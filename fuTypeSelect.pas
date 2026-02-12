@@ -1470,7 +1470,10 @@ begin
   {----------------------------------}
   { Проверка выбора }
   {----------------------------------}
-  Row := GridTypes.Row;
+  Row := GridTypes.Selected;
+  if Row < 0 then
+    Row := GridTypes.Row;
+
   if (Row < 0) then
   begin
     ShowMessage('Выберите тип');

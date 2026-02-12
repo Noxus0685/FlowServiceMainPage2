@@ -925,6 +925,9 @@ end;
 
 
 procedure TFormTypeEditor.ButtonDiameterClearClick(Sender: TObject);
+var
+  I: Integer;
+  D: TDiameter;
 begin
   {----------------------------------}
   { Проверки }
@@ -932,10 +935,19 @@ begin
   if (FDiametersLocal = nil) or (FDiametersLocal.Count = 0) then
     Exit;
 
-  {----------------------------------}
-  { Очищаем ЛОКАЛЬНЫЙ список диаметров }
-  {----------------------------------}
-  FDiametersLocal.Clear; // объекты будут освобождены, если OwnsObjects = True
+  {----------------------------------------------------------}
+  { Новая логика удаления: }
+  {  - новые записи удаляем физически }
+  {  - существующие помечаем как удалённые }
+  {----------------------------------------------------------}
+  for I := FDiametersLocal.Count - 1 downto 0 do
+  begin
+    D := FDiametersLocal[I];
+    if D.State = osNew then
+      FDiametersLocal.Delete(I)
+    else
+      D.State := osDeleted;
+  end;
 
   {----------------------------------}
   { Обновляем таблицу }
@@ -1077,6 +1089,9 @@ begin
 end;
 
 procedure TFormTypeEditor.ButtonPointsClearClick(Sender: TObject);
+var
+  I: Integer;
+  P: TTypePoint;
 begin
   {----------------------------------}
   { Защита }
@@ -1084,11 +1099,19 @@ begin
   if (FPointsLocal = nil) or (FPointsLocal.Count = 0) then
     Exit;
 
-  {-----------------------------------------------------}
-  { Очищаем ЛОКАЛЬНЫЙ список точек }
-  { TObjectList сам освободит объекты }
-  {-----------------------------------------------------}
-  FPointsLocal.Clear;
+  {----------------------------------------------------------}
+  { Новая логика удаления: }
+  {  - новые записи удаляем физически }
+  {  - существующие помечаем как удалённые }
+  {----------------------------------------------------------}
+  for I := FPointsLocal.Count - 1 downto 0 do
+  begin
+    P := FPointsLocal[I];
+    if P.State = osNew then
+      FPointsLocal.Delete(I)
+    else
+      P.State := osDeleted;
+  end;
 
   {-----------------------------------------------------}
   { Обновляем таблицу точек }
