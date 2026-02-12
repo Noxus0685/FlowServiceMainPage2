@@ -341,6 +341,7 @@ type
     public
 
     constructor Create;
+    destructor Destroy; override;
 
     procedure Assign(ASource: TDeviceType);
     function Clone: TDeviceType;
@@ -808,6 +809,13 @@ begin
   Error := 0.0;
 end;
 
+destructor TDeviceType.Destroy;
+begin
+  FreeAndNil(FDiameters);
+  FreeAndNil(FPoints);
+  inherited;
+end;
+
 function TDeviceType.GetID: Integer;
 begin
   Result := FID;
@@ -1132,13 +1140,18 @@ var
 begin
   Result := nil;
 
-  if (ADN = '') or (FDiameters = nil) then
+  if FDiameters = nil then
     Exit;
 
   S := Trim(ADN);
+  if S = '' then
+    Exit;
 
   for I := 0 to FDiameters.Count - 1 do
   begin
+    if FDiameters[I] = nil then
+      Continue;
+
     if FDiameters[I].State = osDeleted then
       Continue;
 
@@ -1209,8 +1222,6 @@ procedure TDeviceType.AddPointData(const AName, ADesc: string; AFlowRate: Double
 
     P.RepeatsProtocol := 3;
     P.Repeats := 5;
-
-    FPoints.Add(P);
   end;
 
 
