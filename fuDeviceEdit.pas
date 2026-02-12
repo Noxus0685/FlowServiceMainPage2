@@ -949,9 +949,9 @@ begin
           (not SameText(CurrentType.Modification, NewType.Modification));
     end;
 
-    NeedFill := IsTypeChanged;
+    //NeedFill := IsTypeChanged;
 
-    if NeedFill then
+    //if NeedFill then
       NeedFill := AskFillFromType;
 
     {----------------------------------------------------}
@@ -962,14 +962,21 @@ begin
     else
       RepoName := '';
 
-    FDevice.AttachType(NewType, RepoName);
-    FDeviceType := NewType;
+    if NeedFill then
+    begin
+      FDevice.AttachType(NewType, RepoName);
+      FDeviceType := NewType;
 
     {----------------------------------------------------}
     { 5. Копируем данные из типа → в прибор }
     {----------------------------------------------------}
-    if NeedFill then
+
       FDevice.FillFromType(NewType);
+    end;
+
+
+
+
 
     {----------------------------------------------------}
     { 6. Обновляем UI }

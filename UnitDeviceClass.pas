@@ -702,7 +702,6 @@ begin
   Result.Assign(Self);
 end;
 
-
 function TDevice.CompareTo(
   const B: TDevice;
   ASortField: TDeviceSortField
