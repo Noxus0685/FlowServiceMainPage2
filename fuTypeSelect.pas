@@ -492,8 +492,9 @@ end;
 
 procedure TFormTypeSelect.ButtonTypeAddClick(Sender: TObject);
 var
-  NewType, SrcType: TDeviceType;
+  NewType: TDeviceType;
   SelRow: Integer;
+  I: Integer;
 begin
 
    { --------------------------------------------------}
@@ -521,8 +522,13 @@ begin
   {-------------------------------------------------}
   { 4. Выделяем добавленную строку }
   {-------------------------------------------------}
-  if GridTypes.RowCount > 0 then
-    GridTypes.Row := GridTypes.RowCount - 1;
+  if FDevFilteredTypes <> nil then
+    for I := 0 to FDevFilteredTypes.Count - 1 do
+      if FDevFilteredTypes[I] = NewType then
+      begin
+        GridTypes.Row := I;
+        Break;
+      end;
 end;
 
  procedure TFormTypeSelect.ButtonTypeClearClick(Sender: TObject);

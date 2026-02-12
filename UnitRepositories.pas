@@ -1398,17 +1398,44 @@ begin
 end;
 
 function TTypeRepository.CreateType(AType: TDeviceType): TDeviceType;
+var
+  D: TDiameter;
+  P: TTypePoint;
 begin
   Result := CreateNewType;
   if AType = nil then
     Exit;
+
   // копируем ВСЕ поля
   Result.Assign(AType);
+
+  { Новый объект должен быть новым для БД }
+  Result.ID := GenerateTypeID;
+  Result.State := osNew;
+
+  { Дочерние сущности привязываем к новому типу и помечаем как новые }
+  if Result.Diameters <> nil then
+    for D in Result.Diameters do
+    begin
+      D.ID := 0;
+      D.DeviceTypeID := Result.ID;
+      D.State := osNew;
+    end;
+
+  if Result.Points <> nil then
+    for P in Result.Points do
+    begin
+      P.ID := 0;
+      P.DeviceTypeID := Result.ID;
+      P.State := osNew;
+    end;
 end;
 
 function TTypeRepository.CreateType(ATypeID: Integer): TDeviceType;
 var
   Src: TDeviceType;
+  D: TDiameter;
+  P: TTypePoint;
 begin
   { если индекс невалидный — просто новый тип }
   if (ATypeID < 0) or (ATypeID >= FTypes.Count) then
@@ -1424,8 +1451,25 @@ begin
   { копируем ВСЕ поля }
   Result.Assign(Src);
 
-  { гарантируем уникальность }
+  { гарантируем уникальность и корректное состояние для сохранения }
   Result.ID := GenerateTypeID;
+  Result.State := osNew;
+
+  if Result.Diameters <> nil then
+    for D in Result.Diameters do
+    begin
+      D.ID := 0;
+      D.DeviceTypeID := Result.ID;
+      D.State := osNew;
+    end;
+
+  if Result.Points <> nil then
+    for P in Result.Points do
+    begin
+      P.ID := 0;
+      P.DeviceTypeID := Result.ID;
+      P.State := osNew;
+    end;
 end;
 
 function TTypeRepository.CategoryToText(
