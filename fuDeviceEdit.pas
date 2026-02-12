@@ -520,13 +520,13 @@ begin
   {-----------------------------------------------------}
   { Обновляем таблицу }
   {-----------------------------------------------------}
-  GridPoints.RowCount := FDevice.Points.Count;
-  GridPoints.Repaint;
+  UpdatePointsGrid;
 
   {-----------------------------------------------------}
   { Выделяем новую точку }
   {-----------------------------------------------------}
-  GridPoints.Selected := FDevice.Points.Count - 1;
+  if GridPoints.RowCount > 0 then
+    GridPoints.Selected := GridPoints.RowCount - 1;
 
   SetModified;
 end;
@@ -571,6 +571,7 @@ end;
 procedure TFormDeviceEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TDevicePoint;
+  PointIdx: Integer;
 begin
   if FDevice = nil then
     Exit;
@@ -585,7 +586,9 @@ begin
   {----------------------------------}
   if Point.State = osNew then
   begin
-    FDevice.Points.Remove(Point);
+    PointIdx := FDevice.Points.IndexOf(Point);
+    if PointIdx >= 0 then
+      FDevice.Points.Delete(PointIdx);
   end
   else
   begin
