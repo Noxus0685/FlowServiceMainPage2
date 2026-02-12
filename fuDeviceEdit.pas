@@ -288,6 +288,7 @@ type
 
      function GetDisplayedCoef: Double;
      procedure RecalcDevicePointsCoef;
+     procedure RefreshDeviceTypeReference;
 
      procedure UpdateUIFromDevice;
      procedure InitCategoryComboEdit;
@@ -783,6 +784,7 @@ end;
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
+  FoundRepo: TTypeRepository;
 begin
   FLoading := True;
   try
@@ -817,11 +819,16 @@ begin
       FoundType :=
         DataManager.FindType(
           FDevice.DeviceTypeUUID,
-          FDevice.DeviceTypeName
+          FDevice.DeviceTypeName,
+          FoundRepo
         );
 
       if FoundType <> nil then
+      begin
         FDeviceType := FoundType;
+        if FoundRepo <> nil then
+          DataManager.ActiveTypeRepo := FoundRepo;
+      end;
     end;
 
     UpdateUIFromDevice;
@@ -829,6 +836,31 @@ begin
   finally
     FLoading := False;
   end;
+end;
+
+procedure TFormDeviceEditor.RefreshDeviceTypeReference;
+var
+  FoundType: TDeviceType;
+  FoundRepo: TTypeRepository;
+begin
+  if (DataManager = nil) or (FDevice = nil) then
+    Exit;
+
+  if (FDevice.DeviceTypeUUID = '') and (FDevice.DeviceTypeName = '') then
+  begin
+    FDeviceType := nil;
+    Exit;
+  end;
+
+  FoundType := DataManager.FindType(
+    FDevice.DeviceTypeUUID,
+    FDevice.DeviceTypeName,
+    FoundRepo
+  );
+
+  FDeviceType := FoundType;
+  if FoundRepo <> nil then
+    DataManager.ActiveTypeRepo := FoundRepo;
 end;
 
 
@@ -856,30 +888,18 @@ begin
   if (FDevice = nil) or (DataManager = nil) then
     Exit;
 
-  FoundType := FDeviceType; // текущий тип
+  RefreshDeviceTypeReference;
 
   Frm := TFormTypeSelect.Create(Self);
   try
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    if FoundType <> nil then
+    FoundType := DataManager.FindType(FDevice.DeviceTypeUUID, FDevice.DeviceTypeName, FoundRepo);
+    if (FoundType <> nil) and (FoundRepo <> nil) then
     begin
-
-    RepoName :=   FoundType.RepoName;
-    if RepoName<>'' then
-    begin
-
-      FoundRepo := DataManager.FindTypeRepositoryByName(
-                     RepoName
-                   );
-
-      if FoundRepo <> nil then
-      begin
-        DataManager.ActiveTypeRepo := FoundRepo;
-        Frm.SelectType(FoundType);
-      end;
-      end;
+      DataManager.ActiveTypeRepo := FoundRepo;
+      Frm.SelectType(FoundType);
     end;
 
     {----------------------------------------------------}
@@ -891,6 +911,13 @@ begin
     NewType := Frm.SelectedType;
     if NewType = nil then
       Exit;
+
+    NewType := DataManager.FindType(NewType.MitUUID, NewType.Name, FoundRepo);
+    if NewType = nil then
+      Exit;
+
+    if FoundRepo <> nil then
+      DataManager.ActiveTypeRepo := FoundRepo;
 
     {----------------------------------------------------}
     { 3. Проверяем смену типа }
@@ -905,10 +932,13 @@ begin
     {----------------------------------------------------}
     { 4. Привязываем тип }
     {----------------------------------------------------}
-    FDevice.AttachType(
-      NewType,
-      DataManager.ActiveTypeRepo.Name
-    );
+    if DataManager.ActiveTypeRepo <> nil then
+      RepoName := DataManager.ActiveTypeRepo.Name
+    else
+      RepoName := '';
+
+    FDevice.AttachType(NewType, RepoName);
+    FDeviceType := NewType;
 
     {----------------------------------------------------}
     { 5. Копируем данные из типа → в прибор }
@@ -935,6 +965,8 @@ var
 begin
   FLoading := True;
   try
+    RefreshDeviceTypeReference;
+
     // =====================================================
     // == Основные текстовые поля
     // =====================================================
@@ -1182,8 +1214,10 @@ begin
     ComboEditDN.Items.Clear;
 
     // Заполняем ComboBox диаметрами типа
-    for var D in FDeviceType.Diameters do
-      ComboEditDN.Items.Add(D.Name);
+    if FDeviceType.Diameters <> nil then
+      for var D in FDeviceType.Diameters do
+        if (D <> nil) and (D.State <> osDeleted) then
+          ComboEditDN.Items.Add(D.Name);
 
   finally
     ComboEditDN.Items.EndUpdate;
@@ -1463,6 +1497,8 @@ begin
   NewDN := Trim(ComboEditDN.Text);
   if NewDN = '' then
     Exit;
+
+  RefreshDeviceTypeReference;
 
   {----------------------------------}
   { Если тип НЕ привязан }
