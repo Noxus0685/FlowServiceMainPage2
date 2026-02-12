@@ -602,7 +602,24 @@ begin
 end;
 
 procedure TFormDeviceEditor.ButtonPointsClearClick(Sender: TObject);
+var
+  I: Integer;
+  P: TDevicePoint;
 begin
+  if (FDevice = nil) or (FDevice.Points = nil) or (FDevice.Points.Count = 0) then
+    Exit;
+
+  for I := FDevice.Points.Count - 1 downto 0 do
+  begin
+    P := FDevice.Points[I];
+    if P.State = osNew then
+      FDevice.Points.Delete(I)
+    else
+      P.State := osDeleted;
+  end;
+
+  GridPoints.Row := -1;
+  UpdatePointsGrid;
   SetModified;
 end;
 
