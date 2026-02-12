@@ -883,7 +883,6 @@ end;
 procedure TFormTypeEditor.ButtonDiameterAddClick(Sender: TObject);
 var
   NewD: TDiameter;
-  NewIndex: Integer;
   SrcD: TDiameter;
   SrcIndex: Integer;
 begin
@@ -916,9 +915,8 @@ begin
   {--------------------------------------------------}
   { Выделяем добавленную строку }
   {--------------------------------------------------}
-  NewIndex := FDiametersLocal.Count - 1;
-  if NewIndex >= 0 then
-    GridDiameters.Selected := NewIndex;
+  if GridDiameters.RowCount > 0 then
+    GridDiameters.Selected := GridDiameters.RowCount - 1;
 
   SetModified;
 end;
@@ -952,13 +950,15 @@ begin
   {----------------------------------}
   { Обновляем таблицу }
   {----------------------------------}
-  GridDiameters.RowCount := 0;
-  GridDiameters.Repaint;
+  UpdateDiametersGrid;
+  UpdatePointsGrid;
 
   {----------------------------------}
   { Сбрасываем выбранный диаметр }
   {----------------------------------}
   GridDiameters.Selected := -1;
+  FSelectedDiameterID := -1;
+  FSelectedDiameterIndex := -1;
 
   SetModified;
 end;
@@ -1055,13 +1055,12 @@ begin
   {-----------------------------------------------------}
   { Обновляем таблицу }
   {-----------------------------------------------------}
-  GridPoints.RowCount := FPointsLocal.Count;
-
   UpdatePointsGrid;
   {-----------------------------------------------------}
   { Выделяем новую точку }
   {-----------------------------------------------------}
-  GridPoints.Selected := FPointsLocal.Count - 1;
+  if GridPoints.RowCount > 0 then
+    GridPoints.Selected := GridPoints.RowCount - 1;
 
   SetModified;
 end;
@@ -1069,6 +1068,7 @@ end;
 procedure TFormTypeEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TTypePoint;
+  PointIdx: Integer;
 begin
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
@@ -1078,7 +1078,11 @@ begin
     Exit;
 
   if Point.State = osNew then
-    FPointsLocal.Remove(Point)
+  begin
+    PointIdx := FPointsLocal.IndexOf(Point);
+    if PointIdx >= 0 then
+      FPointsLocal.Delete(PointIdx);
+  end
   else
     Point.State := osDeleted;
 
