@@ -180,14 +180,7 @@ var
 implementation
 
 procedure TFormTypeSelect.LoadData;
-var
-  Repo: TTypeRepository;
 begin
-  {--------------------------------------------------}
-  { Гарантируем существование списка для UI }
-  {--------------------------------------------------}
-  FDeviceTypes := TObjectList<TDeviceType>.Create(False);
-
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория типов }
   {--------------------------------------------------}
@@ -195,15 +188,16 @@ begin
     Exit;
 
   ActiveRepo := DataManager.ActiveTypeRepo;
-  {--------------------------------------------------}
-  { Привязываем реальные данные }
-  {--------------------------------------------------}
-  FDeviceTypes := ActiveRepo.Types;
 
   {--------------------------------------------------}
   { Загружаем данные из БД }
   {--------------------------------------------------}
   ActiveRepo.LoadTypes;
+
+  {--------------------------------------------------}
+  { Привязываем реальные данные ПОСЛЕ загрузки }
+  {--------------------------------------------------}
+  FDeviceTypes := ActiveRepo.Types;
 end;
 
 function TFormTypeSelect.PassTreeFilter(const AType: TDeviceType): Boolean;
@@ -1011,7 +1005,6 @@ begin
   if DataManager.ActiveTypeRepo = nil then
     Exit;
 
-  FreeAndNil(FDeviceTypes);
   FDeviceTypes := DataManager.ActiveTypeRepo.Types;
 
   FillComboBoxRepository;

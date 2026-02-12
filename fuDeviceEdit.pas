@@ -862,21 +862,16 @@ begin
   if (FDevice = nil) or (DataManager = nil) then
     Exit;
 
-  FoundType := FDeviceType; // текущий тип
-
   Frm := TFormTypeSelect.Create(Self);
   try
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    if FoundType <> nil then
+    FoundType := DataManager.FindType(FDevice.DeviceTypeUUID, FDevice.DeviceTypeName, FoundRepo);
+    if (FoundType <> nil) and (FoundRepo <> nil) then
     begin
-      FoundType := DataManager.FindType(FoundType.MitUUID, FoundType.Name, FoundRepo);
-      if (FoundType <> nil) and (FoundRepo <> nil) then
-      begin
-        DataManager.ActiveTypeRepo := FoundRepo;
-        Frm.SelectType(FoundType);
-      end;
+      DataManager.ActiveTypeRepo := FoundRepo;
+      Frm.SelectType(FoundType);
     end;
 
     {----------------------------------------------------}
