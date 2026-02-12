@@ -1,0 +1,610 @@
+object FormDeviceSelect: TFormDeviceSelect
+  Left = 0
+  Top = 0
+  Caption = #1055#1086#1080#1089#1082' '#1087#1088#1080#1073#1086#1088#1072
+  ClientHeight = 634
+  ClientWidth = 1162
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnClose = FormClose
+  DesignerMasterStyle = 0
+  object LayoutLeft: TLayout
+    Align = Left
+    Position.Y = 24.000000000000000000
+    Size.Width = 233.000000000000000000
+    Size.Height = 566.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 6
+    object lvFlowmeterTypes: TListView
+      ItemAppearanceClassName = 'TListItemAppearance'
+      ItemEditAppearanceClassName = 'TListItemShowCheckAppearance'
+      HeaderAppearanceClassName = 'TListHeaderObjects'
+      FooterAppearanceClassName = 'TListHeaderObjects'
+      EditMode = True
+      Align = Client
+      Margins.Left = 5.000000000000000000
+      Margins.Top = 5.000000000000000000
+      Margins.Right = 5.000000000000000000
+      Margins.Bottom = 5.000000000000000000
+      PopupMenu = PopupMenu1
+      Size.Width = 223.000000000000000000
+      Size.Height = 588.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Visible = False
+      ItemAppearance.ItemHeight = 22
+      ItemAppearance.ItemEditHeight = 22
+    end
+    object TreeViewDevices: TTreeView
+      Align = Client
+      PopupMenu = PopupMenu2
+      Size.Width = 233.000000000000000000
+      Size.Height = 534.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      OnChange = TreeViewDevicesChange
+      Viewport.Width = 229.000000000000000000
+      Viewport.Height = 530.000000000000000000
+      object TreeViewItem1: TTreeViewItem
+        IsChecked = False
+        IsExpanded = False
+        IsSelected = False
+        TabOrder = 0
+        Text = 'TreeViewItem1'
+      end
+      object TreeViewItem2: TTreeViewItem
+        IsChecked = False
+        IsExpanded = False
+        IsSelected = False
+        TabOrder = 1
+        Text = 'TreeViewItem2'
+      end
+      object TreeViewItem3: TTreeViewItem
+        IsChecked = False
+        IsExpanded = False
+        IsSelected = False
+        TabOrder = 2
+        Text = 'TreeViewItem3'
+      end
+    end
+    object ToolBar2: TToolBar
+      Align = MostTop
+      Size.Width = 233.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      object ComboBoxRepository: TComboBox
+        Align = Client
+        Margins.Top = 5.000000000000000000
+        Margins.Right = 10.000000000000000000
+        Margins.Bottom = 5.000000000000000000
+        Size.Width = 158.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        OnChange = ComboBoxRepositoryChange
+      end
+      object Label2: TLabel
+        Align = MostLeft
+        Margins.Left = 5.000000000000000000
+        Position.X = 5.000000000000000000
+        Size.Width = 60.000000000000000000
+        Size.Height = 32.000000000000000000
+        Size.PlatformDefault = False
+        TextSettings.HorzAlign = Center
+        Text = #1044#1072#1085#1085#1099#1077
+        TabOrder = 1
+      end
+    end
+  end
+  object LayoutRight: TLayout
+    Align = Client
+    Size.Width = 919.000000000000000000
+    Size.Height = 566.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 7
+    object Layout4: TLayout
+      Align = Client
+      Size.Width = 919.000000000000000000
+      Size.Height = 534.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      object GridDevices: TGrid
+        Align = Client
+        CanFocus = True
+        ClipChildren = True
+        Margins.Left = 2.000000000000000000
+        Size.Width = 917.000000000000000000
+        Size.Height = 534.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+        OnGetValue = GridDevicesGetValue
+        Viewport.Width = 897.000000000000000000
+        Viewport.Height = 493.000000000000000000
+        object StringColumnName: TStringColumn
+          Header = #1048#1084#1103
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Size.Width = 99.000000000000000000
+        end
+        object StringColumnSerial: TStringColumn
+          Header = #1057#1077#1088#1080#1081#1085#1099#1081' '#1085#1086#1084#1077#1088
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Size.Width = 125.000000000000000000
+        end
+        object StringColumnManufacturer: TStringColumn
+          Header = #1048#1079#1075#1086#1090#1086#1074#1080#1090#1077#1083#1100
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringColumnCategory: TStringColumn
+          Header = #1050#1072#1090#1077#1075#1086#1088#1080#1103
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringColumnModification: TStringColumn
+          Header = #1052#1086#1076#1080#1092#1080#1082#1072#1094#1080#1103
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringColumnAccuracyClass: TStringColumn
+          Header = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringColumnReestrNumber: TStringColumn
+          Header = #1043#1056#1057#1048
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Size.Width = 93.000000000000000000
+        end
+        object StringColumnProcedure: TStringColumn
+          Header = #1055#1088#1086#1094#1077#1076#1091#1088#1072
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringColumnOwner: TStringColumn
+          Header = #1042#1083#1072#1076#1077#1083#1077#1094
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringColumnDateOfManufacture: TStringColumn
+          Header = #1044#1072#1090#1072' '#1087#1088#1086#1080#1079#1074#1086#1076#1089#1090#1074#1072
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringColumnRegDate: TStringColumn
+          Header = #1044#1077#1081#1089#1090#1074#1091#1077#1090' '#1089
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Visible = False
+        end
+        object StringColumnValidityDate: TStringColumn
+          Header = #1044#1077#1081#1089#1090#1074#1080#1090#1077#1083#1077#1085' '#1076#1086
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Visible = False
+        end
+        object StringColumnVerificationMethod: TStringColumn
+          Header = #1052#1077#1090#1086#1076#1080#1082#1072
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Visible = False
+        end
+        object StringColumnIVI: TStringColumn
+          Header = #1052#1055#1048
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Visible = False
+        end
+      end
+    end
+    object ToolBar1: TToolBar
+      Size.Width = 919.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      object Line6: TLine
+        Align = Left
+        LineType = Right
+        Margins.Top = 5.000000000000000000
+        Margins.Bottom = 5.000000000000000000
+        Position.X = 140.000000000000000000
+        Position.Y = 5.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        Stroke.Color = claGray
+      end
+      object Layout32: TLayout
+        Align = MostLeft
+        Padding.Left = 5.000000000000000000
+        Padding.Right = 5.000000000000000000
+        Size.Width = 140.000000000000000000
+        Size.Height = 32.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 38
+        object ButtonDeviceDelete: TButton
+          Align = Left
+          Position.X = 49.000000000000000000
+          Size.Width = 40.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'trashtoolbutton'
+          TabOrder = 2
+          Text = 'ButtonDeviceDelete'
+          TextSettings.Trimming = None
+          OnClick = ButtonDeviceDeleteClick
+        end
+        object ButtonDeviceAdd: TButton
+          Align = Left
+          Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1086#1087#1080#1102' '#1074#1099#1073#1088#1072#1085#1085#1086#1075#1086
+          Position.X = 89.000000000000000000
+          Size.Width = 47.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'additembutton'
+          TabOrder = 1
+          Text = 'ButtonDeviceAdd'
+          TextSettings.Trimming = None
+          OnClick = ButtonDeviceAddClick
+        end
+        object ButtonDeviceClear: TButton
+          Align = Left
+          Position.X = 5.000000000000000000
+          Size.Width = 44.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'pagecurltoolbutton'
+          TabOrder = 0
+          Text = #1054#1095#1080#1089#1090#1080#1090#1100
+          TextSettings.Trimming = None
+          OnClick = ButtonDeviceClearClick
+        end
+      end
+      object Layout2: TLayout
+        Align = Left
+        Position.X = 150.000000000000000000
+        Size.Width = 347.000000000000000000
+        Size.Height = 32.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 37
+        object sbClear: TSpeedButton
+          Align = Left
+          Position.X = 49.000000000000000000
+          Size.Width = 43.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'stoptoolbutton'
+          Text = 'sbClear'
+          TextSettings.Trimming = None
+          OnClick = sbClearClick
+        end
+        object sbFind: TSpeedButton
+          StaysPressed = True
+          Align = MostLeft
+          Size.Width = 49.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'searcheditbutton'
+          Text = 'sbFind'
+          TextSettings.Trimming = None
+          OnClick = sbFindClick
+        end
+        object EditFindDevice: TEdit
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          Align = Client
+          TabOrder = 0
+          ReturnKeyType = Search
+          Margins.Top = 5.000000000000000000
+          Margins.Bottom = 5.000000000000000000
+          Size.Width = 201.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          KillFocusByReturn = True
+          OnExit = EditFindDeviceExit
+        end
+        object SpeedButtonFindInternet: TSpeedButton
+          Align = Right
+          Position.X = 293.000000000000000000
+          Size.Width = 54.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'infotoolbutton'
+          Text = 'SpeedButtonFindInternet'
+          TextSettings.Trimming = None
+        end
+      end
+      object Layout3: TLayout
+        Align = Left
+        Position.X = 507.000000000000000000
+        Size.Width = 224.000000000000000000
+        Size.Height = 32.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 39
+        object Label1: TLabel
+          Align = Left
+          Margins.Left = 10.000000000000000000
+          Position.X = 10.000000000000000000
+          Size.Width = 46.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          Text = #1044#1072#1090#1072':'
+          TabOrder = 0
+        end
+        object DateEditFilter: TDateEdit
+          Date = 46053.000000000000000000
+          IsEmpty = True
+          OnChange = DateEditFilterChange
+          Align = Left
+          Margins.Top = 5.000000000000000000
+          Margins.Bottom = 5.000000000000000000
+          Position.X = 56.000000000000000000
+          Position.Y = 5.000000000000000000
+          Size.Width = 100.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 1
+        end
+      end
+      object Line1: TLine
+        Align = Left
+        LineType = Right
+        Margins.Top = 5.000000000000000000
+        Margins.Bottom = 5.000000000000000000
+        Position.X = 497.000000000000000000
+        Position.Y = 5.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        Stroke.Color = claGray
+      end
+    end
+    object MemoLog: TMemo
+      Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+      DataDetectorTypes = []
+      Align = Bottom
+      Position.Y = 608.000000000000000000
+      Size.Width = 883.000000000000000000
+      Size.Height = 102.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      Visible = False
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
+    end
+  end
+  object lyt1: TLayout
+    Align = Bottom
+    Position.Y = 590.000000000000000000
+    Size.Width = 1162.000000000000000000
+    Size.Height = 44.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object btnOK: TCornerButton
+      Align = Right
+      StyledSettings = [Family, Size, Style]
+      ModalResult = 1
+      Margins.Left = 10.000000000000000000
+      Margins.Top = 10.000000000000000000
+      Margins.Right = 10.000000000000000000
+      Margins.Bottom = 10.000000000000000000
+      Position.X = 1025.000000000000000000
+      Position.Y = 10.000000000000000000
+      Sides = [Top, Left, Bottom, Right]
+      Size.Width = 127.000000000000000000
+      Size.Height = 24.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      Text = #1047#1072#1082#1088#1099#1090#1100
+      TextSettings.FontColor = claDarkgreen
+      TextSettings.Trimming = None
+      XRadius = 3.000000000000000000
+      YRadius = 3.000000000000000000
+    end
+    object CornerButton1: TCornerButton
+      Align = Right
+      StyledSettings = [Family, Size, Style]
+      ModalResult = 1
+      Margins.Left = 10.000000000000000000
+      Margins.Top = 10.000000000000000000
+      Margins.Right = 10.000000000000000000
+      Margins.Bottom = 10.000000000000000000
+      Position.X = 731.000000000000000000
+      Position.Y = 10.000000000000000000
+      Sides = [Top, Left, Bottom, Right]
+      Size.Width = 127.000000000000000000
+      Size.Height = 24.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      Text = #1042#1099#1073#1088#1072#1090#1100
+      TextSettings.FontColor = claDarkgreen
+      TextSettings.Trimming = None
+      XRadius = 3.000000000000000000
+      YRadius = 3.000000000000000000
+    end
+    object CornerButtonEditDevice: TCornerButton
+      Align = Right
+      StyledSettings = [Family, Size, Style]
+      ModalResult = 1
+      Margins.Left = 10.000000000000000000
+      Margins.Top = 10.000000000000000000
+      Margins.Right = 10.000000000000000000
+      Margins.Bottom = 10.000000000000000000
+      Position.X = 878.000000000000000000
+      Position.Y = 10.000000000000000000
+      Sides = [Top, Left, Bottom, Right]
+      Size.Width = 127.000000000000000000
+      Size.Height = 24.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100
+      TextSettings.FontColor = claDarkgreen
+      TextSettings.Trimming = None
+      XRadius = 3.000000000000000000
+      YRadius = 3.000000000000000000
+      OnClick = CornerButtonEditDeviceClick
+    end
+  end
+  object MainMenu: TMenuBar
+    Size.Width = 1162.000000000000000000
+    Size.Height = 24.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    object miFile: TMenuItem
+      Text = #1060#1072#1081#1083
+      object miCreate: TMenuItem
+        Action = aCreateType
+        Locked = True
+        ImageIndex = 0
+      end
+      object miEdit: TMenuItem
+        Action = aEditType
+        Locked = True
+        ImageIndex = 4
+      end
+      object miDelete: TMenuItem
+        Action = aDeleteType
+        Locked = True
+        ImageIndex = 18
+      end
+      object miSave: TMenuItem
+        Locked = True
+        Text = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '
+        OnClick = miSaveClick
+      end
+    end
+    object miService: TMenuItem
+      Locked = True
+      Text = #1057#1077#1088#1074#1080#1089
+      object miRefreshRepository: TMenuItem
+        Locked = True
+        Text = #1054#1073#1085#1086#1074#1080#1090#1100
+        OnClick = miRefreshRepositoryClick
+      end
+      object miAddRepository: TMenuItem
+        Locked = True
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1073#1072#1079#1091' '#1076#1072#1085#1085#1099#1093
+        OnClick = miAddRepositoryClick
+      end
+      object miDeleteRepository: TMenuItem
+        Locked = True
+        Text = #1059#1076#1072#1083#1080#1090#1100' '#1073#1072#1079#1091' '#1076#1072#1085#1085#1099#1093
+        OnClick = miDeleteRepositoryClick
+      end
+      object miLoadRepository: TMenuItem
+        Locked = True
+        Text = #1047#1072#1075#1088#1091#1079#1080#1090#1100' '#1073#1072#1079#1091' '#1076#1072#1085#1085#1099#1093
+        OnClick = miLoadRepositoryClick
+      end
+      object miAddTestData: TMenuItem
+        Locked = True
+        Text = #1044#1086#1073#1086#1072#1074#1080#1090#1100' '#1090#1077#1089#1090#1086#1074#1099#1077' '#1076#1072#1085#1085#1099#1077
+        OnClick = miAddTestDataClick
+      end
+    end
+  end
+  object PopupMenu1: TPopupMenu
+    Left = 237
+    Top = 197
+    object MenuItem1: TMenuItem
+      Action = aCreateType
+      ImageIndex = 14
+    end
+    object MenuItem2: TMenuItem
+      Action = aEditType
+      ImageIndex = 15
+    end
+    object MenuItem3: TMenuItem
+      Action = aDeleteType
+      ImageIndex = 16
+    end
+  end
+  object PopupMenu2: TPopupMenu
+    Left = 80
+    Top = 256
+    object mpExpandAll: TMenuItem
+      Text = #1056#1072#1089#1082#1088#1099#1090#1100' '#1089#1087#1080#1089#1086#1082
+    end
+    object mpCollapseAll: TMenuItem
+      Text = #1057#1074#1077#1088#1085#1091#1090#1100' '#1089#1087#1080#1089#1086#1082
+    end
+    object mpRefresh: TMenuItem
+      Text = #1054#1073#1085#1086#1074#1080#1090#1100
+    end
+  end
+  object Splitter1: TSplitter
+    Align = Left
+    Cursor = crHSplit
+    MinSize = 20.000000000000000000
+    Position.X = 233.000000000000000000
+    Position.Y = 24.000000000000000000
+    Size.Width = 10.000000000000000000
+    Size.Height = 566.000000000000000000
+    Size.PlatformDefault = False
+  end
+  object StatusBar1: TStatusBar
+    Position.Y = 478.000000000000000000
+    ShowSizeGrip = True
+    Size.Width = 359.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    Visible = False
+    TabOrder = 3
+    object sbDetaled: TLabel
+      Tag = 999
+      Align = Client
+      Scale.X = 1.100000023841858000
+      Scale.Y = 1.100000023841858000
+      Size.Width = 326.363616943359400000
+      Size.Height = 20.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'LabelStatusBarStyle'
+      TabOrder = 0
+    end
+  end
+  object ActionList1: TActionList
+    Left = 277
+    Top = 117
+    object aCreateType: TAction
+      Text = #1057#1086#1079#1076#1072#1090#1100'...'
+      ImageIndex = 14
+      ImageIndex = 14
+    end
+    object aEditType: TAction
+      Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100'...'
+      ImageIndex = 15
+      ImageIndex = 15
+    end
+    object aDeleteType: TAction
+      Text = #1059#1076#1072#1083#1080#1090#1100'...'
+      ImageIndex = 16
+      ImageIndex = 16
+    end
+  end
+  object NetHTTPClient1: TNetHTTPClient
+    Accept = 'application/json'
+    ContentType = 'application/json'
+    UserAgent = 'Embarcadero URI Client/1.0'
+    Left = 379
+    Top = 135
+  end
+end

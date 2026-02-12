@@ -1,0 +1,2752 @@
+object FormMain: TFormMain
+  Left = 0
+  Top = 0
+  Caption = 'fuMain'
+  ClientHeight = 639
+  ClientWidth = 1191
+  Visible = True
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  DesignerMasterStyle = 0
+  object TabControl1: TTabControl
+    Align = Client
+    Size.Width = 1191.000000000000000000
+    Size.Height = 639.000000000000000000
+    Size.PlatformDefault = False
+    StyleLookup = 'tabcontrolstyle'
+    TabIndex = 0
+    TabOrder = 6
+    TabPosition = PlatformDefault
+    Sizes = (
+      1191s
+      613s
+      1191s
+      613s
+      1191s
+      613s)
+    object TabItem1: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Trimming = None
+      IsSelected = True
+      Size.Width = 64.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = #1043#1083#1072#1074#1085#1072#1103
+      ExplicitSize.cx = 64.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+      object TabControlWorkTable: TTabControl
+        Align = Client
+        Size.Width = 1191.000000000000000000
+        Size.Height = 493.000000000000000000
+        Size.PlatformDefault = False
+        TabIndex = 0
+        TabOrder = 0
+        TabPosition = PlatformDefault
+        Sizes = (
+          1191s
+          467s
+          1191s
+          467s
+          1458s
+          504s)
+        object TabItem4: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = True
+          Size.Width = 143.000000000000000000
+          Size.Height = 26.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
+          Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083' 1 ('#1044#1059'25)'
+          ExplicitSize.cx = 143.000000000000000000
+          ExplicitSize.cy = 26.000000000000000000
+          object Panel2: TPanel
+            Align = Top
+            Size.Width = 1191.000000000000000000
+            Size.Height = 152.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            object Layout1: TLayout
+              Align = Client
+              Size.Width = 1191.000000000000000000
+              Size.Height = 120.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              object Grid2: TGrid
+                Align = Top
+                CanFocus = True
+                ClipChildren = True
+                Size.Width = 1191.000000000000000000
+                Size.Height = 129.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                RowCount = 2
+                Viewport.Width = 1187.000000000000000000
+                Viewport.Height = 104.000000000000000000
+                object CheckColumn2: TCheckColumn
+                  Header = #1042#1082#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn7: TStringColumn
+                  Header = #1050#1072#1085#1072#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn8: TStringColumn
+                  Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn9: TStringColumn
+                  Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn10: TStringColumn
+                  Header = #1057#1080#1075#1085#1072#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn11: TStringColumn
+                  Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn12: TStringColumn
+                  Header = #1054#1073#1098#1077#1084', '#1084'3'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn13: TStringColumn
+                  Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+              end
+            end
+            object ToolBar2: TToolBar
+              Size.Width = 1191.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Label30: TLabel
+                Position.X = 1.000000000000000000
+                Position.Y = 8.000000000000000000
+                Text = #1069#1090#1072#1083#1086#1085#1099
+                TabOrder = 0
+              end
+            end
+          end
+          object Panel3: TPanel
+            Align = Client
+            Size.Width = 1191.000000000000000000
+            Size.Height = 315.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            object GridDevices: TGrid
+              Align = Client
+              CanFocus = True
+              ClipChildren = True
+              Size.Width = 1191.000000000000000000
+              Size.Height = 283.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              Viewport.Width = 1171.000000000000000000
+              Viewport.Height = 258.000000000000000000
+              object CheckColumn1: TCheckColumn
+                Header = #1042#1082#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn1: TStringColumn
+                Header = #1050#1072#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object Column1: TColumn
+                Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn2: TStringColumn
+                Header = #1057#1077#1088#1080#1081#1085#1099#1081
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn3: TStringColumn
+                Header = #1057#1080#1075#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn4: TStringColumn
+                Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn5: TStringColumn
+                Header = #1054#1073#1098#1077#1084', '#1084'3'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn6: TStringColumn
+                Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+            end
+            object ToolBar1: TToolBar
+              Size.Width = 1191.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Label23: TLabel
+                Position.X = 1.000000000000000000
+                Position.Y = 8.000000000000000000
+                Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+                TabOrder = 0
+              end
+            end
+          end
+        end
+        object TabItem5: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = False
+          Size.Width = 143.000000000000000000
+          Size.Height = 26.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
+          Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083' 2 ('#1044#1059'10)'
+          ExplicitSize.cx = 143.000000000000000000
+          ExplicitSize.cy = 26.000000000000000000
+          object Panel1: TPanel
+            Align = Top
+            Size.Width = 1191.000000000000000000
+            Size.Height = 152.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            object Layout2: TLayout
+              Align = Client
+              Size.Width = 1191.000000000000000000
+              Size.Height = 120.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              object Grid1: TGrid
+                Align = Top
+                CanFocus = True
+                ClipChildren = True
+                Size.Width = 1191.000000000000000000
+                Size.Height = 129.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                RowCount = 2
+                Viewport.Width = 1187.000000000000000000
+                Viewport.Height = 104.000000000000000000
+                object CheckColumn3: TCheckColumn
+                  Header = #1042#1082#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn14: TStringColumn
+                  Header = #1050#1072#1085#1072#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn15: TStringColumn
+                  Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn16: TStringColumn
+                  Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn17: TStringColumn
+                  Header = #1057#1080#1075#1085#1072#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn18: TStringColumn
+                  Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn19: TStringColumn
+                  Header = #1054#1073#1098#1077#1084', '#1084'3'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn20: TStringColumn
+                  Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+              end
+            end
+            object ToolBar3: TToolBar
+              Size.Width = 1191.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Label31: TLabel
+                Position.X = 1.000000000000000000
+                Position.Y = 8.000000000000000000
+                Text = #1069#1090#1072#1083#1086#1085#1099
+                TabOrder = 0
+              end
+            end
+          end
+          object Panel4: TPanel
+            Align = Client
+            Size.Width = 1191.000000000000000000
+            Size.Height = 315.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            object Grid3: TGrid
+              Align = Client
+              CanFocus = True
+              ClipChildren = True
+              Size.Width = 1191.000000000000000000
+              Size.Height = 283.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              Viewport.Width = 1171.000000000000000000
+              Viewport.Height = 258.000000000000000000
+              object CheckColumn4: TCheckColumn
+                Header = #1042#1082#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn21: TStringColumn
+                Header = #1050#1072#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object Column2: TColumn
+                Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn22: TStringColumn
+                Header = #1057#1077#1088#1080#1081#1085#1099#1081
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn23: TStringColumn
+                Header = #1057#1080#1075#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn24: TStringColumn
+                Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn25: TStringColumn
+                Header = #1054#1073#1098#1077#1084', '#1084'3'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn26: TStringColumn
+                Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+            end
+            object ToolBar4: TToolBar
+              Size.Width = 1191.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Label33: TLabel
+                Position.X = 1.000000000000000000
+                Position.Y = 8.000000000000000000
+                Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+                TabOrder = 0
+              end
+            end
+          end
+        end
+        object TabItem6: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = False
+          Size.Width = 143.000000000000000000
+          Size.Height = 26.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
+          Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083' 1 ('#1044#1059'25)'
+          Visible = False
+          ExplicitSize.cx = 143.000000000000000000
+          ExplicitSize.cy = 26.000000000000000000
+          object Panel5: TPanel
+            Align = Top
+            Size.Width = 1458.000000000000000000
+            Size.Height = 152.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            object Layout4: TLayout
+              Align = Client
+              Size.Width = 1458.000000000000000000
+              Size.Height = 120.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              object Grid4: TGrid
+                Align = Top
+                CanFocus = True
+                ClipChildren = True
+                Size.Width = 1458.000000000000000000
+                Size.Height = 129.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                RowCount = 2
+                Viewport.Width = 1454.000000000000000000
+                Viewport.Height = 104.000000000000000000
+                object CheckColumn5: TCheckColumn
+                  Header = #1042#1082#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn27: TStringColumn
+                  Header = #1050#1072#1085#1072#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn28: TStringColumn
+                  Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn29: TStringColumn
+                  Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn30: TStringColumn
+                  Header = #1057#1080#1075#1085#1072#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn31: TStringColumn
+                  Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn32: TStringColumn
+                  Header = #1054#1073#1098#1077#1084', '#1084'3'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumn33: TStringColumn
+                  Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+              end
+            end
+            object ToolBar6: TToolBar
+              Size.Width = 1458.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Label34: TLabel
+                Position.X = 1.000000000000000000
+                Position.Y = 8.000000000000000000
+                Text = #1069#1090#1072#1083#1086#1085#1099
+                TabOrder = 0
+              end
+            end
+          end
+          object Panel6: TPanel
+            Align = Client
+            Size.Width = 1458.000000000000000000
+            Size.Height = 352.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            object Grid5: TGrid
+              Align = Client
+              CanFocus = True
+              ClipChildren = True
+              Size.Width = 1458.000000000000000000
+              Size.Height = 320.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              Viewport.Width = 1438.000000000000000000
+              Viewport.Height = 295.000000000000000000
+              object CheckColumn6: TCheckColumn
+                Header = #1042#1082#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn34: TStringColumn
+                Header = #1050#1072#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object Column3: TColumn
+                Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn35: TStringColumn
+                Header = #1057#1077#1088#1080#1081#1085#1099#1081
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn36: TStringColumn
+                Header = #1057#1080#1075#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn37: TStringColumn
+                Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn38: TStringColumn
+                Header = #1054#1073#1098#1077#1084', '#1084'3'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumn39: TStringColumn
+                Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+            end
+            object ToolBar7: TToolBar
+              Size.Width = 1458.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Label35: TLabel
+                Position.X = 1.000000000000000000
+                Position.Y = 8.000000000000000000
+                Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+                TabOrder = 0
+              end
+            end
+          end
+        end
+      end
+      object PanelMain: TPanel
+        Align = MostTop
+        Size.Width = 1191.000000000000000000
+        Size.Height = 120.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        object PanelInstruments: TPanel
+          Align = MostTop
+          Size.Width = 1191.000000000000000000
+          Size.Height = 121.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          object LayoutPump: TLayout
+            Align = Left
+            Position.X = 315.000000000000000000
+            Size.Width = 265.000000000000000000
+            Size.Height = 121.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 4
+            object Line1: TLine
+              Align = Right
+              LineType = Right
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 255.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 111.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
+            end
+            object Layout3: TLayout
+              Align = Client
+              Size.Width = 255.000000000000000000
+              Size.Height = 121.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object LayoutFrequancy: TLayout
+                Position.X = 8.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 232.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                object Rectangle1: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 141.000000000000000000
+                  Size.Width = 91.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelFreq: TLabel
+                    Align = Client
+                    StyledSettings = [Family, FontColor]
+                    Size.Width = 91.000000000000000000
+                    Size.Height = 40.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'labelstyle'
+                    TextSettings.Font.Size = 14.000000000000000000
+                    TextSettings.Font.StyleExt = {00070000000000000004000000}
+                    TextSettings.HorzAlign = Center
+                    Text = '18,6'
+                    TabOrder = 0
+                  end
+                end
+                object LayoutFreqIn: TLayout
+                  Align = Left
+                  Size.Width = 119.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                  object Label15: TLabel
+                    Align = Top
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = #1063#1072#1089#1090#1086#1090#1072', '#1043#1094
+                    TabOrder = 0
+                  end
+                  object SpinBoxFreq: TSpinBox
+                    Touch.InteractiveGestures = [LongTap, DoubleTap]
+                    Align = Client
+                    TabOrder = 1
+                    Cursor = crIBeam
+                    Min = 12.000000000000000000
+                    Value = 20.000000000000000000
+                    Increment = 0.100000001490116100
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 23.000000000000000000
+                    Size.PlatformDefault = False
+                    KillFocusByReturn = True
+                  end
+                end
+              end
+              object LayoutPumpSelect: TLayout
+                Position.X = 8.000000000000000000
+                Position.Y = 65.000000000000000000
+                Size.Width = 232.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+                object ComboEditPumps: TComboEdit
+                  Touch.InteractiveGestures = [LongTap, DoubleTap]
+                  Align = Left
+                  TabOrder = 0
+                  ItemHeight = 19.000000000000000000
+                  Items.Strings = (
+                    #1053#1072#1089#1086#1089'1'
+                    #1053#1072#1089#1086#1089'2')
+                  ItemIndex = 0
+                  Text = #1053#1072#1089#1086#1089'1'
+                  Margins.Right = 10.000000000000000000
+                  Size.Width = 119.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                end
+                object SpeedButton3: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 139.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'playtoolbutton'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+                object SpeedButton28: TSpeedButton
+                  Align = Left
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 171.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'transparentcirclebuttonstyle'
+                  Text = 'SpeedButton27'
+                  TextSettings.Trimming = None
+                  object Rectangle14: TRectangle
+                    Align = Client
+                    Margins.Left = 4.000000000000000000
+                    Margins.Top = 4.000000000000000000
+                    Margins.Right = 4.000000000000000000
+                    Margins.Bottom = 4.000000000000000000
+                    Size.Width = 14.000000000000000000
+                    Size.Height = 14.000000000000000000
+                    Size.PlatformDefault = False
+                  end
+                end
+              end
+              object Label14: TLabel
+                Align = MostBottom
+                Position.Y = 104.000000000000000000
+                Size.Width = 255.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TextSettings.HorzAlign = Center
+                Text = #1053#1072#1089#1086#1089
+                TabOrder = 1
+              end
+            end
+          end
+          object LayoutConditions: TLayout
+            Align = Left
+            Position.X = 1125.000000000000000000
+            Size.Width = 292.000000000000000000
+            Size.Height = 121.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            object Layout9: TLayout
+              Align = Left
+              Size.Width = 273.000000000000000000
+              Size.Height = 121.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              object Layout42: TLayout
+                Position.X = 16.000000000000000000
+                Position.Y = 56.000000000000000000
+                Size.Width = 233.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+                object Rectangle11: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 160.000000000000000000
+                  Size.Width = 73.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelPres: TLabel
+                    Align = Client
+                    Margins.Left = 5.000000000000000000
+                    Size.Width = 68.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = '12'
+                    TabOrder = 0
+                  end
+                end
+                object Label24: TLabel
+                  Align = Left
+                  Size.Width = 89.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = #1044#1072#1074#1083#1077#1085#1080#1077', '#1082#1055#1072
+                  TabOrder = 0
+                end
+                object EditPres: TEdit
+                  Touch.InteractiveGestures = [LongTap, DoubleTap]
+                  Align = Left
+                  TabOrder = 1
+                  Position.X = 89.000000000000000000
+                  Size.Width = 56.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                end
+              end
+              object Layout50: TLayout
+                Position.X = 16.000000000000000000
+                Position.Y = 81.000000000000000000
+                Size.Width = 233.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+                object Label25: TLabel
+                  Align = Left
+                  Size.Width = 137.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = #1055#1083#1086#1090#1085#1086#1089#1090#1100', '#1082#1075'/'#1084'3'
+                  TabOrder = 0
+                end
+                object Rectangle12: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 160.000000000000000000
+                  Size.Width = 73.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  object Label13: TLabel
+                    Align = Client
+                    Margins.Left = 5.000000000000000000
+                    Size.Width = 68.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = '998.17'
+                    TabOrder = 0
+                  end
+                end
+              end
+              object Layout6: TLayout
+                Position.X = 16.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 232.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                object Rectangle7: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 141.000000000000000000
+                  Size.Width = 91.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelTemp: TLabel
+                    Align = Client
+                    StyledSettings = [Family, FontColor]
+                    Size.Width = 91.000000000000000000
+                    Size.Height = 40.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'labelstyle'
+                    TextSettings.Font.Size = 14.000000000000000000
+                    TextSettings.Font.StyleExt = {00070000000000000004000000}
+                    TextSettings.HorzAlign = Center
+                    Text = '23.4'
+                    TabOrder = 0
+                  end
+                end
+                object Layout7: TLayout
+                  Align = Left
+                  Size.Width = 119.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                  object Label21: TLabel
+                    Align = Top
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072', '#176'C'
+                    TabOrder = 0
+                  end
+                  object EditTemp: TEdit
+                    Touch.InteractiveGestures = [LongTap, DoubleTap]
+                    Align = Client
+                    TabOrder = 1
+                    Text = '45.4'
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 23.000000000000000000
+                    Size.PlatformDefault = False
+                  end
+                end
+              end
+              object Label22: TLabel
+                Align = MostBottom
+                Position.Y = 104.000000000000000000
+                Size.Width = 273.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TextSettings.HorzAlign = Center
+                Text = #1059#1089#1083#1086#1074#1080#1103
+                TabOrder = 3
+              end
+            end
+            object Line3: TLine
+              Align = Left
+              LineType = Right
+              Padding.Top = 10.000000000000000000
+              Padding.Bottom = 10.000000000000000000
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 273.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 111.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
+            end
+          end
+          object LayoutFlowRate: TLayout
+            Align = Left
+            Position.X = 580.000000000000000000
+            Size.Width = 265.000000000000000000
+            Size.Height = 121.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            object Line5: TLine
+              Align = Right
+              LineType = Right
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 255.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 111.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
+            end
+            object Layout5: TLayout
+              Align = Client
+              Size.Width = 255.000000000000000000
+              Size.Height = 121.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Layout12: TLayout
+                Position.X = 8.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 232.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                object Rectangle2: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 141.000000000000000000
+                  Size.Width = 91.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelFlowRate: TLabel
+                    Align = Client
+                    StyledSettings = [Family, FontColor]
+                    Size.Width = 91.000000000000000000
+                    Size.Height = 40.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'labelstyle'
+                    TextSettings.Font.Size = 14.000000000000000000
+                    TextSettings.Font.StyleExt = {00070000000000000004000000}
+                    TextSettings.HorzAlign = Center
+                    Text = '12.0'
+                    TabOrder = 0
+                  end
+                end
+                object Layout13: TLayout
+                  Align = Left
+                  Size.Width = 119.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                  object Label17: TLabel
+                    Align = Top
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                    TabOrder = 0
+                  end
+                  object SpinBoxFlowRate: TSpinBox
+                    Touch.InteractiveGestures = [LongTap, DoubleTap]
+                    Align = Client
+                    TabOrder = 1
+                    Cursor = crIBeam
+                    Min = 12.000000000000000000
+                    Value = 12.000000000000000000
+                    Increment = 0.100000001490116100
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 23.000000000000000000
+                    Size.PlatformDefault = False
+                    KillFocusByReturn = True
+                  end
+                end
+              end
+              object Layout14: TLayout
+                Position.X = 8.000000000000000000
+                Position.Y = 65.000000000000000000
+                Size.Width = 232.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+                object ComboEditUnits: TComboEdit
+                  Touch.InteractiveGestures = [LongTap, DoubleTap]
+                  Align = Left
+                  TabOrder = 0
+                  ItemHeight = 19.000000000000000000
+                  Items.Strings = (
+                    #1084'3/'#1095)
+                  ItemIndex = 0
+                  Text = #1084'3/'#1095
+                  Margins.Right = 10.000000000000000000
+                  Size.Width = 119.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                end
+                object SpeedButton9: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 139.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'playtoolbutton'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+                object SpeedButton4: TSpeedButton
+                  Align = Left
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 171.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'transparentcirclebuttonstyle'
+                  Text = 'SpeedButton27'
+                  TextSettings.Trimming = None
+                  object Rectangle15: TRectangle
+                    Align = Client
+                    Margins.Left = 4.000000000000000000
+                    Margins.Top = 4.000000000000000000
+                    Margins.Right = 4.000000000000000000
+                    Margins.Bottom = 4.000000000000000000
+                    Size.Width = 14.000000000000000000
+                    Size.Height = 14.000000000000000000
+                    Size.PlatformDefault = False
+                  end
+                end
+              end
+              object Label19: TLabel
+                Align = MostBottom
+                Position.Y = 104.000000000000000000
+                Size.Width = 255.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TextSettings.HorzAlign = Center
+                Text = #1056#1072#1089#1093#1086#1076
+                TabOrder = 1
+              end
+            end
+          end
+          object LayoutMain: TLayout
+            Align = MostLeft
+            Size.Width = 315.000000000000000000
+            Size.Height = 121.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 1
+            object Line6: TLine
+              Align = Right
+              LineType = Right
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 305.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 111.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
+            end
+            object Layout16: TLayout
+              Align = Left
+              Size.Width = 305.000000000000000000
+              Size.Height = 121.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object LayoutTaskMain: TLayout
+                Position.X = 23.000000000000000000
+                Position.Y = 25.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 23.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+                object ComboBoxTaskMain: TComboBox
+                  Align = MostLeft
+                  Items.Strings = (
+                    #1058#1077#1089#1090
+                    #1040#1074#1090#1086
+                    '_______________________________________'
+                    #1048#1079#1084#1077#1088#1077#1085#1080#1077
+                    #1057' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072
+                    #1060#1086#1090#1086#1092#1080#1082#1089#1072#1094#1080#1103
+                    '________________________________________'
+                    #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 1'
+                    #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 2'
+                    #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 3')
+                  ItemIndex = 7
+                  ItemHeight = 10.000000000000000000
+                  Margins.Right = 10.000000000000000000
+                  Placement = BottomCenter
+                  Size.Width = 160.000000000000000000
+                  Size.Height = 23.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'comboboxstyle'
+                  TabOrder = 0
+                end
+                object SpeedButton11: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Margins.Right = 10.000000000000000000
+                  Position.X = 180.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 23.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'playtoolbutton'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+                object SpeedButton27: TSpeedButton
+                  Align = Left
+                  Margins.Left = 2.000000000000000000
+                  Position.X = 214.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 23.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'transparentcirclebuttonstyle'
+                  Text = 'SpeedButton27'
+                  TextSettings.Trimming = None
+                  object Rectangle13: TRectangle
+                    Align = Client
+                    Margins.Left = 4.000000000000000000
+                    Margins.Top = 4.000000000000000000
+                    Margins.Right = 4.000000000000000000
+                    Margins.Bottom = 4.000000000000000000
+                    Size.Width = 14.000000000000000000
+                    Size.Height = 15.000000000000000000
+                    Size.PlatformDefault = False
+                  end
+                end
+              end
+              object Label32: TLabel
+                Align = MostBottom
+                Position.Y = 104.000000000000000000
+                Size.Width = 305.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TextSettings.HorzAlign = Center
+                Text = #1043#1083#1072#1074#1085#1072#1103
+                TabOrder = 1
+              end
+              object LayoutTaskAddition: TLayout
+                Position.X = 23.000000000000000000
+                Position.Y = 65.000000000000000000
+                Size.Width = 280.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 3
+                object SpeedButton12: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 202.000000000000000000
+                  Size.Width = 27.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'pausetoolbuttonbordered'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+                object SpeedButton25: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 239.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'forwardtoolbutton'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+                object SpeedButton26: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 170.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'rewindtoolbutton'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+                object ComboBoxTaskStep: TComboBox
+                  Align = MostLeft
+                  Items.Strings = (
+                    #1064#1072#1075' 1 '
+                    #1064#1072#1075' 2'
+                    #1064#1072#1075' 3')
+                  ItemIndex = 0
+                  Size.Width = 160.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 2
+                end
+              end
+              object Label36: TLabel
+                Position.X = 23.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 160.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1047#1072#1076#1072#1095#1072
+                Visible = False
+                TabOrder = 0
+              end
+            end
+          end
+          object LayoutMesure: TLayout
+            Align = Left
+            Position.X = 845.000000000000000000
+            Size.Width = 280.000000000000000000
+            Size.Height = 121.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            object Line13: TLine
+              Align = Right
+              LineType = Right
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 270.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 111.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
+            end
+            object Layout44: TLayout
+              Align = Client
+              Size.Width = 270.000000000000000000
+              Size.Height = 121.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object Layout45: TLayout
+                Position.X = 8.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 232.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+                object Rectangle8: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 141.000000000000000000
+                  Size.Width = 91.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  object Label51: TLabel
+                    Align = Client
+                    StyledSettings = [Family, FontColor]
+                    Size.Width = 91.000000000000000000
+                    Size.Height = 40.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'labelstyle'
+                    TextSettings.Font.Size = 14.000000000000000000
+                    TextSettings.Font.StyleExt = {00070000000000000004000000}
+                    TextSettings.HorzAlign = Center
+                    Text = '12.0'
+                    TabOrder = 0
+                  end
+                end
+                object Layout46: TLayout
+                  Align = Left
+                  Size.Width = 119.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                  object Label52: TLabel
+                    Align = Top
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = #1042#1088#1077#1084#1103', '#1089
+                    TabOrder = 0
+                  end
+                  object Edit11: TEdit
+                    Touch.InteractiveGestures = [LongTap, DoubleTap]
+                    Align = Client
+                    TabOrder = 1
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 23.000000000000000000
+                    Size.PlatformDefault = False
+                  end
+                end
+                object Layout17: TLayout
+                  Size.Width = 232.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 0
+                  object Rectangle3: TRectangle
+                    Align = Right
+                    Fill.Color = claWhite
+                    Position.X = 141.000000000000000000
+                    Size.Width = 91.000000000000000000
+                    Size.Height = 40.000000000000000000
+                    Size.PlatformDefault = False
+                    object LabelTime: TLabel
+                      Align = Client
+                      StyledSettings = [Family, FontColor]
+                      Size.Width = 91.000000000000000000
+                      Size.Height = 40.000000000000000000
+                      Size.PlatformDefault = False
+                      TextSettings.Font.Size = 14.000000000000000000
+                      TextSettings.Font.StyleExt = {00070000000000000004000000}
+                      TextSettings.HorzAlign = Center
+                      Text = '1200,0001'
+                      TabOrder = 0
+                    end
+                  end
+                  object Layout48: TLayout
+                    Align = Left
+                    Size.Width = 119.000000000000000000
+                    Size.Height = 40.000000000000000000
+                    Size.PlatformDefault = False
+                    TabOrder = 1
+                    object Label54: TLabel
+                      Align = Top
+                      Size.Width = 119.000000000000000000
+                      Size.Height = 17.000000000000000000
+                      Size.PlatformDefault = False
+                      Text = #1042#1088#1077#1084#1103', '#1089
+                      TabOrder = 0
+                    end
+                    object EditTime: TEdit
+                      Touch.InteractiveGestures = [LongTap, DoubleTap]
+                      Align = Client
+                      TabOrder = 1
+                      Text = '60'
+                      Size.Width = 119.000000000000000000
+                      Size.Height = 23.000000000000000000
+                      Size.PlatformDefault = False
+                    end
+                  end
+                end
+              end
+              object Layout47: TLayout
+                Position.X = 120.000000000000000000
+                Position.Y = 104.000000000000000000
+                Size.Width = 232.000000000000000000
+                Size.Height = 26.000000000000000000
+                Size.PlatformDefault = False
+                Visible = False
+                TabOrder = 4
+                object ComboEdit8: TComboEdit
+                  Touch.InteractiveGestures = [LongTap, DoubleTap]
+                  Align = Left
+                  TabOrder = 0
+                  ItemHeight = 19.000000000000000000
+                  ItemIndex = -1
+                  Margins.Right = 10.000000000000000000
+                  Size.Width = 119.000000000000000000
+                  Size.Height = 26.000000000000000000
+                  Size.PlatformDefault = False
+                end
+                object SpeedButton23: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 139.000000000000000000
+                  Size.Width = 22.000000000000000000
+                  Size.Height = 26.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'playtoolbutton'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+                object SpeedButton24: TSpeedButton
+                  Align = Left
+                  Padding.Left = 10.000000000000000000
+                  Margins.Left = 10.000000000000000000
+                  Position.X = 171.000000000000000000
+                  Size.Width = 27.000000000000000000
+                  Size.Height = 26.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'pausetoolbuttonbordered'
+                  Text = 'SpeedButton3'
+                  TextSettings.Trimming = None
+                end
+              end
+              object Label53: TLabel
+                Align = MostBottom
+                Position.Y = 104.000000000000000000
+                Size.Width = 270.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TextSettings.HorzAlign = Center
+                Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
+                TabOrder = 3
+              end
+              object Layout49: TLayout
+                Position.X = 8.000000000000000000
+                Position.Y = 56.000000000000000000
+                Size.Width = 233.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+                object Rectangle9: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 166.000000000000000000
+                  Size.Width = 67.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelVolume: TLabel
+                    Align = Client
+                    Margins.Left = 5.000000000000000000
+                    Size.Width = 62.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = '0,0455'
+                    TabOrder = 0
+                  end
+                end
+                object Label56: TLabel
+                  Align = Left
+                  Size.Width = 97.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = #1054#1073#1098#1077#1084', '#1084'3'
+                  TabOrder = 0
+                end
+                object EditVolume: TEdit
+                  Touch.InteractiveGestures = [LongTap, DoubleTap]
+                  Align = Left
+                  TabOrder = 1
+                  Text = '1'
+                  Position.X = 97.000000000000000000
+                  Size.Width = 56.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                end
+              end
+              object Layout51: TLayout
+                Position.X = 8.000000000000000000
+                Position.Y = 81.000000000000000000
+                Size.Width = 233.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                object Label55: TLabel
+                  Align = Left
+                  Size.Width = 97.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = #1048#1084#1087#1091#1083#1100#1089#1099', '#1096#1090
+                  TabOrder = 0
+                end
+                object EditImp: TEdit
+                  Touch.InteractiveGestures = [LongTap, DoubleTap]
+                  Align = Left
+                  TabOrder = 1
+                  Text = '10000'
+                  Position.X = 97.000000000000000000
+                  Size.Width = 56.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                end
+                object Rectangle10: TRectangle
+                  Align = Right
+                  Fill.Color = claWhite
+                  Position.X = 168.000000000000000000
+                  Size.Width = 65.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelImp: TLabel
+                    Align = Contents
+                    Margins.Left = 5.000000000000000000
+                    Size.Width = 60.000000000000000000
+                    Size.Height = 17.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = '12345'
+                    TabOrder = 0
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+    object TabItem2: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Trimming = None
+      IsSelected = False
+      Size.Width = 60.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = #1052#1085#1077#1084#1086
+      ExplicitSize.cx = 60.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+      object ControlBar: TLayout
+        Align = Top
+        Size.Width = 1191.000000000000000000
+        Size.Height = 64.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 8
+        object rctToolsPanelBackground: TRectangle
+          Align = Client
+          Fill.Color = xFFCCCCCC
+          Size.Width = 1191.000000000000000000
+          Size.Height = 64.000000000000000000
+          Size.PlatformDefault = False
+          Stroke.Color = claNull
+          object tbShemeColor: TToolBar
+            Align = Right
+            Margins.Right = 5.000000000000000000
+            Position.X = 950.000000000000000000
+            Size.Width = 187.000000000000000000
+            Size.Height = 64.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            object rct3: TRectangle
+              Align = Client
+              Fill.Color = xFFCCCCCC
+              Padding.Left = 3.000000000000000000
+              Padding.Top = 3.000000000000000000
+              Padding.Bottom = 3.000000000000000000
+              Size.Width = 187.000000000000000000
+              Size.Height = 64.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claNull
+              object pnlShemeColor: TPanel
+                Align = Left
+                Padding.Left = 5.000000000000000000
+                Padding.Top = 2.000000000000000000
+                Padding.Right = 5.000000000000000000
+                Padding.Bottom = 5.000000000000000000
+                Margins.Left = 2.000000000000000000
+                Margins.Top = 2.000000000000000000
+                Margins.Right = 2.000000000000000000
+                Margins.Bottom = 2.000000000000000000
+                Position.X = 95.000000000000000000
+                Position.Y = 5.000000000000000000
+                Size.Width = 90.000000000000000000
+                Size.Height = 54.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 5
+                object Label4: TLabel
+                  Align = Client
+                  AutoSize = True
+                  StyledSettings = [Family]
+                  Size.Width = 80.000000000000000000
+                  Size.Height = 25.000000000000000000
+                  Size.PlatformDefault = False
+                  TextSettings.Font.Size = 10.000000000000000000
+                  TextSettings.Font.StyleExt = {00070000000000000004000000}
+                  TextSettings.FontColor = claDarkslategray
+                  TextSettings.HorzAlign = Center
+                  Text = #1057#1093#1077#1084#1072
+                  TabOrder = 0
+                end
+                object cbSHEME_COLOR: TComboBox
+                  Align = Bottom
+                  Items.Strings = (
+                    #1057#1077#1088#1072#1103
+                    #1057#1080#1085#1103#1103
+                    #1047#1077#1083#1077#1085#1072#1103
+                    #1050#1088#1072#1089#1085#1072#1103
+                    #1046#1077#1083#1090#1072#1103)
+                  ItemIndex = 0
+                  Position.X = 5.000000000000000000
+                  Position.Y = 27.000000000000000000
+                  Size.Width = 80.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 24
+                  ParentShowHint = False
+                  ShowHint = True
+                end
+                object shdwfct12: TShadowEffect
+                  Distance = 3.000000000000000000
+                  Direction = 45.000000000000000000
+                  Softness = 0.300000011920929000
+                  Opacity = 0.400000005960464500
+                  ShadowColor = claBlack
+                end
+              end
+              object pnlBackColor: TPanel
+                Align = MostLeft
+                Padding.Left = 5.000000000000000000
+                Padding.Top = 3.000000000000000000
+                Padding.Right = 5.000000000000000000
+                Padding.Bottom = 5.000000000000000000
+                Margins.Top = 2.000000000000000000
+                Margins.Bottom = 2.000000000000000000
+                Position.X = 3.000000000000000000
+                Position.Y = 5.000000000000000000
+                Size.Width = 90.000000000000000000
+                Size.Height = 54.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 6
+                object Label3: TLabel
+                  Align = Client
+                  AutoSize = True
+                  StyledSettings = [Family]
+                  Size.Width = 80.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TextSettings.Font.Size = 10.000000000000000000
+                  TextSettings.Font.StyleExt = {00070000000000000004000000}
+                  TextSettings.FontColor = claDarkslategray
+                  TextSettings.HorzAlign = Center
+                  Text = #1060#1086#1085
+                  TabOrder = 0
+                end
+                object cbBACK_COLOR: TComboColorBox
+                  Align = Bottom
+                  Color = claWhite
+                  Position.X = 5.000000000000000000
+                  Position.Y = 27.000000000000000000
+                  Size.Width = 80.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                  ParentShowHint = False
+                  ShowHint = True
+                end
+                object ShadowEffect11: TShadowEffect
+                  Distance = 3.000000000000000000
+                  Direction = 45.000000000000000000
+                  Softness = 0.300000011920929000
+                  Opacity = 0.400000005960464500
+                  ShadowColor = claBlack
+                end
+              end
+            end
+          end
+          object lbMainToolButtons: TLayout
+            Align = MostLeft
+            Margins.Left = 1.000000000000000000
+            Margins.Top = 1.000000000000000000
+            Margins.Right = 2.000000000000000000
+            Margins.Bottom = 1.000000000000000000
+            Position.X = 1.000000000000000000
+            Position.Y = 1.000000000000000000
+            Size.Width = 410.000000000000000000
+            Size.Height = 62.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 1
+            object tbMainPanel: TToolBar
+              Align = Client
+              Padding.Top = 1.000000000000000000
+              Padding.Bottom = 1.000000000000000000
+              Size.Width = 410.000000000000000000
+              Size.Height = 62.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              object rct2: TRectangle
+                Align = Client
+                Fill.Color = xFFCCCCCC
+                Padding.Top = 8.000000000000000000
+                Padding.Bottom = 8.000000000000000000
+                Size.Width = 410.000000000000000000
+                Size.Height = 60.000000000000000000
+                Size.PlatformDefault = False
+                Stroke.Color = claNull
+                object sbSaveProject: TSpeedButton
+                  Align = Left
+                  Hint = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1087#1088#1086#1077#1082#1090'...'
+                  ImageIndex = 34
+                  Position.X = 135.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  TextSettings.Trimming = None
+                  object ShadowEffect5: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object sbSaveSettings: TSpeedButton
+                  Align = Left
+                  Hint = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1085#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                  ImageIndex = 37
+                  Margins.Left = 1.000000000000000000
+                  Position.X = 92.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  TextSettings.Trimming = None
+                  object ShadowEffect6: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object sbSetup: TSpeedButton
+                  Align = MostLeft
+                  ImageIndex = 5
+                  Margins.Left = 5.000000000000000000
+                  Position.X = 5.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  Text = #1053#1072#1089#1090#1088#1086#1081#1082#1072
+                  TextSettings.Trimming = None
+                  object shdwfct4: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object sbSound: TSpeedButton
+                  Align = Left
+                  ImageIndex = 40
+                  Margins.Left = 1.000000000000000000
+                  Margins.Right = 1.000000000000000000
+                  Position.X = 275.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  Text = #1047#1074#1091#1082
+                  TextSettings.Trimming = None
+                  object ShadowEffect7: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object sbToolPosition: TSpeedButton
+                  Align = Left
+                  ImageIndex = 38
+                  Position.X = 231.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  Text = #1055#1077#1088#1077#1084#1077#1089#1090#1080#1090#1100' '#1087#1072#1085#1077#1083#1100
+                  TextSettings.Trimming = None
+                  object ShadowEffect8: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object ebEditProject: TSpeedButton
+                  Align = MostLeft
+                  ImageIndex = 17
+                  Position.X = 48.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1085#1080#1077' '#1087#1088#1086#1077#1082#1090#1072
+                  TextSettings.Trimming = None
+                  object ShadowEffect2: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object btnWorkLog: TSpeedButton
+                  Align = Left
+                  Hint = #1046#1091#1088#1085#1072#1083' '#1088#1072#1073#1086#1090#1099
+                  ImageIndex = 51
+                  Margins.Right = 1.000000000000000000
+                  Position.X = 319.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  Text = #1046#1091#1088#1085#1072#1083
+                  TextSettings.Trimming = None
+                  object ShadowEffect4: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object btnProjectInfo: TSpeedButton
+                  Align = Left
+                  ImageIndex = 48
+                  Margins.Right = 1.000000000000000000
+                  Position.X = 363.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  TextSettings.Trimming = None
+                  object ShadowEffect3: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+                object SpeedButton1: TSpeedButton
+                  Align = Left
+                  ImageIndex = 63
+                  Margins.Left = 5.000000000000000000
+                  Margins.Right = 5.000000000000000000
+                  Position.X = 183.000000000000000000
+                  Position.Y = 8.000000000000000000
+                  Size.Width = 43.000000000000000000
+                  Size.Height = 44.000000000000000000
+                  Size.PlatformDefault = False
+                  ParentShowHint = False
+                  ShowHint = True
+                  StyleLookup = 'bigiconspeedbuttonstyle'
+                  TextSettings.Trimming = None
+                  object ShadowEffect15: TShadowEffect
+                    Distance = 3.000000000000000000
+                    Direction = 45.000000000000000000
+                    Softness = 0.300000011920929000
+                    Opacity = 0.400000005960464500
+                    ShadowColor = claBlack
+                  end
+                end
+              end
+            end
+          end
+          object tcShemeElements: TTabControl
+            Align = Left
+            Padding.Left = 5.000000000000000000
+            Padding.Right = 5.000000000000000000
+            Margins.Top = 1.000000000000000000
+            Margins.Bottom = 2.000000000000000000
+            Position.X = 967.000000000000000000
+            Position.Y = 1.000000000000000000
+            Size.Width = 527.000000000000000000
+            Size.Height = 61.000000000000000000
+            Size.PlatformDefault = False
+            StyleLookup = 'tcShemeElementsStyle1'
+            TabIndex = 0
+            TabOrder = 0
+            TabPosition = PlatformDefault
+            Sizes = (
+              517s
+              37s
+              517s
+              37s
+              517s
+              37s
+              517s
+              37s)
+            object tiControl: TTabItem
+              CustomIcon = <
+                item
+                end>
+              TextSettings.Trimming = None
+              IsSelected = True
+              Size.Width = 147.000000000000000000
+              Size.Height = 24.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'tcsmallheaderstyle'
+              TabOrder = 0
+              Text = #1059#1087#1088#1072#1074#1083#1077#1085#1080#1077' '#1080' '#1090#1077#1083#1077#1084#1077#1090#1088#1080#1103
+              ExplicitSize.cx = 87.000000000000000000
+              ExplicitSize.cy = 26.000000000000000000
+              object btnCreatePump: TSpeedButton
+                Align = MostLeft
+                Hint = #1053#1072#1089#1086#1089' '#1089' '#1088#1077#1075#1091#1083#1103#1090#1086#1088#1086#1084' '#1095#1072#1089#1090#1086#1090#1099' '#1074#1088#1072#1097#1077#1085#1080#1103
+                ImageIndex = 0
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 1.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateUnoperatedPump: TSpeedButton
+                Align = MostLeft
+                Hint = #1053#1072#1089#1086#1089' '#1089' '#1076#1080#1089#1082#1088#1077#1090#1085#1099#1084' '#1091#1087#1088#1072#1074#1083#1077#1085#1080#1077#1084
+                ImageIndex = 1
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 33.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreatePnevmoValve: TSpeedButton
+                Align = Left
+                Hint = #1044#1080#1089#1082#1088#1077#1090#1085#1072#1103' '#1079#1072#1076#1074#1080#1078#1082#1072
+                ImageIndex = 2
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 97.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateElectroValve: TSpeedButton
+                Align = Left
+                Hint = #1056#1077#1075#1091#1083#1080#1088#1091#1077#1084#1072#1103' '#1079#1072#1076#1074#1080#1078#1082#1072
+                ImageIndex = 3
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 65.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateBlcdValve: TSpeedButton
+                Align = Left
+                Hint = #1057#1083#1080#1074' '#1074#1077#1089#1086#1074#1086#1075#1086' '#1073#1072#1082#1072
+                ImageIndex = 5
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 129.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateUPP: TSpeedButton
+                Align = Left
+                Hint = #1059#1089#1090#1088#1086#1081#1089#1090#1074#1086' '#1087#1077#1088#1077#1082#1083#1102#1095#1077#1085#1080#1103' '#1087#1086#1090#1086#1082#1072
+                ImageIndex = 6
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 5.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 161.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateFlowmeter: TSpeedButton
+                Align = Left
+                Hint = #1069#1090#1072#1083#1086#1085#1085#1099#1081' '#1088#1072#1089#1093#1086#1076#1086#1084#1077#1088
+                ImageIndex = 22
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 197.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateTermometer: TSpeedButton
+                Align = Left
+                Hint = #1058#1077#1088#1084#1086#1084#1077#1090#1088
+                ImageIndex = 24
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 261.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateManometer: TSpeedButton
+                Align = Left
+                Hint = #1052#1072#1085#1086#1084#1077#1090#1088
+                ImageIndex = 23
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 293.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateFlowmetersPanel: TSpeedButton
+                Align = Left
+                Hint = #1055#1072#1085#1077#1083#1100' '#1087#1086#1076#1082#1083#1102#1095#1077#1085#1080#1103
+                ImageIndex = 25
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 325.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateLevelDetector: TSpeedButton
+                Align = Left
+                Hint = 
+                  #1057#1086#1089#1090#1086#1103#1085#1080#1077' '#1076#1080#1089#1090#1082#1088#1077#1090#1085#1086#1075#1086' '#1074#1093#1086#1076#1072' / '#1074#1099#1093#1086#1076#1072#13#10'('#1044#1072#1090#1095#1080#1082' '#1091#1088#1086#1074#1085#1103', '#1080#1085#1076#1080#1082#1072#1090#1086#1088 +
+                  ' '#1088#1077#1083#1077' '#1076#1072#1074#1083#1077#1085#1080#1103' '#1080' '#1090'.'#1087'.)'
+                ImageIndex = 26
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 357.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateWaterLevel: TSpeedButton
+                Align = Left
+                Hint = 
+                  #1048#1085#1076#1080#1082#1072#1090#1086#1088' '#1079#1072#1075#1088#1091#1078#1077#1085#1085#1086#1089#1090#1080' '#1074#1077#1089#1086#1074#1086#1075#1086' '#1073#1072#1082#1072#13#10'('#1048#1085#1076#1080#1082#1072#1090#1086#1088' '#1091#1088#1086#1074#1085#1103' '#1078#1080#1076#1082#1086#1089#1090 +
+                  #1080')'
+                ImageIndex = 27
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 389.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateScale: TSpeedButton
+                Align = Left
+                Hint = 
+                  #1048#1085#1076#1080#1082#1072#1090#1086#1088' '#1079#1072#1075#1088#1091#1078#1077#1085#1085#1086#1089#1090#1080' '#1074#1077#1089#1086#1074#1086#1075#1086' '#1073#1072#1082#1072#13#10'('#1048#1085#1076#1080#1082#1072#1090#1086#1088' '#1091#1088#1086#1074#1085#1103' '#1078#1080#1076#1082#1086#1089#1090 +
+                  #1080')'
+                ImageIndex = 33
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 229.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object shdwfct5: TShadowEffect
+                Distance = 3.000000000000000000
+                Direction = 45.000000000000000000
+                Softness = 0.300000011920929000
+                Opacity = 0.400000005960464500
+                ShadowColor = claBlack
+              end
+            end
+            object tiPipeAndFittings: TTabItem
+              CustomIcon = <
+                item
+                end>
+              TextSettings.Trimming = None
+              IsSelected = False
+              Size.Width = 104.000000000000000000
+              Size.Height = 24.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'tcsmallheaderstyle'
+              TabOrder = 0
+              Text = #1069#1083#1077#1084#1077#1085#1090#1099' '#1089#1093#1077#1084#1099
+              ExplicitSize.cx = 119.000000000000000000
+              ExplicitSize.cy = 26.000000000000000000
+              object btnCreateElbow: TSpeedButton
+                Align = Left
+                Hint = #1054#1090#1074#1086#1076
+                ImageIndex = 7
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 65.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateCross: TSpeedButton
+                Align = Left
+                Hint = #1050#1088#1077#1089#1090#1086#1074#1080#1085#1072
+                ImageIndex = 8
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 97.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateTee: TSpeedButton
+                Align = Left
+                Hint = #1058#1088#1086#1081#1085#1080#1082
+                ImageIndex = 9
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 129.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateFlange: TSpeedButton
+                Align = Left
+                Hint = #1060#1083#1072#1085#1077#1094
+                ImageIndex = 10
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 161.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateHorisontalPipe: TSpeedButton
+                Tag = 1
+                Align = MostLeft
+                Hint = #1058#1088#1091#1073#1072' '#1075#1086#1088#1080#1079#1086#1085#1090#1072#1083#1100#1085#1072#1103
+                ImageIndex = 12
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 1.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateVerticalPipe: TSpeedButton
+                Align = Left
+                Hint = #1058#1088#1091#1073#1072' '#1074#1077#1088#1090#1080#1082#1072#1083#1100#1085#1072#1103
+                ImageIndex = 13
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 33.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreatePump_1: TSpeedButton
+                Align = Left
+                Hint = #1053#1072#1089#1086#1089
+                ImageIndex = 14
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 193.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateMotor: TSpeedButton
+                Align = Left
+                Hint = #1053#1072#1089#1086#1089' 4'
+                ImageIndex = 21
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 289.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreate8: TSpeedButton
+                Align = Left
+                Hint = #1042#1077#1089#1086#1074#1086#1081' '#1073#1072#1082
+                ImageIndex = 15
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 417.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreatefitTank_V: TSpeedButton
+                Align = Left
+                Hint = #1056#1077#1089#1089#1080#1074#1077#1088' '#1074#1077#1088#1089#1090#1080#1082#1072#1083#1100#1085#1099#1081
+                ImageIndex = 17
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 321.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreate10: TSpeedButton
+                Align = Left
+                Hint = #1045#1084#1082#1086#1089#1090#1100
+                ImageIndex = 16
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 385.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreatefitTank_H: TSpeedButton
+                Align = Left
+                Hint = #1056#1077#1089#1089#1080#1074#1077#1088' '#1075#1086#1088#1080#1079#1086#1085#1090#1072#1083#1100#1085#1099#1081
+                ImageIndex = 18
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 353.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreatePump_2: TSpeedButton
+                Align = Left
+                Hint = #1053#1072#1089#1086#1089' 2'
+                ImageIndex = 19
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 225.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreatePump_3: TSpeedButton
+                Align = Left
+                Hint = #1053#1072#1089#1086#1089' 3'
+                ImageIndex = 20
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 257.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object shdwfct6: TShadowEffect
+                Distance = 3.000000000000000000
+                Direction = 45.000000000000000000
+                Softness = 0.300000011920929000
+                Opacity = 0.400000005960464500
+                ShadowColor = claBlack
+              end
+            end
+            object tiAnimation: TTabItem
+              CustomIcon = <
+                item
+                end>
+              TextSettings.Trimming = None
+              IsSelected = False
+              Size.Width = 85.000000000000000000
+              Size.Height = 24.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'tcsmallheaderstyle'
+              TabOrder = 0
+              Text = #1054#1092#1086#1088#1084#1083#1077#1085#1080#1077
+              ExplicitSize.cx = 77.000000000000000000
+              ExplicitSize.cy = 26.000000000000000000
+              object btnCreateGroupBox: TSpeedButton
+                Tag = 1
+                Align = MostLeft
+                Hint = #1053#1088#1091#1087#1087#1080#1088#1086#1074#1072#1090#1077#1083#1100' '#1092#1091#1085#1082#1094#1080#1086#1085#1072#1083#1100#1085#1086#1089#1090#1080
+                ImageIndex = 28
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 1.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+              object btnCreateText: TSpeedButton
+                Tag = 1
+                Align = Left
+                Hint = #1058#1077#1082#1089#1090#1086#1074#1072#1103' '#1080#1085#1092#1086#1088#1084#1072#1094#1080#1103
+                ImageIndex = 32
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 33.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
+                TextSettings.Trimming = None
+              end
+            end
+            object tiUserComponents: TTabItem
+              CustomIcon = <
+                item
+                end>
+              TextSettings.Trimming = None
+              IsSelected = False
+              Size.Width = 171.000000000000000000
+              Size.Height = 24.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'tcsmallheaderstyle'
+              TabOrder = 0
+              Text = #1055#1086#1083#1100#1079#1086#1074#1072#1090#1077#1083#1100#1089#1082#1080#1077' '#1087#1088#1080#1084#1080#1090#1080#1074#1099
+              ExplicitSize.cx = 188.000000000000000000
+              ExplicitSize.cy = 26.000000000000000000
+              object btnAddUserPrimitive: TSpeedButton
+                Tag = 1
+                Align = MostLeft
+                Enabled = False
+                Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1086#1083#1100#1079#1086#1074#1072#1090#1077#1083#1100#1089#1082#1080#1081' '#1087#1088#1084#1080#1090#1080#1074'...'
+                ImageIndex = 84
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 1.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1086#1083#1100#1079#1086#1074#1072#1090#1077#1083#1100#1089#1082#1080#1081' '#1087#1088#1084#1080#1090#1080#1074'...'
+                TextSettings.Trimming = None
+              end
+              object btnDeleteUserPrimitive: TSpeedButton
+                Tag = 1
+                Align = MostLeft
+                Enabled = False
+                Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1086#1083#1100#1079#1086#1074#1072#1090#1077#1083#1100#1089#1082#1080#1081' '#1087#1088#1084#1080#1090#1080#1074'...'
+                ImageIndex = 85
+                Margins.Left = 1.000000000000000000
+                Margins.Top = 6.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Margins.Bottom = 6.000000000000000000
+                Position.X = 33.000000000000000000
+                Position.Y = 6.000000000000000000
+                Size.Width = 30.000000000000000000
+                Size.Height = 25.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1086#1083#1100#1079#1086#1074#1072#1090#1077#1083#1100#1089#1082#1080#1081' '#1087#1088#1084#1080#1090#1080#1074'...'
+                TextSettings.Trimming = None
+              end
+            end
+            object shdwfct14: TShadowEffect
+              Distance = 3.000000000000000000
+              Direction = 45.000000000000000000
+              Softness = 0.300000011920929000
+              Opacity = 0.400000005960464500
+              ShadowColor = claBlack
+            end
+          end
+          object tbEditProject: TToolBar
+            Align = Left
+            Margins.Left = 10.000000000000000000
+            Margins.Right = 10.000000000000000000
+            Position.X = 1504.000000000000000000
+            Size.Width = 140.000000000000000000
+            Size.Height = 64.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            object rct4: TRectangle
+              Align = Client
+              Fill.Color = xFFCCCCCC
+              Padding.Left = 4.000000000000000000
+              Padding.Top = 8.000000000000000000
+              Padding.Right = 4.000000000000000000
+              Padding.Bottom = 8.000000000000000000
+              Size.Width = 140.000000000000000000
+              Size.Height = 64.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claNull
+              object btnComponentsVisible: TSpeedButton
+                Align = MostLeft
+                ImageIndex = 32
+                Margins.Left = 1.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Position.X = 5.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 43.000000000000000000
+                Size.Height = 48.000000000000000000
+                Size.PlatformDefault = False
+                ParentShowHint = False
+                ShowHint = True
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                TextSettings.Trimming = None
+                object shdwfct9: TShadowEffect
+                  Distance = 3.000000000000000000
+                  Direction = 45.000000000000000000
+                  Softness = 0.300000011920929000
+                  Opacity = 0.400000005960464500
+                  ShadowColor = claBlack
+                end
+              end
+              object btnAnimateVisible: TSpeedButton
+                Align = Left
+                Enabled = False
+                ImageIndex = 53
+                Margins.Left = 1.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Position.X = 95.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 43.000000000000000000
+                Size.Height = 48.000000000000000000
+                Size.PlatformDefault = False
+                ParentShowHint = False
+                ShowHint = True
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                TextSettings.Trimming = None
+                object ShadowEffect1: TShadowEffect
+                  Distance = 3.000000000000000000
+                  Direction = 45.000000000000000000
+                  Softness = 0.300000011920929000
+                  Opacity = 0.400000005960464500
+                  ShadowColor = claBlack
+                end
+              end
+              object btnDeleteComponet: TSpeedButton
+                Align = Left
+                ImageIndex = 31
+                Margins.Left = 1.000000000000000000
+                Margins.Right = 1.000000000000000000
+                Position.X = 50.000000000000000000
+                Position.Y = 8.000000000000000000
+                Size.Width = 43.000000000000000000
+                Size.Height = 48.000000000000000000
+                Size.PlatformDefault = False
+                ParentShowHint = False
+                ShowHint = True
+                StyleLookup = 'bigiconspeedbuttonstyle'
+                TextSettings.Trimming = None
+                object shdwfct10: TShadowEffect
+                  Distance = 3.000000000000000000
+                  Direction = 45.000000000000000000
+                  Softness = 0.300000011920929000
+                  Opacity = 0.400000005960464500
+                  ShadowColor = claBlack
+                end
+              end
+            end
+          end
+          object lytWorkTask: TLayout
+            Align = Left
+            Position.X = 567.000000000000000000
+            Size.Width = 400.000000000000000000
+            Size.Height = 64.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 4
+            object Label11: TLabel
+              Align = Top
+              Margins.Left = 10.000000000000000000
+              Margins.Top = 10.000000000000000000
+              Margins.Right = 10.000000000000000000
+              Position.X = 10.000000000000000000
+              Position.Y = 10.000000000000000000
+              Size.Width = 280.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1042#1099#1087#1086#1083#1085#1103#1077#1084#1072#1103' '#1079#1072#1076#1072#1095#1072
+              TabOrder = 0
+            end
+            object cbMainTask: TComboBox
+              Align = Client
+              Items.Strings = (
+                #1053#1072#1095#1072#1083#1100#1085#1072#1103' '#1080#1085#1080#1094#1080#1072#1083#1080#1079#1072#1094#1080#1103
+                #1058#1077#1089#1090#1086#1074#1099#1081' '#1088#1077#1078#1080#1084
+                #1055#1086#1074#1077#1088#1082#1072' '#1087#1088#1080#1073#1086#1088#1086#1074' ('#1090#1080#1087': F,I,U) '#1087#1086' '#1101#1090#1072#1083#1086#1085#1085#1099#1084' '#1088#1072#1089#1093#1086#1076#1086#1084#1077#1088#1072#1084)
+              ItemIndex = 0
+              Margins.Left = 10.000000000000000000
+              Margins.Top = 5.000000000000000000
+              Margins.Right = 10.000000000000000000
+              Margins.Bottom = 10.000000000000000000
+              Size.Width = 280.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+            end
+            object sbRunStop: TSpeedButton
+              Align = MostRight
+              ImageIndex = 75
+              Margins.Left = 1.000000000000000000
+              Margins.Top = 10.000000000000000000
+              Margins.Right = 10.000000000000000000
+              Margins.Bottom = 10.000000000000000000
+              Position.X = 347.000000000000000000
+              Position.Y = 10.000000000000000000
+              Size.Width = 43.000000000000000000
+              Size.Height = 44.000000000000000000
+              Size.PlatformDefault = False
+              ParentShowHint = False
+              ShowHint = True
+              StyleLookup = 'bigiconspeedbuttonstyle'
+              TextSettings.Trimming = None
+            end
+            object sbPause: TSpeedButton
+              Align = MostRight
+              Enabled = False
+              ImageIndex = 74
+              Margins.Left = 1.000000000000000000
+              Margins.Top = 10.000000000000000000
+              Margins.Right = 2.000000000000000000
+              Margins.Bottom = 10.000000000000000000
+              Position.X = 301.000000000000000000
+              Position.Y = 10.000000000000000000
+              Size.Width = 43.000000000000000000
+              Size.Height = 44.000000000000000000
+              Size.PlatformDefault = False
+              ParentShowHint = False
+              ShowHint = True
+              StyleLookup = 'bigiconspeedbuttonstyle'
+              TextSettings.Trimming = None
+            end
+            object ShadowEffect10: TShadowEffect
+              Distance = 3.000000000000000000
+              Direction = 45.000000000000000000
+              Softness = 0.300000011920929000
+              Opacity = 0.400000005960464500
+              ShadowColor = claBlack
+            end
+          end
+          object btnAbout: TSpeedButton
+            Align = MostRight
+            ImageIndex = 78
+            Margins.Left = 1.000000000000000000
+            Margins.Top = 10.000000000000000000
+            Margins.Right = 5.000000000000000000
+            Margins.Bottom = 10.000000000000000000
+            Position.X = 1143.000000000000000000
+            Position.Y = 10.000000000000000000
+            Size.Width = 43.000000000000000000
+            Size.Height = 44.000000000000000000
+            Size.PlatformDefault = False
+            ParentShowHint = False
+            ShowHint = True
+            StyleLookup = 'bigiconspeedbuttonstyle'
+            TextSettings.Trimming = None
+            object shdwfct11: TShadowEffect
+              Distance = 3.000000000000000000
+              Direction = 45.000000000000000000
+              Softness = 0.300000011920929000
+              Opacity = 0.400000005960464500
+              ShadowColor = claBlack
+            end
+          end
+          object lytWorkDesktop: TLayout
+            Align = Left
+            Position.X = 413.000000000000000000
+            Size.Width = 154.000000000000000000
+            Size.Height = 64.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 5
+            object Label12: TLabel
+              Align = Top
+              Margins.Left = 10.000000000000000000
+              Margins.Top = 10.000000000000000000
+              Margins.Right = 10.000000000000000000
+              Position.X = 10.000000000000000000
+              Position.Y = 10.000000000000000000
+              Size.Width = 134.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+              TabOrder = 0
+              object PerspectiveTransformEffect1: TPerspectiveTransformEffect
+                Enabled = False
+              end
+            end
+            object cbWorkDesktop: TComboBox
+              Align = Client
+              Items.Strings = (
+                #1053#1077' '#1091#1082#1072#1079#1072#1085)
+              Margins.Left = 10.000000000000000000
+              Margins.Top = 5.000000000000000000
+              Margins.Right = 10.000000000000000000
+              Margins.Bottom = 10.000000000000000000
+              Size.Width = 134.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+            end
+            object ShadowEffect9: TShadowEffect
+              Distance = 3.000000000000000000
+              Direction = 45.000000000000000000
+              Softness = 0.300000011920929000
+              Opacity = 0.400000005960464500
+              ShadowColor = claBlack
+            end
+          end
+          object shdwfct8: TShadowEffect
+            Distance = 3.000000000000000000
+            Direction = 45.000000000000000000
+            Softness = 0.300000011920929000
+            Opacity = 0.400000005960464500
+            ShadowColor = claBlack
+          end
+        end
+      end
+    end
+    object TabItem3: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Trimming = None
+      IsSelected = False
+      Size.Width = 81.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = #1054#1073#1088#1072#1073#1086#1090#1082#1072
+      ExplicitSize.cx = 81.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+    end
+  end
+end
