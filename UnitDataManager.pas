@@ -76,7 +76,7 @@ type
   function FindCategoryByID(AID: Integer): TDeviceCategory;
   function Categories : TObjectList<TDeviceCategory>;
 
-  function FindType(const AUUID, AName: string): TDeviceType;
+  function FindType(const AUUID, AName: string; out ARepo: TTypeRepository): TDeviceType;
   function FindTypeRepositoryByName(const AName: string): TTypeRepository;
 
 
@@ -1092,12 +1092,14 @@ begin
 end;
 
 function TManagerTDM.FindType(
-  const AUUID, AName: string
+  const AUUID, AName: string;
+  out ARepo: TTypeRepository
 ): TDeviceType;
 var
   Repo: TTypeRepository;
 begin
   Result := nil;
+  ARepo := nil;
 
   // --------------------------------------------------
   // 1. Сначала ищем в активном репозитории
@@ -1113,7 +1115,10 @@ begin
    //   Result := ActiveTypeRepo.FindTypeByName(AName);
 
     if Result <> nil then
+    begin
+      ARepo := ActiveTypeRepo;
       Exit;
+    end;
   end;
 
   // --------------------------------------------------
@@ -1133,7 +1138,10 @@ begin
       Result := Repo.FindTypeByName(AName);
 
     if Result <> nil then
+    begin
+      ARepo := Repo;
       Exit;
+    end;
   end;
 end;
 

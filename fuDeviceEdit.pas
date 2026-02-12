@@ -783,6 +783,7 @@ end;
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
+  FoundRepo: TTypeRepository;
 begin
   FLoading := True;
   try
@@ -817,11 +818,16 @@ begin
       FoundType :=
         DataManager.FindType(
           FDevice.DeviceTypeUUID,
-          FDevice.DeviceTypeName
+          FDevice.DeviceTypeName,
+          FoundRepo
         );
 
       if FoundType <> nil then
+      begin
         FDeviceType := FoundType;
+        if FoundRepo <> nil then
+          DataManager.ActiveTypeRepo := FoundRepo;
+      end;
     end;
 
     UpdateUIFromDevice;
@@ -865,20 +871,11 @@ begin
     {----------------------------------------------------}
     if FoundType <> nil then
     begin
-
-    RepoName :=   FoundType.RepoName;
-    if RepoName<>'' then
-    begin
-
-      FoundRepo := DataManager.FindTypeRepositoryByName(
-                     RepoName
-                   );
-
-      if FoundRepo <> nil then
+      FoundType := DataManager.FindType(FoundType.MitUUID, FoundType.Name, FoundRepo);
+      if (FoundType <> nil) and (FoundRepo <> nil) then
       begin
         DataManager.ActiveTypeRepo := FoundRepo;
         Frm.SelectType(FoundType);
-      end;
       end;
     end;
 
@@ -905,10 +902,12 @@ begin
     {----------------------------------------------------}
     { 4. Привязываем тип }
     {----------------------------------------------------}
-    FDevice.AttachType(
-      NewType,
-      DataManager.ActiveTypeRepo.Name
-    );
+    if DataManager.ActiveTypeRepo <> nil then
+      RepoName := DataManager.ActiveTypeRepo.Name
+    else
+      RepoName := '';
+
+    FDevice.AttachType(NewType, RepoName);
 
     {----------------------------------------------------}
     { 5. Копируем данные из типа → в прибор }
