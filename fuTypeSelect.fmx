@@ -23,7 +23,6 @@ object FormTypeSelect: TFormTypeSelect
       HeaderAppearanceClassName = 'TListHeaderObjects'
       FooterAppearanceClassName = 'TListHeaderObjects'
       EditMode = True
-      Images = DevicesDataBaseForm.ilSigns
       Align = Client
       Margins.Left = 5.000000000000000000
       Margins.Top = 5.000000000000000000
@@ -124,8 +123,8 @@ object FormTypeSelect: TFormTypeSelect
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
-        Viewport.Width = 861.000000000000000000
-        Viewport.Height = 637.000000000000000000
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 678.000000000000000000
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103
           HeaderSettings.TextSettings.Trimming = Character
@@ -368,8 +367,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -400,7 +399,7 @@ object FormTypeSelect: TFormTypeSelect
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
     end
-    object CornerButton1: TCornerButton
+    object CornerButtonSelectType: TCornerButton
       Align = Right
       StyledSettings = [Family, Size, Style]
       ModalResult = 1
@@ -420,7 +419,7 @@ object FormTypeSelect: TFormTypeSelect
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
-      OnClick = CornerButton1Click
+      OnClick = CornerButtonSelectTypeClick
     end
     object CornerButtonEditType: TCornerButton
       Align = Right
@@ -446,7 +445,6 @@ object FormTypeSelect: TFormTypeSelect
     end
   end
   object MainMenu: TMenuBar
-    Images = DevicesDataBaseForm.ilSigns
     Size.Width = 1126.000000000000000000
     Size.Height = 24.000000000000000000
     Size.PlatformDefault = False
@@ -500,7 +498,6 @@ object FormTypeSelect: TFormTypeSelect
     end
   end
   object PopupMenu1: TPopupMenu
-    Images = DevicesDataBaseForm.ilSigns
     Left = 237
     Top = 197
     object MenuItem1: TMenuItem
@@ -562,7 +559,6 @@ object FormTypeSelect: TFormTypeSelect
     end
   end
   object ActionList1: TActionList
-    Images = DevicesDataBaseForm.ilSigns
     Left = 277
     Top = 117
     object aCreateType: TAction

@@ -65,7 +65,7 @@ type
     MenuItem3: TMenuItem;
     StatusBar1: TStatusBar;
     sbDetaled: TLabel;
-    CornerButton1: TCornerButton;
+    CornerButtonSelectType: TCornerButton;
     CornerButtonEditType: TCornerButton;
     Splitter1: TSplitter;
     Label1: TLabel;
@@ -123,7 +123,7 @@ type
     procedure miSaveClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure miLoadRepositoryClick(Sender: TObject);
-    procedure CornerButton1Click(Sender: TObject);
+    procedure CornerButtonSelectTypeClick(Sender: TObject);
 
   private
 
@@ -1463,14 +1463,17 @@ if MessageDlg(
   end;
 end;
 
-procedure TFormTypeSelect.CornerButton1Click(Sender: TObject);
+procedure TFormTypeSelect.CornerButtonSelectTypeClick(Sender: TObject);
 var
   Row: Integer;
 begin
   {----------------------------------}
   { Проверка выбора }
   {----------------------------------}
-  Row := GridTypes.Row;
+  Row := GridTypes.Selected;
+  if Row < 0 then
+    Row := GridTypes.Row;
+
   if (Row < 0) then
   begin
     ShowMessage('Выберите тип');

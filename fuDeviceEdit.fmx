@@ -1939,8 +1939,8 @@ object FormDeviceEditor: TFormDeviceEditor
           RowHeight = 18.000000000000000000
           RowCount = 3
           OnGetValue = GridPointsGetValue
-          Viewport.Width = 897.000000000000000000
-          Viewport.Height = 275.000000000000000000
+          Viewport.Width = 901.000000000000000000
+          Viewport.Height = 316.000000000000000000
           object StringColumnPointName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.WordWrap = False
@@ -2243,8 +2243,8 @@ object FormDeviceEditor: TFormDeviceEditor
         Size.Height = 146.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        Viewport.Width = 897.000000000000000000
-        Viewport.Height = 142.000000000000000000
+        Viewport.Width = 901.000000000000000000
+        Viewport.Height = 146.000000000000000000
       end
     end
     object GroupBox7: TGroupBox
@@ -2460,8 +2460,8 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 905.000000000000000000
-      Viewport.Height = 469.000000000000000000
+      Viewport.Width = 909.000000000000000000
+      Viewport.Height = 473.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000
@@ -2472,7 +2472,6 @@ object FormDeviceEditor: TFormDeviceEditor
     end
   end
   object ppmnuCalculateVolume: TPopupMenu
-    Images = MainForm.ImageList1
     Left = 668
     Top = 199
     object miCalculateVolume: TMenuItem

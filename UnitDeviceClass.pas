@@ -702,7 +702,6 @@ begin
   Result.Assign(Self);
 end;
 
-
 function TDevice.CompareTo(
   const B: TDevice;
   ASortField: TDeviceSortField
@@ -802,6 +801,11 @@ procedure TPointSpillage.Assign(ASource: TPointSpillage);
 begin
   if ASource = nil then
     Exit;
+
+  {====================================================================}
+  { СОСТОЯНИЕ }
+  {====================================================================}
+  State := ASource.State;
 
   {====================================================================}
   { ИДЕНТИФИКАЦИЯ И СВЯЗИ }

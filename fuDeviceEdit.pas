@@ -602,7 +602,24 @@ begin
 end;
 
 procedure TFormDeviceEditor.ButtonPointsClearClick(Sender: TObject);
+var
+  I: Integer;
+  P: TDevicePoint;
 begin
+  if (FDevice = nil) or (FDevice.Points = nil) or (FDevice.Points.Count = 0) then
+    Exit;
+
+  for I := FDevice.Points.Count - 1 downto 0 do
+  begin
+    P := FDevice.Points[I];
+    if P.State = osNew then
+      FDevice.Points.Delete(I)
+    else
+      P.State := osDeleted;
+  end;
+
+  GridPoints.Row := -1;
+  UpdatePointsGrid;
   SetModified;
 end;
 
@@ -867,9 +884,9 @@ end;
 procedure TFormDeviceEditor.SpeedButtonFindTypeClick(Sender: TObject);
 var
   Frm: TFormTypeSelect;
-  FoundType, NewType: TDeviceType;
+  CurrentType, NewType: TDeviceType;
   FoundRepo: TTypeRepository;
-  NeedFill: Boolean;
+  NeedFill, IsTypeChanged: Boolean;
   RepoName: string;
 
 function AskFillFromType: Boolean;
@@ -895,11 +912,11 @@ begin
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    FoundType := DataManager.FindType(FDevice.DeviceTypeUUID, FDevice.DeviceTypeName, FoundRepo);
-    if (FoundType <> nil) and (FoundRepo <> nil) then
+    CurrentType := DataManager.FindType(FDevice.DeviceTypeUUID, FDevice.DeviceTypeName, FoundRepo);
+    if (CurrentType <> nil) and (FoundRepo <> nil) then
     begin
       DataManager.ActiveTypeRepo := FoundRepo;
-      Frm.SelectType(FoundType);
+      Frm.SelectType(CurrentType);
     end;
 
     {----------------------------------------------------}
@@ -912,39 +929,54 @@ begin
     if NewType = nil then
       Exit;
 
-    NewType := DataManager.FindType(NewType.MitUUID, NewType.Name, FoundRepo);
-    if NewType = nil then
-      Exit;
-
-    if FoundRepo <> nil then
-      DataManager.ActiveTypeRepo := FoundRepo;
+    FoundRepo := DataManager.ActiveTypeRepo;
 
     {----------------------------------------------------}
     { 3. Проверяем смену типа }
     {----------------------------------------------------}
-    NeedFill :=
-      (FoundType = nil) or
-      (not SameText(FoundType.MitUUID, NewType.MitUUID));
+    IsTypeChanged := True;
 
-    if NeedFill then
+    if CurrentType <> nil then
+    begin
+      if (CurrentType = NewType) then
+        IsTypeChanged := False
+      else if (CurrentType.MitUUID <> '') and (NewType.MitUUID <> '') then
+        IsTypeChanged := not SameText(CurrentType.MitUUID, NewType.MitUUID)
+      else
+        IsTypeChanged :=
+          (CurrentType.ID <> NewType.ID) or
+          (not SameText(CurrentType.Name, NewType.Name)) or
+          (not SameText(CurrentType.Modification, NewType.Modification));
+    end;
+
+    //NeedFill := IsTypeChanged;
+
+    //if NeedFill then
       NeedFill := AskFillFromType;
 
     {----------------------------------------------------}
     { 4. Привязываем тип }
     {----------------------------------------------------}
-    if DataManager.ActiveTypeRepo <> nil then
-      RepoName := DataManager.ActiveTypeRepo.Name
+    if FoundRepo <> nil then
+      RepoName := FoundRepo.Name
     else
       RepoName := '';
 
-    FDevice.AttachType(NewType, RepoName);
-    FDeviceType := NewType;
+    if NeedFill then
+    begin
+      FDevice.AttachType(NewType, RepoName);
+      FDeviceType := NewType;
 
     {----------------------------------------------------}
     { 5. Копируем данные из типа → в прибор }
     {----------------------------------------------------}
-    if NeedFill then
+
       FDevice.FillFromType(NewType);
+    end;
+
+
+
+
 
     {----------------------------------------------------}
     { 6. Обновляем UI }
