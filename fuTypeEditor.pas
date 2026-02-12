@@ -232,6 +232,8 @@ type
       const Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure ButtonDiameterAddClick(Sender: TObject);
     procedure ButtonDiameterDeleteClick(Sender: TObject);
     procedure ButtonDiameterClearClick(Sender: TObject);
@@ -326,6 +328,8 @@ type
 
   procedure UpdateDiametersGrid;
   procedure UpdatePointsGrid;
+  function GetDiameterByVisibleRow(ARow: Integer): TDiameter;
+  function GetPointByVisibleRow(ARow: Integer): TTypePoint;
 
 
   procedure RecalcPointsBySelectedDiameter;
@@ -677,18 +681,21 @@ begin
 end;
 
 procedure TFormTypeEditor.UpdateDiametersGrid;
+var
+  D: TDiameter;
+  VisibleCount: Integer;
 begin
-  // Проверяем, что список не равен nil
   if FDiametersLocal = nil then
-  begin
-  // ShowMessage('Список диаметров не инициализирован!');
-    Exit;  // Прерываем выполнение, если список не инициализирован
-  end;
+    Exit;
 
-  // Обновляем таблицу диаметров, если список инициализирован
+  VisibleCount := 0;
+  for D in FDiametersLocal do
+    if (D <> nil) and (D.State <> osDeleted) then
+      Inc(VisibleCount);
+
   GridDiameters.BeginUpdate;
   try
-    GridDiameters.RowCount := FDiametersLocal.Count;
+    GridDiameters.RowCount := VisibleCount;
   finally
     GridDiameters.EndUpdate;
   end;
@@ -696,19 +703,67 @@ end;
 
 
 procedure TFormTypeEditor.UpdatePointsGrid;
+var
+  P: TTypePoint;
+  VisibleCount: Integer;
 begin
-
   if FPointsLocal = nil then
-  begin
-   // ShowMessage('Список точек не инициализирован!');
-    Exit;  // Прерываем выполнение, если список не инициализирован
-  end;
+    Exit;
+
+  VisibleCount := 0;
+  for P in FPointsLocal do
+    if (P <> nil) and (P.State <> osDeleted) then
+      Inc(VisibleCount);
 
   GridPoints.BeginUpdate;
   try
-    GridPoints.RowCount := FPointsLocal.Count;
+    GridPoints.RowCount := VisibleCount;
   finally
     GridPoints.EndUpdate;
+  end;
+end;
+
+function TFormTypeEditor.GetDiameterByVisibleRow(ARow: Integer): TDiameter;
+var
+  D: TDiameter;
+  VisibleIndex: Integer;
+begin
+  Result := nil;
+
+  if (FDiametersLocal = nil) or (ARow < 0) then
+    Exit;
+
+  VisibleIndex := -1;
+  for D in FDiametersLocal do
+  begin
+    if (D <> nil) and (D.State <> osDeleted) then
+    begin
+      Inc(VisibleIndex);
+      if VisibleIndex = ARow then
+        Exit(D);
+    end;
+  end;
+end;
+
+function TFormTypeEditor.GetPointByVisibleRow(ARow: Integer): TTypePoint;
+var
+  P: TTypePoint;
+  VisibleIndex: Integer;
+begin
+  Result := nil;
+
+  if (FPointsLocal = nil) or (ARow < 0) then
+    Exit;
+
+  VisibleIndex := -1;
+  for P in FPointsLocal do
+  begin
+    if (P <> nil) and (P.State <> osDeleted) then
+    begin
+      Inc(VisibleIndex);
+      if VisibleIndex = ARow then
+        Exit(P);
+    end;
   end;
 end;
 
@@ -766,20 +821,7 @@ begin
 end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
-var
-  Repo: TTypeRepository;
 begin
-  // --------------------------------------------------
-  // Проверка наличия активного репозитория
-  // --------------------------------------------------
-  if (DataManager = nil) or (DataManager.ActiveTypeRepo = nil) then
-  begin
-    ShowMessage('Активный репозиторий типов не выбран');
-    Exit;
-  end;
-
-  Repo := DataManager.ActiveTypeRepo;
-
   // --------------------------------------------------
   // Валидация данных
   // --------------------------------------------------
@@ -789,31 +831,74 @@ begin
     Exit;
   end;
 
-  // --------------------------------------------------
-  // Сохранение типа
-  // --------------------------------------------------
-  if not Repo.SaveType(FType) then
-  begin
-    ShowMessage('Ошибка сохранения типа');
-    Exit;
-  end;
-
-  FModified := True;
   ModalResult := mrOk;
+end;
+
+procedure TFormTypeEditor.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  FreeAndNil(FType);
+  FOriginalType := nil;
+end;
+
+procedure TFormTypeEditor.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+var
+  Repo: TTypeRepository;
+begin
+  CanClose := True;
+
+  try
+    if ModalResult <> mrOk then
+      Exit;
+
+    if (DataManager = nil) or (DataManager.ActiveTypeRepo = nil) then
+      raise Exception.Create('Активный репозиторий типов не выбран');
+
+    if (FType = nil) or (Trim(FType.Name) = '') then
+      raise Exception.Create('Не задано наименование типа');
+
+    Repo := DataManager.ActiveTypeRepo;
+
+    if FOriginalType <> nil then
+    begin
+      FOriginalType.Assign(FType);
+      if not Repo.SaveType(FOriginalType) then
+        raise Exception.Create('Ошибка сохранения типа');
+    end
+    else
+    begin
+      if not Repo.SaveType(FType) then
+        raise Exception.Create('Ошибка сохранения типа');
+    end;
+
+    FModified := True;
+  except
+    on E: Exception do
+    begin
+      CanClose := False;
+      ShowMessage('Ошибка сохранения: ' + E.Message);
+    end;
+  end;
 end;
 
 procedure TFormTypeEditor.ButtonDiameterAddClick(Sender: TObject);
 var
   NewD: TDiameter;
   NewIndex: Integer;
+  SrcD: TDiameter;
+  SrcIndex: Integer;
 begin
   if FType = nil then
     Exit;
 
+  SrcIndex := -1;
+  SrcD := GetDiameterByVisibleRow(GridDiameters.Selected);
+  if (SrcD <> nil) and (FDiametersLocal <> nil) then
+    SrcIndex := FDiametersLocal.IndexOf(SrcD);
+
   {--------------------------------------------------}
   { Копируем диаметр }
   {--------------------------------------------------}
-  NewD := FType.CopyDiameter(GridDiameters.Selected);
+  NewD := FType.CopyDiameter(SrcIndex);
   if NewD = nil then
     Exit;
 
@@ -867,43 +952,23 @@ begin
 end;
 procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
-  SelRow: Integer;
+  D: TDiameter;
 begin
-  {----------------------------------}
-  { Текущая строка }
-  {----------------------------------}
-  SelRow := GridDiameters.Row;
-
-  if (FDiametersLocal = nil) then
+  if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
 
-  if (SelRow < 0) or (SelRow >= FDiametersLocal.Count) then
+  D := GetDiameterByVisibleRow(GridDiameters.Row);
+  if D = nil then
     Exit;
 
-  {----------------------------------}
-  { Удаляем выбранный диаметр }
-  {----------------------------------}
-  FDiametersLocal.Delete(SelRow);
-  // объект будет освобождён автоматически,
-  // если FDiametersLocal.OwnsObjects = True
-
-  {----------------------------------}
-  { Обновляем таблицу }
-  {----------------------------------}
-  UpdateDiametersGrid;
-
-  {----------------------------------}
-  { Корректируем выделение }
-  {----------------------------------}
-  if FDiametersLocal.Count > 0 then
-  begin
-    if SelRow >= FDiametersLocal.Count then
-      GridDiameters.Row := FDiametersLocal.Count - 1
-    else
-      GridDiameters.Row := SelRow;
-  end
+  if D.State = osNew then
+    FDiametersLocal.Remove(D)
   else
-    GridDiameters.Row := -1;
+    D.State := osDeleted;
+
+  GridDiameters.Row := -1;
+  UpdateDiametersGrid;
+  UpdatePointsGrid;
 
   SetModified;
 end;
@@ -991,39 +1056,22 @@ end;
 
 procedure TFormTypeEditor.ButtonPointDeleteClick(Sender: TObject);
 var
-  SelRow: Integer;
+  Point: TTypePoint;
 begin
-  if (FPointsLocal = nil) then
+  if (FType = nil) or (FPointsLocal = nil) then
     Exit;
 
-  {-----------------------------------------------------}
-  { Текущая строка }
-  {-----------------------------------------------------}
-  SelRow := GridPoints.Row;
-
-  if (SelRow < 0) or (SelRow >= FPointsLocal.Count) then
+  Point := GetPointByVisibleRow(GridPoints.Row);
+  if Point = nil then
     Exit;
 
-  {-----------------------------------------------------}
-  { Удаляем точку из ЛОКАЛЬНОГО списка }
-  { TObjectList освобождает объект сама }
-  {-----------------------------------------------------}
-  FPointsLocal.Delete(SelRow);
-
-  {-----------------------------------------------------}
-  { Обновляем таблицу }
-  {-----------------------------------------------------}
-  UpdatePointsGrid;
-
-  {-----------------------------------------------------}
-  { Корректируем выделение }
-  {-----------------------------------------------------}
-  if FPointsLocal.Count = 0 then
-    GridPoints.Row := -1
-  else if SelRow >= FPointsLocal.Count then
-    GridPoints.Row := FPointsLocal.Count - 1
+  if Point.State = osNew then
+    FPointsLocal.Remove(Point)
   else
-    GridPoints.Row := SelRow;
+    Point.State := osDeleted;
+
+  GridPoints.Row := -1;
+  UpdatePointsGrid;
 
   SetModified;
 end;
@@ -2367,19 +2415,9 @@ procedure TFormTypeEditor.GridDiametersGetValue(
 var
   D: TDiameter;
 begin
-  // -----------------------------------------------------
-  // Защита
-  // -----------------------------------------------------
-    if FDiametersLocal = nil then
-  begin
-  // ShowMessage('Список диаметров не инициализирован!');
-    Exit;  // Прерываем выполнение, если список не инициализирован
-  end;
-
-  if (ARow < 0) or (ARow > FDiametersLocal.Count-1) then
+  D := GetDiameterByVisibleRow(ARow);
+  if D = nil then
     Exit;
-
-  D := FDiametersLocal[ARow];
 
   // =====================================================
   // == Наименование
@@ -2443,24 +2481,17 @@ end;
 
 procedure TFormTypeEditor.GridDiametersSelChanged(Sender: TObject);
 var
-  Sel: Integer;
+  D: TDiameter;
   NewCoef: Double;
 begin
-  Sel := GridDiameters.Selected;
-
-  // ----------------------------------------
-  // Проверка
-  // ----------------------------------------
-  if (Sel < 0) or (Sel > FDiametersLocal.Count-1) then
+  D := GetDiameterByVisibleRow(GridDiameters.Selected);
+  if D = nil then
   begin
     FSelectedDiameterID := -1;
     Exit;
   end;
 
-  // ----------------------------------------
-  // Выбранный диаметр — из ЛОКАЛЬНОГО массива
-  // ----------------------------------------
-  FSelectedDiameterID := FDiametersLocal[Sel].ID;
+  FSelectedDiameterID := D.ID;
 
   // ----------------------------------------
   // Если диапазон не задан явно —
@@ -2474,8 +2505,8 @@ begin
   // ----------------------------------------
   if FType.FreqFlowRate = 0 then
   begin
-    if FDiametersLocal[Sel].Qmax > 0 then
-      NewCoef := FDiametersLocal[Sel].QFmax / FDiametersLocal[Sel].Qmax
+    if D.Qmax > 0 then
+      NewCoef := D.QFmax / D.Qmax
     else
       NewCoef := 0;
 
@@ -2491,8 +2522,8 @@ begin
   // ----------------------------------------
   if FType.Coef = 0 then
   begin
-    if FDiametersLocal[Sel].Qmax > 0 then
-      NewCoef := FDiametersLocal[Sel].Kp / FDiametersLocal[Sel].Qmax
+    if D.Qmax > 0 then
+      NewCoef := D.Kp / D.Qmax
     else
       NewCoef := 0;
 
@@ -2518,6 +2549,7 @@ var
   D: TDiameter;
   S: string;
   Qmax, RangeDynamic, NewCoef: Double;
+  SelD: TDiameter;
 begin
   {-----------------------------------------------------}
   { Защита }
@@ -2525,10 +2557,7 @@ begin
   if (FDiametersLocal = nil) then
     Exit;
 
-  if (ARow < 0) or (ARow >= FDiametersLocal.Count) then
-    Exit;
-
-  D := FDiametersLocal[ARow];
+  D := GetDiameterByVisibleRow(ARow);
   if D = nil then
     Exit;
 
@@ -2567,7 +2596,8 @@ begin
     else
       D.Qmin := 0;
 
-    if GridDiameters.Row = ARow then
+    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if SelD = D then
       RecalcPointsBySelectedDiameter;
   end
 
@@ -2608,7 +2638,8 @@ begin
         EditFreqFlowRate.TextPrompt := '-';
     end;
 
-    if GridDiameters.Row = ARow then
+    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if SelD = D then
       RecalcPointsBySelectedDiameter;
   end
 
@@ -2635,7 +2666,8 @@ begin
         EditCoef.TextPrompt := '-';
     end;
 
-    if GridDiameters.Row = ARow then
+    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if SelD = D then
       RecalcPointsBySelectedDiameter;
   end;
 
@@ -2660,10 +2692,7 @@ begin
   if (FPointsLocal = nil) then
     Exit;
 
-  if (ARow < 0) or (ARow >= FPointsLocal.Count) then
-    Exit;
-
-  P := FPointsLocal[ARow];
+  P := GetPointByVisibleRow(ARow);
   if P = nil then
     Exit;
 
@@ -2702,11 +2731,7 @@ begin
     if (FDiametersLocal = nil) then
       Exit;
 
-    if (GridDiameters.Row < 0) or
-       (GridDiameters.Row >= FDiametersLocal.Count) then
-      Exit;
-
-    D := FDiametersLocal[GridDiameters.Row];
+    D := GetDiameterByVisibleRow(GridDiameters.Row);
     if D = nil then
       Exit;
 
@@ -3099,18 +3124,12 @@ procedure TFormTypeEditor.GridPointsGetValue(
 var
   P: TTypePoint;
   Qmax, Q: Double;
-  DIndex: Integer;
+  D: TDiameter;
 begin
   {-----------------------------------------------------}
   { Защита }
   {-----------------------------------------------------}
-  if (FPointsLocal = nil) then
-    Exit;
-
-  if (ARow < 0) or (ARow >= FPointsLocal.Count) then
-    Exit;
-
-  P := FPointsLocal[ARow];
+  P := GetPointByVisibleRow(ARow);
   if P = nil then
     Exit;
 
@@ -3188,16 +3207,14 @@ begin
   else if (ACol = StringColumnPointQ.Index) or
           (ACol = StringColumnPointVolume.Index) then
   begin
-    if (FDiametersLocal = nil) or
-       (GridDiameters.Row < 0) or
-       (GridDiameters.Row >= FDiametersLocal.Count) then
+    D := GetDiameterByVisibleRow(GridDiameters.Row);
+    if D = nil then
     begin
       Value := '—';
       Exit;
     end;
 
-    DIndex := GridDiameters.Row;
-    Qmax := FDiametersLocal[DIndex].Qmax;
+    Qmax := D.Qmax;
 
     Q := P.FlowRate * Qmax;
 
@@ -3321,20 +3338,19 @@ end;
 
 procedure TFormTypeEditor.UpdateRangeDynamicPromptBySelectedDiameter;
 var
-  SelRow: Integer;
+  D: TDiameter;
   Qmax, Qmin: Double;
   RangeDynamic: Integer;
 begin
   // очищаем prompt по умолчанию
   EditRangeDynamic.TextPrompt := '';
 
-  // текущая строка грида (FMX!)
-  SelRow := GridDiameters.Row;
-  if (SelRow < 0) or (SelRow > FDiametersLocal.Count-1) then
+  D := GetDiameterByVisibleRow(GridDiameters.Row);
+  if D = nil then
     Exit;
 
-  Qmax := FDiametersLocal[SelRow].Qmax;
-  Qmin := FDiametersLocal[SelRow].Qmin;
+  Qmax := D.Qmax;
+  Qmin := D.Qmin;
 
   // считаем только если оба значения осмысленные
   if (Qmax > 0) and (Qmin > 0) then

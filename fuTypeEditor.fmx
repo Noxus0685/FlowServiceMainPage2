@@ -7,6 +7,8 @@ object FormTypeEditor: TFormTypeEditor
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
+  OnClose = FormClose
+  OnCloseQuery = FormCloseQuery
   DesignerMasterStyle = 0
   object layLeft: TLayout
     Align = Left
