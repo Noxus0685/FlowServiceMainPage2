@@ -340,8 +340,6 @@ type
    procedure LoadPoints;
   procedure LoadDiameters;
   procedure RecalcDiametersKp;
-  procedure SortDiametersLocal;
-  procedure SortPointsLocal;
 
   public
 
@@ -690,8 +688,6 @@ begin
   if FDiametersLocal = nil then
     Exit;
 
-  SortDiametersLocal;
-
   VisibleCount := 0;
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
@@ -714,8 +710,6 @@ begin
   if FPointsLocal = nil then
     Exit;
 
-  SortPointsLocal;
-
   VisibleCount := 0;
   for P in FPointsLocal do
     if (P <> nil) and (P.State <> osDeleted) then
@@ -727,47 +721,6 @@ begin
   finally
     GridPoints.EndUpdate;
   end;
-end;
-
-procedure TFormTypeEditor.SortDiametersLocal;
-begin
-  if FDiametersLocal = nil then
-    Exit;
-
-  FDiametersLocal.Sort(
-    TComparer<TDiameter>.Construct(
-      function(const L, R: TDiameter): Integer
-      begin
-        if L = nil then
-          Exit(-1);
-        if R = nil then
-          Exit(1);
-        Result := StrToIntDef(L.DN, 0) - StrToIntDef(R.DN, 0);
-      end
-    )
-  );
-end;
-
-procedure TFormTypeEditor.SortPointsLocal;
-begin
-  if FPointsLocal = nil then
-    Exit;
-
-  FPointsLocal.Sort(
-    TComparer<TTypePoint>.Construct(
-      function(const L, R: TTypePoint): Integer
-      begin
-        if L = nil then
-          Exit(-1);
-        if R = nil then
-          Exit(1);
-
-        Result := CompareValue(L.FlowRate, R.FlowRate);
-        if Result = 0 then
-          Result := L.Num - R.Num;
-      end
-    )
-  );
 end;
 
 function TFormTypeEditor.GetDiameterByVisibleRow(ARow: Integer): TDiameter;
