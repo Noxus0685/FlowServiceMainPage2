@@ -345,6 +345,7 @@ type
 
     procedure Assign(ASource: TDeviceType);
     function Clone: TDeviceType;
+    function GetSearchText: string; override;
 
     function CompareTo(const B: TDeviceType; ASortField: TDeviceTypeSortField): Integer;
 
@@ -870,6 +871,20 @@ begin
     sfValidityDate:
       Result := CompareDateTime(ValidityDate, B.ValidityDate);
   end;
+end;
+
+function TDeviceType.GetSearchText: string;
+begin
+  Result := Trim(
+    Name + ' ' +
+    Modification + ' ' +
+    Manufacturer + ' ' +
+    ReestrNumber + ' ' +
+    CategoryName + ' ' +
+    AccuracyClass + ' ' +
+    VerificationMethod + ' ' +
+    ProcedureName
+  );
 end;
 
 function SortDeviceTypes(
