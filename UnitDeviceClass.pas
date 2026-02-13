@@ -342,9 +342,6 @@ type
       ASortField: Integer
     ): Integer; override;
 
-    function GetSearchText: string; override;
-    function GetFilterDate: TDate; override;
-
     function CompareTo(
       const B: TDevice;
       ASortField: TDeviceSortField
@@ -721,28 +718,6 @@ begin
     Exit(inherited CompareTo(B, ASortField));
 
   Result := CompareTo(TDevice(B), TDeviceSortField(ASortField));
-end;
-
-function TDevice.GetSearchText: string;
-begin
-  Result := Trim(
-    Name + ' ' +
-    SerialNumber + ' ' +
-    Manufacturer + ' ' +
-    Owner + ' ' +
-    ReestrNumber + ' ' +
-    CategoryName + ' ' +
-    Modification + ' ' +
-    AccuracyClass + ' ' +
-    VerificationMethod + ' ' +
-    ProcedureName + ' ' +
-    DN
-  );
-end;
-
-function TDevice.GetFilterDate: TDate;
-begin
-  Result := RegDate;
 end;
 
 function TDevice.CompareTo(
