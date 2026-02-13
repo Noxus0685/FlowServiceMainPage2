@@ -341,7 +341,7 @@ type
     function CompareTo(
       const B: TTypeEntity;
       ASortField: Integer
-    ): Integer; overload;
+    ): Integer; override;
 
     function CompareTo(
       const B: TDevice;
