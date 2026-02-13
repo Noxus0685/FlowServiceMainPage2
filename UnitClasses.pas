@@ -345,6 +345,7 @@ type
 
     procedure Assign(ASource: TDeviceType);
     function Clone: TDeviceType;
+    function GetSearchText: string; override;
 
     function CompareTo(const B: TDeviceType; ASortField: TDeviceTypeSortField): Integer;
     function GetSearchText: string; override;

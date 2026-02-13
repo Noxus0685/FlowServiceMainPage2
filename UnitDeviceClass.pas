@@ -336,6 +336,7 @@ type
 
     procedure Assign(ASource: TDevice);
     function Clone: TDevice;
+    function GetSearchText: string; override;
 
     function CompareTo(
       const B: TTypeEntity;
@@ -707,6 +708,23 @@ begin
   Result.Assign(Self);
   Result.ID := ID;
   Result.MitUUID := MitUUID;
+end;
+
+function TDevice.GetSearchText: string;
+begin
+  Result := Trim(
+    Name + ' ' +
+    SerialNumber + ' ' +
+    Manufacturer + ' ' +
+    Owner + ' ' +
+    ReestrNumber + ' ' +
+    CategoryName + ' ' +
+    Modification + ' ' +
+    AccuracyClass + ' ' +
+    VerificationMethod + ' ' +
+    ProcedureName + ' ' +
+    DN
+  );
 end;
 
 function TDevice.CompareTo(
