@@ -626,8 +626,13 @@ end;
 
 procedure TFormDeviceSelect.ButtonDeviceAddClick(Sender: TObject);
 var
+<<<<<<< codex/fix-device-addition-functionality-bwgyzz
+  NewDevice, SrcDevice: TDevice;
+  SelRow, NewRow: Integer;
+=======
   SrcDevice: TDevice;
   SelRow: Integer;
+>>>>>>> main
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
@@ -646,6 +651,15 @@ begin
 
   SelRow := GridDevices.Row;
   SrcDevice := nil;
+<<<<<<< codex/fix-device-addition-functionality-bwgyzz
+
+  if (FDevFilteredDevices <> nil) and
+     (SelRow >= 0) and
+     (SelRow < FDevFilteredDevices.Count) then
+    SrcDevice := FDevFilteredDevices[SelRow];
+
+  NewDevice := ActiveRepo.CreateDevice(SrcDevice);
+=======
 
   if (FDevFilteredDevices <> nil) and
      (SelRow >= 0) and
@@ -653,6 +667,7 @@ begin
     SrcDevice := FDevFilteredDevices[SelRow];
 
   ActiveRepo.CreateDevice(SrcDevice);
+>>>>>>> main
 
 
   {--------------------------------------------------}
@@ -665,7 +680,16 @@ begin
   {--------------------------------------------------}
   { 4. Выделяем добавленную строку }
   {--------------------------------------------------}
-  if GridDevices.RowCount > 0 then
+  GridDevices.Row := -1;
+  if (NewDevice <> nil) and (FDevFilteredDevices <> nil) then
+    for NewRow := 0 to FDevFilteredDevices.Count - 1 do
+      if FDevFilteredDevices[NewRow] = NewDevice then
+      begin
+        GridDevices.Row := NewRow;
+        Break;
+      end;
+
+  if (GridDevices.Row < 0) and (GridDevices.RowCount > 0) then
     GridDevices.Row := GridDevices.RowCount - 1;
 end;
 
@@ -765,6 +789,7 @@ end;
 procedure TFormDeviceSelect.ApplyFilter;
 var
   SourceDevices: TObjectList<TDevice>;
+  DateFilterEnabled: Boolean;
 begin
   {----------------------------------}
   { 1. Фильтр по дереву }
@@ -789,23 +814,27 @@ begin
   { 3. Фильтр по дате }
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
+  DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
   FDevFilteredByDate :=
     TEntityFilters<TDevice>.ApplyDateFilter(
       FDevFilteredByText,
       DateEditFilter.Date,
-      not DateEditFilter.IsEmpty
+      DateFilterEnabled
     );
 
   {----------------------------------}
   { 4. Сортировка }
   {----------------------------------}
   FreeAndNil(FDevFilteredDevices);
-  FDevFilteredDevices :=
-    TEntitySorter<TDevice>.Sort(
-      FDevFilteredByDate,
-      Ord(ColumnToSortField(FSortColumn)),
-      FSortAscending
-    );
+  if FDevFilteredByDate = nil then
+    FDevFilteredDevices := TObjectList<TDevice>.Create(False)
+  else
+    FDevFilteredDevices :=
+      TEntitySorter<TDevice>.Sort(
+        FDevFilteredByDate,
+        Ord(ColumnToSortField(FSortColumn)),
+        FSortAscending
+      );
 end;
 
 function TFormDeviceSelect.BuildFilteredByTree(
@@ -1544,16 +1573,19 @@ end;
 
 
 procedure TFormDeviceSelect.DateEditFilterChange(Sender: TObject);
+var
+  DateFilterEnabled: Boolean;
 begin
   {----------------------------------}
   { Фильтр по дате поверх текста }
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
+  DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
   FDevFilteredByDate :=
     TEntityFilters<TDevice>.ApplyDateFilter(
       FDevFilteredByText,
       DateEditFilter.Date,
-      not DateEditFilter.IsEmpty
+      DateFilterEnabled
     );
 
   {----------------------------------}
