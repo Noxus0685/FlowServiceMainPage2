@@ -165,6 +165,9 @@ private
   ): TObjectList<TDevice>;
 
   function PassTreeFilter(const ADevice: TDevice): Boolean;
+  function BuildTextFilteredDevices(const Source: TObjectList<TDevice>; const AText: string): TObjectList<TDevice>;
+  function BuildDateFilteredDevices(const Source: TObjectList<TDevice>; ADate: TDate; AEnabled: Boolean): TObjectList<TDevice>;
+  function SortDevices(const Source: TObjectList<TDevice>): TObjectList<TDevice>;
   function BuildSearchURL(const ASearch: string): string;
 
   { ================= СОРТИРОВКА ================= }
@@ -627,7 +630,7 @@ end;
 procedure TFormDeviceSelect.ButtonDeviceAddClick(Sender: TObject);
 var
   NewDevice, SrcDevice: TDevice;
-  SelRow: Integer;
+  SelRow, NewRow: Integer;
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
@@ -645,8 +648,14 @@ begin
 
 
   SelRow := GridDevices.Row;
+  SrcDevice := nil;
 
-  NewDevice := ActiveRepo.CreateDevice(SelRow);
+  if (FDevFilteredDevices <> nil) and
+     (SelRow >= 0) and
+     (SelRow < FDevFilteredDevices.Count) then
+    SrcDevice := FDevFilteredDevices[SelRow];
+
+  NewDevice := ActiveRepo.CreateDevice(SrcDevice);
 
 
   {--------------------------------------------------}
@@ -659,7 +668,16 @@ begin
   {--------------------------------------------------}
   { 4. Выделяем добавленную строку }
   {--------------------------------------------------}
-  if GridDevices.RowCount > 0 then
+  GridDevices.Row := -1;
+  if (NewDevice <> nil) and (FDevFilteredDevices <> nil) then
+    for NewRow := 0 to FDevFilteredDevices.Count - 1 do
+      if FDevFilteredDevices[NewRow] = NewDevice then
+      begin
+        GridDevices.Row := NewRow;
+        Break;
+      end;
+
+  if (GridDevices.Row < 0) and (GridDevices.RowCount > 0) then
     GridDevices.Row := GridDevices.RowCount - 1;
 end;
 
@@ -759,6 +777,7 @@ end;
 procedure TFormDeviceSelect.ApplyFilter;
 var
   SourceDevices: TObjectList<TDevice>;
+  DateFilterEnabled: Boolean;
 begin
   {----------------------------------}
   { 1. Фильтр по дереву }
@@ -773,33 +792,92 @@ begin
   { 2. Текстовый фильтр }
   {----------------------------------}
   FreeAndNil(FDevFilteredByText);
-  FDevFilteredByText :=
-    TEntityFilters<TDevice>.ApplyTextFilter(
-      FDevFilteredByTree,
-      Trim(EditFindDevice.Text)
-    );
+  FDevFilteredByText := BuildTextFilteredDevices(FDevFilteredByTree, Trim(EditFindDevice.Text));
 
   {----------------------------------}
   { 3. Фильтр по дате }
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
-  FDevFilteredByDate :=
-    TEntityFilters<TDevice>.ApplyDateFilter(
-      FDevFilteredByText,
-      DateEditFilter.Date,
-      not DateEditFilter.IsEmpty
-    );
+  DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
+  FDevFilteredByDate := BuildDateFilteredDevices(FDevFilteredByText, DateEditFilter.Date, DateFilterEnabled);
 
   {----------------------------------}
   { 4. Сортировка }
   {----------------------------------}
   FreeAndNil(FDevFilteredDevices);
-  FDevFilteredDevices :=
-    TEntitySorter<TDevice>.Sort(
-      FDevFilteredByDate,
-      Ord(ColumnToSortField(FSortColumn)),
-      FSortAscending
-    );
+  FDevFilteredDevices := SortDevices(FDevFilteredByDate);
+end;
+
+function TFormDeviceSelect.BuildTextFilteredDevices(const Source: TObjectList<TDevice>; const AText: string): TObjectList<TDevice>;
+var
+  D: TDevice;
+  FindText: string;
+begin
+  Result := TObjectList<TDevice>.Create(False);
+  if Source = nil then
+    Exit;
+
+  FindText := UpperCase(Trim(AText));
+  if FindText = '' then
+  begin
+    Result.AddRange(Source);
+    Exit;
+  end;
+
+  for D in Source do
+    if (D <> nil) and (Pos(FindText, UpperCase(D.GetSearchText)) > 0) then
+      Result.Add(D);
+end;
+
+function TFormDeviceSelect.BuildDateFilteredDevices(const Source: TObjectList<TDevice>; ADate: TDate; AEnabled: Boolean): TObjectList<TDevice>;
+var
+  D: TDevice;
+begin
+  Result := TObjectList<TDevice>.Create(False);
+  if Source = nil then
+    Exit;
+
+  if not AEnabled then
+  begin
+    Result.AddRange(Source);
+    Exit;
+  end;
+
+  for D in Source do
+    if (D <> nil) and (D.RegDate >= ADate) then
+      Result.Add(D);
+end;
+
+function TFormDeviceSelect.SortDevices(const Source: TObjectList<TDevice>): TObjectList<TDevice>;
+var
+  SortField: TDeviceSortField;
+begin
+  Result := TObjectList<TDevice>.Create(False);
+  if Source = nil then
+    Exit;
+
+  Result.AddRange(Source);
+  SortField := ColumnToSortField(FSortColumn);
+
+  Result.Sort(
+    TComparer<TDevice>.Construct(
+      function(const L, R: TDevice): Integer
+      var
+        Cmp: Integer;
+      begin
+        if L = nil then
+          Exit(-1);
+        if R = nil then
+          Exit(1);
+
+        Cmp := L.CompareTo(R, SortField);
+        if FSortAscending then
+          Result := Cmp
+        else
+          Result := -Cmp;
+      end
+    )
+  );
 end;
 
 function TFormDeviceSelect.BuildFilteredByTree(
@@ -1420,11 +1498,17 @@ begin
   if ACol = StringColumnName.Index then
     Result := dsfName
 
+  else if ACol = StringColumnSerial.Index then
+    Result := dsfSerialNumber
+
   else if ACol = StringColumnCategory.Index then
     Result := dsfCategory
 
   else if ACol = StringColumnManufacturer.Index then
     Result := dsfManufacturer
+
+  else if ACol = StringColumnOwner.Index then
+    Result := dsfOwner
 
   else if ACol = StringColumnModification.Index then
     Result := dsfModification
@@ -1449,6 +1533,9 @@ begin
 
   else if ACol = StringColumnValidityDate.Index then
     Result := dsfValidityDate
+
+  else if ACol = StringColumnDateOfManufacture.Index then
+    Result := dsfDateOfManufacture
 
   else
     Result := dsfName; // безопасный дефолт
@@ -1529,28 +1616,21 @@ end;
 
 
 procedure TFormDeviceSelect.DateEditFilterChange(Sender: TObject);
+var
+  DateFilterEnabled: Boolean;
 begin
   {----------------------------------}
   { Фильтр по дате поверх текста }
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
-  FDevFilteredByDate :=
-    TEntityFilters<TDevice>.ApplyDateFilter(
-      FDevFilteredByText,
-      DateEditFilter.Date,
-      not DateEditFilter.IsEmpty
-    );
+  DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
+  FDevFilteredByDate := BuildDateFilteredDevices(FDevFilteredByText, DateEditFilter.Date, DateFilterEnabled);
 
   {----------------------------------}
   { Сортировка }
   {----------------------------------}
   FreeAndNil(FDevFilteredDevices);
-  FDevFilteredDevices :=
-    TEntitySorter<TDevice>.Sort(
-      FDevFilteredByDate,
-      Ord(ColumnToSortField(FSortColumn)),
-      FSortAscending
-    );
+  FDevFilteredDevices := SortDevices(FDevFilteredByDate);
 
   {----------------------------------}
   { Обновление таблицы }
@@ -1743,12 +1823,7 @@ begin
   { Сортируем ТЕКУЩИЙ результат }
   {----------------------------------}
   FreeAndNil(FDevFilteredDevices);
-  FDevFilteredDevices :=
-    TEntitySorter<TDevice>.Sort(
-      FDevFilteredByDate,          // текущий список после всех фильтров
-      Ord(ColumnToSortField(FSortColumn)),
-      FSortAscending
-    );
+  FDevFilteredDevices := SortDevices(FDevFilteredByDate); // текущий список после всех фильтров
 
   {----------------------------------}
   { Обновление таблицы }

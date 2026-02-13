@@ -159,6 +159,9 @@ type
 
 
     function PassTreeFilter(const AType: TDeviceType): Boolean;
+    function BuildTextFilteredTypes(const Source: TObjectList<TDeviceType>; const AText: string): TObjectList<TDeviceType>;
+    function BuildDateFilteredTypes(const Source: TObjectList<TDeviceType>; ADate: TDate; AEnabled: Boolean): TObjectList<TDeviceType>;
+    function SortTypesLocal(const Source: TObjectList<TDeviceType>): TObjectList<TDeviceType>;
     function BuildSearchURL(const ASearch: string): string;
 
     procedure FillComboBoxRepository;
@@ -446,6 +449,8 @@ begin
 end;
 
 procedure TFormTypeSelect.ApplyFilter;
+var
+  DateFilterEnabled: Boolean;
 begin
   {----------------------------------}
   { 1. Фильтр по дереву  }
@@ -458,36 +463,95 @@ begin
   { 2. Текстовый фильтр }
   {----------------------------------}
   FreeAndNil(FDevFilteredByText);
-
-  FDevFilteredByText :=
-  TEntityFilters<TDeviceType>.ApplyTextFilter(
-    FDevFilteredByTree,
-    EditFindType.Text
-  );
+  FDevFilteredByText := BuildTextFilteredTypes(FDevFilteredByTree, EditFindType.Text);
 
   {----------------------------------}
   { 3. Фильтр по дате }
   {----------------------------------}
-FreeAndNil(FDevFilteredByDate);
-FDevFilteredByDate :=
-  TEntityFilters<TDeviceType>.ApplyDateFilter(
-    FDevFilteredByText,
-    DateEditFilter.Date,
-    not DateEditFilter.IsEmpty
-  );
+  FreeAndNil(FDevFilteredByDate);
+  DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
+  FDevFilteredByDate := BuildDateFilteredTypes(FDevFilteredByText, DateEditFilter.Date, DateFilterEnabled);
 
 
   {----------------------------------}
   { 4. Сортировка }
   {----------------------------------}
   FreeAndNil(FDevFilteredTypes);
-  FDevFilteredTypes :=
-    SortDeviceTypes(
-      FDevFilteredByDate,
-      ColumnToSortField(FSortColumn),
-      FSortAscending
-    );
+  FDevFilteredTypes := SortTypesLocal(FDevFilteredByDate);
 
+end;
+
+
+function TFormTypeSelect.BuildTextFilteredTypes(const Source: TObjectList<TDeviceType>; const AText: string): TObjectList<TDeviceType>;
+var
+  T: TDeviceType;
+  FindText: string;
+begin
+  Result := TObjectList<TDeviceType>.Create(False);
+  if Source = nil then
+    Exit;
+
+  FindText := UpperCase(Trim(AText));
+  if FindText = '' then
+  begin
+    Result.AddRange(Source);
+    Exit;
+  end;
+
+  for T in Source do
+    if (T <> nil) and (Pos(FindText, UpperCase(T.GetSearchText)) > 0) then
+      Result.Add(T);
+end;
+
+function TFormTypeSelect.BuildDateFilteredTypes(const Source: TObjectList<TDeviceType>; ADate: TDate; AEnabled: Boolean): TObjectList<TDeviceType>;
+var
+  T: TDeviceType;
+begin
+  Result := TObjectList<TDeviceType>.Create(False);
+  if Source = nil then
+    Exit;
+
+  if not AEnabled then
+  begin
+    Result.AddRange(Source);
+    Exit;
+  end;
+
+  for T in Source do
+    if (T <> nil) and (T.RegDate >= ADate) then
+      Result.Add(T);
+end;
+
+function TFormTypeSelect.SortTypesLocal(const Source: TObjectList<TDeviceType>): TObjectList<TDeviceType>;
+var
+  SortField: TDeviceTypeSortField;
+begin
+  Result := TObjectList<TDeviceType>.Create(False);
+  if Source = nil then
+    Exit;
+
+  Result.AddRange(Source);
+  SortField := ColumnToSortField(FSortColumn);
+
+  Result.Sort(
+    TComparer<TDeviceType>.Construct(
+      function(const L, R: TDeviceType): Integer
+      var
+        Cmp: Integer;
+      begin
+        if L = nil then
+          Exit(-1);
+        if R = nil then
+          Exit(1);
+
+        Cmp := L.CompareTo(R, SortField);
+        if FSortAscending then
+          Result := Cmp
+        else
+          Result := -Cmp;
+      end
+    )
+  );
 end;
 
 procedure TFormTypeSelect.ButtonTypeAddClick(Sender: TObject);
@@ -619,29 +683,22 @@ begin
 end;
 
 procedure TFormTypeSelect.DateEditFilterChange(Sender: TObject);
+var
+  DateFilterEnabled: Boolean;
 begin
   {----------------------------------}
   { Фильтр по дате поверх текста }
   {----------------------------------}
-FreeAndNil(FDevFilteredByDate);
-FDevFilteredByDate :=
-  TEntityFilters<TDeviceType>.ApplyDateFilter(
-    FDevFilteredByText,
-    DateEditFilter.Date,
-    not DateEditFilter.IsEmpty
-  );
+  FreeAndNil(FDevFilteredByDate);
+  DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
+  FDevFilteredByDate := BuildDateFilteredTypes(FDevFilteredByText, DateEditFilter.Date, DateFilterEnabled);
 
 
   {----------------------------------}
   { Сортировка }
   {----------------------------------}
   FreeAndNil(FDevFilteredTypes);
-  FDevFilteredTypes :=
-    SortDeviceTypes(
-      FDevFilteredByDate,
-      ColumnToSortField(FSortColumn),
-      FSortAscending
-    );
+  FDevFilteredTypes := SortTypesLocal(FDevFilteredByDate);
 
   {----------------------------------}
   { Обновление таблицы }
@@ -857,12 +914,7 @@ begin
   { Сортируем ТЕКУЩИЙ результат }
   {----------------------------------}
   FreeAndNil(FDevFilteredTypes);
-  FDevFilteredTypes :=
-    SortDeviceTypes(
-      FDevFilteredByDate,          // текущий список после всех фильтров
-      ColumnToSortField(FSortColumn),
-      FSortAscending
-    );
+  FDevFilteredTypes := SortTypesLocal(FDevFilteredByDate); // текущий список после всех фильтров
 
   {----------------------------------}
   { Обновление таблицы }
