@@ -193,6 +193,9 @@ begin
   if Assigned(TypesConnection) then
     TypesConnection.Connected := False;
 
+  if Assigned(DevicesConnection) then
+    DevicesConnection.Connected := False;
+
   inherited;
 end;
 
@@ -208,15 +211,42 @@ begin
     TFile.Create(FDatabaseFileName).Free;
   end;
 
+  { Важно: в DFM оба Connection могут быть уже Connected=True.
+    Чтобы гарантированно переключиться на нужный файл БД,
+    сначала отключаем их, затем задаём параметры и подключаем заново. }
+  TypesConnection.Connected := False;
+  DevicesConnection.Connected := False;
+
   TypesConnection.DriverName := 'SQLite';
   TypesConnection.Params.Database := FDatabaseFileName;
   TypesConnection.LoginPrompt := False;
   TypesConnection.Connected := True;
+
+  DevicesConnection.DriverName := 'SQLite';
+  DevicesConnection.Params.Database := FDatabaseFileName;
+  DevicesConnection.LoginPrompt := False;
+  DevicesConnection.Connected := True;
+
+  try
+    TFile.AppendAllText(
+      TPath.Combine(TPath.GetTempPath, 'FlowService_DevicePoint_Debug.log'),
+      FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) +
+      ' | OpenDB | File=' + FDatabaseFileName +
+      ' | TypesDB=' + TypesConnection.Params.Database +
+      ' | DevicesDB=' + DevicesConnection.Params.Database +
+      ' | TypesConnected=' + BoolToStr(TypesConnection.Connected, True) +
+      ' | DevicesConnected=' + BoolToStr(DevicesConnection.Connected, True) + sLineBreak,
+      TEncoding.UTF8
+    );
+  except
+    { no-op }
+  end;
 end;
 
 procedure TDM.CloseDB;
 begin
   TypesConnection.Connected := False;
+  DevicesConnection.Connected := False;
 end;
 
 function TDM.CreateQuery: TFDQuery;
