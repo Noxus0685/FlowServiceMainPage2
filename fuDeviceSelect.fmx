@@ -121,8 +121,8 @@ object FormDeviceSelect: TFormDeviceSelect
         Size.PlatformDefault = False
         TabOrder = 0
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-        OnGetValue = GridDevicesGetValue
         OnHeaderClick = GridDevicesHeaderClick
+        OnGetValue = GridDevicesGetValue
         Viewport.Width = 897.000000000000000000
         Viewport.Height = 493.000000000000000000
         object StringColumnName: TStringColumn
@@ -390,8 +390,8 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout

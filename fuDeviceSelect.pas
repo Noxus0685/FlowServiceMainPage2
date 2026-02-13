@@ -626,13 +626,11 @@ end;
 
 procedure TFormDeviceSelect.ButtonDeviceAddClick(Sender: TObject);
 var
-<<<<<<< codex/fix-device-addition-functionality-bwgyzz
-  NewDevice, SrcDevice: TDevice;
-  SelRow, NewRow: Integer;
-=======
+
   SrcDevice: TDevice;
   SelRow: Integer;
->>>>>>> main
+  NewDevice: TDevice;
+  NewRow: Integer;
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
@@ -651,15 +649,7 @@ begin
 
   SelRow := GridDevices.Row;
   SrcDevice := nil;
-<<<<<<< codex/fix-device-addition-functionality-bwgyzz
 
-  if (FDevFilteredDevices <> nil) and
-     (SelRow >= 0) and
-     (SelRow < FDevFilteredDevices.Count) then
-    SrcDevice := FDevFilteredDevices[SelRow];
-
-  NewDevice := ActiveRepo.CreateDevice(SrcDevice);
-=======
 
   if (FDevFilteredDevices <> nil) and
      (SelRow >= 0) and
@@ -667,7 +657,7 @@ begin
     SrcDevice := FDevFilteredDevices[SelRow];
 
   ActiveRepo.CreateDevice(SrcDevice);
->>>>>>> main
+
 
 
   {--------------------------------------------------}
