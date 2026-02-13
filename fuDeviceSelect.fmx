@@ -331,6 +331,7 @@ object FormDeviceSelect: TFormDeviceSelect
           StyleLookup = 'infotoolbutton'
           Text = 'SpeedButtonFindInternet'
           TextSettings.Trimming = None
+          OnClick = SpeedButtonFindInternetClick
         end
       end
       object Layout3: TLayout

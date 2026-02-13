@@ -123,6 +123,7 @@ type
     procedure CornerButtonEditDeviceClick(Sender: TObject);
     procedure miAddTestDataClick(Sender: TObject);
     procedure miLoadClick(Sender: TObject);
+    procedure SpeedButtonFindInternetClick(Sender: TObject);
 
 private
 
@@ -866,6 +867,275 @@ begin
    ApplyFilter;
     UpdateGridDevices;
 end;
+
+
+procedure TFormDeviceSelect.SpeedButtonFindInternetClick(Sender: TObject);
+var
+  Resp: IHTTPResponse;
+  Url: string;
+  ResponseText: string;
+
+  Json: TJSONObject;
+  ResultObj: TJSONObject;
+  Items: TJSONArray;
+  Item: TJSONObject;
+
+  I: Integer;
+  SearchText: string;
+  DetectText: string;
+
+  CurrentYear: Integer;
+  StartYear: Integer;
+  SearchYear: Integer;
+  TotalCount: Integer;
+  FoundCount: Integer;
+
+  Dev: TDevice;
+  FoundType: TDeviceType;
+  FoundRepo: TTypeRepository;
+
+  ImportedReestr: string;
+  ImportedCategoryName: string;
+  ImportedDeviceTypeName: string;
+  ImportedModification: string;
+  ImportedSerialNumber: string;
+  ImportedOwner: string;
+  ImportedRegDate: TDate;
+  ImportedValidityDate: TDate;
+  ImportedDocNum: string;
+
+  function TryParseArshinDate(const S: string; out ADate: TDate): Boolean;
+  var
+    STrim, SDay, SMonth, SYear: string;
+    P1, P2: Integer;
+    D, M, Y: Integer;
+  begin
+    Result := False;
+    ADate := 0;
+
+    STrim := Trim(S);
+    P1 := Pos('.', STrim);
+    if P1 <= 0 then
+      Exit;
+
+    P2 := PosEx('.', STrim, P1 + 1);
+    if P2 <= 0 then
+      Exit;
+
+    if PosEx('.', STrim, P2 + 1) > 0 then
+      Exit;
+
+    SDay := Copy(STrim, 1, P1 - 1);
+    SMonth := Copy(STrim, P1 + 1, P2 - P1 - 1);
+    SYear := Copy(STrim, P2 + 1, MaxInt);
+
+    if not TryStrToInt(SDay, D) then
+      Exit;
+
+    if not TryStrToInt(SMonth, M) then
+      Exit;
+
+    if not TryStrToInt(SYear, Y) then
+      Exit;
+
+  //  Result := TryEncodeDate(Y, M, D, ADate);
+  end;
+
+  function FindTypeByReestrNumber(
+    const AReestrNumber: string;
+    out ARepo: TTypeRepository
+  ): TDeviceType;
+  var
+    Repo: TTypeRepository;
+    T: TDeviceType;
+  begin
+    Result := nil;
+    ARepo := nil;
+
+    if (AReestrNumber = '') or (DataManager = nil) then
+      Exit;
+
+    for Repo in DataManager.TypeRepositories do
+    begin
+      if (Repo = nil) or (Repo.Types = nil) then
+        Continue;
+
+      for T in Repo.Types do
+        if SameText(Trim(T.ReestrNumber), Trim(AReestrNumber)) then
+        begin
+          Result := T;
+          ARepo := Repo;
+          Exit;
+        end;
+    end;
+  end;
+
+begin
+  MemoLog.Visible := True;
+  MemoLog.Lines.Clear;
+
+  if EditFindDevice.Text.Trim = '' then
+  begin
+    MemoLog.Lines.Add('Пустая строка поиска');
+    Exit;
+  end;
+
+  if ActiveRepo = nil then
+  begin
+    MemoLog.Lines.Add('Активный репозиторий не инициализирован');
+    Exit;
+  end;
+
+  CurrentYear := YearOf(Date);
+  if not DateEditFilter.IsEmpty then
+    StartYear := YearOf(DateEditFilter.Date)
+  else
+    StartYear := CurrentYear;
+
+  if StartYear < 2010 then
+    StartYear := 2010;
+
+  if StartYear > CurrentYear then
+    StartYear := CurrentYear;
+
+  SearchText := '*' + EditFindDevice.Text.Trim + '*';
+  FoundCount := 0;
+
+  try
+    for SearchYear := StartYear to CurrentYear do
+    begin
+      Url :=
+        'https://fgis.gost.ru/fundmetrologytest/eapi/vri/' +
+        '?year=' + SearchYear.ToString +
+        '&search=' + TNetEncoding.URL.Encode(SearchText) +
+        '&rows=100&start=0';
+
+      Resp := NetHTTPClient1.Get(Url);
+      ResponseText := Resp.ContentAsString;
+
+      MemoLog.Lines.Add('URL: ' + Url);
+      MemoLog.Lines.Add('Status: ' + Resp.StatusCode.ToString);
+
+      Json := TJSONObject.ParseJSONValue(ResponseText) as TJSONObject;
+      try
+        if Json = nil then
+          Continue;
+
+        ResultObj := Json.GetValue('result') as TJSONObject;
+        if ResultObj = nil then
+          Continue;
+
+        TotalCount := ResultObj.GetValue<Integer>('count');
+        MemoLog.Lines.Add('Count: ' + TotalCount.ToString);
+
+        if TotalCount <= 0 then
+          Continue;
+
+        Items := ResultObj.GetValue('items') as TJSONArray;
+        if Items = nil then
+          Continue;
+
+        for I := 0 to Items.Count - 1 do
+        begin
+          Item := Items.Items[I] as TJSONObject;
+          if Item = nil then
+            Continue;
+
+          Dev := ActiveRepo.CreateDevice(-1);
+
+          if Item.GetValue('vri_id') <> nil then
+            Dev.MitUUID := Item.GetValue('vri_id').Value;
+
+          ImportedOwner := '';
+          ImportedReestr := '';
+          ImportedCategoryName := '';
+          ImportedDeviceTypeName := '';
+          ImportedModification := '';
+          ImportedSerialNumber := '';
+          ImportedRegDate := 0;
+          ImportedValidityDate := 0;
+          ImportedDocNum := '';
+
+          if Item.GetValue('org_title') <> nil then
+            ImportedOwner := Item.GetValue('org_title').Value;
+
+          if Item.GetValue('mit_number') <> nil then
+            ImportedReestr := Item.GetValue('mit_number').Value;
+
+          if Item.GetValue('mit_title') <> nil then
+            ImportedCategoryName := Item.GetValue('mit_title').Value;
+
+          if Item.GetValue('mit_notation') <> nil then
+            ImportedDeviceTypeName := Item.GetValue('mit_notation').Value;
+
+          if Item.GetValue('mi_modification') <> nil then
+            ImportedModification := Item.GetValue('mi_modification').Value;
+
+          if Item.GetValue('mi_number') <> nil then
+            ImportedSerialNumber := Item.GetValue('mi_number').Value;
+
+          if (Item.GetValue('verification_date') <> nil) then
+            TryParseArshinDate(Item.GetValue('verification_date').Value, ImportedRegDate);
+
+          if (Item.GetValue('valid_date') <> nil) then
+            TryParseArshinDate(Item.GetValue('valid_date').Value, ImportedValidityDate);
+
+          if Item.GetValue('result_docnum') <> nil then
+            ImportedDocNum := Item.GetValue('result_docnum').Value;
+
+          FoundType := FindTypeByReestrNumber(ImportedReestr, FoundRepo);
+          if FoundType <> nil then
+          begin
+            Dev.AttachType(FoundType, FoundRepo.Name);
+            Dev.FillFromType(FoundType);
+          end;
+
+          Dev.Owner := ImportedOwner;
+          Dev.ReestrNumber := ImportedReestr;
+          Dev.CategoryName := ImportedCategoryName;
+          Dev.DeviceTypeName := ImportedDeviceTypeName;
+          Dev.Modification := ImportedModification;
+          Dev.SerialNumber := ImportedSerialNumber;
+          Dev.Documentation := ImportedDocNum;
+
+          if ImportedRegDate > 0 then
+            Dev.RegDate := ImportedRegDate;
+
+          if ImportedValidityDate > 0 then
+            Dev.ValidityDate := ImportedValidityDate;
+
+          if Dev.Category <= 0 then
+          begin
+            DetectText := NormalizeSearchText(Dev.CategoryName + ' ' + Dev.DeviceTypeName);
+
+            if DataManager.ActiveTypeRepo <> nil then
+              Dev.Category := DataManager.ActiveTypeRepo.DetectCategoryByKeywords(DetectText);
+          end;
+
+          Inc(FoundCount);
+        end;
+
+        Break;
+      finally
+        Json.Free;
+      end;
+    end;
+
+    MemoLog.Lines.Add('------------------------------');
+    MemoLog.Lines.Add('Добавлено приборов: ' + FoundCount.ToString);
+
+    if not UpdateConnection then
+      Exit;
+
+    BuildTree;
+    ApplyFilter;
+    UpdateGridDevices;
+  except
+    on E: Exception do
+      MemoLog.Lines.Add('ERROR: ' + E.Message);
+  end;
+end;
+
 
 procedure TFormDeviceSelect.TreeViewDevicesChange(Sender: TObject);
 begin
