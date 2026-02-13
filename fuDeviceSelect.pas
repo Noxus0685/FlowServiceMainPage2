@@ -101,6 +101,7 @@ type
     StringColumnOwner: TStringColumn;
     StringColumnDateOfManufacture: TStringColumn;
     miAddTestData: TMenuItem;
+    miLoad: TMenuItem;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -121,6 +122,7 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure CornerButtonEditDeviceClick(Sender: TObject);
     procedure miAddTestDataClick(Sender: TObject);
+    procedure miLoadClick(Sender: TObject);
 
 private
 
@@ -348,6 +350,28 @@ begin
       FDevFilteredDevices.Clear;
 
     UpdateGridDevices;
+  end;
+end;
+
+procedure TFormDeviceSelect.miLoadClick(Sender: TObject);
+begin
+
+  if DataManager.ActiveDeviceRepo = nil then
+    Exit;
+
+  try
+    // TWaitCursor.Create;
+
+    if not DataManager.ActiveDeviceRepo.Load then
+      raise Exception.Create('Не удалось загрузить приборы');
+
+    UpdateGridDevices; // обновление таблицы приборов
+    BuildTree;         // если есть дерево
+    ApplyFilter;
+
+    ShowMessage('Приборы загружены');
+  finally
+    // Screen.Cursor := crDefault;
   end;
 end;
 
