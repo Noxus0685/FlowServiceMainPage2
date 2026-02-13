@@ -1256,7 +1256,10 @@ end;
 function TDeviceType.Clone: TDeviceType;
 begin
   Result := TDeviceType.Create;
+   Result.ID := ID;
+   Result.MitUUID := MitUUID;
   Result.Assign(Self);
+
 end;
 
 
@@ -1271,8 +1274,7 @@ begin
   {====================================================================}
   { Идентификация }
   {====================================================================}
-   //ID := ASource.ID;
-  //MitUUID := ASource.MitUUID;
+
 
   {====================================================================}
   { Наименование и классификация }

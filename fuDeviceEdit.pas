@@ -228,6 +228,7 @@ type
     dedtDateOfManufacture: TDateEdit;
     EditQmin: TEdit;
     Label49: TLabel;
+    StringColumnHash: TStringColumn;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure SpeedButtonFindTypeClick(Sender: TObject);
@@ -2288,6 +2289,13 @@ begin
       Value := P.RepeatsProtocol
     else
       Value := 1;
+  end
+
+  else if ACol = StringColumnHash.Index then
+  begin
+
+      Value := P.MitUUID;
+
   end
 
   else if ACol = IntegerColumnPointRepeats.Index then
