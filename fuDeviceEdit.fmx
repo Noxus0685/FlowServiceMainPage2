@@ -515,6 +515,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Width = 177.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
+          KillFocusByReturn = True
         end
       end
       object Layout45: TLayout
@@ -634,6 +635,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TextPrompt = #1053#1086#1084#1077#1088' '#1087#1088#1080#1073#1086#1088#1072
+          KillFocusByReturn = True
           ParentShowHint = False
           ShowHint = True
           OnTyping = edtSerialNumberTyping
@@ -2208,6 +2210,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TextPrompt = #1042#1083#1072#1076#1077#1083#1077#1094', '#1086#1088#1075#1072#1085#1080#1079#1072#1094#1080#1103
+          KillFocusByReturn = True
           ParentShowHint = False
           ShowHint = True
           OnExit = edtOwnerExit
@@ -2299,6 +2302,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Width = 100.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
+          KillFocusByReturn = True
           OnChange = ComboEditDNChange
         end
       end
@@ -2334,6 +2338,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TextPrompt = 'Qmax'
+          KillFocusByReturn = True
           ParentShowHint = False
           ShowHint = True
           Left = 276
@@ -2352,6 +2357,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TextPrompt = 'Qmin'
+          KillFocusByReturn = True
           ParentShowHint = False
           ShowHint = True
           Left = 276
