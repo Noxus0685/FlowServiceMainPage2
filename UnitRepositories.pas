@@ -10,6 +10,7 @@ uses
   System.Classes,
   System.SysUtils,    System.DateUtils,
   System.Generics.Collections,
+  System.IOUtils,
 
   FireDAC.Stan.Intf, FireDAC.Stan.Option,
   FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def,
@@ -338,6 +339,20 @@ function Col(const AName, ASqlType: string): TTableColumn;
 begin
   Result.Name := AName;
   Result.SqlType := ASqlType;
+end;
+
+procedure AppendRepoDebugLog(const AMessage: string);
+var
+  LogFile: string;
+  Line: string;
+begin
+  try
+    LogFile := TPath.Combine(TPath.GetTempPath, 'FlowService_DevicePoint_Debug.log');
+    Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' | ' + AMessage + sLineBreak;
+    TFile.AppendAllText(LogFile, Line, TEncoding.UTF8);
+  except
+    { no-op: debug logging must never break save flow }
+  end;
 end;
 
  procedure SetIntParam(Q: TFDQuery; const AName: string; const AValue: Integer);
@@ -4398,7 +4413,7 @@ begin
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
-  Result.DeviceID := Q.FieldByName('DeviceID').AsInteger;
+  Result.DeviceID := DeviceID;
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
@@ -4507,8 +4522,41 @@ begin
     Exit;
 
   for P in ADevice.Points do
+  begin
+    if P <> nil then
+      P.DeviceID := ADevice.ID;
+
     if not UpdateDevicePoint(P) then
       Exit(False);
+  end;
+
+  {--------------------------------------------------}
+  { Жёсткая синхронизация состава точек в БД: }
+  { удаляем всё, чего нет в актуальном списке прибора }
+  {--------------------------------------------------}
+  KeepIDs := '';
+  for P in ADevice.Points do
+    if (P <> nil) and (P.State <> osDeleted) and (P.ID > 0) then
+    begin
+      if KeepIDs <> '' then
+        KeepIDs := KeepIDs + ',';
+      KeepIDs := KeepIDs + IntToStr(P.ID);
+    end;
+
+  Q := FDM.CreateQuery;
+  try
+    if KeepIDs = '' then
+      Q.SQL.Text :=
+        'delete from DevicePoint where DeviceID = :DeviceID'
+    else
+      Q.SQL.Text :=
+        'delete from DevicePoint where DeviceID = :DeviceID and ID not in (' + KeepIDs + ')';
+
+    SetIntParam(Q, 'DeviceID', ADevice.ID);
+    Q.ExecSQL;
+  finally
+    Q.Free;
+  end;
 
   {--------------------------------------------------}
   { Жёсткая синхронизация состава точек в БД: }

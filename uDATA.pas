@@ -211,6 +211,12 @@ begin
     TFile.Create(FDatabaseFileName).Free;
   end;
 
+  { Важно: в DFM оба Connection могут быть уже Connected=True.
+    Чтобы гарантированно переключиться на нужный файл БД,
+    сначала отключаем их, затем задаём параметры и подключаем заново. }
+  TypesConnection.Connected := False;
+  DevicesConnection.Connected := False;
+
   TypesConnection.DriverName := 'SQLite';
   TypesConnection.Params.Database := FDatabaseFileName;
   TypesConnection.LoginPrompt := False;
