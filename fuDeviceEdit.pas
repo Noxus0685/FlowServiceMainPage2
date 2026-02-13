@@ -294,7 +294,6 @@ type
      procedure UpdateUIFromDevice;
      procedure InitCategoryComboEdit;
      procedure UpdatePointsGrid;
-     procedure SortDevicePointsLocal;
      procedure SetModified;
 
      procedure CloseEditor(ASave: Boolean);
@@ -2421,8 +2420,6 @@ begin
   if FDevice = nil then
     Exit;
 
-  SortDevicePointsLocal;
-
   GridPoints.BeginUpdate;
   try
     VisibleCount := 0;
@@ -2443,28 +2440,6 @@ begin
   finally
     GridPoints.EndUpdate;
   end;
-end;
-
-procedure TFormDeviceEditor.SortDevicePointsLocal;
-begin
-  if (FDevice = nil) or (FDevice.Points = nil) then
-    Exit;
-
-  FDevice.Points.Sort(
-    TComparer<TDevicePoint>.Construct(
-      function(const L, R: TDevicePoint): Integer
-      begin
-        if L = nil then
-          Exit(-1);
-        if R = nil then
-          Exit(1);
-
-        Result := CompareValue(L.FlowRate, R.FlowRate);
-        if Result = 0 then
-          Result := L.Num - R.Num;
-      end
-    )
-  );
 end;
 
 procedure TFormDeviceEditor.SetModified;
