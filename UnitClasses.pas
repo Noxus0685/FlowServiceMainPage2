@@ -1389,6 +1389,7 @@ begin
   begin
     NewD := AddDiameter;   // ← создаём с текущим ID типа
     NewD.Assign(D);
+    NewD.DeviceTypeID := ID;
   end;
 
   {====================================================================}
@@ -1400,6 +1401,7 @@ begin
   begin
     NewP := AddTypePoint;  // ← создаём с текущим ID типа
     NewP.Assign(P);
+    NewP.DeviceTypeID := ID;
   end;
 end;
 
