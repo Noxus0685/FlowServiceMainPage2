@@ -320,7 +320,8 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
     property Devices: TObjectList<TDevice> read FDevices write FDevices;
     property Device: TDevice read FDevice write FDevice;
 
-    function CreateDevice(AIndex: Integer): TDevice;
+    function CreateDevice(AIndex: Integer): TDevice; overload;
+    function CreateDevice(const ASource: TDevice): TDevice; overload;
 
     function GetDevice(ADeviceID: Integer): TDevice;
 
@@ -3803,6 +3804,17 @@ begin
   Result.Assign(Src);
 
   { гарантируем уникальность }
+  Result.ID := GenerateDeviceID;
+  Result.State := osNew;
+end;
+
+function TDeviceRepository.CreateDevice(const ASource: TDevice): TDevice;
+begin
+  if ASource = nil then
+    Exit(CreateNewDevice);
+
+  Result := CreateNewDevice;
+  Result.Assign(ASource);
   Result.ID := GenerateDeviceID;
   Result.State := osNew;
 end;
