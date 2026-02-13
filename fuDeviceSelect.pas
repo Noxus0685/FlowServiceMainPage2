@@ -626,7 +626,7 @@ end;
 
 procedure TFormDeviceSelect.ButtonDeviceAddClick(Sender: TObject);
 var
-  NewDevice, SrcDevice: TDevice;
+  SrcDevice: TDevice;
   SelRow: Integer;
 begin
   {--------------------------------------------------}
@@ -645,8 +645,14 @@ begin
 
 
   SelRow := GridDevices.Row;
+  SrcDevice := nil;
 
-  NewDevice := ActiveRepo.CreateDevice(SelRow);
+  if (FDevFilteredDevices <> nil) and
+     (SelRow >= 0) and
+     (SelRow < FDevFilteredDevices.Count) then
+    SrcDevice := FDevFilteredDevices[SelRow];
+
+  ActiveRepo.CreateDevice(SrcDevice);
 
 
   {--------------------------------------------------}
@@ -1420,11 +1426,17 @@ begin
   if ACol = StringColumnName.Index then
     Result := dsfName
 
+  else if ACol = StringColumnSerial.Index then
+    Result := dsfSerialNumber
+
   else if ACol = StringColumnCategory.Index then
     Result := dsfCategory
 
   else if ACol = StringColumnManufacturer.Index then
     Result := dsfManufacturer
+
+  else if ACol = StringColumnOwner.Index then
+    Result := dsfOwner
 
   else if ACol = StringColumnModification.Index then
     Result := dsfModification
@@ -1449,6 +1461,9 @@ begin
 
   else if ACol = StringColumnValidityDate.Index then
     Result := dsfValidityDate
+
+  else if ACol = StringColumnDateOfManufacture.Index then
+    Result := dsfDateOfManufacture
 
   else
     Result := dsfName; // безопасный дефолт
