@@ -604,7 +604,6 @@ begin
   { 1. Копирование простых полей  }
   { ============================= }
 
-  MitUUID := ASource.MitUUID;
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   DeviceTypeName := ASource.DeviceTypeName;
   DeviceTypeRepo := ASource.DeviceTypeRepo;
@@ -700,6 +699,8 @@ function TDevice.Clone: TDevice;
 begin
   Result := TDevice.Create;
   Result.Assign(Self);
+  Result.ID := ID;
+  Result.MitUUID := MitUUID;
 end;
 
 function TDevice.CompareTo(

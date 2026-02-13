@@ -4558,6 +4558,34 @@ begin
     Q.Free;
   end;
 
+  {--------------------------------------------------}
+  { Жёсткая синхронизация состава точек в БД: }
+  { удаляем всё, чего нет в актуальном списке прибора }
+  {--------------------------------------------------}
+  KeepIDs := '';
+  for P in ADevice.Points do
+    if (P <> nil) and (P.State <> osDeleted) and (P.ID > 0) then
+    begin
+      if KeepIDs <> '' then
+        KeepIDs := KeepIDs + ',';
+      KeepIDs := KeepIDs + IntToStr(P.ID);
+    end;
+
+  Q := FDM.CreateQuery;
+  try
+    if KeepIDs = '' then
+      Q.SQL.Text :=
+        'delete from DevicePoint where DeviceID = :DeviceID'
+    else
+      Q.SQL.Text :=
+        'delete from DevicePoint where DeviceID = :DeviceID and ID not in (' + KeepIDs + ')';
+
+    SetIntParam(Q, 'DeviceID', ADevice.ID);
+    Q.ExecSQL;
+  finally
+    Q.Free;
+  end;
+
   Result := True;
 end;
 
@@ -4594,45 +4622,13 @@ begin
 
           SetIntParam(Q, 'ID', APoint.ID);
           SetIntParam(Q, 'DeviceID', APoint.DeviceID);
-
-          AppendRepoDebugLog(Format(
-            'DELETE TRY #1 DevicePoint: ID=%d DeviceID=%d | DMFile=%s | QueryDB=%s | ConnConnected=%s',
-            [
-              APoint.ID,
-              APoint.DeviceID,
-              FDM.GetDatabaseFileName,
-              Q.Connection.Params.Database,
-              BoolToStr(Q.Connection.Connected, True)
-            ]
-          ));
-
           Q.ExecSQL;
 
-          AppendRepoDebugLog(Format(
-            'DELETE RES #1 DevicePoint: ID=%d DeviceID=%d RowsAffected=%d',
-            [APoint.ID, APoint.DeviceID, Q.RowsAffected]
-          ));
-
-          { Идемпотентное удаление: если связь с DeviceID рассинхронизирована,
-            пробуем удалить по первичному ключу точки }
           if Q.RowsAffected = 0 then
-          begin
-            Q.SQL.Text :=
-              'delete from DevicePoint where ID = :ID';
-            SetIntParam(Q, 'ID', APoint.ID);
-
-            AppendRepoDebugLog(Format(
-              'DELETE TRY #2 DevicePoint (fallback by ID): ID=%d | QueryDB=%s',
-              [APoint.ID, Q.Connection.Params.Database]
-            ));
-
-            Q.ExecSQL;
-
-            AppendRepoDebugLog(Format(
-              'DELETE RES #2 DevicePoint (fallback by ID): ID=%d RowsAffected=%d',
-              [APoint.ID, Q.RowsAffected]
-            ));
-          end;
+            raise Exception.CreateFmt(
+              'DevicePoint not deleted (ID=%d, DeviceID=%d)',
+              [APoint.ID, APoint.DeviceID]
+            );
 
           Exit(True);
         end;
