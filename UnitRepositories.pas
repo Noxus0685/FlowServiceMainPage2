@@ -2416,10 +2416,42 @@ begin
             Exit(True);
 
           Q.SQL.Text :=
-            'delete from DeviceDiameter where ID = :ID';
+            'delete from DeviceDiameter where ID = :ID and DeviceTypeID = :DeviceTypeID';
 
           SetIntParam(Q, 'ID', ADiameter.ID);
+          SetIntParam(Q, 'DeviceTypeID', ADiameter.DeviceTypeID);
+
+          AppendRepoDebugLog(Format(
+            'DELETE TRY #1 DeviceDiameter: ID=%d DeviceTypeID=%d | DMFile=%s | QueryDB=%s',
+            [ADiameter.ID, ADiameter.DeviceTypeID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
+          ));
+
           Q.ExecSQL;
+
+          AppendRepoDebugLog(Format(
+            'DELETE RES #1 DeviceDiameter: ID=%d DeviceTypeID=%d RowsAffected=%d',
+            [ADiameter.ID, ADiameter.DeviceTypeID, Q.RowsAffected]
+          ));
+
+          if Q.RowsAffected = 0 then
+          begin
+            Q.SQL.Text :=
+              'delete from DeviceDiameter where ID = :ID';
+            SetIntParam(Q, 'ID', ADiameter.ID);
+
+            AppendRepoDebugLog(Format(
+              'DELETE TRY #2 DeviceDiameter (fallback by ID): ID=%d',
+              [ADiameter.ID]
+            ));
+
+            Q.ExecSQL;
+
+            AppendRepoDebugLog(Format(
+              'DELETE RES #2 DeviceDiameter (fallback by ID): ID=%d RowsAffected=%d',
+              [ADiameter.ID, Q.RowsAffected]
+            ));
+          end;
+
           Exit(True);
         end;
 
@@ -2496,6 +2528,8 @@ function TTypeRepository.UpdateDiameters(
 ): Boolean;
 var
   D: TDiameter;
+  Q: TFDQuery;
+  KeepIDs: string;
 begin
   Result := False;
 
@@ -2507,14 +2541,41 @@ begin
 
   for D in AType.Diameters do
   begin
+    if D <> nil then
+      D.DeviceTypeID := AType.ID;
+
     if not UpdateDiameter(D) then
       Exit(False);
   end;
 
-   for D in AType.Diameters do
-  begin
-    if not UpdateDiameter(D) then
-      Exit(False);
+  KeepIDs := '';
+  for D in AType.Diameters do
+    if (D <> nil) and (D.State <> osDeleted) and (D.ID > 0) then
+    begin
+      if KeepIDs <> '' then
+        KeepIDs := KeepIDs + ',';
+      KeepIDs := KeepIDs + IntToStr(D.ID);
+    end;
+
+  Q := FDM.CreateQuery;
+  try
+    if KeepIDs = '' then
+      Q.SQL.Text :=
+        'delete from DeviceDiameter where DeviceTypeID = :DeviceTypeID'
+    else
+      Q.SQL.Text :=
+        'delete from DeviceDiameter where DeviceTypeID = :DeviceTypeID and ID not in (' + KeepIDs + ')';
+
+    SetIntParam(Q, 'DeviceTypeID', AType.ID);
+
+    AppendRepoDebugLog(Format(
+      'SYNC DeviceDiameter: DeviceTypeID=%d KeepIDs=%s | QueryDB=%s',
+      [AType.ID, KeepIDs, Q.Connection.Params.Database]
+    ));
+
+    Q.ExecSQL;
+  finally
+    Q.Free;
   end;
 
   Result := True;
@@ -2744,6 +2805,8 @@ function TTypeRepository.UpdateTypePoints(
 ): Boolean;
 var
   P: TTypePoint;
+  Q: TFDQuery;
+  KeepIDs: string;
 begin
   Result := False;
 
@@ -2755,8 +2818,41 @@ begin
 
   for P in AType.Points do
   begin
+    if P <> nil then
+      P.DeviceTypeID := AType.ID;
+
     if not UpdateTypePoint(P) then
       Exit(False);
+  end;
+
+  KeepIDs := '';
+  for P in AType.Points do
+    if (P <> nil) and (P.State <> osDeleted) and (P.ID > 0) then
+    begin
+      if KeepIDs <> '' then
+        KeepIDs := KeepIDs + ',';
+      KeepIDs := KeepIDs + IntToStr(P.ID);
+    end;
+
+  Q := FDM.CreateQuery;
+  try
+    if KeepIDs = '' then
+      Q.SQL.Text :=
+        'delete from DeviceTypePoint where DeviceTypeID = :DeviceTypeID'
+    else
+      Q.SQL.Text :=
+        'delete from DeviceTypePoint where DeviceTypeID = :DeviceTypeID and ID not in (' + KeepIDs + ')';
+
+    SetIntParam(Q, 'DeviceTypeID', AType.ID);
+
+    AppendRepoDebugLog(Format(
+      'SYNC DeviceTypePoint: DeviceTypeID=%d KeepIDs=%s | QueryDB=%s',
+      [AType.ID, KeepIDs, Q.Connection.Params.Database]
+    ));
+
+    Q.ExecSQL;
+  finally
+    Q.Free;
   end;
 
   Result := True;
@@ -2790,10 +2886,42 @@ begin
             Exit(True);
 
           Q.SQL.Text :=
-            'delete from DeviceTypePoint where ID = :ID';
+            'delete from DeviceTypePoint where ID = :ID and DeviceTypeID = :DeviceTypeID';
 
           SetIntParam(Q, 'ID', APoint.ID);
+          SetIntParam(Q, 'DeviceTypeID', APoint.DeviceTypeID);
+
+          AppendRepoDebugLog(Format(
+            'DELETE TRY #1 DeviceTypePoint: ID=%d DeviceTypeID=%d | DMFile=%s | QueryDB=%s',
+            [APoint.ID, APoint.DeviceTypeID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
+          ));
+
           Q.ExecSQL;
+
+          AppendRepoDebugLog(Format(
+            'DELETE RES #1 DeviceTypePoint: ID=%d DeviceTypeID=%d RowsAffected=%d',
+            [APoint.ID, APoint.DeviceTypeID, Q.RowsAffected]
+          ));
+
+          if Q.RowsAffected = 0 then
+          begin
+            Q.SQL.Text :=
+              'delete from DeviceTypePoint where ID = :ID';
+            SetIntParam(Q, 'ID', APoint.ID);
+
+            AppendRepoDebugLog(Format(
+              'DELETE TRY #2 DeviceTypePoint (fallback by ID): ID=%d',
+              [APoint.ID]
+            ));
+
+            Q.ExecSQL;
+
+            AppendRepoDebugLog(Format(
+              'DELETE RES #2 DeviceTypePoint (fallback by ID): ID=%d RowsAffected=%d',
+              [APoint.ID, Q.RowsAffected]
+            ));
+          end;
+
           Exit(True);
         end;
 
