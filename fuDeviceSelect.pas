@@ -113,6 +113,7 @@ type
     procedure sbFindClick(Sender: TObject);
     procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDevicesHeaderClick(Column: TColumn);
     procedure miAddRepositoryClick(Sender: TObject);
     procedure miDeleteRepositoryClick(Sender: TObject);
     procedure miLoadRepositoryClick(Sender: TObject);
@@ -149,7 +150,7 @@ private
   procedure LoadData;                            // загрузка приборов из репозитория
   procedure BuildTree;                           // построение дерева (категории / типы / владельцы)
   procedure UpdateGridDevices;                   // обновление таблицы приборов
-  procedure OpenDeviceEditor(ADevice: TDevice);  // открытие редактора прибора
+  function OpenDeviceEditor(ADevice: TDevice): Boolean;  // открытие редактора прибора
   function GetDeviceCategoryText(const ADevice: TDevice; AForTree: Boolean = False): string;
   function FindDeviceTreeNode(const ADevice: TDevice): TTreeViewItem;
   procedure SelectEditedDevice(const ADevice: TDevice);
@@ -756,50 +757,49 @@ begin
 end;
 
 procedure TFormDeviceSelect.ApplyFilter;
+var
+  SourceDevices: TObjectList<TDevice>;
 begin
   {----------------------------------}
   { 1. Фильтр по дереву }
   {----------------------------------}
-  // дерево остаётся как есть
+  { Берём уже загруженный список, чтобы фильтрация не зависела от ActiveRepo=nil }
+  SourceDevices := FDevices;
+
   FreeAndNil(FDevFilteredByTree);
-  FDevFilteredByTree := BuildFilteredByTree(ActiveRepo.Devices);
+  FDevFilteredByTree := BuildFilteredByTree(SourceDevices);
 
   {----------------------------------}
   { 2. Текстовый фильтр }
   {----------------------------------}
   FreeAndNil(FDevFilteredByText);
-
-  FreeAndNil(FDevFilteredByText);
   FDevFilteredByText :=
-  TEntityFilters<TDevice>.ApplyTextFilter(
-    FDevFilteredByTree,
-    EditFindDevice.Text
-  );
+    TEntityFilters<TDevice>.ApplyTextFilter(
+      FDevFilteredByTree,
+      Trim(EditFindDevice.Text)
+    );
 
   {----------------------------------}
   { 3. Фильтр по дате }
   {----------------------------------}
-
   FreeAndNil(FDevFilteredByDate);
   FDevFilteredByDate :=
-  TEntityFilters<TDevice>.ApplyDateFilter(
-    FDevFilteredByText,
-    DateEditFilter.Date,
-    not DateEditFilter.IsEmpty
-  );
+    TEntityFilters<TDevice>.ApplyDateFilter(
+      FDevFilteredByText,
+      DateEditFilter.Date,
+      not DateEditFilter.IsEmpty
+    );
 
   {----------------------------------}
   { 4. Сортировка }
   {----------------------------------}
-
-    FreeAndNil(FDevFilteredDevices);
-    FDevFilteredDevices :=
+  FreeAndNil(FDevFilteredDevices);
+  FDevFilteredDevices :=
     TEntitySorter<TDevice>.Sort(
-    FDevFilteredByDate,
-    Ord(ColumnToSortField(FSortColumn)),
-    FSortAscending
-  );
-
+      FDevFilteredByDate,
+      Ord(ColumnToSortField(FSortColumn)),
+      FSortAscending
+    );
 end;
 
 function TFormDeviceSelect.BuildFilteredByTree(
@@ -1226,10 +1226,12 @@ begin
   UpdateGridDevices;
 end;
 
-procedure TFormDeviceSelect.OpenDeviceEditor(ADevice: TDevice);
+function TFormDeviceSelect.OpenDeviceEditor(ADevice: TDevice): Boolean;
 var
   Frm: TFormDeviceEditor;
 begin
+  Result := False;
+
   if ADevice = nil then
     Exit;
 
@@ -1246,13 +1248,7 @@ begin
     { Открываем модально }
     {----------------------------------}
     if Frm.ShowModal = mrOk then
-    begin
-      {----------------------------------}
-      { Обновляем данные и UI }
-      {----------------------------------}
-      BuildTree;
-      SelectEditedDevice(ADevice);
-    end;
+      Result := True;
 
   finally
     Frm.Free;
@@ -1521,9 +1517,14 @@ begin
   {----------------------------------}
   { Открываем редактор }
   {----------------------------------}
-  OpenDeviceEditor(ADevice);
-
-    ADevice := FDevFilteredDevices[Row];
+  if OpenDeviceEditor(ADevice) then
+  begin
+    {----------------------------------}
+    { Перестраиваем дерево/таблицу и возвращаем выделение на отредактированный прибор }
+    {----------------------------------}
+    BuildTree;
+    SelectEditedDevice(ADevice);
+  end;
 end;
 
 
@@ -1720,6 +1721,39 @@ begin
 
   else if ACol = StringColumnProcedure.Index then
     Value := D.ProcedureName;
+end;
+
+procedure TFormDeviceSelect.GridDevicesHeaderClick(Column: TColumn);
+begin
+  if Column = nil then
+    Exit;
+
+  {----------------------------------}
+  { Логика сортировки (утверждённая) }
+  {----------------------------------}
+  if FSortColumn = Column.Index then
+    FSortAscending := not FSortAscending
+  else
+  begin
+    FSortColumn := Column.Index;
+    FSortAscending := True;
+  end;
+
+  {----------------------------------}
+  { Сортируем ТЕКУЩИЙ результат }
+  {----------------------------------}
+  FreeAndNil(FDevFilteredDevices);
+  FDevFilteredDevices :=
+    TEntitySorter<TDevice>.Sort(
+      FDevFilteredByDate,          // текущий список после всех фильтров
+      Ord(ColumnToSortField(FSortColumn)),
+      FSortAscending
+    );
+
+  {----------------------------------}
+  { Обновление таблицы }
+  {----------------------------------}
+  UpdateGridDevices;
 end;
 
 end.

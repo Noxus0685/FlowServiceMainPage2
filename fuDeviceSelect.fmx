@@ -122,6 +122,7 @@ object FormDeviceSelect: TFormDeviceSelect
         TabOrder = 0
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
         OnGetValue = GridDevicesGetValue
+        OnHeaderClick = GridDevicesHeaderClick
         Viewport.Width = 897.000000000000000000
         Viewport.Height = 493.000000000000000000
         object StringColumnName: TStringColumn
