@@ -226,21 +226,6 @@ begin
   DevicesConnection.Params.Database := FDatabaseFileName;
   DevicesConnection.LoginPrompt := False;
   DevicesConnection.Connected := True;
-
-  try
-    TFile.AppendAllText(
-      TPath.Combine(TPath.GetTempPath, 'FlowService_DevicePoint_Debug.log'),
-      FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) +
-      ' | OpenDB | File=' + FDatabaseFileName +
-      ' | TypesDB=' + TypesConnection.Params.Database +
-      ' | DevicesDB=' + DevicesConnection.Params.Database +
-      ' | TypesConnected=' + BoolToStr(TypesConnection.Connected, True) +
-      ' | DevicesConnected=' + BoolToStr(DevicesConnection.Connected, True) + sLineBreak,
-      TEncoding.UTF8
-    );
-  except
-    { no-op }
-  end;
 end;
 
 procedure TDM.CloseDB;
