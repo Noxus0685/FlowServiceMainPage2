@@ -4394,8 +4394,8 @@ begin
    Result := ADevice.AddPoint;
 
   {================ Идентификация ================}
-  //Result.ID := Q.FieldByName('ID').AsInteger;
-
+  Result.ID := Q.FieldByName('ID').AsInteger;
+  Result.DeviceID := Q.FieldByName('DeviceID').AsInteger;
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
