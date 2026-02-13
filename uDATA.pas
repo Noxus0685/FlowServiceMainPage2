@@ -193,6 +193,9 @@ begin
   if Assigned(TypesConnection) then
     TypesConnection.Connected := False;
 
+  if Assigned(DevicesConnection) then
+    DevicesConnection.Connected := False;
+
   inherited;
 end;
 
@@ -212,11 +215,17 @@ begin
   TypesConnection.Params.Database := FDatabaseFileName;
   TypesConnection.LoginPrompt := False;
   TypesConnection.Connected := True;
+
+  DevicesConnection.DriverName := 'SQLite';
+  DevicesConnection.Params.Database := FDatabaseFileName;
+  DevicesConnection.LoginPrompt := False;
+  DevicesConnection.Connected := True;
 end;
 
 procedure TDM.CloseDB;
 begin
   TypesConnection.Connected := False;
+  DevicesConnection.Connected := False;
 end;
 
 function TDM.CreateQuery: TFDQuery;
