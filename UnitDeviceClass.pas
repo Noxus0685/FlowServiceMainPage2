@@ -341,7 +341,7 @@ type
     function CompareTo(
       const B: TTypeEntity;
       ASortField: Integer
-    ): Integer; overload;
+    ): Integer; overload; override;
 
     function CompareTo(
       const B: TDevice;
@@ -711,20 +711,159 @@ begin
 end;
 
 function TDevice.GetSearchText: string;
+var
+  B: TStringBuilder;
+  P: TDevicePoint;
+  S: TPointSpillage;
+  procedure Add(const V: string);
+  begin
+    if Trim(V) = '' then
+      Exit;
+    B.Append(V).Append(' ');
+  end;
 begin
-  Result := Trim(
-    Name + ' ' +
-    SerialNumber + ' ' +
-    Manufacturer + ' ' +
-    Owner + ' ' +
-    ReestrNumber + ' ' +
-    CategoryName + ' ' +
-    Modification + ' ' +
-    AccuracyClass + ' ' +
-    VerificationMethod + ' ' +
-    ProcedureName + ' ' +
-    DN
-  );
+  B := TStringBuilder.Create;
+  try
+    Add(IntToStr(ID));
+    Add(Name);
+    Add(MitUUID);
+    Add(Description);
+    Add(RepoName);
+
+    Add(DeviceTypeUUID);
+    Add(DeviceTypeName);
+    Add(DeviceTypeRepo);
+
+    Add(SerialNumber);
+    Add(Modification);
+    Add(Manufacturer);
+    Add(Owner);
+    Add(ReestrNumber);
+
+    Add(IntToStr(Category));
+    Add(CategoryName);
+    Add(AccuracyClass);
+
+    Add(DateToStr(RegDate));
+    Add(DateToStr(ValidityDate));
+    Add(DateToStr(DateOfManufacture));
+    Add(Documentation);
+    Add(IntToStr(IVI));
+
+    Add(DN);
+    Add(FloatToStr(Qmax));
+    Add(FloatToStr(Qmin));
+    Add(FloatToStr(RangeDynamic));
+    Add(FloatToStr(Error));
+
+    Add(VerificationMethod);
+    Add(ProcedureName);
+
+    Add(IntToStr(MeasuredDimension));
+    Add(IntToStr(OutputType));
+    Add(IntToStr(DimensionCoef));
+
+    Add(IntToStr(OutputSet));
+    Add(IntToStr(Freq));
+    Add(FloatToStr(Coef));
+    Add(FloatToStr(FreqFlowRate));
+
+    Add(IntToStr(VoltageRange));
+    Add(FloatToStr(VoltageQminRate));
+    Add(FloatToStr(VoltageQmaxRate));
+
+    Add(IntToStr(CurrentRange));
+    Add(FloatToStr(CurrentQminRate));
+    Add(FloatToStr(CurrentQmaxRate));
+    Add(IntToStr(IntegrationTime));
+
+    Add(ProtocolName);
+    Add(IntToStr(BaudRate));
+    Add(IntToStr(Parity));
+    Add(IntToStr(DeviceAddress));
+
+    Add(IntToStr(InputType));
+    Add(IntToStr(SpillageType));
+    Add(IntToStr(SpillageStop));
+    Add(IntToStr(Repeats));
+    Add(IntToStr(RepeatsProtocol));
+
+    Add(Comment);
+    Add(ReportingForm);
+
+    for P in FPoints do
+    begin
+      Add(IntToStr(P.ID));
+      Add(IntToStr(P.DeviceID));
+      Add(IntToStr(P.DeviceTypePointID));
+      Add(IntToStr(P.Num));
+      Add(P.Name);
+      Add(P.Description);
+      Add(FloatToStr(P.FlowRate));
+      Add(FloatToStr(P.Q));
+      Add(P.FlowAccuracy);
+      Add(FloatToStr(P.Pressure));
+      Add(FloatToStr(P.Temp));
+      Add(P.TempAccuracy);
+      Add(IntToStr(P.LimitImp));
+      Add(FloatToStr(P.LimitVolume));
+      Add(FloatToStr(P.LimitTime));
+      Add(FloatToStr(P.Error));
+      Add(IntToStr(P.Pause));
+      Add(IntToStr(P.RepeatsProtocol));
+      Add(IntToStr(P.Repeats));
+    end;
+
+    for S in FSpillages do
+    begin
+      Add(IntToStr(S.ID));
+      Add(IntToStr(S.DeviceID));
+      Add(IntToStr(S.DevicePointID));
+      Add(IntToStr(S.DeviceTypePointID));
+      Add(IntToStr(S.Num));
+      Add(S.Description);
+      Add(DateTimeToStr(S.DateTime));
+      Add(S.OperatorName);
+      Add(S.EtalonName);
+      Add(FloatToStr(S.SpillTime));
+      Add(FloatToStr(S.QavgEtalon));
+      Add(FloatToStr(S.EtalonVolume));
+      Add(FloatToStr(S.EtalonMass));
+      Add(FloatToStr(S.QEtalonStd));
+      Add(FloatToStr(S.QEtalonCV));
+      Add(FloatToStr(S.DeviceVolume));
+      Add(FloatToStr(S.DeviceMass));
+      Add(FloatToStr(S.Velocity));
+      Add(FloatToStr(S.Error));
+      Add(BoolToStr(S.Valid, True));
+      Add(FloatToStr(S.QStd));
+      Add(FloatToStr(S.QCV));
+      Add(FloatToStr(S.VolumeBefore));
+      Add(FloatToStr(S.VolumeAfter));
+      Add(IntToStr(S.PulseCount));
+      Add(FloatToStr(S.MeanFrequency));
+      Add(FloatToStr(S.AvgCurrent));
+      Add(FloatToStr(S.AvgVoltage));
+      Add(S.Data1);
+      Add(S.Data2);
+      Add(FloatToStr(S.StartTemperature));
+      Add(FloatToStr(S.EndTemperature));
+      Add(FloatToStr(S.AvgTemperature));
+      Add(FloatToStr(S.InputPressure));
+      Add(FloatToStr(S.OutputPressure));
+      Add(FloatToStr(S.Density));
+      Add(FloatToStr(S.AmbientTemperature));
+      Add(FloatToStr(S.AtmosphericPressure));
+      Add(FloatToStr(S.RelativeHumidity));
+      Add(FloatToStr(S.Coef));
+      Add(S.FCDCoefficient);
+      Add(S.ArchivedData);
+    end;
+
+    Result := Trim(B.ToString);
+  finally
+    B.Free;
+  end;
 end;
 
 function TDevice.CompareTo(

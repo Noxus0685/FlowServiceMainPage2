@@ -345,7 +345,7 @@ type
 
     procedure Assign(ASource: TDeviceType);
     function Clone: TDeviceType;
-    //function GetSearchText: string;
+    function GetSearchText: string; override;
 
     function CompareTo(const B: TDeviceType; ASortField: TDeviceTypeSortField): Integer;
 
@@ -471,6 +471,112 @@ end;
 function TTypeEntity.GetSearchText: string;
 begin
   Result := Name;
+end;
+
+function TDeviceType.GetSearchText: string;
+var
+  B: TStringBuilder;
+  D: TDiameter;
+  P: TTypePoint;
+  procedure Add(const V: string);
+  begin
+    if Trim(V) = '' then
+      Exit;
+    B.Append(V).Append(' ');
+  end;
+begin
+  B := TStringBuilder.Create;
+  try
+    Add(IntToStr(ID));
+    Add(Name);
+    Add(MitUUID);
+    Add(Description);
+    Add(RepoName);
+
+    Add(Modification);
+    Add(Manufacturer);
+    Add(ReestrNumber);
+    Add(IntToStr(Category));
+    Add(CategoryName);
+    Add(AccuracyClass);
+    Add(DateToStr(RegDate));
+    Add(DateToStr(ValidityDate));
+    Add(IntToStr(IVI));
+    Add(FloatToStr(RangeDynamic));
+    Add(VerificationMethod);
+    Add(ProcedureName);
+    Add(ProcedureCmd1);
+    Add(ProcedureCmd2);
+    Add(ProcedureCmd3);
+    Add(ProcedureCmd4);
+    Add(ProcedureCmd5);
+    Add(Documentation);
+    Add(ReportingForm);
+    Add(SerialNumTemplate);
+    Add(IntToStr(MeasuredDimension));
+    Add(IntToStr(OutputType));
+    Add(IntToStr(DimensionCoef));
+    Add(IntToStr(OutputSet));
+    Add(IntToStr(Freq));
+    Add(FloatToStr(Coef));
+    Add(FloatToStr(FreqFlowRate));
+    Add(IntToStr(VoltageRange));
+    Add(FloatToStr(VoltageQminRate));
+    Add(FloatToStr(VoltageQmaxRate));
+    Add(IntToStr(CurrentRange));
+    Add(FloatToStr(CurrentQminRate));
+    Add(FloatToStr(CurrentQmaxRate));
+    Add(IntToStr(IntegrationTime));
+    Add(ProtocolName);
+    Add(IntToStr(BaudRate));
+    Add(IntToStr(Parity));
+    Add(IntToStr(DeviceAddress));
+    Add(IntToStr(InputType));
+    Add(IntToStr(SpillageType));
+    Add(IntToStr(SpillageStop));
+    Add(IntToStr(Repeats));
+    Add(IntToStr(RepeatsProtocol));
+    Add(FloatToStr(Error));
+
+    for D in FDiameters do
+    begin
+      Add(IntToStr(D.ID));
+      Add(IntToStr(D.DeviceTypeID));
+      Add(D.Name);
+      Add(D.DN);
+      Add(D.Description);
+      Add(FloatToStr(D.Qmax));
+      Add(FloatToStr(D.Qmin));
+      Add(FloatToStr(D.Kp));
+      Add(FloatToStr(D.QFmax));
+      Add(FloatToStr(D.Vmax));
+      Add(FloatToStr(D.Vmin));
+    end;
+
+    for P in FPoints do
+    begin
+      Add(IntToStr(P.ID));
+      Add(IntToStr(P.DeviceTypeID));
+      Add(P.Name);
+      Add(P.Description);
+      Add(FloatToStr(P.FlowRate));
+      Add(P.FlowAccuracy);
+      Add(FloatToStr(P.Pressure));
+      Add(FloatToStr(P.Temp));
+      Add(P.TempAccuracy);
+      Add(IntToStr(P.LimitImp));
+      Add(FloatToStr(P.LimitVolume));
+      Add(FloatToStr(P.LimitTime));
+      Add(FloatToStr(P.Error));
+      Add(IntToStr(P.Pause));
+      Add(IntToStr(P.RepeatsProtocol));
+      Add(IntToStr(P.Repeats));
+    end;
+
+    Result := Trim(B.ToString);
+  finally
+    B.Free;
+  end;
 end;
 
 function TTypeEntity.GetFilterDate: TDate;
