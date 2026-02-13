@@ -149,6 +149,9 @@ private
   procedure BuildTree;                           // построение дерева (категории / типы / владельцы)
   procedure UpdateGridDevices;                   // обновление таблицы приборов
   procedure OpenDeviceEditor(ADevice: TDevice);  // открытие редактора прибора
+  function GetDeviceCategoryText(const ADevice: TDevice; AForTree: Boolean = False): string;
+  function FindDeviceTreeNode(const ADevice: TDevice): TTreeViewItem;
+  procedure SelectEditedDevice(const ADevice: TDevice);
 
   { ================= ФИЛЬТРЫ ================= }
 
@@ -492,6 +495,7 @@ var
   ModText, ModKey: string;
 
   ManPass: Integer;
+  CategoryText: string;
 begin
   if ActiveRepo = nil then
   begin
@@ -554,11 +558,12 @@ begin
           TreeViewDevices.AddObject(ManNode);
         end;
 
-        {========== КАТЕГОРИЯ (ТОЛЬКО ПО ИМЕНИ) =========}
-        if Trim(D.CategoryName) <> '' then
+        {========== КАТЕГОРИЯ =========}
+        CategoryText := GetDeviceCategoryText(D, True);
+        if Trim(CategoryText) <> '' then
         begin
-          CatText := D.CategoryName;
-          CatKey  := D.CategoryName;
+          CatText := CategoryText;
+          CatKey  := CategoryText;
         end
         else
         begin
@@ -975,13 +980,109 @@ begin
       {----------------------------------}
       { Обновляем данные и UI }
       {----------------------------------}
-      ApplyFilter;
-      UpdateGridDevices;
+      BuildTree;
+      SelectEditedDevice(ADevice);
     end;
 
   finally
     Frm.Free;
   end;
+end;
+
+function TFormDeviceSelect.GetDeviceCategoryText(const ADevice: TDevice; AForTree: Boolean): string;
+var
+  C: TDeviceCategory;
+begin
+  Result := '';
+
+  if ADevice = nil then
+    Exit;
+
+  if ADevice.Category > 0 then
+  begin
+    if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
+      Result := DataManager.ActiveTypeRepo.CategoryToText(ADevice.Category, ADevice.CategoryName)
+    else if DataManager <> nil then
+    begin
+      C := DataManager.FindCategoryByID(ADevice.Category);
+      if C <> nil then
+        Result := C.Name
+      else
+        Result := ADevice.CategoryName;
+    end
+    else
+      Result := ADevice.CategoryName;
+  end
+  else if ADevice.Category = -1 then
+  begin
+    if AForTree then
+      Result := ''
+    else
+      Result := Trim(ADevice.CategoryName);
+  end;
+end;
+
+function TFormDeviceSelect.FindDeviceTreeNode(const ADevice: TDevice): TTreeViewItem;
+var
+  ManNode, CatNode, ModNode: TTreeViewItem;
+  ManKey, CatKey, ModKey: string;
+begin
+  Result := nil;
+
+  if ADevice = nil then
+    Exit;
+
+  if Trim(ADevice.Manufacturer) <> '' then
+    ManKey := ADevice.Manufacturer
+  else
+    ManKey := '';
+
+  ManNode := FindChildInTree(TreeViewDevices, Ord(tnManufacturer), ManKey);
+  if ManNode = nil then
+    Exit;
+
+  CatKey := GetDeviceCategoryText(ADevice, True);
+  CatNode := FindChildInNode(ManNode, Ord(tnCategory), CatKey);
+  if CatNode = nil then
+    Exit(ManNode);
+
+  if Trim(ADevice.Modification) <> '' then
+    ModKey := ADevice.Modification
+  else
+    ModKey := '';
+
+  ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
+  if ModNode <> nil then
+    Exit(ModNode);
+
+  Result := CatNode;
+end;
+
+procedure TFormDeviceSelect.SelectEditedDevice(const ADevice: TDevice);
+var
+  Node: TTreeViewItem;
+  I: Integer;
+begin
+  Node := FindDeviceTreeNode(ADevice);
+  if Node <> nil then
+    TreeViewDevices.Selected := Node;
+
+  FreeAndNil(FDevFilteredByTree);
+  FDevFilteredByTree := BuildFilteredByTree(FDevices);
+
+  ApplyFilter;
+  UpdateGridDevices;
+
+  GridDevices.Row := -1;
+  if FDevFilteredDevices = nil then
+    Exit;
+
+  for I := 0 to FDevFilteredDevices.Count - 1 do
+    if FDevFilteredDevices[I] = ADevice then
+    begin
+      GridDevices.Row := I;
+      Break;
+    end;
 end;
 
 function TFormDeviceSelect.PassTreeFilter(
@@ -1024,7 +1125,7 @@ begin
       Ord(tnCategory):
         begin
           // TagString = '' → без категории
-          if ADevice.CategoryName <> Cur.TagString then
+          if GetDeviceCategoryText(ADevice, True) <> Cur.TagString then
             Exit(False);
         end;
 
@@ -1302,8 +1403,8 @@ begin
 
   else if ACol = StringColumnCategory.Index then
   begin
-    if Trim(D.CategoryName) <> '' then
-      Value := D.CategoryName
+    if Trim(GetDeviceCategoryText(D)) <> '' then
+      Value := GetDeviceCategoryText(D)
     else
       Value := '-';
   end
