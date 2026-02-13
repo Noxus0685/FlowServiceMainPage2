@@ -10,6 +10,7 @@ uses
   System.Classes,
   System.SysUtils,    System.DateUtils,
   System.Generics.Collections,
+  System.IOUtils,
 
   FireDAC.Stan.Intf, FireDAC.Stan.Option,
   FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def,
@@ -338,6 +339,20 @@ function Col(const AName, ASqlType: string): TTableColumn;
 begin
   Result.Name := AName;
   Result.SqlType := ASqlType;
+end;
+
+procedure AppendRepoDebugLog(const AMessage: string);
+var
+  LogFile: string;
+  Line: string;
+begin
+  try
+    LogFile := TPath.Combine(TPath.GetTempPath, 'FlowService_DevicePoint_Debug.log');
+    Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' | ' + AMessage + sLineBreak;
+    TFile.AppendAllText(LogFile, Line, TEncoding.UTF8);
+  except
+    { no-op: debug logging must never break save flow }
+  end;
 end;
 
  procedure SetIntParam(Q: TFDQuery; const AName: string; const AValue: Integer);
@@ -3568,7 +3583,7 @@ begin
   {--------------------------------------------------}
   { ТРАНЗАКЦИЯ }
   {--------------------------------------------------}
-  FDM.DevicesConnection.StartTransaction;
+  FDM.StartTransaction;
   try
     for D in FDevices do
       if not UpdateDevice(D) then
@@ -3579,12 +3594,12 @@ begin
     { вторая очередь }
     // SaveSpillages;
 
-    FDM.DevicesConnection.Commit;
+    FDM.Commit;
     FState := osSaved;
     Result := True;
 
   except
-    FDM.DevicesConnection.Rollback;
+    FDM.Rollback;
     raise;
   end;
 end;
@@ -3606,20 +3621,20 @@ begin
     );
 
   // Начинаем транзакцию
-  FDM.DevicesConnection.StartTransaction;
+  FDM.StartTransaction;
   try
     // Обновляем прибор
     if not UpdateDevice(ADevice) then
       raise Exception.Create('Ошибка сохранения прибора');
 
     // Применяем изменения в БД
-    FDM.DevicesConnection.Commit;
+    FDM.Commit;
 
     Result := True;
 
   except
     // Если произошла ошибка, откатываем изменения
-    FDM.DevicesConnection.Rollback;
+    FDM.Rollback;
     raise;
   end;
 end;
@@ -4081,7 +4096,7 @@ begin
 
   Q := FDM.CreateQuery;
   try
-    FDM.DevicesConnection.StartTransaction;
+    FDM.StartTransaction;
     try
       {--------------------------------------------------}
       { 1. Полная очистка таблицы }
@@ -4103,11 +4118,11 @@ begin
           );
       end;
 
-      FDM.DevicesConnection.Commit;
+      FDM.Commit;
       Result := True;
 
     except
-      FDM.DevicesConnection.Rollback;
+      FDM.Rollback;
       raise;
     end;
 
@@ -4391,11 +4406,14 @@ begin
    DeviceID := Q.FieldByName('DeviceID').AsInteger;
 
    ADevice := FindDeviceByID(DeviceID);
+   if ADevice = nil then
+     raise Exception.CreateFmt('Device for point not found (DeviceID=%d)', [DeviceID]);
+
    Result := ADevice.AddPoint;
 
   {================ Идентификация ================}
-  //Result.ID := Q.FieldByName('ID').AsInteger;
-
+  Result.ID := Q.FieldByName('ID').AsInteger;
+  Result.DeviceID := DeviceID;
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
@@ -4495,6 +4513,8 @@ function TDeviceRepository.UpdateDevicePoints(
 ): Boolean;
 var
   P: TDevicePoint;
+  Q: TFDQuery;
+  KeepIDs: string;
 begin
   Result := False;
 
@@ -4502,8 +4522,41 @@ begin
     Exit;
 
   for P in ADevice.Points do
+  begin
+    if P <> nil then
+      P.DeviceID := ADevice.ID;
+
     if not UpdateDevicePoint(P) then
       Exit(False);
+  end;
+
+  {--------------------------------------------------}
+  { Жёсткая синхронизация состава точек в БД: }
+  { удаляем всё, чего нет в актуальном списке прибора }
+  {--------------------------------------------------}
+  KeepIDs := '';
+  for P in ADevice.Points do
+    if (P <> nil) and (P.State <> osDeleted) and (P.ID > 0) then
+    begin
+      if KeepIDs <> '' then
+        KeepIDs := KeepIDs + ',';
+      KeepIDs := KeepIDs + IntToStr(P.ID);
+    end;
+
+  Q := FDM.CreateQuery;
+  try
+    if KeepIDs = '' then
+      Q.SQL.Text :=
+        'delete from DevicePoint where DeviceID = :DeviceID'
+    else
+      Q.SQL.Text :=
+        'delete from DevicePoint where DeviceID = :DeviceID and ID not in (' + KeepIDs + ')';
+
+    SetIntParam(Q, 'DeviceID', ADevice.ID);
+    Q.ExecSQL;
+  finally
+    Q.Free;
+  end;
 
   Result := True;
 end;
@@ -4537,10 +4590,49 @@ begin
             Exit(True);  // новая точка — просто забываем
 
           Q.SQL.Text :=
-            'delete from DevicePoint where ID = :ID';
+            'delete from DevicePoint where ID = :ID and DeviceID = :DeviceID';
 
           SetIntParam(Q, 'ID', APoint.ID);
+          SetIntParam(Q, 'DeviceID', APoint.DeviceID);
+
+          AppendRepoDebugLog(Format(
+            'DELETE TRY #1 DevicePoint: ID=%d DeviceID=%d | DMFile=%s | QueryDB=%s | ConnConnected=%s',
+            [
+              APoint.ID,
+              APoint.DeviceID,
+              FDM.GetDatabaseFileName,
+              Q.Connection.Params.Database,
+              BoolToStr(Q.Connection.Connected, True)
+            ]
+          ));
+
           Q.ExecSQL;
+
+          AppendRepoDebugLog(Format(
+            'DELETE RES #1 DevicePoint: ID=%d DeviceID=%d RowsAffected=%d',
+            [APoint.ID, APoint.DeviceID, Q.RowsAffected]
+          ));
+
+          { Идемпотентное удаление: если связь с DeviceID рассинхронизирована,
+            пробуем удалить по первичному ключу точки }
+          if Q.RowsAffected = 0 then
+          begin
+            Q.SQL.Text :=
+              'delete from DevicePoint where ID = :ID';
+            SetIntParam(Q, 'ID', APoint.ID);
+
+            AppendRepoDebugLog(Format(
+              'DELETE TRY #2 DevicePoint (fallback by ID): ID=%d | QueryDB=%s',
+              [APoint.ID, Q.Connection.Params.Database]
+            ));
+
+            Q.ExecSQL;
+
+            AppendRepoDebugLog(Format(
+              'DELETE RES #2 DevicePoint (fallback by ID): ID=%d RowsAffected=%d',
+              [APoint.ID, Q.RowsAffected]
+            ));
+          end;
 
           Exit(True);
         end;
@@ -5048,7 +5140,7 @@ end;
 //  if (FDM = nil) or (FSpillages = nil) then
 //    Exit;
 //
-//  FDM.DevicesConnection.StartTransaction;
+//  FDM.StartTransaction;
 //  try
 //    for S in FSpillages do
 //    begin
@@ -5190,11 +5282,11 @@ end;
 //      end;
 //    end;
 //
-//    FDM.DevicesConnection.Commit;
+//    FDM.Commit;
 //    Result := True;
 //
 //  except
-//    FDM.DevicesConnection.Rollback;
+//    FDM.Rollback;
 //    raise;
 //  end;
 //end;
