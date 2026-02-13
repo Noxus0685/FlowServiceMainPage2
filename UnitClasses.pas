@@ -348,6 +348,8 @@ type
     function GetSearchText: string; override;
 
     function CompareTo(const B: TDeviceType; ASortField: TDeviceTypeSortField): Integer;
+    function GetSearchText: string; override;
+    function GetFilterDate: TDate; override;
 
     procedure AddDiameterData(const ADN: string; AQmax, AQmin, AKp: Double  );
     function  CopyDiameter(SrcIndex: Integer): TDiameter;
@@ -380,27 +382,6 @@ type
 
   end;
 
-  TEntitySorter<T: class> = class
-  public
-    class function Sort(
-      const Source: TObjectList<T>;
-      ASortField: Integer;
-      AAscending: Boolean
-    ): TObjectList<T>;
-  end;
-  TEntityFilters<T: class> = class
-  public
-    class function ApplyTextFilter(
-      const Source: TObjectList<T>;
-      const AText: string
-    ): TObjectList<T>;
-
-    class function ApplyDateFilter(
-      const Source: TObjectList<T>;
-      ADate: TDate;
-      AEnabled: Boolean
-    ): TObjectList<T>;
-  end;
   TEntityHelpers<T: TTypeEntity> = class
   public
     class function NextID(
@@ -422,45 +403,6 @@ begin
   FState := osNew;
   FMitUUID := TGUID.NewGuid.ToString;
 end;
-
-class function TEntitySorter<T>.Sort(
-  const Source: TObjectList<T>;
-  ASortField: Integer;
-  AAscending: Boolean
-): TObjectList<T>;
-begin
-  Result := TObjectList<T>.Create(False);
-
-  if Source = nil then
-    Exit;
-
-  Result.AddRange(Source);
-
-  Result.Sort(
-    TComparer<T>.Construct(
-      function(const L, R: T): Integer
-      var
-        E1, E2: TTypeEntity;
-        Cmp: Integer;
-      begin
-        if not (TObject(L) is TTypeEntity) or
-           not (TObject(R) is TTypeEntity) then
-          Exit(0);
-
-        E1 := TTypeEntity(TObject(L));
-        E2 := TTypeEntity(TObject(R));
-
-        Cmp := E1.CompareTo(E2, ASortField);
-
-        if AAscending then
-          Result := Cmp
-        else
-          Result := -Cmp;
-      end
-    )
-  );
-end;
-
 
 
 function TTypeEntity.GetID: Integer;
@@ -887,6 +829,11 @@ begin
   );
 end;
 
+function TDeviceType.GetFilterDate: TDate;
+begin
+  Result := RegDate;
+end;
+
 function SortDeviceTypes(
   const Source: TObjectList<TDeviceType>;
   ASortField: TDeviceTypeSortField;
@@ -927,69 +874,6 @@ begin
     end;
 end;
 
-
-class function TEntityFilters<T>.ApplyTextFilter(
-  const Source: TObjectList<T>;
-  const AText: string
-): TObjectList<T>;
-var
-  E: T;
-  Ent: TTypeEntity;
-  Find, S: string;
-begin
-  Result := TObjectList<T>.Create(False);
-
-  if (Source = nil) or (Trim(AText) = '') then
-  begin
-    if Source <> nil then
-      Result.AddRange(Source);
-    Exit;
-  end;
-
-  Find := UpperCase(Trim(AText));
-
-  for E in Source do
-  begin
-    if not (TObject(E) is TTypeEntity) then
-      Continue;
-
-    Ent := TTypeEntity(TObject(E));
-    S := UpperCase(Ent.GetSearchText);
-
-    if Pos(Find, S) > 0 then
-      Result.Add(E);
-  end;
-end;
-
-
-class function TEntityFilters<T>.ApplyDateFilter(
-  const Source: TObjectList<T>;
-  ADate: TDate;
-  AEnabled: Boolean
-): TObjectList<T>;
-var
-  E: T;
-  Ent: TTypeEntity;
-begin
-  Result := TObjectList<T>.Create(False);
-
-  if (Source = nil) or not AEnabled then
-  begin
-    if Source <> nil then
-      Result.AddRange(Source);
-    Exit;
-  end;
-
-  for E in Source do
-  begin
-    if not (TObject(E) is TTypeEntity) then
-      Continue;
-
-    Ent := TTypeEntity(TObject(E));
-    if Ent.GetFilterDate >= ADate then
-      Result.Add(E);
-  end;
-end;
 
   class function TEntityHelpers<T>.NextID(
   const List: TObjectList<T>

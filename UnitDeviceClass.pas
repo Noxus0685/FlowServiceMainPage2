@@ -26,7 +26,8 @@ type
     dsfVerificationMethod,   // Методика поверки
     dsfIVI,                  // Межповерочный интервал
     dsfRegDate,              // Дата регистрации
-    dsfValidityDate          // Действует до
+    dsfValidityDate,         // Действует до
+    dsfDateOfManufacture     // Дата изготовления
   );
 
 
@@ -338,9 +339,14 @@ type
     function GetSearchText: string; override;
 
     function CompareTo(
+      const B: TTypeEntity;
+      ASortField: Integer
+    ): Integer; override;
+
+    function CompareTo(
       const B: TDevice;
       ASortField: TDeviceSortField
-    ): Integer;
+    ): Integer; reintroduce; overload;
 
     function AddPoint: TDevicePoint;
     function AddSpillage: TPointSpillage;
@@ -722,6 +728,17 @@ begin
 end;
 
 function TDevice.CompareTo(
+  const B: TTypeEntity;
+  ASortField: Integer
+): Integer;
+begin
+  if not (B is TDevice) then
+    Exit(inherited CompareTo(B, ASortField));
+
+  Result := CompareTo(TDevice(B), TDeviceSortField(ASortField));
+end;
+
+function TDevice.CompareTo(
   const B: TDevice;
   ASortField: TDeviceSortField
 ): Integer;
@@ -744,7 +761,10 @@ begin
       Result := CompareText(Owner, B.Owner);
 
     dsfCategory:
-      Result := Category - B.Category;
+      Result := CompareText(CategoryName, B.CategoryName);
+
+    dsfModification:
+      Result := CompareText(Modification, B.Modification);
 
     dsfDN:
       Result := CompareText(DN, B.DN);
@@ -755,11 +775,28 @@ begin
     dsfAccuracyClass:
       Result := CompareText(AccuracyClass, B.AccuracyClass);
 
+    dsfReestrNumber:
+      Result := CompareText(ReestrNumber, B.ReestrNumber);
+
+    dsfProcedure:
+      Result := CompareText(ProcedureName, B.ProcedureName);
+
+    dsfVerificationMethod:
+      Result := CompareText(VerificationMethod, B.VerificationMethod);
+
+    dsfIVI:
+      Result := IVI - B.IVI;
+
     dsfRegDate:
       Result := CompareDate(RegDate, B.RegDate);
+
+    dsfValidityDate:
+      Result := CompareDate(ValidityDate, B.ValidityDate);
+
+    dsfDateOfManufacture:
+      Result := CompareDate(DateOfManufacture, B.DateOfManufacture);
   end;
 end;
-
 procedure TDevicePoint.Assign(ASource: TDevicePoint);
 begin
   if ASource = nil then
