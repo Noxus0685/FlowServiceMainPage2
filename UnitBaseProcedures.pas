@@ -207,6 +207,8 @@ begin
   // ------------------------------------
   Digits := Max(0, -Floor(Log10(Delta)));
 
+  if Digits>10 then
+          Digits := 10;
   // Формат без экспоненты
   Fmt := '0.' + StringOfChar('#', Digits);
 

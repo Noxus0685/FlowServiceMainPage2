@@ -156,11 +156,6 @@ type
     EditFreqFlowRate: TEdit;
     shdwfct1: TShadowEffect;
     layRight: TLayout;
-    GroupBox2: TGroupBox;
-    Layout21: TLayout;
-    Label19: TLabel;
-    Layout20: TLayout;
-    Label18: TLabel;
     grpWorkShedule: TGroupBox;
     Layout15: TLayout;
     GridPoints: TGrid;
@@ -229,6 +224,7 @@ type
     EditQmin: TEdit;
     Label49: TLabel;
     StringColumnHash: TStringColumn;
+    ShadowEffect1: TShadowEffect;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure SpeedButtonFindTypeClick(Sender: TObject);
@@ -268,6 +264,7 @@ type
     procedure ButtonPointDeleteClick(Sender: TObject);
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure ComboEditDNChange(Sender: TObject);
+    procedure mmoCommentExit(Sender: TObject);
 
 
   private
@@ -302,6 +299,7 @@ type
      procedure CloseEditor(ASave: Boolean);
      function   GetSelectedPoint: TDevicePoint;
      function GetPointByVisibleRow(ARow: Integer): TDevicePoint;
+      procedure UpdateQmaxQmin;
 
   public
     { Public declarations }
@@ -862,6 +860,11 @@ begin
   end;
 end;
 
+procedure TFormDeviceEditor.mmoCommentExit(Sender: TObject);
+begin
+   FDevice.Description :=   mmoComment.Text;
+end;
+
 procedure TFormDeviceEditor.RefreshDeviceTypeReference;
 var
   FoundType: TDeviceType;
@@ -997,6 +1000,33 @@ begin
   end;
 end;
 
+ procedure TFormDeviceEditor.UpdateQmaxQmin;
+ begin
+    // =====================================================
+// == Максимальный расход
+// =====================================================
+EditQmax.Text := '';
+EditQmax.TextPrompt := '';
+
+if FDevice.Qmax > 0 then
+  EditQmax.Text :=  FormatQorV(FDevice.Qmax, FDevice.Error)
+else
+  EditQmax.TextPrompt := '—';
+
+// =====================================================
+// == Минимальный расход
+// =====================================================
+EditQmin.Text := '';
+EditQmin.TextPrompt := '';
+
+if FDevice.Qmin > 0 then
+  EditQmin.Text :=  FormatQorV(FDevice.Qmin, FDevice.Error)
+else
+  EditQmin.TextPrompt := '—';
+end;
+
+
+
 procedure TFormDeviceEditor.UpdateUIFromDevice;
 var
   AccErr: Double;
@@ -1040,6 +1070,8 @@ begin
       edtOwner.Hint := edtOwner.Text
     else
       edtOwner.Hint := '';
+
+      mmoComment.Text := FDevice.Description;
 
     // =====================================================
     // == Даты
@@ -1228,16 +1260,8 @@ begin
     // =====================================================
     mmoComment.Text := FDevice.Comment;
 
-    // =====================================================
-// == Максимальный расход
-// =====================================================
-EditQmax.Text := '';
-EditQmax.TextPrompt := '';
+    UpdateQmaxQmin;
 
-if FDevice.Qmax > 0 then
-  EditQmax.Text := FloatToStr(FDevice.Qmax)
-else
-  EditQmax.TextPrompt := '—';
 
  // =====================================================
 // == Диаметр (DN)
@@ -1767,6 +1791,7 @@ begin
   { обновляем погрешность в точках прибора }
   //UpdateDevicePointsError;     // ← аналог UpdatePointsErrorFromType
   UpdatePointsGrid;            // ← обновление таблицы точек прибора
+  UpdateQmaxQmin;
 
   SetModified;
 end;

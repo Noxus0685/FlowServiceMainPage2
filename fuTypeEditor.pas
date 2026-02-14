@@ -806,9 +806,10 @@ end;
 begin
   if FLoading then Exit;
   FModified := True;
+  if FType.State <> osNew then
+    FType.State :=  osModified;
 
-  FType.State :=  osModified;
-end;
+    end;
 
 function TFormTypeEditor.Modified: Boolean;
 begin
@@ -853,8 +854,8 @@ begin
     if (DataManager = nil) or (DataManager.ActiveTypeRepo = nil) then
       raise Exception.Create('Активный репозиторий типов не выбран');
 
-    if (FType = nil) or (Trim(FType.Name) = '') then
-      raise Exception.Create('Не задано наименование типа');
+    if (FType = nil)  then
+      raise Exception.Create('Не задан тип');
 
     Repo := DataManager.ActiveTypeRepo;
 
