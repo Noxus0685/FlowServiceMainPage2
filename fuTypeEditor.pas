@@ -3301,32 +3301,6 @@ begin
   end;
 end;
 
-
-//procedure TFormTypeEditor.LoadDiametersForType;
-//var
-//  I, Row: Integer;
-//begin
-//  GridDiameters.BeginUpdate;
-//  try
-//    SetLength(FDiameterRowMap, 0);
-//    Row := 0;
-//
-//    for I := 0 to High(FakeDB.Diameters) do
-//      if (FakeDB.Diameters[I].FlowmeterTypeID = FTypeID) then
-//      begin
-//        SetLength(FDiameterRowMap, Row + 1);
-//        FDiameterRowMap[Row] := FakeDB.Diameters[I].ID;
-//        Inc(Row);
-//      end;
-//
-//    GridDiameters.RowCount := Length(FDiameterRowMap);
-//    GridDiameters.Repaint;
-//  finally
-//    GridDiameters.EndUpdate;
-//  end;
-//end;
-//
-
 procedure TFormTypeEditor.LoadDiameters;
 begin
   {----------------------------------}

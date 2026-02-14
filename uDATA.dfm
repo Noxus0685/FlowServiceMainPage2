@@ -1,11 +1,10 @@
-﻿object DM: TDM
+object DM: TDM
   Height = 480
   Width = 640
   object TypesConnection: TFDConnection
     Params.Strings = (
       'Database='
       'DriverID=SQLite')
-    Connected = False
     Left = 224
     Top = 115
   end
@@ -37,7 +36,6 @@
     Params.Strings = (
       'Database='
       'DriverID=SQLite')
-    Connected = False
     Left = 72
     Top = 24
   end
