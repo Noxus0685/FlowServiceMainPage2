@@ -268,10 +268,13 @@ type
     procedure ButtonPointDeleteClick(Sender: TObject);
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure ComboEditDNChange(Sender: TObject);
+
+
   private
     { Private declarations }
      FDevice: TDevice;
      FOriginalDevice: TDevice;
+
 
      FDeviceType: TDeviceType; // ссылка на найденный тип
      FLoading: Boolean;

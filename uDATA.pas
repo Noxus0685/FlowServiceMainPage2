@@ -35,7 +35,7 @@ type
     DevicePoints: TFDTable;
     SpillagePoints: TFDTable;
     Categories: TFDTable;
-   // procedure qryFlowmeterTypesBeforeOpen(DataSet: TDataSet);
+
 
   private
     FDatabaseFileName :String;

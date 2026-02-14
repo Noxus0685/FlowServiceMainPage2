@@ -1048,7 +1048,7 @@ begin
     Ent := TTypeEntity(TObject(E));
     S := UpperCase(Ent.GetSearchText);
 
-    if Pos(Find, S) > 0 then
+    if (ContainsText(S, Find) ) then
       Result.Add(E);
   end;
 end;

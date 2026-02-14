@@ -11,7 +11,8 @@ uses
   fuMain in 'fuMain.pas' {FormMain},
   UnitDeviceClass in 'UnitDeviceClass.pas',
   fuDeviceSelect in 'fuDeviceSelect.pas' {FormDeviceSelect},
-  fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor};
+  fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor},
+  uDATA in 'uDATA.pas' {DM: TDataModule};
 
 {$R *.res}
 
@@ -43,6 +44,7 @@ begin
   Application.CreateForm(TFormTypeEditor, FormTypeEditor);
   Application.CreateForm(TFormMain, FormMain);
   Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
+  Application.CreateForm(TDM, DM);
   Application.Run;
 
   {--------------------------------------------------}
