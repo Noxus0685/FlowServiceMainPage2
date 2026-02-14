@@ -63,6 +63,7 @@ type
     procedure ExecSQL(const ASQL: string);
     function IsConnected: Boolean;
     procedure EnsureTable(const ATable: string; const Columns: TTableColumns);
+    procedure NormalizeDeviceDiameterSchema;
     function  GetTableColumns(const ATable: string): TStringList;
     function GetDatabaseFileName: string;
     procedure SetDatabaseFileName(const Value: string);
@@ -322,6 +323,69 @@ begin
         );
   finally
     Existing.Free;
+  end;
+end;
+
+procedure TDM.NormalizeDeviceDiameterSchema;
+var
+  Cols: TStringList;
+  NeedMigrate: Boolean;
+begin
+  if not TableExists('DeviceDiameter') then
+    Exit;
+
+  Cols := GetTableColumns('DeviceDiameter');
+  try
+    NeedMigrate :=
+      (Cols.IndexOf('FlowmeterTypeID') >= 0) and
+      (Cols.IndexOf('DeviceTypeID') >= 0);
+  finally
+    Cols.Free;
+  end;
+
+  if not NeedMigrate then
+    Exit;
+
+  StartTransaction;
+  try
+    ExecSQL('DROP TABLE IF EXISTS DeviceDiameter_new');
+
+    ExecSQL(
+      'CREATE TABLE DeviceDiameter_new (' +
+      'ID INTEGER PRIMARY KEY AUTOINCREMENT,' +
+      'DeviceTypeID INTEGER NOT NULL,' +
+      'Name TEXT,' +
+      'DN TEXT,' +
+      'Description TEXT,' +
+      'Qmax REAL,' +
+      'Qmin REAL,' +
+      'Kp REAL,' +
+      'QFmax REAL,' +
+      'Vmax REAL,' +
+      'Vmin REAL' +
+      ')'
+    );
+
+    ExecSQL(
+      'INSERT INTO DeviceDiameter_new (' +
+      'ID, DeviceTypeID, Name, DN, Description, Qmax, Qmin, Kp, QFmax, Vmax, Vmin' +
+      ') ' +
+      'SELECT ' +
+      'ID, ' +
+      'COALESCE(CASE WHEN DeviceTypeID IS NULL OR DeviceTypeID = 0 THEN FlowmeterTypeID ELSE DeviceTypeID END, 0), ' +
+      'Name, DN, Description, Qmax, Qmin, Kp, QFmax, Vmax, Vmin ' +
+      'FROM DeviceDiameter'
+    );
+
+    ExecSQL('DROP TABLE DeviceDiameter');
+    ExecSQL('ALTER TABLE DeviceDiameter_new RENAME TO DeviceDiameter');
+
+    Commit;
+  except
+    Rollback;
+    raise Exception.Create(
+      'Ошибка корректировки структуры БД DeviceDiameter. ' +
+      'Пожалуйста, обновите структуру БД (пересоздайте файл БД).');
   end;
 end;
 

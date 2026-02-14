@@ -2298,8 +2298,10 @@ begin
 end;
 procedure TTypeRepository.EnsureDiameterSchema;
 begin
+  FDM.NormalizeDeviceDiameterSchema;
   FDM.EnsureTable('DeviceDiameter', RequiredDiameterColumns);
 end;
+
 procedure TTypeRepository.AssertDiameterSchema;
 var
   Existing: TStringList;
