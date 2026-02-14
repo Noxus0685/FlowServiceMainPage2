@@ -2910,7 +2910,13 @@ var
   FileStream: TFileStream;
 
   DevType: TDeviceType;
+
+  P: Integer;
+  YY: Integer;
+  Y, M, D: Word;
+  Dt: TDateTime;
 begin
+
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
 
@@ -3004,20 +3010,42 @@ begin
         );
       DevType.ValidityDate := ValidToDate;
 
-      {---------- Дата регистрации ----------}
-      if Pos('-', DevType.ReestrNumber) > 0 then
-      begin
-        RegYear :=
-          2000 + StrToIntDef(
-            Copy(
-              DevType.ReestrNumber,
-              Pos('-', DevType.ReestrNumber) + 1,
-              2
-            ),
-            0
-          );
-        DevType.RegDate := EncodeDate(RegYear, 1, 1);
-      end;
+     // DevType.RegDate :=
+
+{---------- Дата регистрации ----------}
+ P := Pos('-', DevType.ReestrNumber);
+  if P > 0 then
+  begin
+    YY := StrToIntDef(Copy(DevType.ReestrNumber, P + 1, 2), 0);
+
+    // Считаем год как Integer, чтобы удобно было делать -100
+    RegYear := 2000 + YY;
+    if RegYear > YearOf(Date) then
+      Dec(RegYear, 100);
+
+    // Month/Day берём из ValidityDate (если есть), иначе 1/1
+    if DevType.ValidityDate > 0 then
+    begin
+      M := MonthOf(DevType.ValidityDate);
+      D := DayOf(DevType.ValidityDate);
+    end
+    else
+    begin
+      M := 1;
+      D := 1;
+    end;
+
+    // Приведение года к Word (после всех вычислений)
+    if (RegYear < 1) or (RegYear > 9999) then
+      Exit; // или Y := 1; как тебе нужно
+    Y := Word(RegYear);
+
+    // TryEncodeDate требует out-переменную, нельзя туда property напрямую
+    if not TryEncodeDate(Y, M, D, Dt) then
+      Dt := EncodeDate(Y, M, 1);
+
+    DevType.RegDate := Dt;
+  end;
 
       {---------- МПИ ----------}
       MPIArr := Json.GetValue('mpi') as TJSONArray;

@@ -10,7 +10,7 @@ uses
   System.Classes,
   System.SysUtils,    System.DateUtils,
   System.Generics.Collections,
-  System.IOUtils,
+  System.IOUtils,   System.StrUtils,
 
   FireDAC.Stan.Intf, FireDAC.Stan.Option,
   FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def,
@@ -3030,39 +3030,41 @@ begin
       Exit(C);
 end;
 
-function TTypeRepository.DetectCategoryByKeywords(
-  const Text: string
-): Integer;
+function TTypeRepository.DetectCategoryByKeywords(const Text: string): Integer;
 var
   C: TDeviceCategory;
   Words: TArray<string>;
   W: string;
+  Key: string;
   Src: string;
 begin
   Result := -1;
 
-  if (Text.Trim = '') or (FCategories = nil) then
+  Src := Text.Trim;
+  if (Src = '') or (FCategories = nil) then
     Exit;
 
-  Src := LowerCase(Text);
+  Src := Src.ToUpper.Replace('Ё', 'Е');
 
   for C in FCategories do
   begin
-    // пропускаем пустую категорию
     if C.ID < 0 then
       Continue;
 
     if C.KeyWords.Trim = '' then
       Continue;
 
-    Words := C.KeyWords.Split([';']);
+    Words := C.KeyWords.Split([';'], TStringSplitOptions.ExcludeEmpty);
 
     for W in Words do
     begin
-      if W = '' then
+      Key := W.Trim;
+      if Key = '' then
         Continue;
 
-      if Pos(LowerCase(W), Src) > 0 then
+      Key := Key.ToUpper.Replace('Ё', 'Е');
+
+      if ContainsText(Src, Key) then
       begin
         Result := C.ID;
         Exit;
@@ -3070,6 +3072,7 @@ begin
     end;
   end;
 end;
+
 
  function TTypeRepository.LoadCategories: Boolean;
 var

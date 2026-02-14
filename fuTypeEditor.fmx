@@ -2321,14 +2321,13 @@ object FormTypeEditor: TFormTypeEditor
       Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
       DataDetectorTypes = []
       Position.X = 8.000000000000000000
-      Position.Y = -424.000000000000000000
-      Size.Width = 909.000000000000000000
-      Size.Height = 473.000000000000000000
+      Position.Y = -2.000000000000000000
+      Size.Width = 794.000000000000000000
+      Size.Height = 51.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
-      Visible = False
-      Viewport.Width = 905.000000000000000000
-      Viewport.Height = 469.000000000000000000
+      Viewport.Width = 790.000000000000000000
+      Viewport.Height = 47.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000
