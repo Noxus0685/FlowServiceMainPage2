@@ -558,6 +558,7 @@ procedure TManagerTDM.AddRepository(
 var
   Ini: TIniFile;
   DM: TDM;
+  Repo: TBaseRepository;
   RepoName: string;
   DbFile: string;
   KindStr: string;
@@ -620,7 +621,13 @@ begin
     {--------------------------------------------------}
     { 3. Создаём репозиторий }
     {--------------------------------------------------}
-    CreateRepository(RepoName, AKind, DM);
+    Repo := CreateRepository(RepoName, AKind, DM);
+
+    {--------------------------------------------------}
+    { 4. Загружаем/инициализируем схему и данные }
+    {--------------------------------------------------}
+    if Repo.State <> osLoaded then
+      Repo.Load;
 
   except
     DM.Free;

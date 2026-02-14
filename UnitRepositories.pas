@@ -2385,6 +2385,7 @@ begin
       'order by ID';
 
     SetIntParam(Q, 'ID', ATypeID);
+
     Q.Open;
 
     while not Q.Eof do
