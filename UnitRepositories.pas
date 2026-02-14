@@ -2375,6 +2375,8 @@ begin
   if (ATypeID <= 0) or (FDM = nil) then
     Exit;
 
+  EnsureDiameterSchema;
+
   Q := FDM.CreateQuery;
   try
     Q.SQL.Text :=
@@ -2406,6 +2408,8 @@ begin
 
   if (ADiameter = nil) or (FDM = nil) then
     Exit;
+
+  EnsureDiameterSchema;
 
   if ADiameter.State = osClean then
     Exit(True);
@@ -2544,6 +2548,8 @@ begin
 
   if (AType = nil) or (FDM = nil) then
     Exit;
+
+  EnsureDiameterSchema;
 
   if AType.Diameters = nil then
     Exit(True);
