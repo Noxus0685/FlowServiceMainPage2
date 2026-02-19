@@ -1,8 +1,8 @@
 ﻿[Closed Files]
 File_0=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.SysUtils.pas',0,1,6951,1,6964,0,0,,
-File_1=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Forms.pas',0,1,1927,1,1940,0,0,{{882,4},{890,15},{'Mouse events'}}{{892,4},{913,15},{'Keys events'}},
-File_2=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Grid.Style.pas',0,1,3202,1,3215,0,0,{{391,0},{490,11},{'TDefaultEditor'}}{{492,0},{527,11},{'TNumberCell'}}{{529,0},{583,11},{'TCellText'}}{{585,0},{682,11},{'TProgressCell'}}{{684,0},{867,11},{'TCheckCell'}}{{869,0},{985,11},{'TDateCell'}}{{987,0},{1091,11},{'TTimeCell'}}{{1093,0},{1223,11},{'TPopupCell'}}{{1225,0},{1376,11},{'TImageCell'}}{{1378,0},{1560,11},{'TCurrencyCell'}}{{1562,0},{1749,11},{'TGridHeaderItem'}}{{1564,0},{1626,11},{'TGlyphCell'}},
-File_3=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Types.pas',0,1,5404,1,5417,0,0,{{6034,0},{6573,11},{' implementation of Caret'}}{{6131,0},{6262,11},{'global methods for Flasher'}},
+File_1=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Forms.pas',0,1,1927,1,1940,0,0,{{882,4}
+File_2=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Grid.Style.pas',0,1,3202,1,3215,0,0,{{391,0}
+File_3=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Types.pas',0,1,5404,1,5417,0,0,{{6034,0}
 File_4=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Rtti.pas',0,1,2678,1,2700,0,0,,
 File_5=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Controls.pas',0,1,4483,1,4496,0,0,{{701,4}
 File_6=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Win.pas',0,1,3607,1,3620,0,0,,
@@ -16,30 +16,34 @@ File_13=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx
 File_14=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.SQLite.pas',0,1,1977,1,1993,0,0,,
 
 [Modules]
-Module0=D:\Projects\FlowServiceMainPage\fuMain.pas
-Module1=d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Timer.Win.pas
-Module2=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
-Module3=D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas
-Module4=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
-Module5=D:\Projects\FlowServiceMainPage\fuTypeSelect.pas
-Module6=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
-Module7=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
-Module8=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
-Module9=D:\Projects\FlowServiceMainPage\UnitClasses.pas
-Module10=D:\Projects\FlowServiceMainPage\uDATA.pas
-Module11=D:\Projects\FlowServiceMainPage\UnitDataManager.pas
-Module12=D:\Projects\FlowServiceMainPage\UnitRepositories.pas
-Count=13
+Module0=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+Module1=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
+Module2=D:\Projects\FlowServiceMainPage\fuMain.pas
+Module3=d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Timer.Win.pas
+Module4=D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas
+Module5=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
+Module6=D:\Projects\FlowServiceMainPage\fuTypeSelect.pas
+Module7=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
+Module8=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
+Module9=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
+Module10=D:\Projects\FlowServiceMainPage\UnitClasses.pas
+Module11=D:\Projects\FlowServiceMainPage\uDATA.pas
+Module12=D:\Projects\FlowServiceMainPage\UnitDataManager.pas
+Module13=D:\Projects\FlowServiceMainPage\UnitRepositories.pas
+Count=14
 EditWindowCount=1
+
+[D:\Projects\FlowServiceMainPage\UnitMeterValue.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj]
+ModuleType=TBaseProject
 
 [D:\Projects\FlowServiceMainPage\fuMain.pas]
 ModuleType=TSourceModule
 
 [d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Timer.Win.pas]
 ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj]
-ModuleType=TBaseProject
 
 [D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas]
 ModuleType=TSourceModule
@@ -72,8 +76,8 @@ ModuleType=TSourceModule
 ModuleType=TSourceModule
 
 [EditWindow0]
-ViewCount=13
-CurrentEditView=D:\Projects\FlowServiceMainPage\fuMain.pas
+ViewCount=14
+CurrentEditView=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
 View0=0
 View1=1
 View2=2
@@ -87,6 +91,7 @@ View9=9
 View10=10
 View11=11
 View12=12
+View13=13
 PercentageSizes=1
 Create=1
 Visible=1
@@ -243,16 +248,27 @@ EditViewName=Borland.FormDesignerView
 
 [View11]
 CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+CursorX=1
+CursorY=1
+TopLine=1
+LeftCol=1
+Elisions=
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+
+[View12]
+CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\ProjectFornTest.dpr
 CursorX=1
-CursorY=53
-TopLine=40
+CursorY=54
+TopLine=41
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\ProjectFornTest.dpr
 
-[View12]
+[View13]
 CustomEditViewType=TEditView
 Module=d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Timer.Win.pas
 CursorX=1
@@ -418,11 +434,6 @@ LRDockWidth=1897
 Dockable=1
 StayOnTop=0
 SplitPos=117
-
-[PropInspDesignerSelection]
-ArrangeBy=Name
-SelectedItem=ReadOnly,Action
-ExpandedItems=Border=0,BorderIcons=0,Constraints=0,Fill=0,FormFactor=0,"LiveBindings Designer=0",LiveBindings=0,Margins=0,HeaderSettings=0,Padding=0,Touch=0,PopupMenu=0,Anchors=0,HeaderSettings.StyledSettings=0,HeaderSettings.TextSettings=0,HeaderSettings.TextSettings.Font=0
 
 [frmDesignPreview]
 PercentageSizes=1

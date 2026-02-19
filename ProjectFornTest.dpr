@@ -12,7 +12,8 @@ uses
   UnitDeviceClass in 'UnitDeviceClass.pas',
   fuDeviceSelect in 'fuDeviceSelect.pas' {FormDeviceSelect},
   fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor},
-  uDATA in 'uDATA.pas' {DM: TDataModule};
+  uDATA in 'uDATA.pas' {DM: TDataModule},
+  UnitMeterValue in 'UnitMeterValue.pas';
 
 {$R *.res}
 
@@ -43,7 +44,7 @@ begin
  // Application.CreateForm(TFormTypeSelect, FormTypeSelect);
 //  Application.CreateForm(TFormTypeEditor, FormTypeEditor);
   Application.CreateForm(TFormMain, FormMain);
-//  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
+  //  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
 //  Application.CreateForm(TDM, DM);
   Application.Run;
 
