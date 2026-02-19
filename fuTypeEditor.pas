@@ -864,11 +864,13 @@ begin
       FOriginalType.Assign(FType);
       if not Repo.SaveType(FOriginalType) then
         raise Exception.Create('Ошибка сохранения типа');
+      FOriginalType.SelectedDiameterID := FSelectedDiameterID;
     end
     else
     begin
       if not Repo.SaveType(FType) then
         raise Exception.Create('Ошибка сохранения типа');
+            FType.SelectedDiameterID := FSelectedDiameterID;
     end;
 
     FModified := True;
@@ -3197,7 +3199,7 @@ begin
     Value := P.Name
 
   else if ACol = StringColumnPointFlowRate.Index then
-    Value := FormatFloatN(P.FlowRate, 3)
+    Value :=  FormatFloat('0.###', P.FlowRate)
 
   else if ACol = StringColumnPointFlowError.Index then
     Value := FormatAccuracy(P.FlowAccuracy)

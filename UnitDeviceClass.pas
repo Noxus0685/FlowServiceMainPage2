@@ -1187,7 +1187,17 @@ begin
   {====================================================}
   TD := nil;
 
+
+
+   for var D in AType.Diameters do
+    if AType.SelectedDiameterID = D.ID then
+    begin
+      TD := D;
+      Break;
+    end;
+
   // 1️⃣ Пытаемся найти совпадение по DN / Name
+  if (TD = nil) then
   for var D in AType.Diameters do
     if SameText(D.DN, DN) or SameText(D.Name, DN) then
     begin
@@ -1202,12 +1212,11 @@ begin
   // 3️⃣ Если диаметров нет вообще — выходим
   if TD <> nil then
    begin
+   Self.DN := TD.Name;
+
   {====================================================}
   { 6. Назначаем параметры диаметра }
   {====================================================}
-  Qmax := TD.Qmax;
-  Qmin := TD.Qmin;
-
   Self.Qmax := TD.Qmax;
   Self.Qmin := TD.Qmin;
   Self.RangeDynamic := TD.Qmax / Max(TD.Qmin, 1e-6);

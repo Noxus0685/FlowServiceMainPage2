@@ -340,6 +340,8 @@ type
 
     public
 
+    SelectedDiameterID : Integer;
+
     constructor Create;
     destructor Destroy; override;
 

@@ -39,12 +39,12 @@ begin
   {--------------------------------------------------}
   { Формы }
   {--------------------------------------------------}
-  Application.CreateForm(TFormDeviceSelect, FormDeviceSelect);
-  Application.CreateForm(TFormTypeSelect, FormTypeSelect);
-  Application.CreateForm(TFormTypeEditor, FormTypeEditor);
+ // Application.CreateForm(TFormDeviceSelect, FormDeviceSelect);
+ // Application.CreateForm(TFormTypeSelect, FormTypeSelect);
+//  Application.CreateForm(TFormTypeEditor, FormTypeEditor);
   Application.CreateForm(TFormMain, FormMain);
-  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
-  Application.CreateForm(TDM, DM);
+//  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
+//  Application.CreateForm(TDM, DM);
   Application.Run;
 
   {--------------------------------------------------}

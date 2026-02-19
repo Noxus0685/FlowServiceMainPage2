@@ -2,29 +2,30 @@ object FormMain: TFormMain
   Left = 0
   Top = 0
   Caption = 'fuMain'
-  ClientHeight = 639
-  ClientWidth = 1191
+  ClientHeight = 640
+  ClientWidth = 1192
   Visible = True
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
   DesignerMasterStyle = 0
   object TabControl1: TTabControl
     Align = Client
-    Size.Width = 1191.000000000000000000
-    Size.Height = 639.000000000000000000
+    Size.Width = 1192.000000000000000000
+    Size.Height = 640.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
     TabIndex = 0
     TabOrder = 6
     TabPosition = PlatformDefault
     Sizes = (
-      1191s
-      613s
-      1191s
-      613s
-      1191s
-      613s)
+      1192s
+      614s
+      1192s
+      614s
+      1192s
+      614s)
     object TabItem1: TTabItem
       CustomIcon = <
         item
@@ -41,17 +42,17 @@ object FormMain: TFormMain
       ExplicitSize.cy = 26.000000000000000000
       object TabControlWorkTable: TTabControl
         Align = Client
-        Size.Width = 1191.000000000000000000
-        Size.Height = 493.000000000000000000
+        Size.Width = 1192.000000000000000000
+        Size.Height = 494.000000000000000000
         Size.PlatformDefault = False
         TabIndex = 0
         TabOrder = 0
         TabPosition = PlatformDefault
         Sizes = (
-          1191s
-          467s
-          1191s
-          467s
+          1192s
+          468s
+          1192s
+          468s
           1458s
           504s)
         object TabItem4: TTabItem
@@ -70,13 +71,13 @@ object FormMain: TFormMain
           ExplicitSize.cy = 26.000000000000000000
           object Panel2: TPanel
             Align = Top
-            Size.Width = 1191.000000000000000000
+            Size.Width = 1192.000000000000000000
             Size.Height = 152.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 2
             object Layout1: TLayout
               Align = Client
-              Size.Width = 1191.000000000000000000
+              Size.Width = 1192.000000000000000000
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
@@ -84,27 +85,34 @@ object FormMain: TFormMain
                 Align = Top
                 CanFocus = True
                 ClipChildren = True
-                Size.Width = 1191.000000000000000000
+                Size.Width = 1192.000000000000000000
                 Size.Height = 129.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
                 RowCount = 2
-                Viewport.Width = 1187.000000000000000000
+                OnGetValue = Grid2GetValue
+                OnSetValue = Grid2SetValue
+                OnCellClick = Grid2CellClick
+                Viewport.Width = 1188.000000000000000000
                 Viewport.Height = 104.000000000000000000
                 object CheckColumn2: TCheckColumn
+                  HorzAlign = Center
                   Header = #1042#1082#1083
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
+                  ReadOnly = True
+                  Size.Width = 41.000000000000000000
                 end
                 object StringColumn7: TStringColumn
                   Header = #1050#1072#1085#1072#1083
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                 end
-                object StringColumn8: TStringColumn
+                object StringColumnType: TStringColumn
                   Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
+                  ReadOnly = True
                 end
                 object StringColumn9: TStringColumn
                   Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
@@ -131,10 +139,22 @@ object FormMain: TFormMain
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                 end
+                object PopupColumnSignal: TPopupColumn
+                  HorzAlign = Center
+                  Header = #1057#1080#1075#1085#1072#1083
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                  PopupMenu = PopupMenu1
+                  Items.Strings = (
+                    #1048#1084#1087
+                    #1063#1072#1089#1090#1086#1090#1072
+                    #1057#1074#1103#1079#1100
+                    #1058#1086#1082)
+                end
               end
             end
             object ToolBar2: TToolBar
-              Size.Width = 1191.000000000000000000
+              Size.Width = 1192.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
@@ -148,20 +168,20 @@ object FormMain: TFormMain
           end
           object Panel3: TPanel
             Align = Client
-            Size.Width = 1191.000000000000000000
-            Size.Height = 315.000000000000000000
+            Size.Width = 1192.000000000000000000
+            Size.Height = 316.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 3
             object GridDevices: TGrid
               Align = Client
               CanFocus = True
               ClipChildren = True
-              Size.Width = 1191.000000000000000000
-              Size.Height = 283.000000000000000000
+              Size.Width = 1192.000000000000000000
+              Size.Height = 284.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 1171.000000000000000000
-              Viewport.Height = 258.000000000000000000
+              Viewport.Width = 1172.000000000000000000
+              Viewport.Height = 259.000000000000000000
               object CheckColumn1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.WordWrap = False
@@ -204,7 +224,7 @@ object FormMain: TFormMain
               end
             end
             object ToolBar1: TToolBar
-              Size.Width = 1191.000000000000000000
+              Size.Width = 1192.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
@@ -233,13 +253,13 @@ object FormMain: TFormMain
           ExplicitSize.cy = 26.000000000000000000
           object Panel1: TPanel
             Align = Top
-            Size.Width = 1191.000000000000000000
+            Size.Width = 1192.000000000000000000
             Size.Height = 152.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 2
             object Layout2: TLayout
               Align = Client
-              Size.Width = 1191.000000000000000000
+              Size.Width = 1192.000000000000000000
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
@@ -247,12 +267,12 @@ object FormMain: TFormMain
                 Align = Top
                 CanFocus = True
                 ClipChildren = True
-                Size.Width = 1191.000000000000000000
+                Size.Width = 1192.000000000000000000
                 Size.Height = 129.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
                 RowCount = 2
-                Viewport.Width = 1187.000000000000000000
+                Viewport.Width = 1188.000000000000000000
                 Viewport.Height = 104.000000000000000000
                 object CheckColumn3: TCheckColumn
                   Header = #1042#1082#1083
@@ -297,7 +317,7 @@ object FormMain: TFormMain
               end
             end
             object ToolBar3: TToolBar
-              Size.Width = 1191.000000000000000000
+              Size.Width = 1192.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
@@ -311,20 +331,20 @@ object FormMain: TFormMain
           end
           object Panel4: TPanel
             Align = Client
-            Size.Width = 1191.000000000000000000
-            Size.Height = 315.000000000000000000
+            Size.Width = 1192.000000000000000000
+            Size.Height = 316.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 3
             object Grid3: TGrid
               Align = Client
               CanFocus = True
               ClipChildren = True
-              Size.Width = 1191.000000000000000000
-              Size.Height = 283.000000000000000000
+              Size.Width = 1192.000000000000000000
+              Size.Height = 284.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 1171.000000000000000000
-              Viewport.Height = 258.000000000000000000
+              Viewport.Width = 1172.000000000000000000
+              Viewport.Height = 259.000000000000000000
               object CheckColumn4: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.WordWrap = False
@@ -367,7 +387,7 @@ object FormMain: TFormMain
               end
             end
             object ToolBar4: TToolBar
-              Size.Width = 1191.000000000000000000
+              Size.Width = 1192.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
@@ -547,13 +567,13 @@ object FormMain: TFormMain
       end
       object PanelMain: TPanel
         Align = MostTop
-        Size.Width = 1191.000000000000000000
+        Size.Width = 1192.000000000000000000
         Size.Height = 120.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
         object PanelInstruments: TPanel
           Align = MostTop
-          Size.Width = 1191.000000000000000000
+          Size.Width = 1192.000000000000000000
           Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
@@ -1478,21 +1498,21 @@ object FormMain: TFormMain
       ExplicitSize.cy = 26.000000000000000000
       object ControlBar: TLayout
         Align = Top
-        Size.Width = 1191.000000000000000000
+        Size.Width = 1192.000000000000000000
         Size.Height = 64.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 8
         object rctToolsPanelBackground: TRectangle
           Align = Client
           Fill.Color = xFFCCCCCC
-          Size.Width = 1191.000000000000000000
+          Size.Width = 1192.000000000000000000
           Size.Height = 64.000000000000000000
           Size.PlatformDefault = False
           Stroke.Color = claNull
           object tbShemeColor: TToolBar
             Align = Right
             Margins.Right = 5.000000000000000000
-            Position.X = 950.000000000000000000
+            Position.X = 951.000000000000000000
             Size.Width = 187.000000000000000000
             Size.Height = 64.000000000000000000
             Size.PlatformDefault = False
@@ -1858,21 +1878,21 @@ object FormMain: TFormMain
             TabPosition = PlatformDefault
             Sizes = (
               517s
-              37s
+              35s
               517s
-              37s
+              35s
               517s
-              37s
+              35s
               517s
-              37s)
+              35s)
             object tiControl: TTabItem
               CustomIcon = <
                 item
                 end>
               TextSettings.Trimming = None
               IsSelected = True
-              Size.Width = 147.000000000000000000
-              Size.Height = 24.000000000000000000
+              Size.Width = 163.000000000000000000
+              Size.Height = 26.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'tcsmallheaderstyle'
               TabOrder = 0
@@ -1890,7 +1910,7 @@ object FormMain: TFormMain
                 Position.X = 1.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -1907,7 +1927,7 @@ object FormMain: TFormMain
                 Position.X = 33.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -1924,7 +1944,7 @@ object FormMain: TFormMain
                 Position.X = 97.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -1941,7 +1961,7 @@ object FormMain: TFormMain
                 Position.X = 65.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -1958,7 +1978,7 @@ object FormMain: TFormMain
                 Position.X = 129.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -1975,7 +1995,7 @@ object FormMain: TFormMain
                 Position.X = 161.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -1992,7 +2012,7 @@ object FormMain: TFormMain
                 Position.X = 197.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2009,7 +2029,7 @@ object FormMain: TFormMain
                 Position.X = 261.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2026,7 +2046,7 @@ object FormMain: TFormMain
                 Position.X = 293.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2043,7 +2063,7 @@ object FormMain: TFormMain
                 Position.X = 325.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2062,7 +2082,7 @@ object FormMain: TFormMain
                 Position.X = 357.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2081,7 +2101,7 @@ object FormMain: TFormMain
                 Position.X = 389.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2100,7 +2120,7 @@ object FormMain: TFormMain
                 Position.X = 229.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2120,8 +2140,8 @@ object FormMain: TFormMain
                 end>
               TextSettings.Trimming = None
               IsSelected = False
-              Size.Width = 104.000000000000000000
-              Size.Height = 24.000000000000000000
+              Size.Width = 113.000000000000000000
+              Size.Height = 26.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'tcsmallheaderstyle'
               TabOrder = 0
@@ -2139,7 +2159,7 @@ object FormMain: TFormMain
                 Position.X = 65.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2156,7 +2176,7 @@ object FormMain: TFormMain
                 Position.X = 97.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2173,7 +2193,7 @@ object FormMain: TFormMain
                 Position.X = 129.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2190,7 +2210,7 @@ object FormMain: TFormMain
                 Position.X = 161.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2208,7 +2228,7 @@ object FormMain: TFormMain
                 Position.X = 1.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2225,7 +2245,7 @@ object FormMain: TFormMain
                 Position.X = 33.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2242,7 +2262,7 @@ object FormMain: TFormMain
                 Position.X = 193.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2259,7 +2279,7 @@ object FormMain: TFormMain
                 Position.X = 289.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2276,7 +2296,7 @@ object FormMain: TFormMain
                 Position.X = 417.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2293,7 +2313,7 @@ object FormMain: TFormMain
                 Position.X = 321.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2310,7 +2330,7 @@ object FormMain: TFormMain
                 Position.X = 385.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2327,7 +2347,7 @@ object FormMain: TFormMain
                 Position.X = 353.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2344,7 +2364,7 @@ object FormMain: TFormMain
                 Position.X = 225.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2361,7 +2381,7 @@ object FormMain: TFormMain
                 Position.X = 257.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2381,8 +2401,8 @@ object FormMain: TFormMain
                 end>
               TextSettings.Trimming = None
               IsSelected = False
-              Size.Width = 85.000000000000000000
-              Size.Height = 24.000000000000000000
+              Size.Width = 93.000000000000000000
+              Size.Height = 26.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'tcsmallheaderstyle'
               TabOrder = 0
@@ -2401,7 +2421,7 @@ object FormMain: TFormMain
                 Position.X = 1.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2419,7 +2439,7 @@ object FormMain: TFormMain
                 Position.X = 33.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080'...'
@@ -2432,8 +2452,8 @@ object FormMain: TFormMain
                 end>
               TextSettings.Trimming = None
               IsSelected = False
-              Size.Width = 171.000000000000000000
-              Size.Height = 24.000000000000000000
+              Size.Width = 188.000000000000000000
+              Size.Height = 26.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'tcsmallheaderstyle'
               TabOrder = 0
@@ -2453,7 +2473,7 @@ object FormMain: TFormMain
                 Position.X = 1.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1086#1083#1100#1079#1086#1074#1072#1090#1077#1083#1100#1089#1082#1080#1081' '#1087#1088#1084#1080#1090#1080#1074'...'
@@ -2472,7 +2492,7 @@ object FormMain: TFormMain
                 Position.X = 33.000000000000000000
                 Position.Y = 6.000000000000000000
                 Size.Width = 30.000000000000000000
-                Size.Height = 25.000000000000000000
+                Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'bigiconspeedbuttonstyle'
                 Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1086#1083#1100#1079#1086#1074#1072#1090#1077#1083#1100#1089#1082#1080#1081' '#1087#1088#1084#1080#1090#1080#1074'...'
@@ -2662,7 +2682,7 @@ object FormMain: TFormMain
             Margins.Top = 10.000000000000000000
             Margins.Right = 5.000000000000000000
             Margins.Bottom = 10.000000000000000000
-            Position.X = 1143.000000000000000000
+            Position.X = 1144.000000000000000000
             Position.Y = 10.000000000000000000
             Size.Width = 43.000000000000000000
             Size.Height = 44.000000000000000000
@@ -2747,6 +2767,16 @@ object FormMain: TFormMain
       Text = #1054#1073#1088#1072#1073#1086#1090#1082#1072
       ExplicitSize.cx = 81.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
+    end
+  end
+  object PopupMenu1: TPopupMenu
+    Left = 880
+    Top = 252
+    object MenuItem1: TMenuItem
+      Text = 'MenuItem1'
+    end
+    object MenuItem2: TMenuItem
+      Text = 'MenuItem2'
     end
   end
 end

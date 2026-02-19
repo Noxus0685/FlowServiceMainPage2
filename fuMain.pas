@@ -1,16 +1,34 @@
-unit fuMain;
+﻿unit fuMain;
 
 interface
 
 uses
+  fuTypeSelect,
+  UnitDataManager,
+  UnitDeviceClass,
+  UnitClasses,
+  UnitRepositories,
+  UnitBaseProcedures,
+  System.Math,
+
+
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, System.Rtti,
   FMX.Grid.Style, FMX.Filter.Effects, FMX.Colors, FMX.Effects, FMX.ListBox,
   FMX.Edit, FMX.StdCtrls, FMX.ComboEdit, FMX.EditBox, FMX.SpinBox, FMX.Objects,
   FMX.Grid, FMX.ScrollBox, FMX.Layouts, FMX.Controls.Presentation,
-  FMX.TabControl;
+  FMX.TabControl, FMX.Menus;
+
+
 
 type
+
+  TRowData = record
+    Enabled: Boolean;
+    SignalIndex: Integer;
+    SignalName: string;
+  end;
+
   TFormMain = class(TForm)
     TabControl1: TTabControl;
     TabItem1: TTabItem;
@@ -21,7 +39,7 @@ type
     Grid2: TGrid;
     CheckColumn2: TCheckColumn;
     StringColumn7: TStringColumn;
-    StringColumn8: TStringColumn;
+    StringColumnType: TStringColumn;
     StringColumn9: TStringColumn;
     StringColumn10: TStringColumn;
     StringColumn11: TStringColumn;
@@ -285,17 +303,210 @@ type
     ShadowEffect9: TShadowEffect;
     shdwfct8: TShadowEffect;
     TabItem3: TTabItem;
+    PopupColumnSignal: TPopupColumn;
+    PopupMenu1: TPopupMenu;
+    MenuItem1: TMenuItem;
+    MenuItem2: TMenuItem;
+    procedure FormCreate(Sender: TObject);
+    procedure Grid2GetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
+    procedure Grid2SetValue(Sender: TObject; const ACol, ARow: Integer;
+      const Value: TValue);
+    procedure Grid2CellClick(const Column: TColumn; const Row: Integer);
   private
     { Private declarations }
+    procedure OpenTypeSelect(ARow: Integer);
   public
     { Public declarations }
   end;
 
+
 var
   FormMain: TFormMain;
+
+  FRows: array of TRowData;
 
 implementation
 
 {$R *.fmx}
+
+procedure TFormMain.FormCreate(Sender: TObject);
+begin
+  Grid2.RowCount := 2;
+
+  // Заполняем список через имя колонки
+  PopupColumnSignal.Items.Clear;
+  PopupColumnSignal.Items.Add('Импульсный');
+  PopupColumnSignal.Items.Add('Частотный');
+  PopupColumnSignal.Items.Add('Токовый');
+  PopupColumnSignal.Items.Add('Напряжение');
+
+  SetLength(FRows, 2);
+
+  FRows[0].Enabled := True;
+  FRows[0].SignalIndex := 0;
+
+  FRows[1].Enabled := False;
+  FRows[1].SignalIndex := 1;
+end;
+
+procedure TFormMain.OpenTypeSelect(ARow: Integer);
+var
+  Frm: TFormTypeSelect;
+  CurrentType, NewType: TDeviceType;
+  FoundRepo: TTypeRepository;
+  RepoName: string;
+  IsTypeChanged, NeedFill: Boolean;
+begin
+
+ // if (FDevice = nil) or (DataManager = nil) then
+ //   Exit;
+
+  //RefreshDeviceTypeReference;
+
+  Frm := TFormTypeSelect.Create(Self);
+  try
+    {----------------------------------------------------}
+    { 1. Предвыбор текущего типа }
+    {----------------------------------------------------}
+ //   CurrentType := DataManager.FindType(
+ //     FDevice.DeviceTypeUUID,
+ //     FDevice.DeviceTypeName,
+ //     FoundRepo
+ //   );
+
+ //   if (CurrentType <> nil) and (FoundRepo <> nil) then
+//    begin
+  //    DataManager.ActiveTypeRepo := FoundRepo;
+  //    Frm.SelectType(CurrentType);
+  //  end;
+
+    {----------------------------------------------------}
+    { 2. Открываем форму выбора }
+    {----------------------------------------------------}
+    if Frm.ShowModal <> mrOk then
+      Exit;
+
+    NewType := Frm.SelectedType;
+    if NewType = nil then
+      Exit;
+
+    FoundRepo := DataManager.ActiveTypeRepo;
+
+    {----------------------------------------------------}
+    { 3. Проверяем смену типа }
+    {----------------------------------------------------}
+    IsTypeChanged := True;
+
+    if CurrentType <> nil then
+    begin
+      if CurrentType = NewType then
+        IsTypeChanged := False
+      else if (CurrentType.MitUUID <> '') and (NewType.MitUUID <> '') then
+        IsTypeChanged :=
+          not SameText(CurrentType.MitUUID, NewType.MitUUID)
+      else
+        IsTypeChanged :=
+          (CurrentType.ID <> NewType.ID) or
+          (not SameText(CurrentType.Name, NewType.Name)) or
+          (not SameText(CurrentType.Modification, NewType.Modification));
+    end;
+
+    NeedFill := False;
+
+//    if IsTypeChanged then
+//      NeedFill := AskFillFromType;
+
+    {----------------------------------------------------}
+    { 4. Привязываем тип }
+    {----------------------------------------------------}
+    if FoundRepo <> nil then
+      RepoName := FoundRepo.Name
+    else
+      RepoName := '';
+
+  //  if NeedFill then
+  //  begin
+  //    FDevice.AttachType(NewType, RepoName);
+  //    FDeviceType := NewType;
+
+      {----------------------------------------------------}
+      { 5. Копируем данные из типа → в прибор }
+      {----------------------------------------------------}
+  //    FDevice.FillFromType(NewType);
+  //  end;
+
+    {----------------------------------------------------}
+    { 6. Обновляем UI }
+    {----------------------------------------------------}
+  //  UpdateUIFromDevice;
+
+  //  Grid2.Invalidate;   // обновить грид
+  //  SetModified;
+
+  finally
+    Frm.Free;
+  end;
+end;
+
+procedure TFormMain.Grid2CellClick(const Column: TColumn;
+  const Row: Integer);
+  var  Combo: TComboEdit;
+begin
+  if (Row < Length(FRows)) then
+  begin
+
+  if Column = CheckColumn2 then
+    FRows[Row].Enabled := not  FRows[Row].Enabled;
+
+
+  if Column = PopupColumnSignal then
+  begin
+
+  end;
+
+
+  if Column = StringColumnType then
+   begin
+      OpenTypeSelect( Row );
+  end;
+
+
+     Grid2.BeginUpdate;
+  try
+    Grid2.RowCount := 2;
+  finally
+    Grid2.EndUpdate;
+  end;
+end;
+
+
+  end;
+
+
+procedure TFormMain.Grid2GetValue(Sender: TObject;
+  const ACol, ARow: Integer; var Value: TValue);
+begin
+  if ARow >= Length(FRows) then Exit;
+
+  if Grid2.Columns[ACol] = CheckColumn2 then
+    Value := FRows[ARow].Enabled
+
+  else if ACol = PopupColumnSignal.Index then
+    Value := FRows[ARow].SignalName;   // ← отдаём строку
+end;
+
+
+procedure TFormMain.Grid2SetValue(Sender: TObject;
+  const ACol, ARow: Integer; const Value: TValue);
+begin
+  if ARow >= Length(FRows) then Exit;
+
+  if Grid2.Columns[ACol] = CheckColumn2 then
+    FRows[ARow].Enabled := Value.AsBoolean
+
+  else if ACol = PopupColumnSignal.Index then
+    FRows[ARow].SignalName := Value.AsString;  // ← сохраняем строку
+end;
 
 end.

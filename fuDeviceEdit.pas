@@ -2285,7 +2285,7 @@ begin
     Value := P.Name
 
   else if ACol = StringColumnPointFlowRate.Index then
-    Value := FormatFloatN(P.FlowRate, 3)
+    Value := FormatFloat('0.####', P.FlowRate)
 
   else if ACol = StringColumnPointFlowError.Index then
     Value := FormatAccuracy(P.FlowAccuracy)
