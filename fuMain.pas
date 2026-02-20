@@ -473,6 +473,10 @@ var
   RepoName: string;
   IsTypeChanged, NeedFill: Boolean;
 begin
+  if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
+    Exit;
+
+  CurrentType := nil;
 
  // if (FDevice = nil) or (DataManager = nil) then
  //   Exit;
@@ -495,6 +499,17 @@ begin
   //    DataManager.ActiveTypeRepo := FoundRepo;
   //    Frm.SelectType(CurrentType);
   //  end;
+
+
+    if (DataManager <> nil) then
+    begin
+      CurrentType := DataManager.FindType('', FFlowMeterRows[ARow].Meter.DeviceTypeName, FoundRepo);
+      if (CurrentType <> nil) and (FoundRepo <> nil) then
+      begin
+        DataManager.ActiveTypeRepo := FoundRepo;
+        Frm.SelectType(CurrentType);
+      end;
+    end;
 
     {----------------------------------------------------}
     { 2. Открываем форму выбора }
@@ -535,10 +550,16 @@ begin
     {----------------------------------------------------}
     { 4. Привязываем тип }
     {----------------------------------------------------}
+    if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
+      FoundRepo := DataManager.ActiveTypeRepo;
+
     if FoundRepo <> nil then
       RepoName := FoundRepo.Name
     else
       RepoName := '';
+
+    FFlowMeterRows[ARow].Meter.DeviceTypeName := NewType.Name;
+    FFlowMeterRows[ARow].TypeIndex := FindTypeIndex(NewType.Name);
 
   //  if NeedFill then
   //  begin
@@ -572,10 +593,7 @@ begin
   if Column = CheckColumnEnable then
     FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled
   else if Column = Column1 then
-  begin
-    FFlowMeterRows[Row].TypeIndex := (FFlowMeterRows[Row].TypeIndex + 1) mod Length(CFlowMeterTypes);
-    ApplyFlowMeterSelection(Row);
-  end
+    OpenTypeSelect(Row)
   else if Column = StringColumn2 then
   begin
     FFlowMeterRows[Row].SerialIndex := (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
