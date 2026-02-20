@@ -6,10 +6,12 @@ uses
   fuTypeSelect,
   UnitDataManager,
   UnitDeviceClass,
+  UnitFlowMeter,
   UnitClasses,
   UnitRepositories,
   UnitBaseProcedures,
   System.Math,
+  System.Generics.Collections,
 
 
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
@@ -27,6 +29,14 @@ type
     Enabled: Boolean;
     SignalIndex: Integer;
     SignalName: string;
+  end;
+
+  TFlowMeterRowData = record
+    Enabled: Boolean;
+    Channel: Integer;
+    Meter: TFlowMeter;
+    TypeIndex: Integer;
+    SerialIndex: Integer;
   end;
 
   TFormMain = class(TForm)
@@ -313,11 +323,23 @@ type
     procedure Grid2SetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure Grid2CellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
+    procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
+      const Value: TValue);
+    procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
   private
     { Private declarations }
+    FFlowMeters: TObjectList<TFlowMeter>;
+    FFlowMeterRows: TArray<TFlowMeterRowData>;
     procedure OpenTypeSelect(ARow: Integer);
+    procedure InitFlowMeters;
+    procedure ApplyFlowMeterSelection(const ARow: Integer);
+    function FindTypeIndex(const ATypeName: string): Integer;
+    function FindSerialIndex(const ASerialNumber: string): Integer;
   public
     { Public declarations }
+    destructor Destroy; override;
   end;
 
 
@@ -330,8 +352,30 @@ implementation
 
 {$R *.fmx}
 
+const
+  CFlowMeterTypes: array[0..2] of string = (
+    'Расходомер ПРЭМ',
+    'Расходомер ЭЛЕМЕР',
+    'Расходомер ВЗЛЕТ'
+  );
+
+  CFlowMeterSerials: array[0..3] of string = (
+    'SN-1001',
+    'SN-1002',
+    'SN-1003',
+    'SN-1004'
+  );
+
+destructor TFormMain.Destroy;
+begin
+  FFlowMeters.Free;
+  inherited;
+end;
+
 procedure TFormMain.FormCreate(Sender: TObject);
 begin
+  FFlowMeters := TObjectList<TFlowMeter>.Create(True);
+
   Grid2.RowCount := 2;
 
   // Заполняем список через имя колонки
@@ -348,6 +392,71 @@ begin
 
   FRows[1].Enabled := False;
   FRows[1].SignalIndex := 1;
+
+  GridDevices.OnGetValue := GridDevicesGetValue;
+  GridDevices.OnSetValue := GridDevicesSetValue;
+  GridDevices.OnCellClick := GridDevicesCellClick;
+
+  InitFlowMeters;
+end;
+
+procedure TFormMain.InitFlowMeters;
+var
+  I: Integer;
+  Meter: TFlowMeter;
+begin
+  FFlowMeters.Clear;
+  SetLength(FFlowMeterRows, 3);
+
+  for I := 0 to High(FFlowMeterRows) do
+  begin
+    Meter := TFlowMeter.Create(False);
+    Meter.SetChannel(I + 1);
+    Meter.DeviceTypeName := CFlowMeterTypes[I mod Length(CFlowMeterTypes)];
+    Meter.SerialNumber := CFlowMeterSerials[I mod Length(CFlowMeterSerials)];
+    FFlowMeters.Add(Meter);
+
+    FFlowMeterRows[I].Enabled := True;
+    FFlowMeterRows[I].Channel := I + 1;
+    FFlowMeterRows[I].Meter := Meter;
+    FFlowMeterRows[I].TypeIndex := FindTypeIndex(Meter.DeviceTypeName);
+    FFlowMeterRows[I].SerialIndex := FindSerialIndex(Meter.SerialNumber);
+  end;
+
+  GridDevices.RowCount := Length(FFlowMeterRows);
+  GridDevices.Repaint;
+end;
+
+function TFormMain.FindTypeIndex(const ATypeName: string): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := 0 to High(CFlowMeterTypes) do
+    if SameText(CFlowMeterTypes[I], ATypeName) then
+      Exit(I);
+end;
+
+function TFormMain.FindSerialIndex(const ASerialNumber: string): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := 0 to High(CFlowMeterSerials) do
+    if SameText(CFlowMeterSerials[I], ASerialNumber) then
+      Exit(I);
+end;
+
+procedure TFormMain.ApplyFlowMeterSelection(const ARow: Integer);
+begin
+  if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
+    Exit;
+
+  FFlowMeterRows[ARow].TypeIndex := EnsureRange(FFlowMeterRows[ARow].TypeIndex, 0, High(CFlowMeterTypes));
+  FFlowMeterRows[ARow].SerialIndex := EnsureRange(FFlowMeterRows[ARow].SerialIndex, 0, High(CFlowMeterSerials));
+
+  FFlowMeterRows[ARow].Meter.DeviceTypeName := CFlowMeterTypes[FFlowMeterRows[ARow].TypeIndex];
+  FFlowMeterRows[ARow].Meter.SerialNumber := CFlowMeterSerials[FFlowMeterRows[ARow].SerialIndex];
 end;
 
 procedure TFormMain.OpenTypeSelect(ARow: Integer);
@@ -446,6 +555,63 @@ begin
 
   finally
     Frm.Free;
+  end;
+end;
+
+procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+begin
+  if (Row < 0) or (Row >= Length(FFlowMeterRows)) then
+    Exit;
+
+  if Column = CheckColumn1 then
+    FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled
+  else if Column = Column1 then
+  begin
+    FFlowMeterRows[Row].TypeIndex := (FFlowMeterRows[Row].TypeIndex + 1) mod Length(CFlowMeterTypes);
+    ApplyFlowMeterSelection(Row);
+  end
+  else if Column = StringColumn2 then
+  begin
+    FFlowMeterRows[Row].SerialIndex := (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
+    ApplyFlowMeterSelection(Row);
+  end;
+
+  GridDevices.Repaint;
+end;
+
+procedure TFormMain.GridDevicesGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+begin
+  if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
+    Exit;
+
+  if GridDevices.Columns[ACol] = CheckColumn1 then
+    Value := FFlowMeterRows[ARow].Enabled
+  else if GridDevices.Columns[ACol] = StringColumn1 then
+    Value := FFlowMeterRows[ARow].Channel
+  else if GridDevices.Columns[ACol] = Column1 then
+    Value := FFlowMeterRows[ARow].Meter.DeviceTypeName
+  else if GridDevices.Columns[ACol] = StringColumn2 then
+    Value := FFlowMeterRows[ARow].Meter.SerialNumber;
+end;
+
+procedure TFormMain.GridDevicesSetValue(Sender: TObject; const ACol,
+  ARow: Integer; const Value: TValue);
+begin
+  if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
+    Exit;
+
+  if GridDevices.Columns[ACol] = CheckColumn1 then
+    FFlowMeterRows[ARow].Enabled := Value.AsBoolean
+  else if GridDevices.Columns[ACol] = Column1 then
+  begin
+    FFlowMeterRows[ARow].Meter.DeviceTypeName := Value.AsString;
+    FFlowMeterRows[ARow].TypeIndex := FindTypeIndex(FFlowMeterRows[ARow].Meter.DeviceTypeName);
+  end
+  else if GridDevices.Columns[ACol] = StringColumn2 then
+  begin
+    FFlowMeterRows[ARow].Meter.SerialNumber := Value.AsString;
+    FFlowMeterRows[ARow].SerialIndex := FindSerialIndex(FFlowMeterRows[ARow].Meter.SerialNumber);
   end;
 end;
 
