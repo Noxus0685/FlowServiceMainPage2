@@ -17,8 +17,8 @@ File_14=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\dat
 
 [Modules]
 Module0=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
-Module1=D:\Projects\FlowServiceMainPage\fuMain.pas
-Module2=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
+Module1=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
+Module2=D:\Projects\FlowServiceMainPage\fuMain.pas
 Module3=d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Timer.Win.pas
 Module4=D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas
 Module5=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
@@ -36,11 +36,11 @@ EditWindowCount=1
 [D:\Projects\FlowServiceMainPage\UnitMeterValue.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\fuMain.pas]
-ModuleType=TSourceModule
-
 [D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj]
 ModuleType=TBaseProject
+
+[D:\Projects\FlowServiceMainPage\fuMain.pas]
+ModuleType=TSourceModule
 
 [d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Timer.Win.pas]
 ModuleType=TSourceModule
@@ -249,9 +249,9 @@ EditViewName=Borland.FormDesignerView
 [View11]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
-CursorX=32
-CursorY=6
-TopLine=1
+CursorX=1
+CursorY=1
+TopLine=702
 LeftCol=1
 Elisions=
 Bookmarks=

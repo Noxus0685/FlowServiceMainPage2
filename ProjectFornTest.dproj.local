@@ -1,10 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
 	<Transactions>
-    <Transaction>1899.12.30 00:00:00.000.277,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\dmFakeDB.pas=</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.756,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\dmFakeDB.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.610,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitBaseProcedures.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.101,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuTypeEditor.pas=C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Unit3.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.756,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\dmFakeDB.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.277,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\dmFakeDB.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.831,D:\Downloads\TestBD\TestBD\uDATA.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.104,=D:\Downloads\TestBD\TestBD\uDATA.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.353,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit3.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit.fmx</Transaction>
@@ -16,28 +16,28 @@
     <Transaction>1899.12.30 00:00:00.000.633,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitManagerData.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.461,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitDataManager.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitManagerData.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.618,C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\ProjectFornTest.dproj=C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Project1.dproj</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.392,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.389,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.163,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.992,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.041,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.205,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.739,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.863,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.796,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuMain.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitfuMain.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.789,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceSelect.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.864,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.769,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.172,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.163,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.392,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.389,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.769,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.527,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.733,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.739,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.863,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.041,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.205,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.298,C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Main.pas=C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Unit2.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.239,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit1.fmx</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.992,=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.958,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\FormTypeSearch.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Main.fmx</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.796,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuMain.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitfuMain.fmx</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.864,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit.fmx</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.637,D:\Projects\FlowServiceMainPage\Unit1.pas=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.398,=D:\Projects\FlowServiceMainPage\Unit1.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.637,D:\Projects\FlowServiceMainPage\Unit1.pas=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.239,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit1.fmx</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.864,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceEdit.fmx</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.796,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuMain.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitfuMain.fmx</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.298,C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Main.pas=C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.058,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitUnitClasses.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.688,=C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.789,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuDeviceSelect.fmx=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\Unit2.fmx</Transaction>
