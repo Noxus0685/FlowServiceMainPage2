@@ -13,7 +13,9 @@ uses
   fuDeviceSelect in 'fuDeviceSelect.pas' {FormDeviceSelect},
   fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor},
   uDATA in 'uDATA.pas' {DM: TDataModule},
-  UnitMeterValue in 'UnitMeterValue.pas';
+  UnitMeterValue in 'UnitMeterValue.pas',
+  UnitClasses in 'UnitClasses.pas',
+  UnitFlowMeter in 'UnitFlowMeter.pas';
 
 {$R *.res}
 
