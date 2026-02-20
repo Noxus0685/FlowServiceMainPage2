@@ -59,11 +59,10 @@ type
     Label30: TLabel;
     Panel3: TPanel;
     GridDevices: TGrid;
-    CheckColumn1: TCheckColumn;
-    StringColumn1: TStringColumn;
+    CheckColumnEnable: TCheckColumn;
+    StringColumnChanel: TStringColumn;
     Column1: TColumn;
     StringColumn2: TStringColumn;
-    StringColumn3: TStringColumn;
     StringColumn4: TStringColumn;
     StringColumn5: TStringColumn;
     StringColumn6: TStringColumn;
@@ -310,6 +309,7 @@ type
     Label12: TLabel;
     PerspectiveTransformEffect1: TPerspectiveTransformEffect;
     cbWorkDesktop: TComboBox;
+    Splitter1: TSplitter;
     ShadowEffect9: TShadowEffect;
     shdwfct8: TShadowEffect;
     TabItem3: TTabItem;
@@ -317,6 +317,12 @@ type
     PopupMenu1: TPopupMenu;
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
+    PopupColumn1: TPopupColumn;
+    MenuItem3: TMenuItem;
+    MenuItem4: TMenuItem;
+    MenuItem5: TMenuItem;
+    MenuItem6: TMenuItem;
+    MenuItem7: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure Grid2GetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -563,7 +569,7 @@ begin
   if (Row < 0) or (Row >= Length(FFlowMeterRows)) then
     Exit;
 
-  if Column = CheckColumn1 then
+  if Column = CheckColumnEnable then
     FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled
   else if Column = Column1 then
   begin
@@ -585,9 +591,9 @@ begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumn1 then
+  if GridDevices.Columns[ACol] = CheckColumnEnable then
     Value := FFlowMeterRows[ARow].Enabled
-  else if GridDevices.Columns[ACol] = StringColumn1 then
+  else if GridDevices.Columns[ACol] = StringColumnChanel then
     Value := FFlowMeterRows[ARow].Channel
   else if GridDevices.Columns[ACol] = Column1 then
     Value := FFlowMeterRows[ARow].Meter.DeviceTypeName
@@ -601,7 +607,7 @@ begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumn1 then
+  if GridDevices.Columns[ACol] = CheckColumnEnable then
     FFlowMeterRows[ARow].Enabled := Value.AsBoolean
   else if GridDevices.Columns[ACol] = Column1 then
   begin

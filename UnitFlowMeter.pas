@@ -1,4 +1,4 @@
-unit UnitFlowMeter;
+﻿unit UnitFlowMeter;
 
 interface
 
@@ -196,7 +196,7 @@ type
     constructor Create(AHSCDevice: THscDevice; AIsEtalon: Boolean); overload;
     constructor Create(AHSCDevice: THscDevice; AIsEtalon: Boolean; AHash: Integer); overload;
     constructor Create(AIsEtalon: Boolean); overload;
-    destructor Destroy; override;
+    destructor Destroy;
 
     procedure SetHSC(AHSCDevice: THscDevice);
     procedure SetType(AType: TFlowMeterType); overload;
