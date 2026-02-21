@@ -61,11 +61,11 @@ type
     GridDevices: TGrid;
     CheckColumnEnable: TCheckColumn;
     StringColumnChanel: TStringColumn;
-    Column1: TColumn;
-    StringColumn2: TStringColumn;
-    StringColumn4: TStringColumn;
-    StringColumn5: TStringColumn;
-    StringColumn6: TStringColumn;
+    ColumnDeviceType: TColumn;
+    StringColumnDeviceSerial: TStringColumn;
+    StringColumnDeviceFlowRate: TStringColumn;
+    StringColumnDeviceVolume: TStringColumn;
+    StringColumnDeviceError: TStringColumn;
     ToolBar1: TToolBar;
     Label23: TLabel;
     TabItem5: TTabItem;
@@ -317,12 +317,19 @@ type
     PopupMenu1: TPopupMenu;
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
-    PopupColumn1: TPopupColumn;
+    PopupColumnDeviceSignal: TPopupColumn;
     MenuItem3: TMenuItem;
     MenuItem4: TMenuItem;
     MenuItem5: TMenuItem;
     MenuItem6: TMenuItem;
     MenuItem7: TMenuItem;
+    Column1: TColumn;
+    TabItem7: TTabItem;
+    StringGrid1: TStringGrid;
+    StringColumn1: TStringColumn;
+    StringColumn2: TStringColumn;
+    StringColumn3: TStringColumn;
+    StringColumn4: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure Grid2GetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -334,8 +341,15 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDevicesEditingDone(Sender: TObject; const ACol,
+      ARow: Integer);
   private
     { Private declarations }
+  FLastClickRow: Integer;
+  FLastClickCol: TColumn;
+  FLastClickTick: Cardinal;
+
+
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     procedure OpenTypeSelect(ARow: Integer);
@@ -404,6 +418,10 @@ begin
   GridDevices.OnCellClick := GridDevicesCellClick;
 
   InitFlowMeters;
+
+  FLastClickRow := -1;
+FLastClickCol := nil;
+FLastClickTick := 0;
 end;
 
 procedure TFormMain.InitFlowMeters;
@@ -586,21 +604,78 @@ begin
 end;
 
 procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+const
+  SECOND_CLICK_MS = 700; // окно "второго клика" (подбери по ощущениям)
+var
+  Tick: Cardinal;
+  IsSecondClick: Boolean;
+  Rows: Integer;
 begin
   if (Row < 0) or (Row >= Length(FFlowMeterRows)) then
     Exit;
 
-  if Column = CheckColumnEnable then
-    FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled
-  else if Column = Column1 then
-    OpenTypeSelect(Row)
-  else if Column = StringColumn2 then
+  Rows := GridDevices.RowCount;
+  Tick := TThread.GetTickCount;
+  GridDevices.ReadOnly:=True;
+
+  IsSecondClick :=
+    (Row = FLastClickRow) and
+    (Column = FLastClickCol) ;
+   // and (Tick - FLastClickTick <= SECOND_CLICK_MS)
+
+  // Обновляем "последний клик" ВСЕГДА
+  FLastClickRow := Row;
+  FLastClickCol := Column;
+  FLastClickTick := Tick;
+
+  if (Column = CheckColumnEnable) then
+    FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
+
+
+  if (Column = PopupColumnDeviceSignal) then
+   begin
+    GridDevices.ReadOnly:=False;
+    GridDevices.EditorMode := True;
+    inherited;
+    Exit;
+   end ;
+
+
+  // Первый клик по ячейке — ничего кроме выделения (грид уже выделил сам)
+  if IsSecondClick then
   begin
-    FFlowMeterRows[Row].SerialIndex := (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
+
+  // === Второй клик по уже выделенной ячейке — выполняем действие ===
+  if Column = ColumnDeviceType then
+   begin
+    GridDevices.EditorMode := False;
+    OpenTypeSelect(Row);
+    end
+
+  else if Column = StringColumnDeviceSerial then
+  begin
+         GridDevices.ReadOnly:=False;
+         GridDevices.EditorMode := True;
+
+    FFlowMeterRows[Row].SerialIndex :=
+      (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
     ApplyFlowMeterSelection(Row);
   end;
 
-  GridDevices.Repaint;
+  end;
+
+  GridDevices.BeginUpdate;
+  try
+    GridDevices.RowCount := Rows;
+  finally
+    GridDevices.EndUpdate;
+  end;
+end;
+
+procedure TFormMain.GridDevicesEditingDone(Sender: TObject; const ACol,
+  ARow: Integer);
+begin
+         GridDevices.ReadOnly:=True;
 end;
 
 procedure TFormMain.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -613,9 +688,9 @@ begin
     Value := FFlowMeterRows[ARow].Enabled
   else if GridDevices.Columns[ACol] = StringColumnChanel then
     Value := FFlowMeterRows[ARow].Channel
-  else if GridDevices.Columns[ACol] = Column1 then
+  else if GridDevices.Columns[ACol] = ColumnDeviceType then
     Value := FFlowMeterRows[ARow].Meter.DeviceTypeName
-  else if GridDevices.Columns[ACol] = StringColumn2 then
+  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial then
     Value := FFlowMeterRows[ARow].Meter.SerialNumber;
 end;
 
@@ -627,16 +702,18 @@ begin
 
   if GridDevices.Columns[ACol] = CheckColumnEnable then
     FFlowMeterRows[ARow].Enabled := Value.AsBoolean
-  else if GridDevices.Columns[ACol] = Column1 then
+  else if GridDevices.Columns[ACol] = ColumnDeviceType then
   begin
     FFlowMeterRows[ARow].Meter.DeviceTypeName := Value.AsString;
     FFlowMeterRows[ARow].TypeIndex := FindTypeIndex(FFlowMeterRows[ARow].Meter.DeviceTypeName);
   end
-  else if GridDevices.Columns[ACol] = StringColumn2 then
+  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial then
   begin
     FFlowMeterRows[ARow].Meter.SerialNumber := Value.AsString;
     FFlowMeterRows[ARow].SerialIndex := FindSerialIndex(FFlowMeterRows[ARow].Meter.SerialNumber);
   end;
+
+           GridDevices.ReadOnly:=False;
 end;
 
 procedure TFormMain.Grid2CellClick(const Column: TColumn;

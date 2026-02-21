@@ -57,7 +57,6 @@ type
     MainMenu: TMenuBar;
     miFile: TMenuItem;
     miCreate: TMenuItem;
-    miEdit: TMenuItem;
     miDelete: TMenuItem;
     PopupMenu1: TPopupMenu;
     MenuItem1: TMenuItem;
@@ -100,6 +99,14 @@ type
     mpExpandAll: TMenuItem;
     mpCollapseAll: TMenuItem;
     mpRefresh: TMenuItem;
+    miEdit: TMenuItem;
+    miCopy: TMenuItem;
+    miPaste: TMenuItem;
+    miCut: TMenuItem;
+    TypeCopy: TAction;
+    TypePaste: TAction;
+    TypeCut: TAction;
+    Action3: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -124,6 +131,7 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure miLoadRepositoryClick(Sender: TObject);
     procedure CornerButtonSelectTypeClick(Sender: TObject);
+    procedure TypeCopyExecute(Sender: TObject);
 
   private
 
@@ -443,6 +451,11 @@ begin
   finally
     TreeViewTypes.EndUpdate;
   end;
+end;
+
+procedure TFormTypeSelect.TypeCopyExecute(Sender: TObject);
+begin
+     //Здесь копирование Типа в DataManager TypeBufer
 end;
 
 procedure TFormTypeSelect.ApplyFilter;

@@ -249,9 +249,9 @@ EditViewName=Borland.FormDesignerView
 [View11]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
-CursorX=1
-CursorY=1
-TopLine=702
+CursorX=6
+CursorY=709
+TopLine=192
 LeftCol=1
 Elisions=
 Bookmarks=

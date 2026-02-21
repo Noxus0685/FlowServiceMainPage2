@@ -6,6 +6,7 @@ uses
   UnitBaseProcedures,
   uDATA,
   UnitClasses,
+  UnitDeviceClass,
   UnitRepositories,
   System.IniFiles,
   System.Classes,
@@ -45,6 +46,9 @@ type
     function MakeUniqueRepositoryName(const ABaseName: string): string;
 
   public
+
+  BufferType: TDeviceType;
+  BufferDevice: TDevice;
 
   constructor Create(const AIniFileName: string);
   destructor Destroy; override;

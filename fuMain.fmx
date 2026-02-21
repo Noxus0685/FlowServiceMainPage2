@@ -55,7 +55,9 @@ object FormMain: TFormMain
           1182s
           468s
           1458s
-          504s)
+          504s
+          1182s
+          468s)
         object TabItem4: TTabItem
           CustomIcon = <
             item
@@ -178,15 +180,21 @@ object FormMain: TFormMain
               Align = Client
               CanFocus = True
               ClipChildren = True
+              PopupMenu = PopupMenu1
               Size.Width = 1182.000000000000000000
               Size.Height = 268.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, CancelEditingByDefault, AutoDisplacement]
+              Options = [AlternatingRowBackground, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, CancelEditingByDefault, AutoDisplacement]
+              OnGetValue = GridDevicesGetValue
+              OnSetValue = GridDevicesSetValue
+              OnEditingDone = GridDevicesEditingDone
+              OnCellClick = GridDevicesCellClick
               Viewport.Width = 1162.000000000000000000
               Viewport.Height = 243.000000000000000000
               object CheckColumnEnable: TCheckColumn
                 Header = #1042#1082#1083
+                HeaderSettings.TextSettings.Trimming = Character
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 ReadOnly = True
@@ -195,19 +203,25 @@ object FormMain: TFormMain
                 Header = #1050#1072#1085#1072#1083
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
+                Size.Width = 117.000000000000000000
               end
-              object Column1: TColumn
+              object ColumnDeviceType: TColumn
                 Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                HeaderSettings.StyleLookup = 'headeritemstyle'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
+                Size.Width = 124.000000000000000000
               end
-              object StringColumn2: TStringColumn
+              object StringColumnDeviceSerial: TStringColumn
                 Header = #1057#1077#1088#1080#1081#1085#1099#1081
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 PopupMenu = PopupMenu1
+                Size.Width = 113.000000000000000000
               end
-              object PopupColumn1: TPopupColumn
+              object PopupColumnDeviceSignal: TPopupColumn
                 Header = #1057#1080#1075#1085#1072#1083
                 HeaderSettings.TextSettings.Trimming = Character
                 HeaderSettings.TextSettings.WordWrap = False
@@ -217,20 +231,28 @@ object FormMain: TFormMain
                   #1058#1086#1082
                   #1048#1085#1090#1077#1088#1092#1077#1081#1089)
               end
-              object StringColumn4: TStringColumn
+              object StringColumnDeviceFlowRate: TStringColumn
                 Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
               end
-              object StringColumn5: TStringColumn
+              object StringColumnDeviceVolume: TStringColumn
                 Header = #1054#1073#1098#1077#1084', '#1084'3'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
               end
-              object StringColumn6: TStringColumn
+              object StringColumnDeviceError: TStringColumn
+                Locked = True
                 Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
+              end
+              object Column1: TColumn
+                HeaderSettings.TextSettings.WordWrap = False
+                ReadOnly = True
               end
             end
             object ToolBar1: TToolBar
@@ -581,6 +603,49 @@ object FormMain: TFormMain
                 Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
                 TabOrder = 0
               end
+            end
+          end
+        end
+        object TabItem7: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = False
+          Size.Width = 69.000000000000000000
+          Size.Height = 26.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
+          Text = 'TabItem7'
+          object StringGrid1: TStringGrid
+            CanFocus = True
+            ClipChildren = True
+            DragMode = dmAutomatic
+            Position.X = 118.000000000000000000
+            Position.Y = 118.000000000000000000
+            Size.Width = 787.000000000000000000
+            Size.Height = 307.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            Options = [ColumnResize, ColumnMove, ColLines, RowLines, Header, HeaderClick, AutoDisplacement]
+            Viewport.Width = 767.000000000000000000
+            Viewport.Height = 282.000000000000000000
+            object StringColumn1: TStringColumn
+              Header = '1'
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumn2: TStringColumn
+              Header = '2'
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumn3: TStringColumn
+              Header = '3'
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumn4: TStringColumn
+              Header = '4'
+              HeaderSettings.TextSettings.WordWrap = False
             end
           end
         end

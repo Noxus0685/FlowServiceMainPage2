@@ -123,8 +123,8 @@ object FormTypeSelect: TFormTypeSelect
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
-        Viewport.Width = 861.000000000000000000
-        Viewport.Height = 637.000000000000000000
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 678.000000000000000000
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103
           HeaderSettings.TextSettings.Trimming = Character
@@ -367,8 +367,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -456,11 +456,6 @@ object FormTypeSelect: TFormTypeSelect
         Locked = True
         ImageIndex = 0
       end
-      object miEdit: TMenuItem
-        Action = aEditType
-        Locked = True
-        ImageIndex = 4
-      end
       object miDelete: TMenuItem
         Action = aDeleteType
         Locked = True
@@ -494,6 +489,22 @@ object FormTypeSelect: TFormTypeSelect
         Locked = True
         Text = #1047#1072#1075#1088#1091#1079#1080#1090#1100' '#1073#1072#1079#1091' '#1076#1072#1085#1085#1099#1093
         OnClick = miLoadRepositoryClick
+      end
+    end
+    object miEdit: TMenuItem
+      Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100
+      object miCopy: TMenuItem
+        Action = TypeCopy
+        Locked = True
+        ImageIndex = -1
+      end
+      object miPaste: TMenuItem
+        Locked = True
+        Text = 'miPaste'
+      end
+      object miCut: TMenuItem
+        Locked = True
+        Text = 'miCut'
       end
     end
   end
@@ -575,6 +586,22 @@ object FormTypeSelect: TFormTypeSelect
       Text = #1059#1076#1072#1083#1080#1090#1100'...'
       ImageIndex = 16
       ImageIndex = 16
+    end
+    object TypeCopy: TAction
+      Category = 'Edit'
+      Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
+      OnExecute = TypeCopyExecute
+    end
+    object TypePaste: TAction
+      Category = 'Edit'
+      Text = #1042#1089#1090#1072#1074#1080#1090#1100
+    end
+    object TypeCut: TAction
+      Category = 'Edit'
+      Text = #1042#1099#1088#1077#1079#1072#1090#1100
+    end
+    object Action3: TAction
+      Text = 'Action3'
     end
   end
   object NetHTTPClient1: TNetHTTPClient
