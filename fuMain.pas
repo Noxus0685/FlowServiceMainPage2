@@ -9,6 +9,7 @@ uses
   UnitFlowMeter,
   UnitClasses,
   UnitRepositories,
+  UnitWorkTable,
   UnitBaseProcedures,
   System.Math,
   System.Generics.Collections,
@@ -27,7 +28,9 @@ type
 
   TRowData = record
     Enabled: Boolean;
-    SignalIndex: Integer;
+    ChannelName: string;
+    TypeName: string;
+    Serial: string;
     SignalName: string;
   end;
 
@@ -37,6 +40,7 @@ type
     Meter: TFlowMeter;
     TypeIndex: Integer;
     SerialIndex: Integer;
+    SignalName: string;
   end;
 
   TFormMain = class(TForm)
@@ -294,12 +298,16 @@ type
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     procedure OpenTypeSelect(ARow: Integer);
     procedure InitFlowMeters;
+    procedure InitTables;
     procedure ApplyFlowMeterSelection(const ARow: Integer);
     function FindTypeIndex(const ATypeName: string): Integer;
     function FindSerialIndex(const ASerialNumber: string): Integer;
+    function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
   public
     { Public declarations }
     destructor Destroy; override;
+  private
+    FWorkTable: TWorkTableManager;
   end;
 
 
@@ -328,12 +336,19 @@ const
 
 destructor TFormMain.Destroy;
 begin
+  FWorkTable.Free;
   FFlowMeters.Free;
   inherited;
 end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
 begin
+  FWorkTable := TWorkTableManager.Create(
+    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    'TableSettings.ini'
+  );
+  FWorkTable.Load;
+
   FFlowMeters := TObjectList<TFlowMeter>.Create(True);
 
   GridDevices.RowCount := 2;
@@ -345,23 +360,106 @@ begin
   PopupColumnDeviceSignal1.Items.Add('Токовый');
   PopupColumnDeviceSignal1.Items.Add('Напряжение');
 
-  SetLength(FRows, 2);
+  PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
 
-  FRows[0].Enabled := True;
-  FRows[0].SignalIndex := 0;
-
-  FRows[1].Enabled := False;
-  FRows[1].SignalIndex := 1;
+  SetLength(FRows, 0);
 
   GridDevices.OnGetValue := GridDevicesGetValue;
   GridDevices.OnSetValue := GridDevicesSetValue;
   GridDevices.OnCellClick := GridDevicesCellClick;
 
   InitFlowMeters;
+  InitTables;
 
   FLastClickRow := -1;
 FLastClickCol := nil;
 FLastClickTick := 0;
+end;
+
+function TFormMain.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
+begin
+  Result := nil;
+  if (FWorkTable = nil) or (FWorkTable.WorkTables = nil) then
+    Exit;
+
+  if (AIndex < 0) or (AIndex >= FWorkTable.WorkTables.Count) then
+    Exit;
+
+  Result := FWorkTable.WorkTables[AIndex];
+end;
+
+procedure TFormMain.InitTables;
+var
+  TableCount: Integer;
+  WorkTable: TWorkTable;
+  Tab: TTabItem;
+  GridEtalonsN, GridDevicesN: TGrid;
+  I, LimitCount: Integer;
+begin
+  TableCount := 0;
+  if (FWorkTable <> nil) and (FWorkTable.WorkTables <> nil) then
+    TableCount := FWorkTable.WorkTables.Count;
+
+  TabItemWorkTable1.Visible := TableCount >= 1;
+
+  Tab := FindComponent('TabItemWorkTable2') as TTabItem;
+  if Assigned(Tab) then
+    Tab.Visible := TableCount >= 2;
+
+  Tab := FindComponent('TabItemWorkTable3') as TTabItem;
+  if Assigned(Tab) then
+    Tab.Visible := TableCount >= 3;
+
+  LimitCount := Min(TableCount, 3);
+
+  for I := 1 to LimitCount do
+  begin
+    WorkTable := GetWorkTableByIndex(I - 1);
+    if WorkTable = nil then
+      Continue;
+
+    GridEtalonsN := FindComponent('GridEtalons' + IntToStr(I)) as TGrid;
+    if (GridEtalonsN = nil) and (I = 1) then
+      GridEtalonsN := GridEtalons;
+
+    if Assigned(GridEtalonsN) then
+    begin
+      GridEtalonsN.RowCount := WorkTable.EtalonChannels.Count;
+      GridEtalonsN.Repaint;
+    end;
+
+    GridDevicesN := FindComponent('GridDevices' + IntToStr(I)) as TGrid;
+    if (GridDevicesN = nil) and (I = 1) then
+      GridDevicesN := GridDevices;
+
+    if Assigned(GridDevicesN) then
+    begin
+      GridDevicesN.RowCount := WorkTable.DeviceChannels.Count;
+      GridDevicesN.Repaint;
+    end;
+
+    if I = 1 then
+    begin
+      SetLength(FRows, WorkTable.EtalonChannels.Count);
+      for TableCount := 0 to WorkTable.EtalonChannels.Count - 1 do
+      begin
+        FRows[TableCount].Enabled := WorkTable.EtalonChannels[TableCount].Enabled;
+        FRows[TableCount].ChannelName := WorkTable.EtalonChannels[TableCount].Name;
+        FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].TypeName;
+        FRows[TableCount].Serial := WorkTable.EtalonChannels[TableCount].Serial;
+        FRows[TableCount].SignalName := WorkTable.EtalonChannels[TableCount].Signal;
+      end;
+
+      SetLength(FFlowMeterRows, WorkTable.DeviceChannels.Count);
+      for TableCount := 0 to WorkTable.DeviceChannels.Count - 1 do
+      begin
+        FFlowMeterRows[TableCount].Enabled := WorkTable.DeviceChannels[TableCount].Enabled;
+        FFlowMeterRows[TableCount].Channel := TableCount + 1;
+        FFlowMeterRows[TableCount].Meter := nil;
+        FFlowMeterRows[TableCount].SignalName := WorkTable.DeviceChannels[TableCount].Signal;
+      end;
+    end;
+  end;
 end;
 
 procedure TFormMain.InitFlowMeters;
@@ -550,58 +648,63 @@ var
   Tick: Cardinal;
   IsSecondClick: Boolean;
   Rows: Integer;
+  WorkTable: TWorkTable;
 begin
-  if (Row < 0) or (Row >= Length(FFlowMeterRows)) then
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
+    Exit;
+
+  if (WorkTable = nil) and ((Row < 0) or (Row >= Length(FFlowMeterRows))) then
     Exit;
 
   Rows := GridDevices.RowCount;
   Tick := TThread.GetTickCount;
-  GridDevices.ReadOnly:=True;
+  GridDevices.ReadOnly := True;
 
   IsSecondClick :=
     (Row = FLastClickRow) and
-    (Column = FLastClickCol) ;
-   // and (Tick - FLastClickTick <= SECOND_CLICK_MS)
+    (Column = FLastClickCol);
 
-  // Обновляем "последний клик" ВСЕГДА
   FLastClickRow := Row;
   FLastClickCol := Column;
   FLastClickTick := Tick;
 
   if (Column = CheckColumnDeviceEnable1) then
-    FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
-
+  begin
+    if WorkTable <> nil then
+      WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled
+    else
+      FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
+  end;
 
   if (Column = PopupColumnDeviceSignal1 ) then
-   begin
+  begin
     GridDevices.ReadOnly:=False;
     GridDevices.EditorMode := True;
     inherited;
     Exit;
-   end ;
-
-
-  // Первый клик по ячейке — ничего кроме выделения (грид уже выделил сам)
-  if IsSecondClick then
-  begin
-
-  // === Второй клик по уже выделенной ячейке — выполняем действие ===
-  if Column = ColumnDeviceType1 then
-   begin
-    GridDevices.EditorMode := False;
-    OpenTypeSelect(Row);
-    end
-
-  else if Column = StringColumnDeviceSerial1 then
-  begin
-         GridDevices.ReadOnly:=False;
-         GridDevices.EditorMode := True;
-
-    FFlowMeterRows[Row].SerialIndex :=
-      (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
-    ApplyFlowMeterSelection(Row);
   end;
 
+  if IsSecondClick then
+  begin
+    if Column = ColumnDeviceType1 then
+    begin
+      GridDevices.EditorMode := False;
+      if WorkTable = nil then
+        OpenTypeSelect(Row);
+    end
+    else if Column = StringColumnDeviceSerial1 then
+    begin
+      GridDevices.ReadOnly := False;
+      GridDevices.EditorMode := True;
+
+      if WorkTable = nil then
+      begin
+        FFlowMeterRows[Row].SerialIndex :=
+          (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
+        ApplyFlowMeterSelection(Row);
+      end;
+    end;
   end;
 
   GridDevices.BeginUpdate;
@@ -620,7 +723,25 @@ end;
 
 procedure TFormMain.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
+var
+  WorkTable: TWorkTable;
 begin
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
+  begin
+    if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
+      Value := WorkTable.DeviceChannels[ARow].Enabled
+    else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
+      Value := WorkTable.DeviceChannels[ARow].Name
+    else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
+      Value := WorkTable.DeviceChannels[ARow].TypeName
+    else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
+      Value := WorkTable.DeviceChannels[ARow].Serial
+    else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
+      Value := WorkTable.DeviceChannels[ARow].Signal;
+    Exit;
+  end;
+
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
@@ -631,12 +752,32 @@ begin
   else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
     Value := FFlowMeterRows[ARow].Meter.DeviceTypeName
   else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
-    Value := FFlowMeterRows[ARow].Meter.SerialNumber;
+    Value := FFlowMeterRows[ARow].Meter.SerialNumber
+  else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
+    Value := FFlowMeterRows[ARow].SignalName;
 end;
 
 procedure TFormMain.GridDevicesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
+var
+  WorkTable: TWorkTable;
 begin
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
+  begin
+    if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
+      WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean
+    else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
+      WorkTable.DeviceChannels[ARow].Name := Value.AsString
+    else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
+      WorkTable.DeviceChannels[ARow].TypeName := Value.AsString
+    else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
+      WorkTable.DeviceChannels[ARow].Serial := Value.AsString
+    else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
+      WorkTable.DeviceChannels[ARow].Signal := Value.AsString;
+    Exit;
+  end;
+
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
@@ -651,69 +792,106 @@ begin
   begin
     FFlowMeterRows[ARow].Meter.SerialNumber := Value.AsString;
     FFlowMeterRows[ARow].SerialIndex := FindSerialIndex(FFlowMeterRows[ARow].Meter.SerialNumber);
-  end;
+  end
+  else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
+    FFlowMeterRows[ARow].SignalName := Value.AsString;
 
-           GridDevices.ReadOnly:=False;
+  GridDevices.ReadOnly := False;
 end;
 
 procedure TFormMain.GridEtalonsCellClick(const Column: TColumn;
   const Row: Integer);
-  var  Combo: TComboEdit;
+var
+  WorkTable: TWorkTable;
 begin
-  if (Row < Length(FRows)) then
+  WorkTable := GetWorkTableByIndex(0);
+
+  if (WorkTable <> nil) and (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
   begin
+    if Column = CheckColumnEtalonEnable1 then
+      WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
 
-  if Column = CheckColumnEtalonEnable1 then
-    FRows[Row].Enabled := not  FRows[Row].Enabled;
+    if Column = StringColumnEtalonType1 then
+      OpenTypeSelect(Row);
 
-
-  if Column = PopupColumnEtalonSignal1 then
-  begin
-
+    GridEtalons.Repaint;
+    Exit;
   end;
 
-
-  if Column = StringColumnEtalonType1 then
-   begin
-      OpenTypeSelect( Row );
-  end;
-
-
-     GridEtalons.BeginUpdate;
-  try
-   GridEtalons.RowCount := 2;
-  finally
-    GridEtalons.EndUpdate;
-  end;
+  if (Row < Length(FRows)) and (Column = CheckColumnEtalonEnable1) then
+    FRows[Row].Enabled := not FRows[Row].Enabled;
 end;
-
-
-  end;
 
 
 procedure TFormMain.GridEtalonsGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
+var
+  WorkTable: TWorkTable;
 begin
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
+  begin
+    if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
+      Value := WorkTable.EtalonChannels[ARow].Enabled
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
+      Value := WorkTable.EtalonChannels[ARow].Name
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
+      Value := WorkTable.EtalonChannels[ARow].TypeName
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
+      Value := WorkTable.EtalonChannels[ARow].Serial
+    else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
+      Value := WorkTable.EtalonChannels[ARow].Signal;
+    Exit;
+  end;
+
   if ARow >= Length(FRows) then Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
+  if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
     Value := FRows[ARow].Enabled
-
-  //else if ACol = PopupColumnDeviceSignal1.Index then
-  //  Value := FRows[ARow].SignalName;   // ← отдаём строку
+  else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
+    Value := FRows[ARow].ChannelName
+  else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
+    Value := FRows[ARow].TypeName
+  else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
+    Value := FRows[ARow].Serial
+  else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
+    Value := FRows[ARow].SignalName;
 end;
 
 
 procedure TFormMain.GridEtalonsSetValue(Sender: TObject;
   const ACol, ARow: Integer; const Value: TValue);
+var
+  WorkTable: TWorkTable;
 begin
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
+  begin
+    if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
+      WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
+      WorkTable.EtalonChannels[ARow].Name := Value.AsString
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
+      WorkTable.EtalonChannels[ARow].TypeName := Value.AsString
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
+      WorkTable.EtalonChannels[ARow].Serial := Value.AsString
+    else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
+      WorkTable.EtalonChannels[ARow].Signal := Value.AsString;
+    Exit;
+  end;
+
   if ARow >= Length(FRows) then Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1  then
+  if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
     FRows[ARow].Enabled := Value.AsBoolean
-
- // else if ACol = PopupColumnSignal.Index then
- //   FRows[ARow].SignalName := Value.AsString;  // ← сохраняем строку
+  else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
+    FRows[ARow].ChannelName := Value.AsString
+  else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
+    FRows[ARow].TypeName := Value.AsString
+  else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
+    FRows[ARow].Serial := Value.AsString
+  else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
+    FRows[ARow].SignalName := Value.AsString;
 end;
 
 end.
