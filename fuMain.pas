@@ -42,84 +42,31 @@ type
   TFormMain = class(TForm)
     TabControl1: TTabControl;
     TabItem1: TTabItem;
-    TabControlWorkTable: TTabControl;
-    TabItem4: TTabItem;
+    TabControlWorkTables: TTabControl;
+    TabItemWorkTable1: TTabItem;
     Panel2: TPanel;
     Layout1: TLayout;
-    Grid2: TGrid;
-    CheckColumn2: TCheckColumn;
-    StringColumn7: TStringColumn;
-    StringColumnType: TStringColumn;
-    StringColumn9: TStringColumn;
-    StringColumn10: TStringColumn;
-    StringColumn11: TStringColumn;
-    StringColumn12: TStringColumn;
-    StringColumn13: TStringColumn;
+    GridEtalons: TGrid;
+    CheckColumnEtalonEnable1: TCheckColumn;
+    StringColumnEtalonChanel1: TStringColumn;
+    StringColumnEtalonType1: TStringColumn;
+    StringColumnEtalonSerial1: TStringColumn;
+    StringColumnEtalonFlowRate1: TStringColumn;
+    StringColumnEtalonVolume1: TStringColumn;
+    StringColumnEtalonError1: TStringColumn;
     ToolBar2: TToolBar;
     Label30: TLabel;
     Panel3: TPanel;
     GridDevices: TGrid;
-    CheckColumnEnable: TCheckColumn;
-    StringColumnChanel: TStringColumn;
-    ColumnDeviceType: TColumn;
-    StringColumnDeviceSerial: TStringColumn;
-    StringColumnDeviceFlowRate: TStringColumn;
-    StringColumnDeviceVolume: TStringColumn;
-    StringColumnDeviceError: TStringColumn;
+    CheckColumnDeviceEnable1: TCheckColumn;
+    StringColumnDeviceChanel1: TStringColumn;
+    ColumnDeviceType1: TColumn;
+    StringColumnDeviceSerial1: TStringColumn;
+    StringColumnDeviceFlowRate1: TStringColumn;
+    StringColumnDeviceVolume1: TStringColumn;
+    StringColumnDeviceError1: TStringColumn;
     ToolBar1: TToolBar;
     Label23: TLabel;
-    TabItem5: TTabItem;
-    Panel1: TPanel;
-    Layout2: TLayout;
-    Grid1: TGrid;
-    CheckColumn3: TCheckColumn;
-    StringColumn14: TStringColumn;
-    StringColumn15: TStringColumn;
-    StringColumn16: TStringColumn;
-    StringColumn17: TStringColumn;
-    StringColumn18: TStringColumn;
-    StringColumn19: TStringColumn;
-    StringColumn20: TStringColumn;
-    ToolBar3: TToolBar;
-    Label31: TLabel;
-    Panel4: TPanel;
-    Grid3: TGrid;
-    CheckColumn4: TCheckColumn;
-    StringColumn21: TStringColumn;
-    Column2: TColumn;
-    StringColumn22: TStringColumn;
-    StringColumn23: TStringColumn;
-    StringColumn24: TStringColumn;
-    StringColumn25: TStringColumn;
-    StringColumn26: TStringColumn;
-    ToolBar4: TToolBar;
-    Label33: TLabel;
-    TabItem6: TTabItem;
-    Panel5: TPanel;
-    Layout4: TLayout;
-    Grid4: TGrid;
-    CheckColumn5: TCheckColumn;
-    StringColumn27: TStringColumn;
-    StringColumn28: TStringColumn;
-    StringColumn29: TStringColumn;
-    StringColumn30: TStringColumn;
-    StringColumn31: TStringColumn;
-    StringColumn32: TStringColumn;
-    StringColumn33: TStringColumn;
-    ToolBar6: TToolBar;
-    Label34: TLabel;
-    Panel6: TPanel;
-    Grid5: TGrid;
-    CheckColumn6: TCheckColumn;
-    StringColumn34: TStringColumn;
-    Column3: TColumn;
-    StringColumn35: TStringColumn;
-    StringColumn36: TStringColumn;
-    StringColumn37: TStringColumn;
-    StringColumn38: TStringColumn;
-    StringColumn39: TStringColumn;
-    ToolBar7: TToolBar;
-    Label35: TLabel;
     PanelMain: TPanel;
     PanelInstruments: TPanel;
     LayoutPump: TLayout;
@@ -313,29 +260,22 @@ type
     ShadowEffect9: TShadowEffect;
     shdwfct8: TShadowEffect;
     TabItem3: TTabItem;
-    PopupColumnSignal: TPopupColumn;
+    PopupColumnEtalonSignal1: TPopupColumn;
     PopupMenu1: TPopupMenu;
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
-    PopupColumnDeviceSignal: TPopupColumn;
+    PopupColumnDeviceSignal1: TPopupColumn;
     MenuItem3: TMenuItem;
     MenuItem4: TMenuItem;
     MenuItem5: TMenuItem;
     MenuItem6: TMenuItem;
     MenuItem7: TMenuItem;
-    Column1: TColumn;
-    TabItem7: TTabItem;
-    StringGrid1: TStringGrid;
-    StringColumn1: TStringColumn;
-    StringColumn2: TStringColumn;
-    StringColumn3: TStringColumn;
-    StringColumn4: TStringColumn;
     procedure FormCreate(Sender: TObject);
-    procedure Grid2GetValue(Sender: TObject; const ACol, ARow: Integer;
+    procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
-    procedure Grid2SetValue(Sender: TObject; const ACol, ARow: Integer;
+    procedure GridEtalonsSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
-    procedure Grid2CellClick(const Column: TColumn; const Row: Integer);
+    procedure GridEtalonsCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -396,14 +336,14 @@ procedure TFormMain.FormCreate(Sender: TObject);
 begin
   FFlowMeters := TObjectList<TFlowMeter>.Create(True);
 
-  Grid2.RowCount := 2;
+  GridDevices.RowCount := 2;
 
   // Заполняем список через имя колонки
-  PopupColumnSignal.Items.Clear;
-  PopupColumnSignal.Items.Add('Импульсный');
-  PopupColumnSignal.Items.Add('Частотный');
-  PopupColumnSignal.Items.Add('Токовый');
-  PopupColumnSignal.Items.Add('Напряжение');
+  PopupColumnDeviceSignal1.Items.Clear;
+  PopupColumnDeviceSignal1.Items.Add('Импульсный');
+  PopupColumnDeviceSignal1.Items.Add('Частотный');
+  PopupColumnDeviceSignal1.Items.Add('Токовый');
+  PopupColumnDeviceSignal1.Items.Add('Напряжение');
 
   SetLength(FRows, 2);
 
@@ -628,11 +568,11 @@ begin
   FLastClickCol := Column;
   FLastClickTick := Tick;
 
-  if (Column = CheckColumnEnable) then
+  if (Column = CheckColumnDeviceEnable1) then
     FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
 
 
-  if (Column = PopupColumnDeviceSignal) then
+  if (Column = PopupColumnDeviceSignal1 ) then
    begin
     GridDevices.ReadOnly:=False;
     GridDevices.EditorMode := True;
@@ -646,13 +586,13 @@ begin
   begin
 
   // === Второй клик по уже выделенной ячейке — выполняем действие ===
-  if Column = ColumnDeviceType then
+  if Column = ColumnDeviceType1 then
    begin
     GridDevices.EditorMode := False;
     OpenTypeSelect(Row);
     end
 
-  else if Column = StringColumnDeviceSerial then
+  else if Column = StringColumnDeviceSerial1 then
   begin
          GridDevices.ReadOnly:=False;
          GridDevices.EditorMode := True;
@@ -684,13 +624,13 @@ begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumnEnable then
+  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     Value := FFlowMeterRows[ARow].Enabled
-  else if GridDevices.Columns[ACol] = StringColumnChanel then
+  else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
     Value := FFlowMeterRows[ARow].Channel
-  else if GridDevices.Columns[ACol] = ColumnDeviceType then
+  else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
     Value := FFlowMeterRows[ARow].Meter.DeviceTypeName
-  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial then
+  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
     Value := FFlowMeterRows[ARow].Meter.SerialNumber;
 end;
 
@@ -700,14 +640,14 @@ begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumnEnable then
+  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     FFlowMeterRows[ARow].Enabled := Value.AsBoolean
-  else if GridDevices.Columns[ACol] = ColumnDeviceType then
+  else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
   begin
     FFlowMeterRows[ARow].Meter.DeviceTypeName := Value.AsString;
     FFlowMeterRows[ARow].TypeIndex := FindTypeIndex(FFlowMeterRows[ARow].Meter.DeviceTypeName);
   end
-  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial then
+  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
   begin
     FFlowMeterRows[ARow].Meter.SerialNumber := Value.AsString;
     FFlowMeterRows[ARow].SerialIndex := FindSerialIndex(FFlowMeterRows[ARow].Meter.SerialNumber);
@@ -716,34 +656,34 @@ begin
            GridDevices.ReadOnly:=False;
 end;
 
-procedure TFormMain.Grid2CellClick(const Column: TColumn;
+procedure TFormMain.GridEtalonsCellClick(const Column: TColumn;
   const Row: Integer);
   var  Combo: TComboEdit;
 begin
   if (Row < Length(FRows)) then
   begin
 
-  if Column = CheckColumn2 then
+  if Column = CheckColumnEtalonEnable1 then
     FRows[Row].Enabled := not  FRows[Row].Enabled;
 
 
-  if Column = PopupColumnSignal then
+  if Column = PopupColumnEtalonSignal1 then
   begin
 
   end;
 
 
-  if Column = StringColumnType then
+  if Column = StringColumnEtalonType1 then
    begin
       OpenTypeSelect( Row );
   end;
 
 
-     Grid2.BeginUpdate;
+     GridEtalons.BeginUpdate;
   try
-    Grid2.RowCount := 2;
+   GridEtalons.RowCount := 2;
   finally
-    Grid2.EndUpdate;
+    GridEtalons.EndUpdate;
   end;
 end;
 
@@ -751,29 +691,29 @@ end;
   end;
 
 
-procedure TFormMain.Grid2GetValue(Sender: TObject;
+procedure TFormMain.GridEtalonsGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
 begin
   if ARow >= Length(FRows) then Exit;
 
-  if Grid2.Columns[ACol] = CheckColumn2 then
+  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     Value := FRows[ARow].Enabled
 
-  else if ACol = PopupColumnSignal.Index then
-    Value := FRows[ARow].SignalName;   // ← отдаём строку
+  //else if ACol = PopupColumnDeviceSignal1.Index then
+  //  Value := FRows[ARow].SignalName;   // ← отдаём строку
 end;
 
 
-procedure TFormMain.Grid2SetValue(Sender: TObject;
+procedure TFormMain.GridEtalonsSetValue(Sender: TObject;
   const ACol, ARow: Integer; const Value: TValue);
 begin
   if ARow >= Length(FRows) then Exit;
 
-  if Grid2.Columns[ACol] = CheckColumn2 then
+  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1  then
     FRows[ARow].Enabled := Value.AsBoolean
 
-  else if ACol = PopupColumnSignal.Index then
-    FRows[ARow].SignalName := Value.AsString;  // ← сохраняем строку
+ // else if ACol = PopupColumnSignal.Index then
+ //   FRows[ARow].SignalName := Value.AsString;  // ← сохраняем строку
 end;
 
 end.

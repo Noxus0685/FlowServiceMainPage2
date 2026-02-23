@@ -15,7 +15,8 @@ uses
   uDATA in 'uDATA.pas' {DM: TDataModule},
   UnitMeterValue in 'UnitMeterValue.pas',
   UnitClasses in 'UnitClasses.pas',
-  UnitFlowMeter in 'UnitFlowMeter.pas';
+  UnitFlowMeter in 'UnitFlowMeter.pas',
+  UnitWorkTable in 'UnitWorkTable.pas';
 
 {$R *.res}
 

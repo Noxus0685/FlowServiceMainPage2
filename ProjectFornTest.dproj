@@ -329,6 +329,7 @@
         <DCCReference Include="UnitMeterValue.pas"/>
         <DCCReference Include="UnitClasses.pas"/>
         <DCCReference Include="UnitFlowMeter.pas"/>
+        <DCCReference Include="UnitWorkTable.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -40,7 +40,7 @@ object FormMain: TFormMain
       Text = #1043#1083#1072#1074#1085#1072#1103
       ExplicitSize.cx = 64.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
-      object TabControlWorkTable: TTabControl
+      object TabControlWorkTables: TTabControl
         Align = Client
         Padding.Left = 10.000000000000000000
         Size.Width = 1192.000000000000000000
@@ -51,14 +51,8 @@ object FormMain: TFormMain
         TabPosition = PlatformDefault
         Sizes = (
           1182s
-          468s
-          1182s
-          468s
-          1458s
-          504s
-          1182s
           468s)
-        object TabItem4: TTabItem
+        object TabItemWorkTable1: TTabItem
           CustomIcon = <
             item
             end>
@@ -85,7 +79,7 @@ object FormMain: TFormMain
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              object Grid2: TGrid
+              object GridEtalons: TGrid
                 Align = Top
                 CanFocus = True
                 ClipChildren = True
@@ -94,56 +88,36 @@ object FormMain: TFormMain
                 Size.PlatformDefault = False
                 TabOrder = 0
                 RowCount = 2
-                OnGetValue = Grid2GetValue
-                OnSetValue = Grid2SetValue
-                OnCellClick = Grid2CellClick
+                OnGetValue = GridEtalonsGetValue
+                OnSetValue = GridEtalonsSetValue
+                OnCellClick = GridEtalonsCellClick
                 Viewport.Width = 1178.000000000000000000
                 Viewport.Height = 104.000000000000000000
-                object CheckColumn2: TCheckColumn
+                object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                   ReadOnly = True
-                  Size.Width = 41.000000000000000000
+                  Size.Width = 27.000000000000000000
                 end
-                object StringColumn7: TStringColumn
+                object StringColumnEtalonChanel1: TStringColumn
                   Header = #1050#1072#1085#1072#1083
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                 end
-                object StringColumnType: TStringColumn
+                object StringColumnEtalonType1: TStringColumn
                   Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                   ReadOnly = True
                 end
-                object StringColumn9: TStringColumn
+                object StringColumnEtalonSerial1: TStringColumn
                   Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                 end
-                object StringColumn10: TStringColumn
-                  Header = #1057#1080#1075#1085#1072#1083
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn11: TStringColumn
-                  Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn12: TStringColumn
-                  Header = #1054#1073#1098#1077#1084', '#1084'3'
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn13: TStringColumn
-                  Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object PopupColumnSignal: TPopupColumn
+                object PopupColumnEtalonSignal1: TPopupColumn
                   HorzAlign = Center
                   Header = #1057#1080#1075#1085#1072#1083
                   HeaderSettings.TextSettings.WordWrap = False
@@ -154,6 +128,21 @@ object FormMain: TFormMain
                     #1063#1072#1089#1090#1086#1090#1072
                     #1057#1074#1103#1079#1100
                     #1058#1086#1082)
+                end
+                object StringColumnEtalonFlowRate1: TStringColumn
+                  Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumnEtalonVolume1: TStringColumn
+                  Header = #1054#1073#1098#1077#1084', '#1084'3'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumnEtalonError1: TStringColumn
+                  Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
                 end
               end
             end
@@ -192,21 +181,21 @@ object FormMain: TFormMain
               OnCellClick = GridDevicesCellClick
               Viewport.Width = 1162.000000000000000000
               Viewport.Height = 243.000000000000000000
-              object CheckColumnEnable: TCheckColumn
+              object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 ReadOnly = True
               end
-              object StringColumnChanel: TStringColumn
+              object StringColumnDeviceChanel1: TStringColumn
                 Header = #1050#1072#1085#1072#1083
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 ReadOnly = True
                 Size.Width = 117.000000000000000000
               end
-              object ColumnDeviceType: TColumn
+              object ColumnDeviceType1: TColumn
                 Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
                 HeaderSettings.StyleLookup = 'headeritemstyle'
                 HeaderSettings.TextSettings.WordWrap = False
@@ -214,14 +203,14 @@ object FormMain: TFormMain
                 ReadOnly = True
                 Size.Width = 124.000000000000000000
               end
-              object StringColumnDeviceSerial: TStringColumn
+              object StringColumnDeviceSerial1: TStringColumn
                 Header = #1057#1077#1088#1080#1081#1085#1099#1081
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 PopupMenu = PopupMenu1
                 Size.Width = 113.000000000000000000
               end
-              object PopupColumnDeviceSignal: TPopupColumn
+              object PopupColumnDeviceSignal1: TPopupColumn
                 Header = #1057#1080#1075#1085#1072#1083
                 HeaderSettings.TextSettings.Trimming = Character
                 HeaderSettings.TextSettings.WordWrap = False
@@ -231,27 +220,22 @@ object FormMain: TFormMain
                   #1058#1086#1082
                   #1048#1085#1090#1077#1088#1092#1077#1081#1089)
               end
-              object StringColumnDeviceFlowRate: TStringColumn
+              object StringColumnDeviceFlowRate1: TStringColumn
                 Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 ReadOnly = True
               end
-              object StringColumnDeviceVolume: TStringColumn
+              object StringColumnDeviceVolume1: TStringColumn
                 Header = #1054#1073#1098#1077#1084', '#1084'3'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 ReadOnly = True
               end
-              object StringColumnDeviceError: TStringColumn
-                Locked = True
+              object StringColumnDeviceError1: TStringColumn
                 Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
-                ReadOnly = True
-              end
-              object Column1: TColumn
-                HeaderSettings.TextSettings.WordWrap = False
                 ReadOnly = True
               end
             end
@@ -276,377 +260,6 @@ object FormMain: TFormMain
             Size.Width = 1182.000000000000000000
             Size.Height = 16.000000000000000000
             Size.PlatformDefault = False
-          end
-        end
-        object TabItem5: TTabItem
-          CustomIcon = <
-            item
-            end>
-          TextSettings.Trimming = None
-          IsSelected = False
-          Padding.Left = 10.000000000000000000
-          Size.Width = 143.000000000000000000
-          Size.Height = 26.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = ''
-          TabOrder = 0
-          Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083' 2 ('#1044#1059'10)'
-          ExplicitSize.cx = 143.000000000000000000
-          ExplicitSize.cy = 26.000000000000000000
-          object Panel1: TPanel
-            Align = Top
-            Size.Width = 1182.000000000000000000
-            Size.Height = 152.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 2
-            object Layout2: TLayout
-              Align = Client
-              Size.Width = 1182.000000000000000000
-              Size.Height = 120.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 0
-              object Grid1: TGrid
-                Align = Top
-                CanFocus = True
-                ClipChildren = True
-                Size.Width = 1182.000000000000000000
-                Size.Height = 129.000000000000000000
-                Size.PlatformDefault = False
-                TabOrder = 0
-                RowCount = 2
-                Viewport.Width = 1178.000000000000000000
-                Viewport.Height = 104.000000000000000000
-                object CheckColumn3: TCheckColumn
-                  Header = #1042#1082#1083
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn14: TStringColumn
-                  Header = #1050#1072#1085#1072#1083
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn15: TStringColumn
-                  Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn16: TStringColumn
-                  Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn17: TStringColumn
-                  Header = #1057#1080#1075#1085#1072#1083
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn18: TStringColumn
-                  Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn19: TStringColumn
-                  Header = #1054#1073#1098#1077#1084', '#1084'3'
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn20: TStringColumn
-                  Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-              end
-            end
-            object ToolBar3: TToolBar
-              Size.Width = 1182.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              object Label31: TLabel
-                Position.X = 1.000000000000000000
-                Position.Y = 8.000000000000000000
-                Text = #1069#1090#1072#1083#1086#1085#1099
-                TabOrder = 0
-              end
-            end
-          end
-          object Panel4: TPanel
-            Align = Client
-            Size.Width = 1182.000000000000000000
-            Size.Height = 316.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 3
-            object Grid3: TGrid
-              Align = Client
-              CanFocus = True
-              ClipChildren = True
-              Size.Width = 1182.000000000000000000
-              Size.Height = 284.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 0
-              Viewport.Width = 1162.000000000000000000
-              Viewport.Height = 259.000000000000000000
-              object CheckColumn4: TCheckColumn
-                Header = #1042#1082#1083
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn21: TStringColumn
-                Header = #1050#1072#1085#1072#1083
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object Column2: TColumn
-                Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn22: TStringColumn
-                Header = #1057#1077#1088#1080#1081#1085#1099#1081
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn23: TStringColumn
-                Header = #1057#1080#1075#1085#1072#1083
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn24: TStringColumn
-                Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn25: TStringColumn
-                Header = #1054#1073#1098#1077#1084', '#1084'3'
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn26: TStringColumn
-                Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-            end
-            object ToolBar4: TToolBar
-              Size.Width = 1182.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              object Label33: TLabel
-                Position.X = 1.000000000000000000
-                Position.Y = 8.000000000000000000
-                Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
-                TabOrder = 0
-              end
-            end
-          end
-        end
-        object TabItem6: TTabItem
-          CustomIcon = <
-            item
-            end>
-          TextSettings.Trimming = None
-          IsSelected = False
-          Size.Width = 143.000000000000000000
-          Size.Height = 26.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = ''
-          TabOrder = 0
-          Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083' 1 ('#1044#1059'25)'
-          Visible = False
-          ExplicitSize.cx = 143.000000000000000000
-          ExplicitSize.cy = 26.000000000000000000
-          object Panel5: TPanel
-            Align = Top
-            Size.Width = 1458.000000000000000000
-            Size.Height = 152.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 2
-            object Layout4: TLayout
-              Align = Client
-              Size.Width = 1458.000000000000000000
-              Size.Height = 120.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 0
-              object Grid4: TGrid
-                Align = Top
-                CanFocus = True
-                ClipChildren = True
-                Size.Width = 1458.000000000000000000
-                Size.Height = 129.000000000000000000
-                Size.PlatformDefault = False
-                TabOrder = 0
-                RowCount = 2
-                Viewport.Width = 1454.000000000000000000
-                Viewport.Height = 104.000000000000000000
-                object CheckColumn5: TCheckColumn
-                  Header = #1042#1082#1083
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn27: TStringColumn
-                  Header = #1050#1072#1085#1072#1083
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn28: TStringColumn
-                  Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn29: TStringColumn
-                  Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn30: TStringColumn
-                  Header = #1057#1080#1075#1085#1072#1083
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn31: TStringColumn
-                  Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn32: TStringColumn
-                  Header = #1054#1073#1098#1077#1084', '#1084'3'
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-                object StringColumn33: TStringColumn
-                  Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-                  HeaderSettings.TextSettings.WordWrap = False
-                  HeaderSettings.TextSettings.HorzAlign = Center
-                end
-              end
-            end
-            object ToolBar6: TToolBar
-              Size.Width = 1458.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              object Label34: TLabel
-                Position.X = 1.000000000000000000
-                Position.Y = 8.000000000000000000
-                Text = #1069#1090#1072#1083#1086#1085#1099
-                TabOrder = 0
-              end
-            end
-          end
-          object Panel6: TPanel
-            Align = Client
-            Size.Width = 1458.000000000000000000
-            Size.Height = 352.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 3
-            object Grid5: TGrid
-              Align = Client
-              CanFocus = True
-              ClipChildren = True
-              Size.Width = 1458.000000000000000000
-              Size.Height = 320.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 0
-              Viewport.Width = 1438.000000000000000000
-              Viewport.Height = 295.000000000000000000
-              object CheckColumn6: TCheckColumn
-                Header = #1042#1082#1083
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn34: TStringColumn
-                Header = #1050#1072#1085#1072#1083
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object Column3: TColumn
-                Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn35: TStringColumn
-                Header = #1057#1077#1088#1080#1081#1085#1099#1081
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn36: TStringColumn
-                Header = #1057#1080#1075#1085#1072#1083
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn37: TStringColumn
-                Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn38: TStringColumn
-                Header = #1054#1073#1098#1077#1084', '#1084'3'
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-              object StringColumn39: TStringColumn
-                Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-              end
-            end
-            object ToolBar7: TToolBar
-              Size.Width = 1458.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              object Label35: TLabel
-                Position.X = 1.000000000000000000
-                Position.Y = 8.000000000000000000
-                Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
-                TabOrder = 0
-              end
-            end
-          end
-        end
-        object TabItem7: TTabItem
-          CustomIcon = <
-            item
-            end>
-          TextSettings.Trimming = None
-          IsSelected = False
-          Size.Width = 69.000000000000000000
-          Size.Height = 26.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = ''
-          TabOrder = 0
-          Text = 'TabItem7'
-          object StringGrid1: TStringGrid
-            CanFocus = True
-            ClipChildren = True
-            DragMode = dmAutomatic
-            Position.X = 118.000000000000000000
-            Position.Y = 118.000000000000000000
-            Size.Width = 787.000000000000000000
-            Size.Height = 307.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 0
-            Options = [ColumnResize, ColumnMove, ColLines, RowLines, Header, HeaderClick, AutoDisplacement]
-            Viewport.Width = 767.000000000000000000
-            Viewport.Height = 282.000000000000000000
-            object StringColumn1: TStringColumn
-              Header = '1'
-              HeaderSettings.TextSettings.WordWrap = False
-            end
-            object StringColumn2: TStringColumn
-              Header = '2'
-              HeaderSettings.TextSettings.WordWrap = False
-            end
-            object StringColumn3: TStringColumn
-              Header = '3'
-              HeaderSettings.TextSettings.WordWrap = False
-            end
-            object StringColumn4: TStringColumn
-              Header = '4'
-              HeaderSettings.TextSettings.WordWrap = False
-            end
           end
         end
       end
