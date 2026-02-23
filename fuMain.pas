@@ -297,6 +297,9 @@ type
     procedure GridDevicesEditingDone(Sender: TObject; const ACol,
       ARow: Integer);
     procedure ActionAddWorkTableExecute(Sender: TObject);
+    procedure ActionAddDeviceChannelExecute(Sender: TObject);
+    procedure ActionAddEtalonChannelExecute(Sender: TObject);
+    procedure ActionSaveWorkTableExecute(Sender: TObject);
   private
     { Private declarations }
   FLastClickRow: Integer;
@@ -520,8 +523,77 @@ begin
 end;
 
 procedure TFormMain.ActionAddWorkTableExecute(Sender: TObject);
+var
+  WorkTable: TWorkTable;
 begin
-// FWorkTableManager.WorkTables.Add();
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+    Exit;
+
+  WorkTable := TWorkTable.Create;
+  WorkTable.ID := FWorkTableManager.WorkTables.Count + 1;
+  WorkTable.Name := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+  FWorkTableManager.WorkTables.Add(WorkTable);
+
+  InitTables;
+
+  if FWorkTableManager.WorkTables.Count > 0 then
+    TabControlWorkTables.TabIndex := EnsureRange(
+      FWorkTableManager.WorkTables.Count - 1,
+      0,
+      Max(0, TabControlWorkTables.TabCount - 1)
+    );
+end;
+
+procedure TFormMain.ActionAddDeviceChannelExecute(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+  ChannelIndex: Integer;
+begin
+  WorkTable := GetWorkTableByIndex(TabControlWorkTables.TabIndex);
+  if WorkTable = nil then
+    Exit;
+
+  ChannelIndex := WorkTable.DeviceChannels.Count + 1;
+  WorkTable.AddDeviceChannel(
+    True,
+    IntToStr(ChannelIndex),
+    '',
+    '',
+    'Импульсный',
+    ''
+  );
+
+  InitTables;
+end;
+
+procedure TFormMain.ActionAddEtalonChannelExecute(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+  ChannelIndex: Integer;
+begin
+  WorkTable := GetWorkTableByIndex(TabControlWorkTables.TabIndex);
+  if WorkTable = nil then
+    Exit;
+
+  ChannelIndex := WorkTable.EtalonChannels.Count + 1;
+  WorkTable.AddEtalonChannel(
+    True,
+    IntToStr(ChannelIndex),
+    '',
+    '',
+    'Импульсный',
+    ''
+  );
+
+  InitTables;
+end;
+
+procedure TFormMain.ActionSaveWorkTableExecute(Sender: TObject);
+begin
+  if FWorkTableManager = nil then
+    Exit;
+
+  FWorkTableManager.Save;
 end;
 
 procedure TFormMain.ApplyFlowMeterSelection(const ARow: Integer);
