@@ -84,6 +84,7 @@ type
       const ASectionPrefix: string;
       AChannels: TObjectList<TChannel>
     ); static;
+
   public
     constructor Create;
     destructor Destroy; override;
