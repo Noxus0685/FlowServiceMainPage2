@@ -20,7 +20,7 @@ uses
   FMX.Grid.Style, FMX.Filter.Effects, FMX.Colors, FMX.Effects, FMX.ListBox,
   FMX.Edit, FMX.StdCtrls, FMX.ComboEdit, FMX.EditBox, FMX.SpinBox, FMX.Objects,
   FMX.Grid, FMX.ScrollBox, FMX.Layouts, FMX.Controls.Presentation,
-  FMX.TabControl, FMX.Menus;
+  FMX.TabControl, FMX.Menus, System.Actions, FMX.ActnList;
 
 
 
@@ -274,6 +274,14 @@ type
     MenuItem5: TMenuItem;
     MenuItem6: TMenuItem;
     MenuItem7: TMenuItem;
+    PopupMenuWorkTables: TPopupMenu;
+    miAddTable: TMenuItem;
+    MenuItem9: TMenuItem;
+    MenuItem10: TMenuItem;
+    ActionListWorkTables: TActionList;
+    ActionAddWorkTable: TAction;
+    ActionAddDeviceChannel: TAction;
+    ActionAddEtalonChannel: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -287,6 +295,7 @@ type
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDevicesEditingDone(Sender: TObject; const ACol,
       ARow: Integer);
+    procedure ActionAddWorkTableExecute(Sender: TObject);
   private
     { Private declarations }
   FLastClickRow: Integer;
@@ -307,7 +316,7 @@ type
     { Public declarations }
     destructor Destroy; override;
   private
-    FWorkTable: TWorkTableManager;
+    FWorkTableManager: TWorkTableManager;
   end;
 
 
@@ -336,18 +345,18 @@ const
 
 destructor TFormMain.Destroy;
 begin
-  FWorkTable.Free;
+  FWorkTableManager.Free;
   FFlowMeters.Free;
   inherited;
 end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
 begin
-  FWorkTable := TWorkTableManager.Create(
+  FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
     'TableSettings.ini'
   );
-  FWorkTable.Load;
+  FWorkTableManager.Load;
 
   FFlowMeters := TObjectList<TFlowMeter>.Create(True);
 
@@ -379,13 +388,13 @@ end;
 function TFormMain.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
 begin
   Result := nil;
-  if (FWorkTable = nil) or (FWorkTable.WorkTables = nil) then
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
     Exit;
 
-  if (AIndex < 0) or (AIndex >= FWorkTable.WorkTables.Count) then
+  if (AIndex < 0) or (AIndex >= FWorkTableManager.WorkTables.Count) then
     Exit;
 
-  Result := FWorkTable.WorkTables[AIndex];
+  Result := FWorkTableManager.WorkTables[AIndex];
 end;
 
 procedure TFormMain.InitTables;
@@ -397,8 +406,8 @@ var
   I, LimitCount: Integer;
 begin
   TableCount := 0;
-  if (FWorkTable <> nil) and (FWorkTable.WorkTables <> nil) then
-    TableCount := FWorkTable.WorkTables.Count;
+  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+    TableCount := FWorkTableManager.WorkTables.Count;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
@@ -507,6 +516,11 @@ begin
   for I := 0 to High(CFlowMeterSerials) do
     if SameText(CFlowMeterSerials[I], ASerialNumber) then
       Exit(I);
+end;
+
+procedure TFormMain.ActionAddWorkTableExecute(Sender: TObject);
+begin
+// FWorkTableManager.WorkTables.Add();
 end;
 
 procedure TFormMain.ApplyFlowMeterSelection(const ARow: Integer);
