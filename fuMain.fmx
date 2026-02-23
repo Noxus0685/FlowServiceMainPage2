@@ -2526,5 +2526,9 @@ object FormMain: TFormMain
       Category = 'EtalonChannels'
       Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1072#1085#1072#1083' '#1101#1090#1072#1083#1086#1085#1086#1074
     end
+    object ActionSaveWorkTable: TAction
+      Category = 'WorkTable'
+      Text = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1088#1072#1073#1086#1095#1091#1102' '#1089#1088#1077#1076#1091
+    end
   end
 end

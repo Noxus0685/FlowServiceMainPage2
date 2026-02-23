@@ -282,6 +282,7 @@ type
     ActionAddWorkTable: TAction;
     ActionAddDeviceChannel: TAction;
     ActionAddEtalonChannel: TAction;
+    ActionSaveWorkTable: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
