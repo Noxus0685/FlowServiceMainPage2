@@ -2504,10 +2504,12 @@ object FormMain: TFormMain
       ImageIndex = -1
     end
     object MenuItem9: TMenuItem
-      Text = 'MenuItem9'
+      Action = ActionAddDeviceChannel
+      ImageIndex = -1
     end
     object MenuItem10: TMenuItem
-      Text = 'MenuItem10'
+      Action = ActionAddEtalonChannel
+      ImageIndex = -1
     end
   end
   object ActionListWorkTables: TActionList
@@ -2521,14 +2523,17 @@ object FormMain: TFormMain
     object ActionAddDeviceChannel: TAction
       Category = 'DeviceChannels'
       Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1072#1085#1072#1083' '#1087#1088#1080#1073#1086#1088#1086#1074' '
+      OnExecute = ActionAddDeviceChannelExecute
     end
     object ActionAddEtalonChannel: TAction
       Category = 'EtalonChannels'
       Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1072#1085#1072#1083' '#1101#1090#1072#1083#1086#1085#1086#1074
+      OnExecute = ActionAddEtalonChannelExecute
     end
     object ActionSaveWorkTable: TAction
       Category = 'WorkTable'
       Text = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1088#1072#1073#1086#1095#1091#1102' '#1089#1088#1077#1076#1091
+      OnExecute = ActionSaveWorkTableExecute
     end
   end
 end
