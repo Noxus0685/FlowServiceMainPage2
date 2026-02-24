@@ -709,18 +709,13 @@ begin
   case MeterFlowType of
     mftUnknownType,
     mftWeightsType,
-    mftWeightsVolumeFlowmeterType,
-    mftWeightsMassFlowmeterType,
+
     mftMassFlowmeterType:
       begin
         case MeterFlowType of
           mftWeightsType:
             FlowTypeName := 'Весовое устройство';
-          mftWeightsVolumeFlowmeterType:
-            FlowTypeName := 'Весовое устройство + ОР';
-          mftWeightsMassFlowmeterType:
-            FlowTypeName := 'Весовое устройство + МР';
-        else
+         else
           FlowTypeName := 'Массовый расходомер';
         end;
 
@@ -790,10 +785,6 @@ procedure TFlowMeter.SetMeterFlowType(const AMeterFlowType: string);
 begin
   if SameText(AMeterFlowType, 'Весовое устройство') then
     SetMeterFlowType(mftWeightsType)
-  else if SameText(AMeterFlowType, 'Весовое устройство + ОР') then
-    SetMeterFlowType(mftWeightsVolumeFlowmeterType)
-  else if SameText(AMeterFlowType, 'Весовое устройство + МР') then
-    SetMeterFlowType(mftWeightsMassFlowmeterType)
   else if SameText(AMeterFlowType, 'Массовый расходомер') then
     SetMeterFlowType(mftMassFlowmeterType)
   else if SameText(AMeterFlowType, 'Объемный расходомер') then

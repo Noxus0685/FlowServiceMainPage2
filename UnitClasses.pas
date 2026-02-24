@@ -70,13 +70,13 @@ type
   );
 
   TStdCategory = (
-    mftUnknownType = -1,
-    mftWeightsType = 0,
-    mftWeightsVolumeFlowmeterType = 1,
-    mftWeightsMassFlowmeterType = 2,
-    mftMassFlowmeterType = 3,
-    mftVolumeFlowmeterType = 4,
-    mftTankType = 5
+    mftUserType = -1,
+    mftUnknownType = 0,
+    mftMassFlowmeterType = 1,
+    mftVolumeFlowmeterType = 2,
+    mftWeightsType = 3,
+    mftTankType = 4
+
   );
 
 
