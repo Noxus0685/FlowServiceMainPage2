@@ -19,7 +19,7 @@ const
 
 type
 
-  TMeterFlowType = (mftWeightsType, mftVolumeType);
+  TMeterFlowType = (mftWeightsType, mftWeightsVolumeFlowmeterType, mftWeightsMassFlowmeterType, mftMassFlowmeterType, mftVolumeFlowmeterType, mftTankType);
 
   TFlowMeter = class;
 
@@ -259,6 +259,12 @@ public
 
   function GetChannel: Byte;
   procedure SetChannel(AChannel: Byte);
+
+  procedure SetEtalon(AEtalon: TFlowMeter);
+  procedure SetMeterFlowType(AMeterFlowType: TMeterFlowType); overload;
+  procedure SetMeterFlowType(const AMeterFlowType: string); overload;
+  function GetMeterFlowType: string;
+  procedure SetAsEtalon;
 
   procedure SetImpCoef(AK: Double); overload;
   procedure SetImpCoef(AK: Single); overload;
@@ -544,72 +550,253 @@ procedure TFlowMeter.InitValues;
 var
   IsExisted: Integer;
 begin
-//    ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueImp.SetAsImp;
-//
-//  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueImpTotal.SetAsImp;
-//
-//  ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, Hash, Name);
-//  ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, Hash, Name);
-//
-//  ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueVolumeFlow.SetAsVolumeFlow;
-//  ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
-//  ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
-//
-//  ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueMassFlow.SetAsMassFlow;
-//  ValueMassFlow.ValueBaseMultiplier := ValueImp;
-//  ValueMassFlow.ValueBaseDevider := ValueMassCoef;
-//
-//  ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueVolume.SetAsVolume;
-//  ValueVolume.ValueBaseMultiplier := ValueImpTotal;
-//  ValueVolume.ValueBaseDevider := ValueVolumeCoef;
-//  ValueVolume.ValueCorrection := ValueVolumeFlow;
-//
-//  ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueMass.SetAsMass;
-//  ValueMass.ValueBaseMultiplier := ValueImpTotal;
-//  ValueMass.ValueBaseDevider := ValueMassCoef;
-//  ValueMass.ValueCorrection := ValueMassFlow;
-//
-//  ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueVolumeMeter.SetAsVolume;
-//
-//  ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueMassMeter.SetAsMass;
-//
-//  ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueVolumeError.SetAsError;
-//  ValueVolumeError.ValueBaseMultiplier := ValueVolumeMeter;
-//  ValueVolumeError.ValueBaseDevider := ValueVolume;
-//
-//  ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueMassError.SetAsError;
-//  ValueMassError.ValueBaseMultiplier := ValueMassMeter;
-//  ValueMassError.ValueBaseDevider := ValueMass;
-//
-//  ValueCoef := ValueMassCoef;
-//
-//  ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueCurrent.SetAsCurrent;
-//
-//  ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, Hash, Name);
-//  if IsExisted = 0 then
-//    ValueTime.SetAsTime;
+  ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueTime.SetAsTime;
+
+  ValuePressure := TMeterValue.GetExistedMeterValueBool(HashValuePressure, IsExisted, Hash, Name);
+
+  ValueTemperture := TMeterValue.GetExistedMeterValueBool(HashValueTemperture, IsExisted, Hash, Name);
+
+  ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, Hash, Name);
+  ValueDensity.ValueBaseMultiplier := ValueTemperture;
+  ValueDensity.ValueBaseDevider := ValuePressure;
+  ValueDensity.ValueRate := nil;
+  ValueDensity.ValueEtalon := nil;
+
+  ValueAirPressure := TMeterValue.GetExistedMeterValueBool(HashValueAirPressure, IsExisted, Hash, Name);
+  ValueAirTemperture := TMeterValue.GetExistedMeterValueBool(HashValueAirTemperture, IsExisted, Hash, Name);
+  ValueHumidity := TMeterValue.GetExistedMeterValueBool(HashValueHumidity, IsExisted, Hash, Name);
+
+  ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueImp.SetAsImp;
+
+  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueImpTotal.SetAsImp;
+
+  ValueCoef := TMeterValue.GetExistedMeterValueBool(HashValueCoef, IsExisted, Hash, Name);
+
+  ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolumeCoef.SetValue(Kp);
+
+  ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMassCoef.SetValue(Kp);
+
+  ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMassFlow.SetAsMassFlow;
+  ValueMassFlow.ValueCorrection := nil;
+  ValueMassFlow.ValueBaseMultiplier := ValueImp;
+  ValueMassFlow.ValueBaseDevider := ValueMassCoef;
+  ValueMassFlow.ValueRate := nil;
+  ValueMassFlow.ValueEtalon := nil;
+
+  ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolumeFlow.SetAsVolumeFlow;
+  ValueVolumeFlow.ValueCorrection := nil;
+  ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
+  ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
+  ValueVolumeFlow.ValueRate := nil;
+  ValueVolumeFlow.ValueEtalon := nil;
+
+  ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolume.SetAsVolume;
+  ValueVolume.ValueCorrection := ValueVolumeFlow;
+  ValueVolume.ValueBaseMultiplier := ValueImpTotal;
+  ValueVolume.ValueBaseDevider := ValueVolumeCoef;
+  ValueVolume.ValueRate := nil;
+  ValueVolume.ValueEtalon := nil;
+
+  ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMass.SetAsMass;
+  ValueMass.ValueCorrection := ValueMassFlow;
+  ValueMass.ValueBaseMultiplier := ValueImpTotal;
+  ValueMass.ValueBaseDevider := ValueMassCoef;
+  ValueMass.ValueRate := nil;
+  ValueMass.ValueEtalon := nil;
+
+  ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMassMeter.SetAsMass;
+
+  ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolumeMeter.SetAsVolume;
+
+  ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolumeError.SetAsError;
+  if EtalonMeter <> nil then
+    ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
+  ValueVolumeError.ValueBaseMultiplier := ValueVolume;
+
+  ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMassError.SetAsError;
+  if EtalonMeter <> nil then
+    ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
+  ValueMassError.ValueBaseMultiplier := ValueMass;
+
+  ValueError := TMeterValue.GetExistedMeterValueBool(HashValueError, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueError.SetAsError;
+  if EtalonMeter <> nil then
+    ValueError.ValueEtalon := EtalonMeter.ValueVolume;
+  ValueError.ValueBaseMultiplier := ValueVolumeMeter;
+
+  ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueCurrent.SetAsCurrent;
+
+  SetMeterFlowType(MeterFlowType);
+
+  if not IsEtalon then
+  begin
+    if ValueFlow <> nil then
+      ValueFlow.Accuracy := 4;
+    ValueImp.Accuracy := 0;
+  end
+  else if ValueFlow <> nil then
+    ValueFlow.Accuracy := 4;
+end;
+
+procedure TFlowMeter.SetEtalon(AEtalon: TFlowMeter);
+begin
+  if AEtalon = nil then
+    Exit;
+
+  EtalonMeter := AEtalon;
+
+  if ValueVolumeError <> nil then
+    ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
+  if ValueMassError <> nil then
+    ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
+  if ValueError <> nil then
+    ValueError.ValueEtalon := EtalonMeter.ValueVolume;
+end;
+
+procedure TFlowMeter.SetMeterFlowType(AMeterFlowType: TMeterFlowType);
+begin
+  MeterFlowType := AMeterFlowType;
+
+  if (ValueVolumeCoef = nil) or (ValueMassCoef = nil) or (ValueDensity = nil) or
+     (ValueVolume = nil) or (ValueMass = nil) then
+    Exit;
+
+  case MeterFlowType of
+    mftWeightsType,
+    mftWeightsVolumeFlowmeterType,
+    mftWeightsMassFlowmeterType,
+    mftMassFlowmeterType:
+      begin
+        case MeterFlowType of
+          mftWeightsType:
+            FlowTypeName := 'Весовое устройство';
+          mftWeightsVolumeFlowmeterType:
+            FlowTypeName := 'Весовое устройство + ОР';
+          mftWeightsMassFlowmeterType:
+            FlowTypeName := 'Весовое устройство + МР';
+        else
+          FlowTypeName := 'Массовый расходомер';
+        end;
+
+        ValueVolumeCoef.ValueCorrection := nil;
+        ValueVolumeCoef.ValueBaseMultiplier := ValueMassCoef;
+        ValueVolumeCoef.ValueBaseDevider := nil;
+        ValueVolumeCoef.ValueRate := ValueDensity;
+
+        ValueMassCoef.ValueCorrection := nil;
+        ValueMassCoef.ValueBaseMultiplier := nil;
+        ValueMassCoef.ValueBaseDevider := nil;
+        ValueMassCoef.ValueRate := nil;
+
+        ValueMassCoef.DependenceType := INDEPENDENT;
+        ValueVolumeCoef.DependenceType := DEPENDENT;
+
+        ValueCoef := ValueMassCoef;
+        ValueQuantity := ValueMass;
+        ValueFlow := ValueMassFlow;
+      end;
+
+    mftVolumeFlowmeterType,
+    mftTankType:
+      begin
+        if MeterFlowType = mftVolumeFlowmeterType then
+          FlowTypeName := 'Объемный расходомер'
+        else
+          FlowTypeName := 'Мерник';
+
+        ValueMassCoef.ValueCorrection := nil;
+        ValueMassCoef.ValueBaseMultiplier := ValueVolumeCoef;
+        ValueMassCoef.ValueBaseDevider := ValueDensity;
+        ValueMassCoef.ValueRate := nil;
+
+        ValueVolumeCoef.ValueCorrection := nil;
+        ValueVolumeCoef.ValueBaseMultiplier := nil;
+        ValueVolumeCoef.ValueBaseDevider := nil;
+        ValueVolumeCoef.ValueRate := nil;
+
+        ValueMassCoef.DependenceType := DEPENDENT;
+        ValueVolumeCoef.DependenceType := INDEPENDENT;
+
+        ValueVolumeCoef.ValueType := CONST_TYPE;
+        ValueMassCoef.ValueType := CONST_TYPE;
+
+        ValueCoef := ValueVolumeCoef;
+        ValueQuantity := ValueVolume;
+        ValueFlow := ValueVolumeFlow;
+      end;
+  end;
+
+  if ValueVolume <> nil then
+    ValueVolume.UpdateType := HAND_TYPE;
+  if ValueMass <> nil then
+    ValueMass.UpdateType := HAND_TYPE;
+
+  if IsEtalon then
+  begin
+    if ValueVolume <> nil then
+      ValueVolume.UpdateType := ONLINE_TYPE;
+    if ValueMass <> nil then
+      ValueMass.UpdateType := ONLINE_TYPE;
+  end;
+end;
+
+procedure TFlowMeter.SetMeterFlowType(const AMeterFlowType: string);
+begin
+  if SameText(AMeterFlowType, 'Весовое устройство') then
+    SetMeterFlowType(mftWeightsType)
+  else if SameText(AMeterFlowType, 'Весовое устройство + ОР') then
+    SetMeterFlowType(mftWeightsVolumeFlowmeterType)
+  else if SameText(AMeterFlowType, 'Весовое устройство + МР') then
+    SetMeterFlowType(mftWeightsMassFlowmeterType)
+  else if SameText(AMeterFlowType, 'Массовый расходомер') then
+    SetMeterFlowType(mftMassFlowmeterType)
+  else if SameText(AMeterFlowType, 'Объемный расходомер') then
+    SetMeterFlowType(mftVolumeFlowmeterType)
+  else if SameText(AMeterFlowType, 'Мерник') then
+    SetMeterFlowType(mftTankType);
+end;
+
+function TFlowMeter.GetMeterFlowType: string;
+begin
+  Result := FlowTypeName;
+end;
+
+procedure TFlowMeter.SetAsEtalon;
+begin
+  SetChannel(3);
+  Name := 'Etalon';
+  IsEtalon := True;
+  SetMeterFlowType(mftMassFlowmeterType);
+  SetImpCoef(100);
 end;
 
 procedure TFlowMeter.SetChannel(AChannel: Byte);
