@@ -275,6 +275,10 @@ public
 end;
 implementation
 
+uses
+  UnitDataManager,
+  UnitRepositories;
+
 { TFlowMeter }
 
 
@@ -458,21 +462,154 @@ begin
 end;
 
 procedure TFlowMeter.Init(UUID: string);
+var
+  FoundDevice: TDevice;
+  FoundRepo: TDeviceRepository;
+  SrcDevice: TDevice;
 begin
+  Self.DeviceUUID := UUID;
+
+  if DataManager <> nil then
+  begin
+    FoundDevice := DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
+
+    if FoundDevice = nil then
+    begin
+      if DataManager.ActiveDeviceRepo <> nil then
+      begin
+        SrcDevice := TDevice.Create;
+        try
+          SrcDevice.MitUUID := Self.DeviceUUID;
+          SrcDevice.SerialNumber := Self.SerialNumber;
+          SrcDevice.DeviceTypeName := Self.DeviceTypeName;
+          SrcDevice.DeviceTypeUUID := Self.DeviceTypeUUID;
+          SrcDevice.OutputType := Self.OutputType;
+
+          FoundDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
+        finally
+          SrcDevice.Free;
+        end;
+      end;
+    end;
+    if FoundDevice <> nil then
+      Self.Device := FoundDevice;
+  end;
+
   ResultValue := '-';
   MeterFlowType := mftWeightsType;
   FChannel := CHANNEL;
+
+  if Assigned(Self.Device) then
+    SetValues;
 end;
 
 
 procedure TFlowMeter.InitHashValues;
 begin
-  // TODO: перенести оригинальную C++ логику инициализации хэшей.
+  if ValueImp <> nil then
+    HashValueImp := ValueImp.Hash;
+  if ValueImpTotal <> nil then
+    HashValueImpTotal := ValueImpTotal.Hash;
+  if ValueCoef <> nil then
+    HashValueCoef := ValueCoef.Hash;
+  if ValueVolumeCoef <> nil then
+    HashValueVolumeCoef := ValueVolumeCoef.Hash;
+  if ValueMassCoef <> nil then
+    HashValueMassCoef := ValueMassCoef.Hash;
+  if ValueVolume <> nil then
+    HashValueVolume := ValueVolume.Hash;
+  if ValueMass <> nil then
+    HashValueMass := ValueMass.Hash;
+  if ValueVolumeFlow <> nil then
+    HashValueVolumeFlow := ValueVolumeFlow.Hash;
+  if ValueMassFlow <> nil then
+    HashValueMassFlow := ValueMassFlow.Hash;
+  if ValueVolumeMeter <> nil then
+    HashValueVolumeMeter := ValueVolumeMeter.Hash;
+  if ValueMassMeter <> nil then
+    HashValueMassMeter := ValueMassMeter.Hash;
+  if ValueError <> nil then
+    HashValueError := ValueError.Hash;
+  if ValueVolumeError <> nil then
+    HashValueVolumeError := ValueVolumeError.Hash;
+  if ValueMassError <> nil then
+    HashValueMassError := ValueMassError.Hash;
+  if ValueCurrent <> nil then
+    HashValueCurrent := ValueCurrent.Hash;
+  if ValueTime <> nil then
+    HashValueTime := ValueTime.Hash;
 end;
 
 procedure TFlowMeter.InitValues;
+var
+  IsExisted: Integer;
 begin
-  // TODO: перенести оригинальную C++ логику связывания Value*.
+  ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueImp.SetAsImp;
+
+  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueImpTotal.SetAsImp;
+
+  ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, Hash, Name);
+  ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, Hash, Name);
+
+  ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolumeFlow.SetAsVolumeFlow;
+  ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
+  ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
+
+  ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMassFlow.SetAsMassFlow;
+  ValueMassFlow.ValueBaseMultiplier := ValueImp;
+  ValueMassFlow.ValueBaseDevider := ValueMassCoef;
+
+  ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolume.SetAsVolume;
+  ValueVolume.ValueBaseMultiplier := ValueImpTotal;
+  ValueVolume.ValueBaseDevider := ValueVolumeCoef;
+  ValueVolume.ValueCorrection := ValueVolumeFlow;
+
+  ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMass.SetAsMass;
+  ValueMass.ValueBaseMultiplier := ValueImpTotal;
+  ValueMass.ValueBaseDevider := ValueMassCoef;
+  ValueMass.ValueCorrection := ValueMassFlow;
+
+  ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolumeMeter.SetAsVolume;
+
+  ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMassMeter.SetAsMass;
+
+  ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueVolumeError.SetAsError;
+  ValueVolumeError.ValueBaseMultiplier := ValueVolumeMeter;
+  ValueVolumeError.ValueBaseDevider := ValueVolume;
+
+  ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueMassError.SetAsError;
+  ValueMassError.ValueBaseMultiplier := ValueMassMeter;
+  ValueMassError.ValueBaseDevider := ValueMass;
+
+  ValueCoef := ValueMassCoef;
+
+  ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueCurrent.SetAsCurrent;
+
+  ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, Hash, Name);
+  if IsExisted = 0 then
+    ValueTime.SetAsTime;
 end;
 
 procedure TFlowMeter.SetChannel(AChannel: Byte);

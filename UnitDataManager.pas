@@ -81,6 +81,7 @@ type
   function Categories : TObjectList<TDeviceCategory>;
 
   function FindType(const AUUID, AName: string; out ARepo: TTypeRepository): TDeviceType;
+  function FindDevice(const AUUID: string; out ARepo: TDeviceRepository): TDevice;
   function FindTypeRepositoryByName(const AName: string): TTypeRepository;
 
 
@@ -1153,6 +1154,56 @@ begin
       ARepo := Repo;
       Exit;
     end;
+  end;
+end;
+
+function TManagerTDM.FindDevice(
+  const AUUID: string;
+  out ARepo: TDeviceRepository
+): TDevice;
+var
+  Repo: TDeviceRepository;
+begin
+  Result := nil;
+  ARepo := nil;
+
+  if AUUID = '' then
+    Exit;
+
+  // --------------------------------------------------
+  // 1. Сначала ищем в активном репозитории приборов
+  // --------------------------------------------------
+  if (ActiveDeviceRepo <> nil) and (ActiveDeviceRepo.Devices <> nil) then
+  begin
+    for Result in ActiveDeviceRepo.Devices do
+      if SameText(Result.MitUUID, AUUID) then
+      begin
+        ARepo := ActiveDeviceRepo;
+        Exit;
+      end;
+
+    Result := nil;
+  end;
+
+  // --------------------------------------------------
+  // 2. Затем ищем во всех остальных репозиториях
+  // --------------------------------------------------
+  for Repo in DeviceRepositories do
+  begin
+    if Repo = ActiveDeviceRepo then
+      Continue;
+
+    if Repo.Devices = nil then
+      Continue;
+
+    for Result in Repo.Devices do
+      if SameText(Result.MitUUID, AUUID) then
+      begin
+        ARepo := Repo;
+        Exit;
+      end;
+
+    Result := nil;
   end;
 end;
 
