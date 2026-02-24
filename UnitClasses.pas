@@ -69,6 +69,16 @@ type
     otVisual    = 5
   );
 
+  TStdCategory = (
+    mftUnknownType = -1,
+    mftWeightsType = 0,
+    mftWeightsVolumeFlowmeterType = 1,
+    mftWeightsMassFlowmeterType = 2,
+    mftMassFlowmeterType = 3,
+    mftVolumeFlowmeterType = 4,
+    mftTankType = 5
+  );
+
 
  // Классы!
 
@@ -215,6 +225,7 @@ type
     {====================================================================}
     MeasuredDimension: TMeasuredDimension; // Измеряемая величина по умолчанию
     DefaultOutputType: TOutputType;         // Тип сигнала по умолчанию
+    StdCategory: TStdCategory;               // Стандартная категория для runtime-логики
 
     constructor Create;
 
@@ -649,6 +660,7 @@ begin
 
   MeasuredDimension := mdUnknown;
   DefaultOutputType := otUnknown;
+  StdCategory := mftUnknownType;
 end;
 
 

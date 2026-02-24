@@ -1114,7 +1114,8 @@ var
     const AName: string;
     ADimension: TMeasuredDimension;
     AOutputType: TOutputType;
-    const AKeyWords: string
+    const AKeyWords: string;
+    AStdCategory: TStdCategory
   );
   begin
     C := TDeviceCategory.Create;
@@ -1123,6 +1124,7 @@ var
     C.MeasuredDimension := ADimension;
     C.DefaultOutputType := AOutputType;
     C.KeyWords := AKeyWords;
+    C.StdCategory := AStdCategory;
     FCategories.Add(C);
   end;
 
@@ -1137,7 +1139,8 @@ begin
     '<категория>',
     mdVolume,
     otImpulse,
-    ''
+    '',
+    mftUnknownType
   );
 
     // =================================================
@@ -1148,7 +1151,8 @@ begin
     '<не указана>',
     mdVolume,
     otImpulse,
-    ''
+    '',
+    mftUnknownType
   );
   // =================================================
   // 0 — Расходомер электромагнитный
@@ -1158,7 +1162,8 @@ begin
     'Расходомер электромагнитный',
     mdVolume,
     otImpulse,
-    'электромагнитн;магнитн'
+    'электромагнитн;магнитн',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1169,7 +1174,8 @@ begin
     'Расходомер кориолисовый',
     mdMass,
     otImpulse,
-    'кориолис'
+    'кориолис',
+    mftMassFlowmeterType
   );
 
   // =================================================
@@ -1180,7 +1186,8 @@ begin
     'Расходомер вихревой',
     mdVolume,
     otFrequency,
-    'вихр'
+    'вихр',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1191,7 +1198,8 @@ begin
     'Расходомер механический',
     mdVolume,
     otImpulse,
-    'механич;турбин;крыльчат'
+    'механич;турбин;крыльчат',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1202,7 +1210,8 @@ begin
     'Расходомер ультразвуковой',
     mdVolume,
     otImpulse,
-    'ультразв'
+    'ультразв',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1213,7 +1222,8 @@ begin
     'Счётчик воды механический',
     mdVolume,
     otImpulse,
-    'счётчик воды;водосчётчик;водомер'
+    'счётчик воды;водосчётчик;водомер',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1224,7 +1234,8 @@ begin
     'Скоростомер',
     mdSpeed,
     otFrequency,
-    'скорост'
+    'скорост',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1235,7 +1246,8 @@ begin
     'Теплосчетчик',
     mdMass,
     otInterface,
-    'теплосчетчик;теплосчётчик;теплов'
+    'теплосчетчик;теплосчётчик;теплов',
+    mftMassFlowmeterType
   );
 
   // =================================================
@@ -1246,7 +1258,8 @@ begin
     'Ротаметр',
     mdVolume,
     otVisual,
-    'ротаметр'
+    'ротаметр',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1257,7 +1270,8 @@ begin
     'Емкость (мерник)',
     mdVolume,
     otVisual,
-    'емкост;мерник;бак;резервуар'
+    'емкост;мерник;бак;резервуар',
+    mftTankType
   );
 
   // =================================================
@@ -1268,7 +1282,8 @@ begin
     'Весы',
     mdMass,
     otInterface,
-    'весы;взвешиван'
+    'весы;взвешиван',
+    mftWeightsType
   );
 
   Result := FCategories;
@@ -3129,6 +3144,11 @@ begin
             Q.FieldByName('DefaultOutputType').AsInteger
           );
 
+        if Q.FindField('StdCategory') <> nil then
+          C.StdCategory := TStdCategory(Q.FieldByName('StdCategory').AsInteger)
+        else
+          C.StdCategory := mftUnknownType;
+
         FCategories.Add(C);
         Q.Next;
       end;
@@ -3181,9 +3201,9 @@ begin
       {--------------------------------------------}
       Q.SQL.Text :=
         'insert into DeviceCategory (' +
-        'ID, Name, KeyWords, MeasuredDimension, DefaultOutputType' +
+        'ID, Name, KeyWords, MeasuredDimension, DefaultOutputType, StdCategory' +
         ') values (' +
-        ':ID, :Name, :KeyWords, :MeasuredDimension, :DefaultOutputType' +
+        ':ID, :Name, :KeyWords, :MeasuredDimension, :DefaultOutputType, :StdCategory' +
         ')';
 
       for C in FCategories do
@@ -3218,6 +3238,12 @@ begin
           AsInteger := Ord(C.DefaultOutputType);
         end;
 
+        with Q.ParamByName('StdCategory') do
+        begin
+          DataType := ftInteger;
+          AsInteger := Ord(C.StdCategory);
+        end;
+
         Q.ExecSQL;
       end;
 
@@ -3243,7 +3269,8 @@ begin
     Col('Name', 'TEXT NOT NULL'),
     Col('KeyWords', 'TEXT'),
     Col('MeasuredDimension', 'INTEGER'),
-    Col('DefaultOutputType', 'INTEGER')
+    Col('DefaultOutputType', 'INTEGER'),
+    Col('StdCategory', 'INTEGER')
   ];
 end;
 procedure TTypeRepository.EnsureCategorySchema;

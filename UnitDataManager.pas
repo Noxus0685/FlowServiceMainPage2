@@ -887,7 +887,8 @@ var
     const AName: string;
     ADimension: TMeasuredDimension;
     AOutputType: TOutputType;
-    const AKeyWords: string
+    const AKeyWords: string;
+    AStdCategory: TStdCategory
   );
   begin
     C := TDeviceCategory.Create;
@@ -896,6 +897,7 @@ var
     C.MeasuredDimension := ADimension;
     C.DefaultOutputType := AOutputType;
     C.KeyWords := AKeyWords;
+    C.StdCategory := AStdCategory;
     FCategories.Add(C);
   end;
 
@@ -947,7 +949,8 @@ begin
     '<категория>',
     mdVolume,
     otImpulse,
-    ''
+    '',
+    mftUnknownType
   );
 
   // =================================================
@@ -958,7 +961,8 @@ begin
     '<не указана>',
     mdVolume,
     otImpulse,
-    ''
+    '',
+    mftUnknownType
   );
 
   // =================================================
@@ -969,7 +973,8 @@ begin
     'Расходомер электромагнитный',
     mdVolume,
     otImpulse,
-    'электромагнитн;магнитн'
+    'электромагнитн;магнитн',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -980,7 +985,8 @@ begin
     'Расходомер кориолисовый',
     mdMass,
     otImpulse,
-    'кориолис'
+    'кориолис',
+    mftMassFlowmeterType
   );
 
   // =================================================
@@ -991,7 +997,8 @@ begin
     'Расходомер вихревой',
     mdVolume,
     otFrequency,
-    'вихр'
+    'вихр',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1002,7 +1009,8 @@ begin
     'Расходомер механический',
     mdVolume,
     otImpulse,
-    'механич;турбин;крыльчат'
+    'механич;турбин;крыльчат',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1013,7 +1021,8 @@ begin
     'Расходомер ультразвуковой',
     mdVolume,
     otImpulse,
-    'ультразв'
+    'ультразв',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1024,7 +1033,8 @@ begin
     'Счётчик воды механический',
     mdVolume,
     otImpulse,
-    'счётчик воды;водосчётчик;водомер'
+    'счётчик воды;водосчётчик;водомер',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1035,7 +1045,8 @@ begin
     'Скоростомер',
     mdSpeed,
     otFrequency,
-    'скорост'
+    'скорост',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1046,7 +1057,8 @@ begin
     'Теплосчетчик',
     mdMass,
     otInterface,
-    'теплосчетчик;теплосчётчик;теплов'
+    'теплосчетчик;теплосчётчик;теплов',
+    mftMassFlowmeterType
   );
 
   // =================================================
@@ -1057,7 +1069,8 @@ begin
     'Ротаметр',
     mdVolume,
     otVisual,
-    'ротаметр'
+    'ротаметр',
+    mftVolumeFlowmeterType
   );
 
   // =================================================
@@ -1068,7 +1081,8 @@ begin
     'Емкость (мерник)',
     mdVolume,
     otVisual,
-    'емкост;мерник;бак;резервуар'
+    'емкост;мерник;бак;резервуар',
+    mftTankType
   );
 
   // =================================================
@@ -1079,7 +1093,8 @@ begin
     'Весы',
     mdMass,
     otInterface,
-    'весы;взвешиван'
+    'весы;взвешиван',
+    mftWeightsType
   );
 
   Result := FCategories;

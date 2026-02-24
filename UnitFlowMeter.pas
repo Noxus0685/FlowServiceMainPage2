@@ -18,9 +18,6 @@ const
   XMLVERFLOWMETERS = '5.0';
 
 type
-
-  TMeterFlowType = (mftWeightsType, mftWeightsVolumeFlowmeterType, mftWeightsMassFlowmeterType, mftMassFlowmeterType, mftVolumeFlowmeterType, mftTankType);
-
   TFlowMeter = class;
 
 {
@@ -193,7 +190,7 @@ public
   PointIndex: Integer;
   Comment: string;
 
-  MeterFlowType: TMeterFlowType;
+  MeterFlowType: TStdCategory;
 
   ValueImp: TMeterValue;
   ValueImpTotal: TMeterValue;
@@ -261,9 +258,10 @@ public
   procedure SetChannel(AChannel: Byte);
 
   procedure SetEtalon(AEtalon: TFlowMeter);
-  procedure SetMeterFlowType(AMeterFlowType: TMeterFlowType); overload;
+  procedure SetMeterFlowType(AMeterFlowType: TStdCategory); overload;
   procedure SetMeterFlowType(const AMeterFlowType: string); overload;
   function GetMeterFlowType: string;
+  function ResolveStdCategoryFromDevice: TStdCategory;
   procedure SetAsEtalon;
 
   procedure SetImpCoef(AK: Double); overload;
@@ -321,6 +319,7 @@ begin
   FSerialNumber :=   FDevice.SerialNumber;
   FDeviceTypeUUID :=  FDevice.DeviceTypeUUID;
   FOutputType :=  FDevice.OutputType;
+  MeterFlowType := ResolveStdCategoryFromDevice;
 
  end;
 end;
@@ -462,7 +461,7 @@ end;
 procedure TFlowMeter.Init;
 begin
   ResultValue := '-';
-  MeterFlowType := mftWeightsType;
+  MeterFlowType := mftUnknownType;
   FChannel := CHANNEL;
 
 end;
@@ -502,7 +501,7 @@ begin
   end;
 
   ResultValue := '-';
-  MeterFlowType := mftWeightsType;
+  MeterFlowType := ResolveStdCategoryFromDevice;
   FChannel := CHANNEL;
 
   if Assigned(Self.Device) then
@@ -682,7 +681,24 @@ begin
     ValueError.ValueEtalon := EtalonMeter.ValueVolume;
 end;
 
-procedure TFlowMeter.SetMeterFlowType(AMeterFlowType: TMeterFlowType);
+function TFlowMeter.ResolveStdCategoryFromDevice: TStdCategory;
+var
+  Cat: TDeviceCategory;
+begin
+  Result := mftUnknownType;
+
+  if not Assigned(Device) then
+    Exit;
+
+  if DataManager = nil then
+    Exit;
+
+  Cat := DataManager.FindCategoryByID(Device.Category);
+  if Cat <> nil then
+    Exit(Cat.StdCategory);
+end;
+
+procedure TFlowMeter.SetMeterFlowType(AMeterFlowType: TStdCategory);
 begin
   MeterFlowType := AMeterFlowType;
 
@@ -691,6 +707,7 @@ begin
     Exit;
 
   case MeterFlowType of
+    mftUnknownType,
     mftWeightsType,
     mftWeightsVolumeFlowmeterType,
     mftWeightsMassFlowmeterType,
@@ -782,7 +799,9 @@ begin
   else if SameText(AMeterFlowType, 'Объемный расходомер') then
     SetMeterFlowType(mftVolumeFlowmeterType)
   else if SameText(AMeterFlowType, 'Мерник') then
-    SetMeterFlowType(mftTankType);
+    SetMeterFlowType(mftTankType)
+  else
+    SetMeterFlowType(mftUnknownType);
 end;
 
 function TFlowMeter.GetMeterFlowType: string;
