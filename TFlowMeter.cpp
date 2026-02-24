@@ -258,7 +258,7 @@ void TFlowMeter::InitValues()
 
     ValueError->ValueBaseMultiplier = ValueVolumeMeter;
 
-       SetMeterFlowType(MeterFlowType);
+       SetMeterCategory(MeterFlowCategory);
 
         if (!IsEtalon) {
         ValueFlow->Accuracy = 4;
@@ -429,7 +429,7 @@ void TFlowMeter::CopyValues(TFlowMeter* EtalonMeter)
 
     ValueError->ValueBaseMultiplier = ValueVolumeMeter;
 
-       SetMeterFlowType(MeterFlowType);
+       SetMeterCategory(MeterFlowCategory);
 
         if (!IsEtalon) {
 
@@ -575,7 +575,7 @@ void TFlowMeter::RestoreValues()
 
     ValueError->ValueBaseMultiplier = ValueVolumeMeter;
 
-    SetMeterFlowType(MeterFlowType);
+    SetMeterCategory(MeterFlowCategory);
 
         if (!IsEtalon) {
 
@@ -622,19 +622,19 @@ void TFlowMeter::Init()
     FlowMax = 3000;
     Points.clear();
 
-    Pnt.Qrate = 0.1; //Часть от FlowMax
-    Pnt.Mrate = 0.1; //Часть от FlowMax
+    Pnt.Qrate = 0.1; //Г—Г Г±ГІГј Г®ГІ FlowMax
+    Pnt.Mrate = 0.1; //Г—Г Г±ГІГј Г®ГІ FlowMax
     Pnt.Q = 0.06;
 
     Pnt.Name = "Q1";
     Pnt.Q = 60;
-	Pnt.Num = 3; //Кол-во измерений
-    Pnt.State = 0; //<Состоние
-	Pnt.Time = 120; //Время измерения
+	Pnt.Num = 3; //ГЉГ®Г«-ГўГ® ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ©
+    Pnt.State = 0; //<Г‘Г®Г±ГІГ®Г­ГЁГҐ
+	Pnt.Time = 120; //Г‚Г°ГҐГ¬Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГї
     Pnt.Volume = 0;
     Pnt.Imp = 0;
-    Pnt.Accuracy = 10; //Точность выхода на расход
-	Pnt.Error = 0.1; //Погрешность допустимая измерениы
+    Pnt.Accuracy = 10; //Г’Г®Г·Г­Г®Г±ГІГј ГўГ»ГµГ®Г¤Г  Г­Г  Г°Г Г±ГµГ®Г¤
+	Pnt.Error = 0.1; //ГЏГ®ГЈГ°ГҐГёГ­Г®Г±ГІГј Г¤Г®ГЇГіГ±ГІГЁГ¬Г Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ»
     Pnt.RagePlus = 10;
     Pnt.RageMinus = 10;
     Pnt.IsRageFree = 0;
@@ -643,33 +643,33 @@ void TFlowMeter::Init()
 
 	size =   Points.size();
 
-    Pnt.Qrate = 0.5; //Часть от FlowMax
-    Pnt.Mrate = 0.5; //Часть от FlowMax
+    Pnt.Qrate = 0.5; //Г—Г Г±ГІГј Г®ГІ FlowMax
+    Pnt.Mrate = 0.5; //Г—Г Г±ГІГј Г®ГІ FlowMax
     Pnt.Q = 150;
     Pnt.Name = "Q2";
-    Pnt.Num = 1; //Кол-во измерений
-    Pnt.State = 0; //<Состоние
-	Pnt.Time = 120; //Время измерения
+    Pnt.Num = 1; //ГЉГ®Г«-ГўГ® ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ©
+    Pnt.State = 0; //<Г‘Г®Г±ГІГ®Г­ГЁГҐ
+	Pnt.Time = 120; //Г‚Г°ГҐГ¬Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГї
     Pnt.Volume = 0;
     Pnt.Imp = 0;
-    Pnt.Accuracy = 10; //Точность выхода на расход
-	Pnt.Error = 0.1; //Погрешность допустимая измерениы
+    Pnt.Accuracy = 10; //Г’Г®Г·Г­Г®Г±ГІГј ГўГ»ГµГ®Г¤Г  Г­Г  Г°Г Г±ГµГ®Г¤
+	Pnt.Error = 0.1; //ГЏГ®ГЈГ°ГҐГёГ­Г®Г±ГІГј Г¤Г®ГЇГіГ±ГІГЁГ¬Г Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ»
     Pnt.RagePlus = 10;
     Pnt.RageMinus = 10;
     Pnt.IsRageFree = 0;
 	AddPoint(Pnt);
 
-    Pnt.Qrate = 1; //Часть от FlowMax
-    Pnt.Mrate = 1; //Часть от FlowMax
+    Pnt.Qrate = 1; //Г—Г Г±ГІГј Г®ГІ FlowMax
+    Pnt.Mrate = 1; //Г—Г Г±ГІГј Г®ГІ FlowMax
     Pnt.Q = 1500;
 	Pnt.Name = "Q3";
-    Pnt.Num = 1; //Кол-во измерений
-    Pnt.State = 0; //<Состоние
-    Pnt.Time = 120; //Время измерения
+    Pnt.Num = 1; //ГЉГ®Г«-ГўГ® ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ©
+    Pnt.State = 0; //<Г‘Г®Г±ГІГ®Г­ГЁГҐ
+    Pnt.Time = 120; //Г‚Г°ГҐГ¬Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГї
     Pnt.Volume = 0;
     Pnt.Imp = 0;
-    Pnt.Accuracy = 10; //Точность выхода на расход
-	Pnt.Error = 0.1; //Погрешность допустимая измерениы
+    Pnt.Accuracy = 10; //Г’Г®Г·Г­Г®Г±ГІГј ГўГ»ГµГ®Г¤Г  Г­Г  Г°Г Г±ГµГ®Г¤
+	Pnt.Error = 0.1; //ГЏГ®ГЈГ°ГҐГёГ­Г®Г±ГІГј Г¤Г®ГЇГіГ±ГІГЁГ¬Г Гї ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ»
     Pnt.RagePlus = 10;
     Pnt.RageMinus = 10;
     Pnt.IsRageFree = 1;
@@ -695,18 +695,18 @@ void TFlowMeter::Init()
         //	ValueFlow->Error = 1;
 
 
-    miOwner = "Физ. лицо";
+    miOwner = "Г”ГЁГ§. Г«ГЁГ¶Г®";
     //
-    // Серийный номер поверяемого устройства
+    // Г‘ГҐГ°ГЁГ©Г­Г»Г© Г­Г®Г¬ГҐГ° ГЇГ®ГўГҐГ°ГїГҐГ¬Г®ГЈГ® ГіГ±ГІГ°Г®Г©Г±ГІГўГ 
     SerialNum = "";
     //
-    // Номер ГРСИ поверяемого устройства
+    // ГЌГ®Г¬ГҐГ° ГѓГђГ‘Г€ ГЇГ®ГўГҐГ°ГїГҐГ¬Г®ГЈГ® ГіГ±ГІГ°Г®Г©Г±ГІГўГ 
     CertificateNum = "";
 
     DN = "15";
     docTitle = "1592-2015";
 
-    means = "60661.15.3Р.00540801";
+    means = "60661.15.3Гђ.00540801";
 
     year_production = "";
 
@@ -716,8 +716,8 @@ void TFlowMeter::Init()
     P2 = "";
 
     tempWater = "18,75";
-    temperature = "22,4 град. С";
-    pressure = "99,2 кПа";
+    temperature = "22,4 ГЈГ°Г Г¤. Г‘";
+    pressure = "99,2 ГЄГЏГ ";
     hymidity = "51,30%";
 
     vrfDate = DateToISO8601(Today(), false); //DateToStr();//ToDayFGISFormat();
@@ -731,7 +731,7 @@ void TFlowMeter::Init()
 
     validDate = validDate.SubString(0, 9) + validDate.SubString(23, 29);
 
-    Result = "Годен";
+    Result = "ГѓГ®Г¤ГҐГ­";
 
     VerificationInterval = 6;
 
@@ -795,9 +795,9 @@ UnicodeString TFlowMeter::GetSendStatus()
         text = "-";
 
     } else if (SendStatus == 1) {
-        text = "Отправляется";
+        text = "ГЋГІГЇГ°Г ГўГ«ГїГҐГІГ±Гї";
     } else {
-        text = "Отправлен";
+        text = "ГЋГІГЇГ°Г ГўГ«ГҐГ­";
     }
 
     return text;
@@ -807,11 +807,11 @@ void TFlowMeter::SetSendStatus(UnicodeString text)
 {
     if (text == "-") {
         SendStatus = 0;
-    } else if (text == "Отправляется") {
+    } else if (text == "ГЋГІГЇГ°Г ГўГ«ГїГҐГІГ±Гї") {
         SendStatus = 1;
     }
 
-    else if (text == "Отправлен")
+    else if (text == "ГЋГІГЇГ°Г ГўГ«ГҐГ­")
     {
         SendStatus = 2;
     }
@@ -829,12 +829,12 @@ UnicodeString TFlowMeter::GetStatus()
     if (IsEtalon) {
 
     if (Status == 0) {
-        text = "В работе";
+        text = "Г‚ Г°Г ГЎГ®ГІГҐ";
      }
      else if (Status == 1) {
-        text = "Не годен";
+        text = "ГЌГҐ ГЈГ®Г¤ГҐГ­";
     } else if (Status == 2) {
-        text = "Отсутствует";
+        text = "ГЋГІГ±ГіГІГ±ГІГўГіГҐГІ";
     }
 
 
@@ -843,9 +843,9 @@ UnicodeString TFlowMeter::GetStatus()
     {
 
      if (Status == 1) {
-        text = "Не Годен";
+        text = "ГЌГҐ ГѓГ®Г¤ГҐГ­";
     } else if (Status == 2) {
-        text = "Годен";
+        text = "ГѓГ®Г¤ГҐГ­";
     }
 
     }
@@ -859,11 +859,11 @@ void TFlowMeter::SetStatus(UnicodeString status)
 	if (status == "-")
 	{
 		Status = 0;
-	} else if (status == "Не Годен")
+	} else if (status == "ГЌГҐ ГѓГ®Г¤ГҐГ­")
 	{
         Status = 1;
 	}
-	else if (status == "Годен")
+	else if (status == "ГѓГ®Г¤ГҐГ­")
     {
         Status = 2;
 	}
@@ -965,13 +965,13 @@ void TFlowMeter::SetValues(void)
 
 
 
-	if (MeterFlowType == EMETERFLOWTYPE::WEIGHTS_TYPE) {
+	if (MeterFlowCategory == EMETERFLOWTYPE::WEIGHTS_TYPE) {
         // ValueFlow -> SetValue((float)GetFlow());
         //	 ValueVolume -> SetValue((float)GetVolume());
         //	 ValueImp -> SetValue((float)GetTotalImp());
         //	 ValueVolumeError -> SetValue((float)GetVolumeError());
 
-	} else if (MeterFlowType == EMETERFLOWTYPE::WEIGHTS_TYPE) {
+	} else if (MeterFlowCategory == EMETERFLOWTYPE::WEIGHTS_TYPE) {
     }
 }
 
@@ -1179,7 +1179,7 @@ bool TFlowMeter::SaveDataPoint()
         DataPoint.DateTime = Today();
 
 
-        Qt = ValueVolumeFlow->GetStrNum(Point.Q, "м3/ч");
+        Qt = ValueVolumeFlow->GetStrNum(Point.Q, "Г¬3/Г·");
         DataPoint.Qt = RemoveTrailingZeros(Qt);
 
 
@@ -1198,29 +1198,29 @@ bool TFlowMeter::SaveDataPoint()
 
         DataPoint.EtlTemp = EtalonMeter->ValueTemperture->GetStringValue();
         DataPoint.EtlPres =
-            EtalonMeter->ValuePressure->GetStringValue(); //Давление
+            EtalonMeter->ValuePressure->GetStringValue(); //Г„Г ГўГ«ГҐГ­ГЁГҐ
         DataPoint.EtlTempAir =
             EtalonMeter->ValueAirTemperture->GetStringValue();
         DataPoint.EtlPresAir =
-            EtalonMeter->ValueAirPressure->GetStringValue(); //Давление
-        DataPoint.EtlHumidity = EtalonMeter->ValueHumidity->GetStringValue();
+       if ((MeterFlowCategory==WEIGHTS_TYPE)||(MeterFlowCategory==WEIGHTS_VOLUME_FLOWMETER_TYPE)||
+       (MeterFlowCategory==WEIGHTS_MASS_FLOWMETER_TYPE)) {
 
-        DataPoint.EtlDensity =  EtalonMeter->ValueDensity->GetStringValue();
+       } else if (MeterFlowCategory==MASS_FLOWMETER_TYPE)
 
 
-        DataPoint.Time = ValueTime->GetStringValue();
+       } else if (MeterFlowCategory==VOLUME_FLOWMETER_TYPE)
 
-        DataPoint.Volume = ValueVolume->GetStringValue();
-        DataPoint.Imp = ValueImpTotal->GetStringValue();
+       if (MeterFlowCategory==WEIGHTS_VOLUME_FLOWMETER_TYPE)
+       } else if (MeterFlowCategory==WEIGHTS_MASS_FLOWMETER_TYPE)
         DataPoint.Mass = ValueMass->GetStringValue();
 
         DataPoint.VolumeMeter = ValueVolumeMeter->GetStringValue();
         DataPoint.MassMeter = ValueMassMeter->GetStringValue();
 
         DataPoint.Temp = ValueTemperture->GetStringValue();
-        DataPoint.Pres = ValuePressure->GetStringValue(); //Давление
+        DataPoint.Pres = ValuePressure->GetStringValue(); //Г„Г ГўГ«ГҐГ­ГЁГҐ
         DataPoint.TempAir = ValueAirTemperture->GetStringValue();
-        DataPoint.PresAir = ValueAirPressure->GetStringValue(); //Давление
+        DataPoint.PresAir = ValueAirPressure->GetStringValue(); //Г„Г ГўГ«ГҐГ­ГЁГҐ
         DataPoint.Humidity = ValueHumidity->GetStringValue();
         DataPoint.Density = ValueDensity->GetStringValue();
 
@@ -1286,7 +1286,7 @@ bool TFlowMeter::GetPointUseFlow(float Q, tPoint &point)
     tPoint pnt;
 
     for (int i = 0; i < Points.size(); i++) {
-        // Вычисляем расход для данной калибровочной точки
+        // Г‚Г»Г·ГЁГ±Г«ГїГҐГ¬ Г°Г Г±ГµГ®Г¤ Г¤Г«Гї Г¤Г Г­Г­Г®Г© ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ®Г·ГЄГЁ
         if (Points[i].Time > 0) {
             Qp = Points[i].Q;
             pnt = Points[i];
@@ -1319,17 +1319,17 @@ bool TFlowMeter::IsDataPointGood(tDataPoint &dataPoint, tPoint point)
 
 
 
-    // проверка расхода
+    // ГЇГ°Г®ГўГҐГ°ГЄГ  Г°Г Г±ГµГ®Г¤Г 
     if (IsFlowInPoint(Q, point)) {
         dataPoint.Name = point.Name;
         e1 = abs(point.Error);
         e2 = abs(Error);
-        // проверка обьема
+        // ГЇГ°Г®ГўГҐГ°ГЄГ  Г®ГЎГјГҐГ¬Г 
          if ((time >= point.Time-1) ||
          (volume >= point.Volume) )
          {
             // dataPoint.IsUsed = 1;
-            // проверка погрешности
+            // ГЇГ°Г®ГўГҐГ°ГЄГ  ГЇГ®ГЈГ°ГҐГёГ­Г®Г±ГІГЁ
             if (e1 > e2)
             {
                 dataPoint.State = 4;
@@ -1373,7 +1373,7 @@ int TFlowMeter::CheckStatus()
 
     if (!Points.empty()) {
         for (int i = 0; i < Points.size(); i++) {
-            // Вычисляем расход для данной калибровочной точки
+            // Г‚Г»Г·ГЁГ±Г«ГїГҐГ¬ Г°Г Г±ГµГ®Г¤ Г¤Г«Гї Г¤Г Г­Г­Г®Г© ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ®Г·ГЄГЁ
             if (Points[i].Time > 0) {
                 Q = Points[i].Q;
                 point = Points[i];
@@ -1403,8 +1403,8 @@ int TFlowMeter::CheckStatus()
                         j = DataPoints.size();
                     } else {
                         Status = 1;
-                        Result = "Не годен";
-                        return 1; //не годен
+                        Result = "ГЌГҐ ГЈГ®Г¤ГҐГ­";
+                        return 1; //Г­ГҐ ГЈГ®Г¤ГҐГ­
                     }
                 }
             }
@@ -1418,14 +1418,14 @@ int TFlowMeter::CheckStatus()
 
         if (statusPoints == 1) {
             Status = 2;
-            Result = "Годен";
+            Result = "ГѓГ®Г¤ГҐГ­";
             Status = 2;
-            return 2; //годен
+            return 2; //ГЈГ®Г¤ГҐГ­
 
         } else {
             Status = 0;
             Result = "-";
-            return 0; // не достаточно данных
+            return 0; // Г­ГҐ Г¤Г®Г±ГІГ ГІГ®Г·Г­Г® Г¤Г Г­Г­Г»Гµ
         }
     }
     Result = "-";
@@ -1456,10 +1456,10 @@ int TFlowMeter::CheckFullStatus()
     if ((!Points.empty()) && (!DataPoints.empty())) {
         for (int i = 0; i < Points.size(); i++) {
             UsedDataPoints.push_back(DataPoints[0]);
-            // Вычисляем расход для данной калибровочной точки
+            // Г‚Г»Г·ГЁГ±Г«ГїГҐГ¬ Г°Г Г±ГµГ®Г¤ Г¤Г«Гї Г¤Г Г­Г­Г®Г© ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ®Г·ГЄГЁ
             if (Points[i].Time > 0) {
                 Q = Points[i].Q;
-                Points[i].State = 0; //Обнуляем состояние
+                Points[i].State = 0; //ГЋГЎГ­ГіГ«ГїГҐГ¬ Г±Г®Г±ГІГ®ГїГ­ГЁГҐ
             } else {
                 Status = 0;
                 Result = "-";
@@ -1489,8 +1489,8 @@ int TFlowMeter::CheckFullStatus()
                                 UsedDataPoints[i] = DataPoints[j];
                             }
 
-                            // Result = "Не годен";
-                            // return 1; //не годен
+                            // Result = "ГЌГҐ ГЈГ®Г¤ГҐГ­";
+                            // return 1; //Г­ГҐ ГЈГ®Г¤ГҐГ­
                         }
                     }
                 }
@@ -1508,21 +1508,21 @@ int TFlowMeter::CheckFullStatus()
 
         if (statusPoints == 5) {
             Status = 2;
-            Result = "Годен";
-            return 2; //годен
+            Result = "ГѓГ®Г¤ГҐГ­";
+            return 2; //ГЈГ®Г¤ГҐГ­
 
         } else {
             if (statusPoints == 3) {
-                Result = "Не годен";
-                return 1; //не годен
+                Result = "ГЌГҐ ГЈГ®Г¤ГҐГ­";
+                return 1; //Г­ГҐ ГЈГ®Г¤ГҐГ­
             }
 
             Status = 0;
-            Result = "Нет всех измерений";
-            return 0; // не достаточно данных
+            Result = "ГЌГҐГІ ГўГ±ГҐГµ ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ©";
+            return 0; // Г­ГҐ Г¤Г®Г±ГІГ ГІГ®Г·Г­Г® Г¤Г Г­Г­Г»Гµ
         }
     }
-    Result = "Нет всех измерений";
+    Result = "ГЌГҐГІ ГўГ±ГҐГµ ГЁГ§Г¬ГҐГ°ГҐГ­ГЁГ©";
 
     Status = 0;
     return 0;
@@ -1877,7 +1877,7 @@ void TFlowMeter::SetCopy(TFlowMeter* Meter)
 
 
         FactoryKp = Meter->FactoryKp;
-		SetMeterFlowType(Meter->MeterFlowType);
+		SetMeterCategory(Meter->MeterFlowCategory);
 
 	   //	TypeHash = Meter->Type->Hash;
 	   //	DeviceType = Meter->Type->DeviceName;
@@ -1966,7 +1966,7 @@ void TFlowMeter::AddPoint(tPoint Pnt)
         temp = Pnt;
 
         for (int i = 0; i < Points.size(); i++) {
-			// Вычисляем расход для данной калибровочной точки
+			// Г‚Г»Г·ГЁГ±Г«ГїГҐГ¬ Г°Г Г±ГµГ®Г¤ Г¤Г«Гї Г¤Г Г­Г­Г®Г© ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ®Г·ГЄГЁ
             temp1 = Points[i];
 			if (Points[i].Time > 0)
 			{
@@ -2017,7 +2017,7 @@ void TFlowMeter::AddEmptyPoint(tPoint Pnt)
         temp = Pnt;
 
         for (int i = 0; i < Points.size(); i++) {
-			// Вычисляем расход для данной калибровочной точки
+			// Г‚Г»Г·ГЁГ±Г«ГїГҐГ¬ Г°Г Г±ГµГ®Г¤ Г¤Г«Гї Г¤Г Г­Г­Г®Г© ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ®Г·ГЄГЁ
             temp1 = Points[i];
 		 //	if (Points[i].Time > 0)
 			{
@@ -2082,7 +2082,7 @@ void TFlowMeter::SaveCalibrData(void)
     }
 
     for (int i = 0; i < 20; i++) {
-        // Вычисляем расход для данной калибровочной точки
+        // Г‚Г»Г·ГЁГ±Г«ГїГҐГ¬ Г°Г Г±ГµГ®Г¤ Г¤Г«Гї Г¤Г Г­Г­Г®Г© ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ®Г·ГЄГЁ
         if (i < size) {
             Pnt = CalibrPoints[i];
 
@@ -2108,7 +2108,7 @@ void TFlowMeter::SaveCoef()
 
 int8_t TFlowMeter::UpdateCoefs()
 {
-	if ((int)MeterFlowType<	(int)VOLUME_FLOWMETER_TYPE) {
+	if ((int)MeterFlowCategory<	(int)VOLUME_FLOWMETER_TYPE) {
         return ValueMassFlow->UpdateCoefs(CalibrPoints);
     } else {
 		return ValueVolume->UpdateCoefs(CalibrPoints);
@@ -2199,7 +2199,7 @@ int8_t TFlowMeter::AddCalibrPoint(tCalibrPoint Pnt)
         temp = Pnt;
 
         for (int i = 0; i < CalibrPoints.size(); i++) {
-            // Вычисляем расход для данной калибровочной точки
+            // Г‚Г»Г·ГЁГ±Г«ГїГҐГ¬ Г°Г Г±ГµГ®Г¤ Г¤Г«Гї Г¤Г Г­Г­Г®Г© ГЄГ Г«ГЁГЎГ°Г®ГўГ®Г·Г­Г®Г© ГІГ®Г·ГЄГЁ
             temp1 = CalibrPoints[i];
             if (CalibrPoints[i].Time > 0) {
                 Q1 = CalibrPoints[i].EtlValue / CalibrPoints[i].Time;
@@ -2381,12 +2381,12 @@ void TFlowMeter::SaveTestMetersToFile(TFlowMeter* AFlowMeter, int IsBackUp)
     XmlDoc = new TXMLDocument(NULL);
 
 	//XmlDoc->DOMVendor = DOMVendors->Vendors[0];
-    // < OMNI XML кроссплатформенный вендор
+    // < OMNI XML ГЄГ°Г®Г±Г±ГЇГ«Г ГІГґГ®Г°Г¬ГҐГ­Г­Г»Г© ГўГҐГ­Г¤Г®Г°
     XmlDoc->XML->Clear();
     XmlDoc->FileName = "";
     XmlDoc->Active = true;
     //
-    // Создадим главную ветку и добавим узел об устройстве
+    // Г‘Г®Г§Г¤Г Г¤ГЁГ¬ ГЈГ«Г ГўГ­ГіГѕ ГўГҐГІГЄГі ГЁ Г¤Г®ГЎГ ГўГЁГ¬ ГіГ§ГҐГ« Г®ГЎ ГіГ±ГІГ°Г®Г©Г±ГІГўГҐ
 
     rootNode = XmlDoc->AddChild("Devices");
 
@@ -2495,7 +2495,7 @@ void TFlowMeter::SaveTestMetersToFile(TFlowMeter* AFlowMeter, int IsBackUp)
                     "ModifidedDateTime", FlowMeters[j]->ModifidedDateTime);
 
                 SetIntAttribute(
-                    "MeterFlowType", sampleNode, (int)FlowMeters[j]->MeterFlowType);
+                    "MeterFlowType", sampleNode, (int)FlowMeters[j]->MeterFlowCategory);
 
                 SetIntAttribute(
                     "PointHash", sampleNode, FlowMeters[j]->Point.Hash);
@@ -2749,12 +2749,12 @@ void TFlowMeter::SaveEtalonsToFile(int IsBackUp)
     XmlDoc = new TXMLDocument(NULL);
 
 	//XmlDoc->DOMVendor = DOMVendors->Vendors[0];
-    // < OMNI XML кроссплатформенный вендор
+    // < OMNI XML ГЄГ°Г®Г±Г±ГЇГ«Г ГІГґГ®Г°Г¬ГҐГ­Г­Г»Г© ГўГҐГ­Г¤Г®Г°
 	XmlDoc->XML->Clear();
     XmlDoc->FileName = "";
     XmlDoc->Active = true;
     //
-    // Создадим главную ветку и добавим узел об устройстве
+    // Г‘Г®Г§Г¤Г Г¤ГЁГ¬ ГЈГ«Г ГўГ­ГіГѕ ГўГҐГІГЄГі ГЁ Г¤Г®ГЎГ ГўГЁГ¬ ГіГ§ГҐГ« Г®ГЎ ГіГ±ГІГ°Г®Г©Г±ГІГўГҐ
 
     rootNode = XmlDoc->AddChild("Devices");
 
@@ -2857,7 +2857,7 @@ void TFlowMeter::SaveEtalonsToFile(int IsBackUp)
 
 
                 SetIntAttribute(
-					"MeterFlowType", sampleNode, (int)Etalons[j]->MeterFlowType);
+					"MeterFlowType", sampleNode, (int)Etalons[j]->MeterFlowCategory);
 
                Etalons[j]->InitHashValues();
 
@@ -3066,7 +3066,7 @@ void TFlowMeter::SaveEtalonsToFile(int IsBackUp)
                }
                catch (...)
                {
-                    ShowMessage("Ошибка сохранения данных");
+                    ShowMessage("ГЋГёГЁГЎГЄГ  Г±Г®ГµГ°Г Г­ГҐГ­ГЁГї Г¤Г Г­Г­Г»Гµ");
                }
 
             }
@@ -3227,16 +3227,16 @@ TFlowMeter* TFlowMeter::LoadEtalonsFromFile()
 
     /*
 	if (!DirectoryExists(TSettingsClass::Dir)) {
-		Result = "Файл устройств не существует";
-		throw Exception("Файл устройств не существует");
+		Result = "Г”Г Г©Г« ГіГ±ГІГ°Г®Г©Г±ГІГў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ";
+		throw Exception("Г”Г Г©Г« ГіГ±ГІГ°Г®Г©Г±ГІГў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ");
 	}
 
 	FileName = ExtractFileName(fname);
 	 */
     if (!FileExists(fname)) {
-        Result = "Файл устройств не существует";
-        //	throw Exception("Файл типов не существует");
-        ShowMessage(Format("Файл '%s' не существует. Создан новый файл.",
+        Result = "Г”Г Г©Г« ГіГ±ГІГ°Г®Г©Г±ГІГў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ";
+        //	throw Exception("Г”Г Г©Г« ГІГЁГЇГ®Гў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ");
+        ShowMessage(Format("Г”Г Г©Г« '%s' Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ. Г‘Г®Г§Г¤Г Г­ Г­Г®ГўГ»Г© ГґГ Г©Г«.",
             ARRAYOFCONST((fname))));
         SaveToFile(nullptr, 0);
     }
@@ -3244,7 +3244,7 @@ TFlowMeter* TFlowMeter::LoadEtalonsFromFile()
     document = LoadXMLDocument(fname);
 
     if (document == NULL) {
-        Result = "Файл пустой или поврежден";
+        Result = "Г”Г Г©Г« ГЇГіГ±ГІГ®Г© ГЁГ«ГЁ ГЇГ®ГўГ°ГҐГ¦Г¤ГҐГ­";
         throw Exception(Result);
     }
 
@@ -3253,7 +3253,7 @@ TFlowMeter* TFlowMeter::LoadEtalonsFromFile()
     rootNode = document->ChildNodes->FindNode("Devices");
 
     if (rootNode == NULL) {
-        Result = "Файл пустой или поврежден";
+        Result = "Г”Г Г©Г« ГЇГіГ±ГІГ®Г© ГЁГ«ГЁ ГЇГ®ГўГ°ГҐГ¦Г¤ГҐГ­";
         throw Exception(Result);
     }
 
@@ -3329,12 +3329,12 @@ TFlowMeter* TFlowMeter::LoadEtalonsFromFile()
             FlowMeter->ModifidedDateTime =
                 GetAttribute("ModifidedDateTime", sampleNode);
 
-            FlowMeter->MeterFlowType =
+            FlowMeter->MeterFlowCategory =
                 (eMeterFlowType)GetIntAttribute("MeterFlowType", sampleNode, 0);
 
-        //    FlowMeter->SetMeterFlowType((eMeterFlowType)GetIntAttribute("MeterFlowType", sampleNode, 0));
+        //    FlowMeter->SetMeterCategory((eMeterFlowType)GetIntAttribute("MeterFlowType", sampleNode, 0));
 
-            FlowMeter->MeterFlowType = MASS_FLOWMETER_TYPE;
+            FlowMeter->MeterFlowCategory = MASS_FLOWMETER_TYPE;
 
                                FlowMeter->HashValueImp = GetIntAttribute("HashValueImp", sampleNode,0);
                FlowMeter->HashValueImpTotal = GetIntAttribute("HashValueImpTotal", sampleNode,0);
@@ -3502,7 +3502,7 @@ TFlowMeter* TFlowMeter::LoadEtalonsFromFile()
     /* }	else
 	{
 
-				Result = "Версия не может быть обработана";
+				Result = "Г‚ГҐГ°Г±ГЁГї Г­ГҐ Г¬Г®Г¦ГҐГІ ГЎГ»ГІГј Г®ГЎГ°Г ГЎГ®ГІГ Г­Г ";
 				throw Exception(Result);
  *///	}
 
@@ -3556,16 +3556,16 @@ TFlowMeter* TFlowMeter::LoadTestMetersFromFile()
 
     /*
 	if (!DirectoryExists(TSettingsClass::Dir)) {
-		Result = "Файл устройств не существует";
-		throw Exception("Файл устройств не существует");
+		Result = "Г”Г Г©Г« ГіГ±ГІГ°Г®Г©Г±ГІГў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ";
+		throw Exception("Г”Г Г©Г« ГіГ±ГІГ°Г®Г©Г±ГІГў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ");
 	}
 
 	FileName = ExtractFileName(fname);
 	 */
 	if (!FileExists(fname)) {
-        Result = "Файл устройств не существует";
-        //	throw Exception("Файл типов не существует");
-        ShowMessage(Format("Файл '%s' не существует. Создан новый файл.",
+        Result = "Г”Г Г©Г« ГіГ±ГІГ°Г®Г©Г±ГІГў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ";
+        //	throw Exception("Г”Г Г©Г« ГІГЁГЇГ®Гў Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ");
+        ShowMessage(Format("Г”Г Г©Г« '%s' Г­ГҐ Г±ГіГ№ГҐГ±ГІГўГіГҐГІ. Г‘Г®Г§Г¤Г Г­ Г­Г®ГўГ»Г© ГґГ Г©Г«.",
             ARRAYOFCONST((fname))));
         SaveToFile(nullptr, 0);
     }
@@ -3573,7 +3573,7 @@ TFlowMeter* TFlowMeter::LoadTestMetersFromFile()
     document = LoadXMLDocument(fname);
 
     if (document == NULL) {
-        Result = "Файл пустой или поврежден";
+        Result = "Г”Г Г©Г« ГЇГіГ±ГІГ®Г© ГЁГ«ГЁ ГЇГ®ГўГ°ГҐГ¦Г¤ГҐГ­";
         throw Exception(Result);
     }
 
@@ -3582,7 +3582,7 @@ TFlowMeter* TFlowMeter::LoadTestMetersFromFile()
     rootNode = document->ChildNodes->FindNode("Devices");
 
     if (rootNode == NULL) {
-        Result = "Файл пустой или поврежден";
+        Result = "Г”Г Г©Г« ГЇГіГ±ГІГ®Г© ГЁГ«ГЁ ГЇГ®ГўГ°ГҐГ¦Г¤ГҐГ­";
         throw Exception(Result);
     }
 
@@ -3664,10 +3664,10 @@ TFlowMeter* TFlowMeter::LoadTestMetersFromFile()
             FlowMeter->ModifidedDateTime =
                 GetAttribute("ModifidedDateTime", sampleNode);
 
-            FlowMeter->MeterFlowType =
+            FlowMeter->MeterFlowCategory =
                (eMeterFlowType) GetIntAttribute("MeterFlowType", sampleNode, 1);
 
-        //   FlowMeter->SetMeterFlowType(
+        //   FlowMeter->SetMeterCategory(
         //   (eMeterFlowType)GetIntAttribute("MeterFlowType", sampleNode, 0));
 
 
@@ -3887,7 +3887,7 @@ TFlowMeter* TFlowMeter::LoadTestMetersFromFile()
         }
 
        } else {
-            Result = "Файл пустой или поврежден";
+            Result = "Г”Г Г©Г« ГЇГіГ±ГІГ®Г© ГЁГ«ГЁ ГЇГ®ГўГ°ГҐГ¦Г¤ГҐГ­";
             throw Exception(Result);
         }
 
@@ -3900,7 +3900,7 @@ TFlowMeter* TFlowMeter::LoadTestMetersFromFile()
     /* }	else
 	{
 
-				Result = "Версия не может быть обработана";
+				Result = "Г‚ГҐГ°Г±ГЁГї Г­ГҐ Г¬Г®Г¦ГҐГІ ГЎГ»ГІГј Г®ГЎГ°Г ГЎГ®ГІГ Г­Г ";
 				throw Exception(Result);
  *///	}
 
@@ -3911,21 +3911,21 @@ TFlowMeter* TFlowMeter::LoadTestMetersFromFile()
 
 void TFlowMeter::SortEtalons()
 {
-    // Сортировка вектора по свойству DN
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГўГҐГЄГІГ®Г°Г  ГЇГ® Г±ГўГ®Г©Г±ГІГўГі DN
     std::sort(Etalons.begin(), Etalons.end(),
 		[](TFlowMeter* a, TFlowMeter* b) { return a->FlowMax < b->FlowMax; });
 }
 
 void TFlowMeter::SortPoints()
 {
-    // Сортировка вектора по свойству расход
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГўГҐГЄГІГ®Г°Г  ГЇГ® Г±ГўГ®Г©Г±ГІГўГі Г°Г Г±ГµГ®Г¤
     std::sort(Points.begin(), Points.end(),
 		[](tPoint a, tPoint b) { return a.Q < b.Q; });
 }
 
 void TFlowMeter::SortFlowMeters()
 {
-    // Сортировка вектора по свойству DN
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГўГҐГЄГІГ®Г°Г  ГЇГ® Г±ГўГ®Г©Г±ГІГўГі DN
 	std::sort(FlowMeters.begin(), FlowMeters.end(),
 		[](TFlowMeter* a, TFlowMeter* b) { return a->FlowMax < b->FlowMax; });
 }
@@ -4118,30 +4118,30 @@ void TFlowMeter::SetEtalon(TFlowMeter* Etalon)
     }
 }
 
-void TFlowMeter::SetMeterFlowType(eMeterFlowType meterFlowType)
+void TFlowMeter::SetMeterCategory(eMeterFlowType meterFlowType)
 {
-    MeterFlowType = meterFlowType;
+    MeterFlowCategory = meterFlowType;
 
-  //  	WEIGHTS_TYPE = 0,    //Весовое устройство
-  //	WEIGHTS_VOLUME_FLOWMETER_TYPE = 1, //Весовое устройство + ОР
-  //	WEIGHTS_MASS_FLOWMETER_TYPE = 2, // Весовое устройство + МР
-  //	MASS_FLOWMETER_TYPE = 3, //Массовый расходомер
- //	VOLUME_FLOWMETER_TYPE = 4, //Объемный расходомер
-  //	TANK_TYPE = 5, // Мерник
+	if (MeterFlowCategory == WEIGHTS_TYPE)
+		else if (MeterFlowCategory == WEIGHTS_VOLUME_FLOWMETER_TYPE)
+	else if (MeterFlowCategory == WEIGHTS_MASS_FLOWMETER_TYPE) {
+		else if (MeterFlowCategory == MASS_FLOWMETER_TYPE) {
+	else if (MeterFlowCategory == VOLUME_FLOWMETER_TYPE)
+		else if (MeterFlowCategory == 	TANK_TYPE)
 
 
-	if (MeterFlowType == WEIGHTS_TYPE)
+void TFlowMeter::SetMeterCategory(UnicodeString meterFlowType)
 	{
-		FlowTypeName =   "Весовое устройство";
+        SetMeterCategory(WEIGHTS_TYPE);
 
-		ValueVolumeCoef->ValueCorrection = nullptr;
-		ValueVolumeCoef->ValueBaseMultiplier = ValueMassCoef;
-		ValueVolumeCoef->ValueBaseDevider = nullptr;
-		ValueVolumeCoef->ValueRate = ValueDensity;
+        SetMeterCategory(WEIGHTS_VOLUME_FLOWMETER_TYPE);
+        SetMeterCategory(WEIGHTS_MASS_FLOWMETER_TYPE);
+        SetMeterCategory(MASS_FLOWMETER_TYPE);
+        SetMeterCategory(VOLUME_FLOWMETER_TYPE);
 
-		ValueMassCoef->ValueCorrection = nullptr;
-		ValueMassCoef->ValueBaseMultiplier = nullptr;
-		ValueMassCoef->ValueBaseDevider = nullptr;
+        SetMeterCategory(TANK_TYPE);
+UnicodeString TFlowMeter::GetMeterCategory()
+	EtalonMeter->SetMeterCategory(MASS_FLOWMETER_TYPE);
 		ValueMassCoef->ValueRate = nullptr;
 
 		ValueMassCoef->DependenceType = EDEPTYPE::INDEPENDENT;
@@ -4158,7 +4158,7 @@ void TFlowMeter::SetMeterFlowType(eMeterFlowType meterFlowType)
 
 		else if (MeterFlowType == WEIGHTS_VOLUME_FLOWMETER_TYPE)
 	{
-				FlowTypeName =   "Весовое устройство + ОР";
+				FlowTypeName =   "Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ® + ГЋГђ";
 		ValueQuantity = ValueVolume;
 		ValueFlow = ValueVolumeFlow;
 
@@ -4186,7 +4186,7 @@ void TFlowMeter::SetMeterFlowType(eMeterFlowType meterFlowType)
 
 	else if (MeterFlowType == WEIGHTS_MASS_FLOWMETER_TYPE) {
 
-		FlowTypeName =   "Весовое устройство + МР";
+		FlowTypeName =   "Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ® + ГЊГђ";
 
 		ValueQuantity = ValueVolume;
 		ValueFlow = ValueVolumeFlow;
@@ -4218,7 +4218,7 @@ void TFlowMeter::SetMeterFlowType(eMeterFlowType meterFlowType)
 	}
 		else if (MeterFlowType == MASS_FLOWMETER_TYPE) {
 
-		FlowTypeName =   "Массовый расходомер";
+		FlowTypeName =   "ГЊГ Г±Г±Г®ГўГ»Г© Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°";
 
 
 		ValueQuantity = ValueVolume;
@@ -4249,7 +4249,7 @@ void TFlowMeter::SetMeterFlowType(eMeterFlowType meterFlowType)
 
 	else if (MeterFlowType == VOLUME_FLOWMETER_TYPE)
 	{
-				FlowTypeName =   "Объемный расходомер";
+				FlowTypeName =   "ГЋГЎГєГҐГ¬Г­Г»Г© Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°";
 
 		ValueMassCoef->ValueCorrection = nullptr;
 		ValueMassCoef->ValueBaseMultiplier = ValueVolumeCoef;
@@ -4278,7 +4278,7 @@ void TFlowMeter::SetMeterFlowType(eMeterFlowType meterFlowType)
 
 		else if (MeterFlowType == 	TANK_TYPE)
 	{
-				FlowTypeName =   "Мерник";
+				FlowTypeName =   "ГЊГҐГ°Г­ГЁГЄ";
 
 		ValueQuantity = ValueVolume;
 		ValueFlow = ValueVolumeFlow;
@@ -4320,40 +4320,40 @@ void TFlowMeter::SetMeterFlowType(UnicodeString meterFlowType)
 {
 
 
-  //  	WEIGHTS_TYPE = 0,    //Весовое устройство
-  //	WEIGHTS_VOLUME_FLOWMETER_TYPE = 1, //Весовое устройство + ОР
-  //	WEIGHTS_MASS_FLOWMETER_TYPE = 2, // Весовое устройство + МР
-  //	MASS_FLOWMETER_TYPE = 3, //Массовый расходомер
- //	VOLUME_FLOWMETER_TYPE = 4, //Объемный расходомер
-  //	TANK_TYPE = 5, // Мерник
+  //  	WEIGHTS_TYPE = 0,    //Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ®
+  //	WEIGHTS_VOLUME_FLOWMETER_TYPE = 1, //Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ® + ГЋГђ
+  //	WEIGHTS_MASS_FLOWMETER_TYPE = 2, // Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ® + ГЊГђ
+  //	MASS_FLOWMETER_TYPE = 3, //ГЊГ Г±Г±Г®ГўГ»Г© Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°
+ //	VOLUME_FLOWMETER_TYPE = 4, //ГЋГЎГєГҐГ¬Г­Г»Г© Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°
+  //	TANK_TYPE = 5, // ГЊГҐГ°Г­ГЁГЄ
 
 
-	if (meterFlowType == "Весовое устройство")
+	if (meterFlowType == "Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ®")
 	{
         SetMeterFlowType(WEIGHTS_TYPE);
 	}
 
-		else if (meterFlowType == "Весовое устройство + ОР")
+		else if (meterFlowType == "Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ® + ГЋГђ")
 	{
         SetMeterFlowType(WEIGHTS_VOLUME_FLOWMETER_TYPE);
 	}
 
-	else if (meterFlowType == "Весовое устройство + МР") {
+	else if (meterFlowType == "Г‚ГҐГ±Г®ГўГ®ГҐ ГіГ±ГІГ°Г®Г©Г±ГІГўГ® + ГЊГђ") {
 
         SetMeterFlowType(WEIGHTS_MASS_FLOWMETER_TYPE);
 	}
-		else if (meterFlowType == "Массовый расходомер") {
+		else if (meterFlowType == "ГЊГ Г±Г±Г®ГўГ»Г© Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°") {
 
         SetMeterFlowType(MASS_FLOWMETER_TYPE);
 	}
 
-	else if (meterFlowType == "Объемный расходомер")
+	else if (meterFlowType == "ГЋГЎГєГҐГ¬Г­Г»Г© Г°Г Г±ГµГ®Г¤Г®Г¬ГҐГ°")
 	{
         SetMeterFlowType(VOLUME_FLOWMETER_TYPE);
 
 	}
 
-		else if (meterFlowType == 	"Мерник")
+		else if (meterFlowType == 	"ГЊГҐГ°Г­ГЁГЄ")
 	{
         SetMeterFlowType(TANK_TYPE);
 	}
@@ -4379,15 +4379,15 @@ void TFlowMeter::SetAsEtalon()
 
     EtalonMeter->SetKoef(100);
 }
-// Расчёт времени до достижения предела по объему в мс
+// ГђГ Г±Г·ВёГІ ГўГ°ГҐГ¬ГҐГ­ГЁ Г¤Г® Г¤Г®Г±ГІГЁГ¦ГҐГ­ГЁГї ГЇГ°ГҐГ¤ГҐГ«Г  ГЇГ® Г®ГЎГєГҐГ¬Гі Гў Г¬Г±
 int TFlowMeter::TimeToEndVolumeLimit(
     float pointVolume, float DelayCoef, float TimeCoef)
 {
     float add_volume = 0, volume = 0, add_time = 0, flow;
 
-    flow = ValueFlow->GetFloatValue("л/с"); //Получаем л/с
+    flow = ValueFlow->GetFloatValue("Г«/Г±"); //ГЏГ®Г«ГіГ·Г ГҐГ¬ Г«/Г±
     volume = ValueVolume->GetFloatValue();
-    //Прогноз по объему на следующую секунду в л
+    //ГЏГ°Г®ГЈГ­Г®Г§ ГЇГ® Г®ГЎГєГҐГ¬Гі Г­Г  Г±Г«ГҐГ¤ГіГѕГ№ГіГѕ Г±ГҐГЄГіГ­Г¤Гі Гў Г«
     add_volume = volume + flow;
     pointVolume = pointVolume - DelayCoef * flow;
 
@@ -4425,7 +4425,7 @@ UnicodeString TFlowMeter::JSonConvert(TFlowMeter* AFlowMeter)
     TJSONObject* jPoint = new TJSONObject();
     TJSONObject* jDataPoint;
     //
-    // Создадим главную ветку и добавим узел об устройстве
+    // Г‘Г®Г§Г¤Г Г¤ГЁГ¬ ГЈГ«Г ГўГ­ГіГѕ ГўГҐГІГЄГі ГЁ Г¤Г®ГЎГ ГўГЁГ¬ ГіГ§ГҐГ« Г®ГЎ ГіГ±ГІГ°Г®Г©Г±ГІГўГҐ
 
     jObject->AddPair("VER", XMLVER);
 
@@ -4634,9 +4634,9 @@ void TFlowMeter::ApiSent()
     if (!FlowMeters.empty()) {
         k = FlowMeters.size();
         while (l < FlowMeters.size()) {
-            if (FlowMeters[l]->SendStatus == 1) //"Отправляется")
+            if (FlowMeters[l]->SendStatus == 1) //"ГЋГІГЇГ°Г ГўГ«ГїГҐГІГ±Гї")
             {
-                FlowMeters[l]->SendStatus = 2; //"Отправлен";
+                FlowMeters[l]->SendStatus = 2; //"ГЋГІГЇГ°Г ГўГ«ГҐГ­";
             }
             l = l + 1;
         }
@@ -4666,9 +4666,9 @@ int TFlowMeter::ApiCheckResult()
             int st = FlowMeters[j]->SendStatus;
             System::UnicodeString res = FlowMeters[j]->Result;
 
-            if ((res == "Годен") && (st != 2)) {
+            if ((res == "ГѓГ®Г¤ГҐГ­") && (st != 2)) {
                 success = true;
-            } else if ((FlowMeters[j]->Result == "Не годен") &&
+            } else if ((FlowMeters[j]->Result == "ГЌГҐ ГЈГ®Г¤ГҐГ­") &&
                        (FlowMeters[j]->SendStatus != 2))
             {
                 return 1;
@@ -4709,7 +4709,7 @@ UnicodeString TFlowMeter::ApiConvert()
     TJSONObject* jPoint = new TJSONObject();
     TJSONObject* jDataPoint;
     //
-    // Создадим главную ветку и добавим узел об устройстве
+    // Г‘Г®Г§Г¤Г Г¤ГЁГ¬ ГЈГ«Г ГўГ­ГіГѕ ГўГҐГІГЄГі ГЁ Г¤Г®ГЎГ ГўГЁГ¬ ГіГ§ГҐГ« Г®ГЎ ГіГ±ГІГ°Г®Г©Г±ГІГўГҐ
 
     // CheckStoragePermission_(this);
 
@@ -4736,8 +4736,8 @@ UnicodeString TFlowMeter::ApiConvert()
                 FlowMeters[j]->Data1 = TSettingsClass::TempData;
             }
 
-            if (((FlowMeters[j]->Result == "Годен") ||
-                    (FlowMeters[j]->Result == "Не годен")) &&
+            if (((FlowMeters[j]->Result == "ГѓГ®Г¤ГҐГ­") ||
+                    (FlowMeters[j]->Result == "ГЌГҐ ГЈГ®Г¤ГҐГ­")) &&
                 (FlowMeters[j]->SendStatus != 2))
             {
                 FlowMeters[j]->SendStatus = 1;
@@ -4748,7 +4748,7 @@ UnicodeString TFlowMeter::ApiConvert()
                 TJSONObject* jPoint = new TJSONObject();
                 TJSONObject* jDataPoint;
                 //
-                // Создадим главную ветку и добавим узел об устройстве
+                // Г‘Г®Г§Г¤Г Г¤ГЁГ¬ ГЈГ«Г ГўГ­ГіГѕ ГўГҐГІГЄГі ГЁ Г¤Г®ГЎГ ГўГЁГ¬ ГіГ§ГҐГ« Г®ГЎ ГіГ±ГІГ°Г®Г©Г±ГІГўГҐ
 
                 jDevice->AddPair(new TJSONPair("order_id",
                     new TJSONNumber(StrToInt_(FlowMeters[j]->ID_Order))));
@@ -4767,7 +4767,7 @@ UnicodeString TFlowMeter::ApiConvert()
                 jDevice->AddPair("Adress", FlowMeters[j]->Adress);
                 jDevice->AddPair("AllMeans", TSettingsClass::AllMeans);
 
-                //!!!Верное	jDevice->AddPair("ProtocolNum", TSettingsClass::ProtocolNumTitle+IntToStr(TSettingsClass::ProtocolNum++));
+                //!!!Г‚ГҐГ°Г­Г®ГҐ	jDevice->AddPair("ProtocolNum", TSettingsClass::ProtocolNumTitle+IntToStr(TSettingsClass::ProtocolNum++));
                 jDevice->AddPair("ProtocolNum",
                     new TJSONNumber(TSettingsClass::ProtocolNum++));
 
@@ -4896,7 +4896,7 @@ UnicodeString TFlowMeter::JSonConvert()
     TJSONObject* jPoint = new TJSONObject();
     TJSONObject* jDataPoint;
     //
-    // Создадим главную ветку и добавим узел об устройстве
+    // Г‘Г®Г§Г¤Г Г¤ГЁГ¬ ГЈГ«Г ГўГ­ГіГѕ ГўГҐГІГЄГі ГЁ Г¤Г®ГЎГ ГўГЁГ¬ ГіГ§ГҐГ« Г®ГЎ ГіГ±ГІГ°Г®Г©Г±ГІГўГҐ
     jObject->AddPair("emai", TSettingsClass::eMail);
     jObject->AddPair(
         new TJSONPair("order_id", new TJSONNumber(StrToInt_(ID_Order))));
@@ -5369,7 +5369,7 @@ void TFlowMeter::AutoFill(TFlowMeter* Meter)
         DataPoint.DateTime = Now();
         DataPoint.Date  = FormatDateTime("dd.mm.yyyy hh:nn", Now());
 
-        DataPoint.Qt =  Meter->ValueVolumeFlow->GetStrNum(Point.Q, "м3/ч");
+        DataPoint.Qt =  Meter->ValueVolumeFlow->GetStrNum(Point.Q, "Г¬3/Г·");
 
         DataPoint.Q = RandStr(Point.Q, Point.Error/2);
 
@@ -5394,11 +5394,11 @@ void TFlowMeter::AutoFill(TFlowMeter* Meter)
 
         DataPoint.EtlTemp = RandStr(EtalonMeter->ValueTemperture->GetDoubleValue()+(i*0.5), 0.1);
         DataPoint.EtlPres =
-            RandStr(EtalonMeter->ValuePressure->GetDoubleValue(), 0.2); //Давление
+            RandStr(EtalonMeter->ValuePressure->GetDoubleValue(), 0.2); //Г„Г ГўГ«ГҐГ­ГЁГҐ
         DataPoint.EtlTempAir =
             RandStr(EtalonMeter->ValueAirTemperture->GetDoubleValue(), 0.2);
         DataPoint.EtlPresAir =
-            RandStr(EtalonMeter->ValueAirPressure->GetDoubleValue(), 0.2); //Давление
+            RandStr(EtalonMeter->ValueAirPressure->GetDoubleValue(), 0.2); //Г„Г ГўГ«ГҐГ­ГЁГҐ
         DataPoint.EtlHumidity =
            RandStr(EtalonMeter->ValueHumidity->GetDoubleValue(), 0.2);
 
@@ -5419,7 +5419,7 @@ void TFlowMeter::AutoFill(TFlowMeter* Meter)
         DataPoint.Temp = RandStr(EtalonMeter->ValueTemperture->GetDoubleValue()+(i*0.5), 0.1);
         DataPoint.Pres = RandStr(EtalonMeter->ValuePressure->GetDoubleValue(), 0.2);
         DataPoint.TempAir =  RandStr(EtalonMeter->ValueAirTemperture->GetDoubleValue(), 0.2);
-        DataPoint.PresAir = RandStr(EtalonMeter->ValueAirPressure->GetDoubleValue(), 0.2); //Давление
+        DataPoint.PresAir = RandStr(EtalonMeter->ValueAirPressure->GetDoubleValue(), 0.2); //Г„Г ГўГ«ГҐГ­ГЁГҐ
         DataPoint.Humidity = RandStr(EtalonMeter->ValueHumidity->GetDoubleValue(), 0.2);
         DataPoint.Density = RandStr(EtalonMeter->ValueDensity->GetDoubleValue(), 0.2);
 
@@ -5596,36 +5596,36 @@ void TFlowMeter::SetFinalValuesByEtalon()
 
 
 
-		if (GetMeterFlowType() == "Весовое устройство")
+		if (GetMeterCategory() == " ")
 	{
 		ValueVolumeMeter->SetValue((double)-1);
 		ValueMassMeter->SetValue((double)-1);
 	}
 
-		else if (GetMeterFlowType() == "Весовое устройство + ОР")
+		else if (GetMeterCategory() == "  + ")
 	{
 		ValueVolumeMeter->SetValue(EtalonMeter->ValueVolume->GetDoubleValue());
 		ValueMassMeter->SetValue((double)-1);
 	}
 
-	else if (GetMeterFlowType()== "Весовое устройство + МР") {
+	else if (GetMeterCategory()== "  + ") {
 
 		ValueVolumeMeter->SetValue((double)-1);
 		ValueMassMeter->SetValue(EtalonMeter->ValueMass->GetDoubleValue());
 	}
-		else if (GetMeterFlowType() == "Массовый расходомер") {
+		else if (GetMeterCategory() == " ") {
 
 		ValueVolumeMeter->SetValue((double)-1);
 		ValueMassMeter->SetValue(EtalonMeter->ValueMass->GetDoubleValue());
 	}
 
-	else if (GetMeterFlowType() == "Объемный расходомер")
+	else if (GetMeterCategory() == " ")
 	{
 			ValueVolumeMeter->SetValue(EtalonMeter->ValueVolume->GetDoubleValue());
 			ValueMassMeter->SetValue((double)-1);
 	}
 
-		else if (GetMeterFlowType() == 	"Мерник")
+		else if (GetMeterCategory() == 	"")
 	{
 		ValueVolumeMeter->SetValue((double)-1);
 		ValueMassMeter->SetValue((double)-1);
@@ -5649,7 +5649,7 @@ void TFlowMeter::SetFinalValuesByEtalon()
 
 void TFlowMeter::SortDataPointsFlow(int MinMax )
 {
-    // Сортировка по Qt от большего к меньшему
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГЇГ® Qt Г®ГІ ГЎГ®Г«ГјГёГҐГЈГ® ГЄ Г¬ГҐГ­ГјГёГҐГ¬Гі
     if (MinMax == 0) {
     std::sort(DataPoints.begin(), DataPoints.end(),
         [](const tDataPoint& a, const tDataPoint& b) {
@@ -5668,14 +5668,14 @@ void TFlowMeter::SortDataPointsFlow(int MinMax )
 void TFlowMeter::SortDataPointsDate(int MinMax )
 {
 if (MinMax == 1) {
-    // Сортировка по Date от меньшего к большему
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГЇГ® Date Г®ГІ Г¬ГҐГ­ГјГёГҐГЈГ® ГЄ ГЎГ®Г«ГјГёГҐГ¬Гі
     std::sort(DataPoints.begin(), DataPoints.end(),
         [](const tDataPoint& a, const tDataPoint& b) {
             return StrToDateTimeDef(a.Date, TDateTime(0)) < StrToDateTimeDef(b.Date, TDateTime(0));
         });
 } else
 {
-    // Сортировка по Date от большему к меньшего
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГЇГ® Date Г®ГІ ГЎГ®Г«ГјГёГҐГ¬Гі ГЄ Г¬ГҐГ­ГјГёГҐГЈГ®
     std::sort(DataPoints.begin(), DataPoints.end(),
         [](const tDataPoint& a, const tDataPoint& b) {
             return StrToDateTimeDef(a.Date, TDateTime(0)) > StrToDateTimeDef(b.Date, TDateTime(0));
@@ -5687,14 +5687,14 @@ if (MinMax == 1) {
  void TFlowMeter::SortDataPointsName(int MinMax )
 {
 if (MinMax == 1) {
-    // Сортировка по Date от меньшего к большему
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГЇГ® Date Г®ГІ Г¬ГҐГ­ГјГёГҐГЈГ® ГЄ ГЎГ®Г«ГјГёГҐГ¬Гі
  std::sort(DataPoints.begin(), DataPoints.end(),
     [](const tDataPoint& a, const tDataPoint& b) {
         return a.Name < b.Name;
     });
 } else
 {
-    // Сортировка по Date от большему к меньшего
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГЇГ® Date Г®ГІ ГЎГ®Г«ГјГёГҐГ¬Гі ГЄ Г¬ГҐГ­ГјГёГҐГЈГ®
  std::sort(DataPoints.begin(), DataPoints.end(),
     [](const tDataPoint& a, const tDataPoint& b) {
         return a.Name > b.Name;
@@ -5705,7 +5705,7 @@ if (MinMax == 1) {
 
  void TFlowMeter::SortDataPointsError(int MinMax )
 {
-    // Сортировка по Qt от большего к меньшему
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГЇГ® Qt Г®ГІ ГЎГ®Г«ГјГёГҐГЈГ® ГЄ Г¬ГҐГ­ГјГёГҐГ¬Гі
     if (MinMax == 0) {
     std::sort(DataPoints.begin(), DataPoints.end(),
         [](const tDataPoint& a, const tDataPoint& b) {
@@ -5725,7 +5725,7 @@ if (MinMax == 1) {
 
  void TFlowMeter::SortDataPointsErrorMeter(int MinMax )
 {
-    // Сортировка по Qt от большего к меньшему
+    // Г‘Г®Г°ГІГЁГ°Г®ГўГЄГ  ГЇГ® Qt Г®ГІ ГЎГ®Г«ГјГёГҐГЈГ® ГЄ Г¬ГҐГ­ГјГёГҐГ¬Гі
     if (MinMax == 0) {
     std::sort(DataPoints.begin(), DataPoints.end(),
         [](const tDataPoint& a, const tDataPoint& b) {
@@ -5793,14 +5793,14 @@ void TFlowMeter::DataPointsCalc()
 		if (TryStrToDouble_(dp.ErrorMass, errmass))
 		   {
 			errmasses.push_back(errmass);
-			relatedPointsM.push_back(&dp); // Сохраняем указатель на оригинальный объект
+			relatedPointsM.push_back(&dp); // Г‘Г®ГµГ°Г Г­ГїГҐГ¬ ГіГЄГ Г§Г ГІГҐГ«Гј Г­Г  Г®Г°ГЁГЈГЁГ­Г Г«ГјГ­Г»Г© Г®ГЎГєГҐГЄГІ
 		   }
 
 
 		if (TryStrToDouble_(dp.ErrorVolume, errvol))
 		   {
 			errvolumes.push_back(errvol);
-			relatedPointsV.push_back(&dp); // Сохраняем указатель на оригинальный объект
+			relatedPointsV.push_back(&dp); // Г‘Г®ГµГ°Г Г­ГїГҐГ¬ ГіГЄГ Г§Г ГІГҐГ«Гј Г­Г  Г®Г°ГЁГЈГЁГ­Г Г«ГјГ­Г»Г© Г®ГЎГєГҐГЄГІ
 		   }
 
 
