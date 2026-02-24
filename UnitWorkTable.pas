@@ -5,6 +5,7 @@ interface
 uses
 
   UnitFlowMeter,
+  UnitMeterValue,
   UnitClasses,
   UnitDataManager,
   System.SysUtils,
@@ -34,6 +35,15 @@ type
     FValueResult: Double;
 
     FFlowMeter: TFlowMeter;
+    FValueImp: TMeterValue;
+    FValueImpTotal: TMeterValue;
+    FValueCurrent: TMeterValue;
+    FValueInterface: TMeterValue;
+
+    FHashValueImp: string;
+    FHashValueImpTotal: string;
+    FHashValueCurrent: string;
+    FHashValueInterface: string;
 
     // --- ïðîêñè ê FlowMeter ---
     function GetTypeNameProxy: string;
@@ -93,6 +103,11 @@ type
     property CurResult: Double read GetCurResultProxy write SetCurResultProxy;
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
+
+    property ValueImp: TMeterValue read FValueImp;
+    property ValueImpTotal: TMeterValue read FValueImpTotal;
+    property ValueCurrent: TMeterValue read FValueCurrent;
+    property ValueInterface: TMeterValue read FValueInterface;
   end;
 
   TWorkTable = class
@@ -112,6 +127,28 @@ type
     FTimeResult: Double;
     FState: TSpillState;
     FTableClamped: Boolean;
+
+    FValueTempertureBefore: TMeterValue;
+    FValueTempertureAfter: TMeterValue;
+    FValueTempertureDelta: TMeterValue;
+    FValuePressureBefore: TMeterValue;
+    FValuePressureAfter: TMeterValue;
+    FValuePressureDelta: TMeterValue;
+    FValueAirPressure: TMeterValue;
+    FValueAirTemperture: TMeterValue;
+    FValueHumidity: TMeterValue;
+
+    FHashValueTempertureBefore: string;
+    FHashValueTempertureAfter: string;
+    FHashValueTempertureDelta: string;
+    FHashValuePressureBefore: string;
+    FHashValuePressureAfter: string;
+    FHashValuePressureDelta: string;
+    FHashValueAirPressure: string;
+    FHashValueAirTemperture: string;
+    FHashValueHumidity: string;
+
+    procedure InitMeterValues;
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
@@ -163,6 +200,16 @@ type
 
     property State: TSpillState read FState write FState;
     property TableClamped: Boolean read FTableClamped write FTableClamped;
+
+    property ValueTempertureBefore: TMeterValue read FValueTempertureBefore;
+    property ValueTempertureAfter: TMeterValue read FValueTempertureAfter;
+    property ValueTempertureDelta: TMeterValue read FValueTempertureDelta;
+    property ValuePressureBefore: TMeterValue read FValuePressureBefore;
+    property ValuePressureAfter: TMeterValue read FValuePressureAfter;
+    property ValuePressureDelta: TMeterValue read FValuePressureDelta;
+    property ValueAirPressure: TMeterValue read FValueAirPressure;
+    property ValueAirTemperture: TMeterValue read FValueAirTemperture;
+    property ValueHumidity: TMeterValue read FValueHumidity;
   end;
 
   TWorkTableManager = class
@@ -186,6 +233,8 @@ implementation
 
   {$REGION 'TChannel'}
 constructor TChannel.Create;
+var
+  IsExisted: Integer;
 begin
   inherited Create;
 
@@ -199,6 +248,21 @@ begin
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
+
+  FValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
+  FValueImp.SetAsImp;
+  FValueImp.SetToSave(True);
+
+  FValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
+  FValueImpTotal.SetAsImp;
+  FValueImpTotal.SetToSave(True);
+
+  FValueCurrent := TMeterValue.GetExistedMeterValueBool(FHashValueCurrent, IsExisted, UUID, Name);
+  FValueCurrent.SetAsCurrent;
+  FValueCurrent.SetToSave(True);
+
+  FValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
+  FValueInterface.SetToSave(True);
 end;
 
 destructor TChannel.Destroy;
@@ -353,6 +417,39 @@ begin
 
   FState := ssNone;
   FTableClamped := False;
+  InitMeterValues;
+end;
+
+procedure TWorkTable.InitMeterValues;
+var
+  IsExisted: Integer;
+begin
+  FValueTempertureBefore := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureBefore, IsExisted, '', Name);
+  FValueTempertureBefore.SetToSave(True);
+
+  FValueTempertureAfter := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureAfter, IsExisted, '', Name);
+  FValueTempertureAfter.SetToSave(True);
+
+  FValueTempertureDelta := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureDelta, IsExisted, '', Name);
+  FValueTempertureDelta.SetToSave(True);
+
+  FValuePressureBefore := TMeterValue.GetExistedMeterValueBool(FHashValuePressureBefore, IsExisted, '', Name);
+  FValuePressureBefore.SetToSave(True);
+
+  FValuePressureAfter := TMeterValue.GetExistedMeterValueBool(FHashValuePressureAfter, IsExisted, '', Name);
+  FValuePressureAfter.SetToSave(True);
+
+  FValuePressureDelta := TMeterValue.GetExistedMeterValueBool(FHashValuePressureDelta, IsExisted, '', Name);
+  FValuePressureDelta.SetToSave(True);
+
+  FValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
+  FValueAirPressure.SetToSave(True);
+
+  FValueAirTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueAirTemperture, IsExisted, '', Name);
+  FValueAirTemperture.SetToSave(True);
+
+  FValueHumidity := TMeterValue.GetExistedMeterValueBool(FHashValueHumidity, IsExisted, '', Name);
+  FValueHumidity.SetToSave(True);
 end;
 
 destructor TWorkTable.Destroy;
@@ -404,14 +501,18 @@ class procedure TWorkTable.Save(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
   Ini: TIniFile;
+  ValuesIni: TIniFile;
   I: Integer;
   WorkTable: TWorkTable;
   Section: string;
+  WorkTableValuesFileName: string;
 begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
 
   Ini := TIniFile.Create(AIniFileName);
+  WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
+  ValuesIni := TIniFile.Create(WorkTableValuesFileName);
   try
     Ini.EraseSection('WorkTables');
     Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
@@ -434,10 +535,32 @@ begin
       Ini.WriteString(Section, 'State', SpillStateToString(WorkTable.State));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
 
+      ValuesIni.EraseSection(Section);
+      ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
+      ValuesIni.WriteString(Section, 'HashValueTempertureAfter', WorkTable.ValueTempertureAfter.Hash);
+      ValuesIni.WriteString(Section, 'HashValueTempertureDelta', WorkTable.ValueTempertureDelta.Hash);
+      ValuesIni.WriteString(Section, 'HashValuePressureBefore', WorkTable.ValuePressureBefore.Hash);
+      ValuesIni.WriteString(Section, 'HashValuePressureAfter', WorkTable.ValuePressureAfter.Hash);
+      ValuesIni.WriteString(Section, 'HashValuePressureDelta', WorkTable.ValuePressureDelta.Hash);
+      ValuesIni.WriteString(Section, 'HashValueAirPressure', WorkTable.ValueAirPressure.Hash);
+      ValuesIni.WriteString(Section, 'HashValueAirTemperture', WorkTable.ValueAirTemperture.Hash);
+      ValuesIni.WriteString(Section, 'HashValueHumidity', WorkTable.ValueHumidity.Hash);
+
+      ValuesIni.WriteFloat(Section, 'ValueTempertureBefore', WorkTable.ValueTempertureBefore.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueTempertureAfter', WorkTable.ValueTempertureAfter.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueTempertureDelta', WorkTable.ValueTempertureDelta.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValuePressureBefore', WorkTable.ValuePressureBefore.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValuePressureAfter', WorkTable.ValuePressureAfter.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValuePressureDelta', WorkTable.ValuePressureDelta.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueAirPressure', WorkTable.ValueAirPressure.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueAirTemperture', WorkTable.ValueAirTemperture.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueHumidity', WorkTable.ValueHumidity.GetDoubleValue);
+
       SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
     end;
   finally
+    ValuesIni.Free;
     Ini.Free;
   end;
 end;
@@ -446,9 +569,11 @@ class procedure TWorkTable.Load(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
   Ini: TIniFile;
+  ValuesIni: TIniFile;
   Count, I: Integer;
   WorkTable: TWorkTable;
   Section: string;
+  WorkTableValuesFileName: string;
 begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
@@ -459,6 +584,8 @@ begin
   AWorkTables.Clear;
 
   Ini := TIniFile.Create(AIniFileName);
+  WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
+  ValuesIni := TIniFile.Create(WorkTableValuesFileName);
   try
     Count := Ini.ReadInteger('WorkTables', 'Count', 0);
 
@@ -481,12 +608,45 @@ begin
       );
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
 
+      WorkTable.FHashValueTempertureBefore := ValuesIni.ReadString(Section, 'HashValueTempertureBefore', WorkTable.FHashValueTempertureBefore);
+      WorkTable.FHashValueTempertureAfter := ValuesIni.ReadString(Section, 'HashValueTempertureAfter', WorkTable.FHashValueTempertureAfter);
+      WorkTable.FHashValueTempertureDelta := ValuesIni.ReadString(Section, 'HashValueTempertureDelta', WorkTable.FHashValueTempertureDelta);
+      WorkTable.FHashValuePressureBefore := ValuesIni.ReadString(Section, 'HashValuePressureBefore', WorkTable.FHashValuePressureBefore);
+      WorkTable.FHashValuePressureAfter := ValuesIni.ReadString(Section, 'HashValuePressureAfter', WorkTable.FHashValuePressureAfter);
+      WorkTable.FHashValuePressureDelta := ValuesIni.ReadString(Section, 'HashValuePressureDelta', WorkTable.FHashValuePressureDelta);
+      WorkTable.FHashValueAirPressure := ValuesIni.ReadString(Section, 'HashValueAirPressure', WorkTable.FHashValueAirPressure);
+      WorkTable.FHashValueAirTemperture := ValuesIni.ReadString(Section, 'HashValueAirTemperture', WorkTable.FHashValueAirTemperture);
+      WorkTable.FHashValueHumidity := ValuesIni.ReadString(Section, 'HashValueHumidity', WorkTable.FHashValueHumidity);
+
+      if WorkTable.FValueTempertureBefore <> nil then WorkTable.FValueTempertureBefore.DeleteFromVector;
+      if WorkTable.FValueTempertureAfter <> nil then WorkTable.FValueTempertureAfter.DeleteFromVector;
+      if WorkTable.FValueTempertureDelta <> nil then WorkTable.FValueTempertureDelta.DeleteFromVector;
+      if WorkTable.FValuePressureBefore <> nil then WorkTable.FValuePressureBefore.DeleteFromVector;
+      if WorkTable.FValuePressureAfter <> nil then WorkTable.FValuePressureAfter.DeleteFromVector;
+      if WorkTable.FValuePressureDelta <> nil then WorkTable.FValuePressureDelta.DeleteFromVector;
+      if WorkTable.FValueAirPressure <> nil then WorkTable.FValueAirPressure.DeleteFromVector;
+      if WorkTable.FValueAirTemperture <> nil then WorkTable.FValueAirTemperture.DeleteFromVector;
+      if WorkTable.FValueHumidity <> nil then WorkTable.FValueHumidity.DeleteFromVector;
+
+      WorkTable.InitMeterValues;
+
+      WorkTable.ValueTempertureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureBefore', 0));
+      WorkTable.ValueTempertureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureAfter', 0));
+      WorkTable.ValueTempertureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureDelta', 0));
+      WorkTable.ValuePressureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureBefore', 0));
+      WorkTable.ValuePressureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureAfter', 0));
+      WorkTable.ValuePressureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureDelta', 0));
+      WorkTable.ValueAirPressure.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirPressure', 0));
+      WorkTable.ValueAirTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirTemperture', 0));
+      WorkTable.ValueHumidity.SetValue(ValuesIni.ReadFloat(Section, 'ValueHumidity', 0));
+
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
 
       AWorkTables.Add(WorkTable);
     end;
   finally
+    ValuesIni.Free;
     Ini.Free;
   end;
 end;
@@ -525,6 +685,11 @@ begin
     AIni.WriteFloat(Section, 'CurResult', Channel.CurResult);
     AIni.WriteFloat(Section, 'ValueSec', Channel.ValueSec);
     AIni.WriteFloat(Section, 'ValueResult', Channel.ValueResult);
+
+    AIni.WriteString(Section, 'HashValueImp', Channel.ValueImp.Hash);
+    AIni.WriteString(Section, 'HashValueImpTotal', Channel.ValueImpTotal.Hash);
+    AIni.WriteString(Section, 'HashValueCurrent', Channel.ValueCurrent.Hash);
+    AIni.WriteString(Section, 'HashValueInterface', Channel.ValueInterface.Hash);
   end;
 end;
 
@@ -534,6 +699,7 @@ var
   Count, I: Integer;
   Channel: TChannel;
   Section: string;
+  IsExisted: Integer;
 begin
   if (AIni = nil) or (AChannels = nil) then
     Exit;
@@ -561,6 +727,28 @@ begin
     Channel.CurResult := AIni.ReadFloat(Section, 'CurResult', 0);
     Channel.ValueSec := AIni.ReadFloat(Section, 'ValueSec', 0);
     Channel.ValueResult := AIni.ReadFloat(Section, 'ValueResult', 0);
+
+    Channel.FHashValueImp := AIni.ReadString(Section, 'HashValueImp', Channel.FHashValueImp);
+    Channel.FHashValueImpTotal := AIni.ReadString(Section, 'HashValueImpTotal', Channel.FHashValueImpTotal);
+    Channel.FHashValueCurrent := AIni.ReadString(Section, 'HashValueCurrent', Channel.FHashValueCurrent);
+    Channel.FHashValueInterface := AIni.ReadString(Section, 'HashValueInterface', Channel.FHashValueInterface);
+
+    if Channel.FValueImp <> nil then Channel.FValueImp.DeleteFromVector;
+    if Channel.FValueImpTotal <> nil then Channel.FValueImpTotal.DeleteFromVector;
+    if Channel.FValueCurrent <> nil then Channel.FValueCurrent.DeleteFromVector;
+    if Channel.FValueInterface <> nil then Channel.FValueInterface.DeleteFromVector;
+
+    Channel.FValueImp := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImp, IsExisted, Channel.UUID, Channel.Name);
+    Channel.FValueImp.SetAsImp;
+    Channel.FValueImp.SetToSave(True);
+    Channel.FValueImpTotal := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImpTotal, IsExisted, Channel.UUID, Channel.Name);
+    Channel.FValueImpTotal.SetAsImp;
+    Channel.FValueImpTotal.SetToSave(True);
+    Channel.FValueCurrent := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueCurrent, IsExisted, Channel.UUID, Channel.Name);
+    Channel.FValueCurrent.SetAsCurrent;
+    Channel.FValueCurrent.SetToSave(True);
+    Channel.FValueInterface := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueInterface, IsExisted, Channel.UUID, Channel.Name);
+    Channel.FValueInterface.SetToSave(True);
 
     Channel.Init;
 
