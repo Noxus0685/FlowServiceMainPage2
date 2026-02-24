@@ -177,6 +177,12 @@ begin
   EnsureColumn('DeviceType', 'RepeatsProtocol', 'INTEGER');
 
   EnsureColumn('DeviceType', 'Error', 'REAL');
+
+  {--------------------------------------------------}
+  { Миграция категорий (если таблица уже существует) }
+  {--------------------------------------------------}
+  if TableExists('DeviceCategory') then
+    EnsureColumn('DeviceCategory', 'StdCategory', 'INTEGER');
 end;
 
 procedure TDM.CreateEmptyDatabase;
