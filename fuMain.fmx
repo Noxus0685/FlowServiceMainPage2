@@ -81,11 +81,11 @@ object FormMain: TFormMain
               Size.PlatformDefault = False
               TabOrder = 0
               object GridEtalons: TGrid
-                Align = Top
+                Align = Client
                 CanFocus = True
                 ClipChildren = True
                 Size.Width = 1260.000000000000000000
-                Size.Height = 129.000000000000000000
+                Size.Height = 120.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
                 RowCount = 2
@@ -93,7 +93,7 @@ object FormMain: TFormMain
                 OnSetValue = GridEtalonsSetValue
                 OnCellClick = GridEtalonsCellClick
                 Viewport.Width = 1256.000000000000000000
-                Viewport.Height = 104.000000000000000000
+                Viewport.Height = 95.000000000000000000
                 object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
@@ -272,6 +272,7 @@ object FormMain: TFormMain
         TabOrder = 1
         object PanelInstruments: TPanel
           Align = MostTop
+          PopupMenu = PopupMenuInstrumentalLayOut
           Size.Width = 1270.000000000000000000
           Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
@@ -416,8 +417,13 @@ object FormMain: TFormMain
               end
               object Label14: TLabel
                 Align = MostBottom
-                Position.Y = 104.000000000000000000
-                Size.Width = 255.000000000000000000
+                Margins.Left = 2.000000000000000000
+                Margins.Top = 2.000000000000000000
+                Margins.Right = 2.000000000000000000
+                Margins.Bottom = 2.000000000000000000
+                Position.X = 2.000000000000000000
+                Position.Y = 102.000000000000000000
+                Size.Width = 251.000000000000000000
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 TextSettings.HorzAlign = Center
@@ -2497,18 +2503,22 @@ object FormMain: TFormMain
     end
   end
   object PopupMenuWorkTables: TPopupMenu
-    Left = 1002
-    Top = 260
+    Left = 1082
+    Top = 228
     object miAddTable: TMenuItem
       Action = ActionAddWorkTable
       ImageIndex = -1
     end
-    object MenuItem9: TMenuItem
+    object miAddDeviceChannel: TMenuItem
       Action = ActionAddDeviceChannel
       ImageIndex = -1
     end
-    object MenuItem10: TMenuItem
+    object miAddEtalonChannel: TMenuItem
       Action = ActionAddEtalonChannel
+      ImageIndex = -1
+    end
+    object miSaveWorkTable: TMenuItem
+      Action = ActionSaveWorkTable
       ImageIndex = -1
     end
   end
@@ -2534,6 +2544,31 @@ object FormMain: TFormMain
       Category = 'WorkTable'
       Text = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1088#1072#1073#1086#1095#1091#1102' '#1089#1088#1077#1076#1091
       OnExecute = ActionSaveWorkTableExecute
+    end
+  end
+  object PopupMenuInstrumentalLayOut: TPopupMenu
+    Left = 1128
+    Top = 136
+    object miFlowRate: TMenuItem
+      RadioItem = True
+      IsChecked = True
+      Text = 'miFlowRate'
+    end
+    object miPump: TMenuItem
+      RadioItem = True
+      IsChecked = True
+      Text = 'miPump'
+    end
+    object miMain: TMenuItem
+      RadioItem = True
+      IsChecked = True
+      Text = 'miMain'
+    end
+    object miMesurment: TMenuItem
+      Text = 'miMesurment'
+    end
+    object miConditions: TMenuItem
+      Text = 'miConditions'
     end
   end
 end

@@ -276,13 +276,20 @@ type
     MenuItem7: TMenuItem;
     PopupMenuWorkTables: TPopupMenu;
     miAddTable: TMenuItem;
-    MenuItem9: TMenuItem;
-    MenuItem10: TMenuItem;
+    miAddDeviceChannel: TMenuItem;
+    miAddEtalonChannel: TMenuItem;
     ActionListWorkTables: TActionList;
     ActionAddWorkTable: TAction;
     ActionAddDeviceChannel: TAction;
     ActionAddEtalonChannel: TAction;
     ActionSaveWorkTable: TAction;
+    miSaveWorkTable: TMenuItem;
+    PopupMenuInstrumentalLayOut: TPopupMenu;
+    miFlowRate: TMenuItem;
+    miPump: TMenuItem;
+    miMain: TMenuItem;
+    miMesurment: TMenuItem;
+    miConditions: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -300,6 +307,7 @@ type
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
     procedure ActionSaveWorkTableExecute(Sender: TObject);
+    procedure SpeedButton2Click(Sender: TObject);
   private
     { Private declarations }
   FLastClickRow: Integer;
@@ -355,6 +363,9 @@ begin
 end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
+var
+  OT: TOutputType;
+
 begin
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -368,10 +379,9 @@ begin
 
   // Заполняем список через имя колонки
   PopupColumnDeviceSignal1.Items.Clear;
-  PopupColumnDeviceSignal1.Items.Add('Импульсный');
-  PopupColumnDeviceSignal1.Items.Add('Частотный');
-  PopupColumnDeviceSignal1.Items.Add('Токовый');
-  PopupColumnDeviceSignal1.Items.Add('Напряжение');
+
+  for OT := otFrequency to High(TOutputType) do
+    PopupColumnDeviceSignal1.Items.Add(GetOutputTypeName(OT));
 
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
 
@@ -460,7 +470,7 @@ begin
         FRows[TableCount].ChannelName := WorkTable.EtalonChannels[TableCount].Name;
         FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].TypeName;
         FRows[TableCount].Serial := WorkTable.EtalonChannels[TableCount].Serial;
-        FRows[TableCount].SignalName := WorkTable.EtalonChannels[TableCount].Signal;
+        FRows[TableCount].SignalName := GetOutputTypeName(WorkTable.EtalonChannels[TableCount].Signal);
       end;
 
       SetLength(FFlowMeterRows, WorkTable.DeviceChannels.Count);
@@ -469,7 +479,7 @@ begin
         FFlowMeterRows[TableCount].Enabled := WorkTable.DeviceChannels[TableCount].Enabled;
         FFlowMeterRows[TableCount].Channel := TableCount + 1;
         FFlowMeterRows[TableCount].Meter := nil;
-        FFlowMeterRows[TableCount].SignalName := WorkTable.DeviceChannels[TableCount].Signal;
+        FFlowMeterRows[TableCount].SignalName := GetOutputTypeName(WorkTable.DeviceChannels[TableCount].Signal);
       end;
     end;
   end;
@@ -487,15 +497,15 @@ begin
   begin
     Meter := TFlowMeter.Create(False);
     Meter.SetChannel(I + 1);
-    Meter.DeviceTypeName := CFlowMeterTypes[I mod Length(CFlowMeterTypes)];
-    Meter.SerialNumber := CFlowMeterSerials[I mod Length(CFlowMeterSerials)];
+  //  Meter.DeviceTypeName := CFlowMeterTypes[I mod Length(CFlowMeterTypes)];
+  //  Meter.SerialNumber := CFlowMeterSerials[I mod Length(CFlowMeterSerials)];
     FFlowMeters.Add(Meter);
 
     FFlowMeterRows[I].Enabled := True;
     FFlowMeterRows[I].Channel := I + 1;
     FFlowMeterRows[I].Meter := Meter;
-    FFlowMeterRows[I].TypeIndex := FindTypeIndex(Meter.DeviceTypeName);
-    FFlowMeterRows[I].SerialIndex := FindSerialIndex(Meter.SerialNumber);
+   // FFlowMeterRows[I].TypeIndex := FindTypeIndex(Meter.DeviceTypeName);
+   // FFlowMeterRows[I].SerialIndex := FindSerialIndex(Meter.SerialNumber);
   end;
 
   GridDevices.RowCount := Length(FFlowMeterRows);
@@ -556,8 +566,8 @@ begin
   ChannelIndex := WorkTable.DeviceChannels.Count + 1;
   WorkTable.AddDeviceChannel(
     True,
+    -1,
     IntToStr(ChannelIndex),
-    '',
     '',
     'Импульсный',
     ''
@@ -578,8 +588,9 @@ begin
   ChannelIndex := WorkTable.EtalonChannels.Count + 1;
   WorkTable.AddEtalonChannel(
     True,
+    -1,
     IntToStr(ChannelIndex),
-    '',
+
     '',
     'Импульсный',
     ''
@@ -604,8 +615,8 @@ begin
   FFlowMeterRows[ARow].TypeIndex := EnsureRange(FFlowMeterRows[ARow].TypeIndex, 0, High(CFlowMeterTypes));
   FFlowMeterRows[ARow].SerialIndex := EnsureRange(FFlowMeterRows[ARow].SerialIndex, 0, High(CFlowMeterSerials));
 
-  FFlowMeterRows[ARow].Meter.DeviceTypeName := CFlowMeterTypes[FFlowMeterRows[ARow].TypeIndex];
-  FFlowMeterRows[ARow].Meter.SerialNumber := CFlowMeterSerials[FFlowMeterRows[ARow].SerialIndex];
+ // FFlowMeterRows[ARow].Meter.DeviceTypeName := CFlowMeterTypes[FFlowMeterRows[ARow].TypeIndex];
+ // FFlowMeterRows[ARow].Meter.SerialNumber := CFlowMeterSerials[FFlowMeterRows[ARow].SerialIndex];
 end;
 
 procedure TFormMain.OpenTypeSelect(ARow: Integer);
@@ -619,8 +630,6 @@ begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  CurrentType := nil;
-
  // if (FDevice = nil) or (DataManager = nil) then
  //   Exit;
 
@@ -631,11 +640,10 @@ begin
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
- //   CurrentType := DataManager.FindType(
- //     FDevice.DeviceTypeUUID,
- //     FDevice.DeviceTypeName,
- //     FoundRepo
- //   );
+   // CurrentType := DataManager.FindType(
+   //   FDevice.DeviceTypeUUID,
+   //   FDevice.DeviceTypeName,
+  //    FoundRepo);
 
  //   if (CurrentType <> nil) and (FoundRepo <> nil) then
 //    begin
@@ -647,11 +655,14 @@ begin
     if (DataManager <> nil) then
     begin
       CurrentType := DataManager.FindType('', FFlowMeterRows[ARow].Meter.DeviceTypeName, FoundRepo);
+     // LoadData
+
       if (CurrentType <> nil) and (FoundRepo <> nil) then
       begin
         DataManager.ActiveTypeRepo := FoundRepo;
         Frm.SelectType(CurrentType);
       end;
+
     end;
 
     {----------------------------------------------------}
@@ -728,6 +739,11 @@ begin
   end;
 end;
 
+procedure TFormMain.SpeedButton2Click(Sender: TObject);
+begin
+ LayoutPump.Visible := False;
+end;
+
 procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 700; // окно "второго клика" (подбери по ощущениям)
@@ -777,7 +793,7 @@ begin
     if Column = ColumnDeviceType1 then
     begin
       GridDevices.EditorMode := False;
-      if WorkTable = nil then
+      if WorkTable <> nil then
         OpenTypeSelect(Row);
     end
     else if Column = StringColumnDeviceSerial1 then
@@ -825,23 +841,14 @@ begin
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
       Value := WorkTable.DeviceChannels[ARow].Serial
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-      Value := WorkTable.DeviceChannels[ARow].Signal;
+      Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
     Exit;
   end;
 
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
-    Value := FFlowMeterRows[ARow].Enabled
-  else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
-    Value := FFlowMeterRows[ARow].Channel
-  else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
-    Value := FFlowMeterRows[ARow].Meter.DeviceTypeName
-  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
-    Value := FFlowMeterRows[ARow].Meter.SerialNumber
-  else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-    Value := FFlowMeterRows[ARow].SignalName;
+
 end;
 
 procedure TFormMain.GridDevicesSetValue(Sender: TObject; const ACol,
@@ -861,29 +868,14 @@ begin
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-      WorkTable.DeviceChannels[ARow].Signal := Value.AsString;
+      WorkTable.DeviceChannels[ARow].Signal := Value.AsInteger;
     Exit;
   end;
 
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
-    FFlowMeterRows[ARow].Enabled := Value.AsBoolean
-  else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
-  begin
-    FFlowMeterRows[ARow].Meter.DeviceTypeName := Value.AsString;
-    FFlowMeterRows[ARow].TypeIndex := FindTypeIndex(FFlowMeterRows[ARow].Meter.DeviceTypeName);
-  end
-  else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
-  begin
-    FFlowMeterRows[ARow].Meter.SerialNumber := Value.AsString;
-    FFlowMeterRows[ARow].SerialIndex := FindSerialIndex(FFlowMeterRows[ARow].Meter.SerialNumber);
-  end
-  else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-    FFlowMeterRows[ARow].SignalName := Value.AsString;
-
-  GridDevices.ReadOnly := False;
+  GridDevices.ReadOnly := True;
 end;
 
 procedure TFormMain.GridEtalonsCellClick(const Column: TColumn;
@@ -927,7 +919,7 @@ begin
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
       Value := WorkTable.EtalonChannels[ARow].Serial
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
-      Value := WorkTable.EtalonChannels[ARow].Signal;
+      Value := GetOutputTypeName(WorkTable.EtalonChannels[ARow].Signal);
     Exit;
   end;
 
@@ -963,7 +955,7 @@ begin
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
       WorkTable.EtalonChannels[ARow].Serial := Value.AsString
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
-      WorkTable.EtalonChannels[ARow].Signal := Value.AsString;
+      WorkTable.EtalonChannels[ARow].Signal := Value.AsInteger;
     Exit;
   end;
 

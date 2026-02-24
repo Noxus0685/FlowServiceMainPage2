@@ -414,8 +414,36 @@ type
   function SortDeviceTypes(const Source: TObjectList<TDeviceType>; ASortField: TDeviceTypeSortField;   ASortAscending: Boolean): TObjectList<TDeviceType>;
   function GetNextPointStdIndex(Count: Integer): Integer;
 
+  function GetOutputTypeName(AType: TOutputType): string; overload;
+  function GetOutputTypeName(AType: Integer): string; overload;
+
 
 implementation
+
+function GetOutputTypeName(AType: TOutputType): string;
+begin
+  case AType of
+    otFrequency: Result := 'Частотный';
+    otImpulse:   Result := 'Импульсный';
+    otVoltage:   Result := 'Напряжение';
+    otCurrent:   Result := 'Токовый (4-20 мА)';
+    otInterface: Result := 'Интерфейсный';
+    otVisual:    Result := 'Визуальный';
+    otUnknown:   Result := '-';
+  else
+    Result := ' ';
+  end;
+end;
+
+
+function GetOutputTypeName(AType: Integer): string;
+begin
+  if (AType >= Ord(Low(TOutputType))) and
+     (AType <= Ord(High(TOutputType))) then
+    Result := GetOutputTypeName(TOutputType(AType))
+  else
+    Result := ' ';
+end;
 
  constructor TTypeEntity.Create;
 begin

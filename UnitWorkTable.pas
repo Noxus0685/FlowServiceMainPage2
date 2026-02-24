@@ -3,11 +3,13 @@ unit UnitWorkTable;
 interface
 
 uses
+
+  UnitFlowMeter,
+  UnitClasses,
+  UnitDataManager,
   System.SysUtils,
-  System.Classes,
   System.IniFiles,
-  System.Generics.Collections,
-  UnitClasses;
+  System.Generics.Collections;
 
 type
   TSpillState = (
@@ -22,34 +24,73 @@ type
   TChannel = class(TTypeEntity)
   private
     FEnabled: Boolean;
-    FTypeName: string;
-    FSerial: string;
-    FSignal: string;
-    FDeviceUUID: string;
+
+    // Значения канала (НЕ прокси)
     FImpSec: Double;
     FImpResult: Double;
     FCurSec: Double;
     FCurResult: Double;
     FValueSec: Double;
     FValueResult: Double;
+
+    FFlowMeter: TFlowMeter;
+
+    // --- прокси к FlowMeter ---
+    function GetTypeNameProxy: string;
+    procedure SetTypeNameProxy(const AValue: string);
+
+    function GetSerialProxy: string;
+    procedure SetSerialProxy(const AValue: string);
+
+    function GetSignalProxy: Integer;
+    procedure SetSignalProxy(const AValue: Integer);
+
+    function GetDeviceUUIDProxy: string;
+    procedure SetDeviceUUIDProxy(const AValue: string);
+
+    // --- обычные геттеры/сеттеры к переменным канала ---
+    function GetImpSecProxy: Double;
+    procedure SetImpSecProxy(const AValue: Double);
+
+    function GetImpResultProxy: Double;
+    procedure SetImpResultProxy(const AValue: Double);
+
+    function GetCurSecProxy: Double;
+    procedure SetCurSecProxy(const AValue: Double);
+
+    function GetCurResultProxy: Double;
+    procedure SetCurResultProxy(const AValue: Double);
+
+    function GetValueSecProxy: Double;
+    procedure SetValueSecProxy(const AValue: Double);
+
+    function GetValueResultProxy: Double;
+    procedure SetValueResultProxy(const AValue: Double);
+
   public
     constructor Create; override;
+    destructor Destroy; override;
 
     property UUID: string read FMitUUID write FMitUUID;
 
+    property FlowMeter: TFlowMeter read FFlowMeter;
+
     property Enabled: Boolean read FEnabled write FEnabled;
     property Name: string read FName write FName;
-    property TypeName: string read FTypeName write FTypeName;
-    property Serial: string read FSerial write FSerial;
-    property Signal: string read FSignal write FSignal;
-    property DeviceUUID: string read FDeviceUUID write FDeviceUUID;
 
-    property ImpSec: Double read FImpSec write FImpSec;
-    property ImpResult: Double read FImpResult write FImpResult;
-    property CurSec: Double read FCurSec write FCurSec;
-    property CurResult: Double read FCurResult write FCurResult;
-    property ValueSec: Double read FValueSec write FValueSec;
-    property ValueResult: Double read FValueResult write FValueResult;
+    // Прокси-поля (дублируют FlowMeter)
+    property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
+    property Serial: string read GetSerialProxy write SetSerialProxy;
+    property Signal: Integer read GetSignalProxy write SetSignalProxy;
+    property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
+
+    // Поля канала (внутренние переменные)
+    property ImpSec: Double read GetImpSecProxy write SetImpSecProxy;
+    property ImpResult: Double read GetImpResultProxy write SetImpResultProxy;
+    property CurSec: Double read GetCurSecProxy write SetCurSecProxy;
+    property CurResult: Double read GetCurResultProxy write SetCurResultProxy;
+    property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
+    property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
   end;
 
   TWorkTable = class
@@ -90,12 +131,12 @@ type
     destructor Destroy; override;
 
     function AddDeviceChannel: TChannel; overload;
-    function AddDeviceChannel(const AEnabled: Boolean; const AName, ATypeName,
-      ASerial, ASignal, ADeviceUUID: string): TChannel; overload;
+    function AddDeviceChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
+        ATypeName, ASerial, ADeviceUUID: string): TChannel; overload;
 
     function AddEtalonChannel: TChannel; overload;
-    function AddEtalonChannel(const AEnabled: Boolean; const AName, ATypeName,
-      ASerial, ASignal, ADeviceUUID: string): TChannel; overload;
+    function AddEtalonChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
+       ATypeName, ASerial, ADeviceUUID: string): TChannel;  overload;
 
     class procedure Save(const AIniFileName: string;
       AWorkTables: TObjectList<TWorkTable>); static;
@@ -139,17 +180,15 @@ type
 
 implementation
 
-{ TChannel }
 
+  {$REGION 'TChannel'}
 constructor TChannel.Create;
 begin
   inherited Create;
 
+  FFlowMeter := TFlowMeter.Create;
+
   FEnabled := True;
-  FTypeName := '';
-  FSerial := '';
-  FSignal := '';
-  FDeviceUUID := '';
 
   FImpSec := 0;
   FImpResult := 0;
@@ -159,8 +198,138 @@ begin
   FValueResult := 0;
 end;
 
-{ TWorkTable }
+destructor TChannel.Destroy;
+begin
+  FreeAndNil(FFlowMeter);
+  inherited Destroy;
+end;
 
+// =====================================================
+// == Proxy: FlowMeter поля
+// =====================================================
+
+function TChannel.GetTypeNameProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.DeviceTypeName
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetTypeNameProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.DeviceTypeName := AValue;
+end;
+
+function TChannel.GetSerialProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.SerialNumber
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetSerialProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.SerialNumber := AValue;
+end;
+
+function TChannel.GetSignalProxy: Integer;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.OutputType
+  else
+    Result := -1;
+end;
+
+procedure TChannel.SetSignalProxy(const AValue: Integer);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.OutputType := AValue;
+end;
+
+function TChannel.GetDeviceUUIDProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.DeviceUUID
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetDeviceUUIDProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.DeviceUUID := AValue;
+end;
+
+// =====================================================
+// == Proxy: внутренние переменные канала
+// =====================================================
+
+function TChannel.GetImpSecProxy: Double;
+begin
+  Result := FImpSec;
+end;
+
+procedure TChannel.SetImpSecProxy(const AValue: Double);
+begin
+  FImpSec := AValue;
+end;
+
+function TChannel.GetImpResultProxy: Double;
+begin
+  Result := FImpResult;
+end;
+
+procedure TChannel.SetImpResultProxy(const AValue: Double);
+begin
+  FImpResult := AValue;
+end;
+
+function TChannel.GetCurSecProxy: Double;
+begin
+  Result := FCurSec;
+end;
+
+procedure TChannel.SetCurSecProxy(const AValue: Double);
+begin
+  FCurSec := AValue;
+end;
+
+function TChannel.GetCurResultProxy: Double;
+begin
+  Result := FCurResult;
+end;
+
+procedure TChannel.SetCurResultProxy(const AValue: Double);
+begin
+  FCurResult := AValue;
+end;
+
+function TChannel.GetValueSecProxy: Double;
+begin
+  Result := FValueSec;
+end;
+
+procedure TChannel.SetValueSecProxy(const AValue: Double);
+begin
+  FValueSec := AValue;
+end;
+
+function TChannel.GetValueResultProxy: Double;
+begin
+  Result := FValueResult;
+end;
+
+procedure TChannel.SetValueResultProxy(const AValue: Double);
+begin
+  FValueResult := AValue;
+end;
+    {$ENDREGION}
+
+  {$REGION 'TWorkTable'}
 constructor TWorkTable.Create;
 begin
   inherited Create;
@@ -185,8 +354,8 @@ begin
   FDeviceChannels.Add(Result);
 end;
 
-function TWorkTable.AddDeviceChannel(const AEnabled: Boolean; const AName,
-  ATypeName, ASerial, ASignal, ADeviceUUID: string): TChannel;
+function TWorkTable.AddDeviceChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
+  ATypeName, ASerial, ADeviceUUID: string): TChannel;
 begin
   Result := AddDeviceChannel;
   Result.Enabled := AEnabled;
@@ -203,8 +372,8 @@ begin
   FEtalonChannels.Add(Result);
 end;
 
-function TWorkTable.AddEtalonChannel(const AEnabled: Boolean; const AName,
-  ATypeName, ASerial, ASignal, ADeviceUUID: string): TChannel;
+function TWorkTable.AddEtalonChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
+  ATypeName, ASerial, ADeviceUUID: string): TChannel;
 begin
   Result := AddEtalonChannel;
   Result.Enabled := AEnabled;
@@ -331,7 +500,7 @@ begin
     AIni.WriteString(Section, 'Name', Channel.Name);
     AIni.WriteString(Section, 'TypeName', Channel.TypeName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
-    AIni.WriteString(Section, 'Signal', Channel.Signal);
+    AIni.WriteInteger(Section, 'Signal', Channel.Signal);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
 
     AIni.WriteFloat(Section, 'ImpSec', Channel.ImpSec);
@@ -367,7 +536,7 @@ begin
     Channel.Name := AIni.ReadString(Section, 'Name', '');
     Channel.TypeName := AIni.ReadString(Section, 'TypeName', '');
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
-    Channel.Signal := AIni.ReadString(Section, 'Signal', '');
+    Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
 
     Channel.ImpSec := AIni.ReadFloat(Section, 'ImpSec', 0);
@@ -376,6 +545,8 @@ begin
     Channel.CurResult := AIni.ReadFloat(Section, 'CurResult', 0);
     Channel.ValueSec := AIni.ReadFloat(Section, 'ValueSec', 0);
     Channel.ValueResult := AIni.ReadFloat(Section, 'ValueResult', 0);
+
+    Channel.FFlowMeter.Init(Channel.DeviceUUID);
 
     AChannels.Add(Channel);
   end;
@@ -443,5 +614,8 @@ procedure TWorkTableManager.Save;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
 end;
+    {$ENDREGION 'TWorkTable'}
+
+
 
 end.

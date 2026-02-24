@@ -3,6 +3,9 @@
 interface
 
 uses
+  UnitClasses,
+
+
   System.SysUtils,
   System.Classes,
   System.JSON,
@@ -15,264 +18,399 @@ const
   XMLVERFLOWMETERS = '5.0';
 
 type
-  THscDevice = class
-  end;
-
-  TFlowMeterType = class
-  end;
 
   TMeterFlowType = (mftWeightsType, mftVolumeType);
 
-  TPoint = record
-    Hash: Integer;
-    Name: string;
-    Qrate: Single;
-    Q: Single;
-    Volume: Single;
-    VTime: Single;
-    Error: Single;
-    RangeMinus: Single;
-    RangePlus: Single;
-  end;
-
-  TDataPoint = record
-    PointHash: Integer;
-    DateTime: TDateTime;
-    Error: Double;
-  end;
-
-  TOnChanged = reference to procedure;
-
   TFlowMeter = class;
 
-  TFlowMeter = class(TDevice)
-  private
-    FChannel: Byte;
-    FHSCDevice: THscDevice;
-    FHSC: THscDevice;
-    FImpulses: array[0..99] of Word;
-    FWrImp: Byte;
-    FRdImp: Byte;
-    FVolSum: Single;
-    FImpSum: Single;
-    procedure Init;
-    procedure InitValues;
-    procedure CopyValues(const AEtalonMeter: TFlowMeter);
-  public
-    class var ActiveEtalonHash: Integer;
-    class var ActiveFlowMeterHash: Integer;
-    class var SignCipher: string;
-    class var PorveritelFio: string;
+{
+  TFlowMeter – класс runtime-состояния прибора.
+  -------------------------------------------------------------
+  Данный класс НЕ является сущностью БД и не должен использоваться
+  для хранения или изменения паспортных данных устройства.
 
-    class var JValue: TJSONValue;
-    class var JArray: TJSONArray;
-    class var JObject: TJSONObject;
+  TFlowMeter описывает текущее состояние прибора в процессе работы:
+  - текущий расход
+  - температура
+  - давление
+  - измеренные значения (TMeterValue)
+  - состояние канала / сигнала
+  - временные флаги и служебные параметры
 
-    class var FlowMeters: TObjectList<TFlowMeter>;
-    class var Etalons: TObjectList<TFlowMeter>;
+  Паспортные данные (тип, серийный номер, коэффициенты,
+  точки проливки, межповерочный интервал и т.д.) хранятся
+  в объекте TDevice, который загружается из репозитория.
 
-    class var SHSC: THscDevice;
-    class var ActiveFlowMeter: TFlowMeter;
-    class var ActiveEtalon: TFlowMeter;
-    class var EtalonMeter: TFlowMeter;
+  TFlowMeter должен содержать ссылку на соответствующий TDevice
+  и использовать его как источник конфигурационных данных,
+  но не дублировать их.
 
-    class var OnChangedTestMeter: TOnChanged;
+  Жизненный цикл:
+  - создаётся каналом (TChannel) при инициализации стола
+  - привязывается к TDevice после загрузки конфигурации
+  - уничтожается вместе с каналом
 
-    TypeMeter: TFlowMeterType;
+  Таким образом:
+  TDevice   → описание прибора (БД, конфигурация)
+  TFlowMeter → текущее состояние прибора (runtime)
+ }
 
-    Hash: Integer;
-    DeviceHash: Integer;
-    TypeHash: Integer;
-    OrderHash: Integer;
+TFlowMeter = class(TDevice)
+private
+  // =====================================================
+  // == Связь с "базовым" устройством из БД
+  // =====================================================
+  FDevice: TDevice;
 
-    IsEtalon: Boolean;
-    Active: Integer;
-    CheckType: Integer;
+  FSerialNumber:  string;
+  FUUID :  string;
+  FDeviceTypeUUID:  string;
+  FDeviceUUID:  string;
+  FOutputType: Integer; // тип должен совпадать с типом OutputType в TDevice
 
-    Status: Integer;
-    SendStatus: Integer;
+  function GetDevice: TDevice;
+  procedure SetDevice(const ADevice: TDevice);
 
-    FlowTypeName: string;
+  function GetDeviceUUID: string;
+  procedure SetDeviceUUID(const ADevice: string);
 
-    // Дублирующие с TDevice поля НЕ объявляются здесь намеренно:
-    // Name, DeviceTypeName, Modification, SerialNumber, DN, Owner, Documentation,
-    // RegDate/ValidityDate/DateOfManufacture, IVI, Qmax/Qmin и др.
+  function GetDeviceTypeNameProxy: string;
+  procedure SetDeviceTypeNameProxy(const AValue: string);
 
-    DocNumber: string;
-    Means: string;
+  function GetDeviceTypeUUIDProxy: string;
+  procedure SetDeviceTypeUUIDProxy(const AValue: string);
 
-    K1, P1, K2, P2: string;
-    TempWater, Temperature, Pressure, Humidity: string;
-    VrfDate: string;
+  function GetSerialNumberProxy: string;
+  procedure SetSerialNumberProxy(const AValue: string);
 
-    Data1, Data2, Data3: string;
-    Date1, Date2: string;
+  function GetOutputTypeProxy: Integer;
+  procedure SetOutputTypeProxy(const AValue: Integer);
 
-    ResultValue: string;
-    MeterDateTime: TDateTime;
-    ModifiedDateTime: string;
 
-    Kp: Double;
-    FactoryKp: Double;
-    FreqMax: Double;
 
-    K: array[0..99] of Double;
-    Q: array[0..99] of Double;
+private
 
-    FlowMax: Double;
-    FlowMin: Double;
-    QuantityMax: Double;
-    QuantityMin: Double;
+  FChannel: Byte;
+  FImpulses: array[0..99] of Word;
+  FWrImp: Byte;
+  FRdImp: Byte;
+  FVolSum: Single;
+  FImpSum: Single;
 
-    Error: Double;
+  procedure InitValues;
+  procedure CopyValues(const AEtalonMeter: TFlowMeter);
 
-    Point: TPoint;
-    DataPoint: TDataPoint;
-    CalibrPoint: TCalibrPoint;
+public
+  // =====================================================
+  // == Прокси-свойства к устройству через FlowMeter
+  // =====================================================
+  property Device: TDevice read GetDevice write SetDevice;
 
-    Points: TList<TPoint>;
-    DataPoints: TList<TDataPoint>;
-    UsedDataPoints: TList<TDataPoint>;
-    CalibrPoints: TList<TCalibrPoint>;
+  property DeviceUUID: string
+    read GetDeviceUUID
+    write SetDeviceUUID;
 
-    PointIndex: Integer;
-    Comment: string;
+  // Имя типа прибора (берется из привязанного TDevice)
+  property DeviceTypeName: string
+    read GetDeviceTypeNameProxy
+    write SetDeviceTypeNameProxy;
 
-    MeterFlowType: TMeterFlowType;
+  property DeviceTypeUUID: string
+    read GetDeviceTypeUUIDProxy
+    write SetDeviceTypeUUIDProxy;
 
-    ValueImp: TMeterValue;
-    ValueImpTotal: TMeterValue;
-    ValueCoef: TMeterValue;
-    ValueMassCoef: TMeterValue;
-    ValueVolumeCoef: TMeterValue;
-    ValueVolume: TMeterValue;
-    ValueMass: TMeterValue;
-    ValueVolumeMeter: TMeterValue;
-    ValueMassMeter: TMeterValue;
-    ValueMassFlow: TMeterValue;
-    ValueVolumeFlow: TMeterValue;
-    ValueQuantity: TMeterValue;
-    ValueFlow: TMeterValue;
-    ValueError: TMeterValue;
-    ValueVolumeError: TMeterValue;
-    ValueMassError: TMeterValue;
-    ValueDensity: TMeterValue;
-    ValuePressure: TMeterValue;
-    ValueTemperture: TMeterValue;
-    ValueAirPressure: TMeterValue;
-    ValueAirTemperture: TMeterValue;
-    ValueHumidity: TMeterValue;
-    ValueCurrent: TMeterValue;
-    ValueTime: TMeterValue;
+  // Серийный номер (берется из привязанного TDevice)
+  property SerialNumber: string
+    read GetSerialNumberProxy
+    write SetSerialNumberProxy;
 
-    HashValueImp: Integer;
-    HashValueImpTotal: Integer;
-    HashValueCoef: Integer;
-    HashValueMassCoef: Integer;
-    HashValueVolumeCoef: Integer;
-    HashValueVolume: Integer;
-    HashValueMass: Integer;
-    HashValueVolumeMeter: Integer;
-    HashValueMassMeter: Integer;
-    HashValueMassFlow: Integer;
-    HashValueVolumeFlow: Integer;
-    HashValueQuantity: Integer;
-    HashValueFlow: Integer;
-    HashValueError: Integer;
-    HashValueVolumeError: Integer;
-    HashValueMassError: Integer;
-    HashValueDensity: Integer;
-    HashValuePressure: Integer;
-    HashValueTemperture: Integer;
-    HashValueAirPressure: Integer;
-    HashValueAirTemperture: Integer;
-    HashValueHumidity: Integer;
-    HashValueCurrent: Integer;
-    HashValueTime: Integer;
+  property OutputType: Integer
+    read GetOutputTypeProxy
+    write SetOutputTypeProxy;
 
-    constructor Create(AMeter: TFlowMeter); overload;
-    constructor Create(AHSCDevice: THscDevice; AEtalonMeter: TFlowMeter); overload;
-    constructor Create(AHSCDevice: THscDevice; AOrderHash: Integer; AIsEtalon: Boolean); overload;
-    constructor Create(AHSCDevice: THscDevice; AIsEtalon: Boolean); overload;
-    constructor Create(AHSCDevice: THscDevice; AIsEtalon: Boolean; AHash: Integer); overload;
-    constructor Create(AIsEtalon: Boolean); overload;
-    destructor Destroy;
+public
+  class var ActiveEtalonHash: Integer;
+  class var ActiveFlowMeterHash: Integer;
+  class var SignCipher: string;
+  class var PorveritelFio: string;
 
-    procedure SetHSC(AHSCDevice: THscDevice);
-    procedure SetType(AType: TFlowMeterType); overload;
-    function SetType(ATypeHash: Integer): Boolean; overload;
-    procedure SetCopy(AMeter: TFlowMeter);
+  class var JValue: TJSONValue;
+  class var JArray: TJSONArray;
+  class var JObject: TJSONObject;
 
-    function GetStatus: string;
-    procedure SetStatus(const AValue: string);
-    function GetSendStatus: string;
-    procedure SetSendStatus(const AText: string);
+  class var FlowMeters: TObjectList<TFlowMeter>;
+  class var Etalons: TObjectList<TFlowMeter>;
 
-    function GetChannel: Byte;
-    procedure SetChannel(AChannel: Byte);
+  class var ActiveFlowMeter: TFlowMeter;
+  class var ActiveEtalon: TFlowMeter;
+  class var EtalonMeter: TFlowMeter;
 
-    procedure SetImpCoef(AK: Double); overload;
-    procedure SetImpCoef(AK: Single); overload;
-    function SetImpCoef(const AK: string): Boolean; overload;
+  UUID: string;
+  DeviceHash: Integer;
+  TypeHash: Integer;
+  OrderHash: Integer;
 
-    procedure InitHashValues;
-    procedure SetValues;
-    procedure SetMonitorValues;
-    procedure SetFinalValues;
-  end;
+  IsEtalon: Boolean;
+  Active: Integer;
+  CheckType: Integer;
 
+  Status: Integer;
+  SendStatus: Integer;
+
+  FlowTypeName: string;
+
+  // Дублирующие с TDevice поля НЕ объявляются здесь намеренно:
+  // Name, DeviceTypeName, Modification, SerialNumber, DN, Owner, Documentation,
+  // RegDate/ValidityDate/DateOfManufacture, IVI, Qmax/Qmin и др.
+
+  DocNumber: string;
+  Means: string;
+
+  K1, P1, K2, P2: string;
+  TempWater, Temperature, Pressure, Humidity: string;
+  VrfDate: string;
+
+  Data1, Data2, Data3: string;
+  Date1, Date2: string;
+
+  ResultValue: string;
+  MeterDateTime: TDateTime;
+  ModifiedDateTime: string;
+
+  Kp: Double;
+  FactoryKp: Double;
+  FreqMax: Double;
+
+  K: array[0..99] of Double;
+  Q: array[0..99] of Double;
+
+  FlowMax: Double;
+  FlowMin: Double;
+  QuantityMax: Double;
+  QuantityMin: Double;
+
+  Error: Double;
+
+  PointIndex: Integer;
+  Comment: string;
+
+  MeterFlowType: TMeterFlowType;
+
+  ValueImp: TMeterValue;
+  ValueImpTotal: TMeterValue;
+  ValueCoef: TMeterValue;
+  ValueMassCoef: TMeterValue;
+  ValueVolumeCoef: TMeterValue;
+  ValueVolume: TMeterValue;
+  ValueMass: TMeterValue;
+  ValueVolumeMeter: TMeterValue;
+  ValueMassMeter: TMeterValue;
+  ValueMassFlow: TMeterValue;
+  ValueVolumeFlow: TMeterValue;
+  ValueQuantity: TMeterValue;
+  ValueFlow: TMeterValue;
+  ValueError: TMeterValue;
+  ValueVolumeError: TMeterValue;
+  ValueMassError: TMeterValue;
+  ValueDensity: TMeterValue;
+  ValuePressure: TMeterValue;
+  ValueTemperture: TMeterValue;
+  ValueAirPressure: TMeterValue;
+  ValueAirTemperture: TMeterValue;
+  ValueHumidity: TMeterValue;
+  ValueCurrent: TMeterValue;
+  ValueTime: TMeterValue;
+
+  HashValueImp: Integer;
+  HashValueImpTotal: Integer;
+  HashValueCoef: Integer;
+  HashValueMassCoef: Integer;
+  HashValueVolumeCoef: Integer;
+  HashValueVolume: Integer;
+  HashValueMass: Integer;
+  HashValueVolumeMeter: Integer;
+  HashValueMassMeter: Integer;
+  HashValueMassFlow: Integer;
+  HashValueVolumeFlow: Integer;
+  HashValueQuantity: Integer;
+  HashValueFlow: Integer;
+  HashValueError: Integer;
+  HashValueVolumeError: Integer;
+  HashValueMassError: Integer;
+  HashValueDensity: Integer;
+  HashValuePressure: Integer;
+  HashValueTemperture: Integer;
+  HashValueAirPressure: Integer;
+  HashValueAirTemperture: Integer;
+  HashValueHumidity: Integer;
+  HashValueCurrent: Integer;
+  HashValueTime: Integer;
+
+  constructor Create(); overload;
+  constructor Create(AIsEtalon: Boolean); overload;
+  destructor Destroy;
+
+  function SetType(ATypeHash: Integer): Boolean; overload;
+  procedure SetCopy(AMeter: TFlowMeter);
+
+  function GetStatus: string;
+  procedure SetStatus(const AValue: string);
+  function GetSendStatus: string;
+  procedure SetSendStatus(const AText: string);
+
+  function GetChannel: Byte;
+  procedure SetChannel(AChannel: Byte);
+
+  procedure SetImpCoef(AK: Double); overload;
+  procedure SetImpCoef(AK: Single); overload;
+  function SetImpCoef(const AK: string): Boolean; overload;
+
+  procedure InitHashValues;
+  procedure SetValues;
+  procedure SetMonitorValues;
+  procedure SetFinalValues;
+
+  procedure Init; overload;
+  procedure Init(UUID: string); overload;
+end;
 implementation
 
 { TFlowMeter }
 
-constructor TFlowMeter.Create(AHSCDevice: THscDevice; AOrderHash: Integer; AIsEtalon: Boolean);
+
+
+constructor TFlowMeter.Create();
 begin
   inherited Create;
-  Init;
-  FHSCDevice := AHSCDevice;
-  FHSC := AHSCDevice;
-  OrderHash := AOrderHash;
-  IsEtalon := AIsEtalon;
-end;
-
-constructor TFlowMeter.Create(AMeter: TFlowMeter);
-begin
-  inherited Create;
-  Init;
-  if AMeter <> nil then
-  begin
-    IsEtalon := AMeter.IsEtalon;
-    FHSCDevice := AMeter.FHSCDevice;
-    FHSC := AMeter.FHSC;
-    SetCopy(AMeter);
-  end;
-end;
-
-constructor TFlowMeter.Create(AHSCDevice: THscDevice; AEtalonMeter: TFlowMeter);
-begin
-  inherited Create;
-  Init;
-  FHSCDevice := AHSCDevice;
-  FHSC := AHSCDevice;
-  IsEtalon := False;
-  EtalonMeter := AEtalonMeter;
-end;
-
-constructor TFlowMeter.Create(AHSCDevice: THscDevice; AIsEtalon: Boolean);
-begin
-  Create(AHSCDevice, 0, AIsEtalon);
-end;
-
-constructor TFlowMeter.Create(AHSCDevice: THscDevice; AIsEtalon: Boolean; AHash: Integer);
-begin
-  Create(AHSCDevice, 0, AIsEtalon);
-  Hash := AHash;
 end;
 
 constructor TFlowMeter.Create(AIsEtalon: Boolean);
 begin
-  Create(SHSC, 0, AIsEtalon);
+  inherited Create;
 end;
+
+
+
+{ ===================================================== }
+{ == Связь с TDevice                                 == }
+{ ===================================================== }
+
+function TFlowMeter.GetDevice: TDevice;
+begin
+  Result := FDevice;
+end;
+
+procedure TFlowMeter.SetDevice(const ADevice: TDevice);
+begin
+  if FDevice = ADevice then
+    Exit;
+
+  FDevice := ADevice;
+
+  // Если нужно хранить UUID устройства отдельно
+  if Assigned(FDevice) then
+  begin
+    Self.UUID := FDevice.MitUUID;   // если у FlowMeter есть UUID
+    FDeviceUUID:= ADevice.MitUUID;
+  end;
+end;
+
+
+function TFlowMeter.GetDeviceUUID: string;
+begin
+ if Assigned(FDevice) then
+   Result := FDevice.MitUUID
+   else
+   Result :=  FDeviceUUID;
+end;
+
+procedure TFlowMeter.SetDeviceUUID(const ADevice: string);
+begin
+
+  FDeviceUUID := ADevice;
+
+   if Assigned(FDevice) then
+    Exit;
+
+
+
+end;
+
+function TFlowMeter.GetOutputTypeProxy: Integer;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.OutputType
+  else
+    Result := FOutputType;
+end;
+
+procedure TFlowMeter.SetOutputTypeProxy(const AValue: Integer);
+begin
+  if Assigned(FDevice) then
+    FDevice.OutputType := AValue;
+
+  FOutputType := AValue;
+end;
+
+
+{ ===================================================== }
+{ == Прокси: Тип устройства                          == }
+{ ===================================================== }
+
+function TFlowMeter.GetDeviceTypeNameProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.DeviceTypeName
+  else
+    Result := '';
+end;
+
+procedure TFlowMeter.SetDeviceTypeNameProxy(const AValue: string);
+begin
+  if Assigned(FDevice) then
+    FDevice.DeviceTypeName := AValue;
+end;
+
+function TFlowMeter.GetDeviceTypeUUIDProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.DeviceTypeUUID
+  else
+    Result := FDeviceTypeUUID;
+end;
+
+procedure TFlowMeter.SetDeviceTypeUUIDProxy(const AValue: string);
+begin
+  if Assigned(FDevice) then
+    FDevice.DeviceTypeUUID := AValue
+  else
+   FDeviceTypeUUID := AValue;
+
+end;
+
+
+{ ===================================================== }
+{ == Прокси: Серийный номер                          == }
+{ ===================================================== }
+
+function TFlowMeter.GetSerialNumberProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.SerialNumber
+  else
+    Result := FSerialNumber;
+end;
+
+procedure TFlowMeter.SetSerialNumberProxy(const AValue: string);
+begin
+  FSerialNumber :=  AValue;
+  if Assigned(FDevice) then
+    FDevice.SerialNumber := AValue;
+end;
+
+
+
+
 
 procedure TFlowMeter.CopyValues(const AEtalonMeter: TFlowMeter);
 begin
@@ -282,10 +420,7 @@ end;
 
 destructor TFlowMeter.Destroy;
 begin
-  Points.Free;
-  DataPoints.Free;
-  UsedDataPoints.Free;
-  CalibrPoints.Free;
+
   inherited;
 end;
 
@@ -320,11 +455,15 @@ begin
   MeterFlowType := mftWeightsType;
   FChannel := CHANNEL;
 
-  Points := TList<TPoint>.Create;
-  DataPoints := TList<TDataPoint>.Create;
-  UsedDataPoints := TList<TDataPoint>.Create;
-  CalibrPoints := TList<TCalibrPoint>.Create;
 end;
+
+procedure TFlowMeter.Init(UUID: string);
+begin
+  ResultValue := '-';
+  MeterFlowType := mftWeightsType;
+  FChannel := CHANNEL;
+end;
+
 
 procedure TFlowMeter.InitHashValues;
 begin
@@ -346,7 +485,7 @@ begin
   if AMeter = nil then
     Exit;
 
-  Hash := AMeter.Hash;
+  UUID := AMeter.UUID;
   DeviceHash := AMeter.DeviceHash;
   TypeHash := AMeter.TypeHash;
   OrderHash := AMeter.OrderHash;
@@ -359,11 +498,7 @@ begin
   // TODO: перенести оригинальную C++ логику расчёта финальных значений.
 end;
 
-procedure TFlowMeter.SetHSC(AHSCDevice: THscDevice);
-begin
-  FHSCDevice := AHSCDevice;
-  FHSC := AHSCDevice;
-end;
+
 
 procedure TFlowMeter.SetImpCoef(AK: Single);
 begin
@@ -405,10 +540,6 @@ begin
     Status := 0;
 end;
 
-procedure TFlowMeter.SetType(AType: TFlowMeterType);
-begin
-  TypeMeter := AType;
-end;
 
 function TFlowMeter.SetType(ATypeHash: Integer): Boolean;
 begin
