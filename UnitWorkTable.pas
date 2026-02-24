@@ -250,15 +250,30 @@ begin
   FValueResult := 0;
 
   FValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
-  FValueImp.SetAsImp;
+  if IsExisted = 0 then
+  begin
+    FValueImp.SetAsImp;
+    FValueImp.DependenceType := INDEPENDENT;
+    FValueImp.UpdateType := ONLINE_TYPE;
+  end;
   FValueImp.SetToSave(True);
 
   FValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
-  FValueImpTotal.SetAsImp;
+  if IsExisted = 0 then
+  begin
+    FValueImpTotal.SetAsImp;
+    FValueImpTotal.DependenceType := INDEPENDENT;
+    FValueImpTotal.UpdateType := ONLINE_TYPE;
+  end;
   FValueImpTotal.SetToSave(True);
 
   FValueCurrent := TMeterValue.GetExistedMeterValueBool(FHashValueCurrent, IsExisted, UUID, Name);
-  FValueCurrent.SetAsCurrent;
+  if IsExisted = 0 then
+  begin
+    FValueCurrent.SetAsCurrent;
+    FValueCurrent.DependenceType := INDEPENDENT;
+    FValueCurrent.UpdateType := ONLINE_TYPE;
+  end;
   FValueCurrent.SetToSave(True);
 
   FValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
@@ -425,30 +440,84 @@ var
   IsExisted: Integer;
 begin
   FValueTempertureBefore := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureBefore, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueTempertureBefore.SetAsTemp;
+    FValueTempertureBefore.DependenceType := INDEPENDENT;
+    FValueTempertureBefore.UpdateType := ONLINE_TYPE;
+  end;
   FValueTempertureBefore.SetToSave(True);
 
   FValueTempertureAfter := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureAfter, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueTempertureAfter.SetAsTemp;
+    FValueTempertureAfter.DependenceType := INDEPENDENT;
+    FValueTempertureAfter.UpdateType := ONLINE_TYPE;
+  end;
   FValueTempertureAfter.SetToSave(True);
 
   FValueTempertureDelta := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureDelta, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueTempertureDelta.SetAsError;
+    FValueTempertureDelta.DependenceType := INDEPENDENT;
+    FValueTempertureDelta.UpdateType := ONLINE_TYPE;
+  end;
   FValueTempertureDelta.SetToSave(True);
 
   FValuePressureBefore := TMeterValue.GetExistedMeterValueBool(FHashValuePressureBefore, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValuePressureBefore.SetAsPressure;
+    FValuePressureBefore.DependenceType := INDEPENDENT;
+    FValuePressureBefore.UpdateType := ONLINE_TYPE;
+  end;
   FValuePressureBefore.SetToSave(True);
 
   FValuePressureAfter := TMeterValue.GetExistedMeterValueBool(FHashValuePressureAfter, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValuePressureAfter.SetAsPressure;
+    FValuePressureAfter.DependenceType := INDEPENDENT;
+    FValuePressureAfter.UpdateType := ONLINE_TYPE;
+  end;
   FValuePressureAfter.SetToSave(True);
 
   FValuePressureDelta := TMeterValue.GetExistedMeterValueBool(FHashValuePressureDelta, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValuePressureDelta.SetAsError;
+    FValuePressureDelta.DependenceType := INDEPENDENT;
+    FValuePressureDelta.UpdateType := ONLINE_TYPE;
+  end;
   FValuePressureDelta.SetToSave(True);
 
   FValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueAirPressure.SetAsAirPressure;
+    FValueAirPressure.DependenceType := INDEPENDENT;
+    FValueAirPressure.UpdateType := ONLINE_TYPE;
+  end;
   FValueAirPressure.SetToSave(True);
 
   FValueAirTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueAirTemperture, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueAirTemperture.SetAsAirTemp;
+    FValueAirTemperture.DependenceType := INDEPENDENT;
+    FValueAirTemperture.UpdateType := ONLINE_TYPE;
+  end;
   FValueAirTemperture.SetToSave(True);
 
   FValueHumidity := TMeterValue.GetExistedMeterValueBool(FHashValueHumidity, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueHumidity.SetAsHumidity;
+    FValueHumidity.DependenceType := INDEPENDENT;
+    FValueHumidity.UpdateType := ONLINE_TYPE;
+  end;
   FValueHumidity.SetToSave(True);
 end;
 
@@ -739,13 +808,30 @@ begin
     if Channel.FValueInterface <> nil then Channel.FValueInterface.DeleteFromVector;
 
     Channel.FValueImp := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImp, IsExisted, Channel.UUID, Channel.Name);
-    Channel.FValueImp.SetAsImp;
+    if IsExisted = 0 then
+    begin
+      Channel.FValueImp.SetAsImp;
+      Channel.FValueImp.DependenceType := INDEPENDENT;
+      Channel.FValueImp.UpdateType := ONLINE_TYPE;
+    end;
     Channel.FValueImp.SetToSave(True);
+
     Channel.FValueImpTotal := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImpTotal, IsExisted, Channel.UUID, Channel.Name);
-    Channel.FValueImpTotal.SetAsImp;
+    if IsExisted = 0 then
+    begin
+      Channel.FValueImpTotal.SetAsImp;
+      Channel.FValueImpTotal.DependenceType := INDEPENDENT;
+      Channel.FValueImpTotal.UpdateType := ONLINE_TYPE;
+    end;
     Channel.FValueImpTotal.SetToSave(True);
+
     Channel.FValueCurrent := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueCurrent, IsExisted, Channel.UUID, Channel.Name);
-    Channel.FValueCurrent.SetAsCurrent;
+    if IsExisted = 0 then
+    begin
+      Channel.FValueCurrent.SetAsCurrent;
+      Channel.FValueCurrent.DependenceType := INDEPENDENT;
+      Channel.FValueCurrent.UpdateType := ONLINE_TYPE;
+    end;
     Channel.FValueCurrent.SetToSave(True);
     Channel.FValueInterface := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueInterface, IsExisted, Channel.UUID, Channel.Name);
     Channel.FValueInterface.SetToSave(True);
