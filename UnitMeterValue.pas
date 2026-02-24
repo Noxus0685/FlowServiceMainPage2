@@ -1,4 +1,4 @@
-unit UnitMeterValue;
+﻿unit UnitMeterValue;
 
 interface
 
@@ -72,39 +72,54 @@ type
     Mean: Double;
     MeanCnt: Integer;
     Means: TList<Double>;
+
     Dimensions: TList<TDimension>;
+
     ValueType: EValueType;
+
     DependenceType: EDependenceType;
     UpdateType: EUpdateType;
+
+
     ValueRate: TMeterValue;
     ValueBaseMultiplier: TMeterValue;
     ValueBaseDevider: TMeterValue;
     ValueCorrection: TMeterValue;
     ValueEtalon: TMeterValue;
+
+
     HashValueRate: Integer;
     HashValueBaseMultiplier: Integer;
     HashValueBaseDevider: Integer;
     HashValueCorrection: Integer;
     HashValueEtalon: Integer;
+
     CurrentDimIndex: Integer;
     CurrentDim: TDimension;
     FilterShortOrder: Integer;
     FilterShortDelta: Single;
+
     Name: string;
     ShrtName: string;
     Description: string;
     &Type: string;
     RawValueName: string;
     RawValueDim: string;
+
     Accuracy: Byte;
+
     Error: Double;
+
     ARRAY_SIZE: Integer;
+
     CoefK: Double;
     CoefP: Double;
+
     MaxValue: Double;
     MinValue: Double;
     MaxNomValue: Double;
     MinNomValue: Double;
+
     RawValues: TList<Double>;
     Values: TList<Double>;
     AverValues: TList<Single>;
@@ -126,11 +141,14 @@ type
     class function GetMeterValue(AHash, AHashOwner: Integer; const AName: string): TMeterValue; overload; static;
 
     procedure Random;
+
     function GetFloatValue: Single; overload;
     function GetFloatValue(Dim: Byte): Single; overload;
     function GetFloatValue(const ADim: string): Single; overload;
+
     function FilterApply: Double;
     function AverageApply: Single;
+
     function GetDoubleValue: Double; overload;
     function GetDoubleValue(const ADim: string): Double; overload;
     function GetDoubleValue(Dim: Byte): Double; overload;
@@ -146,6 +164,7 @@ type
 
     procedure SetFilter(AOrder: Integer);
     function GetFilter: Integer;
+
     procedure SetRawValue(InputValue: Double); overload;
     procedure SetRawValue(InputValue: Double; Q: Single); overload;
     procedure SetMainValue(InputValue: Double; Q: Single); overload;
@@ -159,7 +178,7 @@ type
     procedure SetDimValue(AValue: Double); overload;
     procedure SetDimValue(const AStr: string); overload;
     procedure SetValue(const AValue: string); overload;
-    procedure SetAsTime;
+
     function Rate(Q: Double): Double;
     function UpdateCoefs(CalibrPoints: TArray<TCalibrPoint>): Int8;
     procedure SetValueCurrnet(AValue: Double);
@@ -180,6 +199,7 @@ type
     function GetDoubleNum(const AStr: string): Double;
     procedure Reset;
 
+    procedure SetAsTime;
     procedure SetAsVolume;
     procedure SetAsMass;
     procedure SetAsVolumeFlow;

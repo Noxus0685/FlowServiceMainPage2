@@ -290,6 +290,7 @@ type
     miMain: TMenuItem;
     miMesurment: TMenuItem;
     miConditions: TMenuItem;
+    SpeedButtonMinimizePumpLayout: TSpeedButton;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -308,7 +309,10 @@ type
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
     procedure ActionSaveWorkTableExecute(Sender: TObject);
     procedure SpeedButton2Click(Sender: TObject);
+    procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
   private
+
+  FActiveWorkTable: TWorkTable;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -324,6 +328,7 @@ type
     function FindTypeIndex(const ATypeName: string): Integer;
     function FindSerialIndex(const ASerialNumber: string): Integer;
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
+    procedure UpdateGridDevices;
   public
     { Public declarations }
     destructor Destroy; override;
@@ -372,6 +377,8 @@ begin
     'TableSettings.ini'
   );
   FWorkTableManager.Load;
+
+
 
   FFlowMeters := TObjectList<TFlowMeter>.Create(True);
 
@@ -422,6 +429,9 @@ begin
   TableCount := 0;
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
     TableCount := FWorkTableManager.WorkTables.Count;
+
+  //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
+    FActiveWorkTable:= GetWorkTableByIndex(0);
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
@@ -626,43 +636,37 @@ var
   FoundRepo: TTypeRepository;
   RepoName: string;
   IsTypeChanged, NeedFill: Boolean;
+  Ch: TChannel;
 begin
-  if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
+
+  if (FActiveWorkTable = nil) then
     Exit;
 
- // if (FDevice = nil) or (DataManager = nil) then
- //   Exit;
+  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+    Exit;
 
-  //RefreshDeviceTypeReference;
+  if (DataManager = nil) then
+    Exit;
+
+  Ch := FActiveWorkTable.DeviceChannels[ARow];
+  if (Ch = nil) or (Ch.FlowMeter = nil) then
+    Exit;
 
   Frm := TFormTypeSelect.Create(Self);
   try
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-   // CurrentType := DataManager.FindType(
-   //   FDevice.DeviceTypeUUID,
-   //   FDevice.DeviceTypeName,
-  //    FoundRepo);
+    CurrentType := DataManager.FindType(
+      '',                     // UUID можем не знать
+      Ch.TypeName,            // текущее имя типа (прокси в FlowMeter)
+      FoundRepo
+    );
 
- //   if (CurrentType <> nil) and (FoundRepo <> nil) then
-//    begin
-  //    DataManager.ActiveTypeRepo := FoundRepo;
-  //    Frm.SelectType(CurrentType);
-  //  end;
-
-
-    if (DataManager <> nil) then
+    if (CurrentType <> nil) and (FoundRepo <> nil) then
     begin
-      CurrentType := DataManager.FindType('', FFlowMeterRows[ARow].Meter.DeviceTypeName, FoundRepo);
-     // LoadData
-
-      if (CurrentType <> nil) and (FoundRepo <> nil) then
-      begin
-        DataManager.ActiveTypeRepo := FoundRepo;
-        Frm.SelectType(CurrentType);
-      end;
-
+      DataManager.ActiveTypeRepo := FoundRepo;
+      Frm.SelectType(CurrentType);
     end;
 
     {----------------------------------------------------}
@@ -687,8 +691,7 @@ begin
       if CurrentType = NewType then
         IsTypeChanged := False
       else if (CurrentType.MitUUID <> '') and (NewType.MitUUID <> '') then
-        IsTypeChanged :=
-          not SameText(CurrentType.MitUUID, NewType.MitUUID)
+        IsTypeChanged := not SameText(CurrentType.MitUUID, NewType.MitUUID)
       else
         IsTypeChanged :=
           (CurrentType.ID <> NewType.ID) or
@@ -697,14 +700,13 @@ begin
     end;
 
     NeedFill := False;
-
-//    if IsTypeChanged then
-//      NeedFill := AskFillFromType;
+    // if IsTypeChanged then
+    //   NeedFill := AskFillFromType;
 
     {----------------------------------------------------}
-    { 4. Привязываем тип }
+    { 4. Привязываем тип (в runtime: FlowMeter / Channel) }
     {----------------------------------------------------}
-    if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
+    if (DataManager.ActiveTypeRepo <> nil) then
       FoundRepo := DataManager.ActiveTypeRepo;
 
     if FoundRepo <> nil then
@@ -712,28 +714,28 @@ begin
     else
       RepoName := '';
 
-    FFlowMeterRows[ARow].Meter.DeviceTypeName := NewType.Name;
-    FFlowMeterRows[ARow].TypeIndex := FindTypeIndex(NewType.Name);
+    // Новая идеология: канал проксирует в FlowMeter
+    Ch.TypeName := NewType.Name;
 
-  //  if NeedFill then
-  //  begin
-  //    FDevice.AttachType(NewType, RepoName);
-  //    FDeviceType := NewType;
+    // Если у вас был расчёт индекса по типу для UI/сигнала — храните как отдельное поле канала/строки,
+    // либо пересчитывайте динамически. Здесь оставляю как комментарий:
+    // Ch.TypeIndex := FindTypeIndex(NewType.Name);
 
-      {----------------------------------------------------}
-      { 5. Копируем данные из типа → в прибор }
-      {----------------------------------------------------}
-  //    FDevice.FillFromType(NewType);
-  //  end;
+    {----------------------------------------------------}
+    { 5. При необходимости заполняем данные прибора из типа }
+    {----------------------------------------------------}
+    // В новой модели это обычно делается на уровне привязки TDevice к каналу:
+    // if NeedFill and Assigned(Ch.FlowMeter.Device) then
+    // begin
+    //   Ch.FlowMeter.Device.AttachType(NewType, RepoName);
+    //   Ch.FlowMeter.Device.FillFromType(NewType);
+    // end;
 
     {----------------------------------------------------}
     { 6. Обновляем UI }
     {----------------------------------------------------}
-  //  UpdateUIFromDevice;
-
-  //  Grid2.Invalidate;   // обновить грид
-  //  SetModified;
-
+    UpdateGridDevices;  // подставь имя своего грида
+    // SetModified;
   finally
     Frm.Free;
   end;
@@ -742,6 +744,11 @@ end;
 procedure TFormMain.SpeedButton2Click(Sender: TObject);
 begin
  LayoutPump.Visible := False;
+end;
+
+procedure TFormMain.SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
+begin
+      LayoutPump.Visible:=False;
 end;
 
 procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -829,7 +836,7 @@ procedure TFormMain.GridDevicesGetValue(Sender: TObject; const ACol,
 var
   WorkTable: TWorkTable;
 begin
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
@@ -936,6 +943,24 @@ begin
   else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
     Value := FRows[ARow].SignalName;
 end;
+
+ procedure TFormMain.UpdateGridDevices;
+  var  Rows: Integer;
+ begin
+   Rows:= GridDevices.RowCount;
+
+    GridDevices.BeginUpdate;
+
+    GridDevices.RowCount := 0;
+
+  try
+    GridDevices.RowCount := Rows;
+  finally
+    GridDevices.EndUpdate;
+  end;
+
+
+ end;
 
 
 procedure TFormMain.GridEtalonsSetValue(Sender: TObject;

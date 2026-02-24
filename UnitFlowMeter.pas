@@ -55,7 +55,7 @@ type
   TFlowMeter → текущее состояние прибора (runtime)
  }
 
-TFlowMeter = class(TDevice)
+TFlowMeter = class(TTypeEntity)
 private
   // =====================================================
   // == Связь с "базовым" устройством из БД
@@ -63,7 +63,6 @@ private
   FDevice: TDevice;
 
   FSerialNumber:  string;
-  FUUID :  string;
   FDeviceTypeUUID:  string;
   FDeviceUUID:  string;
   FOutputType: Integer; // тип должен совпадать с типом OutputType в TDevice
@@ -306,17 +305,18 @@ end;
 
 procedure TFlowMeter.SetDevice(const ADevice: TDevice);
 begin
-  if FDevice = ADevice then
-    Exit;
+   if Assigned(ADevice) then
+ begin
+   FDevice := ADevice;
 
-  FDevice := ADevice;
+  Self.UUID := FDevice.MitUUID;
+  Self.Name := FDevice.Name;
+  FDeviceUUID:= FDevice.MitUUID;
+  FSerialNumber :=   FDevice.SerialNumber;
+  FDeviceTypeUUID :=  FDevice.DeviceTypeUUID;
+  FOutputType :=  FDevice.OutputType;
 
-  // Если нужно хранить UUID устройства отдельно
-  if Assigned(FDevice) then
-  begin
-    Self.UUID := FDevice.MitUUID;   // если у FlowMeter есть UUID
-    FDeviceUUID:= ADevice.MitUUID;
-  end;
+ end;
 end;
 
 
@@ -544,72 +544,72 @@ procedure TFlowMeter.InitValues;
 var
   IsExisted: Integer;
 begin
-  ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueImp.SetAsImp;
-
-  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueImpTotal.SetAsImp;
-
-  ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, Hash, Name);
-  ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, Hash, Name);
-
-  ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueVolumeFlow.SetAsVolumeFlow;
-  ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
-  ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
-
-  ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueMassFlow.SetAsMassFlow;
-  ValueMassFlow.ValueBaseMultiplier := ValueImp;
-  ValueMassFlow.ValueBaseDevider := ValueMassCoef;
-
-  ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueVolume.SetAsVolume;
-  ValueVolume.ValueBaseMultiplier := ValueImpTotal;
-  ValueVolume.ValueBaseDevider := ValueVolumeCoef;
-  ValueVolume.ValueCorrection := ValueVolumeFlow;
-
-  ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueMass.SetAsMass;
-  ValueMass.ValueBaseMultiplier := ValueImpTotal;
-  ValueMass.ValueBaseDevider := ValueMassCoef;
-  ValueMass.ValueCorrection := ValueMassFlow;
-
-  ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueVolumeMeter.SetAsVolume;
-
-  ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueMassMeter.SetAsMass;
-
-  ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueVolumeError.SetAsError;
-  ValueVolumeError.ValueBaseMultiplier := ValueVolumeMeter;
-  ValueVolumeError.ValueBaseDevider := ValueVolume;
-
-  ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueMassError.SetAsError;
-  ValueMassError.ValueBaseMultiplier := ValueMassMeter;
-  ValueMassError.ValueBaseDevider := ValueMass;
-
-  ValueCoef := ValueMassCoef;
-
-  ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueCurrent.SetAsCurrent;
-
-  ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, Hash, Name);
-  if IsExisted = 0 then
-    ValueTime.SetAsTime;
+//    ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueImp.SetAsImp;
+//
+//  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueImpTotal.SetAsImp;
+//
+//  ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, Hash, Name);
+//  ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, Hash, Name);
+//
+//  ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueVolumeFlow.SetAsVolumeFlow;
+//  ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
+//  ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
+//
+//  ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueMassFlow.SetAsMassFlow;
+//  ValueMassFlow.ValueBaseMultiplier := ValueImp;
+//  ValueMassFlow.ValueBaseDevider := ValueMassCoef;
+//
+//  ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueVolume.SetAsVolume;
+//  ValueVolume.ValueBaseMultiplier := ValueImpTotal;
+//  ValueVolume.ValueBaseDevider := ValueVolumeCoef;
+//  ValueVolume.ValueCorrection := ValueVolumeFlow;
+//
+//  ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueMass.SetAsMass;
+//  ValueMass.ValueBaseMultiplier := ValueImpTotal;
+//  ValueMass.ValueBaseDevider := ValueMassCoef;
+//  ValueMass.ValueCorrection := ValueMassFlow;
+//
+//  ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueVolumeMeter.SetAsVolume;
+//
+//  ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueMassMeter.SetAsMass;
+//
+//  ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueVolumeError.SetAsError;
+//  ValueVolumeError.ValueBaseMultiplier := ValueVolumeMeter;
+//  ValueVolumeError.ValueBaseDevider := ValueVolume;
+//
+//  ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueMassError.SetAsError;
+//  ValueMassError.ValueBaseMultiplier := ValueMassMeter;
+//  ValueMassError.ValueBaseDevider := ValueMass;
+//
+//  ValueCoef := ValueMassCoef;
+//
+//  ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueCurrent.SetAsCurrent;
+//
+//  ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, Hash, Name);
+//  if IsExisted = 0 then
+//    ValueTime.SetAsTime;
 end;
 
 procedure TFlowMeter.SetChannel(AChannel: Byte);

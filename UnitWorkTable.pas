@@ -1,4 +1,4 @@
-unit UnitWorkTable;
+﻿unit UnitWorkTable;
 
 interface
 
@@ -169,6 +169,7 @@ type
   private
     FIniFileName: string;
     FWorkTables: TObjectList<TWorkTable>;
+    FActiveWorkTable  :TWorkTable;
   public
     constructor Create(const AIniFileName: string);
     destructor Destroy; override;

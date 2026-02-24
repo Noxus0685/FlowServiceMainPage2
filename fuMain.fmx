@@ -429,6 +429,15 @@ object FormMain: TFormMain
                 TextSettings.HorzAlign = Center
                 Text = #1053#1072#1089#1086#1089
                 TabOrder = 1
+                object SpeedButtonMinimizePumpLayout: TSpeedButton
+                  Align = Left
+                  Size.Width = 17.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = '_'
+                  TextSettings.Trimming = None
+                  OnClick = SpeedButtonMinimizePumpLayoutClick
+                end
               end
             end
           end
