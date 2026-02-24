@@ -887,25 +887,72 @@ end;
 
 procedure TFormMain.GridEtalonsCellClick(const Column: TColumn;
   const Row: Integer);
+const
+  SECOND_CLICK_MS = 700;
 var
+  Tick: Cardinal;
+  IsSecondClick: Boolean;
+  Rows: Integer;
   WorkTable: TWorkTable;
 begin
   WorkTable := GetWorkTableByIndex(0);
 
-  if (WorkTable <> nil) and (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
+  if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
+    Exit;
+
+  if (WorkTable = nil) and ((Row < 0) or (Row >= Length(FRows))) then
+    Exit;
+
+  Rows := GridEtalons.RowCount;
+  Tick := TThread.GetTickCount;
+  GridEtalons.ReadOnly := True;
+
+  IsSecondClick :=
+    (Row = FLastClickRow) and
+    (Column = FLastClickCol) and
+    (Tick - FLastClickTick <= SECOND_CLICK_MS);
+
+  FLastClickRow := Row;
+  FLastClickCol := Column;
+  FLastClickTick := Tick;
+
+  if Column = CheckColumnEtalonEnable1 then
   begin
-    if Column = CheckColumnEtalonEnable1 then
-      WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
+    if WorkTable <> nil then
+      WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled
+    else
+      FRows[Row].Enabled := not FRows[Row].Enabled;
+  end;
 
-    if Column = StringColumnEtalonType1 then
-      OpenTypeSelect(Row);
-
-    GridEtalons.Repaint;
+  if Column = PopupColumnEtalonSignal1 then
+  begin
+    GridEtalons.ReadOnly := False;
+    GridEtalons.EditorMode := True;
+    inherited;
     Exit;
   end;
 
-  if (Row < Length(FRows)) and (Column = CheckColumnEtalonEnable1) then
-    FRows[Row].Enabled := not FRows[Row].Enabled;
+  if IsSecondClick then
+  begin
+    if Column = StringColumnEtalonType1 then
+    begin
+      GridEtalons.EditorMode := False;
+      if WorkTable <> nil then
+        OpenTypeSelect(Row);
+    end
+    else if Column = StringColumnEtalonSerial1 then
+    begin
+      GridEtalons.ReadOnly := False;
+      GridEtalons.EditorMode := True;
+    end;
+  end;
+
+  GridEtalons.BeginUpdate;
+  try
+    GridEtalons.RowCount := Rows;
+  finally
+    GridEtalons.EndUpdate;
+  end;
 end;
 
 
@@ -914,7 +961,7 @@ procedure TFormMain.GridEtalonsGetValue(Sender: TObject;
 var
   WorkTable: TWorkTable;
 begin
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
@@ -930,7 +977,8 @@ begin
     Exit;
   end;
 
-  if ARow >= Length(FRows) then Exit;
+  if (ARow < 0) or (ARow >= Length(FRows)) then
+    Exit;
 
   if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
     Value := FRows[ARow].Enabled
@@ -984,7 +1032,8 @@ begin
     Exit;
   end;
 
-  if ARow >= Length(FRows) then Exit;
+  if (ARow < 0) or (ARow >= Length(FRows)) then
+    Exit;
 
   if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
     FRows[ARow].Enabled := Value.AsBoolean
@@ -996,6 +1045,8 @@ begin
     FRows[ARow].Serial := Value.AsString
   else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
     FRows[ARow].SignalName := Value.AsString;
+
+  GridEtalons.ReadOnly := True;
 end;
 
 end.
