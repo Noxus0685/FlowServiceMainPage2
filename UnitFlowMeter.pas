@@ -217,30 +217,30 @@ public
   ValueCurrent: TMeterValue;
   ValueTime: TMeterValue;
 
-  HashValueImp: Integer;
-  HashValueImpTotal: Integer;
-  HashValueCoef: Integer;
-  HashValueMassCoef: Integer;
-  HashValueVolumeCoef: Integer;
-  HashValueVolume: Integer;
-  HashValueMass: Integer;
-  HashValueVolumeMeter: Integer;
-  HashValueMassMeter: Integer;
-  HashValueMassFlow: Integer;
-  HashValueVolumeFlow: Integer;
-  HashValueQuantity: Integer;
-  HashValueFlow: Integer;
-  HashValueError: Integer;
-  HashValueVolumeError: Integer;
-  HashValueMassError: Integer;
-  HashValueDensity: Integer;
-  HashValuePressure: Integer;
-  HashValueTemperture: Integer;
-  HashValueAirPressure: Integer;
-  HashValueAirTemperture: Integer;
-  HashValueHumidity: Integer;
-  HashValueCurrent: Integer;
-  HashValueTime: Integer;
+  HashValueImp: string;
+  HashValueImpTotal: string;
+  HashValueCoef: string;
+  HashValueMassCoef: string;
+  HashValueVolumeCoef: string;
+  HashValueVolume: string;
+  HashValueMass: string;
+  HashValueVolumeMeter: string;
+  HashValueMassMeter: string;
+  HashValueMassFlow: string;
+  HashValueVolumeFlow: string;
+  HashValueQuantity: string;
+  HashValueFlow: string;
+  HashValueError: string;
+  HashValueVolumeError: string;
+  HashValueMassError: string;
+  HashValueDensity: string;
+  HashValuePressure: string;
+  HashValueTemperture: string;
+  HashValueAirPressure: string;
+  HashValueAirTemperture: string;
+  HashValueHumidity: string;
+  HashValueCurrent: string;
+  HashValueTime: string;
 
   constructor Create(); overload;
   constructor Create(AIsEtalon: Boolean); overload;
@@ -549,43 +549,43 @@ procedure TFlowMeter.InitValues;
 var
   IsExisted: Integer;
 begin
-  ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, Hash, Name);
+  ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueTime.SetAsTime;
 
-  ValuePressure := TMeterValue.GetExistedMeterValueBool(HashValuePressure, IsExisted, Hash, Name);
+  ValuePressure := TMeterValue.GetExistedMeterValueBool(HashValuePressure, IsExisted, UUID, Name);
 
-  ValueTemperture := TMeterValue.GetExistedMeterValueBool(HashValueTemperture, IsExisted, Hash, Name);
+  ValueTemperture := TMeterValue.GetExistedMeterValueBool(HashValueTemperture, IsExisted, UUID, Name);
 
-  ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, Hash, Name);
+  ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, UUID, Name);
   ValueDensity.ValueBaseMultiplier := ValueTemperture;
   ValueDensity.ValueBaseDevider := ValuePressure;
   ValueDensity.ValueRate := nil;
   ValueDensity.ValueEtalon := nil;
 
-  ValueAirPressure := TMeterValue.GetExistedMeterValueBool(HashValueAirPressure, IsExisted, Hash, Name);
-  ValueAirTemperture := TMeterValue.GetExistedMeterValueBool(HashValueAirTemperture, IsExisted, Hash, Name);
-  ValueHumidity := TMeterValue.GetExistedMeterValueBool(HashValueHumidity, IsExisted, Hash, Name);
+  ValueAirPressure := TMeterValue.GetExistedMeterValueBool(HashValueAirPressure, IsExisted, UUID, Name);
+  ValueAirTemperture := TMeterValue.GetExistedMeterValueBool(HashValueAirTemperture, IsExisted, UUID, Name);
+  ValueHumidity := TMeterValue.GetExistedMeterValueBool(HashValueHumidity, IsExisted, UUID, Name);
 
-  ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, Hash, Name);
+  ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueImp.SetAsImp;
 
-  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, Hash, Name);
+  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueImpTotal.SetAsImp;
 
-  ValueCoef := TMeterValue.GetExistedMeterValueBool(HashValueCoef, IsExisted, Hash, Name);
+  ValueCoef := TMeterValue.GetExistedMeterValueBool(HashValueCoef, IsExisted, UUID, Name);
 
-  ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, Hash, Name);
+  ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueVolumeCoef.SetValue(Kp);
 
-  ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, Hash, Name);
+  ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueMassCoef.SetValue(Kp);
 
-  ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, Hash, Name);
+  ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueMassFlow.SetAsMassFlow;
   ValueMassFlow.ValueCorrection := nil;
@@ -594,7 +594,7 @@ begin
   ValueMassFlow.ValueRate := nil;
   ValueMassFlow.ValueEtalon := nil;
 
-  ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, Hash, Name);
+  ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueVolumeFlow.SetAsVolumeFlow;
   ValueVolumeFlow.ValueCorrection := nil;
@@ -603,7 +603,7 @@ begin
   ValueVolumeFlow.ValueRate := nil;
   ValueVolumeFlow.ValueEtalon := nil;
 
-  ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, Hash, Name);
+  ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueVolume.SetAsVolume;
   ValueVolume.ValueCorrection := ValueVolumeFlow;
@@ -612,7 +612,7 @@ begin
   ValueVolume.ValueRate := nil;
   ValueVolume.ValueEtalon := nil;
 
-  ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, Hash, Name);
+  ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueMass.SetAsMass;
   ValueMass.ValueCorrection := ValueMassFlow;
@@ -621,36 +621,36 @@ begin
   ValueMass.ValueRate := nil;
   ValueMass.ValueEtalon := nil;
 
-  ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, Hash, Name);
+  ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueMassMeter.SetAsMass;
 
-  ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, Hash, Name);
+  ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueVolumeMeter.SetAsVolume;
 
-  ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, Hash, Name);
+  ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueVolumeError.SetAsError;
   if EtalonMeter <> nil then
     ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
   ValueVolumeError.ValueBaseMultiplier := ValueVolume;
 
-  ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, Hash, Name);
+  ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueMassError.SetAsError;
   if EtalonMeter <> nil then
     ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
   ValueMassError.ValueBaseMultiplier := ValueMass;
 
-  ValueError := TMeterValue.GetExistedMeterValueBool(HashValueError, IsExisted, Hash, Name);
+  ValueError := TMeterValue.GetExistedMeterValueBool(HashValueError, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueError.SetAsError;
   if EtalonMeter <> nil then
     ValueError.ValueEtalon := EtalonMeter.ValueVolume;
   ValueError.ValueBaseMultiplier := ValueVolumeMeter;
 
-  ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, Hash, Name);
+  ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, UUID, Name);
   if IsExisted = 0 then
     ValueCurrent.SetAsCurrent;
 
