@@ -306,6 +306,8 @@ type
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
     procedure ActionSaveWorkTableExecute(Sender: TObject);
+    procedure TimerSetValuesTimer(Sender: TObject);
+    procedure TimerMainTimer(Sender: TObject);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
   private
@@ -382,6 +384,14 @@ begin
       ASignal := Ord(OT);
       Exit(True);
     end;
+end;
+
+function MeterValueToText(AMeterValue: TMeterValue; const AFormat: string = '0.###'): string;
+begin
+  if AMeterValue = nil then
+    Exit('0');
+
+  Result := FormatFloat(AFormat, AMeterValue.GetDoubleValue);
 end;
 
 destructor TFormMain.Destroy;
@@ -640,6 +650,105 @@ begin
   FWorkTableManager.Save;
 end;
 
+procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+  I: Integer;
+  DeviceChannel: TChannel;
+  EtalonChannel: TChannel;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  // Основные MeterValues рабочего стола.
+  WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
+  WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
+  WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
+  WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
+
+  // Основные MeterValues каналов прибора.
+  for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+  begin
+    DeviceChannel := WorkTable.DeviceChannels[I];
+    if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
+      Continue;
+
+    DeviceChannel.FlowMeter.ValueFlow.SetValue(WorkTable.FlowRate);
+    DeviceChannel.FlowMeter.ValueQuantity.SetValue(DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
+    DeviceChannel.FlowMeter.ValueVolume.SetValue(DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue);
+    DeviceChannel.FlowMeter.ValueTemperture.SetValue(WorkTable.Temp);
+    DeviceChannel.FlowMeter.ValueTime.SetValue(WorkTable.Time);
+  end;
+
+  // Основные MeterValues эталонных каналов.
+  for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+  begin
+    EtalonChannel := WorkTable.EtalonChannels[I];
+    if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
+      Continue;
+
+    EtalonChannel.FlowMeter.ValueFlow.SetValue(WorkTable.FlowRate);
+    EtalonChannel.FlowMeter.ValueQuantity.SetValue(EtalonChannel.FlowMeter.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
+    EtalonChannel.FlowMeter.ValueVolume.SetValue(EtalonChannel.FlowMeter.ValueQuantity.GetDoubleValue);
+    EtalonChannel.FlowMeter.ValueTemperture.SetValue(WorkTable.Temp);
+    EtalonChannel.FlowMeter.ValueTime.SetValue(WorkTable.Time);
+  end;
+end;
+
+procedure TFormMain.TimerMainTimer(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+  DeviceMeter: TFlowMeter;
+  EtalonMeter: TFlowMeter;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  DeviceMeter := nil;
+  if WorkTable.DeviceChannels.Count > 0 then
+    DeviceMeter := WorkTable.DeviceChannels[0].FlowMeter;
+
+  EtalonMeter := nil;
+  if WorkTable.EtalonChannels.Count > 0 then
+    EtalonMeter := WorkTable.EtalonChannels[0].FlowMeter;
+
+  // Обновление таблиц по основным MeterValues.
+  GridDevices.Repaint;
+  GridEtalons.Repaint;
+
+  // Обновление элементов формы.
+  LabelTime.Text := MeterValueToText(nil, '0.0');
+  LabelFlowRate.Text := MeterValueToText(nil, '0.###');
+  LabelTemp.Text := MeterValueToText(nil, '0.##');
+
+  if DeviceMeter <> nil then
+  begin
+    LabelTime.Text := MeterValueToText(DeviceMeter.ValueTime, '0.0');
+    LabelFlowRate.Text := MeterValueToText(DeviceMeter.ValueFlow, '0.###');
+    LabelTemp.Text := MeterValueToText(DeviceMeter.ValueTemperture, '0.##');
+  end;
+
+  // Явно используем основные колонки (данные берутся через GridDevicesGetValue/GridEtalonsGetValue).
+  StringColumnDeviceFlowRate1.Header := 'Расход';
+  StringColumnDeviceVolume1.Header := 'Объём';
+  StringColumnEtalonFlowRate1.Header := 'Расход';
+  StringColumnEtalonVolume1.Header := 'Объём';
+
+  if DeviceMeter <> nil then
+  begin
+    StringColumnDeviceFlowRate1.TagString := MeterValueToText(DeviceMeter.ValueFlow, '0.###');
+    StringColumnDeviceVolume1.TagString := MeterValueToText(DeviceMeter.ValueQuantity, '0.###');
+  end;
+
+  if EtalonMeter <> nil then
+  begin
+    StringColumnEtalonFlowRate1.TagString := MeterValueToText(EtalonMeter.ValueFlow, '0.###');
+    StringColumnEtalonVolume1.TagString := MeterValueToText(EtalonMeter.ValueQuantity, '0.###');
+  end;
+end;
+
 procedure TFormMain.ApplyFlowMeterSelection(const ARow: Integer);
 begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
@@ -864,6 +973,20 @@ begin
       Value := WorkTable.DeviceChannels[ARow].TypeName
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
       Value := WorkTable.DeviceChannels[ARow].Serial
+    else if GridDevices.Columns[ACol] = StringColumnDeviceFlowRate1 then
+    begin
+      if WorkTable.DeviceChannels[ARow].FlowMeter <> nil then
+        Value := MeterValueToText(WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow, '0.###')
+      else
+        Value := '0';
+    end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceVolume1 then
+    begin
+      if WorkTable.DeviceChannels[ARow].FlowMeter <> nil then
+        Value := MeterValueToText(WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity, '0.###')
+      else
+        Value := '0';
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
     Exit;
@@ -991,6 +1114,20 @@ begin
       Value := WorkTable.EtalonChannels[ARow].TypeName
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
       Value := WorkTable.EtalonChannels[ARow].Serial
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1 then
+    begin
+      if WorkTable.EtalonChannels[ARow].FlowMeter <> nil then
+        Value := MeterValueToText(WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow, '0.###')
+      else
+        Value := '0';
+    end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonVolume1 then
+    begin
+      if WorkTable.EtalonChannels[ARow].FlowMeter <> nil then
+        Value := MeterValueToText(WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity, '0.###')
+      else
+        Value := '0';
+    end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       Value := GetOutputTypeName(WorkTable.EtalonChannels[ARow].Signal);
     Exit;
