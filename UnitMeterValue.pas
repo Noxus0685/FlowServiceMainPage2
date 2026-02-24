@@ -6,8 +6,7 @@ uses
   System.SysUtils,
   System.Classes,
   System.Math,
-  System.Generics.Collections,
-  System.DateUtils;
+  System.Generics.Collections;
 
 type
   EUpdateType = (OFFLINE_TYPE, ONLINE_TYPE, HAND_TYPE);
@@ -16,7 +15,7 @@ type
 
   TDimension = record
     Name: string;
-    Hash: Integer;
+    Hash: string;
     Rate: Double;
     Devider: Double;
     Factor: Boolean;
@@ -26,7 +25,7 @@ type
   TCoef = record
     Name: string;
     Index: Integer;
-    Hash: Integer;
+    Hash: string;
     Value: Double;
     Arg: Double;
     Q1: Double;
@@ -64,8 +63,8 @@ type
     ValueWoCorrection: Double;
     TempDelta: Integer;
     Short_Mean_index: Integer;
-    Hash: Integer;
-    HashOwner: Integer;
+    Hash: string;
+    HashOwner: string;
     NameOwner: string;
     IsToSave: Boolean;
     Value: Double;
@@ -88,11 +87,11 @@ type
     ValueEtalon: TMeterValue;
 
 
-    HashValueRate: Integer;
-    HashValueBaseMultiplier: Integer;
-    HashValueBaseDevider: Integer;
-    HashValueCorrection: Integer;
-    HashValueEtalon: Integer;
+    HashValueRate: string;
+    HashValueBaseMultiplier: string;
+    HashValueBaseDevider: string;
+    HashValueCorrection: string;
+    HashValueEtalon: string;
 
     CurrentDimIndex: Integer;
     CurrentDim: TDimension;
@@ -127,18 +126,18 @@ type
     Coefs: TList<TCoef>;
 
     constructor Create; overload;
-    constructor Create(AHashOwner: Integer; const ANameOwner: string); overload;
+    constructor Create(const AHashOwner: string; const ANameOwner: string); overload;
     constructor Create(ACopyFrom: TMeterValue); overload;
-    constructor CreateFromHash(AHash: Integer);
+    constructor CreateFromHash(const AHash: string);
     destructor Destroy; override;
 
     procedure SetCopy(AMeterValue: TMeterValue);
-    class function GetNewMeterValue(AHash: Integer): TMeterValue; static;
-    class function GetNewMeterValueBool(AHash: Integer; out IsExisted: Integer; AHashOwner: Integer; const AName: string): TMeterValue; static;
-    class function GetCopyMeterValueBool(var AHash: Integer; out IsExisted: Integer): TMeterValue; static;
-    class function GetExistedMeterValueBool(var AHash: Integer; out IsExisted: Integer; AHashOwner: Integer; const AName: string): TMeterValue; static;
-    class function GetMeterValue(AHash: Integer): TMeterValue; overload; static;
-    class function GetMeterValue(AHash, AHashOwner: Integer; const AName: string): TMeterValue; overload; static;
+    class function GetNewMeterValue(const AHash: string): TMeterValue; static;
+    class function GetNewMeterValueBool(const AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue; static;
+    class function GetCopyMeterValueBool(var AHash: string; out IsExisted: Integer): TMeterValue; static;
+    class function GetExistedMeterValueBool(var AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue; static;
+    class function GetMeterValue(const AHash: string): TMeterValue; overload; static;
+    class function GetMeterValue(const AHash, AHashOwner: string; const AName: string): TMeterValue; overload; static;
 
     procedure Random;
 
@@ -209,12 +208,12 @@ type
     procedure SetAsCurrent;
     procedure SetCalcValue;
 
-    function GetNewHash: Integer;
+    function GetNewUUID: string;
     class procedure SaveToFile(IsBackUp: Integer); static;
     class procedure LoadFromFile; static;
 
     procedure SetCoef(ACoef: TCoef); overload;
-    function SetCoef(AValue, AArg: Double): Integer; overload;
+    function SetCoef(AValue, AArg: Double): string; overload;
     function GetNewHashCoef: Integer;
     procedure CalcCoefs;
     procedure SetToSave(AIsToSave: Boolean);
@@ -240,7 +239,7 @@ end;
 constructor TMeterValue.Create;
 begin
   inherited Create;
-  Hash := GetNewHash;
+  Hash := GetNewUUID;
   FFilterOrder := -1;
   FAverageOrder := 1;
   TempDelta := 3;
@@ -263,7 +262,7 @@ begin
   FMeterValues.Add(Self);
 end;
 
-constructor TMeterValue.Create(AHashOwner: Integer; const ANameOwner: string);
+constructor TMeterValue.Create(const AHashOwner: string; const ANameOwner: string);
 begin
   Create;
   HashOwner := AHashOwner;
@@ -276,7 +275,7 @@ begin
   SetCopy(ACopyFrom);
 end;
 
-constructor TMeterValue.CreateFromHash(AHash: Integer);
+constructor TMeterValue.CreateFromHash(const AHash: string);
 var
   MV: TMeterValue;
 begin
@@ -321,35 +320,35 @@ begin
   for C in AMeterValue.Coefs do Coefs.Add(C);
 end;
 
-class function TMeterValue.GetMeterValue(AHash: Integer): TMeterValue;
+class function TMeterValue.GetMeterValue(const AHash: string): TMeterValue;
 var
   MV: TMeterValue;
 begin
   Result := nil;
-  if AHash = 0 then Exit;
+  if AHash.IsEmpty then Exit;
   for MV in FMeterValues do
     if MV.Hash = AHash then
       Exit(MV);
 end;
 
-class function TMeterValue.GetMeterValue(AHash, AHashOwner: Integer; const AName: string): TMeterValue;
+class function TMeterValue.GetMeterValue(const AHash, AHashOwner: string; const AName: string): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
   if Result = nil then
     Result := TMeterValue.Create(AHashOwner, AName);
 end;
 
-class function TMeterValue.GetNewMeterValue(AHash: Integer): TMeterValue;
+class function TMeterValue.GetNewMeterValue(const AHash: string): TMeterValue;
 var
   MV: TMeterValue;
 begin
-  if AHash = 0 then Exit(nil);
+  if AHash.IsEmpty then Exit(nil);
   MV := GetMeterValue(AHash);
   if MV <> nil then Exit(TMeterValue.Create(MV));
   Result := TMeterValue.Create;
 end;
 
-class function TMeterValue.GetNewMeterValueBool(AHash: Integer; out IsExisted: Integer; AHashOwner: Integer; const AName: string): TMeterValue;
+class function TMeterValue.GetNewMeterValueBool(const AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
   if Result <> nil then
@@ -364,7 +363,7 @@ begin
   end;
 end;
 
-class function TMeterValue.GetCopyMeterValueBool(var AHash: Integer; out IsExisted: Integer): TMeterValue;
+class function TMeterValue.GetCopyMeterValueBool(var AHash: string; out IsExisted: Integer): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
   if Result <> nil then
@@ -381,13 +380,13 @@ begin
   end;
 end;
 
-class function TMeterValue.GetExistedMeterValueBool(var AHash: Integer; out IsExisted: Integer; AHashOwner: Integer; const AName: string): TMeterValue;
+class function TMeterValue.GetExistedMeterValueBool(var AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
   if Result <> nil then
   begin
     IsExisted := 1;
-    if Result.HashOwner = 0 then
+    if Result.HashOwner.IsEmpty then
     begin
       Result.HashOwner := AHashOwner;
       Result.NameOwner := AName;
@@ -622,7 +621,7 @@ var
   D: TDimension;
 begin
   D.Name := AName;
-  D.Hash := GetNewHash;
+  D.Hash := GetNewUUID;
   D.Rate := ARate;
   D.Devider := ADevider;
   D.Recip := ARecip;
@@ -767,9 +766,9 @@ begin
   SetValue(FilterApply);
 end;
 
-function TMeterValue.GetNewHash: Integer;
+function TMeterValue.GetNewUUID: string;
 begin
-  Result := Integer(DateTimeToUnix(Now, False)) + System.Random(MaxInt);
+  Result := TGUID.NewGuid.ToString;
 end;
 
 class procedure TMeterValue.SaveToFile(IsBackUp: Integer);
@@ -785,11 +784,11 @@ begin
   Coefs.Add(ACoef);
 end;
 
-function TMeterValue.SetCoef(AValue, AArg: Double): Integer;
+function TMeterValue.SetCoef(AValue, AArg: Double): string;
 var
   C: TCoef;
 begin
-  C.Hash := GetNewHashCoef;
+  C.Hash := GetNewUUID;
   C.Index := Coefs.Count;
   C.Value := AValue;
   C.Arg := AArg;
