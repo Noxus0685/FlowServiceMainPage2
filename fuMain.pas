@@ -360,6 +360,32 @@ const
     'SN-1004'
   );
 
+function TryGetOutputTypeFromValue(const AValue: TValue; out ASignal: Integer): Boolean;
+var
+  OT: TOutputType;
+  SignalName: string;
+begin
+  Result := False;
+  ASignal := Ord(otUnknown);
+
+  if AValue.IsType<Integer> then
+  begin
+    ASignal := AValue.AsInteger;
+    Exit(True);
+  end;
+
+  if not AValue.IsType<string> then
+    Exit;
+
+  SignalName := AValue.AsString;
+  for OT := Low(TOutputType) to High(TOutputType) do
+    if SameText(GetOutputTypeName(OT), SignalName) then
+    begin
+      ASignal := Ord(OT);
+      Exit(True);
+    end;
+end;
+
 destructor TFormMain.Destroy;
 begin
   FWorkTableManager.Free;
@@ -862,6 +888,7 @@ procedure TFormMain.GridDevicesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 var
   WorkTable: TWorkTable;
+  Signal: Integer;
 begin
   WorkTable := GetWorkTableByIndex(0);
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
@@ -875,7 +902,8 @@ begin
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-      WorkTable.DeviceChannels[ARow].Signal := Value.AsInteger;
+      if TryGetOutputTypeFromValue(Value, Signal) then
+        WorkTable.DeviceChannels[ARow].Signal := Signal;
     Exit;
   end;
 
@@ -1015,6 +1043,7 @@ procedure TFormMain.GridEtalonsSetValue(Sender: TObject;
   const ACol, ARow: Integer; const Value: TValue);
 var
   WorkTable: TWorkTable;
+  Signal: Integer;
 begin
   WorkTable := GetWorkTableByIndex(0);
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
@@ -1028,7 +1057,8 @@ begin
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
       WorkTable.EtalonChannels[ARow].Serial := Value.AsString
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
-      WorkTable.EtalonChannels[ARow].Signal := Value.AsInteger;
+      if TryGetOutputTypeFromValue(Value, Signal) then
+        WorkTable.EtalonChannels[ARow].Signal := Signal;
     Exit;
   end;
 
