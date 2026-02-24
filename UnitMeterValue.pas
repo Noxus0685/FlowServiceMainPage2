@@ -207,7 +207,17 @@ type
     procedure SetAsMassFlow;
     procedure SetAsImp;
     procedure SetAsError;
+    procedure SetAsMassError;
+    procedure SetAsVolumeError;
+    procedure SetAsDensity;
+    procedure SetAsTemp;
+    procedure SetAsAirTemp;
+    procedure SetAsPressure;
     procedure SetAsCurrent;
+    procedure SetAsAirPressure;
+    procedure SetAsMassCoef;
+    procedure SetAsVolumeCoef;
+    procedure SetAsHumidity;
     procedure SetCalcValue;
 
     function GetNewUUID: string;
@@ -261,7 +271,9 @@ begin
   Values := TList<Double>.Create;
   AverValues := TList<Single>.Create;
   Coefs := TList<TCoef>.Create;
+  IsToSave := True;
   FMeterValues.Add(Self);
+  FMeterValuesSaves.Add(Self);
 end;
 
 constructor TMeterValue.Create(const AHashOwner: string; const ANameOwner: string);
@@ -577,9 +589,23 @@ end;
 
 procedure TMeterValue.SetAsTime;
 begin
+  ValueType := CONST_TYPE;
+  Value := 0;
+  SetFilter(-1);
+  Accuracy := 0;
+  Error := 0.001;
+  Name := 'Время';
+  ShrtName := 'T';
+  Dimensions.Clear;
   SetDimension('s', 1);
-  SetDimension('min', 1 / 60);
-  SetDimension('h', 1 / 3600);
+  SetDimension('min', 1, 60, False);
+  SetDimension('h', 1, 3600, False);
+  SetDim(0);
+  SetValue(0.0);
+  MaxValue := 99999999;
+  MinValue := 0;
+  MaxNomValue := 3600;
+  MinNomValue := 0;
 end;
 
 function TMeterValue.Rate(Q: Double): Double;
@@ -730,37 +756,341 @@ end;
 
 procedure TMeterValue.SetAsVolume;
 begin
-  SetDimension('m3', 1);
+  ValueType := SUM_TYPE;
+  Name := 'Объем';
+  ShrtName := 'V';
+  SetFilter(-1);
+  Accuracy := 6;
+  Value := 0;
+  Dimensions.Clear;
+  SetDimension('л', 1);
+  SetDimension('м3', 1, 1000, False);
+  SetDim(0);
+  MaxValue := MaxDouble;
+  MinValue := 0;
+  Error := 0.01;
 end;
 
 procedure TMeterValue.SetAsMass;
 begin
-  SetDimension('kg', 1);
+  ValueType := SUM_TYPE;
+  Name := 'Масса';
+  ShrtName := 'M';
+  SetFilter(-1);
+  Accuracy := 6;
+  Value := 0;
+  Dimensions.Clear;
+  SetDimension('кг', 1, 1, False);
+  SetDimension('т', 1, 1000, False);
+  SetDim(0);
+  MaxValue := MaxDouble;
+  MinValue := 0;
+  Error := 0.01;
 end;
 
 procedure TMeterValue.SetAsVolumeFlow;
 begin
-  SetDimension('m3/h', 1);
+  ValueType := FLOW_TYPE;
+  Name := 'Объемный расход';
+  ShrtName := 'Qv';
+  SetFilter(8);
+  Accuracy := 4;
+  Value := 0;
+  Dimensions.Clear;
+  SetDimension('л/с', 1, 1, False);
+  SetDimension('л/мин', 60, 1, False);
+  SetDimension('л/ч', 3600, 1, False);
+  SetDimension('м3/мин', 60, 1000, False);
+  SetDimension('м3/ч', 3600, 1000, False);
+  SetDim(4);
+  MaxValue := MaxDouble;
+  MinValue := 0;
+  Error := 0.01;
 end;
 
 procedure TMeterValue.SetAsMassFlow;
 begin
-  SetDimension('kg/h', 1);
+  ValueType := FLOW_TYPE;
+  Name := 'Массовый расход';
+  ShrtName := 'Qm';
+  SetFilter(8);
+  Accuracy := 4;
+  Value := 0;
+  Dimensions.Clear;
+  SetDimension('кг/с', 1, 1, False);
+  SetDimension('кг/мин', 60, 1, False);
+  SetDimension('кг/ч', 3600, 1, False);
+  SetDimension('т/мин', 60, 1000, False);
+  SetDimension('т/ч', 3600, 1000, False);
+  SetDim(4);
+  MaxValue := MaxDouble;
+  MinValue := 0;
+  Error := 0.01;
 end;
 
 procedure TMeterValue.SetAsImp;
 begin
-  SetDimension('imp', 1);
+  ValueType := FLOW_TYPE;
+  Value := 0;
+  SetFilter(-1);
+  Accuracy := 5;
+  Name := 'Импульсы';
+  ShrtName := 'N';
+  Dimensions.Clear;
+  SetDimension('имп', 1, 1, False);
+  SetDim(0);
+  MaxValue := MaxDouble;
+  MinValue := 0;
+  Error := 0.001;
+  Reset;
 end;
 
 procedure TMeterValue.SetAsError;
 begin
+  ValueType := ERROR_TYPE;
+  Value := 0;
+  SetFilter(-1);
+  Accuracy := 4;
+  Error := 0.0;
+  ShrtName := 'δ';
+  Name := 'Погрешность';
+  Dimensions.Clear;
   SetDimension('%', 1);
+  SetDim(0);
+  MaxValue := 100;
+  MinValue := -100;
+  MaxNomValue := 0.1;
+  MinNomValue := -0.1;
+end;
+
+procedure TMeterValue.SetAsMassError;
+begin
+  ValueType := ERROR_TYPE;
+  Value := 0;
+  SetFilter(-1);
+  Accuracy := 4;
+  Error := 0;
+  Name := 'Погрешность по массе';
+  ShrtName := 'δm';
+  Dimensions.Clear;
+  SetDimension('%', 1);
+  SetDim(0);
+  MaxValue := 100;
+  MinValue := -100;
+  MaxNomValue := 0.1;
+  MinNomValue := -0.1;
+end;
+
+procedure TMeterValue.SetAsVolumeError;
+begin
+  ValueType := ERROR_TYPE;
+  Value := 0;
+  SetFilter(-1);
+  Accuracy := 4;
+  Error := 0;
+  Name := 'Погрешность по объему';
+  ShrtName := 'δv';
+  Dimensions.Clear;
+  SetDimension('%', 1);
+  SetDim(0);
+  MaxValue := 100;
+  MinValue := -100;
+  MaxNomValue := 0.1;
+  MinNomValue := -0.1;
+end;
+
+procedure TMeterValue.SetAsDensity;
+begin
+  ValueType := CONST_TYPE;
+  Value := 998.1;
+  SetFilter(-1);
+  Accuracy := 5;
+  Name := 'Плотность';
+  ShrtName := 'ρ';
+  Dimensions.Clear;
+  SetDimension('кг/л', 1);
+  SetDimension('кг/м3', 1000);
+  SetDimension('т/л', 1, 1000, False);
+  SetDimension('т/м3', 1);
+  SetDim(0);
+  MaxValue := 1.1100;
+  MinValue := 0.900;
+  MaxNomValue := 0.999;
+  MinNomValue := 0.997;
+  Error := 0.01;
+  SetValue(0.9982);
+end;
+
+procedure TMeterValue.SetAsTemp;
+begin
+  ValueType := CONST_TYPE;
+  Value := 21.3;
+  SetFilter(-1);
+  Accuracy := 4;
+  Name := 'Температура';
+  &Type := 'PT100';
+  RawValueName := 'Сопротивление';
+  RawValueDim := 'Ом';
+  ShrtName := 't';
+  Dimensions.Clear;
+  SetDimension('°C', 1);
+  SetDimension('град. С', 1);
+  SetDim(0);
+  SetValue(20.0);
+  MaxValue := 100;
+  MinValue := 0;
+  MaxNomValue := 25;
+  MinNomValue := 15;
+  Error := 0.5;
+  SetValue(21.3);
+end;
+
+procedure TMeterValue.SetAsAirTemp;
+begin
+  ValueType := CONST_TYPE;
+  Value := 21.3;
+  SetFilter(-1);
+  Accuracy := 4;
+  Name := 'Температура атм';
+  &Type := 'ИВТМ';
+  RawValueName := '';
+  RawValueDim := '';
+  ShrtName := 't';
+  Dimensions.Clear;
+  SetDimension('°C', 1);
+  SetDimension('град. С', 1);
+  SetDim(0);
+  SetValue(20.0);
+  MaxValue := 100;
+  MinValue := 0;
+  MaxNomValue := 25;
+  MinNomValue := 15;
+  Error := 0.5;
+  SetValue(21.3);
+end;
+
+procedure TMeterValue.SetAsPressure;
+begin
+  ValueType := CONST_TYPE;
+  Value := 98;
+  SetFilter(-1);
+  Accuracy := 4;
+  Name := 'Давление';
+  &Type := 'Датчик';
+  RawValueName := 'Ток';
+  RawValueDim := 'мА';
+  ShrtName := 'P';
+  Dimensions.Clear;
+  SetDimension('Па', 1);
+  SetDimension('гПа', 1, 100, False);
+  SetDimension('кПа', 1, 1000, False);
+  SetDimension('bar', 1, 100000, False);
+  SetDimension('МПа', 1, 1000000, False);
+  SetDim(3);
+  MaxValue := 1600000;
+  MinValue := -10000;
+  MaxNomValue := 100000;
+  MinNomValue := 0;
+  Error := 0.5;
+  CoefK := 100000;
+  CoefP := -400000;
+  SetValue(98.0);
+end;
+
+procedure TMeterValue.SetAsAirPressure;
+begin
+  ValueType := CONST_TYPE;
+  Value := 102124.64;
+  SetFilter(-1);
+  Accuracy := 4;
+  Name := 'Давление атм';
+  ShrtName := 'Pатм';
+  Dimensions.Clear;
+  SetDimension('Па', 1);
+  SetDimension('гПа', 1, 100, False);
+  SetDimension('мм.рт.ст.', 1, 133.32239023154, False);
+  SetDimension('кПа', 1, 1000, False);
+  SetDim(1);
+  MaxValue := 1000000;
+  MinValue := -10000;
+  MaxNomValue := 103000;
+  MinNomValue := 101000;
+  CoefK := 10000;
+  CoefP := -40000;
+  Error := 0.1;
+  SetValue(102124.64);
 end;
 
 procedure TMeterValue.SetAsCurrent;
 begin
-  SetDimension('mA', 1);
+  ValueType := CONST_TYPE;
+  Value := 4;
+  SetFilter(-1);
+  Accuracy := 4;
+  Name := 'Ток';
+  ShrtName := 'I';
+  Dimensions.Clear;
+  SetDimension('мА', 1);
+  SetDim(0);
+  MaxValue := 20;
+  MinValue := 0;
+  MaxNomValue := 20;
+  MinNomValue := 4;
+  Error := 0.02;
+  CoefK := 1;
+  CoefP := 0;
+  SetValue(4.0);
+end;
+
+procedure TMeterValue.SetAsMassCoef;
+begin
+  ValueType := CONST_TYPE;
+  Value := 100;
+  SetFilter(-1);
+  Accuracy := 5;
+  ShrtName := 'Km';
+  Name := 'Коэфициент по массе';
+  Dimensions.Clear;
+  SetDimension('имп/кг', 1);
+  SetDimension('кг/имп', 1, 1, True);
+  SetDim(0);
+  Error := 0.01;
+  MaxValue := MaxDouble;
+  MinValue := 0.00000000001;
+end;
+
+procedure TMeterValue.SetAsVolumeCoef;
+begin
+  ValueType := CONST_TYPE;
+  Value := 100;
+  SetFilter(-1);
+  Accuracy := 5;
+  Error := 0.01;
+  ShrtName := 'Kv';
+  Name := 'Коэфициент по объему';
+  Dimensions.Clear;
+  SetDimension('имп/л', 1, 1, False);
+  SetDimension('л/имп', 1, 1, True);
+  SetDim(0);
+  MaxValue := MaxDouble;
+  MinValue := 0.00000000001;
+end;
+
+procedure TMeterValue.SetAsHumidity;
+begin
+  ValueType := CONST_TYPE;
+  Value := 35;
+  SetFilter(-1);
+  Accuracy := 4;
+  Name := 'Влажность';
+  ShrtName := 'φ атм';
+  Dimensions.Clear;
+  SetDimension('%', 1);
+  SetDim(0);
+  MaxValue := 100;
+  MinValue := 0;
+  MaxNomValue := 60;
+  MinNomValue := 20;
 end;
 
 procedure TMeterValue.SetCalcValue;
@@ -902,7 +1232,7 @@ begin
 
       if not Hash.IsEmpty then
         MV.Hash := Hash;
-      MV.IsToSave := Ini.ReadBool(Section, 'IsToSave', True);
+      MV.IsToSave := True;
       MV.HashOwner := Ini.ReadString(Section, 'HashOwner', '');
       MV.NameOwner := Ini.ReadString(Section, 'NameOwner', '');
       MV.Name := Ini.ReadString(Section, 'Name', '');
@@ -959,8 +1289,7 @@ begin
         CoefItem.InUse := Ini.ReadBool(Section + '.Coef.' + IntToStr(J), 'InUse', True);
         MV.Coefs.Add(CoefItem);
       end;
-      if MV.IsToSave then
-        FMeterValuesSaves.Add(MV);
+      MV.SetToSave(True);
     end;
   finally
     Ini.Free;

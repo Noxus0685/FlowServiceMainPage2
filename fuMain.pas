@@ -386,6 +386,7 @@ end;
 
 destructor TFormMain.Destroy;
 begin
+  TMeterValue.SaveToFile(0);
   FWorkTableManager.Free;
   FFlowMeters.Free;
   inherited;
@@ -396,6 +397,8 @@ var
   OT: TOutputType;
 
 begin
+  TMeterValue.LoadFromFile;
+
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
     'TableSettings.ini'
