@@ -302,8 +302,6 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
-    procedure GridDevicesEditingDone(Sender: TObject; const ACol,
-      ARow: Integer);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
@@ -419,10 +417,6 @@ begin
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
 
   SetLength(FRows, 0);
-
-  GridDevices.OnGetValue := GridDevicesGetValue;
-  GridDevices.OnSetValue := GridDevicesSetValue;
-  GridDevices.OnCellClick := GridDevicesCellClick;
 
   InitFlowMeters;
   InitTables;
@@ -813,7 +807,7 @@ begin
       FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
   end;
 
-  if (Column = PopupColumnDeviceSignal1 ) then
+    if (Column = PopupColumnDeviceSignal1 ) then
   begin
     GridDevices.ReadOnly:=False;
     GridDevices.EditorMode := True;
@@ -849,12 +843,6 @@ begin
   finally
     GridDevices.EndUpdate;
   end;
-end;
-
-procedure TFormMain.GridDevicesEditingDone(Sender: TObject; const ACol,
-  ARow: Integer);
-begin
-         GridDevices.ReadOnly:=True;
 end;
 
 procedure TFormMain.GridDevicesGetValue(Sender: TObject; const ACol,

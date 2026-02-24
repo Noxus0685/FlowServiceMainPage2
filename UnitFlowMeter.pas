@@ -707,9 +707,7 @@ begin
     Exit;
 
   case MeterFlowCategory of
-    mftUnknownType,
     mftWeightsType,
-
     mftMassFlowmeterType:
       begin
         case MeterFlowCategory of
@@ -736,7 +734,7 @@ begin
         ValueQuantity := ValueMass;
         ValueFlow := ValueMassFlow;
       end;
-
+    mftUnknownType,
     mftVolumeFlowmeterType,
     mftTankType:
       begin
