@@ -2579,4 +2579,14 @@ object FormMain: TFormMain
       OnExecute = ActionSaveWorkTableExecute
     end
   end
+  object TimerSetValues: TTimer
+    OnTimer = TimerSetValuesTimer
+    Left = 778
+    Top = 260
+  end
+  object TimerMain: TTimer
+    OnTimer = TimerMainTimer
+    Left = 874
+    Top = 412
+  end
 end

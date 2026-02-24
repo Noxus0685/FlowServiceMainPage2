@@ -5,6 +5,7 @@ interface
 uses
   fuTypeSelect,
   UnitDataManager,
+  UnitMeterValue,
   UnitDeviceClass,
   UnitFlowMeter,
   UnitClasses,
@@ -291,6 +292,8 @@ type
     miMesurment: TMenuItem;
     miConditions: TMenuItem;
     SpeedButtonMinimizePumpLayout: TSpeedButton;
+    TimerSetValues: TTimer;
+    TimerMain: TTimer;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

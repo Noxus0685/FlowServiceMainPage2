@@ -1114,9 +1114,9 @@ var
   CoefItem: TCoef;
 begin
   FMeterValuesSaves.Clear;
-  for MV in FMeterValues do
-    if MV.IsToSave then
-      FMeterValuesSaves.Add(MV);
+ // for MV in FMeterValues do
+//    if MV.IsToSave then
+ //     FMeterValuesSaves.Add(MV);
 
   if IsBackUp = 0 then
     FileName := TPath.Combine(ExtractFilePath(ParamStr(0)), 'MeterValues.ini')
