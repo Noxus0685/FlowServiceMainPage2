@@ -13,6 +13,8 @@ uses
   System.Generics.Collections;
 
 type
+  TWorkTable = class;
+
   TSpillState = (
     ssNone,
     ssReady,
@@ -108,6 +110,8 @@ type
     property ValueImpTotal: TMeterValue read FValueImpTotal;
     property ValueCurrent: TMeterValue read FValueCurrent;
     property ValueInterface: TMeterValue read FValueInterface;
+
+    procedure RebindFlowMeterValues(const AWorkTable: TWorkTable);
   end;
 
   TWorkTable = class
@@ -210,6 +214,9 @@ type
     property ValueAirPressure: TMeterValue read FValueAirPressure;
     property ValueAirTemperture: TMeterValue read FValueAirTemperture;
     property ValueHumidity: TMeterValue read FValueHumidity;
+
+    procedure RebindAllFlowMeters;
+    procedure RecalculateAllMeterValues;
   end;
 
   TWorkTableManager = class
@@ -295,6 +302,29 @@ begin
     Exit;
 
   FFlowMeter.Init(DeviceUUID);
+end;
+
+procedure TChannel.RebindFlowMeterValues(const AWorkTable: TWorkTable);
+begin
+  if (FFlowMeter = nil) then
+    Exit;
+
+  // Импульсы и ток прибора берём напрямую из канала.
+  FFlowMeter.ValueImp := FValueImp;
+  FFlowMeter.ValueImpTotal := FValueImpTotal;
+  FFlowMeter.ValueCurrent := FValueCurrent;
+
+  if AWorkTable <> nil then
+  begin
+    // Температура/давление и атмосферные условия берём из рабочего стола.
+    FFlowMeter.ValueTemperture := AWorkTable.ValueTempertureBefore;
+    FFlowMeter.ValuePressure := AWorkTable.ValuePressureBefore;
+    FFlowMeter.ValueAirPressure := AWorkTable.ValueAirPressure;
+    FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
+    FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
+  end;
+
+  FFlowMeter.InitHashValues;
 end;
 
 // =====================================================
@@ -532,6 +562,7 @@ function TWorkTable.AddDeviceChannel: TChannel;
 begin
   Result := TChannel.Create;
   FDeviceChannels.Add(Result);
+  Result.RebindFlowMeterValues(Self);
 end;
 
 function TWorkTable.AddDeviceChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
@@ -545,12 +576,77 @@ begin
   Result.Signal := ASignal;
   Result.DeviceUUID := ADeviceUUID;
   Result.Init;
+  Result.RebindFlowMeterValues(Self);
 end;
 
 function TWorkTable.AddEtalonChannel: TChannel;
 begin
   Result := TChannel.Create;
   FEtalonChannels.Add(Result);
+  Result.RebindFlowMeterValues(Self);
+end;
+
+procedure TWorkTable.RebindAllFlowMeters;
+var
+  I: Integer;
+begin
+  for I := 0 to FDeviceChannels.Count - 1 do
+    FDeviceChannels[I].RebindFlowMeterValues(Self);
+
+  for I := 0 to FEtalonChannels.Count - 1 do
+    FEtalonChannels[I].RebindFlowMeterValues(Self);
+end;
+
+procedure TWorkTable.RecalculateAllMeterValues;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  RebindAllFlowMeters;
+
+  if FValueTempertureBefore <> nil then FValueTempertureBefore.SetValue(FValueTempertureBefore.GetDoubleValue);
+  if FValueTempertureAfter <> nil then FValueTempertureAfter.SetValue(FValueTempertureAfter.GetDoubleValue);
+  if FValueTempertureDelta <> nil then FValueTempertureDelta.SetValue(FValueTempertureDelta.GetDoubleValue);
+  if FValuePressureBefore <> nil then FValuePressureBefore.SetValue(FValuePressureBefore.GetDoubleValue);
+  if FValuePressureAfter <> nil then FValuePressureAfter.SetValue(FValuePressureAfter.GetDoubleValue);
+  if FValuePressureDelta <> nil then FValuePressureDelta.SetValue(FValuePressureDelta.GetDoubleValue);
+  if FValueAirPressure <> nil then FValueAirPressure.SetValue(FValueAirPressure.GetDoubleValue);
+  if FValueAirTemperture <> nil then FValueAirTemperture.SetValue(FValueAirTemperture.GetDoubleValue);
+  if FValueHumidity <> nil then FValueHumidity.SetValue(FValueHumidity.GetDoubleValue);
+
+  for I := 0 to FDeviceChannels.Count - 1 do
+  begin
+    Channel := FDeviceChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if Channel.ValueImp <> nil then Channel.ValueImp.SetValue(Channel.ValueImp.GetDoubleValue);
+    if Channel.ValueImpTotal <> nil then Channel.ValueImpTotal.SetValue(Channel.ValueImpTotal.GetDoubleValue);
+    if Channel.ValueCurrent <> nil then Channel.ValueCurrent.SetValue(Channel.ValueCurrent.GetDoubleValue);
+
+    if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue(Channel.FlowMeter.ValueFlow.GetDoubleValue);
+    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue(Channel.FlowMeter.ValueQuantity.GetDoubleValue);
+    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue(Channel.FlowMeter.ValueVolume.GetDoubleValue);
+    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue(Channel.FlowMeter.ValueMass.GetDoubleValue);
+    if Channel.FlowMeter.ValueTime <> nil then Channel.FlowMeter.ValueTime.SetValue(Channel.FlowMeter.ValueTime.GetDoubleValue);
+  end;
+
+  for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if Channel.ValueImp <> nil then Channel.ValueImp.SetValue(Channel.ValueImp.GetDoubleValue);
+    if Channel.ValueImpTotal <> nil then Channel.ValueImpTotal.SetValue(Channel.ValueImpTotal.GetDoubleValue);
+    if Channel.ValueCurrent <> nil then Channel.ValueCurrent.SetValue(Channel.ValueCurrent.GetDoubleValue);
+
+    if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue(Channel.FlowMeter.ValueFlow.GetDoubleValue);
+    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue(Channel.FlowMeter.ValueQuantity.GetDoubleValue);
+    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue(Channel.FlowMeter.ValueVolume.GetDoubleValue);
+    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue(Channel.FlowMeter.ValueMass.GetDoubleValue);
+    if Channel.FlowMeter.ValueTime <> nil then Channel.FlowMeter.ValueTime.SetValue(Channel.FlowMeter.ValueTime.GetDoubleValue);
+  end;
 end;
 
 function TWorkTable.AddEtalonChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
@@ -564,6 +660,7 @@ begin
   Result.Signal := ASignal;
   Result.DeviceUUID := ADeviceUUID;
   Result.Init;
+  Result.RebindFlowMeterValues(Self);
 end;
 
 class procedure TWorkTable.Save(const AIniFileName: string;
@@ -711,6 +808,8 @@ begin
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
+      WorkTable.RebindAllFlowMeters;
+      WorkTable.RecalculateAllMeterValues;
 
       AWorkTables.Add(WorkTable);
     end;

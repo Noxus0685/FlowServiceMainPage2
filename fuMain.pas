@@ -324,6 +324,8 @@ type
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
+    FNextClimateChangeAt: TDateTime;
+    procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
     procedure OpenTypeSelect(ARow: Integer);
     procedure InitFlowMeters;
     procedure InitTables;
@@ -438,8 +440,11 @@ begin
   InitTables;
 
   FLastClickRow := -1;
-FLastClickCol := nil;
-FLastClickTick := 0;
+  FLastClickCol := nil;
+  FLastClickTick := 0;
+
+  Randomize;
+  FNextClimateChangeAt := Now;
 end;
 
 function TFormMain.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
@@ -467,7 +472,9 @@ begin
     TableCount := FWorkTableManager.WorkTables.Count;
 
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
-    FActiveWorkTable:= GetWorkTableByIndex(0);
+  FActiveWorkTable := GetWorkTableByIndex(0);
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.RebindAllFlowMeters;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
@@ -653,6 +660,25 @@ begin
   FWorkTableManager.Save;
 end;
 
+procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
+var
+  TempDelta, PressDelta: Double;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
+  begin
+    TempDelta := (Random * 0.30) - 0.15;
+    PressDelta := (Random * 0.06) - 0.03;
+
+    AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
+    AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
+
+    FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
+  end;
+end;
+
 procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -663,6 +689,8 @@ begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
+
+  UpdateRandomClimate(WorkTable);
 
   // Основные MeterValues рабочего стола.
   WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
@@ -681,6 +709,9 @@ begin
     DeviceChannel.FlowMeter.ValueQuantity.SetValue(DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
     DeviceChannel.FlowMeter.ValueVolume.SetValue(DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue);
     DeviceChannel.FlowMeter.ValueTemperture.SetValue(WorkTable.Temp);
+    DeviceChannel.FlowMeter.ValuePressure.SetValue(WorkTable.Press);
+    DeviceChannel.FlowMeter.ValueCurrent.SetValue(DeviceChannel.ValueCurrent.GetDoubleValue);
+    DeviceChannel.FlowMeter.ValueImp.SetValue(DeviceChannel.ValueImp.GetDoubleValue);
     DeviceChannel.FlowMeter.ValueTime.SetValue(WorkTable.Time);
   end;
 
@@ -695,8 +726,13 @@ begin
     EtalonChannel.FlowMeter.ValueQuantity.SetValue(EtalonChannel.FlowMeter.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
     EtalonChannel.FlowMeter.ValueVolume.SetValue(EtalonChannel.FlowMeter.ValueQuantity.GetDoubleValue);
     EtalonChannel.FlowMeter.ValueTemperture.SetValue(WorkTable.Temp);
+    EtalonChannel.FlowMeter.ValuePressure.SetValue(WorkTable.Press);
+    EtalonChannel.FlowMeter.ValueCurrent.SetValue(EtalonChannel.ValueCurrent.GetDoubleValue);
+    EtalonChannel.FlowMeter.ValueImp.SetValue(EtalonChannel.ValueImp.GetDoubleValue);
     EtalonChannel.FlowMeter.ValueTime.SetValue(WorkTable.Time);
   end;
+
+  WorkTable.RecalculateAllMeterValues;
 end;
 
 procedure TFormMain.TimerMainTimer(Sender: TObject);
@@ -731,6 +767,15 @@ begin
     LabelTime.Text := MeterValueToText(DeviceMeter.ValueTime, '0.0');
     LabelFlowRate.Text := MeterValueToText(DeviceMeter.ValueFlow, '0.###');
     LabelTemp.Text := MeterValueToText(DeviceMeter.ValueTemperture, '0.##');
+    LabelVolume.Text := MeterValueToText(DeviceMeter.ValueQuantity, '0.###');
+    LabelImp.Text := MeterValueToText(DeviceMeter.ValueImp, '0');
+    EditPres.Text := MeterValueToText(DeviceMeter.ValuePressure, '0.###');
+  end
+  else
+  begin
+    LabelVolume.Text := MeterValueToText(nil, '0.###');
+    LabelImp.Text := MeterValueToText(nil, '0');
+    EditPres.Text := MeterValueToText(nil, '0.###');
   end;
 
   // Явно используем основные колонки (данные берутся через GridDevicesGetValue/GridEtalonsGetValue).
@@ -869,6 +914,7 @@ begin
     {----------------------------------------------------}
     { 6. Обновляем UI }
     {----------------------------------------------------}
+    FActiveWorkTable.RecalculateAllMeterValues;
     UpdateGridDevices;  // подставь имя своего грида
     // SetModified;
   finally
