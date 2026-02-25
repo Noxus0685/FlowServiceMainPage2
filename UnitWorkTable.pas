@@ -284,6 +284,13 @@ begin
   FValueCurrent.SetToSave(True);
 
   FValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+  begin
+    FValueInterface.Name := 'Интерфейс';
+    FValueInterface.ShrtName := 'Интерфейс';
+    FValueInterface.DependenceType := INDEPENDENT;
+    FValueInterface.UpdateType := ONLINE_TYPE;
+  end;
   FValueInterface.SetToSave(True);
 end;
 
@@ -941,6 +948,13 @@ begin
     end;
     Channel.FValueCurrent.SetToSave(True);
     Channel.FValueInterface := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueInterface, IsExisted, Channel.UUID, Channel.Name);
+    if IsExisted = 0 then
+    begin
+      Channel.FValueInterface.Name := 'Интерфейс';
+      Channel.FValueInterface.ShrtName := 'Интерфейс';
+      Channel.FValueInterface.DependenceType := INDEPENDENT;
+      Channel.FValueInterface.UpdateType := ONLINE_TYPE;
+    end;
     Channel.FValueInterface.SetToSave(True);
 
     Channel.Init;

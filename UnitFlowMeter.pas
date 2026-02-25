@@ -554,18 +554,30 @@ begin
     ValueTime.SetAsTime;
 
   ValuePressure := TMeterValue.GetExistedMeterValueBool(HashValuePressure, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValuePressure.SetAsPressure;
 
   ValueTemperture := TMeterValue.GetExistedMeterValueBool(HashValueTemperture, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValueTemperture.SetAsTemp;
 
   ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValueDensity.SetAsDensity;
   ValueDensity.ValueBaseMultiplier := ValueTemperture;
   ValueDensity.ValueBaseDevider := ValuePressure;
   ValueDensity.ValueRate := nil;
   ValueDensity.ValueEtalon := nil;
 
   ValueAirPressure := TMeterValue.GetExistedMeterValueBool(HashValueAirPressure, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValueAirPressure.SetAsAirPressure;
   ValueAirTemperture := TMeterValue.GetExistedMeterValueBool(HashValueAirTemperture, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValueAirTemperture.SetAsAirTemp;
   ValueHumidity := TMeterValue.GetExistedMeterValueBool(HashValueHumidity, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValueHumidity.SetAsHumidity;
 
   ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, UUID, Name);
   if IsExisted = 0 then
@@ -575,7 +587,9 @@ begin
   if IsExisted = 0 then
     ValueImpTotal.SetAsImp;
 
-  ValueCoef := TMeterValue.GetExistedMeterValueBool(HashValueCoef, IsExisted, UUID, Name);
+  ValueCoef := nil;
+  if not HashValueCoef.IsEmpty then
+    ValueCoef := TMeterValue.GetExistedMeterValueBool(HashValueCoef, IsExisted, UUID, Name);
 
   ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
