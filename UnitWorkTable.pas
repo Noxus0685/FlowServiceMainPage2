@@ -9,6 +9,7 @@ uses
   UnitClasses,
   UnitDataManager,
   System.SysUtils,
+  System.StrUtils,
   System.IniFiles,
   System.Generics.Collections;
 
@@ -27,6 +28,7 @@ type
   TChannel = class(TTypeEntity)
   private
     FEnabled: Boolean;
+    FText: string;
 
     // Çíà÷åíèÿ êàíàëà (ÍÅ ïðîêñè)
     FImpSec: Double;
@@ -91,6 +93,7 @@ type
 
     property Enabled: Boolean read FEnabled write FEnabled;
     property Name: string read FName write FName;
+    property Text: string read FText write FText;
 
     // Ïðîêñè-ïîëÿ (äóáëèðóþò FlowMeter)
     property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
@@ -118,6 +121,7 @@ type
   private
     FID: Integer;
     FName: string;
+    FText: string;
 
     FDeviceChannels: TObjectList<TChannel>;
     FEtalonChannels: TObjectList<TChannel>;
@@ -173,6 +177,11 @@ type
     constructor Create;
     destructor Destroy; override;
 
+    class function BuildWorkTableServiceName(const ATableIndex: Integer): string; static;
+    class function BuildDeviceChannelServiceName(const AChannelIndex: Integer): string; static;
+    class function BuildEtalonChannelServiceName(const AChannelIndex: Integer): string; static;
+    class function BuildChannelDefaultText(const AChannelIndex: Integer): string; static;
+
     function AddDeviceChannel: TChannel; overload;
     function AddDeviceChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
         ATypeName, ASerial, ADeviceUUID: string): TChannel; overload;
@@ -189,6 +198,7 @@ type
 
     property ID: Integer read FID write FID;
     property Name: string read FName write FName;
+    property Text: string read FText write FText;
 
     property DeviceChannels: TObjectList<TChannel> read FDeviceChannels;
     property EtalonChannels: TObjectList<TChannel> read FEtalonChannels;
@@ -249,6 +259,7 @@ begin
 
   FEnabled := False;
   FName:= 'Канал';
+  FText := '1';
   FImpSec := 0;
   FImpResult := 0;
   FCurSec := 0;
@@ -469,6 +480,7 @@ begin
 
   FState := ssNone;
   FTableClamped := False;
+  FText := 'Рабочий стол 1';
 
   Temp:= 20.2;
   TempDelta:=0.1;
@@ -574,8 +586,14 @@ begin
 end;
 
 function TWorkTable.AddDeviceChannel: TChannel;
+var
+  ChannelIndex: Integer;
 begin
+  ChannelIndex := FDeviceChannels.Count + 1;
   Result := TChannel.Create;
+  Result.ID := ChannelIndex;
+  Result.Name := BuildDeviceChannelServiceName(ChannelIndex);
+  Result.Text := BuildChannelDefaultText(ChannelIndex);
   FDeviceChannels.Add(Result);
   Result.RebindFlowMeterValues(Self);
 end;
@@ -585,7 +603,7 @@ function TWorkTable.AddDeviceChannel(const AEnabled: Boolean; const ASignal: Int
 begin
   Result := AddDeviceChannel;
   Result.Enabled := AEnabled;
-  Result.Name := AName;
+  Result.Text := AName;
   Result.TypeName := ATypeName;
   Result.Serial := ASerial;
   Result.Signal := ASignal;
@@ -595,8 +613,14 @@ begin
 end;
 
 function TWorkTable.AddEtalonChannel: TChannel;
+var
+  ChannelIndex: Integer;
 begin
+  ChannelIndex := FEtalonChannels.Count + 1;
   Result := TChannel.Create;
+  Result.ID := ChannelIndex;
+  Result.Name := BuildEtalonChannelServiceName(ChannelIndex);
+  Result.Text := BuildChannelDefaultText(ChannelIndex);
   FEtalonChannels.Add(Result);
   Result.RebindFlowMeterValues(Self);
 end;
@@ -669,7 +693,7 @@ function TWorkTable.AddEtalonChannel(const AEnabled: Boolean; const ASignal: Int
 begin
   Result := AddEtalonChannel;
   Result.Enabled := AEnabled;
-  Result.Name := AName;
+  Result.Text := AName;
   Result.TypeName := ATypeName;
   Result.Serial := ASerial;
   Result.Signal := ASignal;
@@ -703,9 +727,14 @@ begin
       WorkTable := AWorkTables[I];
       Section := 'WorkTable.' + IntToStr(I);
 
+      WorkTable.Name := BuildWorkTableServiceName(WorkTable.ID);
+      if Trim(WorkTable.Text) = '' then
+        WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+
       Ini.EraseSection(Section);
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
+      Ini.WriteString(Section, 'Text', WorkTable.Text);
       Ini.WriteFloat(Section, 'Temp', WorkTable.Temp);
       Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
       Ini.WriteFloat(Section, 'Press', WorkTable.Press);
@@ -776,7 +805,10 @@ begin
       WorkTable := TWorkTable.Create;
 
       WorkTable.ID := Ini.ReadInteger(Section, 'ID', I + 1);
-      WorkTable.Name := Ini.ReadString(Section, 'Name', '');
+      WorkTable.Name := BuildWorkTableServiceName(WorkTable.ID);
+      WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
+      if Trim(WorkTable.Text) = '' then
+        WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
       WorkTable.Temp := Ini.ReadFloat(Section, 'Temp', 0);
       WorkTable.TempDelta := Ini.ReadFloat(Section, 'TempDelta', 0);
       WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
@@ -852,11 +884,18 @@ begin
     Channel := AChannels[I];
     Section := ASectionPrefix + '.' + IntToStr(I);
 
+    Channel.ID := I + 1;
+    if EndsText('.Etalon', ASectionPrefix) then
+      Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
+    else
+      Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+
     AIni.EraseSection(Section);
     AIni.WriteInteger(Section, 'ID', Channel.ID);
     AIni.WriteString(Section, 'UUID', Channel.UUID);
     AIni.WriteBool(Section, 'Enabled', Channel.Enabled);
     AIni.WriteString(Section, 'Name', Channel.Name);
+    AIni.WriteString(Section, 'Text', Channel.Text);
     AIni.WriteString(Section, 'TypeName', Channel.TypeName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
@@ -898,7 +937,13 @@ begin
     Channel.ID := AIni.ReadInteger(Section, 'ID', I + 1);
     Channel.UUID := AIni.ReadString(Section, 'UUID', '');
     Channel.Enabled := AIni.ReadBool(Section, 'Enabled', True);
-    Channel.Name := AIni.ReadString(Section, 'Name', '');
+    if EndsText('.Etalon', ASectionPrefix) then
+      Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
+    else
+      Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+    Channel.Text := AIni.ReadString(Section, 'Text', BuildChannelDefaultText(I + 1));
+    if Trim(Channel.Text) = '' then
+      Channel.Text := BuildChannelDefaultText(I + 1);
     Channel.TypeName := AIni.ReadString(Section, 'TypeName', '');
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
     Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
@@ -961,6 +1006,26 @@ begin
 
     AChannels.Add(Channel);
   end;
+end;
+
+class function TWorkTable.BuildWorkTableServiceName(const ATableIndex: Integer): string;
+begin
+  Result := 'Рабочий стол ' + IntToStr(ATableIndex);
+end;
+
+class function TWorkTable.BuildDeviceChannelServiceName(const AChannelIndex: Integer): string;
+begin
+  Result := 'Канал поверяемых приборов ' + IntToStr(AChannelIndex);
+end;
+
+class function TWorkTable.BuildEtalonChannelServiceName(const AChannelIndex: Integer): string;
+begin
+  Result := 'Канал эталонов ' + IntToStr(AChannelIndex);
+end;
+
+class function TWorkTable.BuildChannelDefaultText(const AChannelIndex: Integer): string;
+begin
+  Result := IntToStr(AChannelIndex);
 end;
 
 class function TWorkTable.SpillStateFromString(const AValue: string): TSpillState;
