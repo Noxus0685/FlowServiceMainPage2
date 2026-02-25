@@ -715,11 +715,11 @@ begin
 
   if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
   begin
-    TempDelta := (Random * 0.30) - 0.15;
-    PressDelta := (Random * 0.06) - 0.03;
+    TempDelta := 20+ (Random * 0.30) - 0.15;
+    PressDelta := 0.1 + (Random * 0.06) - 0.03;
 
-    AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-    AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
+   // AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
+   // AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
 
     FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
   end;

@@ -92,8 +92,8 @@ object FormMain: TFormMain
                 OnGetValue = GridEtalonsGetValue
                 OnSetValue = GridEtalonsSetValue
                 OnCellClick = GridEtalonsCellClick
-                Viewport.Width = 1260.000000000000000000
-                Viewport.Height = 120.000000000000000000
+                Viewport.Width = 1256.000000000000000000
+                Viewport.Height = 95.000000000000000000
                 object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
@@ -179,8 +179,8 @@ object FormMain: TFormMain
               OnGetValue = GridDevicesGetValue
               OnSetValue = GridDevicesSetValue
               OnCellClick = GridDevicesCellClick
-              Viewport.Width = 1260.000000000000000000
-              Viewport.Height = 268.000000000000000000
+              Viewport.Width = 1240.000000000000000000
+              Viewport.Height = 243.000000000000000000
               object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
