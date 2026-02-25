@@ -498,6 +498,10 @@ begin
     if WorkTable = nil then
       Continue;
 
+    Tab := FindComponent('TabItemWorkTable' + IntToStr(I)) as TTabItem;
+    if Assigned(Tab) then
+      Tab.Text := WorkTable.Text;
+
     GridEtalonsN := FindComponent('GridEtalons' + IntToStr(I)) as TGrid;
     if (GridEtalonsN = nil) and (I = 1) then
       GridEtalonsN := GridEtalons;
@@ -524,7 +528,7 @@ begin
       for TableCount := 0 to WorkTable.EtalonChannels.Count - 1 do
       begin
         FRows[TableCount].Enabled := WorkTable.EtalonChannels[TableCount].Enabled;
-        FRows[TableCount].ChannelName := WorkTable.EtalonChannels[TableCount].Name;
+        FRows[TableCount].ChannelName := WorkTable.EtalonChannels[TableCount].Text;
         FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].TypeName;
         FRows[TableCount].Serial := WorkTable.EtalonChannels[TableCount].Serial;
         FRows[TableCount].SignalName := GetOutputTypeName(WorkTable.EtalonChannels[TableCount].Signal);
@@ -598,7 +602,8 @@ begin
 
   WorkTable := TWorkTable.Create;
   WorkTable.ID := FWorkTableManager.WorkTables.Count + 1;
-  WorkTable.Name := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+  WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
+  WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
   FWorkTableManager.WorkTables.Add(WorkTable);
 
   InitTables;
@@ -624,7 +629,7 @@ begin
   WorkTable.AddDeviceChannel(
     True,
     -1,
-    'Канал приборов ' + IntToStr(ChannelIndex),
+    TWorkTable.BuildChannelDefaultText(ChannelIndex),
     '',
     'Импульсный',
     ''
@@ -646,7 +651,7 @@ begin
   WorkTable.AddEtalonChannel(
     True,
     -1,
-    'Канал эталонов ' + IntToStr(ChannelIndex),
+    TWorkTable.BuildChannelDefaultText(ChannelIndex),
 
     '',
     'Импульсный',
@@ -1063,7 +1068,7 @@ begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
       Value := WorkTable.DeviceChannels[ARow].Enabled
     else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
-      Value := WorkTable.DeviceChannels[ARow].Name
+      Value := WorkTable.DeviceChannels[ARow].Text
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
       Value := WorkTable.DeviceChannels[ARow].TypeName
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
@@ -1105,7 +1110,7 @@ begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
       WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean
     else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
-      WorkTable.DeviceChannels[ARow].Name := Value.AsString
+      WorkTable.DeviceChannels[ARow].Text := Value.AsString
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
       WorkTable.DeviceChannels[ARow].TypeName := Value.AsString
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
@@ -1204,7 +1209,7 @@ begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
       Value := WorkTable.EtalonChannels[ARow].Enabled
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
-      Value := WorkTable.EtalonChannels[ARow].Name
+      Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
       Value := WorkTable.EtalonChannels[ARow].TypeName
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
@@ -1274,7 +1279,7 @@ begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
       WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
-      WorkTable.EtalonChannels[ARow].Name := Value.AsString
+      WorkTable.EtalonChannels[ARow].Text := Value.AsString
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
       WorkTable.EtalonChannels[ARow].TypeName := Value.AsString
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
