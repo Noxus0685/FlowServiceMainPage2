@@ -462,6 +462,14 @@ begin
 
   FState := ssNone;
   FTableClamped := False;
+
+  Temp:= 20.2;
+  TempDelta:=0.1;
+  Press:=101.1;
+  PressDelta:=0.1;
+  FlowRate:=10;
+
+
   InitMeterValues;
 end;
 

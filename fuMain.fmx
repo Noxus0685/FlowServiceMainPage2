@@ -2555,6 +2555,16 @@ object FormMain: TFormMain
       Text = 'miConditions'
     end
   end
+  object TimerSetValues: TTimer
+    OnTimer = TimerSetValuesTimer
+    Left = 778
+    Top = 260
+  end
+  object TimerMain: TTimer
+    OnTimer = TimerMainTimer
+    Left = 874
+    Top = 412
+  end
   object ActionListWorkTables: TActionList
     Left = 922
     Top = 428
@@ -2578,15 +2588,5 @@ object FormMain: TFormMain
       Text = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1088#1072#1073#1086#1095#1091#1102' '#1089#1088#1077#1076#1091
       OnExecute = ActionSaveWorkTableExecute
     end
-  end
-  object TimerSetValues: TTimer
-    OnTimer = TimerSetValuesTimer
-    Left = 778
-    Top = 260
-  end
-  object TimerMain: TTimer
-    OnTimer = TimerMainTimer
-    Left = 874
-    Top = 412
   end
 end
