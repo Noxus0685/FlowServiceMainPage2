@@ -272,7 +272,7 @@ begin
   Values := TList<Double>.Create;
   AverValues := TList<Single>.Create;
   Coefs := TList<TCoef>.Create;
-  IsToSave := True;
+  IsToSave := False;
   FMeterValues.Add(Self);
   FMeterValuesSaves.Add(Self);
 end;

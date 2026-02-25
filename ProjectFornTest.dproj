@@ -326,10 +326,14 @@
             <FormType>dfm</FormType>
             <DesignClass>TDataModule</DesignClass>
         </DCCReference>
-        <DCCReference Include="UnitMeterValue.pas"/>
         <DCCReference Include="UnitClasses.pas"/>
         <DCCReference Include="UnitFlowMeter.pas"/>
         <DCCReference Include="UnitWorkTable.pas"/>
+        <DCCReference Include="fuMeterValues.pas">
+            <Form>FormMeterValues</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
+        <DCCReference Include="UnitMeterValue.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

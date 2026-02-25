@@ -13,10 +13,11 @@ uses
   fuDeviceSelect in 'fuDeviceSelect.pas' {FormDeviceSelect},
   fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor},
   uDATA in 'uDATA.pas' {DM: TDataModule},
-  UnitMeterValue in 'UnitMeterValue.pas',
   UnitClasses in 'UnitClasses.pas',
   UnitFlowMeter in 'UnitFlowMeter.pas',
-  UnitWorkTable in 'UnitWorkTable.pas';
+  UnitWorkTable in 'UnitWorkTable.pas',
+  fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
+  UnitMeterValue in 'UnitMeterValue.pas';
 
 {$R *.res}
 
@@ -47,6 +48,7 @@ begin
  // Application.CreateForm(TFormTypeSelect, FormTypeSelect);
 //  Application.CreateForm(TFormTypeEditor, FormTypeEditor);
   Application.CreateForm(TFormMain, FormMain);
+  Application.CreateForm(TFormMeterValues, FormMeterValues);
   //  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
 //  Application.CreateForm(TDM, DM);
   Application.Run;

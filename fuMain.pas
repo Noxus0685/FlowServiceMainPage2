@@ -295,6 +295,8 @@ type
     SpeedButtonMinimizePumpLayout: TSpeedButton;
     TimerSetValues: TTimer;
     TimerMain: TTimer;
+    ActionMeterValueProperties: TAction;
+    MenuItem8: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -622,7 +624,7 @@ begin
   WorkTable.AddDeviceChannel(
     True,
     -1,
-    IntToStr(ChannelIndex),
+    'Канал приборов ' + IntToStr(ChannelIndex),
     '',
     'Импульсный',
     ''
@@ -644,7 +646,7 @@ begin
   WorkTable.AddEtalonChannel(
     True,
     -1,
-    IntToStr(ChannelIndex),
+    'Канал эталонов ' + IntToStr(ChannelIndex),
 
     '',
     'Импульсный',
@@ -661,6 +663,8 @@ begin
 
   FWorkTableManager.Save;
 end;
+
+
 
 procedure TFormMain.ActionMeterValuesPropertiesExecute(Sender: TObject);
 var

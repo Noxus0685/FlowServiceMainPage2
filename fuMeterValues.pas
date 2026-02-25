@@ -1,4 +1,4 @@
-unit fuMeterValues;
+﻿unit fuMeterValues;
 
 interface
 
@@ -8,8 +8,7 @@ uses
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
   FMX.Controls.Presentation, FMX.StdCtrls, FMX.TabControl, FMX.Edit,
   FMX.Layouts, FMX.Objects, FMX.Grid, FMX.Grid.Style, FMX.ScrollBox,
-  FMX.Tee.Chart, FMX.Tee.Engine, FMX.Tee.Procs,
-  UnitMeterValue;
+  UnitMeterValue, System.Rtti, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart;
 
 type
   TFormMeterValues = class(TForm)

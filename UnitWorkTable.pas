@@ -247,8 +247,8 @@ begin
 
   FFlowMeter := TFlowMeter.Create;
 
-  FEnabled := True;
-
+  FEnabled := False;
+  FName:= 'Канал';
   FImpSec := 0;
   FImpResult := 0;
   FCurSec := 0;

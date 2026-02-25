@@ -92,8 +92,8 @@ object FormMain: TFormMain
                 OnGetValue = GridEtalonsGetValue
                 OnSetValue = GridEtalonsSetValue
                 OnCellClick = GridEtalonsCellClick
-                Viewport.Width = 1256.000000000000000000
-                Viewport.Height = 95.000000000000000000
+                Viewport.Width = 1260.000000000000000000
+                Viewport.Height = 120.000000000000000000
                 object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
@@ -179,8 +179,8 @@ object FormMain: TFormMain
               OnGetValue = GridDevicesGetValue
               OnSetValue = GridDevicesSetValue
               OnCellClick = GridDevicesCellClick
-              Viewport.Width = 1240.000000000000000000
-              Viewport.Height = 243.000000000000000000
+              Viewport.Width = 1260.000000000000000000
+              Viewport.Height = 268.000000000000000000
               object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
@@ -2529,6 +2529,10 @@ object FormMain: TFormMain
       Action = ActionSaveWorkTable
       ImageIndex = -1
     end
+    object MenuItem8: TMenuItem
+      Action = ActionMeterValueProperties
+      ImageIndex = -1
+    end
   end
   object PopupMenuInstrumentalLayOut: TPopupMenu
     Left = 1128
@@ -2587,6 +2591,11 @@ object FormMain: TFormMain
       Category = 'WorkTable'
       Text = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1088#1072#1073#1086#1095#1091#1102' '#1089#1088#1077#1076#1091
       OnExecute = ActionSaveWorkTableExecute
+    end
+    object ActionMeterValueProperties: TAction
+      Category = 'MeterValue'
+      Text = #1057#1074#1086#1081#1089#1090#1074#1072' '#1079#1085#1072#1095#1077#1085#1080#1103
+      OnExecute = ActionMeterValuesPropertiesExecute
     end
   end
 end
