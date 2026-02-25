@@ -230,6 +230,7 @@ type
     procedure CalcCoefs;
     procedure SetToSave(AIsToSave: Boolean);
     procedure DeleteFromVector;
+    class function GetMeterValues: TObjectList<TMeterValue>; static;
   end;
 
 implementation
@@ -1340,6 +1341,11 @@ procedure TMeterValue.DeleteFromVector;
 begin
   FMeterValues.Remove(Self);
   FMeterValuesSaves.Remove(Self);
+end;
+
+class function TMeterValue.GetMeterValues: TObjectList<TMeterValue>;
+begin
+  Result := FMeterValues;
 end;
 
 end.

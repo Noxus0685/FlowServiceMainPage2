@@ -4,6 +4,7 @@ interface
 
 uses
   fuTypeSelect,
+  fuMeterValues,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -309,6 +310,7 @@ type
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
     procedure ActionSaveWorkTableExecute(Sender: TObject);
+    procedure ActionMeterValuesPropertiesExecute(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
     procedure SpeedButton2Click(Sender: TObject);
@@ -658,6 +660,46 @@ begin
     Exit;
 
   FWorkTableManager.Save;
+end;
+
+procedure TFormMain.ActionMeterValuesPropertiesExecute(Sender: TObject);
+var
+  Frm: TFormMeterValues;
+  MV: TMeterValue;
+  WorkTable: TWorkTable;
+  Row: Integer;
+begin
+  MV := nil;
+  WorkTable := FActiveWorkTable;
+
+  if (WorkTable <> nil) and (WorkTable.DeviceChannels.Count > 0) then
+  begin
+    Row := GridDevices.Row;
+    if (Row < 0) or (Row >= WorkTable.DeviceChannels.Count) then
+      Row := 0;
+
+    if (WorkTable.DeviceChannels[Row] <> nil) and
+       (WorkTable.DeviceChannels[Row].FlowMeter <> nil) then
+      MV := WorkTable.DeviceChannels[Row].FlowMeter.ValueFlow;
+  end;
+
+  if (MV = nil) and (TMeterValue.GetMeterValues <> nil) and
+     (TMeterValue.GetMeterValues.Count > 0) then
+    MV := TMeterValue.GetMeterValues[0];
+
+  if MV = nil then
+  begin
+    ShowMessage('Нет доступных MeterValue для редактирования.');
+    Exit;
+  end;
+
+  Frm := TFormMeterValues.Create(Self);
+  try
+    Frm.MeterValue := MV;
+    Frm.ShowModal;
+  finally
+    Frm.Free;
+  end;
 end;
 
 procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
