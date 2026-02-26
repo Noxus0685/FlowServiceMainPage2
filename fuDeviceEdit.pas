@@ -1009,7 +1009,7 @@ EditQmax.Text := '';
 EditQmax.TextPrompt := '';
 
 if FDevice.Qmax > 0 then
-  EditQmax.Text :=  FormatQorV(FDevice.Qmax, FDevice.Error)
+  EditQmax.Text :=  FormatByBaseError(FDevice.Qmax, FDevice.Error)
 else
   EditQmax.TextPrompt := '—';
 
@@ -1020,7 +1020,7 @@ EditQmin.Text := '';
 EditQmin.TextPrompt := '';
 
 if FDevice.Qmin > 0 then
-  EditQmin.Text :=  FormatQorV(FDevice.Qmin, FDevice.Error)
+  EditQmin.Text :=  FormatByBaseError(FDevice.Qmin, FDevice.Error)
 else
   EditQmin.TextPrompt := '—';
 end;
@@ -2376,7 +2376,7 @@ begin
       if Q <= 0 then
         Value := '—'
       else
-        Value := FormatQorV(Q, P.Error);
+        Value := FormatByBaseError(Q, P.Error);
     end
 
     {---------------------------}
@@ -2385,10 +2385,10 @@ begin
     else
     begin
       if P.LimitVolume > 0 then
-        Value := FormatQorV(P.LimitVolume, P.Error)
+        Value := FormatByBaseError(P.LimitVolume, P.Error)
 
       else if (Q > 0) and (P.LimitTime > 0) then
-        Value := FormatQorV(Q * P.LimitTime / 3.6, P.Error)
+        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error)
 
       else
         Value := '—';
