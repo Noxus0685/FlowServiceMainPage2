@@ -515,6 +515,8 @@ end;
 function TMeterValue.GetStringValue(Dim: Byte): string;
 var
   Dbl: Double;
+  Precision: Integer;
+  FormatMask: string;
 begin
   if Value < MinValue then
     Exit('-');
@@ -523,7 +525,22 @@ begin
     Exit('+NAN');
 
   Dbl := GetDoubleValue(Dim);
-  Result := RemoveTrailingZeros(FormatValue(Dbl, Accuracy, Error));
+  if (Error <> 0) and (Abs(Dbl) < (Error / 100) / 10) then
+    Dbl := 0;
+
+  Precision := Accuracy;
+  if Precision < 0 then
+    Precision := 0;
+
+  if Precision > 12 then
+    Precision := 12;
+
+  if Precision > 0 then
+    FormatMask := '0.' + StringOfChar('0', Precision)
+  else
+    FormatMask := '0';
+
+  Result := FormatFloat(FormatMask, Dbl);
 end;
 
 function TMeterValue.GetStringValue(const ADim: string): string;
