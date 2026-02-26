@@ -236,6 +236,9 @@ type
 
 implementation
 
+uses
+  UnitBaseProcedures;
+
 { TMeterValue }
 
 class constructor TMeterValue.CreateClass;

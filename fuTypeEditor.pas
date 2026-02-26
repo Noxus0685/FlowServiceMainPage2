@@ -2469,7 +2469,7 @@ begin
     if D.Qmax = 0 then
       Value := '—'
     else
-      Value := FormatQorV(D.Qmax, FType.Error);
+      Value := FormatByBaseError(D.Qmax, FType.Error);
   end
 
   // =====================================================
@@ -2480,7 +2480,7 @@ begin
     if D.Qmin = 0 then
       Value := '—'
     else
-      Value := FormatQorV(D.Qmin, FType.Error);
+      Value := FormatByBaseError(D.Qmin, FType.Error);
   end
 
   // =====================================================
@@ -2491,7 +2491,7 @@ begin
     if D.QFmax = 0 then
       Value := '—'
     else
-      Value := FormatQorV(D.QFmax, FType.Error);
+      Value := FormatByBaseError(D.QFmax, FType.Error);
   end
 
   // =====================================================
@@ -2504,7 +2504,7 @@ begin
     else
       // для Kp используем ту же логику точности,
       // т.к. он участвует в расчёте объёма/массы
-      Value := FormatQorV(D.Kp, FType.Error);
+      Value := FormatByBaseError(D.Kp, FType.Error);
   end;
 end;
 
@@ -3284,7 +3284,7 @@ begin
       if Q <= 0 then
         Value := '—'
       else
-        Value := FormatQorV(Q, P.Error);
+        Value := FormatByBaseError(Q, P.Error);
     end
 
     {---------------------------}
@@ -3293,10 +3293,10 @@ begin
     else if ACol = StringColumnPointVolume.Index then
     begin
       if P.LimitVolume > 0 then
-        Value := FormatQorV(P.LimitVolume, P.Error)
+        Value := FormatByBaseError(P.LimitVolume, P.Error)
 
       else if (Q > 0) and (P.LimitTime > 0) then
-        Value := FormatQorV(Q * P.LimitTime / 3.6, P.Error)
+        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error)
 
       else
         Value := '—';

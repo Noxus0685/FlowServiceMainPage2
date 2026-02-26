@@ -60,7 +60,11 @@ function FormatDeviceError(Value: Double): string;
 function FormatError(Value: Double): string;
  function FormatPhys(Value: Double): string;
 function FormatTime(Value: Double): string;
-function FormatQorV(Value, BaseError: Double): string;
+function FormatByBaseError(Value, BaseError: Double): string;
+function FormatValue(Value: Double; Accuracy: Integer; Error: Double): string; overload;
+function FormatValue(const Str: string; Accuracy: Integer; Error: Double): string; overload;
+function RemoveTrailingZeros(const Str: string): string;
+function RandomGenerate(Value, Error: Double): Double;
 function FormatFloatN(Value: Double; Digits: Integer): string;
 function NormalizeAccuracyInput(const S: string): string;
 function FormatAccuracy(const S: string): string;
@@ -155,7 +159,7 @@ begin
   Result := FormatFloat('0.' + StringOfChar('0', Digits), Value);
 end;
 
-function FormatQorV(Value, BaseError: Double): string;
+function FormatByBaseError(Value, BaseError: Double): string;
 var
   Delta, Rounded: Double;
   Digits: Integer;
@@ -213,6 +217,115 @@ begin
   Fmt := '0.' + StringOfChar('#', Digits);
 
   Result := FormatFloat(Fmt, Rounded);
+end;
+
+function FormatValue(Value: Double; Accuracy: Integer; Error: Double): string;
+var
+  Dbl: Double;
+  FS: TFormatSettings;
+begin
+  Dbl := Value;
+  if (Error <> 0) and (Abs(Dbl) < (Error / 100) / 10) then
+    Dbl := 0;
+
+  FS := TFormatSettings.Create;
+  Result := FormatValue(FloatToStrF(Dbl, ffFixed, 10, 12, FS), Accuracy, Error);
+end;
+
+function FormatValue(const Str: string; Accuracy: Integer; Error: Double): string;
+var
+  FS: TFormatSettings;
+  S: string;
+  V: Double;
+  AbsError, ValuePart: Double;
+  DigitsAfterDecimal: Double;
+  FractPartCnt, IntPartCnt, SepPos: Integer;
+begin
+  FS := TFormatSettings.Create;
+  S := Trim(Str);
+  S := StringReplace(S, '.', FS.DecimalSeparator, [rfReplaceAll]);
+  S := StringReplace(S, ',', FS.DecimalSeparator, [rfReplaceAll]);
+  V := StrToFloatDef(S, 0, FS);
+
+  if Error = 0 then
+    Exit(FloatToStrF(V, ffNumber, 10, EnsureRange(Accuracy, 0, 12), FS));
+
+  SepPos := Pos(FS.DecimalSeparator, S);
+  if SepPos = 0 then
+  begin
+    FractPartCnt := 0;
+    IntPartCnt := Length(S);
+  end
+  else
+  begin
+    IntPartCnt := SepPos - 1;
+    FractPartCnt := Length(S) - SepPos;
+    if IntPartCnt < 0 then
+      IntPartCnt := 0;
+  end;
+
+  if FractPartCnt > 0 then
+  begin
+    if IntPartCnt < 5 then
+    begin
+      if V <> 0 then
+      begin
+        AbsError := Abs(V * Error) / 100;
+        ValuePart := AbsError / 10;
+      end
+      else
+        ValuePart := (Error / 100) / 10;
+
+      if ValuePart < 1 then
+        DigitsAfterDecimal := -Log10(ValuePart)
+      else
+        DigitsAfterDecimal := 0;
+
+      if DigitsAfterDecimal < 0 then
+        DigitsAfterDecimal := 0;
+    end
+    else
+      DigitsAfterDecimal := 0;
+
+    FractPartCnt := Round(DigitsAfterDecimal);
+  end;
+
+  FractPartCnt := EnsureRange(FractPartCnt, 0, 12);
+  Result := FloatToStrF(V, ffNumber, 10, FractPartCnt, FS);
+end;
+
+function RemoveTrailingZeros(const Str: string): string;
+var
+  S: string;
+  FS: TFormatSettings;
+  SepPos, EndPos: Integer;
+begin
+  FS := TFormatSettings.Create;
+  S := Trim(Str);
+  SepPos := Pos(FS.DecimalSeparator, S);
+  if SepPos = 0 then
+    Exit(S);
+
+  EndPos := Length(S);
+  while (EndPos > SepPos) and (S[EndPos] = '0') do
+    Dec(EndPos);
+
+  if (EndPos >= SepPos) and (S[EndPos] = FS.DecimalSeparator) then
+    Dec(EndPos);
+
+  if EndPos > 0 then
+    Result := Copy(S, 1, EndPos)
+  else
+    Result := '0';
+end;
+
+function RandomGenerate(Value, Error: Double): Double;
+var
+  LowerBound, UpperBound: Double;
+begin
+  LowerBound := Value - Value * Error / 100.0;
+  UpperBound := Value + Value * Error / 100.0;
+  Result := LowerBound + Random * (UpperBound - LowerBound);
 end;
 
 function FormatTime(Value: Double): string;
