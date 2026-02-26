@@ -338,6 +338,7 @@ type
     function FindSerialIndex(const ASerialNumber: string): Integer;
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
+    procedure UpdateUIFromValues;
   public
     { Public declarations }
     destructor Destroy; override;
@@ -393,14 +394,6 @@ begin
       ASignal := Ord(OT);
       Exit(True);
     end;
-end;
-
-function MeterValueToText(AMeterValue: TMeterValue; const AFormat: string = '0.###'): string;
-begin
-  if AMeterValue = nil then
-    Exit('0');
-
-  Result := FormatFloat(AFormat, AMeterValue.GetDoubleValue);
 end;
 
 destructor TFormMain.Destroy;
@@ -748,6 +741,7 @@ begin
   WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
   WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
   WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
+  WorkTable.ValueTime.SetValue(WorkTable.Time);
 
   // Основные MeterValues каналов прибора.
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
@@ -763,7 +757,6 @@ begin
     DeviceChannel.FlowMeter.ValuePressure.SetValue(WorkTable.Press);
     DeviceChannel.FlowMeter.ValueCurrent.SetValue(DeviceChannel.ValueCurrent.GetDoubleValue);
     DeviceChannel.FlowMeter.ValueImp.SetValue(DeviceChannel.ValueImp.GetDoubleValue);
-    DeviceChannel.FlowMeter.ValueTime.SetValue(WorkTable.Time);
   end;
 
   // Основные MeterValues эталонных каналов.
@@ -780,17 +773,23 @@ begin
     EtalonChannel.FlowMeter.ValuePressure.SetValue(WorkTable.Press);
     EtalonChannel.FlowMeter.ValueCurrent.SetValue(EtalonChannel.ValueCurrent.GetDoubleValue);
     EtalonChannel.FlowMeter.ValueImp.SetValue(EtalonChannel.ValueImp.GetDoubleValue);
-    EtalonChannel.FlowMeter.ValueTime.SetValue(WorkTable.Time);
   end;
 
   WorkTable.RecalculateAllMeterValues;
 end;
 
 procedure TFormMain.TimerMainTimer(Sender: TObject);
+begin
+  UpdateUIFromValues;
+end;
+
+procedure TFormMain.UpdateUIFromValues;
 var
   WorkTable: TWorkTable;
   DeviceMeter: TFlowMeter;
   EtalonMeter: TFlowMeter;
+  I: Integer;
+  MinImpValue: TMeterValue;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -804,32 +803,56 @@ begin
   if WorkTable.EtalonChannels.Count > 0 then
     EtalonMeter := WorkTable.EtalonChannels[0].FlowMeter;
 
-  // Обновление таблиц по основным MeterValues.
   GridDevices.Repaint;
   GridEtalons.Repaint;
 
-  // Обновление элементов формы.
-  LabelTime.Text := MeterValueToText(nil, '0.0');
-  LabelFlowRate.Text := MeterValueToText(nil, '0.###');
-  LabelTemp.Text := MeterValueToText(nil, '0.##');
+  if WorkTable.ValueTime <> nil then
+    LabelTime.Text := WorkTable.ValueTime.GetStrValue
+  else
+    LabelTime.Text := '0';
 
-  if DeviceMeter <> nil then
+  if WorkTable.ValueTempertureAfter <> nil then
+    LabelTemp.Text := WorkTable.ValueTempertureAfter.GetStrValue
+  else
+    LabelTemp.Text := '0';
+
+  if WorkTable.ValuePressure <> nil then
+    EditPres.Text := WorkTable.ValuePressure.GetStrValue
+  else
+    EditPres.Text := '0';
+
+  if EtalonMeter <> nil then
   begin
-    LabelTime.Text := MeterValueToText(DeviceMeter.ValueTime, '0.0');
-    LabelFlowRate.Text := MeterValueToText(DeviceMeter.ValueFlow, '0.###');
-    LabelTemp.Text := MeterValueToText(DeviceMeter.ValueTemperture, '0.##');
-    LabelVolume.Text := MeterValueToText(DeviceMeter.ValueQuantity, '0.###');
-    LabelImp.Text := MeterValueToText(DeviceMeter.ValueImp, '0');
-    EditPres.Text := MeterValueToText(DeviceMeter.ValuePressure, '0.###');
+    if EtalonMeter.ValueFlow <> nil then
+      LabelFlowRate.Text := EtalonMeter.ValueFlow.GetStrValue
+    else
+      LabelFlowRate.Text := '0';
+
+    if EtalonMeter.ValueQuantity <> nil then
+      LabelVolume.Text := EtalonMeter.ValueQuantity.GetStrValue
+    else
+      LabelVolume.Text := '0';
   end
   else
   begin
-    LabelVolume.Text := MeterValueToText(nil, '0.###');
-    LabelImp.Text := MeterValueToText(nil, '0');
-    EditPres.Text := MeterValueToText(nil, '0.###');
+    LabelFlowRate.Text := '0';
+    LabelVolume.Text := '0';
   end;
 
-  // Явно используем основные колонки (данные берутся через GridDevicesGetValue/GridEtalonsGetValue).
+  MinImpValue := nil;
+  for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+    if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].ValueImp <> nil) then
+    begin
+      if (MinImpValue = nil) or
+         (WorkTable.DeviceChannels[I].ValueImp.GetDoubleValue < MinImpValue.GetDoubleValue) then
+        MinImpValue := WorkTable.DeviceChannels[I].ValueImp;
+    end;
+
+  if MinImpValue <> nil then
+    LabelImp.Text := MinImpValue.GetStrValue
+  else
+    LabelImp.Text := '0';
+
   StringColumnDeviceFlowRate1.Header := 'Расход';
   StringColumnDeviceVolume1.Header := 'Объём';
   StringColumnEtalonFlowRate1.Header := 'Расход';
@@ -837,14 +860,28 @@ begin
 
   if DeviceMeter <> nil then
   begin
-    StringColumnDeviceFlowRate1.TagString := MeterValueToText(DeviceMeter.ValueFlow, '0.###');
-    StringColumnDeviceVolume1.TagString := MeterValueToText(DeviceMeter.ValueQuantity, '0.###');
+    if DeviceMeter.ValueFlow <> nil then
+      StringColumnDeviceFlowRate1.TagString := DeviceMeter.ValueFlow.GetStrValue
+    else
+      StringColumnDeviceFlowRate1.TagString := '0';
+
+    if DeviceMeter.ValueQuantity <> nil then
+      StringColumnDeviceVolume1.TagString := DeviceMeter.ValueQuantity.GetStrValue
+    else
+      StringColumnDeviceVolume1.TagString := '0';
   end;
 
   if EtalonMeter <> nil then
   begin
-    StringColumnEtalonFlowRate1.TagString := MeterValueToText(EtalonMeter.ValueFlow, '0.###');
-    StringColumnEtalonVolume1.TagString := MeterValueToText(EtalonMeter.ValueQuantity, '0.###');
+    if EtalonMeter.ValueFlow <> nil then
+      StringColumnEtalonFlowRate1.TagString := EtalonMeter.ValueFlow.GetStrValue
+    else
+      StringColumnEtalonFlowRate1.TagString := '0';
+
+    if EtalonMeter.ValueQuantity <> nil then
+      StringColumnEtalonVolume1.TagString := EtalonMeter.ValueQuantity.GetStrValue
+    else
+      StringColumnEtalonVolume1.TagString := '0';
   end;
 end;
 
@@ -1075,15 +1112,17 @@ begin
       Value := WorkTable.DeviceChannels[ARow].Serial
     else if GridDevices.Columns[ACol] = StringColumnDeviceFlowRate1 then
     begin
-      if WorkTable.DeviceChannels[ARow].FlowMeter <> nil then
-        Value := MeterValueToText(WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow, '0.###')
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '0';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceVolume1 then
     begin
-      if WorkTable.DeviceChannels[ARow].FlowMeter <> nil then
-        Value := MeterValueToText(WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity, '0.###')
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
         Value := '0';
     end
@@ -1216,15 +1255,17 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Serial
     else if GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1 then
     begin
-      if WorkTable.EtalonChannels[ARow].FlowMeter <> nil then
-        Value := MeterValueToText(WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow, '0.###')
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '0';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonVolume1 then
     begin
-      if WorkTable.EtalonChannels[ARow].FlowMeter <> nil then
-        Value := MeterValueToText(WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity, '0.###')
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
         Value := '0';
     end
