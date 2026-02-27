@@ -741,6 +741,8 @@ begin
   WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
   WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
   WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
+  WorkTable.ValueFlowRate.SetValue(WorkTable.FlowRate);
+  WorkTable.ValueQuantity.SetValue(WorkTable.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
   WorkTable.Time:= WorkTable.Time+1;
   WorkTable.ValueTime.SetValue(WorkTable.Time);
 
@@ -789,6 +791,7 @@ var
   WorkTable: TWorkTable;
   DeviceMeter: TFlowMeter;
   EtalonMeter: TFlowMeter;
+  MeterForNames: TFlowMeter;
   I: Integer;
   MinImpValue: TMeterValue;
 begin
@@ -804,6 +807,10 @@ begin
   if WorkTable.EtalonChannels.Count > 0 then
     EtalonMeter := WorkTable.EtalonChannels[0].FlowMeter;
 
+  MeterForNames := EtalonMeter;
+  if MeterForNames = nil then
+    MeterForNames := DeviceMeter;
+
   GridDevices.Repaint;
   GridEtalons.Repaint;
 
@@ -812,8 +819,8 @@ begin
   else
     LabelTime.Text := '0';
 
-  if WorkTable.ValueTempertureAfter <> nil then
-    LabelTemp.Text := WorkTable.ValueTemperture.GetStrValue
+  if WorkTable.ValueTemperture <> nil then
+    LabelTemp.Text := FormatFloat('0', WorkTable.ValueTemperture.GetDoubleValue)
   else
     LabelTemp.Text := '0';
 
@@ -822,22 +829,42 @@ begin
   else
     EditPres.Text := '0';
 
-  if EtalonMeter <> nil then
-  begin
-    if EtalonMeter.ValueFlow <> nil then
-      LabelFlowRate.Text := EtalonMeter.ValueFlow.GetStrValue
-    else
-      LabelFlowRate.Text := '0';
-
-    if EtalonMeter.ValueQuantity <> nil then
-      LabelVolume.Text := EtalonMeter.ValueQuantity.GetStrValue
-    else
-      LabelVolume.Text := '0';
-  end
+  if WorkTable.ValueFlowRate <> nil then
+    LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
-  begin
     LabelFlowRate.Text := '0';
-    LabelVolume.Text := '0';
+
+  if WorkTable.ValuePressure <> nil then
+    LabelPressure.Text := WorkTable.ValuePressure.GetStrValue
+  else
+    LabelPressure.Text := '0';
+
+  if (MeterForNames <> nil) and (MeterForNames.ValueDensity <> nil) then
+    LabelDensity.Text := MeterForNames.ValueDensity.GetStrValue
+  else
+    LabelDensity.Text := '0';
+
+  if WorkTable.ValueQuantity <> nil then
+    LabelQuantity.Text := WorkTable.ValueQuantity.GetStrValue
+  else
+    LabelQuantity.Text := '0';
+
+  if MeterForNames <> nil then
+  begin
+    if MeterForNames.ValueFlow <> nil then
+      LabelNameFlowRate.Text := MeterForNames.ValueFlow.GetStrFullName;
+    if MeterForNames.ValueTime <> nil then
+      LabelNameTime.Text := MeterForNames.ValueTime.GetStrFullName;
+    if MeterForNames.ValueQuantity <> nil then
+      LabelNameQuantity.Text := MeterForNames.ValueQuantity.GetStrFullName;
+    if MeterForNames.ValueImp <> nil then
+      LabelNameImp.Text := MeterForNames.ValueImp.GetStrFullName;
+    if MeterForNames.ValuePressure <> nil then
+      LabelNamePressure.Text := MeterForNames.ValuePressure.GetStrFullName;
+    if MeterForNames.ValueDensity <> nil then
+      LabelNameDensity.Text := MeterForNames.ValueDensity.GetStrFullName;
+    if MeterForNames.ValueTemperture <> nil then
+      LabelNameTemperture.Text := MeterForNames.ValueTemperture.GetStrFullName;
   end;
 
   MinImpValue := nil;
@@ -854,35 +881,41 @@ begin
   else
     LabelImp.Text := '0';
 
-  StringColumnDeviceFlowRate1.Header := 'Расход';
-  StringColumnDeviceVolume1.Header := 'Объём';
-  StringColumnEtalonFlowRate1.Header := 'Расход';
-  StringColumnEtalonVolume1.Header := 'Объём';
+  if WorkTable.ValueFlowRate <> nil then
+  begin
+    StringColumnDeviceFlowRate1.Header := WorkTable.ValueFlowRate.GetStrFullName;
+    StringColumnEtalonFlowRate1.Header := WorkTable.ValueFlowRate.GetStrFullName;
+  end;
+  if WorkTable.ValueQuantity <> nil then
+  begin
+    StringColumnDeviceQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
+    StringColumnEtalonQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
+  end;
 
   if DeviceMeter <> nil then
   begin
-    if DeviceMeter.ValueFlow <> nil then
-      StringColumnDeviceFlowRate1.TagString := DeviceMeter.ValueFlow.GetStrValue
+    if WorkTable.ValueFlowRate <> nil then
+      StringColumnDeviceFlowRate1.TagString := WorkTable.ValueFlowRate.GetStrValue
     else
       StringColumnDeviceFlowRate1.TagString := '0';
 
-    if DeviceMeter.ValueQuantity <> nil then
-      StringColumnDeviceVolume1.TagString := DeviceMeter.ValueQuantity.GetStrValue
+    if WorkTable.ValueQuantity <> nil then
+      StringColumnDeviceQuantity1.TagString := WorkTable.ValueQuantity.GetStrValue
     else
-      StringColumnDeviceVolume1.TagString := '0';
+      StringColumnDeviceQuantity1.TagString := '0';
   end;
 
   if EtalonMeter <> nil then
   begin
-    if EtalonMeter.ValueFlow <> nil then
-      StringColumnEtalonFlowRate1.TagString := EtalonMeter.ValueFlow.GetStrValue
+    if WorkTable.ValueFlowRate <> nil then
+      StringColumnEtalonFlowRate1.TagString := WorkTable.ValueFlowRate.GetStrValue
     else
       StringColumnEtalonFlowRate1.TagString := '0';
 
-    if EtalonMeter.ValueQuantity <> nil then
-      StringColumnEtalonVolume1.TagString := EtalonMeter.ValueQuantity.GetStrValue
+    if WorkTable.ValueQuantity <> nil then
+      StringColumnEtalonQuantity1.TagString := WorkTable.ValueQuantity.GetStrValue
     else
-      StringColumnEtalonVolume1.TagString := '0';
+      StringColumnEtalonQuantity1.TagString := '0';
   end;
 end;
 
@@ -1119,7 +1152,7 @@ begin
       else
         Value := '0';
     end
-    else if GridDevices.Columns[ACol] = StringColumnDeviceVolume1 then
+    else if GridDevices.Columns[ACol] = StringColumnDeviceQuantity1 then
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity <> nil) then
@@ -1262,7 +1295,7 @@ begin
       else
         Value := '0';
     end
-    else if GridEtalons.Columns[ACol] = StringColumnEtalonVolume1 then
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1 then
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
