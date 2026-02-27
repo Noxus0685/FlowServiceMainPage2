@@ -148,6 +148,8 @@ type
     FValueAirTemperture: TMeterValue;
     FValueHumidity: TMeterValue;
     FValueTime: TMeterValue;
+    FValueQuantity: TMeterValue;
+    FValueFlowRate: TMeterValue;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -161,6 +163,8 @@ type
     FHashValueAirTemperture: string;
     FHashValueHumidity: string;
     FHashValueTime: string;
+    FHashValueQuantity: string;
+    FHashValueFlowRate: string;
 
     procedure InitMeterValues;
 
@@ -233,6 +237,8 @@ type
     property ValueAirTemperture: TMeterValue read FValueAirTemperture;
     property ValueHumidity: TMeterValue read FValueHumidity;
     property ValueTime: TMeterValue read FValueTime;
+    property ValueQuantity: TMeterValue read FValueQuantity;
+    property ValueFlowRate: TMeterValue read FValueFlowRate;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -353,6 +359,8 @@ begin
     FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
     FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
     FFlowMeter.ValueTime := AWorkTable.ValueTime;
+    FFlowMeter.ValueQuantity := AWorkTable.ValueQuantity;
+    FFlowMeter.ValueFlow := AWorkTable.ValueFlowRate;
   end;
 
   FFlowMeter.InitHashValues;
@@ -647,6 +655,24 @@ begin
     FValueTime.UpdateType := ONLINE_TYPE;
   end;
   FValueTime.SetToSave(True);
+
+  FValueQuantity := TMeterValue.GetExistedMeterValueBool(FHashValueQuantity, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueQuantity.SetAsVolume;
+    FValueQuantity.DependenceType := INDEPENDENT;
+    FValueQuantity.UpdateType := ONLINE_TYPE;
+  end;
+  FValueQuantity.SetToSave(True);
+
+  FValueFlowRate := TMeterValue.GetExistedMeterValueBool(FHashValueFlowRate, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueFlowRate.SetAsVolumeFlow;
+    FValueFlowRate.DependenceType := INDEPENDENT;
+    FValueFlowRate.UpdateType := ONLINE_TYPE;
+  end;
+  FValueFlowRate.SetToSave(True);
 end;
 
 { Frees channel collections owned by the work table. }
@@ -732,6 +758,8 @@ begin
   if FValueAirTemperture <> nil then FValueAirTemperture.SetValue(FValueAirTemperture.GetDoubleValue);
   if FValueHumidity <> nil then FValueHumidity.SetValue(FValueHumidity.GetDoubleValue);
   if FValueTime <> nil then FValueTime.SetValue(FValueTime.GetDoubleValue);
+  if FValueQuantity <> nil then FValueQuantity.SetValue(FValueQuantity.GetDoubleValue);
+  if FValueFlowRate <> nil then FValueFlowRate.SetValue(FValueFlowRate.GetDoubleValue);
 
 
 
@@ -842,6 +870,8 @@ begin
       ValuesIni.WriteString(Section, 'HashValueAirTemperture', WorkTable.ValueAirTemperture.Hash);
       ValuesIni.WriteString(Section, 'HashValueHumidity', WorkTable.ValueHumidity.Hash);
       ValuesIni.WriteString(Section, 'HashValueTime', WorkTable.ValueTime.Hash);
+      ValuesIni.WriteString(Section, 'HashValueQuantity', WorkTable.ValueQuantity.Hash);
+      ValuesIni.WriteString(Section, 'HashValueFlowRate', WorkTable.ValueFlowRate.Hash);
 
       ValuesIni.WriteFloat(Section, 'ValueTempertureBefore', WorkTable.ValueTempertureBefore.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueTempertureAfter', WorkTable.ValueTempertureAfter.GetDoubleValue);
@@ -855,6 +885,8 @@ begin
       ValuesIni.WriteFloat(Section, 'ValueAirTemperture', WorkTable.ValueAirTemperture.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueHumidity', WorkTable.ValueHumidity.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueTime', WorkTable.ValueTime.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueQuantity', WorkTable.ValueQuantity.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueFlowRate', WorkTable.ValueFlowRate.GetDoubleValue);
 
       SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
@@ -924,6 +956,8 @@ begin
       WorkTable.FHashValueAirTemperture := ValuesIni.ReadString(Section, 'HashValueAirTemperture', WorkTable.FHashValueAirTemperture);
       WorkTable.FHashValueHumidity := ValuesIni.ReadString(Section, 'HashValueHumidity', WorkTable.FHashValueHumidity);
       WorkTable.FHashValueTime := ValuesIni.ReadString(Section, 'HashValueTime', WorkTable.FHashValueTime);
+      WorkTable.FHashValueQuantity := ValuesIni.ReadString(Section, 'HashValueQuantity', WorkTable.FHashValueQuantity);
+      WorkTable.FHashValueFlowRate := ValuesIni.ReadString(Section, 'HashValueFlowRate', WorkTable.FHashValueFlowRate);
 
       if WorkTable.FValueTempertureBefore <> nil then WorkTable.FValueTempertureBefore.DeleteFromVector;
       if WorkTable.FValueTempertureAfter <> nil then WorkTable.FValueTempertureAfter.DeleteFromVector;
@@ -937,6 +971,8 @@ begin
       if WorkTable.FValueAirTemperture <> nil then WorkTable.FValueAirTemperture.DeleteFromVector;
       if WorkTable.FValueHumidity <> nil then WorkTable.FValueHumidity.DeleteFromVector;
       if WorkTable.FValueTime <> nil then WorkTable.FValueTime.DeleteFromVector;
+      if WorkTable.FValueQuantity <> nil then WorkTable.FValueQuantity.DeleteFromVector;
+      if WorkTable.FValueFlowRate <> nil then WorkTable.FValueFlowRate.DeleteFromVector;
 
       WorkTable.InitMeterValues;
 
@@ -952,6 +988,8 @@ begin
       WorkTable.ValueAirTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirTemperture', 0));
       WorkTable.ValueHumidity.SetValue(ValuesIni.ReadFloat(Section, 'ValueHumidity', 0));
       WorkTable.ValueTime.SetValue(ValuesIni.ReadFloat(Section, 'ValueTime', 0));
+      WorkTable.ValueQuantity.SetValue(ValuesIni.ReadFloat(Section, 'ValueQuantity', 0));
+      WorkTable.ValueFlowRate.SetValue(ValuesIni.ReadFloat(Section, 'ValueFlowRate', 0));
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
