@@ -12,7 +12,7 @@ uses
 
 type
   EUpdateType = (OFFLINE_TYPE, ONLINE_TYPE, HAND_TYPE);
-  EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE, ERROR_TYPE);
+  EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE, ERROR_TYPE, MEAN_TYPE);
   EDependenceType = (INDEPENDENT, DEPENDENT);
 
   TDimension = record
@@ -798,8 +798,78 @@ end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue;
+var
+  ValueLocal: Double;
+  Q: Single;
 begin
-  SetValue(FRawValue);
+  ValueLocal := 0;
+
+  if UpdateType <> HAND_TYPE then
+  begin
+    if ValueEtalon <> nil then
+    begin
+      if ValueType = ERROR_TYPE then
+      begin
+        if ValueBaseMultiplier <> nil then
+          ValueLocal := ValueBaseMultiplier.Value - ValueEtalon.Value
+        else
+          ValueLocal := -ValueEtalon.Value;
+
+        if ValueEtalon.Value <> 0 then
+        begin
+          ValueLocal := ValueLocal * 100;
+          ValueLocal := ValueLocal / ValueEtalon.Value;
+        end
+        else
+          ValueLocal := -101;
+
+        SetValue(ValueLocal);
+      end
+      else
+        ValueLocal := 0;
+    end
+    else if (ValueBaseMultiplier <> nil) or (ValueBaseDevider <> nil) then
+    begin
+      if ValueType = MEAN_TYPE then
+      begin
+        if ValueBaseMultiplier <> nil then
+          ValueLocal := ValueBaseMultiplier.Value
+        else
+          ValueLocal := 0;
+
+        if ValueBaseDevider <> nil then
+          ValueLocal := (ValueLocal - ValueBaseDevider.Value) / 2
+        else
+          ValueLocal := ValueLocal / 2;
+      end
+      else
+      begin
+        if ValueBaseMultiplier <> nil then
+          ValueLocal := ValueBaseMultiplier.Value
+        else
+          ValueLocal := 1;
+
+        if ValueRate <> nil then
+          ValueLocal := ValueLocal * ValueRate.Value;
+
+        if ValueBaseDevider <> nil then
+          ValueLocal := ValueLocal / ValueBaseDevider.Value;
+      end;
+
+      ValueWoCorrection := ValueLocal;
+
+      if ValueCorrection <> nil then
+      begin
+        Q := ValueCorrection.Value;
+        if Coefs.Count > 0 then
+          ValueLocal := ValueLocal * Rate(Q);
+      end
+      else if Coefs.Count > 0 then
+        ValueLocal := ValueLocal * Rate(ValueLocal);
+
+      SetValue(ValueLocal);
+    end;
+  end;
 end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
