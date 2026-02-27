@@ -503,6 +503,9 @@ begin
 end;
     {$ENDREGION}
 
+
+
+
   {$REGION 'TWorkTable'}
 { Creates a work table with default state, channels lists, and meter values. }
 constructor TWorkTable.Create;
@@ -729,6 +732,8 @@ begin
   if FValueAirTemperture <> nil then FValueAirTemperture.SetValue(FValueAirTemperture.GetDoubleValue);
   if FValueHumidity <> nil then FValueHumidity.SetValue(FValueHumidity.GetDoubleValue);
   if FValueTime <> nil then FValueTime.SetValue(FValueTime.GetDoubleValue);
+
+
 
   for I := 0 to FDeviceChannels.Count - 1 do
   begin
@@ -1197,6 +1202,9 @@ procedure TWorkTableManager.Save;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
 end;
+
+
+
     {$ENDREGION 'TWorkTable'}
 
 

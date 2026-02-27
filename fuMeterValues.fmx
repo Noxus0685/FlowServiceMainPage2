@@ -3184,7 +3184,7 @@ object FormMeterValues: TFormMeterValues
     Size.Width = 922.000000000000000000
     Size.Height = 955.000000000000000000
     Size.PlatformDefault = False
-    TabIndex = 4
+    TabIndex = 0
     TabOrder = 3
     TabPosition = PlatformDefault
     OnChange = TabControlMeterValueSettingsChange
@@ -3204,7 +3204,7 @@ object FormMeterValues: TFormMeterValues
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 77.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -5420,7 +5420,7 @@ object FormMeterValues: TFormMeterValues
         Size.Height = 22.000000000000000000
         Size.PlatformDefault = False
         KillFocusByReturn = True
-        OnExit = Z
+        OnExit = EditTestValueDimExit
       end
       object LabelValueDim: TLabel
         Position.X = 36.000000000000000000
@@ -5505,7 +5505,7 @@ object FormMeterValues: TFormMeterValues
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 60.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False

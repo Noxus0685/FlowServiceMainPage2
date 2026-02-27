@@ -58,7 +58,7 @@ type
     StringColumnEtalonType1: TStringColumn;
     StringColumnEtalonSerial1: TStringColumn;
     StringColumnEtalonFlowRate1: TStringColumn;
-    StringColumnEtalonVolume1: TStringColumn;
+    StringColumnEtalonQuantity1: TStringColumn;
     StringColumnEtalonError1: TStringColumn;
     ToolBar2: TToolBar;
     Label30: TLabel;
@@ -69,7 +69,7 @@ type
     ColumnDeviceType1: TColumn;
     StringColumnDeviceSerial1: TStringColumn;
     StringColumnDeviceFlowRate1: TStringColumn;
-    StringColumnDeviceVolume1: TStringColumn;
+    StringColumnDeviceQuantity1: TStringColumn;
     StringColumnDeviceError1: TStringColumn;
     ToolBar1: TToolBar;
     Label23: TLabel;
@@ -82,7 +82,7 @@ type
     Rectangle1: TRectangle;
     LabelFreq: TLabel;
     LayoutFreqIn: TLayout;
-    Label15: TLabel;
+    LabelNameFreq: TLabel;
     SpinBoxFreq: TSpinBox;
     LayoutPumpSelect: TLayout;
     ComboEditPumps: TComboEdit;
@@ -94,18 +94,18 @@ type
     Layout9: TLayout;
     Layout42: TLayout;
     Rectangle11: TRectangle;
-    LabelPres: TLabel;
-    Label24: TLabel;
+    LabelPressure: TLabel;
+    LabelNamePressure: TLabel;
     EditPres: TEdit;
     Layout50: TLayout;
-    Label25: TLabel;
+    LabelNameDensity: TLabel;
     Rectangle12: TRectangle;
-    Label13: TLabel;
+    LabelDensity: TLabel;
     Layout6: TLayout;
     Rectangle7: TRectangle;
     LabelTemp: TLabel;
     Layout7: TLayout;
-    Label21: TLabel;
+    LabelNameTemperture: TLabel;
     EditTemp: TEdit;
     Label22: TLabel;
     Line3: TLine;
@@ -116,7 +116,7 @@ type
     Rectangle2: TRectangle;
     LabelFlowRate: TLabel;
     Layout13: TLayout;
-    Label17: TLabel;
+    LabelNameFlowRate: TLabel;
     SpinBoxFlowRate: TSpinBox;
     Layout14: TLayout;
     ComboEditUnits: TComboEdit;
@@ -152,7 +152,7 @@ type
     Rectangle3: TRectangle;
     LabelTime: TLabel;
     Layout48: TLayout;
-    Label54: TLabel;
+    LabelNameTime: TLabel;
     EditTime: TEdit;
     Layout47: TLayout;
     ComboEdit8: TComboEdit;
@@ -161,11 +161,11 @@ type
     Label53: TLabel;
     Layout49: TLayout;
     Rectangle9: TRectangle;
-    LabelVolume: TLabel;
-    Label56: TLabel;
+    LabelQuantity: TLabel;
+    LabelNameQuantity: TLabel;
     EditVolume: TEdit;
     Layout51: TLayout;
-    Label55: TLabel;
+    LabelNameImp: TLabel;
     EditImp: TEdit;
     Rectangle10: TRectangle;
     LabelImp: TLabel;
@@ -813,7 +813,7 @@ begin
     LabelTime.Text := '0';
 
   if WorkTable.ValueTempertureAfter <> nil then
-    LabelTemp.Text := WorkTable.ValueTempertureAfter.GetStrValue
+    LabelTemp.Text := WorkTable.ValueTemperture.GetStrValue
   else
     LabelTemp.Text := '0';
 

@@ -225,8 +225,6 @@ var
   FS: TFormatSettings;
 begin
   Dbl := Value;
-  if (Error <> 0) and (Abs(Dbl) < (Error / 100) / 10) then
-    Dbl := 0;
 
   FS := TFormatSettings.Create;
   Result := FormatValue(FloatToStrF(Dbl, ffFixed, 10, 12, FS), Accuracy, Error);

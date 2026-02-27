@@ -554,10 +554,22 @@ begin
   Result := GetDoubleValue(ADim);
 end;
 
-{ Returns current value in base dimension without extra conversion. }
+{ Returns current value in base dimension Zero analyse. }
 function TMeterValue.GetDoubleValue: Double;
+var
+  AbsError: Double;
 begin
-  Result := Value;
+  if Error <> 0 then
+  begin
+    AbsError := Abs(Value) * Error / 100;
+
+    if Abs(Value) < AbsError / 10 then
+      Result := 0
+    else
+      Result := Value;
+  end
+  else
+    Result := Value;
 end;
 
 { Returns current value in base units or converted to the requested dimension. }
@@ -631,6 +643,7 @@ function TMeterValue.GetStringValue(Dim: Byte): string;
 var
   Dbl: Double;
 begin
+
   Dbl := GetDoubleValue(Dim);
 
   if Value < MinValue then
@@ -916,9 +929,7 @@ begin
           ValueLocal := 0;
 
         if ValueBaseDevider <> nil then
-          ValueLocal := (ValueLocal - ValueBaseDevider.Value) / 2
-        else
-          ValueLocal := ValueLocal / 2;
+          ValueLocal := (ValueLocal + ValueBaseDevider.Value) / 2;
       end
       else
       begin
@@ -1486,7 +1497,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 98;
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := 0;
   Name := 'Давление';
   &Type := 'Датчик';
   RawValueName := 'Ток';
@@ -1503,7 +1514,7 @@ begin
   MinValue := -10000;
   MaxNomValue := 100000;
   MinNomValue := 0;
-  Error := 0.5;
+  Error := 0.1;
   CoefK := 100000;
   CoefP := -400000;
   SetValue(98.0);

@@ -103,7 +103,7 @@ type
     procedure EditValueDimExit(Sender: TObject);
     procedure EditMinExit(Sender: TObject);
     procedure EditMaxExit(Sender: TObject);
-    procedure Z(Sender: TObject);
+    procedure EditTestValueDimExit(Sender: TObject);
     procedure EditTestValueRawExit(Sender: TObject);
     procedure StringGridCoefsDataSelChanged(Sender: TObject);
     procedure TabItem4Click(Sender: TObject);
@@ -178,7 +178,7 @@ end;
 procedure TFormMeterValues.UpdateLayoutValues;
 begin
   LabelValueName.Text := MeterValue.GetStrFullName;
-  EditValueFull.Text := MeterValue.GetStringValue;
+  EditValueFull.Text := MeterValue.GetStrValue;
 
   EditValue.Text := FloatToStr(MeterValue.GetDoubleValueDim);
   EditMax.Text := MeterValue.GetStringNum(MeterValue.MaxValue);
@@ -477,7 +477,7 @@ begin
   RefreshLayoutValues;
 end;
 
-procedure TFormMeterValues.Z(Sender: TObject);
+procedure TFormMeterValues.EditTestValueDimExit(Sender: TObject);
 var
   Dbl: Double;
 begin
@@ -485,6 +485,7 @@ begin
   MeterValue.SetDimValue(Dbl);
   UpdateLayoutTest;
   EditTestValueRaw.Text := '';
+  LabelTestValueWoCorrection.Text := '';
 end;
 
 procedure TFormMeterValues.EditTestValueRawExit(Sender: TObject);
@@ -507,7 +508,7 @@ begin
   LabelTestValueWoCorrection.Text :=
     MeterValue.GetStringNum(MeterValue.ValueWoCorrection) + ' ' + MeterValue.GetDimName(0);
 
-  LabelTestValueDim.Text := MeterValue.GetStringValue + ' ' + MeterValue.GetDimName;
+  LabelTestValueDim.Text := MeterValue.GetStrValue + ' ' + MeterValue.GetDimName;
 end;
 
 procedure TFormMeterValues.StringGridCoefsDataSelChanged(Sender: TObject);
@@ -563,41 +564,41 @@ begin
         StringGridValuesList.Cells[Col, I] := IntToStr(I); Inc(Col);
         StringGridValuesList.Cells[Col, I] := Item.NameOwner; Inc(Col);
         StringGridValuesList.Cells[Col, I] := Item.GetStrFullName; Inc(Col);
-        StringGridValuesList.Cells[Col, I] := Item.GetStringValue; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.GetStrValue; Inc(Col);
         StringGridValuesList.Cells[Col, I] := Item.Hash; Inc(Col);
 
         if Item.ValueRate <> nil then
         begin
           StringGridValuesList.Cells[Col, I] := Item.ValueRate.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueRate.GetStringValue; Inc(Col);
+          StringGridValuesList.Cells[Col, I] := Item.ValueRate.GetStrValue; Inc(Col);
           StringGridValuesList.Cells[Col, I] := Item.ValueRate.Hash; Inc(Col);
         end;
 
         if Item.ValueBaseMultiplier <> nil then
         begin
           StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.GetStringValue; Inc(Col);
+          StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.GetStrValue; Inc(Col);
           StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.Hash; Inc(Col);
         end;
 
         if Item.ValueBaseDevider <> nil then
         begin
           StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.GetStringValue; Inc(Col);
+          StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.GetStrValue; Inc(Col);
           StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.Hash; Inc(Col);
         end;
 
         if Item.ValueCorrection <> nil then
         begin
           StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.GetStringValue; Inc(Col);
+          StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.GetStrValue; Inc(Col);
           StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.Hash; Inc(Col);
         end;
 
         if Item.ValueEtalon <> nil then
         begin
           StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.GetStringValue; Inc(Col);
+          StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.GetStrValue; Inc(Col);
           StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.Hash; Inc(Col);
         end;
 
@@ -640,7 +641,7 @@ begin
   if MeterValue.ValueRate <> nil then
   begin
     EditNameValueRate.Text := MeterValue.ValueRate.GetStrFullName;
-    EditValueRate.Text := MeterValue.ValueRate.GetStringValue;
+    EditValueRate.Text := MeterValue.ValueRate.GetStrValue;
   end
   else
   begin
@@ -651,7 +652,7 @@ begin
   if MeterValue.ValueBaseMultiplier <> nil then
   begin
     EditNameValueMultiplier.Text := MeterValue.ValueBaseMultiplier.GetStrFullName;
-    EditValueMultiplier.Text := MeterValue.ValueBaseMultiplier.GetStringValue;
+    EditValueMultiplier.Text := MeterValue.ValueBaseMultiplier.GetStrValue;
   end
   else
   begin
@@ -662,7 +663,7 @@ begin
   if MeterValue.ValueBaseDevider <> nil then
   begin
     EditNameValueDevider.Text := MeterValue.ValueBaseDevider.GetStrFullName;
-    EditValueDevider.Text := MeterValue.ValueBaseDevider.GetStringValue;
+    EditValueDevider.Text := MeterValue.ValueBaseDevider.GetStrValue;
   end
   else
   begin
