@@ -270,7 +270,6 @@ begin
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
-
   FValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin

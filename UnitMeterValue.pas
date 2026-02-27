@@ -979,7 +979,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 21.3;
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := 2;
   Name := 'Температура';
   &Type := 'PT100';
   RawValueName := 'Сопротивление';
