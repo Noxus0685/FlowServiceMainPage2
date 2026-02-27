@@ -892,8 +892,8 @@ begin
   if Coefs.Count > 0 then
   begin
     Qetl := 0;
-    K := Coefs[Coefs.Count - 1].K;
-    B := Coefs[Coefs.Count - 1].b;
+    K := 0;
+    B := 0;
 
     for I := 0 to Coefs.Count - 1 do
     begin
@@ -914,7 +914,7 @@ begin
     end;
   end;
 
-  Result := CoefK * Q + CoefP;
+  Result := 1;
 end;
 
 { Replaces calibration table and recalculates interpolation coefficients. }
