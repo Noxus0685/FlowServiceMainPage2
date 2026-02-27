@@ -161,8 +161,15 @@ type
     function GetStringValue: string; overload;
     function GetStringValue(Dim: Byte): string; overload;
     function GetStringValue(const ADim: string): string; overload;
+    function GetStringMeanValue(Dim: Byte): string; overload;
+    function GetStringMeanValue: string; overload;
     function GetStrValue: string;
     function GetStringNum(AValue: Double): string;
+    function GetStrNumLimits(AValue: Double): string;
+    function GetStrNum(AValue: Double): string; overload;
+    function GetStrNum(const AStrValue, ADim: string): string; overload;
+    function GetStrNum(const AStrValue: string): string; overload;
+    function GetStrNum(AValue: Double; const ADim: string): string; overload;
 
     procedure SetFilter(AOrder: Integer);
     function GetFilter: Integer;
@@ -198,7 +205,9 @@ type
     function SetDim(Dim: Integer): Boolean;
     function NextDim: Boolean;
     function GetStrFullName: string;
-    function GetDoubleNum(const AStr: string): Double;
+    function GetDoubleNum(const AStr: string): Double; overload;
+    function GetDoubleNum(AValue: Double; const ADim: string): Double; overload;
+    function GetDoubleNum(const AStr: string; Dim: Integer): Double; overload;
     procedure Reset;
 
     procedure SetAsTime;
@@ -239,20 +248,21 @@ implementation
 uses
   UnitBaseProcedures;
 
-{ TMeterValue }
-
+{ Initializes class-level collections used to store all meter value instances. }
 class constructor TMeterValue.CreateClass;
 begin
   FMeterValues := TObjectList<TMeterValue>.Create(False);
   FMeterValuesSaves := TObjectList<TMeterValue>.Create(False);
 end;
 
+{ Releases class-level collections allocated in the class constructor. }
 class destructor TMeterValue.DestroyClass;
 begin
   FMeterValues.Free;
   FMeterValuesSaves.Free;
 end;
 
+{ Creates a meter value object with default runtime fields and storage buffers. }
 constructor TMeterValue.Create;
 begin
   inherited Create;
@@ -281,6 +291,7 @@ begin
   FMeterValuesSaves.Add(Self);
 end;
 
+{ Creates a meter value object with default runtime fields and storage buffers. }
 constructor TMeterValue.Create(const AHashOwner: string; const ANameOwner: string);
 begin
   Create;
@@ -288,12 +299,14 @@ begin
   NameOwner := ANameOwner;
 end;
 
+{ Creates a meter value object with default runtime fields and storage buffers. }
 constructor TMeterValue.Create(ACopyFrom: TMeterValue);
 begin
   Create;
   SetCopy(ACopyFrom);
 end;
 
+{ Creates a meter value object and binds it to the provided persistent hash. }
 constructor TMeterValue.CreateFromHash(const AHash: string);
 var
   MV: TMeterValue;
@@ -304,6 +317,7 @@ begin
     SetCopy(MV);
 end;
 
+{ Frees owned collections and unregisters this instance from global lists. }
 destructor TMeterValue.Destroy;
 begin
   Coefs.Free;
@@ -315,6 +329,7 @@ begin
   inherited;
 end;
 
+{ Copies core configuration and calibration settings from another meter value object. }
 procedure TMeterValue.SetCopy(AMeterValue: TMeterValue);
 var
   D: TDimension;
@@ -339,6 +354,7 @@ begin
   for C in AMeterValue.Coefs do Coefs.Add(C);
 end;
 
+{ Finds an existing meter value by hash (and optional owner context). }
 class function TMeterValue.GetMeterValue(const AHash: string): TMeterValue;
 var
   MV: TMeterValue;
@@ -350,6 +366,7 @@ begin
       Exit(MV);
 end;
 
+{ Finds an existing meter value by hash (and optional owner context). }
 class function TMeterValue.GetMeterValue(const AHash, AHashOwner: string; const AName: string): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
@@ -357,6 +374,7 @@ begin
     Result := TMeterValue.Create(AHashOwner, AName);
 end;
 
+{ Returns an existing meter value for hash or creates and registers a new one. }
 class function TMeterValue.GetNewMeterValue(const AHash: string): TMeterValue;
 var
   MV: TMeterValue;
@@ -367,6 +385,7 @@ begin
   Result := TMeterValue.Create;
 end;
 
+{ Gets or creates a meter value and reports whether it already existed. }
 class function TMeterValue.GetNewMeterValueBool(const AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
@@ -382,6 +401,7 @@ begin
   end;
 end;
 
+{ Creates a cloned meter value from hash and reports whether source existed. }
 class function TMeterValue.GetCopyMeterValueBool(var AHash: string; out IsExisted: Integer): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
@@ -399,6 +419,7 @@ begin
   end;
 end;
 
+{ Gets an existing meter value by hash; creates one only if missing. }
 class function TMeterValue.GetExistedMeterValueBool(var AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue;
 begin
   Result := GetMeterValue(AHash);
@@ -419,41 +440,49 @@ begin
   end;
 end;
 
+{ Assigns a random test value in the expected operating range. }
 procedure TMeterValue.Random;
 begin
   SetValue(System.Math.RandomRange(0, 1000) / 10);
 end;
 
+{ Applies configured digital filter to current samples and returns filtered value. }
 function TMeterValue.FilterApply: Double;
 begin
   Result := Value;
 end;
 
+{ Calculates short-term averaged value from the latest measurement history. }
 function TMeterValue.AverageApply: Single;
 begin
   Result := FShortMean;
 end;
 
+{ Returns current value as Single in the default/base dimension. }
 function TMeterValue.GetFloatValue: Single;
 begin
   Result := GetDoubleValue;
 end;
 
+{ Returns current value converted to single-precision (and optional dimension). }
 function TMeterValue.GetFloatValue(Dim: Byte): Single;
 begin
   Result := GetDoubleValue(Dim);
 end;
 
+{ Returns current value converted to single-precision (and optional dimension). }
 function TMeterValue.GetFloatValue(const ADim: string): Single;
 begin
   Result := GetDoubleValue(ADim);
 end;
 
+{ Returns current value in base dimension without extra conversion. }
 function TMeterValue.GetDoubleValue: Double;
 begin
   Result := Value;
 end;
 
+{ Returns current value in base units or converted to the requested dimension. }
 function TMeterValue.GetDoubleValue(Dim: Byte): Double;
 var
   D: TDimension;
@@ -476,129 +505,257 @@ begin
     Result := Result / D.Devider;
 end;
 
+{ Returns current value in base units or converted to the requested dimension. }
 function TMeterValue.GetDoubleValue(const ADim: string): Double;
 begin
   Result := Value * GetDimRate(ADim);
 end;
 
+{ Returns current value converted to the currently selected dimension. }
 function TMeterValue.GetDoubleValueDim: Double;
 begin
   Result := GetDoubleValue(CurrentDimIndex);
 end;
 
+{ Returns accumulated mean in base units; falls back to current value if empty. }
 function TMeterValue.GetDoubleMeanValue: Double;
 begin
   if Means.Count = 0 then Exit(Value);
   Result := Mean;
 end;
 
+{ Returns mean value in base units or converted to a requested dimension. }
 function TMeterValue.GetDoubleMeanValue(dim: Byte): Double;
 begin
   Result := GetDoubleMeanValue * GetDimRate(dim);
 end;
 
+{ Returns mean value in base units or converted to a requested dimension. }
 function TMeterValue.GetDoubleMeanValue(const DimName: string): Double;
 begin
   Result := GetDoubleMeanValue * GetDimRate(DimName);
 end;
 
+{ Checks whether current value deviation from last mean is within the limit. }
 function TMeterValue.IsStable(lim: Integer): Boolean;
 begin
   Result := Abs(Value - FLastMean) <= lim;
 end;
 
+{ Returns formatted string value in the default display dimension. }
 function TMeterValue.GetStringValue: string;
 begin
-  Result := FormatFloat('0.#####', GetDoubleValue);
+  Result := GetStringValue(0);
 end;
 
+{ Formats current numeric value to string in default or requested dimension. }
 function TMeterValue.GetStringValue(Dim: Byte): string;
 var
   Dbl: Double;
-  Precision: Integer;
-  FormatMask: string;
 begin
+  Dbl := GetDoubleValue(Dim);
+
   if Value < MinValue then
     Exit('-');
 
   if Value > MaxValue then
     Exit('+NAN');
 
-  Dbl := GetDoubleValue(Dim);
-  if (Error <> 0) and (Abs(Dbl) < (Error / 100) / 10) then
-    Dbl := 0;
-
-  Precision := Accuracy;
-  if Precision < 0 then
-    Precision := 0;
-
-  if Precision > 12 then
-    Precision := 12;
-
-  if Precision > 0 then
-    FormatMask := '0.' + StringOfChar('0', Precision)
-  else
-    FormatMask := '0';
-
-  Result := FormatFloat(FormatMask, Dbl);
+  Result := FormatValue(Dbl, Accuracy, Error);
 end;
 
+{ Formats current numeric value to string in default or requested dimension. }
 function TMeterValue.GetStringValue(const ADim: string): string;
 begin
-  Result := FormatFloat('0.#####', GetDoubleValue(ADim));
+  Result := GetStringValue(GetDim(ADim));
 end;
 
+{ Formats mean numeric value to string in default or requested dimension. }
+function TMeterValue.GetStringMeanValue(Dim: Byte): string;
+var
+  Dbl: Double;
+begin
+  Dbl := GetDoubleMeanValue(Dim);
+
+  if Value < MinValue then
+    Exit('-');
+
+  if Value > MaxValue then
+    Exit('+NAN');
+
+  Result := FormatValue(Dbl, Accuracy, Error);
+end;
+
+{ Returns formatted mean value in the default display dimension. }
+function TMeterValue.GetStringMeanValue: string;
+begin
+  Result := GetStringMeanValue(0);
+end;
+
+{ Returns formatted value using CurrentDimIndex as active display dimension. }
 function TMeterValue.GetStrValue: string;
 begin
   Result := GetStringValue(CurrentDimIndex);
 end;
 
+{ Formats the provided number using meter formatting rules without changing state. }
 function TMeterValue.GetStringNum(AValue: Double): string;
+var
+  Temp: Double;
 begin
-  Result := FormatFloat('0.#####', AValue);
+  Temp := Value;
+  Value := AValue;
+  try
+    Result := GetStringValue;
+  finally
+    Value := Temp;
+  end;
 end;
 
+{ Formats the provided number in current dimension with limit checks. }
+function TMeterValue.GetStrNumLimits(AValue: Double): string;
+var
+  Temp: Double;
+begin
+  Temp := Value;
+  Value := AValue;
+  try
+    Result := GetStringValue(CurrentDimIndex);
+  finally
+    Value := Temp;
+  end;
+end;
+
+{ Formats numeric/text input using current or requested dimension settings. }
+function TMeterValue.GetStrNum(AValue: Double): string;
+var
+  Temp: Double;
+  Dbl: Double;
+begin
+  Temp := Value;
+  Value := AValue;
+  try
+    Dbl := GetDoubleValue(CurrentDimIndex);
+    Result := FormatValue(Dbl, Accuracy, Error);
+  finally
+    Value := Temp;
+  end;
+end;
+
+{ Formats numeric/text input using current or requested dimension settings. }
+function TMeterValue.GetStrNum(const AStrValue, ADim: string): string;
+var
+  Temp: Double;
+  Parsed: Double;
+begin
+  Temp := Value;
+  Parsed := StrToFloatDef(StringReplace(Trim(AStrValue), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  Value := Parsed;
+  try
+    Result := GetStringValue(ADim);
+  finally
+    Value := Temp;
+  end;
+end;
+
+{ Formats numeric/text input using current or requested dimension settings. }
+function TMeterValue.GetStrNum(const AStrValue: string): string;
+var
+  Temp: Double;
+  Parsed: Double;
+begin
+  Temp := Value;
+  Parsed := StrToFloatDef(StringReplace(Trim(AStrValue), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  Value := Parsed;
+  try
+    Result := GetStringValue;
+  finally
+    Value := Temp;
+  end;
+end;
+
+{ Formats numeric/text input using current or requested dimension settings. }
+function TMeterValue.GetStrNum(AValue: Double; const ADim: string): string;
+var
+  Temp: Double;
+begin
+  Temp := Value;
+  Value := AValue;
+  try
+    Result := GetStringValue(ADim);
+  finally
+    Value := Temp;
+  end;
+end;
+
+{ Parses numeric input and converts it into base or requested dimension units. }
+function TMeterValue.GetDoubleNum(AValue: Double; const ADim: string): Double;
+var
+  Temp: Double;
+  FO: Integer;
+begin
+  Temp := Value;
+  Value := AValue;
+  FO := FFilterOrder;
+  FFilterOrder := -1;
+  try
+    Result := GetDoubleValue(ADim);
+  finally
+    Value := Temp;
+    FFilterOrder := FO;
+  end;
+end;
+
+{ Sets filter order used by runtime smoothing logic. }
 procedure TMeterValue.SetFilter(AOrder: Integer);
 begin
   FFilterOrder := AOrder;
 end;
 
+{ Returns current filter order used for runtime signal smoothing. }
 function TMeterValue.GetFilter: Integer;
 begin
   Result := FFilterOrder;
 end;
 
+{ Stores raw sensor input and propagates it through standard value pipeline. }
 procedure TMeterValue.SetRawValue(InputValue: Double);
 begin
   FRawValue := InputValue;
   SetValue(InputValue);
 end;
 
+{ Stores raw sensor input and propagates it through standard value pipeline. }
 procedure TMeterValue.SetRawValue(InputValue: Double; Q: Single);
 begin
   SetRawValue(InputValue * Rate(Q));
 end;
 
+{ Sets processed value directly (optionally with flow-dependent correction). }
 procedure TMeterValue.SetMainValue(InputValue: Double);
 begin
   SetValue(InputValue);
 end;
 
+{ Sets processed value directly (optionally with flow-dependent correction). }
 procedure TMeterValue.SetMainValue(InputValue: Double; Q: Single);
 begin
   SetValue(InputValue * Rate(Q));
 end;
 
+{ Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue;
 begin
   SetValue(FRawValue);
 end;
 
+{ Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue(AValue: Single);
 begin
   SetValue(Double(AValue));
 end;
 
+{ Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue(AValue: Double);
 begin
   Value := EnsureRange(AValue, MinValue, MaxValue);
@@ -610,36 +767,43 @@ begin
   FLastMean := Mean;
 end;
 
+{ Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue(AValue: Double; Dim: Byte);
 begin
   SetValue(AValue / GetDimRate(Dim));
 end;
 
+{ Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue(AValue: Double; const ADimensions: string);
 begin
   SetValue(AValue / GetDimRate(ADimensions));
 end;
 
+{ Adds increment to current value via standard SetValue pipeline. }
 procedure TMeterValue.SetAddValue(InputValue: Double);
 begin
   SetValue(Value + InputValue);
 end;
 
+{ Sets value expressed in current dimension (number or string input). }
 procedure TMeterValue.SetDimValue(AValue: Double);
 begin
   SetValue(AValue, CurrentDimIndex);
 end;
 
+{ Sets value expressed in current dimension (number or string input). }
 procedure TMeterValue.SetDimValue(const AStr: string);
 begin
   SetDimValue(GetDoubleNum(AStr));
 end;
 
+{ Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue(const AValue: string);
 begin
   SetValue(GetDoubleNum(AValue));
 end;
 
+{ Configures this meter value as time with predefined units and limits. }
 procedure TMeterValue.SetAsTime;
 begin
   ValueType := CONST_TYPE;
@@ -661,11 +825,13 @@ begin
   MinNomValue := 0;
 end;
 
+{ Calculates linear correction coefficient by flow argument Q. }
 function TMeterValue.Rate(Q: Double): Double;
 begin
   Result := CoefK * Q + CoefP;
 end;
 
+{ Replaces calibration table and recalculates interpolation coefficients. }
 function TMeterValue.UpdateCoefs(CalibrPoints: TArray<TCalibrPoint>): Int8;
 var
   P: TCalibrPoint;
@@ -677,11 +843,13 @@ begin
   Result := 0;
 end;
 
+{ Compatibility wrapper that assigns current value through SetValue. }
 procedure TMeterValue.SetValueCurrnet(AValue: Double);
 begin
   SetValue(AValue);
 end;
 
+{ Finds dimension index by name; returns -1 when dimension is absent. }
 function TMeterValue.FindDimIndex(const AName: string): Integer;
 var
   I: Integer;
@@ -692,11 +860,13 @@ begin
   Result := -1;
 end;
 
+{ Adds a new dimension with conversion parameters and metadata. }
 procedure TMeterValue.SetDimension(const ADimensions: string; DimRate: Double);
 begin
   SetDimension(ADimensions, DimRate, 1, False);
 end;
 
+{ Adds a new dimension with conversion parameters and metadata. }
 procedure TMeterValue.SetDimension(const AName: string; ARate, ADevider: Double; ARecip: Boolean);
 var
   D: TDimension;
@@ -712,6 +882,7 @@ begin
     CurrentDimIndex := 0;
 end;
 
+{ Returns conversion factor for dimension name or index. }
 function TMeterValue.GetDimRate(const AName: string): Double;
 var
   I: Integer;
@@ -721,6 +892,7 @@ begin
   Result := GetDimRate(I);
 end;
 
+{ Returns conversion factor for dimension name or index. }
 function TMeterValue.GetDimRate(Dim: Integer): Double;
 var
   D: TDimension;
@@ -733,11 +905,13 @@ begin
     Result := D.Rate / D.Devider;
 end;
 
+{ Returns dimension name for the currently selected dimension index. }
 function TMeterValue.GetDimName: string;
 begin
   Result := GetDimName(CurrentDimIndex);
 end;
 
+{ Returns dimension name for current or specified index. }
 function TMeterValue.GetDimName(Dim: Integer): string;
 begin
   if (Dim >= 0) and (Dim < Dimensions.Count) then
@@ -746,6 +920,7 @@ begin
     Result := '';
 end;
 
+{ Returns dimension index/details or current dimension index overload. }
 function TMeterValue.GetDim(const AName: string; out Dim: TDimension): Boolean;
 var
   I: Integer;
@@ -755,28 +930,33 @@ begin
   if Result then Dim := Dimensions[I];
 end;
 
+{ Returns dimension index/details or current dimension index overload. }
 function TMeterValue.GetDim(const AName: string): Integer;
 begin
   Result := FindDimIndex(AName);
 end;
 
+{ Returns dimension index/details or current dimension index overload. }
 function TMeterValue.GetDim(index: Integer; out Dim: TDimension): Boolean;
 begin
   Result := (index >= 0) and (index < Dimensions.Count);
   if Result then Dim := Dimensions[index];
 end;
 
+{ Returns the current active dimension index. }
 function TMeterValue.GetDim: Integer;
 begin
   Result := CurrentDimIndex;
 end;
 
+{ Selects active dimension index when it is valid. }
 function TMeterValue.SetDim(Dim: Integer): Boolean;
 begin
   Result := (Dim >= 0) and (Dim < Dimensions.Count);
   if Result then CurrentDimIndex := Dim;
 end;
 
+{ Switches active dimension to the next one and wraps at the end of list. }
 function TMeterValue.NextDim: Boolean;
 begin
   if Dimensions.Count = 0 then Exit(False);
@@ -784,6 +964,7 @@ begin
   Result := True;
 end;
 
+{ Returns full display caption including meter name and current dimension name. }
 function TMeterValue.GetStrFullName: string;
 begin
   Result := Name;
@@ -791,11 +972,27 @@ begin
     Result := Result + ', ' + GetDimName;
 end;
 
+{ Parses numeric input and converts it into base or requested dimension units. }
 function TMeterValue.GetDoubleNum(const AStr: string): Double;
+var
+  Parsed: Double;
 begin
-  Result := StrToFloatDef(StringReplace(Trim(AStr), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  Parsed := StrToFloatDef(StringReplace(Trim(AStr), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  Result := EnsureRange(Parsed / GetDimRate(CurrentDimIndex), MinValue, MaxValue);
 end;
 
+{ Parses numeric input and converts it into base or requested dimension units. }
+function TMeterValue.GetDoubleNum(const AStr: string; Dim: Integer): Double;
+var
+  Parsed: Double;
+  BaseValue: Double;
+begin
+  Parsed := StrToFloatDef(StringReplace(Trim(AStr), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  BaseValue := EnsureRange(Parsed / GetDimRate(CurrentDimIndex), MinValue, MaxValue);
+  Result := BaseValue * GetDimRate(Dim);
+end;
+
+{ Clears runtime accumulators and returns measurement state to initial defaults. }
 procedure TMeterValue.Reset;
 begin
   Value := 0;
@@ -807,6 +1004,7 @@ begin
   Means.Clear;
 end;
 
+{ Configures this meter value as volume with predefined units and limits. }
 procedure TMeterValue.SetAsVolume;
 begin
   ValueType := SUM_TYPE;
@@ -824,6 +1022,7 @@ begin
   Error := 0.01;
 end;
 
+{ Configures this meter value as mass with predefined units and limits. }
 procedure TMeterValue.SetAsMass;
 begin
   ValueType := SUM_TYPE;
@@ -841,6 +1040,7 @@ begin
   Error := 0.01;
 end;
 
+{ Configures this meter value as volume flow with predefined units. }
 procedure TMeterValue.SetAsVolumeFlow;
 begin
   ValueType := FLOW_TYPE;
@@ -861,6 +1061,7 @@ begin
   Error := 0.01;
 end;
 
+{ Configures this meter value as mass flow with predefined units. }
 procedure TMeterValue.SetAsMassFlow;
 begin
   ValueType := FLOW_TYPE;
@@ -881,6 +1082,7 @@ begin
   Error := 0.01;
 end;
 
+{ Configures this meter value as impulse counter with predefined limits. }
 procedure TMeterValue.SetAsImp;
 begin
   ValueType := FLOW_TYPE;
@@ -898,6 +1100,7 @@ begin
   Reset;
 end;
 
+{ Configures this meter value as generic error percentage value. }
 procedure TMeterValue.SetAsError;
 begin
   ValueType := ERROR_TYPE;
@@ -916,6 +1119,7 @@ begin
   MinNomValue := -0.1;
 end;
 
+{ Configures this meter value as mass error percentage value. }
 procedure TMeterValue.SetAsMassError;
 begin
   ValueType := ERROR_TYPE;
@@ -934,6 +1138,7 @@ begin
   MinNomValue := -0.1;
 end;
 
+{ Configures this meter value as volume error percentage value. }
 procedure TMeterValue.SetAsVolumeError;
 begin
   ValueType := ERROR_TYPE;
@@ -952,6 +1157,7 @@ begin
   MinNomValue := -0.1;
 end;
 
+{ Configures this meter value as density with supported units. }
 procedure TMeterValue.SetAsDensity;
 begin
   ValueType := CONST_TYPE;
@@ -974,6 +1180,7 @@ begin
   SetValue(0.9982);
 end;
 
+{ Configures this meter value as product temperature with supported units. }
 procedure TMeterValue.SetAsTemp;
 begin
   ValueType := CONST_TYPE;
@@ -998,6 +1205,7 @@ begin
   SetValue(21.3);
 end;
 
+{ Configures this meter value as ambient temperature with supported units. }
 procedure TMeterValue.SetAsAirTemp;
 begin
   ValueType := CONST_TYPE;
@@ -1022,6 +1230,7 @@ begin
   SetValue(21.3);
 end;
 
+{ Configures this meter value as pressure with supported units and limits. }
 procedure TMeterValue.SetAsPressure;
 begin
   ValueType := CONST_TYPE;
@@ -1050,6 +1259,7 @@ begin
   SetValue(98.0);
 end;
 
+{ Configures this meter value as atmospheric pressure with supported units. }
 procedure TMeterValue.SetAsAirPressure;
 begin
   ValueType := CONST_TYPE;
@@ -1074,6 +1284,7 @@ begin
   SetValue(102124.64);
 end;
 
+{ Configures this meter value as electrical current with supported units. }
 procedure TMeterValue.SetAsCurrent;
 begin
   ValueType := CONST_TYPE;
@@ -1095,6 +1306,7 @@ begin
   SetValue(4.0);
 end;
 
+{ Configures this meter value as mass conversion coefficient. }
 procedure TMeterValue.SetAsMassCoef;
 begin
   ValueType := CONST_TYPE;
@@ -1112,6 +1324,7 @@ begin
   MinValue := 0.00000000001;
 end;
 
+{ Configures this meter value as volume conversion coefficient. }
 procedure TMeterValue.SetAsVolumeCoef;
 begin
   ValueType := CONST_TYPE;
@@ -1129,6 +1342,7 @@ begin
   MinValue := 0.00000000001;
 end;
 
+{ Configures this meter value as relative humidity percentage. }
 procedure TMeterValue.SetAsHumidity;
 begin
   ValueType := CONST_TYPE;
@@ -1146,16 +1360,19 @@ begin
   MinNomValue := 20;
 end;
 
+{ Configures this meter value as calculated/derived value placeholder. }
 procedure TMeterValue.SetCalcValue;
 begin
   SetValue(FilterApply);
 end;
 
+{ Creates a GUID-based unique identifier string for a meter value object. }
 function TMeterValue.GetNewUUID: string;
 begin
   Result := TGUID.NewGuid.ToString;
 end;
 
+{ Serializes all meter values to persistent INI storage (optionally backup). }
 class procedure TMeterValue.SaveToFile(IsBackUp: Integer);
 var
   Ini: TIniFile;
@@ -1252,6 +1469,7 @@ begin
   end;
 end;
 
+{ Loads meter values from persistent INI storage and restores relations. }
 class procedure TMeterValue.LoadFromFile;
 var
   Ini: TIniFile;
@@ -1349,11 +1567,13 @@ begin
   end;
 end;
 
+{ Stores a calibration coefficient entry (record or value/argument pair). }
 procedure TMeterValue.SetCoef(ACoef: TCoef);
 begin
   Coefs.Add(ACoef);
 end;
 
+{ Stores a calibration coefficient entry (record or value/argument pair). }
 function TMeterValue.SetCoef(AValue, AArg: Double): string;
 var
   C: TCoef;
@@ -1367,16 +1587,19 @@ begin
   Result := C.Hash;
 end;
 
+{ Returns index position for appending a new coefficient entry. }
 function TMeterValue.GetNewHashCoef: Integer;
 begin
   Result := Coefs.Count + 1;
 end;
 
+{ Recalculates piecewise-linear coefficient parameters after table changes. }
 procedure TMeterValue.CalcCoefs;
 begin
   // Заглушка: вычисления коэффициентов калибровки.
 end;
 
+{ Marks value as persistent and updates the save-list registry. }
 procedure TMeterValue.SetToSave(AIsToSave: Boolean);
 begin
   IsToSave := AIsToSave;
@@ -1389,12 +1612,14 @@ begin
     FMeterValuesSaves.Remove(Self);
 end;
 
+{ Removes this instance from global in-memory meter value registries. }
 procedure TMeterValue.DeleteFromVector;
 begin
   FMeterValues.Remove(Self);
   FMeterValuesSaves.Remove(Self);
 end;
 
+{ Returns shared registry containing all created TMeterValue instances. }
 class function TMeterValue.GetMeterValues: TObjectList<TMeterValue>;
 begin
   Result := FMeterValues;
