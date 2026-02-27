@@ -886,7 +886,12 @@ void TMeterValue::SetValue(double value, uint8_t Dim) {
 	double dbl;
 	double val;
 
-	if (Dimensions[Dim].Recip) {
+	if (Dim >= Dimensions.size()) {
+		SetValue(value);
+		return;
+	}
+
+	if (Dimensions[Dim].Recip && (value != 0)) {
 		val = (1 / value);
     } else {
 		val = value;
@@ -907,9 +912,12 @@ void TMeterValue::SetValue(double value, uint8_t Dim) {
 
 void TMeterValue::SetValue(double Value, UnicodeString Dim)
 {
-    double dbl;
-
-	SetValue(Value, GetDim(Dim));
+	int dimIndex = GetDim(Dim);
+	if (dimIndex >= 0) {
+		SetValue(Value, dimIndex);
+	} else {
+		SetValue(Value);
+	}
 }
 
 void TMeterValue::SetAddValue(double InputValue)
@@ -924,7 +932,10 @@ double TMeterValue::GetDimRate(UnicodeString Name) {
 		if (Name.CompareIC(DimName) == 0)
 			// (StringCompare(Name,DimName))//(Name.CompareIC(DimName)==0)
 		{
-			return (Dimensions[i].Rate/Dimensions[i].Devider);
+			if (Dimensions[i].Recip) {
+				return (Dimensions[i].Devider / Dimensions[i].Rate);
+			}
+			return (Dimensions[i].Rate / Dimensions[i].Devider);
 		}
 	}
 
@@ -934,8 +945,12 @@ double TMeterValue::GetDimRate(UnicodeString Name) {
 
 double TMeterValue::GetDimRate(int Dim) {
    double rt=0;
-	if (Dim <  Dimensions.size()) {
-		rt = (Dimensions[Dim].Rate/Dimensions[Dim].Devider);
+	if ((Dim >= 0) && (Dim < Dimensions.size())) {
+		if (Dimensions[Dim].Recip) {
+			rt = (Dimensions[Dim].Devider / Dimensions[Dim].Rate);
+		} else {
+			rt = (Dimensions[Dim].Rate / Dimensions[Dim].Devider);
+		}
 		return rt;
 	}
 
@@ -943,8 +958,7 @@ double TMeterValue::GetDimRate(int Dim) {
 }
 
 UnicodeString TMeterValue::GetDimName() {
-
-	return	CurrentDim.Name;
+	return GetDimName(CurrentDimIndex);
 
 }
 
@@ -963,7 +977,7 @@ UnicodeString TMeterValue::GetDimName(int Dim)
 }
 
 bool TMeterValue::GetDim(int index, Dimension &Dim) {
-	if (index < Dimensions.size()) {
+	if ((index >= 0) && (index < Dimensions.size())) {
 		Dim = Dimensions[index];
 		return true;
 	}
@@ -972,7 +986,7 @@ bool TMeterValue::GetDim(int index, Dimension &Dim) {
 
 bool TMeterValue::GetDim(UnicodeString Name, Dimension &Dim) {
 	for (int i = 0; i < Dimensions.size(); i++) {
-		if (Name == Dimensions[i].Name) {
+		if (Name.CompareIC(Dimensions[i].Name) == 0) {
 			Dim = Dimensions[i];
 			return true;
 		}
@@ -983,7 +997,7 @@ bool TMeterValue::GetDim(UnicodeString Name, Dimension &Dim) {
 
 int TMeterValue::GetDim(UnicodeString Name) {
 	for (int i = 0; i <  Dimensions.size(); i++) {
-		if (Name == Dimensions[i].Name) {
+		if (Name.CompareIC(Dimensions[i].Name) == 0) {
 			return i;
 		}
 	}
@@ -1003,6 +1017,10 @@ void TMeterValue::SetDimension(UnicodeString Name, double Rate) {
 	Dim.Recip = false;
 	Dim.Name = Name;
 	Dimensions.push_back(Dim);
+	if (Dimensions.size() == 1) {
+		CurrentDimIndex = 0;
+		CurrentDim = Dimensions[0];
+	}
 }
 
  void TMeterValue::SetDimension(UnicodeString Name, double Rate, double Devider, bool Recip) {
@@ -1015,6 +1033,10 @@ void TMeterValue::SetDimension(UnicodeString Name, double Rate) {
 	Dim.Recip 	= Recip;
 	//
 	Dimensions.push_back(Dim);
+	if (Dimensions.size() == 1) {
+		CurrentDimIndex = 0;
+		CurrentDim = Dimensions[0];
+	}
 }
 
 void TMeterValue::SetAsVolume()
@@ -1688,7 +1710,7 @@ bool TMeterValue::IsStable(int lim) {
 
 bool TMeterValue::SetDim(int Dim) {
 
-	if (Dim<Dimensions.size()) {
+	if ((Dim >= 0) && (Dim < Dimensions.size())) {
 		if (GetDim(Dim, CurrentDim)) {
 		 CurrentDimIndex = Dim;
             return true;
@@ -2438,8 +2460,6 @@ UnicodeString  TMeterValue::GetRawValueFullName()
 {
 	return RawValueName + ", " + RawValueDim;
 }
-
-
 
 
 

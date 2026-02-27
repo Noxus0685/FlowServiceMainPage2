@@ -720,27 +720,80 @@ end;
 
 { Stores raw sensor input and propagates it through standard value pipeline. }
 procedure TMeterValue.SetRawValue(InputValue: Double);
+var
+  ValueLocal: Double;
+  RateLocal: Double;
+  ResultLocal: Double;
 begin
+  RawValues.Insert(0, FRawValue);
+  if RawValues.Count > ARRAY_SIZE then
+    RawValues.Delete(RawValues.Count - 1);
+
   FRawValue := InputValue;
-  SetValue(InputValue);
+
+  if UpdateType <> HAND_TYPE then
+  begin
+    UpdateType := ONLINE_TYPE;
+
+    if Assigned(ValueRate) then
+      ValueLocal := InputValue * ValueRate.GetDoubleValue
+    else
+      ValueLocal := InputValue;
+
+    ValueLocal := ValueLocal * CoefK + CoefP;
+
+    ValueWoCorrection := ValueLocal;
+
+    RateLocal := Rate(ValueLocal);
+    ResultLocal := RateLocal * ValueLocal;
+
+    SetValue(ResultLocal);
+  end;
 end;
 
 { Stores raw sensor input and propagates it through standard value pipeline. }
 procedure TMeterValue.SetRawValue(InputValue: Double; Q: Single);
+var
+  ValueLocal: Double;
 begin
-  SetRawValue(InputValue * Rate(Q));
+  if UpdateType <> HAND_TYPE then
+  begin
+    UpdateType := ONLINE_TYPE;
+    if Assigned(ValueRate) then
+      ValueLocal := InputValue * ValueRate.GetDoubleValue
+    else
+      ValueLocal := InputValue;
+
+    ValueLocal := ValueLocal * CoefK + CoefP;
+    ValueWoCorrection := ValueLocal;
+    SetMainValue(ValueLocal, Q);
+  end;
 end;
 
 { Sets processed value directly (optionally with flow-dependent correction). }
 procedure TMeterValue.SetMainValue(InputValue: Double);
+var
+  ValueLocal: Double;
 begin
-  SetValue(InputValue);
+  if Coefs.Count > 0 then
+    ValueLocal := InputValue * Rate(InputValue)
+  else
+    ValueLocal := InputValue;
+
+  SetValue(ValueLocal);
 end;
 
 { Sets processed value directly (optionally with flow-dependent correction). }
 procedure TMeterValue.SetMainValue(InputValue: Double; Q: Single);
+var
+  ValueLocal: Double;
 begin
-  SetValue(InputValue * Rate(Q));
+  if Coefs.Count > 0 then
+    ValueLocal := InputValue * Rate(Q)
+  else
+    ValueLocal := InputValue;
+
+  SetValue(ValueLocal);
 end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
@@ -827,7 +880,40 @@ end;
 
 { Calculates linear correction coefficient by flow argument Q. }
 function TMeterValue.Rate(Q: Double): Double;
+var
+  I: Integer;
+  K: Double;
+  B: Double;
+  Qetl: Double;
 begin
+  if Q = 0 then
+    Exit(1);
+
+  if Coefs.Count > 0 then
+  begin
+    Qetl := 0;
+    K := Coefs[Coefs.Count - 1].K;
+    B := Coefs[Coefs.Count - 1].b;
+
+    for I := 0 to Coefs.Count - 1 do
+    begin
+      K := Coefs[I].K;
+      B := Coefs[I].b;
+
+      if (Q >= Coefs[I].Q1) and (Q < Coefs[I].Q2) then
+      begin
+        Qetl := K * Q + B;
+        Exit(Qetl / Q);
+      end;
+    end;
+
+    if Qetl = 0 then
+    begin
+      Qetl := K * Q + B;
+      Exit(Qetl / Q);
+    end;
+  end;
+
   Result := CoefK * Q + CoefP;
 end;
 
