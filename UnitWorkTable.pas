@@ -30,7 +30,7 @@ type
     FEnabled: Boolean;
     FText: string;
 
-    // Çíà÷åíèÿ êàíàëà (ÍÅ ïðîêñè)
+    // Channel values (not proxy fields)
     FImpSec: Double;
     FImpResult: Double;
     FCurSec: Double;
@@ -49,7 +49,7 @@ type
     FHashValueCurrent: string;
     FHashValueInterface: string;
 
-    // --- ïðîêñè ê FlowMeter ---
+    // --- proxies for FlowMeter fields ---
     function GetTypeNameProxy: string;
     procedure SetTypeNameProxy(const AValue: string);
 
@@ -64,7 +64,7 @@ type
 
     procedure Init;
 
-    // --- îáû÷íûå ãåòòåðû/ñåòòåðû ê ïåðåìåííûì êàíàëà ---
+    // --- regular getters/setters for channel fields ---
     function GetImpSecProxy: Double;
     procedure SetImpSecProxy(const AValue: Double);
 
@@ -95,13 +95,13 @@ type
     property Name: string read FName write FName;
     property Text: string read FText write FText;
 
-    // Ïðîêñè-ïîëÿ (äóáëèðóþò FlowMeter)
+    // Proxy fields (mirror FlowMeter)
     property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
 
-    // Ïîëÿ êàíàëà (âíóòðåííèå ïåðåìåííûå)
+    // Channel fields (internal variables)
     property ImpSec: Double read GetImpSecProxy write SetImpSecProxy;
     property ImpResult: Double read GetImpResultProxy write SetImpResultProxy;
     property CurSec: Double read GetCurSecProxy write SetCurSecProxy;
@@ -139,9 +139,11 @@ type
     FValueTempertureBefore: TMeterValue;
     FValueTempertureAfter: TMeterValue;
     FValueTempertureDelta: TMeterValue;
+    FValueTemperture: TMeterValue;
     FValuePressureBefore: TMeterValue;
     FValuePressureAfter: TMeterValue;
     FValuePressureDelta: TMeterValue;
+    FValuePressure: TMeterValue;
     FValueAirPressure: TMeterValue;
     FValueAirTemperture: TMeterValue;
     FValueHumidity: TMeterValue;
@@ -150,9 +152,11 @@ type
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
     FHashValueTempertureDelta: string;
+    FHashValueTemperture: string;
     FHashValuePressureBefore: string;
     FHashValuePressureAfter: string;
     FHashValuePressureDelta: string;
+    FHashValuePressure: string;
     FHashValueAirPressure: string;
     FHashValueAirTemperture: string;
     FHashValueHumidity: string;
@@ -220,14 +224,15 @@ type
     property ValueTempertureBefore: TMeterValue read FValueTempertureBefore;
     property ValueTempertureAfter: TMeterValue read FValueTempertureAfter;
     property ValueTempertureDelta: TMeterValue read FValueTempertureDelta;
+    property ValueTemperture: TMeterValue read FValueTemperture;
     property ValuePressureBefore: TMeterValue read FValuePressureBefore;
     property ValuePressureAfter: TMeterValue read FValuePressureAfter;
     property ValuePressureDelta: TMeterValue read FValuePressureDelta;
+    property ValuePressure: TMeterValue read FValuePressure;
     property ValueAirPressure: TMeterValue read FValueAirPressure;
     property ValueAirTemperture: TMeterValue read FValueAirTemperture;
     property ValueHumidity: TMeterValue read FValueHumidity;
     property ValueTime: TMeterValue read FValueTime;
-    property ValuePressure: TMeterValue read FValuePressureBefore;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -253,6 +258,7 @@ implementation
 
 
   {$REGION 'TChannel'}
+{ Creates a channel object, initializes defaults, and allocates linked meter values. }
 constructor TChannel.Create;
 var
   IsExisted: Integer;
@@ -308,12 +314,14 @@ begin
   FValueInterface.SetToSave(True);
 end;
 
+{ Releases channel-owned resources and removes linked values from shared storage. }
 destructor TChannel.Destroy;
 begin
   FreeAndNil(FFlowMeter);
   inherited Destroy;
 end;
 
+{ Initializes channel FlowMeter links using the configured device UUID. }
 procedure TChannel.Init;
 begin
   if not Assigned(FFlowMeter) then
@@ -325,21 +333,22 @@ begin
   FFlowMeter.Init(DeviceUUID);
 end;
 
+{ Rebinds FlowMeter value references to channel and work table meter values. }
 procedure TChannel.RebindFlowMeterValues(const AWorkTable: TWorkTable);
 begin
   if (FFlowMeter = nil) then
     Exit;
 
-  // Импульсы и ток прибора берём напрямую из канала.
+  // Pulse and current values are taken directly from the channel.
   FFlowMeter.ValueImp := FValueImp;
   FFlowMeter.ValueImpTotal := FValueImpTotal;
   FFlowMeter.ValueCurrent := FValueCurrent;
 
   if AWorkTable <> nil then
   begin
-    // Температура/давление и атмосферные условия берём из рабочего стола.
-    FFlowMeter.ValueTemperture := AWorkTable.ValueTempertureBefore;
-    FFlowMeter.ValuePressure := AWorkTable.ValuePressureBefore;
+    // Temperature/pressure and atmospheric conditions are taken from the work table.
+    FFlowMeter.ValueTemperture := AWorkTable.ValueTemperture;
+    FFlowMeter.ValuePressure := AWorkTable.ValuePressure;
     FFlowMeter.ValueAirPressure := AWorkTable.ValueAirPressure;
     FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
     FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
@@ -350,9 +359,10 @@ begin
 end;
 
 // =====================================================
-// == Proxy: FlowMeter ïîëÿ
+// == Proxy: FlowMeter fields
 // =====================================================
 
+{ Returns device type name from FlowMeter for proxy property access. }
 function TChannel.GetTypeNameProxy: string;
 begin
   if Assigned(FFlowMeter) then
@@ -361,12 +371,14 @@ begin
     Result := '';
 end;
 
+{ Updates FlowMeter device type name through proxy property. }
 procedure TChannel.SetTypeNameProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.DeviceTypeName := AValue;
 end;
 
+{ Returns serial number from FlowMeter for proxy property access. }
 function TChannel.GetSerialProxy: string;
 begin
   if Assigned(FFlowMeter) then
@@ -375,12 +387,14 @@ begin
     Result := '';
 end;
 
+{ Updates FlowMeter serial number through proxy property. }
 procedure TChannel.SetSerialProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.SerialNumber := AValue;
 end;
 
+{ Returns FlowMeter output signal type for proxy property access. }
 function TChannel.GetSignalProxy: Integer;
 begin
   if Assigned(FFlowMeter) then
@@ -389,12 +403,14 @@ begin
     Result := -1;
 end;
 
+{ Updates FlowMeter output signal type through proxy property. }
 procedure TChannel.SetSignalProxy(const AValue: Integer);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.OutputType := AValue;
 end;
 
+{ Returns bound FlowMeter device UUID for proxy property access. }
 function TChannel.GetDeviceUUIDProxy: string;
 begin
   if Assigned(FFlowMeter) then
@@ -403,6 +419,7 @@ begin
     Result := '';
 end;
 
+{ Updates FlowMeter device UUID through proxy property. }
 procedure TChannel.SetDeviceUUIDProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
@@ -410,64 +427,76 @@ begin
 end;
 
 // =====================================================
-// == Proxy: âíóòðåííèå ïåðåìåííûå êàíàëà
+// == Proxy: channel internal variables
 // =====================================================
 
+{ Returns channel pulse-per-second runtime value. }
 function TChannel.GetImpSecProxy: Double;
 begin
   Result := FImpSec;
 end;
 
+{ Stores channel pulse-per-second runtime value. }
 procedure TChannel.SetImpSecProxy(const AValue: Double);
 begin
   FImpSec := AValue;
 end;
 
+{ Returns channel pulse result value. }
 function TChannel.GetImpResultProxy: Double;
 begin
   Result := FImpResult;
 end;
 
+{ Stores channel pulse result value. }
 procedure TChannel.SetImpResultProxy(const AValue: Double);
 begin
   FImpResult := AValue;
 end;
 
+{ Returns channel current-per-second runtime value. }
 function TChannel.GetCurSecProxy: Double;
 begin
   Result := FCurSec;
 end;
 
+{ Stores channel current-per-second runtime value. }
 procedure TChannel.SetCurSecProxy(const AValue: Double);
 begin
   FCurSec := AValue;
 end;
 
+{ Returns channel current result value. }
 function TChannel.GetCurResultProxy: Double;
 begin
   Result := FCurResult;
 end;
 
+{ Stores channel current result value. }
 procedure TChannel.SetCurResultProxy(const AValue: Double);
 begin
   FCurResult := AValue;
 end;
 
+{ Returns channel secondary runtime value. }
 function TChannel.GetValueSecProxy: Double;
 begin
   Result := FValueSec;
 end;
 
+{ Stores channel secondary runtime value. }
 procedure TChannel.SetValueSecProxy(const AValue: Double);
 begin
   FValueSec := AValue;
 end;
 
+{ Returns channel secondary result value. }
 function TChannel.GetValueResultProxy: Double;
 begin
   Result := FValueResult;
 end;
 
+{ Stores channel secondary result value. }
 procedure TChannel.SetValueResultProxy(const AValue: Double);
 begin
   FValueResult := AValue;
@@ -475,6 +504,7 @@ end;
     {$ENDREGION}
 
   {$REGION 'TWorkTable'}
+{ Creates a work table with default state, channels lists, and meter values. }
 constructor TWorkTable.Create;
 begin
   inherited Create;
@@ -496,6 +526,7 @@ begin
   InitMeterValues;
 end;
 
+{ Creates/restores all work table meter values and configures their dependencies. }
 procedure TWorkTable.InitMeterValues;
 var
   IsExisted: Integer;
@@ -527,6 +558,18 @@ begin
   end;
   FValueTempertureDelta.SetToSave(True);
 
+  FValueTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueTemperture, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueTemperture.SetAsTemp;
+    FValueTemperture.DependenceType := INDEPENDENT;
+    FValueTemperture.UpdateType := ONLINE_TYPE;
+  end;
+  FValueTemperture.ValueType := MEAN_TYPE;
+  FValueTemperture.ValueBaseMultiplier := FValueTempertureAfter;
+  FValueTemperture.ValueBaseDevider := FValueTempertureBefore;
+  FValueTemperture.SetToSave(True);
+
   FValuePressureBefore := TMeterValue.GetExistedMeterValueBool(FHashValuePressureBefore, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
@@ -553,6 +596,18 @@ begin
     FValuePressureDelta.UpdateType := ONLINE_TYPE;
   end;
   FValuePressureDelta.SetToSave(True);
+
+  FValuePressure := TMeterValue.GetExistedMeterValueBool(FHashValuePressure, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValuePressure.SetAsPressure;
+    FValuePressure.DependenceType := INDEPENDENT;
+    FValuePressure.UpdateType := ONLINE_TYPE;
+  end;
+  FValuePressure.ValueType := MEAN_TYPE;
+  FValuePressure.ValueBaseMultiplier := FValuePressureAfter;
+  FValuePressure.ValueBaseDevider := FValuePressureBefore;
+  FValuePressure.SetToSave(True);
 
   FValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
   if IsExisted = 0 then
@@ -591,6 +646,7 @@ begin
   FValueTime.SetToSave(True);
 end;
 
+{ Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
   FDeviceChannels.Free;
@@ -598,6 +654,7 @@ begin
   inherited;
 end;
 
+{ Adds a new device channel with default identifiers and bindings. }
 function TWorkTable.AddDeviceChannel: TChannel;
 var
   ChannelIndex: Integer;
@@ -611,6 +668,7 @@ begin
   Result.RebindFlowMeterValues(Self);
 end;
 
+{ Adds and configures a new device channel from provided parameters. }
 function TWorkTable.AddDeviceChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
   ATypeName, ASerial, ADeviceUUID: string): TChannel;
 begin
@@ -625,6 +683,7 @@ begin
   Result.RebindFlowMeterValues(Self);
 end;
 
+{ Adds a new etalon channel with default identifiers and bindings. }
 function TWorkTable.AddEtalonChannel: TChannel;
 var
   ChannelIndex: Integer;
@@ -638,6 +697,7 @@ begin
   Result.RebindFlowMeterValues(Self);
 end;
 
+{ Rebinds all device and etalon flow meters to this work table values. }
 procedure TWorkTable.RebindAllFlowMeters;
 var
   I: Integer;
@@ -649,6 +709,7 @@ begin
     FEtalonChannels[I].RebindFlowMeterValues(Self);
 end;
 
+{ Triggers recalculation/update pass for work table and channel meter values. }
 procedure TWorkTable.RecalculateAllMeterValues;
 var
   I: Integer;
@@ -659,9 +720,11 @@ begin
   if FValueTempertureBefore <> nil then FValueTempertureBefore.SetValue(FValueTempertureBefore.GetDoubleValue);
   if FValueTempertureAfter <> nil then FValueTempertureAfter.SetValue(FValueTempertureAfter.GetDoubleValue);
   if FValueTempertureDelta <> nil then FValueTempertureDelta.SetValue(FValueTempertureDelta.GetDoubleValue);
+  if FValueTemperture <> nil then FValueTemperture.SetValue;
   if FValuePressureBefore <> nil then FValuePressureBefore.SetValue(FValuePressureBefore.GetDoubleValue);
   if FValuePressureAfter <> nil then FValuePressureAfter.SetValue(FValuePressureAfter.GetDoubleValue);
   if FValuePressureDelta <> nil then FValuePressureDelta.SetValue(FValuePressureDelta.GetDoubleValue);
+  if FValuePressure <> nil then FValuePressure.SetValue;
   if FValueAirPressure <> nil then FValueAirPressure.SetValue(FValueAirPressure.GetDoubleValue);
   if FValueAirTemperture <> nil then FValueAirTemperture.SetValue(FValueAirTemperture.GetDoubleValue);
   if FValueHumidity <> nil then FValueHumidity.SetValue(FValueHumidity.GetDoubleValue);
@@ -702,6 +765,7 @@ begin
   end;
 end;
 
+{ Adds and configures a new etalon channel from provided parameters. }
 function TWorkTable.AddEtalonChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
   ATypeName, ASerial, ADeviceUUID: string): TChannel;
 begin
@@ -716,6 +780,7 @@ begin
   Result.RebindFlowMeterValues(Self);
 end;
 
+{ Saves work table list, channels, and meter values to INI files. }
 class procedure TWorkTable.Save(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
@@ -763,9 +828,11 @@ begin
       ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
       ValuesIni.WriteString(Section, 'HashValueTempertureAfter', WorkTable.ValueTempertureAfter.Hash);
       ValuesIni.WriteString(Section, 'HashValueTempertureDelta', WorkTable.ValueTempertureDelta.Hash);
+      ValuesIni.WriteString(Section, 'HashValueTemperture', WorkTable.ValueTemperture.Hash);
       ValuesIni.WriteString(Section, 'HashValuePressureBefore', WorkTable.ValuePressureBefore.Hash);
       ValuesIni.WriteString(Section, 'HashValuePressureAfter', WorkTable.ValuePressureAfter.Hash);
       ValuesIni.WriteString(Section, 'HashValuePressureDelta', WorkTable.ValuePressureDelta.Hash);
+      ValuesIni.WriteString(Section, 'HashValuePressure', WorkTable.ValuePressure.Hash);
       ValuesIni.WriteString(Section, 'HashValueAirPressure', WorkTable.ValueAirPressure.Hash);
       ValuesIni.WriteString(Section, 'HashValueAirTemperture', WorkTable.ValueAirTemperture.Hash);
       ValuesIni.WriteString(Section, 'HashValueHumidity', WorkTable.ValueHumidity.Hash);
@@ -774,9 +841,11 @@ begin
       ValuesIni.WriteFloat(Section, 'ValueTempertureBefore', WorkTable.ValueTempertureBefore.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueTempertureAfter', WorkTable.ValueTempertureAfter.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueTempertureDelta', WorkTable.ValueTempertureDelta.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueTemperture', WorkTable.ValueTemperture.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValuePressureBefore', WorkTable.ValuePressureBefore.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValuePressureAfter', WorkTable.ValuePressureAfter.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValuePressureDelta', WorkTable.ValuePressureDelta.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValuePressure', WorkTable.ValuePressure.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueAirPressure', WorkTable.ValueAirPressure.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueAirTemperture', WorkTable.ValueAirTemperture.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueHumidity', WorkTable.ValueHumidity.GetDoubleValue);
@@ -791,6 +860,7 @@ begin
   end;
 end;
 
+{ Loads work table list, channels, and meter values from INI files. }
 class procedure TWorkTable.Load(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
@@ -840,9 +910,11 @@ begin
       WorkTable.FHashValueTempertureBefore := ValuesIni.ReadString(Section, 'HashValueTempertureBefore', WorkTable.FHashValueTempertureBefore);
       WorkTable.FHashValueTempertureAfter := ValuesIni.ReadString(Section, 'HashValueTempertureAfter', WorkTable.FHashValueTempertureAfter);
       WorkTable.FHashValueTempertureDelta := ValuesIni.ReadString(Section, 'HashValueTempertureDelta', WorkTable.FHashValueTempertureDelta);
+      WorkTable.FHashValueTemperture := ValuesIni.ReadString(Section, 'HashValueTemperture', WorkTable.FHashValueTemperture);
       WorkTable.FHashValuePressureBefore := ValuesIni.ReadString(Section, 'HashValuePressureBefore', WorkTable.FHashValuePressureBefore);
       WorkTable.FHashValuePressureAfter := ValuesIni.ReadString(Section, 'HashValuePressureAfter', WorkTable.FHashValuePressureAfter);
       WorkTable.FHashValuePressureDelta := ValuesIni.ReadString(Section, 'HashValuePressureDelta', WorkTable.FHashValuePressureDelta);
+      WorkTable.FHashValuePressure := ValuesIni.ReadString(Section, 'HashValuePressure', WorkTable.FHashValuePressure);
       WorkTable.FHashValueAirPressure := ValuesIni.ReadString(Section, 'HashValueAirPressure', WorkTable.FHashValueAirPressure);
       WorkTable.FHashValueAirTemperture := ValuesIni.ReadString(Section, 'HashValueAirTemperture', WorkTable.FHashValueAirTemperture);
       WorkTable.FHashValueHumidity := ValuesIni.ReadString(Section, 'HashValueHumidity', WorkTable.FHashValueHumidity);
@@ -851,9 +923,11 @@ begin
       if WorkTable.FValueTempertureBefore <> nil then WorkTable.FValueTempertureBefore.DeleteFromVector;
       if WorkTable.FValueTempertureAfter <> nil then WorkTable.FValueTempertureAfter.DeleteFromVector;
       if WorkTable.FValueTempertureDelta <> nil then WorkTable.FValueTempertureDelta.DeleteFromVector;
+      if WorkTable.FValueTemperture <> nil then WorkTable.FValueTemperture.DeleteFromVector;
       if WorkTable.FValuePressureBefore <> nil then WorkTable.FValuePressureBefore.DeleteFromVector;
       if WorkTable.FValuePressureAfter <> nil then WorkTable.FValuePressureAfter.DeleteFromVector;
       if WorkTable.FValuePressureDelta <> nil then WorkTable.FValuePressureDelta.DeleteFromVector;
+      if WorkTable.FValuePressure <> nil then WorkTable.FValuePressure.DeleteFromVector;
       if WorkTable.FValueAirPressure <> nil then WorkTable.FValueAirPressure.DeleteFromVector;
       if WorkTable.FValueAirTemperture <> nil then WorkTable.FValueAirTemperture.DeleteFromVector;
       if WorkTable.FValueHumidity <> nil then WorkTable.FValueHumidity.DeleteFromVector;
@@ -864,9 +938,11 @@ begin
       WorkTable.ValueTempertureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureBefore', 0));
       WorkTable.ValueTempertureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureAfter', 0));
       WorkTable.ValueTempertureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureDelta', 0));
+      WorkTable.ValueTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueTemperture', 0));
       WorkTable.ValuePressureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureBefore', 0));
       WorkTable.ValuePressureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureAfter', 0));
       WorkTable.ValuePressureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureDelta', 0));
+      WorkTable.ValuePressure.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressure', 0));
       WorkTable.ValueAirPressure.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirPressure', 0));
       WorkTable.ValueAirTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirTemperture', 0));
       WorkTable.ValueHumidity.SetValue(ValuesIni.ReadFloat(Section, 'ValueHumidity', 0));
@@ -885,6 +961,7 @@ begin
   end;
 end;
 
+{ Persists channel collection metadata to INI storage. }
 class procedure TWorkTable.SaveChannelList(AIni: TIniFile;
   const ASectionPrefix: string; AChannels: TObjectList<TChannel>);
 var
@@ -934,6 +1011,7 @@ begin
   end;
 end;
 
+{ Restores channel collection metadata from INI storage. }
 class procedure TWorkTable.LoadChannelList(AIni: TIniFile;
   const ASectionPrefix: string; AChannels: TObjectList<TChannel>);
 var
@@ -1027,26 +1105,31 @@ begin
   end;
 end;
 
+{ Builds canonical internal service name for a work table by index. }
 class function TWorkTable.BuildWorkTableServiceName(const ATableIndex: Integer): string;
 begin
   Result := 'Рабочий стол ' + IntToStr(ATableIndex);
 end;
 
+{ Builds canonical internal service name for a device channel by index. }
 class function TWorkTable.BuildDeviceChannelServiceName(const AChannelIndex: Integer): string;
 begin
   Result := 'Канал поверяемых приборов ' + IntToStr(AChannelIndex);
 end;
 
+{ Builds canonical internal service name for an etalon channel by index. }
 class function TWorkTable.BuildEtalonChannelServiceName(const AChannelIndex: Integer): string;
 begin
   Result := 'Канал эталонов ' + IntToStr(AChannelIndex);
 end;
 
+{ Builds default UI display text for a channel by index. }
 class function TWorkTable.BuildChannelDefaultText(const AChannelIndex: Integer): string;
 begin
   Result := IntToStr(AChannelIndex);
 end;
 
+{ Converts persisted string to spill state enum value. }
 class function TWorkTable.SpillStateFromString(const AValue: string): TSpillState;
 begin
   if SameText(AValue, 'Ready') then
@@ -1067,6 +1150,7 @@ begin
   Result := ssNone;
 end;
 
+{ Converts spill state enum value to persisted string. }
 class function TWorkTable.SpillStateToString(AState: TSpillState): string;
 begin
   case AState of
@@ -1087,6 +1171,7 @@ end;
 
 { TWorkTableManager }
 
+{ Creates manager and initializes work table storage container. }
 constructor TWorkTableManager.Create(const AIniFileName: string);
 begin
   inherited Create;
@@ -1094,17 +1179,20 @@ begin
   FWorkTables := TObjectList<TWorkTable>.Create(True);
 end;
 
+{ Frees managed work table collection and manager resources. }
 destructor TWorkTableManager.Destroy;
 begin
   FWorkTables.Free;
   inherited;
 end;
 
+{ Loads managed work tables from configured INI file. }
 procedure TWorkTableManager.Load;
 begin
   TWorkTable.Load(FIniFileName, FWorkTables);
 end;
 
+{ Saves managed work tables to configured INI file. }
 procedure TWorkTableManager.Save;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
