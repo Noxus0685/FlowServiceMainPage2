@@ -448,8 +448,86 @@ end;
 
 { Applies configured digital filter to current samples and returns filtered value. }
 function TMeterValue.FilterApply: Double;
+var
+  Flt: Double;
+  Val: Double;
+  Limit: Double;
+  MeanLocal: Double;
+  Delta: Integer;
+  I: Integer;
+  Nulls: Boolean;
 begin
-  Result := Value;
+  MeanLocal := 0;
+  Flt := Value;
+
+  if FFilterOrder > 0 then
+  begin
+    if Values.Count > FFilterOrder then
+      Delta := FFilterOrder
+    else
+    begin
+      Delta := Values.Count;
+      if TempDelta > Delta then
+        TempDelta := Delta;
+    end;
+
+    if TempDelta < FFilterOrder then
+    begin
+      if TempDelta < Delta then
+      begin
+        Delta := TempDelta;
+        Inc(TempDelta);
+      end;
+    end;
+
+    Nulls := False;
+
+    for I := 0 to Delta - 1 do
+    begin
+      Val := Values[I];
+      MeanLocal := MeanLocal + Val;
+
+      if Val = 0 then
+        Nulls := True;
+
+      if I = FilterShortOrder - 1 then
+      begin
+        if FilterShortOrder > 0 then
+          FShortMean := MeanLocal / FilterShortOrder
+        else
+          FShortMean := 0;
+
+        if (FLastMean <> 0) and (not Nulls) then
+        begin
+          Limit := (FShortMean * Error) / 100;
+          if Abs(FLastMean - FShortMean) > Limit then
+          begin
+            Delta := FilterShortOrder;
+            TempDelta := FilterShortOrder;
+          end;
+        end;
+      end;
+    end;
+
+    if Delta > 0 then
+      Mean := MeanLocal / Delta
+    else
+      Mean := Value;
+
+    FLastMean := Mean;
+    Flt := Mean;
+  end
+  else
+  begin
+    Mean := Flt;
+    Flt := Value;
+  end;
+
+  AverValues.Insert(0, Mean);
+  if AverValues.Count > ARRAY_SIZE then
+    AverValues.Delete(AverValues.Count - 1);
+
+  Result := Flt;
 end;
 
 { Calculates short-term averaged value from the latest measurement history. }
@@ -880,14 +958,24 @@ end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
 procedure TMeterValue.SetValue(AValue: Double);
+var
+  InputValue: Double;
 begin
-  Value := EnsureRange(AValue, MinValue, MaxValue);
-  Values.Add(Value);
-  if Values.Count > ARRAY_SIZE then
-    Values.Delete(0);
-  Mean := (Mean * MeanCnt + Value) / (MeanCnt + 1);
-  Inc(MeanCnt);
-  FLastMean := Mean;
+  InputValue := EnsureRange(AValue, MinValue, MaxValue);
+
+  if ARRAY_SIZE > 0 then
+  begin
+    Values.Insert(0, InputValue);
+    if Values.Count > ARRAY_SIZE then
+      Values.Delete(Values.Count - 1);
+
+    if (FFilterOrder <> -1) and (not FFinalValue) then
+      Value := FilterApply
+    else
+      Value := InputValue;
+  end
+  else
+    Value := InputValue;
 end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
@@ -1151,6 +1239,12 @@ end;
 { Clears runtime accumulators and returns measurement state to initial defaults. }
 procedure TMeterValue.Reset;
 begin
+  FFilterRd := 0;
+  FFilterWr := 0;
+  FFilterCnt := 0;
+  FLastMean := 0;
+  TempDelta := 0;
+
   Value := 0;
   Mean := 0;
   MeanCnt := 0;
