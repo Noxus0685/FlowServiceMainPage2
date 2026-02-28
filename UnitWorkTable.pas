@@ -541,6 +541,11 @@ end;
 procedure TWorkTable.InitMeterValues;
 var
   IsExisted: Integer;
+  procedure EnsureDescription(AMeterValue: TMeterValue; const ADescription: string);
+  begin
+    if (AMeterValue <> nil) and (Trim(AMeterValue.Description) = '') then
+      AMeterValue.Description := ADescription;
+  end;
 begin
   FValueTempertureBefore := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureBefore, IsExisted, '', Name);
   if IsExisted = 0 then
@@ -549,6 +554,7 @@ begin
     FValueTempertureBefore.DependenceType := INDEPENDENT;
     FValueTempertureBefore.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueTempertureBefore, 'Температура до стола');
   FValueTempertureBefore.SetToSave(True);
 
   FValueTempertureAfter := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureAfter, IsExisted, '', Name);
@@ -558,6 +564,7 @@ begin
     FValueTempertureAfter.DependenceType := INDEPENDENT;
     FValueTempertureAfter.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueTempertureAfter, 'Температура после стола');
   FValueTempertureAfter.SetToSave(True);
 
   FValueTempertureDelta := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureDelta, IsExisted, '', Name);
@@ -567,6 +574,7 @@ begin
     FValueTempertureDelta.DependenceType := INDEPENDENT;
     FValueTempertureDelta.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueTempertureDelta, 'Разница температур до и после стола');
   FValueTempertureDelta.SetToSave(True);
 
   FValueTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueTemperture, IsExisted, '', Name);
@@ -579,6 +587,7 @@ begin
   FValueTemperture.ValueType := MEAN_TYPE;
   FValueTemperture.ValueBaseMultiplier := FValueTempertureAfter;
   FValueTemperture.ValueBaseDevider := FValueTempertureBefore;
+  EnsureDescription(FValueTemperture, 'Средняя температура стола');
   FValueTemperture.SetToSave(True);
 
   FValuePressureBefore := TMeterValue.GetExistedMeterValueBool(FHashValuePressureBefore, IsExisted, '', Name);
@@ -588,6 +597,7 @@ begin
     FValuePressureBefore.DependenceType := INDEPENDENT;
     FValuePressureBefore.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValuePressureBefore, 'Давление до стола');
   FValuePressureBefore.SetToSave(True);
 
   FValuePressureAfter := TMeterValue.GetExistedMeterValueBool(FHashValuePressureAfter, IsExisted, '', Name);
@@ -597,6 +607,7 @@ begin
     FValuePressureAfter.DependenceType := INDEPENDENT;
     FValuePressureAfter.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValuePressureAfter, 'Давление после стола');
   FValuePressureAfter.SetToSave(True);
 
   FValuePressureDelta := TMeterValue.GetExistedMeterValueBool(FHashValuePressureDelta, IsExisted, '', Name);
@@ -606,6 +617,7 @@ begin
     FValuePressureDelta.DependenceType := INDEPENDENT;
     FValuePressureDelta.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValuePressureDelta, 'Разница давлений до и после стола');
   FValuePressureDelta.SetToSave(True);
 
   FValuePressure := TMeterValue.GetExistedMeterValueBool(FHashValuePressure, IsExisted, '', Name);
@@ -618,6 +630,7 @@ begin
   FValuePressure.ValueType := MEAN_TYPE;
   FValuePressure.ValueBaseMultiplier := FValuePressureAfter;
   FValuePressure.ValueBaseDevider := FValuePressureBefore;
+  EnsureDescription(FValuePressure, 'Среднее давление стола');
   FValuePressure.SetToSave(True);
 
   FValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
@@ -627,6 +640,7 @@ begin
     FValueAirPressure.DependenceType := INDEPENDENT;
     FValueAirPressure.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueAirPressure, 'Атмосферное давление');
   FValueAirPressure.SetToSave(True);
 
   FValueAirTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueAirTemperture, IsExisted, '', Name);
@@ -636,6 +650,7 @@ begin
     FValueAirTemperture.DependenceType := INDEPENDENT;
     FValueAirTemperture.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueAirTemperture, 'Температура воздуха');
   FValueAirTemperture.SetToSave(True);
 
   FValueHumidity := TMeterValue.GetExistedMeterValueBool(FHashValueHumidity, IsExisted, '', Name);
@@ -645,6 +660,7 @@ begin
     FValueHumidity.DependenceType := INDEPENDENT;
     FValueHumidity.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueHumidity, 'Влажность воздуха');
   FValueHumidity.SetToSave(True);
 
   FValueTime := TMeterValue.GetExistedMeterValueBool(FHashValueTime, IsExisted, '', Name);
@@ -654,6 +670,7 @@ begin
     FValueTime.DependenceType := INDEPENDENT;
     FValueTime.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueTime, 'Время измерения');
   FValueTime.SetToSave(True);
 
   FValueQuantity := TMeterValue.GetExistedMeterValueBool(FHashValueQuantity, IsExisted, '', Name);
@@ -663,6 +680,7 @@ begin
     FValueQuantity.DependenceType := INDEPENDENT;
     FValueQuantity.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueQuantity, 'Объём за измерение');
   FValueQuantity.SetToSave(True);
 
   FValueFlowRate := TMeterValue.GetExistedMeterValueBool(FHashValueFlowRate, IsExisted, '', Name);
@@ -672,6 +690,7 @@ begin
     FValueFlowRate.DependenceType := INDEPENDENT;
     FValueFlowRate.UpdateType := ONLINE_TYPE;
   end;
+  EnsureDescription(FValueFlowRate, 'Расход');
   FValueFlowRate.SetToSave(True);
 end;
 
