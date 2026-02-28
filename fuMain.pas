@@ -340,6 +340,7 @@ type
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
     procedure UpdateUIFromValues;
+    procedure SetValues;
 
      procedure UpdateGrids;
 
@@ -933,6 +934,58 @@ begin
     EtalonChannel.FlowMeter.ValuePressure.SetValue(WorkTable.Press);
     EtalonChannel.FlowMeter.ValueCurrent.SetValue(EtalonChannel.ValueCurrent.GetDoubleValue);
     EtalonChannel.FlowMeter.ValueImp.SetValue(EtalonChannel.ValueImp.GetDoubleValue);
+  end;
+
+  WorkTable.RecalculateAllMeterValues;
+end;
+
+procedure TFormMain.SetValues;
+var
+  WorkTable: TWorkTable;
+  I: Integer;
+  DeviceChannel: TChannel;
+  EtalonChannel: TChannel;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  UpdateRandomClimate(WorkTable);
+
+  // Основные MeterValues рабочего стола.
+  WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
+  WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
+  WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
+  WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
+  WorkTable.ValueFlowRate.SetValue(WorkTable.FlowRate);
+  WorkTable.ValueQuantity.SetValue(WorkTable.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
+  WorkTable.Time := WorkTable.Time + 1;
+  WorkTable.ValueTime.SetValue(WorkTable.Time);
+
+  // Основные MeterValues эталонных каналов.
+  for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+  begin
+    EtalonChannel := WorkTable.EtalonChannels[I];
+    if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
+      Continue;
+
+    EtalonChannel.ValueCurrent.SetValue(EtalonChannel.CurSec);
+    EtalonChannel.ValueImp.SetValue(EtalonChannel.ImpSec);
+    EtalonChannel.ValueImpTotal.SetValue(EtalonChannel.ImpResult);
+    EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
+  end;
+
+  // Основные MeterValues каналов приборов.
+  for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+  begin
+    DeviceChannel := WorkTable.DeviceChannels[I];
+    if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
+      Continue;
+
+    DeviceChannel.ValueCurrent.SetValue(DeviceChannel.CurSec);
+    DeviceChannel.ValueImp.SetValue(DeviceChannel.ImpSec);
+    DeviceChannel.ValueImpTotal.SetValue(DeviceChannel.ImpResult);
+    DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
   end;
 
   WorkTable.RecalculateAllMeterValues;
