@@ -237,8 +237,8 @@ type
     property ValueAirTemperture: TMeterValue read FValueAirTemperture;
     property ValueHumidity: TMeterValue read FValueHumidity;
     property ValueTime: TMeterValue read FValueTime;
-    property ValueQuantity: TMeterValue read FValueQuantity;
-    property ValueFlowRate: TMeterValue read FValueFlowRate;
+    property ValueQuantity: TMeterValue read FValueQuantity write FValueQuantity;
+    property ValueFlowRate: TMeterValue read FValueFlowRate write FValueFlowRate;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
