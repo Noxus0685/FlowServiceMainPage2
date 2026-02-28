@@ -202,7 +202,8 @@ type
     function GetDim(const AName: string): Integer; overload;
     function GetDim(index: Integer; out Dim: TDimension): Boolean; overload;
     function GetDim: Integer; overload;
-    function SetDim(Dim: Integer): Boolean;
+    function SetDim(Dim: Integer): Boolean; overload;
+    function SetDim(const ADimName: string): Boolean; overload;
     function NextDim: Boolean;
     function GetStrFullName: string;
     function GetDoubleNum(const AStr: string): Double; overload;
@@ -1209,6 +1210,20 @@ function TMeterValue.SetDim(Dim: Integer): Boolean;
 begin
   Result := (Dim >= 0) and (Dim < Dimensions.Count);
   if Result then CurrentDimIndex := Dim;
+end;
+
+{ Selects active dimension by its display name (TDimension.Name). }
+function TMeterValue.SetDim(const ADimName: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 0 to Dimensions.Count - 1 do
+    if SameText(Dimensions[I].Name, ADimName) then
+    begin
+      CurrentDimIndex := I;
+      Exit(True);
+    end;
 end;
 
 { Switches active dimension to the next one and wraps at the end of list. }

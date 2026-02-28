@@ -315,6 +315,7 @@ type
     procedure ActionMeterValuesPropertiesExecute(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
+    procedure ComboEditUnitsChange(Sender: TObject);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
   private
@@ -357,6 +358,22 @@ implementation
 {$R *.fmx}
 
 const
+  CVolumeFlowUnits: array[0..4] of string = (
+    'л/с',
+    'л/мин',
+    'л/ч',
+    'м3/мин',
+    'м3/ч'
+  );
+
+  CMassFlowUnits: array[0..4] of string = (
+    'кг/с',
+    'кг/мин',
+    'кг/ч',
+    'т/мин',
+    'т/ч'
+  );
+
   CFlowMeterTypes: array[0..2] of string = (
     'Расходомер ПРЭМ',
     'Расходомер ЭЛЕМЕР',
@@ -369,6 +386,29 @@ const
     'SN-1003',
     'SN-1004'
   );
+
+function IsVolumeFlowUnit(const AUnit: string): Boolean;
+var
+  I: Integer;
+begin
+  for I := Low(CVolumeFlowUnits) to High(CVolumeFlowUnits) do
+    if SameText(AUnit, CVolumeFlowUnits[I]) then
+      Exit(True);
+  Result := False;
+end;
+
+function ResolveQuantityUnitByFlowUnit(const AUnit: string): string;
+begin
+  if SameText(AUnit, 'л/с') or SameText(AUnit, 'л/мин') or SameText(AUnit, 'л/ч') then
+    Exit('л');
+  if SameText(AUnit, 'м3/мин') or SameText(AUnit, 'м3/ч') then
+    Exit('м3');
+  if SameText(AUnit, 'кг/с') or SameText(AUnit, 'кг/мин') or SameText(AUnit, 'кг/ч') then
+    Exit('кг');
+  if SameText(AUnit, 'т/мин') or SameText(AUnit, 'т/ч') then
+    Exit('т');
+  Result := '';
+end;
 
 function TryGetOutputTypeFromValue(const AValue: TValue; out ASignal: Integer): Boolean;
 var
@@ -407,6 +447,7 @@ end;
 procedure TFormMain.FormCreate(Sender: TObject);
 var
   OT: TOutputType;
+  UnitName: string;
 
 begin
   TMeterValue.LoadFromFile;
@@ -431,10 +472,21 @@ begin
 
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
 
+  ComboEditUnits.Items.Clear;
+  for UnitName in CVolumeFlowUnits do
+    ComboEditUnits.Items.Add(UnitName);
+  for UnitName in CMassFlowUnits do
+    ComboEditUnits.Items.Add(UnitName);
+  ComboEditUnits.OnChange := ComboEditUnitsChange;
+  if ComboEditUnits.Items.Count > 0 then
+    ComboEditUnits.ItemIndex := 0;
+
   SetLength(FRows, 0);
 
   InitFlowMeters;
   InitTables;
+  if ComboEditUnits.ItemIndex >= 0 then
+    ComboEditUnitsChange(ComboEditUnits);
 
   FLastClickRow := -1;
   FLastClickCol := nil;
@@ -442,6 +494,108 @@ begin
 
   Randomize;
   FNextClimateChangeAt := Now;
+end;
+
+procedure TFormMain.ComboEditUnitsChange(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+  I: Integer;
+  UnitName: string;
+  QuantityUnitName: string;
+  IsVolumeUnits: Boolean;
+  Meter: TFlowMeter;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  UnitName := Trim(ComboEditUnits.Text);
+  if UnitName = '' then
+    Exit;
+
+  IsVolumeUnits := IsVolumeFlowUnit(UnitName);
+  QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
+
+  Meter := nil;
+  if (WorkTable.EtalonChannels.Count > 0) and (WorkTable.EtalonChannels[0] <> nil) then
+    Meter := WorkTable.EtalonChannels[0].FlowMeter;
+  if (Meter = nil) and (WorkTable.DeviceChannels.Count > 0) and (WorkTable.DeviceChannels[0] <> nil) then
+    Meter := WorkTable.DeviceChannels[0].FlowMeter;
+
+  if Meter <> nil then
+  begin
+    if IsVolumeUnits then
+    begin
+      WorkTable.ValueQuantity := Meter.ValueVolume;
+      WorkTable.ValueFlowRate := Meter.ValueVolumeFlow;
+    end
+    else
+    begin
+      WorkTable.ValueQuantity := Meter.ValueMass;
+      WorkTable.ValueFlowRate := Meter.ValueMassFlow;
+    end;
+  end;
+
+  if WorkTable.ValueFlowRate <> nil then
+    WorkTable.ValueFlowRate.SetDim(UnitName);
+
+  if (WorkTable.ValueQuantity <> nil) and (QuantityUnitName <> '') then
+    WorkTable.ValueQuantity.SetDim(QuantityUnitName);
+
+  for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+  begin
+    if (WorkTable.DeviceChannels[I] = nil) or (WorkTable.DeviceChannels[I].FlowMeter = nil) then
+      Continue;
+
+    Meter := WorkTable.DeviceChannels[I].FlowMeter;
+    if IsVolumeUnits then
+    begin
+      Meter.ValueQuantity := Meter.ValueVolume;
+      Meter.ValueFlow := Meter.ValueVolumeFlow;
+      if Meter.ValueVolume <> nil then
+        Meter.ValueVolume.SetDim(QuantityUnitName);
+      if Meter.ValueVolumeFlow <> nil then
+        Meter.ValueVolumeFlow.SetDim(UnitName);
+    end
+    else
+    begin
+      Meter.ValueQuantity := Meter.ValueMass;
+      Meter.ValueFlow := Meter.ValueMassFlow;
+      if Meter.ValueMass <> nil then
+        Meter.ValueMass.SetDim(QuantityUnitName);
+      if Meter.ValueMassFlow <> nil then
+        Meter.ValueMassFlow.SetDim(UnitName);
+    end;
+  end;
+
+  for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+  begin
+    if (WorkTable.EtalonChannels[I] = nil) or (WorkTable.EtalonChannels[I].FlowMeter = nil) then
+      Continue;
+
+    Meter := WorkTable.EtalonChannels[I].FlowMeter;
+    if IsVolumeUnits then
+    begin
+      Meter.ValueQuantity := Meter.ValueVolume;
+      Meter.ValueFlow := Meter.ValueVolumeFlow;
+      if Meter.ValueVolume <> nil then
+        Meter.ValueVolume.SetDim(QuantityUnitName);
+      if Meter.ValueVolumeFlow <> nil then
+        Meter.ValueVolumeFlow.SetDim(UnitName);
+    end
+    else
+    begin
+      Meter.ValueQuantity := Meter.ValueMass;
+      Meter.ValueFlow := Meter.ValueMassFlow;
+      if Meter.ValueMass <> nil then
+        Meter.ValueMass.SetDim(QuantityUnitName);
+      if Meter.ValueMassFlow <> nil then
+        Meter.ValueMassFlow.SetDim(UnitName);
+    end;
+  end;
+
+  WorkTable.RecalculateAllMeterValues;
+  UpdateUIFromValues;
 end;
 
 function TFormMain.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
