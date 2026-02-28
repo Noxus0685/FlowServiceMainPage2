@@ -815,12 +815,12 @@ begin
   GridEtalons.Repaint;
 
   if WorkTable.ValueTime <> nil then
-    LabelTime.Text := WorkTable.ValueTime.GetStrValue
+    LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
   else
     LabelTime.Text := '0';
 
   if WorkTable.ValueTemperture <> nil then
-    LabelTemp.Text := FormatFloat('0', WorkTable.ValueTemperture.GetDoubleValue)
+    LabelTemp.Text :=    WorkTable.ValueTemperture.GetStrValue
   else
     LabelTemp.Text := '0';
 
@@ -852,7 +852,7 @@ begin
   if MeterForNames <> nil then
   begin
     if MeterForNames.ValueFlow <> nil then
-      LabelNameFlowRate.Text := MeterForNames.ValueFlow.GetStrFullName;
+      LabelNameFlowRate.Text :=  'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
     if MeterForNames.ValueTime <> nil then
       LabelNameTime.Text := MeterForNames.ValueTime.GetStrFullName;
     if MeterForNames.ValueQuantity <> nil then
@@ -883,8 +883,8 @@ begin
 
   if WorkTable.ValueFlowRate <> nil then
   begin
-    StringColumnDeviceFlowRate1.Header := WorkTable.ValueFlowRate.GetStrFullName;
-    StringColumnEtalonFlowRate1.Header := WorkTable.ValueFlowRate.GetStrFullName;
+    StringColumnDeviceFlowRate1.Header := 'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
+    StringColumnEtalonFlowRate1.Header := 'Расход, ' +WorkTable.ValueFlowRate.GetDimName;
   end;
   if WorkTable.ValueQuantity <> nil then
   begin

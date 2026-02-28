@@ -192,22 +192,31 @@ public
 
   MeterFlowCategory: TStdCategory;
 
+
   ValueImp: TMeterValue;
   ValueImpTotal: TMeterValue;
   ValueCoef: TMeterValue;
   ValueMassCoef: TMeterValue;
   ValueVolumeCoef: TMeterValue;
+
+  ValueQuantity: TMeterValue;
   ValueVolume: TMeterValue;
   ValueMass: TMeterValue;
+
+
   ValueVolumeMeter: TMeterValue;
   ValueMassMeter: TMeterValue;
+
+  ValueFlow: TMeterValue;
   ValueMassFlow: TMeterValue;
   ValueVolumeFlow: TMeterValue;
-  ValueQuantity: TMeterValue;
-  ValueFlow: TMeterValue;
+
+
   ValueError: TMeterValue;
   ValueVolumeError: TMeterValue;
   ValueMassError: TMeterValue;
+
+
   ValueDensity: TMeterValue;
   ValuePressure: TMeterValue;
   ValueTemperture: TMeterValue;
@@ -215,6 +224,7 @@ public
   ValueAirTemperture: TMeterValue;
   ValueHumidity: TMeterValue;
   ValueCurrent: TMeterValue;
+
   ValueTime: TMeterValue;
 
   HashValueImp: string;
