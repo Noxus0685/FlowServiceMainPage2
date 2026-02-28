@@ -94,6 +94,7 @@ private
   FImpSum: Single;
 
   procedure InitValues;
+  procedure ApplyMeasurementModel;
   procedure CopyValues(const AEtalonMeter: TFlowMeter);
 
 public
@@ -280,6 +281,7 @@ public
 
   procedure InitHashValues;
   procedure SetValues;
+  procedure RebindCalculatedValues;
   procedure SetMonitorValues;
   procedure SetFinalValues;
 
@@ -330,6 +332,7 @@ begin
   FDeviceTypeUUID :=  FDevice.DeviceTypeUUID;
   FOutputType :=  FDevice.OutputType;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
+  ApplyMeasurementModel;
 
  end;
 end;
@@ -703,6 +706,80 @@ begin
     ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
   if ValueError <> nil then
     ValueError.ValueEtalon := EtalonMeter.ValueVolume;
+
+  ApplyMeasurementModel;
+end;
+
+procedure TFlowMeter.ApplyMeasurementModel;
+var
+  OutputKind: TOutputType;
+  MeasuredKind: TMeasuredDimension;
+  FlowSource: TMeterValue;
+  TotalSource: TMeterValue;
+begin
+  OutputKind := TOutputType(OutputType);
+  MeasuredKind := mdUnknown;
+  if Assigned(Device) then
+    MeasuredKind := TMeasuredDimension(Device.MeasuredDimension);
+
+  FlowSource := ValueImp;
+  TotalSource := ValueImpTotal;
+
+  if (OutputKind = otCurrent) and Assigned(ValueCurrent) then
+  begin
+    FlowSource := ValueCurrent;
+    if TotalSource = nil then
+      TotalSource := ValueCurrent;
+  end;
+
+  if ValueMassFlow <> nil then
+  begin
+    ValueMassFlow.ValueCorrection := nil;
+    ValueMassFlow.ValueBaseMultiplier := FlowSource;
+    ValueMassFlow.ValueBaseDevider := ValueMassCoef;
+    ValueMassFlow.ValueRate := nil;
+  end;
+
+  if ValueVolumeFlow <> nil then
+  begin
+    ValueVolumeFlow.ValueCorrection := nil;
+    ValueVolumeFlow.ValueBaseMultiplier := FlowSource;
+    ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
+    ValueVolumeFlow.ValueRate := nil;
+  end;
+
+  if ValueMass <> nil then
+  begin
+    ValueMass.ValueCorrection := ValueMassFlow;
+    ValueMass.ValueBaseMultiplier := TotalSource;
+    ValueMass.ValueBaseDevider := ValueMassCoef;
+    ValueMass.ValueRate := nil;
+  end;
+
+  if ValueVolume <> nil then
+  begin
+    ValueVolume.ValueCorrection := ValueVolumeFlow;
+    ValueVolume.ValueBaseMultiplier := TotalSource;
+    ValueVolume.ValueBaseDevider := ValueVolumeCoef;
+    ValueVolume.ValueRate := nil;
+  end;
+
+  case MeasuredKind of
+    mdMassFlow,
+    mdMass:
+      begin
+        ValueFlow := ValueMassFlow;
+        ValueQuantity := ValueMass;
+      end;
+    mdVolumeFlow,
+    mdVolume:
+      begin
+        ValueFlow := ValueVolumeFlow;
+        ValueQuantity := ValueVolume;
+      end;
+  else
+    SetMeterCategory(MeterFlowCategory);
+  end;
 end;
 
 function TFlowMeter.ResolveStdCategoryFromDevice: TStdCategory;
@@ -907,6 +984,11 @@ procedure TFlowMeter.SetValues;
 begin
   InitHashValues;
   InitValues;
+end;
+
+procedure TFlowMeter.RebindCalculatedValues;
+begin
+  ApplyMeasurementModel;
 end;
 
 initialization

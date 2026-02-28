@@ -359,10 +359,9 @@ begin
     FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
     FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
     FFlowMeter.ValueTime := AWorkTable.ValueTime;
-    FFlowMeter.ValueQuantity := AWorkTable.ValueQuantity;
-    FFlowMeter.ValueFlow := AWorkTable.ValueFlowRate;
   end;
 
+  FFlowMeter.RebindCalculatedValues;
   FFlowMeter.InitHashValues;
 end;
 
