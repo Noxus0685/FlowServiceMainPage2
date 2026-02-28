@@ -566,6 +566,7 @@ begin
         StringGridValuesList.Cells[Col, I] := Item.NameOwner; Inc(Col);
         StringGridValuesList.Cells[Col, I] := Item.GetStrFullName; Inc(Col);
         StringGridValuesList.Cells[Col, I] := Item.GetStrValue; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.Description; Inc(Col);
         StringGridValuesList.Cells[Col, I] := Item.Hash; Inc(Col);
 
         if Item.ValueRate <> nil then
