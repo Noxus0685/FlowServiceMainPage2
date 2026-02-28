@@ -1037,9 +1037,9 @@ begin
   Name := 'Время';
   ShrtName := 'T';
   Dimensions.Clear;
-  SetDimension('s', 1);
-  SetDimension('min', 1, 60, False);
-  SetDimension('h', 1, 3600, False);
+  SetDimension('сек', 1);
+  SetDimension('мин', 1, 60, False);
+  SetDimension('ч', 1, 3600, False);
   SetDim(0);
   SetValue(0.0);
   MaxValue := 99999999;

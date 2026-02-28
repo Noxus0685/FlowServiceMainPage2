@@ -340,6 +340,9 @@ type
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
     procedure UpdateUIFromValues;
+
+     procedure UpdateGrids;
+
   public
     { Public declarations }
     destructor Destroy; override;
@@ -938,6 +941,7 @@ end;
 procedure TFormMain.TimerMainTimer(Sender: TObject);
 begin
   UpdateUIFromValues;
+  UpdateGrids;
 end;
 
 procedure TFormMain.UpdateUIFromValues;
@@ -1071,6 +1075,9 @@ begin
     else
       StringColumnEtalonQuantity1.TagString := '0';
   end;
+
+
+
 end;
 
 procedure TFormMain.ApplyFlowMeterSelection(const ARow: Integer);
@@ -1191,7 +1198,8 @@ begin
     { 6. Обновляем UI }
     {----------------------------------------------------}
     FActiveWorkTable.RecalculateAllMeterValues;
-    UpdateGridDevices;  // подставь имя своего грида
+
+    UpdateGrids;
     // SetModified;
   finally
     Frm.Free;
@@ -1321,8 +1329,6 @@ begin
 
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
-
-
 end;
 
 procedure TFormMain.GridDevicesSetValue(Sender: TObject; const ACol,
@@ -1430,7 +1436,9 @@ procedure TFormMain.GridEtalonsGetValue(Sender: TObject;
 var
   WorkTable: TWorkTable;
 begin
+
   WorkTable := FActiveWorkTable;
+
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
@@ -1495,6 +1503,48 @@ end;
 
  end;
 
+procedure ReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer);
+var
+  i: Integer;
+  Sel: Integer;
+begin
+  if AGrid = nil then Exit;
+
+  Sel := AGrid.Selected;
+
+  AGrid.BeginUpdate;
+  try
+    AGrid.RowCount := 0;
+
+    // добавляем строки по одной
+    for i := 1 to ANewRowCount do
+      AGrid.RowCount := i;
+
+  finally
+    AGrid.EndUpdate;
+  end;
+
+  // вернуть выделение (если осталось валидным)
+  if (Sel >= 0) and (Sel < AGrid.RowCount) then
+    AGrid.Selected := Sel;
+
+  AGrid.Repaint;
+end;
+
+procedure TFormMain.UpdateGrids;
+var
+  WT: TWorkTable;
+begin
+  WT := GetWorkTableByIndex(0);
+
+  if WT <> nil then
+    ReloadGridByGrowingRowCount(GridDevices, WT.DeviceChannels.Count)
+  else
+    ReloadGridByGrowingRowCount(GridDevices, Length(FFlowMeterRows));
+
+  // для эталонов аналогично — подставь свой источник строк
+  ReloadGridByGrowingRowCount(GridEtalons, GridEtalons.RowCount);
+end;
 
 procedure TFormMain.GridEtalonsSetValue(Sender: TObject;
   const ACol, ARow: Integer; const Value: TValue);
