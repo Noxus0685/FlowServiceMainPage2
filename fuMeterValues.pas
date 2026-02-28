@@ -83,6 +83,7 @@ type
     EditNameValueRate: TEdit;
     EditValueRate: TEdit;
     LabelTestValueWoCorrection: TLabel;
+    StringColumnDescription: TStringColumn;
     procedure FormShow(Sender: TObject);
     procedure AddRowButtonClick(Sender: TObject);
     procedure StringGridCoefsDataEditingDone(Sender: TObject; const ACol,
