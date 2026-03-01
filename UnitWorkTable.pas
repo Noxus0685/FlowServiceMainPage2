@@ -111,6 +111,8 @@ type
 
     property ValueImp: TMeterValue read FValueImp;
     property ValueImpTotal: TMeterValue read FValueImpTotal;
+    // Синоним для совместимости формулировки/старого кода: ValueImpResult == ValueImpTotal
+    property ValueImpResult: TMeterValue read FValueImpTotal;
     property ValueCurrent: TMeterValue read FValueCurrent;
     property ValueInterface: TMeterValue read FValueInterface;
 
@@ -347,7 +349,7 @@ begin
 
   // Pulse and current values are taken directly from the channel.
   FFlowMeter.ValueImp := FValueImp;
-  FFlowMeter.ValueImpTotal := FValueImpTotal;
+  FFlowMeter.ValueImpTotal := ValueImpResult;
   FFlowMeter.ValueCurrent := FValueCurrent;
 
   if AWorkTable <> nil then
@@ -359,10 +361,9 @@ begin
     FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
     FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
     FFlowMeter.ValueTime := AWorkTable.ValueTime;
-    FFlowMeter.ValueQuantity := AWorkTable.ValueQuantity;
-    FFlowMeter.ValueFlow := AWorkTable.ValueFlowRate;
   end;
 
+  FFlowMeter.RebindCalculatedValues;
   FFlowMeter.InitHashValues;
 end;
 
