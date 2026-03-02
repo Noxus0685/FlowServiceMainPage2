@@ -213,6 +213,8 @@ type
     function GetDoubleNum(const AStr: string; Dim: Integer): Double; overload;
     procedure Reset;
 
+    procedure SetAs(AMeterValue: TMeterValue);
+
     procedure SetAsTime;
     procedure SetAsVolume;
     procedure SetAsMass;
@@ -1084,6 +1086,47 @@ end;
 procedure TMeterValue.SetValue(const AValue: string);
 begin
   SetValue(GetDoubleNum(AValue));
+end;
+
+{ Configures this meter value as time with predefined units and limits. }
+procedure TMeterValue.SetAs(AMeterValue: TMeterValue);
+var
+  D: TDimension;
+begin
+  if (AMeterValue = nil) or (AMeterValue = Self) then
+    Exit;
+
+  ValueType := AMeterValue.ValueType;
+  DependenceType := AMeterValue.DependenceType;
+  UpdateType := AMeterValue.UpdateType;
+
+  Name := AMeterValue.Name;
+  ShrtName := AMeterValue.ShrtName;
+  Description := AMeterValue.Description;
+  &Type := AMeterValue.&Type;
+  RawValueName := AMeterValue.RawValueName;
+  RawValueDim := AMeterValue.RawValueDim;
+
+  SetFilter(AMeterValue.GetFilter);
+  FilterShortOrder := AMeterValue.FilterShortOrder;
+  FilterShortDelta := AMeterValue.FilterShortDelta;
+
+  Accuracy := AMeterValue.Accuracy;
+  Error := AMeterValue.Error;
+  MaxValue := AMeterValue.MaxValue;
+  MinValue := AMeterValue.MinValue;
+  MaxNomValue := AMeterValue.MaxNomValue;
+  MinNomValue := AMeterValue.MinNomValue;
+
+  CoefK := AMeterValue.CoefK;
+  CoefP := AMeterValue.CoefP;
+
+  Dimensions.Clear;
+  for D in AMeterValue.Dimensions do
+    Dimensions.Add(D);
+
+  if not SetDim(AMeterValue.CurrentDimIndex) and (Dimensions.Count > 0) then
+    SetDim(0);
 end;
 
 { Configures this meter value as time with predefined units and limits. }
