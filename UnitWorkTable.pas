@@ -83,6 +83,8 @@ type
     function GetValueResultProxy: Double;
     procedure SetValueResultProxy(const AValue: Double);
 
+    procedure InitMeterValues;
+
   public
     constructor Create; override;
     destructor Destroy; override;
@@ -266,10 +268,58 @@ implementation
 
 
   {$REGION 'TChannel'}
-{ Creates a channel object, initializes defaults, and allocates linked meter values. }
-constructor TChannel.Create;
+
+procedure TChannel.InitMeterValues;
 var
   IsExisted: Integer;
+begin
+ FValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+  begin
+    FValueImp.SetAsImp;
+    FValueImp.Description:='Импульсы за сек';
+    FValueImp.DependenceType := INDEPENDENT;
+    FValueImp.UpdateType := ONLINE_TYPE;
+  end;
+  FValueImp.SetToSave(True);
+
+  FValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+  begin
+    FValueImpTotal.SetAsImp;
+    FValueImp.Description:='Импульсы накопительный итог';
+    FValueImpTotal.DependenceType := INDEPENDENT;
+    FValueImpTotal.UpdateType := ONLINE_TYPE;
+  end;
+  FValueImpTotal.SetToSave(True);
+
+  FValueCurrent := TMeterValue.GetExistedMeterValueBool(FHashValueCurrent, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+  begin
+    FValueCurrent.SetAsCurrent;
+    FValueImp.Description:='Ток текущий';
+    FValueCurrent.DependenceType := INDEPENDENT;
+    FValueCurrent.UpdateType := ONLINE_TYPE;
+  end;
+  FValueCurrent.SetToSave(True);
+
+  FValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+  begin
+    FValueInterface.Name := 'Интерфейс';
+    FValueInterface.ShrtName := 'Интерфейс';
+    FValueImp.Description:='Значение расхода';
+    FValueInterface.DependenceType := INDEPENDENT;
+    FValueInterface.UpdateType := ONLINE_TYPE;
+  end;
+  FValueInterface.SetToSave(True);
+
+
+end;
+
+  { Creates a channel object, initializes defaults, and allocates linked meter values. }
+constructor TChannel.Create;
+
 begin
   inherited Create;
 
@@ -284,42 +334,8 @@ begin
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
-  FValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
-  if IsExisted = 0 then
-  begin
-    FValueImp.SetAsImp;
-    FValueImp.DependenceType := INDEPENDENT;
-    FValueImp.UpdateType := ONLINE_TYPE;
-  end;
-  FValueImp.SetToSave(True);
 
-  FValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
-  if IsExisted = 0 then
-  begin
-    FValueImpTotal.SetAsImp;
-    FValueImpTotal.DependenceType := INDEPENDENT;
-    FValueImpTotal.UpdateType := ONLINE_TYPE;
-  end;
-  FValueImpTotal.SetToSave(True);
-
-  FValueCurrent := TMeterValue.GetExistedMeterValueBool(FHashValueCurrent, IsExisted, UUID, Name);
-  if IsExisted = 0 then
-  begin
-    FValueCurrent.SetAsCurrent;
-    FValueCurrent.DependenceType := INDEPENDENT;
-    FValueCurrent.UpdateType := ONLINE_TYPE;
-  end;
-  FValueCurrent.SetToSave(True);
-
-  FValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
-  if IsExisted = 0 then
-  begin
-    FValueInterface.Name := 'Интерфейс';
-    FValueInterface.ShrtName := 'Интерфейс';
-    FValueInterface.DependenceType := INDEPENDENT;
-    FValueInterface.UpdateType := ONLINE_TYPE;
-  end;
-  FValueInterface.SetToSave(True);
+  InitMeterValues;
 end;
 
 { Releases channel-owned resources and removes linked values from shared storage. }
@@ -347,10 +363,14 @@ begin
   if (FFlowMeter = nil) then
     Exit;
 
+  FFlowMeter.RebindCalculatedValues;
+  FFlowMeter.InitHashValues;
+
   // Pulse and current values are taken directly from the channel.
   FFlowMeter.ValueImp := FValueImp;
   FFlowMeter.ValueImpTotal := ValueImpResult;
   FFlowMeter.ValueCurrent := FValueCurrent;
+  //Интерфейс тоже.
 
   if AWorkTable <> nil then
   begin
@@ -363,8 +383,7 @@ begin
     FFlowMeter.ValueTime := AWorkTable.ValueTime;
   end;
 
-  FFlowMeter.RebindCalculatedValues;
-  FFlowMeter.InitHashValues;
+
 end;
 
 // =====================================================
@@ -681,7 +700,7 @@ begin
     FValueQuantity.DependenceType := INDEPENDENT;
     FValueQuantity.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueQuantity, 'Объём за измерение');
+  EnsureDescription(FValueQuantity, 'Кол-во жидкости за измерение');
   FValueQuantity.SetToSave(True);
 
   FValueFlowRate := TMeterValue.GetExistedMeterValueBool(FHashValueFlowRate, IsExisted, '', Name);
@@ -764,22 +783,21 @@ var
   I: Integer;
   Channel: TChannel;
 begin
-  RebindAllFlowMeters;
-
-  if FValueTempertureBefore <> nil then FValueTempertureBefore.SetValue(FValueTempertureBefore.GetDoubleValue);
-  if FValueTempertureAfter <> nil then FValueTempertureAfter.SetValue(FValueTempertureAfter.GetDoubleValue);
-  if FValueTempertureDelta <> nil then FValueTempertureDelta.SetValue(FValueTempertureDelta.GetDoubleValue);
-  if FValueTemperture <> nil then FValueTemperture.SetValue;
-  if FValuePressureBefore <> nil then FValuePressureBefore.SetValue(FValuePressureBefore.GetDoubleValue);
-  if FValuePressureAfter <> nil then FValuePressureAfter.SetValue(FValuePressureAfter.GetDoubleValue);
-  if FValuePressureDelta <> nil then FValuePressureDelta.SetValue(FValuePressureDelta.GetDoubleValue);
-  if FValuePressure <> nil then FValuePressure.SetValue;
-  if FValueAirPressure <> nil then FValueAirPressure.SetValue(FValueAirPressure.GetDoubleValue);
-  if FValueAirTemperture <> nil then FValueAirTemperture.SetValue(FValueAirTemperture.GetDoubleValue);
-  if FValueHumidity <> nil then FValueHumidity.SetValue(FValueHumidity.GetDoubleValue);
-  if FValueTime <> nil then FValueTime.SetValue(FValueTime.GetDoubleValue);
-  if FValueQuantity <> nil then FValueQuantity.SetValue(FValueQuantity.GetDoubleValue);
-  if FValueFlowRate <> nil then FValueFlowRate.SetValue(FValueFlowRate.GetDoubleValue);
+//  RebindAllFlowMeters;
+ // if FValueTempertureBefore <> nil then FValueTempertureBefore.SetValue(FValueTempertureBefore.GetDoubleValue);
+//  if FValueTempertureAfter <> nil then FValueTempertureAfter.SetValue(FValueTempertureAfter.GetDoubleValue);
+ // if FValueTempertureDelta <> nil then FValueTempertureDelta.SetValue(FValueTempertureDelta.GetDoubleValue);
+//  if FValueTemperture <> nil then FValueTemperture.SetValue;
+ // if FValuePressureBefore <> nil then FValuePressureBefore.SetValue(FValuePressureBefore.GetDoubleValue);
+ // if FValuePressureAfter <> nil then FValuePressureAfter.SetValue(FValuePressureAfter.GetDoubleValue);
+//  if FValuePressureDelta <> nil then FValuePressureDelta.SetValue(FValuePressureDelta.GetDoubleValue);
+ // if FValuePressure <> nil then FValuePressure.SetValue;
+//  if FValueAirPressure <> nil then FValueAirPressure.SetValue(FValueAirPressure.GetDoubleValue);
+ // if FValueAirTemperture <> nil then FValueAirTemperture.SetValue(FValueAirTemperture.GetDoubleValue);
+//  if FValueHumidity <> nil then FValueHumidity.SetValue(FValueHumidity.GetDoubleValue);
+//  if FValueTime <> nil then FValueTime.SetValue(FValueTime.GetDoubleValue);
+  if FValueQuantity <> nil then FValueQuantity.SetValue();
+  if FValueFlowRate <> nil then FValueFlowRate.SetValue();
 
 
 
@@ -789,15 +807,11 @@ begin
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
 
-    if Channel.ValueImp <> nil then Channel.ValueImp.SetValue(Channel.ValueImp.GetDoubleValue);
-    if Channel.ValueImpTotal <> nil then Channel.ValueImpTotal.SetValue(Channel.ValueImpTotal.GetDoubleValue);
-    if Channel.ValueCurrent <> nil then Channel.ValueCurrent.SetValue(Channel.ValueCurrent.GetDoubleValue);
+     if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue();
+    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue();
+    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
+    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
 
-    if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue(Channel.FlowMeter.ValueFlow.GetDoubleValue);
-    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue(Channel.FlowMeter.ValueQuantity.GetDoubleValue);
-    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue(Channel.FlowMeter.ValueVolume.GetDoubleValue);
-    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue(Channel.FlowMeter.ValueMass.GetDoubleValue);
-    if Channel.FlowMeter.ValueTime <> nil then Channel.FlowMeter.ValueTime.SetValue(Channel.FlowMeter.ValueTime.GetDoubleValue);
   end;
 
   for I := 0 to FEtalonChannels.Count - 1 do
@@ -806,15 +820,10 @@ begin
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
 
-    if Channel.ValueImp <> nil then Channel.ValueImp.SetValue(Channel.ValueImp.GetDoubleValue);
-    if Channel.ValueImpTotal <> nil then Channel.ValueImpTotal.SetValue(Channel.ValueImpTotal.GetDoubleValue);
-    if Channel.ValueCurrent <> nil then Channel.ValueCurrent.SetValue(Channel.ValueCurrent.GetDoubleValue);
-
-    if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue(Channel.FlowMeter.ValueFlow.GetDoubleValue);
-    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue(Channel.FlowMeter.ValueQuantity.GetDoubleValue);
-    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue(Channel.FlowMeter.ValueVolume.GetDoubleValue);
-    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue(Channel.FlowMeter.ValueMass.GetDoubleValue);
-    if Channel.FlowMeter.ValueTime <> nil then Channel.FlowMeter.ValueTime.SetValue(Channel.FlowMeter.ValueTime.GetDoubleValue);
+    if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue();
+    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue();
+    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
+    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
   end;
 end;
 

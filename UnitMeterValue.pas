@@ -1359,7 +1359,7 @@ begin
   ValueType := FLOW_TYPE;
   Name := 'Объемный расход';
   ShrtName := 'Qv';
-  SetFilter(8);
+  SetFilter(-1);
   Accuracy := 4;
   Value := 0;
   Dimensions.Clear;
@@ -1380,7 +1380,7 @@ begin
   ValueType := FLOW_TYPE;
   Name := 'Массовый расход';
   ShrtName := 'Qm';
-  SetFilter(8);
+  SetFilter(-1);
   Accuracy := 4;
   Value := 0;
   Dimensions.Clear;

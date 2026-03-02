@@ -297,6 +297,7 @@ type
     TimerMain: TTimer;
     ActionMeterValueProperties: TAction;
     MenuItem8: TMenuItem;
+    TabItem4: TTabItem;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -333,7 +334,6 @@ type
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure OpenTypeSelect(ARow: Integer);
-    procedure InitFlowMeters;
     procedure InitTables;
     procedure ApplyFlowMeterSelection(const ARow: Integer);
     function FindTypeIndex(const ATypeName: string): Integer;
@@ -488,7 +488,6 @@ begin
 
   SetLength(FRows, 0);
 
-  InitFlowMeters;
   InitTables;
   if ComboEditUnits.ItemIndex >= 0 then
     ComboEditUnitsChange(ComboEditUnits);
@@ -698,33 +697,6 @@ begin
   end;
 end;
 
-procedure TFormMain.InitFlowMeters;
-var
-  I: Integer;
-  Meter: TFlowMeter;
-begin
-  FFlowMeters.Clear;
-  SetLength(FFlowMeterRows, 3);
-
-  for I := 0 to High(FFlowMeterRows) do
-  begin
-    Meter := TFlowMeter.Create(False);
-    Meter.SetChannel(I + 1);
-  //  Meter.DeviceTypeName := CFlowMeterTypes[I mod Length(CFlowMeterTypes)];
-  //  Meter.SerialNumber := CFlowMeterSerials[I mod Length(CFlowMeterSerials)];
-    FFlowMeters.Add(Meter);
-
-    FFlowMeterRows[I].Enabled := True;
-    FFlowMeterRows[I].Channel := I + 1;
-    FFlowMeterRows[I].Meter := Meter;
-   // FFlowMeterRows[I].TypeIndex := FindTypeIndex(Meter.DeviceTypeName);
-   // FFlowMeterRows[I].SerialIndex := FindSerialIndex(Meter.SerialNumber);
-  end;
-
-  GridDevices.RowCount := Length(FFlowMeterRows);
-  GridDevices.Repaint;
-end;
-
 function TFormMain.FindTypeIndex(const ATypeName: string): Integer;
 var
   I: Integer;
@@ -821,8 +793,6 @@ begin
   FWorkTableManager.Save;
 end;
 
-
-
 procedure TFormMain.ActionMeterValuesPropertiesExecute(Sender: TObject);
 var
   Frm: TFormMeterValues;
@@ -899,7 +869,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := (Random * 0.30) - 0.05;
+    ImpDelta := (Random * 3) - 5;
 
     Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
     Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
@@ -912,8 +882,8 @@ begin
     if Channel = nil then
       Continue;
 
-    CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := (Random * 0.30) - 0.05;
+    CurDelta := (Random * 0.6) - 0.3;
+    ImpDelta := (Random * 10) - 5;
 
     Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
     Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
@@ -950,8 +920,7 @@ begin
   WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
   WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
   WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
-  WorkTable.ValueFlowRate.SetValue(WorkTable.FlowRate);
-  WorkTable.ValueQuantity.SetValue(WorkTable.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
+
   WorkTable.Time := WorkTable.Time + 1;
   WorkTable.ValueTime.SetValue(WorkTable.Time);
 

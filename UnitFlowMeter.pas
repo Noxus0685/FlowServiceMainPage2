@@ -1059,8 +1059,6 @@ begin
   // TODO: перенести оригинальную C++ логику расчёта финальных значений.
 end;
 
-
-
 procedure TFlowMeter.SetImpCoef(AK: Single);
 begin
   SetImpCoef(Double(AK));

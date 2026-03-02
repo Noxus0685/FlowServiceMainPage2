@@ -4696,8 +4696,8 @@ object FormMeterValues: TFormMeterValues
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
                   OnSelChanged = StringGridCoefsDataSelChanged
                   OnEditingDone = StringGridCoefsDataEditingDone
-                  Viewport.Width = 906.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 886.000000000000000000
+                  Viewport.Height = 168.000000000000000000
                   object CheckColumn1: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -4874,8 +4874,8 @@ object FormMeterValues: TFormMeterValues
                   TabOrder = 0
                   RowCount = 20
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
-                  Viewport.Width = 906.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 886.000000000000000000
+                  Viewport.Height = 168.000000000000000000
                   object CheckColumn2: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -5242,8 +5242,8 @@ object FormMeterValues: TFormMeterValues
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridDimensionsSelChanged
-          Viewport.Width = 922.000000000000000000
-          Viewport.Height = 193.000000000000000000
+          Viewport.Width = 902.000000000000000000
+          Viewport.Height = 168.000000000000000000
           object StringColumn8: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False
@@ -5533,14 +5533,14 @@ object FormMeterValues: TFormMeterValues
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridValuesListSelChanged
-          Viewport.Width = 922.000000000000000000
-          Viewport.Height = 399.000000000000000000
-          object StringColumn7: TStringColumn
+          Viewport.Width = 902.000000000000000000
+          Viewport.Height = 358.000000000000000000
+          object StringColumnNum: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False
             Size.Width = 73.000000000000000000
           end
-          object StringColumn38: TStringColumn
+          object StringColumnDevice: TStringColumn
             Header = #1059#1089#1090#1088#1086#1081#1089#1090#1074#1086
             HeaderSettings.TextSettings.WordWrap = False
           end
@@ -5548,80 +5548,80 @@ object FormMeterValues: TFormMeterValues
             Header = #1054#1087#1080#1089#1072#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn20: TStringColumn
+          object StringColumnName: TStringColumn
             Header = #1053#1072#1080#1084#1077#1085#1086#1074#1072#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
             Size.Width = 116.000000000000000000
           end
-          object StringColumn21: TStringColumn
+          object StringColumnMainValue: TStringColumn
             Header = #1047#1085#1072#1095#1077#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
             Size.Width = 122.000000000000000000
           end
-          object StringColumn22: TStringColumn
+          object StringColumnValueHash: TStringColumn
             Header = 'HASH'
             HeaderSettings.TextSettings.WordWrap = False
             Size.Width = 118.000000000000000000
           end
-          object StringColumn23: TStringColumn
+          object StringColumnRate: TStringColumn
             Header = 'Rate'
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn24: TStringColumn
+          object StringColumnRateValue: TStringColumn
             Header = #1047#1085#1072#1095#1077#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
             Size.Width = 120.000000000000000000
           end
-          object StringColumn25: TStringColumn
+          object StringColumnRateHash: TStringColumn
             Header = 'HASH'
             HeaderSettings.TextSettings.WordWrap = False
             Size.Width = 119.000000000000000000
           end
-          object StringColumn26: TStringColumn
+          object StringColumnMultiplier: TStringColumn
             Header = #1052#1085#1086#1078#1080#1090#1077#1083#1100
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn27: TStringColumn
+          object StringColumnMultiplierValue: TStringColumn
             Header = #1047#1085#1072#1095#1077#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn28: TStringColumn
+          object StringColumnMultiplierHash: TStringColumn
             Header = 'Hash'
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn29: TStringColumn
+          object StringColumnDevider: TStringColumn
             Header = #1044#1077#1083#1080#1090#1077#1083#1100
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn30: TStringColumn
+          object StringColumnDeviderValue: TStringColumn
             Header = #1047#1085#1072#1095#1077#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn31: TStringColumn
+          object StringColumnDeviderHash: TStringColumn
             Header = 'Hash'
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn32: TStringColumn
+          object StringColumnCorrection: TStringColumn
             Header = 'Correction'
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn33: TStringColumn
+          object StringColumnCorrectionValue: TStringColumn
             Header = #1047#1085#1072#1095#1077#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn34: TStringColumn
+          object StringColumnCorrectionHash: TStringColumn
             Header = 'Hash'
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn35: TStringColumn
+          object StringColumnEtalonName: TStringColumn
             Header = 'Etalon'
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn36: TStringColumn
+          object StringColumnEtalonValue: TStringColumn
             Header = #1047#1085#1072#1095#1077#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object StringColumn37: TStringColumn
+          object StringColumnEtalonHash: TStringColumn
             Header = 'Hash'
             HeaderSettings.TextSettings.WordWrap = False
           end

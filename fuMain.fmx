@@ -16,10 +16,12 @@ object FormMain: TFormMain
     Size.Height = 640.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 0
+    TabIndex = 3
     TabOrder = 6
     TabPosition = PlatformDefault
     Sizes = (
+      1374s
+      614s
       1374s
       614s
       1374s
@@ -31,7 +33,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -2480,6 +2482,19 @@ object FormMain: TFormMain
       Text = #1054#1073#1088#1072#1073#1086#1090#1082#1072
       ExplicitSize.cx = 81.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
+    end
+    object TabItem4: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Trimming = None
+      IsSelected = True
+      Size.Width = 46.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = 'TEST'
     end
   end
   object PopupMenu1: TPopupMenu
