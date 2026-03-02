@@ -297,7 +297,24 @@ type
     TimerMain: TTimer;
     ActionMeterValueProperties: TAction;
     MenuItem8: TMenuItem;
-    TabItem4: TTabItem;
+    TabItemTest: TTabItem;
+    LayoutTestValues: TLayout;
+    GroupBoxEtalonChannels: TGroupBox;
+    LabelEtalonCurSec: TLabel;
+    LabelEtalonImpSec: TLabel;
+    LabelEtalonImpResult: TLabel;
+    EditEtalonCurSec: TEdit;
+    EditEtalonImpSec: TEdit;
+    EditEtalonImpResult: TEdit;
+    ButtonApplyEtalonValues: TButton;
+    GroupBoxDeviceChannels: TGroupBox;
+    LabelDeviceCurSec: TLabel;
+    LabelDeviceImpSec: TLabel;
+    LabelDeviceImpResult: TLabel;
+    EditDeviceCurSec: TEdit;
+    EditDeviceImpSec: TEdit;
+    EditDeviceImpResult: TEdit;
+    ButtonApplyDeviceValues: TButton;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -319,6 +336,8 @@ type
     procedure ComboEditUnitsChange(Sender: TObject);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
+    procedure ButtonApplyEtalonValuesClick(Sender: TObject);
+    procedure ButtonApplyDeviceValuesClick(Sender: TObject);
   private
 
   FActiveWorkTable: TWorkTable;
@@ -344,6 +363,8 @@ type
     procedure SetValues;
 
      procedure UpdateGrids;
+    procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
+      AImpSec, AImpResult: Double);
 
   public
     { Public declarations }
@@ -869,7 +890,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := (Random * 3) - 5;
+    ImpDelta := Random(11) - 5;
 
     Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
     Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
@@ -883,7 +904,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := (Random * 10) - 5;
+    ImpDelta := Random(11) - 5;
 
     Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
     Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
@@ -1558,6 +1579,62 @@ begin
 
   // для эталонов аналогично — подставь свой источник строк
   ReloadGridByGrowingRowCount(GridEtalons, GridEtalons.RowCount);
+end;
+
+
+procedure TFormMain.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
+  AImpSec, AImpResult: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if AChannels = nil then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Channel := AChannels[I];
+    if Channel = nil then
+      Continue;
+
+    Channel.CurSec := ACurSec;
+    Channel.ImpSec := AImpSec;
+    Channel.ImpResult := AImpResult;
+  end;
+end;
+
+procedure TFormMain.ButtonApplyEtalonValuesClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetWorkTableByIndex(0);
+  if WorkTable = nil then
+    Exit;
+
+  ApplyChannelValues(
+    WorkTable.EtalonChannels,
+    NormalizeFloatInput(EditEtalonCurSec.Text),
+    NormalizeFloatInput(EditEtalonImpSec.Text),
+    NormalizeFloatInput(EditEtalonImpResult.Text)
+  );
+  SetValues;
+end;
+
+procedure TFormMain.ButtonApplyDeviceValuesClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetWorkTableByIndex(0);
+  if WorkTable = nil then
+    Exit;
+
+  ApplyChannelValues(
+    WorkTable.DeviceChannels,
+    NormalizeFloatInput(EditDeviceCurSec.Text),
+    NormalizeFloatInput(EditDeviceImpSec.Text),
+    NormalizeFloatInput(EditDeviceImpResult.Text)
+  );
+  SetValues;
 end;
 
 procedure TFormMain.GridEtalonsSetValue(Sender: TObject;
