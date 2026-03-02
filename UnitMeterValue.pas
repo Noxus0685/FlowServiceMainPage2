@@ -59,6 +59,7 @@ type
     FRawValue: Double;
     FFactor: Double;
     FDevider: Double;
+    FAggregateMeterValues: TObjectList<TMeterValue>;
     function FindDimIndex(const AName: string): Integer;
     class constructor CreateClass;
     class destructor DestroyClass;
@@ -242,6 +243,10 @@ type
     procedure CalcCoefs;
     procedure SetToSave(AIsToSave: Boolean);
     procedure DeleteFromVector;
+    procedure AddMeterValue(AMeterValue: TMeterValue);
+    procedure RemoveMeterValue(AMeterValue: TMeterValue);
+    procedure ClearMeterValues;
+    property MeterValues: TObjectList<TMeterValue> read FAggregateMeterValues;
     class function GetMeterValues: TObjectList<TMeterValue>; static;
   end;
 
@@ -288,6 +293,7 @@ begin
   Values := TList<Double>.Create;
   AverValues := TList<Single>.Create;
   Coefs := TList<TCoef>.Create;
+  FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
   IsToSave := False;
   FMeterValues.Add(Self);
   FMeterValuesSaves.Add(Self);
@@ -328,6 +334,7 @@ begin
   RawValues.Free;
   Means.Free;
   Dimensions.Free;
+  FAggregateMeterValues.Free;
   inherited;
 end;
 
@@ -561,6 +568,9 @@ function TMeterValue.GetDoubleValue: Double;
 var
   AbsError: Double;
 begin
+  if ValueType = AGGREGATE_TYPE then
+    SetValue;
+
   if Error <> 0 then
   begin
     AbsError := Abs(Value) * Error / 100;
@@ -907,11 +917,24 @@ procedure TMeterValue.SetValue;
 var
   ValueLocal: Double;
   Q: Single;
+  MeterValue: TMeterValue;
 begin
   ValueLocal := 0;
 
   if UpdateType <> HAND_TYPE then
   begin
+    if ValueType = AGGREGATE_TYPE then
+    begin
+      for MeterValue in FAggregateMeterValues do
+      begin
+        if (MeterValue = nil) or (MeterValue = Self) then
+          Continue;
+        ValueLocal := ValueLocal + MeterValue.GetDoubleValue;
+      end;
+      SetValue(ValueLocal);
+      Exit;
+    end;
+
     if ValueEtalon <> nil then
     begin
       if ValueType = ERROR_TYPE then
@@ -974,6 +997,29 @@ begin
       SetValue(ValueLocal);
     end;
   end;
+end;
+
+{ Adds a meter value to the aggregate source list (if not already present). }
+procedure TMeterValue.AddMeterValue(AMeterValue: TMeterValue);
+begin
+  if (AMeterValue = nil) or (AMeterValue = Self) then
+    Exit;
+  if FAggregateMeterValues.IndexOf(AMeterValue) < 0 then
+    FAggregateMeterValues.Add(AMeterValue);
+end;
+
+{ Removes a meter value from the aggregate source list. }
+procedure TMeterValue.RemoveMeterValue(AMeterValue: TMeterValue);
+begin
+  if AMeterValue = nil then
+    Exit;
+  FAggregateMeterValues.Remove(AMeterValue);
+end;
+
+{ Clears all aggregate source meter values. }
+procedure TMeterValue.ClearMeterValues;
+begin
+  FAggregateMeterValues.Clear;
 end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }

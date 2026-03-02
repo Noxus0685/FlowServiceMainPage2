@@ -547,20 +547,6 @@ begin
   if (Meter = nil) and (WorkTable.DeviceChannels.Count > 0) and (WorkTable.DeviceChannels[0] <> nil) then
     Meter := WorkTable.DeviceChannels[0].FlowMeter;
 
-  if Meter <> nil then
-  begin
-    if IsVolumeUnits then
-    begin
-      WorkTable.ValueQuantity := Meter.ValueVolume;
-      WorkTable.ValueFlowRate := Meter.ValueVolumeFlow;
-    end
-    else
-    begin
-      WorkTable.ValueQuantity := Meter.ValueMass;
-      WorkTable.ValueFlowRate := Meter.ValueMassFlow;
-    end;
-  end;
-
   if WorkTable.ValueFlowRate <> nil then
     WorkTable.ValueFlowRate.SetDim(UnitName);
 
