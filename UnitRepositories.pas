@@ -416,10 +416,7 @@ begin
   begin
     DataType := ftDateTime;
     if AValue = 0 then
-    begin
-      Clear;
-      DataType := ftDateTime;
-    end
+      Clear
     else
       AsDateTime := AValue;
   end;
