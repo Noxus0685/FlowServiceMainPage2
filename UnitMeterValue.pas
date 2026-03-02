@@ -250,6 +250,7 @@ type
     procedure ClearMeterValues;
     property MeterValues: TObjectList<TMeterValue> read FAggregateMeterValues;
     class function GetMeterValues: TObjectList<TMeterValue>; static;
+    class procedure RebindReferences(const AOldValue, ANewValue: TMeterValue); static;
   end;
 
 implementation
@@ -2028,6 +2029,58 @@ end;
 class function TMeterValue.GetMeterValues: TObjectList<TMeterValue>;
 begin
   Result := FMeterValues;
+end;
+
+class procedure TMeterValue.RebindReferences(const AOldValue, ANewValue: TMeterValue);
+var
+  MV: TMeterValue;
+  I: Integer;
+begin
+  if (AOldValue = nil) or (AOldValue = ANewValue) then
+    Exit;
+
+  for MV in FMeterValues do
+  begin
+    if MV = nil then
+      Continue;
+
+    if MV.ValueRate = AOldValue then
+      MV.ValueRate := ANewValue;
+    if MV.ValueBaseMultiplier = AOldValue then
+      MV.ValueBaseMultiplier := ANewValue;
+    if MV.ValueBaseDevider = AOldValue then
+      MV.ValueBaseDevider := ANewValue;
+    if MV.ValueCorrection = AOldValue then
+      MV.ValueCorrection := ANewValue;
+    if MV.ValueEtalon = AOldValue then
+      MV.ValueEtalon := ANewValue;
+
+    for I := MV.MeterValues.Count - 1 downto 0 do
+    begin
+      if MV.MeterValues[I] <> AOldValue then
+        Continue;
+
+      if ANewValue = nil then
+        MV.MeterValues.Delete(I)
+      else if MV.MeterValues.IndexOf(ANewValue) < 0 then
+        MV.MeterValues[I] := ANewValue
+      else
+        MV.MeterValues.Delete(I);
+    end;
+  end;
+
+  for I := FMeterValuesSaves.Count - 1 downto 0 do
+  begin
+    if FMeterValuesSaves[I] <> AOldValue then
+      Continue;
+
+    if ANewValue = nil then
+      FMeterValuesSaves.Delete(I)
+    else if FMeterValuesSaves.IndexOf(ANewValue) < 0 then
+      FMeterValuesSaves[I] := ANewValue
+    else
+      FMeterValuesSaves.Delete(I);
+  end;
 end;
 
 end.
