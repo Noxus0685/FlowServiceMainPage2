@@ -5113,6 +5113,8 @@ begin
     Exit(True);
 
   ADevice.CalibrCoefTable.DeviceID := ADevice.ID;
+  if ADevice.CalibrCoefTable.UUID = '' then
+    ADevice.CalibrCoefTable.UUID := TGUID.NewGuid.ToString;
 
   Q := FDM.CreateQuery;
   try
@@ -5152,6 +5154,8 @@ begin
       if Item = nil then
         Continue;
       Item.TableID := TableID;
+      if Item.UUID = '' then
+        Item.UUID := TGUID.NewGuid.ToString;
       Q.SQL.Text :=
         'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, K, b) ' +
         'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :K, :b)';
