@@ -690,93 +690,106 @@ begin
   Result := GetStringValue(CurrentDimIndex);
 end;
 
-{ Formats the provided number using meter formatting rules without changing state. }
+{ C++ parity for GetStringNum(double):
+  temporarily substitutes internal Value by AValue, formats via GetStringValue(),
+  then restores previous Value. This keeps method side-effect free for callers. }
 function TMeterValue.GetStringNum(AValue: Double): string;
 var
-  Temp: Double;
+  TempValue: Double;
 begin
-  Temp := Value;
+  TempValue := Value;
   Value := AValue;
   try
     Result := GetStringValue;
   finally
-    Value := Temp;
+    Value := TempValue;
   end;
 end;
 
-{ Formats the provided number in current dimension with limit checks. }
+{ C++ parity for GetStrNumLimits(double):
+  formats AValue exactly in CurrentDimIndex representation (with dimension/limits
+  logic inside GetStringValue(CurrentDimIndex)) and restores object state after call. }
 function TMeterValue.GetStrNumLimits(AValue: Double): string;
 var
-  Temp: Double;
+  TempValue: Double;
 begin
-  Temp := Value;
+  TempValue := Value;
   Value := AValue;
   try
     Result := GetStringValue(CurrentDimIndex);
   finally
-    Value := Temp;
+    Value := TempValue;
   end;
 end;
 
-{ Formats numeric/text input using current or requested dimension settings. }
+{ C++ parity for GetStrNum(double):
+  converts AValue into CurrentDimIndex numeric view and formats it by Accuracy/Error,
+  without persisting any temporary Value change. }
 function TMeterValue.GetStrNum(AValue: Double): string;
 var
-  Temp: Double;
-  Dbl: Double;
+  TempValue: Double;
+  DisplayValue: Double;
 begin
-  Temp := Value;
+  TempValue := Value;
   Value := AValue;
   try
-    Dbl := GetDoubleValue(CurrentDimIndex);
-    Result := FormatValue(Dbl, Accuracy, Error);
+    DisplayValue := GetDoubleValue(CurrentDimIndex);
+    Result := FormatValue(DisplayValue, Accuracy, Error);
   finally
-    Value := Temp;
+    Value := TempValue;
   end;
 end;
 
-{ Formats numeric/text input using current or requested dimension settings. }
+{ C++ parity for GetStrNum(UnicodeString strvalue, UnicodeString Dim):
+  parses textual input into numeric value (invalid text -> 0), assigns it directly
+  to internal Value, returns formatted representation in requested dimension ADim,
+  and restores previous Value on exit. }
 function TMeterValue.GetStrNum(const AStrValue, ADim: string): string;
 var
-  Temp: Double;
-  Parsed: Double;
+  TempValue: Double;
+  ParsedValue: Double;
 begin
-  Temp := Value;
-  Parsed := StrToFloatDef(StringReplace(Trim(AStrValue), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
-  Value := Parsed;
+  TempValue := Value;
+  ParsedValue := StrToFloatDef(StringReplace(Trim(AStrValue), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  Value := ParsedValue;
   try
     Result := GetStringValue(ADim);
   finally
-    Value := Temp;
+    Value := TempValue;
   end;
 end;
 
-{ Formats numeric/text input using current or requested dimension settings. }
+{ C++ parity for GetStrNum(UnicodeString strvalue):
+  parses text, places it into temporary Value, then delegates formatting to
+  GetStringValue() using current/default display dimension rules. }
 function TMeterValue.GetStrNum(const AStrValue: string): string;
 var
-  Temp: Double;
-  Parsed: Double;
+  TempValue: Double;
+  ParsedValue: Double;
 begin
-  Temp := Value;
-  Parsed := StrToFloatDef(StringReplace(Trim(AStrValue), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
-  Value := Parsed;
+  TempValue := Value;
+  ParsedValue := StrToFloatDef(StringReplace(Trim(AStrValue), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  Value := ParsedValue;
   try
     Result := GetStringValue;
   finally
-    Value := Temp;
+    Value := TempValue;
   end;
 end;
 
-{ Formats numeric/text input using current or requested dimension settings. }
+{ C++ parity for GetStrNum(double value, UnicodeString Dim):
+  assigns numeric input directly to Value and returns string in requested ADim,
+  then restores previous Value so conversion helper has no observable side effects. }
 function TMeterValue.GetStrNum(AValue: Double; const ADim: string): string;
 var
-  Temp: Double;
+  TempValue: Double;
 begin
-  Temp := Value;
+  TempValue := Value;
   Value := AValue;
   try
     Result := GetStringValue(ADim);
   finally
-    Value := Temp;
+    Value := TempValue;
   end;
 end;
 
@@ -1245,21 +1258,45 @@ end;
 { Parses numeric input and converts it into base or requested dimension units. }
 function TMeterValue.GetDoubleNum(const AStr: string): Double;
 var
-  Parsed: Double;
+  TempValue: Double;
+  TempFilterOrder: Integer;
 begin
-  Parsed := StrToFloatDef(StringReplace(Trim(AStr), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
-  Result := EnsureRange(Parsed / GetDimRate(CurrentDimIndex), MinValue, MaxValue);
+  { C++ parity:
+    - preserve current Value;
+    - temporarily disable runtime filtering (filter_order := -1), because conversion
+      helper methods must return the "raw" converted number, not a filtered one;
+    - assign parsed value as if it was entered in CurrentDimIndex units;
+    - read back resulting base Value and restore object state. }
+  TempValue := Value;
+  TempFilterOrder := FFilterOrder;
+  FFilterOrder := -1;
+  try
+    { Use invariant parser with decimal separator normalization.
+      Invalid input becomes 0.0, matching prior Delphi behavior and C++ fallback logic
+      from TryStrToDouble_ usage in related methods. }
+    SetDimValue(AStr);
+    Result := Value;
+  finally
+    Value := TempValue;
+    FFilterOrder := TempFilterOrder;
+  end;
 end;
 
 { Parses numeric input and converts it into base or requested dimension units. }
 function TMeterValue.GetDoubleNum(const AStr: string; Dim: Integer): Double;
 var
-  Parsed: Double;
-  BaseValue: Double;
+  TempValue: Double;
 begin
-  Parsed := StrToFloatDef(StringReplace(Trim(AStr), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
-  BaseValue := EnsureRange(Parsed / GetDimRate(CurrentDimIndex), MinValue, MaxValue);
-  Result := BaseValue * GetDimRate(Dim);
+  { C++ parity for GetDoubleNum(str, int Dim):
+    convert incoming string from CurrentDimIndex representation into the internal
+    base value, then return that value converted to requested Dim. }
+  TempValue := Value;
+  try
+    SetDimValue(AStr);
+    Result := GetDoubleValue(Dim);
+  finally
+    Value := TempValue;
+  end;
 end;
 
 { Clears runtime accumulators and returns measurement state to initial defaults. }
