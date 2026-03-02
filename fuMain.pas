@@ -4,6 +4,7 @@ interface
 
 uses
   fuTypeSelect,
+  fuDeviceEdit,
   fuMeterValues,
   UnitDataManager,
   UnitMeterValue,
@@ -748,30 +749,53 @@ end;
 
 procedure TFormMain.ActionOpenDeviceEditorExecute(Sender: TObject);
 var
+  WorkTable: TWorkTable;
+  Ch: TChannel;
+  ADevice: TDevice;
+  ActiveRepo: TDeviceRepository;
+  FoundRepo: TDeviceRepository;
+  Row: Integer;
   Frm: TFormDeviceEditor;
-
 begin
-  Result := False;
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
 
+  Row := GridDevices.Row;
+  if (Row < 0) or (Row >= WorkTable.DeviceChannels.Count) then
+    Exit;
+
+  Ch := WorkTable.DeviceChannels[Row];
+  if Ch = nil then
+    Exit;
+
+  ADevice := nil;
+  ActiveRepo := nil;
+  if DataManager <> nil then
+  begin
+    ActiveRepo := DataManager.ActiveDeviceRepo;
+
+    if Ch.DeviceUUID <> '' then
+      ADevice := DataManager.FindDevice(Ch.DeviceUUID, FoundRepo);
+  end;
+
+  if (ADevice = nil) and (ActiveRepo <> nil) then
+  begin
+    ADevice := ActiveRepo.CreateDevice(-1);
+    Ch.DeviceUUID := ADevice.MitUUID;
+    Ch.TypeName := ADevice.DeviceTypeName;
+    Ch.Serial := ADevice.SerialNumber;
+  end;
 
   Frm := TFormDeviceEditor.Create(Self);
   try
-    {----------------------------------}
-    { Передаём контекст }
-    {----------------------------------}
- //  Frm.DataManager := DataManager;
- //   Frm.ActiveRepo  := ActiveRepo;
- //   Frm.Device      := ADevice;
-      Frm.LoadDevice(ADevice);
-    {----------------------------------}
-    { Открываем модально }
-    {----------------------------------}
+    Frm.LoadDevice(ADevice);
     if Frm.ShowModal = mrOk then
-      Result := True;
-
+      UpdateGridDevices;
   finally
     Frm.Free;
   end;
+end;
 
 procedure TFormMain.ActionAddDeviceChannelExecute(Sender: TObject);
 var
