@@ -412,10 +412,17 @@ procedure SetDateTimeParam(
   const AValue: TDateTime
 );
 begin
-  if AValue = 0 then
-    Q.ParamByName(AName).Clear
-  else
-    Q.ParamByName(AName).AsDateTime := AValue;
+  with Q.ParamByName(AName) do
+  begin
+    DataType := ftDateTime;
+    if AValue = 0 then
+    begin
+      Clear;
+      DataType := ftDateTime;
+    end
+    else
+      AsDateTime := AValue;
+  end;
 end;
 
  {$ENDREGION}
@@ -5135,7 +5142,7 @@ begin
       TableID := ADevice.CalibrCoefTable.ID
     else
     begin
-      TableID := FDM.DevicesConnection.GetLastAutoGenValue('CalibrCoefTable');
+      TableID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
       ADevice.CalibrCoefTable.ID := TableID;
     end;
 
@@ -5562,7 +5569,7 @@ begin
 
     if ASpillage.State = osNew then
       ASpillage.ID :=
-        FDM.DevicesConnection.GetLastAutoGenValue('PointSpillage');
+        Q.Connection.ExecSQLScalar('select last_insert_rowid()');
 
     ASpillage.State := osClean;
     Result := True;
