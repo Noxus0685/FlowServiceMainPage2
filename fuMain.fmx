@@ -2514,7 +2514,7 @@ object FormMain: TFormMain
           Size.Height = 260.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
-          Text = 'Reference channels'
+          Text = 'Каналы эталонов'
           object LabelEtalonCurSec: TLabel
             Position.X = 24.000000000000000000
             Position.Y = 48.000000000000000000
@@ -2567,7 +2567,7 @@ object FormMain: TFormMain
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 6
-            Text = 'Apply'
+            Text = 'Применить'
             OnClick = ButtonApplyEtalonValuesClick
           end
         end
@@ -2577,7 +2577,7 @@ object FormMain: TFormMain
           Size.Height = 260.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
-          Text = 'Device channels'
+          Text = 'Каналы поверяемых приборов'
           object LabelDeviceCurSec: TLabel
             Position.X = 24.000000000000000000
             Position.Y = 48.000000000000000000
@@ -2630,7 +2630,7 @@ object FormMain: TFormMain
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 6
-            Text = 'Apply'
+            Text = 'Применить'
             OnClick = ButtonApplyDeviceValuesClick
           end
         end
