@@ -63,25 +63,11 @@ private
   FDeviceUUID:  string;
   FOutputType: Integer; // тип должен совпадать с типом OutputType в TDevice
 
-  function GetDevice: TDevice;
-  procedure SetDevice(const ADevice: TDevice);
-
-  function GetDeviceUUID: string;
-  procedure SetDeviceUUID(const ADevice: string);
-
-  function GetDeviceTypeNameProxy: string;
-  procedure SetDeviceTypeNameProxy(const AValue: string);
-
-  function GetDeviceTypeUUIDProxy: string;
-  procedure SetDeviceTypeUUIDProxy(const AValue: string);
-
-  function GetSerialNumberProxy: string;
-  procedure SetSerialNumberProxy(const AValue: string);
-
-  function GetOutputTypeProxy: Integer;
-  procedure SetOutputTypeProxy(const AValue: Integer);
-
-  procedure SetMeterValue(var ATarget: TMeterValue; const AValue: TMeterValue);
+  FImpulses: array[0..99] of Word;
+  FWrImp: Byte;
+  FRdImp: Byte;
+  FVolSum: Single;
+  FImpSum: Single;
 
   FValueImp: TMeterValue;
   FValueImpTotal: TMeterValue;
@@ -108,6 +94,53 @@ private
   FValueCurrent: TMeterValue;
   FValueTime: TMeterValue;
 
+  HashValueImp: string;
+  HashValueImpTotal: string;
+  HashValueCoef: string;
+  HashValueMassCoef: string;
+  HashValueVolumeCoef: string;
+  HashValueVolume: string;
+  HashValueMass: string;
+  HashValueVolumeMeter: string;
+  HashValueMassMeter: string;
+  HashValueMassFlow: string;
+  HashValueVolumeFlow: string;
+  HashValueQuantity: string;
+  HashValueFlow: string;
+  HashValueError: string;
+  HashValueVolumeError: string;
+  HashValueMassError: string;
+  HashValueDensity: string;
+  HashValuePressure: string;
+  HashValueTemperture: string;
+  HashValueAirPressure: string;
+  HashValueAirTemperture: string;
+  HashValueHumidity: string;
+  HashValueCurrent: string;
+  HashValueTime: string;
+
+  function GetDevice: TDevice;
+  procedure SetDevice(const ADevice: TDevice);
+
+  function GetDeviceUUID: string;
+  procedure SetDeviceUUID(const ADevice: string);
+
+  function GetDeviceTypeNameProxy: string;
+  procedure SetDeviceTypeNameProxy(const AValue: string);
+
+  function GetDeviceTypeUUIDProxy: string;
+  procedure SetDeviceTypeUUIDProxy(const AValue: string);
+
+  function GetSerialNumberProxy: string;
+  procedure SetSerialNumberProxy(const AValue: string);
+
+  function GetOutputTypeProxy: Integer;
+  procedure SetOutputTypeProxy(const AValue: Integer);
+
+  procedure SetMeterValue(var ATarget: TMeterValue; const AValue: TMeterValue);
+
+
+
   procedure SetValueImp(const AValue: TMeterValue);
   procedure SetValueImpTotal(const AValue: TMeterValue);
   procedure SetValueCoef(const AValue: TMeterValue);
@@ -132,16 +165,6 @@ private
   procedure SetValueHumidity(const AValue: TMeterValue);
   procedure SetValueCurrent(const AValue: TMeterValue);
   procedure SetValueTime(const AValue: TMeterValue);
-
-
-
-private
-
-  FImpulses: array[0..99] of Word;
-  FWrImp: Byte;
-  FRdImp: Byte;
-  FVolSum: Single;
-  FImpSum: Single;
 
   procedure InitValues;
   procedure ApplyMeasurementModel;
@@ -267,31 +290,6 @@ public
   property ValueHumidity: TMeterValue read FValueHumidity write SetValueHumidity;
   property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
   property ValueTime: TMeterValue read FValueTime write SetValueTime;
-
-  HashValueImp: string;
-  HashValueImpTotal: string;
-  HashValueCoef: string;
-  HashValueMassCoef: string;
-  HashValueVolumeCoef: string;
-  HashValueVolume: string;
-  HashValueMass: string;
-  HashValueVolumeMeter: string;
-  HashValueMassMeter: string;
-  HashValueMassFlow: string;
-  HashValueVolumeFlow: string;
-  HashValueQuantity: string;
-  HashValueFlow: string;
-  HashValueError: string;
-  HashValueVolumeError: string;
-  HashValueMassError: string;
-  HashValueDensity: string;
-  HashValuePressure: string;
-  HashValueTemperture: string;
-  HashValueAirPressure: string;
-  HashValueAirTemperture: string;
-  HashValueHumidity: string;
-  HashValueCurrent: string;
-  HashValueTime: string;
 
   constructor Create(); overload;
   constructor Create(AIsEtalon: Boolean); overload;
@@ -578,11 +576,9 @@ begin
 
   if ATarget <> nil then
   begin
-<<<<<<< codex/refactor-tmetervalue-management-8t4j7y
+
     TMeterValue.RebindReferences(ATarget, AValue);
 
-=======
->>>>>>> main
     if TMeterValue.GetMeterValues <> nil then
       TMeterValue.GetMeterValues.Remove(ATarget);
     ATarget.Free;
