@@ -2495,6 +2495,8 @@ object FormMain: TFormMain
       StyleLookup = ''
       TabOrder = 0
       Text = 'TEST'
+      ExplicitSize.cx = 46.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
       object LayoutTestValues: TLayout
         Align = Top
         Margins.Left = 24.000000000000000000
@@ -2513,8 +2515,8 @@ object FormMain: TFormMain
           Size.Width = 657.000000000000000000
           Size.Height = 260.000000000000000000
           Size.PlatformDefault = False
+          Text = #1069#1090#1074#1083#1086#1085#1099
           TabOrder = 0
-          Text = 'Каналы эталонов'
           object LabelEtalonCurSec: TLabel
             Position.X = 24.000000000000000000
             Position.Y = 48.000000000000000000
@@ -2534,31 +2536,34 @@ object FormMain: TFormMain
             TabOrder = 2
           end
           object EditEtalonCurSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 3
+            Text = '0'
             Position.X = 140.000000000000000000
             Position.Y = 44.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 3
-            Text = '0'
           end
           object EditEtalonImpSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 4
+            Text = '0'
             Position.X = 140.000000000000000000
             Position.Y = 92.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 4
-            Text = '0'
           end
           object EditEtalonImpResult: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 5
+            Text = '0'
             Position.X = 140.000000000000000000
             Position.Y = 140.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 5
-            Text = '0'
           end
           object ButtonApplyEtalonValues: TButton
             Position.X = 140.000000000000000000
@@ -2567,7 +2572,8 @@ object FormMain: TFormMain
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 6
-            Text = 'Применить'
+            Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+            TextSettings.Trimming = None
             OnClick = ButtonApplyEtalonValuesClick
           end
         end
@@ -2576,8 +2582,8 @@ object FormMain: TFormMain
           Size.Width = 657.000000000000000000
           Size.Height = 260.000000000000000000
           Size.PlatformDefault = False
+          Text = #1055#1088#1080#1073#1086#1088#1099
           TabOrder = 1
-          Text = 'Каналы поверяемых приборов'
           object LabelDeviceCurSec: TLabel
             Position.X = 24.000000000000000000
             Position.Y = 48.000000000000000000
@@ -2597,31 +2603,34 @@ object FormMain: TFormMain
             TabOrder = 2
           end
           object EditDeviceCurSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 3
+            Text = '0'
             Position.X = 160.000000000000000000
             Position.Y = 44.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 3
-            Text = '0'
           end
           object EditDeviceImpSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 4
+            Text = '0'
             Position.X = 160.000000000000000000
             Position.Y = 92.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 4
-            Text = '0'
           end
           object EditDeviceImpResult: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 5
+            Text = '0'
             Position.X = 160.000000000000000000
             Position.Y = 140.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 5
-            Text = '0'
           end
           object ButtonApplyDeviceValues: TButton
             Position.X = 160.000000000000000000
@@ -2630,7 +2639,8 @@ object FormMain: TFormMain
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 6
-            Text = 'Применить'
+            Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+            TextSettings.Trimming = None
             OnClick = ButtonApplyDeviceValuesClick
           end
         end

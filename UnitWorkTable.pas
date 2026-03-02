@@ -783,23 +783,9 @@ var
   I: Integer;
   Channel: TChannel;
 begin
-//  RebindAllFlowMeters;
- // if FValueTempertureBefore <> nil then FValueTempertureBefore.SetValue(FValueTempertureBefore.GetDoubleValue);
-//  if FValueTempertureAfter <> nil then FValueTempertureAfter.SetValue(FValueTempertureAfter.GetDoubleValue);
- // if FValueTempertureDelta <> nil then FValueTempertureDelta.SetValue(FValueTempertureDelta.GetDoubleValue);
-//  if FValueTemperture <> nil then FValueTemperture.SetValue;
- // if FValuePressureBefore <> nil then FValuePressureBefore.SetValue(FValuePressureBefore.GetDoubleValue);
- // if FValuePressureAfter <> nil then FValuePressureAfter.SetValue(FValuePressureAfter.GetDoubleValue);
-//  if FValuePressureDelta <> nil then FValuePressureDelta.SetValue(FValuePressureDelta.GetDoubleValue);
- // if FValuePressure <> nil then FValuePressure.SetValue;
-//  if FValueAirPressure <> nil then FValueAirPressure.SetValue(FValueAirPressure.GetDoubleValue);
- // if FValueAirTemperture <> nil then FValueAirTemperture.SetValue(FValueAirTemperture.GetDoubleValue);
-//  if FValueHumidity <> nil then FValueHumidity.SetValue(FValueHumidity.GetDoubleValue);
-//  if FValueTime <> nil then FValueTime.SetValue(FValueTime.GetDoubleValue);
+
   if FValueQuantity <> nil then FValueQuantity.SetValue();
   if FValueFlowRate <> nil then FValueFlowRate.SetValue();
-
-
 
   for I := 0 to FDeviceChannels.Count - 1 do
   begin
@@ -807,10 +793,11 @@ begin
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
 
-     if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue();
-    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue();
+    if Channel.FlowMeter.ValueVolumeFlow <> nil then Channel.FlowMeter.ValueVolumeFlow.SetValue();
+    if Channel.FlowMeter.ValueMassFlow <> nil then Channel.FlowMeter.ValueMassFlow.SetValue();
     if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
     if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
+
 
   end;
 
@@ -820,8 +807,8 @@ begin
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
 
-    if Channel.FlowMeter.ValueFlow <> nil then Channel.FlowMeter.ValueFlow.SetValue();
-    if Channel.FlowMeter.ValueQuantity <> nil then Channel.FlowMeter.ValueQuantity.SetValue();
+    if Channel.FlowMeter.ValueMassFlow <> nil then Channel.FlowMeter.ValueMassFlow.SetValue();
+    if Channel.FlowMeter.ValueVolumeFlow <> nil then Channel.FlowMeter.ValueVolumeFlow.SetValue();
     if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
     if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
   end;

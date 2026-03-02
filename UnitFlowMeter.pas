@@ -577,7 +577,7 @@ begin
 
   ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueDensity.SetAsDensity;
+  ValueDensity.SetAsDensity;
   ValueDensity.ValueBaseMultiplier := ValueTemperture;
   ValueDensity.ValueBaseDevider := ValuePressure;
   ValueDensity.ValueRate := nil;
@@ -813,6 +813,9 @@ begin
         FlowSource := ValueImp;
         if Assigned(ValueCoef) and Assigned(Device) then
           ValueCoef.SetValue(Device.Coef);
+
+          SetUpdateType(ONLINE_TYPE);
+
       end;
     otVoltage:
       begin
