@@ -171,6 +171,7 @@ type
     FHashValueFlowRate: string;
 
     procedure InitMeterValues;
+    procedure UpdateAggregateMeterValues;
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
@@ -700,6 +701,7 @@ begin
     FValueQuantity.DependenceType := INDEPENDENT;
     FValueQuantity.UpdateType := ONLINE_TYPE;
   end;
+  FValueQuantity.ValueType := AGGREGATE_TYPE;
   EnsureDescription(FValueQuantity, 'Кол-во жидкости за измерение');
   FValueQuantity.SetToSave(True);
 
@@ -710,8 +712,36 @@ begin
     FValueFlowRate.DependenceType := INDEPENDENT;
     FValueFlowRate.UpdateType := ONLINE_TYPE;
   end;
+  FValueFlowRate.ValueType := AGGREGATE_TYPE;
   EnsureDescription(FValueFlowRate, 'Расход');
   FValueFlowRate.SetToSave(True);
+
+  UpdateAggregateMeterValues;
+end;
+
+{ Rebuilds aggregate lists for table values from enabled etalon channels. }
+procedure TWorkTable.UpdateAggregateMeterValues;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if FValueQuantity <> nil then
+    FValueQuantity.ClearMeterValues;
+  if FValueFlowRate <> nil then
+    FValueFlowRate.ClearMeterValues;
+
+  for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if (FValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
+      FValueQuantity.AddMeterValue(Channel.FlowMeter.ValueQuantity);
+
+    if (FValueFlowRate <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+      FValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
+  end;
 end;
 
 { Frees channel collections owned by the work table. }
@@ -775,6 +805,8 @@ begin
 
   for I := 0 to FEtalonChannels.Count - 1 do
     FEtalonChannels[I].RebindFlowMeterValues(Self);
+
+  UpdateAggregateMeterValues;
 end;
 
 { Triggers recalculation/update pass for work table and channel meter values. }
@@ -783,6 +815,7 @@ var
   I: Integer;
   Channel: TChannel;
 begin
+  UpdateAggregateMeterValues;
 
   if FValueQuantity <> nil then FValueQuantity.SetValue();
   if FValueFlowRate <> nil then FValueFlowRate.SetValue();
