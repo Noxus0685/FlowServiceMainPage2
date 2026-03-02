@@ -331,6 +331,7 @@ type
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     FNextClimateChangeAt: TDateTime;
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
+    procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure OpenTypeSelect(ARow: Integer);
     procedure InitFlowMeters;
     procedure InitTables;
@@ -881,62 +882,56 @@ begin
   end;
 end;
 
+procedure TFormMain.UpdateRandomSignals(const AWorkTable: TWorkTable);
+var
+  I: Integer;
+  Channel: TChannel;
+  CurDelta: Double;
+  ImpDelta: Double;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := AWorkTable.EtalonChannels[I];
+    if Channel = nil then
+      Continue;
+
+    CurDelta := (Random * 0.06) - 0.03;
+    ImpDelta := (Random * 0.30) - 0.05;
+
+    Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
+    Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+    Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+  end;
+
+  for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+
+    CurDelta := (Random * 0.06) - 0.03;
+    ImpDelta := (Random * 0.30) - 0.05;
+
+    Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
+    Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+    Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+  end;
+end;
+
 procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;
-  I: Integer;
-  DeviceChannel: TChannel;
-  EtalonChannel: TChannel;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
   UpdateRandomClimate(WorkTable);
-
-  // Основные MeterValues рабочего стола.
-  WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
-  WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
-  WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
-  WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
-  WorkTable.ValueFlowRate.SetValue(WorkTable.FlowRate);
-  WorkTable.ValueQuantity.SetValue(WorkTable.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
-  WorkTable.Time:= WorkTable.Time+1;
-  WorkTable.ValueTime.SetValue(WorkTable.Time);
-
-  // Основные MeterValues каналов прибора.
-  for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-  begin
-    DeviceChannel := WorkTable.DeviceChannels[I];
-    if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
-      Continue;
-
-    DeviceChannel.FlowMeter.ValueFlow.SetValue(WorkTable.FlowRate);
-    DeviceChannel.FlowMeter.ValueQuantity.SetValue(DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
-    DeviceChannel.FlowMeter.ValueVolume.SetValue(DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue);
-    DeviceChannel.FlowMeter.ValueTemperture.SetValue(WorkTable.Temp);
-    DeviceChannel.FlowMeter.ValuePressure.SetValue(WorkTable.Press);
-    DeviceChannel.FlowMeter.ValueCurrent.SetValue(DeviceChannel.ValueCurrent.GetDoubleValue);
-    DeviceChannel.FlowMeter.ValueImp.SetValue(DeviceChannel.ValueImp.GetDoubleValue);
-  end;
-
-  // Основные MeterValues эталонных каналов.
-  for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-  begin
-    EtalonChannel := WorkTable.EtalonChannels[I];
-    if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
-      Continue;
-
-    EtalonChannel.FlowMeter.ValueFlow.SetValue(WorkTable.FlowRate);
-    EtalonChannel.FlowMeter.ValueQuantity.SetValue(EtalonChannel.FlowMeter.ValueQuantity.GetDoubleValue + WorkTable.FlowRate);
-    EtalonChannel.FlowMeter.ValueVolume.SetValue(EtalonChannel.FlowMeter.ValueQuantity.GetDoubleValue);
-    EtalonChannel.FlowMeter.ValueTemperture.SetValue(WorkTable.Temp);
-    EtalonChannel.FlowMeter.ValuePressure.SetValue(WorkTable.Press);
-    EtalonChannel.FlowMeter.ValueCurrent.SetValue(EtalonChannel.ValueCurrent.GetDoubleValue);
-    EtalonChannel.FlowMeter.ValueImp.SetValue(EtalonChannel.ValueImp.GetDoubleValue);
-  end;
-
-  WorkTable.RecalculateAllMeterValues;
+  UpdateRandomSignals(WorkTable);
+  SetValues;
 end;
 
 procedure TFormMain.SetValues;
@@ -949,8 +944,6 @@ begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
-
-  UpdateRandomClimate(WorkTable);
 
   // Основные MeterValues рабочего стола.
   WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
@@ -972,7 +965,6 @@ begin
     EtalonChannel.ValueCurrent.SetValue(EtalonChannel.CurSec);
     EtalonChannel.ValueImp.SetValue(EtalonChannel.ImpSec);
     EtalonChannel.ValueImpTotal.SetValue(EtalonChannel.ImpResult);
-    EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
   end;
 
   // Основные MeterValues каналов приборов.
