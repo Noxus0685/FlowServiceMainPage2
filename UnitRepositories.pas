@@ -4962,6 +4962,7 @@ begin
     Col('OrderNo', 'INTEGER'),
     Col('Name', 'TEXT'),
     Col('Value', 'REAL'),
+    Col('Arg', 'REAL'),
     Col('QFrom', 'REAL'),
     Col('QTo', 'REAL'),
     Col('K', 'REAL'),
@@ -5074,6 +5075,7 @@ begin
           Item.OrderNo := QItem.FieldByName('OrderNo').AsInteger;
           Item.Name := QItem.FieldByName('Name').AsString;
           Item.Value := QItem.FieldByName('Value').AsFloat;
+          Item.Arg := QItem.FieldByName('Arg').AsFloat;
           Item.QFrom := QItem.FieldByName('QFrom').AsFloat;
           Item.QTo := QItem.FieldByName('QTo').AsFloat;
           Item.K := QItem.FieldByName('K').AsFloat;
@@ -5144,13 +5146,14 @@ begin
         Continue;
       Item.TableID := TableID;
       Q.SQL.Text :=
-        'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, QFrom, QTo, K, b) ' +
-        'values (:UUID, :TableID, :OrderNo, :Name, :Value, :QFrom, :QTo, :K, :b)';
+        'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, K, b) ' +
+        'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :K, :b)';
       SetStrParam(Q, 'UUID', Item.UUID);
       SetIntParam(Q, 'TableID', Item.TableID);
       SetIntParam(Q, 'OrderNo', Item.OrderNo);
       SetStrParam(Q, 'Name', Item.Name);
       SetFloatParam(Q, 'Value', Item.Value);
+      SetFloatParam(Q, 'Arg', Item.Arg);
       SetFloatParam(Q, 'QFrom', Item.QFrom);
       SetFloatParam(Q, 'QTo', Item.QTo);
       SetFloatParam(Q, 'K', Item.K);

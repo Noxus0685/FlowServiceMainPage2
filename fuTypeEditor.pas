@@ -4,7 +4,7 @@ interface
 
 uses
 
-  UnitDataManager, UnitClasses,UnitRepositories, UnitBaseProcedures,
+  UnitDataManager, UnitClasses,UnitRepositories, UnitBaseProcedures, UnitDeviceClass,
 
 
   System.Math, System.DateUtils,
@@ -320,6 +320,12 @@ type
 
   ActiveRepo: TTypeRepository;
 
+  FCalibrCoefItemsLocal: TObjectList<TCalibrCoefItem>;
+  FGridCoefs: TGrid;
+  FButtonCoefAdd: TButton;
+  FButtonCoefDelete: TButton;
+  FButtonCoefClear: TButton;
+
 
 
 
@@ -339,6 +345,14 @@ type
   procedure UpdatePointsErrorFromType;
 
   procedure InitLocalData;
+  procedure InitCoefsTab;
+  procedure UpdateCoefsGrid;
+  function GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
+  procedure GridCoefsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+  procedure GridCoefsSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
+  procedure ButtonCoefAddClick(Sender: TObject);
+  procedure ButtonCoefDeleteClick(Sender: TObject);
+  procedure ButtonCoefClearClick(Sender: TObject);
 
    procedure LoadPoints;
   procedure LoadDiameters;
@@ -397,8 +411,71 @@ implementation
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
  begin
    inherited Create(AOwner);
+   InitCoefsTab;
    LoadType(AType);
  end;
+
+procedure TFormTypeEditor.InitCoefsTab;
+
+  function NewCol(const AHeader: string; const AWidth: Single): TStringColumn;
+  begin
+    Result := TStringColumn.Create(FGridCoefs);
+    Result.Header := AHeader;
+    Result.Width := AWidth;
+    Result.Parent := FGridCoefs;
+  end;
+var
+  LTop: TLayout;
+begin
+  FCalibrCoefItemsLocal := TObjectList<TCalibrCoefItem>.Create(True);
+
+  LTop := TLayout.Create(TabItemCoefs);
+  LTop.Parent := TabItemCoefs;
+  LTop.Align := TAlignLayout.Top;
+  LTop.Height := 42;
+  LTop.Padding.Left := 8;
+  LTop.Padding.Right := 8;
+  LTop.Padding.Top := 6;
+  LTop.Padding.Bottom := 6;
+
+  FButtonCoefAdd := TButton.Create(LTop);
+  FButtonCoefAdd.Parent := LTop;
+  FButtonCoefAdd.Align := TAlignLayout.Left;
+  FButtonCoefAdd.Width := 120;
+  FButtonCoefAdd.Text := 'Добавить';
+  FButtonCoefAdd.OnClick := ButtonCoefAddClick;
+
+  FButtonCoefDelete := TButton.Create(LTop);
+  FButtonCoefDelete.Parent := LTop;
+  FButtonCoefDelete.Align := TAlignLayout.Left;
+  FButtonCoefDelete.Width := 120;
+  FButtonCoefDelete.Text := 'Удалить';
+  FButtonCoefDelete.OnClick := ButtonCoefDeleteClick;
+
+  FButtonCoefClear := TButton.Create(LTop);
+  FButtonCoefClear.Parent := LTop;
+  FButtonCoefClear.Align := TAlignLayout.Left;
+  FButtonCoefClear.Width := 140;
+  FButtonCoefClear.Text := 'Очистить';
+  FButtonCoefClear.OnClick := ButtonCoefClearClick;
+
+  FGridCoefs := TGrid.Create(TabItemCoefs);
+  FGridCoefs.Parent := TabItemCoefs;
+  FGridCoefs.Align := TAlignLayout.Client;
+  FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
+  FGridCoefs.OnGetValue := GridCoefsGetValue;
+  FGridCoefs.OnSetValue := GridCoefsSetValue;
+
+  NewCol('Наименование', 170);
+  NewCol('Value', 90);
+  NewCol('Arg', 90);
+  NewCol('QFrom', 90);
+  NewCol('QTo', 90);
+  NewCol('K', 90);
+  NewCol('b', 90);
+
+  UpdateCoefsGrid;
+end;
 
 procedure TFormTypeEditor.UpdateUIFromType;
 var
@@ -726,6 +803,116 @@ begin
   end;
 end;
 
+procedure TFormTypeEditor.UpdateCoefsGrid;
+begin
+  if FGridCoefs = nil then
+    Exit;
+
+  FGridCoefs.BeginUpdate;
+  try
+    FGridCoefs.RowCount := FCalibrCoefItemsLocal.Count;
+  finally
+    FGridCoefs.EndUpdate;
+  end;
+end;
+
+function TFormTypeEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
+begin
+  Result := nil;
+  if (ARow < 0) or (FCalibrCoefItemsLocal = nil) or (ARow >= FCalibrCoefItemsLocal.Count) then
+    Exit;
+  Result := FCalibrCoefItemsLocal[ARow];
+end;
+
+procedure TFormTypeEditor.GridCoefsGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+var
+  Item: TCalibrCoefItem;
+begin
+  Item := GetCoefByVisibleRow(ARow);
+  if Item = nil then
+    Exit;
+
+  case ACol of
+    0: Value := Item.Name;
+    1: Value := FloatToStr(Item.Value);
+    2: Value := FloatToStr(Item.Arg);
+    3: Value := FloatToStr(Item.QFrom);
+    4: Value := FloatToStr(Item.QTo);
+    5: Value := FloatToStr(Item.K);
+    6: Value := FloatToStr(Item.b);
+  end;
+end;
+
+procedure TFormTypeEditor.GridCoefsSetValue(Sender: TObject; const ACol,
+  ARow: Integer; const Value: TValue);
+var
+  Item: TCalibrCoefItem;
+  S: string;
+begin
+  Item := GetCoefByVisibleRow(ARow);
+  if Item = nil then
+    Exit;
+
+  S := Value.ToString;
+  case ACol of
+    0: Item.Name := S;
+    1: Item.Value := StrToFloatDef(S, Item.Value);
+    2: Item.Arg := StrToFloatDef(S, Item.Arg);
+    3: Item.QFrom := StrToFloatDef(S, Item.QFrom);
+    4: Item.QTo := StrToFloatDef(S, Item.QTo);
+    5: Item.K := StrToFloatDef(S, Item.K);
+    6: Item.b := StrToFloatDef(S, Item.b);
+  end;
+
+  SetModified;
+end;
+
+procedure TFormTypeEditor.ButtonCoefAddClick(Sender: TObject);
+var
+  Item: TCalibrCoefItem;
+begin
+  if FCalibrCoefItemsLocal = nil then
+    Exit;
+
+  Item := TCalibrCoefItem.Create;
+  Item.OrderNo := FCalibrCoefItemsLocal.Count + 1;
+  Item.Name := 'Коэф. ' + IntToStr(Item.OrderNo);
+  Item.Value := 1;
+  Item.Arg := 0;
+  Item.K := 1;
+  Item.b := 0;
+  FCalibrCoefItemsLocal.Add(Item);
+  UpdateCoefsGrid;
+  if FGridCoefs.RowCount > 0 then
+    FGridCoefs.Selected := FGridCoefs.RowCount - 1;
+  SetModified;
+end;
+
+procedure TFormTypeEditor.ButtonCoefDeleteClick(Sender: TObject);
+var
+  Row: Integer;
+begin
+  if (FCalibrCoefItemsLocal = nil) or (FGridCoefs = nil) then
+    Exit;
+  Row := FGridCoefs.Row;
+  if (Row < 0) or (Row >= FCalibrCoefItemsLocal.Count) then
+    Exit;
+
+  FCalibrCoefItemsLocal.Delete(Row);
+  UpdateCoefsGrid;
+  SetModified;
+end;
+
+procedure TFormTypeEditor.ButtonCoefClearClick(Sender: TObject);
+begin
+  if FCalibrCoefItemsLocal = nil then
+    Exit;
+  FCalibrCoefItemsLocal.Clear;
+  UpdateCoefsGrid;
+  SetModified;
+end;
+
 function TFormTypeEditor.GetDiameterByVisibleRow(ARow: Integer): TDiameter;
 var
   D: TDiameter;
@@ -841,6 +1028,7 @@ end;
 procedure TFormTypeEditor.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   FreeAndNil(FType);
+  FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
 end;
 
