@@ -853,22 +853,39 @@ end;
 procedure TFlowMeter.InitValues;
 var
   IsExisted: Integer;
+  procedure SetDescription(AMeterValue: TMeterValue; const ADescription: string);
+  begin
+    if AMeterValue <> nil then
+      AMeterValue.Description := ADescription;
+  end;
 begin
   ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueTime.SetAsTime;
+    SetDescription(ValueTime, 'Время измерения');
+  end;
 
   ValuePressure := TMeterValue.GetExistedMeterValueBool(HashValuePressure, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValuePressure.SetAsPressure;
+    SetDescription(ValuePressure, 'Давление среды');
+  end;
 
   ValueTemperture := TMeterValue.GetExistedMeterValueBool(HashValueTemperture, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueTemperture.SetAsTemp;
+    SetDescription(ValueTemperture, 'Температура среды');
+  end;
 
   ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueDensity.SetAsDensity;
+  begin
+    ValueDensity.SetAsDensity;
+    SetDescription(ValueDensity, 'Плотность среды');
+  end;
   ValueDensity.ValueBaseMultiplier := ValueTemperture;
   ValueDensity.ValueBaseDevider := ValuePressure;
   ValueDensity.ValueRate := nil;
@@ -876,35 +893,59 @@ begin
 
   ValueAirPressure := TMeterValue.GetExistedMeterValueBool(HashValueAirPressure, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueAirPressure.SetAsAirPressure;
+    SetDescription(ValueAirPressure, 'Атмосферное давление');
+  end;
   ValueAirTemperture := TMeterValue.GetExistedMeterValueBool(HashValueAirTemperture, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueAirTemperture.SetAsAirTemp;
+    SetDescription(ValueAirTemperture, 'Температура воздуха');
+  end;
   ValueHumidity := TMeterValue.GetExistedMeterValueBool(HashValueHumidity, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueHumidity.SetAsHumidity;
+    SetDescription(ValueHumidity, 'Влажность воздуха');
+  end;
 
   ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueImp.SetAsImp;
+    SetDescription(ValueImp, 'Импульсы расходомера');
+  end;
 
   ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueImpTotal.SetAsImp;
+    SetDescription(ValueImpTotal, 'Суммарные импульсы');
+  end;
 
   ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueVolumeCoef.SetAsVolumeCoef;
+    SetDescription(ValueVolumeCoef, 'Коэффициент объема');
+  end;
   ValueVolumeCoef.SetValue(1);
 
   ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueMassCoef.SetAsMassCoef;
-    ValueMassCoef.SetValue(1);
+  begin
+    ValueMassCoef.SetAsMassCoef;
+    SetDescription(ValueMassCoef, 'Коэффициент массы');
+  end;
+  ValueMassCoef.SetValue(1);
 
   ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueMassFlow.SetAsMassFlow;
+  begin
+    ValueMassFlow.SetAsMassFlow;
+    SetDescription(ValueMassFlow, 'Массовый расход');
+  end;
   ValueMassFlow.ValueCorrection := nil;
   ValueMassFlow.ValueBaseMultiplier := ValueImp;
   ValueMassFlow.ValueBaseDevider := ValueMassCoef;
@@ -913,7 +954,10 @@ begin
 
   ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueVolumeFlow.SetAsVolumeFlow;
+  begin
+    ValueVolumeFlow.SetAsVolumeFlow;
+    SetDescription(ValueVolumeFlow, 'Объемный расход');
+  end;
   ValueVolumeFlow.ValueCorrection := nil;
   ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
   ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
@@ -922,7 +966,10 @@ begin
 
   ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueVolume.SetAsVolume;
+  begin
+    ValueVolume.SetAsVolume;
+    SetDescription(ValueVolume, 'Объем');
+  end;
   ValueVolume.ValueCorrection := ValueVolumeFlow;
   ValueVolume.ValueBaseMultiplier := ValueImpTotal;
   ValueVolume.ValueBaseDevider := ValueVolumeCoef;
@@ -931,7 +978,10 @@ begin
 
   ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueMass.SetAsMass;
+  begin
+    ValueMass.SetAsMass;
+    SetDescription(ValueMass, 'Масса');
+  end;
   ValueMass.ValueCorrection := ValueMassFlow;
   ValueMass.ValueBaseMultiplier := ValueImpTotal;
   ValueMass.ValueBaseDevider := ValueMassCoef;
@@ -940,36 +990,54 @@ begin
 
   ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueMassMeter.SetAsMass;
+  begin
+    ValueMassMeter.SetAsMass;
+    SetDescription(ValueMassMeter, 'Масса по прибору');
+  end;
 
   ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueVolumeMeter.SetAsVolume;
+  begin
+    ValueVolumeMeter.SetAsVolume;
+    SetDescription(ValueVolumeMeter, 'Объем по прибору');
+  end;
 
   ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, UUID, Name);
   if IsExisted = 0 then
-  ValueVolumeError.SetAsError;
+  begin
+    ValueVolumeError.SetAsError;
+    SetDescription(ValueVolumeError, 'Погрешность объема');
+  end;
   if EtalonMeter <> nil then
-  ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
+    ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
   ValueVolumeError.ValueBaseMultiplier := ValueVolume;
 
   ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueMassError.SetAsError;
+    SetDescription(ValueMassError, 'Погрешность массы');
+  end;
   if EtalonMeter <> nil then
     ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
   ValueMassError.ValueBaseMultiplier := ValueMass;
 
   ValueError := TMeterValue.GetExistedMeterValueBool(HashValueError, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueError.SetAsError;
+    SetDescription(ValueError, 'Итоговая погрешность');
+  end;
   if EtalonMeter <> nil then
     ValueError.ValueEtalon := EtalonMeter.ValueVolume;
   ValueError.ValueBaseMultiplier := ValueVolumeMeter;
 
   ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, UUID, Name);
   if IsExisted = 0 then
+  begin
     ValueCurrent.SetAsCurrent;
+    SetDescription(ValueCurrent, 'Токовый сигнал');
+  end;
 
   SetMeterCategory(MeterFlowCategory);
 
