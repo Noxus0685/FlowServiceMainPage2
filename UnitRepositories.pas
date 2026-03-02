@@ -412,10 +412,17 @@ procedure SetDateTimeParam(
   const AValue: TDateTime
 );
 begin
-  if AValue = 0 then
-    Q.ParamByName(AName).Clear
-  else
-    Q.ParamByName(AName).AsDateTime := AValue;
+  with Q.ParamByName(AName) do
+  begin
+    DataType := ftDateTime;
+    if AValue = 0 then
+    begin
+      Clear;
+      DataType := ftDateTime;
+    end
+    else
+      AsDateTime := AValue;
+  end;
 end;
 
  {$ENDREGION}
@@ -5109,6 +5116,8 @@ begin
     Exit(True);
 
   ADevice.CalibrCoefTable.DeviceID := ADevice.ID;
+  if ADevice.CalibrCoefTable.UUID = '' then
+    ADevice.CalibrCoefTable.UUID := TGUID.NewGuid.ToString;
 
   Q := FDM.CreateQuery;
   try
@@ -5135,7 +5144,18 @@ begin
       TableID := ADevice.CalibrCoefTable.ID
     else
     begin
-      TableID := FDM.DevicesConnection.GetLastAutoGenValue('CalibrCoefTable');
+      Q.SQL.Text := 'select ID from CalibrCoefTable where UUID = :UUID limit 1';
+      SetStrParam(Q, 'UUID', ADevice.CalibrCoefTable.UUID);
+      Q.Open;
+      try
+        if not Q.Eof then
+          TableID := Q.Fields[0].AsInteger
+        else
+          raise Exception.Create('Failed to read inserted CalibrCoefTable ID by UUID');
+      finally
+        Q.Close;
+      end;
+
       ADevice.CalibrCoefTable.ID := TableID;
     end;
 
@@ -5148,6 +5168,8 @@ begin
       if Item = nil then
         Continue;
       Item.TableID := TableID;
+      if Item.UUID = '' then
+        Item.UUID := TGUID.NewGuid.ToString;
       Q.SQL.Text :=
         'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, K, b) ' +
         'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :K, :b)';
@@ -5562,7 +5584,7 @@ begin
 
     if ASpillage.State = osNew then
       ASpillage.ID :=
-        FDM.DevicesConnection.GetLastAutoGenValue('PointSpillage');
+        Q.Connection.ExecSQLScalar('select last_insert_rowid()');
 
     ASpillage.State := osClean;
     Result := True;
