@@ -412,10 +412,17 @@ procedure SetDateTimeParam(
   const AValue: TDateTime
 );
 begin
-  if AValue = 0 then
-    Q.ParamByName(AName).Clear
-  else
-    Q.ParamByName(AName).AsDateTime := AValue;
+  with Q.ParamByName(AName) do
+  begin
+    DataType := ftDateTime;
+    if AValue = 0 then
+    begin
+      Clear;
+      DataType := ftDateTime;
+    end
+    else
+      AsDateTime := AValue;
+  end;
 end;
 
  {$ENDREGION}
