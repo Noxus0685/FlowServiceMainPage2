@@ -890,7 +890,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := (Random * 3) - 5;
+    ImpDelta := Random(11) - 5;
 
     Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
     Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
@@ -904,7 +904,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := (Random * 10) - 5;
+    ImpDelta := Random(11) - 5;
 
     Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
     Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
