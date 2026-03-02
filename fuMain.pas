@@ -341,6 +341,7 @@ type
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure ActionOpenDeviceEditorExecute(Sender: TObject);
+    procedure ActionOpenDeviceSelectExecute(Sender: TObject);
   private
 
   FActiveWorkTable: TWorkTable;
