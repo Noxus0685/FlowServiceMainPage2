@@ -14,7 +14,6 @@ uses
   UnitMeterValue;
 
 const
-  CHANNEL = 2;
   XMLVERFLOWMETERS = '5.0';
 
 type
@@ -86,7 +85,6 @@ private
 
 private
 
-  FChannel: Byte;
   FImpulses: array[0..99] of Word;
   FWrImp: Byte;
   FRdImp: Byte;
@@ -264,9 +262,6 @@ public
   procedure SetStatus(const AValue: string);
   function GetSendStatus: string;
   procedure SetSendStatus(const AText: string);
-
-  function GetChannel: Byte;
-  procedure SetChannel(AChannel: Byte);
 
   procedure SetEtalon(AEtalon: TFlowMeter);
   procedure SetMeterCategory(AMeterFlowType: TStdCategory); overload;
@@ -449,11 +444,6 @@ begin
   inherited;
 end;
 
-function TFlowMeter.GetChannel: Byte;
-begin
-  Result := FChannel;
-end;
-
 function TFlowMeter.GetSendStatus: string;
 begin
   case SendStatus of
@@ -478,7 +468,6 @@ procedure TFlowMeter.Init;
 begin
   ResultValue := '-';
   MeterFlowCategory := mftUnknownType;
-  FChannel := CHANNEL;
 
 end;
 
@@ -518,7 +507,6 @@ begin
 
   ResultValue := '-';
   MeterFlowCategory := ResolveStdCategoryFromDevice;
-  FChannel := CHANNEL;
 
   if Assigned(Self.Device) then
     SetValues;
@@ -1063,16 +1051,10 @@ end;
 
 procedure TFlowMeter.SetAsEtalon;
 begin
-  SetChannel(3);
   Name := 'Etalon';
   IsEtalon := True;
   SetMeterCategory(mftMassFlowmeterType);
   SetImpCoef(100);
-end;
-
-procedure TFlowMeter.SetChannel(AChannel: Byte);
-begin
-  FChannel := AChannel;
 end;
 
 procedure TFlowMeter.SetCopy(AMeter: TFlowMeter);
