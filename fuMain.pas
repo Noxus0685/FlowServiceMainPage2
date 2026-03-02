@@ -315,6 +315,7 @@ type
     EditDeviceImpSec: TEdit;
     EditDeviceImpResult: TEdit;
     ButtonApplyDeviceValues: TButton;
+    ActionOpenDeviceEditor: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -338,6 +339,7 @@ type
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
+    procedure ActionOpenDeviceEditorExecute(Sender: TObject);
   private
 
   FActiveWorkTable: TWorkTable;
@@ -743,6 +745,33 @@ begin
       Max(0, TabControlWorkTables.TabCount - 1)
     );
 end;
+
+procedure TFormMain.ActionOpenDeviceEditorExecute(Sender: TObject);
+var
+  Frm: TFormDeviceEditor;
+
+begin
+  Result := False;
+
+
+  Frm := TFormDeviceEditor.Create(Self);
+  try
+    {----------------------------------}
+    { Передаём контекст }
+    {----------------------------------}
+ //  Frm.DataManager := DataManager;
+ //   Frm.ActiveRepo  := ActiveRepo;
+ //   Frm.Device      := ADevice;
+      Frm.LoadDevice(ADevice);
+    {----------------------------------}
+    { Открываем модально }
+    {----------------------------------}
+    if Frm.ShowModal = mrOk then
+      Result := True;
+
+  finally
+    Frm.Free;
+  end;
 
 procedure TFormMain.ActionAddDeviceChannelExecute(Sender: TObject);
 var

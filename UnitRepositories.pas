@@ -4988,6 +4988,7 @@ var
   procedure CheckTable(const ATableName: string; const ARequired: TTableColumns);
   var
     I: Integer;
+    C:   TTableColumn;
   begin
     Existing.Clear;
     Existing.AddStrings(FDM.GetTableColumns(ATableName));
