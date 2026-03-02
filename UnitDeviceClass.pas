@@ -208,10 +208,43 @@ type
     procedure Assign(ASource: TPointSpillage);
   end;
 
+  TCalibrCoefItem = class
+  public
+    Name: string;
+    UUID: string;
+    TableID: Integer;
+    OrderNo: Integer;
+    Value: Double;
+    QFrom: Double;
+    QTo: Double;
+    K: Double;
+    b: Double;
+
+    function InRange(Q: Double): Boolean;
+  end;
+
+  TCalibrCoefTable = class
+  public
+    ID: Integer;
+    UUID: string;
+    DeviceID: Integer;
+    AppliedAt: TDateTime;
+    Name: string;
+    Comment: string;
+    Items: TObjectList<TCalibrCoefItem>;
+
+    constructor Create;
+    destructor Destroy; override;
+
+    function FindItemByQ(Q: Double): TCalibrCoefItem;
+    function ApplyByQ(Q, X: Double): Double;
+  end;
+
   TDevice = class(TTypeEntity)
   private
       FSpillages  : TObjectList<TPointSpillage>;
       FPoints     : TObjectList<TDevicePoint>;
+      FCalibrCoefTable: TCalibrCoefTable;
       FDeviceType : TDeviceType;
   public
     {====================================================================}
@@ -348,6 +381,7 @@ type
 
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
     property  Points     : TObjectList<TDevicePoint> read  FPoints write  FPoints;
+    property  CalibrCoefTable: TCalibrCoefTable read FCalibrCoefTable write FCalibrCoefTable;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
     procedure FillFromType(AType: TDeviceType);
@@ -360,6 +394,7 @@ destructor TDevice.Destroy;
 begin
   FSpillages.Free;
   FPoints.Free;
+  FCalibrCoefTable.Free;
   inherited;
 end;
 
@@ -372,6 +407,8 @@ begin
   {----------------------------------}
   FSpillages := TObjectList<TPointSpillage>.Create(True);
   FPoints    := TObjectList<TDevicePoint>.Create(True);
+  FCalibrCoefTable := TCalibrCoefTable.Create;
+  FCalibrCoefTable.DeviceID := ID;
 
   {----------------------------------}
   { Идентификация }
@@ -598,6 +635,8 @@ var
   NewS: TPointSpillage;
   P: TDevicePoint;
   NewP: TDevicePoint;
+  CI: TCalibrCoefItem;
+  NewCI: TCalibrCoefItem;
 begin
   if ASource = nil then
     Exit;
@@ -695,6 +734,93 @@ begin
     NewP := AddPoint;        // ← создаём через агрегат
     NewP.Assign(P);
   end;
+
+  if FCalibrCoefTable = nil then
+    FCalibrCoefTable := TCalibrCoefTable.Create;
+
+  if ASource.FCalibrCoefTable = nil then
+  begin
+    FCalibrCoefTable.ID := 0;
+    FCalibrCoefTable.UUID := '';
+    FCalibrCoefTable.DeviceID := ID;
+    FCalibrCoefTable.AppliedAt := 0;
+    FCalibrCoefTable.Name := '';
+    FCalibrCoefTable.Comment := '';
+    FCalibrCoefTable.Items.Clear;
+    Exit;
+  end;
+
+  FCalibrCoefTable.ID := ASource.FCalibrCoefTable.ID;
+  FCalibrCoefTable.UUID := ASource.FCalibrCoefTable.UUID;
+  FCalibrCoefTable.DeviceID := ASource.FCalibrCoefTable.DeviceID;
+  FCalibrCoefTable.AppliedAt := ASource.FCalibrCoefTable.AppliedAt;
+  FCalibrCoefTable.Name := ASource.FCalibrCoefTable.Name;
+  FCalibrCoefTable.Comment := ASource.FCalibrCoefTable.Comment;
+  FCalibrCoefTable.Items.Clear;
+  for CI in ASource.FCalibrCoefTable.Items do
+  begin
+    NewCI := TCalibrCoefItem.Create;
+    NewCI.Name := CI.Name;
+    NewCI.UUID := CI.UUID;
+    NewCI.TableID := CI.TableID;
+    NewCI.OrderNo := CI.OrderNo;
+    NewCI.Value := CI.Value;
+    NewCI.QFrom := CI.QFrom;
+    NewCI.QTo := CI.QTo;
+    NewCI.K := CI.K;
+    NewCI.b := CI.b;
+    FCalibrCoefTable.Items.Add(NewCI);
+  end;
+end;
+
+function TCalibrCoefItem.InRange(Q: Double): Boolean;
+begin
+  Result := (Q >= QFrom) and ((Q < QTo) or SameValue(Q, QTo));
+end;
+
+constructor TCalibrCoefTable.Create;
+begin
+  inherited Create;
+  Items := TObjectList<TCalibrCoefItem>.Create(True);
+end;
+
+destructor TCalibrCoefTable.Destroy;
+begin
+  Items.Free;
+  inherited;
+end;
+
+function TCalibrCoefTable.FindItemByQ(Q: Double): TCalibrCoefItem;
+var
+  I: Integer;
+  LastIndex: Integer;
+  Item: TCalibrCoefItem;
+begin
+  Result := nil;
+  if (Items = nil) or (Items.Count = 0) then
+    Exit;
+
+  LastIndex := Items.Count - 1;
+  for I := 0 to LastIndex do
+  begin
+    Item := Items[I];
+    if Item = nil then
+      Continue;
+
+    if (Q >= Item.QFrom) and ((Q < Item.QTo) or ((I = LastIndex) and (Q <= Item.QTo))) then
+      Exit(Item);
+  end;
+end;
+
+function TCalibrCoefTable.ApplyByQ(Q, X: Double): Double;
+var
+  Item: TCalibrCoefItem;
+begin
+  Item := FindItemByQ(Q);
+  if Item = nil then
+    Exit(X);
+
+  Result := X * Item.K + Item.b;
 end;
 
 function TDevice.Clone: TDevice;

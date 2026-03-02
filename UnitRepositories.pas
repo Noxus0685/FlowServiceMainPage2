@@ -277,6 +277,17 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
       ADevice: TDevice
     ): Boolean;
 
+    { ================= SCHEMA : CALIB COEF ================= }
+
+    function RequiredCalibrCoefTableColumns: TTableColumns;
+    function RequiredCalibrCoefItemColumns: TTableColumns;
+    procedure EnsureCalibrCoefSchema;
+    procedure AssertCalibrCoefSchema;
+
+    { ================= DB : CALIB COEF ================= }
+    function LoadCalibrCoefByDevice(ADeviceID: Integer): Boolean;
+    function UpdateCalibrCoef(ADevice: TDevice): Boolean;
+
 
     { ================= SCHEMA : SPILLAGES ================= }
 
@@ -3657,10 +3668,12 @@ begin
     EnsureDeviceSchema;
     EnsureDevicePointSchema;
     EnsureSpillageSchema;
+    EnsureCalibrCoefSchema;
 
     AssertDeviceSchema;
     AssertDevicePointSchema;
     AssertSpillageSchema;
+    AssertCalibrCoefSchema;
 
     {==================================================}
     { 2. ПРИБОРЫ }
@@ -4196,6 +4209,7 @@ begin
       // Загружаем связанные данные для устройства
       LoadDevicePointsByDevice(Result.ID);
       LoadSpillagesByDevice(Result.ID);
+      LoadCalibrCoefByDevice(Result.ID);
     end;
 
   finally
@@ -4252,6 +4266,9 @@ begin
 
     if not LoadSpillagesByDevice(NewD.ID) then
       raise Exception.Create('Не удалось загрузить проливы');
+
+    if not LoadCalibrCoefByDevice(NewD.ID) then
+      raise Exception.Create('Не удалось загрузить таблицу калибровочных коэффициентов');
 
         Q.Next;
       end;
@@ -4345,6 +4362,16 @@ begin
 
           Q.SQL.Text :=
             'delete from DevicePoint where DeviceID = :DeviceID';
+          SetIntParam(Q, 'DeviceID', ADevice.ID);
+          Q.ExecSQL;
+
+          Q.SQL.Text :=
+            'delete from CalibrCoefItem where TableID in (select ID from CalibrCoefTable where DeviceID = :DeviceID)';
+          SetIntParam(Q, 'DeviceID', ADevice.ID);
+          Q.ExecSQL;
+
+          Q.SQL.Text :=
+            'delete from CalibrCoefTable where DeviceID = :DeviceID';
           SetIntParam(Q, 'DeviceID', ADevice.ID);
           Q.ExecSQL;
 
@@ -4488,6 +4515,7 @@ begin
 
     UpdateDevicePoints(ADevice);
     UpdateSpillages(ADevice);
+    UpdateCalibrCoef(ADevice);
 
     ADevice.State := osClean;
     Result := True;
@@ -4909,6 +4937,234 @@ begin
 end;
 
     {$ENDREGION}
+
+
+{$REGION 'Calibr Coef'}
+
+function TDeviceRepository.RequiredCalibrCoefTableColumns: TTableColumns;
+begin
+  Result := [
+    Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
+    Col('UUID', 'TEXT'),
+    Col('DeviceID', 'INTEGER'),
+    Col('AppliedAt', 'TEXT'),
+    Col('Name', 'TEXT'),
+    Col('Comment', 'TEXT')
+  ];
+end;
+
+function TDeviceRepository.RequiredCalibrCoefItemColumns: TTableColumns;
+begin
+  Result := [
+    Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
+    Col('UUID', 'TEXT'),
+    Col('TableID', 'INTEGER'),
+    Col('OrderNo', 'INTEGER'),
+    Col('Name', 'TEXT'),
+    Col('Value', 'REAL'),
+    Col('QFrom', 'REAL'),
+    Col('QTo', 'REAL'),
+    Col('K', 'REAL'),
+    Col('b', 'REAL')
+  ];
+end;
+
+procedure TDeviceRepository.EnsureCalibrCoefSchema;
+begin
+  FDM.EnsureTable('CalibrCoefTable', RequiredCalibrCoefTableColumns);
+  FDM.EnsureTable('CalibrCoefItem', RequiredCalibrCoefItemColumns);
+end;
+
+procedure TDeviceRepository.AssertCalibrCoefSchema;
+var
+  Existing: TStringList;
+  Missing: TStringList;
+  C: TTableColumn;
+  function HasCol(const AName: string): Boolean;
+  begin
+    Result := Existing.IndexOf(UpperCase(AName)) >= 0;
+  end;
+  procedure CheckTable(const ATableName: string; const ARequired: TTableColumns);
+  var
+    I: Integer;
+  begin
+    Existing.Clear;
+    Existing.AddStrings(FDM.GetTableColumns(ATableName));
+    for I := 0 to Existing.Count - 1 do
+      Existing[I] := UpperCase(Trim(Existing[I]));
+
+    Missing.Clear;
+    for C in ARequired do
+      if not HasCol(C.Name) then
+        Missing.Add(C.Name);
+
+    if Missing.Count > 0 then
+      raise Exception.Create(
+        'Схема БД несовместима с ' + ATableName + '.' + sLineBreak +
+        'Отсутствуют колонки:' + sLineBreak +
+        Missing.Text
+      );
+  end;
+begin
+  Existing := TStringList.Create;
+  Missing := TStringList.Create;
+  try
+    CheckTable('CalibrCoefTable', RequiredCalibrCoefTableColumns);
+    CheckTable('CalibrCoefItem', RequiredCalibrCoefItemColumns);
+  finally
+    Existing.Free;
+    Missing.Free;
+  end;
+end;
+
+function TDeviceRepository.LoadCalibrCoefByDevice(ADeviceID: Integer): Boolean;
+var
+  Device: TDevice;
+  QTable: TFDQuery;
+  QItem: TFDQuery;
+  Item: TCalibrCoefItem;
+begin
+  Result := False;
+
+  if (ADeviceID <= 0) or (FDM = nil) then
+    Exit;
+
+  Device := FindDeviceByID(ADeviceID);
+  if Device = nil then
+    Exit;
+
+  if Device.CalibrCoefTable = nil then
+    Device.CalibrCoefTable := TCalibrCoefTable.Create;
+
+  Device.CalibrCoefTable.DeviceID := ADeviceID;
+  Device.CalibrCoefTable.ID := 0;
+  Device.CalibrCoefTable.UUID := '';
+  Device.CalibrCoefTable.AppliedAt := 0;
+  Device.CalibrCoefTable.Name := '';
+  Device.CalibrCoefTable.Comment := '';
+  Device.CalibrCoefTable.Items.Clear;
+
+  QTable := FDM.CreateQuery;
+  try
+    QTable.SQL.Text :=
+      'select * from CalibrCoefTable where DeviceID = :DeviceID order by AppliedAt desc, ID desc limit 1';
+    SetIntParam(QTable, 'DeviceID', ADeviceID);
+    QTable.Open;
+
+    if not QTable.Eof then
+    begin
+      Device.CalibrCoefTable.ID := QTable.FieldByName('ID').AsInteger;
+      Device.CalibrCoefTable.UUID := QTable.FieldByName('UUID').AsString;
+      Device.CalibrCoefTable.DeviceID := QTable.FieldByName('DeviceID').AsInteger;
+      Device.CalibrCoefTable.AppliedAt := QTable.FieldByName('AppliedAt').AsDateTime;
+      Device.CalibrCoefTable.Name := QTable.FieldByName('Name').AsString;
+      Device.CalibrCoefTable.Comment := QTable.FieldByName('Comment').AsString;
+
+      QItem := FDM.CreateQuery;
+      try
+        QItem.SQL.Text :=
+          'select * from CalibrCoefItem where TableID = :TableID order by OrderNo, ID';
+        SetIntParam(QItem, 'TableID', Device.CalibrCoefTable.ID);
+        QItem.Open;
+        while not QItem.Eof do
+        begin
+          Item := TCalibrCoefItem.Create;
+          Item.UUID := QItem.FieldByName('UUID').AsString;
+          Item.TableID := QItem.FieldByName('TableID').AsInteger;
+          Item.OrderNo := QItem.FieldByName('OrderNo').AsInteger;
+          Item.Name := QItem.FieldByName('Name').AsString;
+          Item.Value := QItem.FieldByName('Value').AsFloat;
+          Item.QFrom := QItem.FieldByName('QFrom').AsFloat;
+          Item.QTo := QItem.FieldByName('QTo').AsFloat;
+          Item.K := QItem.FieldByName('K').AsFloat;
+          Item.b := QItem.FieldByName('b').AsFloat;
+          Device.CalibrCoefTable.Items.Add(Item);
+          QItem.Next;
+        end;
+      finally
+        QItem.Free;
+      end;
+    end;
+
+    Result := True;
+  finally
+    QTable.Free;
+  end;
+end;
+
+function TDeviceRepository.UpdateCalibrCoef(ADevice: TDevice): Boolean;
+var
+  Q: TFDQuery;
+  Item: TCalibrCoefItem;
+  TableID: Integer;
+begin
+  Result := False;
+
+  if (ADevice = nil) or (ADevice.CalibrCoefTable = nil) then
+    Exit(True);
+
+  ADevice.CalibrCoefTable.DeviceID := ADevice.ID;
+
+  Q := FDM.CreateQuery;
+  try
+    if ADevice.CalibrCoefTable.ID > 0 then
+    begin
+      Q.SQL.Text :=
+        'update CalibrCoefTable set UUID=:UUID, DeviceID=:DeviceID, AppliedAt=:AppliedAt, Name=:Name, Comment=:Comment where ID=:ID';
+      SetIntParam(Q, 'ID', ADevice.CalibrCoefTable.ID);
+    end
+    else
+    begin
+      Q.SQL.Text :=
+        'insert into CalibrCoefTable (UUID, DeviceID, AppliedAt, Name, Comment) values (:UUID, :DeviceID, :AppliedAt, :Name, :Comment)';
+    end;
+
+    SetStrParam(Q, 'UUID', ADevice.CalibrCoefTable.UUID);
+    SetIntParam(Q, 'DeviceID', ADevice.CalibrCoefTable.DeviceID);
+    SetDateTimeParam(Q, 'AppliedAt', ADevice.CalibrCoefTable.AppliedAt);
+    SetStrParam(Q, 'Name', ADevice.CalibrCoefTable.Name);
+    SetStrParam(Q, 'Comment', ADevice.CalibrCoefTable.Comment);
+    Q.ExecSQL;
+
+    if ADevice.CalibrCoefTable.ID > 0 then
+      TableID := ADevice.CalibrCoefTable.ID
+    else
+    begin
+      TableID := FDM.DevicesConnection.GetLastAutoGenValue('CalibrCoefTable');
+      ADevice.CalibrCoefTable.ID := TableID;
+    end;
+
+    Q.SQL.Text := 'delete from CalibrCoefItem where TableID = :TableID';
+    SetIntParam(Q, 'TableID', TableID);
+    Q.ExecSQL;
+
+    for Item in ADevice.CalibrCoefTable.Items do
+    begin
+      if Item = nil then
+        Continue;
+      Item.TableID := TableID;
+      Q.SQL.Text :=
+        'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, QFrom, QTo, K, b) ' +
+        'values (:UUID, :TableID, :OrderNo, :Name, :Value, :QFrom, :QTo, :K, :b)';
+      SetStrParam(Q, 'UUID', Item.UUID);
+      SetIntParam(Q, 'TableID', Item.TableID);
+      SetIntParam(Q, 'OrderNo', Item.OrderNo);
+      SetStrParam(Q, 'Name', Item.Name);
+      SetFloatParam(Q, 'Value', Item.Value);
+      SetFloatParam(Q, 'QFrom', Item.QFrom);
+      SetFloatParam(Q, 'QTo', Item.QTo);
+      SetFloatParam(Q, 'K', Item.K);
+      SetFloatParam(Q, 'b', Item.b);
+      Q.ExecSQL;
+    end;
+
+    Result := True;
+  finally
+    Q.Free;
+  end;
+end;
+
+{$ENDREGION}
 
  {$REGION 'Spillage Points'}
 
