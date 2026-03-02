@@ -716,7 +716,7 @@ begin
   EnsureDescription(FValueFlowRate, 'Расход');
   FValueFlowRate.SetToSave(True);
 
-  UpdateAggregateMeterValues;
+
 end;
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
@@ -815,7 +815,6 @@ var
   I: Integer;
   Channel: TChannel;
 begin
-  UpdateAggregateMeterValues;
 
   if FValueQuantity <> nil then FValueQuantity.SetValue();
   if FValueFlowRate <> nil then FValueFlowRate.SetValue();
@@ -1044,6 +1043,7 @@ begin
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
       WorkTable.RebindAllFlowMeters;
       WorkTable.RecalculateAllMeterValues;
+      WorkTable.UpdateAggregateMeterValues;
 
       AWorkTables.Add(WorkTable);
     end;

@@ -484,10 +484,6 @@ begin
   );
   FWorkTableManager.Load;
 
-
-
-  FFlowMeters := TObjectList<TFlowMeter>.Create(True);
-
   GridDevices.RowCount := 2;
 
   // Заполняем список через имя колонки
