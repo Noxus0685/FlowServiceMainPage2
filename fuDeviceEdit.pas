@@ -277,6 +277,15 @@ type
      FLoading: Boolean;
      FBlockCategoryEdit: Boolean;
 
+     FTabControlMain: TTabControl;
+     FTabItemDevice: TTabItem;
+     FTabItemCoefs: TTabItem;
+     FGridCoefs: TGrid;
+     FButtonCoefAdd: TButton;
+     FButtonCoefDelete: TButton;
+     FButtonCoefClear: TButton;
+     FCoefsTabInitialized: Boolean;
+
      procedure ApplyMassMode;
      procedure ApplyVolumeMode;
      procedure ApplyMeasuredDimension;
@@ -299,7 +308,17 @@ type
      procedure CloseEditor(ASave: Boolean);
      function   GetSelectedPoint: TDevicePoint;
      function GetPointByVisibleRow(ARow: Integer): TDevicePoint;
-      procedure UpdateQmaxQmin;
+     procedure UpdateQmaxQmin;
+
+     procedure InitCoefsTab;
+     procedure EnsureCalibrCoefTable;
+     procedure UpdateCoefsGrid;
+     function GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
+     procedure GridCoefsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+     procedure GridCoefsSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
+     procedure ButtonCoefAddClick(Sender: TObject);
+     procedure ButtonCoefDeleteClick(Sender: TObject);
+     procedure ButtonCoefClearClick(Sender: TObject);
 
   public
     { Public declarations }
@@ -803,11 +822,236 @@ begin
   end;
 end;
 
+procedure TFormDeviceEditor.EnsureCalibrCoefTable;
+begin
+  if FDevice = nil then
+    Exit;
+
+  if FDevice.CalibrCoefTable = nil then
+    FDevice.CalibrCoefTable := TCalibrCoefTable.Create;
+
+  FDevice.CalibrCoefTable.DeviceID := FDevice.ID;
+end;
+
+procedure TFormDeviceEditor.InitCoefsTab;
+
+  function NewCol(const AHeader: string; const AWidth: Single): TStringColumn;
+  begin
+    Result := TStringColumn.Create(FGridCoefs);
+    Result.Header := AHeader;
+    Result.Width := AWidth;
+    Result.Parent := FGridCoefs;
+  end;
+var
+  LTop: TLayout;
+begin
+  if FCoefsTabInitialized then
+    Exit;
+
+  FTabControlMain := TTabControl.Create(layRight);
+  FTabControlMain.Parent := layRight;
+  FTabControlMain.Align := TAlignLayout.Client;
+
+  FTabItemDevice := TTabItem.Create(FTabControlMain);
+  FTabItemDevice.Parent := FTabControlMain;
+  FTabItemDevice.Text := 'Устройство';
+  FTabItemDevice.Name := 'TabItemDevice';
+
+  FTabItemCoefs := TTabItem.Create(FTabControlMain);
+  FTabItemCoefs.Parent := FTabControlMain;
+  FTabItemCoefs.Text := 'Коэффициенты';
+  FTabItemCoefs.Name := 'TabItemCoefs';
+
+  grpWorkShedule.Parent := FTabItemDevice;
+  grpWorkShedule.Align := TAlignLayout.Top;
+
+  GroupBox6.Parent := FTabItemDevice;
+  GroupBox6.Align := TAlignLayout.Top;
+
+  LTop := TLayout.Create(FTabItemCoefs);
+  LTop.Parent := FTabItemCoefs;
+  LTop.Align := TAlignLayout.Top;
+  LTop.Height := 42;
+  LTop.Padding.Left := 8;
+  LTop.Padding.Right := 8;
+  LTop.Padding.Top := 6;
+  LTop.Padding.Bottom := 6;
+
+  FButtonCoefAdd := TButton.Create(LTop);
+  FButtonCoefAdd.Parent := LTop;
+  FButtonCoefAdd.Align := TAlignLayout.Left;
+  FButtonCoefAdd.Width := 120;
+  FButtonCoefAdd.Text := 'Добавить';
+  FButtonCoefAdd.OnClick := ButtonCoefAddClick;
+
+  FButtonCoefDelete := TButton.Create(LTop);
+  FButtonCoefDelete.Parent := LTop;
+  FButtonCoefDelete.Align := TAlignLayout.Left;
+  FButtonCoefDelete.Width := 120;
+  FButtonCoefDelete.Text := 'Удалить';
+  FButtonCoefDelete.OnClick := ButtonCoefDeleteClick;
+
+  FButtonCoefClear := TButton.Create(LTop);
+  FButtonCoefClear.Parent := LTop;
+  FButtonCoefClear.Align := TAlignLayout.Left;
+  FButtonCoefClear.Width := 140;
+  FButtonCoefClear.Text := 'Очистить';
+  FButtonCoefClear.OnClick := ButtonCoefClearClick;
+
+  FGridCoefs := TGrid.Create(FTabItemCoefs);
+  FGridCoefs.Parent := FTabItemCoefs;
+  FGridCoefs.Align := TAlignLayout.Client;
+  FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
+  FGridCoefs.OnGetValue := GridCoefsGetValue;
+  FGridCoefs.OnSetValue := GridCoefsSetValue;
+
+  NewCol('Наименование', 170);
+  NewCol('Value', 90);
+  NewCol('Arg', 90);
+  NewCol('QFrom', 90);
+  NewCol('QTo', 90);
+  NewCol('K', 90);
+  NewCol('b', 90);
+
+  FTabControlMain.ActiveTab := FTabItemDevice;
+  FCoefsTabInitialized := True;
+end;
+
+procedure TFormDeviceEditor.UpdateCoefsGrid;
+begin
+  if FGridCoefs = nil then
+    Exit;
+
+  EnsureCalibrCoefTable;
+
+  FGridCoefs.BeginUpdate;
+  try
+    FGridCoefs.RowCount := FDevice.CalibrCoefTable.Items.Count;
+  finally
+    FGridCoefs.EndUpdate;
+  end;
+end;
+
+function TFormDeviceEditor.GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
+begin
+  Result := nil;
+
+  if (FDevice = nil) or (ARow < 0) then
+    Exit;
+
+  EnsureCalibrCoefTable;
+
+  if ARow >= FDevice.CalibrCoefTable.Items.Count then
+    Exit;
+
+  Result := FDevice.CalibrCoefTable.Items[ARow];
+end;
+
+procedure TFormDeviceEditor.GridCoefsGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+var
+  Item: TCalibrCoefItem;
+begin
+  Item := GetCoefByVisibleRow(ARow);
+  if Item = nil then
+    Exit;
+
+  case ACol of
+    0: Value := Item.Name;
+    1: Value := FloatToStr(Item.Value);
+    2: Value := FloatToStr(Item.Arg);
+    3: Value := FloatToStr(Item.QFrom);
+    4: Value := FloatToStr(Item.QTo);
+    5: Value := FloatToStr(Item.K);
+    6: Value := FloatToStr(Item.b);
+  end;
+end;
+
+procedure TFormDeviceEditor.GridCoefsSetValue(Sender: TObject; const ACol,
+  ARow: Integer; const Value: TValue);
+var
+  Item: TCalibrCoefItem;
+  S: string;
+begin
+  Item := GetCoefByVisibleRow(ARow);
+  if Item = nil then
+    Exit;
+
+  S := Value.ToString;
+
+  case ACol of
+    0: Item.Name := S;
+    1: Item.Value := StrToFloatDef(S, Item.Value);
+    2: Item.Arg := StrToFloatDef(S, Item.Arg);
+    3: Item.QFrom := StrToFloatDef(S, Item.QFrom);
+    4: Item.QTo := StrToFloatDef(S, Item.QTo);
+    5: Item.K := StrToFloatDef(S, Item.K);
+    6: Item.b := StrToFloatDef(S, Item.b);
+  end;
+
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.ButtonCoefAddClick(Sender: TObject);
+var
+  Item: TCalibrCoefItem;
+begin
+  EnsureCalibrCoefTable;
+
+  Item := TCalibrCoefItem.Create;
+  Item.OrderNo := FDevice.CalibrCoefTable.Items.Count + 1;
+  Item.Name := 'Коэф. ' + IntToStr(Item.OrderNo);
+  Item.Value := 1;
+  Item.Arg := 0;
+  Item.K := 1;
+  Item.b := 0;
+
+  FDevice.CalibrCoefTable.Items.Add(Item);
+
+  UpdateCoefsGrid;
+  if FGridCoefs.RowCount > 0 then
+    FGridCoefs.Selected := FGridCoefs.RowCount - 1;
+
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.ButtonCoefDeleteClick(Sender: TObject);
+var
+  Row: Integer;
+begin
+  if (FDevice = nil) or (FGridCoefs = nil) then
+    Exit;
+
+  EnsureCalibrCoefTable;
+
+  Row := FGridCoefs.Row;
+  if (Row < 0) or (Row >= FDevice.CalibrCoefTable.Items.Count) then
+    Exit;
+
+  FDevice.CalibrCoefTable.Items.Delete(Row);
+  UpdateCoefsGrid;
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.ButtonCoefClearClick(Sender: TObject);
+begin
+  if FDevice = nil then
+    Exit;
+
+  EnsureCalibrCoefTable;
+  FDevice.CalibrCoefTable.Items.Clear;
+
+  UpdateCoefsGrid;
+  SetModified;
+end;
+
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
   FoundRepo: TTypeRepository;
 begin
+  InitCoefsTab;
+
   FLoading := True;
   try
     FreeAndNil(FDevice);
@@ -854,6 +1098,7 @@ begin
     end;
 
     UpdateUIFromDevice;
+    UpdateCoefsGrid;
 
   finally
     FLoading := False;
@@ -1323,6 +1568,7 @@ end;
     // == Точки прибора
     // =====================================================
     UpdatePointsGrid;
+    UpdateCoefsGrid;
 
         finally
         FLoading := False;

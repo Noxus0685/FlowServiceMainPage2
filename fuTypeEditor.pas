@@ -411,7 +411,7 @@ implementation
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
  begin
    inherited Create(AOwner);
-   InitCoefsTab;
+   TabItemCoefs.Visible := False;
    LoadType(AType);
  end;
 
