@@ -222,6 +222,9 @@ type
     MemoLog: TMemo;
     NetHTTPClient1: TNetHTTPClient;
     DeepSeek: TSpeedButton;
+    TabControlMain: TTabControl;
+    TabItemDevice: TTabItem;
+    TabItemCoefs: TTabItem;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
