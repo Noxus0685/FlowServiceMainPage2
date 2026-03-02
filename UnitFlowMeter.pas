@@ -275,7 +275,7 @@ public
   function SetImpCoef(const AK: string): Boolean; overload;
 
   procedure InitHashValues;
-  procedure SetValues;
+  procedure InitAllValues;
   procedure UpdateByDevice;
   procedure RebindCalculatedValues;
   procedure SetMonitorValues;
@@ -298,6 +298,8 @@ uses
 constructor TFlowMeter.Create();
 begin
   inherited Create;
+  Name:='Новое устройство';
+  FlowMeters.Add(self);
 end;
 
 constructor TFlowMeter.Create(AIsEtalon: Boolean);
@@ -508,8 +510,8 @@ begin
   ResultValue := '-';
   MeterFlowCategory := ResolveStdCategoryFromDevice;
 
-  if Assigned(Self.Device) then
-    SetValues;
+ // if Assigned(Self.Device) then
+    InitAllValues;
 end;
 
 procedure TFlowMeter.InitHashValues;
@@ -1122,11 +1124,11 @@ begin
   Result := True;
 end;
 
-procedure TFlowMeter.SetValues;
+procedure TFlowMeter.InitAllValues;
 begin
-  InitHashValues;
+   // InitHashValues;
   InitValues;
-  UpdateByDevice;
+  ApplyMeasurementModel;
 end;
 
 procedure TFlowMeter.RebindCalculatedValues;

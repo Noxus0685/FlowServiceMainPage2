@@ -482,6 +482,7 @@ begin
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
     'TableSettings.ini'
   );
+
   FWorkTableManager.Load;
 
   GridDevices.RowCount := 2;

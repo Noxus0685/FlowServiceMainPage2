@@ -297,8 +297,10 @@ begin
   Coefs := TList<TCoef>.Create;
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
   IsToSave := False;
+
   FMeterValues.Add(Self);
-  FMeterValuesSaves.Add(Self);
+
+
 end;
 
 { Creates a meter value object with default runtime fields and storage buffers. }

@@ -336,6 +336,8 @@ begin
   FValueSec := 0;
   FValueResult := 0;
 
+  FFlowMeter.Name := 'Прибор ' + FName;
+
   InitMeterValues;
 end;
 
@@ -1209,7 +1211,11 @@ begin
     end;
     Channel.FValueInterface.SetToSave(True);
 
+    Channel.FlowMeter.Name := 'прибор '+ Channel.Name;
+
     Channel.Init;
+
+
 
     AChannels.Add(Channel);
   end;
