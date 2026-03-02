@@ -81,6 +81,58 @@ private
   function GetOutputTypeProxy: Integer;
   procedure SetOutputTypeProxy(const AValue: Integer);
 
+  procedure SetMeterValue(var ATarget: TMeterValue; const AValue: TMeterValue);
+
+  FValueImp: TMeterValue;
+  FValueImpTotal: TMeterValue;
+  FValueCoef: TMeterValue;
+  FValueMassCoef: TMeterValue;
+  FValueVolumeCoef: TMeterValue;
+  FValueQuantity: TMeterValue;
+  FValueVolume: TMeterValue;
+  FValueMass: TMeterValue;
+  FValueVolumeMeter: TMeterValue;
+  FValueMassMeter: TMeterValue;
+  FValueFlow: TMeterValue;
+  FValueMassFlow: TMeterValue;
+  FValueVolumeFlow: TMeterValue;
+  FValueError: TMeterValue;
+  FValueVolumeError: TMeterValue;
+  FValueMassError: TMeterValue;
+  FValueDensity: TMeterValue;
+  FValuePressure: TMeterValue;
+  FValueTemperture: TMeterValue;
+  FValueAirPressure: TMeterValue;
+  FValueAirTemperture: TMeterValue;
+  FValueHumidity: TMeterValue;
+  FValueCurrent: TMeterValue;
+  FValueTime: TMeterValue;
+
+  procedure SetValueImp(const AValue: TMeterValue);
+  procedure SetValueImpTotal(const AValue: TMeterValue);
+  procedure SetValueCoef(const AValue: TMeterValue);
+  procedure SetValueMassCoef(const AValue: TMeterValue);
+  procedure SetValueVolumeCoef(const AValue: TMeterValue);
+  procedure SetValueQuantity(const AValue: TMeterValue);
+  procedure SetValueVolume(const AValue: TMeterValue);
+  procedure SetValueMass(const AValue: TMeterValue);
+  procedure SetValueVolumeMeter(const AValue: TMeterValue);
+  procedure SetValueMassMeter(const AValue: TMeterValue);
+  procedure SetValueFlow(const AValue: TMeterValue);
+  procedure SetValueMassFlow(const AValue: TMeterValue);
+  procedure SetValueVolumeFlow(const AValue: TMeterValue);
+  procedure SetValueError(const AValue: TMeterValue);
+  procedure SetValueVolumeError(const AValue: TMeterValue);
+  procedure SetValueMassError(const AValue: TMeterValue);
+  procedure SetValueDensity(const AValue: TMeterValue);
+  procedure SetValuePressure(const AValue: TMeterValue);
+  procedure SetValueTemperture(const AValue: TMeterValue);
+  procedure SetValueAirPressure(const AValue: TMeterValue);
+  procedure SetValueAirTemperture(const AValue: TMeterValue);
+  procedure SetValueHumidity(const AValue: TMeterValue);
+  procedure SetValueCurrent(const AValue: TMeterValue);
+  procedure SetValueTime(const AValue: TMeterValue);
+
 
 
 private
@@ -191,40 +243,30 @@ public
 
   MeterFlowCategory: TStdCategory;
 
-
-  ValueImp: TMeterValue;
-  ValueImpTotal: TMeterValue;
-  ValueCoef: TMeterValue;
-  ValueMassCoef: TMeterValue;
-  ValueVolumeCoef: TMeterValue;
-
-  ValueQuantity: TMeterValue;
-  ValueVolume: TMeterValue;
-  ValueMass: TMeterValue;
-
-
-  ValueVolumeMeter: TMeterValue;
-  ValueMassMeter: TMeterValue;
-
-  ValueFlow: TMeterValue;
-  ValueMassFlow: TMeterValue;
-  ValueVolumeFlow: TMeterValue;
-
-
-  ValueError: TMeterValue;
-  ValueVolumeError: TMeterValue;
-  ValueMassError: TMeterValue;
-
-
-  ValueDensity: TMeterValue;
-  ValuePressure: TMeterValue;
-  ValueTemperture: TMeterValue;
-  ValueAirPressure: TMeterValue;
-  ValueAirTemperture: TMeterValue;
-  ValueHumidity: TMeterValue;
-  ValueCurrent: TMeterValue;
-
-  ValueTime: TMeterValue;
+  property ValueImp: TMeterValue read FValueImp write SetValueImp;
+  property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
+  property ValueCoef: TMeterValue read FValueCoef write SetValueCoef;
+  property ValueMassCoef: TMeterValue read FValueMassCoef write SetValueMassCoef;
+  property ValueVolumeCoef: TMeterValue read FValueVolumeCoef write SetValueVolumeCoef;
+  property ValueQuantity: TMeterValue read FValueQuantity write SetValueQuantity;
+  property ValueVolume: TMeterValue read FValueVolume write SetValueVolume;
+  property ValueMass: TMeterValue read FValueMass write SetValueMass;
+  property ValueVolumeMeter: TMeterValue read FValueVolumeMeter write SetValueVolumeMeter;
+  property ValueMassMeter: TMeterValue read FValueMassMeter write SetValueMassMeter;
+  property ValueFlow: TMeterValue read FValueFlow write SetValueFlow;
+  property ValueMassFlow: TMeterValue read FValueMassFlow write SetValueMassFlow;
+  property ValueVolumeFlow: TMeterValue read FValueVolumeFlow write SetValueVolumeFlow;
+  property ValueError: TMeterValue read FValueError write SetValueError;
+  property ValueVolumeError: TMeterValue read FValueVolumeError write SetValueVolumeError;
+  property ValueMassError: TMeterValue read FValueMassError write SetValueMassError;
+  property ValueDensity: TMeterValue read FValueDensity write SetValueDensity;
+  property ValuePressure: TMeterValue read FValuePressure write SetValuePressure;
+  property ValueTemperture: TMeterValue read FValueTemperture write SetValueTemperture;
+  property ValueAirPressure: TMeterValue read FValueAirPressure write SetValueAirPressure;
+  property ValueAirTemperture: TMeterValue read FValueAirTemperture write SetValueAirTemperture;
+  property ValueHumidity: TMeterValue read FValueHumidity write SetValueHumidity;
+  property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
+  property ValueTime: TMeterValue read FValueTime write SetValueTime;
 
   HashValueImp: string;
   HashValueImpTotal: string;
@@ -369,30 +411,30 @@ begin
   HashValueCurrent := '';
   HashValueTime := '';
 
-  ValueImp := nil;
-  ValueImpTotal := nil;
-  ValueCoef := nil;
-  ValueMassCoef := nil;
-  ValueVolumeCoef := nil;
-  ValueQuantity := nil;
-  ValueVolume := nil;
-  ValueMass := nil;
-  ValueVolumeMeter := nil;
-  ValueMassMeter := nil;
-  ValueFlow := nil;
-  ValueMassFlow := nil;
-  ValueVolumeFlow := nil;
-  ValueError := nil;
-  ValueVolumeError := nil;
-  ValueMassError := nil;
-  ValueDensity := nil;
-  ValuePressure := nil;
-  ValueTemperture := nil;
-  ValueAirPressure := nil;
-  ValueAirTemperture := nil;
-  ValueHumidity := nil;
-  ValueCurrent := nil;
-  ValueTime := nil;
+  FValueImp := nil;
+  FValueImpTotal := nil;
+  FValueCoef := nil;
+  FValueMassCoef := nil;
+  FValueVolumeCoef := nil;
+  FValueQuantity := nil;
+  FValueVolume := nil;
+  FValueMass := nil;
+  FValueVolumeMeter := nil;
+  FValueMassMeter := nil;
+  FValueFlow := nil;
+  FValueMassFlow := nil;
+  FValueVolumeFlow := nil;
+  FValueError := nil;
+  FValueVolumeError := nil;
+  FValueMassError := nil;
+  FValueDensity := nil;
+  FValuePressure := nil;
+  FValueTemperture := nil;
+  FValueAirPressure := nil;
+  FValueAirTemperture := nil;
+  FValueHumidity := nil;
+  FValueCurrent := nil;
+  FValueTime := nil;
 
   MeterFlowCategory := mftUnknownType;
   Name:='Новое устройство';
@@ -529,6 +571,142 @@ end;
 
 
 
+procedure TFlowMeter.SetMeterValue(var ATarget: TMeterValue; const AValue: TMeterValue);
+begin
+  if ATarget = AValue then
+    Exit;
+
+  if ATarget <> nil then
+  begin
+    if TMeterValue.GetMeterValues <> nil then
+      TMeterValue.GetMeterValues.Remove(ATarget);
+    ATarget.Free;
+  end;
+
+  ATarget := AValue;
+end;
+
+procedure TFlowMeter.SetValueImp(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueImp, AValue);
+end;
+
+procedure TFlowMeter.SetValueImpTotal(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueImpTotal, AValue);
+end;
+
+procedure TFlowMeter.SetValueCoef(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueCoef, AValue);
+end;
+
+procedure TFlowMeter.SetValueMassCoef(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueMassCoef, AValue);
+end;
+
+procedure TFlowMeter.SetValueVolumeCoef(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueVolumeCoef, AValue);
+end;
+
+procedure TFlowMeter.SetValueQuantity(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueQuantity, AValue);
+end;
+
+procedure TFlowMeter.SetValueVolume(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueVolume, AValue);
+end;
+
+procedure TFlowMeter.SetValueMass(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueMass, AValue);
+end;
+
+procedure TFlowMeter.SetValueVolumeMeter(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueVolumeMeter, AValue);
+end;
+
+procedure TFlowMeter.SetValueMassMeter(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueMassMeter, AValue);
+end;
+
+procedure TFlowMeter.SetValueFlow(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueFlow, AValue);
+end;
+
+procedure TFlowMeter.SetValueMassFlow(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueMassFlow, AValue);
+end;
+
+procedure TFlowMeter.SetValueVolumeFlow(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueVolumeFlow, AValue);
+end;
+
+procedure TFlowMeter.SetValueError(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueError, AValue);
+end;
+
+procedure TFlowMeter.SetValueVolumeError(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueVolumeError, AValue);
+end;
+
+procedure TFlowMeter.SetValueMassError(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueMassError, AValue);
+end;
+
+procedure TFlowMeter.SetValueDensity(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueDensity, AValue);
+end;
+
+procedure TFlowMeter.SetValuePressure(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressure, AValue);
+end;
+
+procedure TFlowMeter.SetValueTemperture(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTemperture, AValue);
+end;
+
+procedure TFlowMeter.SetValueAirPressure(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueAirPressure, AValue);
+end;
+
+procedure TFlowMeter.SetValueAirTemperture(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueAirTemperture, AValue);
+end;
+
+procedure TFlowMeter.SetValueHumidity(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueHumidity, AValue);
+end;
+
+procedure TFlowMeter.SetValueCurrent(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueCurrent, AValue);
+end;
+
+procedure TFlowMeter.SetValueTime(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTime, AValue);
+end;
+
+
 
 
 procedure TFlowMeter.CopyValues(const AEtalonMeter: TFlowMeter);
@@ -539,6 +717,30 @@ end;
 
 destructor TFlowMeter.Destroy;
 begin
+  ValueImp := nil;
+  ValueImpTotal := nil;
+  ValueCoef := nil;
+  ValueMassCoef := nil;
+  ValueVolumeCoef := nil;
+  ValueQuantity := nil;
+  ValueVolume := nil;
+  ValueMass := nil;
+  ValueVolumeMeter := nil;
+  ValueMassMeter := nil;
+  ValueFlow := nil;
+  ValueMassFlow := nil;
+  ValueVolumeFlow := nil;
+  ValueError := nil;
+  ValueVolumeError := nil;
+  ValueMassError := nil;
+  ValueDensity := nil;
+  ValuePressure := nil;
+  ValueTemperture := nil;
+  ValueAirPressure := nil;
+  ValueAirTemperture := nil;
+  ValueHumidity := nil;
+  ValueCurrent := nil;
+  ValueTime := nil;
 
   inherited;
 end;
