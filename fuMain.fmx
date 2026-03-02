@@ -2483,7 +2483,7 @@ object FormMain: TFormMain
       ExplicitSize.cx = 81.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
     end
-    object TabItem4: TTabItem
+    object TabItemTest: TTabItem
       CustomIcon = <
         item
         end>
@@ -2495,6 +2495,146 @@ object FormMain: TFormMain
       StyleLookup = ''
       TabOrder = 0
       Text = 'TEST'
+      object LayoutTestValues: TLayout
+        Align = Top
+        Margins.Left = 24.000000000000000000
+        Margins.Top = 24.000000000000000000
+        Margins.Right = 24.000000000000000000
+        Margins.Bottom = 24.000000000000000000
+        Position.X = 24.000000000000000000
+        Position.Y = 24.000000000000000000
+        Size.Width = 1326.000000000000000000
+        Size.Height = 260.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        object GroupBoxEtalonChannels: TGroupBox
+          Align = Left
+          Margins.Right = 12.000000000000000000
+          Size.Width = 657.000000000000000000
+          Size.Height = 260.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          Text = 'Каналы эталонов'
+          object LabelEtalonCurSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 48.000000000000000000
+            Text = 'CurSec'
+            TabOrder = 0
+          end
+          object LabelEtalonImpSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 96.000000000000000000
+            Text = 'ImpSec'
+            TabOrder = 1
+          end
+          object LabelEtalonImpResult: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 144.000000000000000000
+            Text = 'ImpResult'
+            TabOrder = 2
+          end
+          object EditEtalonCurSec: TEdit
+            Position.X = 140.000000000000000000
+            Position.Y = 44.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            Text = '0'
+          end
+          object EditEtalonImpSec: TEdit
+            Position.X = 140.000000000000000000
+            Position.Y = 92.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 4
+            Text = '0'
+          end
+          object EditEtalonImpResult: TEdit
+            Position.X = 140.000000000000000000
+            Position.Y = 140.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 5
+            Text = '0'
+          end
+          object ButtonApplyEtalonValues: TButton
+            Position.X = 140.000000000000000000
+            Position.Y = 190.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 6
+            Text = 'Применить'
+            OnClick = ButtonApplyEtalonValuesClick
+          end
+        end
+        object GroupBoxDeviceChannels: TGroupBox
+          Align = Client
+          Size.Width = 657.000000000000000000
+          Size.Height = 260.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 1
+          Text = 'Каналы поверяемых приборов'
+          object LabelDeviceCurSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 48.000000000000000000
+            Text = 'CurSec'
+            TabOrder = 0
+          end
+          object LabelDeviceImpSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 96.000000000000000000
+            Text = 'ImpSec'
+            TabOrder = 1
+          end
+          object LabelDeviceImpResult: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 144.000000000000000000
+            Text = 'ImpResult'
+            TabOrder = 2
+          end
+          object EditDeviceCurSec: TEdit
+            Position.X = 160.000000000000000000
+            Position.Y = 44.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            Text = '0'
+          end
+          object EditDeviceImpSec: TEdit
+            Position.X = 160.000000000000000000
+            Position.Y = 92.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 4
+            Text = '0'
+          end
+          object EditDeviceImpResult: TEdit
+            Position.X = 160.000000000000000000
+            Position.Y = 140.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 5
+            Text = '0'
+          end
+          object ButtonApplyDeviceValues: TButton
+            Position.X = 160.000000000000000000
+            Position.Y = 190.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 6
+            Text = 'Применить'
+            OnClick = ButtonApplyDeviceValuesClick
+          end
+        end
+      end
     end
   end
   object PopupMenu1: TPopupMenu
