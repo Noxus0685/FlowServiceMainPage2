@@ -892,21 +892,19 @@ begin
   if IsExisted = 0 then
     ValueImpTotal.SetAsImp;
 
-  ValueCoef := nil;
-  if not HashValueCoef.IsEmpty then
-    ValueCoef := TMeterValue.GetExistedMeterValueBool(HashValueCoef, IsExisted, UUID, Name);
-
   ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueVolumeCoef.SetValue(Kp);
+    ValueVolumeCoef.SetAsVolumeCoef;
+  ValueVolumeCoef.SetValue(1);
 
   ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueMassCoef.SetValue(Kp);
+  ValueMassCoef.SetAsMassCoef;
+    ValueMassCoef.SetValue(1);
 
   ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueMassFlow.SetAsMassFlow;
+  ValueMassFlow.SetAsMassFlow;
   ValueMassFlow.ValueCorrection := nil;
   ValueMassFlow.ValueBaseMultiplier := ValueImp;
   ValueMassFlow.ValueBaseDevider := ValueMassCoef;
@@ -915,7 +913,7 @@ begin
 
   ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueVolumeFlow.SetAsVolumeFlow;
+  ValueVolumeFlow.SetAsVolumeFlow;
   ValueVolumeFlow.ValueCorrection := nil;
   ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
   ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
@@ -924,7 +922,7 @@ begin
 
   ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueVolume.SetAsVolume;
+  ValueVolume.SetAsVolume;
   ValueVolume.ValueCorrection := ValueVolumeFlow;
   ValueVolume.ValueBaseMultiplier := ValueImpTotal;
   ValueVolume.ValueBaseDevider := ValueVolumeCoef;
@@ -933,7 +931,7 @@ begin
 
   ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueMass.SetAsMass;
+  ValueMass.SetAsMass;
   ValueMass.ValueCorrection := ValueMassFlow;
   ValueMass.ValueBaseMultiplier := ValueImpTotal;
   ValueMass.ValueBaseDevider := ValueMassCoef;
@@ -942,17 +940,17 @@ begin
 
   ValueMassMeter := TMeterValue.GetExistedMeterValueBool(HashValueMassMeter, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueMassMeter.SetAsMass;
+  ValueMassMeter.SetAsMass;
 
   ValueVolumeMeter := TMeterValue.GetExistedMeterValueBool(HashValueVolumeMeter, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueVolumeMeter.SetAsVolume;
+  ValueVolumeMeter.SetAsVolume;
 
   ValueVolumeError := TMeterValue.GetExistedMeterValueBool(HashValueVolumeError, IsExisted, UUID, Name);
   if IsExisted = 0 then
-    ValueVolumeError.SetAsError;
+  ValueVolumeError.SetAsError;
   if EtalonMeter <> nil then
-    ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
+  ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
   ValueVolumeError.ValueBaseMultiplier := ValueVolume;
 
   ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, UUID, Name);

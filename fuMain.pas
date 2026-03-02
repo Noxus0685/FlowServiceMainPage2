@@ -1415,6 +1415,8 @@ begin
       WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled
     else
       FRows[Row].Enabled := not FRows[Row].Enabled;
+
+     WorkTable.RebindAllFlowMeters;
   end;
 
   if Column = PopupColumnEtalonSignal1 then
@@ -1633,7 +1635,10 @@ begin
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
-      WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean
+     begin
+      WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
+      WorkTable.RebindAllFlowMeters;
+     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
       WorkTable.EtalonChannels[ARow].Text := Value.AsString
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
