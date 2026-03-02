@@ -269,8 +269,7 @@ void TFlowMeter::InitValues()
         		if (TSettingsClass::EtalonCHNum != 0) {
 		SetChannel(TSettingsClass::EtalonCHNum);
 
-        ValueVolume->UpdateType = ONLINE_TYPE;
-        ValueMass->UpdateType   = ONLINE_TYPE;
+        SetUpdateType(ONLINE_TYPE);
 	}
     }
 
@@ -588,8 +587,7 @@ void TFlowMeter::RestoreValues()
         if (TSettingsClass::EtalonCHNum != 0) {
 		SetChannel(TSettingsClass::EtalonCHNum);
 
-        ValueVolume->UpdateType = ONLINE_TYPE;
-        ValueMass->UpdateType   = ONLINE_TYPE;
+        SetUpdateType(ONLINE_TYPE);
 	}
     }
 
@@ -934,6 +932,40 @@ void TFlowMeter::SetMonitorValues(void)
     ValueMass->SetValue();
 
     ValueVolumeError->SetValue((float)GetVolumeError());
+}
+
+void TFlowMeter::SetUpdateType(eUpdateType Type)
+{
+    auto SetType = [Type](TMeterValue* Value) {
+        if (Value != nullptr) {
+            Value->UpdateType = Type;
+        }
+    };
+
+    SetType(ValueTime);
+    SetType(ValuePressure);
+    SetType(ValueTemperture);
+    SetType(ValueDensity);
+    SetType(ValueAirPressure);
+    SetType(ValueAirTemperture);
+    SetType(ValueHumidity);
+    SetType(ValueImp);
+    SetType(ValueImpTotal);
+    SetType(ValueCoef);
+    SetType(ValueMassCoef);
+    SetType(ValueVolumeCoef);
+    SetType(ValueMassFlow);
+    SetType(ValueVolumeFlow);
+    SetType(ValueVolume);
+    SetType(ValueMass);
+    SetType(ValueVolumeMeter);
+    SetType(ValueMassMeter);
+    SetType(ValueQuantity);
+    SetType(ValueFlow);
+    SetType(ValueError);
+    SetType(ValueVolumeError);
+    SetType(ValueMassError);
+    SetType(ValueCurrent);
 }
 
 void TFlowMeter::SetValues(void)
@@ -4152,8 +4184,7 @@ UnicodeString TFlowMeter::GetMeterCategory()
 		ValueQuantity = ValueMass;
 		ValueFlow = ValueMassFlow;
 
-        ValueVolume->UpdateType = HAND_TYPE;
-        ValueMass->UpdateType   = HAND_TYPE;
+        SetUpdateType(HAND_TYPE);
 	}
 
 		else if (MeterFlowType == WEIGHTS_VOLUME_FLOWMETER_TYPE)
@@ -4180,8 +4211,7 @@ UnicodeString TFlowMeter::GetMeterCategory()
 		ValueQuantity = ValueMass;
 		ValueFlow = ValueMassFlow;
 
-        ValueVolume->UpdateType = HAND_TYPE;
-        ValueMass->UpdateType   = HAND_TYPE;
+        SetUpdateType(HAND_TYPE);
 	}
 
 	else if (MeterFlowType == WEIGHTS_MASS_FLOWMETER_TYPE) {
@@ -4213,8 +4243,7 @@ UnicodeString TFlowMeter::GetMeterCategory()
 		ValueQuantity = ValueMass;
 		ValueFlow = ValueMassFlow;
 
-        ValueVolume->UpdateType = HAND_TYPE;
-        ValueMass->UpdateType   = HAND_TYPE;
+        SetUpdateType(HAND_TYPE);
 	}
 		else if (MeterFlowType == MASS_FLOWMETER_TYPE) {
 
@@ -4243,8 +4272,7 @@ UnicodeString TFlowMeter::GetMeterCategory()
 		ValueQuantity = ValueMass;
 		ValueFlow = ValueMassFlow;
 
-        ValueVolume->UpdateType = HAND_TYPE;
-        ValueMass->UpdateType   = HAND_TYPE;
+        SetUpdateType(HAND_TYPE);
 	}
 
 	else if (MeterFlowType == VOLUME_FLOWMETER_TYPE)
@@ -4272,8 +4300,7 @@ UnicodeString TFlowMeter::GetMeterCategory()
 		ValueQuantity = ValueVolume;
 		ValueFlow = ValueVolumeFlow;
 
-        ValueVolume->UpdateType = HAND_TYPE;
-        ValueMass->UpdateType   = HAND_TYPE;
+        SetUpdateType(HAND_TYPE);
 	}
 
 		else if (MeterFlowType == 	TANK_TYPE)
@@ -4304,13 +4331,11 @@ UnicodeString TFlowMeter::GetMeterCategory()
 		ValueQuantity = ValueVolume;
 		ValueFlow = ValueVolumeFlow;
 
-        ValueVolume->UpdateType = HAND_TYPE;
-        ValueMass->UpdateType   = HAND_TYPE;
+        SetUpdateType(HAND_TYPE);
 	}
 
     if (IsEtalon) {
-       ValueVolume->UpdateType = ONLINE_TYPE;
-       ValueMass->UpdateType   = ONLINE_TYPE;
+       SetUpdateType(ONLINE_TYPE);
     }
 
 
@@ -5837,4 +5862,3 @@ void TFlowMeter::DataPointsCalc()
 }
 
 #pragma package(smart_init)
-
