@@ -416,10 +416,7 @@ begin
   begin
     DataType := ftDateTime;
     if AValue = 0 then
-    begin
-      Clear;
-      DataType := ftDateTime;
-    end
+      Clear
     else
       AsDateTime := AValue;
   end;
@@ -5144,18 +5141,7 @@ begin
       TableID := ADevice.CalibrCoefTable.ID
     else
     begin
-      Q.SQL.Text := 'select ID from CalibrCoefTable where UUID = :UUID limit 1';
-      SetStrParam(Q, 'UUID', ADevice.CalibrCoefTable.UUID);
-      Q.Open;
-      try
-        if not Q.Eof then
-          TableID := Q.Fields[0].AsInteger
-        else
-          raise Exception.Create('Failed to read inserted CalibrCoefTable ID by UUID');
-      finally
-        Q.Close;
-      end;
-
+      TableID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
       ADevice.CalibrCoefTable.ID := TableID;
     end;
 
