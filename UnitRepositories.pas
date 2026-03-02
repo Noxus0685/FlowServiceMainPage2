@@ -425,12 +425,18 @@ end;
 function ReadFieldDateTimeDef(AField: TField; const ADefault: TDateTime = 0): TDateTime;
 var
   S: string;
-  F: Double;
 begin
   Result := ADefault;
 
   if (AField = nil) or AField.IsNull then
     Exit;
+
+  try
+    Result := AField.AsDateTime;
+    Exit;
+  except
+    { Fallback for text-based datetime storage }
+  end;
 
   S := Trim(AField.AsString);
   if S = '' then
@@ -444,12 +450,6 @@ begin
 
   if TryStrToDate(S, Result) then
     Exit;
-
-  if TryStrToFloat(S, F, TFormatSettings.Invariant) then
-  begin
-    Result := F;
-    Exit;
-  end;
 
   Result := ADefault;
 end;
