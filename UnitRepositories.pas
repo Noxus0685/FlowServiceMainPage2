@@ -1541,6 +1541,8 @@ begin
   // --------------------------------------------------
   // > 0 → ищем в справочнике
   // --------------------------------------------------
+  if FCategories<>nil then
+
   for C in FCategories do
     if C.ID = ACategory then
       Exit(C.Name);

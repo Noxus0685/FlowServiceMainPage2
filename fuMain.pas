@@ -3,6 +3,7 @@
 interface
 
 uses
+  fuDeviceSelect,
   fuTypeSelect,
   fuDeviceEdit,
   fuMeterValues,
@@ -317,6 +318,8 @@ type
     EditDeviceImpResult: TEdit;
     ButtonApplyDeviceValues: TButton;
     ActionOpenDeviceEditor: TAction;
+    ActionOpenDeviceSelect: TAction;
+    MenuItem9: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -342,6 +345,7 @@ type
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure ActionOpenDeviceEditorExecute(Sender: TObject);
     procedure ActionOpenDeviceSelectExecute(Sender: TObject);
+
   private
 
   FActiveWorkTable: TWorkTable;
@@ -793,6 +797,47 @@ begin
     Frm.LoadDevice(ADevice);
     if Frm.ShowModal = mrOk then
       UpdateGridDevices;
+  finally
+    Frm.Free;
+  end;
+end;
+
+procedure TFormMain.ActionOpenDeviceSelectExecute(Sender: TObject);
+
+var
+  WorkTable: TWorkTable;
+  Ch: TChannel;
+  Row: Integer;
+  Frm: TFormDeviceSelect;
+  SelDevice: TDevice;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  Row := GridDevices.Row;
+  if (Row < 0) or (Row >= WorkTable.DeviceChannels.Count) then
+    Exit;
+
+  Ch := WorkTable.DeviceChannels[Row];
+  if Ch = nil then
+    Exit;
+
+  Frm := TFormDeviceSelect.Create(Self);
+  try
+    if Frm.ShowModal <> mrOk then
+      Exit;
+
+    SelDevice := Frm.GetSelectedDevice;
+    if SelDevice = nil then
+      Exit;
+
+    Ch.DeviceUUID := SelDevice.MitUUID;
+    Ch.TypeName := SelDevice.DeviceTypeName;
+    Ch.Serial := SelDevice.SerialNumber;
+    Ch.Signal := SelDevice.OutputType;
+
+    UpdateGridDevices;
   finally
     Frm.Free;
   end;
