@@ -298,6 +298,103 @@ uses
 constructor TFlowMeter.Create();
 begin
   inherited Create;
+  UUID := '';
+  DeviceHash := 0;
+  TypeHash := 0;
+  OrderHash := 0;
+
+  IsEtalon := False;
+  Active := 0;
+  CheckType := 0;
+  Status := 0;
+  SendStatus := 0;
+
+  FlowTypeName := '';
+  DocNumber := '';
+  Means := '';
+
+  K1 := '';
+  P1 := '';
+  K2 := '';
+  P2 := '';
+  TempWater := '';
+  Temperature := '';
+  Pressure := '';
+  Humidity := '';
+  VrfDate := '';
+
+  Data1 := '';
+  Data2 := '';
+  Data3 := '';
+  Date1 := '';
+  Date2 := '';
+
+  ResultValue := '';
+  MeterDateTime := 0;
+  ModifiedDateTime := '';
+
+  Kp := 0;
+  FactoryKp := 0;
+  FreqMax := 0;
+  FlowMax := 0;
+  FlowMin := 0;
+  QuantityMax := 0;
+  QuantityMin := 0;
+  Error := 0;
+  PointIndex := 0;
+  Comment := '';
+
+  HashValueImp := '';
+  HashValueImpTotal := '';
+  HashValueCoef := '';
+  HashValueMassCoef := '';
+  HashValueVolumeCoef := '';
+  HashValueVolume := '';
+  HashValueMass := '';
+  HashValueVolumeMeter := '';
+  HashValueMassMeter := '';
+  HashValueMassFlow := '';
+  HashValueVolumeFlow := '';
+  HashValueQuantity := '';
+  HashValueFlow := '';
+  HashValueError := '';
+  HashValueVolumeError := '';
+  HashValueMassError := '';
+  HashValueDensity := '';
+  HashValuePressure := '';
+  HashValueTemperture := '';
+  HashValueAirPressure := '';
+  HashValueAirTemperture := '';
+  HashValueHumidity := '';
+  HashValueCurrent := '';
+  HashValueTime := '';
+
+  ValueImp := nil;
+  ValueImpTotal := nil;
+  ValueCoef := nil;
+  ValueMassCoef := nil;
+  ValueVolumeCoef := nil;
+  ValueQuantity := nil;
+  ValueVolume := nil;
+  ValueMass := nil;
+  ValueVolumeMeter := nil;
+  ValueMassMeter := nil;
+  ValueFlow := nil;
+  ValueMassFlow := nil;
+  ValueVolumeFlow := nil;
+  ValueError := nil;
+  ValueVolumeError := nil;
+  ValueMassError := nil;
+  ValueDensity := nil;
+  ValuePressure := nil;
+  ValueTemperture := nil;
+  ValueAirPressure := nil;
+  ValueAirTemperture := nil;
+  ValueHumidity := nil;
+  ValueCurrent := nil;
+  ValueTime := nil;
+
+  MeterFlowCategory := mftUnknownType;
   Name:='Новое устройство';
   FlowMeters.Add(self);
 end;
