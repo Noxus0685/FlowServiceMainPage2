@@ -47,7 +47,7 @@ type
     function  ColumnExists(const ATable, AColumn: string): Boolean;
     function  TableExists(const ATable: string): Boolean;
     procedure CreateTable(const ATable: string; const Columns: TTableColumns);
-
+    procedure ApplySQLitePragmas(AConnection: TFDConnection);
 
 
   public
@@ -205,6 +205,29 @@ begin
   inherited;
 end;
 
+procedure TDM.ApplySQLitePragmas(AConnection: TFDConnection);
+var
+  Q: TFDQuery;
+begin
+  if (AConnection = nil) or (not AConnection.Connected) then
+    Exit;
+
+  Q := TFDQuery.Create(nil);
+  try
+    Q.Connection := AConnection;
+    Q.SQL.Text := 'PRAGMA foreign_keys = ON';
+    Q.ExecSQL;
+    Q.SQL.Text := 'PRAGMA busy_timeout = 5000';
+    Q.ExecSQL;
+    Q.SQL.Text := 'PRAGMA journal_mode = WAL';
+    Q.ExecSQL;
+    Q.SQL.Text := 'PRAGMA synchronous = NORMAL';
+    Q.ExecSQL;
+  finally
+    Q.Free;
+  end;
+end;
+
 procedure TDM.OpenDB;
 begin
 
@@ -225,13 +248,18 @@ begin
 
   TypesConnection.DriverName := 'SQLite';
   TypesConnection.Params.Database := FDatabaseFileName;
+  TypesConnection.Params.Values['BusyTimeout'] := '5000';
   TypesConnection.LoginPrompt := False;
   TypesConnection.Connected := True;
 
   DevicesConnection.DriverName := 'SQLite';
   DevicesConnection.Params.Database := FDatabaseFileName;
+  DevicesConnection.Params.Values['BusyTimeout'] := '5000';
   DevicesConnection.LoginPrompt := False;
   DevicesConnection.Connected := True;
+
+  ApplySQLitePragmas(TypesConnection);
+  ApplySQLitePragmas(DevicesConnection);
 end;
 
 procedure TDM.CloseDB;
