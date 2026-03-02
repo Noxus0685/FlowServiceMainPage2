@@ -578,6 +578,11 @@ begin
 
   if ATarget <> nil then
   begin
+<<<<<<< codex/refactor-tmetervalue-management-8t4j7y
+    TMeterValue.RebindReferences(ATarget, AValue);
+
+=======
+>>>>>>> main
     if TMeterValue.GetMeterValues <> nil then
       TMeterValue.GetMeterValues.Remove(ATarget);
     ATarget.Free;
