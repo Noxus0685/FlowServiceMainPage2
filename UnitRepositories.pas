@@ -422,6 +422,38 @@ begin
   end;
 end;
 
+function ReadFieldDateTimeDef(AField: TField; const ADefault: TDateTime = 0): TDateTime;
+var
+  S: string;
+  F: Double;
+begin
+  Result := ADefault;
+
+  if (AField = nil) or AField.IsNull then
+    Exit;
+
+  S := Trim(AField.AsString);
+  if S = '' then
+    Exit;
+
+  if TryISO8601ToDate(S, Result, True) then
+    Exit;
+
+  if TryStrToDateTime(S, Result) then
+    Exit;
+
+  if TryStrToDate(S, Result) then
+    Exit;
+
+  if TryStrToFloat(S, F, TFormatSettings.Invariant) then
+  begin
+    Result := F;
+    Exit;
+  end;
+
+  Result := ADefault;
+end;
+
  {$ENDREGION}
 
 {$REGION 'TBaseRepository'}
@@ -5064,7 +5096,7 @@ begin
       Device.CalibrCoefTable.ID := QTable.FieldByName('ID').AsInteger;
       Device.CalibrCoefTable.UUID := QTable.FieldByName('UUID').AsString;
       Device.CalibrCoefTable.DeviceID := QTable.FieldByName('DeviceID').AsInteger;
-      Device.CalibrCoefTable.AppliedAt := QTable.FieldByName('AppliedAt').AsDateTime;
+      Device.CalibrCoefTable.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
       Device.CalibrCoefTable.Name := QTable.FieldByName('Name').AsString;
       Device.CalibrCoefTable.Comment := QTable.FieldByName('Comment').AsString;
 
