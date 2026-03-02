@@ -521,7 +521,6 @@ begin
     SetValues;
 end;
 
-
 procedure TFlowMeter.InitHashValues;
 begin
   if ValueImp <> nil then
