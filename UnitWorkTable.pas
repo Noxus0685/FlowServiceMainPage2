@@ -351,10 +351,6 @@ procedure TChannel.Init;
 begin
   if not Assigned(FFlowMeter) then
     Exit;
-
-  if DataManager = nil then
-    Exit;
-
   FFlowMeter.Init(DeviceUUID);
 end;
 
@@ -363,6 +359,7 @@ procedure TChannel.RebindFlowMeterValues(const AWorkTable: TWorkTable);
 begin
   if (FFlowMeter = nil) then
     Exit;
+
 
   FFlowMeter.RebindCalculatedValues;
   FFlowMeter.InitHashValues;
