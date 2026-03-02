@@ -183,6 +183,7 @@ private
 
 public
   { Public declarations }
+  function GetSelectedDevice: TDevice;
 
   end;
 
@@ -192,6 +193,22 @@ var
 implementation
 
 {$R *.fmx}
+function TFormDeviceSelect.GetSelectedDevice: TDevice;
+var
+  Row: Integer;
+begin
+  Result := nil;
+
+  Row := GridDevices.Row;
+  if Row < 0 then
+    Exit;
+
+  if (FDevFilteredDevices = nil) or (Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  Result := FDevFilteredDevices[Row];
+end;
+
 procedure TFormDeviceSelect.LoadData;
 begin
   {--------------------------------------------------}
