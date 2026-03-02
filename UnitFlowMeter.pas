@@ -285,6 +285,7 @@ public
   procedure RebindCalculatedValues;
   procedure SetMonitorValues;
   procedure SetFinalValues;
+  procedure SetUpdateType(AType: EUpdateType);
 
   procedure Init; overload;
   procedure Init(UUID: string); overload;
@@ -997,18 +998,10 @@ begin
       end;
   end;
 
-  if ValueVolume <> nil then
-    ValueVolume.UpdateType := HAND_TYPE;
-  if ValueMass <> nil then
-    ValueMass.UpdateType := HAND_TYPE;
+  SetUpdateType(HAND_TYPE);
 
   if IsEtalon then
-  begin
-    if ValueVolume <> nil then
-      ValueVolume.UpdateType := ONLINE_TYPE;
-    if ValueMass <> nil then
-      ValueMass.UpdateType := ONLINE_TYPE;
-  end;
+    SetUpdateType(ONLINE_TYPE);
 end;
 
 procedure TFlowMeter.SetMeterCategory(const AMeterFlowType: string);
@@ -1028,6 +1021,46 @@ end;
 function TFlowMeter.GetMeterCategory: string;
 begin
   Result := FlowTypeName;
+end;
+
+procedure TFlowMeter.SetUpdateType(AType: EUpdateType);
+
+  procedure ApplyUpdateType(AMeterValue: TMeterValue);
+  begin
+    if AMeterValue <> nil then
+      AMeterValue.UpdateType := AType;
+  end;
+
+begin
+  ApplyUpdateType(ValueTime);
+  ApplyUpdateType(ValuePressure);
+  ApplyUpdateType(ValueTemperture);
+  ApplyUpdateType(ValueDensity);
+  ApplyUpdateType(ValueAirPressure);
+  ApplyUpdateType(ValueAirTemperture);
+  ApplyUpdateType(ValueHumidity);
+
+  ApplyUpdateType(ValueImp);
+  ApplyUpdateType(ValueImpTotal);
+  ApplyUpdateType(ValueCurrent);
+
+  ApplyUpdateType(ValueCoef);
+  ApplyUpdateType(ValueMassCoef);
+  ApplyUpdateType(ValueVolumeCoef);
+
+  ApplyUpdateType(ValueMassFlow);
+  ApplyUpdateType(ValueVolumeFlow);
+  ApplyUpdateType(ValueFlow);
+
+  ApplyUpdateType(ValueMass);
+  ApplyUpdateType(ValueVolume);
+  ApplyUpdateType(ValueQuantity);
+  ApplyUpdateType(ValueMassMeter);
+  ApplyUpdateType(ValueVolumeMeter);
+
+  ApplyUpdateType(ValueError);
+  ApplyUpdateType(ValueMassError);
+  ApplyUpdateType(ValueVolumeError);
 end;
 
 procedure TFlowMeter.SetAsEtalon;

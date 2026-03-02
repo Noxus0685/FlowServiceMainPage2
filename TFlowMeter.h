@@ -429,6 +429,7 @@ class TFlowMeter : public TMeterDevice
     void SetValues(void);
     void SetMonitorValues(void);
     void SetFinalValues(void);
+    void SetUpdateType(eUpdateType Type);
 
     double GetVolumeError();
     double GetMassError();
@@ -516,7 +517,6 @@ class TFlowMeter : public TMeterDevice
 };
 
 #endif
-
 
 
 
