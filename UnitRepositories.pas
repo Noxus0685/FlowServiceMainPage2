@@ -5139,7 +5139,7 @@ begin
       TableID := ADevice.CalibrCoefTable.ID
     else
     begin
-      TableID := FDM.DevicesConnection.GetLastAutoGenValue('CalibrCoefTable');
+      TableID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
       ADevice.CalibrCoefTable.ID := TableID;
     end;
 
@@ -5566,7 +5566,7 @@ begin
 
     if ASpillage.State = osNew then
       ASpillage.ID :=
-        FDM.DevicesConnection.GetLastAutoGenValue('PointSpillage');
+        Q.Connection.ExecSQLScalar('select last_insert_rowid()');
 
     ASpillage.State := osClean;
     Result := True;
