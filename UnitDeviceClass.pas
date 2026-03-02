@@ -215,6 +215,7 @@ type
     TableID: Integer;
     OrderNo: Integer;
     Value: Double;
+    Arg: Double;
     QFrom: Double;
     QTo: Double;
     K: Double;
@@ -765,6 +766,7 @@ begin
     NewCI.TableID := CI.TableID;
     NewCI.OrderNo := CI.OrderNo;
     NewCI.Value := CI.Value;
+    NewCI.Arg := CI.Arg;
     NewCI.QFrom := CI.QFrom;
     NewCI.QTo := CI.QTo;
     NewCI.K := CI.K;
