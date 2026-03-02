@@ -724,11 +724,16 @@ procedure TWorkTable.UpdateAggregateMeterValues;
 var
   I: Integer;
   Channel: TChannel;
+  IsQuantityTemplateSet: Boolean;
+  IsFlowTemplateSet: Boolean;
 begin
   if FValueQuantity <> nil then
     FValueQuantity.ClearMeterValues;
   if FValueFlowRate <> nil then
     FValueFlowRate.ClearMeterValues;
+
+  IsQuantityTemplateSet := False;
+  IsFlowTemplateSet := False;
 
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
@@ -737,10 +742,26 @@ begin
       Continue;
 
     if (FValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
+    begin
+      if not IsQuantityTemplateSet then
+      begin
+        FValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
+        FValueQuantity.ValueType := AGGREGATE_TYPE;
+        IsQuantityTemplateSet := True;
+      end;
       FValueQuantity.AddMeterValue(Channel.FlowMeter.ValueQuantity);
+    end;
 
     if (FValueFlowRate <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+    begin
+      if not IsFlowTemplateSet then
+      begin
+        FValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
+        FValueFlowRate.ValueType := AGGREGATE_TYPE;
+        IsFlowTemplateSet := True;
+      end;
       FValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
+    end;
   end;
 end;
 
