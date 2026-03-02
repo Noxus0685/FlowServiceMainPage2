@@ -281,6 +281,7 @@ public
 
   procedure InitHashValues;
   procedure SetValues;
+  procedure UpdateByDevice;
   procedure RebindCalculatedValues;
   procedure SetMonitorValues;
   procedure SetFinalValues;
@@ -332,7 +333,7 @@ begin
   FDeviceTypeUUID :=  FDevice.DeviceTypeUUID;
   FOutputType :=  FDevice.OutputType;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
-  ApplyMeasurementModel;
+  UpdateByDevice;
 
  end;
 end;
@@ -372,6 +373,7 @@ begin
     FDevice.OutputType := AValue;
 
   FOutputType := AValue;
+  UpdateByDevice;
 end;
 
 
@@ -715,20 +717,150 @@ var
   MeasuredKind: TMeasuredDimension;
   FlowSource: TMeterValue;
   TotalSource: TMeterValue;
+  VoltageRange: Double;
+  CurrentRange: Double;
+  K: Double;
 begin
+  if (ValueMassCoef = nil) or (ValueVolumeCoef = nil) or
+     (ValueMassFlow = nil) or (ValueVolumeFlow = nil) or
+     (ValueMass = nil) or (ValueVolume = nil) then
+    Exit;
+
   OutputKind := TOutputType(OutputType);
   MeasuredKind := mdUnknown;
   if Assigned(Device) then
     MeasuredKind := TMeasuredDimension(Device.MeasuredDimension);
 
+  case MeasuredKind of
+    mdMassFlow,
+    mdMass:
+      begin
+        ValueVolumeCoef.ValueCorrection := nil;
+        ValueVolumeCoef.ValueBaseMultiplier := ValueMassCoef;
+        ValueVolumeCoef.ValueBaseDevider := nil;
+        ValueVolumeCoef.ValueRate := ValueDensity;
+
+        ValueMassCoef.ValueCorrection := nil;
+        ValueMassCoef.ValueBaseMultiplier := nil;
+        ValueMassCoef.ValueBaseDevider := nil;
+        ValueMassCoef.ValueRate := nil;
+
+        ValueMassCoef.DependenceType := INDEPENDENT;
+        ValueVolumeCoef.DependenceType := DEPENDENT;
+
+        ValueCoef := ValueMassCoef;
+        ValueQuantity := ValueMass;
+        ValueFlow := ValueMassFlow;
+      end;
+    mdUnknown,
+    mdVolumeFlow,
+    mdVolume:
+      begin
+        ValueMassCoef.ValueCorrection := nil;
+        ValueMassCoef.ValueBaseMultiplier := ValueVolumeCoef;
+        ValueMassCoef.ValueBaseDevider := ValueDensity;
+        ValueMassCoef.ValueRate := nil;
+
+        ValueVolumeCoef.ValueCorrection := nil;
+        ValueVolumeCoef.ValueBaseMultiplier := nil;
+        ValueVolumeCoef.ValueBaseDevider := nil;
+        ValueVolumeCoef.ValueRate := nil;
+
+        ValueMassCoef.DependenceType := DEPENDENT;
+        ValueVolumeCoef.DependenceType := INDEPENDENT;
+
+        ValueVolumeCoef.ValueType := CONST_TYPE;
+        ValueMassCoef.ValueType := CONST_TYPE;
+
+        ValueCoef := ValueVolumeCoef;
+        ValueQuantity := ValueVolume;
+        ValueFlow := ValueVolumeFlow;
+      end;
+    mdSpeed,
+    mdHeat:
+      begin
+        // зарезервировано: используем модель объемного расходомера по умолчанию
+        ValueMassCoef.ValueCorrection := nil;
+        ValueMassCoef.ValueBaseMultiplier := ValueVolumeCoef;
+        ValueMassCoef.ValueBaseDevider := ValueDensity;
+        ValueMassCoef.ValueRate := nil;
+
+        ValueVolumeCoef.ValueCorrection := nil;
+        ValueVolumeCoef.ValueBaseMultiplier := nil;
+        ValueVolumeCoef.ValueBaseDevider := nil;
+        ValueVolumeCoef.ValueRate := nil;
+
+        ValueMassCoef.DependenceType := DEPENDENT;
+        ValueVolumeCoef.DependenceType := INDEPENDENT;
+
+        ValueVolumeCoef.ValueType := CONST_TYPE;
+        ValueMassCoef.ValueType := CONST_TYPE;
+
+        ValueCoef := ValueVolumeCoef;
+        ValueQuantity := ValueVolume;
+        ValueFlow := ValueVolumeFlow;
+      end;
+  end;
+
   FlowSource := ValueImp;
   TotalSource := ValueImpTotal;
 
-  if (OutputKind = otCurrent) and Assigned(ValueCurrent) then
-  begin
-    FlowSource := ValueCurrent;
-    if TotalSource = nil then
-      TotalSource := ValueCurrent;
+  case OutputKind of
+    otUnknown,
+    otFrequency,
+    otImpulse:
+      begin
+        FlowSource := ValueImp;
+        if Assigned(ValueCoef) and Assigned(Device) then
+          ValueCoef.SetValue(Device.Coef);
+      end;
+    otVoltage:
+      begin
+        FlowSource := ValueImp;
+        VoltageRange := 24;
+        if Assigned(Device) and (Device.VoltageRange > 0) then
+          VoltageRange := Device.VoltageRange;
+
+        K := 0;
+        if Assigned(Device) and (VoltageRange <> 0) then
+          K := (Device.VoltageQmaxRate - Device.VoltageQminRate) / VoltageRange;
+
+        if Assigned(ValueCoef) then
+          ValueCoef.SetValue(K);
+      end;
+    otCurrent:
+      begin
+        if Assigned(ValueCurrent) then
+          FlowSource := ValueCurrent
+        else
+          FlowSource := ValueImp;
+
+        CurrentRange := 16;
+        if Assigned(Device) then
+        begin
+          if Device.CurrentRange = 20 then
+            CurrentRange := 16
+          else if Device.CurrentRange > 0 then
+            CurrentRange := Device.CurrentRange;
+        end;
+
+        K := 0;
+        if Assigned(Device) and (CurrentRange <> 0) then
+          K := (Device.CurrentQmaxRate - Device.CurrentQminRate) / CurrentRange;
+
+        if Assigned(ValueCoef) then
+          ValueCoef.SetValue(K);
+
+        if TotalSource = nil then
+          TotalSource := FlowSource;
+      end;
+    otInterface,
+    otVisual:
+      begin
+        FlowSource := ValueImp;
+        if Assigned(ValueCoef) then
+          ValueCoef.SetValue(1);
+      end;
   end;
 
   if ValueMassFlow <> nil then
@@ -763,22 +895,19 @@ begin
     ValueVolume.ValueRate := nil;
   end;
 
-  case MeasuredKind of
-    mdMassFlow,
-    mdMass:
-      begin
-        ValueFlow := ValueMassFlow;
-        ValueQuantity := ValueMass;
-      end;
-    mdVolumeFlow,
-    mdVolume:
-      begin
-        ValueFlow := ValueVolumeFlow;
-        ValueQuantity := ValueVolume;
-      end;
-  else
-    SetMeterCategory(MeterFlowCategory);
-  end;
+end;
+
+procedure TFlowMeter.UpdateByDevice;
+begin
+  if not Assigned(Device) then
+    Exit;
+
+  if (ValueMassCoef = nil) or (ValueVolumeCoef = nil) or
+     (ValueMassFlow = nil) or (ValueVolumeFlow = nil) or
+     (ValueMass = nil) or (ValueVolume = nil) then
+    Exit;
+
+  ApplyMeasurementModel;
 end;
 
 function TFlowMeter.ResolveStdCategoryFromDevice: TStdCategory;
@@ -983,6 +1112,7 @@ procedure TFlowMeter.SetValues;
 begin
   InitHashValues;
   InitValues;
+  UpdateByDevice;
 end;
 
 procedure TFlowMeter.RebindCalculatedValues;
