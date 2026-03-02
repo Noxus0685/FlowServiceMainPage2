@@ -998,10 +998,8 @@ begin
       end;
   end;
 
-  SetUpdateType(HAND_TYPE);
-
-  if IsEtalon then
     SetUpdateType(ONLINE_TYPE);
+
 end;
 
 procedure TFlowMeter.SetMeterCategory(const AMeterFlowType: string);

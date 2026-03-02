@@ -12,7 +12,8 @@ uses
 
 type
   EUpdateType = (OFFLINE_TYPE, ONLINE_TYPE, HAND_TYPE);
-  EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE, ERROR_TYPE, MEAN_TYPE);
+  EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE,
+                  ERROR_TYPE, MEAN_TYPE, AGGREGATE_TYPE);
   EDependenceType = (INDEPENDENT, DEPENDENT);
 
   TDimension = record

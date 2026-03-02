@@ -16,7 +16,7 @@ object FormMain: TFormMain
     Size.Height = 640.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 3
+    TabIndex = 0
     TabOrder = 6
     TabPosition = PlatformDefault
     Sizes = (
@@ -33,7 +33,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -2488,7 +2488,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 46.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
