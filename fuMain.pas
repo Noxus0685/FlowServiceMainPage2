@@ -1183,6 +1183,27 @@ var
   WorkTable: TWorkTable;
   I: Integer;
   MinImpValue: TMeterValue;
+  RawValueBaseMultiplier: TMeterValue;
+
+  function FindFirstValueBaseMultiplier(
+    AChannels: TObjectList<TChannel>): TMeterValue;
+  var
+    J: Integer;
+  begin
+    Result := nil;
+    if AChannels = nil then
+      Exit;
+
+    for J := 0 to AChannels.Count - 1 do
+      if (AChannels[J] <> nil) and
+         (AChannels[J].FlowMeter <> nil) and
+         (AChannels[J].FlowMeter.ValueFlow <> nil) and
+         (AChannels[J].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+      begin
+        Result := AChannels[J].FlowMeter.ValueFlow.ValueBaseMultiplier;
+        Exit;
+      end;
+  end;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -1269,6 +1290,16 @@ begin
     StringColumnEtalonQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
   end;
 
+<<<<<<< codex/add-valueflow.valuebasemultiplier-to-columns-abe1up
+  RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.DeviceChannels);
+  if RawValueBaseMultiplier = nil then
+    RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.EtalonChannels);
+
+  if RawValueBaseMultiplier <> nil then
+  begin
+    StringColumnDeviceRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+    StringColumnEtalonRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+=======
   if (WorkTable.ValueFlowRate <> nil) and
      (WorkTable.ValueFlowRate.ValueBaseMultiplier <> nil) then
   begin
@@ -1276,6 +1307,7 @@ begin
       WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
     StringColumnEtalonRawValue1.Header :=
       WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
+>>>>>>> main
   end;
 
 
@@ -1610,7 +1642,7 @@ begin
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
         Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
-        Value := '0';
+        Value := '-';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceQuantity1 then
     begin
@@ -1618,7 +1650,16 @@ begin
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity <> nil) then
         Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
-        Value := '0';
+        Value := '-';
+    end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
+      else
+        Value := '-';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
     begin
@@ -1781,7 +1822,7 @@ begin
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
-        Value := '0';
+        Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1 then
     begin
@@ -1789,7 +1830,16 @@ begin
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
-        Value := '0';
+        Value := '-';
+    end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
+      else
+        Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1 then
     begin
