@@ -342,6 +342,7 @@ type
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
     procedure ComboEditUnitsChange(Sender: TObject);
+    procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
@@ -523,8 +524,6 @@ begin
   SetLength(FRows, 0);
 
   InitTables;
-  if ComboEditUnits.ItemIndex >= 0 then
-    ComboEditUnitsChange(ComboEditUnits);
 
   FLastClickRow := -1;
   FLastClickCol := nil;
@@ -534,12 +533,10 @@ begin
   FNextClimateChangeAt := Now;
 end;
 
-procedure TFormMain.ComboEditUnitsChange(Sender: TObject);
+procedure TFormMain.SetDim(FlowUnitName: string; QuantityUnitName: string);
 var
   WorkTable: TWorkTable;
   I: Integer;
-  UnitName: string;
-  QuantityUnitName: string;
   IsVolumeUnits: Boolean;
   Meter: TFlowMeter;
 begin
@@ -547,12 +544,16 @@ begin
   if WorkTable = nil then
     Exit;
 
-  UnitName := Trim(ComboEditUnits.Text);
-  if UnitName = '' then
+  FlowUnitName := Trim(FlowUnitName);
+  QuantityUnitName := Trim(QuantityUnitName);
+
+  if FlowUnitName = '' then
     Exit;
 
-  IsVolumeUnits := IsVolumeFlowUnit(UnitName);
-  QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
+  if QuantityUnitName = '' then
+    QuantityUnitName := ResolveQuantityUnitByFlowUnit(FlowUnitName);
+
+  IsVolumeUnits := IsVolumeFlowUnit(FlowUnitName);
 
   Meter := nil;
   if (WorkTable.EtalonChannels.Count > 0) and (WorkTable.EtalonChannels[0] <> nil) then
@@ -560,8 +561,11 @@ begin
   if (Meter = nil) and (WorkTable.DeviceChannels.Count > 0) and (WorkTable.DeviceChannels[0] <> nil) then
     Meter := WorkTable.DeviceChannels[0].FlowMeter;
 
+  WorkTable.FlowUnitName := FlowUnitName;
+  WorkTable.QuantityUnitName := QuantityUnitName;
+
   if WorkTable.ValueFlowRate <> nil then
-    WorkTable.ValueFlowRate.SetDim(UnitName);
+    WorkTable.ValueFlowRate.SetDim(FlowUnitName);
 
   if (WorkTable.ValueQuantity <> nil) and (QuantityUnitName <> '') then
     WorkTable.ValueQuantity.SetDim(QuantityUnitName);
@@ -579,7 +583,7 @@ begin
       if Meter.ValueVolume <> nil then
         Meter.ValueVolume.SetDim(QuantityUnitName);
       if Meter.ValueVolumeFlow <> nil then
-        Meter.ValueVolumeFlow.SetDim(UnitName);
+        Meter.ValueVolumeFlow.SetDim(FlowUnitName);
     end
     else
     begin
@@ -588,7 +592,7 @@ begin
       if Meter.ValueMass <> nil then
         Meter.ValueMass.SetDim(QuantityUnitName);
       if Meter.ValueMassFlow <> nil then
-        Meter.ValueMassFlow.SetDim(UnitName);
+        Meter.ValueMassFlow.SetDim(FlowUnitName);
     end;
   end;
 
@@ -605,7 +609,7 @@ begin
       if Meter.ValueVolume <> nil then
         Meter.ValueVolume.SetDim(QuantityUnitName);
       if Meter.ValueVolumeFlow <> nil then
-        Meter.ValueVolumeFlow.SetDim(UnitName);
+        Meter.ValueVolumeFlow.SetDim(FlowUnitName);
     end
     else
     begin
@@ -614,12 +618,25 @@ begin
       if Meter.ValueMass <> nil then
         Meter.ValueMass.SetDim(QuantityUnitName);
       if Meter.ValueMassFlow <> nil then
-        Meter.ValueMassFlow.SetDim(UnitName);
+        Meter.ValueMassFlow.SetDim(FlowUnitName);
     end;
   end;
 
   WorkTable.RecalculateAllMeterValues;
   UpdateUIFromValues;
+end;
+
+procedure TFormMain.ComboEditUnitsChange(Sender: TObject);
+var
+  UnitName: string;
+  QuantityUnitName: string;
+begin
+  UnitName := Trim(ComboEditUnits.Text);
+  if UnitName = '' then
+    Exit;
+
+  QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
+  SetDim(UnitName, QuantityUnitName);
 end;
 
 function TFormMain.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
@@ -649,7 +666,16 @@ begin
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
   FActiveWorkTable := GetWorkTableByIndex(0);
   if FActiveWorkTable <> nil then
+  begin
     FActiveWorkTable.RebindAllFlowMeters;
+
+    if FActiveWorkTable.FlowUnitName <> '' then
+      ComboEditUnits.Text := FActiveWorkTable.FlowUnitName
+    else if ComboEditUnits.Items.Count > 0 then
+      ComboEditUnits.ItemIndex := 0;
+
+    SetDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
+  end;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
