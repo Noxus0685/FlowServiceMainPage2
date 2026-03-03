@@ -378,6 +378,7 @@ type
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure OpenTypeSelect(ARow: Integer);
+    procedure OpenChannelDeviceEditor(AChannel: TChannel);
     procedure InitTables;
     procedure ApplyFlowMeterSelection(const ARow: Integer);
     function FindTypeIndex(const ATypeName: string): Integer;
@@ -848,11 +849,7 @@ procedure TFormMain.ActionOpenDeviceEditorExecute(Sender: TObject);
 var
   WorkTable: TWorkTable;
   Ch: TChannel;
-  ADevice: TDevice;
-  ActiveRepo: TDeviceRepository;
-  FoundRepo: TDeviceRepository;
   Row: Integer;
-  Frm: TFormDeviceEditor;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -866,29 +863,52 @@ begin
   if Ch = nil then
     Exit;
 
+  OpenChannelDeviceEditor(Ch);
+end;
+
+procedure TFormMain.OpenChannelDeviceEditor(AChannel: TChannel);
+var
+  ADevice: TDevice;
+  ActiveRepo: TDeviceRepository;
+  FoundRepo: TDeviceRepository;
+  Frm: TFormDeviceEditor;
+begin
+  if AChannel = nil then
+    Exit;
+
   ADevice := nil;
   ActiveRepo := nil;
   if DataManager <> nil then
   begin
     ActiveRepo := DataManager.ActiveDeviceRepo;
 
-    if Ch.DeviceUUID <> '' then
-      ADevice := DataManager.FindDevice(Ch.DeviceUUID, FoundRepo);
+    if AChannel.DeviceUUID <> '' then
+      ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
   end;
 
   if (ADevice = nil) and (ActiveRepo <> nil) then
   begin
     ADevice := ActiveRepo.CreateDevice(-1);
-    Ch.DeviceUUID := ADevice.MitUUID;
-    Ch.TypeName := ADevice.DeviceTypeName;
-    Ch.Serial := ADevice.SerialNumber;
+    AChannel.DeviceUUID := ADevice.MitUUID;
+    AChannel.TypeName := ADevice.DeviceTypeName;
+    AChannel.Serial := ADevice.SerialNumber;
   end;
 
   Frm := TFormDeviceEditor.Create(Self);
   try
     Frm.LoadDevice(ADevice);
     if Frm.ShowModal = mrOk then
-      UpdateGridDevices;
+    begin
+      if ADevice <> nil then
+      begin
+        AChannel.DeviceUUID := ADevice.MitUUID;
+        AChannel.TypeName := ADevice.DeviceTypeName;
+        AChannel.Serial := ADevice.SerialNumber;
+        AChannel.Signal := ADevice.OutputType;
+      end;
+
+      UpdateGrids;
+    end;
   finally
     Frm.Free;
   end;
@@ -1523,6 +1543,12 @@ begin
       if WorkTable <> nil then
         OpenTypeSelect(Row);
     end
+    else if Column = StringColumnDeviceName1 then
+    begin
+      GridDevices.EditorMode := False;
+      if WorkTable <> nil then
+        OpenChannelDeviceEditor(WorkTable.DeviceChannels[Row]);
+    end
     else if Column = StringColumnDeviceSerial1 then
     begin
       GridDevices.ReadOnly := False;
@@ -1559,6 +1585,14 @@ begin
       Value := WorkTable.DeviceChannels[ARow].Text
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
       Value := WorkTable.DeviceChannels[ARow].TypeName
+    else if GridDevices.Columns[ACol] = StringColumnDeviceName1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.Name
+      else
+        Value := '';
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
       Value := WorkTable.DeviceChannels[ARow].Serial
     else if GridDevices.Columns[ACol] = StringColumnDeviceFlowRate1 then
@@ -1675,6 +1709,12 @@ begin
       if WorkTable <> nil then
         OpenTypeSelect(Row);
     end
+    else if Column = StringColumnEtalonName1 then
+    begin
+      GridEtalons.EditorMode := False;
+      if WorkTable <> nil then
+        OpenChannelDeviceEditor(WorkTable.EtalonChannels[Row]);
+    end
     else if Column = StringColumnEtalonSerial1 then
     begin
       GridEtalons.ReadOnly := False;
@@ -1707,6 +1747,14 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
       Value := WorkTable.EtalonChannels[ARow].TypeName
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonName1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.Device <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.Device.Name
+      else
+        Value := '';
+    end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
       Value := WorkTable.EtalonChannels[ARow].Serial
     else if GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1 then
