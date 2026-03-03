@@ -61,6 +61,10 @@ private
   FSerialNumber:  string;
   FDeviceTypeUUID:  string;
   FDeviceUUID:  string;
+  FRepoTypeName: string;
+  FRepoTypeUUID: string;
+  FRepoDeviceName: string;
+  FRepoDeviceUUID: string;
   FOutputType: Integer; // тип должен совпадать с типом OutputType в TDevice
 
   FImpulses: array[0..99] of Word;
@@ -131,6 +135,18 @@ private
   function GetDeviceTypeUUIDProxy: string;
   procedure SetDeviceTypeUUIDProxy(const AValue: string);
 
+  function GetRepoTypeNameProxy: string;
+  procedure SetRepoTypeNameProxy(const AValue: string);
+
+  function GetRepoTypeUUIDProxy: string;
+  procedure SetRepoTypeUUIDProxy(const AValue: string);
+
+  function GetRepoDeviceNameProxy: string;
+  procedure SetRepoDeviceNameProxy(const AValue: string);
+
+  function GetRepoDeviceUUIDProxy: string;
+  procedure SetRepoDeviceUUIDProxy(const AValue: string);
+
   function GetSerialNumberProxy: string;
   procedure SetSerialNumberProxy(const AValue: string);
 
@@ -188,6 +204,22 @@ public
   property DeviceTypeUUID: string
     read GetDeviceTypeUUIDProxy
     write SetDeviceTypeUUIDProxy;
+
+  property RepoTypeName: string
+    read GetRepoTypeNameProxy
+    write SetRepoTypeNameProxy;
+
+  property RepoTypeUUID: string
+    read GetRepoTypeUUIDProxy
+    write SetRepoTypeUUIDProxy;
+
+  property RepoDeviceName: string
+    read GetRepoDeviceNameProxy
+    write SetRepoDeviceNameProxy;
+
+  property RepoDeviceUUID: string
+    read GetRepoDeviceUUIDProxy
+    write SetRepoDeviceUUIDProxy;
 
   // Серийный номер (берется из привязанного TDevice)
   property SerialNumber: string
@@ -434,6 +466,11 @@ begin
   FValueCurrent := nil;
   FValueTime := nil;
 
+  FRepoTypeName := '';
+  FRepoTypeUUID := '';
+  FRepoDeviceName := '';
+  FRepoDeviceUUID := '';
+
   MeterFlowCategory := mftUnknownType;
   Name:='Новое устройство';
   FlowMeters.Add(self);
@@ -466,11 +503,75 @@ begin
   FDeviceUUID:= FDevice.MitUUID;
   FSerialNumber :=   FDevice.SerialNumber;
   FDeviceTypeUUID :=  FDevice.DeviceTypeUUID;
+  FRepoTypeName := FDevice.RepoTypeName;
+  FRepoTypeUUID := FDevice.RepoTypeUUID;
+  FRepoDeviceName := FDevice.RepoDeviceName;
+  FRepoDeviceUUID := FDevice.RepoDeviceUUID;
   FOutputType :=  FDevice.OutputType;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
   UpdateByDevice;
 
  end;
+end;
+
+function TFlowMeter.GetRepoTypeNameProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.RepoTypeName
+  else
+    Result := FRepoTypeName;
+end;
+
+procedure TFlowMeter.SetRepoTypeNameProxy(const AValue: string);
+begin
+  FRepoTypeName := AValue;
+  if Assigned(FDevice) then
+    FDevice.RepoTypeName := AValue;
+end;
+
+function TFlowMeter.GetRepoTypeUUIDProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.RepoTypeUUID
+  else
+    Result := FRepoTypeUUID;
+end;
+
+procedure TFlowMeter.SetRepoTypeUUIDProxy(const AValue: string);
+begin
+  FRepoTypeUUID := AValue;
+  if Assigned(FDevice) then
+    FDevice.RepoTypeUUID := AValue;
+end;
+
+function TFlowMeter.GetRepoDeviceNameProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.RepoDeviceName
+  else
+    Result := FRepoDeviceName;
+end;
+
+procedure TFlowMeter.SetRepoDeviceNameProxy(const AValue: string);
+begin
+  FRepoDeviceName := AValue;
+  if Assigned(FDevice) then
+    FDevice.RepoDeviceName := AValue;
+end;
+
+function TFlowMeter.GetRepoDeviceUUIDProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.RepoDeviceUUID
+  else
+    Result := FRepoDeviceUUID;
+end;
+
+procedure TFlowMeter.SetRepoDeviceUUIDProxy(const AValue: string);
+begin
+  FRepoDeviceUUID := AValue;
+  if Assigned(FDevice) then
+    FDevice.RepoDeviceUUID := AValue;
 end;
 
 
@@ -795,6 +896,10 @@ begin
           SrcDevice.SerialNumber := Self.SerialNumber;
           SrcDevice.DeviceTypeName := Self.DeviceTypeName;
           SrcDevice.DeviceTypeUUID := Self.DeviceTypeUUID;
+          SrcDevice.RepoTypeName := Self.RepoTypeName;
+          SrcDevice.RepoTypeUUID := Self.RepoTypeUUID;
+          SrcDevice.RepoDeviceName := Self.RepoDeviceName;
+          SrcDevice.RepoDeviceUUID := Self.RepoDeviceUUID;
           SrcDevice.OutputType := Self.OutputType;
 
           FoundDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);

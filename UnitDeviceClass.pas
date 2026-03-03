@@ -258,6 +258,10 @@ type
     DeviceTypeUUID: string;      // Ссылка на тип прибора (FK)
     DeviceTypeName: string;     // Имя типа (для отображения)
     DeviceTypeRepo: string;     // Имя типа (для отображения)
+    RepoTypeName: string;       // Имя репозитория типа (DeviceTypeUUID)
+    RepoTypeUUID: string;       // UUID репозитория типа (DeviceTypeUUID)
+    RepoDeviceName: string;     // Имя репозитория прибора (DeviceUUID)
+    RepoDeviceUUID: string;     // UUID репозитория прибора (DeviceUUID)
 
     {====================================================================}
     { НАИМЕНОВАНИЕ И ПАСПОРТНЫЕ ДАННЫЕ }
@@ -417,6 +421,10 @@ begin
   DeviceTypeUUID := '';
   DeviceTypeName := '';
   DeviceTypeRepo := '';
+  RepoTypeName := '';
+  RepoTypeUUID := '';
+  RepoDeviceName := '';
+  RepoDeviceUUID := '';
    {----------------------------------}
   { Наименование и паспорт }
   {----------------------------------}
@@ -649,6 +657,10 @@ begin
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   DeviceTypeName := ASource.DeviceTypeName;
   DeviceTypeRepo := ASource.DeviceTypeRepo;
+  RepoTypeName := ASource.RepoTypeName;
+  RepoTypeUUID := ASource.RepoTypeUUID;
+  RepoDeviceName := ASource.RepoDeviceName;
+  RepoDeviceUUID := ASource.RepoDeviceUUID;
 
   Name := ASource.Name;
   SerialNumber := ASource.SerialNumber;
@@ -856,6 +868,10 @@ begin
     Add(DeviceTypeUUID);
     Add(DeviceTypeName);
     Add(DeviceTypeRepo);
+    Add(RepoTypeName);
+    Add(RepoTypeUUID);
+    Add(RepoDeviceName);
+    Add(RepoDeviceUUID);
 
     Add(SerialNumber);
     Add(Modification);
@@ -1254,6 +1270,7 @@ begin
   DeviceTypeUUID := AType.MitUUID;
   DeviceTypeName := AType.Name;
   DeviceTypeRepo := RepoName;
+  RepoTypeName := RepoName;
 
 end;
 
