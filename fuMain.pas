@@ -621,7 +621,7 @@ begin
         Meter.ValueMassFlow.SetDim(FlowUnitName);
     end;
   end;
-
+  WorkTable.UpdateAggregateMeterValues;
   WorkTable.RecalculateAllMeterValues;
   UpdateUIFromValues;
 end;
@@ -1103,9 +1103,6 @@ end;
 procedure TFormMain.UpdateUIFromValues;
 var
   WorkTable: TWorkTable;
-  DeviceMeter: TFlowMeter;
-  EtalonMeter: TFlowMeter;
-  MeterForNames: TFlowMeter;
   I: Integer;
   MinImpValue: TMeterValue;
 begin
@@ -1113,17 +1110,8 @@ begin
   if WorkTable = nil then
     Exit;
 
-  DeviceMeter := nil;
-  if WorkTable.DeviceChannels.Count > 0 then
-    DeviceMeter := WorkTable.DeviceChannels[0].FlowMeter;
 
-  EtalonMeter := nil;
-  if WorkTable.EtalonChannels.Count > 0 then
-    EtalonMeter := WorkTable.EtalonChannels[0].FlowMeter;
 
-  MeterForNames := EtalonMeter;
-  if MeterForNames = nil then
-    MeterForNames := DeviceMeter;
 
   GridDevices.Repaint;
   GridEtalons.Repaint;
@@ -1153,8 +1141,8 @@ begin
   else
     LabelPressure.Text := '0';
 
-  if (MeterForNames <> nil) and (MeterForNames.ValueDensity <> nil) then
-    LabelDensity.Text := MeterForNames.ValueDensity.GetStrValue
+  if WorkTable.ValueDensity <> nil then
+    LabelDensity.Text := WorkTable.ValueDensity.GetStrValue
   else
     LabelDensity.Text := '0';
 
@@ -1163,23 +1151,20 @@ begin
   else
     LabelQuantity.Text := '0';
 
-  if MeterForNames <> nil then
-  begin
-    if MeterForNames.ValueFlow <> nil then
+
+    if WorkTable.ValueFlowRate <> nil then
       LabelNameFlowRate.Text :=  'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
-    if MeterForNames.ValueTime <> nil then
-      LabelNameTime.Text := MeterForNames.ValueTime.GetStrFullName;
-    if MeterForNames.ValueQuantity <> nil then
-      LabelNameQuantity.Text := MeterForNames.ValueQuantity.GetStrFullName;
-    if MeterForNames.ValueImp <> nil then
-      LabelNameImp.Text := MeterForNames.ValueImp.GetStrFullName;
-    if MeterForNames.ValuePressure <> nil then
-      LabelNamePressure.Text := MeterForNames.ValuePressure.GetStrFullName;
-    if MeterForNames.ValueDensity <> nil then
-      LabelNameDensity.Text := MeterForNames.ValueDensity.GetStrFullName;
-    if MeterForNames.ValueTemperture <> nil then
-      LabelNameTemperture.Text := MeterForNames.ValueTemperture.GetStrFullName;
-  end;
+    if WorkTable.ValueTime <> nil then
+      LabelNameTime.Text := WorkTable.ValueTime.GetStrFullName;
+    if WorkTable.ValueQuantity <> nil then
+      LabelNameQuantity.Text := WorkTable.ValueQuantity.GetStrFullName;
+    if WorkTable.ValuePressure <> nil then
+      LabelNamePressure.Text := WorkTable.ValuePressure.GetStrFullName;
+    if WorkTable.ValueDensity <> nil then
+      LabelNameDensity.Text := WorkTable.ValueDensity.GetStrFullName;
+    if WorkTable.ValueTemperture <> nil then
+      LabelNameTemperture.Text := WorkTable.ValueTemperture.GetStrFullName;
+
 
   MinImpValue := nil;
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
@@ -1206,8 +1191,7 @@ begin
     StringColumnEtalonQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
   end;
 
-  if DeviceMeter <> nil then
-  begin
+
     if WorkTable.ValueFlowRate <> nil then
       StringColumnDeviceFlowRate1.TagString := WorkTable.ValueFlowRate.GetStrValue
     else
@@ -1217,10 +1201,9 @@ begin
       StringColumnDeviceQuantity1.TagString := WorkTable.ValueQuantity.GetStrValue
     else
       StringColumnDeviceQuantity1.TagString := '0';
-  end;
 
-  if EtalonMeter <> nil then
-  begin
+
+
     if WorkTable.ValueFlowRate <> nil then
       StringColumnEtalonFlowRate1.TagString := WorkTable.ValueFlowRate.GetStrValue
     else
@@ -1230,10 +1213,6 @@ begin
       StringColumnEtalonQuantity1.TagString := WorkTable.ValueQuantity.GetStrValue
     else
       StringColumnEtalonQuantity1.TagString := '0';
-  end;
-
-
-
 end;
 
 procedure TFormMain.ApplyFlowMeterSelection(const ARow: Integer);

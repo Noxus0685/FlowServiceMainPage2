@@ -213,7 +213,7 @@ type
     procedure SetValueTime(const AValue: TMeterValue);
     procedure SetValueQuantity(const AValue: TMeterValue);
     procedure SetValueFlowRate(const AValue: TMeterValue);
-    procedure UpdateAggregateMeterValues;
+
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
@@ -291,6 +291,7 @@ type
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
+        procedure UpdateAggregateMeterValues;
   end;
 
   TWorkTableManager = class
