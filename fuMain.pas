@@ -386,6 +386,7 @@ var
   FormMain: TFormMain;
 
   FRows: array of TRowData;
+  IsUpdating: Boolean = False;
 
 implementation
 
@@ -1057,8 +1058,13 @@ end;
 
 procedure TFormMain.TimerMainTimer(Sender: TObject);
 begin
-  UpdateUIFromValues;
-  UpdateGrids;
+  IsUpdating := True;
+  try
+    UpdateUIFromValues;
+    UpdateGrids;
+  finally
+    IsUpdating := False;
+  end;
 end;
 
 procedure TFormMain.UpdateUIFromValues;
@@ -1454,6 +1460,9 @@ var
   WorkTable: TWorkTable;
   Signal: Integer;
 begin
+  if IsUpdating then
+    Exit;
+
   WorkTable := GetWorkTableByIndex(0);
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
@@ -1650,6 +1659,39 @@ begin
   AGrid.Repaint;
 end;
 
+procedure SoftReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer;
+  const ARefreshColumns: array of TColumn);
+var
+  I: Integer;
+  Sel: Integer;
+begin
+  if AGrid = nil then
+    Exit;
+
+  Sel := AGrid.Selected;
+
+  AGrid.BeginUpdate;
+  try
+    if AGrid.RowCount < ANewRowCount then
+      for I := AGrid.RowCount + 1 to ANewRowCount do
+        AGrid.RowCount := I
+    else if AGrid.RowCount <> ANewRowCount then
+      AGrid.RowCount := ANewRowCount;
+  finally
+    AGrid.EndUpdate;
+  end;
+
+  if (Sel >= 0) and (Sel < AGrid.RowCount) then
+    AGrid.Selected := Sel;
+
+  if Length(ARefreshColumns) = 0 then
+    AGrid.Repaint
+  else
+    for I := Low(ARefreshColumns) to High(ARefreshColumns) do
+      if ARefreshColumns[I] <> nil then
+        ARefreshColumns[I].Repaint;
+end;
+
 procedure TFormMain.UpdateGrids;
 var
   WT: TWorkTable;
@@ -1657,12 +1699,30 @@ begin
   WT := GetWorkTableByIndex(0);
 
   if WT <> nil then
-    ReloadGridByGrowingRowCount(GridDevices, WT.DeviceChannels.Count)
+    SoftReloadGridByGrowingRowCount(
+      GridDevices,
+      WT.DeviceChannels.Count,
+      [StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1, StringColumnDeviceError1]
+    )
   else
-    ReloadGridByGrowingRowCount(GridDevices, Length(FFlowMeterRows));
+    SoftReloadGridByGrowingRowCount(
+      GridDevices,
+      Length(FFlowMeterRows),
+      [StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1, StringColumnDeviceError1]
+    );
 
-  // для эталонов аналогично — подставь свой источник строк
-  ReloadGridByGrowingRowCount(GridEtalons, GridEtalons.RowCount);
+  if WT <> nil then
+    SoftReloadGridByGrowingRowCount(
+      GridEtalons,
+      WT.EtalonChannels.Count,
+      [StringColumnEtalonFlowRate1, StringColumnEtalonQuantity1, StringColumnEtalonError1]
+    )
+  else
+    SoftReloadGridByGrowingRowCount(
+      GridEtalons,
+      GridEtalons.RowCount,
+      [StringColumnEtalonFlowRate1, StringColumnEtalonQuantity1, StringColumnEtalonError1]
+    );
 end;
 
 
@@ -1730,6 +1790,9 @@ var
   WorkTable: TWorkTable;
   Signal: Integer;
 begin
+  if IsUpdating then
+    Exit;
+
   WorkTable := GetWorkTableByIndex(0);
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
