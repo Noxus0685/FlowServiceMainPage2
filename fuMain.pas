@@ -703,7 +703,7 @@ var
   WorkTable: TWorkTable;
   Tab: TTabItem;
   GridEtalonsN, GridDevicesN: TGrid;
-  I, LimitCount: Integer;
+  I, LimitCount, UnitIndex: Integer;
 begin
   TableCount := 0;
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
@@ -716,7 +716,13 @@ begin
     FActiveWorkTable.RebindAllFlowMeters;
 
     if FActiveWorkTable.FlowUnitName <> '' then
-      ComboEditUnits.Text := FActiveWorkTable.FlowUnitName
+    begin
+      UnitIndex := ComboEditUnits.Items.IndexOf(FActiveWorkTable.FlowUnitName);
+      if UnitIndex >= 0 then
+        ComboEditUnits.ItemIndex := UnitIndex
+      else if ComboEditUnits.Items.Count > 0 then
+        ComboEditUnits.ItemIndex := 0;
+    end
     else if ComboEditUnits.Items.Count > 0 then
       ComboEditUnits.ItemIndex := 0;
 
