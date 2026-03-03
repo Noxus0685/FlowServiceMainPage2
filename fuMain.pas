@@ -353,6 +353,9 @@ type
     procedure SpeedButtonMinimizeConditionsClick(Sender: TObject);
     procedure SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
     procedure SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
+    procedure PopupMenuInstrumentalLayOutPopup(Sender: TObject);
+    procedure MenuInstrumentalLayOutClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
   private
 
@@ -531,6 +534,47 @@ begin
 
   Randomize;
   FNextClimateChangeAt := Now;
+
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+end;
+
+procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
+begin
+  miFlowRate.IsChecked := LayoutFlowRate.Visible;
+  miPump.IsChecked := LayoutPump.Visible;
+  miMain.IsChecked := LayoutMain.Visible;
+  miMesurment.IsChecked := LayoutMesure.Visible;
+  miConditions.IsChecked := LayoutConditions.Visible;
+end;
+
+procedure TFormMain.MenuInstrumentalLayOutClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  NewVisible: Boolean;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  NewVisible := not MenuItem.IsChecked;
+  MenuItem.IsChecked := NewVisible;
+
+  if MenuItem = miFlowRate then
+    LayoutFlowRate.Visible := NewVisible
+  else if MenuItem = miPump then
+    LayoutPump.Visible := NewVisible
+  else if MenuItem = miMain then
+    LayoutMain.Visible := NewVisible
+  else if MenuItem = miMesurment then
+    LayoutMesure.Visible := NewVisible
+  else if MenuItem = miConditions then
+    LayoutConditions.Visible := NewVisible;
+end;
+
+procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  if FWorkTableManager <> nil then
+    FWorkTableManager.Save;
 end;
 
 procedure TFormMain.SetDim(FlowUnitName: string; QuantityUnitName: string);
