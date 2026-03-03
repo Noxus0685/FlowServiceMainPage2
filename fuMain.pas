@@ -866,7 +866,7 @@ begin
     -1,
     TWorkTable.BuildChannelDefaultText(ChannelIndex),
     '',
-    'Импульсный',
+    '-',
     ''
   );
 
@@ -889,7 +889,7 @@ begin
     TWorkTable.BuildChannelDefaultText(ChannelIndex),
 
     '',
-    'Импульсный',
+    '-',
     ''
   );
 

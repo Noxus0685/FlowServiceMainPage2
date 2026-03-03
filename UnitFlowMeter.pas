@@ -60,6 +60,7 @@ private
 
   FSerialNumber:  string;
   FDeviceTypeUUID:  string;
+  FTypeName:  string;
   FDeviceUUID:  string;
   FRepoTypeName: string;
   FRepoTypeUUID: string;
@@ -622,11 +623,12 @@ begin
   if Assigned(FDevice) then
     Result := FDevice.DeviceTypeName
   else
-    Result := '';
+    Result := FTypeName;
 end;
 
 procedure TFlowMeter.SetDeviceTypeNameProxy(const AValue: string);
 begin
+  FTypeName := AValue;
   if Assigned(FDevice) then
     FDevice.DeviceTypeName := AValue;
 end;
