@@ -323,6 +323,12 @@ type
     SpeedButtonMinimizeMesure: TSpeedButton;
     SpeedButtonMinimizeConditions: TSpeedButton;
     LayoutMain: TLayout;
+    StringColumnEtalonName1: TStringColumn;
+    StringColumnDeviceName1: TStringColumn;
+    StringColumnDeviceStd1: TStringColumn;
+    StringColumnEtalonStd1: TStringColumn;
+    StringColumnEtalonRawValue1: TStringColumn;
+    StringColumnDeviceRawValue1: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
