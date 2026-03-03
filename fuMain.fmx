@@ -8,6 +8,7 @@ object FormMain: TFormMain
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
+  OnClose = FormClose
   OnCreate = FormCreate
   DesignerMasterStyle = 0
   object TabControl1: TTabControl
@@ -2735,27 +2736,30 @@ object FormMain: TFormMain
     end
   end
   object PopupMenuInstrumentalLayOut: TPopupMenu
+    OnPopup = PopupMenuInstrumentalLayOutPopup
     Left = 1104
     Top = 224
     object miFlowRate: TMenuItem
-      RadioItem = True
       IsChecked = True
+      OnClick = MenuInstrumentalLayOutClick
       Text = 'miFlowRate'
     end
     object miPump: TMenuItem
-      RadioItem = True
       IsChecked = True
+      OnClick = MenuInstrumentalLayOutClick
       Text = 'miPump'
     end
     object miMain: TMenuItem
-      RadioItem = True
       IsChecked = True
+      OnClick = MenuInstrumentalLayOutClick
       Text = 'miMain'
     end
     object miMesurment: TMenuItem
+      OnClick = MenuInstrumentalLayOutClick
       Text = 'miMesurment'
     end
     object miConditions: TMenuItem
+      OnClick = MenuInstrumentalLayOutClick
       Text = 'miConditions'
     end
   end
