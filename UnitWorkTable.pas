@@ -62,6 +62,21 @@ type
     function GetDeviceUUIDProxy: string;
     procedure SetDeviceUUIDProxy(const AValue: string);
 
+    function GetTypeUUIDProxy: string;
+    procedure SetTypeUUIDProxy(const AValue: string);
+
+    function GetRepoTypeNameProxy: string;
+    procedure SetRepoTypeNameProxy(const AValue: string);
+
+    function GetRepoTypeUUIDProxy: string;
+    procedure SetRepoTypeUUIDProxy(const AValue: string);
+
+    function GetRepoDeviceNameProxy: string;
+    procedure SetRepoDeviceNameProxy(const AValue: string);
+
+    function GetRepoDeviceUUIDProxy: string;
+    procedure SetRepoDeviceUUIDProxy(const AValue: string);
+
     procedure Init;
 
     // --- regular getters/setters for channel fields ---
@@ -102,6 +117,11 @@ type
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
+    property TypeUUID: string read GetTypeUUIDProxy write SetTypeUUIDProxy;
+    property RepoTypeName: string read GetRepoTypeNameProxy write SetRepoTypeNameProxy;
+    property RepoTypeUUID: string read GetRepoTypeUUIDProxy write SetRepoTypeUUIDProxy;
+    property RepoDeviceName: string read GetRepoDeviceNameProxy write SetRepoDeviceNameProxy;
+    property RepoDeviceUUID: string read GetRepoDeviceUUIDProxy write SetRepoDeviceUUIDProxy;
 
     // Channel fields (internal variables)
     property ImpSec: Double read GetImpSecProxy write SetImpSecProxy;
@@ -452,6 +472,76 @@ procedure TChannel.SetDeviceUUIDProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.DeviceUUID := AValue;
+end;
+
+function TChannel.GetTypeUUIDProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.DeviceTypeUUID
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetTypeUUIDProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.DeviceTypeUUID := AValue;
+end;
+
+function TChannel.GetRepoTypeNameProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.RepoTypeName
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetRepoTypeNameProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.RepoTypeName := AValue;
+end;
+
+function TChannel.GetRepoTypeUUIDProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.RepoTypeUUID
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetRepoTypeUUIDProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.RepoTypeUUID := AValue;
+end;
+
+function TChannel.GetRepoDeviceNameProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.RepoDeviceName
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetRepoDeviceNameProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.RepoDeviceName := AValue;
+end;
+
+function TChannel.GetRepoDeviceUUIDProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+    Result := FFlowMeter.RepoDeviceUUID
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetRepoDeviceUUIDProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+    FFlowMeter.RepoDeviceUUID := AValue;
 end;
 
 // =====================================================
@@ -1108,6 +1198,11 @@ begin
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
+    AIni.WriteString(Section, 'TypeUUID', Channel.TypeUUID);
+    AIni.WriteString(Section, 'RepoTypeName', Channel.RepoTypeName);
+    AIni.WriteString(Section, 'RepoTypeUUID', Channel.RepoTypeUUID);
+    AIni.WriteString(Section, 'RepoDeviceName', Channel.RepoDeviceName);
+    AIni.WriteString(Section, 'RepoDeviceUUID', Channel.RepoDeviceUUID);
 
     AIni.WriteFloat(Section, 'ImpSec', Channel.ImpSec);
     AIni.WriteFloat(Section, 'ImpResult', Channel.ImpResult);
@@ -1157,6 +1252,11 @@ begin
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
     Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
+    Channel.TypeUUID := AIni.ReadString(Section, 'TypeUUID', '');
+    Channel.RepoTypeName := AIni.ReadString(Section, 'RepoTypeName', '');
+    Channel.RepoTypeUUID := AIni.ReadString(Section, 'RepoTypeUUID', '');
+    Channel.RepoDeviceName := AIni.ReadString(Section, 'RepoDeviceName', '');
+    Channel.RepoDeviceUUID := AIni.ReadString(Section, 'RepoDeviceUUID', '');
 
     Channel.ImpSec := AIni.ReadFloat(Section, 'ImpSec', 0);
     Channel.ImpResult := AIni.ReadFloat(Section, 'ImpResult', 0);

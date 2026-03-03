@@ -1226,10 +1226,12 @@ procedure TFormMain.OpenTypeSelect(ARow: Integer);
 var
   Frm: TFormTypeSelect;
   CurrentType, NewType: TDeviceType;
-  FoundRepo: TTypeRepository;
+  FoundRepo, PreferredRepo: TTypeRepository;
   RepoName: string;
+  RepoUUID: string;
   IsTypeChanged, NeedFill: Boolean;
   Ch: TChannel;
+  Repo: TTypeRepository;
 begin
 
   if (FActiveWorkTable = nil) then
@@ -1250,11 +1252,35 @@ begin
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
+    PreferredRepo := nil;
+    FoundRepo := nil;
+
+    if Ch.FlowMeter.RepoTypeUUID <> '' then
+    begin
+      for Repo in DataManager.TypeRepositories do
+        if SameText(Repo.UUID, Ch.FlowMeter.RepoTypeUUID) then
+        begin
+          PreferredRepo := Repo;
+          Break;
+        end;
+    end;
+
+    if PreferredRepo <> nil then
+      DataManager.ActiveTypeRepo := PreferredRepo;
+
     CurrentType := DataManager.FindType(
-      '',                     // UUID можем не знать
-      Ch.TypeName,            // текущее имя типа (прокси в FlowMeter)
+      Ch.FlowMeter.DeviceTypeUUID,
+      '',
       FoundRepo
     );
+
+    if (CurrentType = nil) and (Ch.FlowMeter.DeviceTypeUUID <> '') then
+    begin
+      ShowMessage('Данный тип не найден. Загрузите репозитарий ' + Ch.FlowMeter.RepoTypeName);
+    end;
+
+    if (CurrentType = nil) and (Ch.TypeName <> '') then
+      CurrentType := DataManager.FindType('', Ch.TypeName, FoundRepo);
 
     if (CurrentType <> nil) and (FoundRepo <> nil) then
     begin
@@ -1303,12 +1329,28 @@ begin
       FoundRepo := DataManager.ActiveTypeRepo;
 
     if FoundRepo <> nil then
-      RepoName := FoundRepo.Name
+    begin
+      RepoName := FoundRepo.Name;
+      RepoUUID := FoundRepo.UUID;
+    end
     else
+    begin
       RepoName := '';
+      RepoUUID := '';
+    end;
 
     // Новая идеология: канал проксирует в FlowMeter
     Ch.TypeName := NewType.Name;
+    Ch.TypeUUID := NewType.MitUUID;
+    Ch.RepoTypeName := RepoName;
+    Ch.RepoTypeUUID := RepoUUID;
+
+    if Assigned(Ch.FlowMeter) and Assigned(Ch.FlowMeter.Device) then
+    begin
+      Ch.FlowMeter.Device.DeviceTypeUUID := NewType.MitUUID;
+      Ch.FlowMeter.Device.RepoTypeName := RepoName;
+      Ch.FlowMeter.Device.RepoTypeUUID := RepoUUID;
+    end;
 
     // Если у вас был расчёт индекса по типу для UI/сигнала — храните как отдельное поле канала/строки,
     // либо пересчитывайте динамически. Здесь оставляю как комментарий:
