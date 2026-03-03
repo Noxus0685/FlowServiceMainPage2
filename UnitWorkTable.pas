@@ -175,6 +175,7 @@ type
     FValuePressureAfter: TMeterValue;
     FValuePressureDelta: TMeterValue;
     FValuePressure: TMeterValue;
+    FValueDensity: TMeterValue;
     FValueAirPressure: TMeterValue;
     FValueAirTemperture: TMeterValue;
     FValueHumidity: TMeterValue;
@@ -190,6 +191,7 @@ type
     FHashValuePressureAfter: string;
     FHashValuePressureDelta: string;
     FHashValuePressure: string;
+    FHashValueDensity: string;
     FHashValueAirPressure: string;
     FHashValueAirTemperture: string;
     FHashValueHumidity: string;
@@ -207,6 +209,7 @@ type
     procedure SetValuePressureAfter(const AValue: TMeterValue);
     procedure SetValuePressureDelta(const AValue: TMeterValue);
     procedure SetValuePressure(const AValue: TMeterValue);
+    procedure SetValueDensity(const AValue: TMeterValue);
     procedure SetValueAirPressure(const AValue: TMeterValue);
     procedure SetValueAirTemperture(const AValue: TMeterValue);
     procedure SetValueHumidity(const AValue: TMeterValue);
@@ -282,6 +285,7 @@ type
     property ValuePressureAfter: TMeterValue read FValuePressureAfter write SetValuePressureAfter;
     property ValuePressureDelta: TMeterValue read FValuePressureDelta write SetValuePressureDelta;
     property ValuePressure: TMeterValue read FValuePressure write SetValuePressure;
+    property ValueDensity: TMeterValue read FValueDensity write SetValueDensity;
     property ValueAirPressure: TMeterValue read FValueAirPressure write SetValueAirPressure;
     property ValueAirTemperture: TMeterValue read FValueAirTemperture write SetValueAirTemperture;
     property ValueHumidity: TMeterValue read FValueHumidity write SetValueHumidity;
@@ -469,6 +473,7 @@ begin
     // Temperature/pressure and atmospheric conditions are taken from the work table.
     FFlowMeter.ValueTemperture := AWorkTable.ValueTemperture;
     FFlowMeter.ValuePressure := AWorkTable.ValuePressure;
+    FFlowMeter.ValueDensity := AWorkTable.ValueDensity;
     FFlowMeter.ValueAirPressure := AWorkTable.ValueAirPressure;
     FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
     FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
@@ -817,6 +822,18 @@ begin
   EnsureDescription(FValuePressure, 'Среднее давление стола');
   FValuePressure.SetToSave(True);
 
+  ValueDensity := TMeterValue.GetExistedMeterValueBool(FHashValueDensity, IsExisted, '', Name);
+  if IsExisted = 0 then
+  begin
+    FValueDensity.SetAsDensity;
+    EnsureDescription(FValueDensity, 'Плотность среды');
+  end;
+  FValueDensity.ValueBaseMultiplier := FValueTemperture;
+  FValueDensity.ValueBaseDevider := FValuePressure;
+  FValueDensity.ValueRate := nil;
+  FValueDensity.ValueEtalon := nil;
+  FValueDensity.SetToSave(True);
+
   ValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
@@ -947,6 +964,11 @@ end;
 procedure TWorkTable.SetValuePressure(const AValue: TMeterValue);
 begin
   SetMeterValue(FValuePressure, FHashValuePressure, AValue);
+end;
+
+procedure TWorkTable.SetValueDensity(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueDensity, FHashValueDensity, AValue);
 end;
 
 procedure TWorkTable.SetValueAirPressure(const AValue: TMeterValue);
@@ -1197,6 +1219,7 @@ begin
       ValuesIni.WriteString(Section, 'HashValuePressureAfter', WorkTable.ValuePressureAfter.Hash);
       ValuesIni.WriteString(Section, 'HashValuePressureDelta', WorkTable.ValuePressureDelta.Hash);
       ValuesIni.WriteString(Section, 'HashValuePressure', WorkTable.ValuePressure.Hash);
+      ValuesIni.WriteString(Section, 'HashValueDensity', WorkTable.ValueDensity.Hash);
       ValuesIni.WriteString(Section, 'HashValueAirPressure', WorkTable.ValueAirPressure.Hash);
       ValuesIni.WriteString(Section, 'HashValueAirTemperture', WorkTable.ValueAirTemperture.Hash);
       ValuesIni.WriteString(Section, 'HashValueHumidity', WorkTable.ValueHumidity.Hash);
@@ -1285,6 +1308,7 @@ begin
       WorkTable.FHashValuePressureAfter := ValuesIni.ReadString(Section, 'HashValuePressureAfter', WorkTable.FHashValuePressureAfter);
       WorkTable.FHashValuePressureDelta := ValuesIni.ReadString(Section, 'HashValuePressureDelta', WorkTable.FHashValuePressureDelta);
       WorkTable.FHashValuePressure := ValuesIni.ReadString(Section, 'HashValuePressure', WorkTable.FHashValuePressure);
+      WorkTable.FHashValueDensity := ValuesIni.ReadString(Section, 'HashValueDensity', WorkTable.FHashValueDensity);
       WorkTable.FHashValueAirPressure := ValuesIni.ReadString(Section, 'HashValueAirPressure', WorkTable.FHashValueAirPressure);
       WorkTable.FHashValueAirTemperture := ValuesIni.ReadString(Section, 'HashValueAirTemperture', WorkTable.FHashValueAirTemperture);
       WorkTable.FHashValueHumidity := ValuesIni.ReadString(Section, 'HashValueHumidity', WorkTable.FHashValueHumidity);
