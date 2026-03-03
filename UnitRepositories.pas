@@ -5096,7 +5096,7 @@ begin
       Device.CalibrCoefTable.ID := QTable.FieldByName('ID').AsInteger;
       Device.CalibrCoefTable.UUID := QTable.FieldByName('UUID').AsString;
       Device.CalibrCoefTable.DeviceID := QTable.FieldByName('DeviceID').AsInteger;
-      Device.CalibrCoefTable.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
+         Device.CalibrCoefTable.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
       Device.CalibrCoefTable.Name := QTable.FieldByName('Name').AsString;
       Device.CalibrCoefTable.Comment := QTable.FieldByName('Comment').AsString;
 

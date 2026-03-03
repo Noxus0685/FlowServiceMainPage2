@@ -75,7 +75,6 @@ type
     StringColumnDeviceError1: TStringColumn;
     ToolBar1: TToolBar;
     Label23: TLabel;
-    PanelMain: TPanel;
     PanelInstruments: TPanel;
     LayoutPump: TLayout;
     Line1: TLine;
@@ -126,7 +125,6 @@ type
     SpeedButton4: TSpeedButton;
     Rectangle15: TRectangle;
     Label19: TLabel;
-    LayoutMain: TLayout;
     Line6: TLine;
     Layout16: TLayout;
     LayoutTaskMain: TLayout;
@@ -320,6 +318,11 @@ type
     ActionOpenDeviceEditor: TAction;
     ActionOpenDeviceSelect: TAction;
     MenuItem9: TMenuItem;
+    SpeedButtonMinimizeLayoutMain: TSpeedButton;
+    SpeedButtonMinimzeLayoutFlowRate: TSpeedButton;
+    SpeedButtonMinimizeMesure: TSpeedButton;
+    SpeedButtonMinimizeConditions: TSpeedButton;
+    LayoutMain: TLayout;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -345,6 +348,10 @@ type
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure ActionOpenDeviceEditorExecute(Sender: TObject);
     procedure ActionOpenDeviceSelectExecute(Sender: TObject);
+    procedure SpeedButtonMinimizeMesureClick(Sender: TObject);
+    procedure SpeedButtonMinimizeConditionsClick(Sender: TObject);
+    procedure SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
+    procedure SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
 
   private
 
@@ -1328,9 +1335,29 @@ begin
  LayoutPump.Visible := False;
 end;
 
+procedure TFormMain.SpeedButtonMinimizeConditionsClick(Sender: TObject);
+begin
+    LayoutConditions.Visible:=False;
+end;
+
+procedure TFormMain.SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
+begin
+    LayoutMain.Visible:=False;
+end;
+
+procedure TFormMain.SpeedButtonMinimizeMesureClick(Sender: TObject);
+begin
+LayoutMesure.Visible:=False;
+end;
+
 procedure TFormMain.SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
 begin
       LayoutPump.Visible:=False;
+end;
+
+procedure TFormMain.SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
+begin
+    LayoutFlowRate.Visible:=False;
 end;
 
 procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
