@@ -1290,6 +1290,7 @@ begin
     StringColumnEtalonQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
   end;
 
+<<<<<<< codex/add-valueflow.valuebasemultiplier-to-columns-abe1up
   RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.DeviceChannels);
   if RawValueBaseMultiplier = nil then
     RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.EtalonChannels);
@@ -1298,6 +1299,15 @@ begin
   begin
     StringColumnDeviceRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
     StringColumnEtalonRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+=======
+  if (WorkTable.ValueFlowRate <> nil) and
+     (WorkTable.ValueFlowRate.ValueBaseMultiplier <> nil) then
+  begin
+    StringColumnDeviceRawValue1.Header :=
+      WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
+    StringColumnEtalonRawValue1.Header :=
+      WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
+>>>>>>> main
   end;
 
 
@@ -1651,6 +1661,15 @@ begin
       else
         Value := '-';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
+      else
+        Value := '0';
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
     Exit;
@@ -1821,6 +1840,15 @@ begin
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
       else
         Value := '-';
+    end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
+      else
+        Value := '0';
     end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       Value := GetOutputTypeName(WorkTable.EtalonChannels[ARow].Signal);
