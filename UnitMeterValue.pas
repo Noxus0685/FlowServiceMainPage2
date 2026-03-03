@@ -1789,13 +1789,39 @@ end;
 { Serializes all meter values to persistent INI storage (optionally backup). }
 class procedure TMeterValue.SaveToFile(IsBackUp: Integer);
 var
-  Ini: TIniFile;
   FileName: string;
   I, J: Integer;
   MV: TMeterValue;
   Section: string;
+  SubSection: string;
   Dim: TDimension;
   CoefItem: TCoef;
+  Content: TStringBuilder;
+
+  procedure AddSection(const ASection: string);
+  begin
+    Content.Append('[').Append(ASection).AppendLine(']');
+  end;
+
+  procedure AddPair(const AKey, AValue: string);
+  begin
+    Content.Append(AKey).Append('=').AppendLine(AValue);
+  end;
+
+  procedure AddInteger(const AKey: string; const AValue: Integer);
+  begin
+    AddPair(AKey, IntToStr(AValue));
+  end;
+
+  procedure AddFloat(const AKey: string; const AValue: Double);
+  begin
+    AddPair(AKey, FloatToStr(AValue));
+  end;
+
+  procedure AddBoolean(const AKey: string; const AValue: Boolean);
+  begin
+    AddPair(AKey, BoolToStr(AValue, True));
+  end;
 begin
   FMeterValuesSaves.Clear;
   for MV in FMeterValues do
@@ -1807,79 +1833,88 @@ begin
   else
     FileName := TPath.Combine(ExtractFilePath(ParamStr(0)), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
 
-  Ini := TIniFile.Create(FileName);
+  Content := TStringBuilder.Create(1024 * 1024);
   try
-    Ini.EraseSection('MeterValues');
-    Ini.WriteString('MeterValues', 'VER', '1.0');
-    Ini.WriteInteger('MeterValues', 'ValuesCount', FMeterValuesSaves.Count);
+    AddSection('MeterValues');
+    AddPair('VER', '1.0');
+    AddInteger('ValuesCount', FMeterValuesSaves.Count);
+    Content.AppendLine;
 
     for I := 0 to FMeterValuesSaves.Count - 1 do
     begin
       MV := FMeterValuesSaves[I];
       Section := 'MeterValue.' + IntToStr(I);
-      Ini.EraseSection(Section);
 
-      Ini.WriteString(Section, 'Hash', MV.Hash);
-      Ini.WriteBool(Section, 'IsToSave', MV.IsToSave);
-      Ini.WriteString(Section, 'HashOwner', MV.HashOwner);
-      Ini.WriteString(Section, 'NameOwner', MV.NameOwner);
-      Ini.WriteString(Section, 'Name', MV.Name);
-      Ini.WriteString(Section, 'ShrtName', MV.ShrtName);
-      Ini.WriteString(Section, 'Description', MV.Description);
-      Ini.WriteString(Section, 'Type', MV.&Type);
-      Ini.WriteString(Section, 'RawValueName', MV.RawValueName);
-      Ini.WriteString(Section, 'RawValueDim', MV.RawValueDim);
+      AddSection(Section);
+      AddPair('Hash', MV.Hash);
+      AddBoolean('IsToSave', MV.IsToSave);
+      AddPair('HashOwner', MV.HashOwner);
+      AddPair('NameOwner', MV.NameOwner);
+      AddPair('Name', MV.Name);
+      AddPair('ShrtName', MV.ShrtName);
+      AddPair('Description', MV.Description);
+      AddPair('Type', MV.&Type);
+      AddPair('RawValueName', MV.RawValueName);
+      AddPair('RawValueDim', MV.RawValueDim);
 
-      Ini.WriteString(Section, 'HashValueRate', MV.HashValueRate);
-      Ini.WriteString(Section, 'HashValueBaseMultiplier', MV.HashValueBaseMultiplier);
-      Ini.WriteString(Section, 'HashValueBaseDevider', MV.HashValueBaseDevider);
-      Ini.WriteString(Section, 'HashValueCorrection', MV.HashValueCorrection);
-      Ini.WriteString(Section, 'HashValueEtalon', MV.HashValueEtalon);
+      AddPair('HashValueRate', MV.HashValueRate);
+      AddPair('HashValueBaseMultiplier', MV.HashValueBaseMultiplier);
+      AddPair('HashValueBaseDevider', MV.HashValueBaseDevider);
+      AddPair('HashValueCorrection', MV.HashValueCorrection);
+      AddPair('HashValueEtalon', MV.HashValueEtalon);
 
-      Ini.WriteInteger(Section, 'filter_order', MV.FFilterOrder);
-      Ini.WriteInteger(Section, 'Accuracy', MV.Accuracy);
-      Ini.WriteFloat(Section, 'Error', MV.Error);
-      Ini.WriteFloat(Section, 'MaxValue', MV.MaxValue);
-      Ini.WriteFloat(Section, 'MinValue', MV.MinValue);
-      Ini.WriteFloat(Section, 'MaxNomValue', MV.MaxNomValue);
-      Ini.WriteFloat(Section, 'MinNomValue', MV.MinNomValue);
-      Ini.WriteFloat(Section, 'CoefK', MV.CoefK);
-      Ini.WriteFloat(Section, 'CoefP', MV.CoefP);
-      Ini.WriteInteger(Section, 'CurrentDimIndex', MV.CurrentDimIndex);
-      Ini.WriteInteger(Section, 'ValueType', Ord(MV.ValueType));
-      Ini.WriteInteger(Section, 'DependenceType', Ord(MV.DependenceType));
-      Ini.WriteInteger(Section, 'UpdateType', Ord(MV.UpdateType));
+      AddInteger('filter_order', MV.FFilterOrder);
+      AddInteger('Accuracy', MV.Accuracy);
+      AddFloat('Error', MV.Error);
+      AddFloat('MaxValue', MV.MaxValue);
+      AddFloat('MinValue', MV.MinValue);
+      AddFloat('MaxNomValue', MV.MaxNomValue);
+      AddFloat('MinNomValue', MV.MinNomValue);
+      AddFloat('CoefK', MV.CoefK);
+      AddFloat('CoefP', MV.CoefP);
+      AddInteger('CurrentDimIndex', MV.CurrentDimIndex);
+      AddInteger('ValueType', Ord(MV.ValueType));
+      AddInteger('DependenceType', Ord(MV.DependenceType));
+      AddInteger('UpdateType', Ord(MV.UpdateType));
 
-      Ini.WriteInteger(Section, 'DimensionsCount', MV.Dimensions.Count);
+      AddInteger('DimensionsCount', MV.Dimensions.Count);
       for J := 0 to MV.Dimensions.Count - 1 do
       begin
         Dim := MV.Dimensions[J];
-        Ini.WriteString(Section + '.Dimension.' + IntToStr(J), 'Name', Dim.Name);
-        Ini.WriteString(Section + '.Dimension.' + IntToStr(J), 'Hash', Dim.Hash);
-        Ini.WriteFloat(Section + '.Dimension.' + IntToStr(J), 'Rate', Dim.Rate);
-        Ini.WriteFloat(Section + '.Dimension.' + IntToStr(J), 'Devider', Dim.Devider);
-        Ini.WriteBool(Section + '.Dimension.' + IntToStr(J), 'Factor', Dim.Factor);
-        Ini.WriteBool(Section + '.Dimension.' + IntToStr(J), 'Recip', Dim.Recip);
+        SubSection := Section + '.Dimension.' + IntToStr(J);
+        AddSection(SubSection);
+        AddPair('Name', Dim.Name);
+        AddPair('Hash', Dim.Hash);
+        AddFloat('Rate', Dim.Rate);
+        AddFloat('Devider', Dim.Devider);
+        AddBoolean('Factor', Dim.Factor);
+        AddBoolean('Recip', Dim.Recip);
       end;
 
-      Ini.WriteInteger(Section, 'CoefsCount', MV.Coefs.Count);
+      AddInteger('CoefsCount', MV.Coefs.Count);
       for J := 0 to MV.Coefs.Count - 1 do
       begin
         CoefItem := MV.Coefs[J];
-        Ini.WriteString(Section + '.Coef.' + IntToStr(J), 'Name', CoefItem.Name);
-        Ini.WriteInteger(Section + '.Coef.' + IntToStr(J), 'Index', CoefItem.Index);
-        Ini.WriteString(Section + '.Coef.' + IntToStr(J), 'Hash', CoefItem.Hash);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Value', CoefItem.Value);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Arg', CoefItem.Arg);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Q1', CoefItem.Q1);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Q2', CoefItem.Q2);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'K', CoefItem.K);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'b', CoefItem.b);
-        Ini.WriteBool(Section + '.Coef.' + IntToStr(J), 'InUse', CoefItem.InUse);
+        SubSection := Section + '.Coef.' + IntToStr(J);
+        AddSection(SubSection);
+        AddPair('Name', CoefItem.Name);
+        AddInteger('Index', CoefItem.Index);
+        AddPair('Hash', CoefItem.Hash);
+        AddFloat('Value', CoefItem.Value);
+        AddFloat('Arg', CoefItem.Arg);
+        AddFloat('Q1', CoefItem.Q1);
+        AddFloat('Q2', CoefItem.Q2);
+        AddFloat('K', CoefItem.K);
+        AddFloat('b', CoefItem.b);
+        AddBoolean('InUse', CoefItem.InUse);
       end;
+
+      Content.AppendLine;
     end;
+
+    TFile.WriteAllText(FileName, Content.ToString, TEncoding.Default);
   finally
-    Ini.Free;
+    Content.Free;
   end;
 end;
 
