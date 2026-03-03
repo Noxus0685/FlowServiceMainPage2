@@ -48,6 +48,7 @@ type
     class var FMeterValues: TObjectList<TMeterValue>;
     class var FMeterValuesSaves: TObjectList<TMeterValue>;
     class var FFinalValue: Boolean;
+
   private
     FFilterOrder: Integer;
     FFilterRd: Integer;
@@ -63,6 +64,7 @@ type
     function FindDimIndex(const AName: string): Integer;
     class constructor CreateClass;
     class destructor DestroyClass;
+
   public
     ValueWoCorrection: Double;
     TempDelta: Integer;
@@ -128,6 +130,8 @@ type
     AverValues: TList<Single>;
     Coef: TCoef;
     Coefs: TList<TCoef>;
+
+    IsBind : Boolean;
 
     constructor Create; overload;
     constructor Create(const AHashOwner: string; const ANameOwner: string); overload;
@@ -449,9 +453,13 @@ begin
   else
   begin
     IsExisted := 0;
+
     Result := TMeterValue.Create(AHashOwner, AName);
     AHash := Result.Hash;
   end;
+
+    Result.IsBind := True;
+
 end;
 
 { Assigns a random test value in the expected operating range. }
@@ -1790,9 +1798,9 @@ var
   CoefItem: TCoef;
 begin
   FMeterValuesSaves.Clear;
- // for MV in FMeterValues do
-//    if MV.IsToSave then
- //     FMeterValuesSaves.Add(MV);
+  for MV in FMeterValues do
+    if MV.IsToSave then
+      FMeterValuesSaves.Add(MV);
 
   if IsBackUp = 0 then
     FileName := TPath.Combine(ExtractFilePath(ParamStr(0)), 'MeterValues.ini')
@@ -1966,7 +1974,7 @@ begin
         CoefItem.InUse := Ini.ReadBool(Section + '.Coef.' + IntToStr(J), 'InUse', True);
         MV.Coefs.Add(CoefItem);
       end;
-      MV.SetToSave(True);
+      MV.SetToSave(False);
     end;
   finally
     Ini.Free;
