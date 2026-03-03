@@ -156,6 +156,10 @@ private
 
   procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
 
+  function GetValueCoef: TMeterValue;
+  function GetValueQuantity: TMeterValue;
+  function GetValueFlow: TMeterValue;
+
 
 
   procedure SetValueImp(const AValue: TMeterValue);
@@ -301,15 +305,15 @@ public
 
   property ValueImp: TMeterValue read FValueImp write SetValueImp;
   property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
-  property ValueCoef: TMeterValue read FValueCoef write SetValueCoef;
+  property ValueCoef: TMeterValue read GetValueCoef write SetValueCoef;
   property ValueMassCoef: TMeterValue read FValueMassCoef write SetValueMassCoef;
   property ValueVolumeCoef: TMeterValue read FValueVolumeCoef write SetValueVolumeCoef;
-  property ValueQuantity: TMeterValue read FValueQuantity write SetValueQuantity;
+  property ValueQuantity: TMeterValue read GetValueQuantity write SetValueQuantity;
   property ValueVolume: TMeterValue read FValueVolume write SetValueVolume;
   property ValueMass: TMeterValue read FValueMass write SetValueMass;
   property ValueVolumeMeter: TMeterValue read FValueVolumeMeter write SetValueVolumeMeter;
   property ValueMassMeter: TMeterValue read FValueMassMeter write SetValueMassMeter;
-  property ValueFlow: TMeterValue read FValueFlow write SetValueFlow;
+  property ValueFlow: TMeterValue read GetValueFlow write SetValueFlow;
   property ValueMassFlow: TMeterValue read FValueMassFlow write SetValueMassFlow;
   property ValueVolumeFlow: TMeterValue read FValueVolumeFlow write SetValueVolumeFlow;
   property ValueError: TMeterValue read FValueError write SetValueError;
@@ -700,6 +704,21 @@ begin
     ATargetHash := '';
 end;
 
+function TFlowMeter.GetValueCoef: TMeterValue;
+begin
+  Result := TMeterValue.GetMeterValue(HashValueCoef);
+end;
+
+function TFlowMeter.GetValueQuantity: TMeterValue;
+begin
+  Result := TMeterValue.GetMeterValue(HashValueQuantity);
+end;
+
+function TFlowMeter.GetValueFlow: TMeterValue;
+begin
+  Result := TMeterValue.GetMeterValue(HashValueFlow);
+end;
+
 procedure TFlowMeter.SetValueImp(const AValue: TMeterValue);
 begin
   SetMeterValue(FValueImp, HashValueImp, AValue);
@@ -712,7 +731,10 @@ end;
 
 procedure TFlowMeter.SetValueCoef(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueCoef, HashValueCoef, AValue);
+  if AValue <> nil then
+    HashValueCoef := AValue.Hash
+  else
+    HashValueCoef := '';
 end;
 
 procedure TFlowMeter.SetValueMassCoef(const AValue: TMeterValue);
@@ -727,7 +749,10 @@ end;
 
 procedure TFlowMeter.SetValueQuantity(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueQuantity, HashValueQuantity, AValue);
+  if AValue <> nil then
+    HashValueQuantity := AValue.Hash
+  else
+    HashValueQuantity := '';
 end;
 
 procedure TFlowMeter.SetValueVolume(const AValue: TMeterValue);
@@ -752,7 +777,10 @@ end;
 
 procedure TFlowMeter.SetValueFlow(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueFlow, HashValueFlow, AValue);
+  if AValue <> nil then
+    HashValueFlow := AValue.Hash
+  else
+    HashValueFlow := '';
 end;
 
 procedure TFlowMeter.SetValueMassFlow(const AValue: TMeterValue);
