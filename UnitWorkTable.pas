@@ -164,6 +164,8 @@ type
     FTimeResult: Double;
     FState: TSpillState;
     FTableClamped: Boolean;
+    FFlowUnitName: string;
+    FQuantityUnitName: string;
 
     FValueTempertureBefore: TMeterValue;
     FValueTempertureAfter: TMeterValue;
@@ -269,6 +271,8 @@ type
 
     property State: TSpillState read FState write FState;
     property TableClamped: Boolean read FTableClamped write FTableClamped;
+    property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
+    property QuantityUnitName: string read FQuantityUnitName write FQuantityUnitName;
 
     property ValueTempertureBefore: TMeterValue read FValueTempertureBefore write SetValueTempertureBefore;
     property ValueTempertureAfter: TMeterValue read FValueTempertureAfter write SetValueTempertureAfter;
@@ -703,6 +707,8 @@ begin
   FState := ssNone;
   FTableClamped := False;
   FText := 'Рабочий стол 1';
+  FFlowUnitName := 'м3/ч';
+  FQuantityUnitName := 'м3';
 
   Temp:= 20.2;
   TempDelta:=0.1;
@@ -1178,6 +1184,8 @@ begin
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
       Ini.WriteString(Section, 'State', SpillStateToString(WorkTable.State));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
+      Ini.WriteString(Section, 'FlowUnitName', WorkTable.FlowUnitName);
+      Ini.WriteString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName);
 
       ValuesIni.EraseSection(Section);
       ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
@@ -1265,6 +1273,8 @@ begin
         Ini.ReadString(Section, 'State', 'None')
       );
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
+      WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
+      WorkTable.QuantityUnitName := Trim(Ini.ReadString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName));
 
       WorkTable.FHashValueTempertureBefore := ValuesIni.ReadString(Section, 'HashValueTempertureBefore', WorkTable.FHashValueTempertureBefore);
       WorkTable.FHashValueTempertureAfter := ValuesIni.ReadString(Section, 'HashValueTempertureAfter', WorkTable.FHashValueTempertureAfter);
