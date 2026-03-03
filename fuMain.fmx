@@ -702,7 +702,7 @@ object FormMain: TFormMain
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 2
-              object ComboEditUnits: TComboEdit
+              object ComboEditUnits: TComboBox
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Left
                 TabOrder = 0
@@ -716,7 +716,7 @@ object FormMain: TFormMain
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
                 KillFocusByReturn = True
-                OnChange = ComboEditUnitsChange
+                OnChange = ComboBoxUnitsChange
               end
               object SpeedButton9: TSpeedButton
                 Align = Left
