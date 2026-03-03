@@ -1269,6 +1269,15 @@ begin
     StringColumnEtalonQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
   end;
 
+  if (WorkTable.ValueFlowRate <> nil) and
+     (WorkTable.ValueFlowRate.ValueBaseMultiplier <> nil) then
+  begin
+    StringColumnDeviceRawValue1.Header :=
+      WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
+    StringColumnEtalonRawValue1.Header :=
+      WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
+  end;
+
 
     if WorkTable.ValueFlowRate <> nil then
       StringColumnDeviceFlowRate1.TagString := WorkTable.ValueFlowRate.GetStrValue
@@ -1611,6 +1620,15 @@ begin
       else
         Value := '0';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
+      else
+        Value := '0';
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
     Exit;
@@ -1773,6 +1791,15 @@ begin
       else
         Value := '0';
     end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
+      else
+        Value := '0';
+    end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       Value := GetOutputTypeName(WorkTable.EtalonChannels[ARow].Signal);
     Exit;
@@ -1882,26 +1909,30 @@ begin
     SoftReloadGridByGrowingRowCount(
       GridDevices,
       WT.DeviceChannels.Count,
-      [StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1, StringColumnDeviceError1]
+      [StringColumnDeviceRawValue1, StringColumnDeviceFlowRate1,
+       StringColumnDeviceQuantity1, StringColumnDeviceError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
       GridDevices,
       Length(FFlowMeterRows),
-      [StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1, StringColumnDeviceError1]
+      [StringColumnDeviceRawValue1, StringColumnDeviceFlowRate1,
+       StringColumnDeviceQuantity1, StringColumnDeviceError1]
     );
 
   if WT <> nil then
     SoftReloadGridByGrowingRowCount(
       GridEtalons,
       WT.EtalonChannels.Count,
-      [StringColumnEtalonFlowRate1, StringColumnEtalonQuantity1, StringColumnEtalonError1]
+      [StringColumnEtalonRawValue1, StringColumnEtalonFlowRate1,
+       StringColumnEtalonQuantity1, StringColumnEtalonError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
       GridEtalons,
       GridEtalons.RowCount,
-      [StringColumnEtalonFlowRate1, StringColumnEtalonQuantity1, StringColumnEtalonError1]
+      [StringColumnEtalonRawValue1, StringColumnEtalonFlowRate1,
+       StringColumnEtalonQuantity1, StringColumnEtalonError1]
     );
 end;
 
