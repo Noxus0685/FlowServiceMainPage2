@@ -154,7 +154,7 @@ private
   function GetOutputTypeProxy: Integer;
   procedure SetOutputTypeProxy(const AValue: Integer);
 
-  procedure SetMeterValue(var ATarget: TMeterValue; const AValue: TMeterValue);
+  procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
 
 
 
@@ -672,10 +672,16 @@ end;
 
 
 
-procedure TFlowMeter.SetMeterValue(var ATarget: TMeterValue; const AValue: TMeterValue);
+procedure TFlowMeter.SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
 begin
   if ATarget = AValue then
+  begin
+    if ATarget <> nil then
+      ATargetHash := ATarget.Hash
+    else
+      ATargetHash := '';
     Exit;
+  end;
 
   if ATarget <> nil then
   begin
@@ -688,126 +694,130 @@ begin
   end;
 
   ATarget := AValue;
+  if ATarget <> nil then
+    ATargetHash := ATarget.Hash
+  else
+    ATargetHash := '';
 end;
 
 procedure TFlowMeter.SetValueImp(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueImp, AValue);
+  SetMeterValue(FValueImp, HashValueImp, AValue);
 end;
 
 procedure TFlowMeter.SetValueImpTotal(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueImpTotal, AValue);
+  SetMeterValue(FValueImpTotal, HashValueImpTotal, AValue);
 end;
 
 procedure TFlowMeter.SetValueCoef(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueCoef, AValue);
+  SetMeterValue(FValueCoef, HashValueCoef, AValue);
 end;
 
 procedure TFlowMeter.SetValueMassCoef(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueMassCoef, AValue);
+  SetMeterValue(FValueMassCoef, HashValueMassCoef, AValue);
 end;
 
 procedure TFlowMeter.SetValueVolumeCoef(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueVolumeCoef, AValue);
+  SetMeterValue(FValueVolumeCoef, HashValueVolumeCoef, AValue);
 end;
 
 procedure TFlowMeter.SetValueQuantity(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueQuantity, AValue);
+  SetMeterValue(FValueQuantity, HashValueQuantity, AValue);
 end;
 
 procedure TFlowMeter.SetValueVolume(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueVolume, AValue);
+  SetMeterValue(FValueVolume, HashValueVolume, AValue);
 end;
 
 procedure TFlowMeter.SetValueMass(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueMass, AValue);
+  SetMeterValue(FValueMass, HashValueMass, AValue);
 end;
 
 procedure TFlowMeter.SetValueVolumeMeter(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueVolumeMeter, AValue);
+  SetMeterValue(FValueVolumeMeter, HashValueVolumeMeter, AValue);
 end;
 
 procedure TFlowMeter.SetValueMassMeter(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueMassMeter, AValue);
+  SetMeterValue(FValueMassMeter, HashValueMassMeter, AValue);
 end;
 
 procedure TFlowMeter.SetValueFlow(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueFlow, AValue);
+  SetMeterValue(FValueFlow, HashValueFlow, AValue);
 end;
 
 procedure TFlowMeter.SetValueMassFlow(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueMassFlow, AValue);
+  SetMeterValue(FValueMassFlow, HashValueMassFlow, AValue);
 end;
 
 procedure TFlowMeter.SetValueVolumeFlow(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueVolumeFlow, AValue);
+  SetMeterValue(FValueVolumeFlow, HashValueVolumeFlow, AValue);
 end;
 
 procedure TFlowMeter.SetValueError(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueError, AValue);
+  SetMeterValue(FValueError, HashValueError, AValue);
 end;
 
 procedure TFlowMeter.SetValueVolumeError(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueVolumeError, AValue);
+  SetMeterValue(FValueVolumeError, HashValueVolumeError, AValue);
 end;
 
 procedure TFlowMeter.SetValueMassError(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueMassError, AValue);
+  SetMeterValue(FValueMassError, HashValueMassError, AValue);
 end;
 
 procedure TFlowMeter.SetValueDensity(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueDensity, AValue);
+  SetMeterValue(FValueDensity, HashValueDensity, AValue);
 end;
 
 procedure TFlowMeter.SetValuePressure(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValuePressure, AValue);
+  SetMeterValue(FValuePressure, HashValuePressure, AValue);
 end;
 
 procedure TFlowMeter.SetValueTemperture(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueTemperture, AValue);
+  SetMeterValue(FValueTemperture, HashValueTemperture, AValue);
 end;
 
 procedure TFlowMeter.SetValueAirPressure(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueAirPressure, AValue);
+  SetMeterValue(FValueAirPressure, HashValueAirPressure, AValue);
 end;
 
 procedure TFlowMeter.SetValueAirTemperture(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueAirTemperture, AValue);
+  SetMeterValue(FValueAirTemperture, HashValueAirTemperture, AValue);
 end;
 
 procedure TFlowMeter.SetValueHumidity(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueHumidity, AValue);
+  SetMeterValue(FValueHumidity, HashValueHumidity, AValue);
 end;
 
 procedure TFlowMeter.SetValueCurrent(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueCurrent, AValue);
+  SetMeterValue(FValueCurrent, HashValueCurrent, AValue);
 end;
 
 procedure TFlowMeter.SetValueTime(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueTime, AValue);
+  SetMeterValue(FValueTime, HashValueTime, AValue);
 end;
 
 

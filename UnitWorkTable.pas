@@ -99,6 +99,11 @@ type
     procedure SetValueResultProxy(const AValue: Double);
 
     procedure InitMeterValues;
+    procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
+    procedure SetValueImp(const AValue: TMeterValue);
+    procedure SetValueImpTotal(const AValue: TMeterValue);
+    procedure SetValueCurrent(const AValue: TMeterValue);
+    procedure SetValueInterface(const AValue: TMeterValue);
 
   public
     constructor Create; override;
@@ -131,12 +136,12 @@ type
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
 
-    property ValueImp: TMeterValue read FValueImp;
-    property ValueImpTotal: TMeterValue read FValueImpTotal;
+    property ValueImp: TMeterValue read FValueImp write SetValueImp;
+    property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
     // Синоним для совместимости формулировки/старого кода: ValueImpResult == ValueImpTotal
     property ValueImpResult: TMeterValue read FValueImpTotal;
-    property ValueCurrent: TMeterValue read FValueCurrent;
-    property ValueInterface: TMeterValue read FValueInterface;
+    property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
+    property ValueInterface: TMeterValue read FValueInterface write SetValueInterface;
 
     procedure RebindFlowMeterValues(const AWorkTable: TWorkTable);
   end;
@@ -191,6 +196,21 @@ type
     FHashValueFlowRate: string;
 
     procedure InitMeterValues;
+    procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
+    procedure SetValueTempertureBefore(const AValue: TMeterValue);
+    procedure SetValueTempertureAfter(const AValue: TMeterValue);
+    procedure SetValueTempertureDelta(const AValue: TMeterValue);
+    procedure SetValueTemperture(const AValue: TMeterValue);
+    procedure SetValuePressureBefore(const AValue: TMeterValue);
+    procedure SetValuePressureAfter(const AValue: TMeterValue);
+    procedure SetValuePressureDelta(const AValue: TMeterValue);
+    procedure SetValuePressure(const AValue: TMeterValue);
+    procedure SetValueAirPressure(const AValue: TMeterValue);
+    procedure SetValueAirTemperture(const AValue: TMeterValue);
+    procedure SetValueHumidity(const AValue: TMeterValue);
+    procedure SetValueTime(const AValue: TMeterValue);
+    procedure SetValueQuantity(const AValue: TMeterValue);
+    procedure SetValueFlowRate(const AValue: TMeterValue);
     procedure UpdateAggregateMeterValues;
 
     class function SpillStateToString(AState: TSpillState): string; static;
@@ -250,20 +270,20 @@ type
     property State: TSpillState read FState write FState;
     property TableClamped: Boolean read FTableClamped write FTableClamped;
 
-    property ValueTempertureBefore: TMeterValue read FValueTempertureBefore;
-    property ValueTempertureAfter: TMeterValue read FValueTempertureAfter;
-    property ValueTempertureDelta: TMeterValue read FValueTempertureDelta;
-    property ValueTemperture: TMeterValue read FValueTemperture;
-    property ValuePressureBefore: TMeterValue read FValuePressureBefore;
-    property ValuePressureAfter: TMeterValue read FValuePressureAfter;
-    property ValuePressureDelta: TMeterValue read FValuePressureDelta;
-    property ValuePressure: TMeterValue read FValuePressure;
-    property ValueAirPressure: TMeterValue read FValueAirPressure;
-    property ValueAirTemperture: TMeterValue read FValueAirTemperture;
-    property ValueHumidity: TMeterValue read FValueHumidity;
-    property ValueTime: TMeterValue read FValueTime;
-    property ValueQuantity: TMeterValue read FValueQuantity write FValueQuantity;
-    property ValueFlowRate: TMeterValue read FValueFlowRate write FValueFlowRate;
+    property ValueTempertureBefore: TMeterValue read FValueTempertureBefore write SetValueTempertureBefore;
+    property ValueTempertureAfter: TMeterValue read FValueTempertureAfter write SetValueTempertureAfter;
+    property ValueTempertureDelta: TMeterValue read FValueTempertureDelta write SetValueTempertureDelta;
+    property ValueTemperture: TMeterValue read FValueTemperture write SetValueTemperture;
+    property ValuePressureBefore: TMeterValue read FValuePressureBefore write SetValuePressureBefore;
+    property ValuePressureAfter: TMeterValue read FValuePressureAfter write SetValuePressureAfter;
+    property ValuePressureDelta: TMeterValue read FValuePressureDelta write SetValuePressureDelta;
+    property ValuePressure: TMeterValue read FValuePressure write SetValuePressure;
+    property ValueAirPressure: TMeterValue read FValueAirPressure write SetValueAirPressure;
+    property ValueAirTemperture: TMeterValue read FValueAirTemperture write SetValueAirTemperture;
+    property ValueHumidity: TMeterValue read FValueHumidity write SetValueHumidity;
+    property ValueTime: TMeterValue read FValueTime write SetValueTime;
+    property ValueQuantity: TMeterValue read FValueQuantity write SetValueQuantity;
+    property ValueFlowRate: TMeterValue read FValueFlowRate write SetValueFlowRate;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -294,7 +314,7 @@ procedure TChannel.InitMeterValues;
 var
   IsExisted: Integer;
 begin
- FValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
+ ValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
     FValueImp.SetAsImp;
@@ -304,7 +324,7 @@ begin
   end;
   FValueImp.SetToSave(True);
 
-  FValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
+  ValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
     FValueImpTotal.SetAsImp;
@@ -314,7 +334,7 @@ begin
   end;
   FValueImpTotal.SetToSave(True);
 
-  FValueCurrent := TMeterValue.GetExistedMeterValueBool(FHashValueCurrent, IsExisted, UUID, Name);
+  ValueCurrent := TMeterValue.GetExistedMeterValueBool(FHashValueCurrent, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
     FValueCurrent.SetAsCurrent;
@@ -324,7 +344,7 @@ begin
   end;
   FValueCurrent.SetToSave(True);
 
-  FValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
+  ValueInterface := TMeterValue.GetExistedMeterValueBool(FHashValueInterface, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
     FValueInterface.Name := 'Интерфейс';
@@ -336,6 +356,53 @@ begin
   FValueInterface.SetToSave(True);
 
 
+end;
+
+procedure TChannel.SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
+begin
+  if ATarget = AValue then
+  begin
+    if ATarget <> nil then
+      ATargetHash := ATarget.Hash
+    else
+      ATargetHash := '';
+    Exit;
+  end;
+
+  if ATarget <> nil then
+  begin
+    TMeterValue.RebindReferences(ATarget, AValue);
+
+    if TMeterValue.GetMeterValues <> nil then
+      TMeterValue.GetMeterValues.Remove(ATarget);
+    ATarget.Free;
+  end;
+
+  ATarget := AValue;
+  if ATarget <> nil then
+    ATargetHash := ATarget.Hash
+  else
+    ATargetHash := '';
+end;
+
+procedure TChannel.SetValueImp(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueImp, FHashValueImp, AValue);
+end;
+
+procedure TChannel.SetValueImpTotal(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueImpTotal, FHashValueImpTotal, AValue);
+end;
+
+procedure TChannel.SetValueCurrent(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueCurrent, FHashValueCurrent, AValue);
+end;
+
+procedure TChannel.SetValueInterface(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueInterface, FHashValueInterface, AValue);
 end;
 
   { Creates a channel object, initializes defaults, and allocates linked meter values. }
@@ -657,7 +724,7 @@ var
       AMeterValue.Description := ADescription;
   end;
 begin
-  FValueTempertureBefore := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureBefore, IsExisted, '', Name);
+  ValueTempertureBefore := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureBefore, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueTempertureBefore.SetAsTemp;
@@ -667,7 +734,7 @@ begin
   EnsureDescription(FValueTempertureBefore, 'Температура до стола');
   FValueTempertureBefore.SetToSave(True);
 
-  FValueTempertureAfter := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureAfter, IsExisted, '', Name);
+  ValueTempertureAfter := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureAfter, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueTempertureAfter.SetAsTemp;
@@ -677,7 +744,7 @@ begin
   EnsureDescription(FValueTempertureAfter, 'Температура после стола');
   FValueTempertureAfter.SetToSave(True);
 
-  FValueTempertureDelta := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureDelta, IsExisted, '', Name);
+  ValueTempertureDelta := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureDelta, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueTempertureDelta.SetAsError;
@@ -687,7 +754,7 @@ begin
   EnsureDescription(FValueTempertureDelta, 'Разница температур до и после стола');
   FValueTempertureDelta.SetToSave(True);
 
-  FValueTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueTemperture, IsExisted, '', Name);
+  ValueTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueTemperture, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueTemperture.SetAsTemp;
@@ -700,7 +767,7 @@ begin
   EnsureDescription(FValueTemperture, 'Средняя температура стола');
   FValueTemperture.SetToSave(True);
 
-  FValuePressureBefore := TMeterValue.GetExistedMeterValueBool(FHashValuePressureBefore, IsExisted, '', Name);
+  ValuePressureBefore := TMeterValue.GetExistedMeterValueBool(FHashValuePressureBefore, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValuePressureBefore.SetAsPressure;
@@ -710,7 +777,7 @@ begin
   EnsureDescription(FValuePressureBefore, 'Давление до стола');
   FValuePressureBefore.SetToSave(True);
 
-  FValuePressureAfter := TMeterValue.GetExistedMeterValueBool(FHashValuePressureAfter, IsExisted, '', Name);
+  ValuePressureAfter := TMeterValue.GetExistedMeterValueBool(FHashValuePressureAfter, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValuePressureAfter.SetAsPressure;
@@ -720,7 +787,7 @@ begin
   EnsureDescription(FValuePressureAfter, 'Давление после стола');
   FValuePressureAfter.SetToSave(True);
 
-  FValuePressureDelta := TMeterValue.GetExistedMeterValueBool(FHashValuePressureDelta, IsExisted, '', Name);
+  ValuePressureDelta := TMeterValue.GetExistedMeterValueBool(FHashValuePressureDelta, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValuePressureDelta.SetAsError;
@@ -730,7 +797,7 @@ begin
   EnsureDescription(FValuePressureDelta, 'Разница давлений до и после стола');
   FValuePressureDelta.SetToSave(True);
 
-  FValuePressure := TMeterValue.GetExistedMeterValueBool(FHashValuePressure, IsExisted, '', Name);
+  ValuePressure := TMeterValue.GetExistedMeterValueBool(FHashValuePressure, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValuePressure.SetAsPressure;
@@ -743,7 +810,7 @@ begin
   EnsureDescription(FValuePressure, 'Среднее давление стола');
   FValuePressure.SetToSave(True);
 
-  FValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
+  ValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueAirPressure.SetAsAirPressure;
@@ -753,7 +820,7 @@ begin
   EnsureDescription(FValueAirPressure, 'Атмосферное давление');
   FValueAirPressure.SetToSave(True);
 
-  FValueAirTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueAirTemperture, IsExisted, '', Name);
+  ValueAirTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueAirTemperture, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueAirTemperture.SetAsAirTemp;
@@ -763,7 +830,7 @@ begin
   EnsureDescription(FValueAirTemperture, 'Температура воздуха');
   FValueAirTemperture.SetToSave(True);
 
-  FValueHumidity := TMeterValue.GetExistedMeterValueBool(FHashValueHumidity, IsExisted, '', Name);
+  ValueHumidity := TMeterValue.GetExistedMeterValueBool(FHashValueHumidity, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueHumidity.SetAsHumidity;
@@ -773,7 +840,7 @@ begin
   EnsureDescription(FValueHumidity, 'Влажность воздуха');
   FValueHumidity.SetToSave(True);
 
-  FValueTime := TMeterValue.GetExistedMeterValueBool(FHashValueTime, IsExisted, '', Name);
+  ValueTime := TMeterValue.GetExistedMeterValueBool(FHashValueTime, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueTime.SetAsTime;
@@ -783,7 +850,7 @@ begin
   EnsureDescription(FValueTime, 'Время измерения');
   FValueTime.SetToSave(True);
 
-  FValueQuantity := TMeterValue.GetExistedMeterValueBool(FHashValueQuantity, IsExisted, '', Name);
+  ValueQuantity := TMeterValue.GetExistedMeterValueBool(FHashValueQuantity, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueQuantity.SetAsVolume;
@@ -794,7 +861,7 @@ begin
   EnsureDescription(FValueQuantity, 'Кол-во жидкости за измерение');
   FValueQuantity.SetToSave(True);
 
-  FValueFlowRate := TMeterValue.GetExistedMeterValueBool(FHashValueFlowRate, IsExisted, '', Name);
+  ValueFlowRate := TMeterValue.GetExistedMeterValueBool(FHashValueFlowRate, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
     FValueFlowRate.SetAsVolumeFlow;
@@ -806,6 +873,103 @@ begin
   FValueFlowRate.SetToSave(True);
 
 
+end;
+
+procedure TWorkTable.SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
+begin
+  if ATarget = AValue then
+  begin
+    if ATarget <> nil then
+      ATargetHash := ATarget.Hash
+    else
+      ATargetHash := '';
+    Exit;
+  end;
+
+  if ATarget <> nil then
+  begin
+    TMeterValue.RebindReferences(ATarget, AValue);
+
+    if TMeterValue.GetMeterValues <> nil then
+      TMeterValue.GetMeterValues.Remove(ATarget);
+    ATarget.Free;
+  end;
+
+  ATarget := AValue;
+  if ATarget <> nil then
+    ATargetHash := ATarget.Hash
+  else
+    ATargetHash := '';
+end;
+
+procedure TWorkTable.SetValueTempertureBefore(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTempertureBefore, FHashValueTempertureBefore, AValue);
+end;
+
+procedure TWorkTable.SetValueTempertureAfter(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTempertureAfter, FHashValueTempertureAfter, AValue);
+end;
+
+procedure TWorkTable.SetValueTempertureDelta(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTempertureDelta, FHashValueTempertureDelta, AValue);
+end;
+
+procedure TWorkTable.SetValueTemperture(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTemperture, FHashValueTemperture, AValue);
+end;
+
+procedure TWorkTable.SetValuePressureBefore(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressureBefore, FHashValuePressureBefore, AValue);
+end;
+
+procedure TWorkTable.SetValuePressureAfter(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressureAfter, FHashValuePressureAfter, AValue);
+end;
+
+procedure TWorkTable.SetValuePressureDelta(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressureDelta, FHashValuePressureDelta, AValue);
+end;
+
+procedure TWorkTable.SetValuePressure(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressure, FHashValuePressure, AValue);
+end;
+
+procedure TWorkTable.SetValueAirPressure(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueAirPressure, FHashValueAirPressure, AValue);
+end;
+
+procedure TWorkTable.SetValueAirTemperture(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueAirTemperture, FHashValueAirTemperture, AValue);
+end;
+
+procedure TWorkTable.SetValueHumidity(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueHumidity, FHashValueHumidity, AValue);
+end;
+
+procedure TWorkTable.SetValueTime(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTime, FHashValueTime, AValue);
+end;
+
+procedure TWorkTable.SetValueQuantity(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueQuantity, FHashValueQuantity, AValue);
+end;
+
+procedure TWorkTable.SetValueFlowRate(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueFlowRate, FHashValueFlowRate, AValue);
 end;
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
@@ -1275,7 +1439,7 @@ begin
     if Channel.FValueCurrent <> nil then Channel.FValueCurrent.DeleteFromVector;
     if Channel.FValueInterface <> nil then Channel.FValueInterface.DeleteFromVector;
 
-    Channel.FValueImp := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImp, IsExisted, Channel.UUID, Channel.Name);
+    Channel.ValueImp := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImp, IsExisted, Channel.UUID, Channel.Name);
     if IsExisted = 0 then
     begin
       Channel.FValueImp.SetAsImp;
@@ -1284,7 +1448,7 @@ begin
     end;
     Channel.FValueImp.SetToSave(True);
 
-    Channel.FValueImpTotal := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImpTotal, IsExisted, Channel.UUID, Channel.Name);
+    Channel.ValueImpTotal := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImpTotal, IsExisted, Channel.UUID, Channel.Name);
     if IsExisted = 0 then
     begin
       Channel.FValueImpTotal.SetAsImp;
@@ -1293,7 +1457,7 @@ begin
     end;
     Channel.FValueImpTotal.SetToSave(True);
 
-    Channel.FValueCurrent := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueCurrent, IsExisted, Channel.UUID, Channel.Name);
+    Channel.ValueCurrent := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueCurrent, IsExisted, Channel.UUID, Channel.Name);
     if IsExisted = 0 then
     begin
       Channel.FValueCurrent.SetAsCurrent;
@@ -1301,7 +1465,7 @@ begin
       Channel.FValueCurrent.UpdateType := ONLINE_TYPE;
     end;
     Channel.FValueCurrent.SetToSave(True);
-    Channel.FValueInterface := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueInterface, IsExisted, Channel.UUID, Channel.Name);
+    Channel.ValueInterface := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueInterface, IsExisted, Channel.UUID, Channel.Name);
     if IsExisted = 0 then
     begin
       Channel.FValueInterface.Name := 'Интерфейс';
