@@ -714,6 +714,8 @@ object FormMain: TFormMain
                 Size.Width = 119.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
+                KillFocusByReturn = True
+                OnChange = ComboEditUnitsChange
               end
               object SpeedButton9: TSpeedButton
                 Align = Left
