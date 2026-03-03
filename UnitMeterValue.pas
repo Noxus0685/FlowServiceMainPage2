@@ -1789,11 +1789,12 @@ end;
 { Serializes all meter values to persistent INI storage (optionally backup). }
 class procedure TMeterValue.SaveToFile(IsBackUp: Integer);
 var
-  Ini: TIniFile;
+  Ini: TMemIniFile;
   FileName: string;
   I, J: Integer;
   MV: TMeterValue;
   Section: string;
+  SubSection: string;
   Dim: TDimension;
   CoefItem: TCoef;
 begin
@@ -1807,9 +1808,9 @@ begin
   else
     FileName := TPath.Combine(ExtractFilePath(ParamStr(0)), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
 
-  Ini := TIniFile.Create(FileName);
+  Ini := TMemIniFile.Create(FileName);
   try
-    Ini.EraseSection('MeterValues');
+    Ini.Clear;
     Ini.WriteString('MeterValues', 'VER', '1.0');
     Ini.WriteInteger('MeterValues', 'ValuesCount', FMeterValuesSaves.Count);
 
@@ -1817,7 +1818,6 @@ begin
     begin
       MV := FMeterValuesSaves[I];
       Section := 'MeterValue.' + IntToStr(I);
-      Ini.EraseSection(Section);
 
       Ini.WriteString(Section, 'Hash', MV.Hash);
       Ini.WriteBool(Section, 'IsToSave', MV.IsToSave);
@@ -1854,30 +1854,34 @@ begin
       for J := 0 to MV.Dimensions.Count - 1 do
       begin
         Dim := MV.Dimensions[J];
-        Ini.WriteString(Section + '.Dimension.' + IntToStr(J), 'Name', Dim.Name);
-        Ini.WriteString(Section + '.Dimension.' + IntToStr(J), 'Hash', Dim.Hash);
-        Ini.WriteFloat(Section + '.Dimension.' + IntToStr(J), 'Rate', Dim.Rate);
-        Ini.WriteFloat(Section + '.Dimension.' + IntToStr(J), 'Devider', Dim.Devider);
-        Ini.WriteBool(Section + '.Dimension.' + IntToStr(J), 'Factor', Dim.Factor);
-        Ini.WriteBool(Section + '.Dimension.' + IntToStr(J), 'Recip', Dim.Recip);
+        SubSection := Section + '.Dimension.' + IntToStr(J);
+        Ini.WriteString(SubSection, 'Name', Dim.Name);
+        Ini.WriteString(SubSection, 'Hash', Dim.Hash);
+        Ini.WriteFloat(SubSection, 'Rate', Dim.Rate);
+        Ini.WriteFloat(SubSection, 'Devider', Dim.Devider);
+        Ini.WriteBool(SubSection, 'Factor', Dim.Factor);
+        Ini.WriteBool(SubSection, 'Recip', Dim.Recip);
       end;
 
       Ini.WriteInteger(Section, 'CoefsCount', MV.Coefs.Count);
       for J := 0 to MV.Coefs.Count - 1 do
       begin
         CoefItem := MV.Coefs[J];
-        Ini.WriteString(Section + '.Coef.' + IntToStr(J), 'Name', CoefItem.Name);
-        Ini.WriteInteger(Section + '.Coef.' + IntToStr(J), 'Index', CoefItem.Index);
-        Ini.WriteString(Section + '.Coef.' + IntToStr(J), 'Hash', CoefItem.Hash);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Value', CoefItem.Value);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Arg', CoefItem.Arg);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Q1', CoefItem.Q1);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'Q2', CoefItem.Q2);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'K', CoefItem.K);
-        Ini.WriteFloat(Section + '.Coef.' + IntToStr(J), 'b', CoefItem.b);
-        Ini.WriteBool(Section + '.Coef.' + IntToStr(J), 'InUse', CoefItem.InUse);
+        SubSection := Section + '.Coef.' + IntToStr(J);
+        Ini.WriteString(SubSection, 'Name', CoefItem.Name);
+        Ini.WriteInteger(SubSection, 'Index', CoefItem.Index);
+        Ini.WriteString(SubSection, 'Hash', CoefItem.Hash);
+        Ini.WriteFloat(SubSection, 'Value', CoefItem.Value);
+        Ini.WriteFloat(SubSection, 'Arg', CoefItem.Arg);
+        Ini.WriteFloat(SubSection, 'Q1', CoefItem.Q1);
+        Ini.WriteFloat(SubSection, 'Q2', CoefItem.Q2);
+        Ini.WriteFloat(SubSection, 'K', CoefItem.K);
+        Ini.WriteFloat(SubSection, 'b', CoefItem.b);
+        Ini.WriteBool(SubSection, 'InUse', CoefItem.InUse);
       end;
     end;
+
+    Ini.UpdateFile;
   finally
     Ini.Free;
   end;
