@@ -120,7 +120,7 @@ type
     LabelNameFlowRate: TLabel;
     SpinBoxFlowRate: TSpinBox;
     Layout14: TLayout;
-    ComboEditUnits: TComboEdit;
+    ComboEditUnits: TComboBox;
     SpeedButton9: TSpeedButton;
     SpeedButton4: TSpeedButton;
     Rectangle15: TRectangle;
@@ -341,7 +341,7 @@ type
     procedure ActionMeterValuesPropertiesExecute(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
-    procedure ComboEditUnitsChange(Sender: TObject);
+    procedure ComboBoxUnitsChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
@@ -520,7 +520,7 @@ begin
     ComboEditUnits.Items.Add(UnitName);
   for UnitName in CMassFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
-  ComboEditUnits.OnChange := ComboEditUnitsChange;
+  ComboEditUnits.OnChange := ComboBoxUnitsChange;
   if ComboEditUnits.Items.Count > 0 then
     ComboEditUnits.ItemIndex := 0;
 
@@ -670,7 +670,7 @@ begin
   UpdateUIFromValues;
 end;
 
-procedure TFormMain.ComboEditUnitsChange(Sender: TObject);
+procedure TFormMain.ComboBoxUnitsChange(Sender: TObject);
 var
   UnitName: string;
   QuantityUnitName: string;
@@ -681,6 +681,8 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
+
+  GridDevices.SetFocus;
 end;
 
 function TFormMain.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
@@ -701,7 +703,7 @@ var
   WorkTable: TWorkTable;
   Tab: TTabItem;
   GridEtalonsN, GridDevicesN: TGrid;
-  I, LimitCount: Integer;
+  I, LimitCount, UnitIndex: Integer;
 begin
   TableCount := 0;
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
@@ -714,7 +716,13 @@ begin
     FActiveWorkTable.RebindAllFlowMeters;
 
     if FActiveWorkTable.FlowUnitName <> '' then
-      ComboEditUnits.Text := FActiveWorkTable.FlowUnitName
+    begin
+      UnitIndex := ComboEditUnits.Items.IndexOf(FActiveWorkTable.FlowUnitName);
+      if UnitIndex >= 0 then
+        ComboEditUnits.ItemIndex := UnitIndex
+      else if ComboEditUnits.Items.Count > 0 then
+        ComboEditUnits.ItemIndex := 0;
+    end
     else if ComboEditUnits.Items.Count > 0 then
       ComboEditUnits.ItemIndex := 0;
 
