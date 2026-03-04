@@ -1670,6 +1670,14 @@ begin
       else
         Value := '0';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceStd1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStringStdDeviationPercent
+      else
+        Value := '-';
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
     Exit;
@@ -1849,6 +1857,14 @@ begin
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
       else
         Value := '0';
+    end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonStd1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStringStdDeviationPercent
+      else
+        Value := '-';
     end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       Value := GetOutputTypeName(WorkTable.EtalonChannels[ARow].Signal);
