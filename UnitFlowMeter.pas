@@ -91,6 +91,13 @@ private
   FValueVolumeError: TMeterValue;
   FValueMassError: TMeterValue;
   FValueDensity: TMeterValue;
+  FValueTempertureBefore: TMeterValue;
+  FValueTempertureAfter: TMeterValue;
+  FValueTempertureDelta: TMeterValue;
+  FValuePressureBefore: TMeterValue;
+  FValuePressureAfter: TMeterValue;
+  FValuePressureDelta: TMeterValue;
+  FValueFlowRate: TMeterValue;
   FValuePressure: TMeterValue;
   FValueTemperture: TMeterValue;
   FValueAirPressure: TMeterValue;
@@ -116,6 +123,13 @@ private
   HashValueVolumeError: string;
   HashValueMassError: string;
   HashValueDensity: string;
+  HashValueTempertureBefore: string;
+  HashValueTempertureAfter: string;
+  HashValueTempertureDelta: string;
+  HashValuePressureBefore: string;
+  HashValuePressureAfter: string;
+  HashValuePressureDelta: string;
+  HashValueFlowRate: string;
   HashValuePressure: string;
   HashValueTemperture: string;
   HashValueAirPressure: string;
@@ -179,6 +193,13 @@ private
   procedure SetValueVolumeError(const AValue: TMeterValue);
   procedure SetValueMassError(const AValue: TMeterValue);
   procedure SetValueDensity(const AValue: TMeterValue);
+  procedure SetValueTempertureBefore(const AValue: TMeterValue);
+  procedure SetValueTempertureAfter(const AValue: TMeterValue);
+  procedure SetValueTempertureDelta(const AValue: TMeterValue);
+  procedure SetValuePressureBefore(const AValue: TMeterValue);
+  procedure SetValuePressureAfter(const AValue: TMeterValue);
+  procedure SetValuePressureDelta(const AValue: TMeterValue);
+  procedure SetValueFlowRate(const AValue: TMeterValue);
   procedure SetValuePressure(const AValue: TMeterValue);
   procedure SetValueTemperture(const AValue: TMeterValue);
   procedure SetValueAirPressure(const AValue: TMeterValue);
@@ -320,6 +341,13 @@ public
   property ValueVolumeError: TMeterValue read FValueVolumeError write SetValueVolumeError;
   property ValueMassError: TMeterValue read FValueMassError write SetValueMassError;
   property ValueDensity: TMeterValue read FValueDensity write SetValueDensity;
+  property ValueTempertureBefore: TMeterValue read FValueTempertureBefore write SetValueTempertureBefore;
+  property ValueTempertureAfter: TMeterValue read FValueTempertureAfter write SetValueTempertureAfter;
+  property ValueTempertureDelta: TMeterValue read FValueTempertureDelta write SetValueTempertureDelta;
+  property ValuePressureBefore: TMeterValue read FValuePressureBefore write SetValuePressureBefore;
+  property ValuePressureAfter: TMeterValue read FValuePressureAfter write SetValuePressureAfter;
+  property ValuePressureDelta: TMeterValue read FValuePressureDelta write SetValuePressureDelta;
+  property ValueFlowRate: TMeterValue read FValueFlowRate write SetValueFlowRate;
   property ValuePressure: TMeterValue read FValuePressure write SetValuePressure;
   property ValueTemperture: TMeterValue read FValueTemperture write SetValueTemperture;
   property ValueAirPressure: TMeterValue read FValueAirPressure write SetValueAirPressure;
@@ -438,6 +466,13 @@ begin
   HashValueVolumeError := '';
   HashValueMassError := '';
   HashValueDensity := '';
+  HashValueTempertureBefore := '';
+  HashValueTempertureAfter := '';
+  HashValueTempertureDelta := '';
+  HashValuePressureBefore := '';
+  HashValuePressureAfter := '';
+  HashValuePressureDelta := '';
+  HashValueFlowRate := '';
   HashValuePressure := '';
   HashValueTemperture := '';
   HashValueAirPressure := '';
@@ -463,6 +498,13 @@ begin
   FValueVolumeError := nil;
   FValueMassError := nil;
   FValueDensity := nil;
+  FValueTempertureBefore := nil;
+  FValueTempertureAfter := nil;
+  FValueTempertureDelta := nil;
+  FValuePressureBefore := nil;
+  FValuePressureAfter := nil;
+  FValuePressureDelta := nil;
+  FValueFlowRate := nil;
   FValuePressure := nil;
   FValueTemperture := nil;
   FValueAirPressure := nil;
@@ -813,6 +855,41 @@ begin
   SetMeterValue(FValueDensity, HashValueDensity, AValue);
 end;
 
+procedure TFlowMeter.SetValueTempertureBefore(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTempertureBefore, HashValueTempertureBefore, AValue);
+end;
+
+procedure TFlowMeter.SetValueTempertureAfter(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTempertureAfter, HashValueTempertureAfter, AValue);
+end;
+
+procedure TFlowMeter.SetValueTempertureDelta(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueTempertureDelta, HashValueTempertureDelta, AValue);
+end;
+
+procedure TFlowMeter.SetValuePressureBefore(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressureBefore, HashValuePressureBefore, AValue);
+end;
+
+procedure TFlowMeter.SetValuePressureAfter(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressureAfter, HashValuePressureAfter, AValue);
+end;
+
+procedure TFlowMeter.SetValuePressureDelta(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValuePressureDelta, HashValuePressureDelta, AValue);
+end;
+
+procedure TFlowMeter.SetValueFlowRate(const AValue: TMeterValue);
+begin
+  SetMeterValue(FValueFlowRate, HashValueFlowRate, AValue);
+end;
+
 procedure TFlowMeter.SetValuePressure(const AValue: TMeterValue);
 begin
   SetMeterValue(FValuePressure, HashValuePressure, AValue);
@@ -876,6 +953,13 @@ begin
   ValueVolumeError := nil;
   ValueMassError := nil;
   ValueDensity := nil;
+  ValueTempertureBefore := nil;
+  ValueTempertureAfter := nil;
+  ValueTempertureDelta := nil;
+  ValuePressureBefore := nil;
+  ValuePressureAfter := nil;
+  ValuePressureDelta := nil;
+  ValueFlowRate := nil;
   ValuePressure := nil;
   ValueTemperture := nil;
   ValueAirPressure := nil;

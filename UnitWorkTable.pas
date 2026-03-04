@@ -106,7 +106,6 @@ type
     procedure SetValueResultProxy(const AValue: Double);
 
     procedure InitMeterValues;
-    procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
     procedure SetValueImp(const AValue: TMeterValue);
     procedure SetValueImpTotal(const AValue: TMeterValue);
     procedure SetValueCurrent(const AValue: TMeterValue);
@@ -174,21 +173,7 @@ type
     FFlowUnitName: string;
     FQuantityUnitName: string;
 
-    FValueTempertureBefore: TMeterValue;
-    FValueTempertureAfter: TMeterValue;
-    FValueTempertureDelta: TMeterValue;
-    FValueTemperture: TMeterValue;
-    FValuePressureBefore: TMeterValue;
-    FValuePressureAfter: TMeterValue;
-    FValuePressureDelta: TMeterValue;
-    FValuePressure: TMeterValue;
-    FValueDensity: TMeterValue;
-    FValueAirPressure: TMeterValue;
-    FValueAirTemperture: TMeterValue;
-    FValueHumidity: TMeterValue;
-    FValueTime: TMeterValue;
-    FValueQuantity: TMeterValue;
-    FValueFlowRate: TMeterValue;
+    FTableFlow: TFlowMeter;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -216,7 +201,21 @@ type
     FDevicesGridColumns: TArray<TGridColumnLayout>;
 
     procedure InitMeterValues;
-    procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
+    function GetValueTempertureBefore: TMeterValue;
+    function GetValueTempertureAfter: TMeterValue;
+    function GetValueTempertureDelta: TMeterValue;
+    function GetValueTemperture: TMeterValue;
+    function GetValuePressureBefore: TMeterValue;
+    function GetValuePressureAfter: TMeterValue;
+    function GetValuePressureDelta: TMeterValue;
+    function GetValuePressure: TMeterValue;
+    function GetValueDensity: TMeterValue;
+    function GetValueAirPressure: TMeterValue;
+    function GetValueAirTemperture: TMeterValue;
+    function GetValueHumidity: TMeterValue;
+    function GetValueTime: TMeterValue;
+    function GetValueQuantity: TMeterValue;
+    function GetValueFlowRate: TMeterValue;
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
     procedure SetValueTempertureDelta(const AValue: TMeterValue);
@@ -290,6 +289,7 @@ type
 
     property DeviceChannels: TObjectList<TChannel> read FDeviceChannels;
     property EtalonChannels: TObjectList<TChannel> read FEtalonChannels;
+    property TableFlow: TFlowMeter read FTableFlow;
 
     property Temp: Double read FTemp write FTemp;
     property TempDelta: Double read FTempDelta write FTempDelta;
@@ -305,21 +305,21 @@ type
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
     property QuantityUnitName: string read FQuantityUnitName write FQuantityUnitName;
 
-    property ValueTempertureBefore: TMeterValue read FValueTempertureBefore write SetValueTempertureBefore;
-    property ValueTempertureAfter: TMeterValue read FValueTempertureAfter write SetValueTempertureAfter;
-    property ValueTempertureDelta: TMeterValue read FValueTempertureDelta write SetValueTempertureDelta;
-    property ValueTemperture: TMeterValue read FValueTemperture write SetValueTemperture;
-    property ValuePressureBefore: TMeterValue read FValuePressureBefore write SetValuePressureBefore;
-    property ValuePressureAfter: TMeterValue read FValuePressureAfter write SetValuePressureAfter;
-    property ValuePressureDelta: TMeterValue read FValuePressureDelta write SetValuePressureDelta;
-    property ValuePressure: TMeterValue read FValuePressure write SetValuePressure;
-    property ValueDensity: TMeterValue read FValueDensity write SetValueDensity;
-    property ValueAirPressure: TMeterValue read FValueAirPressure write SetValueAirPressure;
-    property ValueAirTemperture: TMeterValue read FValueAirTemperture write SetValueAirTemperture;
-    property ValueHumidity: TMeterValue read FValueHumidity write SetValueHumidity;
-    property ValueTime: TMeterValue read FValueTime write SetValueTime;
-    property ValueQuantity: TMeterValue read FValueQuantity write SetValueQuantity;
-    property ValueFlowRate: TMeterValue read FValueFlowRate write SetValueFlowRate;
+    property ValueTempertureBefore: TMeterValue read GetValueTempertureBefore write SetValueTempertureBefore;
+    property ValueTempertureAfter: TMeterValue read GetValueTempertureAfter write SetValueTempertureAfter;
+    property ValueTempertureDelta: TMeterValue read GetValueTempertureDelta write SetValueTempertureDelta;
+    property ValueTemperture: TMeterValue read GetValueTemperture write SetValueTemperture;
+    property ValuePressureBefore: TMeterValue read GetValuePressureBefore write SetValuePressureBefore;
+    property ValuePressureAfter: TMeterValue read GetValuePressureAfter write SetValuePressureAfter;
+    property ValuePressureDelta: TMeterValue read GetValuePressureDelta write SetValuePressureDelta;
+    property ValuePressure: TMeterValue read GetValuePressure write SetValuePressure;
+    property ValueDensity: TMeterValue read GetValueDensity write SetValueDensity;
+    property ValueAirPressure: TMeterValue read GetValueAirPressure write SetValueAirPressure;
+    property ValueAirTemperture: TMeterValue read GetValueAirTemperture write SetValueAirTemperture;
+    property ValueHumidity: TMeterValue read GetValueHumidity write SetValueHumidity;
+    property ValueTime: TMeterValue read GetValueTime write SetValueTime;
+    property ValueQuantity: TMeterValue read GetValueQuantity write SetValueQuantity;
+    property ValueFlowRate: TMeterValue read GetValueFlowRate write SetValueFlowRate;
 
     property LayoutFlowRateVisible: Boolean read FLayoutFlowRateVisible write FLayoutFlowRateVisible;
     property LayoutPumpVisible: Boolean read FLayoutPumpVisible write FLayoutPumpVisible;
@@ -745,6 +745,7 @@ begin
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
+  FTableFlow := TFlowMeter.Create;
 
   FState := ssNone;
   FTableClamped := False;
@@ -781,266 +782,389 @@ begin
   ValueTempertureBefore := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureBefore, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueTempertureBefore.SetAsTemp;
-    FValueTempertureBefore.DependenceType := INDEPENDENT;
-    FValueTempertureBefore.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueTempertureBefore.SetAsTemp;
+    FTableFlow.ValueTempertureBefore.DependenceType := INDEPENDENT;
+    FTableFlow.ValueTempertureBefore.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueTempertureBefore, 'Температура до стола');
-  FValueTempertureBefore.SetToSave(True);
+  EnsureDescription(FTableFlow.ValueTempertureBefore, 'Температура до стола');
+  FTableFlow.ValueTempertureBefore.SetToSave(True);
 
   ValueTempertureAfter := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureAfter, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueTempertureAfter.SetAsTemp;
-    FValueTempertureAfter.DependenceType := INDEPENDENT;
-    FValueTempertureAfter.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueTempertureAfter.SetAsTemp;
+    FTableFlow.ValueTempertureAfter.DependenceType := INDEPENDENT;
+    FTableFlow.ValueTempertureAfter.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueTempertureAfter, 'Температура после стола');
-  FValueTempertureAfter.SetToSave(True);
+  EnsureDescription(FTableFlow.ValueTempertureAfter, 'Температура после стола');
+  FTableFlow.ValueTempertureAfter.SetToSave(True);
 
   ValueTempertureDelta := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureDelta, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueTempertureDelta.SetAsError;
-    FValueTempertureDelta.DependenceType := INDEPENDENT;
-    FValueTempertureDelta.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueTempertureDelta.SetAsError;
+    FTableFlow.ValueTempertureDelta.DependenceType := INDEPENDENT;
+    FTableFlow.ValueTempertureDelta.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueTempertureDelta, 'Разница температур до и после стола');
-  FValueTempertureDelta.SetToSave(True);
+  EnsureDescription(FTableFlow.ValueTempertureDelta, 'Разница температур до и после стола');
+  FTableFlow.ValueTempertureDelta.SetToSave(True);
 
   ValueTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueTemperture, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueTemperture.SetAsTemp;
-    FValueTemperture.DependenceType := INDEPENDENT;
-    FValueTemperture.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueTemperture.SetAsTemp;
+    FTableFlow.ValueTemperture.DependenceType := INDEPENDENT;
+    FTableFlow.ValueTemperture.UpdateType := ONLINE_TYPE;
   end;
-  FValueTemperture.ValueType := MEAN_TYPE;
-  FValueTemperture.ValueBaseMultiplier := FValueTempertureAfter;
-  FValueTemperture.ValueBaseDevider := FValueTempertureBefore;
-  EnsureDescription(FValueTemperture, 'Средняя температура стола');
-  FValueTemperture.SetToSave(True);
+  FTableFlow.ValueTemperture.ValueType := MEAN_TYPE;
+  FTableFlow.ValueTemperture.ValueBaseMultiplier := FTableFlow.ValueTempertureAfter;
+  FTableFlow.ValueTemperture.ValueBaseDevider := FTableFlow.ValueTempertureBefore;
+  EnsureDescription(FTableFlow.ValueTemperture, 'Средняя температура стола');
+  FTableFlow.ValueTemperture.SetToSave(True);
 
   ValuePressureBefore := TMeterValue.GetExistedMeterValueBool(FHashValuePressureBefore, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValuePressureBefore.SetAsPressure;
-    FValuePressureBefore.DependenceType := INDEPENDENT;
-    FValuePressureBefore.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValuePressureBefore.SetAsPressure;
+    FTableFlow.ValuePressureBefore.DependenceType := INDEPENDENT;
+    FTableFlow.ValuePressureBefore.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValuePressureBefore, 'Давление до стола');
-  FValuePressureBefore.SetToSave(True);
+  EnsureDescription(FTableFlow.ValuePressureBefore, 'Давление до стола');
+  FTableFlow.ValuePressureBefore.SetToSave(True);
 
   ValuePressureAfter := TMeterValue.GetExistedMeterValueBool(FHashValuePressureAfter, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValuePressureAfter.SetAsPressure;
-    FValuePressureAfter.DependenceType := INDEPENDENT;
-    FValuePressureAfter.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValuePressureAfter.SetAsPressure;
+    FTableFlow.ValuePressureAfter.DependenceType := INDEPENDENT;
+    FTableFlow.ValuePressureAfter.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValuePressureAfter, 'Давление после стола');
-  FValuePressureAfter.SetToSave(True);
+  EnsureDescription(FTableFlow.ValuePressureAfter, 'Давление после стола');
+  FTableFlow.ValuePressureAfter.SetToSave(True);
 
   ValuePressureDelta := TMeterValue.GetExistedMeterValueBool(FHashValuePressureDelta, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValuePressureDelta.SetAsError;
-    FValuePressureDelta.DependenceType := INDEPENDENT;
-    FValuePressureDelta.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValuePressureDelta.SetAsError;
+    FTableFlow.ValuePressureDelta.DependenceType := INDEPENDENT;
+    FTableFlow.ValuePressureDelta.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValuePressureDelta, 'Разница давлений до и после стола');
-  FValuePressureDelta.SetToSave(True);
+  EnsureDescription(FTableFlow.ValuePressureDelta, 'Разница давлений до и после стола');
+  FTableFlow.ValuePressureDelta.SetToSave(True);
 
   ValuePressure := TMeterValue.GetExistedMeterValueBool(FHashValuePressure, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValuePressure.SetAsPressure;
-    FValuePressure.DependenceType := INDEPENDENT;
-    FValuePressure.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValuePressure.SetAsPressure;
+    FTableFlow.ValuePressure.DependenceType := INDEPENDENT;
+    FTableFlow.ValuePressure.UpdateType := ONLINE_TYPE;
   end;
-  FValuePressure.ValueType := MEAN_TYPE;
-  FValuePressure.ValueBaseMultiplier := FValuePressureAfter;
-  FValuePressure.ValueBaseDevider := FValuePressureBefore;
-  EnsureDescription(FValuePressure, 'Среднее давление стола');
-  FValuePressure.SetToSave(True);
+  FTableFlow.ValuePressure.ValueType := MEAN_TYPE;
+  FTableFlow.ValuePressure.ValueBaseMultiplier := FTableFlow.ValuePressureAfter;
+  FTableFlow.ValuePressure.ValueBaseDevider := FTableFlow.ValuePressureBefore;
+  EnsureDescription(FTableFlow.ValuePressure, 'Среднее давление стола');
+  FTableFlow.ValuePressure.SetToSave(True);
 
   ValueDensity := TMeterValue.GetExistedMeterValueBool(FHashValueDensity, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueDensity.SetAsDensity;
-    EnsureDescription(FValueDensity, 'Плотность среды');
+    FTableFlow.ValueDensity.SetAsDensity;
+    EnsureDescription(FTableFlow.ValueDensity, 'Плотность среды');
   end;
-  FValueDensity.ValueBaseMultiplier := FValueTemperture;
-  FValueDensity.ValueBaseDevider := FValuePressure;
-  FValueDensity.ValueRate := nil;
-  FValueDensity.ValueEtalon := nil;
-  FValueDensity.SetToSave(True);
+  FTableFlow.ValueDensity.ValueBaseMultiplier := FTableFlow.ValueTemperture;
+  FTableFlow.ValueDensity.ValueBaseDevider := FTableFlow.ValuePressure;
+  FTableFlow.ValueDensity.ValueRate := nil;
+  FTableFlow.ValueDensity.ValueEtalon := nil;
+  FTableFlow.ValueDensity.SetToSave(True);
 
   ValueAirPressure := TMeterValue.GetExistedMeterValueBool(FHashValueAirPressure, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueAirPressure.SetAsAirPressure;
-    FValueAirPressure.DependenceType := INDEPENDENT;
-    FValueAirPressure.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueAirPressure.SetAsAirPressure;
+    FTableFlow.ValueAirPressure.DependenceType := INDEPENDENT;
+    FTableFlow.ValueAirPressure.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueAirPressure, 'Атмосферное давление');
-  FValueAirPressure.SetToSave(True);
+  EnsureDescription(FTableFlow.ValueAirPressure, 'Атмосферное давление');
+  FTableFlow.ValueAirPressure.SetToSave(True);
 
   ValueAirTemperture := TMeterValue.GetExistedMeterValueBool(FHashValueAirTemperture, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueAirTemperture.SetAsAirTemp;
-    FValueAirTemperture.DependenceType := INDEPENDENT;
-    FValueAirTemperture.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueAirTemperture.SetAsAirTemp;
+    FTableFlow.ValueAirTemperture.DependenceType := INDEPENDENT;
+    FTableFlow.ValueAirTemperture.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueAirTemperture, 'Температура воздуха');
-  FValueAirTemperture.SetToSave(True);
+  EnsureDescription(FTableFlow.ValueAirTemperture, 'Температура воздуха');
+  FTableFlow.ValueAirTemperture.SetToSave(True);
 
   ValueHumidity := TMeterValue.GetExistedMeterValueBool(FHashValueHumidity, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueHumidity.SetAsHumidity;
-    FValueHumidity.DependenceType := INDEPENDENT;
-    FValueHumidity.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueHumidity.SetAsHumidity;
+    FTableFlow.ValueHumidity.DependenceType := INDEPENDENT;
+    FTableFlow.ValueHumidity.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueHumidity, 'Влажность воздуха');
-  FValueHumidity.SetToSave(True);
+  EnsureDescription(FTableFlow.ValueHumidity, 'Влажность воздуха');
+  FTableFlow.ValueHumidity.SetToSave(True);
 
   ValueTime := TMeterValue.GetExistedMeterValueBool(FHashValueTime, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueTime.SetAsTime;
-    FValueTime.DependenceType := INDEPENDENT;
-    FValueTime.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueTime.SetAsTime;
+    FTableFlow.ValueTime.DependenceType := INDEPENDENT;
+    FTableFlow.ValueTime.UpdateType := ONLINE_TYPE;
   end;
-  EnsureDescription(FValueTime, 'Время измерения');
-  FValueTime.SetToSave(True);
+  EnsureDescription(FTableFlow.ValueTime, 'Время измерения');
+  FTableFlow.ValueTime.SetToSave(True);
 
   ValueQuantity := TMeterValue.GetExistedMeterValueBool(FHashValueQuantity, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueQuantity.SetAsVolume;
-    FValueQuantity.DependenceType := INDEPENDENT;
-    FValueQuantity.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueQuantity.SetAsVolume;
+    FTableFlow.ValueQuantity.DependenceType := INDEPENDENT;
+    FTableFlow.ValueQuantity.UpdateType := ONLINE_TYPE;
   end;
-  FValueQuantity.ValueType := AGGREGATE_TYPE;
-  EnsureDescription(FValueQuantity, 'Кол-во жидкости за измерение');
-  FValueQuantity.SetToSave(True);
+  FTableFlow.ValueQuantity.ValueType := AGGREGATE_TYPE;
+  EnsureDescription(FTableFlow.ValueQuantity, 'Кол-во жидкости за измерение');
+  FTableFlow.ValueQuantity.SetToSave(True);
 
   ValueFlowRate := TMeterValue.GetExistedMeterValueBool(FHashValueFlowRate, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
-    FValueFlowRate.SetAsVolumeFlow;
-    FValueFlowRate.DependenceType := INDEPENDENT;
-    FValueFlowRate.UpdateType := ONLINE_TYPE;
+    FTableFlow.ValueFlowRate.SetAsVolumeFlow;
+    FTableFlow.ValueFlowRate.DependenceType := INDEPENDENT;
+    FTableFlow.ValueFlowRate.UpdateType := ONLINE_TYPE;
   end;
-  FValueFlowRate.ValueType := AGGREGATE_TYPE;
-  EnsureDescription(FValueFlowRate, 'Расход');
-  FValueFlowRate.SetToSave(True);
+  FTableFlow.ValueFlowRate.ValueType := AGGREGATE_TYPE;
+  EnsureDescription(FTableFlow.ValueFlowRate, 'Расход');
+  FTableFlow.ValueFlowRate.SetToSave(True);
 
 
 end;
 
-procedure TWorkTable.SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
+function TWorkTable.GetValueTempertureBefore: TMeterValue;
 begin
-  if ATarget = AValue then
-  begin
-    if ATarget <> nil then
-      ATargetHash := ATarget.Hash
-    else
-      ATargetHash := '';
-    Exit;
-  end;
+  if FTableFlow <> nil then Result := FTableFlow.ValueTempertureBefore else Result := nil;
+end;
 
-  if ATarget <> nil then
-  begin
-    TMeterValue.RebindReferences(ATarget, AValue);
+function TWorkTable.GetValueTempertureAfter: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueTempertureAfter else Result := nil;
+end;
 
-    if TMeterValue.GetMeterValues <> nil then
-      TMeterValue.GetMeterValues.Remove(ATarget);
-    ATarget.Free;
-  end;
+function TWorkTable.GetValueTempertureDelta: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueTempertureDelta else Result := nil;
+end;
 
-  ATarget := AValue;
-  if ATarget <> nil then
-    ATargetHash := ATarget.Hash
-  else
-    ATargetHash := '';
+function TWorkTable.GetValueTemperture: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueTemperture else Result := nil;
+end;
+
+function TWorkTable.GetValuePressureBefore: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValuePressureBefore else Result := nil;
+end;
+
+function TWorkTable.GetValuePressureAfter: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValuePressureAfter else Result := nil;
+end;
+
+function TWorkTable.GetValuePressureDelta: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValuePressureDelta else Result := nil;
+end;
+
+function TWorkTable.GetValuePressure: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValuePressure else Result := nil;
+end;
+
+function TWorkTable.GetValueDensity: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueDensity else Result := nil;
+end;
+
+function TWorkTable.GetValueAirPressure: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueAirPressure else Result := nil;
+end;
+
+function TWorkTable.GetValueAirTemperture: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueAirTemperture else Result := nil;
+end;
+
+function TWorkTable.GetValueHumidity: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueHumidity else Result := nil;
+end;
+
+function TWorkTable.GetValueTime: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueTime else Result := nil;
+end;
+
+function TWorkTable.GetValueQuantity: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueQuantity else Result := nil;
+end;
+
+function TWorkTable.GetValueFlowRate: TMeterValue;
+begin
+  if FTableFlow <> nil then Result := FTableFlow.ValueFlowRate else Result := nil;
 end;
 
 procedure TWorkTable.SetValueTempertureBefore(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueTempertureBefore, FHashValueTempertureBefore, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueTempertureBefore := AValue;
+  if AValue <> nil then
+    FHashValueTempertureBefore := AValue.Hash
+  else
+    FHashValueTempertureBefore := '';
 end;
 
 procedure TWorkTable.SetValueTempertureAfter(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueTempertureAfter, FHashValueTempertureAfter, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueTempertureAfter := AValue;
+  if AValue <> nil then
+    FHashValueTempertureAfter := AValue.Hash
+  else
+    FHashValueTempertureAfter := '';
 end;
 
 procedure TWorkTable.SetValueTempertureDelta(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueTempertureDelta, FHashValueTempertureDelta, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueTempertureDelta := AValue;
+  if AValue <> nil then
+    FHashValueTempertureDelta := AValue.Hash
+  else
+    FHashValueTempertureDelta := '';
 end;
 
 procedure TWorkTable.SetValueTemperture(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueTemperture, FHashValueTemperture, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueTemperture := AValue;
+  if AValue <> nil then
+    FHashValueTemperture := AValue.Hash
+  else
+    FHashValueTemperture := '';
 end;
 
 procedure TWorkTable.SetValuePressureBefore(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValuePressureBefore, FHashValuePressureBefore, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValuePressureBefore := AValue;
+  if AValue <> nil then
+    FHashValuePressureBefore := AValue.Hash
+  else
+    FHashValuePressureBefore := '';
 end;
 
 procedure TWorkTable.SetValuePressureAfter(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValuePressureAfter, FHashValuePressureAfter, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValuePressureAfter := AValue;
+  if AValue <> nil then
+    FHashValuePressureAfter := AValue.Hash
+  else
+    FHashValuePressureAfter := '';
 end;
 
 procedure TWorkTable.SetValuePressureDelta(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValuePressureDelta, FHashValuePressureDelta, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValuePressureDelta := AValue;
+  if AValue <> nil then
+    FHashValuePressureDelta := AValue.Hash
+  else
+    FHashValuePressureDelta := '';
 end;
 
 procedure TWorkTable.SetValuePressure(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValuePressure, FHashValuePressure, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValuePressure := AValue;
+  if AValue <> nil then
+    FHashValuePressure := AValue.Hash
+  else
+    FHashValuePressure := '';
 end;
 
 procedure TWorkTable.SetValueDensity(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueDensity, FHashValueDensity, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueDensity := AValue;
+  if AValue <> nil then
+    FHashValueDensity := AValue.Hash
+  else
+    FHashValueDensity := '';
 end;
 
 procedure TWorkTable.SetValueAirPressure(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueAirPressure, FHashValueAirPressure, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueAirPressure := AValue;
+  if AValue <> nil then
+    FHashValueAirPressure := AValue.Hash
+  else
+    FHashValueAirPressure := '';
 end;
 
 procedure TWorkTable.SetValueAirTemperture(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueAirTemperture, FHashValueAirTemperture, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueAirTemperture := AValue;
+  if AValue <> nil then
+    FHashValueAirTemperture := AValue.Hash
+  else
+    FHashValueAirTemperture := '';
 end;
 
 procedure TWorkTable.SetValueHumidity(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueHumidity, FHashValueHumidity, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueHumidity := AValue;
+  if AValue <> nil then
+    FHashValueHumidity := AValue.Hash
+  else
+    FHashValueHumidity := '';
 end;
 
 procedure TWorkTable.SetValueTime(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueTime, FHashValueTime, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueTime := AValue;
+  if AValue <> nil then
+    FHashValueTime := AValue.Hash
+  else
+    FHashValueTime := '';
 end;
 
 procedure TWorkTable.SetValueQuantity(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueQuantity, FHashValueQuantity, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueQuantity := AValue;
+  if AValue <> nil then
+    FHashValueQuantity := AValue.Hash
+  else
+    FHashValueQuantity := '';
 end;
 
 procedure TWorkTable.SetValueFlowRate(const AValue: TMeterValue);
 begin
-  SetMeterValue(FValueFlowRate, FHashValueFlowRate, AValue);
+  if FTableFlow <> nil then
+    FTableFlow.ValueFlowRate := AValue;
+  if AValue <> nil then
+    FHashValueFlowRate := AValue.Hash
+  else
+    FHashValueFlowRate := '';
 end;
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
@@ -1051,10 +1175,10 @@ var
   IsQuantityTemplateSet: Boolean;
   IsFlowTemplateSet: Boolean;
 begin
-  if FValueQuantity <> nil then
-    FValueQuantity.ClearMeterValues;
-  if FValueFlowRate <> nil then
-    FValueFlowRate.ClearMeterValues;
+  if FTableFlow.ValueQuantity <> nil then
+    FTableFlow.ValueQuantity.ClearMeterValues;
+  if FTableFlow.ValueFlowRate <> nil then
+    FTableFlow.ValueFlowRate.ClearMeterValues;
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
@@ -1065,26 +1189,26 @@ begin
     if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
       Continue;
 
-    if (FValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
+    if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
     begin
       if not IsQuantityTemplateSet then
       begin
-        FValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
-        FValueQuantity.ValueType := AGGREGATE_TYPE;
+        FTableFlow.ValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
+        FTableFlow.ValueQuantity.ValueType := AGGREGATE_TYPE;
         IsQuantityTemplateSet := True;
       end;
-      FValueQuantity.AddMeterValue(Channel.FlowMeter.ValueQuantity);
+      FTableFlow.ValueQuantity.AddMeterValue(Channel.FlowMeter.ValueQuantity);
     end;
 
-    if (FValueFlowRate <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+    if (FTableFlow.ValueFlowRate <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
     begin
       if not IsFlowTemplateSet then
       begin
-        FValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
-        FValueFlowRate.ValueType := AGGREGATE_TYPE;
+        FTableFlow.ValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
+        FTableFlow.ValueFlowRate.ValueType := AGGREGATE_TYPE;
         IsFlowTemplateSet := True;
       end;
-      FValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
+      FTableFlow.ValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
     end;
   end;
 end;
@@ -1092,6 +1216,7 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
+  FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
   FEtalonChannels.Free;
   inherited;
@@ -1161,8 +1286,8 @@ var
   Channel: TChannel;
 begin
 
-  if FValueQuantity <> nil then FValueQuantity.SetValue();
-  if FValueFlowRate <> nil then FValueFlowRate.SetValue();
+  if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
+  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
 
   for I := 0 to FDeviceChannels.Count - 1 do
   begin
@@ -1370,20 +1495,20 @@ begin
       WorkTable.FHashValueQuantity := ValuesIni.ReadString(Section, 'HashValueQuantity', WorkTable.FHashValueQuantity);
       WorkTable.FHashValueFlowRate := ValuesIni.ReadString(Section, 'HashValueFlowRate', WorkTable.FHashValueFlowRate);
 
-      if WorkTable.FValueTempertureBefore <> nil then WorkTable.FValueTempertureBefore.DeleteFromVector;
-      if WorkTable.FValueTempertureAfter <> nil then WorkTable.FValueTempertureAfter.DeleteFromVector;
-      if WorkTable.FValueTempertureDelta <> nil then WorkTable.FValueTempertureDelta.DeleteFromVector;
-      if WorkTable.FValueTemperture <> nil then WorkTable.FValueTemperture.DeleteFromVector;
-      if WorkTable.FValuePressureBefore <> nil then WorkTable.FValuePressureBefore.DeleteFromVector;
-      if WorkTable.FValuePressureAfter <> nil then WorkTable.FValuePressureAfter.DeleteFromVector;
-      if WorkTable.FValuePressureDelta <> nil then WorkTable.FValuePressureDelta.DeleteFromVector;
-      if WorkTable.FValuePressure <> nil then WorkTable.FValuePressure.DeleteFromVector;
-      if WorkTable.FValueAirPressure <> nil then WorkTable.FValueAirPressure.DeleteFromVector;
-      if WorkTable.FValueAirTemperture <> nil then WorkTable.FValueAirTemperture.DeleteFromVector;
-      if WorkTable.FValueHumidity <> nil then WorkTable.FValueHumidity.DeleteFromVector;
-      if WorkTable.FValueTime <> nil then WorkTable.FValueTime.DeleteFromVector;
-      if WorkTable.FValueQuantity <> nil then WorkTable.FValueQuantity.DeleteFromVector;
-      if WorkTable.FValueFlowRate <> nil then WorkTable.FValueFlowRate.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueTempertureBefore <> nil then WorkTable.FTableFlow.ValueTempertureBefore.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueTempertureAfter <> nil then WorkTable.FTableFlow.ValueTempertureAfter.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueTempertureDelta <> nil then WorkTable.FTableFlow.ValueTempertureDelta.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueTemperture <> nil then WorkTable.FTableFlow.ValueTemperture.DeleteFromVector;
+      if WorkTable.FTableFlow.ValuePressureBefore <> nil then WorkTable.FTableFlow.ValuePressureBefore.DeleteFromVector;
+      if WorkTable.FTableFlow.ValuePressureAfter <> nil then WorkTable.FTableFlow.ValuePressureAfter.DeleteFromVector;
+      if WorkTable.FTableFlow.ValuePressureDelta <> nil then WorkTable.FTableFlow.ValuePressureDelta.DeleteFromVector;
+      if WorkTable.FTableFlow.ValuePressure <> nil then WorkTable.FTableFlow.ValuePressure.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueAirPressure <> nil then WorkTable.FTableFlow.ValueAirPressure.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueAirTemperture <> nil then WorkTable.FTableFlow.ValueAirTemperture.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueHumidity <> nil then WorkTable.FTableFlow.ValueHumidity.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueTime <> nil then WorkTable.FTableFlow.ValueTime.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueQuantity <> nil then WorkTable.FTableFlow.ValueQuantity.DeleteFromVector;
+      if WorkTable.FTableFlow.ValueFlowRate <> nil then WorkTable.FTableFlow.ValueFlowRate.DeleteFromVector;
 
       WorkTable.InitMeterValues;
 
