@@ -1259,8 +1259,8 @@ begin
     SetDescription(ValueError, 'Итоговая погрешность');
   end;
   if EtalonMeter <> nil then
-    ValueError.ValueEtalon := EtalonMeter.ValueVolume;
-  ValueError.ValueBaseMultiplier := ValueVolumeMeter;
+    ValueError.ValueEtalon := EtalonMeter.ValueQuantity;
+  ValueError.ValueBaseMultiplier := ValueQuantity;
 
   ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, UUID, Name);
   if IsExisted = 0 then
@@ -1294,7 +1294,7 @@ begin
   if ValueMassError <> nil then
     ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
   if ValueError <> nil then
-    ValueError.ValueEtalon := EtalonMeter.ValueVolume;
+    ValueError.ValueEtalon := EtalonMeter.ValueQuantity;
 
   //ApplyMeasurementModel;
 end;
@@ -1486,6 +1486,15 @@ begin
     ValueVolume.ValueRate := nil;
   end;
 
+  if ValueError <> nil then
+  begin
+    ValueError.ValueBaseMultiplier := ValueQuantity;
+    if EtalonMeter <> nil then
+      ValueError.ValueEtalon := EtalonMeter.ValueQuantity
+    else
+      ValueError.ValueEtalon := nil;
+  end;
+
 end;
 
 procedure TFlowMeter.UpdateByDevice;
@@ -1583,6 +1592,15 @@ begin
         ValueQuantity := ValueVolume;
         ValueFlow := ValueVolumeFlow;
       end;
+  end;
+
+  if ValueError <> nil then
+  begin
+    ValueError.ValueBaseMultiplier := ValueQuantity;
+    if EtalonMeter <> nil then
+      ValueError.ValueEtalon := EtalonMeter.ValueQuantity
+    else
+      ValueError.ValueEtalon := nil;
   end;
 
     SetUpdateType(ONLINE_TYPE);

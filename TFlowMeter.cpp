@@ -253,10 +253,10 @@ void TFlowMeter::InitValues()
     if (IsExisted==0) ValueError->SetAsError();
 
     if (EtalonMeter != nullptr) {
-        ValueError->ValueEtalon = EtalonMeter->ValueVolume;
+        ValueError->ValueEtalon = EtalonMeter->ValueQuantity;
     }
 
-    ValueError->ValueBaseMultiplier = ValueVolumeMeter;
+    ValueError->ValueBaseMultiplier = ValueQuantity;
 
        SetMeterCategory(MeterFlowCategory);
 
@@ -423,10 +423,10 @@ void TFlowMeter::CopyValues(TFlowMeter* EtalonMeter)
     if (IsExisted==0) ValueError->SetAsError();
 
     if (EtalonMeter != nullptr) {
-        ValueError->ValueEtalon = EtalonMeter->ValueVolume;
+        ValueError->ValueEtalon = EtalonMeter->ValueQuantity;
     }
 
-    ValueError->ValueBaseMultiplier = ValueVolumeMeter;
+    ValueError->ValueBaseMultiplier = ValueQuantity;
 
        SetMeterCategory(MeterFlowCategory);
 
@@ -569,10 +569,10 @@ void TFlowMeter::RestoreValues()
     if (IsExisted==0) ValueError->SetAsError();
 
     if (EtalonMeter != nullptr) {
-        ValueError->ValueEtalon = EtalonMeter->ValueVolume;
+        ValueError->ValueEtalon = EtalonMeter->ValueQuantity;
     }
 
-    ValueError->ValueBaseMultiplier = ValueVolumeMeter;
+    ValueError->ValueBaseMultiplier = ValueQuantity;
 
     SetMeterCategory(MeterFlowCategory);
 
@@ -4145,7 +4145,7 @@ void TFlowMeter::SetEtalon(TFlowMeter* Etalon)
         if (ValueVolumeError != nullptr) {
             ValueVolumeError->ValueEtalon = EtalonMeter->ValueVolume;
             ValueMassError->ValueEtalon = EtalonMeter->ValueMass;
-            ValueError->ValueEtalon = EtalonMeter->ValueVolume;
+            ValueError->ValueEtalon = EtalonMeter->ValueQuantity;
         }
     }
 }
