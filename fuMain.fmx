@@ -165,6 +165,9 @@ object FormMain: TFormMain
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                 end
+                object StringColumnEtalonPressureDelta1: TStringColumn
+                  HeaderSettings.TextSettings.WordWrap = False
+                end
               end
             end
             object ToolBar2: TToolBar
@@ -273,6 +276,18 @@ object FormMain: TFormMain
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
+              object StringColumnDeviceQuantityBefore1: TStringColumn
+                Header = #1054#1073#1098#1077#1084' '#1076#1086
+                HeaderSettings.TextSettings.WordWrap = False
+              end
+              object StringColumnDeviceQuantityAfter1: TStringColumn
+                Header = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
+                HeaderSettings.TextSettings.WordWrap = False
+              end
+              object StringColumnDevicePressureDelta1: TStringColumn
+                Header = #1055#1088#1077#1087#1072#1076
+                HeaderSettings.TextSettings.WordWrap = False
+              end
             end
             object ToolBar1: TToolBar
               Size.Width = 1560.000000000000000000
@@ -284,6 +299,10 @@ object FormMain: TFormMain
                 Position.Y = 8.000000000000000000
                 Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
                 TabOrder = 0
+              end
+              object PopupMenuDevicesGridLayOut: TPopupMenu
+                Left = 1010
+                Top = 333
               end
             end
           end
@@ -2738,8 +2757,8 @@ object FormMain: TFormMain
     end
   end
   object PopupMenuWorkTables: TPopupMenu
-    Left = 1082
-    Top = 228
+    Left = 994
+    Top = 236
     object miAddTable: TMenuItem
       Action = ActionAddWorkTable
       ImageIndex = -1
@@ -2841,5 +2860,9 @@ object FormMain: TFormMain
       Text = #1042#1099#1073#1088#1072#1090#1100' '#1087#1088#1080#1073#1086#1088
       OnExecute = ActionOpenDeviceSelectExecute
     end
+  end
+  object PopupMenuEtalonsGridLayOut: TPopupMenu
+    Left = 1066
+    Top = 349
   end
 end

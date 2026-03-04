@@ -329,6 +329,12 @@ type
     StringColumnEtalonStd1: TStringColumn;
     StringColumnEtalonRawValue1: TStringColumn;
     StringColumnDeviceRawValue1: TStringColumn;
+    StringColumnEtalonPressureDelta1: TStringColumn;
+    StringColumnDeviceQuantityBefore1: TStringColumn;
+    StringColumnDeviceQuantityAfter1: TStringColumn;
+    StringColumnDevicePressureDelta1: TStringColumn;
+    PopupMenuEtalonsGridLayOut: TPopupMenu;
+    PopupMenuDevicesGridLayOut: TPopupMenu;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
