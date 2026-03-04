@@ -173,6 +173,7 @@ type
     function GetStringMeanValue: string; overload;
     function GetStringVariation: string;
     function GetStringStdDeviationPercent: string;
+    function GetStrStdDeviationPercent: string;
     function GetStrValue: string;
     function GetStringNum(AValue: Double): string;
     function GetStrNumLimits(AValue: Double): string;
@@ -768,13 +769,18 @@ end;
 { Returns formatted variation string in absolute units. }
 function TMeterValue.GetStringVariation: string;
 begin
-  Result := FormatValue(GetDoubleVariation, Accuracy, Error);
+  Result := FormatValue(GetDoubleVariation, 0, 0.01);
 end;
 
 { Returns formatted standard deviation string in percent. }
 function TMeterValue.GetStringStdDeviationPercent: string;
 begin
-  Result := FormatValue(GetDoubleStdDeviationPercent, Accuracy, 0) + ' %';
+  Result := FormatValue(GetDoubleStdDeviationPercent, 0, 0.01) + ' %';
+end;
+
+function TMeterValue.GetStrStdDeviationPercent: string;
+begin
+  Result := FormatValue(GetDoubleStdDeviationPercent, 0, 0.01);
 end;
 
 { Returns formatted value using CurrentDimIndex as active display dimension. }
