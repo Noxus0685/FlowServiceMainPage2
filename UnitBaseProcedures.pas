@@ -221,13 +221,55 @@ end;
 
 function FormatValue(Value: Double; Accuracy: Integer; Error: Double): string;
 var
-  Dbl: Double;
   FS: TFormatSettings;
+  FractPartCnt: Integer;
+  AbsError, ValuePart: Double;
+  IntPartDigits: Integer;
+  AbsV: Double;
 begin
-  Dbl := Value;
-
   FS := TFormatSettings.Create;
-  Result := FormatValue(FloatToStrF(Dbl, ffFixed, 10, 12, FS), Accuracy, Error);
+
+  // 1) Accuracy = 0 => целое
+  if Accuracy <= 0 then
+    Exit(FloatToStrF(Value, ffNumber, 10, 0, FS));
+
+  // 2) Error = 0 => фиксированная точность = Accuracy
+  if Error <= 0 then
+    Exit(FloatToStrF(Value, ffNumber, 10, EnsureRange(Accuracy, 0, 12), FS));
+
+  // 3) Error > 0 => точность от погрешности
+  AbsV := Abs(Value);
+
+  // Кол-во цифр в целой части (как критерий "IntPartCnt < 5" в строковом варианте)
+  if AbsV < 1 then
+    IntPartDigits := 1
+  else
+    IntPartDigits := Trunc(Log10(AbsV)) + 1;
+
+  if IntPartDigits < 5 then
+  begin
+    // AbsError = |V| * Error% (если V=0, используем Error% как раньше)
+    if Value <> 0 then
+      AbsError := AbsV * Error / 100
+    else
+      AbsError := Error / 100;
+
+    // Берём десятую часть абсолютной погрешности (как в твоём коде)
+    ValuePart := AbsError / 10;
+
+    if ValuePart < 1 then
+      FractPartCnt := Ceil(-Log10(ValuePart))
+    else
+      FractPartCnt := 0;
+
+    if FractPartCnt < 0 then
+      FractPartCnt := 0;
+  end
+  else
+    FractPartCnt := 0;
+
+  FractPartCnt := EnsureRange(FractPartCnt, 0, 12);
+  Result := FloatToStrF(Value, ffNumber, 10, FractPartCnt, FS);
 end;
 
 function FormatValue(const Str: string; Accuracy: Integer; Error: Double): string;

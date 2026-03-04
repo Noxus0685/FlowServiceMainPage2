@@ -1058,16 +1058,17 @@ begin
   ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
-    ValueImp.SetAsImp;
+
     SetDescription(ValueImp, 'Импульсы расходомера');
   end;
+    ValueImp.SetAsImp;
 
   ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
-    ValueImpTotal.SetAsImp;
     SetDescription(ValueImpTotal, 'Суммарные импульсы');
   end;
+    ValueImpTotal.SetAsImp;
 
   ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, UUID, Name);
   if IsExisted = 0 then
@@ -1194,6 +1195,7 @@ begin
   end
   else if ValueFlow <> nil then
     ValueFlow.Accuracy := 4;
+        ValueImp.Accuracy := 0;
 end;
 
 procedure TFlowMeter.SetEtalon(AEtalon: TFlowMeter);

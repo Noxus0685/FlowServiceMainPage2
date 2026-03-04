@@ -326,21 +326,23 @@ begin
  ValueImp := TMeterValue.GetExistedMeterValueBool(FHashValueImp, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
-    FValueImp.SetAsImp;
     FValueImp.Description:='Импульсы за сек';
     FValueImp.DependenceType := INDEPENDENT;
     FValueImp.UpdateType := ONLINE_TYPE;
   end;
+
+  FValueImp.SetAsImp;
   FValueImp.SetToSave(True);
 
   ValueImpTotal := TMeterValue.GetExistedMeterValueBool(FHashValueImpTotal, IsExisted, UUID, Name);
   if IsExisted = 0 then
   begin
-    FValueImpTotal.SetAsImp;
     FValueImp.Description:='Импульсы накопительный итог';
     FValueImpTotal.DependenceType := INDEPENDENT;
     FValueImpTotal.UpdateType := ONLINE_TYPE;
   end;
+
+  FValueImpTotal.SetAsImp;
   FValueImpTotal.SetToSave(True);
 
   ValueCurrent := TMeterValue.GetExistedMeterValueBool(FHashValueCurrent, IsExisted, UUID, Name);
@@ -363,7 +365,6 @@ begin
     FValueInterface.UpdateType := ONLINE_TYPE;
   end;
   FValueInterface.SetToSave(True);
-
 
 end;
 
@@ -433,8 +434,6 @@ begin
   FValueResult := 0;
 
   FFlowMeter.Name := 'Прибор ' + FName;
-
-  InitMeterValues;
 end;
 
 { Releases channel-owned resources and removes linked values from shared storage. }
@@ -1474,41 +1473,7 @@ begin
     if Channel.FValueCurrent <> nil then Channel.FValueCurrent.DeleteFromVector;
     if Channel.FValueInterface <> nil then Channel.FValueInterface.DeleteFromVector;
 
-    Channel.ValueImp := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImp, IsExisted, Channel.UUID, Channel.Name);
-    if IsExisted = 0 then
-    begin
-      Channel.FValueImp.SetAsImp;
-      Channel.FValueImp.DependenceType := INDEPENDENT;
-      Channel.FValueImp.UpdateType := ONLINE_TYPE;
-    end;
-    Channel.FValueImp.SetToSave(True);
-
-    Channel.ValueImpTotal := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueImpTotal, IsExisted, Channel.UUID, Channel.Name);
-    if IsExisted = 0 then
-    begin
-      Channel.FValueImpTotal.SetAsImp;
-      Channel.FValueImpTotal.DependenceType := INDEPENDENT;
-      Channel.FValueImpTotal.UpdateType := ONLINE_TYPE;
-    end;
-    Channel.FValueImpTotal.SetToSave(True);
-
-    Channel.ValueCurrent := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueCurrent, IsExisted, Channel.UUID, Channel.Name);
-    if IsExisted = 0 then
-    begin
-      Channel.FValueCurrent.SetAsCurrent;
-      Channel.FValueCurrent.DependenceType := INDEPENDENT;
-      Channel.FValueCurrent.UpdateType := ONLINE_TYPE;
-    end;
-    Channel.FValueCurrent.SetToSave(True);
-    Channel.ValueInterface := TMeterValue.GetExistedMeterValueBool(Channel.FHashValueInterface, IsExisted, Channel.UUID, Channel.Name);
-    if IsExisted = 0 then
-    begin
-      Channel.FValueInterface.Name := 'Интерфейс';
-      Channel.FValueInterface.ShrtName := 'Интерфейс';
-      Channel.FValueInterface.DependenceType := INDEPENDENT;
-      Channel.FValueInterface.UpdateType := ONLINE_TYPE;
-    end;
-    Channel.FValueInterface.SetToSave(True);
+    Channel.InitMeterValues;
 
     Channel.FlowMeter.Name := 'прибор '+ Channel.Name;
 

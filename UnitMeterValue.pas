@@ -1502,7 +1502,7 @@ begin
   ValueType := FLOW_TYPE;
   Value := 0;
   SetFilter(-1);
-  Accuracy := 5;
+  Accuracy := 0;
   Name := 'Импульсы';
   ShrtName := 'N';
   Dimensions.Clear;

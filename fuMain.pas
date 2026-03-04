@@ -1290,7 +1290,6 @@ begin
     StringColumnEtalonQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
   end;
 
-<<<<<<< codex/add-valueflow.valuebasemultiplier-to-columns-abe1up
   RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.DeviceChannels);
   if RawValueBaseMultiplier = nil then
     RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.EtalonChannels);
@@ -1299,15 +1298,6 @@ begin
   begin
     StringColumnDeviceRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
     StringColumnEtalonRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
-=======
-  if (WorkTable.ValueFlowRate <> nil) and
-     (WorkTable.ValueFlowRate.ValueBaseMultiplier <> nil) then
-  begin
-    StringColumnDeviceRawValue1.Header :=
-      WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
-    StringColumnEtalonRawValue1.Header :=
-      WorkTable.ValueFlowRate.ValueBaseMultiplier.GetStrFullName;
->>>>>>> main
   end;
 
 
