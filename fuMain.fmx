@@ -179,11 +179,13 @@ object FormMain: TFormMain
               end
             end
             object ToolBar2: TToolBar
+              PopupMenu = PopupMenuEtalonsGridLayOut
               Size.Width = 1560.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
               object Label30: TLabel
+                PopupMenu = PopupMenuEtalonsGridLayOut
                 Position.X = 1.000000000000000000
                 Position.Y = 8.000000000000000000
                 Text = #1069#1090#1072#1083#1086#1085#1099
@@ -304,11 +306,13 @@ object FormMain: TFormMain
               end
             end
             object ToolBar1: TToolBar
+              PopupMenu = PopupMenuDevicesGridLayOut
               Size.Width = 1560.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
               object Label23: TLabel
+                PopupMenu = PopupMenuDevicesGridLayOut
                 Position.X = 1.000000000000000000
                 Position.Y = 8.000000000000000000
                 Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
@@ -2837,6 +2841,11 @@ object FormMain: TFormMain
     Left = 874
     Top = 412
   end
+  object PopupMenuEtalonsGridLayOut: TPopupMenu
+    OnPopup = PopupMenuEtalonsGridLayOutPopup
+    Left = 1066
+    Top = 349
+  end
   object ActionListWorkTables: TActionList
     Left = 922
     Top = 428
@@ -2875,10 +2884,5 @@ object FormMain: TFormMain
       Text = #1042#1099#1073#1088#1072#1090#1100' '#1087#1088#1080#1073#1086#1088
       OnExecute = ActionOpenDeviceSelectExecute
     end
-  end
-  object PopupMenuEtalonsGridLayOut: TPopupMenu
-    OnPopup = PopupMenuEtalonsGridLayOutPopup
-    Left = 1066
-    Top = 349
   end
 end

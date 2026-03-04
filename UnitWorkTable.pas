@@ -106,6 +106,8 @@ type
     procedure SetValueResultProxy(const AValue: Double);
 
     procedure InitMeterValues;
+    procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string;const AValue: TMeterValue);
+
     procedure SetValueImp(const AValue: TMeterValue);
     procedure SetValueImpTotal(const AValue: TMeterValue);
     procedure SetValueCurrent(const AValue: TMeterValue);
@@ -405,7 +407,7 @@ begin
 
 end;
 
-procedure TChannel.SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
+procedure TChannel.SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string;const AValue: TMeterValue);
 begin
   if ATarget = AValue then
   begin
