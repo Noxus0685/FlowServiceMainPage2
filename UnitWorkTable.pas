@@ -233,6 +233,7 @@ type
     procedure SetValueTime(const AValue: TMeterValue);
     procedure SetValueQuantity(const AValue: TMeterValue);
     procedure SetValueFlowRate(const AValue: TMeterValue);
+    procedure AssignTableFlowAsEtalonToDevices;
 
 
     class function SpillStateToString(AState: TSpillState): string; static;
@@ -941,7 +942,23 @@ begin
   EnsureDescription(FTableFlow.ValueFlowRate, 'Расход');
   FTableFlow.ValueFlowRate.SetToSave(True);
 
+  AssignTableFlowAsEtalonToDevices;
+end;
 
+procedure TWorkTable.AssignTableFlowAsEtalonToDevices;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if FTableFlow = nil then
+    Exit;
+
+  for I := 0 to FDeviceChannels.Count - 1 do
+  begin
+    Channel := FDeviceChannels[I];
+    if (Channel <> nil) and (Channel.FlowMeter <> nil) then
+      Channel.FlowMeter.SetEtalon(FTableFlow);
+  end;
 end;
 
 function TWorkTable.GetValueTempertureBefore: TMeterValue;
@@ -1236,6 +1253,8 @@ begin
   Result.Text := BuildChannelDefaultText(ChannelIndex);
   FDeviceChannels.Add(Result);
   Result.RebindFlowMeterValues(Self);
+  if (Result.FlowMeter <> nil) and (FTableFlow <> nil) then
+    Result.FlowMeter.SetEtalon(FTableFlow);
 end;
 
 { Adds and configures a new device channel from provided parameters. }
@@ -1274,6 +1293,8 @@ var
 begin
   for I := 0 to FDeviceChannels.Count - 1 do
     FDeviceChannels[I].RebindFlowMeterValues(Self);
+
+  AssignTableFlowAsEtalonToDevices;
 
   for I := 0 to FEtalonChannels.Count - 1 do
     FEtalonChannels[I].RebindFlowMeterValues(Self);
