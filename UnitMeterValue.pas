@@ -163,12 +163,16 @@ type
     function GetDoubleMeanValue(const DimName: string): Double; overload;
     function GetDoubleMeanValue(dim: Byte): Double; overload;
     function GetDoubleMeanValue: Double; overload;
+    function GetDoubleVariation: Double;
+    function GetDoubleStdDeviationPercent: Double;
     function IsStable(lim: Integer): Boolean;
     function GetStringValue: string; overload;
     function GetStringValue(Dim: Byte): string; overload;
     function GetStringValue(const ADim: string): string; overload;
     function GetStringMeanValue(Dim: Byte): string; overload;
     function GetStringMeanValue: string; overload;
+    function GetStringVariation: string;
+    function GetStringStdDeviationPercent: string;
     function GetStrValue: string;
     function GetStringNum(AValue: Double): string;
     function GetStrNumLimits(AValue: Double): string;
@@ -651,6 +655,59 @@ begin
   Result := GetDoubleMeanValue * GetDimRate(DimName);
 end;
 
+{ Returns variation (max - min) in absolute units over Values history. }
+function TMeterValue.GetDoubleVariation: Double;
+var
+  MinHistory: Double;
+  MaxHistory: Double;
+  ItemValue: Double;
+begin
+  if Values.Count = 0 then
+    Exit(0);
+
+  MinHistory := Values[0];
+  MaxHistory := Values[0];
+
+  for ItemValue in Values do
+  begin
+    if ItemValue < MinHistory then
+      MinHistory := ItemValue;
+    if ItemValue > MaxHistory then
+      MaxHistory := ItemValue;
+  end;
+
+  Result := MaxHistory - MinHistory;
+end;
+
+{ Returns standard deviation in percent relative to mean over Values history. }
+function TMeterValue.GetDoubleStdDeviationPercent: Double;
+var
+  MeanHistory: Double;
+  SumSquares: Double;
+  ItemValue: Double;
+  Delta: Double;
+begin
+  if Values.Count = 0 then
+    Exit(0);
+
+  MeanHistory := 0;
+  for ItemValue in Values do
+    MeanHistory := MeanHistory + ItemValue;
+  MeanHistory := MeanHistory / Values.Count;
+
+  if SameValue(MeanHistory, 0, 1E-12) then
+    Exit(0);
+
+  SumSquares := 0;
+  for ItemValue in Values do
+  begin
+    Delta := ItemValue - MeanHistory;
+    SumSquares := SumSquares + Sqr(Delta);
+  end;
+
+  Result := Sqrt(SumSquares / Values.Count) / Abs(MeanHistory) * 100;
+end;
+
 { Checks whether current value deviation from last mean is within the limit. }
 function TMeterValue.IsStable(lim: Integer): Boolean;
 begin
@@ -706,6 +763,18 @@ end;
 function TMeterValue.GetStringMeanValue: string;
 begin
   Result := GetStringMeanValue(0);
+end;
+
+{ Returns formatted variation string in absolute units. }
+function TMeterValue.GetStringVariation: string;
+begin
+  Result := FormatValue(GetDoubleVariation, Accuracy, Error);
+end;
+
+{ Returns formatted standard deviation string in percent. }
+function TMeterValue.GetStringStdDeviationPercent: string;
+begin
+  Result := FormatValue(GetDoubleStdDeviationPercent, Accuracy, 0) + ' %';
 end;
 
 { Returns formatted value using CurrentDimIndex as active display dimension. }
