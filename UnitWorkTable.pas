@@ -14,6 +14,13 @@ uses
   System.Generics.Collections;
 
 type
+  TGridColumnLayout = record
+    Name: string;
+    DisplayIndex: Integer;
+    Width: Single;
+    Visible: Boolean;
+  end;
+
   TWorkTable = class;
 
   TSpillState = (
@@ -199,6 +206,15 @@ type
     FHashValueQuantity: string;
     FHashValueFlowRate: string;
 
+    FLayoutFlowRateVisible: Boolean;
+    FLayoutPumpVisible: Boolean;
+    FLayoutMainVisible: Boolean;
+    FLayoutMesureVisible: Boolean;
+    FLayoutConditionsVisible: Boolean;
+
+    FEtalonsGridColumns: TArray<TGridColumnLayout>;
+    FDevicesGridColumns: TArray<TGridColumnLayout>;
+
     procedure InitMeterValues;
     procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
@@ -220,6 +236,18 @@ type
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
+
+    class procedure SaveGridColumns(
+      AIni: TIniFile;
+      const ASectionPrefix: string;
+      const AColumns: TArray<TGridColumnLayout>
+    ); static;
+
+    class procedure LoadGridColumns(
+      AIni: TIniFile;
+      const ASectionPrefix: string;
+      out AColumns: TArray<TGridColumnLayout>
+    ); static;
 
     class procedure SaveChannelList(
       AIni: TIniFile;
@@ -292,6 +320,15 @@ type
     property ValueTime: TMeterValue read FValueTime write SetValueTime;
     property ValueQuantity: TMeterValue read FValueQuantity write SetValueQuantity;
     property ValueFlowRate: TMeterValue read FValueFlowRate write SetValueFlowRate;
+
+    property LayoutFlowRateVisible: Boolean read FLayoutFlowRateVisible write FLayoutFlowRateVisible;
+    property LayoutPumpVisible: Boolean read FLayoutPumpVisible write FLayoutPumpVisible;
+    property LayoutMainVisible: Boolean read FLayoutMainVisible write FLayoutMainVisible;
+    property LayoutMesureVisible: Boolean read FLayoutMesureVisible write FLayoutMesureVisible;
+    property LayoutConditionsVisible: Boolean read FLayoutConditionsVisible write FLayoutConditionsVisible;
+
+    property EtalonsGridColumns: TArray<TGridColumnLayout> read FEtalonsGridColumns write FEtalonsGridColumns;
+    property DevicesGridColumns: TArray<TGridColumnLayout> read FDevicesGridColumns write FDevicesGridColumns;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -714,6 +751,12 @@ begin
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
   FQuantityUnitName := 'м3';
+
+  FLayoutFlowRateVisible := True;
+  FLayoutPumpVisible := True;
+  FLayoutMainVisible := True;
+  FLayoutMesureVisible := True;
+  FLayoutConditionsVisible := True;
 
   Temp:= 20.2;
   TempDelta:=0.1;
@@ -1208,6 +1251,11 @@ begin
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
       Ini.WriteString(Section, 'FlowUnitName', WorkTable.FlowUnitName);
       Ini.WriteString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName);
+      Ini.WriteBool(Section, 'LayoutFlowRateVisible', WorkTable.LayoutFlowRateVisible);
+      Ini.WriteBool(Section, 'LayoutPumpVisible', WorkTable.LayoutPumpVisible);
+      Ini.WriteBool(Section, 'LayoutMainVisible', WorkTable.LayoutMainVisible);
+      Ini.WriteBool(Section, 'LayoutMesureVisible', WorkTable.LayoutMesureVisible);
+      Ini.WriteBool(Section, 'LayoutConditionsVisible', WorkTable.LayoutConditionsVisible);
 
       ValuesIni.EraseSection(Section);
       ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
@@ -1243,6 +1291,8 @@ begin
 
       SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
+      SaveGridColumns(Ini, Section + '.EtalonGrid', WorkTable.EtalonsGridColumns);
+      SaveGridColumns(Ini, Section + '.DeviceGrid', WorkTable.DevicesGridColumns);
     end;
   finally
     ValuesIni.Free;
@@ -1298,6 +1348,11 @@ begin
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
       WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
       WorkTable.QuantityUnitName := Trim(Ini.ReadString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName));
+      WorkTable.LayoutFlowRateVisible := Ini.ReadBool(Section, 'LayoutFlowRateVisible', True);
+      WorkTable.LayoutPumpVisible := Ini.ReadBool(Section, 'LayoutPumpVisible', True);
+      WorkTable.LayoutMainVisible := Ini.ReadBool(Section, 'LayoutMainVisible', True);
+      WorkTable.LayoutMesureVisible := Ini.ReadBool(Section, 'LayoutMesureVisible', True);
+      WorkTable.LayoutConditionsVisible := Ini.ReadBool(Section, 'LayoutConditionsVisible', True);
 
       WorkTable.FHashValueTempertureBefore := ValuesIni.ReadString(Section, 'HashValueTempertureBefore', WorkTable.FHashValueTempertureBefore);
       WorkTable.FHashValueTempertureAfter := ValuesIni.ReadString(Section, 'HashValueTempertureAfter', WorkTable.FHashValueTempertureAfter);
@@ -1349,6 +1404,8 @@ begin
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
+      LoadGridColumns(Ini, Section + '.EtalonGrid', WorkTable.FEtalonsGridColumns);
+      LoadGridColumns(Ini, Section + '.DeviceGrid', WorkTable.FDevicesGridColumns);
       WorkTable.RebindAllFlowMeters;
       WorkTable.RecalculateAllMeterValues;
       WorkTable.UpdateAggregateMeterValues;
@@ -1358,6 +1415,54 @@ begin
   finally
     ValuesIni.Free;
     Ini.Free;
+  end;
+end;
+
+class procedure TWorkTable.SaveGridColumns(AIni: TIniFile;
+  const ASectionPrefix: string; const AColumns: TArray<TGridColumnLayout>);
+var
+  I: Integer;
+  Section: string;
+begin
+  if AIni = nil then
+    Exit;
+
+  AIni.EraseSection(ASectionPrefix);
+  AIni.WriteInteger(ASectionPrefix, 'Count', Length(AColumns));
+
+  for I := 0 to High(AColumns) do
+  begin
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    AIni.EraseSection(Section);
+    AIni.WriteString(Section, 'Name', AColumns[I].Name);
+    AIni.WriteInteger(Section, 'DisplayIndex', AColumns[I].DisplayIndex);
+    AIni.WriteFloat(Section, 'Width', AColumns[I].Width);
+    AIni.WriteBool(Section, 'Visible', AColumns[I].Visible);
+  end;
+end;
+
+class procedure TWorkTable.LoadGridColumns(AIni: TIniFile;
+  const ASectionPrefix: string; out AColumns: TArray<TGridColumnLayout>);
+var
+  I, Count: Integer;
+  Section: string;
+begin
+  SetLength(AColumns, 0);
+  if AIni = nil then
+    Exit;
+
+  Count := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
+  if Count <= 0 then
+    Exit;
+
+  SetLength(AColumns, Count);
+  for I := 0 to Count - 1 do
+  begin
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    AColumns[I].Name := AIni.ReadString(Section, 'Name', '');
+    AColumns[I].DisplayIndex := AIni.ReadInteger(Section, 'DisplayIndex', I);
+    AColumns[I].Width := AIni.ReadFloat(Section, 'Width', 80);
+    AColumns[I].Visible := AIni.ReadBool(Section, 'Visible', True);
   end;
 end;
 

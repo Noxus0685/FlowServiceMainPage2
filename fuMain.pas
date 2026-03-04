@@ -399,6 +399,10 @@ type
     procedure UpdateUIFromValues;
     procedure SetValues;
     procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
+    procedure SaveLayoutSettingsToWorkTable;
+    procedure LoadLayoutSettingsFromWorkTable;
+    procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
+    procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
 
      procedure UpdateGrids;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
@@ -588,6 +592,8 @@ begin
     LayoutMesure.Visible := NewVisible
   else if MenuItem = miConditions then
     LayoutConditions.Visible := NewVisible;
+
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
@@ -641,10 +647,108 @@ begin
   NewVisible := not MenuItem.IsChecked;
   MenuItem.IsChecked := NewVisible;
   Column.Visible := NewVisible;
+
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.CaptureGridColumnsLayout(AGrid: TGrid;
+  out AColumns: TArray<TGridColumnLayout>);
+var
+  I: Integer;
+begin
+  SetLength(AColumns, 0);
+  if AGrid = nil then
+    Exit;
+
+  SetLength(AColumns, AGrid.ColumnCount);
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    AColumns[I].Name := AGrid.Columns[I].Name;
+    AColumns[I].DisplayIndex := I;
+    AColumns[I].Width := AGrid.Columns[I].Width;
+    AColumns[I].Visible := AGrid.Columns[I].Visible;
+  end;
+end;
+
+procedure TFormMain.ApplyGridColumnsLayout(AGrid: TGrid;
+  const AColumns: TArray<TGridColumnLayout>);
+var
+  I, J: Integer;
+  Column: TColumn;
+begin
+  if (AGrid = nil) or (Length(AColumns) = 0) then
+    Exit;
+
+  AGrid.BeginUpdate;
+  try
+    for I := 0 to High(AColumns) do
+    begin
+      Column := nil;
+      for J := 0 to AGrid.ColumnCount - 1 do
+        if SameText(AGrid.Columns[J].Name, AColumns[I].Name) then
+        begin
+          Column := AGrid.Columns[J];
+          Break;
+        end;
+
+      if Column = nil then
+        Continue;
+
+      Column.Visible := AColumns[I].Visible;
+      if AColumns[I].Width > 0 then
+        Column.Width := AColumns[I].Width;
+      if (AColumns[I].DisplayIndex >= 0) and (AColumns[I].DisplayIndex < AGrid.ColumnCount) then
+        Column.Index := AColumns[I].DisplayIndex;
+    end;
+  finally
+    AGrid.EndUpdate;
+  end;
+end;
+
+procedure TFormMain.SaveLayoutSettingsToWorkTable;
+var
+  WorkTable: TWorkTable;
+  EtalonColumns: TArray<TGridColumnLayout>;
+  DeviceColumns: TArray<TGridColumnLayout>;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  WorkTable.LayoutFlowRateVisible := LayoutFlowRate.Visible;
+  WorkTable.LayoutPumpVisible := LayoutPump.Visible;
+  WorkTable.LayoutMainVisible := LayoutMain.Visible;
+  WorkTable.LayoutMesureVisible := LayoutMesure.Visible;
+  WorkTable.LayoutConditionsVisible := LayoutConditions.Visible;
+
+  CaptureGridColumnsLayout(GridEtalons, EtalonColumns);
+  CaptureGridColumnsLayout(GridDevices, DeviceColumns);
+  WorkTable.EtalonsGridColumns := EtalonColumns;
+  WorkTable.DevicesGridColumns := DeviceColumns;
+end;
+
+procedure TFormMain.LoadLayoutSettingsFromWorkTable;
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  LayoutFlowRate.Visible := WorkTable.LayoutFlowRateVisible;
+  LayoutPump.Visible := WorkTable.LayoutPumpVisible;
+  LayoutMain.Visible := WorkTable.LayoutMainVisible;
+  LayoutMesure.Visible := WorkTable.LayoutMesureVisible;
+  LayoutConditions.Visible := WorkTable.LayoutConditionsVisible;
+
+  ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
+  ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
 end;
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  SaveLayoutSettingsToWorkTable;
   if FWorkTableManager <> nil then
     FWorkTableManager.Save;
 end;
@@ -799,6 +903,7 @@ begin
       ComboEditUnits.ItemIndex := 0;
 
     SetDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
+    LoadLayoutSettingsFromWorkTable;
   end;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
@@ -1070,6 +1175,7 @@ begin
   if FWorkTableManager = nil then
     Exit;
 
+  SaveLayoutSettingsToWorkTable;
   FWorkTableManager.Save;
 end;
 
