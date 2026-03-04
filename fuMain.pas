@@ -403,6 +403,7 @@ type
     procedure LoadLayoutSettingsFromWorkTable;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
+    procedure MarkChannelDeviceModified(AChannel: TChannel);
 
      procedure UpdateGrids;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
@@ -751,6 +752,18 @@ begin
   SaveLayoutSettingsToWorkTable;
   if FWorkTableManager <> nil then
     FWorkTableManager.Save;
+
+  if DataManager <> nil then
+    DataManager.Save;
+end;
+
+procedure TFormMain.MarkChannelDeviceModified(AChannel: TChannel);
+begin
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
+    Exit;
+
+  if AChannel.FlowMeter.Device.State <> osDeleted then
+    AChannel.FlowMeter.Device.State := osModified;
 end;
 
 procedure TFormMain.SetDim(FlowUnitName: string; QuantityUnitName: string);
@@ -1724,7 +1737,10 @@ begin
   if (Column = CheckColumnDeviceEnable1) then
   begin
     if WorkTable <> nil then
-      WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled
+    begin
+      WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled;
+      MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
+    end
     else
       FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
   end;
@@ -1861,6 +1877,7 @@ procedure TFormMain.GridDevicesSetValue(Sender: TObject; const ACol,
 var
   WorkTable: TWorkTable;
   Signal: Integer;
+  Changed: Boolean;
 begin
   if IsUpdating then
     Exit;
@@ -1868,17 +1885,38 @@ begin
   WorkTable := GetWorkTableByIndex(0);
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
+    Changed := False;
+
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
-      WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean
+    begin
+      Changed := WorkTable.DeviceChannels[ARow].Enabled <> Value.AsBoolean;
+      WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
-      WorkTable.DeviceChannels[ARow].Text := Value.AsString
+    begin
+      Changed := WorkTable.DeviceChannels[ARow].Text <> Value.AsString;
+      WorkTable.DeviceChannels[ARow].Text := Value.AsString;
+    end
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
-      WorkTable.DeviceChannels[ARow].TypeName := Value.AsString
+    begin
+      Changed := WorkTable.DeviceChannels[ARow].TypeName <> Value.AsString;
+      WorkTable.DeviceChannels[ARow].TypeName := Value.AsString;
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
-      WorkTable.DeviceChannels[ARow].Serial := Value.AsString
+    begin
+      Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
+      WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
+      begin
+        Changed := WorkTable.DeviceChannels[ARow].Signal <> Signal;
         WorkTable.DeviceChannels[ARow].Signal := Signal;
+      end;
+
+    if Changed then
+      MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
+
     Exit;
   end;
 
@@ -1922,11 +1960,15 @@ begin
   if Column = CheckColumnEtalonEnable1 then
   begin
     if WorkTable <> nil then
-      WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled
+    begin
+      WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
+      MarkChannelDeviceModified(WorkTable.EtalonChannels[Row]);
+    end
     else
       FRows[Row].Enabled := not FRows[Row].Enabled;
 
-     WorkTable.RebindAllFlowMeters;
+    if WorkTable <> nil then
+      WorkTable.RebindAllFlowMeters;
   end;
 
   if Column = PopupColumnEtalonSignal1 then
@@ -2243,6 +2285,7 @@ procedure TFormMain.GridEtalonsSetValue(Sender: TObject;
 var
   WorkTable: TWorkTable;
   Signal: Integer;
+  Changed: Boolean;
 begin
   if IsUpdating then
     Exit;
@@ -2250,20 +2293,39 @@ begin
   WorkTable := GetWorkTableByIndex(0);
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
+    Changed := False;
+
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
      begin
+      Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
       WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
       WorkTable.RebindAllFlowMeters;
      end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
-      WorkTable.EtalonChannels[ARow].Text := Value.AsString
+    begin
+      Changed := WorkTable.EtalonChannels[ARow].Text <> Value.AsString;
+      WorkTable.EtalonChannels[ARow].Text := Value.AsString;
+    end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
-      WorkTable.EtalonChannels[ARow].TypeName := Value.AsString
+    begin
+      Changed := WorkTable.EtalonChannels[ARow].TypeName <> Value.AsString;
+      WorkTable.EtalonChannels[ARow].TypeName := Value.AsString;
+    end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
-      WorkTable.EtalonChannels[ARow].Serial := Value.AsString
+    begin
+      Changed := WorkTable.EtalonChannels[ARow].Serial <> Value.AsString;
+      WorkTable.EtalonChannels[ARow].Serial := Value.AsString;
+    end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
+      begin
+        Changed := WorkTable.EtalonChannels[ARow].Signal <> Signal;
         WorkTable.EtalonChannels[ARow].Signal := Signal;
+      end;
+
+    if Changed then
+      MarkChannelDeviceModified(WorkTable.EtalonChannels[ARow]);
+
     Exit;
   end;
 
