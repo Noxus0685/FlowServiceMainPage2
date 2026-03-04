@@ -335,6 +335,8 @@ type
     StringColumnDevicePressureDelta1: TStringColumn;
     PopupMenuEtalonsGridLayOut: TPopupMenu;
     PopupMenuDevicesGridLayOut: TPopupMenu;
+    StringColumnDeviceOptions1: TStringColumn;
+    StringColumnEtalonOptions1: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

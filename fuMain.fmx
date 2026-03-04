@@ -166,7 +166,14 @@ object FormMain: TFormMain
                   HeaderSettings.TextSettings.HorzAlign = Center
                 end
                 object StringColumnEtalonPressureDelta1: TStringColumn
+                  Header = #1055#1077#1088#1077#1087#1072#1076
                   HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
+                end
+                object StringColumnEtalonOptions1: TStringColumn
+                  Header = #1057#1090#1072#1090#1091#1089
+                  HeaderSettings.TextSettings.WordWrap = False
+                  HeaderSettings.TextSettings.HorzAlign = Center
                 end
               end
             end
@@ -287,6 +294,12 @@ object FormMain: TFormMain
               object StringColumnDevicePressureDelta1: TStringColumn
                 Header = #1055#1088#1077#1087#1072#1076
                 HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnDeviceOptions1: TStringColumn
+                Header = #1057#1090#1072#1090#1091#1089
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
               end
             end
             object ToolBar1: TToolBar
