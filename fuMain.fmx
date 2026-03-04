@@ -87,6 +87,7 @@ object FormMain: TFormMain
                 Align = Client
                 CanFocus = True
                 ClipChildren = True
+                PopupMenu = PopupMenuEtalonsGridLayOut
                 Size.Width = 1560.000000000000000000
                 Size.Height = 120.000000000000000000
                 Size.PlatformDefault = False
@@ -200,7 +201,7 @@ object FormMain: TFormMain
               Align = Client
               CanFocus = True
               ClipChildren = True
-              PopupMenu = PopupMenu1
+              PopupMenu = PopupMenuDevicesGridLayOut
               Size.Width = 1560.000000000000000000
               Size.Height = 267.000000000000000000
               Size.PlatformDefault = False
@@ -314,6 +315,7 @@ object FormMain: TFormMain
                 TabOrder = 0
               end
               object PopupMenuDevicesGridLayOut: TPopupMenu
+                OnPopup = PopupMenuDevicesGridLayOutPopup
                 Left = 1010
                 Top = 333
               end
@@ -2875,6 +2877,7 @@ object FormMain: TFormMain
     end
   end
   object PopupMenuEtalonsGridLayOut: TPopupMenu
+    OnPopup = PopupMenuEtalonsGridLayOutPopup
     Left = 1066
     Top = 349
   end
