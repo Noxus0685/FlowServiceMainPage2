@@ -1294,12 +1294,11 @@ begin
   for I := 0 to FDeviceChannels.Count - 1 do
     FDeviceChannels[I].RebindFlowMeterValues(Self);
 
-  AssignTableFlowAsEtalonToDevices;
-
-  for I := 0 to FEtalonChannels.Count - 1 do
+   for I := 0 to FEtalonChannels.Count - 1 do
     FEtalonChannels[I].RebindFlowMeterValues(Self);
 
   UpdateAggregateMeterValues;
+  AssignTableFlowAsEtalonToDevices;
 end;
 
 { Triggers recalculation/update pass for work table and channel meter values. }
@@ -1322,6 +1321,7 @@ begin
     if Channel.FlowMeter.ValueMassFlow <> nil then Channel.FlowMeter.ValueMassFlow.SetValue();
     if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
     if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
+    if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
 
 
   end;
@@ -1336,6 +1336,7 @@ begin
     if Channel.FlowMeter.ValueVolumeFlow <> nil then Channel.FlowMeter.ValueVolumeFlow.SetValue();
     if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
     if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
+    if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
   end;
 end;
 

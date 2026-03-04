@@ -1296,7 +1296,7 @@ begin
   if ValueError <> nil then
     ValueError.ValueEtalon := EtalonMeter.ValueVolume;
 
-  ApplyMeasurementModel;
+  //ApplyMeasurementModel;
 end;
 
 procedure TFlowMeter.ApplyMeasurementModel;
