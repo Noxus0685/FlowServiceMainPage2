@@ -1839,6 +1839,14 @@ begin
       else
         Value := '-';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceError1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueError <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueError.GetStrValue
+      else
+        Value := '-';
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
     Exit;
@@ -2024,6 +2032,14 @@ begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStringStdDeviationPercent
+      else
+        Value := '-';
+    end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonError1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueError <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueError.GetStrValue
       else
         Value := '-';
     end
