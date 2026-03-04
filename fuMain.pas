@@ -369,6 +369,9 @@ type
     procedure SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
     procedure PopupMenuInstrumentalLayOutPopup(Sender: TObject);
     procedure MenuInstrumentalLayOutClick(Sender: TObject);
+    procedure PopupMenuDevicesGridLayOutPopup(Sender: TObject);
+    procedure PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
+    procedure MenuGridLayOutClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
   private
@@ -395,6 +398,7 @@ type
     procedure UpdateGridDevices;
     procedure UpdateUIFromValues;
     procedure SetValues;
+    procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
 
      procedure UpdateGrids;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
@@ -584,6 +588,59 @@ begin
     LayoutMesure.Visible := NewVisible
   else if MenuItem = miConditions then
     LayoutConditions.Visible := NewVisible;
+end;
+
+procedure TFormMain.FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  Column: TColumn;
+begin
+  if (AMenu = nil) or (AGrid = nil) then
+    Exit;
+
+  AMenu.Clear;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    Column := AGrid.Columns[I];
+
+    MenuItem := TMenuItem.Create(AMenu);
+    MenuItem.Parent := AMenu;
+    MenuItem.Text := Column.Header;
+    MenuItem.IsChecked := Column.Visible;
+    MenuItem.TagObject := Column;
+    MenuItem.OnClick := MenuGridLayOutClick;
+  end;
+end;
+
+procedure TFormMain.PopupMenuDevicesGridLayOutPopup(Sender: TObject);
+begin
+  FillGridLayOutPopup(PopupMenuDevicesGridLayOut, GridDevices);
+end;
+
+procedure TFormMain.PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
+begin
+  FillGridLayOutPopup(PopupMenuEtalonsGridLayOut, GridEtalons);
+end;
+
+procedure TFormMain.MenuGridLayOutClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  Column: TColumn;
+  NewVisible: Boolean;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  if not (MenuItem.TagObject is TColumn) then
+    Exit;
+
+  Column := TColumn(MenuItem.TagObject);
+  NewVisible := not MenuItem.IsChecked;
+  MenuItem.IsChecked := NewVisible;
+  Column.Visible := NewVisible;
 end;
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
