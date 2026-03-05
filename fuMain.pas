@@ -357,6 +357,16 @@ type
     SpeedButtonTest: TSpeedButton;
     Circle1: TCircle;
     HorzScrollBoxInstrumental: THorzScrollBox;
+    Layout2: TLayout;
+    Layout11: TLayout;
+    Button1: TButton;
+    Circle2: TCircle;
+    TestButton: TButton;
+    GlowMesYellow: TGlowEffect;
+    GlowMesGreen: TGlowEffect;
+    GlowMesRed: TGlowEffect;
+    Button2: TButton;
+    CheckBox1: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
