@@ -356,6 +356,7 @@ type
     Label2: TLabel;
     SpeedButtonTest: TSpeedButton;
     Circle1: TCircle;
+    HorzScrollBoxInstrumental: THorzScrollBox;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
