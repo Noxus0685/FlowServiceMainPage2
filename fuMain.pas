@@ -372,6 +372,8 @@ type
     GlowMesGreen: TGlowEffect;
     GlowMesRed: TGlowEffect;
     TestButton: TButton;
+    StringColumnEtalonRawSumValue1: TStringColumn;
+    StringColumnDeviceRawSumValue1: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -622,7 +624,7 @@ var
       Exit;
 
     AChannel.CurSec := 0;
-    AChannel.ImpSec := 0;
+   // AChannel.ImpSec := 0;
     AChannel.ImpResult := 0;
   end;
 begin
@@ -634,6 +636,12 @@ begin
   FActiveWorkTable.Temp := 0;
   FActiveWorkTable.Press := 0;
   FNextClimateChangeAt := 0;
+
+  FActiveWorkTable.Time  := 0;
+  FActiveWorkTable.TimeResult  := 0;
+
+ // FActiveWorkTable.FlowRate   := 0;
+
 
   if FActiveWorkTable.TableFlow <> nil then
     FActiveWorkTable.TableFlow.Reset;

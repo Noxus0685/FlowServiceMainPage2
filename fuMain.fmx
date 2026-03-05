@@ -12,8 +12,8 @@ object FormMain: TFormMain
   OnClose = FormClose
   DesignerMasterStyle = 0
   object PopupMenu1: TPopupMenu
-    Left = 880
-    Top = 252
+    Left = 1656
+    Top = 244
     object MenuItem1: TMenuItem
       Text = 'MenuItem1'
     end
@@ -40,8 +40,8 @@ object FormMain: TFormMain
     end
   end
   object PopupMenuWorkTables: TPopupMenu
-    Left = 994
-    Top = 236
+    Left = 1698
+    Top = 244
     object miAddTable: TMenuItem
       Action = ActionAddWorkTable
       ImageIndex = -1
@@ -69,8 +69,8 @@ object FormMain: TFormMain
   end
   object PopupMenuInstrumentalLayOut: TPopupMenu
     OnPopup = PopupMenuInstrumentalLayOutPopup
-    Left = 1104
-    Top = 224
+    Left = 1616
+    Top = 248
     object miFlowRate: TMenuItem
       IsChecked = True
       Text = 'miFlowRate'
@@ -101,18 +101,18 @@ object FormMain: TFormMain
   end
   object TimerSetValues: TTimer
     OnTimer = TimerSetValuesTimer
-    Left = 778
-    Top = 260
+    Left = 1650
+    Top = 188
   end
   object TimerMain: TTimer
     OnTimer = TimerMainTimer
-    Left = 874
-    Top = 412
+    Left = 1690
+    Top = 188
   end
   object PopupMenuEtalonsGridLayOut: TPopupMenu
     OnPopup = PopupMenuEtalonsGridLayOutPopup
-    Left = 1066
-    Top = 349
+    Left = 1650
+    Top = 141
   end
   object TabControl1: TTabControl
     Align = Client
@@ -1454,6 +1454,10 @@ object FormMain: TFormMain
                     HeaderSettings.TextSettings.WordWrap = False
                     HeaderSettings.TextSettings.HorzAlign = Center
                   end
+                  object StringColumnEtalonRawSumValue1: TStringColumn
+                    Header = #1047#1085#1072#1095#1077#1085#1080#1077
+                    HeaderSettings.TextSettings.WordWrap = False
+                  end
                 end
               end
               object ToolBar2: TToolBar
@@ -1582,6 +1586,10 @@ object FormMain: TFormMain
                   HeaderSettings.TextSettings.WordWrap = False
                   HeaderSettings.TextSettings.HorzAlign = Center
                 end
+                object StringColumnDeviceRawSumValue1: TStringColumn
+                  Header = #1047#1085#1072#1095#1077#1085#1080#1077
+                  HeaderSettings.TextSettings.WordWrap = False
+                end
               end
               object ToolBar1: TToolBar
                 PopupMenu = PopupMenuDevicesGridLayOut
@@ -1598,8 +1606,8 @@ object FormMain: TFormMain
                 end
                 object PopupMenuDevicesGridLayOut: TPopupMenu
                   OnPopup = PopupMenuDevicesGridLayOutPopup
-                  Left = 1010
-                  Top = 333
+                  Left = 1690
+                  Top = 141
                 end
               end
             end
@@ -1721,10 +1729,9 @@ object FormMain: TFormMain
                 Enabled = False
               end
               object GlowEffectCancelRed: TGlowEffect
-                Softness = 1.000000000000000000
+                Softness = 0.300000011920929000
                 GlowColor = claRed
                 Opacity = 1.000000000000000000
-                Enabled = False
               end
             end
             object TestButton: TButton
@@ -3213,8 +3220,8 @@ object FormMain: TFormMain
     end
   end
   object ActionListWorkTables: TActionList
-    Left = 922
-    Top = 428
+    Left = 1610
+    Top = 140
     object ActionAddWorkTable: TAction
       Category = 'WorkTable'
       Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1088#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
