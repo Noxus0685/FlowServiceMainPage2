@@ -651,6 +651,7 @@ end;
 procedure TFormMain.ApplyInstrumentalVisibleOrder;
 var
   I: Integer;
+  Layout: TLayout;
 begin
   if FInstrumentalVisibleOrder = nil then
     Exit;
@@ -658,10 +659,12 @@ begin
   HorzScrollBoxInstrumental.BeginUpdate;
   try
     for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
-      // В FMX при Align=Left визуальный порядок идет от больших Index к меньшим.
-      // Поэтому новый включенный блок (в конце списка) получает больший Index
-      // и оказывается справа, т.е. добавляется в конец.
-      FInstrumentalVisibleOrder[I].Index := HorzScrollBoxInstrumental.ControlsCount - 1 - I;
+      FInstrumentalVisibleOrder[I].Index := I;
+
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+      LayoutMesure, LayoutConditions, LayoutProcedures] do
+      if FInstrumentalVisibleOrder.IndexOf(Layout) < 0 then
+        Layout.Index := HorzScrollBoxInstrumental.ControlsCount - 1;
   finally
     HorzScrollBoxInstrumental.EndUpdate;
   end;
