@@ -360,10 +360,6 @@ type
     Layout11: TLayout;
     Button1: TButton;
     Circle2: TCircle;
-    ButtonTest: TButton;
-    GlowMesYellow: TGlowEffect;
-    GlowMesGreen: TGlowEffect;
-    GlowMesRed: TGlowEffect;
     ButtonMonitor: TButton;
     CheckBox1: TCheckBox;
     CircleIndicatorMonitor: TCircle;
@@ -372,6 +368,10 @@ type
     GlowEffect1: TGlowEffect;
     GlowEffect2: TGlowEffect;
     GlowEffectCancelRed: TGlowEffect;
+    GlowMesYellow: TGlowEffect;
+    GlowMesGreen: TGlowEffect;
+    GlowMesRed: TGlowEffect;
+    TestButton: TButton;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -410,10 +410,9 @@ type
     procedure MenuGridLayOutClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Circle1Click(Sender: TObject);
-    procedure SpeedButtonTestClick(Sender: TObject);
     procedure ButtonMonitorClick(Sender: TObject);
-    procedure ButtonTestClick(Sender: TObject);
     procedure ButtonCancelClick(Sender: TObject);
+    procedure TestButtonClick(Sender: TObject);
 
 
   private
@@ -685,10 +684,23 @@ begin
     FActiveWorkTable.MeasurementState := ANewState;
 
   case ANewState of
+    STATE_NONE:
+      begin
+        TestButton.Enabled := False;
+        ButtonMonitor.Enabled := False;
+        SpeedButtonStartPump.Enabled := False;
+        SpeedButtonSetFlowRate.Enabled := False;
+        SpeedButtonProcedureStart.Enabled := False;
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := False;
+        GlowMesYellow.Enabled := False;
+      end;
+
+
     STATE_STANDBY:
       begin
-        ButtonTest.Text := 'Измерение';
-        ButtonTest.Enabled := False;
+        TestButton.Text := 'Измерение';
+        TestButton.Enabled := False;
         ButtonMonitor.Enabled := False;
         SpeedButtonStartPump.Enabled := False;
         SpeedButtonSetFlowRate.Enabled := False;
@@ -703,7 +715,7 @@ begin
 
     STATE_CONNECTED:
       begin
-        ButtonTest.Enabled := True;
+        TestButton.Enabled := True;
         ButtonMonitor.Enabled := True;
         SpeedButtonStartPump.Enabled := True;
         SpeedButtonSetFlowRate.Enabled := True;
@@ -723,8 +735,8 @@ begin
     STATE_STARTTEST:
       begin
         ButtonMonitor.Enabled := False;
-        ButtonTest.Text := 'Запуск';
-        ButtonTest.Enabled := False;
+        TestButton.Text := 'Запуск';
+        TestButton.Enabled := False;
       end;
 
     STATE_STARTMONITOR:
@@ -756,8 +768,8 @@ begin
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := False;
         ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
-        ButtonTest.Text := 'Стоп';
-        ButtonTest.Enabled := True;
+        TestButton.Text := 'Стоп';
+        TestButton.Enabled := True;
         ResetMeasurementValues;
       end;
 
@@ -770,8 +782,8 @@ begin
 
     STATE_STOPTEST:
       begin
-        ButtonTest.Text := 'Завершение';
-        ButtonTest.Enabled := False;
+        TestButton.Text := 'Завершение';
+        TestButton.Enabled := False;
       end;
 
     STATE_STOPWAIT:
@@ -781,8 +793,8 @@ begin
 
     STATE_COMPLETE:
       begin
-        ButtonTest.Text := 'Сохранение';
-        ButtonTest.Enabled := False;
+        TestButton.Text := 'Сохранение';
+        TestButton.Enabled := False;
         GlowMesYellow.Enabled := True;
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := False;
@@ -793,8 +805,8 @@ begin
         GlowMesYellow.Enabled := False;
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := True;
-        ButtonTest.Text := 'Сохранить?';
-        ButtonTest.Enabled := True;
+        TestButton.Text := 'Сохранить?';
+        TestButton.Enabled := True;
         ButtonMonitor.Enabled := True;
         ButtonCancel.Visible := True;
         GlowEffectCancelRed.Enabled := True;
@@ -805,8 +817,8 @@ begin
         GlowMesRed.Enabled := True;
         GlowMesYellow.Enabled := False;
         GlowMesGreen.Enabled := False;
-        ButtonTest.Text := 'Ошибка';
-        ButtonTest.Enabled := False;
+        TestButton.Text := 'Ошибка';
+        TestButton.Enabled := False;
         ButtonMonitor.Enabled := False;
         ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
       end;
@@ -881,10 +893,9 @@ begin
   );
 
   ButtonMonitor.OnClick := ButtonMonitorClick;
-  ButtonTest.OnClick := ButtonTestClick;
   ButtonCancel.OnClick := ButtonCancelClick;
 
-  OnChangeState(STATE_STANDBY);
+  OnChangeState(STATE_NONE);
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
@@ -1878,6 +1889,9 @@ begin
   end;
 
   case WorkTable.MeasurementState of
+    STATE_NONE:
+      OnChangeState(STATE_STANDBY);
+
     STATE_STANDBY:
       OnChangeState(STATE_CONNECTED);
 
@@ -2342,11 +2356,6 @@ begin
   SaveLayoutSettingsToWorkTable;
 end;
 
-procedure TFormMain.SpeedButtonTestClick(Sender: TObject);
-begin
- GridDevices.Repaint;
-end;
-
 procedure TFormMain.ButtonMonitorClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -2361,7 +2370,7 @@ begin
     StartMonitor;
 end;
 
-procedure TFormMain.ButtonTestClick(Sender: TObject);
+procedure TFormMain.TestButtonClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
 begin

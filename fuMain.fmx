@@ -603,7 +603,6 @@ object FormMain: TFormMain
                     StyleLookup = 'transparentcirclebuttonstyle'
                     Text = 'SpeedButtonTest'
                     TextSettings.Trimming = None
-                    OnClick = SpeedButtonTestClick
                     object Circle1: TCircle
                       Align = Client
                       HitTest = False
@@ -1664,6 +1663,7 @@ object FormMain: TFormMain
             Text = #1052#1086#1085#1080#1090#1086#1088
             TextSettings.Trimming = None
             object CircleIndicatorMonitor: TCircle
+              Align = Center
               Fill.Kind = Gradient
               Fill.Gradient.Points = <
                 item
@@ -1675,10 +1675,9 @@ object FormMain: TFormMain
                   Offset = 1.000000000000000000
                 end>
               Fill.Gradient.Style = Radial
-              Position.X = 8.000000000000000000
-              Position.Y = 16.000000000000000000
-              Size.Width = 10.000000000000000000
-              Size.Height = 10.000000000000000000
+              Margins.Right = 75.000000000000000000
+              Size.Width = 12.000000000000000000
+              Size.Height = 12.000000000000000000
               Size.PlatformDefault = False
             end
           end
@@ -1688,36 +1687,6 @@ object FormMain: TFormMain
             Size.Height = 50.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 2
-            object ButtonTest: TButton
-              Align = Center
-              Size.Width = 157.000000000000000000
-              Size.Height = 76.000000000000000000
-              Size.PlatformDefault = False
-              StyleLookup = 'circlebuttonstyle'
-              TabOrder = 1
-              TabStop = False
-              Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077' '
-              TextSettings.WordWrap = True
-              TextSettings.Trimming = None
-              object GlowMesYellow: TGlowEffect
-                Softness = 1.000000000000000000
-                GlowColor = xFFF69E2D
-                Opacity = 1.000000000000000000
-                Enabled = False
-              end
-              object GlowMesGreen: TGlowEffect
-                Softness = 1.000000000000000000
-                GlowColor = claYellowgreen
-                Opacity = 1.000000000000000000
-                Enabled = False
-              end
-              object GlowMesRed: TGlowEffect
-                Softness = 1.000000000000000000
-                GlowColor = claRed
-                Opacity = 1.000000000000000000
-                Enabled = False
-              end
-            end
             object CheckBox1: TCheckBox
               Position.X = 192.000000000000000000
               Size.Width = 76.000000000000000000
@@ -1732,12 +1701,13 @@ object FormMain: TFormMain
               Size.Height = 50.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'circlebuttonstyle'
-              TabOrder = 0
+              TabOrder = 1
               TabStop = False
               Text = #1054#1090#1084#1077#1085#1072
               TextSettings.WordWrap = True
               TextSettings.Trimming = None
               Visible = False
+              OnClick = ButtonCancelClick
               object GlowEffect1: TGlowEffect
                 Softness = 1.000000000000000000
                 GlowColor = xFFF69E2D
@@ -1754,6 +1724,37 @@ object FormMain: TFormMain
                 Softness = 1.000000000000000000
                 GlowColor = claRed
                 Opacity = 1.000000000000000000
+                Enabled = False
+              end
+            end
+            object TestButton: TButton
+              Align = Center
+              Size.Width = 113.000000000000000000
+              Size.Height = 90.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'circlebuttonstyle'
+              TabOrder = 0
+              TabStop = False
+              Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077' '
+              TextSettings.WordWrap = True
+              TextSettings.Trimming = None
+              OnClick = TestButtonClick
+              object GlowMesGreen: TGlowEffect
+                Softness = 1.000000000000000000
+                GlowColor = claYellowgreen
+                Opacity = 1.000000000000000000
+                Enabled = False
+              end
+              object GlowMesRed: TGlowEffect
+                Softness = 0.400000005960464500
+                GlowColor = claRed
+                Opacity = 0.899999976158142100
+                Enabled = False
+              end
+              object GlowMesYellow: TGlowEffect
+                Softness = 1.000000000000000000
+                GlowColor = xFFF69E2D
+                Opacity = 0.899999976158142100
                 Enabled = False
               end
             end
