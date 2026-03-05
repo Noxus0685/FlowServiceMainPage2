@@ -612,6 +612,7 @@ begin
 end;
 
 function TFormMain.GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
+// Сопоставляет пункт popup-меню и соответствующий инструментальный блок.
 begin
   Result := nil;
   if AMenuItem = miFlowRate then
@@ -629,6 +630,8 @@ begin
 end;
 
 procedure TFormMain.RebuildInstrumentalVisibleOrder;
+// Пересобирает список видимых блоков по текущему состоянию UI.
+// Используется после загрузки формы/настроек, чтобы синхронизировать модель порядка.
 var
   I: Integer;
   Control: TControl;
@@ -652,19 +655,30 @@ procedure TFormMain.ApplyInstrumentalVisibleOrder;
 var
   I: Integer;
   Layout: TLayout;
+  X: Single;
 begin
   if FInstrumentalVisibleOrder = nil then
     Exit;
 
   HorzScrollBoxInstrumental.BeginUpdate;
   try
-    for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
-      FInstrumentalVisibleOrder[I].Index := I;
-
+    // Не полагаемся на неочевидный порядок Align=Left/MostLeft:
+    // задаем положение блоков вручную в порядке включения.
     for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
       LayoutMesure, LayoutConditions, LayoutProcedures] do
-      if FInstrumentalVisibleOrder.IndexOf(Layout) < 0 then
-        Layout.Index := HorzScrollBoxInstrumental.ControlsCount - 1;
+      Layout.Align := TAlignLayout.None;
+
+    X := 0;
+    for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
+    begin
+      Layout := FInstrumentalVisibleOrder[I];
+      Layout.Visible := True;
+      Layout.Position.X := X;
+      Layout.Position.Y := 0;
+      X := X + Layout.Width;
+    end;
+
+    HorzScrollBoxInstrumental.Content.Width := Max(X, HorzScrollBoxInstrumental.Width);
   finally
     HorzScrollBoxInstrumental.EndUpdate;
   end;
@@ -672,6 +686,8 @@ end;
 
 procedure TFormMain.SetInstrumentalLayoutVisible(ALayout: TLayout;
   AVisible: Boolean);
+// Единая точка переключения видимости: поддерживает список порядка
+// и сразу перестраивает визуальное расположение блоков.
 begin
   if (ALayout = nil) or (FInstrumentalVisibleOrder = nil) then
     Exit;
@@ -679,11 +695,13 @@ begin
   if AVisible then
   begin
     ALayout.Visible := True;
+    // При включении добавляем блок в конец последовательности показа.
     if FInstrumentalVisibleOrder.IndexOf(ALayout) < 0 then
       FInstrumentalVisibleOrder.Add(ALayout);
   end
   else
   begin
+    // При выключении удаляем блок из последовательности.
     FInstrumentalVisibleOrder.Remove(ALayout);
     ALayout.Visible := False;
   end;
