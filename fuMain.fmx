@@ -1631,7 +1631,7 @@ object FormMain: TFormMain
             Size.Height = 50.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = 'transparentcirclebuttonstyle'
-            TabOrder = 1
+            TabOrder = 0
             Text = 'Button1'
             TextSettings.Trimming = None
             Visible = False
@@ -1654,51 +1654,78 @@ object FormMain: TFormMain
               Stroke.Join = Round
             end
           end
-          object TestButton: TButton
-            Align = Center
-            Size.Width = 105.000000000000000000
-            Size.Height = 82.000000000000000000
-            Size.PlatformDefault = False
-            StyleLookup = 'circlebuttonstyle'
-            TabOrder = 0
-            TabStop = False
-            Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077' '
-            TextSettings.WordWrap = True
-            TextSettings.Trimming = None
-            object GlowMesYellow: TGlowEffect
-              Softness = 1.000000000000000000
-              GlowColor = xFFF69E2D
-              Opacity = 0.899999976158142100
-              Enabled = False
-            end
-            object GlowMesGreen: TGlowEffect
-              Softness = 1.000000000000000000
-              GlowColor = claYellowgreen
-              Opacity = 1.000000000000000000
-              Enabled = False
-            end
-            object GlowMesRed: TGlowEffect
-              Softness = 0.400000005960464500
-              GlowColor = claRed
-              Opacity = 0.899999976158142100
-              Enabled = False
-            end
-          end
           object Button2: TButton
             Position.X = 26.000000000000000000
             Position.Y = 24.000000000000000000
             Size.Width = 105.000000000000000000
             Size.Height = 41.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 2
+            TabOrder = 1
             Text = #1052#1086#1085#1080#1090#1086#1088
             TextSettings.Trimming = None
+            object CircleIndicatorMonitor: TCircle
+              Fill.Kind = Gradient
+              Fill.Gradient.Points = <
+                item
+                  Color = xFF4CFF5F
+                  Offset = 0.000000000000000000
+                end
+                item
+                  Color = claWhite
+                  Offset = 1.000000000000000000
+                end>
+              Fill.Gradient.Style = Radial
+              Position.X = 8.000000000000000000
+              Position.Y = 16.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 10.000000000000000000
+              Size.PlatformDefault = False
+            end
           end
-          object CheckBox1: TCheckBox
-            Position.X = 963.000000000000000000
-            Position.Y = 40.000000000000000000
-            TabOrder = 3
-            Text = #1040#1074#1090#1086
+          object Layout15: TLayout
+            Align = Center
+            Size.Width = 244.000000000000000000
+            Size.Height = 50.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            object TestButton: TButton
+              Align = Center
+              Size.Width = 157.000000000000000000
+              Size.Height = 76.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'circlebuttonstyle'
+              TabOrder = 0
+              TabStop = False
+              Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077' '
+              TextSettings.WordWrap = True
+              TextSettings.Trimming = None
+              object GlowMesYellow: TGlowEffect
+                Softness = 1.000000000000000000
+                GlowColor = xFFF69E2D
+                Opacity = 0.899999976158142100
+                Enabled = False
+              end
+              object GlowMesGreen: TGlowEffect
+                Softness = 1.000000000000000000
+                GlowColor = claYellowgreen
+                Opacity = 1.000000000000000000
+                Enabled = False
+              end
+              object GlowMesRed: TGlowEffect
+                Softness = 0.400000005960464500
+                GlowColor = claRed
+                Opacity = 0.899999976158142100
+                Enabled = False
+              end
+            end
+            object CheckBox1: TCheckBox
+              Position.X = 168.000000000000000000
+              Size.Width = 76.000000000000000000
+              Size.Height = 50.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 3
+              Text = #1040#1074#1090#1086
+            end
           end
         end
       end

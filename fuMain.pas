@@ -367,6 +367,8 @@ type
     GlowMesRed: TGlowEffect;
     Button2: TButton;
     CheckBox1: TCheckBox;
+    CircleIndicatorMonitor: TCircle;
+    Layout15: TLayout;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
