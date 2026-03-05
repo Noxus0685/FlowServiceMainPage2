@@ -437,6 +437,11 @@ type
     destructor Destroy; override;
   private
     FWorkTableManager: TWorkTableManager;
+    FInstrumentalVisibleOrder: TList<TLayout>;
+    function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
+    procedure RebuildInstrumentalVisibleOrder;
+    procedure ApplyInstrumentalVisibleOrder;
+    procedure SetInstrumentalLayoutVisible(ALayout: TLayout; AVisible: Boolean);
   end;
 
 
@@ -532,6 +537,7 @@ end;
 destructor TFormMain.Destroy;
 begin
   TMeterValue.SaveToFile(0);
+  FInstrumentalVisibleOrder.Free;
   FWorkTableManager.Free;
   FFlowMeters.Free;
   inherited;
@@ -544,6 +550,8 @@ var
 
 begin
   TMeterValue.LoadFromFile;
+
+  FInstrumentalVisibleOrder := TList<TLayout>.Create;
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -583,6 +591,7 @@ begin
   FNextClimateChangeAt := Now;
 
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  RebuildInstrumentalVisibleOrder;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
@@ -602,9 +611,90 @@ begin
   miProcedures.IsChecked := LayoutProcedures.Visible;
 end;
 
+function TFormMain.GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
+begin
+  Result := nil;
+  if AMenuItem = miFlowRate then
+    Result := LayoutFlowRate
+  else if AMenuItem = miPump then
+    Result := LayoutPump
+  else if AMenuItem = miMain then
+    Result := LayoutMain
+  else if AMenuItem = miMesurment then
+    Result := LayoutMesure
+  else if AMenuItem = miConditions then
+    Result := LayoutConditions
+  else if AMenuItem = miProcedures then
+    Result := LayoutProcedures;
+end;
+
+procedure TFormMain.RebuildInstrumentalVisibleOrder;
+var
+  I: Integer;
+  Control: TControl;
+begin
+  if FInstrumentalVisibleOrder = nil then
+    Exit;
+
+  FInstrumentalVisibleOrder.Clear;
+  for I := 0 to HorzScrollBoxInstrumental.ControlsCount - 1 do
+  begin
+    Control := HorzScrollBoxInstrumental.Controls[I];
+    if (Control is TLayout) and Control.Visible and
+       ((Control = LayoutFlowRate) or (Control = LayoutPump) or
+        (Control = LayoutMain) or (Control = LayoutMesure) or
+        (Control = LayoutConditions) or (Control = LayoutProcedures)) then
+      FInstrumentalVisibleOrder.Add(TLayout(Control));
+  end;
+end;
+
+procedure TFormMain.ApplyInstrumentalVisibleOrder;
+var
+  I: Integer;
+  Layout: TLayout;
+begin
+  if FInstrumentalVisibleOrder = nil then
+    Exit;
+
+  HorzScrollBoxInstrumental.BeginUpdate;
+  try
+    for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
+      FInstrumentalVisibleOrder[I].Index := I;
+
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+      LayoutMesure, LayoutConditions, LayoutProcedures] do
+      if FInstrumentalVisibleOrder.IndexOf(Layout) < 0 then
+        Layout.Index := HorzScrollBoxInstrumental.ControlsCount - 1;
+  finally
+    HorzScrollBoxInstrumental.EndUpdate;
+  end;
+end;
+
+procedure TFormMain.SetInstrumentalLayoutVisible(ALayout: TLayout;
+  AVisible: Boolean);
+begin
+  if (ALayout = nil) or (FInstrumentalVisibleOrder = nil) then
+    Exit;
+
+  if AVisible then
+  begin
+    ALayout.Visible := True;
+    if FInstrumentalVisibleOrder.IndexOf(ALayout) < 0 then
+      FInstrumentalVisibleOrder.Add(ALayout);
+  end
+  else
+  begin
+    FInstrumentalVisibleOrder.Remove(ALayout);
+    ALayout.Visible := False;
+  end;
+
+  ApplyInstrumentalVisibleOrder;
+end;
+
 procedure TFormMain.MenuInstrumentalLayOutClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
+  Layout: TLayout;
   NewVisible: Boolean;
 begin
   if not (Sender is TMenuItem) then
@@ -614,18 +704,8 @@ begin
   NewVisible := not MenuItem.IsChecked;
   MenuItem.IsChecked := NewVisible;
 
-  if MenuItem = miFlowRate then
-    LayoutFlowRate.Visible := NewVisible
-  else if MenuItem = miPump then
-    LayoutPump.Visible := NewVisible
-  else if MenuItem = miMain then
-    LayoutMain.Visible := NewVisible
-  else if MenuItem = miMesurment then
-    LayoutMesure.Visible := NewVisible
-  else if MenuItem = miConditions then
-    LayoutConditions.Visible := NewVisible
-  else if MenuItem = miProcedures then
-    LayoutProcedures.Visible := NewVisible;
+  Layout := GetLayoutByMenuItem(MenuItem);
+  SetInstrumentalLayoutVisible(Layout, NewVisible);
 
   SaveLayoutSettingsToWorkTable;
 end;
@@ -781,6 +861,7 @@ begin
   LayoutMesure.Visible := WorkTable.LayoutMesureVisible;
   LayoutConditions.Visible := WorkTable.LayoutConditionsVisible;
   LayoutProcedures.Visible := WorkTable.LayoutProceduresVisible;
+  RebuildInstrumentalVisibleOrder;
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
