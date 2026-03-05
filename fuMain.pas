@@ -18,7 +18,6 @@ uses
   System.Math,
   System.Generics.Collections,
 
-
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, System.Rtti,
   FMX.Grid.Style, FMX.Filter.Effects, FMX.Colors, FMX.Effects, FMX.ListBox,
@@ -413,6 +412,7 @@ type
     procedure Circle1Click(Sender: TObject);
     procedure SpeedButtonTestClick(Sender: TObject);
 
+
   private
 
   FActiveWorkTable: TWorkTable;
@@ -570,27 +570,22 @@ begin
   inherited;
 end;
 
-
 procedure TFormMain.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
+var
+  P: TGradientPoint;
 begin
   CircleIndicatorMonitor.Fill.Kind := TBrushKind.Gradient;
   CircleIndicatorMonitor.Fill.Gradient.Style := TGradientStyle.Radial;
 
-  if CircleIndicatorMonitor.Fill.Gradient.Points.Count < 2 then
-  begin
-    CircleIndicatorMonitor.Fill.Gradient.Points.Clear;
-    CircleIndicatorMonitor.Fill.Gradient.Points.Add.Color := AColor;
-    CircleIndicatorMonitor.Fill.Gradient.Points[0].Offset := 0;
-    CircleIndicatorMonitor.Fill.Gradient.Points.Add.Color := claWhite;
-    CircleIndicatorMonitor.Fill.Gradient.Points[1].Offset := 1;
-  end
-  else
-  begin
-    CircleIndicatorMonitor.Fill.Gradient.Points[0].Color := AColor;
-    CircleIndicatorMonitor.Fill.Gradient.Points[0].Offset := 0;
-    CircleIndicatorMonitor.Fill.Gradient.Points[1].Color := claWhite;
-    CircleIndicatorMonitor.Fill.Gradient.Points[1].Offset := 1;
-  end;
+  CircleIndicatorMonitor.Fill.Gradient.Points.Clear;
+
+  P := TGradientPoint(CircleIndicatorMonitor.Fill.Gradient.Points.Add);
+  P.Color := AColor;
+  P.Offset := 0;
+
+  P := TGradientPoint(CircleIndicatorMonitor.Fill.Gradient.Points.Add);
+  P.Color := TAlphaColorRec.White;   // вместо claWhite
+  P.Offset := 1;
 end;
 
 procedure TFormMain.ResetMeasurementValues;
@@ -670,7 +665,7 @@ begin
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := False;
         GlowMesYellow.Enabled := False;
-        ApplyMonitorIndicatorColor(claGray);
+        ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
         ButtonCancel.Visible := False;
       end;
 
@@ -706,7 +701,7 @@ begin
 
     STATE_STOPMONITOR:
       begin
-        ApplyMonitorIndicatorColor(claGray);
+        ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
       end;
 
     STATE_STARTWAIT:
@@ -714,7 +709,7 @@ begin
         GlowMesYellow.Enabled := True;
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := False;
-        ApplyMonitorIndicatorColor(claGray);
+        ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
         ButtonTest.Text := 'Стоп';
         ButtonTest.Enabled := True;
         ResetMeasurementValues;
@@ -767,7 +762,7 @@ begin
         ButtonTest.Text := 'Ошибка';
         ButtonTest.Enabled := False;
         ButtonMonitor.Enabled := False;
-        ApplyMonitorIndicatorColor(claGray);
+        ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
       end;
   else
     begin

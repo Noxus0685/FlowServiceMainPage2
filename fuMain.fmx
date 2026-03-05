@@ -1703,6 +1703,7 @@ object FormMain: TFormMain
                 Softness = 1.000000000000000000
                 GlowColor = xFFF69E2D
                 Opacity = 1.000000000000000000
+                Enabled = False
               end
               object GlowMesGreen: TGlowEffect
                 Softness = 1.000000000000000000
