@@ -345,11 +345,11 @@ object FormMain: TFormMain
         TabOrder = 0
         object LayoutPump: TLayout
           Align = Left
-          Position.X = 315.000000000000000000
+          Position.X = 630.000000000000000000
           Size.Width = 265.000000000000000000
           Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 4
+          TabOrder = 5
           object Line1: TLine
             Align = Right
             LineType = Right
@@ -481,7 +481,7 @@ object FormMain: TFormMain
                 end
               end
             end
-            object Label14: TLabel
+            object LabelLayoutPump: TLabel
               Align = MostBottom
               Margins.Left = 2.000000000000000000
               Margins.Top = 2.000000000000000000
@@ -509,7 +509,7 @@ object FormMain: TFormMain
         end
         object LayoutConditions: TLayout
           Align = Left
-          Position.X = 1125.000000000000000000
+          Position.X = 1440.000000000000000000
           Size.Width = 292.000000000000000000
           Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
@@ -648,7 +648,7 @@ object FormMain: TFormMain
                 end
               end
             end
-            object Label22: TLabel
+            object LabelLayoutConditions: TLabel
               Align = MostBottom
               Position.Y = 104.000000000000000000
               Size.Width = 273.000000000000000000
@@ -685,11 +685,11 @@ object FormMain: TFormMain
         end
         object LayoutFlowRate: TLayout
           Align = Left
-          Position.X = 580.000000000000000000
+          Position.X = 895.000000000000000000
           Size.Width = 265.000000000000000000
           Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 3
+          TabOrder = 4
           object Line5: TLine
             Align = Right
             LineType = Right
@@ -820,7 +820,7 @@ object FormMain: TFormMain
                 end
               end
             end
-            object Label19: TLabel
+            object LabelLayoutFlowRate: TLabel
               Align = MostBottom
               Position.Y = 104.000000000000000000
               Size.Width = 255.000000000000000000
@@ -846,7 +846,7 @@ object FormMain: TFormMain
           Size.Width = 315.000000000000000000
           Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 1
+          TabOrder = 2
           object Line6: TLine
             Align = Right
             LineType = Right
@@ -866,9 +866,9 @@ object FormMain: TFormMain
             Size.PlatformDefault = False
             TabOrder = 1
             object LayoutTaskMain: TLayout
-              Position.X = 23.000000000000000000
+              Position.X = 86.000000000000000000
               Position.Y = 25.000000000000000000
-              Size.Width = 260.000000000000000000
+              Size.Width = 146.000000000000000000
               Size.Height = 23.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 2
@@ -894,13 +894,14 @@ object FormMain: TFormMain
                 Size.PlatformDefault = False
                 StyleLookup = 'comboboxstyle'
                 TabOrder = 0
+                Visible = False
               end
-              object SpeedButton11: TSpeedButton
+              object SpeedButtonSpillageStart: TSpeedButton
                 Align = Left
                 Padding.Left = 10.000000000000000000
                 Margins.Left = 10.000000000000000000
                 Margins.Right = 10.000000000000000000
-                Position.X = 180.000000000000000000
+                Position.X = 58.000000000000000000
                 Size.Width = 22.000000000000000000
                 Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
@@ -908,18 +909,19 @@ object FormMain: TFormMain
                 Text = 'SpeedButton3'
                 TextSettings.Trimming = None
               end
-              object SpeedButton27: TSpeedButton
+              object SpeedButtonSpillageStop: TSpeedButton
                 Align = Left
                 Margins.Left = 2.000000000000000000
-                Position.X = 214.000000000000000000
+                Position.X = 92.000000000000000000
                 Size.Width = 22.000000000000000000
                 Size.Height = 23.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'transparentcirclebuttonstyle'
-                Text = 'SpeedButton27'
+                Text = 'SpeedButtonSpillageStop'
                 TextSettings.Trimming = None
                 object Rectangle13: TRectangle
                   Align = Client
+                  HitTest = False
                   Margins.Left = 4.000000000000000000
                   Margins.Top = 4.000000000000000000
                   Margins.Right = 4.000000000000000000
@@ -929,8 +931,29 @@ object FormMain: TFormMain
                   Size.PlatformDefault = False
                 end
               end
+              object SpeedButtonTest: TSpeedButton
+                Align = MostLeft
+                Margins.Left = 20.000000000000000000
+                Margins.Right = 10.000000000000000000
+                Position.X = 20.000000000000000000
+                Size.Width = 18.000000000000000000
+                Size.Height = 23.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'transparentcirclebuttonstyle'
+                Text = 'SpeedButtonTest'
+                TextSettings.Trimming = None
+                OnClick = SpeedButtonTestClick
+                object Circle1: TCircle
+                  Align = Client
+                  HitTest = False
+                  Size.Width = 18.000000000000000000
+                  Size.Height = 23.000000000000000000
+                  Size.PlatformDefault = False
+                  OnClick = Circle1Click
+                end
+              end
             end
-            object Label32: TLabel
+            object LabelLayoutMain: TLabel
               Align = MostBottom
               Position.Y = 104.000000000000000000
               Size.Width = 305.000000000000000000
@@ -956,7 +979,7 @@ object FormMain: TFormMain
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 3
-              object SpeedButton12: TSpeedButton
+              object SpeedButtonTaskPause: TSpeedButton
                 Align = Left
                 Padding.Left = 10.000000000000000000
                 Margins.Left = 10.000000000000000000
@@ -968,7 +991,7 @@ object FormMain: TFormMain
                 Text = 'SpeedButton3'
                 TextSettings.Trimming = None
               end
-              object SpeedButton25: TSpeedButton
+              object SpeedButtonTaskNext: TSpeedButton
                 Align = Left
                 Padding.Left = 10.000000000000000000
                 Margins.Left = 10.000000000000000000
@@ -980,7 +1003,7 @@ object FormMain: TFormMain
                 Text = 'SpeedButton3'
                 TextSettings.Trimming = None
               end
-              object SpeedButton26: TSpeedButton
+              object SpeedButtonTaskPrevious: TSpeedButton
                 Align = Left
                 Padding.Left = 10.000000000000000000
                 Margins.Left = 10.000000000000000000
@@ -998,7 +1021,6 @@ object FormMain: TFormMain
                   #1064#1072#1075' 1 '
                   #1064#1072#1075' 2'
                   #1064#1072#1075' 3')
-                ItemIndex = 0
                 Size.Width = 160.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -1019,11 +1041,11 @@ object FormMain: TFormMain
         end
         object LayoutMesure: TLayout
           Align = Left
-          Position.X = 845.000000000000000000
+          Position.X = 1160.000000000000000000
           Size.Width = 280.000000000000000000
           Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 2
+          TabOrder = 3
           object Line13: TLine
             Align = Right
             LineType = Right
@@ -1188,7 +1210,7 @@ object FormMain: TFormMain
                 TextSettings.Trimming = None
               end
             end
-            object Label53: TLabel
+            object LabelLayoutMesure: TLabel
               Align = MostBottom
               Position.Y = 104.000000000000000000
               Size.Width = 270.000000000000000000
@@ -1292,6 +1314,184 @@ object FormMain: TFormMain
                   TabOrder = 0
                 end
               end
+            end
+          end
+        end
+        object LayoutProcedures: TLayout
+          Align = MostLeft
+          Position.X = 315.000000000000000000
+          Size.Width = 315.000000000000000000
+          Size.Height = 121.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 1
+          object Line2: TLine
+            Align = Right
+            LineType = Right
+            Margins.Top = 5.000000000000000000
+            Margins.Bottom = 5.000000000000000000
+            Position.X = 305.000000000000000000
+            Position.Y = 5.000000000000000000
+            Size.Width = 10.000000000000000000
+            Size.Height = 111.000000000000000000
+            Size.PlatformDefault = False
+            Stroke.Color = claGray
+          end
+          object Layout4: TLayout
+            Align = Left
+            Size.Width = 305.000000000000000000
+            Size.Height = 121.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 1
+            object Layout8: TLayout
+              Position.X = 23.000000000000000000
+              Position.Y = 25.000000000000000000
+              Size.Width = 260.000000000000000000
+              Size.Height = 23.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 2
+              object ComboBoxProcedure: TComboBox
+                Align = MostLeft
+                Items.Strings = (
+                  #1058#1077#1089#1090
+                  #1040#1074#1090#1086
+                  '_______________________________________'
+                  #1048#1079#1084#1077#1088#1077#1085#1080#1077
+                  #1057' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072
+                  #1060#1086#1090#1086#1092#1080#1082#1089#1072#1094#1080#1103
+                  '________________________________________'
+                  #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 1'
+                  #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 2'
+                  #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 3')
+                ItemIndex = 7
+                ItemHeight = 10.000000000000000000
+                Margins.Right = 10.000000000000000000
+                Placement = BottomCenter
+                Size.Width = 160.000000000000000000
+                Size.Height = 23.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'comboboxstyle'
+                TabOrder = 0
+              end
+              object SpeedButtonProcedureStart: TSpeedButton
+                Align = Left
+                Padding.Left = 10.000000000000000000
+                Margins.Left = 10.000000000000000000
+                Margins.Right = 10.000000000000000000
+                Position.X = 180.000000000000000000
+                Size.Width = 22.000000000000000000
+                Size.Height = 23.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'playtoolbutton'
+                Text = 'SpeedButton3'
+                TextSettings.Trimming = None
+              end
+              object SpeedButtonProcedureStop: TSpeedButton
+                Align = Left
+                Margins.Left = 2.000000000000000000
+                Position.X = 214.000000000000000000
+                Size.Width = 22.000000000000000000
+                Size.Height = 23.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'transparentcirclebuttonstyle'
+                Text = 'SpeedButton27'
+                TextSettings.Trimming = None
+                object Rectangle4: TRectangle
+                  Align = Client
+                  HitTest = False
+                  Margins.Left = 4.000000000000000000
+                  Margins.Top = 4.000000000000000000
+                  Margins.Right = 4.000000000000000000
+                  Margins.Bottom = 4.000000000000000000
+                  Size.Width = 14.000000000000000000
+                  Size.Height = 15.000000000000000000
+                  Size.PlatformDefault = False
+                end
+              end
+            end
+            object LabelLayoutProcedures: TLabel
+              Align = MostBottom
+              Position.Y = 104.000000000000000000
+              Size.Width = 305.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
+              TextSettings.HorzAlign = Center
+              Text = #1055#1088#1086#1094#1077#1076#1091#1088#1099
+              TabOrder = 1
+              object SpeedButtonMinimizeProcedures: TSpeedButton
+                Align = Left
+                Size.Width = 17.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                Text = '_'
+                TextSettings.Trimming = None
+                OnClick = SpeedButtonMinimizeLayoutMainClick
+              end
+            end
+            object Layout10: TLayout
+              Position.X = 23.000000000000000000
+              Position.Y = 65.000000000000000000
+              Size.Width = 280.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 3
+              object SpeedButtonStepPause: TSpeedButton
+                Align = Left
+                Padding.Left = 10.000000000000000000
+                Margins.Left = 10.000000000000000000
+                Position.X = 202.000000000000000000
+                Size.Width = 27.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'pausetoolbuttonbordered'
+                Text = 'SpeedButton3'
+                TextSettings.Trimming = None
+              end
+              object SpeedButtonStepNext: TSpeedButton
+                Align = Left
+                Padding.Left = 10.000000000000000000
+                Margins.Left = 10.000000000000000000
+                Position.X = 239.000000000000000000
+                Size.Width = 22.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'forwardtoolbutton'
+                Text = 'SpeedButton3'
+                TextSettings.Trimming = None
+              end
+              object SpeedButtonStepPrevious: TSpeedButton
+                Align = Left
+                Padding.Left = 10.000000000000000000
+                Margins.Left = 10.000000000000000000
+                Position.X = 170.000000000000000000
+                Size.Width = 22.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'rewindtoolbutton'
+                Text = 'SpeedButton3'
+                TextSettings.Trimming = None
+              end
+              object ComboBoxStep: TComboBox
+                Align = MostLeft
+                Items.Strings = (
+                  #1064#1072#1075' 1 '
+                  #1064#1072#1075' 2'
+                  #1064#1072#1075' 3')
+                ItemIndex = 0
+                Size.Width = 160.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+              end
+            end
+            object Label2: TLabel
+              Position.X = 23.000000000000000000
+              Position.Y = 8.000000000000000000
+              Size.Width = 160.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1047#1072#1076#1072#1095#1072
+              Visible = False
+              TabOrder = 0
             end
           end
         end

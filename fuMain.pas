@@ -90,7 +90,7 @@ type
     SpeedButton3: TSpeedButton;
     SpeedButton28: TSpeedButton;
     Rectangle14: TRectangle;
-    Label14: TLabel;
+    LabelLayoutPump: TLabel;
     LayoutConditions: TLayout;
     Layout9: TLayout;
     Layout42: TLayout;
@@ -108,7 +108,7 @@ type
     Layout7: TLayout;
     LabelNameTemperture: TLabel;
     EditTemp: TEdit;
-    Label22: TLabel;
+    LabelLayoutConditions: TLabel;
     Line3: TLine;
     LayoutFlowRate: TLayout;
     Line5: TLine;
@@ -124,19 +124,19 @@ type
     SpeedButton9: TSpeedButton;
     SpeedButton4: TSpeedButton;
     Rectangle15: TRectangle;
-    Label19: TLabel;
+    LabelLayoutFlowRate: TLabel;
     Line6: TLine;
     Layout16: TLayout;
     LayoutTaskMain: TLayout;
     ComboBoxTaskMain: TComboBox;
-    SpeedButton11: TSpeedButton;
-    SpeedButton27: TSpeedButton;
+    SpeedButtonSpillageStart: TSpeedButton;
+    SpeedButtonSpillageStop: TSpeedButton;
     Rectangle13: TRectangle;
-    Label32: TLabel;
+    LabelLayoutMain: TLabel;
     LayoutTaskAddition: TLayout;
-    SpeedButton12: TSpeedButton;
-    SpeedButton25: TSpeedButton;
-    SpeedButton26: TSpeedButton;
+    SpeedButtonTaskPause: TSpeedButton;
+    SpeedButtonTaskNext: TSpeedButton;
+    SpeedButtonTaskPrevious: TSpeedButton;
     ComboBoxTaskStep: TComboBox;
     Label36: TLabel;
     LayoutMesure: TLayout;
@@ -158,7 +158,7 @@ type
     ComboEdit8: TComboEdit;
     SpeedButton23: TSpeedButton;
     SpeedButton24: TSpeedButton;
-    Label53: TLabel;
+    LabelLayoutMesure: TLabel;
     Layout49: TLayout;
     Rectangle9: TRectangle;
     LabelQuantity: TLabel;
@@ -337,6 +337,24 @@ type
     PopupMenuDevicesGridLayOut: TPopupMenu;
     StringColumnDeviceOptions1: TStringColumn;
     StringColumnEtalonOptions1: TStringColumn;
+    LayoutProcedures: TLayout;
+    Line2: TLine;
+    Layout4: TLayout;
+    Layout8: TLayout;
+    ComboBoxProcedure: TComboBox;
+    SpeedButtonProcedureStart: TSpeedButton;
+    SpeedButtonProcedureStop: TSpeedButton;
+    Rectangle4: TRectangle;
+    LabelLayoutProcedures: TLabel;
+    SpeedButtonMinimizeProcedures: TSpeedButton;
+    Layout10: TLayout;
+    SpeedButtonStepPause: TSpeedButton;
+    SpeedButtonStepNext: TSpeedButton;
+    SpeedButtonStepPrevious: TSpeedButton;
+    ComboBoxStep: TComboBox;
+    Label2: TLabel;
+    SpeedButtonTest: TSpeedButton;
+    Circle1: TCircle;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -373,6 +391,8 @@ type
     procedure PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
     procedure MenuGridLayOutClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure Circle1Click(Sender: TObject);
+    procedure SpeedButtonTestClick(Sender: TObject);
 
   private
 
@@ -669,6 +689,11 @@ begin
     AColumns[I].Width := AGrid.Columns[I].Width;
     AColumns[I].Visible := AGrid.Columns[I].Visible;
   end;
+end;
+
+procedure TFormMain.Circle1Click(Sender: TObject);
+begin
+ GridDevices.Repaint;
 end;
 
 procedure TFormMain.ApplyGridColumnsLayout(AGrid: TGrid;
@@ -1704,6 +1729,11 @@ end;
 procedure TFormMain.SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
 begin
     LayoutFlowRate.Visible:=False;
+end;
+
+procedure TFormMain.SpeedButtonTestClick(Sender: TObject);
+begin
+ GridDevices.Repaint;
 end;
 
 procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);

@@ -1711,7 +1711,7 @@ begin
     Channel.RepoDeviceUUID := AIni.ReadString(Section, 'RepoDeviceUUID', '');
 
     Channel.ImpSec := AIni.ReadFloat(Section, 'ImpSec', 0);
-    Channel.ImpResult := AIni.ReadFloat(Section, 'ImpResult', 0);
+    Channel.ImpResult :=0; //AIni.ReadFloat(Section, 'ImpResult', 0);
     Channel.CurSec := AIni.ReadFloat(Section, 'CurSec', 0);
     Channel.CurResult := AIni.ReadFloat(Section, 'CurResult', 0);
     Channel.ValueSec := AIni.ReadFloat(Section, 'ValueSec', 0);
