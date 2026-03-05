@@ -1424,7 +1424,7 @@ object FormMain: TFormMain
                 Size.PlatformDefault = False
                 Text = '_'
                 TextSettings.Trimming = None
-                OnClick = SpeedButtonMinimizeLayoutMainClick
+                OnClick = SpeedButtonMinimizeProceduresClick
               end
             end
             object Layout10: TLayout
@@ -3028,6 +3028,10 @@ object FormMain: TFormMain
     end
     object miConditions: TMenuItem
       Text = 'miConditions'
+      OnClick = MenuInstrumentalLayOutClick
+    end
+    object miProcedures: TMenuItem
+      Text = 'miProcedures'
       OnClick = MenuInstrumentalLayOutClick
     end
   end

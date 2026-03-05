@@ -292,6 +292,7 @@ type
     miMain: TMenuItem;
     miMesurment: TMenuItem;
     miConditions: TMenuItem;
+    miProcedures: TMenuItem;
     SpeedButtonMinimizePumpLayout: TSpeedButton;
     TimerSetValues: TTimer;
     TimerMain: TTimer;
@@ -384,6 +385,7 @@ type
     procedure SpeedButtonMinimizeMesureClick(Sender: TObject);
     procedure SpeedButtonMinimizeConditionsClick(Sender: TObject);
     procedure SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
+    procedure SpeedButtonMinimizeProceduresClick(Sender: TObject);
     procedure SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
     procedure PopupMenuInstrumentalLayOutPopup(Sender: TObject);
     procedure MenuInstrumentalLayOutClick(Sender: TObject);
@@ -584,11 +586,19 @@ end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
 begin
+  miFlowRate.Text := LabelLayoutFlowRate.Text;
+  miPump.Text := LabelLayoutPump.Text;
+  miMain.Text := LabelLayoutMain.Text;
+  miMesurment.Text := LabelLayoutMesure.Text;
+  miConditions.Text := LabelLayoutConditions.Text;
+  miProcedures.Text := LabelLayoutProcedures.Text;
+
   miFlowRate.IsChecked := LayoutFlowRate.Visible;
   miPump.IsChecked := LayoutPump.Visible;
   miMain.IsChecked := LayoutMain.Visible;
   miMesurment.IsChecked := LayoutMesure.Visible;
   miConditions.IsChecked := LayoutConditions.Visible;
+  miProcedures.IsChecked := LayoutProcedures.Visible;
 end;
 
 procedure TFormMain.MenuInstrumentalLayOutClick(Sender: TObject);
@@ -612,7 +622,9 @@ begin
   else if MenuItem = miMesurment then
     LayoutMesure.Visible := NewVisible
   else if MenuItem = miConditions then
-    LayoutConditions.Visible := NewVisible;
+    LayoutConditions.Visible := NewVisible
+  else if MenuItem = miProcedures then
+    LayoutProcedures.Visible := NewVisible;
 
   SaveLayoutSettingsToWorkTable;
 end;
@@ -746,6 +758,7 @@ begin
   WorkTable.LayoutMainVisible := LayoutMain.Visible;
   WorkTable.LayoutMesureVisible := LayoutMesure.Visible;
   WorkTable.LayoutConditionsVisible := LayoutConditions.Visible;
+  WorkTable.LayoutProceduresVisible := LayoutProcedures.Visible;
 
   CaptureGridColumnsLayout(GridEtalons, EtalonColumns);
   CaptureGridColumnsLayout(GridDevices, DeviceColumns);
@@ -766,6 +779,7 @@ begin
   LayoutMain.Visible := WorkTable.LayoutMainVisible;
   LayoutMesure.Visible := WorkTable.LayoutMesureVisible;
   LayoutConditions.Visible := WorkTable.LayoutConditionsVisible;
+  LayoutProcedures.Visible := WorkTable.LayoutProceduresVisible;
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
@@ -1714,6 +1728,13 @@ end;
 procedure TFormMain.SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
 begin
     LayoutMain.Visible:=False;
+end;
+
+procedure TFormMain.SpeedButtonMinimizeProceduresClick(Sender: TObject);
+begin
+  LayoutProcedures.Visible := False;
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonMinimizeMesureClick(Sender: TObject);
