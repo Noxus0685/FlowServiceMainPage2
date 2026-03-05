@@ -199,6 +199,7 @@ type
     FLayoutMesureVisible: Boolean;
     FLayoutConditionsVisible: Boolean;
     FLayoutProceduresVisible: Boolean;
+    FInstrumentalLayoutOrder: string;
 
     FEtalonsGridColumns: TArray<TGridColumnLayout>;
     FDevicesGridColumns: TArray<TGridColumnLayout>;
@@ -331,6 +332,7 @@ type
     property LayoutMesureVisible: Boolean read FLayoutMesureVisible write FLayoutMesureVisible;
     property LayoutConditionsVisible: Boolean read FLayoutConditionsVisible write FLayoutConditionsVisible;
     property LayoutProceduresVisible: Boolean read FLayoutProceduresVisible write FLayoutProceduresVisible;
+    property InstrumentalLayoutOrder: string read FInstrumentalLayoutOrder write FInstrumentalLayoutOrder;
 
     property EtalonsGridColumns: TArray<TGridColumnLayout> read FEtalonsGridColumns write FEtalonsGridColumns;
     property DevicesGridColumns: TArray<TGridColumnLayout> read FDevicesGridColumns write FDevicesGridColumns;
@@ -764,6 +766,7 @@ begin
   FLayoutMesureVisible := True;
   FLayoutConditionsVisible := True;
   FLayoutProceduresVisible := True;
+  FInstrumentalLayoutOrder := 'FlowRate,Pump,Main,Mesure,Conditions,Procedures';
 
   Temp:= 20.2;
   TempDelta:=0.1;
@@ -1409,6 +1412,7 @@ begin
       Ini.WriteBool(Section, 'LayoutMesureVisible', WorkTable.LayoutMesureVisible);
       Ini.WriteBool(Section, 'LayoutConditionsVisible', WorkTable.LayoutConditionsVisible);
       Ini.WriteBool(Section, 'LayoutProceduresVisible', WorkTable.LayoutProceduresVisible);
+      Ini.WriteString(Section, 'InstrumentalLayoutOrder', WorkTable.InstrumentalLayoutOrder);
 
       ValuesIni.EraseSection(Section);
       ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
@@ -1507,6 +1511,8 @@ begin
       WorkTable.LayoutMesureVisible := Ini.ReadBool(Section, 'LayoutMesureVisible', True);
       WorkTable.LayoutConditionsVisible := Ini.ReadBool(Section, 'LayoutConditionsVisible', True);
       WorkTable.LayoutProceduresVisible := Ini.ReadBool(Section, 'LayoutProceduresVisible', True);
+      WorkTable.InstrumentalLayoutOrder := Ini.ReadString(Section, 'InstrumentalLayoutOrder',
+        'FlowRate,Pump,Main,Mesure,Conditions,Procedures');
 
       WorkTable.FHashValueTempertureBefore := ValuesIni.ReadString(Section, 'HashValueTempertureBefore', WorkTable.FHashValueTempertureBefore);
       WorkTable.FHashValueTempertureAfter := ValuesIni.ReadString(Section, 'HashValueTempertureAfter', WorkTable.FHashValueTempertureAfter);
