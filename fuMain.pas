@@ -615,9 +615,28 @@ var
     if AMeter <> nil then
       AMeter.Reset;
   end;
+
+  procedure ResetSimulationChannelFields(const AChannel: TChannel);
+  begin
+    if AChannel = nil then
+      Exit;
+
+    AChannel.CurSec := 0;
+    AChannel.ImpSec := 0;
+    AChannel.ImpResult := 0;
+  end;
 begin
   if FActiveWorkTable = nil then
     Exit;
+
+  // Сброс полей, участвующих в имитации
+  // (используются в UpdateRandomClimate/UpdateRandomSignals).
+  FActiveWorkTable.Temp := 0;
+  FActiveWorkTable.Press := 0;
+  FNextClimateChangeAt := 0;
+
+  if FActiveWorkTable.TableFlow <> nil then
+    FActiveWorkTable.TableFlow.Reset;
 
   ResetMeter(FActiveWorkTable.ValueTempertureBefore);
   ResetMeter(FActiveWorkTable.ValueTempertureAfter);
@@ -637,6 +656,11 @@ begin
 
   for Ch in FActiveWorkTable.DeviceChannels do
   begin
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Reset;
+
+    ResetSimulationChannelFields(Ch);
+
     ResetMeter(Ch.ValueImp);
     ResetMeter(Ch.ValueImpTotal);
     ResetMeter(Ch.ValueCurrent);
@@ -645,6 +669,11 @@ begin
 
   for Ch in FActiveWorkTable.EtalonChannels do
   begin
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Reset;
+
+    ResetSimulationChannelFields(Ch);
+
     ResetMeter(Ch.ValueImp);
     ResetMeter(Ch.ValueImpTotal);
     ResetMeter(Ch.ValueCurrent);
@@ -737,11 +766,13 @@ begin
         ButtonMonitor.Enabled := False;
         TestButton.Text := 'Запуск';
         TestButton.Enabled := False;
+        ResetMeasurementValues;
       end;
 
     STATE_STARTMONITOR:
       begin
         ButtonCancel.Visible := False;
+        ResetMeasurementValues;
       end;
 
     STATE_STARTMONITORWAIT:
