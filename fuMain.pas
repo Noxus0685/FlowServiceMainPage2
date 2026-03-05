@@ -652,30 +652,19 @@ procedure TFormMain.ApplyInstrumentalVisibleOrder;
 var
   I: Integer;
   Layout: TLayout;
-  X: Single;
 begin
   if FInstrumentalVisibleOrder = nil then
     Exit;
 
   HorzScrollBoxInstrumental.BeginUpdate;
   try
-    // Не полагаемся на неочевидный порядок Align=Left/MostLeft:
-    // задаем положение блоков вручную в порядке включения.
+    for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
+      FInstrumentalVisibleOrder[I].Index := I;
+
     for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
       LayoutMesure, LayoutConditions, LayoutProcedures] do
-      Layout.Align := TAlignLayout.None;
-
-    X := 0;
-    for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
-    begin
-      Layout := FInstrumentalVisibleOrder[I];
-      Layout.Visible := True;
-      Layout.Position.X := X;
-      Layout.Position.Y := 0;
-      X := X + Layout.Width;
-    end;
-
-    HorzScrollBoxInstrumental.Content.Width := Max(X, HorzScrollBoxInstrumental.Width);
+      if FInstrumentalVisibleOrder.IndexOf(Layout) < 0 then
+        Layout.Index := HorzScrollBoxInstrumental.ControlsCount - 1;
   finally
     HorzScrollBoxInstrumental.EndUpdate;
   end;
