@@ -447,7 +447,7 @@ object FormMain: TFormMain
                     TabOrder = 0
                     OnChange = ComboBoxUnitsChange
                   end
-                  object SpeedButton9: TSpeedButton
+                  object SpeedButtonSetFlowRate: TSpeedButton
                     Align = Left
                     Padding.Left = 10.000000000000000000
                     Margins.Left = 10.000000000000000000
@@ -1260,7 +1260,7 @@ object FormMain: TFormMain
                     Size.Height = 22.000000000000000000
                     Size.PlatformDefault = False
                   end
-                  object SpeedButton3: TSpeedButton
+                  object SpeedButtonStartPump: TSpeedButton
                     Align = Left
                     Padding.Left = 10.000000000000000000
                     Margins.Left = 10.000000000000000000
@@ -1269,7 +1269,7 @@ object FormMain: TFormMain
                     Size.Height = 22.000000000000000000
                     Size.PlatformDefault = False
                     StyleLookup = 'playtoolbutton'
-                    Text = 'SpeedButton3'
+                    Text = 'SpeedButtonStartPump'
                     TextSettings.Trimming = None
                   end
                   object SpeedButton28: TSpeedButton
@@ -1654,7 +1654,7 @@ object FormMain: TFormMain
               Stroke.Join = Round
             end
           end
-          object Button2: TButton
+          object ButtonMonitor: TButton
             Position.X = 26.000000000000000000
             Position.Y = 24.000000000000000000
             Size.Width = 105.000000000000000000
@@ -1667,7 +1667,7 @@ object FormMain: TFormMain
               Fill.Kind = Gradient
               Fill.Gradient.Points = <
                 item
-                  Color = xFF4CFF5F
+                  Color = claGray
                   Offset = 0.000000000000000000
                 end
                 item
@@ -1688,13 +1688,13 @@ object FormMain: TFormMain
             Size.Height = 50.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 2
-            object TestButton: TButton
+            object ButtonTest: TButton
               Align = Center
               Size.Width = 157.000000000000000000
               Size.Height = 76.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'circlebuttonstyle'
-              TabOrder = 0
+              TabOrder = 1
               TabStop = False
               Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077' '
               TextSettings.WordWrap = True
@@ -1702,8 +1702,7 @@ object FormMain: TFormMain
               object GlowMesYellow: TGlowEffect
                 Softness = 1.000000000000000000
                 GlowColor = xFFF69E2D
-                Opacity = 0.899999976158142100
-                Enabled = False
+                Opacity = 1.000000000000000000
               end
               object GlowMesGreen: TGlowEffect
                 Softness = 1.000000000000000000
@@ -1712,19 +1711,50 @@ object FormMain: TFormMain
                 Enabled = False
               end
               object GlowMesRed: TGlowEffect
-                Softness = 0.400000005960464500
+                Softness = 1.000000000000000000
                 GlowColor = claRed
-                Opacity = 0.899999976158142100
+                Opacity = 1.000000000000000000
                 Enabled = False
               end
             end
             object CheckBox1: TCheckBox
-              Position.X = 168.000000000000000000
+              Position.X = 192.000000000000000000
               Size.Width = 76.000000000000000000
               Size.Height = 50.000000000000000000
               Size.PlatformDefault = False
-              TabOrder = 3
+              TabOrder = 4
               Text = #1040#1074#1090#1086
+            end
+            object ButtonCancel: TButton
+              Position.X = -29.000000000000000000
+              Size.Width = 110.000000000000000000
+              Size.Height = 50.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'circlebuttonstyle'
+              TabOrder = 0
+              TabStop = False
+              Text = #1054#1090#1084#1077#1085#1072
+              TextSettings.WordWrap = True
+              TextSettings.Trimming = None
+              Visible = False
+              object GlowEffect1: TGlowEffect
+                Softness = 1.000000000000000000
+                GlowColor = xFFF69E2D
+                Opacity = 1.000000000000000000
+                Enabled = False
+              end
+              object GlowEffect2: TGlowEffect
+                Softness = 1.000000000000000000
+                GlowColor = claYellowgreen
+                Opacity = 1.000000000000000000
+                Enabled = False
+              end
+              object GlowEffectCancelRed: TGlowEffect
+                Softness = 1.000000000000000000
+                GlowColor = claRed
+                Opacity = 1.000000000000000000
+                Enabled = False
+              end
             end
           end
         end

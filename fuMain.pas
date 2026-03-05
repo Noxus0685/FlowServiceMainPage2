@@ -87,7 +87,7 @@ type
     SpinBoxFreq: TSpinBox;
     LayoutPumpSelect: TLayout;
     ComboEditPumps: TComboEdit;
-    SpeedButton3: TSpeedButton;
+    SpeedButtonStartPump: TSpeedButton;
     SpeedButton28: TSpeedButton;
     Rectangle14: TRectangle;
     LabelLayoutPump: TLabel;
@@ -121,7 +121,7 @@ type
     SpinBoxFlowRate: TSpinBox;
     Layout14: TLayout;
     ComboEditUnits: TComboBox;
-    SpeedButton9: TSpeedButton;
+    SpeedButtonSetFlowRate: TSpeedButton;
     SpeedButton4: TSpeedButton;
     Rectangle15: TRectangle;
     LabelLayoutFlowRate: TLabel;
@@ -361,14 +361,18 @@ type
     Layout11: TLayout;
     Button1: TButton;
     Circle2: TCircle;
-    TestButton: TButton;
+    ButtonTest: TButton;
     GlowMesYellow: TGlowEffect;
     GlowMesGreen: TGlowEffect;
     GlowMesRed: TGlowEffect;
-    Button2: TButton;
+    ButtonMonitor: TButton;
     CheckBox1: TCheckBox;
     CircleIndicatorMonitor: TCircle;
     Layout15: TLayout;
+    ButtonCancel: TButton;
+    GlowEffect1: TGlowEffect;
+    GlowEffect2: TGlowEffect;
+    GlowEffectCancelRed: TGlowEffect;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
