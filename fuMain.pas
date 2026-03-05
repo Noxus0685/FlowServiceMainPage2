@@ -411,6 +411,8 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Circle1Click(Sender: TObject);
     procedure SpeedButtonTestClick(Sender: TObject);
+    procedure ButtonMonitorClick(Sender: TObject);
+    procedure ButtonTestClick(Sender: TObject);
 
 
   private
@@ -447,6 +449,10 @@ type
     procedure ResetMeasurementValues;
     procedure OnChangeState(const ANewState: TMeasurementState);
     procedure SetConfiguration;
+    procedure StartMonitor;
+    procedure StopMonitor;
+    procedure StartTest;
+    procedure StopTest;
 
     procedure UpdateGrids;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
@@ -637,6 +643,27 @@ end;
 procedure TFormMain.SetConfiguration;
 begin
   OnChangeState(STATE_CONFIGED);
+end;
+
+procedure TFormMain.StartMonitor;
+begin
+  OnChangeState(STATE_STARTMONITOR);
+end;
+
+procedure TFormMain.StopMonitor;
+begin
+  OnChangeState(STATE_STOPMONITOR);
+end;
+
+procedure TFormMain.StartTest;
+begin
+  ResetMeasurementValues;
+  OnChangeState(STATE_STARTTEST);
+end;
+
+procedure TFormMain.StopTest;
+begin
+  OnChangeState(STATE_STOPTEST);
 end;
 
 procedure TFormMain.OnChangeState(const ANewState: TMeasurementState);
@@ -833,6 +860,9 @@ begin
     LayoutProcedures.Visible,
     LayoutOrder
   );
+
+  ButtonMonitor.OnClick := ButtonMonitorClick;
+  ButtonTest.OnClick := ButtonTestClick;
 
   OnChangeState(STATE_STANDBY);
 end;
@@ -1820,9 +1850,42 @@ begin
   if WorkTable = nil then
     Exit;
 
-  UpdateRandomClimate(WorkTable);
-  UpdateRandomSignals(WorkTable);
-  SetValues;
+  if WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE] then
+  begin
+    UpdateRandomClimate(WorkTable);
+    UpdateRandomSignals(WorkTable);
+    SetValues;
+  end;
+
+  case WorkTable.MeasurementState of
+    STATE_STANDBY:
+      OnChangeState(STATE_CONNECTED);
+
+    STATE_STARTMONITOR:
+      OnChangeState(STATE_STARTMONITORWAIT);
+
+    STATE_STARTMONITORWAIT:
+      OnChangeState(STATE_MONITOR);
+
+    STATE_STOPMONITOR,
+    STATE_CONFIGED:
+      OnChangeState(STATE_CONNECTED);
+
+    STATE_STARTTEST:
+      OnChangeState(STATE_STARTWAIT);
+
+    STATE_STARTWAIT:
+      OnChangeState(STATE_EXECUTE);
+
+    STATE_STOPTEST:
+      OnChangeState(STATE_STOPWAIT);
+
+    STATE_STOPWAIT:
+      OnChangeState(STATE_COMPLETE);
+
+    STATE_COMPLETE:
+      OnChangeState(STATE_FINALREAD);
+  end;
 end;
 
 procedure TFormMain.SetValues;
@@ -1874,7 +1937,16 @@ begin
 end;
 
 procedure TFormMain.TimerMainTimer(Sender: TObject);
+var
+  WorkTable: TWorkTable;
 begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
+    Exit;
+
   IsUpdating := True;
   try
     UpdateUIFromValues;
@@ -2250,6 +2322,34 @@ end;
 procedure TFormMain.SpeedButtonTestClick(Sender: TObject);
 begin
  GridDevices.Repaint;
+end;
+
+procedure TFormMain.ButtonMonitorClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  if WorkTable.MeasurementState = STATE_MONITOR then
+    StopMonitor
+  else
+    StartMonitor;
+end;
+
+procedure TFormMain.ButtonTestClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  if WorkTable.MeasurementState = STATE_EXECUTE then
+    StopTest
+  else
+    StartTest;
 end;
 
 procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
