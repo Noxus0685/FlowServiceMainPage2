@@ -386,6 +386,7 @@ public
   procedure SetMonitorValues;
   procedure SetFinalValues;
   procedure SetUpdateType(AType: EUpdateType);
+  procedure Reset;
 
   procedure Init; overload;
   procedure Init(UUID: string); overload;
@@ -1710,6 +1711,22 @@ end;
 procedure TFlowMeter.SetMonitorValues;
 begin
   // TODO: перенести оригинальную C++ логику значений мониторинга.
+end;
+
+procedure TFlowMeter.Reset;
+
+  procedure ApplyReset(const AMeterValue: TMeterValue);
+  begin
+    if AMeterValue <> nil then
+      AMeterValue.Reset;
+  end;
+
+begin
+  ApplyReset(ValueVolume);
+  ApplyReset(ValueMass);
+  ApplyReset(ValueVolumeFlow);
+  ApplyReset(ValueMassFlow);
+  ApplyReset(ValueTime);
 end;
 
 procedure TFlowMeter.SetSendStatus(const AText: string);

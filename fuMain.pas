@@ -619,6 +619,9 @@ begin
   if FActiveWorkTable = nil then
     Exit;
 
+  if FActiveWorkTable.TableFlow <> nil then
+    FActiveWorkTable.TableFlow.Reset;
+
   ResetMeter(FActiveWorkTable.ValueTempertureBefore);
   ResetMeter(FActiveWorkTable.ValueTempertureAfter);
   ResetMeter(FActiveWorkTable.ValueTempertureDelta);
@@ -637,6 +640,9 @@ begin
 
   for Ch in FActiveWorkTable.DeviceChannels do
   begin
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Reset;
+
     ResetMeter(Ch.ValueImp);
     ResetMeter(Ch.ValueImpTotal);
     ResetMeter(Ch.ValueCurrent);
@@ -645,6 +651,9 @@ begin
 
   for Ch in FActiveWorkTable.EtalonChannels do
   begin
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Reset;
+
     ResetMeter(Ch.ValueImp);
     ResetMeter(Ch.ValueImpTotal);
     ResetMeter(Ch.ValueCurrent);
@@ -737,11 +746,13 @@ begin
         ButtonMonitor.Enabled := False;
         TestButton.Text := 'Запуск';
         TestButton.Enabled := False;
+        ResetMeasurementValues;
       end;
 
     STATE_STARTMONITOR:
       begin
         ButtonCancel.Visible := False;
+        ResetMeasurementValues;
       end;
 
     STATE_STARTMONITORWAIT:
