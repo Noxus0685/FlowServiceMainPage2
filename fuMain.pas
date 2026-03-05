@@ -442,6 +442,8 @@ type
     procedure RebuildInstrumentalVisibleOrder;
     procedure ApplyInstrumentalVisibleOrder;
     procedure SetInstrumentalLayoutVisible(ALayout: TLayout; AVisible: Boolean);
+    procedure RestoreInstrumentalLayoutsByFlags(const AFlowRateVisible, APumpVisible,
+      AMainVisible, AMesureVisible, AConditionsVisible, AProceduresVisible: Boolean);
   end;
 
 
@@ -591,8 +593,14 @@ begin
   FNextClimateChangeAt := Now;
 
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
-  RebuildInstrumentalVisibleOrder;
-  ApplyInstrumentalVisibleOrder;
+  RestoreInstrumentalLayoutsByFlags(
+    LayoutFlowRate.Visible,
+    LayoutPump.Visible,
+    LayoutMain.Visible,
+    LayoutMesure.Visible,
+    LayoutConditions.Visible,
+    LayoutProcedures.Visible
+  );
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
@@ -709,6 +717,48 @@ begin
     FInstrumentalVisibleOrder.Remove(ALayout);
     ALayout.Visible := False;
   end;
+
+  ApplyInstrumentalVisibleOrder;
+end;
+
+procedure TFormMain.RestoreInstrumentalLayoutsByFlags(
+  const AFlowRateVisible, APumpVisible, AMainVisible, AMesureVisible,
+  AConditionsVisible, AProceduresVisible: Boolean);
+var
+  Layout: TLayout;
+begin
+  if FInstrumentalVisibleOrder = nil then
+    Exit;
+
+  // Полный сброс: сначала скрываем все блоки, затем показываем по одному
+  // в фиксированном порядке (как пункты PopupMenuInstrumentalLayOut).
+  HorzScrollBoxInstrumental.BeginUpdate;
+  try
+    FInstrumentalVisibleOrder.Clear;
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+      LayoutMesure, LayoutConditions, LayoutProcedures] do
+    begin
+      Layout.Align := TAlignLayout.None;
+      Layout.Visible := False;
+      Layout.Position.X := 0;
+      Layout.Position.Y := 0;
+    end;
+  finally
+    HorzScrollBoxInstrumental.EndUpdate;
+  end;
+
+  if AFlowRateVisible then
+    SetInstrumentalLayoutVisible(LayoutFlowRate, True);
+  if APumpVisible then
+    SetInstrumentalLayoutVisible(LayoutPump, True);
+  if AMainVisible then
+    SetInstrumentalLayoutVisible(LayoutMain, True);
+  if AMesureVisible then
+    SetInstrumentalLayoutVisible(LayoutMesure, True);
+  if AConditionsVisible then
+    SetInstrumentalLayoutVisible(LayoutConditions, True);
+  if AProceduresVisible then
+    SetInstrumentalLayoutVisible(LayoutProcedures, True);
 
   ApplyInstrumentalVisibleOrder;
 end;
@@ -877,14 +927,14 @@ begin
   if WorkTable = nil then
     Exit;
 
-  LayoutFlowRate.Visible := WorkTable.LayoutFlowRateVisible;
-  LayoutPump.Visible := WorkTable.LayoutPumpVisible;
-  LayoutMain.Visible := WorkTable.LayoutMainVisible;
-  LayoutMesure.Visible := WorkTable.LayoutMesureVisible;
-  LayoutConditions.Visible := WorkTable.LayoutConditionsVisible;
-  LayoutProcedures.Visible := WorkTable.LayoutProceduresVisible;
-  RebuildInstrumentalVisibleOrder;
-  ApplyInstrumentalVisibleOrder;
+  RestoreInstrumentalLayoutsByFlags(
+    WorkTable.LayoutFlowRateVisible,
+    WorkTable.LayoutPumpVisible,
+    WorkTable.LayoutMainVisible,
+    WorkTable.LayoutMesureVisible,
+    WorkTable.LayoutConditionsVisible,
+    WorkTable.LayoutProceduresVisible
+  );
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
