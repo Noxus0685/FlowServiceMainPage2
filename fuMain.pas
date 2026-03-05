@@ -602,6 +602,7 @@ begin
 
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
   RebuildInstrumentalVisibleOrder;
+  ApplyInstrumentalVisibleOrder;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
@@ -704,6 +705,9 @@ begin
 
   if AVisible then
   begin
+    // Сразу отключаем Align, чтобы блок не встраивался поверх существующих
+    // по внутренним правилам Align перед последующим перерасчетом позиций.
+    ALayout.Align := TAlignLayout.None;
     ALayout.Visible := True;
     // При включении добавляем блок в конец последовательности показа.
     if FInstrumentalVisibleOrder.IndexOf(ALayout) < 0 then
@@ -890,6 +894,7 @@ begin
   LayoutConditions.Visible := WorkTable.LayoutConditionsVisible;
   LayoutProcedures.Visible := WorkTable.LayoutProceduresVisible;
   RebuildInstrumentalVisibleOrder;
+  ApplyInstrumentalVisibleOrder;
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
