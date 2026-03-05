@@ -446,6 +446,7 @@ type
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure MarkChannelDeviceModified(AChannel: TChannel);
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
+    procedure RefreshMonitorIndicator;
     procedure ResetMeasurementValues;
     procedure OnChangeState(const ANewState: TMeasurementState);
     procedure SetConfiguration;
@@ -592,6 +593,17 @@ begin
   P := TGradientPoint(CircleIndicatorMonitor.Fill.Gradient.Points.Add);
   P.Color := TAlphaColorRec.White;   // вместо claWhite
   P.Offset := 1;
+
+  RefreshMonitorIndicator;
+end;
+
+procedure TFormMain.RefreshMonitorIndicator;
+begin
+  if CircleIndicatorMonitor = nil then
+    Exit;
+
+  CircleIndicatorMonitor.Repaint;
+  ButtonMonitor.Repaint;
 end;
 
 procedure TFormMain.ResetMeasurementValues;
@@ -1943,6 +1955,9 @@ begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
+
+  if WorkTable.MeasurementState in [STATE_STARTMONITORWAIT, STATE_MONITOR, STATE_STOPMONITOR] then
+    RefreshMonitorIndicator;
 
   if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
     Exit;
