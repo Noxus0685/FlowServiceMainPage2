@@ -198,6 +198,7 @@ type
     FLayoutMainVisible: Boolean;
     FLayoutMesureVisible: Boolean;
     FLayoutConditionsVisible: Boolean;
+    FLayoutProceduresVisible: Boolean;
 
     FEtalonsGridColumns: TArray<TGridColumnLayout>;
     FDevicesGridColumns: TArray<TGridColumnLayout>;
@@ -329,6 +330,7 @@ type
     property LayoutMainVisible: Boolean read FLayoutMainVisible write FLayoutMainVisible;
     property LayoutMesureVisible: Boolean read FLayoutMesureVisible write FLayoutMesureVisible;
     property LayoutConditionsVisible: Boolean read FLayoutConditionsVisible write FLayoutConditionsVisible;
+    property LayoutProceduresVisible: Boolean read FLayoutProceduresVisible write FLayoutProceduresVisible;
 
     property EtalonsGridColumns: TArray<TGridColumnLayout> read FEtalonsGridColumns write FEtalonsGridColumns;
     property DevicesGridColumns: TArray<TGridColumnLayout> read FDevicesGridColumns write FDevicesGridColumns;
@@ -761,6 +763,7 @@ begin
   FLayoutMainVisible := True;
   FLayoutMesureVisible := True;
   FLayoutConditionsVisible := True;
+  FLayoutProceduresVisible := True;
 
   Temp:= 20.2;
   TempDelta:=0.1;
@@ -1405,6 +1408,7 @@ begin
       Ini.WriteBool(Section, 'LayoutMainVisible', WorkTable.LayoutMainVisible);
       Ini.WriteBool(Section, 'LayoutMesureVisible', WorkTable.LayoutMesureVisible);
       Ini.WriteBool(Section, 'LayoutConditionsVisible', WorkTable.LayoutConditionsVisible);
+      Ini.WriteBool(Section, 'LayoutProceduresVisible', WorkTable.LayoutProceduresVisible);
 
       ValuesIni.EraseSection(Section);
       ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
@@ -1502,6 +1506,7 @@ begin
       WorkTable.LayoutMainVisible := Ini.ReadBool(Section, 'LayoutMainVisible', True);
       WorkTable.LayoutMesureVisible := Ini.ReadBool(Section, 'LayoutMesureVisible', True);
       WorkTable.LayoutConditionsVisible := Ini.ReadBool(Section, 'LayoutConditionsVisible', True);
+      WorkTable.LayoutProceduresVisible := Ini.ReadBool(Section, 'LayoutProceduresVisible', True);
 
       WorkTable.FHashValueTempertureBefore := ValuesIni.ReadString(Section, 'HashValueTempertureBefore', WorkTable.FHashValueTempertureBefore);
       WorkTable.FHashValueTempertureAfter := ValuesIni.ReadString(Section, 'HashValueTempertureAfter', WorkTable.FHashValueTempertureAfter);
