@@ -437,6 +437,17 @@ type
     destructor Destroy; override;
   private
     FWorkTableManager: TWorkTableManager;
+    FInstrumentalVisibleOrder: TList<TLayout>;
+    function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
+    procedure RebuildInstrumentalVisibleOrder;
+    procedure ApplyInstrumentalVisibleOrder;
+    procedure SetInstrumentalLayoutVisible(ALayout: TLayout; AVisible: Boolean);
+    function GetLayoutOrderKey(ALayout: TLayout): string;
+    function GetLayoutByOrderKey(const AKey: string): TLayout;
+    function GetInstrumentalVisibleOrderAsString: string;
+    procedure RestoreInstrumentalLayoutsByFlags(const AFlowRateVisible, APumpVisible,
+      AMainVisible, AMesureVisible, AConditionsVisible, AProceduresVisible: Boolean;
+      const AOrder: string = '');
   end;
 
 
@@ -532,6 +543,7 @@ end;
 destructor TFormMain.Destroy;
 begin
   TMeterValue.SaveToFile(0);
+  FInstrumentalVisibleOrder.Free;
   FWorkTableManager.Free;
   FFlowMeters.Free;
   inherited;
@@ -541,9 +553,12 @@ procedure TFormMain.FormCreate(Sender: TObject);
 var
   OT: TOutputType;
   UnitName: string;
+  LayoutOrder: string;
 
 begin
   TMeterValue.LoadFromFile;
+
+  FInstrumentalVisibleOrder := TList<TLayout>.Create;
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -583,6 +598,19 @@ begin
   FNextClimateChangeAt := Now;
 
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  LayoutOrder := '';
+  if FActiveWorkTable <> nil then
+    LayoutOrder := FActiveWorkTable.InstrumentalLayoutOrder;
+
+  RestoreInstrumentalLayoutsByFlags(
+    LayoutFlowRate.Visible,
+    LayoutPump.Visible,
+    LayoutMain.Visible,
+    LayoutMesure.Visible,
+    LayoutConditions.Visible,
+    LayoutProcedures.Visible,
+    LayoutOrder
+  );
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
@@ -602,9 +630,235 @@ begin
   miProcedures.IsChecked := LayoutProcedures.Visible;
 end;
 
+function TFormMain.GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
+// Сопоставляет пункт popup-меню и соответствующий инструментальный блок.
+begin
+  Result := nil;
+  if AMenuItem = miFlowRate then
+    Result := LayoutFlowRate
+  else if AMenuItem = miPump then
+    Result := LayoutPump
+  else if AMenuItem = miMain then
+    Result := LayoutMain
+  else if AMenuItem = miMesurment then
+    Result := LayoutMesure
+  else if AMenuItem = miConditions then
+    Result := LayoutConditions
+  else if AMenuItem = miProcedures then
+    Result := LayoutProcedures;
+end;
+
+procedure TFormMain.RebuildInstrumentalVisibleOrder;
+// Пересобирает список видимых блоков по текущему состоянию UI.
+// Используется после загрузки формы/настроек, чтобы синхронизировать модель порядка.
+var
+  I: Integer;
+  Control: TControl;
+begin
+  if FInstrumentalVisibleOrder = nil then
+    Exit;
+
+  FInstrumentalVisibleOrder.Clear;
+  for I := 0 to HorzScrollBoxInstrumental.ControlsCount - 1 do
+  begin
+    Control := HorzScrollBoxInstrumental.Controls[I];
+    if (Control is TLayout) and Control.Visible and
+       ((Control = LayoutFlowRate) or (Control = LayoutPump) or
+        (Control = LayoutMain) or (Control = LayoutMesure) or
+        (Control = LayoutConditions) or (Control = LayoutProcedures)) then
+      FInstrumentalVisibleOrder.Add(TLayout(Control));
+  end;
+end;
+
+procedure TFormMain.ApplyInstrumentalVisibleOrder;
+var
+  I: Integer;
+  Layout: TLayout;
+  X: Single;
+begin
+  if FInstrumentalVisibleOrder = nil then
+    Exit;
+
+  HorzScrollBoxInstrumental.BeginUpdate;
+  try
+    // Не полагаемся на неочевидный порядок Align=Left/MostLeft:
+    // задаем положение блоков вручную в порядке включения.
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+      LayoutMesure, LayoutConditions, LayoutProcedures] do
+      Layout.Align := TAlignLayout.None;
+
+    X := 0;
+    for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
+    begin
+      Layout := FInstrumentalVisibleOrder[I];
+      Layout.Visible := True;
+      Layout.Position.X := X;
+      Layout.Position.Y := 0;
+      X := X + Layout.Width;
+    end;
+
+    HorzScrollBoxInstrumental.Content.Width := Max(X, HorzScrollBoxInstrumental.Width);
+  finally
+    HorzScrollBoxInstrumental.EndUpdate;
+  end;
+end;
+
+procedure TFormMain.SetInstrumentalLayoutVisible(ALayout: TLayout;
+  AVisible: Boolean);
+// Единая точка переключения видимости: поддерживает список порядка
+// и сразу перестраивает визуальное расположение блоков.
+begin
+  if (ALayout = nil) or (FInstrumentalVisibleOrder = nil) then
+    Exit;
+
+  if AVisible then
+  begin
+    // Сразу отключаем Align, чтобы блок не встраивался поверх существующих
+    // по внутренним правилам Align перед последующим перерасчетом позиций.
+    ALayout.Align := TAlignLayout.None;
+    ALayout.Visible := True;
+    // При включении добавляем блок в конец последовательности показа.
+    if FInstrumentalVisibleOrder.IndexOf(ALayout) < 0 then
+      FInstrumentalVisibleOrder.Add(ALayout);
+  end
+  else
+  begin
+    // При выключении удаляем блок из последовательности.
+    FInstrumentalVisibleOrder.Remove(ALayout);
+    ALayout.Visible := False;
+  end;
+
+  ApplyInstrumentalVisibleOrder;
+end;
+
+function TFormMain.GetLayoutOrderKey(ALayout: TLayout): string;
+begin
+  Result := '';
+  if ALayout = LayoutFlowRate then
+    Result := 'FlowRate'
+  else if ALayout = LayoutPump then
+    Result := 'Pump'
+  else if ALayout = LayoutMain then
+    Result := 'Main'
+  else if ALayout = LayoutMesure then
+    Result := 'Mesure'
+  else if ALayout = LayoutConditions then
+    Result := 'Conditions'
+  else if ALayout = LayoutProcedures then
+    Result := 'Procedures';
+end;
+
+function TFormMain.GetLayoutByOrderKey(const AKey: string): TLayout;
+begin
+  Result := nil;
+  if SameText(AKey, 'FlowRate') then
+    Result := LayoutFlowRate
+  else if SameText(AKey, 'Pump') then
+    Result := LayoutPump
+  else if SameText(AKey, 'Main') then
+    Result := LayoutMain
+  else if SameText(AKey, 'Mesure') then
+    Result := LayoutMesure
+  else if SameText(AKey, 'Conditions') then
+    Result := LayoutConditions
+  else if SameText(AKey, 'Procedures') then
+    Result := LayoutProcedures;
+end;
+
+function TFormMain.GetInstrumentalVisibleOrderAsString: string;
+var
+  I: Integer;
+  Key: string;
+begin
+  Result := '';
+  if FInstrumentalVisibleOrder = nil then
+    Exit;
+
+  for I := 0 to FInstrumentalVisibleOrder.Count - 1 do
+  begin
+    Key := GetLayoutOrderKey(FInstrumentalVisibleOrder[I]);
+    if Key = '' then
+      Continue;
+    if Result <> '' then
+      Result := Result + ',';
+    Result := Result + Key;
+  end;
+end;
+
+procedure TFormMain.RestoreInstrumentalLayoutsByFlags(
+  const AFlowRateVisible, APumpVisible, AMainVisible, AMesureVisible,
+  AConditionsVisible, AProceduresVisible: Boolean; const AOrder: string);
+var
+  Layout: TLayout;
+  OrderKeys: TStringList;
+  I: Integer;
+
+  function IsRequestedVisible(ALayout: TLayout): Boolean;
+  begin
+    Result := ((ALayout = LayoutFlowRate) and AFlowRateVisible) or
+      ((ALayout = LayoutPump) and APumpVisible) or
+      ((ALayout = LayoutMain) and AMainVisible) or
+      ((ALayout = LayoutMesure) and AMesureVisible) or
+      ((ALayout = LayoutConditions) and AConditionsVisible) or
+      ((ALayout = LayoutProcedures) and AProceduresVisible);
+  end;
+
+  procedure ShowIfVisibleAndNotAdded(ALayout: TLayout);
+  begin
+    if (ALayout = nil) or not IsRequestedVisible(ALayout) then
+      Exit;
+    if FInstrumentalVisibleOrder.IndexOf(ALayout) >= 0 then
+      Exit;
+    SetInstrumentalLayoutVisible(ALayout, True);
+  end;
+
+begin
+  if FInstrumentalVisibleOrder = nil then
+    Exit;
+
+  // Полный сброс: сначала скрываем все блоки, затем показываем по одному.
+  HorzScrollBoxInstrumental.BeginUpdate;
+  try
+    FInstrumentalVisibleOrder.Clear;
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+      LayoutMesure, LayoutConditions, LayoutProcedures] do
+    begin
+      Layout.Align := TAlignLayout.None;
+      Layout.Visible := False;
+      Layout.Position.X := 0;
+      Layout.Position.Y := 0;
+    end;
+  finally
+    HorzScrollBoxInstrumental.EndUpdate;
+  end;
+
+  // 1) Восстанавливаем видимые блоки в сохраненном порядке прошлого сеанса.
+  OrderKeys := TStringList.Create;
+  try
+    OrderKeys.StrictDelimiter := True;
+    OrderKeys.Delimiter := ',';
+    OrderKeys.DelimitedText := AOrder;
+    for I := 0 to OrderKeys.Count - 1 do
+      ShowIfVisibleAndNotAdded(GetLayoutByOrderKey(Trim(OrderKeys[I])));
+  finally
+    OrderKeys.Free;
+  end;
+
+  // 2) Если в сохраненном порядке чего-то нет, добираем в порядке пунктов меню.
+  ShowIfVisibleAndNotAdded(LayoutFlowRate);
+  ShowIfVisibleAndNotAdded(LayoutPump);
+  ShowIfVisibleAndNotAdded(LayoutMain);
+  ShowIfVisibleAndNotAdded(LayoutMesure);
+  ShowIfVisibleAndNotAdded(LayoutConditions);
+  ShowIfVisibleAndNotAdded(LayoutProcedures);
+
+  ApplyInstrumentalVisibleOrder;
+end;
+
 procedure TFormMain.MenuInstrumentalLayOutClick(Sender: TObject);
 var
   MenuItem: TMenuItem;
+  Layout: TLayout;
   NewVisible: Boolean;
 begin
   if not (Sender is TMenuItem) then
@@ -614,18 +868,8 @@ begin
   NewVisible := not MenuItem.IsChecked;
   MenuItem.IsChecked := NewVisible;
 
-  if MenuItem = miFlowRate then
-    LayoutFlowRate.Visible := NewVisible
-  else if MenuItem = miPump then
-    LayoutPump.Visible := NewVisible
-  else if MenuItem = miMain then
-    LayoutMain.Visible := NewVisible
-  else if MenuItem = miMesurment then
-    LayoutMesure.Visible := NewVisible
-  else if MenuItem = miConditions then
-    LayoutConditions.Visible := NewVisible
-  else if MenuItem = miProcedures then
-    LayoutProcedures.Visible := NewVisible;
+  Layout := GetLayoutByMenuItem(MenuItem);
+  SetInstrumentalLayoutVisible(Layout, NewVisible);
 
   SaveLayoutSettingsToWorkTable;
 end;
@@ -760,6 +1004,7 @@ begin
   WorkTable.LayoutMesureVisible := LayoutMesure.Visible;
   WorkTable.LayoutConditionsVisible := LayoutConditions.Visible;
   WorkTable.LayoutProceduresVisible := LayoutProcedures.Visible;
+  WorkTable.InstrumentalLayoutOrder := GetInstrumentalVisibleOrderAsString;
 
   CaptureGridColumnsLayout(GridEtalons, EtalonColumns);
   CaptureGridColumnsLayout(GridDevices, DeviceColumns);
@@ -775,12 +1020,15 @@ begin
   if WorkTable = nil then
     Exit;
 
-  LayoutFlowRate.Visible := WorkTable.LayoutFlowRateVisible;
-  LayoutPump.Visible := WorkTable.LayoutPumpVisible;
-  LayoutMain.Visible := WorkTable.LayoutMainVisible;
-  LayoutMesure.Visible := WorkTable.LayoutMesureVisible;
-  LayoutConditions.Visible := WorkTable.LayoutConditionsVisible;
-  LayoutProcedures.Visible := WorkTable.LayoutProceduresVisible;
+  RestoreInstrumentalLayoutsByFlags(
+    WorkTable.LayoutFlowRateVisible,
+    WorkTable.LayoutPumpVisible,
+    WorkTable.LayoutMainVisible,
+    WorkTable.LayoutMesureVisible,
+    WorkTable.LayoutConditionsVisible,
+    WorkTable.LayoutProceduresVisible,
+    WorkTable.InstrumentalLayoutOrder
+  );
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
@@ -1718,39 +1966,51 @@ end;
 
 procedure TFormMain.SpeedButton2Click(Sender: TObject);
 begin
- LayoutPump.Visible := False;
+  SetInstrumentalLayoutVisible(LayoutPump, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonMinimizeConditionsClick(Sender: TObject);
 begin
-    LayoutConditions.Visible:=False;
+  SetInstrumentalLayoutVisible(LayoutConditions, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
 begin
-    LayoutMain.Visible:=False;
+  SetInstrumentalLayoutVisible(LayoutMain, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonMinimizeProceduresClick(Sender: TObject);
 begin
-  LayoutProcedures.Visible := False;
+  SetInstrumentalLayoutVisible(LayoutProcedures, False);
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
   SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonMinimizeMesureClick(Sender: TObject);
 begin
-LayoutMesure.Visible:=False;
+  SetInstrumentalLayoutVisible(LayoutMesure, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
 begin
-      LayoutPump.Visible:=False;
+  SetInstrumentalLayoutVisible(LayoutPump, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
 begin
-    LayoutFlowRate.Visible:=False;
+  SetInstrumentalLayoutVisible(LayoutFlowRate, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
 end;
 
 procedure TFormMain.SpeedButtonTestClick(Sender: TObject);
