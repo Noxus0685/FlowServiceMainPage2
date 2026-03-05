@@ -413,6 +413,7 @@ type
     procedure SpeedButtonTestClick(Sender: TObject);
     procedure ButtonMonitorClick(Sender: TObject);
     procedure ButtonTestClick(Sender: TObject);
+    procedure ButtonCancelClick(Sender: TObject);
 
 
   private
@@ -686,11 +687,17 @@ begin
   case ANewState of
     STATE_STANDBY:
       begin
+        ButtonTest.Text := 'Измерение';
         ButtonTest.Enabled := False;
         ButtonMonitor.Enabled := False;
         SpeedButtonStartPump.Enabled := False;
         SpeedButtonSetFlowRate.Enabled := False;
         SpeedButtonProcedureStart.Enabled := False;
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := False;
+        GlowMesYellow.Enabled := False;
+        GlowEffectCancelRed.Enabled := False;
+        ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
         ButtonCancel.Visible := False;
       end;
 
@@ -875,6 +882,7 @@ begin
 
   ButtonMonitor.OnClick := ButtonMonitorClick;
   ButtonTest.OnClick := ButtonTestClick;
+  ButtonCancel.OnClick := ButtonCancelClick;
 
   OnChangeState(STATE_STANDBY);
 end;
@@ -2365,6 +2373,11 @@ begin
     StopTest
   else
     StartTest;
+end;
+
+procedure TFormMain.ButtonCancelClick(Sender: TObject);
+begin
+  OnChangeState(STATE_STANDBY);
 end;
 
 procedure TFormMain.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
