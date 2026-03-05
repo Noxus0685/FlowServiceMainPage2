@@ -14,6 +14,25 @@ uses
   System.Generics.Collections;
 
 type
+  TMeasurementState = (
+    STATE_NONE = 0,
+    STATE_STANDBY,
+    STATE_CONNECTED,
+    STATE_STARTMONITOR,
+    STATE_STARTMONITORWAIT,
+    STATE_MONITOR,
+    STATE_STOPMONITOR,
+    STATE_CONFIGED,
+    STATE_STARTTEST,
+    STATE_STARTWAIT,
+    STATE_EXECUTE,
+    STATE_STOPTEST,
+    STATE_STOPWAIT,
+    STATE_COMPLETE,
+    STATE_FINALREAD,
+    STATE_FAILURE
+  );
+
   TGridColumnLayout = record
     Name: string;
     DisplayIndex: Integer;
@@ -171,6 +190,7 @@ type
     FTime: Double;
     FTimeResult: Double;
     FState: TSpillState;
+    FMeasurementState: TMeasurementState;
     FTableClamped: Boolean;
     FFlowUnitName: string;
     FQuantityUnitName: string;
@@ -240,6 +260,8 @@ type
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
+    class function MeasurementStateToString(AState: TMeasurementState): string; static;
+    class function MeasurementStateFromString(const AValue: string): TMeasurementState; static;
 
     class procedure SaveGridColumns(
       AIni: TIniFile;
@@ -306,6 +328,7 @@ type
     property TimeResult: Double read FTimeResult write FTimeResult;
 
     property State: TSpillState read FState write FState;
+    property MeasurementState: TMeasurementState read FMeasurementState write FMeasurementState;
     property TableClamped: Boolean read FTableClamped write FTableClamped;
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
     property QuantityUnitName: string read FQuantityUnitName write FQuantityUnitName;
@@ -755,6 +778,7 @@ begin
   FTableFlow := TFlowMeter.Create;
 
   FState := ssNone;
+  FMeasurementState := STATE_NONE;
   FTableClamped := False;
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
@@ -1403,6 +1427,7 @@ begin
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
       Ini.WriteString(Section, 'State', SpillStateToString(WorkTable.State));
+      Ini.WriteString(Section, 'MeasurementState', MeasurementStateToString(WorkTable.MeasurementState));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
       Ini.WriteString(Section, 'FlowUnitName', WorkTable.FlowUnitName);
       Ini.WriteString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName);
@@ -1501,6 +1526,9 @@ begin
       WorkTable.TimeResult := Ini.ReadFloat(Section, 'TimeResult', 0);
       WorkTable.State := SpillStateFromString(
         Ini.ReadString(Section, 'State', 'None')
+      );
+      WorkTable.MeasurementState := MeasurementStateFromString(
+        Ini.ReadString(Section, 'MeasurementState', 'STATE_NONE')
       );
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
       WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
@@ -1793,6 +1821,68 @@ begin
     Exit(ssResultReady);
 
   Result := ssNone;
+end;
+
+
+class function TWorkTable.MeasurementStateFromString(
+  const AValue: string): TMeasurementState;
+begin
+  if SameText(AValue, 'STATE_STANDBY') then
+    Exit(STATE_STANDBY);
+  if SameText(AValue, 'STATE_CONNECTED') then
+    Exit(STATE_CONNECTED);
+  if SameText(AValue, 'STATE_STARTMONITOR') then
+    Exit(STATE_STARTMONITOR);
+  if SameText(AValue, 'STATE_STARTMONITORWAIT') then
+    Exit(STATE_STARTMONITORWAIT);
+  if SameText(AValue, 'STATE_MONITOR') then
+    Exit(STATE_MONITOR);
+  if SameText(AValue, 'STATE_STOPMONITOR') then
+    Exit(STATE_STOPMONITOR);
+  if SameText(AValue, 'STATE_CONFIGED') then
+    Exit(STATE_CONFIGED);
+  if SameText(AValue, 'STATE_STARTTEST') then
+    Exit(STATE_STARTTEST);
+  if SameText(AValue, 'STATE_STARTWAIT') then
+    Exit(STATE_STARTWAIT);
+  if SameText(AValue, 'STATE_EXECUTE') then
+    Exit(STATE_EXECUTE);
+  if SameText(AValue, 'STATE_STOPTEST') then
+    Exit(STATE_STOPTEST);
+  if SameText(AValue, 'STATE_STOPWAIT') then
+    Exit(STATE_STOPWAIT);
+  if SameText(AValue, 'STATE_COMPLETE') then
+    Exit(STATE_COMPLETE);
+  if SameText(AValue, 'STATE_FINALREAD') then
+    Exit(STATE_FINALREAD);
+  if SameText(AValue, 'STATE_FAILURE') then
+    Exit(STATE_FAILURE);
+
+  Result := STATE_NONE;
+end;
+
+class function TWorkTable.MeasurementStateToString(
+  AState: TMeasurementState): string;
+begin
+  case AState of
+    STATE_STANDBY: Result := 'STATE_STANDBY';
+    STATE_CONNECTED: Result := 'STATE_CONNECTED';
+    STATE_STARTMONITOR: Result := 'STATE_STARTMONITOR';
+    STATE_STARTMONITORWAIT: Result := 'STATE_STARTMONITORWAIT';
+    STATE_MONITOR: Result := 'STATE_MONITOR';
+    STATE_STOPMONITOR: Result := 'STATE_STOPMONITOR';
+    STATE_CONFIGED: Result := 'STATE_CONFIGED';
+    STATE_STARTTEST: Result := 'STATE_STARTTEST';
+    STATE_STARTWAIT: Result := 'STATE_STARTWAIT';
+    STATE_EXECUTE: Result := 'STATE_EXECUTE';
+    STATE_STOPTEST: Result := 'STATE_STOPTEST';
+    STATE_STOPWAIT: Result := 'STATE_STOPWAIT';
+    STATE_COMPLETE: Result := 'STATE_COMPLETE';
+    STATE_FINALREAD: Result := 'STATE_FINALREAD';
+    STATE_FAILURE: Result := 'STATE_FAILURE';
+  else
+    Result := 'STATE_NONE';
+  end;
 end;
 
 { Converts spill state enum value to persisted string. }

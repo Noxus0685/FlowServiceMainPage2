@@ -443,8 +443,12 @@ type
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure MarkChannelDeviceModified(AChannel: TChannel);
+    procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
+    procedure ResetMeasurementValues;
+    procedure OnChangeState(const ANewState: TMeasurementState);
+    procedure SetConfiguration;
 
-     procedure UpdateGrids;
+    procedure UpdateGrids;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
 
@@ -566,6 +570,212 @@ begin
   inherited;
 end;
 
+
+procedure TFormMain.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
+begin
+  CircleIndicatorMonitor.Fill.Kind := TBrushKind.Gradient;
+  CircleIndicatorMonitor.Fill.Gradient.Style := TGradientStyle.Radial;
+
+  if CircleIndicatorMonitor.Fill.Gradient.Points.Count < 2 then
+  begin
+    CircleIndicatorMonitor.Fill.Gradient.Points.Clear;
+    CircleIndicatorMonitor.Fill.Gradient.Points.Add.Color := AColor;
+    CircleIndicatorMonitor.Fill.Gradient.Points[0].Offset := 0;
+    CircleIndicatorMonitor.Fill.Gradient.Points.Add.Color := claWhite;
+    CircleIndicatorMonitor.Fill.Gradient.Points[1].Offset := 1;
+  end
+  else
+  begin
+    CircleIndicatorMonitor.Fill.Gradient.Points[0].Color := AColor;
+    CircleIndicatorMonitor.Fill.Gradient.Points[0].Offset := 0;
+    CircleIndicatorMonitor.Fill.Gradient.Points[1].Color := claWhite;
+    CircleIndicatorMonitor.Fill.Gradient.Points[1].Offset := 1;
+  end;
+end;
+
+procedure TFormMain.ResetMeasurementValues;
+var
+  Ch: TChannel;
+
+  procedure ResetMeter(const AMeter: TMeterValue);
+  begin
+    if AMeter <> nil then
+      AMeter.Reset;
+  end;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  ResetMeter(FActiveWorkTable.ValueTempertureBefore);
+  ResetMeter(FActiveWorkTable.ValueTempertureAfter);
+  ResetMeter(FActiveWorkTable.ValueTempertureDelta);
+  ResetMeter(FActiveWorkTable.ValueTemperture);
+  ResetMeter(FActiveWorkTable.ValuePressureBefore);
+  ResetMeter(FActiveWorkTable.ValuePressureAfter);
+  ResetMeter(FActiveWorkTable.ValuePressureDelta);
+  ResetMeter(FActiveWorkTable.ValuePressure);
+  ResetMeter(FActiveWorkTable.ValueDensity);
+  ResetMeter(FActiveWorkTable.ValueAirPressure);
+  ResetMeter(FActiveWorkTable.ValueAirTemperture);
+  ResetMeter(FActiveWorkTable.ValueHumidity);
+  ResetMeter(FActiveWorkTable.ValueTime);
+  ResetMeter(FActiveWorkTable.ValueQuantity);
+  ResetMeter(FActiveWorkTable.ValueFlowRate);
+
+  for Ch in FActiveWorkTable.DeviceChannels do
+  begin
+    ResetMeter(Ch.ValueImp);
+    ResetMeter(Ch.ValueImpTotal);
+    ResetMeter(Ch.ValueCurrent);
+    ResetMeter(Ch.ValueInterface);
+  end;
+
+  for Ch in FActiveWorkTable.EtalonChannels do
+  begin
+    ResetMeter(Ch.ValueImp);
+    ResetMeter(Ch.ValueImpTotal);
+    ResetMeter(Ch.ValueCurrent);
+    ResetMeter(Ch.ValueInterface);
+  end;
+end;
+
+procedure TFormMain.SetConfiguration;
+begin
+  OnChangeState(STATE_CONFIGED);
+end;
+
+procedure TFormMain.OnChangeState(const ANewState: TMeasurementState);
+begin
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.MeasurementState := ANewState;
+
+  case ANewState of
+    STATE_STANDBY:
+      begin
+        ButtonTest.Enabled := False;
+        ButtonMonitor.Enabled := False;
+        SpeedButtonStartPump.Enabled := False;
+        SpeedButtonSetFlowRate.Enabled := False;
+        SpeedButtonProcedureStart.Enabled := False;
+        ButtonCancel.Visible := False;
+      end;
+
+    STATE_CONNECTED:
+      begin
+        ButtonTest.Enabled := True;
+        ButtonMonitor.Enabled := True;
+        SpeedButtonStartPump.Enabled := True;
+        SpeedButtonSetFlowRate.Enabled := True;
+        SpeedButtonProcedureStart.Enabled := True;
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := False;
+        GlowMesYellow.Enabled := False;
+        ApplyMonitorIndicatorColor(claGray);
+        ButtonCancel.Visible := False;
+      end;
+
+    STATE_CONFIGED:
+      begin
+        // Статус зафиксирован после отправки настроек.
+      end;
+
+    STATE_STARTTEST:
+      begin
+        ButtonMonitor.Enabled := False;
+        ButtonTest.Text := 'Запуск';
+        ButtonTest.Enabled := False;
+      end;
+
+    STATE_STARTMONITOR:
+      begin
+        ButtonCancel.Visible := False;
+      end;
+
+    STATE_STARTMONITORWAIT:
+      begin
+        ApplyMonitorIndicatorColor(GlowMesYellow.GlowColor);
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := False;
+        GlowMesYellow.Enabled := False;
+      end;
+
+    STATE_MONITOR:
+      begin
+        ApplyMonitorIndicatorColor(GlowMesGreen.GlowColor);
+      end;
+
+    STATE_STOPMONITOR:
+      begin
+        ApplyMonitorIndicatorColor(claGray);
+      end;
+
+    STATE_STARTWAIT:
+      begin
+        GlowMesYellow.Enabled := True;
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := False;
+        ApplyMonitorIndicatorColor(claGray);
+        ButtonTest.Text := 'Стоп';
+        ButtonTest.Enabled := True;
+        ResetMeasurementValues;
+      end;
+
+    STATE_EXECUTE:
+      begin
+        GlowMesGreen.Enabled := True;
+        GlowMesRed.Enabled := False;
+        GlowMesYellow.Enabled := False;
+      end;
+
+    STATE_STOPTEST:
+      begin
+        ButtonTest.Text := 'Завершение';
+        ButtonTest.Enabled := False;
+      end;
+
+    STATE_STOPWAIT:
+      begin
+        // Ожидание завершения остановки.
+      end;
+
+    STATE_COMPLETE:
+      begin
+        ButtonTest.Text := 'Сохранение';
+        ButtonTest.Enabled := False;
+        GlowMesYellow.Enabled := True;
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := False;
+      end;
+
+    STATE_FINALREAD:
+      begin
+        GlowMesYellow.Enabled := False;
+        GlowMesRed.Enabled := False;
+        GlowMesGreen.Enabled := True;
+        ButtonTest.Text := 'Сохранить?';
+        ButtonTest.Enabled := True;
+        ButtonMonitor.Enabled := True;
+        ButtonCancel.Visible := True;
+        GlowEffectCancelRed.Enabled := True;
+      end;
+
+    STATE_FAILURE:
+      begin
+        GlowMesRed.Enabled := True;
+        GlowMesYellow.Enabled := False;
+        GlowMesGreen.Enabled := False;
+        ButtonTest.Text := 'Ошибка';
+        ButtonTest.Enabled := False;
+        ButtonMonitor.Enabled := False;
+        ApplyMonitorIndicatorColor(claGray);
+      end;
+  else
+    begin
+      // STATE_NONE
+    end;
+  end;
+end;
+
 procedure TFormMain.FormCreate(Sender: TObject);
 var
   OT: TOutputType;
@@ -628,6 +838,8 @@ begin
     LayoutProcedures.Visible,
     LayoutOrder
   );
+
+  OnChangeState(STATE_STANDBY);
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
