@@ -1173,8 +1173,11 @@ end;
 
 { Sets value expressed in current dimension (number or string input). }
 procedure TMeterValue.SetDimValue(const AStr: string);
+var
+  ParsedValue: Double;
 begin
-  SetDimValue(GetDoubleNum(AStr));
+  ParsedValue := StrToFloatDef(StringReplace(Trim(AStr), ',', '.', [rfReplaceAll]), 0, TFormatSettings.Invariant);
+  SetDimValue(ParsedValue);
 end;
 
 { Assigns value, applies range limits, and updates history/mean buffers. }
