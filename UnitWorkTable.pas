@@ -1423,6 +1423,9 @@ begin
     Ini.EraseSection('WorkTables');
     Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
 
+    if AWorkTables.Count > 0 then
+      ValuesIni.WriteFloat('Common', 'InitDensity', AWorkTables[0].ValueDensity.GetDoubleValue);
+
     for I := 0 to AWorkTables.Count - 1 do
     begin
       WorkTable := AWorkTables[I];
@@ -1481,6 +1484,7 @@ begin
       ValuesIni.WriteFloat(Section, 'ValuePressureAfter', WorkTable.ValuePressureAfter.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValuePressureDelta', WorkTable.ValuePressureDelta.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValuePressure', WorkTable.ValuePressure.GetDoubleValue);
+      ValuesIni.WriteFloat(Section, 'ValueDensity', WorkTable.ValueDensity.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueAirPressure', WorkTable.ValueAirPressure.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueAirTemperture', WorkTable.ValueAirTemperture.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueHumidity', WorkTable.ValueHumidity.GetDoubleValue);
@@ -1523,6 +1527,7 @@ begin
   ValuesIni := TIniFile.Create(WorkTableValuesFileName);
   try
     Count := Ini.ReadInteger('WorkTables', 'Count', 0);
+    TMeterValue.SetInitDensity(ValuesIni.ReadFloat('Common', 'InitDensity', TMeterValue.GetInitDensity));
 
     for I := 0 to Count - 1 do
     begin
@@ -1600,6 +1605,7 @@ begin
       WorkTable.ValuePressureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureAfter', 0));
       WorkTable.ValuePressureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureDelta', 0));
       WorkTable.ValuePressure.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressure', 0));
+      WorkTable.ValueDensity.SetValue(ValuesIni.ReadFloat(Section, 'ValueDensity', TMeterValue.GetInitDensity));
       WorkTable.ValueAirPressure.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirPressure', 0));
       WorkTable.ValueAirTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirTemperture', 0));
       WorkTable.ValueHumidity.SetValue(ValuesIni.ReadFloat(Section, 'ValueHumidity', 0));
