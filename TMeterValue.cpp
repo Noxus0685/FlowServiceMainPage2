@@ -1675,8 +1675,11 @@ void TMeterValue::Reset() {
 	RawValues.clear();
 	AverValues.clear();
 
-    Value = 0;
+}
 
+void TMeterValue::Reset(double value) {
+	Reset();
+	Value = value;
 }
 
 bool TMeterValue::IsStable(int lim) {

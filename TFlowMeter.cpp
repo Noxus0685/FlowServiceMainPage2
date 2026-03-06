@@ -898,15 +898,15 @@ void TFlowMeter::ResetTest(void)
     ValueFlow->ARRAY_SIZE = 100;
     ValueFlow->SetFilter(8);
 
-    ValueTime->Reset();
+    ValueTime->Reset(0);
 
     ValueImp->Reset();
-    ValueImpTotal->Reset();
+    ValueImpTotal->Reset(0);
 
-    ValueTime->Reset();
+    ValueTime->Reset(0);
 
-    ValueVolume->Reset();
-    ValueMass->Reset();
+    ValueVolume->Reset(0);
+    ValueMass->Reset(0);
 }
 
 void TFlowMeter::SetMonitorValues(void)
