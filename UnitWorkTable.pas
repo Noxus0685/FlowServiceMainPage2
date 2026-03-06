@@ -799,7 +799,7 @@ begin
   FlowRate:=10;
 
 
-  InitMeterValues;
+ // InitMeterValues;
 end;
 
 { Creates/restores all work table meter values and configures their dependencies. }
@@ -849,6 +849,7 @@ begin
     FTableFlow.ValueTemperture.DependenceType := INDEPENDENT;
     FTableFlow.ValueTemperture.UpdateType := ONLINE_TYPE;
   end;
+  //FTableFlow.ValueTemperture.SetAsTemp;
   FTableFlow.ValueTemperture.ValueType := MEAN_TYPE;
   FTableFlow.ValueTemperture.ValueBaseMultiplier := FTableFlow.ValueTempertureAfter;
   FTableFlow.ValueTemperture.ValueBaseDevider := FTableFlow.ValueTempertureBefore;
@@ -1616,6 +1617,7 @@ begin
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
       LoadGridColumns(Ini, Section + '.EtalonGrid', WorkTable.FEtalonsGridColumns);
       LoadGridColumns(Ini, Section + '.DeviceGrid', WorkTable.FDevicesGridColumns);
+
       WorkTable.RebindAllFlowMeters;
       WorkTable.RecalculateAllMeterValues;
       WorkTable.UpdateAggregateMeterValues;

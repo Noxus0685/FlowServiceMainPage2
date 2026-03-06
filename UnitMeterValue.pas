@@ -742,7 +742,9 @@ if Abs(Value) < EPS then
   if Value <= MinValue then
     Exit('-');
 
-  if Value >= MaxValue then
+
+
+  if (Value >= MaxValue) and (MaxValue<>0) then
     Exit('+NAN');
 
   Result := FormatValue(Dbl, Accuracy, Error);
@@ -1132,6 +1134,8 @@ var
   InputValue: Double;
 begin
   //InputValue := EnsureRange(AValue, MinValue, MaxValue);
+  InputValue :=   AValue;
+
 
   if ARRAY_SIZE > 0 then
   begin
