@@ -1715,18 +1715,25 @@ end;
 
 procedure TFlowMeter.Reset;
 
-  procedure ApplyReset(const AMeterValue: TMeterValue);
+  procedure ApplyReset(const AMeterValue: TMeterValue); overload;
   begin
     if AMeterValue <> nil then
       AMeterValue.Reset;
   end;
 
+  procedure ApplyReset(const AMeterValue: TMeterValue; const AValue: Double); overload;
+  begin
+    if AMeterValue <> nil then
+      AMeterValue.Reset(AValue);
+  end;
+
 begin
-  ApplyReset(ValueVolume);
-  ApplyReset(ValueMass);
+  ApplyReset(ValueVolume, 0);
+  ApplyReset(ValueMass, 0);
   ApplyReset(ValueVolumeFlow);
   ApplyReset(ValueMassFlow);
-  ApplyReset(ValueTime);
+  ApplyReset(ValueTime, 0);
+  ApplyReset(ValueImpTotal, 0);
 end;
 
 procedure TFlowMeter.SetSendStatus(const AText: string);

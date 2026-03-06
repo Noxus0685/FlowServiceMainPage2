@@ -225,7 +225,8 @@ type
     function GetDoubleNum(const AStr: string): Double; overload;
     function GetDoubleNum(AValue: Double; const ADim: string): Double; overload;
     function GetDoubleNum(const AStr: string; Dim: Integer): Double; overload;
-    procedure Reset;
+    procedure Reset; overload;
+    procedure Reset(AValue: Double); overload;
 
     procedure SetAs(AMeterValue: TMeterValue);
 
@@ -1496,13 +1497,18 @@ begin
   FLastMean := 0;
   TempDelta := 0;
 
-  Value := 0;
   Mean := 0;
   MeanCnt := 0;
   RawValues.Clear;
   Values.Clear;
   AverValues.Clear;
   Means.Clear;
+end;
+
+procedure TMeterValue.Reset(AValue: Double);
+begin
+  Reset;
+  Value := AValue;
 end;
 
 { Configures this meter value as volume with predefined units and limits. }
