@@ -622,10 +622,16 @@ procedure TFormMain.ResetMeasurementValues;
 var
   Ch: TChannel;
 
-  procedure ResetMeter(const AMeter: TMeterValue);
+  procedure ResetMeter(const AMeter: TMeterValue); overload;
   begin
     if AMeter <> nil then
       AMeter.Reset;
+  end;
+
+  procedure ResetMeter(const AMeter: TMeterValue; const AValue: Double); overload;
+  begin
+    if AMeter <> nil then
+      AMeter.Reset(AValue);
   end;
 
   procedure ResetSimulationChannelFields(const AChannel: TChannel);
@@ -668,8 +674,8 @@ begin
   ResetMeter(FActiveWorkTable.ValueAirPressure);
   ResetMeter(FActiveWorkTable.ValueAirTemperture);
   ResetMeter(FActiveWorkTable.ValueHumidity);
-  ResetMeter(FActiveWorkTable.ValueTime);
-  ResetMeter(FActiveWorkTable.ValueQuantity);
+  ResetMeter(FActiveWorkTable.ValueTime, 0);
+  ResetMeter(FActiveWorkTable.ValueQuantity, 0);
   ResetMeter(FActiveWorkTable.ValueFlowRate);
 
   for Ch in FActiveWorkTable.DeviceChannels do
@@ -680,7 +686,7 @@ begin
     ResetSimulationChannelFields(Ch);
 
     ResetMeter(Ch.ValueImp);
-    ResetMeter(Ch.ValueImpTotal);
+    ResetMeter(Ch.ValueImpTotal, 0);
     ResetMeter(Ch.ValueCurrent);
     ResetMeter(Ch.ValueInterface);
   end;
@@ -693,7 +699,7 @@ begin
     ResetSimulationChannelFields(Ch);
 
     ResetMeter(Ch.ValueImp);
-    ResetMeter(Ch.ValueImpTotal);
+    ResetMeter(Ch.ValueImpTotal, 0);
     ResetMeter(Ch.ValueCurrent);
     ResetMeter(Ch.ValueInterface);
   end;
