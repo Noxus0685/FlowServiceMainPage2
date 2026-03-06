@@ -649,8 +649,8 @@ begin
 
   // Сброс полей, участвующих в имитации
   // (используются в UpdateRandomClimate/UpdateRandomSignals).
-  FActiveWorkTable.Temp := 0;
-  FActiveWorkTable.Press := 0;
+  //FActiveWorkTable.Temp := 0;
+  //FActiveWorkTable.Press := 0;
   FNextClimateChangeAt := 0;
 
   FActiveWorkTable.Time  := 0;
@@ -963,7 +963,7 @@ begin
 
   ButtonMonitor.OnClick := ButtonMonitorClick;
   ButtonCancel.OnClick := ButtonCancelClick;
-
+  SetValues;
   OnChangeState(STATE_NONE);
 end;
 
@@ -2116,37 +2116,37 @@ begin
   if WorkTable.ValueTime <> nil then
     LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
   else
-    LabelTime.Text := '0';
+    LabelTime.Text := '-';
 
   if WorkTable.ValueTemperture <> nil then
     LabelTemp.Text :=    WorkTable.ValueTemperture.GetStrValue
   else
-    LabelTemp.Text := '0';
+    LabelTemp.Text := '-';
 
   if WorkTable.ValuePressure <> nil then
     EditPres.Text := WorkTable.ValuePressure.GetStrValue
   else
-    EditPres.Text := '0';
+    EditPres.Text := '-';
 
   if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
-    LabelFlowRate.Text := '0';
+    LabelFlowRate.Text := '-';
 
   if WorkTable.ValuePressure <> nil then
     LabelPressure.Text := WorkTable.ValuePressure.GetStrValue
   else
-    LabelPressure.Text := '0';
+    LabelPressure.Text := '-';
 
   if WorkTable.ValueDensity <> nil then
     LabelDensity.Text := WorkTable.ValueDensity.GetStrValue
   else
-    LabelDensity.Text := '0';
+    LabelDensity.Text := '-';
 
   if WorkTable.ValueQuantity <> nil then
     LabelQuantity.Text := WorkTable.ValueQuantity.GetStrValue
   else
-    LabelQuantity.Text := '0';
+    LabelQuantity.Text := '-';
 
 
     if WorkTable.ValueFlowRate <> nil then

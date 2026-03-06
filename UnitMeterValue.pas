@@ -1131,7 +1131,7 @@ procedure TMeterValue.SetValue(AValue: Double);
 var
   InputValue: Double;
 begin
-  InputValue := EnsureRange(AValue, MinValue, MaxValue);
+  //InputValue := EnsureRange(AValue, MinValue, MaxValue);
 
   if ARRAY_SIZE > 0 then
   begin

@@ -1355,6 +1355,10 @@ begin
   if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
   if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
   if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+
+  if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
+  if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
 
      for I := 0 to FEtalonChannels.Count - 1 do
   begin
@@ -1588,10 +1592,10 @@ begin
 
       WorkTable.InitMeterValues;
 
-      WorkTable.ValueTempertureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureBefore', 0));
-      WorkTable.ValueTempertureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureAfter', 0));
+      WorkTable.ValueTempertureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureBefore', 21));
+      WorkTable.ValueTempertureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureAfter', 21));
       WorkTable.ValueTempertureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureDelta', 0));
-      WorkTable.ValueTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueTemperture', 0));
+      WorkTable.ValueTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueTemperture', 21));
       WorkTable.ValuePressureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureBefore', 0));
       WorkTable.ValuePressureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureAfter', 0));
       WorkTable.ValuePressureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureDelta', 0));
@@ -1602,6 +1606,11 @@ begin
       WorkTable.ValueTime.SetValue(ValuesIni.ReadFloat(Section, 'ValueTime', 0));
       WorkTable.ValueQuantity.SetValue(ValuesIni.ReadFloat(Section, 'ValueQuantity', 0));
       WorkTable.ValueFlowRate.SetValue(ValuesIni.ReadFloat(Section, 'ValueFlowRate', 0));
+
+      WorkTable.ValueTempertureBefore.SetValue(21);
+      WorkTable.ValueTempertureAfter.SetValue(21);
+
+      WorkTable.Temp := 21;
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
