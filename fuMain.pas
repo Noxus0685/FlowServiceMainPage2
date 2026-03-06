@@ -964,6 +964,7 @@ begin
   ButtonMonitor.OnClick := ButtonMonitorClick;
   ButtonCancel.OnClick := ButtonCancelClick;
   SetValues;
+  UpdateForm;
   OnChangeState(STATE_NONE);
 end;
 
