@@ -10,6 +10,9 @@ uses
   System.IOUtils,
   System.Generics.Collections;
 
+  const
+  EPS = 1E-12;
+
 type
   EUpdateType = (OFFLINE_TYPE, ONLINE_TYPE, HAND_TYPE);
   EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE,
@@ -42,6 +45,8 @@ type
     Value: Double;
     Arg: Double;
   end;
+
+
 
   TMeterValue = class
   private
@@ -111,7 +116,7 @@ type
     RawValueName: string;
     RawValueDim: string;
 
-    Accuracy: Byte;
+    Accuracy: Integer;
 
     Error: Double;
 
@@ -234,6 +239,7 @@ type
     procedure SetAsMassError;
     procedure SetAsVolumeError;
     procedure SetAsDensity;
+    procedure SetAsTempPT100;
     procedure SetAsTemp;
     procedure SetAsAirTemp;
     procedure SetAsPressure;
@@ -589,16 +595,16 @@ begin
   if ValueType = AGGREGATE_TYPE then
     SetValue;
 
-  if Error <> 0 then
-  begin
-    AbsError := Abs(Value) * Error / 100;
-
-    if Abs(Value) < AbsError / 10 then
-      Result := 0
-    else
-      Result := Value;
-  end
-  else
+//  if (Error <> 0) and (MinNomValue<>0) then
+//  begin
+//    AbsError := Abs(MinNomValue) * Error / 100;
+//
+//    if Abs(Value) < AbsError / 1000 then
+//      Result := 0
+//    else
+//      Result := Value;
+//  end
+//  else
     Result := Value;
 end;
 
@@ -729,10 +735,13 @@ begin
 
   Dbl := GetDoubleValue(Dim);
 
-  if Value < MinValue then
+if Abs(Value) < EPS then
+  Exit('0');
+
+  if Value <= MinValue then
     Exit('-');
 
-  if Value > MaxValue then
+  if Value >= MaxValue then
     Exit('+NAN');
 
   Result := FormatValue(Dbl, Accuracy, Error);
@@ -769,18 +778,18 @@ end;
 { Returns formatted variation string in absolute units. }
 function TMeterValue.GetStringVariation: string;
 begin
-  Result := FormatValue(GetDoubleVariation, 0, 0.01);
+  Result := FormatValue(GetDoubleVariation, -1, 1);
 end;
 
 { Returns formatted standard deviation string in percent. }
 function TMeterValue.GetStringStdDeviationPercent: string;
 begin
-  Result := FormatValue(GetDoubleStdDeviationPercent, 0, 0.01) + ' %';
+  Result := FormatValue(GetDoubleStdDeviationPercent, -1, 10) + ' %';
 end;
 
 function TMeterValue.GetStrStdDeviationPercent: string;
 begin
-  Result := FormatValue(GetDoubleStdDeviationPercent, 0, 0.01);
+  Result := FormatValue(GetDoubleStdDeviationPercent, -1, 10);
 end;
 
 { Returns formatted value using CurrentDimIndex as active display dimension. }
@@ -1038,7 +1047,7 @@ begin
           ValueLocal := ValueLocal / ValueEtalon.Value;
         end
         else
-          ValueLocal := -101;
+          ValueLocal := -MaxDouble;
 
         SetValue(ValueLocal);
       end
@@ -1518,7 +1527,8 @@ begin
   Name := 'Масса';
   ShrtName := 'M';
   SetFilter(-1);
-  Accuracy := 6;
+  Accuracy := -1;
+  Error := 0.1;
   Value := 0;
   Dimensions.Clear;
   SetDimension('кг', 1, 1, False);
@@ -1526,7 +1536,6 @@ begin
   SetDim(0);
   MaxValue := MaxDouble;
   MinValue := 0;
-  Error := 0.01;
 end;
 
 { Configures this meter value as volume flow with predefined units. }
@@ -1536,8 +1545,12 @@ begin
   Name := 'Объемный расход';
   ShrtName := 'Qv';
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := -1;
+  Error := 0.1;
   Value := 0;
+  MinValue := 0;
+  MaxValue := MaxDouble;
+
   Dimensions.Clear;
   SetDimension('л/с', 1, 1, False);
   SetDimension('л/мин', 60, 1, False);
@@ -1545,9 +1558,7 @@ begin
   SetDimension('м3/мин', 60, 1000, False);
   SetDimension('м3/ч', 3600, 1000, False);
   SetDim(4);
-  MaxValue := MaxDouble;
-  MinValue := 0;
-  Error := 0.01;
+
 end;
 
 { Configures this meter value as mass flow with predefined units. }
@@ -1557,7 +1568,10 @@ begin
   Name := 'Массовый расход';
   ShrtName := 'Qm';
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := -1;
+  Error := 0.1;
+  MaxValue := MaxDouble;
+  MinValue := 0;
   Value := 0;
   Dimensions.Clear;
   SetDimension('кг/с', 1, 1, False);
@@ -1566,9 +1580,7 @@ begin
   SetDimension('т/мин', 60, 1000, False);
   SetDimension('т/ч', 3600, 1000, False);
   SetDim(4);
-  MaxValue := MaxDouble;
-  MinValue := 0;
-  Error := 0.01;
+
 end;
 
 { Configures this meter value as impulse counter with predefined limits. }
@@ -1578,14 +1590,16 @@ begin
   Value := 0;
   SetFilter(-1);
   Accuracy := 0;
+  Error := 0.001;
+  MaxValue := MaxDouble;
+  MinValue := 0;
+
   Name := 'Импульсы';
   ShrtName := 'N';
   Dimensions.Clear;
   SetDimension('имп', 1, 1, False);
   SetDim(0);
-  MaxValue := MaxDouble;
-  MinValue := 0;
-  Error := 0.001;
+
   Reset;
 end;
 
@@ -1595,17 +1609,20 @@ begin
   ValueType := ERROR_TYPE;
   Value := 0;
   SetFilter(-1);
-  Accuracy := 4;
-  Error := 0.0;
+  Accuracy := -1;
+  Error := 10;
+
+  MaxValue := 999;
+  MinValue := -999;
+  MaxNomValue := 0.1;
+  MinNomValue := -0.1;
   ShrtName := 'δ';
+
   Name := 'Погрешность';
   Dimensions.Clear;
   SetDimension('%', 1);
   SetDim(0);
-  MaxValue := 100;
-  MinValue := -100;
-  MaxNomValue := 0.1;
-  MinNomValue := -0.1;
+
 end;
 
 { Configures this meter value as mass error percentage value. }
@@ -1614,17 +1631,20 @@ begin
   ValueType := ERROR_TYPE;
   Value := 0;
   SetFilter(-1);
-  Accuracy := 4;
-  Error := 0;
+  Accuracy := -1;
+  Error := 10;
+
+  MaxValue := 999;
+  MinValue := -999;
+  MaxNomValue := 0.1;
+  MinNomValue := -0.1;
+
   Name := 'Погрешность по массе';
   ShrtName := 'δm';
   Dimensions.Clear;
   SetDimension('%', 1);
   SetDim(0);
-  MaxValue := 100;
-  MinValue := -100;
-  MaxNomValue := 0.1;
-  MinNomValue := -0.1;
+
 end;
 
 { Configures this meter value as volume error percentage value. }
@@ -1633,17 +1653,20 @@ begin
   ValueType := ERROR_TYPE;
   Value := 0;
   SetFilter(-1);
-  Accuracy := 4;
-  Error := 0;
+  Accuracy := -1;
+  Error := 10;
+
+  MaxValue := 999;
+  MinValue := -999;
+  MaxNomValue := 0.1;
+  MinNomValue := -0.1;
+
   Name := 'Погрешность по объему';
   ShrtName := 'δv';
   Dimensions.Clear;
   SetDimension('%', 1);
   SetDim(0);
-  MaxValue := 100;
-  MinValue := -100;
-  MaxNomValue := 0.1;
-  MinNomValue := -0.1;
+
 end;
 
 { Configures this meter value as density with supported units. }
@@ -1652,7 +1675,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 998.1;
   SetFilter(-1);
-  Accuracy := 5;
+  Accuracy := -1;
   Name := 'Плотность';
   ShrtName := 'ρ';
   Dimensions.Clear;
@@ -1670,7 +1693,7 @@ begin
 end;
 
 { Configures this meter value as product temperature with supported units. }
-procedure TMeterValue.SetAsTemp;
+procedure TMeterValue.SetAsTempPT100;
 begin
   ValueType := CONST_TYPE;
   Value := 21.3;
@@ -1680,6 +1703,31 @@ begin
   &Type := 'PT100';
   RawValueName := 'Сопротивление';
   RawValueDim := 'Ом';
+  ShrtName := 't';
+  Dimensions.Clear;
+  SetDimension('°C', 1);
+  SetDimension('град. С', 1);
+  SetDim(0);
+  SetValue(20.0);
+  MaxValue := 100;
+  MinValue := 0;
+  MaxNomValue := 25;
+  MinNomValue := 15;
+  Error := 0.5;
+  SetValue(21.3);
+end;
+
+
+procedure TMeterValue.SetAsTemp;
+begin
+  ValueType := CONST_TYPE;
+  Value := 21.3;
+  SetFilter(-1);
+  Accuracy := 2;
+  Name := 'Температура';
+  &Type := '';
+  RawValueName := 'Температура';
+  RawValueDim := '°C';
   ShrtName := 't';
   Dimensions.Clear;
   SetDimension('°C', 1);

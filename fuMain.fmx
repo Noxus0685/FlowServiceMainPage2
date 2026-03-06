@@ -101,7 +101,7 @@ object FormMain: TFormMain
   end
   object TimerSetValues: TTimer
     OnTimer = TimerSetValuesTimer
-    Left = 1650
+    Left = 1618
     Top = 188
   end
   object TimerMain: TTimer
@@ -1670,6 +1670,7 @@ object FormMain: TFormMain
             TabOrder = 1
             Text = #1052#1086#1085#1080#1090#1086#1088
             TextSettings.Trimming = None
+            OnClick = ButtonMonitorClick
             object CircleIndicatorMonitor: TCircle
               Align = Center
               Fill.Kind = Gradient
@@ -3216,6 +3217,26 @@ object FormMain: TFormMain
             OnClick = ButtonApplyDeviceValuesClick
           end
         end
+      end
+      object EditTestNum: TEdit
+        Touch.InteractiveGestures = [LongTap, DoubleTap]
+        TabOrder = 1
+        Position.X = 200.000000000000000000
+        Position.Y = 366.000000000000000000
+        KillFocusByReturn = True
+        OnExit = EditTestNumExit
+      end
+      object LabelTestNum: TLabel
+        Position.X = 344.000000000000000000
+        Position.Y = 371.000000000000000000
+        Text = 'LabelTestNum'
+        TabOrder = 3
+      end
+      object Label5: TLabel
+        Position.X = 65.000000000000000000
+        Position.Y = 366.000000000000000000
+        Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+        TabOrder = 2
       end
     end
   end

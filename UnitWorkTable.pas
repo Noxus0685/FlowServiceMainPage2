@@ -1338,8 +1338,32 @@ var
   Channel: TChannel;
 begin
 
+
+
+   for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if Channel.FlowMeter.ValueMassFlow <> nil then Channel.FlowMeter.ValueMassFlow.SetValue();
+    if Channel.FlowMeter.ValueVolumeFlow <> nil then Channel.FlowMeter.ValueVolumeFlow.SetValue();
+    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
+    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
+  end;
+
+  if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
   if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
   if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+
+     for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+      if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
+  end;
+
 
   for I := 0 to FDeviceChannels.Count - 1 do
   begin
@@ -1356,18 +1380,7 @@ begin
 
   end;
 
-  for I := 0 to FEtalonChannels.Count - 1 do
-  begin
-    Channel := FEtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
-      Continue;
 
-    if Channel.FlowMeter.ValueMassFlow <> nil then Channel.FlowMeter.ValueMassFlow.SetValue();
-    if Channel.FlowMeter.ValueVolumeFlow <> nil then Channel.FlowMeter.ValueVolumeFlow.SetValue();
-    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
-    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
-    if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
-  end;
 end;
 
 { Adds and configures a new etalon channel from provided parameters. }

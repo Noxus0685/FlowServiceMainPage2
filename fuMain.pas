@@ -374,6 +374,9 @@ type
     TestButton: TButton;
     StringColumnEtalonRawSumValue1: TStringColumn;
     StringColumnDeviceRawSumValue1: TStringColumn;
+    EditTestNum: TEdit;
+    LabelTestNum: TLabel;
+    Label5: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -415,6 +418,7 @@ type
     procedure ButtonMonitorClick(Sender: TObject);
     procedure ButtonCancelClick(Sender: TObject);
     procedure TestButtonClick(Sender: TObject);
+    procedure EditTestNumExit(Sender: TObject);
 
 
   private
@@ -460,6 +464,7 @@ type
     procedure UpdateGrids;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
+       procedure UpdateForm;
 
   public
     { Public declarations }
@@ -577,6 +582,11 @@ begin
   FWorkTableManager.Free;
   FFlowMeters.Free;
   inherited;
+end;
+
+procedure TFormMain.EditTestNumExit(Sender: TObject);
+begin
+       LabelTestNum.Text := FActiveWorkTable.DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
 procedure TFormMain.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
@@ -715,6 +725,17 @@ begin
   OnChangeState(STATE_STOPTEST);
 end;
 
+ procedure TFormMain.UpdateForm;
+ begin
+          IsUpdating := True;
+            try
+               UpdateUIFromValues;
+                UpdateGrids;
+            finally
+          IsUpdating := False;
+          end;
+ end;
+
 procedure TFormMain.OnChangeState(const ANewState: TMeasurementState);
 begin
   if FActiveWorkTable <> nil then
@@ -799,6 +820,7 @@ begin
     STATE_STOPMONITOR:
       begin
         ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
+        UpdateForm;
       end;
 
     STATE_STARTWAIT:
@@ -823,6 +845,7 @@ begin
       begin
         TestButton.Text := 'Завершение';
         TestButton.Enabled := False;
+        UpdateForm;
       end;
 
     STATE_STOPWAIT:
@@ -849,6 +872,7 @@ begin
         ButtonMonitor.Enabled := True;
         ButtonCancel.Visible := True;
         GlowEffectCancelRed.Enabled := True;
+        UpdateForm;
       end;
 
     STATE_FAILURE:
@@ -2023,13 +2047,7 @@ begin
   if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
     Exit;
 
-  IsUpdating := True;
-  try
-    UpdateUIFromValues;
-    UpdateGrids;
-  finally
-    IsUpdating := False;
-  end;
+  UpdateForm;
 end;
 
 procedure TFormMain.UpdateUIFromValues;
@@ -2603,7 +2621,7 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStringStdDeviationPercent
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
       else
         Value := '-';
     end
@@ -2825,7 +2843,7 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStringStdDeviationPercent
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrStdDeviationPercent
       else
         Value := '-';
     end

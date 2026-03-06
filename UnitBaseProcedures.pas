@@ -219,57 +219,62 @@ begin
   Result := FormatFloat(Fmt, Rounded);
 end;
 
+function GetDigitsFromError(Value, Error: Double): Integer;
+var
+  AbsError: Double;
+  ValuePart: Double;
+begin
+  Result := 0;
+
+  if Error <= 0 then
+    Exit;
+
+  // Абсолютная погрешность при относительной погрешности Error (%)
+  AbsError := Abs(Value) * Error / 100;
+
+  // Если само значение = 0, то относительная погрешность не даёт масштаба.
+  // В таком случае просто оставляем 0 знаков.
+  if AbsError <= 0 then
+    Exit;
+
+  // Требуемая дискретность отображения = 1/10 абсолютной погрешности
+  ValuePart := AbsError / 2;
+
+  if ValuePart >= 1 then
+    Exit(0);
+
+  Result := Ceil(-Log10(ValuePart));
+
+  if Result < 0 then
+    Result := 0;
+
+  Result := EnsureRange(Result, 0, 12);
+end;
+
 function FormatValue(Value: Double; Accuracy: Integer; Error: Double): string;
 var
   FS: TFormatSettings;
   FractPartCnt: Integer;
-  AbsError, ValuePart: Double;
-  IntPartDigits: Integer;
-  AbsV: Double;
+  RoundedValue: Double;
 begin
   FS := TFormatSettings.Create;
 
-  // 1) Accuracy = 0 => целое
-  if Accuracy <= 0 then
-    Exit(FloatToStrF(Value, ffNumber, 10, 0, FS));
-
-  // 2) Error = 0 => фиксированная точность = Accuracy
-  if Error <= 0 then
-    Exit(FloatToStrF(Value, ffNumber, 10, EnsureRange(Accuracy, 0, 12), FS));
-
-  // 3) Error > 0 => точность от погрешности
-  AbsV := Abs(Value);
-
-  // Кол-во цифр в целой части (как критерий "IntPartCnt < 5" в строковом варианте)
-  if AbsV < 1 then
-    IntPartDigits := 1
-  else
-    IntPartDigits := Trunc(Log10(AbsV)) + 1;
-
-  if IntPartDigits < 5 then
+  // 1. Если точность указана явно - используем только её
+  if Accuracy >= 0 then
   begin
-    // AbsError = |V| * Error% (если V=0, используем Error% как раньше)
-    if Value <> 0 then
-      AbsError := AbsV * Error / 100
-    else
-      AbsError := Error / 100;
+    FractPartCnt := EnsureRange(Accuracy, 0, 12);
+    RoundedValue := RoundTo(Value, -FractPartCnt);
+    Exit(FloatToStrF(RoundedValue, ffFixed, 18, FractPartCnt, FS));
+  end;
 
-    // Берём десятую часть абсолютной погрешности (как в твоём коде)
-    ValuePart := AbsError / 10;
-
-    if ValuePart < 1 then
-      FractPartCnt := Ceil(-Log10(ValuePart))
-    else
-      FractPartCnt := 0;
-
-    if FractPartCnt < 0 then
-      FractPartCnt := 0;
-  end
+  // 2. Иначе, если задана погрешность - рассчитываем число знаков по ней
+  if Error > 0 then
+    FractPartCnt := GetDigitsFromError(Value, Error)
   else
     FractPartCnt := 0;
 
-  FractPartCnt := EnsureRange(FractPartCnt, 0, 12);
-  Result := FloatToStrF(Value, ffNumber, 10, FractPartCnt, FS);
+  RoundedValue := RoundTo(Value, -FractPartCnt);
+  Result := FloatToStrF(RoundedValue, ffFixed, 18, FractPartCnt, FS);
 end;
 
 function FormatValue(const Str: string; Accuracy: Integer; Error: Double): string;
@@ -277,61 +282,15 @@ var
   FS: TFormatSettings;
   S: string;
   V: Double;
-  AbsError, ValuePart: Double;
-  DigitsAfterDecimal: Double;
-  FractPartCnt, IntPartCnt, SepPos: Integer;
 begin
   FS := TFormatSettings.Create;
   S := Trim(Str);
+
   S := StringReplace(S, '.', FS.DecimalSeparator, [rfReplaceAll]);
   S := StringReplace(S, ',', FS.DecimalSeparator, [rfReplaceAll]);
+
   V := StrToFloatDef(S, 0, FS);
-
-  if Error = 0 then
-    Exit(FloatToStrF(V, ffNumber, 10, EnsureRange(Accuracy, 0, 12), FS));
-
-  SepPos := Pos(FS.DecimalSeparator, S);
-  if SepPos = 0 then
-  begin
-    FractPartCnt := 0;
-    IntPartCnt := Length(S);
-  end
-  else
-  begin
-    IntPartCnt := SepPos - 1;
-    FractPartCnt := Length(S) - SepPos;
-    if IntPartCnt < 0 then
-      IntPartCnt := 0;
-  end;
-
-  if FractPartCnt > 0 then
-  begin
-    if IntPartCnt < 5 then
-    begin
-      if V <> 0 then
-      begin
-        AbsError := Abs(V * Error) / 100;
-        ValuePart := AbsError / 10;
-      end
-      else
-        ValuePart := (Error / 100) / 10;
-
-      if ValuePart < 1 then
-        DigitsAfterDecimal := -Log10(ValuePart)
-      else
-        DigitsAfterDecimal := 0;
-
-      if DigitsAfterDecimal < 0 then
-        DigitsAfterDecimal := 0;
-    end
-    else
-      DigitsAfterDecimal := 0;
-
-    FractPartCnt := Round(DigitsAfterDecimal);
-  end;
-
-  FractPartCnt := EnsureRange(FractPartCnt, 0, 12);
-  Result := FloatToStrF(V, ffNumber, 10, FractPartCnt, FS);
+  Result := FormatValue(V, Accuracy, Error);
 end;
 
 function RemoveTrailingZeros(const Str: string): string;
