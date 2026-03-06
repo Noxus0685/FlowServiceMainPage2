@@ -53,6 +53,7 @@ type
     class var FMeterValues: TObjectList<TMeterValue>;
     class var FMeterValuesSaves: TObjectList<TMeterValue>;
     class var FFinalValue: Boolean;
+    class var FInitDensity: Double;
 
   private
     FFilterOrder: Integer;
@@ -267,6 +268,8 @@ type
     property MeterValues: TObjectList<TMeterValue> read FAggregateMeterValues;
     class function GetMeterValues: TObjectList<TMeterValue>; static;
     class procedure RebindReferences(const AOldValue, ANewValue: TMeterValue); static;
+    class function GetInitDensity: Double; static;
+    class procedure SetInitDensity(const AValue: Double); static;
   end;
 
 implementation
@@ -279,6 +282,7 @@ class constructor TMeterValue.CreateClass;
 begin
   FMeterValues := TObjectList<TMeterValue>.Create(False);
   FMeterValuesSaves := TObjectList<TMeterValue>.Create(False);
+  FInitDensity := 0.9982;
 end;
 
 { Releases class-level collections allocated in the class constructor. }
@@ -1023,6 +1027,12 @@ begin
 
   if UpdateType <> HAND_TYPE then
   begin
+    if SameText(Name, 'Плотность') then
+    begin
+      SetCalcValue;
+      Exit;
+    end;
+
     if ValueType = AGGREGATE_TYPE then
     begin
       for MeterValue in FAggregateMeterValues do
@@ -1702,7 +1712,7 @@ begin
   MaxNomValue := 0.999;
   MinNomValue := 0.997;
   Error := 0.01;
-  SetValue(0.9982);
+  SetValue(FInitDensity);
 end;
 
 { Configures this meter value as product temperature with supported units. }
@@ -1912,7 +1922,40 @@ end;
 
 { Configures this meter value as calculated/derived value placeholder. }
 procedure TMeterValue.SetCalcValue;
+var
+  ResultLocal: Double;
+  TLocal: Double;
+  PLocal: Double;
+  DensLocal: Double;
+  DLocal: Double;
+  D2Local: Double;
+  T2Local: Double;
+  T3Local: Double;
+  T4Local: Double;
+  PAdd: Double;
 begin
+  if SameText(Name, 'Плотность') then
+  begin
+    if (ValueBaseMultiplier <> nil) and (ValueBaseDevider <> nil) then
+    begin
+      TLocal := ValueBaseMultiplier.Value;
+      PLocal := ValueBaseDevider.Value;
+      DensLocal := (FInitDensity * 1000 - 998.204) + 1.7675;
+
+      PAdd := (PLocal / 20000 * 0.01);
+      T2Local := Power(TLocal + (-3.983035), 2);
+      T3Local := (522528.9 * (TLocal + 69.34881));
+      T4Local := (-4.612 * Power(10, -3) + 0.106 * Power(10, -3) * TLocal);
+
+      D2Local := (1 - T2Local * (TLocal + 301.797) / T3Local);
+      DLocal := (998.204 * D2Local) + T4Local;
+      ResultLocal := DLocal + DensLocal + PAdd;
+
+      SetValue(ResultLocal / 1000);
+    end;
+    Exit;
+  end;
+
   SetValue(FilterApply);
 end;
 
@@ -1948,6 +1991,7 @@ begin
   try
     Ini.Clear;
     Ini.WriteString('MeterValues', 'VER', '1.0');
+    Ini.WriteFloat('MeterValues', 'InitDensity', FInitDensity);
     Ini.WriteInteger('MeterValues', 'ValuesCount', FMeterValuesSaves.Count);
 
     for I := 0 to FMeterValuesSaves.Count - 1 do
@@ -2044,6 +2088,7 @@ begin
 
   Ini := TIniFile.Create(FileName);
   try
+    FInitDensity := Ini.ReadFloat('MeterValues', 'InitDensity', FInitDensity);
     Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
     FMeterValuesSaves.Clear;
 
@@ -2119,6 +2164,16 @@ begin
   finally
     Ini.Free;
   end;
+end;
+
+class function TMeterValue.GetInitDensity: Double;
+begin
+  Result := FInitDensity;
+end;
+
+class procedure TMeterValue.SetInitDensity(const AValue: Double);
+begin
+  FInitDensity := AValue;
 end;
 
 { Stores a calibration coefficient entry (record or value/argument pair). }
