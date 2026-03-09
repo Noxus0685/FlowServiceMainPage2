@@ -110,9 +110,83 @@ object FormMain: TFormMain
     Top = 188
   end
   object PopupMenuEtalonsGridLayOut: TPopupMenu
-    OnPopup = PopupMenuDevicesGridLayOutPopup
+    OnPopup = PopupMenuEtalonsGridLayOutPopup
     Left = 1610
     Top = 405
+  end
+  object PopupMenuDevicesGrid: TPopupMenu
+    Left = 1660
+    Top = 405
+    object MenuItemDevicesClearRow: TMenuItem
+      Text = 'Очистить строку'
+    end
+    object MenuItemDevicesCopy: TMenuItem
+      Text = 'Копировать'
+    end
+    object MenuItemDevicesPaste: TMenuItem
+      Text = 'Вставить'
+    end
+    object MenuItemDevicesSep1: TMenuItem
+      Text = '-'
+    end
+    object MenuItemDevicesClearAll: TMenuItem
+      Text = 'Очистить все приборы'
+    end
+    object MenuItemDevicesFillAllBySelected: TMenuItem
+      Text = 'Заполнить все по выбранному'
+    end
+    object MenuItemDevicesSep2: TMenuItem
+      Text = '-'
+    end
+    object MenuItemDevicesFromArchive: TMenuItem
+      Text = 'Прибор из архива'
+    end
+    object MenuItemDevicesSep3: TMenuItem
+      Text = '-'
+    end
+    object MenuItemDevicesSetFlowSource: TMenuItem
+      Text = 'Установить источник расхода'
+    end
+    object MenuItemDevicesAssignEtalon: TMenuItem
+      Text = 'Назначить эталоном'
+    end
+  end
+  object PopupMenuEtalonsGrid: TPopupMenu
+    Left = 1710
+    Top = 405
+    object MenuItemEtalonsClearRow: TMenuItem
+      Text = 'Очистить строку'
+    end
+    object MenuItemEtalonsCopy: TMenuItem
+      Text = 'Копировать'
+    end
+    object MenuItemEtalonsPaste: TMenuItem
+      Text = 'Вставить'
+    end
+    object MenuItemEtalonsSep1: TMenuItem
+      Text = '-'
+    end
+    object MenuItemEtalonsClearAll: TMenuItem
+      Text = 'Очистить все приборы'
+    end
+    object MenuItemEtalonsFillAllBySelected: TMenuItem
+      Text = 'Заполнить все по выбранному'
+    end
+    object MenuItemEtalonsSep2: TMenuItem
+      Text = '-'
+    end
+    object MenuItemEtalonsFromArchive: TMenuItem
+      Text = 'Прибор из архива'
+    end
+    object MenuItemEtalonsSep3: TMenuItem
+      Text = '-'
+    end
+    object MenuItemEtalonsSetFlowSource: TMenuItem
+      Text = 'Установить источник расхода'
+    end
+    object MenuItemEtalonsAssignEtalon: TMenuItem
+      Text = 'Назначить эталоном'
+    end
   end
   object TabControl1: TTabControl
     Align = Client
@@ -1355,7 +1429,7 @@ object FormMain: TFormMain
                   Align = Client
                   CanFocus = True
                   ClipChildren = True
-                  PopupMenu = PopupMenuEtalonsGridLayOut
+                  PopupMenu = PopupMenuEtalonsGrid
                   Size.Width = 1770.000000000000000000
                   Size.Height = 120.000000000000000000
                   Size.PlatformDefault = False
@@ -1475,7 +1549,7 @@ object FormMain: TFormMain
                 Align = Client
                 CanFocus = True
                 ClipChildren = True
-                PopupMenu = PopupMenuEtalonsGridLayOut
+                PopupMenu = PopupMenuDevicesGrid
                 Size.Width = 1770.000000000000000000
                 Size.Height = 309.000000000000000000
                 Size.PlatformDefault = False
