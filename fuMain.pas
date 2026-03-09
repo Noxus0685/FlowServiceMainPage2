@@ -1302,9 +1302,7 @@ begin
 
   if Item.Text = 'прочее' then
   begin
-    GridResults.Visible := False;
-    GridDataPoints.Visible := True;
-    GridDataPoints.RowCount := 0;
+    ShowAllDevicesResults;
     Exit;
   end;
 
@@ -1312,9 +1310,7 @@ begin
     ShowDeviceSpillages(TDevice(Item.TagObject))
   else
   begin
-    GridResults.Visible := False;
-    GridDataPoints.Visible := True;
-    GridDataPoints.RowCount := 0;
+    ShowAllDevicesResults;
   end;
 end;
 

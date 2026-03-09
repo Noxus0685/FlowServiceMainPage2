@@ -1,4 +1,4 @@
-object FormMain: TFormMain
+﻿object FormMain: TFormMain
   Left = 0
   Top = 0
   Caption = 'fuMain'
@@ -3263,103 +3263,103 @@ object FormMain: TFormMain
               Header = #1069#1090#1072#1083#1086#1085
             end
             object StringColumnSpillageSpillTime: TStringColumn
-              Header = 'SpillTime'
+              Header = 'Время'
             end
             object StringColumnSpillageQavgEtalon: TStringColumn
-              Header = 'QavgEtalon'
+              Header = 'Расход'
             end
             object StringColumnSpillageEtalonVolume: TStringColumn
-              Header = 'EtalonVolume'
+              Header = 'ОбъемЭ'
             end
             object StringColumnSpillageEtalonMass: TStringColumn
-              Header = 'EtalonMass'
+              Header = 'МассаЭ'
             end
             object StringColumnSpillageQEtalonStd: TStringColumn
-              Header = 'QEtalonStd'
+              Header = 'СКОЭ'
             end
             object StringColumnSpillageQEtalonCV: TStringColumn
-              Header = 'QEtalonCV'
+              Header = 'ВариацияЭ'
             end
             object StringColumnSpillageDeviceVolume: TStringColumn
-              Header = 'DeviceVolume'
+              Header = 'ОбъемП'
             end
             object StringColumnSpillageDeviceMass: TStringColumn
-              Header = 'DeviceMass'
+              Header = 'МассаП'
             end
             object StringColumnSpillageVelocity: TStringColumn
-              Header = 'Velocity'
+              Header = 'Скорость'
             end
             object StringColumnSpillageError: TStringColumn
-              Header = 'Error'
+              Header = 'Погрешность'
             end
             object StringColumnSpillageValid: TStringColumn
-              Header = 'Valid'
+              Header = 'Годность'
             end
             object StringColumnSpillageQStd: TStringColumn
-              Header = 'QStd'
+              Header = 'СКОП'
             end
             object StringColumnSpillageQCV: TStringColumn
-              Header = 'QCV'
+              Header = 'ВариацияП'
             end
             object StringColumnSpillageVolumeBefore: TStringColumn
-              Header = 'VolumeBefore'
+              Header = 'До'
             end
             object StringColumnSpillageVolumeAfter: TStringColumn
-              Header = 'VolumeAfter'
+              Header = 'После'
             end
             object StringColumnSpillagePulseCount: TStringColumn
-              Header = 'PulseCount'
+              Header = 'Импульсы'
             end
             object StringColumnSpillageMeanFrequency: TStringColumn
-              Header = 'MeanFrequency'
+              Header = 'Частота'
             end
             object StringColumnSpillageAvgCurrent: TStringColumn
-              Header = 'AvgCurrent'
+              Header = 'Ток'
             end
             object StringColumnSpillageAvgVoltage: TStringColumn
-              Header = 'AvgVoltage'
+              Header = 'Напряжение'
             end
             object StringColumnSpillageData1: TStringColumn
-              Header = 'Data1'
+              Header = 'Данные1'
             end
             object StringColumnSpillageData2: TStringColumn
-              Header = 'Data2'
+              Header = 'Данные2'
             end
             object StringColumnSpillageStartTemperature: TStringColumn
-              Header = 'StartTemperature'
+              Header = 'Тнач'
             end
             object StringColumnSpillageEndTemperature: TStringColumn
-              Header = 'EndTemperature'
+              Header = 'Ткон'
             end
             object StringColumnSpillageAvgTemperature: TStringColumn
-              Header = 'AvgTemperature'
+              Header = 'Тсред'
             end
             object StringColumnSpillageInputPressure: TStringColumn
-              Header = 'InputPressure'
+              Header = 'ДавлВх'
             end
             object StringColumnSpillageOutputPressure: TStringColumn
-              Header = 'OutputPressure'
+              Header = 'ДавлВых'
             end
             object StringColumnSpillageDensity: TStringColumn
-              Header = 'Density'
+              Header = 'Плотность'
             end
             object StringColumnSpillageAmbientTemperature: TStringColumn
-              Header = 'AmbientTemperature'
+              Header = 'Твозд'
             end
             object StringColumnSpillageAtmosphericPressure: TStringColumn
-              Header = 'AtmosphericPressure'
+              Header = 'АтмДавл'
             end
             object StringColumnSpillageRelativeHumidity: TStringColumn
-              Header = 'RelativeHumidity'
+              Header = 'Влажность'
             end
             object StringColumnSpillageCoef: TStringColumn
-              Header = 'Coef'
+              Header = 'Коэф'
             end
             object StringColumnSpillageFCDCoefficient: TStringColumn
-              Header = 'FCDCoefficient'
+              Header = 'Коррекция'
             end
             object StringColumnSpillageArchivedData: TStringColumn
-              Header = 'ArchivedData'
+              Header = 'Архив'
             end
           end
           object GridResults: TGrid
