@@ -171,6 +171,7 @@ type
     property ValueInterface: TMeterValue read FValueInterface write SetValueInterface;
 
     procedure RebindFlowMeterValues(const AWorkTable: TWorkTable);
+    procedure SetValues;
   end;
 
   TWorkTable = class
@@ -256,6 +257,8 @@ type
     procedure SetValueQuantity(const AValue: TMeterValue);
     procedure SetValueFlowRate(const AValue: TMeterValue);
     procedure AssignTableFlowAsEtalonToDevices;
+
+    procedure SetValues;
 
 
     class function SpillStateToString(AState: TSpillState): string; static;
@@ -762,6 +765,14 @@ procedure TChannel.SetValueResultProxy(const AValue: Double);
 begin
   FValueResult := AValue;
 end;
+
+procedure TChannel.SetValues;
+begin
+ if FFlowMeter<>nil then
+    FFlowMeter.SetValues;
+end;
+
+
     {$ENDREGION}
 
 
@@ -812,6 +823,7 @@ var
       AMeterValue.Description := ADescription;
   end;
 begin
+
   ValueTempertureBefore := TMeterValue.GetExistedMeterValueBool(FHashValueTempertureBefore, IsExisted, '', Name);
   if IsExisted = 0 then
   begin
@@ -903,8 +915,8 @@ begin
   if IsExisted = 0 then
   begin
     FTableFlow.ValueDensity.SetAsDensity;
-    EnsureDescription(FTableFlow.ValueDensity, 'Плотность среды');
   end;
+  EnsureDescription(FTableFlow.ValueDensity, 'Плотность среды');
   FTableFlow.ValueDensity.ValueBaseMultiplier := FTableFlow.ValueTemperture;
   FTableFlow.ValueDensity.ValueBaseDevider := FTableFlow.ValuePressure;
   FTableFlow.ValueDensity.ValueRate := nil;
@@ -1332,6 +1344,27 @@ begin
   AssignTableFlowAsEtalonToDevices;
 end;
 
+procedure TWorkTable.SetValues;
+
+begin
+
+if FTableFlow<>nil then
+
+    begin
+  if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
+  if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
+  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+
+  if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
+  if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
+
+  if FTableFlow.ValueDensity <> nil then FTableFlow.ValueDensity.SetValue();
+
+     end
+end;
+
+
 { Triggers recalculation/update pass for work table and channel meter values. }
 procedure TWorkTable.RecalculateAllMeterValues;
 var
@@ -1347,19 +1380,11 @@ begin
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
 
-    if Channel.FlowMeter.ValueMassFlow <> nil then Channel.FlowMeter.ValueMassFlow.SetValue();
-    if Channel.FlowMeter.ValueVolumeFlow <> nil then Channel.FlowMeter.ValueVolumeFlow.SetValue();
-    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
-    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
+    Channel.SetValues;
+
   end;
 
-  if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
-  if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
-  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
-  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
-
-  if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
-  if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
+      Self.SetValues;
 
      for I := 0 to FEtalonChannels.Count - 1 do
   begin
@@ -1376,13 +1401,7 @@ begin
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
 
-    if Channel.FlowMeter.ValueVolumeFlow <> nil then Channel.FlowMeter.ValueVolumeFlow.SetValue();
-    if Channel.FlowMeter.ValueMassFlow <> nil then Channel.FlowMeter.ValueMassFlow.SetValue();
-    if Channel.FlowMeter.ValueVolume <> nil then Channel.FlowMeter.ValueVolume.SetValue();
-    if Channel.FlowMeter.ValueMass <> nil then Channel.FlowMeter.ValueMass.SetValue();
-    if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
-
-
+    Channel.SetValues;
   end;
 
 

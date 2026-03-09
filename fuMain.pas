@@ -1914,6 +1914,8 @@ begin
   if AWorkTable = nil then
     Exit;
 
+    AWorkTable.Time := AWorkTable.Time + 1;
+
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
   begin
     Channel := AWorkTable.EtalonChannels[I];
@@ -1951,12 +1953,8 @@ begin
   if WorkTable = nil then
     Exit;
 
-  if WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE] then
-  begin
     UpdateRandomClimate(WorkTable);
-    UpdateRandomSignals(WorkTable);
-    SetValues;
-  end;
+
 
   case WorkTable.MeasurementState of
     STATE_NONE:
@@ -1971,6 +1969,9 @@ begin
     STATE_STARTMONITORWAIT:
       OnChangeState(STATE_MONITOR);
 
+    STATE_MONITOR:
+       UpdateRandomSignals(WorkTable);
+
     STATE_STOPMONITOR,
     STATE_CONFIGED:
       OnChangeState(STATE_CONNECTED);
@@ -1980,6 +1981,9 @@ begin
 
     STATE_STARTWAIT:
       OnChangeState(STATE_EXECUTE);
+
+    STATE_EXECUTE:
+       UpdateRandomSignals(WorkTable);
 
     STATE_STOPTEST:
       OnChangeState(STATE_STOPWAIT);
@@ -2009,7 +2013,6 @@ begin
   WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
   WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
 
-  WorkTable.Time := WorkTable.Time + 1;
   WorkTable.ValueTime.SetValue(WorkTable.Time);
 
   // Основные MeterValues эталонных каналов.
@@ -2038,15 +2041,26 @@ begin
   end;
 
   WorkTable.RecalculateAllMeterValues;
+
 end;
 
 procedure TFormMain.TimerMainTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;
 begin
+
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
+
+  SetValues;
+
+  IsUpdating := True;
+  try
+    UpdateUIFromValues;
+  finally
+    IsUpdating := False;
+  end;
 
   if WorkTable.MeasurementState in [STATE_STARTMONITORWAIT, STATE_MONITOR, STATE_STOPMONITOR] then
     RefreshMonitorIndicator;
@@ -2054,7 +2068,13 @@ begin
   if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
     Exit;
 
-  UpdateForm;
+  IsUpdating := True;
+  try
+   UpdateGrids;
+  finally
+   IsUpdating := False;
+  end;
+
 end;
 
 procedure TFormMain.UpdateUIFromValues;
@@ -2076,16 +2096,16 @@ var
     for J := 0 to AChannels.Count - 1 do
       if (AChannels[J] <> nil) and
          (AChannels[J].FlowMeter <> nil) and
-         (AChannels[J].FlowMeter.ValueFlow <> nil) and
-         (AChannels[J].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+        (AChannels[J].FlowMeter.ValueFlow <> nil) and
+        (AChannels[J].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
       begin
         Result := AChannels[J].FlowMeter.ValueFlow.ValueBaseMultiplier;
         Exit;
       end;
   end;
 
-  function FindFirstQuantityValueBaseMultiplier(
-    AChannels: TObjectList<TChannel>): TMeterValue;
+  function FindFirstQuantityValueBaseMultiplier
+    (AChannels: TObjectList<TChannel>): TMeterValue;
   var
     J: Integer;
   begin
@@ -2094,10 +2114,9 @@ var
       Exit;
 
     for J := 0 to AChannels.Count - 1 do
-      if (AChannels[J] <> nil) and
-         (AChannels[J].FlowMeter <> nil) and
-         (AChannels[J].FlowMeter.ValueQuantity <> nil) and
-         (AChannels[J].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
+      if (AChannels[J] <> nil) and (AChannels[J].FlowMeter <> nil) and
+        (AChannels[J].FlowMeter.ValueQuantity <> nil) and
+        (AChannels[J].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
       begin
         Result := AChannels[J].FlowMeter.ValueQuantity.ValueBaseMultiplier;
         Exit;

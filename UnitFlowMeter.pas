@@ -390,6 +390,8 @@ public
 
   procedure Init; overload;
   procedure Init(UUID: string); overload;
+  procedure SetValues;
+
 end;
 implementation
 
@@ -1773,6 +1775,21 @@ end;
 procedure TFlowMeter.RebindCalculatedValues;
 begin
   ApplyMeasurementModel;
+end;
+
+procedure TFlowMeter.SetValues;
+begin
+    if ValueMassCoef <> nil then ValueMassCoef.SetValue();
+    if ValueVolumeCoef <> nil then ValueVolumeCoef.SetValue();
+
+    if ValueMassFlow <> nil then ValueMassFlow.SetValue();
+    if ValueVolumeFlow <> nil then ValueVolumeFlow.SetValue();
+    if ValueVolume <> nil then ValueVolume.SetValue();
+    if ValueMass <> nil then ValueMass.SetValue();
+
+    if ValueMassError <> nil then ValueMassError.SetValue();
+    if ValueVolumeError <> nil then ValueVolumeError.SetValue();
+    if ValueError <> nil then ValueError.SetValue();
 end;
 
 initialization

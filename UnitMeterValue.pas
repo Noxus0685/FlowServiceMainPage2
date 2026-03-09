@@ -1532,7 +1532,7 @@ begin
   Name := 'Объем';
   ShrtName := 'V';
   SetFilter(-1);
-  Accuracy := 6;
+  Accuracy := -1;
   Value := 0;
   Dimensions.Clear;
   SetDimension('л', 1);
@@ -1771,7 +1771,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 21.3;
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := 2;
   Name := 'Температура атм';
   &Type := 'ИВТМ';
   RawValueName := '';
@@ -1796,7 +1796,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 98;
   SetFilter(-1);
-  Accuracy := 0;
+  Accuracy := -1;
   Name := 'Давление';
   &Type := 'Датчик';
   RawValueName := 'Ток';
@@ -1825,7 +1825,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 102124.64;
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := -1;
   Name := 'Давление атм';
   ShrtName := 'Pатм';
   Dimensions.Clear;
@@ -1850,7 +1850,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 4;
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := -1;
   Name := 'Ток';
   ShrtName := 'I';
   Dimensions.Clear;
@@ -1872,7 +1872,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 100;
   SetFilter(-1);
-  Accuracy := 5;
+  Accuracy := -1;
   ShrtName := 'Km';
   Name := 'Коэфициент по массе';
   Dimensions.Clear;
@@ -1890,7 +1890,7 @@ begin
   ValueType := CONST_TYPE;
   Value := 100;
   SetFilter(-1);
-  Accuracy := 5;
+  Accuracy := -1;
   Error := 0.01;
   ShrtName := 'Kv';
   Name := 'Коэфициент по объему';
@@ -1908,7 +1908,8 @@ begin
   ValueType := CONST_TYPE;
   Value := 35;
   SetFilter(-1);
-  Accuracy := 4;
+  Accuracy := -1;
+    Error := 0.1;
   Name := 'Влажность';
   ShrtName := 'φ атм';
   Dimensions.Clear;

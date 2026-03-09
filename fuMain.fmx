@@ -106,7 +106,7 @@ object FormMain: TFormMain
   end
   object TimerMain: TTimer
     OnTimer = TimerMainTimer
-    Left = 1690
+    Left = 1706
     Top = 188
   end
   object PopupMenuEtalonsGridLayOut: TPopupMenu
@@ -221,6 +221,7 @@ object FormMain: TFormMain
                     Size.Width = 56.000000000000000000
                     Size.Height = 17.000000000000000000
                     Size.PlatformDefault = False
+                    KillFocusByReturn = True
                   end
                 end
                 object Layout50: TLayout
@@ -306,6 +307,7 @@ object FormMain: TFormMain
                       Size.Width = 119.000000000000000000
                       Size.Height = 23.000000000000000000
                       Size.PlatformDefault = False
+                      KillFocusByReturn = True
                     end
                   end
                 end
@@ -822,6 +824,7 @@ object FormMain: TFormMain
                         Size.Width = 119.000000000000000000
                         Size.Height = 23.000000000000000000
                         Size.PlatformDefault = False
+                        KillFocusByReturn = True
                       end
                     end
                   end
@@ -930,6 +933,7 @@ object FormMain: TFormMain
                     Size.Width = 56.000000000000000000
                     Size.Height = 17.000000000000000000
                     Size.PlatformDefault = False
+                    KillFocusByReturn = True
                   end
                 end
                 object Layout51: TLayout
@@ -956,6 +960,7 @@ object FormMain: TFormMain
                     Size.Width = 56.000000000000000000
                     Size.Height = 17.000000000000000000
                     Size.PlatformDefault = False
+                    KillFocusByReturn = True
                   end
                   object Rectangle10: TRectangle
                     Align = Right
