@@ -193,7 +193,11 @@ begin
   { Проверяем наличие активного репозитория типов }
   {--------------------------------------------------}
   if (DataManager = nil) or (DataManager.ActiveTypeRepo = nil) then
+  begin
+    ActiveRepo := nil;
+    FDeviceTypes := nil;
     Exit;
+  end;
 
   ActiveRepo := DataManager.ActiveTypeRepo;
 
@@ -459,13 +463,20 @@ begin
 end;
 
 procedure TFormTypeSelect.ApplyFilter;
+var
+  SourceTypes: TObjectList<TDeviceType>;
 begin
+  SourceTypes := FDeviceTypes;
+
+  if (SourceTypes = nil) and (ActiveRepo <> nil) then
+    SourceTypes := ActiveRepo.Types;
+
   {----------------------------------}
   { 1. Фильтр по дереву  }
   {----------------------------------}
   // дерево остаётся как есть
   FreeAndNil(FDevFilteredByTree);
-  FDevFilteredByTree := BuildFilteredByTree(ActiveRepo.Types);
+  FDevFilteredByTree := BuildFilteredByTree(SourceTypes);
 
   {----------------------------------}
   { 2. Текстовый фильтр }
@@ -734,9 +745,9 @@ begin
    FillComboBoxRepository;
    if UpdateConnection then
    begin
-   BuildTree;
-   ApplyFilter;
-   UpdateGridTypes;
+     BuildTree;
+     ApplyFilter;
+     UpdateGridTypes;
    end;
 
 end;
@@ -1589,6 +1600,7 @@ begin
   {----------------------------------}
   { Обновляем ссылку на данные }
   {----------------------------------}
+  ActiveRepo := DataManager.ActiveTypeRepo;
   FDeviceTypes := DataManager.ActiveTypeRepo.Types;
 
   Result := True;
@@ -1596,6 +1608,9 @@ end;
 
 procedure TFormTypeSelect.ClearTreeAndGrid;
 begin
+  ActiveRepo := nil;
+  FDeviceTypes := nil;
+
   {----------------------------------}
   { Очистка дерева }
   {----------------------------------}
