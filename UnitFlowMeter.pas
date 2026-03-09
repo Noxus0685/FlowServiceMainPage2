@@ -388,6 +388,7 @@ public
   procedure SetFinalValues;
   procedure SetUpdateType(AType: EUpdateType);
   procedure Reset;
+  procedure AddDataPoint(const APoint: TPointSpillage);
 
   procedure Init; overload;
   procedure Init(UUID: string); overload;
@@ -563,6 +564,21 @@ begin
   UpdateByDevice;
 
  end;
+end;
+
+procedure TFlowMeter.AddDataPoint(const APoint: TPointSpillage);
+var
+  NewPoint: TPointSpillage;
+begin
+  if (FDevice = nil) or (APoint = nil) then
+    Exit;
+
+  NewPoint := FDevice.AddSpillage;
+  if NewPoint = nil then
+    Exit;
+
+  NewPoint.Assign(APoint);
+  NewPoint.DeviceID := FDevice.ID;
 end;
 
 function TFlowMeter.GetRepoTypeNameProxy: string;
