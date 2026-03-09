@@ -361,7 +361,6 @@ type
     Button1: TButton;
     Circle2: TCircle;
     ButtonMonitor: TButton;
-    CheckBox1: TCheckBox;
     CircleIndicatorMonitor: TCircle;
     Layout15: TLayout;
     ButtonCancel: TButton;
@@ -377,6 +376,8 @@ type
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
     Label5: TLabel;
+    Switch1: TSwitch;
+    Label1: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

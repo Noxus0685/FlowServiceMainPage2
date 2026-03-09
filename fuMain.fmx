@@ -529,27 +529,21 @@ object FormMain: TFormMain
                 Size.PlatformDefault = False
                 TabOrder = 1
                 object LayoutTaskMain: TLayout
-                  Position.X = 86.000000000000000000
+                  Position.X = 23.000000000000000000
                   Position.Y = 25.000000000000000000
-                  Size.Width = 146.000000000000000000
+                  Size.Width = 282.000000000000000000
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 2
                   object ComboBoxTaskMain: TComboBox
                     Align = MostLeft
                     Items.Strings = (
-                      #1058#1077#1089#1090
                       #1040#1074#1090#1086
-                      '_______________________________________'
                       #1048#1079#1084#1077#1088#1077#1085#1080#1077
                       #1057' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072
-                      #1060#1086#1090#1086#1092#1080#1082#1089#1072#1094#1080#1103
-                      '________________________________________'
-                      #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 1'
-                      #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 2'
-                      #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 3')
-                    ItemIndex = 7
-                    ItemHeight = 10.000000000000000000
+                      #1060#1086#1090#1086#1092#1080#1082#1089#1072#1094#1080#1103)
+                    ItemIndex = 0
+                    ItemHeight = 12.000000000000000000
                     Margins.Right = 10.000000000000000000
                     Placement = BottomCenter
                     Size.Width = 160.000000000000000000
@@ -557,14 +551,13 @@ object FormMain: TFormMain
                     Size.PlatformDefault = False
                     StyleLookup = 'comboboxstyle'
                     TabOrder = 0
-                    Visible = False
                   end
                   object SpeedButtonSpillageStart: TSpeedButton
                     Align = Left
                     Padding.Left = 10.000000000000000000
-                    Margins.Left = 10.000000000000000000
+                    Margins.Left = 3.000000000000000000
                     Margins.Right = 10.000000000000000000
-                    Position.X = 58.000000000000000000
+                    Position.X = 204.000000000000000000
                     Size.Width = 22.000000000000000000
                     Size.Height = 23.000000000000000000
                     Size.PlatformDefault = False
@@ -575,7 +568,7 @@ object FormMain: TFormMain
                   object SpeedButtonSpillageStop: TSpeedButton
                     Align = Left
                     Margins.Left = 2.000000000000000000
-                    Position.X = 92.000000000000000000
+                    Position.X = 238.000000000000000000
                     Size.Width = 22.000000000000000000
                     Size.Height = 23.000000000000000000
                     Size.PlatformDefault = False
@@ -596,9 +589,9 @@ object FormMain: TFormMain
                   end
                   object SpeedButtonTest: TSpeedButton
                     Align = MostLeft
-                    Margins.Left = 20.000000000000000000
+                    Margins.Left = 3.000000000000000000
                     Margins.Right = 10.000000000000000000
-                    Position.X = 20.000000000000000000
+                    Position.X = 173.000000000000000000
                     Size.Width = 18.000000000000000000
                     Size.Height = 23.000000000000000000
                     Size.PlatformDefault = False
@@ -683,6 +676,7 @@ object FormMain: TFormMain
                       #1064#1072#1075' 1 '
                       #1064#1072#1075' 2'
                       #1064#1072#1075' 3')
+                    ItemHeight = 12.000000000000000000
                     Size.Width = 160.000000000000000000
                     Size.Height = 22.000000000000000000
                     Size.PlatformDefault = False
@@ -695,8 +689,7 @@ object FormMain: TFormMain
                   Size.Width = 160.000000000000000000
                   Size.Height = 17.000000000000000000
                   Size.PlatformDefault = False
-                  Text = #1047#1072#1076#1072#1095#1072
-                  Visible = False
+                  Text = #1058#1080#1087' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
                   TabOrder = 0
                 end
               end
@@ -1017,18 +1010,11 @@ object FormMain: TFormMain
                   object ComboBoxProcedure: TComboBox
                     Align = MostLeft
                     Items.Strings = (
-                      #1058#1077#1089#1090
-                      #1040#1074#1090#1086
-                      '_______________________________________'
-                      #1048#1079#1084#1077#1088#1077#1085#1080#1077
-                      #1057' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072
-                      #1060#1086#1090#1086#1092#1080#1082#1089#1072#1094#1080#1103
-                      '________________________________________'
                       #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 1'
                       #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 2'
                       #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 3')
-                    ItemIndex = 7
-                    ItemHeight = 10.000000000000000000
+                    ItemIndex = 0
+                    ItemHeight = 12.000000000000000000
                     Margins.Right = 10.000000000000000000
                     Placement = BottomCenter
                     Size.Width = 160.000000000000000000
@@ -1154,8 +1140,7 @@ object FormMain: TFormMain
                   Size.Width = 160.000000000000000000
                   Size.Height = 17.000000000000000000
                   Size.PlatformDefault = False
-                  Text = #1047#1072#1076#1072#1095#1072
-                  Visible = False
+                  Text = #1047#1072#1076#1072#1085#1080#1077' '
                   TabOrder = 0
                 end
               end
@@ -1697,18 +1682,10 @@ object FormMain: TFormMain
           end
           object Layout15: TLayout
             Align = Center
-            Size.Width = 244.000000000000000000
+            Size.Width = 273.000000000000000000
             Size.Height = 50.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 2
-            object CheckBox1: TCheckBox
-              Position.X = 192.000000000000000000
-              Size.Width = 76.000000000000000000
-              Size.Height = 50.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 4
-              Text = #1040#1074#1090#1086
-            end
             object ButtonCancel: TButton
               Position.X = -29.000000000000000000
               Size.Width = 110.000000000000000000
@@ -1770,6 +1747,23 @@ object FormMain: TFormMain
                 Opacity = 0.899999976158142100
                 Enabled = False
               end
+            end
+            object Switch1: TSwitch
+              IsChecked = False
+              Position.X = 213.000000000000000000
+              Position.Y = 17.000000000000000000
+              Size.Width = 52.000000000000000000
+              Size.Height = 25.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 4
+            end
+            object Label1: TLabel
+              Position.X = 224.000000000000000000
+              Size.Width = 41.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1040#1074#1090#1086
+              TabOrder = 5
             end
           end
         end
