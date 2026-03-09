@@ -574,6 +574,8 @@ begin
   Result := FShortMean;
 end;
 
+
+
 { Returns current value as Single in the default/base dimension. }
 function TMeterValue.GetFloatValue: Single;
 begin

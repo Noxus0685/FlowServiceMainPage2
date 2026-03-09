@@ -23,7 +23,9 @@ uses
   FMX.Grid.Style, FMX.Filter.Effects, FMX.Colors, FMX.Effects, FMX.ListBox,
   FMX.Edit, FMX.StdCtrls, FMX.ComboEdit, FMX.EditBox, FMX.SpinBox, FMX.Objects,
   FMX.Grid, FMX.ScrollBox, FMX.Layouts, FMX.Controls.Presentation,
-  FMX.TabControl, FMX.Menus, System.Actions, FMX.ActnList;
+  FMX.TabControl, FMX.Menus, System.Actions, FMX.ActnList, FMX.ListView.Types,
+  FMX.ListView.Appearances, FMX.ListView.Adapters.Base, FMX.Memo.Types,
+  FMX.Memo, FMX.DateTimeCtrls, FMX.TreeView, FMX.ListView;
 
 
 
@@ -48,7 +50,7 @@ type
 
   TFormMain = class(TForm)
     TabControl1: TTabControl;
-    TabItem1: TTabItem;
+    TabItemTable: TTabItem;
     TabControlWorkTables: TTabControl;
     TabItemWorkTable1: TTabItem;
     Panel2: TPanel;
@@ -168,7 +170,7 @@ type
     EditImp: TEdit;
     Rectangle10: TRectangle;
     LabelImp: TLabel;
-    TabItem2: TTabItem;
+    TabItemMnemo: TTabItem;
     ControlBar: TLayout;
     rctToolsPanelBackground: TRectangle;
     tbShemeColor: TToolBar;
@@ -264,7 +266,7 @@ type
     Splitter1: TSplitter;
     ShadowEffect9: TShadowEffect;
     shdwfct8: TShadowEffect;
-    TabItem3: TTabItem;
+    TabItemResults: TTabItem;
     PopupColumnEtalonSignal1: TPopupColumn;
     PopupMenu1: TPopupMenu;
     MenuItem1: TMenuItem;
@@ -404,6 +406,49 @@ type
     Label1: TLabel;
     ActionCopyType: TAction;
     ActionFillAllTypes: TAction;
+    LayoutLeft: TLayout;
+    lvFlowmeterTypes: TListView;
+    TreeViewDevices: TTreeView;
+    TreeViewItem1: TTreeViewItem;
+    TreeViewItem2: TTreeViewItem;
+    TreeViewItem3: TTreeViewItem;
+    ToolBar3: TToolBar;
+    ComboBoxRepository: TComboBox;
+    Label6: TLabel;
+    LayoutRight: TLayout;
+    Layout18: TLayout;
+    GridDataPoints: TGrid;
+    StringColumnName: TStringColumn;
+    ToolBar4: TToolBar;
+    Line4: TLine;
+    Layout32: TLayout;
+    ButtonDeviceDelete: TButton;
+    ButtonDeviceAdd: TButton;
+    ButtonDeviceClear: TButton;
+    Layout19: TLayout;
+    sbClear: TSpeedButton;
+    sbFind: TSpeedButton;
+    EditFindDevice: TEdit;
+    SpeedButtonFindInternet: TSpeedButton;
+    Layout20: TLayout;
+    Label7: TLabel;
+    DateEditFilter: TDateEdit;
+    Line7: TLine;
+    MemoLog: TMemo;
+    lyt1: TLayout;
+    btnOK: TCornerButton;
+    CornerButton1: TCornerButton;
+    CornerButtonEditDevice: TCornerButton;
+    Splitter2: TSplitter;
+    GridResults: TGrid;
+    StringColumnResultName: TStringColumn;
+    StringColumnResultSerial: TStringColumn;
+    StringColumnResultType: TStringColumn;
+    StringColumnPointNum1: TStringColumn;
+    StringColumnPointNum2: TStringColumn;
+    StringColumnPointNum3: TStringColumn;
+    StringColumnPointNum4: TStringColumn;
+    StringColumnResult: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -1316,7 +1361,7 @@ begin
     Exit;
 
   PopupPoint := AMenu.PopupPoint;
-  Result := PopupPoint.Y <= AGrid.HeaderHeight;
+  Result := PopupPoint.Y <= 20;
 end;
 
 procedure TFormMain.FillGridDevicesActionsPopup(AMenu: TPopupMenu);
@@ -2669,22 +2714,22 @@ begin
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.DeviceID := DeviceChannel.FlowMeter.Device.ID;
       Point.EtalonName := WorkTable.TableFlow.Name;
-      Point.SpillTime := WorkTable.ValueTime.GetValue;
-      Point.QavgEtalon := WorkTable.ValueFlowRate.GetValue;
-      Point.EtalonVolume := WorkTable.ValueQuantity.GetValue;
-      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueQuantity.GetValue;
-      Point.Error := DeviceChannel.FlowMeter.ValueError.GetValue;
-      Point.PulseCount := Round(DeviceChannel.ValueImpResult.GetValue);
-      Point.MeanFrequency := DeviceChannel.ValueImp.GetValue;
-      Point.AvgCurrent := DeviceChannel.ValueCurrent.GetValue;
-      Point.StartTemperature := WorkTable.ValueTempertureBefore.GetValue;
-      Point.EndTemperature := WorkTable.ValueTempertureAfter.GetValue;
-      Point.AvgTemperature := WorkTable.ValueTemperture.GetValue;
-      Point.InputPressure := WorkTable.ValuePressureBefore.GetValue;
-      Point.OutputPressure := WorkTable.ValuePressureAfter.GetValue;
-      Point.AtmosphericPressure := WorkTable.ValueAirPressure.GetValue;
-      Point.AmbientTemperature := WorkTable.ValueAirTemperture.GetValue;
-      Point.RelativeHumidity := WorkTable.ValueHumidity.GetValue;
+      Point.SpillTime := WorkTable.ValueTime.GetDoubleValue;
+      Point.QavgEtalon := WorkTable.ValueFlowRate.GetDoubleValue;
+      Point.EtalonVolume := WorkTable.ValueQuantity.GetDoubleValue;
+      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue;
+      Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
+      Point.PulseCount := Round(DeviceChannel.ValueImpResult.GetDoubleValue);
+      Point.MeanFrequency := DeviceChannel.ValueImp.GetDoubleValue;
+      Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
+      Point.StartTemperature := WorkTable.ValueTempertureBefore.GetDoubleValue;
+      Point.EndTemperature := WorkTable.ValueTempertureAfter.GetDoubleValue;
+      Point.AvgTemperature := WorkTable.ValueTemperture.GetDoubleValue;
+      Point.InputPressure := WorkTable.ValuePressureBefore.GetDoubleValue;
+      Point.OutputPressure := WorkTable.ValuePressureAfter.GetDoubleValue;
+      Point.AtmosphericPressure := WorkTable.ValueAirPressure.GetDoubleValue;
+      Point.AmbientTemperature := WorkTable.ValueAirTemperture.GetDoubleValue;
+      Point.RelativeHumidity := WorkTable.ValueHumidity.GetDoubleValue;
       Point.Valid := True;
 
       DeviceChannel.FlowMeter.AddDataPoint(Point);
