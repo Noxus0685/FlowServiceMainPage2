@@ -656,17 +656,7 @@ type
   private type
     TChannelClipboardData = record
       HasData: Boolean;
-      Enabled: Boolean;
-      Text: string;
-      TypeName: string;
-      Serial: string;
-      Signal: Integer;
-      DeviceUUID: string;
-      TypeUUID: string;
-      RepoTypeName: string;
-      RepoTypeUUID: string;
-      RepoDeviceName: string;
-      RepoDeviceUUID: string;
+      Snapshot: TChannel;
     end;
   private
     FDeviceClipboard: TChannelClipboardData;
@@ -775,6 +765,8 @@ end;
 
 destructor TFormMain.Destroy;
 begin
+  FreeAndNil(FDeviceClipboard.Snapshot);
+  FreeAndNil(FEtalonClipboard.Snapshot);
   TMeterValue.SaveToFile(0);
   FInstrumentalVisibleOrder.Free;
   FWorkTableManager.Free;
@@ -2519,40 +2511,22 @@ end;
 procedure TFormMain.SaveChannelToClipboard(AChannel: TChannel;
   var AClipboard: TChannelClipboardData);
 begin
+  FreeAndNil(AClipboard.Snapshot);
   AClipboard.HasData := AChannel <> nil;
   if AChannel = nil then
     Exit;
 
-  AClipboard.Enabled := AChannel.Enabled;
-  AClipboard.Text := AChannel.Text;
-  AClipboard.TypeName := AChannel.TypeName;
-  AClipboard.Serial := AChannel.Serial;
-  AClipboard.Signal := AChannel.Signal;
-  AClipboard.DeviceUUID := AChannel.DeviceUUID;
-  AClipboard.TypeUUID := AChannel.TypeUUID;
-  AClipboard.RepoTypeName := AChannel.RepoTypeName;
-  AClipboard.RepoTypeUUID := AChannel.RepoTypeUUID;
-  AClipboard.RepoDeviceName := AChannel.RepoDeviceName;
-  AClipboard.RepoDeviceUUID := AChannel.RepoDeviceUUID;
+  AClipboard.Snapshot := TChannel.Create;
+  AClipboard.Snapshot.AssignFlowMeterFrom(AChannel, nil, False);
 end;
 
 procedure TFormMain.LoadChannelFromClipboard(AChannel: TChannel;
   const AClipboard: TChannelClipboardData);
 begin
-  if (AChannel = nil) or not AClipboard.HasData then
+  if (AChannel = nil) or not AClipboard.HasData or (AClipboard.Snapshot = nil) then
     Exit;
 
-  AChannel.Enabled := AClipboard.Enabled;
-  AChannel.Text := AClipboard.Text;
-  AChannel.TypeName := AClipboard.TypeName;
-  AChannel.Serial := AClipboard.Serial;
-  AChannel.Signal := AClipboard.Signal;
-  AChannel.DeviceUUID := AClipboard.DeviceUUID;
-  AChannel.TypeUUID := AClipboard.TypeUUID;
-  AChannel.RepoTypeName := AClipboard.RepoTypeName;
-  AChannel.RepoTypeUUID := AClipboard.RepoTypeUUID;
-  AChannel.RepoDeviceName := AClipboard.RepoDeviceName;
-  AChannel.RepoDeviceUUID := AClipboard.RepoDeviceUUID;
+  AChannel.AssignFlowMeterFrom(AClipboard.Snapshot, FActiveWorkTable, True);
   MarkChannelDeviceModified(AChannel);
 end;
 
@@ -2576,6 +2550,8 @@ procedure TFormMain.ClearChannelData(AChannel: TChannel);
 begin
   if AChannel = nil then
     Exit;
+
+  AChannel.RecreateFlowMeter(FActiveWorkTable);
 
   AChannel.TypeName := '';
   AChannel.Serial := '';

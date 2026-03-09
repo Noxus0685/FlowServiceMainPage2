@@ -171,6 +171,9 @@ type
     property ValueInterface: TMeterValue read FValueInterface write SetValueInterface;
 
     procedure RebindFlowMeterValues(const AWorkTable: TWorkTable);
+    procedure RecreateFlowMeter(const AWorkTable: TWorkTable);
+    procedure AssignFlowMeterFrom(const ASource: TChannel; const AWorkTable: TWorkTable;
+      const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
   end;
 
@@ -550,6 +553,91 @@ begin
   end;
 
 
+end;
+
+procedure TChannel.RecreateFlowMeter(const AWorkTable: TWorkTable);
+begin
+  FreeAndNil(FFlowMeter);
+  FFlowMeter := TFlowMeter.Create;
+  FFlowMeter.Name := 'Прибор ' + FName;
+
+  Init;
+  RebindFlowMeterValues(AWorkTable);
+end;
+
+procedure TChannel.AssignFlowMeterFrom(const ASource: TChannel;
+  const AWorkTable: TWorkTable; const ACloneDeviceToRepo: Boolean);
+var
+  SrcDevice: TDevice;
+  NewDevice: TDevice;
+begin
+  if (ASource = nil) or (ASource.FFlowMeter = nil) then
+    Exit;
+
+  RecreateFlowMeter(AWorkTable);
+
+  FFlowMeter.UUID := ASource.FFlowMeter.UUID;
+  FFlowMeter.DeviceUUID := ASource.FFlowMeter.DeviceUUID;
+  FFlowMeter.DeviceTypeName := ASource.FFlowMeter.DeviceTypeName;
+  FFlowMeter.DeviceTypeUUID := ASource.FFlowMeter.DeviceTypeUUID;
+  FFlowMeter.RepoTypeName := ASource.FFlowMeter.RepoTypeName;
+  FFlowMeter.RepoTypeUUID := ASource.FFlowMeter.RepoTypeUUID;
+  FFlowMeter.RepoDeviceName := ASource.FFlowMeter.RepoDeviceName;
+  FFlowMeter.RepoDeviceUUID := ASource.FFlowMeter.RepoDeviceUUID;
+  FFlowMeter.SerialNumber := ASource.FFlowMeter.SerialNumber;
+  FFlowMeter.OutputType := ASource.FFlowMeter.OutputType;
+
+  FFlowMeter.Active := ASource.FFlowMeter.Active;
+  FFlowMeter.CheckType := ASource.FFlowMeter.CheckType;
+  FFlowMeter.Status := ASource.FFlowMeter.Status;
+  FFlowMeter.SendStatus := ASource.FFlowMeter.SendStatus;
+  FFlowMeter.FlowTypeName := ASource.FFlowMeter.FlowTypeName;
+  FFlowMeter.DocNumber := ASource.FFlowMeter.DocNumber;
+  FFlowMeter.Means := ASource.FFlowMeter.Means;
+  FFlowMeter.K1 := ASource.FFlowMeter.K1;
+  FFlowMeter.P1 := ASource.FFlowMeter.P1;
+  FFlowMeter.K2 := ASource.FFlowMeter.K2;
+  FFlowMeter.P2 := ASource.FFlowMeter.P2;
+  FFlowMeter.TempWater := ASource.FFlowMeter.TempWater;
+  FFlowMeter.Temperature := ASource.FFlowMeter.Temperature;
+  FFlowMeter.Pressure := ASource.FFlowMeter.Pressure;
+  FFlowMeter.Humidity := ASource.FFlowMeter.Humidity;
+  FFlowMeter.VrfDate := ASource.FFlowMeter.VrfDate;
+  FFlowMeter.Data1 := ASource.FFlowMeter.Data1;
+  FFlowMeter.Data2 := ASource.FFlowMeter.Data2;
+  FFlowMeter.Data3 := ASource.FFlowMeter.Data3;
+  FFlowMeter.Date1 := ASource.FFlowMeter.Date1;
+  FFlowMeter.Date2 := ASource.FFlowMeter.Date2;
+  FFlowMeter.ResultValue := ASource.FFlowMeter.ResultValue;
+  FFlowMeter.MeterDateTime := ASource.FFlowMeter.MeterDateTime;
+  FFlowMeter.ModifiedDateTime := ASource.FFlowMeter.ModifiedDateTime;
+  FFlowMeter.Kp := ASource.FFlowMeter.Kp;
+  FFlowMeter.FactoryKp := ASource.FFlowMeter.FactoryKp;
+  FFlowMeter.FreqMax := ASource.FFlowMeter.FreqMax;
+  FFlowMeter.FlowMax := ASource.FFlowMeter.FlowMax;
+  FFlowMeter.FlowMin := ASource.FFlowMeter.FlowMin;
+  FFlowMeter.QuantityMax := ASource.FFlowMeter.QuantityMax;
+  FFlowMeter.QuantityMin := ASource.FFlowMeter.QuantityMin;
+  FFlowMeter.Error := ASource.FFlowMeter.Error;
+  FFlowMeter.PointIndex := ASource.FFlowMeter.PointIndex;
+  FFlowMeter.Comment := ASource.FFlowMeter.Comment;
+  FFlowMeter.MeterFlowCategory := ASource.FFlowMeter.MeterFlowCategory;
+
+  SrcDevice := ASource.FFlowMeter.Device;
+  if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+  begin
+    NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
+    FFlowMeter.Device := NewDevice;
+  end
+  else if SrcDevice <> nil then
+  begin
+    FFlowMeter.DeviceTypeName := SrcDevice.DeviceTypeName;
+    FFlowMeter.DeviceTypeUUID := SrcDevice.DeviceTypeUUID;
+    FFlowMeter.SerialNumber := SrcDevice.SerialNumber;
+    FFlowMeter.OutputType := SrcDevice.OutputType;
+  end;
+
+  RebindFlowMeterValues(AWorkTable);
 end;
 
 // =====================================================
