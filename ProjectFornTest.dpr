@@ -25,12 +25,17 @@ uses
 begin
   Application.Initialize;
 
+  ForceDirectories(
+    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    'Settings'
+  );
+
   {--------------------------------------------------}
   { Инициализация менеджера БД и репозиториев }
   {--------------------------------------------------}
   DataManager:= TManagerTDM.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'dbsettings.ini'
+    'Settings\\dbsettings.ini'
   );
 
   DataManager.Load;
@@ -58,4 +63,3 @@ begin
   {--------------------------------------------------}
   FreeAndNil(DataManager);
 end.
-

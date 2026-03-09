@@ -912,7 +912,7 @@ begin
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'TableSettings.ini'
+    'Settings\TableSettings.ini'
   );
 
   FWorkTableManager.Load;
