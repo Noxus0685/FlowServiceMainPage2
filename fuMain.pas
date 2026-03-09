@@ -414,6 +414,22 @@ type
     Label1: TLabel;
     ActionCopyType: TAction;
     ActionFillAllTypes: TAction;
+    ActionDevicesClearRow: TAction;
+    ActionDevicesCopy: TAction;
+    ActionDevicesPaste: TAction;
+    ActionDevicesClearAll: TAction;
+    ActionDevicesFillAllBySelected: TAction;
+    ActionDevicesFromArchive: TAction;
+    ActionDevicesSetFlowSource: TAction;
+    ActionDevicesAssignEtalon: TAction;
+    ActionEtalonsClearRow: TAction;
+    ActionEtalonsCopy: TAction;
+    ActionEtalonsPaste: TAction;
+    ActionEtalonsClearAll: TAction;
+    ActionEtalonsFillAllBySelected: TAction;
+    ActionEtalonsFromArchive: TAction;
+    ActionEtalonsSetFlowSource: TAction;
+    ActionEtalonsAssignEtalon: TAction;
     LayoutLeft: TLayout;
     lvFlowmeterTypes: TListView;
     TreeViewDevices: TTreeView;
@@ -542,6 +558,22 @@ type
       var Value: TValue);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure ActionDevicesClearRowExecute(Sender: TObject);
+    procedure ActionDevicesCopyExecute(Sender: TObject);
+    procedure ActionDevicesPasteExecute(Sender: TObject);
+    procedure ActionDevicesClearAllExecute(Sender: TObject);
+    procedure ActionDevicesFillAllBySelectedExecute(Sender: TObject);
+    procedure ActionDevicesFromArchiveExecute(Sender: TObject);
+    procedure ActionDevicesSetFlowSourceExecute(Sender: TObject);
+    procedure ActionDevicesAssignEtalonExecute(Sender: TObject);
+    procedure ActionEtalonsClearRowExecute(Sender: TObject);
+    procedure ActionEtalonsCopyExecute(Sender: TObject);
+    procedure ActionEtalonsPasteExecute(Sender: TObject);
+    procedure ActionEtalonsClearAllExecute(Sender: TObject);
+    procedure ActionEtalonsFillAllBySelectedExecute(Sender: TObject);
+    procedure ActionEtalonsFromArchiveExecute(Sender: TObject);
+    procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
+    procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
 
 
   private
@@ -560,6 +592,7 @@ type
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure OpenTypeSelect(ARow: Integer);
     procedure OpenChannelDeviceEditor(AChannel: TChannel);
+    procedure SelectDeviceForChannel(AChannel: TChannel);
     procedure InitTables;
     procedure ApplyFlowMeterSelection(const ARow: Integer);
     function FindTypeIndex(const ATypeName: string): Integer;
@@ -597,6 +630,9 @@ type
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
        procedure UpdateForm;
+    procedure ClearChannelData(AChannel: TChannel);
+    procedure CopyChannelData(ASource, ADest: TChannel);
+    function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
 
   public
     { Public declarations }
@@ -617,6 +653,26 @@ type
     procedure RestoreInstrumentalLayoutsByFlags(const AFlowRateVisible, APumpVisible,
       AMainVisible, AMesureVisible, AConditionsVisible, AProceduresVisible: Boolean;
       const AOrder: string = '');
+  private type
+    TChannelClipboardData = record
+      HasData: Boolean;
+      Enabled: Boolean;
+      Text: string;
+      TypeName: string;
+      Serial: string;
+      Signal: Integer;
+      DeviceUUID: string;
+      TypeUUID: string;
+      RepoTypeName: string;
+      RepoTypeUUID: string;
+      RepoDeviceName: string;
+      RepoDeviceUUID: string;
+    end;
+  private
+    FDeviceClipboard: TChannelClipboardData;
+    FEtalonClipboard: TChannelClipboardData;
+    procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
+    procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
   end;
 
 
@@ -2322,8 +2378,6 @@ var
   WorkTable: TWorkTable;
   Ch: TChannel;
   Row: Integer;
-  Frm: TFormDeviceSelect;
-  SelDevice: TDevice;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -2337,6 +2391,17 @@ begin
   if Ch = nil then
     Exit;
 
+  SelectDeviceForChannel(Ch);
+end;
+
+procedure TFormMain.SelectDeviceForChannel(AChannel: TChannel);
+var
+  Frm: TFormDeviceSelect;
+  SelDevice: TDevice;
+begin
+  if AChannel = nil then
+    Exit;
+
   Frm := TFormDeviceSelect.Create(Self);
   try
     if Frm.ShowModal <> mrOk then
@@ -2346,12 +2411,12 @@ begin
     if SelDevice = nil then
       Exit;
 
-    Ch.DeviceUUID := SelDevice.MitUUID;
-    Ch.TypeName := SelDevice.DeviceTypeName;
-    Ch.Serial := SelDevice.SerialNumber;
-    Ch.Signal := SelDevice.OutputType;
-
-    UpdateGridDevices;
+    AChannel.DeviceUUID := SelDevice.MitUUID;
+    AChannel.TypeName := SelDevice.DeviceTypeName;
+    AChannel.Serial := SelDevice.SerialNumber;
+    AChannel.Signal := SelDevice.OutputType;
+    MarkChannelDeviceModified(AChannel);
+    UpdateGrids;
   finally
     Frm.Free;
   end;
@@ -2449,6 +2514,271 @@ begin
   finally
     Frm.Free;
   end;
+end;
+
+procedure TFormMain.SaveChannelToClipboard(AChannel: TChannel;
+  var AClipboard: TChannelClipboardData);
+begin
+  AClipboard.HasData := AChannel <> nil;
+  if AChannel = nil then
+    Exit;
+
+  AClipboard.Enabled := AChannel.Enabled;
+  AClipboard.Text := AChannel.Text;
+  AClipboard.TypeName := AChannel.TypeName;
+  AClipboard.Serial := AChannel.Serial;
+  AClipboard.Signal := AChannel.Signal;
+  AClipboard.DeviceUUID := AChannel.DeviceUUID;
+  AClipboard.TypeUUID := AChannel.TypeUUID;
+  AClipboard.RepoTypeName := AChannel.RepoTypeName;
+  AClipboard.RepoTypeUUID := AChannel.RepoTypeUUID;
+  AClipboard.RepoDeviceName := AChannel.RepoDeviceName;
+  AClipboard.RepoDeviceUUID := AChannel.RepoDeviceUUID;
+end;
+
+procedure TFormMain.LoadChannelFromClipboard(AChannel: TChannel;
+  const AClipboard: TChannelClipboardData);
+begin
+  if (AChannel = nil) or not AClipboard.HasData then
+    Exit;
+
+  AChannel.Enabled := AClipboard.Enabled;
+  AChannel.Text := AClipboard.Text;
+  AChannel.TypeName := AClipboard.TypeName;
+  AChannel.Serial := AClipboard.Serial;
+  AChannel.Signal := AClipboard.Signal;
+  AChannel.DeviceUUID := AClipboard.DeviceUUID;
+  AChannel.TypeUUID := AClipboard.TypeUUID;
+  AChannel.RepoTypeName := AClipboard.RepoTypeName;
+  AChannel.RepoTypeUUID := AClipboard.RepoTypeUUID;
+  AChannel.RepoDeviceName := AClipboard.RepoDeviceName;
+  AChannel.RepoDeviceUUID := AClipboard.RepoDeviceUUID;
+  MarkChannelDeviceModified(AChannel);
+end;
+
+function TFormMain.GetSelectedChannel(AChannels: TObjectList<TChannel>;
+  AGrid: TGrid): TChannel;
+var
+  Row: Integer;
+begin
+  Result := nil;
+  if (AChannels = nil) or (AGrid = nil) then
+    Exit;
+
+  Row := AGrid.Row;
+  if (Row < 0) or (Row >= AChannels.Count) then
+    Exit;
+
+  Result := AChannels[Row];
+end;
+
+procedure TFormMain.ClearChannelData(AChannel: TChannel);
+begin
+  if AChannel = nil then
+    Exit;
+
+  AChannel.TypeName := '';
+  AChannel.Serial := '';
+  AChannel.Signal := -1;
+  AChannel.DeviceUUID := '';
+  AChannel.TypeUUID := '';
+  AChannel.RepoTypeName := '';
+  AChannel.RepoTypeUUID := '';
+  AChannel.RepoDeviceName := '';
+  AChannel.RepoDeviceUUID := '';
+  MarkChannelDeviceModified(AChannel);
+end;
+
+procedure TFormMain.CopyChannelData(ASource, ADest: TChannel);
+begin
+  if (ASource = nil) or (ADest = nil) then
+    Exit;
+
+  ADest.TypeName := ASource.TypeName;
+  ADest.Serial := ASource.Serial;
+  ADest.Signal := ASource.Signal;
+  ADest.DeviceUUID := ASource.DeviceUUID;
+  ADest.TypeUUID := ASource.TypeUUID;
+  ADest.RepoTypeName := ASource.RepoTypeName;
+  ADest.RepoTypeUUID := ASource.RepoTypeUUID;
+  ADest.RepoDeviceName := ASource.RepoDeviceName;
+  ADest.RepoDeviceUUID := ASource.RepoDeviceUUID;
+  MarkChannelDeviceModified(ADest);
+end;
+
+procedure TFormMain.ActionDevicesClearRowExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+  ClearChannelData(Ch);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionDevicesCopyExecute(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  SaveChannelToClipboard(GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices), FDeviceClipboard);
+end;
+
+procedure TFormMain.ActionDevicesPasteExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+  LoadChannelFromClipboard(Ch, FDeviceClipboard);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionDevicesClearAllExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+  for Ch in FActiveWorkTable.DeviceChannels do
+    ClearChannelData(Ch);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionDevicesFillAllBySelectedExecute(Sender: TObject);
+var
+  Src, Ch: TChannel;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+  Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+  if Src = nil then
+    Exit;
+  for Ch in FActiveWorkTable.DeviceChannels do
+    if Ch <> Src then
+      CopyChannelData(Src, Ch);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionDevicesFromArchiveExecute(Sender: TObject);
+begin
+  ActionOpenDeviceSelectExecute(Sender);
+end;
+
+procedure TFormMain.ActionDevicesSetFlowSourceExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+  if (Ch <> nil) and (Ch.FlowMeter <> nil) then
+    Ch.FlowMeter.UpdateValues;
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionDevicesAssignEtalonExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.EtalonChannels.Count = 0) then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+  if (Ch <> nil) and (Ch.FlowMeter <> nil) and
+     (FActiveWorkTable.EtalonChannels[0] <> nil) and
+     (FActiveWorkTable.EtalonChannels[0].FlowMeter <> nil) then
+    Ch.FlowMeter.SetEtalon(FActiveWorkTable.EtalonChannels[0].FlowMeter);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionEtalonsClearRowExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+  ClearChannelData(Ch);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionEtalonsCopyExecute(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  SaveChannelToClipboard(GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons), FEtalonClipboard);
+end;
+
+procedure TFormMain.ActionEtalonsPasteExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+  LoadChannelFromClipboard(Ch, FEtalonClipboard);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionEtalonsClearAllExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.EtalonChannels = nil) then
+    Exit;
+  for Ch in FActiveWorkTable.EtalonChannels do
+    ClearChannelData(Ch);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionEtalonsFillAllBySelectedExecute(Sender: TObject);
+var
+  Src, Ch: TChannel;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.EtalonChannels = nil) then
+    Exit;
+  Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+  if Src = nil then
+    Exit;
+  for Ch in FActiveWorkTable.EtalonChannels do
+    if Ch <> Src then
+      CopyChannelData(Src, Ch);
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionEtalonsFromArchiveExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+  SelectDeviceForChannel(Ch);
+end;
+
+procedure TFormMain.ActionEtalonsSetFlowSourceExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+  if (Ch <> nil) and (Ch.FlowMeter <> nil) then
+    Ch.FlowMeter.UpdateValues;
+  UpdateGrids;
+end;
+
+procedure TFormMain.ActionEtalonsAssignEtalonExecute(Sender: TObject);
+var
+  Ch: TChannel;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+  Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+  if (Ch <> nil) and (Ch.FlowMeter <> nil) then
+    Ch.FlowMeter.SetAsEtalon;
+  UpdateGrids;
 end;
 
 procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
