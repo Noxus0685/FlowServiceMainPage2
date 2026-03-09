@@ -2422,8 +2422,15 @@ begin
     if Assigned(Ch.FlowMeter) and Assigned(Ch.FlowMeter.Device) then
     begin
       Ch.FlowMeter.Device.DeviceTypeUUID := NewType.MitUUID;
+      Ch.FlowMeter.Device.DeviceTypeName := NewType.Name;
       Ch.FlowMeter.Device.RepoTypeName := RepoName;
       Ch.FlowMeter.Device.RepoTypeUUID := RepoUUID;
+
+      if IsTypeChanged then
+      begin
+        Ch.FlowMeter.Device.AttachType(NewType, RepoName);
+        Ch.FlowMeter.Device.FillFromType(NewType);
+      end;
     end;
 
     // Если у вас был расчёт индекса по типу для UI/сигнала — храните как отдельное поле канала/строки,

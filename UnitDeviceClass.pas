@@ -390,6 +390,7 @@ type
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
     procedure FillFromType(AType: TDeviceType);
+    procedure SyncNameWithModificationAndDiameter;
 
   end;
 
@@ -1274,6 +1275,22 @@ begin
 
 end;
 
+procedure TDevice.SyncNameWithModificationAndDiameter;
+var
+  NewName: string;
+begin
+  NewName := Trim(Modification);
+  if Trim(DN) <> '' then
+  begin
+    if NewName <> '' then
+      NewName := NewName + ' ';
+    NewName := NewName + Trim(DN);
+  end;
+
+  if NewName <> '' then
+    Name := NewName;
+end;
+
 procedure TDevice.FillFromType(AType: TDeviceType);
 var
   TD: TDiameter;
@@ -1288,6 +1305,7 @@ begin
   {====================================================}
   { 1. Основные параметры }
   {====================================================}
+  Modification      := AType.Modification;
   Manufacturer      := AType.Manufacturer;
   AccuracyClass     := AType.AccuracyClass;
   ReestrNumber      := AType.ReestrNumber;
@@ -1411,6 +1429,8 @@ begin
       DP.LimitImp    := TP.LimitImp;
     end;
   end;
+
+  SyncNameWithModificationAndDiameter;
 end;
 
 
