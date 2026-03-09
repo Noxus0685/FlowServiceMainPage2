@@ -1071,7 +1071,10 @@ begin
       { Новый прибор }
       {----------------------------------}
       FOriginalDevice := nil;
-      FDevice := DataManager.ActiveDeviceRepo.CreateDevice(0);
+      if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+        FDevice := DataManager.ActiveDeviceRepo.CreateDevice(0)
+      else
+        FDevice := TDevice.Create;
       FDevice.State := osNew;
     end;
 

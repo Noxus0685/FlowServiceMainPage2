@@ -1714,6 +1714,8 @@ var
   ADevice: TDevice;
   ActiveRepo: TDeviceRepository;
   FoundRepo: TDeviceRepository;
+  SelDevice: TDevice;
+  SelectFrm: TFormDeviceSelect;
   Frm: TFormDeviceEditor;
 begin
   if AChannel = nil then
@@ -1727,6 +1729,29 @@ begin
 
     if AChannel.DeviceUUID <> '' then
       ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
+  end;
+
+  if (ADevice = nil) and
+     ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
+  begin
+    SelectFrm := TFormDeviceSelect.Create(Self);
+    try
+      if SelectFrm.ShowModal <> mrOk then
+        Exit;
+
+      SelDevice := SelectFrm.GetSelectedDevice;
+      if SelDevice = nil then
+        Exit;
+
+      AChannel.DeviceUUID := SelDevice.MitUUID;
+      AChannel.TypeName := SelDevice.DeviceTypeName;
+      AChannel.Serial := SelDevice.SerialNumber;
+      AChannel.Signal := SelDevice.OutputType;
+      UpdateGridDevices;
+    finally
+      SelectFrm.Free;
+    end;
+    Exit;
   end;
 
   if (ADevice = nil) and (ActiveRepo <> nil) then
