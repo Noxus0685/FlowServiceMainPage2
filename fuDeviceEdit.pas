@@ -2139,6 +2139,8 @@ begin
   // ----------------------------------------
   UpdatePointsGrid;
 
+  FDevice.SyncNameWithModificationAndDiameter;
+
   SetModified;
 end;
 
@@ -2156,7 +2158,7 @@ begin
 
   { сохраняем в модель }
   FDevice.Modification := S;
-  FDevice.SyncNameWithModificationAndDiameter;
+
   EditModification.Text := S;
 
   { prompt, если пусто }
@@ -2164,6 +2166,9 @@ begin
     EditModification.TextPrompt := 'Модификация'
   else
     EditModification.TextPrompt := '';
+
+  FDevice.SyncNameWithModificationAndDiameter;
+ UpdateUIFromDevice;
 
   SetModified;
 end;
