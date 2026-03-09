@@ -118,74 +118,74 @@ object FormMain: TFormMain
     Left = 1660
     Top = 405
     object MenuItemDevicesClearRow: TMenuItem
-      Text = 'Очистить строку'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100#32#1089#1090#1088#1086#1082#1091
     end
     object MenuItemDevicesCopy: TMenuItem
-      Text = 'Копировать'
+      Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
     end
     object MenuItemDevicesPaste: TMenuItem
-      Text = 'Вставить'
+      Text = #1042#1089#1090#1072#1074#1080#1090#1100
     end
     object MenuItemDevicesSep1: TMenuItem
       Text = '-'
     end
     object MenuItemDevicesClearAll: TMenuItem
-      Text = 'Очистить все приборы'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100#32#1074#1089#1077#32#1087#1088#1080#1073#1086#1088#1099
     end
     object MenuItemDevicesFillAllBySelected: TMenuItem
-      Text = 'Заполнить все по выбранному'
+      Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100#32#1074#1089#1077#32#1087#1086#32#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
     end
     object MenuItemDevicesSep2: TMenuItem
       Text = '-'
     end
     object MenuItemDevicesFromArchive: TMenuItem
-      Text = 'Прибор из архива'
+      Text = #1055#1088#1080#1073#1086#1088#32#1080#1079#32#1072#1088#1093#1080#1074#1072
     end
     object MenuItemDevicesSep3: TMenuItem
       Text = '-'
     end
     object MenuItemDevicesSetFlowSource: TMenuItem
-      Text = 'Установить источник расхода'
+      Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100#32#1080#1089#1090#1086#1095#1085#1080#1082#32#1088#1072#1089#1093#1086#1076#1072
     end
     object MenuItemDevicesAssignEtalon: TMenuItem
-      Text = 'Назначить эталоном'
+      Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100#32#1101#1090#1072#1083#1086#1085#1086#1084
     end
   end
   object PopupMenuEtalonsGrid: TPopupMenu
     Left = 1710
     Top = 405
     object MenuItemEtalonsClearRow: TMenuItem
-      Text = 'Очистить строку'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100#32#1089#1090#1088#1086#1082#1091
     end
     object MenuItemEtalonsCopy: TMenuItem
-      Text = 'Копировать'
+      Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
     end
     object MenuItemEtalonsPaste: TMenuItem
-      Text = 'Вставить'
+      Text = #1042#1089#1090#1072#1074#1080#1090#1100
     end
     object MenuItemEtalonsSep1: TMenuItem
       Text = '-'
     end
     object MenuItemEtalonsClearAll: TMenuItem
-      Text = 'Очистить все приборы'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100#32#1074#1089#1077#32#1087#1088#1080#1073#1086#1088#1099
     end
     object MenuItemEtalonsFillAllBySelected: TMenuItem
-      Text = 'Заполнить все по выбранному'
+      Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100#32#1074#1089#1077#32#1087#1086#32#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
     end
     object MenuItemEtalonsSep2: TMenuItem
       Text = '-'
     end
     object MenuItemEtalonsFromArchive: TMenuItem
-      Text = 'Прибор из архива'
+      Text = #1055#1088#1080#1073#1086#1088#32#1080#1079#32#1072#1088#1093#1080#1074#1072
     end
     object MenuItemEtalonsSep3: TMenuItem
       Text = '-'
     end
     object MenuItemEtalonsSetFlowSource: TMenuItem
-      Text = 'Установить источник расхода'
+      Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100#32#1080#1089#1090#1086#1095#1085#1080#1082#32#1088#1072#1089#1093#1086#1076#1072
     end
     object MenuItemEtalonsAssignEtalon: TMenuItem
-      Text = 'Назначить эталоном'
+      Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100#32#1101#1090#1072#1083#1086#1085#1086#1084
     end
   end
   object TabControl1: TTabControl
