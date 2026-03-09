@@ -1,4 +1,4 @@
-﻿object FormMain: TFormMain
+object FormMain: TFormMain
   Left = 0
   Top = 0
   Caption = 'fuMain'
@@ -210,7 +210,7 @@
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 2
+    TabIndex = 0
     TabOrder = 6
     TabPosition = PlatformDefault
     OnChange = TabControl1Change
@@ -228,7 +228,7 @@
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -3136,7 +3136,7 @@
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 81.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -3256,7 +3256,7 @@
             Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDataPointsGetValue
             Viewport.Width = 1515.000000000000000000
-            Viewport.Height = 651.000000000000000000
+            Viewport.Height = 635.000000000000000000
             object StringColumnName: TStringColumn
               Header = #1048#1084#1103
               HeaderSettings.TextSettings.Trimming = Character
@@ -3266,116 +3266,153 @@
             end
             object StringColumnSpillageNum: TStringColumn
               Header = #8470
+              HeaderSettings.TextSettings.WordWrap = False
               Size.Width = 50.000000000000000000
             end
             object StringColumnSpillageDateTime: TStringColumn
               Header = #1044#1072#1090#1072'/'#1074#1088#1077#1084#1103
+              HeaderSettings.TextSettings.WordWrap = False
               Size.Width = 120.000000000000000000
             end
             object StringColumnSpillageOperator: TStringColumn
               Header = #1054#1087#1077#1088#1072#1090#1086#1088
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageEtalonName: TStringColumn
               Header = #1069#1090#1072#1083#1086#1085
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageSpillTime: TStringColumn
-              Header = 'Время'
+              Header = #1042#1088#1077#1084#1103
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQavgEtalon: TStringColumn
-              Header = 'Расход'
+              Header = #1056#1072#1089#1093#1086#1076
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageEtalonVolume: TStringColumn
-              Header = 'ОбъемЭ'
+              Header = #1054#1073#1098#1077#1084#1069
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageEtalonMass: TStringColumn
-              Header = 'МассаЭ'
+              Header = #1052#1072#1089#1089#1072#1069
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQEtalonStd: TStringColumn
-              Header = 'СКОЭ'
+              Header = #1057#1050#1054#1069
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQEtalonCV: TStringColumn
-              Header = 'ВариацияЭ'
+              Header = #1042#1072#1088#1080#1072#1094#1080#1103#1069
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageDeviceVolume: TStringColumn
-              Header = 'ОбъемП'
+              Header = #1054#1073#1098#1077#1084#1055
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageDeviceMass: TStringColumn
-              Header = 'МассаП'
+              Header = #1052#1072#1089#1089#1072#1055
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageVelocity: TStringColumn
-              Header = 'Скорость'
+              Header = #1057#1082#1086#1088#1086#1089#1090#1100
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageError: TStringColumn
-              Header = 'Погрешность'
+              Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageValid: TStringColumn
-              Header = 'Годность'
+              Header = #1043#1086#1076#1085#1086#1089#1090#1100
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQStd: TStringColumn
-              Header = 'СКОП'
+              Header = #1057#1050#1054#1055
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQCV: TStringColumn
-              Header = 'ВариацияП'
+              Header = #1042#1072#1088#1080#1072#1094#1080#1103#1055
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageVolumeBefore: TStringColumn
-              Header = 'До'
+              Header = #1044#1086
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageVolumeAfter: TStringColumn
-              Header = 'После'
+              Header = #1055#1086#1089#1083#1077
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillagePulseCount: TStringColumn
-              Header = 'Импульсы'
+              Header = #1048#1084#1087#1091#1083#1100#1089#1099
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageMeanFrequency: TStringColumn
-              Header = 'Частота'
+              Header = #1063#1072#1089#1090#1086#1090#1072
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAvgCurrent: TStringColumn
-              Header = 'Ток'
+              Header = #1058#1086#1082
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAvgVoltage: TStringColumn
-              Header = 'Напряжение'
+              Header = #1053#1072#1087#1088#1103#1078#1077#1085#1080#1077
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageData1: TStringColumn
-              Header = 'Данные1'
+              Header = #1044#1072#1085#1085#1099#1077'1'
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageData2: TStringColumn
-              Header = 'Данные2'
+              Header = #1044#1072#1085#1085#1099#1077'2'
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageStartTemperature: TStringColumn
-              Header = 'Тнач'
+              Header = #1058#1085#1072#1095
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageEndTemperature: TStringColumn
-              Header = 'Ткон'
+              Header = #1058#1082#1086#1085
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAvgTemperature: TStringColumn
-              Header = 'Тсред'
+              Header = #1058#1089#1088#1077#1076
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageInputPressure: TStringColumn
-              Header = 'ДавлВх'
+              Header = #1044#1072#1074#1083#1042#1093
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageOutputPressure: TStringColumn
-              Header = 'ДавлВых'
+              Header = #1044#1072#1074#1083#1042#1099#1093
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageDensity: TStringColumn
-              Header = 'Плотность'
+              Header = #1055#1083#1086#1090#1085#1086#1089#1090#1100
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAmbientTemperature: TStringColumn
-              Header = 'Твозд'
+              Header = #1058#1074#1086#1079#1076
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAtmosphericPressure: TStringColumn
-              Header = 'АтмДавл'
+              Header = #1040#1090#1084#1044#1072#1074#1083
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageRelativeHumidity: TStringColumn
-              Header = 'Влажность'
+              Header = #1042#1083#1072#1078#1085#1086#1089#1090#1100
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageCoef: TStringColumn
-              Header = 'Коэф'
+              Header = #1050#1086#1101#1092
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageFCDCoefficient: TStringColumn
-              Header = 'Коррекция'
+              Header = #1050#1086#1088#1088#1077#1082#1094#1080#1103
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageArchivedData: TStringColumn
-              Header = 'Архив'
+              Header = #1040#1088#1093#1080#1074
+              HeaderSettings.TextSettings.WordWrap = False
             end
           end
           object GridResults: TGrid
