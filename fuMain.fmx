@@ -1475,7 +1475,7 @@ object FormMain: TFormMain
                 Align = Client
                 CanFocus = True
                 ClipChildren = True
-                PopupMenu = PopupMenuEtalonsGridLayOut
+                PopupMenu = PopupMenuDevicesGridLayOut
                 Size.Width = 1770.000000000000000000
                 Size.Height = 309.000000000000000000
                 Size.PlatformDefault = False
