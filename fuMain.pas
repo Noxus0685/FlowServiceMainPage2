@@ -558,22 +558,6 @@ type
       var Value: TValue);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
-    procedure ActionDevicesClearRowExecute(Sender: TObject);
-    procedure ActionDevicesCopyExecute(Sender: TObject);
-    procedure ActionDevicesPasteExecute(Sender: TObject);
-    procedure ActionDevicesClearAllExecute(Sender: TObject);
-    procedure ActionDevicesFillAllBySelectedExecute(Sender: TObject);
-    procedure ActionDevicesFromArchiveExecute(Sender: TObject);
-    procedure ActionDevicesSetFlowSourceExecute(Sender: TObject);
-    procedure ActionDevicesAssignEtalonExecute(Sender: TObject);
-    procedure ActionEtalonsClearRowExecute(Sender: TObject);
-    procedure ActionEtalonsCopyExecute(Sender: TObject);
-    procedure ActionEtalonsPasteExecute(Sender: TObject);
-    procedure ActionEtalonsClearAllExecute(Sender: TObject);
-    procedure ActionEtalonsFillAllBySelectedExecute(Sender: TObject);
-    procedure ActionEtalonsFromArchiveExecute(Sender: TObject);
-    procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
-    procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
 
 
   private
