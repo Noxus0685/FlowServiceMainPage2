@@ -112,6 +112,7 @@ type
     procedure StringGridValuesListSelChanged(Sender: TObject);
     procedure EditCoefKExit(Sender: TObject);
     procedure EditCoefPExit(Sender: TObject);
+    procedure SpeedButtonResetSettingsClick(Sender: TObject);
   private
     FCoef: TCoef;
     FCoefHash: string;
@@ -686,6 +687,69 @@ begin
 
   Dbl := SafeFloat(EditCoefP.Text);
   MeterValue.CoefP := Dbl;
+end;
+
+procedure TFormMeterValues.SpeedButtonResetSettingsClick(Sender: TObject);
+begin
+  if MeterValue = nil then
+    Exit;
+
+  if SameText(MeterValue.&Type, 'Время') then
+    MeterValue.SetAsTime
+  else if SameText(MeterValue.&Type, 'Объем') then
+    MeterValue.SetAsVolume
+  else if SameText(MeterValue.&Type, 'Масса') then
+    MeterValue.SetAsMass
+  else if SameText(MeterValue.&Type, 'Объемный расход') then
+    MeterValue.SetAsVolumeFlow
+  else if SameText(MeterValue.&Type, 'Массовый расход') then
+    MeterValue.SetAsMassFlow
+  else if SameText(MeterValue.&Type, 'Импульсы') then
+    MeterValue.SetAsImp
+  else if SameText(MeterValue.&Type, 'Погрешность') then
+    MeterValue.SetAsError
+  else if SameText(MeterValue.&Type, 'Погрешность по массе') then
+    MeterValue.SetAsMassError
+  else if SameText(MeterValue.&Type, 'Погрешность по объему') then
+    MeterValue.SetAsVolumeError
+  else if SameText(MeterValue.&Type, 'Расчётная плотность') then
+    MeterValue.SetAsDensity
+  else if SameText(MeterValue.&Type, 'PT100') then
+    MeterValue.SetAsTempPT100
+  else if SameText(MeterValue.&Type, 'Температурный датчик') then
+    MeterValue.SetAsTemp
+  else if SameText(MeterValue.&Type, 'Датчик температуры ИВТМ') then
+    MeterValue.SetAsAirTemp
+  else if SameText(MeterValue.&Type, 'Датчик токовый') then
+    MeterValue.SetAsPressure
+  else if SameText(MeterValue.&Type, 'Давление атмосферное') then
+    MeterValue.SetAsAirPressure
+  else if SameText(MeterValue.&Type, 'Токовый вход') then
+    MeterValue.SetAsCurrent
+  else if SameText(MeterValue.&Type, 'Коэффициент массы') then
+    MeterValue.SetAsMassCoef
+  else if SameText(MeterValue.&Type, 'Коэффициент объема') then
+    MeterValue.SetAsVolumeCoef
+  else if SameText(MeterValue.&Type, 'Датчик влажности') then
+    MeterValue.SetAsHumidity
+  else if SameText(MeterValue.Name, 'Температура') and SameText(MeterValue.RawValueName, 'Сопротивление') then
+    MeterValue.SetAsTempPT100
+  else if SameText(MeterValue.Name, 'Температура') then
+    MeterValue.SetAsTemp
+  else if SameText(MeterValue.Name, 'Температура атм') then
+    MeterValue.SetAsAirTemp
+  else if SameText(MeterValue.Name, 'Давление') then
+    MeterValue.SetAsPressure
+  else if SameText(MeterValue.Name, 'Плотность') then
+    MeterValue.SetAsDensity
+  else if SameText(MeterValue.Name, 'Влажность') then
+    MeterValue.SetAsHumidity;
+
+  UpdateLayoutCommonSettings;
+  UpdateLayoutValues;
+  UpdateStringGridDimensions;
+  UpdateLayoutTest;
+  UpdateLayoutCoefs;
 end;
 
 procedure TFormMeterValues.EditCoefKExit(Sender: TObject);
