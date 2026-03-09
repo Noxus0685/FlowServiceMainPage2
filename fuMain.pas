@@ -2680,7 +2680,7 @@ begin
     Exit;
 
   GridDevices.SetFocus;
-  GridDevices.Selected := PopupColumnDeviceSignal1;
+  GridDevices.Selected := PopupColumnDeviceSignal1.Index;
   ShowMessage('Источник расхода задаётся полем "Сигнал" в выбранной строке прибора.');
 end;
 
@@ -2786,7 +2786,7 @@ begin
     Exit;
 
   GridEtalons.SetFocus;
-  GridEtalons.Selected := PopupColumnEtalonSignal1;
+  GridEtalons.Selected := PopupColumnEtalonSignal1.Index;
   ShowMessage('Источник расхода задаётся полем "Сигнал" в выбранной строке эталона.');
 end;
 
