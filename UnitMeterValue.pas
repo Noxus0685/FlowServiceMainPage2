@@ -1245,6 +1245,7 @@ end;
 { Configures this meter value as time with predefined units and limits. }
 procedure TMeterValue.SetAsTime;
 begin
+  &Type := 'Время';
   ValueType := CONST_TYPE;
   Value := 0;
   SetFilter(-1);
@@ -1528,6 +1529,7 @@ end;
 { Configures this meter value as volume with predefined units and limits. }
 procedure TMeterValue.SetAsVolume;
 begin
+  &Type := 'Объем';
   ValueType := SUM_TYPE;
   Name := 'Объем';
   ShrtName := 'V';
@@ -1546,6 +1548,7 @@ end;
 { Configures this meter value as mass with predefined units and limits. }
 procedure TMeterValue.SetAsMass;
 begin
+  &Type := 'Масса';
   ValueType := SUM_TYPE;
   Name := 'Масса';
   ShrtName := 'M';
@@ -1564,6 +1567,7 @@ end;
 { Configures this meter value as volume flow with predefined units. }
 procedure TMeterValue.SetAsVolumeFlow;
 begin
+  &Type := 'Объемный расход';
   ValueType := FLOW_TYPE;
   Name := 'Объемный расход';
   ShrtName := 'Qv';
@@ -1587,6 +1591,7 @@ end;
 { Configures this meter value as mass flow with predefined units. }
 procedure TMeterValue.SetAsMassFlow;
 begin
+  &Type := 'Массовый расход';
   ValueType := FLOW_TYPE;
   Name := 'Массовый расход';
   ShrtName := 'Qm';
@@ -1609,6 +1614,7 @@ end;
 { Configures this meter value as impulse counter with predefined limits. }
 procedure TMeterValue.SetAsImp;
 begin
+  &Type := 'Импульсы';
   ValueType := FLOW_TYPE;
   Value := 0;
   SetFilter(-1);
@@ -1629,6 +1635,7 @@ end;
 { Configures this meter value as generic error percentage value. }
 procedure TMeterValue.SetAsError;
 begin
+  &Type := 'Погрешность';
   ValueType := ERROR_TYPE;
   Value := 0;
   SetFilter(-1);
@@ -1651,6 +1658,7 @@ end;
 { Configures this meter value as mass error percentage value. }
 procedure TMeterValue.SetAsMassError;
 begin
+  &Type := 'Погрешность по массе';
   ValueType := ERROR_TYPE;
   Value := 0;
   SetFilter(-1);
@@ -1673,6 +1681,7 @@ end;
 { Configures this meter value as volume error percentage value. }
 procedure TMeterValue.SetAsVolumeError;
 begin
+  &Type := 'Погрешность по объему';
   ValueType := ERROR_TYPE;
   Value := 0;
   SetFilter(-1);
@@ -1695,6 +1704,7 @@ end;
 { Configures this meter value as density with supported units. }
 procedure TMeterValue.SetAsDensity;
 begin
+  &Type := 'Расчётная плотность';
   ValueType := CONST_TYPE;
   Value := 998.1;
   SetFilter(-1);
@@ -1748,7 +1758,7 @@ begin
   SetFilter(-1);
   Accuracy := 2;
   Name := 'Температура';
-  &Type := '';
+  &Type := 'Температурный датчик';
   RawValueName := 'Температура';
   RawValueDim := '°C';
   ShrtName := 't';
@@ -1773,7 +1783,7 @@ begin
   SetFilter(-1);
   Accuracy := 2;
   Name := 'Температура атм';
-  &Type := 'ИВТМ';
+  &Type := 'Датчик температуры ИВТМ';
   RawValueName := '';
   RawValueDim := '';
   ShrtName := 't';
@@ -1798,7 +1808,7 @@ begin
   SetFilter(-1);
   Accuracy := -1;
   Name := 'Давление';
-  &Type := 'Датчик';
+  &Type := 'Датчик токовый';
   RawValueName := 'Ток';
   RawValueDim := 'мА';
   ShrtName := 'P';
@@ -1822,6 +1832,7 @@ end;
 { Configures this meter value as atmospheric pressure with supported units. }
 procedure TMeterValue.SetAsAirPressure;
 begin
+  &Type := 'Давление атмосферное';
   ValueType := CONST_TYPE;
   Value := 102124.64;
   SetFilter(-1);
@@ -1847,6 +1858,7 @@ end;
 { Configures this meter value as electrical current with supported units. }
 procedure TMeterValue.SetAsCurrent;
 begin
+  &Type := 'Токовый вход';
   ValueType := CONST_TYPE;
   Value := 4;
   SetFilter(-1);
@@ -1869,6 +1881,7 @@ end;
 { Configures this meter value as mass conversion coefficient. }
 procedure TMeterValue.SetAsMassCoef;
 begin
+  &Type := 'Коэффициент массы';
   ValueType := CONST_TYPE;
   Value := 100;
   SetFilter(-1);
@@ -1887,6 +1900,7 @@ end;
 { Configures this meter value as volume conversion coefficient. }
 procedure TMeterValue.SetAsVolumeCoef;
 begin
+  &Type := 'Коэффициент объема';
   ValueType := CONST_TYPE;
   Value := 100;
   SetFilter(-1);
@@ -1905,6 +1919,7 @@ end;
 { Configures this meter value as relative humidity percentage. }
 procedure TMeterValue.SetAsHumidity;
 begin
+  &Type := 'Датчик влажности';
   ValueType := CONST_TYPE;
   Value := 35;
   SetFilter(-1);
