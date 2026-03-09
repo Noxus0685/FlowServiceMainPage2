@@ -558,7 +558,7 @@ type
       var Value: TValue);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
-        procedure ActionDevicesClearRowExecute(Sender: TObject);
+    procedure ActionDevicesClearRowExecute(Sender: TObject);
     procedure ActionDevicesCopyExecute(Sender: TObject);
     procedure ActionDevicesPasteExecute(Sender: TObject);
     procedure ActionDevicesClearAllExecute(Sender: TObject);
@@ -574,6 +574,7 @@ type
     procedure ActionEtalonsFromArchiveExecute(Sender: TObject);
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
+
 
   private
 
@@ -672,8 +673,6 @@ type
     FEtalonClipboard: TChannelClipboardData;
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
-
-
   end;
 
 
@@ -2669,27 +2668,42 @@ end;
 
 procedure TFormMain.ActionDevicesSetFlowSourceExecute(Sender: TObject);
 var
-  Ch: TChannel;
+  WorkTable: TWorkTable;
+  Row: Integer;
 begin
-  if FActiveWorkTable = nil then
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
     Exit;
-  Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
-  if (Ch <> nil) and (Ch.FlowMeter <> nil) then
-    Ch.FlowMeter.UpdateValues;
-  UpdateGrids;
+
+  Row := GridDevices.Row;
+  if (Row < 0) or (Row >= WorkTable.DeviceChannels.Count) then
+    Exit;
+
+  GridDevices.SetFocus;
+  GridDevices.Selected := PopupColumnDeviceSignal1;
+  ShowMessage('Источник расхода задаётся полем "Сигнал" в выбранной строке прибора.');
 end;
 
 procedure TFormMain.ActionDevicesAssignEtalonExecute(Sender: TObject);
 var
   Ch: TChannel;
+  EtalonCh: TChannel;
+  EtalonRow: Integer;
 begin
   if (FActiveWorkTable = nil) or (FActiveWorkTable.EtalonChannels.Count = 0) then
     Exit;
+
+  EtalonRow := GridEtalons.Row;
+  if (EtalonRow >= 0) and (EtalonRow < FActiveWorkTable.EtalonChannels.Count) then
+    EtalonCh := FActiveWorkTable.EtalonChannels[EtalonRow]
+  else
+    EtalonCh := FActiveWorkTable.EtalonChannels[0];
+
   Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
   if (Ch <> nil) and (Ch.FlowMeter <> nil) and
-     (FActiveWorkTable.EtalonChannels[0] <> nil) and
-     (FActiveWorkTable.EtalonChannels[0].FlowMeter <> nil) then
-    Ch.FlowMeter.SetEtalon(FActiveWorkTable.EtalonChannels[0].FlowMeter);
+     (EtalonCh <> nil) and
+     (EtalonCh.FlowMeter <> nil) then
+    Ch.FlowMeter.SetEtalon(EtalonCh.FlowMeter);
   UpdateGrids;
 end;
 
@@ -2760,25 +2774,38 @@ end;
 
 procedure TFormMain.ActionEtalonsSetFlowSourceExecute(Sender: TObject);
 var
-  Ch: TChannel;
+  WorkTable: TWorkTable;
+  Row: Integer;
 begin
-  if FActiveWorkTable = nil then
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
     Exit;
-  Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
-  if (Ch <> nil) and (Ch.FlowMeter <> nil) then
-    Ch.FlowMeter.UpdateValues;
-  UpdateGrids;
+
+  Row := GridEtalons.Row;
+  if (Row < 0) or (Row >= WorkTable.EtalonChannels.Count) then
+    Exit;
+
+  GridEtalons.SetFocus;
+  GridEtalons.Selected := PopupColumnEtalonSignal1;
+  ShowMessage('Источник расхода задаётся полем "Сигнал" в выбранной строке эталона.');
 end;
 
 procedure TFormMain.ActionEtalonsAssignEtalonExecute(Sender: TObject);
 var
   Ch: TChannel;
+  DeviceCh: TChannel;
 begin
   if FActiveWorkTable = nil then
     Exit;
+
   Ch := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
-  if (Ch <> nil) and (Ch.FlowMeter <> nil) then
-    Ch.FlowMeter.SetAsEtalon;
+  if (Ch = nil) or (Ch.FlowMeter = nil) then
+    Exit;
+
+  for DeviceCh in FActiveWorkTable.DeviceChannels do
+    if (DeviceCh <> nil) and (DeviceCh.FlowMeter <> nil) then
+      DeviceCh.FlowMeter.SetEtalon(Ch.FlowMeter);
+
   UpdateGrids;
 end;
 
