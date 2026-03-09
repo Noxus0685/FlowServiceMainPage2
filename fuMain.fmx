@@ -12,8 +12,8 @@ object FormMain: TFormMain
   OnClose = FormClose
   DesignerMasterStyle = 0
   object PopupMenu1: TPopupMenu
-    Left = 1656
-    Top = 244
+    Left = 1616
+    Top = 300
     object MenuItem1: TMenuItem
       Text = 'MenuItem1'
     end
@@ -40,8 +40,8 @@ object FormMain: TFormMain
     end
   end
   object PopupMenuWorkTables: TPopupMenu
-    Left = 1698
-    Top = 244
+    Left = 1610
+    Top = 348
     object miAddTable: TMenuItem
       Action = ActionAddWorkTable
       ImageIndex = -1
@@ -110,9 +110,9 @@ object FormMain: TFormMain
     Top = 188
   end
   object PopupMenuEtalonsGridLayOut: TPopupMenu
-    OnPopup = PopupMenuEtalonsGridLayOutPopup
-    Left = 1650
-    Top = 141
+    OnPopup = PopupMenuDevicesGridLayOutPopup
+    Left = 1610
+    Top = 405
   end
   object TabControl1: TTabControl
     Align = Client
@@ -1475,7 +1475,7 @@ object FormMain: TFormMain
                 Align = Client
                 CanFocus = True
                 ClipChildren = True
-                PopupMenu = PopupMenuDevicesGridLayOut
+                PopupMenu = PopupMenuEtalonsGridLayOut
                 Size.Width = 1770.000000000000000000
                 Size.Height = 309.000000000000000000
                 Size.PlatformDefault = False
@@ -1596,8 +1596,8 @@ object FormMain: TFormMain
                 end
                 object PopupMenuDevicesGridLayOut: TPopupMenu
                   OnPopup = PopupMenuDevicesGridLayOutPopup
-                  Left = 1690
-                  Top = 141
+                  Left = 1610
+                  Top = 461
                 end
               end
             end

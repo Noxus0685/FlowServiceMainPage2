@@ -1278,11 +1278,11 @@ begin
   if not IsEtalon then
   begin
     if ValueFlow <> nil then
-      ValueFlow.Accuracy := 4;
+      ValueFlow.Accuracy := -1;
     ValueImp.Accuracy := 0;
   end
   else if ValueFlow <> nil then
-    ValueFlow.Accuracy := 4;
+    ValueFlow.Accuracy := -1;
         ValueImp.Accuracy := 0;
 end;
 
