@@ -3885,6 +3885,9 @@ function TDeviceRepository.CreateDevice(AIndex: Integer): TDevice;
 var
   Src: TDevice;
 begin
+  if FDevices = nil then
+    Exit(CreateNewDevice);
+
   { если индекс невалидный — просто новый }
   if (AIndex < 0) or (AIndex >= FDevices.Count) then
     Exit(CreateNewDevice);
