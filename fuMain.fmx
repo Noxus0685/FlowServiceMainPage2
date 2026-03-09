@@ -1,4 +1,4 @@
-object FormMain: TFormMain
+﻿object FormMain: TFormMain
   Left = 0
   Top = 0
   Caption = 'fuMain'
@@ -197,6 +197,7 @@ object FormMain: TFormMain
     TabIndex = 2
     TabOrder = 6
     TabPosition = PlatformDefault
+    OnChange = TabControl1Change
     Sizes = (
       1780s
       752s
@@ -3160,6 +3161,7 @@ object FormMain: TFormMain
           Size.Height = 676.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
+          OnChange = TreeViewDevicesChange
           Viewport.Width = 229.000000000000000000
           Viewport.Height = 672.000000000000000000
           object TreeViewItem1: TTreeViewItem
@@ -3236,7 +3238,7 @@ object FormMain: TFormMain
             TabOrder = 1
             Visible = False
             Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-            OnGetValue = GridDevicesGetValue
+            OnGetValue = GridDataPointsGetValue
             Viewport.Width = 1515.000000000000000000
             Viewport.Height = 651.000000000000000000
             object StringColumnName: TStringColumn
@@ -3245,6 +3247,119 @@ object FormMain: TFormMain
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
               Size.Width = 99.000000000000000000
+            end
+            object StringColumnSpillageNum: TStringColumn
+              Header = #8470
+              Size.Width = 50.000000000000000000
+            end
+            object StringColumnSpillageDateTime: TStringColumn
+              Header = #1044#1072#1090#1072'/'#1074#1088#1077#1084#1103
+              Size.Width = 120.000000000000000000
+            end
+            object StringColumnSpillageOperator: TStringColumn
+              Header = #1054#1087#1077#1088#1072#1090#1086#1088
+            end
+            object StringColumnSpillageEtalonName: TStringColumn
+              Header = #1069#1090#1072#1083#1086#1085
+            end
+            object StringColumnSpillageSpillTime: TStringColumn
+              Header = 'Время'
+            end
+            object StringColumnSpillageQavgEtalon: TStringColumn
+              Header = 'Расход'
+            end
+            object StringColumnSpillageEtalonVolume: TStringColumn
+              Header = 'ОбъемЭ'
+            end
+            object StringColumnSpillageEtalonMass: TStringColumn
+              Header = 'МассаЭ'
+            end
+            object StringColumnSpillageQEtalonStd: TStringColumn
+              Header = 'СКОЭ'
+            end
+            object StringColumnSpillageQEtalonCV: TStringColumn
+              Header = 'ВариацияЭ'
+            end
+            object StringColumnSpillageDeviceVolume: TStringColumn
+              Header = 'ОбъемП'
+            end
+            object StringColumnSpillageDeviceMass: TStringColumn
+              Header = 'МассаП'
+            end
+            object StringColumnSpillageVelocity: TStringColumn
+              Header = 'Скорость'
+            end
+            object StringColumnSpillageError: TStringColumn
+              Header = 'Погрешность'
+            end
+            object StringColumnSpillageValid: TStringColumn
+              Header = 'Годность'
+            end
+            object StringColumnSpillageQStd: TStringColumn
+              Header = 'СКОП'
+            end
+            object StringColumnSpillageQCV: TStringColumn
+              Header = 'ВариацияП'
+            end
+            object StringColumnSpillageVolumeBefore: TStringColumn
+              Header = 'До'
+            end
+            object StringColumnSpillageVolumeAfter: TStringColumn
+              Header = 'После'
+            end
+            object StringColumnSpillagePulseCount: TStringColumn
+              Header = 'Импульсы'
+            end
+            object StringColumnSpillageMeanFrequency: TStringColumn
+              Header = 'Частота'
+            end
+            object StringColumnSpillageAvgCurrent: TStringColumn
+              Header = 'Ток'
+            end
+            object StringColumnSpillageAvgVoltage: TStringColumn
+              Header = 'Напряжение'
+            end
+            object StringColumnSpillageData1: TStringColumn
+              Header = 'Данные1'
+            end
+            object StringColumnSpillageData2: TStringColumn
+              Header = 'Данные2'
+            end
+            object StringColumnSpillageStartTemperature: TStringColumn
+              Header = 'Тнач'
+            end
+            object StringColumnSpillageEndTemperature: TStringColumn
+              Header = 'Ткон'
+            end
+            object StringColumnSpillageAvgTemperature: TStringColumn
+              Header = 'Тсред'
+            end
+            object StringColumnSpillageInputPressure: TStringColumn
+              Header = 'ДавлВх'
+            end
+            object StringColumnSpillageOutputPressure: TStringColumn
+              Header = 'ДавлВых'
+            end
+            object StringColumnSpillageDensity: TStringColumn
+              Header = 'Плотность'
+            end
+            object StringColumnSpillageAmbientTemperature: TStringColumn
+              Header = 'Твозд'
+            end
+            object StringColumnSpillageAtmosphericPressure: TStringColumn
+              Header = 'АтмДавл'
+            end
+            object StringColumnSpillageRelativeHumidity: TStringColumn
+              Header = 'Влажность'
+            end
+            object StringColumnSpillageCoef: TStringColumn
+              Header = 'Коэф'
+            end
+            object StringColumnSpillageFCDCoefficient: TStringColumn
+              Header = 'Коррекция'
+            end
+            object StringColumnSpillageArchivedData: TStringColumn
+              Header = 'Архив'
             end
           end
           object GridResults: TGrid
@@ -3257,7 +3372,7 @@ object FormMain: TFormMain
             Size.PlatformDefault = False
             TabOrder = 0
             Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-            OnGetValue = GridDevicesGetValue
+            OnGetValue = GridResultsGetValue
             Viewport.Width = 1515.000000000000000000
             Viewport.Height = 651.000000000000000000
             object StringColumnResultName: TStringColumn

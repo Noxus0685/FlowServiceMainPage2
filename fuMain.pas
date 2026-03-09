@@ -48,6 +48,14 @@ type
     SignalName: string;
   end;
 
+  TResultGridRow = record
+    Name: string;
+    DeviceType: string;
+    Serial: string;
+    PointValues: TArray<string>;
+    ResultText: string;
+  end;
+
   TFormMain = class(TForm)
     TabControl1: TTabControl;
     TabItemTable: TTabItem;
@@ -419,6 +427,43 @@ type
     Layout18: TLayout;
     GridDataPoints: TGrid;
     StringColumnName: TStringColumn;
+    StringColumnSpillageNum: TStringColumn;
+    StringColumnSpillageDateTime: TStringColumn;
+    StringColumnSpillageOperator: TStringColumn;
+    StringColumnSpillageEtalonName: TStringColumn;
+    StringColumnSpillageSpillTime: TStringColumn;
+    StringColumnSpillageQavgEtalon: TStringColumn;
+    StringColumnSpillageEtalonVolume: TStringColumn;
+    StringColumnSpillageEtalonMass: TStringColumn;
+    StringColumnSpillageQEtalonStd: TStringColumn;
+    StringColumnSpillageQEtalonCV: TStringColumn;
+    StringColumnSpillageDeviceVolume: TStringColumn;
+    StringColumnSpillageDeviceMass: TStringColumn;
+    StringColumnSpillageVelocity: TStringColumn;
+    StringColumnSpillageError: TStringColumn;
+    StringColumnSpillageValid: TStringColumn;
+    StringColumnSpillageQStd: TStringColumn;
+    StringColumnSpillageQCV: TStringColumn;
+    StringColumnSpillageVolumeBefore: TStringColumn;
+    StringColumnSpillageVolumeAfter: TStringColumn;
+    StringColumnSpillagePulseCount: TStringColumn;
+    StringColumnSpillageMeanFrequency: TStringColumn;
+    StringColumnSpillageAvgCurrent: TStringColumn;
+    StringColumnSpillageAvgVoltage: TStringColumn;
+    StringColumnSpillageData1: TStringColumn;
+    StringColumnSpillageData2: TStringColumn;
+    StringColumnSpillageStartTemperature: TStringColumn;
+    StringColumnSpillageEndTemperature: TStringColumn;
+    StringColumnSpillageAvgTemperature: TStringColumn;
+    StringColumnSpillageInputPressure: TStringColumn;
+    StringColumnSpillageOutputPressure: TStringColumn;
+    StringColumnSpillageDensity: TStringColumn;
+    StringColumnSpillageAmbientTemperature: TStringColumn;
+    StringColumnSpillageAtmosphericPressure: TStringColumn;
+    StringColumnSpillageRelativeHumidity: TStringColumn;
+    StringColumnSpillageCoef: TStringColumn;
+    StringColumnSpillageFCDCoefficient: TStringColumn;
+    StringColumnSpillageArchivedData: TStringColumn;
     ToolBar4: TToolBar;
     Line4: TLine;
     Layout32: TLayout;
@@ -491,6 +536,12 @@ type
     procedure ButtonCancelClick(Sender: TObject);
     procedure TestButtonClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
+    procedure TabControl1Change(Sender: TObject);
+    procedure TreeViewDevicesChange(Sender: TObject);
+    procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
+    procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
 
 
   private
@@ -538,6 +589,11 @@ type
     procedure SaveMeasurementResults;
 
     procedure UpdateGrids;
+    procedure RefreshResultsTab;
+    procedure PopulateTreeViewDevices;
+    procedure ShowAllDevicesResults;
+    procedure ShowDeviceSpillages(ADevice: TDevice);
+    procedure UpdateResultsPointColumns;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
        procedure UpdateForm;
@@ -547,6 +603,8 @@ type
     destructor Destroy; override;
   private
     FWorkTableManager: TWorkTableManager;
+    FCurrentResultRows: TArray<TResultGridRow>;
+    FCurrentSpillages: TArray<TPointSpillage>;
     FInstrumentalVisibleOrder: TList<TLayout>;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
     procedure RebuildInstrumentalVisibleOrder;
@@ -649,6 +707,14 @@ begin
       ASignal := Ord(OT);
       Exit(True);
     end;
+end;
+
+function BoolToRussianYesNo(const AValue: Boolean): string;
+begin
+  if AValue then
+    Result := 'Да'
+  else
+    Result := 'Нет';
 end;
 
 destructor TFormMain.Destroy;
@@ -1048,9 +1114,329 @@ begin
 
   ButtonMonitor.OnClick := ButtonMonitorClick;
   ButtonCancel.OnClick := ButtonCancelClick;
+  TabControl1.OnChange := TabControl1Change;
+  TreeViewDevices.OnChange := TreeViewDevicesChange;
+  GridDataPoints.OnGetValue := GridDataPointsGetValue;
+  GridResults.OnGetValue := GridResultsGetValue;
   SetValues;
+  RefreshResultsTab;
   UpdateForm;
   OnChangeState(STATE_NONE);
+end;
+
+procedure TFormMain.TabControl1Change(Sender: TObject);
+begin
+  if TabControl1.ActiveTab = TabItemResults then
+    RefreshResultsTab;
+end;
+
+procedure TFormMain.RefreshResultsTab;
+begin
+  PopulateTreeViewDevices;
+  ShowAllDevicesResults;
+end;
+
+procedure TFormMain.PopulateTreeViewDevices;
+var
+  RootAll, RootOther, RootTable, DeviceItem: TTreeViewItem;
+  I: Integer;
+  WT: TWorkTable;
+  Ch: TChannel;
+begin
+  TreeViewDevices.BeginUpdate;
+  try
+    TreeViewDevices.Clear;
+
+    RootAll := TTreeViewItem.Create(TreeViewDevices);
+    RootAll.Text := '...';
+    TreeViewDevices.AddObject(RootAll);
+
+    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if WT = nil then
+          Continue;
+
+        RootTable := TTreeViewItem.Create(TreeViewDevices);
+        RootTable.Text := WT.Name;
+        RootTable.TagObject := WT;
+        TreeViewDevices.AddObject(RootTable);
+
+        for Ch in WT.DeviceChannels do
+        begin
+          if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+            Continue;
+
+          DeviceItem := TTreeViewItem.Create(TreeViewDevices);
+          DeviceItem.Text := Ch.FlowMeter.Device.Name;
+          DeviceItem.TagObject := Ch.FlowMeter.Device;
+          RootTable.AddObject(DeviceItem);
+        end;
+      end;
+
+    RootOther := TTreeViewItem.Create(TreeViewDevices);
+    RootOther.Text := 'прочее';
+    TreeViewDevices.AddObject(RootOther);
+
+    if TreeViewDevices.Count > 0 then
+      TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0);
+  finally
+    TreeViewDevices.EndUpdate;
+  end;
+end;
+
+procedure TFormMain.UpdateResultsPointColumns;
+var
+  MaxPoints, I: Integer;
+begin
+  MaxPoints := 0;
+  for I := 0 to High(FCurrentResultRows) do
+    MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
+
+  StringColumnPointNum1.Visible := MaxPoints >= 1;
+  StringColumnPointNum2.Visible := MaxPoints >= 2;
+  StringColumnPointNum3.Visible := MaxPoints >= 3;
+  StringColumnPointNum4.Visible := MaxPoints >= 4;
+
+  StringColumnPointNum1.Header := 'Q1';
+  StringColumnPointNum2.Header := 'Q2';
+  StringColumnPointNum3.Header := 'Q3';
+  StringColumnPointNum4.Header := 'Q4';
+end;
+
+procedure TFormMain.ShowAllDevicesResults;
+var
+  Rows: TList<TResultGridRow>;
+  WT: TWorkTable;
+  Ch: TChannel;
+  P: TDevicePoint;
+  Row: TResultGridRow;
+  I: Integer;
+begin
+  Rows := TList<TResultGridRow>.Create;
+  try
+    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+      for WT in FWorkTableManager.WorkTables do
+      begin
+        if WT = nil then
+          Continue;
+        for Ch in WT.DeviceChannels do
+        begin
+          if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+            Continue;
+
+          Row.Name := Ch.FlowMeter.Device.Name;
+          Row.DeviceType := Ch.FlowMeter.Device.DeviceTypeName;
+          Row.Serial := Ch.FlowMeter.Device.SerialNumber;
+          if Ch.FlowMeter.Device.Points <> nil then
+          begin
+            SetLength(Row.PointValues, Ch.FlowMeter.Device.Points.Count);
+            for I := 0 to Ch.FlowMeter.Device.Points.Count - 1 do
+            begin
+              P := Ch.FlowMeter.Device.Points[I];
+              if P <> nil then
+                Row.PointValues[I] := P.Name
+              else
+                Row.PointValues[I] := '';
+            end;
+          end
+          else
+            SetLength(Row.PointValues, 0);
+
+          if Ch.Enabled then
+            Row.ResultText := 'Годен'
+          else
+            Row.ResultText := 'Не годен';
+
+          Rows.Add(Row);
+        end;
+      end;
+
+    FCurrentResultRows := Rows.ToArray;
+  finally
+    Rows.Free;
+  end;
+
+  UpdateResultsPointColumns;
+  GridResults.Visible := True;
+  GridDataPoints.Visible := False;
+  GridResults.RowCount := Length(FCurrentResultRows);
+  GridResults.Repaint;
+end;
+
+procedure TFormMain.ShowDeviceSpillages(ADevice: TDevice);
+var
+  I: Integer;
+begin
+  SetLength(FCurrentSpillages, 0);
+  if ADevice <> nil then
+  begin
+    if ADevice.Spillages <> nil then
+    begin
+      SetLength(FCurrentSpillages, ADevice.Spillages.Count);
+      for I := 0 to ADevice.Spillages.Count - 1 do
+        FCurrentSpillages[I] := ADevice.Spillages[I];
+    end;
+  end;
+
+  GridResults.Visible := False;
+  GridDataPoints.Visible := True;
+  GridDataPoints.RowCount := Length(FCurrentSpillages);
+  GridDataPoints.Repaint;
+end;
+
+procedure TFormMain.TreeViewDevicesChange(Sender: TObject);
+var
+  Item: TTreeViewItem;
+begin
+  Item := TreeViewDevices.Selected;
+  if Item = nil then
+    Exit;
+
+  if Item.Text = '...' then
+  begin
+    ShowAllDevicesResults;
+    Exit;
+  end;
+
+  if Item.Text = 'прочее' then
+  begin
+    ShowAllDevicesResults;
+    Exit;
+  end;
+
+  if Item.TagObject is TDevice then
+    ShowDeviceSpillages(TDevice(Item.TagObject))
+  else
+  begin
+    ShowAllDevicesResults;
+  end;
+end;
+
+procedure TFormMain.GridResultsGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+var
+  Row: TResultGridRow;
+begin
+  if (ARow < 0) or (ARow >= Length(FCurrentResultRows)) then
+    Exit;
+
+  Row := FCurrentResultRows[ARow];
+
+  if GridResults.Columns[ACol] = StringColumnResultName then
+    Value := Row.Name
+  else if GridResults.Columns[ACol] = StringColumnResultType then
+    Value := Row.DeviceType
+  else if GridResults.Columns[ACol] = StringColumnResultSerial then
+    Value := Row.Serial
+  else if GridResults.Columns[ACol] = StringColumnPointNum1 then
+  begin
+    if Length(Row.PointValues) > 0 then Value := Row.PointValues[0] else Value := '';
+  end
+  else if GridResults.Columns[ACol] = StringColumnPointNum2 then
+  begin
+    if Length(Row.PointValues) > 1 then Value := Row.PointValues[1] else Value := '';
+  end
+  else if GridResults.Columns[ACol] = StringColumnPointNum3 then
+  begin
+    if Length(Row.PointValues) > 2 then Value := Row.PointValues[2] else Value := '';
+  end
+  else if GridResults.Columns[ACol] = StringColumnPointNum4 then
+  begin
+    if Length(Row.PointValues) > 3 then Value := Row.PointValues[3] else Value := '';
+  end
+  else if GridResults.Columns[ACol] = StringColumnResult then
+    Value := Row.ResultText;
+end;
+
+procedure TFormMain.GridDataPointsGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+var
+  P: TPointSpillage;
+begin
+  if (ARow < 0) or (ARow >= Length(FCurrentSpillages)) then
+    Exit;
+  P := FCurrentSpillages[ARow];
+  if P = nil then
+    Exit;
+
+  if GridDataPoints.Columns[ACol] = StringColumnName then
+    Value := P.Name
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageNum then
+    Value := P.Num
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageDateTime then
+    Value := DateTimeToStr(P.DateTime)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageOperator then
+    Value := P.OperatorName
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonName then
+    Value := P.EtalonName
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
+    Value := FloatToStr(P.SpillTime)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
+    Value := FloatToStr(P.QavgEtalon)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonVolume then
+    Value := FloatToStr(P.EtalonVolume)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonMass then
+    Value := FloatToStr(P.EtalonMass)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonStd then
+    Value := FloatToStr(P.QEtalonStd)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonCV then
+    Value := FloatToStr(P.QEtalonCV)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceVolume then
+    Value := FloatToStr(P.DeviceVolume)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceMass then
+    Value := FloatToStr(P.DeviceMass)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageVelocity then
+    Value := FloatToStr(P.Velocity)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
+    Value := FloatToStr(P.Error)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageValid then
+    Value := BoolToRussianYesNo(P.Valid)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageQStd then
+    Value := FloatToStr(P.QStd)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageQCV then
+    Value := FloatToStr(P.QCV)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageVolumeBefore then
+    Value := FloatToStr(P.VolumeBefore)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageVolumeAfter then
+    Value := FloatToStr(P.VolumeAfter)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillagePulseCount then
+    Value := P.PulseCount
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageMeanFrequency then
+    Value := FloatToStr(P.MeanFrequency)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageAvgCurrent then
+    Value := FloatToStr(P.AvgCurrent)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageAvgVoltage then
+    Value := FloatToStr(P.AvgVoltage)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageData1 then
+    Value := P.Data1
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageData2 then
+    Value := P.Data2
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageStartTemperature then
+    Value := FloatToStr(P.StartTemperature)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageEndTemperature then
+    Value := FloatToStr(P.EndTemperature)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageAvgTemperature then
+    Value := FloatToStr(P.AvgTemperature)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageInputPressure then
+    Value := FloatToStr(P.InputPressure)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageOutputPressure then
+    Value := FloatToStr(P.OutputPressure)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageDensity then
+    Value := FloatToStr(P.Density)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageAmbientTemperature then
+    Value := FloatToStr(P.AmbientTemperature)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageAtmosphericPressure then
+    Value := FloatToStr(P.AtmosphericPressure)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageRelativeHumidity then
+    Value := FloatToStr(P.RelativeHumidity)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageCoef then
+    Value := FloatToStr(P.Coef)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageFCDCoefficient then
+    Value := P.FCDCoefficient
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageArchivedData then
+    Value := P.ArchivedData;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
