@@ -473,6 +473,9 @@ type
     procedure UpdateUIFromValues;
     procedure SetValues;
     procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
+    procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
+    function IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
+    procedure GridDevicesActionsMenuClick(Sender: TObject);
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
@@ -1290,14 +1293,78 @@ begin
   end;
 end;
 
+function TFormMain.IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
+var
+  PopupPoint: TPointF;
+begin
+  Result := True;
+  if (AMenu = nil) or (AGrid = nil) then
+    Exit;
+
+  // Если меню вызвано не из грида (например, с тулбара), показываем меню колонок.
+  if AMenu.PopupComponent <> AGrid then
+    Exit;
+
+  PopupPoint := AMenu.PopupPoint;
+  Result := PopupPoint.Y <= AGrid.HeaderHeight;
+end;
+
+procedure TFormMain.FillGridDevicesActionsPopup(AMenu: TPopupMenu);
+
+  procedure AddItem(const AText: string; const AEnabled: Boolean = True);
+  var
+    MenuItem: TMenuItem;
+  begin
+    MenuItem := TMenuItem.Create(AMenu);
+    MenuItem.Parent := AMenu;
+    MenuItem.Text := AText;
+    MenuItem.Enabled := AEnabled;
+    MenuItem.OnClick := GridDevicesActionsMenuClick;
+  end;
+
+  procedure AddSeparator;
+  begin
+    AddItem('-');
+  end;
+
+begin
+  if AMenu = nil then
+    Exit;
+
+  AMenu.Clear;
+
+  AddItem('Очистить строку');
+  AddItem('Копировать');
+  AddItem('Вставить');
+  AddSeparator;
+  AddItem('Очистить все приборы');
+  AddItem('Заполнить все по выбранному');
+  AddSeparator;
+  AddItem('Прибор из архива');
+  AddSeparator;
+  AddItem('Установить источник расхода');
+  AddItem('Назначить эталоном');
+end;
+
+procedure TFormMain.GridDevicesActionsMenuClick(Sender: TObject);
+begin
+  // Здесь будут обработчики действий с приборами.
+end;
+
 procedure TFormMain.PopupMenuDevicesGridLayOutPopup(Sender: TObject);
 begin
-  FillGridLayOutPopup(PopupMenuDevicesGridLayOut, GridDevices);
+  if IsHeaderPopup(PopupMenuDevicesGridLayOut, GridDevices) then
+    FillGridLayOutPopup(PopupMenuDevicesGridLayOut, GridDevices)
+  else
+    FillGridDevicesActionsPopup(PopupMenuDevicesGridLayOut);
 end;
 
 procedure TFormMain.PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
 begin
-  FillGridLayOutPopup(PopupMenuEtalonsGridLayOut, GridEtalons);
+  if IsHeaderPopup(PopupMenuEtalonsGridLayOut, GridEtalons) then
+    FillGridLayOutPopup(PopupMenuEtalonsGridLayOut, GridEtalons)
+  else
+    FillGridDevicesActionsPopup(PopupMenuEtalonsGridLayOut);
 end;
 
 procedure TFormMain.MenuGridLayOutClick(Sender: TObject);
