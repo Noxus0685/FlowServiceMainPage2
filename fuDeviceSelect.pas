@@ -276,7 +276,9 @@ begin
     Dlg.Filter := 'SQLite database (*.db)|*.db|Все файлы (*.*)|*.*';
     Dlg.DefaultExt := 'db';
     Dlg.FileName := RepoName + '.db';
-    Dlg.InitialDir := ExtractFilePath(ParamStr(0));
+    Dlg.InitialDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Devices';
+
+    ForceDirectories(Dlg.InitialDir);
 
     if not Dlg.Execute then
       Exit;
@@ -417,7 +419,9 @@ begin
     Dlg.Title := 'Открыть файл репозитория приборов';
     Dlg.Filter := 'SQLite database (*.db)|*.db|Все файлы (*.*)|*.*';
     Dlg.Options := [TOpenOption.ofFileMustExist];
-    Dlg.InitialDir := ExtractFilePath(ParamStr(0));
+    Dlg.InitialDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) + 'Devices';
+
+    ForceDirectories(Dlg.InitialDir);
 
     if not Dlg.Execute then
       Exit;

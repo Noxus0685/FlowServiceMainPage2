@@ -1999,9 +1999,11 @@ begin
       FMeterValuesSaves.Add(MV);
 
   if IsBackUp = 0 then
-    FileName := TPath.Combine(ExtractFilePath(ParamStr(0)), 'MeterValues.ini')
+    FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini')
   else
-    FileName := TPath.Combine(ExtractFilePath(ParamStr(0)), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
+    FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
+
+  ForceDirectories(ExtractFilePath(FileName));
 
   Ini := TMemIniFile.Create(FileName);
   try
@@ -2095,7 +2097,7 @@ var
   CoefItem: TCoef;
   Hash: string;
 begin
-  FileName := TPath.Combine(ExtractFilePath(ParamStr(0)), 'MeterValues.ini');
+  FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini');
   if not FileExists(FileName) then
   begin
     SaveToFile(0);

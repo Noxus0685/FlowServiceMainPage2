@@ -11,6 +11,7 @@ uses
   System.IniFiles,
   System.Classes,
   System.SysUtils,    System.DateUtils,
+  System.IOUtils,
   System.Generics.Collections,
   FireDAC.Comp.Client,
   FireDAC.Stan.Param,
@@ -44,6 +45,7 @@ type
     function CreateTypeRepository(const AName: string; ADM: TDM): TTypeRepository;
     function CreateDeviceRepository(const AName: string; ADM: TDM): TDeviceRepository;
     function MakeUniqueRepositoryName(const ABaseName: string): string;
+    function NormalizeRepositoryDbFileName(AKind: TRepositoryKind; const ADbFile: string): string;
 
   public
 
@@ -173,6 +175,35 @@ begin
   else
     raise Exception.Create('Unknown repository kind');
   end;
+end;
+
+
+function TManagerTDM.NormalizeRepositoryDbFileName(
+  AKind: TRepositoryKind;
+  const ADbFile: string
+): string;
+var
+  BaseDir: string;
+  TargetDir: string;
+begin
+  BaseDir := IncludeTrailingPathDelimiter(ExtractFilePath(FIniFileName));
+
+  case AKind of
+    rkType:
+      TargetDir := TPath.Combine(BaseDir, 'Types');
+
+    rkDevice:
+      TargetDir := TPath.Combine(BaseDir, 'Devices');
+  else
+    TargetDir := BaseDir;
+  end;
+
+  if not TPath.IsPathRooted(ADbFile) then
+    Result := TPath.Combine(TargetDir, TPath.GetFileName(ADbFile))
+  else if SameText(TPath.GetDirectoryName(ADbFile), ExcludeTrailingPathDelimiter(TargetDir)) then
+    Result := ADbFile
+  else
+    Result := TPath.Combine(TargetDir, TPath.GetFileName(ADbFile));
 end;
 
 
@@ -330,6 +361,7 @@ begin
         Continue;
 
       Kind := RepositoryKindFromString(KindStr);
+      DbFile := NormalizeRepositoryDbFileName(Kind, DbFile);
       if Kind <> AKind then
         Continue;
 
@@ -579,7 +611,7 @@ begin
   {--------------------------------------------------}
   { Файл БД (используем тот, что передали) }
   {--------------------------------------------------}
-  DbFile := ADbFile;
+  DbFile := NormalizeRepositoryDbFileName(AKind, ADbFile);
 
   KindStr := RepositoryKindToString(AKind);
 
