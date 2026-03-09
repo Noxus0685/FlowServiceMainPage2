@@ -1818,6 +1818,9 @@ begin
   if FDeviceType = nil then
   begin
     FDevice.DN := NewDN;
+    FDevice.SyncNameWithModificationAndDiameter;
+    UpdateUIFromDevice;
+    SetModified;
     Exit;
   end;
 
@@ -1830,6 +1833,9 @@ begin
   begin
     { Диаметр в типе не найден }
     FDevice.DN := NewDN;
+    FDevice.SyncNameWithModificationAndDiameter;
+    UpdateUIFromDevice;
+    SetModified;
     Exit;
   end;
 
@@ -1854,7 +1860,9 @@ begin
   {----------------------------------}
   { Обновление UI }
   {----------------------------------}
+  FDevice.SyncNameWithModificationAndDiameter;
   UpdateUIFromDevice;
+  SetModified;
 end;
 
 procedure TFormDeviceEditor.dedtDateOfManufactureChange(Sender: TObject);
@@ -2148,6 +2156,7 @@ begin
 
   { сохраняем в модель }
   FDevice.Modification := S;
+  FDevice.SyncNameWithModificationAndDiameter;
   EditModification.Text := S;
 
   { prompt, если пусто }
