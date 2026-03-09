@@ -1259,9 +1259,17 @@ begin
 end;
 
 function TDevice.AddSpillage: TPointSpillage;
- begin
+begin
+  if Spillages = nil then
+    Spillages := TObjectList<TPointSpillage>.Create(True);
 
- end;
+  Result := TPointSpillage.Create(ID);
+  Result.ID := TEntityHelpers<TPointSpillage>.NextID(Spillages);
+  Result.DeviceID := ID;
+  Result.Num := Spillages.Count + 1;
+
+  Spillages.Add(Result);
+end;
 
 procedure TDevice.AttachType(AType: TDeviceType; RepoName: String);
 begin

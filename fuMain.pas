@@ -490,6 +490,7 @@ type
     procedure StopMonitor;
     procedure StartTest;
     procedure StopTest;
+    procedure SaveMeasurementResults;
 
     procedure UpdateGrids;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
@@ -780,6 +781,7 @@ begin
   case ANewState of
     STATE_NONE:
       begin
+        TestButton.Tag := 0;
         TestButton.Enabled := False;
         ButtonMonitor.Enabled := False;
         SpeedButtonStartPump.Enabled := False;
@@ -794,6 +796,7 @@ begin
     STATE_STANDBY:
       begin
         TestButton.Text := 'Измерение';
+        TestButton.Tag := 0;
         TestButton.Enabled := False;
         ButtonMonitor.Enabled := False;
         SpeedButtonStartPump.Enabled := False;
@@ -809,6 +812,8 @@ begin
 
     STATE_CONNECTED:
       begin
+        TestButton.Text := 'Измерение';
+        TestButton.Tag := 1;
         TestButton.Enabled := True;
         ButtonMonitor.Enabled := True;
         SpeedButtonStartPump.Enabled := True;
@@ -830,6 +835,7 @@ begin
       begin
         ButtonMonitor.Enabled := False;
         TestButton.Text := 'Запуск';
+        TestButton.Tag := 2;
         TestButton.Enabled := False;
         ResetMeasurementValues;
       end;
@@ -866,6 +872,7 @@ begin
         GlowMesGreen.Enabled := False;
         ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
         TestButton.Text := 'Стоп';
+        TestButton.Tag := 3;
         TestButton.Enabled := True;
         ResetMeasurementValues;
       end;
@@ -880,6 +887,7 @@ begin
     STATE_STOPTEST:
       begin
         TestButton.Text := 'Завершение';
+        TestButton.Tag := 4;
         TestButton.Enabled := False;
         UpdateForm;
       end;
@@ -892,6 +900,7 @@ begin
     STATE_COMPLETE:
       begin
         TestButton.Text := 'Сохранение';
+        TestButton.Tag := 5;
         TestButton.Enabled := False;
         GlowMesYellow.Enabled := True;
         GlowMesRed.Enabled := False;
@@ -904,6 +913,7 @@ begin
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := True;
         TestButton.Text := 'Сохранить?';
+        TestButton.Tag := 6;
         TestButton.Enabled := True;
         ButtonMonitor.Enabled := True;
         ButtonCancel.Visible := True;
@@ -2623,10 +2633,65 @@ begin
   if WorkTable = nil then
     Exit;
 
+  if (TestButton.Tag = 6) and SameText(Trim(TestButton.Text), 'Сохранить?') then
+  begin
+    SaveMeasurementResults;
+    OnChangeState(STATE_STANDBY);
+    Exit;
+  end;
+
   if WorkTable.MeasurementState = STATE_EXECUTE then
     StopTest
   else
     StartTest;
+end;
+
+procedure TFormMain.SaveMeasurementResults;
+var
+  WorkTable: TWorkTable;
+  DeviceChannel: TChannel;
+  Point: TPointSpillage;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  for DeviceChannel in WorkTable.DeviceChannels do
+  begin
+    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) or
+       (DeviceChannel.FlowMeter = nil) or (DeviceChannel.FlowMeter.Device = nil) then
+      Continue;
+
+    Point := TPointSpillage.Create(DeviceChannel.FlowMeter.Device.ID);
+    try
+      Point.DateTime := Now;
+      Point.Num := DeviceChannel.FlowMeter.Device.Spillages.Count + 1;
+      Point.Name := 'Измерение #' + IntToStr(Point.Num);
+      Point.DeviceID := DeviceChannel.FlowMeter.Device.ID;
+      Point.EtalonName := WorkTable.TableFlow.Name;
+      Point.SpillTime := WorkTable.ValueTime.GetValue;
+      Point.QavgEtalon := WorkTable.ValueFlowRate.GetValue;
+      Point.EtalonVolume := WorkTable.ValueQuantity.GetValue;
+      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueQuantity.GetValue;
+      Point.Error := DeviceChannel.FlowMeter.ValueError.GetValue;
+      Point.PulseCount := Round(DeviceChannel.ValueImpResult.GetValue);
+      Point.MeanFrequency := DeviceChannel.ValueImp.GetValue;
+      Point.AvgCurrent := DeviceChannel.ValueCurrent.GetValue;
+      Point.StartTemperature := WorkTable.ValueTempertureBefore.GetValue;
+      Point.EndTemperature := WorkTable.ValueTempertureAfter.GetValue;
+      Point.AvgTemperature := WorkTable.ValueTemperture.GetValue;
+      Point.InputPressure := WorkTable.ValuePressureBefore.GetValue;
+      Point.OutputPressure := WorkTable.ValuePressureAfter.GetValue;
+      Point.AtmosphericPressure := WorkTable.ValueAirPressure.GetValue;
+      Point.AmbientTemperature := WorkTable.ValueAirTemperture.GetValue;
+      Point.RelativeHumidity := WorkTable.ValueHumidity.GetValue;
+      Point.Valid := True;
+
+      DeviceChannel.FlowMeter.AddDataPoint(Point);
+    finally
+      Point.Free;
+    end;
+  end;
 end;
 
 procedure TFormMain.ButtonCancelClick(Sender: TObject);
