@@ -378,6 +378,8 @@ type
     Label5: TLabel;
     Switch1: TSwitch;
     Label1: TLabel;
+    ActionCopyType: TAction;
+    ActionFillAllTypes: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
