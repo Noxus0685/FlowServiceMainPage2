@@ -1672,6 +1672,12 @@ begin
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
   FWorkTableManager.WorkTables.Add(WorkTable);
 
+   WorkTable.InitMeterValues;
+
+  WorkTable.RebindAllFlowMeters;
+  WorkTable.RecalculateAllMeterValues;
+  WorkTable.UpdateAggregateMeterValues;
+
   InitTables;
 
   if FWorkTableManager.WorkTables.Count > 0 then

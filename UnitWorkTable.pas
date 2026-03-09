@@ -225,7 +225,6 @@ type
     FEtalonsGridColumns: TArray<TGridColumnLayout>;
     FDevicesGridColumns: TArray<TGridColumnLayout>;
 
-    procedure InitMeterValues;
     function GetValueTempertureBefore: TMeterValue;
     function GetValueTempertureAfter: TMeterValue;
     function GetValueTempertureDelta: TMeterValue;
@@ -366,6 +365,7 @@ type
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
         procedure UpdateAggregateMeterValues;
+            procedure InitMeterValues;
   end;
 
   TWorkTableManager = class
@@ -1312,6 +1312,7 @@ begin
   Result.Signal := ASignal;
   Result.DeviceUUID := ADeviceUUID;
   Result.Init;
+  Result.InitMeterValues;
   Result.RebindFlowMeterValues(Self);
 end;
 
@@ -1419,6 +1420,7 @@ begin
   Result.Signal := ASignal;
   Result.DeviceUUID := ADeviceUUID;
   Result.Init;
+  Result.InitMeterValues;
   Result.RebindFlowMeterValues(Self);
 end;
 
