@@ -118,36 +118,44 @@
     Left = 1660
     Top = 405
     object MenuItemDevicesClearRow: TMenuItem
+      Action = ActionDevicesClearRow
       Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1090#1088#1086#1082#1091
     end
     object MenuItemDevicesCopy: TMenuItem
+      Action = ActionDevicesCopy
       Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
     end
     object MenuItemDevicesPaste: TMenuItem
+      Action = ActionDevicesPaste
       Text = #1042#1089#1090#1072#1074#1080#1090#1100
     end
     object MenuItemDevicesSep1: TMenuItem
       Text = '-'
     end
     object MenuItemDevicesClearAll: TMenuItem
+      Action = ActionDevicesClearAll
       Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077' '#1087#1088#1080#1073#1086#1088#1099
     end
     object MenuItemDevicesFillAllBySelected: TMenuItem
+      Action = ActionDevicesFillAllBySelected
       Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1074#1089#1077' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
     end
     object MenuItemDevicesSep2: TMenuItem
       Text = '-'
     end
     object MenuItemDevicesFromArchive: TMenuItem
+      Action = ActionDevicesFromArchive
       Text = #1055#1088#1080#1073#1086#1088' '#1080#1079' '#1072#1088#1093#1080#1074#1072
     end
     object MenuItemDevicesSep3: TMenuItem
       Text = '-'
     end
     object MenuItemDevicesSetFlowSource: TMenuItem
+      Action = ActionDevicesSetFlowSource
       Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1080#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
     end
     object MenuItemDevicesAssignEtalon: TMenuItem
+      Action = ActionDevicesAssignEtalon
       Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100' '#1101#1090#1072#1083#1086#1085#1086#1084
     end
   end
@@ -155,36 +163,44 @@
     Left = 1710
     Top = 405
     object MenuItemEtalonsClearRow: TMenuItem
+      Action = ActionEtalonsClearRow
       Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1090#1088#1086#1082#1091
     end
     object MenuItemEtalonsCopy: TMenuItem
+      Action = ActionEtalonsCopy
       Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
     end
     object MenuItemEtalonsPaste: TMenuItem
+      Action = ActionEtalonsPaste
       Text = #1042#1089#1090#1072#1074#1080#1090#1100
     end
     object MenuItemEtalonsSep1: TMenuItem
       Text = '-'
     end
     object MenuItemEtalonsClearAll: TMenuItem
+      Action = ActionEtalonsClearAll
       Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077' '#1087#1088#1080#1073#1086#1088#1099
     end
     object MenuItemEtalonsFillAllBySelected: TMenuItem
+      Action = ActionEtalonsFillAllBySelected
       Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1074#1089#1077' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
     end
     object MenuItemEtalonsSep2: TMenuItem
       Text = '-'
     end
     object MenuItemEtalonsFromArchive: TMenuItem
+      Action = ActionEtalonsFromArchive
       Text = #1055#1088#1080#1073#1086#1088' '#1080#1079' '#1072#1088#1093#1080#1074#1072
     end
     object MenuItemEtalonsSep3: TMenuItem
       Text = '-'
     end
     object MenuItemEtalonsSetFlowSource: TMenuItem
+      Action = ActionEtalonsSetFlowSource
       Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1080#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
     end
     object MenuItemEtalonsAssignEtalon: TMenuItem
+      Action = ActionEtalonsAssignEtalon
       Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100' '#1101#1090#1072#1083#1086#1085#1086#1084
     end
   end
@@ -3909,6 +3925,86 @@
     object ActionFillAllTypes: TAction
       Category = 'Type'
       Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091' '#1090#1080#1087#1091
+    end
+    object ActionDevicesClearRow: TAction
+      Category = 'DeviceChannels'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1090#1088#1086#1082#1091
+      OnExecute = ActionDevicesClearRowExecute
+    end
+    object ActionDevicesCopy: TAction
+      Category = 'DeviceChannels'
+      Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
+      OnExecute = ActionDevicesCopyExecute
+    end
+    object ActionDevicesPaste: TAction
+      Category = 'DeviceChannels'
+      Text = #1042#1089#1090#1072#1074#1080#1090#1100
+      OnExecute = ActionDevicesPasteExecute
+    end
+    object ActionDevicesClearAll: TAction
+      Category = 'DeviceChannels'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077' '#1087#1088#1080#1073#1086#1088#1099
+      OnExecute = ActionDevicesClearAllExecute
+    end
+    object ActionDevicesFillAllBySelected: TAction
+      Category = 'DeviceChannels'
+      Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1074#1089#1077' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
+      OnExecute = ActionDevicesFillAllBySelectedExecute
+    end
+    object ActionDevicesFromArchive: TAction
+      Category = 'DeviceChannels'
+      Text = #1055#1088#1080#1073#1086#1088' '#1080#1079' '#1072#1088#1093#1080#1074#1072
+      OnExecute = ActionDevicesFromArchiveExecute
+    end
+    object ActionDevicesSetFlowSource: TAction
+      Category = 'DeviceChannels'
+      Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1080#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
+      OnExecute = ActionDevicesSetFlowSourceExecute
+    end
+    object ActionDevicesAssignEtalon: TAction
+      Category = 'DeviceChannels'
+      Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100' '#1101#1090#1072#1083#1086#1085#1086#1084
+      OnExecute = ActionDevicesAssignEtalonExecute
+    end
+    object ActionEtalonsClearRow: TAction
+      Category = 'EtalonChannels'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1090#1088#1086#1082#1091
+      OnExecute = ActionEtalonsClearRowExecute
+    end
+    object ActionEtalonsCopy: TAction
+      Category = 'EtalonChannels'
+      Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
+      OnExecute = ActionEtalonsCopyExecute
+    end
+    object ActionEtalonsPaste: TAction
+      Category = 'EtalonChannels'
+      Text = #1042#1089#1090#1072#1074#1080#1090#1100
+      OnExecute = ActionEtalonsPasteExecute
+    end
+    object ActionEtalonsClearAll: TAction
+      Category = 'EtalonChannels'
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077' '#1087#1088#1080#1073#1086#1088#1099
+      OnExecute = ActionEtalonsClearAllExecute
+    end
+    object ActionEtalonsFillAllBySelected: TAction
+      Category = 'EtalonChannels'
+      Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1074#1089#1077' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
+      OnExecute = ActionEtalonsFillAllBySelectedExecute
+    end
+    object ActionEtalonsFromArchive: TAction
+      Category = 'EtalonChannels'
+      Text = #1055#1088#1080#1073#1086#1088' '#1080#1079' '#1072#1088#1093#1080#1074#1072
+      OnExecute = ActionEtalonsFromArchiveExecute
+    end
+    object ActionEtalonsSetFlowSource: TAction
+      Category = 'EtalonChannels'
+      Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1080#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
+      OnExecute = ActionEtalonsSetFlowSourceExecute
+    end
+    object ActionEtalonsAssignEtalon: TAction
+      Category = 'EtalonChannels'
+      Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100' '#1101#1090#1072#1083#1086#1085#1086#1084
+      OnExecute = ActionEtalonsAssignEtalonExecute
     end
   end
 end
