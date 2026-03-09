@@ -210,6 +210,7 @@ private
 
   procedure InitValues;
   procedure ApplyMeasurementModel;
+  procedure ApplyCalibrCoefsToValue;
   procedure CopyValues(const AEtalonMeter: TFlowMeter);
 
 public
@@ -1498,6 +1499,43 @@ begin
       ValueError.ValueEtalon := nil;
   end;
 
+  ApplyCalibrCoefsToValue;
+
+end;
+
+procedure TFlowMeter.ApplyCalibrCoefsToValue;
+var
+  Item: TCalibrCoefItem;
+  CoefItem: TCoef;
+begin
+  if ValueCoef = nil then
+    Exit;
+
+  ValueCoef.Coefs.Clear;
+
+  if (ValueCoef.DependenceType <> INDEPENDENT) or
+     (Device = nil) or
+     (Device.CalibrCoefTable = nil) or
+     (Device.CalibrCoefTable.Items = nil) then
+    Exit;
+
+  for Item in Device.CalibrCoefTable.Items do
+  begin
+    if Item = nil then
+      Continue;
+
+    CoefItem.Name := Item.Name;
+    CoefItem.Index := Item.OrderNo;
+    CoefItem.Hash := Item.UUID;
+    CoefItem.Value := Item.Value;
+    CoefItem.Arg := Item.Arg;
+    CoefItem.Q1 := Item.QFrom;
+    CoefItem.Q2 := Item.QTo;
+    CoefItem.K := Item.K;
+    CoefItem.b := Item.b;
+    CoefItem.InUse := True;
+    ValueCoef.Coefs.Add(CoefItem);
+  end;
 end;
 
 procedure TFlowMeter.UpdateByDevice;
