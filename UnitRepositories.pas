@@ -289,6 +289,15 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
     function UpdateCalibrCoef(ADevice: TDevice): Boolean;
 
 
+    { ================= SCHEMA : SPILLAGE SESSIONS ================= }
+
+    function RequiredSpillageSessionColumns: TTableColumns;
+    procedure EnsureSpillageSessionSchema;
+    function MapSpillageSessionFromQuery(Q: TFDQuery): TSessionSpillage;
+    function LoadSpillageSessionsByDevice(ADeviceID: Integer): Boolean;
+    function UpdateSpillageSessions(ADevice: TDevice): Boolean;
+    function UpdateSpillageSession(ASession: TSessionSpillage): Boolean;
+
     { ================= SCHEMA : SPILLAGES ================= }
 
     function RequiredSpillageColumns: TTableColumns;
@@ -3705,6 +3714,7 @@ begin
 
     EnsureDeviceSchema;
     EnsureDevicePointSchema;
+    EnsureSpillageSessionSchema;
     EnsureSpillageSchema;
     EnsureCalibrCoefSchema;
 
@@ -4249,6 +4259,7 @@ begin
 
       // Загружаем связанные данные для устройства
       LoadDevicePointsByDevice(Result.ID);
+      LoadSpillageSessionsByDevice(Result.ID);
       LoadSpillagesByDevice(Result.ID);
       LoadCalibrCoefByDevice(Result.ID);
     end;
@@ -4304,6 +4315,9 @@ begin
 
      if not LoadDevicePointsByDevice(NewD.ID) then
       raise Exception.Create('Не удалось загрузить точки приборов');
+
+    if not LoadSpillageSessionsByDevice(NewD.ID) then
+      Exit(nil);
 
     if not LoadSpillagesByDevice(NewD.ID) then
       raise Exception.Create('Не удалось загрузить проливы');
@@ -4555,6 +4569,7 @@ begin
     Q.ExecSQL;
 
     UpdateDevicePoints(ADevice);
+    UpdateSpillageSessions(ADevice);
     UpdateSpillages(ADevice);
     UpdateCalibrCoef(ADevice);
 
@@ -4584,7 +4599,7 @@ function TDeviceRepository.RequiredDevicePointColumns: TTableColumns;
 begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-    Col('DeviceID', 'INTEGER'),
+    Col('SessionID', 'INTEGER'),
     Col('DeviceTypePointID', 'INTEGER'),
 
     Col('Num', 'INTEGER'),
@@ -5215,6 +5230,155 @@ end;
 
 {$ENDREGION}
 
+
+{$REGION 'Spillage Sessions'}
+
+function TDeviceRepository.RequiredSpillageSessionColumns: TTableColumns;
+begin
+  Result := [
+    Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
+    Col('DeviceID', 'INTEGER'),
+    Col('DateTime', 'DATETIME'),
+    Col('OperatorName', 'TEXT'),
+    Col('EtalonName', 'TEXT'),
+    Col('K', 'REAL'),
+    Col('P', 'REAL'),
+    Col('Active', 'INTEGER'),
+    Col('DeviceCoefsName', 'TEXT'),
+    Col('DeviceCoefsUUID', 'TEXT'),
+    Col('CalibrCoefsName', 'TEXT'),
+    Col('CalibrCoefsUUID', 'TEXT')
+  ];
+end;
+
+procedure TDeviceRepository.EnsureSpillageSessionSchema;
+begin
+  FDM.EnsureTable('SessionSpillage', RequiredSpillageSessionColumns);
+end;
+
+function TDeviceRepository.MapSpillageSessionFromQuery(Q: TFDQuery): TSessionSpillage;
+var
+  DeviceID: Integer;
+  ADevice: TDevice;
+begin
+  DeviceID := Q.FieldByName('DeviceID').AsInteger;
+  ADevice := FindDeviceByID(DeviceID);
+  if ADevice = nil then
+    raise Exception.CreateFmt('Device for session not found (DeviceID=%d)', [DeviceID]);
+
+  Result := TSessionSpillage.Create(DeviceID);
+  if ADevice.Sessions = nil then
+    ADevice.Sessions := TObjectList<TSessionSpillage>.Create(True);
+  ADevice.Sessions.Add(Result);
+  Result.ID := Q.FieldByName('ID').AsInteger;
+  Result.DeviceID := DeviceID;
+  Result.DateTime := ReadFieldDateTimeDef(Q.FieldByName('DateTime'));
+  Result.OperatorName := Q.FieldByName('OperatorName').AsString;
+  Result.EtalonName := Q.FieldByName('EtalonName').AsString;
+  Result.K := Q.FieldByName('K').AsFloat;
+  Result.P := Q.FieldByName('P').AsFloat;
+  Result.Active := Q.FieldByName('Active').AsInteger <> 0;
+  Result.DeviceCoefsName := Q.FieldByName('DeviceCoefsName').AsString;
+  Result.DeviceCoefsUUID := Q.FieldByName('DeviceCoefsUUID').AsString;
+  Result.CalibrCoefsName := Q.FieldByName('CalibrCoefsName').AsString;
+  Result.CalibrCoefsUUID := Q.FieldByName('CalibrCoefsUUID').AsString;
+  Result.State := osClean;
+end;
+
+function TDeviceRepository.LoadSpillageSessionsByDevice(ADeviceID: Integer): Boolean;
+var
+  Device: TDevice;
+  Q: TFDQuery;
+begin
+  Result := False;
+  if (ADeviceID <= 0) or (FDM = nil) then Exit;
+  Device := FindDeviceByID(ADeviceID);
+  if Device = nil then Exit;
+
+  if Device.Sessions = nil then
+    Device.Sessions := TObjectList<TSessionSpillage>.Create(True)
+  else
+    Device.Sessions.Clear;
+
+  Q := FDM.CreateQuery;
+  try
+    Q.SQL.Text := 'select * from SessionSpillage where DeviceID = :ID order by DateTime desc, ID desc';
+    SetIntParam(Q, 'ID', ADeviceID);
+    Q.Open;
+    while not Q.Eof do
+    begin
+      MapSpillageSessionFromQuery(Q);
+      Q.Next;
+    end;
+    Result := True;
+  finally
+    Q.Free;
+  end;
+end;
+
+function TDeviceRepository.UpdateSpillageSession(ASession: TSessionSpillage): Boolean;
+var
+  Q: TFDQuery;
+begin
+  Result := False;
+  if (ASession = nil) or (FDM = nil) then Exit;
+  if ASession.State = osClean then Exit(True);
+
+  Q := FDM.CreateQuery;
+  try
+    case ASession.State of
+      osDeleted:
+        begin
+          Q.SQL.Text := 'delete from SessionSpillage where ID = :ID';
+          SetIntParam(Q, 'ID', ASession.ID);
+          Q.ExecSQL;
+          Exit(True);
+        end;
+      osNew:
+        Q.SQL.Text := 'insert into SessionSpillage (DeviceID, DateTime, OperatorName, EtalonName, K, P, Active, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceID, :DateTime, :OperatorName, :EtalonName, :K, :P, :Active, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
+      osModified:
+        begin
+          Q.SQL.Text := 'update SessionSpillage set DeviceID=:DeviceID, DateTime=:DateTime, OperatorName=:OperatorName, EtalonName=:EtalonName, K=:K, P=:P, Active=:Active, DeviceCoefsName=:DeviceCoefsName, DeviceCoefsUUID=:DeviceCoefsUUID, CalibrCoefsName=:CalibrCoefsName, CalibrCoefsUUID=:CalibrCoefsUUID where ID=:ID';
+          SetIntParam(Q, 'ID', ASession.ID);
+        end;
+    end;
+
+    SetIntParam(Q, 'DeviceID', ASession.DeviceID);
+    SetDateTimeParam(Q, 'DateTime', ASession.DateTime);
+    SetStrParam(Q, 'OperatorName', ASession.OperatorName);
+    SetStrParam(Q, 'EtalonName', ASession.EtalonName);
+    SetFloatParam(Q, 'K', ASession.K);
+    SetFloatParam(Q, 'P', ASession.P);
+    SetIntParam(Q, 'Active', Ord(ASession.Active));
+    SetStrParam(Q, 'DeviceCoefsName', ASession.DeviceCoefsName);
+    SetStrParam(Q, 'DeviceCoefsUUID', ASession.DeviceCoefsUUID);
+    SetStrParam(Q, 'CalibrCoefsName', ASession.CalibrCoefsName);
+    SetStrParam(Q, 'CalibrCoefsUUID', ASession.CalibrCoefsUUID);
+
+    Q.ExecSQL;
+    if ASession.State = osNew then
+      ASession.ID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
+    ASession.State := osClean;
+    Result := True;
+  finally
+    Q.Free;
+  end;
+end;
+
+function TDeviceRepository.UpdateSpillageSessions(ADevice: TDevice): Boolean;
+var
+  Sess: TSessionSpillage;
+begin
+  Result := False;
+  if (ADevice = nil) or (ADevice.Sessions = nil) then Exit;
+  for Sess in ADevice.Sessions do
+    if (Sess.DeviceID = ADevice.ID) and not UpdateSpillageSession(Sess) then
+      Exit(False);
+  Result := True;
+end;
+
+{$ENDREGION}
+
  {$REGION 'Spillage Points'}
 
 // БД !!
@@ -5223,46 +5387,27 @@ function TDeviceRepository.RequiredSpillageColumns: TTableColumns;
 begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-
-    { Связи }
-    Col('DeviceID', 'INTEGER'),
+    Col('SessionID', 'INTEGER'),
     Col('DevicePointID', 'INTEGER'),
     Col('DeviceTypePointID', 'INTEGER'),
-
-    { Общая информация }
     Col('Num', 'INTEGER'),
     Col('Name', 'TEXT'),
     Col('Description', 'TEXT'),
-    Col('DateTime', 'DATETIME'),
-
-    { Эталон / установка }
     Col('SpillTime', 'REAL'),
     Col('QavgEtalon', 'REAL'),
     Col('EtalonVolume', 'REAL'),
     Col('EtalonMass', 'REAL'),
-
-    { Статистика эталона }
     Col('QEtalonStd', 'REAL'),
     Col('QEtalonCV', 'REAL'),
-
-    { Показания прибора }
     Col('DeviceVolume', 'REAL'),
     Col('DeviceMass', 'REAL'),
     Col('Velocity', 'REAL'),
-
-    { Результат }
     Col('Error', 'REAL'),
     Col('Valid', 'INTEGER'),
-
-    { Статистика прибора }
     Col('QStd', 'REAL'),
     Col('QCV', 'REAL'),
-
-    { Счётчики }
     Col('VolumeBefore', 'REAL'),
     Col('VolumeAfter', 'REAL'),
-
-    { Сырые данные }
     Col('PulseCount', 'INTEGER'),
     Col('MeanFrequency', 'REAL'),
     Col('AvgCurrent', 'REAL'),
@@ -5270,21 +5415,15 @@ begin
     Col('Data1', 'TEXT'),
     Col('Data2', 'TEXT'),
     Col('ArchivedData', 'TEXT'),
-
-    { Жидкость }
     Col('StartTemperature', 'REAL'),
     Col('EndTemperature', 'REAL'),
     Col('AvgTemperature', 'REAL'),
     Col('InputPressure', 'REAL'),
     Col('OutputPressure', 'REAL'),
     Col('Density', 'REAL'),
-
-    { Окружающая среда }
     Col('AmbientTemperature', 'REAL'),
     Col('AtmosphericPressure', 'REAL'),
     Col('RelativeHumidity', 'REAL'),
-
-    { Параметры прибора }
     Col('Coef', 'REAL'),
     Col('FCDCoefficient', 'TEXT')
   ];
@@ -5327,54 +5466,59 @@ function TDeviceRepository.MapSpillageFromQuery(
   Q: TFDQuery
 ): TPointSpillage;
 var
-DeviceID: Integer;
-ADevice : TDevice;
+  SessionID: Integer;
+  ADevice: TDevice;
+  Dev: TDevice;
+  Sess: TSessionSpillage;
+  Found: Boolean;
 begin
-   DeviceID:= Q.FieldByName('DeviceID').AsInteger;
-   ADevice := FindDeviceByID(DeviceID);
-  Result := ADevice.AddSpillage;
+  SessionID := Q.FieldByName('SessionID').AsInteger;
+  ADevice := nil;
+  Found := False;
 
-  {================ Идентификация ================}
+  for Dev in FDevices do
+  begin
+    if Dev.Sessions <> nil then
+      for Sess in Dev.Sessions do
+        if Sess.ID = SessionID then
+        begin
+          ADevice := Dev;
+          Found := True;
+          Break;
+        end;
+    if Found then
+      Break;
+  end;
+
+  if ADevice = nil then
+    raise Exception.CreateFmt('Device for spillage session not found (SessionID=%d)', [SessionID]);
+
+  Result := TPointSpillage.Create(SessionID);
+  if ADevice.Spillages = nil then
+    ADevice.Spillages := TObjectList<TPointSpillage>.Create(True);
+  ADevice.Spillages.Add(Result);
   Result.ID := Q.FieldByName('ID').AsInteger;
+  Result.SessionID := SessionID;
   Result.DevicePointID := Q.FieldByName('DevicePointID').AsInteger;
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.Num := Q.FieldByName('Num').AsInteger;
-
-  {================ Общая информация =============}
   Result.Name := Q.FieldByName('Name').AsString;
   Result.Description := Q.FieldByName('Description').AsString;
-
-  if not Q.FieldByName('DateTime').IsNull then
-    Result.DateTime := Q.FieldByName('DateTime').AsDateTime;
-
-  {================ Эталон / установка ===========}
   Result.SpillTime := Q.FieldByName('SpillTime').AsFloat;
   Result.QavgEtalon := Q.FieldByName('QavgEtalon').AsFloat;
   Result.EtalonVolume := Q.FieldByName('EtalonVolume').AsFloat;
   Result.EtalonMass := Q.FieldByName('EtalonMass').AsFloat;
-
-  {================ Статистика эталона ===========}
   Result.QEtalonStd := Q.FieldByName('QEtalonStd').AsFloat;
   Result.QEtalonCV := Q.FieldByName('QEtalonCV').AsFloat;
-
-  {================ Показания прибора ============}
   Result.DeviceVolume := Q.FieldByName('DeviceVolume').AsFloat;
   Result.DeviceMass := Q.FieldByName('DeviceMass').AsFloat;
   Result.Velocity := Q.FieldByName('Velocity').AsFloat;
-
-  {================ Результат ====================}
   Result.Error := Q.FieldByName('Error').AsFloat;
   Result.Valid := Q.FieldByName('Valid').AsInteger <> 0;
-
-  {================ Статистика прибора ============}
   Result.QStd := Q.FieldByName('QStd').AsFloat;
   Result.QCV := Q.FieldByName('QCV').AsFloat;
-
-  {================ Счётчики =====================}
   Result.VolumeBefore := Q.FieldByName('VolumeBefore').AsFloat;
   Result.VolumeAfter := Q.FieldByName('VolumeAfter').AsFloat;
-
-  {================ Сырые данные =================}
   Result.PulseCount := Q.FieldByName('PulseCount').AsInteger;
   Result.MeanFrequency := Q.FieldByName('MeanFrequency').AsFloat;
   Result.AvgCurrent := Q.FieldByName('AvgCurrent').AsFloat;
@@ -5382,24 +5526,17 @@ begin
   Result.Data1 := Q.FieldByName('Data1').AsString;
   Result.Data2 := Q.FieldByName('Data2').AsString;
   Result.ArchivedData := Q.FieldByName('ArchivedData').AsString;
-
-  {================ Жидкость =====================}
   Result.StartTemperature := Q.FieldByName('StartTemperature').AsFloat;
   Result.EndTemperature := Q.FieldByName('EndTemperature').AsFloat;
   Result.AvgTemperature := Q.FieldByName('AvgTemperature').AsFloat;
   Result.InputPressure := Q.FieldByName('InputPressure').AsFloat;
   Result.OutputPressure := Q.FieldByName('OutputPressure').AsFloat;
   Result.Density := Q.FieldByName('Density').AsFloat;
-
-  {================ Окружающая среда ==============}
   Result.AmbientTemperature := Q.FieldByName('AmbientTemperature').AsFloat;
   Result.AtmosphericPressure := Q.FieldByName('AtmosphericPressure').AsFloat;
   Result.RelativeHumidity := Q.FieldByName('RelativeHumidity').AsFloat;
-
-  {================ Параметры прибора =============}
   Result.Coef := Q.FieldByName('Coef').AsFloat;
   Result.FCDCoefficient := Q.FieldByName('FCDCoefficient').AsString;
-
   Result.State := osClean;
 end;
 
@@ -5428,7 +5565,7 @@ begin
   try
     Q.SQL.Text :=
       'select * from PointSpillage ' +
-      'where DeviceID = :ID ' +
+      'where SessionID in (select ID from SessionSpillage where DeviceID = :ID) ' +
       'order by Num';
 
     SetIntParam(Q, 'ID', ADeviceID);
@@ -5458,7 +5595,7 @@ begin
     Exit;
 
   for S in ADevice.Spillages do
-    if (S.DeviceID = ADevice.ID) and
+    if (S.SessionID > 0) and
        not UpdateSpillage(S) then
       Exit(False);
 
@@ -5472,144 +5609,99 @@ var
   Q: TFDQuery;
 begin
   Result := False;
-
-  if (ASpillage = nil) or (FDM = nil) then
-    Exit;
-
-  if ASpillage.State = osClean then
-    Exit(True);
+  if (ASpillage = nil) or (FDM = nil) then Exit;
+  if ASpillage.State = osClean then Exit(True);
 
   Q := FDM.CreateQuery;
   try
     case ASpillage.State of
-
       osDeleted:
         begin
-          Q.SQL.Text :=
-            'delete from PointSpillage where ID = :ID';
+          Q.SQL.Text := 'delete from PointSpillage where ID = :ID';
           SetIntParam(Q, 'ID', ASpillage.ID);
           Q.ExecSQL;
           Exit(True);
         end;
-
       osNew:
         Q.SQL.Text :=
           'insert into PointSpillage (' +
-          'DeviceID, DevicePointID, DeviceTypePointID, Num, ' +
-          'Name, Description, DateTime, ' +
-          'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, ' +
-          'QEtalonStd, QEtalonCV, ' +
-          'DeviceVolume, DeviceMass, Velocity, ' +
-          'Error, Valid, QStd, QCV, ' +
-          'VolumeBefore, VolumeAfter, ' +
-          'PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
-          'Data1, Data2, ArchivedData, ' +
-          'StartTemperature, EndTemperature, AvgTemperature, ' +
-          'InputPressure, OutputPressure, Density, ' +
-          'AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
+          'SessionID, DevicePointID, DeviceTypePointID, Num, Name, Description, ' +
+          'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, QEtalonStd, QEtalonCV, ' +
+          'DeviceVolume, DeviceMass, Velocity, Error, Valid, QStd, QCV, ' +
+          'VolumeBefore, VolumeAfter, PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
+          'Data1, Data2, ArchivedData, StartTemperature, EndTemperature, AvgTemperature, ' +
+          'InputPressure, OutputPressure, Density, AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
           'Coef, FCDCoefficient' +
           ') values (' +
-          ':DeviceID, :DevicePointID, :DeviceTypePointID, :Num, ' +
-          ':Name, :Description, :DateTime, ' +
-          ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, ' +
-          ':QEtalonStd, :QEtalonCV, ' +
-          ':DeviceVolume, :DeviceMass, :Velocity, ' +
-          ':Error, :Valid, :QStd, :QCV, ' +
-          ':VolumeBefore, :VolumeAfter, ' +
-          ':PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
-          ':Data1, :Data2, :ArchivedData, ' +
-          ':StartTemperature, :EndTemperature, :AvgTemperature, ' +
-          ':InputPressure, :OutputPressure, :Density, ' +
-          ':AmbientTemperature, :AtmosphericPressure, :RelativeHumidity, ' +
+          ':SessionID, :DevicePointID, :DeviceTypePointID, :Num, :Name, :Description, ' +
+          ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, :QEtalonStd, :QEtalonCV, ' +
+          ':DeviceVolume, :DeviceMass, :Velocity, :Error, :Valid, :QStd, :QCV, ' +
+          ':VolumeBefore, :VolumeAfter, :PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
+          ':Data1, :Data2, :ArchivedData, :StartTemperature, :EndTemperature, :AvgTemperature, ' +
+          ':InputPressure, :OutputPressure, :Density, :AmbientTemperature, :AtmosphericPressure, :RelativeHumidity, ' +
           ':Coef, :FCDCoefficient' +
           ')';
-
       osModified:
         begin
           Q.SQL.Text :=
             'update PointSpillage set ' +
-            'DeviceID=:DeviceID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, Num=:Num, ' +
-            'Name=:Name, Description=:Description, DateTime=:DateTime, ' +
-            'SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
-            'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, ' +
-            'DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
-            'Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, ' +
-            'VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
+            'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, Num=:Num, ' +
+            'Name=:Name, Description=:Description, SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
+            'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
+            'Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
             'PulseCount=:PulseCount, MeanFrequency=:MeanFrequency, AvgCurrent=:AvgCurrent, AvgVoltage=:AvgVoltage, ' +
-            'Data1=:Data1, Data2=:Data2, ArchivedData=:ArchivedData, ' +
-            'StartTemperature=:StartTemperature, EndTemperature=:EndTemperature, AvgTemperature=:AvgTemperature, ' +
-            'InputPressure=:InputPressure, OutputPressure=:OutputPressure, Density=:Density, ' +
-            'AmbientTemperature=:AmbientTemperature, AtmosphericPressure=:AtmosphericPressure, RelativeHumidity=:RelativeHumidity, ' +
-            'Coef=:Coef, FCDCoefficient=:FCDCoefficient ' +
-            'where ID=:ID';
-
+            'Data1=:Data1, Data2=:Data2, ArchivedData=:ArchivedData, StartTemperature=:StartTemperature, EndTemperature=:EndTemperature, AvgTemperature=:AvgTemperature, ' +
+            'InputPressure=:InputPressure, OutputPressure=:OutputPressure, Density=:Density, AmbientTemperature=:AmbientTemperature, AtmosphericPressure=:AtmosphericPressure, RelativeHumidity=:RelativeHumidity, ' +
+            'Coef=:Coef, FCDCoefficient=:FCDCoefficient where ID=:ID';
           SetIntParam(Q, 'ID', ASpillage.ID);
         end;
     end;
 
-    { -------- параметры -------- }
-    SetIntParam(Q, 'DeviceID', ASpillage.DeviceID);
+    SetIntParam(Q, 'SessionID', ASpillage.SessionID);
     SetIntParam(Q, 'DevicePointID', ASpillage.DevicePointID);
     SetIntParam(Q, 'DeviceTypePointID', ASpillage.DeviceTypePointID);
     SetIntParam(Q, 'Num', ASpillage.Num);
-
     SetStrParam(Q, 'Name', ASpillage.Name);
     SetStrParam(Q, 'Description', ASpillage.Description);
-    SetDateTimeParam(Q, 'DateTime', ASpillage.DateTime);
-
     SetFloatParam(Q, 'SpillTime', ASpillage.SpillTime);
     SetFloatParam(Q, 'QavgEtalon', ASpillage.QavgEtalon);
     SetFloatParam(Q, 'EtalonVolume', ASpillage.EtalonVolume);
     SetFloatParam(Q, 'EtalonMass', ASpillage.EtalonMass);
-
     SetFloatParam(Q, 'QEtalonStd', ASpillage.QEtalonStd);
     SetFloatParam(Q, 'QEtalonCV', ASpillage.QEtalonCV);
-
     SetFloatParam(Q, 'DeviceVolume', ASpillage.DeviceVolume);
     SetFloatParam(Q, 'DeviceMass', ASpillage.DeviceMass);
     SetFloatParam(Q, 'Velocity', ASpillage.Velocity);
-
     SetFloatParam(Q, 'Error', ASpillage.Error);
     SetIntParam(Q, 'Valid', Ord(ASpillage.Valid));
-
     SetFloatParam(Q, 'QStd', ASpillage.QStd);
     SetFloatParam(Q, 'QCV', ASpillage.QCV);
-
     SetFloatParam(Q, 'VolumeBefore', ASpillage.VolumeBefore);
     SetFloatParam(Q, 'VolumeAfter', ASpillage.VolumeAfter);
-
     SetIntParam(Q, 'PulseCount', ASpillage.PulseCount);
     SetFloatParam(Q, 'MeanFrequency', ASpillage.MeanFrequency);
     SetFloatParam(Q, 'AvgCurrent', ASpillage.AvgCurrent);
     SetFloatParam(Q, 'AvgVoltage', ASpillage.AvgVoltage);
-
     SetStrParam(Q, 'Data1', ASpillage.Data1);
     SetStrParam(Q, 'Data2', ASpillage.Data2);
     SetStrParam(Q, 'ArchivedData', ASpillage.ArchivedData);
-
     SetFloatParam(Q, 'StartTemperature', ASpillage.StartTemperature);
     SetFloatParam(Q, 'EndTemperature', ASpillage.EndTemperature);
     SetFloatParam(Q, 'AvgTemperature', ASpillage.AvgTemperature);
     SetFloatParam(Q, 'InputPressure', ASpillage.InputPressure);
     SetFloatParam(Q, 'OutputPressure', ASpillage.OutputPressure);
     SetFloatParam(Q, 'Density', ASpillage.Density);
-
     SetFloatParam(Q, 'AmbientTemperature', ASpillage.AmbientTemperature);
     SetFloatParam(Q, 'AtmosphericPressure', ASpillage.AtmosphericPressure);
     SetFloatParam(Q, 'RelativeHumidity', ASpillage.RelativeHumidity);
-
     SetFloatParam(Q, 'Coef', ASpillage.Coef);
     SetStrParam(Q, 'FCDCoefficient', ASpillage.FCDCoefficient);
 
     Q.ExecSQL;
-
     if ASpillage.State = osNew then
-      ASpillage.ID :=
-        Q.Connection.ExecSQLScalar('select last_insert_rowid()');
-
+      ASpillage.ID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
     ASpillage.State := osClean;
     Result := True;
-
   finally
     Q.Free;
   end;
@@ -5649,7 +5741,7 @@ end;
 //            begin
 //              Q.SQL.Text :=
 //                'insert into PointSpillage (' +
-//                'DeviceID, DevicePointID, DeviceTypePointID, Num, ' +
+//                'SessionID, DevicePointID, DeviceTypePointID, Num, ' +
 //                'Name, Description, DateTime, ' +
 //                'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, ' +
 //                'QEtalonStd, QEtalonCV, ' +
@@ -5663,7 +5755,7 @@ end;
 //                'AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
 //                'Coef, FCDCoefficient' +
 //                ') values (' +
-//                ':DeviceID, :DevicePointID, :DeviceTypePointID, :Num, ' +
+//                ':SessionID, :DevicePointID, :DeviceTypePointID, :Num, ' +
 //                ':Name, :Description, :DateTime, ' +
 //                ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, ' +
 //                ':QEtalonStd, :QEtalonCV, ' +
@@ -5683,7 +5775,7 @@ end;
 //            begin
 //              Q.SQL.Text :=
 //                'update PointSpillage set ' +
-//                'DeviceID=:DeviceID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, Num=:Num, ' +
+//                'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, Num=:Num, ' +
 //                'Name=:Name, Description=:Description, DateTime=:DateTime, ' +
 //                'SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
 //                'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, ' +

@@ -10,6 +10,26 @@ interface
 
 type
 
+  TSessionSpillage = class(TTypeEntity)
+  public
+    DeviceID: Integer;
+    DateTime: TDateTime;
+    OperatorName: string;
+    EtalonName: string;
+
+    K: Double;
+    P: Double;
+    Active: Boolean;
+
+    DeviceCoefsName: string;
+    DeviceCoefsUUID: string;
+    CalibrCoefsName: string;
+    CalibrCoefsUUID: string;
+
+    constructor Create(ADeviceID: Integer);
+    procedure Assign(ASource: TSessionSpillage);
+  end;
+
 
   TDeviceSortField = (
     dsfName,                 // Наименование прибора
@@ -98,17 +118,13 @@ type
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
     {====================================================================}
 
-    DeviceID: Integer;           // Прибор, к которому относится измерение (FK → TDevice.ID)
+    SessionID: Integer;          // Сессия, к которой относится измерение (FK → TSessionSpillage.ID)
     DevicePointID: Integer;      // Поверочная точка прибора (FK → TDevicePoint.ID)
     DeviceTypePointID: Integer;  // Шаблонная точка типа (опционально)
 
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
     {====================================================================}
-
-    DateTime: TDateTime;         // Дата и время окончания измерения
-    OperatorName: string;        // Оператор (опционально)
-    EtalonName: string;          // Эталон, использованный при измерении
 
     {====================================================================}
     { ПАРАМЕТРЫ ИЗМЕРЕНИЯ (УСТАНОВКА / ЭТАЛОН) }
@@ -202,7 +218,7 @@ type
     Num: Integer;                // Порядковый номер проливки
     ArchivedData: string;        // Архив сырых данных (по секундам и т.п.)
 
-    constructor Create (ADeviceID : Integer);
+    constructor Create (ASessionID : Integer);
 
 
     procedure Assign(ASource: TPointSpillage);
@@ -244,6 +260,7 @@ type
   TDevice = class(TTypeEntity)
   private
       FSpillages  : TObjectList<TPointSpillage>;
+      FSessions   : TObjectList<TSessionSpillage>;
       FPoints     : TObjectList<TDevicePoint>;
       FCalibrCoefTable: TCalibrCoefTable;
       FDeviceType : TDeviceType;
@@ -382,9 +399,12 @@ type
     ): Integer; reintroduce; overload;
 
     function AddPoint: TDevicePoint;
+    function AddSessionSpillage: TSessionSpillage;
+    function GetActiveSessionSpillage: TSessionSpillage;
     function AddSpillage: TPointSpillage;
 
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
+    property  Sessions   : TObjectList<TSessionSpillage> read FSessions write FSessions;
     property  Points     : TObjectList<TDevicePoint> read  FPoints write  FPoints;
     property  CalibrCoefTable: TCalibrCoefTable read FCalibrCoefTable write FCalibrCoefTable;
 
@@ -398,6 +418,7 @@ implementation
 
 destructor TDevice.Destroy;
 begin
+  FSessions.Free;
   FSpillages.Free;
   FPoints.Free;
   FCalibrCoefTable.Free;
@@ -411,6 +432,7 @@ begin
    {----------------------------------}
   { Создание коллекций }
   {----------------------------------}
+  FSessions  := TObjectList<TSessionSpillage>.Create(True);
   FSpillages := TObjectList<TPointSpillage>.Create(True);
   FPoints    := TObjectList<TDevicePoint>.Create(True);
   FCalibrCoefTable := TCalibrCoefTable.Create;
@@ -526,6 +548,45 @@ begin
   ReportingForm := '';
 end;
 
+constructor TSessionSpillage.Create(ADeviceID: Integer);
+begin
+  inherited Create;
+
+  DeviceID := ADeviceID;
+  DateTime := 0;
+  OperatorName := '';
+  EtalonName := '';
+
+  K := 0.0;
+  P := 0.0;
+  Active := False;
+
+  DeviceCoefsName := '';
+  DeviceCoefsUUID := '';
+  CalibrCoefsName := '';
+  CalibrCoefsUUID := '';
+end;
+
+procedure TSessionSpillage.Assign(ASource: TSessionSpillage);
+begin
+  if ASource = nil then
+    Exit;
+
+  State := ASource.State;
+  ID := ASource.ID;
+  DeviceID := ASource.DeviceID;
+  DateTime := ASource.DateTime;
+  OperatorName := ASource.OperatorName;
+  EtalonName := ASource.EtalonName;
+  K := ASource.K;
+  P := ASource.P;
+  Active := ASource.Active;
+  DeviceCoefsName := ASource.DeviceCoefsName;
+  DeviceCoefsUUID := ASource.DeviceCoefsUUID;
+  CalibrCoefsName := ASource.CalibrCoefsName;
+  CalibrCoefsUUID := ASource.CalibrCoefsUUID;
+end;
+
 constructor TDevicePoint.Create(ADeviceID : Integer);
 begin
   inherited Create;
@@ -568,12 +629,12 @@ begin
   Repeats := 0;
 end;
 
-constructor TPointSpillage.Create(ADeviceID : Integer);
+constructor TPointSpillage.Create(ASessionID : Integer);
 begin
   inherited Create;
 
   { Идентификация }
-  DeviceID := ADeviceID;
+  SessionID := ASessionID;
   DevicePointID := 0;
   DeviceTypePointID := 0;
   Num := 0;
@@ -581,10 +642,6 @@ begin
   { Общая информация }
   Name := 'Новое измерение';
   Description := ' ';
-  DateTime := 0;
-  OperatorName := '';
-  EtalonName := '';
-
   { Измерение }
   SpillTime := 0.0;
   QavgEtalon := 0.0;
@@ -641,12 +698,8 @@ end;
 
 procedure TDevice.Assign(ASource: TDevice);
 var
-  S: TPointSpillage;
-  NewS: TPointSpillage;
   P: TDevicePoint;
   NewP: TDevicePoint;
-  CI: TCalibrCoefItem;
-  NewCI: TCalibrCoefItem;
 begin
   if ASource = nil then
     Exit;
@@ -726,16 +779,23 @@ begin
   State := ASource.State;
 
   { ============================= }
-  { 2. Глубокое копирование проливов }
+  { 2. При копировании НЕ переносим }
+  {    сессии, проливы и таблицу КК }
   { ============================= }
 
+  FSessions.Clear;
   FSpillages.Clear;
 
-  for S in ASource.FSpillages do
-  begin
-    NewS := AddSpillage;     // ← создаём через агрегат
-    NewS.Assign(S);
-  end;
+  if FCalibrCoefTable = nil then
+    FCalibrCoefTable := TCalibrCoefTable.Create;
+
+  FCalibrCoefTable.ID := 0;
+  FCalibrCoefTable.UUID := '';
+  FCalibrCoefTable.DeviceID := ID;
+  FCalibrCoefTable.AppliedAt := 0;
+  FCalibrCoefTable.Name := '';
+  FCalibrCoefTable.Comment := '';
+  FCalibrCoefTable.Items.Clear;
 
   { ============================= }
   { 3. Глубокое копирование точек }
@@ -745,46 +805,8 @@ begin
 
   for P in ASource.FPoints do
   begin
-    NewP := AddPoint;        // ← создаём через агрегат
+    NewP := AddPoint;
     NewP.Assign(P);
-  end;
-
-  if FCalibrCoefTable = nil then
-    FCalibrCoefTable := TCalibrCoefTable.Create;
-
-  if ASource.FCalibrCoefTable = nil then
-  begin
-    FCalibrCoefTable.ID := 0;
-    FCalibrCoefTable.UUID := '';
-    FCalibrCoefTable.DeviceID := ID;
-    FCalibrCoefTable.AppliedAt := 0;
-    FCalibrCoefTable.Name := '';
-    FCalibrCoefTable.Comment := '';
-    FCalibrCoefTable.Items.Clear;
-    Exit;
-  end;
-
-  FCalibrCoefTable.ID := ASource.FCalibrCoefTable.ID;
-  FCalibrCoefTable.UUID := ASource.FCalibrCoefTable.UUID;
-  FCalibrCoefTable.DeviceID := ASource.FCalibrCoefTable.DeviceID;
-  FCalibrCoefTable.AppliedAt := ASource.FCalibrCoefTable.AppliedAt;
-  FCalibrCoefTable.Name := ASource.FCalibrCoefTable.Name;
-  FCalibrCoefTable.Comment := ASource.FCalibrCoefTable.Comment;
-  FCalibrCoefTable.Items.Clear;
-  for CI in ASource.FCalibrCoefTable.Items do
-  begin
-    NewCI := TCalibrCoefItem.Create;
-    NewCI.Name := CI.Name;
-    NewCI.UUID := CI.UUID;
-    NewCI.TableID := CI.TableID;
-    NewCI.OrderNo := CI.OrderNo;
-    NewCI.Value := CI.Value;
-    NewCI.Arg := CI.Arg;
-    NewCI.QFrom := CI.QFrom;
-    NewCI.QTo := CI.QTo;
-    NewCI.K := CI.K;
-    NewCI.b := CI.b;
-    FCalibrCoefTable.Items.Add(NewCI);
   end;
 end;
 
@@ -850,6 +872,7 @@ function TDevice.GetSearchText: string;
 var
   B: TStringBuilder;
   P: TDevicePoint;
+  Sess: TSessionSpillage;
   S: TPointSpillage;
   procedure Add(const V: string);
   begin
@@ -954,17 +977,30 @@ begin
       Add(IntToStr(P.Repeats));
     end;
 
+    for Sess in FSessions do
+    begin
+      Add(IntToStr(Sess.ID));
+      Add(IntToStr(Sess.DeviceID));
+      Add(DateTimeToStr(Sess.DateTime));
+      Add(Sess.OperatorName);
+      Add(Sess.EtalonName);
+      Add(FloatToStr(Sess.K));
+      Add(FloatToStr(Sess.P));
+      Add(BoolToStr(Sess.Active, True));
+      Add(Sess.DeviceCoefsName);
+      Add(Sess.DeviceCoefsUUID);
+      Add(Sess.CalibrCoefsName);
+      Add(Sess.CalibrCoefsUUID);
+    end;
+
     for S in FSpillages do
     begin
       Add(IntToStr(S.ID));
-      Add(IntToStr(S.DeviceID));
+      Add(IntToStr(S.SessionID));
       Add(IntToStr(S.DevicePointID));
       Add(IntToStr(S.DeviceTypePointID));
       Add(IntToStr(S.Num));
       Add(S.Description);
-      Add(DateTimeToStr(S.DateTime));
-      Add(S.OperatorName);
-      Add(S.EtalonName);
       Add(FloatToStr(S.SpillTime));
       Add(FloatToStr(S.QavgEtalon));
       Add(FloatToStr(S.EtalonVolume));
@@ -1153,6 +1189,8 @@ begin
   { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
   {====================================================================}
 
+  SessionID := ASource.SessionID;
+  DevicePointID := ASource.DevicePointID;
   DeviceTypePointID := ASource.DeviceTypePointID;
 
   {====================================================================}
@@ -1160,9 +1198,6 @@ begin
   {====================================================================}
   Name := ASource.Name;
   Description := ASource.Description;
-  DateTime := ASource.DateTime;
-  OperatorName := ASource.OperatorName;
-  EtalonName := ASource.EtalonName;
   Num := ASource.Num;
 
   {====================================================================}
@@ -1258,14 +1293,51 @@ begin
   Points.Add(Result);
 end;
 
+function TDevice.AddSessionSpillage: TSessionSpillage;
+var
+  Sess: TSessionSpillage;
+begin
+  if Sessions = nil then
+    Sessions := TObjectList<TSessionSpillage>.Create(True);
+
+  for Sess in Sessions do
+    Sess.Active := False;
+
+  Result := TSessionSpillage.Create(ID);
+  Result.ID := TEntityHelpers<TSessionSpillage>.NextID(Sessions);
+  Result.DeviceID := ID;
+  Result.Active := True;
+
+  Sessions.Add(Result);
+end;
+
+function TDevice.GetActiveSessionSpillage: TSessionSpillage;
+var
+  Sess: TSessionSpillage;
+begin
+  Result := nil;
+  if Sessions = nil then
+    Exit;
+
+  for Sess in Sessions do
+    if Sess.Active then
+      Exit(Sess);
+end;
+
 function TDevice.AddSpillage: TPointSpillage;
+var
+  ActiveSession: TSessionSpillage;
 begin
   if Spillages = nil then
     Spillages := TObjectList<TPointSpillage>.Create(True);
 
-  Result := TPointSpillage.Create(ID);
+  ActiveSession := GetActiveSessionSpillage;
+  if ActiveSession = nil then
+    ActiveSession := AddSessionSpillage;
+
+  Result := TPointSpillage.Create(ActiveSession.ID);
   Result.ID := TEntityHelpers<TPointSpillage>.NextID(Spillages);
-  Result.DeviceID := ID;
+  Result.SessionID := ActiveSession.ID;
   Result.Num := Spillages.Count + 1;
 
   Spillages.Add(Result);

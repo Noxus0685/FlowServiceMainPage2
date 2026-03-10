@@ -1402,6 +1402,7 @@ procedure TFormMain.GridDataPointsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   P: TPointSpillage;
+  Sess: TSessionSpillage;
 begin
   if (ARow < 0) or (ARow >= Length(FCurrentSpillages)) then
     Exit;
@@ -1414,11 +1415,35 @@ begin
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageNum then
     Value := P.Num
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDateTime then
-    Value := DateTimeToStr(P.DateTime)
+  begin
+    if (ActiveDevice <> nil) and (ActiveDevice.Sessions <> nil) then
+      for Sess in ActiveDevice.Sessions do
+        if Sess.ID = P.SessionID then
+        begin
+          Value := DateTimeToStr(Sess.DateTime);
+          Break;
+        end;
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageOperator then
-    Value := P.OperatorName
+  begin
+    if (ActiveDevice <> nil) and (ActiveDevice.Sessions <> nil) then
+      for Sess in ActiveDevice.Sessions do
+        if Sess.ID = P.SessionID then
+        begin
+          Value := Sess.OperatorName;
+          Break;
+        end;
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonName then
-    Value := P.EtalonName
+  begin
+    if (ActiveDevice <> nil) and (ActiveDevice.Sessions <> nil) then
+      for Sess in ActiveDevice.Sessions do
+        if Sess.ID = P.SessionID then
+        begin
+          Value := Sess.EtalonName;
+          Break;
+        end;
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
     Value := FloatToStr(P.SpillTime)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
@@ -3416,6 +3441,7 @@ var
   WorkTable: TWorkTable;
   DeviceChannel: TChannel;
   Point: TPointSpillage;
+  Session: TSessionSpillage;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -3427,13 +3453,18 @@ begin
        (DeviceChannel.FlowMeter = nil) or (DeviceChannel.FlowMeter.Device = nil) then
       Continue;
 
-    Point := TPointSpillage.Create(DeviceChannel.FlowMeter.Device.ID);
+    Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
+    if Session = nil then
+      Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
+
+    Session.DateTime := Now;
+    Session.EtalonName := WorkTable.TableFlow.Name;
+
+    Point := TPointSpillage.Create(Session.ID);
     try
-      Point.DateTime := Now;
       Point.Num := DeviceChannel.FlowMeter.Device.Spillages.Count + 1;
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
-      Point.DeviceID := DeviceChannel.FlowMeter.Device.ID;
-      Point.EtalonName := WorkTable.TableFlow.Name;
+      Point.SessionID := Session.ID;
       Point.SpillTime := WorkTable.ValueTime.GetDoubleValue;
       Point.QavgEtalon := WorkTable.ValueFlowRate.GetDoubleValue;
       Point.EtalonVolume := WorkTable.ValueQuantity.GetDoubleValue;
