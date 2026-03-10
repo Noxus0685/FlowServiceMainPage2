@@ -29,6 +29,7 @@ type
     K: Double;
     P: Double;
     Active: Boolean;
+    Status: Integer;
 
     DeviceCoefsName: string;
     DeviceCoefsUUID: string;
@@ -612,6 +613,7 @@ begin
   K := 0.0;
   P := 0.0;
   Active := False;
+  Status := 0;
 
   DeviceCoefsName := '';
   DeviceCoefsUUID := '';
@@ -641,6 +643,7 @@ begin
   K := ASource.K;
   P := ASource.P;
   Active := ASource.Active;
+  Status := ASource.Status;
   DeviceCoefsName := ASource.DeviceCoefsName;
   DeviceCoefsUUID := ASource.DeviceCoefsUUID;
   CalibrCoefsName := ASource.CalibrCoefsName;
@@ -1422,6 +1425,7 @@ begin
   Result.ID := TEntityHelpers<TSessionSpillage>.NextID(Sessions);
   Result.DeviceID := ID;
   Result.Active := True;
+  Result.Status := 0;
 
   Sessions.Add(Result);
 end;
@@ -1491,6 +1495,13 @@ begin
   Result.Num := Spillages.Count + 1;
 
   Spillages.Add(Result);
+
+  if ActiveSession.Status <> 1 then
+  begin
+    ActiveSession.Status := 1;
+    if ActiveSession.State = osClean then
+      ActiveSession.State := osModified;
+  end;
 
   if ActiveSession.FSpillages <> nil then
   begin

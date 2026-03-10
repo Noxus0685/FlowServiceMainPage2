@@ -4032,31 +4032,37 @@ object FormMain: TFormMain
       Category = 'Session'
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1089#1077#1089#1089#1080#1102
       Hint = #1059#1076#1072#1083#1080#1090#1100' '#1089#1077#1089#1089#1080#1102
+      OnExecute = ActionSessionDeleteExecute
     end
     object ActionSessionClose: TAction
       Category = 'Session'
       Text = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
       Hint = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
+      OnExecute = ActionSessionCloseExecute
     end
     object ActionSessionPointDelete: TAction
       Category = 'Session'
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
       Hint = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+      OnExecute = ActionSessionPointDeleteExecute
     end
     object ActionSessionPointsClear: TAction
       Category = 'Session'
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1089#1077' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
       Hint = #1059#1076#1072#1083#1080#1090#1100' '#1074#1089#1077' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+      OnExecute = ActionSessionPointsClearExecute
     end
     object ActionSessionActive: TAction
       Category = 'Session'
       Text = #1057#1076#1077#1083#1072#1090#1100' '#1089#1077#1089#1089#1080#1102' '#1072#1082#1090#1080#1074#1085#1086#1081
       Hint = #1057#1076#1077#1083#1072#1090#1100' '#1089#1077#1089#1089#1080#1102' '#1072#1082#1090#1080#1074#1085#1086#1081
+      OnExecute = ActionSessionActiveExecute
     end
     object ActionSessionNew: TAction
       Category = 'Session'
       Text = #1053#1086#1074#1072#1103' '#1089#1077#1089#1089#1080#1103
       Hint = #1053#1086#1074#1072#1103' '#1089#1077#1089#1089#1080#1103
+      OnExecute = ActionSessionNewExecute
     end
   end
   object PopupMenu2: TPopupMenu
