@@ -80,6 +80,7 @@ function FindChildInTree(ATree: TTreeView; ATag: Integer; const AKey: string): T
 function NewGuidString: string;
 function ContainsTextAny(const AText, AFind: string): Boolean;
 function IsDateInRange(const ADate, AFrom, ATo: TDate): Boolean;
+function NormalizeFlowAccuracyInput(const S: string): string;
 
 
 implementation

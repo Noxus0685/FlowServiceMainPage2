@@ -6,12 +6,13 @@ uses
 
   UnitFlowMeter,
   UnitMeterValue,
-  UnitClasses,
+  UnitClasses, UnitDeviceClass,
   UnitDataManager,
   System.SysUtils,
   System.StrUtils,
   System.IniFiles,
   System.Generics.Collections;
+
 
 type
   TMeasurementState = (

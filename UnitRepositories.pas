@@ -4331,7 +4331,7 @@ begin
       raise Exception.Create('Не удалось загрузить точки приборов');
 
     if not LoadSpillageSessionsByDevice(NewD.ID) then
-      Exit(nil);
+      Exit(False);
 
     if not LoadSpillagesByDevice(NewD.ID) then
       raise Exception.Create('Не удалось загрузить проливы');

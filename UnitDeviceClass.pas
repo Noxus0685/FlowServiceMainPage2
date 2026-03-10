@@ -8,11 +8,18 @@ interface
     System.Generics.Collections,    System.StrUtils,    UnitBaseProcedures,
   System.SysUtils;
 
+
+
 type
 
   TPointSpillage = class;
 
   TSessionSpillage = class(TTypeEntity)
+
+
+
+
+
   public
     DeviceID: Integer;
     DateTime: TDateTime;
@@ -56,6 +63,8 @@ type
     dsfValidityDate,         // Действует до
     dsfDateOfManufacture     // Дата изготовления
   );
+
+
 
 
   TDevicePoint = class (TTypeEntity)
@@ -120,8 +129,7 @@ type
 
   TPointSpillage = class (TTypeEntity)
 
-  public
-    const
+            const
       // Статусы точки проливки (используются для UI/журнала анализа)
       SPS_CREATED = 0;              // Точка только создана, данные ещё не присваивались
       SPS_DATA_ASSIGNED = 1;        // Данные присвоены, но анализ ещё не выполнен
@@ -129,6 +137,9 @@ type
       SPS_STOP_CRITERIA_FAILED = 3; // Анализ выполнен: расход сопоставлен, но критерий остановки не выполнен (серый)
       SPS_ERROR_EXCEEDED = 4;       // Анализ выполнен: критерий остановки выполнен, но погрешность выше допуска (красный)
       SPS_OK = 5;                   // Анализ выполнен: критерий остановки выполнен, погрешность в допуске (зелёный)
+
+
+  public
 
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
