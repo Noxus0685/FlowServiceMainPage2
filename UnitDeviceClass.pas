@@ -69,6 +69,16 @@ type
 
   TDevicePoint = class (TTypeEntity)
    public
+    DataPoints: TObjectList<TPointSpillage>;          // Все измерения, относящиеся к точке по расходу
+    ProtocolDataPoints: TObjectList<TPointSpillage>;  // Лучшие измерения по погрешности (не более RepeatsProtocol)
+
+    Status: Integer;             // Статус точки по результатам анализа измерений
+    StatusStr: string;           // Текстовое описание статуса
+
+    ResultError: Double;         // Итоговая (худшая из лучших) погрешность
+    AverageError: Double;        // Средняя погрешность лучших измерений
+    StdDev: Double;              // СКО погрешности лучших измерений
+
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
     {====================================================================}
@@ -123,6 +133,7 @@ type
     Num: Integer;                // Порядковый номер точки (для сортировки / UI)
 
     constructor Create(ADeviceID : Integer);
+    destructor Destroy; override;
 
     procedure Assign(ASource: TDevicePoint);
   end;
@@ -432,7 +443,13 @@ type
     function GetActiveSessionSpillage: TSessionSpillage;
     function AddSpillage: TPointSpillage;
     function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
+<<<<<<< codex/add-measurement-result-fields-to-tdevicepoint
+    procedure AnalyseDataPoints(const ASpillage: TPointSpillage);
+    procedure FillDataPointsList(APoint: TDevicePoint);
+    procedure AnalyseDevicePointsResults;
+=======
     procedure AnalyseDataPoint(const ASpillage: TPointSpillage);
+>>>>>>> main
 
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
     property  Sessions   : TObjectList<TSessionSpillage> read FSessions write FSessions;
@@ -635,6 +652,9 @@ constructor TDevicePoint.Create(ADeviceID : Integer);
 begin
   inherited Create;
 
+  DataPoints := TObjectList<TPointSpillage>.Create(False);
+  ProtocolDataPoints := TObjectList<TPointSpillage>.Create(False);
+
   FID := 0;
   FState := osNew;
 
@@ -671,6 +691,21 @@ begin
   { Повторы }
   RepeatsProtocol := 0;
   Repeats := 0;
+
+  Status := 0;
+  StatusStr := 'Измерения не производились/не анализировались.';
+  ResultError := 0.0;
+  AverageError := 0.0;
+  StdDev := 0.0;
+end;
+
+
+
+destructor TDevicePoint.Destroy;
+begin
+  DataPoints.Free;
+  ProtocolDataPoints.Free;
+  inherited;
 end;
 
 constructor TPointSpillage.Create(ASessionID : Integer);
@@ -1221,6 +1256,22 @@ begin
   {====================================================================}
   RepeatsProtocol := ASource.RepeatsProtocol;
   Repeats := ASource.Repeats;
+
+  Status := ASource.Status;
+  StatusStr := ASource.StatusStr;
+  ResultError := ASource.ResultError;
+  AverageError := ASource.AverageError;
+  StdDev := ASource.StdDev;
+
+  if DataPoints = nil then
+    DataPoints := TObjectList<TPointSpillage>.Create(False)
+  else
+    DataPoints.Clear;
+
+  if ProtocolDataPoints = nil then
+    ProtocolDataPoints := TObjectList<TPointSpillage>.Create(False)
+  else
+    ProtocolDataPoints.Clear;
 end;
 
 procedure TPointSpillage.Assign(ASource: TPointSpillage);
@@ -1567,6 +1618,174 @@ begin
 
   if ASpillage.State = osClean then
     ASpillage.State := osModified;
+end;
+
+
+procedure TDevice.FillDataPointsList(APoint: TDevicePoint);
+var
+  S: TPointSpillage;
+  CandidateList: TList<TPointSpillage>;
+  KeepCount: Integer;
+  I: Integer;
+begin
+  if APoint = nil then
+    Exit;
+
+  if APoint.DataPoints = nil then
+    APoint.DataPoints := TObjectList<TPointSpillage>.Create(False)
+  else
+    APoint.DataPoints.Clear;
+
+  if APoint.ProtocolDataPoints = nil then
+    APoint.ProtocolDataPoints := TObjectList<TPointSpillage>.Create(False)
+  else
+    APoint.ProtocolDataPoints.Clear;
+
+  if Spillages = nil then
+    Exit;
+
+  CandidateList := TList<TPointSpillage>.Create;
+  try
+    for S in Spillages do
+      if IsFlowInPoint(S.QavgEtalon, APoint) then
+      begin
+        APoint.DataPoints.Add(S);
+        CandidateList.Add(S);
+      end;
+
+    CandidateList.Sort(
+      TComparer<TPointSpillage>.Construct(
+        function(const L, R: TPointSpillage): Integer
+        begin
+          Result := CompareValue(Abs(L.Error), Abs(R.Error));
+        end
+      )
+    );
+
+    KeepCount := APoint.RepeatsProtocol;
+    if KeepCount <= 0 then
+      KeepCount := CandidateList.Count
+    else
+      KeepCount := Min(KeepCount, CandidateList.Count);
+
+    for I := 0 to KeepCount - 1 do
+      APoint.ProtocolDataPoints.Add(CandidateList[I]);
+  finally
+    CandidateList.Free;
+  end;
+end;
+
+procedure TDevice.AnalyseDevicePointsResults;
+var
+  DP: TDevicePoint;
+  S: TPointSpillage;
+  ValidCount: Integer;
+  ErrorsSum: Double;
+  VarianceSum: Double;
+  CandidateError: Double;
+  MinInvalidError: Double;
+  HasMinInvalid: Boolean;
+  ErrorExceededInValid: Boolean;
+  RequiredCount: Integer;
+  ProcessedCount: Integer;
+begin
+  if Points = nil then
+    Exit;
+
+  for DP in Points do
+  begin
+    FillDataPointsList(DP);
+
+    DP.Status := 0;
+    DP.StatusStr := 'Измерения не производились/не анализировались.';
+    DP.ResultError := 0.0;
+    DP.AverageError := 0.0;
+    DP.StdDev := 0.0;
+
+    if (DP.DataPoints = nil) or (DP.DataPoints.Count = 0) then
+    begin
+      DP.Status := 1;
+      DP.StatusStr := 'Измерения производились, но измерений, связанных с данной точкой, нет.';
+      Continue;
+    end;
+
+    ValidCount := 0;
+    ErrorsSum := 0.0;
+    VarianceSum := 0.0;
+    CandidateError := -1.0;
+    MinInvalidError := 0.0;
+    HasMinInvalid := False;
+    ErrorExceededInValid := False;
+
+    for S in DP.ProtocolDataPoints do
+    begin
+      ErrorsSum := ErrorsSum + S.Error;
+
+      if Abs(S.Error) <= Abs(DP.Error) then
+      begin
+        Inc(ValidCount);
+        if Abs(S.Error) > CandidateError then
+          CandidateError := Abs(S.Error);
+      end
+      else
+      begin
+        ErrorExceededInValid := True;
+        if (not HasMinInvalid) or (Abs(S.Error) < MinInvalidError) then
+        begin
+          MinInvalidError := Abs(S.Error);
+          HasMinInvalid := True;
+        end;
+      end;
+    end;
+
+    ProcessedCount := DP.ProtocolDataPoints.Count;
+    if ProcessedCount > 0 then
+      DP.AverageError := ErrorsSum / ProcessedCount;
+
+    if ProcessedCount > 0 then
+    begin
+      for S in DP.ProtocolDataPoints do
+        VarianceSum := VarianceSum + Sqr(S.Error - DP.AverageError);
+      DP.StdDev := Sqrt(VarianceSum / ProcessedCount);
+    end;
+
+    RequiredCount := DP.RepeatsProtocol;
+    if RequiredCount <= 0 then
+      RequiredCount := ProcessedCount;
+
+    if ValidCount >= RequiredCount then
+      DP.ResultError := CandidateError
+    else if HasMinInvalid then
+      DP.ResultError := MinInvalidError
+    else if ProcessedCount > 0 then
+      DP.ResultError := Abs(DP.ProtocolDataPoints[0].Error)
+    else
+      DP.ResultError := 0.0;
+
+    if ValidCount = 0 then
+    begin
+      DP.Status := 2;
+      DP.StatusStr := 'Есть измерения по расходу, но корректных измерений недостаточно или нет.';
+    end
+    else if ValidCount < RequiredCount then
+    begin
+      if ErrorExceededInValid then
+      begin
+        DP.Status := 3;
+        DP.StatusStr := 'Есть корректные измерения, но их меньше RepeatsProtocol и часть измерений превышает допуск по погрешности (красный).';
+      end
+      else
+      begin
+        DP.Status := 4;
+        DP.StatusStr := 'Корректные измерения есть, их меньше RepeatsProtocol, но погрешности в пределах допуска (желтый).';
+      end;
+    end
+    else
+    begin
+      DP.Status := 5;
+      DP.StatusStr := 'Корректных измерений не меньше RepeatsProtocol, требование по погрешности выполнено (зеленый).';
+    end;
+  end;
 end;
 
 procedure TDevice.AttachType(AType: TDeviceType; RepoName: String);
