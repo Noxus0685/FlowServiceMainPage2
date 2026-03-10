@@ -514,6 +514,7 @@ type
     Label7: TLabel;
     ButtonSessionClose: TButton;
     Label8: TLabel;
+    PopupMenu2: TPopupMenu;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
