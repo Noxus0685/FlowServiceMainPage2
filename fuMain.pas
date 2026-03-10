@@ -585,6 +585,12 @@ type
     procedure ActionEtalonsFromArchiveExecute(Sender: TObject);
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
+    procedure ActionSessionDeleteExecute(Sender: TObject);
+    procedure ActionSessionCloseExecute(Sender: TObject);
+    procedure ActionSessionPointDeleteExecute(Sender: TObject);
+    procedure ActionSessionPointsClearExecute(Sender: TObject);
+    procedure ActionSessionActiveExecute(Sender: TObject);
+    procedure ActionSessionNewExecute(Sender: TObject);
 
 
   private
@@ -1520,6 +1526,280 @@ begin
 
   if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
     Result := DataManager.ActiveDeviceRepo.FindDeviceByID(Sess.DeviceID);
+end;
+
+procedure TFormMain.ActionSessionDeleteExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Device: TDevice;
+  Session, NextSession: TSessionSpillage;
+  I, NextIdx: Integer;
+  P: TPointSpillage;
+  Repo: TDeviceRepository;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if not (Item.TagObject is TSessionSpillage) then
+    Exit;
+
+  if MessageDlg('Удалить выбранную сессию и все связанные измерения?',
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+    Exit;
+
+  Session := TSessionSpillage(Item.TagObject);
+  Device := ResolveSelectedDevice;
+  if (Session = nil) or (Device = nil) or (Device.Sessions = nil) then
+    Exit;
+
+  if Session.Spillages <> nil then
+    for P in Session.Spillages do
+      if P <> nil then
+        P.State := osDeleted;
+
+  if Device.Spillages <> nil then
+    for P in Device.Spillages do
+      if (P <> nil) and (P.SessionID = Session.ID) then
+        P.State := osDeleted;
+
+  NextSession := nil;
+  NextIdx := -1;
+  if Session.Active then
+  begin
+    for I := 0 to Device.Sessions.Count - 1 do
+      if Device.Sessions[I] = Session then
+      begin
+        NextIdx := I;
+        Break;
+      end;
+
+    if NextIdx >= 0 then
+      for I := NextIdx + 1 to Device.Sessions.Count - 1 do
+        if (Device.Sessions[I] <> nil) and (Device.Sessions[I].State <> osDeleted) then
+        begin
+          NextSession := Device.Sessions[I];
+          Break;
+        end;
+
+    if NextSession = nil then
+      for I := 0 to Device.Sessions.Count - 1 do
+        if (Device.Sessions[I] <> nil) and (Device.Sessions[I] <> Session) and
+           (Device.Sessions[I].State <> osDeleted) then
+        begin
+          NextSession := Device.Sessions[I];
+          Break;
+        end;
+  end;
+
+  Session.Active := False;
+  Session.State := osDeleted;
+
+  if NextSession <> nil then
+  begin
+    NextSession.Active := True;
+    if NextSession.Status = 0 then
+      NextSession.Status := 1;
+    if NextSession.State = osClean then
+      NextSession.State := osModified;
+  end;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  RefreshResultsTab;
+end;
+
+procedure TFormMain.ActionSessionCloseExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Session: TSessionSpillage;
+  Device: TDevice;
+  Repo: TDeviceRepository;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if not (Item.TagObject is TSessionSpillage) then
+    Exit;
+
+  Session := TSessionSpillage(Item.TagObject);
+  Device := ResolveSelectedDevice;
+  if (Session = nil) or (Device = nil) then
+    Exit;
+
+  Session.Active := False;
+  Session.Status := 2;
+  if Session.State = osClean then
+    Session.State := osModified;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  RefreshResultsTab;
+end;
+
+procedure TFormMain.ActionSessionPointDeleteExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Session: TSessionSpillage;
+  Device: TDevice;
+  Point: TPointSpillage;
+  Repo: TDeviceRepository;
+begin
+  if (not GridDataPoints.Visible) or (GridDataPoints.Row < 0) or
+     (GridDataPoints.Row >= Length(FCurrentSpillages)) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if (Item = nil) or not (Item.TagObject is TSessionSpillage) then
+    Exit;
+
+  Session := TSessionSpillage(Item.TagObject);
+  Device := ResolveSelectedDevice;
+  Point := FCurrentSpillages[GridDataPoints.Row];
+  if (Session = nil) or (Device = nil) or (Point = nil) then
+    Exit;
+
+  Point.State := osDeleted;
+  if Session.State = osClean then
+    Session.State := osModified;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  ShowSessionSpillages(Session);
+end;
+
+procedure TFormMain.ActionSessionPointsClearExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Session: TSessionSpillage;
+  Device: TDevice;
+  P: TPointSpillage;
+  Repo: TDeviceRepository;
+begin
+  if not GridDataPoints.Visible then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if (Item = nil) or not (Item.TagObject is TSessionSpillage) then
+    Exit;
+
+  Session := TSessionSpillage(Item.TagObject);
+  Device := ResolveSelectedDevice;
+  if (Session = nil) or (Device = nil) then
+    Exit;
+
+  if Session.Spillages <> nil then
+    for P in Session.Spillages do
+      if P <> nil then
+        P.State := osDeleted;
+
+  if Device.Spillages <> nil then
+    for P in Device.Spillages do
+      if (P <> nil) and (P.SessionID = Session.ID) then
+        P.State := osDeleted;
+
+  if Session.State = osClean then
+    Session.State := osModified;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  ShowSessionSpillages(Session);
+end;
+
+procedure TFormMain.ActionSessionActiveExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Session, S: TSessionSpillage;
+  Device: TDevice;
+  Repo: TDeviceRepository;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if not (Item.TagObject is TSessionSpillage) then
+    Exit;
+
+  Session := TSessionSpillage(Item.TagObject);
+  Device := ResolveSelectedDevice;
+  if (Session = nil) or (Device = nil) or (Device.Sessions = nil) then
+    Exit;
+
+  for S in Device.Sessions do
+    if (S <> nil) and (S.State <> osDeleted) then
+    begin
+      if S = Session then
+      begin
+        S.Active := True;
+        S.Status := 1;
+      end
+      else
+        S.Active := False;
+
+      if S.State = osClean then
+        S.State := osModified;
+    end;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  RefreshResultsTab;
+end;
+
+procedure TFormMain.ActionSessionNewExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Device: TDevice;
+  Session: TSessionSpillage;
+  Repo: TDeviceRepository;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  Device := nil;
+  if Item.TagObject is TDevice then
+    Device := TDevice(Item.TagObject)
+  else if Item.TagObject is TSessionSpillage then
+    Device := ResolveSelectedDevice;
+
+  if Device = nil then
+    Exit;
+
+  Session := Device.AddSessionSpillage;
+  if Session <> nil then
+  begin
+    Session.DateTime := Now;
+    Session.Status := 0;
+  end;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  RefreshResultsTab;
 end;
 
 procedure TFormMain.TreeViewDevicesChange(Sender: TObject);

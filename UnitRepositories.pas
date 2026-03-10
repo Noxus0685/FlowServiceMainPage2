@@ -5258,6 +5258,7 @@ begin
     Col('K', 'REAL'),
     Col('P', 'REAL'),
     Col('Active', 'INTEGER'),
+    Col('Status', 'INTEGER'),
     Col('DeviceCoefsName', 'TEXT'),
     Col('DeviceCoefsUUID', 'TEXT'),
     Col('CalibrCoefsName', 'TEXT'),
@@ -5292,6 +5293,7 @@ begin
   Result.K := Q.FieldByName('K').AsFloat;
   Result.P := Q.FieldByName('P').AsFloat;
   Result.Active := Q.FieldByName('Active').AsInteger <> 0;
+  Result.Status := Q.FieldByName('Status').AsInteger;
   Result.DeviceCoefsName := Q.FieldByName('DeviceCoefsName').AsString;
   Result.DeviceCoefsUUID := Q.FieldByName('DeviceCoefsUUID').AsString;
   Result.CalibrCoefsName := Q.FieldByName('CalibrCoefsName').AsString;
@@ -5349,10 +5351,10 @@ begin
           Exit(True);
         end;
       osNew:
-        Q.SQL.Text := 'insert into SessionSpillage (DeviceID, DateTime, OperatorName, EtalonName, K, P, Active, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceID, :DateTime, :OperatorName, :EtalonName, :K, :P, :Active, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
+        Q.SQL.Text := 'insert into SessionSpillage (DeviceID, DateTime, OperatorName, EtalonName, K, P, Active, Status, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceID, :DateTime, :OperatorName, :EtalonName, :K, :P, :Active, :Status, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
       osModified:
         begin
-          Q.SQL.Text := 'update SessionSpillage set DeviceID=:DeviceID, DateTime=:DateTime, OperatorName=:OperatorName, EtalonName=:EtalonName, K=:K, P=:P, Active=:Active, DeviceCoefsName=:DeviceCoefsName, DeviceCoefsUUID=:DeviceCoefsUUID, CalibrCoefsName=:CalibrCoefsName, CalibrCoefsUUID=:CalibrCoefsUUID where ID=:ID';
+          Q.SQL.Text := 'update SessionSpillage set DeviceID=:DeviceID, DateTime=:DateTime, OperatorName=:OperatorName, EtalonName=:EtalonName, K=:K, P=:P, Active=:Active, Status=:Status, DeviceCoefsName=:DeviceCoefsName, DeviceCoefsUUID=:DeviceCoefsUUID, CalibrCoefsName=:CalibrCoefsName, CalibrCoefsUUID=:CalibrCoefsUUID where ID=:ID';
           SetIntParam(Q, 'ID', ASession.ID);
         end;
     end;
@@ -5364,6 +5366,7 @@ begin
     SetFloatParam(Q, 'K', ASession.K);
     SetFloatParam(Q, 'P', ASession.P);
     SetIntParam(Q, 'Active', Ord(ASession.Active));
+    SetIntParam(Q, 'Status', ASession.Status);
     SetStrParam(Q, 'DeviceCoefsName', ASession.DeviceCoefsName);
     SetStrParam(Q, 'DeviceCoefsUUID', ASession.DeviceCoefsUUID);
     SetStrParam(Q, 'CalibrCoefsName', ASession.CalibrCoefsName);
