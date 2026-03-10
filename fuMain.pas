@@ -626,6 +626,8 @@ type
     procedure PopulateTreeViewDevices;
     procedure ShowAllDevicesResults;
     procedure ShowDeviceSpillages(ADevice: TDevice);
+    procedure ShowSessionSpillages(ASession: TSessionSpillage);
+    function ResolveSelectedDevice: TDevice;
     procedure UpdateResultsPointColumns;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
@@ -1186,10 +1188,11 @@ end;
 
 procedure TFormMain.PopulateTreeViewDevices;
 var
-  RootAll, RootOther, RootTable, DeviceItem: TTreeViewItem;
+  RootAll, RootOther, RootTable, DeviceItem, SessionItem: TTreeViewItem;
   I: Integer;
   WT: TWorkTable;
   Ch: TChannel;
+  Sess: TSessionSpillage;
 begin
   TreeViewDevices.BeginUpdate;
   try
@@ -1220,6 +1223,19 @@ begin
           DeviceItem.Text := Ch.FlowMeter.Device.Name;
           DeviceItem.TagObject := Ch.FlowMeter.Device;
           RootTable.AddObject(DeviceItem);
+
+          if Ch.FlowMeter.Device.Sessions <> nil then
+            for Sess in Ch.FlowMeter.Device.Sessions do
+            begin
+              if Sess = nil then
+                Continue;
+
+              SessionItem := TTreeViewItem.Create(TreeViewDevices);
+              SessionItem.Text :=
+                Format('Сессия #%d (%s)', [Sess.ID, DateTimeToStr(Sess.DateTime)]);
+              SessionItem.TagObject := Sess;
+              DeviceItem.AddObject(SessionItem);
+            end;
         end;
       end;
 
@@ -1334,6 +1350,73 @@ begin
   GridDataPoints.Repaint;
 end;
 
+procedure TFormMain.ShowSessionSpillages(ASession: TSessionSpillage);
+var
+  Device: TDevice;
+  Point: TPointSpillage;
+  List: TList<TPointSpillage>;
+begin
+  SetLength(FCurrentSpillages, 0);
+  if ASession = nil then
+  begin
+    GridResults.Visible := False;
+    GridDataPoints.Visible := True;
+    GridDataPoints.RowCount := 0;
+    GridDataPoints.Repaint;
+    Exit;
+  end;
+
+  Device := ResolveSelectedDevice;
+  if (Device = nil) or (Device.Spillages = nil) then
+  begin
+    GridResults.Visible := False;
+    GridDataPoints.Visible := True;
+    GridDataPoints.RowCount := 0;
+    GridDataPoints.Repaint;
+    Exit;
+  end;
+
+  List := TList<TPointSpillage>.Create;
+  try
+    for Point in Device.Spillages do
+      if (Point <> nil) and (Point.SessionID = ASession.ID) then
+        List.Add(Point);
+
+    FCurrentSpillages := List.ToArray;
+  finally
+    List.Free;
+  end;
+
+  GridResults.Visible := False;
+  GridDataPoints.Visible := True;
+  GridDataPoints.RowCount := Length(FCurrentSpillages);
+  GridDataPoints.Repaint;
+end;
+
+function TFormMain.ResolveSelectedDevice: TDevice;
+var
+  Item: TTreeViewItem;
+  Sess: TSessionSpillage;
+begin
+  Result := nil;
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if Item.TagObject is TDevice then
+    Exit(TDevice(Item.TagObject));
+
+  if not (Item.TagObject is TSessionSpillage) then
+    Exit;
+
+  Sess := TSessionSpillage(Item.TagObject);
+  if (Item.ParentItem <> nil) and (Item.ParentItem.TagObject is TDevice) then
+    Exit(TDevice(Item.ParentItem.TagObject));
+
+  if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+    Result := DataManager.ActiveDeviceRepo.FindDeviceByID(Sess.DeviceID);
+end;
+
 procedure TFormMain.TreeViewDevicesChange(Sender: TObject);
 var
   Item: TTreeViewItem;
@@ -1356,6 +1439,8 @@ begin
 
   if Item.TagObject is TDevice then
     ShowDeviceSpillages(TDevice(Item.TagObject))
+  else if Item.TagObject is TSessionSpillage then
+    ShowSessionSpillages(TSessionSpillage(Item.TagObject))
   else
   begin
     ShowAllDevicesResults;
@@ -1411,10 +1496,7 @@ begin
   if P = nil then
     Exit;
 
-  CurrentDevice := nil;
-  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) and
-     (TreeViewDevices.Selected.TagObject is TDevice) then
-    CurrentDevice := TDevice(TreeViewDevices.Selected.TagObject);
+  CurrentDevice := ResolveSelectedDevice;
 
   if GridDataPoints.Columns[ACol] = StringColumnName then
     Value := P.Name
@@ -3448,10 +3530,15 @@ var
   DeviceChannel: TChannel;
   Point: TPointSpillage;
   Session: TSessionSpillage;
+  DeviceRepo: TDeviceRepository;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
+
+  DeviceRepo := nil;
+  if DataManager <> nil then
+    DeviceRepo := DataManager.ActiveDeviceRepo;
 
   for DeviceChannel in WorkTable.DeviceChannels do
   begin
@@ -3462,6 +3549,8 @@ begin
     Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
     if Session = nil then
       Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
+    if Session.State = osClean then
+      Session.State := osModified;
 
     Session.DateTime := Now;
     Session.EtalonName := WorkTable.TableFlow.Name;
@@ -3490,10 +3579,15 @@ begin
       Point.Valid := True;
 
       DeviceChannel.FlowMeter.AddDataPoint(Point);
+
+      if Assigned(DeviceRepo) then
+        DeviceRepo.SaveDevice(DeviceChannel.FlowMeter.Device);
     finally
       Point.Free;
     end;
   end;
+
+  RefreshResultsTab;
 end;
 
 procedure TFormMain.ButtonCancelClick(Sender: TObject);
