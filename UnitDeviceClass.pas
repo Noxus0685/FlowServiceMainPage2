@@ -443,9 +443,13 @@ type
     function GetActiveSessionSpillage: TSessionSpillage;
     function AddSpillage: TPointSpillage;
     function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
+<<<<<<< codex/add-measurement-result-fields-to-tdevicepoint
     procedure AnalyseDataPoints(const ASpillage: TPointSpillage);
     procedure FillDataPointsList(APoint: TDevicePoint);
     procedure AnalyseDevicePointsResults;
+=======
+    procedure AnalyseDataPoint(const ASpillage: TPointSpillage);
+>>>>>>> main
 
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
     property  Sessions   : TObjectList<TSessionSpillage> read FSessions write FSessions;
@@ -1505,7 +1509,7 @@ begin
   Result := InRange(AFlow, Q1, Q2);
 end;
 
-procedure TDevice.AnalyseDataPoints(const ASpillage: TPointSpillage);
+procedure TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage);
 var
   P, MatchedPoint: TDevicePoint;
   StopOk: Boolean;
