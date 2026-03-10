@@ -304,6 +304,7 @@ type
       FPoints     : TObjectList<TDevicePoint>;
       FCalibrCoefTable: TCalibrCoefTable;
       FDeviceType : TDeviceType;
+      function NormalizeActiveSessionSpillage: TSessionSpillage;
   public
     {====================================================================}
     { ПОЛЯ БД!!! }
@@ -1407,7 +1408,15 @@ begin
     Sessions := TObjectList<TSessionSpillage>.Create(True);
 
   for Sess in Sessions do
-    Sess.Active := False;
+    if Sess <> nil then
+    begin
+      if Sess.Active then
+      begin
+        Sess.Active := False;
+        if Sess.State = osClean then
+          Sess.State := osModified;
+      end;
+    end;
 
   Result := TSessionSpillage.Create(ID);
   Result.ID := TEntityHelpers<TSessionSpillage>.NextID(Sessions);
@@ -1418,16 +1427,50 @@ begin
 end;
 
 function TDevice.GetActiveSessionSpillage: TSessionSpillage;
+begin
+  Result := NormalizeActiveSessionSpillage;
+end;
+
+function TDevice.NormalizeActiveSessionSpillage: TSessionSpillage;
 var
   Sess: TSessionSpillage;
+  ActiveFound: Boolean;
 begin
   Result := nil;
-  if Sessions = nil then
+  if (Sessions = nil) or (Sessions.Count = 0) then
     Exit;
 
+  ActiveFound := False;
   for Sess in Sessions do
+  begin
+    if Sess = nil then
+      Continue;
+
+    if Sess.Active and not ActiveFound then
+    begin
+      Result := Sess;
+      ActiveFound := True;
+      Continue;
+    end;
+
     if Sess.Active then
-      Exit(Sess);
+    begin
+      Sess.Active := False;
+      if Sess.State = osClean then
+        Sess.State := osModified;
+    end;
+  end;
+
+  if Result = nil then
+  begin
+    Result := Sessions[0];
+    if Result <> nil then
+    begin
+      Result.Active := True;
+      if Result.State = osClean then
+        Result.State := osModified;
+    end;
+  end;
 end;
 
 function TDevice.AddSpillage: TPointSpillage;
@@ -1632,6 +1675,7 @@ var
   CandidateList: TList<TPointSpillage>;
   KeepCount: Integer;
   I: Integer;
+  ActiveSession: TSessionSpillage;
 begin
   if APoint = nil then
     Exit;
@@ -1649,10 +1693,14 @@ begin
   if Spillages = nil then
     Exit;
 
+  ActiveSession := GetActiveSessionSpillage;
+  if ActiveSession = nil then
+    Exit;
+
   CandidateList := TList<TPointSpillage>.Create;
   try
     for S in Spillages do
-      if IsFlowInPoint(S.QavgEtalon, APoint) then
+      if (S.SessionID = ActiveSession.ID) and IsFlowInPoint(S.QavgEtalon, APoint) then
       begin
         APoint.DataPoints.Add(S);
         CandidateList.Add(S);
