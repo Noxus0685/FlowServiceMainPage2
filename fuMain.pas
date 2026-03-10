@@ -52,8 +52,11 @@ type
     Name: string;
     DeviceType: string;
     Serial: string;
+    PointNames: TArray<string>;
     PointValues: TArray<string>;
+    PointStatuses: TArray<Integer>;
     ResultText: string;
+    ResultStatus: Integer;
   end;
 
   TFormMain = class(TForm)
@@ -563,6 +566,9 @@ type
       var Value: TValue);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+      const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+      const Value: TValue; const State: TGridDrawStates);
     procedure ActionDevicesClearRowExecute(Sender: TObject);
     procedure ActionDevicesCopyExecute(Sender: TObject);
     procedure ActionDevicesPasteExecute(Sender: TObject);
@@ -634,6 +640,8 @@ type
     procedure ShowSessionSpillages(ASession: TSessionSpillage);
     function ResolveSelectedDevice: TDevice;
     procedure UpdateResultsPointColumns;
+    function GetStatusColor(const AStatus: Integer): TAlphaColor;
+    function BuildResultTextByStatus(const AStatus: Integer): string;
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
        procedure UpdateForm;
@@ -1173,6 +1181,7 @@ begin
   TreeViewDevices.OnChange := TreeViewDevicesChange;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
   GridResults.OnGetValue := GridResultsGetValue;
+  GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
   SetValues;
   RefreshResultsTab;
   UpdateForm;
@@ -1255,23 +1264,83 @@ begin
   end;
 end;
 
+function TFormMain.GetStatusColor(const AStatus: Integer): TAlphaColor;
+begin
+  case AStatus of
+    2: Result := TAlphaColors.Lightgray;
+    3: Result := TAlphaColors.Lightcoral;
+    4: Result := TAlphaColors.Lightyellow;
+    5: Result := TAlphaColors.Lightgreen;
+  else
+    Result := TAlphaColors.Null;
+  end;
+end;
+
+function TFormMain.BuildResultTextByStatus(const AStatus: Integer): string;
+begin
+  case AStatus of
+    1: Result := '-';
+    2: Result := 'Нет данных';
+    3: Result := 'Не Годен';
+    4: Result := 'Нет данных';
+    5: Result := 'Годен';
+  else
+    Result := '-';
+  end;
+end;
+
 procedure TFormMain.UpdateResultsPointColumns;
 var
   MaxPoints, I: Integer;
+  AllSameType: Boolean;
+  FirstTypeName: string;
+  HeaderFromPoints: TArray<string>;
 begin
   MaxPoints := 0;
   for I := 0 to High(FCurrentResultRows) do
     MaxPoints := Max(MaxPoints, Length(FCurrentResultRows[I].PointValues));
+
+  if MaxPoints > 4 then
+    MaxPoints := 4;
 
   StringColumnPointNum1.Visible := MaxPoints >= 1;
   StringColumnPointNum2.Visible := MaxPoints >= 2;
   StringColumnPointNum3.Visible := MaxPoints >= 3;
   StringColumnPointNum4.Visible := MaxPoints >= 4;
 
-  StringColumnPointNum1.Header := 'Q1';
-  StringColumnPointNum2.Header := 'Q2';
-  StringColumnPointNum3.Header := 'Q3';
-  StringColumnPointNum4.Header := 'Q4';
+  AllSameType := Length(FCurrentResultRows) > 0;
+  SetLength(HeaderFromPoints, 0);
+  FirstTypeName := '';
+
+  if Length(FCurrentResultRows) > 0 then
+  begin
+    FirstTypeName := FCurrentResultRows[0].DeviceType;
+    SetLength(HeaderFromPoints, Length(FCurrentResultRows[0].PointNames));
+    for I := 0 to High(HeaderFromPoints) do
+      HeaderFromPoints[I] := FCurrentResultRows[0].PointNames[I];
+  end;
+
+  for I := 1 to High(FCurrentResultRows) do
+    if not SameText(FCurrentResultRows[I].DeviceType, FirstTypeName) then
+    begin
+      AllSameType := False;
+      Break;
+    end;
+
+  if AllSameType and (Length(HeaderFromPoints) > 0) then
+  begin
+    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := HeaderFromPoints[0];
+    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := HeaderFromPoints[1];
+    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := HeaderFromPoints[2];
+    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := HeaderFromPoints[3];
+  end
+  else
+  begin
+    StringColumnPointNum1.Header := 'Q1';
+    StringColumnPointNum2.Header := 'Q2';
+    StringColumnPointNum3.Header := 'Q3';
+    StringColumnPointNum4.Header := 'Q4';
+  end;
 end;
 
 procedure TFormMain.ShowAllDevicesResults;
@@ -1280,6 +1349,7 @@ var
   WT: TWorkTable;
   Ch: TChannel;
   P: TDevicePoint;
+  Device: TDevice;
   Row: TResultGridRow;
   I: Integer;
 begin
@@ -1295,28 +1365,48 @@ begin
           if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
             Continue;
 
-          Row.Name := Ch.FlowMeter.Device.Name;
-          Row.DeviceType := Ch.FlowMeter.Device.DeviceTypeName;
-          Row.Serial := Ch.FlowMeter.Device.SerialNumber;
-          if Ch.FlowMeter.Device.Points <> nil then
+          Device := Ch.FlowMeter.Device;
+
+          Device.AnalyseResults;
+
+          Row.Name := Device.Name;
+          Row.DeviceType := Device.DeviceTypeName;
+          Row.Serial := Device.SerialNumber;
+
+          if Device.Points <> nil then
           begin
-            SetLength(Row.PointValues, Ch.FlowMeter.Device.Points.Count);
-            for I := 0 to Ch.FlowMeter.Device.Points.Count - 1 do
+            SetLength(Row.PointNames, Device.Points.Count);
+            SetLength(Row.PointValues, Device.Points.Count);
+            SetLength(Row.PointStatuses, Device.Points.Count);
+            for I := 0 to Device.Points.Count - 1 do
             begin
-              P := Ch.FlowMeter.Device.Points[I];
+              P := Device.Points[I];
               if P <> nil then
-                Row.PointValues[I] := P.Name
+              begin
+                Row.PointNames[I] := P.Name;
+                Row.PointStatuses[I] := P.Status;
+                if P.Status = 1 then
+                  Row.PointValues[I] := '-'
+                else
+                  Row.PointValues[I] := FormatFloat('0.###', P.ResultError);
+              end
               else
-                Row.PointValues[I] := '';
+              begin
+                Row.PointNames[I] := '';
+                Row.PointStatuses[I] := 1;
+                Row.PointValues[I] := '-';
+              end;
             end;
           end
           else
+          begin
+            SetLength(Row.PointNames, 0);
             SetLength(Row.PointValues, 0);
+            SetLength(Row.PointStatuses, 0);
+          end;
 
-          if Ch.Enabled then
-            Row.ResultText := 'Годен'
-          else
-            Row.ResultText := 'Не годен';
+          Row.ResultStatus := Device.Status;
+          Row.ResultText := BuildResultTextByStatus(Device.Status);
 
           Rows.Add(Row);
         end;
@@ -1496,6 +1586,42 @@ begin
   end
   else if GridResults.Columns[ACol] = StringColumnResult then
     Value := Row.ResultText;
+end;
+
+procedure TFormMain.GridResultsDrawColumnCell(Sender: TObject;
+  const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
+  const Row: Integer; const Value: TValue; const State: TGridDrawStates);
+var
+  GridRow: TResultGridRow;
+  Color: TAlphaColor;
+  PointIdx: Integer;
+begin
+  if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
+    Exit;
+
+  GridRow := FCurrentResultRows[Row];
+  Color := TAlphaColors.Null;
+
+  if Column = StringColumnResult then
+    Color := GetStatusColor(GridRow.ResultStatus)
+  else
+  begin
+    PointIdx := -1;
+    if Column = StringColumnPointNum1 then PointIdx := 0;
+    if Column = StringColumnPointNum2 then PointIdx := 1;
+    if Column = StringColumnPointNum3 then PointIdx := 2;
+    if Column = StringColumnPointNum4 then PointIdx := 3;
+
+    if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointStatuses)) then
+      Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
+  end;
+
+  if Color <> TAlphaColors.Null then
+  begin
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := Color;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
+  end;
 end;
 
 procedure TFormMain.GridDataPointsGetValue(Sender: TObject; const ACol,
