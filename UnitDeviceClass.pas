@@ -121,6 +121,15 @@ type
   TPointSpillage = class (TTypeEntity)
 
   public
+    const
+      // Статусы точки проливки (используются для UI/журнала анализа)
+      SPS_CREATED = 0;              // Точка только создана, данные ещё не присваивались
+      SPS_DATA_ASSIGNED = 1;        // Данные присвоены, но анализ ещё не выполнен
+      SPS_FLOW_NOT_MATCHED = 2;     // Анализ выполнен: расход не сопоставлен ни с одной точкой (серый)
+      SPS_STOP_CRITERIA_FAILED = 3; // Анализ выполнен: расход сопоставлен, но критерий остановки не выполнен (серый)
+      SPS_ERROR_EXCEEDED = 4;       // Анализ выполнен: критерий остановки выполнен, но погрешность выше допуска (красный)
+      SPS_OK = 5;                   // Анализ выполнен: критерий остановки выполнен, погрешность в допуске (зелёный)
+
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
     {====================================================================}
@@ -161,6 +170,8 @@ type
     {====================================================================}
     { РЕЗУЛЬТАТ ИЗМЕРЕНИЯ }
     {====================================================================}
+    Status: Integer;             // Статус анализа точки (см. SPS_*)
+    StatusStr: string;           // Текстовое пояснение статуса
 
     Error: Double;               // Итоговая погрешность, %
     Valid: Boolean;              // Годность измерения (в зачёт / нет)
@@ -409,6 +420,8 @@ type
     function AddSessionSpillage: TSessionSpillage;
     function GetActiveSessionSpillage: TSessionSpillage;
     function AddSpillage: TPointSpillage;
+    function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
+    procedure AnalyseDataPoints(const ASpillage: TPointSpillage);
 
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
     property  Sessions   : TObjectList<TSessionSpillage> read FSessions write FSessions;
@@ -678,6 +691,8 @@ begin
   Velocity := 0.0;
 
   { Результат }
+  Status := SPS_CREATED;
+  StatusStr := 'Точка создана. Данные измерения ещё не присваивались.';
   Error := 0.0;
   Valid := False;
 
@@ -1030,6 +1045,8 @@ begin
       Add(FloatToStr(S.DeviceVolume));
       Add(FloatToStr(S.DeviceMass));
       Add(FloatToStr(S.Velocity));
+      Add(IntToStr(S.Status));
+      Add(S.StatusStr);
       Add(FloatToStr(S.Error));
       Add(BoolToStr(S.Valid, True));
       Add(FloatToStr(S.QStd));
@@ -1244,6 +1261,8 @@ begin
   {====================================================================}
   { РЕЗУЛЬТАТ ИЗМЕРЕНИЯ }
   {====================================================================}
+  Status := ASource.Status;
+  StatusStr := ASource.StatusStr;
   Error := ASource.Error;
   Valid := ASource.Valid;
 
@@ -1370,6 +1389,173 @@ begin
     SessionCopy.State := Result.State;
     ActiveSession.FSpillages.Add(SessionCopy);
   end;
+end;
+
+function TDevice.IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
+var
+  Q1, Q2: Double;
+  Percent: Double;
+  AccNorm: string;
+begin
+  Result := False;
+  if APoint = nil then
+    Exit;
+
+  if APoint.Q <= 0 then
+    Exit;
+
+  AccNorm := NormalizeFlowAccuracyInput(APoint.FlowAccuracy);
+  Percent := 10.0; // fallback по аналогии со старой логикой: ±10%
+
+  if AccNorm <> '' then
+  begin
+    if (AccNorm[1] = '+') or (AccNorm[1] = '-') then
+      Percent := NormalizeFloatInput(Copy(AccNorm, 2, MaxInt))
+    else
+      Percent := NormalizeFloatInput(AccNorm);
+  end;
+
+  if Percent < 0 then
+    Percent := Abs(Percent);
+
+  if StartsText('+', AccNorm) then
+  begin
+    // "+5%" => от Q до Q + 5%*Q
+    Q1 := APoint.Q;
+    Q2 := APoint.Q + (APoint.Q * Percent / 100.0);
+  end
+  else if StartsText('-', AccNorm) then
+  begin
+    // "-5%" => от Q - 5%*Q до Q
+    Q1 := APoint.Q - (APoint.Q * Percent / 100.0);
+    Q2 := APoint.Q;
+  end
+  else
+  begin
+    // "±5%" (или "5") => симметричный диапазон
+    Q1 := APoint.Q - (APoint.Q * Percent / 100.0);
+    Q2 := APoint.Q + (APoint.Q * Percent / 100.0);
+  end;
+
+  if Q1 > Q2 then
+  begin
+    Percent := Q1;
+    Q1 := Q2;
+    Q2 := Percent;
+  end;
+
+  Result := InRange(AFlow, Q1, Q2);
+end;
+
+procedure TDevice.AnalyseDataPoints(const ASpillage: TPointSpillage);
+var
+  P, MatchedPoint: TDevicePoint;
+  StopOk: Boolean;
+  MeasuredValue: Double;
+  AllowedError, ActualError: Double;
+begin
+  if ASpillage = nil then
+    Exit;
+
+  ASpillage.Status := TPointSpillage.SPS_DATA_ASSIGNED;
+  ASpillage.StatusStr := 'Данные присвоены, анализ выполняется.';
+  ASpillage.Valid := False;
+
+  if ASpillage.State = osClean then
+    ASpillage.State := osModified;
+
+  MatchedPoint := nil;
+  for P in FPoints do
+    if IsFlowInPoint(ASpillage.QavgEtalon, P) then
+    begin
+      MatchedPoint := P;
+      Break;
+    end;
+
+  if MatchedPoint = nil then
+  begin
+    ASpillage.DevicePointID := 0;
+    ASpillage.Name := '-';
+    ASpillage.Status := TPointSpillage.SPS_FLOW_NOT_MATCHED;
+    ASpillage.StatusStr :=
+      'Анализ выполнен: расход не соответствует ни одной поверочной точке прибора. ' +
+      'Измерение некорректно (цвет: серый).';
+    Exit;
+  end;
+
+  ASpillage.DevicePointID := MatchedPoint.ID;
+  ASpillage.Name := MatchedPoint.Name;
+
+  StopOk := False;
+  case SpillageStop of
+    2:
+      begin
+        StopOk := ASpillage.PulseCount >= MatchedPoint.LimitImp;
+        if not StopOk then
+          ASpillage.StatusStr := Format(
+            'Критерий остановки "Импульсы" не выполнен: %d < %d.',
+            [ASpillage.PulseCount, MatchedPoint.LimitImp]
+          );
+      end;
+    1:
+      begin
+        if (MeasuredDimension = Ord(mdMassFlow)) or (MeasuredDimension = Ord(mdMass)) then
+          MeasuredValue := ASpillage.DeviceMass
+        else
+          MeasuredValue := ASpillage.DeviceVolume;
+
+        StopOk := MeasuredValue >= MatchedPoint.LimitVolume;
+        if not StopOk then
+          ASpillage.StatusStr := Format(
+            'Критерий остановки "Объём/масса" не выполнен: %.6f < %.6f.',
+            [MeasuredValue, MatchedPoint.LimitVolume]
+          );
+      end;
+    0:
+      begin
+        StopOk := ASpillage.SpillTime >= MatchedPoint.LimitTime;
+        if not StopOk then
+          ASpillage.StatusStr := Format(
+            'Критерий остановки "Время" не выполнен: %.3f < %.3f с.',
+            [ASpillage.SpillTime, MatchedPoint.LimitTime]
+          );
+      end;
+  else
+    begin
+      StopOk := False;
+      ASpillage.StatusStr := Format('Неизвестный критерий остановки SpillageStop=%d.', [SpillageStop]);
+    end;
+  end;
+
+  if not StopOk then
+  begin
+    ASpillage.Status := TPointSpillage.SPS_STOP_CRITERIA_FAILED;
+    ASpillage.StatusStr := 'Анализ выполнен: расход сопоставлен, но ' + ASpillage.StatusStr +
+      ' Измерение некорректно (цвет: серый).';
+    Exit;
+  end;
+
+  AllowedError := Abs(MatchedPoint.Error);
+  ActualError := Abs(ASpillage.Error);
+
+  if ActualError > AllowedError then
+  begin
+    ASpillage.Status := TPointSpillage.SPS_ERROR_EXCEEDED;
+    ASpillage.StatusStr :=
+      Format('Измерение корректно по расходу и критерию остановки, но погрешность превышена: |%.6f| > |%.6f| (цвет: красный).',
+        [ASpillage.Error, MatchedPoint.Error]);
+    ASpillage.Valid := False;
+    Exit;
+  end;
+
+  ASpillage.Status := TPointSpillage.SPS_OK;
+  ASpillage.StatusStr :=
+    Format('Измерение полностью корректно: расход сопоставлен, критерий остановки выполнен, погрешность в допуске: |%.6f| <= |%.6f| (цвет: зелёный).',
+      [ASpillage.Error, MatchedPoint.Error]);
+  ASpillage.Valid := True;
+
+  if ASpillage.State = osClean then
+    ASpillage.State := osModified;
 end;
 
 procedure TDevice.AttachType(AType: TDeviceType; RepoName: String);
