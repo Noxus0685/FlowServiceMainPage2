@@ -5382,12 +5382,38 @@ end;
 function TDeviceRepository.UpdateSpillageSessions(ADevice: TDevice): Boolean;
 var
   Sess: TSessionSpillage;
+  OldSessionID: Integer;
+  P: TPointSpillage;
+  SP: TPointSpillage;
 begin
   Result := False;
   if (ADevice = nil) or (ADevice.Sessions = nil) then Exit;
+
   for Sess in ADevice.Sessions do
-    if (Sess.DeviceID = ADevice.ID) and not UpdateSpillageSession(Sess) then
+  begin
+    if Sess = nil then
+      Continue;
+    if Sess.DeviceID <> ADevice.ID then
+      Sess.DeviceID := ADevice.ID;
+
+    OldSessionID := Sess.ID;
+    if not UpdateSpillageSession(Sess) then
       Exit(False);
+
+    if (OldSessionID > 0) and (Sess.ID > 0) and (OldSessionID <> Sess.ID) then
+    begin
+      if ADevice.Spillages <> nil then
+        for P in ADevice.Spillages do
+          if (P <> nil) and (P.SessionID = OldSessionID) then
+            P.SessionID := Sess.ID;
+
+      if Sess.Spillages <> nil then
+        for SP in Sess.Spillages do
+          if SP <> nil then
+            SP.SessionID := Sess.ID;
+    end;
+  end;
+
   Result := True;
 end;
 
@@ -5484,10 +5510,13 @@ var
   ADevice: TDevice;
   Dev: TDevice;
   Sess: TSessionSpillage;
+  MatchedSession: TSessionSpillage;
   Found: Boolean;
+  SessionPointCopy: TPointSpillage;
 begin
   SessionID := Q.FieldByName('SessionID').AsInteger;
   ADevice := nil;
+  MatchedSession := nil;
   Found := False;
 
   for Dev in FDevices do
@@ -5497,6 +5526,7 @@ begin
         if Sess.ID = SessionID then
         begin
           ADevice := Dev;
+          MatchedSession := Sess;
           Found := True;
           Break;
         end;
@@ -5552,6 +5582,14 @@ begin
   Result.Coef := Q.FieldByName('Coef').AsFloat;
   Result.FCDCoefficient := Q.FieldByName('FCDCoefficient').AsString;
   Result.State := osClean;
+
+  if (MatchedSession <> nil) and (MatchedSession.Spillages <> nil) then
+  begin
+    SessionPointCopy := TPointSpillage.Create(Result.SessionID);
+    SessionPointCopy.Assign(Result);
+    SessionPointCopy.State := osClean;
+    MatchedSession.Spillages.Add(SessionPointCopy);
+  end;
 end;
 
 function TDeviceRepository.LoadSpillagesByDevice(

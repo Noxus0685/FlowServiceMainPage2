@@ -1331,16 +1331,25 @@ end;
 
 procedure TFormMain.ShowDeviceSpillages(ADevice: TDevice);
 var
-  I: Integer;
+  Sess: TSessionSpillage;
+  Point: TPointSpillage;
+  List: TList<TPointSpillage>;
 begin
   SetLength(FCurrentSpillages, 0);
   if ADevice <> nil then
   begin
-    if ADevice.Spillages <> nil then
-    begin
-      SetLength(FCurrentSpillages, ADevice.Spillages.Count);
-      for I := 0 to ADevice.Spillages.Count - 1 do
-        FCurrentSpillages[I] := ADevice.Spillages[I];
+    List := TList<TPointSpillage>.Create;
+    try
+      if ADevice.Sessions <> nil then
+        for Sess in ADevice.Sessions do
+          if (Sess <> nil) and (Sess.Spillages <> nil) then
+            for Point in Sess.Spillages do
+              if Point <> nil then
+                List.Add(Point);
+
+      FCurrentSpillages := List.ToArray;
+    finally
+      List.Free;
     end;
   end;
 
@@ -1367,7 +1376,7 @@ begin
   end;
 
   Device := ResolveSelectedDevice;
-  if (Device = nil) or (Device.Spillages = nil) then
+  if (Device = nil) then
   begin
     GridResults.Visible := False;
     GridDataPoints.Visible := True;
@@ -1378,9 +1387,10 @@ begin
 
   List := TList<TPointSpillage>.Create;
   try
-    for Point in Device.Spillages do
-      if (Point <> nil) and (Point.SessionID = ASession.ID) then
-        List.Add(Point);
+    if ASession.Spillages <> nil then
+      for Point in ASession.Spillages do
+        if Point <> nil then
+          List.Add(Point);
 
     FCurrentSpillages := List.ToArray;
   finally
