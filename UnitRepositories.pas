@@ -5442,6 +5442,8 @@ begin
     Col('DeviceVolume', 'REAL'),
     Col('DeviceMass', 'REAL'),
     Col('Velocity', 'REAL'),
+    Col('Status', 'INTEGER'),
+    Col('StatusStr', 'TEXT'),
     Col('Error', 'REAL'),
     Col('Valid', 'INTEGER'),
     Col('QStd', 'REAL'),
@@ -5557,6 +5559,8 @@ begin
   Result.DeviceVolume := Q.FieldByName('DeviceVolume').AsFloat;
   Result.DeviceMass := Q.FieldByName('DeviceMass').AsFloat;
   Result.Velocity := Q.FieldByName('Velocity').AsFloat;
+  Result.Status := Q.FieldByName('Status').AsInteger;
+  Result.StatusStr := Q.FieldByName('StatusStr').AsString;
   Result.Error := Q.FieldByName('Error').AsFloat;
   Result.Valid := Q.FieldByName('Valid').AsInteger <> 0;
   Result.QStd := Q.FieldByName('QStd').AsFloat;
@@ -5679,7 +5683,7 @@ begin
           'insert into PointSpillage (' +
           'SessionID, DevicePointID, DeviceTypePointID, Num, Name, Description, ' +
           'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, QEtalonStd, QEtalonCV, ' +
-          'DeviceVolume, DeviceMass, Velocity, Error, Valid, QStd, QCV, ' +
+          'DeviceVolume, DeviceMass, Velocity, Status, StatusStr, Error, Valid, QStd, QCV, ' +
           'VolumeBefore, VolumeAfter, PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
           'Data1, Data2, ArchivedData, StartTemperature, EndTemperature, AvgTemperature, ' +
           'InputPressure, OutputPressure, Density, AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
@@ -5687,7 +5691,7 @@ begin
           ') values (' +
           ':SessionID, :DevicePointID, :DeviceTypePointID, :Num, :Name, :Description, ' +
           ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, :QEtalonStd, :QEtalonCV, ' +
-          ':DeviceVolume, :DeviceMass, :Velocity, :Error, :Valid, :QStd, :QCV, ' +
+          ':DeviceVolume, :DeviceMass, :Velocity, :Status, :StatusStr, :Error, :Valid, :QStd, :QCV, ' +
           ':VolumeBefore, :VolumeAfter, :PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
           ':Data1, :Data2, :ArchivedData, :StartTemperature, :EndTemperature, :AvgTemperature, ' +
           ':InputPressure, :OutputPressure, :Density, :AmbientTemperature, :AtmosphericPressure, :RelativeHumidity, ' +
@@ -5700,7 +5704,7 @@ begin
             'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, Num=:Num, ' +
             'Name=:Name, Description=:Description, SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
             'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
-            'Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
+            'Status=:Status, StatusStr=:StatusStr, Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
             'PulseCount=:PulseCount, MeanFrequency=:MeanFrequency, AvgCurrent=:AvgCurrent, AvgVoltage=:AvgVoltage, ' +
             'Data1=:Data1, Data2=:Data2, ArchivedData=:ArchivedData, StartTemperature=:StartTemperature, EndTemperature=:EndTemperature, AvgTemperature=:AvgTemperature, ' +
             'InputPressure=:InputPressure, OutputPressure=:OutputPressure, Density=:Density, AmbientTemperature=:AmbientTemperature, AtmosphericPressure=:AtmosphericPressure, RelativeHumidity=:RelativeHumidity, ' +
@@ -5724,6 +5728,8 @@ begin
     SetFloatParam(Q, 'DeviceVolume', ASpillage.DeviceVolume);
     SetFloatParam(Q, 'DeviceMass', ASpillage.DeviceMass);
     SetFloatParam(Q, 'Velocity', ASpillage.Velocity);
+    SetIntParam(Q, 'Status', ASpillage.Status);
+    SetStrParam(Q, 'StatusStr', ASpillage.StatusStr);
     SetFloatParam(Q, 'Error', ASpillage.Error);
     SetIntParam(Q, 'Valid', Ord(ASpillage.Valid));
     SetFloatParam(Q, 'QStd', ASpillage.QStd);
