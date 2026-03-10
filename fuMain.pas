@@ -1403,6 +1403,7 @@ procedure TFormMain.GridDataPointsGetValue(Sender: TObject; const ACol,
 var
   P: TPointSpillage;
   Sess: TSessionSpillage;
+  CurrentDevice: TDevice;
 begin
   if (ARow < 0) or (ARow >= Length(FCurrentSpillages)) then
     Exit;
@@ -1410,14 +1411,19 @@ begin
   if P = nil then
     Exit;
 
+  CurrentDevice := nil;
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) and
+     (TreeViewDevices.Selected.TagObject is TDevice) then
+    CurrentDevice := TDevice(TreeViewDevices.Selected.TagObject);
+
   if GridDataPoints.Columns[ACol] = StringColumnName then
     Value := P.Name
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageNum then
     Value := P.Num
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDateTime then
   begin
-    if (ActiveDevice <> nil) and (ActiveDevice.Sessions <> nil) then
-      for Sess in ActiveDevice.Sessions do
+    if (CurrentDevice <> nil) and (CurrentDevice.Sessions <> nil) then
+      for Sess in CurrentDevice.Sessions do
         if Sess.ID = P.SessionID then
         begin
           Value := DateTimeToStr(Sess.DateTime);
@@ -1426,8 +1432,8 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageOperator then
   begin
-    if (ActiveDevice <> nil) and (ActiveDevice.Sessions <> nil) then
-      for Sess in ActiveDevice.Sessions do
+    if (CurrentDevice <> nil) and (CurrentDevice.Sessions <> nil) then
+      for Sess in CurrentDevice.Sessions do
         if Sess.ID = P.SessionID then
         begin
           Value := Sess.OperatorName;
@@ -1436,8 +1442,8 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonName then
   begin
-    if (ActiveDevice <> nil) and (ActiveDevice.Sessions <> nil) then
-      for Sess in ActiveDevice.Sessions do
+    if (CurrentDevice <> nil) and (CurrentDevice.Sessions <> nil) then
+      for Sess in CurrentDevice.Sessions do
         if Sess.ID = P.SessionID then
         begin
           Value := Sess.EtalonName;
