@@ -569,6 +569,10 @@ end;
 procedure TFlowMeter.AddDataPoint(const APoint: TPointSpillage);
 var
   NewPoint: TPointSpillage;
+  NewPointID: Integer;
+  NewPointSessionID: Integer;
+  NewPointNum: Integer;
+  Sess: TSessionSpillage;
 begin
   if (FDevice = nil) or (APoint = nil) then
     Exit;
@@ -577,7 +581,34 @@ begin
   if NewPoint = nil then
     Exit;
 
+  NewPointID := NewPoint.ID;
+  NewPointSessionID := NewPoint.SessionID;
+  NewPointNum := NewPoint.Num;
+
   NewPoint.Assign(APoint);
+
+  // Сохраняем служебные поля, присвоенные при добавлении в устройство.
+  NewPoint.ID := NewPointID;
+  NewPoint.SessionID := NewPointSessionID;
+  NewPoint.Num := NewPointNum;
+
+  // Синхронизируем копию точки в списке выбранной сессии.
+  Sess := FDevice.GetActiveSessionSpillage;
+  if (Sess = nil) and (FDevice.Sessions <> nil) then
+  begin
+    for Sess in FDevice.Sessions do
+      if (Sess <> nil) and (Sess.ID = NewPoint.SessionID) then
+        Break;
+
+    if (Sess = nil) or (Sess.ID <> NewPoint.SessionID) then
+      Sess := nil;
+  end;
+
+  if (Sess <> nil) and (Sess.Spillages <> nil) and (Sess.Spillages.Count > 0) then
+  begin
+    Sess.Spillages.Last.Assign(NewPoint);
+    Sess.Spillages.Last.State := NewPoint.State;
+  end;
 end;
 
 function TFlowMeter.GetRepoTypeNameProxy: string;
