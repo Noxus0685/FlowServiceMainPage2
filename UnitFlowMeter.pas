@@ -578,7 +578,6 @@ begin
     Exit;
 
   NewPoint.Assign(APoint);
-  NewPoint.DeviceID := FDevice.ID;
 end;
 
 function TFlowMeter.GetRepoTypeNameProxy: string;
