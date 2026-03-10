@@ -10,6 +10,8 @@ interface
 
 type
 
+  TPointSpillage = class;
+
   TSessionSpillage = class(TTypeEntity)
   public
     DeviceID: Integer;
@@ -26,8 +28,13 @@ type
     CalibrCoefsName: string;
     CalibrCoefsUUID: string;
 
+    FSpillages: TObjectList<TPointSpillage>;
+
     constructor Create(ADeviceID: Integer);
+    destructor Destroy; override;
     procedure Assign(ASource: TSessionSpillage);
+
+    property Spillages: TObjectList<TPointSpillage> read FSpillages;
   end;
 
 
@@ -565,6 +572,14 @@ begin
   DeviceCoefsUUID := '';
   CalibrCoefsName := '';
   CalibrCoefsUUID := '';
+
+  FSpillages := TObjectList<TPointSpillage>.Create(True);
+end;
+
+destructor TSessionSpillage.Destroy;
+begin
+  FSpillages.Free;
+  inherited;
 end;
 
 procedure TSessionSpillage.Assign(ASource: TSessionSpillage);
@@ -585,6 +600,11 @@ begin
   DeviceCoefsUUID := ASource.DeviceCoefsUUID;
   CalibrCoefsName := ASource.CalibrCoefsName;
   CalibrCoefsUUID := ASource.CalibrCoefsUUID;
+
+  if FSpillages = nil then
+    FSpillages := TObjectList<TPointSpillage>.Create(True)
+  else
+    FSpillages.Clear;
 end;
 
 constructor TDevicePoint.Create(ADeviceID : Integer);
@@ -1327,6 +1347,7 @@ end;
 function TDevice.AddSpillage: TPointSpillage;
 var
   ActiveSession: TSessionSpillage;
+  SessionCopy: TPointSpillage;
 begin
   if Spillages = nil then
     Spillages := TObjectList<TPointSpillage>.Create(True);
@@ -1341,6 +1362,14 @@ begin
   Result.Num := Spillages.Count + 1;
 
   Spillages.Add(Result);
+
+  if ActiveSession.FSpillages <> nil then
+  begin
+    SessionCopy := TPointSpillage.Create(Result.SessionID);
+    SessionCopy.Assign(Result);
+    SessionCopy.State := Result.State;
+    ActiveSession.FSpillages.Add(SessionCopy);
+  end;
 end;
 
 procedure TDevice.AttachType(AType: TDeviceType; RepoName: String);
