@@ -3858,9 +3858,23 @@ begin
   // Начинаем транзакцию
   FDM.StartTransaction;
   try
-    // Обновляем прибор
-    if not UpdateDevice(ADevice) then
+    // Сохраняем сам прибор только при наличии изменений.
+    if (ADevice.State <> osClean) and not UpdateDevice(ADevice) then
       raise Exception.Create('Ошибка сохранения прибора');
+
+    // ВАЖНО: дочерние сущности (точки/сессии/проливы/калибровка)
+    // должны сохраняться даже если ADevice.State = osClean.
+    if not UpdateDevicePoints(ADevice) then
+      raise Exception.Create('Ошибка сохранения точек прибора');
+
+    if not UpdateSpillageSessions(ADevice) then
+      raise Exception.Create('Ошибка сохранения сессий пролива');
+
+    if not UpdateSpillages(ADevice) then
+      raise Exception.Create('Ошибка сохранения результатов пролива');
+
+    if not UpdateCalibrCoef(ADevice) then
+      raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
     // Применяем изменения в БД
     FDM.Commit;
