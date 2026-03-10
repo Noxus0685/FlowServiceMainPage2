@@ -413,6 +413,8 @@ type
     SpillageStop: Integer;
     Repeats: Integer;
     RepeatsProtocol: Integer;
+    Status: Integer;            // Итоговый статус прибора по анализу точек (не сохраняется в БД)
+    StatusStr: string;          // Текстовое описание итогового статуса (не сохраняется в БД)
 
     {====================================================================}
     { ОПИСАНИЕ И ПРИМЕЧАНИЯ }
@@ -447,6 +449,7 @@ type
     procedure AnalyseDataPoints(const ASpillage: TPointSpillage);
     procedure FillDataPointsList(APoint: TDevicePoint);
     procedure AnalyseDevicePointsResults;
+    procedure AnalyseResults;
 
 
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
@@ -585,6 +588,8 @@ begin
   SpillageStop := 0;
   Repeats := 3;
   RepeatsProtocol := 3;
+  Status := 0;
+  StatusStr := 'Измерения не производились/не анализировались.';
 
   {----------------------------------}
   { Описание }
@@ -849,6 +854,8 @@ begin
   SpillageStop := ASource.SpillageStop;
   Repeats := ASource.Repeats;
   RepeatsProtocol := ASource.RepeatsProtocol;
+  Status := ASource.Status;
+  StatusStr := ASource.StatusStr;
 
   Comment := ASource.Comment;
   Description := ASource.Description;
@@ -1783,6 +1790,98 @@ begin
       DP.Status := 5;
       DP.StatusStr := 'Корректных измерений не меньше RepeatsProtocol, требование по погрешности выполнено (зеленый).';
     end;
+  end;
+end;
+
+procedure TDevice.AnalyseResults;
+var
+  DP: TDevicePoint;
+  HasStatus3: Boolean;
+  HasStatus4: Boolean;
+  AllStatus5: Boolean;
+  AllStatus0: Boolean;
+  AllStatus01: Boolean;
+  AllStatus012: Boolean;
+begin
+  AnalyseDevicePointsResults;
+
+  Status := 0;
+  StatusStr := 'Измерения не производились/не анализировались.';
+
+  if (Points = nil) or (Points.Count = 0) then
+    Exit;
+
+  HasStatus3 := False;
+  HasStatus4 := False;
+  AllStatus5 := True;
+  AllStatus0 := True;
+  AllStatus01 := True;
+  AllStatus012 := True;
+
+  for DP in Points do
+  begin
+    if DP = nil then
+      Continue;
+
+    if DP.Status <> 5 then
+      AllStatus5 := False;
+
+    if DP.Status <> 0 then
+      AllStatus0 := False;
+
+    if not (DP.Status in [0, 1]) then
+      AllStatus01 := False;
+
+    if not (DP.Status in [0, 1, 2]) then
+      AllStatus012 := False;
+
+    if DP.Status = 3 then
+      HasStatus3 := True;
+
+    if DP.Status = 4 then
+      HasStatus4 := True;
+  end;
+
+  if AllStatus5 then
+  begin
+    Status := 5;
+    StatusStr := 'Все поверочные точки имеют достаточное количество корректных измерений в пределах допуска (зеленый).';
+    Exit;
+  end;
+
+  if HasStatus3 then
+  begin
+    Status := 3;
+    StatusStr := 'Есть поверочные точки с недостаточным количеством корректных измерений и превышением допуска по погрешности (красный).';
+    Exit;
+  end;
+
+  if HasStatus4 then
+  begin
+    Status := 4;
+    StatusStr := 'Есть поверочные точки с корректными измерениями в допуске, но их меньше RepeatsProtocol (желтый).';
+    Exit;
+  end;
+
+  if AllStatus012 then
+  begin
+    Status := 2;
+    StatusStr := 'Есть измерения, связанные с поверочными точками, но корректных измерений недостаточно или они некорректны (серый).';
+    Exit;
+  end;
+
+  if AllStatus01 then
+  begin
+    Status := 1;
+    StatusStr := 'Измерения производились, но измерений, связанных с поверочными точками, нет.';
+    Exit;
+  end;
+
+  if AllStatus0 then
+  begin
+    Status := 0;
+    StatusStr := 'Измерения не производились/не анализировались.';
+    Exit;
   end;
 end;
 
