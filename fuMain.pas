@@ -2358,11 +2358,19 @@ begin
     Exit;
 
   Item := TreeViewDevices.Selected;
-  if not (Item.TagObject is TSessionSpillage) then
-    Exit;
+  Session := nil;
+  Device := nil;
+  if Item.TagObject is TSessionSpillage then
+  begin
+    Session := TSessionSpillage(Item.TagObject);
+    Device := ResolveSelectedDevice;
+  end
+  else if Item.TagObject is TDevice then
+  begin
+    Device := TDevice(Item.TagObject);
+    Session := Device.GetActiveSessionSpillage;
+  end;
 
-  Session := TSessionSpillage(Item.TagObject);
-  Device := ResolveSelectedDevice;
   if (Session = nil) or (Device = nil) then
     Exit;
 
@@ -2457,26 +2465,43 @@ begin
     Exit;
 
   Item := TreeViewDevices.Selected;
-  if (Item = nil) or not (Item.TagObject is TSessionSpillage) then
+  if Item = nil then
     Exit;
 
-  Session := TSessionSpillage(Item.TagObject);
-  Device := ResolveSelectedDevice;
-  if (Session = nil) or (Device = nil) then
-    Exit;
+  Session := nil;
+  Device := nil;
+  if Item.TagObject is TSessionSpillage then
+  begin
+    Session := TSessionSpillage(Item.TagObject);
+    Device := ResolveSelectedDevice;
+    if (Session = nil) or (Device = nil) then
+      Exit;
 
-  if Session.Spillages <> nil then
-    for P in Session.Spillages do
+    if Session.Spillages <> nil then
+      for P in Session.Spillages do
+        if P <> nil then
+          P.State := osDeleted;
+
+    if Device.Spillages <> nil then
+      for P in Device.Spillages do
+        if (P <> nil) and (P.SessionID = Session.ID) then
+          P.State := osDeleted;
+
+    if Session.State = osClean then
+      Session.State := osModified;
+  end
+  else if Item.TagObject is TDevice then
+  begin
+    Device := TDevice(Item.TagObject);
+    if (Device = nil) or (Length(FCurrentSpillages) = 0) then
+      Exit;
+
+    for P in FCurrentSpillages do
       if P <> nil then
         P.State := osDeleted;
-
-  if Device.Spillages <> nil then
-    for P in Device.Spillages do
-      if (P <> nil) and (P.SessionID = Session.ID) then
-        P.State := osDeleted;
-
-  if Session.State = osClean then
-    Session.State := osModified;
+  end
+  else
+    Exit;
 
   Repo := nil;
   if DataManager <> nil then
@@ -2498,11 +2523,19 @@ begin
     Exit;
 
   Item := TreeViewDevices.Selected;
-  if not (Item.TagObject is TSessionSpillage) then
-    Exit;
+  Session := nil;
+  Device := nil;
+  if Item.TagObject is TSessionSpillage then
+  begin
+    Session := TSessionSpillage(Item.TagObject);
+    Device := ResolveSelectedDevice;
+  end
+  else if Item.TagObject is TDevice then
+  begin
+    Device := TDevice(Item.TagObject);
+    Session := Device.GetActiveSessionSpillage;
+  end;
 
-  Session := TSessionSpillage(Item.TagObject);
-  Device := ResolveSelectedDevice;
   if (Session = nil) or (Device = nil) or (Device.Sessions = nil) then
     Exit;
 
