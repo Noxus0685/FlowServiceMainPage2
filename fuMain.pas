@@ -2729,20 +2729,23 @@ procedure TFormMain.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
   Row: Integer;
-  CellBounds: TRectF;
+  P: TPointF;
 begin
   if (Button <> TMouseButton.mbRight) or (GridDataPoints = nil) then
     Exit;
 
+  // CellRect возвращает координаты в системе контента грида,
+  // поэтому учитываем текущую прокрутку ViewportPosition.
+  P := PointF(X + GridDataPoints.ViewportPosition.X,
+    Y + GridDataPoints.ViewportPosition.Y);
+
   for Row := 0 to GridDataPoints.RowCount - 1 do
-  begin
-    CellBounds := GridDataPoints.CellRect(0, Row);
-    if (Y >= CellBounds.Top) and (Y <= CellBounds.Bottom) then
+    if GridDataPoints.CellRect(0, Row).Contains(P) then
     begin
       GridDataPoints.Row := Row;
-      Break;
+      GridDataPoints.SetFocus;
+      Exit;
     end;
-  end;
 end;
 
 
@@ -2750,20 +2753,23 @@ procedure TFormMain.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
 var
   Row: Integer;
-  CellBounds: TRectF;
+  P: TPointF;
 begin
   if (Button <> TMouseButton.mbRight) or (GridResults = nil) then
     Exit;
 
+  // CellRect возвращает координаты в системе контента грида,
+  // поэтому учитываем текущую прокрутку ViewportPosition.
+  P := PointF(X + GridResults.ViewportPosition.X,
+    Y + GridResults.ViewportPosition.Y);
+
   for Row := 0 to GridResults.RowCount - 1 do
-  begin
-    CellBounds := GridResults.CellRect(0, Row);
-    if (Y >= CellBounds.Top) and (Y <= CellBounds.Bottom) then
+    if GridResults.CellRect(0, Row).Contains(P) then
     begin
       GridResults.Row := Row;
-      Break;
+      GridResults.SetFocus;
+      Exit;
     end;
-  end;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
