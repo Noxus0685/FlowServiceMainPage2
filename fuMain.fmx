@@ -3256,6 +3256,7 @@ object FormMain: TFormMain
             TabOrder = 1
             Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDataPointsGetValue
+            OnDrawColumnCell = GridDataPointsDrawColumnCell
             Viewport.Width = 1515.000000000000000000
             Viewport.Height = 635.000000000000000000
             object CheckColumnSpillageEnable: TCheckColumn
