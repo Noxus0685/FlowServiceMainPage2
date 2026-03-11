@@ -525,6 +525,8 @@ type
     MenuItemDataResultsColumns: TMenuItem;
     PopupMenuGridResults: TPopupMenu;
     MenuItemGridResultsColumns: TMenuItem;
+    ActionSessionDeviceRemove: TAction;
+    ActionSessionDeviceAdd: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -611,6 +613,8 @@ type
     procedure MenuTreeViewDevicesClearClick(Sender: TObject);
     procedure MenuTreeViewDevicesAddClick(Sender: TObject);
     procedure MenuTreeViewDevicesDeleteClick(Sender: TObject);
+    procedure ActionSessionDeviceRemoveExecute(Sender: TObject);
+    procedure ActionSessionDeviceAddExecute(Sender: TObject);
 
 
   private
@@ -1397,6 +1401,7 @@ procedure TFormMain.RefreshResultsTab;
 begin
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
+
 end;
 
 function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;
@@ -2256,6 +2261,27 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
+  RefreshResultsTab;
+end;
+
+procedure TFormMain.ActionSessionDeviceAddExecute(Sender: TObject);
+begin
+  AddProcessingDeviceFromSelection;
+  RefreshResultsTab;
+end;
+
+procedure TFormMain.ActionSessionDeviceRemoveExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if not (Item.TagObject is TDevice) then
+    Exit;
+
+  RemoveProcessingDevice(TDevice(Item.TagObject));
   RefreshResultsTab;
 end;
 
