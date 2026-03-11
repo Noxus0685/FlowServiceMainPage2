@@ -25,7 +25,8 @@ uses
   FMX.Grid, FMX.ScrollBox, FMX.Layouts, FMX.Controls.Presentation,
   FMX.TabControl, FMX.Menus, System.Actions, FMX.ActnList, FMX.ListView.Types,
   FMX.ListView.Appearances, FMX.ListView.Adapters.Base, FMX.Memo.Types,
-  FMX.Memo, FMX.DateTimeCtrls, FMX.TreeView, FMX.ListView;
+  FMX.Memo, FMX.DateTimeCtrls, FMX.TreeView, FMX.ListView,
+  System.IniFiles;
 
 
 
@@ -660,6 +661,7 @@ type
     destructor Destroy; override;
   private
     FWorkTableManager: TWorkTableManager;
+    FProcessingDevices: TObjectList<TDevice>;
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
     FInstrumentalVisibleOrder: TList<TLayout>;
@@ -684,6 +686,12 @@ type
     FEtalonClipboard: TChannelClipboardData;
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
+    procedure LoadProcessingDevices;
+    procedure SaveProcessingDevices;
+    function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
+    procedure AddProcessingDevice(ADevice: TDevice);
+    procedure RemoveProcessingDevice(ADevice: TDevice);
+    function HasDeviceInProcessing(ADevice: TDevice): Boolean;
   end;
 
 
@@ -726,6 +734,10 @@ const
     'SN-1003',
     'SN-1004'
   );
+
+  CProcessingDevicesSection = 'ProcessingDevices';
+  CProcessingDevicesCountKey = 'Count';
+  CProcessingDevicesItemKeyPrefix = 'Item';
 
 function IsVolumeFlowUnit(const AUnit: string): Boolean;
 var
@@ -784,11 +796,131 @@ begin
     Result := 'Нет';
 end;
 
+function TFormMain.FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
+var
+  Device: TDevice;
+  DeviceUUID: string;
+begin
+  Result := nil;
+  DeviceUUID := Trim(ADeviceUUID);
+  if (DeviceUUID = '') or (FProcessingDevices = nil) then
+    Exit;
+
+  for Device in FProcessingDevices do
+    if (Device <> nil) and SameText(Trim(Device.MitUUID), DeviceUUID) then
+      Exit(Device);
+end;
+
+function TFormMain.HasDeviceInProcessing(ADevice: TDevice): Boolean;
+begin
+  Result := (ADevice <> nil) and (FindProcessingDeviceByUUID(ADevice.MitUUID) <> nil);
+end;
+
+procedure TFormMain.AddProcessingDevice(ADevice: TDevice);
+begin
+  if (ADevice = nil) or (Trim(ADevice.MitUUID) = '') or (FProcessingDevices = nil) then
+    Exit;
+
+  if HasDeviceInProcessing(ADevice) then
+    Exit;
+
+  FProcessingDevices.Add(ADevice);
+  SaveProcessingDevices;
+end;
+
+procedure TFormMain.RemoveProcessingDevice(ADevice: TDevice);
+var
+  Existing: TDevice;
+begin
+  if (ADevice = nil) or (FProcessingDevices = nil) then
+    Exit;
+
+  Existing := FindProcessingDeviceByUUID(ADevice.MitUUID);
+  if Existing = nil then
+    Exit;
+
+  FProcessingDevices.Remove(Existing);
+  SaveProcessingDevices;
+end;
+
+procedure TFormMain.LoadProcessingDevices;
+var
+  Ini: TIniFile;
+  I, Count: Integer;
+  DeviceUUID: string;
+  Device: TDevice;
+  Repo: TDeviceRepository;
+begin
+  if FProcessingDevices = nil then
+    Exit;
+
+  FProcessingDevices.Clear;
+
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (not FileExists(FWorkTableManager.IniFileName)) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    Count := Ini.ReadInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, 0);
+    for I := 0 to Count - 1 do
+    begin
+      DeviceUUID := Trim(Ini.ReadString(CProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(I), ''));
+      if DeviceUUID = '' then
+        Continue;
+
+      Device := nil;
+      Repo := nil;
+      if DataManager <> nil then
+        Device := DataManager.FindDevice(DeviceUUID, Repo);
+
+      if (Device <> nil) and (FindProcessingDeviceByUUID(Device.MitUUID) = nil) then
+        FProcessingDevices.Add(Device);
+    end;
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TFormMain.SaveProcessingDevices;
+var
+  Ini: TIniFile;
+  I, SaveIndex: Integer;
+  Device: TDevice;
+begin
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (FProcessingDevices = nil) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    Ini.EraseSection(CProcessingDevicesSection);
+
+    SaveIndex := 0;
+    for I := 0 to FProcessingDevices.Count - 1 do
+    begin
+      Device := FProcessingDevices[I];
+      if (Device = nil) or (Trim(Device.MitUUID) = '') then
+        Continue;
+
+      Ini.WriteString(CProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(SaveIndex), Trim(Device.MitUUID));
+      Inc(SaveIndex);
+    end;
+
+    Ini.WriteInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, SaveIndex);
+  finally
+    Ini.Free;
+  end;
+end;
+
 destructor TFormMain.Destroy;
 begin
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   TMeterValue.SaveToFile(0);
+  FProcessingDevices.Free;
   FInstrumentalVisibleOrder.Free;
   FWorkTableManager.Free;
   FFlowMeters.Free;
@@ -1128,6 +1260,7 @@ begin
   TMeterValue.LoadFromFile;
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
+  FProcessingDevices := TObjectList<TDevice>.Create(False);
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -1135,6 +1268,7 @@ begin
   );
 
   FWorkTableManager.Load;
+  LoadProcessingDevices;
 
   GridDevices.RowCount := 2;
 
@@ -1213,60 +1347,108 @@ var
   WT: TWorkTable;
   Ch: TChannel;
   Sess: TSessionSpillage;
-begin
-  TreeViewDevices.BeginUpdate;
-  try
-    TreeViewDevices.Clear;
+  Device: TDevice;
+  ProcessedOnTables: TStringList;
+  TableDeviceUUIDs: TStringList;
 
-    RootAll := TTreeViewItem.Create(TreeViewDevices);
-    RootAll.Text := '...';
-    TreeViewDevices.AddObject(RootAll);
+  procedure AddDeviceNode(const AParent: TTreeViewItem; ADevice: TDevice);
+  begin
+    if (AParent = nil) or (ADevice = nil) then
+      Exit;
 
-    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+    DeviceItem := TTreeViewItem.Create(TreeViewDevices);
+    DeviceItem.Text := ADevice.Name;
+    DeviceItem.TagObject := ADevice;
+    AParent.AddObject(DeviceItem);
+
+    if ADevice.Sessions <> nil then
+      for Sess in ADevice.Sessions do
       begin
-        WT := FWorkTableManager.WorkTables[I];
-        if WT = nil then
+        if Sess = nil then
           Continue;
 
-        RootTable := TTreeViewItem.Create(TreeViewDevices);
-        RootTable.Text := WT.Name;
-        RootTable.TagObject := WT;
-        TreeViewDevices.AddObject(RootTable);
+        SessionItem := TTreeViewItem.Create(TreeViewDevices);
+        SessionItem.Text :=
+          Format('Сессия #%d (%s)', [Sess.ID, DateTimeToStr(Sess.DateTime)]);
+        SessionItem.TagObject := Sess;
+        DeviceItem.AddObject(SessionItem);
+      end;
+  end;
+begin
+  ProcessedOnTables := TStringList.Create;
+  try
+    ProcessedOnTables.Sorted := False;
+    ProcessedOnTables.Duplicates := TDuplicates.dupIgnore;
 
-        for Ch in WT.DeviceChannels do
+    TreeViewDevices.BeginUpdate;
+    try
+      TreeViewDevices.Clear;
+
+      RootAll := TTreeViewItem.Create(TreeViewDevices);
+      RootAll.Text := '...';
+      TreeViewDevices.AddObject(RootAll);
+
+      if FProcessingDevices <> nil then
+        for Device in FProcessingDevices do
+          AddDeviceNode(RootAll, Device);
+
+      if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+        for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
         begin
-          if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+          WT := FWorkTableManager.WorkTables[I];
+          if WT = nil then
             Continue;
 
-          DeviceItem := TTreeViewItem.Create(TreeViewDevices);
-          DeviceItem.Text := Ch.FlowMeter.Device.Name;
-          DeviceItem.TagObject := Ch.FlowMeter.Device;
-          RootTable.AddObject(DeviceItem);
+          RootTable := TTreeViewItem.Create(TreeViewDevices);
+          RootTable.Text := WT.Name;
+          RootTable.TagObject := WT;
+          TreeViewDevices.AddObject(RootTable);
 
-          if Ch.FlowMeter.Device.Sessions <> nil then
-            for Sess in Ch.FlowMeter.Device.Sessions do
+          TableDeviceUUIDs := TStringList.Create;
+          try
+            TableDeviceUUIDs.Sorted := False;
+            TableDeviceUUIDs.Duplicates := TDuplicates.dupIgnore;
+
+            for Ch in WT.DeviceChannels do
             begin
-              if Sess = nil then
+              if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
                 Continue;
 
-              SessionItem := TTreeViewItem.Create(TreeViewDevices);
-              SessionItem.Text :=
-                Format('Сессия #%d (%s)', [Sess.ID, DateTimeToStr(Sess.DateTime)]);
-              SessionItem.TagObject := Sess;
-              DeviceItem.AddObject(SessionItem);
+              Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.MitUUID);
+              if Device = nil then
+                Continue;
+
+              if TableDeviceUUIDs.IndexOf(Device.MitUUID) >= 0 then
+                Continue;
+
+              TableDeviceUUIDs.Add(Device.MitUUID);
+
+              if ProcessedOnTables.IndexOf(Device.MitUUID) < 0 then
+                ProcessedOnTables.Add(Device.MitUUID);
+
+              AddDeviceNode(RootTable, Device);
             end;
+          finally
+            TableDeviceUUIDs.Free;
+          end;
         end;
-      end;
 
-    RootOther := TTreeViewItem.Create(TreeViewDevices);
-    RootOther.Text := 'прочее';
-    TreeViewDevices.AddObject(RootOther);
+      RootOther := TTreeViewItem.Create(TreeViewDevices);
+      RootOther.Text := 'прочее';
+      TreeViewDevices.AddObject(RootOther);
 
-    if TreeViewDevices.Count > 0 then
-      TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0);
+      if FProcessingDevices <> nil then
+        for Device in FProcessingDevices do
+          if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.MitUUID) < 0) then
+            AddDeviceNode(RootOther, Device);
+
+      if TreeViewDevices.Count > 0 then
+        TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0);
+    finally
+      TreeViewDevices.EndUpdate;
+    end;
   finally
-    TreeViewDevices.EndUpdate;
+    ProcessedOnTables.Free;
   end;
 end;
 
@@ -1541,6 +1723,18 @@ begin
     Exit;
 
   Item := TreeViewDevices.Selected;
+  if Item.TagObject is TDevice then
+  begin
+    Device := TDevice(Item.TagObject);
+    if MessageDlg('Удалить выбранный прибор из списка обработки?',
+        TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit;
+
+    RemoveProcessingDevice(Device);
+    RefreshResultsTab;
+    Exit;
+  end;
+
   if not (Item.TagObject is TSessionSpillage) then
     Exit;
 
@@ -2523,6 +2717,8 @@ begin
   if FWorkTableManager <> nil then
     FWorkTableManager.Save;
 
+  SaveProcessingDevices;
+
   if DataManager <> nil then
     DataManager.Save;
 end;
@@ -2863,6 +3059,7 @@ begin
       AChannel.TypeName := SelDevice.DeviceTypeName;
       AChannel.Serial := SelDevice.SerialNumber;
       AChannel.Signal := SelDevice.OutputType;
+      AddProcessingDevice(SelDevice);
       UpdateGridDevices;
     finally
       SelectFrm.Free;
@@ -2889,6 +3086,7 @@ begin
         AChannel.TypeName := ADevice.DeviceTypeName;
         AChannel.Serial := ADevice.SerialNumber;
         AChannel.Signal := ADevice.OutputType;
+        AddProcessingDevice(ADevice);
       end;
 
       UpdateGrids;
@@ -2941,6 +3139,7 @@ begin
     AChannel.TypeName := SelDevice.DeviceTypeName;
     AChannel.Serial := SelDevice.SerialNumber;
     AChannel.Signal := SelDevice.OutputType;
+    AddProcessingDevice(SelDevice);
     MarkChannelDeviceModified(AChannel);
     UpdateGrids;
   finally
@@ -3061,6 +3260,7 @@ begin
     Exit;
 
   AChannel.AssignFlowMeterFrom(AClipboard.Snapshot, FActiveWorkTable, True);
+  AddProcessingDevice(AChannel.FlowMeter.Device);
   MarkChannelDeviceModified(AChannel);
 end;
 
@@ -3081,9 +3281,17 @@ begin
 end;
 
 procedure TFormMain.ClearChannelData(AChannel: TChannel);
+var
+  Device: TDevice;
 begin
   if AChannel = nil then
     Exit;
+
+  Device := nil;
+  if (AChannel.FlowMeter <> nil) then
+    Device := AChannel.FlowMeter.Device;
+
+  RemoveProcessingDevice(Device);
 
   AChannel.RecreateFlowMeter(FActiveWorkTable);
 
@@ -3113,6 +3321,7 @@ begin
   ADest.RepoTypeUUID := ASource.RepoTypeUUID;
   ADest.RepoDeviceName := ASource.RepoDeviceName;
   ADest.RepoDeviceUUID := ASource.RepoDeviceUUID;
+  AddProcessingDevice(ADest.FlowMeter.Device);
   MarkChannelDeviceModified(ADest);
 end;
 
