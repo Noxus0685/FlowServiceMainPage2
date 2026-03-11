@@ -592,6 +592,10 @@ type
     procedure ActionSessionPointsClearExecute(Sender: TObject);
     procedure ActionSessionActiveExecute(Sender: TObject);
     procedure ActionSessionNewExecute(Sender: TObject);
+    procedure PopupMenuTreeViewDevicesPopup(Sender: TObject);
+    procedure MenuTreeViewDevicesClearClick(Sender: TObject);
+    procedure MenuTreeViewDevicesAddClick(Sender: TObject);
+    procedure MenuTreeViewDevicesDeleteClick(Sender: TObject);
 
 
   private
@@ -692,6 +696,7 @@ type
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
+    procedure AddProcessingDeviceFromSelection;
   end;
 
 
@@ -841,6 +846,26 @@ begin
 
   FProcessingDevices.Remove(Existing);
   SaveProcessingDevices;
+end;
+
+procedure TFormMain.AddProcessingDeviceFromSelection;
+var
+  Frm: TFormDeviceSelect;
+  SelDevice: TDevice;
+begin
+  Frm := TFormDeviceSelect.Create(Self);
+  try
+    if Frm.ShowModal <> mrOk then
+      Exit;
+
+    SelDevice := Frm.GetSelectedDevice;
+    if SelDevice = nil then
+      Exit;
+
+    AddProcessingDevice(SelDevice);
+  finally
+    Frm.Free;
+  end;
 end;
 
 procedure TFormMain.LoadProcessingDevices;
@@ -1319,6 +1344,8 @@ begin
   ButtonCancel.OnClick := ButtonCancelClick;
   TabControl1.OnChange := TabControl1Change;
   TreeViewDevices.OnChange := TreeViewDevicesChange;
+  TreeViewDevices.PopupMenu := PopupMenu2;
+  PopupMenu2.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
@@ -1709,6 +1736,193 @@ begin
 
   if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
     Result := DataManager.ActiveDeviceRepo.FindDeviceByID(Sess.DeviceID);
+end;
+
+procedure TFormMain.PopupMenuTreeViewDevicesPopup(Sender: TObject);
+var
+  Item: TTreeViewItem;
+
+  procedure AddActionMenuItem(const AAction: TAction);
+  var
+    MenuItem: TMenuItem;
+  begin
+    if AAction = nil then
+      Exit;
+
+    MenuItem := TMenuItem.Create(PopupMenu2);
+    MenuItem.Action := AAction;
+    PopupMenu2.AddObject(MenuItem);
+  end;
+
+  procedure AddSimpleMenuItem(const AText: string; AOnClick: TNotifyEvent);
+  var
+    MenuItem: TMenuItem;
+  begin
+    MenuItem := TMenuItem.Create(PopupMenu2);
+    MenuItem.Text := AText;
+    MenuItem.OnClick := AOnClick;
+    PopupMenu2.AddObject(MenuItem);
+  end;
+begin
+  if PopupMenu2 = nil then
+    Exit;
+
+  PopupMenu2.Clear;
+
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+
+  if SameText(Item.Text, '...') then
+  begin
+    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
+    AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
+    Exit;
+  end;
+
+  if Item.TagObject is TWorkTable then
+  begin
+    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
+    Exit;
+  end;
+
+  if SameText(Item.Text, 'прочее') then
+  begin
+    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
+    AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
+    Exit;
+  end;
+
+  if Item.TagObject is TDevice then
+  begin
+    AddSimpleMenuItem('Удалить', MenuTreeViewDevicesDeleteClick);
+    AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
+    Exit;
+  end;
+
+  if Item.TagObject is TSessionSpillage then
+  begin
+    AddActionMenuItem(ActionSessionDelete);
+    AddActionMenuItem(ActionSessionClose);
+    AddActionMenuItem(ActionSessionPointsClear);
+    AddActionMenuItem(ActionSessionActive);
+    AddActionMenuItem(ActionSessionNew);
+  end;
+end;
+
+procedure TFormMain.MenuTreeViewDevicesClearClick(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  WT: TWorkTable;
+  Ch: TChannel;
+  Device: TDevice;
+  I: Integer;
+  DeviceUUIDsOnTables: TStringList;
+  DevicesToRemove: TList<TDevice>;
+
+  procedure RemoveCollectedDevices;
+  var
+    D: TDevice;
+  begin
+    if (FProcessingDevices = nil) or (DevicesToRemove.Count = 0) then
+      Exit;
+
+    for D in DevicesToRemove do
+      FProcessingDevices.Remove(D);
+
+    SaveProcessingDevices;
+  end;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+
+  if SameText(Item.Text, '...') then
+  begin
+    if FProcessingDevices <> nil then
+    begin
+      FProcessingDevices.Clear;
+      SaveProcessingDevices;
+    end;
+
+    RefreshResultsTab;
+    Exit;
+  end;
+
+  if (FProcessingDevices = nil) then
+    Exit;
+
+  DeviceUUIDsOnTables := TStringList.Create;
+  DevicesToRemove := TList<TDevice>.Create;
+  try
+    DeviceUUIDsOnTables.Sorted := False;
+    DeviceUUIDsOnTables.Duplicates := dupIgnore;
+
+    if Item.TagObject is TWorkTable then
+    begin
+      WT := TWorkTable(Item.TagObject);
+      if (WT <> nil) and (WT.DeviceChannels <> nil) then
+        for Ch in WT.DeviceChannels do
+          if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.MitUUID));
+
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.MitUUID)) >= 0) then
+          DevicesToRemove.Add(Device);
+
+      RemoveCollectedDevices;
+      RefreshResultsTab;
+      Exit;
+    end;
+
+    if SameText(Item.Text, 'прочее') then
+    begin
+      if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+        for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+        begin
+          WT := FWorkTableManager.WorkTables[I];
+          if (WT = nil) or (WT.DeviceChannels = nil) then
+            Continue;
+
+          for Ch in WT.DeviceChannels do
+            if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+              DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.MitUUID));
+        end;
+
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.MitUUID)) < 0) then
+          DevicesToRemove.Add(Device);
+
+      RemoveCollectedDevices;
+      RefreshResultsTab;
+    end;
+  finally
+    DevicesToRemove.Free;
+    DeviceUUIDsOnTables.Free;
+  end;
+end;
+
+procedure TFormMain.MenuTreeViewDevicesAddClick(Sender: TObject);
+begin
+  AddProcessingDeviceFromSelection;
+  RefreshResultsTab;
+end;
+
+procedure TFormMain.MenuTreeViewDevicesDeleteClick(Sender: TObject);
+var
+  Item: TTreeViewItem;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if not (Item.TagObject is TDevice) then
+    Exit;
+
+  RemoveProcessingDevice(TDevice(Item.TagObject));
+  RefreshResultsTab;
 end;
 
 procedure TFormMain.ActionSessionDeleteExecute(Sender: TObject);
