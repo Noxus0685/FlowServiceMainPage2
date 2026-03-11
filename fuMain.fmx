@@ -3173,6 +3173,7 @@ object FormMain: TFormMain
         end
         object TreeViewDevices: TTreeView
           Align = Client
+          PopupMenu = PopupMenuTreeViewDevices
           Size.Width = 233.000000000000000000
           Size.Height = 676.000000000000000000
           Size.PlatformDefault = False
@@ -3902,6 +3903,11 @@ object FormMain: TFormMain
       end
     end
   end
+  object PopupMenuTreeViewDevices: TPopupMenu
+    OnPopup = PopupMenuTreeViewDevicesPopup
+    Left = 1614
+    Top = 513
+  end
   object ActionListWorkTables: TActionList
     Left = 1610
     Top = 140
@@ -4064,9 +4070,5 @@ object FormMain: TFormMain
       Hint = #1053#1086#1074#1072#1103' '#1089#1077#1089#1089#1080#1103
       OnExecute = ActionSessionNewExecute
     end
-  end
-  object PopupMenu2: TPopupMenu
-    Left = 1614
-    Top = 513
   end
 end
