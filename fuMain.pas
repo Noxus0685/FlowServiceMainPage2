@@ -575,6 +575,8 @@ type
       Button: TMouseButton; Shift: TShiftState; X, Y: Single);
     procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -1370,6 +1372,7 @@ begin
   TreeViewDevices.PopupMenu := PopupMenuTreeViewDevices;
   PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
+  GridDataPoints.OnMouseDown := GridDataPointsMouseDown;
   PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
   PopupMenuGridResults.OnPopup := PopupMenuGridResultsPopup;
   UpdateSessionDateLabel(nil);
@@ -2717,6 +2720,25 @@ begin
     Value := P.FCDCoefficient
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageArchivedData then
     Value := P.ArchivedData;
+end;
+
+procedure TFormMain.GridDataPointsMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  Row: Integer;
+  Point: TPointF;
+begin
+  if (Button <> TMouseButton.mbRight) or (GridDataPoints = nil) then
+    Exit;
+
+  Point := PointF(X, Y);
+
+  for Row := 0 to GridDataPoints.RowCount - 1 do
+    if GridDataPoints.CellRect(0, Row).Contains(Point) then
+    begin
+      GridDataPoints.Row := Row;
+      Break;
+    end;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
