@@ -3258,69 +3258,72 @@ object FormMain: TFormMain
             OnGetValue = GridDataPointsGetValue
             Viewport.Width = 1515.000000000000000000
             Viewport.Height = 635.000000000000000000
+            object CheckColumnSpillageEnable: TCheckColumn
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnSpillageNum: TStringColumn
+              Header = #8470
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              Size.Width = 43.000000000000000000
+            end
             object StringColumnName: TStringColumn
               Header = #1048#1084#1103
               HeaderSettings.TextSettings.Trimming = Character
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
-              Size.Width = 99.000000000000000000
-            end
-            object StringColumnSpillageNum: TStringColumn
-              Header = #8470
-              HeaderSettings.TextSettings.WordWrap = False
-              Size.Width = 50.000000000000000000
+              Size.Width = 104.000000000000000000
             end
             object StringColumnSpillageDateTime: TStringColumn
               Header = #1044#1072#1090#1072'/'#1074#1088#1077#1084#1103
               HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
               Size.Width = 120.000000000000000000
             end
             object StringColumnSpillageOperator: TStringColumn
               Header = #1054#1087#1077#1088#1072#1090#1086#1088
               HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              Size.Width = 110.000000000000000000
             end
             object StringColumnSpillageEtalonName: TStringColumn
               Header = #1069#1090#1072#1083#1086#1085
               HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              Size.Width = 127.000000000000000000
             end
             object StringColumnSpillageSpillTime: TStringColumn
-              Header = #1042#1088#1077#1084#1103
+              Header = #1042#1088#1077#1084#1103', '#1089#1077#1082
               HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
             end
             object StringColumnSpillageQavgEtalon: TStringColumn
               Header = #1056#1072#1089#1093#1086#1076
               HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
             end
             object StringColumnSpillageEtalonVolume: TStringColumn
-              Header = #1054#1073#1098#1077#1084#1069
-              HeaderSettings.TextSettings.WordWrap = False
-            end
-            object StringColumnSpillageEtalonMass: TStringColumn
-              Header = #1052#1072#1089#1089#1072#1069
+              Header = #1054#1073#1098#1077#1084' '#1101#1090#1072#1083#1086#1085#1072', '
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQEtalonStd: TStringColumn
-              Header = #1057#1050#1054#1069
+              Header = #1057#1050#1054' '#1069#1090#1072#1083#1086#1085#1072', %'
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQEtalonCV: TStringColumn
-              Header = #1042#1072#1088#1080#1072#1094#1080#1103#1069
+              Header = #1042#1072#1088#1080#1072#1094#1080#1103'.  '
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageDeviceVolume: TStringColumn
-              Header = #1054#1073#1098#1077#1084#1055
-              HeaderSettings.TextSettings.WordWrap = False
-            end
-            object StringColumnSpillageDeviceMass: TStringColumn
-              Header = #1052#1072#1089#1089#1072#1055
+              Header = #1054#1073#1098#1077#1084' '#1087#1088#1080#1073#1086#1088#1072','
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageVelocity: TStringColumn
-              Header = #1057#1082#1086#1088#1086#1089#1090#1100
+              Header = #1057#1082#1086#1088#1086#1089#1090#1100', '#1084'/'#1089
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageError: TStringColumn
-              Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+              Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageValid: TStringColumn
@@ -3328,27 +3331,27 @@ object FormMain: TFormMain
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQStd: TStringColumn
-              Header = #1057#1050#1054#1055
+              Header = #1057#1050#1054' '#1087#1088#1080#1073#1086#1088#1072', %'
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageQCV: TStringColumn
-              Header = #1042#1072#1088#1080#1072#1094#1080#1103#1055
+              Header = #1042#1072#1088#1080#1072#1094#1080#1103' '#1087#1088#1080#1073#1086#1088#1072','
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageVolumeBefore: TStringColumn
-              Header = #1044#1086
+              Header = #1054#1073#1098#1077#1084' '#1076#1086
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageVolumeAfter: TStringColumn
-              Header = #1055#1086#1089#1083#1077
+              Header = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillagePulseCount: TStringColumn
-              Header = #1048#1084#1087#1091#1083#1100#1089#1099
+              Header = #1048#1084#1087#1091#1083#1100#1089#1099', '#1080#1084#1087
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageMeanFrequency: TStringColumn
-              Header = #1063#1072#1089#1090#1086#1090#1072
+              Header = #1063#1072#1089#1090#1086#1090#1072', '#1043#1094
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAvgCurrent: TStringColumn
@@ -3368,35 +3371,39 @@ object FormMain: TFormMain
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageStartTemperature: TStringColumn
-              Header = #1058#1085#1072#1095
+              Header = #1058' '#1085#1072#1095','
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageEndTemperature: TStringColumn
-              Header = #1058#1082#1086#1085
+              Header = #1058' '#1082#1086#1085','
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAvgTemperature: TStringColumn
-              Header = #1058#1089#1088#1077#1076
+              Header = #1058' '#1089#1088#1077#1076','
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageInputPressure: TStringColumn
-              Header = #1044#1072#1074#1083#1042#1093
+              Header = #1044#1072#1074#1083#1077#1085#1080#1077' '#1042#1093
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageOutputPressure: TStringColumn
-              Header = #1044#1072#1074#1083#1042#1099#1093
+              Header = #1044#1072#1074#1083#1077#1085#1080#1077' '#1042#1099#1093
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnSpillageDeltaPressure: TStringColumn
+              Header = #1044#1072#1074#1083#1077#1085#1080#1077' '#1088#1072#1079#1085#1080#1094#1072', '
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageDensity: TStringColumn
-              Header = #1055#1083#1086#1090#1085#1086#1089#1090#1100
+              Header = #1055#1083#1086#1090#1085#1086#1089#1090#1100','
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAmbientTemperature: TStringColumn
-              Header = #1058#1074#1086#1079#1076
+              Header = #1058' '#1074#1086#1079#1076
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageAtmosphericPressure: TStringColumn
-              Header = #1040#1090#1084#1044#1072#1074#1083
+              Header = #1040#1090#1084' '#1044#1072#1074#1083
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageRelativeHumidity: TStringColumn
@@ -3594,7 +3601,7 @@ object FormMain: TFormMain
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 39
-            object ComboBox1: TComboBox
+            object ComboBoxUnitsResult: TComboBox
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Left
               Items.Strings = (

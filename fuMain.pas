@@ -454,11 +454,9 @@ type
     StringColumnSpillageSpillTime: TStringColumn;
     StringColumnSpillageQavgEtalon: TStringColumn;
     StringColumnSpillageEtalonVolume: TStringColumn;
-    StringColumnSpillageEtalonMass: TStringColumn;
     StringColumnSpillageQEtalonStd: TStringColumn;
     StringColumnSpillageQEtalonCV: TStringColumn;
     StringColumnSpillageDeviceVolume: TStringColumn;
-    StringColumnSpillageDeviceMass: TStringColumn;
     StringColumnSpillageVelocity: TStringColumn;
     StringColumnSpillageError: TStringColumn;
     StringColumnSpillageValid: TStringColumn;
@@ -515,7 +513,7 @@ type
     ActionSessionActive: TAction;
     ActionSessionNew: TAction;
     ActionSessionSynchTable: TAction;
-    ComboBox1: TComboBox;
+    ComboBoxUnitsResult: TComboBox;
     LabelSessionDate: TLabel;
     ButtonSessionClose: TButton;
     Label8: TLabel;
@@ -527,6 +525,8 @@ type
     MenuItemGridResultsColumns: TMenuItem;
     ActionSessionDeviceRemove: TAction;
     ActionSessionDeviceAdd: TAction;
+    CheckColumnSpillageEnable: TCheckColumn;
+    StringColumnSpillageDeltaPressure: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -2813,16 +2813,12 @@ begin
     Value := FloatToStr(P.QavgEtalon)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonVolume then
     Value := FloatToStr(P.EtalonVolume)
-  else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonMass then
-    Value := FloatToStr(P.EtalonMass)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonStd then
     Value := FloatToStr(P.QEtalonStd)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonCV then
     Value := FloatToStr(P.QEtalonCV)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceVolume then
     Value := FloatToStr(P.DeviceVolume)
-  else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceMass then
-    Value := FloatToStr(P.DeviceMass)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageVelocity then
     Value := FloatToStr(P.Velocity)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
