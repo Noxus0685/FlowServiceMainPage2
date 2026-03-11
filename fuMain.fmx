@@ -4084,6 +4084,15 @@ object FormMain: TFormMain
     OnPopup = PopupMenuGridDataPointsPopup
     Left = 1393
     Top = 521
+    object MenuItemDataResultsDeletePoint: TMenuItem
+      Action = ActionSessionPointDelete
+    end
+    object MenuItemDataResultsCloseSession: TMenuItem
+      Action = ActionSessionClose
+    end
+    object MenuItemDataResultsSep1: TMenuItem
+      Text = '-'
+    end
     object MenuItemDataResultsColumns: TMenuItem
       Text = #1057#1090#1086#1083#1073#1094#1099
     end
