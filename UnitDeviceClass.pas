@@ -22,7 +22,8 @@ type
 
   public
     DeviceID: Integer;
-    DateTime: TDateTime;
+    DateTimeOpen: TDateTime;
+    DateTimeClose: TDateTime;
     OperatorName: string;
     EtalonName: string;
 
@@ -257,6 +258,7 @@ type
     {====================================================================}
 
     Num: Integer;                // Порядковый номер проливки
+    DateTime: TDateTime;         // Дата/время окончания измерения
     ArchivedData: string;        // Архив сырых данных (по секундам и т.п.)
 
     constructor Create (ASessionID : Integer);
@@ -606,7 +608,8 @@ begin
   inherited Create;
 
   DeviceID := ADeviceID;
-  DateTime := 0;
+  DateTimeOpen := 0;
+  DateTimeClose := 0;
   OperatorName := '';
   EtalonName := '';
 
@@ -637,7 +640,8 @@ begin
   State := ASource.State;
   ID := ASource.ID;
   DeviceID := ASource.DeviceID;
-  DateTime := ASource.DateTime;
+  DateTimeOpen := ASource.DateTimeOpen;
+  DateTimeClose := ASource.DateTimeClose;
   OperatorName := ASource.OperatorName;
   EtalonName := ASource.EtalonName;
   K := ASource.K;
@@ -673,6 +677,7 @@ begin
   Name := 'Новая поверочная точка';
   Description := 'Наименование точки (Qmax, Qnom, Q1...)';
   Num := 0;
+  DateTime := 0;
 
   { Параметры расхода }
   FlowRate := 0.0;
@@ -1071,7 +1076,8 @@ begin
     begin
       Add(IntToStr(Sess.ID));
       Add(IntToStr(Sess.DeviceID));
-      Add(DateTimeToStr(Sess.DateTime));
+      Add(DateTimeToStr(Sess.DateTimeOpen));
+      Add(DateTimeToStr(Sess.DateTimeClose));
       Add(Sess.OperatorName);
       Add(Sess.EtalonName);
       Add(FloatToStr(Sess.K));
@@ -1228,6 +1234,7 @@ begin
   Name := ASource.Name;
   Description := ASource.Description;
   Num := ASource.Num;
+  DateTime := ASource.DateTime;
 
   {====================================================================}
   { ОСНОВНЫЕ ПАРАМЕТРЫ РАСХОДА }
@@ -1426,6 +1433,8 @@ begin
   Result.DeviceID := ID;
   Result.Active := True;
   Result.Status := 0;
+  Result.DateTimeOpen := Now;
+  Result.DateTimeClose := 0;
 
   Sessions.Add(Result);
 end;

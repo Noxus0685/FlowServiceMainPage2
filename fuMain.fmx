@@ -1,4 +1,4 @@
-object FormMain: TFormMain
+﻿object FormMain: TFormMain
   Left = 0
   Top = 0
   Caption = 'fuMain'
@@ -3566,7 +3566,7 @@ object FormMain: TFormMain
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 37
-            object Label7: TLabel
+            object LabelSessionDate: TLabel
               Align = Left
               Size.Width = 137.000000000000000000
               Size.Height = 32.000000000000000000
