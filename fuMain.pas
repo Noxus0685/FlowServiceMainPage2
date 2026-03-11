@@ -1805,7 +1805,7 @@ begin
     try
       if ADevice.Spillages <> nil then
         for Point in ADevice.Spillages do
-          if Point <> nil then
+          if (Point <> nil) and (Point.State <> osDeleted) then
             List.Add(Point);
 
       FCurrentSpillages := List.ToArray;
@@ -1849,7 +1849,7 @@ begin
     if Device.Spillages <> nil then
     begin
       for Point in Device.Spillages do
-        if (Point <> nil) and (Point.SessionID = ASession.ID) then
+        if (Point <> nil) and (Point.SessionID = ASession.ID) and (Point.State <> osDeleted) then
           List.Add(Point);
     end
     else if ASession.Spillages <> nil then
