@@ -938,21 +938,27 @@ end;
 procedure TFormMain.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
 begin
-  PopulateTreeViewDevices;
-
   if ASession <> nil then
-    SelectTreeItemByTagObject(ASession)
+  begin
+    SelectTreeItemByTagObject(ASession);
+    ShowSessionSpillages(ASession)
+  end
   else if ADevice <> nil then
+  begin
     SelectTreeItemByTagObject(ADevice);
+    ShowDeviceSpillages(ADevice)
+  end;
 
   if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
     TreeViewDevicesChange(TreeViewDevices)
   else
   begin
     UpdateSessionDateLabel(nil);
-    ShowAllDevicesResults;
+
   end;
-end;
+
+
+  end;
 
 procedure TFormMain.LoadProcessingDevices;
 var
@@ -2388,13 +2394,13 @@ begin
     Exit;
 
   Item := TreeViewDevices.Selected;
-  if (Item = nil) or not (Item.TagObject is TSessionSpillage) then
-    Exit;
+  if (Item <> nil) and (Item.TagObject is TSessionSpillage) then
+   begin
+       Session := TSessionSpillage(Item.TagObject);
+       Device := ResolveSelectedDevice;
+       Point := FCurrentSpillages[GridDataPoints.Row];
 
-  Session := TSessionSpillage(Item.TagObject);
-  Device := ResolveSelectedDevice;
-  Point := FCurrentSpillages[GridDataPoints.Row];
-  if (Session = nil) or (Device = nil) or (Point = nil) then
+   if (Session = nil) or (Device = nil) or (Point = nil) then
     Exit;
 
   Point.State := osDeleted;
@@ -2407,7 +2413,36 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  RefreshMeasurementsAfterSessionAction(Device, Session);
+  RefreshMeasurementsAfterSessionAction(nil, Session);
+
+   end;
+
+   if (Item <> nil) and (Item.TagObject is TDevice) then
+   begin
+       Device := TDevice(Item.TagObject);
+       Point := FCurrentSpillages[GridDataPoints.Row];
+
+   if (Device = nil) or (Point = nil) then
+    Exit;
+
+  Point.State := osDeleted;
+  //if Session.State = osClean then
+  //  Session.State := osModified;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  RefreshMeasurementsAfterSessionAction(Device, nil);
+
+   end;
+
+
+
+
+
 end;
 
 procedure TFormMain.ActionSessionPointsClearExecute(Sender: TObject);
