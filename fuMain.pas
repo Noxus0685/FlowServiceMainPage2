@@ -649,6 +649,9 @@ type
     procedure RefreshResultsTab;
     procedure PopulateTreeViewDevices;
     procedure ShowAllDevicesResults;
+    procedure ShowDevicesResults(const ADevices: TList<TDevice>);
+    procedure ShowWorkTableResults(AWorkTable: TWorkTable);
+    procedure ShowOtherDevicesResults;
     procedure ShowDeviceSpillages(ADevice: TDevice);
     procedure ShowSessionSpillages(ASession: TSessionSpillage);
     function ResolveSelectedDevice: TDevice;
@@ -1563,6 +1566,24 @@ end;
 
 procedure TFormMain.ShowAllDevicesResults;
 var
+  Devices: TList<TDevice>;
+  Device: TDevice;
+begin
+  Devices := TList<TDevice>.Create;
+  try
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+        if Device <> nil then
+          Devices.Add(Device);
+
+    ShowDevicesResults(Devices);
+  finally
+    Devices.Free;
+  end;
+end;
+
+procedure TFormMain.ShowDevicesResults(const ADevices: TList<TDevice>);
+var
   Rows: TList<TResultGridRow>;
   P: TDevicePoint;
   Device: TDevice;
@@ -1571,8 +1592,8 @@ var
 begin
   Rows := TList<TResultGridRow>.Create;
   try
-    if FProcessingDevices <> nil then
-      for Device in FProcessingDevices do
+    if ADevices <> nil then
+      for Device in ADevices do
       begin
         if Device = nil then
           Continue;
@@ -1631,6 +1652,80 @@ begin
   GridDataPoints.Visible := False;
   GridResults.RowCount := Length(FCurrentResultRows);
   GridResults.Repaint;
+end;
+
+procedure TFormMain.ShowWorkTableResults(AWorkTable: TWorkTable);
+var
+  Devices: TList<TDevice>;
+  DeviceUUIDs: TStringList;
+  Ch: TChannel;
+  Device: TDevice;
+begin
+  Devices := TList<TDevice>.Create;
+  DeviceUUIDs := TStringList.Create;
+  try
+    DeviceUUIDs.Sorted := False;
+    DeviceUUIDs.Duplicates := dupIgnore;
+
+    if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
+      for Ch in AWorkTable.DeviceChannels do
+      begin
+        if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+          Continue;
+
+        Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.MitUUID);
+        if (Device = nil) or (DeviceUUIDs.IndexOf(Trim(Device.MitUUID)) >= 0) then
+          Continue;
+
+        DeviceUUIDs.Add(Trim(Device.MitUUID));
+        Devices.Add(Device);
+      end;
+
+    ShowDevicesResults(Devices);
+  finally
+    DeviceUUIDs.Free;
+    Devices.Free;
+  end;
+end;
+
+procedure TFormMain.ShowOtherDevicesResults;
+var
+  Devices: TList<TDevice>;
+  DeviceUUIDsOnTables: TStringList;
+  Device: TDevice;
+  WT: TWorkTable;
+  Ch: TChannel;
+  I: Integer;
+begin
+  Devices := TList<TDevice>.Create;
+  DeviceUUIDsOnTables := TStringList.Create;
+  try
+    DeviceUUIDsOnTables.Sorted := False;
+    DeviceUUIDsOnTables.Duplicates := dupIgnore;
+
+    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if (WT = nil) or (WT.DeviceChannels = nil) then
+          Continue;
+
+        for Ch in WT.DeviceChannels do
+          if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.MitUUID));
+      end;
+
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+        if (Device <> nil) and
+           (DeviceUUIDsOnTables.IndexOf(Trim(Device.MitUUID)) < 0) then
+          Devices.Add(Device);
+
+    ShowDevicesResults(Devices);
+  finally
+    DeviceUUIDsOnTables.Free;
+    Devices.Free;
+  end;
 end;
 
 procedure TFormMain.ShowDeviceSpillages(ADevice: TDevice);
@@ -2283,9 +2378,15 @@ begin
     Exit;
   end;
 
+  if Item.TagObject is TWorkTable then
+  begin
+    ShowWorkTableResults(TWorkTable(Item.TagObject));
+    Exit;
+  end;
+
   if Item.Text = 'прочее' then
   begin
-    ShowAllDevicesResults;
+    ShowOtherDevicesResults;
     Exit;
   end;
 
