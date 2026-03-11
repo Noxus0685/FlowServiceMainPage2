@@ -707,6 +707,8 @@ type
     procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable;
       const AClearBeforeSync: Boolean);
     procedure SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
+    procedure UpdateGridDataPoints;
+    procedure UpdateGridResults;
   end;
 
 
@@ -1615,6 +1617,8 @@ begin
   finally
     Devices.Free;
   end;
+  UpdateGridResults
+
 end;
 
 procedure TFormMain.ShowDevicesResults(const ADevices: TList<TDevice>);
@@ -1683,10 +1687,8 @@ begin
   end;
 
   UpdateResultsPointColumns;
-  GridResults.Visible := True;
-  GridDataPoints.Visible := False;
-  GridResults.RowCount := Length(FCurrentResultRows);
-  GridResults.Repaint;
+  UpdateGridResults
+
 end;
 
 procedure TFormMain.ShowWorkTableResults(AWorkTable: TWorkTable);
@@ -1763,6 +1765,31 @@ begin
   end;
 end;
 
+procedure TFormMain.UpdateGridResults;
+begin
+  GridResults.BeginUpdate;
+
+  GridResults.EndUpdate;
+
+  GridResults.RowCount := Length(FCurrentResultRows);
+  GridResults.Repaint;
+
+    GridResults.Visible := True;
+  GridDataPoints.Visible := False;
+
+end;
+
+procedure TFormMain.UpdateGridDataPoints;
+begin
+  GridDataPoints.BeginUpdate;
+  GridDataPoints.RowCount := 0;
+  GridDataPoints.RowCount := Length(FCurrentSpillages);
+  GridDataPoints.Repaint;
+  GridDataPoints.EndUpdate;
+  GridResults.Visible := False;
+  GridDataPoints.Visible := True;
+end;
+
 procedure TFormMain.ShowDeviceSpillages(ADevice: TDevice);
 var
   Point: TPointSpillage;
@@ -1784,10 +1811,7 @@ begin
     end;
   end;
 
-  GridResults.Visible := False;
-  GridDataPoints.Visible := True;
-  GridDataPoints.RowCount := Length(FCurrentSpillages);
-  GridDataPoints.Repaint;
+    UpdateGridDataPoints;
 end;
 
 procedure TFormMain.ShowSessionSpillages(ASession: TSessionSpillage);
@@ -1840,10 +1864,7 @@ begin
     List.Free;
   end;
 
-  GridResults.Visible := False;
-  GridDataPoints.Visible := True;
-  GridDataPoints.RowCount := Length(FCurrentSpillages);
-  GridDataPoints.Repaint;
+  UpdateGridDataPoints;
 end;
 
 function TFormMain.ResolveSelectedDevice: TDevice;

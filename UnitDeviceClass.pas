@@ -1316,6 +1316,7 @@ begin
   Name := ASource.Name;
   Description := ASource.Description;
   Num := ASource.Num;
+  DateTime:= ASource.DateTime;
 
   {====================================================================}
   { ПАРАМЕТРЫ ИЗМЕРЕНИЯ (УСТАНОВКА / ЭТАЛОН) }
