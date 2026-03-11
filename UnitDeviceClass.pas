@@ -460,7 +460,7 @@ type
     property  CalibrCoefTable: TCalibrCoefTable read FCalibrCoefTable write FCalibrCoefTable;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
-    procedure FillFromType(AType: TDeviceType);
+    procedure FillFromType(AType: TDeviceType; const APreservePointsAndSerial: Boolean = False);
     procedure SyncNameWithModificationAndDiameter;
 
   end;
@@ -502,8 +502,8 @@ begin
    {----------------------------------}
   { Наименование и паспорт }
   {----------------------------------}
-  Name := 'Новый прибор';
-  SerialNumber := '000000';
+  Name := '';
+  SerialNumber := '';
   Modification := '';
 
   Manufacturer := '';
@@ -1972,7 +1972,7 @@ begin
     Name := NewName;
 end;
 
-procedure TDevice.FillFromType(AType: TDeviceType);
+procedure TDevice.FillFromType(AType: TDeviceType; const APreservePointsAndSerial: Boolean);
 var
   TD: TDiameter;
   TP: TTypePoint;
@@ -2069,45 +2069,48 @@ begin
 
   Coef := TD.Kp;
    end;
-  {====================================================}
-  { 7. Пересоздаём точки прибора }
-  {====================================================}
-  Points.Clear;
-
-  for TP in AType.Points do
+  if not APreservePointsAndSerial then
   begin
-    DP := Self.AddPoint;
+    {====================================================}
+    { 7. Пересоздаём точки прибора }
+    {====================================================}
+    Points.Clear;
 
-    {--- базовые поля ---}
-    DP.Name           := TP.Name;
-    DP.Description    := TP.Description;
-    DP.Pressure       := TP.Pressure;
-    DP.Temp           := TP.Temp;
-    DP.FlowAccuracy   := TP.FlowAccuracy;
-    DP.Error          := TP.Error;
-    DP.Pause          := TP.Pause;
-    DP.Repeats        := TP.Repeats;
-    DP.RepeatsProtocol:= TP.RepeatsProtocol;
-
-    {--- расчёт  Rate расхода ---}
-    DP.FlowRate := TP.FlowRate;
-
-    DP.Q :=  DP.FlowRate * Qmax;
-    {--- расчёт по времени / импульсам ---}
-    if (DP.Q > 0) and (TP.LimitTime > 0) then
+    for TP in AType.Points do
     begin
-      Tm := TP.LimitTime;
-      V  := Q * Tm / 3.6;
+      DP := Self.AddPoint;
 
-      DP.LimitTime   := Tm;
-      DP.LimitVolume := V;
-      DP.LimitImp    := Round(V * Coef);
-    end
-    else
-    begin
-      DP.LimitTime   := TP.LimitTime;
-      DP.LimitVolume := TP.LimitVolume;
-      DP.LimitImp    := TP.LimitImp;
+      {--- базовые поля ---}
+      DP.Name           := TP.Name;
+      DP.Description    := TP.Description;
+      DP.Pressure       := TP.Pressure;
+      DP.Temp           := TP.Temp;
+      DP.FlowAccuracy   := TP.FlowAccuracy;
+      DP.Error          := TP.Error;
+      DP.Pause          := TP.Pause;
+      DP.Repeats        := TP.Repeats;
+      DP.RepeatsProtocol:= TP.RepeatsProtocol;
+
+      {--- расчёт  Rate расхода ---}
+      DP.FlowRate := TP.FlowRate;
+
+      DP.Q :=  DP.FlowRate * Qmax;
+      {--- расчёт по времени / импульсам ---}
+      if (DP.Q > 0) and (TP.LimitTime > 0) then
+      begin
+        Tm := TP.LimitTime;
+        V  := Q * Tm / 3.6;
+
+        DP.LimitTime   := Tm;
+        DP.LimitVolume := V;
+        DP.LimitImp    := Round(V * Coef);
+      end
+      else
+      begin
+        DP.LimitTime   := TP.LimitTime;
+        DP.LimitVolume := TP.LimitVolume;
+        DP.LimitImp    := TP.LimitImp;
+      end;
     end;
   end;
 

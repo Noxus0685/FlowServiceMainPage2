@@ -612,7 +612,7 @@ type
     FNextClimateChangeAt: TDateTime;
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
-    procedure OpenTypeSelect(ARow: Integer);
+    procedure OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean = False);
     procedure OpenChannelDeviceEditor(AChannel: TChannel);
     procedure SelectDeviceForChannel(AChannel: TChannel);
     procedure InitTables;
@@ -690,6 +690,7 @@ type
     FEtalonClipboard: TChannelClipboardData;
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
+    procedure PersistDeviceAsync(ADevice: TDevice);
     procedure LoadProcessingDevices;
     procedure SaveProcessingDevices;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
@@ -3448,6 +3449,44 @@ begin
   end;
 end;
 
+procedure TFormMain.PersistDeviceAsync(ADevice: TDevice);
+var
+  Repo: TDeviceRepository;
+  ErrMsg: string;
+begin
+  if (ADevice = nil) or (DataManager = nil) then
+    Exit;
+
+  Repo := DataManager.ActiveDeviceRepo;
+  if Repo = nil then
+    Exit;
+
+  TThread.CreateAnonymousThread(
+    procedure
+    begin
+      TMonitor.Enter(Repo);
+      try
+        try
+          Repo.SaveDevice(ADevice);
+        except
+          on E: Exception do
+          begin
+            ErrMsg := E.Message;
+            TThread.Queue(nil,
+              procedure
+              begin
+                ShowMessage('Ошибка сохранения прибора после смены типа: ' + ErrMsg);
+              end
+            );
+          end;
+        end;
+      finally
+        TMonitor.Exit(Repo);
+      end;
+    end
+  ).Start;
+end;
+
 procedure TFormMain.SaveChannelToClipboard(AChannel: TChannel;
   var AClipboard: TChannelClipboardData);
 begin
@@ -4114,7 +4153,7 @@ begin
  // FFlowMeterRows[ARow].Meter.SerialNumber := CFlowMeterSerials[FFlowMeterRows[ARow].SerialIndex];
 end;
 
-procedure TFormMain.OpenTypeSelect(ARow: Integer);
+procedure TFormMain.OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean);
 var
   Frm: TFormTypeSelect;
   CurrentType, NewType: TDeviceType;
@@ -4129,13 +4168,24 @@ begin
   if (FActiveWorkTable = nil) then
     Exit;
 
-  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
-    Exit;
+  if AIsEtalon then
+  begin
+    if (ARow < 0) or (ARow >= FActiveWorkTable.EtalonChannels.Count) then
+      Exit;
+  end
+  else
+  begin
+    if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+      Exit;
+  end;
 
   if (DataManager = nil) then
     Exit;
 
-  Ch := FActiveWorkTable.DeviceChannels[ARow];
+  if AIsEtalon then
+    Ch := FActiveWorkTable.EtalonChannels[ARow]
+  else
+    Ch := FActiveWorkTable.DeviceChannels[ARow];
   if (Ch = nil) or (Ch.FlowMeter = nil) then
     Exit;
 
@@ -4247,7 +4297,10 @@ begin
       if IsTypeChanged then
       begin
         Ch.FlowMeter.Device.AttachType(NewType, RepoName);
-        Ch.FlowMeter.Device.FillFromType(NewType);
+        Ch.FlowMeter.Device.FillFromType(NewType, True);
+        if Ch.FlowMeter.Device.State in [osClean, osLoaded] then
+          Ch.FlowMeter.Device.State := osModified;
+        PersistDeviceAsync(Ch.FlowMeter.Device);
       end;
     end;
 
@@ -4485,7 +4538,7 @@ begin
     begin
       GridDevices.EditorMode := False;
       if WorkTable <> nil then
-        OpenTypeSelect(Row);
+        OpenTypeSelect(Row, False);
     end
     else if Column = StringColumnDeviceName1 then
     begin
@@ -4711,7 +4764,7 @@ begin
     begin
       GridEtalons.EditorMode := False;
       if WorkTable <> nil then
-        OpenTypeSelect(Row);
+        OpenTypeSelect(Row, True);
     end
     else if Column = StringColumnEtalonName1 then
     begin

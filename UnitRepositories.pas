@@ -252,6 +252,7 @@ type
 
 
     function DeviceExistsInDB(AID: Integer): Boolean;
+    function ShouldSaveDevice(ADevice: TDevice): Boolean;
 
     function GenerateDevicePointID: Integer;
 
@@ -3770,6 +3771,17 @@ begin
   end;
 end;
 
+function TDeviceRepository.ShouldSaveDevice(ADevice: TDevice): Boolean;
+begin
+  Result := False;
+
+  if ADevice = nil then
+    Exit;
+
+  Result := (Trim(ADevice.SerialNumber) <> '') or
+            ((ADevice.Spillages <> nil) and (ADevice.Spillages.Count > 0));
+end;
+
 
 function TDeviceRepository.Save: Boolean;
 var
@@ -3821,10 +3833,15 @@ begin
   FDM.StartTransaction;
   try
     for D in FDevices do
+    begin
+      if not ShouldSaveDevice(D) then
+        Continue;
+
       if not UpdateDevice(D) then
         raise Exception.Create(
           'Ошибка сохранения прибора'
         );
+    end;
 
     { вторая очередь }
     // SaveSpillages;
@@ -3854,6 +3871,9 @@ begin
       'Device with invalid ID detected (ID=%d)',
       [ADevice.ID]
     );
+
+  if not ShouldSaveDevice(ADevice) then
+    Exit(True);
 
   // Начинаем транзакцию
   FDM.StartTransaction;
@@ -4380,6 +4400,9 @@ begin
       {--------------------------------------------------}
       for D in FDevices do
       begin
+        if not ShouldSaveDevice(D) then
+          Continue;
+
         D.State := osNew;
 
         if not UpdateDevice(D) then
