@@ -1078,6 +1078,139 @@ begin
   EnsureDescription(FTableFlow.ValueFlowRate, 'Расход');
   FTableFlow.ValueFlowRate.SetToSave(True);
 
+  // Инициализируем оставшиеся значения расходомера стола,
+  // чтобы у FTableFlow не оставалось неинициализированных TMeterValue.
+  if FTableFlow.ValueImp = nil then
+  begin
+    FTableFlow.ValueImp := TMeterValue.Create('', Name);
+    FTableFlow.ValueImp.SetAsImp;
+    EnsureDescription(FTableFlow.ValueImp, 'Импульсы стола');
+  end;
+
+  if FTableFlow.ValueImpTotal = nil then
+  begin
+    FTableFlow.ValueImpTotal := TMeterValue.Create('', Name);
+    FTableFlow.ValueImpTotal.SetAsImp;
+    EnsureDescription(FTableFlow.ValueImpTotal, 'Суммарные импульсы стола');
+  end;
+
+  if FTableFlow.ValueMassCoef = nil then
+  begin
+    FTableFlow.ValueMassCoef := TMeterValue.Create('', Name);
+    FTableFlow.ValueMassCoef.SetAsMassCoef;
+    FTableFlow.ValueMassCoef.SetValue(1);
+    EnsureDescription(FTableFlow.ValueMassCoef, 'Коэффициент массы');
+  end;
+
+  if FTableFlow.ValueVolumeCoef = nil then
+  begin
+    FTableFlow.ValueVolumeCoef := TMeterValue.Create('', Name);
+    FTableFlow.ValueVolumeCoef.SetAsVolumeCoef;
+    FTableFlow.ValueVolumeCoef.SetValue(1);
+    EnsureDescription(FTableFlow.ValueVolumeCoef, 'Коэффициент объема');
+  end;
+
+  if FTableFlow.ValueMassFlow = nil then
+  begin
+    FTableFlow.ValueMassFlow := TMeterValue.Create('', Name);
+    FTableFlow.ValueMassFlow.SetAsMassFlow;
+    EnsureDescription(FTableFlow.ValueMassFlow, 'Массовый расход стола');
+  end;
+
+  if FTableFlow.ValueVolumeFlow = nil then
+  begin
+    FTableFlow.ValueVolumeFlow := TMeterValue.Create('', Name);
+    FTableFlow.ValueVolumeFlow.SetAsVolumeFlow;
+    EnsureDescription(FTableFlow.ValueVolumeFlow, 'Объемный расход стола');
+  end;
+
+  if FTableFlow.ValueVolume = nil then
+  begin
+    FTableFlow.ValueVolume := TMeterValue.Create('', Name);
+    FTableFlow.ValueVolume.SetAsVolume;
+    EnsureDescription(FTableFlow.ValueVolume, 'Объем стола');
+  end;
+
+  if FTableFlow.ValueMass = nil then
+  begin
+    FTableFlow.ValueMass := TMeterValue.Create('', Name);
+    FTableFlow.ValueMass.SetAsMass;
+    EnsureDescription(FTableFlow.ValueMass, 'Масса стола');
+  end;
+
+  if FTableFlow.ValueVolumeMeter = nil then
+  begin
+    FTableFlow.ValueVolumeMeter := TMeterValue.Create('', Name);
+    FTableFlow.ValueVolumeMeter.SetAsVolume;
+    EnsureDescription(FTableFlow.ValueVolumeMeter, 'Объем по прибору стола');
+  end;
+
+  if FTableFlow.ValueMassMeter = nil then
+  begin
+    FTableFlow.ValueMassMeter := TMeterValue.Create('', Name);
+    FTableFlow.ValueMassMeter.SetAsMass;
+    EnsureDescription(FTableFlow.ValueMassMeter, 'Масса по прибору стола');
+  end;
+
+  if FTableFlow.ValueVolumeError = nil then
+  begin
+    FTableFlow.ValueVolumeError := TMeterValue.Create('', Name);
+    FTableFlow.ValueVolumeError.SetAsVolumeError;
+    EnsureDescription(FTableFlow.ValueVolumeError, 'Погрешность объема стола');
+  end;
+
+  if FTableFlow.ValueMassError = nil then
+  begin
+    FTableFlow.ValueMassError := TMeterValue.Create('', Name);
+    FTableFlow.ValueMassError.SetAsMassError;
+    EnsureDescription(FTableFlow.ValueMassError, 'Погрешность массы стола');
+  end;
+
+  if FTableFlow.ValueError = nil then
+  begin
+    FTableFlow.ValueError := TMeterValue.Create('', Name);
+    FTableFlow.ValueError.SetAsError;
+    EnsureDescription(FTableFlow.ValueError, 'Итоговая погрешность стола');
+  end;
+
+  if FTableFlow.ValueCurrent = nil then
+  begin
+    FTableFlow.ValueCurrent := TMeterValue.Create('', Name);
+    FTableFlow.ValueCurrent.SetAsCurrent;
+    EnsureDescription(FTableFlow.ValueCurrent, 'Токовый сигнал стола');
+  end;
+
+  // Настраиваем вычислительные связи для всех инициализированных значений.
+  FTableFlow.ValueMassFlow.ValueCorrection := nil;
+  FTableFlow.ValueMassFlow.ValueBaseMultiplier := FTableFlow.ValueImp;
+  FTableFlow.ValueMassFlow.ValueBaseDevider := FTableFlow.ValueMassCoef;
+  FTableFlow.ValueMassFlow.ValueRate := nil;
+  FTableFlow.ValueMassFlow.ValueEtalon := nil;
+
+  FTableFlow.ValueVolumeFlow.ValueCorrection := nil;
+  FTableFlow.ValueVolumeFlow.ValueBaseMultiplier := FTableFlow.ValueImp;
+  FTableFlow.ValueVolumeFlow.ValueBaseDevider := FTableFlow.ValueVolumeCoef;
+  FTableFlow.ValueVolumeFlow.ValueRate := nil;
+  FTableFlow.ValueVolumeFlow.ValueEtalon := nil;
+
+  FTableFlow.ValueVolume.ValueCorrection := FTableFlow.ValueVolumeFlow;
+  FTableFlow.ValueVolume.ValueBaseMultiplier := FTableFlow.ValueImpTotal;
+  FTableFlow.ValueVolume.ValueBaseDevider := FTableFlow.ValueVolumeCoef;
+  FTableFlow.ValueVolume.ValueRate := nil;
+  FTableFlow.ValueVolume.ValueEtalon := nil;
+
+  FTableFlow.ValueMass.ValueCorrection := FTableFlow.ValueMassFlow;
+  FTableFlow.ValueMass.ValueBaseMultiplier := FTableFlow.ValueImpTotal;
+  FTableFlow.ValueMass.ValueBaseDevider := FTableFlow.ValueMassCoef;
+  FTableFlow.ValueMass.ValueRate := nil;
+  FTableFlow.ValueMass.ValueEtalon := nil;
+
+  FTableFlow.ValueVolumeError.ValueBaseMultiplier := FTableFlow.ValueVolume;
+  FTableFlow.ValueMassError.ValueBaseMultiplier := FTableFlow.ValueMass;
+  FTableFlow.ValueError.ValueBaseMultiplier := FTableFlow.ValueQuantity;
+
+  FTableFlow.SetMeterCategory(FTableFlow.MeterFlowCategory);
+
   AssignTableFlowAsEtalonToDevices;
 end;
 
