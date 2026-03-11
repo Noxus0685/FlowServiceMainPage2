@@ -1760,6 +1760,7 @@ var
   Device: TDevice;
   Point: TPointSpillage;
   List: TList<TPointSpillage>;
+  I: Integer;
 begin
   SetLength(FCurrentSpillages, 0);
   if ASession = nil then
@@ -1784,13 +1785,20 @@ begin
   List := TList<TPointSpillage>.Create;
   try
     if Device.Spillages <> nil then
+    begin
       for Point in Device.Spillages do
         if (Point <> nil) and (Point.SessionID = ASession.ID) then
-          List.Add(Point)
+          List.Add(Point);
+    end
     else if ASession.Spillages <> nil then
-      for Point in ASession.Spillages do
+    begin
+      for I := 0 to ASession.Spillages.Count - 1 do
+      begin
+        Point := ASession.Spillages[I];
         if Point <> nil then
           List.Add(Point);
+      end;
+    end;
 
     FCurrentSpillages := List.ToArray;
   finally
@@ -3639,7 +3647,7 @@ begin
           on E: Exception do
           begin
             ErrMsg := E.Message;
-            TThread.Queue(nil,
+            TThread.Queue(
               procedure
               begin
                 ShowMessage('Ошибка сохранения прибора после смены типа: ' + ErrMsg);
