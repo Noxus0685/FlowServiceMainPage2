@@ -520,6 +520,11 @@ type
     ButtonSessionClose: TButton;
     Label8: TLabel;
     PopupMenuTreeViewDevices: TPopupMenu;
+    PopupMenuGridDataPoints: TPopupMenu;
+    PopupMenuGridDataPointsLayOut: TPopupMenu;
+    MenuItemDataResultsColumns: TMenuItem;
+    PopupMenuGridResults: TPopupMenu;
+    MenuItemGridResultsColumns: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

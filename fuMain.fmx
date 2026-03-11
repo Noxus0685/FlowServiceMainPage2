@@ -3249,11 +3249,12 @@ object FormMain: TFormMain
             CanFocus = True
             ClipChildren = True
             Margins.Left = 2.000000000000000000
+            PopupMenu = PopupMenuGridDataPoints
             Size.Width = 1535.000000000000000000
             Size.Height = 676.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
-            Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+            Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDataPointsGetValue
             Viewport.Width = 1515.000000000000000000
             Viewport.Height = 635.000000000000000000
@@ -3486,6 +3487,7 @@ object FormMain: TFormMain
           end
         end
         object ToolBarDataPoints: TToolBar
+          PopupMenu = PopupMenuGridDataPointsLayOut
           Size.Width = 1537.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
@@ -4075,6 +4077,24 @@ object FormMain: TFormMain
       Text = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1087#1088#1080#1073#1086#1088#1099
       Hint = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1089#1087#1080#1089#1086#1082' '#1087#1088#1080#1073#1086#1088#1086#1074' '#1089#1086' '#1089#1090#1086#1083#1086#1084
       OnExecute = ActionSessionSynchTableExecute
+    end
+  end
+  object PopupMenuGridDataPoints: TPopupMenu
+    Left = 1393
+    Top = 521
+    object MenuItemDataResultsColumns: TMenuItem
+      Text = #1057#1090#1086#1083#1073#1094#1099
+    end
+  end
+  object PopupMenuGridDataPointsLayOut: TPopupMenu
+    Left = 1399
+    Top = 577
+  end
+  object PopupMenuGridResults: TPopupMenu
+    Left = 1673
+    Top = 601
+    object MenuItemGridResultsColumns: TMenuItem
+      Text = 'MenuItemGridResultsColumns'
     end
   end
 end
