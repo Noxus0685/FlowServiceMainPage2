@@ -1344,8 +1344,8 @@ begin
   ButtonCancel.OnClick := ButtonCancelClick;
   TabControl1.OnChange := TabControl1Change;
   TreeViewDevices.OnChange := TreeViewDevicesChange;
-  TreeViewDevices.PopupMenu := PopupMenu2;
-  PopupMenu2.OnPopup := PopupMenuTreeViewDevicesPopup;
+  TreeViewDevices.PopupMenu := PopupMenuTreeViewDevices;
+  PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
@@ -1749,25 +1749,25 @@ var
     if AAction = nil then
       Exit;
 
-    MenuItem := TMenuItem.Create(PopupMenu2);
+    MenuItem := TMenuItem.Create(PopupMenuTreeViewDevices);
     MenuItem.Action := AAction;
-    PopupMenu2.AddObject(MenuItem);
+    PopupMenuTreeViewDevices.AddObject(MenuItem);
   end;
 
   procedure AddSimpleMenuItem(const AText: string; AOnClick: TNotifyEvent);
   var
     MenuItem: TMenuItem;
   begin
-    MenuItem := TMenuItem.Create(PopupMenu2);
+    MenuItem := TMenuItem.Create(PopupMenuTreeViewDevices);
     MenuItem.Text := AText;
     MenuItem.OnClick := AOnClick;
-    PopupMenu2.AddObject(MenuItem);
+    PopupMenuTreeViewDevices.AddObject(MenuItem);
   end;
 begin
-  if PopupMenu2 = nil then
+  if PopupMenuTreeViewDevices = nil then
     Exit;
 
-  PopupMenu2.Clear;
+  PopupMenuTreeViewDevices.Clear;
 
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
@@ -2445,11 +2445,6 @@ begin
   miMesurment.IsChecked := LayoutMesure.Visible;
   miConditions.IsChecked := LayoutConditions.Visible;
   miProcedures.IsChecked := LayoutProcedures.Visible;
-end;
-
-procedure TFormMain.PopupMenuTreeViewDevicesPopup(Sender: TObject);
-begin
-       //Code here
 end;
 
 function TFormMain.GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
