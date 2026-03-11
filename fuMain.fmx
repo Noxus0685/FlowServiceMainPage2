@@ -1,4 +1,4 @@
-﻿object FormMain: TFormMain
+object FormMain: TFormMain
   Left = 0
   Top = 0
   Caption = 'fuMain'
@@ -1455,8 +1455,8 @@
                   OnGetValue = GridEtalonsGetValue
                   OnSetValue = GridEtalonsSetValue
                   OnCellClick = GridEtalonsCellClick
-                  Viewport.Width = 1766.000000000000000000
-                  Viewport.Height = 95.000000000000000000
+                  Viewport.Width = 1770.000000000000000000
+                  Viewport.Height = 120.000000000000000000
                   object CheckColumnEtalonEnable1: TCheckColumn
                     HorzAlign = Center
                     Header = #1042#1082#1083
@@ -1575,8 +1575,8 @@
                 OnGetValue = GridDevicesGetValue
                 OnSetValue = GridDevicesSetValue
                 OnCellClick = GridDevicesCellClick
-                Viewport.Width = 1750.000000000000000000
-                Viewport.Height = 284.000000000000000000
+                Viewport.Width = 1770.000000000000000000
+                Viewport.Height = 309.000000000000000000
                 object CheckColumnDeviceEnable1: TCheckColumn
                   Header = #1042#1082#1083
                   HeaderSettings.TextSettings.Trimming = Character
@@ -3256,8 +3256,8 @@
             Visible = False
             Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDataPointsGetValue
-            Viewport.Width = 1515.000000000000000000
-            Viewport.Height = 635.000000000000000000
+            Viewport.Width = 1535.000000000000000000
+            Viewport.Height = 676.000000000000000000
             object StringColumnName: TStringColumn
               Header = #1048#1084#1103
               HeaderSettings.TextSettings.Trimming = Character
@@ -3634,8 +3634,8 @@
           Size.PlatformDefault = False
           TabOrder = 2
           Visible = False
-          Viewport.Width = 879.000000000000000000
-          Viewport.Height = 98.000000000000000000
+          Viewport.Width = 883.000000000000000000
+          Viewport.Height = 102.000000000000000000
         end
       end
       object lyt1: TLayout

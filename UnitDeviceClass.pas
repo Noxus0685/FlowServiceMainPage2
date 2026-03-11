@@ -133,6 +133,8 @@ type
     { СЛУЖЕБНОЕ }
     {====================================================================}
     Num: Integer;                // Порядковый номер точки (для сортировки / UI)
+    DateTime: TDateTime;         // Дата/время окончания измерения
+    ArchivedData: string;        // Архив сырых данных (по секундам и т.п.)
 
     constructor Create(ADeviceID : Integer);
     destructor Destroy; override;

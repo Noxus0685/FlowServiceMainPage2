@@ -3691,12 +3691,12 @@ begin
           on E: Exception do
           begin
             ErrMsg := E.Message;
-            TThread.Queue(
-              procedure
-              begin
+            //TThread.Queue(
+            //  procedure
+            //  begin
                 ShowMessage('Ошибка сохранения прибора после смены типа: ' + ErrMsg);
-              end
-            );
+           //   end
+           // );
           end;
         end;
       finally
