@@ -725,6 +725,11 @@ type
     procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable;
       const AClearBeforeSync: Boolean);
     procedure SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
+    function FindTreeItemByTagObject(ATagObject: TObject): TTreeViewItem;
+    procedure SelectTreeItemByTagObject(ATagObject: TObject);
+    procedure RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
+      ASession: TSessionSpillage);
+    procedure RefreshResultsAfterDevicesAction;
     procedure UpdateGridDataPoints;
     procedure UpdateGridResults;
   end;
@@ -895,6 +900,57 @@ begin
     AddProcessingDevice(SelDevice);
   finally
     Frm.Free;
+  end;
+end;
+
+procedure TFormMain.RefreshResultsAfterDevicesAction;
+begin
+  PopulateTreeViewDevices;
+  ShowAllDevicesResults;
+end;
+
+function TFormMain.FindTreeItemByTagObject(ATagObject: TObject): TTreeViewItem;
+var
+  I: Integer;
+  Item: TTreeViewItem;
+begin
+  Result := nil;
+  if (TreeViewDevices = nil) or (ATagObject = nil) then
+    Exit;
+
+  for I := 0 to TreeViewDevices.Count - 1 do
+  begin
+    Item := TreeViewDevices.ItemByIndex(I);
+    if (Item <> nil) and (Item.TagObject = ATagObject) then
+      Exit(Item);
+  end;
+end;
+
+procedure TFormMain.SelectTreeItemByTagObject(ATagObject: TObject);
+var
+  Item: TTreeViewItem;
+begin
+  Item := FindTreeItemByTagObject(ATagObject);
+  if Item <> nil then
+    TreeViewDevices.Selected := Item;
+end;
+
+procedure TFormMain.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
+  ASession: TSessionSpillage);
+begin
+  PopulateTreeViewDevices;
+
+  if ASession <> nil then
+    SelectTreeItemByTagObject(ASession)
+  else if ADevice <> nil then
+    SelectTreeItemByTagObject(ADevice);
+
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+    TreeViewDevicesChange(TreeViewDevices)
+  else
+  begin
+    UpdateSessionDateLabel(nil);
+    ShowAllDevicesResults;
   end;
 end;
 
@@ -2026,7 +2082,7 @@ begin
       SaveProcessingDevices;
     end;
 
-    RefreshResultsTab;
+    RefreshResultsAfterDevicesAction;
     Exit;
   end;
 
@@ -2052,7 +2108,7 @@ begin
           DevicesToRemove.Add(Device);
 
       RemoveCollectedDevices;
-      RefreshResultsTab;
+      RefreshResultsAfterDevicesAction;
       Exit;
     end;
 
@@ -2075,7 +2131,7 @@ begin
           DevicesToRemove.Add(Device);
 
       RemoveCollectedDevices;
-      RefreshResultsTab;
+      RefreshResultsAfterDevicesAction;
     end;
   finally
     DevicesToRemove.Free;
@@ -2143,13 +2199,13 @@ begin
   else
     Exit;
 
-  RefreshResultsTab;
+  RefreshResultsAfterDevicesAction;
 end;
 
 procedure TFormMain.MenuTreeViewDevicesAddClick(Sender: TObject);
 begin
   AddProcessingDeviceFromSelection;
-  RefreshResultsTab;
+  RefreshResultsAfterDevicesAction;
 end;
 
 procedure TFormMain.MenuTreeViewDevicesDeleteClick(Sender: TObject);
@@ -2164,7 +2220,7 @@ begin
     Exit;
 
   RemoveProcessingDevice(TDevice(Item.TagObject));
-  RefreshResultsTab;
+  RefreshResultsAfterDevicesAction;
 end;
 
 procedure TFormMain.ActionSessionDeleteExecute(Sender: TObject);
@@ -2188,7 +2244,7 @@ begin
       Exit;
 
     RemoveProcessingDevice(Device);
-    RefreshResultsTab;
+    RefreshResultsAfterDevicesAction;
     Exit;
   end;
 
@@ -2261,13 +2317,13 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  RefreshResultsTab;
+  RefreshMeasurementsAfterSessionAction(Device, NextSession);
 end;
 
 procedure TFormMain.ActionSessionDeviceAddExecute(Sender: TObject);
 begin
   AddProcessingDeviceFromSelection;
-  RefreshResultsTab;
+  RefreshResultsAfterDevicesAction;
 end;
 
 procedure TFormMain.ActionSessionDeviceRemoveExecute(Sender: TObject);
@@ -2282,7 +2338,7 @@ begin
     Exit;
 
   RemoveProcessingDevice(TDevice(Item.TagObject));
-  RefreshResultsTab;
+  RefreshResultsAfterDevicesAction;
 end;
 
 procedure TFormMain.ActionSessionCloseExecute(Sender: TObject);
@@ -2316,7 +2372,7 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  RefreshResultsTab;
+  RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 
 procedure TFormMain.ActionSessionPointDeleteExecute(Sender: TObject);
@@ -2351,7 +2407,7 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  RefreshResultsTab;
+  RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 
 procedure TFormMain.ActionSessionPointsClearExecute(Sender: TObject);
@@ -2393,7 +2449,7 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  RefreshResultsTab;
+  RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 
 procedure TFormMain.ActionSessionActiveExecute(Sender: TObject);
@@ -2437,7 +2493,7 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  RefreshResultsTab;
+  RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 
 procedure TFormMain.ActionSessionNewExecute(Sender: TObject);
@@ -2474,7 +2530,7 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  RefreshResultsTab;
+  RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 
 procedure TFormMain.TreeViewDevicesChange(Sender: TObject);
