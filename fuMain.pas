@@ -2728,49 +2728,36 @@ end;
 procedure TFormMain.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
-  Row: Integer;
-  P: TPointF;
+  ACol, ARow: Integer;
 begin
   if Button <> TMouseButton.mbRight then
     Exit;
 
-  // CellRect возвращает координаты в системе контента грида,
-  // поэтому учитываем текущую прокрутку ViewportPosition.
-  P := PointF(X + GridDataPoints.ViewportPosition.X,
-    Y + GridDataPoints.ViewportPosition.Y);
-
-  for Row := 0 to GridDataPoints.RowCount - 1 do
-    if GridDataPoints.CellRect(0, Row).Contains(P) then
-    begin
-      GridDataPoints.Row := Row;
-      GridDataPoints.SetFocus;
-      Exit;
-    end;
+  if GridDataPoints.CellByPoint(X, Y, ACol, ARow) then
+  begin
+    GridDataPoints.Col := ACol;
+    GridDataPoints.Row := ARow;
+    GridDataPoints.SetFocus;
+  end;
 end;
-
 
 procedure TFormMain.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
 var
-  Row: Integer;
-  P: TPointF;
+  Col, Row: Integer;
 begin
   if Button <> TMouseButton.mbRight then
     Exit;
 
-  // CellRect возвращает координаты в системе контента грида,
-  // поэтому учитываем текущую прокрутку ViewportPosition.
-  P := PointF(X + GridResults.ViewportPosition.X,
-    Y + GridResults.ViewportPosition.Y);
-
-  for Row := 0 to GridResults.RowCount - 1 do
-    if GridResults.CellRect(0, Row).Contains(P) then
-    begin
-      GridResults.Row := Row;
-      GridResults.SetFocus;
-      Exit;
-    end;
+  if GridResults.CellByPoint(X, Y, Col, Row) then
+  begin
+    GridResults.Row := Row;
+    GridResults.Col := Col; // если нужно выбирать и колонку тоже
+    GridResults.SetFocus;
+  end;
 end;
+
+
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
 begin

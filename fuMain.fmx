@@ -3418,10 +3418,10 @@ object FormMain: TFormMain
           end
           object GridResults: TGrid
             Align = Client
-            PopupMenu = PopupMenuGridResults
             CanFocus = True
             ClipChildren = True
             Margins.Left = 2.000000000000000000
+            PopupMenu = PopupMenuGridResults
             Size.Width = 1535.000000000000000000
             Size.Height = 676.000000000000000000
             Size.PlatformDefault = False
@@ -3911,6 +3911,56 @@ object FormMain: TFormMain
     Left = 1614
     Top = 513
   end
+  object PopupMenuGridDataPoints: TPopupMenu
+    OnPopup = PopupMenuGridDataPointsPopup
+    Left = 1393
+    Top = 521
+    object MenuItemDataResultsDeletePoint: TMenuItem
+      Action = ActionSessionPointDelete
+      ImageIndex = -1
+    end
+    object MenuItemDataResultsClearPoints: TMenuItem
+      Action = ActionSessionPointsClear
+      ImageIndex = -1
+    end
+    object MenuItemDataResultsCloseSession: TMenuItem
+      Action = ActionSessionClose
+      ImageIndex = -1
+    end
+    object MenuItemDataResultsSep1: TMenuItem
+      Text = '-'
+    end
+    object MenuItemDataResultsColumns: TMenuItem
+      Text = #1057#1090#1086#1083#1073#1094#1099
+    end
+  end
+  object PopupMenuGridDataPointsLayOut: TPopupMenu
+    Left = 1399
+    Top = 577
+  end
+  object PopupMenuGridResults: TPopupMenu
+    OnPopup = PopupMenuGridResultsPopup
+    Left = 1673
+    Top = 601
+    object MenuItemGridResultsDeletePoint: TMenuItem
+      Action = ActionSessionPointDelete
+      ImageIndex = -1
+    end
+    object MenuItemGridResultsClearPoints: TMenuItem
+      Action = ActionSessionPointsClear
+      ImageIndex = -1
+    end
+    object MenuItemGridResultsCloseSession: TMenuItem
+      Action = ActionSessionClose
+      ImageIndex = -1
+    end
+    object MenuItemGridResultsSep1: TMenuItem
+      Text = '-'
+    end
+    object MenuItemGridResultsColumns: TMenuItem
+      Text = #1057#1090#1086#1083#1073#1094#1099
+    end
+  end
   object ActionListWorkTables: TActionList
     Left = 1610
     Top = 140
@@ -4078,50 +4128,6 @@ object FormMain: TFormMain
       Text = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1087#1088#1080#1073#1086#1088#1099
       Hint = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1089#1087#1080#1089#1086#1082' '#1087#1088#1080#1073#1086#1088#1086#1074' '#1089#1086' '#1089#1090#1086#1083#1086#1084
       OnExecute = ActionSessionSynchTableExecute
-    end
-  end
-  object PopupMenuGridDataPoints: TPopupMenu
-    OnPopup = PopupMenuGridDataPointsPopup
-    Left = 1393
-    Top = 521
-    object MenuItemDataResultsDeletePoint: TMenuItem
-      Action = ActionSessionPointDelete
-    end
-    object MenuItemDataResultsClearPoints: TMenuItem
-      Action = ActionSessionPointsClear
-    end
-    object MenuItemDataResultsCloseSession: TMenuItem
-      Action = ActionSessionClose
-    end
-    object MenuItemDataResultsSep1: TMenuItem
-      Text = '-'
-    end
-    object MenuItemDataResultsColumns: TMenuItem
-      Text = #1057#1090#1086#1083#1073#1094#1099
-    end
-  end
-  object PopupMenuGridDataPointsLayOut: TPopupMenu
-    Left = 1399
-    Top = 577
-  end
-  object PopupMenuGridResults: TPopupMenu
-    OnPopup = PopupMenuGridResultsPopup
-    Left = 1673
-    Top = 601
-    object MenuItemGridResultsDeletePoint: TMenuItem
-      Action = ActionSessionPointDelete
-    end
-    object MenuItemGridResultsClearPoints: TMenuItem
-      Action = ActionSessionPointsClear
-    end
-    object MenuItemGridResultsCloseSession: TMenuItem
-      Action = ActionSessionClose
-    end
-    object MenuItemGridResultsSep1: TMenuItem
-      Text = '-'
-    end
-    object MenuItemGridResultsColumns: TMenuItem
-      Text = #1057#1090#1086#1083#1073#1094#1099
     end
   end
 end
