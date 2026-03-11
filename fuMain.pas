@@ -2731,7 +2731,7 @@ var
   Row: Integer;
   P: TPointF;
 begin
-  if (Button <> TMouseButton.mbRight) or (GridDataPoints = nil) then
+  if Button <> TMouseButton.mbRight then
     Exit;
 
   // CellRect возвращает координаты в системе контента грида,
@@ -2755,7 +2755,7 @@ var
   Row: Integer;
   P: TPointF;
 begin
-  if (Button <> TMouseButton.mbRight) or (GridResults = nil) then
+  if Button <> TMouseButton.mbRight then
     Exit;
 
   // CellRect возвращает координаты в системе контента грида,
