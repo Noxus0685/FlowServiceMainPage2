@@ -1346,12 +1346,13 @@ var
   I: Integer;
   WT: TWorkTable;
   Ch: TChannel;
-  Sess: TSessionSpillage;
   Device: TDevice;
   ProcessedOnTables: TStringList;
   TableDeviceUUIDs: TStringList;
 
   procedure AddDeviceNode(const AParent: TTreeViewItem; ADevice: TDevice);
+  var
+    Sess: TSessionSpillage;
   begin
     if (AParent = nil) or (ADevice = nil) then
       Exit;
