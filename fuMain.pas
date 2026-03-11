@@ -1730,7 +1730,6 @@ end;
 
 procedure TFormMain.ShowDeviceSpillages(ADevice: TDevice);
 var
-  Sess: TSessionSpillage;
   Point: TPointSpillage;
   List: TList<TPointSpillage>;
 begin
@@ -1739,12 +1738,10 @@ begin
   begin
     List := TList<TPointSpillage>.Create;
     try
-      if ADevice.Sessions <> nil then
-        for Sess in ADevice.Sessions do
-          if (Sess <> nil) and (Sess.Spillages <> nil) then
-            for Point in Sess.Spillages do
-              if Point <> nil then
-                List.Add(Point);
+      if ADevice.Spillages <> nil then
+        for Point in ADevice.Spillages do
+          if Point <> nil then
+            List.Add(Point);
 
       FCurrentSpillages := List.ToArray;
     finally
@@ -1763,6 +1760,7 @@ var
   Device: TDevice;
   Point: TPointSpillage;
   List: TList<TPointSpillage>;
+  I: Integer;
 begin
   SetLength(FCurrentSpillages, 0);
   if ASession = nil then
@@ -1786,10 +1784,21 @@ begin
 
   List := TList<TPointSpillage>.Create;
   try
-    if ASession.Spillages <> nil then
-      for Point in ASession.Spillages do
+    if Device.Spillages <> nil then
+    begin
+      for Point in Device.Spillages do
+        if (Point <> nil) and (Point.SessionID = ASession.ID) then
+          List.Add(Point);
+    end
+    else if ASession.Spillages <> nil then
+    begin
+      for I := 0 to ASession.Spillages.Count - 1 do
+      begin
+        Point := ASession.Spillages[I];
         if Point <> nil then
           List.Add(Point);
+      end;
+    end;
 
     FCurrentSpillages := List.ToArray;
   finally
@@ -3638,7 +3647,7 @@ begin
           on E: Exception do
           begin
             ErrMsg := E.Message;
-            TThread.Queue(nil,
+            TThread.Queue(
               procedure
               begin
                 ShowMessage('Ошибка сохранения прибора после смены типа: ' + ErrMsg);
