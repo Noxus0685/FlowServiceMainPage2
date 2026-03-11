@@ -732,6 +732,10 @@ type
     procedure RefreshResultsAfterDevicesAction;
     procedure UpdateGridDataPoints;
     procedure UpdateGridResults;
+    procedure UpdateGridDataPointsHeaders;
+    procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+      const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+      const Value: TValue; const State: TGridDrawStates);
   end;
 
 
@@ -1867,6 +1871,7 @@ end;
 
 procedure TFormMain.UpdateGridDataPoints;
 begin
+  UpdateGridDataPointsHeaders;
   GridDataPoints.BeginUpdate;
   GridDataPoints.RowCount := 0;
   GridDataPoints.RowCount := Length(FCurrentSpillages);
@@ -2810,19 +2815,59 @@ begin
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
     Value := FloatToStr(P.SpillTime)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
-    Value := FloatToStr(P.QavgEtalon)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    begin
+      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+        Value := FActiveWorkTable.TableFlow.ValueVolumeFlow.GetStrNum(P.QavgEtalon)
+      else
+        Value := FActiveWorkTable.TableFlow.ValueMassFlow.GetStrNum(P.QavgEtalon);
+    end
+    else
+      Value := FloatToStr(P.QavgEtalon);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonVolume then
-    Value := FloatToStr(P.EtalonVolume)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    begin
+      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.EtalonVolume)
+      else
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.EtalonVolume);
+    end
+    else
+      Value := FloatToStr(P.EtalonVolume);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonStd then
-    Value := FloatToStr(P.QEtalonStd)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueError.GetStrNum(P.QEtalonStd)
+    else
+      Value := FloatToStr(P.QEtalonStd);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonCV then
     Value := FloatToStr(P.QEtalonCV)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceVolume then
-    Value := FloatToStr(P.DeviceVolume)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    begin
+      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.DeviceVolume)
+      else
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.DeviceVolume);
+    end
+    else
+      Value := FloatToStr(P.DeviceVolume);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageVelocity then
     Value := FloatToStr(P.Velocity)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
-    Value := FloatToStr(P.Error)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueError.GetStrNum(P.Error)
+    else
+      Value := FloatToStr(P.Error);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageValid then
     Value := BoolToRussianYesNo(P.Valid)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQStd then
@@ -2830,11 +2875,36 @@ begin
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQCV then
     Value := FloatToStr(P.QCV)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageVolumeBefore then
-    Value := FloatToStr(P.VolumeBefore)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    begin
+      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.VolumeBefore)
+      else
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.VolumeBefore);
+    end
+    else
+      Value := FloatToStr(P.VolumeBefore);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageVolumeAfter then
-    Value := FloatToStr(P.VolumeAfter)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    begin
+      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.VolumeAfter)
+      else
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.VolumeAfter);
+    end
+    else
+      Value := FloatToStr(P.VolumeAfter);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillagePulseCount then
-    Value := P.PulseCount
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueImp.GetStrNum(P.PulseCount)
+    else
+      Value := P.PulseCount;
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageMeanFrequency then
     Value := FloatToStr(P.MeanFrequency)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageAvgCurrent then
@@ -2846,21 +2916,68 @@ begin
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageData2 then
     Value := P.Data2
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageStartTemperature then
-    Value := FloatToStr(P.StartTemperature)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueTemperture.GetStrNum(P.StartTemperature)
+    else
+      Value := FloatToStr(P.StartTemperature);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEndTemperature then
-    Value := FloatToStr(P.EndTemperature)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueTemperture.GetStrNum(P.EndTemperature)
+    else
+      Value := FloatToStr(P.EndTemperature);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageAvgTemperature then
-    Value := FloatToStr(P.AvgTemperature)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueTemperture.GetStrNum(P.AvgTemperature)
+    else
+      Value := FloatToStr(P.AvgTemperature);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageInputPressure then
-    Value := FloatToStr(P.InputPressure)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValuePressure.GetStrNum(P.InputPressure)
+    else
+      Value := FloatToStr(P.InputPressure);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageOutputPressure then
-    Value := FloatToStr(P.OutputPressure)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValuePressure.GetStrNum(P.OutputPressure)
+    else
+      Value := FloatToStr(P.OutputPressure);
+  end
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeltaPressure then
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValuePressure.GetStrNum(P.InputPressure - P.OutputPressure)
+    else
+      Value := FloatToStr(P.InputPressure - P.OutputPressure);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDensity then
-    Value := FloatToStr(P.Density)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueDensity.GetStrNum(P.Density)
+    else
+      Value := FloatToStr(P.Density);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageAmbientTemperature then
-    Value := FloatToStr(P.AmbientTemperature)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValueTemperture.GetStrNum(P.AmbientTemperature)
+    else
+      Value := FloatToStr(P.AmbientTemperature);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageAtmosphericPressure then
-    Value := FloatToStr(P.AtmosphericPressure)
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      Value := FActiveWorkTable.TableFlow.ValuePressure.GetStrNum(P.AtmosphericPressure)
+    else
+      Value := FloatToStr(P.AtmosphericPressure);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageRelativeHumidity then
     Value := FloatToStr(P.RelativeHumidity)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageCoef then
@@ -2869,6 +2986,31 @@ begin
     Value := P.FCDCoefficient
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageArchivedData then
     Value := P.ArchivedData;
+end;
+
+
+procedure TFormMain.GridDataPointsDrawColumnCell(Sender: TObject;
+  const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
+  const Row: Integer; const Value: TValue; const State: TGridDrawStates);
+var
+  P: TPointSpillage;
+  Color: TAlphaColor;
+begin
+  if (Column <> StringColumnSpillageValid) or (Row < 0) or
+     (Row >= Length(FCurrentSpillages)) then
+    Exit;
+
+  P := FCurrentSpillages[Row];
+  if P = nil then
+    Exit;
+
+  Color := GetStatusColor(P.Status);
+  if Color = TAlphaColors.Null then
+    Exit;
+
+  Canvas.Fill.Kind := TBrushKind.Solid;
+  Canvas.Fill.Color := Color;
+  Canvas.FillRect(Bounds, 0, 0, [], 1);
 end;
 
 procedure TFormMain.GridDataPointsMouseDown(Sender: TObject;
@@ -3554,15 +3696,25 @@ begin
   end;
   WorkTable.UpdateAggregateMeterValues;
   WorkTable.RecalculateAllMeterValues;
+  UpdateGridDataPointsHeaders;
   UpdateUIFromValues;
 end;
 
 procedure TFormMain.ComboBoxUnitsChange(Sender: TObject);
 var
+  UnitSource: TComboBox;
   UnitName: string;
   QuantityUnitName: string;
 begin
-  UnitName := Trim(ComboEditUnits.Text);
+  UnitSource := nil;
+  if Sender is TComboBox then
+    UnitSource := TComboBox(Sender);
+
+  if UnitSource <> nil then
+    UnitName := Trim(UnitSource.Text)
+  else
+    UnitName := Trim(ComboEditUnits.Text);
+
   if UnitName = '' then
     Exit;
 
@@ -3570,6 +3722,85 @@ begin
   SetDim(UnitName, QuantityUnitName);
 
   GridDevices.SetFocus;
+end;
+
+procedure TFormMain.UpdateGridDataPointsHeaders;
+var
+  WorkTable: TWorkTable;
+  IsVolumeUnits: Boolean;
+  FlowDimName: string;
+  QuantityDimName: string;
+  TemperatureDimName: string;
+  PressureDimName: string;
+begin
+  WorkTable := FActiveWorkTable;
+  if (WorkTable = nil) or (WorkTable.TableFlow = nil) then
+    Exit;
+
+  IsVolumeUnits := IsVolumeFlowUnit(WorkTable.FlowUnitName);
+
+  if IsVolumeUnits then
+  begin
+    if WorkTable.TableFlow.ValueVolumeFlow <> nil then
+      FlowDimName := WorkTable.TableFlow.ValueVolumeFlow.GetDimName
+    else
+      FlowDimName := WorkTable.FlowUnitName;
+    if WorkTable.TableFlow.ValueVolume <> nil then
+      QuantityDimName := WorkTable.TableFlow.ValueVolume.GetDimName
+    else
+      QuantityDimName := WorkTable.QuantityUnitName;
+    StringColumnSpillageEtalonVolume.Header := 'Объем эталона, ' + QuantityDimName;
+    StringColumnSpillageDeviceVolume.Header := 'Объем прибора, ' + QuantityDimName;
+    StringColumnSpillageVolumeBefore.Header := 'Объем до, ' + QuantityDimName;
+    StringColumnSpillageVolumeAfter.Header := 'Объем после, ' + QuantityDimName;
+  end
+  else
+  begin
+    if WorkTable.TableFlow.ValueMassFlow <> nil then
+      FlowDimName := WorkTable.TableFlow.ValueMassFlow.GetDimName
+    else
+      FlowDimName := WorkTable.FlowUnitName;
+    if WorkTable.TableFlow.ValueMass <> nil then
+      QuantityDimName := WorkTable.TableFlow.ValueMass.GetDimName
+    else
+      QuantityDimName := WorkTable.QuantityUnitName;
+    StringColumnSpillageEtalonVolume.Header := 'Масса эталона, ' + QuantityDimName;
+    StringColumnSpillageDeviceVolume.Header := 'Масса прибора, ' + QuantityDimName;
+    StringColumnSpillageVolumeBefore.Header := 'Масса до, ' + QuantityDimName;
+    StringColumnSpillageVolumeAfter.Header := 'Масса после, ' + QuantityDimName;
+  end;
+
+  StringColumnSpillageQavgEtalon.Header := 'Расход, ' + FlowDimName;
+
+  StringColumnSpillageQStd.Header := 'СКО прибора, ' + FlowDimName;
+
+  if WorkTable.TableFlow.ValueImp <> nil then
+    StringColumnSpillagePulseCount.Header := 'Импульсы, ' + WorkTable.TableFlow.ValueImp.GetDimName
+  else
+    StringColumnSpillagePulseCount.Header := 'Импульсы';
+
+  if WorkTable.TableFlow.ValueDensity <> nil then
+    StringColumnSpillageDensity.Header := 'Плотность, ' + WorkTable.TableFlow.ValueDensity.GetDimName
+  else
+    StringColumnSpillageDensity.Header := 'Плотность';
+
+  if WorkTable.TableFlow.ValueTemperture <> nil then
+    TemperatureDimName := WorkTable.TableFlow.ValueTemperture.GetDimName
+  else
+    TemperatureDimName := '';
+  StringColumnSpillageStartTemperature.Header := 'T нач, ' + TemperatureDimName;
+  StringColumnSpillageEndTemperature.Header := 'T кон, ' + TemperatureDimName;
+  StringColumnSpillageAvgTemperature.Header := 'T сред, ' + TemperatureDimName;
+  StringColumnSpillageAmbientTemperature.Header := 'T возд, ' + TemperatureDimName;
+
+  if WorkTable.TableFlow.ValuePressure <> nil then
+    PressureDimName := WorkTable.TableFlow.ValuePressure.GetDimName
+  else
+    PressureDimName := '';
+  StringColumnSpillageInputPressure.Header := 'Давление Вх, ' + PressureDimName;
+  StringColumnSpillageOutputPressure.Header := 'Давление Вых, ' + PressureDimName;
+  StringColumnSpillageDeltaPressure.Header := 'Давление разница, ' + PressureDimName;
+  StringColumnSpillageAtmosphericPressure.Header := 'Атм Давл, ' + PressureDimName;
 end;
 
 function TFormMain.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
