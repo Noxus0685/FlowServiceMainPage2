@@ -2306,7 +2306,7 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  ShowSessionSpillages(Session);
+  RefreshResultsTab;
 end;
 
 procedure TFormMain.ActionSessionPointsClearExecute(Sender: TObject);
@@ -2348,7 +2348,7 @@ begin
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
-  ShowSessionSpillages(Session);
+  RefreshResultsTab;
 end;
 
 procedure TFormMain.ActionSessionActiveExecute(Sender: TObject);
