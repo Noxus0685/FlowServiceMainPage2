@@ -4362,7 +4362,9 @@ begin
       if IsTypeChanged then
       begin
         Ch.FlowMeter.Device.AttachType(NewType, RepoName);
-        Ch.FlowMeter.Device.FillFromType(NewType, True);
+        // При смене типа поверочные точки должны полностью переходить из типа в прибор.
+        // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
+        Ch.FlowMeter.Device.FillFromType(NewType, False);
         if Ch.FlowMeter.Device.State in [osClean, osLoaded] then
           Ch.FlowMeter.Device.State := osModified;
         PersistDeviceAsync(Ch.FlowMeter.Device);
