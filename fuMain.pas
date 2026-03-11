@@ -2729,20 +2729,20 @@ procedure TFormMain.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
   Row: Integer;
-  CellBounds: TRectF;
+  P: TPoint;
 begin
-  if (Button <> TMouseButton.mbRight) or (GridDataPoints = nil) then
+  if Button <> TMouseButton.mbRight then
     Exit;
 
+  P := Point(Round(X), Round(Y));
+
   for Row := 0 to GridDataPoints.RowCount - 1 do
-  begin
-    CellBounds := GridDataPoints.CellRect(0, Row);
-    if (Y >= CellBounds.Top) and (Y <= CellBounds.Bottom) then
+    if GridDataPoints.CellRect(0, Row).Contains(P) then
     begin
       GridDataPoints.Row := Row;
+      GridDataPoints.SetFocus;
       Break;
     end;
-  end;
 end;
 
 
@@ -2750,20 +2750,20 @@ procedure TFormMain.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
 var
   Row: Integer;
-  CellBounds: TRectF;
+  P: TPoint;
 begin
-  if (Button <> TMouseButton.mbRight) or (GridResults = nil) then
+  if Button <> TMouseButton.mbRight then
     Exit;
 
+  P := Point(Round(X), Round(Y));
+
   for Row := 0 to GridResults.RowCount - 1 do
-  begin
-    CellBounds := GridResults.CellRect(0, Row);
-    if (Y >= CellBounds.Top) and (Y <= CellBounds.Bottom) then
+    if GridResults.CellRect(0, Row).Contains(P) then
     begin
       GridResults.Row := Row;
+      GridResults.SetFocus;
       Break;
     end;
-  end;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);

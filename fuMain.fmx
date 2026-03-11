@@ -4087,6 +4087,9 @@ object FormMain: TFormMain
     object MenuItemDataResultsDeletePoint: TMenuItem
       Action = ActionSessionPointDelete
     end
+    object MenuItemDataResultsClearPoints: TMenuItem
+      Action = ActionSessionPointsClear
+    end
     object MenuItemDataResultsCloseSession: TMenuItem
       Action = ActionSessionClose
     end
@@ -4105,6 +4108,18 @@ object FormMain: TFormMain
     OnPopup = PopupMenuGridResultsPopup
     Left = 1673
     Top = 601
+    object MenuItemGridResultsDeletePoint: TMenuItem
+      Action = ActionSessionPointDelete
+    end
+    object MenuItemGridResultsClearPoints: TMenuItem
+      Action = ActionSessionPointsClear
+    end
+    object MenuItemGridResultsCloseSession: TMenuItem
+      Action = ActionSessionClose
+    end
+    object MenuItemGridResultsSep1: TMenuItem
+      Text = '-'
+    end
     object MenuItemGridResultsColumns: TMenuItem
       Text = #1057#1090#1086#1083#1073#1094#1099
     end
