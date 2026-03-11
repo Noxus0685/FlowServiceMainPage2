@@ -2729,19 +2729,22 @@ procedure TFormMain.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
   Row: Integer;
-  P: TPoint;
+  P: TPointF;
 begin
   if Button <> TMouseButton.mbRight then
     Exit;
 
-  P := Point(Round(X), Round(Y));
+  // CellRect возвращает координаты в системе контента грида,
+  // поэтому учитываем текущую прокрутку ViewportPosition.
+  P := PointF(X + GridDataPoints.ViewportPosition.X,
+    Y + GridDataPoints.ViewportPosition.Y);
 
   for Row := 0 to GridDataPoints.RowCount - 1 do
     if GridDataPoints.CellRect(0, Row).Contains(P) then
     begin
       GridDataPoints.Row := Row;
       GridDataPoints.SetFocus;
-      Break;
+      Exit;
     end;
 end;
 
@@ -2750,19 +2753,22 @@ procedure TFormMain.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
 var
   Row: Integer;
-  P: TPoint;
+  P: TPointF;
 begin
   if Button <> TMouseButton.mbRight then
     Exit;
 
-  P := Point(Round(X), Round(Y));
+  // CellRect возвращает координаты в системе контента грида,
+  // поэтому учитываем текущую прокрутку ViewportPosition.
+  P := PointF(X + GridResults.ViewportPosition.X,
+    Y + GridResults.ViewportPosition.Y);
 
   for Row := 0 to GridResults.RowCount - 1 do
     if GridResults.CellRect(0, Row).Contains(P) then
     begin
       GridResults.Row := Row;
       GridResults.SetFocus;
-      Break;
+      Exit;
     end;
 end;
 
