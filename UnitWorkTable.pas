@@ -228,6 +228,8 @@ type
 
     FEtalonsGridColumns: TArray<TGridColumnLayout>;
     FDevicesGridColumns: TArray<TGridColumnLayout>;
+    FDataPointsGridColumns: TArray<TGridColumnLayout>;
+    FResultsGridColumns: TArray<TGridColumnLayout>;
 
     function GetValueTempertureBefore: TMeterValue;
     function GetValueTempertureAfter: TMeterValue;
@@ -365,6 +367,8 @@ type
 
     property EtalonsGridColumns: TArray<TGridColumnLayout> read FEtalonsGridColumns write FEtalonsGridColumns;
     property DevicesGridColumns: TArray<TGridColumnLayout> read FDevicesGridColumns write FDevicesGridColumns;
+    property DataPointsGridColumns: TArray<TGridColumnLayout> read FDataPointsGridColumns write FDataPointsGridColumns;
+    property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -1607,6 +1611,8 @@ begin
       SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
       SaveGridColumns(Ini, Section + '.EtalonGrid', WorkTable.EtalonsGridColumns);
       SaveGridColumns(Ini, Section + '.DeviceGrid', WorkTable.DevicesGridColumns);
+      SaveGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.DataPointsGridColumns);
+      SaveGridColumns(Ini, Section + '.ResultsGrid', WorkTable.ResultsGridColumns);
     end;
   finally
     ValuesIni.Free;
@@ -1733,6 +1739,8 @@ begin
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
       LoadGridColumns(Ini, Section + '.EtalonGrid', WorkTable.FEtalonsGridColumns);
       LoadGridColumns(Ini, Section + '.DeviceGrid', WorkTable.FDevicesGridColumns);
+      LoadGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.FDataPointsGridColumns);
+      LoadGridColumns(Ini, Section + '.ResultsGrid', WorkTable.FResultsGridColumns);
 
       WorkTable.RebindAllFlowMeters;
       WorkTable.RecalculateAllMeterValues;

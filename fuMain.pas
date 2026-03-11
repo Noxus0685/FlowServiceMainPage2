@@ -561,6 +561,8 @@ type
     procedure PopupMenuDevicesGridLayOutPopup(Sender: TObject);
     procedure PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
     procedure MenuGridLayOutClick(Sender: TObject);
+    procedure PopupMenuGridDataPointsPopup(Sender: TObject);
+    procedure PopupMenuGridResultsPopup(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Circle1Click(Sender: TObject);
     procedure ButtonMonitorClick(Sender: TObject);
@@ -633,6 +635,7 @@ type
     procedure UpdateUIFromValues;
     procedure SetValues;
     procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
+    procedure FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
     procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
     function IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
     procedure GridDevicesActionsMenuClick(Sender: TObject);
@@ -1367,6 +1370,8 @@ begin
   TreeViewDevices.PopupMenu := PopupMenuTreeViewDevices;
   PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
+  PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
+  PopupMenuGridResults.OnPopup := PopupMenuGridResultsPopup;
   UpdateSessionDateLabel(nil);
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
@@ -3009,6 +3014,40 @@ begin
   end;
 end;
 
+procedure TFormMain.FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  Column: TColumn;
+begin
+  if (AMenuItem = nil) or (AGrid = nil) then
+    Exit;
+
+  AMenuItem.Clear;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    Column := AGrid.Columns[I];
+
+    MenuItem := TMenuItem.Create(AMenuItem);
+    MenuItem.Parent := AMenuItem;
+    MenuItem.Text := Column.Header;
+    MenuItem.IsChecked := Column.Visible;
+    MenuItem.TagObject := Column;
+    MenuItem.OnClick := MenuGridLayOutClick;
+  end;
+end;
+
+procedure TFormMain.PopupMenuGridDataPointsPopup(Sender: TObject);
+begin
+  FillGridColumnsSubMenu(MenuItemDataResultsColumns, GridDataPoints);
+end;
+
+procedure TFormMain.PopupMenuGridResultsPopup(Sender: TObject);
+begin
+  FillGridColumnsSubMenu(MenuItemGridResultsColumns, GridResults);
+end;
+
 function TFormMain.IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
 var
   PopupPoint: TPointF;
@@ -3168,6 +3207,8 @@ var
   WorkTable: TWorkTable;
   EtalonColumns: TArray<TGridColumnLayout>;
   DeviceColumns: TArray<TGridColumnLayout>;
+  DataPointsColumns: TArray<TGridColumnLayout>;
+  ResultsColumns: TArray<TGridColumnLayout>;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -3183,8 +3224,12 @@ begin
 
   CaptureGridColumnsLayout(GridEtalons, EtalonColumns);
   CaptureGridColumnsLayout(GridDevices, DeviceColumns);
+  CaptureGridColumnsLayout(GridDataPoints, DataPointsColumns);
+  CaptureGridColumnsLayout(GridResults, ResultsColumns);
   WorkTable.EtalonsGridColumns := EtalonColumns;
   WorkTable.DevicesGridColumns := DeviceColumns;
+  WorkTable.DataPointsGridColumns := DataPointsColumns;
+  WorkTable.ResultsGridColumns := ResultsColumns;
 end;
 
 procedure TFormMain.LoadLayoutSettingsFromWorkTable;
@@ -3207,6 +3252,8 @@ begin
 
   ApplyGridColumnsLayout(GridEtalons, WorkTable.EtalonsGridColumns);
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
+  ApplyGridColumnsLayout(GridDataPoints, WorkTable.DataPointsGridColumns);
+  ApplyGridColumnsLayout(GridResults, WorkTable.ResultsGridColumns);
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
 end;
 

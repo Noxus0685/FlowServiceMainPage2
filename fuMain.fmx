@@ -3418,6 +3418,7 @@ object FormMain: TFormMain
           end
           object GridResults: TGrid
             Align = Client
+            PopupMenu = PopupMenuGridResults
             CanFocus = True
             ClipChildren = True
             Margins.Left = 2.000000000000000000
@@ -3426,7 +3427,7 @@ object FormMain: TFormMain
             Size.PlatformDefault = False
             TabOrder = 0
             Visible = False
-            Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+            Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridResultsGetValue
             Viewport.Width = 1515.000000000000000000
             Viewport.Height = 651.000000000000000000
@@ -4080,6 +4081,7 @@ object FormMain: TFormMain
     end
   end
   object PopupMenuGridDataPoints: TPopupMenu
+    OnPopup = PopupMenuGridDataPointsPopup
     Left = 1393
     Top = 521
     object MenuItemDataResultsColumns: TMenuItem
@@ -4091,10 +4093,11 @@ object FormMain: TFormMain
     Top = 577
   end
   object PopupMenuGridResults: TPopupMenu
+    OnPopup = PopupMenuGridResultsPopup
     Left = 1673
     Top = 601
     object MenuItemGridResultsColumns: TMenuItem
-      Text = 'MenuItemGridResultsColumns'
+      Text = #1057#1090#1086#1083#1073#1094#1099
     end
   end
 end
