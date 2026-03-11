@@ -690,6 +690,7 @@ type
     FEtalonClipboard: TChannelClipboardData;
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
+    procedure PersistDeviceAsync(ADevice: TDevice);
     procedure LoadProcessingDevices;
     procedure SaveProcessingDevices;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
@@ -3448,6 +3449,44 @@ begin
   end;
 end;
 
+procedure TFormMain.PersistDeviceAsync(ADevice: TDevice);
+var
+  Repo: TDeviceRepository;
+  ErrMsg: string;
+begin
+  if (ADevice = nil) or (DataManager = nil) then
+    Exit;
+
+  Repo := DataManager.ActiveDeviceRepo;
+  if Repo = nil then
+    Exit;
+
+  TThread.CreateAnonymousThread(
+    procedure
+    begin
+      TMonitor.Enter(Repo);
+      try
+        try
+          Repo.SaveDevice(ADevice);
+        except
+          on E: Exception do
+          begin
+            ErrMsg := E.Message;
+            TThread.Queue(nil,
+              procedure
+              begin
+                ShowMessage('Ошибка сохранения прибора после смены типа: ' + ErrMsg);
+              end
+            );
+          end;
+        end;
+      finally
+        TMonitor.Exit(Repo);
+      end;
+    end
+  ).Start;
+end;
+
 procedure TFormMain.SaveChannelToClipboard(AChannel: TChannel;
   var AClipboard: TChannelClipboardData);
 begin
@@ -4259,6 +4298,9 @@ begin
       begin
         Ch.FlowMeter.Device.AttachType(NewType, RepoName);
         Ch.FlowMeter.Device.FillFromType(NewType, True);
+        if Ch.FlowMeter.Device.State in [osClean, osLoaded] then
+          Ch.FlowMeter.Device.State := osModified;
+        PersistDeviceAsync(Ch.FlowMeter.Device);
       end;
     end;
 
