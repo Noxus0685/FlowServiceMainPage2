@@ -514,6 +514,7 @@ type
     ActionSessionPointsClear: TAction;
     ActionSessionActive: TAction;
     ActionSessionNew: TAction;
+    ActionSessionSynchTable: TAction;
     ComboBox1: TComboBox;
     Label7: TLabel;
     ButtonSessionClose: TButton;
@@ -592,6 +593,7 @@ type
     procedure ActionSessionPointsClearExecute(Sender: TObject);
     procedure ActionSessionActiveExecute(Sender: TObject);
     procedure ActionSessionNewExecute(Sender: TObject);
+    procedure ActionSessionSynchTableExecute(Sender: TObject);
     procedure PopupMenuTreeViewDevicesPopup(Sender: TObject);
     procedure MenuTreeViewDevicesClearClick(Sender: TObject);
     procedure MenuTreeViewDevicesAddClick(Sender: TObject);
@@ -698,6 +700,9 @@ type
     procedure RemoveProcessingDevice(ADevice: TDevice);
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDeviceFromSelection;
+    procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable;
+      const AClearBeforeSync: Boolean);
+    procedure SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
   end;
 
 
@@ -1766,12 +1771,14 @@ begin
   begin
     AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
+    AddActionMenuItem(ActionSessionSynchTable);
     Exit;
   end;
 
   if Item.TagObject is TWorkTable then
   begin
     AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
+    AddActionMenuItem(ActionSessionSynchTable);
     Exit;
   end;
 
@@ -1890,6 +1897,69 @@ begin
     DevicesToRemove.Free;
     DeviceUUIDsOnTables.Free;
   end;
+end;
+
+procedure TFormMain.SyncProcessingDevicesFromTable(AWorkTable: TWorkTable;
+  const AClearBeforeSync: Boolean);
+var
+  Ch: TChannel;
+begin
+  if FProcessingDevices = nil then
+    Exit;
+
+  if AClearBeforeSync then
+  begin
+    FProcessingDevices.Clear;
+    SaveProcessingDevices;
+  end;
+
+  if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
+    for Ch in AWorkTable.DeviceChannels do
+      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+        AddProcessingDevice(Ch.FlowMeter.Device);
+end;
+
+procedure TFormMain.SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
+var
+  I: Integer;
+  WT: TWorkTable;
+begin
+  if FProcessingDevices = nil then
+    Exit;
+
+  if AClearBeforeSync then
+  begin
+    FProcessingDevices.Clear;
+    SaveProcessingDevices;
+  end;
+
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+    Exit;
+
+  for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+  begin
+    WT := FWorkTableManager.WorkTables[I];
+    SyncProcessingDevicesFromTable(WT, False);
+  end;
+end;
+
+procedure TFormMain.ActionSessionSynchTableExecute(Sender: TObject);
+var
+  Item: TTreeViewItem;
+begin
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+
+  if Item.TagObject is TWorkTable then
+    SyncProcessingDevicesFromTable(TWorkTable(Item.TagObject), False)
+  else if SameText(Item.Text, '...') then
+    SyncProcessingDevicesFromAllTables(True)
+  else
+    Exit;
+
+  RefreshResultsTab;
 end;
 
 procedure TFormMain.MenuTreeViewDevicesAddClick(Sender: TObject);
@@ -4464,6 +4534,7 @@ begin
       Point.Valid := True;
 
       DeviceChannel.FlowMeter.AddDataPoint(Point);
+      AddProcessingDevice(DeviceChannel.FlowMeter.Device);
 
       if Assigned(DeviceRepo) then
         DeviceRepo.SaveDevice(DeviceChannel.FlowMeter.Device);
