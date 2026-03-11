@@ -307,7 +307,7 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
 
     { ================= DB : SPILLAGES ================= }
 
-    function MapSpillageFromQuery(Q: TFDQuery): TPointSpillage;
+    function MapSpillageFromQuery(Q: TFDQuery; ADevice: TDevice): TPointSpillage;
 
     function LoadSpillagesByDevice(ADeviceID: Integer): Boolean;
 
@@ -5531,39 +5531,34 @@ begin
 end;
 
 function TDeviceRepository.MapSpillageFromQuery(
-  Q: TFDQuery
+  Q: TFDQuery;
+  ADevice: TDevice
 ): TPointSpillage;
 var
   SessionID: Integer;
-  ADevice: TDevice;
-  Dev: TDevice;
   Sess: TSessionSpillage;
   MatchedSession: TSessionSpillage;
-  Found: Boolean;
   SessionPointCopy: TPointSpillage;
 begin
-  SessionID := Q.FieldByName('SessionID').AsInteger;
-  ADevice := nil;
-  MatchedSession := nil;
-  Found := False;
-
-  for Dev in FDevices do
-  begin
-    if Dev.Sessions <> nil then
-      for Sess in Dev.Sessions do
-        if Sess.ID = SessionID then
-        begin
-          ADevice := Dev;
-          MatchedSession := Sess;
-          Found := True;
-          Break;
-        end;
-    if Found then
-      Break;
-  end;
-
   if ADevice = nil then
-    raise Exception.CreateFmt('Device for spillage session not found (SessionID=%d)', [SessionID]);
+    raise Exception.Create('MapSpillageFromQuery: Device is nil');
+
+  SessionID := Q.FieldByName('SessionID').AsInteger;
+  MatchedSession := nil;
+
+  if ADevice.Sessions <> nil then
+    for Sess in ADevice.Sessions do
+      if (Sess <> nil) and (Sess.ID = SessionID) then
+      begin
+        MatchedSession := Sess;
+        Break;
+      end;
+
+  if MatchedSession = nil then
+    raise Exception.CreateFmt(
+      'Session for spillage not found (DeviceID=%d, SessionID=%d)',
+      [ADevice.ID, SessionID]
+    );
 
   Result := TPointSpillage.Create(SessionID);
   if ADevice.Spillages = nil then
@@ -5655,7 +5650,7 @@ begin
 
     while not Q.Eof do
     begin
-      MapSpillageFromQuery(Q);
+      MapSpillageFromQuery(Q, Device);
       Q.Next;
     end;
 
