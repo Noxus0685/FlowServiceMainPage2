@@ -564,6 +564,8 @@ type
     procedure EditTestNumExit(Sender: TObject);
     procedure TabControl1Change(Sender: TObject);
     procedure TreeViewDevicesChange(Sender: TObject);
+    procedure TreeViewDevicesMouseDown(Sender: TObject;
+      Button: TMouseButton; Shift: TShiftState; X, Y: Single);
     procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -1356,6 +1358,7 @@ begin
   ButtonCancel.OnClick := ButtonCancelClick;
   TabControl1.OnChange := TabControl1Change;
   TreeViewDevices.OnChange := TreeViewDevicesChange;
+  TreeViewDevices.OnMouseDown := TreeViewDevicesMouseDown;
   TreeViewDevices.PopupMenu := PopupMenuTreeViewDevices;
   PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
@@ -2474,6 +2477,49 @@ begin
   else
   begin
     ShowAllDevicesResults;
+  end;
+end;
+
+procedure TFormMain.TreeViewDevicesMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  AbsPoint: TPointF;
+  Item: TTreeViewItem;
+  I: Integer;
+
+  function FindItemByPoint(AItem: TTreeViewItem): TTreeViewItem;
+  var
+    ChildIndex: Integer;
+    ChildItem: TTreeViewItem;
+  begin
+    Result := nil;
+    if AItem = nil then
+      Exit;
+
+    for ChildIndex := 0 to AItem.Count - 1 do
+    begin
+      ChildItem := FindItemByPoint(TTreeViewItem(AItem.Items[ChildIndex]));
+      if ChildItem <> nil then
+        Exit(ChildItem);
+    end;
+
+    if AItem.AbsoluteRect.Contains(AbsPoint) then
+      Result := AItem;
+  end;
+
+begin
+  if (Button <> TMouseButton.mbRight) or (TreeViewDevices = nil) then
+    Exit;
+
+  AbsPoint := TreeViewDevices.LocalToAbsolute(PointF(X, Y));
+  for I := 0 to TreeViewDevices.Count - 1 do
+  begin
+    Item := FindItemByPoint(TreeViewDevices.ItemByIndex(I));
+    if Item <> nil then
+    begin
+      TreeViewDevices.Selected := Item;
+      Exit;
+    end;
   end;
 end;
 
