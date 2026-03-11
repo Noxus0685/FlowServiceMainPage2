@@ -516,7 +516,7 @@ type
     ActionSessionNew: TAction;
     ActionSessionSynchTable: TAction;
     ComboBox1: TComboBox;
-    Label7: TLabel;
+    LabelSessionDate: TLabel;
     ButtonSessionClose: TButton;
     Label8: TLabel;
     PopupMenuTreeViewDevices: TPopupMenu;
@@ -655,6 +655,7 @@ type
     procedure ShowDeviceSpillages(ADevice: TDevice);
     procedure ShowSessionSpillages(ASession: TSessionSpillage);
     function ResolveSelectedDevice: TDevice;
+    procedure UpdateSessionDateLabel(ASession: TSessionSpillage);
     procedure UpdateResultsPointColumns;
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
@@ -1356,6 +1357,7 @@ begin
   TreeViewDevices.PopupMenu := PopupMenuTreeViewDevices;
   PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
+  UpdateSessionDateLabel(nil);
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
   SetValues;
@@ -1374,6 +1376,39 @@ procedure TFormMain.RefreshResultsTab;
 begin
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
+end;
+
+function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;
+var
+  DateOpenStr: string;
+  DateCloseStr: string;
+begin
+  if ASession = nil then
+    Exit('Сессия -');
+
+  DateOpenStr := '-';
+  if ASession.DateTimeOpen > 0 then
+    DateOpenStr := DateToStr(ASession.DateTimeOpen);
+
+  if ASession.Active then
+    Exit('Сессия ' + DateOpenStr);
+
+  DateCloseStr := '-';
+  if ASession.DateTimeClose > 0 then
+    DateCloseStr := DateToStr(ASession.DateTimeClose);
+
+  Result := 'Сессия ' + DateOpenStr + '-' + DateCloseStr;
+end;
+
+procedure TFormMain.UpdateSessionDateLabel(ASession: TSessionSpillage);
+begin
+  if LabelSessionDate = nil then
+    Exit;
+
+  if ASession = nil then
+    LabelSessionDate.Text := 'Сессия'
+  else
+    LabelSessionDate.Text := FormatSessionPeriodLabel(ASession);
 end;
 
 procedure TFormMain.PopulateTreeViewDevices;
@@ -1406,7 +1441,7 @@ var
 
         SessionItem := TTreeViewItem.Create(TreeViewDevices);
         SessionItem.Text :=
-          Format('Сессия #%d (%s)', [Sess.ID, DateTimeToStr(Sess.DateTime)]);
+          Format('Сессия #%d (%s)', [Sess.ID, DateToStr(Sess.DateTimeOpen)]);
         SessionItem.TagObject := Sess;
         DeviceItem.AddObject(SessionItem);
       end;
@@ -2205,6 +2240,7 @@ begin
 
   Session.Active := False;
   Session.Status := 2;
+  Session.DateTimeClose := Now;
   if Session.State = osClean then
     Session.State := osModified;
 
@@ -2320,6 +2356,7 @@ begin
       begin
         S.Active := True;
         S.Status := 1;
+        S.DateTimeClose := 0;
       end
       else
         S.Active := False;
@@ -2360,7 +2397,8 @@ begin
   Session := Device.AddSessionSpillage;
   if Session <> nil then
   begin
-    Session.DateTime := Now;
+    Session.DateTimeOpen := Now;
+    Session.DateTimeClose := 0;
     Session.Status := 0;
   end;
 
@@ -2383,26 +2421,35 @@ begin
 
   if Item.Text = '...' then
   begin
+    UpdateSessionDateLabel(nil);
     ShowAllDevicesResults;
     Exit;
   end;
 
   if Item.TagObject is TWorkTable then
   begin
+    UpdateSessionDateLabel(nil);
     ShowWorkTableResults(TWorkTable(Item.TagObject));
     Exit;
   end;
 
   if Item.Text = 'прочее' then
   begin
+    UpdateSessionDateLabel(nil);
     ShowOtherDevicesResults;
     Exit;
   end;
 
   if Item.TagObject is TDevice then
-    ShowDeviceSpillages(TDevice(Item.TagObject))
+  begin
+    UpdateSessionDateLabel(nil);
+    ShowDeviceSpillages(TDevice(Item.TagObject));
+  end
   else if Item.TagObject is TSessionSpillage then
-    ShowSessionSpillages(TSessionSpillage(Item.TagObject))
+  begin
+    UpdateSessionDateLabel(TSessionSpillage(Item.TagObject));
+    ShowSessionSpillages(TSessionSpillage(Item.TagObject));
+  end
   else
   begin
     ShowAllDevicesResults;
@@ -2502,13 +2549,10 @@ begin
     Value := P.Num
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDateTime then
   begin
-    if (CurrentDevice <> nil) and (CurrentDevice.Sessions <> nil) then
-      for Sess in CurrentDevice.Sessions do
-        if Sess.ID = P.SessionID then
-        begin
-          Value := DateTimeToStr(Sess.DateTime);
-          Break;
-        end;
+    if P.DateTime > 0 then
+      Value := DateTimeToStr(P.DateTime)
+    else
+      Value := '-';
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageOperator then
   begin
@@ -4619,7 +4663,8 @@ begin
     if Session.State = osClean then
       Session.State := osModified;
 
-    Session.DateTime := Now;
+    if Session.DateTimeOpen = 0 then
+      Session.DateTimeOpen := Now;
     Session.EtalonName := WorkTable.TableFlow.Name;
 
     Point := TPointSpillage.Create(Session.ID);
@@ -4627,6 +4672,7 @@ begin
       Point.Num := DeviceChannel.FlowMeter.Device.Spillages.Count + 1;
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.SessionID := Session.ID;
+      Point.DateTime := Now;
       Point.SpillTime := WorkTable.ValueTime.GetDoubleValue;
       Point.QavgEtalon := WorkTable.ValueFlowRate.GetDoubleValue;
       Point.EtalonVolume := WorkTable.ValueQuantity.GetDoubleValue;
