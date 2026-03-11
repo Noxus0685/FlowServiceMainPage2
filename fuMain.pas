@@ -518,7 +518,7 @@ type
     Label7: TLabel;
     ButtonSessionClose: TButton;
     Label8: TLabel;
-    PopupMenu2: TPopupMenu;
+    PopupMenuTreeViewDevices: TPopupMenu;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -2445,6 +2445,11 @@ begin
   miMesurment.IsChecked := LayoutMesure.Visible;
   miConditions.IsChecked := LayoutConditions.Visible;
   miProcedures.IsChecked := LayoutProcedures.Visible;
+end;
+
+procedure TFormMain.PopupMenuTreeViewDevicesPopup(Sender: TObject);
+begin
+       //Code here
 end;
 
 function TFormMain.GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
