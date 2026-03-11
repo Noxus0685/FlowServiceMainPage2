@@ -1416,10 +1416,6 @@ begin
       RootAll.Text := '...';
       TreeViewDevices.AddObject(RootAll);
 
-      if FProcessingDevices <> nil then
-        for Device in FProcessingDevices do
-          AddDeviceNode(RootAll, Device);
-
       if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
         for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
         begin
@@ -1562,8 +1558,6 @@ end;
 procedure TFormMain.ShowAllDevicesResults;
 var
   Rows: TList<TResultGridRow>;
-  WT: TWorkTable;
-  Ch: TChannel;
   P: TDevicePoint;
   Device: TDevice;
   Row: TResultGridRow;
@@ -1571,61 +1565,54 @@ var
 begin
   Rows := TList<TResultGridRow>.Create;
   try
-    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-      for WT in FWorkTableManager.WorkTables do
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
       begin
-        if WT = nil then
+        if Device = nil then
           Continue;
-        for Ch in WT.DeviceChannels do
+
+        Device.AnalyseResults;
+
+        Row.Name := Device.Name;
+        Row.DeviceType := Device.DeviceTypeName;
+        Row.Serial := Device.SerialNumber;
+
+        if Device.Points <> nil then
         begin
-          if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
-            Continue;
-
-          Device := Ch.FlowMeter.Device;
-
-          Device.AnalyseResults;
-
-          Row.Name := Device.Name;
-          Row.DeviceType := Device.DeviceTypeName;
-          Row.Serial := Device.SerialNumber;
-
-          if Device.Points <> nil then
+          SetLength(Row.PointNames, Device.Points.Count);
+          SetLength(Row.PointValues, Device.Points.Count);
+          SetLength(Row.PointStatuses, Device.Points.Count);
+          for I := 0 to Device.Points.Count - 1 do
           begin
-            SetLength(Row.PointNames, Device.Points.Count);
-            SetLength(Row.PointValues, Device.Points.Count);
-            SetLength(Row.PointStatuses, Device.Points.Count);
-            for I := 0 to Device.Points.Count - 1 do
+            P := Device.Points[I];
+            if P <> nil then
             begin
-              P := Device.Points[I];
-              if P <> nil then
-              begin
-                Row.PointNames[I] := P.Name;
-                Row.PointStatuses[I] := P.Status;
-                if P.Status = 1 then
-                  Row.PointValues[I] := '-'
-                else
-                  Row.PointValues[I] := FormatFloat('0.###', P.ResultError);
-              end
+              Row.PointNames[I] := P.Name;
+              Row.PointStatuses[I] := P.Status;
+              if P.Status = 1 then
+                Row.PointValues[I] := '-'
               else
-              begin
-                Row.PointNames[I] := '';
-                Row.PointStatuses[I] := 1;
-                Row.PointValues[I] := '-';
-              end;
+                Row.PointValues[I] := FormatFloat('0.###', P.ResultError);
+            end
+            else
+            begin
+              Row.PointNames[I] := '';
+              Row.PointStatuses[I] := 1;
+              Row.PointValues[I] := '-';
             end;
-          end
-          else
-          begin
-            SetLength(Row.PointNames, 0);
-            SetLength(Row.PointValues, 0);
-            SetLength(Row.PointStatuses, 0);
           end;
-
-          Row.ResultStatus := Device.Status;
-          Row.ResultText := BuildResultTextByStatus(Device.Status);
-
-          Rows.Add(Row);
+        end
+        else
+        begin
+          SetLength(Row.PointNames, 0);
+          SetLength(Row.PointValues, 0);
+          SetLength(Row.PointStatuses, 0);
         end;
+
+        Row.ResultStatus := Device.Status;
+        Row.ResultText := BuildResultTextByStatus(Device.Status);
+
+        Rows.Add(Row);
       end;
 
     FCurrentResultRows := Rows.ToArray;
