@@ -575,6 +575,10 @@ type
       Button: TMouseButton; Shift: TShiftState; X, Y: Single);
     procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -1370,9 +1374,11 @@ begin
   TreeViewDevices.PopupMenu := PopupMenuTreeViewDevices;
   PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
+  GridDataPoints.OnMouseDown := GridDataPointsMouseDown;
   PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
   PopupMenuGridResults.OnPopup := PopupMenuGridResultsPopup;
   UpdateSessionDateLabel(nil);
+  GridResults.OnMouseDown := GridResultsMouseDown;
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
   SetValues;
@@ -2717,6 +2723,47 @@ begin
     Value := P.FCDCoefficient
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageArchivedData then
     Value := P.ArchivedData;
+end;
+
+procedure TFormMain.GridDataPointsMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  Row: Integer;
+  CellBounds: TRectF;
+begin
+  if (Button <> TMouseButton.mbRight) or (GridDataPoints = nil) then
+    Exit;
+
+  for Row := 0 to GridDataPoints.RowCount - 1 do
+  begin
+    CellBounds := GridDataPoints.CellRect(0, Row);
+    if (Y >= CellBounds.Top) and (Y <= CellBounds.Bottom) then
+    begin
+      GridDataPoints.Row := Row;
+      Break;
+    end;
+  end;
+end;
+
+
+procedure TFormMain.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+var
+  Row: Integer;
+  CellBounds: TRectF;
+begin
+  if (Button <> TMouseButton.mbRight) or (GridResults = nil) then
+    Exit;
+
+  for Row := 0 to GridResults.RowCount - 1 do
+  begin
+    CellBounds := GridResults.CellRect(0, Row);
+    if (Y >= CellBounds.Top) and (Y <= CellBounds.Bottom) then
+    begin
+      GridResults.Row := Row;
+      Break;
+    end;
+  end;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
