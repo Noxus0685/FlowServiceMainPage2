@@ -527,6 +527,7 @@ type
     ActionSessionDeviceAdd: TAction;
     CheckColumnSpillageEnable: TCheckColumn;
     StringColumnSpillageDeltaPressure: TStringColumn;
+    StringColumnSpillageDeviceFlowRate: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -732,7 +733,7 @@ type
     procedure RefreshResultsAfterDevicesAction;
     procedure UpdateGridDataPoints;
     procedure UpdateGridResults;
-    procedure UpdateGridDataPointsHeaders;
+    procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
     procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
       const Column: TColumn; const Bounds: TRectF; const Row: Integer;
       const Value: TValue; const State: TGridDrawStates);
@@ -1401,11 +1402,25 @@ begin
 
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
 
+
+     ComboBoxUnitsResult.Items.Clear;
+  for UnitName in CVolumeFlowUnits do
+    ComboBoxUnitsResult.Items.Add(UnitName);
+  for UnitName in CMassFlowUnits do
+    ComboBoxUnitsResult.Items.Add(UnitName);
+
+    ComboBoxUnitsResult.ItemIndex := 4;
+
+
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
   for UnitName in CMassFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
+
+
+
+
   ComboEditUnits.OnChange := ComboBoxUnitsChange;
   if ComboEditUnits.Items.Count > 0 then
     ComboEditUnits.ItemIndex := 0;
@@ -1871,7 +1886,7 @@ end;
 
 procedure TFormMain.UpdateGridDataPoints;
 begin
-  UpdateGridDataPointsHeaders;
+//  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
   GridDataPoints.BeginUpdate;
   GridDataPoints.RowCount := 0;
   GridDataPoints.RowCount := Length(FCurrentSpillages);
@@ -3696,7 +3711,7 @@ begin
   end;
   WorkTable.UpdateAggregateMeterValues;
   WorkTable.RecalculateAllMeterValues;
-  UpdateGridDataPointsHeaders;
+  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
   UpdateUIFromValues;
 end;
 
@@ -3721,15 +3736,14 @@ begin
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
 
-  GridDevices.SetFocus;
+  UpdateGridDataPointsHeaders(QuantityUnitName,UnitName );
+  UpdateGridDataPoints;
 end;
 
-procedure TFormMain.UpdateGridDataPointsHeaders;
+procedure TFormMain.UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
 var
   WorkTable: TWorkTable;
   IsVolumeUnits: Boolean;
-  FlowDimName: string;
-  QuantityDimName: string;
   TemperatureDimName: string;
   PressureDimName: string;
 begin
@@ -3741,29 +3755,22 @@ begin
 
   if IsVolumeUnits then
   begin
-    if WorkTable.TableFlow.ValueVolumeFlow <> nil then
-      FlowDimName := WorkTable.TableFlow.ValueVolumeFlow.GetDimName
-    else
-      FlowDimName := WorkTable.FlowUnitName;
-    if WorkTable.TableFlow.ValueVolume <> nil then
-      QuantityDimName := WorkTable.TableFlow.ValueVolume.GetDimName
-    else
-      QuantityDimName := WorkTable.QuantityUnitName;
+
+    StringColumnSpillageQavgEtalon.Header:= 'Расход, ' + FlowDimName;
+    StringColumnSpillageDeviceFlowRate.Header:= 'Расход прибора, ' + FlowDimName;
+
     StringColumnSpillageEtalonVolume.Header := 'Объем эталона, ' + QuantityDimName;
     StringColumnSpillageDeviceVolume.Header := 'Объем прибора, ' + QuantityDimName;
     StringColumnSpillageVolumeBefore.Header := 'Объем до, ' + QuantityDimName;
     StringColumnSpillageVolumeAfter.Header := 'Объем после, ' + QuantityDimName;
+
   end
   else
   begin
-    if WorkTable.TableFlow.ValueMassFlow <> nil then
-      FlowDimName := WorkTable.TableFlow.ValueMassFlow.GetDimName
-    else
-      FlowDimName := WorkTable.FlowUnitName;
-    if WorkTable.TableFlow.ValueMass <> nil then
-      QuantityDimName := WorkTable.TableFlow.ValueMass.GetDimName
-    else
-      QuantityDimName := WorkTable.QuantityUnitName;
+
+    StringColumnSpillageQavgEtalon.Header:= 'Расход, ' + FlowDimName;
+    StringColumnSpillageDeviceFlowRate.Header:='Расход прибора, ' + FlowDimName;
+
     StringColumnSpillageEtalonVolume.Header := 'Масса эталона, ' + QuantityDimName;
     StringColumnSpillageDeviceVolume.Header := 'Масса прибора, ' + QuantityDimName;
     StringColumnSpillageVolumeBefore.Header := 'Масса до, ' + QuantityDimName;

@@ -3256,7 +3256,6 @@ object FormMain: TFormMain
             TabOrder = 1
             Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDataPointsGetValue
-            OnDrawColumnCell = GridDataPointsDrawColumnCell
             Viewport.Width = 1515.000000000000000000
             Viewport.Height = 635.000000000000000000
             object CheckColumnSpillageEnable: TCheckColumn
@@ -3313,6 +3312,10 @@ object FormMain: TFormMain
             end
             object StringColumnSpillageQEtalonCV: TStringColumn
               Header = #1042#1072#1088#1080#1072#1094#1080#1103'.  '
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnSpillageDeviceFlowRate: TStringColumn
+              Header = #1056#1072#1089#1093#1086#1076' '#1087#1088#1080#1073#1086#1088#1072','
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnSpillageDeviceVolume: TStringColumn
