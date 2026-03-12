@@ -5480,7 +5480,7 @@ begin
     Col('QCV', 'REAL'),
     Col('VolumeBefore', 'REAL'),
     Col('VolumeAfter', 'REAL'),
-    Col('PulseCount', 'INTEGER'),
+    Col('PulseCount', 'REAL'),
     Col('MeanFrequency', 'REAL'),
     Col('AvgCurrent', 'REAL'),
     Col('AvgVoltage', 'REAL'),
@@ -5593,7 +5593,7 @@ begin
   Result.QCV := Q.FieldByName('QCV').AsFloat;
   Result.VolumeBefore := Q.FieldByName('VolumeBefore').AsFloat;
   Result.VolumeAfter := Q.FieldByName('VolumeAfter').AsFloat;
-  Result.PulseCount := Q.FieldByName('PulseCount').AsInteger;
+  Result.PulseCount := Q.FieldByName('PulseCount').AsFloat;
   Result.MeanFrequency := Q.FieldByName('MeanFrequency').AsFloat;
   Result.AvgCurrent := Q.FieldByName('AvgCurrent').AsFloat;
   Result.AvgVoltage := Q.FieldByName('AvgVoltage').AsFloat;
@@ -5763,7 +5763,7 @@ begin
     SetFloatParam(Q, 'QCV', ASpillage.QCV);
     SetFloatParam(Q, 'VolumeBefore', ASpillage.VolumeBefore);
     SetFloatParam(Q, 'VolumeAfter', ASpillage.VolumeAfter);
-    SetIntParam(Q, 'PulseCount', ASpillage.PulseCount);
+    SetFloatParam(Q, 'PulseCount', ASpillage.PulseCount);
     SetFloatParam(Q, 'MeanFrequency', ASpillage.MeanFrequency);
     SetFloatParam(Q, 'AvgCurrent', ASpillage.AvgCurrent);
     SetFloatParam(Q, 'AvgVoltage', ASpillage.AvgVoltage);
