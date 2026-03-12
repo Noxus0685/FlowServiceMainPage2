@@ -739,6 +739,7 @@ type
     procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
       const Column: TColumn; const Bounds: TRectF; const Row: Integer;
       const Value: TValue; const State: TGridDrawStates);
+    procedure EmbedProceedingContent;
   private
     FProceedingFrame: TFrameProceeding;
   end;
@@ -1436,8 +1437,7 @@ begin
   FProceedingFrame := TFrameProceeding.Create(Self);
   FProceedingFrame.Parent := TabItem1;
   FProceedingFrame.Align := TAlignLayout.Client;
-  FProceedingFrame.SetWorkTableManager(FWorkTableManager);
-  FProceedingFrame.SetWorkTable(FActiveWorkTable);
+  EmbedProceedingContent;
 
   FLastClickRow := -1;
   FLastClickCol := nil;
@@ -1482,6 +1482,30 @@ begin
   OnChangeState(STATE_NONE);
 end;
 
+procedure TFormMain.EmbedProceedingContent;
+begin
+  if FProceedingFrame = nil then
+    Exit;
+
+  if LayoutLeft <> nil then
+  begin
+    LayoutLeft.Parent := FProceedingFrame.LayoutLeftHost;
+    LayoutLeft.Align := TAlignLayout.Client;
+  end;
+
+  if Splitter2 <> nil then
+  begin
+    Splitter2.Parent := FProceedingFrame.LayoutRoot;
+    Splitter2.Align := TAlignLayout.MostLeft;
+  end;
+
+  if LayoutRight <> nil then
+  begin
+    LayoutRight.Parent := FProceedingFrame.LayoutRightHost;
+    LayoutRight.Align := TAlignLayout.Client;
+  end;
+end;
+
 procedure TFormMain.TabControl1Change(Sender: TObject);
 begin
   if TabControl1.ActiveTab = TabItemResults then
@@ -1492,8 +1516,6 @@ procedure TFormMain.RefreshResultsTab;
 begin
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
-  if FProceedingFrame <> nil then
-    FProceedingFrame.SetWorkTable(FActiveWorkTable);
 
 end;
 

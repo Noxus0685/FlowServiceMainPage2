@@ -1,127 +1,25 @@
-object FrameProceeding: TFrameProceeding
-  Size.Width = 1000.000000000000000000
+﻿object FrameProceeding: TFrameProceeding
+  Size.Width = 1200.000000000000000000
   Size.Height = 700.000000000000000000
   Size.PlatformDefault = False
   object LayoutRoot: TLayout
     Align = Client
-    Size.Width = 1000.000000000000000000
+    Size.Width = 1200.000000000000000000
     Size.Height = 700.000000000000000000
     Size.PlatformDefault = False
-    object ToolBarSession: TToolBar
-      Align = Top
-      Size.Width = 1000.000000000000000000
-      Size.Height = 48.000000000000000000
+    object LayoutLeftHost: TLayout
+      Align = Left
+      Size.Width = 316.000000000000000000
+      Size.Height = 700.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
-      object LabelSessionDate: TLabel
-        Position.X = 16.000000000000000000
-        Position.Y = 14.000000000000000000
-        Text = #1057#1077#1089#1089#1080#1103
-        TabOrder = 0
-      end
-      object ButtonSessionNew: TButton
-        Action = ActionSessionNew
-        Position.X = 260.000000000000000000
-        Position.Y = 8.000000000000000000
-        Size.Width = 110.000000000000000000
-        Size.Height = 32.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 1
-        Text = #1053#1086#1074#1072#1103
-      end
-      object ButtonSessionClose: TButton
-        Action = ActionSessionClose
-        Position.X = 380.000000000000000000
-        Position.Y = 8.000000000000000000
-        Size.Width = 110.000000000000000000
-        Size.Height = 32.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 2
-        Text = #1047#1072#1082#1088#1099#1090#1100
-      end
-      object ButtonSessionDeleteDataPoint: TButton
-        Action = ActionSessionPointDelete
-        Position.X = 500.000000000000000000
-        Position.Y = 8.000000000000000000
-        Size.Width = 140.000000000000000000
-        Size.Height = 32.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 3
-        Text = #1059#1076#1072#1083#1080#1090#1100' '#1090#1086#1095#1082#1091
-      end
-      object ButtonSessionClearPoints: TButton
-        Action = ActionSessionPointsClear
-        Position.X = 650.000000000000000000
-        Position.Y = 8.000000000000000000
-        Size.Width = 160.000000000000000000
-        Size.Height = 32.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 4
-        Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1090#1086#1095#1082#1080
-      end
     end
-    object TreeViewDevices: TTreeView
-      Align = Left
-      Position.Y = 48.000000000000000000
-      Size.Width = 300.000000000000000000
-      Size.Height = 652.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 1
-      OnChange = TreeViewDevicesChange
-    end
-    object Splitter1: TSplitter
-      Align = Left
-      Position.X = 300.000000000000000000
-      Position.Y = 48.000000000000000000
-      Size.Width = 8.000000000000000000
-      Size.Height = 652.000000000000000000
-      Size.PlatformDefault = False
-    end
-    object GridDataPoints: TGrid
+    object LayoutRightHost: TLayout
       Align = Client
-      Position.X = 308.000000000000000000
-      Position.Y = 48.000000000000000000
-      Size.Width = 692.000000000000000000
-      Size.Height = 652.000000000000000000
+      Size.Width = 876.000000000000000000
+      Size.Height = 700.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 3
-      Options = [ColumnResize, ColLines, RowLines, RowSelect, Header]
-      object ColNum: TStringColumn
-        Header = #8470
-        Size.Width = 60.000000000000000000
-      end
-      object ColDateTime: TStringColumn
-        Header = #1044#1072#1090#1072'/'#1074#1088#1077#1084#1103
-        Size.Width = 180.000000000000000000
-      end
-      object ColEtalon: TStringColumn
-        Header = #1069#1090#1072#1083#1086#1085
-        Size.Width = 230.000000000000000000
-      end
-      object ColError: TStringColumn
-        Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-        Size.Width = 150.000000000000000000
-      end
-    end
-  end
-  object ActionListSession: TActionList
-    Left = 48
-    Top = 80
-    object ActionSessionNew: TAction
-      Text = #1053#1086#1074#1072#1103
-      OnExecute = ActionSessionNewExecute
-    end
-    object ActionSessionClose: TAction
-      Text = #1047#1072#1082#1088#1099#1090#1100
-      OnExecute = ActionSessionCloseExecute
-    end
-    object ActionSessionPointDelete: TAction
-      Text = #1059#1076#1072#1083#1080#1090#1100' '#1090#1086#1095#1082#1091
-      OnExecute = ActionSessionPointDeleteExecute
-    end
-    object ActionSessionPointsClear: TAction
-      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1090#1086#1095#1082#1080
-      OnExecute = ActionSessionPointsClearExecute
+      TabOrder = 2
     end
   end
 end
