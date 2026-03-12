@@ -17,7 +17,8 @@ uses
   UnitFlowMeter in 'UnitFlowMeter.pas',
   UnitWorkTable in 'UnitWorkTable.pas',
   fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
-  UnitMeterValue in 'UnitMeterValue.pas';
+  UnitMeterValue in 'UnitMeterValue.pas',
+  frmProceeding in 'frmProceeding.pas' {Frame1: TFrame};
 
 {$R *.res}
 

@@ -178,6 +178,7 @@ type
     EtalonVolume: Double;        // Объем эталона, л
     EtalonMass: Double;          // Масса эталона, кг
 
+
     {====================================================================}
     { СТАТИСТИКА ЭТАЛОНА }
     {====================================================================}
@@ -192,6 +193,9 @@ type
     DeviceVolume: Double;        // Объем по прибору, л
     DeviceMass: Double;          // Масса по прибору, кг
     Velocity: Double;            // Скорость потока (если применимо)
+
+    DeviceMassFlow : Double;         //Расчётные велечины
+    DeviceVolumeFlow  : Double;      //Расчётные велечины
 
     {====================================================================}
     { РЕЗУЛЬТАТ ИЗМЕРЕНИЯ }
@@ -238,6 +242,7 @@ type
 
     InputPressure: Double;       // Давление на входе
     OutputPressure: Double;      // Давление на выходе
+    DeltaPressure: Double;
     Density: Double;             // Плотность жидкости
 
     {====================================================================}
@@ -452,7 +457,7 @@ type
     function AddSpillage: TPointSpillage;
     function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
 
-    procedure AnalyseDataPoints(const ASpillage: TPointSpillage);
+    function  AnalyseDataPoint(const ASpillage: TPointSpillage): Boolean;
     procedure FillDataPointsList(APoint: TDevicePoint);
     procedure AnalyseDevicePointsResults;
     procedure AnalyseResults;
@@ -1580,13 +1585,15 @@ begin
   Result := InRange(AFlow, Q1, Q2);
 end;
 
-procedure TDevice.AnalyseDataPoints(const ASpillage: TPointSpillage);
+function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
 var
   P, MatchedPoint: TDevicePoint;
   StopOk: Boolean;
   MeasuredValue: Double;
   AllowedError, ActualError: Double;
 begin
+
+  result:=False;
   if ASpillage = nil then
     Exit;
 
@@ -1686,6 +1693,7 @@ begin
     Format('Измерение полностью корректно: расход сопоставлен, критерий остановки выполнен, погрешность в допуске: |%.6f| <= |%.6f| (цвет: зелёный).',
       [ASpillage.Error, MatchedPoint.Error]);
   ASpillage.Valid := True;
+    result:=True;
 
   if ASpillage.State = osClean then
     ASpillage.State := osModified;

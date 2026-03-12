@@ -210,11 +210,13 @@ object FormMain: TFormMain
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 2
+    TabIndex = 0
     TabOrder = 6
     TabPosition = PlatformDefault
     OnChange = TabControl1Change
     Sizes = (
+      1780s
+      752s
       1780s
       752s
       1780s
@@ -228,7 +230,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -3136,7 +3138,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 81.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -3915,6 +3917,19 @@ object FormMain: TFormMain
         Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
         TabOrder = 2
       end
+    end
+    object TabItem1: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Trimming = None
+      IsSelected = False
+      Size.Width = 69.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = 'TabItem1'
     end
   end
   object PopupMenuTreeViewDevices: TPopupMenu

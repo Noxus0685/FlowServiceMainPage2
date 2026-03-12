@@ -528,6 +528,7 @@ type
     CheckColumnSpillageEnable: TCheckColumn;
     StringColumnSpillageDeltaPressure: TStringColumn;
     StringColumnSpillageDeviceFlowRate: TStringColumn;
+    TabItem1: TTabItem;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -2494,7 +2495,7 @@ begin
   begin
     Session := TSessionSpillage(Item.TagObject);
     Device := ResolveSelectedDevice;
-    if (Session = nil) or (Device = nil) then
+    if (Session = nil) and (Device = nil) then
       Exit;
 
     if Session.Spillages <> nil then
@@ -2796,6 +2797,11 @@ begin
 
   CurrentDevice := ResolveSelectedDevice;
 
+  P.DeviceMassFlow := P.DeviceVolume/P.SpillTime;
+  P.DeviceVolumeFlow := P.DeviceMass/P.SpillTime;
+  P.MeanFrequency := P.PulseCount/P.SpillTime;
+  P.DeltaPressure :=  P.InputPressure - P.OutputPressure;
+
   if GridDataPoints.Columns[ACol] = StringColumnName then
     Value := P.Name
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageNum then
@@ -3059,8 +3065,6 @@ begin
     GridResults.SetFocus;
   end;
 end;
-
-
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
 begin
@@ -5219,20 +5223,32 @@ begin
       Point.SpillTime := WorkTable.ValueTime.GetDoubleValue;
       Point.QavgEtalon := WorkTable.ValueFlowRate.GetDoubleValue;
       Point.EtalonVolume := WorkTable.ValueQuantity.GetDoubleValue;
-      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueQuantity.GetDoubleValue;
+      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
+      Point.DeviceMass := DeviceChannel.FlowMeter.ValueMass.GetDoubleValue;
+
+
+
+      Point.Density := DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
       Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
-      Point.PulseCount := Round(DeviceChannel.ValueImpResult.GetDoubleValue);
-      Point.MeanFrequency := DeviceChannel.ValueImp.GetDoubleValue;
+      Point.PulseCount := DeviceChannel.ValueImpResult.GetDoubleValue;
+
+      Point.DeviceMassFlow := Point.DeviceVolume/Point.SpillTime;
+      Point.DeviceVolumeFlow := Point.DeviceMass/Point.SpillTime;
+      Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
+
       Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
       Point.StartTemperature := WorkTable.ValueTempertureBefore.GetDoubleValue;
       Point.EndTemperature := WorkTable.ValueTempertureAfter.GetDoubleValue;
       Point.AvgTemperature := WorkTable.ValueTemperture.GetDoubleValue;
       Point.InputPressure := WorkTable.ValuePressureBefore.GetDoubleValue;
       Point.OutputPressure := WorkTable.ValuePressureAfter.GetDoubleValue;
+      Point.DeltaPressure :=  Point.InputPressure - Point.OutputPressure;
       Point.AtmosphericPressure := WorkTable.ValueAirPressure.GetDoubleValue;
       Point.AmbientTemperature := WorkTable.ValueAirTemperture.GetDoubleValue;
       Point.RelativeHumidity := WorkTable.ValueHumidity.GetDoubleValue;
-      Point.Valid := True;
+
+      if DeviceChannel.FlowMeter.Device <> nil then
+        Point.Valid := DeviceChannel.FlowMeter.Device.AnalyseDataPoint(Point);
 
       DeviceChannel.FlowMeter.AddDataPoint(Point);
       AddProcessingDevice(DeviceChannel.FlowMeter.Device);
