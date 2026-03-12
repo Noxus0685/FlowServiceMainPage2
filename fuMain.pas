@@ -2800,8 +2800,8 @@ begin
   P.EtalonVolumeFlow := P.EtalonVolume/P.SpillTime;
   P.EtalonMassFlow := P.EtalonMass/P.SpillTime;
 
-  P.DeviceMassFlow := P.DeviceVolume/P.SpillTime;
-  P.DeviceVolumeFlow := P.DeviceMass/P.SpillTime;
+  P.DeviceMassFlow := P.DeviceMass/P.SpillTime;
+  P.DeviceVolumeFlow := P.DeviceVolume/P.SpillTime;
   P.MeanFrequency := P.PulseCount/P.SpillTime;
   P.DeltaPressure :=  P.InputPressure - P.OutputPressure;
 
@@ -2843,9 +2843,9 @@ begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
     begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FActiveWorkTable.TableFlow.ValueVolumeFlow.GetStrNum(P.QavgEtalon)
+        Value := FActiveWorkTable.TableFlow.ValueVolumeFlow.GetStrNum(P.EtalonVolumeFlow)
       else
-        Value := FActiveWorkTable.TableFlow.ValueMassFlow.GetStrNum(P.QavgEtalon);
+        Value := FActiveWorkTable.TableFlow.ValueMassFlow.GetStrNum(P.EtalonMassFlow);
     end
     else
       Value := FloatToStr(P.QavgEtalon);
@@ -2885,6 +2885,18 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageVelocity then
     Value := FloatToStr(P.Velocity)
+  else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceFlowRate then
+  begin
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    begin
+      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+        Value := FActiveWorkTable.TableFlow.ValueVolumeFlow.GetStrNum(P.DeviceVolumeFlow)
+      else
+        Value := FActiveWorkTable.TableFlow.ValueMassFlow.GetStrNum(P.DeviceMassFlow);
+    end
+    else
+      Value := FloatToStr(P.DeviceVolumeFlow);
+  end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageError then
   begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
@@ -2977,9 +2989,9 @@ begin
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeltaPressure then
   begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
-      Value := FActiveWorkTable.TableFlow.ValuePressure.GetStrNum(P.InputPressure - P.OutputPressure)
+      Value := FActiveWorkTable.TableFlow.ValuePressure.GetStrNum(P.DeltaPressure)
     else
-      Value := FloatToStr(P.InputPressure - P.OutputPressure);
+      Value := FloatToStr(P.DeltaPressure);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDensity then
   begin
@@ -5239,8 +5251,8 @@ begin
       Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
       Point.PulseCount := DeviceChannel.ValueImpResult.GetDoubleValue;
 
-      Point.DeviceMassFlow := Point.DeviceVolume/Point.SpillTime;
-      Point.DeviceVolumeFlow := Point.DeviceMass/Point.SpillTime;
+      Point.DeviceMassFlow := Point.DeviceMass/Point.SpillTime;
+      Point.DeviceVolumeFlow := Point.DeviceVolume/Point.SpillTime;
       Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
 
       Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;

@@ -226,7 +226,7 @@ type
     { СЫРЫЕ ДАННЫЕ ИЗМЕРЕНИЯ }
     {====================================================================}
 
-    PulseCount: Integer;         // Кол-во импульсов
+    PulseCount: Double;          // Кол-во импульсов
     MeanFrequency: Double;       // Средняя частота, Гц
     AvgCurrent: Double;          // Средний ток, мА
     AvgVoltage: Double;          // Среднее напряжение, В
@@ -772,7 +772,7 @@ begin
   VolumeAfter := 0.0;
 
   { Сырые данные }
-  PulseCount := 0;
+  PulseCount := 0.0;
   MeanFrequency := 0.0;
   AvgCurrent := 0.0;
   AvgVoltage := 0.0;
@@ -1123,7 +1123,7 @@ begin
       Add(FloatToStr(S.QCV));
       Add(FloatToStr(S.VolumeBefore));
       Add(FloatToStr(S.VolumeAfter));
-      Add(IntToStr(S.PulseCount));
+      Add(FloatToStr(S.PulseCount));
       Add(FloatToStr(S.MeanFrequency));
       Add(FloatToStr(S.AvgCurrent));
       Add(FloatToStr(S.AvgVoltage));
@@ -1635,7 +1635,7 @@ begin
         StopOk := ASpillage.PulseCount >= MatchedPoint.LimitImp;
         if not StopOk then
           ASpillage.StatusStr := Format(
-            'Критерий остановки "Импульсы" не выполнен: %d < %d.',
+            'Критерий остановки "Импульсы" не выполнен: %.6f < %d.',
             [ASpillage.PulseCount, MatchedPoint.LimitImp]
           );
       end;
