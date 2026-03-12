@@ -7,6 +7,7 @@ uses
   fuTypeSelect,
   fuDeviceEdit,
   fuMeterValues,
+  frmProceeding,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -738,6 +739,8 @@ type
     procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
       const Column: TColumn; const Bounds: TRectF; const Row: Integer;
       const Value: TValue; const State: TGridDrawStates);
+  private
+    FProceedingFrame: TFrameProceeding;
   end;
 
 
@@ -1430,6 +1433,12 @@ begin
 
   InitTables;
 
+  FProceedingFrame := TFrameProceeding.Create(Self);
+  FProceedingFrame.Parent := TabItem1;
+  FProceedingFrame.Align := TAlignLayout.Client;
+  FProceedingFrame.SetWorkTableManager(FWorkTableManager);
+  FProceedingFrame.SetWorkTable(FActiveWorkTable);
+
   FLastClickRow := -1;
   FLastClickCol := nil;
   FLastClickTick := 0;
@@ -1483,6 +1492,8 @@ procedure TFormMain.RefreshResultsTab;
 begin
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
+  if FProceedingFrame <> nil then
+    FProceedingFrame.SetWorkTable(FActiveWorkTable);
 
 end;
 
