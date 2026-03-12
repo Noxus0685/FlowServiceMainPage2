@@ -2797,6 +2797,9 @@ begin
 
   CurrentDevice := ResolveSelectedDevice;
 
+  P.EtalonVolumeFlow := P.EtalonVolume/P.SpillTime;
+  P.EtalonMassFlow := P.EtalonMass/P.SpillTime;
+
   P.DeviceMassFlow := P.DeviceVolume/P.SpillTime;
   P.DeviceVolumeFlow := P.DeviceMass/P.SpillTime;
   P.MeanFrequency := P.PulseCount/P.SpillTime;
@@ -2854,7 +2857,7 @@ begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
         Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.EtalonVolume)
       else
-        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.EtalonVolume);
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.EtalonMass);
     end
     else
       Value := FloatToStr(P.EtalonVolume);
@@ -2875,7 +2878,7 @@ begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
         Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.DeviceVolume)
       else
-        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.DeviceVolume);
+        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.DeviceMass);
     end
     else
       Value := FloatToStr(P.DeviceVolume);
@@ -5222,11 +5225,15 @@ begin
       Point.DateTime := Now;
       Point.SpillTime := WorkTable.ValueTime.GetDoubleValue;
       Point.QavgEtalon := WorkTable.ValueFlowRate.GetDoubleValue;
-      Point.EtalonVolume := WorkTable.ValueQuantity.GetDoubleValue;
+
+      Point.EtalonVolume := WorkTable.TableFlow.ValueVolume.GetDoubleValue;
+      Point.EtalonMass := WorkTable.TableFlow.ValueMass.GetDoubleValue;
+
+      Point.EtalonVolumeFlow := Point.EtalonVolume/Point.SpillTime;
+      Point.EtalonMassFlow := Point.EtalonMass/Point.SpillTime;
+
       Point.DeviceVolume := DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
       Point.DeviceMass := DeviceChannel.FlowMeter.ValueMass.GetDoubleValue;
-
-
 
       Point.Density := DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
       Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
