@@ -1198,8 +1198,8 @@ begin
     begin
       if (CurrentType = NewType) then
         IsTypeChanged := False
-      else if (CurrentType.MitUUID <> '') and (NewType.MitUUID <> '') then
-        IsTypeChanged := not SameText(CurrentType.MitUUID, NewType.MitUUID)
+      else if (CurrentType.UUID <> '') and (NewType.UUID <> '') then
+        IsTypeChanged := not SameText(CurrentType.UUID, NewType.UUID)
       else
         IsTypeChanged :=
           (CurrentType.ID <> NewType.ID) or
@@ -2585,7 +2585,7 @@ begin
   else if ACol = StringColumnHash.Index then
   begin
 
-      Value := P.MitUUID;
+      Value := P.UUID;
 
   end
 

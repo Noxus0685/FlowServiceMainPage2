@@ -1440,7 +1440,7 @@ if MessageDlg(
 
         {------------ mit_uuid ------------}
         if Item.GetValue('mit_uuid') <> nil then
-          DevType.MitUUID := Item.GetValue('mit_uuid').Value;
+          DevType.UUID := Item.GetValue('mit_uuid').Value;
 
         {------------ ГРСИ ------------}
         if Item.GetValue('number') <> nil then
