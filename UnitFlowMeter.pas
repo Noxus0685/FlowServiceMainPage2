@@ -210,6 +210,7 @@ private
 
   procedure InitValues;
   procedure ApplyMeasurementModel;
+  procedure ApplyError;
   procedure ApplyCalibrCoefsToValue;
   procedure CopyValues(const AEtalonMeter: TFlowMeter);
 
@@ -1546,7 +1547,29 @@ begin
   end;
 
   ApplyCalibrCoefsToValue;
+  ApplyError;
 
+end;
+
+procedure TFlowMeter.ApplyError;
+var
+  DeviceError: Double;
+begin
+  DeviceError := 0;
+  if Assigned(Device) then
+    DeviceError := Device.Error;
+
+  if DeviceError = 0 then
+    Exit;
+
+  if ValueVolume <> nil then
+    ValueVolume.Error := DeviceError;
+  if ValueMass <> nil then
+    ValueMass.Error := DeviceError;
+  if ValueMassFlow <> nil then
+    ValueMassFlow.Error := DeviceError;
+  if ValueVolumeFlow <> nil then
+    ValueVolumeFlow.Error := DeviceError;
 end;
 
 procedure TFlowMeter.ApplyCalibrCoefsToValue;
@@ -1595,6 +1618,7 @@ begin
     Exit;
 
   ApplyMeasurementModel;
+  ApplyError;
 end;
 
 function TFlowMeter.ResolveStdCategoryFromDevice: TStdCategory;
