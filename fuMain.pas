@@ -561,6 +561,7 @@ type
     procedure TimerMainTimer(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
+    procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
@@ -641,6 +642,7 @@ type
 
 
     FFlowMeters: TObjectList<TFlowMeter>;
+    FSessionMeter: TFlowMeter;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     FNextClimateChangeAt: TDateTime;
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
@@ -1059,6 +1061,7 @@ begin
   FInstrumentalVisibleOrder.Free;
   FWorkTableManager.Free;
   FFlowMeters.Free;
+  FreeAndNil(FSessionMeter);
   inherited;
 end;
 
@@ -1396,6 +1399,7 @@ begin
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FProcessingDevices := TObjectList<TDevice>.Create(False);
+  FSessionMeter := nil;
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -1990,6 +1994,7 @@ function TFormMain.ResolveSelectedDevice: TDevice;
 var
   Item: TTreeViewItem;
   Sess: TSessionSpillage;
+  NeedInitSessionMeter: Boolean;
 begin
   Result := nil;
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
@@ -1997,17 +2002,39 @@ begin
 
   Item := TreeViewDevices.Selected;
   if Item.TagObject is TDevice then
-    Exit(TDevice(Item.TagObject));
+    Result := TDevice(Item.TagObject)
+  else
+  begin
+    if not (Item.TagObject is TSessionSpillage) then
+      Exit;
 
-  if not (Item.TagObject is TSessionSpillage) then
+    Sess := TSessionSpillage(Item.TagObject);
+    if (Item.ParentItem <> nil) and (Item.ParentItem.TagObject is TDevice) then
+      Result := TDevice(Item.ParentItem.TagObject)
+    else if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+      Result := DataManager.ActiveDeviceRepo.FindDeviceByID(Sess.DeviceID);
+  end;
+
+  if Result = nil then
     Exit;
 
-  Sess := TSessionSpillage(Item.TagObject);
-  if (Item.ParentItem <> nil) and (Item.ParentItem.TagObject is TDevice) then
-    Exit(TDevice(Item.ParentItem.TagObject));
+  NeedInitSessionMeter :=
+    (FSessionMeter = nil) or
+    (FSessionMeter.ValueVolume = nil) or
+    (FSessionMeter.ValueMass = nil) or
+    (FSessionMeter.ValueVolumeFlow = nil) or
+    (FSessionMeter.ValueMassFlow = nil);
 
-  if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-    Result := DataManager.ActiveDeviceRepo.FindDeviceByID(Sess.DeviceID);
+  if NeedInitSessionMeter then
+  begin
+    FreeAndNil(FSessionMeter);
+    FSessionMeter := TFlowMeter.Create;
+    FSessionMeter.InitAllValues;
+  end;
+
+  FSessionMeter.Device := Result;
+  if FActiveWorkTable <> nil then
+    SetSessionDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
 end;
 
 procedure TFormMain.PopupMenuTreeViewDevicesPopup(Sender: TObject);
@@ -2885,12 +2912,12 @@ begin
     Value := FloatToStr(P.QEtalonCV)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceVolume then
   begin
-    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    if (FSessionMeter <> nil) and (FActiveWorkTable <> nil) then
     begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.DeviceVolume)
+        Value := FSessionMeter.ValueVolume.GetStrNum(P.DeviceVolume)
       else
-        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.DeviceMass);
+        Value := FSessionMeter.ValueMass.GetStrNum(P.DeviceMass);
     end
     else
       Value := FloatToStr(P.DeviceVolume);
@@ -2899,12 +2926,12 @@ begin
     Value := FloatToStr(P.Velocity)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceFlowRate then
   begin
-    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    if (FSessionMeter <> nil) and (FActiveWorkTable <> nil) then
     begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FActiveWorkTable.TableFlow.ValueVolumeFlow.GetStrNum(P.DeviceVolumeFlow)
+        Value := FSessionMeter.ValueVolumeFlow.GetStrNum(P.DeviceVolumeFlow)
       else
-        Value := FActiveWorkTable.TableFlow.ValueMassFlow.GetStrNum(P.DeviceMassFlow);
+        Value := FSessionMeter.ValueMassFlow.GetStrNum(P.DeviceMassFlow);
     end
     else
       Value := FloatToStr(P.DeviceVolumeFlow);
@@ -3746,6 +3773,44 @@ begin
   UpdateUIFromValues;
 end;
 
+procedure TFormMain.SetSessionDim(UnitName: string; QuantityUnitName: string);
+var
+  IsVolumeUnits: Boolean;
+begin
+  if FSessionMeter = nil then
+    Exit;
+
+  UnitName := Trim(UnitName);
+  QuantityUnitName := Trim(QuantityUnitName);
+
+  if UnitName = '' then
+    Exit;
+
+  if QuantityUnitName = '' then
+    QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
+
+  IsVolumeUnits := IsVolumeFlowUnit(UnitName);
+
+  if IsVolumeUnits then
+  begin
+    FSessionMeter.ValueQuantity := FSessionMeter.ValueVolume;
+    FSessionMeter.ValueFlow := FSessionMeter.ValueVolumeFlow;
+    if FSessionMeter.ValueVolume <> nil then
+      FSessionMeter.ValueVolume.SetDim(QuantityUnitName);
+    if FSessionMeter.ValueVolumeFlow <> nil then
+      FSessionMeter.ValueVolumeFlow.SetDim(UnitName);
+  end
+  else
+  begin
+    FSessionMeter.ValueQuantity := FSessionMeter.ValueMass;
+    FSessionMeter.ValueFlow := FSessionMeter.ValueMassFlow;
+    if FSessionMeter.ValueMass <> nil then
+      FSessionMeter.ValueMass.SetDim(QuantityUnitName);
+    if FSessionMeter.ValueMassFlow <> nil then
+      FSessionMeter.ValueMassFlow.SetDim(UnitName);
+  end;
+end;
+
 procedure TFormMain.ComboBoxUnitsChange(Sender: TObject);
 var
   UnitSource: TComboBox;
@@ -3766,6 +3831,7 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
+  SetSessionDim(UnitName, QuantityUnitName);
 
   UpdateGridDataPointsHeaders(QuantityUnitName,UnitName );
   UpdateGridDataPoints;
