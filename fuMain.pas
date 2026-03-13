@@ -529,6 +529,9 @@ type
     StringColumnSpillageDeltaPressure: TStringColumn;
     StringColumnSpillageDeviceFlowRate: TStringColumn;
     TabItem1: TTabItem;
+    Panel1: TPanel;
+    Layout21: TLayout;
+    Splitter3: TSplitter;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

@@ -3236,13 +3236,13 @@ object FormMain: TFormMain
       end
       object LayoutRight: TLayout
         Align = Client
-        Size.Width = 1537.000000000000000000
+        Size.Width = 1179.000000000000000000
         Size.Height = 708.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 7
         object Layout18: TLayout
           Align = Client
-          Size.Width = 1537.000000000000000000
+          Size.Width = 1179.000000000000000000
           Size.Height = 676.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
@@ -3252,13 +3252,13 @@ object FormMain: TFormMain
             ClipChildren = True
             Margins.Left = 2.000000000000000000
             PopupMenu = PopupMenuGridDataPoints
-            Size.Width = 1535.000000000000000000
+            Size.Width = 1177.000000000000000000
             Size.Height = 676.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDataPointsGetValue
-            Viewport.Width = 1515.000000000000000000
+            Viewport.Width = 1157.000000000000000000
             Viewport.Height = 635.000000000000000000
             object CheckColumnSpillageEnable: TCheckColumn
               HeaderSettings.TextSettings.WordWrap = False
@@ -3502,7 +3502,7 @@ object FormMain: TFormMain
         end
         object ToolBarDataPoints: TToolBar
           PopupMenu = PopupMenuGridDataPointsLayOut
-          Size.Width = 1537.000000000000000000
+          Size.Width = 1179.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
@@ -3584,6 +3584,8 @@ object FormMain: TFormMain
             TabOrder = 37
             object LabelSessionDate: TLabel
               Align = Left
+              Margins.Left = 10.000000000000000000
+              Position.X = 10.000000000000000000
               Size.Width = 137.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
@@ -3657,7 +3659,7 @@ object FormMain: TFormMain
       object lyt1: TLayout
         Align = Bottom
         Position.Y = 708.000000000000000000
-        Size.Width = 1780.000000000000000000
+        Size.Width = 1432.000000000000000000
         Size.Height = 44.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
@@ -3669,7 +3671,7 @@ object FormMain: TFormMain
           Margins.Top = 10.000000000000000000
           Margins.Right = 10.000000000000000000
           Margins.Bottom = 10.000000000000000000
-          Position.X = 1643.000000000000000000
+          Position.X = 1295.000000000000000000
           Position.Y = 10.000000000000000000
           Sides = [Top, Left, Bottom, Right]
           Size.Width = 127.000000000000000000
@@ -3690,7 +3692,7 @@ object FormMain: TFormMain
           Margins.Top = 10.000000000000000000
           Margins.Right = 10.000000000000000000
           Margins.Bottom = 10.000000000000000000
-          Position.X = 1349.000000000000000000
+          Position.X = 1001.000000000000000000
           Position.Y = 10.000000000000000000
           Sides = [Top, Left, Bottom, Right]
           Size.Width = 127.000000000000000000
@@ -3711,7 +3713,7 @@ object FormMain: TFormMain
           Margins.Top = 10.000000000000000000
           Margins.Right = 10.000000000000000000
           Margins.Bottom = 10.000000000000000000
-          Position.X = 1496.000000000000000000
+          Position.X = 1148.000000000000000000
           Position.Y = 10.000000000000000000
           Sides = [Top, Left, Bottom, Right]
           Size.Width = 127.000000000000000000
@@ -3730,6 +3732,30 @@ object FormMain: TFormMain
         Cursor = crHSplit
         MinSize = 20.000000000000000000
         Position.X = 233.000000000000000000
+        Size.Width = 10.000000000000000000
+        Size.Height = 708.000000000000000000
+        Size.PlatformDefault = False
+      end
+      object Layout21: TLayout
+        Align = MostRight
+        Position.X = 1432.000000000000000000
+        Size.Width = 348.000000000000000000
+        Size.Height = 752.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 9
+        object Panel1: TPanel
+          Align = Client
+          Size.Width = 348.000000000000000000
+          Size.Height = 752.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+        end
+      end
+      object Splitter3: TSplitter
+        Align = Right
+        Cursor = crHSplit
+        MinSize = 20.000000000000000000
+        Position.X = 1422.000000000000000000
         Size.Width = 10.000000000000000000
         Size.Height = 708.000000000000000000
         Size.PlatformDefault = False
@@ -3930,6 +3956,8 @@ object FormMain: TFormMain
       StyleLookup = ''
       TabOrder = 0
       Text = 'TabItem1'
+      ExplicitSize.cx = 69.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
     end
   end
   object PopupMenuTreeViewDevices: TPopupMenu
