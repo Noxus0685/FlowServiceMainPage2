@@ -137,7 +137,7 @@ type
     constructor Create; override;
     destructor Destroy; override;
 
-    property UUID: string read FMitUUID write FMitUUID;
+    property UUID: string read FUUID write FUUID;
 
     property FlowMeter: TFlowMeter read FFlowMeter;
 

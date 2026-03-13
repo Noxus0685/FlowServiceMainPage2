@@ -1223,7 +1223,7 @@ begin
   if (ActiveDeviceRepo <> nil) and (ActiveDeviceRepo.Devices <> nil) then
   begin
     for Result in ActiveDeviceRepo.Devices do
-      if SameText(Result.MitUUID, AUUID) then
+      if SameText(Result.UUID, AUUID) then
       begin
         ARepo := ActiveDeviceRepo;
         Exit;
@@ -1244,7 +1244,7 @@ begin
       Continue;
 
     for Result in Repo.Devices do
-      if SameText(Result.MitUUID, AUUID) then
+      if SameText(Result.UUID, AUUID) then
       begin
         ARepo := Repo;
         Exit;
