@@ -516,7 +516,6 @@ type
     ComboBoxUnitsResult: TComboBox;
     LabelSessionDate: TLabel;
     ButtonSessionClose: TButton;
-    Label8: TLabel;
     PopupMenuTreeViewDevices: TPopupMenu;
     PopupMenuGridDataPoints: TPopupMenu;
     PopupMenuGridDataPointsLayOut: TPopupMenu;
@@ -532,6 +531,16 @@ type
     Panel1: TPanel;
     Layout21: TLayout;
     Splitter3: TSplitter;
+    ToolBarResults: TToolBar;
+    Layout22: TLayout;
+    Label7: TLabel;
+    Line8: TLine;
+    Layout23: TLayout;
+    Button3: TButton;
+    Button4: TButton;
+    Button5: TButton;
+    Button6: TButton;
+    Line9: TLine;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

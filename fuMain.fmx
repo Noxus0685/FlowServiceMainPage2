@@ -3243,7 +3243,7 @@ object FormMain: TFormMain
         object Layout18: TLayout
           Align = Client
           Size.Width = 1179.000000000000000000
-          Size.Height = 676.000000000000000000
+          Size.Height = 708.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           object GridDataPoints: TGrid
@@ -3253,13 +3253,13 @@ object FormMain: TFormMain
             Margins.Left = 2.000000000000000000
             PopupMenu = PopupMenuGridDataPoints
             Size.Width = 1177.000000000000000000
-            Size.Height = 676.000000000000000000
+            Size.Height = 636.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 1
+            TabOrder = 2
             Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDataPointsGetValue
             Viewport.Width = 1157.000000000000000000
-            Viewport.Height = 635.000000000000000000
+            Viewport.Height = 595.000000000000000000
             object CheckColumnSpillageEnable: TCheckColumn
               HeaderSettings.TextSettings.WordWrap = False
             end
@@ -3499,147 +3499,244 @@ object FormMain: TFormMain
               Size.Width = 125.000000000000000000
             end
           end
-        end
-        object ToolBarDataPoints: TToolBar
-          PopupMenu = PopupMenuGridDataPointsLayOut
-          Size.Width = 1179.000000000000000000
-          Size.Height = 32.000000000000000000
-          Size.PlatformDefault = False
-          TabOrder = 1
-          object Line4: TLine
-            Align = Left
-            LineType = Right
-            Margins.Top = 5.000000000000000000
-            Margins.Bottom = 5.000000000000000000
-            Position.X = 330.000000000000000000
-            Position.Y = 5.000000000000000000
-            Size.Width = 12.000000000000000000
-            Size.Height = 22.000000000000000000
-            Size.PlatformDefault = False
-            Stroke.Color = claGray
-          end
-          object Layout32: TLayout
-            Align = Left
-            Padding.Left = 5.000000000000000000
-            Padding.Right = 5.000000000000000000
-            Position.X = 342.000000000000000000
-            Size.Width = 224.000000000000000000
+          object ToolBarDataPoints: TToolBar
+            PopupMenu = PopupMenuGridDataPointsLayOut
+            Size.Width = 1179.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 38
-            object ButtonSessionDeleteDataPoint: TButton
+            TabOrder = 1
+            object Line4: TLine
               Align = Left
-              Hint = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
-              Position.X = 49.000000000000000000
-              Size.Width = 40.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              StyleLookup = 'trashtoolbutton'
-              TabOrder = 3
-              Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
-              TextSettings.Trimming = None
-            end
-            object ButtonSessionNew: TButton
-              Align = Left
-              Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
-              Position.X = 89.000000000000000000
-              Size.Width = 39.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              StyleLookup = 'additembutton'
-              TabOrder = 2
-              Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
-              TextSettings.Trimming = None
-            end
-            object ButtonSessionClearPoints: TButton
-              Align = Left
-              Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
-              Position.X = 5.000000000000000000
-              Size.Width = 44.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              StyleLookup = 'pagecurltoolbutton'
-              TabOrder = 0
-              Text = #1054#1095#1080#1089#1090#1080#1090#1100
-              TextSettings.Trimming = None
-            end
-            object ButtonSessionClose: TButton
-              Align = Left
-              Hint = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
-              Position.X = 128.000000000000000000
-              Size.Width = 47.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              StyleLookup = 'organizetoolbutton'
-              TabOrder = 1
-              Text = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
-              TextSettings.Trimming = None
-            end
-          end
-          object Layout19: TLayout
-            Align = MostLeft
-            Size.Width = 330.000000000000000000
-            Size.Height = 32.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 37
-            object LabelSessionDate: TLabel
-              Align = Left
-              Margins.Left = 10.000000000000000000
-              Position.X = 10.000000000000000000
-              Size.Width = 137.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              Text = #1057#1077#1089#1089#1080#1103
-              TabOrder = 0
-            end
-            object Label8: TLabel
-              Position.X = 184.000000000000000000
-              Position.Y = 8.000000000000000000
-              Size.Width = 129.000000000000000000
-              Size.Height = 17.000000000000000000
-              Size.PlatformDefault = False
-              Text = #1054#1087#1077#1088#1072#1090#1086#1088
-              TabOrder = 1
-            end
-          end
-          object Layout20: TLayout
-            Align = Left
-            Position.X = 576.000000000000000000
-            Size.Width = 224.000000000000000000
-            Size.Height = 32.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 39
-            object ComboBoxUnitsResult: TComboBox
-              Touch.InteractiveGestures = [LongTap, DoubleTap]
-              Align = Left
-              Items.Strings = (
-                #1084'3/'#1095)
-              ItemIndex = 0
-              ItemHeight = 19.000000000000000000
-              Margins.Left = 10.000000000000000000
+              LineType = Right
               Margins.Top = 5.000000000000000000
-              Margins.Right = 10.000000000000000000
               Margins.Bottom = 5.000000000000000000
-              Position.X = 10.000000000000000000
+              Position.X = 458.000000000000000000
               Position.Y = 5.000000000000000000
-              Size.Width = 103.000000000000000000
+              Size.Width = 12.000000000000000000
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
-              TabOrder = 0
-              OnChange = ComboBoxUnitsChange
+              Stroke.Color = claGray
+            end
+            object Layout32: TLayout
+              Align = Left
+              Padding.Left = 5.000000000000000000
+              Padding.Right = 5.000000000000000000
+              Size.Width = 224.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 38
+              object ButtonSessionDeleteDataPoint: TButton
+                Align = Left
+                Hint = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+                Position.X = 49.000000000000000000
+                Size.Width = 40.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'trashtoolbutton'
+                TabOrder = 3
+                Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+                TextSettings.Trimming = None
+              end
+              object ButtonSessionNew: TButton
+                Align = Left
+                Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+                Position.X = 89.000000000000000000
+                Size.Width = 39.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'additembutton'
+                TabOrder = 2
+                Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+                TextSettings.Trimming = None
+              end
+              object ButtonSessionClearPoints: TButton
+                Align = Left
+                Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+                Position.X = 5.000000000000000000
+                Size.Width = 44.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'pagecurltoolbutton'
+                TabOrder = 0
+                Text = #1054#1095#1080#1089#1090#1080#1090#1100
+                TextSettings.Trimming = None
+              end
+              object ButtonSessionClose: TButton
+                Align = Left
+                Hint = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
+                Position.X = 128.000000000000000000
+                Size.Width = 47.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'organizetoolbutton'
+                TabOrder = 1
+                Text = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
+                TextSettings.Trimming = None
+              end
+            end
+            object Layout19: TLayout
+              Align = Left
+              Position.X = 470.000000000000000000
+              Size.Width = 240.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 37
+              object LabelSessionDate: TLabel
+                Align = Left
+                Margins.Left = 10.000000000000000000
+                Position.X = 10.000000000000000000
+                Size.Width = 95.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1057#1077#1089#1089#1080#1103
+                TabOrder = 0
+              end
+            end
+            object Layout20: TLayout
+              Align = Left
+              Position.X = 234.000000000000000000
+              Size.Width = 224.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 39
+              object ComboBoxUnitsResult: TComboBox
+                Touch.InteractiveGestures = [LongTap, DoubleTap]
+                Align = Left
+                Items.Strings = (
+                  #1084'3/'#1095)
+                ItemIndex = 0
+                ItemHeight = 19.000000000000000000
+                Margins.Left = 10.000000000000000000
+                Margins.Top = 5.000000000000000000
+                Margins.Right = 10.000000000000000000
+                Margins.Bottom = 5.000000000000000000
+                Position.X = 10.000000000000000000
+                Position.Y = 5.000000000000000000
+                Size.Width = 103.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                OnChange = ComboBoxUnitsChange
+              end
+            end
+            object Line7: TLine
+              Align = Left
+              LineType = Right
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 224.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
             end
           end
-          object Line7: TLine
-            Align = Left
-            LineType = Right
-            Margins.Top = 5.000000000000000000
-            Margins.Bottom = 5.000000000000000000
-            Position.X = 566.000000000000000000
-            Position.Y = 5.000000000000000000
-            Size.Width = 10.000000000000000000
-            Size.Height = 22.000000000000000000
+          object ToolBarResults: TToolBar
+            Position.Y = 32.000000000000000000
+            Size.Width = 1179.000000000000000000
+            Size.Height = 40.000000000000000000
             Size.PlatformDefault = False
-            Stroke.Color = claGray
+            TabOrder = 3
+            object Layout22: TLayout
+              Align = Left
+              Position.X = 456.000000000000000000
+              Size.Width = 207.000000000000000000
+              Size.Height = 40.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 36
+              object Label7: TLabel
+                Align = Left
+                Margins.Left = 10.000000000000000000
+                Position.X = 10.000000000000000000
+                Size.Width = 137.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1057#1077#1089#1089#1080#1103
+                TabOrder = 0
+              end
+            end
+            object Line8: TLine
+              Align = Left
+              LineType = Right
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 663.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 12.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
+            end
+            object Layout23: TLayout
+              Align = Left
+              Padding.Left = 5.000000000000000000
+              Padding.Right = 5.000000000000000000
+              Size.Width = 446.000000000000000000
+              Size.Height = 40.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 37
+              object Button3: TButton
+                Align = Left
+                Hint = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+                Position.X = 49.000000000000000000
+                Size.Width = 40.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'trashtoolbutton'
+                TabOrder = 3
+                Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+                TextSettings.Trimming = None
+              end
+              object Button4: TButton
+                Align = Left
+                Hint = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+                Position.X = 89.000000000000000000
+                Size.Width = 39.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'additembutton'
+                TabOrder = 2
+                Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
+                TextSettings.Trimming = None
+              end
+              object Button5: TButton
+                Align = Left
+                Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+                Position.X = 5.000000000000000000
+                Size.Width = 44.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'pagecurltoolbutton'
+                TabOrder = 0
+                Text = #1054#1095#1080#1089#1090#1080#1090#1100
+                TextSettings.Trimming = None
+              end
+              object Button6: TButton
+                Align = Left
+                Hint = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
+                Position.X = 128.000000000000000000
+                Size.Width = 47.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'organizetoolbutton'
+                TabOrder = 1
+                Text = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
+                TextSettings.Trimming = None
+              end
+            end
+            object Line9: TLine
+              Align = Left
+              LineType = Right
+              Margins.Top = 5.000000000000000000
+              Margins.Bottom = 5.000000000000000000
+              Position.X = 446.000000000000000000
+              Position.Y = 5.000000000000000000
+              Size.Width = 10.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Stroke.Color = claGray
+            end
           end
         end
         object MemoLog: TMemo
@@ -3650,7 +3747,7 @@ object FormMain: TFormMain
           Size.Width = 883.000000000000000000
           Size.Height = 102.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 2
+          TabOrder = 1
           Visible = False
           Viewport.Width = 879.000000000000000000
           Viewport.Height = 98.000000000000000000
