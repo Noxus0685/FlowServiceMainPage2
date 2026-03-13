@@ -2910,6 +2910,7 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonCV then
     Value := FloatToStr(P.QEtalonCV)
+
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceVolume then
   begin
     if (FSessionMeter <> nil) and (FActiveWorkTable <> nil) then
@@ -3830,7 +3831,6 @@ begin
     Exit;
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
-  SetDim(UnitName, QuantityUnitName);
   SetSessionDim(UnitName, QuantityUnitName);
 
   UpdateGridDataPointsHeaders(QuantityUnitName,UnitName );

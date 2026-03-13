@@ -1,68 +1,48 @@
 ﻿[Closed Files]
-File_0=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.pas',0,1,27008,1,27021,0,0,,
-File_1=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.SysUtils.pas',0,1,19276,1,19292,0,0,,
-File_2=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Generics.Collections.pas',0,1,4424,1,4440,0,0,,
-File_3=TSourceModule,'D:\Projects\FlowServiceMainPage\uDATA.pas',0,1,1,27,6,0,0,,
-File_4=TSourceModule,'D:\Projects\FlowServiceMainPage\UnitDataManager.pas',0,1,173,1,186,0,0,,
-File_5=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\Data.DB.pas',0,1,5034,1,5047,0,0,,
-File_6=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Comp.Client.pas',0,1,5275,1,5284,0,0,,
-File_7=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.SQLite.pas',0,1,1601,1,1614,0,0,,
-File_8=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.SQLiteWrapper.pas',0,1,1928,1,1941,0,0,,
-File_9=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.pas',0,1,8180,1,8193,0,0,,
-File_10=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Stan.Async.pas',0,1,255,1,268,0,0,,
-File_11=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Stan.Error.pas',0,1,541,1,560,0,0,,
-File_12=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Comp.DataSet.pas',0,1,3256,1,3269,0,0,,
-File_13=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Types.pas',0,1,5404,1,5417,0,0,{{6034,0}
-File_14=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Platform.Timer.Win.pas',0,1,159,1,184,0,0,,
+File_0=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.ListBox.pas',0,1,4526,1,4539,0,0,,
+File_1=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\fmx\FMX.Grid.pas',0,1,3081,1,3094,0,0,{{4004,0},{4284,11},{'TGridValues'}}{{4528,0},{4757,11},{'Trivial getters and setters that refer to Model'}},
+File_2=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.Types.pas',0,1,1667,1,1681,0,0,,
+File_3=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.pas',0,1,27008,1,27021,0,0,,
+File_4=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.SysUtils.pas',0,1,19276,1,19292,0,0,,
+File_5=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Generics.Collections.pas',0,1,4424,1,4440,0,0,,
+File_6=TSourceModule,'D:\Projects\FlowServiceMainPage\uDATA.pas',0,1,1,27,6,0,0,,
+File_7=TSourceModule,'D:\Projects\FlowServiceMainPage\UnitDataManager.pas',0,1,173,1,186,0,0,,
+File_8=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\Data.DB.pas',0,1,5034,1,5047,0,0,,
+File_9=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Comp.Client.pas',0,1,5275,1,5284,0,0,,
+File_10=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.SQLite.pas',0,1,1601,1,1614,0,0,,
+File_11=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.SQLiteWrapper.pas',0,1,1928,1,1941,0,0,,
+File_12=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.pas',0,1,8180,1,8193,0,0,,
+File_13=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Stan.Async.pas',0,1,255,1,268,0,0,,
+File_14=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Stan.Error.pas',0,1,541,1,560,0,0,,
 
 [Modules]
 Module0=D:\Projects\FlowServiceMainPage\fuMain.pas
-Module1=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
-Module2=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
-Module3=D:\Projects\FlowServiceMainPage\UnitClasses.pas
-Module4=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
-Module5=D:\Projects\FlowServiceMainPage\UnitRepositories.pas
-Module6=D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas
-Module7=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
-Module8=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
-Module9=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
-Module10=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
-Module11=D:\Projects\FlowServiceMainPage\fuMeterValues.pas
-Module12=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
-Count=13
+Module1=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
+Module2=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
+Module3=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
+Module4=D:\Projects\FlowServiceMainPage\fuMeterValues.pas
+Module5=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+Module6=D:\Projects\FlowServiceMainPage\UnitRepositories.pas
+Module7=D:\Projects\FlowServiceMainPage\UnitClasses.pas
+Module8=D:\Projects\FlowServiceMainPage\frmProceeding.pas
+Module9=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
+Module10=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
+Module11=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
+Module12=D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas
+Module13=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
+Count=14
 EditWindowCount=1
 
 [D:\Projects\FlowServiceMainPage\fuMain.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\UnitClasses.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\UnitRepositories.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\UnitWorkTable.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj]
-ModuleType=TBaseProject
-
 [D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\fuTypeEditor.pas]
+[D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitWorkTable.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceMainPage\fuMeterValues.pas]
@@ -71,8 +51,32 @@ ModuleType=TSourceModule
 [D:\Projects\FlowServiceMainPage\UnitMeterValue.pas]
 ModuleType=TSourceModule
 
+[D:\Projects\FlowServiceMainPage\UnitRepositories.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitClasses.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\frmProceeding.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj]
+ModuleType=TBaseProject
+
+[D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\fuTypeEditor.pas]
+ModuleType=TSourceModule
+
 [EditWindow0]
-ViewCount=13
+ViewCount=14
 CurrentEditView=D:\Projects\FlowServiceMainPage\fuMain.pas
 View0=0
 View1=1
@@ -87,6 +91,7 @@ View9=9
 View10=10
 View11=11
 View12=12
+View13=13
 PercentageSizes=1
 Create=1
 Visible=1
@@ -107,12 +112,12 @@ StayOnTop=0
 DockedToMainForm=1
 BorlandEditorCodeExplorer=BorlandEditorCodeExplorer@EditWindow0
 TopPanelSize=0
-LeftPanelSize=1896
+LeftPanelSize=2807
 LeftPanelClients=PropertyInspector,DockSite3
-LeftPanelData=00000800010100000000420F0000000000000168070000000000000100000000210D000009000000446F636B53697465330100000000201B00001100000050726F7065727479496E73706563746F72FFFFFFFF
-RightPanelSize=2000
+LeftPanelData=00000800010100000000420F00000000000001F70A00000000000001000000005C0E000009000000446F636B53697465330100000000201B00001100000050726F7065727479496E73706563746F72FFFFFFFF
+RightPanelSize=1578
 RightPanelClients=DockSite2,DockSite4
-RightPanelData=00000800010100000000420F00000000000001D00700000000000001000000004412000009000000446F636B53697465320100000000201B000009000000446F636B5369746534FFFFFFFF
+RightPanelData=00000800010100000000420F000000000000012A0600000000000001000000004412000009000000446F636B53697465320100000000201B000009000000446F636B5369746534FFFFFFFF
 BottomPanelSize=1574
 BottomPanelClients=MessageView,DockSite1
 BottomPanelData=0000080001020100000009000000446F636B5369746531DE440000000000000226060000000000000100000000DE4400000F0000004D65737361676556696577466F726DFFFFFFFF
@@ -178,9 +183,9 @@ EditViewName=D:\Projects\FlowServiceMainPage\UnitRepositories.pas
 [View5]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
-CursorX=31
-CursorY=1319
-TopLine=1306
+CursorX=15
+CursorY=182
+TopLine=174
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -200,9 +205,9 @@ EditViewName=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
 [View7]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\fuMain.pas
-CursorX=26
-CursorY=1382
-TopLine=1376
+CursorX=21
+CursorY=2801
+TopLine=2791
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -210,16 +215,27 @@ EditViewName=D:\Projects\FlowServiceMainPage\fuMain.pas
 
 [View8]
 CustomEditViewType=TEditView
-Module=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
+Module=D:\Projects\FlowServiceMainPage\frmProceeding.pas
 CursorX=1
-CursorY=559
-TopLine=548
+CursorY=1
+TopLine=1
 LeftCol=1
-Elisions={{870,2},{2078,28},{'TWorkTable'}}
+Elisions=
+Bookmarks=
+EditViewName=Borland.FormDesignerView
+
+[View9]
+CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
+CursorX=6
+CursorY=923
+TopLine=902
+LeftCol=1
+Elisions={{398,2},{869,15},{'TChannel'}}
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
 
-[View9]
+[View10]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\fuMeterValues.pas
 CursorX=69
@@ -230,29 +246,29 @@ Elisions=
 Bookmarks=
 EditViewName=Borland.FormDesignerView
 
-[View10]
+[View11]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
-CursorX=36
-CursorY=598
-TopLine=590
+CursorX=1
+CursorY=850
+TopLine=72
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
 
-[View11]
+[View12]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
-CursorX=1
-CursorY=588
-TopLine=572
+CursorX=19
+CursorY=89
+TopLine=85
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
 
-[View12]
+[View13]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\ProjectFornTest.dpr
 CursorX=2
@@ -291,11 +307,9 @@ Dockable=1
 StayOnTop=0
 
 [Breakpoints]
-Count=4
+Count=2
 Breakpoint0='D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas',786,'',0,1,'',1,0,0,'',1,'','','',0,''
 Breakpoint1='D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas',794,'',0,1,'',1,0,0,'',1,'','','',0,''
-Breakpoint2='D:\Projects\FlowServiceMainPage\fuMain.pas',4583,'',0,1,'',1,0,0,'',1,'','','',0,''
-Breakpoint3='D:\Projects\FlowServiceMainPage\fuMain.pas',2403,'',0,1,'',1,0,0,'',1,'','','',0,''
 
 [EmbarcaderoWin32Debugger_AddressBreakpoints]
 Count=0
@@ -352,11 +366,11 @@ Docked=1
 State=0
 Left=0
 Top=0
-Width=2000
+Width=1578
 Height=4273
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2000
+ClientWidth=1578
 ClientHeight=4273
 TBDockHeight=5901
 LRDockWidth=2349
@@ -390,11 +404,11 @@ Docked=1
 State=0
 Left=0
 Top=0
-Width=2000
+Width=1578
 Height=2103
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2000
+ClientWidth=1578
 ClientHeight=2103
 TBDockHeight=7151
 LRDockWidth=2000
@@ -408,25 +422,25 @@ Visible=1
 Docked=1
 State=0
 Left=0
-Top=391
-Width=1896
-Height=3479
+Top=425
+Width=2807
+Height=3149
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=1896
-ClientHeight=3479
+ClientWidth=2807
+ClientHeight=3149
 PixelsPerInch=96
 MonitorNum=0
-TBDockHeight=9012
-LRDockWidth=1896
+TBDockHeight=6638
+LRDockWidth=2807
 Dockable=1
 StayOnTop=0
-SplitPos=111
+SplitPos=290
 
 [PropInspDesignerSelection]
 ArrangeBy=Name
-SelectedItem=Text,OnExecute
-ExpandedItems="LiveBindings Designer=0",Anchors=0,LiveBindings=0,Margins=0,Padding=0,Position=0,RotationCenter=0,Scale=0,Size=0,Touch=0,TouchTargetExpansion=0,UnsupportedArchitectures=0,StyledSettings=0,TextSettings=0,UnsupportedPlatforms=0,Options=0,PopupMenu=0,PopupMenu.LiveBindings=0,HeaderSettings=0,Border=0,BorderIcons=0,Constraints=0,Fill=0
+SelectedItem=Name,Images
+ExpandedItems="LiveBindings Designer=0",Anchors=0,LiveBindings=0,Margins=0,Padding=0,Position=0,RotationCenter=0,Scale=0,Size=0,Touch=0,TouchTargetExpansion=0,UnsupportedArchitectures=0,StyledSettings=0,TextSettings=0,UnsupportedPlatforms=0,Options=1,PopupMenu=0,PopupMenu.LiveBindings=0,HeaderSettings=1,Border=0,BorderIcons=0,Constraints=0,Fill=0,Action=0,HeaderSettings.StyledSettings=1,HeaderSettings.TextSettings=0,HeaderSettings.TextSettings.Font=0
 
 [frmDesignPreview]
 PercentageSizes=1
@@ -436,11 +450,11 @@ Docked=1
 State=0
 Left=0
 Top=0
-Width=2000
+Width=1578
 Height=6366
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2000
+ClientWidth=1578
 ClientHeight=6366
 TBDockHeight=5959
 LRDockWidth=2510
@@ -453,7 +467,7 @@ Create=1
 Visible=0
 Docked=1
 State=0
-Left=-1528
+Left=-1609
 Top=243
 Width=276
 Height=359
@@ -641,11 +655,11 @@ Docked=1
 State=0
 Left=0
 Top=0
-Width=2000
+Width=1578
 Height=6366
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2000
+ClientWidth=1578
 ClientHeight=6366
 TBDockHeight=4884
 LRDockWidth=7151
@@ -677,7 +691,7 @@ Create=1
 Visible=0
 Docked=1
 State=0
-Left=-8
+Left=-277
 Top=-124
 Width=1849
 Height=3140
@@ -762,12 +776,12 @@ Docked=1
 State=0
 Left=0
 Top=0
-Width=1896
-Height=3169
+Width=2807
+Height=3498
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=1896
-ClientHeight=3169
+ClientWidth=2807
+ClientHeight=3498
 TBDockHeight=3682
 LRDockWidth=1896
 Dockable=1
@@ -781,11 +795,11 @@ Docked=1
 State=0
 Left=0
 Top=0
-Width=2000
+Width=1578
 Height=6366
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2000
+ClientWidth=1578
 ClientHeight=6366
 TBDockHeight=4884
 LRDockWidth=5307
@@ -876,16 +890,16 @@ Docked=1
 State=0
 Left=0
 Top=28
-Width=2000
+Width=1578
 Height=4545
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2000
+ClientWidth=1578
 ClientHeight=4545
 PixelsPerInch=96
 MonitorNum=0
-TBDockHeight=9012
-LRDockWidth=2000
+TBDockHeight=8721
+LRDockWidth=1578
 Dockable=1
 StayOnTop=0
 TabPosition=1
@@ -902,16 +916,16 @@ Docked=1
 State=0
 Left=0
 Top=28
-Width=1896
-Height=3169
+Width=2807
+Height=3498
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=1896
-ClientHeight=3169
+ClientWidth=2807
+ClientHeight=3498
 PixelsPerInch=96
 MonitorNum=0
-TBDockHeight=9012
-LRDockWidth=1896
+TBDockHeight=6638
+LRDockWidth=2807
 Dockable=1
 StayOnTop=0
 TabPosition=1
@@ -928,16 +942,16 @@ Docked=1
 State=0
 Left=0
 Top=533
-Width=2000
+Width=1578
 Height=2103
 MaxLeft=-1
 MaxTop=-1
-ClientWidth=2000
+ClientWidth=1578
 ClientHeight=2103
 PixelsPerInch=96
 MonitorNum=0
-TBDockHeight=9012
-LRDockWidth=2000
+TBDockHeight=8721
+LRDockWidth=1578
 Dockable=1
 StayOnTop=0
 TabPosition=1
