@@ -883,18 +883,18 @@ begin
     Exit;
 
   for Device in FProcessingDevices do
-    if (Device <> nil) and SameText(Trim(Device.MitUUID), DeviceUUID) then
+    if (Device <> nil) and SameText(Trim(Device.UUID), DeviceUUID) then
       Exit(Device);
 end;
 
 function TFormMain.HasDeviceInProcessing(ADevice: TDevice): Boolean;
 begin
-  Result := (ADevice <> nil) and (FindProcessingDeviceByUUID(ADevice.MitUUID) <> nil);
+  Result := (ADevice <> nil) and (FindProcessingDeviceByUUID(ADevice.UUID) <> nil);
 end;
 
 procedure TFormMain.AddProcessingDevice(ADevice: TDevice);
 begin
-  if (ADevice = nil) or (Trim(ADevice.MitUUID) = '') or (FProcessingDevices = nil) then
+  if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FProcessingDevices = nil) then
     Exit;
 
   if HasDeviceInProcessing(ADevice) then
@@ -911,7 +911,7 @@ begin
   if (ADevice = nil) or (FProcessingDevices = nil) then
     Exit;
 
-  Existing := FindProcessingDeviceByUUID(ADevice.MitUUID);
+  Existing := FindProcessingDeviceByUUID(ADevice.UUID);
   if Existing = nil then
     Exit;
 
@@ -1028,7 +1028,7 @@ begin
       if DataManager <> nil then
         Device := DataManager.FindDevice(DeviceUUID, Repo);
 
-      if (Device <> nil) and (FindProcessingDeviceByUUID(Device.MitUUID) = nil) then
+      if (Device <> nil) and (FindProcessingDeviceByUUID(Device.UUID) = nil) then
         FProcessingDevices.Add(Device);
     end;
   finally
@@ -1054,11 +1054,11 @@ begin
     for I := 0 to FProcessingDevices.Count - 1 do
     begin
       Device := FProcessingDevices[I];
-      if (Device = nil) or (Trim(Device.MitUUID) = '') then
+      if (Device = nil) or (Trim(Device.UUID) = '') then
         Continue;
 
       Ini.WriteString(CProcessingDevicesSection,
-        CProcessingDevicesItemKeyPrefix + IntToStr(SaveIndex), Trim(Device.MitUUID));
+        CProcessingDevicesItemKeyPrefix + IntToStr(SaveIndex), Trim(Device.UUID));
       Inc(SaveIndex);
     end;
 
@@ -1703,17 +1703,17 @@ begin
               if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
                 Continue;
 
-              Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.MitUUID);
+              Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
               if Device = nil then
                 Continue;
 
-              if TableDeviceUUIDs.IndexOf(Device.MitUUID) >= 0 then
+              if TableDeviceUUIDs.IndexOf(Device.UUID) >= 0 then
                 Continue;
 
-              TableDeviceUUIDs.Add(Device.MitUUID);
+              TableDeviceUUIDs.Add(Device.UUID);
 
-              if ProcessedOnTables.IndexOf(Device.MitUUID) < 0 then
-                ProcessedOnTables.Add(Device.MitUUID);
+              if ProcessedOnTables.IndexOf(Device.UUID) < 0 then
+                ProcessedOnTables.Add(Device.UUID);
 
               AddDeviceNode(RootTable, Device);
             end;
@@ -1728,7 +1728,7 @@ begin
 
       if FProcessingDevices <> nil then
         for Device in FProcessingDevices do
-          if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.MitUUID) < 0) then
+          if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
             AddDeviceNode(RootOther, Device);
 
       if TreeViewDevices.Count > 0 then
@@ -1929,11 +1929,11 @@ begin
         if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
           Continue;
 
-        Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.MitUUID);
-        if (Device = nil) or (DeviceUUIDs.IndexOf(Trim(Device.MitUUID)) >= 0) then
+        Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
+        if (Device = nil) or (DeviceUUIDs.IndexOf(Trim(Device.UUID)) >= 0) then
           Continue;
 
-        DeviceUUIDs.Add(Trim(Device.MitUUID));
+        DeviceUUIDs.Add(Trim(Device.UUID));
         Devices.Add(Device);
       end;
 
@@ -1968,13 +1968,13 @@ begin
 
         for Ch in WT.DeviceChannels do
           if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.MitUUID));
+            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
       end;
 
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
         if (Device <> nil) and
-           (DeviceUUIDsOnTables.IndexOf(Trim(Device.MitUUID)) < 0) then
+           (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
           Devices.Add(Device);
 
     ShowDevicesResults(Devices);
@@ -2281,10 +2281,10 @@ begin
       if (WT <> nil) and (WT.DeviceChannels <> nil) then
         for Ch in WT.DeviceChannels do
           if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.MitUUID));
+            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
 
       for Device in FProcessingDevices do
-        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.MitUUID)) >= 0) then
+        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) >= 0) then
           DevicesToRemove.Add(Device);
 
       RemoveCollectedDevices;
@@ -2303,11 +2303,11 @@ begin
 
           for Ch in WT.DeviceChannels do
             if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-              DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.MitUUID));
+              DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
         end;
 
       for Device in FProcessingDevices do
-        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.MitUUID)) < 0) then
+        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
           DevicesToRemove.Add(Device);
 
       RemoveCollectedDevices;
@@ -4220,7 +4220,7 @@ begin
       if SelDevice = nil then
         Exit;
 
-      AChannel.DeviceUUID := SelDevice.MitUUID;
+      AChannel.DeviceUUID := SelDevice.UUID;
       AChannel.TypeName := SelDevice.DeviceTypeName;
       AChannel.Serial := SelDevice.SerialNumber;
       AChannel.Signal := SelDevice.OutputType;
@@ -4235,7 +4235,7 @@ begin
   if (ADevice = nil) and (ActiveRepo <> nil) then
   begin
     ADevice := ActiveRepo.CreateDevice(-1);
-    AChannel.DeviceUUID := ADevice.MitUUID;
+    AChannel.DeviceUUID := ADevice.UUID;
     AChannel.TypeName := ADevice.DeviceTypeName;
     AChannel.Serial := ADevice.SerialNumber;
   end;
@@ -4247,7 +4247,7 @@ begin
     begin
       if ADevice <> nil then
       begin
-        AChannel.DeviceUUID := ADevice.MitUUID;
+        AChannel.DeviceUUID := ADevice.UUID;
         AChannel.TypeName := ADevice.DeviceTypeName;
         AChannel.Serial := ADevice.SerialNumber;
         AChannel.Signal := ADevice.OutputType;
@@ -4300,7 +4300,7 @@ begin
     if SelDevice = nil then
       Exit;
 
-    AChannel.DeviceUUID := SelDevice.MitUUID;
+    AChannel.DeviceUUID := SelDevice.UUID;
     AChannel.TypeName := SelDevice.DeviceTypeName;
     AChannel.Serial := SelDevice.SerialNumber;
     AChannel.Signal := SelDevice.OutputType;
@@ -5208,8 +5208,8 @@ begin
     begin
       if CurrentType = NewType then
         IsTypeChanged := False
-      else if (CurrentType.MitUUID <> '') and (NewType.MitUUID <> '') then
-        IsTypeChanged := not SameText(CurrentType.MitUUID, NewType.MitUUID)
+      else if (CurrentType.UUID <> '') and (NewType.UUID <> '') then
+        IsTypeChanged := not SameText(CurrentType.UUID, NewType.UUID)
       else
         IsTypeChanged :=
           (CurrentType.ID <> NewType.ID) or
@@ -5240,13 +5240,13 @@ begin
 
     // Новая идеология: канал проксирует в FlowMeter
     Ch.TypeName := NewType.Name;
-    Ch.TypeUUID := NewType.MitUUID;
+    Ch.TypeUUID := NewType.UUID;
     Ch.RepoTypeName := RepoName;
     Ch.RepoTypeUUID := RepoUUID;
 
     if Assigned(Ch.FlowMeter) and Assigned(Ch.FlowMeter.Device) then
     begin
-      Ch.FlowMeter.Device.DeviceTypeUUID := NewType.MitUUID;
+      Ch.FlowMeter.Device.DeviceTypeUUID := NewType.UUID;
       Ch.FlowMeter.Device.DeviceTypeName := NewType.Name;
       Ch.FlowMeter.Device.RepoTypeName := RepoName;
       Ch.FlowMeter.Device.RepoTypeUUID := RepoUUID;
@@ -5420,7 +5420,7 @@ begin
          (WorkTable.EtalonChannels[0].FlowMeter.Device <> nil) then
       begin
         Point.EtalonName := WorkTable.EtalonChannels[0].FlowMeter.Device.Name;
-        Point.EtalonUUID := WorkTable.EtalonChannels[0].FlowMeter.Device.MitUUID;
+        Point.EtalonUUID := WorkTable.EtalonChannels[0].FlowMeter.Device.UUID;
       end
       else
       begin

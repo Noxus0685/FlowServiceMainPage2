@@ -553,9 +553,9 @@ begin
  begin
    FDevice := ADevice;
 
-  Self.UUID := FDevice.MitUUID;
+  Self.UUID := FDevice.UUID;
   Self.Name := FDevice.Name;
-  FDeviceUUID:= FDevice.MitUUID;
+  FDeviceUUID:= FDevice.UUID;
   FSerialNumber :=   FDevice.SerialNumber;
   FDeviceTypeUUID :=  FDevice.DeviceTypeUUID;
   FRepoTypeName := FDevice.RepoTypeName;
@@ -678,7 +678,7 @@ end;
 function TFlowMeter.GetDeviceUUID: string;
 begin
  if Assigned(FDevice) then
-   Result := FDevice.MitUUID
+   Result := FDevice.UUID
    else
    Result :=  FDeviceUUID;
 end;
@@ -1069,7 +1069,7 @@ begin
       begin
         SrcDevice := TDevice.Create;
         try
-          SrcDevice.MitUUID := Self.DeviceUUID;
+          SrcDevice.UUID := Self.DeviceUUID;
           SrcDevice.SerialNumber := Self.SerialNumber;
           SrcDevice.DeviceTypeName := Self.DeviceTypeName;
           SrcDevice.DeviceTypeUUID := Self.DeviceTypeUUID;

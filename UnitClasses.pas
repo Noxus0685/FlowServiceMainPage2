@@ -88,7 +88,7 @@ type
     FID: Integer;
     FState: TObjectState;
     FName: string;
-    FMitUUID: string;
+    FUUID: string;
     FDescription: string;         // Описание / примечания
     FRepoName: string;
 
@@ -101,7 +101,7 @@ type
     property ID: Integer read FID write FID;
     property State: TObjectState read FState write FState;
     property Name: string read FName write FName;
-    property MitUUID: string read FMitUUID write FMitUUID;
+    property UUID: string read FUUID write FUUID;
     property Description: string read FDescription write FDescription;
      property RepoName: string read FRepoName write FRepoName;
     {====================================================================}
@@ -461,7 +461,7 @@ begin
   inherited Create;
   FID := 0;
   FState := osNew;
-  FMitUUID := TGUID.NewGuid.ToString;
+  FUUID := TGUID.NewGuid.ToString;
 end;
 
 class function TEntitySorter<T>.Sort(
@@ -530,7 +530,7 @@ begin
   try
     Add(IntToStr(ID));
     Add(Name);
-    Add(MitUUID);
+    Add(UUID);
     Add(Description);
     Add(RepoName);
 
@@ -1406,7 +1406,7 @@ function TDeviceType.Clone: TDeviceType;
 begin
   Result := TDeviceType.Create;
    Result.ID := ID;
-   Result.MitUUID := MitUUID;
+   Result.UUID := UUID;
   Result.Assign(Self);
 
 end;
