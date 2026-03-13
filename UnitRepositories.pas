@@ -4720,7 +4720,11 @@ begin
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
+<<<<<<< codex/rename-mituuid-to-uuid-in-codebase-96ptpk
   Result.UUID := ADevice.UUID;
+=======
+  Result.DeviceUUID := DeviceUUID;
+>>>>>>> main
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
@@ -5054,7 +5058,7 @@ begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('UUID', 'TEXT'),
-    Col('DeviceID', 'INTEGER'),
+    Col('DeviceUUID', 'TEXT'),
     Col('AppliedAt', 'TEXT'),
     Col('Name', 'TEXT'),
     Col('Comment', 'TEXT')
@@ -5289,7 +5293,7 @@ function TDeviceRepository.RequiredSpillageSessionColumns: TTableColumns;
 begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-    Col('DeviceID', 'INTEGER'),
+    Col('DeviceUUID', 'TEXT'),
     Col('DateTimeOpen', 'DATETIME'),
     Col('DateTimeClose', 'DATETIME'),
     Col('OperatorName', 'TEXT'),
@@ -5350,7 +5354,11 @@ begin
     ADevice.Sessions := TObjectList<TSessionSpillage>.Create(True);
   ADevice.Sessions.Add(Result);
   Result.ID := Q.FieldByName('ID').AsInteger;
+<<<<<<< codex/rename-mituuid-to-uuid-in-codebase-96ptpk
   Result.UUID := ADevice.UUID;
+=======
+  Result.DeviceUUID := DeviceUUID;
+>>>>>>> main
   Result.DateTimeOpen := ReadFieldDateTimeDef(Q.FieldByName('DateTimeOpen'));
   Result.DateTimeClose := ReadFieldDateTimeDef(Q.FieldByName('DateTimeClose'));
   Result.OperatorName := Q.FieldByName('OperatorName').AsString;
