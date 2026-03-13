@@ -18,7 +18,8 @@ uses
   UnitWorkTable in 'UnitWorkTable.pas',
   fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
   UnitMeterValue in 'UnitMeterValue.pas',
-  frmProceeding in 'frmProceeding.pas' {Frame1: TFrame};
+  frmProceeding in 'frmProceeding.pas' {Frame1: TFrame},
+  UnitFrameCalibrCoefs in 'UnitFrameCalibrCoefs.pas' {FrameCalibrCoefs: TFrame};
 
 {$R *.res}
 
