@@ -642,7 +642,8 @@ type
 
 
     FFlowMeters: TObjectList<TFlowMeter>;
-    FSessionMeter: TFlowMeter;
+    FSessionDevice: TFlowMeter;
+    FSessionEtalon: TFlowMeter;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     FNextClimateChangeAt: TDateTime;
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
@@ -1061,7 +1062,8 @@ begin
   FInstrumentalVisibleOrder.Free;
   FWorkTableManager.Free;
   FFlowMeters.Free;
-  FreeAndNil(FSessionMeter);
+  FreeAndNil(FSessionDevice);
+  FreeAndNil(FSessionEtalon);
   inherited;
 end;
 
@@ -1399,7 +1401,8 @@ begin
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FProcessingDevices := TObjectList<TDevice>.Create(False);
-  FSessionMeter := nil;
+  FSessionDevice := nil;
+  FSessionEtalon := nil;
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -1994,7 +1997,8 @@ function TFormMain.ResolveSelectedDevice: TDevice;
 var
   Item: TTreeViewItem;
   Sess: TSessionSpillage;
-  NeedInitSessionMeter: Boolean;
+  NeedInitSessionDevice: Boolean;
+  NeedInitSessionEtalon: Boolean;
 begin
   Result := nil;
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
@@ -2018,21 +2022,36 @@ begin
   if Result = nil then
     Exit;
 
-  NeedInitSessionMeter :=
-    (FSessionMeter = nil) or
-    (FSessionMeter.ValueVolume = nil) or
-    (FSessionMeter.ValueMass = nil) or
-    (FSessionMeter.ValueVolumeFlow = nil) or
-    (FSessionMeter.ValueMassFlow = nil);
+  NeedInitSessionDevice :=
+    (FSessionDevice = nil) or
+    (FSessionDevice.ValueVolume = nil) or
+    (FSessionDevice.ValueMass = nil) or
+    (FSessionDevice.ValueVolumeFlow = nil) or
+    (FSessionDevice.ValueMassFlow = nil);
 
-  if NeedInitSessionMeter then
+  if NeedInitSessionDevice then
   begin
-    FreeAndNil(FSessionMeter);
-    FSessionMeter := TFlowMeter.Create;
-    FSessionMeter.InitAllValues;
+    FreeAndNil(FSessionDevice);
+    FSessionDevice := TFlowMeter.Create;
+    FSessionDevice.InitAllValues;
   end;
 
-  FSessionMeter.Device := Result;
+  NeedInitSessionEtalon :=
+    (FSessionEtalon = nil) or
+    (FSessionEtalon.ValueVolume = nil) or
+    (FSessionEtalon.ValueMass = nil) or
+    (FSessionEtalon.ValueVolumeFlow = nil) or
+    (FSessionEtalon.ValueMassFlow = nil);
+
+  if NeedInitSessionEtalon then
+  begin
+    FreeAndNil(FSessionEtalon);
+    FSessionEtalon := TFlowMeter.Create;
+    FSessionEtalon.InitAllValues;
+  end;
+
+  FSessionDevice.Device := Result;
+  FSessionEtalon.Device := Result;
   if FActiveWorkTable <> nil then
     SetSessionDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
 end;
@@ -2835,8 +2854,8 @@ begin
     Exit;
 
   CurrentDevice := nil;
-  if FSessionMeter <> nil then
-    CurrentDevice := FSessionMeter.Device;
+  if FSessionDevice <> nil then
+    CurrentDevice := FSessionDevice.Device;
 
   P.EtalonVolumeFlow := P.EtalonVolume/P.SpillTime;
   P.EtalonMassFlow := P.EtalonMass/P.SpillTime;
@@ -2873,7 +2892,7 @@ begin
       for Sess in CurrentDevice.Sessions do
         if Sess.ID = P.SessionID then
         begin
-          Value := Sess.EtalonName;
+          Value := P.EtalonName;
           Break;
         end;
   end
@@ -2883,10 +2902,15 @@ begin
   begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
     begin
-      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FActiveWorkTable.TableFlow.ValueVolumeFlow.GetStrNum(P.EtalonVolumeFlow)
+      if (FSessionEtalon <> nil) then
+      begin
+        if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+          Value := FSessionEtalon.ValueVolumeFlow.GetStrNum(P.EtalonVolumeFlow)
+        else
+          Value := FSessionEtalon.ValueMassFlow.GetStrNum(P.EtalonMassFlow);
+      end
       else
-        Value := FActiveWorkTable.TableFlow.ValueMassFlow.GetStrNum(P.EtalonMassFlow);
+        Value := FloatToStr(P.QavgEtalon);
     end
     else
       Value := FloatToStr(P.QavgEtalon);
@@ -2895,10 +2919,15 @@ begin
   begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
     begin
-      if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FActiveWorkTable.TableFlow.ValueVolume.GetStrNum(P.EtalonVolume)
+      if (FSessionEtalon <> nil) then
+      begin
+        if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
+          Value := FSessionEtalon.ValueVolume.GetStrNum(P.EtalonVolume)
+        else
+          Value := FSessionEtalon.ValueMass.GetStrNum(P.EtalonMass);
+      end
       else
-        Value := FActiveWorkTable.TableFlow.ValueMass.GetStrNum(P.EtalonMass);
+        Value := FloatToStr(P.EtalonVolume);
     end
     else
       Value := FloatToStr(P.EtalonVolume);
@@ -2915,12 +2944,12 @@ begin
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceVolume then
   begin
-    if (FSessionMeter <> nil) and (FActiveWorkTable <> nil) then
+    if (FSessionDevice <> nil) and (FActiveWorkTable <> nil) then
     begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FSessionMeter.ValueVolume.GetStrNum(P.DeviceVolume)
+        Value := FSessionDevice.ValueVolume.GetStrNum(P.DeviceVolume)
       else
-        Value := FSessionMeter.ValueMass.GetStrNum(P.DeviceMass);
+        Value := FSessionDevice.ValueMass.GetStrNum(P.DeviceMass);
     end
     else
       Value := FloatToStr(P.DeviceVolume);
@@ -2929,12 +2958,12 @@ begin
     Value := FloatToStr(P.Velocity)
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDeviceFlowRate then
   begin
-    if (FSessionMeter <> nil) and (FActiveWorkTable <> nil) then
+    if (FSessionDevice <> nil) and (FActiveWorkTable <> nil) then
     begin
       if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
-        Value := FSessionMeter.ValueVolumeFlow.GetStrNum(P.DeviceVolumeFlow)
+        Value := FSessionDevice.ValueVolumeFlow.GetStrNum(P.DeviceVolumeFlow)
       else
-        Value := FSessionMeter.ValueMassFlow.GetStrNum(P.DeviceMassFlow);
+        Value := FSessionDevice.ValueMassFlow.GetStrNum(P.DeviceMassFlow);
     end
     else
       Value := FloatToStr(P.DeviceVolumeFlow);
@@ -3780,7 +3809,7 @@ procedure TFormMain.SetSessionDim(UnitName: string; QuantityUnitName: string);
 var
   IsVolumeUnits: Boolean;
 begin
-  if FSessionMeter = nil then
+  if (FSessionDevice = nil) and (FSessionEtalon = nil) then
     Exit;
 
   UnitName := Trim(UnitName);
@@ -3796,21 +3825,45 @@ begin
 
   if IsVolumeUnits then
   begin
-    FSessionMeter.ValueQuantity := FSessionMeter.ValueVolume;
-    FSessionMeter.ValueFlow := FSessionMeter.ValueVolumeFlow;
-    if FSessionMeter.ValueVolume <> nil then
-      FSessionMeter.ValueVolume.SetDim(QuantityUnitName);
-    if FSessionMeter.ValueVolumeFlow <> nil then
-      FSessionMeter.ValueVolumeFlow.SetDim(UnitName);
+    if FSessionDevice <> nil then
+    begin
+      FSessionDevice.ValueQuantity := FSessionDevice.ValueVolume;
+      FSessionDevice.ValueFlow := FSessionDevice.ValueVolumeFlow;
+      if FSessionDevice.ValueVolume <> nil then
+        FSessionDevice.ValueVolume.SetDim(QuantityUnitName);
+      if FSessionDevice.ValueVolumeFlow <> nil then
+        FSessionDevice.ValueVolumeFlow.SetDim(UnitName);
+    end;
+    if FSessionEtalon <> nil then
+    begin
+      FSessionEtalon.ValueQuantity := FSessionEtalon.ValueVolume;
+      FSessionEtalon.ValueFlow := FSessionEtalon.ValueVolumeFlow;
+      if FSessionEtalon.ValueVolume <> nil then
+        FSessionEtalon.ValueVolume.SetDim(QuantityUnitName);
+      if FSessionEtalon.ValueVolumeFlow <> nil then
+        FSessionEtalon.ValueVolumeFlow.SetDim(UnitName);
+    end;
   end
   else
   begin
-    FSessionMeter.ValueQuantity := FSessionMeter.ValueMass;
-    FSessionMeter.ValueFlow := FSessionMeter.ValueMassFlow;
-    if FSessionMeter.ValueMass <> nil then
-      FSessionMeter.ValueMass.SetDim(QuantityUnitName);
-    if FSessionMeter.ValueMassFlow <> nil then
-      FSessionMeter.ValueMassFlow.SetDim(UnitName);
+    if FSessionDevice <> nil then
+    begin
+      FSessionDevice.ValueQuantity := FSessionDevice.ValueMass;
+      FSessionDevice.ValueFlow := FSessionDevice.ValueMassFlow;
+      if FSessionDevice.ValueMass <> nil then
+        FSessionDevice.ValueMass.SetDim(QuantityUnitName);
+      if FSessionDevice.ValueMassFlow <> nil then
+        FSessionDevice.ValueMassFlow.SetDim(UnitName);
+    end;
+    if FSessionEtalon <> nil then
+    begin
+      FSessionEtalon.ValueQuantity := FSessionEtalon.ValueMass;
+      FSessionEtalon.ValueFlow := FSessionEtalon.ValueMassFlow;
+      if FSessionEtalon.ValueMass <> nil then
+        FSessionEtalon.ValueMass.SetDim(QuantityUnitName);
+      if FSessionEtalon.ValueMassFlow <> nil then
+        FSessionEtalon.ValueMassFlow.SetDim(UnitName);
+    end;
   end;
 end;
 
@@ -5307,7 +5360,6 @@ begin
 
     if Session.DateTimeOpen = 0 then
       Session.DateTimeOpen := Now;
-    Session.EtalonName := WorkTable.TableFlow.Name;
 
     Point := TPointSpillage.Create(Session.ID);
     try
@@ -5319,6 +5371,19 @@ begin
       Point.QavgEtalon := WorkTable.ValueFlowRate.GetDoubleValue;
 
       Point.EtalonVolume := WorkTable.TableFlow.ValueVolume.GetDoubleValue;
+      if (WorkTable.EtalonChannels.Count > 0) and
+         (WorkTable.EtalonChannels[0] <> nil) and
+         (WorkTable.EtalonChannels[0].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[0].FlowMeter.Device <> nil) then
+      begin
+        Point.EtalonName := WorkTable.EtalonChannels[0].FlowMeter.Device.Name;
+        Point.EtalonUUID := WorkTable.EtalonChannels[0].FlowMeter.Device.UUID;
+      end
+      else
+      begin
+        Point.EtalonName := WorkTable.TableFlow.Name;
+        Point.EtalonUUID := '';
+      end;
       Point.EtalonMass := WorkTable.TableFlow.ValueMass.GetDoubleValue;
 
       Point.EtalonVolumeFlow := Point.EtalonVolume/Point.SpillTime;
