@@ -293,6 +293,8 @@ type
     ID: Integer;
     UUID: string;
     DeviceID: Integer;
+    &Type: Integer;
+    Active: Boolean;
     AppliedAt: TDateTime;
     Name: string;
     Comment: string;
@@ -892,6 +894,8 @@ begin
   FCalibrCoefTable.ID := 0;
   FCalibrCoefTable.UUID := '';
   FCalibrCoefTable.DeviceID := ID;
+  FCalibrCoefTable.&Type := 0;
+  FCalibrCoefTable.Active := False;
   FCalibrCoefTable.AppliedAt := 0;
   FCalibrCoefTable.Name := '';
   FCalibrCoefTable.Comment := '';
@@ -918,6 +922,8 @@ end;
 constructor TCalibrCoefTable.Create;
 begin
   inherited Create;
+  &Type := 0;
+  Active := False;
   Items := TObjectList<TCalibrCoefItem>.Create(True);
 end;
 

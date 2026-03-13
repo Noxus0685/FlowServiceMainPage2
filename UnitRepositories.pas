@@ -5059,6 +5059,8 @@ begin
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('UUID', 'TEXT'),
     Col('DeviceUUID', 'TEXT'),
+    Col('Type', 'INTEGER'),
+    Col('Active', 'INTEGER'),
     Col('AppliedAt', 'TEXT'),
     Col('Name', 'TEXT'),
     Col('Comment', 'TEXT')
@@ -5153,6 +5155,8 @@ begin
   Device.CalibrCoefTable.DeviceID := ADeviceID;
   Device.CalibrCoefTable.ID := 0;
   Device.CalibrCoefTable.UUID := '';
+  Device.CalibrCoefTable.&Type := 0;
+  Device.CalibrCoefTable.Active := False;
   Device.CalibrCoefTable.AppliedAt := 0;
   Device.CalibrCoefTable.Name := '';
   Device.CalibrCoefTable.Comment := '';
@@ -5161,7 +5165,7 @@ begin
   QTable := FDM.CreateQuery;
   try
     QTable.SQL.Text :=
-      'select * from CalibrCoefTable where DeviceID = :DeviceID order by AppliedAt desc, ID desc limit 1';
+      'select * from CalibrCoefTable where DeviceID = :DeviceID order by Active desc, AppliedAt desc, ID desc limit 1';
     SetIntParam(QTable, 'DeviceID', ADeviceID);
     QTable.Open;
 
@@ -5170,7 +5174,9 @@ begin
       Device.CalibrCoefTable.ID := QTable.FieldByName('ID').AsInteger;
       Device.CalibrCoefTable.UUID := QTable.FieldByName('UUID').AsString;
       Device.CalibrCoefTable.DeviceID := QTable.FieldByName('DeviceID').AsInteger;
-         Device.CalibrCoefTable.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
+      Device.CalibrCoefTable.&Type := QTable.FieldByName('Type').AsInteger;
+      Device.CalibrCoefTable.Active := QTable.FieldByName('Active').AsInteger <> 0;
+      Device.CalibrCoefTable.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
       Device.CalibrCoefTable.Name := QTable.FieldByName('Name').AsString;
       Device.CalibrCoefTable.Comment := QTable.FieldByName('Comment').AsString;
 
@@ -5227,17 +5233,19 @@ begin
     if ADevice.CalibrCoefTable.ID > 0 then
     begin
       Q.SQL.Text :=
-        'update CalibrCoefTable set UUID=:UUID, DeviceID=:DeviceID, AppliedAt=:AppliedAt, Name=:Name, Comment=:Comment where ID=:ID';
+        'update CalibrCoefTable set UUID=:UUID, DeviceID=:DeviceID, Type=:Type, Active=:Active, AppliedAt=:AppliedAt, Name=:Name, Comment=:Comment where ID=:ID';
       SetIntParam(Q, 'ID', ADevice.CalibrCoefTable.ID);
     end
     else
     begin
       Q.SQL.Text :=
-        'insert into CalibrCoefTable (UUID, DeviceID, AppliedAt, Name, Comment) values (:UUID, :DeviceID, :AppliedAt, :Name, :Comment)';
+        'insert into CalibrCoefTable (UUID, DeviceID, Type, Active, AppliedAt, Name, Comment) values (:UUID, :DeviceID, :Type, :Active, :AppliedAt, :Name, :Comment)';
     end;
 
     SetStrParam(Q, 'UUID', ADevice.CalibrCoefTable.UUID);
     SetIntParam(Q, 'DeviceID', ADevice.CalibrCoefTable.DeviceID);
+    SetIntParam(Q, 'Type', ADevice.CalibrCoefTable.&Type);
+    SetIntParam(Q, 'Active', Ord(ADevice.CalibrCoefTable.Active));
     SetDateTimeParam(Q, 'AppliedAt', ADevice.CalibrCoefTable.AppliedAt);
     SetStrParam(Q, 'Name', ADevice.CalibrCoefTable.Name);
     SetStrParam(Q, 'Comment', ADevice.CalibrCoefTable.Comment);
@@ -5249,6 +5257,16 @@ begin
     begin
       TableID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
       ADevice.CalibrCoefTable.ID := TableID;
+    end;
+
+    if ADevice.CalibrCoefTable.Active then
+    begin
+      Q.SQL.Text :=
+        'update CalibrCoefTable set Active = 0 where DeviceID = :DeviceID and Type = :Type and ID <> :ID';
+      SetIntParam(Q, 'DeviceID', ADevice.CalibrCoefTable.DeviceID);
+      SetIntParam(Q, 'Type', ADevice.CalibrCoefTable.&Type);
+      SetIntParam(Q, 'ID', TableID);
+      Q.ExecSQL;
     end;
 
     Q.SQL.Text := 'delete from CalibrCoefItem where TableID = :TableID';
