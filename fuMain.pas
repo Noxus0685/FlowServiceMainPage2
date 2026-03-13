@@ -691,8 +691,8 @@ type
     procedure ShowOtherDevicesResults;
     procedure ShowDeviceSpillages(ADevice: TDevice);
     procedure ShowSessionSpillages(ASession: TSessionSpillage);
+    procedure UpdateSessionItems;
     function ResolveSelectedDevice: TDevice;
-    procedure UpdateSessionDateLabel(ASession: TSessionSpillage);
     procedure UpdateResultsPointColumns;
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
@@ -709,6 +709,7 @@ type
   private
     FWorkTableManager: TWorkTableManager;
     FProcessingDevices: TObjectList<TDevice>;
+    FCurrentSession: TSessionSpillage;
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
     FInstrumentalVisibleOrder: TList<TLayout>;
@@ -976,7 +977,7 @@ begin
     TreeViewDevicesChange(TreeViewDevices)
   else
   begin
-    UpdateSessionDateLabel(nil);
+    UpdateSessionItems;
 
   end;
 
@@ -1066,6 +1067,7 @@ begin
   FFlowMeters.Free;
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
+  FCurrentSession := nil;
   inherited;
 end;
 
@@ -1405,6 +1407,7 @@ begin
   FProcessingDevices := TObjectList<TDevice>.Create(False);
   FSessionDevice := nil;
   FSessionEtalon := nil;
+  FCurrentSession := nil;
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -1484,7 +1487,7 @@ begin
   GridDataPoints.OnMouseDown := GridDataPointsMouseDown;
   PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
   PopupMenuGridResults.OnPopup := PopupMenuGridResultsPopup;
-  UpdateSessionDateLabel(nil);
+  UpdateSessionItems;
   GridResults.OnMouseDown := GridResultsMouseDown;
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
@@ -1529,15 +1532,91 @@ begin
   Result := 'Сессия ' + DateOpenStr + '-' + DateCloseStr;
 end;
 
-procedure TFormMain.UpdateSessionDateLabel(ASession: TSessionSpillage);
+procedure TFormMain.UpdateSessionItems;
+var
+  Item: TTreeViewItem;
+  Session: TSessionSpillage;
+  Device: TDevice;
+  UnitName: string;
+  QuantityUnitName: string;
 begin
-  if LabelSessionDate = nil then
-    Exit;
+  Session := nil;
+  Device := nil;
 
-  if ASession = nil then
-    LabelSessionDate.Text := 'Сессия'
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+  begin
+    Item := TreeViewDevices.Selected;
+
+    if Item.TagObject is TSessionSpillage then
+      Session := TSessionSpillage(Item.TagObject);
+
+    if Item.TagObject is TDevice then
+      Device := TDevice(Item.TagObject)
+    else if (Item.ParentItem <> nil) and (Item.ParentItem.TagObject is TDevice) then
+      Device := TDevice(Item.ParentItem.TagObject);
+  end;
+
+  FCurrentSession := Session;
+
+  if LabelSessionDate <> nil then
+  begin
+    if FCurrentSession = nil then
+      LabelSessionDate.Text := 'Сессия'
+    else
+      LabelSessionDate.Text := FormatSessionPeriodLabel(FCurrentSession);
+  end;
+
+  if (Device <> nil) then
+  begin
+    ResolveSelectedDevice;
+
+    if FSessionDevice <> nil then
+    begin
+      FSessionDevice.ApplyMeasurementModel;
+      FSessionDevice.ApplyError;
+    end;
+
+    if FSessionEtalon <> nil then
+    begin
+      FSessionEtalon.ApplyMeasurementModel;
+      FSessionEtalon.ApplyError;
+    end;
+  end
   else
-    LabelSessionDate.Text := FormatSessionPeriodLabel(ASession);
+  begin
+    if FSessionDevice <> nil then
+      FSessionDevice.Device := nil;
+    if FSessionEtalon <> nil then
+      FSessionEtalon.Device := nil;
+  end;
+
+  UnitName := Trim(ComboEditUnits.Text);
+  if (UnitName = '') and (ComboBoxUnitsResult <> nil) then
+    UnitName := Trim(ComboBoxUnitsResult.Text);
+
+  if UnitName <> '' then
+  begin
+    QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
+    SetSessionDim(UnitName, QuantityUnitName);
+  end;
+
+  if (Device <> nil) then
+  begin
+    if FCurrentSession <> nil then
+      ShowSessionSpillages(FCurrentSession)
+    else
+      ShowDeviceSpillages(Device);
+  end
+  else if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+  begin
+    Item := TreeViewDevices.Selected;
+    if Item.Text = '...' then
+      ShowAllDevicesResults
+    else if Item.TagObject is TWorkTable then
+      ShowWorkTableResults(TWorkTable(Item.TagObject))
+    else if Item.Text = 'прочее' then
+      ShowOtherDevicesResults;
+  end;
 end;
 
 procedure TFormMain.PopulateTreeViewDevices;
@@ -2684,48 +2763,8 @@ begin
 end;
 
 procedure TFormMain.TreeViewDevicesChange(Sender: TObject);
-var
-  Item: TTreeViewItem;
 begin
-  Item := TreeViewDevices.Selected;
-  if Item = nil then
-    Exit;
-
-  if Item.Text = '...' then
-  begin
-    UpdateSessionDateLabel(nil);
-    ShowAllDevicesResults;
-    Exit;
-  end;
-
-  if Item.TagObject is TWorkTable then
-  begin
-    UpdateSessionDateLabel(nil);
-    ShowWorkTableResults(TWorkTable(Item.TagObject));
-    Exit;
-  end;
-
-  if Item.Text = 'прочее' then
-  begin
-    UpdateSessionDateLabel(nil);
-    ShowOtherDevicesResults;
-    Exit;
-  end;
-
-  if Item.TagObject is TDevice then
-  begin
-    UpdateSessionDateLabel(nil);
-    ShowDeviceSpillages(TDevice(Item.TagObject));
-  end
-  else if Item.TagObject is TSessionSpillage then
-  begin
-    UpdateSessionDateLabel(TSessionSpillage(Item.TagObject));
-    ShowSessionSpillages(TSessionSpillage(Item.TagObject));
-  end
-  else
-  begin
-    ShowAllDevicesResults;
-  end;
+  UpdateSessionItems;
 end;
 
 procedure TFormMain.TreeViewDevicesMouseDown(Sender: TObject;
@@ -3892,8 +3931,9 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetSessionDim(UnitName, QuantityUnitName);
+  UpdateSessionItems;
 
-  UpdateGridDataPointsHeaders(QuantityUnitName,UnitName );
+  UpdateGridDataPointsHeaders(QuantityUnitName, UnitName);
   UpdateGridDataPoints;
 end;
 
