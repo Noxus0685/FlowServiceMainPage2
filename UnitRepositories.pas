@@ -4720,11 +4720,7 @@ begin
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
-<<<<<<< codex/rename-mituuid-to-uuid-in-codebase-96ptpk
   Result.UUID := ADevice.UUID;
-=======
-  Result.DeviceUUID := DeviceUUID;
->>>>>>> main
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
@@ -5326,10 +5322,17 @@ begin
       Q := FDM.CreateQuery;
       try
         Q.SQL.Text :=
-          'update SessionSpillage ' +
-          'set DeviceUUID = (select UUID from Device where Device.ID = SessionSpillage.DeviceID) ' +
-          'where coalesce(trim(DeviceUUID), '''') = '''' and DeviceID is not null';
-        Q.ExecSQL;
+          'select 1 from sqlite_master where type = ''table'' and name = ''Devices'' limit 1';
+        Q.Open;
+        if not Q.Eof then
+        begin
+          Q.Close;
+          Q.SQL.Text :=
+            'update SessionSpillage ' +
+            'set DeviceUUID = (select UUID from Devices where Devices.ID = SessionSpillage.DeviceID) ' +
+            'where coalesce(trim(DeviceUUID), '''') = '''' and DeviceID is not null';
+          Q.ExecSQL;
+        end;
       finally
         Q.Free;
       end;
@@ -5354,11 +5357,7 @@ begin
     ADevice.Sessions := TObjectList<TSessionSpillage>.Create(True);
   ADevice.Sessions.Add(Result);
   Result.ID := Q.FieldByName('ID').AsInteger;
-<<<<<<< codex/rename-mituuid-to-uuid-in-codebase-96ptpk
   Result.UUID := ADevice.UUID;
-=======
-  Result.DeviceUUID := DeviceUUID;
->>>>>>> main
   Result.DateTimeOpen := ReadFieldDateTimeDef(Q.FieldByName('DateTimeOpen'));
   Result.DateTimeClose := ReadFieldDateTimeDef(Q.FieldByName('DateTimeClose'));
   Result.OperatorName := Q.FieldByName('OperatorName').AsString;
