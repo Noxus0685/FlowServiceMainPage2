@@ -3485,8 +3485,8 @@ object FormMain: TFormMain
               TabOrder = 1
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnGetValue = GridDataPointsGetValue
-              Viewport.Width = 1177.000000000000000000
-              Viewport.Height = 675.000000000000000000
+              Viewport.Width = 1157.000000000000000000
+              Viewport.Height = 634.000000000000000000
               object CheckColumnSpillageEnable: TCheckColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -3889,6 +3889,8 @@ object FormMain: TFormMain
                 StyleLookup = ''
                 TabOrder = 0
                 Text = #1057#1074#1086#1081#1089#1090#1074#1072
+                ExplicitSize.cx = 71.000000000000000000
+                ExplicitSize.cy = 26.000000000000000000
                 object LayoutSessionProperties: TLayout
                   Align = Client
                   Size.Width = 348.000000000000000000
@@ -3947,6 +3949,8 @@ object FormMain: TFormMain
                 StyleLookup = ''
                 TabOrder = 0
                 Text = #1056#1072#1089#1095#1105#1090#1099
+                ExplicitSize.cx = 65.000000000000000000
+                ExplicitSize.cy = 26.000000000000000000
                 object GridCoefs: TGrid
                   CanFocus = True
                   ClipChildren = True
@@ -3956,8 +3960,8 @@ object FormMain: TFormMain
                   Size.Height = 219.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 0
-                  Viewport.Width = 297.000000000000000000
-                  Viewport.Height = 219.000000000000000000
+                  Viewport.Width = 277.000000000000000000
+                  Viewport.Height = 194.000000000000000000
                   object StringColumnCoefTableName: TStringColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -3978,6 +3982,8 @@ object FormMain: TFormMain
                 StyleLookup = ''
                 TabOrder = 0
                 Text = #1055#1086#1087#1088#1072#1074#1082#1080
+                ExplicitSize.cx = 75.000000000000000000
+                ExplicitSize.cy = 26.000000000000000000
               end
               object TabItemReport: TTabItem
                 CustomIcon = <
@@ -3991,6 +3997,8 @@ object FormMain: TFormMain
                 StyleLookup = ''
                 TabOrder = 0
                 Text = #1054#1090#1095#1077#1090#1099
+                ExplicitSize.cx = 61.000000000000000000
+                ExplicitSize.cy = 26.000000000000000000
               end
             end
           end

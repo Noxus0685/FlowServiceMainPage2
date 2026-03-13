@@ -2110,7 +2110,7 @@ begin
     if (Item.ParentItem <> nil) and (Item.ParentItem.TagObject is TDevice) then
       Result := TDevice(Item.ParentItem.TagObject)
     else if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-      Result := DataManager.ActiveDeviceRepo.FindDeviceByID(Sess.DeviceID);
+      Result := DataManager.ActiveDeviceRepo.FindDeviceByUUID(Sess.DeviceUUID);
   end;
 
   if Result = nil then
