@@ -5278,7 +5278,6 @@ begin
     Col('DateTimeOpen', 'DATETIME'),
     Col('DateTimeClose', 'DATETIME'),
     Col('OperatorName', 'TEXT'),
-    Col('EtalonName', 'TEXT'),
     Col('K', 'REAL'),
     Col('P', 'REAL'),
     Col('Active', 'INTEGER'),
@@ -5314,7 +5313,6 @@ begin
   Result.DateTimeOpen := ReadFieldDateTimeDef(Q.FieldByName('DateTimeOpen'));
   Result.DateTimeClose := ReadFieldDateTimeDef(Q.FieldByName('DateTimeClose'));
   Result.OperatorName := Q.FieldByName('OperatorName').AsString;
-  Result.EtalonName := Q.FieldByName('EtalonName').AsString;
   Result.K := Q.FieldByName('K').AsFloat;
   Result.P := Q.FieldByName('P').AsFloat;
   Result.Active := Q.FieldByName('Active').AsInteger <> 0;
@@ -5376,10 +5374,10 @@ begin
           Exit(True);
         end;
       osNew:
-        Q.SQL.Text := 'insert into SessionSpillage (DeviceID, DateTimeOpen, DateTimeClose, OperatorName, EtalonName, K, P, Active, Status, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceID, :DateTimeOpen, :DateTimeClose, :OperatorName, :EtalonName, :K, :P, :Active, :Status, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
+        Q.SQL.Text := 'insert into SessionSpillage (DeviceID, DateTimeOpen, DateTimeClose, OperatorName, K, P, Active, Status, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceID, :DateTimeOpen, :DateTimeClose, :OperatorName, :K, :P, :Active, :Status, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
       osModified:
         begin
-          Q.SQL.Text := 'update SessionSpillage set DeviceID=:DeviceID, DateTimeOpen=:DateTimeOpen, DateTimeClose=:DateTimeClose, OperatorName=:OperatorName, EtalonName=:EtalonName, K=:K, P=:P, Active=:Active, Status=:Status, DeviceCoefsName=:DeviceCoefsName, DeviceCoefsUUID=:DeviceCoefsUUID, CalibrCoefsName=:CalibrCoefsName, CalibrCoefsUUID=:CalibrCoefsUUID where ID=:ID';
+          Q.SQL.Text := 'update SessionSpillage set DeviceID=:DeviceID, DateTimeOpen=:DateTimeOpen, DateTimeClose=:DateTimeClose, OperatorName=:OperatorName, K=:K, P=:P, Active=:Active, Status=:Status, DeviceCoefsName=:DeviceCoefsName, DeviceCoefsUUID=:DeviceCoefsUUID, CalibrCoefsName=:CalibrCoefsName, CalibrCoefsUUID=:CalibrCoefsUUID where ID=:ID';
           SetIntParam(Q, 'ID', ASession.ID);
         end;
     end;
@@ -5388,7 +5386,6 @@ begin
     SetDateTimeParam(Q, 'DateTimeOpen', ASession.DateTimeOpen);
     SetDateTimeParam(Q, 'DateTimeClose', ASession.DateTimeClose);
     SetStrParam(Q, 'OperatorName', ASession.OperatorName);
-    SetStrParam(Q, 'EtalonName', ASession.EtalonName);
     SetFloatParam(Q, 'K', ASession.K);
     SetFloatParam(Q, 'P', ASession.P);
     SetIntParam(Q, 'Active', Ord(ASession.Active));
@@ -5459,6 +5456,8 @@ begin
     Col('SessionID', 'INTEGER'),
     Col('DevicePointID', 'INTEGER'),
     Col('DeviceTypePointID', 'INTEGER'),
+    Col('EtalonName', 'TEXT'),
+    Col('EtalonUUID', 'TEXT'),
     Col('Num', 'INTEGER'),
     Col('Name', 'TEXT'),
     Col('Description', 'TEXT'),
@@ -5572,6 +5571,8 @@ begin
   Result.SessionID := SessionID;
   Result.DevicePointID := Q.FieldByName('DevicePointID').AsInteger;
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
+  Result.EtalonName := Q.FieldByName('EtalonName').AsString;
+  Result.EtalonUUID := Q.FieldByName('EtalonUUID').AsString;
   Result.Num := Q.FieldByName('Num').AsInteger;
   Result.Name := Q.FieldByName('Name').AsString;
   Result.Description := Q.FieldByName('Description').AsString;
@@ -5707,7 +5708,7 @@ begin
       osNew:
         Q.SQL.Text :=
           'insert into PointSpillage (' +
-          'SessionID, DevicePointID, DeviceTypePointID, Num, Name, Description, DateTime, ' +
+          'SessionID, DevicePointID, DeviceTypePointID, EtalonName, EtalonUUID, Num, Name, Description, DateTime, ' +
           'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, QEtalonStd, QEtalonCV, ' +
           'DeviceVolume, DeviceMass, Velocity, Status, StatusStr, Error, Valid, QStd, QCV, ' +
           'VolumeBefore, VolumeAfter, PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
@@ -5715,7 +5716,7 @@ begin
           'InputPressure, OutputPressure, Density, AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
           'Coef, FCDCoefficient' +
           ') values (' +
-          ':SessionID, :DevicePointID, :DeviceTypePointID, :Num, :Name, :Description, :DateTime, ' +
+          ':SessionID, :DevicePointID, :DeviceTypePointID, :EtalonName, :EtalonUUID, :Num, :Name, :Description, :DateTime, ' +
           ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, :QEtalonStd, :QEtalonCV, ' +
           ':DeviceVolume, :DeviceMass, :Velocity, :Status, :StatusStr, :Error, :Valid, :QStd, :QCV, ' +
           ':VolumeBefore, :VolumeAfter, :PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
@@ -5727,7 +5728,7 @@ begin
         begin
           Q.SQL.Text :=
             'update PointSpillage set ' +
-            'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, Num=:Num, ' +
+            'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Num=:Num, ' +
             'Name=:Name, Description=:Description, DateTime=:DateTime, SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
             'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
             'Status=:Status, StatusStr=:StatusStr, Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
@@ -5742,6 +5743,8 @@ begin
     SetIntParam(Q, 'SessionID', ASpillage.SessionID);
     SetIntParam(Q, 'DevicePointID', ASpillage.DevicePointID);
     SetIntParam(Q, 'DeviceTypePointID', ASpillage.DeviceTypePointID);
+    SetStrParam(Q, 'EtalonName', ASpillage.EtalonName);
+    SetStrParam(Q, 'EtalonUUID', ASpillage.EtalonUUID);
     SetIntParam(Q, 'Num', ASpillage.Num);
     SetStrParam(Q, 'Name', ASpillage.Name);
     SetStrParam(Q, 'Description', ASpillage.Description);
@@ -5860,7 +5863,7 @@ end;
 //            begin
 //              Q.SQL.Text :=
 //                'update PointSpillage set ' +
-//                'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, Num=:Num, ' +
+//                'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Num=:Num, ' +
 //                'Name=:Name, Description=:Description, DateTime=:DateTime, ' +
 //                'SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
 //                'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, ' +

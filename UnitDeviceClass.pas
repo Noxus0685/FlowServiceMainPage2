@@ -20,7 +20,6 @@ type
     DateTimeOpen: TDateTime;
     DateTimeClose: TDateTime;
     OperatorName: string;
-    EtalonName: string;
 
     K: Double;
     P: Double;
@@ -158,6 +157,8 @@ type
     SessionID: Integer;          // Сессия, к которой относится измерение (FK → TSessionSpillage.ID)
     DevicePointID: Integer;      // Поверочная точка прибора (FK → TDevicePoint.ID)
     DeviceTypePointID: Integer;  // Шаблонная точка типа (опционально)
+    EtalonName: string;
+    EtalonUUID: string;
 
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
@@ -615,7 +616,6 @@ begin
   DateTimeOpen := 0;
   DateTimeClose := 0;
   OperatorName := '';
-  EtalonName := '';
 
   K := 0.0;
   P := 0.0;
@@ -647,7 +647,6 @@ begin
   DateTimeOpen := ASource.DateTimeOpen;
   DateTimeClose := ASource.DateTimeClose;
   OperatorName := ASource.OperatorName;
-  EtalonName := ASource.EtalonName;
   K := ASource.K;
   P := ASource.P;
   Active := ASource.Active;
@@ -732,6 +731,8 @@ begin
   SessionID := ASessionID;
   DevicePointID := 0;
   DeviceTypePointID := 0;
+  EtalonName := '';
+  EtalonUUID := '';
   Num := 0;
 
   { Общая информация }
@@ -1083,7 +1084,6 @@ begin
       Add(DateTimeToStr(Sess.DateTimeOpen));
       Add(DateTimeToStr(Sess.DateTimeClose));
       Add(Sess.OperatorName);
-      Add(Sess.EtalonName);
       Add(FloatToStr(Sess.K));
       Add(FloatToStr(Sess.P));
       Add(BoolToStr(Sess.Active, True));
@@ -1311,6 +1311,8 @@ begin
   SessionID := ASource.SessionID;
   DevicePointID := ASource.DevicePointID;
   DeviceTypePointID := ASource.DeviceTypePointID;
+  EtalonName := ASource.EtalonName;
+  EtalonUUID := ASource.EtalonUUID;
 
   {====================================================================}
   { ОБЩАЯ ИНФОРМАЦИЯ }
