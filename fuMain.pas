@@ -2054,8 +2054,9 @@ begin
 
   FSessionDevice.Device := Result;
   FSessionEtalon.Device := Result;
+
   if FActiveWorkTable <> nil then
-    SetSessionDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
+  SetSessionDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
 end;
 
 procedure TFormMain.PopupMenuTreeViewDevicesPopup(Sender: TObject);
@@ -2900,10 +2901,9 @@ begin
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageSpillTime then
     Value := FloatToStr(P.SpillTime)
+
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
   begin
-    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
-    begin
       if (FSessionEtalon <> nil) then
       begin
         if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
@@ -2912,15 +2912,16 @@ begin
           Value := FSessionEtalon.ValueMassFlow.GetStrNum(P.EtalonMassFlow);
       end
       else
-        Value := FloatToStr(P.QavgEtalon);
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+    begin
+       Value := FActiveWorkTable.TableFlow.ValueFlow.GetStrNum(P.EtalonMassFlow)
     end
     else
       Value := FloatToStr(P.QavgEtalon);
-  end
+    end
+
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonVolume then
   begin
-    if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
-    begin
       if (FSessionEtalon <> nil) then
       begin
         if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
@@ -2929,9 +2930,11 @@ begin
           Value := FSessionEtalon.ValueMass.GetStrNum(P.EtalonMass);
       end
       else
-        Value := FloatToStr(P.EtalonVolume);
-    end
-    else
+      if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) then
+      begin
+        Value := FActiveWorkTable.TableFlow.ValueFlow.GetStrNum(P.EtalonVolume);
+      end
+      else
       Value := FloatToStr(P.EtalonVolume);
   end
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQEtalonStd then
@@ -5379,7 +5382,7 @@ begin
          (WorkTable.EtalonChannels[0].FlowMeter.Device <> nil) then
       begin
         Point.EtalonName := WorkTable.EtalonChannels[0].FlowMeter.Device.Name;
-        Point.EtalonUUID := WorkTable.EtalonChannels[0].FlowMeter.Device.UUID;
+        Point.EtalonUUID := WorkTable.EtalonChannels[0].FlowMeter.Device.MitUUID;
       end
       else
       begin

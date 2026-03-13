@@ -3679,8 +3679,8 @@ object FormMain: TFormMain
               Visible = False
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnGetValue = GridResultsGetValue
-              Viewport.Width = 1535.000000000000000000
-              Viewport.Height = 676.000000000000000000
+              Viewport.Width = 1515.000000000000000000
+              Viewport.Height = 651.000000000000000000
               object StringColumnResultName: TStringColumn
                 Header = #1048#1084#1103
                 HeaderSettings.TextSettings.Trimming = Character
@@ -3747,8 +3747,8 @@ object FormMain: TFormMain
             Size.PlatformDefault = False
             TabOrder = 1
             Visible = False
-            Viewport.Width = 883.000000000000000000
-            Viewport.Height = 102.000000000000000000
+            Viewport.Width = 879.000000000000000000
+            Viewport.Height = 98.000000000000000000
           end
         end
         object LayoutLeft: TLayout
