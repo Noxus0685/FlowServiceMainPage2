@@ -16,7 +16,7 @@ type
 
   TSessionSpillage = class(TTypeEntity)
   public
-    DeviceID: Integer;
+    DeviceUUID: string;
     DateTimeOpen: TDateTime;
     DateTimeClose: TDateTime;
     OperatorName: string;
@@ -33,7 +33,7 @@ type
 
     FSpillages: TObjectList<TPointSpillage>;
 
-    constructor Create(ADeviceID: Integer);
+    constructor Create(const ADeviceUUID: string);
     destructor Destroy; override;
     procedure Assign(ASource: TSessionSpillage);
 
@@ -608,11 +608,11 @@ begin
   ReportingForm := '';
 end;
 
-constructor TSessionSpillage.Create(ADeviceID: Integer);
+constructor TSessionSpillage.Create(const ADeviceUUID: string);
 begin
   inherited Create;
 
-  DeviceID := ADeviceID;
+  DeviceUUID := ADeviceUUID;
   DateTimeOpen := 0;
   DateTimeClose := 0;
   OperatorName := '';
@@ -643,7 +643,7 @@ begin
 
   State := ASource.State;
   ID := ASource.ID;
-  DeviceID := ASource.DeviceID;
+  DeviceUUID := ASource.DeviceUUID;
   DateTimeOpen := ASource.DateTimeOpen;
   DateTimeClose := ASource.DateTimeClose;
   OperatorName := ASource.OperatorName;
@@ -965,7 +965,7 @@ begin
   Result := TDevice.Create;
   Result.Assign(Self);
   Result.ID := ID;
-  Result.MitUUID := MitUUID;
+  Result.UUID := UUID;
 end;
 
 function TDevice.GetSearchText: string;
@@ -985,7 +985,7 @@ begin
   try
     Add(IntToStr(ID));
     Add(Name);
-    Add(MitUUID);
+    Add(UUID);
     Add(Description);
     Add(RepoName);
 
@@ -1080,7 +1080,7 @@ begin
     for Sess in FSessions do
     begin
       Add(IntToStr(Sess.ID));
-      Add(IntToStr(Sess.DeviceID));
+      Add(Sess.DeviceUUID);
       Add(DateTimeToStr(Sess.DateTimeOpen));
       Add(DateTimeToStr(Sess.DateTimeClose));
       Add(Sess.OperatorName);
@@ -1435,9 +1435,9 @@ begin
       end;
     end;
 
-  Result := TSessionSpillage.Create(ID);
+  Result := TSessionSpillage.Create(UUID);
   Result.ID := TEntityHelpers<TSessionSpillage>.NextID(Sessions);
-  Result.DeviceID := ID;
+  Result.DeviceUUID := UUID;
   Result.Active := True;
   Result.Status := 0;
   Result.DateTimeOpen := Now;
@@ -1968,7 +1968,7 @@ begin
   FDeviceType := AType;
 
   // синхронизируем данные устройства
-  DeviceTypeUUID := AType.MitUUID;
+  DeviceTypeUUID := AType.UUID;
   DeviceTypeName := AType.Name;
   DeviceTypeRepo := RepoName;
   RepoTypeName := RepoName;

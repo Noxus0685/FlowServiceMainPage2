@@ -295,7 +295,7 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
     function RequiredSpillageSessionColumns: TTableColumns;
     procedure EnsureSpillageSessionSchema;
     function MapSpillageSessionFromQuery(Q: TFDQuery): TSessionSpillage;
-    function LoadSpillageSessionsByDevice(ADeviceID: Integer): Boolean;
+    function LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
     function UpdateSpillageSessions(ADevice: TDevice): Boolean;
     function UpdateSpillageSession(ASession: TSessionSpillage): Boolean;
 
@@ -309,7 +309,7 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
 
     function MapSpillageFromQuery(Q: TFDQuery; ADevice: TDevice): TPointSpillage;
 
-    function LoadSpillagesByDevice(ADeviceID: Integer): Boolean;
+    function LoadSpillagesByDevice(const ADeviceUUID: string): Boolean;
 
     //function SaveSpillages: Boolean;
 
@@ -350,6 +350,7 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
 
     procedure DeleteDevice(ADevice: TDevice);
     function FindDeviceByID(ADeviceID: Integer): TDevice;
+    function FindDeviceByUUID(const ADeviceUUID: string): TDevice;
     procedure InitBulkTestData;
 
   end;
@@ -1608,7 +1609,7 @@ function TTypeRepository.RequiredTypeColumns: TTableColumns;
 begin
    Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-    Col('MitUUID', 'TEXT'),
+    Col('UUID', 'TEXT'),
 
     Col('Name', 'TEXT NOT NULL'),
     Col('Modification', 'TEXT'),
@@ -1710,7 +1711,7 @@ begin
   Result := CreateNewType;
 
   Result.ID := Q.FieldByName('ID').AsInteger;
-  Result.MitUUID := Q.FieldByName('MitUUID').AsString;
+  Result.UUID := Q.FieldByName('UUID').AsString;
 
   Result.Name := Q.FieldByName('Name').AsString;
   Result.Modification := Q.FieldByName('Modification').AsString;
@@ -2038,7 +2039,7 @@ begin
       osNew:
         Q.SQL.Text :=
           'insert into DeviceType (' +
-          'ID, MitUUID, Name, Modification, Manufacturer, ReestrNumber, ' +
+          'ID, UUID, Name, Modification, Manufacturer, ReestrNumber, ' +
           'Category, CategoryName, AccuracyClass, ' +
           'RegDate, ValidityDate, IVI, RangeDynamic, ' +
           'VerificationMethod, ProcedureName, ' +
@@ -2051,7 +2052,7 @@ begin
           'ProtocolName, BaudRate, Parity, DeviceAddress, ' +
           'InputType, SpillageType, SpillageStop, Repeats, RepeatsProtocol, Error' +
           ') values (' +
-          ':ID, :MitUUID, :Name, :Modification, :Manufacturer, :ReestrNumber, ' +
+          ':ID, :UUID, :Name, :Modification, :Manufacturer, :ReestrNumber, ' +
           ':Category, :CategoryName, :AccuracyClass, ' +
           ':RegDate, :ValidityDate, :IVI, :RangeDynamic, ' +
           ':VerificationMethod, :ProcedureName, ' +
@@ -2071,7 +2072,7 @@ begin
       osModified:
         Q.SQL.Text :=
           'update DeviceType set ' +
-          'MitUUID=:MitUUID, Name=:Name, Modification=:Modification, Manufacturer=:Manufacturer, ReestrNumber=:ReestrNumber, ' +
+          'UUID=:UUID, Name=:Name, Modification=:Modification, Manufacturer=:Manufacturer, ReestrNumber=:ReestrNumber, ' +
           'Category=:Category, CategoryName=:CategoryName, AccuracyClass=:AccuracyClass, ' +
           'RegDate=:RegDate, ValidityDate=:ValidityDate, IVI=:IVI, RangeDynamic=:RangeDynamic, ' +
           'VerificationMethod=:VerificationMethod, ProcedureName=:ProcedureName, ' +
@@ -2090,7 +2091,7 @@ begin
 
     {---------------- ПАРАМЕТРЫ ----------------}
     SetIntParam(Q, 'ID', AType.ID);
-    SetStrParam(Q, 'MitUUID', AType.MitUUID);
+    SetStrParam(Q, 'UUID', AType.UUID);
     SetStrParam(Q, 'Name', AType.Name);
     SetStrParam(Q, 'Modification', AType.Modification);
     SetStrParam(Q, 'Manufacturer', AType.Manufacturer);
@@ -2229,7 +2230,7 @@ begin
     Exit;
 
   for T in FTypes do
-    if SameText(T.MitUUID, AUUID) then
+    if SameText(T.UUID, AUUID) then
       Exit(T);
 end;
 
@@ -4038,7 +4039,7 @@ begin
     { Идентификация }
     {--------------------------------------------------}
     Col('ID',                'INTEGER PRIMARY KEY AUTOINCREMENT'),
-    Col('MitUUID',           'TEXT'),
+    Col('UUID',           'TEXT'),
 
     Col('DeviceTypeUUID',      'TEXT'),
     Col('DeviceTypeName',      'TEXT'),
@@ -4191,7 +4192,7 @@ begin
   Result := CreateNewDevice;
 
   Result.ID := Q.FieldByName('ID').AsInteger;
-  Result.MitUUID := Q.FieldByName('MitUUID').AsString;
+  Result.UUID := Q.FieldByName('UUID').AsString;
 
   Result.DeviceTypeUUID := Q.FieldByName('DeviceTypeUUID').AsString;
   Result.DeviceTypeName := Q.FieldByName('DeviceTypeName').AsString;
@@ -4293,8 +4294,8 @@ begin
 
       // Загружаем связанные данные для устройства
       LoadDevicePointsByDevice(Result.ID);
-      LoadSpillageSessionsByDevice(Result.ID);
-      LoadSpillagesByDevice(Result.ID);
+      LoadSpillageSessionsByDevice(Result.UUID);
+      LoadSpillagesByDevice(Result.UUID);
       LoadCalibrCoefByDevice(Result.ID);
     end;
 
@@ -4350,10 +4351,10 @@ begin
      if not LoadDevicePointsByDevice(NewD.ID) then
       raise Exception.Create('Не удалось загрузить точки приборов');
 
-    if not LoadSpillageSessionsByDevice(NewD.ID) then
+    if not LoadSpillageSessionsByDevice(NewD.UUID) then
       Exit(False);
 
-    if not LoadSpillagesByDevice(NewD.ID) then
+    if not LoadSpillagesByDevice(NewD.UUID) then
       raise Exception.Create('Не удалось загрузить проливы');
 
     if not LoadCalibrCoefByDevice(NewD.ID) then
@@ -4475,7 +4476,7 @@ begin
         Q.SQL.Text :=
           'insert into Devices (' +
           'ID, ' +
-          'MitUUID, DeviceTypeUUID, DeviceTypeName, DeviceTypeRepo, ' +
+          'UUID, DeviceTypeUUID, DeviceTypeName, DeviceTypeRepo, ' +
           'Name, SerialNumber, Modification, ' +
           'Manufacturer, Owner, ReestrNumber, ' +
           'CategoryName, Category, AccuracyClass, ' +
@@ -4491,7 +4492,7 @@ begin
           'Comment, Description, ReportingForm' +
           ') values (' +
           ':ID, ' +
-          ':MitUUID, :DeviceTypeUUID, :DeviceTypeName, :DeviceTypeRepo, ' +
+          ':UUID, :DeviceTypeUUID, :DeviceTypeName, :DeviceTypeRepo, ' +
           ':Name, :SerialNumber, :Modification, ' +
           ':Manufacturer, :Owner, :ReestrNumber, ' +
           ':CategoryName, :Category, :AccuracyClass, ' +
@@ -4511,7 +4512,7 @@ begin
       osModified:
         Q.SQL.Text :=
           'update Devices set ' +
-          'MitUUID = :MitUUID, ' +
+          'UUID = :UUID, ' +
           'DeviceTypeUUID = :DeviceTypeUUID, ' +
           'DeviceTypeName = :DeviceTypeName, ' +
           'DeviceTypeRepo = :DeviceTypeRepo, ' +
@@ -4539,7 +4540,7 @@ begin
 
     SetIntParam(Q, 'ID', ADevice.ID);
 
-    SetStrParam(Q, 'MitUUID', ADevice.MitUUID);
+    SetStrParam(Q, 'UUID', ADevice.UUID);
     SetStrParam(Q, 'DeviceTypeUUID', ADevice.DeviceTypeUUID);
     SetStrParam(Q, 'DeviceTypeName', ADevice.DeviceTypeName);
     SetStrParam(Q, 'DeviceTypeRepo', ADevice.DeviceTypeRepo);
@@ -4719,7 +4720,7 @@ begin
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
-  Result.DeviceID := DeviceID;
+  Result.DeviceUUID := DeviceUUID;
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
@@ -4769,6 +4770,20 @@ begin
 
   for D in FDevices do
     if D.ID = ADeviceID then
+      Exit(D);
+end;
+
+function TDeviceRepository.FindDeviceByUUID(const ADeviceUUID: string): TDevice;
+var
+  D: TDevice;
+begin
+  Result := nil;
+
+  if (Trim(ADeviceUUID) = '') or (FDevices = nil) then
+    Exit;
+
+  for D in FDevices do
+    if (D <> nil) and SameText(Trim(D.UUID), Trim(ADeviceUUID)) then
       Exit(D);
 end;
 
@@ -5039,7 +5054,7 @@ begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('UUID', 'TEXT'),
-    Col('DeviceID', 'INTEGER'),
+    Col('DeviceUUID', 'TEXT'),
     Col('AppliedAt', 'TEXT'),
     Col('Name', 'TEXT'),
     Col('Comment', 'TEXT')
@@ -5274,7 +5289,7 @@ function TDeviceRepository.RequiredSpillageSessionColumns: TTableColumns;
 begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-    Col('DeviceID', 'INTEGER'),
+    Col('DeviceUUID', 'TEXT'),
     Col('DateTimeOpen', 'DATETIME'),
     Col('DateTimeClose', 'DATETIME'),
     Col('OperatorName', 'TEXT'),
@@ -5290,26 +5305,52 @@ begin
 end;
 
 procedure TDeviceRepository.EnsureSpillageSessionSchema;
+var
+  Cols: TStringList;
+  Q: TFDQuery;
+  I: Integer;
 begin
   FDM.EnsureTable('SessionSpillage', RequiredSpillageSessionColumns);
+
+  Cols := FDM.GetTableColumns('SessionSpillage');
+  try
+    for I := 0 to Cols.Count - 1 do
+      Cols[I] := UpperCase(Trim(Cols[I]));
+
+    if (Cols.IndexOf('DEVICEID') >= 0) and (Cols.IndexOf('DEVICEUUID') >= 0) then
+    begin
+      Q := FDM.CreateQuery;
+      try
+        Q.SQL.Text :=
+          'update SessionSpillage ' +
+          'set DeviceUUID = (select UUID from Device where Device.ID = SessionSpillage.DeviceID) ' +
+          'where coalesce(trim(DeviceUUID), '''') = '''' and DeviceID is not null';
+        Q.ExecSQL;
+      finally
+        Q.Free;
+      end;
+    end;
+  finally
+    Cols.Free;
+  end;
 end;
 
 function TDeviceRepository.MapSpillageSessionFromQuery(Q: TFDQuery): TSessionSpillage;
 var
-  DeviceID: Integer;
+  DeviceUUID: string;
   ADevice: TDevice;
 begin
-  DeviceID := Q.FieldByName('DeviceID').AsInteger;
-  ADevice := FindDeviceByID(DeviceID);
+  DeviceUUID := Q.FieldByName('DeviceUUID').AsString;
+  ADevice := FindDeviceByUUID(DeviceUUID);
   if ADevice = nil then
-    raise Exception.CreateFmt('Device for session not found (DeviceID=%d)', [DeviceID]);
+    raise Exception.CreateFmt('Device for session not found (DeviceUUID=%s)', [DeviceUUID]);
 
-  Result := TSessionSpillage.Create(DeviceID);
+  Result := TSessionSpillage.Create(DeviceUUID);
   if ADevice.Sessions = nil then
     ADevice.Sessions := TObjectList<TSessionSpillage>.Create(True);
   ADevice.Sessions.Add(Result);
   Result.ID := Q.FieldByName('ID').AsInteger;
-  Result.DeviceID := DeviceID;
+  Result.DeviceUUID := DeviceUUID;
   Result.DateTimeOpen := ReadFieldDateTimeDef(Q.FieldByName('DateTimeOpen'));
   Result.DateTimeClose := ReadFieldDateTimeDef(Q.FieldByName('DateTimeClose'));
   Result.OperatorName := Q.FieldByName('OperatorName').AsString;
@@ -5324,14 +5365,14 @@ begin
   Result.State := osClean;
 end;
 
-function TDeviceRepository.LoadSpillageSessionsByDevice(ADeviceID: Integer): Boolean;
+function TDeviceRepository.LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
 var
   Device: TDevice;
   Q: TFDQuery;
 begin
   Result := False;
-  if (ADeviceID <= 0) or (FDM = nil) then Exit;
-  Device := FindDeviceByID(ADeviceID);
+  if (Trim(ADeviceUUID) = '') or (FDM = nil) then Exit;
+  Device := FindDeviceByUUID(ADeviceUUID);
   if Device = nil then Exit;
 
   if Device.Sessions = nil then
@@ -5341,8 +5382,8 @@ begin
 
   Q := FDM.CreateQuery;
   try
-    Q.SQL.Text := 'select * from SessionSpillage where DeviceID = :ID order by DateTimeOpen desc, ID desc';
-    SetIntParam(Q, 'ID', ADeviceID);
+    Q.SQL.Text := 'select * from SessionSpillage where DeviceUUID = :DeviceUUID order by DateTimeOpen desc, ID desc';
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
     Q.Open;
     while not Q.Eof do
     begin
@@ -5374,15 +5415,15 @@ begin
           Exit(True);
         end;
       osNew:
-        Q.SQL.Text := 'insert into SessionSpillage (DeviceID, DateTimeOpen, DateTimeClose, OperatorName, K, P, Active, Status, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceID, :DateTimeOpen, :DateTimeClose, :OperatorName, :K, :P, :Active, :Status, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
+        Q.SQL.Text := 'insert into SessionSpillage (DeviceUUID, DateTimeOpen, DateTimeClose, OperatorName, K, P, Active, Status, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceUUID, :DateTimeOpen, :DateTimeClose, :OperatorName, :K, :P, :Active, :Status, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
       osModified:
         begin
-          Q.SQL.Text := 'update SessionSpillage set DeviceID=:DeviceID, DateTimeOpen=:DateTimeOpen, DateTimeClose=:DateTimeClose, OperatorName=:OperatorName, K=:K, P=:P, Active=:Active, Status=:Status, DeviceCoefsName=:DeviceCoefsName, DeviceCoefsUUID=:DeviceCoefsUUID, CalibrCoefsName=:CalibrCoefsName, CalibrCoefsUUID=:CalibrCoefsUUID where ID=:ID';
+          Q.SQL.Text := 'update SessionSpillage set DeviceUUID=:DeviceUUID, DateTimeOpen=:DateTimeOpen, DateTimeClose=:DateTimeClose, OperatorName=:OperatorName, K=:K, P=:P, Active=:Active, Status=:Status, DeviceCoefsName=:DeviceCoefsName, DeviceCoefsUUID=:DeviceCoefsUUID, CalibrCoefsName=:CalibrCoefsName, CalibrCoefsUUID=:CalibrCoefsUUID where ID=:ID';
           SetIntParam(Q, 'ID', ASession.ID);
         end;
     end;
 
-    SetIntParam(Q, 'DeviceID', ASession.DeviceID);
+    SetStrParam(Q, 'DeviceUUID', ASession.DeviceUUID);
     SetDateTimeParam(Q, 'DateTimeOpen', ASession.DateTimeOpen);
     SetDateTimeParam(Q, 'DateTimeClose', ASession.DateTimeClose);
     SetStrParam(Q, 'OperatorName', ASession.OperatorName);
@@ -5419,8 +5460,8 @@ begin
   begin
     if Sess = nil then
       Continue;
-    if Sess.DeviceID <> ADevice.ID then
-      Sess.DeviceID := ADevice.ID;
+    if not SameText(Sess.DeviceUUID, ADevice.UUID) then
+      Sess.DeviceUUID := ADevice.UUID;
 
     OldSessionID := Sess.ID;
     if not UpdateSpillageSession(Sess) then
@@ -5559,8 +5600,8 @@ begin
 
   if MatchedSession = nil then
     raise Exception.CreateFmt(
-      'Session for spillage not found (DeviceID=%d, SessionID=%d)',
-      [ADevice.ID, SessionID]
+      'Session for spillage not found (DeviceUUID=%s, SessionID=%d)',
+      [ADevice.UUID, SessionID]
     );
 
   Result := TPointSpillage.Create(SessionID);
@@ -5624,7 +5665,7 @@ begin
 end;
 
 function TDeviceRepository.LoadSpillagesByDevice(
-  ADeviceID: Integer
+  const ADeviceUUID: string
 ): Boolean;
 var
   Q: TFDQuery;
@@ -5632,10 +5673,10 @@ var
 begin
   Result := False;
 
-  if (ADeviceID <= 0) or (FDM = nil) then
+  if (Trim(ADeviceUUID) = '') or (FDM = nil) then
     Exit;
 
-  Device := FindDeviceByID(ADeviceID);
+  Device := FindDeviceByUUID(ADeviceUUID);
   if Device = nil then
     Exit;
 
@@ -5648,10 +5689,10 @@ begin
   try
     Q.SQL.Text :=
       'select * from PointSpillage ' +
-      'where SessionID in (select ID from SessionSpillage where DeviceID = :ID) ' +
+      'where SessionID in (select ID from SessionSpillage where DeviceUUID = :DeviceUUID) ' +
       'order by Num';
 
-    SetIntParam(Q, 'ID', ADeviceID);
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
     Q.Open;
 
     while not Q.Eof do

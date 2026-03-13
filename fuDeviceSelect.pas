@@ -1095,7 +1095,7 @@ begin
           Dev := ActiveRepo.CreateDevice(-1);
 
           if Item.GetValue('vri_id') <> nil then
-            Dev.MitUUID := Item.GetValue('vri_id').Value;
+            Dev.UUID := Item.GetValue('vri_id').Value;
 
           ImportedOwner := '';
           ImportedReestr := '';

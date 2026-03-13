@@ -3090,7 +3090,7 @@ var
   SpecArr: TJSONArray;
   SpecObj: TJSONObject;
 
-  MitUUID: string;
+  UUID: string;
   ReestrNum: string;
   DetectText: string;
   DocUrl: string;
@@ -3159,7 +3159,7 @@ begin
       Item := Items.Items[0] as TJSONObject;
 
       if Item.GetValue('mit_uuid') = nil then Exit;
-      MitUUID := Item.GetValue('mit_uuid').Value;
+      UUID := Item.GetValue('mit_uuid').Value;
 
     finally
       Json.Free;
@@ -3170,7 +3170,7 @@ begin
     {=================================================}
     Url :=
       'https://fgis.gost.ru/fundmetrology/eapi/mit/' +
-      MitUUID;
+      UUID;
 
     Resp := NetHTTPClient1.Get(Url);
     ResponseText := Resp.ContentAsString;
@@ -3185,7 +3185,7 @@ begin
       GeneralObj := Json.GetValue('general') as TJSONObject;
       if GeneralObj = nil then Exit;
 
-      DevType.MitUUID :=
+      DevType.UUID :=
         GeneralObj.GetValue('mit_uuid').Value;
 
       DevType.ReestrNumber :=

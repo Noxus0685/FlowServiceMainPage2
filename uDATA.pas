@@ -130,7 +130,7 @@ begin
   {--------------------------------------------------}
   { МИГРАЦИИ — ВСЕ ПОЛЯ МОДЕЛИ }
   {--------------------------------------------------}
-  EnsureColumn('DeviceType', 'MitUUID', 'TEXT');
+  EnsureColumn('DeviceType', 'UUID', 'TEXT');
 
   EnsureColumn('DeviceType', 'VerificationMethod', 'TEXT');
   EnsureColumn('DeviceType', 'ProcedureName', 'TEXT');
@@ -409,7 +409,7 @@ end;
 //const
 //  REQUIRED_COLUMNS: array [0..47] of string = (
 //    'ID',
-//    'MitUUID',
+//    'UUID',
 //
 //    'Name',
 //    'Modification',
