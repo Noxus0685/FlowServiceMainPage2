@@ -443,7 +443,7 @@ type
     ToolBar3: TToolBar;
     ComboBoxRepository: TComboBox;
     Label6: TLabel;
-    LayoutRight: TLayout;
+    LayoutCenter: TLayout;
     Layout18: TLayout;
     GridDataPoints: TGrid;
     StringColumnName: TStringColumn;
@@ -529,7 +529,7 @@ type
     StringColumnSpillageDeviceFlowRate: TStringColumn;
     TabItem1: TTabItem;
     Panel1: TPanel;
-    Layout21: TLayout;
+    LayoutRight: TLayout;
     Splitter3: TSplitter;
     ToolBarResults: TToolBar;
     Layout22: TLayout;
@@ -541,6 +541,8 @@ type
     Button5: TButton;
     Button6: TButton;
     Line9: TLine;
+    LayoutTop: TLayout;
+    LayoutMiddle: TLayout;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
