@@ -15,11 +15,6 @@ type
   TPointSpillage = class;
 
   TSessionSpillage = class(TTypeEntity)
-
-
-
-
-
   public
     DeviceID: Integer;
     DateTimeOpen: TDateTime;
