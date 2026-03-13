@@ -2834,7 +2834,9 @@ begin
   if P = nil then
     Exit;
 
-  CurrentDevice := ResolveSelectedDevice;
+  CurrentDevice := nil;
+  if FSessionMeter <> nil then
+    CurrentDevice := FSessionMeter.Device;
 
   P.EtalonVolumeFlow := P.EtalonVolume/P.SpillTime;
   P.EtalonMassFlow := P.EtalonMass/P.SpillTime;
