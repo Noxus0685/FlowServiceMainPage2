@@ -550,13 +550,11 @@ type
     StringColumn2: TStringColumn;
     LabelSessionDate: TLabel;
     LabelCoefs: TLabel;
-    SpeedButton2: TSpeedButton;
-    SpeedButton3: TSpeedButton;
-    SpeedButton5: TSpeedButton;
     Chart1: TChart;
     TabItemCalibrCoefs: TTabItem;
     TabItemReport: TTabItem;
     LayoutSessionProperties: TLayout;
+    LabelSessionActive: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

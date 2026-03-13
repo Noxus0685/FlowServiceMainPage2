@@ -5054,7 +5054,7 @@ begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('UUID', 'TEXT'),
-    Col('DeviceID', 'INTEGER'),
+    Col('DeviceUUID', 'TEXT'),
     Col('AppliedAt', 'TEXT'),
     Col('Name', 'TEXT'),
     Col('Comment', 'TEXT')
@@ -5289,7 +5289,7 @@ function TDeviceRepository.RequiredSpillageSessionColumns: TTableColumns;
 begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
-    Col('DeviceID', 'INTEGER'),
+    Col('DeviceUUID', 'TEXT'),
     Col('DateTimeOpen', 'DATETIME'),
     Col('DateTimeClose', 'DATETIME'),
     Col('OperatorName', 'TEXT'),

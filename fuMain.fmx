@@ -1457,8 +1457,8 @@ object FormMain: TFormMain
                   OnGetValue = GridEtalonsGetValue
                   OnSetValue = GridEtalonsSetValue
                   OnCellClick = GridEtalonsCellClick
-                  Viewport.Width = 1766.000000000000000000
-                  Viewport.Height = 95.000000000000000000
+                  Viewport.Width = 1770.000000000000000000
+                  Viewport.Height = 120.000000000000000000
                   object CheckColumnEtalonEnable1: TCheckColumn
                     HorzAlign = Center
                     Header = #1042#1082#1083
@@ -1577,8 +1577,8 @@ object FormMain: TFormMain
                 OnGetValue = GridDevicesGetValue
                 OnSetValue = GridDevicesSetValue
                 OnCellClick = GridDevicesCellClick
-                Viewport.Width = 1750.000000000000000000
-                Viewport.Height = 284.000000000000000000
+                Viewport.Width = 1770.000000000000000000
+                Viewport.Height = 309.000000000000000000
                 object CheckColumnDeviceEnable1: TCheckColumn
                   Header = #1042#1082#1083
                   HeaderSettings.TextSettings.Trimming = Character
@@ -3485,8 +3485,8 @@ object FormMain: TFormMain
               TabOrder = 1
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnGetValue = GridDataPointsGetValue
-              Viewport.Width = 1157.000000000000000000
-              Viewport.Height = 634.000000000000000000
+              Viewport.Width = 1177.000000000000000000
+              Viewport.Height = 675.000000000000000000
               object CheckColumnSpillageEnable: TCheckColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -3669,8 +3669,8 @@ object FormMain: TFormMain
               Visible = False
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnGetValue = GridResultsGetValue
-              Viewport.Width = 1515.000000000000000000
-              Viewport.Height = 651.000000000000000000
+              Viewport.Width = 1535.000000000000000000
+              Viewport.Height = 676.000000000000000000
               object StringColumnResultName: TStringColumn
                 Header = #1048#1084#1103
                 HeaderSettings.TextSettings.Trimming = Character
@@ -3737,8 +3737,8 @@ object FormMain: TFormMain
             Size.PlatformDefault = False
             TabOrder = 1
             Visible = False
-            Viewport.Width = 879.000000000000000000
-            Viewport.Height = 98.000000000000000000
+            Viewport.Width = 883.000000000000000000
+            Viewport.Height = 102.000000000000000000
           end
         end
         object LayoutLeft: TLayout
@@ -3865,8 +3865,8 @@ object FormMain: TFormMain
               Size.Width = 348.000000000000000000
               Size.Height = 675.000000000000000000
               Size.PlatformDefault = False
-              TabIndex = 0
-              TabOrder = 1
+              TabIndex = 1
+              TabOrder = 0
               TabPosition = PlatformDefault
               Sizes = (
                 348s
@@ -3882,7 +3882,7 @@ object FormMain: TFormMain
                   item
                   end>
                 TextSettings.Trimming = None
-                IsSelected = True
+                IsSelected = False
                 Size.Width = 71.000000000000000000
                 Size.Height = 26.000000000000000000
                 Size.PlatformDefault = False
@@ -3905,44 +3905,14 @@ object FormMain: TFormMain
                     Margins.Left = 10.000000000000000000
                     Position.X = 14.000000000000000000
                     Position.Y = 16.000000000000000000
-                    Size.Width = 95.000000000000000000
+                    Size.Width = 59.000000000000000000
                     Size.Height = 25.000000000000000000
                     Size.PlatformDefault = False
                     Text = #1057#1077#1089#1089#1080#1103
                     TabOrder = 0
                   end
-                  object SpeedButton2: TSpeedButton
-                    Position.X = 18.000000000000000000
-                    Position.Y = 125.000000000000000000
-                    Size.Width = 41.000000000000000000
-                    Size.Height = 22.000000000000000000
-                    Size.PlatformDefault = False
-                    StyleLookup = 'composetoolbutton'
-                    Text = 'SpeedButton2'
-                    TextSettings.Trimming = None
-                  end
-                  object SpeedButton3: TSpeedButton
-                    Position.X = 104.000000000000000000
-                    Position.Y = 125.000000000000000000
-                    Size.Width = 41.000000000000000000
-                    Size.Height = 22.000000000000000000
-                    Size.PlatformDefault = False
-                    StyleLookup = 'composetoolbutton'
-                    Text = 'SpeedButton2'
-                    TextSettings.Trimming = None
-                  end
-                  object SpeedButton5: TSpeedButton
-                    Position.X = 63.000000000000000000
-                    Position.Y = 125.000000000000000000
-                    Size.Width = 41.000000000000000000
-                    Size.Height = 22.000000000000000000
-                    Size.PlatformDefault = False
-                    StyleLookup = 'composetoolbutton'
-                    Text = 'SpeedButton2'
-                    TextSettings.Trimming = None
-                  end
                   object Chart1: TChart
-                    Position.X = -96.000000000000000000
+                    Position.X = 27.000000000000000000
                     Position.Y = 204.000000000000000000
                     Foot.Font.StyleExt = {00040000000200000004000000}
                     Legend.Title.Font.StyleExt = {00070000000000000004000000}
@@ -3951,11 +3921,17 @@ object FormMain: TFormMain
                       'TChart')
                     Zoom.Brush.Kind = None
                     Zoom.Pen.Fill.Color = claSilver
-                    TabOrder = 5
+                    TabOrder = 2
                     Size.Width = 273.000000000000000000
                     Size.Height = 209.000000000000000000
                     Size.PlatformDefault = False
                     ColorPaletteIndex = 13
+                  end
+                  object LabelSessionActive: TLabel
+                    Position.X = 16.000000000000000000
+                    Position.Y = 56.000000000000000000
+                    Text = 'LabelSessionActive'
+                    TabOrder = 3
                   end
                 end
               end
@@ -3964,7 +3940,7 @@ object FormMain: TFormMain
                   item
                   end>
                 TextSettings.Trimming = None
-                IsSelected = False
+                IsSelected = True
                 Size.Width = 65.000000000000000000
                 Size.Height = 26.000000000000000000
                 Size.PlatformDefault = False
@@ -3975,13 +3951,13 @@ object FormMain: TFormMain
                   CanFocus = True
                   ClipChildren = True
                   Position.X = 24.000000000000000000
-                  Position.Y = 190.000000000000000000
+                  Position.Y = 126.000000000000000000
                   Size.Width = 297.000000000000000000
                   Size.Height = 219.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 0
-                  Viewport.Width = 277.000000000000000000
-                  Viewport.Height = 194.000000000000000000
+                  Viewport.Width = 297.000000000000000000
+                  Viewport.Height = 219.000000000000000000
                   object StringColumnCoefTableName: TStringColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end

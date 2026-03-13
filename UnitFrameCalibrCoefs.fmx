@@ -1,0 +1,72 @@
+object FrameCalibrCoefs: TFrameCalibrCoefs
+  Size.Width = 850.000000000000000000
+  Size.Height = 619.000000000000000000
+  Size.PlatformDefault = False
+  object Layout1: TLayout
+    Position.X = 64.000000000000000000
+    Position.Y = 48.000000000000000000
+    Size.Width = 713.000000000000000000
+    Size.Height = 185.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object Grid1: TGrid
+      Align = Client
+      CanFocus = True
+      ClipChildren = True
+      Size.Width = 713.000000000000000000
+      Size.Height = 145.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Viewport.Width = 693.000000000000000000
+      Viewport.Height = 120.000000000000000000
+      object CheckColumnCoefEnable: TCheckColumn
+        HeaderSettings.TextSettings.WordWrap = False
+      end
+    end
+    object ToolBar1: TToolBar
+      Size.Width = 713.000000000000000000
+      Size.Height = 40.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      object SpeedButtonCoefsClear: TSpeedButton
+        Align = Left
+        Size.Width = 57.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'pagecurltoolbutton'
+        Text = 'SpeedButtonCoefsClear'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCoefDelete: TSpeedButton
+        Align = Left
+        Position.X = 57.000000000000000000
+        Size.Width = 49.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'trashtoolbutton'
+        Text = 'SpeedButtonCoefDelete'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCefAdd: TSpeedButton
+        Align = Left
+        Position.X = 106.000000000000000000
+        Size.Width = 56.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'additembutton'
+        Text = 'SpeedButtonCefAdd'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCoefsRefresh: TSpeedButton
+        Align = Left
+        Position.X = 162.000000000000000000
+        Size.Width = 64.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'refreshtoolbutton'
+        Text = 'SpeedButtonCoefsRefresh'
+        TextSettings.Trimming = None
+      end
+    end
+  end
+end
