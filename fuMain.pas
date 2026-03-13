@@ -26,7 +26,7 @@ uses
   FMX.TabControl, FMX.Menus, System.Actions, FMX.ActnList, FMX.ListView.Types,
   FMX.ListView.Appearances, FMX.ListView.Adapters.Base, FMX.Memo.Types,
   FMX.Memo, FMX.DateTimeCtrls, FMX.TreeView, FMX.ListView,
-  System.IniFiles;
+  System.IniFiles, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart;
 
 
 
@@ -514,7 +514,6 @@ type
     ActionSessionNew: TAction;
     ActionSessionSynchTable: TAction;
     ComboBoxUnitsResult: TComboBox;
-    LabelSessionDate: TLabel;
     ButtonSessionClose: TButton;
     PopupMenuTreeViewDevices: TPopupMenu;
     PopupMenuGridDataPoints: TPopupMenu;
@@ -543,6 +542,21 @@ type
     Line9: TLine;
     LayoutTop: TLayout;
     LayoutMiddle: TLayout;
+    TabControlSessionProperties: TTabControl;
+    TabItemSessionProperties: TTabItem;
+    TabItemCalculations: TTabItem;
+    GridCoefs: TGrid;
+    StringColumnCoefTableName: TStringColumn;
+    StringColumn2: TStringColumn;
+    LabelSessionDate: TLabel;
+    LabelCoefs: TLabel;
+    SpeedButton2: TSpeedButton;
+    SpeedButton3: TSpeedButton;
+    SpeedButton5: TSpeedButton;
+    Chart1: TChart;
+    TabItemCalibrCoefs: TTabItem;
+    TabItemReport: TTabItem;
+    LayoutSessionProperties: TLayout;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -1590,14 +1604,15 @@ begin
       FSessionEtalon.Device := nil;
   end;
 
-  UnitName := Trim(ComboEditUnits.Text);
-  if (UnitName = '') and (ComboBoxUnitsResult <> nil) then
+
+  if (ComboBoxUnitsResult <> nil) then
     UnitName := Trim(ComboBoxUnitsResult.Text);
 
   if UnitName <> '' then
   begin
     QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
     SetSessionDim(UnitName, QuantityUnitName);
+    UpdateGridDataPointsHeaders(QuantityUnitName, UnitName);
   end;
 
   if (Device <> nil) then
@@ -3917,23 +3932,8 @@ var
   UnitName: string;
   QuantityUnitName: string;
 begin
-  UnitSource := nil;
-  if Sender is TComboBox then
-    UnitSource := TComboBox(Sender);
 
-  if UnitSource <> nil then
-    UnitName := Trim(UnitSource.Text)
-  else
-    UnitName := Trim(ComboEditUnits.Text);
-
-  if UnitName = '' then
-    Exit;
-
-  QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
-  SetSessionDim(UnitName, QuantityUnitName);
   UpdateSessionItems;
-
-  UpdateGridDataPointsHeaders(QuantityUnitName, UnitName);
   UpdateGridDataPoints;
 end;
 

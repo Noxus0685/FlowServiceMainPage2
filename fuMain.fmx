@@ -3306,16 +3306,6 @@ object FormMain: TFormMain
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 37
-            object LabelSessionDate: TLabel
-              Align = Left
-              Margins.Left = 10.000000000000000000
-              Position.X = 10.000000000000000000
-              Size.Width = 95.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              Text = #1057#1077#1089#1089#1080#1103
-              TabOrder = 0
-            end
           end
           object Layout20: TLayout
             Align = Left
@@ -3870,6 +3860,163 @@ object FormMain: TFormMain
             Size.Height = 675.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
+            object TabControlSessionProperties: TTabControl
+              Align = Client
+              Size.Width = 348.000000000000000000
+              Size.Height = 675.000000000000000000
+              Size.PlatformDefault = False
+              TabIndex = 0
+              TabOrder = 1
+              TabPosition = PlatformDefault
+              Sizes = (
+                348s
+                649s
+                348s
+                649s
+                348s
+                649s
+                348s
+                649s)
+              object TabItemSessionProperties: TTabItem
+                CustomIcon = <
+                  item
+                  end>
+                TextSettings.Trimming = None
+                IsSelected = True
+                Size.Width = 71.000000000000000000
+                Size.Height = 26.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = ''
+                TabOrder = 0
+                Text = #1057#1074#1086#1081#1089#1090#1074#1072
+                object LayoutSessionProperties: TLayout
+                  Align = Client
+                  Size.Width = 348.000000000000000000
+                  Size.Height = 649.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 0
+                  object LabelCoefs: TLabel
+                    Position.X = 16.000000000000000000
+                    Position.Y = 109.000000000000000000
+                    Text = #1050#1086#1101#1092#1080#1094#1080#1077#1085#1090#1099
+                    TabOrder = 1
+                  end
+                  object LabelSessionDate: TLabel
+                    Margins.Left = 10.000000000000000000
+                    Position.X = 14.000000000000000000
+                    Position.Y = 16.000000000000000000
+                    Size.Width = 95.000000000000000000
+                    Size.Height = 25.000000000000000000
+                    Size.PlatformDefault = False
+                    Text = #1057#1077#1089#1089#1080#1103
+                    TabOrder = 0
+                  end
+                  object SpeedButton2: TSpeedButton
+                    Position.X = 18.000000000000000000
+                    Position.Y = 125.000000000000000000
+                    Size.Width = 41.000000000000000000
+                    Size.Height = 22.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'composetoolbutton'
+                    Text = 'SpeedButton2'
+                    TextSettings.Trimming = None
+                  end
+                  object SpeedButton3: TSpeedButton
+                    Position.X = 104.000000000000000000
+                    Position.Y = 125.000000000000000000
+                    Size.Width = 41.000000000000000000
+                    Size.Height = 22.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'composetoolbutton'
+                    Text = 'SpeedButton2'
+                    TextSettings.Trimming = None
+                  end
+                  object SpeedButton5: TSpeedButton
+                    Position.X = 63.000000000000000000
+                    Position.Y = 125.000000000000000000
+                    Size.Width = 41.000000000000000000
+                    Size.Height = 22.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'composetoolbutton'
+                    Text = 'SpeedButton2'
+                    TextSettings.Trimming = None
+                  end
+                  object Chart1: TChart
+                    Position.X = -96.000000000000000000
+                    Position.Y = 204.000000000000000000
+                    Foot.Font.StyleExt = {00040000000200000004000000}
+                    Legend.Title.Font.StyleExt = {00070000000000000004000000}
+                    SubFoot.Font.StyleExt = {00040000000200000004000000}
+                    Title.Text.Strings = (
+                      'TChart')
+                    Zoom.Brush.Kind = None
+                    Zoom.Pen.Fill.Color = claSilver
+                    TabOrder = 5
+                    Size.Width = 273.000000000000000000
+                    Size.Height = 209.000000000000000000
+                    Size.PlatformDefault = False
+                    ColorPaletteIndex = 13
+                  end
+                end
+              end
+              object TabItemCalculations: TTabItem
+                CustomIcon = <
+                  item
+                  end>
+                TextSettings.Trimming = None
+                IsSelected = False
+                Size.Width = 65.000000000000000000
+                Size.Height = 26.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = ''
+                TabOrder = 0
+                Text = #1056#1072#1089#1095#1105#1090#1099
+                object GridCoefs: TGrid
+                  CanFocus = True
+                  ClipChildren = True
+                  Position.X = 24.000000000000000000
+                  Position.Y = 190.000000000000000000
+                  Size.Width = 297.000000000000000000
+                  Size.Height = 219.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 0
+                  Viewport.Width = 277.000000000000000000
+                  Viewport.Height = 194.000000000000000000
+                  object StringColumnCoefTableName: TStringColumn
+                    HeaderSettings.TextSettings.WordWrap = False
+                  end
+                  object StringColumn2: TStringColumn
+                    HeaderSettings.TextSettings.WordWrap = False
+                  end
+                end
+              end
+              object TabItemCalibrCoefs: TTabItem
+                CustomIcon = <
+                  item
+                  end>
+                TextSettings.Trimming = None
+                IsSelected = False
+                Size.Width = 75.000000000000000000
+                Size.Height = 26.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = ''
+                TabOrder = 0
+                Text = #1055#1086#1087#1088#1072#1074#1082#1080
+              end
+              object TabItemReport: TTabItem
+                CustomIcon = <
+                  item
+                  end>
+                TextSettings.Trimming = None
+                IsSelected = False
+                Size.Width = 61.000000000000000000
+                Size.Height = 26.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = ''
+                TabOrder = 0
+                Text = #1054#1090#1095#1077#1090#1099
+              end
+            end
           end
         end
       end

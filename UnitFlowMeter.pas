@@ -208,10 +208,7 @@ private
   procedure SetValueCurrent(const AValue: TMeterValue);
   procedure SetValueTime(const AValue: TMeterValue);
 
-  procedure InitValues;
-  procedure ApplyMeasurementModel;
-  procedure ApplyError;
-  procedure ApplyCalibrCoefsToValue;
+
   procedure CopyValues(const AEtalonMeter: TFlowMeter);
 
 public
@@ -394,6 +391,11 @@ public
   procedure Init; overload;
   procedure Init(UUID: string); overload;
   procedure SetValues;
+
+  procedure InitValues;
+  procedure ApplyMeasurementModel;
+  procedure ApplyError;
+  procedure ApplyCalibrCoefsToValue;
 
 end;
 implementation
