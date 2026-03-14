@@ -1,0 +1,181 @@
+object FrameCalibrCoefs: TFrameCalibrCoefs
+  Size.Width = 850.000000000000000000
+  Size.Height = 618.000000000000000000
+  Size.PlatformDefault = False
+  object Layout1: TLayout
+    Align = Client
+    Size.Width = 850.000000000000000000
+    Size.Height = 618.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object GridCoefs: TGrid
+      Align = Client
+      CanFocus = True
+      ClipChildren = True
+      Size.Width = 850.000000000000000000
+      Size.Height = 264.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Viewport.Width = 830.000000000000000000
+      Viewport.Height = 223.000000000000000000
+      object CheckColumnCoefEnable: TCheckColumn
+        Header = #1042#1082#1083
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+        Size.Width = 33.000000000000000000
+      end
+      object StringColumnCoefNum: TStringColumn
+        HeaderSettings.TextSettings.WordWrap = False
+        Size.Width = 39.000000000000000000
+      end
+      object StringColumnCoefValue: TStringColumn
+        Header = #1069#1090#1072#1083#1086#1085', '
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnCoefArg: TStringColumn
+        Header = #1055#1088#1080#1073#1086#1088' '#1080#1089#1093', '
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnCoefInitError: TStringColumn
+        Header = #1055#1086#1075#1088' '#1080#1089#1093', %'
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnCoefCalcError: TStringColumn
+        Header = #1055#1086#1075#1088' '#1088#1072#1089#1095', %'
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnCoefK: TStringColumn
+        Header = #1050#1086#1101#1092'-'#1085#1090' K'
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnCoefb: TStringColumn
+        Header = #1050#1086#1101#1092'-'#1085#1090' b'
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnCoefFrom: TStringColumn
+        Header = #1044#1080#1072#1087#1072#1079#1086#1085' '#1086#1090
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnCoefTo: TStringColumn
+        Header = #1044#1080#1072#1087#1072#1079#1086#1085' '#1076#1086
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+    end
+    object ToolBar1: TToolBar
+      Size.Width = 850.000000000000000000
+      Size.Height = 40.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      object SpeedButtonCoefsClear: TSpeedButton
+        Align = Left
+        Size.Width = 57.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'pagecurltoolbutton'
+        Text = 'SpeedButtonCoefsClear'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCoefDelete: TSpeedButton
+        Align = Left
+        Position.X = 57.000000000000000000
+        Size.Width = 49.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'trashtoolbutton'
+        Text = 'SpeedButtonCoefDelete'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCefAdd: TSpeedButton
+        Align = Left
+        Position.X = 106.000000000000000000
+        Size.Width = 56.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'additembutton'
+        Text = 'SpeedButtonCefAdd'
+        TextSettings.Trimming = None
+      end
+      object SpeedButtonCoefsRefresh: TSpeedButton
+        Align = Left
+        Position.X = 162.000000000000000000
+        Size.Width = 64.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'refreshtoolbutton'
+        Text = 'SpeedButtonCoefsRefresh'
+        TextSettings.Trimming = None
+      end
+      object LabelCoefTable: TLabel
+        Position.X = 234.000000000000000000
+        Position.Y = 15.000000000000000000
+        Size.Width = 143.000000000000000000
+        Size.Height = 17.000000000000000000
+        Size.PlatformDefault = False
+        Text = #1058#1072#1073#1083#1080#1094#1072' '#1082#1086#1101#1092#1080#1094#1080#1077#1085#1090#1086#1074
+        TabOrder = 0
+      end
+      object ComboBoxCoefTables: TComboBox
+        Position.X = 416.000000000000000000
+        Position.Y = 10.000000000000000000
+        Size.Width = 145.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+      end
+    end
+    object Layout2: TLayout
+      Align = Bottom
+      Position.Y = 304.000000000000000000
+      Size.Width = 850.000000000000000000
+      Size.Height = 314.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      object Layout3: TLayout
+        Align = Right
+        Position.X = 640.000000000000000000
+        Size.Width = 210.000000000000000000
+        Size.Height = 314.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        object ComboBox1: TComboBox
+          Position.X = 32.000000000000000000
+          Position.Y = 32.000000000000000000
+          Size.Width = 137.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+        end
+      end
+      object Layout4: TLayout
+        Align = Client
+        Size.Width = 640.000000000000000000
+        Size.Height = 314.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        object Chart1: TChart
+          Foot.Font.StyleExt = {00040000000200000004000000}
+          Legend.Title.Font.StyleExt = {00070000000000000004000000}
+          SubFoot.Font.StyleExt = {00040000000200000004000000}
+          Title.Text.Strings = (
+            'TChart')
+          Zoom.Brush.Kind = None
+          Zoom.Pen.Fill.Color = claSilver
+          Align = Client
+          TabOrder = 0
+          Size.Width = 640.000000000000000000
+          Size.Height = 314.000000000000000000
+          Size.PlatformDefault = False
+          ColorPaletteIndex = 13
+        end
+      end
+    end
+  end
+end
