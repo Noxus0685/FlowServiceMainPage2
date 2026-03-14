@@ -251,7 +251,7 @@ type
 
 
 
-    function DeviceExistsInDB(AID: Integer): Boolean;
+    function DeviceExistsInDB(const AUUID: string): Boolean;
     function ShouldSaveDevice(ADevice: TDevice): Boolean;
 
     function GenerateDevicePointID: Integer;
@@ -286,7 +286,7 @@ function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
     procedure AssertCalibrCoefSchema;
 
     { ================= DB : CALIB COEF ================= }
-    function LoadCalibrCoefByDevice(ADeviceID: Integer): Boolean;
+    function LoadCalibrCoefByDevice(const ADeviceUUID: string): Boolean;
     function UpdateCalibrCoef(ADevice: TDevice): Boolean;
 
 
@@ -3755,20 +3755,20 @@ begin
   end;
 end;
 
-function TDeviceRepository.DeviceExistsInDB(AID: Integer): Boolean;
+function TDeviceRepository.DeviceExistsInDB(const AUUID: string): Boolean;
 var
   Q: TFDQuery;
 begin
   Result := False;
 
-  if (FDM = nil) or (AID <= 0) then
+  if (FDM = nil) or (Trim(AUUID) = '') then
     Exit;
 
   Q := FDM.CreateQuery;
   try
     Q.SQL.Text :=
-      'select 1 from Devices where ID = :ID limit 1';
-    SetIntParam(Q, 'ID', AID);
+      'select 1 from Devices where UUID = :UUID limit 1';
+    SetStrParam(Q, 'UUID', Trim(AUUID));
     Q.Open;
     Result := not Q.Eof;
   finally
@@ -3791,7 +3791,8 @@ end;
 function TDeviceRepository.Save: Boolean;
 var
   D: TDevice;
-  SeenIDs: TDictionary<Integer, TDevice>;
+  SeenUUIDs: TDictionary<string, TDevice>;
+  DeviceUUID: string;
 begin
   Result := False;
 
@@ -3801,35 +3802,34 @@ begin
   {--------------------------------------------------}
   { ЖЁСТКАЯ ПРОВЕРКА ЦЕЛОСТНОСТИ (до транзакции) }
   {--------------------------------------------------}
-  SeenIDs := TDictionary<Integer, TDevice>.Create;
+  SeenUUIDs := TDictionary<string, TDevice>.Create;
   try
     for D in FDevices do
     begin
-      { ID обязан быть валидным }
-      if D.ID <= 0 then
+      DeviceUUID := Trim(D.UUID);
+
+      { UUID обязан быть валидным }
+      if DeviceUUID = '' then
+        raise Exception.Create('Device with invalid UUID detected (UUID is empty)');
+
+      { запрет дубликатов UUID в памяти }
+      if SeenUUIDs.ContainsKey(DeviceUUID) then
         raise Exception.CreateFmt(
-          'Device with invalid ID detected (ID=%d)',
-          [D.ID]
+          'Duplicate device UUID in memory: %s',
+          [DeviceUUID]
         );
 
-      { запрет дубликатов ID в памяти }
-      if SeenIDs.ContainsKey(D.ID) then
-        raise Exception.CreateFmt(
-          'Duplicate device ID in memory: %d',
-          [D.ID]
-        );
-
-      SeenIDs.Add(D.ID, D);
+      SeenUUIDs.Add(DeviceUUID, D);
 
       { osNew допустим только если записи нет в БД }
-      if (D.State = osNew) and DeviceExistsInDB(D.ID) then
+      if (D.State = osNew) and DeviceExistsInDB(DeviceUUID) then
         raise Exception.CreateFmt(
-          'Attempt to INSERT existing device ID=%d',
-          [D.ID]
+          'Attempt to INSERT existing device UUID=%s',
+          [DeviceUUID]
         );
     end;
   finally
-    SeenIDs.Free;
+    SeenUUIDs.Free;
   end;
 
   {--------------------------------------------------}
@@ -3871,11 +3871,8 @@ begin
     Exit;
 
   { базовая защита }
-  if ADevice.ID <= 0 then
-    raise Exception.CreateFmt(
-      'Device with invalid ID detected (ID=%d)',
-      [ADevice.ID]
-    );
+  if Trim(ADevice.UUID) = '' then
+    raise Exception.Create('Device with invalid UUID detected (UUID is empty)');
 
   if not ShouldSaveDevice(ADevice) then
     Exit(True);
@@ -4300,7 +4297,7 @@ begin
       LoadDevicePointsByDevice(Result.ID);
       LoadSpillageSessionsByDevice(Result.UUID);
       LoadSpillagesByDevice(Result.UUID);
-      LoadCalibrCoefByDevice(Result.ID);
+      LoadCalibrCoefByDevice(Result.UUID);
     end;
 
   finally
@@ -4361,7 +4358,7 @@ begin
     if not LoadSpillagesByDevice(NewD.UUID) then
       raise Exception.Create('Не удалось загрузить проливы');
 
-    if not LoadCalibrCoefByDevice(NewD.ID) then
+    if not LoadCalibrCoefByDevice(NewD.UUID) then
       raise Exception.Create('Не удалось загрузить таблицу калибровочных коэффициентов');
 
         Q.Next;
@@ -4463,13 +4460,13 @@ begin
           Q.ExecSQL;
 
           Q.SQL.Text :=
-            'delete from CalibrCoefItem where TableID in (select ID from CalibrCoefTable where DeviceID = :DeviceID)';
-          SetIntParam(Q, 'DeviceID', ADevice.ID);
+            'delete from CalibrCoefItem where TableID in (select ID from CalibrCoefTable where DeviceUUID = :DeviceUUID)';
+          SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
           Q.ExecSQL;
 
           Q.SQL.Text :=
-            'delete from CalibrCoefTable where DeviceID = :DeviceID';
-          SetIntParam(Q, 'DeviceID', ADevice.ID);
+            'delete from CalibrCoefTable where DeviceUUID = :DeviceUUID';
+          SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
           Q.ExecSQL;
 
           Exit(True);
@@ -4798,10 +4795,10 @@ var
 begin
   Result := False;
 
-  if (ADeviceID <= 0) or (FDM = nil) then
+  if (Trim(ADeviceUUID) = '') or (FDM = nil) then
     Exit;
 
-  Device := FindDeviceByID(ADeviceID);
+  Device := FindDeviceByUUID(ADeviceUUID);
   if (Device = nil) then
     Exit;
 
@@ -5080,14 +5077,48 @@ begin
     Col('QFrom', 'REAL'),
     Col('QTo', 'REAL'),
     Col('K', 'REAL'),
-    Col('b', 'REAL')
+    Col('b', 'REAL'),
+    Col('Enable', 'INTEGER')
   ];
 end;
 
 procedure TDeviceRepository.EnsureCalibrCoefSchema;
+var
+  Cols: TStringList;
+  Q: TFDQuery;
+  I: Integer;
 begin
   FDM.EnsureTable('CalibrCoefTable', RequiredCalibrCoefTableColumns);
   FDM.EnsureTable('CalibrCoefItem', RequiredCalibrCoefItemColumns);
+
+  Cols := FDM.GetTableColumns('CalibrCoefTable');
+  try
+    for I := 0 to Cols.Count - 1 do
+      Cols[I] := UpperCase(Trim(Cols[I]));
+
+    if (Cols.IndexOf('DEVICEID') >= 0) and (Cols.IndexOf('DEVICEUUID') >= 0) then
+    begin
+      Q := FDM.CreateQuery;
+      try
+        Q.SQL.Text :=
+          'select 1 from sqlite_master where type = ''table'' and name = ''Devices'' limit 1';
+        Q.Open;
+        if not Q.Eof then
+        begin
+          Q.Close;
+          Q.SQL.Text :=
+            'update CalibrCoefTable ' +
+            'set DeviceUUID = (select UUID from Devices where Devices.ID = CalibrCoefTable.DeviceID) ' +
+            'where coalesce(trim(DeviceUUID), '''') = '''' and DeviceID is not null';
+          Q.ExecSQL;
+        end;
+      finally
+        Q.Free;
+      end;
+    end;
+  finally
+    Cols.Free;
+  end;
 end;
 
 procedure TDeviceRepository.AssertCalibrCoefSchema;
@@ -5133,7 +5164,7 @@ begin
   end;
 end;
 
-function TDeviceRepository.LoadCalibrCoefByDevice(ADeviceID: Integer): Boolean;
+function TDeviceRepository.LoadCalibrCoefByDevice(const ADeviceUUID: string): Boolean;
 var
   Device: TDevice;
   QTable: TFDQuery;
@@ -5142,17 +5173,18 @@ var
 begin
   Result := False;
 
-  if (ADeviceID <= 0) or (FDM = nil) then
+  if (Trim(ADeviceUUID) = '') or (FDM = nil) then
     Exit;
 
-  Device := FindDeviceByID(ADeviceID);
+  Device := FindDeviceByUUID(ADeviceUUID);
   if Device = nil then
     Exit;
 
   if Device.CalibrCoefTable = nil then
     Device.CalibrCoefTable := TCalibrCoefTable.Create;
 
-  Device.CalibrCoefTable.DeviceID := ADeviceID;
+  Device.CalibrCoefTable.DeviceID := Device.ID;
+  Device.CalibrCoefTable.DeviceUUID := Device.UUID;
   Device.CalibrCoefTable.ID := 0;
   Device.CalibrCoefTable.UUID := '';
   Device.CalibrCoefTable.&Type := 0;
@@ -5165,15 +5197,15 @@ begin
   QTable := FDM.CreateQuery;
   try
     QTable.SQL.Text :=
-      'select * from CalibrCoefTable where DeviceID = :DeviceID order by Active desc, AppliedAt desc, ID desc limit 1';
-    SetIntParam(QTable, 'DeviceID', ADeviceID);
+      'select * from CalibrCoefTable where DeviceUUID = :DeviceUUID order by Active desc, AppliedAt desc, ID desc limit 1';
+    SetStrParam(QTable, 'DeviceUUID', Trim(ADeviceUUID));
     QTable.Open;
 
     if not QTable.Eof then
     begin
       Device.CalibrCoefTable.ID := QTable.FieldByName('ID').AsInteger;
       Device.CalibrCoefTable.UUID := QTable.FieldByName('UUID').AsString;
-      Device.CalibrCoefTable.DeviceID := QTable.FieldByName('DeviceID').AsInteger;
+      Device.CalibrCoefTable.DeviceUUID := QTable.FieldByName('DeviceUUID').AsString;
       Device.CalibrCoefTable.&Type := QTable.FieldByName('Type').AsInteger;
       Device.CalibrCoefTable.Active := QTable.FieldByName('Active').AsInteger <> 0;
       Device.CalibrCoefTable.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
@@ -5199,6 +5231,7 @@ begin
           Item.QTo := QItem.FieldByName('QTo').AsFloat;
           Item.K := QItem.FieldByName('K').AsFloat;
           Item.b := QItem.FieldByName('b').AsFloat;
+          Item.Enable := ReadFieldBoolDef(QItem, 'Enable', True);
           Device.CalibrCoefTable.Items.Add(Item);
           QItem.Next;
         end;
@@ -5225,6 +5258,7 @@ begin
     Exit(True);
 
   ADevice.CalibrCoefTable.DeviceID := ADevice.ID;
+  ADevice.CalibrCoefTable.DeviceUUID := ADevice.UUID;
   if ADevice.CalibrCoefTable.UUID = '' then
     ADevice.CalibrCoefTable.UUID := TGUID.NewGuid.ToString;
 
@@ -5233,17 +5267,17 @@ begin
     if ADevice.CalibrCoefTable.ID > 0 then
     begin
       Q.SQL.Text :=
-        'update CalibrCoefTable set UUID=:UUID, DeviceID=:DeviceID, Type=:Type, Active=:Active, AppliedAt=:AppliedAt, Name=:Name, Comment=:Comment where ID=:ID';
+        'update CalibrCoefTable set UUID=:UUID, DeviceUUID=:DeviceUUID, Type=:Type, Active=:Active, AppliedAt=:AppliedAt, Name=:Name, Comment=:Comment where ID=:ID';
       SetIntParam(Q, 'ID', ADevice.CalibrCoefTable.ID);
     end
     else
     begin
       Q.SQL.Text :=
-        'insert into CalibrCoefTable (UUID, DeviceID, Type, Active, AppliedAt, Name, Comment) values (:UUID, :DeviceID, :Type, :Active, :AppliedAt, :Name, :Comment)';
+        'insert into CalibrCoefTable (UUID, DeviceUUID, Type, Active, AppliedAt, Name, Comment) values (:UUID, :DeviceUUID, :Type, :Active, :AppliedAt, :Name, :Comment)';
     end;
 
     SetStrParam(Q, 'UUID', ADevice.CalibrCoefTable.UUID);
-    SetIntParam(Q, 'DeviceID', ADevice.CalibrCoefTable.DeviceID);
+    SetStrParam(Q, 'DeviceUUID', ADevice.CalibrCoefTable.DeviceUUID);
     SetIntParam(Q, 'Type', ADevice.CalibrCoefTable.&Type);
     SetIntParam(Q, 'Active', Ord(ADevice.CalibrCoefTable.Active));
     SetDateTimeParam(Q, 'AppliedAt', ADevice.CalibrCoefTable.AppliedAt);
@@ -5262,8 +5296,8 @@ begin
     if ADevice.CalibrCoefTable.Active then
     begin
       Q.SQL.Text :=
-        'update CalibrCoefTable set Active = 0 where DeviceID = :DeviceID and Type = :Type and ID <> :ID';
-      SetIntParam(Q, 'DeviceID', ADevice.CalibrCoefTable.DeviceID);
+        'update CalibrCoefTable set Active = 0 where DeviceUUID = :DeviceUUID and Type = :Type and ID <> :ID';
+      SetStrParam(Q, 'DeviceUUID', ADevice.CalibrCoefTable.DeviceUUID);
       SetIntParam(Q, 'Type', ADevice.CalibrCoefTable.&Type);
       SetIntParam(Q, 'ID', TableID);
       Q.ExecSQL;
@@ -5281,8 +5315,8 @@ begin
       if Item.UUID = '' then
         Item.UUID := TGUID.NewGuid.ToString;
       Q.SQL.Text :=
-        'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, K, b) ' +
-        'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :K, :b)';
+        'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, K, b, Enable) ' +
+        'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :K, :b, :Enable)';
       SetStrParam(Q, 'UUID', Item.UUID);
       SetIntParam(Q, 'TableID', Item.TableID);
       SetIntParam(Q, 'OrderNo', Item.OrderNo);
@@ -5293,6 +5327,7 @@ begin
       SetFloatParam(Q, 'QTo', Item.QTo);
       SetFloatParam(Q, 'K', Item.K);
       SetFloatParam(Q, 'b', Item.b);
+      SetIntParam(Q, 'Enable', Ord(Item.Enable));
       Q.ExecSQL;
     end;
 
