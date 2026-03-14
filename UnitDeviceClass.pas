@@ -284,6 +284,7 @@ type
     QTo: Double;
     K: Double;
     b: Double;
+    Enable: Boolean;            // Используется ли точка в расчётах K и P
 
     function InRange(Q: Double): Boolean;
   end;
@@ -293,6 +294,7 @@ type
     ID: Integer;
     UUID: string;
     DeviceID: Integer;
+    DeviceUUID: string;
     &Type: Integer;
     Active: Boolean;
     AppliedAt: TDateTime;
@@ -497,6 +499,7 @@ begin
   FPoints    := TObjectList<TDevicePoint>.Create(True);
   FCalibrCoefTable := TCalibrCoefTable.Create;
   FCalibrCoefTable.DeviceID := ID;
+  FCalibrCoefTable.DeviceUUID := UUID;
 
   {----------------------------------}
   { Идентификация }
@@ -894,6 +897,7 @@ begin
   FCalibrCoefTable.ID := 0;
   FCalibrCoefTable.UUID := '';
   FCalibrCoefTable.DeviceID := ID;
+  FCalibrCoefTable.DeviceUUID := UUID;
   FCalibrCoefTable.&Type := 0;
   FCalibrCoefTable.Active := False;
   FCalibrCoefTable.AppliedAt := 0;
@@ -943,11 +947,18 @@ begin
   if (Items = nil) or (Items.Count = 0) then
     Exit;
 
-  LastIndex := Items.Count - 1;
+  LastIndex := -1;
+  for I := 0 to Items.Count - 1 do
+    if (Items[I] <> nil) and Items[I].Enable then
+      LastIndex := I;
+
+  if LastIndex < 0 then
+    Exit;
+
   for I := 0 to LastIndex do
   begin
     Item := Items[I];
-    if Item = nil then
+    if (Item = nil) or (not Item.Enable) then
       Continue;
 
     if (Q >= Item.QFrom) and ((Q < Item.QTo) or ((I = LastIndex) and (Q <= Item.QTo))) then

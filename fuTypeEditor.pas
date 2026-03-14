@@ -882,6 +882,7 @@ begin
   Item.Arg := 0;
   Item.K := 1;
   Item.b := 0;
+  Item.Enable := True;
   FCalibrCoefItemsLocal.Add(Item);
   UpdateCoefsGrid;
   if FGridCoefs.RowCount > 0 then
