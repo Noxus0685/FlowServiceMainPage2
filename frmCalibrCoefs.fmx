@@ -25,7 +25,9 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         Size.Width = 33.000000000000000000
       end
       object StringColumnCoefNum: TStringColumn
+        Header = #8470
         HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
         Size.Width = 39.000000000000000000
       end
       object StringColumnCoefValue: TStringColumn
