@@ -30,11 +30,13 @@ type
     Layout2: TLayout;
     Layout3: TLayout;
     Layout4: TLayout;
-    Chart1: TChart;
+    ChartCoefs: TChart;
     ComboBox1: TComboBox;
     LabelCoefTable: TLabel;
     ComboBoxCoefTables: TComboBox;
     StringColumnCoefNum: TStringColumn;
+    SpeedButtonCoefGetPoints: TSpeedButton;
+    ComboBoxUnitsCoefs: TComboBox;
   private
     { Private declarations }
   public

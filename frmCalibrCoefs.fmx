@@ -16,8 +16,8 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Size.Height = 264.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
-      Viewport.Width = 830.000000000000000000
-      Viewport.Height = 223.000000000000000000
+      Viewport.Width = 850.000000000000000000
+      Viewport.Height = 264.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False
@@ -116,21 +116,52 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         TextSettings.Trimming = None
       end
       object LabelCoefTable: TLabel
-        Position.X = 234.000000000000000000
-        Position.Y = 15.000000000000000000
+        Align = Right
+        Position.X = 562.000000000000000000
         Size.Width = 143.000000000000000000
-        Size.Height = 17.000000000000000000
+        Size.Height = 40.000000000000000000
         Size.PlatformDefault = False
         Text = #1058#1072#1073#1083#1080#1094#1072' '#1082#1086#1101#1092#1080#1094#1080#1077#1085#1090#1086#1074
-        TabOrder = 0
+        TabOrder = 1
       end
       object ComboBoxCoefTables: TComboBox
-        Position.X = 416.000000000000000000
+        Align = Right
+        Margins.Top = 10.000000000000000000
+        Margins.Bottom = 10.000000000000000000
+        Position.X = 705.000000000000000000
         Position.Y = 10.000000000000000000
         Size.Width = 145.000000000000000000
-        Size.Height = 22.000000000000000000
+        Size.Height = 20.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 1
+        TabOrder = 2
+      end
+      object SpeedButtonCoefGetPoints: TSpeedButton
+        Align = Left
+        Position.X = 226.000000000000000000
+        Size.Width = 64.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'organizetoolbutton'
+        Text = 'SpeedButtonCoefsRefresh'
+        TextSettings.Trimming = None
+      end
+      object ComboBoxUnitsCoefs: TComboBox
+        Touch.InteractiveGestures = [LongTap, DoubleTap]
+        Align = Left
+        Items.Strings = (
+          #1084'3/'#1095)
+        ItemIndex = 0
+        ItemHeight = 19.000000000000000000
+        Margins.Left = 50.000000000000000000
+        Margins.Top = 10.000000000000000000
+        Margins.Right = 10.000000000000000000
+        Margins.Bottom = 10.000000000000000000
+        Position.X = 340.000000000000000000
+        Position.Y = 10.000000000000000000
+        Size.Width = 103.000000000000000000
+        Size.Height = 20.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
       end
     end
     object Layout2: TLayout
@@ -162,7 +193,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         Size.Height = 314.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        object Chart1: TChart
+        object ChartCoefs: TChart
           Foot.Font.StyleExt = {00040000000200000004000000}
           Legend.Title.Font.StyleExt = {00070000000000000004000000}
           SubFoot.Font.StyleExt = {00040000000200000004000000}
