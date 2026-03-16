@@ -621,8 +621,34 @@ begin
 end;
 
 procedure TFrameCalibrCoefs.SpeedButtonAddTableClick(Sender: TObject);
+var
+  Device: TDevice;
+  Table: TCalibrCoefTable;
+  ExistingTable: TCalibrCoefTable;
+  Stamp: TDateTime;
 begin
-//Метод добавления таблицы
+  if (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+
+  Device := FFlowMeter.Device;
+
+  Stamp := Now;
+  Table := TCalibrCoefTable.Create;
+  Table.DeviceID := Device.ID;
+  Table.DeviceUUID := Device.UUID;
+  Table.&Type := Ord(FCurrentType);
+  Table.Active := True;
+  Table.AppliedAt := Stamp;
+  Table.Name := FormatDateTime('dd.mm.yyyy hh:nn:ss', Stamp);
+
+  for ExistingTable in Device.CalibrCoefTables do
+    if (ExistingTable <> nil) and (ExistingTable.&Type = Ord(FCurrentType)) then
+      ExistingTable.Active := False;
+
+  Device.CalibrCoefTables.Add(Table);
+  FillCoefTables;
+  UpdateGrid;
+  UpdateChart;
 end;
 
 procedure TFrameCalibrCoefs.SpeedButtonCefAddClick(Sender: TObject);
@@ -691,8 +717,34 @@ begin
 end;
 
 procedure TFrameCalibrCoefs.SpeedButtonDeleteTableClick(Sender: TObject);
+var
+  Device: TDevice;
+  TableToDelete: TCalibrCoefTable;
+  I: Integer;
 begin
-//Метод удаления таблицы
+  if (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+
+  if (ComboBoxCoefTable.ItemIndex < 0) or (FCurrentTable = nil) then
+    Exit;
+
+  Device := FFlowMeter.Device;
+  TableToDelete := FCurrentTable;
+
+  Device.CalibrCoefTables.Remove(TableToDelete);
+
+  if TableToDelete.Active then
+    for I := 0 to Device.CalibrCoefTables.Count - 1 do
+      if (Device.CalibrCoefTables[I] <> nil) and
+         (Device.CalibrCoefTables[I].&Type = Ord(FCurrentType)) then
+      begin
+        Device.CalibrCoefTables[I].Active := True;
+        Break;
+      end;
+
+  FillCoefTables;
+  UpdateGrid;
+  UpdateChart;
 end;
 
 function TFrameCalibrCoefs.TryGetSpillageValues(ASpillage: TPointSpillage; out AArg,
