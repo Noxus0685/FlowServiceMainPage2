@@ -4414,10 +4414,9 @@ begin
           NewD.UUID := TGUID.NewGuid.ToString;
           NewD.State := osModified;
           LoadErrors.Add(Format('У прибора "%s" в БД отсутствовал UUID. Присвоен новый UUID.', [NewD.Name]));
-        end;
-
-        FDevices.Add(NewD);
-
+        end
+           else
+           begin
         if not LoadDevicePointsByDevice(NewD.UUID) then
           LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [NewD.Name]));
 
@@ -4429,6 +4428,8 @@ begin
 
         if not LoadCalibrCoefByDevice(NewD.UUID) then
           LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [NewD.Name]));
+
+           end;
 
         Q.Next;
       end;
