@@ -433,6 +433,7 @@ begin
   end;
 end;
 
+
 function ReadFieldDateTimeDef(AField: TField; const ADefault: TDateTime = 0): TDateTime;
 var
   S: string;
@@ -463,6 +464,46 @@ begin
     Exit;
 
   Result := ADefault;
+end;
+
+function ReadFieldBoolDef(
+  Q: TFDQuery;
+  const AFieldName: string;
+  const ADefault: Boolean
+): Boolean;
+var
+  F: TField;
+  S: string;
+  N: Integer;
+begin
+  Result := ADefault;
+
+  if (Q = nil) then
+    Exit;
+
+  F := Q.FindField(AFieldName);
+  if (F = nil) or F.IsNull then
+    Exit;
+
+  try
+    Result := F.AsBoolean;
+    Exit;
+  except
+    { Fallback for text / numeric bool storage }
+  end;
+
+  S := Trim(LowerCase(F.AsString));
+  if S = '' then
+    Exit;
+
+  if (S = '1') or (S = 'true') or (S = 't') or (S = 'yes') or (S = 'y') then
+    Exit(True);
+
+  if (S = '0') or (S = 'false') or (S = 'f') or (S = 'no') or (S = 'n') then
+    Exit(False);
+
+  if TryStrToInt(S, N) then
+    Exit(N <> 0);
 end;
 
  {$ENDREGION}
