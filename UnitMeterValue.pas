@@ -1271,39 +1271,73 @@ end;
 function TMeterValue.Rate(Q: Double): Double;
 var
   I: Integer;
-  K: Double;
-  B: Double;
   Qetl: Double;
 begin
-  if Q = 0 then
-    Exit(1);
+  {
+    Flow calculation using calibration coefficient table.
 
-  if Coefs.Count > 0 then
+    The device produces pulses proportional to the flow rate. Normally the flow
+    could be calculated using a constant conversion coefficient:
+
+    Flow ≈ Imp * CoefBase
+
+    where:
+    Imp – pulses per unit time
+    CoefBase – factory (base) conversion coefficient
+
+    However, the real device has nonlinearity depending on the flow rate.
+    This nonlinearity is corrected using a calibration table represented by
+    the function:
+
+    Rate(Q)
+
+    where Q is the flow argument. Rate(Q) is obtained from a piecewise-linear
+    calibration function.
+
+    The real conversion coefficient therefore becomes:
+
+    Coef(Q) = CoefBase * Rate(Q)
+
+    The final flow calculation must remain in the form:
+
+    Flow = Imp * Coef(Imp)
+
+    Since the correction depends on flow, the argument for Rate() is taken from
+    the first approximation of flow using the base coefficient:
+
+    Q ≈ Imp * CoefBase
+
+    Therefore the coefficient used in calculation is:
+
+    Coef(Imp) = CoefBase * Rate(Imp * CoefBase)
+
+    And the final formula becomes:
+
+    Flow = Imp * CoefBase * Rate(Imp * CoefBase)
+
+    This effectively performs one iteration of the nonlinear correction and is
+    sufficient because the calibration correction is typically small.
+  }
+  Result := 1;
+
+  if SameValue(Q, 0, 1E-12) then
+    Exit;
+
+  if Coefs.Count = 0 then
+    Exit;
+
+  for I := 0 to Coefs.Count - 1 do
   begin
-    Qetl := 0;
-    K := 0;
-    B := 0;
+    if not Coefs[I].InUse then
+      Continue;
 
-    for I := 0 to Coefs.Count - 1 do
+    if (Q >= Coefs[I].Q1) and (Q <= Coefs[I].Q2) then
     begin
-      K := Coefs[I].K;
-      B := Coefs[I].b;
-
-      if (Q >= Coefs[I].Q1) and (Q < Coefs[I].Q2) then
-      begin
-        Qetl := K * Q + B;
-        Exit(Qetl / Q);
-      end;
-    end;
-
-    if Qetl = 0 then
-    begin
-      Qetl := K * Q + B;
-      Exit(Qetl / Q);
+      Qetl := Coefs[I].K * Q + Coefs[I].b;
+      Result := Qetl / Q;
+      Exit;
     end;
   end;
-
-  Result := 1;
 end;
 
 { Replaces calibration table and recalculates interpolation coefficients. }
@@ -2224,8 +2258,191 @@ end;
 
 { Recalculates piecewise-linear coefficient parameters after table changes. }
 procedure TMeterValue.CalcCoefs;
+var
+  I, J: Integer;
+  TempCoef: TCoef;
+  ActiveIndexes: TList<Integer>;
+  IdxCurr, IdxNext, IdxLast: Integer;
+  Arg1, Arg2: Double;
+  Value1, Value2: Double;
+  KLocal, BLocal: Double;
 begin
-  // Заглушка: вычисления коэффициентов калибровки.
+  {
+    Rebuilds piecewise-linear calibration segments from the current list of
+    calibration points.
+
+    GENERAL RULES
+
+    1. Only points with InUse = True participate in segment construction.
+       Disabled points remain in the list, but their calculated fields are cleared.
+
+    2. Active points are sorted by Arg in ascending order.
+
+    3. The full argument axis must be covered without gaps:
+         - the first active point always starts from negative infinity;
+         - the last active point always ends at positive infinity;
+         - every next segment starts exactly where the previous one ends.
+
+       Therefore, for active points P1..PN:
+         P1.Q1 = NegInfinity
+         P1.Q2 = P2.Arg
+
+         P2.Q1 = P1.Q2 = P2.Arg
+         P2.Q2 = P3.Arg
+
+         ...
+
+         PN.Q1 = PN.Arg
+         PN.Q2 = Infinity
+
+       This means all segment ranges are continuous and fully cover the domain.
+
+    4. Segment line coefficients are calculated from the current point and the
+       next active point:
+         K = (Value2 - Value1) / (Arg2 - Arg1)
+         b = Value1 - K * Arg1
+
+       So point Pi describes the segment that starts at Pi and extends up to
+       the next active point.
+
+    5. The last active point has no next point, therefore its K and b are copied
+       from the previous active point:
+         PN.K = P(N-1).K
+         PN.b = P(N-1).b
+
+       This allows the last segment to continue up to positive infinity.
+
+    6. If there is exactly one active point, a flat line is created for the whole
+       domain from negative infinity to positive infinity:
+         Q1 = NegInfinity
+         Q2 = Infinity
+         K  = 0
+         b  = Value
+
+       This is the literal interpretation of "a line without slope passing through
+       the only calibration point".
+
+    NOTES
+
+    - If two active points have the same Arg, a valid line cannot be built
+      between them due to division by zero. In this implementation such a pair
+      is skipped.
+    - Index fields are refreshed after sorting.
+    - All calculated fields of disabled or non-participating points are reset.
+  }
+
+  // Clear all calculated segment fields for every coefficient row.
+  for I := 0 to Coefs.Count - 1 do
+  begin
+    TempCoef := Coefs[I];
+    TempCoef.K := 0;
+    TempCoef.b := 0;
+    TempCoef.Q1 := 0;
+    TempCoef.Q2 := 0;
+    Coefs[I] := TempCoef;
+  end;
+
+  if Coefs.Count = 0 then
+    Exit;
+
+  // Sort all points by Arg in ascending order.
+  for I := 0 to Coefs.Count - 2 do
+    for J := I + 1 to Coefs.Count - 1 do
+      if Coefs[I].Arg > Coefs[J].Arg then
+      begin
+        TempCoef := Coefs[I];
+        Coefs[I] := Coefs[J];
+        Coefs[J] := TempCoef;
+      end;
+
+  // Refresh sequential indexes after sorting.
+  for I := 0 to Coefs.Count - 1 do
+  begin
+    TempCoef := Coefs[I];
+    TempCoef.Index := I;
+    Coefs[I] := TempCoef;
+  end;
+
+  // Collect indexes of active points only.
+  ActiveIndexes := TList<Integer>.Create;
+  try
+    for I := 0 to Coefs.Count - 1 do
+      if Coefs[I].InUse then
+        ActiveIndexes.Add(I);
+
+    // No active points -> nothing to calculate.
+    if ActiveIndexes.Count = 0 then
+      Exit;
+
+    // Single active point:
+    // create one flat segment for the whole range from -Infinity to +Infinity.
+    if ActiveIndexes.Count = 1 then
+    begin
+      IdxCurr := ActiveIndexes[0];
+
+      TempCoef := Coefs[IdxCurr];
+      TempCoef.Q1 := NegInfinity;
+      TempCoef.Q2 := Infinity;
+      TempCoef.K := 0;
+      TempCoef.b := TempCoef.Value;
+      Coefs[IdxCurr] := TempCoef;
+
+      Exit;
+    end;
+
+    // Build segments for all active points except the last one.
+    // Each point Pi uses Pi and P(i+1) to calculate its line parameters.
+    for I := 0 to ActiveIndexes.Count - 2 do
+    begin
+      IdxCurr := ActiveIndexes[I];
+      IdxNext := ActiveIndexes[I + 1];
+
+      Arg1 := Coefs[IdxCurr].Arg;
+      Arg2 := Coefs[IdxNext].Arg;
+      Value1 := Coefs[IdxCurr].Value;
+      Value2 := Coefs[IdxNext].Value;
+
+      // Protect against division by zero if two active points have identical Arg.
+      if SameValue(Arg1, Arg2, 1E-12) then
+        Continue;
+
+      KLocal := (Value2 - Value1) / (Arg2 - Arg1);
+      BLocal := Value1 - KLocal * Arg1;
+
+      TempCoef := Coefs[IdxCurr];
+
+      // Segment range rules:
+      // first point starts from -Infinity,
+      // every other point starts from its own Arg,
+      // current point ends at the next point Arg.
+      if I = 0 then
+        TempCoef.Q1 := NegInfinity
+      else
+        TempCoef.Q1 := Arg1;
+
+      TempCoef.Q2 := Arg2;
+
+      TempCoef.K := KLocal;
+      TempCoef.b := BLocal;
+
+      Coefs[IdxCurr] := TempCoef;
+    end;
+
+    // The last active point extends to +Infinity.
+    // Its line parameters are copied from the previous active point.
+    IdxLast := ActiveIndexes[ActiveIndexes.Count - 1];
+    IdxCurr := ActiveIndexes[ActiveIndexes.Count - 2];
+
+    TempCoef := Coefs[IdxLast];
+    TempCoef.Q1 := Coefs[IdxLast].Arg;
+    TempCoef.Q2 := Infinity;
+    TempCoef.K := Coefs[IdxCurr].K;
+    TempCoef.b := Coefs[IdxCurr].b;
+    Coefs[IdxLast] := TempCoef;
+
+  finally
+    ActiveIndexes.Free;
+  end;
 end;
 
 { Marks value as persistent and updates the save-list registry. }
