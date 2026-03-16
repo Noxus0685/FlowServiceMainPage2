@@ -475,6 +475,7 @@ begin
     raise Exception.Create('Unknown repository kind');
   end;
 end;
+
 procedure TManagerTDM.LoadRepositories(
   AKind: TRepositoryKind
 );
