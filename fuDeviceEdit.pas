@@ -320,6 +320,8 @@ type
      procedure ButtonCoefDeleteClick(Sender: TObject);
      procedure ButtonCoefClearClick(Sender: TObject);
 
+     procedure  UpdateComboEditDN;
+
   public
     { Public declarations }
      procedure LoadDevice(ADevice: TDevice);
@@ -1220,17 +1222,18 @@ begin
     else
       RepoName := '';
 
-    // Тип должен привязываться всегда, даже если пользователь
-    // отказался заполнять остальные поля из типа.
+  if NeedFill then
+  begin
     FDevice.AttachType(NewType, RepoName);
     FDeviceType := NewType;
 
     {----------------------------------------------------}
     { 5. Копируем данные из типа → в прибор }
     {----------------------------------------------------}
-    if NeedFill then
+
       FDevice.FillFromType(NewType);
 
+  end;
 
 
 
@@ -1272,6 +1275,66 @@ else
   EditQmin.TextPrompt := '—';
 end;
 
+procedure  TFormDeviceEditor.UpdateComboEditDN;
+var  Idx: Integer;
+begin
+   // =====================================================
+// == Диаметр (DN)
+// =====================================================
+ComboEditDN.Text := '';
+ComboEditDN.Hint := '';
+
+
+
+if FDeviceType <> nil then
+begin
+  // Если у нас есть ассоциированный тип, заполняем диаметр
+  ComboEditDN.Items.BeginUpdate;
+  try
+    ComboEditDN.Items.Clear;
+
+    // Заполняем ComboBox диаметрами типа
+    if FDeviceType.Diameters <> nil then
+      for var D in FDeviceType.Diameters do
+        if (D <> nil) and (D.State <> osDeleted) then
+          ComboEditDN.Items.Add(D.Name);
+
+  finally
+    ComboEditDN.Items.EndUpdate;
+  end;
+
+  // Выбираем текущий диаметр, если он задан в FDevice.DN
+  if FDevice.DN <> '' then
+  begin
+    Idx := ComboEditDN.Items.IndexOf(FDevice.DN);
+    if Idx >= 0 then
+    begin
+      ComboEditDN.ItemIndex := Idx;
+      ComboEditDN.Text := ComboEditDN.Items[Idx];
+    end
+    else
+    begin
+      // Если диаметра нет в списке, то оставляем текст как есть
+      ComboEditDN.ItemIndex := -1;
+      ComboEditDN.Text := FDevice.DN;
+    end;
+  end
+  else
+  begin
+    ComboEditDN.ItemIndex := -1;
+    ComboEditDN.Text := '';  // если DN пустое, ComboBox тоже пустой
+  end;
+
+  ComboEditDN.Hint := ComboEditDN.Text;
+end
+else
+begin
+  // Если типа нет, выводим DN из устройства
+  ComboEditDN.ItemIndex := -1;
+  ComboEditDN.Text := FDevice.DN;  // показываем текущее значение DN
+  ComboEditDN.Hint := FDevice.DN;
+end;
+end;
 
 
 procedure TFormDeviceEditor.UpdateUIFromDevice;
@@ -1513,58 +1576,7 @@ begin
  // =====================================================
 // == Диаметр (DN)
 // =====================================================
-ComboEditDN.Text := '';
-ComboEditDN.Hint := '';
-
-if FDeviceType <> nil then
-begin
-  // Если у нас есть ассоциированный тип, заполняем диаметр
-  ComboEditDN.Items.BeginUpdate;
-  try
-    ComboEditDN.Items.Clear;
-
-    // Заполняем ComboBox диаметрами типа
-    if FDeviceType.Diameters <> nil then
-      for var D in FDeviceType.Diameters do
-        if (D <> nil) and (D.State <> osDeleted) then
-          ComboEditDN.Items.Add(D.Name);
-
-  finally
-    ComboEditDN.Items.EndUpdate;
-  end;
-
-  // Выбираем текущий диаметр, если он задан в FDevice.DN
-  if FDevice.DN <> '' then
-  begin
-    Idx := ComboEditDN.Items.IndexOf(FDevice.DN);
-    if Idx >= 0 then
-    begin
-      ComboEditDN.ItemIndex := Idx;
-      ComboEditDN.Text := ComboEditDN.Items[Idx];
-    end
-    else
-    begin
-      // Если диаметра нет в списке, то оставляем текст как есть
-      ComboEditDN.ItemIndex := -1;
-      ComboEditDN.Text := FDevice.DN;
-    end;
-  end
-  else
-  begin
-    ComboEditDN.ItemIndex := -1;
-    ComboEditDN.Text := '';  // если DN пустое, ComboBox тоже пустой
-  end;
-
-  ComboEditDN.Hint := ComboEditDN.Text;
-end
-else
-begin
-  // Если типа нет, выводим DN из устройства
-  ComboEditDN.ItemIndex := -1;
-  ComboEditDN.Text := FDevice.DN;  // показываем текущее значение DN
-  ComboEditDN.Hint := FDevice.DN;
-end;
-
+ UpdateComboEditDN;
 
     // =====================================================
     // == Точки прибора
