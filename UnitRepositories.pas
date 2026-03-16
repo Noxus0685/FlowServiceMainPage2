@@ -18,7 +18,8 @@ uses
   FireDAC.Phys.SQLiteDef, FireDAC.Stan.ExprFuncs,
   FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
   Data.DB, FireDAC.Comp.DataSet, FireDAC.Comp.Client, FireDAC.FMXUI.Wait,
-  FireDAC.Phys.SQLiteWrapper.Stat
+  FireDAC.Phys.SQLiteWrapper.Stat,
+  FMX.Dialogs
   ;
 
 type
@@ -3834,120 +3835,140 @@ var
   D: TDevice;
   SeenUUIDs: TDictionary<string, TDevice>;
   DeviceUUID: string;
+  SaveErrors: TStringList;
 begin
   Result := False;
 
   if (FDM = nil) or (FDevices = nil) then
     Exit;
 
-  {--------------------------------------------------}
-  { ЖЁСТКАЯ ПРОВЕРКА ЦЕЛОСТНОСТИ (до транзакции) }
-  {--------------------------------------------------}
+  SaveErrors := TStringList.Create;
   SeenUUIDs := TDictionary<string, TDevice>.Create;
   try
     for D in FDevices do
     begin
       DeviceUUID := Trim(D.UUID);
 
-      { UUID обязан быть валидным }
       if DeviceUUID = '' then
-        raise Exception.Create('Device with invalid UUID detected (UUID is empty)');
+      begin
+        D.UUID := TGUID.NewGuid.ToString;
+        DeviceUUID := D.UUID;
+        SaveErrors.Add(Format('При сохранении прибору "%s" был присвоен новый UUID.', [D.Name]));
+      end;
 
-      { запрет дубликатов UUID в памяти }
       if SeenUUIDs.ContainsKey(DeviceUUID) then
-        raise Exception.CreateFmt(
-          'Duplicate device UUID in memory: %s',
-          [DeviceUUID]
-        );
+      begin
+        SaveErrors.Add(Format('Дублирующийся UUID прибора: %s.', [DeviceUUID]));
+        Continue;
+      end;
 
       SeenUUIDs.Add(DeviceUUID, D);
 
-      { osNew допустим только если записи нет в БД }
       if (D.State = osNew) and DeviceExistsInDB(DeviceUUID) then
-        raise Exception.CreateFmt(
-          'Attempt to INSERT existing device UUID=%s',
-          [DeviceUUID]
-        );
-    end;
-  finally
-    SeenUUIDs.Free;
-  end;
+      begin
+        SaveErrors.Add(Format('Нельзя вставить прибор с существующим UUID: %s.', [DeviceUUID]));
+        Continue;
+      end;
 
-  {--------------------------------------------------}
-  { ТРАНЗАКЦИЯ }
-  {--------------------------------------------------}
-  FDM.StartTransaction;
-  try
-    for D in FDevices do
-    begin
       if not ShouldSaveDevice(D) then
         Continue;
 
-      if not UpdateDevice(D) then
-        raise Exception.Create(
-          'Ошибка сохранения прибора'
-        );
+      FDM.StartTransaction;
+      try
+        if (D.State <> osClean) and not UpdateDevice(D) then
+          raise Exception.Create('Ошибка сохранения прибора');
+
+        if not UpdateDevicePoints(D) then
+          raise Exception.Create('Ошибка сохранения точек прибора');
+
+        if not UpdateSpillageSessions(D) then
+          raise Exception.Create('Ошибка сохранения сессий пролива');
+
+        if not UpdateSpillages(D) then
+          raise Exception.Create('Ошибка сохранения результатов пролива');
+
+        if not UpdateCalibrCoef(D) then
+          raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
+
+        FDM.Commit;
+      except
+        on E: Exception do
+        begin
+          FDM.Rollback;
+          SaveErrors.Add(Format('Ошибка сохранения прибора "%s": %s', [D.Name, E.Message]));
+        end;
+      end;
     end;
 
-    { вторая очередь }
-    // SaveSpillages;
+    if SaveErrors.Count > 0 then
+    begin
+      FState := osLoaded;
+      ShowMessage('Сохранение выполнено с предупреждениями:' + sLineBreak + SaveErrors.Text);
+    end
+    else
+      FState := osSaved;
 
-    FDM.Commit;
-    FState := osSaved;
     Result := True;
-
-  except
-    FDM.Rollback;
-    raise;
+  finally
+    SeenUUIDs.Free;
+    SaveErrors.Free;
   end;
 end;
 
 function TDeviceRepository.SaveDevice(
   ADevice: TDevice
 ): Boolean;
+var
+  SaveErrors: TStringList;
 begin
   Result := False;
 
   if (ADevice = nil) or (FDM = nil) then
     Exit;
 
-  { базовая защита }
-  if Trim(ADevice.UUID) = '' then
-    raise Exception.Create('Device with invalid UUID detected (UUID is empty)');
-
-  if not ShouldSaveDevice(ADevice) then
-    Exit(True);
-
-  // Начинаем транзакцию
-  FDM.StartTransaction;
+  SaveErrors := TStringList.Create;
   try
-    // Сохраняем сам прибор только при наличии изменений.
-    if (ADevice.State <> osClean) and not UpdateDevice(ADevice) then
-      raise Exception.Create('Ошибка сохранения прибора');
+    if Trim(ADevice.UUID) = '' then
+    begin
+      ADevice.UUID := TGUID.NewGuid.ToString;
+      SaveErrors.Add(Format('При сохранении прибору "%s" был присвоен новый UUID.', [ADevice.Name]));
+    end;
 
-    // ВАЖНО: дочерние сущности (точки/сессии/проливы/калибровка)
-    // должны сохраняться даже если ADevice.State = osClean.
-    if not UpdateDevicePoints(ADevice) then
-      raise Exception.Create('Ошибка сохранения точек прибора');
+    if not ShouldSaveDevice(ADevice) then
+      Exit(True);
 
-    if not UpdateSpillageSessions(ADevice) then
-      raise Exception.Create('Ошибка сохранения сессий пролива');
+    FDM.StartTransaction;
+    try
+      if (ADevice.State <> osClean) and not UpdateDevice(ADevice) then
+        raise Exception.Create('Ошибка сохранения прибора');
 
-    if not UpdateSpillages(ADevice) then
-      raise Exception.Create('Ошибка сохранения результатов пролива');
+      if not UpdateDevicePoints(ADevice) then
+        raise Exception.Create('Ошибка сохранения точек прибора');
 
-    if not UpdateCalibrCoef(ADevice) then
-      raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
+      if not UpdateSpillageSessions(ADevice) then
+        raise Exception.Create('Ошибка сохранения сессий пролива');
 
-    // Применяем изменения в БД
-    FDM.Commit;
+      if not UpdateSpillages(ADevice) then
+        raise Exception.Create('Ошибка сохранения результатов пролива');
 
-    Result := True;
+      if not UpdateCalibrCoef(ADevice) then
+        raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
-  except
-    // Если произошла ошибка, откатываем изменения
-    FDM.Rollback;
-    raise;
+      FDM.Commit;
+      Result := True;
+    except
+      on E: Exception do
+      begin
+        FDM.Rollback;
+        SaveErrors.Add(Format('Ошибка сохранения прибора "%s": %s', [ADevice.Name, E.Message]));
+        Result := True;
+      end;
+    end;
+
+    if SaveErrors.Count > 0 then
+      ShowMessage('Сохранение выполнено с предупреждениями:' + sLineBreak + SaveErrors.Text);
+  finally
+    SaveErrors.Free;
   end;
 end;
 
@@ -4366,6 +4387,7 @@ function TDeviceRepository.LoadDevices: Boolean;
 var
   Q: TFDQuery;
   NewD: TDevice;
+  LoadErrors: TStringList;
 begin
   Result := False;
 
@@ -4375,6 +4397,7 @@ begin
   FState := osLoading;
 
   FDevices := TObjectList<TDevice>.Create(True);
+  LoadErrors := TStringList.Create;
 
   Q := FDM.CreateQuery;
   try
@@ -4386,24 +4409,38 @@ begin
       begin
         NewD := MapDeviceFromQuery(Q);
 
-    FDevices.Add(NewD);
+        if Trim(NewD.UUID) = '' then
+        begin
+          NewD.UUID := TGUID.NewGuid.ToString;
+          NewD.State := osModified;
+          LoadErrors.Add(Format('У прибора "%s" в БД отсутствовал UUID. Присвоен новый UUID.', [NewD.Name]));
+        end;
 
-     if not LoadDevicePointsByDevice(NewD.UUID) then
-      raise Exception.Create('Не удалось загрузить точки приборов');
+        FDevices.Add(NewD);
 
-    if not LoadSpillageSessionsByDevice(NewD.UUID) then
-      Exit(False);
+        if not LoadDevicePointsByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [NewD.Name]));
 
-    if not LoadSpillagesByDevice(NewD.UUID) then
-      raise Exception.Create('Не удалось загрузить проливы');
+        if not LoadSpillageSessionsByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить проливы прибора "%s".', [NewD.Name]));
 
-    if not LoadCalibrCoefByDevice(NewD.UUID) then
-      raise Exception.Create('Не удалось загрузить таблицу калибровочных коэффициентов');
+        if not LoadSpillagesByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить результаты проливов прибора "%s".', [NewD.Name]));
+
+        if not LoadCalibrCoefByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [NewD.Name]));
 
         Q.Next;
       end;
 
-      FState := osClean;
+      if LoadErrors.Count > 0 then
+      begin
+        FState := osLoaded;
+        ShowMessage('Часть данных приборов не загружена:' + sLineBreak + LoadErrors.Text);
+      end
+      else
+        FState := osClean;
+
       Result := True;
 
     except
@@ -4413,6 +4450,7 @@ begin
 
   finally
     Q.Free;
+    LoadErrors.Free;
   end;
 end;
 
