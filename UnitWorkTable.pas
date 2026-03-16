@@ -77,6 +77,9 @@ type
     FHashValueInterface: string;
 
     // --- proxies for FlowMeter fields ---
+    function GetDeviceNameProxy: string;
+    procedure SetDeviceNameProxy(const AValue: string);
+
     function GetTypeNameProxy: string;
     procedure SetTypeNameProxy(const AValue: string);
 
@@ -146,6 +149,7 @@ type
     property Text: string read FText write FText;
 
     // Proxy fields (mirror FlowMeter)
+    property DeviceName: string read GetDeviceNameProxy write SetDeviceNameProxy;
     property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
@@ -582,6 +586,7 @@ begin
   RecreateFlowMeter(AWorkTable);
 
   FFlowMeter.UUID := ASource.FFlowMeter.UUID;
+  FFlowMeter.Name := ASource.FFlowMeter.Name;
   FFlowMeter.DeviceUUID := ASource.FFlowMeter.DeviceUUID;
   FFlowMeter.DeviceTypeName := ASource.FFlowMeter.DeviceTypeName;
   FFlowMeter.DeviceTypeUUID := ASource.FFlowMeter.DeviceTypeUUID;
@@ -656,6 +661,29 @@ begin
     Result := FFlowMeter.DeviceTypeName
   else
     Result := '';
+end;
+
+function TChannel.GetDeviceNameProxy: string;
+begin
+  if Assigned(FFlowMeter) then
+  begin
+    if Assigned(FFlowMeter.Device) then
+      Result := FFlowMeter.Device.Name
+    else
+      Result := FFlowMeter.Name;
+  end
+  else
+    Result := '';
+end;
+
+procedure TChannel.SetDeviceNameProxy(const AValue: string);
+begin
+  if Assigned(FFlowMeter) then
+  begin
+    FFlowMeter.Name := AValue;
+    if Assigned(FFlowMeter.Device) then
+      FFlowMeter.Device.Name := AValue;
+  end;
 end;
 
 { Updates FlowMeter device type name through proxy property. }
@@ -1967,6 +1995,7 @@ begin
     AIni.WriteString(Section, 'Name', Channel.Name);
     AIni.WriteString(Section, 'Text', Channel.Text);
     AIni.WriteString(Section, 'TypeName', Channel.TypeName);
+    AIni.WriteString(Section, 'DeviceName', Channel.DeviceName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
@@ -2021,6 +2050,7 @@ begin
     if Trim(Channel.Text) = '' then
       Channel.Text := BuildChannelDefaultText(I + 1);
     Channel.TypeName := AIni.ReadString(Section, 'TypeName', '');
+    Channel.DeviceName := AIni.ReadString(Section, 'DeviceName', Channel.TypeName);
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
     Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
