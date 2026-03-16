@@ -12,6 +12,18 @@ interface
 
 type
 
+  TCalibrCoefTableType = (
+    cctReference = 0,                 // справочная таблица (в расчётах TMeterValue не применяется)
+    cctMeterValueCoef = 1,            // поправка коэффициента пересчёта TMeterValue.Coef
+    cctMeterValueFlowRate = 2,        // поправка TMeterValue.FlowRate
+    cctMeterValueQuantity = 3,        // поправка TMeterValue.Quantity
+    cctMeterValueDensity = 4,         // поправка TMeterValue.Density
+    cctDeviceCoefCorrection = 11,     // поправка коэффициента преобразования (для записи в прибор)
+    cctDeviceFlowRateCorrection = 12, // поправка расхода (для записи в прибор)
+    cctDeviceQuantityCorrection = 13, // поправка количества (для записи в прибор)
+    cctDeviceDensityCorrection = 14   // поправка плотности (для записи в прибор)
+  );
+
   TPointSpillage = class;
 
   TSessionSpillage = class(TTypeEntity)
@@ -314,9 +326,11 @@ type
       FSpillages  : TObjectList<TPointSpillage>;
       FSessions   : TObjectList<TSessionSpillage>;
       FPoints     : TObjectList<TDevicePoint>;
-      FCalibrCoefTable: TCalibrCoefTable;
+      FCalibrCoefTable: TObjectList<TCalibrCoefTable>;
       FDeviceType : TDeviceType;
       function NormalizeActiveSessionSpillage: TSessionSpillage;
+      function GetCalibrCoefTable: TCalibrCoefTable;
+      procedure SetCalibrCoefTable(const Value: TCalibrCoefTable);
   public
     {====================================================================}
     { ПОЛЯ БД!!! }
@@ -468,7 +482,8 @@ type
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
     property  Sessions   : TObjectList<TSessionSpillage> read FSessions write FSessions;
     property  Points     : TObjectList<TDevicePoint> read  FPoints write  FPoints;
-    property  CalibrCoefTable: TCalibrCoefTable read FCalibrCoefTable write FCalibrCoefTable;
+    property  CalibrCoefTables: TObjectList<TCalibrCoefTable> read FCalibrCoefTable write FCalibrCoefTable;
+    property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
     procedure FillFromType(AType: TDeviceType; const APreservePointsAndSerial: Boolean = False);
@@ -497,9 +512,7 @@ begin
   FSessions  := TObjectList<TSessionSpillage>.Create(True);
   FSpillages := TObjectList<TPointSpillage>.Create(True);
   FPoints    := TObjectList<TDevicePoint>.Create(True);
-  FCalibrCoefTable := TCalibrCoefTable.Create;
-  FCalibrCoefTable.DeviceID := ID;
-  FCalibrCoefTable.DeviceUUID := UUID;
+  FCalibrCoefTable := TObjectList<TCalibrCoefTable>.Create(True);
 
   {----------------------------------}
   { Идентификация }
@@ -611,6 +624,61 @@ begin
   Comment := '';
   Description := '';
   ReportingForm := '';
+end;
+
+function TDevice.GetCalibrCoefTable: TCalibrCoefTable;
+begin
+  Result := nil;
+  if (FCalibrCoefTable = nil) or (FCalibrCoefTable.Count = 0) then
+    Exit;
+  Result := FCalibrCoefTable[0];
+end;
+
+procedure TDevice.SetCalibrCoefTable(const Value: TCalibrCoefTable);
+var
+  NewTable: TCalibrCoefTable;
+  SrcItem: TCalibrCoefItem;
+  NewItem: TCalibrCoefItem;
+begin
+  if FCalibrCoefTable = nil then
+    FCalibrCoefTable := TObjectList<TCalibrCoefTable>.Create(True);
+
+  FCalibrCoefTable.Clear;
+  if Value = nil then
+    Exit;
+
+  NewTable := TCalibrCoefTable.Create;
+  NewTable.ID := Value.ID;
+  NewTable.UUID := Value.UUID;
+  NewTable.DeviceID := Value.DeviceID;
+  NewTable.DeviceUUID := Value.DeviceUUID;
+  NewTable.&Type := Value.&Type;
+  NewTable.Active := Value.Active;
+  NewTable.AppliedAt := Value.AppliedAt;
+  NewTable.Name := Value.Name;
+  NewTable.Comment := Value.Comment;
+
+  if Value.Items <> nil then
+    for SrcItem in Value.Items do
+    begin
+      if SrcItem = nil then
+        Continue;
+      NewItem := TCalibrCoefItem.Create;
+      NewItem.Name := SrcItem.Name;
+      NewItem.UUID := SrcItem.UUID;
+      NewItem.TableID := SrcItem.TableID;
+      NewItem.OrderNo := SrcItem.OrderNo;
+      NewItem.Value := SrcItem.Value;
+      NewItem.Arg := SrcItem.Arg;
+      NewItem.QFrom := SrcItem.QFrom;
+      NewItem.QTo := SrcItem.QTo;
+      NewItem.K := SrcItem.K;
+      NewItem.b := SrcItem.b;
+      NewItem.Enable := SrcItem.Enable;
+      NewTable.Items.Add(NewItem);
+    end;
+
+  FCalibrCoefTable.Add(NewTable);
 end;
 
 constructor TSessionSpillage.Create(const ADeviceUUID: string);
@@ -891,19 +959,7 @@ begin
   FSessions.Clear;
   FSpillages.Clear;
 
-  if FCalibrCoefTable = nil then
-    FCalibrCoefTable := TCalibrCoefTable.Create;
-
-  FCalibrCoefTable.ID := 0;
-  FCalibrCoefTable.UUID := '';
-  FCalibrCoefTable.DeviceID := ID;
-  FCalibrCoefTable.DeviceUUID := UUID;
-  FCalibrCoefTable.&Type := 0;
-  FCalibrCoefTable.Active := False;
-  FCalibrCoefTable.AppliedAt := 0;
-  FCalibrCoefTable.Name := '';
-  FCalibrCoefTable.Comment := '';
-  FCalibrCoefTable.Items.Clear;
+  FCalibrCoefTable.Clear;
 
   { ============================= }
   { 3. Глубокое копирование точек }

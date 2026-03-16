@@ -395,7 +395,8 @@ public
   procedure InitValues;
   procedure ApplyMeasurementModel;
   procedure ApplyError;
-  procedure ApplyCalibrCoefsToValue;
+  procedure ApplyCalibrCoefsToValue(ATable: TCalibrCoefTable);
+  procedure ApplyCalibrCoefsToValues;
 
 end;
 implementation
@@ -1548,7 +1549,7 @@ begin
       ValueError.ValueEtalon := nil;
   end;
 
-  ApplyCalibrCoefsToValue;
+  ApplyCalibrCoefsToValues;
   ApplyError;
 
 end;
@@ -1574,23 +1575,39 @@ begin
     ValueVolumeFlow.Error := DeviceError;
 end;
 
-procedure TFlowMeter.ApplyCalibrCoefsToValue;
+procedure TFlowMeter.ApplyCalibrCoefsToValue(ATable: TCalibrCoefTable);
 var
   Item: TCalibrCoefItem;
   CoefItem: TCoef;
+  TableType: Integer;
+  TargetValue: TMeterValue;
 begin
-  if ValueCoef = nil then
+  if ATable = nil then
     Exit;
 
-  ValueCoef.Coefs.Clear;
+  TableType := ATable.&Type;
 
-  if (ValueCoef.DependenceType <> INDEPENDENT) or
-     (Device = nil) or
-     (Device.CalibrCoefTable = nil) or
-     (Device.CalibrCoefTable.Items = nil) then
+  if (not ATable.Active) or
+     (ATable.Items = nil) then
     Exit;
 
-  for Item in Device.CalibrCoefTable.Items do
+  TargetValue := nil;
+  case TableType of
+    Ord(cctMeterValueCoef):
+      if (ValueCoef <> nil) and (ValueCoef.DependenceType = INDEPENDENT) then
+        TargetValue := ValueCoef;
+    Ord(cctMeterValueFlowRate):
+      TargetValue := ValueFlow;
+    Ord(cctMeterValueQuantity):
+      TargetValue := ValueQuantity;
+    Ord(cctMeterValueDensity):
+      TargetValue := ValueDensity;
+  end;
+
+  if TargetValue = nil then
+    Exit;
+
+  for Item in ATable.Items do
   begin
     if Item = nil then
       Continue;
@@ -1605,8 +1622,29 @@ begin
     CoefItem.K := Item.K;
     CoefItem.b := Item.b;
     CoefItem.InUse := True;
-    ValueCoef.Coefs.Add(CoefItem);
+    TargetValue.Coefs.Add(CoefItem);
   end;
+end;
+
+procedure TFlowMeter.ApplyCalibrCoefsToValues;
+var
+  Table: TCalibrCoefTable;
+begin
+  if ValueCoef <> nil then
+    ValueCoef.Coefs.Clear;
+  if ValueFlow <> nil then
+    ValueFlow.Coefs.Clear;
+  if ValueQuantity <> nil then
+    ValueQuantity.Coefs.Clear;
+  if ValueDensity <> nil then
+    ValueDensity.Coefs.Clear;
+
+  if (Device = nil) or
+     (Device.CalibrCoefTables = nil) then
+    Exit;
+
+  for Table in Device.CalibrCoefTables do
+    ApplyCalibrCoefsToValue(Table);
 end;
 
 procedure TFlowMeter.UpdateByDevice;
