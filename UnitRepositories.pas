@@ -494,13 +494,16 @@ begin
   if (F = nil) or F.IsNull then
     Exit;
 
-  try
+  if F.DataType in [ftBoolean] then
+  begin
     Result := F.AsBoolean;
     Exit;
-  except
-    { Fallback for text / numeric bool storage }
   end;
 
+  if F.DataType in [ftSmallint, ftInteger, ftWord, ftLongWord, ftLargeint, ftShortint, ftByte, ftAutoInc] then
+    Exit(F.AsInteger <> 0);
+
+  { Fallback for text / numeric bool storage }
   S := Trim(LowerCase(F.AsString));
   if S = '' then
     Exit;
