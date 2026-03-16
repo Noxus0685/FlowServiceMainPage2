@@ -18,7 +18,8 @@ uses
   FireDAC.Phys.SQLiteDef, FireDAC.Stan.ExprFuncs,
   FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
   Data.DB, FireDAC.Comp.DataSet, FireDAC.Comp.Client, FireDAC.FMXUI.Wait,
-  FireDAC.Phys.SQLiteWrapper.Stat
+  FireDAC.Phys.SQLiteWrapper.Stat,
+  FMX.Dialogs
   ;
 
 type
@@ -4366,6 +4367,7 @@ function TDeviceRepository.LoadDevices: Boolean;
 var
   Q: TFDQuery;
   NewD: TDevice;
+  LoadErrors: TStringList;
 begin
   Result := False;
 
@@ -4375,6 +4377,7 @@ begin
   FState := osLoading;
 
   FDevices := TObjectList<TDevice>.Create(True);
+  LoadErrors := TStringList.Create;
 
   Q := FDM.CreateQuery;
   try
@@ -4388,22 +4391,29 @@ begin
 
     FDevices.Add(NewD);
 
-     if not LoadDevicePointsByDevice(NewD.UUID) then
-      raise Exception.Create('Не удалось загрузить точки приборов');
+        if not LoadDevicePointsByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [NewD.Name]));
 
-    if not LoadSpillageSessionsByDevice(NewD.UUID) then
-      Exit(False);
+        if not LoadSpillageSessionsByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить проливы прибора "%s".', [NewD.Name]));
 
-    if not LoadSpillagesByDevice(NewD.UUID) then
-      raise Exception.Create('Не удалось загрузить проливы');
+        if not LoadSpillagesByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить результаты проливов прибора "%s".', [NewD.Name]));
 
-    if not LoadCalibrCoefByDevice(NewD.UUID) then
-      raise Exception.Create('Не удалось загрузить таблицу калибровочных коэффициентов');
+        if not LoadCalibrCoefByDevice(NewD.UUID) then
+          LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [NewD.Name]));
 
         Q.Next;
       end;
 
-      FState := osClean;
+      if LoadErrors.Count > 0 then
+      begin
+        FState := osLoaded;
+        ShowMessage('Часть данных приборов не загружена:' + sLineBreak + LoadErrors.Text);
+      end
+      else
+        FState := osClean;
+
       Result := True;
 
     except
@@ -4413,6 +4423,7 @@ begin
 
   finally
     Q.Free;
+    LoadErrors.Free;
   end;
 end;
 
