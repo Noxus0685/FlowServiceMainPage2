@@ -5169,6 +5169,7 @@ var
   Device: TDevice;
   QTable: TFDQuery;
   QItem: TFDQuery;
+  Table: TCalibrCoefTable;
   Item: TCalibrCoefItem;
 begin
   Result := False;
@@ -5180,43 +5181,36 @@ begin
   if Device = nil then
     Exit;
 
-  if Device.CalibrCoefTable = nil then
-    Device.CalibrCoefTable := TCalibrCoefTable.Create;
-
-  Device.CalibrCoefTable.DeviceID := Device.ID;
-  Device.CalibrCoefTable.DeviceUUID := Device.UUID;
-  Device.CalibrCoefTable.ID := 0;
-  Device.CalibrCoefTable.UUID := '';
-  Device.CalibrCoefTable.&Type := 0;
-  Device.CalibrCoefTable.Active := False;
-  Device.CalibrCoefTable.AppliedAt := 0;
-  Device.CalibrCoefTable.Name := '';
-  Device.CalibrCoefTable.Comment := '';
-  Device.CalibrCoefTable.Items.Clear;
+  if Device.CalibrCoefTables = nil then
+    Device.CalibrCoefTables := TObjectList<TCalibrCoefTable>.Create(True);
+  Device.CalibrCoefTables.Clear;
 
   QTable := FDM.CreateQuery;
   try
     QTable.SQL.Text :=
-      'select * from CalibrCoefTable where DeviceUUID = :DeviceUUID order by Active desc, AppliedAt desc, ID desc limit 1';
+      'select * from CalibrCoefTable where DeviceUUID = :DeviceUUID order by Type, Active desc, AppliedAt desc, ID desc';
     SetStrParam(QTable, 'DeviceUUID', Trim(ADeviceUUID));
     QTable.Open;
 
-    if not QTable.Eof then
+    while not QTable.Eof do
     begin
-      Device.CalibrCoefTable.ID := QTable.FieldByName('ID').AsInteger;
-      Device.CalibrCoefTable.UUID := QTable.FieldByName('UUID').AsString;
-      Device.CalibrCoefTable.DeviceUUID := QTable.FieldByName('DeviceUUID').AsString;
-      Device.CalibrCoefTable.&Type := QTable.FieldByName('Type').AsInteger;
-      Device.CalibrCoefTable.Active := QTable.FieldByName('Active').AsInteger <> 0;
-      Device.CalibrCoefTable.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
-      Device.CalibrCoefTable.Name := QTable.FieldByName('Name').AsString;
-      Device.CalibrCoefTable.Comment := QTable.FieldByName('Comment').AsString;
+      Table := TCalibrCoefTable.Create;
+      Table.ID := QTable.FieldByName('ID').AsInteger;
+      Table.UUID := QTable.FieldByName('UUID').AsString;
+      Table.DeviceID := Device.ID;
+      Table.DeviceUUID := QTable.FieldByName('DeviceUUID').AsString;
+      Table.&Type := QTable.FieldByName('Type').AsInteger;
+      Table.Active := QTable.FieldByName('Active').AsInteger <> 0;
+      Table.AppliedAt := ReadFieldDateTimeDef(QTable.FieldByName('AppliedAt'));
+      Table.Name := QTable.FieldByName('Name').AsString;
+      Table.Comment := QTable.FieldByName('Comment').AsString;
+      Device.CalibrCoefTables.Add(Table);
 
       QItem := FDM.CreateQuery;
       try
         QItem.SQL.Text :=
           'select * from CalibrCoefItem where TableID = :TableID order by OrderNo, ID';
-        SetIntParam(QItem, 'TableID', Device.CalibrCoefTable.ID);
+        SetIntParam(QItem, 'TableID', Table.ID);
         QItem.Open;
         while not QItem.Eof do
         begin
@@ -5232,12 +5226,14 @@ begin
           Item.K := QItem.FieldByName('K').AsFloat;
           Item.b := QItem.FieldByName('b').AsFloat;
           Item.Enable := ReadFieldBoolDef(QItem, 'Enable', True);
-          Device.CalibrCoefTable.Items.Add(Item);
+          Table.Items.Add(Item);
           QItem.Next;
         end;
       finally
         QItem.Free;
       end;
+
+      QTable.Next;
     end;
 
     Result := True;
@@ -5249,86 +5245,72 @@ end;
 function TDeviceRepository.UpdateCalibrCoef(ADevice: TDevice): Boolean;
 var
   Q: TFDQuery;
+  Table: TCalibrCoefTable;
   Item: TCalibrCoefItem;
   TableID: Integer;
 begin
   Result := False;
 
-  if (ADevice = nil) or (ADevice.CalibrCoefTable = nil) then
+  if (ADevice = nil) or (ADevice.CalibrCoefTables = nil) then
     Exit(True);
-
-  ADevice.CalibrCoefTable.DeviceID := ADevice.ID;
-  ADevice.CalibrCoefTable.DeviceUUID := ADevice.UUID;
-  if ADevice.CalibrCoefTable.UUID = '' then
-    ADevice.CalibrCoefTable.UUID := TGUID.NewGuid.ToString;
 
   Q := FDM.CreateQuery;
   try
-    if ADevice.CalibrCoefTable.ID > 0 then
+    Q.SQL.Text := 'delete from CalibrCoefItem where TableID in (select ID from CalibrCoefTable where DeviceUUID = :DeviceUUID)';
+    SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from CalibrCoefTable where DeviceUUID = :DeviceUUID';
+    SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
+    Q.ExecSQL;
+
+    for Table in ADevice.CalibrCoefTables do
     begin
-      Q.SQL.Text :=
-        'update CalibrCoefTable set UUID=:UUID, DeviceUUID=:DeviceUUID, Type=:Type, Active=:Active, AppliedAt=:AppliedAt, Name=:Name, Comment=:Comment where ID=:ID';
-      SetIntParam(Q, 'ID', ADevice.CalibrCoefTable.ID);
-    end
-    else
-    begin
+      if Table = nil then
+        Continue;
+
+      Table.DeviceID := ADevice.ID;
+      Table.DeviceUUID := ADevice.UUID;
+      if Table.UUID = '' then
+        Table.UUID := TGUID.NewGuid.ToString;
+
       Q.SQL.Text :=
         'insert into CalibrCoefTable (UUID, DeviceUUID, Type, Active, AppliedAt, Name, Comment) values (:UUID, :DeviceUUID, :Type, :Active, :AppliedAt, :Name, :Comment)';
-    end;
-
-    SetStrParam(Q, 'UUID', ADevice.CalibrCoefTable.UUID);
-    SetStrParam(Q, 'DeviceUUID', ADevice.CalibrCoefTable.DeviceUUID);
-    SetIntParam(Q, 'Type', ADevice.CalibrCoefTable.&Type);
-    SetIntParam(Q, 'Active', Ord(ADevice.CalibrCoefTable.Active));
-    SetDateTimeParam(Q, 'AppliedAt', ADevice.CalibrCoefTable.AppliedAt);
-    SetStrParam(Q, 'Name', ADevice.CalibrCoefTable.Name);
-    SetStrParam(Q, 'Comment', ADevice.CalibrCoefTable.Comment);
-    Q.ExecSQL;
-
-    if ADevice.CalibrCoefTable.ID > 0 then
-      TableID := ADevice.CalibrCoefTable.ID
-    else
-    begin
-      TableID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
-      ADevice.CalibrCoefTable.ID := TableID;
-    end;
-
-    if ADevice.CalibrCoefTable.Active then
-    begin
-      Q.SQL.Text :=
-        'update CalibrCoefTable set Active = 0 where DeviceUUID = :DeviceUUID and Type = :Type and ID <> :ID';
-      SetStrParam(Q, 'DeviceUUID', ADevice.CalibrCoefTable.DeviceUUID);
-      SetIntParam(Q, 'Type', ADevice.CalibrCoefTable.&Type);
-      SetIntParam(Q, 'ID', TableID);
+      SetStrParam(Q, 'UUID', Table.UUID);
+      SetStrParam(Q, 'DeviceUUID', Table.DeviceUUID);
+      SetIntParam(Q, 'Type', Table.&Type);
+      SetIntParam(Q, 'Active', Ord(Table.Active));
+      SetDateTimeParam(Q, 'AppliedAt', Table.AppliedAt);
+      SetStrParam(Q, 'Name', Table.Name);
+      SetStrParam(Q, 'Comment', Table.Comment);
       Q.ExecSQL;
-    end;
 
-    Q.SQL.Text := 'delete from CalibrCoefItem where TableID = :TableID';
-    SetIntParam(Q, 'TableID', TableID);
-    Q.ExecSQL;
+      TableID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
+      Table.ID := TableID;
 
-    for Item in ADevice.CalibrCoefTable.Items do
-    begin
-      if Item = nil then
-        Continue;
-      Item.TableID := TableID;
-      if Item.UUID = '' then
-        Item.UUID := TGUID.NewGuid.ToString;
+      for Item in Table.Items do
+      begin
+        if Item = nil then
+          Continue;
+        Item.TableID := TableID;
+        if Item.UUID = '' then
+          Item.UUID := TGUID.NewGuid.ToString;
       Q.SQL.Text :=
         'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, K, b, Enable) ' +
         'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :K, :b, :Enable)';
-      SetStrParam(Q, 'UUID', Item.UUID);
-      SetIntParam(Q, 'TableID', Item.TableID);
-      SetIntParam(Q, 'OrderNo', Item.OrderNo);
-      SetStrParam(Q, 'Name', Item.Name);
-      SetFloatParam(Q, 'Value', Item.Value);
-      SetFloatParam(Q, 'Arg', Item.Arg);
-      SetFloatParam(Q, 'QFrom', Item.QFrom);
-      SetFloatParam(Q, 'QTo', Item.QTo);
-      SetFloatParam(Q, 'K', Item.K);
-      SetFloatParam(Q, 'b', Item.b);
-      SetIntParam(Q, 'Enable', Ord(Item.Enable));
-      Q.ExecSQL;
+        SetStrParam(Q, 'UUID', Item.UUID);
+        SetIntParam(Q, 'TableID', Item.TableID);
+        SetIntParam(Q, 'OrderNo', Item.OrderNo);
+        SetStrParam(Q, 'Name', Item.Name);
+        SetFloatParam(Q, 'Value', Item.Value);
+        SetFloatParam(Q, 'Arg', Item.Arg);
+        SetFloatParam(Q, 'QFrom', Item.QFrom);
+        SetFloatParam(Q, 'QTo', Item.QTo);
+        SetFloatParam(Q, 'K', Item.K);
+        SetFloatParam(Q, 'b', Item.b);
+        SetIntParam(Q, 'Enable', Ord(Item.Enable));
+        Q.ExecSQL;
+      end;
     end;
 
     Result := True;
