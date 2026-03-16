@@ -554,17 +554,45 @@ begin
   if Item = nil then
     Exit;
 
-  case ACol of
-    0: Value := Item.Enable;
-    1: Value := Item.OrderNo;
-    2: if FValue <> nil then Value := FValue.GetStrNum(Item.Value) else Value := FloatToStr(Item.Value);
-    3: if FValue <> nil then Value := FValue.GetStrNum(Item.Arg) else Value := FloatToStr(Item.Arg);
-    4: Value := FormatFloat('0.000000', InitErrorPercent(Item));
-    5: Value := FormatFloat('0.000000', CalcErrorPercent(Item));
-    6: Value := FormatFloat('0.000000', Item.K);
-    7: Value := FormatFloat('0.000000', Item.b);
-    8: if FValue <> nil then Value := FValue.GetStrNum(Item.QFrom) else Value := FloatToStr(Item.QFrom);
-    9: if FValue <> nil then Value := FValue.GetStrNum(Item.QTo) else Value := FloatToStr(Item.QTo);
+  if GridCoefs.Columns[ACol] = CheckColumnCoefEnable then
+    Value := Item.Enable
+  else if GridCoefs.Columns[ACol] = StringColumnCoefNum then
+    Value := Item.OrderNo
+  else if GridCoefs.Columns[ACol] = StringColumnCoefValue then
+  begin
+    if FValue <> nil then
+      Value := FValue.GetStrNum(Item.Value)
+    else
+      Value := FloatToStr(Item.Value);
+  end
+  else if GridCoefs.Columns[ACol] = StringColumnCoefArg then
+  begin
+    if FValue <> nil then
+      Value := FValue.GetStrNum(Item.Arg)
+    else
+      Value := FloatToStr(Item.Arg);
+  end
+  else if GridCoefs.Columns[ACol] = StringColumnCoefInitError then
+    Value := FormatFloat('0.000000', InitErrorPercent(Item))
+  else if GridCoefs.Columns[ACol] = StringColumnCoefCalcError then
+    Value := FormatFloat('0.000000', CalcErrorPercent(Item))
+  else if GridCoefs.Columns[ACol] = StringColumnCoefK then
+    Value := FormatFloat('0.000000', Item.K)
+  else if GridCoefs.Columns[ACol] = StringColumnCoefb then
+    Value := FormatFloat('0.000000', Item.b)
+  else if GridCoefs.Columns[ACol] = StringColumnCoefFrom then
+  begin
+    if FValue <> nil then
+      Value := FValue.GetStrNum(Item.QFrom)
+    else
+      Value := FloatToStr(Item.QFrom);
+  end
+  else if GridCoefs.Columns[ACol] = StringColumnCoefTo then
+  begin
+    if FValue <> nil then
+      Value := FValue.GetStrNum(Item.QTo)
+    else
+      Value := FloatToStr(Item.QTo);
   end;
 end;
 
