@@ -1220,17 +1220,16 @@ begin
     else
       RepoName := '';
 
-    if NeedFill then
-    begin
-      FDevice.AttachType(NewType, RepoName);
-      FDeviceType := NewType;
+    // Тип должен привязываться всегда, даже если пользователь
+    // отказался заполнять остальные поля из типа.
+    FDevice.AttachType(NewType, RepoName);
+    FDeviceType := NewType;
 
     {----------------------------------------------------}
     { 5. Копируем данные из типа → в прибор }
     {----------------------------------------------------}
-
+    if NeedFill then
       FDevice.FillFromType(NewType);
-    end;
 
 
 
