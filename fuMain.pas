@@ -7,6 +7,7 @@ uses
   fuTypeSelect,
   fuDeviceEdit,
   fuMeterValues,
+  frmCalibrCoefs,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -658,6 +659,7 @@ type
     FFlowMeters: TObjectList<TFlowMeter>;
     FSessionDevice: TFlowMeter;
     FSessionEtalon: TFlowMeter;
+    FFrameCalibrCoefs: TFrameCalibrCoefs;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     FNextClimateChangeAt: TDateTime;
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
@@ -704,6 +706,8 @@ type
     procedure ShowDeviceSpillages(ADevice: TDevice);
     procedure ShowSessionSpillages(ASession: TSessionSpillage);
     procedure UpdateSessionItems;
+    procedure InitCalibrCoefsFrame;
+    procedure UpdateCalibrCoefsFrame;
     function ResolveSelectedDevice: TDevice;
     procedure UpdateResultsPointColumns;
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
@@ -1077,6 +1081,7 @@ begin
   FInstrumentalVisibleOrder.Free;
   FWorkTableManager.Free;
   FFlowMeters.Free;
+  FreeAndNil(FFrameCalibrCoefs);
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
   FCurrentSession := nil;
@@ -1419,6 +1424,7 @@ begin
   FProcessingDevices := TObjectList<TDevice>.Create(False);
   FSessionDevice := nil;
   FSessionEtalon := nil;
+  FFrameCalibrCoefs := nil;
   FCurrentSession := nil;
 
   FWorkTableManager := TWorkTableManager.Create(
@@ -1503,10 +1509,30 @@ begin
   GridResults.OnMouseDown := GridResultsMouseDown;
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+  InitCalibrCoefsFrame;
   SetValues;
   RefreshResultsTab;
   UpdateForm;
   OnChangeState(STATE_NONE);
+end;
+
+procedure TFormMain.InitCalibrCoefsFrame;
+begin
+  if (TabItemCalibrCoefs = nil) or (FFrameCalibrCoefs <> nil) then
+    Exit;
+
+  FFrameCalibrCoefs := TFrameCalibrCoefs.Create(Self);
+  FFrameCalibrCoefs.Parent := TabItemCalibrCoefs;
+  FFrameCalibrCoefs.Align := TAlignLayout.Client;
+  FFrameCalibrCoefs.Init(FSessionDevice, cctReference);
+end;
+
+procedure TFormMain.UpdateCalibrCoefsFrame;
+begin
+  if FFrameCalibrCoefs = nil then
+    Exit;
+
+  FFrameCalibrCoefs.Init(FSessionDevice, FFrameCalibrCoefs.CurrentType);
 end;
 
 procedure TFormMain.TabControl1Change(Sender: TObject);
@@ -1582,6 +1608,8 @@ begin
   begin
     ResolveSelectedDevice;
 
+    UpdateCalibrCoefsFrame;
+
     if FSessionDevice <> nil then
     begin
       FSessionDevice.ApplyMeasurementModel;
@@ -1600,6 +1628,8 @@ begin
       FSessionDevice.Device := nil;
     if FSessionEtalon <> nil then
       FSessionEtalon.Device := nil;
+
+    UpdateCalibrCoefsFrame;
   end;
 
 
