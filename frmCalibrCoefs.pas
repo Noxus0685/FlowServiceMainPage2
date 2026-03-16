@@ -608,41 +608,43 @@ begin
     Exit;
 
   S := Value.ToString;
-  case ACol of
-    0: Item.Enable := Value.AsBoolean;
-    1: Item.OrderNo := Value.AsInteger;
-    2:
-      begin
-        if FValue <> nil then
-          D := FValue.GetDoubleNum(S)
-        else
-          D := StrToFloatDef(S, Item.Value);
-        Item.Value := D;
-      end;
-    3:
-      begin
-        if FValue <> nil then
-          D := FValue.GetDoubleNum(S)
-        else
-          D := StrToFloatDef(S, Item.Arg);
-        Item.Arg := D;
-      end;
-    6: Item.K := StrToFloatDef(S, Item.K);
-    7: Item.b := StrToFloatDef(S, Item.b);
-    8:
-      begin
-        if FValue <> nil then
-          Item.QFrom := FValue.GetDoubleNum(S)
-        else
-          Item.QFrom := StrToFloatDef(S, Item.QFrom);
-      end;
-    9:
-      begin
-        if FValue <> nil then
-          Item.QTo := FValue.GetDoubleNum(S)
-        else
-          Item.QTo := StrToFloatDef(S, Item.QTo);
-      end;
+  if GridCoefs.Columns[ACol] = CheckColumnCoefEnable then
+    Item.Enable := Value.AsBoolean
+  else if GridCoefs.Columns[ACol] = StringColumnCoefNum then
+    Item.OrderNo := Value.AsInteger
+  else if GridCoefs.Columns[ACol] = StringColumnCoefValue then
+  begin
+    if FValue <> nil then
+      D := FValue.GetDoubleNum(S)
+    else
+      D := StrToFloatDef(S, Item.Value);
+    Item.Value := D;
+  end
+  else if GridCoefs.Columns[ACol] = StringColumnCoefArg then
+  begin
+    if FValue <> nil then
+      D := FValue.GetDoubleNum(S)
+    else
+      D := StrToFloatDef(S, Item.Arg);
+    Item.Arg := D;
+  end
+  else if GridCoefs.Columns[ACol] = StringColumnCoefK then
+    Item.K := StrToFloatDef(S, Item.K)
+  else if GridCoefs.Columns[ACol] = StringColumnCoefb then
+    Item.b := StrToFloatDef(S, Item.b)
+  else if GridCoefs.Columns[ACol] = StringColumnCoefFrom then
+  begin
+    if FValue <> nil then
+      Item.QFrom := FValue.GetDoubleNum(S)
+    else
+      Item.QFrom := StrToFloatDef(S, Item.QFrom);
+  end
+  else if GridCoefs.Columns[ACol] = StringColumnCoefTo then
+  begin
+    if FValue <> nil then
+      Item.QTo := FValue.GetDoubleNum(S)
+    else
+      Item.QTo := StrToFloatDef(S, Item.QTo);
   end;
 
   UpdateGrid;
