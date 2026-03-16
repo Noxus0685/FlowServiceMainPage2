@@ -1,10 +1,10 @@
 object FrameCalibrCoefs: TFrameCalibrCoefs
-  Size.Width = 850.000000000000000000
+  Size.Width = 779.000000000000000000
   Size.Height = 618.000000000000000000
   Size.PlatformDefault = False
   object Layout1: TLayout
     Align = Client
-    Size.Width = 850.000000000000000000
+    Size.Width = 779.000000000000000000
     Size.Height = 618.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
@@ -12,12 +12,12 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Align = Client
       CanFocus = True
       ClipChildren = True
-      Size.Width = 850.000000000000000000
-      Size.Height = 264.000000000000000000
+      Size.Width = 779.000000000000000000
+      Size.Height = 224.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
-      Viewport.Width = 850.000000000000000000
-      Viewport.Height = 264.000000000000000000
+      Viewport.Width = 759.000000000000000000
+      Viewport.Height = 183.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False
@@ -72,7 +72,8 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       end
     end
     object ToolBar1: TToolBar
-      Size.Width = 850.000000000000000000
+      Position.Y = 40.000000000000000000
+      Size.Width = 779.000000000000000000
       Size.Height = 40.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
@@ -115,26 +116,6 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         Text = 'SpeedButtonCoefsRefresh'
         TextSettings.Trimming = None
       end
-      object LabelCoefTable: TLabel
-        Align = Right
-        Position.X = 562.000000000000000000
-        Size.Width = 143.000000000000000000
-        Size.Height = 40.000000000000000000
-        Size.PlatformDefault = False
-        Text = #1058#1072#1073#1083#1080#1094#1072' '#1082#1086#1101#1092#1080#1094#1080#1077#1085#1090#1086#1074
-        TabOrder = 1
-      end
-      object ComboBoxCoefTables: TComboBox
-        Align = Right
-        Margins.Top = 10.000000000000000000
-        Margins.Bottom = 10.000000000000000000
-        Position.X = 705.000000000000000000
-        Position.Y = 10.000000000000000000
-        Size.Width = 145.000000000000000000
-        Size.Height = 20.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 2
-      end
       object SpeedButtonCoefGetPoints: TSpeedButton
         Align = Left
         Position.X = 226.000000000000000000
@@ -167,13 +148,13 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
     object Layout2: TLayout
       Align = Bottom
       Position.Y = 304.000000000000000000
-      Size.Width = 850.000000000000000000
+      Size.Width = 779.000000000000000000
       Size.Height = 314.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
       object Layout3: TLayout
         Align = Right
-        Position.X = 640.000000000000000000
+        Position.X = 569.000000000000000000
         Size.Width = 210.000000000000000000
         Size.Height = 314.000000000000000000
         Size.PlatformDefault = False
@@ -189,7 +170,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       end
       object Layout4: TLayout
         Align = Client
-        Size.Width = 640.000000000000000000
+        Size.Width = 569.000000000000000000
         Size.Height = 314.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
@@ -203,11 +184,59 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
           Zoom.Pen.Fill.Color = claSilver
           Align = Client
           TabOrder = 0
-          Size.Width = 640.000000000000000000
+          Size.Width = 569.000000000000000000
           Size.Height = 314.000000000000000000
           Size.PlatformDefault = False
           ColorPaletteIndex = 13
         end
+      end
+    end
+    object ToolBar2: TToolBar
+      Size.Width = 779.000000000000000000
+      Size.Height = 40.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      object LabelCoefTable: TLabel
+        Align = Left
+        Margins.Left = 20.000000000000000000
+        Position.X = 261.000000000000000000
+        Size.Width = 143.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        Text = #1058#1072#1073#1083#1080#1094#1072' '#1082#1086#1101#1092#1080#1094#1080#1077#1085#1090#1086#1074
+        TabOrder = 1
+      end
+      object ComboBoxCoefTable: TComboBox
+        Align = Left
+        Margins.Top = 10.000000000000000000
+        Margins.Bottom = 10.000000000000000000
+        Position.X = 404.000000000000000000
+        Position.Y = 10.000000000000000000
+        Size.Width = 101.000000000000000000
+        Size.Height = 20.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 3
+      end
+      object LabelCoefType: TLabel
+        Align = MostLeft
+        Margins.Left = 10.000000000000000000
+        Position.X = 10.000000000000000000
+        Size.Width = 120.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        Text = #1058#1080#1087' '#1082#1086#1101#1092#1080#1094#1080#1077#1085#1090#1086#1074
+        TabOrder = 4
+      end
+      object ComboBoxCoefType: TComboBox
+        Align = Left
+        Margins.Top = 10.000000000000000000
+        Margins.Bottom = 10.000000000000000000
+        Position.X = 130.000000000000000000
+        Position.Y = 10.000000000000000000
+        Size.Width = 111.000000000000000000
+        Size.Height = 20.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 2
       end
     end
   end

@@ -33,10 +33,13 @@ type
     ChartCoefs: TChart;
     ComboBox1: TComboBox;
     LabelCoefTable: TLabel;
-    ComboBoxCoefTables: TComboBox;
+    ComboBoxCoefTable: TComboBox;
     StringColumnCoefNum: TStringColumn;
     SpeedButtonCoefGetPoints: TSpeedButton;
     ComboBoxUnitsCoefs: TComboBox;
+    ToolBar2: TToolBar;
+    LabelCoefType: TLabel;
+    ComboBoxCoefType: TComboBox;
   private
     { Private declarations }
   public
