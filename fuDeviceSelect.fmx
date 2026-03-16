@@ -139,6 +139,13 @@ object FormDeviceSelect: TFormDeviceSelect
           HeaderSettings.TextSettings.HorzAlign = Center
           Size.Width = 125.000000000000000000
         end
+        object StringColumnHASH: TStringColumn
+          Header = 'HASH'
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Size.Width = 160.000000000000000000
+        end
         object StringColumnManufacturer: TStringColumn
           Header = #1048#1079#1075#1086#1090#1086#1074#1080#1090#1077#1083#1100
           HeaderSettings.TextSettings.Trimming = Character
