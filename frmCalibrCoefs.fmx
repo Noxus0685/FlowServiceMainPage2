@@ -13,11 +13,12 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       CanFocus = True
       ClipChildren = True
       Size.Width = 907.000000000000000000
-      Size.Height = 224.000000000000000000
+      Size.Height = 288.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
+      OnGetValue = GridCoefsGetValue
       Viewport.Width = 887.000000000000000000
-      Viewport.Height = 199.000000000000000000
+      Viewport.Height = 263.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False
@@ -115,6 +116,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         StyleLookup = 'refreshtoolbutton'
         Text = 'SpeedButtonCoefsRefresh'
         TextSettings.Trimming = None
+        OnClick = SpeedButtonCoefsRefreshClick
       end
       object SpeedButtonCoefGetPoints: TSpeedButton
         Align = Left
@@ -147,16 +149,15 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
     end
     object Layout2: TLayout
       Align = Bottom
-      Position.Y = 304.000000000000000000
+      Position.Y = 376.000000000000000000
       Size.Width = 907.000000000000000000
-      Size.Height = 314.000000000000000000
+      Size.Height = 242.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
       object Layout3: TLayout
-        Align = Right
-        Position.X = 697.000000000000000000
-        Size.Width = 210.000000000000000000
-        Size.Height = 314.000000000000000000
+        Align = Left
+        Size.Width = 193.000000000000000000
+        Size.Height = 242.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object ComboBox1: TComboBox
@@ -170,8 +171,8 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       end
       object Layout4: TLayout
         Align = Client
-        Size.Width = 697.000000000000000000
-        Size.Height = 314.000000000000000000
+        Size.Width = 714.000000000000000000
+        Size.Height = 242.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
         object ChartCoefs: TChart
@@ -187,8 +188,8 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
           Zoom.Pen.Fill.Color = claSilver
           Align = Client
           TabOrder = 0
-          Size.Width = 697.000000000000000000
-          Size.Height = 314.000000000000000000
+          Size.Width = 714.000000000000000000
+          Size.Height = 242.000000000000000000
           Size.PlatformDefault = False
           ColorPaletteIndex = 13
           object Series1: TFastLineSeries
@@ -272,6 +273,15 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         TextSettings.Trimming = None
         OnClick = SpeedButtonDeleteTableClick
       end
+    end
+    object Splitter1: TSplitter
+      Align = Bottom
+      Cursor = crVSplit
+      MinSize = 20.000000000000000000
+      Position.Y = 368.000000000000000000
+      Size.Width = 907.000000000000000000
+      Size.Height = 8.000000000000000000
+      Size.PlatformDefault = False
     end
   end
 end

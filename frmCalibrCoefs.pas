@@ -45,6 +45,7 @@ type
     ComboBoxCoefType: TComboBox;
     SpeedButtonAddTable: TSpeedButton;
     SpeedButtonDeleteTable: TSpeedButton;
+    Splitter1: TSplitter;
     procedure ComboBoxCoefTypeChange(Sender: TObject);
     procedure ComboBoxCoefTableChange(Sender: TObject);
     procedure ComboBoxUnitsCoefsChange(Sender: TObject);
@@ -343,10 +344,10 @@ end;
 
 procedure TFrameCalibrCoefs.UpdateGrid;
 begin
-  if (FCurrentTable = nil) or (FCurrentTable.Items = nil) then
-    GridCoefs.RowCount := 0
-  else
-    GridCoefs.RowCount := FCurrentTable.Items.Count;
+   GridCoefs.RowCount := 0;
+
+  if (FCurrentTable <> nil) and (FCurrentTable.Items <> nil) then
+        GridCoefs.RowCount := FCurrentTable.Items.Count;
 
   GridCoefs.Repaint;
 end;
