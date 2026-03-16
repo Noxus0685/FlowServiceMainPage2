@@ -437,6 +437,8 @@ end;
 
 function ReadFieldDateTimeDef(AField: TField; const ADefault: TDateTime = 0): TDateTime;
 var
+  Fmt: TFormatSettings;
+  VFloat: Double;
   S: string;
 begin
   Result := ADefault;
@@ -444,11 +446,10 @@ begin
   if (AField = nil) or AField.IsNull then
     Exit;
 
-  try
+  if AField.DataType in [ftDate, ftTime, ftDateTime, ftTimeStamp, ftOraTimeStamp, ftOraInterval] then
+  begin
     Result := AField.AsDateTime;
     Exit;
-  except
-    { Fallback for text-based datetime storage }
   end;
 
   S := Trim(AField.AsString);
@@ -457,6 +458,13 @@ begin
 
   if TryISO8601ToDate(S, Result, True) then
     Exit;
+
+  Fmt := TFormatSettings.Invariant;
+  if TryStrToFloat(S, VFloat, Fmt) then
+  begin
+    Result := VFloat;
+    Exit;
+  end;
 
   if TryStrToDateTime(S, Result) then
     Exit;
@@ -486,13 +494,16 @@ begin
   if (F = nil) or F.IsNull then
     Exit;
 
-  try
+  if F.DataType in [ftBoolean] then
+  begin
     Result := F.AsBoolean;
     Exit;
-  except
-    { Fallback for text / numeric bool storage }
   end;
 
+  if F.DataType in [ftSmallint, ftInteger, ftWord, ftLongWord, ftLargeint, ftShortint, ftByte, ftAutoInc] then
+    Exit(F.AsInteger <> 0);
+
+  { Fallback for text / numeric bool storage }
   S := Trim(LowerCase(F.AsString));
   if S = '' then
     Exit;
