@@ -144,6 +144,9 @@ private
   function GetDeviceUUID: string;
   procedure SetDeviceUUID(const ADevice: string);
 
+  function GetDeviceNameProxy: string;
+  procedure SetDeviceNameProxy(const AValue: string);
+
   function GetDeviceTypeNameProxy: string;
   procedure SetDeviceTypeNameProxy(const AValue: string);
 
@@ -220,6 +223,10 @@ public
   property DeviceUUID: string
     read GetDeviceUUID
     write SetDeviceUUID;
+
+  property DeviceName: string
+    read GetDeviceNameProxy
+    write SetDeviceNameProxy;
 
   // Имя типа прибора (берется из привязанного TDevice)
   property DeviceTypeName: string
@@ -731,6 +738,21 @@ begin
   FTypeName := AValue;
   if Assigned(FDevice) then
     FDevice.DeviceTypeName := AValue;
+end;
+
+function TFlowMeter.GetDeviceNameProxy: string;
+begin
+  if Assigned(FDevice) then
+    Result := FDevice.Name
+  else
+    Result := Name;
+end;
+
+procedure TFlowMeter.SetDeviceNameProxy(const AValue: string);
+begin
+  Name := AValue;
+  if Assigned(FDevice) then
+    FDevice.Name := AValue;
 end;
 
 function TFlowMeter.GetDeviceTypeUUIDProxy: string;

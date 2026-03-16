@@ -666,12 +666,7 @@ end;
 function TChannel.GetDeviceNameProxy: string;
 begin
   if Assigned(FFlowMeter) then
-  begin
-    if Assigned(FFlowMeter.Device) then
-      Result := FFlowMeter.Device.Name
-    else
-      Result := FFlowMeter.Name;
-  end
+    Result := FFlowMeter.DeviceName
   else
     Result := '';
 end;
@@ -679,11 +674,7 @@ end;
 procedure TChannel.SetDeviceNameProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
-  begin
-    FFlowMeter.Name := AValue;
-    if Assigned(FFlowMeter.Device) then
-      FFlowMeter.Device.Name := AValue;
-  end;
+    FFlowMeter.DeviceName := AValue;
 end;
 
 { Updates FlowMeter device type name through proxy property. }
