@@ -16,8 +16,8 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Size.Height = 224.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
-      Viewport.Width = 759.000000000000000000
-      Viewport.Height = 183.000000000000000000
+      Viewport.Width = 779.000000000000000000
+      Viewport.Height = 224.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False

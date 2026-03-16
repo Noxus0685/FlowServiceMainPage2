@@ -773,7 +773,7 @@ end;
 procedure   TManagerTDM.CloseAll;
 begin
   FDms.Clear;         // освобождает все TDM
-  FRepositories.Clear;
+  //FRepositories.Clear;
 end;
 
 function TManagerTDM.MakeUniqueRepositoryName(
@@ -906,7 +906,7 @@ destructor  TManagerTDM.Destroy;
 begin
   CloseAll;
   FDms.Free;
-  FRepositories.Free;
+//  FRepositories.Free;        // Надо разобраться почему тут возикает ошибка и устранить её
   inherited;
 end;
 
