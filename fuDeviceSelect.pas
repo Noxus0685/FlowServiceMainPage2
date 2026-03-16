@@ -98,6 +98,7 @@ type
     StatusBar1: TStatusBar;
     sbDetaled: TLabel;
     StringColumnSerial: TStringColumn;
+    StringColumnHASH: TStringColumn;
     StringColumnOwner: TStringColumn;
     StringColumnDateOfManufacture: TStringColumn;
     miAddTestData: TMenuItem;
@@ -1723,6 +1724,9 @@ begin
 
   else if ACol = StringColumnSerial.Index then
     Value := D.SerialNumber
+
+  else if ACol = StringColumnHASH.Index then
+    Value := D.UUID
 
   else if ACol = StringColumnManufacturer.Index then
     Value := D.Manufacturer

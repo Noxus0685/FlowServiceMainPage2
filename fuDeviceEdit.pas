@@ -2583,8 +2583,7 @@ begin
 
   else if ACol = StringColumnHash.Index then
   begin
-
-      Value := P.UUID;
+      Value := FDevice.UUID;
 
   end
 
