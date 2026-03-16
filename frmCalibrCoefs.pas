@@ -1,4 +1,4 @@
-unit frmCalibrCoefs;
+﻿unit frmCalibrCoefs;
 
 interface
 
@@ -36,11 +36,15 @@ type
     LabelCoefTable: TLabel;
     ComboBoxCoefTable: TComboBox;
     StringColumnCoefNum: TStringColumn;
-    SpeedButtonCoefGetPoints: TSpeedButton;
+    SpeedButtonCoefGetPoints:
+    TSpeedButton;
+    Series1: TFastLineSeries;
     ComboBoxUnitsCoefs: TComboBox;
     ToolBar2: TToolBar;
     LabelCoefType: TLabel;
     ComboBoxCoefType: TComboBox;
+    SpeedButtonAddTable: TSpeedButton;
+    SpeedButtonDeleteTable: TSpeedButton;
     procedure ComboBoxCoefTypeChange(Sender: TObject);
     procedure ComboBoxCoefTableChange(Sender: TObject);
     procedure ComboBoxUnitsCoefsChange(Sender: TObject);
@@ -51,6 +55,8 @@ type
     procedure SpeedButtonCoefsClearClick(Sender: TObject);
     procedure SpeedButtonCoefsRefreshClick(Sender: TObject);
     procedure SpeedButtonCoefGetPointsClick(Sender: TObject);
+    procedure SpeedButtonDeleteTableClick(Sender: TObject);
+    procedure SpeedButtonAddTableClick(Sender: TObject);
   private
     FFlowMeter: TFlowMeter;
     FValue: TMeterValue;
@@ -614,6 +620,11 @@ begin
   UpdateChart;
 end;
 
+procedure TFrameCalibrCoefs.SpeedButtonAddTableClick(Sender: TObject);
+begin
+//Метод добавления таблицы
+end;
+
 procedure TFrameCalibrCoefs.SpeedButtonCefAddClick(Sender: TObject);
 var
   Item: TCalibrCoefItem;
@@ -677,6 +688,11 @@ begin
 
   UpdateGrid;
   UpdateChart;
+end;
+
+procedure TFrameCalibrCoefs.SpeedButtonDeleteTableClick(Sender: TObject);
+begin
+//Метод удаления таблицы
 end;
 
 function TFrameCalibrCoefs.TryGetSpillageValues(ASpillage: TPointSpillage; out AArg,

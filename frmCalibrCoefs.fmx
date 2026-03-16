@@ -1,10 +1,10 @@
 object FrameCalibrCoefs: TFrameCalibrCoefs
-  Size.Width = 779.000000000000000000
+  Size.Width = 907.000000000000000000
   Size.Height = 618.000000000000000000
   Size.PlatformDefault = False
   object Layout1: TLayout
     Align = Client
-    Size.Width = 779.000000000000000000
+    Size.Width = 907.000000000000000000
     Size.Height = 618.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
@@ -12,12 +12,12 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Align = Client
       CanFocus = True
       ClipChildren = True
-      Size.Width = 779.000000000000000000
+      Size.Width = 907.000000000000000000
       Size.Height = 224.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
-      Viewport.Width = 779.000000000000000000
-      Viewport.Height = 224.000000000000000000
+      Viewport.Width = 887.000000000000000000
+      Viewport.Height = 199.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False
@@ -73,7 +73,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
     end
     object ToolBar1: TToolBar
       Position.Y = 40.000000000000000000
-      Size.Width = 779.000000000000000000
+      Size.Width = 907.000000000000000000
       Size.Height = 40.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
@@ -148,13 +148,13 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
     object Layout2: TLayout
       Align = Bottom
       Position.Y = 304.000000000000000000
-      Size.Width = 779.000000000000000000
+      Size.Width = 907.000000000000000000
       Size.Height = 314.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
       object Layout3: TLayout
         Align = Right
-        Position.X = 569.000000000000000000
+        Position.X = 697.000000000000000000
         Size.Width = 210.000000000000000000
         Size.Height = 314.000000000000000000
         Size.PlatformDefault = False
@@ -170,36 +170,48 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       end
       object Layout4: TLayout
         Align = Client
-        Size.Width = 569.000000000000000000
+        Size.Width = 697.000000000000000000
         Size.Height = 314.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
         object ChartCoefs: TChart
           Foot.Font.StyleExt = {00040000000200000004000000}
           Legend.Title.Font.StyleExt = {00070000000000000004000000}
+          Legend.Visible = False
           SubFoot.Font.StyleExt = {00040000000200000004000000}
           Title.Text.Strings = (
             'TChart')
+          View3D = False
+          View3DOptions.Orthogonal = False
           Zoom.Brush.Kind = None
           Zoom.Pen.Fill.Color = claSilver
           Align = Client
           TabOrder = 0
-          Size.Width = 569.000000000000000000
+          Size.Width = 697.000000000000000000
           Size.Height = 314.000000000000000000
           Size.PlatformDefault = False
           ColorPaletteIndex = 13
+          object Series1: TFastLineSeries
+            HoverElement = []
+            LinePen.Color = xFF4466A3
+            LinePen.Fill.Color = xFF4466A3
+            XValues.Name = 'X'
+            XValues.Order = loAscending
+            YValues.Name = 'Y'
+            YValues.Order = loNone
+          end
         end
       end
     end
     object ToolBar2: TToolBar
-      Size.Width = 779.000000000000000000
+      Size.Width = 907.000000000000000000
       Size.Height = 40.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 3
       object LabelCoefTable: TLabel
         Align = Left
         Margins.Left = 20.000000000000000000
-        Position.X = 261.000000000000000000
+        Position.X = 333.000000000000000000
         Size.Width = 143.000000000000000000
         Size.Height = 40.000000000000000000
         Size.PlatformDefault = False
@@ -210,9 +222,9 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         Align = Left
         Margins.Top = 10.000000000000000000
         Margins.Bottom = 10.000000000000000000
-        Position.X = 404.000000000000000000
+        Position.X = 476.000000000000000000
         Position.Y = 10.000000000000000000
-        Size.Width = 101.000000000000000000
+        Size.Width = 149.000000000000000000
         Size.Height = 20.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 3
@@ -233,10 +245,32 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         Margins.Bottom = 10.000000000000000000
         Position.X = 130.000000000000000000
         Position.Y = 10.000000000000000000
-        Size.Width = 111.000000000000000000
+        Size.Width = 183.000000000000000000
         Size.Height = 20.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 2
+      end
+      object SpeedButtonAddTable: TSpeedButton
+        Align = Left
+        Position.X = 677.000000000000000000
+        Size.Width = 36.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'additembutton'
+        Text = 'SpeedButtonAddTable'
+        TextSettings.Trimming = None
+        OnClick = SpeedButtonAddTableClick
+      end
+      object SpeedButtonDeleteTable: TSpeedButton
+        Align = Left
+        Position.X = 625.000000000000000000
+        Size.Width = 52.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'trashtoolbutton'
+        Text = 'SpeedButtonAddTable'
+        TextSettings.Trimming = None
+        OnClick = SpeedButtonDeleteTableClick
       end
     end
   end
