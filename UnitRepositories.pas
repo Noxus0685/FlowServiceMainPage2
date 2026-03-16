@@ -266,7 +266,7 @@ type
 
     function MapDevicePointFromQuery(Q: TFDQuery): TDevicePoint;
 
-function LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
+    function LoadDevicePointsByDevice(const ADeviceUUID: string): Boolean;
 
 
 
@@ -433,6 +433,7 @@ begin
   end;
 end;
 
+
 function ReadFieldDateTimeDef(AField: TField; const ADefault: TDateTime = 0): TDateTime;
 var
   S: string;
@@ -463,6 +464,46 @@ begin
     Exit;
 
   Result := ADefault;
+end;
+
+function ReadFieldBoolDef(
+  Q: TFDQuery;
+  const AFieldName: string;
+  const ADefault: Boolean
+): Boolean;
+var
+  F: TField;
+  S: string;
+  N: Integer;
+begin
+  Result := ADefault;
+
+  if (Q = nil) then
+    Exit;
+
+  F := Q.FindField(AFieldName);
+  if (F = nil) or F.IsNull then
+    Exit;
+
+  try
+    Result := F.AsBoolean;
+    Exit;
+  except
+    { Fallback for text / numeric bool storage }
+  end;
+
+  S := Trim(LowerCase(F.AsString));
+  if S = '' then
+    Exit;
+
+  if (S = '1') or (S = 'true') or (S = 't') or (S = 'yes') or (S = 'y') then
+    Exit(True);
+
+  if (S = '0') or (S = 'false') or (S = 'f') or (S = 'no') or (S = 'n') then
+    Exit(False);
+
+  if TryStrToInt(S, N) then
+    Exit(N <> 0);
 end;
 
  {$ENDREGION}
@@ -4277,14 +4318,14 @@ var
 begin
   Result := nil;
 
-  if (ADevice = nil) or (ADevice.ID <= 0) or (FDM = nil) then
+  if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FDM = nil) then
     Exit;
 
   Q := FDM.CreateQuery;
   try
-    // Выполняем запрос для поиска устройства по ID
-    Q.SQL.Text := 'select * from Devices where ID = :ID';
-    Q.ParamByName('ID').AsInteger := ADevice.ID;
+    // Выполняем запрос для поиска устройства по UUID
+    Q.SQL.Text := 'select * from Devices where UUID = :UUID';
+    SetStrParam(Q, 'UUID', Trim(ADevice.UUID));
     Q.Open;
 
     // Если запись найдена
@@ -4294,7 +4335,7 @@ begin
       Result := MapDeviceFromQuery(Q);
 
       // Загружаем связанные данные для устройства
-      LoadDevicePointsByDevice(Result.ID);
+      LoadDevicePointsByDevice(Result.UUID);
       LoadSpillageSessionsByDevice(Result.UUID);
       LoadSpillagesByDevice(Result.UUID);
       LoadCalibrCoefByDevice(Result.UUID);
@@ -4307,22 +4348,18 @@ end;
 
 function TDeviceRepository.LoadDevice(ADeviceId: Integer): TDevice;
 var
-  Tmp: TDevice;
+  Existing: TDevice;
 begin
   Result := nil;
 
   if ADeviceId <= 0 then
     Exit;
 
-  Tmp := TDevice.Create;
-  try
-    Tmp.ID := ADeviceId;
+  Existing := FindDeviceByID(ADeviceId);
+  if (Existing = nil) or (Trim(Existing.UUID) = '') then
+    Exit;
 
-    Result := LoadDevice(Tmp);
-
-  finally
-    Tmp.Free;
-  end;
+  Result := LoadDevice(Existing);
 end;
 
 function TDeviceRepository.LoadDevices: Boolean;
@@ -4349,7 +4386,9 @@ begin
       begin
         NewD := MapDeviceFromQuery(Q);
 
-     if not LoadDevicePointsByDevice(NewD.ID) then
+    FDevices.Add(NewD);
+
+     if not LoadDevicePointsByDevice(NewD.UUID) then
       raise Exception.Create('Не удалось загрузить точки приборов');
 
     if not LoadSpillageSessionsByDevice(NewD.UUID) then
@@ -4439,9 +4478,9 @@ begin
   if ADevice.State = osClean then
     Exit(True);
 
-  { защита: новый объект ОБЯЗАН иметь ID }
-  if (ADevice.State = osNew) and (ADevice.ID <= 0) then
-    raise Exception.Create('New device must have predefined ID');
+  { защита: объект обязан иметь UUID }
+  if Trim(ADevice.UUID) = '' then
+    raise Exception.Create('Device must have UUID');
 
   Q := FDM.CreateQuery;
   try
@@ -4450,13 +4489,13 @@ begin
       {======================= DELETE =======================}
       osDeleted:
         begin
-          Q.SQL.Text := 'delete from Devices where ID = :ID';
-          SetIntParam(Q, 'ID', ADevice.ID);
+          Q.SQL.Text := 'delete from Devices where UUID = :UUID';
+          SetStrParam(Q, 'UUID', ADevice.UUID);
           Q.ExecSQL;
 
           Q.SQL.Text :=
-            'delete from DevicePoint where DeviceID = :DeviceID';
-          SetIntParam(Q, 'DeviceID', ADevice.ID);
+            'delete from DevicePoint where DeviceUUID = :DeviceUUID';
+          SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
           Q.ExecSQL;
 
           Q.SQL.Text :=
@@ -4476,7 +4515,6 @@ begin
       osNew:
         Q.SQL.Text :=
           'insert into Devices (' +
-          'ID, ' +
           'UUID, DeviceTypeUUID, DeviceTypeName, DeviceTypeRepo, ' +
           'Name, SerialNumber, Modification, ' +
           'Manufacturer, Owner, ReestrNumber, ' +
@@ -4492,7 +4530,6 @@ begin
           'InputType, SpillageType, SpillageStop, Repeats, RepeatsProtocol, ' +
           'Comment, Description, ReportingForm' +
           ') values (' +
-          ':ID, ' +
           ':UUID, :DeviceTypeUUID, :DeviceTypeName, :DeviceTypeRepo, ' +
           ':Name, :SerialNumber, :Modification, ' +
           ':Manufacturer, :Owner, :ReestrNumber, ' +
@@ -4531,15 +4568,13 @@ begin
           'InputType = :InputType, SpillageType = :SpillageType, SpillageStop = :SpillageStop, ' +
           'Repeats = :Repeats, RepeatsProtocol = :RepeatsProtocol, ' +
           'Comment = :Comment, Description = :Description, ReportingForm = :ReportingForm ' +
-          'where ID = :ID';
+          'where UUID = :UUID';
 
     else
       Exit(True);
     end;
 
     {======================= ПАРАМЕТРЫ =======================}
-
-    SetIntParam(Q, 'ID', ADevice.ID);
 
     SetStrParam(Q, 'UUID', ADevice.UUID);
     SetStrParam(Q, 'DeviceTypeUUID', ADevice.DeviceTypeUUID);
@@ -4638,6 +4673,7 @@ function TDeviceRepository.RequiredDevicePointColumns: TTableColumns;
 begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
+    Col('DeviceUUID', 'TEXT'),
     Col('SessionID', 'INTEGER'),
     Col('DeviceTypePointID', 'INTEGER'),
 
@@ -4705,17 +4741,17 @@ function TDeviceRepository.MapDevicePointFromQuery(
 ): TDevicePoint;
 var
 
-DeviceID : Integer;
+DeviceUUID: string;
 ADevice : TDevice;
 
 
 begin
 
-   DeviceID := Q.FieldByName('DeviceID').AsInteger;
+   DeviceUUID := Q.FieldByName('DeviceUUID').AsString;
 
-   ADevice := FindDeviceByID(DeviceID);
+   ADevice := FindDeviceByUUID(DeviceUUID);
    if ADevice = nil then
-     raise Exception.CreateFmt('Device for point not found (DeviceID=%d)', [DeviceID]);
+     raise Exception.CreateFmt('Device for point not found (DeviceUUID=%s)', [DeviceUUID]);
 
    Result := ADevice.AddPoint;
 
@@ -4788,7 +4824,7 @@ begin
       Exit(D);
 end;
 
-function TDeviceRepository.LoadDevicePointsByDevice(ADeviceID: Integer): Boolean;
+function TDeviceRepository.LoadDevicePointsByDevice(const ADeviceUUID: string): Boolean;
 var
   Q: TFDQuery;
   Device: TDevice;
@@ -4811,10 +4847,10 @@ begin
   try
     Q.SQL.Text :=
       'select * from DevicePoint ' +
-      'where DeviceID = :ID ' +
+      'where DeviceUUID = :DeviceUUID ' +
       'order by Num';
 
-    SetIntParam(Q, 'ID', ADeviceID);
+    SetStrParam(Q, 'DeviceUUID', Trim(ADeviceUUID));
     Q.Open;
 
     while not Q.Eof do
@@ -4846,7 +4882,7 @@ begin
   for P in ADevice.Points do
   begin
     if P <> nil then
-      P.DeviceID := ADevice.ID;
+      P.UUID := ADevice.UUID;
 
     if not UpdateDevicePoint(P) then
       Exit(False);
@@ -4869,12 +4905,12 @@ begin
   try
     if KeepIDs = '' then
       Q.SQL.Text :=
-        'delete from DevicePoint where DeviceID = :DeviceID'
+        'delete from DevicePoint where DeviceUUID = :DeviceUUID'
     else
       Q.SQL.Text :=
-        'delete from DevicePoint where DeviceID = :DeviceID and ID not in (' + KeepIDs + ')';
+        'delete from DevicePoint where DeviceUUID = :DeviceUUID and ID not in (' + KeepIDs + ')';
 
-    SetIntParam(Q, 'DeviceID', ADevice.ID);
+    SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
     Q.ExecSQL;
   finally
     Q.Free;
@@ -4897,12 +4933,12 @@ begin
   try
     if KeepIDs = '' then
       Q.SQL.Text :=
-        'delete from DevicePoint where DeviceID = :DeviceID'
+        'delete from DevicePoint where DeviceUUID = :DeviceUUID'
     else
       Q.SQL.Text :=
-        'delete from DevicePoint where DeviceID = :DeviceID and ID not in (' + KeepIDs + ')';
+        'delete from DevicePoint where DeviceUUID = :DeviceUUID and ID not in (' + KeepIDs + ')';
 
-    SetIntParam(Q, 'DeviceID', ADevice.ID);
+    SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
     Q.ExecSQL;
   finally
     Q.Free;
@@ -4926,8 +4962,8 @@ begin
     Exit(True);
 
   { защита: точка обязана принадлежать прибору }
-  if APoint.DeviceID <= 0 then
-    raise Exception.Create('DevicePoint must have valid DeviceID');
+  if Trim(APoint.UUID) = '' then
+    raise Exception.Create('DevicePoint must have valid DeviceUUID');
 
   Q := FDM.CreateQuery;
   try
@@ -4940,16 +4976,16 @@ begin
             Exit(True);  // новая точка — просто забываем
 
           Q.SQL.Text :=
-            'delete from DevicePoint where ID = :ID and DeviceID = :DeviceID';
+            'delete from DevicePoint where ID = :ID and DeviceUUID = :DeviceUUID';
 
           SetIntParam(Q, 'ID', APoint.ID);
-          SetIntParam(Q, 'DeviceID', APoint.DeviceID);
+          SetStrParam(Q, 'DeviceUUID', APoint.UUID);
           Q.ExecSQL;
 
           if Q.RowsAffected = 0 then
             raise Exception.CreateFmt(
-              'DevicePoint not deleted (ID=%d, DeviceID=%d)',
-              [APoint.ID, APoint.DeviceID]
+              'DevicePoint not deleted (ID=%d, DeviceUUID=%s)',
+              [APoint.ID, APoint.UUID]
             );
 
           Exit(True);
@@ -4960,13 +4996,13 @@ begin
         begin
           Q.SQL.Text :=
             'insert into DevicePoint (' +
-            'DeviceID, DeviceTypePointID, Num, Name, Description, ' +
+            'DeviceUUID, DeviceTypePointID, Num, Name, Description, ' +
             'FlowRate, Q, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, ' +
             'Error, Pause, RepeatsProtocol, Repeats' +
             ') values (' +
-            ':DeviceID, :DeviceTypePointID, :Num, :Name, :Description, ' +
+            ':DeviceUUID, :DeviceTypePointID, :Num, :Name, :Description, ' +
             ':FlowRate, :Q, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, ' +
@@ -4982,7 +5018,7 @@ begin
 
           Q.SQL.Text :=
             'update DevicePoint set ' +
-            'DeviceID=:DeviceID, ' +
+            'DeviceUUID=:DeviceUUID, ' +
             'DeviceTypePointID=:DeviceTypePointID, ' +
             'Num=:Num, Name=:Name, Description=:Description, ' +
             'FlowRate=:FlowRate, Q=:Q, FlowAccuracy=:FlowAccuracy, ' +
@@ -5002,7 +5038,7 @@ begin
     if APoint.State <> osNew then
       SetIntParam(Q, 'ID', APoint.ID);
 
-    SetIntParam(Q, 'DeviceID', APoint.DeviceID);
+    SetStrParam(Q, 'DeviceUUID', APoint.UUID);
     SetIntParam(Q, 'DeviceTypePointID', APoint.DeviceTypePointID);
     SetIntParam(Q, 'Num', APoint.Num);
 
