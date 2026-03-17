@@ -437,14 +437,10 @@ type
     ActionEtalonsSetFlowSource: TAction;
     ActionEtalonsAssignEtalon: TAction;
     LayoutLeft: TLayout;
-    lvFlowmeterTypes: TListView;
     TreeViewDevices: TTreeView;
     TreeViewItem1: TTreeViewItem;
     TreeViewItem2: TTreeViewItem;
     TreeViewItem3: TTreeViewItem;
-    ToolBar3: TToolBar;
-    ComboBoxRepository: TComboBox;
-    Label6: TLabel;
     LayoutCenter: TLayout;
     Layout18: TLayout;
     GridDataPoints: TGrid;
@@ -648,6 +644,8 @@ type
     procedure ActionSessionDeviceRemoveExecute(Sender: TObject);
     procedure ActionSessionDeviceAddExecute(Sender: TObject);
     procedure GridResultsSelChanged(Sender: TObject);
+    procedure ButtonSessionClearPointsClick(Sender: TObject);
+    procedure ButtonSessionDeleteDataPointClick(Sender: TObject);
 
 
   private
@@ -5493,6 +5491,39 @@ begin
     StopMonitor
   else
     StartMonitor;
+end;
+
+procedure TFormMain.ButtonSessionClearPointsClick(Sender: TObject);
+begin
+      // Всё делаем через Action
+      // Здесь в зависимости от того что выбрано в TreeViewDevices:
+      // Если выбран стол, то очищаем из списка оброботки все приборв
+      // Если выбран ... , очищаем все приборы из списка обработки
+      // Если выбран конкретный прибор, то запращиваем подтверждение "очистить все результаты для данного прибора?" удаляем все сессии и все точки с ним связанные
+      // Если выбрана сессия, то запращиваем подтверждение "очистить все результаты данной сессии измерений?" удаляем сессию и все измерения с ней связанные
+
+
+end;
+
+procedure TFormMain.ButtonSessionDeleteDataPointClick(Sender: TObject);
+begin
+      // Всё делаем через Action
+      // Здесь в зависимости от того что выбрано в TreeViewDevices:
+      // 1. Если выбран стол, то
+        // 1.1. Если выбран конкретный прибор в GridResults, то удаляем из списка отображения прибор
+        // 1.2. Если ничего не выбрано в GridResults, то ничего не делаем.
+      // 2. Если выбран ... , то
+      // 2.1.Если выбран конкретный прибор в GridResults, то удаляем из списка отображения прибор
+      // 2.2.Если не выбран конкретный прибор в GridResults, то ничего
+
+      // 3. Если выбран конкретный прибор:
+      // 3.1. Если выбрана конкретная точка в GridDataPoints, то запращиваем подтверждение "удалить выбранное измерение?". Выбираем следующую точку, если она есть.  При повторном нажатии удаления подтверждение не спрашиваем. Удаляем точку.
+      // 3.2. Если точка не выбрана в   GridDataPoints, то удаляем из списка отображения прибор
+
+      // 4. Если выбрана сессия, то
+     // 3.1. Если выбрана конкретная точка в GridDataPoints, то запращиваем подтверждение "удалить выбранное измерение?". Выбираем следующую точку, если она есть.  При повторном нажатии удаления подтверждение не спрашиваем. Удаляем точку.
+      // 3.2. Если точка не выбрана в   GridDataPoints, то запращиваем подтверждение "удалить выбранную сессию?". Если да -  удаляем сессию
+
 end;
 
 procedure TFormMain.TestButtonClick(Sender: TObject);

@@ -17,8 +17,8 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Size.PlatformDefault = False
       TabOrder = 0
       OnGetValue = GridCoefsGetValue
-      Viewport.Width = 887.000000000000000000
-      Viewport.Height = 263.000000000000000000
+      Viewport.Width = 907.000000000000000000
+      Viewport.Height = 288.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False
@@ -86,6 +86,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         StyleLookup = 'pagecurltoolbutton'
         Text = 'SpeedButtonCoefsClear'
         TextSettings.Trimming = None
+        OnClick = SpeedButtonCoefsClearClick
       end
       object SpeedButtonCoefDelete: TSpeedButton
         Align = Left
