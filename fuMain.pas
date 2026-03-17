@@ -3217,7 +3217,7 @@ begin
       Repo.SaveDevice(Device);
   end;
 
-  GridDataPoints.Repaint;
+  UpdateGridDataPoints;
 end;
 
 

@@ -362,22 +362,7 @@ begin
       ComboBoxUnitsCoefs.ItemIndex := 0;
     UnitsValue.SetDim(ComboBoxUnitsCoefs.ItemIndex);
   end;
-<<<<<<< HEAD
-   end
-    //Если мы корректируем FValue по ValueCorrection
-   else
-   begin
-     //Здесь должен быть код:
-     // Если тип   FValue - это массовый коэфициент   &Type = 'Коэффициент массы';, то
-     // для коэфициента применяются   FValueCorrection должен быть FValue.ValueMassFlow
-     // и наполняется единицами FValue.ValueMassFlow
 
-     // Если тип   FValue - это объемный коэфициент     &Type := 'Коэффициент объема';, то
-     // для коэфициента применяются   FValueCorrection должен быть FValue.ValueVolumeFlow
-     // и наполняется единицами FValue.ValueVolumeFlow
-   end;
-=======
->>>>>>> 6f83158ec36364003b05051e644a39b8c031e73a
 end;
 
 procedure TFrameCalibrCoefs.UpdateHeaders;
