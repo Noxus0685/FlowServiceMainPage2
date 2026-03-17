@@ -2084,6 +2084,7 @@ begin
       Ini.WriteFloat(Section, 'MinNomValue', MV.MinNomValue);
       Ini.WriteFloat(Section, 'CoefK', MV.CoefK);
       Ini.WriteFloat(Section, 'CoefP', MV.CoefP);
+      Ini.WriteFloat(Section, 'Constant', MV.Constant);
       Ini.WriteInteger(Section, 'CurrentDimIndex', MV.CurrentDimIndex);
       Ini.WriteInteger(Section, 'ValueType', Ord(MV.ValueType));
       Ini.WriteInteger(Section, 'DependenceType', Ord(MV.DependenceType));
@@ -2186,6 +2187,7 @@ begin
       MV.MinNomValue := Ini.ReadFloat(Section, 'MinNomValue', MV.MinNomValue);
       MV.CoefK := Ini.ReadFloat(Section, 'CoefK', MV.CoefK);
       MV.CoefP := Ini.ReadFloat(Section, 'CoefP', MV.CoefP);
+      MV.Constant := Ini.ReadFloat(Section, 'Constant', MV.Constant);
       MV.CurrentDimIndex := Ini.ReadInteger(Section, 'CurrentDimIndex', 0);
       MV.ValueType := EValueType(Ini.ReadInteger(Section, 'ValueType', Ord(MV.ValueType)));
       MV.DependenceType := EDependenceType(Ini.ReadInteger(Section, 'DependenceType', Ord(MV.DependenceType)));
