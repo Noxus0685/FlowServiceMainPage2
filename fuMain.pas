@@ -51,6 +51,7 @@ type
   end;
 
   TResultGridRow = record
+    Device: TDevice;
     Name: string;
     DeviceType: string;
     Serial: string;
@@ -1890,6 +1891,7 @@ begin
 
         Device.AnalyseResults;
 
+        Row.Device := Device;
         Row.Name := Device.Name;
         Row.DeviceType := Device.DeviceTypeName;
         Row.Serial := Device.SerialNumber;
@@ -3276,8 +3278,38 @@ begin
 end;
 
 procedure TFormMain.GridResultsSelChanged(Sender: TObject);
+var
+  SelectedDevice: TDevice;
+  NeedInitSessionDevice: Boolean;
 begin
-     UpdateCalibrCoefsFrame;
+  if (GridResults = nil) or (GridResults.Row < 0) or
+     (GridResults.Row >= Length(FCurrentResultRows)) then
+  begin
+    UpdateCalibrCoefsFrame;
+    Exit;
+  end;
+
+  SelectedDevice := FCurrentResultRows[GridResults.Row].Device;
+  if SelectedDevice <> nil then
+  begin
+    NeedInitSessionDevice :=
+      (FSessionDevice = nil) or
+      (FSessionDevice.ValueVolume = nil) or
+      (FSessionDevice.ValueMass = nil) or
+      (FSessionDevice.ValueVolumeFlow = nil) or
+      (FSessionDevice.ValueMassFlow = nil);
+
+    if NeedInitSessionDevice then
+    begin
+      FreeAndNil(FSessionDevice);
+      FSessionDevice := TFlowMeter.Create;
+      FSessionDevice.InitAllValues;
+    end;
+
+    FSessionDevice.Device := SelectedDevice;
+  end;
+
+  UpdateCalibrCoefsFrame;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
