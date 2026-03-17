@@ -78,6 +78,8 @@ type
     function InitErrorPercent(AItem: TCalibrCoefItem): Double;
     function CalcErrorPercent(AItem: TCalibrCoefItem): Double;
     function TryGetSpillageValues(ASpillage: TPointSpillage; out AArg, AValue: Double): Boolean;
+    function TryGetEtalonFlow(ASpillage: TPointSpillage; out AFlow: Double): Boolean;
+    procedure ApplyMeasuredFlowBoundsToCoefs;
     function BuildCoefFromPoint(const AArg, AValue: Double; AOrderNo: Integer): TCalibrCoefItem;
 
     procedure EnsureChartSeries;
@@ -693,6 +695,7 @@ begin
 
   SyncTableToMeterValue;
   FValue.CalcCoefs;
+  ApplyMeasuredFlowBoundsToCoefs;
   SyncMeterValueToTable;
 
   UpdateGrid;
@@ -789,6 +792,7 @@ begin
 
   SyncTableToMeterValue;
   FValue.CalcCoefs;
+  ApplyMeasuredFlowBoundsToCoefs;
   SyncMeterValueToTable;
 
   UpdateGrid;
@@ -935,6 +939,87 @@ begin
   end;
 
   Result := Result and (not SameValue(AValue, 0, 1E-12));
+end;
+
+function TFrameCalibrCoefs.TryGetEtalonFlow(ASpillage: TPointSpillage; out AFlow: Double): Boolean;
+var
+  Dim: TMeasuredDimension;
+begin
+  Result := False;
+  AFlow := 0;
+
+  if (ASpillage = nil) or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+
+  Dim := TMeasuredDimension(FFlowMeter.Device.MeasuredDimension);
+
+  if (Dim = mdVolumeFlow) or (Dim = mdVolume) then
+    AFlow := ASpillage.EtalonVolumeFlow
+  else
+    AFlow := ASpillage.EtalonMassFlow;
+
+  Result := not SameValue(AFlow, 0, 1E-12);
+end;
+
+procedure TFrameCalibrCoefs.ApplyMeasuredFlowBoundsToCoefs;
+var
+  Flows: TList<Double>;
+  Spillage: TPointSpillage;
+  Flow: Double;
+  I, LastIdx, MaxIdx: Integer;
+  C: TCoef;
+begin
+  if (FValue = nil) or (FValue.ValueCorrection = nil) then
+    Exit;
+
+  if (FFlowMeter = nil) or (FFlowMeter.Device = nil) or (FFlowMeter.Device.Spillages = nil) then
+    Exit;
+
+  Flows := TList<Double>.Create;
+  try
+    for Spillage in FFlowMeter.Device.Spillages do
+    begin
+      if (Spillage = nil) or (not Spillage.Enabled) then
+        Continue;
+
+      if TryGetEtalonFlow(Spillage, Flow) then
+        Flows.Add(Flow);
+    end;
+
+    if Flows.Count = 0 then
+      Exit;
+
+    Flows.Sort;
+    MaxIdx := Min(FValue.Coefs.Count, Flows.Count) - 1;
+
+    for I := 0 to MaxIdx do
+    begin
+      C := FValue.Coefs[I];
+
+      if I = 0 then
+        C.Q1 := NegInfinity
+      else
+        C.Q1 := Flows[I - 1];
+
+      if I = MaxIdx then
+        C.Q2 := Infinity
+      else
+        C.Q2 := Flows[I];
+
+      FValue.Coefs[I] := C;
+    end;
+
+    LastIdx := FValue.Coefs.Count - 1;
+    for I := MaxIdx + 1 to LastIdx do
+    begin
+      C := FValue.Coefs[I];
+      C.Q1 := 0;
+      C.Q2 := 0;
+      FValue.Coefs[I] := C;
+    end;
+  finally
+    Flows.Free;
+  end;
 end;
 
 function TFrameCalibrCoefs.BuildCoefFromPoint(const AArg, AValue: Double;
