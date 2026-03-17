@@ -607,6 +607,7 @@ type
       Button: TMouseButton; Shift: TShiftState; X, Y: Single);
     procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDataPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
@@ -1502,6 +1503,7 @@ begin
   TreeViewDevices.PopupMenu := PopupMenuTreeViewDevices;
   PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
   GridDataPoints.OnGetValue := GridDataPointsGetValue;
+  GridDataPoints.OnCellClick := GridDataPointsCellClick;
   GridDataPoints.OnMouseDown := GridDataPointsMouseDown;
   PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
   PopupMenuGridResults.OnPopup := PopupMenuGridResultsPopup;
@@ -2952,6 +2954,8 @@ begin
 
   if GridDataPoints.Columns[ACol] = StringColumnName then
     Value := P.Name
+  else if GridDataPoints.Columns[ACol] = CheckColumnSpillageEnable then
+    Value := P.Enabled
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageNum then
     Value := P.Num
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageDateTime then
@@ -3180,6 +3184,38 @@ begin
     Value := P.FCDCoefficient
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageArchivedData then
     Value := P.ArchivedData;
+end;
+
+procedure TFormMain.GridDataPointsCellClick(const Column: TColumn;
+  const Row: Integer);
+var
+  Point: TPointSpillage;
+  Device: TDevice;
+  Repo: TDeviceRepository;
+begin
+  if (Column <> CheckColumnSpillageEnable) or (Row < 0) or
+     (Row >= Length(FCurrentSpillages)) then
+    Exit;
+
+  Point := FCurrentSpillages[Row];
+  if Point = nil then
+    Exit;
+
+  Point.Enabled := not Point.Enabled;
+  if Point.State = osClean then
+    Point.State := osModified;
+
+  Device := ResolveSelectedDevice;
+  if Device <> nil then
+  begin
+    Repo := nil;
+    if DataManager <> nil then
+      Repo := DataManager.ActiveDeviceRepo;
+    if Repo <> nil then
+      Repo.SaveDevice(Device);
+  end;
+
+  GridDataPoints.Repaint;
 end;
 
 

@@ -889,6 +889,9 @@ begin
 
   for Spillage in FFlowMeter.Device.Spillages do
   begin
+    if not Spillage.Enabled then
+      Continue;
+
     if not TryGetSpillageValues(Spillage, ArgValue, RefValue) then
       Continue;
 

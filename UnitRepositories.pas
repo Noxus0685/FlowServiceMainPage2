@@ -5631,6 +5631,7 @@ begin
     Col('DeviceTypePointID', 'INTEGER'),
     Col('EtalonName', 'TEXT'),
     Col('EtalonUUID', 'TEXT'),
+    Col('Enabled', 'INTEGER'),
     Col('Num', 'INTEGER'),
     Col('Name', 'TEXT'),
     Col('Description', 'TEXT'),
@@ -5746,6 +5747,7 @@ begin
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
   Result.EtalonName := Q.FieldByName('EtalonName').AsString;
   Result.EtalonUUID := Q.FieldByName('EtalonUUID').AsString;
+  Result.Enabled := Q.FieldByName('Enabled').AsInteger <> 0;
   Result.Num := Q.FieldByName('Num').AsInteger;
   Result.Name := Q.FieldByName('Name').AsString;
   Result.Description := Q.FieldByName('Description').AsString;
@@ -5881,7 +5883,7 @@ begin
       osNew:
         Q.SQL.Text :=
           'insert into PointSpillage (' +
-          'SessionID, DevicePointID, DeviceTypePointID, EtalonName, EtalonUUID, Num, Name, Description, DateTime, ' +
+          'SessionID, DevicePointID, DeviceTypePointID, EtalonName, EtalonUUID, Enabled, Num, Name, Description, DateTime, ' +
           'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, QEtalonStd, QEtalonCV, ' +
           'DeviceVolume, DeviceMass, Velocity, Status, StatusStr, Error, Valid, QStd, QCV, ' +
           'VolumeBefore, VolumeAfter, PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
@@ -5889,7 +5891,7 @@ begin
           'InputPressure, OutputPressure, Density, AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
           'Coef, FCDCoefficient' +
           ') values (' +
-          ':SessionID, :DevicePointID, :DeviceTypePointID, :EtalonName, :EtalonUUID, :Num, :Name, :Description, :DateTime, ' +
+          ':SessionID, :DevicePointID, :DeviceTypePointID, :EtalonName, :EtalonUUID, :Enabled, :Num, :Name, :Description, :DateTime, ' +
           ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, :QEtalonStd, :QEtalonCV, ' +
           ':DeviceVolume, :DeviceMass, :Velocity, :Status, :StatusStr, :Error, :Valid, :QStd, :QCV, ' +
           ':VolumeBefore, :VolumeAfter, :PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
@@ -5901,7 +5903,7 @@ begin
         begin
           Q.SQL.Text :=
             'update PointSpillage set ' +
-            'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Num=:Num, ' +
+            'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Enabled=:Enabled, Num=:Num, ' +
             'Name=:Name, Description=:Description, DateTime=:DateTime, SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
             'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
             'Status=:Status, StatusStr=:StatusStr, Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
@@ -5918,6 +5920,7 @@ begin
     SetIntParam(Q, 'DeviceTypePointID', ASpillage.DeviceTypePointID);
     SetStrParam(Q, 'EtalonName', ASpillage.EtalonName);
     SetStrParam(Q, 'EtalonUUID', ASpillage.EtalonUUID);
+    SetIntParam(Q, 'Enabled', Ord(ASpillage.Enabled));
     SetIntParam(Q, 'Num', ASpillage.Num);
     SetStrParam(Q, 'Name', ASpillage.Name);
     SetStrParam(Q, 'Description', ASpillage.Description);
