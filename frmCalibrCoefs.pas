@@ -351,10 +351,13 @@ begin
    else
    begin
      //Здесь должен быть код:
-     // Если тип   FValue - это массовый коэфициент, то
-     // для
+     // Если тип   FValue - это массовый коэфициент   &Type = 'Коэффициент массы';, то
+     // для коэфициента применяются   FValueCorrection должен быть FValue.ValueMassFlow
+     // и наполняется единицами FValue.ValueMassFlow
 
-
+     // Если тип   FValue - это объемный коэфициент     &Type := 'Коэффициент объема';, то
+     // для коэфициента применяются   FValueCorrection должен быть FValue.ValueVolumeFlow
+     // и наполняется единицами FValue.ValueVolumeFlow
    end;
 end;
 

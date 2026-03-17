@@ -3483,7 +3483,6 @@ object FormMain: TFormMain
               Size.Height = 675.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
-              Visible = False
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnGetValue = GridDataPointsGetValue
               Viewport.Width = 1157.000000000000000000
@@ -3669,6 +3668,7 @@ object FormMain: TFormMain
               Size.Height = 675.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
+              Visible = False
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnSelChanged = GridResultsSelChanged
               OnGetValue = GridResultsGetValue
