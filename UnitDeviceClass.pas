@@ -807,6 +807,7 @@ begin
   DeviceTypePointID := 0;
   EtalonName := '';
   EtalonUUID := '';
+  Enabled := True;
   Num := 0;
 
   { Общая информация }
@@ -1387,6 +1388,7 @@ begin
   DeviceTypePointID := ASource.DeviceTypePointID;
   EtalonName := ASource.EtalonName;
   EtalonUUID := ASource.EtalonUUID;
+  Enabled := ASource.Enabled;
 
   {====================================================================}
   { ОБЩАЯ ИНФОРМАЦИЯ }
