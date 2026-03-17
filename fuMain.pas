@@ -5586,6 +5586,8 @@ begin
       Point.DeviceVolumeFlow := Point.DeviceVolume/Point.SpillTime;
       Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
 
+      Point.Coef  :=  DeviceChannel.FlowMeter.ValueCoef.GetDoubleValue;
+
       Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
       Point.StartTemperature := WorkTable.ValueTempertureBefore.GetDoubleValue;
       Point.EndTemperature := WorkTable.ValueTempertureAfter.GetDoubleValue;

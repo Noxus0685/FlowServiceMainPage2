@@ -3,6 +3,7 @@
 interface
 
 uses
+  UnitClasses,
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Rtti, System.Math, System.DateUtils, System.Generics.Collections,
   FMX.Types, FMX.Graphics, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.StdCtrls,
@@ -827,24 +828,60 @@ end;
 
 function TFrameCalibrCoefs.TryGetSpillageValues(ASpillage: TPointSpillage; out AArg,
   AValue: Double): Boolean;
+  var
+    Dim: TMeasuredDimension;
+
 begin
   Result := False;
   if ASpillage = nil then
     Exit;
 
+    Dim:= FFlowMeter.Device.MeasuredDimension;
+
   case FCurrentType of
     cctMeterValueCoef,
     cctDeviceCoefCorrection:
       begin
-        AArg := ASpillage.Coef;
-        AValue := ASpillage.Coef;
+
+    case Dim of
+      mdVolumeFlow,
+      mdVolume:
+      begin
+        AArg :=   ASpillage.Coef;
+        AValue := ASpillage.PulseCount / ASpillage.EtalonVolume;
         Result := True;
+      end;
+
+      mdMassFlow,
+      mdMass:
+      begin
+        AArg :=   ASpillage.Coef;
+        AValue := ASpillage.PulseCount / ASpillage.EtalonMass;
+        Result := True;
+      end;
+
+      mdSpeed:
+      begin
+        //Надо реализовать потом!
+        AArg :=   ASpillage.Coef;
+        AValue := ASpillage.PulseCount / ASpillage.EtalonMass;
+        Result := True;
+      end;
+
+      mdHeat:
+      begin
+        //Надо реализовать потом!
+        AArg :=   ASpillage.Coef;
+        AValue := ASpillage.PulseCount / ASpillage.EtalonMass;
+        Result := True;
+      end;
+    end;
       end;
 
     cctMeterValueFlowRate,
     cctDeviceFlowRateCorrection:
       begin
-        if not SameValue(ASpillage.EtalonVolumeFlow, 0, 1E-12) then
+        if (Dim = mdVolumeFlow) or (Dim = mdVolume) then
         begin
           AArg := ASpillage.DeviceVolumeFlow;
           AValue := ASpillage.EtalonVolumeFlow;
@@ -860,7 +897,7 @@ begin
     cctMeterValueQuantity,
     cctDeviceQuantityCorrection:
       begin
-        if not SameValue(ASpillage.EtalonVolume, 0, 1E-12) then
+        if (Dim = mdVolumeFlow) or (Dim = mdVolume) then
         begin
           AArg := ASpillage.DeviceVolume;
           AValue := ASpillage.EtalonVolume;
@@ -883,7 +920,7 @@ begin
 
     cctReference:
       begin
-        if not SameValue(ASpillage.EtalonVolumeFlow, 0, 1E-12) then
+        if (Dim = mdVolumeFlow) or (Dim = mdVolume) then
         begin
           AArg := ASpillage.DeviceVolumeFlow;
           AValue := ASpillage.EtalonVolumeFlow;
