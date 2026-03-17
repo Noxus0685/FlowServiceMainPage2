@@ -687,6 +687,7 @@ type
     procedure LoadLayoutSettingsFromWorkTable;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
+    procedure EnforceDataPointsColumnsLayout;
     procedure MarkChannelDeviceModified(AChannel: TChannel);
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
@@ -1509,6 +1510,7 @@ begin
   GridDataPoints.OnMouseDown := GridDataPointsMouseDown;
   PopupMenuGridDataPoints.OnPopup := PopupMenuGridDataPointsPopup;
   PopupMenuGridResults.OnPopup := PopupMenuGridResultsPopup;
+  EnforceDataPointsColumnsLayout;
   UpdateSessionItems;
   GridResults.OnMouseDown := GridResultsMouseDown;
   GridResults.OnGetValue := GridResultsGetValue;
@@ -2025,9 +2027,15 @@ begin
   GridResults.EndUpdate;
 
   GridResults.RowCount := Length(FCurrentResultRows);
-  GridResults.Repaint;
+  if Length(FCurrentResultRows) = 0 then
+    GridResults.Row := -1
+  else if (GridResults.Row < 0) or (GridResults.Row >= Length(FCurrentResultRows)) then
+    GridResults.Row := 0;
 
-    GridResults.Visible := True;
+  GridResults.Repaint;
+  GridResultsSelChanged(GridResults);
+
+  GridResults.Visible := True;
   GridDataPoints.Visible := False;
 
 end;
@@ -2812,6 +2820,7 @@ end;
 procedure TFormMain.TreeViewDevicesChange(Sender: TObject);
 begin
   UpdateSessionItems;
+  UpdateCalibrCoefsFrame;
 end;
 
 procedure TFormMain.TreeViewDevicesMouseDown(Sender: TObject;
@@ -3622,6 +3631,9 @@ begin
   begin
     Column := AGrid.Columns[I];
 
+    if (AGrid = GridDataPoints) and (Column = StringColumnSpillageNum) then
+      Continue;
+
     MenuItem := TMenuItem.Create(AMenuItem);
     MenuItem.Parent := AMenuItem;
     MenuItem.Text := Column.Header;
@@ -3729,10 +3741,22 @@ begin
     Exit;
 
   Column := TColumn(MenuItem.TagObject);
+
+  if Column = StringColumnSpillageNum then
+  begin
+    MenuItem.IsChecked := False;
+    StringColumnSpillageNum.Visible := False;
+    Exit;
+  end;
+
   NewVisible := not MenuItem.IsChecked;
   MenuItem.IsChecked := NewVisible;
   Column.Visible := NewVisible;
 
+  if (Column = CheckColumnSpillageEnable) and not CheckColumnSpillageEnable.Visible then
+    CheckColumnSpillageEnable.Visible := True;
+
+  EnforceDataPointsColumnsLayout;
   SaveLayoutSettingsToWorkTable;
 end;
 
@@ -3795,6 +3819,21 @@ begin
   end;
 end;
 
+procedure TFormMain.EnforceDataPointsColumnsLayout;
+begin
+  if GridDataPoints = nil then
+    Exit;
+
+  if CheckColumnSpillageEnable <> nil then
+  begin
+    CheckColumnSpillageEnable.Visible := True;
+    CheckColumnSpillageEnable.Index := 0;
+  end;
+
+  if StringColumnSpillageNum <> nil then
+    StringColumnSpillageNum.Visible := False;
+end;
+
 procedure TFormMain.SaveLayoutSettingsToWorkTable;
 var
   WorkTable: TWorkTable;
@@ -3847,6 +3886,7 @@ begin
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
   ApplyGridColumnsLayout(GridDataPoints, WorkTable.DataPointsGridColumns);
   ApplyGridColumnsLayout(GridResults, WorkTable.ResultsGridColumns);
+  EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
 end;
 
