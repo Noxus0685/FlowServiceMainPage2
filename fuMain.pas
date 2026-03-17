@@ -1609,7 +1609,6 @@ begin
   if (Device <> nil) then
   begin
     ResolveSelectedDevice;
-
     UpdateCalibrCoefsFrame;
 
     if FSessionDevice <> nil then

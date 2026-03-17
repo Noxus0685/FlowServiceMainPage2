@@ -1475,10 +1475,10 @@ begin
     otImpulse:
       begin
         FlowSource := ValueImp;
-        if Assigned(ValueCoef) and Assigned(Device) then
-          ValueCoef.SetValue(Device.Coef);
+        K := 1;
 
-          SetUpdateType(ONLINE_TYPE);
+        if Assigned(Device) and (Device.Coef<>0) then
+         K :=  Device.Coef;
 
       end;
     otVoltage:
@@ -1488,12 +1488,10 @@ begin
         if Assigned(Device) and (Device.VoltageRange > 0) then
           VoltageRange := Device.VoltageRange;
 
-        K := 0;
+        K := 1;
         if Assigned(Device) and (VoltageRange <> 0) then
           K := (Device.VoltageQmaxRate - Device.VoltageQminRate) / VoltageRange;
 
-        if Assigned(ValueCoef) then
-          ValueCoef.SetValue(K);
       end;
     otCurrent:
       begin
@@ -1511,12 +1509,9 @@ begin
             CurrentRange := Device.CurrentRange;
         end;
 
-        K := 0;
+        K := 1;
         if Assigned(Device) and (CurrentRange <> 0) then
           K := (Device.CurrentQmaxRate - Device.CurrentQminRate) / CurrentRange;
-
-        if Assigned(ValueCoef) then
-          ValueCoef.SetValue(K);
 
         if TotalSource = nil then
           TotalSource := FlowSource;
@@ -1525,10 +1520,18 @@ begin
     otVisual:
       begin
         FlowSource := ValueImp;
-        if Assigned(ValueCoef) then
-          ValueCoef.SetValue(1);
       end;
   end;
+
+        if Assigned(ValueCoef) then
+        begin
+          ValueCoef.SetValue(K);
+          ValueCoef.CoefCorrection:= K; //На что мы умножаем аргумент корректирующей функции
+          ValueCoef.ValueCorrection:= FlowSource;
+          SetUpdateType(ONLINE_TYPE);
+        end;
+
+
 
   if ValueMassFlow <> nil then
   begin

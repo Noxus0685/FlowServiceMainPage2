@@ -126,6 +126,8 @@ type
     CoefK: Double;
     CoefP: Double;
 
+    CoefCorrection:  Double;
+
     MaxValue: Double;
     MinValue: Double;
     MaxNomValue: Double;
@@ -1099,7 +1101,7 @@ begin
 
       if ValueCorrection <> nil then
       begin
-        Q := ValueCorrection.Value;
+        Q := ValueCorrection.Value * CoefCorrection;   //Приведение поправочного аргумента к нужной размерности
         if Coefs.Count > 0 then
           ValueLocal := ValueLocal * Rate(Q);
       end

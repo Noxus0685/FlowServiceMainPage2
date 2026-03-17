@@ -60,7 +60,9 @@ type
     procedure SpeedButtonAddTableClick(Sender: TObject);
   private
     FFlowMeter: TFlowMeter;
-    FValue: TMeterValue;
+    FValue: TMeterValue;   //Корректируемое значение
+    FValueCorrection:  TMeterValue; //аргумент функции корректировки
+
     FCurrentType: TCalibrCoefTableType;
     FCurrentTable: TCalibrCoefTable;
     FFilteredTables: TObjectList<TCalibrCoefTable>;
@@ -70,7 +72,7 @@ type
 
     function GetCurrentItem(ARow: Integer): TCalibrCoefItem;
     function GetCoefTypeLabel(AType: TCalibrCoefTableType): string;
-    function ResolveValueByType(AType: TCalibrCoefTableType): TMeterValue;
+    procedure ResolveValueByType(AType: TCalibrCoefTableType);
     function BuildTableCaption(ATable: TCalibrCoefTable): string;
     function InitErrorPercent(AItem: TCalibrCoefItem): Double;
     function CalcErrorPercent(AItem: TCalibrCoefItem): Double;
@@ -137,7 +139,8 @@ procedure TFrameCalibrCoefs.Init(AFlowMeter: TFlowMeter; ADefaultType: TCalibrCo
 begin
   FFlowMeter := AFlowMeter;
   FCurrentType := ADefaultType;
-  FValue := ResolveValueByType(FCurrentType);
+
+  ResolveValueByType(FCurrentType);   //определение FValue и  FValueCorrection
 
   FillCoefTypes;
   FillCoefTables;
@@ -153,51 +156,66 @@ begin
     cctReference:
       Result := 'справочная таблица';
     cctMeterValueCoef:
-      Result := 'поправка коэффициента преобразования';
+      Result := 'коэффициент преобразования';
     cctMeterValueFlowRate:
-      Result := 'поправка расхода';
+      Result := 'корректировка расхода';
     cctMeterValueQuantity:
-      Result := 'поправка кол-ва жидкости';
+      Result := 'корректировка кол-ва';
     cctMeterValueDensity:
-      Result := 'поправка плотности';
+      Result := 'корректировка плотности';
     cctDeviceCoefCorrection:
-      Result := 'поправка коэффициента преобразования (для записи в прибор)';
+      Result := 'коэффициент преобразования (прибор)';
     cctDeviceFlowRateCorrection:
-      Result := 'поправка расхода (для записи в прибор)';
+      Result := 'поправка расхода (прибор)';
     cctDeviceQuantityCorrection:
-      Result := 'поправка количества (для записи в прибор)';
+      Result := 'поправка количества (прибор)';
     cctDeviceDensityCorrection:
-      Result := 'поправка плотности (для записи в прибор)';
+      Result := 'поправка плотности (прибор)';
   else
     Result := Format('тип %d', [Ord(AType)]);
   end;
 end;
 
-function TFrameCalibrCoefs.ResolveValueByType(AType: TCalibrCoefTableType): TMeterValue;
+procedure TFrameCalibrCoefs.ResolveValueByType(AType: TCalibrCoefTableType);
 begin
-  Result := nil;
+
   if FFlowMeter = nil then
     Exit;
 
   case AType of
     cctMeterValueCoef,
     cctDeviceCoefCorrection:
-      Result := FFlowMeter.ValueCoef;
+    begin
+      FValue := FFlowMeter.ValueCoef;
+      FValueCorrection:= FFlowMeter.ValueFlowRate;
+    end;
 
     cctMeterValueFlowRate,
     cctDeviceFlowRateCorrection:
-      Result := FFlowMeter.ValueFlow;
+    begin
+      FValue := FFlowMeter.ValueFlow;
+      FValueCorrection:= FFlowMeter.ValueFlowRate;
+    end;
 
     cctMeterValueQuantity,
     cctDeviceQuantityCorrection:
-      Result := FFlowMeter.ValueQuantity;
+        begin
+      FValue := FFlowMeter.ValueQuantity;
+            FValueCorrection:= FFlowMeter.ValueQuantity;
+        end;
 
     cctMeterValueDensity,
     cctDeviceDensityCorrection:
-      Result := FFlowMeter.ValueDensity;
+    begin
+      FValue := FFlowMeter.ValueDensity;
+      FValueCorrection:= FFlowMeter.ValueDensity;
+    end;
 
     cctReference:
-      Result := FFlowMeter.ValueFlow;
+    begin
+      FValue := FFlowMeter.ValueFlow;
+      FValueCorrection:= FFlowMeter.ValueFlow;
+    end;
   end;
 end;
 
@@ -314,6 +332,9 @@ begin
 
   if FValue = nil then
     Exit;
+    //Если мы корректируем FValue по самой FValue
+   if (FValue.ValueCorrection = nil) then
+   begin
 
   for I := 0 to FValue.Dimensions.Count - 1 do
     ComboBoxUnitsCoefs.Items.Add(FValue.GetDimName(I));
@@ -325,6 +346,16 @@ begin
       ComboBoxUnitsCoefs.ItemIndex := 0;
     FValue.SetDim(ComboBoxUnitsCoefs.ItemIndex);
   end;
+   end
+    //Если мы корректируем FValue по ValueCorrection
+   else
+   begin
+     //Здесь должен быть код:
+     // Если тип   FValue - это массовый коэфициент, то
+     // для
+
+
+   end;
 end;
 
 procedure TFrameCalibrCoefs.UpdateHeaders;
@@ -509,7 +540,7 @@ begin
     Exit;
 
   FCurrentType := TCalibrCoefTableType(Item.Tag);
-  FValue := ResolveValueByType(FCurrentType);
+  ResolveValueByType(FCurrentType);  //Определение FValue
 
   FillCoefTables;
   FillUnits;
@@ -560,22 +591,22 @@ begin
     Value := Item.OrderNo
   else if GridCoefs.Columns[ACol] = StringColumnCoefValue then
   begin
-    if FValue <> nil then
-      Value := FValue.GetStrNum(Item.Value)
+    if FValueCorrection <> nil then
+      Value := FValueCorrection.GetStrNum(Item.Value)
     else
       Value := FloatToStr(Item.Value);
   end
   else if GridCoefs.Columns[ACol] = StringColumnCoefArg then
   begin
-    if FValue <> nil then
-      Value := FValue.GetStrNum(Item.Arg)
+    if FValueCorrection <> nil then
+      Value := FValueCorrection.GetStrNum(Item.Arg)
     else
       Value := FloatToStr(Item.Arg);
   end
   else if GridCoefs.Columns[ACol] = StringColumnCoefInitError then
-    Value := FormatFloat('0.000000', InitErrorPercent(Item))
+    Value := FormatFloat('0.00', InitErrorPercent(Item))
   else if GridCoefs.Columns[ACol] = StringColumnCoefCalcError then
-    Value := FormatFloat('0.000000', CalcErrorPercent(Item))
+    Value := FormatFloat('0.00', CalcErrorPercent(Item))
   else if GridCoefs.Columns[ACol] = StringColumnCoefK then
     Value := FormatFloat('0.000000', Item.K)
   else if GridCoefs.Columns[ACol] = StringColumnCoefb then
@@ -622,8 +653,8 @@ begin
   end
   else if GridCoefs.Columns[ACol] = StringColumnCoefArg then
   begin
-    if FValue <> nil then
-      D := FValue.GetDoubleNum(S)
+    if FValueCorrection <> nil then
+      D := FValueCorrection.GetDoubleNum(S)
     else
       D := StrToFloatDef(S, Item.Arg);
     Item.Arg := D;
@@ -634,15 +665,15 @@ begin
     Item.b := StrToFloatDef(S, Item.b)
   else if GridCoefs.Columns[ACol] = StringColumnCoefFrom then
   begin
-    if FValue <> nil then
-      Item.QFrom := FValue.GetDoubleNum(S)
+    if  FValueCorrection<> nil then
+      Item.QFrom := FValueCorrection.GetDoubleNum(S)
     else
       Item.QFrom := StrToFloatDef(S, Item.QFrom);
   end
   else if GridCoefs.Columns[ACol] = StringColumnCoefTo then
   begin
-    if FValue <> nil then
-      Item.QTo := FValue.GetDoubleNum(S)
+    if FValueCorrection <> nil then
+      Item.QTo := FValueCorrection.GetDoubleNum(S)
     else
       Item.QTo := StrToFloatDef(S, Item.QTo);
   end;
