@@ -127,6 +127,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         StyleLookup = 'organizetoolbutton'
         Text = 'SpeedButtonCoefsRefresh'
         TextSettings.Trimming = None
+        OnClick = SpeedButtonCoefGetPointsClick
       end
       object ComboBoxUnitsCoefs: TComboBox
         Touch.InteractiveGestures = [LongTap, DoubleTap]

@@ -647,6 +647,10 @@ begin
       Item.QTo := StrToFloatDef(S, Item.QTo);
   end;
 
+  SyncTableToMeterValue;
+  FValue.CalcCoefs;
+  SyncMeterValueToTable;
+
   UpdateGrid;
   UpdateChart;
 end;
