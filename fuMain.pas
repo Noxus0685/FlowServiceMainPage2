@@ -720,6 +720,9 @@ type
     procedure ClearChannelData(AChannel: TChannel);
     procedure CopyChannelData(ASource, ADest: TChannel);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
+    procedure ResetPointDeleteConfirm;
+    function GetSelectedResultDevice: TDevice;
+    function DeleteSelectedDataPointWithRules(const AOwner: TObject): Boolean;
 
   public
     { Public declarations }
@@ -731,6 +734,8 @@ type
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
     FInstrumentalVisibleOrder: TList<TLayout>;
+    FSkipPointDeleteConfirm: Boolean;
+    FPointDeleteOwner: TObject;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
     procedure RebuildInstrumentalVisibleOrder;
     procedure ApplyInstrumentalVisibleOrder;
@@ -5430,6 +5435,99 @@ begin
   end;
 end;
 
+procedure TFormMain.ResetPointDeleteConfirm;
+begin
+  FSkipPointDeleteConfirm := False;
+  FPointDeleteOwner := nil;
+end;
+
+function TFormMain.GetSelectedResultDevice: TDevice;
+begin
+  Result := nil;
+  if (GridResults = nil) or (GridResults.Row < 0) or
+     (GridResults.Row >= Length(FCurrentResultRows)) then
+    Exit;
+
+  Result := FCurrentResultRows[GridResults.Row].Device;
+end;
+
+function TFormMain.DeleteSelectedDataPointWithRules(const AOwner: TObject): Boolean;
+var
+  Item: TTreeViewItem;
+  Session: TSessionSpillage;
+  Device: TDevice;
+  Point, NextPoint: TPointSpillage;
+  NextRow, I: Integer;
+  Repo: TDeviceRepository;
+begin
+  Result := False;
+  if (not GridDataPoints.Visible) or (GridDataPoints.Row < 0) or
+     (GridDataPoints.Row >= Length(FCurrentSpillages)) then
+    Exit;
+
+  Item := nil;
+  if TreeViewDevices <> nil then
+    Item := TreeViewDevices.Selected;
+
+  Session := nil;
+  Device := nil;
+  if (Item <> nil) and (Item.TagObject is TSessionSpillage) then
+  begin
+    Session := TSessionSpillage(Item.TagObject);
+    Device := ResolveSelectedDevice;
+  end
+  else if (Item <> nil) and (Item.TagObject is TDevice) then
+    Device := TDevice(Item.TagObject)
+  else
+    Exit;
+
+  Point := FCurrentSpillages[GridDataPoints.Row];
+  if (Device = nil) or (Point = nil) then
+    Exit;
+
+  if (not FSkipPointDeleteConfirm) or (FPointDeleteOwner <> AOwner) then
+    if MessageDlg('Удалить выбранное измерение?', TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit;
+
+  NextPoint := nil;
+  if GridDataPoints.Row + 1 < Length(FCurrentSpillages) then
+    NextPoint := FCurrentSpillages[GridDataPoints.Row + 1];
+
+  Point.State := osDeleted;
+  if (Session <> nil) and (Session.State = osClean) then
+    Session.State := osModified;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  if Session <> nil then
+    RefreshMeasurementsAfterSessionAction(nil, Session)
+  else
+    RefreshMeasurementsAfterSessionAction(Device, nil);
+
+  if NextPoint <> nil then
+  begin
+    NextRow := -1;
+    for I := 0 to High(FCurrentSpillages) do
+      if FCurrentSpillages[I] = NextPoint then
+      begin
+        NextRow := I;
+        Break;
+      end;
+
+    if NextRow >= 0 then
+      GridDataPoints.Row := NextRow;
+  end;
+
+  FSkipPointDeleteConfirm := True;
+  FPointDeleteOwner := AOwner;
+  Result := True;
+end;
+
 procedure TFormMain.SpeedButton2Click(Sender: TObject);
 begin
   SetInstrumentalLayoutVisible(LayoutPump, False);
@@ -5494,36 +5592,156 @@ begin
 end;
 
 procedure TFormMain.ButtonSessionClearPointsClick(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Device: TDevice;
+  Session, NextSession: TSessionSpillage;
+  P: TPointSpillage;
+  Ch: TChannel;
+  WT: TWorkTable;
+  Repo: TDeviceRepository;
+  I, NextIdx: Integer;
 begin
-      // Всё делаем через Action
-      // Здесь в зависимости от того что выбрано в TreeViewDevices:
-      // Если выбран стол, то очищаем из списка оброботки все приборв
-      // Если выбран ... , очищаем все приборы из списка обработки
-      // Если выбран конкретный прибор, то запращиваем подтверждение "очистить все результаты для данного прибора?" удаляем все сессии и все точки с ним связанные
-      // Если выбрана сессия, то запращиваем подтверждение "очистить все результаты данной сессии измерений?" удаляем сессию и все измерения с ней связанные
+  ResetPointDeleteConfirm;
 
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
 
+  Item := TreeViewDevices.Selected;
+
+  if SameText(Item.Text, '...') then
+  begin
+    if FProcessingDevices <> nil then
+      FProcessingDevices.Clear;
+    SaveProcessingDevices;
+    RefreshResultsAfterDevicesAction;
+    Exit;
+  end;
+
+  if Item.TagObject is TWorkTable then
+  begin
+    WT := TWorkTable(Item.TagObject);
+    if (WT = nil) or (WT.DeviceChannels = nil) then
+      Exit;
+
+    for Ch in WT.DeviceChannels do
+      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+        RemoveProcessingDevice(Ch.FlowMeter.Device);
+
+    RefreshResultsAfterDevicesAction;
+    Exit;
+  end;
+
+  if Item.TagObject is TSessionSpillage then
+  begin
+    if MessageDlg('Очистить все результаты данной сессии измерений?',
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit;
+
+    ActionSessionDeleteExecute(ActionSessionDelete);
+    Exit;
+  end;
+
+  if not (Item.TagObject is TDevice) then
+    Exit;
+
+  Device := TDevice(Item.TagObject);
+  if MessageDlg('Очистить все результаты для данного прибора?',
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+    Exit;
+
+  if Device = nil then
+    Exit;
+
+  if Device.Sessions <> nil then
+    for Session in Device.Sessions do
+      if Session <> nil then
+      begin
+        Session.Active := False;
+        Session.State := osDeleted;
+      end;
+
+  if Device.Spillages <> nil then
+    for P in Device.Spillages do
+      if P <> nil then
+        P.State := osDeleted;
+
+  NextSession := nil;
+  NextIdx := -1;
+  if Device.Sessions <> nil then
+  begin
+    for I := 0 to Device.Sessions.Count - 1 do
+      if (Device.Sessions[I] <> nil) and (Device.Sessions[I].State <> osDeleted) then
+      begin
+        NextIdx := I;
+        Break;
+      end;
+
+    if NextIdx >= 0 then
+      NextSession := Device.Sessions[NextIdx];
+  end;
+
+  if NextSession <> nil then
+  begin
+    NextSession.Active := True;
+    if NextSession.Status = 0 then
+      NextSession.Status := 1;
+    if NextSession.State = osClean then
+      NextSession.State := osModified;
+  end;
+
+  Repo := nil;
+  if DataManager <> nil then
+    Repo := DataManager.ActiveDeviceRepo;
+  if Repo <> nil then
+    Repo.SaveDevice(Device);
+
+  RefreshMeasurementsAfterSessionAction(Device, NextSession);
 end;
 
 procedure TFormMain.ButtonSessionDeleteDataPointClick(Sender: TObject);
+var
+  Item: TTreeViewItem;
+  Device: TDevice;
 begin
-      // Всё делаем через Action
-      // Здесь в зависимости от того что выбрано в TreeViewDevices:
-      // 1. Если выбран стол, то
-        // 1.1. Если выбран конкретный прибор в GridResults, то удаляем из списка отображения прибор
-        // 1.2. Если ничего не выбрано в GridResults, то ничего не делаем.
-      // 2. Если выбран ... , то
-      // 2.1.Если выбран конкретный прибор в GridResults, то удаляем из списка отображения прибор
-      // 2.2.Если не выбран конкретный прибор в GridResults, то ничего
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
 
-      // 3. Если выбран конкретный прибор:
-      // 3.1. Если выбрана конкретная точка в GridDataPoints, то запращиваем подтверждение "удалить выбранное измерение?". Выбираем следующую точку, если она есть.  При повторном нажатии удаления подтверждение не спрашиваем. Удаляем точку.
-      // 3.2. Если точка не выбрана в   GridDataPoints, то удаляем из списка отображения прибор
+  Item := TreeViewDevices.Selected;
 
-      // 4. Если выбрана сессия, то
-     // 3.1. Если выбрана конкретная точка в GridDataPoints, то запращиваем подтверждение "удалить выбранное измерение?". Выбираем следующую точку, если она есть.  При повторном нажатии удаления подтверждение не спрашиваем. Удаляем точку.
-      // 3.2. Если точка не выбрана в   GridDataPoints, то запращиваем подтверждение "удалить выбранную сессию?". Если да -  удаляем сессию
+  if SameText(Item.Text, '...') or (Item.TagObject is TWorkTable) or SameText(Item.Text, 'прочее') then
+  begin
+    ResetPointDeleteConfirm;
+    Device := GetSelectedResultDevice;
+    if Device <> nil then
+    begin
+      RemoveProcessingDevice(Device);
+      RefreshResultsAfterDevicesAction;
+    end;
+    Exit;
+  end;
 
+  if Item.TagObject is TDevice then
+  begin
+    if DeleteSelectedDataPointWithRules(Item.TagObject) then
+      Exit;
+
+    ResetPointDeleteConfirm;
+    RemoveProcessingDevice(TDevice(Item.TagObject));
+    RefreshResultsAfterDevicesAction;
+    Exit;
+  end;
+
+  if Item.TagObject is TSessionSpillage then
+  begin
+    if DeleteSelectedDataPointWithRules(Item.TagObject) then
+      Exit;
+
+    ResetPointDeleteConfirm;
+    if MessageDlg('Удалить выбранную сессию?', TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes then
+      ActionSessionDeleteExecute(ActionSessionDelete);
+  end;
 end;
 
 procedure TFormMain.TestButtonClick(Sender: TObject);
