@@ -2025,9 +2025,15 @@ begin
   GridResults.EndUpdate;
 
   GridResults.RowCount := Length(FCurrentResultRows);
-  GridResults.Repaint;
+  if Length(FCurrentResultRows) = 0 then
+    GridResults.Row := -1
+  else if (GridResults.Row < 0) or (GridResults.Row >= Length(FCurrentResultRows)) then
+    GridResults.Row := 0;
 
-    GridResults.Visible := True;
+  GridResults.Repaint;
+  GridResultsSelChanged(GridResults);
+
+  GridResults.Visible := True;
   GridDataPoints.Visible := False;
 
 end;
@@ -2812,6 +2818,7 @@ end;
 procedure TFormMain.TreeViewDevicesChange(Sender: TObject);
 begin
   UpdateSessionItems;
+  UpdateCalibrCoefsFrame;
 end;
 
 procedure TFormMain.TreeViewDevicesMouseDown(Sender: TObject;
