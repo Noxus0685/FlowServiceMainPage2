@@ -646,6 +646,7 @@ type
     procedure MenuTreeViewDevicesDeleteClick(Sender: TObject);
     procedure ActionSessionDeviceRemoveExecute(Sender: TObject);
     procedure ActionSessionDeviceAddExecute(Sender: TObject);
+    procedure GridResultsSelChanged(Sender: TObject);
 
 
   private
@@ -3272,6 +3273,11 @@ begin
     GridResults.Col := Col; // если нужно выбирать и колонку тоже
     GridResults.SetFocus;
   end;
+end;
+
+procedure TFormMain.GridResultsSelChanged(Sender: TObject);
+begin
+     UpdateCalibrCoefsFrame;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
