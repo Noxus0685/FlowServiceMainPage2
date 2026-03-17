@@ -327,35 +327,41 @@ end;
 procedure TFrameCalibrCoefs.FillUnits;
 var
   I: Integer;
+  UnitsValue: TMeterValue;
 begin
   ComboBoxUnitsCoefs.Clear;
 
   if FValue = nil then
     Exit;
-    //Если мы корректируем FValue по самой FValue
-   if (FValue.ValueCorrection = nil) then
-   begin
 
-  for I := 0 to FValue.Dimensions.Count - 1 do
-    ComboBoxUnitsCoefs.Items.Add(FValue.GetDimName(I));
+  UnitsValue := FValue;
+
+  //Если мы корректируем FValue по ValueCorrection
+  if FValue.ValueCorrection <> nil then
+  begin
+    if SameText(FValue.&Type, 'Коэффициент массы') and (FFlowMeter <> nil) then
+      UnitsValue := FFlowMeter.ValueMassFlow
+    else if SameText(FValue.&Type, 'Коэффициент объема') and (FFlowMeter <> nil) then
+      UnitsValue := FFlowMeter.ValueVolumeFlow
+    else
+      UnitsValue := FValue.ValueCorrection;
+
+    FValueCorrection := UnitsValue;
+  end;
+
+  if UnitsValue = nil then
+    Exit;
+
+  for I := 0 to UnitsValue.Dimensions.Count - 1 do
+    ComboBoxUnitsCoefs.Items.Add(UnitsValue.GetDimName(I));
 
   if ComboBoxUnitsCoefs.Count > 0 then
   begin
-    ComboBoxUnitsCoefs.ItemIndex := FValue.GetDim;
+    ComboBoxUnitsCoefs.ItemIndex := UnitsValue.GetDim;
     if ComboBoxUnitsCoefs.ItemIndex < 0 then
       ComboBoxUnitsCoefs.ItemIndex := 0;
-    FValue.SetDim(ComboBoxUnitsCoefs.ItemIndex);
+    UnitsValue.SetDim(ComboBoxUnitsCoefs.ItemIndex);
   end;
-   end
-    //Если мы корректируем FValue по ValueCorrection
-   else
-   begin
-     //Здесь должен быть код:
-     // Если тип   FValue - это массовый коэфициент, то
-     // для
-
-
-   end;
 end;
 
 procedure TFrameCalibrCoefs.UpdateHeaders;
@@ -569,7 +575,12 @@ end;
 
 procedure TFrameCalibrCoefs.ComboBoxUnitsCoefsChange(Sender: TObject);
 begin
-  if (FValue <> nil) and (ComboBoxUnitsCoefs.ItemIndex >= 0) then
+  if ComboBoxUnitsCoefs.ItemIndex < 0 then
+    Exit;
+
+  if (FValue <> nil) and (FValue.ValueCorrection <> nil) and (FValueCorrection <> nil) then
+    FValueCorrection.SetDim(ComboBoxUnitsCoefs.ItemIndex)
+  else if FValue <> nil then
     FValue.SetDim(ComboBoxUnitsCoefs.ItemIndex);
 
   UpdateHeaders;
