@@ -833,10 +833,10 @@ function TFrameCalibrCoefs.TryGetSpillageValues(ASpillage: TPointSpillage; out A
 
 begin
   Result := False;
-  if ASpillage = nil then
+  if (ASpillage = nil) or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
     Exit;
 
-    Dim:= FFlowMeter.Device.MeasuredDimension;
+  Dim := TMeasuredDimension(FFlowMeter.Device.MeasuredDimension);
 
   case FCurrentType of
     cctMeterValueCoef,
