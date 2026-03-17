@@ -1536,7 +1536,7 @@ begin
   if FFrameCalibrCoefs = nil then
     Exit;
 
-  FFrameCalibrCoefs.Init(FSessionDevice, FFrameCalibrCoefs.CurrentType);
+  FFrameCalibrCoefs.Init(FSessionDevice, cctMeterValueCoef);
 end;
 
 procedure TFormMain.TabControl1Change(Sender: TObject);
