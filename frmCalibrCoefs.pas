@@ -961,8 +961,15 @@ var
   Item: TCalibrCoefItem;
   OrderNo: Integer;
 begin
-  if (FCurrentTable = nil) or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+  if (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
     Exit;
+
+  if FCurrentTable = nil then
+  begin
+    SpeedButtonAddTableClick(nil);
+    if FCurrentTable = nil then
+      Exit;
+  end;
 
   FCurrentTable.Items.Clear;
   OrderNo := 1;
