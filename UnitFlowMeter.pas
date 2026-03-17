@@ -1371,6 +1371,8 @@ begin
     ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
   if ValueError <> nil then
     ValueError.ValueEtalon := EtalonMeter.ValueQuantity;
+  if ValueCoef <> nil then
+    ValueCoef.ValueCorrection := EtalonMeter.ValueFlow;
 
   //ApplyMeasurementModel;
 end;
@@ -1526,7 +1528,8 @@ begin
         if Assigned(ValueCoef) then
         begin
           ValueCoef.SetValue(K);
-          ValueCoef.CoefCorrection:= K; //На что мы умножаем аргумент корректирующей функции
+          ValueCoef.Constant:= K;
+          ValueCoef.CoefCorrection:=1;
           ValueCoef.ValueCorrection:= FlowSource;
           SetUpdateType(ONLINE_TYPE);
         end;

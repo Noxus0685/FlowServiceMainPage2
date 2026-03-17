@@ -15,7 +15,7 @@ uses
 
 type
   EUpdateType = (OFFLINE_TYPE, ONLINE_TYPE, HAND_TYPE);
-  EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE,
+  EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE, PARAM_TYPE,
                   ERROR_TYPE, MEAN_TYPE, AGGREGATE_TYPE);
   EDependenceType = (INDEPENDENT, DEPENDENT);
 
@@ -127,6 +127,7 @@ type
     CoefP: Double;
 
     CoefCorrection:  Double;
+    Constant:  Double;
 
     MaxValue: Double;
     MinValue: Double;
@@ -1029,15 +1030,15 @@ var
 begin
   ValueLocal := 0;
 
-  if UpdateType <> HAND_TYPE then
-  begin
+    if UpdateType = HAND_TYPE then
+     Exit;
+
     if SameText(Name, 'Плотность') then
     begin
       SetCalcValue;
-      Exit;
-    end;
+    end
 
-    if ValueType = AGGREGATE_TYPE then
+    else if ValueType = AGGREGATE_TYPE then
     begin
       for MeterValue in FAggregateMeterValues do
       begin
@@ -1045,13 +1046,12 @@ begin
           Continue;
         ValueLocal := ValueLocal + MeterValue.GetDoubleValue;
       end;
-      SetValue(ValueLocal);
-      Exit;
-    end;
+    end
 
-    if ValueEtalon <> nil then
-    begin
-      if ValueType = ERROR_TYPE then
+    else if ValueType = ERROR_TYPE then
+     begin
+
+     if ValueEtalon <> nil then
       begin
         if ValueBaseMultiplier <> nil then
           ValueLocal := ValueBaseMultiplier.Value - ValueEtalon.Value
@@ -1065,17 +1065,13 @@ begin
         end
         else
           ValueLocal := -MaxDouble;
-
-        SetValue(ValueLocal);
       end
-      else
-        ValueLocal := 0;
     end
-    else if (ValueBaseMultiplier <> nil) or (ValueBaseDevider <> nil) then
-    begin
-      if ValueType = MEAN_TYPE then
+
+    else if ValueType = MEAN_TYPE then
       begin
-        if ValueBaseMultiplier <> nil then
+
+       if ValueBaseMultiplier <> nil then
           ValueLocal := ValueBaseMultiplier.Value
         else
           ValueLocal := 0;
@@ -1083,7 +1079,13 @@ begin
         if ValueBaseDevider <> nil then
           ValueLocal := (ValueLocal + ValueBaseDevider.Value) / 2;
       end
-      else
+
+     else if (ValueType = CONST_TYPE) and (DependenceType = INDEPENDENT)  then
+       begin
+           ValueLocal:=Constant;
+       end
+
+    else
       begin
         if ValueBaseMultiplier <> nil then
           ValueLocal := ValueBaseMultiplier.Value
@@ -1108,10 +1110,11 @@ begin
       else if Coefs.Count > 0 then
         ValueLocal := ValueLocal * Rate(ValueLocal);
 
+
       SetValue(ValueLocal);
     end;
-  end;
-end;
+
+
 
 { Adds a meter value to the aggregate source list (if not already present). }
 procedure TMeterValue.AddMeterValue(AMeterValue: TMeterValue);
@@ -1250,7 +1253,7 @@ end;
 procedure TMeterValue.SetAsTime;
 begin
   &Type := 'Время';
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 0;
   SetFilter(-1);
   Accuracy := 0;
@@ -1743,7 +1746,7 @@ end;
 procedure TMeterValue.SetAsDensity;
 begin
   &Type := 'Расчётная плотность';
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 998.1;
   SetFilter(-1);
   Accuracy := -1;
@@ -1766,7 +1769,7 @@ end;
 { Configures this meter value as product temperature with supported units. }
 procedure TMeterValue.SetAsTempPT100;
 begin
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 21.3;
   SetFilter(-1);
   Accuracy := 2;
@@ -1791,7 +1794,7 @@ end;
 
 procedure TMeterValue.SetAsTemp;
 begin
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 21.3;
   SetFilter(-1);
   Accuracy := 2;
@@ -1816,7 +1819,7 @@ end;
 { Configures this meter value as ambient temperature with supported units. }
 procedure TMeterValue.SetAsAirTemp;
 begin
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 21.3;
   SetFilter(-1);
   Accuracy := 2;
@@ -1841,7 +1844,7 @@ end;
 { Configures this meter value as pressure with supported units and limits. }
 procedure TMeterValue.SetAsPressure;
 begin
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 98;
   SetFilter(-1);
   Accuracy := -1;
@@ -1871,7 +1874,7 @@ end;
 procedure TMeterValue.SetAsAirPressure;
 begin
   &Type := 'Давление атмосферное';
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 102124.64;
   SetFilter(-1);
   Accuracy := -1;
@@ -1897,7 +1900,7 @@ end;
 procedure TMeterValue.SetAsCurrent;
 begin
   &Type := 'Токовый вход';
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 4;
   SetFilter(-1);
   Accuracy := -1;
@@ -1958,7 +1961,7 @@ end;
 procedure TMeterValue.SetAsHumidity;
 begin
   &Type := 'Датчик влажности';
-  ValueType := CONST_TYPE;
+  ValueType := PARAM_TYPE;
   Value := 35;
   SetFilter(-1);
   Accuracy := -1;
