@@ -5523,6 +5523,9 @@ var
   Point: TPointSpillage;
   Session: TSessionSpillage;
   DeviceRepo: TDeviceRepository;
+  MeterValueCoef: TMeterValue;
+  MeasuredDim: TMeasuredDimension;
+  CurrentCoef: Double;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -5586,7 +5589,27 @@ begin
       Point.DeviceVolumeFlow := Point.DeviceVolume/Point.SpillTime;
       Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
 
-      Point.Coef  :=  DeviceChannel.FlowMeter.ValueCoef.GetDoubleValue;
+      CurrentCoef := 0.0;
+      MeterValueCoef := DeviceChannel.FlowMeter.ValueCoef;
+      if MeterValueCoef <> nil then
+        CurrentCoef := MeterValueCoef.GetDoubleValue
+      else if DeviceChannel.FlowMeter.Device <> nil then
+        CurrentCoef := DeviceChannel.FlowMeter.Device.Coef;
+
+      if SameValue(CurrentCoef, 0.0, 1E-12) and
+         (DeviceChannel.FlowMeter.Device <> nil) then
+      begin
+        MeasuredDim := TMeasuredDimension(DeviceChannel.FlowMeter.Device.MeasuredDimension);
+        case MeasuredDim of
+          mdVolumeFlow, mdVolume:
+            if not SameValue(Point.EtalonVolume, 0.0, 1E-12) then
+              CurrentCoef := Point.PulseCount / Point.EtalonVolume;
+          mdMassFlow, mdMass:
+            if not SameValue(Point.EtalonMass, 0.0, 1E-12) then
+              CurrentCoef := Point.PulseCount / Point.EtalonMass;
+        end;
+      end;
+      Point.Coef := CurrentCoef;
 
       Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
       Point.StartTemperature := WorkTable.ValueTempertureBefore.GetDoubleValue;
