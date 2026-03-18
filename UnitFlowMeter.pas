@@ -1530,7 +1530,10 @@ begin
           ValueCoef.SetValue(K);
           ValueCoef.Constant:= K;
           ValueCoef.CoefCorrection:=1;
-          ValueCoef.ValueCorrection:= FlowSource;
+
+          if (EtalonMeter <> nil) and (EtalonMeter.ValueFlowRate<> nil)  then
+             ValueCoef.ValueCorrection:= EtalonMeter.ValueFlowRate;
+
           SetUpdateType(ONLINE_TYPE);
         end;
 

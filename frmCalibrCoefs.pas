@@ -27,8 +27,8 @@ type
     StringColumnCoefCalcError: TStringColumn;
     StringColumnCoefK: TStringColumn;
     StringColumnCoefb: TStringColumn;
-    StringColumnCoefFrom: TStringColumn;
-    StringColumnCoefTo: TStringColumn;
+    StringColumnQ1: TStringColumn;
+    StringColumnQ2: TStringColumn;
     Layout2: TLayout;
     Layout3: TLayout;
     Layout4: TLayout;
@@ -47,6 +47,8 @@ type
     SpeedButtonAddTable: TSpeedButton;
     SpeedButtonDeleteTable: TSpeedButton;
     Splitter1: TSplitter;
+    ComboBoxUnitsCorrection: TComboBox;
+    LabelCoefsRange: TLabel;
     procedure ComboBoxCoefTypeChange(Sender: TObject);
     procedure ComboBoxCoefTableChange(Sender: TObject);
     procedure ComboBoxUnitsCoefsChange(Sender: TObject);
@@ -59,6 +61,7 @@ type
     procedure SpeedButtonCoefGetPointsClick(Sender: TObject);
     procedure SpeedButtonDeleteTableClick(Sender: TObject);
     procedure SpeedButtonAddTableClick(Sender: TObject);
+    procedure ComboBoxUnitsCorrectionChange(Sender: TObject);
   private
     FFlowMeter: TFlowMeter;
     FValue: TMeterValue;   //Корректируемое значение
@@ -80,7 +83,7 @@ type
     function TryGetSpillageValues(ASpillage: TPointSpillage; out AArg, AValue: Double): Boolean;
     function TryGetEtalonFlow(ASpillage: TPointSpillage; out AFlow: Double): Boolean;
     procedure ApplyMeasuredFlowBoundsToCoefs;
-    function BuildCoefFromPoint(const AArg, AValue: Double; AOrderNo: Integer): TCalibrCoefItem;
+    function BuildCoefFromPoint(const AArg, AValue, Q1, Q2: Double; AOrderNo: Integer): TCalibrCoefItem;
 
     procedure EnsureChartSeries;
     procedure FillCoefTypes;
@@ -332,25 +335,14 @@ var
   I: Integer;
   UnitsValue: TMeterValue;
 begin
+
+// Основная величина!
   ComboBoxUnitsCoefs.Clear;
 
   if FValue = nil then
     Exit;
 
   UnitsValue := FValue;
-
-  //Если мы корректируем FValue по ValueCorrection
-  if FValue.ValueCorrection <> nil then
-  begin
-    if SameText(FValue.&Type, 'Коэффициент массы') and (FFlowMeter <> nil) then
-      UnitsValue := FFlowMeter.ValueMassFlow
-    else if SameText(FValue.&Type, 'Коэффициент объема') and (FFlowMeter <> nil) then
-      UnitsValue := FFlowMeter.ValueVolumeFlow
-    else
-      UnitsValue := FValue.ValueCorrection;
-
-    FValueCorrection := UnitsValue;
-  end;
 
   if UnitsValue = nil then
     Exit;
@@ -364,6 +356,50 @@ begin
     if ComboBoxUnitsCoefs.ItemIndex < 0 then
       ComboBoxUnitsCoefs.ItemIndex := 0;
     UnitsValue.SetDim(ComboBoxUnitsCoefs.ItemIndex);
+  end;
+
+  //Коррекция
+
+  ComboBoxUnitsCorrection.Clear;
+  ComboBoxUnitsCorrection.Visible:=True;
+  LabelCoefsRange.Visible:=True;
+  //если для локального    FValue не задан ValueCorrection, но это коэф-нт
+  // для которого он должен быть задан, то берем тот тип значений, который там должен быть.
+  if FValue.ValueCorrection = nil then
+     begin
+
+    if SameText(FValue.&Type, 'Коэффициент массы') and (FFlowMeter <> nil) then
+      FValueCorrection :=  FFlowMeter.ValueMassFlow
+
+
+    else if SameText(FValue.&Type, 'Коэффициент объема') and (FFlowMeter <> nil) then
+      FValueCorrection :=  FFlowMeter.ValueVolumeFlow
+
+    else
+      begin
+      //Нет корректировки и это не коэфнт
+      //Значит скрываем второй ComboBox
+       ComboBoxUnitsCorrection.Visible:=False;
+       LabelCoefsRange.Visible:=False;
+       FValueCorrection :=  FValue;
+     end
+    end
+
+    else
+    FValueCorrection :=  FValue.ValueCorrection;
+
+
+  UnitsValue := FValueCorrection;
+
+  for I := 0 to UnitsValue.Dimensions.Count - 1 do
+    ComboBoxUnitsCorrection.Items.Add(UnitsValue.GetDimName(I));
+
+  if ComboBoxUnitsCorrection.Count > 0 then
+  begin
+    ComboBoxUnitsCorrection.ItemIndex := UnitsValue.GetDim;
+    if ComboBoxUnitsCorrection.ItemIndex < 0 then
+      ComboBoxUnitsCorrection.ItemIndex := 0;
+    UnitsValue.SetDim(ComboBoxUnitsCorrection.ItemIndex);
   end;
 
 end;
@@ -381,6 +417,20 @@ begin
 
   StringColumnCoefValue.Header := 'Эталон' + DimText;
   StringColumnCoefArg.Header := 'Прибор исх' + DimText;
+
+  DimText := '';
+  if FValueCorrection <> nil then
+    DimText := FValueCorrection.GetDimName
+
+  else if FValue <> nil then
+    DimText := FValue.GetDimName;
+
+  if DimText <> '' then
+    DimText := ', ' + DimText;
+
+  StringColumnQ1.Header := 'Диапазон от' + DimText;
+  StringColumnQ2.Header := 'Диапазон до' + DimText;
+
 end;
 
 procedure TFrameCalibrCoefs.UpdateGrid;
@@ -582,10 +632,20 @@ begin
   if ComboBoxUnitsCoefs.ItemIndex < 0 then
     Exit;
 
-  if (FValue <> nil) and (FValue.ValueCorrection <> nil) and (FValueCorrection <> nil) then
-    FValueCorrection.SetDim(ComboBoxUnitsCoefs.ItemIndex)
-  else if FValue <> nil then
+   if FValue <> nil then
     FValue.SetDim(ComboBoxUnitsCoefs.ItemIndex);
+
+  UpdateHeaders;
+  UpdateGrid;
+end;
+
+procedure TFrameCalibrCoefs.ComboBoxUnitsCorrectionChange(Sender: TObject);
+begin
+  if ComboBoxUnitsCorrection.ItemIndex < 0 then
+    Exit;
+
+  if (FValue.ValueCorrection <> nil) and (FValueCorrection <> nil) then
+    FValueCorrection.SetDim(ComboBoxUnitsCorrection.ItemIndex);
 
   UpdateHeaders;
   UpdateGrid;
@@ -607,14 +667,14 @@ begin
   else if GridCoefs.Columns[ACol] = StringColumnCoefValue then
   begin
     if FValueCorrection <> nil then
-      Value := FValueCorrection.GetStrNum(Item.Value)
+      Value := FValue.GetStrNum(Item.Value)
     else
       Value := FloatToStr(Item.Value);
   end
   else if GridCoefs.Columns[ACol] = StringColumnCoefArg then
   begin
     if FValueCorrection <> nil then
-      Value := FValueCorrection.GetStrNum(Item.Arg)
+      Value := FValue.GetStrNum(Item.Arg)
     else
       Value := FloatToStr(Item.Arg);
   end
@@ -626,17 +686,17 @@ begin
     Value := FormatFloat('0.000000', Item.K)
   else if GridCoefs.Columns[ACol] = StringColumnCoefb then
     Value := FormatFloat('0.000000', Item.b)
-  else if GridCoefs.Columns[ACol] = StringColumnCoefFrom then
+  else if GridCoefs.Columns[ACol] = StringColumnQ1 then
   begin
     if FValue <> nil then
-      Value := FValue.GetStrNum(Item.QFrom)
+      Value := FValueCorrection.GetStrNum(Item.QFrom)
     else
       Value := FloatToStr(Item.QFrom);
   end
-  else if GridCoefs.Columns[ACol] = StringColumnCoefTo then
+  else if GridCoefs.Columns[ACol] = StringColumnQ2 then
   begin
     if FValue <> nil then
-      Value := FValue.GetStrNum(Item.QTo)
+      Value := FValueCorrection.GetStrNum(Item.QTo)
     else
       Value := FloatToStr(Item.QTo);
   end;
@@ -669,7 +729,7 @@ begin
   else if GridCoefs.Columns[ACol] = StringColumnCoefArg then
   begin
     if FValueCorrection <> nil then
-      D := FValueCorrection.GetDoubleNum(S)
+      D := FValue.GetDoubleNum(S)
     else
       D := StrToFloatDef(S, Item.Arg);
     Item.Arg := D;
@@ -678,14 +738,14 @@ begin
     Item.K := StrToFloatDef(S, Item.K)
   else if GridCoefs.Columns[ACol] = StringColumnCoefb then
     Item.b := StrToFloatDef(S, Item.b)
-  else if GridCoefs.Columns[ACol] = StringColumnCoefFrom then
+  else if GridCoefs.Columns[ACol] = StringColumnQ1 then
   begin
     if  FValueCorrection<> nil then
       Item.QFrom := FValueCorrection.GetDoubleNum(S)
     else
       Item.QFrom := StrToFloatDef(S, Item.QFrom);
   end
-  else if GridCoefs.Columns[ACol] = StringColumnCoefTo then
+  else if GridCoefs.Columns[ACol] = StringColumnQ2 then
   begin
     if FValueCorrection <> nil then
       Item.QTo := FValueCorrection.GetDoubleNum(S)
@@ -1022,7 +1082,7 @@ begin
   end;
 end;
 
-function TFrameCalibrCoefs.BuildCoefFromPoint(const AArg, AValue: Double;
+function TFrameCalibrCoefs.BuildCoefFromPoint(const AArg, AValue, Q1, Q2: Double;
   AOrderNo: Integer): TCalibrCoefItem;
 begin
   Result := TCalibrCoefItem.Create;
@@ -1031,8 +1091,8 @@ begin
   Result.OrderNo := AOrderNo;
   Result.Arg := AArg;
   Result.Value := AValue;
-  Result.QFrom := AArg;
-  Result.QTo := AArg;
+  Result.QFrom := Q1;
+  Result.QTo := Q2;
   Result.K := 1;
   Result.b := 0;
   Result.Enable := True;
@@ -1064,10 +1124,16 @@ begin
     if not Spillage.Enabled then
       Continue;
 
+    //Получение аргумента и функции
     if not TryGetSpillageValues(Spillage, ArgValue, RefValue) then
       Continue;
 
-    Item := BuildCoefFromPoint(ArgValue, RefValue, OrderNo);
+    //Получение диапазона
+    //Здесь должен быть диапазон
+    if not TryGetSpillageRange(Spillage, Q1, Q2) then
+      Continue;
+
+    Item := BuildCoefFromPoint(ArgValue, RefValue, Q1, Q2, OrderNo);
     FCurrentTable.Items.Add(Item);
     Inc(OrderNo);
   end;

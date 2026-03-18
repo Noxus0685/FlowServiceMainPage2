@@ -17,8 +17,8 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Size.PlatformDefault = False
       TabOrder = 0
       OnGetValue = GridCoefsGetValue
-      Viewport.Width = 907.000000000000000000
-      Viewport.Height = 288.000000000000000000
+      Viewport.Width = 887.000000000000000000
+      Viewport.Height = 263.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False
@@ -41,6 +41,16 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         HeaderSettings.TextSettings.WordWrap = False
         HeaderSettings.TextSettings.HorzAlign = Center
       end
+      object StringColumnQ1: TStringColumn
+        Header = #1044#1080#1072#1087#1072#1079#1086#1085' '#1086#1090
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
+      object StringColumnQ2: TStringColumn
+        Header = #1044#1080#1072#1087#1072#1079#1086#1085' '#1076#1086
+        HeaderSettings.TextSettings.WordWrap = False
+        HeaderSettings.TextSettings.HorzAlign = Center
+      end
       object StringColumnCoefInitError: TStringColumn
         Header = #1055#1086#1075#1088' '#1080#1089#1093', %'
         HeaderSettings.TextSettings.WordWrap = False
@@ -58,16 +68,6 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       end
       object StringColumnCoefb: TStringColumn
         Header = #1050#1086#1101#1092'-'#1085#1090' b'
-        HeaderSettings.TextSettings.WordWrap = False
-        HeaderSettings.TextSettings.HorzAlign = Center
-      end
-      object StringColumnCoefFrom: TStringColumn
-        Header = #1044#1080#1072#1087#1072#1079#1086#1085' '#1086#1090
-        HeaderSettings.TextSettings.WordWrap = False
-        HeaderSettings.TextSettings.HorzAlign = Center
-      end
-      object StringColumnCoefTo: TStringColumn
-        Header = #1044#1080#1072#1087#1072#1079#1086#1085' '#1076#1086
         HeaderSettings.TextSettings.WordWrap = False
         HeaderSettings.TextSettings.HorzAlign = Center
       end
@@ -137,16 +137,38 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
           #1084'3/'#1095)
         ItemIndex = 0
         ItemHeight = 19.000000000000000000
-        Margins.Left = 50.000000000000000000
+        Margins.Left = 20.000000000000000000
         Margins.Top = 10.000000000000000000
         Margins.Right = 10.000000000000000000
         Margins.Bottom = 10.000000000000000000
-        Position.X = 340.000000000000000000
+        Position.X = 310.000000000000000000
         Position.Y = 10.000000000000000000
         Size.Width = 103.000000000000000000
         Size.Height = 20.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
+      end
+      object ComboBoxUnitsCorrection: TComboBox
+        Align = Left
+        Margins.Top = 10.000000000000000000
+        Margins.Bottom = 10.000000000000000000
+        Position.X = 510.000000000000000000
+        Position.Y = 10.000000000000000000
+        Size.Width = 100.000000000000000000
+        Size.Height = 20.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        OnChange = ComboBoxUnitsCorrectionChange
+      end
+      object LabelCoefsRange: TLabel
+        Align = Left
+        Margins.Left = 15.000000000000000000
+        Position.X = 438.000000000000000000
+        Size.Width = 72.000000000000000000
+        Size.Height = 40.000000000000000000
+        Size.PlatformDefault = False
+        Text = #1044#1080#1072#1087#1072#1079#1086#1085
+        TabOrder = 2
       end
     end
     object Layout2: TLayout
