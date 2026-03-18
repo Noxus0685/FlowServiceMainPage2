@@ -295,6 +295,7 @@ type
     Arg: Double;
     QFrom: Double;
     QTo: Double;
+    RangeArg: Double;
     K: Double;
     b: Double;
     Enable: Boolean;            // Используется ли точка в расчётах K и P

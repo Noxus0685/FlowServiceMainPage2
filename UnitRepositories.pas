@@ -5162,6 +5162,7 @@ begin
     Col('Arg', 'REAL'),
     Col('QFrom', 'REAL'),
     Col('QTo', 'REAL'),
+    Col('RangeArg', 'REAL'),
     Col('K', 'REAL'),
     Col('b', 'REAL'),
     Col('Enable', 'INTEGER')
@@ -5309,6 +5310,10 @@ begin
           Item.Arg := QItem.FieldByName('Arg').AsFloat;
           Item.QFrom := QItem.FieldByName('QFrom').AsFloat;
           Item.QTo := QItem.FieldByName('QTo').AsFloat;
+          if QItem.FindField('RangeArg') <> nil then
+            Item.RangeArg := QItem.FieldByName('RangeArg').AsFloat
+          else
+            Item.RangeArg := Item.Arg;
           Item.K := QItem.FieldByName('K').AsFloat;
           Item.b := QItem.FieldByName('b').AsFloat;
           Item.Enable := ReadFieldBoolDef(QItem, 'Enable', True);
@@ -5382,8 +5387,8 @@ begin
         if Item.UUID = '' then
           Item.UUID := TGUID.NewGuid.ToString;
       Q.SQL.Text :=
-        'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, K, b, Enable) ' +
-        'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :K, :b, :Enable)';
+        'insert into CalibrCoefItem (UUID, TableID, OrderNo, Name, Value, Arg, QFrom, QTo, RangeArg, K, b, Enable) ' +
+        'values (:UUID, :TableID, :OrderNo, :Name, :Value, :Arg, :QFrom, :QTo, :RangeArg, :K, :b, :Enable)';
         SetStrParam(Q, 'UUID', Item.UUID);
         SetIntParam(Q, 'TableID', Item.TableID);
         SetIntParam(Q, 'OrderNo', Item.OrderNo);
@@ -5392,6 +5397,7 @@ begin
         SetFloatParam(Q, 'Arg', Item.Arg);
         SetFloatParam(Q, 'QFrom', Item.QFrom);
         SetFloatParam(Q, 'QTo', Item.QTo);
+        SetFloatParam(Q, 'RangeArg', Item.RangeArg);
         SetFloatParam(Q, 'K', Item.K);
         SetFloatParam(Q, 'b', Item.b);
         SetIntParam(Q, 'Enable', Ord(Item.Enable));
