@@ -602,8 +602,8 @@ function TMeterValue.GetDoubleValue: Double;
 var
   AbsError: Double;
 begin
-  if ValueType = AGGREGATE_TYPE then
-    SetValue;
+  if ValueType = AGGREGATE_TYPE then     //Спорный момент. SetValue должен делаться
+    SetValue;                           // Перед использованием.
 
 //  if (Error <> 0) and (MinNomValue<>0) then
 //  begin
@@ -849,14 +849,20 @@ function TMeterValue.GetStrNum(AValue: Double): string;
 var
   TempValue: Double;
   DisplayValue: Double;
+  TempType: EValueType;
+
 begin
   TempValue := Value;
   Value := AValue;
+  TempType:=  ValueType;
+   ValueType:= CONST_TYPE;
   try
     DisplayValue := GetDoubleValue(CurrentDimIndex);
     Result := FormatValue(DisplayValue, Accuracy, Error);
   finally
+
     Value := TempValue;
+    ValueType:= TempType;
   end;
 end;
 

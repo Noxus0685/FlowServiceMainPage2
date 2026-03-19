@@ -1637,7 +1637,7 @@ begin
     Channel := FEtalonChannels[I];
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
-      if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
+    if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
   end;
 
 

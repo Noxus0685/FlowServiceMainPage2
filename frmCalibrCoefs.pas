@@ -969,7 +969,7 @@ begin
           begin
             AArg := ASpillage.Coef;
             AQ := ASpillage.EtalonVolumeFlow;
-            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            if OutputKind in [otFrequency, otImpulse] then
             begin
               Result := not SameValue(ASpillage.EtalonVolume, 0, 1E-12);
               if Result then
@@ -985,7 +985,7 @@ begin
           begin
             AArg := ASpillage.Coef;
             AQ := ASpillage.EtalonVolume;
-            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            if OutputKind in [otFrequency, otImpulse] then
             begin
               Result := not SameValue(ASpillage.EtalonVolume, 0, 1E-12);
               if Result then
@@ -1001,7 +1001,7 @@ begin
           begin
             AArg := ASpillage.Coef;
             AQ := ASpillage.EtalonMassFlow;
-            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            if OutputKind in [otFrequency, otImpulse] then
             begin
               Result := not SameValue(ASpillage.EtalonMass, 0, 1E-12);
               if Result then
@@ -1017,7 +1017,7 @@ begin
           begin
             AArg := ASpillage.Coef;
             AQ := ASpillage.EtalonMass;
-            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            if OutputKind in [otFrequency, otImpulse] then
             begin
               Result := not SameValue(ASpillage.EtalonMass, 0, 1E-12);
               if Result then
