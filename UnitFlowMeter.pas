@@ -1392,10 +1392,13 @@ begin
      (ValueMass = nil) or (ValueVolume = nil) then
     Exit;
 
-  OutputKind := TOutputType(OutputType);
+  OutputKind := TOutputType(Self.OutputType);
   MeasuredKind := mdUnknown;
-  if Assigned(Device) then
+  if Assigned(Self.Device) then
+   begin
     MeasuredKind := TMeasuredDimension(Device.MeasuredDimension);
+
+   end;
 
   case MeasuredKind of
     mdMassFlow,
@@ -1506,7 +1509,7 @@ begin
         if Assigned(Device) then
         begin
           if Device.CurrentRange = 20 then
-            CurrentRange := 16
+            CurrentRange := 16   //??!?!?!?!?
           else if Device.CurrentRange > 0 then
             CurrentRange := Device.CurrentRange;
         end;

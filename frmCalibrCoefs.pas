@@ -71,6 +71,9 @@ type
     FCurrentType: TCalibrCoefTableType;
     FCurrentTable: TCalibrCoefTable;
     FFilteredTables: TObjectList<TCalibrCoefTable>;
+
+    FCurrentSpillages : TObjectList<TPointSpillage>;
+
     FSeriesInitError: TLineSeries;
     FSeriesCalcError: TLineSeries;
     FUpdatingUI: Boolean;
