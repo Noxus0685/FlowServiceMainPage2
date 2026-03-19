@@ -84,9 +84,11 @@ type
     function BuildTableCaption(ATable: TCalibrCoefTable): string;
     function InitErrorPercent(AItem: TCalibrCoefItem): Double;
     function CalcErrorPercent(AItem: TCalibrCoefItem): Double;
-    function TryGetSpillageValues(ASpillage: TPointSpillage; out AArg, AValue, ARangeArg: Double): Boolean;
-    function BuildCoefFromPoint(const AArg, AValue, ARangeArg: Double; AOrderNo: Integer): TCalibrCoefItem;
+    function TryGetSpillageValues(ASpillage: TPointSpillage; out AArg, AValue, AQ: Double): Boolean;
+    function BuildCoefFromPoint(const AArg, AValue, AQ: Double; AOrderNo: Integer): TCalibrCoefItem;
+    procedure BuildCurrentTableFromSpillages;
     procedure RecalculateCurrentTable;
+    procedure SetCurrentSpillages(ASpillages: TObjectList<TPointSpillage>);
 
     procedure EnsureChartSeries;
     procedure FillCoefTypes;
@@ -103,7 +105,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
 
-    procedure Init(AFlowMeter: TFlowMeter; ADefaultType: TCalibrCoefTableType);
+    procedure Init(AFlowMeter: TFlowMeter; ADefaultType: TCalibrCoefTableType; ASpillages: TObjectList<TPointSpillage> = nil);
     property FlowMeter: TFlowMeter read FFlowMeter;
     property CurrentType: TCalibrCoefTableType read FCurrentType;
     property CurrentTable: TCalibrCoefTable read FCurrentTable;
@@ -119,6 +121,7 @@ constructor TFrameCalibrCoefs.Create(AOwner: TComponent);
 begin
   inherited;
   FFilteredTables := TObjectList<TCalibrCoefTable>.Create(False);
+  FCurrentSpillages := TObjectList<TPointSpillage>.Create(False);
   FCurrentType := cctReference;
 
   GridCoefs.OnGetValue := GridCoefsGetValue;
@@ -140,14 +143,16 @@ end;
 
 destructor TFrameCalibrCoefs.Destroy;
 begin
+  FCurrentSpillages.Free;
   FFilteredTables.Free;
   inherited;
 end;
 
-procedure TFrameCalibrCoefs.Init(AFlowMeter: TFlowMeter; ADefaultType: TCalibrCoefTableType);
+procedure TFrameCalibrCoefs.Init(AFlowMeter: TFlowMeter; ADefaultType: TCalibrCoefTableType; ASpillages: TObjectList<TPointSpillage>);
 begin
   FFlowMeter := AFlowMeter;
   FCurrentType := ADefaultType;
+  SetCurrentSpillages(ASpillages);
 
   ResolveValueByType(FCurrentType);   //определение FValue и  FValueCorrection
 
@@ -186,46 +191,94 @@ begin
 end;
 
 procedure TFrameCalibrCoefs.ResolveValueByType(AType: TCalibrCoefTableType);
+var
+  Dim: TMeasuredDimension;
 begin
-
   if FFlowMeter = nil then
     Exit;
+
+  if (FFlowMeter.Device <> nil) then
+    Dim := TMeasuredDimension(FFlowMeter.Device.MeasuredDimension)
+  else
+    Dim := mdUnknown;
 
   case AType of
     cctMeterValueCoef,
     cctDeviceCoefCorrection:
-    begin
-      FValue := FFlowMeter.ValueCoef;
-      FValueCorrection:= FFlowMeter.ValueFlowRate;
-    end;
+      begin
+        FValue := FFlowMeter.ValueCoef;
+        case Dim of
+          mdVolumeFlow:
+            FValueCorrection := FFlowMeter.ValueVolumeFlow;
+          mdVolume:
+            FValueCorrection := FFlowMeter.ValueVolume;
+          mdMassFlow:
+            FValueCorrection := FFlowMeter.ValueMassFlow;
+          mdMass:
+            FValueCorrection := FFlowMeter.ValueMass;
+        else
+          FValueCorrection := FFlowMeter.ValueFlowRate;
+        end;
+      end;
 
     cctMeterValueFlowRate,
     cctDeviceFlowRateCorrection:
-    begin
-      FValue := FFlowMeter.ValueFlow;
-      FValueCorrection:= FFlowMeter.ValueFlowRate;
-    end;
+      begin
+        FValue := FFlowMeter.ValueFlow;
+        case Dim of
+          mdVolumeFlow, mdVolume:
+            FValueCorrection := FFlowMeter.ValueVolume;
+          mdMassFlow, mdMass:
+            FValueCorrection := FFlowMeter.ValueMass;
+        else
+          FValueCorrection := FFlowMeter.ValueFlowRate;
+        end;
+      end;
 
     cctMeterValueQuantity,
     cctDeviceQuantityCorrection:
-        begin
-      FValue := FFlowMeter.ValueQuantity;
-            FValueCorrection:= FFlowMeter.ValueQuantity;
+      begin
+        FValue := FFlowMeter.ValueQuantity;
+        case Dim of
+          mdVolumeFlow, mdVolume:
+            FValueCorrection := FFlowMeter.ValueVolume;
+          mdMassFlow, mdMass:
+            FValueCorrection := FFlowMeter.ValueMass;
+        else
+          FValueCorrection := FFlowMeter.ValueQuantity;
         end;
+      end;
 
     cctMeterValueDensity,
     cctDeviceDensityCorrection:
-    begin
-      FValue := FFlowMeter.ValueDensity;
-      FValueCorrection:= FFlowMeter.ValueDensity;
-    end;
+      begin
+        FValue := FFlowMeter.ValueDensity;
+        FValueCorrection := FFlowMeter.ValueDensity;
+      end;
 
     cctReference:
-    begin
-      FValue := FFlowMeter.ValueFlow;
-      FValueCorrection:= FFlowMeter.ValueFlow;
-    end;
+      begin
+        FValue := FFlowMeter.ValueFlow;
+        FValueCorrection := FFlowMeter.ValueFlow;
+      end;
   end;
+end;
+
+procedure TFrameCalibrCoefs.SetCurrentSpillages(
+  ASpillages: TObjectList<TPointSpillage>);
+var
+  Spillage: TPointSpillage;
+begin
+  if FCurrentSpillages = nil then
+    FCurrentSpillages := TObjectList<TPointSpillage>.Create(False);
+
+  FCurrentSpillages.Clear;
+  if ASpillages = nil then
+    Exit;
+
+  for Spillage in ASpillages do
+    if Spillage <> nil then
+      FCurrentSpillages.Add(Spillage);
 end;
 
 procedure TFrameCalibrCoefs.FillCoefTypes;
@@ -891,19 +944,22 @@ begin
 end;
 
 function TFrameCalibrCoefs.TryGetSpillageValues(ASpillage: TPointSpillage; out AArg,
-  AValue, ARangeArg: Double): Boolean;
+  AValue, AQ: Double): Boolean;
 var
   Dim: TMeasuredDimension;
+  OutputKind: TOutputType;
+  RatioBase: Double;
 begin
   Result := False;
   AArg := 0;
   AValue := 0;
-  ARangeArg := 0;
+  AQ := 0;
 
   if (ASpillage = nil) or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
     Exit;
 
   Dim := TMeasuredDimension(FFlowMeter.Device.MeasuredDimension);
+  OutputKind := TOutputType(FFlowMeter.OutputType);
 
   case FCurrentType of
     cctMeterValueCoef,
@@ -912,30 +968,66 @@ begin
         mdVolumeFlow:
           begin
             AArg := ASpillage.Coef;
-            AValue := ASpillage.PulseCount / ASpillage.EtalonVolume;
-            ARangeArg := ASpillage.EtalonVolumeFlow;
-            Result := not SameValue(ASpillage.EtalonVolume, 0, 1E-12);
+            AQ := ASpillage.EtalonVolumeFlow;
+            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            begin
+              Result := not SameValue(ASpillage.EtalonVolume, 0, 1E-12);
+              if Result then
+                AValue := ASpillage.PulseCount / ASpillage.EtalonVolume;
+            end
+            else
+            begin
+              AValue := ASpillage.Coef * ASpillage.Error / 100;
+              Result := True;
+            end;
           end;
         mdVolume:
           begin
             AArg := ASpillage.Coef;
-            AValue := ASpillage.PulseCount / ASpillage.EtalonVolume;
-            ARangeArg := ASpillage.EtalonVolume;
-            Result := not SameValue(ASpillage.EtalonVolume, 0, 1E-12);
+            AQ := ASpillage.EtalonVolume;
+            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            begin
+              Result := not SameValue(ASpillage.EtalonVolume, 0, 1E-12);
+              if Result then
+                AValue := ASpillage.PulseCount / ASpillage.EtalonVolume;
+            end
+            else
+            begin
+              AValue := ASpillage.Coef * ASpillage.Error / 100;
+              Result := True;
+            end;
           end;
         mdMassFlow:
           begin
             AArg := ASpillage.Coef;
-            AValue := ASpillage.PulseCount / ASpillage.EtalonMass;
-            ARangeArg := ASpillage.EtalonMassFlow;
-            Result := not SameValue(ASpillage.EtalonMass, 0, 1E-12);
+            AQ := ASpillage.EtalonMassFlow;
+            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            begin
+              Result := not SameValue(ASpillage.EtalonMass, 0, 1E-12);
+              if Result then
+                AValue := ASpillage.PulseCount / ASpillage.EtalonMass;
+            end
+            else
+            begin
+              AValue := ASpillage.Coef * ASpillage.Error / 100;
+              Result := True;
+            end;
           end;
         mdMass:
           begin
-            AArg := ASpillage.EtalonMass;
-            AValue := ASpillage.DeviceMass;
-            ARangeArg := ASpillage.EtalonMassFlow;
-            Result := True;
+            AArg := ASpillage.Coef;
+            AQ := ASpillage.EtalonMass;
+            if OutputKind in [otUnknown, otFrequency, otImpulse] then
+            begin
+              Result := not SameValue(ASpillage.EtalonMass, 0, 1E-12);
+              if Result then
+                AValue := ASpillage.PulseCount / ASpillage.EtalonMass;
+            end
+            else
+            begin
+              AValue := ASpillage.Coef * ASpillage.Error / 100;
+              Result := True;
+            end;
           end;
       end;
 
@@ -947,14 +1039,14 @@ begin
           begin
             AArg := ASpillage.DeviceVolumeFlow;
             AValue := ASpillage.EtalonVolumeFlow;
-            ARangeArg := ASpillage.DeviceVolume;
+            AQ := AArg;
             Result := True;
           end;
         mdMassFlow, mdMass:
           begin
             AArg := ASpillage.DeviceMassFlow;
             AValue := ASpillage.EtalonMassFlow;
-            ARangeArg := ASpillage.DeviceMass;
+            AQ := AArg;
             Result := True;
           end;
       end;
@@ -966,14 +1058,14 @@ begin
           begin
             AArg := ASpillage.DeviceVolume;
             AValue := ASpillage.EtalonVolume;
-            ARangeArg := ASpillage.DeviceVolume;
+            AQ := AArg;
             Result := True;
           end;
         mdMassFlow, mdMass:
           begin
             AArg := ASpillage.DeviceMass;
             AValue := ASpillage.EtalonMass;
-            ARangeArg := ASpillage.DeviceMass;
+            AQ := AArg;
             Result := True;
           end;
       end;
@@ -982,31 +1074,79 @@ begin
     cctDeviceDensityCorrection:
       begin
         AArg := ASpillage.Density;
-        AValue := ASpillage.Density;
-        ARangeArg := ASpillage.AvgTemperature;
-        Result := True;
+        AQ := ASpillage.AvgTemperature;
+        Result := not SameValue(ASpillage.EtalonMass, 0, 1E-12);
+        if Result then
+          AValue := ASpillage.EtalonVolume / ASpillage.EtalonMass;
       end;
   end;
 
-  Result := Result and (not IsNan(AArg)) and (not IsNan(AValue)) and (not IsNan(ARangeArg));
+  if Result then
+  begin
+    if SameValue(AArg, 0, 1E-12) then
+      Exit(False);
+
+    RatioBase := AValue / AArg;
+    Result := (not IsNan(RatioBase)) and (not IsInfinite(RatioBase));
+  end;
+
+  Result := Result and (not IsNan(AArg)) and (not IsNan(AValue)) and (not IsNan(AQ)) and
+    (not IsInfinite(AArg)) and (not IsInfinite(AValue)) and (not IsInfinite(AQ));
 end;
 
-procedure TFrameCalibrCoefs.RecalculateCurrentTable;
+procedure TFrameCalibrCoefs.BuildCurrentTableFromSpillages;
 var
-  EnabledByArg: TList<TCalibrCoefItem>;
-  EnabledByRange: TList<TCalibrCoefItem>;
+  Spillage: TPointSpillage;
+  ArgValue: Double;
+  RefValue: Double;
+  QValue: Double;
   Item: TCalibrCoefItem;
-  I: Integer;
-  PrevItem: TCalibrCoefItem;
-  KLocal: Double;
-  BLocal: Double;
-  WorkRangeArg: Double;
+  OrderNo: Integer;
 begin
   if (FCurrentTable = nil) or (FCurrentTable.Items = nil) then
     Exit;
 
-  EnabledByArg := TList<TCalibrCoefItem>.Create;
-  EnabledByRange := TList<TCalibrCoefItem>.Create;
+  FCurrentTable.Items.Clear;
+  OrderNo := 1;
+
+  if FCurrentSpillages = nil then
+    Exit;
+
+  for Spillage in FCurrentSpillages do
+  begin
+    if (Spillage = nil) or (not Spillage.Enabled) then
+      Continue;
+
+    if not TryGetSpillageValues(Spillage, ArgValue, RefValue, QValue) then
+      Continue;
+
+    Item := BuildCoefFromPoint(ArgValue, RefValue, QValue, OrderNo);
+    FCurrentTable.Items.Add(Item);
+    Inc(OrderNo);
+  end;
+end;
+
+procedure TFrameCalibrCoefs.RecalculateCurrentTable;
+type
+  TCoefSeed = record
+    Item: TCalibrCoefItem;
+    Ratio: Double;
+    Q: Double;
+  end;
+var
+  Seeds: TList<TCoefSeed>;
+  Seed: TCoefSeed;
+  PrevSeed: TCoefSeed;
+  CurrSeed: TCoefSeed;
+  Item: TCalibrCoefItem;
+  I: Integer;
+  KLocal: Double;
+  BLocal: Double;
+begin
+  if (FCurrentTable = nil) or (FCurrentTable.Items = nil) then
+    Exit;
+
+  Seeds := TList<TCoefSeed>.Create;
   try
     for Item in FCurrentTable.Items do
     begin
@@ -1018,95 +1158,77 @@ begin
       Item.QFrom := 0;
       Item.QTo := 0;
 
-      if Item.Enable then
-      begin
-        EnabledByArg.Add(Item);
+      if (not Item.Enable) or SameValue(Item.Arg, 0, 1E-12) then
+        Continue;
 
-        if (FValue <> nil) and (FValue.ValueCorrection <> nil) then
-          WorkRangeArg := Item.RangeArg
-        else
-          WorkRangeArg := Item.Arg;
+      Seed.Item := Item;
+      Seed.Ratio := Item.Value / Item.Arg;
+      Seed.Q := Item.RangeArg;
+      if IsNan(Seed.Ratio) or IsInfinite(Seed.Ratio) or IsNan(Seed.Q) or IsInfinite(Seed.Q) then
+        Continue;
 
-        Item.RangeArg := WorkRangeArg;
-        EnabledByRange.Add(Item);
-      end;
+      Seeds.Add(Seed);
     end;
 
-    EnabledByArg.Sort(TComparer<TCalibrCoefItem>.Construct(
-      function(const Left, Right: TCalibrCoefItem): Integer
+    Seeds.Sort(TComparer<TCoefSeed>.Construct(
+      function(const Left, Right: TCoefSeed): Integer
       begin
-        Result := CompareValue(Left.Arg, Right.Arg);
+        Result := CompareValue(Left.Q, Right.Q);
         if Result = EqualsValue then
-          Result := Left.OrderNo - Right.OrderNo;
+          Result := Left.Item.OrderNo - Right.Item.OrderNo;
       end));
 
-    EnabledByRange.Sort(TComparer<TCalibrCoefItem>.Construct(
-      function(const Left, Right: TCalibrCoefItem): Integer
-      begin
-        Result := CompareValue(Left.RangeArg, Right.RangeArg);
-        if Result = EqualsValue then
-          Result := Left.OrderNo - Right.OrderNo;
-      end));
+    if Seeds.Count = 0 then
+      Exit;
 
-    if EnabledByArg.Count = 1 then
+    if Seeds.Count = 1 then
     begin
-      Item := EnabledByArg[0];
+      Item := Seeds[0].Item;
+      Item.QFrom := NegInfinity;
+      Item.QTo := Infinity;
       Item.K := 0;
-      Item.b := Item.Value;
-    end
-    else
-      for I := 1 to EnabledByArg.Count - 1 do
-      begin
-        PrevItem := EnabledByArg[I - 1];
-        Item := EnabledByArg[I];
-
-        if SameValue(Item.Arg, PrevItem.Arg, 1E-12) then
-          Continue;
-
-        KLocal := (Item.Value - PrevItem.Value) / (Item.Arg - PrevItem.Arg);
-        BLocal := PrevItem.Value - KLocal * PrevItem.Arg;
-
-        Item.K := KLocal;
-        Item.b := BLocal;
-      end;
-
-    if EnabledByArg.Count > 1 then
-    begin
-      EnabledByArg[0].K := EnabledByArg[1].K;
-      EnabledByArg[0].b := EnabledByArg[1].b;
-      EnabledByArg[EnabledByArg.Count - 1].K := EnabledByArg[EnabledByArg.Count - 2].K;
-      EnabledByArg[EnabledByArg.Count - 1].b := EnabledByArg[EnabledByArg.Count - 2].b;
+      Item.b := Seeds[0].Ratio;
+      ReindexItems;
+      Exit;
     end;
 
-    if EnabledByRange.Count = 1 then
+    for I := 0 to Seeds.Count - 2 do
     begin
-      EnabledByRange[0].QFrom := NegInfinity;
-      EnabledByRange[0].QTo := Infinity;
-    end
-    else
-      for I := 0 to EnabledByRange.Count - 1 do
+      PrevSeed := Seeds[I];
+      CurrSeed := Seeds[I + 1];
+
+      if I = 0 then
+        PrevSeed.Item.QFrom := NegInfinity
+      else
+        PrevSeed.Item.QFrom := PrevSeed.Q;
+      PrevSeed.Item.QTo := CurrSeed.Q;
+
+      if SameValue(PrevSeed.Q, CurrSeed.Q, 1E-12) then
       begin
-        Item := EnabledByRange[I];
-
-        if I = 0 then
-          Item.QFrom := NegInfinity
-        else
-          Item.QFrom := Item.RangeArg;
-
-        if I = EnabledByRange.Count - 1 then
-          Item.QTo := Infinity
-        else
-          Item.QTo := EnabledByRange[I + 1].RangeArg;
+        PrevSeed.Item.K := 0;
+        PrevSeed.Item.b := PrevSeed.Ratio;
+        Continue;
       end;
+
+      KLocal := (PrevSeed.Ratio - CurrSeed.Ratio) / (PrevSeed.Q - CurrSeed.Q);
+      BLocal := PrevSeed.Ratio - KLocal * PrevSeed.Q;
+      PrevSeed.Item.K := KLocal;
+      PrevSeed.Item.b := BLocal;
+    end;
+
+    Item := Seeds[Seeds.Count - 1].Item;
+    Item.QFrom := Seeds[Seeds.Count - 1].Q;
+    Item.QTo := Infinity;
+    Item.K := Seeds[Seeds.Count - 2].Item.K;
+    Item.b := Seeds[Seeds.Count - 2].Item.b;
 
     ReindexItems;
   finally
-    EnabledByArg.Free;
-    EnabledByRange.Free;
+    Seeds.Free;
   end;
 end;
 
-function TFrameCalibrCoefs.BuildCoefFromPoint(const AArg, AValue, ARangeArg: Double;
+function TFrameCalibrCoefs.BuildCoefFromPoint(const AArg, AValue, AQ: Double;
   AOrderNo: Integer): TCalibrCoefItem;
 
 begin
@@ -1116,7 +1238,7 @@ begin
   Result.OrderNo := AOrderNo;
   Result.Arg := AArg;
   Result.Value := AValue;
-  Result.RangeArg := ARangeArg;
+  Result.RangeArg := AQ;
   Result.QFrom := 0;
   Result.QTo := 0;
   Result.K := 0;
@@ -1125,13 +1247,6 @@ begin
 end;
 
 procedure TFrameCalibrCoefs.SpeedButtonCoefGetPointsClick(Sender: TObject);
-var
-  Spillage: TPointSpillage;
-  ArgValue: Double;
-  RefValue: Double;
-  RangeArg: Double;
-  Item: TCalibrCoefItem;
-  OrderNo: Integer;
 begin
   if (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
     Exit;
@@ -1143,22 +1258,7 @@ begin
       Exit;
   end;
 
-  FCurrentTable.Items.Clear;
-  OrderNo := 1;
-
-  for Spillage in FFlowMeter.Device.Spillages do
-  begin
-    if not Spillage.Enabled then
-      Continue;
-
-    //Получение аргумента и функции
-    if not TryGetSpillageValues(Spillage, ArgValue, RefValue, RangeArg) then
-      Continue;
-
-    Item := BuildCoefFromPoint(ArgValue, RefValue, RangeArg, OrderNo);
-    FCurrentTable.Items.Add(Item);
-    Inc(OrderNo);
-  end;
+  BuildCurrentTableFromSpillages;
 
   SpeedButtonCoefsRefreshClick(Sender);
 end;

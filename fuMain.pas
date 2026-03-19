@@ -776,6 +776,7 @@ type
     procedure UpdateGridDataPoints;
     procedure UpdateGridResults;
     procedure UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);
+    function BuildCurrentSpillagesList: TObjectList<TPointSpillage>;
     procedure GridDataPointsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
       const Column: TColumn; const Bounds: TRectF; const Row: Integer;
       const Value: TValue; const State: TGridDrawStates);
@@ -1526,6 +1527,8 @@ begin
 end;
 
 procedure TFormMain.InitCalibrCoefsFrame;
+var
+  Spillages: TObjectList<TPointSpillage>;
 begin
   if (TabItemCalibrCoefs = nil) or (FFrameCalibrCoefs <> nil) then
     Exit;
@@ -1533,15 +1536,27 @@ begin
   FFrameCalibrCoefs := TFrameCalibrCoefs.Create(Self);
   FFrameCalibrCoefs.Parent := TabItemCalibrCoefs;
   FFrameCalibrCoefs.Align := TAlignLayout.Client;
-  FFrameCalibrCoefs.Init(FSessionDevice, cctReference);
+  Spillages := BuildCurrentSpillagesList;
+  try
+    FFrameCalibrCoefs.Init(FSessionDevice, cctReference, Spillages);
+  finally
+    Spillages.Free;
+  end;
 end;
 
 procedure TFormMain.UpdateCalibrCoefsFrame;
+var
+  Spillages: TObjectList<TPointSpillage>;
 begin
   if FFrameCalibrCoefs = nil then
     Exit;
 
-  FFrameCalibrCoefs.Init(FSessionDevice, cctMeterValueCoef);
+  Spillages := BuildCurrentSpillagesList;
+  try
+    FFrameCalibrCoefs.Init(FSessionDevice, cctMeterValueCoef, Spillages);
+  finally
+    Spillages.Free;
+  end;
 end;
 
 procedure TFormMain.TabControl1Change(Sender: TObject);
@@ -2053,6 +2068,16 @@ begin
   GridDataPoints.EndUpdate;
   GridResults.Visible := False;
   GridDataPoints.Visible := True;
+end;
+
+function TFormMain.BuildCurrentSpillagesList: TObjectList<TPointSpillage>;
+var
+  Point: TPointSpillage;
+begin
+  Result := TObjectList<TPointSpillage>.Create(False);
+  for Point in FCurrentSpillages do
+    if Point <> nil then
+      Result.Add(Point);
 end;
 
 procedure TFormMain.ShowDeviceSpillages(ADevice: TDevice);
