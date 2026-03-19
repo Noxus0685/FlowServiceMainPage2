@@ -584,21 +584,139 @@ end;
 procedure TFrameCalibrCoefs.UpdateChart;
 var
   Item: TCalibrCoefItem;
+  LastItem: TCalibrCoefItem;
+  X1: Double;
+  X2: Double;
+  MaxQ: Double;
+  MaxFiniteQ: Double;
+  InitErr: Double;
+  CalcErr: Double;
+  AxisTitleX: string;
+  AxisTitleY: string;
+
+  function IsFiniteValue(const AValue: Double): Boolean;
+  begin
+    Result := (not IsNan(AValue)) and (not IsInfinite(AValue));
+  end;
+
+  function BuildAxisTitle(AMeterValue: TMeterValue; const ADefault: string): string;
+  begin
+    Result := ADefault;
+    if AMeterValue = nil then
+      Exit;
+
+    if AMeterValue.Description <> '' then
+      Result := AMeterValue.Description
+    else if AMeterValue.Name <> '' then
+      Result := AMeterValue.Name;
+
+    if (AMeterValue.CurrentDim.Name <> '') and (Pos(AMeterValue.CurrentDim.Name, Result) = 0) then
+      Result := Result + ', ' + AMeterValue.CurrentDim.Name;
+  end;
+
+  function GetItemX1(AChartItem: TCalibrCoefItem): Double;
+  begin
+    Result := 0;
+    if AChartItem = nil then
+      Exit;
+
+    if IsFiniteValue(AChartItem.QFrom) and (AChartItem.QFrom > 0) then
+      Result := AChartItem.QFrom;
+  end;
+
+  function GetItemX2(AChartItem: TCalibrCoefItem): Double;
+  begin
+    Result := 0;
+    if AChartItem = nil then
+      Exit;
+
+    if IsFiniteValue(AChartItem.QTo) and (AChartItem.QTo > 0) then
+      Result := AChartItem.QTo
+    else if IsFiniteValue(AChartItem.RangeArg) and (AChartItem.RangeArg > 0) then
+      Result := AChartItem.RangeArg
+    else
+      Result := GetItemX1(AChartItem);
+  end;
+
 begin
   EnsureChartSeries;
   FSeriesInitError.Clear;
   FSeriesCalcError.Clear;
 
-  if (FCurrentTable = nil) or (FCurrentTable.Items = nil) then
+  ChartCoefs.Legend.Visible := True;
+  ChartCoefs.BottomAxis.Title.Visible := True;
+  ChartCoefs.LeftAxis.Title.Visible := True;
+
+  AxisTitleX := BuildAxisTitle(FValueCorrection, 'Q');
+  AxisTitleY := 'Погрешность, %';
+
+  ChartCoefs.BottomAxis.Title.Caption := AxisTitleX;
+  ChartCoefs.LeftAxis.Title.Caption := AxisTitleY;
+
+  if (FCurrentTable = nil) or (FCurrentTable.Items = nil) or (FCurrentTable.Items.Count = 0) then
+  begin
+    ChartCoefs.BottomAxis.Automatic := False;
+    ChartCoefs.BottomAxis.SetMinMax(0, 1);
     Exit;
+  end;
+
+  MaxFiniteQ := 0;
+  LastItem := nil;
 
   for Item in FCurrentTable.Items do
   begin
     if Item = nil then
       Continue;
 
-    FSeriesInitError.AddXY(Item.Arg, InitErrorPercent(Item));
-    FSeriesCalcError.AddXY(Item.Arg, CalcErrorPercent(Item));
+    LastItem := Item;
+    X2 := GetItemX2(Item);
+    if IsFiniteValue(X2) and (X2 > MaxFiniteQ) then
+      MaxFiniteQ := X2;
+  end;
+
+  if LastItem <> nil then
+    MaxQ := GetItemX2(LastItem)
+  else
+    MaxQ := 0;
+
+  if (not IsFiniteValue(MaxQ)) or (MaxQ <= 0) then
+    MaxQ := MaxFiniteQ;
+
+  if MaxQ > 0 then
+    MaxQ := MaxQ * 1.1
+  else
+    MaxQ := 1;
+
+  ChartCoefs.BottomAxis.Automatic := False;
+  ChartCoefs.BottomAxis.SetMinMax(0, MaxQ);
+
+  for Item in FCurrentTable.Items do
+  begin
+    if Item = nil then
+      Continue;
+
+    X1 := GetItemX1(Item);
+    X2 := GetItemX2(Item);
+
+    if X2 < X1 then
+      X2 := X1;
+
+    if X1 > MaxQ then
+      Continue;
+
+    if X2 > MaxQ then
+      X2 := MaxQ;
+
+    InitErr := InitErrorPercent(Item);
+    CalcErr := CalcErrorPercent(Item);
+
+    FSeriesInitError.AddXY(X1, InitErr);
+    if not SameValue(X2, X1, 1E-12) then
+      FSeriesInitError.AddXY(X2, InitErr);
+
+    FSeriesCalcError.AddXY(X1, CalcErr);
+    if not SameValue(X2, X1, 1E-12) then
+      FSeriesCalcError.AddXY(X2, CalcErr);
   end;
 end;
 
