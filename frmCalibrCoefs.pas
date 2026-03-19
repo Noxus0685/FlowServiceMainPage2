@@ -100,6 +100,7 @@ type
     procedure SetCurrentTable(ATable: TCalibrCoefTable);
     procedure SyncTableToMeterValue;
     procedure SyncMeterValueToTable;
+    procedure SortCurrentTableByRange;
     procedure ReindexItems;
   public
     constructor Create(AOwner: TComponent); override;
@@ -558,6 +559,8 @@ end;
 procedure TFrameCalibrCoefs.SetCurrentTable(ATable: TCalibrCoefTable);
 begin
   FCurrentTable := ATable;
+  SortCurrentTableByRange;
+  ReindexItems;
   SyncTableToMeterValue;
   UpdateGrid;
   UpdateChart;
@@ -619,6 +622,31 @@ begin
     if C.Name <> '' then
       Item.Name := C.Name;
   end;
+end;
+
+procedure TFrameCalibrCoefs.SortCurrentTableByRange;
+begin
+  if (FCurrentTable = nil) or (FCurrentTable.Items = nil) then
+    Exit;
+
+  FCurrentTable.Items.Sort(TComparer<TCalibrCoefItem>.Construct(
+    function(const Left, Right: TCalibrCoefItem): Integer
+    begin
+      if Left = Right then
+        Exit(0);
+      if Left = nil then
+        Exit(1);
+      if Right = nil then
+        Exit(-1);
+
+      Result := CompareValue(Left.QFrom, Right.QFrom);
+      if Result = EqualsValue then
+        Result := CompareValue(Left.QTo, Right.QTo);
+      if Result = EqualsValue then
+        Result := CompareValue(Left.RangeArg, Right.RangeArg);
+      if Result = EqualsValue then
+        Result := Left.OrderNo - Right.OrderNo;
+    end));
 end;
 
 function TFrameCalibrCoefs.GetCurrentItem(ARow: Integer): TCalibrCoefItem;
@@ -1188,6 +1216,7 @@ begin
       Item.QTo := Infinity;
       Item.K := 0;
       Item.b := Seeds[0].Ratio;
+      SortCurrentTableByRange;
       ReindexItems;
       Exit;
     end;
@@ -1222,6 +1251,7 @@ begin
     Item.K := Seeds[Seeds.Count - 2].Item.K;
     Item.b := Seeds[Seeds.Count - 2].Item.b;
 
+    SortCurrentTableByRange;
     ReindexItems;
   finally
     Seeds.Free;
