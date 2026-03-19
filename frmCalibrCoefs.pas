@@ -526,12 +526,58 @@ end;
 
 function TFrameCalibrCoefs.CalcErrorPercent(AItem: TCalibrCoefItem): Double;
 var
+  Dim: TMeasuredDimension;
+  Q: Double;
   RateVal: Double;
 begin
   if (AItem = nil) or SameValue(AItem.Value, 0, 1E-12) or (FValue = nil) then
     Exit(0);
 
-  RateVal := FValue.Rate(AItem.Arg);
+  if (FFlowMeter <> nil) and (FFlowMeter.Device <> nil) then
+    Dim := TMeasuredDimension(FFlowMeter.Device.MeasuredDimension)
+  else
+    Dim := mdUnknown;
+
+  Q := AItem.Arg;
+
+  case FCurrentType of
+    cctMeterValueCoef,
+    cctDeviceCoefCorrection:
+      case Dim of
+        mdVolumeFlow,
+        mdVolume,
+        mdMassFlow,
+        mdMass:
+          Q := AItem.RangeArg;
+      end;
+
+    cctMeterValueFlowRate,
+    cctDeviceFlowRateCorrection,
+    cctReference:
+      case Dim of
+        mdVolumeFlow,
+        mdVolume,
+        mdMassFlow,
+        mdMass:
+          Q := AItem.Arg;
+      end;
+
+    cctMeterValueQuantity,
+    cctDeviceQuantityCorrection:
+      case Dim of
+        mdVolumeFlow,
+        mdVolume,
+        mdMassFlow,
+        mdMass:
+          Q := AItem.Arg;
+      end;
+
+    cctMeterValueDensity,
+    cctDeviceDensityCorrection:
+      Q := AItem.RangeArg;
+  end;
+
+  RateVal := FValue.Rate(Q);
   Result := (AItem.Value - (AItem.Arg * RateVal)) / AItem.Value * 100;
 end;
 
