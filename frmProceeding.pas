@@ -302,6 +302,33 @@ begin
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
 
+  TreeViewDevices.OnChange := TreeViewDevicesChange;
+  TreeViewDevices.OnMouseDown := TreeViewDevicesMouseDown;
+  PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
+
+  GridDataPoints.OnGetValue := GridDataPointsGetValue;
+  GridDataPoints.OnCellClick := GridDataPointsCellClick;
+  GridDataPoints.OnMouseDown := GridDataPointsMouseDown;
+  GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
+
+  GridResults.OnSelChanged := GridResultsSelChanged;
+  GridResults.OnGetValue := GridResultsGetValue;
+  GridResults.OnMouseDown := GridResultsMouseDown;
+  GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+
+  ButtonSessionDeleteDataPoint.OnClick := ButtonSessionDeleteDataPointClick;
+  ButtonSessionClearPoints.OnClick := ButtonSessionClearPointsClick;
+
+  ActionSessionDelete.OnExecute := ActionSessionDeleteExecute;
+  ActionSessionClose.OnExecute := ActionSessionCloseExecute;
+  ActionSessionPointDelete.OnExecute := ActionSessionPointDeleteExecute;
+  ActionSessionPointsClear.OnExecute := ActionSessionPointsClearExecute;
+  ActionSessionActive.OnExecute := ActionSessionActiveExecute;
+  ActionSessionNew.OnExecute := ActionSessionNewExecute;
+  ActionSessionSynchTable.OnExecute := ActionSessionSynchTableExecute;
+  ActionSessionDeviceRemove.OnExecute := ActionSessionDeviceRemoveExecute;
+  ActionSessionDeviceAdd.OnExecute := ActionSessionDeviceAddExecute;
+
   ComboBoxUnitsResult.Items.Clear;
   for UnitName in CVolumeFlowUnits do
     ComboBoxUnitsResult.Items.Add(UnitName);
