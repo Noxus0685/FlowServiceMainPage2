@@ -513,6 +513,7 @@ type
     procedure ActionEtalonsFromArchiveExecute(Sender: TObject);
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
+    procedure ComboBoxUnitsChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
 
   private
@@ -2541,6 +2542,21 @@ begin
   GridDevices.SetFocus;
   GridDevices.Selected := PopupColumnDeviceSignal1.Index;
   ShowMessage('Источник расхода задаётся полем "Сигнал" в выбранной строке прибора.');
+end;
+
+procedure TFormMain.ComboBoxUnitsChange(Sender: TObject);
+var
+  UnitName: string;
+  QuantityUnitName: string;
+begin
+  UnitName := Trim(ComboEditUnits.Text);
+  if UnitName = '' then
+    Exit;
+
+  QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
+  SetDim(UnitName, QuantityUnitName);
+
+  GridDevices.SetFocus;
 end;
 
 procedure TFormMain.ActionDevicesAssignEtalonExecute(Sender: TObject);
