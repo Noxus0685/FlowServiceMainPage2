@@ -1,4 +1,4 @@
-﻿unit frmProceeding;
+unit frmProceeding;
 
 interface
 
@@ -139,6 +139,7 @@ type
     btnOK: TCornerButton;
     CornerButton1: TCornerButton;
     CornerButtonEditDevice: TCornerButton;
+    ActionListWorkTables: TActionList;
     ActionSessionDelete: TAction;
     ActionSessionClose: TAction;
     ActionSessionPointDelete: TAction;
