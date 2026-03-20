@@ -1,23 +1,23 @@
-object FrameProceeding: TFrameProceeding
-  Size.Width = 1103.000000000000000000
-  Size.Height = 667.000000000000000000
+object FrameProceed: TFrameProceed
+  Size.Width = 1051.000000000000000000
+  Size.Height = 688.000000000000000000
   Size.PlatformDefault = False
   object LayoutMiddle: TLayout
     Align = Client
-    Size.Width = 1103.000000000000000000
-    Size.Height = 590.000000000000000000
+    Size.Width = 1051.000000000000000000
+    Size.Height = 611.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 2
+    TabOrder = 3
     object LayoutCenter: TLayout
       Align = Client
-      Size.Width = 502.000000000000000000
-      Size.Height = 590.000000000000000000
+      Size.Width = 450.000000000000000000
+      Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 7
       object Layout18: TLayout
         Align = Client
-        Size.Width = 502.000000000000000000
-        Size.Height = 590.000000000000000000
+        Size.Width = 450.000000000000000000
+        Size.Height = 611.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object GridDataPoints: TGrid
@@ -26,13 +26,13 @@ object FrameProceeding: TFrameProceeding
           ClipChildren = True
           Margins.Left = 2.000000000000000000
           PopupMenu = PopupMenuGridDataPoints
-          Size.Width = 500.000000000000000000
-          Size.Height = 590.000000000000000000
+          Size.Width = 448.000000000000000000
+          Size.Height = 611.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-          Viewport.Width = 500.000000000000000000
-          Viewport.Height = 590.000000000000000000
+          Viewport.Width = 428.000000000000000000
+          Viewport.Height = 570.000000000000000000
           object CheckColumnSpillageEnable: TCheckColumn
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
@@ -291,18 +291,19 @@ object FrameProceeding: TFrameProceeding
     object LayoutLeft: TLayout
       Align = Left
       Size.Width = 233.000000000000000000
-      Size.Height = 590.000000000000000000
+      Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 6
       object TreeViewDevices: TTreeView
         Align = Client
         PopupMenu = PopupMenuTreeViewDevices
         Size.Width = 233.000000000000000000
-        Size.Height = 590.000000000000000000
+        Size.Height = 611.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
+        OnChange = TreeViewDevicesChange
         Viewport.Width = 229.000000000000000000
-        Viewport.Height = 586.000000000000000000
+        Viewport.Height = 607.000000000000000000
         object TreeViewItem1: TTreeViewItem
           IsChecked = False
           IsExpanded = False
@@ -332,48 +333,48 @@ object FrameProceeding: TFrameProceeding
       MinSize = 20.000000000000000000
       Position.X = 233.000000000000000000
       Size.Width = 10.000000000000000000
-      Size.Height = 590.000000000000000000
+      Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
     end
     object Splitter3: TSplitter
       Align = Right
       Cursor = crHSplit
       MinSize = 20.000000000000000000
-      Position.X = 745.000000000000000000
+      Position.X = 693.000000000000000000
       Size.Width = 10.000000000000000000
-      Size.Height = 590.000000000000000000
+      Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
     end
     object LayoutRight: TLayout
       Align = MostRight
-      Position.X = 755.000000000000000000
+      Position.X = 703.000000000000000000
       Size.Width = 348.000000000000000000
-      Size.Height = 590.000000000000000000
+      Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 9
       object Panel1: TPanel
         Align = Client
         Size.Width = 348.000000000000000000
-        Size.Height = 590.000000000000000000
+        Size.Height = 611.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object TabControlSessionProperties: TTabControl
           Align = Client
           Size.Width = 348.000000000000000000
-          Size.Height = 590.000000000000000000
+          Size.Height = 611.000000000000000000
           Size.PlatformDefault = False
           TabIndex = 1
           TabOrder = 0
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            564s
+            585s
             348s
-            564s
+            585s
             348s
-            564s
+            585s
             348s
-            564s)
+            585s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
@@ -391,7 +392,7 @@ object FrameProceeding: TFrameProceeding
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 564.000000000000000000
+              Size.Height = 585.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -457,8 +458,8 @@ object FrameProceeding: TFrameProceeding
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 297.000000000000000000
-              Viewport.Height = 219.000000000000000000
+              Viewport.Width = 277.000000000000000000
+              Viewport.Height = 194.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -503,12 +504,12 @@ object FrameProceeding: TFrameProceeding
   end
   object LayoutTop: TLayout
     Align = Top
-    Size.Width = 1103.000000000000000000
+    Size.Width = 1051.000000000000000000
     Size.Height = 33.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 1
+    TabOrder = 2
     object ToolBarDataPoints: TToolBar
-      Size.Width = 1103.000000000000000000
+      Size.Width = 1051.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
@@ -744,8 +745,8 @@ object FrameProceeding: TFrameProceeding
   end
   object lyt1: TLayout
     Align = MostBottom
-    Position.Y = 623.000000000000000000
-    Size.Width = 1103.000000000000000000
+    Position.Y = 644.000000000000000000
+    Size.Width = 1051.000000000000000000
     Size.Height = 44.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
@@ -757,7 +758,7 @@ object FrameProceeding: TFrameProceeding
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 966.000000000000000000
+      Position.X = 914.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 127.000000000000000000
@@ -778,7 +779,7 @@ object FrameProceeding: TFrameProceeding
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 672.000000000000000000
+      Position.X = 620.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 127.000000000000000000
@@ -799,7 +800,7 @@ object FrameProceeding: TFrameProceeding
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 819.000000000000000000
+      Position.X = 767.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 127.000000000000000000
@@ -813,13 +814,9 @@ object FrameProceeding: TFrameProceeding
       YRadius = 3.000000000000000000
     end
   end
-  object PopupMenuTreeViewDevices: TPopupMenu
-    Left = 792
-    Top = 240
-  end
   object PopupMenuGridDataPoints: TPopupMenu
-    Left = 840
-    Top = 240
+    Left = 626
+    Top = 248
     object MenuItemGridDataPointsDelete: TMenuItem
       Action = ActionSessionPointDelete
       ImageIndex = -1
@@ -834,8 +831,8 @@ object FrameProceeding: TFrameProceeding
     end
   end
   object PopupMenuGridResults: TPopupMenu
-    Left = 888
-    Top = 240
+    Left = 626
+    Top = 256
     object MenuItemGridResultsDelete: TMenuItem
       Action = ActionSessionPointDelete
       ImageIndex = -1
@@ -849,8 +846,12 @@ object FrameProceeding: TFrameProceeding
       ImageIndex = -1
     end
   end
+  object PopupMenuTreeViewDevices: TPopupMenu
+    Left = 626
+    Top = 264
+  end
   object ActionListWorkTables: TActionList
-    Left = 936
+    Left = 626
     Top = 240
     object ActionSessionDelete: TAction
       Category = 'Session'

@@ -1,4 +1,4 @@
-unit frmProceeding;
+﻿unit frmProceeding;
 
 interface
 
@@ -153,6 +153,7 @@ type
     ActionSessionDeviceRemove: TAction;
     ActionSessionDeviceAdd: TAction;
 
+
     private
 
     FFrameCalibrCoefs: TFrameCalibrCoefs;
@@ -301,33 +302,6 @@ begin
   FCurrentSession := nil;
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
-
-  TreeViewDevices.OnChange := TreeViewDevicesChange;
-  TreeViewDevices.OnMouseDown := TreeViewDevicesMouseDown;
-  PopupMenuTreeViewDevices.OnPopup := PopupMenuTreeViewDevicesPopup;
-
-  GridDataPoints.OnGetValue := GridDataPointsGetValue;
-  GridDataPoints.OnCellClick := GridDataPointsCellClick;
-  GridDataPoints.OnMouseDown := GridDataPointsMouseDown;
-  GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
-
-  GridResults.OnSelChanged := GridResultsSelChanged;
-  GridResults.OnGetValue := GridResultsGetValue;
-  GridResults.OnMouseDown := GridResultsMouseDown;
-  GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
-
-  ButtonSessionDeleteDataPoint.OnClick := ButtonSessionDeleteDataPointClick;
-  ButtonSessionClearPoints.OnClick := ButtonSessionClearPointsClick;
-
-  ActionSessionDelete.OnExecute := ActionSessionDeleteExecute;
-  ActionSessionClose.OnExecute := ActionSessionCloseExecute;
-  ActionSessionPointDelete.OnExecute := ActionSessionPointDeleteExecute;
-  ActionSessionPointsClear.OnExecute := ActionSessionPointsClearExecute;
-  ActionSessionActive.OnExecute := ActionSessionActiveExecute;
-  ActionSessionNew.OnExecute := ActionSessionNewExecute;
-  ActionSessionSynchTable.OnExecute := ActionSessionSynchTableExecute;
-  ActionSessionDeviceRemove.OnExecute := ActionSessionDeviceRemoveExecute;
-  ActionSessionDeviceAdd.OnExecute := ActionSessionDeviceAddExecute;
 
   ComboBoxUnitsResult.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -2069,6 +2043,7 @@ begin
       ActionSessionDeleteExecute(ActionSessionDelete);
   end;
 end;
+
 
 procedure TFrameProceeding.GridResultsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
