@@ -11,6 +11,19 @@ uses
   FMX.ScrollBox, System.Actions, FMX.ActnList;
 
 type
+  TResultGridRow = record
+    Device: TDevice;
+    Name: string;
+    DeviceType: string;
+    Serial: string;
+    PointNames: TArray<string>;
+    PointValues: TArray<string>;
+    PointStatuses: TArray<Integer>;
+    ResultText: string;
+    ResultStatus: Integer;
+  end;
+
+
   TFrameProceed = class(TFrame)
     ActionListWorkTables: TActionList;
     ActionSessionDelete: TAction;
