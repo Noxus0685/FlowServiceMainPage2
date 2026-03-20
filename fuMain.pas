@@ -8,6 +8,7 @@ uses
   fuDeviceEdit,
   fuMeterValues,
   frmCalibrCoefs,
+  frmProceeding,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -32,7 +33,6 @@ uses
 
 
 type
-
   TRowData = record
     Enabled: Boolean;
     ChannelName: string;
@@ -736,6 +736,7 @@ type
     FInstrumentalVisibleOrder: TList<TLayout>;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
+    FFrameProceeding: TFrameProceeding;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
     procedure RebuildInstrumentalVisibleOrder;
     procedure ApplyInstrumentalVisibleOrder;
@@ -1425,6 +1426,7 @@ begin
   FSessionDevice := nil;
   FSessionEtalon := nil;
   FFrameCalibrCoefs := nil;
+  FFrameProceeding := nil;
   FCurrentSession := nil;
 
   FWorkTableManager := TWorkTableManager.Create(
@@ -1512,6 +1514,10 @@ begin
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
   InitCalibrCoefsFrame;
+  FFrameProceeding := TFrameProceeding.Create(Self);
+  FFrameProceeding.Parent := TabItem1;
+  FFrameProceeding.Align := TAlignLayout.Client;
+  FFrameProceeding.Initialize(FWorkTableManager);
   SetValues;
   RefreshResultsTab;
   UpdateForm;
@@ -1555,6 +1561,8 @@ procedure TFormMain.TabControl1Change(Sender: TObject);
 begin
   if TabControl1.ActiveTab = TabItemResults then
     RefreshResultsTab;
+  if (TabControl1.ActiveTab = TabItem1) and (FFrameProceeding <> nil) then
+    FFrameProceeding.RefreshResultsTab;
 end;
 
 procedure TFormMain.RefreshResultsTab;
