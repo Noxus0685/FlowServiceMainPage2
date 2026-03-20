@@ -9,6 +9,7 @@ uses
   fuMeterValues,
   frmCalibrCoefs,
   frmProceed,
+  frmMainTable,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -576,6 +577,7 @@ type
     FWorkTableManager: TWorkTableManager;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
+    FFrameMainTable: TFrameMainTable;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
     procedure RebuildInstrumentalVisibleOrder;
     procedure ApplyInstrumentalVisibleOrder;
@@ -1037,6 +1039,10 @@ var
   LayoutOrder: string;
 
 begin
+  FFrameMainTable := TFrameMainTable.Create(Self);
+  FFrameMainTable.Parent := TabItem1;
+  FFrameMainTable.Align := TAlignLayout.Client;
+
   TMeterValue.LoadFromFile;
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
