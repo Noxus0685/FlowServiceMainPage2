@@ -792,6 +792,9 @@ var
 
 implementation
 
+uses
+  frmProceeding;
+
 {$R *.fmx}
 
 const
