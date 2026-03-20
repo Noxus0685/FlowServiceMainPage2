@@ -529,6 +529,7 @@ object FormMain: TFormMain
                   Size.PlatformDefault = False
                   TabOrder = 2
                   object ComboEditUnits: TComboBox
+                    OnChange = ComboBoxUnitsChange
                     Touch.InteractiveGestures = [LongTap, DoubleTap]
                     Align = Left
                     Items.Strings = (
