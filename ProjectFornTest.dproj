@@ -334,11 +334,6 @@
             <FormType>fmx</FormType>
         </DCCReference>
         <DCCReference Include="UnitMeterValue.pas"/>
-        <DCCReference Include="frmProceeding.pas">
-            <Form>FrameProceeding</Form>
-            <FormType>fmx</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
         <DCCReference Include="frmCalibrCoefs.pas">
             <Form>FrameCalibrCoefs</Form>
             <FormType>fmx</FormType>

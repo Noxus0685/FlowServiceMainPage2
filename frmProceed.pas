@@ -1,4 +1,4 @@
-unit frmProceed;
+﻿unit frmProceed;
 
 interface
 
@@ -158,21 +158,6 @@ type
     MenuItemGridResultsClose: TMenuItem;
     ActionSessionDeviceRemove: TAction;
     ActionSessionDeviceAdd: TAction;
-
-
-    private
-
-    FFrameCalibrCoefs: TFrameCalibrCoefs;
-    FWorkTableManager: TWorkTableManager;
-    FProcessingDevices: TObjectList<TDevice>;
-    FCurrentSession: TSessionSpillage;
-    FCurrentResultRows: TArray<TResultGridRow>;
-    FCurrentSpillages: TArray<TPointSpillage>;
-    FActiveWorkTable: TWorkTable;
-    FSessionDevice: TFlowMeter;
-    FSessionEtalon: TFlowMeter;
-    FSkipPointDeleteConfirm: Boolean;
-    FPointDeleteOwner: TObject;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
@@ -234,7 +219,17 @@ type
     procedure ResetPointDeleteConfirm;
     procedure InitCalibrCoefsFrame;
   private
-    { Private declarations }
+    FFrameCalibrCoefs: TFrameCalibrCoefs;
+    FWorkTableManager: TWorkTableManager;
+    FProcessingDevices: TObjectList<TDevice>;
+    FCurrentSession: TSessionSpillage;
+    FCurrentResultRows: TArray<TResultGridRow>;
+    FCurrentSpillages: TArray<TPointSpillage>;
+    FActiveWorkTable: TWorkTable;
+    FSessionDevice: TFlowMeter;
+    FSessionEtalon: TFlowMeter;
+    FSkipPointDeleteConfirm: Boolean;
+    FPointDeleteOwner: TObject;
   public
     { Public declarations }
     procedure Initialize(AWorkTableManager: TWorkTableManager);
@@ -299,6 +294,8 @@ procedure TFrameProceed.Initialize(AWorkTableManager: TWorkTableManager);
 var
   UnitName: string;
 begin
+    GridResults.OnGetValue := GridDataPointsGetValue;
+
   FWorkTableManager := AWorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
@@ -2086,6 +2083,8 @@ begin
   else if GridResults.Columns[ACol] = StringColumnResult then
     Value := Row.ResultText;
 end;
+
+
 procedure TFrameProceed.GridResultsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);

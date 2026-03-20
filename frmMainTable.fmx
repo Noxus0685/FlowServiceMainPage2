@@ -1,26 +1,26 @@
 object FrameMainTable: TFrameMainTable
-  Size.Width = 1103.000000000000000000
+  Size.Width = 1252.000000000000000000
   Size.Height = 685.000000000000000000
   Size.PlatformDefault = False
   object Layout2: TLayout
     Align = Client
-    Size.Width = 1103.000000000000000000
+    Size.Width = 1252.000000000000000000
     Size.Height = 685.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     object PanelInstruments: TPanel
       Align = MostTop
-      Size.Width = 1103.000000000000000000
+      Size.Width = 1252.000000000000000000
       Size.Height = 129.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       object HorzScrollBoxInstrumental: THorzScrollBox
         Align = Client
-        Size.Width = 1103.000000000000000000
+        Size.Width = 1252.000000000000000000
         Size.Height = 129.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        Viewport.Width = 1103.000000000000000000
+        Viewport.Width = 1252.000000000000000000
         Viewport.Height = 113.000000000000000000
         object LayoutConditions: TLayout
           Align = Left
@@ -1160,14 +1160,14 @@ object FrameMainTable: TFrameMainTable
     object TabControlWorkTables: TTabControl
       Align = Client
       Padding.Left = 10.000000000000000000
-      Size.Width = 1103.000000000000000000
+      Size.Width = 1252.000000000000000000
       Size.Height = 460.000000000000000000
       Size.PlatformDefault = False
       TabIndex = 0
       TabOrder = 1
       TabPosition = PlatformDefault
       Sizes = (
-        1093s
+        1242s
         434s)
       object TabItemWorkTable1: TTabItem
         CustomIcon = <
@@ -1186,13 +1186,13 @@ object FrameMainTable: TFrameMainTable
         ExplicitSize.cy = 26.000000000000000000
         object Panel2: TPanel
           Align = Top
-          Size.Width = 1093.000000000000000000
+          Size.Width = 1242.000000000000000000
           Size.Height = 152.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 2
           object Layout1: TLayout
             Align = Client
-            Size.Width = 1093.000000000000000000
+            Size.Width = 1242.000000000000000000
             Size.Height = 120.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
@@ -1200,13 +1200,13 @@ object FrameMainTable: TFrameMainTable
               Align = Client
               CanFocus = True
               ClipChildren = True
-              Size.Width = 1093.000000000000000000
+              Size.Width = 1242.000000000000000000
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               RowCount = 2
-              Viewport.Width = 1089.000000000000000000
-              Viewport.Height = 79.000000000000000000
+              Viewport.Width = 1242.000000000000000000
+              Viewport.Height = 120.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -1291,7 +1291,7 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBar2: TToolBar
-            Size.Width = 1093.000000000000000000
+            Size.Width = 1242.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
@@ -1305,7 +1305,7 @@ object FrameMainTable: TFrameMainTable
         end
         object Panel3: TPanel
           Align = Client
-          Size.Width = 1093.000000000000000000
+          Size.Width = 1242.000000000000000000
           Size.Height = 266.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
@@ -1313,13 +1313,13 @@ object FrameMainTable: TFrameMainTable
             Align = Client
             CanFocus = True
             ClipChildren = True
-            Size.Width = 1093.000000000000000000
+            Size.Width = 1242.000000000000000000
             Size.Height = 234.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-            Viewport.Width = 1073.000000000000000000
-            Viewport.Height = 193.000000000000000000
+            Viewport.Width = 1242.000000000000000000
+            Viewport.Height = 234.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -1416,7 +1416,7 @@ object FrameMainTable: TFrameMainTable
           end
           object ToolBar1: TToolBar
             PopupMenu = PopupMenuDevicesGridLayOut
-            Size.Width = 1093.000000000000000000
+            Size.Width = 1242.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
@@ -1439,7 +1439,7 @@ object FrameMainTable: TFrameMainTable
           MinSize = 20.000000000000000000
           Position.Y = 152.000000000000000000
           ShowGrip = False
-          Size.Width = 1093.000000000000000000
+          Size.Width = 1242.000000000000000000
           Size.Height = 16.000000000000000000
           Size.PlatformDefault = False
         end
@@ -1448,7 +1448,7 @@ object FrameMainTable: TFrameMainTable
     object Layout11: TLayout
       Align = MostBottom
       Position.Y = 589.000000000000000000
-      Size.Width = 1103.000000000000000000
+      Size.Width = 1252.000000000000000000
       Size.Height = 96.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 4

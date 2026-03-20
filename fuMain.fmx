@@ -3485,6 +3485,7 @@ object FormMain: TFormMain
               Size.Height = 675.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 1
+              Visible = False
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnGetValue = GridDataPointsGetValue
               OnCellClick = GridDataPointsCellClick
@@ -3671,12 +3672,11 @@ object FormMain: TFormMain
               Size.Height = 675.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Visible = False
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnSelChanged = GridResultsSelChanged
               OnGetValue = GridResultsGetValue
-              Viewport.Width = 1177.000000000000000000
-              Viewport.Height = 675.000000000000000000
+              Viewport.Width = 1157.000000000000000000
+              Viewport.Height = 650.000000000000000000
               object StringColumnResultName: TStringColumn
                 Header = #1048#1084#1103
                 HeaderSettings.TextSettings.Trimming = Character
@@ -3917,8 +3917,8 @@ object FormMain: TFormMain
                   Size.Height = 219.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 0
-                  Viewport.Width = 297.000000000000000000
-                  Viewport.Height = 219.000000000000000000
+                  Viewport.Width = 277.000000000000000000
+                  Viewport.Height = 194.000000000000000000
                   object StringColumnCoefTableName: TStringColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
