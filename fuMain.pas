@@ -32,6 +32,7 @@ uses
 
 
 type
+  TFrameProceeding = class;
 
   TRowData = record
     Enabled: Boolean;
@@ -736,6 +737,7 @@ type
     FInstrumentalVisibleOrder: TList<TLayout>;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
+    FFrameProceeding: TFrameProceeding;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
     procedure RebuildInstrumentalVisibleOrder;
     procedure ApplyInstrumentalVisibleOrder;
@@ -790,6 +792,9 @@ var
   IsUpdating: Boolean = False;
 
 implementation
+
+uses
+  frmProceeding;
 
 {$R *.fmx}
 
@@ -1425,6 +1430,7 @@ begin
   FSessionDevice := nil;
   FSessionEtalon := nil;
   FFrameCalibrCoefs := nil;
+  FFrameProceeding := nil;
   FCurrentSession := nil;
 
   FWorkTableManager := TWorkTableManager.Create(
@@ -1512,6 +1518,10 @@ begin
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
   InitCalibrCoefsFrame;
+  FFrameProceeding := TFrameProceeding.Create(Self);
+  FFrameProceeding.Parent := TabItem1;
+  FFrameProceeding.Align := TAlignLayout.Client;
+  FFrameProceeding.Initialize(FWorkTableManager);
   SetValues;
   RefreshResultsTab;
   UpdateForm;
@@ -1555,6 +1565,8 @@ procedure TFormMain.TabControl1Change(Sender: TObject);
 begin
   if TabControl1.ActiveTab = TabItemResults then
     RefreshResultsTab;
+  if (TabControl1.ActiveTab = TabItem1) and (FFrameProceeding <> nil) then
+    FFrameProceeding.RefreshResultsTab;
 end;
 
 procedure TFormMain.RefreshResultsTab;
