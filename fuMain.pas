@@ -455,7 +455,7 @@ type
     procedure ActionMeterValuesPropertiesExecute(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
-    procedure ComboBoxUnitsChange(Sender: TObject);
+
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
@@ -1040,7 +1040,7 @@ var
 
 begin
   FFrameMainTable := TFrameMainTable.Create(Self);
-  FFrameMainTable.Parent := TabItem1;
+  FFrameMainTable.Parent := TabItemTable;
   FFrameMainTable.Align := TAlignLayout.Client;
 
   TMeterValue.LoadFromFile;
@@ -1072,9 +1072,6 @@ begin
     ComboEditUnits.Items.Add(UnitName);
 
 
-
-
-  ComboEditUnits.OnChange := ComboBoxUnitsChange;
   if ComboEditUnits.Items.Count > 0 then
     ComboEditUnits.ItemIndex := 0;
 
@@ -1134,14 +1131,14 @@ end;
 
 procedure TFormMain.PopupMenuGridDataPointsPopup(Sender: TObject);
 begin
-  if FFrameProceed <> nil then
-    FFrameProceed.PopupMenuGridDataPointsPopup(Sender);
+ // if FFrameProceed <> nil then
+ //   FFrameProceed.PopupMenuGridDataPointsPopup(Sender);
 end;
 
 procedure TFormMain.PopupMenuGridResultsPopup(Sender: TObject);
 begin
-  if FFrameProceed <> nil then
-    FFrameProceed.PopupMenuGridResultsPopup(Sender);
+ // if FFrameProceed <> nil then
+ //   FFrameProceed.PopupMenuGridResultsPopup(Sender);
 end;
 
 procedure TFormMain.TreeViewDevicesChange(Sender: TObject);

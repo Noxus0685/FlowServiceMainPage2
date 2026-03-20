@@ -454,7 +454,6 @@ type
     procedure ActionMeterValuesPropertiesExecute(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
-    procedure ComboBoxUnitsChange(Sender: TObject);
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
@@ -521,6 +520,9 @@ type
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
   FLastClickTick: Cardinal;
+
+  FRows: array of TRowData;
+  IsUpdating: Boolean;
 
 
     FFlowMeters: TObjectList<TFlowMeter>;
@@ -602,9 +604,6 @@ type
   end;
 
 
-var
-  FRows: array of TRowData;
-  IsUpdating: Boolean = False;
 
 implementation
 
@@ -1036,9 +1035,7 @@ var
   LayoutOrder: string;
 
 begin
-  FFrameMainTable := TFrameMainTable.Create(Self);
-  FFrameMainTable.Parent := TabItem1;
-  FFrameMainTable.Align := TAlignLayout.Client;
+
 
   TMeterValue.LoadFromFile;
 
@@ -1068,10 +1065,6 @@ begin
   for UnitName in CMassFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
 
-
-
-
-  ComboEditUnits.OnChange := ComboBoxUnitsChange;
   if ComboEditUnits.Items.Count > 0 then
     ComboEditUnits.ItemIndex := 0;
 
@@ -1131,14 +1124,14 @@ end;
 
 procedure TFrameMainTable.PopupMenuGridDataPointsPopup(Sender: TObject);
 begin
-  if FFrameProceed <> nil then
-    FFrameProceed.PopupMenuGridDataPointsPopup(Sender);
+ // if FFrameProceed <> nil then
+ //   FFrameProceed.PopupMenuGridDataPointsPopup(Sender);
 end;
 
 procedure TFrameMainTable.PopupMenuGridResultsPopup(Sender: TObject);
 begin
-  if FFrameProceed <> nil then
-    FFrameProceed.PopupMenuGridResultsPopup(Sender);
+ // if FFrameProceed <> nil then
+ //   FFrameProceed.PopupMenuGridResultsPopup(Sender);
 end;
 
 procedure TFrameMainTable.TreeViewDevicesChange(Sender: TObject);
