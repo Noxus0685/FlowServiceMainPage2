@@ -455,7 +455,63 @@ type
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
+    procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
+    procedure SpeedButton2Click(Sender: TObject);
+    procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
+    procedure ButtonApplyEtalonValuesClick(Sender: TObject);
+    procedure ButtonApplyDeviceValuesClick(Sender: TObject);
+    procedure ActionOpenDeviceEditorExecute(Sender: TObject);
+    procedure ActionOpenDeviceSelectExecute(Sender: TObject);
+    procedure SpeedButtonMinimizeMesureClick(Sender: TObject);
+    procedure SpeedButtonMinimizeConditionsClick(Sender: TObject);
+    procedure SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
+    procedure SpeedButtonMinimizeProceduresClick(Sender: TObject);
+    procedure SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
+    procedure PopupMenuInstrumentalLayOutPopup(Sender: TObject);
+    procedure MenuInstrumentalLayOutClick(Sender: TObject);
+    procedure PopupMenuDevicesGridLayOutPopup(Sender: TObject);
+    procedure PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
+    procedure MenuGridLayOutClick(Sender: TObject);
+    procedure PopupMenuGridDataPointsPopup(Sender: TObject);
+    procedure PopupMenuGridResultsPopup(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure Circle1Click(Sender: TObject);
+    procedure ButtonMonitorClick(Sender: TObject);
+    procedure ButtonCancelClick(Sender: TObject);
+    procedure TestButtonClick(Sender: TObject);
+    procedure EditTestNumExit(Sender: TObject);
     procedure TabControl1Change(Sender: TObject);
+    procedure TreeViewDevicesChange(Sender: TObject);
+    procedure TreeViewDevicesMouseDown(Sender: TObject;
+      Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+    procedure GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
+    procedure GridDataPointsCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
+    procedure GridResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+      const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+      const Value: TValue; const State: TGridDrawStates);
+    procedure ActionDevicesClearRowExecute(Sender: TObject);
+    procedure ActionDevicesCopyExecute(Sender: TObject);
+    procedure ActionDevicesPasteExecute(Sender: TObject);
+    procedure ActionDevicesClearAllExecute(Sender: TObject);
+    procedure ActionDevicesFillAllBySelectedExecute(Sender: TObject);
+    procedure ActionDevicesFromArchiveExecute(Sender: TObject);
+    procedure ActionDevicesSetFlowSourceExecute(Sender: TObject);
+    procedure ActionDevicesAssignEtalonExecute(Sender: TObject);
+    procedure ActionEtalonsClearRowExecute(Sender: TObject);
+    procedure ActionEtalonsCopyExecute(Sender: TObject);
+    procedure ActionEtalonsPasteExecute(Sender: TObject);
+    procedure ActionEtalonsClearAllExecute(Sender: TObject);
+    procedure ActionEtalonsFillAllBySelectedExecute(Sender: TObject);
+    procedure ActionEtalonsFromArchiveExecute(Sender: TObject);
+    procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
+    procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
 
   private
@@ -1061,6 +1117,143 @@ procedure TFormMain.TabControl1Change(Sender: TObject);
 begin
   if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
     FFrameProceed.RefreshResultsTab;
+end;
+
+
+procedure TFormMain.SetSessionDim(UnitName: string; QuantityUnitName: string);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.SetSessionDim(UnitName, QuantityUnitName);
+end;
+
+procedure TFormMain.PopupMenuGridDataPointsPopup(Sender: TObject);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.PopupMenuGridDataPointsPopup(Sender);
+end;
+
+procedure TFormMain.PopupMenuGridResultsPopup(Sender: TObject);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.PopupMenuGridResultsPopup(Sender);
+end;
+
+procedure TFormMain.TreeViewDevicesChange(Sender: TObject);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.TreeViewDevicesChange(Sender);
+end;
+
+procedure TFormMain.TreeViewDevicesMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.TreeViewDevicesMouseDown(Sender, Button, Shift, X, Y);
+end;
+
+procedure TFormMain.GridDataPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
+  var Value: TValue);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.GridDataPointsGetValue(Sender, ACol, ARow, Value);
+end;
+
+procedure TFormMain.GridDataPointsCellClick(const Column: TColumn; const Row: Integer);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.GridDataPointsCellClick(Column, Row);
+end;
+
+procedure TFormMain.GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.GridDataPointsMouseDown(Sender, Button, Shift, X, Y);
+end;
+
+procedure TFormMain.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.GridResultsMouseDown(Sender, Button, Shift, X, Y);
+end;
+
+procedure TFormMain.GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer;
+  var Value: TValue);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.GridResultsGetValue(Sender, ACol, ARow, Value);
+end;
+
+procedure TFormMain.GridResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+  const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+  const Value: TValue; const State: TGridDrawStates);
+begin
+  if FFrameProceed <> nil then
+    FFrameProceed.GridResultsDrawColumnCell(Sender, Canvas, Column, Bounds, Row, Value, State);
+end;
+
+procedure TFormMain.SpeedButton2Click(Sender: TObject);
+begin
+  SetInstrumentalLayoutVisible(LayoutPump, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.SpeedButtonMinimizeConditionsClick(Sender: TObject);
+begin
+  SetInstrumentalLayoutVisible(LayoutConditions, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.SpeedButtonMinimizeLayoutMainClick(Sender: TObject);
+begin
+  SetInstrumentalLayoutVisible(LayoutMain, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.SpeedButtonMinimizeProceduresClick(Sender: TObject);
+begin
+  SetInstrumentalLayoutVisible(LayoutProcedures, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.SpeedButtonMinimizeMesureClick(Sender: TObject);
+begin
+  SetInstrumentalLayoutVisible(LayoutMesure, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
+begin
+  SetInstrumentalLayoutVisible(LayoutPump, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
+begin
+  SetInstrumentalLayoutVisible(LayoutFlowRate, False);
+  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
+  SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFormMain.ButtonMonitorClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  if WorkTable.MeasurementState = STATE_MONITOR then
+    StopMonitor
+  else
+    StartMonitor;
 end;
 
 procedure TFormMain.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
