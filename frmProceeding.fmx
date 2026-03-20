@@ -7,7 +7,7 @@ object FrameProceeding: TFrameProceeding
     Size.Width = 1103.000000000000000000
     Size.Height = 590.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 6
+    TabOrder = 3
     object LayoutCenter: TLayout
       Align = Client
       Size.Width = 502.000000000000000000
@@ -30,8 +30,8 @@ object FrameProceeding: TFrameProceeding
           Size.PlatformDefault = False
           TabOrder = 1
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-          Viewport.Width = 500.000000000000000000
-          Viewport.Height = 590.000000000000000000
+          Viewport.Width = 480.000000000000000000
+          Viewport.Height = 549.000000000000000000
           object CheckColumnSpillageEnable: TCheckColumn
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
@@ -364,21 +364,21 @@ object FrameProceeding: TFrameProceeding
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            585s
+            564s
             348s
-            585s
+            564s
             348s
-            585s
+            564s
             348s
-            585s)
+            564s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 71.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -388,7 +388,7 @@ object FrameProceeding: TFrameProceeding
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 585.000000000000000000
+              Size.Height = 564.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -437,8 +437,8 @@ object FrameProceeding: TFrameProceeding
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 65.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -454,8 +454,8 @@ object FrameProceeding: TFrameProceeding
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 297.000000000000000000
-              Viewport.Height = 219.000000000000000000
+              Viewport.Width = 277.000000000000000000
+              Viewport.Height = 194.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -470,8 +470,8 @@ object FrameProceeding: TFrameProceeding
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 73.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -485,8 +485,8 @@ object FrameProceeding: TFrameProceeding
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 61.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -503,7 +503,7 @@ object FrameProceeding: TFrameProceeding
     Size.Width = 1103.000000000000000000
     Size.Height = 33.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 5
+    TabOrder = 2
     object ToolBarDataPoints: TToolBar
       Size.Width = 1103.000000000000000000
       Size.Height = 32.000000000000000000

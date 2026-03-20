@@ -792,8 +792,7 @@ var
 
 implementation
 
-uses
-  frmProceeding;
+
 
 {$R *.fmx}
 
@@ -1516,11 +1515,14 @@ begin
   GridResults.OnMouseDown := GridResultsMouseDown;
   GridResults.OnGetValue := GridResultsGetValue;
   GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
-  InitCalibrCoefsFrame;
+
   FFrameProceeding := TFrameProceeding.Create(Self);
   FFrameProceeding.Parent := TabItem1;
   FFrameProceeding.Align := TAlignLayout.Client;
   FFrameProceeding.Initialize(FWorkTableManager);
+
+  InitCalibrCoefsFrame;
+
   SetValues;
   RefreshResultsTab;
   UpdateForm;
@@ -1572,7 +1574,6 @@ procedure TFormMain.RefreshResultsTab;
 begin
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
-
 end;
 
 function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;

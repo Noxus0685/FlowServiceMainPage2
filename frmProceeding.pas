@@ -318,7 +318,6 @@ end;
 
 procedure TFrameProceeding.RefreshResultsTab;
 begin
-  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
@@ -510,7 +509,6 @@ begin
   end;
 end;
 
-
 function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;
 var
   DateOpenStr: string;
@@ -532,8 +530,6 @@ begin
 
   Result := 'Сессия ' + DateOpenStr + '-' + DateCloseStr;
 end;
-
-
 
 procedure TFrameProceeding.UpdateSessionItems;
 var
@@ -625,6 +621,7 @@ begin
       ShowOtherDevicesResults;
   end;
 end;
+
 procedure TFrameProceeding.PopulateTreeViewDevices;
 var
   RootAll, RootOther, RootTable, DeviceItem, SessionItem: TTreeViewItem;
@@ -1756,11 +1753,13 @@ begin
 
   RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
+
 procedure TFrameProceeding.TreeViewDevicesChange(Sender: TObject);
 begin
   UpdateSessionItems;
   UpdateCalibrCoefsFrame;
 end;
+
 procedure TFrameProceeding.TreeViewDevicesMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
@@ -1803,6 +1802,9 @@ begin
     end;
   end;
 end;
+
+
+
 function TFrameProceeding.GetSelectedResultDevice: TDevice;
 begin
   Result := nil;
@@ -2039,6 +2041,7 @@ begin
       ActionSessionDeleteExecute(ActionSessionDelete);
   end;
 end;
+
 procedure TFrameProceeding.GridResultsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
