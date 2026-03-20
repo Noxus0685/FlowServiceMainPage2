@@ -21,6 +21,11 @@ object FrameProceeding: TFrameProceeding
         Size.PlatformDefault = False
         TabOrder = 0
         object GridDataPoints: TGrid
+          PopupMenu = PopupMenuGridDataPoints
+          OnGetValue = GridDataPointsGetValue
+          OnCellClick = GridDataPointsCellClick
+          OnMouseDown = GridDataPointsMouseDown
+          OnDrawColumnCell = GridDataPointsDrawColumnCell
           Align = Client
           CanFocus = True
           ClipChildren = True
@@ -204,6 +209,11 @@ object FrameProceeding: TFrameProceeding
           end
         end
         object GridResults: TGrid
+          PopupMenu = PopupMenuGridResults
+          OnSelChanged = GridResultsSelChanged
+          OnGetValue = GridResultsGetValue
+          OnMouseDown = GridResultsMouseDown
+          OnDrawColumnCell = GridResultsDrawColumnCell
           Align = Client
           CanFocus = True
           ClipChildren = True
@@ -293,6 +303,9 @@ object FrameProceeding: TFrameProceeding
       Size.PlatformDefault = False
       TabOrder = 6
       object TreeViewDevices: TTreeView
+        PopupMenu = PopupMenuTreeViewDevices
+        OnChange = TreeViewDevicesChange
+        OnMouseDown = TreeViewDevicesMouseDown
         Align = Client
         Size.Width = 233.000000000000000000
         Size.Height = 590.000000000000000000
@@ -540,6 +553,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 3
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
           TextSettings.Trimming = None
+          OnClick = ButtonSessionDeleteDataPointClick
         end
         object ButtonSessionNew: TButton
           Align = Left
@@ -564,6 +578,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 0
           Text = #1054#1095#1080#1089#1090#1080#1090#1100
           TextSettings.Trimming = None
+          OnClick = ButtonSessionClearPointsClick
         end
         object ButtonSessionClose: TButton
           Align = Left
@@ -802,6 +817,100 @@ object FrameProceeding: TFrameProceeding
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
+    end
+  end
+  object PopupMenuTreeViewDevices: TPopupMenu
+    OnPopup = PopupMenuTreeViewDevicesPopup
+    Left = 792
+    Top = 240
+  end
+  object PopupMenuGridDataPoints: TPopupMenu
+    Left = 840
+    Top = 240
+    object MenuItemGridDataPointsDelete: TMenuItem
+      Action = ActionSessionPointDelete
+      ImageIndex = -1
+    end
+    object MenuItemGridDataPointsClear: TMenuItem
+      Action = ActionSessionPointsClear
+      ImageIndex = -1
+    end
+    object MenuItemGridDataPointsClose: TMenuItem
+      Action = ActionSessionClose
+      ImageIndex = -1
+    end
+  end
+  object PopupMenuGridResults: TPopupMenu
+    Left = 888
+    Top = 240
+    object MenuItemGridResultsDelete: TMenuItem
+      Action = ActionSessionPointDelete
+      ImageIndex = -1
+    end
+    object MenuItemGridResultsClear: TMenuItem
+      Action = ActionSessionPointsClear
+      ImageIndex = -1
+    end
+    object MenuItemGridResultsClose: TMenuItem
+      Action = ActionSessionClose
+      ImageIndex = -1
+    end
+  end
+  object ActionListWorkTables: TActionList
+    Left = 936
+    Top = 240
+    object ActionSessionDelete: TAction
+      Category = 'Session'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1089#1077#1089#1089#1080#1102
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1089#1077#1089#1089#1080#1102
+      OnExecute = ActionSessionDeleteExecute
+    end
+    object ActionSessionClose: TAction
+      Category = 'Session'
+      Text = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
+      Hint = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
+      OnExecute = ActionSessionCloseExecute
+    end
+    object ActionSessionPointDelete: TAction
+      Category = 'Session'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
+      OnExecute = ActionSessionPointDeleteExecute
+    end
+    object ActionSessionPointsClear: TAction
+      Category = 'Session'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1089#1077' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1074#1089#1077' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
+      OnExecute = ActionSessionPointsClearExecute
+    end
+    object ActionSessionActive: TAction
+      Category = 'Session'
+      Text = #1057#1076#1077#1083#1072#1090#1100' '#1089#1077#1089#1089#1080#1102' '#1072#1082#1090#1080#1074#1085#1086#1081
+      Hint = #1057#1076#1077#1083#1072#1090#1100' '#1089#1077#1089#1089#1080#1102' '#1072#1082#1090#1080#1074#1085#1086#1081
+      OnExecute = ActionSessionActiveExecute
+    end
+    object ActionSessionNew: TAction
+      Category = 'Session'
+      Text = #1053#1086#1074#1072#1103' '#1089#1077#1089#1089#1080#1103
+      Hint = #1053#1086#1074#1072#1103' '#1089#1077#1089#1089#1080#1103
+      OnExecute = ActionSessionNewExecute
+    end
+    object ActionSessionSynchTable: TAction
+      Category = 'Session'
+      Text = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1087#1088#1080#1073#1086#1088#1099
+      Hint = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1089#1087#1080#1089#1086#1082' '#1087#1088#1080#1073#1086#1088#1086#1074' '#1089#1086' '#1089#1090#1086#1083#1086#1084
+      OnExecute = ActionSessionSynchTableExecute
+    end
+    object ActionSessionDeviceRemove: TAction
+      Category = 'Session'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1087#1088#1080#1073#1086#1088' '#1080#1079' '#1089#1087#1080#1089#1082#1072
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1087#1088#1080#1073#1086#1088' '#1080#1079' '#1089#1087#1080#1089#1082#1072
+      OnExecute = ActionSessionDeviceRemoveExecute
+    end
+    object ActionSessionDeviceAdd: TAction
+      Category = 'Session'
+      Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1088#1080#1073#1086#1088' '#1074' '#1089#1087#1080#1089#1086#1082
+      OnExecute = ActionSessionDeviceAddExecute
     end
   end
 end
