@@ -566,6 +566,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 2
           Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
           TextSettings.Trimming = None
+          Action = ActionSessionNew
         end
         object ButtonSessionClearPoints: TButton
           Align = Left
@@ -591,6 +592,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 1
           Text = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
           TextSettings.Trimming = None
+          Action = ActionSessionClose
         end
       end
       object Layout19: TLayout
@@ -696,6 +698,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 3
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1080#1079#1084#1077#1088#1077#1085#1080#1077
           TextSettings.Trimming = None
+          Action = ActionSessionPointDelete
         end
         object Button4: TButton
           Align = Left
@@ -708,6 +711,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 2
           Text = #1057#1086#1079#1076#1072#1090#1100' '#1085#1086#1074#1091#1102' '#1089#1077#1089#1089#1080#1102
           TextSettings.Trimming = None
+          Action = ActionSessionNew
         end
         object Button5: TButton
           Align = Left
@@ -720,6 +724,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 0
           Text = #1054#1095#1080#1089#1090#1080#1090#1100
           TextSettings.Trimming = None
+          Action = ActionSessionPointsClear
         end
         object Button6: TButton
           Align = Left
@@ -732,6 +737,7 @@ object FrameProceeding: TFrameProceeding
           TabOrder = 1
           Text = #1047#1072#1082#1088#1099#1090#1100' '#1089#1077#1089#1089#1080#1102
           TextSettings.Trimming = None
+          Action = ActionSessionClose
         end
       end
       object Line9: TLine
