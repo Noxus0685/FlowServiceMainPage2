@@ -229,6 +229,9 @@ type
     { Private declarations }
   public
     { Public declarations }
+    procedure Initialize(AWorkTableManager: TWorkTableManager);
+    procedure RefreshResultsTab;
+    destructor Destroy; override;
   end;
 
 implementation
@@ -263,6 +266,55 @@ begin
   if SameText(AUnit, 'т/мин') or SameText(AUnit, 'т/ч') then
     Exit('т');
   Result := '';
+end;
+
+destructor TFrameProceeding.Destroy;
+begin
+  FreeAndNil(FFrameCalibrCoefs);
+  FreeAndNil(FSessionDevice);
+  FreeAndNil(FSessionEtalon);
+  FreeAndNil(FProcessingDevices);
+  inherited;
+end;
+
+procedure TFrameProceeding.Initialize(AWorkTableManager: TWorkTableManager);
+var
+  UnitName: string;
+begin
+  FWorkTableManager := AWorkTableManager;
+  if FWorkTableManager <> nil then
+    FActiveWorkTable := FWorkTableManager.ActiveWorkTable
+  else
+    FActiveWorkTable := nil;
+
+  if FProcessingDevices = nil then
+    FProcessingDevices := TObjectList<TDevice>.Create(False);
+
+  FCurrentSession := nil;
+  FreeAndNil(FSessionDevice);
+  FreeAndNil(FSessionEtalon);
+
+  ComboBoxUnitsResult.Items.Clear;
+  for UnitName in CVolumeFlowUnits do
+    ComboBoxUnitsResult.Items.Add(UnitName);
+  for UnitName in CMassFlowUnits do
+    ComboBoxUnitsResult.Items.Add(UnitName);
+  if ComboBoxUnitsResult.Items.Count > 4 then
+    ComboBoxUnitsResult.ItemIndex := 4
+  else if ComboBoxUnitsResult.Items.Count > 0 then
+    ComboBoxUnitsResult.ItemIndex := 0;
+
+  LoadProcessingDevices;
+  InitCalibrCoefsFrame;
+  RefreshResultsTab;
+end;
+
+procedure TFrameProceeding.RefreshResultsTab;
+begin
+  if FWorkTableManager <> nil then
+    FActiveWorkTable := FWorkTableManager.ActiveWorkTable;
+  PopulateTreeViewDevices;
+  ShowAllDevicesResults;
 end;
 
 function TFrameProceeding.FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
