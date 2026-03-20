@@ -8,6 +8,7 @@ uses
   fuDeviceEdit,
   fuMeterValues,
   frmCalibrCoefs,
+  frmProceeding,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -32,8 +33,6 @@ uses
 
 
 type
-  TFrameProceeding = class;
-
   TRowData = record
     Enabled: Boolean;
     ChannelName: string;

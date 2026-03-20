@@ -242,10 +242,10 @@ const
   CProcessingDevicesSection = 'ProcessingDevices';
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
+  CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
+  CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
 function IsVolumeFlowUnit(const AUnit: string): Boolean;
-const
-  CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
 var
   I: Integer;
 begin
@@ -268,6 +268,16 @@ begin
   Result := '';
 end;
 
+function ResolveManagerWorkTable(AWorkTableManager: TWorkTableManager): TWorkTable;
+begin
+  Result := nil;
+  if (AWorkTableManager = nil) or (AWorkTableManager.WorkTables = nil) or
+     (AWorkTableManager.WorkTables.Count = 0) then
+    Exit;
+
+  Result := AWorkTableManager.WorkTables[0];
+end;
+
 destructor TFrameProceeding.Destroy;
 begin
   FreeAndNil(FFrameCalibrCoefs);
@@ -282,10 +292,7 @@ var
   UnitName: string;
 begin
   FWorkTableManager := AWorkTableManager;
-  if FWorkTableManager <> nil then
-    FActiveWorkTable := FWorkTableManager.ActiveWorkTable
-  else
-    FActiveWorkTable := nil;
+  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
@@ -311,8 +318,7 @@ end;
 
 procedure TFrameProceeding.RefreshResultsTab;
 begin
-  if FWorkTableManager <> nil then
-    FActiveWorkTable := FWorkTableManager.ActiveWorkTable;
+  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
