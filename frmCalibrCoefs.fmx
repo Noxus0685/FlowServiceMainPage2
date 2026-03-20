@@ -1,11 +1,11 @@
 object FrameCalibrCoefs: TFrameCalibrCoefs
   Size.Width = 907.000000000000000000
-  Size.Height = 618.000000000000000000
+  Size.Height = 651.000000000000000000
   Size.PlatformDefault = False
   object Layout1: TLayout
     Align = Client
     Size.Width = 907.000000000000000000
-    Size.Height = 618.000000000000000000
+    Size.Height = 651.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     object GridCoefs: TGrid
@@ -13,12 +13,12 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       CanFocus = True
       ClipChildren = True
       Size.Width = 907.000000000000000000
-      Size.Height = 288.000000000000000000
+      Size.Height = 563.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       OnGetValue = GridCoefsGetValue
-      Viewport.Width = 887.000000000000000000
-      Viewport.Height = 263.000000000000000000
+      Viewport.Width = 907.000000000000000000
+      Viewport.Height = 563.000000000000000000
       object CheckColumnCoefEnable: TCheckColumn
         Header = #1042#1082#1083
         HeaderSettings.TextSettings.WordWrap = False
@@ -170,19 +170,32 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
         Text = #1044#1080#1072#1087#1072#1079#1086#1085
         TabOrder = 2
       end
+      object SpeedButtonShowGraph: TSpeedButton
+        Position.X = 696.000000000000000000
+        Position.Y = 8.000000000000000000
+        Size.Width = 49.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = 'arrowdowntoolbuttonbordered'
+        Text = 'SpeedButtonShowGraph'
+        TextSettings.Trimming = None
+        OnClick = SpeedButtonShowGraphClick
+      end
     end
-    object Layout2: TLayout
+    object LayoutGraph: TLayout
       Align = Bottom
-      Position.Y = 376.000000000000000000
+      Position.Y = 409.000000000000000000
       Size.Width = 907.000000000000000000
       Size.Height = 242.000000000000000000
       Size.PlatformDefault = False
+      Visible = False
       TabOrder = 2
       object Layout3: TLayout
         Align = Left
         Size.Width = 193.000000000000000000
         Size.Height = 242.000000000000000000
         Size.PlatformDefault = False
+        Visible = False
         TabOrder = 0
         object ComboBox1: TComboBox
           Position.X = 32.000000000000000000
@@ -195,7 +208,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       end
       object Layout4: TLayout
         Align = Client
-        Size.Width = 714.000000000000000000
+        Size.Width = 907.000000000000000000
         Size.Height = 242.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
@@ -212,14 +225,34 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
           Zoom.Pen.Fill.Color = claSilver
           Align = Client
           TabOrder = 0
-          Size.Width = 714.000000000000000000
+          Cursor = crCross
+          Size.Width = 907.000000000000000000
           Size.Height = 242.000000000000000000
           Size.PlatformDefault = False
           ColorPaletteIndex = 13
           object Series1: TFastLineSeries
             HoverElement = []
-            LinePen.Color = xFF4466A3
-            LinePen.Fill.Color = xFF4466A3
+            Cursor = crArrow
+            Depth = 3
+            Marks.Transparency = 100
+            Marks.Visible = True
+            Marks.Margins.Units = maPixels
+            Marks.Style = smsLabel
+            Marks.Angle = 5
+            Marks.BackColor = xFF808026
+            Marks.Callout.ArrowHead = ahLine
+            Marks.Callout.Distance = 1
+            Marks.DrawEvery = 4
+            Marks.Symbol.Brush.Color = x00D68C8C
+            Marks.Symbol.Emboss.Visible = True
+            Marks.Symbol.Transparency = 44
+            Marks.Symbol.Visible = True
+            Marks.Tail.Visible = True
+            Marks.Color = xFF808026
+            SeriesColor = xFFA6B9DB
+            LinePen.Color = x00FFFFFF
+            LinePen.Width = 4.651162624359131000
+            LinePen.EndStyle = esRound
             XValues.Name = 'X'
             XValues.Order = loAscending
             YValues.Name = 'Y'
@@ -302,7 +335,7 @@ object FrameCalibrCoefs: TFrameCalibrCoefs
       Align = Bottom
       Cursor = crVSplit
       MinSize = 20.000000000000000000
-      Position.Y = 368.000000000000000000
+      Position.Y = 643.000000000000000000
       Size.Width = 907.000000000000000000
       Size.Height = 8.000000000000000000
       Size.PlatformDefault = False

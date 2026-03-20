@@ -228,6 +228,7 @@ type
     function GetStrFullName: string;
     function GetDoubleNum(const AStr: string): Double; overload;
     function GetDoubleNum(AValue: Double; const ADim: string): Double; overload;
+    function GetDoubleNum(AValue: Double): Double; overload;
     function GetDoubleNum(const AStr: string; Dim: Integer): Double; overload;
     procedure Reset; overload;
     procedure Reset(AValue: Double); overload;
@@ -924,8 +925,11 @@ function TMeterValue.GetDoubleNum(AValue: Double; const ADim: string): Double;
 var
   Temp: Double;
   FO: Integer;
+  TempType:  EValueType;
 begin
   Temp := Value;
+  TempType:= self.ValueType;
+  self.ValueType:= CONST_TYPE;
   Value := AValue;
   FO := FFilterOrder;
   FFilterOrder := -1;
@@ -933,9 +937,32 @@ begin
     Result := GetDoubleValue(ADim);
   finally
     Value := Temp;
+    self.ValueType :=   TempType ;
     FFilterOrder := FO;
   end;
 end;
+
+function TMeterValue.GetDoubleNum(AValue: Double): Double;
+var
+  Temp: Double;
+  FO: Integer;
+  TempType:  EValueType;
+begin
+  Temp := Value;
+  TempType:= self.ValueType;
+  self.ValueType:= CONST_TYPE;
+  Value := AValue;
+  FO := FFilterOrder;
+  FFilterOrder := -1;
+  try
+    Result := GetDoubleValue(CurrentDimIndex);
+  finally
+    Value := Temp;
+    self.ValueType :=   TempType ;
+    FFilterOrder := FO;
+  end;
+end;
+
 
 { Sets filter order used by runtime smoothing logic. }
 procedure TMeterValue.SetFilter(AOrder: Integer);
@@ -1345,7 +1372,7 @@ begin
     if (Q >= Coefs[I].Q1) and (Q <= Coefs[I].Q2) then
     begin
       Qetl := Coefs[I].K * Q + Coefs[I].b;
-      Result := Qetl / Q;
+      Result := Qetl;
       Exit;
     end;
   end;

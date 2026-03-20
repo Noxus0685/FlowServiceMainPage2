@@ -3822,7 +3822,7 @@ object FormMain: TFormMain
               Size.Width = 348.000000000000000000
               Size.Height = 675.000000000000000000
               Size.PlatformDefault = False
-              TabIndex = 2
+              TabIndex = 1
               TabOrder = 0
               TabPosition = PlatformDefault
               Sizes = (
@@ -3899,7 +3899,7 @@ object FormMain: TFormMain
                   item
                   end>
                 TextSettings.Trimming = None
-                IsSelected = False
+                IsSelected = True
                 Size.Width = 65.000000000000000000
                 Size.Height = 26.000000000000000000
                 Size.PlatformDefault = False
@@ -3932,7 +3932,7 @@ object FormMain: TFormMain
                   item
                   end>
                 TextSettings.Trimming = None
-                IsSelected = True
+                IsSelected = False
                 Size.Width = 73.000000000000000000
                 Size.Height = 26.000000000000000000
                 Size.PlatformDefault = False

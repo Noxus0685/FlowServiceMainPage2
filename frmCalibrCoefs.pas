@@ -30,7 +30,7 @@ type
     StringColumnCoefb: TStringColumn;
     StringColumnQ1: TStringColumn;
     StringColumnQ2: TStringColumn;
-    Layout2: TLayout;
+    LayoutGraph: TLayout;
     Layout3: TLayout;
     Layout4: TLayout;
     ChartCoefs: TChart;
@@ -50,6 +50,7 @@ type
     Splitter1: TSplitter;
     ComboBoxUnitsCorrection: TComboBox;
     LabelCoefsRange: TLabel;
+    SpeedButtonShowGraph: TSpeedButton;
     procedure ComboBoxCoefTypeChange(Sender: TObject);
     procedure ComboBoxCoefTableChange(Sender: TObject);
     procedure ComboBoxUnitsCoefsChange(Sender: TObject);
@@ -63,6 +64,7 @@ type
     procedure SpeedButtonDeleteTableClick(Sender: TObject);
     procedure SpeedButtonAddTableClick(Sender: TObject);
     procedure ComboBoxUnitsCorrectionChange(Sender: TObject);
+    procedure SpeedButtonShowGraphClick(Sender: TObject);
   private
     FFlowMeter: TFlowMeter;
     FValue: TMeterValue;   //Корректируемое значение
@@ -76,6 +78,7 @@ type
 
     FSeriesInitError: TLineSeries;
     FSeriesCalcError: TLineSeries;
+    FSeriesMarkers: TPointSeries;
     FUpdatingUI: Boolean;
 
     function GetCurrentItem(ARow: Integer): TCalibrCoefItem;
@@ -515,6 +518,18 @@ begin
     FSeriesCalcError.Title := 'Погрешность расч, %';
     FSeriesCalcError.ParentChart := ChartCoefs;
   end;
+
+   if FSeriesMarkers = nil then
+  begin
+    FSeriesMarkers := TPointSeries.Create(Self);
+    FSeriesMarkers.ParentChart := ChartCoefs;
+    FSeriesMarkers.Title := 'Точки';
+
+    FSeriesMarkers.Pointer.Visible := True;
+    FSeriesMarkers.Pointer.Style := psCircle;
+    FSeriesMarkers.Pointer.HorizSize := 6;
+    FSeriesMarkers.Pointer.VertSize := 6;
+  end;
 end;
 
 function TFrameCalibrCoefs.InitErrorPercent(AItem: TCalibrCoefItem): Double;
@@ -584,140 +599,173 @@ end;
 procedure TFrameCalibrCoefs.UpdateChart;
 var
   Item: TCalibrCoefItem;
-  LastItem: TCalibrCoefItem;
-  X1: Double;
-  X2: Double;
-  MaxQ: Double;
-  MaxFiniteQ: Double;
-  InitErr: Double;
-  CalcErr: Double;
-  AxisTitleX: string;
-  AxisTitleY: string;
+  I : integer;
+  X: Double;
+  MinX, MaxX: Double;
+  MinY, MaxY: Double;
+  InitErr, CalcErr: Double;
+  DX, DY: Double;
+  FirstX, LastX: Double;
+  FirstInitErr, LastInitErr: Double;
+  FirstCalcErr, LastCalcErr: Double;
+  HasFirst: Boolean;
 
-  function IsFiniteValue(const AValue: Double): Boolean;
-  begin
-    Result := (not IsNan(AValue)) and (not IsInfinite(AValue));
-  end;
+
 
   function BuildAxisTitle(AMeterValue: TMeterValue; const ADefault: string): string;
+var
+  BaseName: string;
+  DimName: string;
+begin
+  Result := ADefault;
+
+  if AMeterValue = nil then
+    Exit;
+
+  // 1. Имя параметра
+  if AMeterValue.Description <> '' then
+    BaseName := AMeterValue.Description
+  else if AMeterValue.Name <> '' then
+    BaseName := AMeterValue.Name
+  else
+    BaseName := ADefault;
+
+  // 2. Единицы измерения
+  DimName := '';
+  DimName := AMeterValue.GetDimName;
+
+  // 3. Формирование строки
+  if (DimName <> '') and (Pos(DimName, BaseName) = 0) then
+    Result := BaseName + ' (' + DimName + ')'
+  else
+    Result := BaseName;
+end;
+
+  procedure UpdateBounds(const AX, AY: Double);
   begin
-    Result := ADefault;
-    if AMeterValue = nil then
-      Exit;
-
-    if AMeterValue.Description <> '' then
-      Result := AMeterValue.Description
-    else if AMeterValue.Name <> '' then
-      Result := AMeterValue.Name;
-
-    if (AMeterValue.CurrentDim.Name <> '') and (Pos(AMeterValue.CurrentDim.Name, Result) = 0) then
-      Result := Result + ', ' + AMeterValue.CurrentDim.Name;
+    if AX < MinX then MinX := AX;
+    if AX > MaxX then MaxX := AX;
+    if AY < MinY then MinY := AY;
+    if AY > MaxY then MaxY := AY;
   end;
 
-  function GetItemX1(AChartItem: TCalibrCoefItem): Double;
+   function GetItemX(AChartItem: TCalibrCoefItem): Double;
+begin
+  Result := 0;
+  if AChartItem = nil then
+    Exit;
+
+  if (IsInfinite(AChartItem.RangeArg)=False )then
   begin
-    Result := 0;
-    if AChartItem = nil then
-      Exit;
 
-    if IsFiniteValue(AChartItem.QFrom) and (AChartItem.QFrom > 0) then
-      Result := AChartItem.QFrom;
-  end;
-
-  function GetItemX2(AChartItem: TCalibrCoefItem): Double;
-  begin
-    Result := 0;
-    if AChartItem = nil then
-      Exit;
-
-    if IsFiniteValue(AChartItem.QTo) and (AChartItem.QTo > 0) then
-      Result := AChartItem.QTo
-    else if IsFiniteValue(AChartItem.RangeArg) and (AChartItem.RangeArg > 0) then
-      Result := AChartItem.RangeArg
+    if FValueCorrection <> nil then
+      Result :=  FValueCorrection.GetDoubleNum(AChartItem.RangeArg)
     else
-      Result := GetItemX1(AChartItem);
+      Result := AChartItem.RangeArg;
+  end
+
+
+  else if (AChartItem.RangeArg=Infinity) then
+       Result := Infinity
+  else
+      Result := AChartItem.RangeArg;
+
+
+
   end;
 
 begin
   EnsureChartSeries;
+
   FSeriesInitError.Clear;
   FSeriesCalcError.Clear;
+  FSeriesMarkers.Clear;
+
+  FSeriesInitError.Pointer.Visible := True;
+  FSeriesCalcError.Pointer.Visible := True;
 
   ChartCoefs.Legend.Visible := True;
   ChartCoefs.BottomAxis.Title.Visible := True;
   ChartCoefs.LeftAxis.Title.Visible := True;
 
-  AxisTitleX := BuildAxisTitle(FValueCorrection, 'Q');
-  AxisTitleY := 'Погрешность, %';
-
-  ChartCoefs.BottomAxis.Title.Caption := AxisTitleX;
-  ChartCoefs.LeftAxis.Title.Caption := AxisTitleY;
+ChartCoefs.BottomAxis.Title.Caption := BuildAxisTitle(FValueCorrection, 'Q');
+  ChartCoefs.LeftAxis.Title.Caption := 'Погрешность, %';
 
   if (FCurrentTable = nil) or (FCurrentTable.Items = nil) or (FCurrentTable.Items.Count = 0) then
   begin
-    ChartCoefs.BottomAxis.Automatic := False;
-    ChartCoefs.BottomAxis.SetMinMax(0, 1);
+    ChartCoefs.BottomAxis.Automatic := True;
+   // ChartCoefs.BottomAxis.SetMinMax(0, 1);
+    ChartCoefs.LeftAxis.Automatic := True;
+   /// ChartCoefs.LeftAxis.SetMinMax(-1, 1);
     Exit;
   end;
 
-  MaxFiniteQ := 0;
-  LastItem := nil;
+  MinX :=  1.0E300;
+  MaxX := -1.0E300;
+  MinY :=  1.0E300;
+  MaxY := -1.0E300;
+  HasFirst := False;
+
+  I := 0;
+
 
   for Item in FCurrentTable.Items do
   begin
-    if Item = nil then
+   // Inc(I);
+    if (Item = nil){ or (I=1) }then
       Continue;
 
-    LastItem := Item;
-    X2 := GetItemX2(Item);
-    if IsFiniteValue(X2) and (X2 > MaxFiniteQ) then
-      MaxFiniteQ := X2;
-  end;
 
-  if LastItem <> nil then
-    MaxQ := GetItemX2(LastItem)
-  else
-    MaxQ := 0;
-
-  if (not IsFiniteValue(MaxQ)) or (MaxQ <= 0) then
-    MaxQ := MaxFiniteQ;
-
-  if MaxQ > 0 then
-    MaxQ := MaxQ * 1.1
-  else
-    MaxQ := 1;
-
-  ChartCoefs.BottomAxis.Automatic := False;
-  ChartCoefs.BottomAxis.SetMinMax(0, MaxQ);
-
-  for Item in FCurrentTable.Items do
-  begin
-    if Item = nil then
-      Continue;
-
-    X1 := GetItemX1(Item);
-    X2 := GetItemX2(Item);
-
-    if X2 < X1 then
-      X2 := X1;
-
-    if X1 > MaxQ then
-      Continue;
-
-    if X2 > MaxQ then
-      X2 := MaxQ;
+     X := GetItemX(Item);
 
     InitErr := InitErrorPercent(Item);
     CalcErr := CalcErrorPercent(Item);
 
-    FSeriesInitError.AddXY(X1, InitErr);
-    if not SameValue(X2, X1, 1E-12) then
-      FSeriesInitError.AddXY(X2, InitErr);
+    FSeriesInitError.AddXY(X, InitErr);
 
-    FSeriesCalcError.AddXY(X1, CalcErr);
-    if not SameValue(X2, X1, 1E-12) then
-      FSeriesCalcError.AddXY(X2, CalcErr);
+
+    FSeriesCalcError.AddXY(X, CalcErr);
+
+
+    UpdateBounds(X, InitErr);
+
+    UpdateBounds(X, CalcErr);
+
+
+    if not HasFirst then
+    begin
+      FirstX := X;
+      FirstInitErr := InitErr;
+      FirstCalcErr := CalcErr;
+      HasFirst := True;
+    end;
+
+    LastX := X;
+    LastInitErr := InitErr;
+    LastCalcErr := CalcErr;
   end;
+
+  if not HasFirst then
+    Exit;
+
+  DX := (MaxX - MinX) * 0.1;
+  if DX <= 0 then
+    DX := 1;
+
+  DY := (MaxY - MinY) * 0.1;
+  if DY <= 0 then
+    DY := 1;
+
+  { хвосты }
+ // FSeriesInitError.AddXY(MaxX + DX * 2, LastInitErr);
+ // FSeriesCalcError.AddXY(MaxX + DX * 2, LastCalcErr);
+
+  { показываем видимую область чуть уже, чем все данные серии }
+  ChartCoefs.BottomAxis.Automatic := False;
+  ChartCoefs.BottomAxis.SetMinMax(MinX - DX, MaxX + DX);
+
+  ChartCoefs.LeftAxis.Automatic := False;
+  ChartCoefs.LeftAxis.SetMinMax(MinY- DY/10, MaxY + DY);
 end;
 
 procedure TFrameCalibrCoefs.SetCurrentTable(ATable: TCalibrCoefTable);
@@ -914,14 +962,14 @@ begin
     Value := Item.OrderNo
   else if GridCoefs.Columns[ACol] = StringColumnCoefValue then
   begin
-    if FValueCorrection <> nil then
+    if FValue <> nil then
       Value := FValue.GetStrNum(Item.Value)
     else
       Value := FloatToStr(Item.Value);
   end
   else if GridCoefs.Columns[ACol] = StringColumnCoefArg then
   begin
-    if FValueCorrection <> nil then
+    if FValue <> nil then
       Value := FValue.GetStrNum(Item.Arg)
     else
       Value := FloatToStr(Item.Arg);
@@ -936,14 +984,14 @@ begin
     Value := FormatFloat('0.000000', Item.b)
   else if GridCoefs.Columns[ACol] = StringColumnQ1 then
   begin
-    if FValue <> nil then
+    if FValueCorrection <> nil then
       Value := FValueCorrection.GetStrNum(Item.QFrom)
     else
       Value := FloatToStr(Item.QFrom);
   end
   else if GridCoefs.Columns[ACol] = StringColumnQ2 then
   begin
-    if FValue <> nil then
+    if FValueCorrection <> nil then
       Value := FValueCorrection.GetStrNum(Item.QTo)
     else
       Value := FloatToStr(Item.QTo);
@@ -1133,6 +1181,16 @@ begin
   FillCoefTables;
   UpdateGrid;
   UpdateChart;
+end;
+
+procedure TFrameCalibrCoefs.SpeedButtonShowGraphClick(Sender: TObject);
+begin
+
+if LayoutGraph.Visible then
+     LayoutGraph.Visible:= False
+     else
+     LayoutGraph.Visible:= True;
+
 end;
 
 function TFrameCalibrCoefs.TryGetSpillageValues(ASpillage: TPointSpillage; out AArg,

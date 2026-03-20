@@ -4102,8 +4102,6 @@ var
   QuantityUnitName: string;
 begin
 
-  UpdateSessionItems;
-  UpdateGridDataPoints;
 end;
 
 procedure TFormMain.UpdateGridDataPointsHeaders(QuantityDimName: string; FlowDimName: string);

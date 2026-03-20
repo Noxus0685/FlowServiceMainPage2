@@ -335,7 +335,7 @@
         </DCCReference>
         <DCCReference Include="UnitMeterValue.pas"/>
         <DCCReference Include="frmProceeding.pas">
-            <Form>Frame1</Form>
+            <Form>FrameProceeding</Form>
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
