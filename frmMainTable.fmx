@@ -1462,201 +1462,188 @@
         end
       end
     end
-    object Layout11: TLayout
-      Align = MostBottom
-      Position.Y = 589.000000000000000000
-      Size.Width = 1252.000000000000000000
-      Size.Height = 96.000000000000000000
+    object TabItemTest: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Trimming = None
+      IsSelected = False
+      Size.Width = 46.000000000000000000
+      Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 4
-      object Button1: TButton
-        Align = Left
-        Margins.Left = 50.000000000000000000
-        Position.X = 50.000000000000000000
-        Size.Width = 35.000000000000000000
-        Size.Height = 50.000000000000000000
-        Size.PlatformDefault = False
-        StyleLookup = 'transparentcirclebuttonstyle'
-        TabOrder = 0
-        Text = 'Button1'
-        TextSettings.Trimming = None
-        Visible = False
-        object Circle2: TCircle
-          Align = Client
-          Fill.Kind = Gradient
-          Fill.Gradient.Points = <
-            item
-              Color = xFF9B9B9B
-              Offset = 0.000000000000000000
-            end
-            item
-              Color = claWhite
-              Offset = 0.903726696968078600
-            end>
-          Fill.Gradient.Style = Radial
-          Size.Width = 35.000000000000000000
-          Size.Height = 50.000000000000000000
-          Size.PlatformDefault = False
-          Stroke.Join = Round
-        end
-      end
-      object ButtonMonitor: TButton
-        OnClick = ButtonMonitorClick
-        Position.X = 26.000000000000000000
+      StyleLookup = ''
+      TabOrder = 1
+      Text = 'TEST'
+      ExplicitSize.cx = 46.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+      object LayoutTestValues: TLayout
+        Align = Top
+        Margins.Left = 24.000000000000000000
+        Margins.Top = 24.000000000000000000
+        Margins.Right = 24.000000000000000000
+        Margins.Bottom = 24.000000000000000000
+        Position.X = 24.000000000000000000
         Position.Y = 24.000000000000000000
-        Size.Width = 105.000000000000000000
-        Size.Height = 41.000000000000000000
+        Size.Width = 1204.000000000000000000
+        Size.Height = 260.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 1
-        Text = #1052#1086#1085#1080#1090#1086#1088
-        TextSettings.Trimming = None
-        object CircleIndicatorMonitor: TCircle
-          Align = Center
-          Fill.Kind = Gradient
-          Fill.Gradient.Points = <
-            item
-              Color = claGray
-              Offset = 0.000000000000000000
-            end
-            item
-              Color = claWhite
-              Offset = 1.000000000000000000
-            end>
-          Fill.Gradient.Style = Radial
-          Margins.Right = 75.000000000000000000
-          Size.Width = 12.000000000000000000
-          Size.Height = 12.000000000000000000
+        TabOrder = 0
+        object GroupBoxEtalonChannels: TGroupBox
+          Align = Left
+          Margins.Right = 12.000000000000000000
+          Size.Width = 596.000000000000000000
+          Size.Height = 260.000000000000000000
           Size.PlatformDefault = False
-        end
-      end
-      object Layout15: TLayout
-        Align = Center
-        Size.Width = 273.000000000000000000
-        Size.Height = 50.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 2
-        object ButtonCancel: TButton
-          OnClick = ButtonCancelClick
-          Position.X = -29.000000000000000000
-          Size.Width = 110.000000000000000000
-          Size.Height = 50.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = 'circlebuttonstyle'
-          TabOrder = 1
-          TabStop = False
-          Text = #1054#1090#1084#1077#1085#1072
-          TextSettings.WordWrap = True
-          TextSettings.Trimming = None
-          Visible = False
-          object GlowEffect1: TGlowEffect
-            Softness = 1.000000000000000000
-            GlowColor = xFFF69E2D
-            Opacity = 1.000000000000000000
-            Enabled = False
-          end
-          object GlowEffect2: TGlowEffect
-            Softness = 1.000000000000000000
-            GlowColor = claYellowgreen
-            Opacity = 1.000000000000000000
-            Enabled = False
-          end
-          object GlowEffectCancelRed: TGlowEffect
-            Softness = 0.300000011920929000
-            GlowColor = claRed
-            Opacity = 1.000000000000000000
-          end
-        end
-        object TestButton: TButton
-          OnClick = TestButtonClick
-          Align = Center
-          Size.Width = 113.000000000000000000
-          Size.Height = 90.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = 'circlebuttonstyle'
+          Text = #1069#1090#1074#1083#1086#1085#1099
           TabOrder = 0
-          TabStop = False
-          Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077' '
-          TextSettings.WordWrap = True
-          TextSettings.Trimming = None
-          object GlowMesGreen: TGlowEffect
-            Softness = 1.000000000000000000
-            GlowColor = claYellowgreen
-            Opacity = 1.000000000000000000
-            Enabled = False
+          object LabelEtalonCurSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 48.000000000000000000
+            Text = 'CurSec'
+            TabOrder = 0
           end
-          object GlowMesRed: TGlowEffect
-            Softness = 0.400000005960464500
-            GlowColor = claRed
-            Opacity = 0.899999976158142100
-            Enabled = False
+          object LabelEtalonImpSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 96.000000000000000000
+            Text = 'ImpSec'
+            TabOrder = 1
           end
-          object GlowMesYellow: TGlowEffect
-            Softness = 1.000000000000000000
-            GlowColor = xFFF69E2D
-            Opacity = 0.899999976158142100
-            Enabled = False
+          object LabelEtalonImpResult: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 144.000000000000000000
+            Text = 'ImpResult'
+            TabOrder = 2
+          end
+          object EditEtalonCurSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 3
+            Text = '0'
+            Position.X = 140.000000000000000000
+            Position.Y = 44.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+          end
+          object EditEtalonImpSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 4
+            Text = '0'
+            Position.X = 140.000000000000000000
+            Position.Y = 92.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+          end
+          object EditEtalonImpResult: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 5
+            Text = '0'
+            Position.X = 140.000000000000000000
+            Position.Y = 140.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+          end
+          object ButtonApplyEtalonValues: TButton
+            Position.X = 140.000000000000000000
+            Position.Y = 190.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 6
+            Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+            TextSettings.Trimming = None
+            OnClick = ButtonApplyEtalonValuesClick
           end
         end
-        object Switch1: TSwitch
-          IsChecked = False
-          Position.X = 213.000000000000000000
-          Position.Y = 17.000000000000000000
-          Size.Width = 52.000000000000000000
-          Size.Height = 25.000000000000000000
+        object GroupBoxDeviceChannels: TGroupBox
+          Align = Client
+          Size.Width = 596.000000000000000000
+          Size.Height = 260.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 3
-        end
-        object Label1: TLabel
-          Position.X = 224.000000000000000000
-          Size.Width = 41.000000000000000000
-          Size.Height = 17.000000000000000000
-          Size.PlatformDefault = False
-          Text = #1040#1074#1090#1086
-          TabOrder = 5
+          Text = #1055#1088#1080#1073#1086#1088#1099
+          TabOrder = 1
+          object LabelDeviceCurSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 48.000000000000000000
+            Text = 'CurSec'
+            TabOrder = 0
+          end
+          object LabelDeviceImpSec: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 96.000000000000000000
+            Text = 'ImpSec'
+            TabOrder = 1
+          end
+          object LabelDeviceImpResult: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 144.000000000000000000
+            Text = 'ImpResult'
+            TabOrder = 2
+          end
+          object EditDeviceCurSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 3
+            Text = '0'
+            Position.X = 160.000000000000000000
+            Position.Y = 44.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+          end
+          object EditDeviceImpSec: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 4
+            Text = '0'
+            Position.X = 160.000000000000000000
+            Position.Y = 92.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+          end
+          object EditDeviceImpResult: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 5
+            Text = '0'
+            Position.X = 160.000000000000000000
+            Position.Y = 140.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+          end
+          object ButtonApplyDeviceValues: TButton
+            Position.X = 160.000000000000000000
+            Position.Y = 190.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 6
+            Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+            TextSettings.Trimming = None
+            OnClick = ButtonApplyDeviceValuesClick
+          end
         end
       end
-    end
-    object ButtonApplyEtalonValues: TButton
-      Position.X = 140.000000000000000000
-      Position.Y = 190.000000000000000000
-      Size.Width = 180.000000000000000000
-      Size.Height = 30.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 5
-      Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
-      TextSettings.Trimming = None
-      OnClick = ButtonApplyEtalonValuesClick
-    end
-    object ButtonApplyDeviceValues: TButton
-      Position.X = 340.000000000000000000
-      Position.Y = 190.000000000000000000
-      Size.Width = 180.000000000000000000
-      Size.Height = 30.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 6
-      Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
-      TextSettings.Trimming = None
-      OnClick = ButtonApplyDeviceValuesClick
-    end
-    object EditTestNum: TEdit
-      Touch.InteractiveGestures = [LongTap, DoubleTap]
-      TabOrder = 7
-      Position.X = 200.000000000000000000
-      Position.Y = 366.000000000000000000
-      KillFocusByReturn = True
-      OnExit = EditTestNumExit
-    end
-    object LabelTestNum: TLabel
-      Position.X = 344.000000000000000000
-      Position.Y = 371.000000000000000000
-      Text = 'LabelTestNum'
-      TabOrder = 8
-    end
-    object Label5: TLabel
-      Position.X = 65.000000000000000000
-      Position.Y = 366.000000000000000000
-      Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-      TabOrder = 9
+      object EditTestNum: TEdit
+        Touch.InteractiveGestures = [LongTap, DoubleTap]
+        TabOrder = 1
+        Position.X = 200.000000000000000000
+        Position.Y = 366.000000000000000000
+        KillFocusByReturn = True
+        OnExit = EditTestNumExit
+      end
+      object LabelTestNum: TLabel
+        Position.X = 344.000000000000000000
+        Position.Y = 371.000000000000000000
+        Text = 'LabelTestNum'
+        TabOrder = 3
+      end
+      object Label5: TLabel
+        Position.X = 65.000000000000000000
+        Position.Y = 366.000000000000000000
+        Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+        TabOrder = 2
+      end
     end
   object PopupMenuInstrumentalLayOut: TPopupMenu
     OnPopup = PopupMenuInstrumentalLayOutPopup
