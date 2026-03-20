@@ -1,4 +1,4 @@
-object FrameMainTable: TFrameMainTable
+﻿object FrameMainTable: TFrameMainTable
   Size.Width = 1252.000000000000000000
   Size.Height = 685.000000000000000000
   Size.PlatformDefault = False
@@ -9,12 +9,14 @@ object FrameMainTable: TFrameMainTable
     Size.PlatformDefault = False
     TabOrder = 0
     object PanelInstruments: TPanel
+      PopupMenu = PopupMenuInstrumentalLayOut
       Align = MostTop
       Size.Width = 1252.000000000000000000
       Size.Height = 129.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       object HorzScrollBoxInstrumental: THorzScrollBox
+        PopupMenu = PopupMenuInstrumentalLayOut
         Align = Client
         Size.Width = 1252.000000000000000000
         Size.Height = 129.000000000000000000
@@ -175,6 +177,7 @@ object FrameMainTable: TFrameMainTable
               Text = #1059#1089#1083#1086#1074#1080#1103
               TabOrder = 3
               object SpeedButtonMinimizeConditions: TSpeedButton
+                OnClick = SpeedButtonMinimizeConditionsClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -289,6 +292,7 @@ object FrameMainTable: TFrameMainTable
               Size.PlatformDefault = False
               TabOrder = 2
               object ComboEditUnits: TComboBox
+                    OnChange = ComboBoxUnitsChange
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Left
                 Items.Strings = (
@@ -345,6 +349,7 @@ object FrameMainTable: TFrameMainTable
               Text = #1056#1072#1089#1093#1086#1076
               TabOrder = 1
               object SpeedButtonMinimzeLayoutFlowRate: TSpeedButton
+                OnClick = SpeedButtonMinimzeLayoutFlowRateClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -450,6 +455,7 @@ object FrameMainTable: TFrameMainTable
                 Text = 'SpeedButtonTest'
                 TextSettings.Trimming = None
                 object Circle1: TCircle
+                      OnClick = Circle1Click
                   Align = Client
                   HitTest = False
                   Size.Width = 18.000000000000000000
@@ -468,6 +474,7 @@ object FrameMainTable: TFrameMainTable
               Text = #1043#1083#1072#1074#1085#1072#1103
               TabOrder = 1
               object SpeedButtonMinimizeLayoutMain: TSpeedButton
+                OnClick = SpeedButtonMinimizeLayoutMainClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -725,6 +732,7 @@ object FrameMainTable: TFrameMainTable
               Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
               TabOrder = 3
               object SpeedButtonMinimizeMesure: TSpeedButton
+                OnClick = SpeedButtonMinimizeMesureClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -917,6 +925,7 @@ object FrameMainTable: TFrameMainTable
               Text = #1055#1088#1086#1094#1077#1076#1091#1088#1099
               TabOrder = 1
               object SpeedButtonMinimizeProcedures: TSpeedButton
+                OnClick = SpeedButtonMinimizeProceduresClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -1145,6 +1154,7 @@ object FrameMainTable: TFrameMainTable
               Text = #1053#1072#1089#1086#1089
               TabOrder = 1
               object SpeedButtonMinimizePumpLayout: TSpeedButton
+                OnClick = SpeedButtonMinimizePumpLayoutClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -1197,6 +1207,9 @@ object FrameMainTable: TFrameMainTable
             Size.PlatformDefault = False
             TabOrder = 0
             object GridEtalons: TGrid
+                  OnGetValue = GridEtalonsGetValue
+                  OnSetValue = GridEtalonsSetValue
+                  OnCellClick = GridEtalonsCellClick
               Align = Client
               CanFocus = True
               ClipChildren = True
@@ -1310,6 +1323,9 @@ object FrameMainTable: TFrameMainTable
           Size.PlatformDefault = False
           TabOrder = 3
           object GridDevices: TGrid
+                OnGetValue = GridDevicesGetValue
+                OnSetValue = GridDevicesSetValue
+                OnCellClick = GridDevicesCellClick
             Align = Client
             CanFocus = True
             ClipChildren = True
@@ -1428,6 +1444,7 @@ object FrameMainTable: TFrameMainTable
               TabOrder = 0
             end
             object PopupMenuDevicesGridLayOut: TPopupMenu
+              OnPopup = PopupMenuDevicesGridLayOutPopup
               Left = 1610
               Top = 461
             end
@@ -1484,6 +1501,7 @@ object FrameMainTable: TFrameMainTable
         end
       end
       object ButtonMonitor: TButton
+        OnClick = ButtonMonitorClick
         Position.X = 26.000000000000000000
         Position.Y = 24.000000000000000000
         Size.Width = 105.000000000000000000
@@ -1518,6 +1536,7 @@ object FrameMainTable: TFrameMainTable
         Size.PlatformDefault = False
         TabOrder = 2
         object ButtonCancel: TButton
+          OnClick = ButtonCancelClick
           Position.X = -29.000000000000000000
           Size.Width = 110.000000000000000000
           Size.Height = 50.000000000000000000
@@ -1548,6 +1567,7 @@ object FrameMainTable: TFrameMainTable
           end
         end
         object TestButton: TButton
+          OnClick = TestButtonClick
           Align = Center
           Size.Width = 113.000000000000000000
           Size.Height = 90.000000000000000000
@@ -1596,5 +1616,56 @@ object FrameMainTable: TFrameMainTable
         end
       end
     end
+    object ButtonApplyEtalonValues: TButton
+      Position.X = 140.000000000000000000
+      Position.Y = 190.000000000000000000
+      Size.Width = 180.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 5
+      Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+      TextSettings.Trimming = None
+      OnClick = ButtonApplyEtalonValuesClick
+    end
+    object ButtonApplyDeviceValues: TButton
+      Position.X = 340.000000000000000000
+      Position.Y = 190.000000000000000000
+      Size.Width = 180.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 6
+      Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+      TextSettings.Trimming = None
+      OnClick = ButtonApplyDeviceValuesClick
+    end
+    object EditTestNum: TEdit
+      Touch.InteractiveGestures = [LongTap, DoubleTap]
+      TabOrder = 7
+      Position.X = 200.000000000000000000
+      Position.Y = 366.000000000000000000
+      KillFocusByReturn = True
+      OnExit = EditTestNumExit
+    end
+    object LabelTestNum: TLabel
+      Position.X = 344.000000000000000000
+      Position.Y = 371.000000000000000000
+      Text = 'LabelTestNum'
+      TabOrder = 8
+    end
+    object Label5: TLabel
+      Position.X = 65.000000000000000000
+      Position.Y = 366.000000000000000000
+      Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+      TabOrder = 9
+    end
+  object PopupMenuInstrumentalLayOut: TPopupMenu
+    OnPopup = PopupMenuInstrumentalLayOutPopup
+    Left = 24
+    Top = 24
+  end
+  object PopupMenuEtalonsGridLayOut: TPopupMenu
+    OnPopup = PopupMenuEtalonsGridLayOutPopup
+    Left = 72
+    Top = 24
   end
 end
