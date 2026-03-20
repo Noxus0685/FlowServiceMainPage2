@@ -1457,8 +1457,8 @@ object FormMain: TFormMain
                   OnGetValue = GridEtalonsGetValue
                   OnSetValue = GridEtalonsSetValue
                   OnCellClick = GridEtalonsCellClick
-                  Viewport.Width = 1766.000000000000000000
-                  Viewport.Height = 95.000000000000000000
+                  Viewport.Width = 1770.000000000000000000
+                  Viewport.Height = 120.000000000000000000
                   object CheckColumnEtalonEnable1: TCheckColumn
                     HorzAlign = Center
                     Header = #1042#1082#1083
@@ -1577,8 +1577,8 @@ object FormMain: TFormMain
                 OnGetValue = GridDevicesGetValue
                 OnSetValue = GridDevicesSetValue
                 OnCellClick = GridDevicesCellClick
-                Viewport.Width = 1750.000000000000000000
-                Viewport.Height = 284.000000000000000000
+                Viewport.Width = 1770.000000000000000000
+                Viewport.Height = 309.000000000000000000
                 object CheckColumnDeviceEnable1: TCheckColumn
                   Header = #1042#1082#1083
                   HeaderSettings.TextSettings.Trimming = Character
@@ -3488,8 +3488,8 @@ object FormMain: TFormMain
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnGetValue = GridDataPointsGetValue
               OnCellClick = GridDataPointsCellClick
-              Viewport.Width = 1157.000000000000000000
-              Viewport.Height = 634.000000000000000000
+              Viewport.Width = 1177.000000000000000000
+              Viewport.Height = 675.000000000000000000
               object CheckColumnSpillageEnable: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.WordWrap = False
@@ -3675,8 +3675,8 @@ object FormMain: TFormMain
               Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
               OnSelChanged = GridResultsSelChanged
               OnGetValue = GridResultsGetValue
-              Viewport.Width = 1157.000000000000000000
-              Viewport.Height = 650.000000000000000000
+              Viewport.Width = 1177.000000000000000000
+              Viewport.Height = 675.000000000000000000
               object StringColumnResultName: TStringColumn
                 Header = #1048#1084#1103
                 HeaderSettings.TextSettings.Trimming = Character
@@ -3743,8 +3743,8 @@ object FormMain: TFormMain
             Size.PlatformDefault = False
             TabOrder = 1
             Visible = False
-            Viewport.Width = 879.000000000000000000
-            Viewport.Height = 98.000000000000000000
+            Viewport.Width = 883.000000000000000000
+            Viewport.Height = 102.000000000000000000
           end
         end
         object LayoutLeft: TLayout
@@ -3917,8 +3917,8 @@ object FormMain: TFormMain
                   Size.Height = 219.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 0
-                  Viewport.Width = 277.000000000000000000
-                  Viewport.Height = 194.000000000000000000
+                  Viewport.Width = 297.000000000000000000
+                  Viewport.Height = 219.000000000000000000
                   object StringColumnCoefTableName: TStringColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end

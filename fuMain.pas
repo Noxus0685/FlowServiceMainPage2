@@ -876,14 +876,6 @@ begin
     end;
 end;
 
-function BoolToRussianYesNo(const AValue: Boolean): string;
-begin
-  if AValue then
-    Result := 'Да'
-  else
-    Result := 'Нет';
-end;
-
 function TFormMain.FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
 var
   Device: TDevice;

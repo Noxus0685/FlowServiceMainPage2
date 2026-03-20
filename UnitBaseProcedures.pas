@@ -81,9 +81,17 @@ function NewGuidString: string;
 function ContainsTextAny(const AText, AFind: string): Boolean;
 function IsDateInRange(const ADate, AFrom, ATo: TDate): Boolean;
 function NormalizeFlowAccuracyInput(const S: string): string;
-
+function BoolToRussianYesNo(const AValue: Boolean): string;
 
 implementation
+
+function BoolToRussianYesNo(const AValue: Boolean): string;
+begin
+  if AValue then
+    Result := 'Да'
+  else
+    Result := 'Нет';
+end;
 
 function NormalizeFloatInput(const S: string): Double;
 var

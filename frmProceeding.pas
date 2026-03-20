@@ -1,4 +1,4 @@
-unit frmProceeding;
+﻿unit frmProceeding;
 
 interface
 
@@ -151,6 +151,9 @@ type
     PopupMenuGridResults: TPopupMenu;
     ActionSessionDeviceRemove: TAction;
     ActionSessionDeviceAdd: TAction;
+
+    private
+
     FFrameCalibrCoefs: TFrameCalibrCoefs;
     FWorkTableManager: TWorkTableManager;
     FProcessingDevices: TObjectList<TDevice>;
@@ -448,6 +451,32 @@ begin
     Ini.Free;
   end;
 end;
+
+
+function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;
+var
+  DateOpenStr: string;
+  DateCloseStr: string;
+begin
+  if ASession = nil then
+    Exit('Сессия -');
+
+  DateOpenStr := '-';
+  if ASession.DateTimeOpen > 0 then
+    DateOpenStr := DateToStr(ASession.DateTimeOpen);
+
+  if ASession.Active then
+    Exit('Сессия ' + DateOpenStr);
+
+  DateCloseStr := '-';
+  if ASession.DateTimeClose > 0 then
+    DateCloseStr := DateToStr(ASession.DateTimeClose);
+
+  Result := 'Сессия ' + DateOpenStr + '-' + DateCloseStr;
+end;
+
+
+
 procedure TFrameProceeding.UpdateSessionItems;
 var
   Item: TTreeViewItem;

@@ -1205,8 +1205,8 @@ object FrameMainTable: TFrameMainTable
               Size.PlatformDefault = False
               TabOrder = 0
               RowCount = 2
-              Viewport.Width = 1093.000000000000000000
-              Viewport.Height = 120.000000000000000000
+              Viewport.Width = 1089.000000000000000000
+              Viewport.Height = 79.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -1318,8 +1318,8 @@ object FrameMainTable: TFrameMainTable
             Size.PlatformDefault = False
             TabOrder = 0
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-            Viewport.Width = 1093.000000000000000000
-            Viewport.Height = 234.000000000000000000
+            Viewport.Width = 1073.000000000000000000
+            Viewport.Height = 193.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -1584,7 +1584,7 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 52.000000000000000000
           Size.Height = 25.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 4
+          TabOrder = 3
         end
         object Label1: TLabel
           Position.X = 224.000000000000000000
