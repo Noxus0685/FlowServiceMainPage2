@@ -294,8 +294,6 @@ procedure TFrameProceed.Initialize(AWorkTableManager: TWorkTableManager);
 var
   UnitName: string;
 begin
-    GridResults.OnGetValue := GridDataPointsGetValue;
-
   FWorkTableManager := AWorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
