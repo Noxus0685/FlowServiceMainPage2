@@ -63,8 +63,6 @@ type
   end;
 
   TFrameMainTable = class(TFrame)
-    TabControl1: TTabControl;
-    TabItemTable: TTabItem;
     TabControlWorkTables: TTabControl;
     TabItemWorkTable1: TTabItem;
     Panel2: TPanel;
@@ -184,103 +182,7 @@ type
     EditImp: TEdit;
     Rectangle10: TRectangle;
     LabelImp: TLabel;
-    TabItemMnemo: TTabItem;
-    ControlBar: TLayout;
-    rctToolsPanelBackground: TRectangle;
-    tbShemeColor: TToolBar;
-    rct3: TRectangle;
-    pnlShemeColor: TPanel;
-    Label4: TLabel;
-    cbSHEME_COLOR: TComboBox;
-    shdwfct12: TShadowEffect;
-    pnlBackColor: TPanel;
-    Label3: TLabel;
-    cbBACK_COLOR: TComboColorBox;
-    ShadowEffect11: TShadowEffect;
-    lbMainToolButtons: TLayout;
-    tbMainPanel: TToolBar;
-    rct2: TRectangle;
-    sbSaveProject: TSpeedButton;
-    ShadowEffect5: TShadowEffect;
-    sbSaveSettings: TSpeedButton;
-    ShadowEffect6: TShadowEffect;
-    sbSetup: TSpeedButton;
-    shdwfct4: TShadowEffect;
-    sbSound: TSpeedButton;
-    ShadowEffect7: TShadowEffect;
-    sbToolPosition: TSpeedButton;
-    ShadowEffect8: TShadowEffect;
-    ebEditProject: TSpeedButton;
-    ShadowEffect2: TShadowEffect;
-    btnWorkLog: TSpeedButton;
-    ShadowEffect4: TShadowEffect;
-    btnProjectInfo: TSpeedButton;
-    ShadowEffect3: TShadowEffect;
-    SpeedButton1: TSpeedButton;
-    ShadowEffect15: TShadowEffect;
-    tcShemeElements: TTabControl;
-    tiControl: TTabItem;
-    btnCreatePump: TSpeedButton;
-    btnCreateUnoperatedPump: TSpeedButton;
-    btnCreatePnevmoValve: TSpeedButton;
-    btnCreateElectroValve: TSpeedButton;
-    btnCreateBlcdValve: TSpeedButton;
-    btnCreateUPP: TSpeedButton;
-    btnCreateFlowmeter: TSpeedButton;
-    btnCreateTermometer: TSpeedButton;
-    btnCreateManometer: TSpeedButton;
-    btnCreateFlowmetersPanel: TSpeedButton;
-    btnCreateLevelDetector: TSpeedButton;
-    btnCreateWaterLevel: TSpeedButton;
-    btnCreateScale: TSpeedButton;
-    shdwfct5: TShadowEffect;
-    tiPipeAndFittings: TTabItem;
-    btnCreateElbow: TSpeedButton;
-    btnCreateCross: TSpeedButton;
-    btnCreateTee: TSpeedButton;
-    btnCreateFlange: TSpeedButton;
-    btnCreateHorisontalPipe: TSpeedButton;
-    btnCreateVerticalPipe: TSpeedButton;
-    btnCreatePump_1: TSpeedButton;
-    btnCreateMotor: TSpeedButton;
-    btnCreate8: TSpeedButton;
-    btnCreatefitTank_V: TSpeedButton;
-    btnCreate10: TSpeedButton;
-    btnCreatefitTank_H: TSpeedButton;
-    btnCreatePump_2: TSpeedButton;
-    btnCreatePump_3: TSpeedButton;
-    shdwfct6: TShadowEffect;
-    tiAnimation: TTabItem;
-    btnCreateGroupBox: TSpeedButton;
-    btnCreateText: TSpeedButton;
-    tiUserComponents: TTabItem;
-    btnAddUserPrimitive: TSpeedButton;
-    btnDeleteUserPrimitive: TSpeedButton;
-    shdwfct14: TShadowEffect;
-    tbEditProject: TToolBar;
-    rct4: TRectangle;
-    btnComponentsVisible: TSpeedButton;
-    shdwfct9: TShadowEffect;
-    btnAnimateVisible: TSpeedButton;
-    ShadowEffect1: TShadowEffect;
-    btnDeleteComponet: TSpeedButton;
-    shdwfct10: TShadowEffect;
-    lytWorkTask: TLayout;
-    Label11: TLabel;
-    cbMainTask: TComboBox;
-    sbRunStop: TSpeedButton;
-    sbPause: TSpeedButton;
-    ShadowEffect10: TShadowEffect;
-    btnAbout: TSpeedButton;
-    shdwfct11: TShadowEffect;
-    lytWorkDesktop: TLayout;
-    Label12: TLabel;
-    PerspectiveTransformEffect1: TPerspectiveTransformEffect;
-    cbWorkDesktop: TComboBox;
     Splitter1: TSplitter;
-    ShadowEffect9: TShadowEffect;
-    shdwfct8: TShadowEffect;
-    TabItemResults: TTabItem;
     PopupColumnEtalonSignal1: TPopupColumn;
     PopupMenu1: TPopupMenu;
     MenuItem1: TMenuItem;
@@ -1109,19 +1011,16 @@ begin
   ButtonCancel.OnClick := ButtonCancelClick;
   EnforceDataPointsColumnsLayout;
 
-  FFrameProceed := TFrameProceed.Create(Self);
-  FFrameProceed.Parent := TabItemResults;
-  FFrameProceed.Align := TAlignLayout.Client;
-  FFrameProceed.Initialize(FWorkTableManager);
 
   SetValues;
   UpdateForm;
   OnChangeState(STATE_NONE);
 end;
+
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
 begin
-  if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
-    FFrameProceed.RefreshResultsTab;
+//  if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
+//    FFrameProceed.RefreshResultsTab;
 end;
 
 
@@ -2848,7 +2747,6 @@ procedure TFrameMainTable.TimerMainTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;
 begin
-
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;

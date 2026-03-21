@@ -1,5 +1,4 @@
 object FrameMainTable: TFrameMainTable
-  OnCreate = FormCreate
   Size.Width = 1252.000000000000000000
   Size.Height = 685.000000000000000000
   Size.PlatformDefault = False

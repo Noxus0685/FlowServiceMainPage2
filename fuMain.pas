@@ -1043,68 +1043,6 @@ begin
   FFrameMainTable.Align := TAlignLayout.Client;
   FFrameMainTable.Initialize;
 
-
-//  TMeterValue.LoadFromFile;
-//
-//  FInstrumentalVisibleOrder := TList<TLayout>.Create;
-//  FFrameProceed := nil;
-//
-//  FWorkTableManager := TWorkTableManager.Create(
-//    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-//    'Settings\TableSettings.ini'
-//  );
-//
-//  FWorkTableManager.Load;
-//
-//  GridDevices.RowCount := 2;
-//
-//  // Заполняем список через имя колонки
-//  PopupColumnDeviceSignal1.Items.Clear;
-//
-//  for OT := otFrequency to High(TOutputType) do
-//    PopupColumnDeviceSignal1.Items.Add(GetOutputTypeName(OT));
-//
-//  PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
-//
-//  ComboEditUnits.Items.Clear;
-//  for UnitName in CVolumeFlowUnits do
-//    ComboEditUnits.Items.Add(UnitName);
-//  for UnitName in CMassFlowUnits do
-//    ComboEditUnits.Items.Add(UnitName);
-//
-//
-//  if ComboEditUnits.Items.Count > 0 then
-//    ComboEditUnits.ItemIndex := 0;
-//
-//  SetLength(FRows, 0);
-//
-//  InitTables;
-//
-//  FLastClickRow := -1;
-//  FLastClickCol := nil;
-//  FLastClickTick := 0;
-//
-//  Randomize;
-//  FNextClimateChangeAt := Now;
-//
-//  PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
-//  LayoutOrder := '';
-//  if FActiveWorkTable <> nil then
-//    LayoutOrder := FActiveWorkTable.InstrumentalLayoutOrder;
-//
-//  RestoreInstrumentalLayoutsByFlags(
-//    LayoutFlowRate.Visible,
-//    LayoutPump.Visible,
-//    LayoutMain.Visible,
-//    LayoutMesure.Visible,
-//    LayoutConditions.Visible,
-//    LayoutProcedures.Visible,
-//    LayoutOrder
-//  );
-//
-//  ButtonMonitor.OnClick := ButtonMonitorClick;
-//  ButtonCancel.OnClick := ButtonCancelClick;
-//  TabControl1.OnChange := TabControl1Change;
   EnforceDataPointsColumnsLayout;
 
   FFrameProceed := TFrameProceed.Create(Self);
@@ -1112,10 +1050,6 @@ begin
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize(FWorkTableManager);
 
-
-//  SetValues;
-//  UpdateForm;
-//  OnChangeState(STATE_NONE);
 end;
 procedure TFormMain.TabControl1Change(Sender: TObject);
 begin
