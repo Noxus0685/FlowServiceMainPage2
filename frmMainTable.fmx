@@ -1,4 +1,5 @@
 object FrameMainTable: TFrameMainTable
+  OnCreate = FormCreate
   Size.Width = 1252.000000000000000000
   Size.Height = 685.000000000000000000
   Size.PlatformDefault = False
@@ -1895,6 +1896,16 @@ object FrameMainTable: TFrameMainTable
         Text = 'miProcedures'
         OnClick = MenuInstrumentalLayOutClick
       end
+    end
+    object TimerSetValues: TTimer
+      OnTimer = TimerSetValuesTimer
+      Left = 1618
+      Top = 188
+    end
+    object TimerMain: TTimer
+      OnTimer = TimerMainTimer
+      Left = 1706
+      Top = 188
     end
     object PopupMenuEtalonsGridLayOut: TPopupMenu
       OnPopup = PopupMenuEtalonsGridLayOutPopup
