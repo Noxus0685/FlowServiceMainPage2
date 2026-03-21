@@ -1170,6 +1170,7 @@ object FrameMainTable: TFrameMainTable
     object TabControlWorkTables: TTabControl
       Align = Client
       Padding.Left = 10.000000000000000000
+      PopupMenu = PopupMenuWorkTables
       Size.Width = 1252.000000000000000000
       Size.Height = 556.000000000000000000
       Size.PlatformDefault = False
@@ -1212,6 +1213,7 @@ object FrameMainTable: TFrameMainTable
               Align = Client
               CanFocus = True
               ClipChildren = True
+              PopupMenu = PopupMenuEtalonsGrid
               Size.Width = 1242.000000000000000000
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
@@ -1258,6 +1260,7 @@ object FrameMainTable: TFrameMainTable
                 Header = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
+                PopupMenu = PopupMenu1
                 Items.Strings = (
                   #1048#1084#1087
                   #1063#1072#1089#1090#1086#1090#1072
@@ -1306,11 +1309,13 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBar2: TToolBar
+            PopupMenu = PopupMenuEtalonsGridLayOut
             Size.Width = 1242.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Label30: TLabel
+              PopupMenu = PopupMenuEtalonsGridLayOut
               Position.X = 1.000000000000000000
               Position.Y = 8.000000000000000000
               Text = #1069#1090#1072#1083#1086#1085#1099
@@ -1328,6 +1333,7 @@ object FrameMainTable: TFrameMainTable
             Align = Client
             CanFocus = True
             ClipChildren = True
+            PopupMenu = PopupMenuDevicesGrid
             Size.Width = 1242.000000000000000000
             Size.Height = 330.000000000000000000
             Size.PlatformDefault = False
@@ -1369,6 +1375,7 @@ object FrameMainTable: TFrameMainTable
               Header = #1057#1077#1088#1080#1081#1085#1099#1081
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
+              PopupMenu = PopupMenu1
               Size.Width = 106.000000000000000000
             end
             object PopupColumnDeviceSignal1: TPopupColumn
@@ -1647,15 +1654,315 @@ object FrameMainTable: TFrameMainTable
         end
       end
     end
+    object PopupMenu1: TPopupMenu
+      Left = 1616
+      Top = 300
+      object MenuItem1: TMenuItem
+        Text = 'MenuItem1'
+      end
+      object MenuItem2: TMenuItem
+        Text = 'MenuItem2'
+      end
+      object MenuItem3: TMenuItem
+        Text = 'MenuItem3'
+      end
+      object MenuItem4: TMenuItem
+        Text = 'MenuItem4'
+        object MenuItem5: TMenuItem
+          Locked = True
+          Text = 'MenuItem5'
+        end
+        object MenuItem6: TMenuItem
+          Locked = True
+          Text = 'MenuItem6'
+        end
+        object MenuItem7: TMenuItem
+          Locked = True
+          Text = 'MenuItem7'
+        end
+      end
+    end
+    object PopupMenuWorkTables: TPopupMenu
+      Left = 1610
+      Top = 348
+      object miAddTable: TMenuItem
+        Action = ActionAddWorkTable
+        ImageIndex = -1
+      end
+      object miAddDeviceChannel: TMenuItem
+        Action = ActionAddDeviceChannel
+        ImageIndex = -1
+      end
+      object miAddEtalonChannel: TMenuItem
+        Action = ActionAddEtalonChannel
+        ImageIndex = -1
+      end
+      object miSaveWorkTable: TMenuItem
+        Action = ActionSaveWorkTable
+        ImageIndex = -1
+      end
+      object MenuItem8: TMenuItem
+        Action = ActionMeterValueProperties
+        ImageIndex = -1
+      end
+      object MenuItem9: TMenuItem
+        Action = ActionOpenDeviceSelect
+        ImageIndex = -1
+      end
+    end
     object PopupMenuInstrumentalLayOut: TPopupMenu
       OnPopup = PopupMenuInstrumentalLayOutPopup
-      Left = 1008
-      Top = 464
+      Left = 1616
+      Top = 248
+      object miFlowRate: TMenuItem
+        IsChecked = True
+        Text = 'miFlowRate'
+        OnClick = MenuInstrumentalLayOutClick
+      end
+      object miPump: TMenuItem
+        IsChecked = True
+        Text = 'miPump'
+        OnClick = MenuInstrumentalLayOutClick
+      end
+      object miMain: TMenuItem
+        IsChecked = True
+        Text = 'miMain'
+        OnClick = MenuInstrumentalLayOutClick
+      end
+      object miMesurment: TMenuItem
+        Text = 'miMesurment'
+        OnClick = MenuInstrumentalLayOutClick
+      end
+      object miConditions: TMenuItem
+        Text = 'miConditions'
+        OnClick = MenuInstrumentalLayOutClick
+      end
+      object miProcedures: TMenuItem
+        Text = 'miProcedures'
+        OnClick = MenuInstrumentalLayOutClick
+      end
     end
     object PopupMenuEtalonsGridLayOut: TPopupMenu
       OnPopup = PopupMenuEtalonsGridLayOutPopup
-      Left = 1008
-      Top = 408
+      Left = 1610
+      Top = 405
+    end
+    object PopupMenuDevicesGrid: TPopupMenu
+      Left = 1660
+      Top = 405
+      object MenuItemDevicesClearRow: TMenuItem
+        Action = ActionDevicesClearRow
+        ImageIndex = -1
+      end
+      object MenuItemDevicesCopy: TMenuItem
+        Action = ActionDevicesCopy
+        ImageIndex = -1
+      end
+      object MenuItemDevicesPaste: TMenuItem
+        Action = ActionDevicesPaste
+        ImageIndex = -1
+      end
+      object MenuItemDevicesSep1: TMenuItem
+        Text = '-'
+      end
+      object MenuItemDevicesClearAll: TMenuItem
+        Action = ActionDevicesClearAll
+        ImageIndex = -1
+      end
+      object MenuItemDevicesFillAllBySelected: TMenuItem
+        Action = ActionDevicesFillAllBySelected
+        ImageIndex = -1
+      end
+      object MenuItemDevicesSep2: TMenuItem
+        Text = '-'
+      end
+      object MenuItemDevicesFromArchive: TMenuItem
+        Action = ActionDevicesFromArchive
+        ImageIndex = -1
+      end
+      object MenuItemDevicesSep3: TMenuItem
+        Text = '-'
+      end
+      object MenuItemDevicesSetFlowSource: TMenuItem
+        Action = ActionDevicesSetFlowSource
+        ImageIndex = -1
+      end
+      object MenuItemDevicesAssignEtalon: TMenuItem
+        Action = ActionDevicesAssignEtalon
+        ImageIndex = -1
+      end
+    end
+    object PopupMenuEtalonsGrid: TPopupMenu
+      Left = 1710
+      Top = 405
+      object MenuItemEtalonsClearRow: TMenuItem
+        Action = ActionEtalonsClearRow
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsCopy: TMenuItem
+        Action = ActionEtalonsCopy
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsPaste: TMenuItem
+        Action = ActionEtalonsPaste
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsSep1: TMenuItem
+        Text = '-'
+      end
+      object MenuItemEtalonsClearAll: TMenuItem
+        Action = ActionEtalonsClearAll
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsFillAllBySelected: TMenuItem
+        Action = ActionEtalonsFillAllBySelected
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsSep2: TMenuItem
+        Text = '-'
+      end
+      object MenuItemEtalonsFromArchive: TMenuItem
+        Action = ActionEtalonsFromArchive
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsSep3: TMenuItem
+        Text = '-'
+      end
+      object MenuItemEtalonsSetFlowSource: TMenuItem
+        Action = ActionEtalonsSetFlowSource
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsAssignEtalon: TMenuItem
+        Action = ActionEtalonsAssignEtalon
+        ImageIndex = -1
+      end
+    end
+    object ActionListWorkTables: TActionList
+      Left = 1610
+      Top = 140
+      object ActionAddWorkTable: TAction
+        Category = 'WorkTable'
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1088#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+        OnExecute = ActionAddWorkTableExecute
+      end
+      object ActionAddDeviceChannel: TAction
+        Category = 'DeviceChannels'
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1072#1085#1072#1083' '#1087#1088#1080#1073#1086#1088#1086#1074' '
+        OnExecute = ActionAddDeviceChannelExecute
+      end
+      object ActionAddEtalonChannel: TAction
+        Category = 'EtalonChannels'
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1072#1085#1072#1083' '#1101#1090#1072#1083#1086#1085#1086#1074
+        OnExecute = ActionAddEtalonChannelExecute
+      end
+      object ActionSaveWorkTable: TAction
+        Category = 'WorkTable'
+        Text = #1057#1086#1093#1088#1072#1085#1080#1090#1100' '#1088#1072#1073#1086#1095#1091#1102' '#1089#1088#1077#1076#1091
+        OnExecute = ActionSaveWorkTableExecute
+      end
+      object ActionMeterValueProperties: TAction
+        Category = 'MeterValue'
+        Text = #1057#1074#1086#1081#1089#1090#1074#1072' '#1079#1085#1072#1095#1077#1085#1080#1103
+        OnExecute = ActionMeterValuesPropertiesExecute
+      end
+      object ActionOpenDeviceEditor: TAction
+        Category = 'Device'
+        Text = #1057#1074#1086#1081#1089#1090#1074#1072' '#1087#1088#1080#1073#1086#1088#1072
+        OnExecute = ActionOpenDeviceEditorExecute
+      end
+      object ActionOpenDeviceSelect: TAction
+        Category = 'Device'
+        Text = #1042#1099#1073#1088#1072#1090#1100' '#1087#1088#1080#1073#1086#1088
+        OnExecute = ActionOpenDeviceSelectExecute
+      end
+      object ActionCopyType: TAction
+        Category = 'Type'
+        Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100' '#1090#1080#1087
+      end
+      object ActionFillAllTypes: TAction
+        Category = 'Type'
+        Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091' '#1090#1080#1087#1091
+      end
+      object ActionDevicesClearRow: TAction
+        Category = 'DeviceChannels'
+        Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1090#1088#1086#1082#1091
+        OnExecute = ActionDevicesClearRowExecute
+      end
+      object ActionDevicesCopy: TAction
+        Category = 'DeviceChannels'
+        Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
+        OnExecute = ActionDevicesCopyExecute
+      end
+      object ActionDevicesPaste: TAction
+        Category = 'DeviceChannels'
+        Text = #1042#1089#1090#1072#1074#1080#1090#1100
+        OnExecute = ActionDevicesPasteExecute
+      end
+      object ActionDevicesClearAll: TAction
+        Category = 'DeviceChannels'
+        Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077' '#1087#1088#1080#1073#1086#1088#1099
+        OnExecute = ActionDevicesClearAllExecute
+      end
+      object ActionDevicesFillAllBySelected: TAction
+        Category = 'DeviceChannels'
+        Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1074#1089#1077' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
+        OnExecute = ActionDevicesFillAllBySelectedExecute
+      end
+      object ActionDevicesFromArchive: TAction
+        Category = 'DeviceChannels'
+        Text = #1055#1088#1080#1073#1086#1088' '#1080#1079' '#1072#1088#1093#1080#1074#1072
+        OnExecute = ActionDevicesFromArchiveExecute
+      end
+      object ActionDevicesSetFlowSource: TAction
+        Category = 'DeviceChannels'
+        Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1080#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
+        OnExecute = ActionDevicesSetFlowSourceExecute
+      end
+      object ActionDevicesAssignEtalon: TAction
+        Category = 'DeviceChannels'
+        Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100' '#1101#1090#1072#1083#1086#1085#1086#1084
+        OnExecute = ActionDevicesAssignEtalonExecute
+      end
+      object ActionEtalonsClearRow: TAction
+        Category = 'EtalonChannels'
+        Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1089#1090#1088#1086#1082#1091
+        OnExecute = ActionEtalonsClearRowExecute
+      end
+      object ActionEtalonsCopy: TAction
+        Category = 'EtalonChannels'
+        Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
+        OnExecute = ActionEtalonsCopyExecute
+      end
+      object ActionEtalonsPaste: TAction
+        Category = 'EtalonChannels'
+        Text = #1042#1089#1090#1072#1074#1080#1090#1100
+        OnExecute = ActionEtalonsPasteExecute
+      end
+      object ActionEtalonsClearAll: TAction
+        Category = 'EtalonChannels'
+        Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1074#1089#1077' '#1087#1088#1080#1073#1086#1088#1099
+        OnExecute = ActionEtalonsClearAllExecute
+      end
+      object ActionEtalonsFillAllBySelected: TAction
+        Category = 'EtalonChannels'
+        Text = #1047#1072#1087#1086#1083#1085#1080#1090#1100' '#1074#1089#1077' '#1087#1086' '#1074#1099#1073#1088#1072#1085#1085#1086#1084#1091
+        OnExecute = ActionEtalonsFillAllBySelectedExecute
+      end
+      object ActionEtalonsFromArchive: TAction
+        Category = 'EtalonChannels'
+        Text = #1055#1088#1080#1073#1086#1088' '#1080#1079' '#1072#1088#1093#1080#1074#1072
+        OnExecute = ActionEtalonsFromArchiveExecute
+      end
+      object ActionEtalonsSetFlowSource: TAction
+        Category = 'EtalonChannels'
+        Text = #1059#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1080#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
+        OnExecute = ActionEtalonsSetFlowSourceExecute
+      end
+      object ActionEtalonsAssignEtalon: TAction
+        Category = 'EtalonChannels'
+        Text = #1053#1072#1079#1085#1072#1095#1080#1090#1100' '#1101#1090#1072#1083#1086#1085#1086#1084
+        OnExecute = ActionEtalonsAssignEtalonExecute
+      end
     end
   end
 end

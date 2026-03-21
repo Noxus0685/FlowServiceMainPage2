@@ -285,6 +285,7 @@ type
     PopupMenu1: TPopupMenu;
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
+    MenuItem3: TMenuItem;
     PopupColumnDeviceSignal1: TPopupColumn;
     MenuItem4: TMenuItem;
     MenuItem5: TMenuItem;
