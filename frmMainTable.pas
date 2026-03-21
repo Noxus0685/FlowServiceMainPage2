@@ -478,6 +478,7 @@ type
     { Public declarations }
     procedure Initialize;
     destructor Destroy; override;
+    property WorkTableManager: TWorkTableManager read FWorkTableManager;
   private
     FInitialized: Boolean;
     FWorkTableManager: TWorkTableManager;
