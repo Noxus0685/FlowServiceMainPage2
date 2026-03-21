@@ -1,4 +1,4 @@
-unit frmMainTable;
+﻿unit frmMainTable;
 
 interface
 
@@ -1107,7 +1107,6 @@ begin
 
   ButtonMonitor.OnClick := ButtonMonitorClick;
   ButtonCancel.OnClick := ButtonCancelClick;
-  TabControl1.OnChange := TabControl1Change;
   EnforceDataPointsColumnsLayout;
 
   FFrameProceed := TFrameProceed.Create(Self);

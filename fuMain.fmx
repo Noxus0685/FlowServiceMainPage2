@@ -210,7 +210,7 @@ object FormMain: TFormMain
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 0
+    TabIndex = 1
     TabOrder = 6
     TabPosition = PlatformDefault
     OnChange = TabControl1Change
@@ -230,7 +230,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1706,51 +1706,20 @@ object FormMain: TFormMain
             end
           end
         end
-        object Layout11: TLayout
+        object LayoutControl: TLayout
           Align = MostBottom
           Position.Y = 656.000000000000000000
           Size.Width = 1780.000000000000000000
           Size.Height = 96.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 4
-          object Button1: TButton
-            Align = Left
-            Margins.Left = 50.000000000000000000
-            Position.X = 50.000000000000000000
-            Size.Width = 35.000000000000000000
-            Size.Height = 50.000000000000000000
-            Size.PlatformDefault = False
-            StyleLookup = 'transparentcirclebuttonstyle'
-            TabOrder = 0
-            Text = 'Button1'
-            TextSettings.Trimming = None
-            Visible = False
-            object Circle2: TCircle
-              Align = Client
-              Fill.Kind = Gradient
-              Fill.Gradient.Points = <
-                item
-                  Color = xFF9B9B9B
-                  Offset = 0.000000000000000000
-                end
-                item
-                  Color = claWhite
-                  Offset = 0.903726696968078600
-                end>
-              Fill.Gradient.Style = Radial
-              Size.Width = 35.000000000000000000
-              Size.Height = 50.000000000000000000
-              Size.PlatformDefault = False
-              Stroke.Join = Round
-            end
-          end
           object ButtonMonitor: TButton
             Position.X = 26.000000000000000000
             Position.Y = 24.000000000000000000
             Size.Width = 105.000000000000000000
             Size.Height = 41.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 1
+            TabOrder = 0
             Text = #1052#1086#1085#1080#1090#1086#1088
             TextSettings.Trimming = None
             OnClick = ButtonMonitorClick
@@ -1778,7 +1747,7 @@ object FormMain: TFormMain
             Size.Width = 273.000000000000000000
             Size.Height = 50.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 2
+            TabOrder = 1
             object ButtonCancel: TButton
               Position.X = -29.000000000000000000
               Size.Width = 110.000000000000000000
@@ -1867,7 +1836,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 60.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
