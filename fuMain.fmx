@@ -529,7 +529,6 @@ object FormMain: TFormMain
                   Size.PlatformDefault = False
                   TabOrder = 2
                   object ComboEditUnits: TComboBox
-                    OnChange = ComboBoxUnitsChange
                     Touch.InteractiveGestures = [LongTap, DoubleTap]
                     Align = Left
                     Items.Strings = (
@@ -541,6 +540,7 @@ object FormMain: TFormMain
                     Size.Height = 22.000000000000000000
                     Size.PlatformDefault = False
                     TabOrder = 0
+                    OnChange = ComboBoxUnitsChange
                   end
                   object SpeedButtonSetFlowRate: TSpeedButton
                     Align = Left

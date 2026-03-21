@@ -1,4 +1,4 @@
-﻿object FrameMainTable: TFrameMainTable
+object FrameMainTable: TFrameMainTable
   Size.Width = 1252.000000000000000000
   Size.Height = 685.000000000000000000
   Size.PlatformDefault = False
@@ -9,15 +9,15 @@
     Size.PlatformDefault = False
     TabOrder = 0
     object PanelInstruments: TPanel
-      PopupMenu = PopupMenuInstrumentalLayOut
       Align = MostTop
+      PopupMenu = PopupMenuInstrumentalLayOut
       Size.Width = 1252.000000000000000000
       Size.Height = 129.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       object HorzScrollBoxInstrumental: THorzScrollBox
-        PopupMenu = PopupMenuInstrumentalLayOut
         Align = Client
+        PopupMenu = PopupMenuInstrumentalLayOut
         Size.Width = 1252.000000000000000000
         Size.Height = 129.000000000000000000
         Size.PlatformDefault = False
@@ -177,13 +177,13 @@
               Text = #1059#1089#1083#1086#1074#1080#1103
               TabOrder = 3
               object SpeedButtonMinimizeConditions: TSpeedButton
-                OnClick = SpeedButtonMinimizeConditionsClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 Text = '_'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonMinimizeConditionsClick
               end
             end
           end
@@ -292,7 +292,6 @@
               Size.PlatformDefault = False
               TabOrder = 2
               object ComboEditUnits: TComboBox
-                    OnChange = ComboBoxUnitsChange
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Left
                 Items.Strings = (
@@ -304,6 +303,7 @@
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
+                OnChange = ComboBoxUnitsChange
               end
               object SpeedButtonSetFlowRate: TSpeedButton
                 Align = Left
@@ -349,13 +349,13 @@
               Text = #1056#1072#1089#1093#1086#1076
               TabOrder = 1
               object SpeedButtonMinimzeLayoutFlowRate: TSpeedButton
-                OnClick = SpeedButtonMinimzeLayoutFlowRateClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 Text = '_'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonMinimzeLayoutFlowRateClick
               end
             end
           end
@@ -455,12 +455,12 @@
                 Text = 'SpeedButtonTest'
                 TextSettings.Trimming = None
                 object Circle1: TCircle
-                      OnClick = Circle1Click
                   Align = Client
                   HitTest = False
                   Size.Width = 18.000000000000000000
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
+                  OnClick = Circle1Click
                 end
               end
             end
@@ -474,13 +474,13 @@
               Text = #1043#1083#1072#1074#1085#1072#1103
               TabOrder = 1
               object SpeedButtonMinimizeLayoutMain: TSpeedButton
-                OnClick = SpeedButtonMinimizeLayoutMainClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 Text = '_'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonMinimizeLayoutMainClick
               end
             end
             object LayoutTaskAddition: TLayout
@@ -732,13 +732,13 @@
               Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
               TabOrder = 3
               object SpeedButtonMinimizeMesure: TSpeedButton
-                OnClick = SpeedButtonMinimizeMesureClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 Text = '_'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonMinimizeMesureClick
               end
             end
             object Layout49: TLayout
@@ -925,13 +925,13 @@
               Text = #1055#1088#1086#1094#1077#1076#1091#1088#1099
               TabOrder = 1
               object SpeedButtonMinimizeProcedures: TSpeedButton
-                OnClick = SpeedButtonMinimizeProceduresClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 Text = '_'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonMinimizeProceduresClick
               end
             end
             object Layout10: TLayout
@@ -1154,13 +1154,13 @@
               Text = #1053#1072#1089#1086#1089
               TabOrder = 1
               object SpeedButtonMinimizePumpLayout: TSpeedButton
-                OnClick = SpeedButtonMinimizePumpLayoutClick
                 Align = Left
                 Size.Width = 17.000000000000000000
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 Text = '_'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonMinimizePumpLayoutClick
               end
             end
           end
@@ -1171,14 +1171,16 @@
       Align = Client
       Padding.Left = 10.000000000000000000
       Size.Width = 1252.000000000000000000
-      Size.Height = 460.000000000000000000
+      Size.Height = 556.000000000000000000
       Size.PlatformDefault = False
       TabIndex = 0
       TabOrder = 1
       TabPosition = PlatformDefault
       Sizes = (
         1242s
-        434s)
+        530s
+        1242s
+        530s)
       object TabItemWorkTable1: TTabItem
         CustomIcon = <
           item
@@ -1207,9 +1209,6 @@
             Size.PlatformDefault = False
             TabOrder = 0
             object GridEtalons: TGrid
-                  OnGetValue = GridEtalonsGetValue
-                  OnSetValue = GridEtalonsSetValue
-                  OnCellClick = GridEtalonsCellClick
               Align = Client
               CanFocus = True
               ClipChildren = True
@@ -1218,8 +1217,11 @@
               Size.PlatformDefault = False
               TabOrder = 0
               RowCount = 2
-              Viewport.Width = 1242.000000000000000000
-              Viewport.Height = 120.000000000000000000
+              OnGetValue = GridEtalonsGetValue
+              OnSetValue = GridEtalonsSetValue
+              OnCellClick = GridEtalonsCellClick
+              Viewport.Width = 1238.000000000000000000
+              Viewport.Height = 79.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -1319,23 +1321,23 @@
         object Panel3: TPanel
           Align = Client
           Size.Width = 1242.000000000000000000
-          Size.Height = 266.000000000000000000
+          Size.Height = 362.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
           object GridDevices: TGrid
-                OnGetValue = GridDevicesGetValue
-                OnSetValue = GridDevicesSetValue
-                OnCellClick = GridDevicesCellClick
             Align = Client
             CanFocus = True
             ClipChildren = True
             Size.Width = 1242.000000000000000000
-            Size.Height = 234.000000000000000000
+            Size.Height = 330.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
-            Viewport.Width = 1242.000000000000000000
-            Viewport.Height = 234.000000000000000000
+            OnGetValue = GridDevicesGetValue
+            OnSetValue = GridDevicesSetValue
+            OnCellClick = GridDevicesCellClick
+            Viewport.Width = 1222.000000000000000000
+            Viewport.Height = 289.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -1461,198 +1463,199 @@
           Size.PlatformDefault = False
         end
       end
-    end
-    object TabItemTest: TTabItem
-      CustomIcon = <
-        item
-        end>
-      TextSettings.Trimming = None
-      IsSelected = False
-      Size.Width = 46.000000000000000000
-      Size.Height = 26.000000000000000000
-      Size.PlatformDefault = False
-      StyleLookup = ''
-      TabOrder = 1
-      Text = 'TEST'
-      ExplicitSize.cx = 46.000000000000000000
-      ExplicitSize.cy = 26.000000000000000000
-      object LayoutTestValues: TLayout
-        Align = Top
-        Margins.Left = 24.000000000000000000
-        Margins.Top = 24.000000000000000000
-        Margins.Right = 24.000000000000000000
-        Margins.Bottom = 24.000000000000000000
-        Position.X = 24.000000000000000000
-        Position.Y = 24.000000000000000000
-        Size.Width = 1204.000000000000000000
-        Size.Height = 260.000000000000000000
+      object TabItemTest: TTabItem
+        CustomIcon = <
+          item
+          end>
+        TextSettings.Trimming = None
+        IsSelected = False
+        Size.Width = 46.000000000000000000
+        Size.Height = 26.000000000000000000
         Size.PlatformDefault = False
+        StyleLookup = ''
         TabOrder = 0
-        object GroupBoxEtalonChannels: TGroupBox
-          Align = Left
-          Margins.Right = 12.000000000000000000
-          Size.Width = 596.000000000000000000
+        Text = 'TEST'
+        ExplicitSize.cx = 46.000000000000000000
+        ExplicitSize.cy = 26.000000000000000000
+        object LayoutTestValues: TLayout
+          Align = Top
+          Margins.Left = 24.000000000000000000
+          Margins.Top = 24.000000000000000000
+          Margins.Right = 24.000000000000000000
+          Margins.Bottom = 24.000000000000000000
+          Position.X = 24.000000000000000000
+          Position.Y = 24.000000000000000000
+          Size.Width = 1194.000000000000000000
           Size.Height = 260.000000000000000000
           Size.PlatformDefault = False
-          Text = #1069#1090#1074#1083#1086#1085#1099
           TabOrder = 0
-          object LabelEtalonCurSec: TLabel
-            Position.X = 24.000000000000000000
-            Position.Y = 48.000000000000000000
-            Text = 'CurSec'
+          object GroupBoxEtalonChannels: TGroupBox
+            Align = Left
+            Margins.Right = 12.000000000000000000
+            Size.Width = 596.000000000000000000
+            Size.Height = 260.000000000000000000
+            Size.PlatformDefault = False
+            Text = #1069#1090#1074#1083#1086#1085#1099
             TabOrder = 0
+            object LabelEtalonCurSec: TLabel
+              Position.X = 24.000000000000000000
+              Position.Y = 48.000000000000000000
+              Text = 'CurSec'
+              TabOrder = 0
+            end
+            object LabelEtalonImpSec: TLabel
+              Position.X = 24.000000000000000000
+              Position.Y = 96.000000000000000000
+              Text = 'ImpSec'
+              TabOrder = 1
+            end
+            object LabelEtalonImpResult: TLabel
+              Position.X = 24.000000000000000000
+              Position.Y = 144.000000000000000000
+              Text = 'ImpResult'
+              TabOrder = 2
+            end
+            object EditEtalonCurSec: TEdit
+              Touch.InteractiveGestures = [LongTap, DoubleTap]
+              TabOrder = 3
+              Text = '0'
+              Position.X = 140.000000000000000000
+              Position.Y = 44.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+            end
+            object EditEtalonImpSec: TEdit
+              Touch.InteractiveGestures = [LongTap, DoubleTap]
+              TabOrder = 4
+              Text = '0'
+              Position.X = 140.000000000000000000
+              Position.Y = 92.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+            end
+            object EditEtalonImpResult: TEdit
+              Touch.InteractiveGestures = [LongTap, DoubleTap]
+              TabOrder = 5
+              Text = '0'
+              Position.X = 140.000000000000000000
+              Position.Y = 140.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+            end
+            object ButtonApplyEtalonValues: TButton
+              Position.X = 140.000000000000000000
+              Position.Y = 190.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 6
+              Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+              TextSettings.Trimming = None
+              OnClick = ButtonApplyEtalonValuesClick
+            end
           end
-          object LabelEtalonImpSec: TLabel
-            Position.X = 24.000000000000000000
-            Position.Y = 96.000000000000000000
-            Text = 'ImpSec'
+          object GroupBoxDeviceChannels: TGroupBox
+            Align = Client
+            Size.Width = 586.000000000000000000
+            Size.Height = 260.000000000000000000
+            Size.PlatformDefault = False
+            Text = #1055#1088#1080#1073#1086#1088#1099
             TabOrder = 1
-          end
-          object LabelEtalonImpResult: TLabel
-            Position.X = 24.000000000000000000
-            Position.Y = 144.000000000000000000
-            Text = 'ImpResult'
-            TabOrder = 2
-          end
-          object EditEtalonCurSec: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
-            TabOrder = 3
-            Text = '0'
-            Position.X = 140.000000000000000000
-            Position.Y = 44.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 22.000000000000000000
-            Size.PlatformDefault = False
-          end
-          object EditEtalonImpSec: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
-            TabOrder = 4
-            Text = '0'
-            Position.X = 140.000000000000000000
-            Position.Y = 92.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 22.000000000000000000
-            Size.PlatformDefault = False
-          end
-          object EditEtalonImpResult: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
-            TabOrder = 5
-            Text = '0'
-            Position.X = 140.000000000000000000
-            Position.Y = 140.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 22.000000000000000000
-            Size.PlatformDefault = False
-          end
-          object ButtonApplyEtalonValues: TButton
-            Position.X = 140.000000000000000000
-            Position.Y = 190.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 30.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 6
-            Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
-            TextSettings.Trimming = None
-            OnClick = ButtonApplyEtalonValuesClick
+            object LabelDeviceCurSec: TLabel
+              Position.X = 24.000000000000000000
+              Position.Y = 48.000000000000000000
+              Text = 'CurSec'
+              TabOrder = 0
+            end
+            object LabelDeviceImpSec: TLabel
+              Position.X = 24.000000000000000000
+              Position.Y = 96.000000000000000000
+              Text = 'ImpSec'
+              TabOrder = 1
+            end
+            object LabelDeviceImpResult: TLabel
+              Position.X = 24.000000000000000000
+              Position.Y = 144.000000000000000000
+              Text = 'ImpResult'
+              TabOrder = 2
+            end
+            object EditDeviceCurSec: TEdit
+              Touch.InteractiveGestures = [LongTap, DoubleTap]
+              TabOrder = 3
+              Text = '0'
+              Position.X = 160.000000000000000000
+              Position.Y = 44.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+            end
+            object EditDeviceImpSec: TEdit
+              Touch.InteractiveGestures = [LongTap, DoubleTap]
+              TabOrder = 4
+              Text = '0'
+              Position.X = 160.000000000000000000
+              Position.Y = 92.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+            end
+            object EditDeviceImpResult: TEdit
+              Touch.InteractiveGestures = [LongTap, DoubleTap]
+              TabOrder = 5
+              Text = '0'
+              Position.X = 160.000000000000000000
+              Position.Y = 140.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 22.000000000000000000
+              Size.PlatformDefault = False
+            end
+            object ButtonApplyDeviceValues: TButton
+              Position.X = 160.000000000000000000
+              Position.Y = 190.000000000000000000
+              Size.Width = 180.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 6
+              Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
+              TextSettings.Trimming = None
+              OnClick = ButtonApplyDeviceValuesClick
+            end
           end
         end
-        object GroupBoxDeviceChannels: TGroupBox
-          Align = Client
-          Size.Width = 596.000000000000000000
-          Size.Height = 260.000000000000000000
-          Size.PlatformDefault = False
-          Text = #1055#1088#1080#1073#1086#1088#1099
+        object EditTestNum: TEdit
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
           TabOrder = 1
-          object LabelDeviceCurSec: TLabel
-            Position.X = 24.000000000000000000
-            Position.Y = 48.000000000000000000
-            Text = 'CurSec'
-            TabOrder = 0
-          end
-          object LabelDeviceImpSec: TLabel
-            Position.X = 24.000000000000000000
-            Position.Y = 96.000000000000000000
-            Text = 'ImpSec'
-            TabOrder = 1
-          end
-          object LabelDeviceImpResult: TLabel
-            Position.X = 24.000000000000000000
-            Position.Y = 144.000000000000000000
-            Text = 'ImpResult'
-            TabOrder = 2
-          end
-          object EditDeviceCurSec: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
-            TabOrder = 3
-            Text = '0'
-            Position.X = 160.000000000000000000
-            Position.Y = 44.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 22.000000000000000000
-            Size.PlatformDefault = False
-          end
-          object EditDeviceImpSec: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
-            TabOrder = 4
-            Text = '0'
-            Position.X = 160.000000000000000000
-            Position.Y = 92.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 22.000000000000000000
-            Size.PlatformDefault = False
-          end
-          object EditDeviceImpResult: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
-            TabOrder = 5
-            Text = '0'
-            Position.X = 160.000000000000000000
-            Position.Y = 140.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 22.000000000000000000
-            Size.PlatformDefault = False
-          end
-          object ButtonApplyDeviceValues: TButton
-            Position.X = 160.000000000000000000
-            Position.Y = 190.000000000000000000
-            Size.Width = 180.000000000000000000
-            Size.Height = 30.000000000000000000
-            Size.PlatformDefault = False
-            TabOrder = 6
-            Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
-            TextSettings.Trimming = None
-            OnClick = ButtonApplyDeviceValuesClick
-          end
+          Position.X = 200.000000000000000000
+          Position.Y = 366.000000000000000000
+          KillFocusByReturn = True
+          OnExit = EditTestNumExit
         end
-      end
-      object EditTestNum: TEdit
-        Touch.InteractiveGestures = [LongTap, DoubleTap]
-        TabOrder = 1
-        Position.X = 200.000000000000000000
-        Position.Y = 366.000000000000000000
-        KillFocusByReturn = True
-        OnExit = EditTestNumExit
-      end
-      object LabelTestNum: TLabel
-        Position.X = 344.000000000000000000
-        Position.Y = 371.000000000000000000
-        Text = 'LabelTestNum'
-        TabOrder = 3
-      end
-      object Label5: TLabel
-        Position.X = 65.000000000000000000
-        Position.Y = 366.000000000000000000
-        Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-        TabOrder = 2
+        object LabelTestNum: TLabel
+          Position.X = 344.000000000000000000
+          Position.Y = 371.000000000000000000
+          Text = 'LabelTestNum'
+          TabOrder = 3
+        end
+        object Label5: TLabel
+          Position.X = 65.000000000000000000
+          Position.Y = 366.000000000000000000
+          Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+          TabOrder = 2
+        end
       end
     end
-  object PopupMenuInstrumentalLayOut: TPopupMenu
-    OnPopup = PopupMenuInstrumentalLayOutPopup
-    Left = 24
-    Top = 24
-  end
-  object PopupMenuEtalonsGridLayOut: TPopupMenu
-    OnPopup = PopupMenuEtalonsGridLayOutPopup
-    Left = 72
-    Top = 24
+    object PopupMenuInstrumentalLayOut: TPopupMenu
+      OnPopup = PopupMenuInstrumentalLayOutPopup
+      Left = 1008
+      Top = 464
+    end
+    object PopupMenuEtalonsGridLayOut: TPopupMenu
+      OnPopup = PopupMenuEtalonsGridLayOutPopup
+      Left = 1008
+      Top = 408
+    end
   end
 end

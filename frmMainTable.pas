@@ -286,7 +286,6 @@ type
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
     PopupColumnDeviceSignal1: TPopupColumn;
-    MenuItem3: TMenuItem;
     MenuItem4: TMenuItem;
     MenuItem5: TMenuItem;
     MenuItem6: TMenuItem;
@@ -398,7 +397,6 @@ type
     HorzScrollBoxInstrumental: THorzScrollBox;
     Layout2: TLayout;
     Layout11: TLayout;
-    Button1: TButton;
     Circle2: TCircle;
     ButtonMonitor: TButton;
     CircleIndicatorMonitor: TCircle;

@@ -19,7 +19,8 @@ uses
   fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
   UnitMeterValue in 'UnitMeterValue.pas',
   frmCalibrCoefs in 'frmCalibrCoefs.pas' {FrameCalibrCoefs: TFrame},
-  frmProceed in 'frmProceed.pas' {FrameProceed: TFrame};
+  frmProceed in 'frmProceed.pas' {FrameProceed: TFrame},
+  frmMainTable in 'frmMainTable.pas';
 
 {$R *.res}
 
