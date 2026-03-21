@@ -573,8 +573,10 @@ type
 
   public
     { Public declarations }
+    procedure Initialize;
     destructor Destroy; override;
   private
+    FInitialized: Boolean;
     FWorkTableManager: TWorkTableManager;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
@@ -1029,13 +1031,21 @@ begin
 end;
 
 procedure TFrameMainTable.FormCreate(Sender: TObject);
+begin
+  Initialize;
+end;
+
+procedure TFrameMainTable.Initialize;
 var
   OT: TOutputType;
   UnitName: string;
   LayoutOrder: string;
 
 begin
+  if FInitialized then
+    Exit;
 
+  FInitialized := True;
 
   TMeterValue.LoadFromFile;
 
@@ -1103,7 +1113,6 @@ begin
   FFrameProceed.Parent := TabItemResults;
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize(FWorkTableManager);
-
 
   SetValues;
   UpdateForm;
