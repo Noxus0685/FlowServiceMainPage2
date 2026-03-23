@@ -211,28 +211,9 @@ type
     miConditions: TMenuItem;
     miProcedures: TMenuItem;
     SpeedButtonMinimizePumpLayout: TSpeedButton;
-    TimerSetValues: TTimer;
     TimerMain: TTimer;
     ActionMeterValueProperties: TAction;
     MenuItem8: TMenuItem;
-    TabItemTest: TTabItem;
-    LayoutTestValues: TLayout;
-    GroupBoxEtalonChannels: TGroupBox;
-    LabelEtalonCurSec: TLabel;
-    LabelEtalonImpSec: TLabel;
-    LabelEtalonImpResult: TLabel;
-    EditEtalonCurSec: TEdit;
-    EditEtalonImpSec: TEdit;
-    EditEtalonImpResult: TEdit;
-    ButtonApplyEtalonValues: TButton;
-    GroupBoxDeviceChannels: TGroupBox;
-    LabelDeviceCurSec: TLabel;
-    LabelDeviceImpSec: TLabel;
-    LabelDeviceImpResult: TLabel;
-    EditDeviceCurSec: TEdit;
-    EditDeviceImpSec: TEdit;
-    EditDeviceImpResult: TEdit;
-    ButtonApplyDeviceValues: TButton;
     ActionOpenDeviceEditor: TAction;
     ActionOpenDeviceSelect: TAction;
     MenuItem9: TMenuItem;
@@ -298,13 +279,11 @@ type
     SpeedButtonTest: TSpeedButton;
     Circle1: TCircle;
     HorzScrollBoxInstrumental: THorzScrollBox;
-    Layout2: TLayout;
-    Layout11: TLayout;
-    Button1: TButton;
-    Circle2: TCircle;
+    Layout: TLayout;
+    LayoutControl: TLayout;
     ButtonMonitor: TButton;
     CircleIndicatorMonitor: TCircle;
-    Layout15: TLayout;
+    LayoutButtonTest: TLayout;
     ButtonCancel: TButton;
     GlowEffect1: TGlowEffect;
     GlowEffect2: TGlowEffect;
@@ -315,9 +294,6 @@ type
     TestButton: TButton;
     StringColumnEtalonRawSumValue1: TStringColumn;
     StringColumnDeviceRawSumValue1: TStringColumn;
-    EditTestNum: TEdit;
-    LabelTestNum: TLabel;
-    Label5: TLabel;
     Switch1: TSwitch;
     Label1: TLabel;
     ActionCopyType: TAction;
@@ -354,13 +330,10 @@ type
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
     procedure ActionSaveWorkTableExecute(Sender: TObject);
     procedure ActionMeterValuesPropertiesExecute(Sender: TObject);
-    procedure TimerSetValuesTimer(Sender: TObject);
     procedure TimerMainTimer(Sender: TObject);
     procedure SetSessionDim(UnitName: string; QuantityUnitName: string);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButtonMinimizePumpLayoutClick(Sender: TObject);
-    procedure ButtonApplyEtalonValuesClick(Sender: TObject);
-    procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure ActionOpenDeviceEditorExecute(Sender: TObject);
     procedure ActionOpenDeviceSelectExecute(Sender: TObject);
     procedure SpeedButtonMinimizeMesureClick(Sender: TObject);
@@ -380,7 +353,6 @@ type
     procedure ButtonMonitorClick(Sender: TObject);
     procedure ButtonCancelClick(Sender: TObject);
     procedure TestButtonClick(Sender: TObject);
-    procedure EditTestNumExit(Sender: TObject);
     procedure TabControl1Change(Sender: TObject);
     procedure TreeViewDevicesChange(Sender: TObject);
     procedure TreeViewDevicesMouseDown(Sender: TObject;
@@ -431,8 +403,6 @@ type
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     FNextClimateChangeAt: TDateTime;
-    procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
-    procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean = False);
     procedure OpenChannelDeviceEditor(AChannel: TChannel);
     procedure SelectDeviceForChannel(AChannel: TChannel);
@@ -458,7 +428,7 @@ type
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure ResetMeasurementValues;
-    procedure OnChangeState(const ANewState: TMeasurementState);
+
     procedure SetConfiguration;
     procedure StartMonitor;
     procedure StopMonitor;
@@ -467,18 +437,13 @@ type
     procedure SaveMeasurementResults;
 
     procedure UpdateGrids;
-    procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
-      AImpSec, AImpResult: Double);
+
        procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
     procedure CopyChannelData(ASource, ADest: TChannel);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
 
-  public
-    { Public declarations }
-    procedure Initialize;
-    destructor Destroy; override;
-    property WorkTableManager: TWorkTableManager read FWorkTableManager;
+
   private
     FInitialized: Boolean;
     FWorkTableManager: TWorkTableManager;
@@ -496,6 +461,20 @@ type
     procedure RestoreInstrumentalLayoutsByFlags(const AFlowRateVisible, APumpVisible,
       AMainVisible, AMesureVisible, AConditionsVisible, AProceduresVisible: Boolean;
       const AOrder: string = '');
+  public
+    { Public declarations }
+    procedure Initialize;
+    destructor Destroy; override;
+
+    procedure OnChangeState(const ANewState: EMeasurementState);
+    procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
+      AImpSec, AImpResult: Double);
+
+
+
+    property WorkTableManager: TWorkTableManager read FWorkTableManager;
+
+
   private type
     TChannelClipboardData = record
       HasData: Boolean;
@@ -609,11 +588,6 @@ begin
   FWorkTableManager.Free;
   FFlowMeters.Free;
   inherited;
-end;
-
-procedure TFrameMainTable.EditTestNumExit(Sender: TObject);
-begin
-       LabelTestNum.Text := FActiveWorkTable.DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
@@ -769,7 +743,7 @@ end;
           end;
  end;
 
-procedure TFrameMainTable.OnChangeState(const ANewState: TMeasurementState);
+procedure TFrameMainTable.OnChangeState(const ANewState: EMeasurementState);
 begin
   if FActiveWorkTable <> nil then
     FActiveWorkTable.MeasurementState := ANewState;
@@ -1670,8 +1644,6 @@ var
   WorkTable: TWorkTable;
   EtalonColumns: TArray<TGridColumnLayout>;
   DeviceColumns: TArray<TGridColumnLayout>;
-  DataPointsColumns: TArray<TGridColumnLayout>;
-  ResultsColumns: TArray<TGridColumnLayout>;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -1687,12 +1659,9 @@ begin
 
   CaptureGridColumnsLayout(GridEtalons, EtalonColumns);
   CaptureGridColumnsLayout(GridDevices, DeviceColumns);
-  CaptureGridColumnsLayout(FFrameProceed.GridDataPoints, DataPointsColumns);
-  CaptureGridColumnsLayout(FFrameProceed.GridResults, ResultsColumns);
   WorkTable.EtalonsGridColumns := EtalonColumns;
   WorkTable.DevicesGridColumns := DeviceColumns;
-  WorkTable.DataPointsGridColumns := DataPointsColumns;
-  WorkTable.ResultsGridColumns := ResultsColumns;
+
 end;
 
 procedure TFrameMainTable.LoadLayoutSettingsFromWorkTable;
@@ -2585,117 +2554,6 @@ begin
   UpdateGrids;
 end;
 
-procedure TFrameMainTable.UpdateRandomClimate(const AWorkTable: TWorkTable);
-var
-  TempDelta, PressDelta: Double;
-begin
-  if AWorkTable = nil then
-    Exit;
-
-  if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
-  begin
-    TempDelta :=  (Random * 0.30) - 0.15;
-    PressDelta :=  (Random * 0.06) - 0.03;
-
-    AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-    AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
-
-    FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
-  end;
-end;
-
-procedure TFrameMainTable.UpdateRandomSignals(const AWorkTable: TWorkTable);
-var
-  I: Integer;
-  Channel: TChannel;
-  CurDelta: Double;
-  ImpDelta: Double;
-begin
-  if AWorkTable = nil then
-    Exit;
-
-    AWorkTable.Time := AWorkTable.Time + 1;
-
-  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-  begin
-    Channel := AWorkTable.EtalonChannels[I];
-    if Channel = nil then
-      Continue;
-
-    CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
-
-    Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-    Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
-    Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
-  end;
-
-  for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
-  begin
-    Channel := AWorkTable.DeviceChannels[I];
-    if Channel = nil then
-      Continue;
-
-    CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
-
-    Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-    Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
-    Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
-  end;
-end;
-
-procedure TFrameMainTable.TimerSetValuesTimer(Sender: TObject);
-var
-  WorkTable: TWorkTable;
-begin
-  WorkTable := FActiveWorkTable;
-  if WorkTable = nil then
-    Exit;
-
-    UpdateRandomClimate(WorkTable);
-
-
-  case WorkTable.MeasurementState of
-    STATE_NONE:
-      OnChangeState(STATE_STANDBY);
-
-    STATE_STANDBY:
-      OnChangeState(STATE_CONNECTED);
-
-    STATE_STARTMONITOR:
-      OnChangeState(STATE_STARTMONITORWAIT);
-
-    STATE_STARTMONITORWAIT:
-      OnChangeState(STATE_MONITOR);
-
-    STATE_MONITOR:
-       UpdateRandomSignals(WorkTable);
-
-    STATE_STOPMONITOR,
-    STATE_CONFIGED:
-      OnChangeState(STATE_CONNECTED);
-
-    STATE_STARTTEST:
-      OnChangeState(STATE_STARTWAIT);
-
-    STATE_STARTWAIT:
-      OnChangeState(STATE_EXECUTE);
-
-    STATE_EXECUTE:
-       UpdateRandomSignals(WorkTable);
-
-    STATE_STOPTEST:
-      OnChangeState(STATE_STOPWAIT);
-
-    STATE_STOPWAIT:
-      OnChangeState(STATE_COMPLETE);
-
-    STATE_COMPLETE:
-      OnChangeState(STATE_FINALREAD);
-  end;
-end;
-
 procedure TFrameMainTable.SetValues;
 var
   WorkTable: TWorkTable;
@@ -2756,19 +2614,19 @@ begin
 
   IsUpdating := True;
   try
+  //Grid Headers + Instrumental Labels
     UpdateUIFromValues;
   finally
     IsUpdating := False;
   end;
 
-  if WorkTable.MeasurementState in [STATE_STARTMONITORWAIT, STATE_MONITOR, STATE_STOPMONITOR] then
-    RefreshMonitorIndicator;
 
   if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
     Exit;
 
   IsUpdating := True;
   try
+//Grids
    UpdateGrids;
   finally
    IsUpdating := False;
@@ -2825,12 +2683,6 @@ begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
-
-
-
-
-  GridDevices.Repaint;
-  GridEtalons.Repaint;
 
   if WorkTable.ValueTime <> nil then
     LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
@@ -2949,6 +2801,13 @@ begin
       StringColumnEtalonQuantity1.TagString := WorkTable.ValueQuantity.GetStrValue
     else
       StringColumnEtalonQuantity1.TagString := '0';
+
+
+
+  if WorkTable.MeasurementState in [STATE_STARTMONITORWAIT, STATE_MONITOR, STATE_STOPMONITOR] then
+    RefreshMonitorIndicator;
+
+
 end;
 
 procedure TFrameMainTable.ApplyFlowMeterSelection(const ARow: Integer);
@@ -3832,40 +3691,6 @@ begin
     else
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
   end;
-end;
-
-procedure TFrameMainTable.ButtonApplyEtalonValuesClick(Sender: TObject);
-var
-  WorkTable: TWorkTable;
-begin
-  WorkTable := GetWorkTableByIndex(0);
-  if WorkTable = nil then
-    Exit;
-
-  ApplyChannelValues(
-    WorkTable.EtalonChannels,
-    NormalizeFloatInput(EditEtalonCurSec.Text),
-    NormalizeFloatInput(EditEtalonImpSec.Text),
-    NormalizeFloatInput(EditEtalonImpResult.Text)
-  );
-  SetValues;
-end;
-
-procedure TFrameMainTable.ButtonApplyDeviceValuesClick(Sender: TObject);
-var
-  WorkTable: TWorkTable;
-begin
-  WorkTable := GetWorkTableByIndex(0);
-  if WorkTable = nil then
-    Exit;
-
-  ApplyChannelValues(
-    WorkTable.DeviceChannels,
-    NormalizeFloatInput(EditDeviceCurSec.Text),
-    NormalizeFloatInput(EditDeviceImpSec.Text),
-    NormalizeFloatInput(EditDeviceImpResult.Text)
-  );
-  SetValues;
 end;
 
 procedure TFrameMainTable.GridEtalonsSetValue(Sender: TObject;

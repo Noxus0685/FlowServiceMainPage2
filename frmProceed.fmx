@@ -31,10 +31,11 @@ object FrameProceed: TFrameProceed
           Size.PlatformDefault = False
           TabOrder = 1
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+          OnColumnMoved = GridDataPointsColumnMoved
           OnGetValue = GridDataPointsGetValue
           OnCellClick = GridDataPointsCellClick
-          Viewport.Width = 448.000000000000000000
-          Viewport.Height = 611.000000000000000000
+          Viewport.Width = 428.000000000000000000
+          Viewport.Height = 570.000000000000000000
           object CheckColumnSpillageEnable: TCheckColumn
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
@@ -373,21 +374,21 @@ object FrameProceed: TFrameProceed
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            606s
+            585s
             348s
-            606s
+            585s
             348s
-            606s
+            585s
             348s
-            606s)
+            585s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 71.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -397,7 +398,7 @@ object FrameProceed: TFrameProceed
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 606.000000000000000000
+              Size.Height = 585.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -446,8 +447,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 65.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -463,8 +464,8 @@ object FrameProceed: TFrameProceed
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 297.000000000000000000
-              Viewport.Height = 219.000000000000000000
+              Viewport.Width = 277.000000000000000000
+              Viewport.Height = 194.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -479,8 +480,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 73.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -494,8 +495,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 61.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0

@@ -1061,7 +1061,8 @@ var
   Q: Single;
   MeterValue: TMeterValue;
 begin
-  ValueLocal := 0;
+
+  ValueLocal := Value;
 
     if UpdateType = HAND_TYPE then
      Exit;
@@ -1073,6 +1074,7 @@ begin
 
     else if ValueType = AGGREGATE_TYPE then
     begin
+      ValueLocal := 0;
       for MeterValue in FAggregateMeterValues do
       begin
         if (MeterValue = nil) or (MeterValue = Self) then
@@ -1118,7 +1120,7 @@ begin
            ValueLocal:=Constant;
        end
 
-    else
+    else if (DependenceType = DEPENDENT) then
       begin
         if ValueBaseMultiplier <> nil then
           ValueLocal := ValueBaseMultiplier.Value
@@ -1605,6 +1607,7 @@ procedure TMeterValue.SetAsVolume;
 begin
   &Type := 'Объем';
   ValueType := SUM_TYPE;
+  DependenceType:=  DEPENDENT;
   Name := 'Объем';
   ShrtName := 'V';
   SetFilter(-1);
@@ -1624,6 +1627,7 @@ procedure TMeterValue.SetAsMass;
 begin
   &Type := 'Масса';
   ValueType := SUM_TYPE;
+  DependenceType:=  DEPENDENT;
   Name := 'Масса';
   ShrtName := 'M';
   SetFilter(-1);
@@ -1643,6 +1647,7 @@ procedure TMeterValue.SetAsVolumeFlow;
 begin
   &Type := 'Объемный расход';
   ValueType := FLOW_TYPE;
+  DependenceType:=  DEPENDENT;
   Name := 'Объемный расход';
   ShrtName := 'Qv';
   SetFilter(-1);
@@ -1667,6 +1672,7 @@ procedure TMeterValue.SetAsMassFlow;
 begin
   &Type := 'Массовый расход';
   ValueType := FLOW_TYPE;
+    DependenceType:=  DEPENDENT;
   Name := 'Массовый расход';
   ShrtName := 'Qm';
   SetFilter(-1);
@@ -1690,6 +1696,7 @@ procedure TMeterValue.SetAsImp;
 begin
   &Type := 'Импульсы';
   ValueType := FLOW_TYPE;
+    DependenceType:=  INDEPENDENT;
   Value := 0;
   SetFilter(-1);
   Accuracy := 0;
@@ -1711,6 +1718,7 @@ procedure TMeterValue.SetAsError;
 begin
   &Type := 'Погрешность';
   ValueType := ERROR_TYPE;
+      DependenceType:=  DEPENDENT;
   Value := 0;
   SetFilter(-1);
   Accuracy := -1;
@@ -1734,6 +1742,7 @@ procedure TMeterValue.SetAsMassError;
 begin
   &Type := 'Погрешность по массе';
   ValueType := ERROR_TYPE;
+   DependenceType:=  DEPENDENT;
   Value := 0;
   SetFilter(-1);
   Accuracy := -1;
@@ -1757,6 +1766,7 @@ procedure TMeterValue.SetAsVolumeError;
 begin
   &Type := 'Погрешность по объему';
   ValueType := ERROR_TYPE;
+  DependenceType:=  DEPENDENT;
   Value := 0;
   SetFilter(-1);
   Accuracy := -1;
@@ -1780,6 +1790,7 @@ procedure TMeterValue.SetAsDensity;
 begin
   &Type := 'Расчётная плотность';
   ValueType := PARAM_TYPE;
+  DependenceType:=  DEPENDENT;
   Value := 998.1;
   SetFilter(-1);
   Accuracy := -1;
@@ -1803,6 +1814,7 @@ end;
 procedure TMeterValue.SetAsTempPT100;
 begin
   ValueType := PARAM_TYPE;
+  DependenceType:=  DEPENDENT;
   Value := 21.3;
   SetFilter(-1);
   Accuracy := 2;
@@ -1828,6 +1840,7 @@ end;
 procedure TMeterValue.SetAsTemp;
 begin
   ValueType := PARAM_TYPE;
+  DependenceType:=  INDEPENDENT;
   Value := 21.3;
   SetFilter(-1);
   Accuracy := 2;
@@ -1853,6 +1866,7 @@ end;
 procedure TMeterValue.SetAsAirTemp;
 begin
   ValueType := PARAM_TYPE;
+  DependenceType:=  INDEPENDENT;
   Value := 21.3;
   SetFilter(-1);
   Accuracy := 2;
@@ -1878,6 +1892,7 @@ end;
 procedure TMeterValue.SetAsPressure;
 begin
   ValueType := PARAM_TYPE;
+  DependenceType:=  DEPENDENT;
   Value := 98;
   SetFilter(-1);
   Accuracy := -1;
@@ -1908,6 +1923,7 @@ procedure TMeterValue.SetAsAirPressure;
 begin
   &Type := 'Давление атмосферное';
   ValueType := PARAM_TYPE;
+  DependenceType:=  INDEPENDENT;
   Value := 102124.64;
   SetFilter(-1);
   Accuracy := -1;
@@ -1934,6 +1950,7 @@ procedure TMeterValue.SetAsCurrent;
 begin
   &Type := 'Токовый вход';
   ValueType := PARAM_TYPE;
+  DependenceType:=  INDEPENDENT;
   Value := 4;
   SetFilter(-1);
   Accuracy := -1;
@@ -1957,6 +1974,7 @@ procedure TMeterValue.SetAsMassCoef;
 begin
   &Type := 'Коэффициент массы';
   ValueType := CONST_TYPE;
+  DependenceType:=  DEPENDENT;
   Value := 100;
   SetFilter(-1);
   Accuracy := -1;
@@ -1976,6 +1994,7 @@ procedure TMeterValue.SetAsVolumeCoef;
 begin
   &Type := 'Коэффициент объема';
   ValueType := CONST_TYPE;
+  DependenceType:=  DEPENDENT;
   Value := 100;
   SetFilter(-1);
   Accuracy := -1;
@@ -1995,6 +2014,7 @@ procedure TMeterValue.SetAsHumidity;
 begin
   &Type := 'Датчик влажности';
   ValueType := PARAM_TYPE;
+  DependenceType:=  INDEPENDENT;
   Value := 35;
   SetFilter(-1);
   Accuracy := -1;

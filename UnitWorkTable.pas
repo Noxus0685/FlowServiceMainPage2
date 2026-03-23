@@ -15,7 +15,7 @@ uses
 
 
 type
-  TMeasurementState = (
+  EMeasurementState = (
     STATE_NONE = 0,
     STATE_STANDBY,
     STATE_CONNECTED,
@@ -41,7 +41,40 @@ type
     Visible: Boolean;
   end;
 
-  TWorkTable = class;
+
+  EPumpState = (
+    PUMP_STOP,        // насос остановлен
+    PUMP_Starting,    // насос стартует
+    PUMP_STARTED,     // насос работает на минимальной частоте
+    PUMP_FreqChanging, // насос меняет частоту
+    PUMP_OnGoing      // насос выставил частоту и штатно работает
+  );
+
+
+type
+
+  TPump = class(TTypeEntity)
+  private
+
+    FFreq: Double;
+    FStatus: EPumpState;
+
+    function GetIsRunning: Boolean;
+  public
+    constructor Create(const APumpName, APumpUUID: string);
+    destructor Destroy; override;
+
+    procedure Start;
+    procedure Stop;
+    procedure SetFrequency(ANewFreq: Double);
+    function GetStateAsString: string;
+
+    property Name: string read FName write FName;
+    property UUID: string read FUUID write FUUID;
+    property Freq: Double read FFreq write FFreq;
+    property State: EPumpState read FStatus write FStatus;
+    property IsRunning: Boolean read GetIsRunning;
+  end;  TWorkTable = class;
 
   TSpillState = (
     ssNone,
@@ -183,6 +216,30 @@ type
   end;
 
   TWorkTable = class
+
+  type
+  // Обработчики для расхода
+  TOnFlowRateSetEvent = procedure(ASender: TObject; ANewFlowRate: Double) of object;
+
+  // Обработчики для насоса
+  TOnPumpStartEvent = procedure(ASender: TObject; APumpName: string) of object;
+  TOnPumpStopEvent = procedure(ASender: TObject; APumpName: string) of object;
+  TOnFreqSetEvent = procedure(ASender: TObject; APumpName: string; ANewFreq: Double) of object;
+
+  // Обработчики для пакетных заданий
+  TOnProcStartEvent = procedure(ASender: TObject; AProcName: string) of object;
+  TOnProcStopEvent = procedure(ASender: TObject; AProcName: string) of object;
+  TOnProcPauseEvent = procedure(ASender: TObject; AProcName: string) of object;
+  TOnProcNextStepEvent = procedure(ASender: TObject; AProcName: string) of object;
+  TOnProcRepeatEvent = procedure(ASender: TObject; AProcName: string) of object;
+
+  // Обработчики для измерений
+  TOnSpillageStartEvent = procedure(ASender: TObject) of object;
+  TOnSpillageStopEvent = procedure(ASender: TObject) of object;
+  TOnMeasurementStateChangedEvent = procedure(ASender: TObject;
+    AOldState, ANewState: EMeasurementState) of object;
+
+
   private
     FID: Integer;
     FName: string;
@@ -190,6 +247,8 @@ type
 
     FDeviceChannels: TObjectList<TChannel>;
     FEtalonChannels: TObjectList<TChannel>;
+
+    FPumps: TObjectList<TPump>;
 
     FTemp: Double;
     FTempDelta: Double;
@@ -199,7 +258,7 @@ type
     FTime: Double;
     FTimeResult: Double;
     FState: TSpillState;
-    FMeasurementState: TMeasurementState;
+    FMeasurementState: EMeasurementState;
     FTableClamped: Boolean;
     FFlowUnitName: string;
     FQuantityUnitName: string;
@@ -272,8 +331,8 @@ type
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
-    class function MeasurementStateToString(AState: TMeasurementState): string; static;
-    class function MeasurementStateFromString(const AValue: string): TMeasurementState; static;
+    class function MeasurementStateToString(AState: EMeasurementState): string; static;
+    class function MeasurementStateFromString(const AValue: string): EMeasurementState; static;
 
     class procedure SaveGridColumns(
       AIni: TIniFile;
@@ -299,6 +358,40 @@ type
       AChannels: TObjectList<TChannel>
     ); static;
 
+private
+  // События расхода
+  FOnFlowRateSet: TOnFlowRateSetEvent;
+  // События насоса
+  FOnPumpStart: TOnPumpStartEvent;
+  FOnPumpStop: TOnPumpStopEvent;
+  FOnFreqSet: TOnFreqSetEvent;
+  // События пакетных заданий
+  FOnProcStart: TOnProcStartEvent;
+  FOnProcStop: TOnProcStopEvent;
+  FOnProcPause: TOnProcPauseEvent;
+  FOnProcNextStep: TOnProcNextStepEvent;
+  FOnProcRepeat: TOnProcRepeatEvent;
+  // События измерений
+  FOnSpillageStart: TOnSpillageStartEvent;
+  FOnSpillageStop: TOnSpillageStopEvent;
+  FOnMeasurementStateChanged: TOnMeasurementStateChangedEvent;
+
+
+protected
+  procedure DoFlowRateSet(ANewFlowRate: Double);
+  procedure DoPumpStart(APumpName: string);
+  procedure DoPumpStop(APumpName: string);
+  procedure DoFreqSet(APumpName: string; ANewFreq: Double);
+  procedure DoProcStart(AProcName: string);
+  procedure DoProcStop(AProcName: string);
+  procedure DoProcPause(AProcName: string);
+  procedure DoProcNextStep(AProcName: string);
+  procedure DoProcRepeat(AProcName: string);
+  procedure DoSpillageStart;
+  procedure DoSpillageStop;
+  procedure DoMeasurementStateChanged(AOldState, ANewState: EMeasurementState);
+
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -322,6 +415,15 @@ type
     class procedure Load(const AIniFileName: string;
       AWorkTables: TObjectList<TWorkTable>); static;
 
+      function AddPump(const APumpName, APumpUUID: string): TPump; overload;
+      function AddPump(APump: TPump): Boolean; overload;
+  procedure RemovePump(const APumpUUID: string); overload;
+  procedure RemovePump(APump: TPump); overload;
+  procedure ClearPumps;
+  function FindPumpByUUID(const APumpUUID: string): TPump;
+  function FindPumpByName(const APumpName: string): TPump;
+  property Pumps: TObjectList<TPump> read FPumps;
+
     property ID: Integer read FID write FID;
     property Name: string read FName write FName;
     property Text: string read FText write FText;
@@ -340,7 +442,7 @@ type
     property TimeResult: Double read FTimeResult write FTimeResult;
 
     property State: TSpillState read FState write FState;
-    property MeasurementState: TMeasurementState read FMeasurementState write FMeasurementState;
+    property MeasurementState: EMeasurementState read FMeasurementState write FMeasurementState;
     property TableClamped: Boolean read FTableClamped write FTableClamped;
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
     property QuantityUnitName: string read FQuantityUnitName write FQuantityUnitName;
@@ -374,11 +476,33 @@ type
     property DataPointsGridColumns: TArray<TGridColumnLayout> read FDataPointsGridColumns write FDataPointsGridColumns;
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
 
+
+
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
-        procedure UpdateAggregateMeterValues;
-            procedure InitMeterValues;
+    procedure UpdateAggregateMeterValues;
+    procedure InitMeterValues;
+
+
+  public
+  property OnFlowRateSet: TOnFlowRateSetEvent read FOnFlowRateSet write FOnFlowRateSet;
+  property OnPumpStart: TOnPumpStartEvent read FOnPumpStart write FOnPumpStart;
+  property OnPumpStop: TOnPumpStopEvent read FOnPumpStop write FOnPumpStop;
+  property OnFreqSet: TOnFreqSetEvent read FOnFreqSet write FOnFreqSet;
+  property OnProcStart: TOnProcStartEvent read FOnProcStart write FOnProcStart;
+  property OnProcStop: TOnProcStopEvent read FOnProcStop write FOnProcStop;
+  property OnProcPause: TOnProcPauseEvent read FOnProcPause write FOnProcPause;
+  property OnProcNextStep: TOnProcNextStepEvent read FOnProcNextStep write FOnProcNextStep;
+  property OnProcRepeat: TOnProcRepeatEvent read FOnProcRepeat write FOnProcRepeat;
+  property OnSpillageStart: TOnSpillageStartEvent read FOnSpillageStart write FOnSpillageStart;
+  property OnSpillageStop: TOnSpillageStopEvent read FOnSpillageStop write FOnSpillageStop;
+  property OnMeasurementStateChanged: TOnMeasurementStateChangedEvent
+    read FOnMeasurementStateChanged write FOnMeasurementStateChanged;
+
+
   end;
+
+
 
   TWorkTableManager = class
   private
@@ -898,6 +1022,9 @@ begin
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
+
+  FPumps := TObjectList<TPump>.Create(True); // True — автоосвобождение объектов
+
   FTableFlow := TFlowMeter.Create;
 
   FState := ssNone;
@@ -1526,6 +1653,8 @@ begin
   FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
   FEtalonChannels.Free;
+  FreeAndNil(FPumps);
+
   inherited;
 end;
 
@@ -1597,17 +1726,15 @@ begin
 if FTableFlow<>nil then
 
     begin
+  if FTableFlow.ValueDensity <> nil then FTableFlow.ValueDensity.SetValue();
   if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
   if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
   if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
-  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+
 
   if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
   if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
-
-  if FTableFlow.ValueDensity <> nil then FTableFlow.ValueDensity.SetValue();
-
-     end
+    end
 end;
 
 
@@ -2127,7 +2254,7 @@ end;
 
 
 class function TWorkTable.MeasurementStateFromString(
-  const AValue: string): TMeasurementState;
+  const AValue: string): EMeasurementState;
 begin
   if SameText(AValue, 'STATE_STANDBY') then
     Exit(STATE_STANDBY);
@@ -2164,7 +2291,7 @@ begin
 end;
 
 class function TWorkTable.MeasurementStateToString(
-  AState: TMeasurementState): string;
+  AState: EMeasurementState): string;
 begin
   case AState of
     STATE_STANDBY: Result := 'STATE_STANDBY';
@@ -2235,10 +2362,220 @@ begin
   TWorkTable.Save(FIniFileName, FWorkTables);
 end;
 
+procedure TWorkTable.DoFlowRateSet(ANewFlowRate: Double);
+begin
+  if Assigned(FOnFlowRateSet) then
+    FOnFlowRateSet(Self, ANewFlowRate);
+end;
+
+procedure TWorkTable.DoPumpStart(APumpName: string);
+begin
+  if Assigned(FOnPumpStart) then
+    FOnPumpStart(Self, APumpName);
+end;
+
+procedure TWorkTable.DoPumpStop(APumpName: string);
+begin
+  if Assigned(FOnPumpStop) then
+    FOnPumpStop(Self, APumpName);
+end;
+
+procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
+begin
+  if Assigned(FOnFreqSet) then
+    FOnFreqSet(Self, APumpName, ANewFreq);
+end;
+
+procedure TWorkTable.DoProcStart(AProcName: string);
+begin
+  if Assigned(FOnProcStart) then
+    FOnProcStart(Self, AProcName);
+end;
+
+procedure TWorkTable.DoProcStop(AProcName: string);
+begin
+  if Assigned(FOnProcStop) then
+    FOnProcStop(Self, AProcName);
+end;
+
+procedure TWorkTable.DoProcPause(AProcName: string);
+begin
+  if Assigned(FOnProcPause) then
+    FOnProcPause(Self, AProcName);
+end;
+
+procedure TWorkTable.DoProcNextStep(AProcName: string);
+begin
+  if Assigned(FOnProcNextStep) then
+    FOnProcNextStep(Self, AProcName);
+end;
+
+procedure TWorkTable.DoProcRepeat(AProcName: string);
+begin
+  if Assigned(FOnProcRepeat) then
+    FOnProcRepeat(Self, AProcName);
+end;
+
+procedure TWorkTable.DoSpillageStart;
+begin
+  if Assigned(FOnSpillageStart) then
+    FOnSpillageStart(Self);
+end;
+
+procedure TWorkTable.DoSpillageStop;
+begin
+  if Assigned(FOnSpillageStop) then
+    FOnSpillageStop(Self);
+end;
+
+procedure TWorkTable.DoMeasurementStateChanged(AOldState, ANewState: EMeasurementState);
+begin
+  if Assigned(FOnMeasurementStateChanged) then
+    FOnMeasurementStateChanged(Self, AOldState, ANewState);
+end;
+
+function TWorkTable.AddPump(const APumpName, APumpUUID: string): TPump;
+var
+  NewPump: TPump;
+begin
+  NewPump := TPump.Create(APumpName, APumpUUID);
+  FPumps.Add(NewPump);
+  Result := NewPump;
+end;
+
+function TWorkTable.AddPump(APump: TPump): Boolean;
+begin
+  if Assigned(APump) then
+  begin
+    FPumps.Add(APump);
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
+procedure TWorkTable.RemovePump(const APumpUUID: string);
+var
+  Pump: TPump;
+begin
+  Pump := FindPumpByUUID(APumpUUID);
+  if Assigned(Pump) then
+    FPumps.Remove(Pump);
+end;
+
+procedure TWorkTable.RemovePump(APump: TPump);
+begin
+  if Assigned(APump) then
+    FPumps.Remove(APump);
+end;
+
+procedure TWorkTable.ClearPumps;
+begin
+  FPumps.Clear;
+end;
+
+function TWorkTable.FindPumpByUUID(const APumpUUID: string): TPump;
+var
+  Pump: TPump;
+begin
+  for Pump in FPumps do
+  begin
+    if Pump.UUID = APumpUUID then
+    begin
+      Result := Pump;
+      Exit;
+    end;
+  end;
+  Result := nil;
+end;
+
+function TWorkTable.FindPumpByName(const APumpName: string): TPump;
+var
+  Pump: TPump;
+begin
+  for Pump in FPumps do
+  begin
+    if Pump.Name = APumpName then
+    begin
+      Result := Pump;
+      Exit;
+    end;
+  end;
+  Result := nil;
+end;
 
 
     {$ENDREGION 'TWorkTable'}
 
+   {$REGION 'TPump'}
+constructor TPump.Create(const APumpName, APumpUUID: string);
+begin
+  inherited Create;
+  FName := APumpName;
+  FUUID := APumpUUID;
+  FFreq := 0.0;
+  FStatus := PUMP_STOP;
+end;
 
+destructor TPump.Destroy;
+begin
+  inherited;
+end;
+
+function TPump.GetIsRunning: Boolean;
+begin
+  Result := (FStatus = PUMP_STARTED) or (FStatus = PUMP_OnGoing);
+end;
+
+procedure TPump.Start;
+begin
+  if FStatus = PUMP_STOP then
+  begin
+    FStatus := PUMP_Starting;
+    // Здесь может быть логика запуска насоса (вызов внешних процедур и т. д.)
+    // После успешного запуска устанавливаем рабочее состояние
+    FStatus := PUMP_STARTED; // или PUMP_OnGoing, если сразу задаём частоту
+  end;
+end;
+
+procedure TPump.Stop;
+begin
+  if IsRunning then
+  begin
+    FStatus := PUMP_STOP;
+    FFreq := 0.0;
+    // Здесь может быть логика остановки насоса
+  end;
+end;
+
+procedure TPump.SetFrequency(ANewFreq: Double);
+begin
+  if not IsRunning then
+    Exit; // Не меняем частоту, если насос не работает
+
+  if Abs(FFreq - ANewFreq) < 0.001 then
+    Exit; // Частота не изменилась
+
+  FStatus := PUMP_FreqChanging;
+  // Здесь может быть логика изменения частоты (вызов внешних процедур)
+
+  FFreq := ANewFreq;
+  FStatus := PUMP_OnGoing; // После установки частоты — штатная работа
+end;
+
+function TPump.GetStateAsString: string;
+begin
+  case FStatus of
+    PUMP_STOP: Result := 'Остановлен';
+    PUMP_Starting: Result := 'Запуск';
+    PUMP_STARTED: Result := 'Работает (мин. частота)';
+    PUMP_FreqChanging: Result := 'Меняет частоту';
+    PUMP_OnGoing: Result := 'Работает штатно';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+  {$ENDREGION 'TPump'}
 
 end.

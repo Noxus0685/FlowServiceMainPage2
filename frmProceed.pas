@@ -218,6 +218,11 @@ type
     procedure UpdateCalibrCoefsFrame;
     procedure ResetPointDeleteConfirm;
     procedure InitCalibrCoefsFrame;
+
+    procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
+    procedure SaveLayoutSettingsToWorkTable;
+    procedure GridDataPointsColumnMoved(Column: TColumn; FromIndex,
+      ToIndex: Integer);
   private
     FFrameCalibrCoefs: TFrameCalibrCoefs;
     FWorkTableManager: TWorkTableManager;
@@ -401,6 +406,46 @@ begin
     Ini.Free;
   end;
 end;
+
+procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
+  out AColumns: TArray<TGridColumnLayout>);
+var
+  I: Integer;
+begin
+  SetLength(AColumns, 0);
+  if AGrid = nil then
+    Exit;
+
+  SetLength(AColumns, AGrid.ColumnCount);
+  for I := 0 to AGrid.ColumnCount - 1 do
+  begin
+    AColumns[I].Name := AGrid.Columns[I].Name;
+    AColumns[I].DisplayIndex := I;
+    AColumns[I].Width := AGrid.Columns[I].Width;
+    AColumns[I].Visible := AGrid.Columns[I].Visible;
+  end;
+end;
+
+
+procedure TFrameProceed.SaveLayoutSettingsToWorkTable;
+var
+  WorkTable: TWorkTable;
+  EtalonColumns: TArray<TGridColumnLayout>;
+  DeviceColumns: TArray<TGridColumnLayout>;
+  DataPointsColumns: TArray<TGridColumnLayout>;
+  ResultsColumns: TArray<TGridColumnLayout>;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+   CaptureGridColumnsLayout(GridDataPoints, DataPointsColumns);
+  CaptureGridColumnsLayout(GridResults, ResultsColumns);
+  WorkTable.DataPointsGridColumns := DataPointsColumns;
+  WorkTable.ResultsGridColumns := ResultsColumns;
+end;
+
+
+
 procedure TFrameProceed.AddProcessingDeviceFromSelection;
 var
   Frm: TFormDeviceSelect;
@@ -2458,6 +2503,12 @@ begin
 
   UpdateGridDataPoints;
 end;
+procedure TFrameProceed.GridDataPointsColumnMoved(Column: TColumn; FromIndex,
+  ToIndex: Integer);
+begin
+     SaveLayoutSettingsToWorkTable;
+end;
+
 procedure TFrameProceed.GridDataPointsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
