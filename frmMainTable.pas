@@ -386,6 +386,7 @@ type
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
+    procedure ComboEditPumpsChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
 
   private
@@ -428,6 +429,8 @@ type
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure ResetMeasurementValues;
+    procedure RefreshPumpsCombo;
+    procedure SyncPumpControls;
 
     procedure SetConfiguration;
     procedure StartMonitor;
@@ -706,6 +709,71 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.RefreshPumpsCombo;
+var
+  Pump: TPump;
+  SelectedPumpName: string;
+  ItemIndex: Integer;
+begin
+  ComboEditPumps.Items.Clear;
+  ComboEditPumps.ItemIndex := -1;
+
+  if FActiveWorkTable = nil then
+  begin
+    ComboEditPumps.Text := '';
+    SyncPumpControls;
+    Exit;
+  end;
+
+  SelectedPumpName := Trim(ComboEditPumps.Text);
+  for Pump in FActiveWorkTable.Pumps do
+    ComboEditPumps.Items.Add(Pump.Name);
+
+  ItemIndex := -1;
+  if SelectedPumpName <> '' then
+    ItemIndex := ComboEditPumps.Items.IndexOf(SelectedPumpName);
+  if (ItemIndex < 0) and (ComboEditPumps.Items.Count > 0) then
+    ItemIndex := 0;
+
+  ComboEditPumps.ItemIndex := ItemIndex;
+  if ItemIndex >= 0 then
+    ComboEditPumps.Text := ComboEditPumps.Items[ItemIndex]
+  else
+    ComboEditPumps.Text := '';
+
+  SyncPumpControls;
+end;
+
+procedure TFrameMainTable.SyncPumpControls;
+var
+  Pump: TPump;
+begin
+  Pump := nil;
+  if FActiveWorkTable <> nil then
+    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboEditPumps.Text));
+
+  if Pump <> nil then
+  begin
+    SpinBoxFreq.Value := Pump.Freq;
+    if Pump.IsRunning then
+      SpeedButtonStartPump.Text := '■'
+    else
+      SpeedButtonStartPump.Text := '▶';
+    SpeedButtonStartPump.Hint := Pump.GetStateAsString;
+  end
+  else
+  begin
+    SpinBoxFreq.Value := 0;
+    SpeedButtonStartPump.Text := '▶';
+    SpeedButtonStartPump.Hint := '';
+  end;
+end;
+
+procedure TFrameMainTable.ComboEditPumpsChange(Sender: TObject);
+begin
+  SyncPumpControls;
+end;
+
 procedure TFrameMainTable.SetConfiguration;
 begin
   OnChangeState(STATE_CONFIGED);
@@ -959,6 +1027,7 @@ begin
   SetLength(FRows, 0);
 
   InitTables;
+  RefreshPumpsCombo;
 
   FLastClickRow := -1;
   FLastClickCol := nil;
@@ -1850,7 +1919,10 @@ begin
 
     SetDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
     LoadLayoutSettingsFromWorkTable;
-  end;
+    RefreshPumpsCombo;
+  end
+  else
+    RefreshPumpsCombo;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
