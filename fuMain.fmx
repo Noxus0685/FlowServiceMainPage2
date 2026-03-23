@@ -5,6 +5,7 @@ object FormMain: TFormMain
   ClientHeight = 778
   ClientWidth = 1780
   Visible = True
+  Fill.Color = xFFF2F7FF
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -175,7 +176,7 @@ object FormMain: TFormMain
                 end
                 object cbBACK_COLOR: TComboColorBox
                   Align = Bottom
-                  Color = claWhite
+                  Color = xFFF2F7FF
                   Position.X = 5.000000000000000000
                   Position.Y = 27.000000000000000000
                   Size.Width = 80.000000000000000000
