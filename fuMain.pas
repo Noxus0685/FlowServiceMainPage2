@@ -73,7 +73,7 @@ begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
-//123
+//12332
   FFrameMainTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
