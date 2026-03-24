@@ -73,7 +73,7 @@ begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
-
+//123
   FFrameMainTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
@@ -133,7 +133,7 @@ begin
   if AWorkTable = nil then
     Exit;
 
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+   // ÃŽÃ¡Ã­Ã®Ã¢Ã«Ã¿Ã¥Ã¬ Ã­Ã¥ ÃªÃ Ã¦Ã¤Ã³Ã¾ Ã±Ã¥ÃªÃ³Ã­Ã¤Ã³
   if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
   begin
     TempDelta :=  (Random * 0.30) - 0.15;
