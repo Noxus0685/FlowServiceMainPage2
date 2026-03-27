@@ -227,6 +227,8 @@ type
     ShadowEffect1: TShadowEffect;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
+      const Value: TValue);
     procedure SpeedButtonFindTypeClick(Sender: TObject);
     procedure ceCategoryChange(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
@@ -2654,6 +2656,116 @@ begin
     end;
   end;
 end;
+
+procedure TFormDeviceEditor.GridPointsSetValue(
+  Sender: TObject;
+  const ACol, ARow: Integer;
+  const Value: TValue
+);
+var
+  P: TDevicePoint;
+  Qmax, Q, V, Tm, Coef: Double;
+  S: string;
+begin
+  if (FDevice = nil) then
+    Exit;
+
+  P := GetPointByVisibleRow(ARow);
+  if P = nil then
+    Exit;
+
+  S := Trim(Value.AsString);
+
+  if ACol = StringColumnPointName.Index then
+    P.Name := S
+
+  else if ACol = StringColumnPointStab.Index then
+    P.Pause := Round(NormalizeFloatInput(S))
+
+  else if ACol = StringColumnPointPres.Index then
+    P.Pressure := NormalizeFloatInput(S)
+
+  else if ACol = StringColumnPontTemp.Index then
+    P.Temp := NormalizeFloatInput(S)
+
+  else if ACol = StringColumnPointTempError.Index then
+    P.TempAccuracy := NormalizeAccuracyInput(S)
+
+  else if ACol = StringColumnPointFlowError.Index then
+    P.FlowAccuracy := NormalizeAccuracyInput(S)
+
+  else if ACol = StringColumnPointError.Index then
+    P.Error := NormalizeFloatInput(S)
+
+  else if ACol = IntegerColumnPointRepeatsForm.Index then
+    P.RepeatsProtocol := Round(NormalizeFloatInput(S))
+
+  else if ACol = IntegerColumnPointRepeats.Index then
+    P.Repeats := Round(NormalizeFloatInput(S))
+
+  else
+  begin
+    Qmax := FDevice.Qmax;
+    Coef := FDevice.Coef;
+    Q := P.FlowRate * Qmax;
+
+    if ACol = StringColumnPointFlowRate.Index then
+      P.FlowRate := NormalizeFloatInput(S)
+
+    else if ACol = StringColumnPointQ.Index then
+    begin
+      Q := NormalizeFloatInput(S);
+      if Qmax > 0 then
+        P.FlowRate := Q / Qmax;
+    end
+
+    else if ACol = StringColumnPointVolume.Index then
+    begin
+      V := NormalizeFloatInput(S);
+      P.LimitVolume := V;
+
+      if (V > 0) and (Q > 0) then
+        P.LimitTime := V * 3.6 / Q;
+
+      if (V > 0) and (Coef > 0) then
+        P.LimitImp := Round(V * Coef);
+    end
+
+    else if ACol = StringColumnPointImp.Index then
+    begin
+      P.LimitImp := Round(NormalizeFloatInput(S));
+
+      if (P.LimitImp > 0) and (Coef > 0) then
+      begin
+        V := P.LimitImp / Coef;
+        P.LimitVolume := V;
+
+        if Q > 0 then
+          P.LimitTime := V * 3.6 / Q;
+      end;
+    end
+
+    else if ACol = StringColumnPointTime.Index then
+    begin
+      Tm := NormalizeFloatInput(S);
+      P.LimitTime := Tm;
+
+      if (Tm > 0) and (Q > 0) then
+      begin
+        V := Q * Tm / 3.6;
+        P.LimitVolume := V;
+
+        if Coef > 0 then
+          P.LimitImp := Round(V * Coef);
+      end;
+    end;
+  end;
+
+  P.State := osModified;
+  SetModified;
+  UpdatePointsGrid;
+end;
+
 procedure TFormDeviceEditor.InitCategoryComboEdit;
 var
   C: TDeviceCategory;
