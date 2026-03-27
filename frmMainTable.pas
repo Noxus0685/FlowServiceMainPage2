@@ -441,6 +441,8 @@ type
     procedure ResetMeasurementValues;
     procedure RefreshPumpsCombo;
     procedure SyncPumpControls;
+    procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
+      AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
 
     procedure SetConfiguration;
     procedure StartMonitor;
@@ -2453,15 +2455,29 @@ end;
 procedure TFrameMainTable.ActionDevicesFillAllBySelectedExecute(Sender: TObject);
 var
   Src, Ch: TChannel;
+  SourceType: TDeviceType;
+  FoundRepo: TTypeRepository;
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
+     (DataManager = nil) then
     Exit;
+
   Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
   if Src = nil then
     Exit;
+
+  FoundRepo := nil;
+  SourceType := DataManager.FindType(Src.TypeUUID, Src.TypeName, FoundRepo);
+  if SourceType = nil then
+  begin
+    ShowMessage('Тип выбранной строки не найден в подключенных репозиториях.');
+    Exit;
+  end;
+
   for Ch in FActiveWorkTable.DeviceChannels do
-    if (Ch <> Src)and(Ch.Enabled=True) then
-      CopyChannelData(Src, Ch);
+    if (Ch <> Src) and Ch.Enabled then
+      AttachType(Ch, SourceType, FoundRepo, True);
+
   UpdateGrids;
 end;
 
@@ -2901,14 +2917,61 @@ begin
  // FFlowMeterRows[ARow].Meter.SerialNumber := CFlowMeterSerials[FFlowMeterRows[ARow].SerialIndex];
 end;
 
+procedure TFrameMainTable.AttachType(AChannel: TChannel; ANewType: TDeviceType;
+  AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
+var
+  RepoName: string;
+  RepoUUID: string;
+begin
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (ANewType = nil) then
+    Exit;
+
+  if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
+    AFoundRepo := DataManager.ActiveTypeRepo;
+
+  if AFoundRepo <> nil then
+  begin
+    RepoName := AFoundRepo.Name;
+    RepoUUID := AFoundRepo.UUID;
+  end
+  else
+  begin
+    RepoName := '';
+    RepoUUID := '';
+  end;
+
+  AChannel.TypeName := ANewType.Name;
+  AChannel.TypeUUID := ANewType.UUID;
+  AChannel.RepoTypeName := RepoName;
+  AChannel.RepoTypeUUID := RepoUUID;
+
+  if not Assigned(AChannel.FlowMeter.Device) then
+    Exit;
+
+  AChannel.FlowMeter.Device.DeviceTypeUUID := ANewType.UUID;
+  AChannel.FlowMeter.Device.DeviceTypeName := ANewType.Name;
+  AChannel.FlowMeter.Device.RepoTypeName := RepoName;
+  AChannel.FlowMeter.Device.RepoTypeUUID := RepoUUID;
+
+  if not AIsTypeChanged then
+    Exit;
+
+  AChannel.FlowMeter.Device.AttachType(ANewType, RepoName);
+  // При смене типа поверочные точки должны полностью переходить из типа в прибор.
+  // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
+  AChannel.FlowMeter.Device.FillFromType(ANewType, False);
+  if AChannel.FlowMeter.Device.State in [osClean, osLoaded] then
+    AChannel.FlowMeter.Device.State := osModified;
+  MarkChannelDeviceModified(AChannel);
+  PersistDeviceAsync(AChannel.FlowMeter.Device);
+end;
+
 procedure TFrameMainTable.OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean);
 var
   Frm: TFormTypeSelect;
   CurrentType, NewType: TDeviceType;
   FoundRepo, PreferredRepo: TTypeRepository;
-  RepoName: string;
-  RepoUUID: string;
-  IsTypeChanged, NeedFill: Boolean;
+  IsTypeChanged: Boolean;
   Ch: TChannel;
   Repo: TTypeRepository;
 begin
@@ -3008,68 +3071,10 @@ begin
           (not SameText(CurrentType.Modification, NewType.Modification));
     end;
 
-    NeedFill := False;
-    // if IsTypeChanged then
-    //   NeedFill := AskFillFromType;
+    AttachType(Ch, NewType, FoundRepo, IsTypeChanged);
 
     {----------------------------------------------------}
-    { 4. Привязываем тип (в runtime: FlowMeter / Channel) }
-    {----------------------------------------------------}
-    if (DataManager.ActiveTypeRepo <> nil) then
-      FoundRepo := DataManager.ActiveTypeRepo;
-
-    if FoundRepo <> nil then
-    begin
-      RepoName := FoundRepo.Name;
-      RepoUUID := FoundRepo.UUID;
-    end
-    else
-    begin
-      RepoName := '';
-      RepoUUID := '';
-    end;
-
-    // Новая идеология: канал проксирует в FlowMeter
-    Ch.TypeName := NewType.Name;
-    Ch.TypeUUID := NewType.UUID;
-    Ch.RepoTypeName := RepoName;
-    Ch.RepoTypeUUID := RepoUUID;
-
-    if Assigned(Ch.FlowMeter) and Assigned(Ch.FlowMeter.Device) then
-    begin
-      Ch.FlowMeter.Device.DeviceTypeUUID := NewType.UUID;
-      Ch.FlowMeter.Device.DeviceTypeName := NewType.Name;
-      Ch.FlowMeter.Device.RepoTypeName := RepoName;
-      Ch.FlowMeter.Device.RepoTypeUUID := RepoUUID;
-
-      if IsTypeChanged then
-      begin
-        Ch.FlowMeter.Device.AttachType(NewType, RepoName);
-        // При смене типа поверочные точки должны полностью переходить из типа в прибор.
-        // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
-        Ch.FlowMeter.Device.FillFromType(NewType, False);
-        if Ch.FlowMeter.Device.State in [osClean, osLoaded] then
-          Ch.FlowMeter.Device.State := osModified;
-        PersistDeviceAsync(Ch.FlowMeter.Device);
-      end;
-    end;
-
-    // Если у вас был расчёт индекса по типу для UI/сигнала — храните как отдельное поле канала/строки,
-    // либо пересчитывайте динамически. Здесь оставляю как комментарий:
-    // Ch.TypeIndex := FindTypeIndex(NewType.Name);
-
-    {----------------------------------------------------}
-    { 5. При необходимости заполняем данные прибора из типа }
-    {----------------------------------------------------}
-    // В новой модели это обычно делается на уровне привязки TDevice к каналу:
-    // if NeedFill and Assigned(Ch.FlowMeter.Device) then
-    // begin
-    //   Ch.FlowMeter.Device.AttachType(NewType, RepoName);
-    //   Ch.FlowMeter.Device.FillFromType(NewType);
-    // end;
-
-    {----------------------------------------------------}
-    { 6. Обновляем UI }
+    { 4. Обновляем UI }
     {----------------------------------------------------}
     FActiveWorkTable.RecalculateAllMeterValues;
 
