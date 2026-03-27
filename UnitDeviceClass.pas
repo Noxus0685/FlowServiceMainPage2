@@ -491,6 +491,7 @@ type
     property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
+    procedure AttachDN(ADiameter: TDiameter; AType: TDeviceType);
     procedure FillFromType(AType: TDeviceType; const APreservePointsAndSerial: Boolean = False);
     procedure SyncNameWithModificationAndDiameter;
 
@@ -2084,6 +2085,49 @@ begin
   DeviceTypeRepo := RepoName;
   RepoTypeName := RepoName;
 
+end;
+
+procedure TDevice.AttachDN(ADiameter: TDiameter; AType: TDeviceType);
+var
+  I: Integer;
+  P: TDevicePoint;
+  Q, V, Tm, LCoef: Double;
+begin
+  if ADiameter = nil then
+  begin
+    SyncNameWithModificationAndDiameter;
+    Exit;
+  end;
+
+  if (AType <> nil) and (FDeviceType <> AType) then
+    FDeviceType := AType;
+
+  DN := ADiameter.Name;
+  Qmax := ADiameter.Qmax;
+  Qmin := ADiameter.Qmin;
+
+  if Qmin > 0 then
+    RangeDynamic := Qmax / Qmin;
+
+  Coef := ADiameter.Kp;
+
+  LCoef := Coef;
+  if (Points <> nil) and (LCoef > 0) then
+    for I := 0 to Points.Count - 1 do
+    begin
+      P := Points[I];
+      Q := P.FlowRate;
+
+      if (Q > 0) and (P.LimitTime > 0) then
+      begin
+        Tm := P.LimitTime;
+        V := Q * Tm / 3.6;
+        P.LimitVolume := V;
+        P.LimitImp := Round(V * LCoef);
+      end;
+    end;
+
+  SyncNameWithModificationAndDiameter;
 end;
 
 procedure TDevice.SyncNameWithModificationAndDiameter;
