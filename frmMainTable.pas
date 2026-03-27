@@ -331,6 +331,7 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
@@ -3308,6 +3309,52 @@ begin
   finally
     GridDevices.EndUpdate;
   end;
+end;
+
+procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
+var
+  WorkTable: TWorkTable;
+  Row: Integer;
+  AllEnabled: Boolean;
+  NewEnabled: Boolean;
+begin
+  if Column <> CheckColumnDeviceEnable1 then
+    Exit;
+
+  WorkTable := GetWorkTableByIndex(0);
+  if WorkTable <> nil then
+  begin
+    AllEnabled := WorkTable.DeviceChannels.Count > 0;
+    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
+      if not WorkTable.DeviceChannels[Row].Enabled then
+      begin
+        AllEnabled := False;
+        Break;
+      end;
+
+    NewEnabled := not AllEnabled;
+    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
+    begin
+      WorkTable.DeviceChannels[Row].Enabled := NewEnabled;
+      MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
+    end;
+  end
+  else
+  begin
+    AllEnabled := Length(FFlowMeterRows) > 0;
+    for Row := 0 to High(FFlowMeterRows) do
+      if not FFlowMeterRows[Row].Enabled then
+      begin
+        AllEnabled := False;
+        Break;
+      end;
+
+    NewEnabled := not AllEnabled;
+    for Row := 0 to High(FFlowMeterRows) do
+      FFlowMeterRows[Row].Enabled := NewEnabled;
+  end;
+
+  GridDevices.Repaint;
 end;
 
 procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
