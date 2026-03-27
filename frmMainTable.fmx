@@ -1223,8 +1223,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1434.000000000000000000
-              Viewport.Height = 120.000000000000000000
+              Viewport.Width = 1430.000000000000000000
+              Viewport.Height = 95.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -1319,6 +1319,9 @@ object FrameMainTable: TFrameMainTable
               PopupMenu = PopupMenuEtalonsGridLayOut
               Position.X = 1.000000000000000000
               Position.Y = 8.000000000000000000
+              Size.Width = 100.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
               Text = #1069#1090#1072#1083#1086#1085#1099
               TabOrder = 0
             end
@@ -1344,8 +1347,8 @@ object FrameMainTable: TFrameMainTable
             OnSetValue = GridDevicesSetValue
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1434.000000000000000000
-            Viewport.Height = 234.000000000000000000
+            Viewport.Width = 1414.000000000000000000
+            Viewport.Height = 193.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -1440,7 +1443,7 @@ object FrameMainTable: TFrameMainTable
               Header = #1047#1085#1072#1095#1077#1085#1080#1077
               HeaderSettings.TextSettings.WordWrap = False
             end
-            object StringColumnUUID: TStringColumn
+            object StringColumnUUID1: TStringColumn
               Header = 'UUID'
               HeaderSettings.TextSettings.WordWrap = False
             end
@@ -1452,9 +1455,11 @@ object FrameMainTable: TFrameMainTable
             Size.PlatformDefault = False
             TabOrder = 1
             object Label23: TLabel
+              Align = Left
               PopupMenu = PopupMenuDevicesGridLayOut
-              Position.X = 1.000000000000000000
-              Position.Y = 8.000000000000000000
+              Size.Width = 100.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
               Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
               TabOrder = 0
             end
@@ -1462,6 +1467,61 @@ object FrameMainTable: TFrameMainTable
               OnPopup = PopupMenuDevicesGridLayOutPopup
               Left = 1610
               Top = 461
+            end
+            object SpeedButton1: TSpeedButton
+              Action = ActionDevicesFillAllBySelected
+              Align = Left
+              ImageIndex = -1
+              Position.X = 100.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'arrowdowntoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton2: TSpeedButton
+              Action = ActionDevicesClearAll
+              Align = Left
+              ImageIndex = -1
+              Position.X = 153.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'pagecurltoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton3: TSpeedButton
+              Action = ActionDevicesClearRow
+              Align = Left
+              ImageIndex = -1
+              Position.X = 206.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'trashtoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton4: TSpeedButton
+              Action = ActionAddDeviceChannel
+              Align = Left
+              ImageIndex = -1
+              Position.X = 259.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'additembutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton5: TSpeedButton
+              Action = ActionOpenDeviceSelect
+              Align = Left
+              ImageIndex = -1
+              Position.X = 312.000000000000000000
+              Size.Width = 57.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'searchtoolbutton'
+              TextSettings.Trimming = None
             end
           end
         end

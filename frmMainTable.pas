@@ -314,7 +314,12 @@ type
     ActionEtalonsSetFlowSource: TAction;
     ActionEtalonsAssignEtalon: TAction;
     ComboBoxPumps: TComboBox;
-    StringColumnUUID: TStringColumn;
+    StringColumnUUID1: TStringColumn;
+    SpeedButton1: TSpeedButton;
+    SpeedButton2: TSpeedButton;
+    SpeedButton3: TSpeedButton;
+    SpeedButton4: TSpeedButton;
+    SpeedButton5: TSpeedButton;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -2454,7 +2459,7 @@ begin
   if Src = nil then
     Exit;
   for Ch in FActiveWorkTable.DeviceChannels do
-    if Ch <> Src then
+    if (Ch <> Src)and(Ch.Enabled=True) then
       CopyChannelData(Src, Ch);
   UpdateGrids;
 end;
@@ -3432,7 +3437,7 @@ begin
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal)
-    else if GridDevices.Columns[ACol] = StringColumnUUID then
+    else if GridDevices.Columns[ACol] = StringColumnUUID1 then
         begin
         if WorkTable.DeviceChannels[ARow].FlowMeter.Device<>nil then
            Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID;
