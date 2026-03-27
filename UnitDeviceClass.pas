@@ -1292,6 +1292,7 @@ begin
       Result := CompareDate(DateOfManufacture, B.DateOfManufacture);
   end;
 end;
+
 procedure TDevicePoint.Assign(ASource: TDevicePoint);
 begin
   if ASource = nil then
@@ -1776,7 +1777,6 @@ begin
   if ASpillage.State = osClean then
     ASpillage.State := osModified;
 end;
-
 
 procedure TDevice.FillDataPointsList(APoint: TDevicePoint);
 var

@@ -247,7 +247,7 @@ begin
       if not Repo.WriteAccess then
         Continue;
 
-     // if (Repo.State <> osLoaded) and (Repo.State <> osClean) then
+      if (Repo.State <> osLoaded) and (Repo.State <> osClean) then
         Repo.Save;
     end;
 

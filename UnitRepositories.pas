@@ -1747,6 +1747,7 @@ begin
 
   Q := FDM.CreateQuery;
   try
+    try
     case AType.State of
 
       {==================================================}
@@ -1900,10 +1901,11 @@ begin
     if OwnsTransaction and FDM.TypesConnection.InTransaction then
       FDM.TypesConnection.Rollback;
     raise;
-
+    end;
   finally
     Q.Free;
   end;
+
 end;
 
 function TTypeRepository.DeleteTypeCascade(const ATypeUUID: string): Boolean;
@@ -4098,6 +4100,7 @@ begin
 
   Q := FDM.CreateQuery;
   try
+   try
     case ADevice.State of
 
       {======================= DELETE =======================}
@@ -4263,6 +4266,7 @@ begin
     if OwnsTransaction and FDM.TypesConnection.InTransaction then
       FDM.TypesConnection.Rollback;
     raise;
+   end;
 
   finally
     Q.Free;
