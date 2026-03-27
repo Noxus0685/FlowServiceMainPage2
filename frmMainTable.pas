@@ -2127,6 +2127,7 @@ begin
       if ADevice <> nil then
       begin
         AChannel.DeviceUUID := ADevice.UUID;
+        AChannel.DeviceName:= ADevice.Name;
         AChannel.TypeName := ADevice.DeviceTypeName;
         AChannel.Serial := ADevice.SerialNumber;
         AChannel.Signal := ADevice.OutputType;
@@ -2476,7 +2477,9 @@ begin
 
   for Ch in FActiveWorkTable.DeviceChannels do
     if (Ch <> Src) and Ch.Enabled then
+    begin
       AttachType(Ch, SourceType, FoundRepo, True);
+    end;
 
   UpdateGrids;
 end;
@@ -2960,6 +2963,10 @@ begin
   // При смене типа поверочные точки должны полностью переходить из типа в прибор.
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
   AChannel.FlowMeter.Device.FillFromType(ANewType, False);
+
+
+
+
   if AChannel.FlowMeter.Device.State in [osClean, osLoaded] then
     AChannel.FlowMeter.Device.State := osModified;
   MarkChannelDeviceModified(AChannel);

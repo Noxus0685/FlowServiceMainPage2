@@ -2654,6 +2654,7 @@ begin
     end;
   end;
 end;
+
 procedure TFormDeviceEditor.InitCategoryComboEdit;
 var
   C: TDeviceCategory;
