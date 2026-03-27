@@ -3030,6 +3030,7 @@ begin
     end;
   end;
 
+  P.State:=osModified;
   SetModified;
   UpdatePointsGrid;
 end;

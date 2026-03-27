@@ -1289,6 +1289,7 @@ begin
   Result.ID := GenerateTypeID;
   Result.State := osNew;
 
+
 end;
 
 function TTypeRepository.CreateType(Index: Integer): TDeviceType;

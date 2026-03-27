@@ -3323,8 +3323,8 @@ var
   AllEnabled: Boolean;
   NewEnabled: Boolean;
 begin
-  if Column <> CheckColumnDeviceEnable1 then
-    Exit;
+  if Column = CheckColumnDeviceEnable1 then
+  begin
 
   WorkTable := GetWorkTableByIndex(0);
   if WorkTable <> nil then
@@ -3359,7 +3359,8 @@ begin
       FFlowMeterRows[Row].Enabled := NewEnabled;
   end;
 
-  GridDevices.Repaint;
+  UpdateGridDevices;
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
