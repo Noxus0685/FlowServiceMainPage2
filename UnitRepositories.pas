@@ -100,6 +100,7 @@ type
         //Сохранение одного тиипа. ACheckExists - нужно ли проверять его наличие в БД или сразу добавлять новый.
 //    function SaveType(AType: TDeviceType; ACheckExists: Boolean): Boolean;
     function UpdateType(AType: TDeviceType): Boolean; //редактировать один тип
+    function DeleteTypeCascade(const ATypeUUID: string): Boolean;
     function SaveTypes: Boolean; //Сохранение с заменой всех типов
     function RebuildTypes: Boolean;
 
@@ -302,6 +303,8 @@ type
     function LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
     function UpdateSpillageSessions(ADevice: TDevice): Boolean;
     function UpdateSpillageSession(ASession: TSessionSpillage): Boolean;
+    function DeleteSessionCascade(ASessionID: Integer): Boolean;
+    function DeleteDeviceCascade(const ADeviceUUID: string): Boolean;
 
     { ================= SCHEMA : SPILLAGES ================= }
 
@@ -1724,6 +1727,7 @@ end;
 function TTypeRepository.UpdateType(AType: TDeviceType): Boolean;
 var
   Q: TFDQuery;
+  OwnsTransaction: Boolean;
 begin
   Result := False;
 
@@ -1737,6 +1741,10 @@ begin
   if (AType.State = osNew) and (AType.ID <= 0) then
     raise Exception.Create('New type must have predefined ID');
 
+  OwnsTransaction := not FDM.TypesConnection.InTransaction;
+  if OwnsTransaction then
+    FDM.TypesConnection.StartTransaction;
+
   Q := FDM.CreateQuery;
   try
     case AType.State of
@@ -1746,27 +1754,12 @@ begin
       {==================================================}
       osDeleted:
         begin
-          { точки типа }
-          Q.SQL.Text :=
-            'delete from DeviceTypePoint where DeviceTypeUUID = :UUID';
-          SetStrParam(Q, 'UUID', AType.UUID);
-          Q.ExecSQL;
-
-          { диаметры }
-          Q.SQL.Text :=
-            'delete from DeviceDiameter where DeviceTypeUUID = :UUID';
-          SetStrParam(Q, 'UUID', AType.UUID);
-          Q.ExecSQL;
-
-          { сам тип }
-          Q.SQL.Text :=
-            'delete from DeviceType where UUID = :UUID';
-          SetStrParam(Q, 'UUID', AType.UUID);
-          Q.ExecSQL;
-
+          if not DeleteTypeCascade(AType.UUID) then
+            Exit(False);
           AType.State := osClean;
-          Result := True;
-          Exit;
+          if OwnsTransaction then
+            FDM.TypesConnection.Commit;
+          Exit(True);
         end;
 
       {==================================================}
@@ -1899,8 +1892,44 @@ begin
         Exit(False);
 
     AType.State := osClean;
+    if OwnsTransaction then
+      FDM.TypesConnection.Commit;
     Result := True;
 
+  except
+    if OwnsTransaction and FDM.TypesConnection.InTransaction then
+      FDM.TypesConnection.Rollback;
+    raise;
+
+  finally
+    Q.Free;
+  end;
+end;
+
+function TTypeRepository.DeleteTypeCascade(const ATypeUUID: string): Boolean;
+var
+  Q: TFDQuery;
+begin
+  Result := False;
+
+  if (Trim(ATypeUUID) = '') or (FDM = nil) then
+    Exit;
+
+  Q := FDM.CreateQuery;
+  try
+    Q.SQL.Text := 'delete from DeviceTypePoint where DeviceTypeUUID = :UUID';
+    SetStrParam(Q, 'UUID', ATypeUUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from DeviceDiameter where DeviceTypeUUID = :UUID';
+    SetStrParam(Q, 'UUID', ATypeUUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from DeviceType where UUID = :UUID';
+    SetStrParam(Q, 'UUID', ATypeUUID);
+    Q.ExecSQL;
+
+    Result := True;
   finally
     Q.Free;
   end;
@@ -4049,6 +4078,7 @@ end;
 function TDeviceRepository.UpdateDevice(ADevice: TDevice): Boolean;
 var
   Q: TFDQuery;
+  OwnsTransaction: Boolean;
 begin
   Result := False;
 
@@ -4062,6 +4092,10 @@ begin
   if Trim(ADevice.UUID) = '' then
     raise Exception.Create('Device must have UUID');
 
+  OwnsTransaction := not FDM.TypesConnection.InTransaction;
+  if OwnsTransaction then
+    FDM.TypesConnection.StartTransaction;
+
   Q := FDM.CreateQuery;
   try
     case ADevice.State of
@@ -4069,25 +4103,11 @@ begin
       {======================= DELETE =======================}
       osDeleted:
         begin
-          Q.SQL.Text := 'delete from Devices where UUID = :UUID';
-          SetStrParam(Q, 'UUID', ADevice.UUID);
-          Q.ExecSQL;
-
-          Q.SQL.Text :=
-            'delete from DevicePoint where DeviceUUID = :DeviceUUID';
-          SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
-          Q.ExecSQL;
-
-          Q.SQL.Text :=
-            'delete from CalibrCoefItem where TableID in (select ID from CalibrCoefTable where DeviceUUID = :DeviceUUID)';
-          SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
-          Q.ExecSQL;
-
-          Q.SQL.Text :=
-            'delete from CalibrCoefTable where DeviceUUID = :DeviceUUID';
-          SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
-          Q.ExecSQL;
-
+          if not DeleteDeviceCascade(ADevice.UUID) then
+            Exit(False);
+          ADevice.State := osClean;
+          if OwnsTransaction then
+            FDM.TypesConnection.Commit;
           Exit(True);
         end;
 
@@ -4235,7 +4255,14 @@ begin
         raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
     ADevice.State := osClean;
+    if OwnsTransaction then
+      FDM.TypesConnection.Commit;
     Result := True;
+
+  except
+    if OwnsTransaction and FDM.TypesConnection.InTransaction then
+      FDM.TypesConnection.Rollback;
+    raise;
 
   finally
     Q.Free;
@@ -5057,10 +5084,7 @@ begin
     case ASession.State of
       osDeleted:
         begin
-          Q.SQL.Text := 'delete from SessionSpillage where ID = :ID';
-          SetIntParam(Q, 'ID', ASession.ID);
-          Q.ExecSQL;
-          Exit(True);
+          Exit(DeleteSessionCascade(ASession.ID));
         end;
       osNew:
         Q.SQL.Text := 'insert into SessionSpillage (DeviceUUID, DateTimeOpen, DateTimeClose, OperatorName, K, P, Active, Status, DeviceCoefsName, DeviceCoefsUUID, CalibrCoefsName, CalibrCoefsUUID) values (:DeviceUUID, :DateTimeOpen, :DateTimeClose, :OperatorName, :K, :P, :Active, :Status, :DeviceCoefsName, :DeviceCoefsUUID, :CalibrCoefsName, :CalibrCoefsUUID)';
@@ -5094,42 +5118,147 @@ begin
   end;
 end;
 
+function TDeviceRepository.DeleteSessionCascade(ASessionID: Integer): Boolean;
+var
+  Q: TFDQuery;
+begin
+  Result := False;
+
+  if (ASessionID <= 0) or (FDM = nil) then
+    Exit;
+
+  Q := FDM.CreateQuery;
+  try
+    Q.SQL.Text := 'delete from PointSpillage where SessionID = :SessionID';
+    SetIntParam(Q, 'SessionID', ASessionID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from SessionSpillage where ID = :SessionID';
+    SetIntParam(Q, 'SessionID', ASessionID);
+    Q.ExecSQL;
+
+    Result := True;
+  finally
+    Q.Free;
+  end;
+end;
+
+function TDeviceRepository.DeleteDeviceCascade(const ADeviceUUID: string): Boolean;
+var
+  Q: TFDQuery;
+begin
+  Result := False;
+
+  if (Trim(ADeviceUUID) = '') or (FDM = nil) then
+    Exit;
+
+  Q := FDM.CreateQuery;
+  try
+    Q.SQL.Text :=
+      'delete from PointSpillage where SessionID in ' +
+      '(select ID from SessionSpillage where DeviceUUID = :DeviceUUID)';
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from SessionSpillage where DeviceUUID = :DeviceUUID';
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from DevicePoint where DeviceUUID = :DeviceUUID';
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text :=
+      'delete from CalibrCoefItem where TableID in ' +
+      '(select ID from CalibrCoefTable where DeviceUUID = :DeviceUUID)';
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from CalibrCoefTable where DeviceUUID = :DeviceUUID';
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
+    Q.ExecSQL;
+
+    Q.SQL.Text := 'delete from Devices where UUID = :DeviceUUID';
+    SetStrParam(Q, 'DeviceUUID', ADeviceUUID);
+    Q.ExecSQL;
+
+    Result := True;
+  finally
+    Q.Free;
+  end;
+end;
+
 function TDeviceRepository.UpdateSpillageSessions(ADevice: TDevice): Boolean;
 var
   Sess: TSessionSpillage;
   OldSessionID: Integer;
   P: TPointSpillage;
   SP: TPointSpillage;
+  KeepIDs: TDictionary<Integer, Byte>;
+  Q: TFDQuery;
+  SessionIDsToDelete: TList<Integer>;
 begin
   Result := False;
   if (ADevice = nil) or (ADevice.Sessions = nil) then Exit;
 
-  for Sess in ADevice.Sessions do
-  begin
-    if Sess = nil then
-      Continue;
-    if not SameText(Sess.DeviceUUID, ADevice.UUID) then
-      Sess.DeviceUUID := ADevice.UUID;
+  KeepIDs := TDictionary<Integer, Byte>.Create;
+  SessionIDsToDelete := TList<Integer>.Create;
+  try
+    for Sess in ADevice.Sessions do
+      if (Sess <> nil) and (Sess.ID > 0) and not KeepIDs.ContainsKey(Sess.ID) then
+        KeepIDs.Add(Sess.ID, 0);
 
-    OldSessionID := Sess.ID;
-    if not UpdateSpillageSession(Sess) then
-      Exit(False);
-
-    if (OldSessionID > 0) and (Sess.ID > 0) and (OldSessionID <> Sess.ID) then
-    begin
-      if ADevice.Spillages <> nil then
-        for P in ADevice.Spillages do
-          if (P <> nil) and (P.SessionID = OldSessionID) then
-            P.SessionID := Sess.ID;
-
-      if Sess.Spillages <> nil then
-        for SP in Sess.Spillages do
-          if SP <> nil then
-            SP.SessionID := Sess.ID;
+    Q := FDM.CreateQuery;
+    try
+      Q.SQL.Text :=
+        'select ID from SessionSpillage where DeviceUUID = :DeviceUUID';
+      SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
+      Q.Open;
+      while not Q.Eof do
+      begin
+        OldSessionID := Q.FieldByName('ID').AsInteger;
+        if not KeepIDs.ContainsKey(OldSessionID) then
+          SessionIDsToDelete.Add(OldSessionID);
+        Q.Next;
+      end;
+    finally
+      Q.Free;
     end;
-  end;
 
-  Result := True;
+    for OldSessionID in SessionIDsToDelete do
+      if not DeleteSessionCascade(OldSessionID) then
+        Exit(False);
+
+    for Sess in ADevice.Sessions do
+    begin
+      if Sess = nil then
+        Continue;
+      if not SameText(Sess.DeviceUUID, ADevice.UUID) then
+        Sess.DeviceUUID := ADevice.UUID;
+
+      OldSessionID := Sess.ID;
+      if not UpdateSpillageSession(Sess) then
+        Exit(False);
+
+      if (OldSessionID > 0) and (Sess.ID > 0) and (OldSessionID <> Sess.ID) then
+      begin
+        if ADevice.Spillages <> nil then
+          for P in ADevice.Spillages do
+            if (P <> nil) and (P.SessionID = OldSessionID) then
+              P.SessionID := Sess.ID;
+
+        if Sess.Spillages <> nil then
+          for SP in Sess.Spillages do
+            if SP <> nil then
+              SP.SessionID := Sess.ID;
+      end;
+    end;
+
+    Result := True;
+  finally
+    SessionIDsToDelete.Free;
+    KeepIDs.Free;
+  end;
 end;
 
 {$ENDREGION}
@@ -5362,18 +5491,63 @@ function TDeviceRepository.UpdateSpillages(
 ): Boolean;
 var
   S: TPointSpillage;
+  KeepIDs: TDictionary<Integer, Byte>;
+  Q: TFDQuery;
+  ExistingID: Integer;
+  SpillageIDsToDelete: TList<Integer>;
 begin
   Result := False;
 
   if (ADevice = nil) or (ADevice.Spillages = nil) then
     Exit;
 
-  for S in ADevice.Spillages do
-    if (S.SessionID > 0) and
-       not UpdateSpillage(S) then
-      Exit(False);
+  KeepIDs := TDictionary<Integer, Byte>.Create;
+  SpillageIDsToDelete := TList<Integer>.Create;
+  try
+    for S in ADevice.Spillages do
+      if (S <> nil) and (S.ID > 0) and not KeepIDs.ContainsKey(S.ID) then
+        KeepIDs.Add(S.ID, 0);
 
-  Result := True;
+    Q := FDM.CreateQuery;
+    try
+      Q.SQL.Text :=
+        'select PS.ID from PointSpillage PS ' +
+        'where PS.SessionID in (select ID from SessionSpillage where DeviceUUID = :DeviceUUID)';
+      SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
+      Q.Open;
+      while not Q.Eof do
+      begin
+        ExistingID := Q.FieldByName('ID').AsInteger;
+        if not KeepIDs.ContainsKey(ExistingID) then
+          SpillageIDsToDelete.Add(ExistingID);
+        Q.Next;
+      end;
+    finally
+      Q.Free;
+    end;
+
+    Q := FDM.CreateQuery;
+    try
+      Q.SQL.Text := 'delete from PointSpillage where ID = :ID';
+      for ExistingID in SpillageIDsToDelete do
+      begin
+        SetIntParam(Q, 'ID', ExistingID);
+        Q.ExecSQL;
+      end;
+    finally
+      Q.Free;
+    end;
+
+    for S in ADevice.Spillages do
+      if (S.SessionID > 0) and
+         not UpdateSpillage(S) then
+        Exit(False);
+
+    Result := True;
+  finally
+    SpillageIDsToDelete.Free;
+    KeepIDs.Free;
+  end;
 end;
 
 function TDeviceRepository.UpdateSpillage(
