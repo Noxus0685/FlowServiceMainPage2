@@ -91,6 +91,7 @@ type
     FUUID: string;
     FDescription: string;         // Описание / примечания
     FRepoName: string;
+    procedure SetState(const Value: TObjectState); virtual;
 
   public
 
@@ -99,7 +100,7 @@ type
     function GetID: Integer;
 
     property ID: Integer read FID write FID;
-    property State: TObjectState read FState write FState;
+    property State: TObjectState read FState write SetState;
     property Name: string read FName write FName;
     property UUID: string read FUUID write FUUID;
     property Description: string read FDescription write FDescription;
@@ -242,6 +243,8 @@ type
   private
       FDiameters  : TObjectList<TDiameter>;
       FPoints     : TObjectList<TTypePoint>;
+  protected
+      procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ПОЛЯ БД!!!  }
@@ -456,12 +459,17 @@ begin
     Result := ' ';
 end;
 
- constructor TTypeEntity.Create;
+constructor TTypeEntity.Create;
 begin
   inherited Create;
   FID := 0;
   FState := osNew;
   FUUID := TGUID.NewGuid.ToString;
+end;
+
+procedure TTypeEntity.SetState(const Value: TObjectState);
+begin
+  FState := Value;
 end;
 
 class function TEntitySorter<T>.Sort(
@@ -970,6 +978,25 @@ begin
   FreeAndNil(FDiameters);
   FreeAndNil(FPoints);
   inherited;
+end;
+
+procedure TDeviceType.SetState(const Value: TObjectState);
+var
+  D: TDiameter;
+  P: TTypePoint;
+begin
+  inherited SetState(Value);
+
+  if FState = osNew then
+  begin
+    if FDiameters <> nil then
+      for D in FDiameters do
+        D.State := osNew;
+
+    if FPoints <> nil then
+      for P in FPoints do
+        P.State := osNew;
+  end;
 end;
 
 function TDeviceType.GetID: Integer;
