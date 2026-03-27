@@ -1347,6 +1347,7 @@ object FrameMainTable: TFrameMainTable
             OnSetValue = GridDevicesSetValue
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
+            OnHeaderClick = GridDevicesHeaderClick
             Viewport.Width = 1414.000000000000000000
             Viewport.Height = 193.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
