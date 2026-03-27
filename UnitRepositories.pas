@@ -121,7 +121,9 @@ type
       //Загрузка в список диаметров конкретного типа из БД    //Требует реализации SQL
     function MapDiameterFromQuery(Q: TFDQuery): TDiameter;
 
-    function LoadDiametersByType(ATypeID: Integer): TObjectList<TDiameter>;
+    function LoadDiametersByType(ATypeID: Integer): TObjectList<TDiameter>;  overload;
+
+    function LoadDiametersByType(ATypeUUID: String): TObjectList<TDiameter>; overload;
 
     function UpdateDiameter(ADiameter: TDiameter): Boolean;
     function UpdateDiameters(AType: TDeviceType): Boolean;
@@ -139,7 +141,8 @@ type
     {==== Работа с БД! ====}
     function MapTypePointFromQuery(Q: TFDQuery): TTypePoint;
 
-    function LoadTypePointsByType(ATypeID: Integer): TObjectList<TTypePoint>;
+
+     function LoadTypePointsByType(ATypeUUID: string): TObjectList<TTypePoint>;
 
      function UpdateTypePoint(APoint: TTypePoint): Boolean;
     function UpdateTypePoints(AType: TDeviceType): Boolean;   //Редактирование точек определенного типа //Требует реализации SQL
@@ -191,7 +194,7 @@ type
 
     {==== Работа с БД! ====}
 
-    function LoadType(ATypeID: Integer): TDeviceType;
+    function LoadType(ATypeUUID: String): TDeviceType;  overload;
     function LoadTypes: Boolean;          //Загрузка в список всех типов
 
 
@@ -676,17 +679,17 @@ begin
   try
     for T in FTypes do
     begin
-      if T.ID <= 0 then
+      if T.UUID = '' then
         raise Exception.CreateFmt(
-          'Type with invalid ID detected (ID=%d)',
-          [T.ID]
+          'Type with invalid ID detected (ID=%s)',
+          [T.UUID]
         );
 
-      if SeenIDs.ContainsKey(T.ID) then
-        raise Exception.CreateFmt(
-          'Duplicate type ID in memory: %d',
-          [T.ID]
-        );
+     // if SeenIDs.ContainsKey(T.UUID) then
+     //   raise Exception.CreateFmt(
+     //     'Duplicate type ID in memory: %s',
+      //    [T.UUID]
+      //  );
 
       SeenIDs.Add(T.ID, T);
     end;
@@ -711,8 +714,15 @@ begin
 
       if T.Points <> nil then
         for var P in T.Points do
-          if not UpdateTypePoint(P) then
-            raise Exception.Create('Ошибка сохранения точки типа');
+
+
+try
+  if not UpdateTypePoint(P) then
+    raise Exception.Create('Ошибка сохранения точки типа');
+except
+  on E: Exception do
+    ShowMessage('Произошла ошибка: ' + E.Message);
+end;
 
       T.State := osClean;
     end;
@@ -909,168 +919,6 @@ begin
   Result := FTypes;
 end;
 
-//
-//function TTypeRepository.InitDiameters: TObjectList<TDiameter>;
-//var
-//  D: TDiameter;
-//
-//
-//begin
-//  //FDiameters.Clear;
-////  FNextDiameterID := 1;
-////
-////  // =====================================================
-////  // Типы 1–5 : ВЗЛЕТ ТЭР-М
-////  // =====================================================
-////  D.AddDiameterData(1, '15', 6.3, 0.063, 1000);
-////  D.AddDiameterData(1, '25', 16.0, 0.16, 800);
-////  D.AddDiameterData(1, '40', 40.0, 0.40, 600);
-////
-////  D.AddDiameterData(2, '15', 6.3, 0.063, 1100);
-////  D.AddDiameterData(2, '25', 16.0, 0.16, 900);
-////
-////  D.AddDiameterData(3, '15', 6.3, 0.063, 1200);
-////  D.AddDiameterData(3, '40', 40.0, 0.40, 600);
-////
-////  D.AddDiameterData(4, '20', 10.0, 0.10, 700);
-////  D.AddDiameterData(4, '50', 60.0, 0.60, 500);
-////
-////  D.AddDiameterData(5, '15', 6.3, 0.063, 900);
-////  D.AddDiameterData(5, '25', 16.0, 0.16, 700);
-////
-////  // =====================================================
-////  // Типы 6–10 : ЭМИС-КОР
-////  // =====================================================
-////  D.AddDiameterData(6, '10', 3.0, 0.03, 1500);
-////  D.AddDiameterData(6, '25', 16.0, 0.16, 900);
-////  D.AddDiameterData(6, '50', 60.0, 0.60, 500);
-////
-////  D.AddDiameterData(7, '15', 6.3, 0.063, 1200);
-////  D.AddDiameterData(7, '40', 40.0, 0.40, 700);
-////
-////  D.AddDiameterData(8, '20', 10.0, 0.10, 800);
-////  D.AddDiameterData(8, '80', 120.0, 1.20, 400);
-////
-////  D.AddDiameterData(9, '15', 6.3, 0.063, 900);
-////  D.AddDiameterData(9, '50', 60.0, 0.60, 450);
-////
-////  D.AddDiameterData(10, '25', 16.0, 0.16, 600);
-////  D.AddDiameterData(10, '100', 160.0, 1.60, 300);
-////
-////  // =====================================================
-////  // Типы 11–14 : ВИХРЬ-01
-////  // =====================================================
-////  D.AddDiameterData(11, '25', 25.0, 0.25, 700);
-////  D.AddDiameterData(11, '100', 160.0, 1.60, 300);
-////
-////  D.AddDiameterData(12, '40', 40.0, 0.40, 600);
-////  D.AddDiameterData(12, '150', 250.0, 2.50, 200);
-////
-////  D.AddDiameterData(13, 'DN500', 500.0, 5.0, 50);
-////  D.AddDiameterData(13, 'DN1000', 1000.0, 10.0, 25);
-////
-////  D.AddDiameterData(14, '25', 25.0, 0.25, 700);
-////  D.AddDiameterData(14, '80', 120.0, 1.20, 350);
-////
-////  // =====================================================
-////  // Типы 15–17 : СВК (счётчики воды)
-////  // =====================================================
-////  D.AddDiameterData(15, '15', 3.0, 0.03, 400);
-////  D.AddDiameterData(15, '20', 5.0, 0.05, 300);
-////  D.AddDiameterData(15, '25', 7.0, 0.07, 250);
-////
-////  D.AddDiameterData(16, '20', 5.0, 0.05, 350);
-////  D.AddDiameterData(16, '25', 7.0, 0.07, 300);
-////
-////  D.AddDiameterData(17, '15', 3.0, 0.03, 450);
-////  D.AddDiameterData(17, '20', 5.0, 0.05, 320);
-////
-////  // =====================================================
-////  // Типы 18–19 : РМ
-////  // =====================================================
-////  D.AddDiameterData(18, '10', 1.6, 0.016, 200);
-////  D.AddDiameterData(18, '20', 4.0, 0.04, 150);
-////
-////  D.AddDiameterData(19, '10', 1.6, 0.016, 220);
-////  D.AddDiameterData(19, '25', 6.3, 0.063, 120);
-////
-////  // =====================================================
-////  // Типы 20–25 : ТЕСТ / ПРОЧИЕ
-////  // =====================================================
-////  D.AddDiameterData(20, '15', 5.0, 0.05, 100);
-////  D.AddDiameterData(20, '25', 10.0, 0.10, 80);
-////
-////  D.AddDiameterData(21, '15', 5.0, 0.05, 100);
-////  D.AddDiameterData(21, '25', 10.0, 0.10, 80);
-////
-////  D.AddDiameterData(22, '15', 5.0, 0.05, 100);
-////  D.AddDiameterData(22, '25', 10.0, 0.10, 80);
-////
-////  D.AddDiameterData(23, '15', 5.0, 0.05, 100);
-////  D.AddDiameterData(23, '25', 10.0, 0.10, 80);
-////
-////  D.AddDiameterData(24, '15', 5.0, 0.05, 100);
-////  D.AddDiameterData(24, '25', 10.0, 0.10, 80);
-////
-////  D.AddDiameterData(25, '15', 5.0, 0.05, 100);
-////  D.AddDiameterData(25, '25', 10.0, 0.10, 80);
-//
-//  Result := FDiameters;
-//end;
-//
-//function TTypeRepository.InitPoints: TObjectList<TTypePoint>;
-//var
-//  P: TTypePoint;
-//  TypeID: Integer;
-//
-//
-//
-//begin
-//  FPoints.Clear;
-//  FNextPointID := 1;
-////
-//  // =====================================================
-//  // Для каждого типа: Qmin / Qnom / Qmax
-//  // =====================================================
-//  for TypeID := 1 to 25 do
-//  begin
-//    // --- Минимальный расход ---
-//    AddPoint(
-//      TypeID,
-//      'Qmin',
-//      'Минимальный расход',
-//      0.10,
-//      '±5%',
-//      60,
-//      10
-//    );
-//
-//    // --- Номинальный расход ---
-//    AddPoint(
-//      TypeID,
-//      'Qnom',
-//      'Номинальный расход',
-//      0.50,
-//      '±2%',
-//      30,
-//      5
-//    );
-//
-//    // --- Максимальный расход ---
-//    AddPoint(
-//      TypeID,
-//      'Qmax',
-//      'Максимальный расход',
-//      1.00,
-//      '±1%',
-//      20,
-//      5
-//    );
-//  end;
-//
-//  Result := FPoints;
-//end;
-
 procedure TTypeRepository.InitBulkTestData;
 var
   ManIdx, TypeVarIdx, ModIdx, AccIdx, DevIdx: Integer;
@@ -1090,131 +938,15 @@ var
   P: TTypePoint;
 begin
   FTypes.Clear;
-  //FDiameters.Clear;
- // FPoints.Clear;
+
 
   FNextTypeID := 1;
   FNextDiameterID := 1;
   FNextPointID := 1;
 
   BaseRegDate := EncodeDate(2020, 1, 1);
-//
-//  // =====================================================
-//  // 20 ИЗГОТОВИТЕЛЕЙ
-//  // =====================================================
-//  for ManIdx := 1 to 20 do
-//  begin
-//    Manufacturer := Format('Изготовитель %d', [ManIdx]);
-//
-//    // =================================================
-//    // 3–4 ВАРИАНТА ТИПОВ
-//    // =================================================
-//    for TypeVarIdx := 1 to 4 do
-//    begin
-//      TypeName := Format('Тип-%d-%d', [ManIdx, TypeVarIdx]);
-//
-//      // =================================================
-//      // 50 МОДИФИКАЦИЙ
-//      // =================================================
-//      for ModIdx := 1 to 5 do
-//      begin
-//        Modification := Format('Мод-%02d', [ModIdx]);
-//
-//        // =================================================
-//        // 2 КЛАССА ТОЧНОСТИ
-//        // =================================================
-//        for AccIdx := 0 to 1 do
-//        begin
-//          if AccIdx = 0 then
-//            Accuracy := '±0.5'
-//          else
-//            Accuracy := '±1.0';
-//
-//          // =================================================
-//          // 5 ПРИБОРОВ НА КОМБИНАЦИЮ
-//          // =================================================
-//          for DevIdx := 1 to 5 do
-//          begin
-//            CategoryID := (ManIdx mod 6) + 1;
-//
-//            // ---------- СОЗДАНИЕ ТИПА ----------
-//            TypeObj := TDeviceType.Create;
-//            TypeObj.ID := FNextTypeID;
-//            Inc(FNextTypeID);
-//
-//            TypeObj.Name := TypeName;
-//            TypeObj.Manufacturer := Manufacturer;
-//            TypeObj.Modification := Modification;
-//            TypeObj.AccuracyClass := Accuracy;
-//            TypeObj.Category := CategoryID;
-//            TypeObj.ReestrNumber := Format('%05d-%02d', [TypeObj.ID, ManIdx]);
-//            TypeObj.ProcedureName := 'Поверка';
-//            TypeObj.IVI := 4 + (DevIdx mod 3);
-//            TypeObj.RegDate := IncYear(BaseRegDate, DevIdx);
-//            TypeObj.ValidityDate := IncYear(TypeObj.RegDate, 4);
-//
-//            FTypes.Add(TypeObj);
-//
-//            // =================================================
-//            // 8 ДИАМЕТРОВ НА ТИП
-//            // =================================================
-//            for DiamIdx := 1 to 8 do
-//            begin
-//              D := TDiameter.Create;
-//              D.ID := GenerateDiameterID;
-//              D.DeviceTypeID := TypeObj.ID;
-//
-//              D.DN := IntToStr(DiamIdx * 10);
-//              D.Name := 'DN' + D.DN;
-//
-//              D.Qmax := DiamIdx * 10;
-//              D.Qmin := D.Qmax / 100;
-//              D.Kp := 1000 / DiamIdx;
-//              D.QFmax := D.Qmax;
-//
-//              FDiameters.Add(D);
-//            end;
-//
-//            // =================================================
-//            // 5 ТОЧЕК НА ТИП
-//            // =================================================
-//            for PointIdx := 1 to 5 do
-//            begin
-//              P := TTypePoint.Create;
-//              P.ID := GenerateTypePointID;
-//              P.DeviceTypeID := TypeObj.ID;
-//
-//              case PointIdx of
-//                1: begin P.Name := 'Qmin'; P.FlowRate := 0.10; end;
-//                2: begin P.Name := 'Qlow'; P.FlowRate := 0.25; end;
-//                3: begin P.Name := 'Qnom'; P.FlowRate := 0.50; end;
-//                4: begin P.Name := 'Qhigh';P.FlowRate := 0.75; end;
-//                5: begin P.Name := 'Qmax'; P.FlowRate := 1.00; end;
-//              end;
-//
-//              P.Description := 'Автотест';
-//              P.FlowAccuracy := '±2%';
-//              P.Temp := 20;
-//              P.Pressure := 0;
-//              P.TempAccuracy := '0';
-//
-//              P.LimitTime := 30;
-//              P.Pause := 10;
-//              P.Error := 0.5;
-//
-//              P.RepeatsProtocol := 3;
-//              P.Repeats := 5;
-//
-//              FPoints.Add(P);
-//            end;
-//          end;
-//        end;
-//      end;
-//    end;
-//  end;
+
 end;
-
-
 
 function TTypeRepository.InitCategories: TObjectList<TDeviceCategory>;
 var
@@ -1830,19 +1562,19 @@ begin
   Result.State := osClean;
 end;
 
-function TTypeRepository.LoadType(ATypeID: Integer): TDeviceType;
+function TTypeRepository.LoadType(ATypeUUID: string): TDeviceType;
 var
   Q: TFDQuery;
 begin
   Result := nil;
 
-  if (ATypeID <= 0) or (FDM = nil) then
+  if (ATypeUUID = '') or (FDM = nil) then
     Exit;
 
   Q := FDM.CreateQuery;
   try
-    Q.SQL.Text := 'select * from DeviceType where ID = :ID';
-    SetIntParam(Q, 'ID', ATypeID);
+    Q.SQL.Text := 'select * from DeviceType where UUID = :UUID';
+    SetStrParam(Q, 'UUID', ATypeUUID);
     Q.Open;
 
     if not Q.Eof then
@@ -1850,8 +1582,8 @@ begin
       Result := MapTypeFromQuery(Q);
 
       { зависимые данные — ВНУТРИ типа }
-      LoadDiametersByType(Result.ID);
-      LoadTypePointsByType(Result.ID);
+      LoadDiametersByType(Result.UUID);
+      LoadTypePointsByType(Result.UUID);
     end;
   finally
     Q.Free;
@@ -1862,7 +1594,7 @@ function TTypeRepository.LoadTypes: Boolean;
 var
   Q: TFDQuery;
   NewT: TDeviceType;
-  TypeID: Integer;
+  TypeUUID: String;
 begin
   Result := False;
 
@@ -1886,17 +1618,17 @@ begin
   Q := FDM.CreateQuery;
   try
     try
-      { получаем ТОЛЬКО ID }
+      { получаем ТОЛЬКО UUID }
       Q.SQL.Text :=
-        'select ID from DeviceType order by Name';
+        'select UUID from DeviceType order by Name';
       Q.Open;
 
       while not Q.Eof do
       begin
-        TypeID := Q.FieldByName('ID').AsInteger;
+        TypeUUID := Q.FieldByName('UUID').AsString;
 
         { загрузка агрегата }
-        NewT := LoadType(TypeID);
+        NewT := LoadType(TypeUUID);
         Q.Next;
       end;
 
@@ -1911,56 +1643,7 @@ begin
     Q.Free;
   end;
 end;
-//
-//function TTypeRepository.SaveType(
-//  AType: TDeviceType;
-//  ACheckExists: Boolean
-//): Boolean;
-//
-//var
-//  Exists: Boolean;
-//  Q: TFDQuery;
-//begin
-//  Result := False;
-//
-//  if (AType = nil) or (FDM = nil) then
-//    Exit;
-//
-//  // ---------------------------------------------------
-//  // Если состояние уже задано — просто сохраняем
-//  // ---------------------------------------------------
-//  if AType.State <> osClean then
-//    Exit(UpdateType(AType));
-//
-//  // ---------------------------------------------------
-//  // Если состояние неизвестно — определяем его
-//  // ---------------------------------------------------
-//  Exists := False;
-//
-//  if ACheckExists and (AType.ID > 0) then
-//  begin
-//    Q := FDM.CreateQuery;
-//    try
-//      Q.SQL.Text := 'select 1 from DeviceType where ID = :ID';
-//      Q.ParamByName('ID').AsInteger := AType.ID;
-//      Q.Open;
-//      Exists := not Q.Eof;
-//    finally
-//      Q.Free;
-//    end;
-//  end;
-//
-//  // ---------------------------------------------------
-//  // Назначаем состояние
-//  // ---------------------------------------------------
-//  if Exists then
-//    AType.State := osModified
-//  else
-//    AType.State := osNew;
-//
-//  Result := UpdateType(AType);
-//end;
-//
+
 function TTypeRepository.SaveTypes: Boolean;
 var
   T: TDeviceType;
@@ -2065,20 +1748,20 @@ begin
         begin
           { точки типа }
           Q.SQL.Text :=
-            'delete from DeviceTypePoint where DeviceTypeID = :ID';
-          SetIntParam(Q, 'ID', AType.ID);
+            'delete from DeviceTypePoint where DeviceTypeUUID = :UUID';
+          SetStrParam(Q, 'UUID', AType.UUID);
           Q.ExecSQL;
 
           { диаметры }
           Q.SQL.Text :=
-            'delete from DeviceDiameter where DeviceTypeID = :ID';
-          SetIntParam(Q, 'ID', AType.ID);
+            'delete from DeviceDiameter where DeviceTypeUUID = :UUID';
+          SetStrParam(Q, 'UUID', AType.UUID);
           Q.ExecSQL;
 
           { сам тип }
           Q.SQL.Text :=
-            'delete from DeviceType where ID = :ID';
-          SetIntParam(Q, 'ID', AType.ID);
+            'delete from DeviceType where UUID = :UUID';
+          SetStrParam(Q, 'UUID', AType.UUID);
           Q.ExecSQL;
 
           AType.State := osClean;
@@ -2310,114 +1993,13 @@ end;
 
 
 
-
-//
-//function TTypeRepository.GetDiameters(
-//  AType: TDeviceType
-//): TObjectList<TDiameter>;
-//var
-//  D: TDiameter;
-//begin
-//  Result := TObjectList<TDiameter>.Create(False);
-//
-//  if (AType = nil) or (FDiameters = nil) then
-//    Exit;
-//
-//  for D in FDiameters do
-//    if D.DeviceTypeID = AType.ID then
-//      Result.Add(D);
-//end;
-//
-//function TTypeRepository.SetDiameters(
-//  AType: TDeviceType;
-//  ADiameters: TObjectList<TDiameter>
-//): Boolean;
-//var
-//  I: Integer;
-//  D: TDiameter;
-//begin
-//  Result := False;
-//
-//  if (AType = nil) or (FDiameters = nil) or (ADiameters = nil) then
-//    Exit;
-//
-//  // 1. Удаляем старые диаметры этого типа
-//  for I := FDiameters.Count - 1 downto 0 do
-//    if FDiameters[I].DeviceTypeID = AType.ID then
-//      FDiameters.Delete(I); // объект освобождается
-//
-//  // 2. Добавляем новые
-//  for D in ADiameters do
-//  begin
-//    D.DeviceTypeID := AType.ID;
-//    FDiameters.Add(D);
-//  end;
-//
-//  Result := True;
-//end;
-//
-//
-//function TTypeRepository.LoadDiameters: Boolean;
-//var
-//  T: TDeviceType;
-//  L: TObjectList<TDiameter>;
-//  D: TDiameter;
-//begin
-//  Result := False;
-//
-//  {----------------------------------}
-//  { Проверка исходных данных }
-//  {----------------------------------}
-//  if (FDM = nil) or (FTypes = nil) then
-//    Exit;
-//
-//  FState := osLoading;
-//
-//  {----------------------------------}
-//  { Пересоздаём хранилище }
-//  {----------------------------------}
-//  FreeAndNil(FDiameters);
-//  FDiameters := TObjectList<TDiameter>.Create(True);
-//
-//  try
-//    for T in FTypes do
-//    begin
-//      L := LoadDiametersByType(T.ID);
-//      try
-//        if L <> nil then
-//        begin
-//          for D in L do
-//            FDiameters.Add(D);
-//
-//          // передаём владение объектами основному списку
-//          L.OwnsObjects := False;
-//        end;
-//      finally
-//        L.Free;
-//      end;
-//    end;
-//
-//    {----------------------------------}
-//    { Успешная загрузка }
-//    {----------------------------------}
-//    FState := osClean;
-//    Result := True;
-//
-//  except
-//    FState := osError;
-//    Result := False;
-//    raise;
-//  end;
-//end;
-//
-
   /// БД
 function TTypeRepository.RequiredDiameterColumns: TTableColumns;
 begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('DeviceTypeID', 'INTEGER'),
-
+    Col('DeviceTypeUUID', 'TEXT'),
     Col('Name', 'TEXT'),
     Col('DN', 'TEXT'),
     Col('Description', 'TEXT'),
@@ -2466,17 +2048,19 @@ end;
 
  function TTypeRepository.MapDiameterFromQuery(Q: TFDQuery): TDiameter;
   var
-     ADeviceTypeID: Integer;
+     ADeviceTypeUUID: String;
      AType: TDeviceType;
  begin
 
-  ADeviceTypeID := Q.FieldByName('DeviceTypeID').AsInteger;
+  ADeviceTypeUUID := Q.FieldByName('DeviceTypeUUID').AsString;
 
-  AType:= FindTypeByID(ADeviceTypeID);
+  AType:= FindTypeByUUID(ADeviceTypeUUID);
 
   Result := AType.AddDiameter;
 
   Result.ID := Q.FieldByName('ID').AsInteger;
+
+  Result.DeviceTypeUUID:= ADeviceTypeUUID;
 
   Result.Name := Q.FieldByName('Name').AsString;
   Result.DN := Q.FieldByName('DN').AsString;
@@ -2492,6 +2076,40 @@ end;
   Result.Vmin := Q.FieldByName('Vmin').AsFloat;
 
   Result.State := osClean;
+end;
+
+
+function TTypeRepository.LoadDiametersByType(ATypeUUID: String): TObjectList<TDiameter>;
+var
+  Q: TFDQuery;
+begin
+  Result := TObjectList<TDiameter>.Create(True);
+
+  if (ATypeUUID = '') or (FDM = nil) then
+    Exit;
+
+  EnsureDiameterSchema;
+
+  Q := FDM.CreateQuery;
+  try
+    Q.SQL.Text :=
+      'select * from DeviceDiameter ' +
+      'where DeviceTypeUUID = :UUID ' +
+      'order by ID';
+
+    SetStrParam(Q, 'UUID', ATypeUUID);
+
+    Q.Open;
+
+    while not Q.Eof do
+    begin
+      Result.Add(MapDiameterFromQuery(Q));
+      Q.Next;
+    end;
+
+  finally
+    Q.Free;
+  end;
 end;
 
 function TTypeRepository.LoadDiametersByType(ATypeID: Integer): TObjectList<TDiameter>;
@@ -2540,12 +2158,12 @@ begin
 
   EnsureDiameterSchema;
 
-  if ADiameter.State = osClean then
-    Exit(True);
+  //if ADiameter.State = osClean then
+  //  Exit(True);
 
   { защита: диаметр обязан принадлежать типу }
-  if ADiameter.DeviceTypeID <= 0 then
-    raise Exception.Create('Diameter must have valid DeviceTypeID');
+  if ADiameter.DeviceTypeUUID = ''  then
+    raise Exception.Create('Diameter must have valid DeviceTypeUUID');
 
   Q := FDM.CreateQuery;
   try
@@ -2558,39 +2176,39 @@ begin
             Exit(True);
 
           Q.SQL.Text :=
-            'delete from DeviceDiameter where ID = :ID and DeviceTypeID = :DeviceTypeID';
+            'delete from DeviceDiameter where ID = :ID and DeviceTypeUUID = :DeviceTypeUUID';
 
           SetIntParam(Q, 'ID', ADiameter.ID);
-          SetIntParam(Q, 'DeviceTypeID', ADiameter.DeviceTypeID);
+          SetStrParam(Q, 'DeviceTypeUUID', ADiameter.DeviceTypeUUID);
 
           AppendRepoDebugLog(Format(
-            'DELETE TRY #1 DeviceDiameter: ID=%d DeviceTypeID=%d | DMFile=%s | QueryDB=%s',
-            [ADiameter.ID, ADiameter.DeviceTypeID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
+            'DELETE TRY #1 DeviceDiameter: ID=%d DeviceTypeUUID=%s | DMFile=%s | QueryDB=%s',
+            [ADiameter.ID, ADiameter.DeviceTypeUUID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
           ));
 
           Q.ExecSQL;
 
           AppendRepoDebugLog(Format(
-            'DELETE RES #1 DeviceDiameter: ID=%d DeviceTypeID=%d RowsAffected=%d',
-            [ADiameter.ID, ADiameter.DeviceTypeID, Q.RowsAffected]
+            'DELETE RES #1 DeviceDiameter: ID=%d DeviceTypeUUID=%s RowsAffected=%d',
+            [ADiameter.ID, ADiameter.DeviceTypeUUID, Q.RowsAffected]
           ));
 
           if Q.RowsAffected = 0 then
           begin
             Q.SQL.Text :=
-              'delete from DeviceDiameter where ID = :ID';
-            SetIntParam(Q, 'ID', ADiameter.ID);
+              'delete from DeviceDiameter where UUID = :UUID';
+            SetStrParam(Q, 'UUID', ADiameter.UUID);
 
             AppendRepoDebugLog(Format(
-              'DELETE TRY #2 DeviceDiameter (fallback by ID): ID=%d',
-              [ADiameter.ID]
+              'DELETE TRY #2 DeviceDiameter (fallback by UUID): UUID=%s',
+              [ADiameter.UUID]
             ));
 
             Q.ExecSQL;
 
             AppendRepoDebugLog(Format(
-              'DELETE RES #2 DeviceDiameter (fallback by ID): ID=%d RowsAffected=%d',
-              [ADiameter.ID, Q.RowsAffected]
+              'DELETE RES #2 DeviceDiameter (fallback by ID): UUID=%s RowsAffected=%d',
+              [ADiameter.UUID, Q.RowsAffected]
             ));
           end;
 
@@ -2602,10 +2220,10 @@ begin
         begin
           Q.SQL.Text :=
             'insert into DeviceDiameter (' +
-            'DeviceTypeID, Name, DN, Description, ' +
+            'DeviceTypeID, DeviceTypeUUID, Name, DN, Description, ' +
             'Qmax, Qmin, Kp, QFmax, Vmax, Vmin' +
             ') values (' +
-            ':DeviceTypeID, :Name, :DN, :Description, ' +
+            ':DeviceTypeID, :DeviceTypeUUID,:Name, :DN, :Description, ' +
             ':Qmax, :Qmin, :Kp, :QFmax, :Vmax, :Vmin' +
             ')';
         end;
@@ -2619,6 +2237,7 @@ begin
           Q.SQL.Text :=
             'update DeviceDiameter set ' +
             'DeviceTypeID=:DeviceTypeID, ' +
+            'DeviceTypeUUID=:DeviceTypeUUID, ' +
             'Name=:Name, DN=:DN, Description=:Description, ' +
             'Qmax=:Qmax, Qmin=:Qmin, Kp=:Kp, ' +
             'QFmax=:QFmax, Vmax=:Vmax, Vmin=:Vmin ' +
@@ -2635,6 +2254,7 @@ begin
       SetIntParam(Q, 'ID', ADiameter.ID);
 
     SetIntParam(Q, 'DeviceTypeID', ADiameter.DeviceTypeID);
+    SetStrParam(Q, 'DeviceTypeUUID', ADiameter.DeviceTypeUUID);
     SetStrParam(Q, 'Name', ADiameter.Name);
     SetStrParam(Q, 'DN', ADiameter.DN);
     SetStrParam(Q, 'Description', ADiameter.Description);
@@ -2685,9 +2305,9 @@ begin
 
   for D in AType.Diameters do
   begin
-    if D <> nil then
+    if D <> nil then  begin
       D.DeviceTypeID := AType.ID;
-
+       D.DeviceTypeUUID := AType.UUID;  end;
     if not UpdateDiameter(D) then
       Exit(False);
   end;
@@ -2705,16 +2325,16 @@ begin
   try
     if KeepIDs = '' then
       Q.SQL.Text :=
-        'delete from DeviceDiameter where DeviceTypeID = :DeviceTypeID'
+        'delete from DeviceDiameter where DeviceTypeUUID = :DeviceTypeUUID'
     else
       Q.SQL.Text :=
-        'delete from DeviceDiameter where DeviceTypeID = :DeviceTypeID and ID not in (' + KeepIDs + ')';
+        'delete from DeviceDiameter where DeviceTypeUUID = :DeviceTypeUUID and ID not in (' + KeepIDs + ')';
 
-    SetIntParam(Q, 'DeviceTypeID', AType.ID);
+    SetStrParam(Q, 'DeviceTypeUUID', AType.UUID);
 
     AppendRepoDebugLog(Format(
-      'SYNC DeviceDiameter: DeviceTypeID=%d KeepIDs=%s | QueryDB=%s',
-      [AType.ID, KeepIDs, Q.Connection.Params.Database]
+      'SYNC DeviceDiameter: DeviceTypeUUID=%s KeepIDs=%s | QueryDB=%s',
+      [AType.UUID, KeepIDs, Q.Connection.Params.Database]
     ));
 
     Q.ExecSQL;
@@ -2729,22 +2349,6 @@ end;
 
  {$REGION 'Type Points'}
 
-//function TTypeRepository.GetTypePoints(
-//  AType: TDeviceType
-//): TObjectList<TTypePoint>;
-//var
-//  P: TTypePoint;
-//begin
-//  Result := TObjectList<TTypePoint>.Create(False);
-//
-//  if (AType = nil) or (FPoints = nil) then
-//    Exit;
-//
-//  for P in FPoints do
-//    if P.DeviceTypeID = AType.ID then
-//      Result.Add(P);
-//end;
-
 //БД!!!
 
 
@@ -2753,6 +2357,7 @@ begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('DeviceTypeID', 'INTEGER'),
+     Col('DeviceTypeUUID', 'TEXT'),
 
     Col('Name', 'TEXT'),
     Col('Description', 'TEXT'),
@@ -2810,35 +2415,22 @@ begin
   end;
 end;
 
-//   var
-//     ADeviceTypeID: Integer;
-//     AType: TDeviceType;
-// begin
-//
-//
-//  ADeviceTypeID := Q.FieldByName('DeviceTypeID').AsInteger;
-//
-//  AType:= FindTypeByID(ADeviceTypeID);
-//
-//  Result := AType.AddDiameter;
-
-
 function TTypeRepository.MapTypePointFromQuery(
   Q: TFDQuery
 ): TTypePoint;
 var
-  DeviceTypeID: Integer;
+  DeviceTypeUUID: String;
      AType: TDeviceType;
  begin
 
-  DeviceTypeID:=  Q.FieldByName('DeviceTypeID').AsInteger;
-  AType:= FindTypeByID(DeviceTypeID);
+  DeviceTypeUUID:=  Q.FieldByName('DeviceTypeUUID').AsString;
+  AType:= FindTypeByUUID(DeviceTypeUUID);
   Result := AType.AddTypePoint;
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
   Result.DeviceTypeID := Q.FieldByName('DeviceTypeID').AsInteger;
-
+  Result.DeviceTypeUUID:= DeviceTypeUUID;
   {================ Общая информация =============}
   Result.Name := Q.FieldByName('Name').AsString;
   Result.Description := Q.FieldByName('Description').AsString;
@@ -2871,24 +2463,24 @@ var
 end;
 
 function TTypeRepository.LoadTypePointsByType(
-  ATypeID: Integer
+  ATypeUUID: string
 ): TObjectList<TTypePoint>;
 var
   Q: TFDQuery;
 begin
   Result := TObjectList<TTypePoint>.Create(True);
 
-  if (ATypeID <= 0) or (FDM = nil) then
+  if (ATypeUUID = '') or (FDM = nil) then
     Exit;
 
   Q := FDM.CreateQuery;
   try
     Q.SQL.Text :=
       'select * from DeviceTypePoint ' +
-      'where DeviceTypeID = :ID ' +
+      'where DeviceTypeUUID = :DeviceTypeUUID ' +
       'order by ID';
 
-    SetIntParam(Q, 'ID', ATypeID);
+    SetStrParam(Q, 'DeviceTypeUUID', ATypeUUID);
     Q.Open;
 
     while not Q.Eof do
@@ -2901,48 +2493,7 @@ begin
     Q.Free;
   end;
 end;
-//
-//function TTypeRepository.LoadTypePoints: Boolean;
-//var
-//  T: TDeviceType;
-//  L: TObjectList<TTypePoint>;
-//  P: TTypePoint;
-//begin
-//  Result := False;
-//
-//  if (FDM = nil) or (FTypes = nil) then
-//    Exit;
-//
-//  FState := osLoading;
-//
-//  FreeAndNil(FPoints);
-//  FPoints := TObjectList<TTypePoint>.Create(True);
-//
-//  try
-//    for T in FTypes do
-//    begin
-//      L := LoadTypePointsByType(T.ID);
-//      try
-//        if L <> nil then
-//        begin
-//          for P in L do
-//            FPoints.Add(P);
-//
-//          L.OwnsObjects := False;
-//        end;
-//      finally
-//        L.Free;
-//      end;
-//    end;
-//
-//    FState := osClean;
-//    Result := True;
-//
-//  except
-//    FState := osError;
-//    raise;
-//  end;
-//end;
+
 
 function TTypeRepository.UpdateTypePoints(
   AType: TDeviceType
@@ -3001,6 +2552,7 @@ begin
 
   Result := True;
 end;
+
 function TTypeRepository.UpdateTypePoint(
   APoint: TTypePoint
 ): Boolean;
@@ -3012,12 +2564,12 @@ begin
   if (APoint = nil) or (FDM = nil) then
     Exit;
 
-  if APoint.State = osClean then
-    Exit(True);
+ // if APoint.State = osClean then
+ //   Exit(True);
 
   { защита: точка обязана принадлежать типу }
-  if APoint.DeviceTypeID <= 0 then
-    raise Exception.Create('TypePoint must have valid DeviceTypeID');
+  if APoint.DeviceTypeUUID = '' then
+    raise Exception.Create('TypePoint must have valid DeviceTypeUUID');
 
   Q := FDM.CreateQuery;
   try
@@ -3030,21 +2582,21 @@ begin
             Exit(True);
 
           Q.SQL.Text :=
-            'delete from DeviceTypePoint where ID = :ID and DeviceTypeID = :DeviceTypeID';
+            'delete from DeviceTypePoint where ID = :ID and DeviceTypeUUID = :DeviceTypeUUID';
 
           SetIntParam(Q, 'ID', APoint.ID);
-          SetIntParam(Q, 'DeviceTypeID', APoint.DeviceTypeID);
+          SetStrParam(Q, 'DeviceTypeUUID', APoint.DeviceTypeUUID);
 
           AppendRepoDebugLog(Format(
-            'DELETE TRY #1 DeviceTypePoint: ID=%d DeviceTypeID=%d | DMFile=%s | QueryDB=%s',
-            [APoint.ID, APoint.DeviceTypeID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
+            'DELETE TRY #1 DeviceTypePoint: ID=%d DeviceTypeUUID=%s | DMFile=%s | QueryDB=%s',
+            [APoint.ID, APoint.DeviceTypeUUID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
           ));
 
           Q.ExecSQL;
 
           AppendRepoDebugLog(Format(
-            'DELETE RES #1 DeviceTypePoint: ID=%d DeviceTypeID=%d RowsAffected=%d',
-            [APoint.ID, APoint.DeviceTypeID, Q.RowsAffected]
+            'DELETE RES #1 DeviceTypePoint: ID=%d DeviceTypeUUID=%s RowsAffected=%d',
+            [APoint.ID, APoint.DeviceTypeUUID, Q.RowsAffected]
           ));
 
           if Q.RowsAffected = 0 then
@@ -3074,13 +2626,13 @@ begin
         begin
           Q.SQL.Text :=
             'insert into DeviceTypePoint (' +
-            'DeviceTypeID, Name, Description, ' +
+            'DeviceTypeID, DeviceTypeUUID, Name, Description, ' +
             'FlowRate, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, ' +
             'Error, Pause, RepeatsProtocol, Repeats' +
             ') values (' +
-            ':DeviceTypeID, :Name, :Description, ' +
+            ':DeviceTypeID,:DeviceTypeUUID, :Name, :Description, ' +
             ':FlowRate, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, ' +
@@ -3097,6 +2649,7 @@ begin
           Q.SQL.Text :=
             'update DeviceTypePoint set ' +
             'DeviceTypeID=:DeviceTypeID, ' +
+            'DeviceTypeUUID=:DeviceTypeUUID, ' +
             'Name=:Name, Description=:Description, ' +
             'FlowRate=:FlowRate, FlowAccuracy=:FlowAccuracy, ' +
             'Pressure=:Pressure, Temp=:Temp, TempAccuracy=:TempAccuracy, ' +
@@ -3116,6 +2669,7 @@ begin
       SetIntParam(Q, 'ID', APoint.ID);
 
     SetIntParam(Q, 'DeviceTypeID', APoint.DeviceTypeID);
+    SetStrParam(Q, 'DeviceTypeUUID', APoint.DeviceTypeUUID);
     SetStrParam(Q, 'Name', APoint.Name);
     SetStrParam(Q, 'Description', APoint.Description);
 
@@ -3889,18 +3443,6 @@ begin
         if (D.State <> osClean) and not UpdateDevice(D) then
           raise Exception.Create('Ошибка сохранения прибора');
 
-        if not UpdateDevicePoints(D) then
-          raise Exception.Create('Ошибка сохранения точек прибора');
-
-        if not UpdateSpillageSessions(D) then
-          raise Exception.Create('Ошибка сохранения сессий пролива');
-
-        if not UpdateSpillages(D) then
-          raise Exception.Create('Ошибка сохранения результатов пролива');
-
-        if not UpdateCalibrCoef(D) then
-          raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
-
         FDM.Commit;
       except
         on E: Exception do
@@ -3942,7 +3484,7 @@ begin
     if Trim(ADevice.UUID) = '' then
     begin
       ADevice.UUID := TGUID.NewGuid.ToString;
-      SaveErrors.Add(Format('При сохранении прибору "%s" был присвоен новый UUID.', [ADevice.Name]));
+      SaveErrors.Add(Format('При сохранении прибора "%s", серийный номер "%s" был присвоен новый UUID.', [ADevice.Name, ADevice.SerialNumber]));
     end;
 
     if not ShouldSaveDevice(ADevice) then
@@ -3952,18 +3494,6 @@ begin
     try
       if (ADevice.State <> osClean) and not UpdateDevice(ADevice) then
         raise Exception.Create('Ошибка сохранения прибора');
-
-      if not UpdateDevicePoints(ADevice) then
-        raise Exception.Create('Ошибка сохранения точек прибора');
-
-      if not UpdateSpillageSessions(ADevice) then
-        raise Exception.Create('Ошибка сохранения сессий пролива');
-
-      if not UpdateSpillages(ADevice) then
-        raise Exception.Create('Ошибка сохранения результатов пролива');
-
-      if not UpdateCalibrCoef(ADevice) then
-        raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
       FDM.Commit;
       Result := True;
@@ -3977,7 +3507,7 @@ begin
     end;
 
     if SaveErrors.Count > 0 then
-      ShowMessage('Сохранение выполнено с предупреждениями:' + sLineBreak + SaveErrors.Text);
+      SaveErrors.Add('Сохранение выполнено с предупреждениями:' + sLineBreak + SaveErrors.Text);
   finally
     SaveErrors.Free;
   end;
@@ -4692,10 +4222,17 @@ begin
 
     Q.ExecSQL;
 
-    UpdateDevicePoints(ADevice);
-    UpdateSpillageSessions(ADevice);
-    UpdateSpillages(ADevice);
-    UpdateCalibrCoef(ADevice);
+      if not UpdateDevicePoints(ADevice) then
+        raise Exception.Create('Ошибка сохранения точек прибора');
+
+      if not UpdateSpillageSessions(ADevice) then
+        raise Exception.Create('Ошибка сохранения сессий пролива');
+
+      if not UpdateSpillages(ADevice) then
+        raise Exception.Create('Ошибка сохранения результатов пролива');
+
+      if not UpdateCalibrCoef(ADevice) then
+        raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
     ADevice.State := osClean;
     Result := True;
@@ -4807,8 +4344,8 @@ begin
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
-  Result.UUID := ADevice.UUID;
   Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
+  Result.DeviceUUID :=  DeviceUUID;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
   {================ Общая информация =============}
@@ -4932,38 +4469,10 @@ begin
   for P in ADevice.Points do
   begin
     if P <> nil then
-      P.UUID := ADevice.UUID;
+      P.DeviceUUID := ADevice.UUID;
 
     if not UpdateDevicePoint(P) then
       Exit(False);
-  end;
-
-  {--------------------------------------------------}
-  { Жёсткая синхронизация состава точек в БД: }
-  { удаляем всё, чего нет в актуальном списке прибора }
-  {--------------------------------------------------}
-  KeepIDs := '';
-  for P in ADevice.Points do
-    if (P <> nil) and (P.State <> osDeleted) and (P.ID > 0) then
-    begin
-      if KeepIDs <> '' then
-        KeepIDs := KeepIDs + ',';
-      KeepIDs := KeepIDs + IntToStr(P.ID);
-    end;
-
-  Q := FDM.CreateQuery;
-  try
-    if KeepIDs = '' then
-      Q.SQL.Text :=
-        'delete from DevicePoint where DeviceUUID = :DeviceUUID'
-    else
-      Q.SQL.Text :=
-        'delete from DevicePoint where DeviceUUID = :DeviceUUID and ID not in (' + KeepIDs + ')';
-
-    SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
-    Q.ExecSQL;
-  finally
-    Q.Free;
   end;
 
   {--------------------------------------------------}
@@ -5008,11 +4517,11 @@ begin
   if (APoint = nil) or (FDM = nil) then
     Exit;
 
-  if APoint.State = osClean then
-    Exit(True);
+ // if APoint.State = osClean then
+ //   Exit(True);
 
   { защита: точка обязана принадлежать прибору }
-  if Trim(APoint.UUID) = '' then
+  if Trim(APoint.DeviceUUID) = '' then
     raise Exception.Create('DevicePoint must have valid DeviceUUID');
 
   Q := FDM.CreateQuery;
@@ -5029,7 +4538,7 @@ begin
             'delete from DevicePoint where ID = :ID and DeviceUUID = :DeviceUUID';
 
           SetIntParam(Q, 'ID', APoint.ID);
-          SetStrParam(Q, 'DeviceUUID', APoint.UUID);
+          SetStrParam(Q, 'DeviceUUID', APoint.DeviceUUID);
           Q.ExecSQL;
 
           if Q.RowsAffected = 0 then
@@ -5088,7 +4597,7 @@ begin
     if APoint.State <> osNew then
       SetIntParam(Q, 'ID', APoint.ID);
 
-    SetStrParam(Q, 'DeviceUUID', APoint.UUID);
+    SetStrParam(Q, 'DeviceUUID', APoint.DeviceUUID);
     SetIntParam(Q, 'DeviceTypePointID', APoint.DeviceTypePointID);
     SetIntParam(Q, 'Num', APoint.Num);
 
@@ -5251,7 +4760,7 @@ begin
   end;
 end;
 
-function TDeviceRepository.LoadCalibrCoefByDevice(const ADeviceUUID: string): Boolean;
+ function TDeviceRepository.LoadCalibrCoefByDevice(const ADeviceUUID: string): Boolean;
 var
   Device: TDevice;
   QTable: TFDQuery;
@@ -5489,6 +4998,7 @@ begin
   ADevice.Sessions.Add(Result);
   Result.ID := Q.FieldByName('ID').AsInteger;
   Result.UUID := ADevice.UUID;
+  Result.DeviceUUID := DeviceUUID;
   Result.DateTimeOpen := ReadFieldDateTimeDef(Q.FieldByName('DateTimeOpen'));
   Result.DateTimeClose := ReadFieldDateTimeDef(Q.FieldByName('DateTimeClose'));
   Result.OperatorName := Q.FieldByName('OperatorName').AsString;
@@ -5977,171 +5487,10 @@ begin
   end;
 end;
 
-
-//function TDeviceRepository.SaveSpillages: Boolean;
-//var
-//  S: TPointSpillage;
-//  Q: TFDQuery;
-//begin
-//  Result := False;
-//
-//  if (FDM = nil) or (FSpillages = nil) then
-//    Exit;
-//
-//  FDM.StartTransaction;
-//  try
-//    for S in FSpillages do
-//    begin
-//      if S.State = osClean then
-//        Continue;
-//
-//      Q := FDM.CreateQuery;
-//      try
-//        case S.State of
-//
-//          osDeleted:
-//            begin
-//              Q.SQL.Text :=
-//                'delete from PointSpillage where ID = :ID';
-//              SetIntParam(Q, 'ID', S.ID);
-//              Q.ExecSQL;
-//            end;
-//
-//          osNew:
-//            begin
-//              Q.SQL.Text :=
-//                'insert into PointSpillage (' +
-//                'SessionID, DevicePointID, DeviceTypePointID, Num, ' +
-//                'Name, Description, DateTime, ' +
-//                'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, ' +
-//                'QEtalonStd, QEtalonCV, ' +
-//                'DeviceVolume, DeviceMass, Velocity, ' +
-//                'Error, Valid, QStd, QCV, ' +
-//                'VolumeBefore, VolumeAfter, ' +
-//                'PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
-//                'Data1, Data2, ArchivedData, ' +
-//                'StartTemperature, EndTemperature, AvgTemperature, ' +
-//                'InputPressure, OutputPressure, Density, ' +
-//                'AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
-//                'Coef, FCDCoefficient' +
-//                ') values (' +
-//                ':SessionID, :DevicePointID, :DeviceTypePointID, :Num, ' +
-//                ':Name, :Description, :DateTime, ' +
-//                ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, ' +
-//                ':QEtalonStd, :QEtalonCV, ' +
-//                ':DeviceVolume, :DeviceMass, :Velocity, ' +
-//                ':Error, :Valid, :QStd, :QCV, ' +
-//                ':VolumeBefore, :VolumeAfter, ' +
-//                ':PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
-//                ':Data1, :Data2, :ArchivedData, ' +
-//                ':StartTemperature, :EndTemperature, :AvgTemperature, ' +
-//                ':InputPressure, :OutputPressure, :Density, ' +
-//                ':AmbientTemperature, :AtmosphericPressure, :RelativeHumidity, ' +
-//                ':Coef, :FCDCoefficient' +
-//                ')';
-//            end;
-//
-//          osModified:
-//            begin
-//              Q.SQL.Text :=
-//                'update PointSpillage set ' +
-//                'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Num=:Num, ' +
-//                'Name=:Name, Description=:Description, DateTime=:DateTime, ' +
-//                'SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
-//                'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, ' +
-//                'DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
-//                'Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, ' +
-//                'VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
-//                'PulseCount=:PulseCount, MeanFrequency=:MeanFrequency, AvgCurrent=:AvgCurrent, AvgVoltage=:AvgVoltage, ' +
-//                'Data1=:Data1, Data2=:Data2, ArchivedData=:ArchivedData, ' +
-//                'StartTemperature=:StartTemperature, EndTemperature=:EndTemperature, AvgTemperature=:AvgTemperature, ' +
-//                'InputPressure=:InputPressure, OutputPressure=:OutputPressure, Density=:Density, ' +
-//                'AmbientTemperature=:AmbientTemperature, AtmosphericPressure=:AtmosphericPressure, RelativeHumidity=:RelativeHumidity, ' +
-//                'Coef=:Coef, FCDCoefficient=:FCDCoefficient ' +
-//                'where ID=:ID';
-//
-//              SetIntParam(Q, 'ID', S.ID);
-//            end;
-//        end;
-//
-//        {--------- параметры ---------}
-//        SetIntParam(Q, 'DeviceID', S.DeviceID);
-//        SetIntParam(Q, 'DevicePointID', S.DevicePointID);
-//        SetIntParam(Q, 'DeviceTypePointID', S.DeviceTypePointID);
-//        SetIntParam(Q, 'Num', S.Num);
-//
-//        SetStrParam(Q, 'Name', S.Name);
-//        SetStrParam(Q, 'Description', S.Description);
-//        SetDateTimeParam(Q, 'DateTime', S.DateTime);
-//
-//        SetFloatParam(Q, 'SpillTime', S.SpillTime);
-//        SetFloatParam(Q, 'QavgEtalon', S.QavgEtalon);
-//        SetFloatParam(Q, 'EtalonVolume', S.EtalonVolume);
-//        SetFloatParam(Q, 'EtalonMass', S.EtalonMass);
-//
-//        SetFloatParam(Q, 'QEtalonStd', S.QEtalonStd);
-//        SetFloatParam(Q, 'QEtalonCV', S.QEtalonCV);
-//
-//        SetFloatParam(Q, 'DeviceVolume', S.DeviceVolume);
-//        SetFloatParam(Q, 'DeviceMass', S.DeviceMass);
-//        SetFloatParam(Q, 'Velocity', S.Velocity);
-//
-//        SetFloatParam(Q, 'Error', S.Error);
-//        SetIntParam(Q, 'Valid', Ord(S.Valid));
-//
-//        SetFloatParam(Q, 'QStd', S.QStd);
-//        SetFloatParam(Q, 'QCV', S.QCV);
-//
-//        SetFloatParam(Q, 'VolumeBefore', S.VolumeBefore);
-//        SetFloatParam(Q, 'VolumeAfter', S.VolumeAfter);
-//
-//        SetIntParam(Q, 'PulseCount', S.PulseCount);
-//        SetFloatParam(Q, 'MeanFrequency', S.MeanFrequency);
-//        SetFloatParam(Q, 'AvgCurrent', S.AvgCurrent);
-//        SetFloatParam(Q, 'AvgVoltage', S.AvgVoltage);
-//
-//        SetStrParam(Q, 'Data1', S.Data1);
-//        SetStrParam(Q, 'Data2', S.Data2);
-//        SetStrParam(Q, 'ArchivedData', S.ArchivedData);
-//
-//        SetFloatParam(Q, 'StartTemperature', S.StartTemperature);
-//        SetFloatParam(Q, 'EndTemperature', S.EndTemperature);
-//        SetFloatParam(Q, 'AvgTemperature', S.AvgTemperature);
-//        SetFloatParam(Q, 'InputPressure', S.InputPressure);
-//        SetFloatParam(Q, 'OutputPressure', S.OutputPressure);
-//        SetFloatParam(Q, 'Density', S.Density);
-//
-//        SetFloatParam(Q, 'AmbientTemperature', S.AmbientTemperature);
-//        SetFloatParam(Q, 'AtmosphericPressure', S.AtmosphericPressure);
-//        SetFloatParam(Q, 'RelativeHumidity', S.RelativeHumidity);
-//
-//        SetFloatParam(Q, 'Coef', S.Coef);
-//        SetStrParam(Q, 'FCDCoefficient', S.FCDCoefficient);
-//
-//        Q.ExecSQL;
-//
-//        if S.State = osNew then
-//          S.ID := FDM.DevicesConnection.GetLastAutoGenValue('PointSpillage');
-//
-//        S.State := osClean;
-//
-//      finally
-//        Q.Free;
-//      end;
-//    end;
-//
-//    FDM.Commit;
-//    Result := True;
-//
-//  except
-//    FDM.Rollback;
-//    raise;
-//  end;
-//end;
-//
  {$ENDREGION}
 
 
 
    {$ENDREGION}
+
 end.

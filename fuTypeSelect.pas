@@ -107,6 +107,7 @@ type
     TypePaste: TAction;
     TypeCut: TAction;
     Action3: TAction;
+    StringColumnUUID: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -857,7 +858,11 @@ begin
     Value := T.VerificationMethod
 
   else if ACol = StringColumnProcedure.Index then
-    Value := T.ProcedureName;
+    Value := T.ProcedureName
+
+   else if ACol =  StringColumnUUID.Index  then
+    Value := T.UUID;
+
 end;
 
 

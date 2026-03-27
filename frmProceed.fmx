@@ -1,22 +1,22 @@
 object FrameProceed: TFrameProceed
-  Size.Width = 1051.000000000000000000
+  Size.Width = 1564.000000000000000000
   Size.Height = 688.000000000000000000
   Size.PlatformDefault = False
   object LayoutMiddle: TLayout
     Align = Client
-    Size.Width = 1051.000000000000000000
+    Size.Width = 1564.000000000000000000
     Size.Height = 611.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 2
     object LayoutCenter: TLayout
       Align = Client
-      Size.Width = 450.000000000000000000
+      Size.Width = 963.000000000000000000
       Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 7
       object Layout18: TLayout
         Align = Client
-        Size.Width = 450.000000000000000000
+        Size.Width = 963.000000000000000000
         Size.Height = 611.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
@@ -26,16 +26,17 @@ object FrameProceed: TFrameProceed
           ClipChildren = True
           Margins.Left = 2.000000000000000000
           PopupMenu = PopupMenuGridDataPoints
-          Size.Width = 448.000000000000000000
+          Size.Width = 961.000000000000000000
           Size.Height = 611.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
+          Visible = False
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnColumnMoved = GridDataPointsColumnMoved
           OnGetValue = GridDataPointsGetValue
           OnCellClick = GridDataPointsCellClick
-          Viewport.Width = 428.000000000000000000
-          Viewport.Height = 570.000000000000000000
+          Viewport.Width = 961.000000000000000000
+          Viewport.Height = 611.000000000000000000
           object CheckColumnSpillageEnable: TCheckColumn
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
@@ -213,16 +214,15 @@ object FrameProceed: TFrameProceed
           ClipChildren = True
           Margins.Left = 2.000000000000000000
           PopupMenu = PopupMenuGridResults
-          Size.Width = 448.000000000000000000
+          Size.Width = 961.000000000000000000
           Size.Height = 611.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
-          Visible = False
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
-          Viewport.Width = 448.000000000000000000
-          Viewport.Height = 611.000000000000000000
+          Viewport.Width = 941.000000000000000000
+          Viewport.Height = 570.000000000000000000
           object StringColumnResultName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.Trimming = Character
@@ -346,14 +346,14 @@ object FrameProceed: TFrameProceed
       Align = Right
       Cursor = crHSplit
       MinSize = 20.000000000000000000
-      Position.X = 693.000000000000000000
+      Position.X = 1206.000000000000000000
       Size.Width = 10.000000000000000000
       Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
     end
     object LayoutRight: TLayout
       Align = MostRight
-      Position.X = 703.000000000000000000
+      Position.X = 1216.000000000000000000
       Size.Width = 348.000000000000000000
       Size.Height = 611.000000000000000000
       Size.PlatformDefault = False
@@ -464,8 +464,8 @@ object FrameProceed: TFrameProceed
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 277.000000000000000000
-              Viewport.Height = 194.000000000000000000
+              Viewport.Width = 297.000000000000000000
+              Viewport.Height = 219.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -510,12 +510,12 @@ object FrameProceed: TFrameProceed
   end
   object LayoutTop: TLayout
     Align = Top
-    Size.Width = 1051.000000000000000000
+    Size.Width = 1564.000000000000000000
     Size.Height = 33.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1
     object ToolBarDataPoints: TToolBar
-      Size.Width = 1051.000000000000000000
+      Size.Width = 1564.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
@@ -754,7 +754,7 @@ object FrameProceed: TFrameProceed
   object lyt1: TLayout
     Align = MostBottom
     Position.Y = 644.000000000000000000
-    Size.Width = 1051.000000000000000000
+    Size.Width = 1564.000000000000000000
     Size.Height = 44.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
@@ -766,7 +766,7 @@ object FrameProceed: TFrameProceed
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 914.000000000000000000
+      Position.X = 1427.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 127.000000000000000000
@@ -787,7 +787,7 @@ object FrameProceed: TFrameProceed
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 620.000000000000000000
+      Position.X = 1133.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 127.000000000000000000
@@ -808,7 +808,7 @@ object FrameProceed: TFrameProceed
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 767.000000000000000000
+      Position.X = 1280.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 127.000000000000000000
@@ -823,8 +823,8 @@ object FrameProceed: TFrameProceed
     end
   end
   object PopupMenuGridDataPoints: TPopupMenu
-    Left = 626
-    Top = 248
+    Left = 578
+    Top = 200
     object MenuItemGridDataPointsDelete: TMenuItem
       Action = ActionSessionPointDelete
       ImageIndex = -1
@@ -839,8 +839,8 @@ object FrameProceed: TFrameProceed
     end
   end
   object PopupMenuGridResults: TPopupMenu
-    Left = 626
-    Top = 256
+    Left = 730
+    Top = 200
     object MenuItemGridResultsDelete: TMenuItem
       Action = ActionSessionPointDelete
       ImageIndex = -1
@@ -855,12 +855,13 @@ object FrameProceed: TFrameProceed
     end
   end
   object PopupMenuTreeViewDevices: TPopupMenu
-    Left = 626
-    Top = 264
+    OnPopup = PopupMenuTreeViewDevicesPopup
+    Left = 826
+    Top = 328
   end
   object ActionListWorkTables: TActionList
-    Left = 626
-    Top = 240
+    Left = 434
+    Top = 200
     object ActionSessionDelete: TAction
       Category = 'Session'
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1089#1077#1089#1089#1080#1102

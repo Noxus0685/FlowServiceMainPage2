@@ -2783,6 +2783,8 @@ begin
   if D = nil then
     Exit;
 
+  D.State:=osModified;
+
   S := Trim(Value.AsString);
 
   {=====================================================}

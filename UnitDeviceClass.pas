@@ -92,6 +92,7 @@ type
     {====================================================================}
 
     DeviceID: Integer;           // Идентификатор прибора (FK → TDevice.ID)
+    DeviceUUID: String;
     DeviceTypePointID: Integer;  // Идентификатор шаблонной точки типа (опционально)
 
     {====================================================================}
@@ -974,6 +975,7 @@ begin
   begin
     NewP := AddPoint;
     NewP.Assign(P);
+    NewP.DeviceUUID := UUID;
   end;
 end;
 
@@ -1487,7 +1489,7 @@ begin
   Result := TDevicePoint.Create(ID);
   Result.ID := TEntityHelpers<TDevicePoint>.NextID(Points);
   Result.DeviceID := ID;
-
+  Result.DeviceUUID:=UUID;
   StdIdx := GetNextPointStdIndex(Points.Count);
   Result.FlowRate := StdPointRates[StdIdx];
 

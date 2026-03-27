@@ -7,11 +7,12 @@ uses
   frmMainTable,
   UnitBaseProcedures,
   UnitWorkTable,
-
-
+  UnitDataManager,
+  System.UITypes,
   System.SysUtils, System.Classes, FMX.Types, FMX.Controls, FMX.Forms, FMX.TabControl,
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
-  FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit;
+  FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
+  FMX.EditBox, FMX.SpinBox;
 
 type
   TFormMain = class(TForm)
@@ -40,21 +41,27 @@ type
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
     Label5: TLabel;
+
     procedure FormCreate(Sender: TObject);
     procedure TabControlMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
+
+
+
   private
     FWorkTableManager: TWorkTableManager;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
-
     FNextClimateChangeAt: TDateTime;
 
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
+
   public
 
   end;
@@ -103,6 +110,24 @@ end;
 procedure TFormMain.EditTestNumExit(Sender: TObject);
 begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
+end;
+
+procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+       Self.WindowState := TWindowState.wsMinimized;
+       DataManager.Save;
+
+     if FWorkTableManager = nil then
+    Exit;
+
+    if FFrameMainTable= nil then
+    Exit;
+
+  FFrameMainTable.SaveLayoutSettingsToWorkTable;
+  FWorkTableManager.Save;
+
+
+
 end;
 
 procedure TFormMain.FormCreate(Sender: TObject);

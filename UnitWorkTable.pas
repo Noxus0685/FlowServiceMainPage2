@@ -3,7 +3,7 @@
 interface
 
 uses
-
+  UnitRepositories,
   UnitFlowMeter,
   UnitMeterValue,
   UnitClasses, UnitDeviceClass,
@@ -213,6 +213,8 @@ type
     procedure AssignFlowMeterFrom(const ASource: TChannel; const AWorkTable: TWorkTable;
       const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
+    procedure CreateDevice;
+
   end;
 
   TWorkTable = class
@@ -654,6 +656,7 @@ procedure TChannel.Init;
 begin
   if not Assigned(FFlowMeter) then
     Exit;
+
   FFlowMeter.Init(DeviceUUID);
 end;
 
@@ -697,6 +700,24 @@ begin
   Init;
   RebindFlowMeterValues(AWorkTable);
 end;
+
+ procedure TChannel.CreateDevice;
+ var
+    ADevice: TDevice;
+    AType: TDeviceType;
+    ActiveRepo:  TDeviceRepository;
+    FoundRepo: TTypeRepository;
+begin
+
+  if DataManager = nil then
+  Exit;
+
+  if FFlowMeter = nil then
+  Exit;
+
+  FFlowMeter.CreateDevice;
+
+  end;
 
 procedure TChannel.AssignFlowMeterFrom(const ASource: TChannel;
   const AWorkTable: TWorkTable; const ACloneDeviceToRepo: Boolean);
@@ -853,7 +874,9 @@ end;
 procedure TChannel.SetDeviceUUIDProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
+  begin
     FFlowMeter.DeviceUUID := AValue;
+  end;
 end;
 
 function TChannel.GetTypeUUIDProxy: string;

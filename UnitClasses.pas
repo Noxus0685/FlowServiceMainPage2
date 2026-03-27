@@ -120,7 +120,7 @@ type
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
     {====================================================================}
     DeviceTypeID: Integer;       // Идентификатор типа прибора (FK → TDeviceType.ID)
-
+    DeviceTypeUUID: String;       // Идентификатор типа прибора (FK → TDeviceType.ID)
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
     {====================================================================}
@@ -159,7 +159,7 @@ type
 
 
     DeviceTypeID: Integer;       // Идентификатор типа прибора (FK → TDeviceType.ID)
-
+    DeviceTypeUUID: String;       // Идентификатор типа прибора (FK → TDeviceType.ID)
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
     {====================================================================}
@@ -583,6 +583,7 @@ begin
     begin
       Add(IntToStr(D.ID));
       Add(IntToStr(D.DeviceTypeID));
+       Add(D.DeviceTypeUUID);
       Add(D.Name);
       Add(D.DN);
       Add(D.Description);
@@ -598,6 +599,7 @@ begin
     begin
       Add(IntToStr(P.ID));
       Add(IntToStr(P.DeviceTypeID));
+      Add(P.DeviceTypeUUID);
       Add(P.Name);
       Add(P.Description);
       Add(FloatToStr(P.FlowRate));
@@ -712,7 +714,7 @@ begin
   {----------------------------------}
   ID := ASource.ID;
   DeviceTypeID := ASource.DeviceTypeID;
-
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
   { Общая информация }
   {----------------------------------}
@@ -811,7 +813,7 @@ begin
   {----------------------------------}
   ID := ASource.ID;
   DeviceTypeID := ASource.DeviceTypeID;
-
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
   { Общая информация }
   {----------------------------------}
@@ -1539,6 +1541,7 @@ begin
     NewD := AddDiameter;   // ← создаём с текущим ID типа
     NewD.Assign(D);
     NewD.DeviceTypeID := ID;
+    NewD.DeviceTypeUUID := UUID;
   end;
 
   {====================================================================}
@@ -1551,6 +1554,7 @@ begin
     NewP := AddTypePoint;  // ← создаём с текущим ID типа
     NewP.Assign(P);
     NewP.DeviceTypeID := ID;
+    NewP.DeviceTypeUUID := UUID;
   end;
 end;
 

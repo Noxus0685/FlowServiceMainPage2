@@ -99,7 +99,6 @@ type
     LabelNameFreq: TLabel;
     SpinBoxFreq: TSpinBox;
     LayoutPumpSelect: TLayout;
-    ComboEditPumps: TComboEdit;
     SpeedButtonStartPump: TSpeedButton;
     SpeedButton28: TSpeedButton;
     Rectangle14: TRectangle;
@@ -125,17 +124,17 @@ type
     Line3: TLine;
     LayoutFlowRate: TLayout;
     Line5: TLine;
-    Layout5: TLayout;
-    Layout12: TLayout;
-    Rectangle2: TRectangle;
+    LayoutFLR: TLayout;
+    LayoutFLDisplay: TLayout;
+    RectangleLabelFR: TRectangle;
     LabelFlowRate: TLabel;
-    Layout13: TLayout;
+    LayoutSpinEditFR: TLayout;
     LabelNameFlowRate: TLabel;
     SpinBoxFlowRate: TSpinBox;
-    Layout14: TLayout;
+    LayoutFREdit: TLayout;
     ComboEditUnits: TComboBox;
     SpeedButtonSetFlowRate: TSpeedButton;
-    SpeedButton4: TSpeedButton;
+    SpeedButtonStopChangeFlowRate: TSpeedButton;
     Rectangle15: TRectangle;
     LabelLayoutFlowRate: TLabel;
     Line6: TLine;
@@ -314,6 +313,8 @@ type
     ActionEtalonsFromArchive: TAction;
     ActionEtalonsSetFlowSource: TAction;
     ActionEtalonsAssignEtalon: TAction;
+    ComboBoxPumps: TComboBox;
+    StringColumnUUID: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -388,6 +389,11 @@ type
     procedure ComboBoxUnitsChange(Sender: TObject);
     procedure ComboEditPumpsChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
+    procedure ComboBoxPumpsChange(Sender: TObject);
+    procedure GridEtalonsCellDblClick(const Column: TColumn;
+      const Row: Integer);
+    procedure GridDevicesCellDblClick(const Column: TColumn;
+      const Row: Integer);
 
   private
 
@@ -420,8 +426,6 @@ type
     procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
     function IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
     procedure GridDevicesActionsMenuClick(Sender: TObject);
-    procedure SaveLayoutSettingsToWorkTable;
-    procedure LoadLayoutSettingsFromWorkTable;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure EnforceDataPointsColumnsLayout;
@@ -445,6 +449,7 @@ type
     procedure ClearChannelData(AChannel: TChannel);
     procedure CopyChannelData(ASource, ADest: TChannel);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
+
 
 
   private
@@ -473,7 +478,8 @@ type
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
 
-
+    procedure SaveLayoutSettingsToWorkTable;
+    procedure LoadLayoutSettingsFromWorkTable;
 
     property WorkTableManager: TWorkTableManager read FWorkTableManager;
 
@@ -715,31 +721,27 @@ var
   SelectedPumpName: string;
   ItemIndex: Integer;
 begin
-  ComboEditPumps.Items.Clear;
-  ComboEditPumps.ItemIndex := -1;
+  ComboBoxPumps.Items.Clear;
+  ComboBoxPumps.ItemIndex := -1;
 
   if FActiveWorkTable = nil then
   begin
-    ComboEditPumps.Text := '';
     SyncPumpControls;
     Exit;
   end;
 
-  SelectedPumpName := Trim(ComboEditPumps.Text);
+  SelectedPumpName := Trim(ComboBoxPumps.Text);
   for Pump in FActiveWorkTable.Pumps do
-    ComboEditPumps.Items.Add(Pump.Name);
+    ComboBoxPumps.Items.Add(Pump.Name);
 
   ItemIndex := -1;
   if SelectedPumpName <> '' then
-    ItemIndex := ComboEditPumps.Items.IndexOf(SelectedPumpName);
-  if (ItemIndex < 0) and (ComboEditPumps.Items.Count > 0) then
+    ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
+  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
     ItemIndex := 0;
 
-  ComboEditPumps.ItemIndex := ItemIndex;
-  if ItemIndex >= 0 then
-    ComboEditPumps.Text := ComboEditPumps.Items[ItemIndex]
-  else
-    ComboEditPumps.Text := '';
+  ComboBoxPumps.ItemIndex := ItemIndex;
+
 
   SyncPumpControls;
 end;
@@ -750,7 +752,7 @@ var
 begin
   Pump := nil;
   if FActiveWorkTable <> nil then
-    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboEditPumps.Text));
+    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboBoxPumps.Text));
 
   if Pump <> nil then
   begin
@@ -2107,13 +2109,7 @@ begin
     Exit;
   end;
 
-  if (ADevice = nil) and (ActiveRepo <> nil) then
-  begin
-    ADevice := ActiveRepo.CreateDevice(-1);
-    AChannel.DeviceUUID := ADevice.UUID;
-    AChannel.TypeName := ADevice.DeviceTypeName;
-    AChannel.Serial := ADevice.SerialNumber;
-  end;
+  AChannel.CreateDevice;
 
   Frm := TFormDeviceEditor.Create(Self);
   try
@@ -2368,7 +2364,7 @@ begin
   if AChannel = nil then
     Exit;
 
-  Device := nil;
+
   if (AChannel.FlowMeter <> nil) then
     Device := AChannel.FlowMeter.Device;
 
@@ -2484,6 +2480,11 @@ begin
   GridDevices.SetFocus;
   GridDevices.Selected := PopupColumnDeviceSignal1.Index;
   ShowMessage('Источник расхода задаётся полем "Сигнал" в выбранной строке прибора.');
+end;
+
+procedure TFrameMainTable.ComboBoxPumpsChange(Sender: TObject);
+begin
+  SyncPumpControls;
 end;
 
 procedure TFrameMainTable.ComboBoxUnitsChange(Sender: TObject);
@@ -3223,7 +3224,7 @@ end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
-  SECOND_CLICK_MS = 700; // окно "второго клика" (подбери по ощущениям)
+  SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
 var
   Tick: Cardinal;
   IsSecondClick: Boolean;
@@ -3295,6 +3296,57 @@ begin
       end;
     end;
   end;
+
+  GridDevices.BeginUpdate;
+  try
+    GridDevices.RowCount := Rows;
+  finally
+    GridDevices.EndUpdate;
+  end;
+end;
+
+procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
+  const Row: Integer);
+var
+  Rows: Integer;
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
+    Exit;
+
+  if (WorkTable = nil) and ((Row < 0) or (Row >= Length(FFlowMeterRows))) then
+    Exit;
+
+  Rows := GridDevices.RowCount;
+  GridDevices.ReadOnly := True;
+
+
+    if Column = ColumnDeviceType1 then
+    begin
+      GridDevices.EditorMode := False;
+      if WorkTable <> nil then
+        OpenTypeSelect(Row, False);
+    end
+    else if Column = StringColumnDeviceName1 then
+    begin
+      GridDevices.EditorMode := False;
+      if WorkTable <> nil then
+        OpenChannelDeviceEditor(WorkTable.DeviceChannels[Row]);
+    end
+    else if Column = StringColumnDeviceSerial1 then
+    begin
+      GridDevices.ReadOnly := False;
+      GridDevices.EditorMode := True;
+
+      if WorkTable = nil then
+      begin
+        FFlowMeterRows[Row].SerialIndex :=
+          (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
+        ApplyFlowMeterSelection(Row);
+      end;
+    end;
+
 
   GridDevices.BeginUpdate;
   try
@@ -3379,8 +3431,15 @@ begin
         Value := '-';
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-      Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
-    Exit;
+      Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal)
+    else if GridDevices.Columns[ACol] = StringColumnUUID then
+        begin
+        if WorkTable.DeviceChannels[ARow].FlowMeter.Device<>nil then
+           Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID;
+        end;
+
+
+          Exit;
   end;
 
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
@@ -3443,8 +3502,6 @@ end;
 
 procedure TFrameMainTable.GridEtalonsCellClick(const Column: TColumn;
   const Row: Integer);
-const
-  SECOND_CLICK_MS = 700;
 var
   Tick: Cardinal;
   IsSecondClick: Boolean;
@@ -3465,8 +3522,7 @@ begin
 
   IsSecondClick :=
     (Row = FLastClickRow) and
-    (Column = FLastClickCol) and
-    (Tick - FLastClickTick <= SECOND_CLICK_MS);
+    (Column = FLastClickCol);
 
   FLastClickRow := Row;
   FLastClickCol := Column;
@@ -3523,6 +3579,52 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.GridEtalonsCellDblClick(const Column: TColumn;
+  const Row: Integer);
+var
+  Tick: Cardinal;
+  IsSecondClick: Boolean;
+  Rows: Integer;
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetWorkTableByIndex(0);
+
+  if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
+    Exit;
+
+  if (WorkTable = nil) and ((Row < 0) or (Row >= Length(FRows))) then
+    Exit;
+
+  Rows := GridEtalons.RowCount;
+  GridEtalons.ReadOnly := True;
+
+    if Column = StringColumnEtalonType1 then
+    begin
+      GridEtalons.EditorMode := False;
+      if WorkTable <> nil then
+        OpenTypeSelect(Row, True);
+    end
+    else if Column = StringColumnEtalonName1 then
+    begin
+      GridEtalons.EditorMode := False;
+      if WorkTable <> nil then
+        OpenChannelDeviceEditor(WorkTable.EtalonChannels[Row]);
+    end
+    else if Column = StringColumnEtalonSerial1 then
+    begin
+      GridEtalons.ReadOnly := False;
+      GridEtalons.EditorMode := True;
+    end;
+
+
+  GridEtalons.BeginUpdate;
+  try
+    GridEtalons.RowCount := Rows;
+  finally
+    GridEtalons.EndUpdate;
+  end;
+
+end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);

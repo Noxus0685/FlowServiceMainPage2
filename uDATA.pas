@@ -404,97 +404,7 @@ begin
     Q.Free;
   end;
 end;
-//
-//procedure TDM.AssertDeviceTypeSchema;
-//const
-//  REQUIRED_COLUMNS: array [0..47] of string = (
-//    'ID',
-//    'UUID',
-//
-//    'Name',
-//    'Modification',
-//    'Manufacturer',
-//    'ReestrNumber',
-//
-//    'Category',
-//    'CategoryName',
-//    'AccuracyClass',
-//
-//    'RegDate',
-//    'ValidityDate',
-//    'IVI',
-//    'RangeDynamic',
-//
-//    'VerificationMethod',
-//    'ProcedureName',
-//
-//    'ProcedureCmd1',
-//    'ProcedureCmd2',
-//    'ProcedureCmd3',
-//    'ProcedureCmd4',
-//    'ProcedureCmd5',
-//
-//    'Description',
-//    'Documentation',
-//    'ReportingForm',
-//    'SerialNumTemplate',
-//
-//    'MeasuredDimension',
-//    'OutputType',
-//    'DimensionCoef',
-//
-//    'OutputSet',
-//    'Freq',
-//    'Coef',
-//    'FreqFlowRate',
-//
-//    'VoltageRange',
-//    'VoltageQminRate',
-//    'VoltageQmaxRate',
-//
-//    'CurrentRange',
-//    'CurrentQminRate',
-//    'CurrentQmaxRate',
-//    'IntegrationTime',
-//
-//    'ProtocolName',
-//    'BaudRate',
-//    'Parity',
-//    'DeviceAddress',
-//
-//    'InputType',
-//    'SpillageType',
-//    'SpillageStop',
-//
-//    'Repeats',
-//    'RepeatsProtocol',
-//
-//    'Error'
-//  );
-//var
-//  Existing: TStringList;
-//  Missing: TStringList;
-//  I: Integer;
-//begin
-//  Existing := GetTableColumns('DeviceType');
-//  Missing := TStringList.Create;
-//  try
-//    for I := Low(REQUIRED_COLUMNS) to High(REQUIRED_COLUMNS) do
-//      if Existing.IndexOf(REQUIRED_COLUMNS[I]) < 0 then
-//        Missing.Add(REQUIRED_COLUMNS[I]);
-//
-//    if Missing.Count > 0 then
-//      raise Exception.Create(
-//        'Схема БД несовместима с моделью DeviceType.' + sLineBreak +
-//        'Отсутствуют колонки:' + sLineBreak +
-//        Missing.Text
-//      );
-//  finally
-//    Existing.Free;
-//    Missing.Free;
-//  end;
-//end;
-//
+
 function TDM.TableExists(const ATable: string): Boolean;
 var
   Q: TFDQuery;
@@ -641,7 +551,8 @@ begin
     Q.SQL.Text :=
       'CREATE TABLE IF NOT EXISTS DeviceDiameter (' +
       'ID INTEGER PRIMARY KEY AUTOINCREMENT,' +
-      'DeviceTypeID INTEGER NOT NULL,' +
+      'DeviceTypeID INTEGER,' +
+      'DeviceTypeUUID TEXT NOT NULL,' +
       'Name TEXT,' +
       'DN TEXT,' +
       'Description TEXT,' +
@@ -660,7 +571,8 @@ begin
     Q.SQL.Text :=
       'CREATE TABLE IF NOT EXISTS DeviceTypePoint (' +
       'ID INTEGER PRIMARY KEY AUTOINCREMENT,' +
-      'DeviceTypeID INTEGER NOT NULL,' +
+      'DeviceTypeID INTEGER,' +
+      'DeviceTypeUUID TEXT NOT NULL,' +
       'Name TEXT,' +
       'Description TEXT,' +
       'FlowRate REAL,' +

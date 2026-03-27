@@ -345,6 +345,7 @@
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="frmMainTable.pas"/>
+        <DCCReference Include="UnitRepositories.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

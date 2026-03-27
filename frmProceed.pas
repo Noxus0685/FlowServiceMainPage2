@@ -299,8 +299,6 @@ procedure TFrameProceed.Initialize(AWorkTableManager: TWorkTableManager);
 var
   UnitName: string;
 begin
-    GridResults.OnGetValue := GridDataPointsGetValue;
-
   FWorkTableManager := AWorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
@@ -513,7 +511,6 @@ begin
   else
   begin
     UpdateSessionItems;
-
   end;
 
 
@@ -1194,6 +1191,7 @@ begin
   if FActiveWorkTable <> nil then
   SetSessionDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
 end;
+
 procedure TFrameProceed.PopupMenuTreeViewDevicesPopup(Sender: TObject);
 var
   Item: TTreeViewItem;
