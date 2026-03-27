@@ -146,7 +146,7 @@ type
     Vmax: Double;                // Максимальный объем / масса, л (кг)
     Vmin: Double;                // Минимальный объем / масса, л (кг)
 
-    constructor Create(ADeviceTypeID : Integer);
+    constructor Create(ADeviceTypeUUID : string);
     procedure Assign(ASource: TDiameter);
 
   end;
@@ -202,7 +202,7 @@ type
     RepeatsProtocol: Integer;    // Кол-во повторов, идущих в зачёт
     Repeats: Integer;            // Общее кол-во измерений в серии
 
-    constructor Create(ADeviceTypeID : Integer);
+    constructor Create(ADeviceTypeUUID : String);
     procedure Assign(ASource: TTypePoint);
 
   end;
@@ -666,7 +666,7 @@ begin
 end;
 
 
-constructor TDiameter.Create(ADeviceTypeID : Integer);
+constructor TDiameter.Create(ADeviceTypeUUID : string);
 begin
   inherited Create;
 
@@ -677,7 +677,7 @@ begin
   {====================================================================}
   { Идентификация и связь с типом }
   {====================================================================}
-  DeviceTypeID := ADeviceTypeID;
+  DeviceTypeUUID := ADeviceTypeUUID;
   {====================================================================}
   { Общая информация }
   {====================================================================}
@@ -746,14 +746,14 @@ begin
   State := ASource.State;
 end;
 
-constructor TTypePoint.Create(ADeviceTypeID : Integer);
+constructor TTypePoint.Create(ADeviceTypeUUID : String);
 begin
   inherited Create;
 
   {====================================================================}
   { Идентификация и связи }
   {====================================================================}
-  DeviceTypeID := ADeviceTypeID;
+  DeviceTypeUUID := ADeviceTypeUUID;
 
   {====================================================================}
   { Общая информация }
@@ -798,7 +798,7 @@ begin
   Repeats := 0;
 end;
 
-procedure   TTypePoint.Assign(ASource: TTypePoint);
+procedure TTypePoint.Assign(ASource: TTypePoint);
 begin
   if ASource = nil then
     Exit;
@@ -1176,13 +1176,15 @@ begin
   if Diameters = nil then
     Diameters := TObjectList<TDiameter>.Create(True);
 
-  Result := TDiameter.Create(ID);
+  Result := TDiameter.Create(UUID);
   Result.ID := TEntityHelpers<TDiameter>.NextID(Diameters);
-  Diameters.Add(Result);
+  Result.DeviceTypeID:=ID;
 
   NewDNmm := StdDN[0];
   Result.DN   := NewDNmm.ToString;
   Result.Name := 'DN' + Result.DN;
+
+  Diameters.Add(Result);
 
 end;
 
@@ -1341,8 +1343,9 @@ begin
   if Points = nil then
     Points := TObjectList<TTypePoint>.Create(True);
 
-  Result := TTypePoint.Create(ID);
-  Result.ID :=  TEntityHelpers<TTypePoint>.NextID(Points);
+  Result := TTypePoint.Create(UUID);
+  Result.ID := TEntityHelpers<TTypePoint>.NextID(Points);
+  Result.DeviceTypeID:= ID;
 
   StdIdx := GetNextPointStdIndex(Points.Count);
   Result.FlowRate := StdPointRates[StdIdx];

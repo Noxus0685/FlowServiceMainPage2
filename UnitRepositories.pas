@@ -178,7 +178,7 @@ type
     property Types: TObjectList<TDeviceType> read FTypes write FTypes;
 
     function CreateType(AType: TDeviceType): TDeviceType; overload;
-    function CreateType(ATypeID: Integer): TDeviceType; overload;
+    function CreateType(Index: Integer): TDeviceType; overload;
 
 
     function GetType(ATypeID: Integer): TDeviceType;
@@ -1203,12 +1203,12 @@ end;
 procedure TTypeRepository.DeleteType(AType: TDeviceType);
 var
   I: Integer;
-  TypeID: Integer;
+  TypeUUID: String;
 begin
   if (AType = nil) or (FDM = nil) then
     Exit;
 
-  TypeID := AType.ID;
+  TypeUUID := AType.UUID;
 
   {----------------------------------}
   { Точки — помечаем на удаление }
@@ -1216,7 +1216,7 @@ begin
   if AType.Points <> nil then
   begin
     for I := 0 to AType.Points.Count - 1 do
-      if AType.Points[I].DeviceTypeID = TypeID then
+      if AType.Points[I].DeviceTypeUUID = TypeUUID then
         AType.Points[I].State := osDeleted;
   end;
 
@@ -1226,7 +1226,7 @@ begin
   if AType.Diameters <> nil then
   begin
     for I := 0 to AType.Diameters.Count - 1 do
-      if AType.Diameters[I].DeviceTypeID = TypeID then
+      if AType.Diameters[I].DeviceTypeUUID = TypeUUID then
         AType.Diameters[I].State := osDeleted;
   end;
 
@@ -1282,7 +1282,6 @@ begin
   Result := CreateNewType;
   if AType = nil then
     Exit;
-
   // копируем ВСЕ поля
   Result.Assign(AType);
 
@@ -1290,63 +1289,24 @@ begin
   Result.ID := GenerateTypeID;
   Result.State := osNew;
 
-  { Дочерние сущности привязываем к новому типу и помечаем как новые }
-  if Result.Diameters <> nil then
-    for D in Result.Diameters do
-    begin
-      D.ID := 0;
-      D.DeviceTypeID := Result.ID;
-      D.State := osNew;
-    end;
-
-  if Result.Points <> nil then
-    for P in Result.Points do
-    begin
-      P.ID := 0;
-      P.DeviceTypeID := Result.ID;
-      P.State := osNew;
-    end;
 end;
 
-function TTypeRepository.CreateType(ATypeID: Integer): TDeviceType;
+function TTypeRepository.CreateType(Index: Integer): TDeviceType;
 var
   Src: TDeviceType;
   D: TDiameter;
   P: TTypePoint;
 begin
   { если индекс невалидный — просто новый тип }
-  if (ATypeID < 0) or (ATypeID >= FTypes.Count) then
+  if (Index < 0) or (Index >= FTypes.Count) then
     Exit(CreateNewType);
 
-  Src := FTypes[ATypeID];
+  Src := FTypes[Index];
   if Src = nil then
     Exit(CreateNewType);
 
   { создаём новый тип }
-  Result := CreateNewType;
-
-  { копируем ВСЕ поля }
-  Result.Assign(Src);
-
-  { гарантируем уникальность и корректное состояние для сохранения }
-  Result.ID := GenerateTypeID;
-  Result.State := osNew;
-
-  if Result.Diameters <> nil then
-    for D in Result.Diameters do
-    begin
-      D.ID := 0;
-      D.DeviceTypeID := Result.ID;
-      D.State := osNew;
-    end;
-
-  if Result.Points <> nil then
-    for P in Result.Points do
-    begin
-      P.ID := 0;
-      P.DeviceTypeID := Result.ID;
-      P.State := osNew;
-    end;
+  Result := CreateType(Src);
 end;
 
 function TTypeRepository.CategoryToText(
@@ -2263,7 +2223,10 @@ begin
       osModified:
         begin
           if ADiameter.ID <= 0 then
-            raise Exception.Create('Cannot update diameter without ID');
+          begin
+             ADiameter.ID := 1;
+             raise Exception.Create('Для диаметра недопустимое значение ID');
+          end;
 
           Q.SQL.Text :=
             'update DeviceDiameter set ' +
