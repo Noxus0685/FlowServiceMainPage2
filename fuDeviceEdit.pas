@@ -1851,27 +1851,13 @@ begin
   end;
 
   {----------------------------------}
-  { Перенос данных диаметра в прибор }
+  { Применяем диаметр через модель }
   {----------------------------------}
-  FDevice.DN := D.Name;
-
-  FDevice.Qmax := D.Qmax;
-  FDevice.Qmin := D.Qmin;
-
-  if D.Qmin > 0 then
-    FDevice.RangeDynamic := D.Qmax / D.Qmin;
-
-  FDevice.Coef := D.Kp;
-
-  {----------------------------------}
-  { Пересчёт точек прибора }
-  {----------------------------------}
-  RecalcDevicePointsCoef;
+  FDevice.AttachDN(D, FDeviceType);
 
   {----------------------------------}
   { Обновление UI }
   {----------------------------------}
-  FDevice.SyncNameWithModificationAndDiameter;
   UpdateUIFromDevice;
   SetModified;
 end;
