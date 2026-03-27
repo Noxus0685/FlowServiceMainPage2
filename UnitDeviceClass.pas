@@ -334,6 +334,8 @@ type
       function NormalizeActiveSessionSpillage: TSessionSpillage;
       function GetCalibrCoefTable: TCalibrCoefTable;
       procedure SetCalibrCoefTable(const Value: TCalibrCoefTable);
+  protected
+      procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ПОЛЯ БД!!! }
@@ -627,6 +629,36 @@ begin
   Comment := '';
   Description := '';
   ReportingForm := '';
+end;
+
+procedure TDevice.SetState(const Value: TObjectState);
+var
+  Session: TSessionSpillage;
+  Point: TDevicePoint;
+  Spillage: TPointSpillage;
+  SessionSpillage: TPointSpillage;
+begin
+  inherited SetState(Value);
+
+  if FState = osNew then
+  begin
+    if FPoints <> nil then
+      for Point in FPoints do
+        Point.State := osNew;
+
+    if FSpillages <> nil then
+      for Spillage in FSpillages do
+        Spillage.State := osNew;
+
+    if FSessions <> nil then
+      for Session in FSessions do
+      begin
+        Session.State := osNew;
+        if Session.Spillages <> nil then
+          for SessionSpillage in Session.Spillages do
+            SessionSpillage.State := osNew;
+      end;
+  end;
 end;
 
 function TDevice.GetCalibrCoefTable: TCalibrCoefTable;
