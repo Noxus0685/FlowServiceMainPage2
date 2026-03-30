@@ -61,6 +61,9 @@ type
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure UpdateRandomFreq(const APump: TPump);
+    procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+    procedure FlowRateStateHandler(AFlowRate: TFlowRate;
+      AAction: EFlowRateAction);
   public
 
   end;
@@ -118,6 +121,15 @@ begin
 
 end;
 
+
+procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EFlowRateAction);
+begin
+
+  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.FlowSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
+
+end;
+
+
 procedure TFormMain.FormCreate(Sender: TObject);
 begin
 
@@ -130,6 +142,7 @@ begin
     FWorkTableManager.Load;
   //Подумать над динамической привязкой ко всем столам
   FWorkTableManager.ActiveWorkTable.OnPumpChange:= PumpStateHandler;
+  FWorkTableManager.ActiveWorkTable.OnFlowRateChange:= FlowRateStateHandler;
 
   FWorkTableManager.ActiveWorkTable.AddPump('1');
   FWorkTableManager.ActiveWorkTable.AddPump('2');
@@ -192,14 +205,10 @@ begin
    if APump.IsRunning = true then
     begin
       APump.Freq := EnsureRange(APump.Freq + Freq,APump.Freq , APump.FreqSet);
-      if APump.Freq = APump.FreqSet then
-
     end
     else
     begin
       APump.Freq := EnsureRange(APump.Freq - Freq,0 , APump.Freq);
-      if APump.Freq = 0 then
-
     end;
 
 
@@ -207,6 +216,36 @@ begin
     FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
 end;
+
+
+procedure TFormMain.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+var
+  Flow: Double;
+begin
+  if AFlowRate = nil then
+    Exit;
+
+   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+  if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
+  begin
+    Flow := (Random * 10);
+
+   if AFlowRate.IsRunning = true then
+    begin
+      AFlowRate.flow := EnsureRange(AFlowRate.flow + Flow,AFlowRate.flow, AFlowRate.FlowSet);
+    end
+    else
+    begin
+      AFlowRate.flow  := EnsureRange(AFlowRate.flow  - Flow,0 , AFlowRate.flow );
+    end;
+
+
+
+    FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
+   end;
+end;
+
+
 
 procedure TFormMain.UpdateRandomSignals(const AWorkTable: TWorkTable);
 var
@@ -253,11 +292,13 @@ procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;
   Pump: tPump;
+  FlowRate: TFlowRate;
 begin
 
   try
       WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
       Pump := WorkTable.ActivePump;
+      FlowRate:= WorkTable.FlowRate;
   except
        Exit;
   end;
@@ -271,8 +312,9 @@ begin
 
     UpdateRandomClimate(WorkTable);
     UpdateRandomFreq(Pump);
+    //UpdateRandomFlowRate(FlowRate);
 
-    FFrameMainTable.UpdateUIPump;
+
 
   case WorkTable.MeasurementState of
     STATE_NONE:

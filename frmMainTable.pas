@@ -392,9 +392,13 @@ type
     procedure ComboBoxPumpsChange(Sender: TObject);
     procedure Rectangle14Click(Sender: TObject);
     procedure UpdateUIPump;
+    procedure UpdateUIFlowRate;
     procedure ComboBoxPumpsClick(Sender: TObject);
     procedure SpinBoxFreqChange(Sender: TObject);
     procedure SpinBoxFreqMouseEnter(Sender: TObject);
+    procedure Rectangle15Click(Sender: TObject);
+    procedure SpeedButtonSetFlowRateClick(Sender: TObject);
+    procedure SpinBoxFlowRateChange(Sender: TObject);
 
   private
 
@@ -497,6 +501,7 @@ type
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
+
 
 
   end;
@@ -1204,6 +1209,11 @@ end;
 
 
 
+procedure TFrameMainTable.SpeedButtonSetFlowRateClick(Sender: TObject);
+begin
+FActiveWorkTable.DoFlowRateStart;
+end;
+
 procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
@@ -1220,6 +1230,12 @@ begin
 end;
 
 
+
+procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
+begin
+FActiveWorkTable.DoFlowRateSet(SpinBoxFlowRate.value);
+
+end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
@@ -1313,6 +1329,12 @@ begin
       FActiveWorkTable.DoPumpStop(ComboBoxPumps.Text) ;
       FActiveWorkTable.ActivePump.State:=PUMP_STOPED;
     end;
+end;
+
+procedure TFrameMainTable.Rectangle15Click(Sender: TObject);
+begin
+ FActiveWorkTable.DoFlowRateStop;
+
 end;
 
 procedure TFrameMainTable.ApplyInstrumentalVisibleOrder;
@@ -2708,6 +2730,9 @@ begin
   if WorkTable = nil then
     Exit;
 
+
+
+
   // Основные MeterValues рабочего стола.
   WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
   WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
@@ -2743,6 +2768,13 @@ begin
 
   WorkTable.RecalculateAllMeterValues;
 
+  WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue;
+
+    {if WorkTable.ValueFlowRate <> nil then
+    LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
+  else
+    LabelFlowRate.Text := '-'; }
+
 end;
 
 procedure TFrameMainTable.TimerMainTimer(Sender: TObject);
@@ -2759,9 +2791,12 @@ begin
   try
   //Grid Headers + Instrumental Labels
     UpdateUIFromValues;
+    UpdateUIPump;
+    UpdateUIFlowRate;
   finally
     IsUpdating := False;
   end;
+
 
 
   if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
@@ -2843,10 +2878,12 @@ begin
   else
     EditPres.Text := '-';
 
-  if WorkTable.ValueFlowRate <> nil then
+  {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
-    LabelFlowRate.Text := '-';
+    LabelFlowRate.Text := '-'; }
+
+
 
   if WorkTable.ValuePressure <> nil then
     LabelPressure.Text := WorkTable.ValuePressure.GetStrValue
@@ -3962,6 +3999,36 @@ begin
 
 end;
 
+
+
+procedure TFrameMainTable.UpdateUIFlowRate;
+var
+  WorkTable: TWorkTable;
+  i:integer;
+begin
+    WorkTable := FActiveWorkTable;
+
+    if WorkTable = nil then
+      Exit;
+
+    if WorkTable.FlowRate.IsRunning then
+      LabelFlowRate.Text :=
+      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Flow)
+    else
+      LabelFlowRate.Text := '0';
+
+
+    if WorkTable.FlowRate.Flow = 0 then
+       Rectangle2.Fill.Color := TAlphaColorRec.White
+
+    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.FlowAccuracyPlus/100) * WorkTable.FlowRate.FlowSet ))
+    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.FlowAccuracyminus/100) * WorkTable.FlowRate.FlowSet )) then
+      Rectangle2.Fill.Color := TAlphaColorRec.Greenyellow
+        else if (WorkTable.FlowRate.Flow <> WorkTable.FlowRate.FlowSet) then
+      Rectangle2.Fill.Color := TAlphaColorRec.Yellow
+
+
+end;
 
 
 

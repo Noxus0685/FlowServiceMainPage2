@@ -251,7 +251,7 @@ object FrameMainTable: TFrameMainTable
                   TextSettings.Font.Size = 14.000000000000000000
                   TextSettings.Font.StyleExt = {00070000000000000004000000}
                   TextSettings.HorzAlign = Center
-                  Text = '12.0'
+                  Text = '0'
                   TabOrder = 0
                 end
               end
@@ -274,13 +274,14 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   TabOrder = 1
                   Cursor = crIBeam
-                  Min = 12.000000000000000000
-                  Value = 12.000000000000000000
+                  ValueType = Float
                   Increment = 0.100000001490116100
+                  KeyboardType = NumbersAndPunctuation
                   Size.Width = 119.000000000000000000
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
                   KillFocusByReturn = True
+                  OnChange = SpinBoxFlowRateChange
                 end
               end
             end
@@ -316,6 +317,7 @@ object FrameMainTable: TFrameMainTable
                 StyleLookup = 'playtoolbutton'
                 Text = 'SpeedButton3'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonSetFlowRateClick
               end
               object SpeedButton4: TSpeedButton
                 Align = Left
@@ -336,6 +338,7 @@ object FrameMainTable: TFrameMainTable
                   Size.Width = 14.000000000000000000
                   Size.Height = 14.000000000000000000
                   Size.PlatformDefault = False
+                  OnClick = Rectangle15Click
                 end
               end
             end
