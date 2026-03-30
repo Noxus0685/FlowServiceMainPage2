@@ -302,8 +302,9 @@
     <File Path="UnitDeviceClass.pas"/>
     <File Path="UnitFlowMeter.pas"/>
     <File Path="UnitMeterValue.pas"/>
-    <File Path="UnitWorkTable.pas"/>
     <File Path="frmMainTable.pas"/>
+    <File Path="frmMainTable.fmx"/>
+    <File Path="UnitWorkTable.pas"/>
     <File Path="UnitRepositories.pas"/>
   </ProjectSortOrder>
 </BorlandProject>

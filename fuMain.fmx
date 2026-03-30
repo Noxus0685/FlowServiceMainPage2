@@ -67,7 +67,7 @@ object FormMain: TFormMain
         TabOrder = 8
         object rctToolsPanelBackground: TRectangle
           Align = Client
-          Fill.Color = xFFCCCCCC
+          Fill.Color = xFFE6EEF8
           Size.Width = 1780.000000000000000000
           Size.Height = 64.000000000000000000
           Size.PlatformDefault = False
@@ -82,7 +82,7 @@ object FormMain: TFormMain
             TabOrder = 2
             object rct3: TRectangle
               Align = Client
-              Fill.Color = xFFCCCCCC
+              Fill.Color = xFFE6EEF8
               Padding.Left = 3.000000000000000000
               Padding.Top = 3.000000000000000000
               Padding.Bottom = 3.000000000000000000
@@ -176,7 +176,7 @@ object FormMain: TFormMain
                 end
                 object cbBACK_COLOR: TComboColorBox
                   Align = Bottom
-                  Color = claWhite
+                  Color = xFFF7FAFF
                   Position.X = 5.000000000000000000
                   Position.Y = 27.000000000000000000
                   Size.Width = 80.000000000000000000
@@ -218,7 +218,7 @@ object FormMain: TFormMain
               TabOrder = 0
               object rct2: TRectangle
                 Align = Client
-                Fill.Color = xFFCCCCCC
+                Fill.Color = xFFE6EEF8
                 Padding.Top = 8.000000000000000000
                 Padding.Bottom = 8.000000000000000000
                 Size.Width = 410.000000000000000000
@@ -1081,7 +1081,7 @@ object FormMain: TFormMain
             TabOrder = 3
             object rct4: TRectangle
               Align = Client
-              Fill.Color = xFFCCCCCC
+              Fill.Color = xFFE6EEF8
               Padding.Left = 4.000000000000000000
               Padding.Top = 8.000000000000000000
               Padding.Right = 4.000000000000000000
@@ -1512,6 +1512,18 @@ object FormMain: TFormMain
         Position.Y = 366.000000000000000000
         Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
         TabOrder = 2
+      end
+      object mPump: TMemo
+        Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+        DataDetectorTypes = []
+        Position.X = 570.000000000000000000
+        Position.Y = 312.000000000000000000
+        Size.Width = 423.000000000000000000
+        Size.Height = 243.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 4
+        Viewport.Width = 423.000000000000000000
+        Viewport.Height = 243.000000000000000000
       end
     end
   end

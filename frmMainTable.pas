@@ -395,8 +395,19 @@ type
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
-    procedure ComboEditPumpsChange(Sender: TObject);
+    procedure ZChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
+    procedure SpeedButtonStartPumpClick(Sender: TObject);
+    procedure ComboBoxPumpsChange(Sender: TObject);
+    procedure Rectangle14Click(Sender: TObject);
+    procedure UpdateUIPump;
+    procedure UpdateUIFlowRate;
+    procedure ComboBoxPumpsClick(Sender: TObject);
+    procedure SpinBoxFreqChange(Sender: TObject);
+    procedure SpinBoxFreqMouseEnter(Sender: TObject);
+    procedure Rectangle15Click(Sender: TObject);
+    procedure SpeedButtonSetFlowRateClick(Sender: TObject);
+    procedure SpinBoxFlowRateChange(Sender: TObject);
     procedure ComboBoxPumpsChange(Sender: TObject);
     procedure GridEtalonsCellDblClick(const Column: TColumn;
       const Row: Integer);
@@ -467,6 +478,7 @@ type
 
   private
     FInitialized: Boolean;
+    FChange: string ;
     FWorkTableManager: TWorkTableManager;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
@@ -494,7 +506,7 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
 
-    property WorkTableManager: TWorkTableManager read FWorkTableManager;
+    property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
 
 
   private type
@@ -508,6 +520,9 @@ type
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
+
+
+
   end;
 
 
@@ -517,6 +532,8 @@ implementation
 
 
 {$R *.fmx}
+
+uses fuMain;
 
 const
   CVolumeFlowUnits: array[0..4] of string = (
@@ -739,6 +756,7 @@ begin
 
   if FActiveWorkTable = nil then
   begin
+    //ComboBoxPumps.Text := '';
     SyncPumpControls;
     Exit;
   end;
@@ -754,6 +772,10 @@ begin
     ItemIndex := 0;
 
   ComboBoxPumps.ItemIndex := ItemIndex;
+ { if ItemIndex >= 0 then
+    ComboBoxPumps.Text := ComboBoxPumps.Items[ItemIndex]
+  else
+    ComboBoxPumps.Text := '';   }
 
 
   SyncPumpControls;
@@ -769,7 +791,7 @@ begin
 
   if Pump <> nil then
   begin
-    SpinBoxFreq.Value := Pump.Freq;
+   // SpinBoxFreq.Value := Pump.Freq;
     if Pump.IsRunning then
       SpeedButtonStartPump.Text := '■'
     else
@@ -778,13 +800,13 @@ begin
   end
   else
   begin
-    SpinBoxFreq.Value := 0;
+    //SpinBoxFreq.Value := 0;
     SpeedButtonStartPump.Text := '▶';
     SpeedButtonStartPump.Hint := '';
   end;
 end;
 
-procedure TFrameMainTable.ComboEditPumpsChange(Sender: TObject);
+procedure TFrameMainTable.ZChange(Sender: TObject);
 begin
   SyncPumpControls;
 end;
@@ -826,7 +848,7 @@ end;
           end;
  end;
 
-procedure TFrameMainTable.OnChangeState(const ANewState: EMeasurementState);
+procedure TFrameMainTable.OnChangeState(const ANewState: EMeasurementState); //ChangeStateHandler
 begin
   if FActiveWorkTable <> nil then
     FActiveWorkTable.MeasurementState := ANewState;
@@ -996,6 +1018,8 @@ begin
   Initialize;
 end;
 
+
+
 procedure TFrameMainTable.Initialize;
 var
   OT: TOutputType;
@@ -1013,12 +1037,9 @@ begin
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
 
-  FWorkTableManager := TWorkTableManager.Create(
-    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'Settings\TableSettings.ini'
-  );
 
-  FWorkTableManager.Load;
+
+
 
   GridDevices.RowCount := 2;
 
@@ -1042,6 +1063,7 @@ begin
   SetLength(FRows, 0);
 
   InitTables;
+
   RefreshPumpsCombo;
 
   FLastClickRow := -1;
@@ -1205,6 +1227,49 @@ begin
   SaveLayoutSettingsToWorkTable;
 end;
 
+
+
+procedure TFrameMainTable.SpeedButtonSetFlowRateClick(Sender: TObject);
+begin
+FActiveWorkTable.DoFlowRateStart;
+end;
+
+procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
+begin
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
+  begin
+    LayoutPump.tag:=0;
+
+    FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
+    FActiveWorkTable.ActivePump.State:=PUMP_STARTED;
+    UpdateUIPump;
+
+  end;
+
+
+end;
+
+
+
+procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
+begin
+FActiveWorkTable.DoFlowRateSet(SpinBoxFlowRate.value);
+
+end;
+
+procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
+begin
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
+    begin
+      FActiveWorkTable.DoFreqSet(ComboBoxPumps.Text,strtofloat(SpinBoxFreq.Text));
+    end;
+end;
+
+procedure TFrameMainTable.SpinBoxFreqMouseEnter(Sender: TObject);
+begin
+  LayoutPump.tag:=3;
+end;
+
 procedure TFrameMainTable.ButtonMonitorClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -1274,6 +1339,22 @@ begin
         (Control = LayoutConditions) or (Control = LayoutProcedures)) then
       FInstrumentalVisibleOrder.Add(TLayout(Control));
   end;
+end;
+
+procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
+begin
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
+    begin
+      LayoutPump.tag:=0;
+      FActiveWorkTable.DoPumpStop(ComboBoxPumps.Text) ;
+      FActiveWorkTable.ActivePump.State:=PUMP_STOPED;
+    end;
+end;
+
+procedure TFrameMainTable.Rectangle15Click(Sender: TObject);
+begin
+ FActiveWorkTable.DoFlowRateStop;
+
 end;
 
 procedure TFrameMainTable.ApplyInstrumentalVisibleOrder;
@@ -2613,7 +2694,19 @@ end;
 
 procedure TFrameMainTable.ComboBoxPumpsChange(Sender: TObject);
 begin
-  SyncPumpControls;
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
+    begin
+      LayoutPump.tag:=0;
+      FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
+      UpdateUIPump;
+    end;
+end;
+
+
+
+procedure TFrameMainTable.ComboBoxPumpsClick(Sender: TObject);
+begin
+  ComboBoxPumps.Tag:=2;
 end;
 
 procedure TFrameMainTable.ComboBoxUnitsChange(Sender: TObject);
@@ -2767,6 +2860,9 @@ begin
   if WorkTable = nil then
     Exit;
 
+
+
+
   // Основные MeterValues рабочего стола.
   WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
   WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
@@ -2802,6 +2898,13 @@ begin
 
   WorkTable.RecalculateAllMeterValues;
 
+  WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue;
+
+    {if WorkTable.ValueFlowRate <> nil then
+    LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
+  else
+    LabelFlowRate.Text := '-'; }
+
 end;
 
 procedure TFrameMainTable.TimerMainTimer(Sender: TObject);
@@ -2818,9 +2921,12 @@ begin
   try
   //Grid Headers + Instrumental Labels
     UpdateUIFromValues;
+    UpdateUIPump;
+    UpdateUIFlowRate;
   finally
     IsUpdating := False;
   end;
+
 
 
   if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
@@ -2886,6 +2992,7 @@ begin
   if WorkTable = nil then
     Exit;
 
+
   if WorkTable.ValueTime <> nil then
     LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
   else
@@ -2901,10 +3008,12 @@ begin
   else
     EditPres.Text := '-';
 
-  if WorkTable.ValueFlowRate <> nil then
+  {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
-    LabelFlowRate.Text := '-';
+    LabelFlowRate.Text := '-'; }
+
+
 
   if WorkTable.ValuePressure <> nil then
     LabelPressure.Text := WorkTable.ValuePressure.GetStrValue
@@ -4141,5 +4250,97 @@ begin
 
   GridEtalons.ReadOnly := True;
 end;
+
+
+
+
+procedure TFrameMainTable.UpdateUIPump;
+var
+  WorkTable: TWorkTable;
+  i:integer;
+begin
+    WorkTable := FActiveWorkTable;
+
+    if WorkTable = nil then
+      Exit;
+
+    if WorkTable.ActivePump = nil then
+      exit;
+
+    if WorkTable.ActivePump <> nil then
+      LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Freq)
+    else
+      LabelFreq.Text := '-';
+
+    if WorkTable.ActivePump.Freq = 0 then
+       Rectangle1.Fill.Color := TAlphaColorRec.White
+    else if (WorkTable.ActivePump.Freq < WorkTable.ActivePump.FreqSet) then
+      Rectangle1.Fill.Color := TAlphaColorRec.Yellow
+    else if WorkTable.ActivePump.Freq = WorkTable.ActivePump.FreqSet then
+      Rectangle1.Fill.Color := TAlphaColorRec.Greenyellow ;
+
+
+
+    if LayoutPump.tag = 3 then
+      exit;
+
+    LayoutPump.tag:=2;
+
+   // if ((SpinBoxFreq.Text='12,00') and (WorkTable.ActivePump.FreqSet <> 0)) or
+    // ((SpinBoxFreq.Text <>  '12,00') and (WorkTable.ActivePump.FreqSet = 0))  then
+
+    SpinBoxFreq.Value:= (WorkTable.ActivePump.FreqSet);
+
+
+
+
+    if ComboBoxPumps.Count <> 0 then
+      for I := ComboBoxPumps.Count-1 to 0 do
+      begin
+        if ComboBoxPumps.Items[i] =  WorkTable.ActivePump.Name then
+        begin
+          ComboBoxPumps.ItemIndex := i;
+          break;
+        end;
+      end;
+
+   LayoutPump.tag:=0;
+
+
+
+end;
+
+
+
+procedure TFrameMainTable.UpdateUIFlowRate;
+var
+  WorkTable: TWorkTable;
+  i:integer;
+begin
+    WorkTable := FActiveWorkTable;
+
+    if WorkTable = nil then
+      Exit;
+
+    if WorkTable.FlowRate.IsRunning then
+      LabelFlowRate.Text :=
+      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Flow)
+    else
+      LabelFlowRate.Text := '0';
+
+
+    if WorkTable.FlowRate.Flow = 0 then
+       Rectangle2.Fill.Color := TAlphaColorRec.White
+
+    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.FlowAccuracyPlus/100) * WorkTable.FlowRate.FlowSet ))
+    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.FlowAccuracyminus/100) * WorkTable.FlowRate.FlowSet )) then
+      Rectangle2.Fill.Color := TAlphaColorRec.Greenyellow
+        else if (WorkTable.FlowRate.Flow <> WorkTable.FlowRate.FlowSet) then
+      Rectangle2.Fill.Color := TAlphaColorRec.Yellow
+
+
+end;
+
+
 
 end.

@@ -15,11 +15,12 @@ uses
   uDATA in 'uDATA.pas' {DM: TDataModule},
   UnitClasses in 'UnitClasses.pas',
   UnitFlowMeter in 'UnitFlowMeter.pas',
-  UnitWorkTable in 'UnitWorkTable.pas',
   fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
   UnitMeterValue in 'UnitMeterValue.pas',
   frmCalibrCoefs in 'frmCalibrCoefs.pas' {FrameCalibrCoefs: TFrame},
   frmProceed in 'frmProceed.pas' {FrameProceed: TFrame},
+  frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
+  UnitWorkTable in 'UnitWorkTable.pas';
   frmMainTable in 'frmMainTable.pas',
   UnitRepositories in 'UnitRepositories.pas';
 

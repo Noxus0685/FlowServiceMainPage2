@@ -1,4 +1,4 @@
-unit fuMain;
+﻿unit fuMain;
 
 interface
 
@@ -12,6 +12,7 @@ uses
   System.SysUtils, System.Classes, FMX.Types, FMX.Controls, FMX.Forms, FMX.TabControl,
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
+  FMX.Memo.Types, FMX.ScrollBox, FMX.Memo;
   FMX.EditBox, FMX.SpinBox;
 
 type
@@ -41,13 +42,14 @@ type
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
     Label5: TLabel;
-
+    mPump: TMemo;
     procedure FormCreate(Sender: TObject);
     procedure TabControlMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
+    procedure  PumpStateHandler(APump: TPump; AAction:EPumpAction);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
 
@@ -58,9 +60,15 @@ type
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
     FNextClimateChangeAt: TDateTime;
+    FNextFreqChangeAt: TDateTime;
+
 
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
+    procedure UpdateRandomFreq(const APump: TPump);
+    procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+    procedure FlowRateStateHandler(AFlowRate: TFlowRate;
+      AAction: EFlowRateAction);
 
   public
 
@@ -80,7 +88,7 @@ begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
-
+//1233211
   FFrameMainTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
@@ -112,6 +120,22 @@ begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
+procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EPumpAction);
+begin
+
+  FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
+
+end;
+
+
+procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EFlowRateAction);
+begin
+
+  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.FlowSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
+
+end;
+
+
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
        Self.WindowState := TWindowState.wsMinimized;
@@ -132,12 +156,30 @@ end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
 begin
+
+
+  FWorkTableManager := TWorkTableManager.Create(
+    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
+    'Settings\TableSettings.ini'
+  );
+
+    FWorkTableManager.Load;
+  //Подумать над динамической привязкой ко всем столам
+  FWorkTableManager.ActiveWorkTable.OnPumpChange:= PumpStateHandler;
+  FWorkTableManager.ActiveWorkTable.OnFlowRateChange:= FlowRateStateHandler;
+
+  FWorkTableManager.ActiveWorkTable.AddPump('1');
+  FWorkTableManager.ActiveWorkTable.AddPump('2');
+  FWorkTableManager.ActiveWorkTable.AddPump('3');
+
+
   FFrameMainTable := TFrameMainTable.Create(Self);
   FFrameMainTable.Parent := TabItemTable;
   FFrameMainTable.Align := TAlignLayout.Client;
+  FFrameMainTable.WorkTableManager := FWorkTableManager ;
   FFrameMainTable.Initialize;
 
-  FWorkTableManager := FFrameMainTable.WorkTableManager;
+
 
   FFrameProceed := TFrameProceed.Create(Self);
   FFrameProceed.Parent := TabItemResults;
@@ -158,7 +200,7 @@ begin
   if AWorkTable = nil then
     Exit;
 
-   // ��������� �� ������ �������
+   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
   begin
     TempDelta :=  (Random * 0.30) - 0.15;
@@ -170,6 +212,64 @@ begin
     FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
    end;
 end;
+
+
+procedure TFormMain.UpdateRandomFreq(const APump: TPump);
+var
+  Freq: Double;
+begin
+  if APump = nil then
+    Exit;
+
+   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+  if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
+  begin
+    Freq := (Random * 10);
+
+   if APump.IsRunning = true then
+    begin
+      APump.Freq := EnsureRange(APump.Freq + Freq,APump.Freq , APump.FreqSet);
+    end
+    else
+    begin
+      APump.Freq := EnsureRange(APump.Freq - Freq,0 , APump.Freq);
+    end;
+
+
+
+    FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
+   end;
+end;
+
+
+procedure TFormMain.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+var
+  Flow: Double;
+begin
+  if AFlowRate = nil then
+    Exit;
+
+   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+  if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
+  begin
+    Flow := (Random * 10);
+
+   if AFlowRate.IsRunning = true then
+    begin
+      AFlowRate.flow := EnsureRange(AFlowRate.flow + Flow,AFlowRate.flow, AFlowRate.FlowSet);
+    end
+    else
+    begin
+      AFlowRate.flow  := EnsureRange(AFlowRate.flow  - Flow,0 , AFlowRate.flow );
+    end;
+
+
+
+    FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
+   end;
+end;
+
+
 
 procedure TFormMain.UpdateRandomSignals(const AWorkTable: TWorkTable);
 var
@@ -215,14 +315,29 @@ end;
 procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  Pump: tPump;
+  FlowRate: TFlowRate;
 begin
 
-  WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
+  try
+      WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
+      Pump := WorkTable.ActivePump;
+      FlowRate:= WorkTable.FlowRate;
+  except
+       Exit;
+  end;
+
 
   if WorkTable = nil then
     Exit;
 
+   if Pump = nil then
+    Exit;
+
     UpdateRandomClimate(WorkTable);
+    UpdateRandomFreq(Pump);
+    //UpdateRandomFlowRate(FlowRate);
+
 
 
   case WorkTable.MeasurementState of
