@@ -3,7 +3,7 @@
 interface
 
 uses
-
+  UnitRepositories,
   UnitFlowMeter,
   UnitMeterValue,
   UnitClasses, UnitDeviceClass,
@@ -299,6 +299,8 @@ type
     procedure AssignFlowMeterFrom(const ASource: TChannel; const AWorkTable: TWorkTable;
       const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
+    procedure CreateDevice;
+
   end;
 
   TWorkTable = class
@@ -434,25 +436,25 @@ type
     class function MeasurementStateFromString(const AValue: string): EMeasurementState; static;
 
     class procedure SaveGridColumns(
-      AIni: TIniFile;
+      AIni: TCustomIniFile;
       const ASectionPrefix: string;
       const AColumns: TArray<TGridColumnLayout>
     ); static;
 
     class procedure LoadGridColumns(
-      AIni: TIniFile;
+      AIni: TCustomIniFile;
       const ASectionPrefix: string;
       out AColumns: TArray<TGridColumnLayout>
     ); static;
 
     class procedure SaveChannelList(
-      AIni: TIniFile;
+      AIni: TCustomIniFile;
       const ASectionPrefix: string;
       AChannels: TObjectList<TChannel>
     ); static;
 
     class procedure LoadChannelList(
-      AIni: TIniFile;
+      AIni: TCustomIniFile;
       const ASectionPrefix: string;
       AChannels: TObjectList<TChannel>
     ); static;
@@ -783,6 +785,7 @@ procedure TChannel.Init;
 begin
   if not Assigned(FFlowMeter) then
     Exit;
+
   FFlowMeter.Init(DeviceUUID);
 end;
 
@@ -826,6 +829,24 @@ begin
   Init;
   RebindFlowMeterValues(AWorkTable);
 end;
+
+ procedure TChannel.CreateDevice;
+ var
+    ADevice: TDevice;
+    AType: TDeviceType;
+    ActiveRepo:  TDeviceRepository;
+    FoundRepo: TTypeRepository;
+begin
+
+  if DataManager = nil then
+  Exit;
+
+  if FFlowMeter = nil then
+  Exit;
+
+  FFlowMeter.CreateDevice;
+
+  end;
 
 procedure TChannel.AssignFlowMeterFrom(const ASource: TChannel;
   const AWorkTable: TWorkTable; const ACloneDeviceToRepo: Boolean);
@@ -982,7 +1003,9 @@ end;
 procedure TChannel.SetDeviceUUIDProxy(const AValue: string);
 begin
   if Assigned(FFlowMeter) then
+  begin
     FFlowMeter.DeviceUUID := AValue;
+  end;
 end;
 
 function TChannel.GetTypeUUIDProxy: string;
@@ -1941,8 +1964,8 @@ end;
 class procedure TWorkTable.Save(const AIniFileName: string;
   AWorkTables: TObjectList<TWorkTable>);
 var
-  Ini: TIniFile;
-  ValuesIni: TIniFile;
+  Ini: TMemIniFile;
+  ValuesIni: TMemIniFile;
   I: Integer;
   WorkTable: TWorkTable;
   Section: string;
@@ -1951,11 +1974,10 @@ begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
 
-  Ini := TIniFile.Create(AIniFileName);
+  Ini := TMemIniFile.Create(AIniFileName);
   WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
-  ValuesIni := TIniFile.Create(WorkTableValuesFileName);
+  ValuesIni := TMemIniFile.Create(WorkTableValuesFileName);
   try
-    Ini.EraseSection('WorkTables');
     Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
 
     if AWorkTables.Count > 0 then
@@ -1970,7 +1992,6 @@ begin
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
 
-      Ini.EraseSection(Section);
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
       Ini.WriteString(Section, 'Text', WorkTable.Text);
@@ -1994,7 +2015,6 @@ begin
       Ini.WriteBool(Section, 'LayoutProceduresVisible', WorkTable.LayoutProceduresVisible);
       Ini.WriteString(Section, 'InstrumentalLayoutOrder', WorkTable.InstrumentalLayoutOrder);
 
-      ValuesIni.EraseSection(Section);
       ValuesIni.WriteString(Section, 'HashValueTempertureBefore', WorkTable.ValueTempertureBefore.Hash);
       ValuesIni.WriteString(Section, 'HashValueTempertureAfter', WorkTable.ValueTempertureAfter.Hash);
       ValuesIni.WriteString(Section, 'HashValueTempertureDelta', WorkTable.ValueTempertureDelta.Hash);
@@ -2034,6 +2054,8 @@ begin
       SaveGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.DataPointsGridColumns);
       SaveGridColumns(Ini, Section + '.ResultsGrid', WorkTable.ResultsGridColumns);
     end;
+    Ini.UpdateFile;
+    ValuesIni.UpdateFile;
   finally
     ValuesIni.Free;
     Ini.Free;
@@ -2174,22 +2196,27 @@ begin
   end;
 end;
 
-class procedure TWorkTable.SaveGridColumns(AIni: TIniFile;
+class procedure TWorkTable.SaveGridColumns(AIni: TCustomIniFile;
   const ASectionPrefix: string; const AColumns: TArray<TGridColumnLayout>);
 var
-  I: Integer;
+  I, OldCount: Integer;
   Section: string;
 begin
   if AIni = nil then
     Exit;
 
-  AIni.EraseSection(ASectionPrefix);
+  OldCount := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
   AIni.WriteInteger(ASectionPrefix, 'Count', Length(AColumns));
+
+  for I := Length(AColumns) to OldCount - 1 do
+  begin
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    AIni.EraseSection(Section);
+  end;
 
   for I := 0 to High(AColumns) do
   begin
     Section := ASectionPrefix + '.' + IntToStr(I);
-    AIni.EraseSection(Section);
     AIni.WriteString(Section, 'Name', AColumns[I].Name);
     AIni.WriteInteger(Section, 'DisplayIndex', AColumns[I].DisplayIndex);
     AIni.WriteFloat(Section, 'Width', AColumns[I].Width);
@@ -2197,7 +2224,7 @@ begin
   end;
 end;
 
-class procedure TWorkTable.LoadGridColumns(AIni: TIniFile;
+class procedure TWorkTable.LoadGridColumns(AIni: TCustomIniFile;
   const ASectionPrefix: string; out AColumns: TArray<TGridColumnLayout>);
 var
   I, Count: Integer;
@@ -2223,18 +2250,24 @@ begin
 end;
 
 { Persists channel collection metadata to INI storage. }
-class procedure TWorkTable.SaveChannelList(AIni: TIniFile;
+class procedure TWorkTable.SaveChannelList(AIni: TCustomIniFile;
   const ASectionPrefix: string; AChannels: TObjectList<TChannel>);
 var
-  I: Integer;
+  I, OldCount: Integer;
   Channel: TChannel;
   Section: string;
 begin
   if (AIni = nil) or (AChannels = nil) then
     Exit;
 
-  AIni.EraseSection(ASectionPrefix);
+  OldCount := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
   AIni.WriteInteger(ASectionPrefix, 'Count', AChannels.Count);
+
+  for I := AChannels.Count to OldCount - 1 do
+  begin
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    AIni.EraseSection(Section);
+  end;
 
   for I := 0 to AChannels.Count - 1 do
   begin
@@ -2247,7 +2280,6 @@ begin
     else
       Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
 
-    AIni.EraseSection(Section);
     AIni.WriteInteger(Section, 'ID', Channel.ID);
     AIni.WriteString(Section, 'UUID', Channel.UUID);
     AIni.WriteBool(Section, 'Enabled', Channel.Enabled);
@@ -2279,7 +2311,7 @@ begin
 end;
 
 { Restores channel collection metadata from INI storage. }
-class procedure TWorkTable.LoadChannelList(AIni: TIniFile;
+class procedure TWorkTable.LoadChannelList(AIni: TCustomIniFile;
   const ASectionPrefix: string; AChannels: TObjectList<TChannel>);
 var
   Count, I: Integer;

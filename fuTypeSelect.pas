@@ -107,6 +107,7 @@ type
     TypePaste: TAction;
     TypeCut: TAction;
     Action3: TAction;
+    StringColumnUUID: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -168,6 +169,7 @@ type
 
     function PassTreeFilter(const AType: TDeviceType): Boolean;
     function BuildSearchURL(const ASearch: string): string;
+    procedure ApplyTreeSelectionToType(AType: TDeviceType);
 
     procedure FillComboBoxRepository;
 
@@ -518,6 +520,7 @@ procedure TFormTypeSelect.ButtonTypeAddClick(Sender: TObject);
 var
   NewType: TDeviceType;
   SelRow: Integer;
+  SourceType: TDeviceType;
   I: Integer;
 begin
 
@@ -532,9 +535,15 @@ begin
   {-------------------------------------------------}
   { 1. Формируем новый тип }
   {-------------------------------------------------}
-  SelRow := GridTypes.Row;
+  SelRow := GridTypes.Selected;
+  SourceType := nil;
 
-  NewType := ActiveRepo.CreateType(SelRow);
+  if (FDevFilteredTypes <> nil) and (SelRow >= 0) and (SelRow < FDevFilteredTypes.Count) then
+    SourceType := FDevFilteredTypes[SelRow];
+
+  NewType := ActiveRepo.CreateType(SourceType);
+  if SourceType = nil then
+    ApplyTreeSelectionToType(NewType);
 
   {-------------------------------------------------}
   { Обновляем ТОЛЬКО фильтрованные списки }
@@ -553,6 +562,34 @@ begin
         GridTypes.Row := I;
         Break;
       end;
+end;
+
+procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType);
+var
+  Cur: TTreeViewItem;
+begin
+  if AType = nil then
+    Exit;
+
+  Cur := TreeViewTypes.Selected;
+  while Cur <> nil do
+  begin
+    case Cur.Tag of
+      Ord(tnManufacturer):
+        AType.Manufacturer := Cur.TagString;
+
+      Ord(tnCategory):
+        begin
+          AType.Category := StrToIntDef(Cur.TagString, 0);
+          AType.CategoryName := Cur.Text;
+        end;
+
+      Ord(tnModification):
+        AType.Modification := Cur.TagString;
+    end;
+
+    Cur := Cur.ParentItem;
+  end;
 end;
 
  procedure TFormTypeSelect.ButtonTypeClearClick(Sender: TObject);
@@ -857,7 +894,11 @@ begin
     Value := T.VerificationMethod
 
   else if ACol = StringColumnProcedure.Index then
-    Value := T.ProcedureName;
+    Value := T.ProcedureName
+
+   else if ACol =  StringColumnUUID.Index  then
+    Value := T.UUID;
+
 end;
 
 

@@ -91,6 +91,7 @@ type
     FUUID: string;
     FDescription: string;         // Описание / примечания
     FRepoName: string;
+    procedure SetState(const Value: TObjectState); virtual;
 
   public
 
@@ -99,7 +100,7 @@ type
     function GetID: Integer;
 
     property ID: Integer read FID write FID;
-    property State: TObjectState read FState write FState;
+    property State: TObjectState read FState write SetState;
     property Name: string read FName write FName;
     property UUID: string read FUUID write FUUID;
     property Description: string read FDescription write FDescription;
@@ -120,7 +121,7 @@ type
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
     {====================================================================}
     DeviceTypeID: Integer;       // Идентификатор типа прибора (FK → TDeviceType.ID)
-
+    DeviceTypeUUID: String;       // Идентификатор типа прибора (FK → TDeviceType.ID)
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
     {====================================================================}
@@ -146,7 +147,7 @@ type
     Vmax: Double;                // Максимальный объем / масса, л (кг)
     Vmin: Double;                // Минимальный объем / масса, л (кг)
 
-    constructor Create(ADeviceTypeID : Integer);
+    constructor Create(ADeviceTypeUUID : string);
     procedure Assign(ASource: TDiameter);
 
   end;
@@ -159,7 +160,7 @@ type
 
 
     DeviceTypeID: Integer;       // Идентификатор типа прибора (FK → TDeviceType.ID)
-
+    DeviceTypeUUID: String;       // Идентификатор типа прибора (FK → TDeviceType.ID)
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
     {====================================================================}
@@ -202,7 +203,7 @@ type
     RepeatsProtocol: Integer;    // Кол-во повторов, идущих в зачёт
     Repeats: Integer;            // Общее кол-во измерений в серии
 
-    constructor Create(ADeviceTypeID : Integer);
+    constructor Create(ADeviceTypeUUID : String);
     procedure Assign(ASource: TTypePoint);
 
   end;
@@ -242,6 +243,8 @@ type
   private
       FDiameters  : TObjectList<TDiameter>;
       FPoints     : TObjectList<TTypePoint>;
+  protected
+      procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ПОЛЯ БД!!!  }
@@ -456,12 +459,17 @@ begin
     Result := ' ';
 end;
 
- constructor TTypeEntity.Create;
+constructor TTypeEntity.Create;
 begin
   inherited Create;
   FID := 0;
   FState := osNew;
   FUUID := TGUID.NewGuid.ToString;
+end;
+
+procedure TTypeEntity.SetState(const Value: TObjectState);
+begin
+  FState := Value;
 end;
 
 class function TEntitySorter<T>.Sort(
@@ -583,6 +591,7 @@ begin
     begin
       Add(IntToStr(D.ID));
       Add(IntToStr(D.DeviceTypeID));
+       Add(D.DeviceTypeUUID);
       Add(D.Name);
       Add(D.DN);
       Add(D.Description);
@@ -598,6 +607,7 @@ begin
     begin
       Add(IntToStr(P.ID));
       Add(IntToStr(P.DeviceTypeID));
+      Add(P.DeviceTypeUUID);
       Add(P.Name);
       Add(P.Description);
       Add(FloatToStr(P.FlowRate));
@@ -664,7 +674,7 @@ begin
 end;
 
 
-constructor TDiameter.Create(ADeviceTypeID : Integer);
+constructor TDiameter.Create(ADeviceTypeUUID : string);
 begin
   inherited Create;
 
@@ -675,7 +685,7 @@ begin
   {====================================================================}
   { Идентификация и связь с типом }
   {====================================================================}
-  DeviceTypeID := ADeviceTypeID;
+  DeviceTypeUUID := ADeviceTypeUUID;
   {====================================================================}
   { Общая информация }
   {====================================================================}
@@ -712,7 +722,7 @@ begin
   {----------------------------------}
   ID := ASource.ID;
   DeviceTypeID := ASource.DeviceTypeID;
-
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
   { Общая информация }
   {----------------------------------}
@@ -744,14 +754,14 @@ begin
   State := ASource.State;
 end;
 
-constructor TTypePoint.Create(ADeviceTypeID : Integer);
+constructor TTypePoint.Create(ADeviceTypeUUID : String);
 begin
   inherited Create;
 
   {====================================================================}
   { Идентификация и связи }
   {====================================================================}
-  DeviceTypeID := ADeviceTypeID;
+  DeviceTypeUUID := ADeviceTypeUUID;
 
   {====================================================================}
   { Общая информация }
@@ -796,7 +806,7 @@ begin
   Repeats := 0;
 end;
 
-procedure   TTypePoint.Assign(ASource: TTypePoint);
+procedure TTypePoint.Assign(ASource: TTypePoint);
 begin
   if ASource = nil then
     Exit;
@@ -811,7 +821,7 @@ begin
   {----------------------------------}
   ID := ASource.ID;
   DeviceTypeID := ASource.DeviceTypeID;
-
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
   { Общая информация }
   {----------------------------------}
@@ -968,6 +978,25 @@ begin
   FreeAndNil(FDiameters);
   FreeAndNil(FPoints);
   inherited;
+end;
+
+procedure TDeviceType.SetState(const Value: TObjectState);
+var
+  D: TDiameter;
+  P: TTypePoint;
+begin
+  inherited SetState(Value);
+
+  if FState = osNew then
+  begin
+    if FDiameters <> nil then
+      for D in FDiameters do
+        D.State := osNew;
+
+    if FPoints <> nil then
+      for P in FPoints do
+        P.State := osNew;
+  end;
 end;
 
 function TDeviceType.GetID: Integer;
@@ -1174,13 +1203,15 @@ begin
   if Diameters = nil then
     Diameters := TObjectList<TDiameter>.Create(True);
 
-  Result := TDiameter.Create(ID);
+  Result := TDiameter.Create(UUID);
   Result.ID := TEntityHelpers<TDiameter>.NextID(Diameters);
-  Diameters.Add(Result);
+  Result.DeviceTypeID:=ID;
 
   NewDNmm := StdDN[0];
   Result.DN   := NewDNmm.ToString;
   Result.Name := 'DN' + Result.DN;
+
+  Diameters.Add(Result);
 
 end;
 
@@ -1339,8 +1370,9 @@ begin
   if Points = nil then
     Points := TObjectList<TTypePoint>.Create(True);
 
-  Result := TTypePoint.Create(ID);
-  Result.ID :=  TEntityHelpers<TTypePoint>.NextID(Points);
+  Result := TTypePoint.Create(UUID);
+  Result.ID := TEntityHelpers<TTypePoint>.NextID(Points);
+  Result.DeviceTypeID:= ID;
 
   StdIdx := GetNextPointStdIndex(Points.Count);
   Result.FlowRate := StdPointRates[StdIdx];
@@ -1539,6 +1571,7 @@ begin
     NewD := AddDiameter;   // ← создаём с текущим ID типа
     NewD.Assign(D);
     NewD.DeviceTypeID := ID;
+    NewD.DeviceTypeUUID := UUID;
   end;
 
   {====================================================================}
@@ -1551,6 +1584,7 @@ begin
     NewP := AddTypePoint;  // ← создаём с текущим ID типа
     NewP.Assign(P);
     NewP.DeviceTypeID := ID;
+    NewP.DeviceTypeUUID := UUID;
   end;
 end;
 

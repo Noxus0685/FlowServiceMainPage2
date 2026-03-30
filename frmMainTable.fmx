@@ -1,28 +1,28 @@
 object FrameMainTable: TFrameMainTable
-  Size.Width = 1252.000000000000000000
-  Size.Height = 685.000000000000000000
+  Size.Width = 1444.000000000000000000
+  Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
   object Layout: TLayout
     Align = Client
-    Size.Width = 1252.000000000000000000
-    Size.Height = 685.000000000000000000
+    Size.Width = 1444.000000000000000000
+    Size.Height = 686.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     object PanelInstruments: TPanel
       Align = MostTop
       PopupMenu = PopupMenuInstrumentalLayOut
-      Size.Width = 1252.000000000000000000
+      Size.Width = 1444.000000000000000000
       Size.Height = 129.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       object HorzScrollBoxInstrumental: THorzScrollBox
         Align = Client
         PopupMenu = PopupMenuInstrumentalLayOut
-        Size.Width = 1252.000000000000000000
+        Size.Width = 1444.000000000000000000
         Size.Height = 129.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        Viewport.Width = 1252.000000000000000000
+        Viewport.Width = 1444.000000000000000000
         Viewport.Height = 113.000000000000000000
         object LayoutConditions: TLayout
           Align = Left
@@ -221,20 +221,20 @@ object FrameMainTable: TFrameMainTable
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
-          object Layout5: TLayout
+          object LayoutFLR: TLayout
             Align = Client
             Size.Width = 271.000000000000000000
             Size.Height = 113.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
-            object Layout12: TLayout
+            object LayoutFLDisplay: TLayout
               Position.X = 8.000000000000000000
               Position.Y = 8.000000000000000000
               Size.Width = 232.000000000000000000
               Size.Height = 40.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              object Rectangle2: TRectangle
+              object RectangleLabelFR: TRectangle
                 Align = Right
                 Fill.Color = claWhite
                 Position.X = 141.000000000000000000
@@ -255,7 +255,7 @@ object FrameMainTable: TFrameMainTable
                   TabOrder = 0
                 end
               end
-              object Layout13: TLayout
+              object LayoutSpinEditFR: TLayout
                 Align = Left
                 Size.Width = 119.000000000000000000
                 Size.Height = 40.000000000000000000
@@ -285,7 +285,7 @@ object FrameMainTable: TFrameMainTable
                 end
               end
             end
-            object Layout14: TLayout
+            object LayoutFREdit: TLayout
               Position.X = 8.000000000000000000
               Position.Y = 65.000000000000000000
               Size.Width = 232.000000000000000000
@@ -295,6 +295,7 @@ object FrameMainTable: TFrameMainTable
               object ComboEditUnits: TComboBox
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Left
+                Hint = #1042#1099#1073#1088#1072#1090#1100' '#1077#1076#1080#1085#1080#1094#1099' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
                 Items.Strings = (
                   #1084'3/'#1095)
                 ItemIndex = 0
@@ -308,6 +309,7 @@ object FrameMainTable: TFrameMainTable
               end
               object SpeedButtonSetFlowRate: TSpeedButton
                 Align = Left
+                Hint = #1042#1099#1081#1090#1080' '#1085#1072' '#1079#1072#1076#1072#1085#1085#1099#1081' '#1088#1072#1089#1093#1086#1076
                 Padding.Left = 10.000000000000000000
                 Margins.Left = 10.000000000000000000
                 Position.X = 139.000000000000000000
@@ -319,8 +321,9 @@ object FrameMainTable: TFrameMainTable
                 TextSettings.Trimming = None
                 OnClick = SpeedButtonSetFlowRateClick
               end
-              object SpeedButton4: TSpeedButton
+              object SpeedButtonStopChangeFlowRate: TSpeedButton
                 Align = Left
+                Hint = #1054#1089#1090#1072#1085#1086#1074#1080#1090#1100' '#1074#1099#1093#1086#1076' '#1085#1072' '#1088#1072#1089#1093#1086#1076
                 Margins.Left = 10.000000000000000000
                 Position.X = 171.000000000000000000
                 Size.Width = 22.000000000000000000
@@ -1102,7 +1105,7 @@ object FrameMainTable: TFrameMainTable
                 Align = Left
                 Padding.Left = 10.000000000000000000
                 Margins.Left = 10.000000000000000000
-                Position.X = 131.000000000000000000
+                Position.X = 141.000000000000000000
                 Size.Width = 22.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -1114,7 +1117,7 @@ object FrameMainTable: TFrameMainTable
               object SpeedButton28: TSpeedButton
                 Align = Left
                 Margins.Left = 10.000000000000000000
-                Position.X = 163.000000000000000000
+                Position.X = 173.000000000000000000
                 Size.Width = 22.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -1174,15 +1177,15 @@ object FrameMainTable: TFrameMainTable
       Align = Client
       Padding.Left = 10.000000000000000000
       PopupMenu = PopupMenuWorkTables
-      Size.Width = 1252.000000000000000000
-      Size.Height = 460.000000000000000000
+      Size.Width = 1444.000000000000000000
+      Size.Height = 461.000000000000000000
       Size.PlatformDefault = False
       TabIndex = 0
       TabOrder = 1
       TabPosition = PlatformDefault
       Sizes = (
-        1242s
-        434s)
+        1434s
+        435s)
       object TabItemWorkTable1: TTabItem
         CustomIcon = <
           item
@@ -1200,13 +1203,13 @@ object FrameMainTable: TFrameMainTable
         ExplicitSize.cy = 26.000000000000000000
         object Panel2: TPanel
           Align = Top
-          Size.Width = 1242.000000000000000000
+          Size.Width = 1434.000000000000000000
           Size.Height = 152.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 2
           object Layout1: TLayout
             Align = Client
-            Size.Width = 1242.000000000000000000
+            Size.Width = 1434.000000000000000000
             Size.Height = 120.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
@@ -1215,15 +1218,16 @@ object FrameMainTable: TFrameMainTable
               CanFocus = True
               ClipChildren = True
               PopupMenu = PopupMenuEtalonsGrid
-              Size.Width = 1242.000000000000000000
+              Size.Width = 1434.000000000000000000
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               RowCount = 2
               OnGetValue = GridEtalonsGetValue
               OnCellClick = GridEtalonsCellClick
-              Viewport.Width = 1238.000000000000000000
-              Viewport.Height = 79.000000000000000000
+              OnCellDblClick = GridEtalonsCellDblClick
+              Viewport.Width = 1434.000000000000000000
+              Viewport.Height = 120.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -1244,6 +1248,10 @@ object FrameMainTable: TFrameMainTable
                 HeaderSettings.TextSettings.HorzAlign = Center
                 ReadOnly = True
                 Size.Width = 111.000000000000000000
+              end
+              object PopupColumnEtalonDN1: TPopupColumn
+                Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+                HeaderSettings.TextSettings.WordWrap = False
               end
               object StringColumnEtalonName1: TStringColumn
                 Header = #1055#1088#1080#1073#1086#1088
@@ -1310,7 +1318,7 @@ object FrameMainTable: TFrameMainTable
           end
           object ToolBar2: TToolBar
             PopupMenu = PopupMenuEtalonsGridLayOut
-            Size.Width = 1242.000000000000000000
+            Size.Width = 1434.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
@@ -1318,6 +1326,9 @@ object FrameMainTable: TFrameMainTable
               PopupMenu = PopupMenuEtalonsGridLayOut
               Position.X = 1.000000000000000000
               Position.Y = 8.000000000000000000
+              Size.Width = 100.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
               Text = #1069#1090#1072#1083#1086#1085#1099
               TabOrder = 0
             end
@@ -1325,8 +1336,8 @@ object FrameMainTable: TFrameMainTable
         end
         object Panel3: TPanel
           Align = Client
-          Size.Width = 1242.000000000000000000
-          Size.Height = 266.000000000000000000
+          Size.Width = 1434.000000000000000000
+          Size.Height = 267.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
           object GridDevices: TGrid
@@ -1334,15 +1345,17 @@ object FrameMainTable: TFrameMainTable
             CanFocus = True
             ClipChildren = True
             PopupMenu = PopupMenuDevicesGrid
-            Size.Width = 1242.000000000000000000
-            Size.Height = 234.000000000000000000
+            Size.Width = 1434.000000000000000000
+            Size.Height = 235.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+            OnHeaderClick = GridDevicesHeaderClick
             OnGetValue = GridDevicesGetValue
             OnCellClick = GridDevicesCellClick
-            Viewport.Width = 1222.000000000000000000
-            Viewport.Height = 193.000000000000000000
+            OnCellDblClick = GridDevicesCellDblClick
+            Viewport.Width = 1434.000000000000000000
+            Viewport.Height = 235.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -1364,6 +1377,10 @@ object FrameMainTable: TFrameMainTable
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
               Size.Width = 111.000000000000000000
+            end
+            object PopupColumnDeviceDN1: TPopupColumn
+              Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceName1: TStringColumn
               Header = #1055#1088#1080#1073#1086#1088
@@ -1437,17 +1454,23 @@ object FrameMainTable: TFrameMainTable
               Header = #1047#1085#1072#1095#1077#1085#1080#1077
               HeaderSettings.TextSettings.WordWrap = False
             end
+            object StringColumnUUID1: TStringColumn
+              Header = 'UUID'
+              HeaderSettings.TextSettings.WordWrap = False
+            end
           end
           object ToolBar1: TToolBar
             PopupMenu = PopupMenuDevicesGridLayOut
-            Size.Width = 1242.000000000000000000
+            Size.Width = 1434.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Label23: TLabel
+              Align = Left
               PopupMenu = PopupMenuDevicesGridLayOut
-              Position.X = 1.000000000000000000
-              Position.Y = 8.000000000000000000
+              Size.Width = 100.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
               Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
               TabOrder = 0
             end
@@ -1455,6 +1478,61 @@ object FrameMainTable: TFrameMainTable
               OnPopup = PopupMenuDevicesGridLayOutPopup
               Left = 1610
               Top = 461
+            end
+            object SpeedButton1: TSpeedButton
+              Action = ActionDevicesFillAllBySelected
+              Align = Left
+              ImageIndex = -1
+              Position.X = 100.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'arrowdowntoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton2: TSpeedButton
+              Action = ActionDevicesClearAll
+              Align = Left
+              ImageIndex = -1
+              Position.X = 153.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'pagecurltoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton3: TSpeedButton
+              Action = ActionDevicesClearRow
+              Align = Left
+              ImageIndex = -1
+              Position.X = 206.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'trashtoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton4: TSpeedButton
+              Action = ActionAddDeviceChannel
+              Align = Left
+              ImageIndex = -1
+              Position.X = 259.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'additembutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton5: TSpeedButton
+              Action = ActionOpenDeviceSelect
+              Align = Left
+              ImageIndex = -1
+              Position.X = 312.000000000000000000
+              Size.Width = 57.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'searchtoolbutton'
+              TextSettings.Trimming = None
             end
           end
         end
@@ -1464,7 +1542,7 @@ object FrameMainTable: TFrameMainTable
           MinSize = 20.000000000000000000
           Position.Y = 152.000000000000000000
           ShowGrip = False
-          Size.Width = 1242.000000000000000000
+          Size.Width = 1434.000000000000000000
           Size.Height = 16.000000000000000000
           Size.PlatformDefault = False
         end
@@ -1472,8 +1550,8 @@ object FrameMainTable: TFrameMainTable
     end
     object LayoutControl: TLayout
       Align = MostBottom
-      Position.Y = 589.000000000000000000
-      Size.Width = 1252.000000000000000000
+      Position.Y = 590.000000000000000000
+      Size.Width = 1444.000000000000000000
       Size.Height = 96.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 4

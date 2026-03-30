@@ -2783,6 +2783,8 @@ begin
   if D = nil then
     Exit;
 
+  D.State:=osModified;
+
   S := Trim(Value.AsString);
 
   {=====================================================}
@@ -3028,6 +3030,7 @@ begin
     end;
   end;
 
+  P.State:=osModified;
   SetModified;
   UpdatePointsGrid;
 end;

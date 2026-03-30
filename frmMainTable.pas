@@ -124,17 +124,17 @@ type
     Line3: TLine;
     LayoutFlowRate: TLayout;
     Line5: TLine;
-    Layout5: TLayout;
-    Layout12: TLayout;
-    Rectangle2: TRectangle;
+    LayoutFLR: TLayout;
+    LayoutFLDisplay: TLayout;
+    RectangleLabelFR: TRectangle;
     LabelFlowRate: TLabel;
-    Layout13: TLayout;
+    LayoutSpinEditFR: TLayout;
     LabelNameFlowRate: TLabel;
     SpinBoxFlowRate: TSpinBox;
-    Layout14: TLayout;
+    LayoutFREdit: TLayout;
     ComboEditUnits: TComboBox;
     SpeedButtonSetFlowRate: TSpeedButton;
-    SpeedButton4: TSpeedButton;
+    SpeedButtonStopChangeFlowRate: TSpeedButton;
     Rectangle15: TRectangle;
     LabelLayoutFlowRate: TLabel;
     Line6: TLine;
@@ -314,6 +314,14 @@ type
     ActionEtalonsSetFlowSource: TAction;
     ActionEtalonsAssignEtalon: TAction;
     ComboBoxPumps: TComboBox;
+    StringColumnUUID1: TStringColumn;
+    SpeedButton1: TSpeedButton;
+    SpeedButton2: TSpeedButton;
+    SpeedButton3: TSpeedButton;
+    SpeedButton4: TSpeedButton;
+    SpeedButton5: TSpeedButton;
+    PopupColumnEtalonDN1: TPopupColumn;
+    PopupColumnDeviceDN1: TPopupColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -325,6 +333,7 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
     procedure ActionAddEtalonChannelExecute(Sender: TObject);
@@ -399,6 +408,11 @@ type
     procedure Rectangle15Click(Sender: TObject);
     procedure SpeedButtonSetFlowRateClick(Sender: TObject);
     procedure SpinBoxFlowRateChange(Sender: TObject);
+    procedure ComboBoxPumpsChange(Sender: TObject);
+    procedure GridEtalonsCellDblClick(const Column: TColumn;
+      const Row: Integer);
+    procedure GridDevicesCellDblClick(const Column: TColumn;
+      const Row: Integer);
 
   private
 
@@ -426,13 +440,14 @@ type
     procedure UpdateGridDevices;
     procedure UpdateUIFromValues;
     procedure SetValues;
+    function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
+    procedure FillDNItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
+    function ApplyChannelDNChange(AChannel: TChannel; const ANewDN: string): Boolean;
     procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
     procedure FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
     procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
     function IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
     procedure GridDevicesActionsMenuClick(Sender: TObject);
-    procedure SaveLayoutSettingsToWorkTable;
-    procedure LoadLayoutSettingsFromWorkTable;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure EnforceDataPointsColumnsLayout;
@@ -442,6 +457,8 @@ type
     procedure ResetMeasurementValues;
     procedure RefreshPumpsCombo;
     procedure SyncPumpControls;
+    procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
+      AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
 
     procedure SetConfiguration;
     procedure StartMonitor;
@@ -456,6 +473,7 @@ type
     procedure ClearChannelData(AChannel: TChannel);
     procedure CopyChannelData(ASource, ADest: TChannel);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
+
 
 
   private
@@ -485,7 +503,8 @@ type
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
 
-
+    procedure SaveLayoutSettingsToWorkTable;
+    procedure LoadLayoutSettingsFromWorkTable;
 
     property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
 
@@ -757,6 +776,7 @@ begin
     ComboBoxPumps.Text := ComboBoxPumps.Items[ItemIndex]
   else
     ComboBoxPumps.Text := '';   }
+
 
   SyncPumpControls;
 end;
@@ -2086,6 +2106,105 @@ begin
       Exit(I);
 end;
 
+function TFrameMainTable.ResolveTypeForChannel(AChannel: TChannel;
+  out ARepo: TTypeRepository): TDeviceType;
+var
+  TypeUUID: string;
+  TypeName: string;
+begin
+  Result := nil;
+  ARepo := nil;
+
+  if (AChannel = nil) or (DataManager = nil) then
+    Exit;
+
+  TypeUUID := Trim(AChannel.TypeUUID);
+  TypeName := Trim(AChannel.TypeName);
+
+  if (TypeUUID = '') and (AChannel.FlowMeter <> nil) then
+    TypeUUID := Trim(AChannel.FlowMeter.DeviceTypeUUID);
+
+  if (TypeName = '') and (AChannel.FlowMeter <> nil) then
+    TypeName := Trim(AChannel.FlowMeter.DeviceTypeName);
+
+  Result := DataManager.FindType(TypeUUID, TypeName, ARepo);
+end;
+
+procedure TFrameMainTable.FillDNItemsForChannel(AChannel: TChannel;
+  APopupColumn: TPopupColumn);
+var
+  DeviceType: TDeviceType;
+  Repo: TTypeRepository;
+  D: TDiameter;
+begin
+  if APopupColumn = nil then
+    Exit;
+
+  APopupColumn.Items.BeginUpdate;
+  try
+    APopupColumn.Items.Clear;
+
+    DeviceType := ResolveTypeForChannel(AChannel, Repo);
+    if (DeviceType = nil) or (DeviceType.Diameters = nil) then
+      Exit;
+
+    for D in DeviceType.Diameters do
+      if (D <> nil) and (Trim(D.Name) <> '') then
+        APopupColumn.Items.Add(D.Name);
+  finally
+    APopupColumn.Items.EndUpdate;
+  end;
+end;
+
+function TFrameMainTable.ApplyChannelDNChange(AChannel: TChannel;
+  const ANewDN: string): Boolean;
+var
+  DeviceType: TDeviceType;
+  Repo: TTypeRepository;
+  Device: TDevice;
+  NewDN: string;
+  D: TDiameter;
+begin
+  Result := False;
+
+  NewDN := Trim(ANewDN);
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (NewDN = '') then
+    Exit;
+
+  Device := AChannel.FlowMeter.Device;
+  if Device = nil then
+    Exit;
+
+  if SameText(Trim(Device.DN), NewDN) then
+    Exit;
+
+  DeviceType := ResolveTypeForChannel(AChannel, Repo);
+
+  if DeviceType = nil then
+  begin
+    Device.DN := NewDN;
+    Device.SyncNameWithModificationAndDiameter;
+  end
+  else
+  begin
+    D := DeviceType.FindDiameterByDN(NewDN);
+    if D = nil then
+    begin
+      Device.DN := NewDN;
+      Device.SyncNameWithModificationAndDiameter;
+    end
+    else
+      Device.AttachDN(D, DeviceType);
+  end;
+
+  if AChannel.FlowMeter <> nil then
+    AChannel.FlowMeter.UpdateByDevice;
+
+  MarkChannelDeviceModified(AChannel);
+  PersistDeviceAsync(Device);
+  Result := True;
+end;
+
 procedure TFrameMainTable.ActionAddWorkTableExecute(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -2183,13 +2302,7 @@ begin
     Exit;
   end;
 
-  if (ADevice = nil) and (ActiveRepo <> nil) then
-  begin
-    ADevice := ActiveRepo.CreateDevice(-1);
-    AChannel.DeviceUUID := ADevice.UUID;
-    AChannel.TypeName := ADevice.DeviceTypeName;
-    AChannel.Serial := ADevice.SerialNumber;
-  end;
+  AChannel.CreateDevice;
 
   Frm := TFormDeviceEditor.Create(Self);
   try
@@ -2199,6 +2312,7 @@ begin
       if ADevice <> nil then
       begin
         AChannel.DeviceUUID := ADevice.UUID;
+        AChannel.DeviceName:= ADevice.Name;
         AChannel.TypeName := ADevice.DeviceTypeName;
         AChannel.Serial := ADevice.SerialNumber;
         AChannel.Signal := ADevice.OutputType;
@@ -2444,7 +2558,7 @@ begin
   if AChannel = nil then
     Exit;
 
-  Device := nil;
+
   if (AChannel.FlowMeter <> nil) then
     Device := AChannel.FlowMeter.Device;
 
@@ -2527,15 +2641,31 @@ end;
 procedure TFrameMainTable.ActionDevicesFillAllBySelectedExecute(Sender: TObject);
 var
   Src, Ch: TChannel;
+  SourceType: TDeviceType;
+  FoundRepo: TTypeRepository;
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
+     (DataManager = nil) then
     Exit;
+
   Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
   if Src = nil then
     Exit;
+
+  FoundRepo := nil;
+  SourceType := DataManager.FindType(Src.TypeUUID, Src.TypeName, FoundRepo);
+  if SourceType = nil then
+  begin
+    ShowMessage('Тип выбранной строки не найден в подключенных репозиториях.');
+    Exit;
+  end;
+
   for Ch in FActiveWorkTable.DeviceChannels do
-    if Ch <> Src then
-      CopyChannelData(Src, Ch);
+    if (Ch <> Src) and Ch.Enabled then
+    begin
+      AttachType(Ch, SourceType, FoundRepo, True);
+    end;
+
   UpdateGrids;
 end;
 
@@ -3003,14 +3133,65 @@ begin
  // FFlowMeterRows[ARow].Meter.SerialNumber := CFlowMeterSerials[FFlowMeterRows[ARow].SerialIndex];
 end;
 
+procedure TFrameMainTable.AttachType(AChannel: TChannel; ANewType: TDeviceType;
+  AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
+var
+  RepoName: string;
+  RepoUUID: string;
+begin
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (ANewType = nil) then
+    Exit;
+
+  if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
+    AFoundRepo := DataManager.ActiveTypeRepo;
+
+  if AFoundRepo <> nil then
+  begin
+    RepoName := AFoundRepo.Name;
+    RepoUUID := AFoundRepo.UUID;
+  end
+  else
+  begin
+    RepoName := '';
+    RepoUUID := '';
+  end;
+
+  AChannel.TypeName := ANewType.Name;
+  AChannel.TypeUUID := ANewType.UUID;
+  AChannel.RepoTypeName := RepoName;
+  AChannel.RepoTypeUUID := RepoUUID;
+
+  if not Assigned(AChannel.FlowMeter.Device) then
+    Exit;
+
+  AChannel.FlowMeter.Device.DeviceTypeUUID := ANewType.UUID;
+  AChannel.FlowMeter.Device.DeviceTypeName := ANewType.Name;
+  AChannel.FlowMeter.Device.RepoTypeName := RepoName;
+  AChannel.FlowMeter.Device.RepoTypeUUID := RepoUUID;
+
+  if not AIsTypeChanged then
+    Exit;
+
+  AChannel.FlowMeter.Device.AttachType(ANewType, RepoName);
+  // При смене типа поверочные точки должны полностью переходить из типа в прибор.
+  // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
+  AChannel.FlowMeter.Device.FillFromType(ANewType, False);
+
+
+
+
+  if AChannel.FlowMeter.Device.State in [osClean, osLoaded] then
+    AChannel.FlowMeter.Device.State := osModified;
+  MarkChannelDeviceModified(AChannel);
+  PersistDeviceAsync(AChannel.FlowMeter.Device);
+end;
+
 procedure TFrameMainTable.OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean);
 var
   Frm: TFormTypeSelect;
   CurrentType, NewType: TDeviceType;
   FoundRepo, PreferredRepo: TTypeRepository;
-  RepoName: string;
-  RepoUUID: string;
-  IsTypeChanged, NeedFill: Boolean;
+  IsTypeChanged: Boolean;
   Ch: TChannel;
   Repo: TTypeRepository;
 begin
@@ -3110,68 +3291,10 @@ begin
           (not SameText(CurrentType.Modification, NewType.Modification));
     end;
 
-    NeedFill := False;
-    // if IsTypeChanged then
-    //   NeedFill := AskFillFromType;
+    AttachType(Ch, NewType, FoundRepo, IsTypeChanged);
 
     {----------------------------------------------------}
-    { 4. Привязываем тип (в runtime: FlowMeter / Channel) }
-    {----------------------------------------------------}
-    if (DataManager.ActiveTypeRepo <> nil) then
-      FoundRepo := DataManager.ActiveTypeRepo;
-
-    if FoundRepo <> nil then
-    begin
-      RepoName := FoundRepo.Name;
-      RepoUUID := FoundRepo.UUID;
-    end
-    else
-    begin
-      RepoName := '';
-      RepoUUID := '';
-    end;
-
-    // Новая идеология: канал проксирует в FlowMeter
-    Ch.TypeName := NewType.Name;
-    Ch.TypeUUID := NewType.UUID;
-    Ch.RepoTypeName := RepoName;
-    Ch.RepoTypeUUID := RepoUUID;
-
-    if Assigned(Ch.FlowMeter) and Assigned(Ch.FlowMeter.Device) then
-    begin
-      Ch.FlowMeter.Device.DeviceTypeUUID := NewType.UUID;
-      Ch.FlowMeter.Device.DeviceTypeName := NewType.Name;
-      Ch.FlowMeter.Device.RepoTypeName := RepoName;
-      Ch.FlowMeter.Device.RepoTypeUUID := RepoUUID;
-
-      if IsTypeChanged then
-      begin
-        Ch.FlowMeter.Device.AttachType(NewType, RepoName);
-        // При смене типа поверочные точки должны полностью переходить из типа в прибор.
-        // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
-        Ch.FlowMeter.Device.FillFromType(NewType, False);
-        if Ch.FlowMeter.Device.State in [osClean, osLoaded] then
-          Ch.FlowMeter.Device.State := osModified;
-        PersistDeviceAsync(Ch.FlowMeter.Device);
-      end;
-    end;
-
-    // Если у вас был расчёт индекса по типу для UI/сигнала — храните как отдельное поле канала/строки,
-    // либо пересчитывайте динамически. Здесь оставляю как комментарий:
-    // Ch.TypeIndex := FindTypeIndex(NewType.Name);
-
-    {----------------------------------------------------}
-    { 5. При необходимости заполняем данные прибора из типа }
-    {----------------------------------------------------}
-    // В новой модели это обычно делается на уровне привязки TDevice к каналу:
-    // if NeedFill and Assigned(Ch.FlowMeter.Device) then
-    // begin
-    //   Ch.FlowMeter.Device.AttachType(NewType, RepoName);
-    //   Ch.FlowMeter.Device.FillFromType(NewType);
-    // end;
-
-    {----------------------------------------------------}
-    { 6. Обновляем UI }
+    { 4. Обновляем UI }
     {----------------------------------------------------}
     FActiveWorkTable.RecalculateAllMeterValues;
 
@@ -3332,7 +3455,7 @@ end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
-  SECOND_CLICK_MS = 700; // окно "второго клика" (подбери по ощущениям)
+  SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
 var
   Tick: Cardinal;
   IsSecondClick: Boolean;
@@ -3369,7 +3492,17 @@ begin
       FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
   end;
 
-    if (Column = PopupColumnDeviceSignal1 ) then
+    if (Column = PopupColumnDeviceDN1) then
+  begin
+    if WorkTable <> nil then
+      FillDNItemsForChannel(WorkTable.DeviceChannels[Row], PopupColumnDeviceDN1);
+    GridDevices.ReadOnly := False;
+    GridDevices.EditorMode := True;
+    inherited;
+    Exit;
+  end;
+
+  if (Column = PopupColumnDeviceSignal1 ) then
   begin
     GridDevices.ReadOnly:=False;
     GridDevices.EditorMode := True;
@@ -3413,6 +3546,104 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
+var
+  WorkTable: TWorkTable;
+  Row: Integer;
+  AllEnabled: Boolean;
+  NewEnabled: Boolean;
+begin
+  if Column = CheckColumnDeviceEnable1 then
+  begin
+
+  WorkTable := GetWorkTableByIndex(0);
+  if WorkTable <> nil then
+  begin
+    AllEnabled := WorkTable.DeviceChannels.Count > 0;
+    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
+      if not WorkTable.DeviceChannels[Row].Enabled then
+      begin
+        AllEnabled := False;
+        Break;
+      end;
+
+    NewEnabled := not AllEnabled;
+    for Row := 0 to WorkTable.DeviceChannels.Count - 1 do
+    begin
+      WorkTable.DeviceChannels[Row].Enabled := NewEnabled;
+      MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
+    end;
+  end
+  else
+  begin
+    AllEnabled := Length(FFlowMeterRows) > 0;
+    for Row := 0 to High(FFlowMeterRows) do
+      if not FFlowMeterRows[Row].Enabled then
+      begin
+        AllEnabled := False;
+        Break;
+      end;
+
+    NewEnabled := not AllEnabled;
+    for Row := 0 to High(FFlowMeterRows) do
+      FFlowMeterRows[Row].Enabled := NewEnabled;
+  end;
+
+  UpdateGridDevices;
+  end;
+end;
+
+procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
+  const Row: Integer);
+var
+  Rows: Integer;
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
+    Exit;
+
+  if (WorkTable = nil) and ((Row < 0) or (Row >= Length(FFlowMeterRows))) then
+    Exit;
+
+  Rows := GridDevices.RowCount;
+  GridDevices.ReadOnly := True;
+
+
+    if Column = ColumnDeviceType1 then
+    begin
+      GridDevices.EditorMode := False;
+      if WorkTable <> nil then
+        OpenTypeSelect(Row, False);
+    end
+    else if Column = StringColumnDeviceName1 then
+    begin
+      GridDevices.EditorMode := False;
+      if WorkTable <> nil then
+        OpenChannelDeviceEditor(WorkTable.DeviceChannels[Row]);
+    end
+    else if Column = StringColumnDeviceSerial1 then
+    begin
+      GridDevices.ReadOnly := False;
+      GridDevices.EditorMode := True;
+
+      if WorkTable = nil then
+      begin
+        FFlowMeterRows[Row].SerialIndex :=
+          (FFlowMeterRows[Row].SerialIndex + 1) mod Length(CFlowMeterSerials);
+        ApplyFlowMeterSelection(Row);
+      end;
+    end;
+
+
+  GridDevices.BeginUpdate;
+  try
+    GridDevices.RowCount := Rows;
+  finally
+    GridDevices.EndUpdate;
+  end;
+end;
+
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -3427,6 +3658,14 @@ begin
       Value := WorkTable.DeviceChannels[ARow].Text
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
       Value := WorkTable.DeviceChannels[ARow].TypeName
+    else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.DN
+      else
+        Value := '';
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceName1 then
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
@@ -3488,8 +3727,15 @@ begin
         Value := '-';
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-      Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal);
-    Exit;
+      Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal)
+    else if GridDevices.Columns[ACol] = StringColumnUUID1 then
+        begin
+        if WorkTable.DeviceChannels[ARow].FlowMeter.Device<>nil then
+           Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID;
+        end;
+
+
+          Exit;
   end;
 
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
@@ -3531,6 +3777,8 @@ begin
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
     end
+    else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
+      Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString)
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
@@ -3552,8 +3800,6 @@ end;
 
 procedure TFrameMainTable.GridEtalonsCellClick(const Column: TColumn;
   const Row: Integer);
-const
-  SECOND_CLICK_MS = 700;
 var
   Tick: Cardinal;
   IsSecondClick: Boolean;
@@ -3574,8 +3820,7 @@ begin
 
   IsSecondClick :=
     (Row = FLastClickRow) and
-    (Column = FLastClickCol) and
-    (Tick - FLastClickTick <= SECOND_CLICK_MS);
+    (Column = FLastClickCol);
 
   FLastClickRow := Row;
   FLastClickCol := Column;
@@ -3593,6 +3838,16 @@ begin
 
     if WorkTable <> nil then
       WorkTable.RebindAllFlowMeters;
+  end;
+
+  if Column = PopupColumnEtalonDN1 then
+  begin
+    if WorkTable <> nil then
+      FillDNItemsForChannel(WorkTable.EtalonChannels[Row], PopupColumnEtalonDN1);
+    GridEtalons.ReadOnly := False;
+    GridEtalons.EditorMode := True;
+    inherited;
+    Exit;
   end;
 
   if Column = PopupColumnEtalonSignal1 then
@@ -3632,6 +3887,52 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.GridEtalonsCellDblClick(const Column: TColumn;
+  const Row: Integer);
+var
+  Tick: Cardinal;
+  IsSecondClick: Boolean;
+  Rows: Integer;
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetWorkTableByIndex(0);
+
+  if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
+    Exit;
+
+  if (WorkTable = nil) and ((Row < 0) or (Row >= Length(FRows))) then
+    Exit;
+
+  Rows := GridEtalons.RowCount;
+  GridEtalons.ReadOnly := True;
+
+    if Column = StringColumnEtalonType1 then
+    begin
+      GridEtalons.EditorMode := False;
+      if WorkTable <> nil then
+        OpenTypeSelect(Row, True);
+    end
+    else if Column = StringColumnEtalonName1 then
+    begin
+      GridEtalons.EditorMode := False;
+      if WorkTable <> nil then
+        OpenChannelDeviceEditor(WorkTable.EtalonChannels[Row]);
+    end
+    else if Column = StringColumnEtalonSerial1 then
+    begin
+      GridEtalons.ReadOnly := False;
+      GridEtalons.EditorMode := True;
+    end;
+
+
+  GridEtalons.BeginUpdate;
+  try
+    GridEtalons.RowCount := Rows;
+  finally
+    GridEtalons.EndUpdate;
+  end;
+
+end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
@@ -3649,6 +3950,14 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
       Value := WorkTable.EtalonChannels[ARow].TypeName
+    else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.Device <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.Device.DN
+      else
+        Value := '';
+    end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonName1 then
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
@@ -3910,6 +4219,8 @@ begin
       Changed := WorkTable.EtalonChannels[ARow].Serial <> Value.AsString;
       WorkTable.EtalonChannels[ARow].Serial := Value.AsString;
     end
+    else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
+      Changed := ApplyChannelDNChange(WorkTable.EtalonChannels[ARow], Value.AsString)
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin

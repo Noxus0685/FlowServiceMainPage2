@@ -1888,6 +1888,7 @@ object FormDeviceEditor: TFormDeviceEditor
           RowHeight = 18.000000000000000000
           RowCount = 3
           OnGetValue = GridPointsGetValue
+          OnSetValue = GridPointsSetValue
           Viewport.Width = 896.000000000000000000
           Viewport.Height = 275.000000000000000000
           object StringColumnPointName: TStringColumn

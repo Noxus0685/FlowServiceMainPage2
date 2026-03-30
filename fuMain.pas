@@ -7,12 +7,13 @@ uses
   frmMainTable,
   UnitBaseProcedures,
   UnitWorkTable,
-
-
+  UnitDataManager,
+  System.UITypes,
   System.SysUtils, System.Classes, FMX.Types, FMX.Controls, FMX.Forms, FMX.TabControl,
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo;
+  FMX.EditBox, FMX.SpinBox;
 
 type
   TFormMain = class(TForm)
@@ -49,11 +50,15 @@ type
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
     procedure  PumpStateHandler(APump: TPump; AAction:EPumpAction);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+
+
+
+
   private
     FWorkTableManager: TWorkTableManager;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
-
     FNextClimateChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
 
@@ -64,6 +69,7 @@ type
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
     procedure FlowRateStateHandler(AFlowRate: TFlowRate;
       AAction: EFlowRateAction);
+
   public
 
   end;
@@ -129,6 +135,24 @@ begin
 
 end;
 
+
+procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+       Self.WindowState := TWindowState.wsMinimized;
+       DataManager.Save;
+
+     if FWorkTableManager = nil then
+    Exit;
+
+    if FFrameMainTable= nil then
+    Exit;
+
+  FFrameMainTable.SaveLayoutSettingsToWorkTable;
+  FWorkTableManager.Save;
+
+
+
+end;
 
 procedure TFormMain.FormCreate(Sender: TObject);
 begin

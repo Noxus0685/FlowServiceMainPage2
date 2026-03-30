@@ -397,6 +397,8 @@ public
 
   procedure Init; overload;
   procedure Init(UUID: string); overload;
+  procedure CreateDevice;
+
   procedure SetValues;
 
   procedure InitValues;
@@ -757,6 +759,7 @@ end;
 
 function TFlowMeter.GetDeviceTypeUUIDProxy: string;
 begin
+
   if Assigned(FDevice) then
     Result := FDevice.DeviceTypeUUID
   else
@@ -765,10 +768,10 @@ end;
 
 procedure TFlowMeter.SetDeviceTypeUUIDProxy(const AValue: string);
 begin
-  if Assigned(FDevice) then
-    FDevice.DeviceTypeUUID := AValue
-  else
    FDeviceTypeUUID := AValue;
+  if Assigned(FDevice) then
+    FDevice.DeviceTypeUUID := AValue;
+
 
 end;
 
@@ -790,6 +793,7 @@ begin
   FSerialNumber :=  AValue;
   if Assigned(FDevice) then
     FDevice.SerialNumber := AValue;
+
 end;
 
 
@@ -1074,40 +1078,75 @@ begin
 
 end;
 
+procedure TFlowMeter.CreateDevice;
+ var
+    ADevice: TDevice;
+    AType: TDeviceType;
+    ActiveRepo:  TDeviceRepository;
+    FoundRepo: TTypeRepository;
+begin
+
+  if DataManager = nil then
+  Exit;
+
+  ActiveRepo := DataManager.ActiveDeviceRepo;
+
+   if ActiveRepo = nil then
+  Exit;
+
+
+  ADevice:= FDevice;
+  AType := DataManager.FindType(DeviceTypeUUID, FTypeName, FoundRepo);
+
+  if (FDevice = nil) then
+   begin
+
+    ADevice := ActiveRepo.CreateDevice(-1);
+
+    ADevice.DeviceTypeUUID := DeviceTypeUUID;
+    ADevice.DeviceTypeName := FTypeName;
+    ADevice.SerialNumber := FSerialNumber;
+    ADevice.UUID := Self.DeviceUUID;
+    ADevice.SerialNumber := Self.SerialNumber;
+    ADevice.DeviceTypeName := Self.DeviceTypeName;
+    ADevice.DeviceTypeUUID := Self.DeviceTypeUUID;
+    ADevice.RepoTypeName := Self.RepoTypeName;
+    ADevice.RepoTypeUUID := Self.RepoTypeUUID;
+    ADevice.RepoDeviceName := Self.RepoDeviceName;
+    ADevice.RepoDeviceUUID := Self.RepoDeviceUUID;
+    ADevice.OutputType := Self.OutputType;
+
+    FDevice:= ADevice;
+
+    if (AType <> nil) then
+    begin
+    if (FoundRepo <> nil) then
+    begin
+       DataManager.ActiveTypeRepo := FoundRepo;
+       ADevice.AttachType(AType,FoundRepo.Name);
+    end;
+
+    ADevice.FillFromType(AType);
+    end;
+   end;
+end;
+
 procedure TFlowMeter.Init(UUID: string);
 var
   FoundDevice: TDevice;
   FoundRepo: TDeviceRepository;
   SrcDevice: TDevice;
 begin
+  FoundDevice := nil;
   Self.DeviceUUID := UUID;
 
   if DataManager <> nil then
   begin
+
     FoundDevice := DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
 
     if FoundDevice = nil then
-    begin
-      if DataManager.ActiveDeviceRepo <> nil then
-      begin
-        SrcDevice := TDevice.Create;
-        try
-          SrcDevice.UUID := Self.DeviceUUID;
-          SrcDevice.SerialNumber := Self.SerialNumber;
-          SrcDevice.DeviceTypeName := Self.DeviceTypeName;
-          SrcDevice.DeviceTypeUUID := Self.DeviceTypeUUID;
-          SrcDevice.RepoTypeName := Self.RepoTypeName;
-          SrcDevice.RepoTypeUUID := Self.RepoTypeUUID;
-          SrcDevice.RepoDeviceName := Self.RepoDeviceName;
-          SrcDevice.RepoDeviceUUID := Self.RepoDeviceUUID;
-          SrcDevice.OutputType := Self.OutputType;
-
-          FoundDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
-        finally
-          SrcDevice.Free;
-        end;
-      end;
-    end;
+      CreateDevice;
     if FoundDevice <> nil then
       Self.Device := FoundDevice;
   end;

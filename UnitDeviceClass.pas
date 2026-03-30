@@ -92,6 +92,7 @@ type
     {====================================================================}
 
     DeviceID: Integer;           // Идентификатор прибора (FK → TDevice.ID)
+    DeviceUUID: String;
     DeviceTypePointID: Integer;  // Идентификатор шаблонной точки типа (опционально)
 
     {====================================================================}
@@ -333,6 +334,8 @@ type
       function NormalizeActiveSessionSpillage: TSessionSpillage;
       function GetCalibrCoefTable: TCalibrCoefTable;
       procedure SetCalibrCoefTable(const Value: TCalibrCoefTable);
+  protected
+      procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ПОЛЯ БД!!! }
@@ -488,6 +491,7 @@ type
     property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
+    procedure AttachDN(ADiameter: TDiameter; AType: TDeviceType);
     procedure FillFromType(AType: TDeviceType; const APreservePointsAndSerial: Boolean = False);
     procedure SyncNameWithModificationAndDiameter;
 
@@ -626,6 +630,36 @@ begin
   Comment := '';
   Description := '';
   ReportingForm := '';
+end;
+
+procedure TDevice.SetState(const Value: TObjectState);
+var
+  Session: TSessionSpillage;
+  Point: TDevicePoint;
+  Spillage: TPointSpillage;
+  SessionSpillage: TPointSpillage;
+begin
+  inherited SetState(Value);
+
+  if FState = osNew then
+  begin
+    if FPoints <> nil then
+      for Point in FPoints do
+        Point.State := osNew;
+
+    if FSpillages <> nil then
+      for Spillage in FSpillages do
+        Spillage.State := osNew;
+
+    if FSessions <> nil then
+      for Session in FSessions do
+      begin
+        Session.State := osNew;
+        if Session.Spillages <> nil then
+          for SessionSpillage in Session.Spillages do
+            SessionSpillage.State := osNew;
+      end;
+  end;
 end;
 
 function TDevice.GetCalibrCoefTable: TCalibrCoefTable;
@@ -974,6 +1008,7 @@ begin
   begin
     NewP := AddPoint;
     NewP.Assign(P);
+    NewP.DeviceUUID := UUID;
   end;
 end;
 
@@ -1290,6 +1325,7 @@ begin
       Result := CompareDate(DateOfManufacture, B.DateOfManufacture);
   end;
 end;
+
 procedure TDevicePoint.Assign(ASource: TDevicePoint);
 begin
   if ASource = nil then
@@ -1487,7 +1523,7 @@ begin
   Result := TDevicePoint.Create(ID);
   Result.ID := TEntityHelpers<TDevicePoint>.NextID(Points);
   Result.DeviceID := ID;
-
+  Result.DeviceUUID:=UUID;
   StdIdx := GetNextPointStdIndex(Points.Count);
   Result.FlowRate := StdPointRates[StdIdx];
 
@@ -1775,7 +1811,6 @@ begin
     ASpillage.State := osModified;
 end;
 
-
 procedure TDevice.FillDataPointsList(APoint: TDevicePoint);
 var
   S: TPointSpillage;
@@ -2050,6 +2085,49 @@ begin
   DeviceTypeRepo := RepoName;
   RepoTypeName := RepoName;
 
+end;
+
+procedure TDevice.AttachDN(ADiameter: TDiameter; AType: TDeviceType);
+var
+  I: Integer;
+  P: TDevicePoint;
+  Q, V, Tm, LCoef: Double;
+begin
+  if ADiameter = nil then
+  begin
+    SyncNameWithModificationAndDiameter;
+    Exit;
+  end;
+
+  if (AType <> nil) and (FDeviceType <> AType) then
+    FDeviceType := AType;
+
+  DN := ADiameter.Name;
+  Qmax := ADiameter.Qmax;
+  Qmin := ADiameter.Qmin;
+
+  if Qmin > 0 then
+    RangeDynamic := Qmax / Qmin;
+
+  Coef := ADiameter.Kp;
+
+  LCoef := Coef;
+  if (Points <> nil) and (LCoef > 0) then
+    for I := 0 to Points.Count - 1 do
+    begin
+      P := Points[I];
+      Q := P.FlowRate;
+
+      if (Q > 0) and (P.LimitTime > 0) then
+      begin
+        Tm := P.LimitTime;
+        V := Q * Tm / 3.6;
+        P.LimitVolume := V;
+        P.LimitImp := Round(V * LCoef);
+      end;
+    end;
+
+  SyncNameWithModificationAndDiameter;
 end;
 
 procedure TDevice.SyncNameWithModificationAndDiameter;
