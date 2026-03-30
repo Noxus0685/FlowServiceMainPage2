@@ -1,11 +1,11 @@
 object FrameMainTable: TFrameMainTable
   Size.Width = 1444.000000000000000000
-  Size.Height = 685.000000000000000000
+  Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
   object Layout: TLayout
     Align = Client
     Size.Width = 1444.000000000000000000
-    Size.Height = 685.000000000000000000
+    Size.Height = 686.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     object PanelInstruments: TPanel
@@ -1174,14 +1174,14 @@ object FrameMainTable: TFrameMainTable
       Padding.Left = 10.000000000000000000
       PopupMenu = PopupMenuWorkTables
       Size.Width = 1444.000000000000000000
-      Size.Height = 460.000000000000000000
+      Size.Height = 461.000000000000000000
       Size.PlatformDefault = False
       TabIndex = 0
       TabOrder = 1
       TabPosition = PlatformDefault
       Sizes = (
         1434s
-        434s)
+        435s)
       object TabItemWorkTable1: TTabItem
         CustomIcon = <
           item
@@ -1330,7 +1330,7 @@ object FrameMainTable: TFrameMainTable
         object Panel3: TPanel
           Align = Client
           Size.Width = 1434.000000000000000000
-          Size.Height = 266.000000000000000000
+          Size.Height = 267.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
           object GridDevices: TGrid
@@ -1339,7 +1339,7 @@ object FrameMainTable: TFrameMainTable
             ClipChildren = True
             PopupMenu = PopupMenuDevicesGrid
             Size.Width = 1434.000000000000000000
-            Size.Height = 234.000000000000000000
+            Size.Height = 235.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
@@ -1349,7 +1349,7 @@ object FrameMainTable: TFrameMainTable
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
             Viewport.Width = 1414.000000000000000000
-            Viewport.Height = 193.000000000000000000
+            Viewport.Height = 194.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -1371,6 +1371,10 @@ object FrameMainTable: TFrameMainTable
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
               Size.Width = 111.000000000000000000
+            end
+            object PopupColumnDN1: TPopupColumn
+              Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+              HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceName1: TStringColumn
               Header = #1055#1088#1080#1073#1086#1088
@@ -1540,7 +1544,7 @@ object FrameMainTable: TFrameMainTable
     end
     object LayoutControl: TLayout
       Align = MostBottom
-      Position.Y = 589.000000000000000000
+      Position.Y = 590.000000000000000000
       Size.Width = 1444.000000000000000000
       Size.Height = 96.000000000000000000
       Size.PlatformDefault = False
