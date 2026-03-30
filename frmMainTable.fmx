@@ -983,7 +983,7 @@ object FrameMainTable: TFrameMainTable
                   #1064#1072#1075' 1 '
                   #1064#1072#1075' 2'
                   #1064#1072#1075' 3')
-                ItemIndex = 0
+                ItemIndex = 2
                 Size.Width = 160.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -1033,27 +1033,6 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 40.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              object Rectangle1: TRectangle
-                Align = Right
-                Fill.Color = claWhite
-                Position.X = 141.000000000000000000
-                Size.Width = 91.000000000000000000
-                Size.Height = 40.000000000000000000
-                Size.PlatformDefault = False
-                object LabelFreq: TLabel
-                  Align = Client
-                  StyledSettings = [Family, FontColor]
-                  Size.Width = 91.000000000000000000
-                  Size.Height = 40.000000000000000000
-                  Size.PlatformDefault = False
-                  StyleLookup = 'labelstyle'
-                  TextSettings.Font.Size = 14.000000000000000000
-                  TextSettings.Font.StyleExt = {00070000000000000004000000}
-                  TextSettings.HorzAlign = Center
-                  Text = '18,6'
-                  TabOrder = 0
-                end
-              end
               object LayoutFreqIn: TLayout
                 Align = Left
                 Size.Width = 119.000000000000000000
@@ -1073,13 +1052,39 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   TabOrder = 1
                   Cursor = crIBeam
-                  Min = 12.000000000000000000
-                  Value = 20.000000000000000000
+                  Value = 12.000000000000000000
+                  ValueType = Float
                   Increment = 0.100000001490116100
+                  KeyboardType = NumbersAndPunctuation
                   Size.Width = 119.000000000000000000
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
                   KillFocusByReturn = True
+                  ParentShowHint = False
+                  ShowHint = False
+                  OnChange = SpinBoxFreqChange
+                  OnMouseEnter = SpinBoxFreqMouseEnter
+                end
+              end
+              object Rectangle1: TRectangle
+                Align = Right
+                Fill.Color = claWhite
+                Position.X = 141.000000000000000000
+                Size.Width = 91.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                object LabelFreq: TLabel
+                  Align = Client
+                  StyledSettings = [Family, FontColor]
+                  Size.Width = 91.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'labelstyle'
+                  TextSettings.Font.Size = 14.000000000000000000
+                  TextSettings.Font.StyleExt = {00070000000000000004000000}
+                  TextSettings.HorzAlign = Center
+                  Text = '0'
+                  TabOrder = 0
                 end
               end
             end
@@ -1090,38 +1095,23 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 2
-              object ComboEditPumps: TComboEdit
-                Touch.InteractiveGestures = [LongTap, DoubleTap]
-                Align = Left
-                OnChange = ComboEditPumpsChange
-                TabOrder = 0
-                ItemHeight = 19.000000000000000000
-                Items.Strings = (
-                  #1053#1072#1089#1086#1089'1'
-                  #1053#1072#1089#1086#1089'2')
-                ItemIndex = 0
-                Text = #1053#1072#1089#1086#1089'1'
-                Margins.Right = 10.000000000000000000
-                Size.Width = 119.000000000000000000
-                Size.Height = 22.000000000000000000
-                Size.PlatformDefault = False
-              end
               object SpeedButtonStartPump: TSpeedButton
                 Align = Left
                 Padding.Left = 10.000000000000000000
                 Margins.Left = 10.000000000000000000
-                Position.X = 139.000000000000000000
+                Position.X = 131.000000000000000000
                 Size.Width = 22.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'playtoolbutton'
                 Text = 'SpeedButtonStartPump'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonStartPumpClick
               end
               object SpeedButton28: TSpeedButton
                 Align = Left
                 Margins.Left = 10.000000000000000000
-                Position.X = 171.000000000000000000
+                Position.X = 163.000000000000000000
                 Size.Width = 22.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -1137,7 +1127,16 @@ object FrameMainTable: TFrameMainTable
                   Size.Width = 14.000000000000000000
                   Size.Height = 14.000000000000000000
                   Size.PlatformDefault = False
+                  OnClick = Rectangle14Click
                 end
+              end
+              object ComboBoxPumps: TComboBox
+                Align = Left
+                Size.Width = 121.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                OnChange = ComboBoxPumpsChange
               end
             end
             object LabelLayoutPump: TLabel
@@ -1219,7 +1218,6 @@ object FrameMainTable: TFrameMainTable
               TabOrder = 0
               RowCount = 2
               OnGetValue = GridEtalonsGetValue
-              OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               Viewport.Width = 1238.000000000000000000
               Viewport.Height = 79.000000000000000000
@@ -1339,7 +1337,6 @@ object FrameMainTable: TFrameMainTable
             TabOrder = 0
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnGetValue = GridDevicesGetValue
-            OnSetValue = GridDevicesSetValue
             OnCellClick = GridDevicesCellClick
             Viewport.Width = 1222.000000000000000000
             Viewport.Height = 193.000000000000000000

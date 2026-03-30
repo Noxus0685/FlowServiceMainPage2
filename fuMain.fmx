@@ -5,7 +5,6 @@ object FormMain: TFormMain
   ClientHeight = 778
   ClientWidth = 1780
   Visible = True
-  Fill.Color = xFFF7FAFF
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -1512,6 +1511,18 @@ object FormMain: TFormMain
         Position.Y = 366.000000000000000000
         Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
         TabOrder = 2
+      end
+      object mPump: TMemo
+        Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+        DataDetectorTypes = []
+        Position.X = 570.000000000000000000
+        Position.Y = 312.000000000000000000
+        Size.Width = 423.000000000000000000
+        Size.Height = 243.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 4
+        Viewport.Width = 423.000000000000000000
+        Viewport.Height = 243.000000000000000000
       end
     end
   end

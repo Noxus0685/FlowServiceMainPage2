@@ -99,7 +99,6 @@ type
     LabelNameFreq: TLabel;
     SpinBoxFreq: TSpinBox;
     LayoutPumpSelect: TLayout;
-    ComboEditPumps: TComboEdit;
     SpeedButtonStartPump: TSpeedButton;
     SpeedButton28: TSpeedButton;
     Rectangle14: TRectangle;
@@ -314,6 +313,7 @@ type
     ActionEtalonsFromArchive: TAction;
     ActionEtalonsSetFlowSource: TAction;
     ActionEtalonsAssignEtalon: TAction;
+    ComboBoxPumps: TComboBox;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -386,8 +386,15 @@ type
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
-    procedure ComboEditPumpsChange(Sender: TObject);
+    procedure ZChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
+    procedure SpeedButtonStartPumpClick(Sender: TObject);
+    procedure ComboBoxPumpsChange(Sender: TObject);
+    procedure Rectangle14Click(Sender: TObject);
+    procedure UpdateUIPump;
+    procedure ComboBoxPumpsClick(Sender: TObject);
+    procedure SpinBoxFreqChange(Sender: TObject);
+    procedure SpinBoxFreqMouseEnter(Sender: TObject);
 
   private
 
@@ -449,6 +456,7 @@ type
 
   private
     FInitialized: Boolean;
+    FChange: string ;
     FWorkTableManager: TWorkTableManager;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
@@ -475,7 +483,7 @@ type
 
 
 
-    property WorkTableManager: TWorkTableManager read FWorkTableManager;
+    property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
 
 
   private type
@@ -489,6 +497,8 @@ type
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
+
+
   end;
 
 
@@ -498,6 +508,8 @@ implementation
 
 
 {$R *.fmx}
+
+uses fuMain;
 
 const
   CVolumeFlowUnits: array[0..4] of string = (
@@ -715,31 +727,31 @@ var
   SelectedPumpName: string;
   ItemIndex: Integer;
 begin
-  ComboEditPumps.Items.Clear;
-  ComboEditPumps.ItemIndex := -1;
+  ComboBoxPumps.Items.Clear;
+  ComboBoxPumps.ItemIndex := -1;
 
   if FActiveWorkTable = nil then
   begin
-    ComboEditPumps.Text := '';
+    //ComboBoxPumps.Text := '';
     SyncPumpControls;
     Exit;
   end;
 
-  SelectedPumpName := Trim(ComboEditPumps.Text);
+  SelectedPumpName := Trim(ComboBoxPumps.Text);
   for Pump in FActiveWorkTable.Pumps do
-    ComboEditPumps.Items.Add(Pump.Name);
+    ComboBoxPumps.Items.Add(Pump.Name);
 
   ItemIndex := -1;
   if SelectedPumpName <> '' then
-    ItemIndex := ComboEditPumps.Items.IndexOf(SelectedPumpName);
-  if (ItemIndex < 0) and (ComboEditPumps.Items.Count > 0) then
+    ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
+  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
     ItemIndex := 0;
 
-  ComboEditPumps.ItemIndex := ItemIndex;
-  if ItemIndex >= 0 then
-    ComboEditPumps.Text := ComboEditPumps.Items[ItemIndex]
+  ComboBoxPumps.ItemIndex := ItemIndex;
+ { if ItemIndex >= 0 then
+    ComboBoxPumps.Text := ComboBoxPumps.Items[ItemIndex]
   else
-    ComboEditPumps.Text := '';
+    ComboBoxPumps.Text := '';   }
 
   SyncPumpControls;
 end;
@@ -750,11 +762,11 @@ var
 begin
   Pump := nil;
   if FActiveWorkTable <> nil then
-    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboEditPumps.Text));
+    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboBoxPumps.Text));
 
   if Pump <> nil then
   begin
-    SpinBoxFreq.Value := Pump.Freq;
+   // SpinBoxFreq.Value := Pump.Freq;
     if Pump.IsRunning then
       SpeedButtonStartPump.Text := '■'
     else
@@ -763,13 +775,13 @@ begin
   end
   else
   begin
-    SpinBoxFreq.Value := 0;
+    //SpinBoxFreq.Value := 0;
     SpeedButtonStartPump.Text := '▶';
     SpeedButtonStartPump.Hint := '';
   end;
 end;
 
-procedure TFrameMainTable.ComboEditPumpsChange(Sender: TObject);
+procedure TFrameMainTable.ZChange(Sender: TObject);
 begin
   SyncPumpControls;
 end;
@@ -811,7 +823,7 @@ end;
           end;
  end;
 
-procedure TFrameMainTable.OnChangeState(const ANewState: EMeasurementState);
+procedure TFrameMainTable.OnChangeState(const ANewState: EMeasurementState); //ChangeStateHandler
 begin
   if FActiveWorkTable <> nil then
     FActiveWorkTable.MeasurementState := ANewState;
@@ -981,6 +993,8 @@ begin
   Initialize;
 end;
 
+
+
 procedure TFrameMainTable.Initialize;
 var
   OT: TOutputType;
@@ -998,12 +1012,9 @@ begin
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
 
-  FWorkTableManager := TWorkTableManager.Create(
-    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'Settings\TableSettings.ini'
-  );
 
-  FWorkTableManager.Load;
+
+
 
   GridDevices.RowCount := 2;
 
@@ -1027,6 +1038,7 @@ begin
   SetLength(FRows, 0);
 
   InitTables;
+
   RefreshPumpsCombo;
 
   FLastClickRow := -1;
@@ -1190,6 +1202,38 @@ begin
   SaveLayoutSettingsToWorkTable;
 end;
 
+
+
+procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
+begin
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
+  begin
+    LayoutPump.tag:=0;
+
+    FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
+    FActiveWorkTable.ActivePump.State:=PUMP_STARTED;
+    UpdateUIPump;
+
+  end;
+
+
+end;
+
+
+
+procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
+begin
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
+    begin
+      FActiveWorkTable.DoFreqSet(ComboBoxPumps.Text,strtofloat(SpinBoxFreq.Text));
+    end;
+end;
+
+procedure TFrameMainTable.SpinBoxFreqMouseEnter(Sender: TObject);
+begin
+  LayoutPump.tag:=3;
+end;
+
 procedure TFrameMainTable.ButtonMonitorClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -1259,6 +1303,16 @@ begin
         (Control = LayoutConditions) or (Control = LayoutProcedures)) then
       FInstrumentalVisibleOrder.Add(TLayout(Control));
   end;
+end;
+
+procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
+begin
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
+    begin
+      LayoutPump.tag:=0;
+      FActiveWorkTable.DoPumpStop(ComboBoxPumps.Text) ;
+      FActiveWorkTable.ActivePump.State:=PUMP_STOPED;
+    end;
 end;
 
 procedure TFrameMainTable.ApplyInstrumentalVisibleOrder;
@@ -2486,6 +2540,23 @@ begin
   ShowMessage('Источник расхода задаётся полем "Сигнал" в выбранной строке прибора.');
 end;
 
+procedure TFrameMainTable.ComboBoxPumpsChange(Sender: TObject);
+begin
+  if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
+    begin
+      LayoutPump.tag:=0;
+      FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
+      UpdateUIPump;
+    end;
+end;
+
+
+
+procedure TFrameMainTable.ComboBoxPumpsClick(Sender: TObject);
+begin
+  ComboBoxPumps.Tag:=2;
+end;
+
 procedure TFrameMainTable.ComboBoxUnitsChange(Sender: TObject);
 var
   UnitName: string;
@@ -2755,6 +2826,7 @@ begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
+
 
   if WorkTable.ValueTime <> nil then
     LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
@@ -3830,5 +3902,67 @@ begin
 
   GridEtalons.ReadOnly := True;
 end;
+
+
+
+
+procedure TFrameMainTable.UpdateUIPump;
+var
+  WorkTable: TWorkTable;
+  i:integer;
+begin
+    WorkTable := FActiveWorkTable;
+
+    if WorkTable = nil then
+      Exit;
+
+    if WorkTable.ActivePump = nil then
+      exit;
+
+    if WorkTable.ActivePump <> nil then
+      LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Freq)
+    else
+      LabelFreq.Text := '-';
+
+    if WorkTable.ActivePump.Freq = 0 then
+       Rectangle1.Fill.Color := TAlphaColorRec.White
+    else if (WorkTable.ActivePump.Freq < WorkTable.ActivePump.FreqSet) then
+      Rectangle1.Fill.Color := TAlphaColorRec.Yellow
+    else if WorkTable.ActivePump.Freq = WorkTable.ActivePump.FreqSet then
+      Rectangle1.Fill.Color := TAlphaColorRec.Greenyellow ;
+
+
+
+    if LayoutPump.tag = 3 then
+      exit;
+
+    LayoutPump.tag:=2;
+
+   // if ((SpinBoxFreq.Text='12,00') and (WorkTable.ActivePump.FreqSet <> 0)) or
+    // ((SpinBoxFreq.Text <>  '12,00') and (WorkTable.ActivePump.FreqSet = 0))  then
+
+    SpinBoxFreq.Value:= (WorkTable.ActivePump.FreqSet);
+
+
+
+
+    if ComboBoxPumps.Count <> 0 then
+      for I := ComboBoxPumps.Count-1 to 0 do
+      begin
+        if ComboBoxPumps.Items[i] =  WorkTable.ActivePump.Name then
+        begin
+          ComboBoxPumps.ItemIndex := i;
+          break;
+        end;
+      end;
+
+   LayoutPump.tag:=0;
+
+
+
+end;
+
+
+
 
 end.
