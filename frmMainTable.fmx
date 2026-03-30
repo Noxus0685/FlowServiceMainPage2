@@ -1223,8 +1223,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1430.000000000000000000
-              Viewport.Height = 95.000000000000000000
+              Viewport.Width = 1434.000000000000000000
+              Viewport.Height = 120.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -1245,6 +1245,10 @@ object FrameMainTable: TFrameMainTable
                 HeaderSettings.TextSettings.HorzAlign = Center
                 ReadOnly = True
                 Size.Width = 111.000000000000000000
+              end
+              object PopupColumnEtalonDN1: TPopupColumn
+                Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+                HeaderSettings.TextSettings.WordWrap = False
               end
               object StringColumnEtalonName1: TStringColumn
                 Header = #1055#1088#1080#1073#1086#1088
@@ -1348,8 +1352,8 @@ object FrameMainTable: TFrameMainTable
             OnSetValue = GridDevicesSetValue
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1414.000000000000000000
-            Viewport.Height = 194.000000000000000000
+            Viewport.Width = 1434.000000000000000000
+            Viewport.Height = 235.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -1372,7 +1376,7 @@ object FrameMainTable: TFrameMainTable
               ReadOnly = True
               Size.Width = 111.000000000000000000
             end
-            object PopupColumnDN1: TPopupColumn
+            object PopupColumnDeviceDN1: TPopupColumn
               Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
               HeaderSettings.TextSettings.WordWrap = False
             end
