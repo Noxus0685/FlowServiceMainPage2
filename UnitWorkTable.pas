@@ -55,6 +55,16 @@ type
 
     );
 
+  EFlowRateState = (
+    FLOWRATE_IDLE,      // расход в допустимом диапазоне
+    FLOWRATE_LIMITED    // расход ограничен min/max
+  );
+
+  EFlowRateAction = (
+    FLOWRATE_SET,       // расход установлен
+    FLOWRATE_RESET      // расход сброшен
+  );
+
 
 type
 
@@ -104,7 +114,40 @@ type
     property PumpType : string read FPumpType write FPumpType;
 
 
-  end;  TWorkTable = class;
+  end;
+
+  TFlowRate = class(TTypeEntity)
+  private
+    FValue: Double;
+    FValueMin: Double;
+    FValueMax: Double;
+    FSetValue: Double;
+    FState: EFlowRateState;
+    FAction: EFlowRateAction;
+    FName: string;
+    FHint: string;
+    function GetIsChanging: Boolean;
+    procedure SetValueMin(const Value: Double);
+    procedure SetValueMax(const Value: Double);
+  public
+    constructor Create(const AName: string = 'FlowRate');
+    procedure SetFlowRate(ANewValue: Double);
+    procedure Reset;
+    function GetStateAsString: string;
+    function GetActionAsString: string;
+
+    property Name: string read FName write FName;
+    property Hint: string read FHint write FHint;
+    property Value: Double read FValue write FValue;
+    property SetValue: Double read FSetValue write FSetValue;
+    property ValueMin: Double read FValueMin write SetValueMin;
+    property ValueMax: Double read FValueMax write SetValueMax;
+    property State: EFlowRateState read FState write FState;
+    property Action: EFlowRateAction read FAction write FAction;
+    property IsChanging: Boolean read GetIsChanging;
+  end;
+
+  TWorkTable = class;
 
   TSpillState = (
     ssNone,
@@ -292,6 +335,7 @@ type
     FPress: Double;
     FPressDelta: Double;
     FFlowRate: Double;
+    FFlowRateObj: TFlowRate;
     FTime: Double;
     FTimeResult: Double;
     FState: TSpillState;
@@ -346,6 +390,7 @@ type
     function GetValueTime: TMeterValue;
     function GetValueQuantity: TMeterValue;
     function GetValueFlowRate: TMeterValue;
+    function GetFlowRate: Double;
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
     procedure SetValueTempertureDelta(const AValue: TMeterValue);
@@ -361,6 +406,7 @@ type
     procedure SetValueTime(const AValue: TMeterValue);
     procedure SetValueQuantity(const AValue: TMeterValue);
     procedure SetValueFlowRate(const AValue: TMeterValue);
+    procedure SetFlowRate(const AValue: Double);
     procedure AssignTableFlowAsEtalonToDevices;
 
     procedure SetValues;
@@ -471,7 +517,8 @@ private
     property TempDelta: Double read FTempDelta write FTempDelta;
     property Press: Double read FPress write FPress;
     property PressDelta: Double read FPressDelta write FPressDelta;
-    property FlowRate: Double read FFlowRate write FFlowRate;
+    property FlowRate: Double read GetFlowRate write SetFlowRate;
+    property FlowRateObj: TFlowRate read FFlowRateObj;
 
     property Time: Double read FTime write FTime;
     property TimeResult: Double read FTimeResult write FTimeResult;
@@ -1087,6 +1134,7 @@ begin
   FEtalonChannels := TObjectList<TChannel>.Create(True);
 
   FPumps := TObjectList<TPump>.Create(True); // True — автоосвобождение объектов
+  FFlowRateObj := TFlowRate.Create('Расход');
 
   FTableFlow := TFlowMeter.Create;
 
@@ -1109,7 +1157,7 @@ begin
   TempDelta:=0.1;
   Press:=101.1;
   PressDelta:=0.1;
-  FlowRate:=10;
+  FlowRate := 10;
 
 
  // InitMeterValues;
@@ -1444,6 +1492,14 @@ begin
   if FTableFlow <> nil then Result := FTableFlow.ValueTempertureBefore else Result := nil;
 end;
 
+function TWorkTable.GetFlowRate: Double;
+begin
+  if FFlowRateObj <> nil then
+    Result := FFlowRateObj.Value
+  else
+    Result := FFlowRate;
+end;
+
 function TWorkTable.GetValueTempertureAfter: TMeterValue;
 begin
   if FTableFlow <> nil then Result := FTableFlow.ValueTempertureAfter else Result := nil;
@@ -1664,6 +1720,16 @@ begin
     FHashValueFlowRate := '';
 end;
 
+procedure TWorkTable.SetFlowRate(const AValue: Double);
+begin
+  if Abs(FFlowRate - AValue) < 0.0001 then
+    Exit;
+
+  FFlowRate := AValue;
+  if FFlowRateObj <> nil then
+    FFlowRateObj.SetFlowRate(AValue);
+end;
+
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
 procedure TWorkTable.UpdateAggregateMeterValues;
 var
@@ -1713,6 +1779,7 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
+  FreeAndNil(FFlowRateObj);
   FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
   FEtalonChannels.Free;
@@ -2636,6 +2703,89 @@ end;
 
 
 
+
+   {$REGION 'TFlowRate'}
+constructor TFlowRate.Create(const AName: string);
+begin
+  inherited Create;
+  FName := AName;
+  FValueMin := 0;
+  FValueMax := 10000;
+  FValue := 0;
+  FSetValue := 0;
+  FState := FLOWRATE_IDLE;
+  FAction := FLOWRATE_RESET;
+end;
+
+function TFlowRate.GetIsChanging: Boolean;
+begin
+  Result := Abs(FValue - FSetValue) > 0.0001;
+end;
+
+procedure TFlowRate.SetValueMin(const Value: Double);
+begin
+  if (Value < 0) or (Value > FValueMax) then
+    Exit;
+  FValueMin := Value;
+end;
+
+procedure TFlowRate.SetValueMax(const Value: Double);
+begin
+  if (Value < 0) or (Value < FValueMin) then
+    Exit;
+  FValueMax := Value;
+end;
+
+procedure TFlowRate.SetFlowRate(ANewValue: Double);
+begin
+  if ANewValue < FValueMin then
+  begin
+    FSetValue := FValueMin;
+    FState := FLOWRATE_LIMITED;
+  end
+  else if ANewValue > FValueMax then
+  begin
+    FSetValue := FValueMax;
+    FState := FLOWRATE_LIMITED;
+  end
+  else
+  begin
+    FSetValue := ANewValue;
+    FState := FLOWRATE_IDLE;
+  end;
+
+  FValue := FSetValue;
+  FAction := FLOWRATE_SET;
+end;
+
+procedure TFlowRate.Reset;
+begin
+  FValue := 0;
+  FSetValue := 0;
+  FState := FLOWRATE_IDLE;
+  FAction := FLOWRATE_RESET;
+end;
+
+function TFlowRate.GetStateAsString: string;
+begin
+  case FState of
+    FLOWRATE_IDLE: Result := 'В диапазоне';
+    FLOWRATE_LIMITED: Result := 'Ограничен границами';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function TFlowRate.GetActionAsString: string;
+begin
+  case FAction of
+    FLOWRATE_SET: Result := 'Установлен';
+    FLOWRATE_RESET: Result := 'Сброшен';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+  {$ENDREGION 'TFlowRate'}
 
    {$REGION 'TPump'}
 constructor TPump.Create(const APumpName: string);
