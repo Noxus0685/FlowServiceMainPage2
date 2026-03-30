@@ -320,7 +320,8 @@ type
     SpeedButton3: TSpeedButton;
     SpeedButton4: TSpeedButton;
     SpeedButton5: TSpeedButton;
-    PopupColumnDN1: TPopupColumn;
+    PopupColumnEtalonDN1: TPopupColumn;
+    PopupColumnDeviceDN1: TPopupColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -428,6 +429,9 @@ type
     procedure UpdateGridDevices;
     procedure UpdateUIFromValues;
     procedure SetValues;
+    function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
+    procedure FillDNItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
+    function ApplyChannelDNChange(AChannel: TChannel; const ANewDN: string): Boolean;
     procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
     procedure FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
     procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
@@ -2021,6 +2025,105 @@ begin
       Exit(I);
 end;
 
+function TFrameMainTable.ResolveTypeForChannel(AChannel: TChannel;
+  out ARepo: TTypeRepository): TDeviceType;
+var
+  TypeUUID: string;
+  TypeName: string;
+begin
+  Result := nil;
+  ARepo := nil;
+
+  if (AChannel = nil) or (DataManager = nil) then
+    Exit;
+
+  TypeUUID := Trim(AChannel.TypeUUID);
+  TypeName := Trim(AChannel.TypeName);
+
+  if (TypeUUID = '') and (AChannel.FlowMeter <> nil) then
+    TypeUUID := Trim(AChannel.FlowMeter.DeviceTypeUUID);
+
+  if (TypeName = '') and (AChannel.FlowMeter <> nil) then
+    TypeName := Trim(AChannel.FlowMeter.DeviceTypeName);
+
+  Result := DataManager.FindType(TypeUUID, TypeName, ARepo);
+end;
+
+procedure TFrameMainTable.FillDNItemsForChannel(AChannel: TChannel;
+  APopupColumn: TPopupColumn);
+var
+  DeviceType: TDeviceType;
+  Repo: TTypeRepository;
+  D: TDiameter;
+begin
+  if APopupColumn = nil then
+    Exit;
+
+  APopupColumn.Items.BeginUpdate;
+  try
+    APopupColumn.Items.Clear;
+
+    DeviceType := ResolveTypeForChannel(AChannel, Repo);
+    if (DeviceType = nil) or (DeviceType.Diameters = nil) then
+      Exit;
+
+    for D in DeviceType.Diameters do
+      if (D <> nil) and (Trim(D.Name) <> '') then
+        APopupColumn.Items.Add(D.Name);
+  finally
+    APopupColumn.Items.EndUpdate;
+  end;
+end;
+
+function TFrameMainTable.ApplyChannelDNChange(AChannel: TChannel;
+  const ANewDN: string): Boolean;
+var
+  DeviceType: TDeviceType;
+  Repo: TTypeRepository;
+  Device: TDevice;
+  NewDN: string;
+  D: TDiameter;
+begin
+  Result := False;
+
+  NewDN := Trim(ANewDN);
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (NewDN = '') then
+    Exit;
+
+  Device := AChannel.FlowMeter.Device;
+  if Device = nil then
+    Exit;
+
+  if SameText(Trim(Device.DN), NewDN) then
+    Exit;
+
+  DeviceType := ResolveTypeForChannel(AChannel, Repo);
+
+  if DeviceType = nil then
+  begin
+    Device.DN := NewDN;
+    Device.SyncNameWithModificationAndDiameter;
+  end
+  else
+  begin
+    D := DeviceType.FindDiameterByDN(NewDN);
+    if D = nil then
+    begin
+      Device.DN := NewDN;
+      Device.SyncNameWithModificationAndDiameter;
+    end
+    else
+      Device.AttachDN(D, DeviceType);
+  end;
+
+  if AChannel.FlowMeter <> nil then
+    AChannel.FlowMeter.UpdateByDevice;
+
+  MarkChannelDeviceModified(AChannel);
+  PersistDeviceAsync(Device);
+  Result := True;
+end;
+
 procedure TFrameMainTable.ActionAddWorkTableExecute(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -3280,7 +3383,17 @@ begin
       FFlowMeterRows[Row].Enabled := not FFlowMeterRows[Row].Enabled;
   end;
 
-    if (Column = PopupColumnDeviceSignal1 ) then
+    if (Column = PopupColumnDeviceDN1) then
+  begin
+    if WorkTable <> nil then
+      FillDNItemsForChannel(WorkTable.DeviceChannels[Row], PopupColumnDeviceDN1);
+    GridDevices.ReadOnly := False;
+    GridDevices.EditorMode := True;
+    inherited;
+    Exit;
+  end;
+
+  if (Column = PopupColumnDeviceSignal1 ) then
   begin
     GridDevices.ReadOnly:=False;
     GridDevices.EditorMode := True;
@@ -3436,6 +3549,14 @@ begin
       Value := WorkTable.DeviceChannels[ARow].Text
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
       Value := WorkTable.DeviceChannels[ARow].TypeName
+    else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.DN
+      else
+        Value := '';
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceName1 then
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
@@ -3547,6 +3668,8 @@ begin
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
     end
+    else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
+      Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString)
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
@@ -3606,6 +3729,16 @@ begin
 
     if WorkTable <> nil then
       WorkTable.RebindAllFlowMeters;
+  end;
+
+  if Column = PopupColumnEtalonDN1 then
+  begin
+    if WorkTable <> nil then
+      FillDNItemsForChannel(WorkTable.EtalonChannels[Row], PopupColumnEtalonDN1);
+    GridEtalons.ReadOnly := False;
+    GridEtalons.EditorMode := True;
+    inherited;
+    Exit;
   end;
 
   if Column = PopupColumnEtalonSignal1 then
@@ -3708,6 +3841,14 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
       Value := WorkTable.EtalonChannels[ARow].TypeName
+    else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.Device <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.Device.DN
+      else
+        Value := '';
+    end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonName1 then
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
@@ -3969,6 +4110,8 @@ begin
       Changed := WorkTable.EtalonChannels[ARow].Serial <> Value.AsString;
       WorkTable.EtalonChannels[ARow].Serial := Value.AsString;
     end
+    else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
+      Changed := ApplyChannelDNChange(WorkTable.EtalonChannels[ARow], Value.AsString)
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin

@@ -1246,6 +1246,10 @@ object FrameMainTable: TFrameMainTable
                 ReadOnly = True
                 Size.Width = 111.000000000000000000
               end
+              object PopupColumnEtalonDN1: TPopupColumn
+                Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+                HeaderSettings.TextSettings.WordWrap = False
+              end
               object StringColumnEtalonName1: TStringColumn
                 Header = #1055#1088#1080#1073#1086#1088
                 HeaderSettings.TextSettings.WordWrap = False
@@ -1372,7 +1376,7 @@ object FrameMainTable: TFrameMainTable
               ReadOnly = True
               Size.Width = 111.000000000000000000
             end
-            object PopupColumnDN1: TPopupColumn
+            object PopupColumnDeviceDN1: TPopupColumn
               Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
               HeaderSettings.TextSettings.WordWrap = False
             end
