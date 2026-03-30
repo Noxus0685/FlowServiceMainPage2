@@ -408,7 +408,7 @@ type
     procedure Rectangle15Click(Sender: TObject);
     procedure SpeedButtonSetFlowRateClick(Sender: TObject);
     procedure SpinBoxFlowRateChange(Sender: TObject);
-    procedure ComboBoxPumpsChange(Sender: TObject);
+
     procedure GridEtalonsCellDblClick(const Column: TColumn;
       const Row: Integer);
     procedure GridDevicesCellDblClick(const Column: TColumn;
@@ -4330,13 +4330,13 @@ begin
 
 
     if WorkTable.FlowRate.Flow = 0 then
-       Rectangle2.Fill.Color := TAlphaColorRec.White
+       RectangleLabelFR.Fill.Color := TAlphaColorRec.White
 
     else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.FlowAccuracyPlus/100) * WorkTable.FlowRate.FlowSet ))
     and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.FlowAccuracyminus/100) * WorkTable.FlowRate.FlowSet )) then
-      Rectangle2.Fill.Color := TAlphaColorRec.Greenyellow
+      RectangleLabelFR.Fill.Color := TAlphaColorRec.Greenyellow
         else if (WorkTable.FlowRate.Flow <> WorkTable.FlowRate.FlowSet) then
-      Rectangle2.Fill.Color := TAlphaColorRec.Yellow
+      RectangleLabelFR.Fill.Color := TAlphaColorRec.Yellow
 
 
 end;

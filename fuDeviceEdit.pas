@@ -1840,23 +1840,23 @@ begin
   {----------------------------------}
   { Тип привязан — ищем диаметр }
   {----------------------------------}
-  D := FDeviceType.FindDiameterByDN(NewDN);   // ← существующая функция
+  D := FDeviceType.FindDiameterByDN(NewDN);
 
   if D = nil then
   begin
     { Диаметр в типе не найден }
     FDevice.DN := NewDN;
-    FDevice.SyncNameWithModificationAndDiameter;
-    UpdateUIFromDevice;
-    SetModified;
-    Exit;
-  end;
+  end
 
+  else
+
+  begin
   {----------------------------------}
   { Применяем диаметр через модель }
   {----------------------------------}
   FDevice.AttachDN(D, FDeviceType);
-
+  end;
+      FDevice.SyncNameWithModificationAndDiameter;
   {----------------------------------}
   { Обновление UI }
   {----------------------------------}

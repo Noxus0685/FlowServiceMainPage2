@@ -257,7 +257,11 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
-        <DCCReference Include="frmMainTable.pas"/>
+        <DCCReference Include="frmMainTable.pas">
+            <Form>FrameMainTable</Form>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="UnitWorkTable.pas"/>
         <DCCReference Include="UnitRepositories.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>

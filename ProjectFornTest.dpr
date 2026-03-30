@@ -20,8 +20,7 @@ uses
   frmCalibrCoefs in 'frmCalibrCoefs.pas' {FrameCalibrCoefs: TFrame},
   frmProceed in 'frmProceed.pas' {FrameProceed: TFrame},
   frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
-  UnitWorkTable in 'UnitWorkTable.pas';
-  frmMainTable in 'frmMainTable.pas',
+  UnitWorkTable in 'UnitWorkTable.pas',
   UnitRepositories in 'UnitRepositories.pas';
 
 {$R *.res}

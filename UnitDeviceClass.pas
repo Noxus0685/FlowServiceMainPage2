@@ -2135,13 +2135,15 @@ var
   NewName: string;
 begin
   NewName := Trim(Modification);
-  if Trim(DN) <> '' then
+ // Диаметр не будем отображать.
+
+{  if Trim(DN) <> '' then
   begin
     if NewName <> '' then
       NewName := NewName + ' ';
-    NewName := NewName + Trim(DN);
+    NewName := NewName; //+ Trim(DN);
   end;
-
+                       }
   if NewName <> '' then
     Name := NewName;
 end;
