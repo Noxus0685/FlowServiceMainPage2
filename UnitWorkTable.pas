@@ -177,6 +177,8 @@ type
     FTempDelta: Double;
     FPress: Double;
     FPressDelta: Double;
+    FCurrentTemp: Double;
+    FCurrentPress: Double;
     FTime: Double;
     FTimeResult: Double;
     FState: ECondirionsState;
@@ -185,6 +187,7 @@ type
     constructor Create(const AName: string = 'Conditions');
     procedure SetTemperature(const ATemp, ATempDelta: Double);
     procedure SetPressure(const APress, APressDelta: Double);
+    procedure SetCurrentValues(const ACurrentTemp, ACurrentPress: Double);
     procedure SetTime(const ATime, ATimeResult: Double);
     procedure Reset;
     function GetStateAsString: string;
@@ -196,6 +199,8 @@ type
     property TempDelta: Double read FTempDelta write FTempDelta;
     property Press: Double read FPress write FPress;
     property PressDelta: Double read FPressDelta write FPressDelta;
+    property CurrentTemp: Double read FCurrentTemp write FCurrentTemp;
+    property CurrentPress: Double read FCurrentPress write FCurrentPress;
     property Time: Double read FTime write FTime;
     property TimeResult: Double read FTimeResult write FTimeResult;
     property State: ECondirionsState read FState write FState;
@@ -1927,7 +1932,7 @@ end;
 procedure TWorkTable.SetTemp(const AValue: Double);
 begin
   if FCondirions <> nil then
-    FCondirions.Temp := AValue;
+    FCondirions.SetTemperature(AValue, FCondirions.TempDelta);
 end;
 
 procedure TWorkTable.SetTempDelta(const AValue: Double);
@@ -1939,7 +1944,7 @@ end;
 procedure TWorkTable.SetPress(const AValue: Double);
 begin
   if FCondirions <> nil then
-    FCondirions.Press := AValue;
+    FCondirions.SetPressure(AValue, FCondirions.PressDelta);
 end;
 
 procedure TWorkTable.SetPressDelta(const AValue: Double);
@@ -2937,6 +2942,8 @@ begin
   FTempDelta := 0.1;
   FPress := 101.1;
   FPressDelta := 0.1;
+  FCurrentTemp := FTemp;
+  FCurrentPress := FPress;
   FTime := 0;
   FTimeResult := 0;
   FState := CONDIRIONS_STARTED;
@@ -2959,6 +2966,12 @@ begin
   FAction := CONDIRIONS_SET_PRESSURE;
 end;
 
+procedure TCondirions.SetCurrentValues(const ACurrentTemp, ACurrentPress: Double);
+begin
+  FCurrentTemp := ACurrentTemp;
+  FCurrentPress := ACurrentPress;
+end;
+
 procedure TCondirions.SetTime(const ATime, ATimeResult: Double);
 begin
   FTime := ATime;
@@ -2973,6 +2986,8 @@ begin
   FTempDelta := 0;
   FPress := 0;
   FPressDelta := 0;
+  FCurrentTemp := 0;
+  FCurrentPress := 0;
   FTime := 0;
   FTimeResult := 0;
   FState := CONDIRIONS_STOPED;
