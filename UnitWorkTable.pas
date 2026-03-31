@@ -121,9 +121,8 @@ type
   private
     FFlow: Double;
     FFlowSet: Double;
-    FValueMin: Double;
-    FValueMax: Double;
-    FSetValue: Double;
+    FFlowRateMin: Double;
+    FFlowRateMax: Double;
     FStatus: EFlowRateState;
     FAction: EFlowRateAction;
     FFlowAccuracyPlus: Double;           //в %
@@ -133,8 +132,8 @@ type
     FHint: string;
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
-    procedure SetValueMin(const Value: Double);
-    procedure SetValueMax(const Value: Double);
+    procedure SetFlowRateMin(const Value: Double);
+    procedure SetFlowRateMax(const Value: Double);
     procedure Start;
   public
     constructor Create(const AName: string = 'FlowRate');
@@ -149,9 +148,8 @@ type
     property Hint: string read FHint write FHint;
     property Flow: Double read FFlow write FFlow;
     property FlowSet: Double read FFlowSet write FFlowSet;
-    property SetValue: Double read FSetValue write FSetValue;
-    property ValueMin: Double read FValueMin write SetValueMin;
-    property ValueMax: Double read FValueMax write SetValueMax;
+    property FlowRateMin: Double read FFlowRateMin write FFlowRateMin;
+    property FlowRateMax: Double read FFlowRateMax write FFlowRateMax;
     property FlowAccuracyPlus: Double read FFlowAccuracyPlus write FFlowAccuracyPlus;
     property FlowAccuracyMinus: Double read FFlowAccuracyMinus write FFlowAccuracyMinus;
     property Status: EFlowRateState read FStatus write FStatus;
@@ -1539,7 +1537,7 @@ begin
   if FlowRate <> nil then
     Result := FlowRate.Flow
   else
-    Result := FlowRate.ValueMin;
+    Result := FlowRate.FFlowRateMin;
 end;
 
 function TWorkTable.GetValueTempertureAfter: TMeterValue;
@@ -2584,8 +2582,6 @@ begin
   if FlowRate=nil then
     Exit;
 
-  IF FlowRate.FAction = FlowRate_Stop then
-    exit;
 
   FlowRate.SetFlowRate(ANewFlowRate);
 
@@ -2796,14 +2792,35 @@ constructor TFlowRate.Create(const AName: string);
 begin
   inherited Create;
   FName := AName;
-  FValueMin := 0;
-  FValueMax := 100;
+  FFlowRateMin := 0;
+  FFlowRateMax := 100;
   FFlow := 0;
-  FFlowSet := FValueMin;
+  FFlowSet := FFlowRateMin;
   FlowAccuracyPlus:=5;
   FlowAccuracyMinus:=5;
   FStatus := FLOWRATE_STOPED;
   FAction := FLOWRATE_STOP;
+end;
+
+
+
+procedure TFlowRate.SetFlowRateMax(const Value: Double);
+begin
+  if Value > 1000 then Exit;
+  if Value < 0 then Exit;
+  if Value < FFlowRateMax then Exit;
+
+    FFlowRateMax := Value;
+end;
+
+
+procedure TFlowRate.SetFlowRateMin(const Value: Double);
+begin
+  if Value > 1000 then Exit;
+  if Value < 0 then Exit;
+  if Value > FFlowRateMax then Exit;
+
+  FFlowRateMin := Value;
 end;
 
 
@@ -2815,33 +2832,19 @@ end;
 
 function TFlowRate.GetIsChanging: Boolean;
 begin
-  Result := Abs(FFlow - FSetValue) > 0.0001;
+  Result := Abs(FFlow - FFlowSet) > 0.0001;     // неправильная логика
 end;
 
-procedure TFlowRate.SetValueMin(const Value: Double);
-begin
-  if (Value < 0) or (Value > FValueMax) then
-    Exit;
-  FValueMin := Value;
-end;
-
-procedure TFlowRate.SetValueMax(const Value: Double);
-begin
-  if (Value < 0) or (Value < FValueMin) then
-    Exit;
-  FValueMax := Value;
-end;
 
 procedure TFlowRate.SetFlowRate(ANewValue: Double);
 begin
-  if ANewValue < FValueMin then
-    FSetValue := FValueMin
-  else if ANewValue > FValueMax then
-    FSetValue := FValueMax
+  if ANewValue < FFlowRateMin then
+    FFlowSet := FFlowRateMin
+  else if ANewValue > FFlowRateMax then
+    FFlowSet := FFlowRateMax
   else
-    FSetValue := ANewValue;
+    FFlowSet := ANewValue;
 
-  FFlowSet := FSetValue;
   FAction := FLOWRATE_SET;
 end;
 
@@ -2849,10 +2852,10 @@ end;
 procedure TFlowRate.Start;
 begin
 
-    if FFlowSet<FValueMin then
-      FFlowSet:=FValueMin;
-    if FFlowSet>FValueMax then
-      FFlowSet:=FValueMax;
+    if FFlowSet<FFlowRateMin then
+      FFlowSet:=FFlowRateMin;
+    if FFlowSet>FFlowRateMax then
+      FFlowSet:=FFlowRateMax;
 
 
   //FFlow := FFlowSet;

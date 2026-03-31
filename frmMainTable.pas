@@ -2898,8 +2898,10 @@ begin
 
   WorkTable.RecalculateAllMeterValues;
 
-  WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue;
-
+  if WorkTable.FlowRate.IsRunning then
+    WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
+  else
+    WorkTable.FlowRate.Flow:=0;
     {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
