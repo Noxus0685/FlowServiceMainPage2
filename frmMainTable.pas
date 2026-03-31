@@ -408,6 +408,8 @@ type
     procedure Rectangle15Click(Sender: TObject);
     procedure SpeedButtonSetFlowRateClick(Sender: TObject);
     procedure SpinBoxFlowRateChange(Sender: TObject);
+    procedure EditTempExit(Sender: TObject);
+    procedure EditPresExit(Sender: TObject);
 
     procedure GridEtalonsCellDblClick(const Column: TColumn;
       const Row: Integer);
@@ -457,6 +459,7 @@ type
     procedure ResetMeasurementValues;
     procedure RefreshPumpsCombo;
     procedure SyncPumpControls;
+    procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
 
@@ -2994,21 +2997,27 @@ begin
   if WorkTable = nil then
     Exit;
 
+  UpdateConditionsCurrentValues(WorkTable);
 
   if WorkTable.ValueTime <> nil then
     LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
   else
     LabelTime.Text := '-';
 
-  if WorkTable.ValueTemperture <> nil then
-    LabelTemp.Text :=    WorkTable.ValueTemperture.GetStrValue
+  if WorkTable.Condirions <> nil then
+  begin
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.Condirions.CurrentTemp);
+    LabelPressure.Text := FormatFloat('0.###', WorkTable.Condirions.CurrentPress);
+    EditTemp.Text := FormatFloat('0.###', WorkTable.Temp);
+    EditPres.Text := FormatFloat('0.###', WorkTable.Press);
+  end
   else
+  begin
     LabelTemp.Text := '-';
-
-  if WorkTable.ValuePressure <> nil then
-    EditPres.Text := WorkTable.ValuePressure.GetStrValue
-  else
+    LabelPressure.Text := '-';
+    EditTemp.Text := '-';
     EditPres.Text := '-';
+  end;
 
   {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
@@ -3016,11 +3025,6 @@ begin
     LabelFlowRate.Text := '-'; }
 
 
-
-  if WorkTable.ValuePressure <> nil then
-    LabelPressure.Text := WorkTable.ValuePressure.GetStrValue
-  else
-    LabelPressure.Text := '-';
 
   if WorkTable.ValueDensity <> nil then
     LabelDensity.Text := WorkTable.ValueDensity.GetStrValue
@@ -3121,6 +3125,58 @@ begin
     RefreshMonitorIndicator;
 
 
+end;
+
+procedure TFrameMainTable.UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
+var
+  CurrentTemp: Double;
+  CurrentPress: Double;
+begin
+  if (AWorkTable = nil) or (AWorkTable.Condirions = nil) then
+    Exit;
+
+  CurrentTemp := AWorkTable.Condirions.CurrentTemp;
+  CurrentPress := AWorkTable.Condirions.CurrentPress;
+
+  if AWorkTable.ValueTemperture <> nil then
+    CurrentTemp := AWorkTable.ValueTemperture.GetDoubleValue;
+
+  if AWorkTable.ValuePressure <> nil then
+    CurrentPress := AWorkTable.ValuePressure.GetDoubleValue;
+
+  AWorkTable.Condirions.SetCurrentValues(CurrentTemp, CurrentPress);
+end;
+
+procedure TFrameMainTable.EditTempExit(Sender: TObject);
+var
+  Value: Double;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.Condirions = nil) then
+    Exit;
+
+  if TryStrToFloat(EditTemp.Text, Value) then
+  begin
+    FActiveWorkTable.Condirions.SetTemperature(Value, FActiveWorkTable.Condirions.TempDelta);
+    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Condirions.Temp);
+  end
+  else
+    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Condirions.Temp);
+end;
+
+procedure TFrameMainTable.EditPresExit(Sender: TObject);
+var
+  Value: Double;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.Condirions = nil) then
+    Exit;
+
+  if TryStrToFloat(EditPres.Text, Value) then
+  begin
+    FActiveWorkTable.Condirions.SetPressure(Value, FActiveWorkTable.Condirions.PressDelta);
+    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Condirions.Press);
+  end
+  else
+    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Condirions.Press);
 end;
 
 procedure TFrameMainTable.ApplyFlowMeterSelection(const ARow: Integer);

@@ -78,6 +78,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 KillFocusByReturn = True
+                OnExit = EditPresExit
               end
             end
             object Layout50: TLayout
@@ -164,6 +165,7 @@ object FrameMainTable: TFrameMainTable
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
                   KillFocusByReturn = True
+                  OnExit = EditTempExit
                 end
               end
             end
