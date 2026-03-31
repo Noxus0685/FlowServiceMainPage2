@@ -66,6 +66,19 @@ type
     FLOWRATE_SET
   );
 
+  ECondirionsState = (
+    CONDIRIONS_STOPED,
+    CONDIRIONS_STARTED
+  );
+
+  ECondirionsAction = (
+    CONDIRIONS_NONE,
+    CONDIRIONS_SET_TEMPERATURE,
+    CONDIRIONS_SET_PRESSURE,
+    CONDIRIONS_SET_TIME,
+    CONDIRIONS_RESET
+  );
+
 
 type
 
@@ -154,6 +167,39 @@ type
     property FlowAccuracyMinus: Double read FFlowAccuracyMinus write FFlowAccuracyMinus;
     property Status: EFlowRateState read FStatus write FStatus;
     property Action: EFlowRateAction read FAction write FAction;
+  end;
+
+  TCondirions = class(TTypeEntity)
+  private
+    FName: string;
+    FHint: string;
+    FTemp: Double;
+    FTempDelta: Double;
+    FPress: Double;
+    FPressDelta: Double;
+    FTime: Double;
+    FTimeResult: Double;
+    FState: ECondirionsState;
+    FAction: ECondirionsAction;
+  public
+    constructor Create(const AName: string = 'Conditions');
+    procedure SetTemperature(const ATemp, ATempDelta: Double);
+    procedure SetPressure(const APress, APressDelta: Double);
+    procedure SetTime(const ATime, ATimeResult: Double);
+    procedure Reset;
+    function GetStateAsString: string;
+    function GetActionAsString: string;
+
+    property Name: string read FName write FName;
+    property Hint: string read FHint write FHint;
+    property Temp: Double read FTemp write FTemp;
+    property TempDelta: Double read FTempDelta write FTempDelta;
+    property Press: Double read FPress write FPress;
+    property PressDelta: Double read FPressDelta write FPressDelta;
+    property Time: Double read FTime write FTime;
+    property TimeResult: Double read FTimeResult write FTimeResult;
+    property State: ECondirionsState read FState write FState;
+    property Action: ECondirionsAction read FAction write FAction;
   end;
 
   TWorkTable = class;
@@ -345,12 +391,7 @@ type
 
     FFlowRate: TFlowRate;
 
-    FTemp: Double;
-    FTempDelta: Double;
-    FPress: Double;
-    FPressDelta: Double;
-    FTime: Double;
-    FTimeResult: Double;
+    FCondirions: TCondirions;
     FState: TSpillState;
     FMeasurementState: EMeasurementState;
     FTableClamped: Boolean;
@@ -403,6 +444,12 @@ type
     function GetValueTime: TMeterValue;
     function GetValueQuantity: TMeterValue;
     function GetValueFlowRate: TMeterValue;
+    function GetTemp: Double;
+    function GetTempDelta: Double;
+    function GetPress: Double;
+    function GetPressDelta: Double;
+    function GetTime: Double;
+    function GetTimeResult: Double;
     function GetFlowRate: Double;
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
@@ -419,6 +466,12 @@ type
     procedure SetValueTime(const AValue: TMeterValue);
     procedure SetValueQuantity(const AValue: TMeterValue);
     procedure SetValueFlowRate(const AValue: TMeterValue);
+    procedure SetTemp(const AValue: Double);
+    procedure SetTempDelta(const AValue: Double);
+    procedure SetPress(const AValue: Double);
+    procedure SetPressDelta(const AValue: Double);
+    procedure SetTime(const AValue: Double);
+    procedure SetTimeResult(const AValue: Double);
     //procedure SetFlowRate(const AValue: Double);
     procedure AssignTableFlowAsEtalonToDevices;
 
@@ -520,6 +573,7 @@ private
 
   property ActivePump: TPump read FActivePump write FActivePump;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
+  property Condirions: TCondirions read FCondirions write FCondirions;
 
     property ID: Integer read FID write FID;
     property Name: string read FName write FName;
@@ -528,15 +582,15 @@ private
     property DeviceChannels: TObjectList<TChannel> read FDeviceChannels;
     property EtalonChannels: TObjectList<TChannel> read FEtalonChannels;
     property TableFlow: TFlowMeter read FTableFlow;
-    property Temp: Double read FTemp write FTemp;
-    property TempDelta: Double read FTempDelta write FTempDelta;
-    property Press: Double read FPress write FPress;
-    property PressDelta: Double read FPressDelta write FPressDelta;
+    property Temp: Double read GetTemp write SetTemp;
+    property TempDelta: Double read GetTempDelta write SetTempDelta;
+    property Press: Double read GetPress write SetPress;
+    property PressDelta: Double read GetPressDelta write SetPressDelta;
 
 
 
-    property Time: Double read FTime write FTime;
-    property TimeResult: Double read FTimeResult write FTimeResult;
+    property Time: Double read GetTime write SetTime;
+    property TimeResult: Double read GetTimeResult write SetTimeResult;
 
     property State: TSpillState read FState write FState;
     property MeasurementState: EMeasurementState read FMeasurementState write FMeasurementState;
@@ -1175,6 +1229,7 @@ begin
 
   FPumps := TObjectList<TPump>.Create(True); // True — автоосвобождение объектов
   FlowRate := TFlowRate.Create('Расход');
+  Condirions := TCondirions.Create('Условия');
 
   FTableFlow := TFlowMeter.Create;
 
@@ -1193,10 +1248,10 @@ begin
   FLayoutProceduresVisible := True;
   FInstrumentalLayoutOrder := 'FlowRate,Pump,Main,Mesure,Conditions,Procedures';
 
-  Temp:= 20.2;
-  TempDelta:=0.1;
-  Press:=101.1;
-  PressDelta:=0.1;
+  Temp := 20.2;
+  TempDelta := 0.1;
+  Press := 101.1;
+  PressDelta := 0.1;
   //FlowRate := 10;
 
 
@@ -1811,6 +1866,7 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
+  FreeAndNil(FCondirions);
   FreeAndNil(FlowRate);
   FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
@@ -1818,6 +1874,90 @@ begin
   FreeAndNil(FPumps);
 
   inherited;
+end;
+
+function TWorkTable.GetTemp: Double;
+begin
+  if FCondirions <> nil then
+    Result := FCondirions.Temp
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetTempDelta: Double;
+begin
+  if FCondirions <> nil then
+    Result := FCondirions.TempDelta
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetPress: Double;
+begin
+  if FCondirions <> nil then
+    Result := FCondirions.Press
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetPressDelta: Double;
+begin
+  if FCondirions <> nil then
+    Result := FCondirions.PressDelta
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetTime: Double;
+begin
+  if FCondirions <> nil then
+    Result := FCondirions.Time
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetTimeResult: Double;
+begin
+  if FCondirions <> nil then
+    Result := FCondirions.TimeResult
+  else
+    Result := 0;
+end;
+
+procedure TWorkTable.SetTemp(const AValue: Double);
+begin
+  if FCondirions <> nil then
+    FCondirions.Temp := AValue;
+end;
+
+procedure TWorkTable.SetTempDelta(const AValue: Double);
+begin
+  if FCondirions <> nil then
+    FCondirions.TempDelta := AValue;
+end;
+
+procedure TWorkTable.SetPress(const AValue: Double);
+begin
+  if FCondirions <> nil then
+    FCondirions.Press := AValue;
+end;
+
+procedure TWorkTable.SetPressDelta(const AValue: Double);
+begin
+  if FCondirions <> nil then
+    FCondirions.PressDelta := AValue;
+end;
+
+procedure TWorkTable.SetTime(const AValue: Double);
+begin
+  if FCondirions <> nil then
+    FCondirions.Time := AValue;
+end;
+
+procedure TWorkTable.SetTimeResult(const AValue: Double);
+begin
+  if FCondirions <> nil then
+    FCondirions.TimeResult := AValue;
 end;
 
 { Adds a new device channel with default identifiers and bindings. }
@@ -2786,6 +2926,82 @@ end;
 
 
 
+
+
+   {$REGION 'TCondirions'}
+constructor TCondirions.Create(const AName: string);
+begin
+  inherited Create;
+  FName := AName;
+  FTemp := 20.2;
+  FTempDelta := 0.1;
+  FPress := 101.1;
+  FPressDelta := 0.1;
+  FTime := 0;
+  FTimeResult := 0;
+  FState := CONDIRIONS_STARTED;
+  FAction := CONDIRIONS_NONE;
+end;
+
+procedure TCondirions.SetTemperature(const ATemp, ATempDelta: Double);
+begin
+  FTemp := ATemp;
+  FTempDelta := ATempDelta;
+  FState := CONDIRIONS_STARTED;
+  FAction := CONDIRIONS_SET_TEMPERATURE;
+end;
+
+procedure TCondirions.SetPressure(const APress, APressDelta: Double);
+begin
+  FPress := APress;
+  FPressDelta := APressDelta;
+  FState := CONDIRIONS_STARTED;
+  FAction := CONDIRIONS_SET_PRESSURE;
+end;
+
+procedure TCondirions.SetTime(const ATime, ATimeResult: Double);
+begin
+  FTime := ATime;
+  FTimeResult := ATimeResult;
+  FState := CONDIRIONS_STARTED;
+  FAction := CONDIRIONS_SET_TIME;
+end;
+
+procedure TCondirions.Reset;
+begin
+  FTemp := 0;
+  FTempDelta := 0;
+  FPress := 0;
+  FPressDelta := 0;
+  FTime := 0;
+  FTimeResult := 0;
+  FState := CONDIRIONS_STOPED;
+  FAction := CONDIRIONS_RESET;
+end;
+
+function TCondirions.GetStateAsString: string;
+begin
+  case FState of
+    CONDIRIONS_STARTED: Result := 'Активны';
+    CONDIRIONS_STOPED: Result := 'Сброшены';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function TCondirions.GetActionAsString: string;
+begin
+  case FAction of
+    CONDIRIONS_NONE: Result := 'Без действий';
+    CONDIRIONS_SET_TEMPERATURE: Result := 'Изменена температура';
+    CONDIRIONS_SET_PRESSURE: Result := 'Изменено давление';
+    CONDIRIONS_SET_TIME: Result := 'Изменено время';
+    CONDIRIONS_RESET: Result := 'Сброшены';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+  {$ENDREGION 'TCondirions'}
 
    {$REGION 'TFlowRate'}
 constructor TFlowRate.Create(const AName: string);
