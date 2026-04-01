@@ -428,7 +428,6 @@ type
   FRows: array of TRowData;
   IsUpdating: Boolean;
   FIsScannerUse: Boolean;
-  FScannerEnterPressed: Boolean;
 
 
     FFlowMeters: TObjectList<TFlowMeter>;
@@ -1084,7 +1083,6 @@ begin
   FLastClickCol := nil;
   FLastClickTick := 0;
   FIsScannerUse := False;
-  FScannerEnterPressed := False;
 
   Randomize;
   FNextClimateChangeAt := Now;
@@ -3561,16 +3559,6 @@ begin
     LeaveDeviceSerialEditing;
 end;
 
-procedure TFrameMainTable.GridDevicesKeyDown(Sender: TObject; var Key: Word;
-  var KeyChar: Char; Shift: TShiftState);
-begin
-  if not FIsScannerUse then
-    Exit;
-
-  if (Key = vkReturn) and (GridDevices.Selected = StringColumnDeviceSerial1.Index) then
-    FScannerEnterPressed := True;
-end;
-
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -3896,11 +3884,8 @@ begin
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
 
-      if FScannerEnterPressed then
-      begin
+      if FIsScannerUse then
         HandleScannerSerialEnter(ARow, Value.AsString);
-        FScannerEnterPressed := False;
-      end;
 
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
