@@ -172,6 +172,9 @@ type
   TConditionsTemp = class(TTypeEntity)
   private
     FTemp: Double;
+    FTempSet: Double;
+    FTempBefore: Double;
+    FTempAfter: Double;
     FTempDelta: Double;
     FTempMin: Double;
     FTempMax: Double;
@@ -181,8 +184,11 @@ type
     procedure SetTempMax(const Value: Double);
   public
     constructor Create;
-    procedure SetTemperature(const ATemp, ATempDelta: Double);
+    procedure SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
     property Temp: Double read FTemp write FTemp;
+    property TempSet: Double read FTempSet write FTempSet;
+    property TempBefore: Double read FTempBefore write FTempBefore;
+    property TempAfter: Double read FTempAfter write FTempAfter;
     property TempDelta: Double read FTempDelta write FTempDelta;
     property TempMin: Double read FTempMin write SetTempMin;
     property TempMax: Double read FTempMax write SetTempMax;
@@ -193,6 +199,9 @@ type
   TConditionsPress = class(TTypeEntity)
   private
     FPress: Double;
+    FPressSet: Double;
+    FPressBefore: Double;
+    FPressAfter: Double;
     FPressDelta: Double;
     FPressMin: Double;
     FPressMax: Double;
@@ -202,82 +211,16 @@ type
     procedure SetPressMax(const Value: Double);
   public
     constructor Create;
-    procedure SetPressure(const APress, APressDelta: Double);
+    procedure SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
     property Press: Double read FPress write FPress;
+    property PressSet: Double read FPressSet write FPressSet;
+    property PressBefore: Double read FPressBefore write FPressBefore;
+    property PressAfter: Double read FPressAfter write FPressAfter;
     property PressDelta: Double read FPressDelta write FPressDelta;
     property PressMin: Double read FPressMin write SetPressMin;
     property PressMax: Double read FPressMax write SetPressMax;
     property PressAccuracyPlus: Double read FPressAccuracyPlus write FPressAccuracyPlus;
     property PressAccuracyMinus: Double read FPressAccuracyMinus write FPressAccuracyMinus;
-  end;
-
-  TConditions = class(TTypeEntity)
-  private
-    FName: string;
-    FHint: string;
-    FConditionsTemp: TConditionsTemp;
-    FConditionsPress: TConditionsPress;
-    FCurrentTemp: Double;
-    FCurrentPress: Double;
-    FTime: Double;
-    FTimeResult: Double;
-    FState: EConditionsState;
-    FAction: EConditionsAction;
-    function GetTemp: Double;
-    function GetTempDelta: Double;
-    function GetPress: Double;
-    function GetPressDelta: Double;
-    function GetTempMin: Double;
-    function GetTempMax: Double;
-    function GetTempAccuracyPlus: Double;
-    function GetTempAccuracyMinus: Double;
-    function GetPressMin: Double;
-    function GetPressMax: Double;
-    function GetPressAccuracyPlus: Double;
-    function GetPressAccuracyMinus: Double;
-    procedure SetTemp(const Value: Double);
-    procedure SetTempDelta(const Value: Double);
-    procedure SetPress(const Value: Double);
-    procedure SetPressDelta(const Value: Double);
-    procedure SetTempMin(const Value: Double);
-    procedure SetTempMax(const Value: Double);
-    procedure SetTempAccuracyPlus(const Value: Double);
-    procedure SetTempAccuracyMinus(const Value: Double);
-    procedure SetPressMin(const Value: Double);
-    procedure SetPressMax(const Value: Double);
-    procedure SetPressAccuracyPlus(const Value: Double);
-    procedure SetPressAccuracyMinus(const Value: Double);
-  public
-    constructor Create(const AName: string = 'Conditions');
-    destructor Destroy; override;
-    procedure SetTemperature(const ATemp, ATempDelta: Double);
-    procedure SetPressure(const APress, APressDelta: Double);
-    procedure SetCurrentValues(const ACurrentTemp, ACurrentPress: Double);
-    procedure SetTime(const ATime, ATimeResult: Double);
-    procedure Reset;
-    function GetStateAsString: string;
-    function GetActionAsString: string;
-
-    property Name: string read FName write FName;
-    property Hint: string read FHint write FHint;
-    property Temp: Double read GetTemp write SetTemp;
-    property TempDelta: Double read GetTempDelta write SetTempDelta;
-    property Press: Double read GetPress write SetPress;
-    property PressDelta: Double read GetPressDelta write SetPressDelta;
-    property TempMin: Double read GetTempMin write SetTempMin;
-    property TempMax: Double read GetTempMax write SetTempMax;
-    property TempAccuracyPlus: Double read GetTempAccuracyPlus write SetTempAccuracyPlus;
-    property TempAccuracyMinus: Double read GetTempAccuracyMinus write SetTempAccuracyMinus;
-    property PressMin: Double read GetPressMin write SetPressMin;
-    property PressMax: Double read GetPressMax write SetPressMax;
-    property PressAccuracyPlus: Double read GetPressAccuracyPlus write SetPressAccuracyPlus;
-    property PressAccuracyMinus: Double read GetPressAccuracyMinus write SetPressAccuracyMinus;
-    property CurrentTemp: Double read FCurrentTemp write FCurrentTemp;
-    property CurrentPress: Double read FCurrentPress write FCurrentPress;
-    property Time: Double read FTime write FTime;
-    property TimeResult: Double read FTimeResult write FTimeResult;
-    property State: EConditionsState read FState write FState;
-    property Action: EConditionsAction read FAction write FAction;
   end;
 
   TWorkTable = class;
@@ -469,7 +412,10 @@ type
 
     FFlowRate: TFlowRate;
 
-    FConditions: TConditions;
+    FConditionsTemp: TConditionsTemp;
+    FConditionsPress: TConditionsPress;
+    FTime: Double;
+    FTimeResult: Double;
     FState: TSpillState;
     FMeasurementState: EMeasurementState;
     FTableClamped: Boolean;
@@ -651,7 +597,6 @@ private
 
   property ActivePump: TPump read FActivePump write FActivePump;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
-  property Conditions: TConditions read FConditions write FConditions;
 
     property ID: Integer read FID write FID;
     property Name: string read FName write FName;
@@ -710,6 +655,8 @@ private
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
     procedure InitMeterValues;
+    procedure SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
+    procedure SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
 
 
   public
@@ -1307,7 +1254,8 @@ begin
 
   FPumps := TObjectList<TPump>.Create(True); // True — автоосвобождение объектов
   FlowRate := TFlowRate.Create('Расход');
-  Conditions := TConditions.Create('Условия');
+  FConditionsTemp := TConditionsTemp.Create;
+  FConditionsPress := TConditionsPress.Create;
 
   FTableFlow := TFlowMeter.Create;
 
@@ -1944,7 +1892,8 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
-  FreeAndNil(FConditions);
+  FreeAndNil(FConditionsTemp);
+  FreeAndNil(FConditionsPress);
   FreeAndNil(FlowRate);
   FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
@@ -1956,86 +1905,146 @@ end;
 
 function TWorkTable.GetTemp: Double;
 begin
-  if FConditions <> nil then
-    Result := FConditions.Temp
+  if FConditionsTemp <> nil then
+    Result := FConditionsTemp.Temp
   else
     Result := 0;
 end;
 
 function TWorkTable.GetTempDelta: Double;
 begin
-  if FConditions <> nil then
-    Result := FConditions.TempDelta
+  if FConditionsTemp <> nil then
+    Result := FConditionsTemp.TempDelta
   else
     Result := 0;
 end;
 
 function TWorkTable.GetPress: Double;
 begin
-  if FConditions <> nil then
-    Result := FConditions.Press
+  if FConditionsPress <> nil then
+    Result := FConditionsPress.Press
   else
     Result := 0;
 end;
 
 function TWorkTable.GetPressDelta: Double;
 begin
-  if FConditions <> nil then
-    Result := FConditions.PressDelta
+  if FConditionsPress <> nil then
+    Result := FConditionsPress.PressDelta
   else
     Result := 0;
 end;
 
 function TWorkTable.GetTime: Double;
 begin
-  if FConditions <> nil then
-    Result := FConditions.Time
-  else
-    Result := 0;
+  Result := FTime;
 end;
 
 function TWorkTable.GetTimeResult: Double;
 begin
-  if FConditions <> nil then
-    Result := FConditions.TimeResult
-  else
-    Result := 0;
+  Result := FTimeResult;
 end;
 
 procedure TWorkTable.SetTemp(const AValue: Double);
+var
+  TempBeforeValue: Double;
+  TempAfterValue: Double;
 begin
-  if FConditions <> nil then
-    FConditions.SetTemperature(AValue, FConditions.TempDelta);
+  TempBeforeValue := 0;
+  TempAfterValue := 0;
+  if ValueTempertureBefore <> nil then
+    TempBeforeValue := ValueTempertureBefore.GetDoubleValue;
+  if ValueTempertureAfter <> nil then
+    TempAfterValue := ValueTempertureAfter.GetDoubleValue;
+  SetTemperature(AValue, TempDelta, TempBeforeValue, TempAfterValue);
 end;
 
 procedure TWorkTable.SetTempDelta(const AValue: Double);
 begin
-  if FConditions <> nil then
-    FConditions.TempDelta := AValue;
+  if FConditionsTemp <> nil then
+    FConditionsTemp.TempDelta := AValue;
 end;
 
 procedure TWorkTable.SetPress(const AValue: Double);
+var
+  PressBeforeValue: Double;
+  PressAfterValue: Double;
 begin
-  if FConditions <> nil then
-    FConditions.SetPressure(AValue, FConditions.PressDelta);
+  PressBeforeValue := 0;
+  PressAfterValue := 0;
+  if ValuePressureBefore <> nil then
+    PressBeforeValue := ValuePressureBefore.GetDoubleValue;
+  if ValuePressureAfter <> nil then
+    PressAfterValue := ValuePressureAfter.GetDoubleValue;
+  SetPressure(AValue, PressDelta, PressBeforeValue, PressAfterValue);
 end;
 
 procedure TWorkTable.SetPressDelta(const AValue: Double);
 begin
-  if FConditions <> nil then
-    FConditions.PressDelta := AValue;
+  if FConditionsPress <> nil then
+    FConditionsPress.PressDelta := AValue;
 end;
 
 procedure TWorkTable.SetTime(const AValue: Double);
 begin
-  if FConditions <> nil then
-    FConditions.Time := AValue;
+  FTime := AValue;
 end;
 
 procedure TWorkTable.SetTimeResult(const AValue: Double);
 begin
-  if FConditions <> nil then
-    FConditions.TimeResult := AValue;
+  FTimeResult := AValue;
+end;
+
+procedure TWorkTable.SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
+var
+  AppliedTemp: Double;
+  AppliedTempBefore: Double;
+  AppliedTempAfter: Double;
+begin
+  AppliedTemp := ATemp;
+  AppliedTempBefore := ATempBefore;
+  AppliedTempAfter := ATempAfter;
+
+  if FConditionsTemp <> nil then
+  begin
+    FConditionsTemp.SetTemperature(ATemp, ATempDelta, ATempBefore, ATempAfter);
+    AppliedTemp := FConditionsTemp.Temp;
+    AppliedTempBefore := FConditionsTemp.TempBefore;
+    AppliedTempAfter := FConditionsTemp.TempAfter;
+  end;
+
+  if ValueTempertureBefore <> nil then
+    ValueTempertureBefore.SetDoubleValue(AppliedTempBefore);
+  if ValueTempertureAfter <> nil then
+    ValueTempertureAfter.SetDoubleValue(AppliedTempAfter);
+  if ValueTemperture <> nil then
+    ValueTemperture.SetDoubleValue(AppliedTemp);
+end;
+
+procedure TWorkTable.SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
+var
+  AppliedPress: Double;
+  AppliedPressBefore: Double;
+  AppliedPressAfter: Double;
+begin
+  AppliedPress := APress;
+  AppliedPressBefore := APressBefore;
+  AppliedPressAfter := APressAfter;
+
+  if FConditionsPress <> nil then
+  begin
+    FConditionsPress.SetPressure(APress, APressDelta, APressBefore, APressAfter);
+    AppliedPress := FConditionsPress.Press;
+    AppliedPressBefore := FConditionsPress.PressBefore;
+    AppliedPressAfter := FConditionsPress.PressAfter;
+  end;
+
+  if ValuePressureBefore <> nil then
+    ValuePressureBefore.SetDoubleValue(AppliedPressBefore);
+  if ValuePressureAfter <> nil then
+    ValuePressureAfter.SetDoubleValue(AppliedPressAfter);
+  if ValuePressure <> nil then
+    ValuePressure.SetDoubleValue(AppliedPress);
 end;
 
 { Adds a new device channel with default identifiers and bindings. }
@@ -3013,6 +3022,9 @@ begin
   FTempMin := -50;
   FTempMax := 150;
   FTemp := 20.2;
+  FTempSet := FTemp;
+  FTempBefore := FTemp;
+  FTempAfter := FTemp;
   FTempDelta := 0.1;
   FTempAccuracyPlus := 1;
   FTempAccuracyMinus := 1;
@@ -3030,14 +3042,26 @@ begin
   FTempMin := Value;
 end;
 
-procedure TConditionsTemp.SetTemperature(const ATemp, ATempDelta: Double);
+procedure TConditionsTemp.SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
+var
+  CalculatedTemp: Double;
 begin
-  if ATemp < FTempMin then
+  FTempSet := ATemp;
+  FTempBefore := ATempBefore;
+  FTempAfter := ATempAfter;
+
+  if Abs(ATempBefore) <= 1E-12 then
+    CalculatedTemp := ATempAfter
+  else
+    CalculatedTemp := ATempAfter - ATempBefore;
+
+  if CalculatedTemp < FTempMin then
     FTemp := FTempMin
-  else if ATemp > FTempMax then
+  else if CalculatedTemp > FTempMax then
     FTemp := FTempMax
   else
-    FTemp := ATemp;
+    FTemp := CalculatedTemp;
+
   FTempDelta := ATempDelta;
 end;
 
@@ -3047,6 +3071,9 @@ begin
   FPressMin := 0;
   FPressMax := 200;
   FPress := 101.1;
+  FPressSet := FPress;
+  FPressBefore := FPress;
+  FPressAfter := FPress;
   FPressDelta := 0.1;
   FPressAccuracyPlus := 1;
   FPressAccuracyMinus := 1;
@@ -3064,220 +3091,29 @@ begin
   FPressMin := Value;
 end;
 
-procedure TConditionsPress.SetPressure(const APress, APressDelta: Double);
+procedure TConditionsPress.SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
+var
+  CalculatedPress: Double;
 begin
-  if APress < FPressMin then
+  FPressSet := APress;
+  FPressBefore := APressBefore;
+  FPressAfter := APressAfter;
+
+  if Abs(APressBefore) <= 1E-12 then
+    CalculatedPress := APressAfter
+  else
+    CalculatedPress := APressAfter - APressBefore;
+
+  if CalculatedPress < FPressMin then
     FPress := FPressMin
-  else if APress > FPressMax then
+  else if CalculatedPress > FPressMax then
     FPress := FPressMax
   else
-    FPress := APress;
+    FPress := CalculatedPress;
+
   FPressDelta := APressDelta;
 end;
 
-constructor TConditions.Create(const AName: string);
-begin
-  inherited Create;
-  FName := AName;
-  FConditionsTemp := TConditionsTemp.Create;
-  FConditionsPress := TConditionsPress.Create;
-  FCurrentTemp := FConditionsTemp.Temp;
-  FCurrentPress := FConditionsPress.Press;
-  FTime := 0;
-  FTimeResult := 0;
-  FState := CONDITIONS_STARTED;
-  FAction := CONDITIONS_NONE;
-end;
-
-destructor TConditions.Destroy;
-begin
-  FreeAndNil(FConditionsTemp);
-  FreeAndNil(FConditionsPress);
-  inherited;
-end;
-
-procedure TConditions.SetTemperature(const ATemp, ATempDelta: Double);
-begin
-  FConditionsTemp.SetTemperature(ATemp, ATempDelta);
-  FState := CONDITIONS_STARTED;
-  FAction := CONDITIONS_SET_TEMPERATURE;
-end;
-
-procedure TConditions.SetPressure(const APress, APressDelta: Double);
-begin
-  FConditionsPress.SetPressure(APress, APressDelta);
-  FState := CONDITIONS_STARTED;
-  FAction := CONDITIONS_SET_PRESSURE;
-end;
-
-procedure TConditions.SetCurrentValues(const ACurrentTemp, ACurrentPress: Double);
-begin
-  FCurrentTemp := ACurrentTemp;
-  FCurrentPress := ACurrentPress;
-end;
-
-procedure TConditions.SetTime(const ATime, ATimeResult: Double);
-begin
-  FTime := ATime;
-  FTimeResult := ATimeResult;
-  FState := CONDITIONS_STARTED;
-  FAction := CONDITIONS_SET_TIME;
-end;
-
-procedure TConditions.Reset;
-begin
-  FConditionsTemp.SetTemperature(0, 0);
-  FConditionsPress.SetPressure(0, 0);
-  FCurrentTemp := 0;
-  FCurrentPress := 0;
-  FTime := 0;
-  FTimeResult := 0;
-  FState := CONDITIONS_STOPED;
-  FAction := CONDITIONS_RESET;
-end;
-
-function TConditions.GetTemp: Double;
-begin
-  Result := FConditionsTemp.Temp;
-end;
-
-function TConditions.GetTempDelta: Double;
-begin
-  Result := FConditionsTemp.TempDelta;
-end;
-
-function TConditions.GetPress: Double;
-begin
-  Result := FConditionsPress.Press;
-end;
-
-function TConditions.GetPressDelta: Double;
-begin
-  Result := FConditionsPress.PressDelta;
-end;
-
-function TConditions.GetTempMin: Double;
-begin
-  Result := FConditionsTemp.TempMin;
-end;
-
-function TConditions.GetTempMax: Double;
-begin
-  Result := FConditionsTemp.TempMax;
-end;
-
-function TConditions.GetTempAccuracyPlus: Double;
-begin
-  Result := FConditionsTemp.TempAccuracyPlus;
-end;
-
-function TConditions.GetTempAccuracyMinus: Double;
-begin
-  Result := FConditionsTemp.TempAccuracyMinus;
-end;
-
-function TConditions.GetPressMin: Double;
-begin
-  Result := FConditionsPress.PressMin;
-end;
-
-function TConditions.GetPressMax: Double;
-begin
-  Result := FConditionsPress.PressMax;
-end;
-
-function TConditions.GetPressAccuracyPlus: Double;
-begin
-  Result := FConditionsPress.PressAccuracyPlus;
-end;
-
-function TConditions.GetPressAccuracyMinus: Double;
-begin
-  Result := FConditionsPress.PressAccuracyMinus;
-end;
-
-procedure TConditions.SetTemp(const Value: Double);
-begin
-  FConditionsTemp.Temp := Value;
-end;
-
-procedure TConditions.SetTempDelta(const Value: Double);
-begin
-  FConditionsTemp.TempDelta := Value;
-end;
-
-procedure TConditions.SetPress(const Value: Double);
-begin
-  FConditionsPress.Press := Value;
-end;
-
-procedure TConditions.SetPressDelta(const Value: Double);
-begin
-  FConditionsPress.PressDelta := Value;
-end;
-
-procedure TConditions.SetTempMin(const Value: Double);
-begin
-  FConditionsTemp.TempMin := Value;
-end;
-
-procedure TConditions.SetTempMax(const Value: Double);
-begin
-  FConditionsTemp.TempMax := Value;
-end;
-
-procedure TConditions.SetTempAccuracyPlus(const Value: Double);
-begin
-  FConditionsTemp.TempAccuracyPlus := Value;
-end;
-
-procedure TConditions.SetTempAccuracyMinus(const Value: Double);
-begin
-  FConditionsTemp.TempAccuracyMinus := Value;
-end;
-
-procedure TConditions.SetPressMin(const Value: Double);
-begin
-  FConditionsPress.PressMin := Value;
-end;
-
-procedure TConditions.SetPressMax(const Value: Double);
-begin
-  FConditionsPress.PressMax := Value;
-end;
-
-procedure TConditions.SetPressAccuracyPlus(const Value: Double);
-begin
-  FConditionsPress.PressAccuracyPlus := Value;
-end;
-
-procedure TConditions.SetPressAccuracyMinus(const Value: Double);
-begin
-  FConditionsPress.PressAccuracyMinus := Value;
-end;
-
-function TConditions.GetStateAsString: string;
-begin
-  case FState of
-    CONDITIONS_STARTED: Result := 'Активны';
-    CONDITIONS_STOPED: Result := 'Сброшены';
-  else
-    Result := 'Неизвестно';
-  end;
-end;
-
-function TConditions.GetActionAsString: string;
-begin
-  case FAction of
-    CONDITIONS_NONE: Result := 'Без действий';
-    CONDITIONS_SET_TEMPERATURE: Result := 'Изменена температура';
-    CONDITIONS_SET_PRESSURE: Result := 'Изменено давление';
-    CONDITIONS_SET_TIME: Result := 'Изменено время';
-    CONDITIONS_RESET: Result := 'Сброшены';
-  else
-    Result := 'Неизвестно';
-  end;
-end;
   {$ENDREGION 'TConditions'}
 
    {$REGION 'TFlowRate'}

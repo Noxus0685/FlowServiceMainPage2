@@ -3004,20 +3004,17 @@ begin
   else
     LabelTime.Text := '-';
 
-  if WorkTable.Conditions <> nil then
-  begin
-    LabelTemp.Text := FormatFloat('0.###', WorkTable.Conditions.CurrentTemp);
-    LabelPressure.Text := FormatFloat('0.###', WorkTable.Conditions.CurrentPress);
-    EditTemp.Text := FormatFloat('0.###', WorkTable.Temp);
-    EditPres.Text := FormatFloat('0.###', WorkTable.Press);
-  end
+  if WorkTable.ValueTemperture <> nil then
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.ValueTemperture.GetDoubleValue)
   else
-  begin
-    LabelTemp.Text := '-';
-    LabelPressure.Text := '-';
-    EditTemp.Text := '-';
-    EditPres.Text := '-';
-  end;
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.Temp);
+
+  if WorkTable.ValuePressure <> nil then
+    LabelPressure.Text := FormatFloat('0.###', WorkTable.ValuePressure.GetDoubleValue)
+  else
+    LabelPressure.Text := FormatFloat('0.###', WorkTable.Press);
+  EditTemp.Text := FormatFloat('0.###', WorkTable.Temp);
+  EditPres.Text := FormatFloat('0.###', WorkTable.Press);
 
   {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
@@ -3128,55 +3125,67 @@ begin
 end;
 
 procedure TFrameMainTable.UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
-var
-  CurrentTemp: Double;
-  CurrentPress: Double;
 begin
-  if (AWorkTable = nil) or (AWorkTable.Conditions = nil) then
-    Exit;
-
-  CurrentTemp := AWorkTable.Conditions.CurrentTemp;
-  CurrentPress := AWorkTable.Conditions.CurrentPress;
-
-  if AWorkTable.ValueTemperture <> nil then
-    CurrentTemp := AWorkTable.ValueTemperture.GetDoubleValue;
-
-  if AWorkTable.ValuePressure <> nil then
-    CurrentPress := AWorkTable.ValuePressure.GetDoubleValue;
-
-  AWorkTable.Conditions.SetCurrentValues(CurrentTemp, CurrentPress);
+  // Актуальные значения условий уже приходят через meter values
+  // и выводятся непосредственно в UpdateUI.
 end;
 
 procedure TFrameMainTable.EditTempExit(Sender: TObject);
 var
   Value: Double;
+  TempBeforeValue: Double;
+  TempAfterValue: Double;
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.Conditions = nil) then
+  if FActiveWorkTable = nil then
     Exit;
 
   if TryStrToFloat(EditTemp.Text, Value) then
   begin
-    FActiveWorkTable.Conditions.SetTemperature(Value, FActiveWorkTable.Conditions.TempDelta);
-    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Conditions.Temp);
+    TempBeforeValue := 0;
+    TempAfterValue := 0;
+    if FActiveWorkTable.ValueTempertureBefore <> nil then
+      TempBeforeValue := FActiveWorkTable.ValueTempertureBefore.GetDoubleValue;
+    if FActiveWorkTable.ValueTempertureAfter <> nil then
+      TempAfterValue := FActiveWorkTable.ValueTempertureAfter.GetDoubleValue;
+    FActiveWorkTable.SetTemperature(
+      Value,
+      FActiveWorkTable.TempDelta,
+      TempBeforeValue,
+      TempAfterValue
+    );
+    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Temp);
   end
   else
-    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Conditions.Temp);
+    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Temp);
 end;
 
 procedure TFrameMainTable.EditPresExit(Sender: TObject);
 var
   Value: Double;
+  PressBeforeValue: Double;
+  PressAfterValue: Double;
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.Conditions = nil) then
+  if FActiveWorkTable = nil then
     Exit;
 
   if TryStrToFloat(EditPres.Text, Value) then
   begin
-    FActiveWorkTable.Conditions.SetPressure(Value, FActiveWorkTable.Conditions.PressDelta);
-    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Conditions.Press);
+    PressBeforeValue := 0;
+    PressAfterValue := 0;
+    if FActiveWorkTable.ValuePressureBefore <> nil then
+      PressBeforeValue := FActiveWorkTable.ValuePressureBefore.GetDoubleValue;
+    if FActiveWorkTable.ValuePressureAfter <> nil then
+      PressAfterValue := FActiveWorkTable.ValuePressureAfter.GetDoubleValue;
+    FActiveWorkTable.SetPressure(
+      Value,
+      FActiveWorkTable.PressDelta,
+      PressBeforeValue,
+      PressAfterValue
+    );
+    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
   else
-    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Conditions.Press);
+    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
 end;
 
 procedure TFrameMainTable.ApplyFlowMeterSelection(const ARow: Integer);
