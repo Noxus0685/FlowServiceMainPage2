@@ -1224,6 +1224,7 @@ object FrameMainTable: TFrameMainTable
               TabOrder = 0
               RowCount = 2
               OnGetValue = GridEtalonsGetValue
+              OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
               Viewport.Width = 1430.000000000000000000
@@ -1352,6 +1353,7 @@ object FrameMainTable: TFrameMainTable
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnHeaderClick = GridDevicesHeaderClick
             OnGetValue = GridDevicesGetValue
+            OnSetValue = GridDevicesSetValue
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
             Viewport.Width = 1414.000000000000000000
@@ -1532,6 +1534,16 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'searchtoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton6: TSpeedButton
+              Align = Left
+              Position.X = 369.000000000000000000
+              Size.Width = 57.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'actiontoolbutton'
+              Text = 'SpeedButton6'
               TextSettings.Trimming = None
             end
           end

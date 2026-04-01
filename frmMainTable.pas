@@ -322,6 +322,7 @@ type
     SpeedButton5: TSpeedButton;
     PopupColumnEtalonDN1: TPopupColumn;
     PopupColumnDeviceDN1: TPopupColumn;
+    SpeedButton6: TSpeedButton;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -429,6 +430,7 @@ type
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     FNextClimateChangeAt: TDateTime;
+    DN: TObject;
     procedure OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean = False);
     procedure OpenChannelDeviceEditor(AChannel: TChannel);
     procedure SelectDeviceForChannel(AChannel: TChannel);
@@ -2664,6 +2666,11 @@ begin
     if (Ch <> Src) and Ch.Enabled then
     begin
       AttachType(Ch, SourceType, FoundRepo, True);
+
+    If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
+      Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
+
+
     end;
 
   UpdateGrids;
@@ -3774,8 +3781,11 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
     begin
+
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
+
+
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
       Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString)
