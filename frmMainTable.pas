@@ -334,6 +334,8 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridDevicesKeyDown(Sender: TObject; var Key: Word;
+      var KeyChar: Char; Shift: TShiftState);
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
@@ -3898,12 +3900,16 @@ begin
     if Changed then
       MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
 
+    if GridDevices.Columns[ACol] <> StringColumnDeviceSerial1 then
+      FScannerEnterPressed := False;
+
     Exit;
   end;
 
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
+  FScannerEnterPressed := False;
   GridDevices.ReadOnly := True;
 end;
 
