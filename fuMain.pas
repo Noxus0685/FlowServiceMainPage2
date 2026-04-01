@@ -69,6 +69,8 @@ type
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
     procedure FlowRateStateHandler(AFlowRate: TFlowRate;
       AAction: EFlowRateAction);
+    procedure FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp;
+      AAction: EConditionsAction);
 
   public
 
@@ -135,6 +137,14 @@ begin
 
 end;
 
+procedure  TFormMain.FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp; AAction:EConditionsAction);
+begin
+
+  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsTemp.TempSet));
+
+end;
+
+
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
@@ -167,6 +177,7 @@ begin
   //Подумать над динамической привязкой ко всем столам
   FWorkTableManager.ActiveWorkTable.OnPumpChange:= PumpStateHandler;
   FWorkTableManager.ActiveWorkTable.OnFlowRateChange:= FlowRateStateHandler;
+  FWorkTableManager.ActiveWorkTable.OnConditionTempChange:= FlowConditionsTempHandler;
 
   FWorkTableManager.ActiveWorkTable.AddPump('1');
   FWorkTableManager.ActiveWorkTable.AddPump('2');
@@ -203,11 +214,32 @@ begin
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
   begin
+
     TempDelta :=  (Random * 0.30) - 0.15;
     PressDelta :=  (Random * 0.06) - 0.03;
 
-    AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-    AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
+    if (AWorkTable.ConditionsTemp.IsRunning) and  (AWorkTable.ConditionsTemp.Temp<AWorkTable.ConditionsTemp.TempSet) then
+    begin
+      AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore+1);
+      AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter+1);
+    end
+    else if (AWorkTable.ConditionsTemp.IsRunning) and  (AWorkTable.ConditionsTemp.Temp>AWorkTable.ConditionsTemp.TempSet)  then
+    begin
+      AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore-1);
+      AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter-1);
+    end;
+
+    AWorkTable.ConditionsTemp.SetTemperatureBefore(EnsureRange(AWorkTable.ConditionsTemp.TempBefore + TempDelta, -50.0, 150.0));
+    AWorkTable.ConditionsTemp.SetTemperatureAfter(EnsureRange(AWorkTable.ConditionsTemp.TempAfter + TempDelta, -50.0, 150.0));
+
+    if (AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
+    AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100)) then
+      AWorkTable.ConditionsTemp.State:=CONDITIONS_STOPED
+    else
+      AWorkTable.ConditionsTemp.STATE:=CONDITIONS_STARTED;
+
+    //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
+    //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
 
     FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
    end;

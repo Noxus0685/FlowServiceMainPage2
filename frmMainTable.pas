@@ -523,6 +523,7 @@ type
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
+    procedure UpdateUIConditions;
 
 
 
@@ -2867,10 +2868,14 @@ begin
 
 
   // Основные MeterValues рабочего стола.
-  WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
-  WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
+   WorkTable.SetTemperature(WorkTable.ConditionsTemp.TempBefore, WorkTable.ConditionsTemp.TempAfter);
+  WorkTable.ValueTempertureBefore.SetValue(WorkTable.ConditionsTemp.TempBefore);
+  WorkTable.ValueTempertureAfter.SetValue(WorkTable.ConditionsTemp.TempAfter);
+
   WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
   WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
+
+
 
   WorkTable.ValueTime.SetValue(WorkTable.Time);
 
@@ -2901,6 +2906,11 @@ begin
 
   WorkTable.RecalculateAllMeterValues;
 
+
+   WorkTable.ConditionsTemp.Temp:=  WorkTable.ValueTemperture.GetDoubleValue;
+   // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
+
+
   if WorkTable.FlowRate.IsRunning then
     WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
   else
@@ -2928,6 +2938,7 @@ begin
     UpdateUIFromValues;
     UpdateUIPump;
     UpdateUIFlowRate;
+    UpdateUIConditions;
   finally
     IsUpdating := False;
   end;
@@ -3007,14 +3018,14 @@ begin
   if WorkTable.ValueTemperture <> nil then
     LabelTemp.Text := FormatFloat('0.###', WorkTable.ValueTemperture.GetDoubleValue)
   else
-    LabelTemp.Text := FormatFloat('0.###', WorkTable.Temp);
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.ConditionsTemp.Temp);
 
   if WorkTable.ValuePressure <> nil then
     LabelPressure.Text := FormatFloat('0.###', WorkTable.ValuePressure.GetDoubleValue)
   else
     LabelPressure.Text := FormatFloat('0.###', WorkTable.Press);
-  EditTemp.Text := FormatFloat('0.###', WorkTable.Temp);
-  EditPres.Text := FormatFloat('0.###', WorkTable.Press);
+  //EditTemp.Text := FormatFloat('0.###', WorkTable.Temp);
+  //EditPres.Text := FormatFloat('0.###', WorkTable.Press);
 
   {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
@@ -3136,27 +3147,36 @@ var
   TempBeforeValue: Double;
   TempAfterValue: Double;
 begin
+   Layout9.tag := 0;
   if FActiveWorkTable = nil then
     Exit;
 
   if TryStrToFloat(EditTemp.Text, Value) then
   begin
-    TempBeforeValue := 0;
+   { TempBeforeValue := 0;
     TempAfterValue := 0;
+
+   if AConditionsTemp.TempAfter <> nil then
+      TempBeforeValue := FActiveWorkTable.ValueTempertureBefore.GetDoubleValue;
+    if AConditionsTemp.TempAfter <> nil then
+      TempAfterValue :=  FActiveWorkTable.ValueTempertureAfter.GetDoubleValue;
+
+
     if FActiveWorkTable.ValueTempertureBefore <> nil then
       TempBeforeValue := FActiveWorkTable.ValueTempertureBefore.GetDoubleValue;
     if FActiveWorkTable.ValueTempertureAfter <> nil then
-      TempAfterValue := FActiveWorkTable.ValueTempertureAfter.GetDoubleValue;
-    FActiveWorkTable.SetTemperature(
-      Value,
-      FActiveWorkTable.TempDelta,
-      TempBeforeValue,
-      TempAfterValue
-    );
-    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Temp);
-  end
-  else
-    EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Temp);
+      TempAfterValue := FActiveWorkTable.ValueTempertureAfter.GetDoubleValue;    }
+
+   // FActiveWorkTable.ConditionsTemp.SetTemp(strtofloat(EditTemp.Text));
+    FActiveWorkTable.DoConditionsTempStart(strtofloat(EditTemp.Text));
+  {  FActiveWorkTable.SetTemperature(
+      FActiveWorkTable.ConditionsTemp.TempBefore,
+      FActiveWorkTable.ConditionsTemp.TempAfter
+    );  }
+    //EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Temp);
+  end;
+  //else
+    //EditTemp.Text := FormatFloat('0.###', FActiveWorkTable.Temp);
 end;
 
 procedure TFrameMainTable.EditPresExit(Sender: TObject);
@@ -4408,6 +4428,63 @@ begin
 
 end;
 
+procedure TFrameMainTable.UpdateUIConditions;
+var
+  WorkTable: TWorkTable;
+  i:integer;
+begin
+    WorkTable := FActiveWorkTable;
+
+    if WorkTable = nil then
+      Exit;
+
+
+
+    {else
+      LabelFlowRate.Text := '0';    }
+
+
+   {   FActiveWorkTable.SetTemperature(
+      FActiveWorkTable.ConditionsTemp.TempBefore,
+      FActiveWorkTable.ConditionsTemp.TempAfter
+    );    }
+
+      if Layout9.tag = 3 then
+      exit;
+
+    Layout9.tag:=2;
+
+     if ABS(strtofloat(EditTemp.Text)-WorkTable.ConditionsTemp.TempSet) < 0.00001 then
+     //if StrToFloat(EditTemp.Text)  <> FormatFloat('0.##', WorkTable.ConditionsTemp.TempSet) then
+      EditTemp.Text :=
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsTemp.TempSet) ;
+
+    LabelTemp.text:=
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsTemp.Temp);
+   // FormatFloat('0.##', (WorkTable.ConditionsTemp.Temp));
+
+   if WorkTable.ConditionsTemp.Temp=0 then
+    RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+   else IF WorkTable.ConditionsTemp.IsRunning then
+    Rectangle7.Fill.Color := TAlphaColorRec.Yellow
+   else
+    Rectangle7.Fill.Color := TAlphaColorRec.Greenyellow ;
+
+    Layout9.tag:=0;
+
+
+  {
+    if WorkTable.FlowRate.Flow = 0 then
+       RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+
+    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.FlowAccuracyPlus/100) * WorkTable.FlowRate.FlowSet ))
+    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.FlowAccuracyminus/100) * WorkTable.FlowRate.FlowSet )) then
+      RectangleLabelFR.Fill.Color := TAlphaColorRec.Greenyellow
+        else if (WorkTable.FlowRate.Flow <> WorkTable.FlowRate.FlowSet) then
+      RectangleLabelFR.Fill.Color := TAlphaColorRec.Yellow
+      }
+
+end;
 
 
 end.

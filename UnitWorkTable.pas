@@ -72,11 +72,11 @@ type
   );
 
   EConditionsAction = (
-    CONDITIONS_NONE,
+    CONDITIONS_STOP,
     CONDITIONS_SET_TEMPERATURE,
     CONDITIONS_SET_PRESSURE,
     CONDITIONS_SET_TIME,
-    CONDITIONS_RESET
+    CONDITIONS_START
   );
 
 
@@ -122,7 +122,6 @@ type
     property FreqMax: Double read FFreqMax write SetFreqMax;
     property FreqMin: Double read FFreqMin write SetFreqMin;
     property Action : EPumpAction read FAction write FAction;
-
     property Header: string read FHeader write FHeader;
     property Hint: string read FHint write FHint;
     property PumpType : string read FPumpType write FPumpType;
@@ -180,12 +179,23 @@ type
     FTempMax: Double;
     FTempAccuracyPlus: Double;
     FTempAccuracyMinus: Double;
-    procedure SetTempMin(const Value: Double);
-    procedure SetTempMax(const Value: Double);
+    FStatus: EConditionsState;
+    FAction: EConditionsAction;
+
+
   public
     constructor Create;
-    procedure SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
+     procedure Stop;
+    procedure SetTemperatureBefore(ATempBefore: Double);
+    procedure SetTemperatureAfter(ATempAfter: Double);
+    procedure SetTemp(ATempset: Double);
+    function GetIsRunning: Boolean;
+    procedure SetTempMin(const Value: Double);
+    procedure SetTempMax(const Value: Double);
+    property Action : EConditionsAction read FAction write FAction;
+    property State: EConditionsState read FStatus write FStatus;
     property Temp: Double read FTemp write FTemp;
+    property IsRunning: Boolean read GetIsRunning;
     property TempSet: Double read FTempSet write FTempSet;
     property TempBefore: Double read FTempBefore write FTempBefore;
     property TempAfter: Double read FTempAfter write FTempAfter;
@@ -207,11 +217,18 @@ type
     FPressMax: Double;
     FPressAccuracyPlus: Double;
     FPressAccuracyMinus: Double;
-    procedure SetPressMin(const Value: Double);
-    procedure SetPressMax(const Value: Double);
+    FStatus: EConditionsState;
+    FAction: EConditionsAction;
+
+
   public
     constructor Create;
     procedure SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
+    procedure SetPressureBefore(APressBefore: Double);
+    procedure SetPressureAfter(APressAfter: Double);
+
+    procedure SetPressMin(const Value: Double);
+    procedure SetPressMax(const Value: Double);
     property Press: Double read FPress write FPress;
     property PressSet: Double read FPressSet write FPressSet;
     property PressBefore: Double read FPressBefore write FPressBefore;
@@ -381,7 +398,7 @@ type
 
   TonPumpChangeEvent =  procedure(APump: TPump ; FAction : EPumpAction) of object;
   TonFlowRateChangeEvent =  procedure(AFlowRate: TFlowRate ; FAction : EFlowRateAction) of object;
-
+  TOnConditionTempChangeEvent  =  procedure(AConditionsTemp: TConditionsTemp ; FAction : EConditionsAction) of object;
 
   // Обработчики для пакетных заданий
   TOnProcStartEvent = procedure(ASender: TObject; AProcName: string) of object;
@@ -544,7 +561,7 @@ private
 
   FOnPumpChange: TonPumpChangeEvent;
   FOnFlowRateChange: TonFlowRateChangeEvent;
-
+  FOnConditionTempChange : TOnConditionTempChangeEvent;
   // События пакетных заданий
   FOnProcStart: TOnProcStartEvent;
   FOnProcStop: TOnProcStopEvent;
@@ -595,6 +612,8 @@ private
   function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
 
+  property ConditionsTemp: TConditionsTemp read FConditionsTemp;
+
   property ActivePump: TPump read FActivePump write FActivePump;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
 
@@ -605,7 +624,7 @@ private
     property DeviceChannels: TObjectList<TChannel> read FDeviceChannels;
     property EtalonChannels: TObjectList<TChannel> read FEtalonChannels;
     property TableFlow: TFlowMeter read FTableFlow;
-    property Temp: Double read GetTemp write SetTemp;
+    //property Temp: Double read GetTemp write SetTemp;
     property TempDelta: Double read GetTempDelta write SetTempDelta;
     property Press: Double read GetPress write SetPress;
     property PressDelta: Double read GetPressDelta write SetPressDelta;
@@ -655,7 +674,7 @@ private
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
     procedure InitMeterValues;
-    procedure SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
+    procedure SetTemperature(ATempBefore, ATempAfter: Double);
     procedure SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
 
 
@@ -668,6 +687,7 @@ private
   //property OnFreqSet: TOnFreqSetEvent read FOnFreqSet write FOnFreqSet;
   property OnPumpChange: TonPumpChangeEvent read FOnPumpChange write FOnPumpChange;
   property OnFlowRateChange: TonFlowRateChangeEvent read FOnFlowRateChange write FOnFlowRateChange;
+  property OnConditionTempChange: TOnConditionTempChangeEvent read FOnConditionTempChange write FOnConditionTempChange;
 
   property OnProcStart: TOnProcStartEvent read FOnProcStart write FOnProcStart;
   property OnProcStop: TOnProcStopEvent read FOnProcStop write FOnProcStop;
@@ -692,6 +712,9 @@ private
   procedure DoFlowRateStart;
   procedure DoFlowRateStop;
   procedure DoFlowRateSet(ANewFlowRate: Double);
+
+  procedure DoConditionsTempStart(ATempSet: Double);
+  procedure DoConditionsTempStop;
 
   procedure DoProcStart(AProcName: string);
   procedure DoProcStop(AProcName: string);
@@ -1274,7 +1297,7 @@ begin
   FLayoutProceduresVisible := True;
   FInstrumentalLayoutOrder := 'FlowRate,Pump,Main,Mesure,Conditions,Procedures';
 
-  Temp := 20.2;
+  //Temp := 20.2;
   TempDelta := 0.1;
   Press := 101.1;
   PressDelta := 0.1;
@@ -1956,7 +1979,7 @@ begin
     TempBeforeValue := ValueTempertureBefore.GetDoubleValue;
   if ValueTempertureAfter <> nil then
     TempAfterValue := ValueTempertureAfter.GetDoubleValue;
-  SetTemperature(AValue, TempDelta, TempBeforeValue, TempAfterValue);
+  SetTemperature(TempBeforeValue, TempAfterValue);
 end;
 
 procedure TWorkTable.SetTempDelta(const AValue: Double);
@@ -1995,30 +2018,13 @@ begin
   FTimeResult := AValue;
 end;
 
-procedure TWorkTable.SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
-var
-  AppliedTemp: Double;
-  AppliedTempBefore: Double;
-  AppliedTempAfter: Double;
+procedure TWorkTable.SetTemperature(ATempBefore, ATempAfter: Double);
 begin
-  AppliedTemp := ATemp;
-  AppliedTempBefore := ATempBefore;
-  AppliedTempAfter := ATempAfter;
+  if (ATempBefore = 0)  then
+    FConditionsTemp.TempBefore:= ATempAfter ;
+  if ATempAfter = 0 then
+    FConditionsTemp.TempAfter:= ATempBefore ;
 
-  if FConditionsTemp <> nil then
-  begin
-    FConditionsTemp.SetTemperature(ATemp, ATempDelta, ATempBefore, ATempAfter);
-    AppliedTemp := FConditionsTemp.Temp;
-    AppliedTempBefore := FConditionsTemp.TempBefore;
-    AppliedTempAfter := FConditionsTemp.TempAfter;
-  end;
-
-  if ValueTempertureBefore <> nil then
-    ValueTempertureBefore.SetDoubleValue(AppliedTempBefore);
-  if ValueTempertureAfter <> nil then
-    ValueTempertureAfter.SetDoubleValue(AppliedTempAfter);
-  if ValueTemperture <> nil then
-    ValueTemperture.SetDoubleValue(AppliedTemp);
 end;
 
 procedure TWorkTable.SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
@@ -2040,11 +2046,11 @@ begin
   end;
 
   if ValuePressureBefore <> nil then
-    ValuePressureBefore.SetDoubleValue(AppliedPressBefore);
+    ValuePressureBefore.SetValue(AppliedPressBefore);
   if ValuePressureAfter <> nil then
-    ValuePressureAfter.SetDoubleValue(AppliedPressAfter);
+    ValuePressureAfter.SetValue(AppliedPressAfter);
   if ValuePressure <> nil then
-    ValuePressure.SetDoubleValue(AppliedPress);
+    ValuePressure.SetValue(AppliedPress);
 end;
 
 { Adds a new device channel with default identifiers and bindings. }
@@ -2115,14 +2121,14 @@ begin
 if FTableFlow<>nil then
 
     begin
-  if FTableFlow.ValueDensity <> nil then FTableFlow.ValueDensity.SetValue();
-  if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
-  if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
-  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+      if FTableFlow.ValueDensity <> nil then FTableFlow.ValueDensity.SetValue();
+      if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
+      if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
+      if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
 
 
-  if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
-  if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
+      if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
+      if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
     end
 end;
 
@@ -2220,7 +2226,7 @@ begin
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
       Ini.WriteString(Section, 'Text', WorkTable.Text);
-      Ini.WriteFloat(Section, 'Temp', WorkTable.Temp);
+      Ini.WriteFloat(Section, 'Temp', WorkTable.ConditionsTemp.Temp);
       Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
       Ini.WriteFloat(Section, 'Press', WorkTable.Press);
       Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
@@ -2323,7 +2329,7 @@ begin
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-      WorkTable.Temp := Ini.ReadFloat(Section, 'Temp', 0);
+      WorkTable.ConditionsTemp.Temp := Ini.ReadFloat(Section, 'Temp', 0);
       WorkTable.TempDelta := Ini.ReadFloat(Section, 'TempDelta', 0);
       WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
       WorkTable.PressDelta := Ini.ReadFloat(Section, 'PressDelta', 0);
@@ -2400,7 +2406,7 @@ begin
       WorkTable.ValueTempertureBefore.SetValue(21);
       WorkTable.ValueTempertureAfter.SetValue(21);
 
-      WorkTable.Temp := 21;
+      WorkTable.ConditionsTemp.Temp := 21;
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
@@ -2769,6 +2775,40 @@ begin
     FOnFlowRateChange(FlowRate, FlowRate_START);
 end;
 
+procedure TWorkTable.DoConditionsTempStart(ATempSet: Double);
+begin
+
+
+  if ConditionsTemp=nil then
+  Exit;
+
+
+
+  ConditionsTemp.SetTemp(ATempSet);
+
+  if Assigned(FOnConditionTempChange) then
+    FOnConditionTempChange(ConditionsTemp, Conditions_START);
+end;
+
+
+procedure TWorkTable.DoConditionsTempStop;
+begin
+
+
+  if ConditionsTemp=nil then
+  Exit;
+
+  IF ConditionsTemp.FAction = Conditions_START then
+    exit;
+
+  ConditionsTemp.Stop;
+
+  if Assigned(FOnConditionTempChange) then
+    FOnConditionTempChange(ConditionsTemp, Conditions_Stop);
+end;
+
+
+
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
@@ -3022,12 +3062,12 @@ begin
   FTempMin := -50;
   FTempMax := 150;
   FTemp := 20.2;
-  FTempSet := FTemp;
-  FTempBefore := FTemp;
-  FTempAfter := FTemp;
+  FTempSet := 21;
+  FTempBefore := 21;
+  FTempAfter := 22;
   FTempDelta := 0.1;
-  FTempAccuracyPlus := 1;
-  FTempAccuracyMinus := 1;
+  FTempAccuracyPlus := 5;
+  FTempAccuracyMinus := 5;
 end;
 
 procedure TConditionsTemp.SetTempMax(const Value: Double);
@@ -3042,27 +3082,46 @@ begin
   FTempMin := Value;
 end;
 
-procedure TConditionsTemp.SetTemperature(const ATemp, ATempDelta, ATempBefore, ATempAfter: Double);
-var
-  CalculatedTemp: Double;
+
+
+procedure TConditionsTemp.SetTemperatureBefore(ATempBefore: Double);
 begin
-  FTempSet := ATemp;
-  FTempBefore := ATempBefore;
-  FTempAfter := ATempAfter;
+  if ATempBefore < FTempMin then
+    FTempBefore := FTempMin
+  else if ATempBefore > FTempMax then
+    FTempBefore := FTempMax
+  else FTempBefore:=ATempBefore;
+end;
+procedure TConditionsTemp.SetTemperatureAfter(ATempAfter: Double);
+begin
+  if ATempAfter < FTempMin then
+    FTempAfter := FTempMin
+  else if ATempAfter > FTempMax then
+    FTempAfter := FTempMax
+  else FTempAfter:=ATempAfter;
+end;
 
-  if Abs(ATempBefore) <= 1E-12 then
-    CalculatedTemp := ATempAfter
-  else
-    CalculatedTemp := ATempAfter - ATempBefore;
+procedure TConditionsTemp.SetTemp(ATempset: Double);
+begin
+    if ATempset < FTempMin then
+    FTempset := FTempMin
+  else if ATempset > FTempMax then
+    FTempset := FTempMax
+  else FTempset:=ATempset;
+  FAction := Conditions_START;
+end;
 
-  if CalculatedTemp < FTempMin then
-    FTemp := FTempMin
-  else if CalculatedTemp > FTempMax then
-    FTemp := FTempMax
-  else
-    FTemp := CalculatedTemp;
 
-  FTempDelta := ATempDelta;
+procedure TConditionsTemp.Stop;
+begin
+  FAction := Conditions_STOP;
+end;
+
+
+
+function TConditionsTemp.GetIsRunning: Boolean;
+begin
+    Result := (FStatus = CONDITIONS_STARTED);
 end;
 
 constructor TConditionsPress.Create;
@@ -3099,10 +3158,10 @@ begin
   FPressBefore := APressBefore;
   FPressAfter := APressAfter;
 
-  if Abs(APressBefore) <= 1E-12 then
+  if Abs(APressBefore) <= 0 then
     CalculatedPress := APressAfter
   else
-    CalculatedPress := APressAfter - APressBefore;
+    CalculatedPress := (APressAfter + APressBefore)/2;
 
   if CalculatedPress < FPressMin then
     FPress := FPressMin
@@ -3113,6 +3172,25 @@ begin
 
   FPressDelta := APressDelta;
 end;
+
+procedure TConditionsPress.SetPressureBefore(APressBefore: Double);
+begin
+  if APressBefore < FPressMin then
+    FPressBefore := FPressMin
+  else if APressBefore > FPressMax then
+    FPressBefore := FPressMax
+  else FPressBefore:=APressBefore;
+end;
+procedure TConditionsPress.SetPressureAfter(APressAfter: Double);
+begin
+  if APressAfter < FPressMin then
+    FPressAfter := FPressMin
+  else if APressAfter > FPressMax then
+    FPressAfter := FPressMax
+  else FPressAfter:=APressAfter;
+end;
+
+
 
   {$ENDREGION 'TConditions'}
 
@@ -3188,7 +3266,7 @@ begin
 
 
   //FFlow := FFlowSet;
-  FStatus := FLOWRATE_STARTED;
+  FStatus := FLOWRATE_STARTED;  // неправильно
   FAction := FLOWRATE_START;
 end;
 
