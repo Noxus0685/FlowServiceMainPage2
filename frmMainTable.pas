@@ -425,6 +425,7 @@ type
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
+  FIsScannerUse: Boolean;
 
 
     FFlowMeters: TObjectList<TFlowMeter>;
@@ -461,6 +462,13 @@ type
     procedure SyncPumpControls;
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
+    function IsDuplicateDeviceSerial(const AWorkTable: TWorkTable;
+      const ARow: Integer; const ASerial: string): Boolean;
+    function FindNextEnabledDeviceRow(const AWorkTable: TWorkTable;
+      const ACurrentRow: Integer): Integer;
+    procedure FocusDeviceSerialCell(const ARow: Integer; const ASelectAll: Boolean);
+    procedure LeaveDeviceSerialEditing;
+    procedure HandleScannerSerialEnter(const ARow: Integer; const ASerial: string);
 
     procedure SetConfiguration;
     procedure StartMonitor;
@@ -509,6 +517,7 @@ type
     procedure LoadLayoutSettingsFromWorkTable;
 
     property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
+    property IsScannerUse: Boolean read FIsScannerUse write FIsScannerUse;
 
 
   private type
@@ -1071,6 +1080,7 @@ begin
   FLastClickRow := -1;
   FLastClickCol := nil;
   FLastClickTick := 0;
+  FIsScannerUse := False;
 
   Randomize;
   FNextClimateChangeAt := Now;
@@ -3460,6 +3470,93 @@ begin
   OnChangeState(STATE_STANDBY);
 end;
 
+procedure TFrameMainTable.LeaveDeviceSerialEditing;
+begin
+  GridDevices.EditorMode := False;
+  GridDevices.ReadOnly := True;
+end;
+
+procedure TFrameMainTable.FocusDeviceSerialCell(const ARow: Integer;
+  const ASelectAll: Boolean);
+var
+  Edit: TCustomEdit;
+begin
+  if (ARow < 0) or (ARow >= GridDevices.RowCount) then
+    Exit;
+
+  GridDevices.Row := ARow;
+  GridDevices.SetFocus;
+  GridDevices.Selected := StringColumnDeviceSerial1.Index;
+  GridDevices.ReadOnly := False;
+  GridDevices.EditorMode := True;
+
+  if ASelectAll and (GridDevices.Editor is TCustomEdit) then
+  begin
+    Edit := TCustomEdit(GridDevices.Editor);
+    Edit.SelectAll;
+  end;
+end;
+
+function TFrameMainTable.IsDuplicateDeviceSerial(const AWorkTable: TWorkTable;
+  const ARow: Integer; const ASerial: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  if (AWorkTable = nil) or (Trim(ASerial) = '') then
+    Exit;
+
+  for I := 0 to ARow - 1 do
+    if SameText(Trim(AWorkTable.DeviceChannels[I].Serial), Trim(ASerial)) then
+      Exit(True);
+end;
+
+function TFrameMainTable.FindNextEnabledDeviceRow(const AWorkTable: TWorkTable;
+  const ACurrentRow: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  if AWorkTable = nil then
+    Exit;
+
+  for I := ACurrentRow + 1 to AWorkTable.DeviceChannels.Count - 1 do
+    if AWorkTable.DeviceChannels[I].Enabled then
+      Exit(I);
+end;
+
+procedure TFrameMainTable.HandleScannerSerialEnter(const ARow: Integer;
+  const ASerial: string);
+var
+  WorkTable: TWorkTable;
+  NextRow: Integer;
+begin
+  if not FIsScannerUse then
+    Exit;
+
+  WorkTable := GetWorkTableByIndex(0);
+  if (WorkTable = nil) or (ARow < 0) or (ARow >= WorkTable.DeviceChannels.Count) then
+    Exit;
+
+  if Trim(ASerial) = '' then
+  begin
+    LeaveDeviceSerialEditing;
+    Exit;
+  end;
+
+  if IsDuplicateDeviceSerial(WorkTable, ARow, ASerial) then
+  begin
+    FocusDeviceSerialCell(ARow, True);
+    Exit;
+  end;
+
+  NextRow := FindNextEnabledDeviceRow(WorkTable, ARow);
+  if NextRow >= 0 then
+    FocusDeviceSerialCell(NextRow, True)
+  else
+    LeaveDeviceSerialEditing;
+end;
+
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -3785,6 +3882,8 @@ begin
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
 
+      if FIsScannerUse then
+        HandleScannerSerialEnter(ARow, Value.AsString);
 
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
