@@ -49,7 +49,7 @@ type
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
-    procedure  PumpStateHandler(APump: TPump; AAction:EPumpAction);
+    procedure  PumpStateHandler(APump: TPump; AAction:EControlAction);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
 
@@ -68,9 +68,9 @@ type
     procedure UpdateRandomFreq(const APump: TPump);
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
     procedure FlowRateStateHandler(AFlowRate: TFlowRate;
-      AAction: EFlowRateAction);
+      AAction: EControlAction);
     procedure FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp;
-      AAction: EConditionsAction);
+      AAction: EControlAction);
 
   public
 
@@ -122,7 +122,7 @@ begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
-procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EPumpAction);
+procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EControlAction);
 begin
 
   FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
@@ -130,14 +130,14 @@ begin
 end;
 
 
-procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EFlowRateAction);
+procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EControlAction);
 begin
 
   FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.FlowSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
 
 end;
 
-procedure  TFormMain.FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp; AAction:EConditionsAction);
+procedure  TFormMain.FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp; AAction:EControlAction);
 begin
 
   FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsTemp.TempSet));
@@ -234,9 +234,9 @@ begin
 
     if (AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
     AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100)) then
-      AWorkTable.ConditionsTemp.State:=CONDITIONS_STOPED
+      AWorkTable.ConditionsTemp.State:=CONTROL_STOPPED
     else
-      AWorkTable.ConditionsTemp.STATE:=CONDITIONS_STARTED;
+      AWorkTable.ConditionsTemp.STATE:=CONTROL_STARTED;
 
     //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
     //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
