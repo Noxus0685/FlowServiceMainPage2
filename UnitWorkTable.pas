@@ -200,12 +200,18 @@ type
 
   public
     constructor Create;
+    procedure Stop;
+    procedure SetPress(APressSet: Double);
+    function GetIsRunning: Boolean;
     procedure SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
     procedure SetPressureBefore(APressBefore: Double);
     procedure SetPressureAfter(APressAfter: Double);
 
     procedure SetPressMin(const Value: Double);
     procedure SetPressMax(const Value: Double);
+    property Action: EControlAction read FAction write FAction;
+    property State: EControlState read FStatus write FStatus;
+    property IsRunning: Boolean read GetIsRunning;
     property Press: Double read FPress write FPress;
     property PressSet: Double read FPressSet write FPressSet;
     property PressBefore: Double read FPressBefore write FPressBefore;
@@ -376,6 +382,7 @@ type
   TonPumpChangeEvent =  procedure(APump: TPump ; FAction : EControlAction) of object;
   TonFlowRateChangeEvent =  procedure(AFlowRate: TFlowRate ; FAction : EControlAction) of object;
   TOnConditionTempChangeEvent  =  procedure(AConditionsTemp: TConditionsTemp ; FAction : EControlAction) of object;
+  TOnConditionPressChangeEvent  =  procedure(AConditionsPress: TConditionsPress ; FAction : EControlAction) of object;
 
   // Обработчики для пакетных заданий
   TOnProcStartEvent = procedure(ASender: TObject; AProcName: string) of object;
@@ -539,6 +546,7 @@ private
   FOnPumpChange: TonPumpChangeEvent;
   FOnFlowRateChange: TonFlowRateChangeEvent;
   FOnConditionTempChange : TOnConditionTempChangeEvent;
+  FOnConditionPressChange : TOnConditionPressChangeEvent;
   // События пакетных заданий
   FOnProcStart: TOnProcStartEvent;
   FOnProcStop: TOnProcStopEvent;
@@ -665,6 +673,7 @@ private
   property OnPumpChange: TonPumpChangeEvent read FOnPumpChange write FOnPumpChange;
   property OnFlowRateChange: TonFlowRateChangeEvent read FOnFlowRateChange write FOnFlowRateChange;
   property OnConditionTempChange: TOnConditionTempChangeEvent read FOnConditionTempChange write FOnConditionTempChange;
+  property OnConditionPressChange: TOnConditionPressChangeEvent read FOnConditionPressChange write FOnConditionPressChange;
 
   property OnProcStart: TOnProcStartEvent read FOnProcStart write FOnProcStart;
   property OnProcStop: TOnProcStopEvent read FOnProcStop write FOnProcStop;
@@ -692,6 +701,8 @@ private
 
   procedure DoConditionsTempStart(ATempSet: Double);
   procedure DoConditionsTempStop;
+  procedure DoConditionsPressStart(APressSet: Double);
+  procedure DoConditionsPressStop;
 
   procedure DoProcStart(AProcName: string);
   procedure DoProcStop(AProcName: string);
@@ -2775,13 +2786,38 @@ begin
   if ConditionsTemp=nil then
   Exit;
 
-  IF ConditionsTemp.FAction = CONTROL_ACTION_START then
+  IF ConditionsTemp.FAction = CONTROL_ACTION_STOP then
     exit;
 
   ConditionsTemp.Stop;
 
   if Assigned(FOnConditionTempChange) then
     FOnConditionTempChange(ConditionsTemp, CONTROL_ACTION_STOP);
+end;
+
+procedure TWorkTable.DoConditionsPressStart(APressSet: Double);
+begin
+  if ConditionsPress = nil then
+    Exit;
+
+  ConditionsPress.SetPress(APressSet);
+
+  if Assigned(FOnConditionPressChange) then
+    FOnConditionPressChange(ConditionsPress, CONTROL_ACTION_START);
+end;
+
+procedure TWorkTable.DoConditionsPressStop;
+begin
+  if ConditionsPress = nil then
+    Exit;
+
+  if ConditionsPress.FAction = CONTROL_ACTION_STOP then
+    Exit;
+
+  ConditionsPress.Stop;
+
+  if Assigned(FOnConditionPressChange) then
+    FOnConditionPressChange(ConditionsPress, CONTROL_ACTION_STOP);
 end;
 
 
@@ -3045,6 +3081,8 @@ begin
   FTempDelta := 0.1;
   FTempAccuracyPlus := 5;
   FTempAccuracyMinus := 5;
+  FStatus := CONTROL_STOPPED;
+  FAction := CONTROL_ACTION_STOP;
 end;
 
 procedure TConditionsTemp.SetTempMax(const Value: Double);
@@ -3113,6 +3151,30 @@ begin
   FPressDelta := 0.1;
   FPressAccuracyPlus := 1;
   FPressAccuracyMinus := 1;
+  FStatus := CONTROL_STOPPED;
+  FAction := CONTROL_ACTION_STOP;
+end;
+
+procedure TConditionsPress.Stop;
+begin
+  FAction := CONTROL_ACTION_STOP;
+end;
+
+procedure TConditionsPress.SetPress(APressSet: Double);
+begin
+  if APressSet < FPressMin then
+    FPressSet := FPressMin
+  else if APressSet > FPressMax then
+    FPressSet := FPressMax
+  else
+    FPressSet := APressSet;
+
+  FAction := CONTROL_ACTION_START;
+end;
+
+function TConditionsPress.GetIsRunning: Boolean;
+begin
+  Result := (FStatus = CONTROL_STARTED);
 end;
 
 procedure TConditionsPress.SetPressMax(const Value: Double);
