@@ -1245,7 +1245,7 @@ begin
     LayoutPump.tag:=0;
 
     FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
-    FActiveWorkTable.ActivePump.State:=PUMP_STARTED;
+    FActiveWorkTable.ActivePump.State:=CONTROL_STARTED;
     UpdateUIPump;
 
   end;
@@ -1351,7 +1351,7 @@ begin
     begin
       LayoutPump.tag:=0;
       FActiveWorkTable.DoPumpStop(ComboBoxPumps.Text) ;
-      FActiveWorkTable.ActivePump.State:=PUMP_STOPED;
+      FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
     end;
 end;
 

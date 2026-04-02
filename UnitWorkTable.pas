@@ -42,41 +42,18 @@ type
   end;
 
 
-  EPumpState = (
-    PUMP_STOPED,        // насос остановлен
-    PUMP_STARTED     // насос работает на минимальной частоте
-
+  EControlState = (
+    CONTROL_STOPPED,
+    CONTROL_STARTED
   );
 
-  EPumpAction = (
-    PUMP_START,   // насос стартует
-    PUMP_SET,    // насос меняет частоту
-    PUMP_STOP     // насос останавливается
-
-    );
-
-  EFlowRateState = (
-    FLOWRATE_STARTED,
-    FLOWRATE_STOPED
-  );
-
-  EFlowRateAction = (
-    FLOWRATE_START,
-    FLOWRATE_STOP,
-    FLOWRATE_SET
-  );
-
-  EConditionsState = (
-    CONDITIONS_STOPED,
-    CONDITIONS_STARTED
-  );
-
-  EConditionsAction = (
-    CONDITIONS_STOP,
-    CONDITIONS_SET_TEMPERATURE,
-    CONDITIONS_SET_PRESSURE,
-    CONDITIONS_SET_TIME,
-    CONDITIONS_START
+  EControlAction = (
+    CONTROL_ACTION_START,
+    CONTROL_ACTION_STOP,
+    CONTROL_ACTION_SET,
+    CONTROL_ACTION_SET_TEMPERATURE,
+    CONTROL_ACTION_SET_PRESSURE,
+    CONTROL_ACTION_SET_TIME
   );
 
 
@@ -88,8 +65,8 @@ type
     FFreq: Double;  // текущая
     FFreqMax: Double;
     FFreqMin: Double;
-    FStatus: EPumpState;
-    FAction: EPumpAction;
+    FStatus: EControlState;
+    FAction: EControlAction;
     FName: string;
     FHeader: string; // краткое название насоса по мнемосхеме
     FHint: string;
@@ -116,12 +93,12 @@ type
     //property UUID: string read FUUID write FUUID;
     property Freq: Double read FFreq write FFreq;
     property FreqSet: Double read FFreqSet write FFreqSet;
-    property State: EPumpState read FStatus write FStatus;
+    property State: EControlState read FStatus write FStatus;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
     property FreqMax: Double read FFreqMax write SetFreqMax;
     property FreqMin: Double read FFreqMin write SetFreqMin;
-    property Action : EPumpAction read FAction write FAction;
+    property Action : EControlAction read FAction write FAction;
     property Header: string read FHeader write FHeader;
     property Hint: string read FHint write FHint;
     property PumpType : string read FPumpType write FPumpType;
@@ -135,8 +112,8 @@ type
     FFlowSet: Double;
     FFlowRateMin: Double;
     FFlowRateMax: Double;
-    FStatus: EFlowRateState;
-    FAction: EFlowRateAction;
+    FStatus: EControlState;
+    FAction: EControlAction;
     FFlowAccuracyPlus: Double;           //в %
     FFlowAccuracyMinus: Double;
 
@@ -164,8 +141,8 @@ type
     property FlowRateMax: Double read FFlowRateMax write FFlowRateMax;
     property FlowAccuracyPlus: Double read FFlowAccuracyPlus write FFlowAccuracyPlus;
     property FlowAccuracyMinus: Double read FFlowAccuracyMinus write FFlowAccuracyMinus;
-    property Status: EFlowRateState read FStatus write FStatus;
-    property Action: EFlowRateAction read FAction write FAction;
+    property Status: EControlState read FStatus write FStatus;
+    property Action: EControlAction read FAction write FAction;
   end;
 
   TConditionsTemp = class(TTypeEntity)
@@ -179,8 +156,8 @@ type
     FTempMax: Double;
     FTempAccuracyPlus: Double;
     FTempAccuracyMinus: Double;
-    FStatus: EConditionsState;
-    FAction: EConditionsAction;
+    FStatus: EControlState;
+    FAction: EControlAction;
 
 
   public
@@ -192,8 +169,8 @@ type
     function GetIsRunning: Boolean;
     procedure SetTempMin(const Value: Double);
     procedure SetTempMax(const Value: Double);
-    property Action : EConditionsAction read FAction write FAction;
-    property State: EConditionsState read FStatus write FStatus;
+    property Action : EControlAction read FAction write FAction;
+    property State: EControlState read FStatus write FStatus;
     property Temp: Double read FTemp write FTemp;
     property IsRunning: Boolean read GetIsRunning;
     property TempSet: Double read FTempSet write FTempSet;
@@ -217,8 +194,8 @@ type
     FPressMax: Double;
     FPressAccuracyPlus: Double;
     FPressAccuracyMinus: Double;
-    FStatus: EConditionsState;
-    FAction: EConditionsAction;
+    FStatus: EControlState;
+    FAction: EControlAction;
 
 
   public
@@ -396,9 +373,9 @@ type
   //TOnPumpStopEvent = procedure(ASender: TObject; APumpName: string) of object;
   //TOnFreqSetEvent = procedure(ASender: TObject; APumpName: string; ANewFreq: Double) of object;
 
-  TonPumpChangeEvent =  procedure(APump: TPump ; FAction : EPumpAction) of object;
-  TonFlowRateChangeEvent =  procedure(AFlowRate: TFlowRate ; FAction : EFlowRateAction) of object;
-  TOnConditionTempChangeEvent  =  procedure(AConditionsTemp: TConditionsTemp ; FAction : EConditionsAction) of object;
+  TonPumpChangeEvent =  procedure(APump: TPump ; FAction : EControlAction) of object;
+  TonFlowRateChangeEvent =  procedure(AFlowRate: TFlowRate ; FAction : EControlAction) of object;
+  TOnConditionTempChangeEvent  =  procedure(AConditionsTemp: TConditionsTemp ; FAction : EControlAction) of object;
 
   // Обработчики для пакетных заданий
   TOnProcStartEvent = procedure(ASender: TObject; AProcName: string) of object;
@@ -2750,13 +2727,13 @@ begin
   if Pump=nil then
   Exit;
 
-  IF Pump.FAction = PUMP_START then
+  IF Pump.FAction = CONTROL_ACTION_START then
     exit;
 
   Pump.Start;
 
   if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump, PUMP_START);
+    FOnPumpChange(Pump, CONTROL_ACTION_START);
 end;
 
 procedure TWorkTable.DoFlowRateStart;
@@ -2766,13 +2743,13 @@ begin
   if FlowRate=nil then
   Exit;
 
-  IF FlowRate.FAction = FlowRate_START then
+  IF FlowRate.FAction = CONTROL_ACTION_START then
     exit;
 
   FlowRate.Start;
 
   if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, FlowRate_START);
+    FOnFlowRateChange(FlowRate, CONTROL_ACTION_START);
 end;
 
 procedure TWorkTable.DoConditionsTempStart(ATempSet: Double);
@@ -2787,7 +2764,7 @@ begin
   ConditionsTemp.SetTemp(ATempSet);
 
   if Assigned(FOnConditionTempChange) then
-    FOnConditionTempChange(ConditionsTemp, Conditions_START);
+    FOnConditionTempChange(ConditionsTemp, CONTROL_ACTION_START);
 end;
 
 
@@ -2798,13 +2775,13 @@ begin
   if ConditionsTemp=nil then
   Exit;
 
-  IF ConditionsTemp.FAction = Conditions_START then
+  IF ConditionsTemp.FAction = CONTROL_ACTION_START then
     exit;
 
   ConditionsTemp.Stop;
 
   if Assigned(FOnConditionTempChange) then
-    FOnConditionTempChange(ConditionsTemp, Conditions_Stop);
+    FOnConditionTempChange(ConditionsTemp, CONTROL_ACTION_STOP);
 end;
 
 
@@ -2818,13 +2795,13 @@ begin
   if Pump=nil then
     Exit;
 
-  IF Pump.FAction = PUMP_STOP then
+  IF Pump.FAction = CONTROL_ACTION_STOP then
     exit;
 
   Pump.Stop;
 
   if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump,PUMP_START);
+    FOnPumpChange(Pump,CONTROL_ACTION_STOP);
 end;
 
 procedure TWorkTable.DoFlowRateStop;
@@ -2834,13 +2811,13 @@ begin
   if FlowRate=nil then
   Exit;
 
-  IF FlowRate.FAction = FlowRate_Stop then
+  IF FlowRate.FAction = CONTROL_ACTION_STOP then
     exit;
 
   FlowRate.Stop;
 
   if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, FlowRate_Stop);
+    FOnFlowRateChange(FlowRate, CONTROL_ACTION_STOP);
 end;
 
 
@@ -2854,7 +2831,7 @@ begin
 
 
   if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, FlowRate_set);
+    FOnFlowRateChange(FlowRate, CONTROL_ACTION_SET);
 end;
 
 procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
@@ -2871,7 +2848,7 @@ begin
 
 
   if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump,PUMP_SET);
+    FOnPumpChange(Pump,CONTROL_ACTION_SET);
 end;
 
 procedure TWorkTable.DoProcStart(AProcName: string);
@@ -3108,20 +3085,20 @@ begin
   else if ATempset > FTempMax then
     FTempset := FTempMax
   else FTempset:=ATempset;
-  FAction := Conditions_START;
+  FAction := CONTROL_ACTION_START;
 end;
 
 
 procedure TConditionsTemp.Stop;
 begin
-  FAction := Conditions_STOP;
+  FAction := CONTROL_ACTION_STOP;
 end;
 
 
 
 function TConditionsTemp.GetIsRunning: Boolean;
 begin
-    Result := (FStatus = CONDITIONS_STARTED);
+    Result := (FStatus = CONTROL_STARTED);
 end;
 
 constructor TConditionsPress.Create;
@@ -3205,8 +3182,8 @@ begin
   FFlowSet := FFlowRateMin;
   FlowAccuracyPlus:=5;
   FlowAccuracyMinus:=5;
-  FStatus := FLOWRATE_STOPED;
-  FAction := FLOWRATE_STOP;
+  FStatus := CONTROL_STOPPED;
+  FAction := CONTROL_ACTION_STOP;
 end;
 
 
@@ -3233,7 +3210,7 @@ end;
 
 function TFlowRate.GetIsRunning: Boolean;
 begin
-  Result := (FStatus = FLOWRATE_STARTED);
+  Result := (FStatus = CONTROL_STARTED);
 end;
 
 
@@ -3252,7 +3229,7 @@ begin
   else
     FFlowSet := ANewValue;
 
-  FAction := FLOWRATE_SET;
+  FAction := CONTROL_ACTION_SET;
 end;
 
 
@@ -3266,8 +3243,8 @@ begin
 
 
   //FFlow := FFlowSet;
-  FStatus := FLOWRATE_STARTED;  // неправильно
-  FAction := FLOWRATE_START;
+  FStatus := CONTROL_STARTED;  // неправильно
+  FAction := CONTROL_ACTION_START;
 end;
 
 
@@ -3275,8 +3252,8 @@ procedure TFlowRate.Stop;
 begin
   //FFlow := 0;
   //FSetValue := 0;
-  FStatus := FLOWRATE_STOPED;
-  FAction := FLOWRATE_STOP;
+  FStatus := CONTROL_STOPPED;
+  FAction := CONTROL_ACTION_STOP;
 end;
 
 
@@ -3286,8 +3263,8 @@ end;
 function TFlowRate.GetStateAsString: string;
 begin
   case FStatus of
-    FLOWRATE_STARTED: Result := 'Запущен';
-    FLOWRATE_STOPED: Result := 'Остановлен';
+    CONTROL_STARTED: Result := 'Запущен';
+    CONTROL_STOPPED: Result := 'Остановлен';
   else
     Result := 'Неизвестно';
   end;
@@ -3296,9 +3273,9 @@ end;
 function TFlowRate.GetActionAsString: string;
 begin
   case FAction of
-    FLOWRATE_START: Result := 'Запущен';
-    FLOWRATE_SET: Result := 'Изменен расход воды';
-    FLOWRATE_STOP: Result := 'Сброшен';
+    CONTROL_ACTION_START: Result := 'Запущен';
+    CONTROL_ACTION_SET: Result := 'Изменен расход воды';
+    CONTROL_ACTION_STOP: Result := 'Сброшен';
   else
     Result := 'Неизвестно';
   end;
@@ -3315,8 +3292,8 @@ begin
 
   FFreq:=0;
   FFreqSet := FFreqMin;
-  FStatus := PUMP_STOPED;
-  FAction:= PUMP_STOP;
+  FStatus := CONTROL_STOPPED;
+  FAction:= CONTROL_ACTION_STOP;
 
 end;
 
@@ -3327,7 +3304,7 @@ end;
 
 function TPump.GetIsRunning: Boolean;
 begin
-  Result := (FStatus = PUMP_STARTED);
+  Result := (FStatus = CONTROL_STARTED);
 end;
 
 function TPump.GetIsChanging: Boolean;
@@ -3367,7 +3344,7 @@ begin
 
     // Здесь может быть логика запуска насоса (вызов внешних процедур и т. д.)
     // После успешного запуска устанавливаем рабочее состояние
-    FAction := PUMP_START;
+    FAction := CONTROL_ACTION_START;
   end;
 end;
 
@@ -3375,7 +3352,7 @@ procedure TPump.Stop;
 begin
   if IsRunning then
   begin
-    FAction := PUMP_STOP;
+    FAction := CONTROL_ACTION_STOP;
     //FFreqSet := 0.0;
     // Здесь может быть логика остановки насоса
   end;
@@ -3394,15 +3371,15 @@ begin
       else
         FFreqSet:=ANewFreq;
 
-      FAction:=PUMP_SET;
+      FAction:=CONTROL_ACTION_SET;
 
 end;
 
 function TPump.GetStateAsString: string;
 begin
   case FStatus of
-    PUMP_STOPED: Result := 'Остановлен';
-    PUMP_STARTED: Result := 'Работает (мин. частота)';
+    CONTROL_STOPPED: Result := 'Остановлен';
+    CONTROL_STARTED: Result := 'Работает (мин. частота)';
   else
     Result := 'Неизвестно';
   end;
@@ -3411,9 +3388,9 @@ end;
 function TPump.GetActionAsString: string;
 begin
   case FAction of
-    PUMP_STOP: Result := 'Остановливается';
-    PUMP_START: Result := 'Запускается';
-    PUMP_SET: Result := 'Меняется частота';
+    CONTROL_ACTION_STOP: Result := 'Остановливается';
+    CONTROL_ACTION_START: Result := 'Запускается';
+    CONTROL_ACTION_SET: Result := 'Меняется частота';
   else
     Result := 'Неизвестно';
   end;
