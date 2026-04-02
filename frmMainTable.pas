@@ -334,8 +334,7 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
-    procedure GridDevicesKeyDown(Sender: TObject; var Key: Word;
-      var KeyChar: Char; Shift: TShiftState);
+
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
@@ -416,6 +415,9 @@ type
       const Row: Integer);
     procedure GridDevicesCellDblClick(const Column: TColumn;
       const Row: Integer);
+    procedure SpeedButton6Click(Sender: TObject);
+    procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
+      var CanSelect: Boolean);
 
   private
 
@@ -517,6 +519,8 @@ type
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
+
+    procedure StartEditSerialCell(ARow: Integer);
 
     property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
     property IsScannerUse: Boolean read FIsScannerUse write FIsScannerUse;
@@ -1106,10 +1110,44 @@ begin
   ButtonCancel.OnClick := ButtonCancelClick;
   EnforceDataPointsColumnsLayout;
 
-
   SetValues;
   UpdateForm;
   OnChangeState(STATE_NONE);
+
+  FIsScannerUse:=True;
+ // StartEditSerialCell(0);
+end;
+
+procedure TFrameMainTable.StartEditSerialCell(ARow: Integer);
+var
+  ColIndex: Integer;
+begin
+  if (ARow < 0) or (ARow >= GridDevices.RowCount) then
+    Exit;
+
+  ColIndex := StringColumnDeviceSerial1.Index;
+
+  GridDevices.ReadOnly:=False;
+  // 1. Сначала выбор
+  GridDevices.SetFocus;
+  GridDevices.Row := ARow;
+
+  // ВАЖНО: именно ColumnIndex, а не Selected
+  GridDevices.ColumnIndex := ColIndex;
+
+  // 2. Сбрасываем режим (иначе может не переключиться)
+  GridDevices.EditorMode := False;
+
+  // 3. Отложенно включаем редактор
+  TThread.Queue(nil,
+    procedure
+    begin
+      // повторно фиксируем (это ключ к стабильности)
+      GridDevices.Row := ARow;
+      GridDevices.ColumnIndex := ColIndex;
+
+      GridDevices.EditorMode := True;
+    end);
 end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
@@ -1197,6 +1235,12 @@ begin
   SetInstrumentalLayoutVisible(LayoutPump, False);
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
   SaveLayoutSettingsToWorkTable;
+end;
+
+procedure TFrameMainTable.SpeedButton6Click(Sender: TObject);
+begin
+
+StartEditSerialCell(1);
 end;
 
 procedure TFrameMainTable.SpeedButtonMinimizeConditionsClick(Sender: TObject);
@@ -3485,18 +3529,22 @@ var
 begin
   if (ARow < 0) or (ARow >= GridDevices.RowCount) then
     Exit;
-
+  {
   GridDevices.Row := ARow;
   GridDevices.SetFocus;
   GridDevices.Selected := StringColumnDeviceSerial1.Index;
   GridDevices.ReadOnly := False;
   GridDevices.EditorMode := True;
+  }
 
-  if ASelectAll and (GridDevices.Editor is TCustomEdit) then
+ StartEditSerialCell(ARow);
+
+
+ { if ASelectAll and (GridDevices.Editor is TCustomEdit) then
   begin
     Edit := TCustomEdit(GridDevices.Editor);
     Edit.SelectAll;
-  end;
+  end;    }
 end;
 
 function TFrameMainTable.IsDuplicateDeviceSerial(const AWorkTable: TWorkTable;
@@ -3607,6 +3655,19 @@ begin
     inherited;
     Exit;
   end;
+
+      if Column = StringColumnDeviceSerial1 then
+  begin
+    GridDevices.SetFocus;
+
+      GridDevices.ReadOnly:=False;
+    //  GridDevices.EditorMode := True;
+
+      inherited;
+      Exit;
+  end;
+
+
 
   if (Column = PopupColumnDeviceSignal1 ) then
   begin
@@ -3848,6 +3909,32 @@ begin
     Exit;
 end;
 
+procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
+  ARow: Integer; var CanSelect: Boolean);
+begin
+
+    if not IsUpdating then
+
+
+
+    if ACol = StringColumnDeviceSerial1.Index then
+  begin
+    GridDevices.SetFocus;
+    // 2. Сбрасываем режим (иначе может не переключиться)
+    GridDevices.EditorMode := False;
+    GridDevices.ReadOnly:=True;
+    // 3. Отложенно включаем редактор
+    TThread.Queue(nil,
+    procedure
+    begin
+      GridDevices.ReadOnly:=False;
+      GridDevices.EditorMode := True;
+    end);
+  end;
+
+
+end;
+
 procedure TFrameMainTable.GridDevicesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 var
@@ -3885,7 +3972,9 @@ begin
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
 
       if FIsScannerUse then
+        begin
         HandleScannerSerialEnter(ARow, Value.AsString);
+        end;
 
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
@@ -3900,8 +3989,8 @@ begin
     if Changed then
       MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
 
-    if GridDevices.Columns[ACol] <> StringColumnDeviceSerial1 then
-      FScannerEnterPressed := False;
+   // if GridDevices.Columns[ACol] <> StringColumnDeviceSerial1 then
+      //FScannerEnterPressed := False;
 
     Exit;
   end;
@@ -3909,7 +3998,7 @@ begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
-  FScannerEnterPressed := False;
+ // FScannerEnterPressed := False;
   GridDevices.ReadOnly := True;
 end;
 
