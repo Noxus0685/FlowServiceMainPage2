@@ -3182,26 +3182,13 @@ end;
 procedure TFrameMainTable.EditPresExit(Sender: TObject);
 var
   Value: Double;
-  PressBeforeValue: Double;
-  PressAfterValue: Double;
 begin
   if FActiveWorkTable = nil then
     Exit;
 
   if TryStrToFloat(EditPres.Text, Value) then
   begin
-    PressBeforeValue := 0;
-    PressAfterValue := 0;
-    if FActiveWorkTable.ValuePressureBefore <> nil then
-      PressBeforeValue := FActiveWorkTable.ValuePressureBefore.GetDoubleValue;
-    if FActiveWorkTable.ValuePressureAfter <> nil then
-      PressAfterValue := FActiveWorkTable.ValuePressureAfter.GetDoubleValue;
-    FActiveWorkTable.SetPressure(
-      Value,
-      FActiveWorkTable.PressDelta,
-      PressBeforeValue,
-      PressAfterValue
-    );
+    FActiveWorkTable.DoConditionsPressStart(Value);
     EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
   else
