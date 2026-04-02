@@ -73,6 +73,7 @@ object FrameMainTable: TFrameMainTable
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Left
                 TabOrder = 1
+                Text = '0,00'
                 Position.X = 89.000000000000000000
                 Size.Width = 56.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -160,7 +161,7 @@ object FrameMainTable: TFrameMainTable
                   Touch.InteractiveGestures = [LongTap, DoubleTap]
                   Align = Client
                   TabOrder = 1
-                  Text = '45,50'
+                  Text = '0,00'
                   Size.Width = 119.000000000000000000
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False

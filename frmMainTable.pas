@@ -1245,7 +1245,7 @@ begin
     LayoutPump.tag:=0;
 
     FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
-    FActiveWorkTable.ActivePump.State:=CONTROL_STARTED;
+    //FActiveWorkTable.ActivePump.State:=CONTROL_STARTED;
     UpdateUIPump;
 
   end;
@@ -1351,7 +1351,7 @@ begin
     begin
       LayoutPump.tag:=0;
       FActiveWorkTable.DoPumpStop(ComboBoxPumps.Text) ;
-      FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
+      //FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
     end;
 end;
 
@@ -2872,8 +2872,8 @@ begin
   WorkTable.ValueTempertureBefore.SetValue(WorkTable.ConditionsTemp.TempBefore);
   WorkTable.ValueTempertureAfter.SetValue(WorkTable.ConditionsTemp.TempAfter);
 
-  WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
-  WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
+  WorkTable.ValuePressureBefore.SetValue(WorkTable.ConditionsPress.PressBefore);
+  WorkTable.ValuePressureAfter.SetValue(WorkTable.ConditionsPress.PressAfter);
 
 
 
@@ -2908,6 +2908,8 @@ begin
 
 
    WorkTable.ConditionsTemp.Temp:=  WorkTable.ValueTemperture.GetDoubleValue;
+   WorkTable.ConditionsPress.Press:=  WorkTable.ValuePressure.GetDoubleValue;
+
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
 
@@ -3020,10 +3022,10 @@ begin
   else
     LabelTemp.Text := FormatFloat('0.###', WorkTable.ConditionsTemp.Temp);
 
-  if WorkTable.ValuePressure <> nil then
+ { if WorkTable.ValuePressure <> nil then
     LabelPressure.Text := FormatFloat('0.###', WorkTable.ValuePressure.GetDoubleValue)
   else
-    LabelPressure.Text := FormatFloat('0.###', WorkTable.Press);
+    LabelPressure.Text := FormatFloat('0.###', WorkTable.Press); }
   //EditTemp.Text := FormatFloat('0.###', WorkTable.Temp);
   //EditPres.Text := FormatFloat('0.###', WorkTable.Press);
 
@@ -3169,6 +3171,9 @@ begin
 
    // FActiveWorkTable.ConditionsTemp.SetTemp(strtofloat(EditTemp.Text));
     FActiveWorkTable.DoConditionsTempStart(strtofloat(EditTemp.Text));
+
+    FActiveWorkTable.ConditionsTemp.State:=CONTROL_STARTED;
+    UpdateUIConditions;
   {  FActiveWorkTable.SetTemperature(
       FActiveWorkTable.ConditionsTemp.TempBefore,
       FActiveWorkTable.ConditionsTemp.TempAfter
@@ -3189,10 +3194,11 @@ begin
   if TryStrToFloat(EditPres.Text, Value) then
   begin
     FActiveWorkTable.DoConditionsPressStart(Value);
-    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
+    UpdateUIConditions;
+    //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
-  else
-    EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
+  //else
+    //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
 end;
 
 procedure TFrameMainTable.ApplyFlowMeterSelection(const ARow: Integer);
@@ -4425,51 +4431,55 @@ begin
     if WorkTable = nil then
       Exit;
 
-
-
-    {else
-      LabelFlowRate.Text := '0';    }
-
-
-   {   FActiveWorkTable.SetTemperature(
-      FActiveWorkTable.ConditionsTemp.TempBefore,
-      FActiveWorkTable.ConditionsTemp.TempAfter
-    );    }
-
       if Layout9.tag = 3 then
       exit;
 
     Layout9.tag:=2;
 
-     if ABS(strtofloat(EditTemp.Text)-WorkTable.ConditionsTemp.TempSet) < 0.00001 then
-     //if StrToFloat(EditTemp.Text)  <> FormatFloat('0.##', WorkTable.ConditionsTemp.TempSet) then
+   if (WorkTable.ConditionsTemp.TempSet=0) or (WorkTable.ConditionsTemp.Temp=0) then
+    Rectangle7.Fill.Color := TAlphaColorRec.White
+   ELSE if (WorkTable.ConditionsTemp.TempSet<=WorkTable.ConditionsTemp.Temp*(1+WorkTable.ConditionsTemp.TempAccuracyPlus/100))
+      AND (WorkTable.ConditionsTemp.TempSet>=WorkTable.ConditionsTemp.Temp*(1-WorkTable.ConditionsTemp.TempAccuracyPlus/100)) THEN
+    Rectangle7.Fill.Color := TAlphaColorRec.Greenyellow
+   else
+    Rectangle7.Fill.Color := TAlphaColorRec.Yellow;
+
+
+
+   if (WorkTable.ConditionsPress.PressSet=0) or (WorkTable.ConditionsPress.Press=0 )then
+    Rectangle11.Fill.Color := TAlphaColorRec.White
+   else IF WorkTable.ConditionsPress.IsRunning then
+    Rectangle11.Fill.Color := TAlphaColorRec.Yellow
+   else
+    Rectangle11.Fill.Color := TAlphaColorRec.Greenyellow ;
+
+
+
+
+    if (ABS(strtofloat(EditTemp.Text)-WorkTable.ConditionsTemp.TempSet) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
       EditTemp.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsTemp.TempSet) ;
 
+    if (ABS(strtofloat(EditPres.Text)-WorkTable.ConditionsPress.PressSet) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
+      EditPres.Text :=
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsPress.PressSet) ;
+
     LabelTemp.text:=
     WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsTemp.Temp);
+
+    LabelPressure.text:=
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsPress.Press);
    // FormatFloat('0.##', (WorkTable.ConditionsTemp.Temp));
 
-   if WorkTable.ConditionsTemp.Temp=0 then
-    RectangleLabelFR.Fill.Color := TAlphaColorRec.White
-   else IF WorkTable.ConditionsTemp.IsRunning then
-    Rectangle7.Fill.Color := TAlphaColorRec.Yellow
-   else
-    Rectangle7.Fill.Color := TAlphaColorRec.Greenyellow ;
+
+
+
+
+
 
     Layout9.tag:=0;
 
 
-  {
-    if WorkTable.FlowRate.Flow = 0 then
-       RectangleLabelFR.Fill.Color := TAlphaColorRec.White
-
-    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.FlowAccuracyPlus/100) * WorkTable.FlowRate.FlowSet ))
-    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.FlowAccuracyminus/100) * WorkTable.FlowRate.FlowSet )) then
-      RectangleLabelFR.Fill.Color := TAlphaColorRec.Greenyellow
-        else if (WorkTable.FlowRate.Flow <> WorkTable.FlowRate.FlowSet) then
-      RectangleLabelFR.Fill.Color := TAlphaColorRec.Yellow
-      }
 
 end;
 

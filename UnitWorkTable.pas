@@ -50,10 +50,7 @@ type
   EControlAction = (
     CONTROL_ACTION_START,
     CONTROL_ACTION_STOP,
-    CONTROL_ACTION_SET,
-    CONTROL_ACTION_SET_TEMPERATURE,
-    CONTROL_ACTION_SET_PRESSURE,
-    CONTROL_ACTION_SET_TIME
+    CONTROL_ACTION_SET
   );
 
 
@@ -80,7 +77,7 @@ type
   public
     constructor Create(const APumpName: string);
     destructor Destroy; override;
-
+    procedure SetState(AStatus: EControlState);
     procedure Start;
     procedure Stop;
     procedure SetFrequency(ANewFreq: Double);
@@ -88,7 +85,6 @@ type
     procedure SetFreqMax(const Value: Double);
     function GetStateAsString: string;
     function GetActionAsString: string;
-
     property Name: string read FName write FName;
     //property UUID: string read FUUID write FUUID;
     property Freq: Double read FFreq write FFreq;
@@ -119,18 +115,19 @@ type
 
     FName: string;
     FHint: string;
+
+  public
+    constructor Create(const AName: string = 'FlowRate');
+    procedure SetFlowRate(ANewValue: Double);
+    procedure Stop;
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
     procedure SetFlowRateMin(const Value: Double);
     procedure SetFlowRateMax(const Value: Double);
     procedure Start;
-  public
-    constructor Create(const AName: string = 'FlowRate');
-    procedure SetFlowRate(ANewValue: Double);
-    procedure Stop;
     function GetStateAsString: string;
     function GetActionAsString: string;
-
+    procedure SetState(AStatus: EControlState);
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
     property Name: string read FName write FName;
@@ -160,6 +157,7 @@ type
     FAction: EControlAction;
 
 
+
   public
     constructor Create;
      procedure Stop;
@@ -167,6 +165,7 @@ type
     procedure SetTemperatureAfter(ATempAfter: Double);
     procedure SetTemp(ATempset: Double);
     function GetIsRunning: Boolean;
+    procedure SetState(AStatus: EControlState);
     procedure SetTempMin(const Value: Double);
     procedure SetTempMax(const Value: Double);
     property Action : EControlAction read FAction write FAction;
@@ -198,15 +197,15 @@ type
     FAction: EControlAction;
 
 
+
   public
     constructor Create;
     procedure Stop;
     procedure SetPress(APressSet: Double);
     function GetIsRunning: Boolean;
-    procedure SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
     procedure SetPressureBefore(APressBefore: Double);
     procedure SetPressureAfter(APressAfter: Double);
-
+    procedure SetState(AStatus: EControlState);
     procedure SetPressMin(const Value: Double);
     procedure SetPressMax(const Value: Double);
     property Action: EControlAction read FAction write FAction;
@@ -598,6 +597,7 @@ private
   property Pumps: TObjectList<TPump> read FPumps;
 
   property ConditionsTemp: TConditionsTemp read FConditionsTemp;
+  property ConditionsPress: TConditionsPress read FConditionsPress;
 
   property ActivePump: TPump read FActivePump write FActivePump;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
@@ -660,7 +660,7 @@ private
     procedure UpdateAggregateMeterValues;
     procedure InitMeterValues;
     procedure SetTemperature(ATempBefore, ATempAfter: Double);
-    procedure SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
+    procedure SetPressure(APressBefore, APressAfter: Double);
 
 
   public
@@ -1987,7 +1987,7 @@ begin
     PressBeforeValue := ValuePressureBefore.GetDoubleValue;
   if ValuePressureAfter <> nil then
     PressAfterValue := ValuePressureAfter.GetDoubleValue;
-  SetPressure(AValue, PressDelta, PressBeforeValue, PressAfterValue);
+  SetPressure( PressBeforeValue, PressAfterValue);
 end;
 
 procedure TWorkTable.SetPressDelta(const AValue: Double);
@@ -2015,30 +2015,15 @@ begin
 
 end;
 
-procedure TWorkTable.SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
-var
-  AppliedPress: Double;
-  AppliedPressBefore: Double;
-  AppliedPressAfter: Double;
+procedure TWorkTable.SetPressure( APressBefore, APressAfter: Double);
+
 begin
-  AppliedPress := APress;
-  AppliedPressBefore := APressBefore;
-  AppliedPressAfter := APressAfter;
 
-  if FConditionsPress <> nil then
-  begin
-    FConditionsPress.SetPressure(APress, APressDelta, APressBefore, APressAfter);
-    AppliedPress := FConditionsPress.Press;
-    AppliedPressBefore := FConditionsPress.PressBefore;
-    AppliedPressAfter := FConditionsPress.PressAfter;
-  end;
+  if (APressBefore = 0)  then
+    FConditionsPress.PressBefore:= APressAfter ;
+  if APressAfter = 0 then
+    FConditionsPress.PressAfter:= APressBefore ;
 
-  if ValuePressureBefore <> nil then
-    ValuePressureBefore.SetValue(AppliedPressBefore);
-  if ValuePressureAfter <> nil then
-    ValuePressureAfter.SetValue(AppliedPressAfter);
-  if ValuePressure <> nil then
-    ValuePressure.SetValue(AppliedPress);
 end;
 
 { Adds a new device channel with default identifiers and bindings. }
@@ -3075,14 +3060,19 @@ begin
   FTempMin := -50;
   FTempMax := 150;
   FTemp := 20.2;
-  FTempSet := 21;
-  FTempBefore := 21;
-  FTempAfter := 22;
+  FTempSet := 0;
+  FTempBefore := 0;
+  FTempAfter := 0;
   FTempDelta := 0.1;
   FTempAccuracyPlus := 5;
   FTempAccuracyMinus := 5;
   FStatus := CONTROL_STOPPED;
   FAction := CONTROL_ACTION_STOP;
+end;
+
+procedure TConditionsTemp.SetState(AStatus: EControlState);
+begin
+  FStatus := AStatus;
 end;
 
 procedure TConditionsTemp.SetTempMax(const Value: Double);
@@ -3144,13 +3134,13 @@ begin
   inherited Create;
   FPressMin := 0;
   FPressMax := 200;
-  FPress := 101.1;
-  FPressSet := FPress;
-  FPressBefore := FPress;
-  FPressAfter := FPress;
+  FPress := 10;
+  FPressSet := 0;
+  FPressBefore := 0;
+  FPressAfter := 0;
   FPressDelta := 0.1;
-  FPressAccuracyPlus := 1;
-  FPressAccuracyMinus := 1;
+  FPressAccuracyPlus := 5;
+  FPressAccuracyMinus := 5;
   FStatus := CONTROL_STOPPED;
   FAction := CONTROL_ACTION_STOP;
 end;
@@ -3162,15 +3152,22 @@ end;
 
 procedure TConditionsPress.SetPress(APressSet: Double);
 begin
-  if APressSet < FPressMin then
+
+    if APressSet < FPressMin then
     FPressSet := FPressMin
   else if APressSet > FPressMax then
     FPressSet := FPressMax
-  else
-    FPressSet := APressSet;
+  else FPressSet:=APressSet;
 
   FAction := CONTROL_ACTION_START;
 end;
+
+procedure TConditionsPress.SetState(AStatus: EControlState);
+begin
+  FStatus := AStatus;
+end;
+
+
 
 function TConditionsPress.GetIsRunning: Boolean;
 begin
@@ -3189,28 +3186,7 @@ begin
   FPressMin := Value;
 end;
 
-procedure TConditionsPress.SetPressure(const APress, APressDelta, APressBefore, APressAfter: Double);
-var
-  CalculatedPress: Double;
-begin
-  FPressSet := APress;
-  FPressBefore := APressBefore;
-  FPressAfter := APressAfter;
 
-  if Abs(APressBefore) <= 0 then
-    CalculatedPress := APressAfter
-  else
-    CalculatedPress := (APressAfter + APressBefore)/2;
-
-  if CalculatedPress < FPressMin then
-    FPress := FPressMin
-  else if CalculatedPress > FPressMax then
-    FPress := FPressMax
-  else
-    FPress := CalculatedPress;
-
-  FPressDelta := APressDelta;
-end;
 
 procedure TConditionsPress.SetPressureBefore(APressBefore: Double);
 begin
@@ -3268,6 +3244,12 @@ begin
 
   FFlowRateMin := Value;
 end;
+
+procedure TFlowRate.SetState(AStatus: EControlState);
+begin
+  FStatus := AStatus;
+end;
+
 
 
 function TFlowRate.GetIsRunning: Boolean;
@@ -3435,6 +3417,11 @@ begin
 
       FAction:=CONTROL_ACTION_SET;
 
+end;
+
+procedure TPump.SetState(AStatus: EControlState);
+begin
+  FStatus := AStatus;
 end;
 
 function TPump.GetStateAsString: string;

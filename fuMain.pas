@@ -61,6 +61,7 @@ type
     FFrameMainTable: TFrameMainTable;
     FNextClimateChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
+    FNextPressChangeAt: TDateTime;
 
 
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
@@ -71,6 +72,9 @@ type
       AAction: EControlAction);
     procedure FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp;
       AAction: EControlAction);
+    procedure FlowConditionsPressHandler(AConditionsPress: tConditionsPress;
+      AAction: EControlAction);
+    procedure UpdateRandomPress(const AWorkTable: TWorkTable);
 
   public
 
@@ -144,6 +148,13 @@ begin
 
 end;
 
+procedure  TFormMain.FlowConditionsPressHandler(AConditionsPress: tConditionsPress; AAction:EControlAction);
+begin
+
+  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsPress.PressSet));
+
+end;
+
 
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -178,6 +189,7 @@ begin
   FWorkTableManager.ActiveWorkTable.OnPumpChange:= PumpStateHandler;
   FWorkTableManager.ActiveWorkTable.OnFlowRateChange:= FlowRateStateHandler;
   FWorkTableManager.ActiveWorkTable.OnConditionTempChange:= FlowConditionsTempHandler;
+  FWorkTableManager.ActiveWorkTable.OnConditionPressChange:= FlowConditionsPressHandler;
 
   FWorkTableManager.ActiveWorkTable.AddPump('1');
   FWorkTableManager.ActiveWorkTable.AddPump('2');
@@ -211,32 +223,51 @@ begin
   if AWorkTable = nil then
     Exit;
 
+  IF (AWorkTable.ConditionsTemp.Action = CONTROL_ACTION_START)THEN
+    AWorkTable.ConditionsTemp.SetState(CONTROL_STARTED)
+  else  if (AWorkTable.ConditionsTemp.Action = CONTROL_ACTION_STOP) then
+    AWorkTable.ConditionsTemp.SetState(CONTROL_STOPPED);
+
+
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
   begin
 
     TempDelta :=  (Random * 0.30) - 0.15;
     PressDelta :=  (Random * 0.06) - 0.03;
+    if (AWorkTable.ConditionsTemp.IsRunning) then
+    begin
+      if NOT(AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
+      AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
+      AND  (AWorkTable.ConditionsTemp.Temp<AWorkTable.ConditionsTemp.TempSet)  THEN
+      begin
+        AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore+1);
+        AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter+1);
+      end
+    ELSE if not(AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
+      AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
+      AND  (AWorkTable.ConditionsTemp.Temp>AWorkTable.ConditionsTemp.TempSet)  THEN
+      begin
+        AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore-1);
+        AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter-1);
+      end;
 
-    if (AWorkTable.ConditionsTemp.IsRunning) and  (AWorkTable.ConditionsTemp.Temp<AWorkTable.ConditionsTemp.TempSet) then
-    begin
-      AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore+1);
-      AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter+1);
-    end
-    else if (AWorkTable.ConditionsTemp.IsRunning) and  (AWorkTable.ConditionsTemp.Temp>AWorkTable.ConditionsTemp.TempSet)  then
-    begin
-      AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore-1);
-      AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter-1);
+      if (AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
+      AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100)) then
+        AWorkTable.DoConditionsTempStop
+
     end;
 
-    AWorkTable.ConditionsTemp.SetTemperatureBefore(EnsureRange(AWorkTable.ConditionsTemp.TempBefore + TempDelta, -50.0, 150.0));
-    AWorkTable.ConditionsTemp.SetTemperatureAfter(EnsureRange(AWorkTable.ConditionsTemp.TempAfter + TempDelta, -50.0, 150.0));
 
-    if (AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
-    AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100)) then
-      AWorkTable.ConditionsTemp.State:=CONTROL_STOPPED
-    else
-      AWorkTable.ConditionsTemp.STATE:=CONTROL_STARTED;
+      if AWorkTable.ConditionsTemp.TempSet<>0 then
+      begin
+        AWorkTable.ConditionsTemp.SetTemperatureBefore(EnsureRange(AWorkTable.ConditionsTemp.TempBefore + TempDelta, -50.0, 150.0));
+        AWorkTable.ConditionsTemp.SetTemperatureAfter(EnsureRange(AWorkTable.ConditionsTemp.TempAfter + TempDelta, -50.0, 150.0));
+      end;
+
+
+
+
 
     //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
     //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
@@ -245,6 +276,64 @@ begin
    end;
 end;
 
+procedure TFormMain.UpdateRandomPress(const AWorkTable: TWorkTable);
+var
+  TempDelta, PressDelta: Double;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  IF AWorkTable.ConditionsPress.Action = CONTROL_ACTION_START THEN
+    AWorkTable.ConditionsPress.SetState(CONTROL_STARTED)
+  else  if (AWorkTable.ConditionsPress.Action = CONTROL_ACTION_STOP) then
+    AWorkTable.ConditionsPress.SetState(CONTROL_STOPPED);
+
+   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+  if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
+  begin
+
+    TempDelta :=  (Random * 0.30) - 0.15;
+    PressDelta :=  (Random * 0.06) - 0.03;
+    if (AWorkTable.ConditionsPress.IsRunning) then
+    begin
+      if  (AWorkTable.ConditionsPress.Press<AWorkTable.ConditionsPress.PressSet) then
+      begin
+        AWorkTable.ConditionsPress.SetPressureBefore(AWorkTable.ConditionsPress.PressBefore+1);
+        AWorkTable.ConditionsPress.SetPressureAfter(AWorkTable.ConditionsPress.PressAfter+1);
+      end
+      else if  (AWorkTable.ConditionsPress.Press>AWorkTable.ConditionsPress.PressSet)  then
+      begin
+        AWorkTable.ConditionsPress.SetPressureBefore(AWorkTable.ConditionsPress.PressBefore-0.3);
+        AWorkTable.ConditionsPress.SetPressureAfter(AWorkTable.ConditionsPress.PressAfter-0.3);
+      end;
+      if (AWorkTable.ConditionsPress.PressSet<=AWorkTable.ConditionsPress.Press*(1+AWorkTable.ConditionsPress.PressAccuracyPlus/100))
+      AND (AWorkTable.ConditionsPress.PressSet>=AWorkTable.ConditionsPress.Press*(1-AWorkTable.ConditionsPress.PressAccuracyPlus/100)) then
+        AWorkTable.DoConditionsPressStop;
+
+    end;
+      if  (AWorkTable.ConditionsPress.Press<AWorkTable.ConditionsPress.PressSet)  then
+      begin
+        AWorkTable.ConditionsPress.SetPressureBefore(EnsureRange(AWorkTable.ConditionsPress.PressBefore + 0.1, -50.0, 150.0));
+        AWorkTable.ConditionsPress.SetPressureAfter(EnsureRange(AWorkTable.ConditionsPress.PressAfter + 0.1, -50.0, 150.0));
+      end;
+      if AWorkTable.ConditionsPress.PressSet<>0 then
+      begin
+        AWorkTable.ConditionsPress.SetPressureBefore(EnsureRange(AWorkTable.ConditionsPress.PressBefore + PressDelta, -50.0, 150.0));
+        AWorkTable.ConditionsPress.SetPressureAfter(EnsureRange(AWorkTable.ConditionsPress.PressAfter + PressDelta, -50.0, 150.0));
+      end;
+
+
+
+
+      //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
+      //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
+
+      FNextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
+   end;
+end;
+
+
+
 
 procedure TFormMain.UpdateRandomFreq(const APump: TPump);
 var
@@ -252,6 +341,11 @@ var
 begin
   if APump = nil then
     Exit;
+
+  IF (APump.Action = CONTROL_ACTION_START)  THEN
+    APump.SetState(CONTROL_STARTED)
+  else  if (APump.Action = CONTROL_ACTION_STOP) then
+    APump.SetState(CONTROL_STOPPED);
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
@@ -280,6 +374,12 @@ var
 begin
   if AFlowRate = nil then
     Exit;
+
+
+  IF AFlowRate.Action = CONTROL_ACTION_START THEN
+    AFlowRate.SetState(CONTROL_STARTED)
+  else  if (AFlowRate.Action = CONTROL_ACTION_STOP) then
+    AFlowRate.SetState(CONTROL_STOPPED);
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
@@ -368,7 +468,8 @@ begin
 
     UpdateRandomClimate(WorkTable);
     UpdateRandomFreq(Pump);
-    //UpdateRandomFlowRate(FlowRate);
+    UpdateRandomFlowRate(FlowRate);
+    UpdateRandomPress(WorkTable);
 
 
 
