@@ -356,7 +356,8 @@ type
 
    procedure LoadPoints;
   procedure LoadDiameters;
-  procedure RecalcDiametersKp;
+  procedure RecalcDiametersKpByCoef;
+  procedure RecalcDiametersKpByFreq;
 
   public
 
@@ -2036,7 +2037,7 @@ begin
   FType.Coef := NewBaseCoef;
 
   // 6. Пересчёт Kp для всех диаметров
-  RecalcDiametersKp;
+  RecalcDiametersKpByCoef;
 
   // 7. Обновление таблицы диаметров
   UpdateDiametersGrid;
@@ -2098,7 +2099,7 @@ begin
 end;
 
 
-procedure TFormTypeEditor.RecalcDiametersKp;
+procedure TFormTypeEditor.RecalcDiametersKpByCoef;
 var
   I: Integer;
 begin
@@ -2107,6 +2108,20 @@ begin
 
   for I := 0 to FDiametersLocal.Count - 1 do
     FDiametersLocal[I].Kp := FType.Coef * FDiametersLocal[I].Qmax;
+end;
+
+procedure TFormTypeEditor.RecalcDiametersKpByFreq;
+var
+  I: Integer;
+begin
+  if (FDiametersLocal = nil) or (FType = nil) then
+    Exit;
+
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if FDiametersLocal[I].QFmax > 0 then
+      FDiametersLocal[I].Kp := 3.6 * FType.Freq / FDiametersLocal[I].QFmax
+    else
+      FDiametersLocal[I].Kp := 0;
 end;
 
 
@@ -2179,6 +2194,12 @@ begin
   // Сохраняем в тип
   // ----------------------------------------
   FType.Freq := NewFreq;
+
+  // ----------------------------------------
+  // Пересчёт Kp по частоте
+  // Kp = 3.6 * Freq / QFmax
+  // ----------------------------------------
+  RecalcDiametersKpByFreq;
 
   // ----------------------------------------
   // Обновление таблицы диаметров
