@@ -26,17 +26,21 @@ type
     GroupBoxEtalonChannels: TGroupBox;
     LabelEtalonCurSec: TLabel;
     LabelEtalonImpSec: TLabel;
+    LabelEtalonFlowRate: TLabel;
     LabelEtalonImpResult: TLabel;
     EditEtalonCurSec: TEdit;
     EditEtalonImpSec: TEdit;
+    EditEtalonFlowRate: TEdit;
     EditEtalonImpResult: TEdit;
     ButtonApplyEtalonValues: TButton;
     GroupBoxDeviceChannels: TGroupBox;
     LabelDeviceCurSec: TLabel;
     LabelDeviceImpSec: TLabel;
+    LabelDeviceFlowRate: TLabel;
     LabelDeviceImpResult: TLabel;
     EditDeviceCurSec: TEdit;
     EditDeviceImpSec: TEdit;
+    EditDeviceFlowRate: TEdit;
     EditDeviceImpResult: TEdit;
     ButtonApplyDeviceValues: TButton;
     EditTestNum: TEdit;
@@ -49,6 +53,8 @@ type
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
+    procedure EditEtalonFlowRateExit(Sender: TObject);
+    procedure EditDeviceFlowRateExit(Sender: TObject);
     procedure  PumpStateHandler(APump: TPump; AAction:EPumpAction);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
@@ -69,6 +75,9 @@ type
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
     procedure FlowRateStateHandler(AFlowRate: TFlowRate;
       AAction: EFlowRateAction);
+    function GetChannelFlowCoef(const AChannel: TChannel): Double;
+    procedure UpdateEtalonImpSecFromFlowRate;
+    procedure UpdateDeviceImpSecFromFlowRate;
 
   public
 
@@ -89,6 +98,8 @@ begin
   if WorkTable = nil then
     Exit;
 //1233211
+  UpdateDeviceImpSecFromFlowRate;
+
   FFrameMainTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
@@ -106,6 +117,8 @@ begin
   if WorkTable = nil then
     Exit;
 
+  UpdateEtalonImpSecFromFlowRate;
+
   FFrameMainTable.ApplyChannelValues(
     WorkTable.EtalonChannels,
     NormalizeFloatInput(EditEtalonCurSec.Text),
@@ -118,6 +131,16 @@ end;
 procedure TFormMain.EditTestNumExit(Sender: TObject);
 begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
+end;
+
+procedure TFormMain.EditDeviceFlowRateExit(Sender: TObject);
+begin
+  UpdateDeviceImpSecFromFlowRate;
+end;
+
+procedure TFormMain.EditEtalonFlowRateExit(Sender: TObject);
+begin
+  UpdateEtalonImpSecFromFlowRate;
 end;
 
 procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EPumpAction);
@@ -239,6 +262,58 @@ begin
 
     FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
+end;
+
+function TFormMain.GetChannelFlowCoef(const AChannel: TChannel): Double;
+begin
+  Result := 0.0;
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    Exit;
+
+  if (AChannel.FlowMeter.ValueCoef <> nil) then
+    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+
+  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
+    Result := AChannel.FlowMeter.Device.Coef;
+
+  if SameValue(Result, 0.0, 1E-12) then
+    Result := AChannel.FlowMeter.Kp;
+end;
+
+procedure TFormMain.UpdateDeviceImpSecFromFlowRate;
+var
+  WorkTable: TWorkTable;
+  FlowRate, Coef, ImpSec: Double;
+begin
+  WorkTable := FWorkTableManager.WorkTables[0];
+  if (WorkTable = nil) or (WorkTable.DeviceChannels.Count = 0) then
+    Exit;
+
+  FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
+  Coef := GetChannelFlowCoef(WorkTable.DeviceChannels[0]);
+  if Coef <= 0 then
+    Exit;
+
+  ImpSec := (FlowRate * Coef) / 3600.0;
+  EditDeviceImpSec.Text := FloatToStr(ImpSec);
+end;
+
+procedure TFormMain.UpdateEtalonImpSecFromFlowRate;
+var
+  WorkTable: TWorkTable;
+  FlowRate, Coef, ImpSec: Double;
+begin
+  WorkTable := FWorkTableManager.WorkTables[0];
+  if (WorkTable = nil) or (WorkTable.EtalonChannels.Count = 0) then
+    Exit;
+
+  FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
+  Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
+  if Coef <= 0 then
+    Exit;
+
+  ImpSec := (FlowRate * Coef) / 3600.0;
+  EditEtalonImpSec.Text := FloatToStr(ImpSec);
 end;
 
 
