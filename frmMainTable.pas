@@ -2868,12 +2868,12 @@ begin
 
 
   // Основные MeterValues рабочего стола.
-   WorkTable.SetTemperature(WorkTable.ConditionsTemp.BeforeValue, WorkTable.ConditionsTemp.AfterValue);
-  WorkTable.ValueTempertureBefore.SetValue(WorkTable.ConditionsTemp.BeforeValue);
-  WorkTable.ValueTempertureAfter.SetValue(WorkTable.ConditionsTemp.AfterValue);
+   WorkTable.SetTemperature(WorkTable.FluidTemp.BeforeValue, WorkTable.FluidTemp.AfterValue);
+  WorkTable.ValueTempertureBefore.SetValue(WorkTable.FluidTemp.BeforeValue);
+  WorkTable.ValueTempertureAfter.SetValue(WorkTable.FluidTemp.AfterValue);
 
-  WorkTable.ValuePressureBefore.SetValue(WorkTable.ConditionsPress.BeforeValue);
-  WorkTable.ValuePressureAfter.SetValue(WorkTable.ConditionsPress.AfterValue);
+  WorkTable.ValuePressureBefore.SetValue(WorkTable.FluidPress.BeforeValue);
+  WorkTable.ValuePressureAfter.SetValue(WorkTable.FluidPress.AfterValue);
 
 
 
@@ -2907,8 +2907,8 @@ begin
   WorkTable.RecalculateAllMeterValues;
 
 
-   WorkTable.ConditionsTemp.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
-   WorkTable.ConditionsPress.Value:=  WorkTable.ValuePressure.GetDoubleValue;
+   WorkTable.FluidTemp.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
+   WorkTable.FluidPress.Value:=  WorkTable.ValuePressure.GetDoubleValue;
 
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
@@ -3020,7 +3020,7 @@ begin
   if WorkTable.ValueTemperture <> nil then
     LabelTemp.Text := FormatFloat('0.###', WorkTable.ValueTemperture.GetDoubleValue)
   else
-    LabelTemp.Text := FormatFloat('0.###', WorkTable.ConditionsTemp.Value);
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.FluidTemp.Value);
 
  { if WorkTable.ValuePressure <> nil then
     LabelPressure.Text := FormatFloat('0.###', WorkTable.ValuePressure.GetDoubleValue)
@@ -3156,9 +3156,9 @@ begin
   if TryStrToFloat(EditTemp.Text, Value) then
   begin
 
-    FActiveWorkTable.DoConditionsTempStart(strtofloat(EditTemp.Text));
+    FActiveWorkTable.DoFluidTempStart(strtofloat(EditTemp.Text));
 
-    FActiveWorkTable.ConditionsTemp.Status:=CONTROL_STARTED;
+    FActiveWorkTable.FluidTemp.Status:=CONTROL_STARTED;
     UpdateUIConditions;
 
   end;
@@ -3174,7 +3174,7 @@ begin
 
   if TryStrToFloat(EditPres.Text, Value) then
   begin
-    FActiveWorkTable.DoConditionsPressStart(Value);
+    FActiveWorkTable.DoFluidPressStart(Value);
     UpdateUIConditions;
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
@@ -4417,19 +4417,19 @@ begin
 
     Layout9.tag:=2;
 
-   if (WorkTable.ConditionsTemp.SetValue=0) or (WorkTable.ConditionsTemp.Value=0) then
+   if (WorkTable.FluidTemp.SetValue=0) or (WorkTable.FluidTemp.Value=0) then
     Rectangle7.Fill.Color := TAlphaColorRec.White
-   ELSE if (WorkTable.ConditionsTemp.SetValue<=WorkTable.ConditionsTemp.Value*(1+WorkTable.ConditionsTemp.AccuracyPlus/100))
-      AND (WorkTable.ConditionsTemp.SetValue>=WorkTable.ConditionsTemp.Value*(1-WorkTable.ConditionsTemp.AccuracyPlus/100)) THEN
+   ELSE if (WorkTable.FluidTemp.SetValue<=WorkTable.FluidTemp.Value*(1+WorkTable.FluidTemp.AccuracyPlus/100))
+      AND (WorkTable.FluidTemp.SetValue>=WorkTable.FluidTemp.Value*(1-WorkTable.FluidTemp.AccuracyPlus/100)) THEN
     Rectangle7.Fill.Color := $ffC9FFC7
    else
     Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
 
 
 
-   if (WorkTable.ConditionsPress.SetValue=0) or (WorkTable.ConditionsPress.Value=0 )then
+   if (WorkTable.FluidPress.SetValue=0) or (WorkTable.FluidPress.Value=0 )then
     Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF WorkTable.ConditionsPress.IsRunning then
+   else IF WorkTable.FluidPress.IsRunning then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
    else
     Rectangle11.Fill.Color := $ffC9FFC7;
@@ -4437,20 +4437,20 @@ begin
 
 
 
-    if (ABS(strtofloat(EditTemp.Text)-WorkTable.ConditionsTemp.SetValue) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
+    if (ABS(strtofloat(EditTemp.Text)-WorkTable.FluidTemp.SetValue) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
       EditTemp.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsTemp.SetValue) ;
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.SetValue) ;
 
-    if (ABS(strtofloat(EditPres.Text)-WorkTable.ConditionsPress.SetValue) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
+    if (ABS(strtofloat(EditPres.Text)-WorkTable.FluidPress.SetValue) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
       EditPres.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsPress.SetValue) ;
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.SetValue) ;
 
     LabelTemp.text:=
-    WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsTemp.Value);
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value);
 
     LabelPressure.text:=
-    WorkTable.ValueTemperture.GetStrNum(WorkTable.ConditionsPress.Value);
-   // FormatFloat('0.##', (WorkTable.ConditionsTemp.Temp));
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.Value);
+   // FormatFloat('0.##', (WorkTable.FluidTemp.Temp));
 
 
 
