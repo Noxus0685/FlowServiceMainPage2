@@ -491,7 +491,8 @@ type
     property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
-    procedure AttachDN(ADiameter: TDiameter; AType: TDeviceType);
+    procedure AttachDN(ADiameter: TDiameter; AType: TDeviceType);  overload;
+    procedure AttachDN(ADN: String; AType: TDeviceType);  overload;
     procedure FillFromType(AType: TDeviceType; const APreservePointsAndSerial: Boolean = False);
     procedure SyncNameWithModificationAndDiameter;
 
@@ -559,7 +560,7 @@ begin
   {----------------------------------}
   { Метрология }
   {----------------------------------}
-  DN := 'DN25';
+  DN := '';
   Qmax := 10.0;                     // м³/ч — типовое значение
   Qmin := 0.1;
   RangeDynamic := 100.0;            // Qmax / Qmin
@@ -2128,6 +2129,14 @@ begin
     end;
 
   SyncNameWithModificationAndDiameter;
+end;
+
+procedure TDevice.AttachDN(ADN: String; AType: TDeviceType);
+var
+  ADiameter: TDiameter;
+begin
+  ADiameter:=AType.FindDiameterByDN(ADN);
+  AttachDN(ADiameter, AType);
 end;
 
 procedure TDevice.SyncNameWithModificationAndDiameter;

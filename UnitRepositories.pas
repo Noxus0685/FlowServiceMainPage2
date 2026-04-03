@@ -1699,8 +1699,8 @@ begin
     Exit(True);
 
   { защита: новый тип обязан иметь ID }
-  if (AType.State = osNew) and (AType.ID <= 0) then
-    raise Exception.Create('New type must have predefined ID');
+  if (AType.State = osNew) and (AType.UUID = '') then
+    raise Exception.Create('Новый тип должен иметь UUID');
 
   OwnsTransaction := not FDM.TypesConnection.InTransaction;
   if OwnsTransaction then
@@ -1908,10 +1908,10 @@ begin
     Exit;
 
   { базовая защита }
-  if AType.ID <= 0 then
+  if AType.UUID = '' then
     raise Exception.CreateFmt(
-      'Type with invalid ID detected (ID=%d)',
-      [AType.ID]
+      'Type with invalid UUID detected (UUID=%d)',
+      [AType.UUID]
     );
 
   FDM.TypesConnection.StartTransaction;
@@ -2155,7 +2155,7 @@ begin
 
   { защита: диаметр обязан принадлежать типу }
   if ADiameter.DeviceTypeUUID = ''  then
-    raise Exception.Create('Diameter must have valid DeviceTypeUUID');
+    raise Exception.Create('Диаметр должен иметь DeviceTypeUUID');
 
   Q := FDM.CreateQuery;
   try
@@ -2300,9 +2300,11 @@ begin
 
   for D in AType.Diameters do
   begin
-    if D <> nil then  begin
+    if D <> nil then
+    begin
       D.DeviceTypeID := AType.ID;
-       D.DeviceTypeUUID := AType.UUID;  end;
+      D.DeviceTypeUUID := AType.UUID;
+    end;
     if not UpdateDiameter(D) then
       Exit(False);
   end;
