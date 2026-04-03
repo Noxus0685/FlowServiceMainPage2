@@ -3157,8 +3157,6 @@ begin
   begin
 
     FActiveWorkTable.DoFluidTempStart(NormalizeFloatInput(EditTemp.Text));
-
-    FActiveWorkTable.FluidTemp.Status:=CONTROL_STARTED;
     UpdateUIConditions;
 
   end;
@@ -3171,10 +3169,10 @@ var
 begin
   if FActiveWorkTable = nil then
     Exit;
-
+      Layout9.tag := 0;
   if TryStrToFloat(EditPres.Text, Value) then
   begin
-    FActiveWorkTable.DoFluidPressStart(Value);
+    FActiveWorkTable.DoFluidPressStart(NormalizeFloatInput(EditPres.Text));
     UpdateUIConditions;
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
@@ -4335,9 +4333,9 @@ begin
 
     if WorkTable.ActivePump.Value = 0 then
        Rectangle1.Fill.Color := TAlphaColorRec.White
-    else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.SetValue) then
+    else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.ValueSet) then
       Rectangle1.Fill.Color := TAlphaColorRec.Lightyellow
-    else if WorkTable.ActivePump.Value = WorkTable.ActivePump.SetValue then
+    else if WorkTable.ActivePump.Value = WorkTable.ActivePump.ValueSet then
       Rectangle1.Fill.Color := $ffC9FFC7 ;
 
 
@@ -4350,7 +4348,7 @@ begin
    // if ((SpinBoxFreq.Text='12,00') and (WorkTable.ActivePump.FreqSet <> 0)) or
     // ((SpinBoxFreq.Text <>  '12,00') and (WorkTable.ActivePump.FreqSet = 0))  then
 
-    SpinBoxFreq.Value:= (WorkTable.ActivePump.SetValue);
+    SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet);
 
 
 
@@ -4395,7 +4393,7 @@ begin
 
    ELSE if WorkTable.FlowRate.IsStable THEN
       RectangleLabelFR.Fill.Color := $ffC9FFC7
-        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.SetValue) then
+        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
       RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
 
 
@@ -4416,7 +4414,7 @@ begin
 
     Layout9.tag:=2;
 
-   if (WorkTable.FluidTemp.SetValue=0) or (WorkTable.FluidTemp.Value=0) then
+   if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
     Rectangle7.Fill.Color := TAlphaColorRec.White
    ELSE if WorkTable.FluidTemp.IsStable THEN
     Rectangle7.Fill.Color := $ffC9FFC7
@@ -4425,21 +4423,21 @@ begin
 
 
 
-   if (WorkTable.FluidPress.SetValue=0) or (WorkTable.FluidPress.Value=0 )then
+   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )then
     Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF WorkTable.FluidPress.IsRunning then
+   else IF not(WorkTable.FluidPress.IsStable) then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
    else
     Rectangle11.Fill.Color := $ffC9FFC7;
 
 
 
-    if SameValue(NormalizeFloatInput(EditTemp.Text),WorkTable.FluidTemp.SetValue,MinDouble) or (NormalizeFloatInput(EditTemp.Text) = 0)  then
+    if SameValue(NormalizeFloatInput(EditTemp.Text),WorkTable.FluidTemp.ValueSet,MinDouble) or (NormalizeFloatInput(EditTemp.Text) = 0)  then
       EditTemp.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.SetValue) ;
-    if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidTemp.SetValue,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
+    if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidPress.ValueSet,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
       EditPres.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.SetValue) ;
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.ValueSet) ;
 
     LabelTemp.text:=
     WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value);
@@ -4447,12 +4445,6 @@ begin
     LabelPressure.text:=
     WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.Value);
    // FormatFloat('0.##', (WorkTable.FluidTemp.Temp));
-
-
-
-
-
-
 
     Layout9.tag:=0;
 

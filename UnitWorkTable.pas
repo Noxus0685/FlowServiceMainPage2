@@ -89,7 +89,7 @@ TParameters = class(TObject)
     property Hint: string read FHint write FHint;
     property Status: EControlState read FStatus write FStatus;
     property Action: EControlAction read FAction write FAction;
-    property SetValue: Double read FSet write FSet;
+    property ValueSet: Double read FSet write FSet;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
     property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
@@ -3003,8 +3003,8 @@ end;
 function TFluidTemp.IsStable : Boolean ;
 
 begin
-  Result:= (SetValue<=Value*(1+AccuracyPlus/100))
-      AND (SetValue>=Value*(1-AccuracyMinus/100)) ;
+  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
+      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
 
 end;
 
@@ -3043,8 +3043,8 @@ end;
 
 function TFluidPress.IsStable: Boolean ;
 begin
-  Result:= (SetValue<=Value*(1+AccuracyPlus/100))
-      AND (SetValue>=Value*(1-AccuracyMinus/100)) ;
+  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
+      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
 
 end;
 
@@ -3081,8 +3081,8 @@ end;
 
 function TFlowRate.IsStable : Boolean ;
 begin
-  Result:= (SetValue<=Value*(1+AccuracyPlus/100))
-      AND (SetValue>=Value*(1-AccuracyMinus/100)) ;
+  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
+      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
 
 end;
 
