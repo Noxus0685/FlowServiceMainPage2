@@ -418,6 +418,10 @@ type
     procedure SpeedButton6Click(Sender: TObject);
     procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
       var CanSelect: Boolean);
+    procedure GridDevicesEditingDone(Sender: TObject; const ACol,
+      ARow: Integer);
+    procedure GridDevicesCreateCustomEditor(Sender: TObject;
+      const Column: TColumn; var Control: TStyledControl);
 
   private
 
@@ -3809,6 +3813,18 @@ begin
   finally
     GridDevices.EndUpdate;
   end;
+end;
+
+procedure TFrameMainTable.GridDevicesCreateCustomEditor(Sender: TObject;
+  const Column: TColumn; var Control: TStyledControl);
+begin
+      //   GridDevices.ResetFocus;
+end;
+
+procedure TFrameMainTable.GridDevicesEditingDone(Sender: TObject; const ACol,
+  ARow: Integer);
+begin
+          //GridDevices.ResetFocus;
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,

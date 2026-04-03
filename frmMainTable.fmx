@@ -1185,7 +1185,7 @@ object FrameMainTable: TFrameMainTable
       TabPosition = PlatformDefault
       Sizes = (
         1434s
-        456s)
+        435s)
       object TabItemWorkTable1: TTabItem
         CustomIcon = <
           item
@@ -1193,8 +1193,8 @@ object FrameMainTable: TFrameMainTable
         TextSettings.Trimming = None
         IsSelected = True
         Padding.Left = 10.000000000000000000
-        Size.Width = 1.000000000000000000
-        Size.Height = 5.000000000000000000
+        Size.Width = 143.000000000000000000
+        Size.Height = 26.000000000000000000
         Size.PlatformDefault = False
         StyleLookup = ''
         TabOrder = 0
@@ -1227,8 +1227,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1434.000000000000000000
-              Viewport.Height = 120.000000000000000000
+              Viewport.Width = 1430.000000000000000000
+              Viewport.Height = 95.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -1338,7 +1338,7 @@ object FrameMainTable: TFrameMainTable
         object Panel3: TPanel
           Align = Client
           Size.Width = 1434.000000000000000000
-          Size.Height = 288.000000000000000000
+          Size.Height = 267.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
           object GridDevices: TGrid
@@ -1347,7 +1347,7 @@ object FrameMainTable: TFrameMainTable
             ClipChildren = True
             PopupMenu = PopupMenuDevicesGrid
             Size.Width = 1434.000000000000000000
-            Size.Height = 256.000000000000000000
+            Size.Height = 235.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
@@ -1355,10 +1355,12 @@ object FrameMainTable: TFrameMainTable
             OnSelectCell = GridDevicesSelectCell
             OnGetValue = GridDevicesGetValue
             OnSetValue = GridDevicesSetValue
+            OnCreateCustomEditor = GridDevicesCreateCustomEditor
+            OnEditingDone = GridDevicesEditingDone
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1434.000000000000000000
-            Viewport.Height = 256.000000000000000000
+            Viewport.Width = 1414.000000000000000000
+            Viewport.Height = 194.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character

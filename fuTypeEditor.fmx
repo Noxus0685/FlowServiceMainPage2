@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 9
+    TabOrder = 11
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -1269,7 +1269,7 @@ object FormTypeEditor: TFormTypeEditor
               Size.Width = 172.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
-              Text = #1050#1086#1101#1092#1092#1080#1094#1080#1077#1085#1090' '#13#10'Kp/Qmax'
+              Text = #1050#1086#1101#1092#1092#1080#1094#1080#1077#1085#1090' '#13#10'Kp'#8901'Qmax'
               TabOrder = 1
             end
             object EditCoef: TEdit

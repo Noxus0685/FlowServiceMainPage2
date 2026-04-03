@@ -358,6 +358,8 @@ type
   procedure LoadDiameters;
   procedure RecalcDiametersKpByCoef;
   procedure RecalcDiametersKpByFreq;
+    procedure UpdateUIFreq;
+    procedure UpdateUICoef;
 
   public
 
@@ -607,6 +609,8 @@ begin
       ComboBoxOutputType.ItemIndex := 0;
     ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
 
+      ApplyOutputType;
+
 // =====================================================
 // == Тип выхода (OutputSet) — ДВА ComboBox
 // =====================================================
@@ -625,44 +629,15 @@ end;
 cbOutPutType.Hint  := cbOutPutType.Text;
 cbOutPutType2.Hint := cbOutPutType2.Text;
 
-
     // =====================================================
-    // == Представление коэффициента
+    // == Коэффициент
     // =====================================================
-    if (FType.DimensionCoef >= 0) and
-       (FType.DimensionCoef < cbCoefViewType.Items.Count) then
-      cbCoefViewType.ItemIndex := FType.DimensionCoef
-    else
-      cbCoefViewType.ItemIndex := -1;
-    cbCoefViewType.Hint := cbCoefViewType.Text;
-
-    // =====================================================
-    // == Коэффициент преобразования
-    // =====================================================
-    EditCoef.Text := '';
-    EditCoef.TextPrompt := '';
-    if FType.Coef > 0 then
-      EditCoef.Text := FloatToStr(FType.Coef)
-    else
-      EditCoef.TextPrompt := '-';
+     UpdateUICoef;
 
     // =====================================================
     // == Частота
     // =====================================================
-    if FType.Freq > 0 then
-      EditFreq.Text := IntToStr(FType.Freq)
-    else
-      EditFreq.Text := '';
-
-    // =====================================================
-    // == Отношение расхода к частоте
-    // =====================================================
-    EditFreqFlowRate.Text := '';
-    EditFreqFlowRate.TextPrompt := '';
-    if FType.FreqFlowRate > 0 then
-      EditFreqFlowRate.Text := FloatToStr(FType.FreqFlowRate)
-    else
-      EditFreqFlowRate.TextPrompt := '-';
+     UpdateUIFreq;
 
     // =====================================================
     // == Интерфейс / библиотека
@@ -983,7 +958,6 @@ begin
       {----------------------------------}
       FOriginalType := nil;
       FType := DataManager.ActiveTypeRepo.CreateType(0);
-      FType.State := osNew;
     end;
 
     InitLocalData;
@@ -2030,11 +2004,13 @@ begin
   end;
 
   // 4. Если базовый коэффициент не изменился — выходим
-  if SameValue(FType.Coef, NewBaseCoef, 1e-12) then
-    Exit;
+ // if SameValue(FType.Coef, NewBaseCoef, 1e-12) then
+ //   Exit;
 
   // 5. Сохраняем базовый коэффициент
   FType.Coef := NewBaseCoef;
+
+  FType.Freq := Round(FType.Coef/3.6);
 
   // 6. Пересчёт Kp для всех диаметров
   RecalcDiametersKpByCoef;
@@ -2107,7 +2083,7 @@ begin
     Exit;
 
   for I := 0 to FDiametersLocal.Count - 1 do
-    FDiametersLocal[I].Kp := FType.Coef * FDiametersLocal[I].Qmax;
+    FDiametersLocal[I].Kp := FType.Coef / FDiametersLocal[I].Qmax;
 end;
 
 procedure TFormTypeEditor.RecalcDiametersKpByFreq;
@@ -2187,14 +2163,14 @@ begin
   // ----------------------------------------
   // Нет изменений
   // ----------------------------------------
-  if FType.Freq = NewFreq then
-    Exit;
+//  if FType.Freq = NewFreq then
+//    Exit;
 
   // ----------------------------------------
   // Сохраняем в тип
   // ----------------------------------------
   FType.Freq := NewFreq;
-
+  FType.Coef := 3.6 *  FType.Freq;
   // ----------------------------------------
   // Пересчёт Kp по частоте
   // Kp = 3.6 * Freq / QFmax
@@ -2804,7 +2780,8 @@ begin
   if D = nil then
     Exit;
 
-  D.State:=osModified;
+    if D.State <> osNew then
+       D.State:=osModified;
 
   S := Trim(Value.AsString);
 
@@ -3051,6 +3028,7 @@ begin
     end;
   end;
 
+  if P.State <> osNew then
   P.State:=osModified;
   SetModified;
   UpdatePointsGrid;
@@ -3944,8 +3922,16 @@ procedure TFormTypeEditor.ApplyOutputType;
 begin
   // --- выбор вкладки по имени ---
   case FType.OutputType of
-    0: tcOutPutType.ActiveTab := tiFrequency;  // Частота
-    1: tcOutPutType.ActiveTab := tiImpulse;    // Импульсы
+    0:
+    begin
+    tcOutPutType.ActiveTab := tiFrequency;  // Частота
+    UpdateUIFreq;
+    end;
+    1:
+    begin
+    tcOutPutType.ActiveTab := tiImpulse;    // Импульсы
+    UpdateUICoef;
+    end;
     2: tcOutPutType.ActiveTab := tiVoltage;    // Напряжение
     3: tcOutPutType.ActiveTab := tiCurrent;    // Ток
     4: tcOutPutType.ActiveTab := tiInterface;  // Интерфейс
@@ -4042,6 +4028,47 @@ begin
     InitCategoryComboEdit;
 
 
+end;
+
+procedure TFormTypeEditor.UpdateUICoef;
+begin
+  // =====================================================
+  // == Представление коэффициента
+  // =====================================================
+  if (FType.DimensionCoef >= 0) and (FType.DimensionCoef < cbCoefViewType.Items.Count) then
+    cbCoefViewType.ItemIndex := FType.DimensionCoef
+  else
+    cbCoefViewType.ItemIndex := -1;
+  cbCoefViewType.Hint := cbCoefViewType.Text;
+  // =====================================================
+  // == Коэффициент преобразования
+  // =====================================================
+  EditCoef.Text := '';
+  EditCoef.TextPrompt := '';
+  if FType.Coef > 0 then
+    EditCoef.Text := FloatToStr(FType.Coef)
+  else
+    EditCoef.TextPrompt := '-';
+end;
+
+procedure TFormTypeEditor.UpdateUIFreq;
+begin
+  // =====================================================
+  // == Частота
+  // =====================================================
+  if FType.Freq > 0 then
+    EditFreq.Text := IntToStr(FType.Freq)
+  else
+    EditFreq.Text := '';
+  // =====================================================
+  // == Отношение расхода к частоте
+  // =====================================================
+  EditFreqFlowRate.Text := '';
+  EditFreqFlowRate.TextPrompt := '';
+  if FType.FreqFlowRate > 0 then
+    EditFreqFlowRate.Text := FloatToStr(FType.FreqFlowRate)
+  else
+    EditFreqFlowRate.TextPrompt := '-';
 end;
 
 
