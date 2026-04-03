@@ -126,15 +126,19 @@ TParameters = class(TObject)
   private
 
 
+
   public
     constructor Create(const AName: string = 'FlowRate');
+    function IsStable: Boolean;
     procedure SetParam(ANewValue: Double);
   end;
 //---------------------------------
   TFluidTemp = class(TParameters)
   private
 
+
   public
+    function IsStable: Boolean;
     constructor Create(const AName: string = 'FluidTemp');
     procedure SetParam(ASet: Double);
   end;
@@ -142,8 +146,10 @@ TParameters = class(TObject)
   TFluidPress = class(TParameters)
   private
 
+
   public
     constructor Create(const AName: string = 'FluidPress');
+    function IsStable: Boolean;
     procedure SetParam(ASet: Double);
 
   end;
@@ -2994,6 +3000,15 @@ begin
   FAccuracyMinus := 5;
 end;
 
+function TFluidTemp.IsStable : Boolean ;
+
+begin
+  Result:= (SetValue<=Value*(1+AccuracyPlus/100))
+      AND (SetValue>=Value*(1-AccuracyMinus/100)) ;
+
+end;
+
+
 
 
 procedure TFluidTemp.SetParam(ASet: Double);
@@ -3026,6 +3041,15 @@ begin
 end;
 
 
+function TFluidPress.IsStable: Boolean ;
+begin
+  Result:= (SetValue<=Value*(1+AccuracyPlus/100))
+      AND (SetValue>=Value*(1-AccuracyMinus/100)) ;
+
+end;
+
+
+
 procedure TFluidPress.SetParam(ASet: Double);
 begin
 
@@ -3055,6 +3079,12 @@ begin
   AccuracyMinus:=5;
 end;
 
+function TFlowRate.IsStable : Boolean ;
+begin
+  Result:= (SetValue<=Value*(1+AccuracyPlus/100))
+      AND (SetValue>=Value*(1-AccuracyMinus/100)) ;
+
+end;
 
 
 procedure TFlowRate.SetParam(ANewValue: Double);

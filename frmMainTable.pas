@@ -1265,7 +1265,7 @@ procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
     begin
-      FActiveWorkTable.DoFreqSet(ComboBoxPumps.Text,strtofloat(SpinBoxFreq.Text));
+      FActiveWorkTable.DoFreqSet(ComboBoxPumps.Text,NormalizeFloatInput(SpinBoxFreq.Text));
     end;
 end;
 
@@ -3156,7 +3156,7 @@ begin
   if TryStrToFloat(EditTemp.Text, Value) then
   begin
 
-    FActiveWorkTable.DoFluidTempStart(strtofloat(EditTemp.Text));
+    FActiveWorkTable.DoFluidTempStart(NormalizeFloatInput(EditTemp.Text));
 
     FActiveWorkTable.FluidTemp.Status:=CONTROL_STARTED;
     UpdateUIConditions;
@@ -4393,8 +4393,7 @@ begin
     if WorkTable.FlowRate.Value = 0 then
        RectangleLabelFR.Fill.Color := TAlphaColorRec.White
 
-    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.AccuracyPlus/100) * WorkTable.FlowRate.SetValue ))
-    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.Accuracyminus/100) * WorkTable.FlowRate.SetValue )) then
+   ELSE if WorkTable.FlowRate.IsStable THEN
       RectangleLabelFR.Fill.Color := $ffC9FFC7
         else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.SetValue) then
       RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
@@ -4419,8 +4418,7 @@ begin
 
    if (WorkTable.FluidTemp.SetValue=0) or (WorkTable.FluidTemp.Value=0) then
     Rectangle7.Fill.Color := TAlphaColorRec.White
-   ELSE if (WorkTable.FluidTemp.SetValue<=WorkTable.FluidTemp.Value*(1+WorkTable.FluidTemp.AccuracyPlus/100))
-      AND (WorkTable.FluidTemp.SetValue>=WorkTable.FluidTemp.Value*(1-WorkTable.FluidTemp.AccuracyPlus/100)) THEN
+   ELSE if WorkTable.FluidTemp.IsStable THEN
     Rectangle7.Fill.Color := $ffC9FFC7
    else
     Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
@@ -4436,12 +4434,10 @@ begin
 
 
 
-
-    if (ABS(strtofloat(EditTemp.Text)-WorkTable.FluidTemp.SetValue) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
+    if SameValue(NormalizeFloatInput(EditTemp.Text),WorkTable.FluidTemp.SetValue,MinDouble) or (NormalizeFloatInput(EditTemp.Text) = 0)  then
       EditTemp.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.SetValue) ;
-
-    if (ABS(strtofloat(EditPres.Text)-WorkTable.FluidPress.SetValue) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
+    if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidTemp.SetValue,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
       EditPres.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.SetValue) ;
 

@@ -237,23 +237,19 @@ begin
     PressDelta :=  (Random * 0.06) - 0.03;
     if (AWorkTable.FluidTemp.IsRunning) then
     begin
-      if NOT(AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
-      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
+      if NOT(AWorkTable.FluidTemp.IsStable)
       AND  (AWorkTable.FluidTemp.Value<AWorkTable.FluidTemp.SetValue)  THEN
       begin
         AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue+1);
         AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue+1);
       end
-    ELSE if not(AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
-      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
-      AND  (AWorkTable.FluidTemp.Value>AWorkTable.FluidTemp.SetValue)  THEN
+    ELSE if not(AWorkTable.FluidTemp.IsStable)  THEN
       begin
         AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue-1);
         AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue-1);
       end;
 
-      if (AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
-      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100)) then
+      if AWorkTable.FluidTemp.IsStable then
         AWorkTable.DoFluidTempStop
 
     end;
@@ -306,8 +302,7 @@ begin
         AWorkTable.FluidPress.SetBefore(AWorkTable.FluidPress.BeforeValue-0.3);
         AWorkTable.FluidPress.SetAfter(AWorkTable.FluidPress.AfterValue-0.3);
       end;
-      if (AWorkTable.FluidPress.SetValue<=AWorkTable.FluidPress.Value*(1+AWorkTable.FluidPress.AccuracyPlus/100))
-      AND (AWorkTable.FluidPress.SetValue>=AWorkTable.FluidPress.Value*(1-AWorkTable.FluidPress.AccuracyMinus/100)) then
+      if AWorkTable.FluidTemp.IsStable then
         AWorkTable.DoFluidPressStop;
 
     end;
@@ -512,5 +507,11 @@ begin
       FFrameMainTable.OnChangeState(STATE_FINALREAD);
   end;
 end;
+
+
+
+
+
+
 
 end.
