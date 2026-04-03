@@ -144,14 +144,14 @@ end;
 procedure  TFormMain.FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsTemp.SetValue));
+  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsTemp.SetValue) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.ConditionsTemp.GetActionAsString);
 
 end;
 
 procedure  TFormMain.FlowConditionsPressHandler(AConditionsPress: tConditionsPress; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsPress.SetValue));
+  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsPress.SetValue) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.ConditionsPress.GetActionAsString);
 
 end;
 
