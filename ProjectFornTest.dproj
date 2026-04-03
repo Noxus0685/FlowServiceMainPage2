@@ -341,6 +341,7 @@
         </DCCReference>
         <DCCReference Include="frmMainTable.pas">
             <Form>FrameMainTable</Form>
+            <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="UnitWorkTable.pas"/>

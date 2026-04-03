@@ -53,9 +53,13 @@ type
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
+<<<<<<< Main2
+    procedure  PumpStateHandler(APump: TPump; AAction:EControlAction);
+=======
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
     procedure  PumpStateHandler(APump: TPump; AAction:EPumpAction);
+>>>>>>> main
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
 
@@ -67,6 +71,7 @@ type
     FFrameMainTable: TFrameMainTable;
     FNextClimateChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
+    FNextPressChangeAt: TDateTime;
 
 
     procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
@@ -74,10 +79,19 @@ type
     procedure UpdateRandomFreq(const APump: TPump);
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
     procedure FlowRateStateHandler(AFlowRate: TFlowRate;
+<<<<<<< Main2
+      AAction: EControlAction);
+    procedure FlowFluidTempHandler(AFluidTemp: tFluidTemp;
+      AAction: EControlAction);
+    procedure FlowFluidPressHandler(AFluidPress: tFluidPress;
+      AAction: EControlAction);
+    procedure UpdateRandomPress(const AWorkTable: TWorkTable);
+=======
       AAction: EFlowRateAction);
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
     procedure UpdateEtalonImpSecFromFlowRate;
     procedure UpdateDeviceImpSecFromFlowRate;
+>>>>>>> main
 
   public
 
@@ -133,6 +147,9 @@ begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
+<<<<<<< Main2
+procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EControlAction);
+=======
 procedure TFormMain.EditDeviceFlowRateExit(Sender: TObject);
 begin
   UpdateDeviceImpSecFromFlowRate;
@@ -144,6 +161,7 @@ begin
 end;
 
 procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EPumpAction);
+>>>>>>> main
 begin
 
   FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
@@ -151,12 +169,27 @@ begin
 end;
 
 
-procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EFlowRateAction);
+procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.FlowSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
+  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.SetValue)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
 
 end;
+
+procedure  TFormMain.FlowFluidTempHandler(AFluidTemp: tFluidTemp; AAction:EControlAction);
+begin
+
+  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.SetValue) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
+
+end;
+
+procedure  TFormMain.FlowFluidPressHandler(AFluidPress: tFluidPress; AAction:EControlAction);
+begin
+
+  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.SetValue) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
+
+end;
+
 
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -190,6 +223,8 @@ begin
   //Подумать над динамической привязкой ко всем столам
   FWorkTableManager.ActiveWorkTable.OnPumpChange:= PumpStateHandler;
   FWorkTableManager.ActiveWorkTable.OnFlowRateChange:= FlowRateStateHandler;
+  FWorkTableManager.ActiveWorkTable.OnConditionTempChange:= FlowFluidTempHandler;
+  FWorkTableManager.ActiveWorkTable.OnConditionPressChange:= FlowFluidPressHandler;
 
   FWorkTableManager.ActiveWorkTable.AddPump('1');
   FWorkTableManager.ActiveWorkTable.AddPump('2');
@@ -223,18 +258,116 @@ begin
   if AWorkTable = nil then
     Exit;
 
+  IF (AWorkTable.FluidTemp.Action = CONTROL_ACTION_START)THEN
+    AWorkTable.FluidTemp.SetState(CONTROL_STARTED)
+  else  if (AWorkTable.FluidTemp.Action = CONTROL_ACTION_STOP) then
+    AWorkTable.FluidTemp.SetState(CONTROL_STOPPED);
+
+
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
   begin
+
     TempDelta :=  (Random * 0.30) - 0.15;
     PressDelta :=  (Random * 0.06) - 0.03;
+    if (AWorkTable.FluidTemp.IsRunning) then
+    begin
+      if NOT(AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
+      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
+      AND  (AWorkTable.FluidTemp.Value<AWorkTable.FluidTemp.SetValue)  THEN
+      begin
+        AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue+1);
+        AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue+1);
+      end
+    ELSE if not(AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
+      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
+      AND  (AWorkTable.FluidTemp.Value>AWorkTable.FluidTemp.SetValue)  THEN
+      begin
+        AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue-1);
+        AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue-1);
+      end;
 
-    AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-    AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
+      if (AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
+      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100)) then
+        AWorkTable.DoFluidTempStop
+
+    end;
+
+
+      if AWorkTable.FluidTemp.SetValue<>0 then
+      begin
+        AWorkTable.FluidTemp.SetBefore(EnsureRange(AWorkTable.FluidTemp.BeforeValue + TempDelta, -50.0, 150.0));
+        AWorkTable.FluidTemp.SetAfter(EnsureRange(AWorkTable.FluidTemp.AfterValue + TempDelta, -50.0, 150.0));
+      end;
+
+
+
+
+
+    //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
+    //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
 
     FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
    end;
 end;
+
+procedure TFormMain.UpdateRandomPress(const AWorkTable: TWorkTable);
+var
+  TempDelta, PressDelta: Double;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  IF AWorkTable.FluidPress.Action = CONTROL_ACTION_START THEN
+    AWorkTable.FluidPress.SetState(CONTROL_STARTED)
+  else  if (AWorkTable.FluidPress.Action = CONTROL_ACTION_STOP) then
+    AWorkTable.FluidPress.SetState(CONTROL_STOPPED);
+
+   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
+  if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
+  begin
+
+    TempDelta :=  (Random * 0.30) - 0.15;
+    PressDelta :=  (Random * 0.06) - 0.03;
+    if (AWorkTable.FluidPress.IsRunning) then
+    begin
+      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.SetValue) then
+      begin
+        AWorkTable.FluidPress.SetBefore(AWorkTable.FluidPress.BeforeValue+1);
+        AWorkTable.FluidPress.SetAfter(AWorkTable.FluidPress.AfterValue+1);
+      end
+      else if  (AWorkTable.FluidPress.Value>AWorkTable.FluidPress.SetValue)  then
+      begin
+        AWorkTable.FluidPress.SetBefore(AWorkTable.FluidPress.BeforeValue-0.3);
+        AWorkTable.FluidPress.SetAfter(AWorkTable.FluidPress.AfterValue-0.3);
+      end;
+      if (AWorkTable.FluidPress.SetValue<=AWorkTable.FluidPress.Value*(1+AWorkTable.FluidPress.AccuracyPlus/100))
+      AND (AWorkTable.FluidPress.SetValue>=AWorkTable.FluidPress.Value*(1-AWorkTable.FluidPress.AccuracyMinus/100)) then
+        AWorkTable.DoFluidPressStop;
+
+    end;
+      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.SetValue)  then
+      begin
+        AWorkTable.FluidPress.SetBefore(EnsureRange(AWorkTable.FluidPress.BeforeValue + 0.1, -50.0, 150.0));
+        AWorkTable.FluidPress.SetAfter(EnsureRange(AWorkTable.FluidPress.AfterValue + 0.1, -50.0, 150.0));
+      end;
+      if AWorkTable.FluidPress.SetValue<>0 then
+      begin
+        AWorkTable.FluidPress.SetBefore(EnsureRange(AWorkTable.FluidPress.BeforeValue + PressDelta, -50.0, 150.0));
+        AWorkTable.FluidPress.SetAfter(EnsureRange(AWorkTable.FluidPress.AfterValue + PressDelta, -50.0, 150.0));
+      end;
+
+
+
+
+      //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
+      //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
+
+      FNextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
+   end;
+end;
+
+
 
 
 procedure TFormMain.UpdateRandomFreq(const APump: TPump);
@@ -244,6 +377,11 @@ begin
   if APump = nil then
     Exit;
 
+  IF (APump.Action = CONTROL_ACTION_START)  THEN
+    APump.SetState(CONTROL_STARTED)
+  else  if (APump.Action = CONTROL_ACTION_STOP) then
+    APump.SetState(CONTROL_STOPPED);
+
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
@@ -251,11 +389,11 @@ begin
 
    if APump.IsRunning = true then
     begin
-      APump.Freq := EnsureRange(APump.Freq + Freq,APump.Freq , APump.FreqSet);
+      APump.Value := EnsureRange(APump.Value + Freq,APump.Value , APump.SetValue);
     end
     else
     begin
-      APump.Freq := EnsureRange(APump.Freq - Freq,0 , APump.Freq);
+      APump.Value := EnsureRange(APump.Value - Freq,0 , APump.Value);
     end;
 
 
@@ -324,6 +462,12 @@ begin
   if AFlowRate = nil then
     Exit;
 
+
+  IF AFlowRate.Action = CONTROL_ACTION_START THEN
+    AFlowRate.SetState(CONTROL_STARTED)
+  else  if (AFlowRate.Action = CONTROL_ACTION_STOP) then
+    AFlowRate.SetState(CONTROL_STOPPED);
+
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
@@ -331,11 +475,11 @@ begin
 
    if AFlowRate.IsRunning = true then
     begin
-      AFlowRate.flow := EnsureRange(AFlowRate.flow + Flow,AFlowRate.flow, AFlowRate.FlowSet);
+      AFlowRate.Value := EnsureRange(AFlowRate.Value + Flow,AFlowRate.Value, AFlowRate.SetValue);
     end
     else
     begin
-      AFlowRate.flow  := EnsureRange(AFlowRate.flow  - Flow,0 , AFlowRate.flow );
+      AFlowRate.Value  := EnsureRange(AFlowRate.Value  - Flow,0 , AFlowRate.Value );
     end;
 
 
@@ -411,7 +555,8 @@ begin
 
     UpdateRandomClimate(WorkTable);
     UpdateRandomFreq(Pump);
-    //UpdateRandomFlowRate(FlowRate);
+    UpdateRandomFlowRate(FlowRate);
+    UpdateRandomPress(WorkTable);
 
 
 

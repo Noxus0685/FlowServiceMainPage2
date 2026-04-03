@@ -410,6 +410,8 @@ type
     procedure Rectangle15Click(Sender: TObject);
     procedure SpeedButtonSetFlowRateClick(Sender: TObject);
     procedure SpinBoxFlowRateChange(Sender: TObject);
+    procedure EditTempExit(Sender: TObject);
+    procedure EditPresExit(Sender: TObject);
 
     procedure GridEtalonsCellDblClick(const Column: TColumn;
       const Row: Integer);
@@ -468,6 +470,7 @@ type
     procedure ResetMeasurementValues;
     procedure RefreshPumpsCombo;
     procedure SyncPumpControls;
+    procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
     function IsDuplicateDeviceSerial(const AWorkTable: TWorkTable;
@@ -541,6 +544,7 @@ type
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
+    procedure UpdateUIConditions;
 
 
 
@@ -1303,7 +1307,7 @@ begin
     LayoutPump.tag:=0;
 
     FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
-    FActiveWorkTable.ActivePump.State:=PUMP_STARTED;
+    //FActiveWorkTable.ActivePump.State:=CONTROL_STARTED;
     UpdateUIPump;
 
   end;
@@ -1409,7 +1413,7 @@ begin
     begin
       LayoutPump.tag:=0;
       FActiveWorkTable.DoPumpStop(ComboBoxPumps.Text) ;
-      FActiveWorkTable.ActivePump.State:=PUMP_STOPED;
+      //FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
     end;
 end;
 
@@ -2931,10 +2935,14 @@ begin
 
 
   // Основные MeterValues рабочего стола.
-  WorkTable.ValueTempertureBefore.SetValue(WorkTable.Temp);
-  WorkTable.ValueTempertureAfter.SetValue(WorkTable.Temp);
-  WorkTable.ValuePressureBefore.SetValue(WorkTable.Press);
-  WorkTable.ValuePressureAfter.SetValue(WorkTable.Press);
+   WorkTable.SetTemperature(WorkTable.FluidTemp.BeforeValue, WorkTable.FluidTemp.AfterValue);
+  WorkTable.ValueTempertureBefore.SetValue(WorkTable.FluidTemp.BeforeValue);
+  WorkTable.ValueTempertureAfter.SetValue(WorkTable.FluidTemp.AfterValue);
+
+  WorkTable.ValuePressureBefore.SetValue(WorkTable.FluidPress.BeforeValue);
+  WorkTable.ValuePressureAfter.SetValue(WorkTable.FluidPress.AfterValue);
+
+
 
   WorkTable.ValueTime.SetValue(WorkTable.Time);
 
@@ -2965,8 +2973,17 @@ begin
 
   WorkTable.RecalculateAllMeterValues;
 
-  WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue;
 
+   WorkTable.FluidTemp.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
+   WorkTable.FluidPress.Value:=  WorkTable.ValuePressure.GetDoubleValue;
+
+   // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
+
+
+  if WorkTable.FlowRate.IsRunning then
+    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue
+  else
+    WorkTable.FlowRate.Value:=0;
     {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
@@ -2990,6 +3007,7 @@ begin
     UpdateUIFromValues;
     UpdateUIPump;
     UpdateUIFlowRate;
+    UpdateUIConditions;
   finally
     IsUpdating := False;
   end;
@@ -3059,6 +3077,7 @@ begin
   if WorkTable = nil then
     Exit;
 
+  UpdateConditionsCurrentValues(WorkTable);
 
   if WorkTable.ValueTime <> nil then
     LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
@@ -3066,14 +3085,16 @@ begin
     LabelTime.Text := '-';
 
   if WorkTable.ValueTemperture <> nil then
-    LabelTemp.Text :=    WorkTable.ValueTemperture.GetStrValue
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.ValueTemperture.GetDoubleValue)
   else
-    LabelTemp.Text := '-';
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.FluidTemp.Value);
 
-  if WorkTable.ValuePressure <> nil then
-    EditPres.Text := WorkTable.ValuePressure.GetStrValue
+ { if WorkTable.ValuePressure <> nil then
+    LabelPressure.Text := FormatFloat('0.###', WorkTable.ValuePressure.GetDoubleValue)
   else
-    EditPres.Text := '-';
+    LabelPressure.Text := FormatFloat('0.###', WorkTable.Press); }
+  //EditTemp.Text := FormatFloat('0.###', WorkTable.Temp);
+  //EditPres.Text := FormatFloat('0.###', WorkTable.Press);
 
   {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
@@ -3081,11 +3102,6 @@ begin
     LabelFlowRate.Text := '-'; }
 
 
-
-  if WorkTable.ValuePressure <> nil then
-    LabelPressure.Text := WorkTable.ValuePressure.GetStrValue
-  else
-    LabelPressure.Text := '-';
 
   if WorkTable.ValueDensity <> nil then
     LabelDensity.Text := WorkTable.ValueDensity.GetStrValue
@@ -3186,6 +3202,51 @@ begin
     RefreshMonitorIndicator;
 
 
+end;
+
+procedure TFrameMainTable.UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
+begin
+  // Актуальные значения условий уже приходят через meter values
+  // и выводятся непосредственно в UpdateUI.
+end;
+
+procedure TFrameMainTable.EditTempExit(Sender: TObject);
+var
+  Value: Double;
+  TempBeforeValue: Double;
+  TempAfterValue: Double;
+begin
+   Layout9.tag := 0;
+  if FActiveWorkTable = nil then
+    Exit;
+
+  if TryStrToFloat(EditTemp.Text, Value) then
+  begin
+
+    FActiveWorkTable.DoFluidTempStart(strtofloat(EditTemp.Text));
+
+    FActiveWorkTable.FluidTemp.Status:=CONTROL_STARTED;
+    UpdateUIConditions;
+
+  end;
+
+end;
+
+procedure TFrameMainTable.EditPresExit(Sender: TObject);
+var
+  Value: Double;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  if TryStrToFloat(EditPres.Text, Value) then
+  begin
+    FActiveWorkTable.DoFluidPressStart(Value);
+    UpdateUIConditions;
+    //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
+  end
+  //else
+    //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
 end;
 
 procedure TFrameMainTable.ApplyFlowMeterSelection(const ARow: Integer);
@@ -4488,16 +4549,16 @@ begin
       exit;
 
     if WorkTable.ActivePump <> nil then
-      LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Freq)
+      LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Value)
     else
       LabelFreq.Text := '-';
 
-    if WorkTable.ActivePump.Freq = 0 then
+    if WorkTable.ActivePump.Value = 0 then
        Rectangle1.Fill.Color := TAlphaColorRec.White
-    else if (WorkTable.ActivePump.Freq < WorkTable.ActivePump.FreqSet) then
-      Rectangle1.Fill.Color := TAlphaColorRec.Yellow
-    else if WorkTable.ActivePump.Freq = WorkTable.ActivePump.FreqSet then
-      Rectangle1.Fill.Color := TAlphaColorRec.Greenyellow ;
+    else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.SetValue) then
+      Rectangle1.Fill.Color := TAlphaColorRec.Lightyellow
+    else if WorkTable.ActivePump.Value = WorkTable.ActivePump.SetValue then
+      Rectangle1.Fill.Color := $ffC9FFC7 ;
 
 
 
@@ -4509,7 +4570,7 @@ begin
    // if ((SpinBoxFreq.Text='12,00') and (WorkTable.ActivePump.FreqSet <> 0)) or
     // ((SpinBoxFreq.Text <>  '12,00') and (WorkTable.ActivePump.FreqSet = 0))  then
 
-    SpinBoxFreq.Value:= (WorkTable.ActivePump.FreqSet);
+    SpinBoxFreq.Value:= (WorkTable.ActivePump.SetValue);
 
 
 
@@ -4544,23 +4605,84 @@ begin
 
     if WorkTable.FlowRate.IsRunning then
       LabelFlowRate.Text :=
-      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Flow)
+      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value)
     else
       LabelFlowRate.Text := '0';
 
 
-    if WorkTable.FlowRate.Flow = 0 then
+    if WorkTable.FlowRate.Value = 0 then
        RectangleLabelFR.Fill.Color := TAlphaColorRec.White
 
-    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.FlowAccuracyPlus/100) * WorkTable.FlowRate.FlowSet ))
-    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.FlowAccuracyminus/100) * WorkTable.FlowRate.FlowSet )) then
-      RectangleLabelFR.Fill.Color := TAlphaColorRec.Greenyellow
-        else if (WorkTable.FlowRate.Flow <> WorkTable.FlowRate.FlowSet) then
-      RectangleLabelFR.Fill.Color := TAlphaColorRec.Yellow
+    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.AccuracyPlus/100) * WorkTable.FlowRate.SetValue ))
+    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.Accuracyminus/100) * WorkTable.FlowRate.SetValue )) then
+      RectangleLabelFR.Fill.Color := $ffC9FFC7
+        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.SetValue) then
+      RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
 
 
 end;
 
+procedure TFrameMainTable.UpdateUIConditions;
+var
+  WorkTable: TWorkTable;
+  i:integer;
+begin
+    WorkTable := FActiveWorkTable;
+
+    if WorkTable = nil then
+      Exit;
+
+      if Layout9.tag = 3 then
+      exit;
+
+    Layout9.tag:=2;
+
+   if (WorkTable.FluidTemp.SetValue=0) or (WorkTable.FluidTemp.Value=0) then
+    Rectangle7.Fill.Color := TAlphaColorRec.White
+   ELSE if (WorkTable.FluidTemp.SetValue<=WorkTable.FluidTemp.Value*(1+WorkTable.FluidTemp.AccuracyPlus/100))
+      AND (WorkTable.FluidTemp.SetValue>=WorkTable.FluidTemp.Value*(1-WorkTable.FluidTemp.AccuracyPlus/100)) THEN
+    Rectangle7.Fill.Color := $ffC9FFC7
+   else
+    Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+
+
+
+   if (WorkTable.FluidPress.SetValue=0) or (WorkTable.FluidPress.Value=0 )then
+    Rectangle11.Fill.Color := TAlphaColorRec.White
+   else IF WorkTable.FluidPress.IsRunning then
+    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
+   else
+    Rectangle11.Fill.Color := $ffC9FFC7;
+
+
+
+
+    if (ABS(strtofloat(EditTemp.Text)-WorkTable.FluidTemp.SetValue) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
+      EditTemp.Text :=
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.SetValue) ;
+
+    if (ABS(strtofloat(EditPres.Text)-WorkTable.FluidPress.SetValue) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
+      EditPres.Text :=
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.SetValue) ;
+
+    LabelTemp.text:=
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value);
+
+    LabelPressure.text:=
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.Value);
+   // FormatFloat('0.##', (WorkTable.FluidTemp.Temp));
+
+
+
+
+
+
+
+    Layout9.tag:=0;
+
+
+
+end;
 
 
 end.

@@ -42,120 +42,110 @@ type
   end;
 
 
-  EPumpState = (
-    PUMP_STOPED,        // насос остановлен
-    PUMP_STARTED     // насос работает на минимальной частоте
-
+  EControlState = (
+    CONTROL_STOPPED,
+    CONTROL_STARTED
   );
 
-  EPumpAction = (
-    PUMP_START,   // насос стартует
-    PUMP_SET,    // насос меняет частоту
-    PUMP_STOP     // насос останавливается
-
-    );
-
-  EFlowRateState = (
-    FLOWRATE_STARTED,
-    FLOWRATE_STOPED
-  );
-
-  EFlowRateAction = (
-    FLOWRATE_START,
-    FLOWRATE_STOP,
-    FLOWRATE_SET
+  EControlAction = (
+    CONTROL_ACTION_START,
+    CONTROL_ACTION_STOP,
+    CONTROL_ACTION_SET
   );
 
 
 type
 
-  TPump = class(TTypeEntity)
+
+TParameters = class(TObject)
   private
-
-    FFreq: Double;  // текущая
-    FFreqMax: Double;
-    FFreqMin: Double;
-    FStatus: EPumpState;
-    FAction: EPumpAction;
     FName: string;
-    FHeader: string; // краткое название насоса по мнемосхеме
     FHint: string;
-    FPumpType: string;
-    FFreqSet: double;   //установленная пользователем
-
-
+    FStatus: EControlState;
+    FAction: EControlAction;
+    FMax: Double;
+    FMin: Double;
+    FAccuracyPlus: Double;
+    FAccuracyMinus: Double;
+    FValue: Double;  // текущая
+    FSet: Double;
+    FBefore: Double;
+    FAfter: Double;
+    FDelta: Double;
+  public
+    constructor Create(const AName, AHint: string); virtual;
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
-
-  public
-    constructor Create(const APumpName: string);
-    destructor Destroy; override;
-
-    procedure Start;
-    procedure Stop;
-    procedure SetFrequency(ANewFreq: Double);
-    procedure SetFreqMin(const Value: Double);
-    procedure SetFreqMax(const Value: Double);
     function GetStateAsString: string;
     function GetActionAsString: string;
-
+    procedure SetBefore(ABefore: Double);
+    procedure SetAfter(AAfter: Double);
+    procedure Stop;
+    procedure Start;
+    procedure SetMin(const Value: Double);
+    procedure SetMax(const Value: Double);
+    procedure SetState(AStatus: EControlState);
     property Name: string read FName write FName;
-    //property UUID: string read FUUID write FUUID;
-    property Freq: Double read FFreq write FFreq;
-    property FreqSet: Double read FFreqSet write FFreqSet;
-    property State: EPumpState read FStatus write FStatus;
+    property Hint: string read FHint write FHint;
+    property Status: EControlState read FStatus write FStatus;
+    property Action: EControlAction read FAction write FAction;
+    property SetValue: Double read FSet write FSet;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
-    property FreqMax: Double read FFreqMax write SetFreqMax;
-    property FreqMin: Double read FFreqMin write SetFreqMin;
-    property Action : EPumpAction read FAction write FAction;
-
-    property Header: string read FHeader write FHeader;
-    property Hint: string read FHint write FHint;
-    property PumpType : string read FPumpType write FPumpType;
+    property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
+    property AccuracyMinus: Double read FAccuracyMinus write FAccuracyMinus;
+    property Value: Double read FValue write FValue;
+    property MinValue: Double read FMin write SetMin;
+    property MaxValue: Double read FMax write SetMax;
+    property BeforeValue: Double read FBefore write FBefore;
+    property AfterValue: Double read FAfter write FAfter;
+    property DeltaValue: Double read FDelta write FDelta;
 
 
   end;
 
-  TFlowRate = class(TTypeEntity)
+//---------------------------------
+  TPump = class(TParameters)
   private
-    FFlow: Double;
-    FFlowSet: Double;
-    FValueMin: Double;
-    FValueMax: Double;
-    FSetValue: Double;
-    FStatus: EFlowRateState;
-    FAction: EFlowRateAction;
-    FFlowAccuracyPlus: Double;           //в %
-    FFlowAccuracyMinus: Double;
 
-    FName: string;
-    FHint: string;
-    function GetIsRunning: Boolean;
-    function GetIsChanging: Boolean;
-    procedure SetValueMin(const Value: Double);
-    procedure SetValueMax(const Value: Double);
-    procedure Start;
+
+    FHeader: string; // краткое название насоса по мнемосхеме
+    FPumpType: string;
+  public
+    constructor Create(const APumpName: string);
+    destructor Destroy; override;
+    procedure SetParam(ANewFreq: Double);
+
+    property Header: string read FHeader write FHeader;
+    property PumpType : string read FPumpType write FPumpType;
+
+
+  end;
+//---------------------------------
+  TFlowRate = class(TParameters)
+  private
+
+
   public
     constructor Create(const AName: string = 'FlowRate');
-    procedure SetFlowRate(ANewValue: Double);
-    procedure Stop;
-    function GetStateAsString: string;
-    function GetActionAsString: string;
+    procedure SetParam(ANewValue: Double);
+  end;
+//---------------------------------
+  TFluidTemp = class(TParameters)
+  private
 
-    property IsRunning: Boolean read GetIsRunning;
-    property IsChanging: Boolean read GetIsChanging;
-    property Name: string read FName write FName;
-    property Hint: string read FHint write FHint;
-    property Flow: Double read FFlow write FFlow;
-    property FlowSet: Double read FFlowSet write FFlowSet;
-    property SetValue: Double read FSetValue write FSetValue;
-    property ValueMin: Double read FValueMin write SetValueMin;
-    property ValueMax: Double read FValueMax write SetValueMax;
-    property FlowAccuracyPlus: Double read FFlowAccuracyPlus write FFlowAccuracyPlus;
-    property FlowAccuracyMinus: Double read FFlowAccuracyMinus write FFlowAccuracyMinus;
-    property Status: EFlowRateState read FStatus write FStatus;
-    property Action: EFlowRateAction read FAction write FAction;
+  public
+    constructor Create(const AName: string = 'FluidTemp');
+    procedure SetParam(ASet: Double);
+  end;
+//---------------------------------
+  TFluidPress = class(TParameters)
+  private
+
+  public
+    constructor Create(const AName: string = 'FluidPress');
+    procedure SetParam(ASet: Double);
+
   end;
 
   TWorkTable = class;
@@ -314,9 +304,10 @@ type
   //TOnPumpStopEvent = procedure(ASender: TObject; APumpName: string) of object;
   //TOnFreqSetEvent = procedure(ASender: TObject; APumpName: string; ANewFreq: Double) of object;
 
-  TonPumpChangeEvent =  procedure(APump: TPump ; FAction : EPumpAction) of object;
-  TonFlowRateChangeEvent =  procedure(AFlowRate: TFlowRate ; FAction : EFlowRateAction) of object;
-
+  TonPumpChangeEvent =  procedure(APump: TPump ; FAction : EControlAction) of object;
+  TonFlowRateChangeEvent =  procedure(AFlowRate: TFlowRate ; FAction : EControlAction) of object;
+  TOnConditionTempChangeEvent  =  procedure(AFluidTemp: TFluidTemp ; FAction : EControlAction) of object;
+  TOnConditionPressChangeEvent  =  procedure(AFluidPress: TFluidPress ; FAction : EControlAction) of object;
 
   // Обработчики для пакетных заданий
   TOnProcStartEvent = procedure(ASender: TObject; AProcName: string) of object;
@@ -347,10 +338,8 @@ type
 
     FFlowRate: TFlowRate;
 
-    FTemp: Double;
-    FTempDelta: Double;
-    FPress: Double;
-    FPressDelta: Double;
+    FFluidTemp: TFluidTemp;
+    FFluidPress: TFluidPress;
     FTime: Double;
     FTimeResult: Double;
     FState: TSpillState;
@@ -405,6 +394,12 @@ type
     function GetValueTime: TMeterValue;
     function GetValueQuantity: TMeterValue;
     function GetValueFlowRate: TMeterValue;
+    function GetTemp: Double;
+    function GetTempDelta: Double;
+    function GetPress: Double;
+    function GetPressDelta: Double;
+    function GetTime: Double;
+    function GetTimeResult: Double;
     function GetFlowRate: Double;
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
@@ -421,6 +416,12 @@ type
     procedure SetValueTime(const AValue: TMeterValue);
     procedure SetValueQuantity(const AValue: TMeterValue);
     procedure SetValueFlowRate(const AValue: TMeterValue);
+    procedure SetTemp(const AValue: Double);
+    procedure SetTempDelta(const AValue: Double);
+    procedure SetPress(const AValue: Double);
+    procedure SetPressDelta(const AValue: Double);
+    procedure SetTime(const AValue: Double);
+    procedure SetTimeResult(const AValue: Double);
     //procedure SetFlowRate(const AValue: Double);
     procedure AssignTableFlowAsEtalonToDevices;
 
@@ -469,7 +470,8 @@ private
 
   FOnPumpChange: TonPumpChangeEvent;
   FOnFlowRateChange: TonFlowRateChangeEvent;
-
+  FOnConditionTempChange : TOnConditionTempChangeEvent;
+  FOnConditionPressChange : TOnConditionPressChangeEvent;
   // События пакетных заданий
   FOnProcStart: TOnProcStartEvent;
   FOnProcStop: TOnProcStopEvent;
@@ -520,6 +522,9 @@ private
   function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
 
+  property FluidTemp: TFluidTemp read FFluidTemp;
+  property FluidPress: TFluidPress read FFluidPress;
+
   property ActivePump: TPump read FActivePump write FActivePump;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
 
@@ -530,15 +535,15 @@ private
     property DeviceChannels: TObjectList<TChannel> read FDeviceChannels;
     property EtalonChannels: TObjectList<TChannel> read FEtalonChannels;
     property TableFlow: TFlowMeter read FTableFlow;
-    property Temp: Double read FTemp write FTemp;
-    property TempDelta: Double read FTempDelta write FTempDelta;
-    property Press: Double read FPress write FPress;
-    property PressDelta: Double read FPressDelta write FPressDelta;
+    //property Temp: Double read GetTemp write SetTemp;
+    property TempDelta: Double read GetTempDelta write SetTempDelta;
+    property Press: Double read GetPress write SetPress;
+    property PressDelta: Double read GetPressDelta write SetPressDelta;
 
 
 
-    property Time: Double read FTime write FTime;
-    property TimeResult: Double read FTimeResult write FTimeResult;
+    property Time: Double read GetTime write SetTime;
+    property TimeResult: Double read GetTimeResult write SetTimeResult;
 
     property State: TSpillState read FState write FState;
     property MeasurementState: EMeasurementState read FMeasurementState write FMeasurementState;
@@ -580,6 +585,8 @@ private
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
     procedure InitMeterValues;
+    procedure SetTemperature(ATempBefore, ATempAfter: Double);
+    procedure SetPressure(APressBefore, APressAfter: Double);
 
 
   public
@@ -591,6 +598,8 @@ private
   //property OnFreqSet: TOnFreqSetEvent read FOnFreqSet write FOnFreqSet;
   property OnPumpChange: TonPumpChangeEvent read FOnPumpChange write FOnPumpChange;
   property OnFlowRateChange: TonFlowRateChangeEvent read FOnFlowRateChange write FOnFlowRateChange;
+  property OnConditionTempChange: TOnConditionTempChangeEvent read FOnConditionTempChange write FOnConditionTempChange;
+  property OnConditionPressChange: TOnConditionPressChangeEvent read FOnConditionPressChange write FOnConditionPressChange;
 
   property OnProcStart: TOnProcStartEvent read FOnProcStart write FOnProcStart;
   property OnProcStop: TOnProcStopEvent read FOnProcStop write FOnProcStop;
@@ -615,6 +624,11 @@ private
   procedure DoFlowRateStart;
   procedure DoFlowRateStop;
   procedure DoFlowRateSet(ANewFlowRate: Double);
+
+  procedure DoFluidTempStart(ATempSet: Double);
+  procedure DoFluidTempStop;
+  procedure DoFluidPressStart(APressSet: Double);
+  procedure DoFluidPressStop;
 
   procedure DoProcStart(AProcName: string);
   procedure DoProcStop(AProcName: string);
@@ -1177,6 +1191,8 @@ begin
 
   FPumps := TObjectList<TPump>.Create(True); // True — автоосвобождение объектов
   FlowRate := TFlowRate.Create('Расход');
+  FFluidTemp := TFluidTemp.Create;
+  FFluidPress := TFluidPress.Create;
 
   FTableFlow := TFlowMeter.Create;
 
@@ -1195,10 +1211,10 @@ begin
   FLayoutProceduresVisible := True;
   FInstrumentalLayoutOrder := 'FlowRate,Pump,Main,Mesure,Conditions,Procedures';
 
-  Temp:= 20.2;
-  TempDelta:=0.1;
-  Press:=101.1;
-  PressDelta:=0.1;
+  //Temp := 20.2;
+  TempDelta := 0.1;
+  Press := 101.1;
+  PressDelta := 0.1;
   //FlowRate := 10;
 
 
@@ -1537,9 +1553,9 @@ end;
 function TWorkTable.GetFlowRate: Double;
 begin
   if FlowRate <> nil then
-    Result := FlowRate.Flow
+    Result := FlowRate.Value
   else
-    Result := FlowRate.ValueMin;
+    Result := FlowRate.FMin;
 end;
 
 function TWorkTable.GetValueTempertureAfter: TMeterValue;
@@ -1813,6 +1829,8 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
+  FreeAndNil(FFluidTemp);
+  FreeAndNil(FFluidPress);
   FreeAndNil(FlowRate);
   FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
@@ -1820,6 +1838,118 @@ begin
   FreeAndNil(FPumps);
 
   inherited;
+end;
+
+function TWorkTable.GetTemp: Double;
+begin
+  if FFluidTemp <> nil then
+    Result := FFluidTemp.Value
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetTempDelta: Double;
+begin
+  if FFluidTemp <> nil then
+    Result := FFluidTemp.DeltaValue
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetPress: Double;
+begin
+  if FFluidPress <> nil then
+    Result := FFluidPress.Value
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetPressDelta: Double;
+begin
+  if FFluidPress <> nil then
+    Result := FFluidPress.DeltaValue
+  else
+    Result := 0;
+end;
+
+function TWorkTable.GetTime: Double;
+begin
+  Result := FTime;
+end;
+
+function TWorkTable.GetTimeResult: Double;
+begin
+  Result := FTimeResult;
+end;
+
+procedure TWorkTable.SetTemp(const AValue: Double);
+var
+  TempBeforeValue: Double;
+  TempAfterValue: Double;
+begin
+  TempBeforeValue := 0;
+  TempAfterValue := 0;
+  if ValueTempertureBefore <> nil then
+    TempBeforeValue := ValueTempertureBefore.GetDoubleValue;
+  if ValueTempertureAfter <> nil then
+    TempAfterValue := ValueTempertureAfter.GetDoubleValue;
+  SetTemperature(TempBeforeValue, TempAfterValue);
+end;
+
+procedure TWorkTable.SetTempDelta(const AValue: Double);
+begin
+  if FFluidTemp <> nil then
+    FFluidTemp.DeltaValue := AValue;
+end;
+
+procedure TWorkTable.SetPress(const AValue: Double);
+var
+  PressBeforeValue: Double;
+  PressAfterValue: Double;
+begin
+  PressBeforeValue := 0;
+  PressAfterValue := 0;
+  if ValuePressureBefore <> nil then
+    PressBeforeValue := ValuePressureBefore.GetDoubleValue;
+  if ValuePressureAfter <> nil then
+    PressAfterValue := ValuePressureAfter.GetDoubleValue;
+  SetPressure( PressBeforeValue, PressAfterValue);
+end;
+
+procedure TWorkTable.SetPressDelta(const AValue: Double);
+begin
+  if FFluidPress <> nil then
+    FFluidPress.DeltaValue := AValue;
+end;
+
+procedure TWorkTable.SetTime(const AValue: Double);
+begin
+  FTime := AValue;
+end;
+
+procedure TWorkTable.SetTimeResult(const AValue: Double);
+begin
+  FTimeResult := AValue;
+end;
+
+procedure TWorkTable.SetTemperature(ATempBefore, ATempAfter: Double);
+begin
+  if (ATempBefore = 0)  then
+    FFluidTemp.BeforeValue:= ATempAfter ;
+  if ATempAfter = 0 then
+    FFluidTemp.AfterValue:= ATempBefore ;
+
+end;
+
+procedure TWorkTable.SetPressure( APressBefore, APressAfter: Double);
+
+begin
+
+  if (APressBefore = 0)  then
+    FFluidPress.BeforeValue:= APressAfter ;
+  if APressAfter = 0 then
+    FFluidPress.AfterValue:= APressBefore ;
+
 end;
 
 { Adds a new device channel with default identifiers and bindings. }
@@ -1890,14 +2020,14 @@ begin
 if FTableFlow<>nil then
 
     begin
-  if FTableFlow.ValueDensity <> nil then FTableFlow.ValueDensity.SetValue();
-  if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
-  if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
-  if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
+      if FTableFlow.ValueDensity <> nil then FTableFlow.ValueDensity.SetValue();
+      if FTableFlow.ValueTime <> nil then FTableFlow.ValueTime.SetValue();
+      if FTableFlow.ValueQuantity <> nil then FTableFlow.ValueQuantity.SetValue();
+      if FTableFlow.ValueFlowRate <> nil then FTableFlow.ValueFlowRate.SetValue();
 
 
-  if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
-  if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
+      if FTableFlow.ValueTemperture <> nil then FTableFlow.ValueTemperture.SetValue();
+      if FTableFlow.ValuePressure <> nil then FTableFlow.ValuePressure.SetValue();
     end
 end;
 
@@ -1995,11 +2125,11 @@ begin
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
       Ini.WriteString(Section, 'Text', WorkTable.Text);
-      Ini.WriteFloat(Section, 'Temp', WorkTable.Temp);
+      Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value);
       Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
       Ini.WriteFloat(Section, 'Press', WorkTable.Press);
       Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
-      Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Flow);
+      Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
       Ini.WriteString(Section, 'State', SpillStateToString(WorkTable.State));
@@ -2098,11 +2228,11 @@ begin
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-      WorkTable.Temp := Ini.ReadFloat(Section, 'Temp', 0);
+      WorkTable.FluidTemp.Value := Ini.ReadFloat(Section, 'Temp', 0);
       WorkTable.TempDelta := Ini.ReadFloat(Section, 'TempDelta', 0);
       WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
       WorkTable.PressDelta := Ini.ReadFloat(Section, 'PressDelta', 0);
-      WorkTable.FlowRate.Flow := Ini.ReadFloat(Section, 'FlowRate', 0);
+      WorkTable.FlowRate.Value := Ini.ReadFloat(Section, 'FlowRate', 0);
       WorkTable.Time := Ini.ReadFloat(Section, 'Time', 0);
       WorkTable.TimeResult := Ini.ReadFloat(Section, 'TimeResult', 0);
       WorkTable.State := SpillStateFromString(
@@ -2175,7 +2305,7 @@ begin
       WorkTable.ValueTempertureBefore.SetValue(21);
       WorkTable.ValueTempertureAfter.SetValue(21);
 
-      WorkTable.Temp := 21;
+      WorkTable.FluidTemp.Value := 21;
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
@@ -2519,13 +2649,13 @@ begin
   if Pump=nil then
   Exit;
 
-  IF Pump.FAction = PUMP_START then
+  IF Pump.FAction = CONTROL_ACTION_START then
     exit;
 
   Pump.Start;
 
   if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump, PUMP_START);
+    FOnPumpChange(Pump, CONTROL_ACTION_START);
 end;
 
 procedure TWorkTable.DoFlowRateStart;
@@ -2535,14 +2665,73 @@ begin
   if FlowRate=nil then
   Exit;
 
-  IF FlowRate.FAction = FlowRate_START then
+  IF FlowRate.FAction = CONTROL_ACTION_START then
     exit;
 
   FlowRate.Start;
 
   if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, FlowRate_START);
+    FOnFlowRateChange(FlowRate, CONTROL_ACTION_START);
 end;
+
+procedure TWorkTable.DoFluidTempStart(ATempSet: Double);
+begin
+
+
+  if FluidTemp=nil then
+  Exit;
+
+
+
+  FluidTemp.SetParam(ATempSet);
+
+  if Assigned(FOnConditionTempChange) then
+    FOnConditionTempChange(FluidTemp, CONTROL_ACTION_START);
+end;
+
+
+procedure TWorkTable.DoFluidTempStop;
+begin
+
+
+  if FluidTemp=nil then
+  Exit;
+
+  IF FluidTemp.FAction = CONTROL_ACTION_STOP then
+    exit;
+
+  FluidTemp.Stop;
+
+  if Assigned(FOnConditionTempChange) then
+    FOnConditionTempChange(FluidTemp, CONTROL_ACTION_STOP);
+end;
+
+procedure TWorkTable.DoFluidPressStart(APressSet: Double);
+begin
+  if FluidPress = nil then
+    Exit;
+
+  FluidPress.SetParam(APressSet);
+
+  if Assigned(FOnConditionPressChange) then
+    FOnConditionPressChange(FluidPress, CONTROL_ACTION_START);
+end;
+
+procedure TWorkTable.DoFluidPressStop;
+begin
+  if FluidPress = nil then
+    Exit;
+
+  if FluidPress.FAction = CONTROL_ACTION_STOP then
+    Exit;
+
+  FluidPress.Stop;
+
+  if Assigned(FOnConditionPressChange) then
+    FOnConditionPressChange(FluidPress, CONTROL_ACTION_STOP);
+end;
+
+
 
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
@@ -2553,13 +2742,13 @@ begin
   if Pump=nil then
     Exit;
 
-  IF Pump.FAction = PUMP_STOP then
+  IF Pump.FAction = CONTROL_ACTION_STOP then
     exit;
 
   Pump.Stop;
 
   if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump,PUMP_START);
+    FOnPumpChange(Pump,CONTROL_ACTION_STOP);
 end;
 
 procedure TWorkTable.DoFlowRateStop;
@@ -2569,13 +2758,13 @@ begin
   if FlowRate=nil then
   Exit;
 
-  IF FlowRate.FAction = FlowRate_Stop then
+  IF FlowRate.FAction = CONTROL_ACTION_STOP then
     exit;
 
   FlowRate.Stop;
 
   if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, FlowRate_Stop);
+    FOnFlowRateChange(FlowRate, CONTROL_ACTION_STOP);
 end;
 
 
@@ -2584,14 +2773,12 @@ begin
   if FlowRate=nil then
     Exit;
 
-  IF FlowRate.FAction = FlowRate_Stop then
-    exit;
 
-  FlowRate.SetFlowRate(ANewFlowRate);
+  FlowRate.SetParam(ANewFlowRate);
 
 
   if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, FlowRate_set);
+    FOnFlowRateChange(FlowRate, CONTROL_ACTION_SET);
 end;
 
 procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
@@ -2604,11 +2791,11 @@ begin
   Exit;
 
 
-  Pump.SetFrequency(ANewFreq);
+  Pump.SetParam(ANewFreq);
 
 
   if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump,PUMP_SET);
+    FOnPumpChange(Pump,CONTROL_ACTION_SET);
 end;
 
 procedure TWorkTable.DoProcStart(AProcName: string);
@@ -2703,7 +2890,7 @@ function TWorkTable.FindPumpByUUID(const APumpUUID: string): TPump;
 var
   Pump: TPump;
 begin
-  for Pump in FPumps do
+ { for Pump in FPumps do
   begin
     if Pump.UUID = APumpUUID then
     begin
@@ -2711,7 +2898,7 @@ begin
       Exit;
     end;
   end;
-  Result := nil;
+  Result := nil;   }
 end;
 
 function TWorkTable.FindPumpByName(const APumpName: string): TPump;
@@ -2791,122 +2978,109 @@ end;
 
 
 
+
+   {$REGION 'TConditions'}
+constructor TFluidTemp.Create(const AName: string);
+begin
+  inherited Create(AName,'');
+  FMin := -50;
+  FMax := 150;
+  FValue := 20.2;
+  FSet := 0;
+  FBefore := 0;
+  FAfter := 0;
+  FDelta := 0.1;
+  FAccuracyPlus := 5;
+  FAccuracyMinus := 5;
+end;
+
+
+
+procedure TFluidTemp.SetParam(ASet: Double);
+begin
+    if Aset < FMin then
+    Fset := FMin
+  else if Aset > FMax then
+    Fset := FMax
+  else Fset:=Aset;
+  inherited Start;
+end;
+
+
+
+
+
+
+constructor TFluidPress.Create(const AName: string);
+begin
+  inherited Create(AName,'');
+  FMin := 0;
+  FMax := 200;
+  FValue := 10;
+  FSet := 0;
+  FBefore := 0;
+  FAfter := 0;
+  FDelta := 0.1;
+  FAccuracyPlus := 5;
+  FAccuracyMinus := 5;
+end;
+
+
+procedure TFluidPress.SetParam(ASet: Double);
+begin
+
+    if ASet < FMin then
+    FSet := FMin
+  else if ASet > FMax then
+    FSet := FMax
+  else FSet:=ASet;
+
+  inherited Start;
+end;
+
+
+
+
+  {$ENDREGION 'TConditions'}
+
    {$REGION 'TFlowRate'}
 constructor TFlowRate.Create(const AName: string);
 begin
-  inherited Create;
-  FName := AName;
-  FValueMin := 0;
-  FValueMax := 100;
-  FFlow := 0;
-  FFlowSet := FValueMin;
-  FlowAccuracyPlus:=5;
-  FlowAccuracyMinus:=5;
-  FStatus := FLOWRATE_STOPED;
-  FAction := FLOWRATE_STOP;
+  inherited Create(AName,'');
+  FMin := 0;
+  FMax := 100;
+  FValue := 0;
+  FSet := FMin;
+  AccuracyPlus:=5;
+  AccuracyMinus:=5;
 end;
 
 
-function TFlowRate.GetIsRunning: Boolean;
-begin
-  Result := (FStatus = FLOWRATE_STARTED);
-end;
 
-
-function TFlowRate.GetIsChanging: Boolean;
+procedure TFlowRate.SetParam(ANewValue: Double);
 begin
-  Result := Abs(FFlow - FSetValue) > 0.0001;
-end;
-
-procedure TFlowRate.SetValueMin(const Value: Double);
-begin
-  if (Value < 0) or (Value > FValueMax) then
-    Exit;
-  FValueMin := Value;
-end;
-
-procedure TFlowRate.SetValueMax(const Value: Double);
-begin
-  if (Value < 0) or (Value < FValueMin) then
-    Exit;
-  FValueMax := Value;
-end;
-
-procedure TFlowRate.SetFlowRate(ANewValue: Double);
-begin
-  if ANewValue < FValueMin then
-    FSetValue := FValueMin
-  else if ANewValue > FValueMax then
-    FSetValue := FValueMax
+  if ANewValue < FMin then
+    FSet := FMin
+  else if ANewValue > FMax then
+    FSet := FMax
   else
-    FSetValue := ANewValue;
+    FSet := ANewValue;
 
-  FFlowSet := FSetValue;
-  FAction := FLOWRATE_SET;
+  FAction := CONTROL_ACTION_SET;
 end;
 
 
-procedure TFlowRate.Start;
-begin
-
-    if FFlowSet<FValueMin then
-      FFlowSet:=FValueMin;
-    if FFlowSet>FValueMax then
-      FFlowSet:=FValueMax;
-
-
-  //FFlow := FFlowSet;
-  FStatus := FLOWRATE_STARTED;
-  FAction := FLOWRATE_START;
-end;
-
-
-procedure TFlowRate.Stop;
-begin
-  //FFlow := 0;
-  //FSetValue := 0;
-  FStatus := FLOWRATE_STOPED;
-  FAction := FLOWRATE_STOP;
-end;
-
-
-
-
-
-function TFlowRate.GetStateAsString: string;
-begin
-  case FStatus of
-    FLOWRATE_STARTED: Result := 'Запущен';
-    FLOWRATE_STOPED: Result := 'Остановлен';
-  else
-    Result := 'Неизвестно';
-  end;
-end;
-
-function TFlowRate.GetActionAsString: string;
-begin
-  case FAction of
-    FLOWRATE_START: Result := 'Запущен';
-    FLOWRATE_SET: Result := 'Изменен расход воды';
-    FLOWRATE_STOP: Result := 'Сброшен';
-  else
-    Result := 'Неизвестно';
-  end;
-end;
   {$ENDREGION 'TFlowRate'}
 
    {$REGION 'TPump'}
 constructor TPump.Create(const APumpName: string);
 begin
-  inherited Create;
-  FName := APumpName;
-  FFreqMax:= 50;
-  FFreqMin:= 12;
+  inherited Create(APumpName,'');
+  FMax:= 50;
+  FMin:= 12;
 
-  FFreq:=0;
-  FFreqSet := FFreqMin;
-  FStatus := PUMP_STOPED;
-  FAction:= PUMP_STOP;
+  FValue:=0;
+  FSet := FMin;
 
 end;
 
@@ -2915,101 +3089,126 @@ begin
   inherited;
 end;
 
-function TPump.GetIsRunning: Boolean;
-begin
-  Result := (FStatus = PUMP_STARTED);
-end;
-
-function TPump.GetIsChanging: Boolean;
-begin
-  Result :=  FFreqSet<>FFreq;
-end;
 
 
-procedure TPump.SetFreqMax(const Value: Double);
-begin
-  if Value > 1000 then Exit;
-  if Value < 0 then Exit;
-  if Value < FFreqMin then Exit;
-
-    FFreqMax := Value;
-end;
 
 
-procedure TPump.SetFreqMin(const Value: Double);
-begin
-  if Value > 1000 then Exit;
-  if Value < 0 then Exit;
-  if Value > FFreqMax then Exit;
-
-  FFreqMin := Value;
-end;
-
-procedure TPump.Start;
-begin
-  if NOT IsRunning then
-  begin
-
-    if FFreqSet<FFreqMin then
-      FFreqSet:=FFreqMin;
-    if FFreqSet>FFreqMax then
-      FFreqSet:=FFreqMax;
-
-    // Здесь может быть логика запуска насоса (вызов внешних процедур и т. д.)
-    // После успешного запуска устанавливаем рабочее состояние
-    FAction := PUMP_START;
-  end;
-end;
-
-procedure TPump.Stop;
-begin
-  if IsRunning then
-  begin
-    FAction := PUMP_STOP;
-    //FFreqSet := 0.0;
-    // Здесь может быть логика остановки насоса
-  end;
-end;
-
-procedure TPump.SetFrequency(ANewFreq: Double);
+procedure TPump.SetParam(ANewFreq: Double);
 begin
 
-      if Abs(FFreq - ANewFreq) < 0.001 then
+      if Abs(FValue - ANewFreq) < 0.001 then
         Exit; // Частота не изменилась
 
-      if ANewFreq<FFreqMin then
-        FFreqSet:=FFreqMin
-      else if ANewFreq>FFreqMax then
-        FFreqSet:=FFreqMax
+      if ANewFreq<FMin then
+        FSet:=FMin
+      else if ANewFreq>FMax then
+        FSet:=FMax
       else
-        FFreqSet:=ANewFreq;
+        FSet:=ANewFreq;
 
-      FAction:=PUMP_SET;
+      FAction:=CONTROL_ACTION_SET;
 
 end;
 
-function TPump.GetStateAsString: string;
-begin
-  case FStatus of
-    PUMP_STOPED: Result := 'Остановлен';
-    PUMP_STARTED: Result := 'Работает (мин. частота)';
-  else
-    Result := 'Неизвестно';
-  end;
-end;
-
-function TPump.GetActionAsString: string;
-begin
-  case FAction of
-    PUMP_STOP: Result := 'Остановливается';
-    PUMP_START: Result := 'Запускается';
-    PUMP_SET: Result := 'Меняется частота';
-  else
-    Result := 'Неизвестно';
-  end;
-end;
 
 
   {$ENDREGION 'TPump'}
+
+{ TParameters }
+
+
+constructor TParameters.Create(const AName, AHint: string);
+begin
+  inherited Create;
+  FName := AName;
+  FHint := AHint;
+  FStatus := CONTROL_STOPPED;
+  FAction := CONTROL_ACTION_STOP;
+end;
+
+procedure TParameters.Stop;
+begin
+  FAction := CONTROL_ACTION_STOP;
+end;
+
+
+procedure TParameters.Start;
+begin
+    if FSet<FMin then
+      FSet:=FMin;
+    if FSet>FMax then
+      FSet:=FMax;
+
+  FAction := CONTROL_ACTION_START;
+end;
+
+procedure TParameters.SetMin(const Value: Double);
+begin
+  if Value > FMax then Exit;
+  FMin := Value;
+end;
+
+procedure TParameters.SetMax(const Value: Double);
+begin
+  if Value < FMin then Exit;
+  FMin := Value;
+end;
+
+procedure TParameters.SetState(AStatus: EControlState);
+begin
+  FStatus := AStatus;
+end;
+
+procedure TParameters.SetBefore(ABefore: Double);
+begin
+  if ABefore < FMin then
+    FBefore := FMin
+  else if ABefore > FMax then
+    FBefore := FMax
+  else FBefore:=ABefore;
+end;
+procedure TParameters.SetAfter(AAfter: Double);
+begin
+  if AAfter < FMin then
+    FAfter := FMin
+  else if AAfter > FMax then
+    FAfter := FMax
+  else FAfter:=AAfter;
+end;
+
+
+function TParameters.GetStateAsString: string;
+begin
+  case FStatus of
+    CONTROL_STARTED: Result := 'Запущен';
+    CONTROL_STOPPED: Result := 'Остановлен';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function TParameters.GetActionAsString: string;
+begin
+  case FAction of
+    CONTROL_ACTION_START: Result := 'Запущен';
+    CONTROL_ACTION_SET: Result := 'Изменен расход воды';
+    CONTROL_ACTION_STOP: Result := 'Сброшен';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+
+function TParameters.GetIsRunning: Boolean;
+begin
+  Result := (FStatus = CONTROL_STARTED);
+end;
+
+function TParameters.GetIsChanging: Boolean;
+begin
+  Result :=  FSet<>FValue;
+end;
+
+
 
 end.
