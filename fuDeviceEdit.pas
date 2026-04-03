@@ -2760,7 +2760,7 @@ begin
       end;
     end;
   end;
-
+  if P.State <> osNew then
   P.State := osModified;
   SetModified;
   UpdatePointsGrid;

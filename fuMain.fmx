@@ -17,7 +17,7 @@ object FormMain: TFormMain
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 0
+    TabIndex = 3
     TabOrder = 0
     TabPosition = PlatformDefault
     OnChange = TabControlMainChange
@@ -35,7 +35,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1336,7 +1336,7 @@ object FormMain: TFormMain
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 44.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1379,7 +1379,7 @@ object FormMain: TFormMain
           end
           object LabelEtalonImpResult: TLabel
             Position.X = 24.000000000000000000
-            Position.Y = 144.000000000000000000
+            Position.Y = 190.000000000000000000
             Text = 'ImpResult'
             TabOrder = 2
           end
@@ -1403,23 +1403,40 @@ object FormMain: TFormMain
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
           end
-          object EditEtalonImpResult: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
+          object LabelEtalonFlowRate: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 144.000000000000000000
+            Text = 'FlowRate, m3/h'
             TabOrder = 5
+          end
+          object EditEtalonFlowRate: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 6
             Text = '0'
             Position.X = 140.000000000000000000
             Position.Y = 140.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
+            OnExit = EditEtalonFlowRateExit
+          end
+          object EditEtalonImpResult: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 7
+            Text = '0'
+            Position.X = 140.000000000000000000
+            Position.Y = 186.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
           end
           object ButtonApplyEtalonValues: TButton
             Position.X = 140.000000000000000000
-            Position.Y = 190.000000000000000000
+            Position.Y = 226.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 6
+            TabOrder = 8
             Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
             TextSettings.Trimming = None
             OnClick = ButtonApplyEtalonValuesClick
@@ -1446,7 +1463,7 @@ object FormMain: TFormMain
           end
           object LabelDeviceImpResult: TLabel
             Position.X = 24.000000000000000000
-            Position.Y = 144.000000000000000000
+            Position.Y = 190.000000000000000000
             Text = 'ImpResult'
             TabOrder = 2
           end
@@ -1470,23 +1487,40 @@ object FormMain: TFormMain
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
           end
-          object EditDeviceImpResult: TEdit
-            Touch.InteractiveGestures = [LongTap, DoubleTap]
+          object LabelDeviceFlowRate: TLabel
+            Position.X = 24.000000000000000000
+            Position.Y = 144.000000000000000000
+            Text = 'FlowRate, m3/h'
             TabOrder = 5
+          end
+          object EditDeviceFlowRate: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 6
             Text = '0'
             Position.X = 160.000000000000000000
             Position.Y = 140.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
+            OnExit = EditDeviceFlowRateExit
+          end
+          object EditDeviceImpResult: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 7
+            Text = '0'
+            Position.X = 160.000000000000000000
+            Position.Y = 186.000000000000000000
+            Size.Width = 180.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
           end
           object ButtonApplyDeviceValues: TButton
             Position.X = 160.000000000000000000
-            Position.Y = 190.000000000000000000
+            Position.Y = 226.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 6
+            TabOrder = 8
             Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
             TextSettings.Trimming = None
             OnClick = ButtonApplyDeviceValuesClick
@@ -1522,8 +1556,8 @@ object FormMain: TFormMain
         Size.Height = 243.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 4
-        Viewport.Width = 423.000000000000000000
-        Viewport.Height = 243.000000000000000000
+        Viewport.Width = 419.000000000000000000
+        Viewport.Height = 239.000000000000000000
       end
     end
   end
