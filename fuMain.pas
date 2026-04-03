@@ -137,21 +137,21 @@ end;
 procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.FlowSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
+  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.SetValue)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
 
 end;
 
 procedure  TFormMain.FlowConditionsTempHandler(AConditionsTemp: tConditionsTemp; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsTemp.TempSet));
+  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsTemp.SetValue));
 
 end;
 
 procedure  TFormMain.FlowConditionsPressHandler(AConditionsPress: tConditionsPress; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsPress.PressSet));
+  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.ConditionsPress.SetValue));
 
 end;
 
@@ -237,32 +237,32 @@ begin
     PressDelta :=  (Random * 0.06) - 0.03;
     if (AWorkTable.ConditionsTemp.IsRunning) then
     begin
-      if NOT(AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
-      AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
-      AND  (AWorkTable.ConditionsTemp.Temp<AWorkTable.ConditionsTemp.TempSet)  THEN
+      if NOT(AWorkTable.ConditionsTemp.SetValue<=AWorkTable.ConditionsTemp.Value*(1+AWorkTable.ConditionsTemp.AccuracyPlus/100))
+      AND (AWorkTable.ConditionsTemp.SetValue>=AWorkTable.ConditionsTemp.Value*(1-AWorkTable.ConditionsTemp.AccuracyMinus/100))
+      AND  (AWorkTable.ConditionsTemp.Value<AWorkTable.ConditionsTemp.SetValue)  THEN
       begin
-        AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore+1);
-        AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter+1);
+        AWorkTable.ConditionsTemp.SetBefore(AWorkTable.ConditionsTemp.BeforeValue+1);
+        AWorkTable.ConditionsTemp.SetAfter(AWorkTable.ConditionsTemp.AfterValue+1);
       end
-    ELSE if not(AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
-      AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
-      AND  (AWorkTable.ConditionsTemp.Temp>AWorkTable.ConditionsTemp.TempSet)  THEN
+    ELSE if not(AWorkTable.ConditionsTemp.SetValue<=AWorkTable.ConditionsTemp.Value*(1+AWorkTable.ConditionsTemp.AccuracyPlus/100))
+      AND (AWorkTable.ConditionsTemp.SetValue>=AWorkTable.ConditionsTemp.Value*(1-AWorkTable.ConditionsTemp.AccuracyMinus/100))
+      AND  (AWorkTable.ConditionsTemp.Value>AWorkTable.ConditionsTemp.SetValue)  THEN
       begin
-        AWorkTable.ConditionsTemp.SetTemperatureBefore(AWorkTable.ConditionsTemp.TempBefore-1);
-        AWorkTable.ConditionsTemp.SetTemperatureAfter(AWorkTable.ConditionsTemp.TempAfter-1);
+        AWorkTable.ConditionsTemp.SetBefore(AWorkTable.ConditionsTemp.BeforeValue-1);
+        AWorkTable.ConditionsTemp.SetAfter(AWorkTable.ConditionsTemp.AfterValue-1);
       end;
 
-      if (AWorkTable.ConditionsTemp.TempSet<=AWorkTable.ConditionsTemp.Temp*(1+AWorkTable.ConditionsTemp.TempAccuracyPlus/100))
-      AND (AWorkTable.ConditionsTemp.TempSet>=AWorkTable.ConditionsTemp.Temp*(1-AWorkTable.ConditionsTemp.TempAccuracyPlus/100)) then
+      if (AWorkTable.ConditionsTemp.SetValue<=AWorkTable.ConditionsTemp.Value*(1+AWorkTable.ConditionsTemp.AccuracyPlus/100))
+      AND (AWorkTable.ConditionsTemp.SetValue>=AWorkTable.ConditionsTemp.Value*(1-AWorkTable.ConditionsTemp.AccuracyMinus/100)) then
         AWorkTable.DoConditionsTempStop
 
     end;
 
 
-      if AWorkTable.ConditionsTemp.TempSet<>0 then
+      if AWorkTable.ConditionsTemp.SetValue<>0 then
       begin
-        AWorkTable.ConditionsTemp.SetTemperatureBefore(EnsureRange(AWorkTable.ConditionsTemp.TempBefore + TempDelta, -50.0, 150.0));
-        AWorkTable.ConditionsTemp.SetTemperatureAfter(EnsureRange(AWorkTable.ConditionsTemp.TempAfter + TempDelta, -50.0, 150.0));
+        AWorkTable.ConditionsTemp.SetBefore(EnsureRange(AWorkTable.ConditionsTemp.BeforeValue + TempDelta, -50.0, 150.0));
+        AWorkTable.ConditionsTemp.SetAfter(EnsureRange(AWorkTable.ConditionsTemp.AfterValue + TempDelta, -50.0, 150.0));
       end;
 
 
@@ -296,30 +296,30 @@ begin
     PressDelta :=  (Random * 0.06) - 0.03;
     if (AWorkTable.ConditionsPress.IsRunning) then
     begin
-      if  (AWorkTable.ConditionsPress.Press<AWorkTable.ConditionsPress.PressSet) then
+      if  (AWorkTable.ConditionsPress.Value<AWorkTable.ConditionsPress.SetValue) then
       begin
-        AWorkTable.ConditionsPress.SetPressureBefore(AWorkTable.ConditionsPress.PressBefore+1);
-        AWorkTable.ConditionsPress.SetPressureAfter(AWorkTable.ConditionsPress.PressAfter+1);
+        AWorkTable.ConditionsPress.SetBefore(AWorkTable.ConditionsPress.BeforeValue+1);
+        AWorkTable.ConditionsPress.SetAfter(AWorkTable.ConditionsPress.AfterValue+1);
       end
-      else if  (AWorkTable.ConditionsPress.Press>AWorkTable.ConditionsPress.PressSet)  then
+      else if  (AWorkTable.ConditionsPress.Value>AWorkTable.ConditionsPress.SetValue)  then
       begin
-        AWorkTable.ConditionsPress.SetPressureBefore(AWorkTable.ConditionsPress.PressBefore-0.3);
-        AWorkTable.ConditionsPress.SetPressureAfter(AWorkTable.ConditionsPress.PressAfter-0.3);
+        AWorkTable.ConditionsPress.SetBefore(AWorkTable.ConditionsPress.BeforeValue-0.3);
+        AWorkTable.ConditionsPress.SetAfter(AWorkTable.ConditionsPress.AfterValue-0.3);
       end;
-      if (AWorkTable.ConditionsPress.PressSet<=AWorkTable.ConditionsPress.Press*(1+AWorkTable.ConditionsPress.PressAccuracyPlus/100))
-      AND (AWorkTable.ConditionsPress.PressSet>=AWorkTable.ConditionsPress.Press*(1-AWorkTable.ConditionsPress.PressAccuracyPlus/100)) then
+      if (AWorkTable.ConditionsPress.SetValue<=AWorkTable.ConditionsPress.Value*(1+AWorkTable.ConditionsPress.AccuracyPlus/100))
+      AND (AWorkTable.ConditionsPress.SetValue>=AWorkTable.ConditionsPress.Value*(1-AWorkTable.ConditionsPress.AccuracyMinus/100)) then
         AWorkTable.DoConditionsPressStop;
 
     end;
-      if  (AWorkTable.ConditionsPress.Press<AWorkTable.ConditionsPress.PressSet)  then
+      if  (AWorkTable.ConditionsPress.Value<AWorkTable.ConditionsPress.SetValue)  then
       begin
-        AWorkTable.ConditionsPress.SetPressureBefore(EnsureRange(AWorkTable.ConditionsPress.PressBefore + 0.1, -50.0, 150.0));
-        AWorkTable.ConditionsPress.SetPressureAfter(EnsureRange(AWorkTable.ConditionsPress.PressAfter + 0.1, -50.0, 150.0));
+        AWorkTable.ConditionsPress.SetBefore(EnsureRange(AWorkTable.ConditionsPress.BeforeValue + 0.1, -50.0, 150.0));
+        AWorkTable.ConditionsPress.SetAfter(EnsureRange(AWorkTable.ConditionsPress.AfterValue + 0.1, -50.0, 150.0));
       end;
-      if AWorkTable.ConditionsPress.PressSet<>0 then
+      if AWorkTable.ConditionsPress.SetValue<>0 then
       begin
-        AWorkTable.ConditionsPress.SetPressureBefore(EnsureRange(AWorkTable.ConditionsPress.PressBefore + PressDelta, -50.0, 150.0));
-        AWorkTable.ConditionsPress.SetPressureAfter(EnsureRange(AWorkTable.ConditionsPress.PressAfter + PressDelta, -50.0, 150.0));
+        AWorkTable.ConditionsPress.SetBefore(EnsureRange(AWorkTable.ConditionsPress.BeforeValue + PressDelta, -50.0, 150.0));
+        AWorkTable.ConditionsPress.SetAfter(EnsureRange(AWorkTable.ConditionsPress.AfterValue + PressDelta, -50.0, 150.0));
       end;
 
 
@@ -354,11 +354,11 @@ begin
 
    if APump.IsRunning = true then
     begin
-      APump.Freq := EnsureRange(APump.Freq + Freq,APump.Freq , APump.FreqSet);
+      APump.Value := EnsureRange(APump.Value + Freq,APump.Value , APump.SetValue);
     end
     else
     begin
-      APump.Freq := EnsureRange(APump.Freq - Freq,0 , APump.Freq);
+      APump.Value := EnsureRange(APump.Value - Freq,0 , APump.Value);
     end;
 
 
@@ -388,11 +388,11 @@ begin
 
    if AFlowRate.IsRunning = true then
     begin
-      AFlowRate.flow := EnsureRange(AFlowRate.flow + Flow,AFlowRate.flow, AFlowRate.FlowSet);
+      AFlowRate.Value := EnsureRange(AFlowRate.Value + Flow,AFlowRate.Value, AFlowRate.SetValue);
     end
     else
     begin
-      AFlowRate.flow  := EnsureRange(AFlowRate.flow  - Flow,0 , AFlowRate.flow );
+      AFlowRate.Value  := EnsureRange(AFlowRate.Value  - Flow,0 , AFlowRate.Value );
     end;
 
 
