@@ -131,19 +131,19 @@ TParameters = class(TObject)
     procedure SetParam(ANewValue: Double);
   end;
 //---------------------------------
-  TConditionsTemp = class(TParameters)
+  TFluidTemp = class(TParameters)
   private
 
   public
-    constructor Create(const AName: string = 'ConditionsTemp');
+    constructor Create(const AName: string = 'FluidTemp');
     procedure SetParam(ASet: Double);
   end;
 //---------------------------------
-  TConditionsPress = class(TParameters)
+  TFluidPress = class(TParameters)
   private
 
   public
-    constructor Create(const AName: string = 'ConditionsPress');
+    constructor Create(const AName: string = 'FluidPress');
     procedure SetParam(ASet: Double);
 
   end;
@@ -306,8 +306,8 @@ TParameters = class(TObject)
 
   TonPumpChangeEvent =  procedure(APump: TPump ; FAction : EControlAction) of object;
   TonFlowRateChangeEvent =  procedure(AFlowRate: TFlowRate ; FAction : EControlAction) of object;
-  TOnConditionTempChangeEvent  =  procedure(AConditionsTemp: TConditionsTemp ; FAction : EControlAction) of object;
-  TOnConditionPressChangeEvent  =  procedure(AConditionsPress: TConditionsPress ; FAction : EControlAction) of object;
+  TOnConditionTempChangeEvent  =  procedure(AFluidTemp: TFluidTemp ; FAction : EControlAction) of object;
+  TOnConditionPressChangeEvent  =  procedure(AFluidPress: TFluidPress ; FAction : EControlAction) of object;
 
   // Обработчики для пакетных заданий
   TOnProcStartEvent = procedure(ASender: TObject; AProcName: string) of object;
@@ -338,8 +338,8 @@ TParameters = class(TObject)
 
     FFlowRate: TFlowRate;
 
-    FConditionsTemp: TConditionsTemp;
-    FConditionsPress: TConditionsPress;
+    FFluidTemp: TFluidTemp;
+    FFluidPress: TFluidPress;
     FTime: Double;
     FTimeResult: Double;
     FState: TSpillState;
@@ -522,8 +522,8 @@ private
   function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
 
-  property ConditionsTemp: TConditionsTemp read FConditionsTemp;
-  property ConditionsPress: TConditionsPress read FConditionsPress;
+  property FluidTemp: TFluidTemp read FFluidTemp;
+  property FluidPress: TFluidPress read FFluidPress;
 
   property ActivePump: TPump read FActivePump write FActivePump;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
@@ -625,10 +625,10 @@ private
   procedure DoFlowRateStop;
   procedure DoFlowRateSet(ANewFlowRate: Double);
 
-  procedure DoConditionsTempStart(ATempSet: Double);
-  procedure DoConditionsTempStop;
-  procedure DoConditionsPressStart(APressSet: Double);
-  procedure DoConditionsPressStop;
+  procedure DoFluidTempStart(ATempSet: Double);
+  procedure DoFluidTempStop;
+  procedure DoFluidPressStart(APressSet: Double);
+  procedure DoFluidPressStop;
 
   procedure DoProcStart(AProcName: string);
   procedure DoProcStop(AProcName: string);
@@ -1191,8 +1191,8 @@ begin
 
   FPumps := TObjectList<TPump>.Create(True); // True — автоосвобождение объектов
   FlowRate := TFlowRate.Create('Расход');
-  FConditionsTemp := TConditionsTemp.Create;
-  FConditionsPress := TConditionsPress.Create;
+  FFluidTemp := TFluidTemp.Create;
+  FFluidPress := TFluidPress.Create;
 
   FTableFlow := TFlowMeter.Create;
 
@@ -1829,8 +1829,8 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
-  FreeAndNil(FConditionsTemp);
-  FreeAndNil(FConditionsPress);
+  FreeAndNil(FFluidTemp);
+  FreeAndNil(FFluidPress);
   FreeAndNil(FlowRate);
   FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
@@ -1842,32 +1842,32 @@ end;
 
 function TWorkTable.GetTemp: Double;
 begin
-  if FConditionsTemp <> nil then
-    Result := FConditionsTemp.Value
+  if FFluidTemp <> nil then
+    Result := FFluidTemp.Value
   else
     Result := 0;
 end;
 
 function TWorkTable.GetTempDelta: Double;
 begin
-  if FConditionsTemp <> nil then
-    Result := FConditionsTemp.DeltaValue
+  if FFluidTemp <> nil then
+    Result := FFluidTemp.DeltaValue
   else
     Result := 0;
 end;
 
 function TWorkTable.GetPress: Double;
 begin
-  if FConditionsPress <> nil then
-    Result := FConditionsPress.Value
+  if FFluidPress <> nil then
+    Result := FFluidPress.Value
   else
     Result := 0;
 end;
 
 function TWorkTable.GetPressDelta: Double;
 begin
-  if FConditionsPress <> nil then
-    Result := FConditionsPress.DeltaValue
+  if FFluidPress <> nil then
+    Result := FFluidPress.DeltaValue
   else
     Result := 0;
 end;
@@ -1898,8 +1898,8 @@ end;
 
 procedure TWorkTable.SetTempDelta(const AValue: Double);
 begin
-  if FConditionsTemp <> nil then
-    FConditionsTemp.DeltaValue := AValue;
+  if FFluidTemp <> nil then
+    FFluidTemp.DeltaValue := AValue;
 end;
 
 procedure TWorkTable.SetPress(const AValue: Double);
@@ -1918,8 +1918,8 @@ end;
 
 procedure TWorkTable.SetPressDelta(const AValue: Double);
 begin
-  if FConditionsPress <> nil then
-    FConditionsPress.DeltaValue := AValue;
+  if FFluidPress <> nil then
+    FFluidPress.DeltaValue := AValue;
 end;
 
 procedure TWorkTable.SetTime(const AValue: Double);
@@ -1935,9 +1935,9 @@ end;
 procedure TWorkTable.SetTemperature(ATempBefore, ATempAfter: Double);
 begin
   if (ATempBefore = 0)  then
-    FConditionsTemp.BeforeValue:= ATempAfter ;
+    FFluidTemp.BeforeValue:= ATempAfter ;
   if ATempAfter = 0 then
-    FConditionsTemp.AfterValue:= ATempBefore ;
+    FFluidTemp.AfterValue:= ATempBefore ;
 
 end;
 
@@ -1946,9 +1946,9 @@ procedure TWorkTable.SetPressure( APressBefore, APressAfter: Double);
 begin
 
   if (APressBefore = 0)  then
-    FConditionsPress.BeforeValue:= APressAfter ;
+    FFluidPress.BeforeValue:= APressAfter ;
   if APressAfter = 0 then
-    FConditionsPress.AfterValue:= APressBefore ;
+    FFluidPress.AfterValue:= APressBefore ;
 
 end;
 
@@ -2125,7 +2125,7 @@ begin
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
       Ini.WriteString(Section, 'Text', WorkTable.Text);
-      Ini.WriteFloat(Section, 'Temp', WorkTable.ConditionsTemp.Value);
+      Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value);
       Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
       Ini.WriteFloat(Section, 'Press', WorkTable.Press);
       Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
@@ -2228,7 +2228,7 @@ begin
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-      WorkTable.ConditionsTemp.Value := Ini.ReadFloat(Section, 'Temp', 0);
+      WorkTable.FluidTemp.Value := Ini.ReadFloat(Section, 'Temp', 0);
       WorkTable.TempDelta := Ini.ReadFloat(Section, 'TempDelta', 0);
       WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
       WorkTable.PressDelta := Ini.ReadFloat(Section, 'PressDelta', 0);
@@ -2305,7 +2305,7 @@ begin
       WorkTable.ValueTempertureBefore.SetValue(21);
       WorkTable.ValueTempertureAfter.SetValue(21);
 
-      WorkTable.ConditionsTemp.Value := 21;
+      WorkTable.FluidTemp.Value := 21;
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
@@ -2674,61 +2674,61 @@ begin
     FOnFlowRateChange(FlowRate, CONTROL_ACTION_START);
 end;
 
-procedure TWorkTable.DoConditionsTempStart(ATempSet: Double);
+procedure TWorkTable.DoFluidTempStart(ATempSet: Double);
 begin
 
 
-  if ConditionsTemp=nil then
+  if FluidTemp=nil then
   Exit;
 
 
 
-  ConditionsTemp.SetParam(ATempSet);
+  FluidTemp.SetParam(ATempSet);
 
   if Assigned(FOnConditionTempChange) then
-    FOnConditionTempChange(ConditionsTemp, CONTROL_ACTION_START);
+    FOnConditionTempChange(FluidTemp, CONTROL_ACTION_START);
 end;
 
 
-procedure TWorkTable.DoConditionsTempStop;
+procedure TWorkTable.DoFluidTempStop;
 begin
 
 
-  if ConditionsTemp=nil then
+  if FluidTemp=nil then
   Exit;
 
-  IF ConditionsTemp.FAction = CONTROL_ACTION_STOP then
+  IF FluidTemp.FAction = CONTROL_ACTION_STOP then
     exit;
 
-  ConditionsTemp.Stop;
+  FluidTemp.Stop;
 
   if Assigned(FOnConditionTempChange) then
-    FOnConditionTempChange(ConditionsTemp, CONTROL_ACTION_STOP);
+    FOnConditionTempChange(FluidTemp, CONTROL_ACTION_STOP);
 end;
 
-procedure TWorkTable.DoConditionsPressStart(APressSet: Double);
+procedure TWorkTable.DoFluidPressStart(APressSet: Double);
 begin
-  if ConditionsPress = nil then
+  if FluidPress = nil then
     Exit;
 
-  ConditionsPress.SetParam(APressSet);
+  FluidPress.SetParam(APressSet);
 
   if Assigned(FOnConditionPressChange) then
-    FOnConditionPressChange(ConditionsPress, CONTROL_ACTION_START);
+    FOnConditionPressChange(FluidPress, CONTROL_ACTION_START);
 end;
 
-procedure TWorkTable.DoConditionsPressStop;
+procedure TWorkTable.DoFluidPressStop;
 begin
-  if ConditionsPress = nil then
+  if FluidPress = nil then
     Exit;
 
-  if ConditionsPress.FAction = CONTROL_ACTION_STOP then
+  if FluidPress.FAction = CONTROL_ACTION_STOP then
     Exit;
 
-  ConditionsPress.Stop;
+  FluidPress.Stop;
 
   if Assigned(FOnConditionPressChange) then
-    FOnConditionPressChange(ConditionsPress, CONTROL_ACTION_STOP);
+    FOnConditionPressChange(FluidPress, CONTROL_ACTION_STOP);
 end;
 
 
@@ -2980,7 +2980,7 @@ end;
 
 
    {$REGION 'TConditions'}
-constructor TConditionsTemp.Create(const AName: string);
+constructor TFluidTemp.Create(const AName: string);
 begin
   inherited Create(AName,'');
   FMin := -50;
@@ -2996,7 +2996,7 @@ end;
 
 
 
-procedure TConditionsTemp.SetParam(ASet: Double);
+procedure TFluidTemp.SetParam(ASet: Double);
 begin
     if Aset < FMin then
     Fset := FMin
@@ -3011,7 +3011,7 @@ end;
 
 
 
-constructor TConditionsPress.Create(const AName: string);
+constructor TFluidPress.Create(const AName: string);
 begin
   inherited Create(AName,'');
   FMin := 0;
@@ -3026,7 +3026,7 @@ begin
 end;
 
 
-procedure TConditionsPress.SetParam(ASet: Double);
+procedure TFluidPress.SetParam(ASet: Double);
 begin
 
     if ASet < FMin then
