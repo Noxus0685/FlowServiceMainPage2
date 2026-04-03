@@ -2078,26 +2078,57 @@ end;
 procedure TFormTypeEditor.RecalcDiametersKpByCoef;
 var
   I: Integer;
+  Kp: Double;
 begin
   if (FDiametersLocal = nil) or (FType = nil) then
     Exit;
 
   for I := 0 to FDiametersLocal.Count - 1 do
-    FDiametersLocal[I].Kp := FType.Coef / FDiametersLocal[I].Qmax;
+  begin
+    if FDiametersLocal[I].QFmax > 0 then
+      Kp := FType.Coef / FDiametersLocal[I].QFmax
+    else
+      Kp := 0;
+
+    if not SameValue(FDiametersLocal[I].Kp,Kp,MinDouble)  then
+      begin
+        FDiametersLocal[I].Kp:=Kp;
+        if FDiametersLocal[I].State=osClean then
+           FDiametersLocal[I].State:=osModified
+      end;
+
+
+  end;
+
+
+
 end;
 
 procedure TFormTypeEditor.RecalcDiametersKpByFreq;
 var
   I: Integer;
+  Kp: Double;
 begin
   if (FDiametersLocal = nil) or (FType = nil) then
     Exit;
 
   for I := 0 to FDiametersLocal.Count - 1 do
+  begin
+
     if FDiametersLocal[I].QFmax > 0 then
-      FDiametersLocal[I].Kp := 3.6 * FType.Freq / FDiametersLocal[I].QFmax
+      Kp := 3.6 * FType.Freq / FDiametersLocal[I].QFmax
     else
-      FDiametersLocal[I].Kp := 0;
+      Kp := 0;
+
+    if not SameValue(FDiametersLocal[I].Kp,Kp,MinDouble)  then
+      begin
+        FDiametersLocal[I].Kp:=Kp;
+        if FDiametersLocal[I].State=osClean then
+           FDiametersLocal[I].State:=osModified
+      end;
+
+
+  end;
 end;
 
 
