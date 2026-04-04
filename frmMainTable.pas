@@ -323,6 +323,7 @@ type
     PopupColumnEtalonDN1: TPopupColumn;
     PopupColumnDeviceDN1: TPopupColumn;
     SpeedButton6: TSpeedButton;
+    StringColumnDeviceCoef1: TStringColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -4555,9 +4556,9 @@ begin
 
     if WorkTable.ActivePump.Value = 0 then
        Rectangle1.Fill.Color := TAlphaColorRec.White
-    else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.SetValue) then
+    else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.ValueSet) then
       Rectangle1.Fill.Color := TAlphaColorRec.Lightyellow
-    else if WorkTable.ActivePump.Value = WorkTable.ActivePump.SetValue then
+    else if WorkTable.ActivePump.Value = WorkTable.ActivePump.ValueSet then
       Rectangle1.Fill.Color := $ffC9FFC7 ;
 
 
@@ -4570,7 +4571,7 @@ begin
    // if ((SpinBoxFreq.Text='12,00') and (WorkTable.ActivePump.FreqSet <> 0)) or
     // ((SpinBoxFreq.Text <>  '12,00') and (WorkTable.ActivePump.FreqSet = 0))  then
 
-    SpinBoxFreq.Value:= (WorkTable.ActivePump.SetValue);
+    SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet);
 
 
 
@@ -4613,10 +4614,10 @@ begin
     if WorkTable.FlowRate.Value = 0 then
        RectangleLabelFR.Fill.Color := TAlphaColorRec.White
 
-    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.AccuracyPlus/100) * WorkTable.FlowRate.SetValue ))
-    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.Accuracyminus/100) * WorkTable.FlowRate.SetValue )) then
+    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.AccuracyPlus/100) * WorkTable.FlowRate.ValueSet ))
+    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.Accuracyminus/100) * WorkTable.FlowRate.ValueSet )) then
       RectangleLabelFR.Fill.Color := $ffC9FFC7
-        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.SetValue) then
+        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
       RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
 
 
@@ -4637,17 +4638,17 @@ begin
 
     Layout9.tag:=2;
 
-   if (WorkTable.FluidTemp.SetValue=0) or (WorkTable.FluidTemp.Value=0) then
+   if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
     Rectangle7.Fill.Color := TAlphaColorRec.White
-   ELSE if (WorkTable.FluidTemp.SetValue<=WorkTable.FluidTemp.Value*(1+WorkTable.FluidTemp.AccuracyPlus/100))
-      AND (WorkTable.FluidTemp.SetValue>=WorkTable.FluidTemp.Value*(1-WorkTable.FluidTemp.AccuracyPlus/100)) THEN
+   ELSE if (WorkTable.FluidTemp.ValueSet<=WorkTable.FluidTemp.Value*(1+WorkTable.FluidTemp.AccuracyPlus/100))
+      AND (WorkTable.FluidTemp.ValueSet>=WorkTable.FluidTemp.Value*(1-WorkTable.FluidTemp.AccuracyPlus/100)) THEN
     Rectangle7.Fill.Color := $ffC9FFC7
    else
     Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
 
 
 
-   if (WorkTable.FluidPress.SetValue=0) or (WorkTable.FluidPress.Value=0 )then
+   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )then
     Rectangle11.Fill.Color := TAlphaColorRec.White
    else IF WorkTable.FluidPress.IsRunning then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
@@ -4657,13 +4658,13 @@ begin
 
 
 
-    if (ABS(strtofloat(EditTemp.Text)-WorkTable.FluidTemp.SetValue) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
+    if (ABS(strtofloat(EditTemp.Text)-WorkTable.FluidTemp.ValueSet) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
       EditTemp.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.SetValue) ;
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
 
-    if (ABS(strtofloat(EditPres.Text)-WorkTable.FluidPress.SetValue) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
+    if (ABS(strtofloat(EditPres.Text)-WorkTable.FluidPress.ValueSet) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
       EditPres.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.SetValue) ;
+      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.ValueSet) ;
 
     LabelTemp.text:=
     WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value);

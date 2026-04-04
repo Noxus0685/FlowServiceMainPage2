@@ -303,6 +303,8 @@ type
      procedure RefreshDeviceTypeReference;
 
      procedure UpdateUIFromDevice;
+     procedure UpdateUICoef;
+     procedure UpdateUIFreq;
      procedure InitCategoryComboEdit;
      procedure UpdatePointsGrid;
      procedure SetModified;
@@ -776,18 +778,81 @@ begin
 end;
 
 procedure TFormDeviceEditor.ApplyOutputType;
+var
+ Idx : integer;
 begin
   if FDevice = nil then
     Exit;
 
   // --- выбор вкладки по имени ---
   case FDevice.OutputType of
-    0: tcOutPutType.ActiveTab := tiFrequency;  // Частота
-    1: tcOutPutType.ActiveTab := tiImpulse;    // Импульсы
-    2: tcOutPutType.ActiveTab := tiVoltage;    // Напряжение
-    3: tcOutPutType.ActiveTab := tiCurrent;    // Ток
-    4: tcOutPutType.ActiveTab := tiInterface;  // Интерфейс
-    5: tcOutPutType.ActiveTab := tiVisual;     // Визуальный
+    0: // Частота
+    begin
+    UpdateUIFreq;
+    tcOutPutType.ActiveTab := tiFrequency;
+    end;
+    1: // Импульсы
+    begin
+    UpdateUICoef;
+    tcOutPutType.ActiveTab := tiImpulse;
+    end;
+    2: // Напряжение
+    tcOutPutType.ActiveTab := tiVoltage;
+    3:  // Ток
+    tcOutPutType.ActiveTab := tiCurrent;
+    4:  // Интерфейс
+      begin
+     // =====================================================
+    // == Интерфейс / библиотека
+    // =====================================================
+    Idx := cbLibrares.Items.IndexOf(FDevice.ProtocolName);
+    if Idx >= 0 then
+      cbLibrares.ItemIndex := Idx
+    else
+      cbLibrares.ItemIndex := -1;
+    // =====================================================
+    // == Скорость передачи
+    // =====================================================
+    case FDevice.BaudRate of
+      2400:   cbBaudRate.ItemIndex := 0;
+      4800:   cbBaudRate.ItemIndex := 1;
+      9600:   cbBaudRate.ItemIndex := 2;
+      19200:  cbBaudRate.ItemIndex := 3;
+      115200: cbBaudRate.ItemIndex := 4;
+    else
+      cbBaudRate.ItemIndex := -1;
+    end;
+
+    // =====================================================
+    // == Четность
+    // =====================================================
+    if (FDevice.Parity >= 0) and (FDevice.Parity < cbParity.Items.Count) then
+      cbParity.ItemIndex := FDevice.Parity
+    else
+      cbParity.ItemIndex := 0;
+
+    // =====================================================
+    // == Адрес прибора
+    // =====================================================
+    if FDevice.DeviceAddress >= 0 then
+      edtAddr.Text := IntToStr(FDevice.DeviceAddress)
+    else
+      edtAddr.Text := '';
+
+    tcOutPutType.ActiveTab := tiInterface;
+    end;
+    5: // Визуальный
+    begin
+    // =====================================================
+    // == Визуальный ввод
+    // =====================================================
+    if (FDevice.InputType >= 0) and (FDevice.InputType < cbInputType.Items.Count) then
+      cbInputType.ItemIndex := FDevice.InputType
+    else
+      cbInputType.ItemIndex := 0;
+
+    tcOutPutType.ActiveTab := tiVisual;
+    end;
   end;
 
   // --- столбцы коэффициентов / импульсов (ТОЛЬКО точки прибора) ---
@@ -1338,6 +1403,46 @@ begin
 end;
 end;
 
+procedure TFormDeviceEditor.UpdateUICoef;
+begin
+    // =====================================================
+    // == Представление коэффициента
+    // =====================================================
+    if (FDevice.DimensionCoef >= 0) and
+       (FDevice.DimensionCoef < cbCoefViewType.Items.Count) then
+      cbCoefViewType.ItemIndex := FDevice.DimensionCoef
+    else
+      cbCoefViewType.ItemIndex := -1;
+
+    // =====================================================
+    // == Коэффициент
+    // =====================================================
+    if FDevice.Coef > 0 then
+      EditCoef.Text := FloatToStr(FDevice.Coef)
+    else
+      EditCoef.Text := '';
+end;
+
+procedure TFormDeviceEditor.UpdateUIFreq;
+begin
+
+    // =====================================================
+    // == Частота
+    // =====================================================
+    if FDevice.Freq > 0 then
+      EditFreq.Text := IntToStr(FDevice.Freq)
+    else
+      EditFreq.Text := '';
+
+    // =====================================================
+    // == Отношение расхода к частоте
+    // =====================================================
+    if FDevice.FreqFlowRate > 0 then
+      EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate)
+    else
+      EditFreqFlowRate.Text := '';
+
+end;
 
 procedure TFormDeviceEditor.UpdateUIFromDevice;
 var
@@ -1488,84 +1593,10 @@ begin
       cbOutPutType2.ItemIndex := -1;
     end;
 
-    // =====================================================
-    // == Представление коэффициента
-    // =====================================================
-    if (FDevice.DimensionCoef >= 0) and
-       (FDevice.DimensionCoef < cbCoefViewType.Items.Count) then
-      cbCoefViewType.ItemIndex := FDevice.DimensionCoef
-    else
-      cbCoefViewType.ItemIndex := -1;
+      ApplyOutputType;
 
-    // =====================================================
-    // == Коэффициент
-    // =====================================================
-    if FDevice.Coef > 0 then
-      EditCoef.Text := FloatToStr(FDevice.Coef)
-    else
-      EditCoef.Text := '';
 
-    // =====================================================
-    // == Частота
-    // =====================================================
-    if FDevice.Freq > 0 then
-      EditFreq.Text := IntToStr(FDevice.Freq)
-    else
-      EditFreq.Text := '';
 
-    // =====================================================
-    // == Отношение расхода к частоте
-    // =====================================================
-    if FDevice.FreqFlowRate > 0 then
-      EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate)
-    else
-      EditFreqFlowRate.Text := '';
-
-    // =====================================================
-    // == Интерфейс / библиотека
-    // =====================================================
-    Idx := cbLibrares.Items.IndexOf(FDevice.ProtocolName);
-    if Idx >= 0 then
-      cbLibrares.ItemIndex := Idx
-    else
-      cbLibrares.ItemIndex := -1;
-
-    // =====================================================
-    // == Скорость передачи
-    // =====================================================
-    case FDevice.BaudRate of
-      2400:   cbBaudRate.ItemIndex := 0;
-      4800:   cbBaudRate.ItemIndex := 1;
-      9600:   cbBaudRate.ItemIndex := 2;
-      19200:  cbBaudRate.ItemIndex := 3;
-      115200: cbBaudRate.ItemIndex := 4;
-    else
-      cbBaudRate.ItemIndex := -1;
-    end;
-
-    // =====================================================
-    // == Четность
-    // =====================================================
-    if (FDevice.Parity >= 0) and (FDevice.Parity < cbParity.Items.Count) then
-      cbParity.ItemIndex := FDevice.Parity
-    else
-      cbParity.ItemIndex := 0;
-
-    // =====================================================
-    // == Адрес прибора
-    // =====================================================
-    if FDevice.DeviceAddress >= 0 then
-      edtAddr.Text := IntToStr(FDevice.DeviceAddress)
-    else
-      edtAddr.Text := '';
-
-    // =====================================================
-    // == Визуальный ввод
-    // =====================================================
-    if (FDevice.InputType >= 0) and (FDevice.InputType < cbInputType.Items.Count) then
-      cbInputType.ItemIndex := FDevice.InputType
-    else
-      cbInputType.ItemIndex := 0;
 
     // =====================================================
     // == Комментарий
@@ -1961,6 +1992,9 @@ begin
   // 5. Сохраняем базовый коэффициент
   FDevice.Coef := NewBaseCoef;
 
+  FDevice.Freq := Round(FDevice.Coef * FDevice.FreqFlowRate  / 3.6);
+
+
   // 6. Пересчёт точек прибора
   RecalcDevicePointsCoef;   // ← аналог RecalcDiametersKp + RecalcPointsBySelectedDiameter
 
@@ -2083,9 +2117,11 @@ begin
     Exit;
 
   // ----------------------------------------
-  // Сохраняем в прибор
+  // Сохраняем в прибор    Kp = 3.6 * Freq / QFmax
   // ----------------------------------------
   FDevice.Freq := NewFreq;
+  FDevice.Coef :=   3.6 *  FDevice.Freq /  FDevice.FreqFlowRate;
+
 
   // ----------------------------------------
   // Обновляем точки прибора (если частота влияет)
@@ -2123,9 +2159,10 @@ begin
     Exit;
 
   // ----------------------------------------
-  // Сохраняем в прибор
+  // Сохраняем в прибор  Kp = 3.6 * Freq / QFmax
   // ----------------------------------------
   FDevice.FreqFlowRate := NewRate;
+  FDevice.Coef :=   3.6 *  FDevice.Freq /  FDevice.FreqFlowRate;
 
   // ----------------------------------------
   // Пересчёт параметров прибора

@@ -89,7 +89,7 @@ TParameters = class(TObject)
     property Hint: string read FHint write FHint;
     property Status: EControlState read FStatus write FStatus;
     property Action: EControlAction read FAction write FAction;
-    property SetValue: Double read FSet write FSet;
+    property ValueSet: Double read FSet write FSet;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
     property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;

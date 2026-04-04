@@ -2111,6 +2111,7 @@ begin
     RangeDynamic := Qmax / Qmin;
 
   Coef := ADiameter.Kp;
+  FreqFlowRate:= ADiameter.QFmax;
 
   LCoef := Coef;
   if (Points <> nil) and (LCoef > 0) then
@@ -2191,7 +2192,6 @@ begin
   {====================================================}
   Freq              := AType.Freq;
   FreqFlowRate      := AType.FreqFlowRate;
-  Coef              := AType.Coef;
 
   VoltageRange      := AType.VoltageRange;
   VoltageQminRate   := AType.VoltageQminRate;
@@ -2249,11 +2249,9 @@ begin
   Self.Qmax := TD.Qmax;
   Self.Qmin := TD.Qmin;
   Self.RangeDynamic := TD.Qmax / Max(TD.Qmin, 1e-6);
-  Self.Freq := Round(TD.QFmax);
-
-
-  Coef := TD.Kp;
+  Self.Coef := TD.Kp;
    end;
+
   if not APreservePointsAndSerial then
   begin
     {====================================================}

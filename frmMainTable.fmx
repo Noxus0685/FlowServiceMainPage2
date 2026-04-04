@@ -73,7 +73,7 @@ object FrameMainTable: TFrameMainTable
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Left
                 TabOrder = 1
-                Text = '0,00'
+                Text = '0'
                 Position.X = 89.000000000000000000
                 Size.Width = 56.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -161,7 +161,7 @@ object FrameMainTable: TFrameMainTable
                   Touch.InteractiveGestures = [LongTap, DoubleTap]
                   Align = Client
                   TabOrder = 1
-                  Text = '0,00'
+                  Text = '0'
                   Size.Width = 119.000000000000000000
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
@@ -1464,6 +1464,10 @@ object FrameMainTable: TFrameMainTable
             end
             object StringColumnUUID1: TStringColumn
               Header = 'UUID'
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnDeviceCoef1: TStringColumn
+              Header = #1050#1086#1101#1092'-'#1085#1090
               HeaderSettings.TextSettings.WordWrap = False
             end
           end

@@ -53,13 +53,13 @@ type
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
-<<<<<<< Main2
+
     procedure  PumpStateHandler(APump: TPump; AAction:EControlAction);
-=======
+
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
-    procedure  PumpStateHandler(APump: TPump; AAction:EPumpAction);
->>>>>>> main
+
+
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
 
@@ -78,20 +78,18 @@ type
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure UpdateRandomFreq(const APump: TPump);
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
-    procedure FlowRateStateHandler(AFlowRate: TFlowRate;
-<<<<<<< Main2
-      AAction: EControlAction);
+    procedure FlowRateStateHandler(AFlowRate: TFlowRate; AAction: EControlAction);
     procedure FlowFluidTempHandler(AFluidTemp: tFluidTemp;
       AAction: EControlAction);
     procedure FlowFluidPressHandler(AFluidPress: tFluidPress;
       AAction: EControlAction);
     procedure UpdateRandomPress(const AWorkTable: TWorkTable);
-=======
-      AAction: EFlowRateAction);
-    function GetChannelFlowCoef(const AChannel: TChannel): Double;
+
     procedure UpdateEtalonImpSecFromFlowRate;
     procedure UpdateDeviceImpSecFromFlowRate;
->>>>>>> main
+
+    function GetChannelFlowCoef(const AChannel: TChannel): Double;
+
 
   public
 
@@ -147,9 +145,14 @@ begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
-<<<<<<< Main2
+
 procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EControlAction);
-=======
+begin
+
+  FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
+
+end;
+
 procedure TFormMain.EditDeviceFlowRateExit(Sender: TObject);
 begin
   UpdateDeviceImpSecFromFlowRate;
@@ -160,33 +163,26 @@ begin
   UpdateEtalonImpSecFromFlowRate;
 end;
 
-procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EPumpAction);
->>>>>>> main
-begin
-
-  FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
-
-end;
 
 
 procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.SetValue)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
+  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.ValueSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
 
 end;
 
 procedure  TFormMain.FlowFluidTempHandler(AFluidTemp: tFluidTemp; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.SetValue) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
+  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
 
 end;
 
 procedure  TFormMain.FlowFluidPressHandler(AFluidPress: tFluidPress; AAction:EControlAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.SetValue) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
+  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
 
 end;
 
@@ -272,29 +268,29 @@ begin
     PressDelta :=  (Random * 0.06) - 0.03;
     if (AWorkTable.FluidTemp.IsRunning) then
     begin
-      if NOT(AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
-      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
-      AND  (AWorkTable.FluidTemp.Value<AWorkTable.FluidTemp.SetValue)  THEN
+      if NOT(AWorkTable.FluidTemp.ValueSet<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
+      AND (AWorkTable.FluidTemp.ValueSet>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
+      AND  (AWorkTable.FluidTemp.Value<AWorkTable.FluidTemp.ValueSet)  THEN
       begin
         AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue+1);
         AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue+1);
       end
-    ELSE if not(AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
-      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
-      AND  (AWorkTable.FluidTemp.Value>AWorkTable.FluidTemp.SetValue)  THEN
+    ELSE if not(AWorkTable.FluidTemp.ValueSet<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
+      AND (AWorkTable.FluidTemp.ValueSet>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100))
+      AND  (AWorkTable.FluidTemp.Value>AWorkTable.FluidTemp.ValueSet)  THEN
       begin
         AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue-1);
         AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue-1);
       end;
 
-      if (AWorkTable.FluidTemp.SetValue<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
-      AND (AWorkTable.FluidTemp.SetValue>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100)) then
+      if (AWorkTable.FluidTemp.ValueSet<=AWorkTable.FluidTemp.Value*(1+AWorkTable.FluidTemp.AccuracyPlus/100))
+      AND (AWorkTable.FluidTemp.ValueSet>=AWorkTable.FluidTemp.Value*(1-AWorkTable.FluidTemp.AccuracyMinus/100)) then
         AWorkTable.DoFluidTempStop
 
     end;
 
 
-      if AWorkTable.FluidTemp.SetValue<>0 then
+      if AWorkTable.FluidTemp.ValueSet<>0 then
       begin
         AWorkTable.FluidTemp.SetBefore(EnsureRange(AWorkTable.FluidTemp.BeforeValue + TempDelta, -50.0, 150.0));
         AWorkTable.FluidTemp.SetAfter(EnsureRange(AWorkTable.FluidTemp.AfterValue + TempDelta, -50.0, 150.0));
@@ -331,27 +327,27 @@ begin
     PressDelta :=  (Random * 0.06) - 0.03;
     if (AWorkTable.FluidPress.IsRunning) then
     begin
-      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.SetValue) then
+      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.ValueSet) then
       begin
         AWorkTable.FluidPress.SetBefore(AWorkTable.FluidPress.BeforeValue+1);
         AWorkTable.FluidPress.SetAfter(AWorkTable.FluidPress.AfterValue+1);
       end
-      else if  (AWorkTable.FluidPress.Value>AWorkTable.FluidPress.SetValue)  then
+      else if  (AWorkTable.FluidPress.Value>AWorkTable.FluidPress.ValueSet)  then
       begin
         AWorkTable.FluidPress.SetBefore(AWorkTable.FluidPress.BeforeValue-0.3);
         AWorkTable.FluidPress.SetAfter(AWorkTable.FluidPress.AfterValue-0.3);
       end;
-      if (AWorkTable.FluidPress.SetValue<=AWorkTable.FluidPress.Value*(1+AWorkTable.FluidPress.AccuracyPlus/100))
-      AND (AWorkTable.FluidPress.SetValue>=AWorkTable.FluidPress.Value*(1-AWorkTable.FluidPress.AccuracyMinus/100)) then
+      if (AWorkTable.FluidPress.ValueSet<=AWorkTable.FluidPress.Value*(1+AWorkTable.FluidPress.AccuracyPlus/100))
+      AND (AWorkTable.FluidPress.ValueSet>=AWorkTable.FluidPress.Value*(1-AWorkTable.FluidPress.AccuracyMinus/100)) then
         AWorkTable.DoFluidPressStop;
 
     end;
-      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.SetValue)  then
+      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.ValueSet)  then
       begin
         AWorkTable.FluidPress.SetBefore(EnsureRange(AWorkTable.FluidPress.BeforeValue + 0.1, -50.0, 150.0));
         AWorkTable.FluidPress.SetAfter(EnsureRange(AWorkTable.FluidPress.AfterValue + 0.1, -50.0, 150.0));
       end;
-      if AWorkTable.FluidPress.SetValue<>0 then
+      if AWorkTable.FluidPress.ValueSet<>0 then
       begin
         AWorkTable.FluidPress.SetBefore(EnsureRange(AWorkTable.FluidPress.BeforeValue + PressDelta, -50.0, 150.0));
         AWorkTable.FluidPress.SetAfter(EnsureRange(AWorkTable.FluidPress.AfterValue + PressDelta, -50.0, 150.0));
@@ -389,7 +385,7 @@ begin
 
    if APump.IsRunning = true then
     begin
-      APump.Value := EnsureRange(APump.Value + Freq,APump.Value , APump.SetValue);
+      APump.Value := EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet);
     end
     else
     begin
@@ -432,7 +428,7 @@ begin
   if Coef <= 0 then
     Exit;
 
-  ImpSec := (FlowRate * Coef) / 3600.0;
+  ImpSec := (FlowRate * Coef) / 3.6;
   EditDeviceImpSec.Text := FloatToStr(ImpSec);
 end;
 
@@ -450,7 +446,7 @@ begin
   if Coef <= 0 then
     Exit;
 
-  ImpSec := (FlowRate * Coef) / 3600.0;
+  ImpSec := (FlowRate * Coef) / 3.6;
   EditEtalonImpSec.Text := FloatToStr(ImpSec);
 end;
 
@@ -475,7 +471,7 @@ begin
 
    if AFlowRate.IsRunning = true then
     begin
-      AFlowRate.Value := EnsureRange(AFlowRate.Value + Flow,AFlowRate.Value, AFlowRate.SetValue);
+      AFlowRate.Value := EnsureRange(AFlowRate.Value + Flow,AFlowRate.Value, AFlowRate.ValueSet);
     end
     else
     begin
