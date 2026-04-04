@@ -515,10 +515,10 @@ begin
 
   ADevice := DataManager.FindDevice(ADeviceUUID, Repo);
 
-  if (ADevice <> nil) and (ADevice.State in [osClean, osLoaded, osSaved]) then
+  if (ADevice <> nil) then
     ADevice.State := osModified;
 
-  if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+  if (Repo <> nil) then
     Repo.State := osModified;
 end;
 
@@ -691,7 +691,7 @@ begin
      (DataManager <> nil) then
   begin
     DataManager.FindDevice(UUID, Repo);
-    if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+    if (Repo <> nil) then
       Repo.State := osModified;
   end;
 end;
@@ -1595,7 +1595,6 @@ begin
       if Sess.Active then
       begin
         Sess.Active := False;
-        if Sess.State = osClean then
           Sess.State := osModified;
       end;
     end;
@@ -1641,7 +1640,6 @@ begin
     if Sess.Active then
     begin
       Sess.Active := False;
-      if Sess.State = osClean then
         Sess.State := osModified;
     end;
   end;
@@ -1652,7 +1650,6 @@ begin
     if Result <> nil then
     begin
       Result.Active := True;
-      if Result.State = osClean then
         Result.State := osModified;
     end;
   end;
@@ -1680,7 +1677,6 @@ begin
   if ActiveSession.Status <> 1 then
   begin
     ActiveSession.Status := 1;
-    if ActiveSession.State = osClean then
       ActiveSession.State := osModified;
   end;
 
@@ -1765,7 +1761,6 @@ begin
   ASpillage.StatusStr := 'Данные присвоены, анализ выполняется.';
   ASpillage.Valid := False;
 
-  if ASpillage.State = osClean then
     ASpillage.State := osModified;
 
   MatchedPoint := nil;
@@ -1859,7 +1854,6 @@ begin
   ASpillage.Valid := True;
     result:=True;
 
-  if ASpillage.State = osClean then
     ASpillage.State := osModified;
 end;
 

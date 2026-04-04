@@ -1977,8 +1977,7 @@ begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
     Exit;
 
-  if AChannel.FlowMeter.Device.State <> osDeleted then
-    AChannel.FlowMeter.Device.State := osModified;
+  AChannel.FlowMeter.Device.State := osModified;
 end;
 
 procedure TFrameMainTable.SetDim(FlowUnitName: string; QuantityUnitName: string);
@@ -3354,8 +3353,7 @@ begin
 
 
 
-  if AChannel.FlowMeter.Device.State in [osClean, osLoaded] then
-    AChannel.FlowMeter.Device.State := osModified;
+  AChannel.FlowMeter.Device.State := osModified;
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(AChannel.FlowMeter.Device);
 end;
@@ -3528,8 +3526,7 @@ begin
     Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
     if Session = nil then
       Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
-    if Session.State = osClean then
-      Session.State := osModified;
+    Session.State := osModified;
 
     if Session.DateTimeOpen = 0 then
       Session.DateTimeOpen := Now;
