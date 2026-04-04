@@ -1642,19 +1642,56 @@ procedure TFrameMainTable.FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
 var
   I: Integer;
   MenuItem: TMenuItem;
+  GroupItem: TMenuItem;
   Column: TColumn;
+  GroupItems: array[1..5] of TMenuItem;
+
+  function GetGroupNameByTag(const ATag: Integer): string;
+  begin
+    case ATag of
+      1: Result := 'Канал';
+      2: Result := 'Прибор';
+      3: Result := 'Измерение';
+      4: Result := 'Статистика';
+      5: Result := 'Прочее';
+    else
+      Result := '';
+    end;
+  end;
+
+  function EnsureGroupItem(const ATag: Integer): TMenuItem;
+  begin
+    Result := nil;
+    if (ATag < Low(GroupItems)) or (ATag > High(GroupItems)) then
+      Exit;
+
+    if GroupItems[ATag] = nil then
+    begin
+      GroupItems[ATag] := TMenuItem.Create(AMenu);
+      GroupItems[ATag].Parent := AMenu;
+      GroupItems[ATag].Text := GetGroupNameByTag(ATag);
+    end;
+
+    Result := GroupItems[ATag];
+  end;
 begin
   if (AMenu = nil) or (AGrid = nil) then
     Exit;
 
   AMenu.Clear;
+  for I := Low(GroupItems) to High(GroupItems) do
+    GroupItems[I] := nil;
 
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     Column := AGrid.Columns[I];
 
     MenuItem := TMenuItem.Create(AMenu);
-    MenuItem.Parent := AMenu;
+    GroupItem := EnsureGroupItem(Column.Tag);
+    if GroupItem <> nil then
+      MenuItem.Parent := GroupItem
+    else
+      MenuItem.Parent := AMenu;
     MenuItem.Text := Column.Header;
     MenuItem.IsChecked := Column.Visible;
     MenuItem.TagObject := Column;
@@ -3937,6 +3974,14 @@ begin
       else
         Value := '-';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceCoef1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueCoef <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueCoef.GetStrValue
+      else
+        Value := '-';
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
@@ -4411,7 +4456,7 @@ begin
       WT.DeviceChannels.Count,
       [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
        StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceError1]
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
@@ -4419,7 +4464,7 @@ begin
       Length(FFlowMeterRows),
       [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
        StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceError1]
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     );
 
   if WT <> nil then
