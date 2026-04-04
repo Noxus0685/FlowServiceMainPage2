@@ -497,10 +497,10 @@ begin
 
   AType := DataManager.FindType(ATypeUUID, '', Repo);
 
-  if (AType <> nil) and (AType.State in [osClean, osLoaded, osSaved]) then
+  if (AType <> nil) then
     AType.State := osModified;
 
-  if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+  if (Repo <> nil) then
     Repo.State := osModified;
 end;
 
@@ -1063,7 +1063,7 @@ begin
      (DataManager <> nil) then
   begin
     DataManager.FindType(UUID, '', Repo);
-    if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+    if (Repo <> nil) then
       Repo.State := osModified;
   end;
 end;

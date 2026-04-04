@@ -972,8 +972,7 @@ end;
 begin
   if FLoading then Exit;
   FModified := True;
-  if FType.State <> osNew then
-    FType.State :=  osModified;
+  FType.State :=  osModified;
 
     end;
 
@@ -2811,8 +2810,7 @@ begin
   if D = nil then
     Exit;
 
-    if D.State <> osNew then
-       D.State:=osModified;
+    D.State:=osModified;
 
   S := Trim(Value.AsString);
 
@@ -3059,7 +3057,6 @@ begin
     end;
   end;
 
-  if P.State <> osNew then
   P.State:=osModified;
   SetModified;
   UpdatePointsGrid;

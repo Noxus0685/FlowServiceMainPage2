@@ -2797,7 +2797,6 @@ begin
       end;
     end;
   end;
-  if P.State <> osNew then
   P.State := osModified;
   SetModified;
   UpdatePointsGrid;
@@ -2887,8 +2886,7 @@ begin
   if FDevice = nil then
     Exit;
 
-  if FDevice.State = osClean then
-    FDevice.State := osModified;
+  FDevice.State := osModified;
 end;
 
 procedure TFormDeviceEditor.CloseEditor(ASave: Boolean);

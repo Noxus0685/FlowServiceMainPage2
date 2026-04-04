@@ -639,8 +639,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.RepoTypeName := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 end;
 
@@ -658,8 +657,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.RepoTypeUUID := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 end;
 
@@ -677,8 +675,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.RepoDeviceName := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 end;
 
@@ -696,8 +693,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.RepoDeviceUUID := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 end;
 
@@ -735,8 +731,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.OutputType := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 
   FOutputType := AValue;
@@ -762,8 +757,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.DeviceTypeName := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 end;
 
@@ -781,8 +775,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.Name := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 end;
 
@@ -801,8 +794,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.DeviceTypeUUID := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 
 
@@ -827,8 +819,7 @@ begin
   if Assigned(FDevice) then
   begin
     FDevice.SerialNumber := AValue;
-    if FDevice.State <> osNew then
-      FDevice.State := osModified;
+    FDevice.State := osModified;
   end;
 
 end;
