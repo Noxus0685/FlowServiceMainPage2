@@ -704,7 +704,7 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
-        FOriginalDevice:=FDevice.Clone;
+        FOriginalDevice.Assign(FDevice,True);
         DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else
@@ -1132,6 +1132,7 @@ begin
       { Редактирование существующего прибора }
       {----------------------------------}
       FOriginalDevice := ADevice;
+      //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
     end
     else
@@ -1144,7 +1145,6 @@ begin
         FDevice := DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
-      FDevice.State := osNew;
     end;
 
     {----------------------------------}
@@ -2113,8 +2113,8 @@ begin
   // ----------------------------------------
   // Нет изменений
   // ----------------------------------------
-  if FDevice.Freq = NewFreq then
-    Exit;
+ // if FDevice.Freq = NewFreq then
+ //   Exit;
 
   // ----------------------------------------
   // Сохраняем в прибор    Kp = 3.6 * Freq / QFmax
@@ -2901,7 +2901,9 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
-        FOriginalDevice:=FDevice.Clone;
+        FOriginalDevice.Assign(FDevice,True);
+
+
         DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else

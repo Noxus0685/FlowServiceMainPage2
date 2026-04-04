@@ -85,7 +85,7 @@ type
   function FindType(const AUUID, AName: string; out ARepo: TTypeRepository): TDeviceType;
   function FindDevice(const AUUID: string; out ARepo: TDeviceRepository): TDevice;
   function FindTypeRepositoryByName(const AName: string): TTypeRepository;
-
+  function FindDeviceRepositoryByName(const AName: string): TDeviceRepository;
 
   end;
 
@@ -1271,6 +1271,23 @@ begin
     if SameText(Repo.Name, AName) then
       Exit(Repo);
 end;
+
+
+function TManagerTDM.FindDeviceRepositoryByName(const AName: string): TDeviceRepository;
+var
+  Repo: TDeviceRepository;
+begin
+  Result := nil;
+
+  if AName = '' then
+    Exit;
+
+  for Repo in DeviceRepositories do
+    if SameText(Repo.Name, AName) then
+      Exit(Repo);
+end;
+
+
 
 
 end.

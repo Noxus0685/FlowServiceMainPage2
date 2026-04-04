@@ -776,7 +776,7 @@ var
   );
   begin
     T := TDeviceType.Create;
-    T.Assign(ABase);
+    T.Assign(ABase, False);
 
     T.ID := FNextTypeID;
     Inc(FNextTypeID);
@@ -1283,7 +1283,7 @@ begin
   if AType = nil then
     Exit;
   // копируем ВСЕ поля
-  Result.Assign(AType);
+  Result.Assign(AType, False);
 
   { Новый объект должен быть новым для БД }
   Result.ID := GenerateTypeID;

@@ -1978,6 +1978,9 @@ begin
     Exit;
 
   AChannel.FlowMeter.Device.State := osModified;
+  AChannel.FlowMeter.RebindCalculatedValues;
+  PersistDeviceAsync(AChannel.FlowMeter.Device);
+
 end;
 
 procedure TFrameMainTable.SetDim(FlowUnitName: string; QuantityUnitName: string);
@@ -2370,17 +2373,12 @@ begin
   if AChannel = nil then
     Exit;
 
-  ADevice := nil;
-  ActiveRepo := nil;
   if DataManager <> nil then
-  begin
-    ActiveRepo := DataManager.ActiveDeviceRepo;
+  ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
 
-    if AChannel.DeviceUUID <> '' then
-      ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
-  end;
+  ADevice := AChannel.FlowMeter.Device;
 
-  if (ADevice = nil) and
+   if (ADevice = nil) and
      ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
@@ -2392,20 +2390,13 @@ begin
       if SelDevice = nil then
         Exit;
 
-      AChannel.DeviceUUID := SelDevice.UUID;
-      AChannel.TypeName := SelDevice.DeviceTypeName;
-      AChannel.Serial := SelDevice.SerialNumber;
-      AChannel.Signal := SelDevice.OutputType;
-      if FFrameProceed <> nil then
-        FFrameProceed.AddProcessingDevice(SelDevice);
-      UpdateGridDevices;
+      AChannel.FlowMeter.Init(SelDevice.UUID);
+
     finally
       SelectFrm.Free;
     end;
     Exit;
   end;
-
-  AChannel.CreateDevice;
 
   Frm := TFormDeviceEditor.Create(Self);
   try
@@ -2414,20 +2405,15 @@ begin
     begin
       if ADevice <> nil then
       begin
-        AChannel.DeviceUUID := ADevice.UUID;
-        AChannel.DeviceName:= ADevice.Name;
-        AChannel.TypeName := ADevice.DeviceTypeName;
-        AChannel.Serial := ADevice.SerialNumber;
-        AChannel.Signal := ADevice.OutputType;
-        if FFrameProceed <> nil then
-          FFrameProceed.AddProcessingDevice(ADevice);
-      end;
-
-      UpdateGrids;
+      AChannel.FlowMeter.Init(ADevice.UUID);
+       end;
     end;
   finally
     Frm.Free;
   end;
+
+ UpdateGrids;
+
 end;
 
 procedure TFrameMainTable.ActionOpenDeviceSelectExecute(Sender: TObject);
@@ -2587,6 +2573,9 @@ begin
   Repo := DataManager.ActiveDeviceRepo;
   if Repo = nil then
     Exit;
+
+  if ADevice.SerialNumber = '' then
+  Exit;
 
   TThread.CreateAnonymousThread(
     procedure
@@ -2769,16 +2758,17 @@ begin
     begin
 
        If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
-
+      begin
       Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False)//  (Src.FlowMeter.Device.DN, SourceType);
 
+      end
         else
           AttachType(Ch, SourceType, FoundRepo, True);
 
   //  If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
   //    Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
 
-
+      Ch.FlowMeter.RebindCalculatedValues;
 
     end;
 
@@ -3350,10 +3340,6 @@ begin
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
   AChannel.FlowMeter.Device.FillFromType(ANewType, False);
 
-
-
-
-  AChannel.FlowMeter.Device.State := osModified;
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(AChannel.FlowMeter.Device);
 end;
@@ -3449,7 +3435,7 @@ begin
     { 3. Проверяем смену типа }
     {----------------------------------------------------}
     IsTypeChanged := True;
-
+  {
     if CurrentType <> nil then
     begin
       if CurrentType = NewType then
@@ -3462,12 +3448,14 @@ begin
           (not SameText(CurrentType.Name, NewType.Name)) or
           (not SameText(CurrentType.Modification, NewType.Modification));
     end;
+    }
 
     AttachType(Ch, NewType, FoundRepo, IsTypeChanged);
 
     {----------------------------------------------------}
     { 4. Обновляем UI }
     {----------------------------------------------------}
+
     FActiveWorkTable.RecalculateAllMeterValues;
 
     UpdateGrids;

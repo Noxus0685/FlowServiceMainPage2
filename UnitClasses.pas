@@ -363,7 +363,7 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    procedure Assign(ASource: TDeviceType);
+    procedure Assign(ASource: TDeviceType; FullAssign: Boolean);
     function Clone: TDeviceType;
     function GetSearchText: string; override;
 
@@ -1506,14 +1506,13 @@ end;
 function TDeviceType.Clone: TDeviceType;
 begin
   Result := TDeviceType.Create;
-   Result.ID := ID;
-   Result.UUID := UUID;
-  Result.Assign(Self);
+
+  Result.Assign(Self, True);
 
 end;
 
 
-procedure TDeviceType.Assign(ASource: TDeviceType);
+procedure TDeviceType.Assign(ASource: TDeviceType; FullAssign: Boolean);
 var
   D, NewD: TDiameter;
   P, NewP: TTypePoint;
@@ -1524,7 +1523,21 @@ begin
   {====================================================================}
   { Идентификация }
   {====================================================================}
+   if FullAssign then
+    begin
+    ID := ASource.ID;
+    UUID := ASource.UUID;
+    State :=  ASource.State;
+     end
+     else
+     begin
 
+  {====================================================================}
+  { Состояние }
+  {====================================================================}
+  State := ASource.State;
+
+     end;
 
   {====================================================================}
   { Наименование и классификация }
@@ -1625,10 +1638,7 @@ begin
   {====================================================================}
   Error := ASource.Error;
 
-  {====================================================================}
-  { Состояние }
-  {====================================================================}
-  State := ASource.State;
+
 
   {====================================================================}
   { ГЛУБОКОЕ КОПИРОВАНИЕ ДИАМЕТРОВ }

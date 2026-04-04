@@ -460,7 +460,7 @@ type
     constructor Create;
     destructor Destroy;
 
-    procedure Assign(ASource: TDevice; AssignSerial: Boolean);
+    procedure Assign(ASource: TDevice; FullAssign: Boolean);
     function Clone: TDevice;
     function GetSearchText: string; override;
 
@@ -951,7 +951,7 @@ begin
   FCDCoefficient := '';
 end;
 
-procedure TDevice.Assign(ASource: TDevice; AssignSerial: Boolean);
+procedure TDevice.Assign(ASource: TDevice; FullAssign: Boolean);
 var
   P: TDevicePoint;
   NewP: TDevicePoint;
@@ -959,12 +959,19 @@ begin
   if ASource = nil then
     Exit;
 
-  if AssignSerial then
+  if FullAssign then
+   begin
      SerialNumber := ASource.SerialNumber;
+     UUID:=  ASource. UUID;
+     ID:=  ASource.  ID;
+     State  := ASource.State;
+   end else
+   begin
 
   //не проверяем изменения свойств, но считаем, что что-то изменилось
   { Состояние }
    State := osModified;
+   end;
 
   { ============================= }
   { 1. Копирование простых полей  }
@@ -1126,8 +1133,7 @@ function TDevice.Clone: TDevice;
 begin
   Result := TDevice.Create;
   Result.Assign(Self, True);
-  Result.ID := ID;
-  Result.UUID := UUID;
+
 end;
 
 function TDevice.GetSearchText: string;
@@ -2236,7 +2242,6 @@ begin
   { 3. Сигналы }
   {====================================================}
   Freq              := AType.Freq;
-  FreqFlowRate      := AType.FreqFlowRate;
 
   VoltageRange      := AType.VoltageRange;
   VoltageQminRate   := AType.VoltageQminRate;
@@ -2295,6 +2300,7 @@ begin
   Self.Qmin := TD.Qmin;
   Self.RangeDynamic := TD.Qmax / Max(TD.Qmin, 1e-6);
   Self.Coef := TD.Kp;
+  Self.FreqFlowRate:= TD.QFmax;
    end;
 
   if not APreservePointsAndSerial then
@@ -2344,7 +2350,5 @@ begin
 
   SyncNameWithModificationAndDiameter;
 end;
-
-
 
 end.

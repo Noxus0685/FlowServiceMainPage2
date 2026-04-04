@@ -1027,7 +1027,7 @@ begin
 
     if FOriginalType <> nil then
     begin
-      FOriginalType.Assign(FType);
+      FOriginalType.Assign(FType, True);
       if not Repo.SaveType(FOriginalType) then
         raise Exception.Create('Ошибка сохранения типа');
       FOriginalType.SelectedDiameterID := FSelectedDiameterID;

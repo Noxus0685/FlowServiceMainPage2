@@ -732,6 +732,7 @@ begin
   begin
     FDevice.OutputType := AValue;
     FDevice.State := osModified;
+    ApplyMeasurementModel;
   end;
 
   FOutputType := AValue;
