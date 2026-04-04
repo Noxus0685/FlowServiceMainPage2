@@ -287,6 +287,7 @@ type
      FButtonCoefDelete: TButton;
      FButtonCoefClear: TButton;
      FCoefsTabInitialized: Boolean;
+     FSkipPointDeleteConfirm: Boolean;
 
      procedure ApplyMassMode;
      procedure ApplyVolumeMode;
@@ -599,14 +600,38 @@ procedure TFormDeviceEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TDevicePoint;
   PointIdx: Integer;
+  SelRow: Integer;
 begin
   if FDevice = nil then
     Exit;
+
+  SelRow := GridPoints.Selected;
+  if SelRow < 0 then
+    SelRow := GridPoints.Row;
+  if SelRow < 0 then
+    Exit;
+
+  { Явно подсвечиваем строку для удаления }
+  GridPoints.Row := SelRow;
+  GridPoints.Selected := SelRow;
 
   Point := GetSelectedPoint;  // ← твой метод получения выбранной точки
 
   if Point = nil then
     Exit;
+
+  if not FSkipPointDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранную точку?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipPointDeleteConfirm := True;
+  end;
 
   {----------------------------------}
   { Если точка новая — удаляем физически }
@@ -1123,6 +1148,8 @@ begin
 
   FLoading := True;
   try
+    FSkipPointDeleteConfirm := False;
+
     FreeAndNil(FDevice);
     FDeviceType := nil;
 

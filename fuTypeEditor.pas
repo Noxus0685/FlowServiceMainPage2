@@ -325,6 +325,8 @@ type
   FButtonCoefAdd: TButton;
   FButtonCoefDelete: TButton;
   FButtonCoefClear: TButton;
+  FSkipDiameterDeleteConfirm: Boolean;
+  FSkipPointDeleteConfirm: Boolean;
 
 
 
@@ -938,6 +940,9 @@ procedure TFormTypeEditor.LoadType(AType: TDeviceType);
 begin
   FLoading := True;
   try
+    FSkipDiameterDeleteConfirm := False;
+    FSkipPointDeleteConfirm := False;
+
     {----------------------------------}
     { Освобождаем предыдущий экземпляр }
     {----------------------------------}
@@ -1134,13 +1139,35 @@ end;
 procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
   D: TDiameter;
+  SelRow: Integer;
 begin
   if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
 
-  D := GetDiameterByVisibleRow(GridDiameters.Row);
+  SelRow := GridDiameters.Row;
+  if SelRow < 0 then
+    Exit;
+
+  { Явно подсвечиваем строку для удаления }
+  GridDiameters.Row := SelRow;
+  GridDiameters.Selected := SelRow;
+
+  D := GetDiameterByVisibleRow(SelRow);
   if D = nil then
     Exit;
+
+  if not FSkipDiameterDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранный диаметр?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipDiameterDeleteConfirm := True;
+  end;
 
   if D.State = osNew then
     FDiametersLocal.Remove(D)
@@ -1238,13 +1265,35 @@ procedure TFormTypeEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TTypePoint;
   PointIdx: Integer;
+  SelRow: Integer;
 begin
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
 
-  Point := GetPointByVisibleRow(GridPoints.Row);
+  SelRow := GridPoints.Row;
+  if SelRow < 0 then
+    Exit;
+
+  { Явно подсвечиваем строку для удаления }
+  GridPoints.Row := SelRow;
+  GridPoints.Selected := SelRow;
+
+  Point := GetPointByVisibleRow(SelRow);
   if Point = nil then
     Exit;
+
+  if not FSkipPointDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранную точку?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipPointDeleteConfirm := True;
+  end;
 
   if Point.State = osNew then
   begin
