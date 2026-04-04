@@ -152,6 +152,7 @@ type
 
     FSortColumn: Integer;
     FSortAscending: Boolean;
+    FSkipTypeDeleteConfirm: Boolean;
 
     procedure LoadData;
     procedure BuildTree;
@@ -649,17 +650,25 @@ begin
   if (SelRow < 0) or (SelRow >= FDevFilteredTypes.Count) then
     Exit;
 
+  { Явно подсвечиваем строку для удаления }
+  GridTypes.Row := SelRow;
+
   SelType := FDevFilteredTypes[SelRow];
   if SelType = nil then
     Exit;
 
-  if MessageDlg(
-       'Удалить выбранный тип безвозвратно?',
-       TMsgDlgType.mtWarning,
-       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-       0
-     ) <> mrYes then
-    Exit;
+  if not FSkipTypeDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранный тип безвозвратно?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipTypeDeleteConfirm := True;
+  end;
 
   {----------------------------------}
   { Удаление через репозиторий }
@@ -776,6 +785,7 @@ begin
 
    FSortColumn := -1;
    FSortAscending := True;
+   FSkipTypeDeleteConfirm := False;
 
 
    LoadData;
