@@ -3,6 +3,7 @@
 interface
 
 uses
+  UnitBaseProcedures,
   UnitClasses,
 
 

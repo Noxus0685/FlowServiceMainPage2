@@ -1498,7 +1498,7 @@ object FrameMainTable: TFrameMainTable
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceCoef1: TStringColumn
-              Tag = 1
+              Tag = 2
               Header = #1050#1086#1101#1092'-'#1085#1090
               HeaderSettings.TextSettings.WordWrap = False
             end
