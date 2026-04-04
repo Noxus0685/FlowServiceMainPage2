@@ -1241,12 +1241,14 @@ object FrameMainTable: TFrameMainTable
                 Size.Width = 27.000000000000000000
               end
               object StringColumnEtalonChanel1: TStringColumn
+                Tag = 1
                 Header = #1050#1072#1085#1072#1083
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
                 Size.Width = 45.000000000000000000
               end
               object StringColumnEtalonType1: TStringColumn
+                Tag = 2
                 Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
@@ -1254,20 +1256,24 @@ object FrameMainTable: TFrameMainTable
                 Size.Width = 111.000000000000000000
               end
               object PopupColumnEtalonDN1: TPopupColumn
+                Tag = 2
                 Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
                 HeaderSettings.TextSettings.WordWrap = False
               end
               object StringColumnEtalonName1: TStringColumn
+                Tag = 2
                 Header = #1055#1088#1080#1073#1086#1088
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonSerial1: TStringColumn
+                Tag = 2
                 Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object PopupColumnEtalonSignal1: TPopupColumn
+                Tag = 1
                 HorzAlign = Center
                 Header = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
                 HeaderSettings.TextSettings.WordWrap = False
@@ -1280,41 +1286,49 @@ object FrameMainTable: TFrameMainTable
                   #1058#1086#1082)
               end
               object StringColumnEtalonRawValue1: TStringColumn
+                Tag = 3
                 Header = #1057#1080#1075#1085#1072#1083
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonFlowRate1: TStringColumn
+                Tag = 3
                 Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonQuantity1: TStringColumn
+                Tag = 3
                 Header = #1054#1073#1098#1077#1084', '#1084'3'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonError1: TStringColumn
+                Tag = 4
                 Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonStd1: TStringColumn
+                Tag = 4
                 Header = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonPressureDelta1: TStringColumn
+                Tag = 5
                 Header = #1055#1077#1088#1077#1087#1072#1076
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonOptions1: TStringColumn
+                Tag = 5
                 Header = #1057#1090#1072#1090#1091#1089
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
               end
               object StringColumnEtalonRawSumValue1: TStringColumn
+                Tag = 3
                 Header = #1047#1085#1072#1095#1077#1085#1080#1077
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -1372,6 +1386,7 @@ object FrameMainTable: TFrameMainTable
               ReadOnly = True
             end
             object StringColumnDeviceChanel1: TStringColumn
+              Tag = 1
               Header = #1050#1072#1085#1072#1083
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
@@ -1379,6 +1394,7 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 44.000000000000000000
             end
             object ColumnDeviceType1: TColumn
+              Tag = 2
               Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
               HeaderSettings.StyleLookup = 'headeritemstyle'
               HeaderSettings.TextSettings.WordWrap = False
@@ -1387,15 +1403,18 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 111.000000000000000000
             end
             object PopupColumnDeviceDN1: TPopupColumn
+              Tag = 2
               Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceName1: TStringColumn
+              Tag = 2
               Header = #1055#1088#1080#1073#1086#1088
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
             end
             object StringColumnDeviceSerial1: TStringColumn
+              Tag = 2
               Header = #1057#1077#1088#1080#1081#1085#1099#1081
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
@@ -1403,6 +1422,7 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 106.000000000000000000
             end
             object PopupColumnDeviceSignal1: TPopupColumn
+              Tag = 1
               Header = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
               HeaderSettings.TextSettings.Trimming = Character
               HeaderSettings.TextSettings.WordWrap = False
@@ -1413,60 +1433,72 @@ object FrameMainTable: TFrameMainTable
                 #1048#1085#1090#1077#1088#1092#1077#1081#1089)
             end
             object StringColumnDeviceRawValue1: TStringColumn
+              Tag = 3
               Header = #1057#1080#1075#1085#1072#1083
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
             end
             object StringColumnDeviceFlowRate1: TStringColumn
+              Tag = 3
               Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
             end
             object StringColumnDeviceQuantity1: TStringColumn
+              Tag = 3
               Header = #1054#1073#1098#1077#1084', '#1084'3'
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
             end
             object StringColumnDeviceError1: TStringColumn
+              Tag = 4
               Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
             end
             object StringColumnDeviceStd1: TStringColumn
+              Tag = 4
               Header = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
             end
             object StringColumnDeviceQuantityBefore1: TStringColumn
+              Tag = 3
               Header = #1054#1073#1098#1077#1084' '#1076#1086
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceQuantityAfter1: TStringColumn
+              Tag = 3
               Header = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDevicePressureDelta1: TStringColumn
+              Tag = 5
               Header = #1055#1088#1077#1087#1072#1076
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
             end
             object StringColumnDeviceOptions1: TStringColumn
+              Tag = 5
               Header = #1057#1090#1072#1090#1091#1089
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
             end
             object StringColumnDeviceRawSumValue1: TStringColumn
+              Tag = 3
               Header = #1047#1085#1072#1095#1077#1085#1080#1077
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnUUID1: TStringColumn
+              Tag = 5
               Header = 'UUID'
               HeaderSettings.TextSettings.WordWrap = False
             end
             object StringColumnDeviceCoef1: TStringColumn
+              Tag = 1
               Header = #1050#1086#1101#1092'-'#1085#1090
               HeaderSettings.TextSettings.WordWrap = False
             end
