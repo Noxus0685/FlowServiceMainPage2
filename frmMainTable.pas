@@ -4068,7 +4068,7 @@ begin
   if IsUpdating then
     Exit;
 
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     Changed := False;
@@ -4520,7 +4520,7 @@ begin
   if IsUpdating then
     Exit;
 
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
     Changed := False;
