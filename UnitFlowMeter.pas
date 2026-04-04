@@ -636,7 +636,11 @@ procedure TFlowMeter.SetRepoTypeNameProxy(const AValue: string);
 begin
   FRepoTypeName := AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.RepoTypeName := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 end;
 
 function TFlowMeter.GetRepoTypeUUIDProxy: string;
@@ -651,7 +655,11 @@ procedure TFlowMeter.SetRepoTypeUUIDProxy(const AValue: string);
 begin
   FRepoTypeUUID := AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.RepoTypeUUID := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 end;
 
 function TFlowMeter.GetRepoDeviceNameProxy: string;
@@ -666,7 +674,11 @@ procedure TFlowMeter.SetRepoDeviceNameProxy(const AValue: string);
 begin
   FRepoDeviceName := AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.RepoDeviceName := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 end;
 
 function TFlowMeter.GetRepoDeviceUUIDProxy: string;
@@ -681,7 +693,11 @@ procedure TFlowMeter.SetRepoDeviceUUIDProxy(const AValue: string);
 begin
   FRepoDeviceUUID := AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.RepoDeviceUUID := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 end;
 
 
@@ -716,7 +732,11 @@ end;
 procedure TFlowMeter.SetOutputTypeProxy(const AValue: Integer);
 begin
   if Assigned(FDevice) then
+  begin
     FDevice.OutputType := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 
   FOutputType := AValue;
   UpdateByDevice;
@@ -739,7 +759,11 @@ procedure TFlowMeter.SetDeviceTypeNameProxy(const AValue: string);
 begin
   FTypeName := AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.DeviceTypeName := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 end;
 
 function TFlowMeter.GetDeviceNameProxy: string;
@@ -754,7 +778,11 @@ procedure TFlowMeter.SetDeviceNameProxy(const AValue: string);
 begin
   Name := AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.Name := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 end;
 
 function TFlowMeter.GetDeviceTypeUUIDProxy: string;
@@ -770,7 +798,11 @@ procedure TFlowMeter.SetDeviceTypeUUIDProxy(const AValue: string);
 begin
    FDeviceTypeUUID := AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.DeviceTypeUUID := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 
 
 end;
@@ -792,7 +824,11 @@ procedure TFlowMeter.SetSerialNumberProxy(const AValue: string);
 begin
   FSerialNumber :=  AValue;
   if Assigned(FDevice) then
+  begin
     FDevice.SerialNumber := AValue;
+    if FDevice.State <> osNew then
+      FDevice.State := osModified;
+  end;
 
 end;
 
