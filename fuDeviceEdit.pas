@@ -704,7 +704,7 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
-        FOriginalDevice.Assign(FDevice);
+        FOriginalDevice:=FDevice.Clone;
         DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else
@@ -2903,7 +2903,7 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
-        FOriginalDevice.Assign(FDevice);
+        FOriginalDevice:=FDevice.Clone;
         DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else

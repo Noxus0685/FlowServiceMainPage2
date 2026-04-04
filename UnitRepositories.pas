@@ -3543,14 +3543,8 @@ begin
     Exit(CreateNewDevice);
 
   { создаём новый прибор }
-  Result := CreateNewDevice;
+  Result := CreateDevice(Src);
 
-  { копируем данные }
-  Result.Assign(Src);
-
-  { гарантируем уникальность }
-  Result.ID := GenerateDeviceID;
-  Result.State := osNew;
 end;
 
 function TDeviceRepository.CreateDevice(const ASource: TDevice): TDevice;
@@ -3559,7 +3553,7 @@ begin
     Exit(CreateNewDevice);
 
   Result := CreateNewDevice;
-  Result.Assign(ASource);
+  Result.Assign(ASource, False);
   Result.ID := GenerateDeviceID;
   Result.State := osNew;
 end;

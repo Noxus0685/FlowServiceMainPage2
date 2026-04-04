@@ -2748,6 +2748,7 @@ var
   SourceType: TDeviceType;
   FoundRepo: TTypeRepository;
 begin
+
   if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
      (DataManager = nil) then
     Exit;
@@ -2767,10 +2768,17 @@ begin
   for Ch in FActiveWorkTable.DeviceChannels do
     if (Ch <> Src) and Ch.Enabled then
     begin
-      AttachType(Ch, SourceType, FoundRepo, True);
 
-    If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
-      Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
+       If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
+
+      Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False)//  (Src.FlowMeter.Device.DN, SourceType);
+
+        else
+          AttachType(Ch, SourceType, FoundRepo, True);
+
+  //  If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
+  //    Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
+
 
 
     end;

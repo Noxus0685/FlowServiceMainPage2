@@ -476,7 +476,15 @@ end;
 
 procedure TTypeEntity.SetState(const Value: TObjectState);
 begin
+  if (FState=osNew) and (Value=osModified) then
+  FState := osNew
+
+  else if (FState=osDeleted) then
+  FState := osDeleted
+
+  else
   FState := Value;
+
 end;
 
 procedure MarkTypeAndRepositoryModified(const ATypeUUID: string);

@@ -460,7 +460,7 @@ type
     constructor Create;
     destructor Destroy;
 
-    procedure Assign(ASource: TDevice);
+    procedure Assign(ASource: TDevice; AssignSerial: Boolean);
     function Clone: TDevice;
     function GetSearchText: string; override;
 
@@ -951,13 +951,20 @@ begin
   FCDCoefficient := '';
 end;
 
-procedure TDevice.Assign(ASource: TDevice);
+procedure TDevice.Assign(ASource: TDevice; AssignSerial: Boolean);
 var
   P: TDevicePoint;
   NewP: TDevicePoint;
 begin
   if ASource = nil then
     Exit;
+
+  if AssignSerial then
+     SerialNumber := ASource.SerialNumber;
+
+  //не проверяем изменения свойств, но считаем, что что-то изменилось
+  { Состояние }
+   State := osModified;
 
   { ============================= }
   { 1. Копирование простых полей  }
@@ -972,7 +979,7 @@ begin
   RepoDeviceUUID := ASource.RepoDeviceUUID;
 
   Name := ASource.Name;
-  SerialNumber := ASource.SerialNumber;
+
   Modification := ASource.Modification;
   Manufacturer := ASource.Manufacturer;
   Owner := ASource.Owner;
@@ -1031,9 +1038,6 @@ begin
   Comment := ASource.Comment;
   Description := ASource.Description;
   ReportingForm := ASource.ReportingForm;
-
-  { Состояние }
-  State := ASource.State;
 
   { ============================= }
   { 2. При копировании НЕ переносим }
@@ -1121,7 +1125,7 @@ end;
 function TDevice.Clone: TDevice;
 begin
   Result := TDevice.Create;
-  Result.Assign(Self);
+  Result.Assign(Self, True);
   Result.ID := ID;
   Result.UUID := UUID;
 end;
