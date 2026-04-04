@@ -76,6 +76,8 @@ type
 
 
   TDevicePoint = class (TTypeEntity)
+  protected
+    procedure SetState(const Value: TObjectState); override;
    public
     DataPoints: TObjectList<TPointSpillage>;          // Все измерения, относящиеся к точке по расходу
     ProtocolDataPoints: TObjectList<TPointSpillage>;  // Лучшие измерения по погрешности (не более RepeatsProtocol)
@@ -499,6 +501,26 @@ type
   end;
 
 implementation
+uses
+  UnitDataManager,
+  UnitRepositories;
+
+procedure MarkDeviceAndRepositoryModified(const ADeviceUUID: string);
+var
+  ADevice: TDevice;
+  Repo: TDeviceRepository;
+begin
+  if (Trim(ADeviceUUID) = '') or (DataManager = nil) then
+    Exit;
+
+  ADevice := DataManager.FindDevice(ADeviceUUID, Repo);
+
+  if (ADevice <> nil) and (ADevice.State in [osClean, osLoaded, osSaved]) then
+    ADevice.State := osModified;
+
+  if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+    Repo.State := osModified;
+end;
 
 destructor TDevice.Destroy;
 begin
@@ -635,11 +657,14 @@ end;
 
 procedure TDevice.SetState(const Value: TObjectState);
 var
+  OldState: TObjectState;
   Session: TSessionSpillage;
   Point: TDevicePoint;
   Spillage: TPointSpillage;
   SessionSpillage: TPointSpillage;
+  Repo: TDeviceRepository;
 begin
+  OldState := FState;
   inherited SetState(Value);
 
   if FState = osNew then
@@ -660,6 +685,14 @@ begin
           for SessionSpillage in Session.Spillages do
             SessionSpillage.State := osNew;
       end;
+  end;
+
+  if (Value <> OldState) and (Value in [osNew, osModified, osDeleted]) and
+     (DataManager <> nil) then
+  begin
+    DataManager.FindDevice(UUID, Repo);
+    if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+      Repo.State := osModified;
   end;
 end;
 
@@ -831,6 +864,19 @@ begin
   DataPoints.Free;
   ProtocolDataPoints.Free;
   inherited;
+end;
+
+procedure TDevicePoint.SetState(const Value: TObjectState);
+var
+  OldState: TObjectState;
+begin
+  OldState := FState;
+  inherited SetState(Value);
+
+  if (Value = OldState) or not (Value in [osNew, osModified, osDeleted]) then
+    Exit;
+
+  MarkDeviceAndRepositoryModified(DeviceUUID);
 end;
 
 constructor TPointSpillage.Create(ASessionID : Integer);
@@ -1337,6 +1383,7 @@ begin
   {====================================================================}
   ID := ASource.ID;
   DeviceID := ASource.DeviceID;
+  DeviceUUID := ASource.DeviceUUID;
   DeviceTypePointID := ASource.DeviceTypePointID;
 
   {====================================================================}

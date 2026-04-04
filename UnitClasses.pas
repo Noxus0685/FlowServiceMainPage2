@@ -116,6 +116,8 @@ type
   end;
 
   TDiameter = class (TTypeEntity)
+  protected
+    procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
@@ -153,6 +155,8 @@ type
   end;
 
   TTypePoint = class (TTypeEntity)
+  protected
+    procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
@@ -433,6 +437,9 @@ type
 
 
 implementation
+uses
+  UnitDataManager,
+  UnitRepositories;
 
 function GetOutputTypeName(AType: TOutputType): string;
 begin
@@ -470,6 +477,23 @@ end;
 procedure TTypeEntity.SetState(const Value: TObjectState);
 begin
   FState := Value;
+end;
+
+procedure MarkTypeAndRepositoryModified(const ATypeUUID: string);
+var
+  AType: TDeviceType;
+  Repo: TTypeRepository;
+begin
+  if (Trim(ATypeUUID) = '') or (DataManager = nil) then
+    Exit;
+
+  AType := DataManager.FindType(ATypeUUID, '', Repo);
+
+  if (AType <> nil) and (AType.State in [osClean, osLoaded, osSaved]) then
+    AType.State := osModified;
+
+  if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+    Repo.State := osModified;
 end;
 
 class function TEntitySorter<T>.Sort(
@@ -754,6 +778,19 @@ begin
   State := ASource.State;
 end;
 
+procedure TDiameter.SetState(const Value: TObjectState);
+var
+  OldState: TObjectState;
+begin
+  OldState := FState;
+  inherited SetState(Value);
+
+  if (Value = OldState) or not (Value in [osNew, osModified, osDeleted]) then
+    Exit;
+
+  MarkTypeAndRepositoryModified(DeviceTypeUUID);
+end;
+
 constructor TTypePoint.Create(ADeviceTypeUUID : String);
 begin
   inherited Create;
@@ -863,6 +900,19 @@ begin
   {----------------------------------}
   RepeatsProtocol := ASource.RepeatsProtocol;
   Repeats := ASource.Repeats;
+end;
+
+procedure TTypePoint.SetState(const Value: TObjectState);
+var
+  OldState: TObjectState;
+begin
+  OldState := FState;
+  inherited SetState(Value);
+
+  if (Value = OldState) or not (Value in [osNew, osModified, osDeleted]) then
+    Exit;
+
+  MarkTypeAndRepositoryModified(DeviceTypeUUID);
 end;
 
 constructor TDeviceType.Create;
@@ -982,9 +1032,12 @@ end;
 
 procedure TDeviceType.SetState(const Value: TObjectState);
 var
+  OldState: TObjectState;
   D: TDiameter;
   P: TTypePoint;
+  Repo: TTypeRepository;
 begin
+  OldState := FState;
   inherited SetState(Value);
 
   if FState = osNew then
@@ -996,6 +1049,14 @@ begin
     if FPoints <> nil then
       for P in FPoints do
         P.State := osNew;
+  end;
+
+  if (Value <> OldState) and (Value in [osNew, osModified, osDeleted]) and
+     (DataManager <> nil) then
+  begin
+    DataManager.FindType(UUID, '', Repo);
+    if (Repo <> nil) and (Repo.State in [osClean, osLoaded, osSaved, osEmpty]) then
+      Repo.State := osModified;
   end;
 end;
 
