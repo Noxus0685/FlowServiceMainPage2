@@ -42,7 +42,7 @@ type
   end;
 
 
-  EControlState = (
+  EControlStatus = (
     CONTROL_STOPPED,
     CONTROL_STARTED
   );
@@ -61,7 +61,7 @@ TParameters = class(TObject)
   private
     FName: string;
     FHint: string;
-    FStatus: EControlState;
+    FStatus: EControlStatus;
     FAction: EControlAction;
     FMax: Double;
     FMin: Double;
@@ -78,7 +78,7 @@ TParameters = class(TObject)
     constructor Create(const AName, AHint: string); virtual;
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
-    function GetStateAsString: string;
+    function GetStatusAsString: string;
     function GetActionAsString: string;
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
@@ -89,10 +89,10 @@ TParameters = class(TObject)
     procedure SetMax(const Value: Double);  overload;
     procedure SetMin(const Value: Double; dim :integer ); overload;
     procedure SetMax(const Value: Double; dim :integer);  overload;
-    procedure SetState(AStatus: EControlState);
+    procedure SetStatus(AStatus: EControlStatus);
     property Name: string read FName write FName;
     property Hint: string read FHint write FHint;
-    property Status: EControlState read FStatus write FStatus;
+    property Status: EControlStatus read FStatus write FStatus;
     property Action: EControlAction read FAction write FAction;
     property ValueSet: Double read FSet write FSet;
     property IsRunning: Boolean read GetIsRunning;
@@ -3216,7 +3216,7 @@ begin
 end;
 
 
-procedure TParameters.SetState(AStatus: EControlState);
+procedure TParameters.SetStatus(AStatus: EControlStatus);
 begin
   FStatus := AStatus;
 end;
@@ -3249,7 +3249,7 @@ begin
   else FValue:=AValue;
 end;
 
-function TParameters.GetStateAsString: string;
+function TParameters.GetStatusAsString: string;
 begin
   case FStatus of
     CONTROL_STARTED: Result := 'Запущен';
