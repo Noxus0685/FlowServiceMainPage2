@@ -248,9 +248,9 @@ begin
     Exit;
 
   IF (AWorkTable.FluidTemp.Action = CONTROL_ACTION_START)THEN
-    AWorkTable.FluidTemp.SetState(CONTROL_STARTED)
+    AWorkTable.FluidTemp.SetStatus(CONTROL_STARTED)
   else  if (AWorkTable.FluidTemp.Action = CONTROL_ACTION_STOP) then
-    AWorkTable.FluidTemp.SetState(CONTROL_STOPPED);
+    AWorkTable.FluidTemp.SetStatus(CONTROL_STOPPED);
 
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
@@ -304,9 +304,9 @@ begin
     Exit;
 
   IF AWorkTable.FluidPress.Action = CONTROL_ACTION_START THEN
-    AWorkTable.FluidPress.SetState(CONTROL_STARTED)
+    AWorkTable.FluidPress.SetStatus(CONTROL_STARTED)
   else  if (AWorkTable.FluidPress.Action = CONTROL_ACTION_STOP) then
-    AWorkTable.FluidPress.SetState(CONTROL_STOPPED);
+    AWorkTable.FluidPress.SetStatus(CONTROL_STOPPED);
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
@@ -362,9 +362,9 @@ begin
     Exit;
 
   IF (APump.Action = CONTROL_ACTION_START)  THEN
-    APump.SetState(CONTROL_STARTED)
+    APump.SetStatus(CONTROL_STARTED)
   else  if (APump.Action = CONTROL_ACTION_STOP) then
-    APump.SetState(CONTROL_STOPPED);
+    APump.SetStatus(CONTROL_STOPPED);
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
@@ -448,9 +448,9 @@ begin
 
 
   IF AFlowRate.Action = CONTROL_ACTION_START THEN
-    AFlowRate.SetState(CONTROL_STARTED)
+    AFlowRate.SetStatus(CONTROL_STARTED)
   else  if (AFlowRate.Action = CONTROL_ACTION_STOP) then
-    AFlowRate.SetState(CONTROL_STOPPED);
+    AFlowRate.SetStatus(CONTROL_STOPPED);
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then

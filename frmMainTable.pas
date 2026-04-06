@@ -800,7 +800,7 @@ begin
       SpeedButtonStartPump.Text := '■'
     else
       SpeedButtonStartPump.Text := '▶';
-    SpeedButtonStartPump.Hint := Pump.GetStateAsString;
+    SpeedButtonStartPump.Hint := Pump.GetStatusAsString;
   end
   else
   begin
