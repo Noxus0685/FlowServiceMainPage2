@@ -72,6 +72,8 @@ TParameters = class(TObject)
     FBefore: Double;
     FAfter: Double;
     FDelta: Double;
+    FDim: integer;
+
   public
     constructor Create(const AName, AHint: string); virtual;
     function GetIsRunning: Boolean;
@@ -80,10 +82,13 @@ TParameters = class(TObject)
     function GetActionAsString: string;
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
+    procedure SetValue(AValue: Double);
     procedure Stop;
     procedure Start;
-    procedure SetMin(const Value: Double);
-    procedure SetMax(const Value: Double);
+    procedure SetMin(const Value: Double ); overload ;
+    procedure SetMax(const Value: Double);  overload;
+    procedure SetMin(const Value: Double; dim :integer ); overload;
+    procedure SetMax(const Value: Double; dim :integer);  overload;
     procedure SetState(AStatus: EControlState);
     property Name: string read FName write FName;
     property Hint: string read FHint write FHint;
@@ -3077,12 +3082,14 @@ begin
   FSet := FMin;
   AccuracyPlus:=5;
   AccuracyMinus:=5;
+  FDim:=0;
+
 end;
 
 function TFlowRate.IsStable : Boolean ;
 begin
-  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
+    Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
+        AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
 
 end;
 
@@ -3107,7 +3114,7 @@ constructor TPump.Create(const APumpName: string);
 begin
   inherited Create(APumpName,'');
   FMax:= 50;
-  FMin:= 12;
+  FMin:= 0;
 
   FValue:=0;
   FSet := FMin;
@@ -3173,16 +3180,41 @@ begin
 end;
 
 procedure TParameters.SetMin(const Value: Double);
+var
+WorkTable:TWorkTable ;
 begin
   if Value > FMax then Exit;
-  FMin := Value;
+
+  FMin := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,FDim);
 end;
 
 procedure TParameters.SetMax(const Value: Double);
+var
+WorkTable:TWorkTable ;
 begin
   if Value < FMin then Exit;
-  FMin := Value;
+  FMax := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,FDim);
 end;
+
+
+procedure TParameters.SetMin(const Value: Double; dim: integer);
+var
+WorkTable:TWorkTable ;
+begin
+  if Value > FMax then Exit;
+  FDim:=dim;
+  FMin := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,Dim);
+end;
+
+procedure TParameters.SetMax(const Value: Double; dim: integer);
+var
+WorkTable:TWorkTable ;
+begin
+  if Value < FMin then Exit;
+  FDim:=dim;
+  FMax := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,Dim);
+end;
+
 
 procedure TParameters.SetState(AStatus: EControlState);
 begin
@@ -3197,6 +3229,8 @@ begin
     FBefore := FMax
   else FBefore:=ABefore;
 end;
+
+
 procedure TParameters.SetAfter(AAfter: Double);
 begin
   if AAfter < FMin then
@@ -3206,6 +3240,14 @@ begin
   else FAfter:=AAfter;
 end;
 
+procedure TParameters.SetValue(AValue: Double);
+begin
+  if AValue < FMin then
+    FValue := FMin
+  else if AValue > FMax then
+    FValue := FMax
+  else FValue:=AValue;
+end;
 
 function TParameters.GetStateAsString: string;
 begin

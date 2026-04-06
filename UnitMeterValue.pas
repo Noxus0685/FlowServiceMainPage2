@@ -71,6 +71,7 @@ type
     class constructor CreateClass;
     class destructor DestroyClass;
 
+
   public
     ValueWoCorrection: Double;
     TempDelta: Integer;
@@ -230,6 +231,7 @@ type
     function GetDoubleNum(AValue: Double; const ADim: string): Double; overload;
     function GetDoubleNum(AValue: Double): Double; overload;
     function GetDoubleNum(const AStr: string; Dim: Integer): Double; overload;
+    function GetDoubleNum(AValue: Double; Dim: Integer): Double;  overload;
     procedure Reset; overload;
     procedure Reset(AValue: Double); overload;
 
@@ -962,6 +964,29 @@ begin
     FFilterOrder := FO;
   end;
 end;
+
+function TMeterValue.GetDoubleNum(AValue: Double; Dim: Integer): Double;
+var
+  Temp: Double;
+  FO: Integer;
+  TempType:  EValueType;
+begin
+  Temp := Value;
+  TempType:= self.ValueType;
+  self.ValueType:= CONST_TYPE;
+  Value := AValue;
+  FO := FFilterOrder;
+  FFilterOrder := -1;
+  try
+    Result := GetDoubleValue(Dim);
+  finally
+    Value := Temp;
+    self.ValueType :=   TempType ;
+    FFilterOrder := FO;
+  end;
+end;
+
+
 
 
 { Sets filter order used by runtime smoothing logic. }

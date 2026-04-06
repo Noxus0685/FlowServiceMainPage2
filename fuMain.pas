@@ -373,11 +373,11 @@ begin
 
    if APump.IsRunning = true then
     begin
-      APump.Value := EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet);
+      APump.SetValue(EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet));
     end
     else
     begin
-      APump.Value := EnsureRange(APump.Value - Freq,0 , APump.Value);
+      APump.SetValue(EnsureRange(APump.Value - Freq,0 , APump.Value));
     end;
 
 
@@ -457,7 +457,7 @@ begin
   begin
     Flow := (Random * 10);
 
-   if AFlowRate.IsRunning = true then
+   {if AFlowRate.IsRunning = true then
     begin
       AFlowRate.Value := EnsureRange(AFlowRate.Value + Flow,AFlowRate.Value, AFlowRate.ValueSet);
     end
@@ -465,7 +465,7 @@ begin
     begin
       AFlowRate.Value  := EnsureRange(AFlowRate.Value  - Flow,0 , AFlowRate.Value );
     end;
-
+        }
 
 
     FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);

@@ -277,6 +277,7 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   TabOrder = 1
                   Cursor = crIBeam
+                  Max = 9999999.000000000000000000
                   ValueType = Float
                   Increment = 0.100000001490116100
                   KeyboardType = NumbersAndPunctuation
@@ -1061,6 +1062,7 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   TabOrder = 1
                   Cursor = crIBeam
+                  Max = 9999999.000000000000000000
                   Value = 12.000000000000000000
                   ValueType = Float
                   Increment = 0.100000001490116100

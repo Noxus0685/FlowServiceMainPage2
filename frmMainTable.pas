@@ -1256,8 +1256,11 @@ end;
 
 
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
+var
+AValue:double;
 begin
-FActiveWorkTable.DoFlowRateSet(SpinBoxFlowRate.value);
+AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
+FActiveWorkTable.DoFlowRateSet(AValue);
 
 end;
 
@@ -2725,6 +2728,9 @@ begin
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
 
+  LayoutFlowRate.Tag:=3;
+  UpdateUIFlowRate;
+
   GridDevices.SetFocus;
 end;
 
@@ -2914,7 +2920,7 @@ begin
 
 
   if WorkTable.FlowRate.IsRunning then
-    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue
+    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue    //в value записываем в л/с а выводим в label в м3/ч
   else
     WorkTable.FlowRate.Value:=0;
     {if WorkTable.ValueFlowRate <> nil then
@@ -4350,7 +4356,8 @@ begin
 
     SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet);
 
-
+      SpinBoxFreq.Min:= WorkTable.ActivePump.MinValue;
+      SpinBoxFreq.Max:= WorkTable.ActivePump.MaxValue;
 
 
     if ComboBoxPumps.Count <> 0 then
@@ -4375,6 +4382,7 @@ procedure TFrameMainTable.UpdateUIFlowRate;
 var
   WorkTable: TWorkTable;
   i:integer;
+  AMax:Double;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4387,16 +4395,31 @@ begin
     else
       LabelFlowRate.Text := '0';
 
+    if LayoutFlowRate.tag=3 then
+    begin
+      for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
+        begin
+          if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
+            Amax:=FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax;
+        end;
+
+
+      SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.MinValue);
+      SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum( Amax);
+            if FActiveWorkTable<>nil then
+        SpinBoxFlowRate.text:=WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value);
+    end;
 
     if WorkTable.FlowRate.Value = 0 then
        RectangleLabelFR.Fill.Color := TAlphaColorRec.White
 
+
    ELSE if WorkTable.FlowRate.IsStable THEN
       RectangleLabelFR.Fill.Color := $ffC9FFC7
-        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
-      RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
+   else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
+      RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
 
-
+    LayoutFlowRate.tag:=0;
 end;
 
 procedure TFrameMainTable.UpdateUIConditions;
