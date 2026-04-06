@@ -10,6 +10,7 @@ uses
   UnitRepositories,
   UnitBaseProcedures,
   System.Math,
+  System.Generics.Defaults,
 
 
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
@@ -267,6 +268,7 @@ type
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure ComboEditDNChange(Sender: TObject);
     procedure mmoCommentExit(Sender: TObject);
+    procedure GridPointsHeaderClick(Column: TColumn);
 
 
   private
@@ -288,6 +290,8 @@ type
      FButtonCoefClear: TButton;
      FCoefsTabInitialized: Boolean;
      FSkipPointDeleteConfirm: Boolean;
+     FPointSortColumn: Integer;
+     FPointSortAscending: Boolean;
 
      procedure ApplyMassMode;
      procedure ApplyVolumeMode;
@@ -314,6 +318,7 @@ type
      function   GetSelectedPoint: TDevicePoint;
      function GetPointByVisibleRow(ARow: Integer): TDevicePoint;
      procedure UpdateQmaxQmin;
+     procedure SortPoints;
 
      procedure InitCoefsTab;
      procedure EnsureCalibrCoefTable;
@@ -1149,6 +1154,8 @@ begin
   FLoading := True;
   try
     FSkipPointDeleteConfirm := False;
+    FPointSortColumn := -1;
+    FPointSortAscending := True;
 
     FreeAndNil(FDevice);
     FDeviceType := nil;
@@ -1202,6 +1209,27 @@ begin
   finally
     FLoading := False;
   end;
+end;
+
+procedure TFormDeviceEditor.GridPointsHeaderClick(Column: TColumn);
+begin
+  if (Column = nil) or (FDevice = nil) then
+    Exit;
+
+  if (Column.Index <> StringColumnPointName.Index) and
+     (Column.Index <> StringColumnPointFlowRate.Index) and
+     (Column.Index <> StringColumnPointTime.Index) then
+    Exit;
+
+  if FPointSortColumn = Column.Index then
+    FPointSortAscending := not FPointSortAscending
+  else
+  begin
+    FPointSortColumn := Column.Index;
+    FPointSortAscending := True;
+  end;
+
+  UpdatePointsGrid;
 end;
 
 procedure TFormDeviceEditor.mmoCommentExit(Sender: TObject);
@@ -2883,6 +2911,8 @@ begin
   if FDevice = nil then
     Exit;
 
+  SortPoints;
+
   GridPoints.BeginUpdate;
   try
     VisibleCount := 0;
@@ -2903,6 +2933,58 @@ begin
   finally
     GridPoints.EndUpdate;
   end;
+end;
+
+procedure TFormDeviceEditor.SortPoints;
+var
+  SortAsc: Boolean;
+  SortCol: Integer;
+begin
+  if (FDevice = nil) or (FDevice.Points = nil) or (FDevice.Points.Count < 2) then
+    Exit;
+
+  SortCol := FPointSortColumn;
+  if (SortCol <> StringColumnPointName.Index) and
+     (SortCol <> StringColumnPointFlowRate.Index) and
+     (SortCol <> StringColumnPointTime.Index) then
+    Exit;
+
+  SortAsc := FPointSortAscending;
+
+  FDevice.Points.Sort(
+    TComparer<TDevicePoint>.Construct(
+      function(const Left, Right: TDevicePoint): Integer
+      begin
+        if Left = Right then
+          Exit(0);
+        if Left = nil then
+          Exit(1);
+        if Right = nil then
+          Exit(-1);
+
+        if (Left.State = osDeleted) and (Right.State <> osDeleted) then
+          Exit(1);
+        if (Left.State <> osDeleted) and (Right.State = osDeleted) then
+          Exit(-1);
+
+        if SortCol = StringColumnPointName.Index then
+          Result := CompareText(Left.Name, Right.Name)
+        else if SortCol = StringColumnPointFlowRate.Index then
+          Result := CompareValue(Left.FlowRate, Right.FlowRate)
+        else
+          Result := CompareValue(Left.LimitTime, Right.LimitTime);
+
+        if Result = 0 then
+          Result := CompareValue(Left.Num, Right.Num);
+
+        if (Result = 0) and (Left.ID <> Right.ID) then
+          Result := CompareValue(Left.ID, Right.ID);
+
+        if not SortAsc then
+          Result := -Result;
+      end
+    )
+  );
 end;
 
 procedure TFormDeviceEditor.SetModified;

@@ -1887,6 +1887,7 @@ object FormDeviceEditor: TFormDeviceEditor
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
+          OnHeaderClick = GridPointsHeaderClick
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
           Viewport.Width = 896.000000000000000000

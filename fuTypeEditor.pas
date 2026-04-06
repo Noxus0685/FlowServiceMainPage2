@@ -18,7 +18,8 @@ uses
      System.IOUtils,
   System.NetEncoding,
   System.Net.HttpClient,
-  System.Net.HttpClientComponent, FMX.Memo.Types, FMX.Memo, System.Net.URLClient;
+  System.Net.HttpClientComponent, FMX.Memo.Types, FMX.Memo, System.Net.URLClient,
+  System.Generics.Defaults;
 
 type
 
@@ -235,6 +236,7 @@ type
       const Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
+    procedure GridPointsHeaderClick(Column: TColumn);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure ButtonDiameterAddClick(Sender: TObject);
@@ -327,6 +329,8 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
+  FPointSortColumn: Integer;
+  FPointSortAscending: Boolean;
 
 
 
@@ -339,6 +343,7 @@ type
 
   procedure UpdateDiametersGrid;
   procedure UpdatePointsGrid;
+  procedure SortPoints;
   function GetDiameterByVisibleRow(ARow: Integer): TDiameter;
   function GetPointByVisibleRow(ARow: Integer): TTypePoint;
 
@@ -768,6 +773,8 @@ begin
   if FPointsLocal = nil then
     Exit;
 
+  SortPoints;
+
   VisibleCount := 0;
   for P in FPointsLocal do
     if (P <> nil) and (P.State <> osDeleted) then
@@ -779,6 +786,58 @@ begin
   finally
     GridPoints.EndUpdate;
   end;
+end;
+
+procedure TFormTypeEditor.SortPoints;
+var
+  SortAsc: Boolean;
+  SortCol: Integer;
+begin
+  if (FPointsLocal = nil) or (FPointsLocal.Count < 2) then
+    Exit;
+
+  SortCol := FPointSortColumn;
+  if (SortCol <> StringColumnPointName.Index) and
+     (SortCol <> StringColumnPointFlowRate.Index) and
+     (SortCol <> StringColumnPointTime.Index) then
+    Exit;
+
+  SortAsc := FPointSortAscending;
+
+  FPointsLocal.Sort(
+    TComparer<TTypePoint>.Construct(
+      function(const Left, Right: TTypePoint): Integer
+      begin
+        if Left = Right then
+          Exit(0);
+        if Left = nil then
+          Exit(1);
+        if Right = nil then
+          Exit(-1);
+
+        if (Left.State = osDeleted) and (Right.State <> osDeleted) then
+          Exit(1);
+        if (Left.State <> osDeleted) and (Right.State = osDeleted) then
+          Exit(-1);
+
+        if SortCol = StringColumnPointName.Index then
+          Result := CompareText(Left.Name, Right.Name)
+        else if SortCol = StringColumnPointFlowRate.Index then
+          Result := CompareValue(Left.FlowRate, Right.FlowRate)
+        else
+          Result := CompareValue(Left.LimitTime, Right.LimitTime);
+
+        if Result = 0 then
+          Result := CompareValue(Left.Num, Right.Num);
+
+        if (Result = 0) and (Left.ID <> Right.ID) then
+          Result := CompareValue(Left.ID, Right.ID);
+
+        if not SortAsc then
+          Result := -Result;
+      end
+    )
+  );
 end;
 
 procedure TFormTypeEditor.UpdateCoefsGrid;
@@ -942,6 +1001,8 @@ begin
   try
     FSkipDiameterDeleteConfirm := False;
     FSkipPointDeleteConfirm := False;
+    FPointSortColumn := -1;
+    FPointSortAscending := True;
 
     {----------------------------------}
     { Освобождаем предыдущий экземпляр }
@@ -971,6 +1032,27 @@ begin
   finally
     FLoading := False;
   end;
+end;
+
+procedure TFormTypeEditor.GridPointsHeaderClick(Column: TColumn);
+begin
+  if (Column = nil) or (FPointsLocal = nil) then
+    Exit;
+
+  if (Column.Index <> StringColumnPointName.Index) and
+     (Column.Index <> StringColumnPointFlowRate.Index) and
+     (Column.Index <> StringColumnPointTime.Index) then
+    Exit;
+
+  if FPointSortColumn = Column.Index then
+    FPointSortAscending := not FPointSortAscending
+  else
+  begin
+    FPointSortColumn := Column.Index;
+    FPointSortAscending := True;
+  end;
+
+  UpdatePointsGrid;
 end;
 
  procedure TFormTypeEditor.SetModified;
