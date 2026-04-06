@@ -3068,6 +3068,7 @@ var
   I: Integer;
   MinImpValue: TMeterValue;
   RawValueBaseMultiplier: TMeterValue;
+  RawQuantityBaseMultiplier: TMeterValue;
 
   function FindFirstValueBaseMultiplier(
     AChannels: TObjectList<TChannel>): TMeterValue;
@@ -3189,18 +3190,35 @@ begin
   end;
 
   RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.DeviceChannels);
-  if RawValueBaseMultiplier = nil then
+
+   if RawValueBaseMultiplier <> nil then
+  begin
+    if RawValueBaseMultiplier.&Type = 'Импульсы'  then
+     begin
+      StringColumnDeviceRawValue1.Header := 'Частота, Гц';
+     end
+     else
+     begin
+    StringColumnDeviceRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+     end
+  end;
+
     RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.EtalonChannels);
+
 
   if RawValueBaseMultiplier <> nil then
   begin
-    StringColumnDeviceRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+    if RawValueBaseMultiplier.&Type = 'Импульсы'  then
+     begin
+      StringColumnEtalonRawValue1.Header := 'Частота, Гц';
+     end
+     else
+     begin
     StringColumnEtalonRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+     end
   end;
 
   RawValueBaseMultiplier := FindFirstQuantityValueBaseMultiplier(WorkTable.DeviceChannels);
-  if RawValueBaseMultiplier = nil then
-    RawValueBaseMultiplier := FindFirstQuantityValueBaseMultiplier(WorkTable.EtalonChannels);
 
   if RawValueBaseMultiplier <> nil then
   begin
@@ -3208,6 +3226,12 @@ begin
     StringColumnEtalonRawSumValue1.Header := RawValueBaseMultiplier.GetStrFullName;
   end;
 
+    RawValueBaseMultiplier := FindFirstQuantityValueBaseMultiplier(WorkTable.EtalonChannels);
+
+   if RawValueBaseMultiplier <> nil then
+  begin
+     StringColumnEtalonRawSumValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+  end;
 
     if WorkTable.ValueFlowRate <> nil then
       StringColumnDeviceFlowRate1.TagString := WorkTable.ValueFlowRate.GetStrValue
@@ -3991,7 +4015,7 @@ begin
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
         Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier.GetStrValue
       else
-        Value := '0';
+        Value := '-';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceStd1 then
     begin

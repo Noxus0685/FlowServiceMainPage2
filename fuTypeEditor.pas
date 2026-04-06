@@ -302,8 +302,8 @@ type
 
   FModified: Boolean;
   FLoading: Boolean;
-  FSelectedDiameterIndex: Integer; // выбранный диаметр, индекс в dmFakeDB.Diameters
 
+  FSelectedDiameter: TDiameter;
   FSelectedDiameterID: Integer; // выбранный диаметр, индекс в dmFakeDB.Diameters
 
   // локальные копии
@@ -1132,7 +1132,7 @@ begin
   {----------------------------------}
   GridDiameters.Selected := -1;
   FSelectedDiameterID := -1;
-  FSelectedDiameterIndex := -1;
+  FSelectedDiameter := nil;
 
   SetModified;
 end;
@@ -2790,7 +2790,7 @@ begin
   end;
 
   FSelectedDiameterID := D.ID;
-
+  FSelectedDiameter:= D;
   // ----------------------------------------
   // Если диапазон не задан явно —
   // показываем подсказку по выбранному диаметру
@@ -3122,12 +3122,11 @@ begin
   // -----------------------------------------------------
   // Проверка выбранного диаметра
   // -----------------------------------------------------
-  DIdx := FSelectedDiameterIndex;
-  if (DIdx < 0) or (DIdx > FDiametersLocal.Count-1) then
+  if (FSelectedDiameter = nil) then
     Exit;
 
-  Qmax := FDiametersLocal[DIdx].Qmax;
-  Coef := FDiametersLocal[DIdx].Kp;
+  Qmax := FSelectedDiameter.Qmax;
+  Coef := FSelectedDiameter.Kp;
 
   // -----------------------------------------------------
   // Пересчёт всех ЛОКАЛЬНЫХ точек
@@ -3148,10 +3147,6 @@ begin
     end;
   end;
 
-  // -----------------------------------------------------
-  // Обновляем таблицу точек
-  // -----------------------------------------------------
-  GridPoints.Repaint;
 end;
 
 procedure TFormTypeEditor.sbFindReestrNumberClick(Sender: TObject);

@@ -1052,11 +1052,22 @@ begin
   begin
     if FDiameters <> nil then
       for D in FDiameters do
-        D.State := osNew;
+        D.FState := osNew;
 
     if FPoints <> nil then
       for P in FPoints do
-        P.State := osNew;
+        P.FState := osNew;
+  end
+
+  else if FState = osDeleted then
+  begin
+    if FDiameters <> nil then
+      for D in FDiameters do
+        D.FState := osDeleted;
+
+    if FPoints <> nil then
+      for P in FPoints do
+        P.FState := osDeleted;
   end;
 
   if (Value <> OldState) and (Value in [osNew, osModified, osDeleted]) and
