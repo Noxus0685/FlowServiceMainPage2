@@ -269,6 +269,8 @@ type
     procedure ComboEditDNChange(Sender: TObject);
     procedure mmoCommentExit(Sender: TObject);
     procedure GridPointsHeaderClick(Column: TColumn);
+    procedure cbSpillageTypeChange(Sender: TObject);
+    procedure cbSpillageStopChange(Sender: TObject);
 
 
   private
@@ -300,6 +302,10 @@ type
 
      procedure FillSpillageStopVolume;
      procedure FillSpillageStopMass;
+     procedure PopulateSpillageStopCombo(const ADim: TMeasuredDimension);
+     function  GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
+     function  SpillageStopValueToItemIndex(const AValue: Integer): Integer;
+     function  SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
      procedure FillConversionCoefVolume;
      procedure FillConversionCoefMass;
 
@@ -377,37 +383,8 @@ begin
     // ==================================================
     // КРИТЕРИЙ ОСТАНОВКИ (cbSpillageStop)
     // ==================================================
-    cbSpillageStop.Items.BeginUpdate;
-    try
-      cbSpillageStop.Items.Clear;
-
-      // Импульсы доступны всегда
-      cbSpillageStop.Items.Add('Импульсы');
-
-      case Dim of
-        mdVolumeFlow,
-        mdVolume:
-          cbSpillageStop.Items.Add('Объем, л');
-
-        mdMassFlow,
-        mdMass:
-          cbSpillageStop.Items.Add('Масса, кг');
-
-        mdSpeed:
-          cbSpillageStop.Items.Add('Скорость');
-
-        mdHeat:
-          cbSpillageStop.Items.Add('Теплота');
-      end;
-
-      // Время доступно всегда
-      cbSpillageStop.Items.Add('Время, с');
-    finally
-      cbSpillageStop.Items.EndUpdate;
-    end;
-
-    if cbSpillageStop.ItemIndex < 0 then
-      cbSpillageStop.ItemIndex := 0;
+    PopulateSpillageStopCombo(Dim);
+    cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 
     // ==================================================
     // ОСНОВНАЯ ЛОГИКА ПО ИЗМЕРЯЕМОЙ ВЕЛИЧИНЕ
@@ -523,6 +500,7 @@ begin
   {-----------------------------------------------------}
   NewP.LimitImp  := 10000;
   NewP.LimitTime := 52;
+  NewP.SpillageStop := FDevice.SpillageStop;
   NewP.Pause     := 10;
   NewP.Pressure  := 0;
   NewP.Temp      := 0;
@@ -698,18 +676,7 @@ end;
 
 procedure TFormDeviceEditor.FillSpillageStopVolume;
 begin
-  cbSpillageStop.Items.BeginUpdate;
-  try
-    cbSpillageStop.Items.Clear;
-    cbSpillageStop.Items.Add('Импульсы');
-    cbSpillageStop.Items.Add('Объем, л');
-    cbSpillageStop.Items.Add('Время, с');
-  finally
-    cbSpillageStop.Items.EndUpdate;
-  end;
-
-  if cbSpillageStop.ItemIndex < 0 then
-    cbSpillageStop.ItemIndex := 0;
+  PopulateSpillageStopCombo(mdVolume);
 end;
 
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
@@ -763,18 +730,75 @@ end;
 
 procedure TFormDeviceEditor.FillSpillageStopMass;
 begin
+  PopulateSpillageStopCombo(mdMass);
+end;
+
+function TFormDeviceEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
+begin
+  case ADim of
+    mdVolumeFlow,
+    mdVolume:
+      Result := 'Объем, л';
+    mdMassFlow,
+    mdMass:
+      Result := 'Масса, кг';
+    mdSpeed:
+      Result := 'Скорость';
+    mdHeat:
+      Result := 'Теплота';
+  else
+    Result := 'Объем/масса';
+  end;
+end;
+
+procedure TFormDeviceEditor.PopulateSpillageStopCombo(const ADim: TMeasuredDimension);
+var
+  VolumeCaption: string;
+begin
+  VolumeCaption := GetStopVolumeCaption(ADim);
   cbSpillageStop.Items.BeginUpdate;
   try
     cbSpillageStop.Items.Clear;
+    cbSpillageStop.Items.Add('Время');
     cbSpillageStop.Items.Add('Импульсы');
-    cbSpillageStop.Items.Add('Масса, кг');
-    cbSpillageStop.Items.Add('Время, с');
+    cbSpillageStop.Items.Add(VolumeCaption);
+    cbSpillageStop.Items.Add('Время + импульсы');
+    cbSpillageStop.Items.Add('Время + ' + LowerCase(VolumeCaption));
+    cbSpillageStop.Items.Add('Импульсы + ' + LowerCase(VolumeCaption));
+    cbSpillageStop.Items.Add('Время + импульсы + ' + LowerCase(VolumeCaption));
   finally
     cbSpillageStop.Items.EndUpdate;
   end;
+end;
 
-  if cbSpillageStop.ItemIndex < 0 then
-    cbSpillageStop.ItemIndex := 0;
+function TFormDeviceEditor.SpillageStopValueToItemIndex(const AValue: Integer): Integer;
+begin
+  case AValue of
+    STOP_BY_TIME: Result := 0;
+    STOP_BY_IMP: Result := 1;
+    STOP_BY_VOLUME: Result := 2;
+    STOP_BY_TIME or STOP_BY_IMP: Result := 3;
+    STOP_BY_TIME or STOP_BY_VOLUME: Result := 4;
+    STOP_BY_IMP or STOP_BY_VOLUME: Result := 5;
+    STOP_BY_TIME or STOP_BY_IMP or STOP_BY_VOLUME: Result := 6;
+  else
+    Result := 0;
+  end;
+end;
+
+function TFormDeviceEditor.SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
+begin
+  case AIndex of
+    0: Result := STOP_BY_TIME;
+    1: Result := STOP_BY_IMP;
+    2: Result := STOP_BY_VOLUME;
+    3: Result := STOP_BY_TIME or STOP_BY_IMP;
+    4: Result := STOP_BY_TIME or STOP_BY_VOLUME;
+    5: Result := STOP_BY_IMP or STOP_BY_VOLUME;
+    6: Result := STOP_BY_TIME or STOP_BY_IMP or STOP_BY_VOLUME;
+  else
+    Result := STOP_BY_TIME;
+  end;
 end;
 
 procedure TFormDeviceEditor.FillConversionCoefVolume;
@@ -1586,10 +1610,8 @@ begin
     else
       cbSpillageType.ItemIndex := 0;
 
-    if (FDevice.SpillageStop >= 0) and (FDevice.SpillageStop < cbSpillageStop.Items.Count) then
-      cbSpillageStop.ItemIndex := FDevice.SpillageStop
-    else
-      cbSpillageStop.ItemIndex := 0;
+    PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
+    cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 
     // =====================================================
     // == Повторы
@@ -1735,6 +1757,35 @@ begin
 
   { при необходимости — пересчёт параметров прибора }
 //  RecalcDeviceBySignalSettings; // если метод есть
+
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.cbSpillageTypeChange(Sender: TObject);
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  if cbSpillageType.ItemIndex < 0 then
+    Exit;
+
+  FDevice.SpillageType := cbSpillageType.ItemIndex;
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.cbSpillageStopChange(Sender: TObject);
+var
+  P: TDevicePoint;
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  FDevice.SpillageStop := SpillageStopItemIndexToValue(cbSpillageStop.ItemIndex);
+
+  if FDevice.Points <> nil then
+    for P in FDevice.Points do
+      if P <> nil then
+        P.SpillageStop := FDevice.SpillageStop;
 
   SetModified;
 end;

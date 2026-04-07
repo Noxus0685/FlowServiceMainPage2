@@ -30,6 +30,15 @@ const
 
 type
 
+  TSpillageStopCriterion = (scTime, scImpulse, scVolume);
+  TSpillageStopCriteria = set of TSpillageStopCriterion;
+
+const
+  STOP_BY_TIME = 1;   // 001
+  STOP_BY_IMP = 2;    // 010
+  STOP_BY_VOLUME = 4; // 100
+
+type
 
 
     TDeviceTypeSortField = (
@@ -247,6 +256,8 @@ type
   private
       FDiameters  : TObjectList<TDiameter>;
       FPoints     : TObjectList<TTypePoint>;
+      function GetStopCriteria: TSpillageStopCriteria;
+      procedure SetStopCriteria(const Value: TSpillageStopCriteria);
   protected
       procedure SetState(const Value: TObjectState); override;
   public
@@ -395,6 +406,7 @@ type
 
     property  Diameters  : TObjectList<TDiameter> read FDiameters write FDiameters;
     property  Points     : TObjectList<TTypePoint> read  FPoints write  FPoints;
+    property  StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
 
 
 
@@ -431,6 +443,8 @@ type
 
   function SortDeviceTypes(const Source: TObjectList<TDeviceType>; ASortField: TDeviceTypeSortField;   ASortAscending: Boolean): TObjectList<TDeviceType>;
   function GetNextPointStdIndex(Count: Integer): Integer;
+  function CriteriaToInt(const C: TSpillageStopCriteria): Integer;
+  function IntToCriteria(const Value: Integer): TSpillageStopCriteria;
 
   function GetOutputTypeName(AType: TOutputType): string; overload;
   function GetOutputTypeName(AType: Integer): string; overload;
@@ -464,6 +478,28 @@ begin
     Result := GetOutputTypeName(TOutputType(AType))
   else
     Result := ' ';
+end;
+
+function CriteriaToInt(const C: TSpillageStopCriteria): Integer;
+begin
+  Result := 0;
+  if scTime in C then
+    Result := Result or STOP_BY_TIME;
+  if scImpulse in C then
+    Result := Result or STOP_BY_IMP;
+  if scVolume in C then
+    Result := Result or STOP_BY_VOLUME;
+end;
+
+function IntToCriteria(const Value: Integer): TSpillageStopCriteria;
+begin
+  Result := [];
+  if (Value and STOP_BY_TIME) <> 0 then
+    Include(Result, scTime);
+  if (Value and STOP_BY_IMP) <> 0 then
+    Include(Result, scImpulse);
+  if (Value and STOP_BY_VOLUME) <> 0 then
+    Include(Result, scVolume);
 end;
 
 constructor TTypeEntity.Create;
@@ -552,6 +588,16 @@ end;
 function TTypeEntity.GetSearchText: string;
 begin
   Result := Name;
+end;
+
+function TDeviceType.GetStopCriteria: TSpillageStopCriteria;
+begin
+  Result := IntToCriteria(SpillageStop);
+end;
+
+procedure TDeviceType.SetStopCriteria(const Value: TSpillageStopCriteria);
+begin
+  SpillageStop := CriteriaToInt(Value);
 end;
 
 function TDeviceType.GetSearchText: string;
@@ -1021,7 +1067,7 @@ begin
   { Алгоритмы и испытания }
   {====================================================================}
   SpillageType := 0;
-  SpillageStop := 0;
+  SpillageStop := STOP_BY_TIME;
   Repeats := 0;
   RepeatsProtocol := 0;
 

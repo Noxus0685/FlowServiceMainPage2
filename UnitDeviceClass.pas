@@ -76,6 +76,9 @@ type
 
 
   TDevicePoint = class (TTypeEntity)
+  private
+    function GetStopCriteria: TSpillageStopCriteria;
+    procedure SetStopCriteria(const Value: TSpillageStopCriteria);
   protected
     procedure SetState(const Value: TObjectState); override;
    public
@@ -121,6 +124,7 @@ type
     LimitImp: Integer;           // Ограничение по импульсам, шт
     LimitVolume: Double;         // Ограничение по объему / массе, л (кг)
     LimitTime: Double;           // Ограничение по времени, сек
+    SpillageStop: Integer;       // Критерии остановки (битовая маска)
 
     {====================================================================}
     { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
@@ -149,6 +153,7 @@ type
     destructor Destroy; override;
 
     procedure Assign(ASource: TDevicePoint);
+    property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
   end;
 
   TPointSpillage = class (TTypeEntity)
@@ -333,6 +338,8 @@ type
       FPoints     : TObjectList<TDevicePoint>;
       FCalibrCoefTable: TObjectList<TCalibrCoefTable>;
       FDeviceType : TDeviceType;
+      function GetStopCriteria: TSpillageStopCriteria;
+      procedure SetStopCriteria(const Value: TSpillageStopCriteria);
       function NormalizeActiveSessionSpillage: TSessionSpillage;
       function GetCalibrCoefTable: TCalibrCoefTable;
       procedure SetCalibrCoefTable(const Value: TCalibrCoefTable);
@@ -491,6 +498,7 @@ type
     property  Points     : TObjectList<TDevicePoint> read  FPoints write  FPoints;
     property  CalibrCoefTables: TObjectList<TCalibrCoefTable> read FCalibrCoefTable write FCalibrCoefTable;
     property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
+    property  StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
     procedure AttachDN(ADiameter: TDiameter; AType: TDeviceType);  overload;
@@ -641,7 +649,7 @@ begin
   { Испытания }
   {----------------------------------}
   SpillageType := 0;
-  SpillageStop := 0;
+  SpillageStop := STOP_BY_TIME;
   Repeats := 3;
   RepeatsProtocol := 3;
   Status := 0;
@@ -653,6 +661,16 @@ begin
   Comment := '';
   Description := '';
   ReportingForm := '';
+end;
+
+function TDevice.GetStopCriteria: TSpillageStopCriteria;
+begin
+  Result := IntToCriteria(SpillageStop);
+end;
+
+procedure TDevice.SetStopCriteria(const Value: TSpillageStopCriteria);
+begin
+  SpillageStop := CriteriaToInt(Value);
 end;
 
 procedure TDevice.SetState(const Value: TObjectState);
@@ -839,6 +857,7 @@ begin
   LimitImp := 0;
   LimitVolume := 0.0;
   LimitTime := 0.0;
+  SpillageStop := STOP_BY_TIME;
 
   { Метрология }
   Error := 0.0;
@@ -1239,6 +1258,7 @@ begin
       Add(IntToStr(P.LimitImp));
       Add(FloatToStr(P.LimitVolume));
       Add(FloatToStr(P.LimitTime));
+      Add(IntToStr(P.SpillageStop));
       Add(FloatToStr(P.Error));
       Add(IntToStr(P.Pause));
       Add(IntToStr(P.RepeatsProtocol));
@@ -1430,6 +1450,7 @@ begin
   LimitImp := ASource.LimitImp;
   LimitVolume := ASource.LimitVolume;
   LimitTime := ASource.LimitTime;
+  SpillageStop := ASource.SpillageStop;
 
   {====================================================================}
   { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
@@ -1462,6 +1483,16 @@ begin
     ProtocolDataPoints := TObjectList<TPointSpillage>.Create(False)
   else
     ProtocolDataPoints.Clear;
+end;
+
+function TDevicePoint.GetStopCriteria: TSpillageStopCriteria;
+begin
+  Result := IntToCriteria(SpillageStop);
+end;
+
+procedure TDevicePoint.SetStopCriteria(const Value: TSpillageStopCriteria);
+begin
+  SpillageStop := CriteriaToInt(Value);
 end;
 
 procedure TPointSpillage.Assign(ASource: TPointSpillage);
@@ -1582,6 +1613,7 @@ begin
   Result.ID := TEntityHelpers<TDevicePoint>.NextID(Points);
   Result.DeviceID := ID;
   Result.DeviceUUID:=UUID;
+  Result.SpillageStop := SpillageStop;
   StdIdx := GetNextPointStdIndex(Points.Count);
   Result.FlowRate := StdPointRates[StdIdx];
 
@@ -1755,6 +1787,7 @@ function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
 var
   P, MatchedPoint: TDevicePoint;
   StopOk: Boolean;
+  StopCriteria: TSpillageStopCriteria;
   MeasuredValue: Double;
   AllowedError, ActualError: Double;
 begin
@@ -1791,45 +1824,47 @@ begin
   ASpillage.DevicePointID := MatchedPoint.ID;
   ASpillage.Name := MatchedPoint.Name;
 
-  StopOk := False;
-  case SpillageStop of
-    2:
-      begin
-        StopOk := ASpillage.PulseCount >= MatchedPoint.LimitImp;
-        if not StopOk then
-          ASpillage.StatusStr := Format(
-            'Критерий остановки "Импульсы" не выполнен: %.6f < %d.',
-            [ASpillage.PulseCount, MatchedPoint.LimitImp]
-          );
-      end;
-    1:
-      begin
-        if (MeasuredDimension = Ord(mdMassFlow)) or (MeasuredDimension = Ord(mdMass)) then
-          MeasuredValue := ASpillage.DeviceMass
-        else
-          MeasuredValue := ASpillage.DeviceVolume;
+  StopCriteria := MatchedPoint.StopCriteria;
+  if StopCriteria = [] then
+    StopCriteria := Self.StopCriteria;
+  if StopCriteria = [] then
+    StopCriteria := [scTime];
 
-        StopOk := MeasuredValue >= MatchedPoint.LimitVolume;
-        if not StopOk then
-          ASpillage.StatusStr := Format(
-            'Критерий остановки "Объём/масса" не выполнен: %.6f < %.6f.',
-            [MeasuredValue, MatchedPoint.LimitVolume]
-          );
-      end;
-    0:
-      begin
-        StopOk := ASpillage.SpillTime >= MatchedPoint.LimitTime;
-        if not StopOk then
-          ASpillage.StatusStr := Format(
-            'Критерий остановки "Время" не выполнен: %.3f < %.3f с.',
-            [ASpillage.SpillTime, MatchedPoint.LimitTime]
-          );
-      end;
-  else
-    begin
-      StopOk := False;
-      ASpillage.StatusStr := Format('Неизвестный критерий остановки SpillageStop=%d.', [SpillageStop]);
-    end;
+  StopOk := True;
+
+  if scImpulse in StopCriteria then
+  begin
+    StopOk := StopOk and (ASpillage.PulseCount >= MatchedPoint.LimitImp);
+    if not StopOk then
+      ASpillage.StatusStr := Format(
+        'Критерий остановки "Импульсы" не выполнен: %.6f < %d.',
+        [ASpillage.PulseCount, MatchedPoint.LimitImp]
+      );
+  end;
+
+  if StopOk and (scVolume in StopCriteria) then
+  begin
+    if (MeasuredDimension = Ord(mdMassFlow)) or (MeasuredDimension = Ord(mdMass)) then
+      MeasuredValue := ASpillage.DeviceMass
+    else
+      MeasuredValue := ASpillage.DeviceVolume;
+
+    StopOk := MeasuredValue >= MatchedPoint.LimitVolume;
+    if not StopOk then
+      ASpillage.StatusStr := Format(
+        'Критерий остановки "Объём/масса" не выполнен: %.6f < %.6f.',
+        [MeasuredValue, MatchedPoint.LimitVolume]
+      );
+  end;
+
+  if StopOk and (scTime in StopCriteria) then
+  begin
+    StopOk := ASpillage.SpillTime >= MatchedPoint.LimitTime;
+    if not StopOk then
+      ASpillage.StatusStr := Format(
+        'Критерий остановки "Время" не выполнен: %.3f < %.3f с.',
+        [ASpillage.SpillTime, MatchedPoint.LimitTime]
+      );
   end;
 
   if not StopOk then
@@ -2237,6 +2272,7 @@ begin
   OutputType        := AType.OutputType;
   OutputSet         := AType.OutputSet;
   DimensionCoef     := AType.DimensionCoef;
+  SpillageStop      := AType.SpillageStop;
 
   {====================================================}
   { 3. Сигналы }
@@ -2324,6 +2360,7 @@ begin
       DP.Pause          := TP.Pause;
       DP.Repeats        := TP.Repeats;
       DP.RepeatsProtocol:= TP.RepeatsProtocol;
+      DP.SpillageStop   := SpillageStop;
 
       {--- расчёт  Rate расхода ---}
       DP.FlowRate := TP.FlowRate;
