@@ -1521,8 +1521,7 @@ begin
     NextSession.Active := True;
     if NextSession.Status = 0 then
       NextSession.Status := 1;
-    if NextSession.State = osClean then
-      NextSession.State := osModified;
+    NextSession.State := osModified;
   end;
 
   Repo := nil;
@@ -1582,8 +1581,7 @@ begin
   Session.Active := False;
   Session.Status := 2;
   Session.DateTimeClose := Now;
-  if Session.State = osClean then
-    Session.State := osModified;
+  Session.State := osModified;
 
   Repo := nil;
   if DataManager <> nil then
@@ -1616,8 +1614,7 @@ begin
     Exit;
 
   Point.State := osDeleted;
-  if Session.State = osClean then
-    Session.State := osModified;
+  Session.State := osModified;
 
   Repo := nil;
   if DataManager <> nil then
@@ -1690,7 +1687,6 @@ begin
         if (P <> nil) and (P.SessionID = Session.ID) then
           P.State := osDeleted;
 
-    if Session.State = osClean then
       Session.State := osModified;
   end
   else if Item.TagObject is TDevice then
@@ -1753,8 +1749,7 @@ begin
       else
         S.Active := False;
 
-      if S.State = osClean then
-        S.State := osModified;
+      S.State := osModified;
     end;
 
   Repo := nil;
@@ -1906,7 +1901,7 @@ begin
     NextPoint := FCurrentSpillages[GridDataPoints.Row + 1];
 
   Point.State := osDeleted;
-  if (Session <> nil) and (Session.State = osClean) then
+  if (Session <> nil) then
     Session.State := osModified;
 
   Repo := nil;
@@ -2033,8 +2028,7 @@ begin
     NextSession.Active := True;
     if NextSession.Status = 0 then
       NextSession.Status := 1;
-    if NextSession.State = osClean then
-      NextSession.State := osModified;
+    NextSession.State := osModified;
   end;
 
   Repo := nil;
@@ -2486,8 +2480,7 @@ begin
     Exit;
 
   Point.Enabled := not Point.Enabled;
-  if Point.State = osClean then
-    Point.State := osModified;
+  Point.State := osModified;
 
   Device := ResolveSelectedDevice;
   if Device <> nil then

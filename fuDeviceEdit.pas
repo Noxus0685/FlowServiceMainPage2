@@ -10,6 +10,7 @@ uses
   UnitRepositories,
   UnitBaseProcedures,
   System.Math,
+  System.Generics.Defaults,
 
 
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
@@ -267,6 +268,9 @@ type
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure ComboEditDNChange(Sender: TObject);
     procedure mmoCommentExit(Sender: TObject);
+    procedure GridPointsHeaderClick(Column: TColumn);
+    procedure cbSpillageTypeChange(Sender: TObject);
+    procedure cbSpillageStopChange(Sender: TObject);
 
 
   private
@@ -287,6 +291,9 @@ type
      FButtonCoefDelete: TButton;
      FButtonCoefClear: TButton;
      FCoefsTabInitialized: Boolean;
+     FSkipPointDeleteConfirm: Boolean;
+     FPointSortColumn: Integer;
+     FPointSortAscending: Boolean;
 
      procedure ApplyMassMode;
      procedure ApplyVolumeMode;
@@ -295,6 +302,10 @@ type
 
      procedure FillSpillageStopVolume;
      procedure FillSpillageStopMass;
+     procedure PopulateSpillageStopCombo(const ADim: TMeasuredDimension);
+     function  GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
+     function  SpillageStopValueToItemIndex(const AValue: Integer): Integer;
+     function  SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
      procedure FillConversionCoefVolume;
      procedure FillConversionCoefMass;
 
@@ -303,6 +314,8 @@ type
      procedure RefreshDeviceTypeReference;
 
      procedure UpdateUIFromDevice;
+     procedure UpdateUICoef;
+     procedure UpdateUIFreq;
      procedure InitCategoryComboEdit;
      procedure UpdatePointsGrid;
      procedure SetModified;
@@ -311,6 +324,7 @@ type
      function   GetSelectedPoint: TDevicePoint;
      function GetPointByVisibleRow(ARow: Integer): TDevicePoint;
      procedure UpdateQmaxQmin;
+     procedure SortPoints;
 
      procedure InitCoefsTab;
      procedure EnsureCalibrCoefTable;
@@ -369,37 +383,8 @@ begin
     // ==================================================
     // КРИТЕРИЙ ОСТАНОВКИ (cbSpillageStop)
     // ==================================================
-    cbSpillageStop.Items.BeginUpdate;
-    try
-      cbSpillageStop.Items.Clear;
-
-      // Импульсы доступны всегда
-      cbSpillageStop.Items.Add('Импульсы');
-
-      case Dim of
-        mdVolumeFlow,
-        mdVolume:
-          cbSpillageStop.Items.Add('Объем, л');
-
-        mdMassFlow,
-        mdMass:
-          cbSpillageStop.Items.Add('Масса, кг');
-
-        mdSpeed:
-          cbSpillageStop.Items.Add('Скорость');
-
-        mdHeat:
-          cbSpillageStop.Items.Add('Теплота');
-      end;
-
-      // Время доступно всегда
-      cbSpillageStop.Items.Add('Время, с');
-    finally
-      cbSpillageStop.Items.EndUpdate;
-    end;
-
-    if cbSpillageStop.ItemIndex < 0 then
-      cbSpillageStop.ItemIndex := 0;
+    PopulateSpillageStopCombo(Dim);
+    cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 
     // ==================================================
     // ОСНОВНАЯ ЛОГИКА ПО ИЗМЕРЯЕМОЙ ВЕЛИЧИНЕ
@@ -515,6 +500,7 @@ begin
   {-----------------------------------------------------}
   NewP.LimitImp  := 10000;
   NewP.LimitTime := 52;
+  NewP.SpillageStop := FDevice.SpillageStop;
   NewP.Pause     := 10;
   NewP.Pressure  := 0;
   NewP.Temp      := 0;
@@ -597,14 +583,38 @@ procedure TFormDeviceEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TDevicePoint;
   PointIdx: Integer;
+  SelRow: Integer;
 begin
   if FDevice = nil then
     Exit;
+
+  SelRow := GridPoints.Selected;
+  if SelRow < 0 then
+    SelRow := GridPoints.Row;
+  if SelRow < 0 then
+    Exit;
+
+  { Явно подсвечиваем строку для удаления }
+  GridPoints.Row := SelRow;
+  GridPoints.Selected := SelRow;
 
   Point := GetSelectedPoint;  // ← твой метод получения выбранной точки
 
   if Point = nil then
     Exit;
+
+  if not FSkipPointDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранную точку?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipPointDeleteConfirm := True;
+  end;
 
   {----------------------------------}
   { Если точка новая — удаляем физически }
@@ -666,18 +676,7 @@ end;
 
 procedure TFormDeviceEditor.FillSpillageStopVolume;
 begin
-  cbSpillageStop.Items.BeginUpdate;
-  try
-    cbSpillageStop.Items.Clear;
-    cbSpillageStop.Items.Add('Импульсы');
-    cbSpillageStop.Items.Add('Объем, л');
-    cbSpillageStop.Items.Add('Время, с');
-  finally
-    cbSpillageStop.Items.EndUpdate;
-  end;
-
-  if cbSpillageStop.ItemIndex < 0 then
-    cbSpillageStop.ItemIndex := 0;
+  PopulateSpillageStopCombo(mdVolume);
 end;
 
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
@@ -702,7 +701,7 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
-        FOriginalDevice.Assign(FDevice);
+        FOriginalDevice.Assign(FDevice,True);
         DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else
@@ -731,18 +730,75 @@ end;
 
 procedure TFormDeviceEditor.FillSpillageStopMass;
 begin
+  PopulateSpillageStopCombo(mdMass);
+end;
+
+function TFormDeviceEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
+begin
+  case ADim of
+    mdVolumeFlow,
+    mdVolume:
+      Result := 'Объем, л';
+    mdMassFlow,
+    mdMass:
+      Result := 'Масса, кг';
+    mdSpeed:
+      Result := 'Скорость';
+    mdHeat:
+      Result := 'Теплота';
+  else
+    Result := 'Объем/масса';
+  end;
+end;
+
+procedure TFormDeviceEditor.PopulateSpillageStopCombo(const ADim: TMeasuredDimension);
+var
+  VolumeCaption: string;
+begin
+  VolumeCaption := GetStopVolumeCaption(ADim);
   cbSpillageStop.Items.BeginUpdate;
   try
     cbSpillageStop.Items.Clear;
+    cbSpillageStop.Items.Add('Время');
     cbSpillageStop.Items.Add('Импульсы');
-    cbSpillageStop.Items.Add('Масса, кг');
-    cbSpillageStop.Items.Add('Время, с');
+    cbSpillageStop.Items.Add(VolumeCaption);
+    cbSpillageStop.Items.Add('Время + импульсы');
+    cbSpillageStop.Items.Add('Время + ' + LowerCase(VolumeCaption));
+    cbSpillageStop.Items.Add('Импульсы + ' + LowerCase(VolumeCaption));
+    cbSpillageStop.Items.Add('Время + импульсы + ' + LowerCase(VolumeCaption));
   finally
     cbSpillageStop.Items.EndUpdate;
   end;
+end;
 
-  if cbSpillageStop.ItemIndex < 0 then
-    cbSpillageStop.ItemIndex := 0;
+function TFormDeviceEditor.SpillageStopValueToItemIndex(const AValue: Integer): Integer;
+begin
+  case AValue of
+    STOP_BY_TIME: Result := 0;
+    STOP_BY_IMP: Result := 1;
+    STOP_BY_VOLUME: Result := 2;
+    STOP_BY_TIME or STOP_BY_IMP: Result := 3;
+    STOP_BY_TIME or STOP_BY_VOLUME: Result := 4;
+    STOP_BY_IMP or STOP_BY_VOLUME: Result := 5;
+    STOP_BY_TIME or STOP_BY_IMP or STOP_BY_VOLUME: Result := 6;
+  else
+    Result := 0;
+  end;
+end;
+
+function TFormDeviceEditor.SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
+begin
+  case AIndex of
+    0: Result := STOP_BY_TIME;
+    1: Result := STOP_BY_IMP;
+    2: Result := STOP_BY_VOLUME;
+    3: Result := STOP_BY_TIME or STOP_BY_IMP;
+    4: Result := STOP_BY_TIME or STOP_BY_VOLUME;
+    5: Result := STOP_BY_IMP or STOP_BY_VOLUME;
+    6: Result := STOP_BY_TIME or STOP_BY_IMP or STOP_BY_VOLUME;
+  else
+    Result := STOP_BY_TIME;
+  end;
 end;
 
 procedure TFormDeviceEditor.FillConversionCoefVolume;
@@ -776,18 +832,81 @@ begin
 end;
 
 procedure TFormDeviceEditor.ApplyOutputType;
+var
+ Idx : integer;
 begin
   if FDevice = nil then
     Exit;
 
   // --- выбор вкладки по имени ---
   case FDevice.OutputType of
-    0: tcOutPutType.ActiveTab := tiFrequency;  // Частота
-    1: tcOutPutType.ActiveTab := tiImpulse;    // Импульсы
-    2: tcOutPutType.ActiveTab := tiVoltage;    // Напряжение
-    3: tcOutPutType.ActiveTab := tiCurrent;    // Ток
-    4: tcOutPutType.ActiveTab := tiInterface;  // Интерфейс
-    5: tcOutPutType.ActiveTab := tiVisual;     // Визуальный
+    0: // Частота
+    begin
+    UpdateUIFreq;
+    tcOutPutType.ActiveTab := tiFrequency;
+    end;
+    1: // Импульсы
+    begin
+    UpdateUICoef;
+    tcOutPutType.ActiveTab := tiImpulse;
+    end;
+    2: // Напряжение
+    tcOutPutType.ActiveTab := tiVoltage;
+    3:  // Ток
+    tcOutPutType.ActiveTab := tiCurrent;
+    4:  // Интерфейс
+      begin
+     // =====================================================
+    // == Интерфейс / библиотека
+    // =====================================================
+    Idx := cbLibrares.Items.IndexOf(FDevice.ProtocolName);
+    if Idx >= 0 then
+      cbLibrares.ItemIndex := Idx
+    else
+      cbLibrares.ItemIndex := -1;
+    // =====================================================
+    // == Скорость передачи
+    // =====================================================
+    case FDevice.BaudRate of
+      2400:   cbBaudRate.ItemIndex := 0;
+      4800:   cbBaudRate.ItemIndex := 1;
+      9600:   cbBaudRate.ItemIndex := 2;
+      19200:  cbBaudRate.ItemIndex := 3;
+      115200: cbBaudRate.ItemIndex := 4;
+    else
+      cbBaudRate.ItemIndex := -1;
+    end;
+
+    // =====================================================
+    // == Четность
+    // =====================================================
+    if (FDevice.Parity >= 0) and (FDevice.Parity < cbParity.Items.Count) then
+      cbParity.ItemIndex := FDevice.Parity
+    else
+      cbParity.ItemIndex := 0;
+
+    // =====================================================
+    // == Адрес прибора
+    // =====================================================
+    if FDevice.DeviceAddress >= 0 then
+      edtAddr.Text := IntToStr(FDevice.DeviceAddress)
+    else
+      edtAddr.Text := '';
+
+    tcOutPutType.ActiveTab := tiInterface;
+    end;
+    5: // Визуальный
+    begin
+    // =====================================================
+    // == Визуальный ввод
+    // =====================================================
+    if (FDevice.InputType >= 0) and (FDevice.InputType < cbInputType.Items.Count) then
+      cbInputType.ItemIndex := FDevice.InputType
+    else
+      cbInputType.ItemIndex := 0;
+
+    tcOutPutType.ActiveTab := tiVisual;
+    end;
   end;
 
   // --- столбцы коэффициентов / импульсов (ТОЛЬКО точки прибора) ---
@@ -1058,6 +1177,10 @@ begin
 
   FLoading := True;
   try
+    FSkipPointDeleteConfirm := False;
+    FPointSortColumn := -1;
+    FPointSortAscending := True;
+
     FreeAndNil(FDevice);
     FDeviceType := nil;
 
@@ -1067,6 +1190,7 @@ begin
       { Редактирование существующего прибора }
       {----------------------------------}
       FOriginalDevice := ADevice;
+      //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
     end
     else
@@ -1079,7 +1203,6 @@ begin
         FDevice := DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
-      FDevice.State := osNew;
     end;
 
     {----------------------------------}
@@ -1110,6 +1233,27 @@ begin
   finally
     FLoading := False;
   end;
+end;
+
+procedure TFormDeviceEditor.GridPointsHeaderClick(Column: TColumn);
+begin
+  if (Column = nil) or (FDevice = nil) then
+    Exit;
+
+  if (Column.Index <> StringColumnPointName.Index) and
+     (Column.Index <> StringColumnPointFlowRate.Index) and
+     (Column.Index <> StringColumnPointTime.Index) then
+    Exit;
+
+  if FPointSortColumn = Column.Index then
+    FPointSortAscending := not FPointSortAscending
+  else
+  begin
+    FPointSortColumn := Column.Index;
+    FPointSortAscending := True;
+  end;
+
+  UpdatePointsGrid;
 end;
 
 procedure TFormDeviceEditor.mmoCommentExit(Sender: TObject);
@@ -1338,6 +1482,46 @@ begin
 end;
 end;
 
+procedure TFormDeviceEditor.UpdateUICoef;
+begin
+    // =====================================================
+    // == Представление коэффициента
+    // =====================================================
+    if (FDevice.DimensionCoef >= 0) and
+       (FDevice.DimensionCoef < cbCoefViewType.Items.Count) then
+      cbCoefViewType.ItemIndex := FDevice.DimensionCoef
+    else
+      cbCoefViewType.ItemIndex := -1;
+
+    // =====================================================
+    // == Коэффициент
+    // =====================================================
+    if FDevice.Coef > 0 then
+      EditCoef.Text := FloatToStr(FDevice.Coef)
+    else
+      EditCoef.Text := '';
+end;
+
+procedure TFormDeviceEditor.UpdateUIFreq;
+begin
+
+    // =====================================================
+    // == Частота
+    // =====================================================
+    if FDevice.Freq > 0 then
+      EditFreq.Text := IntToStr(FDevice.Freq)
+    else
+      EditFreq.Text := '';
+
+    // =====================================================
+    // == Отношение расхода к частоте
+    // =====================================================
+    if FDevice.FreqFlowRate > 0 then
+      EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate)
+    else
+      EditFreqFlowRate.Text := '';
+
+end;
 
 procedure TFormDeviceEditor.UpdateUIFromDevice;
 var
@@ -1426,10 +1610,8 @@ begin
     else
       cbSpillageType.ItemIndex := 0;
 
-    if (FDevice.SpillageStop >= 0) and (FDevice.SpillageStop < cbSpillageStop.Items.Count) then
-      cbSpillageStop.ItemIndex := FDevice.SpillageStop
-    else
-      cbSpillageStop.ItemIndex := 0;
+    PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
+    cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 
     // =====================================================
     // == Повторы
@@ -1488,84 +1670,10 @@ begin
       cbOutPutType2.ItemIndex := -1;
     end;
 
-    // =====================================================
-    // == Представление коэффициента
-    // =====================================================
-    if (FDevice.DimensionCoef >= 0) and
-       (FDevice.DimensionCoef < cbCoefViewType.Items.Count) then
-      cbCoefViewType.ItemIndex := FDevice.DimensionCoef
-    else
-      cbCoefViewType.ItemIndex := -1;
+      ApplyOutputType;
 
-    // =====================================================
-    // == Коэффициент
-    // =====================================================
-    if FDevice.Coef > 0 then
-      EditCoef.Text := FloatToStr(FDevice.Coef)
-    else
-      EditCoef.Text := '';
 
-    // =====================================================
-    // == Частота
-    // =====================================================
-    if FDevice.Freq > 0 then
-      EditFreq.Text := IntToStr(FDevice.Freq)
-    else
-      EditFreq.Text := '';
 
-    // =====================================================
-    // == Отношение расхода к частоте
-    // =====================================================
-    if FDevice.FreqFlowRate > 0 then
-      EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate)
-    else
-      EditFreqFlowRate.Text := '';
-
-    // =====================================================
-    // == Интерфейс / библиотека
-    // =====================================================
-    Idx := cbLibrares.Items.IndexOf(FDevice.ProtocolName);
-    if Idx >= 0 then
-      cbLibrares.ItemIndex := Idx
-    else
-      cbLibrares.ItemIndex := -1;
-
-    // =====================================================
-    // == Скорость передачи
-    // =====================================================
-    case FDevice.BaudRate of
-      2400:   cbBaudRate.ItemIndex := 0;
-      4800:   cbBaudRate.ItemIndex := 1;
-      9600:   cbBaudRate.ItemIndex := 2;
-      19200:  cbBaudRate.ItemIndex := 3;
-      115200: cbBaudRate.ItemIndex := 4;
-    else
-      cbBaudRate.ItemIndex := -1;
-    end;
-
-    // =====================================================
-    // == Четность
-    // =====================================================
-    if (FDevice.Parity >= 0) and (FDevice.Parity < cbParity.Items.Count) then
-      cbParity.ItemIndex := FDevice.Parity
-    else
-      cbParity.ItemIndex := 0;
-
-    // =====================================================
-    // == Адрес прибора
-    // =====================================================
-    if FDevice.DeviceAddress >= 0 then
-      edtAddr.Text := IntToStr(FDevice.DeviceAddress)
-    else
-      edtAddr.Text := '';
-
-    // =====================================================
-    // == Визуальный ввод
-    // =====================================================
-    if (FDevice.InputType >= 0) and (FDevice.InputType < cbInputType.Items.Count) then
-      cbInputType.ItemIndex := FDevice.InputType
-    else
-      cbInputType.ItemIndex := 0;
 
     // =====================================================
     // == Комментарий
@@ -1649,6 +1757,35 @@ begin
 
   { при необходимости — пересчёт параметров прибора }
 //  RecalcDeviceBySignalSettings; // если метод есть
+
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.cbSpillageTypeChange(Sender: TObject);
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  if cbSpillageType.ItemIndex < 0 then
+    Exit;
+
+  FDevice.SpillageType := cbSpillageType.ItemIndex;
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.cbSpillageStopChange(Sender: TObject);
+var
+  P: TDevicePoint;
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  FDevice.SpillageStop := SpillageStopItemIndexToValue(cbSpillageStop.ItemIndex);
+
+  if FDevice.Points <> nil then
+    for P in FDevice.Points do
+      if P <> nil then
+        P.SpillageStop := FDevice.SpillageStop;
 
   SetModified;
 end;
@@ -1961,6 +2098,9 @@ begin
   // 5. Сохраняем базовый коэффициент
   FDevice.Coef := NewBaseCoef;
 
+  FDevice.Freq := Round(FDevice.Coef * FDevice.FreqFlowRate  / 3.6);
+
+
   // 6. Пересчёт точек прибора
   RecalcDevicePointsCoef;   // ← аналог RecalcDiametersKp + RecalcPointsBySelectedDiameter
 
@@ -2079,13 +2219,15 @@ begin
   // ----------------------------------------
   // Нет изменений
   // ----------------------------------------
-  if FDevice.Freq = NewFreq then
-    Exit;
+ // if FDevice.Freq = NewFreq then
+ //   Exit;
 
   // ----------------------------------------
-  // Сохраняем в прибор
+  // Сохраняем в прибор    Kp = 3.6 * Freq / QFmax
   // ----------------------------------------
   FDevice.Freq := NewFreq;
+  FDevice.Coef :=   3.6 *  FDevice.Freq /  FDevice.FreqFlowRate;
+
 
   // ----------------------------------------
   // Обновляем точки прибора (если частота влияет)
@@ -2123,9 +2265,10 @@ begin
     Exit;
 
   // ----------------------------------------
-  // Сохраняем в прибор
+  // Сохраняем в прибор  Kp = 3.6 * Freq / QFmax
   // ----------------------------------------
   FDevice.FreqFlowRate := NewRate;
+  FDevice.Coef :=   3.6 *  FDevice.Freq /  FDevice.FreqFlowRate;
 
   // ----------------------------------------
   // Пересчёт параметров прибора
@@ -2760,7 +2903,6 @@ begin
       end;
     end;
   end;
-  if P.State <> osNew then
   P.State := osModified;
   SetModified;
   UpdatePointsGrid;
@@ -2820,6 +2962,8 @@ begin
   if FDevice = nil then
     Exit;
 
+  SortPoints;
+
   GridPoints.BeginUpdate;
   try
     VisibleCount := 0;
@@ -2842,6 +2986,58 @@ begin
   end;
 end;
 
+procedure TFormDeviceEditor.SortPoints;
+var
+  SortAsc: Boolean;
+  SortCol: Integer;
+begin
+  if (FDevice = nil) or (FDevice.Points = nil) or (FDevice.Points.Count < 2) then
+    Exit;
+
+  SortCol := FPointSortColumn;
+  if (SortCol <> StringColumnPointName.Index) and
+     (SortCol <> StringColumnPointFlowRate.Index) and
+     (SortCol <> StringColumnPointTime.Index) then
+    Exit;
+
+  SortAsc := FPointSortAscending;
+
+  FDevice.Points.Sort(
+    TComparer<TDevicePoint>.Construct(
+      function(const Left, Right: TDevicePoint): Integer
+      begin
+        if Left = Right then
+          Exit(0);
+        if Left = nil then
+          Exit(1);
+        if Right = nil then
+          Exit(-1);
+
+        if (Left.State = osDeleted) and (Right.State <> osDeleted) then
+          Exit(1);
+        if (Left.State <> osDeleted) and (Right.State = osDeleted) then
+          Exit(-1);
+
+        if SortCol = StringColumnPointName.Index then
+          Result := CompareText(Left.Name, Right.Name)
+        else if SortCol = StringColumnPointFlowRate.Index then
+          Result := CompareValue(Left.FlowRate, Right.FlowRate)
+        else
+          Result := CompareValue(Left.LimitTime, Right.LimitTime);
+
+        if Result = 0 then
+          Result := CompareValue(Left.Num, Right.Num);
+
+        if (Result = 0) and (Left.ID <> Right.ID) then
+          Result := CompareValue(Left.ID, Right.ID);
+
+        if not SortAsc then
+          Result := -Result;
+      end
+    )
+  );
+end;
+
 procedure TFormDeviceEditor.SetModified;
 begin
   if FLoading then
@@ -2850,8 +3046,7 @@ begin
   if FDevice = nil then
     Exit;
 
-  if FDevice.State = osClean then
-    FDevice.State := osModified;
+  FDevice.State := osModified;
 end;
 
 procedure TFormDeviceEditor.CloseEditor(ASave: Boolean);
@@ -2866,7 +3061,9 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
-        FOriginalDevice.Assign(FDevice);
+        FOriginalDevice.Assign(FDevice,True);
+
+
         DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else

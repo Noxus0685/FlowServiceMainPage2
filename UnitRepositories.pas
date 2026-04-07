@@ -776,7 +776,7 @@ var
   );
   begin
     T := TDeviceType.Create;
-    T.Assign(ABase);
+    T.Assign(ABase, False);
 
     T.ID := FNextTypeID;
     Inc(FNextTypeID);
@@ -1283,7 +1283,7 @@ begin
   if AType = nil then
     Exit;
   // копируем ВСЕ поля
-  Result.Assign(AType);
+  Result.Assign(AType, False);
 
   { Новый объект должен быть новым для БД }
   Result.ID := GenerateTypeID;
@@ -3543,14 +3543,8 @@ begin
     Exit(CreateNewDevice);
 
   { создаём новый прибор }
-  Result := CreateNewDevice;
+  Result := CreateDevice(Src);
 
-  { копируем данные }
-  Result.Assign(Src);
-
-  { гарантируем уникальность }
-  Result.ID := GenerateDeviceID;
-  Result.State := osNew;
 end;
 
 function TDeviceRepository.CreateDevice(const ASource: TDevice): TDevice;
@@ -3559,7 +3553,7 @@ begin
     Exit(CreateNewDevice);
 
   Result := CreateNewDevice;
-  Result.Assign(ASource);
+  Result.Assign(ASource, False);
   Result.ID := GenerateDeviceID;
   Result.State := osNew;
 end;
@@ -4277,6 +4271,7 @@ begin
     Col('LimitImp', 'INTEGER'),
     Col('LimitVolume', 'REAL'),
     Col('LimitTime', 'REAL'),
+    Col('SpillageStop', 'INTEGER'),
 
     Col('Error', 'REAL'),
 
@@ -4363,6 +4358,7 @@ begin
   Result.LimitImp := Q.FieldByName('LimitImp').AsInteger;
   Result.LimitVolume := Q.FieldByName('LimitVolume').AsFloat;
   Result.LimitTime := Q.FieldByName('LimitTime').AsFloat;
+  Result.SpillageStop := Q.FieldByName('SpillageStop').AsInteger;
 
   {================ Погрешности ==================}
   Result.Error := Q.FieldByName('Error').AsFloat;
@@ -4555,13 +4551,13 @@ begin
             'DeviceUUID, DeviceTypePointID, Num, Name, Description, ' +
             'FlowRate, Q, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
-            'LimitImp, LimitVolume, LimitTime, ' +
+            'LimitImp, LimitVolume, LimitTime, SpillageStop, ' +
             'Error, Pause, RepeatsProtocol, Repeats' +
             ') values (' +
             ':DeviceUUID, :DeviceTypePointID, :Num, :Name, :Description, ' +
             ':FlowRate, :Q, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
-            ':LimitImp, :LimitVolume, :LimitTime, ' +
+            ':LimitImp, :LimitVolume, :LimitTime, :SpillageStop, ' +
             ':Error, :Pause, :RepeatsProtocol, :Repeats' +
             ')';
         end;
@@ -4579,7 +4575,7 @@ begin
             'Num=:Num, Name=:Name, Description=:Description, ' +
             'FlowRate=:FlowRate, Q=:Q, FlowAccuracy=:FlowAccuracy, ' +
             'Pressure=:Pressure, Temp=:Temp, TempAccuracy=:TempAccuracy, ' +
-            'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, ' +
+            'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, SpillageStop=:SpillageStop, ' +
             'Error=:Error, Pause=:Pause, ' +
             'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats ' +
             'where ID=:ID';
@@ -4612,6 +4608,7 @@ begin
     SetIntParam(Q, 'LimitImp', APoint.LimitImp);
     SetFloatParam(Q, 'LimitVolume', APoint.LimitVolume);
     SetFloatParam(Q, 'LimitTime', APoint.LimitTime);
+    SetIntParam(Q, 'SpillageStop', APoint.SpillageStop);
 
     SetFloatParam(Q, 'Error', APoint.Error);
     SetIntParam(Q, 'Pause', APoint.Pause);

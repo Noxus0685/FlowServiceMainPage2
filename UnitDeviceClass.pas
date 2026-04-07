@@ -76,6 +76,11 @@ type
 
 
   TDevicePoint = class (TTypeEntity)
+  private
+    function GetStopCriteria: TSpillageStopCriteria;
+    procedure SetStopCriteria(const Value: TSpillageStopCriteria);
+  protected
+    procedure SetState(const Value: TObjectState); override;
    public
     DataPoints: TObjectList<TPointSpillage>;          // Все измерения, относящиеся к точке по расходу
     ProtocolDataPoints: TObjectList<TPointSpillage>;  // Лучшие измерения по погрешности (не более RepeatsProtocol)
@@ -119,6 +124,7 @@ type
     LimitImp: Integer;           // Ограничение по импульсам, шт
     LimitVolume: Double;         // Ограничение по объему / массе, л (кг)
     LimitTime: Double;           // Ограничение по времени, сек
+    SpillageStop: Integer;       // Критерии остановки (битовая маска)
 
     {====================================================================}
     { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
@@ -147,6 +153,7 @@ type
     destructor Destroy; override;
 
     procedure Assign(ASource: TDevicePoint);
+    property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
   end;
 
   TPointSpillage = class (TTypeEntity)
@@ -331,6 +338,8 @@ type
       FPoints     : TObjectList<TDevicePoint>;
       FCalibrCoefTable: TObjectList<TCalibrCoefTable>;
       FDeviceType : TDeviceType;
+      function GetStopCriteria: TSpillageStopCriteria;
+      procedure SetStopCriteria(const Value: TSpillageStopCriteria);
       function NormalizeActiveSessionSpillage: TSessionSpillage;
       function GetCalibrCoefTable: TCalibrCoefTable;
       procedure SetCalibrCoefTable(const Value: TCalibrCoefTable);
@@ -458,7 +467,7 @@ type
     constructor Create;
     destructor Destroy;
 
-    procedure Assign(ASource: TDevice);
+    procedure Assign(ASource: TDevice; FullAssign: Boolean);
     function Clone: TDevice;
     function GetSearchText: string; override;
 
@@ -489,6 +498,7 @@ type
     property  Points     : TObjectList<TDevicePoint> read  FPoints write  FPoints;
     property  CalibrCoefTables: TObjectList<TCalibrCoefTable> read FCalibrCoefTable write FCalibrCoefTable;
     property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
+    property  StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
 
     procedure AttachType(AType: TDeviceType; RepoName: String);
     procedure AttachDN(ADiameter: TDiameter; AType: TDeviceType);  overload;
@@ -499,6 +509,26 @@ type
   end;
 
 implementation
+uses
+  UnitDataManager,
+  UnitRepositories;
+
+procedure MarkDeviceAndRepositoryModified(const ADeviceUUID: string);
+var
+  ADevice: TDevice;
+  Repo: TDeviceRepository;
+begin
+  if (Trim(ADeviceUUID) = '') or (DataManager = nil) then
+    Exit;
+
+  ADevice := DataManager.FindDevice(ADeviceUUID, Repo);
+
+  if (ADevice <> nil) then
+    ADevice.State := osModified;
+
+  if (Repo <> nil) then
+    Repo.State := osModified;
+end;
 
 destructor TDevice.Destroy;
 begin
@@ -619,7 +649,7 @@ begin
   { Испытания }
   {----------------------------------}
   SpillageType := 0;
-  SpillageStop := 0;
+  SpillageStop := STOP_BY_TIME;
   Repeats := 3;
   RepeatsProtocol := 3;
   Status := 0;
@@ -633,13 +663,26 @@ begin
   ReportingForm := '';
 end;
 
+function TDevice.GetStopCriteria: TSpillageStopCriteria;
+begin
+  Result := IntToCriteria(SpillageStop);
+end;
+
+procedure TDevice.SetStopCriteria(const Value: TSpillageStopCriteria);
+begin
+  SpillageStop := CriteriaToInt(Value);
+end;
+
 procedure TDevice.SetState(const Value: TObjectState);
 var
+  OldState: TObjectState;
   Session: TSessionSpillage;
   Point: TDevicePoint;
   Spillage: TPointSpillage;
   SessionSpillage: TPointSpillage;
+  Repo: TDeviceRepository;
 begin
+  OldState := FState;
   inherited SetState(Value);
 
   if FState = osNew then
@@ -660,6 +703,14 @@ begin
           for SessionSpillage in Session.Spillages do
             SessionSpillage.State := osNew;
       end;
+  end;
+
+  if (Value <> OldState) and (Value in [osNew, osModified, osDeleted]) and
+     (DataManager <> nil) then
+  begin
+    DataManager.FindDevice(UUID, Repo);
+    if (Repo <> nil) then
+      Repo.State := osModified;
   end;
 end;
 
@@ -806,6 +857,7 @@ begin
   LimitImp := 0;
   LimitVolume := 0.0;
   LimitTime := 0.0;
+  SpillageStop := STOP_BY_TIME;
 
   { Метрология }
   Error := 0.0;
@@ -831,6 +883,19 @@ begin
   DataPoints.Free;
   ProtocolDataPoints.Free;
   inherited;
+end;
+
+procedure TDevicePoint.SetState(const Value: TObjectState);
+var
+  OldState: TObjectState;
+begin
+  OldState := FState;
+  inherited SetState(Value);
+
+  if (Value = OldState) or not (Value in [osNew, osModified, osDeleted]) then
+    Exit;
+
+  MarkDeviceAndRepositoryModified(DeviceUUID);
 end;
 
 constructor TPointSpillage.Create(ASessionID : Integer);
@@ -905,13 +970,27 @@ begin
   FCDCoefficient := '';
 end;
 
-procedure TDevice.Assign(ASource: TDevice);
+procedure TDevice.Assign(ASource: TDevice; FullAssign: Boolean);
 var
   P: TDevicePoint;
   NewP: TDevicePoint;
 begin
   if ASource = nil then
     Exit;
+
+  if FullAssign then
+   begin
+     SerialNumber := ASource.SerialNumber;
+     UUID:=  ASource. UUID;
+     ID:=  ASource.  ID;
+     State  := ASource.State;
+   end else
+   begin
+
+  //не проверяем изменения свойств, но считаем, что что-то изменилось
+  { Состояние }
+   State := osModified;
+   end;
 
   { ============================= }
   { 1. Копирование простых полей  }
@@ -926,7 +1005,7 @@ begin
   RepoDeviceUUID := ASource.RepoDeviceUUID;
 
   Name := ASource.Name;
-  SerialNumber := ASource.SerialNumber;
+
   Modification := ASource.Modification;
   Manufacturer := ASource.Manufacturer;
   Owner := ASource.Owner;
@@ -985,9 +1064,6 @@ begin
   Comment := ASource.Comment;
   Description := ASource.Description;
   ReportingForm := ASource.ReportingForm;
-
-  { Состояние }
-  State := ASource.State;
 
   { ============================= }
   { 2. При копировании НЕ переносим }
@@ -1075,9 +1151,8 @@ end;
 function TDevice.Clone: TDevice;
 begin
   Result := TDevice.Create;
-  Result.Assign(Self);
-  Result.ID := ID;
-  Result.UUID := UUID;
+  Result.Assign(Self, True);
+
 end;
 
 function TDevice.GetSearchText: string;
@@ -1183,6 +1258,7 @@ begin
       Add(IntToStr(P.LimitImp));
       Add(FloatToStr(P.LimitVolume));
       Add(FloatToStr(P.LimitTime));
+      Add(IntToStr(P.SpillageStop));
       Add(FloatToStr(P.Error));
       Add(IntToStr(P.Pause));
       Add(IntToStr(P.RepeatsProtocol));
@@ -1337,6 +1413,7 @@ begin
   {====================================================================}
   ID := ASource.ID;
   DeviceID := ASource.DeviceID;
+  DeviceUUID := ASource.DeviceUUID;
   DeviceTypePointID := ASource.DeviceTypePointID;
 
   {====================================================================}
@@ -1373,6 +1450,7 @@ begin
   LimitImp := ASource.LimitImp;
   LimitVolume := ASource.LimitVolume;
   LimitTime := ASource.LimitTime;
+  SpillageStop := ASource.SpillageStop;
 
   {====================================================================}
   { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
@@ -1405,6 +1483,16 @@ begin
     ProtocolDataPoints := TObjectList<TPointSpillage>.Create(False)
   else
     ProtocolDataPoints.Clear;
+end;
+
+function TDevicePoint.GetStopCriteria: TSpillageStopCriteria;
+begin
+  Result := IntToCriteria(SpillageStop);
+end;
+
+procedure TDevicePoint.SetStopCriteria(const Value: TSpillageStopCriteria);
+begin
+  SpillageStop := CriteriaToInt(Value);
 end;
 
 procedure TPointSpillage.Assign(ASource: TPointSpillage);
@@ -1525,6 +1613,7 @@ begin
   Result.ID := TEntityHelpers<TDevicePoint>.NextID(Points);
   Result.DeviceID := ID;
   Result.DeviceUUID:=UUID;
+  Result.SpillageStop := SpillageStop;
   StdIdx := GetNextPointStdIndex(Points.Count);
   Result.FlowRate := StdPointRates[StdIdx];
 
@@ -1544,7 +1633,6 @@ begin
       if Sess.Active then
       begin
         Sess.Active := False;
-        if Sess.State = osClean then
           Sess.State := osModified;
       end;
     end;
@@ -1590,7 +1678,6 @@ begin
     if Sess.Active then
     begin
       Sess.Active := False;
-      if Sess.State = osClean then
         Sess.State := osModified;
     end;
   end;
@@ -1601,7 +1688,6 @@ begin
     if Result <> nil then
     begin
       Result.Active := True;
-      if Result.State = osClean then
         Result.State := osModified;
     end;
   end;
@@ -1629,7 +1715,6 @@ begin
   if ActiveSession.Status <> 1 then
   begin
     ActiveSession.Status := 1;
-    if ActiveSession.State = osClean then
       ActiveSession.State := osModified;
   end;
 
@@ -1702,6 +1787,7 @@ function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
 var
   P, MatchedPoint: TDevicePoint;
   StopOk: Boolean;
+  StopCriteria: TSpillageStopCriteria;
   MeasuredValue: Double;
   AllowedError, ActualError: Double;
 begin
@@ -1714,7 +1800,6 @@ begin
   ASpillage.StatusStr := 'Данные присвоены, анализ выполняется.';
   ASpillage.Valid := False;
 
-  if ASpillage.State = osClean then
     ASpillage.State := osModified;
 
   MatchedPoint := nil;
@@ -1739,45 +1824,47 @@ begin
   ASpillage.DevicePointID := MatchedPoint.ID;
   ASpillage.Name := MatchedPoint.Name;
 
-  StopOk := False;
-  case SpillageStop of
-    2:
-      begin
-        StopOk := ASpillage.PulseCount >= MatchedPoint.LimitImp;
-        if not StopOk then
-          ASpillage.StatusStr := Format(
-            'Критерий остановки "Импульсы" не выполнен: %.6f < %d.',
-            [ASpillage.PulseCount, MatchedPoint.LimitImp]
-          );
-      end;
-    1:
-      begin
-        if (MeasuredDimension = Ord(mdMassFlow)) or (MeasuredDimension = Ord(mdMass)) then
-          MeasuredValue := ASpillage.DeviceMass
-        else
-          MeasuredValue := ASpillage.DeviceVolume;
+  StopCriteria := MatchedPoint.StopCriteria;
+  if StopCriteria = [] then
+    StopCriteria := Self.StopCriteria;
+  if StopCriteria = [] then
+    StopCriteria := [scTime];
 
-        StopOk := MeasuredValue >= MatchedPoint.LimitVolume;
-        if not StopOk then
-          ASpillage.StatusStr := Format(
-            'Критерий остановки "Объём/масса" не выполнен: %.6f < %.6f.',
-            [MeasuredValue, MatchedPoint.LimitVolume]
-          );
-      end;
-    0:
-      begin
-        StopOk := ASpillage.SpillTime >= MatchedPoint.LimitTime;
-        if not StopOk then
-          ASpillage.StatusStr := Format(
-            'Критерий остановки "Время" не выполнен: %.3f < %.3f с.',
-            [ASpillage.SpillTime, MatchedPoint.LimitTime]
-          );
-      end;
-  else
-    begin
-      StopOk := False;
-      ASpillage.StatusStr := Format('Неизвестный критерий остановки SpillageStop=%d.', [SpillageStop]);
-    end;
+  StopOk := True;
+
+  if scImpulse in StopCriteria then
+  begin
+    StopOk := StopOk and (ASpillage.PulseCount >= MatchedPoint.LimitImp);
+    if not StopOk then
+      ASpillage.StatusStr := Format(
+        'Критерий остановки "Импульсы" не выполнен: %.6f < %d.',
+        [ASpillage.PulseCount, MatchedPoint.LimitImp]
+      );
+  end;
+
+  if StopOk and (scVolume in StopCriteria) then
+  begin
+    if (MeasuredDimension = Ord(mdMassFlow)) or (MeasuredDimension = Ord(mdMass)) then
+      MeasuredValue := ASpillage.DeviceMass
+    else
+      MeasuredValue := ASpillage.DeviceVolume;
+
+    StopOk := MeasuredValue >= MatchedPoint.LimitVolume;
+    if not StopOk then
+      ASpillage.StatusStr := Format(
+        'Критерий остановки "Объём/масса" не выполнен: %.6f < %.6f.',
+        [MeasuredValue, MatchedPoint.LimitVolume]
+      );
+  end;
+
+  if StopOk and (scTime in StopCriteria) then
+  begin
+    StopOk := ASpillage.SpillTime >= MatchedPoint.LimitTime;
+    if not StopOk then
+      ASpillage.StatusStr := Format(
+        'Критерий остановки "Время" не выполнен: %.3f < %.3f с.',
+        [ASpillage.SpillTime, MatchedPoint.LimitTime]
+      );
   end;
 
   if not StopOk then
@@ -1808,7 +1895,6 @@ begin
   ASpillage.Valid := True;
     result:=True;
 
-  if ASpillage.State = osClean then
     ASpillage.State := osModified;
 end;
 
@@ -2111,6 +2197,7 @@ begin
     RangeDynamic := Qmax / Qmin;
 
   Coef := ADiameter.Kp;
+  FreqFlowRate:= ADiameter.QFmax;
 
   LCoef := Coef;
   if (Points <> nil) and (LCoef > 0) then
@@ -2185,13 +2272,12 @@ begin
   OutputType        := AType.OutputType;
   OutputSet         := AType.OutputSet;
   DimensionCoef     := AType.DimensionCoef;
+  SpillageStop      := AType.SpillageStop;
 
   {====================================================}
   { 3. Сигналы }
   {====================================================}
   Freq              := AType.Freq;
-  FreqFlowRate      := AType.FreqFlowRate;
-  Coef              := AType.Coef;
 
   VoltageRange      := AType.VoltageRange;
   VoltageQminRate   := AType.VoltageQminRate;
@@ -2249,11 +2335,10 @@ begin
   Self.Qmax := TD.Qmax;
   Self.Qmin := TD.Qmin;
   Self.RangeDynamic := TD.Qmax / Max(TD.Qmin, 1e-6);
-  Self.Freq := Round(TD.QFmax);
-
-
-  Coef := TD.Kp;
+  Self.Coef := TD.Kp;
+  Self.FreqFlowRate:= TD.QFmax;
    end;
+
   if not APreservePointsAndSerial then
   begin
     {====================================================}
@@ -2275,6 +2360,7 @@ begin
       DP.Pause          := TP.Pause;
       DP.Repeats        := TP.Repeats;
       DP.RepeatsProtocol:= TP.RepeatsProtocol;
+      DP.SpillageStop   := SpillageStop;
 
       {--- расчёт  Rate расхода ---}
       DP.FlowRate := TP.FlowRate;
@@ -2301,7 +2387,5 @@ begin
 
   SyncNameWithModificationAndDiameter;
 end;
-
-
 
 end.

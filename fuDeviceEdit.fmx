@@ -782,7 +782,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.Width = 343.000000000000000000
       Size.Height = 178.000000000000000000
       Size.PlatformDefault = False
-      TabIndex = 5
+      TabIndex = 2
       TabOrder = 42
       TabPosition = None
       Sizes = (
@@ -1131,7 +1131,7 @@ object FormDeviceEditor: TFormDeviceEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = False
+        IsSelected = True
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
@@ -1647,7 +1647,7 @@ object FormDeviceEditor: TFormDeviceEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = True
+        IsSelected = False
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
@@ -1887,6 +1887,7 @@ object FormDeviceEditor: TFormDeviceEditor
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
+          OnHeaderClick = GridPointsHeaderClick
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
           Viewport.Width = 900.000000000000000000
@@ -2002,10 +2003,11 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Bottom = 5.000000000000000000
           Position.X = 533.000000000000000000
           Position.Y = 5.000000000000000000
-          Size.Width = 100.000000000000000000
+          Size.Width = 172.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
+          OnChange = cbSpillageStopChange
         end
         object Label28: TLabel
           Align = Left
@@ -2033,6 +2035,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 5
+          OnChange = cbSpillageTypeChange
         end
         object Layout38: TLayout
           Align = MostLeft
@@ -2081,7 +2084,7 @@ object FormDeviceEditor: TFormDeviceEditor
         object Label40: TLabel
           Align = Left
           Margins.Left = 20.000000000000000000
-          Position.X = 658.000000000000000000
+          Position.X = 730.000000000000000000
           Size.Width = 67.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
@@ -2095,7 +2098,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Cursor = crIBeam
           Min = 1.000000000000000000
           Value = 1.000000000000000000
-          Position.X = 725.000000000000000000
+          Position.X = 797.000000000000000000
           Position.Y = 5.000000000000000000
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000

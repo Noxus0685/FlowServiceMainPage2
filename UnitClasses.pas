@@ -30,6 +30,15 @@ const
 
 type
 
+  TSpillageStopCriterion = (scTime, scImpulse, scVolume);
+  TSpillageStopCriteria = set of TSpillageStopCriterion;
+
+const
+  STOP_BY_TIME = 1;   // 001
+  STOP_BY_IMP = 2;    // 010
+  STOP_BY_VOLUME = 4; // 100
+
+type
 
 
     TDeviceTypeSortField = (
@@ -116,6 +125,8 @@ type
   end;
 
   TDiameter = class (TTypeEntity)
+  protected
+    procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
@@ -153,6 +164,8 @@ type
   end;
 
   TTypePoint = class (TTypeEntity)
+  protected
+    procedure SetState(const Value: TObjectState); override;
   public
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
@@ -243,6 +256,8 @@ type
   private
       FDiameters  : TObjectList<TDiameter>;
       FPoints     : TObjectList<TTypePoint>;
+      function GetStopCriteria: TSpillageStopCriteria;
+      procedure SetStopCriteria(const Value: TSpillageStopCriteria);
   protected
       procedure SetState(const Value: TObjectState); override;
   public
@@ -359,7 +374,7 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    procedure Assign(ASource: TDeviceType);
+    procedure Assign(ASource: TDeviceType; FullAssign: Boolean);
     function Clone: TDeviceType;
     function GetSearchText: string; override;
 
@@ -391,6 +406,7 @@ type
 
     property  Diameters  : TObjectList<TDiameter> read FDiameters write FDiameters;
     property  Points     : TObjectList<TTypePoint> read  FPoints write  FPoints;
+    property  StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
 
 
 
@@ -427,12 +443,17 @@ type
 
   function SortDeviceTypes(const Source: TObjectList<TDeviceType>; ASortField: TDeviceTypeSortField;   ASortAscending: Boolean): TObjectList<TDeviceType>;
   function GetNextPointStdIndex(Count: Integer): Integer;
+  function CriteriaToInt(const C: TSpillageStopCriteria): Integer;
+  function IntToCriteria(const Value: Integer): TSpillageStopCriteria;
 
   function GetOutputTypeName(AType: TOutputType): string; overload;
   function GetOutputTypeName(AType: Integer): string; overload;
 
 
 implementation
+uses
+  UnitDataManager,
+  UnitRepositories;
 
 function GetOutputTypeName(AType: TOutputType): string;
 begin
@@ -459,6 +480,28 @@ begin
     Result := ' ';
 end;
 
+function CriteriaToInt(const C: TSpillageStopCriteria): Integer;
+begin
+  Result := 0;
+  if scTime in C then
+    Result := Result or STOP_BY_TIME;
+  if scImpulse in C then
+    Result := Result or STOP_BY_IMP;
+  if scVolume in C then
+    Result := Result or STOP_BY_VOLUME;
+end;
+
+function IntToCriteria(const Value: Integer): TSpillageStopCriteria;
+begin
+  Result := [];
+  if (Value and STOP_BY_TIME) <> 0 then
+    Include(Result, scTime);
+  if (Value and STOP_BY_IMP) <> 0 then
+    Include(Result, scImpulse);
+  if (Value and STOP_BY_VOLUME) <> 0 then
+    Include(Result, scVolume);
+end;
+
 constructor TTypeEntity.Create;
 begin
   inherited Create;
@@ -469,7 +512,32 @@ end;
 
 procedure TTypeEntity.SetState(const Value: TObjectState);
 begin
+  if (FState=osNew) and (Value=osModified) then
+  FState := osNew
+
+  else if (FState=osDeleted) then
+  FState := osDeleted
+
+  else
   FState := Value;
+
+end;
+
+procedure MarkTypeAndRepositoryModified(const ATypeUUID: string);
+var
+  AType: TDeviceType;
+  Repo: TTypeRepository;
+begin
+  if (Trim(ATypeUUID) = '') or (DataManager = nil) then
+    Exit;
+
+  AType := DataManager.FindType(ATypeUUID, '', Repo);
+
+  if (AType <> nil) then
+    AType.State := osModified;
+
+  if (Repo <> nil) then
+    Repo.State := osModified;
 end;
 
 class function TEntitySorter<T>.Sort(
@@ -520,6 +588,16 @@ end;
 function TTypeEntity.GetSearchText: string;
 begin
   Result := Name;
+end;
+
+function TDeviceType.GetStopCriteria: TSpillageStopCriteria;
+begin
+  Result := IntToCriteria(SpillageStop);
+end;
+
+procedure TDeviceType.SetStopCriteria(const Value: TSpillageStopCriteria);
+begin
+  SpillageStop := CriteriaToInt(Value);
 end;
 
 function TDeviceType.GetSearchText: string;
@@ -754,6 +832,19 @@ begin
   State := ASource.State;
 end;
 
+procedure TDiameter.SetState(const Value: TObjectState);
+var
+  OldState: TObjectState;
+begin
+  OldState := FState;
+  inherited SetState(Value);
+
+  if (Value = OldState) or not (Value in [osNew, osModified, osDeleted]) then
+    Exit;
+
+  MarkTypeAndRepositoryModified(DeviceTypeUUID);
+end;
+
 constructor TTypePoint.Create(ADeviceTypeUUID : String);
 begin
   inherited Create;
@@ -865,6 +956,19 @@ begin
   Repeats := ASource.Repeats;
 end;
 
+procedure TTypePoint.SetState(const Value: TObjectState);
+var
+  OldState: TObjectState;
+begin
+  OldState := FState;
+  inherited SetState(Value);
+
+  if (Value = OldState) or not (Value in [osNew, osModified, osDeleted]) then
+    Exit;
+
+  MarkTypeAndRepositoryModified(DeviceTypeUUID);
+end;
+
 constructor TDeviceType.Create;
 begin
   inherited Create;
@@ -963,7 +1067,7 @@ begin
   { Алгоритмы и испытания }
   {====================================================================}
   SpillageType := 0;
-  SpillageStop := 0;
+  SpillageStop := STOP_BY_TIME;
   Repeats := 0;
   RepeatsProtocol := 0;
 
@@ -982,20 +1086,42 @@ end;
 
 procedure TDeviceType.SetState(const Value: TObjectState);
 var
+  OldState: TObjectState;
   D: TDiameter;
   P: TTypePoint;
+  Repo: TTypeRepository;
 begin
+  OldState := FState;
   inherited SetState(Value);
 
   if FState = osNew then
   begin
     if FDiameters <> nil then
       for D in FDiameters do
-        D.State := osNew;
+        D.FState := osNew;
 
     if FPoints <> nil then
       for P in FPoints do
-        P.State := osNew;
+        P.FState := osNew;
+  end
+
+  else if FState = osDeleted then
+  begin
+    if FDiameters <> nil then
+      for D in FDiameters do
+        D.FState := osDeleted;
+
+    if FPoints <> nil then
+      for P in FPoints do
+        P.FState := osDeleted;
+  end;
+
+  if (Value <> OldState) and (Value in [osNew, osModified, osDeleted]) and
+     (DataManager <> nil) then
+  begin
+    DataManager.FindType(UUID, '', Repo);
+    if (Repo <> nil) then
+      Repo.State := osModified;
   end;
 end;
 
@@ -1437,14 +1563,13 @@ end;
 function TDeviceType.Clone: TDeviceType;
 begin
   Result := TDeviceType.Create;
-   Result.ID := ID;
-   Result.UUID := UUID;
-  Result.Assign(Self);
+
+  Result.Assign(Self, True);
 
 end;
 
 
-procedure TDeviceType.Assign(ASource: TDeviceType);
+procedure TDeviceType.Assign(ASource: TDeviceType; FullAssign: Boolean);
 var
   D, NewD: TDiameter;
   P, NewP: TTypePoint;
@@ -1455,7 +1580,21 @@ begin
   {====================================================================}
   { Идентификация }
   {====================================================================}
+   if FullAssign then
+    begin
+    ID := ASource.ID;
+    UUID := ASource.UUID;
+    State :=  ASource.State;
+     end
+     else
+     begin
 
+  {====================================================================}
+  { Состояние }
+  {====================================================================}
+  State := ASource.State;
+
+     end;
 
   {====================================================================}
   { Наименование и классификация }
@@ -1556,10 +1695,7 @@ begin
   {====================================================================}
   Error := ASource.Error;
 
-  {====================================================================}
-  { Состояние }
-  {====================================================================}
-  State := ASource.State;
+
 
   {====================================================================}
   { ГЛУБОКОЕ КОПИРОВАНИЕ ДИАМЕТРОВ }

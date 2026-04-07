@@ -56,6 +56,7 @@ type
     procedure  PumpStateHandler(APump: TPump; AAction:EControlAction);
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
+
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
 
@@ -74,16 +75,20 @@ type
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure UpdateRandomFreq(const APump: TPump);
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+
     procedure FlowRateStateHandler(AFlowRate: TFlowRate;
       AAction: EControlAction);
+
     procedure FlowFluidTempHandler(AFluidTemp: tFluidTemp;
       AAction: EControlAction);
     procedure FlowFluidPressHandler(AFluidPress: tFluidPress;
       AAction: EControlAction);
     procedure UpdateRandomPress(const AWorkTable: TWorkTable);
+
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
     procedure UpdateEtalonImpSecFromFlowRate;
     procedure UpdateDeviceImpSecFromFlowRate;
+
 
   public
 
@@ -139,6 +144,14 @@ begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
+
+
+procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EControlAction);
+begin
+
+  FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
+end;
+
 procedure TFormMain.EditDeviceFlowRateExit(Sender: TObject);
 begin
   UpdateDeviceImpSecFromFlowRate;
@@ -150,12 +163,14 @@ begin
 end;
 
 
+
 procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EControlAction);
 begin
 
   FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
 
 end;
+
 
 
 procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EControlAction);
@@ -265,13 +280,17 @@ begin
     PressDelta :=  (Random * 0.06) - 0.03;
     if (AWorkTable.FluidTemp.IsRunning) then
     begin
+
       if NOT(AWorkTable.FluidTemp.IsStable)
+
       AND  (AWorkTable.FluidTemp.Value<AWorkTable.FluidTemp.ValueSet)  THEN
       begin
         AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue+1);
         AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue+1);
       end
+
     ELSE if not(AWorkTable.FluidTemp.IsStable)  THEN
+
       begin
         AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue-1);
         AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue-1);
@@ -327,7 +346,9 @@ begin
         AWorkTable.FluidPress.SetBefore(AWorkTable.FluidPress.BeforeValue-0.3);
         AWorkTable.FluidPress.SetAfter(AWorkTable.FluidPress.AfterValue-0.3);
       end;
+
       if AWorkTable.FluidPress.IsStable then
+
         AWorkTable.DoFluidPressStop;
 
     end;
@@ -374,7 +395,9 @@ begin
 
    if APump.IsRunning = true then
     begin
+
       APump.SetValue(EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet));
+
 
     end
     else
@@ -418,7 +441,7 @@ begin
   if Coef <= 0 then
     Exit;
 
-  ImpSec := (FlowRate * Coef) / 3600.0;
+  ImpSec := (FlowRate * Coef) / 3.6;
   EditDeviceImpSec.Text := FloatToStr(ImpSec);
 end;
 
@@ -436,7 +459,7 @@ begin
   if Coef <= 0 then
     Exit;
 
-  ImpSec := (FlowRate * Coef) / 3600.0;
+  ImpSec := (FlowRate * Coef) / 3.6;
   EditEtalonImpSec.Text := FloatToStr(ImpSec);
 end;
 

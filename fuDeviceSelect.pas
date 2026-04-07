@@ -145,6 +145,7 @@ private
 
   FSortColumn: Integer;
   FSortAscending: Boolean;
+  FSkipDeviceDeleteConfirm: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -763,6 +764,9 @@ begin
   if (SelRow < 0) or (SelRow >= FDevFilteredDevices.Count) then
     Exit;
 
+  { Явно подсвечиваем строку для удаления }
+  GridDevices.Row := SelRow;
+
   SelDevice := FDevFilteredDevices[SelRow];
   if SelDevice = nil then
     Exit;
@@ -770,13 +774,18 @@ begin
   {----------------------------------}
   { Подтверждение удаления }
   {----------------------------------}
-  if MessageDlg(
-       'Удалить выбранный прибор безвозвратно?',
-       TMsgDlgType.mtWarning,
-       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-       0
-     ) <> mrYes then
-    Exit;
+  if not FSkipDeviceDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранный прибор безвозвратно?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipDeviceDeleteConfirm := True;
+  end;
 
   {----------------------------------}
   { Удаление через репозиторий }
@@ -1674,6 +1683,7 @@ begin
   {----------------------------------}
   FSortColumn := -1;
   FSortAscending := True;
+  FSkipDeviceDeleteConfirm := False;
 
   {----------------------------------}
   { Загрузка данных и репозиториев }

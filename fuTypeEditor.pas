@@ -302,8 +302,8 @@ type
 
   FModified: Boolean;
   FLoading: Boolean;
-  FSelectedDiameterIndex: Integer; // выбранный диаметр, индекс в dmFakeDB.Diameters
 
+  FSelectedDiameter: TDiameter;
   FSelectedDiameterID: Integer; // выбранный диаметр, индекс в dmFakeDB.Diameters
 
   // локальные копии
@@ -325,6 +325,8 @@ type
   FButtonCoefAdd: TButton;
   FButtonCoefDelete: TButton;
   FButtonCoefClear: TButton;
+  FSkipDiameterDeleteConfirm: Boolean;
+  FSkipPointDeleteConfirm: Boolean;
 
 
 
@@ -379,6 +381,10 @@ type
 
   procedure FillSpillageStopVolume;
   procedure FillSpillageStopMass;
+  procedure PopulateSpillageStopCombo(const ADim: TMeasuredDimension);
+  function GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
+  function SpillageStopValueToItemIndex(const AValue: Integer): Integer;
+  function SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
   procedure FillConversionCoefVolume;
   procedure FillConversionCoefMass;
 
@@ -545,10 +551,8 @@ begin
     else
       cbSpillageType.ItemIndex := 0;
 
-    if (FType.SpillageStop >= 0) and (FType.SpillageStop < cbSpillageStop.Items.Count) then
-      cbSpillageStop.ItemIndex := FType.SpillageStop
-    else
-      cbSpillageStop.ItemIndex := 0;
+    PopulateSpillageStopCombo(TMeasuredDimension(FType.MeasuredDimension));
+    cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
 
     // =====================================================
     // == Повторы
@@ -938,6 +942,9 @@ procedure TFormTypeEditor.LoadType(AType: TDeviceType);
 begin
   FLoading := True;
   try
+    FSkipDiameterDeleteConfirm := False;
+    FSkipPointDeleteConfirm := False;
+
     {----------------------------------}
     { Освобождаем предыдущий экземпляр }
     {----------------------------------}
@@ -972,8 +979,7 @@ end;
 begin
   if FLoading then Exit;
   FModified := True;
-  if FType.State <> osNew then
-    FType.State :=  osModified;
+  FType.State :=  osModified;
 
     end;
 
@@ -1028,7 +1034,7 @@ begin
 
     if FOriginalType <> nil then
     begin
-      FOriginalType.Assign(FType);
+      FOriginalType.Assign(FType, True);
       if not Repo.SaveType(FOriginalType) then
         raise Exception.Create('Ошибка сохранения типа');
       FOriginalType.SelectedDiameterID := FSelectedDiameterID;
@@ -1128,20 +1134,42 @@ begin
   {----------------------------------}
   GridDiameters.Selected := -1;
   FSelectedDiameterID := -1;
-  FSelectedDiameterIndex := -1;
+  FSelectedDiameter := nil;
 
   SetModified;
 end;
 procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
   D: TDiameter;
+  SelRow: Integer;
 begin
   if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
 
-  D := GetDiameterByVisibleRow(GridDiameters.Row);
+  SelRow := GridDiameters.Row;
+  if SelRow < 0 then
+    Exit;
+
+  { Явно подсвечиваем строку для удаления }
+  GridDiameters.Row := SelRow;
+  GridDiameters.Selected := SelRow;
+
+  D := GetDiameterByVisibleRow(SelRow);
   if D = nil then
     Exit;
+
+  if not FSkipDiameterDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранный диаметр?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipDiameterDeleteConfirm := True;
+  end;
 
   if D.State = osNew then
     FDiametersLocal.Remove(D)
@@ -1239,13 +1267,35 @@ procedure TFormTypeEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TTypePoint;
   PointIdx: Integer;
+  SelRow: Integer;
 begin
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
 
-  Point := GetPointByVisibleRow(GridPoints.Row);
+  SelRow := GridPoints.Row;
+  if SelRow < 0 then
+    Exit;
+
+  { Явно подсвечиваем строку для удаления }
+  GridPoints.Row := SelRow;
+  GridPoints.Selected := SelRow;
+
+  Point := GetPointByVisibleRow(SelRow);
   if Point = nil then
     Exit;
+
+  if not FSkipPointDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранную точку?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
+      Exit;
+
+    FSkipPointDeleteConfirm := True;
+  end;
 
   if Point.State = osNew then
   begin
@@ -1493,8 +1543,8 @@ begin
   if cbSpillageStop.ItemIndex < 0 then
     Exit;
 
-  // просто сохраняем критерий остановки
-  FType.SpillageStop := cbSpillageStop.ItemIndex;
+  // сохраняем критерий остановки как битовую маску
+  FType.SpillageStop := SpillageStopItemIndexToValue(cbSpillageStop.ItemIndex);
 
   SetModified;
 end;
@@ -2742,7 +2792,7 @@ begin
   end;
 
   FSelectedDiameterID := D.ID;
-
+  FSelectedDiameter:= D;
   // ----------------------------------------
   // Если диапазон не задан явно —
   // показываем подсказку по выбранному диаметру
@@ -2811,8 +2861,7 @@ begin
   if D = nil then
     Exit;
 
-    if D.State <> osNew then
-       D.State:=osModified;
+    D.State:=osModified;
 
   S := Trim(Value.AsString);
 
@@ -3059,7 +3108,6 @@ begin
     end;
   end;
 
-  if P.State <> osNew then
   P.State:=osModified;
   SetModified;
   UpdatePointsGrid;
@@ -3076,12 +3124,11 @@ begin
   // -----------------------------------------------------
   // Проверка выбранного диаметра
   // -----------------------------------------------------
-  DIdx := FSelectedDiameterIndex;
-  if (DIdx < 0) or (DIdx > FDiametersLocal.Count-1) then
+  if (FSelectedDiameter = nil) then
     Exit;
 
-  Qmax := FDiametersLocal[DIdx].Qmax;
-  Coef := FDiametersLocal[DIdx].Kp;
+  Qmax := FSelectedDiameter.Qmax;
+  Coef := FSelectedDiameter.Kp;
 
   // -----------------------------------------------------
   // Пересчёт всех ЛОКАЛЬНЫХ точек
@@ -3102,10 +3149,6 @@ begin
     end;
   end;
 
-  // -----------------------------------------------------
-  // Обновляем таблицу точек
-  // -----------------------------------------------------
-  GridPoints.Repaint;
 end;
 
 procedure TFormTypeEditor.sbFindReestrNumberClick(Sender: TObject);
@@ -3747,37 +3790,8 @@ begin
   // ==================================================
   // КРИТЕРИЙ ОСТАНОВКИ (cbSpillageStop)
   // ==================================================
-  cbSpillageStop.Items.BeginUpdate;
-  try
-    cbSpillageStop.Items.Clear;
-
-    // Импульсы доступны всегда
-    cbSpillageStop.Items.Add('Импульсы');
-
-    case Dim of
-      mdVolumeFlow,
-      mdVolume:
-        cbSpillageStop.Items.Add('Объем, л');
-
-      mdMassFlow,
-      mdMass:
-        cbSpillageStop.Items.Add('Масса, кг');
-
-      mdSpeed:
-        cbSpillageStop.Items.Add('Скорость');
-
-      mdHeat:
-        cbSpillageStop.Items.Add('Теплота');
-    end;
-
-    // Время доступно всегда
-    cbSpillageStop.Items.Add('Время, с');
-  finally
-    cbSpillageStop.Items.EndUpdate;
-  end;
-
-  if cbSpillageStop.ItemIndex < 0 then
-    cbSpillageStop.ItemIndex := 0;
+  PopulateSpillageStopCombo(Dim);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
 
   // ==================================================
   // ОСНОВНАЯ ЛОГИКА ПО ИЗМЕРЯЕМОЙ ВЕЛИЧИНЕ
@@ -3889,34 +3903,80 @@ end;
 
 procedure TFormTypeEditor.FillSpillageStopVolume;
 begin
-  cbSpillageStop.Items.BeginUpdate;
-  try
-    cbSpillageStop.Items.Clear;
-    cbSpillageStop.Items.Add('Импульсы');
-    cbSpillageStop.Items.Add('Объем, л');
-    cbSpillageStop.Items.Add('Время, с');
-  finally
-    cbSpillageStop.Items.EndUpdate;
-  end;
-
-  if cbSpillageStop.ItemIndex < 0 then
-    cbSpillageStop.ItemIndex := 0;
+  PopulateSpillageStopCombo(mdVolume);
 end;
 
 procedure TFormTypeEditor.FillSpillageStopMass;
 begin
+  PopulateSpillageStopCombo(mdMass);
+end;
+
+function TFormTypeEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
+begin
+  case ADim of
+    mdVolumeFlow,
+    mdVolume:
+      Result := 'Объем, л';
+    mdMassFlow,
+    mdMass:
+      Result := 'Масса, кг';
+    mdSpeed:
+      Result := 'Скорость';
+    mdHeat:
+      Result := 'Теплота';
+  else
+    Result := 'Объем/масса';
+  end;
+end;
+
+procedure TFormTypeEditor.PopulateSpillageStopCombo(const ADim: TMeasuredDimension);
+var
+  VolumeCaption: string;
+begin
+  VolumeCaption := GetStopVolumeCaption(ADim);
   cbSpillageStop.Items.BeginUpdate;
   try
     cbSpillageStop.Items.Clear;
+    cbSpillageStop.Items.Add('Время');
     cbSpillageStop.Items.Add('Импульсы');
-    cbSpillageStop.Items.Add('Масса, кг');
-    cbSpillageStop.Items.Add('Время, с');
+    cbSpillageStop.Items.Add(VolumeCaption);
+    cbSpillageStop.Items.Add('Время + импульсы');
+    cbSpillageStop.Items.Add('Время + ' + LowerCase(VolumeCaption));
+    cbSpillageStop.Items.Add('Импульсы + ' + LowerCase(VolumeCaption));
+    cbSpillageStop.Items.Add('Время + импульсы + ' + LowerCase(VolumeCaption));
   finally
     cbSpillageStop.Items.EndUpdate;
   end;
+end;
 
-  if cbSpillageStop.ItemIndex < 0 then
-    cbSpillageStop.ItemIndex := 0;
+function TFormTypeEditor.SpillageStopValueToItemIndex(const AValue: Integer): Integer;
+begin
+  case AValue of
+    STOP_BY_TIME: Result := 0;
+    STOP_BY_IMP: Result := 1;
+    STOP_BY_VOLUME: Result := 2;
+    STOP_BY_TIME or STOP_BY_IMP: Result := 3;
+    STOP_BY_TIME or STOP_BY_VOLUME: Result := 4;
+    STOP_BY_IMP or STOP_BY_VOLUME: Result := 5;
+    STOP_BY_TIME or STOP_BY_IMP or STOP_BY_VOLUME: Result := 6;
+  else
+    Result := 0;
+  end;
+end;
+
+function TFormTypeEditor.SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
+begin
+  case AIndex of
+    0: Result := STOP_BY_TIME;
+    1: Result := STOP_BY_IMP;
+    2: Result := STOP_BY_VOLUME;
+    3: Result := STOP_BY_TIME or STOP_BY_IMP;
+    4: Result := STOP_BY_TIME or STOP_BY_VOLUME;
+    5: Result := STOP_BY_IMP or STOP_BY_VOLUME;
+    6: Result := STOP_BY_TIME or STOP_BY_IMP or STOP_BY_VOLUME;
+  else
+    Result := STOP_BY_TIME;
+  end;
 end;
 
 procedure TFormTypeEditor.FillConversionCoefVolume;

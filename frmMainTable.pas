@@ -65,8 +65,8 @@ type
   TFrameMainTable = class(TFrame)
     TabControlWorkTables: TTabControl;
     TabItemWorkTable1: TTabItem;
-    Panel2: TPanel;
-    Layout1: TLayout;
+    PanelEtalons1: TPanel;
+    LayoutEtalons1: TLayout;
     GridEtalons: TGrid;
     CheckColumnEtalonEnable1: TCheckColumn;
     StringColumnEtalonChanel1: TStringColumn;
@@ -75,9 +75,9 @@ type
     StringColumnEtalonFlowRate1: TStringColumn;
     StringColumnEtalonQuantity1: TStringColumn;
     StringColumnEtalonError1: TStringColumn;
-    ToolBar2: TToolBar;
+    ToolBarEtalons1: TToolBar;
     Label30: TLabel;
-    Panel3: TPanel;
+    PanelDevices1: TPanel;
     GridDevices: TGrid;
     CheckColumnDeviceEnable1: TCheckColumn;
     StringColumnDeviceChanel1: TStringColumn;
@@ -322,6 +322,38 @@ type
     SpeedButton5: TSpeedButton;
     PopupColumnEtalonDN1: TPopupColumn;
     PopupColumnDeviceDN1: TPopupColumn;
+
+    SpeedButton6: TSpeedButton;
+    StringColumnDeviceCoef1: TStringColumn;
+    Layout1: TLayout;
+    Splitter2: TSplitter;
+    Panel1: TPanel;
+    TabControl1: TTabControl;
+    TabItem1: TTabItem;
+    TabItem2: TTabItem;
+    TabItem3: TTabItem;
+    Grid1: TGrid;
+    StringColumn1: TStringColumn;
+    StringColumn2: TStringColumn;
+    StringColumn3: TStringColumn;
+    ToolBar2: TToolBar;
+    SpeedButton7: TSpeedButton;
+    SpeedButton8: TSpeedButton;
+    SpeedButton9: TSpeedButton;
+    SpeedButton10: TSpeedButton;
+    StringColumn4: TStringColumn;
+    Grid2: TGrid;
+    ToolBar3: TToolBar;
+    SpeedButton11: TSpeedButton;
+    SpeedButton12: TSpeedButton;
+    SpeedButton13: TSpeedButton;
+    SpeedButton14: TSpeedButton;
+    StringColumn5: TStringColumn;
+    StringColumn6: TStringColumn;
+    StringColumn7: TStringColumn;
+    StringColumn8: TStringColumn;
+    StringColumn9: TStringColumn;
+
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -1584,19 +1616,56 @@ procedure TFrameMainTable.FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
 var
   I: Integer;
   MenuItem: TMenuItem;
+  GroupItem: TMenuItem;
   Column: TColumn;
+  GroupItems: array[1..5] of TMenuItem;
+
+  function GetGroupNameByTag(const ATag: Integer): string;
+  begin
+    case ATag of
+      1: Result := 'Канал';
+      2: Result := 'Прибор';
+      3: Result := 'Измерение';
+      4: Result := 'Статистика';
+      5: Result := 'Прочее';
+    else
+      Result := '';
+    end;
+  end;
+
+  function EnsureGroupItem(const ATag: Integer): TMenuItem;
+  begin
+    Result := nil;
+    if (ATag < Low(GroupItems)) or (ATag > High(GroupItems)) then
+      Exit;
+
+    if GroupItems[ATag] = nil then
+    begin
+      GroupItems[ATag] := TMenuItem.Create(AMenu);
+      GroupItems[ATag].Parent := AMenu;
+      GroupItems[ATag].Text := GetGroupNameByTag(ATag);
+    end;
+
+    Result := GroupItems[ATag];
+  end;
 begin
   if (AMenu = nil) or (AGrid = nil) then
     Exit;
 
   AMenu.Clear;
+  for I := Low(GroupItems) to High(GroupItems) do
+    GroupItems[I] := nil;
 
   for I := 0 to AGrid.ColumnCount - 1 do
   begin
     Column := AGrid.Columns[I];
 
     MenuItem := TMenuItem.Create(AMenu);
-    MenuItem.Parent := AMenu;
+    GroupItem := EnsureGroupItem(Column.Tag);
+    if GroupItem <> nil then
+      MenuItem.Parent := GroupItem
+    else
+      MenuItem.Parent := AMenu;
     MenuItem.Text := Column.Header;
     MenuItem.IsChecked := Column.Visible;
     MenuItem.TagObject := Column;
@@ -1882,8 +1951,10 @@ begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
     Exit;
 
-  if AChannel.FlowMeter.Device.State <> osDeleted then
-    AChannel.FlowMeter.Device.State := osModified;
+  AChannel.FlowMeter.Device.State := osModified;
+  AChannel.FlowMeter.RebindCalculatedValues;
+  PersistDeviceAsync(AChannel.FlowMeter.Device);
+
 end;
 
 procedure TFrameMainTable.SetDim(FlowUnitName: string; QuantityUnitName: string);
@@ -2276,17 +2347,12 @@ begin
   if AChannel = nil then
     Exit;
 
-  ADevice := nil;
-  ActiveRepo := nil;
   if DataManager <> nil then
-  begin
-    ActiveRepo := DataManager.ActiveDeviceRepo;
+  ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
 
-    if AChannel.DeviceUUID <> '' then
-      ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
-  end;
+  ADevice := AChannel.FlowMeter.Device;
 
-  if (ADevice = nil) and
+   if (ADevice = nil) and
      ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
@@ -2298,20 +2364,13 @@ begin
       if SelDevice = nil then
         Exit;
 
-      AChannel.DeviceUUID := SelDevice.UUID;
-      AChannel.TypeName := SelDevice.DeviceTypeName;
-      AChannel.Serial := SelDevice.SerialNumber;
-      AChannel.Signal := SelDevice.OutputType;
-      if FFrameProceed <> nil then
-        FFrameProceed.AddProcessingDevice(SelDevice);
-      UpdateGridDevices;
+      AChannel.FlowMeter.Init(SelDevice.UUID);
+
     finally
       SelectFrm.Free;
     end;
     Exit;
   end;
-
-  AChannel.CreateDevice;
 
   Frm := TFormDeviceEditor.Create(Self);
   try
@@ -2320,20 +2379,15 @@ begin
     begin
       if ADevice <> nil then
       begin
-        AChannel.DeviceUUID := ADevice.UUID;
-        AChannel.DeviceName:= ADevice.Name;
-        AChannel.TypeName := ADevice.DeviceTypeName;
-        AChannel.Serial := ADevice.SerialNumber;
-        AChannel.Signal := ADevice.OutputType;
-        if FFrameProceed <> nil then
-          FFrameProceed.AddProcessingDevice(ADevice);
-      end;
-
-      UpdateGrids;
+      AChannel.FlowMeter.Init(ADevice.UUID);
+       end;
     end;
   finally
     Frm.Free;
   end;
+
+ UpdateGrids;
+
 end;
 
 procedure TFrameMainTable.ActionOpenDeviceSelectExecute(Sender: TObject);
@@ -2494,6 +2548,9 @@ begin
   if Repo = nil then
     Exit;
 
+  if ADevice.SerialNumber = '' then
+  Exit;
+
   TThread.CreateAnonymousThread(
     procedure
     begin
@@ -2653,6 +2710,7 @@ var
   SourceType: TDeviceType;
   FoundRepo: TTypeRepository;
 begin
+
   if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
      (DataManager = nil) then
     Exit;
@@ -2672,7 +2730,22 @@ begin
   for Ch in FActiveWorkTable.DeviceChannels do
     if (Ch <> Src) and Ch.Enabled then
     begin
+
       AttachType(Ch, SourceType, FoundRepo, True);
+
+       If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
+      begin
+      Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False)//  (Src.FlowMeter.Device.DN, SourceType);
+
+      end
+        else
+          AttachType(Ch, SourceType, FoundRepo, True);
+
+  //  If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
+  //    Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
+
+      Ch.FlowMeter.RebindCalculatedValues;
+
     end;
 
   UpdateGrids;
@@ -2974,6 +3047,7 @@ var
   I: Integer;
   MinImpValue: TMeterValue;
   RawValueBaseMultiplier: TMeterValue;
+  RawQuantityBaseMultiplier: TMeterValue;
 
   function FindFirstValueBaseMultiplier(
     AChannels: TObjectList<TChannel>): TMeterValue;
@@ -3095,18 +3169,35 @@ begin
   end;
 
   RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.DeviceChannels);
-  if RawValueBaseMultiplier = nil then
+
+   if RawValueBaseMultiplier <> nil then
+  begin
+    if RawValueBaseMultiplier.&Type = 'Импульсы'  then
+     begin
+      StringColumnDeviceRawValue1.Header := 'Частота, Гц';
+     end
+     else
+     begin
+    StringColumnDeviceRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+     end
+  end;
+
     RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.EtalonChannels);
+
 
   if RawValueBaseMultiplier <> nil then
   begin
-    StringColumnDeviceRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+    if RawValueBaseMultiplier.&Type = 'Импульсы'  then
+     begin
+      StringColumnEtalonRawValue1.Header := 'Частота, Гц';
+     end
+     else
+     begin
     StringColumnEtalonRawValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+     end
   end;
 
   RawValueBaseMultiplier := FindFirstQuantityValueBaseMultiplier(WorkTable.DeviceChannels);
-  if RawValueBaseMultiplier = nil then
-    RawValueBaseMultiplier := FindFirstQuantityValueBaseMultiplier(WorkTable.EtalonChannels);
 
   if RawValueBaseMultiplier <> nil then
   begin
@@ -3114,6 +3205,12 @@ begin
     StringColumnEtalonRawSumValue1.Header := RawValueBaseMultiplier.GetStrFullName;
   end;
 
+    RawValueBaseMultiplier := FindFirstQuantityValueBaseMultiplier(WorkTable.EtalonChannels);
+
+   if RawValueBaseMultiplier <> nil then
+  begin
+     StringColumnEtalonRawSumValue1.Header := RawValueBaseMultiplier.GetStrFullName;
+  end;
 
     if WorkTable.ValueFlowRate <> nil then
       StringColumnDeviceFlowRate1.TagString := WorkTable.ValueFlowRate.GetStrValue
@@ -3244,11 +3341,6 @@ begin
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
   AChannel.FlowMeter.Device.FillFromType(ANewType, False);
 
-
-
-
-  if AChannel.FlowMeter.Device.State in [osClean, osLoaded] then
-    AChannel.FlowMeter.Device.State := osModified;
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(AChannel.FlowMeter.Device);
 end;
@@ -3344,7 +3436,7 @@ begin
     { 3. Проверяем смену типа }
     {----------------------------------------------------}
     IsTypeChanged := True;
-
+  {
     if CurrentType <> nil then
     begin
       if CurrentType = NewType then
@@ -3357,12 +3449,14 @@ begin
           (not SameText(CurrentType.Name, NewType.Name)) or
           (not SameText(CurrentType.Modification, NewType.Modification));
     end;
+    }
 
     AttachType(Ch, NewType, FoundRepo, IsTypeChanged);
 
     {----------------------------------------------------}
     { 4. Обновляем UI }
     {----------------------------------------------------}
+
     FActiveWorkTable.RecalculateAllMeterValues;
 
     UpdateGrids;
@@ -3421,8 +3515,7 @@ begin
     Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
     if Session = nil then
       Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
-    if Session.State = osClean then
-      Session.State := osModified;
+    Session.State := osModified;
 
     if Session.DateTimeOpen = 0 then
       Session.DateTimeOpen := Now;
@@ -3759,6 +3852,14 @@ begin
       else
         Value := '-';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceCoef1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueCoef <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueCoef.GetStrValue
+      else
+        Value := '-';
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
@@ -3775,7 +3876,7 @@ begin
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
         Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier.GetStrValue
       else
-        Value := '0';
+        Value := '-';
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceStd1 then
     begin
@@ -3819,7 +3920,7 @@ begin
   if IsUpdating then
     Exit;
 
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     Changed := False;
@@ -4196,7 +4297,7 @@ begin
       WT.DeviceChannels.Count,
       [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
        StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceError1]
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
@@ -4204,7 +4305,7 @@ begin
       Length(FFlowMeterRows),
       [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
        StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceError1]
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     );
 
   if WT <> nil then
@@ -4260,7 +4361,7 @@ begin
   if IsUpdating then
     Exit;
 
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
     Changed := False;
@@ -4358,6 +4459,7 @@ begin
 
     SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet);
 
+
       SpinBoxFreq.Min:= WorkTable.ActivePump.MinValue;
       SpinBoxFreq.Max:= WorkTable.ActivePump.MaxValue;
 
@@ -4422,6 +4524,13 @@ begin
 
 
 
+    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.AccuracyPlus/100) * WorkTable.FlowRate.ValueSet ))
+    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.Accuracyminus/100) * WorkTable.FlowRate.ValueSet )) then
+      RectangleLabelFR.Fill.Color := $ffC9FFC7
+        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
+      RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
+
+
 
     LayoutFlowRate.tag:=0;
 end;
@@ -4461,6 +4570,7 @@ IF WorkTable.FluidTemp.IsRunning THEN
 IF WorkTable.FluidPress.IsRunning THEN
   begin
    if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
+
     Rectangle11.Fill.Color := TAlphaColorRec.White
    else IF not(WorkTable.FluidPress.IsStable) then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
@@ -4482,6 +4592,7 @@ IF WorkTable.FluidPress.IsRunning THEN
       EditTemp.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
     if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidPress.ValueSet,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
+
       EditPres.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.ValueSet) ;
 
