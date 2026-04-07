@@ -790,8 +790,8 @@ var
   Pump: TPump;
 begin
   Pump := nil;
-  if FActiveWorkTable <> nil then
-    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboBoxPumps.Text));
+  if FWorkTableManager <> nil then
+    Pump := FWorkTableManager.FindPumpByName(Trim(ComboBoxPumps.Text));
 
   if Pump <> nil then
   begin
