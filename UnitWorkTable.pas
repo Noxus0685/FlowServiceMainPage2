@@ -337,6 +337,8 @@ TParameters = class(TObject)
 
     FPumps: TObjectList<TPump>;
 
+    FPoints: TObjectList<TDevicePoint>;
+
     FFlowRate: TFlowRate;
 
     FFluidTemp: TFluidTemp;
@@ -484,12 +486,6 @@ private
   FOnSpillageStop: TOnSpillageStopEvent;
   FOnMeasurementStateChanged: TOnMeasurementStateChangedEvent;
 
-
-
-
-
-
-
   public
     constructor Create;
     destructor Destroy; override;
@@ -519,8 +515,10 @@ private
   procedure RemovePump(APump: TPump); overload;
   procedure ClearPumps;
   procedure SetActivePump(APumpName: string);
+
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
+
   property Pumps: TObjectList<TPump> read FPumps;
 
   property FluidTemp: TFluidTemp read FFluidTemp;

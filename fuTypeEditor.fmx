@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 13
+    TabOrder = 14
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -2285,7 +2285,7 @@ object FormTypeEditor: TFormTypeEditor
           Margins.Bottom = 5.000000000000000000
           Position.X = 533.000000000000000000
           Position.Y = 5.000000000000000000
-          Size.Width = 100.000000000000000000
+          Size.Width = 180.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
@@ -2366,7 +2366,7 @@ object FormTypeEditor: TFormTypeEditor
         object Label40: TLabel
           Align = Left
           Margins.Left = 20.000000000000000000
-          Position.X = 658.000000000000000000
+          Position.X = 738.000000000000000000
           Size.Width = 67.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
@@ -2380,7 +2380,7 @@ object FormTypeEditor: TFormTypeEditor
           Cursor = crIBeam
           Min = 1.000000000000000000
           Value = 1.000000000000000000
-          Position.X = 725.000000000000000000
+          Position.X = 805.000000000000000000
           Position.Y = 5.000000000000000000
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
