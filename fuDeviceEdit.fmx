@@ -2006,6 +2006,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Width = 100.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
+          OnChange = cbSpillageStopChange
           TabOrder = 3
         end
         object Label28: TLabel
@@ -2033,6 +2034,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Width = 223.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
+          OnChange = cbSpillageTypeChange
           TabOrder = 5
         end
         object Layout38: TLayout
