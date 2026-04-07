@@ -2655,18 +2655,16 @@ end;
 procedure TWorkTable.DoPumpStart(APumpName: string);
 var Pump: TPump;
 begin
+  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
+    SetActivePump(APumpName);
 
-  if ActivePump.Action = CONTROL_ACTION_START then
-   exit;
- { Pump:=FindPumpByName(APumpName);
+  Pump := ActivePump;
+  if Pump = nil then
+    Exit;
 
-  if Pump=nil then
-  Exit;
-
-  IF Pump.FAction = CONTROL_ACTION_START then
-    exit;   }
-
-  ActivePump.Start;
+  if Pump.Action = CONTROL_ACTION_START then
+    Exit;
+  Pump.Start;
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump, CONTROL_ACTION_START);
@@ -2750,18 +2748,16 @@ end;
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
-  {
-  Pump:=FindPumpByName(APumpName);
+  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
+    SetActivePump(APumpName);
 
-  if Pump=nil then
+  Pump := ActivePump;
+  if Pump = nil then
     Exit;
 
-  IF Pump.FAction = CONTROL_ACTION_STOP then
-    exit;    }
-
-  IF ActivePump.FAction = CONTROL_ACTION_STOP then
-    exit;
-  ActivePump.Stop;
+  if Pump.FAction = CONTROL_ACTION_STOP then
+    Exit;
+  Pump.Stop;
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_STOP);
@@ -2800,15 +2796,14 @@ end;
 procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
 var Pump: TPump;
 begin
+  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
+    SetActivePump(APumpName);
 
-  {Pump:=FindPumpByName(APumpName);
+  Pump := ActivePump;
+  if Pump = nil then
+    Exit;
 
-  if Pump=nil then
-  Exit;   }
-
-
-  ActivePump.SetParam(ANewFreq);
-
+  Pump.SetParam(ANewFreq);
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_SET);
