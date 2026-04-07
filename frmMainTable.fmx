@@ -206,6 +206,7 @@ object FrameMainTable: TFrameMainTable
           end
         end
         object LayoutFlowRate: TLayout
+          Tag = 3
           Align = Left
           Position.X = 1170.000000000000000000
           Size.Width = 281.000000000000000000
@@ -277,6 +278,7 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   TabOrder = 1
                   Cursor = crIBeam
+                  Max = 9999999.000000000000000000
                   ValueType = Float
                   Increment = 0.100000001490116100
                   KeyboardType = NumbersAndPunctuation
@@ -1061,6 +1063,7 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   TabOrder = 1
                   Cursor = crIBeam
+                  Max = 9999999.000000000000000000
                   Value = 12.000000000000000000
                   ValueType = Float
                   Increment = 0.100000001490116100
@@ -1176,6 +1179,382 @@ object FrameMainTable: TFrameMainTable
         end
       end
     end
+    object TabControlWorkTables: TTabControl
+      Align = Client
+      Padding.Left = 10.000000000000000000
+      PopupMenu = PopupMenuWorkTables
+      Size.Width = 1444.000000000000000000
+      Size.Height = 461.000000000000000000
+      Size.PlatformDefault = False
+      TabIndex = 0
+      TabOrder = 1
+      TabPosition = PlatformDefault
+      Sizes = (
+        1434s
+        435s)
+      object TabItemWorkTable1: TTabItem
+        CustomIcon = <
+          item
+          end>
+        TextSettings.Trimming = None
+        IsSelected = True
+        Padding.Left = 10.000000000000000000
+        Size.Width = 143.000000000000000000
+        Size.Height = 26.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = ''
+        TabOrder = 0
+        Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083' 1 ('#1044#1059'25)'
+        ExplicitSize.cx = 143.000000000000000000
+        ExplicitSize.cy = 26.000000000000000000
+        object Panel2: TPanel
+          Align = Top
+          Size.Width = 1434.000000000000000000
+          Size.Height = 152.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 2
+          object Layout1: TLayout
+            Align = Client
+            Size.Width = 1434.000000000000000000
+            Size.Height = 120.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            object GridEtalons: TGrid
+              Align = Client
+              CanFocus = True
+              ClipChildren = True
+              PopupMenu = PopupMenuEtalonsGrid
+              Size.Width = 1434.000000000000000000
+              Size.Height = 120.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              RowCount = 2
+              OnGetValue = GridEtalonsGetValue
+              OnCellClick = GridEtalonsCellClick
+              OnCellDblClick = GridEtalonsCellDblClick
+              Viewport.Width = 1430.000000000000000000
+              Viewport.Height = 95.000000000000000000
+              object CheckColumnEtalonEnable1: TCheckColumn
+                HorzAlign = Center
+                Header = #1042#1082#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
+                Size.Width = 27.000000000000000000
+              end
+              object StringColumnEtalonChanel1: TStringColumn
+                Header = #1050#1072#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+                Size.Width = 45.000000000000000000
+              end
+              object StringColumnEtalonType1: TStringColumn
+                Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
+                Size.Width = 111.000000000000000000
+              end
+              object PopupColumnEtalonDN1: TPopupColumn
+                Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+                HeaderSettings.TextSettings.WordWrap = False
+              end
+              object StringColumnEtalonName1: TStringColumn
+                Header = #1055#1088#1080#1073#1086#1088
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonSerial1: TStringColumn
+                Header = #1057#1077#1088#1080#1081#1085#1099#1081' '
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object PopupColumnEtalonSignal1: TPopupColumn
+                HorzAlign = Center
+                Header = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+                PopupMenu = PopupMenu1
+                Items.Strings = (
+                  #1048#1084#1087
+                  #1063#1072#1089#1090#1086#1090#1072
+                  #1057#1074#1103#1079#1100
+                  #1058#1086#1082)
+              end
+              object StringColumnEtalonRawValue1: TStringColumn
+                Header = #1057#1080#1075#1085#1072#1083
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonFlowRate1: TStringColumn
+                Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonQuantity1: TStringColumn
+                Header = #1054#1073#1098#1077#1084', '#1084'3'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonError1: TStringColumn
+                Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonStd1: TStringColumn
+                Header = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonPressureDelta1: TStringColumn
+                Header = #1055#1077#1088#1077#1087#1072#1076
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonOptions1: TStringColumn
+                Header = #1057#1090#1072#1090#1091#1089
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonRawSumValue1: TStringColumn
+                Header = #1047#1085#1072#1095#1077#1085#1080#1077
+                HeaderSettings.TextSettings.WordWrap = False
+              end
+            end
+          end
+          object ToolBar2: TToolBar
+            PopupMenu = PopupMenuEtalonsGridLayOut
+            Size.Width = 1434.000000000000000000
+            Size.Height = 32.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 1
+            object Label30: TLabel
+              PopupMenu = PopupMenuEtalonsGridLayOut
+              Position.X = 1.000000000000000000
+              Position.Y = 8.000000000000000000
+              Size.Width = 100.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1069#1090#1072#1083#1086#1085#1099
+              TabOrder = 0
+            end
+          end
+        end
+        object Panel3: TPanel
+          Align = Client
+          Size.Width = 1434.000000000000000000
+          Size.Height = 267.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 3
+          object GridDevices: TGrid
+            Align = Client
+            CanFocus = True
+            ClipChildren = True
+            PopupMenu = PopupMenuDevicesGrid
+            Size.Width = 1434.000000000000000000
+            Size.Height = 235.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+            OnHeaderClick = GridDevicesHeaderClick
+            OnGetValue = GridDevicesGetValue
+            OnCellClick = GridDevicesCellClick
+            OnCellDblClick = GridDevicesCellDblClick
+            Viewport.Width = 1414.000000000000000000
+            Viewport.Height = 194.000000000000000000
+            object CheckColumnDeviceEnable1: TCheckColumn
+              Header = #1042#1082#1083
+              HeaderSettings.TextSettings.Trimming = Character
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
+            end
+            object StringColumnDeviceChanel1: TStringColumn
+              Header = #1050#1072#1085#1072#1083
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
+              Size.Width = 44.000000000000000000
+            end
+            object ColumnDeviceType1: TColumn
+              Header = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+              HeaderSettings.StyleLookup = 'headeritemstyle'
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
+              Size.Width = 111.000000000000000000
+            end
+            object PopupColumnDeviceDN1: TPopupColumn
+              Header = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnDeviceName1: TStringColumn
+              Header = #1055#1088#1080#1073#1086#1088
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+            end
+            object StringColumnDeviceSerial1: TStringColumn
+              Header = #1057#1077#1088#1080#1081#1085#1099#1081
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              PopupMenu = PopupMenu1
+              Size.Width = 106.000000000000000000
+            end
+            object PopupColumnDeviceSignal1: TPopupColumn
+              Header = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
+              HeaderSettings.TextSettings.Trimming = Character
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              Items.Strings = (
+                #1048#1084#1087
+                #1058#1086#1082
+                #1048#1085#1090#1077#1088#1092#1077#1081#1089)
+            end
+            object StringColumnDeviceRawValue1: TStringColumn
+              Header = #1057#1080#1075#1085#1072#1083
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+            end
+            object StringColumnDeviceFlowRate1: TStringColumn
+              Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
+            end
+            object StringColumnDeviceQuantity1: TStringColumn
+              Header = #1054#1073#1098#1077#1084', '#1084'3'
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
+            end
+            object StringColumnDeviceError1: TStringColumn
+              Header = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
+            end
+            object StringColumnDeviceStd1: TStringColumn
+              Header = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+            end
+            object StringColumnDeviceQuantityBefore1: TStringColumn
+              Header = #1054#1073#1098#1077#1084' '#1076#1086
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnDeviceQuantityAfter1: TStringColumn
+              Header = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnDevicePressureDelta1: TStringColumn
+              Header = #1055#1088#1077#1087#1072#1076
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+            end
+            object StringColumnDeviceOptions1: TStringColumn
+              Header = #1057#1090#1072#1090#1091#1089
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+            end
+            object StringColumnDeviceRawSumValue1: TStringColumn
+              Header = #1047#1085#1072#1095#1077#1085#1080#1077
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+            object StringColumnUUID1: TStringColumn
+              Header = 'UUID'
+              HeaderSettings.TextSettings.WordWrap = False
+            end
+          end
+          object ToolBar1: TToolBar
+            PopupMenu = PopupMenuDevicesGridLayOut
+            Size.Width = 1434.000000000000000000
+            Size.Height = 32.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 1
+            object Label23: TLabel
+              Align = Left
+              PopupMenu = PopupMenuDevicesGridLayOut
+              Size.Width = 100.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+              TabOrder = 0
+            end
+            object PopupMenuDevicesGridLayOut: TPopupMenu
+              OnPopup = PopupMenuDevicesGridLayOutPopup
+              Left = 1610
+              Top = 461
+            end
+            object SpeedButton1: TSpeedButton
+              Action = ActionDevicesFillAllBySelected
+              Align = Left
+              ImageIndex = -1
+              Position.X = 100.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'arrowdowntoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton2: TSpeedButton
+              Action = ActionDevicesClearAll
+              Align = Left
+              ImageIndex = -1
+              Position.X = 153.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'pagecurltoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton3: TSpeedButton
+              Action = ActionDevicesClearRow
+              Align = Left
+              ImageIndex = -1
+              Position.X = 206.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'trashtoolbutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton4: TSpeedButton
+              Action = ActionAddDeviceChannel
+              Align = Left
+              ImageIndex = -1
+              Position.X = 259.000000000000000000
+              Size.Width = 53.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'additembutton'
+              TextSettings.Trimming = None
+            end
+            object SpeedButton5: TSpeedButton
+              Action = ActionOpenDeviceSelect
+              Align = Left
+              ImageIndex = -1
+              Position.X = 312.000000000000000000
+              Size.Width = 57.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              StyleLookup = 'searchtoolbutton'
+              TextSettings.Trimming = None
+            end
+          end
+        end
+        object Splitter1: TSplitter
+          Align = Top
+          Cursor = crVSplit
+          MinSize = 20.000000000000000000
+          Position.Y = 152.000000000000000000
+          ShowGrip = False
+          Size.Width = 1434.000000000000000000
+          Size.Height = 16.000000000000000000
+          Size.PlatformDefault = False
+        end
+      end
+    end
+
     object LayoutControl: TLayout
       Align = MostBottom
       Position.Y = 590.000000000000000000

@@ -322,6 +322,7 @@ type
     SpeedButton5: TSpeedButton;
     PopupColumnEtalonDN1: TPopupColumn;
     PopupColumnDeviceDN1: TPopupColumn;
+
     SpeedButton6: TSpeedButton;
     StringColumnDeviceCoef1: TStringColumn;
     Layout1: TLayout;
@@ -352,6 +353,7 @@ type
     StringColumn7: TStringColumn;
     StringColumn8: TStringColumn;
     StringColumn9: TStringColumn;
+
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -363,7 +365,6 @@ type
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
-
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure ActionAddWorkTableExecute(Sender: TObject);
     procedure ActionAddDeviceChannelExecute(Sender: TObject);
@@ -446,13 +447,6 @@ type
       const Row: Integer);
     procedure GridDevicesCellDblClick(const Column: TColumn;
       const Row: Integer);
-    procedure SpeedButton6Click(Sender: TObject);
-    procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
-      var CanSelect: Boolean);
-    procedure GridDevicesEditingDone(Sender: TObject; const ACol,
-      ARow: Integer);
-    procedure GridDevicesCreateCustomEditor(Sender: TObject;
-      const Column: TColumn; var Control: TStyledControl);
 
   private
 
@@ -464,13 +458,11 @@ type
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
-  FIsScannerUse: Boolean;
 
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
     FNextClimateChangeAt: TDateTime;
-    DN: TObject;
     procedure OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean = False);
     procedure OpenChannelDeviceEditor(AChannel: TChannel);
     procedure SelectDeviceForChannel(AChannel: TChannel);
@@ -502,13 +494,6 @@ type
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
-    function IsDuplicateDeviceSerial(const AWorkTable: TWorkTable;
-      const ARow: Integer; const ASerial: string): Boolean;
-    function FindNextEnabledDeviceRow(const AWorkTable: TWorkTable;
-      const ACurrentRow: Integer): Integer;
-    procedure FocusDeviceSerialCell(const ARow: Integer; const ASelectAll: Boolean);
-    procedure LeaveDeviceSerialEditing;
-    procedure HandleScannerSerialEnter(const ARow: Integer; const ASerial: string);
 
     procedure SetConfiguration;
     procedure StartMonitor;
@@ -556,10 +541,7 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
 
-    procedure StartEditSerialCell(ARow: Integer);
-
     property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
-    property IsScannerUse: Boolean read FIsScannerUse write FIsScannerUse;
 
 
   private type
@@ -840,8 +822,8 @@ var
   Pump: TPump;
 begin
   Pump := nil;
-  if FActiveWorkTable <> nil then
-    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboBoxPumps.Text));
+  if FWorkTableManager <> nil then
+    Pump := FWorkTableManager.FindPumpByName(Trim(ComboBoxPumps.Text));
 
   if Pump <> nil then
   begin
@@ -850,7 +832,7 @@ begin
       SpeedButtonStartPump.Text := '■'
     else
       SpeedButtonStartPump.Text := '▶';
-    SpeedButtonStartPump.Hint := Pump.GetStateAsString;
+    SpeedButtonStartPump.Hint := Pump.GetStatusAsString;
   end
   else
   begin
@@ -1123,7 +1105,6 @@ begin
   FLastClickRow := -1;
   FLastClickCol := nil;
   FLastClickTick := 0;
-  FIsScannerUse := False;
 
   Randomize;
   FNextClimateChangeAt := Now;
@@ -1147,44 +1128,10 @@ begin
   ButtonCancel.OnClick := ButtonCancelClick;
   EnforceDataPointsColumnsLayout;
 
+
   SetValues;
   UpdateForm;
   OnChangeState(STATE_NONE);
-
-  FIsScannerUse:=True;
- // StartEditSerialCell(0);
-end;
-
-procedure TFrameMainTable.StartEditSerialCell(ARow: Integer);
-var
-  ColIndex: Integer;
-begin
-  if (ARow < 0) or (ARow >= GridDevices.RowCount) then
-    Exit;
-
-  ColIndex := StringColumnDeviceSerial1.Index;
-
-  GridDevices.ReadOnly:=False;
-  // 1. Сначала выбор
-  GridDevices.SetFocus;
-  GridDevices.Row := ARow;
-
-  // ВАЖНО: именно ColumnIndex, а не Selected
-  GridDevices.ColumnIndex := ColIndex;
-
-  // 2. Сбрасываем режим (иначе может не переключиться)
-  GridDevices.EditorMode := False;
-
-  // 3. Отложенно включаем редактор
-  TThread.Queue(nil,
-    procedure
-    begin
-      // повторно фиксируем (это ключ к стабильности)
-      GridDevices.Row := ARow;
-      GridDevices.ColumnIndex := ColIndex;
-
-      GridDevices.EditorMode := True;
-    end);
 end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
@@ -1274,12 +1221,6 @@ begin
   SaveLayoutSettingsToWorkTable;
 end;
 
-procedure TFrameMainTable.SpeedButton6Click(Sender: TObject);
-begin
-
-StartEditSerialCell(1);
-end;
-
 procedure TFrameMainTable.SpeedButtonMinimizeConditionsClick(Sender: TObject);
 begin
   SetInstrumentalLayoutVisible(LayoutConditions, False);
@@ -1347,8 +1288,13 @@ end;
 
 
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
+var
+AValue:double;
 begin
-FActiveWorkTable.DoFlowRateSet(SpinBoxFlowRate.value);
+//AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
+AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(SpinBoxFlowRate.Value,4);
+
+FActiveWorkTable.DoFlowRateSet(AValue);
 
 end;
 
@@ -1356,7 +1302,7 @@ procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
     begin
-      FActiveWorkTable.DoFreqSet(ComboBoxPumps.Text,strtofloat(SpinBoxFreq.Text));
+      FActiveWorkTable.DoFreqSet(ComboBoxPumps.Text,NormalizeFloatInput(SpinBoxFreq.Text));
     end;
 end;
 
@@ -2785,6 +2731,8 @@ begin
     if (Ch <> Src) and Ch.Enabled then
     begin
 
+      AttachType(Ch, SourceType, FoundRepo, True);
+
        If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
       begin
       Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False)//  (Src.FlowMeter.Device.DN, SourceType);
@@ -2854,6 +2802,9 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
+
+  LayoutFlowRate.Tag:=3;
+  UpdateUIFlowRate;
 
   GridDevices.SetFocus;
 end;
@@ -3043,10 +2994,10 @@ begin
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
 
-  if WorkTable.FlowRate.IsRunning then
-    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue
-  else
-    WorkTable.FlowRate.Value:=0;
+  //if WorkTable.FlowRate.IsRunning then
+    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue;    //в value записываем в л/с а выводим в label в м3/ч
+  //else
+  //  WorkTable.FlowRate.Value:=0;
     {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
@@ -3310,9 +3261,7 @@ begin
   if TryStrToFloat(EditTemp.Text, Value) then
   begin
 
-    FActiveWorkTable.DoFluidTempStart(strtofloat(EditTemp.Text));
-
-    FActiveWorkTable.FluidTemp.Status:=CONTROL_STARTED;
+    FActiveWorkTable.DoFluidTempStart(NormalizeFloatInput(EditTemp.Text));
     UpdateUIConditions;
 
   end;
@@ -3325,10 +3274,10 @@ var
 begin
   if FActiveWorkTable = nil then
     Exit;
-
+      Layout9.tag := 0;
   if TryStrToFloat(EditPres.Text, Value) then
   begin
-    FActiveWorkTable.DoFluidPressStart(Value);
+    FActiveWorkTable.DoFluidPressStart(NormalizeFloatInput(EditPres.Text));
     UpdateUIConditions;
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
@@ -3664,97 +3613,6 @@ begin
   OnChangeState(STATE_STANDBY);
 end;
 
-procedure TFrameMainTable.LeaveDeviceSerialEditing;
-begin
-  GridDevices.EditorMode := False;
-  GridDevices.ReadOnly := True;
-end;
-
-procedure TFrameMainTable.FocusDeviceSerialCell(const ARow: Integer;
-  const ASelectAll: Boolean);
-var
-  Edit: TCustomEdit;
-begin
-  if (ARow < 0) or (ARow >= GridDevices.RowCount) then
-    Exit;
-  {
-  GridDevices.Row := ARow;
-  GridDevices.SetFocus;
-  GridDevices.Selected := StringColumnDeviceSerial1.Index;
-  GridDevices.ReadOnly := False;
-  GridDevices.EditorMode := True;
-  }
-
- StartEditSerialCell(ARow);
-
-
- { if ASelectAll and (GridDevices.Editor is TCustomEdit) then
-  begin
-    Edit := TCustomEdit(GridDevices.Editor);
-    Edit.SelectAll;
-  end;    }
-end;
-
-function TFrameMainTable.IsDuplicateDeviceSerial(const AWorkTable: TWorkTable;
-  const ARow: Integer; const ASerial: string): Boolean;
-var
-  I: Integer;
-begin
-  Result := False;
-  if (AWorkTable = nil) or (Trim(ASerial) = '') then
-    Exit;
-
-  for I := 0 to ARow - 1 do
-    if SameText(Trim(AWorkTable.DeviceChannels[I].Serial), Trim(ASerial)) then
-      Exit(True);
-end;
-
-function TFrameMainTable.FindNextEnabledDeviceRow(const AWorkTable: TWorkTable;
-  const ACurrentRow: Integer): Integer;
-var
-  I: Integer;
-begin
-  Result := -1;
-  if AWorkTable = nil then
-    Exit;
-
-  for I := ACurrentRow + 1 to AWorkTable.DeviceChannels.Count - 1 do
-    if AWorkTable.DeviceChannels[I].Enabled then
-      Exit(I);
-end;
-
-procedure TFrameMainTable.HandleScannerSerialEnter(const ARow: Integer;
-  const ASerial: string);
-var
-  WorkTable: TWorkTable;
-  NextRow: Integer;
-begin
-  if not FIsScannerUse then
-    Exit;
-
-  WorkTable := GetWorkTableByIndex(0);
-  if (WorkTable = nil) or (ARow < 0) or (ARow >= WorkTable.DeviceChannels.Count) then
-    Exit;
-
-  if Trim(ASerial) = '' then
-  begin
-    LeaveDeviceSerialEditing;
-    Exit;
-  end;
-
-  if IsDuplicateDeviceSerial(WorkTable, ARow, ASerial) then
-  begin
-    FocusDeviceSerialCell(ARow, True);
-    Exit;
-  end;
-
-  NextRow := FindNextEnabledDeviceRow(WorkTable, ARow);
-  if NextRow >= 0 then
-    FocusDeviceSerialCell(NextRow, True)
-  else
-    LeaveDeviceSerialEditing;
-end;
-
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -3803,19 +3661,6 @@ begin
     inherited;
     Exit;
   end;
-
-      if Column = StringColumnDeviceSerial1 then
-  begin
-    GridDevices.SetFocus;
-
-      GridDevices.ReadOnly:=False;
-    //  GridDevices.EditorMode := True;
-
-      inherited;
-      Exit;
-  end;
-
-
 
   if (Column = PopupColumnDeviceSignal1 ) then
   begin
@@ -3959,18 +3804,6 @@ begin
   end;
 end;
 
-procedure TFrameMainTable.GridDevicesCreateCustomEditor(Sender: TObject;
-  const Column: TColumn; var Control: TStyledControl);
-begin
-      //   GridDevices.ResetFocus;
-end;
-
-procedure TFrameMainTable.GridDevicesEditingDone(Sender: TObject; const ACol,
-  ARow: Integer);
-begin
-          //GridDevices.ResetFocus;
-end;
-
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -4077,32 +3910,6 @@ begin
     Exit;
 end;
 
-procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
-  ARow: Integer; var CanSelect: Boolean);
-begin
-
-    if not IsUpdating then
-
-
-
-    if ACol = StringColumnDeviceSerial1.Index then
-  begin
-    GridDevices.SetFocus;
-    // 2. Сбрасываем режим (иначе может не переключиться)
-    GridDevices.EditorMode := False;
-    GridDevices.ReadOnly:=True;
-    // 3. Отложенно включаем редактор
-    TThread.Queue(nil,
-    procedure
-    begin
-      GridDevices.ReadOnly:=False;
-      GridDevices.EditorMode := True;
-    end);
-  end;
-
-
-end;
-
 procedure TFrameMainTable.GridDevicesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 var
@@ -4135,15 +3942,8 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
     begin
-
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
-
-      if FIsScannerUse then
-        begin
-        HandleScannerSerialEnter(ARow, Value.AsString);
-        end;
-
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
       Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString)
@@ -4157,16 +3957,12 @@ begin
     if Changed then
       MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
 
-   // if GridDevices.Columns[ACol] <> StringColumnDeviceSerial1 then
-      //FScannerEnterPressed := False;
-
     Exit;
   end;
 
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
     Exit;
 
- // FScannerEnterPressed := False;
   GridDevices.ReadOnly := True;
 end;
 
@@ -4644,7 +4440,7 @@ begin
     else
       LabelFreq.Text := '-';
 
-    if WorkTable.ActivePump.Value = 0 then
+    if (WorkTable.ActivePump.Value = 0) or not (WorkTable.ActivePump.IsRunning) then
        Rectangle1.Fill.Color := TAlphaColorRec.White
     else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.ValueSet) then
       Rectangle1.Fill.Color := TAlphaColorRec.Lightyellow
@@ -4664,6 +4460,8 @@ begin
     SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet);
 
 
+      SpinBoxFreq.Min:= WorkTable.ActivePump.MinValue;
+      SpinBoxFreq.Max:= WorkTable.ActivePump.MaxValue;
 
 
     if ComboBoxPumps.Count <> 0 then
@@ -4688,21 +4486,43 @@ procedure TFrameMainTable.UpdateUIFlowRate;
 var
   WorkTable: TWorkTable;
   i:integer;
+  AMax:Double;
 begin
     WorkTable := FActiveWorkTable;
 
     if WorkTable = nil then
       Exit;
 
-    if WorkTable.FlowRate.IsRunning then
+    //if WorkTable.FlowRate.IsRunning then
       LabelFlowRate.Text :=
-      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value)
-    else
-      LabelFlowRate.Text := '0';
+      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value) ;
+   // else
+   //   LabelFlowRate.Text := '0';
+
+    if LayoutFlowRate.tag=3 then
+    begin
+      for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
+        begin
+          if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
+            Amax:=FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax;
+        end;
 
 
-    if WorkTable.FlowRate.Value = 0 then
-       RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+      SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.MinValue);
+      SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum( Amax);
+            if FActiveWorkTable<>nil then
+        SpinBoxFlowRate.text:=WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value);
+    end;
+
+
+      if WorkTable.FlowRate.Value = 0 then
+         RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+     ELSE if WorkTable.FlowRate.IsStable THEN
+        RectangleLabelFR.Fill.Color := $ffC9FFC7
+     else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
+        RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
+
+
 
     else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.AccuracyPlus/100) * WorkTable.FlowRate.ValueSet ))
     and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.Accuracyminus/100) * WorkTable.FlowRate.ValueSet )) then
@@ -4711,6 +4531,8 @@ begin
       RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
 
 
+
+    LayoutFlowRate.tag:=0;
 end;
 
 procedure TFrameMainTable.UpdateUIConditions;
@@ -4728,31 +4550,49 @@ begin
 
     Layout9.tag:=2;
 
-   if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
-    Rectangle7.Fill.Color := TAlphaColorRec.White
-   ELSE if (WorkTable.FluidTemp.ValueSet<=WorkTable.FluidTemp.Value*(1+WorkTable.FluidTemp.AccuracyPlus/100))
-      AND (WorkTable.FluidTemp.ValueSet>=WorkTable.FluidTemp.Value*(1-WorkTable.FluidTemp.AccuracyPlus/100)) THEN
-    Rectangle7.Fill.Color := $ffC9FFC7
-   else
-    Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+IF WorkTable.FluidTemp.IsRunning THEN
+  begin
+     if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
+      Rectangle7.Fill.Color := TAlphaColorRec.White
+     ELSE if WorkTable.FluidTemp.IsStable   THEN
+      Rectangle7.Fill.Color := $ffC9FFC7
+     else
+      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+  end
+  else
+  begin
+     if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
+      Rectangle7.Fill.Color := TAlphaColorRec.White
+     else IF not(WorkTable.FluidPress.IsStable) then
+      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+  end;
 
+IF WorkTable.FluidPress.IsRunning THEN
+  begin
+   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
 
-
-   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )then
     Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF WorkTable.FluidPress.IsRunning then
+   else IF not(WorkTable.FluidPress.IsStable) then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
    else
     Rectangle11.Fill.Color := $ffC9FFC7;
+  end
+  else
+  begin
+   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
+    Rectangle11.Fill.Color := TAlphaColorRec.White
+   else IF not(WorkTable.FluidPress.IsStable) then
+    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
+
+  end;
 
 
 
-
-    if (ABS(strtofloat(EditTemp.Text)-WorkTable.FluidTemp.ValueSet) < 0.00001) or (StrToFloat(EditTemp.Text) = 0)  then
+    if SameValue(NormalizeFloatInput(EditTemp.Text),WorkTable.FluidTemp.ValueSet,MinDouble) or (NormalizeFloatInput(EditTemp.Text) = 0)  then
       EditTemp.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
+    if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidPress.ValueSet,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
 
-    if (ABS(strtofloat(EditPres.Text)-WorkTable.FluidPress.ValueSet) < 0.00001) or (StrToFloat(EditPres.Text) = 0)  then
       EditPres.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.ValueSet) ;
 
@@ -4762,12 +4602,6 @@ begin
     LabelPressure.text:=
     WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.Value);
    // FormatFloat('0.##', (WorkTable.FluidTemp.Temp));
-
-
-
-
-
-
 
     Layout9.tag:=0;
 
