@@ -531,7 +531,6 @@ private
   procedure ClearPumps;
   procedure SetActivePump(APumpName: string);
   function FindPumpByUUID(const APumpUUID: string): TPump;
-  function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
 
   property FluidTemp: TFluidTemp read FFluidTemp;
@@ -669,6 +668,7 @@ private
     procedure Save;
 
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
+    function FindPumpByName(const APumpName: string): TPump;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
@@ -2655,18 +2655,16 @@ end;
 procedure TWorkTable.DoPumpStart(APumpName: string);
 var Pump: TPump;
 begin
+  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
+    SetActivePump(APumpName);
 
-  if ActivePump.Action = CONTROL_ACTION_START then
-   exit;
- { Pump:=FindPumpByName(APumpName);
+  Pump := ActivePump;
+  if Pump = nil then
+    Exit;
 
-  if Pump=nil then
-  Exit;
-
-  IF Pump.FAction = CONTROL_ACTION_START then
-    exit;   }
-
-  ActivePump.Start;
+  if Pump.Action = CONTROL_ACTION_START then
+    Exit;
+  Pump.Start;
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump, CONTROL_ACTION_START);
@@ -2750,18 +2748,16 @@ end;
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
-  {
-  Pump:=FindPumpByName(APumpName);
+  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
+    SetActivePump(APumpName);
 
-  if Pump=nil then
+  Pump := ActivePump;
+  if Pump = nil then
     Exit;
 
-  IF Pump.FAction = CONTROL_ACTION_STOP then
-    exit;    }
-
-  IF ActivePump.FAction = CONTROL_ACTION_STOP then
-    exit;
-  ActivePump.Stop;
+  if Pump.FAction = CONTROL_ACTION_STOP then
+    Exit;
+  Pump.Stop;
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_STOP);
@@ -2800,15 +2796,14 @@ end;
 procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
 var Pump: TPump;
 begin
+  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
+    SetActivePump(APumpName);
 
-  {Pump:=FindPumpByName(APumpName);
+  Pump := ActivePump;
+  if Pump = nil then
+    Exit;
 
-  if Pump=nil then
-  Exit;   }
-
-
-  ActivePump.SetParam(ANewFreq);
-
+  Pump.SetParam(ANewFreq);
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_SET);
@@ -2917,33 +2912,21 @@ begin
   Result := nil;   }
 end;
 
-function TWorkTable.FindPumpByName(const APumpName: string): TPump;
-var
-  Pump: TPump;
-begin
-  for Pump in FPumps do
-  begin
-    if Pump.Name = APumpName then
-    begin
-      Result := Pump;
-      Exit;
-    end;
-  end;
-  Result := nil;
-end;
-
-
 procedure TWorkTable.SetActivePump(APumpName: string);
 var
   Pump: TPump;
 begin
+  Pump := nil;
+  for Pump in FPumps do
+  begin
+    if Pump.Name = APumpName then
+      Break;
+  end;
 
-  Pump:=FindPumpByName(APumpName);
+  if (Pump = nil) or (Pump.Name <> APumpName) then
+    Exit;
 
-  if Pump=nil then
-  Exit;
-
-    FActivePump:= Pump;
+  FActivePump := Pump;
 end;
 
 
@@ -2987,6 +2970,32 @@ end;
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
 begin
     FActiveWorkTable:= AWorkTable;
+end;
+
+function TWorkTableManager.FindPumpByName(const APumpName: string): TPump;
+var
+  WorkTable: TWorkTable;
+  Pump: TPump;
+begin
+  Result := nil;
+
+  if (FWorkTables = nil) or (APumpName = '') then
+    Exit;
+
+  for WorkTable in FWorkTables do
+  begin
+    if (WorkTable = nil) or (WorkTable.Pumps = nil) then
+      Continue;
+
+    for Pump in WorkTable.Pumps do
+    begin
+      if Pump.Name = APumpName then
+      begin
+        Result := Pump;
+        Exit;
+      end;
+    end;
+  end;
 end;
 
      {$ENDREGION 'TWorkTableManager'}
