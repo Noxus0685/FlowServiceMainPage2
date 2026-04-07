@@ -82,7 +82,8 @@ TParameters = class(TObject)
     function GetActionAsString: string;
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
-    procedure SetValue(AValue: Double);
+    procedure SetValueSet(AValue: Double);
+    function  GetValueSet: Double;
     procedure Stop;
     procedure Start;
     procedure SetMin(const Value: Double ); overload ;
@@ -99,7 +100,7 @@ TParameters = class(TObject)
     property IsChanging: Boolean read GetIsChanging;
     property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
     property AccuracyMinus: Double read FAccuracyMinus write FAccuracyMinus;
-    property Value: Double read FValue write FValue;
+    property Value: Double read GetValueSet write SetValueSet;
     property MinValue: Double read FMin write SetMin;
     property MaxValue: Double read FMax write SetMax;
     property BeforeValue: Double read FBefore write FBefore;
@@ -2655,15 +2656,17 @@ procedure TWorkTable.DoPumpStart(APumpName: string);
 var Pump: TPump;
 begin
 
-  Pump:=FindPumpByName(APumpName);
+  if ActivePump.Action = CONTROL_ACTION_START then
+   exit;
+ { Pump:=FindPumpByName(APumpName);
 
   if Pump=nil then
   Exit;
 
   IF Pump.FAction = CONTROL_ACTION_START then
-    exit;
+    exit;   }
 
-  Pump.Start;
+  ActivePump.Start;
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump, CONTROL_ACTION_START);
@@ -2747,16 +2750,18 @@ end;
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
-
+  {
   Pump:=FindPumpByName(APumpName);
 
   if Pump=nil then
     Exit;
 
   IF Pump.FAction = CONTROL_ACTION_STOP then
-    exit;
+    exit;    }
 
-  Pump.Stop;
+  IF ActivePump.FAction = CONTROL_ACTION_STOP then
+    exit;
+  ActivePump.Stop;
 
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_STOP);
@@ -2796,13 +2801,13 @@ procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
 var Pump: TPump;
 begin
 
-  Pump:=FindPumpByName(APumpName);
+  {Pump:=FindPumpByName(APumpName);
 
   if Pump=nil then
-  Exit;
+  Exit;   }
 
 
-  Pump.SetParam(ANewFreq);
+  ActivePump.SetParam(ANewFreq);
 
 
   if Assigned(FOnPumpChange) then
@@ -3240,7 +3245,7 @@ begin
   else FAfter:=AAfter;
 end;
 
-procedure TParameters.SetValue(AValue: Double);
+procedure TParameters.SetValueSet(AValue: Double);
 begin
   if AValue < FMin then
     FValue := FMin
@@ -3248,6 +3253,12 @@ begin
     FValue := FMax
   else FValue:=AValue;
 end;
+
+function TParameters.GetValueSet: Double;
+begin
+  Result :=  FValue;
+end;
+
 
 function TParameters.GetStatusAsString: string;
 begin

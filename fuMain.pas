@@ -373,11 +373,11 @@ begin
 
    if APump.IsRunning = true then
     begin
-      APump.SetValue(EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet));
+      APump.SetValueSet(EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet));
     end
     else
     begin
-      APump.SetValue(EnsureRange(APump.Value - Freq,0 , APump.Value));
+      APump.SetValueSet(EnsureRange(APump.Value - Freq,0 , APump.Value));
     end;
 
 
