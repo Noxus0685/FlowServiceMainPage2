@@ -150,7 +150,6 @@ procedure  TFormMain.PumpStateHandler(APump: TPump; AAction:EControlAction);
 begin
 
   FormMain.mPump.Lines.Add('Насос: ' + APump.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
-
 end;
 
 procedure TFormMain.EditDeviceFlowRateExit(Sender: TObject);

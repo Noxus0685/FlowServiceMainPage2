@@ -7,12 +7,6 @@ Coordinates=1514,920,80,36
 [PanelInstruments]
 Coordinates=1389,920,115,36
 
-[ToolBar2]
-Coordinates=1312,920,67,36
-
-[Panel3]
-Coordinates=1247,920,55,36
-
 [Line6]
 Coordinates=1191,920,46,36
 
@@ -136,9 +130,6 @@ Coordinates=658,10,132,146
 [EditTime]
 Coordinates=1626,234,65,58
 
-[Layout1]
-Coordinates=361,874,60,36
-
 [SpinBoxFreq]
 Coordinates=598,438,89,58
 
@@ -261,9 +252,6 @@ Coordinates=736,782,214,36
 
 [SpeedButton23]
 Coordinates=315,370,103,58
-
-[Panel2]
-Coordinates=671,782,55,36
 
 [StringColumnDevicePressureDelta1]
 Coordinates=440,782,221,36
@@ -754,4 +742,16 @@ Coordinates=10,10,117,146
 []
 Coordinates=800,10,86,102
 Visible=True
+
+[PanelEtalons1]
+Coordinates=671,782,55,36
+
+[ToolBarEtalons1]
+Coordinates=1312,920,67,36
+
+[LayoutEtalons1]
+Coordinates=361,874,60,36
+
+[PanelDevices1]
+Coordinates=1247,920,55,36
 
