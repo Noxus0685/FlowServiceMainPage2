@@ -531,7 +531,6 @@ private
   procedure ClearPumps;
   procedure SetActivePump(APumpName: string);
   function FindPumpByUUID(const APumpUUID: string): TPump;
-  function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
 
   property FluidTemp: TFluidTemp read FFluidTemp;
@@ -669,6 +668,7 @@ private
     procedure Save;
 
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
+    function FindPumpByName(const APumpName: string): TPump;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
@@ -2917,33 +2917,21 @@ begin
   Result := nil;   }
 end;
 
-function TWorkTable.FindPumpByName(const APumpName: string): TPump;
-var
-  Pump: TPump;
-begin
-  for Pump in FPumps do
-  begin
-    if Pump.Name = APumpName then
-    begin
-      Result := Pump;
-      Exit;
-    end;
-  end;
-  Result := nil;
-end;
-
-
 procedure TWorkTable.SetActivePump(APumpName: string);
 var
   Pump: TPump;
 begin
+  Pump := nil;
+  for Pump in FPumps do
+  begin
+    if Pump.Name = APumpName then
+      Break;
+  end;
 
-  Pump:=FindPumpByName(APumpName);
+  if (Pump = nil) or (Pump.Name <> APumpName) then
+    Exit;
 
-  if Pump=nil then
-  Exit;
-
-    FActivePump:= Pump;
+  FActivePump := Pump;
 end;
 
 
@@ -2987,6 +2975,32 @@ end;
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
 begin
     FActiveWorkTable:= AWorkTable;
+end;
+
+function TWorkTableManager.FindPumpByName(const APumpName: string): TPump;
+var
+  WorkTable: TWorkTable;
+  Pump: TPump;
+begin
+  Result := nil;
+
+  if (FWorkTables = nil) or (APumpName = '') then
+    Exit;
+
+  for WorkTable in FWorkTables do
+  begin
+    if (WorkTable = nil) or (WorkTable.Pumps = nil) then
+      Continue;
+
+    for Pump in WorkTable.Pumps do
+    begin
+      if Pump.Name = APumpName then
+      begin
+        Result := Pump;
+        Exit;
+      end;
+    end;
+  end;
 end;
 
      {$ENDREGION 'TWorkTableManager'}
