@@ -10,6 +10,7 @@ uses
   UnitClasses, UnitDeviceClass,
   UnitDataManager,
   System.SysUtils,
+  System.Math,
   System.StrUtils,
   System.IniFiles,
   System.Generics.Collections;
@@ -578,11 +579,14 @@ private
     property DevicesGridColumns: TArray<TGridColumnLayout> read FDevicesGridColumns write FDevicesGridColumns;
     property DataPointsGridColumns: TArray<TGridColumnLayout> read FDataPointsGridColumns write FDataPointsGridColumns;
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
+    property Points: TObjectList<TDevicePoint> read FPoints;
 
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
+    procedure CreateSessionPoints;
+    function IsSessionPointFit(ADevice: TDevice; APoint: TDevicePoint): Boolean;
     procedure InitMeterValues;
     procedure SetTemperature(ATempBefore, ATempAfter: Double);
     procedure SetPressure(APressBefore, APressAfter: Double);
@@ -1180,6 +1184,149 @@ end;
 
 
   {$REGION 'TWorkTable'}
+function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
+var
+  Normalized: string;
+  Value: Double;
+begin
+  Result := False;
+  AMin := 0;
+  AMax := 0;
+
+  Normalized := NormalizeAccuracyInput(AAccuracy);
+  if Normalized = '' then
+    Exit;
+
+  if StartsText('+', Normalized) then
+  begin
+    Value := Abs(NormalizeFloatInput(Copy(Normalized, 2, MaxInt)));
+    AMin := 0;
+    AMax := Value;
+  end
+  else if StartsText('-', Normalized) then
+  begin
+    Value := Abs(NormalizeFloatInput(Copy(Normalized, 2, MaxInt)));
+    AMin := -Value;
+    AMax := 0;
+  end
+  else
+  begin
+    Value := Abs(NormalizeFloatInput(Normalized));
+    AMin := -Value;
+    AMax := Value;
+  end;
+
+  Result := True;
+end;
+
+function GetAccuracyWidth(const AAccuracy: string): Double;
+var
+  MinVal, MaxVal: Double;
+begin
+  if not AccuracyToRange(AAccuracy, MinVal, MaxVal) then
+    Exit(MaxDouble);
+  Result := MaxVal - MinVal;
+end;
+
+function IsFlowFit(AQ1: Double; AAccuracy: string; AQ2: Double): Boolean;
+var
+  MinPercent, MaxPercent: Double;
+  MinQ, MaxQ: Double;
+  TempValue: Double;
+begin
+  if AQ1 <= 0 then
+    Exit(SameValue(AQ1, AQ2));
+
+  if not AccuracyToRange(AAccuracy, MinPercent, MaxPercent) then
+  begin
+    MinPercent := -10;
+    MaxPercent := 10;
+  end;
+
+  MinQ := AQ1 + (AQ1 * MinPercent / 100.0);
+  MaxQ := AQ1 + (AQ1 * MaxPercent / 100.0);
+
+  if MinQ > MaxQ then
+  begin
+    TempValue := MinQ;
+    MinQ := MaxQ;
+    MaxQ := TempValue;
+  end;
+
+  Result := InRange(AQ2, MinQ, MaxQ);
+end;
+
+function IsTemperatureFit(ATemp1: Double; ATempAccuracy: string; ATemp2: Double): Boolean;
+var
+  MinDelta, MaxDelta: Double;
+  Delta: Double;
+begin
+  if SameValue(ATemp1, 0) and SameValue(ATemp2, 0) then
+    Exit(True);
+
+  if SameValue(ATemp1, 0) xor SameValue(ATemp2, 0) then
+    Exit(False);
+
+  if not AccuracyToRange(ATempAccuracy, MinDelta, MaxDelta) then
+    Exit(SameValue(ATemp1, ATemp2));
+
+  Delta := ATemp2 - ATemp1;
+  Result := InRange(Delta, MinDelta, MaxDelta);
+end;
+
+function GetMostStrictAccuracy(const A1, A2: string): string;
+begin
+  if Trim(A1) = '' then
+    Exit(A2);
+  if Trim(A2) = '' then
+    Exit(A1);
+
+  if GetAccuracyWidth(A1) <= GetAccuracyWidth(A2) then
+    Result := A1
+  else
+    Result := A2;
+end;
+
+function IsStopCriteriaFit(ADevicePoint, ASessionPoint: TDevicePoint): Boolean;
+begin
+  Result := True;
+  if (ADevicePoint = nil) or (ASessionPoint = nil) then
+    Exit(False);
+
+  if (scImpulse in ASessionPoint.StopCriteria) and (ADevicePoint.LimitImp < ASessionPoint.LimitImp) then
+    Exit(False);
+
+  if (scVolume in ASessionPoint.StopCriteria) and (ADevicePoint.LimitVolume < ASessionPoint.LimitVolume) then
+    Exit(False);
+
+  if (scTime in ASessionPoint.StopCriteria) and (ADevicePoint.LimitTime < ASessionPoint.LimitTime) then
+    Exit(False);
+end;
+
+function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
+begin
+  Result := (AP1 <> nil) and (AP2 <> nil)
+    and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.Q)
+    and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.Temp);
+end;
+
+procedure MergePointParams(ATarget, ASource: TDevicePoint);
+begin
+  if (ATarget = nil) or (ASource = nil) then
+    Exit;
+
+  ATarget.StopCriteria := ATarget.StopCriteria + ASource.StopCriteria;
+  ATarget.LimitImp := Max(ATarget.LimitImp, ASource.LimitImp);
+  ATarget.LimitVolume := Max(ATarget.LimitVolume, ASource.LimitVolume);
+  ATarget.LimitTime := Max(ATarget.LimitTime, ASource.LimitTime);
+  ATarget.Pause := Max(ATarget.Pause, ASource.Pause);
+  ATarget.RepeatsProtocol := Max(ATarget.RepeatsProtocol, ASource.RepeatsProtocol);
+  ATarget.Repeats := Max(ATarget.Repeats, ASource.Repeats);
+  ATarget.Pressure := Max(ATarget.Pressure, ASource.Pressure);
+  ATarget.FlowAccuracy := GetMostStrictAccuracy(ATarget.FlowAccuracy, ASource.FlowAccuracy);
+  ATarget.TempAccuracy := GetMostStrictAccuracy(ATarget.TempAccuracy, ASource.TempAccuracy);
+end;
+
 { Creates a work table with default state, channels lists, and meter values. }
 constructor TWorkTable.Create;
 begin
@@ -1187,6 +1334,7 @@ begin
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
+  FPoints := TObjectList<TDevicePoint>.Create(True);
 
   FPumps := TObjectList<TPump>.Create(True); // True — автоосвобождение объектов
   FlowRate := TFlowRate.Create('Расход');
@@ -1825,6 +1973,82 @@ begin
   end;
 end;
 
+procedure TWorkTable.CreateSessionPoints;
+var
+  Channel: TChannel;
+  Device: TDevice;
+  SourcePoint: TDevicePoint;
+  SessionPoint: TDevicePoint;
+  ExistingPoint: TDevicePoint;
+begin
+  if FPoints = nil then
+    FPoints := TObjectList<TDevicePoint>.Create(True);
+
+  FPoints.Clear;
+
+  for Channel in FDeviceChannels do
+  begin
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    Device := Channel.FlowMeter.Device;
+    if (Device = nil) or (Device.Points = nil) then
+      Continue;
+
+    for SourcePoint in Device.Points do
+    begin
+      ExistingPoint := nil;
+      for SessionPoint in FPoints do
+        if IsPointEquivalent(SessionPoint, SourcePoint) then
+        begin
+          ExistingPoint := SessionPoint;
+          Break;
+        end;
+
+      if ExistingPoint = nil then
+      begin
+        SessionPoint := TDevicePoint.Create(0);
+        SessionPoint.Assign(SourcePoint);
+        FPoints.Add(SessionPoint);
+      end
+      else
+        MergePointParams(ExistingPoint, SourcePoint);
+    end;
+  end;
+end;
+
+function TWorkTable.IsSessionPointFit(ADevice: TDevice; APoint: TDevicePoint): Boolean;
+var
+  DevicePoint: TDevicePoint;
+begin
+  Result := False;
+  if (ADevice = nil) or (APoint = nil) or (ADevice.Points = nil) then
+    Exit;
+
+  for DevicePoint in ADevice.Points do
+  begin
+    if not IsFlowFit(DevicePoint.Q, DevicePoint.FlowAccuracy, APoint.Q) then
+      Continue;
+
+    if not IsTemperatureFit(DevicePoint.Temp, DevicePoint.TempAccuracy, APoint.Temp) then
+      Continue;
+
+    if not IsStopCriteriaFit(DevicePoint, APoint) then
+      Continue;
+
+    if DevicePoint.Pause < APoint.Pause then
+      Continue;
+
+    if DevicePoint.RepeatsProtocol < APoint.RepeatsProtocol then
+      Continue;
+
+    if DevicePoint.Repeats < APoint.Repeats then
+      Continue;
+
+    Exit(True);
+  end;
+end;
+
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
@@ -1834,6 +2058,7 @@ begin
   FreeAndNil(FTableFlow);
   FDeviceChannels.Free;
   FEtalonChannels.Free;
+  FreeAndNil(FPoints);
   FreeAndNil(FPumps);
 
   inherited;
