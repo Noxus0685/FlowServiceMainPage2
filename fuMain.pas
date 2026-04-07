@@ -210,6 +210,9 @@ begin
 
     FWorkTableManager.Load;
   //Подумать над динамической привязкой ко всем столам
+  if FWorkTableManager.ActiveWorkTable<>nil then
+  begin
+
   FWorkTableManager.ActiveWorkTable.OnPumpChange:= PumpStateHandler;
   FWorkTableManager.ActiveWorkTable.OnFlowRateChange:= FlowRateStateHandler;
   FWorkTableManager.ActiveWorkTable.OnConditionTempChange:= FlowFluidTempHandler;
@@ -218,6 +221,7 @@ begin
   FWorkTableManager.ActiveWorkTable.AddPump('1');
   FWorkTableManager.ActiveWorkTable.AddPump('2');
   FWorkTableManager.ActiveWorkTable.AddPump('3');
+  end;
 
 
   FFrameMainTable := TFrameMainTable.Create(Self);
@@ -247,7 +251,7 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  IF (AWorkTable.FluidTemp.Action = CONTROL_ACTION_START)THEN
+  IF (AWorkTable.FluidTemp.Action = CONTROL_ACTION_START) OR (AWorkTable.FluidTemp.Action = CONTROL_ACTION_SET)THEN
     AWorkTable.FluidTemp.SetStatus(CONTROL_STARTED)
   else  if (AWorkTable.FluidTemp.Action = CONTROL_ACTION_STOP) then
     AWorkTable.FluidTemp.SetStatus(CONTROL_STOPPED);
@@ -272,9 +276,6 @@ begin
         AWorkTable.FluidTemp.SetBefore(AWorkTable.FluidTemp.BeforeValue-1);
         AWorkTable.FluidTemp.SetAfter(AWorkTable.FluidTemp.AfterValue-1);
       end;
-
-      if AWorkTable.FluidTemp.IsStable then
-        AWorkTable.DoFluidTempStop
 
     end;
 
@@ -373,11 +374,12 @@ begin
 
    if APump.IsRunning = true then
     begin
-      APump.SetValueSet(EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet));
+      APump.SetValue(EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet));
+
     end
     else
     begin
-      APump.SetValueSet(EnsureRange(APump.Value - Freq,0 , APump.Value));
+      APump.SetValue(1)
     end;
 
 

@@ -206,6 +206,7 @@ object FrameMainTable: TFrameMainTable
           end
         end
         object LayoutFlowRate: TLayout
+          Tag = 3
           Align = Left
           Position.X = 1170.000000000000000000
           Size.Width = 281.000000000000000000

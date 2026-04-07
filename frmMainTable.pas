@@ -1259,7 +1259,9 @@ procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
 begin
-AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
+//AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
+AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(SpinBoxFlowRate.Value,4);
+
 FActiveWorkTable.DoFlowRateSet(AValue);
 
 end;
@@ -2919,10 +2921,10 @@ begin
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
 
-  if WorkTable.FlowRate.IsRunning then
-    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue    //в value записываем в л/с а выводим в label в м3/ч
-  else
-    WorkTable.FlowRate.Value:=0;
+  //if WorkTable.FlowRate.IsRunning then
+    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue;    //в value записываем в л/с а выводим в label в м3/ч
+  //else
+  //  WorkTable.FlowRate.Value:=0;
     {if WorkTable.ValueFlowRate <> nil then
     LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
   else
@@ -4337,7 +4339,7 @@ begin
     else
       LabelFreq.Text := '-';
 
-    if WorkTable.ActivePump.Value = 0 then
+    if (WorkTable.ActivePump.Value = 0) or not (WorkTable.ActivePump.IsRunning) then
        Rectangle1.Fill.Color := TAlphaColorRec.White
     else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.ValueSet) then
       Rectangle1.Fill.Color := TAlphaColorRec.Lightyellow
@@ -4389,11 +4391,11 @@ begin
     if WorkTable = nil then
       Exit;
 
-    if WorkTable.FlowRate.IsRunning then
+    //if WorkTable.FlowRate.IsRunning then
       LabelFlowRate.Text :=
-      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value)
-    else
-      LabelFlowRate.Text := '0';
+      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value) ;
+   // else
+   //   LabelFlowRate.Text := '0';
 
     if LayoutFlowRate.tag=3 then
     begin
@@ -4410,14 +4412,16 @@ begin
         SpinBoxFlowRate.text:=WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value);
     end;
 
-    if WorkTable.FlowRate.Value = 0 then
-       RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+
+      if WorkTable.FlowRate.Value = 0 then
+         RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+     ELSE if WorkTable.FlowRate.IsStable THEN
+        RectangleLabelFR.Fill.Color := $ffC9FFC7
+     else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
+        RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
 
 
-   ELSE if WorkTable.FlowRate.IsStable THEN
-      RectangleLabelFR.Fill.Color := $ffC9FFC7
-   else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
-      RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
+
 
     LayoutFlowRate.tag:=0;
 end;
@@ -4437,21 +4441,40 @@ begin
 
     Layout9.tag:=2;
 
-   if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
-    Rectangle7.Fill.Color := TAlphaColorRec.White
-   ELSE if WorkTable.FluidTemp.IsStable THEN
-    Rectangle7.Fill.Color := $ffC9FFC7
-   else
-    Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+IF WorkTable.FluidTemp.IsRunning THEN
+  begin
+     if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
+      Rectangle7.Fill.Color := TAlphaColorRec.White
+     ELSE if WorkTable.FluidTemp.IsStable   THEN
+      Rectangle7.Fill.Color := $ffC9FFC7
+     else
+      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+  end
+  else
+  begin
+     if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
+      Rectangle7.Fill.Color := TAlphaColorRec.White
+     else IF not(WorkTable.FluidPress.IsStable) then
+      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+  end;
 
-
-
-   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )then
+IF WorkTable.FluidPress.IsRunning THEN
+  begin
+   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
     Rectangle11.Fill.Color := TAlphaColorRec.White
    else IF not(WorkTable.FluidPress.IsStable) then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
    else
     Rectangle11.Fill.Color := $ffC9FFC7;
+  end
+  else
+  begin
+   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
+    Rectangle11.Fill.Color := TAlphaColorRec.White
+   else IF not(WorkTable.FluidPress.IsStable) then
+    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
+
+  end;
 
 
 
