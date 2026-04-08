@@ -542,20 +542,28 @@ var
   FlowRate: TFlowRate;
 begin
 
-  try
+   if FWorkTableManager.WorkTables.Count=0 then
+   Exit;
+
+
       WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
+
+  if WorkTable = nil then
+    Exit;
+  try
+
       Pump := WorkTable.ActivePump;
       FlowRate:= WorkTable.FlowRate;
   except
        Exit;
   end;
 
-
-  if WorkTable = nil then
-    Exit;
-
    if Pump = nil then
     Exit;
+
+    if FlowRate = nil then
+    Exit;
+
 
     UpdateRandomClimate(WorkTable);
     UpdateRandomFreq(Pump);
