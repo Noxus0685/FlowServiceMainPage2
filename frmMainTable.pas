@@ -453,6 +453,7 @@ type
     procedure GridMesurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
+    procedure EditTimeExit(Sender: TObject);
 
   private
 
@@ -3276,6 +3277,12 @@ begin
 
   end;
 
+end;
+
+procedure TFrameMainTable.EditTimeExit(Sender: TObject);
+begin
+      //Установленное время
+       FActiveWorkTable.TimeSet:= StrToInt(EditTime.Text);
 end;
 
 procedure TFrameMainTable.EditPresExit(Sender: TObject);

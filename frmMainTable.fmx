@@ -683,6 +683,7 @@ object FrameMainTable: TFrameMainTable
                     Size.Height = 23.000000000000000000
                     Size.PlatformDefault = False
                     KillFocusByReturn = True
+                    OnExit = EditTimeExit
                   end
                 end
               end

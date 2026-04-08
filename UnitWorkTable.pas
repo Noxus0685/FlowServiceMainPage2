@@ -345,6 +345,8 @@ TParameters = class(TObject)
     FText: string;
     FActivePump : TPump;
 
+    FTimeSet : Integer;
+
     FDeviceChannels: TObjectList<TChannel>;
     FEtalonChannels: TObjectList<TChannel>;
 
@@ -547,6 +549,7 @@ private
 
 
     property Time: Double read GetTime write SetTime;
+    property TimeSet: Integer read FTimeSet write FTimeSet;
     property TimeResult: Double read GetTimeResult write SetTimeResult;
 
     property State: TSpillState read FState write FState;
@@ -1922,8 +1925,6 @@ begin
   else
     FHashValueFlowRate := '';
 end;
-
-
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
 procedure TWorkTable.UpdateAggregateMeterValues;
