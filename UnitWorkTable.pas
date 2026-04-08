@@ -337,10 +337,7 @@ TParameters = class(TObject)
   TOnSpillageStartEvent = procedure(ASender: TObject) of object;
   TOnSpillageStopEvent = procedure(ASender: TObject) of object;
   TOnMeasurementStateChangedEvent = procedure(ASender: TObject;
-    AOldState, ANewState: EMeasurementState) of object;
-
-
-
+  AOldState, ANewState: EMeasurementState) of object;
 
   private
     FID: Integer;
@@ -352,9 +349,7 @@ TParameters = class(TObject)
     FEtalonChannels: TObjectList<TChannel>;
 
     FPumps: TObjectList<TPump>;
-
     FPoints: TObjectList<TDevicePoint>;
-
     FFlowRate: TFlowRate;
 
     FFluidTemp: TFluidTemp;
@@ -444,10 +439,6 @@ TParameters = class(TObject)
     procedure AssignTableFlowAsEtalonToDevices;
 
     procedure SetValues;
-
-
-
-
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
@@ -656,8 +647,6 @@ private
 
 
   end;
-
-
 
   TWorkTableManager = class
   private

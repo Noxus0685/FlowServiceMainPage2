@@ -545,29 +545,26 @@ begin
    if FWorkTableManager.WorkTables.Count=0 then
    Exit;
 
-
-      WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
+   WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
 
   if WorkTable = nil then
-    Exit;
-  try
+      Exit;
 
+  try
       Pump := WorkTable.ActivePump;
       FlowRate:= WorkTable.FlowRate;
   except
-       Exit;
+      Exit;
   end;
 
-   if Pump = nil then
-    Exit;
+    if Pump <> nil then
+    UpdateRandomFreq(Pump);
 
-    if FlowRate = nil then
-    Exit;
+    if FlowRate <> nil then
+    UpdateRandomFlowRate(FlowRate);
 
 
     UpdateRandomClimate(WorkTable);
-    UpdateRandomFreq(Pump);
-    UpdateRandomFlowRate(FlowRate);
     UpdateRandomPress(WorkTable);
 
 

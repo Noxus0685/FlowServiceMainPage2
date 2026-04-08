@@ -331,15 +331,15 @@ type
     TabItem1: TTabItem;
     TabItem2: TTabItem;
     TabItem3: TTabItem;
-    Grid1: TGrid;
-    StringColumn2: TStringColumn;
-    StringColumn3: TStringColumn;
+    GridMesurmentRun: TGrid;
+    StringColumnMRFlowRate: TStringColumn;
+    StringColumnMRStopCriterea: TStringColumn;
     ToolBar2: TToolBar;
     SpeedButton7: TSpeedButton;
     SpeedButton8: TSpeedButton;
     SpeedButton9: TSpeedButton;
     SpeedButton10: TSpeedButton;
-    StringColumn4: TStringColumn;
+    StringColumnMRStatus: TStringColumn;
     Grid2: TGrid;
     ToolBar3: TToolBar;
     SpeedButton11: TSpeedButton;
@@ -352,6 +352,7 @@ type
     StringColumn8: TStringColumn;
     StringColumn9: TStringColumn;
     StringColumnDeviceCoef1: TStringColumn;
+    SpeedButtonCreatePoints: TSpeedButton;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -448,6 +449,8 @@ type
       const Row: Integer);
     procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
       var CanSelect: Boolean);
+    procedure GridMesurmentRunGetValue(Sender: TObject; const ACol,
+      ARow: Integer; var Value: TValue);
 
   private
 
@@ -4451,6 +4454,12 @@ end;
 
 
 
+
+procedure TFrameMainTable.GridMesurmentRunGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+begin
+         //Формирование таблицы
+end;
 
 procedure TFrameMainTable.UpdateUIPump;
 var

@@ -1933,7 +1933,7 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 557.000000000000000000
           Size.Height = 461.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 2
+          TabIndex = 0
           TabOrder = 1
           TabPosition = PlatformDefault
           Sizes = (
@@ -1948,7 +1948,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
+            IsSelected = True
             Size.Width = 105.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
@@ -1957,7 +1957,7 @@ object FrameMainTable: TFrameMainTable
             Text = #1061#1086#1076' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
             ExplicitSize.cx = 105.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
-            object Grid1: TGrid
+            object GridMesurmentRun: TGrid
               Align = Client
               CanFocus = True
               ClipChildren = True
@@ -1965,29 +1965,31 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 403.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 557.000000000000000000
-              Viewport.Height = 403.000000000000000000
+              OnGetValue = GridMesurmentRunGetValue
+              Viewport.Width = 537.000000000000000000
+              Viewport.Height = 378.000000000000000000
               object StringColumn8: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
                 Size.Width = 33.000000000000000000
               end
-              object StringColumn1: TStringColumn
+              object StringColumnMRPointName: TStringColumn
                 Header = #1048#1084#1103' '#1090#1086#1095#1082#1080
                 HeaderSettings.TextSettings.WordWrap = False
                 Size.Width = 73.000000000000000000
               end
-              object StringColumn2: TStringColumn
+              object StringColumnMRFlowRate: TStringColumn
                 Header = #1056#1072#1089#1093#1086#1076
                 HeaderSettings.TextSettings.WordWrap = False
                 Size.Width = 71.000000000000000000
               end
-              object StringColumn3: TStringColumn
+              object StringColumnMRStopCriterea: TStringColumn
                 Header = #1055#1072#1088#1084#1077#1090#1088' '#1086#1089#1090#1072#1085#1086#1074#1082#1080
                 HeaderSettings.TextSettings.WordWrap = False
               end
-              object StringColumn4: TStringColumn
+              object StringColumnMRStatus: TStringColumn
                 Header = #1057#1090#1072#1090#1091#1089
                 HeaderSettings.TextSettings.WordWrap = False
+                Size.Width = 74.000000000000000000
               end
             end
             object ToolBar2: TToolBar
@@ -2032,6 +2034,16 @@ object FrameMainTable: TFrameMainTable
                 Size.PlatformDefault = False
                 StyleLookup = 'cleareditbutton'
                 Text = 'SpeedButton10'
+                TextSettings.Trimming = None
+              end
+              object SpeedButtonCreatePoints: TSpeedButton
+                Align = Left
+                Position.X = 241.000000000000000000
+                Size.Width = 80.000000000000000000
+                Size.Height = 32.000000000000000000
+                Size.PlatformDefault = False
+                StyleLookup = 'organizetoolbutton'
+                Text = 'SpeedButtonCreatePoints'
                 TextSettings.Trimming = None
               end
             end
@@ -2128,7 +2140,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
+            IsSelected = False
             Size.Width = 120.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
