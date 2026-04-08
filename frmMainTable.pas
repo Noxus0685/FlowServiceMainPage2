@@ -324,7 +324,6 @@ type
     PopupColumnDeviceDN1: TPopupColumn;
 
     SpeedButton6: TSpeedButton;
-    StringColumnDeviceCoef1: TStringColumn;
     Layout1: TLayout;
     Splitter2: TSplitter;
     Panel1: TPanel;
@@ -333,7 +332,6 @@ type
     TabItem2: TTabItem;
     TabItem3: TTabItem;
     Grid1: TGrid;
-    StringColumn1: TStringColumn;
     StringColumn2: TStringColumn;
     StringColumn3: TStringColumn;
     ToolBar2: TToolBar;
@@ -353,6 +351,7 @@ type
     StringColumn7: TStringColumn;
     StringColumn8: TStringColumn;
     StringColumn9: TStringColumn;
+    StringColumnDeviceCoef1: TStringColumn;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -447,6 +446,8 @@ type
       const Row: Integer);
     procedure GridDevicesCellDblClick(const Column: TColumn;
       const Row: Integer);
+    procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
+      var CanSelect: Boolean);
 
   private
 
@@ -3910,6 +3911,35 @@ begin
     Exit;
 end;
 
+
+
+
+procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
+  ARow: Integer; var CanSelect: Boolean);
+begin
+
+    if not IsUpdating then
+
+
+
+    if ACol = StringColumnDeviceSerial1.Index then
+  begin
+    GridDevices.SetFocus;
+    // 2. Сбрасываем режим (иначе может не переключиться)
+    GridDevices.EditorMode := False;
+    GridDevices.ReadOnly:=True;
+    // 3. Отложенно включаем редактор
+    TThread.Queue(nil,
+    procedure
+    begin
+      GridDevices.ReadOnly:=False;
+      GridDevices.EditorMode := True;
+    end);
+  end;
+
+
+end;
+
 procedure TFrameMainTable.GridDevicesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 var
@@ -4522,13 +4552,6 @@ begin
      else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
         RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
 
-
-
-    else if (strtofloat(LabelFlowRate.Text) < ((1+WorkTable.FlowRate.AccuracyPlus/100) * WorkTable.FlowRate.ValueSet ))
-    and ((strtofloat(LabelFlowRate.Text)) > ((1-WorkTable.FlowRate.Accuracyminus/100) * WorkTable.FlowRate.ValueSet )) then
-      RectangleLabelFR.Fill.Color := $ffC9FFC7
-        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
-      RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow
 
 
 

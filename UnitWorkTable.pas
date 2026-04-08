@@ -533,8 +533,6 @@ private
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
 
-  function FindPumpByName(const APumpName: string): TPump;
-
   property Pumps: TObjectList<TPump> read FPumps;
 
   property FluidTemp: TFluidTemp read FFluidTemp;
