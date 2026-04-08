@@ -4531,8 +4531,8 @@ begin
     Value := Point.Name
   else if GridMesurmentRun.Columns[ACol] = StringColumnMRFlowRate then
   begin
-    if (FActiveWorkTable.FlowMeter <> nil) and (FActiveWorkTable.FlowMeter.ValueFlow <> nil) then
-      Value := FActiveWorkTable.FlowMeter.ValueFlow.GetStrNum(Point.Q)
+    if (FActiveWorkTable.ValueFlowRate <> nil) then
+      Value := FActiveWorkTable.ValueFlowRate.GetStrNum(Point.Q)
     else
       Value := FormatFloat('0.###', Point.Q);
   end

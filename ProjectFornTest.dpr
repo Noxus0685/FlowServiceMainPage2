@@ -21,7 +21,8 @@ uses
   frmProceed in 'frmProceed.pas' {FrameProceed: TFrame},
   frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
   UnitWorkTable in 'UnitWorkTable.pas',
-  UnitRepositories in 'UnitRepositories.pas';
+  UnitRepositories in 'UnitRepositories.pas',
+  UnitMeasurementRun in 'UnitMeasurementRun.pas';
 
 {$R *.res}
 

@@ -415,6 +415,7 @@ TParameters = class(TObject)
     function GetTime: Double;
     function GetTimeResult: Double;
     function GetFlowRate: Double;
+
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
     procedure SetValueTempertureDelta(const AValue: TMeterValue);
@@ -616,11 +617,6 @@ private
   property OnSpillageStop: TOnSpillageStopEvent read FOnSpillageStop write FOnSpillageStop;
   property OnMeasurementStateChanged: TOnMeasurementStateChangedEvent
     read FOnMeasurementStateChanged write FOnMeasurementStateChanged;
-
-
-
-
-
 
   //нужно ли оставить одну  DoPumpChange ?
   procedure DoPumpStart(APumpName: string);
