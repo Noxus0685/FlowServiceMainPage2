@@ -153,6 +153,7 @@ type
     destructor Destroy; override;
 
     procedure Assign(ASource: TDevicePoint);
+    function GetStatus: string;
     property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
   end;
 
@@ -1483,6 +1484,20 @@ begin
     ProtocolDataPoints := TObjectList<TPointSpillage>.Create(False)
   else
     ProtocolDataPoints.Clear;
+end;
+
+function TDevicePoint.GetStatus: string;
+begin
+  case Status of
+    0: Result := 'измерения не проводились';
+    1: Result := 'измерение начато, но не завершено';
+    2: Result := 'измерение начато, но завершено досрочно, не окончено';
+    3: Result := 'измерение завершено корректно';
+    4: Result := 'измерение завершено корректно и результаты отменены';
+    5: Result := 'измерение завершено корректно и результаты сохранены';
+  else
+    Result := 'неизвестный статус';
+  end;
 end;
 
 function TDevicePoint.GetStopCriteria: TSpillageStopCriteria;
