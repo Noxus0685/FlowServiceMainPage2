@@ -72,6 +72,7 @@ type
     class destructor DestroyClass;
 
 
+
   public
     ValueWoCorrection: Double;
     TempDelta: Integer;
@@ -232,6 +233,7 @@ type
     function GetDoubleNum(AValue: Double): Double; overload;
     function GetDoubleNum(const AStr: string; Dim: Integer): Double; overload;
     function GetDoubleNum(AValue: Double; Dim: Integer): Double;  overload;
+    function GetDoubleBaseNum(AValue: Double; Dim: Integer): Double;
     procedure Reset; overload;
     procedure Reset(AValue: Double); overload;
 
@@ -985,6 +987,23 @@ begin
     FFilterOrder := FO;
   end;
 end;
+//
+function TMeterValue.GetDoubleBaseNum(AValue: Double; Dim: Integer): Double;
+var
+  Temp: Double;
+  FO: Integer;
+  TempType:  EValueType;
+begin
+
+  try
+      Result :=AValue / GetDimRate(Dim);
+
+  finally
+
+  end;
+end;
+
+
 
 
 

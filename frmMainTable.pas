@@ -426,7 +426,6 @@ type
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
-    procedure ZChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
     procedure SpeedButtonStartPumpClick(Sender: TObject);
     procedure ComboBoxPumpsChange(Sender: TObject);
@@ -491,7 +490,6 @@ type
     procedure RefreshMonitorIndicator;
     procedure ResetMeasurementValues;
     procedure RefreshPumpsCombo;
-    procedure SyncPumpControls;
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
@@ -794,7 +792,6 @@ begin
   if FActiveWorkTable = nil then
   begin
     //ComboBoxPumps.Text := '';
-    SyncPumpControls;
     Exit;
   end;
 
@@ -815,38 +812,11 @@ begin
     ComboBoxPumps.Text := '';   }
 
 
-  SyncPumpControls;
 end;
 
-procedure TFrameMainTable.SyncPumpControls;
-var
-  Pump: TPump;
-begin
-  Pump := nil;
-  if FActiveWorkTable <> nil then
-    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboBoxPumps.Text));
 
-  if Pump <> nil then
-  begin
-   // SpinBoxFreq.Value := Pump.Freq;
-    if Pump.IsRunning then
-      SpeedButtonStartPump.Text := '■'
-    else
-      SpeedButtonStartPump.Text := '▶';
-    SpeedButtonStartPump.Hint := Pump.GetStatusAsString;
-  end
-  else
-  begin
-    //SpinBoxFreq.Value := 0;
-    SpeedButtonStartPump.Text := '▶';
-    SpeedButtonStartPump.Hint := '';
-  end;
-end;
 
-procedure TFrameMainTable.ZChange(Sender: TObject);
-begin
-  SyncPumpControls;
-end;
+
 
 procedure TFrameMainTable.SetConfiguration;
 begin
@@ -1290,7 +1260,7 @@ var
 AValue:double;
 begin
 //AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
-AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(SpinBoxFlowRate.Value,4);
+AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
 
 FActiveWorkTable.DoFlowRateSet(AValue);
 
@@ -2988,7 +2958,6 @@ begin
 
    WorkTable.FluidTemp.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
    WorkTable.FluidPress.Value:=  WorkTable.ValuePressure.GetDoubleValue;
-
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
 
@@ -4531,14 +4500,14 @@ begin
       for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
         begin
           if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
-            Amax:=FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax;
+            Amax:=FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
         end;
 
 
       SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.MinValue);
-      SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum( Amax);
+      SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
             if FActiveWorkTable<>nil then
-        SpinBoxFlowRate.text:=WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value);
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
     end;
 
 if WorkTable.FlowRate.IsRunning then
@@ -4618,7 +4587,6 @@ IF WorkTable.FluidPress.IsRunning THEN
       EditTemp.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
     if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidPress.ValueSet,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
-
       EditPres.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.ValueSet) ;
 
