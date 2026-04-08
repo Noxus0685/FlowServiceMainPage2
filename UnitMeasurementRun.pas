@@ -180,7 +180,7 @@ end;
 
 function TMeasurementRun.IsThreadRunning: Boolean;
 begin
-  Result := Assigned(FThread) and (not FThread.Terminated);
+  Result := Assigned(FThread) and (not FThread.Finished);
 end;
 
 function TMeasurementRun.IsStable: Boolean;
