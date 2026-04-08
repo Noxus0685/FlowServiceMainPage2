@@ -332,6 +332,7 @@ type
     TabItem2: TTabItem;
     TabItem3: TTabItem;
     GridMesurmentRun: TGrid;
+    StringColumnMRPointName: TStringColumn;
     StringColumnMRFlowRate: TStringColumn;
     StringColumnMRStopCriterea: TStringColumn;
     ToolBar2: TToolBar;
@@ -451,6 +452,7 @@ type
       var CanSelect: Boolean);
     procedure GridMesurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
+    procedure SpeedButtonCreatePointsClick(Sender: TObject);
 
   private
 
@@ -476,6 +478,8 @@ type
     function FindSerialIndex(const ASerialNumber: string): Integer;
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
+    procedure UpdateGridMesurmentRun;
+    procedure UpdateGridMRHeaders;
     procedure UpdateUIFromValues;
     procedure SetValues;
     function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
@@ -1130,6 +1134,7 @@ begin
 
   ButtonMonitor.OnClick := ButtonMonitorClick;
   ButtonCancel.OnClick := ButtonCancelClick;
+  SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
   EnforceDataPointsColumnsLayout;
 
 
@@ -3166,6 +3171,7 @@ begin
     StringColumnDeviceFlowRate1.Header := 'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
     StringColumnEtalonFlowRate1.Header := 'Расход, ' +WorkTable.ValueFlowRate.GetDimName;
   end;
+  UpdateGridMRHeaders;
   if WorkTable.ValueQuantity <> nil then
   begin
     StringColumnDeviceQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
@@ -4257,6 +4263,32 @@ end;
 
  end;
 
+procedure TFrameMainTable.UpdateGridMesurmentRun;
+var
+  Rows: Integer;
+begin
+  if FActiveWorkTable <> nil then
+    Rows := FActiveWorkTable.Points.Count
+  else
+    Rows := 0;
+
+  GridMesurmentRun.BeginUpdate;
+  try
+    GridMesurmentRun.RowCount := 0;
+    GridMesurmentRun.RowCount := Rows;
+  finally
+    GridMesurmentRun.EndUpdate;
+  end;
+end;
+
+procedure TFrameMainTable.UpdateGridMRHeaders;
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+    StringColumnMRFlowRate.Header := 'Расход, ' + FActiveWorkTable.ValueFlowRate.GetDimName
+  else
+    StringColumnMRFlowRate.Header := 'Расход';
+end;
+
 procedure ReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer);
 var
   i: Integer;
@@ -4357,6 +4389,8 @@ begin
        StringColumnEtalonFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     );
+
+  UpdateGridMesurmentRun;
 end;
 
 
@@ -4457,8 +4491,65 @@ end;
 
 procedure TFrameMainTable.GridMesurmentRunGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
+var
+  Point: TDevicePoint;
+  StopParts: TStringList;
+
+  function GetStopCriteriaText(APoint: TDevicePoint): string;
+  begin
+    Result := '';
+    if APoint = nil then
+      Exit;
+
+    StopParts := TStringList.Create;
+    try
+      if scImpulse in APoint.StopCriteria then
+        StopParts.Add(Format('%d имп', [APoint.LimitImp]));
+      if scVolume in APoint.StopCriteria then
+        StopParts.Add(Format('%s л', [FormatFloat('0.###', APoint.LimitVolume)]));
+      if scTime in APoint.StopCriteria then
+        StopParts.Add(Format('%s сек', [FormatFloat('0.###', APoint.LimitTime)]));
+
+      Result := Trim(StringReplace(StopParts.CommaText, ',', ', ', [rfReplaceAll]));
+      Result := StringReplace(Result, '"', '', [rfReplaceAll]);
+    finally
+      StopParts.Free;
+    end;
+  end;
 begin
-         //Формирование таблицы
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.Points = nil) then
+    Exit;
+
+  if (ARow < 0) or (ARow >= FActiveWorkTable.Points.Count) then
+    Exit;
+
+  Point := FActiveWorkTable.Points[ARow];
+  if Point = nil then
+    Exit;
+
+  if GridMesurmentRun.Columns[ACol] = StringColumnMRPointName then
+    Value := Point.Name
+  else if GridMesurmentRun.Columns[ACol] = StringColumnMRFlowRate then
+  begin
+    if (FActiveWorkTable.FlowMeter <> nil) and (FActiveWorkTable.FlowMeter.ValueFlow <> nil) then
+      Value := FActiveWorkTable.FlowMeter.ValueFlow.GetStrNum(Point.Q)
+    else
+      Value := FormatFloat('0.###', Point.Q);
+  end
+  else if GridMesurmentRun.Columns[ACol] = StringColumnMRStopCriterea then
+    Value := GetStopCriteriaText(Point)
+  else if GridMesurmentRun.Columns[ACol] = StringColumnMRStatus then
+    Value := Point.GetStatus;
+end;
+
+procedure TFrameMainTable.SpeedButtonCreatePointsClick(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  FActiveWorkTable.CreateSessionPoints;
+  UpdateGridMRHeaders;
+  UpdateGridMesurmentRun;
 end;
 
 procedure TFrameMainTable.UpdateUIPump;
