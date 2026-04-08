@@ -501,6 +501,7 @@ private
   FOnSpillageStop: TOnSpillageStopEvent;
   FOnMeasurementStateChanged: TOnMeasurementStateChangedEvent;
 
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -532,7 +533,7 @@ private
   procedure SetActivePump(APumpName: string);
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
-
+  function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
 
   property FluidTemp: TFluidTemp read FFluidTemp;
@@ -635,6 +636,7 @@ private
   procedure DoPumpStart(APumpName: string);
   procedure DoPumpStop(APumpName: string);
   procedure DoFreqSet(APumpName: string; ANewFreq: Double);
+  procedure PumpSetStatus(APumpName: string; AStatus: EControlStatus);
 
   procedure DoFlowRateStart;
   procedure DoFlowRateStop;
@@ -2867,10 +2869,7 @@ end;
 procedure TWorkTable.DoPumpStart(APumpName: string);
 var Pump: TPump;
 begin
-  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
-    SetActivePump(APumpName);
-
-  Pump := ActivePump;
+  Pump:=FindPumpByName(APumpName);
   if Pump = nil then
     Exit;
 
@@ -2960,10 +2959,7 @@ end;
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
-  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
-    SetActivePump(APumpName);
-
-  Pump := ActivePump;
+  Pump:=FindPumpByName(APumpName);
   if Pump = nil then
     Exit;
 
@@ -3008,10 +3004,7 @@ end;
 procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
 var Pump: TPump;
 begin
-  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
-    SetActivePump(APumpName);
-
-  Pump := ActivePump;
+  Pump:=FindPumpByName(APumpName);
   if Pump = nil then
     Exit;
 
@@ -3020,6 +3013,20 @@ begin
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_SET);
 end;
+
+procedure TWorkTable.PumpSetStatus(APumpName: string;AStatus: EControlStatus);
+var Pump: TPump;
+begin
+  Pump:=FindPumpByName(APumpName);
+  if Pump = nil then
+    Exit;
+
+  Pump.SetStatus(AStatus);
+
+  if Assigned(FOnPumpChange) then
+    FOnPumpChange(Pump,CONTROL_ACTION_SET);
+end;
+
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
@@ -3108,6 +3115,22 @@ procedure TWorkTable.ClearPumps;
 begin
   FPumps.Clear;
 end;
+
+function TWorkTable.FindPumpByName(const APumpName: string): TPump;
+var
+  Pump: TPump;
+begin
+  for Pump in FPumps do
+  begin
+    if Pump.Name = APumpName then
+    begin
+      Result := Pump;
+      Exit;
+    end;
+  end;
+  Result := nil;
+end;
+
 
 function TWorkTable.FindPumpByUUID(const APumpUUID: string): TPump;
 var

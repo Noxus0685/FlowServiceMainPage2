@@ -383,6 +383,9 @@ begin
   else  if (APump.Action = CONTROL_ACTION_STOP) then
     APump.SetStatus(CONTROL_STOPPED);
 
+
+
+
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
@@ -397,7 +400,8 @@ begin
     end
     else
     begin
-      APump.SetValue(1)
+      APump.SetParam(15);
+      APump.SetValue(0)
     end;
 
 
@@ -541,25 +545,24 @@ var
   Pump: tPump;
   FlowRate: TFlowRate;
 begin
+ if FWorkTableManager.WorkTables.Count=0 then
+  exit;
+ WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
+
+  if WorkTable = nil then
+    Exit;
 
   try
-      WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
       Pump := WorkTable.ActivePump;
       FlowRate:= WorkTable.FlowRate;
   except
        Exit;
   end;
-
-
-  if WorkTable = nil then
-    Exit;
-
-   if Pump = nil then
-    Exit;
-
+  if Pump <> nil then
+     UpdateRandomFreq(Pump);
+  if Pump <> nil then
+     UpdateRandomFlowRate(FlowRate);
     UpdateRandomClimate(WorkTable);
-    UpdateRandomFreq(Pump);
-    UpdateRandomFlowRate(FlowRate);
     UpdateRandomPress(WorkTable);
 
 

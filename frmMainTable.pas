@@ -823,8 +823,8 @@ var
   Pump: TPump;
 begin
   Pump := nil;
-  if FWorkTableManager <> nil then
-    Pump := FWorkTableManager.FindPumpByName(Trim(ComboBoxPumps.Text));
+  if FActiveWorkTable <> nil then
+    Pump := FActiveWorkTable.FindPumpByName(Trim(ComboBoxPumps.Text));
 
   if Pump <> nil then
   begin
@@ -1278,12 +1278,9 @@ begin
     LayoutPump.tag:=0;
 
     FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
-    //FActiveWorkTable.ActivePump.State:=CONTROL_STARTED;
     UpdateUIPump;
 
   end;
-
-
 end;
 
 
@@ -4544,13 +4541,19 @@ begin
         SpinBoxFlowRate.text:=WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value);
     end;
 
-
-      if WorkTable.FlowRate.Value = 0 then
-         RectangleLabelFR.Fill.Color := TAlphaColorRec.White
-     ELSE if WorkTable.FlowRate.IsStable THEN
-        RectangleLabelFR.Fill.Color := $ffC9FFC7
-     else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
-        RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
+if WorkTable.FlowRate.IsRunning then
+  begin
+        if WorkTable.FlowRate.Value = 0 then
+           RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+       ELSE if WorkTable.FlowRate.IsStable THEN
+          RectangleLabelFR.Fill.Color := $ffC9FFC7
+       else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
+          RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
+  end
+  else
+  begin
+    RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+  end;
 
 
 
