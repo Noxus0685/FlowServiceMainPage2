@@ -672,7 +672,8 @@ implementation
 
 
 
-uses frmMainTable;{$REGION 'TChannel'}
+uses frmMainTable,FmxHelper;
+{$REGION 'TChannel'}
 
 procedure TChannel.InitMeterValues;
 var
@@ -2426,7 +2427,7 @@ begin
   ValuesIni := TIniFile.Create(WorkTableValuesFileName);
   try
     Count := Ini.ReadInteger('WorkTables', 'Count', 0);
-    TMeterValue.SetInitDensity(ValuesIni.ReadFloat('Common', 'InitDensity', TMeterValue.GetInitDensity));
+    TMeterValue.SetInitDensity(S2F(ValuesIni.ReadString('Common', 'InitDensity', FloatToStr(TMeterValue.GetInitDensity))));
 
     for I := 0 to Count - 1 do
     begin
@@ -2438,13 +2439,13 @@ begin
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-      WorkTable.FluidTemp.Value := Ini.ReadFloat(Section, 'Temp', 0);
-      WorkTable.TempDelta := Ini.ReadFloat(Section, 'TempDelta', 0);
+      WorkTable.FluidTemp.Value := S2F(Ini.ReadString(Section, 'Temp', '0'));
+      WorkTable.TempDelta := S2F(Ini.ReadString(Section, 'TempDelta','0'));
       //WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
-      WorkTable.PressDelta := Ini.ReadFloat(Section, 'PressDelta', 0);
-      WorkTable.FlowRate.Value := Ini.ReadFloat(Section, 'FlowRate', 0);
-      WorkTable.Time := Ini.ReadFloat(Section, 'Time', 0);
-      WorkTable.TimeResult := Ini.ReadFloat(Section, 'TimeResult', 0);
+      WorkTable.PressDelta := S2F(Ini.ReadString(Section, 'PressDelta','0'));
+      WorkTable.FlowRate.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
+      WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
+      WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
       WorkTable.State := SpillStateFromString(
         Ini.ReadString(Section, 'State', 'None')
       );
@@ -2496,21 +2497,21 @@ begin
 
       WorkTable.InitMeterValues;
 
-      WorkTable.ValueTempertureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureBefore', 21));
-      WorkTable.ValueTempertureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureAfter', 21));
-      WorkTable.ValueTempertureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValueTempertureDelta', 0));
-      WorkTable.ValueTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueTemperture', 21));
-      WorkTable.ValuePressureBefore.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureBefore', 0));
-      WorkTable.ValuePressureAfter.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureAfter', 0));
-      WorkTable.ValuePressureDelta.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressureDelta', 0));
-      WorkTable.ValuePressure.SetValue(ValuesIni.ReadFloat(Section, 'ValuePressure', 0));
-      WorkTable.ValueDensity.SetValue(ValuesIni.ReadFloat(Section, 'ValueDensity', TMeterValue.GetInitDensity));
-      WorkTable.ValueAirPressure.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirPressure', 0));
-      WorkTable.ValueAirTemperture.SetValue(ValuesIni.ReadFloat(Section, 'ValueAirTemperture', 0));
-      WorkTable.ValueHumidity.SetValue(ValuesIni.ReadFloat(Section, 'ValueHumidity', 0));
-      WorkTable.ValueTime.SetValue(ValuesIni.ReadFloat(Section, 'ValueTime', 0));
-      WorkTable.ValueQuantity.SetValue(ValuesIni.ReadFloat(Section, 'ValueQuantity', 0));
-      WorkTable.ValueFlowRate.SetValue(ValuesIni.ReadFloat(Section, 'ValueFlowRate', 0));
+      WorkTable.ValueTempertureBefore.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueTempertureBefore', '21')));
+      WorkTable.ValueTempertureAfter.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueTempertureAfter', '21')));
+      WorkTable.ValueTempertureDelta.SetValue(S2F(ValuesIni.ReadString(Section,'ValueTempertureDelta', '0')));
+      WorkTable.ValueTemperture.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueTemperture', '21')));
+      WorkTable.ValuePressureBefore.SetValue(S2F(ValuesIni.ReadString(Section, 'ValuePressureBefore', '0')));
+      WorkTable.ValuePressureAfter.SetValue(S2F(ValuesIni.ReadString(Section, 'ValuePressureAfter', '0')));
+      WorkTable.ValuePressureDelta.SetValue(S2F(ValuesIni.ReadString(Section, 'ValuePressureDelta', '0')));
+      WorkTable.ValuePressure.SetValue(S2F(ValuesIni.ReadString(Section, 'ValuePressure', '0')));
+      WorkTable.ValueDensity.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueDensity', FloatToStr(TMeterValue.GetInitDensity))));
+      WorkTable.ValueAirPressure.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueAirPressure', '0')));
+      WorkTable.ValueAirTemperture.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueAirTemperture', '0')));
+      WorkTable.ValueHumidity.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueHumidity', '0')));
+      WorkTable.ValueTime.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueTime', '0')));
+      WorkTable.ValueQuantity.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueQuantity', '0')));
+      WorkTable.ValueFlowRate.SetValue(S2F(ValuesIni.ReadString(Section, 'ValueFlowRate', '0')));
 
       WorkTable.ValueTempertureBefore.SetValue(21);
       WorkTable.ValueTempertureAfter.SetValue(21);
@@ -2584,7 +2585,7 @@ begin
     Section := ASectionPrefix + '.' + IntToStr(I);
     AColumns[I].Name := AIni.ReadString(Section, 'Name', '');
     AColumns[I].DisplayIndex := AIni.ReadInteger(Section, 'DisplayIndex', I);
-    AColumns[I].Width := AIni.ReadFloat(Section, 'Width', 80);
+    AColumns[I].Width := S2F(AIni.ReadString(Section, 'Width', '80'));
     AColumns[I].Visible := AIni.ReadBool(Section, 'Visible', True);
   end;
 end;
@@ -2691,12 +2692,12 @@ begin
     Channel.RepoDeviceName := AIni.ReadString(Section, 'RepoDeviceName', '');
     Channel.RepoDeviceUUID := AIni.ReadString(Section, 'RepoDeviceUUID', '');
 
-    Channel.ImpSec := AIni.ReadFloat(Section, 'ImpSec', 0);
+    Channel.ImpSec := S2F(AIni.ReadString(Section, 'ImpSec', '0'));
     Channel.ImpResult :=0; //AIni.ReadFloat(Section, 'ImpResult', 0);
-    Channel.CurSec := AIni.ReadFloat(Section, 'CurSec', 0);
-    Channel.CurResult := AIni.ReadFloat(Section, 'CurResult', 0);
-    Channel.ValueSec := AIni.ReadFloat(Section, 'ValueSec', 0);
-    Channel.ValueResult := AIni.ReadFloat(Section, 'ValueResult', 0);
+    Channel.CurSec := S2F(AIni.ReadString(Section, 'CurSec', '0'));
+    Channel.CurResult := S2F(AIni.ReadString(Section, 'CurResult', '0'));
+    Channel.ValueSec := S2F(AIni.ReadString(Section, 'ValueSec', '0'));
+    Channel.ValueResult := S2F(AIni.ReadString(Section, 'ValueResult', '0'));
 
     Channel.FHashValueImp := AIni.ReadString(Section, 'HashValueImp', Channel.FHashValueImp);
     Channel.FHashValueImpTotal := AIni.ReadString(Section, 'HashValueImpTotal', Channel.FHashValueImpTotal);

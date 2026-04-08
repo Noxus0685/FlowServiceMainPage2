@@ -281,7 +281,7 @@ type
 implementation
 
 uses
-  UnitBaseProcedures;
+  UnitBaseProcedures,FmxHelper;
 
 { Initializes class-level collections used to store all meter value instances. }
 class constructor TMeterValue.CreateClass;
@@ -2226,7 +2226,7 @@ begin
 
   Ini := TIniFile.Create(FileName);
   try
-    FInitDensity := Ini.ReadFloat('MeterValues', 'InitDensity', FInitDensity);
+    FInitDensity := S2F(Ini.ReadString('MeterValues', 'InitDensity', FloatToStr(FInitDensity)));
     Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
     FMeterValuesSaves.Clear;
 
@@ -2258,14 +2258,14 @@ begin
 
       MV.FFilterOrder := Ini.ReadInteger(Section, 'filter_order', MV.FFilterOrder);
       MV.Accuracy := Ini.ReadInteger(Section, 'Accuracy', MV.Accuracy);
-      MV.Error := Ini.ReadFloat(Section, 'Error', MV.Error);
-      MV.MaxValue := Ini.ReadFloat(Section, 'MaxValue', MV.MaxValue);
-      MV.MinValue := Ini.ReadFloat(Section, 'MinValue', MV.MinValue);
-      MV.MaxNomValue := Ini.ReadFloat(Section, 'MaxNomValue', MV.MaxNomValue);
-      MV.MinNomValue := Ini.ReadFloat(Section, 'MinNomValue', MV.MinNomValue);
-      MV.CoefK := Ini.ReadFloat(Section, 'CoefK', MV.CoefK);
-      MV.CoefP := Ini.ReadFloat(Section, 'CoefP', MV.CoefP);
-      MV.Constant := Ini.ReadFloat(Section, 'Constant', MV.Constant);
+      MV.Error := S2F(Ini.ReadString(Section, 'Error', F2S(MV.Error)));
+      MV.MaxValue := S2F(Ini.ReadString(Section, 'MaxValue', F2S(MV.MaxValue)));
+      MV.MinValue := S2F(Ini.ReadString(Section, 'MinValue', F2S(MV.MinValue)));
+      MV.MaxNomValue := S2F(Ini.ReadString(Section, 'MaxNomValue', F2S(MV.MaxNomValue)));
+      MV.MinNomValue := S2F(Ini.ReadString(Section, 'MinNomValue', F2S(MV.MinNomValue)));
+      MV.CoefK := S2F(Ini.ReadString(Section, 'CoefK', F2S(MV.CoefK)));
+      MV.CoefP := S2F(Ini.ReadString(Section, 'CoefP', F2S(MV.CoefP)));
+      MV.Constant := S2F(Ini.ReadString(Section, 'Constant', F2S(MV.Constant)));
       MV.CurrentDimIndex := Ini.ReadInteger(Section, 'CurrentDimIndex', 0);
       MV.ValueType := EValueType(Ini.ReadInteger(Section, 'ValueType', Ord(MV.ValueType)));
       MV.DependenceType := EDependenceType(Ini.ReadInteger(Section, 'DependenceType', Ord(MV.DependenceType)));
@@ -2276,8 +2276,8 @@ begin
       begin
         Dim.Name := Ini.ReadString(Section + '.Dimension.' + IntToStr(J), 'Name', '');
         Dim.Hash := Ini.ReadString(Section + '.Dimension.' + IntToStr(J), 'Hash', '');
-        Dim.Rate := Ini.ReadFloat(Section + '.Dimension.' + IntToStr(J), 'Rate', 1);
-        Dim.Devider := Ini.ReadFloat(Section + '.Dimension.' + IntToStr(J), 'Devider', 1);
+        Dim.Rate := S2F(Ini.ReadString(Section + '.Dimension.' + IntToStr(J), 'Rate', '1'));
+        Dim.Devider := S2F(Ini.ReadString(Section + '.Dimension.' + IntToStr(J), 'Devider', '1'));
         Dim.Factor := Ini.ReadBool(Section + '.Dimension.' + IntToStr(J), 'Factor', True);
         Dim.Recip := Ini.ReadBool(Section + '.Dimension.' + IntToStr(J), 'Recip', False);
         MV.Dimensions.Add(Dim);
@@ -2289,12 +2289,12 @@ begin
         CoefItem.Name := Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'Name', '');
         CoefItem.Index := Ini.ReadInteger(Section + '.Coef.' + IntToStr(J), 'Index', J);
         CoefItem.Hash := Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'Hash', '');
-        CoefItem.Value := Ini.ReadFloat(Section + '.Coef.' + IntToStr(J), 'Value', 0);
-        CoefItem.Arg := Ini.ReadFloat(Section + '.Coef.' + IntToStr(J), 'Arg', 0);
-        CoefItem.Q1 := Ini.ReadFloat(Section + '.Coef.' + IntToStr(J), 'Q1', 0);
-        CoefItem.Q2 := Ini.ReadFloat(Section + '.Coef.' + IntToStr(J), 'Q2', 0);
-        CoefItem.K := Ini.ReadFloat(Section + '.Coef.' + IntToStr(J), 'K', 0);
-        CoefItem.b := Ini.ReadFloat(Section + '.Coef.' + IntToStr(J), 'b', 0);
+        CoefItem.Value := S2F(Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'Value', '0'));
+        CoefItem.Arg := S2F(Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'Arg', '0'));
+        CoefItem.Q1 := S2F(Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'Q1', '0'));
+        CoefItem.Q2 := S2F(Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'Q2', '0'));
+        CoefItem.K := S2F(Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'K', '0'));
+        CoefItem.b := S2F(Ini.ReadString(Section + '.Coef.' + IntToStr(J), 'b', '0'));
         CoefItem.InUse := Ini.ReadBool(Section + '.Coef.' + IntToStr(J), 'InUse', True);
         MV.Coefs.Add(CoefItem);
       end;
