@@ -192,6 +192,7 @@ type
     function GetStrNum(const AStrValue, ADim: string): string; overload;
     function GetStrNum(const AStrValue: string): string; overload;
     function GetStrNum(AValue: Double; const ADim: string): string; overload;
+    function GetStrNum(AValue: Double; const ADim: integer): string; overload;
 
     procedure SetFilter(AOrder: Integer);
     function GetFilter: Integer;
@@ -923,6 +924,20 @@ begin
     Value := TempValue;
   end;
 end;
+
+function TMeterValue.GetStrNum(AValue: Double; const ADim: integer): string;
+var
+  TempValue: Double;
+begin
+  TempValue := Value;
+  Value := AValue;
+  try
+    Result := GetStringValue(ADim);
+  finally
+    Value := TempValue;
+  end;
+end;
+
 
 { Parses numeric input and converts it into base or requested dimension units. }
 function TMeterValue.GetDoubleNum(AValue: Double; const ADim: string): Double;

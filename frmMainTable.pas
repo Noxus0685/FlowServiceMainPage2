@@ -2957,7 +2957,7 @@ begin
 
 
    WorkTable.FluidTemp.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
-   WorkTable.FluidPress.Value:=  WorkTable.ValuePressure.GetDoubleValue;
+   WorkTable.FluidPress.Value:= WorkTable.ValuePressure.GetDoubleValue;
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
 
@@ -4588,13 +4588,17 @@ IF WorkTable.FluidPress.IsRunning THEN
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
     if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidPress.ValueSet,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
       EditPres.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.ValueSet) ;
+      WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet);//,WorkTable.ValuePressure.CurrentDimIndex) ;
 
     LabelTemp.text:=
     WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value);
 
     LabelPressure.text:=
-    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.Value);
+    WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.Value,WorkTable.ValuePressure.CurrentDimIndex);
+
+
+
+   // SpinBoxFlowRate.Max:= FActiveWorkTable.ValuePressure.GetDoubleNum(WorkTable.FluidPress.Value,WorkTable.ValuePressure.CurrentDimIndex);
    // FormatFloat('0.##', (WorkTable.FluidTemp.Temp));
 
     Layout9.tag:=0;
