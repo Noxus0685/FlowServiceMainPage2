@@ -879,7 +879,7 @@ object FrameMainTable: TFrameMainTable
                   #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 1'
                   #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 2'
                   #1055#1072#1082#1077#1090#1085#1086#1077' '#1079#1072#1076#1072#1085#1080#1077' 3')
-                ItemIndex = 0
+                ItemIndex = 2
                 ItemHeight = 12.000000000000000000
                 Margins.Right = 10.000000000000000000
                 Placement = BottomCenter
@@ -1142,6 +1142,7 @@ object FrameMainTable: TFrameMainTable
               end
               object ComboBoxPumps: TComboBox
                 Align = Left
+                ItemIndex = 0
                 Size.Width = 121.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -2046,6 +2047,7 @@ object FrameMainTable: TFrameMainTable
                 StyleLookup = 'organizetoolbutton'
                 Text = 'SpeedButtonCreatePoints'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonCreatePointsClick
               end
             end
           end

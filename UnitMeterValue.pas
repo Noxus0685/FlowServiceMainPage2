@@ -72,6 +72,7 @@ type
     class destructor DestroyClass;
 
 
+
   public
     ValueWoCorrection: Double;
     TempDelta: Integer;
@@ -191,6 +192,7 @@ type
     function GetStrNum(const AStrValue, ADim: string): string; overload;
     function GetStrNum(const AStrValue: string): string; overload;
     function GetStrNum(AValue: Double; const ADim: string): string; overload;
+    function GetStrNum(AValue: Double; const ADim: integer): string; overload;
 
     procedure SetFilter(AOrder: Integer);
     function GetFilter: Integer;
@@ -232,6 +234,7 @@ type
     function GetDoubleNum(AValue: Double): Double; overload;
     function GetDoubleNum(const AStr: string; Dim: Integer): Double; overload;
     function GetDoubleNum(AValue: Double; Dim: Integer): Double;  overload;
+    function GetDoubleBaseNum(AValue: Double; Dim: Integer): Double;
     procedure Reset; overload;
     procedure Reset(AValue: Double); overload;
 
@@ -922,6 +925,20 @@ begin
   end;
 end;
 
+function TMeterValue.GetStrNum(AValue: Double; const ADim: integer): string;
+var
+  TempValue: Double;
+begin
+  TempValue := Value;
+  Value := AValue;
+  try
+    Result := GetStringValue(ADim);
+  finally
+    Value := TempValue;
+  end;
+end;
+
+
 { Parses numeric input and converts it into base or requested dimension units. }
 function TMeterValue.GetDoubleNum(AValue: Double; const ADim: string): Double;
 var
@@ -985,6 +1002,23 @@ begin
     FFilterOrder := FO;
   end;
 end;
+//
+function TMeterValue.GetDoubleBaseNum(AValue: Double; Dim: Integer): Double;
+var
+  Temp: Double;
+  FO: Integer;
+  TempType:  EValueType;
+begin
+
+  try
+      Result :=AValue / GetDimRate(Dim);
+
+  finally
+
+  end;
+end;
+
+
 
 
 

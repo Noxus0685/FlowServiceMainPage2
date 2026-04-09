@@ -167,6 +167,7 @@ TParameters = class(TObject)
 
   TWorkTable = class;
 
+
   TSpillState = (
     ssNone,
     ssReady,
@@ -354,6 +355,9 @@ TParameters = class(TObject)
     FPoints: TObjectList<TDevicePoint>;
     FFlowRate: TFlowRate;
 
+    FMeasurementRun: TObject;
+
+
     FFluidTemp: TFluidTemp;
     FFluidPress: TFluidPress;
     FTime: Double;
@@ -495,6 +499,9 @@ private
   FOnSpillageStop: TOnSpillageStopEvent;
   FOnMeasurementStateChanged: TOnMeasurementStateChangedEvent;
 
+  procedure MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
+  procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -526,8 +533,11 @@ private
   procedure SetActivePump(APumpName: string);
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
-
+  function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
+
+  property MeasurementRun: TObject read FMeasurementRun;
+
 
   property FluidTemp: TFluidTemp read FFluidTemp;
   property FluidPress: TFluidPress read FFluidPress;
@@ -625,6 +635,7 @@ private
   procedure DoPumpStart(APumpName: string);
   procedure DoPumpStop(APumpName: string);
   procedure DoFreqSet(APumpName: string; ANewFreq: Double);
+  procedure PumpSetStatus(APumpName: string; AStatus: EControlStatus);
 
   procedure DoFlowRateStart;
   procedure DoFlowRateStop;
@@ -643,6 +654,11 @@ private
   procedure DoSpillageStart;
   procedure DoSpillageStop;
   procedure DoMeasurementStateChanged(AOldState, ANewState: EMeasurementState);
+  procedure StartMeasurementRun(AMode: Integer = 1);
+  procedure StopMeasurementRun;
+  procedure PauseMeasurementRun;
+  procedure ResumeMeasurementRun;
+  procedure NextMeasurementPoint;
 
 
   end;
@@ -671,8 +687,10 @@ implementation
 
 
 
-
-uses frmMainTable,FmxHelper;
+uses
+  mxHelper,
+  frmMainTable,
+  UnitMeasurementRun;
 {$REGION 'TChannel'}
 
 procedure TChannel.InitMeterValues;
@@ -1366,6 +1384,13 @@ begin
   PressDelta := 0.1;
   //FlowRate := 10;
 
+  FMeasurementRun := TMeasurementRun.Create(Self);
+
+  TMeasurementRun(FMeasurementRun).OnStateChangedMain := MeasurementRunStateChanged;
+  TMeasurementRun(FMeasurementRun).OnPointChangedMain := MeasurementRunPointChanged;
+  TMeasurementRun(FMeasurementRun).OnStateChangedFrame := MeasurementRunStateChanged;
+  TMeasurementRun(FMeasurementRun).OnPointChangedFrame := MeasurementRunPointChanged;
+
 
  // InitMeterValues;
 end;
@@ -2052,6 +2077,7 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
+  FreeAndNil(FMeasurementRun);
   FreeAndNil(FFluidTemp);
   FreeAndNil(FFluidPress);
   FreeAndNil(FlowRate);
@@ -2854,10 +2880,7 @@ end;
 procedure TWorkTable.DoPumpStart(APumpName: string);
 var Pump: TPump;
 begin
-  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
-    SetActivePump(APumpName);
-
-  Pump := ActivePump;
+  Pump:=FindPumpByName(APumpName);
   if Pump = nil then
     Exit;
 
@@ -2947,10 +2970,7 @@ end;
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
-  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
-    SetActivePump(APumpName);
-
-  Pump := ActivePump;
+  Pump:=FindPumpByName(APumpName);
   if Pump = nil then
     Exit;
 
@@ -2995,10 +3015,7 @@ end;
 procedure TWorkTable.DoFreqSet(APumpName: string; ANewFreq: Double);
 var Pump: TPump;
 begin
-  if (ActivePump = nil) or (ActivePump.Name <> APumpName) then
-    SetActivePump(APumpName);
-
-  Pump := ActivePump;
+  Pump:=FindPumpByName(APumpName);
   if Pump = nil then
     Exit;
 
@@ -3007,6 +3024,20 @@ begin
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_SET);
 end;
+
+procedure TWorkTable.PumpSetStatus(APumpName: string;AStatus: EControlStatus);
+var Pump: TPump;
+begin
+  Pump:=FindPumpByName(APumpName);
+  if Pump = nil then
+    Exit;
+
+  Pump.SetStatus(AStatus);
+
+  if Assigned(FOnPumpChange) then
+    FOnPumpChange(Pump,CONTROL_ACTION_SET);
+end;
+
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
@@ -3056,6 +3087,71 @@ begin
     FOnMeasurementStateChanged(Self, AOldState, ANewState);
 end;
 
+procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
+begin
+  State := AState;
+
+  case AState of
+    ssStarting:
+      DoSpillageStart;
+    ssStopping, ssResultReady:
+      DoSpillageStop;
+  end;
+end;
+
+procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
+  APointIndex: Integer);
+begin
+  DoProcNextStep(Format('Point %d', [APointIndex + 1]));
+end;
+
+procedure TWorkTable.StartMeasurementRun(AMode: Integer);
+begin
+  if FMeasurementRun = nil then
+    Exit;
+
+  if AMode = 0 then
+
+    TMeasurementRun(FMeasurementRun).Mode := mrmManual
+  else
+    TMeasurementRun(FMeasurementRun).Mode := mrmAutomatic;
+
+  TMeasurementRun(FMeasurementRun).Start;
+
+end;
+
+procedure TWorkTable.StopMeasurementRun;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).Stop;
+
+end;
+
+procedure TWorkTable.PauseMeasurementRun;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).Pause;
+
+end;
+
+procedure TWorkTable.ResumeMeasurementRun;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).Resume;
+
+end;
+
+procedure TWorkTable.NextMeasurementPoint;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).NextPoint;
+
+end;
+
 function TWorkTable.AddPump(const APumpName: string): TPump;
 var
   NewPump: TPump;
@@ -3095,6 +3191,22 @@ procedure TWorkTable.ClearPumps;
 begin
   FPumps.Clear;
 end;
+
+function TWorkTable.FindPumpByName(const APumpName: string): TPump;
+var
+  Pump: TPump;
+begin
+  for Pump in FPumps do
+  begin
+    if Pump.Name = APumpName then
+    begin
+      Result := Pump;
+      Exit;
+    end;
+  end;
+  Result := nil;
+end;
+
 
 function TWorkTable.FindPumpByUUID(const APumpUUID: string): TPump;
 var

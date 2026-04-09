@@ -428,7 +428,6 @@ type
     procedure ActionEtalonsSetFlowSourceExecute(Sender: TObject);
     procedure ActionEtalonsAssignEtalonExecute(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
-    procedure ZChange(Sender: TObject);
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
     procedure SpeedButtonStartPumpClick(Sender: TObject);
     procedure ComboBoxPumpsChange(Sender: TObject);
@@ -499,7 +498,6 @@ type
     procedure RefreshMonitorIndicator;
     procedure ResetMeasurementValues;
     procedure RefreshPumpsCombo;
-    procedure SyncPumpControls;
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
@@ -802,7 +800,6 @@ begin
   if FActiveWorkTable = nil then
   begin
     //ComboBoxPumps.Text := '';
-    SyncPumpControls;
     Exit;
   end;
 
@@ -823,38 +820,11 @@ begin
     ComboBoxPumps.Text := '';   }
 
 
-  SyncPumpControls;
 end;
 
-procedure TFrameMainTable.SyncPumpControls;
-var
-  Pump: TPump;
-begin
-  Pump := nil;
-  if FWorkTableManager <> nil then
-    Pump := FWorkTableManager.FindPumpByName(Trim(ComboBoxPumps.Text));
 
-  if Pump <> nil then
-  begin
-   // SpinBoxFreq.Value := Pump.Freq;
-    if Pump.IsRunning then
-      SpeedButtonStartPump.Text := '■'
-    else
-      SpeedButtonStartPump.Text := '▶';
-    SpeedButtonStartPump.Hint := Pump.GetStatusAsString;
-  end
-  else
-  begin
-    //SpinBoxFreq.Value := 0;
-    SpeedButtonStartPump.Text := '▶';
-    SpeedButtonStartPump.Hint := '';
-  end;
-end;
 
-procedure TFrameMainTable.ZChange(Sender: TObject);
-begin
-  SyncPumpControls;
-end;
+
 
 procedure TFrameMainTable.SetConfiguration;
 begin
@@ -1287,12 +1257,9 @@ begin
     LayoutPump.tag:=0;
 
     FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
-    //FActiveWorkTable.ActivePump.State:=CONTROL_STARTED;
     UpdateUIPump;
 
   end;
-
-
 end;
 
 
@@ -1302,7 +1269,7 @@ var
 AValue:double;
 begin
 //AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
-AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(SpinBoxFlowRate.Value,4);
+AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
 
 FActiveWorkTable.DoFlowRateSet(AValue);
 
@@ -2999,8 +2966,7 @@ begin
 
 
    WorkTable.FluidTemp.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
-   WorkTable.FluidPress.Value:=  WorkTable.ValuePressure.GetDoubleValue;
-
+   WorkTable.FluidPress.Value:= WorkTable.ValuePressure.GetDoubleValue;
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
 
@@ -4554,7 +4520,7 @@ begin
   if FActiveWorkTable = nil then
     Exit;
 
-  FActiveWorkTable.CreateSessionPoints;
+  FActiveWorkTable.MeasurementRun.CreateSessionPoints;
   UpdateGridMRHeaders;
   UpdateGridMesurmentRun;
 end;
@@ -4641,23 +4607,29 @@ begin
       for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
         begin
           if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
-            Amax:=FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax;
+            Amax:=FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
         end;
 
 
       SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.MinValue);
-      SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum( Amax);
+      SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
             if FActiveWorkTable<>nil then
-        SpinBoxFlowRate.text:=WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value);
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
     end;
 
-
-      if WorkTable.FlowRate.Value = 0 then
-         RectangleLabelFR.Fill.Color := TAlphaColorRec.White
-     ELSE if WorkTable.FlowRate.IsStable THEN
-        RectangleLabelFR.Fill.Color := $ffC9FFC7
-     else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
-        RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
+if WorkTable.FlowRate.IsRunning then
+  begin
+        if WorkTable.FlowRate.Value = 0 then
+           RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+       ELSE if WorkTable.FlowRate.IsStable THEN
+          RectangleLabelFR.Fill.Color := $ffC9FFC7
+       else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
+          RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
+  end
+  else
+  begin
+    RectangleLabelFR.Fill.Color := TAlphaColorRec.White
+  end;
 
 
 
@@ -4722,15 +4694,18 @@ IF WorkTable.FluidPress.IsRunning THEN
       EditTemp.Text :=
       WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
     if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidPress.ValueSet,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
-
       EditPres.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.ValueSet) ;
+      WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet);//,WorkTable.ValuePressure.CurrentDimIndex) ;
 
     LabelTemp.text:=
     WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value);
 
     LabelPressure.text:=
-    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidPress.Value);
+    WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.Value,WorkTable.ValuePressure.CurrentDimIndex);
+
+
+
+   // SpinBoxFlowRate.Max:= FActiveWorkTable.ValuePressure.GetDoubleNum(WorkTable.FluidPress.Value,WorkTable.ValuePressure.CurrentDimIndex);
    // FormatFloat('0.##', (WorkTable.FluidTemp.Temp));
 
     Layout9.tag:=0;
