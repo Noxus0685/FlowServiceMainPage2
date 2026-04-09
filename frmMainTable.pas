@@ -578,7 +578,9 @@ implementation
 
 {$R *.fmx}
 
-uses fuMain;
+uses
+  fuMain,
+  UnitMeasurementRun;
 
 const
   CVolumeFlowUnits: array[0..4] of string = (
@@ -2476,8 +2478,28 @@ begin
 end;
 
 procedure TFrameMainTable.ActionSessionCreatePointsExecute(Sender: TObject);
+var
+  MeasurementRun: TMeasurementRun;
+  SourcePoint: TDevicePoint;
+  SessionPoint: TDevicePoint;
 begin
- //      FActiveWorkTable.MeasurementRun
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.MeasurementRun = nil) then
+    Exit;
+
+  MeasurementRun := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+  MeasurementRun.CreateSessionPoints;
+
+  if (FActiveWorkTable.Points <> nil) and (MeasurementRun.Points <> nil) and
+     (MeasurementRun.Mode = mrmManual) then
+  begin
+    FActiveWorkTable.Points.Clear;
+    for SourcePoint in MeasurementRun.Points do
+    begin
+      SessionPoint := TDevicePoint.Create(0);
+      SessionPoint.Assign(SourcePoint);
+      FActiveWorkTable.Points.Add(SessionPoint);
+    end;
+  end;
 end;
 
 procedure TFrameMainTable.ActionMeterValuesPropertiesExecute(Sender: TObject);
