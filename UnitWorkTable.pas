@@ -688,7 +688,7 @@ implementation
 
 
 uses
-  mxHelper,
+  FmxHelper,
   frmMainTable,
   UnitMeasurementRun;
 {$REGION 'TChannel'}

@@ -22,7 +22,8 @@ uses
   frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
   UnitWorkTable in 'UnitWorkTable.pas',
   UnitRepositories in 'UnitRepositories.pas',
-  UnitMeasurementRun in 'UnitMeasurementRun.pas';
+  UnitMeasurementRun in 'UnitMeasurementRun.pas',
+  FmxHelper in 'FmxHelper.pas';
 
 {$R *.res}
 
