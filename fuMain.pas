@@ -342,9 +342,6 @@ begin
         AWorkTable.FluidPress.SetAfter(AWorkTable.FluidPress.AfterValue-0.3);
       end;
 
-      if AWorkTable.FluidPress.IsStable then
-
-        AWorkTable.DoFluidPressStop;
 
     end;
       if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.ValueSet)  then
@@ -400,7 +397,7 @@ begin
     end
     else
     begin
-      APump.SetParam(15);
+      APump.SetParam(APump.ValueSet);
       APump.SetValue(0)
     end;
 
@@ -491,7 +488,7 @@ begin
     end;
         }
 
-
+    AFlowRate.SetMin(10,4);
     FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
 end;

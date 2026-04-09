@@ -79,6 +79,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 KillFocusByReturn = True
+                OnCanFocus = EditPresCanFocus
                 OnExit = EditPresExit
               end
             end
@@ -166,6 +167,7 @@ object FrameMainTable: TFrameMainTable
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
                   KillFocusByReturn = True
+                  OnCanFocus = EditTempCanFocus
                   OnExit = EditTempExit
                 end
               end
@@ -1502,7 +1504,7 @@ object FrameMainTable: TFrameMainTable
         TabPosition = PlatformDefault
         Sizes = (
           925s
-          456s)
+          435s)
         object TabItemWorkTable1: TTabItem
           CustomIcon = <
             item
@@ -1510,8 +1512,8 @@ object FrameMainTable: TFrameMainTable
           TextSettings.Trimming = None
           IsSelected = True
           Padding.Left = 10.000000000000000000
-          Size.Width = 1.000000000000000000
-          Size.Height = 5.000000000000000000
+          Size.Width = 143.000000000000000000
+          Size.Height = 26.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = ''
           TabOrder = 0
@@ -1669,7 +1671,7 @@ object FrameMainTable: TFrameMainTable
           object PanelDevices1: TPanel
             Align = Client
             Size.Width = 925.000000000000000000
-            Size.Height = 288.000000000000000000
+            Size.Height = 267.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 3
             object GridDevices: TGrid
@@ -1678,7 +1680,7 @@ object FrameMainTable: TFrameMainTable
               ClipChildren = True
               PopupMenu = PopupMenuDevicesGrid
               Size.Width = 925.000000000000000000
-              Size.Height = 256.000000000000000000
+              Size.Height = 235.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
@@ -1689,7 +1691,7 @@ object FrameMainTable: TFrameMainTable
               OnCellClick = GridDevicesCellClick
               OnCellDblClick = GridDevicesCellDblClick
               Viewport.Width = 925.000000000000000000
-              Viewport.Height = 256.000000000000000000
+              Viewport.Height = 235.000000000000000000
               object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
@@ -1940,19 +1942,19 @@ object FrameMainTable: TFrameMainTable
           TabPosition = PlatformDefault
           Sizes = (
             557s
-            456s
+            435s
             557s
-            456s
+            435s
             557s
-            456s)
+            435s)
           object TabItem1: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 105.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -1964,12 +1966,12 @@ object FrameMainTable: TFrameMainTable
               CanFocus = True
               ClipChildren = True
               Size.Width = 557.000000000000000000
-              Size.Height = 424.000000000000000000
+              Size.Height = 403.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               OnGetValue = GridMesurmentRunGetValue
               Viewport.Width = 557.000000000000000000
-              Viewport.Height = 424.000000000000000000
+              Viewport.Height = 403.000000000000000000
               object StringColumn8: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
                 Size.Width = 33.000000000000000000
@@ -2057,8 +2059,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 81.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -2070,11 +2072,11 @@ object FrameMainTable: TFrameMainTable
               CanFocus = True
               ClipChildren = True
               Size.Width = 557.000000000000000000
-              Size.Height = 424.000000000000000000
+              Size.Height = 403.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               Viewport.Width = 557.000000000000000000
-              Viewport.Height = 424.000000000000000000
+              Viewport.Height = 403.000000000000000000
               object StringColumn5: TStringColumn
                 Header = #1055#1088#1080#1073#1086#1088
                 HeaderSettings.TextSettings.WordWrap = False
@@ -2144,8 +2146,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 120.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0

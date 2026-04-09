@@ -3538,6 +3538,8 @@ procedure TParameters.SetMin(const Value: Double; dim: integer);
 var
 WorkTable:TWorkTable ;
 begin
+  if WorkTable=nil then
+    exit;
   if Value > FMax then Exit;
   FDim:=dim;
   FMin := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,Dim);
