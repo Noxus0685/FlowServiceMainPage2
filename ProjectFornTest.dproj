@@ -264,6 +264,7 @@
         </DCCReference>
         <DCCReference Include="UnitWorkTable.pas"/>
         <DCCReference Include="UnitRepositories.pas"/>
+        <DCCReference Include="UnitMeasurementRun.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

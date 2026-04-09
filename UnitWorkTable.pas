@@ -167,6 +167,7 @@ TParameters = class(TObject)
 
   TWorkTable = class;
 
+
   TSpillState = (
     ssNone,
     ssReady,
@@ -337,10 +338,7 @@ TParameters = class(TObject)
   TOnSpillageStartEvent = procedure(ASender: TObject) of object;
   TOnSpillageStopEvent = procedure(ASender: TObject) of object;
   TOnMeasurementStateChangedEvent = procedure(ASender: TObject;
-    AOldState, ANewState: EMeasurementState) of object;
-
-
-
+  AOldState, ANewState: EMeasurementState) of object;
 
   private
     FID: Integer;
@@ -348,14 +346,17 @@ TParameters = class(TObject)
     FText: string;
     FActivePump : TPump;
 
+    FTimeSet : Integer;
+
     FDeviceChannels: TObjectList<TChannel>;
     FEtalonChannels: TObjectList<TChannel>;
 
     FPumps: TObjectList<TPump>;
-
     FPoints: TObjectList<TDevicePoint>;
-
     FFlowRate: TFlowRate;
+
+    FMeasurementRun: TObject;
+
 
     FFluidTemp: TFluidTemp;
     FFluidPress: TFluidPress;
@@ -420,6 +421,7 @@ TParameters = class(TObject)
     function GetTime: Double;
     function GetTimeResult: Double;
     function GetFlowRate: Double;
+
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
     procedure SetValueTempertureDelta(const AValue: TMeterValue);
@@ -444,10 +446,6 @@ TParameters = class(TObject)
     procedure AssignTableFlowAsEtalonToDevices;
 
     procedure SetValues;
-
-
-
-
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
@@ -501,6 +499,8 @@ private
   FOnSpillageStop: TOnSpillageStopEvent;
   FOnMeasurementStateChanged: TOnMeasurementStateChangedEvent;
 
+  procedure MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
+  procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
 
   public
     constructor Create;
@@ -536,6 +536,9 @@ private
   function FindPumpByName(const APumpName: string): TPump;
   property Pumps: TObjectList<TPump> read FPumps;
 
+  property MeasurementRun: TObject read FMeasurementRun;
+
+
   property FluidTemp: TFluidTemp read FFluidTemp;
   property FluidPress: TFluidPress read FFluidPress;
 
@@ -556,6 +559,7 @@ private
 
 
     property Time: Double read GetTime write SetTime;
+    property TimeSet: Integer read FTimeSet write FTimeSet;
     property TimeResult: Double read GetTimeResult write SetTimeResult;
 
     property State: TSpillState read FState write FState;
@@ -627,11 +631,6 @@ private
   property OnMeasurementStateChanged: TOnMeasurementStateChangedEvent
     read FOnMeasurementStateChanged write FOnMeasurementStateChanged;
 
-
-
-
-
-
   //нужно ли оставить одну  DoPumpChange ?
   procedure DoPumpStart(APumpName: string);
   procedure DoPumpStop(APumpName: string);
@@ -655,11 +654,14 @@ private
   procedure DoSpillageStart;
   procedure DoSpillageStop;
   procedure DoMeasurementStateChanged(AOldState, ANewState: EMeasurementState);
+  procedure StartMeasurementRun(AMode: Integer = 1);
+  procedure StopMeasurementRun;
+  procedure PauseMeasurementRun;
+  procedure ResumeMeasurementRun;
+  procedure NextMeasurementPoint;
 
 
   end;
-
-
 
   TWorkTableManager = class
   private
@@ -686,7 +688,10 @@ implementation
 
 
 
-uses frmMainTable;{$REGION 'TChannel'}
+uses
+  frmMainTable,
+  UnitMeasurementRun;
+{$REGION 'TChannel'}
 
 procedure TChannel.InitMeterValues;
 var
@@ -1379,6 +1384,13 @@ begin
   PressDelta := 0.1;
   //FlowRate := 10;
 
+  FMeasurementRun := TMeasurementRun.Create(Self);
+
+  TMeasurementRun(FMeasurementRun).OnStateChangedMain := MeasurementRunStateChanged;
+  TMeasurementRun(FMeasurementRun).OnPointChangedMain := MeasurementRunPointChanged;
+  TMeasurementRun(FMeasurementRun).OnStateChangedFrame := MeasurementRunStateChanged;
+  TMeasurementRun(FMeasurementRun).OnPointChangedFrame := MeasurementRunPointChanged;
+
 
  // InitMeterValues;
 end;
@@ -1940,8 +1952,6 @@ begin
     FHashValueFlowRate := '';
 end;
 
-
-
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
 procedure TWorkTable.UpdateAggregateMeterValues;
 var
@@ -2067,6 +2077,7 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
+  FreeAndNil(FMeasurementRun);
   FreeAndNil(FFluidTemp);
   FreeAndNil(FFluidPress);
   FreeAndNil(FlowRate);
@@ -3074,6 +3085,71 @@ procedure TWorkTable.DoMeasurementStateChanged(AOldState, ANewState: EMeasuremen
 begin
   if Assigned(FOnMeasurementStateChanged) then
     FOnMeasurementStateChanged(Self, AOldState, ANewState);
+end;
+
+procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
+begin
+  State := AState;
+
+  case AState of
+    ssStarting:
+      DoSpillageStart;
+    ssStopping, ssResultReady:
+      DoSpillageStop;
+  end;
+end;
+
+procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
+  APointIndex: Integer);
+begin
+  DoProcNextStep(Format('Point %d', [APointIndex + 1]));
+end;
+
+procedure TWorkTable.StartMeasurementRun(AMode: Integer);
+begin
+  if FMeasurementRun = nil then
+    Exit;
+
+  if AMode = 0 then
+
+    TMeasurementRun(FMeasurementRun).Mode := mrmManual
+  else
+    TMeasurementRun(FMeasurementRun).Mode := mrmAutomatic;
+
+  TMeasurementRun(FMeasurementRun).Start;
+
+end;
+
+procedure TWorkTable.StopMeasurementRun;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).Stop;
+
+end;
+
+procedure TWorkTable.PauseMeasurementRun;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).Pause;
+
+end;
+
+procedure TWorkTable.ResumeMeasurementRun;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).Resume;
+
+end;
+
+procedure TWorkTable.NextMeasurementPoint;
+begin
+  if FMeasurementRun <> nil then
+
+    TMeasurementRun(FMeasurementRun).NextPoint;
+
 end;
 
 function TWorkTable.AddPump(const APumpName: string): TPump;

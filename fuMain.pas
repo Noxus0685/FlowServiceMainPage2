@@ -552,11 +552,19 @@ begin
   if WorkTable = nil then
     Exit;
 
+   if FWorkTableManager.WorkTables.Count=0 then
+   Exit;
+
+   WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
+
+  if WorkTable = nil then
+      Exit;
+
   try
       Pump := WorkTable.ActivePump;
       FlowRate:= WorkTable.FlowRate;
   except
-       Exit;
+      Exit;
   end;
   if Pump <> nil then
      UpdateRandomFreq(Pump);
