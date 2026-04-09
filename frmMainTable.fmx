@@ -2046,6 +2046,7 @@ object FrameMainTable: TFrameMainTable
                 StyleLookup = 'organizetoolbutton'
                 Text = 'SpeedButtonCreatePoints'
                 TextSettings.Trimming = None
+                OnClick = SpeedButtonCreatePointsClick
               end
             end
           end

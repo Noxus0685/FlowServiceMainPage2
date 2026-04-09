@@ -166,7 +166,7 @@ TParameters = class(TObject)
   end;
 
   TWorkTable = class;
-  TMeasurementRun = class;
+
 
   TSpillState = (
     ssNone,
@@ -354,11 +354,9 @@ TParameters = class(TObject)
     FPumps: TObjectList<TPump>;
     FPoints: TObjectList<TDevicePoint>;
     FFlowRate: TFlowRate;
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
     FMeasurementRun: TObject;
-=======
-    FMeasurementRun: TMeasurementRun;
->>>>>>> main
+
 
     FFluidTemp: TFluidTemp;
     FFluidPress: TFluidPress;
@@ -537,11 +535,9 @@ private
   function FindPumpByUUID(const APumpUUID: string): TPump;
 
   property Pumps: TObjectList<TPump> read FPumps;
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
   property MeasurementRun: TObject read FMeasurementRun;
-=======
-  property MeasurementRun: TMeasurementRun read FMeasurementRun;
->>>>>>> main
+
 
   property FluidTemp: TFluidTemp read FFluidTemp;
   property FluidPress: TFluidPress read FFluidPress;
@@ -1388,17 +1384,12 @@ begin
   //FlowRate := 10;
 
   FMeasurementRun := TMeasurementRun.Create(Self);
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
   TMeasurementRun(FMeasurementRun).OnStateChangedMain := MeasurementRunStateChanged;
   TMeasurementRun(FMeasurementRun).OnPointChangedMain := MeasurementRunPointChanged;
   TMeasurementRun(FMeasurementRun).OnStateChangedFrame := MeasurementRunStateChanged;
   TMeasurementRun(FMeasurementRun).OnPointChangedFrame := MeasurementRunPointChanged;
-=======
-  FMeasurementRun.OnStateChangedMain := MeasurementRunStateChanged;
-  FMeasurementRun.OnPointChangedMain := MeasurementRunPointChanged;
-  FMeasurementRun.OnStateChangedFrame := MeasurementRunStateChanged;
-  FMeasurementRun.OnPointChangedFrame := MeasurementRunPointChanged;
->>>>>>> main
+
 
  // InitMeterValues;
 end;
@@ -3114,59 +3105,45 @@ begin
     Exit;
 
   if AMode = 0 then
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
     TMeasurementRun(FMeasurementRun).Mode := mrmManual
   else
     TMeasurementRun(FMeasurementRun).Mode := mrmAutomatic;
 
   TMeasurementRun(FMeasurementRun).Start;
-=======
-    FMeasurementRun.Mode := mrmManual
-  else
-    FMeasurementRun.Mode := mrmAutomatic;
 
-  FMeasurementRun.Start;
->>>>>>> main
 end;
 
 procedure TWorkTable.StopMeasurementRun;
 begin
   if FMeasurementRun <> nil then
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
     TMeasurementRun(FMeasurementRun).Stop;
-=======
-    FMeasurementRun.Stop;
->>>>>>> main
+
 end;
 
 procedure TWorkTable.PauseMeasurementRun;
 begin
   if FMeasurementRun <> nil then
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
     TMeasurementRun(FMeasurementRun).Pause;
-=======
-    FMeasurementRun.Pause;
->>>>>>> main
+
 end;
 
 procedure TWorkTable.ResumeMeasurementRun;
 begin
   if FMeasurementRun <> nil then
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
     TMeasurementRun(FMeasurementRun).Resume;
-=======
-    FMeasurementRun.Resume;
->>>>>>> main
+
 end;
 
 procedure TWorkTable.NextMeasurementPoint;
 begin
   if FMeasurementRun <> nil then
-<<<<<<< codex/implement-tmeasurementrun-class-in-unitmeasurementrun-x51cr6
+
     TMeasurementRun(FMeasurementRun).NextPoint;
-=======
-    FMeasurementRun.NextPoint;
->>>>>>> main
+
 end;
 
 function TWorkTable.AddPump(const APumpName: string): TPump;

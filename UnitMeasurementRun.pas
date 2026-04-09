@@ -231,6 +231,7 @@ begin
     Exit;
 
   FWorkTable.CreateSessionPoints;
+
   for SourcePoint in FWorkTable.Points do
   begin
     ManualPoint := TDevicePoint.Create(0);

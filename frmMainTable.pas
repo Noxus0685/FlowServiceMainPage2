@@ -4554,7 +4554,7 @@ begin
   if FActiveWorkTable = nil then
     Exit;
 
-  FActiveWorkTable.CreateSessionPoints;
+  FActiveWorkTable.MeasurementRun.CreateSessionPoints;
   UpdateGridMRHeaders;
   UpdateGridMesurmentRun;
 end;
