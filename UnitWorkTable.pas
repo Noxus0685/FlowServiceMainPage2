@@ -2899,13 +2899,13 @@ begin
   Pump:=FindPumpByName(APumpName);
   if Pump = nil then
     Exit;
+    if not( Pump.IsRunning)  then
+   begin
+      Pump.Start;
 
-  if Pump.Action = CONTROL_ACTION_START then
-    Exit;
-  Pump.Start;
-
-  if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump, CONTROL_ACTION_START);
+      if Assigned(FOnPumpChange) then
+        FOnPumpChange(Pump, CONTROL_ACTION_START);
+   end;
 end;
 
 procedure TWorkTable.DoFlowRateStart;
@@ -2915,13 +2915,14 @@ begin
   if FlowRate=nil then
   Exit;
 
-  IF FlowRate.FAction = CONTROL_ACTION_START then
-    exit;
+   if not( FlowRate.IsRunning)  then
+   begin
 
-  FlowRate.Start;
+    FlowRate.Start;
 
-  if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, CONTROL_ACTION_START);
+    if Assigned(FOnFlowRateChange) then
+      FOnFlowRateChange(FlowRate, CONTROL_ACTION_START);
+   end;
 end;
 
 procedure TWorkTable.DoFluidTempStart(ATempSet: Double);
@@ -2986,16 +2987,21 @@ end;
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
-  Pump:=FindPumpByName(APumpName);
-  if Pump = nil then
-    Exit;
 
-  if Pump.FAction = CONTROL_ACTION_STOP then
-    Exit;
-  Pump.Stop;
+    Pump:=FindPumpByName(APumpName);
+    if Pump = nil then
+      Exit;
+   if Pump.IsRunning  then
+   begin
+   // if Pump.FAction = CONTROL_ACTION_STOP then
+    //  Exit;
 
-  if Assigned(FOnPumpChange) then
-    FOnPumpChange(Pump,CONTROL_ACTION_STOP);
+
+    Pump.Stop;
+
+    if Assigned(FOnPumpChange) then
+      FOnPumpChange(Pump,CONTROL_ACTION_STOP);
+   end;
 end;
 
 procedure TWorkTable.DoFlowRateStop;
@@ -3005,13 +3011,14 @@ begin
   if FlowRate=nil then
   Exit;
 
-  IF FlowRate.FAction = CONTROL_ACTION_STOP then
-    exit;
+   if FlowRate.IsRunning  then
+   begin
 
-  FlowRate.Stop;
+    FlowRate.Stop;
 
-  if Assigned(FOnFlowRateChange) then
-    FOnFlowRateChange(FlowRate, CONTROL_ACTION_STOP);
+    if Assigned(FOnFlowRateChange) then
+      FOnFlowRateChange(FlowRate, CONTROL_ACTION_STOP);
+   end;
 end;
 
 
@@ -3359,6 +3366,9 @@ end;
 
 procedure TFluidTemp.SetParam(ASet: Double);
 begin
+
+  if  SameValue(FSet ,ASet, MinDouble) then
+    Exit; // Частота не изменилась
     if Aset < FMin then
     Fset := FMin
   else if Aset > FMax then
@@ -3398,7 +3408,8 @@ end;
 
 procedure TFluidPress.SetParam(ASet: Double);
 begin
-
+  if  SameValue(FSet ,ASet, MinDouble) then
+    Exit; // Частота не изменилась
     if ASet < FMin then
     FSet := FMin
   else if ASet > FMax then
@@ -3450,6 +3461,8 @@ end;
 
 procedure TFlowRate.SetParam(ANewValue: Double);
 begin
+  if  SameValue(FSet ,ANewValue, MinDouble) then
+    Exit; // Частота не изменилась
   if ANewValue < FMin then
     FSet := FMin
   else if ANewValue > FMax then
@@ -3486,7 +3499,7 @@ end;
 procedure TPump.SetParam(ANewFreq: Double);
 begin
 
-      if Abs(FValue - ANewFreq) < 0.001 then
+  if  SameValue(FSet ,ANewFreq, MinDouble) then
         Exit; // Частота не изменилась
 
       if ANewFreq<FMin then

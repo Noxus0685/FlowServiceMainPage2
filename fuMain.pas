@@ -477,7 +477,6 @@ begin
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
     Flow := (Random * 10);
-    FWorkTableManager.ActiveWorkTable.SetFlowRateMin(499,4);
     //AFlowRate.SetMin(10,4);
     FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
