@@ -68,11 +68,11 @@ type
     Label41: TLabel;
     EditError: TEdit;
     grpTypeOfCheck: TGroupBox;
-    Layout12: TLayout;
-    Label4: TLabel;
+    LayoutOutPutType: TLayout;
+    LabelOutputType: TLabel;
     ComboBoxOutputType: TComboBox;
-    Layout14: TLayout;
-    Label7: TLabel;
+    LayoutMeasuredDimension: TLayout;
+    LabelMeasuredDimension: TLabel;
     cbMeasuredDimension: TComboBox;
     tcOutPutType: TTabControl;
     tiVoltage: TTabItem;
@@ -226,6 +226,9 @@ type
     Label49: TLabel;
     StringColumnHash: TStringColumn;
     ShadowEffect1: TShadowEffect;
+    LayoutUnits: TLayout;
+    LabelUnits: TLabel;
+    ComboBoxUnits: TComboBox;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;

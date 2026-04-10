@@ -62,11 +62,11 @@ type
     Label39: TLabel;
     cbProcedure: TComboEdit;
     grpTypeOfCheck: TGroupBox;
-    Layout12: TLayout;
-    Label4: TLabel;
+    LayoutOutputType: TLayout;
+    LabelOutputType: TLabel;
     ComboBoxOutputType: TComboBox;
-    Layout14: TLayout;
-    Label7: TLabel;
+    LayoutMeasuredDimension: TLayout;
+    LabelMeasuredDimension: TLabel;
     cbMeasuredDimension: TComboBox;
     tcOutPutType: TTabControl;
     tiVoltage: TTabItem;
@@ -225,6 +225,9 @@ type
     TabControlMain: TTabControl;
     TabItemDevice: TTabItem;
     TabItemCoefs: TTabItem;
+    LayoutUnits: TLayout;
+    LabelUnits: TLabel;
+    ComboBoxUnits: TComboBox;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
