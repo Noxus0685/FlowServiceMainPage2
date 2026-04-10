@@ -79,6 +79,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 KillFocusByReturn = True
+                OnCanFocus = EditPresCanFocus
                 OnExit = EditPresExit
               end
             end
@@ -166,6 +167,7 @@ object FrameMainTable: TFrameMainTable
                   Size.Height = 23.000000000000000000
                   Size.PlatformDefault = False
                   KillFocusByReturn = True
+                  OnCanFocus = EditTempCanFocus
                   OnExit = EditTempExit
                 end
               end

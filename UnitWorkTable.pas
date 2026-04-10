@@ -88,10 +88,8 @@ TParameters = class(TObject)
     function  GetValue: Double;
     procedure Stop;
     procedure Start;
-    procedure SetMin(const Value: Double ); overload ;
-    procedure SetMax(const Value: Double);  overload;
-    procedure SetMin(const Value: Double; dim :integer ); overload;
-    procedure SetMax(const Value: Double; dim :integer);  overload;
+    procedure SetMin(const Value: Double );
+    procedure SetMax(const Value: Double);
     procedure SetStatus(AStatus: EControlStatus);
     property Name: string read FName write FName;
     property Hint: string read FHint write FHint;
@@ -502,6 +500,7 @@ private
   procedure MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
 
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -607,7 +606,8 @@ private
     procedure InitMeterValues;
     procedure SetTemperature(ATempBefore, ATempAfter: Double);
     procedure SetPressure(APressBefore, APressAfter: Double);
-
+    procedure SetFlowRateMin( const AValue: Double;Dim: integer);
+    procedure SetFlowRateMax( const AValue: Double;Dim: integer);
 
   public
   property OnFlowRateSet: TOnFlowRateSetEvent read FOnFlowRateSet write FOnFlowRateSet;
@@ -2189,6 +2189,22 @@ begin
 
 end;
 
+procedure TWorkTable.SetFlowRateMin( const AValue: Double;Dim: integer);
+begin
+  if AValue > FlowRate.FMax then Exit;
+  FlowRate.FMax  := ValueFlowRate.GetDoubleNum(AValue,Dim);
+end;
+
+
+procedure TWorkTable.SetFlowRateMax( const AValue: Double;Dim: integer);
+
+begin
+
+  if AValue < FlowRate.FMin then Exit;
+  FlowRate.FMin := ValueFlowRate.GetDoubleNum(AValue,Dim);
+end;
+
+
 { Adds a new device channel with default identifiers and bindings. }
 function TWorkTable.AddDeviceChannel: TChannel;
 var
@@ -3533,24 +3549,6 @@ begin
   FMax := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,FDim);
 end;
 
-
-procedure TParameters.SetMin(const Value: Double; dim: integer);
-var
-WorkTable:TWorkTable ;
-begin
-  if Value > FMax then Exit;
-  FDim:=dim;
-  FMin := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,Dim);
-end;
-
-procedure TParameters.SetMax(const Value: Double; dim: integer);
-var
-WorkTable:TWorkTable ;
-begin
-  if Value < FMin then Exit;
-  FDim:=dim;
-  FMax := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,Dim);
-end;
 
 
 procedure TParameters.SetStatus(AStatus: EControlStatus);

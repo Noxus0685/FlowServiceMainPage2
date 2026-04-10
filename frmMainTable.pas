@@ -454,6 +454,8 @@ type
       ARow: Integer; var Value: TValue);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure EditTimeExit(Sender: TObject);
+    procedure EditPresCanFocus(Sender: TObject; var ACanFocus: Boolean);
+    procedure EditTempCanFocus(Sender: TObject; var ACanFocus: Boolean);
     procedure ActionSessionCreatePointsExecute(Sender: TObject);
 
   private
@@ -3254,20 +3256,26 @@ begin
   // и выводятся непосредственно в UpdateUI.
 end;
 
+procedure TFrameMainTable.EditTempCanFocus(Sender: TObject;
+  var ACanFocus: Boolean);
+begin
+LayoutConditions.tag:=3;
+end;
+
 procedure TFrameMainTable.EditTempExit(Sender: TObject);
 var
-  Value: Double;
+  Value,AValue: Double;
   TempBeforeValue: Double;
   TempAfterValue: Double;
 begin
-   Layout9.tag := 0;
+  LayoutConditions.tag := 0;
   if FActiveWorkTable = nil then
     Exit;
 
   if TryStrToFloat(EditTemp.Text, Value) then
   begin
-
-    FActiveWorkTable.DoFluidTempStart(NormalizeFloatInput(EditTemp.Text));
+    AValue:= FActiveWorkTable.ValueTemperture.GetDoubleBaseNum(NormalizeFloatInput(EditTemp.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
+    FActiveWorkTable.DoFluidTempStart(AValue);
     UpdateUIConditions;
 
   end;
@@ -3280,16 +3288,24 @@ begin
        FActiveWorkTable.TimeSet:= StrToInt(EditTime.Text);
 end;
 
+procedure TFrameMainTable.EditPresCanFocus(Sender: TObject;
+  var ACanFocus: Boolean);
+begin
+LayoutConditions.tag:=3;
+end;
+
 procedure TFrameMainTable.EditPresExit(Sender: TObject);
 var
   Value: Double;
+  AValue:double;
 begin
   if FActiveWorkTable = nil then
     Exit;
-      Layout9.tag := 0;
+    LayoutConditions.tag:=0;
   if TryStrToFloat(EditPres.Text, Value) then
   begin
-    FActiveWorkTable.DoFluidPressStart(NormalizeFloatInput(EditPres.Text));
+    AValue:= FActiveWorkTable.ValuePressure.GetDoubleBaseNum(NormalizeFloatInput(EditPres.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
+    FActiveWorkTable.DoFluidPressStart(AValue);
     UpdateUIConditions;
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
@@ -4670,6 +4686,7 @@ procedure TFrameMainTable.UpdateUIConditions;
 var
   WorkTable: TWorkTable;
   i:integer;
+  ATempSet,APressSet: string;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4694,7 +4711,7 @@ IF WorkTable.FluidTemp.IsRunning THEN
   begin
      if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
       Rectangle7.Fill.Color := TAlphaColorRec.White
-     else IF not(WorkTable.FluidPress.IsStable) then
+     else IF not(WorkTable.FluidTemp.IsStable) then
       Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
   end;
 
@@ -4718,26 +4735,27 @@ IF WorkTable.FluidPress.IsRunning THEN
   end;
 
 
+    APressset:= WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet);
+    ATempset:= WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet);
 
-    if SameValue(NormalizeFloatInput(EditTemp.Text),WorkTable.FluidTemp.ValueSet,MinDouble) or (NormalizeFloatInput(EditTemp.Text) = 0)  then
-      EditTemp.Text :=
-      WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
-    if SameValue(NormalizeFloatInput(EditPres.Text),WorkTable.FluidPress.ValueSet,MinDouble) or (NormalizeFloatInput(EditPres.Text) = 0)  then
-      EditPres.Text :=
-      WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet);//,WorkTable.ValuePressure.CurrentDimIndex) ;
+    if LayoutConditions.tag<>3 then
+    begin
+      if  SameValue(NormalizeFloatInput(EditTemp.Text) , NormalizeFloatInput(ATempset ), MinDouble)
+      or (NormalizeFloatInput(EditTemp.Text) = 0) or (EditTemp.Text <> ATempset) then
+      EditTemp.Text := WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
+
+
+      if  SameValue(NormalizeFloatInput(EditPres.Text) , NormalizeFloatInput(APressSet ), MinDouble)
+      or (NormalizeFloatInput(EditPres.Text) = 0) or (EditPres.Text <> APressSet)  then
+        EditPres.Text := WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet);
+    end;
 
     LabelTemp.text:=
-    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value);
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value,WorkTable.ValueTemperture.CurrentDimIndex);
 
     LabelPressure.text:=
     WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.Value,WorkTable.ValuePressure.CurrentDimIndex);
 
-
-
-   // SpinBoxFlowRate.Max:= FActiveWorkTable.ValuePressure.GetDoubleNum(WorkTable.FluidPress.Value,WorkTable.ValuePressure.CurrentDimIndex);
-   // FormatFloat('0.##', (WorkTable.FluidTemp.Temp));
-
-    Layout9.tag:=0;
 
 
 
