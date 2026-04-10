@@ -324,15 +324,14 @@ type
     PopupColumnDeviceDN1: TPopupColumn;
 
     SpeedButton6: TSpeedButton;
-    Layout1: TLayout;
+    LayoutProperties: TLayout;
     Splitter2: TSplitter;
-    Panel1: TPanel;
-    TabControl1: TTabControl;
-    TabItem1: TTabItem;
+    PanelProperties: TPanel;
+    TabControlProperties: TTabControl;
+    TabItemMeasurmentRun: TTabItem;
     TabItem2: TTabItem;
     TabItem3: TTabItem;
-    GridMesurmentRun: TGrid;
-    StringColumnMRPointName: TStringColumn;
+    GridMeasurmentRun: TGrid;
     StringColumnMRFlowRate: TStringColumn;
     StringColumnMRStopCriterea: TStringColumn;
     ToolBar2: TToolBar;
@@ -350,10 +349,12 @@ type
     StringColumn5: TStringColumn;
     StringColumn6: TStringColumn;
     StringColumn7: TStringColumn;
-    StringColumn8: TStringColumn;
     StringColumn9: TStringColumn;
     StringColumnDeviceCoef1: TStringColumn;
     SpeedButtonCreatePoints: TSpeedButton;
+    StringColumnMRPointName: TStringColumn;
+    StringColumn1: TStringColumn;
+    ActionSessionCreatePoints: TAction;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -449,12 +450,13 @@ type
       const Row: Integer);
     procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
       var CanSelect: Boolean);
-    procedure GridMesurmentRunGetValue(Sender: TObject; const ACol,
+    procedure GridMeasurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure EditTimeExit(Sender: TObject);
     procedure EditPresCanFocus(Sender: TObject; var ACanFocus: Boolean);
     procedure EditTempCanFocus(Sender: TObject; var ACanFocus: Boolean);
+    procedure ActionSessionCreatePointsExecute(Sender: TObject);
 
   private
 
@@ -578,7 +580,9 @@ implementation
 
 {$R *.fmx}
 
-uses fuMain;
+uses
+  fuMain,
+  UnitMeasurementRun;
 
 const
   CVolumeFlowUnits: array[0..4] of string = (
@@ -2475,6 +2479,31 @@ begin
   FWorkTableManager.Save;
 end;
 
+procedure TFrameMainTable.ActionSessionCreatePointsExecute(Sender: TObject);
+var
+  MeasurementRun: TMeasurementRun;
+  SourcePoint: TDevicePoint;
+  SessionPoint: TDevicePoint;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.MeasurementRun = nil) then
+    Exit;
+
+  MeasurementRun := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+  MeasurementRun.CreateSessionPoints;
+
+  if (FActiveWorkTable.Points <> nil) and (MeasurementRun.Points <> nil) and
+     (MeasurementRun.Mode = mrmManual) then
+  begin
+    FActiveWorkTable.Points.Clear;
+    for SourcePoint in MeasurementRun.Points do
+    begin
+      SessionPoint := TDevicePoint.Create(0);
+      SessionPoint.Assign(SourcePoint);
+      FActiveWorkTable.Points.Add(SessionPoint);
+    end;
+  end;
+end;
+
 procedure TFrameMainTable.ActionMeterValuesPropertiesExecute(Sender: TObject);
 var
   Frm: TFormMeterValues;
@@ -4261,12 +4290,12 @@ begin
   else
     Rows := 0;
 
-  GridMesurmentRun.BeginUpdate;
+  GridMeasurmentRun.BeginUpdate;
   try
-    GridMesurmentRun.RowCount := 0;
-    GridMesurmentRun.RowCount := Rows;
+    GridMeasurmentRun.RowCount := 0;
+    GridMeasurmentRun.RowCount := Rows;
   finally
-    GridMesurmentRun.EndUpdate;
+    GridMeasurmentRun.EndUpdate;
   end;
 end;
 
@@ -4478,7 +4507,7 @@ end;
 
 
 
-procedure TFrameMainTable.GridMesurmentRunGetValue(Sender: TObject; const ACol,
+procedure TFrameMainTable.GridMeasurmentRunGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   Point: TDevicePoint;
@@ -4516,18 +4545,18 @@ begin
   if Point = nil then
     Exit;
 
-  if GridMesurmentRun.Columns[ACol] = StringColumnMRPointName then
+  if GridMeasurmentRun.Columns[ACol] = StringColumnMRPointName then
     Value := Point.Name
-  else if GridMesurmentRun.Columns[ACol] = StringColumnMRFlowRate then
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnMRFlowRate then
   begin
     if (FActiveWorkTable.ValueFlowRate <> nil) then
       Value := FActiveWorkTable.ValueFlowRate.GetStrNum(Point.Q)
     else
       Value := FormatFloat('0.###', Point.Q);
   end
-  else if GridMesurmentRun.Columns[ACol] = StringColumnMRStopCriterea then
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStopCriterea then
     Value := GetStopCriteriaText(Point)
-  else if GridMesurmentRun.Columns[ACol] = StringColumnMRStatus then
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStatus then
     Value := Point.GetStatus;
 end;
 
@@ -4536,7 +4565,7 @@ begin
   if FActiveWorkTable = nil then
     Exit;
 
-  //FActiveWorkTable.MeasurementRun.CreateSessionPoints;
+  ActionSessionCreatePointsExecute(Self);
   UpdateGridMRHeaders;
   UpdateGridMesurmentRun;
 end;

@@ -147,6 +147,7 @@ begin
   EnsureColumn('DeviceType', 'SerialNumTemplate', 'TEXT');
 
   EnsureColumn('DeviceType', 'MeasuredDimension', 'INTEGER');
+  EnsureColumn('DeviceType', 'Units', 'INTEGER');
   EnsureColumn('DeviceType', 'OutputType', 'INTEGER');
   EnsureColumn('DeviceType', 'DimensionCoef', 'INTEGER');
 

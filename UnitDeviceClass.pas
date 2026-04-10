@@ -6,7 +6,7 @@ interface
      UnitClasses,
     System.Generics.Defaults, System.DateUtils,     System.Math,
     System.Generics.Collections,    System.StrUtils,    UnitBaseProcedures,
-  System.SysUtils;
+  System.SysUtils, UnitMeterValue;
 
 
 
@@ -339,6 +339,7 @@ type
       FPoints     : TObjectList<TDevicePoint>;
       FCalibrCoefTable: TObjectList<TCalibrCoefTable>;
       FDeviceType : TDeviceType;
+      FDimensions: TList<TDimension>;
       function GetStopCriteria: TSpillageStopCriteria;
       procedure SetStopCriteria(const Value: TSpillageStopCriteria);
       function NormalizeActiveSessionSpillage: TSessionSpillage;
@@ -409,6 +410,7 @@ type
     { ИЗМЕРЕНИЯ И СИГНАЛЫ (ОБЩЕЕ) }
     {====================================================================}
     MeasuredDimension: Integer; // Измеряемая величина
+    Units: Integer;             // Единицы измерения
     OutputType: Integer;        // Тип выходного сигнала
     DimensionCoef: Integer;     // Представление коэффициента
 
@@ -490,6 +492,10 @@ type
 
     function  AnalyseDataPoint(const ASpillage: TPointSpillage): Boolean;
     procedure FillDataPointsList(APoint: TDevicePoint);
+    procedure SetDimensions;
+    function GetDimensionName: string;
+    function ToBaseUnits(const AValue: Double): Double;
+    function FromBaseUnits(const AValue: Double): Double;
     procedure AnalyseDevicePointsResults;
     procedure AnalyseResults;
 
@@ -497,6 +503,7 @@ type
     property  Spillages  : TObjectList<TPointSpillage> read FSpillages write FSpillages;
     property  Sessions   : TObjectList<TSessionSpillage> read FSessions write FSessions;
     property  Points     : TObjectList<TDevicePoint> read  FPoints write  FPoints;
+    property  Dimensions : TList<TDimension> read FDimensions;
     property  CalibrCoefTables: TObjectList<TCalibrCoefTable> read FCalibrCoefTable write FCalibrCoefTable;
     property  CalibrCoefTable: TCalibrCoefTable read GetCalibrCoefTable write SetCalibrCoefTable;
     property  StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
@@ -536,6 +543,7 @@ begin
   FSessions.Free;
   FSpillages.Free;
   FPoints.Free;
+  FDimensions.Free;
   FCalibrCoefTable.Free;
   inherited;
 end;
@@ -550,6 +558,7 @@ begin
   FSessions  := TObjectList<TSessionSpillage>.Create(True);
   FSpillages := TObjectList<TPointSpillage>.Create(True);
   FPoints    := TObjectList<TDevicePoint>.Create(True);
+  FDimensions := TList<TDimension>.Create;
   FCalibrCoefTable := TObjectList<TCalibrCoefTable>.Create(True);
 
   {----------------------------------}
@@ -607,6 +616,7 @@ begin
   { Измерения и сигналы }
   {----------------------------------}
   MeasuredDimension := 0;           // по enum
+  Units := 0;
   OutputType := 0;
   DimensionCoef := 1;
 
@@ -662,6 +672,7 @@ begin
   Comment := '';
   Description := '';
   ReportingForm := '';
+  SetDimensions;
 end;
 
 function TDevice.GetStopCriteria: TSpillageStopCriteria;
@@ -672,6 +683,120 @@ end;
 procedure TDevice.SetStopCriteria(const Value: TSpillageStopCriteria);
 begin
   SpillageStop := CriteriaToInt(Value);
+end;
+
+procedure TDevice.SetDimensions;
+  procedure AddDimension(const AName: string; ARate, ADevider: Double; ARecip: Boolean);
+  var
+    Dim: TDimension;
+  begin
+    Dim.Name := AName;
+    Dim.Hash := '';
+    Dim.Rate := ARate;
+    Dim.Devider := ADevider;
+    Dim.Factor := False;
+    Dim.Recip := ARecip;
+    FDimensions.Add(Dim);
+  end;
+begin
+  if FDimensions = nil then
+    Exit;
+
+  FDimensions.Clear;
+  case TMeasuredDimension(MeasuredDimension) of
+    mdVolumeFlow:
+      begin
+        AddDimension('л/с', 1, 1, False);
+        AddDimension('л/мин', 60, 1, False);
+        AddDimension('л/ч', 3600, 1, False);
+        AddDimension('м3/мин', 60, 1000, False);
+        AddDimension('м3/ч', 3600, 1000, False);
+      end;
+    mdMassFlow:
+      begin
+        AddDimension('кг/с', 1, 1, False);
+        AddDimension('кг/мин', 60, 1, False);
+        AddDimension('кг/ч', 3600, 1, False);
+        AddDimension('т/мин', 60, 1000, False);
+        AddDimension('т/ч', 3600, 1000, False);
+      end;
+    mdVolume:
+      begin
+        AddDimension('л', 1, 1, False);
+        AddDimension('м3', 1, 1000, False);
+      end;
+    mdMass:
+      begin
+        AddDimension('кг', 1, 1, False);
+        AddDimension('т', 1, 1000, False);
+      end;
+    mdSpeed:
+      begin
+        AddDimension('м/с', 1, 1, False);
+        AddDimension('км/ч', 3.6, 1, False);
+      end;
+    mdHeat:
+      begin
+        AddDimension('Гкал', 1, 1, False);
+        AddDimension('МДж', 4.1868, 1, False);
+      end;
+  end;
+
+  if FDimensions.Count = 0 then
+    Units := 0
+  else if (Units < 0) or (Units >= FDimensions.Count) then
+    Units := 0;
+end;
+
+function TDevice.GetDimensionName: string;
+begin
+  if (FDimensions = nil) or (FDimensions.Count = 0) then
+    Exit('-');
+  if (Units < 0) or (Units >= FDimensions.Count) then
+    Exit(FDimensions[0].Name);
+  Result := FDimensions[Units].Name;
+end;
+
+function TDevice.ToBaseUnits(const AValue: Double): Double;
+var
+  Dim: TDimension;
+begin
+  if (FDimensions = nil) or (FDimensions.Count = 0) then
+    Exit(AValue);
+  if (Units < 0) or (Units >= FDimensions.Count) then
+    Dim := FDimensions[0]
+  else
+    Dim := FDimensions[Units];
+
+  if Dim.Recip then
+  begin
+    if AValue = 0 then
+      Exit(0);
+    Result := (1 / AValue) * Dim.Devider / Dim.Rate;
+  end
+  else
+    Result := AValue * Dim.Devider / Dim.Rate;
+end;
+
+function TDevice.FromBaseUnits(const AValue: Double): Double;
+var
+  Dim: TDimension;
+begin
+  if (FDimensions = nil) or (FDimensions.Count = 0) then
+    Exit(AValue);
+  if (Units < 0) or (Units >= FDimensions.Count) then
+    Dim := FDimensions[0]
+  else
+    Dim := FDimensions[Units];
+
+  if Dim.Recip then
+  begin
+    if AValue = 0 then
+      Exit(0);
+    Result := 1 / (AValue * Dim.Rate / Dim.Devider);
+  end
+  else
+    Result := AValue * Dim.Rate / Dim.Devider;
 end;
 
 procedure TDevice.SetState(const Value: TObjectState);
@@ -1031,6 +1156,8 @@ begin
   ProcedureName := ASource.ProcedureName;
 
   MeasuredDimension := ASource.MeasuredDimension;
+  Units := ASource.Units;
+  SetDimensions;
   OutputType := ASource.OutputType;
   DimensionCoef := ASource.DimensionCoef;
 
@@ -1211,6 +1338,7 @@ begin
     Add(ProcedureName);
 
     Add(IntToStr(MeasuredDimension));
+    Add(IntToStr(Units));
     Add(IntToStr(OutputType));
     Add(IntToStr(DimensionCoef));
 
@@ -2284,6 +2412,8 @@ begin
   { 2. Измерения }
   {====================================================}
   MeasuredDimension := AType.MeasuredDimension;
+  Units             := AType.Units;
+  SetDimensions;
   OutputType        := AType.OutputType;
   OutputSet         := AType.OutputSet;
   DimensionCoef     := AType.DimensionCoef;

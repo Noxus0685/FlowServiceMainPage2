@@ -68,11 +68,11 @@ type
     Label41: TLabel;
     EditError: TEdit;
     grpTypeOfCheck: TGroupBox;
-    Layout12: TLayout;
-    Label4: TLabel;
+    LayoutOutPutType: TLayout;
+    LabelOutputType: TLabel;
     ComboBoxOutputType: TComboBox;
-    Layout14: TLayout;
-    Label7: TLabel;
+    LayoutMeasuredDimension: TLayout;
+    LabelMeasuredDimension: TLabel;
     cbMeasuredDimension: TComboBox;
     tcOutPutType: TTabControl;
     tiVoltage: TTabItem;
@@ -226,6 +226,9 @@ type
     Label49: TLabel;
     StringColumnHash: TStringColumn;
     ShadowEffect1: TShadowEffect;
+    LayoutUnits: TLayout;
+    LabelUnits: TLabel;
+    ComboBoxUnits: TComboBox;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -244,6 +247,8 @@ type
     procedure EditErrorExit(Sender: TObject);
     procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
+    procedure EditQmaxExit(Sender: TObject);
+    procedure EditQminExit(Sender: TObject);
     procedure ComboBoxOutputTypeChange(Sender: TObject);
     procedure cbVoltageRangeChange(Sender: TObject);
     procedure EditVoltageQmaxExit(Sender: TObject);
@@ -372,6 +377,7 @@ begin
     end;
 
     Dim := TMeasuredDimension(FDevice.MeasuredDimension);
+    FDevice.SetDimensions;
     cbMeasuredDimension.Hint := cbMeasuredDimension.Text;
 
     // ==================================================
@@ -426,6 +432,7 @@ begin
     // ==================================================
     // ОБНОВЛЕНИЕ ТАБЛИЦ
     // ==================================================
+    UpdateQmaxQmin;
     UpdatePointsGrid;
 
   finally
@@ -435,9 +442,12 @@ end;
 
 procedure TFormDeviceEditor.ApplyVolumeMode;
 begin
+  FDevice.SetDimensions;
   // ===== Поверочные точки =====
-  StringColumnPointQ.Header      := 'Q, м³/ч';
+  StringColumnPointQ.Header      := 'Q, ' + FDevice.GetDimensionName;
   StringColumnPointVolume.Header := 'V, л';
+  Label47.Text := 'Макс расход, ' + FDevice.GetDimensionName;
+  Label49.Text := 'Мин расход, ' + FDevice.GetDimensionName;
 
   // ===== Критерий остановки =====
   FillSpillageStopVolume;
@@ -663,9 +673,12 @@ end;
 
 procedure TFormDeviceEditor.ApplyMassMode;
 begin
+  FDevice.SetDimensions;
   // ===== Поверочные точки =====
-  StringColumnPointQ.Header      := 'Q, т/ч';
+  StringColumnPointQ.Header      := 'Q, ' + FDevice.GetDimensionName;
   StringColumnPointVolume.Header := 'M, кг';
+  Label47.Text := 'Макс расход, ' + FDevice.GetDimensionName;
+  Label49.Text := 'Мин расход, ' + FDevice.GetDimensionName;
 
   // ===== Критерий остановки =====
   FillSpillageStopMass;
@@ -1405,7 +1418,7 @@ EditQmax.Text := '';
 EditQmax.TextPrompt := '';
 
 if FDevice.Qmax > 0 then
-  EditQmax.Text :=  FormatByBaseError(FDevice.Qmax, FDevice.Error)
+  EditQmax.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qmax), FDevice.Error)
 else
   EditQmax.TextPrompt := '—';
 
@@ -1416,9 +1429,38 @@ EditQmin.Text := '';
 EditQmin.TextPrompt := '';
 
 if FDevice.Qmin > 0 then
-  EditQmin.Text :=  FormatByBaseError(FDevice.Qmin, FDevice.Error)
+  EditQmin.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qmin), FDevice.Error)
 else
   EditQmin.TextPrompt := '—';
+end;
+
+procedure TFormDeviceEditor.EditQmaxExit(Sender: TObject);
+var
+  NewValue: Double;
+begin
+  if (FDevice = nil) or FLoading then
+    Exit;
+  NewValue := FDevice.ToBaseUnits(NormalizeFloatInput(EditQmax.Text));
+  if SameValue(NewValue, FDevice.Qmax) then
+    Exit;
+  FDevice.Qmax := NewValue;
+  SetModified;
+  UpdateQmaxQmin;
+  UpdatePointsGrid;
+end;
+
+procedure TFormDeviceEditor.EditQminExit(Sender: TObject);
+var
+  NewValue: Double;
+begin
+  if (FDevice = nil) or FLoading then
+    Exit;
+  NewValue := FDevice.ToBaseUnits(NormalizeFloatInput(EditQmin.Text));
+  if SameValue(NewValue, FDevice.Qmin) then
+    Exit;
+  FDevice.Qmin := NewValue;
+  SetModified;
+  UpdateQmaxQmin;
 end;
 
 procedure  TFormDeviceEditor.UpdateComboEditDN;
@@ -1807,6 +1849,8 @@ begin
 
   { сохраняем в модель }
   FDevice.MeasuredDimension := V;
+  FDevice.Units := 0;
+  FDevice.SetDimensions;
 
   { применяем логику для выбранной величины }
   ApplyMeasuredDimension;
@@ -2780,7 +2824,7 @@ begin
       if Q <= 0 then
         Value := '—'
       else
-        Value := FormatByBaseError(Q, P.Error);
+        Value := FormatByBaseError(FDevice.FromBaseUnits(Q), P.Error);
     end
 
     {---------------------------}
@@ -2857,7 +2901,7 @@ begin
 
     else if ACol = StringColumnPointQ.Index then
     begin
-      Q := NormalizeFloatInput(S);
+      Q := FDevice.ToBaseUnits(NormalizeFloatInput(S));
       if Qmax > 0 then
         P.FlowRate := Q / Qmax;
     end
