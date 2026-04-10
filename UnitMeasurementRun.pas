@@ -22,7 +22,7 @@ uses
   System.IniFiles;
 
 type
-  EMeasurementRunMode = (mrmManual, mrmAutomatic);
+
 
   TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: TSpillState) of object;
   TMeasurementRunPointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
@@ -349,10 +349,10 @@ begin
   if FWorkTable.FlowRate <> nil then
     Result := Result and FWorkTable.FlowRate.IsStable;
 
-  if FWorkTable.FluidTemp <> nil then
+  if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp<>0) then
     Result := Result and FWorkTable.FluidTemp.IsStable;
 
-  if FWorkTable.FluidPress <> nil then
+  if (FWorkTable.FluidPress <> nil) and  (GetCurrentPoint.Pressure<>0) then
     Result := Result and FWorkTable.FluidPress.IsStable;
 end;
 
@@ -596,9 +596,17 @@ begin
       begin
         if FWorkTable <> nil then
         begin
+
           FWorkTable.DoFlowRateSet(Point.Q);
+
+          FWorkTable.OnChangeState(STATE_STARTMONITOR);
+
+          if Point.Temp<>0 then
           FWorkTable.DoFluidTempStart(Point.Temp);
+
+          if Point.Pressure<>0 then
           FWorkTable.DoFluidPressStart(Point.Pressure);
+
           if Point.LimitTime > 0 then
             FWorkTable.TimeSet := Round(Point.LimitTime);
         end;

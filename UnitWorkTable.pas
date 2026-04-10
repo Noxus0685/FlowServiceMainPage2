@@ -17,6 +17,9 @@ uses
 
 
 type
+
+  EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
+
   EMeasurementState = (
     STATE_NONE = 0,
     STATE_STANDBY,
@@ -34,6 +37,25 @@ type
     STATE_COMPLETE,
     STATE_FINALREAD,
     STATE_FAILURE
+  );
+
+    EWorkTableState = (
+    WT_STATE_NONE = 0,
+    WT_STATE_STANDBY,
+    WT_STATE_CONNECTED,
+    WT_STATE_STARTMONITOR,
+    WT_STATE_STARTMONITORWAIT,
+    WT_STATE_MONITOR,
+    WT_STATE_STOPMONITOR,
+    WT_STATE_CONFIGED,
+    WT_STATE_STARTTEST,
+    WT_STATE_STARTWAIT,
+    WT_STATE_EXECUTE,
+    WT_STATE_STOPTEST,
+    WT_STATE_STOPWAIT,
+    WT_STATE_COMPLETE,
+    WT_STATE_FINALREAD,
+    WT_STATE_FAILURE
   );
 
   TGridColumnLayout = record
@@ -59,7 +81,7 @@ type
 type
 
 
-TParameters = class(TObject)
+ TParameters = class(TObject)
   private
     FName: string;
     FHint: string;
@@ -355,7 +377,7 @@ TParameters = class(TObject)
     FFlowRate: TFlowRate;
 
     FMeasurementRun: TObject;
-
+    FMode:EMeasurementRunMode;
 
     FFluidTemp: TFluidTemp;
     FFluidPress: TFluidPress;
@@ -537,7 +559,7 @@ private
   property Pumps: TObjectList<TPump> read FPumps;
 
   property MeasurementRun: TObject read FMeasurementRun;
-
+  property MeasurementMode: EMeasurementRunMode read FMode write FMode;
 
   property FluidTemp: TFluidTemp read FFluidTemp;
   property FluidPress: TFluidPress read FFluidPress;
@@ -566,8 +588,13 @@ private
 
     property TimeResult: Double read GetTimeResult write SetTimeResult;
 
-    property State: TSpillState read FState write FState;
-    property MeasurementState: EMeasurementState read FMeasurementState write FMeasurementState;
+    //property State: TSpillState read FState write FState;
+
+    //property MeasurementState: EMeasurementState read FMeasurementState write FMeasurementState;
+
+    property State: EMeasurementState read FMeasurementState write FMeasurementState;
+
+
     property TableClamped: Boolean read FTableClamped write FTableClamped;
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
     property QuantityUnitName: string read FQuantityUnitName write FQuantityUnitName;
@@ -2589,6 +2616,42 @@ begin
   Result := ssNone;
 end;
 
+class function TWorkTable.WorkTableStateFromString(
+  const AValue: string): EWorkTableState;
+begin
+  if SameText(AValue, 'STATE_STANDBY') then
+    Exit(STATE_STANDBY);
+  if SameText(AValue, 'STATE_CONNECTED') then
+    Exit(STATE_CONNECTED);
+  if SameText(AValue, 'STATE_STARTMONITOR') then
+    Exit(STATE_STARTMONITOR);
+  if SameText(AValue, 'STATE_STARTMONITORWAIT') then
+    Exit(STATE_STARTMONITORWAIT);
+  if SameText(AValue, 'STATE_MONITOR') then
+    Exit(STATE_MONITOR);
+  if SameText(AValue, 'STATE_STOPMONITOR') then
+    Exit(STATE_STOPMONITOR);
+  if SameText(AValue, 'STATE_CONFIGED') then
+    Exit(STATE_CONFIGED);
+  if SameText(AValue, 'STATE_STARTTEST') then
+    Exit(STATE_STARTTEST);
+  if SameText(AValue, 'STATE_STARTWAIT') then
+    Exit(STATE_STARTWAIT);
+  if SameText(AValue, 'STATE_EXECUTE') then
+    Exit(STATE_EXECUTE);
+  if SameText(AValue, 'STATE_STOPTEST') then
+    Exit(STATE_STOPTEST);
+  if SameText(AValue, 'STATE_STOPWAIT') then
+    Exit(STATE_STOPWAIT);
+  if SameText(AValue, 'STATE_COMPLETE') then
+    Exit(STATE_COMPLETE);
+  if SameText(AValue, 'STATE_FINALREAD') then
+    Exit(STATE_FINALREAD);
+  if SameText(AValue, 'STATE_FAILURE') then
+    Exit(STATE_FAILURE);
+
+  Result := STATE_NONE;
+end;
 
 class function TWorkTable.MeasurementStateFromString(
   const AValue: string): EMeasurementState;
@@ -2626,6 +2689,7 @@ begin
 
   Result := STATE_NONE;
 end;
+
 
 class function TWorkTable.MeasurementStateToString(
   AState: EMeasurementState): string;
@@ -2670,10 +2734,6 @@ begin
   end;
 end;
 
-
-
-
-
 procedure TWorkTable.DoPumpStart(APumpName: string);
 var Pump: TPump;
 begin
@@ -2691,7 +2751,6 @@ end;
 
 procedure TWorkTable.DoFlowRateStart;
 begin
-
 
   if FlowRate=nil then
   Exit;
@@ -2719,7 +2778,6 @@ begin
   if Assigned(FOnConditionTempChange) then
     FOnConditionTempChange(FluidTemp, CONTROL_ACTION_START);
 end;
-
 
 procedure TWorkTable.DoFluidTempStop;
 begin
@@ -2762,8 +2820,6 @@ begin
     FOnConditionPressChange(FluidPress, CONTROL_ACTION_STOP);
 end;
 
-
-
 procedure TWorkTable.DoPumpStop(APumpName: string);
 var Pump: TPump;
 begin
@@ -2794,7 +2850,6 @@ begin
   if Assigned(FOnFlowRateChange) then
     FOnFlowRateChange(FlowRate, CONTROL_ACTION_STOP);
 end;
-
 
 procedure TWorkTable.DoFlowRateSet(ANewFlowRate: Double);
 begin
@@ -2834,7 +2889,6 @@ begin
   if Assigned(FOnPumpChange) then
     FOnPumpChange(Pump,CONTROL_ACTION_SET);
 end;
-
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
@@ -3003,7 +3057,6 @@ begin
   end;
   Result := nil;
 end;
-
 
 function TWorkTable.FindPumpByUUID(const APumpUUID: string): TPump;
 var

@@ -322,7 +322,7 @@ type
     LayoutProperties: TLayout;
     Splitter2: TSplitter;
     PanelProperties: TPanel;
-    TabControlProperties: TTabControl;
+    TabControlResults: TTabControl;
     TabItemMeasurmentRun: TTabItem;
     TabItem2: TTabItem;
     TabItem3: TTabItem;
@@ -355,6 +355,10 @@ type
     LabelRepeat: TLabel;
     LabelRepeatsName: TLabel;
     EditRepeats: TEdit;
+    TabItemProtocol: TTabItem;
+    MemoProtocol: TMemo;
+    TabItemDeviceProperties: TTabItem;
+    StringColumnRepeats: TStringColumn;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -681,7 +685,7 @@ begin
   inherited;
 end;
 
-    function   TFrameMainTable.GetMeasurementRun: TMeasurementRun;
+function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
     begin
       result:= nil;
 
@@ -845,10 +849,6 @@ begin
 
 end;
 
-
-
-
-
 procedure TFrameMainTable.SetConfiguration;
 begin
   OnChangeState(STATE_CONFIGED);
@@ -867,11 +867,13 @@ end;
 procedure TFrameMainTable.StartTest;
 begin
   ResetMeasurementValues;
+  MeasurementRun.Start;
   OnChangeState(STATE_STARTTEST);
 end;
 
 procedure TFrameMainTable.StopTest;
 begin
+    MeasurementRun.Stop;
   OnChangeState(STATE_STOPTEST);
 end;
 
@@ -1071,8 +1073,6 @@ begin
   Initialize;
 end;
 
-
-
 procedure TFrameMainTable.Initialize;
 var
   OT: TOutputType;
@@ -1157,7 +1157,6 @@ begin
 //  if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
 //    FFrameProceed.RefreshResultsTab;
 end;
-
 
 procedure TFrameMainTable.SetSessionDim(UnitName: string; QuantityUnitName: string);
 begin
@@ -1281,8 +1280,6 @@ begin
   SaveLayoutSettingsToWorkTable;
 end;
 
-
-
 procedure TFrameMainTable.SpeedButtonSetFlowRateClick(Sender: TObject);
 begin
 FActiveWorkTable.DoFlowRateStart;
@@ -1299,8 +1296,6 @@ begin
 
   end;
 end;
-
-
 
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var

@@ -525,7 +525,7 @@ object FrameMainTable: TFrameMainTable
                   Size.Width = 68.000000000000000000
                   Size.Height = 17.000000000000000000
                   Size.PlatformDefault = False
-                  Text = '12'
+                  Text = '1'
                   TabOrder = 0
                 end
               end
@@ -541,7 +541,7 @@ object FrameMainTable: TFrameMainTable
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Left
                 TabOrder = 1
-                Text = '0'
+                Text = '1'
                 Position.X = 89.000000000000000000
                 Size.Width = 56.000000000000000000
                 Size.Height = 17.000000000000000000
@@ -986,7 +986,7 @@ object FrameMainTable: TFrameMainTable
                   #1064#1072#1075' 1 '
                   #1064#1072#1075' 2'
                   #1064#1072#1075' 3')
-                ItemIndex = 2
+                ItemIndex = 0
                 Size.Width = 160.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False
@@ -1924,7 +1924,7 @@ object FrameMainTable: TFrameMainTable
         Size.Height = 461.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 3
-        object TabControlProperties: TTabControl
+        object TabControlResults: TTabControl
           Align = Client
           Size.Width = 674.000000000000000000
           Size.Height = 461.000000000000000000
@@ -1933,6 +1933,10 @@ object FrameMainTable: TFrameMainTable
           TabOrder = 1
           TabPosition = PlatformDefault
           Sizes = (
+            674s
+            435s
+            674s
+            435s
             674s
             435s
             674s
@@ -1967,7 +1971,7 @@ object FrameMainTable: TFrameMainTable
               Viewport.Height = 378.000000000000000000
               object StringColumn1: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
-                Size.Width = 57.000000000000000000
+                Size.Width = 50.000000000000000000
               end
               object StringColumnMRPointName: TStringColumn
                 HorzAlign = Center
@@ -1986,6 +1990,10 @@ object FrameMainTable: TFrameMainTable
                 Header = #1055#1072#1088#1084#1077#1090#1088' '#1086#1089#1090#1072#1085#1086#1074#1082#1080
                 HeaderSettings.TextSettings.WordWrap = False
                 Size.Width = 118.000000000000000000
+              end
+              object StringColumnRepeats: TStringColumn
+                Header = #1055#1086#1074#1090#1086#1088#1099
+                HeaderSettings.TextSettings.WordWrap = False
               end
               object StringColumnMRStatus: TStringColumn
                 Header = #1057#1090#1072#1090#1091#1089
@@ -2151,6 +2159,43 @@ object FrameMainTable: TFrameMainTable
             Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1082#1072#1085#1072#1083#1072
             ExplicitSize.cx = 120.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
+          end
+          object TabItemProtocol: TTabItem
+            CustomIcon = <
+              item
+              end>
+            TextSettings.Trimming = None
+            IsSelected = False
+            Size.Width = 74.000000000000000000
+            Size.Height = 26.000000000000000000
+            Size.PlatformDefault = False
+            StyleLookup = ''
+            TabOrder = 0
+            Text = #1055#1088#1086#1090#1086#1082#1086#1083
+            object MemoProtocol: TMemo
+              Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+              DataDetectorTypes = []
+              Align = Client
+              Size.Width = 674.000000000000000000
+              Size.Height = 435.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              Viewport.Width = 674.000000000000000000
+              Viewport.Height = 435.000000000000000000
+            end
+          end
+          object TabItemDeviceProperties: TTabItem
+            CustomIcon = <
+              item
+              end>
+            TextSettings.Trimming = None
+            IsSelected = False
+            Size.Width = 138.000000000000000000
+            Size.Height = 26.000000000000000000
+            Size.PlatformDefault = False
+            StyleLookup = ''
+            TabOrder = 0
+            Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1087#1088#1080#1073#1086#1088#1086#1074
           end
         end
       end
