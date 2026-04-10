@@ -2293,6 +2293,7 @@ object FormDeviceEditor: TFormDeviceEditor
           KillFocusByReturn = True
           ParentShowHint = False
           ShowHint = True
+          OnExit = EditQmaxExit
           Left = 276
           Top = 15
         end
@@ -2312,6 +2313,7 @@ object FormDeviceEditor: TFormDeviceEditor
           KillFocusByReturn = True
           ParentShowHint = False
           ShowHint = True
+          OnExit = EditQminExit
           Left = 276
           Top = 15
         end
