@@ -866,7 +866,7 @@ object FormTypeEditor: TFormTypeEditor
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
-          OnChange = ComboBoxOutputTypeChange
+          OnChange = ComboBoxUnitsChange
         end
       end
     end
