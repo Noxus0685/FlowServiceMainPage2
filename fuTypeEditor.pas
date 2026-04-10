@@ -62,11 +62,11 @@ type
     Label39: TLabel;
     cbProcedure: TComboEdit;
     grpTypeOfCheck: TGroupBox;
-    Layout12: TLayout;
-    Label4: TLabel;
+    LayoutOutputType: TLayout;
+    LabelOutputType: TLabel;
     ComboBoxOutputType: TComboBox;
-    Layout14: TLayout;
-    Label7: TLabel;
+    LayoutMeasuredDimension: TLayout;
+    LabelMeasuredDimension: TLabel;
     cbMeasuredDimension: TComboBox;
     tcOutPutType: TTabControl;
     tiVoltage: TTabItem;
@@ -225,6 +225,9 @@ type
     TabControlMain: TTabControl;
     TabItemDevice: TTabItem;
     TabItemCoefs: TTabItem;
+    LayoutUnits: TLayout;
+    LabelUnits: TLabel;
+    ComboBoxUnits: TComboBox;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -1480,6 +1483,8 @@ begin
 
   // сохраняем в модель
   FType.MeasuredDimension := V;
+  FType.Units := 0;
+  FType.SetDimensions;
 
   // применяем логику для выбранной величины
   ApplyMeasuredDimension;
@@ -2739,7 +2744,7 @@ begin
     if D.Qmax = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(D.Qmax, FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
   end
 
   // =====================================================
@@ -2750,7 +2755,7 @@ begin
     if D.Qmin = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(D.Qmin, FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmin), FType.Error);
   end
 
   // =====================================================
@@ -2761,7 +2766,7 @@ begin
     if D.QFmax = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(D.QFmax, FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(D.QFmax), FType.Error);
   end
 
   // =====================================================
@@ -2882,7 +2887,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNQmax.Index then
   begin
-    Qmax := NormalizeFloatInput(S);
+    Qmax := FType.ToBaseUnits(NormalizeFloatInput(S));
     D.Qmax := Qmax;
 
     { QF = Qmax }
@@ -2908,7 +2913,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNQmin.Index then
   begin
-    D.Qmin := NormalizeFloatInput(S);
+    D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     { ручной ввод => диапазон не актуален }
     FType.RangeDynamic := 0;
@@ -2922,7 +2927,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNQF.Index then
   begin
-    D.QFmax := NormalizeFloatInput(S);
+    D.QFmax := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     if D.Qmax > 0 then
       NewCoef := D.QFmax / D.Qmax
@@ -3052,7 +3057,7 @@ begin
     {---------------------------------}
     else if ACol = StringColumnPointQ.Index then
     begin
-      Q := NormalizeFloatInput(S);
+      Q := FType.ToBaseUnits(NormalizeFloatInput(S));
       if Qmax > 0 then
         P.FlowRate := Q / Qmax;
     end
@@ -3552,7 +3557,7 @@ begin
       if Q <= 0 then
         Value := '—'
       else
-        Value := FormatByBaseError(Q, P.Error);
+        Value := FormatByBaseError(FType.FromBaseUnits(Q), P.Error);
     end
 
     {---------------------------}
@@ -3769,6 +3774,7 @@ begin
     end;
 
    Dim := TMeasuredDimension(FType.MeasuredDimension);
+   FType.SetDimensions;
 
    cbMeasuredDimension.Hint := cbMeasuredDimension.Text;
 
@@ -3859,17 +3865,18 @@ end;
 
 procedure TFormTypeEditor.ApplyVolumeMode;
 begin
+  FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQmax.Header := 'Qmax, м³/ч';
-  StringColumnDNQmin.Header := 'Qmin, м³/ч';
-  StringColumnDNQF.Header   := 'QF, м³/ч';
+  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
+  StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
   StringColumnVmin.Header  := 'Vmin, л';
 
   // ===== Поверочные точки =====
-  StringColumnPointQ.Header      := 'Q, м³/ч';
+  StringColumnPointQ.Header      := 'Q, ' + FType.GetDimensionName;
   StringColumnPointVolume.Header := 'V, л';
 
   // ===== Критерий остановки =====
@@ -3881,17 +3888,18 @@ end;
 
 procedure TFormTypeEditor.ApplyMassMode;
 begin
+  FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQmax.Header := 'Qmax, т/ч';
-  StringColumnDNQmin.Header := 'Qmin, т/ч';
-  StringColumnDNQF.Header   := 'QF, т/ч';
+  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
+  StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
   StringColumnVmin.Header  := 'Mmin, кг';
 
   // ===== Поверочные точки =====
-  StringColumnPointQ.Header      := 'Q, т/ч';
+  StringColumnPointQ.Header      := 'Q, ' + FType.GetDimensionName;
   StringColumnPointVolume.Header := 'M, кг';
 
   // ===== Критерий остановки =====

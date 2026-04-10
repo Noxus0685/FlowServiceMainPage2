@@ -1391,6 +1391,7 @@ begin
     Col('SerialNumTemplate', 'TEXT'),
 
     Col('MeasuredDimension', 'INTEGER'),
+    Col('Units', 'INTEGER'),
     Col('OutputType', 'INTEGER'),
     Col('DimensionCoef', 'INTEGER'),
 
@@ -1495,6 +1496,10 @@ begin
   Result.ReportingForm := Q.FieldByName('ReportingForm').AsString;
   Result.SerialNumTemplate := Q.FieldByName('SerialNumTemplate').AsString;
 
+  Result.MeasuredDimension := Q.FieldByName('MeasuredDimension').AsInteger;
+  Result.Units := Q.FieldByName('Units').AsInteger;
+  Result.SetDimensions;
+  Result.OutputType := Q.FieldByName('OutputType').AsInteger;
   Result.DimensionCoef := Q.FieldByName('DimensionCoef').AsInteger;
 
   Result.OutputSet := Q.FieldByName('OutputSet').AsInteger;
@@ -1736,7 +1741,7 @@ begin
           'VerificationMethod, ProcedureName, ' +
           'ProcedureCmd1, ProcedureCmd2, ProcedureCmd3, ProcedureCmd4, ProcedureCmd5, ' +
           'Description, Documentation, ReportingForm, SerialNumTemplate, ' +
-          'MeasuredDimension, OutputType, DimensionCoef, ' +
+          'MeasuredDimension, Units, OutputType, DimensionCoef, ' +
           'OutputSet, Freq, Coef, FreqFlowRate, ' +
           'VoltageRange, VoltageQminRate, VoltageQmaxRate, ' +
           'CurrentRange, CurrentQminRate, CurrentQmaxRate, IntegrationTime, ' +
@@ -1749,7 +1754,7 @@ begin
           ':VerificationMethod, :ProcedureName, ' +
           ':ProcedureCmd1, :ProcedureCmd2, :ProcedureCmd3, :ProcedureCmd4, :ProcedureCmd5, ' +
           ':Description, :Documentation, :ReportingForm, :SerialNumTemplate, ' +
-          ':MeasuredDimension, :OutputType, :DimensionCoef, ' +
+          ':MeasuredDimension, :Units, :OutputType, :DimensionCoef, ' +
           ':OutputSet, :Freq, :Coef, :FreqFlowRate, ' +
           ':VoltageRange, :VoltageQminRate, :VoltageQmaxRate, ' +
           ':CurrentRange, :CurrentQminRate, :CurrentQmaxRate, :IntegrationTime, ' +
@@ -1770,7 +1775,7 @@ begin
           'ProcedureCmd1=:ProcedureCmd1, ProcedureCmd2=:ProcedureCmd2, ProcedureCmd3=:ProcedureCmd3, ' +
           'ProcedureCmd4=:ProcedureCmd4, ProcedureCmd5=:ProcedureCmd5, ' +
           'Description=:Description, Documentation=:Documentation, ReportingForm=:ReportingForm, SerialNumTemplate=:SerialNumTemplate, ' +
-          'MeasuredDimension=:MeasuredDimension, OutputType=:OutputType, DimensionCoef=:DimensionCoef, ' +
+          'MeasuredDimension=:MeasuredDimension, Units=:Units, OutputType=:OutputType, DimensionCoef=:DimensionCoef, ' +
           'OutputSet=:OutputSet, Freq=:Freq, Coef=:Coef, FreqFlowRate=:FreqFlowRate, ' +
           'VoltageRange=:VoltageRange, VoltageQminRate=:VoltageQminRate, VoltageQmaxRate=:VoltageQmaxRate, ' +
           'CurrentRange=:CurrentRange, CurrentQminRate=:CurrentQminRate, CurrentQmaxRate=:CurrentQmaxRate, IntegrationTime=:IntegrationTime, ' +
@@ -1813,6 +1818,7 @@ begin
     SetStrParam(Q, 'SerialNumTemplate', AType.SerialNumTemplate);
 
     SetIntParam(Q, 'MeasuredDimension', Ord(AType.MeasuredDimension));
+    SetIntParam(Q, 'Units', AType.Units);
     SetIntParam(Q, 'OutputType', Ord(AType.OutputType));
     SetIntParam(Q, 'DimensionCoef', AType.DimensionCoef);
 
@@ -3686,6 +3692,7 @@ begin
     { Измерения и сигналы }
     {--------------------------------------------------}
     Col('MeasuredDimension', 'INTEGER'),
+    Col('Units',             'INTEGER'),
     Col('OutputType',        'INTEGER'),
     Col('DimensionCoef',     'INTEGER'),
 
@@ -3830,6 +3837,8 @@ begin
   Result.ProcedureName := Q.FieldByName('ProcedureName').AsString;
 
   Result.MeasuredDimension := Q.FieldByName('MeasuredDimension').AsInteger;
+  Result.Units := Q.FieldByName('Units').AsInteger;
+  Result.SetDimensions;
   Result.OutputType := Q.FieldByName('OutputType').AsInteger;
   Result.DimensionCoef := Q.FieldByName('DimensionCoef').AsInteger;
 
@@ -4085,7 +4094,7 @@ begin
           'RegDate, ValidityDate, DateOfManufacture, IVI, ' +
           'DN, Qmax, Qmin, RangeDynamic, Error, ' +
           'VerificationMethod, ProcedureName, ' +
-          'MeasuredDimension, OutputType, DimensionCoef, ' +
+          'MeasuredDimension, Units, OutputType, DimensionCoef, ' +
           'OutputSet, Freq, Coef, FreqFlowRate, ' +
           'VoltageRange, VoltageQminRate, VoltageQmaxRate, ' +
           'CurrentRange, CurrentQminRate, CurrentQmaxRate, IntegrationTime, ' +
@@ -4100,7 +4109,7 @@ begin
           ':RegDate, :ValidityDate, :DateOfManufacture, :IVI, ' +
           ':DN, :Qmax, :Qmin, :RangeDynamic, :Error, ' +
           ':VerificationMethod, :ProcedureName, ' +
-          ':MeasuredDimension, :OutputType, :DimensionCoef, ' +
+          ':MeasuredDimension, :Units, :OutputType, :DimensionCoef, ' +
           ':OutputSet, :Freq, :Coef, :FreqFlowRate, ' +
           ':VoltageRange, :VoltageQminRate, :VoltageQmaxRate, ' +
           ':CurrentRange, :CurrentQminRate, :CurrentQmaxRate, :IntegrationTime, ' +
@@ -4123,7 +4132,7 @@ begin
           'RegDate = :RegDate, ValidityDate = :ValidityDate, DateOfManufacture = :DateOfManufacture, IVI = :IVI, ' +
           'DN = :DN, Qmax = :Qmax, Qmin = :Qmin, RangeDynamic = :RangeDynamic, Error = :Error, ' +
           'VerificationMethod = :VerificationMethod, ProcedureName = :ProcedureName, ' +
-          'MeasuredDimension = :MeasuredDimension, OutputType = :OutputType, DimensionCoef = :DimensionCoef, ' +
+          'MeasuredDimension = :MeasuredDimension, Units = :Units, OutputType = :OutputType, DimensionCoef = :DimensionCoef, ' +
           'OutputSet = :OutputSet, Freq = :Freq, Coef = :Coef, FreqFlowRate = :FreqFlowRate, ' +
           'VoltageRange = :VoltageRange, VoltageQminRate = :VoltageQminRate, VoltageQmaxRate = :VoltageQmaxRate, ' +
           'CurrentRange = :CurrentRange, CurrentQminRate = :CurrentQminRate, CurrentQmaxRate = :CurrentQmaxRate, IntegrationTime = :IntegrationTime, ' +
@@ -4171,6 +4180,7 @@ begin
     SetStrParam(Q, 'ProcedureName', ADevice.ProcedureName);
 
     SetIntParam(Q, 'MeasuredDimension', ADevice.MeasuredDimension);
+    SetIntParam(Q, 'Units', ADevice.Units);
     SetIntParam(Q, 'OutputType', ADevice.OutputType);
     SetIntParam(Q, 'DimensionCoef', ADevice.DimensionCoef);
 
