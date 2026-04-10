@@ -20,7 +20,7 @@ type
 
   EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
 
-  EMeasurementState = (
+  EWorkTableState = (
     STATE_NONE = 0,
     STATE_STANDBY,
     STATE_CONNECTED,
@@ -37,25 +37,6 @@ type
     STATE_COMPLETE,
     STATE_FINALREAD,
     STATE_FAILURE
-  );
-
-    EWorkTableState = (
-    WT_STATE_NONE = 0,
-    WT_STATE_STANDBY,
-    WT_STATE_CONNECTED,
-    WT_STATE_STARTMONITOR,
-    WT_STATE_STARTMONITORWAIT,
-    WT_STATE_MONITOR,
-    WT_STATE_STOPMONITOR,
-    WT_STATE_CONFIGED,
-    WT_STATE_STARTTEST,
-    WT_STATE_STARTWAIT,
-    WT_STATE_EXECUTE,
-    WT_STATE_STOPTEST,
-    WT_STATE_STOPWAIT,
-    WT_STATE_COMPLETE,
-    WT_STATE_FINALREAD,
-    WT_STATE_FAILURE
   );
 
   TGridColumnLayout = record
@@ -357,8 +338,7 @@ type
   // Обработчики для измерений
   TOnSpillageStartEvent = procedure(ASender: TObject) of object;
   TOnSpillageStopEvent = procedure(ASender: TObject) of object;
-  TOnMeasurementStateChangedEvent = procedure(ASender: TObject;
-  AOldState, ANewState: EMeasurementState) of object;
+  TOnWorkTableStateChangedEvent = procedure(const ANewState: EWorkTableState) of object;
 
   private
     FID: Integer;
@@ -383,8 +363,7 @@ type
     FFluidPress: TFluidPress;
     FTime: Double;
     FTimeResult: Double;
-    FState: TSpillState;
-    FMeasurementState: EMeasurementState;
+    FState: EWorkTableState;
     FTableClamped: Boolean;
     FFlowUnitName: string;
     FQuantityUnitName: string;
@@ -470,8 +449,8 @@ type
 
     class function SpillStateToString(AState: TSpillState): string; static;
     class function SpillStateFromString(const AValue: string): TSpillState; static;
-    class function MeasurementStateToString(AState: EMeasurementState): string; static;
-    class function MeasurementStateFromString(const AValue: string): EMeasurementState; static;
+    class function WorkTableStateToString(AState: EWorkTableState): string; static;
+    class function WorkTableStateFromString(const AValue: string): EWorkTableState; static;
 
     class procedure SaveGridColumns(
       AIni: TCustomIniFile;
@@ -518,7 +497,9 @@ private
   // События измерений
   FOnSpillageStart: TOnSpillageStartEvent;
   FOnSpillageStop: TOnSpillageStopEvent;
-  FOnMeasurementStateChanged: TOnMeasurementStateChangedEvent;
+  FOnStateChanged: TOnWorkTableStateChangedEvent;
+
+  procedure SetState(const ANewState: EWorkTableState);
 
   procedure MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
@@ -590,9 +571,7 @@ private
 
     //property State: TSpillState read FState write FState;
 
-    //property MeasurementState: EMeasurementState read FMeasurementState write FMeasurementState;
-
-    property State: EMeasurementState read FMeasurementState write FMeasurementState;
+    property State: EWorkTableState read FState write SetState;
 
 
     property TableClamped: Boolean read FTableClamped write FTableClamped;
@@ -657,8 +636,7 @@ private
   property OnProcRepeat: TOnProcRepeatEvent read FOnProcRepeat write FOnProcRepeat;
   property OnSpillageStart: TOnSpillageStartEvent read FOnSpillageStart write FOnSpillageStart;
   property OnSpillageStop: TOnSpillageStopEvent read FOnSpillageStop write FOnSpillageStop;
-  property OnMeasurementStateChanged: TOnMeasurementStateChangedEvent
-    read FOnMeasurementStateChanged write FOnMeasurementStateChanged;
+  property OnStateChanged: TOnWorkTableStateChangedEvent read FOnStateChanged write FOnStateChanged;
 
   //нужно ли оставить одну  DoPumpChange ?
   procedure DoPumpStart(APumpName: string);
@@ -682,7 +660,7 @@ private
   procedure DoProcRepeat(AProcName: string);
   procedure DoSpillageStart;
   procedure DoSpillageStop;
-  procedure DoMeasurementStateChanged(AOldState, ANewState: EMeasurementState);
+  procedure DoStateChanged(ANewState: EWorkTableState);
   procedure StartMeasurementRun(AMode: Integer = 1);
   procedure StopMeasurementRun;
   procedure PauseMeasurementRun;
@@ -1250,8 +1228,7 @@ begin
 
   FTableFlow := TFlowMeter.Create;
 
-  FState := ssNone;
-  FMeasurementState := STATE_NONE;
+  FState := STATE_NONE;
   FTableClamped := False;
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
@@ -2193,8 +2170,8 @@ begin
       Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
-      Ini.WriteString(Section, 'State', SpillStateToString(WorkTable.State));
-      Ini.WriteString(Section, 'MeasurementState', MeasurementStateToString(WorkTable.MeasurementState));
+      Ini.WriteString(Section, 'State', WorkTableStateToString(WorkTable.State));
+      Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.State));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
       Ini.WriteString(Section, 'FlowUnitName', WorkTable.FlowUnitName);
       Ini.WriteString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName);
@@ -2296,11 +2273,9 @@ begin
       WorkTable.FlowRate.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
       WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
       WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
-      WorkTable.State := SpillStateFromString(
-        Ini.ReadString(Section, 'State', 'None')
-      );
-      WorkTable.MeasurementState := MeasurementStateFromString(
-        Ini.ReadString(Section, 'MeasurementState', 'STATE_NONE')
+      WorkTable.State := WorkTableStateFromString(
+        Ini.ReadString(Section, 'State',
+          Ini.ReadString(Section, 'MeasurementState', 'STATE_NONE'))
       );
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
       WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
@@ -2653,46 +2628,9 @@ begin
   Result := STATE_NONE;
 end;
 
-class function TWorkTable.MeasurementStateFromString(
-  const AValue: string): EMeasurementState;
-begin
-  if SameText(AValue, 'STATE_STANDBY') then
-    Exit(STATE_STANDBY);
-  if SameText(AValue, 'STATE_CONNECTED') then
-    Exit(STATE_CONNECTED);
-  if SameText(AValue, 'STATE_STARTMONITOR') then
-    Exit(STATE_STARTMONITOR);
-  if SameText(AValue, 'STATE_STARTMONITORWAIT') then
-    Exit(STATE_STARTMONITORWAIT);
-  if SameText(AValue, 'STATE_MONITOR') then
-    Exit(STATE_MONITOR);
-  if SameText(AValue, 'STATE_STOPMONITOR') then
-    Exit(STATE_STOPMONITOR);
-  if SameText(AValue, 'STATE_CONFIGED') then
-    Exit(STATE_CONFIGED);
-  if SameText(AValue, 'STATE_STARTTEST') then
-    Exit(STATE_STARTTEST);
-  if SameText(AValue, 'STATE_STARTWAIT') then
-    Exit(STATE_STARTWAIT);
-  if SameText(AValue, 'STATE_EXECUTE') then
-    Exit(STATE_EXECUTE);
-  if SameText(AValue, 'STATE_STOPTEST') then
-    Exit(STATE_STOPTEST);
-  if SameText(AValue, 'STATE_STOPWAIT') then
-    Exit(STATE_STOPWAIT);
-  if SameText(AValue, 'STATE_COMPLETE') then
-    Exit(STATE_COMPLETE);
-  if SameText(AValue, 'STATE_FINALREAD') then
-    Exit(STATE_FINALREAD);
-  if SameText(AValue, 'STATE_FAILURE') then
-    Exit(STATE_FAILURE);
 
-  Result := STATE_NONE;
-end;
-
-
-class function TWorkTable.MeasurementStateToString(
-  AState: EMeasurementState): string;
+class function TWorkTable.WorkTableStateToString(
+  AState: EWorkTableState): string;
 begin
   case AState of
     STATE_STANDBY: Result := 'STATE_STANDBY';
@@ -2932,16 +2870,23 @@ begin
     FOnSpillageStop(Self);
 end;
 
-procedure TWorkTable.DoMeasurementStateChanged(AOldState, ANewState: EMeasurementState);
+procedure TWorkTable.SetState(const ANewState: EWorkTableState);
 begin
-  if Assigned(FOnMeasurementStateChanged) then
-    FOnMeasurementStateChanged(Self, AOldState, ANewState);
+  if FState = ANewState then
+    Exit;
+
+  FState := ANewState;
+  DoStateChanged(ANewState);
+end;
+
+procedure TWorkTable.DoStateChanged(ANewState: EWorkTableState);
+begin
+  if Assigned(FOnStateChanged) then
+    FOnStateChanged(ANewState);
 end;
 
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
 begin
-  State := AState;
-
   case AState of
     ssStarting:
       DoSpillageStart;

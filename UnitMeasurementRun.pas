@@ -1,4 +1,4 @@
-unit UnitMeasurementRun;
+﻿unit UnitMeasurementRun;
 
 interface
 
@@ -599,7 +599,7 @@ begin
 
           FWorkTable.DoFlowRateSet(Point.Q);
 
-          FWorkTable.OnChangeState(STATE_STARTMONITOR);
+          FWorkTable.State := STATE_STARTMONITOR;
 
           if Point.Temp<>0 then
           FWorkTable.DoFluidTempStart(Point.Temp);
