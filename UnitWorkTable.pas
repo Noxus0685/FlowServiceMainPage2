@@ -606,8 +606,10 @@ private
     procedure InitMeterValues;
     procedure SetTemperature(ATempBefore, ATempAfter: Double);
     procedure SetPressure(APressBefore, APressAfter: Double);
-    procedure SetFlowRateMin( const AValue: Double;Dim: integer);
-    procedure SetFlowRateMax( const AValue: Double;Dim: integer);
+    procedure SetFlowRateMin(const AValue: Double);
+    procedure SetFlowRateMax(const AValue: Double);
+    procedure SetPressureMin(const AValue: Double);
+    procedure SetPressureMax(const AValue: Double);
 
   public
   property OnFlowRateSet: TOnFlowRateSetEvent read FOnFlowRateSet write FOnFlowRateSet;
@@ -2189,19 +2191,61 @@ begin
 
 end;
 
-procedure TWorkTable.SetFlowRateMin( const AValue: Double;Dim: integer);
+procedure TWorkTable.SetFlowRateMin(const AValue: Double);
+var
+  AValueBase: Double;
 begin
-  if AValue > FlowRate.FMax then Exit;
-  FlowRate.FMax  := ValueFlowRate.GetDoubleNum(AValue,Dim);
+  if (FlowRate = nil) or (ValueFlowRate = nil) then
+    Exit;
+
+  AValueBase := ValueFlowRate.GetDoubleNum(AValue);
+  if AValueBase > FlowRate.FMax then
+    Exit;
+
+  FlowRate.FMin := AValueBase;
 end;
 
 
-procedure TWorkTable.SetFlowRateMax( const AValue: Double;Dim: integer);
-
+procedure TWorkTable.SetFlowRateMax(const AValue: Double);
+var
+  AValueBase: Double;
 begin
+  if (FlowRate = nil) or (ValueFlowRate = nil) then
+    Exit;
 
-  if AValue < FlowRate.FMin then Exit;
-  FlowRate.FMin := ValueFlowRate.GetDoubleNum(AValue,Dim);
+  AValueBase := ValueFlowRate.GetDoubleNum(AValue);
+  if AValueBase < FlowRate.FMin then
+    Exit;
+
+  FlowRate.FMax := AValueBase;
+end;
+
+procedure TWorkTable.SetPressureMin(const AValue: Double);
+var
+  AValueBase: Double;
+begin
+  if (FluidPress = nil) or (ValuePressure = nil) then
+    Exit;
+
+  AValueBase := ValuePressure.GetDoubleNum(AValue);
+  if AValueBase > FluidPress.FMax then
+    Exit;
+
+  FluidPress.FMin := AValueBase;
+end;
+
+procedure TWorkTable.SetPressureMax(const AValue: Double);
+var
+  AValueBase: Double;
+begin
+  if (FluidPress = nil) or (ValuePressure = nil) then
+    Exit;
+
+  AValueBase := ValuePressure.GetDoubleNum(AValue);
+  if AValueBase < FluidPress.FMin then
+    Exit;
+
+  FluidPress.FMax := AValueBase;
 end;
 
 
@@ -3546,20 +3590,19 @@ begin
 end;
 
 procedure TParameters.SetMin(const Value: Double);
-var
-WorkTable:TWorkTable ;
 begin
-  if Value > FMax then Exit;
+  if Value > FMax then
+    Exit;
 
-  FMin := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,FDim);
+  FMin := Value;
 end;
 
 procedure TParameters.SetMax(const Value: Double);
-var
-WorkTable:TWorkTable ;
 begin
-  if Value < FMin then Exit;
-  FMax := WorkTable.TableFlow.ValueFlowRate.GetDoubleNum(Value,FDim);
+  if Value < FMin then
+    Exit;
+
+  FMax := Value;
 end;
 
 
