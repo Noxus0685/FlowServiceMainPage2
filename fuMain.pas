@@ -86,7 +86,7 @@ type
     procedure UpdateRandomPress(const AWorkTable: TWorkTable);
 
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
-    procedure UpdateEtalonImpSecFromFlowRate;
+    function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0):Double;
     procedure UpdateDeviceImpSecFromFlowRate;
 
 
@@ -169,10 +169,21 @@ end;
 
 
 procedure  TFormMain.FlowRateStateHandler(AFlowRate: TFlowRate; AAction:EControlAction);
+var
+FlowRate: Double;
+WorkTable:TWorkTable;
 begin
-
+  WorkTable:= FWorkTableManager.ActiveWorkTable;
   FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.ValueSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
 
+   FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet,4);
+
+  FFrameMainTable.ApplyChannelValues(
+    FWorkTableManager.ActiveWorkTable.EtalonChannels,
+    NormalizeFloatInput('0'),
+    UpdateEtalonImpSecFromFlowRate(FlowRate),
+    NormalizeFloatInput('0')
+  );
 end;
 
 procedure  TFormMain.FlowFluidTempHandler(AFluidTemp: tFluidTemp; AAction:EControlAction);
@@ -441,7 +452,7 @@ begin
   EditDeviceImpSec.Text := FloatToStr(ImpSec);
 end;
 
-procedure TFormMain.UpdateEtalonImpSecFromFlowRate;
+function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0):Double;
 var
   WorkTable: TWorkTable;
   FlowRate, Coef, ImpSec: Double;
@@ -454,9 +465,12 @@ begin
   Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
   if Coef <= 0 then
     Exit;
-
-  ImpSec := (FlowRate * Coef) / 3.6;
+  if AFlowRate<>0 then
+    ImpSec := (AFlowRate * Coef) / 3.6
+  else
+    ImpSec := (FlowRate * Coef) / 3.6;
   EditEtalonImpSec.Text := FloatToStr(ImpSec);
+  Result:= ImpSec;
 end;
 
 

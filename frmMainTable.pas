@@ -1256,9 +1256,8 @@ var
 AValue:double;
 begin
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
-  if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
-    FActiveWorkTable.DoFlowRateSet(AValue);
-  FActiveWorkTable.DoFlowRateStart;
+  //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
+  FActiveWorkTable.DoFlowRateStart(AValue);
   UpdateUIFlowRate;
 end;
 
@@ -1285,6 +1284,9 @@ begin
     FActiveWorkTable.DoFlowRateSet(AValue);
     UpdateUIFlowRate;
   end;
+
+
+
 end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);

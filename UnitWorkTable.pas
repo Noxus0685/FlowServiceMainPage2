@@ -639,7 +639,9 @@ private
   procedure DoFreqSet(APumpName: string; ANewFreq: Double);
   procedure PumpSetStatus(APumpName: string; AStatus: EControlStatus);
 
-  procedure DoFlowRateStart;
+
+  procedure DoFlowRateStart(ANewFlowRate: Double);  overload;
+  procedure DoFlowRateStart;  overload;
   procedure DoFlowRateStop;
   procedure DoFlowRateSet(ANewFlowRate: Double);
 
@@ -2969,6 +2971,31 @@ begin
    end;
 end;
 
+procedure TWorkTable.DoFlowRateStart(ANewFlowRate: Double);
+begin
+
+
+  if FlowRate=nil then
+  Exit;
+
+
+
+    FluidTemp.SetParam(ANewFlowRate);
+    if Assigned(FOnFlowRateChange) then
+      FOnFlowRateChange(FlowRate, CONTROL_ACTION_Set);
+
+   if not( FlowRate.IsRunning)  then
+   begin
+
+
+    FlowRate.Start;
+    if Assigned(FOnFlowRateChange) then
+      FOnFlowRateChange(FlowRate, CONTROL_ACTION_START);
+   end;
+end;
+
+
+
 procedure TWorkTable.DoFluidTempStart(ATempSet: Double);
 begin
 
@@ -3418,7 +3445,7 @@ begin
   else if Aset > FMax then
     Fset := FMax
   else Fset:=Aset;
-  inherited Start;
+  FAction:= CONTROL_ACTION_SET;
 end;
 
 
