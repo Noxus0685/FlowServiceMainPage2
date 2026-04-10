@@ -551,7 +551,7 @@ type
     procedure Initialize;
     destructor Destroy; override;
 
-    procedure OnChangeState(const ANewState: EMeasurementState);
+    procedure OnChangeState(const ANewState: EWorkTableState);
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
 
@@ -851,30 +851,35 @@ end;
 
 procedure TFrameMainTable.SetConfiguration;
 begin
-  OnChangeState(STATE_CONFIGED);
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.State := STATE_CONFIGED;
 end;
 
 procedure TFrameMainTable.StartMonitor;
 begin
-  OnChangeState(STATE_STARTMONITOR);
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.State := STATE_STARTMONITOR;
 end;
 
 procedure TFrameMainTable.StopMonitor;
 begin
-  OnChangeState(STATE_STOPMONITOR);
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.State := STATE_STOPMONITOR;
 end;
 
 procedure TFrameMainTable.StartTest;
 begin
   ResetMeasurementValues;
   MeasurementRun.Start;
-  OnChangeState(STATE_STARTTEST);
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.State := STATE_STARTTEST;
 end;
 
 procedure TFrameMainTable.StopTest;
 begin
     MeasurementRun.Stop;
-  OnChangeState(STATE_STOPTEST);
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.State := STATE_STOPTEST;
 end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
@@ -903,10 +908,13 @@ procedure TFrameMainTable.UpdateForm;
           end;
  end;
 
-procedure TFrameMainTable.OnChangeState(const ANewState: EMeasurementState); //ChangeStateHandler
+procedure TFrameMainTable.OnChangeState(const ANewState: EWorkTableState); //ChangeStateHandler
 begin
-  if FActiveWorkTable <> nil then
-    FActiveWorkTable.MeasurementState := ANewState;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.State <> ANewState) then
+  begin
+    FActiveWorkTable.State := ANewState;
+    Exit;
+  end;
 
   case ANewState of
     STATE_NONE:
@@ -1149,7 +1157,10 @@ begin
 
   SetValues;
   UpdateForm;
-  OnChangeState(STATE_NONE);
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.State := STATE_NONE
+  else
+    OnChangeState(STATE_NONE);
 end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
@@ -1329,7 +1340,7 @@ begin
   if WorkTable = nil then
     Exit;
 
-  if WorkTable.MeasurementState = STATE_MONITOR then
+  if WorkTable.State = STATE_MONITOR then
     StopMonitor
   else
     StartMonitor;
@@ -2090,6 +2101,7 @@ begin
   FActiveWorkTable := GetWorkTableByIndex(0);
   if FActiveWorkTable <> nil then
   begin
+    FActiveWorkTable.OnStateChanged := OnChangeState;
     FActiveWorkTable.RebindAllFlowMeters;
 
     if FActiveWorkTable.FlowUnitName <> '' then
@@ -3048,7 +3060,7 @@ begin
 
 
 
-  if not (WorkTable.MeasurementState in [STATE_MONITOR, STATE_EXECUTE]) then
+  if not (WorkTable.State in [STATE_MONITOR, STATE_EXECUTE]) then
     Exit;
 
   IsUpdating := True;
@@ -3257,7 +3269,7 @@ begin
 
 
 
-  if WorkTable.MeasurementState in [STATE_STARTMONITORWAIT, STATE_MONITOR, STATE_STOPMONITOR] then
+  if WorkTable.State in [STATE_STARTMONITORWAIT, STATE_MONITOR, STATE_STOPMONITOR] then
     RefreshMonitorIndicator;
 
 
@@ -3508,11 +3520,11 @@ begin
   if (TestButton.Tag = 6) and SameText(Trim(TestButton.Text), 'Сохранить?') then
   begin
     SaveMeasurementResults;
-    OnChangeState(STATE_STANDBY);
+    WorkTable.State := STATE_STANDBY;
     Exit;
   end;
 
-  if WorkTable.MeasurementState = STATE_EXECUTE then
+  if WorkTable.State = STATE_EXECUTE then
     StopTest
   else
     StartTest;
@@ -3641,7 +3653,10 @@ end;
 
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
 begin
-  OnChangeState(STATE_STANDBY);
+  if (FActiveWorkTable <> nil) then
+    FActiveWorkTable.State := STATE_STANDBY
+  else
+    OnChangeState(STATE_STANDBY);
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
