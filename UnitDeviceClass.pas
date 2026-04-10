@@ -155,6 +155,8 @@ type
     procedure Assign(ASource: TDevicePoint);
     procedure Apply(ASource: TTypePoint);
     function GetStatus: string;
+    function GetStatusHint: string;
+
     property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
   end;
 
@@ -1002,7 +1004,7 @@ begin
   Repeats := 0;
 
   Status := 0;
-  StatusStr := 'Измерения не производились/не анализировались.';
+  StatusStr := '-';
   ResultError := 0.0;
   AverageError := 0.0;
   StdDev := 0.0;
@@ -1649,6 +1651,20 @@ begin
 end;
 
 function TDevicePoint.GetStatus: string;
+begin
+  case Status of
+    0: Result := '-'; // hint :'измерения не проводились';
+    1: Result := 'в процессе';// hint :'измерение начато, но не завершено';
+    2: Result := 'прервано';// hint :'измерение начато, но завершено досрочно, не окончено';
+    3: Result := 'закончено';// hint :'измерение завершено корректно';
+    4: Result := 'отменено';// hint :'измерение завершено корректно и результаты отменены';
+    5: Result := 'сохранено';// hint :'измерение завершено корректно и результаты сохранены';
+  else
+    Result := 'неизвестный статус';
+  end;
+end;
+
+function TDevicePoint.GetStatusHint: string;
 begin
   case Status of
     0: Result := 'измерения не проводились';

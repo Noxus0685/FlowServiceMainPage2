@@ -1413,13 +1413,6 @@ begin
   begin
     FDevice.AttachType(NewType, RepoName);
     FDeviceType := NewType;
-
-    {----------------------------------------------------}
-    { 5. Копируем данные из типа → в прибор }
-    {----------------------------------------------------}
-
-      FDevice.FillFromType(NewType);
-
   end;
 
 

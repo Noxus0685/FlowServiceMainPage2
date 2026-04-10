@@ -37,7 +37,7 @@ object FrameMainTable: TFrameMainTable
             Size.Height = 113.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
-            object Layout42: TLayout
+            object LayoutPressure: TLayout
               Position.X = 16.000000000000000000
               Position.Y = 56.000000000000000000
               Size.Width = 233.000000000000000000
@@ -401,7 +401,7 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 282.000000000000000000
               Size.Height = 23.000000000000000000
               Size.PlatformDefault = False
-              TabOrder = 2
+              TabOrder = 3
               object ComboBoxTaskMain: TComboBox
                 Align = MostLeft
                 Items.Strings = (
@@ -418,61 +418,6 @@ object FrameMainTable: TFrameMainTable
                 Size.PlatformDefault = False
                 StyleLookup = 'comboboxstyle'
                 TabOrder = 0
-              end
-              object SpeedButtonSpillageStart: TSpeedButton
-                Align = Left
-                Padding.Left = 10.000000000000000000
-                Margins.Left = 3.000000000000000000
-                Margins.Right = 10.000000000000000000
-                Position.X = 204.000000000000000000
-                Size.Width = 22.000000000000000000
-                Size.Height = 23.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'playtoolbutton'
-                Text = 'SpeedButton3'
-                TextSettings.Trimming = None
-              end
-              object SpeedButtonSpillageStop: TSpeedButton
-                Align = Left
-                Margins.Left = 2.000000000000000000
-                Position.X = 238.000000000000000000
-                Size.Width = 22.000000000000000000
-                Size.Height = 23.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'transparentcirclebuttonstyle'
-                Text = 'SpeedButtonSpillageStop'
-                TextSettings.Trimming = None
-                object Rectangle13: TRectangle
-                  Align = Client
-                  HitTest = False
-                  Margins.Left = 4.000000000000000000
-                  Margins.Top = 4.000000000000000000
-                  Margins.Right = 4.000000000000000000
-                  Margins.Bottom = 4.000000000000000000
-                  Size.Width = 14.000000000000000000
-                  Size.Height = 15.000000000000000000
-                  Size.PlatformDefault = False
-                end
-              end
-              object SpeedButtonTest: TSpeedButton
-                Align = MostLeft
-                Margins.Left = 3.000000000000000000
-                Margins.Right = 10.000000000000000000
-                Position.X = 173.000000000000000000
-                Size.Width = 18.000000000000000000
-                Size.Height = 23.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'transparentcirclebuttonstyle'
-                Text = 'SpeedButtonTest'
-                TextSettings.Trimming = None
-                object Circle1: TCircle
-                  Align = Client
-                  HitTest = False
-                  Size.Width = 18.000000000000000000
-                  Size.Height = 23.000000000000000000
-                  Size.PlatformDefault = False
-                  OnClick = Circle1Click
-                end
               end
             end
             object LabelLayoutMain: TLabel
@@ -500,7 +445,8 @@ object FrameMainTable: TFrameMainTable
               Size.Width = 280.000000000000000000
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
-              TabOrder = 3
+              Visible = False
+              TabOrder = 4
               object SpeedButtonTaskPause: TSpeedButton
                 Align = Left
                 Padding.Left = 10.000000000000000000
@@ -558,6 +504,51 @@ object FrameMainTable: TFrameMainTable
               Size.PlatformDefault = False
               Text = #1058#1080#1087' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
               TabOrder = 0
+            end
+            object LayoutRepeats: TLayout
+              Position.X = 24.000000000000000000
+              Position.Y = 64.000000000000000000
+              Size.Width = 233.000000000000000000
+              Size.Height = 17.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 2
+              object RectangleRepeats: TRectangle
+                Align = Right
+                Fill.Color = claWhite
+                Position.X = 160.000000000000000000
+                Size.Width = 73.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                object LabelRepeat: TLabel
+                  Align = Client
+                  Margins.Left = 5.000000000000000000
+                  Size.Width = 68.000000000000000000
+                  Size.Height = 17.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = '12'
+                  TabOrder = 0
+                end
+              end
+              object LabelRepeatsName: TLabel
+                Align = Left
+                Size.Width = 89.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1048#1079#1084#1077#1088#1077#1085#1080#1081
+                TabOrder = 0
+              end
+              object EditRepeats: TEdit
+                Touch.InteractiveGestures = [LongTap, DoubleTap]
+                Align = Left
+                TabOrder = 1
+                Text = '0'
+                Position.X = 89.000000000000000000
+                Size.Width = 56.000000000000000000
+                Size.Height = 17.000000000000000000
+                Size.PlatformDefault = False
+                KillFocusByReturn = True
+                OnExit = EditRepeatsExit
+              end
             end
           end
         end
@@ -1284,7 +1275,7 @@ object FrameMainTable: TFrameMainTable
             Enabled = False
           end
         end
-        object Switch1: TSwitch
+        object SwitchAuto: TSwitch
           IsChecked = False
           Position.X = 213.000000000000000000
           Position.Y = 17.000000000000000000
@@ -1292,8 +1283,9 @@ object FrameMainTable: TFrameMainTable
           Size.Height = 25.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
+          OnSwitch = SwitchAutoSwitch
         end
-        object Label1: TLabel
+        object LabelAuto: TLabel
           Position.X = 224.000000000000000000
           Size.Width = 41.000000000000000000
           Size.Height = 17.000000000000000000

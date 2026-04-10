@@ -17,10 +17,10 @@ uses
   UnitRepositories,
   UnitWorkTable,
   UnitBaseProcedures,
-  System.Math,
-  System.Generics.Collections,
+  UnitMeasurementRun,
 
-  System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
+  System.Math, System.Generics.Collections, System.SysUtils, System.Types,
+  System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, System.Rtti,
   FMX.Grid.Style, FMX.Filter.Effects, FMX.Colors, FMX.Effects, FMX.ListBox,
   FMX.Edit, FMX.StdCtrls, FMX.ComboEdit, FMX.EditBox, FMX.SpinBox, FMX.Objects,
@@ -105,7 +105,7 @@ type
     LabelLayoutPump: TLabel;
     LayoutConditions: TLayout;
     Layout9: TLayout;
-    Layout42: TLayout;
+    LayoutPressure: TLayout;
     Rectangle11: TRectangle;
     LabelPressure: TLabel;
     LabelNamePressure: TLabel;
@@ -141,9 +141,6 @@ type
     Layout16: TLayout;
     LayoutTaskMain: TLayout;
     ComboBoxTaskMain: TComboBox;
-    SpeedButtonSpillageStart: TSpeedButton;
-    SpeedButtonSpillageStop: TSpeedButton;
-    Rectangle13: TRectangle;
     LabelLayoutMain: TLabel;
     LayoutTaskAddition: TLayout;
     SpeedButtonTaskPause: TSpeedButton;
@@ -275,8 +272,6 @@ type
     SpeedButtonStepPrevious: TSpeedButton;
     ComboBoxStep: TComboBox;
     Label2: TLabel;
-    SpeedButtonTest: TSpeedButton;
-    Circle1: TCircle;
     HorzScrollBoxInstrumental: THorzScrollBox;
     Layout: TLayout;
     LayoutControl: TLayout;
@@ -293,8 +288,8 @@ type
     TestButton: TButton;
     StringColumnEtalonRawSumValue1: TStringColumn;
     StringColumnDeviceRawSumValue1: TStringColumn;
-    Switch1: TSwitch;
-    Label1: TLabel;
+    SwitchAuto: TSwitch;
+    LabelAuto: TLabel;
     ActionCopyType: TAction;
     ActionFillAllTypes: TAction;
     ActionDevicesClearRow: TAction;
@@ -355,6 +350,11 @@ type
     StringColumnMRPointName: TStringColumn;
     StringColumn1: TStringColumn;
     ActionSessionCreatePoints: TAction;
+    LayoutRepeats: TLayout;
+    RectangleRepeats: TRectangle;
+    LabelRepeat: TLabel;
+    LabelRepeatsName: TLabel;
+    EditRepeats: TEdit;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -457,6 +457,8 @@ type
     procedure EditPresCanFocus(Sender: TObject; var ACanFocus: Boolean);
     procedure EditTempCanFocus(Sender: TObject; var ACanFocus: Boolean);
     procedure ActionSessionCreatePointsExecute(Sender: TObject);
+    procedure EditRepeatsExit(Sender: TObject);
+    procedure SwitchAutoSwitch(Sender: TObject);
 
   private
 
@@ -567,8 +569,9 @@ type
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
     procedure UpdateUIConditions;
+    function   GetMeasurementRun: TMeasurementRun;
 
-
+    property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
   end;
 
@@ -581,8 +584,8 @@ implementation
 {$R *.fmx}
 
 uses
-  fuMain,
-  UnitMeasurementRun;
+  fuMain;
+
 
 const
   CVolumeFlowUnits: array[0..4] of string = (
@@ -677,6 +680,20 @@ begin
   FFlowMeters.Free;
   inherited;
 end;
+
+    function   TFrameMainTable.GetMeasurementRun: TMeasurementRun;
+    begin
+      result:= nil;
+
+      if FWorkTableManager=nil then
+      Exit;
+      if FWorkTableManager.ActiveWorkTable=nil then
+      Exit;
+      if FWorkTableManager.ActiveWorkTable.MeasurementRun=nil then
+      Exit;
+
+      result:= TMeasurementRun (FWorkTableManager.ActiveWorkTable.MeasurementRun);
+    end;
 
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
 var
@@ -858,7 +875,22 @@ begin
   OnChangeState(STATE_STOPTEST);
 end;
 
- procedure TFrameMainTable.UpdateForm;
+ procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
+begin
+        if MeasurementRun=nil then
+        begin
+            SwitchAuto.IsChecked:=False;
+            Exit;
+        end;
+
+           if SwitchAuto.IsChecked then
+           MeasurementRun.Mode:= EMeasurementRunMode.mrmAutomatic
+           else
+           MeasurementRun.Mode:= EMeasurementRunMode.mrmManual;
+
+end;
+
+procedure TFrameMainTable.UpdateForm;
  begin
           IsUpdating := True;
             try
@@ -2481,27 +2513,14 @@ end;
 
 procedure TFrameMainTable.ActionSessionCreatePointsExecute(Sender: TObject);
 var
-  MeasurementRun: TMeasurementRun;
   SourcePoint: TDevicePoint;
   SessionPoint: TDevicePoint;
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.MeasurementRun = nil) then
+  if (MeasurementRun = nil) then
     Exit;
 
-  MeasurementRun := TMeasurementRun(FActiveWorkTable.MeasurementRun);
-  MeasurementRun.CreateSessionPoints;
+   MeasurementRun.CreateSession;
 
-  if (FActiveWorkTable.Points <> nil) and (MeasurementRun.Points <> nil) and
-     (MeasurementRun.Mode = mrmManual) then
-  begin
-    FActiveWorkTable.Points.Clear;
-    for SourcePoint in MeasurementRun.Points do
-    begin
-      SessionPoint := TDevicePoint.Create(0);
-      SessionPoint.Assign(SourcePoint);
-      FActiveWorkTable.Points.Add(SessionPoint);
-    end;
-  end;
 end;
 
 procedure TFrameMainTable.ActionMeterValuesPropertiesExecute(Sender: TObject);
@@ -2744,10 +2763,9 @@ begin
        If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
       begin
       Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False)//  (Src.FlowMeter.Device.DN, SourceType);
-
       end
-        else
-          AttachType(Ch, SourceType, FoundRepo, True);
+      else
+       AttachType(Ch, SourceType, FoundRepo, True);
 
   //  If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
   //    Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
@@ -3313,6 +3331,13 @@ begin
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
 end;
 
+procedure TFrameMainTable.EditRepeatsExit(Sender: TObject);
+begin
+    //Установка кол-ва повторов.
+  FActiveWorkTable.Repeats:= StrToInt(EditRepeats.Text);
+
+end;
+
 procedure TFrameMainTable.ApplyFlowMeterSelection(const ARow: Integer);
 begin
   if (ARow < 0) or (ARow >= Length(FFlowMeterRows)) then
@@ -3364,11 +3389,9 @@ begin
   if not AIsTypeChanged then
     Exit;
 
-  AChannel.FlowMeter.Device.AttachType(ANewType, RepoName);
   // При смене типа поверочные точки должны полностью переходить из типа в прибор.
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
-  AChannel.FlowMeter.Device.FillFromType(ANewType, False);
-
+  AChannel.FlowMeter.Device.AttachType(ANewType, RepoName);
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(AChannel.FlowMeter.Device);
 end;
@@ -3464,21 +3487,6 @@ begin
     { 3. Проверяем смену типа }
     {----------------------------------------------------}
     IsTypeChanged := True;
-  {
-    if CurrentType <> nil then
-    begin
-      if CurrentType = NewType then
-        IsTypeChanged := False
-      else if (CurrentType.UUID <> '') and (NewType.UUID <> '') then
-        IsTypeChanged := not SameText(CurrentType.UUID, NewType.UUID)
-      else
-        IsTypeChanged :=
-          (CurrentType.ID <> NewType.ID) or
-          (not SameText(CurrentType.Name, NewType.Name)) or
-          (not SameText(CurrentType.Modification, NewType.Modification));
-    end;
-    }
-
     AttachType(Ch, NewType, FoundRepo, IsTypeChanged);
 
     {----------------------------------------------------}
@@ -4286,7 +4294,7 @@ var
   Rows: Integer;
 begin
   if FActiveWorkTable <> nil then
-    Rows := FActiveWorkTable.Points.Count
+    Rows := MeasurementRun.Points.Count
   else
     Rows := 0;
 
@@ -4535,13 +4543,13 @@ var
     end;
   end;
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.Points = nil) then
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
     Exit;
 
-  if (ARow < 0) or (ARow >= FActiveWorkTable.Points.Count) then
+  if (ARow < 0) or (ARow >= MeasurementRun.Points.Count) then
     Exit;
 
-  Point := FActiveWorkTable.Points[ARow];
+  Point := MeasurementRun.Points[ARow];
   if Point = nil then
     Exit;
 
