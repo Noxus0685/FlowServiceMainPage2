@@ -279,6 +279,7 @@ type
     property Enabled: Boolean read FEnabled write FEnabled;
     property Name: string read FName write FName;
     property Text: string read FText write FText;
+    property Group: Integer read FGroup write FGroup;
 
 
 
@@ -817,6 +818,7 @@ begin
   FEnabled := False;
   FName:= 'Канал';
   FText := '1';
+  FGroup := 0;
   FImpSec := 0;
   FImpResult := 0;
   FCurSec := 0;
@@ -924,6 +926,7 @@ begin
   FFlowMeter.RepoDeviceUUID := ASource.FFlowMeter.RepoDeviceUUID;
   FFlowMeter.SerialNumber := ASource.FFlowMeter.SerialNumber;
   FFlowMeter.OutputType := ASource.FFlowMeter.OutputType;
+  FGroup := ASource.FGroup;
 
   FFlowMeter.Active := ASource.FFlowMeter.Active;
   FFlowMeter.CheckType := ASource.FFlowMeter.CheckType;
@@ -1833,6 +1836,8 @@ var
   Channel: TChannel;
   IsQuantityTemplateSet: Boolean;
   IsFlowTemplateSet: Boolean;
+  QuantityGroup: Integer;
+  IsQuantityGroupSet: Boolean;
 begin
   if FTableFlow.ValueQuantity <> nil then
     FTableFlow.ValueQuantity.ClearMeterValues;
@@ -1841,6 +1846,7 @@ begin
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
+  IsQuantityGroupSet := False;
 
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
@@ -1850,6 +1856,14 @@ begin
 
     if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
     begin
+      if not IsQuantityGroupSet then
+      begin
+        QuantityGroup := Channel.Group;
+        IsQuantityGroupSet := True;
+      end;
+      if Channel.Group <> QuantityGroup then
+        Continue;
+
       if not IsQuantityTemplateSet then
       begin
         FTableFlow.ValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
@@ -2461,6 +2475,7 @@ begin
     AIni.WriteBool(Section, 'Enabled', Channel.Enabled);
     AIni.WriteString(Section, 'Name', Channel.Name);
     AIni.WriteString(Section, 'Text', Channel.Text);
+    AIni.WriteInteger(Section, 'Group', Channel.Group);
     AIni.WriteString(Section, 'TypeName', Channel.TypeName);
     AIni.WriteString(Section, 'DeviceName', Channel.DeviceName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
@@ -2514,6 +2529,7 @@ begin
     else
       Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
     Channel.Text := AIni.ReadString(Section, 'Text', BuildChannelDefaultText(I + 1));
+    Channel.Group := AIni.ReadInteger(Section, 'Group', Channel.Group);
     if Trim(Channel.Text) = '' then
       Channel.Text := BuildChannelDefaultText(I + 1);
     Channel.TypeName := AIni.ReadString(Section, 'TypeName', '');
