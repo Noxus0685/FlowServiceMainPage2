@@ -552,6 +552,9 @@ type
     destructor Destroy; override;
 
     procedure OnChangeState(const ANewState: EWorkTableState);
+    procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
+    APointIndex: Integer);
+
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
       AImpSec, AImpResult: Double);
 
@@ -907,6 +910,13 @@ procedure TFrameMainTable.UpdateForm;
           IsUpdating := False;
           end;
  end;
+
+procedure TFrameMainTable.OnChangePoint(ASender: TObject; APoint: TDevicePoint;
+    APointIndex: Integer);
+begin
+
+
+end;
 
 procedure TFrameMainTable.OnChangeState(const ANewState: EWorkTableState); //ChangeStateHandler
 begin
@@ -2102,6 +2112,7 @@ begin
   if FActiveWorkTable <> nil then
   begin
     FActiveWorkTable.OnStateChanged := OnChangeState;
+    FActiveWorkTable.OnPointChanged := OnChangePoint;
     FActiveWorkTable.RebindAllFlowMeters;
 
     if FActiveWorkTable.FlowUnitName <> '' then
@@ -4303,7 +4314,7 @@ procedure TFrameMainTable.UpdateGridMesurmentRun;
 var
   Rows: Integer;
 begin
-  if FActiveWorkTable <> nil then
+  if MeasurementRun <> nil then
     Rows := MeasurementRun.Points.Count
   else
     Rows := 0;
@@ -4665,8 +4676,8 @@ begin
    // else
    //   LabelFlowRate.Text := '0';
 
-    if LayoutFlowRate.tag=3 then
-    begin
+  //  if LayoutFlowRate.tag=3 then
+  //  begin
       for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
         begin
           if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
@@ -4678,7 +4689,7 @@ begin
       SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
             if FActiveWorkTable<>nil then
         SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
-    end;
+  //  end;
 
 if WorkTable.FlowRate.IsRunning then
   begin

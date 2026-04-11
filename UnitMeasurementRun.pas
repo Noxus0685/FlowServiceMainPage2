@@ -24,17 +24,17 @@ uses
 type
 
 
-  TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: TSpillState) of object;
+  TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: EMeasureState) of object;
   TMeasurementRunPointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer) of object;
 
   TMeasurementRun = class
   private type
-    TPointStage = (psSetupPoint, psWaitStable, psMeasure, psSave, psNextPoint, psDone);
+    EPointStage = (psSetupPoint, psWaitStable, psMeasure, psSave, psNextPoint, psDone);
   private
     FWorkTable: TWorkTable;
     FPoints: TObjectList<TDevicePoint>;
-    FState: TSpillState;
+
     FCurrentPointIndex: Integer;
     FThread: TThread;
     FCriticalSection: TCriticalSection;
@@ -45,7 +45,9 @@ type
     FManualFluidPress: Double;
     FManualTimeSet: Integer;
 
-    FCurrentStage: TPointStage;
+    FState: EMeasureState;
+    FCurrentStage: EPointStage;
+
     FWaitStartedTick: UInt64;
     FCurrentRepeat: Integer;
     FIsPaused: Boolean;
@@ -56,7 +58,7 @@ type
     FOnPointChangedFrame: TMeasurementRunPointChangedEvent;
     FOnPointChangedMain: TMeasurementRunPointChangedEvent;
 
-    procedure SetState(const ANewState: TSpillState);
+    procedure SetState(const ANewState: EMeasureState);
     procedure NotifyStateChanged;
     procedure NotifyPointChanged;
     function GetCurrentPoint: TDevicePoint;
@@ -83,9 +85,15 @@ type
     procedure Process;
     procedure SaveMeasurementResults;
 
+    class function SpillStateToString(AState: EMeasureState): string; static;
+    class function SpillStateFromString(const AValue: string): EMeasureState; static;
+
     property WorkTable: TWorkTable read FWorkTable;
     property Points: TObjectList<TDevicePoint> read FPoints;
-    property State: TSpillState read FState;
+
+    property State: EMeasureState read FState;
+    property Stage: EPointStage   read FCurrentStage;
+
     property Mode: EMeasurementRunMode read FMode write FMode;
     property CurrentPointIndex: Integer read FCurrentPointIndex;
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
@@ -254,6 +262,8 @@ end;
 
 { TMeasurementRun }
 
+
+
 constructor TMeasurementRun.Create(AWorkTable: TWorkTable);
 begin
   inherited Create;
@@ -261,7 +271,7 @@ begin
   FPoints := TObjectList<TDevicePoint>.Create(True);
   FCriticalSection := TCriticalSection.Create;
 
-  FState := ssReady;
+  FState := msReady;
   FCurrentPointIndex := -1;
   FMode := mrmAutomatic;
 
@@ -281,7 +291,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TMeasurementRun.SetState(const ANewState: TSpillState);
+procedure TMeasurementRun.SetState(const ANewState: EMeasureState);
 begin
   if FState = ANewState then
     Exit;
@@ -346,7 +356,7 @@ begin
   if (FWorkTable = nil) then
     Exit;
 
-  if FWorkTable.FlowRate <> nil then
+  if (FWorkTable.FlowRate <> nil) and (GetCurrentPoint.Q<>0)  then
     Result := Result and FWorkTable.FlowRate.IsStable;
 
   if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp<>0) then
@@ -474,10 +484,6 @@ begin
   end;
 end;
 
-
-
-
-
 procedure TMeasurementRun.Start;
 begin
   FCriticalSection.Acquire;
@@ -490,7 +496,7 @@ begin
     CreateSessionPoints;
     if FPoints.Count = 0 then
     begin
-      SetState(ssReady);
+      SetState(msNone);
       Exit;
     end;
 
@@ -499,7 +505,9 @@ begin
     FCurrentRepeat := 0;
     FForceNextPoint := False;
     FIsPaused := False;
-    SetState(ssStarting);
+
+    SetState(msReady);
+
     NotifyPointChanged;
 
     FThread := TThread.CreateAnonymousThread(
@@ -534,8 +542,8 @@ begin
   end;
 
   FIsPaused := False;
-  SetState(ssStopping);
-  SetState(ssReady);
+  SetState(msStopping);
+  SetState(msReady);
 end;
 
 procedure TMeasurementRun.Pause;
@@ -543,7 +551,7 @@ begin
   if FIsPaused then
     Exit;
   FIsPaused := True;
-  SetState(ssStopping);
+  SetState(msPause);
 end;
 
 procedure TMeasurementRun.Resume;
@@ -551,7 +559,7 @@ begin
   if not FIsPaused then
     Exit;
   FIsPaused := False;
-  SetState(ssOnGoing);
+  SetState(msOnGoing);
 end;
 
 procedure TMeasurementRun.NextPoint;
@@ -561,7 +569,7 @@ end;
 
 procedure TMeasurementRun.RunThreadProc;
 begin
-  SetState(ssOnGoing);
+  SetState(msOnGoing);
   while not TThread.CurrentThread.CheckTerminated do
   begin
     if FIsPaused then
@@ -587,19 +595,26 @@ begin
   if Point = nil then
   begin
     FCurrentStage := psDone;
-    SetState(ssResultReady);
+    SetState(msResultReady);
     Exit;
   end;
 
   case FCurrentStage of
+
+   //Установка параметров точки
     psSetupPoint:
       begin
+          FWorkTable.State := STATE_STARTMONITOR;
+
         if FWorkTable <> nil then
         begin
 
+          // Если не указан расход, то на него не выходим
+          if (Point.Q<>0) then
+          begin
           FWorkTable.DoFlowRateSet(Point.Q);
-
-          FWorkTable.State := STATE_STARTMONITOR;
+          FWorkTable.DoFlowRateStart;
+          end;
 
           if Point.Temp<>0 then
           FWorkTable.DoFluidTempStart(Point.Temp);
@@ -609,6 +624,7 @@ begin
 
           if Point.LimitTime > 0 then
             FWorkTable.TimeSet := Round(Point.LimitTime);
+
         end;
         FWaitStartedTick := TThread.GetTickCount64;
         FCurrentStage := psWaitStable;
@@ -616,16 +632,21 @@ begin
 
     psWaitStable:
       begin
+         //Принудительное изменение точки
         if FForceNextPoint then
         begin
           FCurrentStage := psNextPoint;
           Exit;
         end;
 
+        //Если вышли на расход, то переходим к измерению
         if IsStable then
           FCurrentStage := psMeasure
+
+        //Ограничение времени ожидания стабилизации
         else if (TThread.GetTickCount64 - FWaitStartedTick) > 30000 then
           FCurrentStage := psMeasure;
+
       end;
 
     psMeasure:
@@ -659,7 +680,7 @@ begin
         if FCurrentPointIndex >= FPoints.Count then
         begin
           FCurrentStage := psDone;
-          SetState(ssResultReady);
+          SetState(msResultReady);
         end
         else
         begin
@@ -690,6 +711,46 @@ begin
 
   if FWorkTable <> nil then
     FWorkTable.TimeResult := Point.LimitTime;
+end;
+
+{ Converts persisted string to spill state enum value. }
+class function TMeasurementRun.SpillStateFromString(const AValue: string): EMeasureState;
+begin
+  if SameText(AValue, 'Готов') then
+    Exit(msReady);
+
+  if SameText(AValue, 'Запуск') then
+    Exit(msStarting);
+
+  if SameText(AValue, 'Измерние') then
+    Exit(msOnGoing);
+
+  if SameText(AValue, 'Остановка') then
+    Exit(msStopping);
+
+  if SameText(AValue, 'Сохранение') then
+    Exit(msResultReady);
+
+  Result := msNone;
+end;
+
+{ Converts spill state enum value to persisted string. }
+class function TMeasurementRun.SpillStateToString(AState: EMeasureState): string;
+begin
+  case AState of
+    msReady:
+      Result := 'Готов';
+    msStarting:
+      Result := 'Запуск';
+    msOnGoing:
+      Result := 'Измерние';
+    msStopping:
+      Result := 'Остановка';
+    msResultReady:
+      Result := 'Сохранение';
+  else
+    Result := '-';
+  end;
 end;
 
 end.

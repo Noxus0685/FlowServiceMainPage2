@@ -139,10 +139,13 @@ type
 
 
   public
+    Etalons: TList<string>;
+
     constructor Create(const AName: string = 'FlowRate');
     function IsStable: Boolean;
     procedure SetParam(ANewValue: Double);
     procedure SetParamFlowRate(ANewValue: Double);
+
   end;
 //---------------------------------
   TFluidTemp = class(TParameters)
@@ -169,19 +172,22 @@ type
   TWorkTable = class;
 
 
-  TSpillState = (
-    ssNone,
-    ssReady,
-    ssStarting,
-    ssOnGoing,
-    ssStopping,
-    ssResultReady
+  EMeasureState = (
+    msNone,       //'Измерение не запущено'
+    msReady,      //'Готов к измерению, точки сформированы'
+    msSetup,      //'ПОдготовка условий
+    msStarting,   //'Запуск измерения'
+    msOnGoing,    //'Измерение'
+    msPause,      //'Пауза '
+    msStopping,   //'Остановка измерения'
+    msResultReady //'Результат готов'
   );
 
   TChannel = class(TTypeEntity)
   private
     FEnabled: Boolean;
     FText: string;
+    FGroup: Integer;
 
     // Channel values (not proxy fields)
     FImpSec: Double;
@@ -338,7 +344,10 @@ type
   // Обработчики для измерений
   TOnSpillageStartEvent = procedure(ASender: TObject) of object;
   TOnSpillageStopEvent = procedure(ASender: TObject) of object;
+
   TOnWorkTableStateChangedEvent = procedure(const ANewState: EWorkTableState) of object;
+  TOnWorkTablePointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
+    APointIndex: Integer) of object;
 
   private
     FID: Integer;
@@ -447,8 +456,7 @@ type
 
     procedure SetValues;
 
-    class function SpillStateToString(AState: TSpillState): string; static;
-    class function SpillStateFromString(const AValue: string): TSpillState; static;
+
     class function WorkTableStateToString(AState: EWorkTableState): string; static;
     class function WorkTableStateFromString(const AValue: string): EWorkTableState; static;
 
@@ -498,10 +506,11 @@ private
   FOnSpillageStart: TOnSpillageStartEvent;
   FOnSpillageStop: TOnSpillageStopEvent;
   FOnStateChanged: TOnWorkTableStateChangedEvent;
+  FOnPointChanged: TOnWorkTablePointChangedEvent;
 
   procedure SetState(const ANewState: EWorkTableState);
 
-  procedure MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
+  procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasureState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
 
 
@@ -637,6 +646,7 @@ private
   property OnSpillageStart: TOnSpillageStartEvent read FOnSpillageStart write FOnSpillageStart;
   property OnSpillageStop: TOnSpillageStopEvent read FOnSpillageStop write FOnSpillageStop;
   property OnStateChanged: TOnWorkTableStateChangedEvent read FOnStateChanged write FOnStateChanged;
+  property OnPointChanged: TOnWorkTablePointChangedEvent read FOnPointChanged write FOnPointChanged;
 
   //нужно ли оставить одну  DoPumpChange ?
   procedure DoPumpStart(APumpName: string);
@@ -2570,26 +2580,7 @@ begin
   Result := IntToStr(AChannelIndex);
 end;
 
-{ Converts persisted string to spill state enum value. }
-class function TWorkTable.SpillStateFromString(const AValue: string): TSpillState;
-begin
-  if SameText(AValue, 'Ready') then
-    Exit(ssReady);
 
-  if SameText(AValue, 'Starting') then
-    Exit(ssStarting);
-
-  if SameText(AValue, 'OnGoing') then
-    Exit(ssOnGoing);
-
-  if SameText(AValue, 'Stopping') then
-    Exit(ssStopping);
-
-  if SameText(AValue, 'ResultReady') then
-    Exit(ssResultReady);
-
-  Result := ssNone;
-end;
 
 class function TWorkTable.WorkTableStateFromString(
   const AValue: string): EWorkTableState;
@@ -2653,24 +2644,7 @@ begin
   end;
 end;
 
-{ Converts spill state enum value to persisted string. }
-class function TWorkTable.SpillStateToString(AState: TSpillState): string;
-begin
-  case AState of
-    ssReady:
-      Result := 'Ready';
-    ssStarting:
-      Result := 'Starting';
-    ssOnGoing:
-      Result := 'OnGoing';
-    ssStopping:
-      Result := 'Stopping';
-    ssResultReady:
-      Result := 'ResultReady';
-  else
-    Result := 'None';
-  end;
-end;
+
 
 procedure TWorkTable.DoPumpStart(APumpName: string);
 var Pump: TPump;
@@ -2885,13 +2859,23 @@ begin
     FOnStateChanged(ANewState);
 end;
 
-procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: TSpillState);
+procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasureState);
 begin
   case AState of
-    ssStarting:
+    msStarting:
+    begin
       DoSpillageStart;
-    ssStopping, ssResultReady:
+         SetState(STATE_STARTWAIT);
+    end;
+    msOnGoing:
+    begin
+        SetState(STATE_EXECUTE);
+    end;
+    msStopping:
+    begin
       DoSpillageStop;
+      SetState(STATE_STOPTEST);
+    end;
   end;
 end;
 
@@ -3208,8 +3192,9 @@ end;
 
 function TFlowRate.IsStable : Boolean ;
 begin
+
     Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-        AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
+        AND (Value>=ValueSet*(1-AccuracyMinus/100));
 
 end;
 
@@ -3257,7 +3242,6 @@ destructor TPump.Destroy;
 begin
   inherited;
 end;
-
 
 
 
