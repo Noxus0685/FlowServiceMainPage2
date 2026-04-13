@@ -24,7 +24,8 @@ uses
   UnitRepositories in 'UnitRepositories.pas',
   UnitMeasurementRun in 'UnitMeasurementRun.pas',
   FmxHelper in 'FmxHelper.pas',
-  UnitParameter in 'UnitParameter.pas';
+  UnitParameter in 'UnitParameter.pas',
+  frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame};
 
 {$R *.res}
 

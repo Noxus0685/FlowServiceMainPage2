@@ -1,0 +1,117 @@
+object FrameMeasurementRun: TFrameMeasurementRun
+  Size.Width = 822.000000000000000000
+  Size.Height = 512.000000000000000000
+  Size.PlatformDefault = False
+  object GridMeasurmentRun: TGrid
+    Align = Client
+    CanFocus = True
+    ClipChildren = True
+    Size.Width = 822.000000000000000000
+    Size.Height = 480.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    RowCount = 1
+    OnGetValue = GridMeasurmentRunGetValue
+    Viewport.Width = 818.000000000000000000
+    Viewport.Height = 455.000000000000000000
+    object StringColumnPointer: TStringColumn
+      HeaderSettings.TextSettings.WordWrap = False
+      Size.Width = 50.000000000000000000
+    end
+    object StringColumnMRPointName: TStringColumn
+      HorzAlign = Center
+      Header = #1048#1084#1103
+      HeaderSettings.TextSettings.Trimming = Character
+      HeaderSettings.TextSettings.WordWrap = False
+      HeaderSettings.TextSettings.HorzAlign = Center
+      Size.Width = 79.000000000000000000
+    end
+    object StringColumnMRFlowRate: TStringColumn
+      Header = #1056#1072#1089#1093#1086#1076
+      HeaderSettings.TextSettings.WordWrap = False
+      Size.Width = 87.000000000000000000
+    end
+    object StringColumnMRStopCriterea: TStringColumn
+      Header = #1055#1072#1088#1084#1077#1090#1088' '#1086#1089#1090#1072#1085#1086#1074#1082#1080
+      HeaderSettings.TextSettings.WordWrap = False
+      Size.Width = 119.000000000000000000
+    end
+    object StringColumnLimitTime: TStringColumn
+      Header = #1042#1088#1077#1084#1103
+      HeaderSettings.TextSettings.WordWrap = False
+    end
+    object StringColumnLimitVolume: TStringColumn
+      Header = #1054#1073#1098#1077#1084
+      HeaderSettings.TextSettings.WordWrap = False
+    end
+    object StringColumnLimitImp: TStringColumn
+      Header = #1048#1084#1087#1091#1083#1100#1089#1099
+      HeaderSettings.TextSettings.WordWrap = False
+    end
+    object StringColumnRepeats: TStringColumn
+      Header = #1055#1086#1074#1090#1086#1088#1099
+      HeaderSettings.TextSettings.WordWrap = False
+      Size.Width = 71.000000000000000000
+    end
+    object StringColumnMRStatus: TStringColumn
+      Header = #1057#1090#1072#1090#1091#1089
+      HeaderSettings.TextSettings.WordWrap = False
+      Size.Width = 74.000000000000000000
+    end
+  end
+  object ToolBarGridMR: TToolBar
+    Size.Width = 822.000000000000000000
+    Size.Height = 32.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    object SpeedButtonPointPrev: TSpeedButton
+      Align = Left
+      Size.Width = 57.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'arrowlefttoolbutton'
+      Text = 'SpeedButtonPointPrev'
+      TextSettings.Trimming = None
+    end
+    object SpeedButtonPointNext: TSpeedButton
+      Align = Left
+      Position.X = 114.000000000000000000
+      Size.Width = 57.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'arrowrighttoolbutton'
+      Text = 'SpeedButton7'
+      TextSettings.Trimming = None
+    end
+    object SpeedButtonPause: TSpeedButton
+      Align = Left
+      Position.X = 57.000000000000000000
+      Size.Width = 57.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'pausetoolbuttonbordered'
+      Text = 'SpeedButton7'
+      TextSettings.Trimming = None
+    end
+    object SpeedButtonPointDelete: TSpeedButton
+      Align = Left
+      Position.X = 171.000000000000000000
+      Size.Width = 70.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'cleareditbutton'
+      Text = 'SpeedButtonPointDelete'
+      TextSettings.Trimming = None
+    end
+    object SpeedButtonCreatePoints: TSpeedButton
+      Align = Left
+      Position.X = 241.000000000000000000
+      Size.Width = 80.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'refreshtoolbutton'
+      Text = 'SpeedButtonCreatePoints'
+      TextSettings.Trimming = None
+    end
+  end
+end

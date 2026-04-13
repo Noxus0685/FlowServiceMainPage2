@@ -4242,21 +4242,9 @@ end;
  end;
 
 procedure TFrameMainTable.UpdateGridMesurmentRun;
-var
-  Rows: Integer;
-begin
-  if MeasurementRun <> nil then
-    Rows := MeasurementRun.Points.Count
-  else
-    Rows := 0;
 
-  GridMeasurmentRun.BeginUpdate;
-  try
-    GridMeasurmentRun.RowCount := 0;
-    GridMeasurmentRun.RowCount := Rows;
-  finally
-    GridMeasurmentRun.EndUpdate;
-  end;
+begin
+
 end;
 
 procedure TFrameMainTable.UpdateGridMRHeaders;

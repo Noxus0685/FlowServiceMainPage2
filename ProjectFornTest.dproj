@@ -271,6 +271,11 @@
         <DCCReference Include="UnitMeasurementRun.pas"/>
         <DCCReference Include="FmxHelper.pas"/>
         <DCCReference Include="UnitParameter.pas"/>
+        <DCCReference Include="frmMeasurementRun.pas">
+            <Form>FrameMeasurementRun</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
