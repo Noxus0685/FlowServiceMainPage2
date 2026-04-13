@@ -366,9 +366,9 @@ begin
       begin
         if FWorkTable <> nil then
         begin
-          FWorkTable.DoFlowRateSet(Point.Q);
-          FWorkTable.DoFluidTempStart(Point.Temp);
-          FWorkTable.DoFluidPressStart(Point.Pressure);
+          FWorkTable.FlowRate.DoFlowRateSet(Point.Q);
+          FWorkTable.FluidTemp.DoFluidTempStart(Point.Temp);
+          FWorkTable.FluidPress.DoFluidPressStart(Point.Pressure);
           if Point.LimitTime > 0 then
             FWorkTable.TimeSet := Round(Point.LimitTime);
         end;

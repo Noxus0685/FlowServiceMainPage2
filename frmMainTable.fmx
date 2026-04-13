@@ -1546,8 +1546,8 @@ object FrameMainTable: TFrameMainTable
                 OnSetValue = GridEtalonsSetValue
                 OnCellClick = GridEtalonsCellClick
                 OnCellDblClick = GridEtalonsCellDblClick
-                Viewport.Width = 804.000000000000000000
-                Viewport.Height = 79.000000000000000000
+                Viewport.Width = 808.000000000000000000
+                Viewport.Height = 120.000000000000000000
                 object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
@@ -1690,8 +1690,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridDevicesSetValue
               OnCellClick = GridDevicesCellClick
               OnCellDblClick = GridDevicesCellDblClick
-              Viewport.Width = 788.000000000000000000
-              Viewport.Height = 194.000000000000000000
+              Viewport.Width = 808.000000000000000000
+              Viewport.Height = 235.000000000000000000
               object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
@@ -1971,8 +1971,8 @@ object FrameMainTable: TFrameMainTable
               TabOrder = 0
               RowCount = 1
               OnGetValue = GridMeasurmentRunGetValue
-              Viewport.Width = 670.000000000000000000
-              Viewport.Height = 378.000000000000000000
+              Viewport.Width = 674.000000000000000000
+              Viewport.Height = 403.000000000000000000
               object StringColumn1: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
                 Size.Width = 57.000000000000000000
