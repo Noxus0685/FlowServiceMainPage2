@@ -4,6 +4,7 @@ interface
 
 uses
   fuDeviceSelect,
+  UnitParameter,
   fuTypeSelect,
   fuDeviceEdit,
   fuMeterValues,
@@ -1224,17 +1225,20 @@ begin
 end;
 
 procedure TFrameMainTable.SpeedButtonSetFlowRateClick(Sender: TObject);
+var
+AValue:double;
 begin
-FActiveWorkTable.DoFlowRateStart;
+  AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
+  //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
+  FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
+  UpdateUIFlowRate;
 end;
 
 procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
-    LayoutPump.tag:=0;
-
-    FActiveWorkTable.DoPumpStart(ComboBoxPumps.Text) ;
+    FActiveWorkTable.ActivePump.DoPumpStart(ComboBoxPumps.Text) ;
     UpdateUIPump;
 
   end;
@@ -1245,9 +1249,14 @@ var
 AValue:double;
 begin
 //AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
-AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
+  if  (LayoutFlowRate.tag=0) or (LayoutFlowRate.tag=3)  then
+  begin
+    AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
+    FActiveWorkTable.FlowRate.DoFlowRateSet(AValue);
+    UpdateUIFlowRate;
+  end;
 
-FActiveWorkTable.DoFlowRateSet(AValue);
+
 
 end;
 
@@ -1255,7 +1264,7 @@ procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
     begin
-      FActiveWorkTable.DoFreqSet(ComboBoxPumps.Text,NormalizeFloatInput(SpinBoxFreq.Text));
+      FActiveWorkTable.ActivePump.DoFreqSet(ComboBoxPumps.Text,NormalizeFloatInput(SpinBoxFreq.Text));
     end;
 end;
 
@@ -1339,16 +1348,16 @@ procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
-      LayoutPump.tag:=0;
-      FActiveWorkTable.DoPumpStop(ComboBoxPumps.Text) ;
+      FActiveWorkTable.ActivePump.DoPumpStop(ComboBoxPumps.Text) ;
+       UpdateUIPump;
       //FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
     end;
 end;
 
 procedure TFrameMainTable.Rectangle15Click(Sender: TObject);
 begin
- FActiveWorkTable.DoFlowRateStop;
-
+ FActiveWorkTable.FlowRate.DoFlowRateStop;
+ UpdateUIFlowRate;
 end;
 
 procedure TFrameMainTable.ApplyInstrumentalVisibleOrder;
@@ -3233,7 +3242,7 @@ begin
   if TryStrToFloat(EditTemp.Text, Value) then
   begin
     AValue:= FActiveWorkTable.ValueTemperture.GetDoubleBaseNum(NormalizeFloatInput(EditTemp.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
-    FActiveWorkTable.DoFluidTempStart(AValue);
+    FActiveWorkTable.FluidTemp.DoFluidTempStart(AValue);
     UpdateUIConditions;
 
   end;
@@ -3263,7 +3272,7 @@ begin
   if TryStrToFloat(EditPres.Text, Value) then
   begin
     AValue:= FActiveWorkTable.ValuePressure.GetDoubleBaseNum(NormalizeFloatInput(EditPres.text),FActiveWorkTable.ValuePressure.CurrentDimIndex);
-    FActiveWorkTable.DoFluidPressStart(AValue);
+    FActiveWorkTable.FluidPress.DoFluidPressStart(AValue);
     UpdateUIConditions;
     //EditPres.Text := FormatFloat('0.###', FActiveWorkTable.Press);
   end
@@ -4557,10 +4566,8 @@ begin
     // ((SpinBoxFreq.Text <>  '12,00') and (WorkTable.ActivePump.FreqSet = 0))  then
 
     SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet);
-
-
-      SpinBoxFreq.Min:= WorkTable.ActivePump.MinValue;
-      SpinBoxFreq.Max:= WorkTable.ActivePump.MaxValue;
+    SpinBoxFreq.Min:= WorkTable.ActivePump.Min;
+    SpinBoxFreq.Max:= WorkTable.ActivePump.Max;
 
 
     if ComboBoxPumps.Count <> 0 then
@@ -4597,21 +4604,21 @@ begin
       WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value) ;
    // else
    //   LabelFlowRate.Text := '0';
-
-  //  if LayoutFlowRate.tag=3 then
-  //  begin
+  // if LayoutFlowRate.tag = 3 then
+   // begin
       for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
         begin
           if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
             Amax:=FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
         end;
-
-
-      SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.MinValue);
+      LayoutFlowRate.tag:=2;
+      SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);
       SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
-            if FActiveWorkTable<>nil then
+      if WorkTable.FlowRate.ValueSet<>0 then
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet)
+      else
         SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
-  //  end;
+
 
 if WorkTable.FlowRate.IsRunning then
   begin
