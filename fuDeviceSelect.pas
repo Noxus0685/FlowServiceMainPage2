@@ -1146,10 +1146,9 @@ begin
 
           FoundType := FindTypeByReestrNumber(ImportedReestr, FoundRepo);
           if FoundType <> nil then
-          begin
             Dev.AttachType(FoundType, FoundRepo.Name);
-            Dev.FillFromType(FoundType);
-          end;
+
+
 
           Dev.Owner := ImportedOwner;
           Dev.ReestrNumber := ImportedReestr;

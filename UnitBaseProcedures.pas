@@ -50,6 +50,26 @@ type
     tnModification
   );
 
+    EMeasurementState = (
+      msNone,
+
+      msSelectPoint,// — Выбор точки измерения
+
+      msSelectEtalon,// — Выбор эталона
+
+      msSetupPoint,// — Установка заданной точки
+
+      msWaitStable,// — Ожидание стабилизации параметров
+
+      msMeasure,// — Проведение измерения
+
+      msResultsRead,// — Подготовка и чтение результатов
+
+      msSave,// — Сохранение результатов
+
+      msDone //— Окончание цикла измерения
+  );
+
 
 function NormalizeFloatInput(const S: string): Double;
 function FormatPercentPM(const Value: Double): string;

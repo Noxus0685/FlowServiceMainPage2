@@ -271,6 +271,7 @@ type
     procedure EditAccuracyClassTyping(Sender: TObject);
     procedure edtDocumentationTyping(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
+    procedure ComboBoxUnitsChange(Sender: TObject);
     procedure ComboBoxOutputTypeChange(Sender: TObject);
     procedure cbOutPutType2Change(Sender: TObject);
     procedure cbCoefViewTypeChange(Sender: TObject);
@@ -363,6 +364,7 @@ type
   procedure LoadDiameters;
   procedure RecalcDiametersKpByCoef;
   procedure RecalcDiametersKpByFreq;
+  procedure UpdateUnitsCombo;
     procedure UpdateUIFreq;
     procedure UpdateUICoef;
 
@@ -1489,6 +1491,26 @@ begin
   // применяем логику для выбранной величины
   ApplyMeasuredDimension;
 
+  SetModified;
+end;
+
+procedure TFormTypeEditor.ComboBoxUnitsChange(Sender: TObject);
+var
+  V: Integer;
+begin
+  if FLoading or (FType = nil) then
+    Exit;
+
+  V := ComboBoxUnits.ItemIndex;
+  if V < 0 then
+    Exit;
+
+  if V = FType.Units then
+    Exit;
+
+  FType.Units := V;
+  FType.SetDimensions;
+  ApplyMeasuredDimension;
   SetModified;
 end;
 
@@ -3775,6 +3797,7 @@ begin
 
    Dim := TMeasuredDimension(FType.MeasuredDimension);
    FType.SetDimensions;
+   UpdateUnitsCombo;
 
    cbMeasuredDimension.Hint := cbMeasuredDimension.Text;
 
@@ -3861,6 +3884,31 @@ begin
   UpdatePointsGrid;
 
   FLoading := False;
+end;
+
+procedure TFormTypeEditor.UpdateUnitsCombo;
+var
+  I: Integer;
+begin
+  ComboBoxUnits.Items.Clear;
+
+  if (FType = nil) or (FType.Dimensions = nil) then
+  begin
+    ComboBoxUnits.ItemIndex := -1;
+    Exit;
+  end;
+
+  for I := 0 to FType.Dimensions.Count - 1 do
+    ComboBoxUnits.Items.Add(FType.Dimensions[I].Name);
+
+  if (FType.Units >= 0) and (FType.Units < ComboBoxUnits.Items.Count) then
+    ComboBoxUnits.ItemIndex := FType.Units
+  else if ComboBoxUnits.Items.Count > 0 then
+    ComboBoxUnits.ItemIndex := 0
+  else
+    ComboBoxUnits.ItemIndex := -1;
+
+  ComboBoxUnits.Hint := ComboBoxUnits.Text;
 end;
 
 procedure TFormTypeEditor.ApplyVolumeMode;
