@@ -307,7 +307,7 @@
     <File Path="frmMainTable.fmx"/>
     <File Path="UnitRepositories.pas"/>
     <File Path="UnitMeasurementRun.pas"/>
+    <File Path="UnitParameter.pas"/>
     <File Path="FmxHelper.pas"/>
-    <File Path="UnitParameters.pas"/>
   </ProjectSortOrder>
 </BorlandProject>

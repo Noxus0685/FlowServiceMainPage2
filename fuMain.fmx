@@ -1398,7 +1398,7 @@ object FormMain: TFormMain
             TabOrder = 4
             Text = '0'
             Position.X = 140.000000000000000000
-            Position.Y = 92.000000000000000000
+            Position.Y = 91.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
