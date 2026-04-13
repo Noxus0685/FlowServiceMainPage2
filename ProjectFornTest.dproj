@@ -352,6 +352,7 @@
         <DCCReference Include="UnitRepositories.pas"/>
         <DCCReference Include="UnitMeasurementRun.pas"/>
         <DCCReference Include="FmxHelper.pas"/>
+        <DCCReference Include="UnitParameters.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

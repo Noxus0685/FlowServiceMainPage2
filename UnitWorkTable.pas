@@ -63,6 +63,10 @@ type
 
 
  TParameters = class(TObject)
+  type
+  TonChangeEvent =  procedure(AParam: TParameters ; FStatus : EControlStatus) of object;
+  TonActionEvent =  procedure(AParam: TParameters ; FAction : EControlAction) of object;
+
   private
     FName: string;
     FHint: string;
@@ -73,11 +77,12 @@ type
     FAccuracyPlus: Double;
     FAccuracyMinus: Double;
     FValue: Double;  // текущая
-    FSet: Double;
+    FSet: Double;    // установленная
     FBefore: Double;
     FAfter: Double;
     FDelta: Double;
     FDim: integer;
+
 
   public
     constructor Create(const AName, AHint: string); virtual;
@@ -108,6 +113,7 @@ type
 
     property MinValue: Double read FMin write SetMin;
     property MaxValue: Double read FMax write SetMax;
+
     property BeforeValue: Double read FBefore write FBefore;
     property AfterValue: Double read FAfter write FAfter;
     property DeltaValue: Double read FDelta write FDelta;
@@ -171,18 +177,6 @@ type
 
   TWorkTable = class;
 
-
-  EMeasureState = (
-    msNone,       //'Измерение не запущено'
-    msReady,      //'Готов к измерению, точки сформированы'
-    msSetup,      //'ПОдготовка условий
-    msStarting,   //'Запуск измерения'
-    msOnGoing,    //'Измерение'
-    msPause,      //'Пауза '
-    msStopping,   //'Остановка измерения'
-    msResultReady //'Результат готов'
-  );
-
   TChannel = class(TTypeEntity)
   private
     FEnabled: Boolean;
@@ -207,6 +201,8 @@ type
     FHashValueImpTotal: string;
     FHashValueCurrent: string;
     FHashValueInterface: string;
+
+
 
     // --- proxies for FlowMeter fields ---
     function GetDeviceNameProxy: string;
@@ -379,6 +375,8 @@ type
 
     FTableFlow: TFlowMeter;
 
+    FNextClimateChangeAt: TDateTime;
+
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
     FHashValueTempertureDelta: string;
@@ -510,7 +508,7 @@ private
 
   procedure SetState(const ANewState: EWorkTableState);
 
-  procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasureState);
+  procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
 
 
@@ -616,6 +614,8 @@ private
     property DataPointsGridColumns: TArray<TGridColumnLayout> read FDataPointsGridColumns write FDataPointsGridColumns;
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
 
+    property  NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
+
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
@@ -672,10 +672,16 @@ private
   procedure DoSpillageStop;
   procedure DoStateChanged(ANewState: EWorkTableState);
   procedure StartMeasurementRun(AMode: Integer = 1);
+  procedure ResetMeasurementValues;
   procedure StopMeasurementRun;
   procedure PauseMeasurementRun;
   procedure ResumeMeasurementRun;
   procedure NextMeasurementPoint;
+
+  procedure StartTest;
+  procedure StopTest;
+  procedure StartMonitor;
+  procedure StopMonitor;
 
 
   end;
@@ -2859,10 +2865,14 @@ begin
     FOnStateChanged(ANewState);
 end;
 
-procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasureState);
+procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
 begin
   case AState of
-    msStarting:
+  msNone:
+  begin
+
+  end;
+   { msStarting:
     begin
       DoSpillageStart;
          SetState(STATE_STARTWAIT);
@@ -2875,7 +2885,7 @@ begin
     begin
       DoSpillageStop;
       SetState(STATE_STOPTEST);
-    end;
+    end;  }
   end;
 end;
 
@@ -2884,6 +2894,115 @@ procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevic
 begin
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
 end;
+
+
+procedure TWorkTable.ResetMeasurementValues;
+var
+  Ch: TChannel;
+
+  procedure ResetMeter(const AMeter: TMeterValue); overload;
+  begin
+    if AMeter <> nil then
+      AMeter.Reset;
+  end;
+
+  procedure ResetMeter(const AMeter: TMeterValue; const AValue: Double); overload;
+  begin
+    if AMeter <> nil then
+      AMeter.Reset(AValue);
+  end;
+
+  procedure ResetSimulationChannelFields(const AChannel: TChannel);
+  begin
+    if AChannel = nil then
+      Exit;
+
+    AChannel.CurSec := 0;
+   // AChannel.ImpSec := 0;
+    AChannel.ImpResult := 0;
+  end;
+begin
+
+  // Сброс полей, участвующих в имитации
+  // (используются в UpdateRandomClimate/UpdateRandomSignals).
+  //FActiveWorkTable.Temp := 0;
+  //FActiveWorkTable.Press := 0;
+  FNextClimateChangeAt := 0;
+
+  Time  := 0;
+  TimeResult  := 0;
+
+ // FActiveWorkTable.FlowRate   := 0;
+
+
+  if TableFlow <> nil then
+    TableFlow.Reset;
+
+  ResetMeter(ValueTempertureBefore);
+  ResetMeter(ValueTempertureAfter);
+  ResetMeter(ValueTempertureDelta);
+  ResetMeter(ValueTemperture);
+  ResetMeter(ValuePressureBefore);
+  ResetMeter(ValuePressureAfter);
+  ResetMeter(ValuePressureDelta);
+  ResetMeter(ValuePressure);
+  ResetMeter(ValueDensity);
+  ResetMeter(ValueAirPressure);
+  ResetMeter(ValueAirTemperture);
+  ResetMeter(ValueHumidity);
+  ResetMeter(ValueTime, 0);
+  ResetMeter(ValueQuantity, 0);
+  ResetMeter(ValueFlowRate);
+
+  for Ch in DeviceChannels do
+  begin
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Reset;
+
+    ResetSimulationChannelFields(Ch);
+
+    ResetMeter(Ch.ValueImp);
+    ResetMeter(Ch.ValueImpTotal, 0);
+    ResetMeter(Ch.ValueCurrent);
+    ResetMeter(Ch.ValueInterface);
+  end;
+
+  for Ch in EtalonChannels do
+  begin
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Reset;
+
+    ResetSimulationChannelFields(Ch);
+
+    ResetMeter(Ch.ValueImp);
+    ResetMeter(Ch.ValueImpTotal, 0);
+    ResetMeter(Ch.ValueCurrent);
+    ResetMeter(Ch.ValueInterface);
+  end;
+end;
+
+  procedure TWorkTable.StartTest;
+  begin
+   ResetMeasurementValues;
+   State := STATE_STARTTEST;
+  end;
+
+   procedure TWorkTable.StartMonitor;
+  begin
+   ResetMeasurementValues;
+   State := STATE_STARTMONITOR;
+  end;
+
+  procedure TWorkTable.StopTest;
+  begin
+    State := STATE_STOPTEST;
+  end;
+
+   procedure TWorkTable.StopMonitor;
+  begin
+   ResetMeasurementValues;
+   State := STATE_STOPMONITOR;
+  end;
 
 procedure TWorkTable.StartMeasurementRun(AMode: Integer);
 begin

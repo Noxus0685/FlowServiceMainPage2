@@ -23,14 +23,14 @@ uses
 
 type
 
-
-  TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: EMeasureState) of object;
+  TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: EMeasurementState) of object;
   TMeasurementRunPointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer) of object;
 
+
+
   TMeasurementRun = class
-  private type
-    EPointStage = (psSetupPoint, psWaitStable, psMeasure, psSave, psNextPoint, psDone);
+
   private
     FWorkTable: TWorkTable;
     FPoints: TObjectList<TDevicePoint>;
@@ -45,8 +45,7 @@ type
     FManualFluidPress: Double;
     FManualTimeSet: Integer;
 
-    FState: EMeasureState;
-    FCurrentStage: EPointStage;
+    FCurrentStage: EMeasurementState;
 
     FWaitStartedTick: UInt64;
     FCurrentRepeat: Integer;
@@ -58,7 +57,7 @@ type
     FOnPointChangedFrame: TMeasurementRunPointChangedEvent;
     FOnPointChangedMain: TMeasurementRunPointChangedEvent;
 
-    procedure SetState(const ANewState: EMeasureState);
+    procedure SetState(const ANewState: EMeasurementState);
     procedure NotifyStateChanged;
     procedure NotifyPointChanged;
     function GetCurrentPoint: TDevicePoint;
@@ -85,14 +84,13 @@ type
     procedure Process;
     procedure SaveMeasurementResults;
 
-    class function SpillStateToString(AState: EMeasureState): string; static;
-    class function SpillStateFromString(const AValue: string): EMeasureState; static;
+    class function SpillStateToString(AState: EMeasurementState): string; static;
+    class function SpillStateFromString(const AValue: string): EMeasurementState; static;
 
     property WorkTable: TWorkTable read FWorkTable;
     property Points: TObjectList<TDevicePoint> read FPoints;
 
-    property State: EMeasureState read FState;
-    property Stage: EPointStage   read FCurrentStage;
+    property Stage: EMeasurementState read FCurrentStage;
 
     property Mode: EMeasurementRunMode read FMode write FMode;
     property CurrentPointIndex: Integer read FCurrentPointIndex;
@@ -258,11 +256,7 @@ begin
   ATarget.TempAccuracy := GetMostStrictAccuracy(ATarget.TempAccuracy, ASource.TempAccuracy);
 end;
 
-
-
 { TMeasurementRun }
-
-
 
 constructor TMeasurementRun.Create(AWorkTable: TWorkTable);
 begin
@@ -271,7 +265,6 @@ begin
   FPoints := TObjectList<TDevicePoint>.Create(True);
   FCriticalSection := TCriticalSection.Create;
 
-  FState := msReady;
   FCurrentPointIndex := -1;
   FMode := mrmAutomatic;
 
@@ -280,7 +273,7 @@ begin
   FManualFluidPress := 1;
   FManualTimeSet := 60;
 
-  FCurrentStage := psDone;
+  FCurrentStage := msNone;
 end;
 
 destructor TMeasurementRun.Destroy;
@@ -291,11 +284,9 @@ begin
   inherited Destroy;
 end;
 
-procedure TMeasurementRun.SetState(const ANewState: EMeasureState);
+procedure TMeasurementRun.SetState(const ANewState: EMeasurementState);
 begin
-  if FState = ANewState then
-    Exit;
-  FState := ANewState;
+
   NotifyStateChanged;
 end;
 
@@ -306,7 +297,7 @@ begin
       procedure
       begin
         if Assigned(FOnStateChangedFrame) then
-          FOnStateChangedFrame(Self, FState);
+          FOnStateChangedFrame(Self, FCurrentStage);
       end);
 
   if Assigned(FOnStateChangedMain) then
@@ -314,7 +305,7 @@ begin
       procedure
       begin
         if Assigned(FOnStateChangedMain) then
-          FOnStateChangedMain(Self, FState);
+          FOnStateChangedMain(Self, FCurrentStage);
       end);
 end;
 
@@ -501,12 +492,12 @@ begin
     end;
 
     FCurrentPointIndex := 0;
-    FCurrentStage := psSetupPoint;
+    FCurrentStage := msSelectPoint;
     FCurrentRepeat := 0;
     FForceNextPoint := False;
     FIsPaused := False;
 
-    SetState(msReady);
+//    SetState();
 
     NotifyPointChanged;
 
@@ -542,8 +533,8 @@ begin
   end;
 
   FIsPaused := False;
-  SetState(msStopping);
-  SetState(msReady);
+ // SetState(msStopping);
+  SetState(msNone);
 end;
 
 procedure TMeasurementRun.Pause;
@@ -551,7 +542,7 @@ begin
   if FIsPaused then
     Exit;
   FIsPaused := True;
-  SetState(msPause);
+  //SetState(msPause);
 end;
 
 procedure TMeasurementRun.Resume;
@@ -559,7 +550,7 @@ begin
   if not FIsPaused then
     Exit;
   FIsPaused := False;
-  SetState(msOnGoing);
+  //SetState(msOnGoing);
 end;
 
 procedure TMeasurementRun.NextPoint;
@@ -569,7 +560,7 @@ end;
 
 procedure TMeasurementRun.RunThreadProc;
 begin
-  SetState(msOnGoing);
+ // SetState(msOnGoing);
   while not TThread.CurrentThread.CheckTerminated do
   begin
     if FIsPaused then
@@ -594,17 +585,18 @@ begin
   Point := GetCurrentPoint;
   if Point = nil then
   begin
-    FCurrentStage := psDone;
-    SetState(msResultReady);
+    FCurrentStage := msDone ;
+    //SetState(msResultReady);
     Exit;
   end;
 
   case FCurrentStage of
 
    //Установка параметров точки
-    psSetupPoint:
+    msSelectPoint:
       begin
-          FWorkTable.State := STATE_STARTMONITOR;
+
+       FWorkTable.StartMonitor;
 
         if FWorkTable <> nil then
         begin
@@ -627,33 +619,33 @@ begin
 
         end;
         FWaitStartedTick := TThread.GetTickCount64;
-        FCurrentStage := psWaitStable;
+        FCurrentStage := msSelectEtalon;
       end;
 
-    psWaitStable:
+    msSetupPoint:
       begin
          //Принудительное изменение точки
         if FForceNextPoint then
         begin
-          FCurrentStage := psNextPoint;
+          FCurrentStage := msSelectPoint;
           Exit;
         end;
 
         //Если вышли на расход, то переходим к измерению
         if IsStable then
-          FCurrentStage := psMeasure
+          FCurrentStage := msMeasure
 
         //Ограничение времени ожидания стабилизации
         else if (TThread.GetTickCount64 - FWaitStartedTick) > 30000 then
-          FCurrentStage := psMeasure;
+          FCurrentStage := msMeasure;
 
       end;
 
-    psMeasure:
+    msMeasure:
       begin
         if FForceNextPoint then
         begin
-          FCurrentStage := psNextPoint;
+          FCurrentStage := msSelectPoint;
           Exit;
         end;
 
@@ -663,33 +655,33 @@ begin
 
         Inc(FCurrentRepeat);
         if FCurrentRepeat >= RepeatsTarget then
-          FCurrentStage := psSave;
+          FCurrentStage := msSave;
       end;
 
-    psSave:
+    msSave:
       begin
         SaveMeasurementResults;
-        FCurrentStage := psNextPoint;
+        FCurrentStage := msSelectPoint;
       end;
 
-    psNextPoint:
+    msResultsRead:
       begin
         FForceNextPoint := False;
         FCurrentRepeat := 0;
         Inc(FCurrentPointIndex);
         if FCurrentPointIndex >= FPoints.Count then
         begin
-          FCurrentStage := psDone;
-          SetState(msResultReady);
+          FCurrentStage := msDone;
+          SetState(msResultsRead);
         end
         else
         begin
           NotifyPointChanged;
-          FCurrentStage := psSetupPoint;
+          FCurrentStage := msSetupPoint;
         end;
       end;
 
-    psDone:
+    msDone:
       begin
         if FThread <> nil then
           FThread.Terminate;
@@ -714,40 +706,43 @@ begin
 end;
 
 { Converts persisted string to spill state enum value. }
-class function TMeasurementRun.SpillStateFromString(const AValue: string): EMeasureState;
+class function TMeasurementRun.SpillStateFromString(const AValue: string): EMeasurementState;
 begin
   if SameText(AValue, 'Готов') then
-    Exit(msReady);
+ // Exit(msNone);
 
   if SameText(AValue, 'Запуск') then
-    Exit(msStarting);
+  //  Exit(msStarting);
 
   if SameText(AValue, 'Измерние') then
-    Exit(msOnGoing);
+  ///  Exit(msOnGoing);
 
   if SameText(AValue, 'Остановка') then
-    Exit(msStopping);
+   // Exit(msStopping);
 
   if SameText(AValue, 'Сохранение') then
-    Exit(msResultReady);
+  //  Exit(msResultReady);
 
   Result := msNone;
 end;
 
 { Converts spill state enum value to persisted string. }
-class function TMeasurementRun.SpillStateToString(AState: EMeasureState): string;
+class function TMeasurementRun.SpillStateToString(AState: EMeasurementState): string;
 begin
   case AState of
+   msNone:
+          Result := '-';
+  {
     msReady:
       Result := 'Готов';
-    msStarting:
+  //  msStarting:
       Result := 'Запуск';
-    msOnGoing:
+ //   msOnGoing:
       Result := 'Измерние';
-    msStopping:
+ //   msStopping:
       Result := 'Остановка';
-    msResultReady:
-      Result := 'Сохранение';
+ //   msResultReady:
+      Result := 'Сохранение';  }
   else
     Result := '-';
   end;

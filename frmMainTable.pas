@@ -478,7 +478,7 @@ type
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
-    FNextClimateChangeAt: TDateTime;
+
     procedure OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean = False);
     procedure OpenChannelDeviceEditor(AChannel: TChannel);
     procedure SelectDeviceForChannel(AChannel: TChannel);
@@ -506,7 +506,6 @@ type
     procedure MarkChannelDeviceModified(AChannel: TChannel);
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
-    procedure ResetMeasurementValues;
     procedure RefreshPumpsCombo;
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
@@ -731,93 +730,6 @@ begin
   ButtonMonitor.Repaint;
 end;
 
-procedure TFrameMainTable.ResetMeasurementValues;
-var
-  Ch: TChannel;
-
-  procedure ResetMeter(const AMeter: TMeterValue); overload;
-  begin
-    if AMeter <> nil then
-      AMeter.Reset;
-  end;
-
-  procedure ResetMeter(const AMeter: TMeterValue; const AValue: Double); overload;
-  begin
-    if AMeter <> nil then
-      AMeter.Reset(AValue);
-  end;
-
-  procedure ResetSimulationChannelFields(const AChannel: TChannel);
-  begin
-    if AChannel = nil then
-      Exit;
-
-    AChannel.CurSec := 0;
-   // AChannel.ImpSec := 0;
-    AChannel.ImpResult := 0;
-  end;
-begin
-  if FActiveWorkTable = nil then
-    Exit;
-
-  // Сброс полей, участвующих в имитации
-  // (используются в UpdateRandomClimate/UpdateRandomSignals).
-  //FActiveWorkTable.Temp := 0;
-  //FActiveWorkTable.Press := 0;
-  FNextClimateChangeAt := 0;
-
-  FActiveWorkTable.Time  := 0;
-  FActiveWorkTable.TimeResult  := 0;
-
- // FActiveWorkTable.FlowRate   := 0;
-
-
-  if FActiveWorkTable.TableFlow <> nil then
-    FActiveWorkTable.TableFlow.Reset;
-
-  ResetMeter(FActiveWorkTable.ValueTempertureBefore);
-  ResetMeter(FActiveWorkTable.ValueTempertureAfter);
-  ResetMeter(FActiveWorkTable.ValueTempertureDelta);
-  ResetMeter(FActiveWorkTable.ValueTemperture);
-  ResetMeter(FActiveWorkTable.ValuePressureBefore);
-  ResetMeter(FActiveWorkTable.ValuePressureAfter);
-  ResetMeter(FActiveWorkTable.ValuePressureDelta);
-  ResetMeter(FActiveWorkTable.ValuePressure);
-  ResetMeter(FActiveWorkTable.ValueDensity);
-  ResetMeter(FActiveWorkTable.ValueAirPressure);
-  ResetMeter(FActiveWorkTable.ValueAirTemperture);
-  ResetMeter(FActiveWorkTable.ValueHumidity);
-  ResetMeter(FActiveWorkTable.ValueTime, 0);
-  ResetMeter(FActiveWorkTable.ValueQuantity, 0);
-  ResetMeter(FActiveWorkTable.ValueFlowRate);
-
-  for Ch in FActiveWorkTable.DeviceChannels do
-  begin
-    if Ch.FlowMeter <> nil then
-      Ch.FlowMeter.Reset;
-
-    ResetSimulationChannelFields(Ch);
-
-    ResetMeter(Ch.ValueImp);
-    ResetMeter(Ch.ValueImpTotal, 0);
-    ResetMeter(Ch.ValueCurrent);
-    ResetMeter(Ch.ValueInterface);
-  end;
-
-  for Ch in FActiveWorkTable.EtalonChannels do
-  begin
-    if Ch.FlowMeter <> nil then
-      Ch.FlowMeter.Reset;
-
-    ResetSimulationChannelFields(Ch);
-
-    ResetMeter(Ch.ValueImp);
-    ResetMeter(Ch.ValueImpTotal, 0);
-    ResetMeter(Ch.ValueCurrent);
-    ResetMeter(Ch.ValueInterface);
-  end;
-end;
-
 procedure TFrameMainTable.RefreshPumpsCombo;
 var
   Pump: TPump;
@@ -872,10 +784,17 @@ end;
 
 procedure TFrameMainTable.StartTest;
 begin
-  ResetMeasurementValues;
+
+  if FActiveWorkTable = nil then
+     Exit;
+
+  FActiveWorkTable.ResetMeasurementValues;
+  FActiveWorkTable.State := STATE_STARTTEST;
+
   MeasurementRun.Start;
-  if FActiveWorkTable <> nil then
-    FActiveWorkTable.State := STATE_STARTTEST;
+
+
+
 end;
 
 procedure TFrameMainTable.StopTest;
@@ -985,13 +904,13 @@ begin
         TestButton.Text := 'Запуск';
         TestButton.Tag := 2;
         TestButton.Enabled := False;
-        ResetMeasurementValues;
+       // ResetMeasurementValues;
       end;
 
     STATE_STARTMONITOR:
       begin
         ButtonCancel.Visible := False;
-        ResetMeasurementValues;
+       // ResetMeasurementValues;
       end;
 
     STATE_STARTMONITORWAIT:
@@ -1022,7 +941,7 @@ begin
         TestButton.Text := 'Стоп';
         TestButton.Tag := 3;
         TestButton.Enabled := True;
-        ResetMeasurementValues;
+       // ResetMeasurementValues;
       end;
 
     STATE_EXECUTE:
@@ -1142,7 +1061,7 @@ begin
   FLastClickTick := 0;
 
   Randomize;
-  FNextClimateChangeAt := Now;
+
 
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
   LayoutOrder := '';
@@ -1168,7 +1087,10 @@ begin
   SetValues;
   UpdateForm;
   if FActiveWorkTable <> nil then
-    FActiveWorkTable.State := STATE_NONE
+  begin
+    FActiveWorkTable.NextClimateChangeAt := Now;
+    FActiveWorkTable.State := STATE_NONE;
+  end
   else
     OnChangeState(STATE_NONE);
 end;
