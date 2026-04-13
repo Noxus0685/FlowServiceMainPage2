@@ -1,39 +1,23 @@
 unit frmMeasurementRun;
 
-
-
 interface
 
 uses
-  fuDeviceSelect,
-  fuTypeSelect,
-  fuDeviceEdit,
-  fuMeterValues,
-  frmCalibrCoefs,
-  frmProceed,
-  frmMainTable,
-
-  UnitParameter,
-  UnitDataManager,
-  UnitMeterValue,
-  UnitDeviceClass,
-  UnitFlowMeter,
-  UnitClasses,
-  UnitRepositories,
-  UnitWorkTable,
-  UnitBaseProcedures,
   UnitMeasurementRun,
-
-  System.Math, System.Generics.Collections, System.SysUtils, System.Types,
-  System.UITypes, System.Classes, System.Variants,
-  FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, System.Rtti,
-  FMX.Grid.Style, FMX.Filter.Effects, FMX.Colors, FMX.Effects, FMX.ListBox,
-  FMX.Edit, FMX.StdCtrls, FMX.ComboEdit, FMX.EditBox, FMX.SpinBox, FMX.Objects,
-  FMX.Grid, FMX.ScrollBox, FMX.Layouts, FMX.Controls.Presentation,
-  FMX.TabControl, FMX.Menus, System.Actions, FMX.ActnList, FMX.ListView.Types,
-  FMX.ListView.Appearances, FMX.ListView.Adapters.Base, FMX.Memo.Types,
-  FMX.Memo, FMX.DateTimeCtrls, FMX.TreeView, FMX.ListView,
-  System.IniFiles, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart;
+  UnitWorkTable,
+  UnitDeviceClass,
+  UnitClasses,
+  UnitBaseProcedures,
+  System.Math,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.Rtti,
+  FMX.Types,
+  FMX.Controls,
+  FMX.Forms,
+  FMX.Graphics,
+  FMX.Grid,
+  FMX.StdCtrls;
 
 type
   TFrameMeasurementRun = class(TFrame)
@@ -55,26 +39,186 @@ type
     StringColumnLimitVolume: TStringColumn;
     procedure GridMeasurmentRunGetValue(Sender: TObject; const ACol,
       ARow: Integer; var Value: TValue);
+    procedure GridMeasurmentRunDrawColumnCell(Sender: TObject;
+      const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
+      const Row: Integer; const Value: TValue; const State: TGridDrawStates);
+    procedure SpeedButtonCreatePointsClick(Sender: TObject);
+    procedure SpeedButtonPauseClick(Sender: TObject);
+    procedure SpeedButtonPointDeleteClick(Sender: TObject);
+    procedure SpeedButtonPointNextClick(Sender: TObject);
+    procedure SpeedButtonPointPrevClick(Sender: TObject);
   private
-    { Private declarations }
-    procedure UpdateGridMesurmentRun;
+    FActiveWorkTable: TWorkTable;
+    FInvalidPointIndexes: TList<Integer>;
+    function GetMeasurementRun: TMeasurementRun;
+    procedure SetActiveWorkTable(const Value: TWorkTable);
+    procedure AttachMeasurementRunEvents;
+    procedure DetachMeasurementRunEvents;
+    procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
+    procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
+    procedure MeasurementRunEvent(ASender: TObject; AEvent: EMeasurementEvent; const AError: TErrorInfo);
+    procedure UpdateGridMRHeaders;
+    procedure UpdateStopCriteriaColumns;
+    function IsPointInvalid(APoint: TDevicePoint): Boolean;
+    function GetRowColor(const ARow: Integer): TAlphaColor;
   public
-    { Public declarations }
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+    procedure UpdateGridMesurmentRun;
+    property MeasurementRun: TMeasurementRun read GetMeasurementRun;
+    property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
   end;
 
 implementation
 
 {$R *.fmx}
 
+constructor TFrameMeasurementRun.Create(AOwner: TComponent);
+begin
+  inherited;
+  FInvalidPointIndexes := TList<Integer>.Create;
+  SpeedButtonPointPrev.OnClick := SpeedButtonPointPrevClick;
+  SpeedButtonPointNext.OnClick := SpeedButtonPointNextClick;
+  SpeedButtonPause.OnClick := SpeedButtonPauseClick;
+  SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
+  SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
+end;
 
+destructor TFrameMeasurementRun.Destroy;
+begin
+  DetachMeasurementRunEvents;
+  FreeAndNil(FInvalidPointIndexes);
+  inherited;
+end;
 
+function TFrameMeasurementRun.GetMeasurementRun: TMeasurementRun;
+begin
+  Result := nil;
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.MeasurementRun = nil) then
+    Exit;
+  Result := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+end;
 
+procedure TFrameMeasurementRun.SetActiveWorkTable(const Value: TWorkTable);
+begin
+  if FActiveWorkTable = Value then
+    Exit;
+
+  DetachMeasurementRunEvents;
+  FActiveWorkTable := Value;
+  FInvalidPointIndexes.Clear;
+  AttachMeasurementRunEvents;
+  UpdateGridMRHeaders;
+  UpdateGridMesurmentRun;
+end;
+
+procedure TFrameMeasurementRun.AttachMeasurementRunEvents;
+begin
+  if MeasurementRun = nil then
+    Exit;
+
+  MeasurementRun.OnPointChangedFrame := MeasurementRunPointChanged;
+  MeasurementRun.OnStateChangedFrame := MeasurementRunStateChanged;
+  MeasurementRun.OnEvent := MeasurementRunEvent;
+end;
+
+procedure TFrameMeasurementRun.DetachMeasurementRunEvents;
+begin
+  if MeasurementRun = nil then
+    Exit;
+
+  MeasurementRun.OnPointChangedFrame := nil;
+  MeasurementRun.OnStateChangedFrame := nil;
+  MeasurementRun.OnEvent := nil;
+end;
+
+procedure TFrameMeasurementRun.MeasurementRunStateChanged(ASender: TObject;
+  AState: EMeasurementState);
+begin
+  UpdateGridMesurmentRun;
+end;
+
+procedure TFrameMeasurementRun.MeasurementRunPointChanged(ASender: TObject;
+  APoint: TDevicePoint; APointIndex: Integer);
+begin
+  UpdateGridMesurmentRun;
+end;
+
+procedure TFrameMeasurementRun.MeasurementRunEvent(ASender: TObject;
+  AEvent: EMeasurementEvent; const AError: TErrorInfo);
+var
+  LIdx: Integer;
+begin
+  if AEvent = mePointInvalid then
+  begin
+    LIdx := MeasurementRun.CurrentPointIndex;
+    if (LIdx >= 0) and (FInvalidPointIndexes.IndexOf(LIdx) < 0) then
+      FInvalidPointIndexes.Add(LIdx);
+  end;
+
+  UpdateGridMesurmentRun;
+end;
+
+function TFrameMeasurementRun.IsPointInvalid(APoint: TDevicePoint): Boolean;
+begin
+  Result := True;
+  if (APoint = nil) or (FActiveWorkTable = nil) then
+    Exit;
+
+  Result := (APoint.Q > 0) and ((APoint.Q < FActiveWorkTable.FlowRate.Min) or (APoint.Q > FActiveWorkTable.FlowRate.Max));
+  if Result then
+    Exit;
+
+  Result := (APoint.Temp > 0) and ((APoint.Temp < FActiveWorkTable.FluidTemp.Min) or (APoint.Temp > FActiveWorkTable.FluidTemp.Max));
+  if Result then
+    Exit;
+
+  Result := (APoint.Pressure > 0) and ((APoint.Pressure < FActiveWorkTable.FluidPress.Min) or (APoint.Pressure > FActiveWorkTable.FluidPress.Max));
+end;
+
+function TFrameMeasurementRun.GetRowColor(const ARow: Integer): TAlphaColor;
+var
+  Point: TDevicePoint;
+begin
+  Result := TAlphaColors.Null;
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) or
+     (ARow < 0) or (ARow >= MeasurementRun.Points.Count) then
+    Exit;
+
+  Point := MeasurementRun.Points[ARow];
+
+  if (FInvalidPointIndexes.IndexOf(ARow) >= 0) or IsPointInvalid(Point) then
+    Exit($FFFFECEC);
+
+  if (MeasurementRun.CurrentPointIndex = ARow) and (MeasurementRun.Stage <> msNone) and
+     (MeasurementRun.Stage <> msDone) then
+    Exit($FFF2E9FF);
+
+  if (Point <> nil) and (Point.Status >= 3) then
+    Exit($FFEAF9EA);
+end;
+
+procedure TFrameMeasurementRun.GridMeasurmentRunDrawColumnCell(Sender: TObject;
+  const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
+  const Row: Integer; const Value: TValue; const State: TGridDrawStates);
+var
+  C: TAlphaColor;
+begin
+  C := GetRowColor(Row);
+  if C = TAlphaColors.Null then
+    Exit;
+
+  Canvas.Fill.Kind := TBrushKind.Solid;
+  Canvas.Fill.Color := C;
+  Canvas.FillRect(Bounds, 0, 0, [], 1);
+end;
 
 procedure TFrameMeasurementRun.GridMeasurmentRunGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
 var
   Point: TDevicePoint;
   StopParts: TStringList;
+  RepeatsNow: Integer;
 
   function GetStopCriteriaText(APoint: TDevicePoint): string;
   begin
@@ -85,11 +229,11 @@ var
     StopParts := TStringList.Create;
     try
       if scImpulse in APoint.StopCriteria then
-        StopParts.Add(Format('%d ���', [APoint.LimitImp]));
+        StopParts.Add(Format('%d имп', [APoint.LimitImp]));
       if scVolume in APoint.StopCriteria then
-        StopParts.Add(Format('%s �', [FormatFloat('0.###', APoint.LimitVolume)]));
+        StopParts.Add(Format('%s л', [FormatFloat('0.###', APoint.LimitVolume)]));
       if scTime in APoint.StopCriteria then
-        StopParts.Add(Format('%s ���', [FormatFloat('0.###', APoint.LimitTime)]));
+        StopParts.Add(Format('%s сек', [FormatFloat('0.###', APoint.LimitTime)]));
 
       Result := Trim(StringReplace(StopParts.CommaText, ',', ', ', [rfReplaceAll]));
       Result := StringReplace(Result, '"', '', [rfReplaceAll]);
@@ -108,29 +252,98 @@ begin
   if Point = nil then
     Exit;
 
-  if GridMeasurmentRun.Columns[ACol] = StringColumnMRPointName then
+  if GridMeasurmentRun.Columns[ACol] = StringColumnPointer then
+  begin
+    if MeasurementRun.CurrentPointIndex = ARow then
+      Value := '▶'
+    else
+      Value := '';
+  end
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnMRPointName then
     Value := Point.Name
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRFlowRate then
   begin
-    if (FActiveWorkTable.ValueFlowRate <> nil) then
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
       Value := FActiveWorkTable.ValueFlowRate.GetStrNum(Point.Q)
     else
       Value := FormatFloat('0.###', Point.Q);
   end
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStopCriterea then
     Value := GetStopCriteriaText(Point)
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnLimitTime then
+    if scTime in Point.StopCriteria then
+      Value := FormatFloat('0.###', Point.LimitTime)
+    else
+      Value := '-'
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnLimitVolume then
+    if scVolume in Point.StopCriteria then
+      Value := FormatFloat('0.###', Point.LimitVolume)
+    else
+      Value := '-'
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnLimitImp then
+    if scImpulse in Point.StopCriteria then
+      Value := IntToStr(Point.LimitImp)
+    else
+      Value := '-'
+  else if GridMeasurmentRun.Columns[ACol] = StringColumnRepeats then
+  begin
+    if MeasurementRun.CurrentPointIndex = ARow then
+      RepeatsNow := MeasurementRun.CurrentRepeat + 1
+    else if Point.Status >= 3 then
+      RepeatsNow := Max(Point.Repeats, 1)
+    else
+      RepeatsNow := 0;
+
+    Value := Format('%d/%d', [RepeatsNow, Max(Point.Repeats, 1)]);
+  end
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStatus then
     Value := Point.GetStatus;
+end;
+
+procedure TFrameMeasurementRun.UpdateGridMRHeaders;
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
+    StringColumnMRFlowRate.Header := 'Расход, ' + FActiveWorkTable.ValueFlowRate.GetDimName
+  else
+    StringColumnMRFlowRate.Header := 'Расход';
+end;
+
+procedure TFrameMeasurementRun.UpdateStopCriteriaColumns;
+var
+  I: Integer;
+  P: TDevicePoint;
+  HasTime, HasVolume, HasImpulse: Boolean;
+begin
+  HasTime := False;
+  HasVolume := False;
+  HasImpulse := False;
+
+  if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
+    for I := 0 to MeasurementRun.Points.Count - 1 do
+    begin
+      P := MeasurementRun.Points[I];
+      if P = nil then
+        Continue;
+      HasTime := HasTime or (scTime in P.StopCriteria);
+      HasVolume := HasVolume or (scVolume in P.StopCriteria);
+      HasImpulse := HasImpulse or (scImpulse in P.StopCriteria);
+    end;
+
+  StringColumnLimitTime.Visible := HasTime;
+  StringColumnLimitVolume.Visible := HasVolume;
+  StringColumnLimitImp.Visible := HasImpulse;
 end;
 
 procedure TFrameMeasurementRun.UpdateGridMesurmentRun;
 var
   Rows: Integer;
 begin
-  if MeasurementRun <> nil then
+  if (MeasurementRun <> nil) and (MeasurementRun.Points <> nil) then
     Rows := MeasurementRun.Points.Count
   else
     Rows := 0;
+
+  UpdateStopCriteriaColumns;
 
   GridMeasurmentRun.BeginUpdate;
   try
@@ -139,7 +352,55 @@ begin
   finally
     GridMeasurmentRun.EndUpdate;
   end;
+
+  GridMeasurmentRun.Repaint;
 end;
 
+procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
+begin
+  if MeasurementRun <> nil then
+    MeasurementRun.Execute(mcPreviousPoint, Null);
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonPointNextClick(Sender: TObject);
+begin
+  if MeasurementRun <> nil then
+    MeasurementRun.Execute(mcNextPoint, Null);
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
+begin
+  if MeasurementRun = nil then
+    Exit;
+  MeasurementRun.Execute(mcPause, Null);
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonPointDeleteClick(Sender: TObject);
+var
+  Row: Integer;
+begin
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
+    Exit;
+
+  Row := GridMeasurmentRun.Selected;
+  if (Row < 0) or (Row >= MeasurementRun.Points.Count) then
+    Exit;
+
+  MeasurementRun.Points.Delete(Row);
+  if MeasurementRun.CurrentPointIndex = Row then
+    MeasurementRun.Execute(mcPreviousPoint, Null);
+
+  UpdateGridMesurmentRun;
+end;
+
+procedure TFrameMeasurementRun.SpeedButtonCreatePointsClick(Sender: TObject);
+begin
+  if MeasurementRun = nil then
+    Exit;
+
+  MeasurementRun.CreateSessionPoints;
+  FInvalidPointIndexes.Clear;
+  UpdateGridMesurmentRun;
+end;
 
 end.

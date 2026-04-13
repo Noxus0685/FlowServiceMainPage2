@@ -1134,8 +1134,6 @@ begin
 
   TMeasurementRun(FMeasurementRun).OnStateChangedMain := MeasurementRunStateChanged;
   TMeasurementRun(FMeasurementRun).OnPointChangedMain := MeasurementRunPointChanged;
-  TMeasurementRun(FMeasurementRun).OnStateChangedFrame := MeasurementRunStateChanged;
-  TMeasurementRun(FMeasurementRun).OnPointChangedFrame := MeasurementRunPointChanged;
 
 
  // InitMeterValues;
