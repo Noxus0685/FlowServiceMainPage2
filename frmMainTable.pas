@@ -4654,8 +4654,8 @@ begin
       WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value) ;
    // else
    //   LabelFlowRate.Text := '0';
-   if LayoutFlowRate.tag = 3 then
-    begin
+  // if LayoutFlowRate.tag = 3 then
+   // begin
       for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
         begin
           if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
@@ -4664,10 +4664,11 @@ begin
       LayoutFlowRate.tag:=2;
       SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.MinValue);
       SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
-      SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
+      if WorkTable.FlowRate.ValueSet<>0 then
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet)
+      else
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
 
-    end;
-          LayoutFlowRate.tag:=2;
 
 if WorkTable.FlowRate.IsRunning then
   begin

@@ -81,7 +81,6 @@ TParameters = class(TObject)
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
     function GetStatusAsString: string;
-    function GetActionAsString: string;
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
     procedure SetValue(AValue: Double);
@@ -123,7 +122,7 @@ TParameters = class(TObject)
     constructor Create(const APumpName: string);
     destructor Destroy; override;
     procedure SetParam(ANewFreq: Double);
-
+    function GetActionAsString: string;
     property Header: string read FHeader write FHeader;
     property PumpType : string read FPumpType write FPumpType;
 
@@ -140,6 +139,7 @@ TParameters = class(TObject)
     function IsStable: Boolean;
     procedure SetParam(ANewValue: Double);
     procedure SetParamFlowRate(ANewValue: Double);
+    function GetActionAsString: string;
   end;
 //---------------------------------
   TFluidTemp = class(TParameters)
@@ -150,6 +150,7 @@ TParameters = class(TObject)
     function IsStable: Boolean;
     constructor Create(const AName: string = 'FluidTemp');
     procedure SetParam(ASet: Double);
+    function GetActionAsString: string;
   end;
 //---------------------------------
   TFluidPress = class(TParameters)
@@ -160,6 +161,7 @@ TParameters = class(TObject)
     constructor Create(const AName: string = 'FluidPress');
     function IsStable: Boolean;
     procedure SetParam(ASet: Double);
+    function GetActionAsString: string;
 
   end;
 
@@ -2977,13 +2979,14 @@ begin
 
   if FlowRate=nil then
   Exit;
+    if not( SameValue(FlowRate.ValueSet ,ANewFlowRate, MinDouble)) then
+    begin
 
-
-
-    FluidTemp.SetParam(ANewFlowRate);
+    FlowRate.SetParam(ANewFlowRate);
     if Assigned(FOnFlowRateChange) then
       FOnFlowRateChange(FlowRate, CONTROL_ACTION_Set);
 
+    end;
    if not( FlowRate.IsRunning)  then
    begin
 
@@ -3003,12 +3006,24 @@ begin
   if FluidTemp=nil then
   Exit;
 
+  if not( SameValue(FluidTemp.ValueSet ,ATempSet, MinDouble)) then
+    begin
+
+    FluidTemp.SetParam(ATempSet);
+    if Assigned(FOnConditionTempChange) then
+      FOnConditionTempChange(FluidTemp, CONTROL_ACTION_Set);
+
+    end;
+   if not( FluidTemp.IsRunning)  then
+   begin
 
 
-  FluidTemp.SetParam(ATempSet);
+    FluidTemp.Start;
+    if Assigned(FOnConditionTempChange) then
+      FOnConditionTempChange(FluidTemp, CONTROL_ACTION_START);
+   end;
 
-  if Assigned(FOnConditionTempChange) then
-    FOnConditionTempChange(FluidTemp, CONTROL_ACTION_START);
+
 end;
 
 
@@ -3033,10 +3048,26 @@ begin
   if FluidPress = nil then
     Exit;
 
-  FluidPress.SetParam(APressSet);
 
-  if Assigned(FOnConditionPressChange) then
-    FOnConditionPressChange(FluidPress, CONTROL_ACTION_START);
+
+  if not( SameValue(FluidPress.ValueSet ,APressSet, MinDouble)) then
+    begin
+
+    FluidPress.SetParam(APressSet);
+    if Assigned(FOnConditionPressChange) then
+      FOnConditionPressChange(FluidPress, CONTROL_ACTION_Set);
+
+    end;
+   if not( FluidPress.IsRunning)  then
+   begin
+
+
+    FluidPress.Start;
+    if Assigned(FOnConditionPressChange) then
+      FOnConditionPressChange(FluidPress, CONTROL_ACTION_START);
+   end;
+
+
 end;
 
 procedure TWorkTable.DoFluidPressStop;
@@ -3432,14 +3463,22 @@ begin
 
 end;
 
-
+ function TFluidTemp.GetActionAsString: string;
+begin
+  case FAction of
+    CONTROL_ACTION_START: Result := 'Запущен';
+    CONTROL_ACTION_SET: Result := 'Установка нового значения температуры';
+    CONTROL_ACTION_STOP: Result := 'Сброшен';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
 
 
 procedure TFluidTemp.SetParam(ASet: Double);
 begin
 
-  if  SameValue(FSet ,ASet, MinDouble) then
-    Exit; // Частота не изменилась
+
     if Aset < FMin then
     Fset := FMin
   else if Aset > FMax then
@@ -3492,6 +3531,19 @@ end;
 
 
 
+ function TFluidPress.GetActionAsString: string;
+begin
+  case FAction of
+    CONTROL_ACTION_START: Result := 'Запущен';
+    CONTROL_ACTION_SET: Result := 'Установка нового значения давления';
+    CONTROL_ACTION_STOP: Result := 'Сброшен';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+
+
 
   {$ENDREGION 'TConditions'}
 
@@ -3528,6 +3580,17 @@ begin
     FSet := ANewValue;
 
   FAction := CONTROL_ACTION_SET;
+end;
+
+ function TFlowRate.GetActionAsString: string;
+begin
+  case FAction of
+    CONTROL_ACTION_START: Result := 'Запущен';
+    CONTROL_ACTION_SET: Result := 'Установка нового значения расхода';
+    CONTROL_ACTION_STOP: Result := 'Сброшен';
+  else
+    Result := 'Неизвестно';
+  end;
 end;
 
 procedure TFlowRate.SetParam(ANewValue: Double);
@@ -3584,7 +3647,16 @@ begin
 
 end;
 
-
+ function TPump.GetActionAsString: string;
+begin
+  case FAction of
+    CONTROL_ACTION_START: Result := 'Запущен';
+    CONTROL_ACTION_SET: Result := 'Изменен расход воды';
+    CONTROL_ACTION_STOP: Result := 'Сброшен';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
 
   {$ENDREGION 'TPump'}
 
@@ -3683,16 +3755,7 @@ begin
   end;
 end;
 
-function TParameters.GetActionAsString: string;
-begin
-  case FAction of
-    CONTROL_ACTION_START: Result := 'Запущен';
-    CONTROL_ACTION_SET: Result := 'Изменен расход воды';
-    CONTROL_ACTION_STOP: Result := 'Сброшен';
-  else
-    Result := 'Неизвестно';
-  end;
-end;
+
 
 
 function TParameters.GetIsRunning: Boolean;
