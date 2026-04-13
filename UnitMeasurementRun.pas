@@ -161,6 +161,7 @@ type
     property Mode: EMeasurementRunMode read FMode write FMode;
     property CurrentPointIndex: Integer read FCurrentPointIndex;
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
+    property CurrentRepeat: Integer read FCurrentRepeat;
 
     property ManualFlowRate: Double read FManualFlowRate write FManualFlowRate;
     property ManualFluidTemp: Double read FManualFluidTemp write FManualFluidTemp;

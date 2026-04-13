@@ -10,6 +10,7 @@ uses
   fuMeterValues,
   frmCalibrCoefs,
   frmProceed,
+  frmMeasurementRun,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -468,6 +469,7 @@ type
   private
 
   FActiveWorkTable: TWorkTable;
+  FFrameMeasurementRun: TFrameMeasurementRun;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -679,6 +681,7 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   TMeterValue.SaveToFile(0);
@@ -834,8 +837,7 @@ procedure TFrameMainTable.UpdateForm;
 procedure TFrameMainTable.OnChangePoint(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer);
 begin
-
-
+  UpdateGridMesurmentRun;
 end;
 
 procedure TFrameMainTable.OnChangeState(const ANewState: EWorkTableState); //ChangeStateHandler
@@ -1027,6 +1029,7 @@ begin
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
+  FFrameMeasurementRun := nil;
 
 
 
@@ -1054,6 +1057,14 @@ begin
   SetLength(FRows, 0);
 
   InitTables;
+
+  if FFrameMeasurementRun = nil then
+  begin
+    FFrameMeasurementRun := TFrameMeasurementRun.Create(Self);
+    FFrameMeasurementRun.Parent := TabItemMeasurmentRun;
+    FFrameMeasurementRun.Align := TAlignLayout.Client;
+  end;
+  FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
 
   RefreshPumpsCombo;
 
@@ -2063,6 +2074,9 @@ begin
   end
   else
     RefreshPumpsCombo;
+
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
@@ -4242,9 +4256,9 @@ end;
  end;
 
 procedure TFrameMainTable.UpdateGridMesurmentRun;
-
 begin
-
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.UpdateGridMesurmentRun;
 end;
 
 procedure TFrameMainTable.UpdateGridMRHeaders;
@@ -4510,12 +4524,8 @@ end;
 
 procedure TFrameMainTable.SpeedButtonCreatePointsClick(Sender: TObject);
 begin
-  if FActiveWorkTable = nil then
-    Exit;
-
-  ActionSessionCreatePointsExecute(Self);
-  UpdateGridMRHeaders;
-  UpdateGridMesurmentRun;
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.SpeedButtonCreatePointsClick(Sender);
 end;
 
 procedure TFrameMainTable.UpdateUIPump;

@@ -11,6 +11,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
     Size.PlatformDefault = False
     TabOrder = 0
     RowCount = 1
+    OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
     Viewport.Width = 818.000000000000000000
     Viewport.Height = 455.000000000000000000
@@ -72,6 +73,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
       StyleLookup = 'arrowlefttoolbutton'
       Text = 'SpeedButtonPointPrev'
       TextSettings.Trimming = None
+      OnClick = SpeedButtonPointPrevClick
     end
     object SpeedButtonPointNext: TSpeedButton
       Align = Left
@@ -82,6 +84,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
       StyleLookup = 'arrowrighttoolbutton'
       Text = 'SpeedButton7'
       TextSettings.Trimming = None
+      OnClick = SpeedButtonPointNextClick
     end
     object SpeedButtonPause: TSpeedButton
       Align = Left
@@ -92,6 +95,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
       StyleLookup = 'pausetoolbuttonbordered'
       Text = 'SpeedButton7'
       TextSettings.Trimming = None
+      OnClick = SpeedButtonPauseClick
     end
     object SpeedButtonPointDelete: TSpeedButton
       Align = Left
@@ -102,6 +106,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
       StyleLookup = 'cleareditbutton'
       Text = 'SpeedButtonPointDelete'
       TextSettings.Trimming = None
+      OnClick = SpeedButtonPointDeleteClick
     end
     object SpeedButtonCreatePoints: TSpeedButton
       Align = Left
@@ -112,6 +117,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
       StyleLookup = 'refreshtoolbutton'
       Text = 'SpeedButtonCreatePoints'
       TextSettings.Trimming = None
+      OnClick = SpeedButtonCreatePointsClick
     end
   end
 end
