@@ -586,43 +586,43 @@ begin
 
 
 
-  case WorkTable.MeasurementState of
+  case WorkTable.State of
     STATE_NONE:
-      FFrameMainTable.OnChangeState(STATE_STANDBY);
+      WorkTable.State := STATE_STANDBY;
 
     STATE_STANDBY:
-      FFrameMainTable.OnChangeState(STATE_CONNECTED);
+      WorkTable.State := STATE_CONNECTED;
 
     STATE_STARTMONITOR:
-      FFrameMainTable.OnChangeState(STATE_STARTMONITORWAIT);
+      WorkTable.State := STATE_STARTMONITORWAIT;
 
     STATE_STARTMONITORWAIT:
-      FFrameMainTable.OnChangeState(STATE_MONITOR);
+      WorkTable.State := STATE_MONITOR;
 
     STATE_MONITOR:
        UpdateRandomSignals(WorkTable);
 
     STATE_STOPMONITOR,
     STATE_CONFIGED:
-      FFrameMainTable.OnChangeState(STATE_CONNECTED);
+      WorkTable.State := STATE_CONNECTED;
 
     STATE_STARTTEST:
-      FFrameMainTable.OnChangeState(STATE_STARTWAIT);
+      WorkTable.State := STATE_STARTWAIT;
 
     STATE_STARTWAIT:
-      FFrameMainTable.OnChangeState(STATE_EXECUTE);
+      WorkTable.State := STATE_EXECUTE;
 
     STATE_EXECUTE:
        UpdateRandomSignals(WorkTable);
 
     STATE_STOPTEST:
-      FFrameMainTable.OnChangeState(STATE_STOPWAIT);
+      WorkTable.State := STATE_STOPWAIT;
 
     STATE_STOPWAIT:
-      FFrameMainTable.OnChangeState(STATE_COMPLETE);
+      WorkTable.State := STATE_COMPLETE;
 
     STATE_COMPLETE:
-      FFrameMainTable.OnChangeState(STATE_FINALREAD);
+      WorkTable.State := STATE_FINALREAD;
   end;
 end;
 

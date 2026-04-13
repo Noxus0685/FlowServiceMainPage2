@@ -247,6 +247,7 @@ type
     procedure EditErrorExit(Sender: TObject);
     procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
+    procedure ComboBoxUnitsChange(Sender: TObject);
     procedure EditQmaxExit(Sender: TObject);
     procedure EditQminExit(Sender: TObject);
     procedure ComboBoxOutputTypeChange(Sender: TObject);
@@ -321,6 +322,7 @@ type
      procedure UpdateUIFromDevice;
      procedure UpdateUICoef;
      procedure UpdateUIFreq;
+     procedure UpdateUnitsCombo;
      procedure InitCategoryComboEdit;
      procedure UpdatePointsGrid;
      procedure SetModified;
@@ -378,6 +380,7 @@ begin
 
     Dim := TMeasuredDimension(FDevice.MeasuredDimension);
     FDevice.SetDimensions;
+    UpdateUnitsCombo;
     cbMeasuredDimension.Hint := cbMeasuredDimension.Text;
 
     // ==================================================
@@ -438,6 +441,31 @@ begin
   finally
     FLoading := False;
   end;
+end;
+
+procedure TFormDeviceEditor.UpdateUnitsCombo;
+var
+  I: Integer;
+begin
+  ComboBoxUnits.Items.Clear;
+
+  if (FDevice = nil) or (FDevice.Dimensions = nil) then
+  begin
+    ComboBoxUnits.ItemIndex := -1;
+    Exit;
+  end;
+
+  for I := 0 to FDevice.Dimensions.Count - 1 do
+    ComboBoxUnits.Items.Add(FDevice.Dimensions[I].Name);
+
+  if (FDevice.Units >= 0) and (FDevice.Units < ComboBoxUnits.Items.Count) then
+    ComboBoxUnits.ItemIndex := FDevice.Units
+  else if ComboBoxUnits.Items.Count > 0 then
+    ComboBoxUnits.ItemIndex := 0
+  else
+    ComboBoxUnits.ItemIndex := -1;
+
+  ComboBoxUnits.Hint := ComboBoxUnits.Text;
 end;
 
 procedure TFormDeviceEditor.ApplyVolumeMode;
@@ -1385,13 +1413,6 @@ begin
   begin
     FDevice.AttachType(NewType, RepoName);
     FDeviceType := NewType;
-
-    {----------------------------------------------------}
-    { 5. Копируем данные из типа → в прибор }
-    {----------------------------------------------------}
-
-      FDevice.FillFromType(NewType);
-
   end;
 
 
@@ -1855,6 +1876,26 @@ begin
   { применяем логику для выбранной величины }
   ApplyMeasuredDimension;
 
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.ComboBoxUnitsChange(Sender: TObject);
+var
+  V: Integer;
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  V := ComboBoxUnits.ItemIndex;
+  if V < 0 then
+    Exit;
+
+  if V = FDevice.Units then
+    Exit;
+
+  FDevice.Units := V;
+  FDevice.SetDimensions;
+  ApplyMeasuredDimension;
   SetModified;
 end;
 

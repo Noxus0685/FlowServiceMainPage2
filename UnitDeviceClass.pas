@@ -153,7 +153,10 @@ type
     destructor Destroy; override;
 
     procedure Assign(ASource: TDevicePoint);
+    procedure Apply(ASource: TTypePoint);
     function GetStatus: string;
+    function GetStatusHint: string;
+
     property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
   end;
 
@@ -345,6 +348,11 @@ type
       function NormalizeActiveSessionSpillage: TSessionSpillage;
       function GetCalibrCoefTable: TCalibrCoefTable;
       procedure SetCalibrCoefTable(const Value: TCalibrCoefTable);
+      function FindDiameter(AType: TDeviceType): TDiameter;
+      procedure ApplyType(AType: TDeviceType);
+      procedure ApplyDiameter(ADiameter: TDiameter; AType: TDeviceType);
+      procedure RecalcPoints;
+      procedure CreatePointsFromType(AType: TDeviceType);
   protected
       procedure SetState(const Value: TObjectState); override;
   public
@@ -996,7 +1004,7 @@ begin
   Repeats := 0;
 
   Status := 0;
-  StatusStr := 'Измерения не производились/не анализировались.';
+  StatusStr := '-';
   ResultError := 0.0;
   AverageError := 0.0;
   StdDev := 0.0;
@@ -1614,7 +1622,49 @@ begin
     ProtocolDataPoints.Clear;
 end;
 
+procedure TDevicePoint.Apply(ASource: TTypePoint);
+begin
+  if ASource = nil then
+    Exit;
+
+  DeviceTypePointID := ASource.ID;
+  Name := ASource.Name;
+  Description := ASource.Description;
+
+  FlowRate := ASource.FlowRate;
+  Q := 0;
+  FlowAccuracy := ASource.FlowAccuracy;
+
+  Pressure := ASource.Pressure;
+  Temp := ASource.Temp;
+  TempAccuracy := ASource.TempAccuracy;
+
+  LimitImp := ASource.LimitImp;
+  LimitVolume := ASource.LimitVolume;
+  LimitTime := ASource.LimitTime;
+
+  Error := ASource.Error;
+  Pause := ASource.Pause;
+
+  RepeatsProtocol := ASource.RepeatsProtocol;
+  Repeats := ASource.Repeats;
+end;
+
 function TDevicePoint.GetStatus: string;
+begin
+  case Status of
+    0: Result := '-'; // hint :'измерения не проводились';
+    1: Result := 'в процессе';// hint :'измерение начато, но не завершено';
+    2: Result := 'прервано';// hint :'измерение начато, но завершено досрочно, не окончено';
+    3: Result := 'закончено';// hint :'измерение завершено корректно';
+    4: Result := 'отменено';// hint :'измерение завершено корректно и результаты отменены';
+    5: Result := 'сохранено';// hint :'измерение завершено корректно и результаты сохранены';
+  else
+    Result := 'неизвестный статус';
+  end;
+end;
+
+function TDevicePoint.GetStatusHint: string;
 begin
   case Status of
     0: Result := 'измерения не проводились';
@@ -2305,29 +2355,64 @@ begin
   end;
 end;
 
-procedure TDevice.AttachType(AType: TDeviceType; RepoName: String);
+function TDevice.FindDiameter(AType: TDeviceType): TDiameter;
 begin
-  FDeviceType := AType;
+  Result := nil;
 
-  // синхронизируем данные устройства
-  DeviceTypeUUID := AType.UUID;
-  DeviceTypeName := AType.Name;
-  DeviceTypeRepo := RepoName;
-  RepoTypeName := RepoName;
+  if AType = nil then
+    Exit;
 
+  for var D in AType.Diameters do
+    if AType.SelectedDiameterID = D.ID then
+      Exit(D);
+
+  for var D in AType.Diameters do
+    if SameText(D.DN, DN) or SameText(D.Name, DN) then
+      Exit(D);
+
+  if AType.Diameters.Count > 0 then
+    Result := AType.Diameters[0];
 end;
 
-procedure TDevice.AttachDN(ADiameter: TDiameter; AType: TDeviceType);
-var
-  I: Integer;
-  P: TDevicePoint;
-  Q, V, Tm, LCoef: Double;
+procedure TDevice.ApplyType(AType: TDeviceType);
+begin
+  if AType = nil then
+    Exit;
+
+  Modification := AType.Modification;
+  Manufacturer := AType.Manufacturer;
+  AccuracyClass := AType.AccuracyClass;
+  ReestrNumber := AType.ReestrNumber;
+  Category := AType.Category;
+  CategoryName := AType.CategoryName;
+
+  MeasuredDimension := AType.MeasuredDimension;
+  Units := AType.Units;
+  SetDimensions;
+  OutputType := AType.OutputType;
+  OutputSet := AType.OutputSet;
+  DimensionCoef := AType.DimensionCoef;
+  SpillageStop := AType.SpillageStop;
+
+  Freq := AType.Freq;
+  VoltageRange := AType.VoltageRange;
+  VoltageQminRate := AType.VoltageQminRate;
+  VoltageQmaxRate := AType.VoltageQmaxRate;
+  CurrentRange := AType.CurrentRange;
+  CurrentQminRate := AType.CurrentQminRate;
+  CurrentQmaxRate := AType.CurrentQmaxRate;
+  IntegrationTime := AType.IntegrationTime;
+
+  VerificationMethod := AType.VerificationMethod;
+  ProcedureName := AType.ProcedureName;
+  ReportingForm := AType.ReportingForm;
+  Documentation := AType.Documentation;
+end;
+
+procedure TDevice.ApplyDiameter(ADiameter: TDiameter; AType: TDeviceType);
 begin
   if ADiameter = nil then
-  begin
-    SyncNameWithModificationAndDiameter;
     Exit;
-  end;
 
   if (AType <> nil) and (FDeviceType <> AType) then
     FDeviceType := AType;
@@ -2337,36 +2422,97 @@ begin
   Qmin := ADiameter.Qmin;
 
   if Qmin > 0 then
-    RangeDynamic := Qmax / Qmin;
+    RangeDynamic := Qmax / Qmin
+  else
+    RangeDynamic := 0;
 
   Coef := ADiameter.Kp;
-  FreqFlowRate:= ADiameter.QFmax;
+  FreqFlowRate := ADiameter.QFmax;
+end;
 
-  LCoef := Coef;
-  if (Points <> nil) and (LCoef > 0) then
-    for I := 0 to Points.Count - 1 do
+procedure TDevice.RecalcPoints;
+var
+  I: Integer;
+  P: TDevicePoint;
+  LQ, V, Tm: Double;
+begin
+  if (Points = nil) or (Coef <= 0) then
+    Exit;
+
+  for I := 0 to Points.Count - 1 do
+  begin
+    P := Points[I];
+    LQ := P.FlowRate * Qmax;
+    P.Q := LQ;
+
+    if (LQ > 0) and (P.LimitTime > 0) then
     begin
-      P := Points[I];
-      Q := P.FlowRate;
-
-      if (Q > 0) and (P.LimitTime > 0) then
-      begin
-        Tm := P.LimitTime;
-        V := Q * Tm / 3.6;
-        P.LimitVolume := V;
-        P.LimitImp := Round(V * LCoef);
-      end;
+      Tm := P.LimitTime;
+      V := LQ * Tm / 3.6;
+      P.LimitVolume := V;
+      P.LimitImp := Round(V * Coef);
     end;
+  end;
+end;
+
+procedure TDevice.CreatePointsFromType(AType: TDeviceType);
+var
+  TP: TTypePoint;
+  DP: TDevicePoint;
+begin
+  if AType = nil then
+    Exit;
+
+  if Points = nil then
+    Points := TObjectList<TDevicePoint>.Create(True);
+
+  Points.Clear;
+
+  for TP in AType.Points do
+  begin
+    DP := AddPoint;
+    DP.Apply(TP);
+    DP.SpillageStop := SpillageStop;
+  end;
+end;
+
+procedure TDevice.AttachType(AType: TDeviceType; RepoName: String);
+begin
+  if AType = nil then
+    Exit;
+
+  FDeviceType := AType;
+  DeviceTypeUUID := AType.UUID;
+  DeviceTypeName := AType.Name;
+  DeviceTypeRepo := RepoName;
+  RepoTypeName := RepoName;
+
+  FillFromType(AType);
+end;
+
+procedure TDevice.AttachDN(ADiameter: TDiameter; AType: TDeviceType);
+begin
+  if ADiameter = nil then
+  begin
+    SyncNameWithModificationAndDiameter;
+    Exit;
+  end;
+
+  ApplyDiameter(ADiameter, AType);
+  RecalcPoints;
 
   SyncNameWithModificationAndDiameter;
 end;
 
 procedure TDevice.AttachDN(ADN: String; AType: TDeviceType);
 var
-  ADiameter: TDiameter;
+  LDiameter: TDiameter;
 begin
-  ADiameter:=AType.FindDiameterByDN(ADN);
-  AttachDN(ADiameter, AType);
+  if AType = nil then
+    Exit;
+
+  LDiameter := AType.FindDiameterByDN(ADN);
+  Self.AttachDN(LDiameter, AType); // вызов overload с TDiameter (не рекурсия)
 end;
 
 procedure TDevice.SyncNameWithModificationAndDiameter;
@@ -2390,145 +2536,20 @@ end;
 procedure TDevice.FillFromType(AType: TDeviceType; const APreservePointsAndSerial: Boolean);
 var
   TD: TDiameter;
-  TP: TTypePoint;
-  DP: TDevicePoint;
-
-  Qmax, Q, V, Tm, Coef: Double;
 begin
   if AType = nil then
     Exit;
 
-  {====================================================}
-  { 1. Основные параметры }
-  {====================================================}
-  Modification      := AType.Modification;
-  Manufacturer      := AType.Manufacturer;
-  AccuracyClass     := AType.AccuracyClass;
-  ReestrNumber      := AType.ReestrNumber;
-  Category          := AType.Category;
-  CategoryName      := AType.CategoryName;
-
-  {====================================================}
-  { 2. Измерения }
-  {====================================================}
-  MeasuredDimension := AType.MeasuredDimension;
-  Units             := AType.Units;
-  SetDimensions;
-  OutputType        := AType.OutputType;
-  OutputSet         := AType.OutputSet;
-  DimensionCoef     := AType.DimensionCoef;
-  SpillageStop      := AType.SpillageStop;
-
-  {====================================================}
-  { 3. Сигналы }
-  {====================================================}
-  Freq              := AType.Freq;
-
-  VoltageRange      := AType.VoltageRange;
-  VoltageQminRate   := AType.VoltageQminRate;
-  VoltageQmaxRate   := AType.VoltageQmaxRate;
-
-  CurrentRange      := AType.CurrentRange;
-  CurrentQminRate   := AType.CurrentQminRate;
-  CurrentQmaxRate   := AType.CurrentQmaxRate;
-
-  IntegrationTime   := AType.IntegrationTime;
-
-  {====================================================}
-  { 4. Прочее }
-  {====================================================}
-  VerificationMethod := AType.VerificationMethod;
-  ProcedureName     := AType.ProcedureName;
-  ReportingForm     := AType.ReportingForm;
-  Documentation     := AType.Documentation;
-
-   {====================================================}
-  { 5. Поиск диаметра типа по DN прибора }
-  {====================================================}
-  TD := nil;
-
-
-
-   for var D in AType.Diameters do
-    if AType.SelectedDiameterID = D.ID then
-    begin
-      TD := D;
-      Break;
-    end;
-
-  // 1️⃣ Пытаемся найти совпадение по DN / Name
-  if (TD = nil) then
-  for var D in AType.Diameters do
-    if SameText(D.DN, DN) or SameText(D.Name, DN) then
-    begin
-      TD := D;
-      Break;
-    end;
-
-  // 2️⃣ Если не найден — берём первый диаметр
-  if (TD = nil) and (AType.Diameters.Count > 0) then
-    TD := AType.Diameters[0];
-
-  // 3️⃣ Если диаметров нет вообще — выходим
+  FDeviceType := AType;
+  ApplyType(AType);
+  TD := FindDiameter(AType);
   if TD <> nil then
-   begin
-   Self.DN := TD.Name;
-
-  {====================================================}
-  { 6. Назначаем параметры диаметра }
-  {====================================================}
-  Self.Qmax := TD.Qmax;
-  Self.Qmin := TD.Qmin;
-  Self.RangeDynamic := TD.Qmax / Max(TD.Qmin, 1e-6);
-  Self.Coef := TD.Kp;
-  Self.FreqFlowRate:= TD.QFmax;
-   end;
+    ApplyDiameter(TD, AType);
 
   if not APreservePointsAndSerial then
-  begin
-    {====================================================}
-    { 7. Пересоздаём точки прибора }
-    {====================================================}
-    Points.Clear;
+    CreatePointsFromType(AType);
 
-    for TP in AType.Points do
-    begin
-      DP := Self.AddPoint;
-
-      {--- базовые поля ---}
-      DP.Name           := TP.Name;
-      DP.Description    := TP.Description;
-      DP.Pressure       := TP.Pressure;
-      DP.Temp           := TP.Temp;
-      DP.FlowAccuracy   := TP.FlowAccuracy;
-      DP.Error          := TP.Error;
-      DP.Pause          := TP.Pause;
-      DP.Repeats        := TP.Repeats;
-      DP.RepeatsProtocol:= TP.RepeatsProtocol;
-      DP.SpillageStop   := SpillageStop;
-
-      {--- расчёт  Rate расхода ---}
-      DP.FlowRate := TP.FlowRate;
-
-      DP.Q :=  DP.FlowRate * Qmax;
-      {--- расчёт по времени / импульсам ---}
-      if (DP.Q > 0) and (TP.LimitTime > 0) then
-      begin
-        Tm := TP.LimitTime;
-        V  := Q * Tm / 3.6;
-
-        DP.LimitTime   := Tm;
-        DP.LimitVolume := V;
-        DP.LimitImp    := Round(V * Coef);
-      end
-      else
-      begin
-        DP.LimitTime   := TP.LimitTime;
-        DP.LimitVolume := TP.LimitVolume;
-        DP.LimitImp    := TP.LimitImp;
-      end;
-    end;
-  end;
+  RecalcPoints;
 
   SyncNameWithModificationAndDiameter;
 end;

@@ -1155,7 +1155,6 @@ begin
        ADevice.AttachType(AType,FoundRepo.Name);
     end;
 
-    ADevice.FillFromType(AType);
     end;
    end;
 end;

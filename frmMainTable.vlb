@@ -64,9 +64,6 @@ Coordinates=151,920,138,36
 [TabItemWorkTable1]
 Coordinates=10,920,131,36
 
-[Label1]
-Coordinates=160,234,53,58
-
 [MenuItemDevicesClearRow]
 Coordinates=1498,874,173,36
 
@@ -277,9 +274,6 @@ Coordinates=1502,736,193,36
 [TimerMain]
 Coordinates=1393,974,75,36
 
-[Switch1]
-Coordinates=1047,302,65,58
-
 [ActionFillAllTypes]
 Coordinates=1829,496,117,36
 
@@ -340,9 +334,6 @@ Coordinates=73,736,79,36
 [Line13]
 Coordinates=10,736,53,36
 
-[Layout42]
-Coordinates=1586,690,67,36
-
 [Line1]
 Coordinates=1530,690,46,36
 
@@ -372,9 +363,6 @@ Coordinates=964,690,109,36
 
 [StringColumnEtalonError1]
 Coordinates=789,690,165,36
-
-[SpeedButtonSpillageStop]
-Coordinates=1300,166,161,58
 
 [Layout3]
 Coordinates=719,690,60,36
@@ -450,9 +438,6 @@ Coordinates=804,644,225,36
 
 [LabelFlowRate]
 Coordinates=584,370,100,58
-
-[SpeedButtonSpillageStart]
-Coordinates=986,234,162,58
 
 [Rectangle9]
 Coordinates=714,644,80,36
@@ -547,9 +532,6 @@ Coordinates=10,598,168,36
 [StringColumnDeviceName1]
 Coordinates=1468,552,173,36
 
-[Circle1]
-Coordinates=1403,552,55,36
-
 [PopupColumnEtalonSignal1]
 Coordinates=1218,552,175,36
 
@@ -640,9 +622,6 @@ Coordinates=969,506,140,36
 [CheckColumnDeviceEnable1]
 Coordinates=778,506,181,36
 
-[SpeedButtonTest]
-Coordinates=406,302,114,58
-
 [ComboEdit8]
 Coordinates=896,10,86,102
 
@@ -651,9 +630,6 @@ Coordinates=621,506,147,36
 
 [TabControlWorkTables]
 Coordinates=464,506,147,36
-
-[Rectangle13]
-Coordinates=367,506,87,36
 
 [LayoutPump]
 Coordinates=271,506,86,36
@@ -740,7 +716,7 @@ Coordinates=697,438,187,36
 Coordinates=10,10,117,146
 
 []
-Coordinates=800,10,86,102
+Coordinates=986,234,162,58
 Visible=True
 
 [PanelEtalons1]
@@ -754,4 +730,13 @@ Coordinates=361,874,60,36
 
 [PanelDevices1]
 Coordinates=1247,920,55,36
+
+[LayoutPressure]
+Coordinates=1586,690,67,36
+
+[LabelAuto]
+Coordinates=160,234,53,58
+
+[SwitchAuto]
+Coordinates=1047,302,65,58
 

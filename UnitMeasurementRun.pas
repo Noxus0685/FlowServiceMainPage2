@@ -1,41 +1,52 @@
-unit UnitMeasurementRun;
+﻿unit UnitMeasurementRun;
 
 interface
 
 uses
+  UnitBaseProcedures,
+  UnitWorkTable,
+  UnitDeviceClass,
+  UnitClasses,
+  UnitRepositories,
+  UnitFlowMeter,
+  UnitMeterValue,
+  UnitDataManager,
+
   System.SysUtils,
   System.Classes,
   System.SyncObjs,
   System.Generics.Collections,
-  UnitWorkTable,
-  UnitDeviceClass,
-  UnitClasses;
+
+  System.Math,
+  System.StrUtils,
+  System.IniFiles;
 
 type
-  TMeasurementRunMode = (mrmManual, mrmAutomatic);
 
-  TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: TSpillState) of object;
+  TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: EMeasurementState) of object;
   TMeasurementRunPointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer) of object;
 
+
+
   TMeasurementRun = class
-  private type
-    TPointStage = (psSetupPoint, psWaitStable, psMeasure, psSave, psNextPoint, psDone);
+
   private
     FWorkTable: TWorkTable;
     FPoints: TObjectList<TDevicePoint>;
-    FState: TSpillState;
+
     FCurrentPointIndex: Integer;
     FThread: TThread;
     FCriticalSection: TCriticalSection;
-    FMode: TMeasurementRunMode;
+    FMode: EMeasurementRunMode;
 
     FManualFlowRate: Double;
     FManualFluidTemp: Double;
     FManualFluidPress: Double;
     FManualTimeSet: Integer;
 
-    FCurrentStage: TPointStage;
+    FCurrentStage: EMeasurementState;
+
     FWaitStartedTick: UInt64;
     FCurrentRepeat: Integer;
     FIsPaused: Boolean;
@@ -46,7 +57,7 @@ type
     FOnPointChangedFrame: TMeasurementRunPointChangedEvent;
     FOnPointChangedMain: TMeasurementRunPointChangedEvent;
 
-    procedure SetState(const ANewState: TSpillState);
+    procedure SetState(const ANewState: EMeasurementState);
     procedure NotifyStateChanged;
     procedure NotifyPointChanged;
     function GetCurrentPoint: TDevicePoint;
@@ -60,6 +71,7 @@ type
     constructor Create(AWorkTable: TWorkTable);
     destructor Destroy; override;
 
+    procedure CreateSession;
     procedure CreateSessionPoints;
     function IsSessionPointFit(ADevice: TDevice; APoint: TDevicePoint): Boolean;
 
@@ -72,10 +84,15 @@ type
     procedure Process;
     procedure SaveMeasurementResults;
 
+    class function SpillStateToString(AState: EMeasurementState): string; static;
+    class function SpillStateFromString(const AValue: string): EMeasurementState; static;
+
     property WorkTable: TWorkTable read FWorkTable;
     property Points: TObjectList<TDevicePoint> read FPoints;
-    property State: TSpillState read FState;
-    property Mode: TMeasurementRunMode read FMode write FMode;
+
+    property Stage: EMeasurementState read FCurrentStage;
+
+    property Mode: EMeasurementRunMode read FMode write FMode;
     property CurrentPointIndex: Integer read FCurrentPointIndex;
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
 
@@ -96,6 +113,149 @@ type
 
 implementation
 
+function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
+var
+  Normalized: string;
+  Value: Double;
+begin
+  Result := False;
+  AMin := 0;
+  AMax := 0;
+
+  Normalized := NormalizeAccuracyInput(AAccuracy);
+  if Normalized = '' then
+    Exit;
+
+  if StartsText('+', Normalized) then
+  begin
+    Value := Abs(NormalizeFloatInput(Copy(Normalized, 2, MaxInt)));
+    AMin := 0;
+    AMax := Value;
+  end
+  else if StartsText('-', Normalized) then
+  begin
+    Value := Abs(NormalizeFloatInput(Copy(Normalized, 2, MaxInt)));
+    AMin := -Value;
+    AMax := 0;
+  end
+  else
+  begin
+    Value := Abs(NormalizeFloatInput(Normalized));
+    AMin := -Value;
+    AMax := Value;
+  end;
+
+  Result := True;
+end;
+
+function GetAccuracyWidth(const AAccuracy: string): Double;
+var
+  MinVal, MaxVal: Double;
+begin
+  if not AccuracyToRange(AAccuracy, MinVal, MaxVal) then
+    Exit(MaxDouble);
+  Result := MaxVal - MinVal;
+end;
+
+function IsFlowFit(AQ1: Double; AAccuracy: string; AQ2: Double): Boolean;
+var
+  MinPercent, MaxPercent: Double;
+  MinQ, MaxQ: Double;
+  TempValue: Double;
+begin
+  if AQ1 <= 0 then
+    Exit(SameValue(AQ1, AQ2));
+
+  if not AccuracyToRange(AAccuracy, MinPercent, MaxPercent) then
+  begin
+    MinPercent := -10;
+    MaxPercent := 10;
+  end;
+
+  MinQ := AQ1 + (AQ1 * MinPercent / 100.0);
+  MaxQ := AQ1 + (AQ1 * MaxPercent / 100.0);
+
+  if MinQ > MaxQ then
+  begin
+    TempValue := MinQ;
+    MinQ := MaxQ;
+    MaxQ := TempValue;
+  end;
+
+  Result := InRange(AQ2, MinQ, MaxQ);
+end;
+
+function IsTemperatureFit(ATemp1: Double; ATempAccuracy: string; ATemp2: Double): Boolean;
+var
+  MinDelta, MaxDelta: Double;
+  Delta: Double;
+begin
+  if SameValue(ATemp1, 0) and SameValue(ATemp2, 0) then
+    Exit(True);
+
+  if SameValue(ATemp1, 0) xor SameValue(ATemp2, 0) then
+    Exit(False);
+
+  if not AccuracyToRange(ATempAccuracy, MinDelta, MaxDelta) then
+    Exit(SameValue(ATemp1, ATemp2));
+
+  Delta := ATemp2 - ATemp1;
+  Result := InRange(Delta, MinDelta, MaxDelta);
+end;
+
+function GetMostStrictAccuracy(const A1, A2: string): string;
+begin
+  if Trim(A1) = '' then
+    Exit(A2);
+  if Trim(A2) = '' then
+    Exit(A1);
+
+  if GetAccuracyWidth(A1) <= GetAccuracyWidth(A2) then
+    Result := A1
+  else
+    Result := A2;
+end;
+
+function IsStopCriteriaFit(ADevicePoint, ASessionPoint: TDevicePoint): Boolean;
+begin
+  Result := True;
+  if (ADevicePoint = nil) or (ASessionPoint = nil) then
+    Exit(False);
+
+  if (scImpulse in ASessionPoint.StopCriteria) and (ADevicePoint.LimitImp < ASessionPoint.LimitImp) then
+    Exit(False);
+
+  if (scVolume in ASessionPoint.StopCriteria) and (ADevicePoint.LimitVolume < ASessionPoint.LimitVolume) then
+    Exit(False);
+
+  if (scTime in ASessionPoint.StopCriteria) and (ADevicePoint.LimitTime < ASessionPoint.LimitTime) then
+    Exit(False);
+end;
+
+function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
+begin
+  Result := (AP1 <> nil) and (AP2 <> nil)
+    and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.Q)
+    and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.Temp);
+end;
+
+procedure MergePointParams(ATarget, ASource: TDevicePoint);
+begin
+  if (ATarget = nil) or (ASource = nil) then
+    Exit;
+
+  ATarget.StopCriteria := ATarget.StopCriteria + ASource.StopCriteria;
+  ATarget.LimitImp := Max(ATarget.LimitImp, ASource.LimitImp);
+  ATarget.LimitVolume := Max(ATarget.LimitVolume, ASource.LimitVolume);
+  ATarget.LimitTime := Max(ATarget.LimitTime, ASource.LimitTime);
+  ATarget.Pause := Max(ATarget.Pause, ASource.Pause);
+  ATarget.RepeatsProtocol := Max(ATarget.RepeatsProtocol, ASource.RepeatsProtocol);
+  ATarget.Repeats := Max(ATarget.Repeats, ASource.Repeats);
+  ATarget.Pressure := Max(ATarget.Pressure, ASource.Pressure);
+  ATarget.FlowAccuracy := GetMostStrictAccuracy(ATarget.FlowAccuracy, ASource.FlowAccuracy);
+  ATarget.TempAccuracy := GetMostStrictAccuracy(ATarget.TempAccuracy, ASource.TempAccuracy);
+end;
+
 { TMeasurementRun }
 
 constructor TMeasurementRun.Create(AWorkTable: TWorkTable);
@@ -105,7 +265,6 @@ begin
   FPoints := TObjectList<TDevicePoint>.Create(True);
   FCriticalSection := TCriticalSection.Create;
 
-  FState := ssReady;
   FCurrentPointIndex := -1;
   FMode := mrmAutomatic;
 
@@ -114,7 +273,7 @@ begin
   FManualFluidPress := 1;
   FManualTimeSet := 60;
 
-  FCurrentStage := psDone;
+  FCurrentStage := msNone;
 end;
 
 destructor TMeasurementRun.Destroy;
@@ -125,11 +284,9 @@ begin
   inherited Destroy;
 end;
 
-procedure TMeasurementRun.SetState(const ANewState: TSpillState);
+procedure TMeasurementRun.SetState(const ANewState: EMeasurementState);
 begin
-  if FState = ANewState then
-    Exit;
-  FState := ANewState;
+
   NotifyStateChanged;
 end;
 
@@ -140,7 +297,7 @@ begin
       procedure
       begin
         if Assigned(FOnStateChangedFrame) then
-          FOnStateChangedFrame(Self, FState);
+          FOnStateChangedFrame(Self, FCurrentStage);
       end);
 
   if Assigned(FOnStateChangedMain) then
@@ -148,7 +305,7 @@ begin
       procedure
       begin
         if Assigned(FOnStateChangedMain) then
-          FOnStateChangedMain(Self, FState);
+          FOnStateChangedMain(Self, FCurrentStage);
       end);
 end;
 
@@ -190,13 +347,13 @@ begin
   if (FWorkTable = nil) then
     Exit;
 
-  if FWorkTable.FlowRate <> nil then
+  if (FWorkTable.FlowRate <> nil) and (GetCurrentPoint.Q<>0)  then
     Result := Result and FWorkTable.FlowRate.IsStable;
 
-  if FWorkTable.FluidTemp <> nil then
+  if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp<>0) then
     Result := Result and FWorkTable.FluidTemp.IsStable;
 
-  if FWorkTable.FluidPress <> nil then
+  if (FWorkTable.FluidPress <> nil) and  (GetCurrentPoint.Pressure<>0) then
     Result := Result and FWorkTable.FluidPress.IsStable;
 end;
 
@@ -205,7 +362,7 @@ begin
   Result := (FThread = nil) or FThread.CheckTerminated;
 end;
 
-procedure TMeasurementRun.CreateSessionPoints;
+procedure TMeasurementRun.CreateSession;
 var
   SourcePoint: TDevicePoint;
   ManualPoint: TDevicePoint;
@@ -215,13 +372,13 @@ begin
   if FMode = mrmManual then
   begin
     ManualPoint := TDevicePoint.Create(0);
-    ManualPoint.FlowRate := FManualFlowRate;
-    ManualPoint.Q := FManualFlowRate;
-    ManualPoint.Temp := FManualFluidTemp;
-    ManualPoint.Pressure := FManualFluidPress;
-    ManualPoint.LimitTime := FManualTimeSet;
-    ManualPoint.Repeats := 1;
-    ManualPoint.RepeatsProtocol := 1;
+    ManualPoint.FlowRate := 1; //FManualFlowRate;
+    ManualPoint.Q := FWorkTable.FlowRate.ValueSet;
+    ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet;
+    ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet;
+    ManualPoint.LimitTime := FWorkTable.TimeSet;
+    ManualPoint.Repeats := FWorkTable.Repeats;
+    ManualPoint.RepeatsProtocol := FWorkTable.Repeats;
     ManualPoint.Num := 1;
     FPoints.Add(ManualPoint);
     Exit;
@@ -230,22 +387,92 @@ begin
   if FWorkTable = nil then
     Exit;
 
-  FWorkTable.CreateSessionPoints;
-
+  CreateSessionPoints;
+   {
   for SourcePoint in FWorkTable.Points do
   begin
     ManualPoint := TDevicePoint.Create(0);
     ManualPoint.Assign(SourcePoint);
     FPoints.Add(ManualPoint);
   end;
+  }
+end;
+
+procedure TMeasurementRun.CreateSessionPoints;
+var
+  Channel: TChannel;
+  Device: TDevice;
+  SourcePoint: TDevicePoint;
+  SessionPoint: TDevicePoint;
+  ExistingPoint: TDevicePoint;
+begin
+  if FPoints = nil then
+    FPoints := TObjectList<TDevicePoint>.Create(True);
+
+  FPoints.Clear;
+
+  for Channel in FWorkTable.DeviceChannels do
+  begin
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    Device := Channel.FlowMeter.Device;
+    if (Device = nil) or (Device.Points = nil) then
+      Continue;
+
+    for SourcePoint in Device.Points do
+    begin
+      ExistingPoint := nil;
+      for SessionPoint in FPoints do
+        if IsPointEquivalent(SessionPoint, SourcePoint) then
+        begin
+          ExistingPoint := SessionPoint;
+          Break;
+        end;
+
+      if ExistingPoint = nil then
+      begin
+        SessionPoint := TDevicePoint.Create(0);
+        SessionPoint.Assign(SourcePoint);
+        SessionPoint.Status:=0;
+        FPoints.Add(SessionPoint);
+      end
+      else
+        MergePointParams(ExistingPoint, SourcePoint);
+    end;
+  end;
 end;
 
 function TMeasurementRun.IsSessionPointFit(ADevice: TDevice; APoint: TDevicePoint): Boolean;
+var
+  DevicePoint: TDevicePoint;
 begin
   Result := False;
-  if FWorkTable = nil then
+  if (ADevice = nil) or (APoint = nil) or (ADevice.Points = nil) then
     Exit;
-  Result := FWorkTable.IsSessionPointFit(ADevice, APoint);
+
+  for DevicePoint in ADevice.Points do
+  begin
+    if not IsFlowFit(DevicePoint.Q, DevicePoint.FlowAccuracy, APoint.Q) then
+      Continue;
+
+    if not IsTemperatureFit(DevicePoint.Temp, DevicePoint.TempAccuracy, APoint.Temp) then
+      Continue;
+
+    if not IsStopCriteriaFit(DevicePoint, APoint) then
+      Continue;
+
+    if DevicePoint.Pause < APoint.Pause then
+      Continue;
+
+    if DevicePoint.RepeatsProtocol < APoint.RepeatsProtocol then
+      Continue;
+
+    if DevicePoint.Repeats < APoint.Repeats then
+      Continue;
+
+    Exit(True);
+  end;
 end;
 
 procedure TMeasurementRun.Start;
@@ -260,16 +487,18 @@ begin
     CreateSessionPoints;
     if FPoints.Count = 0 then
     begin
-      SetState(ssReady);
+      SetState(msNone);
       Exit;
     end;
 
     FCurrentPointIndex := 0;
-    FCurrentStage := psSetupPoint;
+    FCurrentStage := msSelectPoint;
     FCurrentRepeat := 0;
     FForceNextPoint := False;
     FIsPaused := False;
-    SetState(ssStarting);
+
+//    SetState();
+
     NotifyPointChanged;
 
     FThread := TThread.CreateAnonymousThread(
@@ -304,8 +533,8 @@ begin
   end;
 
   FIsPaused := False;
-  SetState(ssStopping);
-  SetState(ssReady);
+ // SetState(msStopping);
+  SetState(msNone);
 end;
 
 procedure TMeasurementRun.Pause;
@@ -313,7 +542,7 @@ begin
   if FIsPaused then
     Exit;
   FIsPaused := True;
-  SetState(ssStopping);
+  //SetState(msPause);
 end;
 
 procedure TMeasurementRun.Resume;
@@ -321,7 +550,7 @@ begin
   if not FIsPaused then
     Exit;
   FIsPaused := False;
-  SetState(ssOnGoing);
+  //SetState(msOnGoing);
 end;
 
 procedure TMeasurementRun.NextPoint;
@@ -331,7 +560,7 @@ end;
 
 procedure TMeasurementRun.RunThreadProc;
 begin
-  SetState(ssOnGoing);
+ // SetState(msOnGoing);
   while not TThread.CurrentThread.CheckTerminated do
   begin
     if FIsPaused then
@@ -356,45 +585,67 @@ begin
   Point := GetCurrentPoint;
   if Point = nil then
   begin
-    FCurrentStage := psDone;
-    SetState(ssResultReady);
+    FCurrentStage := msDone ;
+    //SetState(msResultReady);
     Exit;
   end;
 
   case FCurrentStage of
-    psSetupPoint:
+
+   //Установка параметров точки
+    msSelectPoint:
       begin
+
+       FWorkTable.StartMonitor;
+
         if FWorkTable <> nil then
         begin
-          FWorkTable.FlowRate.DoFlowRateSet(Point.Q);
-          FWorkTable.FluidTemp.DoFluidTempStart(Point.Temp);
-          FWorkTable.FluidPress.DoFluidPressStart(Point.Pressure);
+
+          // Если не указан расход, то на него не выходим
+          if (Point.Q<>0) then
+          begin
+          FWorkTable.DoFlowRateSet(Point.Q);
+          FWorkTable.DoFlowRateStart;
+          end;
+
+          if Point.Temp<>0 then
+          FWorkTable.DoFluidTempStart(Point.Temp);
+
+          if Point.Pressure<>0 then
+          FWorkTable.DoFluidPressStart(Point.Pressure);
+
           if Point.LimitTime > 0 then
             FWorkTable.TimeSet := Round(Point.LimitTime);
+
         end;
         FWaitStartedTick := TThread.GetTickCount64;
-        FCurrentStage := psWaitStable;
+        FCurrentStage := msSelectEtalon;
       end;
 
-    psWaitStable:
+    msSetupPoint:
       begin
+         //Принудительное изменение точки
         if FForceNextPoint then
         begin
-          FCurrentStage := psNextPoint;
+          FCurrentStage := msSelectPoint;
           Exit;
         end;
 
+        //Если вышли на расход, то переходим к измерению
         if IsStable then
-          FCurrentStage := psMeasure
+          FCurrentStage := msMeasure
+
+        //Ограничение времени ожидания стабилизации
         else if (TThread.GetTickCount64 - FWaitStartedTick) > 30000 then
-          FCurrentStage := psMeasure;
+          FCurrentStage := msMeasure;
+
       end;
 
-    psMeasure:
+    msMeasure:
       begin
         if FForceNextPoint then
         begin
-          FCurrentStage := psNextPoint;
+          FCurrentStage := msSelectPoint;
           Exit;
         end;
 
@@ -404,33 +655,33 @@ begin
 
         Inc(FCurrentRepeat);
         if FCurrentRepeat >= RepeatsTarget then
-          FCurrentStage := psSave;
+          FCurrentStage := msSave;
       end;
 
-    psSave:
+    msSave:
       begin
         SaveMeasurementResults;
-        FCurrentStage := psNextPoint;
+        FCurrentStage := msSelectPoint;
       end;
 
-    psNextPoint:
+    msResultsRead:
       begin
         FForceNextPoint := False;
         FCurrentRepeat := 0;
         Inc(FCurrentPointIndex);
         if FCurrentPointIndex >= FPoints.Count then
         begin
-          FCurrentStage := psDone;
-          SetState(ssResultReady);
+          FCurrentStage := msDone;
+          SetState(msResultsRead);
         end
         else
         begin
           NotifyPointChanged;
-          FCurrentStage := psSetupPoint;
+          FCurrentStage := msSetupPoint;
         end;
       end;
 
-    psDone:
+    msDone:
       begin
         if FThread <> nil then
           FThread.Terminate;
@@ -452,6 +703,49 @@ begin
 
   if FWorkTable <> nil then
     FWorkTable.TimeResult := Point.LimitTime;
+end;
+
+{ Converts persisted string to spill state enum value. }
+class function TMeasurementRun.SpillStateFromString(const AValue: string): EMeasurementState;
+begin
+  if SameText(AValue, 'Готов') then
+ // Exit(msNone);
+
+  if SameText(AValue, 'Запуск') then
+  //  Exit(msStarting);
+
+  if SameText(AValue, 'Измерние') then
+  ///  Exit(msOnGoing);
+
+  if SameText(AValue, 'Остановка') then
+   // Exit(msStopping);
+
+  if SameText(AValue, 'Сохранение') then
+  //  Exit(msResultReady);
+
+  Result := msNone;
+end;
+
+{ Converts spill state enum value to persisted string. }
+class function TMeasurementRun.SpillStateToString(AState: EMeasurementState): string;
+begin
+  case AState of
+   msNone:
+          Result := '-';
+  {
+    msReady:
+      Result := 'Готов';
+  //  msStarting:
+      Result := 'Запуск';
+ //   msOnGoing:
+      Result := 'Измерние';
+ //   msStopping:
+      Result := 'Остановка';
+ //   msResultReady:
+      Result := 'Сохранение';  }
+  else
+    Result := '-';
+  end;
 end;
 
 end.
