@@ -20,8 +20,10 @@ uses
 type
 
   EParamStatus = (
+    PARAM_NONE,
     PARAM_STOPPED,
-    PARAM_STARTED
+    PARAM_STARTED,
+    PARAM_CHANGING
   );
 
   EParamAction = (
@@ -66,11 +68,13 @@ TParameter = class(TObject)
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
     function GetIsRunning: Boolean;
-    function GetIsChanging: Boolean;
     procedure SetParam(Avalue: Double);
+    function GetIsChanging: Boolean;
+
   public
     constructor Create(const AName, AHint: string); virtual;
     function GetStatusAsString: string;
+    procedure IsStable(var Status: Boolean);
     procedure Stop;
     procedure Start;
     property OnStatusChange: TonStatusEvent read FOnStatusChange write FOnStatusChange;
@@ -82,7 +86,6 @@ TParameter = class(TObject)
     property ValueSet: Double read FValueSet write SetParam;
     property Value: Double read GetValue write SetValue;
     property IsRunning: Boolean read GetIsRunning;
-    property IsChanging: Boolean read GetIsChanging;
     property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
     property AccuracyMinus: Double read FAccuracyMinus write FAccuracyMinus;
     property Min: Double read FMin write SetMin;
@@ -127,7 +130,6 @@ end;
 
   public
     constructor Create(const AName: string = 'FlowRate');
-    function IsStable: Boolean;
     procedure SetParamFlowRate(ANewValue: Double);
     function GetActionAsString: string;
     procedure DoFlowRateStart(ANewFlowRate: Double);  overload;
@@ -138,7 +140,6 @@ end;
 //---------------------------------
   TFluidTemp = class(TParameter)
   public
-    function IsStable: Boolean;
     constructor Create(const AName: string = 'FluidTemp');
     function GetActionAsString: string;
     procedure DoFluidTempStart(ATempSet: Double);
@@ -149,7 +150,6 @@ end;
   TFluidPress = class(TParameter)
   public
     constructor Create(const AName: string = 'FluidPress');
-    function IsStable: Boolean;
     function GetActionAsString: string;
     procedure DoFluidPressStart(APressSet: Double);
     procedure DoFluidPressStop;
@@ -176,13 +176,6 @@ begin
   FAccuracyMinus := 5;
 end;
 
-function TFluidTemp.IsStable : Boolean ;
-
-begin
-  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
-
-end;
 
  function TFluidTemp.GetActionAsString: string;
 begin
@@ -251,12 +244,6 @@ begin
 end;
 
 
-function TFluidPress.IsStable: Boolean ;
-begin
-  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
-
-end;
 
 
 
@@ -324,13 +311,6 @@ begin
   AccuracyPlus:=5;
   AccuracyMinus:=5;
   FDim:=0;
-
-end;
-
-function TFlowRate.IsStable : Boolean ;
-begin
-    Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-        AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
 
 end;
 
@@ -536,6 +516,12 @@ begin
   FAction := ACTION_STOP;
 end;
 
+
+procedure TParameter.IsStable(var Status: Boolean);
+begin
+  Status := (Value <= ValueSet * (1 + AccuracyPlus / 100)) AND
+            (Value >= ValueSet * (1 - AccuracyMinus / 100));
+end;
 
 procedure TParameter.Start;
 begin
