@@ -1117,21 +1117,37 @@ end;
 
 { Converts persisted string to spill state enum value. }
 class function TMeasurementRun.SpillStateFromString(const AValue: string): EMeasurementState;
+var
+  S: string;
 begin
-  if SameText(AValue, 'Готов') then
- // Exit(msNone);
+  S := Trim(LowerCase(AValue));
 
-  if SameText(AValue, 'Запуск') then
-  //  Exit(msStarting);
+  if (S = '') or (S = '-') or (S = 'none') or (S = 'msnone') then
+    Exit(msNone);
 
-  if SameText(AValue, 'Измерние') then
-  ///  Exit(msOnGoing);
+  if (S = 'выбор точки') or (S = 'выборточки') or (S = 'msselectpoint') then
+    Exit(msSelectPoint);
 
-  if SameText(AValue, 'Остановка') then
-   // Exit(msStopping);
+  if (S = 'выбор эталона') or (S = 'msselectetalon') then
+    Exit(msSelectEtalon);
 
-  if SameText(AValue, 'Сохранение') then
-  //  Exit(msResultReady);
+  if (S = 'установка точки') or (S = 'mssetuppoint') then
+    Exit(msSetupPoint);
+
+  if (S = 'стабилизация') or (S = 'ожидание стабилизации') or (S = 'mswaitstable') then
+    Exit(msWaitStable);
+
+  if (S = 'измерение') or (S = 'msmeasure') then
+    Exit(msMeasure);
+
+  if (S = 'чтение результата') or (S = 'чтение результатов') or (S = 'msresultsread') then
+    Exit(msResultsRead);
+
+  if (S = 'сохранение') or (S = 'mssave') then
+    Exit(msSave);
+
+  if (S = 'завершено') or (S = 'окончание') or (S = 'msdone') then
+    Exit(msDone);
 
   Result := msNone;
 end;
@@ -1140,19 +1156,15 @@ end;
 class function TMeasurementRun.SpillStateToString(AState: EMeasurementState): string;
 begin
   case AState of
-   msNone:
-          Result := '-';
-  {
-    msReady:
-      Result := 'Готов';
-  //  msStarting:
-      Result := 'Запуск';
- //   msOnGoing:
-      Result := 'Измерние';
- //   msStopping:
-      Result := 'Остановка';
- //   msResultReady:
-      Result := 'Сохранение';  }
+    msNone:        Result := '-';
+    msSelectPoint: Result := 'Выбор точки';
+    msSelectEtalon:Result := 'Выбор эталона';
+    msSetupPoint:  Result := 'Установка точки';
+    msWaitStable:  Result := 'Стабилизация';
+    msMeasure:     Result := 'Измерение';
+    msResultsRead: Result := 'Чтение результата';
+    msSave:        Result := 'Сохранение';
+    msDone:        Result := 'Завершено';
   else
     Result := '-';
   end;
