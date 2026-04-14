@@ -50,6 +50,7 @@ type
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
+    FRows: TList<TChannel>;
 
     function GetMeasurementRun: TMeasurementRun;
     procedure SetActiveWorkTable(const Value: TWorkTable);
@@ -57,6 +58,7 @@ type
     procedure DetachMeasurementRun;
 
     procedure BuildColumns;
+    procedure BuildRows;
     procedure RefreshRows;
 
     function GetRowChannel(const ARow: Integer): TChannel;
@@ -67,8 +69,10 @@ type
     function FindPointSpillage(ADevice: TDevice; ASessionPoint: TDevicePoint): TPointSpillage;
 
     function FormatPointHeader(APoint: TDevicePoint): string;
-    function FormatPercentValue(const AValue: Double): string;
+    function FormatErrorValue(const AValue: Double): string;
     function FormatSpillageErrors(ADevicePoint: TDevicePoint; ASpillage: TPointSpillage): string;
+    function BuildErrorsListText(ADevice: TDevice; ASessionPoint: TDevicePoint;
+      const ACurrentError: Double; const AIncludeCurrent: Boolean): string;
 
     function IsCellRunning(AChannel: TChannel; ASessionPoint: TDevicePoint): Boolean;
     function GetCellState(AChannel: TChannel; ASessionPoint: TDevicePoint; out ADevicePoint: TDevicePoint;
@@ -98,6 +102,7 @@ constructor TFrameMRResults.Create(AOwner: TComponent);
 begin
   inherited;
   FPointColumns := TObjectList<TStringColumn>.Create(False);
+  FRows := TList<TChannel>.Create;
 
   GridMRResults.OnGetValue := GridMRResultsGetValue;
   GridMRResults.OnDrawColumnCell := GridMRResultsDrawColumnCell;
@@ -106,6 +111,7 @@ end;
 destructor TFrameMRResults.Destroy;
 begin
   DetachMeasurementRun;
+  FreeAndNil(FRows);
   FreeAndNil(FPointColumns);
   inherited;
 end;
@@ -139,6 +145,7 @@ begin
   AttachMeasurementRun;
 
   BuildColumns;
+  BuildRows;
   RefreshRows;
 end;
 
@@ -151,8 +158,22 @@ end;
 procedure TFrameMRResults.UpdateUI;
 begin
   BuildColumns;
+  BuildRows;
   RefreshRows;
   GridMRResults.Repaint;
+end;
+
+procedure TFrameMRResults.BuildRows;
+var
+  Ch: TChannel;
+begin
+  FRows.Clear;
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for Ch in FActiveWorkTable.DeviceChannels do
+    if Ch <> nil then
+      FRows.Add(Ch);
 end;
 
 procedure TFrameMRResults.BuildColumns;
@@ -200,8 +221,7 @@ var
   RowCount: Integer;
 begin
   RowCount := 0;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
-    RowCount := FActiveWorkTable.DeviceChannels.Count;
+  RowCount := FRows.Count;
 
   GridMRResults.BeginUpdate;
   try
@@ -215,12 +235,10 @@ end;
 function TFrameMRResults.GetRowChannel(const ARow: Integer): TChannel;
 begin
   Result := nil;
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
-    Exit;
-  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+  if (ARow < 0) or (ARow >= FRows.Count) then
     Exit;
 
-  Result := FActiveWorkTable.DeviceChannels[ARow];
+  Result := FRows[ARow];
 end;
 
 function TFrameMRResults.GetDisplayDeviceName(AChannel: TChannel): string;
@@ -274,21 +292,28 @@ function TFrameMRResults.FindPointSpillage(ADevice: TDevice;
 var
   S: TPointSpillage;
   Session: TSessionSpillage;
+  Fallback: TPointSpillage;
 begin
   Result := nil;
   if (ADevice = nil) or (ADevice.Spillages = nil) or (ASessionPoint = nil) then
     Exit;
 
   Session := ADevice.GetActiveSessionSpillage;
+  Fallback := nil;
 
   for S in ADevice.Spillages do
   begin
-    if (Session <> nil) and (S.SessionID <> Session.ID) then
+    if not TMeasurementRun.IsPointEquivalent(ASessionPoint, S) then
       Continue;
 
-    if TMeasurementRun.IsPointEquivalent(ASessionPoint, S) then
+    if (Session <> nil) and (S.SessionID = Session.ID) then
       Exit(S);
+
+    if (Fallback = nil) or (S.DateTime > Fallback.DateTime) then
+      Fallback := S;
   end;
+
+  Result := Fallback;
 end;
 
 function TFrameMRResults.FormatPointHeader(APoint: TDevicePoint): string;
@@ -310,10 +335,11 @@ begin
     Result := QText;
 end;
 
-function TFrameMRResults.FormatPercentValue(const AValue: Double): string;
+function TFrameMRResults.FormatErrorValue(const AValue: Double): string;
 begin
-  if SameValue(AValue, 0.0, 1E-12) then
-    Exit('0%');
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) and
+     (FActiveWorkTable.TableFlow.ValueError <> nil) then
+    Exit(FActiveWorkTable.TableFlow.ValueError.GetStrNum(AValue));
 
   Result := FormatDeviceError(AValue) + '%';
 end;
@@ -333,15 +359,57 @@ begin
   begin
     SetLength(ErrValues, ADevicePoint.ProtocolDataPoints.Count);
     for I := 0 to ADevicePoint.ProtocolDataPoints.Count - 1 do
-      ErrValues[I] := FormatPercentValue(ADevicePoint.ProtocolDataPoints[I].Error);
+      ErrValues[I] := FormatErrorValue(ADevicePoint.ProtocolDataPoints[I].Error);
   end
   else
-    ErrValues := [FormatPercentValue(ASpillage.Error)];
+    ErrValues := [FormatErrorValue(ASpillage.Error)];
 
   if Length(ErrValues) = 1 then
     Result := ErrValues[0]
   else
     Result := '[' + string.Join('; ', ErrValues) + ']';
+end;
+
+function TFrameMRResults.BuildErrorsListText(ADevice: TDevice;
+  ASessionPoint: TDevicePoint; const ACurrentError: Double;
+  const AIncludeCurrent: Boolean): string;
+var
+  S: TPointSpillage;
+  Session: TSessionSpillage;
+  Items: TArray<string>;
+  Cnt: Integer;
+begin
+  Result := '';
+  if (ADevice = nil) or (ADevice.Spillages = nil) or (ASessionPoint = nil) then
+    Exit;
+
+  Session := ADevice.GetActiveSessionSpillage;
+  SetLength(Items, 0);
+  Cnt := 0;
+
+  for S in ADevice.Spillages do
+  begin
+    if (Session <> nil) and (S.SessionID <> Session.ID) then
+      Continue;
+    if not TMeasurementRun.IsPointEquivalent(ASessionPoint, S) then
+      Continue;
+
+    SetLength(Items, Cnt + 1);
+    Items[Cnt] := FormatErrorValue(S.Error);
+    Inc(Cnt);
+  end;
+
+  if AIncludeCurrent then
+  begin
+    SetLength(Items, Cnt + 1);
+    Items[Cnt] := FormatErrorValue(ACurrentError);
+    Inc(Cnt);
+  end;
+
+  if Cnt = 0 then
+    Exit('');
+
+  Result := '[' + string.Join(', ', Items) + ']';
 end;
 
 function TFrameMRResults.IsCellRunning(AChannel: TChannel;
@@ -405,10 +473,16 @@ begin
     4: Result := csDoneWarning;
     5: Result := csDoneValid;
   else
-    if Abs(ASpillage.Error) <= Abs(ADevicePoint.Error) then
-      Result := csDoneValid
+    case ASpillage.Status of
+      TPointSpillage.SPS_OK: Result := csDoneValid;
+      TPointSpillage.SPS_ERROR_EXCEEDED: Result := csDoneInvalid;
+      TPointSpillage.SPS_STOP_CRITERIA_FAILED: Result := csDoneWarning;
     else
-      Result := csDoneInvalid;
+      if Abs(ASpillage.Error) <= Abs(ADevicePoint.Error) then
+        Result := csDoneValid
+      else
+        Result := csDoneInvalid;
+    end;
   end;
 end;
 
@@ -420,6 +494,7 @@ var
   Spillage: TPointSpillage;
   CellState: TMRResultCellState;
   CurrentError: Double;
+  ErrorsText: string;
 begin
   Result := '';
 
@@ -436,7 +511,7 @@ begin
       Result := '';
 
     csPending:
-      Result := FormatPercentValue(DevicePoint.Error);
+      Result := FormatErrorValue(DevicePoint.Error);
 
     csRunning:
       begin
@@ -444,12 +519,19 @@ begin
         if (AChannel.FlowMeter.ValueError <> nil) then
           CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
 
-        Result := FormatPercentValue(DevicePoint.Error) + ' / ' + FormatPercentValue(CurrentError);
+        ErrorsText := BuildErrorsListText(Device, ASessionPoint, CurrentError, True);
+        if ErrorsText = '' then
+          ErrorsText := '[' + FormatErrorValue(CurrentError) + ']';
+        Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText;
       end;
 
     csDoneValid, csDoneInvalid, csDoneWarning:
       begin
-        Result := FormatPercentValue(DevicePoint.Error) + ' / ' + FormatSpillageErrors(DevicePoint, Spillage);
+        ErrorsText := BuildErrorsListText(Device, ASessionPoint, 0.0, False);
+        if ErrorsText <> '' then
+          Result := FormatErrorValue(DevicePoint.Error) + ' / ' + ErrorsText
+        else
+          Result := FormatErrorValue(DevicePoint.Error) + ' / ' + FormatSpillageErrors(DevicePoint, Spillage);
       end;
   end;
 end;
