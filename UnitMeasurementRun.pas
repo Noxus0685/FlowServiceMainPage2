@@ -604,15 +604,15 @@ begin
           // Если не указан расход, то на него не выходим
           if (Point.Q<>0) then
           begin
-          FWorkTable.DoFlowRateSet(Point.Q);
-          FWorkTable.DoFlowRateStart;
+          FWorkTable.FlowRate.DoFlowRateSet(Point.Q);
+          FWorkTable.FlowRate.DoFlowRateStart;
           end;
 
           if Point.Temp<>0 then
-          FWorkTable.DoFluidTempStart(Point.Temp);
+          FWorkTable.FluidTemp.DoFluidTempStart(Point.Temp);
 
           if Point.Pressure<>0 then
-          FWorkTable.DoFluidPressStart(Point.Pressure);
+          FWorkTable.FluidPress.DoFluidPressStart(Point.Pressure);
 
           if Point.LimitTime > 0 then
             FWorkTable.TimeSet := Round(Point.LimitTime);

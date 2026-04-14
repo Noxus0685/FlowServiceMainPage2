@@ -73,6 +73,7 @@ TParameter = class(TObject)
     function GetStatusAsString: string;
     procedure Stop;
     procedure Start;
+    function IsStable: Boolean;
     property OnStatusChange: TonStatusEvent read FOnStatusChange write FOnStatusChange;
     property OnActionChange: TonActionEvent read FOnActionChange write FOnActionChange;
     property Name: string read FName write FName;
@@ -127,7 +128,6 @@ end;
 
   public
     constructor Create(const AName: string = 'FlowRate');
-    function IsStable: Boolean;
     procedure SetParamFlowRate(ANewValue: Double);
     function GetActionAsString: string;
     procedure DoFlowRateStart(ANewFlowRate: Double);  overload;
@@ -138,7 +138,6 @@ end;
 //---------------------------------
   TFluidTemp = class(TParameter)
   public
-    function IsStable: Boolean;
     constructor Create(const AName: string = 'FluidTemp');
     function GetActionAsString: string;
     procedure DoFluidTempStart(ATempSet: Double);
@@ -149,7 +148,7 @@ end;
   TFluidPress = class(TParameter)
   public
     constructor Create(const AName: string = 'FluidPress');
-    function IsStable: Boolean;
+
     function GetActionAsString: string;
     procedure DoFluidPressStart(APressSet: Double);
     procedure DoFluidPressStop;
@@ -176,13 +175,7 @@ begin
   FAccuracyMinus := 5;
 end;
 
-function TFluidTemp.IsStable : Boolean ;
 
-begin
-  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
-
-end;
 
  function TFluidTemp.GetActionAsString: string;
 begin
@@ -248,14 +241,6 @@ begin
   FDelta := 0.1;
   FAccuracyPlus := 5;
   FAccuracyMinus := 5;
-end;
-
-
-function TFluidPress.IsStable: Boolean ;
-begin
-  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
-
 end;
 
 
@@ -327,12 +312,7 @@ begin
 
 end;
 
-function TFlowRate.IsStable : Boolean ;
-begin
-    Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-        AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
 
-end;
 
 
 procedure TFlowRate.SetParamFlowRate(ANewValue: Double);
@@ -536,7 +516,12 @@ begin
   FAction := ACTION_STOP;
 end;
 
+function TParameter.IsStable : Boolean ;
+begin
+    Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
+        AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
 
+end;
 procedure TParameter.Start;
 begin
     if FValueSet<FMin then
