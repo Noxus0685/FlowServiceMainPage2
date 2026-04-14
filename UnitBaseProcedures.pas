@@ -20,12 +20,21 @@ interface
   FMX.Objects, System.Net.URLClient, System.Net.HttpClient,
   System.Net.HttpClientComponent, FMX.Memo.Types, FMX.Memo;
 
+  const
+  COLOR_INVALID = $FFFFECEC;   // Светло-красный: точка некорректна
+  COLOR_RUNNING = $FFF2E9FF;   // Светло-фиолетовый: точка выполняется
+  COLOR_COMPLETED = $FFEAF9EA; // Светло-зелёный: точка выполнена
+
+
 type
+
+
 
    IHasID = interface
     ['{A4E6E2F5-9E6F-4F8F-9A5C-6B4C9D3F8E21}']
     function GetID: Integer;
   end;
+
 
 
   TObjectState = (

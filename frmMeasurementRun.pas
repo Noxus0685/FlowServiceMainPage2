@@ -194,10 +194,7 @@ var
   LIsInvalid: Boolean;
   LIsRunning: Boolean;
   LIsCompleted: Boolean;
-const
-  COLOR_INVALID = $FFFFECEC;   // Светло-красный: точка некорректна
-  COLOR_RUNNING = $FFF2E9FF;   // Светло-фиолетовый: точка выполняется
-  COLOR_COMPLETED = $FFEAF9EA; // Светло-зелёный: точка выполнена
+
 begin
   Result := TAlphaColors.Null;
 
@@ -231,6 +228,10 @@ var
   SavedState: TCanvasSaveState;
 begin
   SavedState := Canvas.SaveState;
+
+  if Row<0 then
+  Exit;
+
   try
     C := GetRowColor(Row);
 
