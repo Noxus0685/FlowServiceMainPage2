@@ -230,9 +230,12 @@ type
     constructor Create(AWorkTable: TWorkTable);
     destructor Destroy; override;
 
+  class var function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
+
     procedure CreateSession;
     procedure CreateSessionPoints;
     function IsSessionPointFit(ADevice: TDevice; APoint: TDevicePoint): Boolean;
+
 
     procedure Start;
     procedure Stop;
@@ -407,7 +410,7 @@ begin
     Exit(False);
 end;
 
-function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
+function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
 begin
   Result := (AP1 <> nil) and (AP2 <> nil)
     and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.Q)
