@@ -11,6 +11,8 @@ uses
   frmCalibrCoefs,
   frmProceed,
   frmMeasurementRun,
+  frmProtocol,
+  UnitProtocols,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -346,7 +348,7 @@ type
     LabelRepeatsName: TLabel;
     EditRepeats: TEdit;
     TabItemProtocol: TTabItem;
-    MemoProtocol: TMemo;
+    LayoutProtocolHost: TLayout;
     TabItemDeviceProperties: TTabItem;
 
     procedure FormCreate(Sender: TObject);
@@ -456,6 +458,7 @@ type
 
   FActiveWorkTable: TWorkTable;
   FFrameMeasurementRun: TFrameMeasurementRun;
+  FFrameProtocol: TFrameProtocol;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -667,6 +670,7 @@ end;
 destructor TFrameMainTable.Destroy;
 begin
   FreeAndNil(FFrameMeasurementRun);
+  FreeAndNil(FFrameProtocol);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   TMeterValue.SaveToFile(0);
@@ -762,13 +766,19 @@ end;
 procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
+  begin
     FActiveWorkTable.State := STATE_STARTMONITOR;
+    ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
+  end;
 end;
 
 procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
+  begin
     FActiveWorkTable.State := STATE_STOPMONITOR;
+    ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
+  end;
 end;
 
 procedure TFrameMainTable.StartTest;
@@ -783,6 +793,7 @@ begin
     Exit;
 
   Run.Execute(mcStart);
+  ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Пользователь запустил измерение', FActiveWorkTable.Name);
 
   end;
 
@@ -799,6 +810,7 @@ begin
     Exit;
 
     Run.Execute(mcStop);
+    ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь остановил измерение', FActiveWorkTable.Name);
 
 end;
 
@@ -1024,6 +1036,7 @@ begin
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
+  FFrameProtocol := nil;
 
 
 
@@ -1059,6 +1072,13 @@ begin
     FFrameMeasurementRun.Align := TAlignLayout.Client;
   end;
   FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameProtocol = nil then
+  begin
+    FFrameProtocol := TFrameProtocol.Create(Self);
+    FFrameProtocol.Parent := LayoutProtocolHost;
+    FFrameProtocol.Align := TAlignLayout.Client;
+  end;
 
   RefreshPumpsCombo;
 
@@ -1236,6 +1256,7 @@ begin
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
+  ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход', Format('Q=%.3f', [AValue]));
   UpdateUIFlowRate;
 end;
 
@@ -1244,6 +1265,7 @@ begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
     FActiveWorkTable.ActivePump.DoPumpStart(ComboBoxPumps.Text) ;
+    ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Пользователь запустил насос', ComboBoxPumps.Text);
     UpdateUIPump;
 
   end;
@@ -2071,6 +2093,13 @@ begin
 
   if FFrameMeasurementRun <> nil then
     FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameProtocol = nil then
+  begin
+    FFrameProtocol := TFrameProtocol.Create(Self);
+    FFrameProtocol.Parent := LayoutProtocolHost;
+    FFrameProtocol.Align := TAlignLayout.Client;
+  end;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
