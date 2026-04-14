@@ -13,8 +13,8 @@ object FrameMeasurementRun: TFrameMeasurementRun
     RowCount = 1
     OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
-    Viewport.Width = 822.000000000000000000
-    Viewport.Height = 480.000000000000000000
+    Viewport.Width = 818.000000000000000000
+    Viewport.Height = 455.000000000000000000
     object StringColumnPointer: TStringColumn
       HeaderSettings.TextSettings.WordWrap = False
       Size.Width = 50.000000000000000000

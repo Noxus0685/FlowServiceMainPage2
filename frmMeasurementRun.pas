@@ -210,19 +210,29 @@ begin
     Exit($FFEAF9EA);
 end;
 
-procedure TFrameMeasurementRun.GridMeasurmentRunDrawColumnCell(Sender: TObject;
-  const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
-  const Row: Integer; const Value: TValue; const State: TGridDrawStates);
+procedure TFrameMeasurementRun.GridMeasurmentRunDrawColumnCell(
+  Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
+  const Bounds: TRectF; const Row: Integer; const Value: TValue;
+  const State: TGridDrawStates);
 var
   C: TAlphaColor;
+  SavedState: TCanvasSaveState;
 begin
-  C := GetRowColor(Row);
-  if C = TAlphaColors.Null then
-    Exit;
+  SavedState := Canvas.SaveState;
+  try
+    C := GetRowColor(Row);
 
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := C;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
+    if C <> TAlphaColors.Null then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := C;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
+
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  finally
+    Canvas.RestoreState(SavedState);
+  end;
 end;
 
 

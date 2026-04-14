@@ -1,4 +1,4 @@
-unit frmFlowMeterProperties;
+﻿unit frmFlowMeterProperties;
 
 interface
 
@@ -54,8 +54,8 @@ type
     function GetQuantityDimName: string;
   public
     constructor Create(AOwner: TComponent); override;
-    property FlowMeter: TFlowMeter read FFlowMeter write SetFlowMeter;
     procedure SetFlowMeter(AFlowMeter: TFlowMeter);
+    property FlowMeter: TFlowMeter read FFlowMeter write SetFlowMeter;
   end;
 
 implementation
