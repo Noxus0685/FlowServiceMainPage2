@@ -1045,6 +1045,7 @@ begin
     Exit;
 
   FInitialized := True;
+  SwitchAuto.IsChecked := False;
 
   TMeterValue.LoadFromFile;
 
