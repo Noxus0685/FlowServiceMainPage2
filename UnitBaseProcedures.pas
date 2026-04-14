@@ -24,7 +24,7 @@ interface
   COLOR_INVALID = $FFFFECEC;   // Светло-красный: точка некорректна
   COLOR_RUNNING = $FFF2E9FF;   // Светло-фиолетовый: точка выполняется
   COLOR_COMPLETED = $FFEAF9EA; // Светло-зелёный: точка выполнена
-
+  COLOR_WARNING   = $FFFFF8E6; // Светло-жёлтый
 
 type
 

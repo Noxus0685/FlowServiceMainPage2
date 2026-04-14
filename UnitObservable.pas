@@ -8,14 +8,14 @@ uses
   System.Generics.Collections;
 
 type
-  IObserver = interface
+  IEventObserver = interface
     ['{7E95DA5C-E734-49FA-868D-4CF8CDFF24B0}']
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
   end;
 
   TObservableObject = class
   private
-    FObservers: TList<IObserver>;
+    FObservers: TList<IEventObserver>;
     FObserversLock: TObject;
   protected
     procedure Notify(Event: Integer; Data: TObject = nil);
@@ -23,8 +23,8 @@ type
     constructor Create; virtual;
     destructor Destroy; override;
 
-    procedure Subscribe(const AObserver: IObserver);
-    procedure Unsubscribe(const AObserver: IObserver);
+    procedure Subscribe(const AObserver: IEventObserver);
+    procedure Unsubscribe(const AObserver: IEventObserver);
     function ObserverCount: Integer;
   end;
 
@@ -33,7 +33,7 @@ implementation
 constructor TObservableObject.Create;
 begin
   inherited Create;
-  FObservers := TList<IObserver>.Create;
+  FObservers := TList<IEventObserver>.Create;
   FObserversLock := TObject.Create;
 end;
 
@@ -52,7 +52,7 @@ begin
   inherited Destroy;
 end;
 
-procedure TObservableObject.Subscribe(const AObserver: IObserver);
+procedure TObservableObject.Subscribe(const AObserver: IEventObserver);
 begin
   if (AObserver = nil) or (FObservers = nil) then
     Exit;
@@ -66,7 +66,7 @@ begin
   end;
 end;
 
-procedure TObservableObject.Unsubscribe(const AObserver: IObserver);
+procedure TObservableObject.Unsubscribe(const AObserver: IEventObserver);
 begin
   if (AObserver = nil) or (FObservers = nil) then
     Exit;
@@ -94,8 +94,7 @@ end;
 
 procedure TObservableObject.Notify(Event: Integer; Data: TObject);
 var
-  LocalObservers: TArray<IObserver>;
-  Observer: IObserver;
+  LocalObservers: TArray<IEventObserver>;
 begin
   if FObservers = nil then
     Exit;
@@ -109,10 +108,16 @@ begin
 
   TThread.Queue(nil,
     procedure
+    var
+      I: Integer;
+      Observer: IEventObserver;
     begin
-      for Observer in LocalObservers do
+      for I := 0 to Length(LocalObservers) - 1 do
+      begin
+        Observer := LocalObservers[I];
         if Observer <> nil then
           Observer.OnNotify(Self, Event, Data);
+      end;
     end);
 end;
 

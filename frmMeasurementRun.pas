@@ -27,7 +27,7 @@ uses
   FMX.ScrollBox;
 
 type
-  TFrameMeasurementRun = class(TFrame, IObserver)
+  TFrameMeasurementRun = class(TFrame, IEventObserver)
     GridMeasurmentRun: TGrid;
     StringColumnPointer: TStringColumn;
     StringColumnMRPointName: TStringColumn;

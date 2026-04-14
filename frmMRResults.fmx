@@ -16,15 +16,15 @@ object FrameMRResults: TFrameMRResults
       Header = #1055#1088#1080#1073#1086#1088
       HeaderSettings.TextSettings.WordWrap = False
     end
-    object StringColumn6: TStringColumn
+    object StringColumnPoint1: TStringColumn
       Header = #1058#1086#1095#1082#1072' 1'
       HeaderSettings.TextSettings.WordWrap = False
     end
-    object StringColumn7: TStringColumn
+    object StringColumnPoint2: TStringColumn
       Header = #1058#1086#1095#1082#1072' 2'
       HeaderSettings.TextSettings.WordWrap = False
     end
-    object StringColumn9: TStringColumn
+    object StringColumnResult: TStringColumn
       Header = #1056#1077#1079#1091#1083#1100#1090#1072#1090
       HeaderSettings.TextSettings.WordWrap = False
     end
@@ -42,36 +42,37 @@ object FrameMRResults: TFrameMRResults
       StyleLookup = 'arrowlefttoolbutton'
       Text = 'SpeedButton7'
       TextSettings.Trimming = None
+      Visible = False
     end
     object SpeedButton12: TSpeedButton
       Align = Left
-      Position.X = 57.000000000000000000
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'pausetoolbuttonbordered'
       Text = 'SpeedButton7'
       TextSettings.Trimming = None
+      Visible = False
     end
     object SpeedButton13: TSpeedButton
       Align = Left
-      Position.X = 114.000000000000000000
       Size.Width = 57.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'arrowrighttoolbutton'
       Text = 'SpeedButton7'
       TextSettings.Trimming = None
+      Visible = False
     end
     object SpeedButton14: TSpeedButton
       Align = Left
-      Position.X = 171.000000000000000000
       Size.Width = 70.000000000000000000
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'cleareditbutton'
       Text = 'SpeedButton10'
       TextSettings.Trimming = None
+      Visible = False
     end
   end
 end

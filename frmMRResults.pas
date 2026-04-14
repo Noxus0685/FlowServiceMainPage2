@@ -12,9 +12,9 @@ type
   TFrameMRResults = class(TFrame)
     GridMRResults: TGrid;
     StringColumnName: TStringColumn;
-    StringColumn6: TStringColumn;
-    StringColumn7: TStringColumn;
-    StringColumn9: TStringColumn;
+    StringColumnPoint1: TStringColumn;
+    StringColumnPoint2: TStringColumn;
+    StringColumnResult: TStringColumn;
     ToolBar: TToolBar;
     SpeedButton11: TSpeedButton;
     SpeedButton12: TSpeedButton;
