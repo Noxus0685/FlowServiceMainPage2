@@ -248,6 +248,7 @@ type
 
     class function SpillStateToString(AState: EMeasurementState): string; static;
     class function SpillStateFromString(const AValue: string): EMeasurementState; static;
+    class function MeasurementEventToString(AEvent: EMeasurementEvent): string; static;
 
     property WorkTable: TWorkTable read FWorkTable;
     property Points: TObjectList<TDevicePoint> read FPoints;
@@ -503,7 +504,7 @@ end;
 procedure TMeasurementRun.FireEvent(AEvent: EMeasurementEvent; const AError: TErrorInfo);
 begin
   ProtocolManager.AddMessage(pcEvent, psMeasurement, 'MeasurementEvent',
-    'Событие измерения', IntToStr(Ord(AEvent)));
+    'Событие измерения', MeasurementEventToString(AEvent));
   if Assigned(FOnEvent) then
     FOnEvent(Self, AEvent, AError);
 end;
@@ -1165,6 +1166,39 @@ begin
     msResultsRead: Result := 'Чтение результата';
     msSave:        Result := 'Сохранение';
     msDone:        Result := 'Завершено';
+  else
+    Result := '-';
+  end;
+end;
+
+class function TMeasurementRun.MeasurementEventToString(AEvent: EMeasurementEvent): string;
+begin
+  case AEvent of
+    meStarted:          Result := 'Запущено';
+    meStopped:          Result := 'Остановлено';
+    mePointSelected:    Result := 'Точка выбрана';
+    mePointInvalid:     Result := 'Точка невалидна';
+    meEtalonSelected:   Result := 'Эталон выбран';
+    meEtalonAbsent:     Result := 'Эталон отсутствует';
+    mePointSet:         Result := 'Точка установлена';
+    mePointNotSet:      Result := 'Точка не установлена';
+    meStableReached:    Result := 'Стабилизация достигнута';
+    meStableRetry:      Result := 'Повтор стабилизации';
+    meStableTimeout:    Result := 'Таймаут стабилизации';
+    meStableUnreachable:Result := 'Стабилизация недостижима';
+    meMeasureStarted:   Result := 'Измерение запущено';
+    meMeasureCompleted: Result := 'Измерение завершено';
+    meMeasureTimeout:   Result := 'Таймаут измерения';
+    meMeasureError:     Result := 'Ошибка измерения';
+    meMeasureWarning:   Result := 'Предупреждение измерения';
+    meResultReading:    Result := 'Чтение результата';
+    meResultReady:      Result := 'Результат готов';
+    meSaveDone:         Result := 'Сохранено';
+    meSaveCancelled:    Result := 'Сохранение отменено';
+    meSaveWarning:      Result := 'Предупреждение сохранения';
+    meSaveError:        Result := 'Ошибка сохранения';
+    mePointDone:        Result := 'Точка завершена';
+    meAllDone:          Result := 'Все точки завершены';
   else
     Result := '-';
   end;
