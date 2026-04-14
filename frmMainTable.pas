@@ -4599,7 +4599,7 @@ begin
    // begin
       for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
         begin
-          if AMax<FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax then
+          if AMax<FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4) then
             Amax:=FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
         end;
       LayoutFlowRate.tag:=2;
