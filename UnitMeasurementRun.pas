@@ -502,11 +502,25 @@ begin
 end;
 
 procedure TMeasurementRun.FireEvent(AEvent: EMeasurementEvent; const AError: TErrorInfo);
+var
+  ErrorDetails: string;
 begin
   ProtocolManager.AddMessage(pcEvent, psMeasurement, 'MeasurementEvent',
     'Событие измерения', MeasurementEventToString(AEvent));
 
+  if (AError.Code <> 0) or (Trim(AError.Msg) <> '') then
+  begin
+    ErrorDetails := Format('Event=%s; Code=%d; Stage=%s; Time=%s; Msg=%s', [
+      MeasurementEventToString(AEvent),
+      AError.Code,
+      SpillStateToString(AError.Stage),
+      FormatDateTime('dd.mm.yyyy hh:nn:ss', AError.Time),
+      AError.Msg
+    ]);
 
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'MeasurementError',
+      'Ошибка события измерения', ErrorDetails);
+  end;
 
   if Assigned(FOnEvent) then
     FOnEvent(Self, AEvent, AError);

@@ -2,16 +2,13 @@ object FrameProtocol: TFrameProtocol
   Size.Width = 600.000000000000000000
   Size.Height = 400.000000000000000000
   Size.PlatformDefault = False
-  object MemoProtocol: TMemo
+  object ListBoxProtocol: TListBox
     Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
-    DataDetectorTypes = []
     Align = Client
     Size.Width = 600.000000000000000000
     Size.Height = 344.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
-    Viewport.Width = 600.000000000000000000
-    Viewport.Height = 344.000000000000000000
   end
   object LayoutFilters: TLayout
     Align = Top

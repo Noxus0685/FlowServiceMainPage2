@@ -11,8 +11,9 @@ uses
   FMX.Controls,
   FMX.Forms,
   FMX.StdCtrls,
-  FMX.Memo,
   FMX.Layouts,
+  FMX.ListBox,
+  FMX.Graphics,
   FMX.Controls.Presentation;
 
 type
@@ -29,7 +30,7 @@ type
     CheckBoxParameters: TCheckBox;
     CheckBoxWorkTable: TCheckBox;
     CheckBoxMeasurement: TCheckBox;
-    MemoProtocol: TMemo;
+    ListBoxProtocol: TListBox;
     procedure SpeedButtonResumeClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonClearClick(Sender: TObject);
@@ -38,6 +39,8 @@ type
     FMessages: TObjectList<TProtocolMessage>;
     FListener: TProtocolListener;
     procedure HandleProtocolMessage(Msg: TProtocolMessage);
+
+    procedure AddProtocolItem(const Msg: TProtocolMessage);
     function IsAllowedByFilters(Msg: TProtocolMessage): Boolean;
     procedure RebuildMemo;
   public
@@ -89,7 +92,30 @@ begin
   FMessages.Add(CopyMsg);
 
   if IsAllowedByFilters(CopyMsg) then
-    MemoProtocol.Lines.Add(TProtocolManager.FormatMessage(CopyMsg));
+    AddProtocolItem(CopyMsg);
+end;
+
+procedure TFrameProtocol.AddProtocolItem(const Msg: TProtocolMessage);
+var
+  Item: TListBoxItem;
+begin
+  if Msg = nil then
+    Exit;
+
+  Item := TListBoxItem.Create(ListBoxProtocol);
+  Item.Stored := False;
+  Item.Text := TProtocolManager.FormatMessage(Msg);
+  Item.Selectable := False;
+  Item.StyledSettings := Item.StyledSettings - [TStyledSetting.FontColor];
+
+  case Msg.Category of
+    pcInfo: Item.TextSettings.FontColor := TAlphaColorRec.Dodgerblue;
+    pcWarning: Item.TextSettings.FontColor := TAlphaColorRec.Gold;
+    pcError: Item.TextSettings.FontColor := TAlphaColorRec.Red;
+  end;
+
+  ListBoxProtocol.AddObject(Item);
+  ListBoxProtocol.ScrollToItem(Item);
 end;
 
 function TFrameProtocol.IsAllowedByFilters(Msg: TProtocolMessage): Boolean;
@@ -117,14 +143,14 @@ procedure TFrameProtocol.RebuildMemo;
 var
   Msg: TProtocolMessage;
 begin
-  MemoProtocol.Lines.BeginUpdate;
+  ListBoxProtocol.BeginUpdate;
   try
-    MemoProtocol.Lines.Clear;
+    ListBoxProtocol.Clear;
     for Msg in FMessages do
       if IsAllowedByFilters(Msg) then
-        MemoProtocol.Lines.Add(TProtocolManager.FormatMessage(Msg));
+        AddProtocolItem(Msg);
   finally
-    MemoProtocol.Lines.EndUpdate;
+    ListBoxProtocol.EndUpdate;
   end;
 end;
 
@@ -137,7 +163,7 @@ procedure TFrameProtocol.SpeedButtonClearClick(Sender: TObject);
 begin
   ProtocolManager.Clear;
   FMessages.Clear;
-  MemoProtocol.Lines.Clear;
+  ListBoxProtocol.Clear;
 end;
 
 procedure TFrameProtocol.SpeedButtonPauseClick(Sender: TObject);
