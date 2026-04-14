@@ -683,7 +683,8 @@ begin
       begin
         SessionPoint := TDevicePoint.Create(0);
         SessionPoint.Assign(SourcePoint);
-        SessionPoint.Status:=0;
+        SessionPoint.Status := 0;
+        SessionPoint.RepeatsCompleted := 0;
         FPoints.Add(SessionPoint);
       end
       else
@@ -907,6 +908,7 @@ begin
   if Result then
   begin
     Point.Status := 0;
+    FCurrentRepeat := Point.RepeatsCompleted;
     NotifyPointChanged;
   end;
 end;
@@ -1103,6 +1105,8 @@ begin
         Inc(FCurrentRepeat);
         if FCurrentRepeat >= RepeatsTarget then
         begin
+          if Point <> nil then
+            Point.Status := 3;
           FCurrentRepeat := 0;
           FireEvent(mePointDone);
           SetStage(msSelectPoint);
@@ -1120,11 +1124,14 @@ end;
 procedure TMeasurementRun.SaveMeasurementResults;
 var
   Point: TDevicePoint;
+  RepeatsTarget: Integer;
 begin
   Point := GetCurrentPoint;
   if Point = nil then
     Exit;
 
+  RepeatsTarget := Max(Point.Repeats, 1);
+  Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
   Point.DateTime := Now;
   Point.Status := 1;
   Point.StatusStr := 'Measured';

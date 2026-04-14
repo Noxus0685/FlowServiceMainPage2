@@ -141,6 +141,7 @@ type
     {====================================================================}
     RepeatsProtocol: Integer;    // Кол-во повторов, идущих в зачёт
     Repeats: Integer;            // Общее кол-во измерений в серии
+    RepeatsCompleted: Integer;   // Выполненных измерений
 
     {====================================================================}
     { СЛУЖЕБНОЕ }
@@ -1002,6 +1003,7 @@ begin
   { Повторы }
   RepeatsProtocol := 0;
   Repeats := 0;
+  RepeatsCompleted := 0;
 
   Status := 0;
   StatusStr := '-';
@@ -1604,6 +1606,7 @@ begin
   {====================================================================}
   RepeatsProtocol := ASource.RepeatsProtocol;
   Repeats := ASource.Repeats;
+  RepeatsCompleted := ASource.RepeatsCompleted;
 
   Status := ASource.Status;
   StatusStr := ASource.StatusStr;
@@ -1648,6 +1651,7 @@ begin
 
   RepeatsProtocol := ASource.RepeatsProtocol;
   Repeats := ASource.Repeats;
+  RepeatsCompleted := 0;
 end;
 
 function TDevicePoint.GetStatus: string;

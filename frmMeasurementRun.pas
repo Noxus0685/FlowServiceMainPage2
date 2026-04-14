@@ -206,7 +206,7 @@ begin
      (MeasurementRun.Stage <> msDone) then
     Exit($FFF2E9FF);
 
-  if (Point <> nil) and (Point.Status >= 3) then
+  if (Point <> nil) and (Point.RepeatsCompleted >= Max(Point.Repeats, 1)) then
     Exit($FFEAF9EA);
 end;
 
@@ -262,10 +262,9 @@ procedure TFrameMeasurementRun.GridMeasurmentRunGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
 var
   Point: TDevicePoint;
-  StopParts: TStringList;
+  RepeatsTarget: Integer;
   RepeatsNow: Integer;
-
-  begin
+begin
   if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
     Exit;
 
@@ -311,14 +310,15 @@ var
       Value := '-'
   else if GridMeasurmentRun.Columns[ACol] = StringColumnRepeats then
   begin
-    if MeasurementRun.CurrentPointIndex = ARow then
-      RepeatsNow := MeasurementRun.CurrentRepeat + 1
-    else if Point.Status >= 3 then
-      RepeatsNow := Max(Point.Repeats, 1)
-    else
-      RepeatsNow := 0;
+    RepeatsTarget := Max(Point.Repeats, 1);
+    RepeatsNow := Point.RepeatsCompleted;
 
-    Value := Format('%d/%d', [RepeatsNow, Max(Point.Repeats, 1)]);
+    if (MeasurementRun.CurrentPointIndex = ARow) and
+       (MeasurementRun.Stage <> msNone) and
+       (MeasurementRun.Stage <> msDone) then
+      RepeatsNow := Min(RepeatsTarget, Max(RepeatsNow, MeasurementRun.CurrentRepeat + 1));
+
+    Value := Format('%d/%d', [RepeatsNow, RepeatsTarget]);
   end
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStatus then
     Value := Point.GetStatus;
