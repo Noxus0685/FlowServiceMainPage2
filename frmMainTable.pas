@@ -782,22 +782,24 @@ begin
   if Run = nil then
     Exit;
 
-  FActiveWorkTable.ResetMeasurementValues;
-  FActiveWorkTable.State := STATE_STARTTEST;
-
   Run.Execute(mcStart);
-end;
+
+  end;
 
 procedure TFrameMainTable.StopTest;
 var
   Run: TMeasurementRun;
 begin
+
+  if FActiveWorkTable = nil then
+    Exit;
+
   Run := MeasurementRun;
-  if Run <> nil then
+  if Run = nil then
+    Exit;
+
     Run.Execute(mcStop);
 
-  if FActiveWorkTable <> nil then
-    FActiveWorkTable.State := STATE_STOPTEST;
 end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
