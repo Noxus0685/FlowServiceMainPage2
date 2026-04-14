@@ -170,46 +170,67 @@ end;
 
 procedure  TFormMain.FlowRateStateHandler(AParameters: TParameter; AAction:EParamAction);
 var
-FlowRate: Double;
-WorkTable:TWorkTable;
-i:integer;
-EnabledEtalonChannels: TObjectList<TChannel>;
-
+  TotalFlowRate: Double;
+  ChannelFlowRate: Double;
+  TotalQmax: Double;
+  ChannelQmax: Double;
+  WorkTable: TWorkTable;
+  I: Integer;
+  Channel: TChannel;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  SingleChannel: TObjectList<TChannel>;
 begin
-  WorkTable:= FWorkTableManager.ActiveWorkTable;
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
   FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.ValueSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
-
- {for I := 0 to FWorkTableManager.ActiveWorkTable.EtalonChannels.Count-1 do
-  begin
-     if FWorkTableManager.ActiveWorkTable.EtalonChannels[I].Enabled then
-     begin
-
-         FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet,4);
-
-        FFrameMainTable.ApplyChannelValues(
-          FWorkTableManager.ActiveWorkTable.EtalonChannels,
-          NormalizeFloatInput('0'),
-          UpdateEtalonImpSecFromFlowRate(FlowRate),
-          NormalizeFloatInput('0')
-        );
-     end;
-  end;}
-
 
   EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
   try
+    TotalQmax := 0;
     for I := 0 to WorkTable.EtalonChannels.Count - 1 do
       if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
-        EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
+      begin
+        Channel := WorkTable.EtalonChannels[I];
+        EnabledEtalonChannels.Add(Channel);
+        if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) and
+           (Channel.FlowMeter.Device.Qmax > 0) then
+          TotalQmax := TotalQmax + Channel.FlowMeter.Device.Qmax;
+      end;
 
-      FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet,4)/(EnabledEtalonChannels.Count);
+    if EnabledEtalonChannels.Count = 0 then
+      Exit;
 
-    FFrameMainTable.ApplyChannelValues(
-      EnabledEtalonChannels,
-      NormalizeFloatInput('0'),
-      UpdateEtalonImpSecFromFlowRate(FlowRate),
-      NormalizeFloatInput('0')
-    );
+    TotalFlowRate := WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet, 4);
+
+    SingleChannel := TObjectList<TChannel>.Create(False);
+    try
+      for I := 0 to EnabledEtalonChannels.Count - 1 do
+      begin
+        Channel := EnabledEtalonChannels[I];
+        ChannelQmax := 0;
+        if (Channel <> nil) and (Channel.FlowMeter <> nil) and
+           (Channel.FlowMeter.Device <> nil) and (Channel.FlowMeter.Device.Qmax > 0) then
+          ChannelQmax := Channel.FlowMeter.Device.Qmax;
+
+        if (TotalQmax > 0) and (ChannelQmax > 0) then
+          ChannelFlowRate := TotalFlowRate * (ChannelQmax / TotalQmax)
+        else
+          ChannelFlowRate := TotalFlowRate / EnabledEtalonChannels.Count;
+
+        SingleChannel.Clear;
+        SingleChannel.Add(Channel);
+        FFrameMainTable.ApplyChannelValues(
+          SingleChannel,
+          NormalizeFloatInput('0'),
+          UpdateEtalonImpSecFromFlowRate(ChannelFlowRate),
+          NormalizeFloatInput('0')
+        );
+      end;
+    finally
+      SingleChannel.Free;
+    end;
   finally
     EnabledEtalonChannels.Free;
   end;
