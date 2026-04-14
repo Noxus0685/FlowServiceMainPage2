@@ -907,7 +907,7 @@ begin
   Result := ValidatePoint(Point, AError);
   if Result then
   begin
-    Point.Status := 0;
+    Point.Status := 1;
     FCurrentRepeat := Point.RepeatsCompleted;
     NotifyPointChanged;
   end;
@@ -1106,7 +1106,7 @@ begin
         if FCurrentRepeat >= RepeatsTarget then
         begin
           if Point <> nil then
-            Point.Status := 3;
+          Point.Status := 3;
           FCurrentRepeat := 0;
           FireEvent(mePointDone);
           SetStage(msSelectPoint);
@@ -1133,8 +1133,9 @@ begin
   RepeatsTarget := Max(Point.Repeats, 1);
   Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
   Point.DateTime := Now;
-  Point.Status := 1;
-  Point.StatusStr := 'Measured';
+
+  //Point.Status := 1;
+  //Point.StatusStr := 'Measured';
 
   if FWorkTable <> nil then
     FWorkTable.TimeResult := Point.LimitTime;
