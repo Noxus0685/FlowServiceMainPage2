@@ -1300,9 +1300,10 @@ procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
-    FActiveWorkTable.ActivePump.DoPumpStart(ComboBoxPumps.Text) ;
     ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Пользователь запустил насос', ComboBoxPumps.Text);
+    FActiveWorkTable.ActivePump.DoPumpStart ;
     UpdateUIPump;
+
 
   end;
 end;
@@ -1327,7 +1328,7 @@ procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
     begin
-      FActiveWorkTable.ActivePump.DoFreqSet(ComboBoxPumps.Text,NormalizeFloatInput(SpinBoxFreq.Text));
+      FActiveWorkTable.ActivePump.DoFreqSet(NormalizeFloatInput(SpinBoxFreq.Text));
     end;
 end;
 
@@ -1411,7 +1412,7 @@ procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
-      FActiveWorkTable.ActivePump.DoPumpStop(ComboBoxPumps.Text) ;
+      FActiveWorkTable.ActivePump.DoPumpStop ;
        UpdateUIPump;
       //FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
     end;
@@ -4582,6 +4583,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   AMax:Double;
+  StableStatus: Boolean;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4604,16 +4606,14 @@ begin
       SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);
       SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
       if WorkTable.FlowRate.ValueSet<>0 then
-        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet)
-      else
-        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet);
 
 
 if WorkTable.FlowRate.IsRunning then
   begin
         if WorkTable.FlowRate.Value = 0 then
            RectangleLabelFR.Fill.Color := TAlphaColorRec.White
-       ELSE if WorkTable.FlowRate.IsStable THEN
+       ELSE if WorkTable.FlowRate.IsStable(StableStatus) THEN
           RectangleLabelFR.Fill.Color := $ffC9FFC7
        else if (WorkTable.FlowRate.Value <> WorkTable.FlowRate.ValueSet) then
           RectangleLabelFR.Fill.Color := TAlphaColorRec.Lightyellow;
@@ -4634,6 +4634,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   ATempSet,APressSet: string;
+  TempStableStatus, PressStableStatus: Boolean;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4649,7 +4650,7 @@ IF WorkTable.FluidTemp.IsRunning THEN
   begin
      if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
       Rectangle7.Fill.Color := TAlphaColorRec.White
-     ELSE if WorkTable.FluidTemp.IsStable   THEN
+     ELSE if WorkTable.FluidTemp.IsStable(TempStableStatus)   THEN
       Rectangle7.Fill.Color := $ffC9FFC7
      else
       Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
@@ -4658,7 +4659,7 @@ IF WorkTable.FluidTemp.IsRunning THEN
   begin
      if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
       Rectangle7.Fill.Color := TAlphaColorRec.White
-     else IF not(WorkTable.FluidTemp.IsStable) then
+     else IF not(WorkTable.FluidTemp.IsStable(TempStableStatus)) then
       Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
   end;
 
@@ -4667,7 +4668,7 @@ IF WorkTable.FluidPress.IsRunning THEN
    if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
 
     Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable) then
+   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
    else
     Rectangle11.Fill.Color := $ffC9FFC7;
@@ -4676,7 +4677,7 @@ IF WorkTable.FluidPress.IsRunning THEN
   begin
    if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
     Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable) then
+   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
 
   end;

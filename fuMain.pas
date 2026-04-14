@@ -279,6 +279,7 @@ end;
 procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double;
+  StableStatus: Boolean;
 begin
   if AWorkTable = nil then
     Exit;
@@ -298,7 +299,7 @@ begin
     if (AWorkTable.FluidTemp.IsRunning) then
     begin
 
-      if NOT(AWorkTable.FluidTemp.IsStable)
+      if NOT(AWorkTable.FluidTemp.IsStable(StableStatus))
 
       AND  (AWorkTable.FluidTemp.Value<AWorkTable.FluidTemp.ValueSet)  THEN
       begin
@@ -306,7 +307,7 @@ begin
         AWorkTable.FluidTemp.AfterValue:=(AWorkTable.FluidTemp.AfterValue+1);
       end
 
-    ELSE if not(AWorkTable.FluidTemp.IsStable)  THEN
+    ELSE if not(AWorkTable.FluidTemp.IsStable(StableStatus))  THEN
 
       begin
         AWorkTable.FluidTemp.BeforeValue:=(AWorkTable.FluidTemp.BeforeValue-1);

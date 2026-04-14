@@ -590,6 +590,8 @@ begin
 end;
 
 function TMeasurementRun.IsStable: Boolean;
+var
+  ParamStatus: Boolean;
 begin
   Result := True;
 
@@ -597,13 +599,13 @@ begin
     Exit;
 
   if (FWorkTable.FlowRate <> nil) and (GetCurrentPoint.Q<>0)  then
-    Result := Result and FWorkTable.FlowRate.IsStable;
+    Result := Result and FWorkTable.FlowRate.IsStable(ParamStatus);
 
   if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp<>0) then
-    Result := Result and FWorkTable.FluidTemp.IsStable;
+    Result := Result and FWorkTable.FluidTemp.IsStable(ParamStatus);
 
   if (FWorkTable.FluidPress <> nil) and  (GetCurrentPoint.Pressure<>0) then
-    Result := Result and FWorkTable.FluidPress.IsStable;
+    Result := Result and FWorkTable.FluidPress.IsStable(ParamStatus);
 end;
 
 function TMeasurementRun.IsTerminated: Boolean;

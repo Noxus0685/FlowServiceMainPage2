@@ -556,7 +556,7 @@ private
   private
     FIniFileName: string;
     FWorkTables: TObjectList<TWorkTable>;
-    FPumps: TObjectList<TPump>;
+
     FActiveWorkTable  :TWorkTable;
   public
     constructor Create(const AIniFileName: string);
