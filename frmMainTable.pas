@@ -10,6 +10,10 @@ uses
   fuMeterValues,
   frmCalibrCoefs,
   frmProceed,
+  frmMeasurementRun,
+  frmProtocol,
+  frmFlowMeterProperties,
+  UnitProtocols,
   UnitDataManager,
   UnitMeterValue,
   UnitDeviceClass,
@@ -327,15 +331,6 @@ type
     TabItemMeasurmentRun: TTabItem;
     TabItem2: TTabItem;
     TabItem3: TTabItem;
-    GridMeasurmentRun: TGrid;
-    StringColumnMRFlowRate: TStringColumn;
-    StringColumnMRStopCriterea: TStringColumn;
-    ToolBar2: TToolBar;
-    SpeedButton7: TSpeedButton;
-    SpeedButton8: TSpeedButton;
-    SpeedButton9: TSpeedButton;
-    SpeedButton10: TSpeedButton;
-    StringColumnMRStatus: TStringColumn;
     Grid2: TGrid;
     ToolBar3: TToolBar;
     SpeedButton11: TSpeedButton;
@@ -347,9 +342,6 @@ type
     StringColumn7: TStringColumn;
     StringColumn9: TStringColumn;
     StringColumnDeviceCoef1: TStringColumn;
-    SpeedButtonCreatePoints: TSpeedButton;
-    StringColumnMRPointName: TStringColumn;
-    StringColumn1: TStringColumn;
     ActionSessionCreatePoints: TAction;
     LayoutRepeats: TLayout;
     RectangleRepeats: TRectangle;
@@ -357,9 +349,8 @@ type
     LabelRepeatsName: TLabel;
     EditRepeats: TEdit;
     TabItemProtocol: TTabItem;
-    MemoProtocol: TMemo;
+    LayoutProtocolHost: TLayout;
     TabItemDeviceProperties: TTabItem;
-    StringColumnRepeats: TStringColumn;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -455,8 +446,7 @@ type
       const Row: Integer);
     procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
       var CanSelect: Boolean);
-    procedure GridMeasurmentRunGetValue(Sender: TObject; const ACol,
-      ARow: Integer; var Value: TValue);
+
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure EditTimeExit(Sender: TObject);
     procedure EditPresCanFocus(Sender: TObject; var ACanFocus: Boolean);
@@ -468,6 +458,9 @@ type
   private
 
   FActiveWorkTable: TWorkTable;
+  FFrameMeasurementRun: TFrameMeasurementRun;
+  FFrameProtocol: TFrameProtocol;
+  FFrameFlowMeterProperties: TFrameFlowMeterProperties;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -489,8 +482,7 @@ type
     function FindSerialIndex(const ASerialNumber: string): Integer;
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
-    procedure UpdateGridMesurmentRun;
-    procedure UpdateGridMRHeaders;
+
     procedure UpdateUIFromValues;
     procedure SetValues;
     function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
@@ -577,6 +569,7 @@ type
     procedure PersistDeviceAsync(ADevice: TDevice);
     procedure UpdateUIConditions;
     function   GetMeasurementRun: TMeasurementRun;
+    procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -679,6 +672,9 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  FreeAndNil(FFrameMeasurementRun);
+  FreeAndNil(FFrameProtocol);
+  FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   TMeterValue.SaveToFile(0);
@@ -701,6 +697,27 @@ function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
 
       result:= TMeasurementRun (FWorkTableManager.ActiveWorkTable.MeasurementRun);
     end;
+
+procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
+var
+  Meter: TFlowMeter;
+begin
+  if FFrameFlowMeterProperties = nil then
+    Exit;
+
+  Meter := nil;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+  begin
+    if ARow < 0 then
+      ARow := GridDevices.Selected;
+
+    if (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) and
+       (FActiveWorkTable.DeviceChannels[ARow] <> nil) then
+      Meter := FActiveWorkTable.DeviceChannels[ARow].FlowMeter;
+  end;
+
+  FFrameFlowMeterProperties.FlowMeter := Meter;
+end;
 
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
 var
@@ -774,35 +791,52 @@ end;
 procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
+  begin
     FActiveWorkTable.State := STATE_STARTMONITOR;
+    ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
+  end;
 end;
 
 procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
+  begin
     FActiveWorkTable.State := STATE_STOPMONITOR;
+    ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
+  end;
 end;
 
 procedure TFrameMainTable.StartTest;
+var
+  Run: TMeasurementRun;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  Run := MeasurementRun;
+  if Run = nil then
+    Exit;
+
+  Run.Execute(mcStart);
+  ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Пользователь запустил измерение', FActiveWorkTable.Name);
+
+  end;
+
+procedure TFrameMainTable.StopTest;
+var
+  Run: TMeasurementRun;
 begin
 
   if FActiveWorkTable = nil then
-     Exit;
+    Exit;
 
-  FActiveWorkTable.ResetMeasurementValues;
-  FActiveWorkTable.State := STATE_STARTTEST;
+  Run := MeasurementRun;
+  if Run = nil then
+    Exit;
 
-  MeasurementRun.Start;
+    Run.Execute(mcStop);
+    ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь остановил измерение', FActiveWorkTable.Name);
 
-
-
-end;
-
-procedure TFrameMainTable.StopTest;
-begin
-    MeasurementRun.Stop;
-  if FActiveWorkTable <> nil then
-    FActiveWorkTable.State := STATE_STOPTEST;
 end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
@@ -834,8 +868,7 @@ procedure TFrameMainTable.UpdateForm;
 procedure TFrameMainTable.OnChangePoint(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer);
 begin
-
-
+  {}
 end;
 
 procedure TFrameMainTable.OnChangeState(const ANewState: EWorkTableState); //ChangeStateHandler
@@ -1027,6 +1060,9 @@ begin
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
+  FFrameMeasurementRun := nil;
+  FFrameProtocol := nil;
+  FFrameFlowMeterProperties := nil;
 
 
 
@@ -1055,6 +1091,31 @@ begin
 
   InitTables;
 
+  if FFrameMeasurementRun = nil then
+  begin
+    FFrameMeasurementRun := TFrameMeasurementRun.Create(Self);
+    FFrameMeasurementRun.Parent := TabItemMeasurmentRun;
+    FFrameMeasurementRun.Align := TAlignLayout.Client;
+  end;
+  FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameProtocol = nil then
+  begin
+    FFrameProtocol := TFrameProtocol.Create(Self);
+    FFrameProtocol.Parent := LayoutProtocolHost;
+    FFrameProtocol.Align := TAlignLayout.Client;
+  end;
+
+  UpdateFlowMeterPropertiesFrame;
+
+  if FFrameFlowMeterProperties = nil then
+  begin
+    FFrameFlowMeterProperties := TFrameFlowMeterProperties.Create(Self);
+    FFrameFlowMeterProperties.Parent := TabItemDeviceProperties;
+    FFrameFlowMeterProperties.Align := TAlignLayout.Client;
+  end;
+  UpdateFlowMeterPropertiesFrame;
+
   RefreshPumpsCombo;
 
   FLastClickRow := -1;
@@ -1081,7 +1142,7 @@ begin
 
   ButtonMonitor.OnClick := ButtonMonitorClick;
   ButtonCancel.OnClick := ButtonCancelClick;
-  SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
+
   EnforceDataPointsColumnsLayout;
 
 
@@ -1231,6 +1292,7 @@ begin
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
+  ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход', Format('Q=%.3f', [AValue]));
   UpdateUIFlowRate;
 end;
 
@@ -1238,8 +1300,10 @@ procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
+    ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Пользователь запустил насос', ComboBoxPumps.Text);
     FActiveWorkTable.ActivePump.DoPumpStart ;
     UpdateUIPump;
+
 
   end;
 end;
@@ -2011,7 +2075,15 @@ begin
   WorkTable.RecalculateAllMeterValues;
   if FFrameProceed <> nil then
     FFrameProceed.UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+
   UpdateUIFromValues;
+
+  LayoutFlowRate.Tag:=3;
+  UpdateUIFlowRate;
+
+  if FFrameMeasurementRun <> nil then
+  FFrameMeasurementRun.UpdateUI;
+
 end;
 
 function TFrameMainTable.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
@@ -2063,6 +2135,16 @@ begin
   end
   else
     RefreshPumpsCombo;
+
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameProtocol = nil then
+  begin
+    FFrameProtocol := TFrameProtocol.Create(Self);
+    FFrameProtocol.Parent := LayoutProtocolHost;
+    FFrameProtocol.Align := TAlignLayout.Client;
+  end;
 
   TabItemWorkTable1.Visible := TableCount >= 1;
 
@@ -2759,8 +2841,6 @@ begin
     end;
 end;
 
-
-
 procedure TFrameMainTable.ComboBoxPumpsClick(Sender: TObject);
 begin
   ComboBoxPumps.Tag:=2;
@@ -2777,9 +2857,6 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
-
-  LayoutFlowRate.Tag:=3;
-  UpdateUIFlowRate;
 
   GridDevices.SetFocus;
 end;
@@ -3136,7 +3213,7 @@ begin
     StringColumnDeviceFlowRate1.Header := 'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
     StringColumnEtalonFlowRate1.Header := 'Расход, ' +WorkTable.ValueFlowRate.GetDimName;
   end;
-  UpdateGridMRHeaders;
+
   if WorkTable.ValueQuantity <> nil then
   begin
     StringColumnDeviceQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
@@ -3692,6 +3769,8 @@ begin
   finally
     GridDevices.EndUpdate;
   end;
+
+  UpdateFlowMeterPropertiesFrame(Row);
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
@@ -3790,6 +3869,8 @@ begin
   finally
     GridDevices.EndUpdate;
   end;
+
+  UpdateFlowMeterPropertiesFrame(Row);
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -3898,12 +3979,10 @@ begin
     Exit;
 end;
 
-
-
-
 procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
+  UpdateFlowMeterPropertiesFrame(ARow);
 
     if not IsUpdating then
 
@@ -4241,32 +4320,6 @@ end;
 
  end;
 
-procedure TFrameMainTable.UpdateGridMesurmentRun;
-var
-  Rows: Integer;
-begin
-  if MeasurementRun <> nil then
-    Rows := MeasurementRun.Points.Count
-  else
-    Rows := 0;
-
-  GridMeasurmentRun.BeginUpdate;
-  try
-    GridMeasurmentRun.RowCount := 0;
-    GridMeasurmentRun.RowCount := Rows;
-  finally
-    GridMeasurmentRun.EndUpdate;
-  end;
-end;
-
-procedure TFrameMainTable.UpdateGridMRHeaders;
-begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
-    StringColumnMRFlowRate.Header := 'Расход, ' + FActiveWorkTable.ValueFlowRate.GetDimName
-  else
-    StringColumnMRFlowRate.Header := 'Расход';
-end;
-
 procedure ReloadGridByGrowingRowCount(AGrid: TGrid; ANewRowCount: Integer);
 var
   i: Integer;
@@ -4368,9 +4421,8 @@ begin
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     );
 
-  UpdateGridMesurmentRun;
+ // UpdateGridMesurmentRun;
 end;
-
 
 procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
   AImpSec, AImpResult: Double);
@@ -4464,70 +4516,10 @@ begin
   GridEtalons.ReadOnly := True;
 end;
 
-
-
-
-procedure TFrameMainTable.GridMeasurmentRunGetValue(Sender: TObject; const ACol,
-  ARow: Integer; var Value: TValue);
-var
-  Point: TDevicePoint;
-  StopParts: TStringList;
-
-  function GetStopCriteriaText(APoint: TDevicePoint): string;
-  begin
-    Result := '';
-    if APoint = nil then
-      Exit;
-
-    StopParts := TStringList.Create;
-    try
-      if scImpulse in APoint.StopCriteria then
-        StopParts.Add(Format('%d имп', [APoint.LimitImp]));
-      if scVolume in APoint.StopCriteria then
-        StopParts.Add(Format('%s л', [FormatFloat('0.###', APoint.LimitVolume)]));
-      if scTime in APoint.StopCriteria then
-        StopParts.Add(Format('%s сек', [FormatFloat('0.###', APoint.LimitTime)]));
-
-      Result := Trim(StringReplace(StopParts.CommaText, ',', ', ', [rfReplaceAll]));
-      Result := StringReplace(Result, '"', '', [rfReplaceAll]);
-    finally
-      StopParts.Free;
-    end;
-  end;
-begin
-  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
-    Exit;
-
-  if (ARow < 0) or (ARow >= MeasurementRun.Points.Count) then
-    Exit;
-
-  Point := MeasurementRun.Points[ARow];
-  if Point = nil then
-    Exit;
-
-  if GridMeasurmentRun.Columns[ACol] = StringColumnMRPointName then
-    Value := Point.Name
-  else if GridMeasurmentRun.Columns[ACol] = StringColumnMRFlowRate then
-  begin
-    if (FActiveWorkTable.ValueFlowRate <> nil) then
-      Value := FActiveWorkTable.ValueFlowRate.GetStrNum(Point.Q)
-    else
-      Value := FormatFloat('0.###', Point.Q);
-  end
-  else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStopCriterea then
-    Value := GetStopCriteriaText(Point)
-  else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStatus then
-    Value := Point.GetStatus;
-end;
-
 procedure TFrameMainTable.SpeedButtonCreatePointsClick(Sender: TObject);
 begin
-  if FActiveWorkTable = nil then
-    Exit;
-
-  ActionSessionCreatePointsExecute(Self);
-  UpdateGridMRHeaders;
-  UpdateGridMesurmentRun;
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.SpeedButtonCreatePointsClick(Sender);
 end;
 
 procedure TFrameMainTable.UpdateUIPump;
@@ -4585,8 +4577,6 @@ begin
 
 
 end;
-
-
 
 procedure TFrameMainTable.UpdateUIFlowRate;
 var

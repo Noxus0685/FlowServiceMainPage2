@@ -305,6 +305,14 @@
     <File Path="UnitRepositories.pas"/>
     <File Path="FmxHelper.pas"/>
     <File Path="UnitMeasurementRun.pas"/>
+    <File Path="FmxHelper.pas"/>
     <File Path="UnitParameter.pas"/>
+    <File Path="frmMeasurementRun.pas"/>
+    <File Path="frmMeasurementRun.fmx"/>
+    <File Path="frmProtocol.pas"/>
+    <File Path="frmProtocol.fmx"/>
+    <File Path="UnitProtocols.pas"/>
+    <File Path="frmFlowMeterProperties.pas"/>
+    <File Path="frmFlowMeterProperties.fmx"/>
   </ProjectSortOrder>
 </BorlandProject>
