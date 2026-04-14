@@ -166,7 +166,7 @@ begin
       Continue;
     end;
 
-    PopResult := FQueue.PopItem(Msg, 50);
+    PopResult := FQueue.PopItem(Msg);
     if PopResult = wrSignaled then
     begin
       try
@@ -198,14 +198,14 @@ begin
   Msg.Description := ADescription;
   Msg.Params := AParams;
 
-  PushResult := FQueue.PushItem(Msg, 0);
+  PushResult := FQueue.PushItem(Msg);
   if PushResult = wrTimeout then
   begin
     OldMsg := nil;
-    if FQueue.PopItem(OldMsg, 0) = wrSignaled then
+    if FQueue.PopItem(OldMsg) = wrSignaled then
       FreeMessage(OldMsg);
 
-    if FQueue.PushItem(Msg, 0) <> wrSignaled then
+    if FQueue.PushItem(Msg) <> wrSignaled then
       FreeMessage(Msg);
   end;
 end;
@@ -282,7 +282,8 @@ var
   Msg: TProtocolMessage;
 begin
   Msg := nil;
-  while FQueue.PopItem(Msg, 0) = wrSignaled do
+  while FQueue.QueueSize > 0 do
+    if FQueue.PopItem(Msg) = wrSignaled then
     FreeMessage(Msg);
 end;
 
