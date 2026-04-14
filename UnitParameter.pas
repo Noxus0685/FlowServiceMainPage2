@@ -13,7 +13,8 @@ uses
   System.Math,
   System.StrUtils,
   System.IniFiles,
-  System.Generics.Collections
+  System.Generics.Collections,
+  UnitProtocols
 
   ;
 
@@ -51,7 +52,7 @@ TParameter = class(TObject)
     FMin: Double;
     FAccuracyPlus: Double;
     FAccuracyMinus: Double;
-    FValue: Double;
+    FValue: Double;  // òåêóùàÿ
     FValueSet: Double;   //óñòàíîâëåííàÿ
     FBefore: Double;
     FAfter: Double;
@@ -507,6 +508,7 @@ constructor TParameter.Create(const AName, AHint: string);
 begin
   inherited Create;
   FName := AName;
+  ProtocolManager.AddMessage(pcState, psParameters, 'ParameterCreate', 'Parameter created', AName);
   FHint := AHint;
   FStatus := PARAM_STOPPED;
   FAction := ACTION_STOP;
@@ -515,6 +517,7 @@ end;
 procedure TParameter.Stop;
 begin
   FAction := ACTION_STOP;
+  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStop', 'Parameter stopped', FName);
 end;
 
 function TParameter.IsStable(var Status: Boolean): Boolean;
@@ -531,6 +534,7 @@ begin
       FValueSet:=FMax;
 
   FAction := ACTION_START;
+  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStart', 'Parameter started', FName);
 end;
 
 procedure TParameter.SetMin(const Value: Double);
@@ -589,6 +593,7 @@ procedure TParameter.SetParam(AValue: Double);
 begin
 
   if  SameValue(FValueSet ,AValue, MinDouble) then
+      ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet]));
         Exit; // ×àñòîòà íå èçìåíèëàñü
 
       if AValue<FMin then

@@ -614,7 +614,12 @@ begin
       WorkTable.State := STATE_EXECUTE;
 
     STATE_EXECUTE:
+     begin
        UpdateRandomSignals(WorkTable);
+
+       if WorkTable.Time = WorkTable.TimeSet then
+          WorkTable.State := STATE_STOPTEST;
+     end;
 
     STATE_STOPTEST:
       WorkTable.State := STATE_STOPWAIT;

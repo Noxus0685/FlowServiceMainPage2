@@ -574,6 +574,8 @@ begin
   FRepoDeviceName := FDevice.RepoDeviceName;
   FRepoDeviceUUID := FDevice.RepoDeviceUUID;
   FOutputType :=  FDevice.OutputType;
+  FlowMax := FDevice.Qmax;
+  FlowMin := FDevice.Qmin;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
   UpdateByDevice;
 

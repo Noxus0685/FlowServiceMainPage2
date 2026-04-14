@@ -14,7 +14,8 @@ uses
   System.StrUtils,
   System.IniFiles,
   System.Generics.Collections ,
-  UnitParameter
+  UnitParameter,
+  UnitProtocols
   ;
 
 
@@ -1134,8 +1135,9 @@ begin
 
   TMeasurementRun(FMeasurementRun).OnStateChangedMain := MeasurementRunStateChanged;
   TMeasurementRun(FMeasurementRun).OnPointChangedMain := MeasurementRunPointChanged;
-  TMeasurementRun(FMeasurementRun).OnStateChangedFrame := MeasurementRunStateChanged;
-  TMeasurementRun(FMeasurementRun).OnPointChangedFrame := MeasurementRunPointChanged;
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableCreate',
+    'Создан рабочий стол', Name);
 
 
  // InitMeterValues;
@@ -1746,6 +1748,8 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableDestroy',
+    'Удалён рабочий стол', Name);
   FreeAndNil(FMeasurementRun);
   FreeAndNil(FFluidTemp);
   FreeAndNil(FFluidPress);
@@ -2623,6 +2627,8 @@ begin
     Exit;
 
   FState := ANewState;
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
+    'Изменено состояние рабочего стола', WorkTableStateToString(ANewState));
   DoStateChanged(ANewState);
 end;
 
@@ -2752,23 +2758,31 @@ end;
   begin
    ResetMeasurementValues;
    State := STATE_STARTTEST;
+   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
+     'Запуск теста', Name);
   end;
 
    procedure TWorkTable.StartMonitor;
   begin
    ResetMeasurementValues;
    State := STATE_STARTMONITOR;
+   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
+     'Запуск мониторинга', Name);
   end;
 
   procedure TWorkTable.StopTest;
   begin
     State := STATE_STOPTEST;
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
+      'Остановка теста', Name);
   end;
 
    procedure TWorkTable.StopMonitor;
   begin
    ResetMeasurementValues;
    State := STATE_STOPMONITOR;
+   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
+     'Остановка мониторинга', Name);
   end;
 
 procedure TWorkTable.StartMeasurementRun(AMode: Integer);
