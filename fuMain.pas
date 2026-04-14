@@ -9,7 +9,7 @@ uses
   UnitWorkTable,
   UnitDataManager,
   System.UITypes,
-  System.SysUtils, System.Classes, FMX.Types, FMX.Controls, FMX.Forms, FMX.TabControl,
+  System.SysUtils, System.Classes, System.Generics.Collections, FMX.Types, FMX.Controls, FMX.Forms, FMX.TabControl,
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
@@ -172,18 +172,29 @@ procedure  TFormMain.FlowRateStateHandler(AParameters: TParameter; AAction:EPara
 var
 FlowRate: Double;
 WorkTable:TWorkTable;
+I: Integer;
+EnabledEtalonChannels: TObjectList<TChannel>;
 begin
   WorkTable:= FWorkTableManager.ActiveWorkTable;
   FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.ValueSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
 
-   FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet,4);
+  FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet,4);
 
-  FFrameMainTable.ApplyChannelValues(
-    FWorkTableManager.ActiveWorkTable.EtalonChannels,
-    NormalizeFloatInput('0'),
-    UpdateEtalonImpSecFromFlowRate(FlowRate),
-    NormalizeFloatInput('0')
-  );
+  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+      if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
+        EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
+
+    FFrameMainTable.ApplyChannelValues(
+      EnabledEtalonChannels,
+      NormalizeFloatInput('0'),
+      UpdateEtalonImpSecFromFlowRate(FlowRate),
+      NormalizeFloatInput('0')
+    );
+  finally
+    EnabledEtalonChannels.Free;
+  end;
 end;
 
 procedure  TFormMain.FlowFluidTempHandler(AParameters: TParameter; AAction:EParamAction);
