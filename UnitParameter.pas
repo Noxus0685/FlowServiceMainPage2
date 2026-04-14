@@ -605,10 +605,13 @@ end;
 function TParameter.GetStatusAsString: string;
 begin
   case FStatus of
-    PARAM_STARTED: Result := 'Çàïóùåí';
-    PARAM_STOPPED: Result := 'Îñòàíîâëåí';
+    PARAM_STARTED: Result := 'Запущен';
+    PARAM_STOPPED: Result := 'Остановлен';
+    PARAM_NONE: Result := 'Бездействует';
+    PARAM_CHANGING: Result := 'Изменяется';
+
   else
-    Result := 'Íåèçâåñòíî';
+    Result := 'Неизвестно';
   end;
 end;
 
