@@ -105,6 +105,7 @@ uses
   UnitFlowMeter,
   UnitMeterValue,
   UnitDataManager,
+  UnitObservable,
 
   System.SysUtils,
   System.Classes,
@@ -122,7 +123,9 @@ type
   TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: EMeasurementState) of object;
   TMeasurementRunPointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer) of object;
-  EMeasurementEvent = (
+  TMeasurementEvent = (
+    meStateChanged,
+    mePointChanged,
     meStarted,
     meStopped,
     mePointSelected,
@@ -150,6 +153,8 @@ type
     meAllDone
   );
 
+  EMeasurementEvent = TMeasurementEvent;
+
   EMeasurementCommand = (
     mcStart,
     mcStop,
@@ -175,7 +180,7 @@ type
 
 
 
-  TMeasurementRun = class
+  TMeasurementRun = class(TObservableObject)
 
   private
     FWorkTable: TWorkTable;
@@ -546,6 +551,7 @@ begin
     Exit;
   FCurrentStage := ANewState;
   NotifyStateChanged;
+  Notify(Integer(meStateChanged));
 end;
 
 procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
@@ -601,6 +607,8 @@ begin
 
   if Assigned(FOnEvent) then
     FOnEvent(Self, AEvent, AError);
+
+  Notify(Integer(AEvent));
 end;
 
 procedure TMeasurementRun.FireEvent(AEvent: EMeasurementEvent);
@@ -652,6 +660,8 @@ begin
         if Assigned(FOnPointChangedMain) then
           FOnPointChangedMain(Self, GetCurrentPoint, FCurrentPointIndex);
       end);
+
+  Notify(Integer(mePointChanged), GetCurrentPoint);
 end;
 
 function TMeasurementRun.GetCurrentPoint: TDevicePoint;
