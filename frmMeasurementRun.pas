@@ -1,4 +1,4 @@
-unit frmMeasurementRun;
+﻿unit frmMeasurementRun;
 
 interface
 
@@ -8,6 +8,11 @@ uses
   UnitDeviceClass,
   UnitClasses,
   UnitBaseProcedures,
+
+    System.Types,
+
+  System.Variants,
+  System.UITypes,
   System.Math,
   System.Generics.Collections,
   System.SysUtils,
@@ -17,7 +22,8 @@ uses
   FMX.Forms,
   FMX.Graphics,
   FMX.Grid,
-  FMX.StdCtrls;
+  FMX.StdCtrls, FMX.Grid.Style, System.Classes, FMX.Controls.Presentation,
+  FMX.ScrollBox;
 
 type
   TFrameMeasurementRun = class(TFrame)
@@ -51,6 +57,9 @@ type
     FActiveWorkTable: TWorkTable;
     FInvalidPointIndexes: TList<Integer>;
     function GetMeasurementRun: TMeasurementRun;
+    function GetStopCriteriaText(APoint: TDevicePoint): string;
+
+
     procedure SetActiveWorkTable(const Value: TWorkTable);
     procedure AttachMeasurementRunEvents;
     procedure DetachMeasurementRunEvents;
@@ -61,6 +70,7 @@ type
     procedure UpdateStopCriteriaColumns;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
+
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -213,6 +223,29 @@ begin
   Canvas.FillRect(Bounds, 0, 0, [], 1);
 end;
 
+
+function TFrameMeasurementRun.GetStopCriteriaText(APoint: TDevicePoint): string;
+var
+  Parts: array of string;
+begin
+  Result := '';
+  if APoint = nil then
+    Exit;
+
+  SetLength(Parts, 0);
+
+  if scImpulse in APoint.StopCriteria then
+    Parts := Parts + [Format('%d имп', [APoint.LimitImp])];
+
+  if scVolume in APoint.StopCriteria then
+    Parts := Parts + [FormatFloat('0.###', APoint.LimitVolume) + ' л'];
+
+  if scTime in APoint.StopCriteria then
+    Parts := Parts + [FormatFloat('0.###', APoint.LimitTime) + ' сек'];
+
+  Result := string.Join(', ', Parts);
+end;
+
 procedure TFrameMeasurementRun.GridMeasurmentRunGetValue(Sender: TObject;
   const ACol, ARow: Integer; var Value: TValue);
 var
@@ -220,28 +253,7 @@ var
   StopParts: TStringList;
   RepeatsNow: Integer;
 
-  function GetStopCriteriaText(APoint: TDevicePoint): string;
   begin
-    Result := '';
-    if APoint = nil then
-      Exit;
-
-    StopParts := TStringList.Create;
-    try
-      if scImpulse in APoint.StopCriteria then
-        StopParts.Add(Format('%d имп', [APoint.LimitImp]));
-      if scVolume in APoint.StopCriteria then
-        StopParts.Add(Format('%s л', [FormatFloat('0.###', APoint.LimitVolume)]));
-      if scTime in APoint.StopCriteria then
-        StopParts.Add(Format('%s сек', [FormatFloat('0.###', APoint.LimitTime)]));
-
-      Result := Trim(StringReplace(StopParts.CommaText, ',', ', ', [rfReplaceAll]));
-      Result := StringReplace(Result, '"', '', [rfReplaceAll]);
-    finally
-      StopParts.Free;
-    end;
-  end;
-begin
   if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
     Exit;
 
@@ -299,6 +311,8 @@ begin
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStatus then
     Value := Point.GetStatus;
 end;
+
+
 
 procedure TFrameMeasurementRun.UpdateGridMRHeaders;
 begin
@@ -359,7 +373,7 @@ end;
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
 begin
   if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcPreviousPoint, Null);
+    MeasurementRun.Execute(mcPreviousPoint, Unassigned);
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointNextClick(Sender: TObject);
@@ -402,5 +416,6 @@ begin
   FInvalidPointIndexes.Clear;
   UpdateGridMesurmentRun;
 end;
+
 
 end.

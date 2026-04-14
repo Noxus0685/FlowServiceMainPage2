@@ -1,5 +1,99 @@
 ﻿unit UnitMeasurementRun;
 
+{
+  TMeasurementRun – Measurement Process Orchestrator (FSM)
+
+  Purpose
+  -------
+  TMeasurementRun is a high-level controller responsible for executing
+  the full measurement cycle. It operates as a finite state machine (FSM)
+  and manages the sequence of stages required to perform measurements.
+
+  It acts as a layer above TWorkTable and uses it as a low-level executor
+  (hardware / bench interface).
+
+  Responsibilities
+  ----------------
+  - Build measurement session (CreateSession)
+  - Iterate through measurement points
+  - Control stage transitions (FSM)
+  - Set process parameters (flow, temperature, pressure)
+  - Wait for system stabilization
+  - Start and monitor measurement process
+  - Handle timeouts and retry logic
+  - Read and validate results
+  - Save results
+  - Notify external systems via events
+
+  Architecture
+  ------------
+  UI / API → Execute(Command)
+           → TMeasurementRun (FSM)
+           → TWorkTable (executor)
+           → FireEvent(Event)
+           → UI / Log / API
+
+  Key Concepts
+  ------------
+  - Stage (EMeasurementStage)
+      Internal state of the FSM. Defines current step of measurement.
+
+  - Command (EMeasurementCommand)
+      External control input. Used to управляe execution (Start, Stop, etc).
+
+  - Event (EMeasurementEvent)
+      Output notification. Used to inform UI/API about state changes.
+
+  Design Rules
+  ------------
+  1. All logic MUST be implemented inside ProcessStage().
+  2. Stage transitions MUST only happen via SetStage().
+  3. UI MUST NOT directly control TWorkTable.
+  4. TWorkTable MUST NOT contain measurement logic.
+  5. Events MUST NOT change system state (no feedback control).
+  6. Commands are the only external control mechanism.
+
+  WorkTable Contract
+  ------------------
+  TWorkTable is treated as a passive executor and must provide:
+
+    - StartTest / StopTest
+    - StartMonitor
+    - FlowRate / FluidTemp / FluidPress control
+    - State (STATE_EXECUTE, STATE_COMPLETE, etc.)
+    - Data access (Flow, Temp, Pressure, Quantity, Time)
+    - Stability flags (IsStable)
+
+  TMeasurementRun must NOT rely on hidden logic inside TWorkTable.
+
+  Typical Flow
+  ------------
+    msSelectPoint
+      → msSelectEtalon
+      → msSetupPoint
+      → msWaitStable
+      → msMeasure
+      → msResultsRead
+      → msSave
+      → msNextPoint
+      → msDone
+
+  Error Handling
+  --------------
+  All errors are reported via FireEvent with TErrorInfo.
+  No exceptions should break the FSM execution flow.
+
+  Threading
+  ---------
+  TMeasurementRun may run in a worker thread.
+  UI updates MUST be synchronized via events.
+
+  Notes
+  -----
+  This class is the single source of truth for measurement logic.
+  Any duplication of logic in UI or TWorkTable is prohibited.
+}
+
 interface
 
 uses
