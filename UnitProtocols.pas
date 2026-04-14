@@ -13,7 +13,10 @@ type
     pcNone,
     pcEvent,
     pcState,
-    pcAction
+    pcAction,
+    pcInfo,
+    pcWarning,
+    pcError
   );
 
   TProtocolSource = (
@@ -294,6 +297,9 @@ begin
     pcEvent: Result := 'EVENT';
     pcState: Result := 'STATE';
     pcAction: Result := 'ACTION';
+    pcInfo: Result := 'INFO';
+    pcWarning: Result := '¬Õ»Ã¿Õ»≈!';
+    pcError: Result := 'Œÿ»¡ ¿!';
   else
     Result := '';
   end;

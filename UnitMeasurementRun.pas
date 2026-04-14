@@ -505,6 +505,9 @@ procedure TMeasurementRun.FireEvent(AEvent: EMeasurementEvent; const AError: TEr
 begin
   ProtocolManager.AddMessage(pcEvent, psMeasurement, 'MeasurementEvent',
     'Событие измерения', MeasurementEventToString(AEvent));
+
+
+
   if Assigned(FOnEvent) then
     FOnEvent(Self, AEvent, AError);
 end;
