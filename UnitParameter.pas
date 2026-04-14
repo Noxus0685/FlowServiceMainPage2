@@ -1,4 +1,4 @@
-unit UnitParameter;
+﻿unit UnitParameter;
 
 interface
 
@@ -21,7 +21,9 @@ type
 
   EParamStatus = (
     PARAM_STOPPED,
-    PARAM_STARTED
+    PARAM_STARTED,
+    PARAM_NONE,
+    PARAM_CHANGING
   );
 
   EParamAction = (
@@ -49,7 +51,7 @@ TParameter = class(TObject)
     FMin: Double;
     FAccuracyPlus: Double;
     FAccuracyMinus: Double;
-    function IsStable(var Status: Boolean): Boolean;
+    FValue: Double;
     FValueSet: Double;   //óñòàíîâëåííàÿ
     FBefore: Double;
     FAfter: Double;
@@ -61,7 +63,6 @@ TParameter = class(TObject)
     procedure SetMin(const Value: Double );
     procedure SetMax(const Value: Double);
     procedure SetValue(AValue: Double);
-    function  GetValue: Double;
     procedure SetStatus(AStatus: EParamStatus);
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
@@ -70,10 +71,10 @@ TParameter = class(TObject)
     procedure SetParam(Avalue: Double);
   public
     constructor Create(const AName, AHint: string); virtual;
+    function IsStable(var Status: Boolean): Boolean;
     function GetStatusAsString: string;
     procedure Stop;
     procedure Start;
-    function IsStable: Boolean;
     property OnStatusChange: TonStatusEvent read FOnStatusChange write FOnStatusChange;
     property OnActionChange: TonActionEvent read FOnActionChange write FOnActionChange;
     property Name: string read FName write FName;
@@ -81,7 +82,7 @@ TParameter = class(TObject)
     property Status: EParamStatus read  FStatus   write SetStatus;
     property Action: EParamAction read FAction write FAction;
     property ValueSet: Double read FValueSet write SetParam;
-    property Value: Double read GetValue write SetValue;
+    property Value: Double read FValue write SetValue;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
     property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
@@ -116,10 +117,10 @@ end;
 
 
 
-    procedure DoPumpStart(APumpName: string);
-    procedure DoPumpStop(APumpName: string);
-    procedure DoFreqSet(APumpName: string; ANewFreq: Double);
-    procedure PumpSetStatus(APumpName: string; AStatus: EParamStatus);
+    procedure DoPumpStart;
+    procedure DoPumpStop;
+    procedure DoFreqSet( ANewFreq: Double);
+    procedure PumpSetStatus( AStatus: EParamStatus);
 
   end;
 //---------------------------------
@@ -180,11 +181,11 @@ end;
  function TFluidTemp.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Çàïóùåí';
-    ACTION_SET: Result := 'Óñòàíîâêà íîâîãî çíà÷åíèÿ òåìïåðàòóðû';
-    ACTION_STOP: Result := 'Ñáðîøåí';
+    ACTION_START: Result := 'Запущен';
+    ACTION_SET: Result := 'Изменена утсановленная температура';
+    ACTION_STOP: Result := 'Сброшен';
   else
-    Result := 'Íåèçâåñòíî';
+    Result := 'Неизвестно';
   end;
 end;
 
@@ -249,11 +250,11 @@ end;
  function TFluidPress.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Çàïóùåí';
-    ACTION_SET: Result := 'Óñòàíîâêà íîâîãî çíà÷åíèÿ äàâëåíèÿ';
-    ACTION_STOP: Result := 'Ñáðîøåí';
+    ACTION_START: Result := 'Запущен';
+    ACTION_SET: Result := 'Изменено установленное давление';
+    ACTION_STOP: Result := 'Сброшен';
   else
-    Result := 'Íåèçâåñòíî';
+    Result := 'Неизвестно';
   end;
 end;
 
@@ -331,11 +332,11 @@ end;
  function TFlowRate.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Çàïóùåí';
-    ACTION_SET: Result := 'Óñòàíîâêà íîâîãî çíà÷åíèÿ ðàñõîäà';
-    ACTION_STOP: Result := 'Ñáðîøåí';
+    ACTION_START: Result := 'Запущен';
+    ACTION_SET: Result := 'Изменен расход воды';
+    ACTION_STOP: Result := 'Сброшен';
   else
-    Result := 'Íåèçâåñòíî';
+    Result := 'Неизвестно';
   end;
 end;
 
@@ -432,15 +433,15 @@ end;
  function TPump.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Çàïóùåí';
-    ACTION_SET: Result := 'Èçìåíåí ðàñõîä âîäû';
-    ACTION_STOP: Result := 'Ñáðîøåí';
+    ACTION_START: Result := 'Запущен';
+    ACTION_SET: Result := 'Изменена частота насоса';
+    ACTION_STOP: Result := 'Сброшен';
   else
-    Result := 'Íåèçâåñòíî';
+    Result := 'Неизвестно';
   end;
 end;
 
-procedure TPump.DoPumpStart(APumpName: string);
+procedure TPump.DoPumpStart;
 begin
   //Pump:=FindPumpByName(APumpName);
   //if Pump = nil then
@@ -454,7 +455,7 @@ begin
    end;
 end;
 
-procedure TPump.DoPumpStop(APumpName: string);
+procedure TPump.DoPumpStop;
 begin
 
  //   Pump:=FindPumpByName(APumpName);
@@ -473,7 +474,7 @@ begin
    end;
 end;
 
-procedure TPump.DoFreqSet(APumpName: string; ANewFreq: Double);
+procedure TPump.DoFreqSet;
 begin
 //  Pump:=FindPumpByName(APumpName);
  // if Pump = nil then
@@ -485,7 +486,7 @@ begin
     FOnActionChange(self,ACTION_SET);
 end;
 
-procedure TPump.PumpSetStatus(APumpName: string;AStatus: EParamStatus);
+procedure TPump.PumpSetStatus(AStatus: EParamStatus);
 begin
  // Pump:=FindPumpByName(APumpName);
  // if Pump = nil then
@@ -583,10 +584,6 @@ begin
   else FValue:=AValue;
 end;
 
-function TParameter.GetValue: Double;
-begin
-  Result :=  FValue;
-end;
 
 procedure TParameter.SetParam(AValue: Double);
 begin

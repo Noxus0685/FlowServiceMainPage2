@@ -1238,7 +1238,7 @@ procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
-    FActiveWorkTable.ActivePump.DoPumpStart(ComboBoxPumps.Text) ;
+    FActiveWorkTable.ActivePump.DoPumpStart ;
     UpdateUIPump;
 
   end;
@@ -1264,7 +1264,7 @@ procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
     begin
-      FActiveWorkTable.ActivePump.DoFreqSet(ComboBoxPumps.Text,NormalizeFloatInput(SpinBoxFreq.Text));
+      FActiveWorkTable.ActivePump.DoFreqSet(NormalizeFloatInput(SpinBoxFreq.Text));
     end;
 end;
 
@@ -1348,7 +1348,7 @@ procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
 begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
-      FActiveWorkTable.ActivePump.DoPumpStop(ComboBoxPumps.Text) ;
+      FActiveWorkTable.ActivePump.DoPumpStop ;
        UpdateUIPump;
       //FActiveWorkTable.ActivePump.State:=CONTROL_STOPPED;
     end;
@@ -4616,9 +4616,7 @@ begin
       SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);
       SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
       if WorkTable.FlowRate.ValueSet<>0 then
-        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet)
-      else
-        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Value);
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet);
 
 
 if WorkTable.FlowRate.IsRunning then
