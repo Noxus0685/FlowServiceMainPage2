@@ -12,6 +12,7 @@ uses
   frmProceed,
   frmMeasurementRun,
   frmProtocol,
+  frmFlowMeterProperties,
   UnitProtocols,
   UnitDataManager,
   UnitMeterValue,
@@ -459,6 +460,7 @@ type
   FActiveWorkTable: TWorkTable;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameProtocol: TFrameProtocol;
+  FFrameFlowMeterProperties: TFrameFlowMeterProperties;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -567,6 +569,7 @@ type
     procedure PersistDeviceAsync(ADevice: TDevice);
     procedure UpdateUIConditions;
     function   GetMeasurementRun: TMeasurementRun;
+    procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -671,6 +674,7 @@ destructor TFrameMainTable.Destroy;
 begin
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameProtocol);
+  FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   TMeterValue.SaveToFile(0);
@@ -693,6 +697,27 @@ function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
 
       result:= TMeasurementRun (FWorkTableManager.ActiveWorkTable.MeasurementRun);
     end;
+
+procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
+var
+  Meter: TFlowMeter;
+begin
+  if FFrameFlowMeterProperties = nil then
+    Exit;
+
+  Meter := nil;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+  begin
+    if ARow < 0 then
+      ARow := GridDevices.Selected;
+
+    if (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) and
+       (FActiveWorkTable.DeviceChannels[ARow] <> nil) then
+      Meter := FActiveWorkTable.DeviceChannels[ARow].FlowMeter;
+  end;
+
+  FFrameFlowMeterProperties.FlowMeter := Meter;
+end;
 
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
 var
@@ -1037,6 +1062,7 @@ begin
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
   FFrameProtocol := nil;
+  FFrameFlowMeterProperties := nil;
 
 
 
@@ -1079,6 +1105,16 @@ begin
     FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
+
+  UpdateFlowMeterPropertiesFrame;
+
+  if FFrameFlowMeterProperties = nil then
+  begin
+    FFrameFlowMeterProperties := TFrameFlowMeterProperties.Create(Self);
+    FFrameFlowMeterProperties.Parent := TabItemDeviceProperties;
+    FFrameFlowMeterProperties.Align := TAlignLayout.Client;
+  end;
+  UpdateFlowMeterPropertiesFrame;
 
   RefreshPumpsCombo;
 
@@ -3732,6 +3768,8 @@ begin
   finally
     GridDevices.EndUpdate;
   end;
+
+  UpdateFlowMeterPropertiesFrame(Row);
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
@@ -3830,6 +3868,8 @@ begin
   finally
     GridDevices.EndUpdate;
   end;
+
+  UpdateFlowMeterPropertiesFrame(Row);
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -3941,6 +3981,7 @@ end;
 procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
+  UpdateFlowMeterPropertiesFrame(ARow);
 
     if not IsUpdating then
 
