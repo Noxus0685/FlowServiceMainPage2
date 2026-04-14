@@ -2907,7 +2907,7 @@ var
   Pump: TPump;
 begin
   Pump := nil;
-  for Pump in FPumps do
+  for Pump in tPump.Pumps do
   begin
     if Pump.Name = APumpName then
       Break;

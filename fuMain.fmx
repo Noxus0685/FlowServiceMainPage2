@@ -1337,7 +1337,7 @@ object FormMain: TFormMain
         end>
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 43.000000000000000000
+      Size.Width = 44.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
@@ -1560,8 +1560,8 @@ object FormMain: TFormMain
         Size.Height = 243.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 4
-        Viewport.Width = 419.000000000000000000
-        Viewport.Height = 239.000000000000000000
+        Viewport.Width = 423.000000000000000000
+        Viewport.Height = 243.000000000000000000
       end
     end
   end
