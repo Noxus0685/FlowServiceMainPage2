@@ -772,23 +772,30 @@ begin
 end;
 
 procedure TFrameMainTable.StartTest;
+var
+  Run: TMeasurementRun;
 begin
-
   if FActiveWorkTable = nil then
-     Exit;
+    Exit;
+
+  Run := MeasurementRun;
+  if Run = nil then
+    Exit;
 
   FActiveWorkTable.ResetMeasurementValues;
   FActiveWorkTable.State := STATE_STARTTEST;
 
-  MeasurementRun.Start;
-
-
-
+  Run.Execute(mcStart);
 end;
 
 procedure TFrameMainTable.StopTest;
+var
+  Run: TMeasurementRun;
 begin
-    MeasurementRun.Stop;
+  Run := MeasurementRun;
+  if Run <> nil then
+    Run.Execute(mcStop);
+
   if FActiveWorkTable <> nil then
     FActiveWorkTable.State := STATE_STOPTEST;
 end;
