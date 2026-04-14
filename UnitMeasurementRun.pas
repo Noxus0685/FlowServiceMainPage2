@@ -238,7 +238,8 @@ type
     procedure Pause;
     procedure Resume;
     procedure NextPoint;
-    procedure Execute(Cmd: EMeasurementCommand; Param: Variant);
+    procedure Execute(Cmd: EMeasurementCommand); overload;
+    procedure Execute(Cmd: EMeasurementCommand; Param: Variant); overload;
 
     procedure Process;
     procedure ProcessStage;
@@ -780,6 +781,11 @@ end;
 procedure TMeasurementRun.NextPoint;
 begin
   FForceNextPoint := FCurrentPointIndex + 1;
+end;
+
+procedure TMeasurementRun.Execute(Cmd: EMeasurementCommand);
+begin
+  Execute(Cmd, Null);
 end;
 
 procedure TMeasurementRun.Execute(Cmd: EMeasurementCommand; Param: Variant);
