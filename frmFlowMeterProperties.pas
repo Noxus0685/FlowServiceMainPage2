@@ -83,7 +83,7 @@ procedure TFrameFlowMeterProperties.BuildUI;
     Result.Text := AText;
     Result.StyledSettings := [];
     Result.TextSettings.Font.Style := [TFontStyle.fsBold];
-    Result.TextSettings.HorzAlign := TTextAlign.Center;
+    Result.TextSettings.HorzAlign := TTextAlign.Leading;
     Result.TextSettings.VertAlign := TTextAlign.Center;
     Result.Align := TAlignLayout.Client;
     Result.Margins.Rect := TRectF.Create(6, 4, 6, 2);
@@ -108,21 +108,21 @@ begin
   GridProps := TGridPanelLayout.Create(Self);
   GridProps.Parent := LayoutRoot;
   GridProps.Align := TAlignLayout.Top;
-  GridProps.Height := 100;
+  GridProps.Height := 340;
   GridProps.RowCollection.Clear;
   GridProps.ColumnCollection.Clear;
 
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 52;
+  GridProps.ColumnCollection.Add.Value := 36;
+  GridProps.ColumnCollection.Add.Value := 64;
 
-  GridProps.ColumnCollection.Add.Value := 14;
-  GridProps.ColumnCollection.Add.Value := 14;
-  GridProps.ColumnCollection.Add.Value := 14;
-  GridProps.ColumnCollection.Add.Value := 14;
-  GridProps.ColumnCollection.Add.Value := 11;
-  GridProps.ColumnCollection.Add.Value := 11;
-  GridProps.ColumnCollection.Add.Value := 11;
-  GridProps.ColumnCollection.Add.Value := 11;
+  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 42;
 
   LabelDeviceName := MakeHeader('Имя');
   LabelDeviceTypeName := MakeHeader('Тип');
@@ -133,20 +133,20 @@ begin
   LabelQuantityMax := MakeHeader('V макс');
   LabelQuantityMin := MakeHeader('V мин');
   GridProps.ControlCollection.AddControl(LabelDeviceName, 0, 0);
-  GridProps.ControlCollection.AddControl(LabelDeviceTypeName, 1, 0);
-  GridProps.ControlCollection.AddControl(LabelSerialNumber, 2, 0);
-  GridProps.ControlCollection.AddControl(LabelOutputType, 3, 0);
-  GridProps.ControlCollection.AddControl(LabelFlowMax, 4, 0);
-  GridProps.ControlCollection.AddControl(LabelFlowMin, 5, 0);
-  GridProps.ControlCollection.AddControl(LabelQuantityMax, 6, 0);
-  GridProps.ControlCollection.AddControl(LabelQuantityMin, 7, 0);
+  GridProps.ControlCollection.AddControl(LabelDeviceTypeName, 0, 1);
+  GridProps.ControlCollection.AddControl(LabelSerialNumber, 0, 2);
+  GridProps.ControlCollection.AddControl(LabelOutputType, 0, 3);
+  GridProps.ControlCollection.AddControl(LabelFlowMax, 0, 4);
+  GridProps.ControlCollection.AddControl(LabelFlowMin, 0, 5);
+  GridProps.ControlCollection.AddControl(LabelQuantityMax, 0, 6);
+  GridProps.ControlCollection.AddControl(LabelQuantityMin, 0, 7);
 
   EditDeviceName := MakeEdit(EditDeviceNameExit, 'Имя');
   EditDeviceTypeName := MakeEdit(EditDeviceTypeNameExit, 'Тип');
   EditSerialNumber := MakeEdit(EditSerialNumberExit, 'Серийный номер');
-  GridProps.ControlCollection.AddControl(EditDeviceName, 0, 1);
+  GridProps.ControlCollection.AddControl(EditDeviceName, 1, 0);
   GridProps.ControlCollection.AddControl(EditDeviceTypeName, 1, 1);
-  GridProps.ControlCollection.AddControl(EditSerialNumber, 2, 1);
+  GridProps.ControlCollection.AddControl(EditSerialNumber, 1, 2);
 
   ComboOutputType := TComboBox.Create(Self);
   ComboOutputType.Parent := GridProps;
@@ -159,16 +159,16 @@ begin
   ComboOutputType.Items.Add('Интерфейс');
   ComboOutputType.Items.Add('Визуальный');
   ComboOutputType.OnChange := ComboOutputTypeChange;
-  GridProps.ControlCollection.AddControl(ComboOutputType, 3, 1);
+  GridProps.ControlCollection.AddControl(ComboOutputType, 1, 3);
 
   EditFlowMax := MakeEdit(EditFlowMaxExit, 'Q макс');
   EditFlowMin := MakeEdit(EditFlowMinExit, 'Q мин');
   EditQuantityMax := MakeEdit(EditQuantityMaxExit, 'V макс');
   EditQuantityMin := MakeEdit(EditQuantityMinExit, 'V мин');
-  GridProps.ControlCollection.AddControl(EditFlowMax, 4, 1);
-  GridProps.ControlCollection.AddControl(EditFlowMin, 5, 1);
-  GridProps.ControlCollection.AddControl(EditQuantityMax, 6, 1);
-  GridProps.ControlCollection.AddControl(EditQuantityMin, 7, 1);
+  GridProps.ControlCollection.AddControl(EditFlowMax, 1, 4);
+  GridProps.ControlCollection.AddControl(EditFlowMin, 1, 5);
+  GridProps.ControlCollection.AddControl(EditQuantityMax, 1, 6);
+  GridProps.ControlCollection.AddControl(EditQuantityMin, 1, 7);
 end;
 
 procedure TFrameFlowMeterProperties.SetFlowMeter(AFlowMeter: TFlowMeter);
