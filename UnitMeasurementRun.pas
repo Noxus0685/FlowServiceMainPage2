@@ -219,6 +219,8 @@ type
     function ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetPoint(Index: Integer; out AError: TErrorInfo): Boolean;
     function SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+    function BuildPointSelectionLog(APoint: TDevicePoint): string;
+    function BuildEtalonSelectionLog(APoint: TDevicePoint): string;
     function CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
 
     procedure RunThreadProc;
@@ -452,7 +454,7 @@ begin
   FCriticalSection := TCriticalSection.Create;
 
   FCurrentPointIndex := -1;
-  FMode := mrmAutomatic;
+  FMode := mrmManual;
 
   FManualFlowRate := 0;
   FManualFluidTemp := 20;
@@ -464,6 +466,70 @@ begin
   FMaxAttemptCount := 3;
   FAttempt := 0;
   FMeasureTimeoutMs := 0;
+end;
+
+function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
+begin
+  if APoint = nil then
+    Exit('Точка не выбрана');
+
+  Result := Format('Точка: %s; Q=%.6g; Ограничения: имп=%d, объем=%.6g, время=%.6g c', [
+    APoint.Name,
+    APoint.Q,
+    APoint.LimitImp,
+    APoint.LimitVolume,
+    APoint.LimitTime
+  ]);
+end;
+
+function TMeasurementRun.BuildEtalonSelectionLog(APoint: TDevicePoint): string;
+var
+  I: Integer;
+  Channel: TChannel;
+  Details: TStringList;
+  DetailsText: string;
+  EtalonName: string;
+  Accuracy: string;
+begin
+  if (APoint = nil) or (FWorkTable = nil) then
+    Exit('Эталоны не выбраны');
+
+  Details := TStringList.Create;
+  try
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel = nil) or (Channel.FlowMeter = nil) then
+        Continue;
+
+      if (APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax) then
+        Continue;
+
+      EtalonName := Trim(Channel.Name);
+      if EtalonName = '' then
+        EtalonName := Trim(Channel.FlowMeter.DeviceName);
+      if EtalonName = '' then
+        EtalonName := 'Без имени';
+
+      Accuracy := '';
+      if Channel.FlowMeter.Device <> nil then
+        Accuracy := Trim(Channel.FlowMeter.Device.AccuracyClass);
+      if Accuracy = '' then
+        Accuracy := 'не указана';
+
+      Details.Add(Format('%s (точность %s)', [EtalonName, Accuracy]));
+    end;
+
+    if Details.Count = 0 then
+      Exit('Эталоны по расходу не найдены');
+
+    DetailsText := Trim(StringReplace(Details.Text, sLineBreak, '; ', [rfReplaceAll]));
+    if EndsText(';', DetailsText) then
+      Delete(DetailsText, Length(DetailsText), 1);
+    Result := 'Установлены эталоны: ' + DetailsText;
+  finally
+    Details.Free;
+  end;
 end;
 
 destructor TMeasurementRun.Destroy;
@@ -1011,6 +1077,8 @@ begin
 
         if SetPoint(FCurrentPointIndex, Error) then
         begin
+          ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
+            'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
           FireEvent(mePointSelected);
           SetStage(msSelectEtalon);
         end
@@ -1025,6 +1093,8 @@ begin
       begin
         if SelectEtalons(Point, Error) then
         begin
+          ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
+            'Выбраны эталоны для точки', BuildEtalonSelectionLog(Point));
           FireEvent(meEtalonSelected);
           SetStage(msSetupPoint);
         end
