@@ -11,6 +11,7 @@ uses
   frmCalibrCoefs,
   frmProceed,
   frmMeasurementRun,
+  frmMRResults,
   frmProtocol,
   frmFlowMeterProperties,
   UnitProtocols,
@@ -449,6 +450,7 @@ type
 
   FActiveWorkTable: TWorkTable;
   FFrameMeasurementRun: TFrameMeasurementRun;
+  FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
     { Private declarations }
@@ -663,6 +665,7 @@ end;
 destructor TFrameMainTable.Destroy;
 begin
   FreeAndNil(FFrameMeasurementRun);
+  FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
@@ -1052,6 +1055,7 @@ begin
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
+  FFrameMRResults := nil;
   FFrameProtocol := nil;
   FFrameFlowMeterProperties := nil;
 
@@ -1089,6 +1093,14 @@ begin
     FFrameMeasurementRun.Align := TAlignLayout.Client;
   end;
   FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameMRResults = nil then
+  begin
+    FFrameMRResults := TFrameMRResults.Create(Self);
+    FFrameMRResults.Parent := TabItemMRResults;
+    FFrameMRResults.Align := TAlignLayout.Client;
+  end;
+  FFrameMRResults.ActiveWorkTable := FActiveWorkTable;
 
   if FFrameProtocol = nil then
   begin
@@ -2075,6 +2087,9 @@ begin
   if FFrameMeasurementRun <> nil then
   FFrameMeasurementRun.UpdateUI;
 
+  if FFrameMRResults <> nil then
+    FFrameMRResults.UpdateUI;
+
 end;
 
 function TFrameMainTable.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
@@ -2129,6 +2144,9 @@ begin
 
   if FFrameMeasurementRun <> nil then
     FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameMRResults <> nil then
+    FFrameMRResults.ActiveWorkTable := FActiveWorkTable;
 
   if FFrameProtocol = nil then
   begin
