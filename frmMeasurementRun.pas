@@ -8,6 +8,7 @@ uses
   UnitDeviceClass,
   UnitClasses,
   UnitBaseProcedures,
+  UnitObservable,
 
     System.Types,
 
@@ -26,7 +27,7 @@ uses
   FMX.ScrollBox;
 
 type
-  TFrameMeasurementRun = class(TFrame)
+  TFrameMeasurementRun = class(TFrame, IObserver)
     GridMeasurmentRun: TGrid;
     StringColumnPointer: TStringColumn;
     StringColumnMRPointName: TStringColumn;
@@ -75,6 +76,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     procedure UpdateUI;
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
@@ -129,9 +131,7 @@ begin
   if MeasurementRun = nil then
     Exit;
 
-  MeasurementRun.OnPointChangedFrame := MeasurementRunPointChanged;
-  MeasurementRun.OnStateChangedFrame := MeasurementRunStateChanged;
-  MeasurementRun.OnEvent := MeasurementRunEvent;
+  MeasurementRun.Subscribe(Self);
 end;
 
 procedure TFrameMeasurementRun.DetachMeasurementRunEvents;
@@ -139,9 +139,39 @@ begin
   if MeasurementRun = nil then
     Exit;
 
-  MeasurementRun.OnPointChangedFrame := nil;
-  MeasurementRun.OnStateChangedFrame := nil;
-  MeasurementRun.OnEvent := nil;
+  MeasurementRun.Unsubscribe(Self);
+end;
+
+procedure TFrameMeasurementRun.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+var
+  LRun: TMeasurementRun;
+  LIdx: Integer;
+begin
+  if not (Sender is TMeasurementRun) then
+    Exit;
+
+  LRun := TMeasurementRun(Sender);
+
+  if Event = Integer(meStateChanged) then
+  begin
+    MeasurementRunStateChanged(Sender, LRun.Stage);
+    Exit;
+  end;
+
+  if Event = Integer(mePointChanged) then
+  begin
+    MeasurementRunPointChanged(Sender, TDevicePoint(Data), LRun.CurrentPointIndex);
+    Exit;
+  end;
+
+  if Event = Integer(mePointInvalid) then
+  begin
+    LIdx := LRun.CurrentPointIndex;
+    if (LIdx >= 0) and (FInvalidPointIndexes.IndexOf(LIdx) < 0) then
+      FInvalidPointIndexes.Add(LIdx);
+  end;
+
+  MeasurementRunEvent(Sender, EMeasurementEvent(Event), TErrorInfo.Empty(LRun.Stage));
 end;
 
 procedure TFrameMeasurementRun.MeasurementRunStateChanged(ASender: TObject;
