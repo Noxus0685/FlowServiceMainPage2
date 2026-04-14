@@ -593,8 +593,10 @@ procedure TParameter.SetParam(AValue: Double);
 begin
 
   if  SameValue(FValueSet ,AValue, MinDouble) then
-      ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet]));
-        Exit; // ×àñòîòà íå èçìåíèëàñü
+       Exit;
+
+  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet]));
+
 
       if AValue<FMin then
         FValueSet:=FMin

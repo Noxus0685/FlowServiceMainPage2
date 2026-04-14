@@ -1496,7 +1496,7 @@ object FrameMainTable: TFrameMainTable
         TabPosition = PlatformDefault
         Sizes = (
           1049s
-          448s)
+          427s)
         object TabItemWorkTable1: TTabItem
           CustomIcon = <
             item
@@ -1504,8 +1504,8 @@ object FrameMainTable: TFrameMainTable
           TextSettings.Trimming = None
           IsSelected = True
           Padding.Left = 10.000000000000000000
-          Size.Width = 1.000000000000000000
-          Size.Height = 5.000000000000000000
+          Size.Width = 143.000000000000000000
+          Size.Height = 26.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = ''
           TabOrder = 0
@@ -1538,8 +1538,8 @@ object FrameMainTable: TFrameMainTable
                 OnSetValue = GridEtalonsSetValue
                 OnCellClick = GridEtalonsCellClick
                 OnCellDblClick = GridEtalonsCellDblClick
-                Viewport.Width = 1049.000000000000000000
-                Viewport.Height = 120.000000000000000000
+                Viewport.Width = 1045.000000000000000000
+                Viewport.Height = 79.000000000000000000
                 object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
@@ -1663,7 +1663,7 @@ object FrameMainTable: TFrameMainTable
           object PanelDevices1: TPanel
             Align = Client
             Size.Width = 1049.000000000000000000
-            Size.Height = 280.000000000000000000
+            Size.Height = 259.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 3
             object GridDevices: TGrid
@@ -1672,7 +1672,7 @@ object FrameMainTable: TFrameMainTable
               ClipChildren = True
               PopupMenu = PopupMenuDevicesGrid
               Size.Width = 1049.000000000000000000
-              Size.Height = 248.000000000000000000
+              Size.Height = 227.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
@@ -1682,8 +1682,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridDevicesSetValue
               OnCellClick = GridDevicesCellClick
               OnCellDblClick = GridDevicesCellDblClick
-              Viewport.Width = 1049.000000000000000000
-              Viewport.Height = 248.000000000000000000
+              Viewport.Width = 1029.000000000000000000
+              Viewport.Height = 186.000000000000000000
               object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
@@ -1924,226 +1924,54 @@ object FrameMainTable: TFrameMainTable
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 3
-        object TabControlResults: TTabControl
+        object TabControlDevices: TTabControl
           Align = Client
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 4
+          TabIndex = 0
           TabOrder = 1
           TabPosition = PlatformDefault
           Sizes = (
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s)
+            427s)
           object TabItemMeasurmentRun: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            IsSelected = True
+            Size.Width = 105.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
             Text = #1061#1086#1076' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
             ExplicitSize.cx = 105.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
-            object GridMeasurmentRun: TGrid
-              Align = Client
-              CanFocus = True
-              ClipChildren = True
-              Size.Width = 674.000000000000000000
-              Size.Height = 395.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 0
-              RowCount = 1
-              OnGetValue = GridMeasurmentRunGetValue
-              Viewport.Width = 674.000000000000000000
-              Viewport.Height = 395.000000000000000000
-              object StringColumn1: TStringColumn
-                HeaderSettings.TextSettings.WordWrap = False
-                Size.Width = 50.000000000000000000
-              end
-              object StringColumnMRPointName: TStringColumn
-                HorzAlign = Center
-                Header = #1048#1084#1103
-                HeaderSettings.TextSettings.Trimming = Character
-                HeaderSettings.TextSettings.WordWrap = False
-                HeaderSettings.TextSettings.HorzAlign = Center
-                Size.Width = 79.000000000000000000
-              end
-              object StringColumnMRFlowRate: TStringColumn
-                Header = #1056#1072#1089#1093#1086#1076
-                HeaderSettings.TextSettings.WordWrap = False
-                Size.Width = 87.000000000000000000
-              end
-              object StringColumnMRStopCriterea: TStringColumn
-                Header = #1055#1072#1088#1084#1077#1090#1088' '#1086#1089#1090#1072#1085#1086#1074#1082#1080
-                HeaderSettings.TextSettings.WordWrap = False
-                Size.Width = 118.000000000000000000
-              end
-              object StringColumnRepeats: TStringColumn
-                Header = #1055#1086#1074#1090#1086#1088#1099
-                HeaderSettings.TextSettings.WordWrap = False
-              end
-              object StringColumnMRStatus: TStringColumn
-                Header = #1057#1090#1072#1090#1091#1089
-                HeaderSettings.TextSettings.WordWrap = False
-                Size.Width = 74.000000000000000000
-              end
-            end
-            object ToolBar2: TToolBar
-              Size.Width = 674.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              object SpeedButton7: TSpeedButton
-                Align = Left
-                Size.Width = 57.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'arrowlefttoolbutton'
-                Text = 'SpeedButton7'
-                TextSettings.Trimming = None
-              end
-              object SpeedButton8: TSpeedButton
-                Align = Left
-                Position.X = 114.000000000000000000
-                Size.Width = 57.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'arrowrighttoolbutton'
-                Text = 'SpeedButton7'
-                TextSettings.Trimming = None
-              end
-              object SpeedButton9: TSpeedButton
-                Align = Left
-                Position.X = 57.000000000000000000
-                Size.Width = 57.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'pausetoolbuttonbordered'
-                Text = 'SpeedButton7'
-                TextSettings.Trimming = None
-              end
-              object SpeedButton10: TSpeedButton
-                Align = Left
-                Position.X = 171.000000000000000000
-                Size.Width = 70.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'cleareditbutton'
-                Text = 'SpeedButton10'
-                TextSettings.Trimming = None
-              end
-              object SpeedButtonCreatePoints: TSpeedButton
-                Align = Left
-                Position.X = 241.000000000000000000
-                Size.Width = 80.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'refreshtoolbutton'
-                Text = 'SpeedButtonCreatePoints'
-                TextSettings.Trimming = None
-                OnClick = SpeedButtonCreatePointsClick
-              end
-            end
           end
-          object TabItem2: TTabItem
+          object TabItemMRResults: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 81.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
             Text = #1056#1077#1079#1091#1083#1100#1090#1072#1090#1099
             ExplicitSize.cx = 81.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
-            object Grid2: TGrid
-              Align = Client
-              CanFocus = True
-              ClipChildren = True
-              Size.Width = 674.000000000000000000
-              Size.Height = 416.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 0
-              Viewport.Width = 674.000000000000000000
-              Viewport.Height = 416.000000000000000000
-              object StringColumn5: TStringColumn
-                Header = #1055#1088#1080#1073#1086#1088
-                HeaderSettings.TextSettings.WordWrap = False
-              end
-              object StringColumn6: TStringColumn
-                Header = #1058#1086#1095#1082#1072' 1'
-                HeaderSettings.TextSettings.WordWrap = False
-              end
-              object StringColumn7: TStringColumn
-                Header = #1058#1086#1095#1082#1072' 2'
-                HeaderSettings.TextSettings.WordWrap = False
-              end
-              object StringColumn9: TStringColumn
-                Header = #1056#1077#1079#1091#1083#1100#1090#1072#1090
-                HeaderSettings.TextSettings.WordWrap = False
-              end
-            end
-            object ToolBar3: TToolBar
-              Size.Width = 674.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 1
-              object SpeedButton11: TSpeedButton
-                Align = Left
-                Size.Width = 57.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'arrowlefttoolbutton'
-                Text = 'SpeedButton7'
-                TextSettings.Trimming = None
-              end
-              object SpeedButton12: TSpeedButton
-                Align = Left
-                Position.X = 57.000000000000000000
-                Size.Width = 57.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'pausetoolbuttonbordered'
-                Text = 'SpeedButton7'
-                TextSettings.Trimming = None
-              end
-              object SpeedButton13: TSpeedButton
-                Align = Left
-                Position.X = 114.000000000000000000
-                Size.Width = 57.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'arrowrighttoolbutton'
-                Text = 'SpeedButton7'
-                TextSettings.Trimming = None
-              end
-              object SpeedButton14: TSpeedButton
-                Align = Left
-                Position.X = 171.000000000000000000
-                Size.Width = 70.000000000000000000
-                Size.Height = 32.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'cleareditbutton'
-                Text = 'SpeedButton10'
-                TextSettings.Trimming = None
-              end
-            end
           end
           object TabItem3: TTabItem
             CustomIcon = <
@@ -2151,8 +1979,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 120.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -2166,8 +1994,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 74.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -2177,7 +2005,7 @@ object FrameMainTable: TFrameMainTable
             object LayoutProtocolHost: TLayout
               Align = Client
               Size.Width = 674.000000000000000000
-              Size.Height = 448.000000000000000000
+              Size.Height = 427.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
             end
@@ -2187,9 +2015,9 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            IsSelected = False
+            Size.Width = 138.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
