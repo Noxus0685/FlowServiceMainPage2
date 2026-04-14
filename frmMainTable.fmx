@@ -2074,16 +2074,12 @@ object FrameMainTable: TFrameMainTable
             Text = #1055#1088#1086#1090#1086#1082#1086#1083
             ExplicitSize.cx = 74.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
-            object MemoProtocol: TMemo
-              Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
-              DataDetectorTypes = []
+            object LayoutProtocolHost: TLayout
               Align = Client
               Size.Width = 674.000000000000000000
               Size.Height = 427.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 674.000000000000000000
-              Viewport.Height = 427.000000000000000000
             end
           end
           object TabItemDeviceProperties: TTabItem

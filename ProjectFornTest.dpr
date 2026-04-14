@@ -25,7 +25,9 @@ uses
   UnitMeasurementRun in 'UnitMeasurementRun.pas',
   FmxHelper in 'FmxHelper.pas',
   UnitParameter in 'UnitParameter.pas',
-  frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame};
+  frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame},
+  UnitProtocols in 'UnitProtocols.pas',
+  frmProtocol in 'frmProtocol.pas' {FrameProtocol: TFrame};
 
 {$R *.res}
 

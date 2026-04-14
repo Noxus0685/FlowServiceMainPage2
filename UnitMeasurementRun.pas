@@ -114,7 +114,8 @@ uses
   System.Math,
   System.StrUtils,
   System.IniFiles,
-  System.Variants;
+  System.Variants,
+  UnitProtocols;
 
 type
 
@@ -472,6 +473,8 @@ end;
 procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
 begin
   SetState(ANewStage);
+  ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
+    'Переход этапа измерения', SpillStateToString(ANewStage));
   EnterStage(ANewStage);
 end;
 
@@ -499,6 +502,8 @@ end;
 
 procedure TMeasurementRun.FireEvent(AEvent: EMeasurementEvent; const AError: TErrorInfo);
 begin
+  ProtocolManager.AddMessage(pcEvent, psMeasurement, 'MeasurementEvent',
+    'Событие измерения', IntToStr(Ord(AEvent)));
   if Assigned(FOnEvent) then
     FOnEvent(Self, AEvent, AError);
 end;
@@ -722,6 +727,8 @@ begin
     FForceNextPoint := -1;
     FIsPaused := False;
     SetStage(msSelectPoint);
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
+      'Запуск процесса измерения', '');
     FireEvent(meStarted);
     NotifyPointChanged;
 
@@ -759,6 +766,8 @@ begin
   FIsPaused := False;
  // SetState(msStopping);
   SetStage(msNone);
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'Stop',
+    'Остановка процесса измерения', '');
   FireEvent(meStopped);
 end;
 
@@ -767,6 +776,8 @@ begin
   if FIsPaused then
     Exit;
   FIsPaused := True;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'Pause',
+    'Пауза процесса измерения', '');
   //SetState(msPause);
 end;
 
@@ -775,12 +786,16 @@ begin
   if not FIsPaused then
     Exit;
   FIsPaused := False;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'Resume',
+    'Возобновление процесса измерения', '');
   //SetState(msOnGoing);
 end;
 
 procedure TMeasurementRun.NextPoint;
 begin
   FForceNextPoint := FCurrentPointIndex + 1;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'NextPoint',
+    'Переход к следующей точке', IntToStr(FForceNextPoint));
 end;
 
 procedure TMeasurementRun.Execute(Cmd: EMeasurementCommand);
