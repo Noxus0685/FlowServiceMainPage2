@@ -9,6 +9,12 @@ object FrameProtocol: TFrameProtocol
     Size.Height = 344.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
+    DisableFocusEffect = True
+    DefaultItemStyles.ItemStyle = ''
+    DefaultItemStyles.GroupHeaderStyle = ''
+    DefaultItemStyles.GroupFooterStyle = ''
+    Viewport.Width = 600.000000000000000000
+    Viewport.Height = 344.000000000000000000
   end
   object LayoutFilters: TLayout
     Align = Top
@@ -98,6 +104,7 @@ object FrameProtocol: TFrameProtocol
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       Text = #9654' '#1057#1090#1072#1088#1090
+      TextSettings.Trimming = None
       OnClick = SpeedButtonResumeClick
     end
     object SpeedButtonPause: TSpeedButton
@@ -107,6 +114,7 @@ object FrameProtocol: TFrameProtocol
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       Text = #9208' '#1057#1090#1086#1087
+      TextSettings.Trimming = None
       OnClick = SpeedButtonPauseClick
     end
     object SpeedButtonClear: TSpeedButton
@@ -116,6 +124,7 @@ object FrameProtocol: TFrameProtocol
       Size.Height = 32.000000000000000000
       Size.PlatformDefault = False
       Text = #55357#56751' '#1054#1095#1080#1089#1090#1080#1090#1100
+      TextSettings.Trimming = None
       OnClick = SpeedButtonClearClick
     end
   end

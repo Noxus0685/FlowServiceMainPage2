@@ -27,7 +27,8 @@ uses
   UnitParameter in 'UnitParameter.pas',
   frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame},
   UnitProtocols in 'UnitProtocols.pas',
-  frmProtocol in 'frmProtocol.pas' {FrameProtocol: TFrame};
+  frmProtocol in 'frmProtocol.pas' {FrameProtocol: TFrame},
+  frmFlowMeterProperties in 'frmFlowMeterProperties.pas' {FrameFlowMeterProperties: TFrame};
 
 {$R *.res}
 

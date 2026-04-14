@@ -7,6 +7,8 @@ uses
   System.SysUtils,
   System.Classes,
   System.Generics.Collections,
+ System.UITypes,
+
   FMX.Types,
   FMX.Controls,
   FMX.Forms,

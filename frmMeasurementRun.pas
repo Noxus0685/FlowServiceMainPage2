@@ -70,13 +70,15 @@ type
     procedure UpdateStopCriteriaColumns;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
+     procedure UpdateGridMesurmentRun;
 
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure UpdateGridMesurmentRun;
+    procedure UpdateUI;
     property MeasurementRun: TMeasurementRun read GetMeasurementRun;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
+
   end;
 
 implementation
@@ -312,6 +314,11 @@ var
     Value := Point.GetStatus;
 end;
 
+procedure TFrameMeasurementRun.UpdateUI;
+begin
+     UpdateGridMRHeaders;
+     UpdateGridMesurmentRun;
+end;
 
 
 procedure TFrameMeasurementRun.UpdateGridMRHeaders;
@@ -369,6 +376,8 @@ begin
 
   GridMeasurmentRun.Repaint;
 end;
+
+
 
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
 begin

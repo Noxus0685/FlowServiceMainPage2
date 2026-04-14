@@ -358,6 +358,17 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="UnitProtocols.pas"/>
+        <DCCReference Include="frmProtocol.pas">
+            <Form>FrameProtocol</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="frmFlowMeterProperties.pas">
+            <Form>FrameFlowMeterProperties</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -2038,7 +2038,15 @@ begin
   WorkTable.RecalculateAllMeterValues;
   if FFrameProceed <> nil then
     FFrameProceed.UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+
   UpdateUIFromValues;
+
+  LayoutFlowRate.Tag:=3;
+  UpdateUIFlowRate;
+
+  if FFrameMeasurementRun <> nil then
+  FFrameMeasurementRun.UpdateUI;
+
 end;
 
 function TFrameMainTable.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
@@ -2812,9 +2820,6 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
-
-  LayoutFlowRate.Tag:=3;
-  UpdateUIFlowRate;
 
   GridDevices.SetFocus;
 end;
