@@ -190,24 +190,36 @@ end;
 
 function TFrameMeasurementRun.GetRowColor(const ARow: Integer): TAlphaColor;
 var
-  Point: TDevicePoint;
+  LPoint: TDevicePoint;
+  LIsInvalid: Boolean;
+  LIsRunning: Boolean;
+  LIsCompleted: Boolean;
+const
+  COLOR_INVALID = $FFFFECEC;   // Светло-красный: точка некорректна
+  COLOR_RUNNING = $FFF2E9FF;   // Светло-фиолетовый: точка выполняется
+  COLOR_COMPLETED = $FFEAF9EA; // Светло-зелёный: точка выполнена
 begin
   Result := TAlphaColors.Null;
+
   if (MeasurementRun = nil) or (MeasurementRun.Points = nil) or
      (ARow < 0) or (ARow >= MeasurementRun.Points.Count) then
     Exit;
 
-  Point := MeasurementRun.Points[ARow];
+  LPoint := MeasurementRun.Points[ARow];
 
-  if (FInvalidPointIndexes.IndexOf(ARow) >= 0) or IsPointInvalid(Point) then
-    Exit($FFFFECEC);
+  LIsInvalid := (FInvalidPointIndexes.IndexOf(ARow) >= 0) or IsPointInvalid(LPoint);
+  if LIsInvalid then
+    Exit(COLOR_INVALID);
 
-  if (MeasurementRun.CurrentPointIndex = ARow) and (MeasurementRun.Stage <> msNone) and
-     (MeasurementRun.Stage <> msDone) then
-    Exit($FFF2E9FF);
+  LIsRunning := (MeasurementRun.CurrentPointIndex = ARow) and
+                (MeasurementRun.Stage <> msNone) and
+                (MeasurementRun.Stage <> msDone);
+  if LIsRunning then
+    Exit(COLOR_RUNNING);
 
-  if (Point <> nil) and (Point.RepeatsCompleted >= Max(Point.Repeats, 1)) then
-    Exit($FFEAF9EA);
+  LIsCompleted := (LPoint <> nil) and (LPoint.RepeatsCompleted >= Max(LPoint.Repeats, 1));
+  if LIsCompleted then
+    Exit(COLOR_COMPLETED);
 end;
 
 procedure TFrameMeasurementRun.GridMeasurmentRunDrawColumnCell(
