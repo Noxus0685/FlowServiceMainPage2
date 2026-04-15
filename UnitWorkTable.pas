@@ -227,6 +227,8 @@ type
     FActivePump : TPump;
 
     FTimeSet : Integer;
+    FLimitImpSet: Integer;
+    FLimitVolumeSet: Double;
     FRepeats:Integer;
     FRepeat:Integer;
 
@@ -444,6 +446,8 @@ private
 
     property Time: Double read GetTime write SetTime;
     property TimeSet: Integer read FTimeSet write FTimeSet;
+    property LimitImpSet: Integer read FLimitImpSet write FLimitImpSet;
+    property LimitVolumeSet: Double read FLimitVolumeSet write FLimitVolumeSet;
 
     property Repeats: Integer read FRepeats write FRepeats;
     property &Repeat: Integer read FRepeat write FRepeat;
@@ -1117,6 +1121,9 @@ begin
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
   FQuantityUnitName := 'м3';
+  FTimeSet := 0;
+  FLimitImpSet := 0;
+  FLimitVolumeSet := 0;
 
   FLayoutFlowRateVisible := True;
   FLayoutPumpVisible := True;
@@ -2099,6 +2106,9 @@ begin
       Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
+      Ini.WriteInteger(Section, 'TimeSet', WorkTable.TimeSet);
+      Ini.WriteInteger(Section, 'LimitImpSet', WorkTable.LimitImpSet);
+      Ini.WriteFloat(Section, 'LimitVolumeSet', WorkTable.LimitVolumeSet);
       Ini.WriteString(Section, 'State', WorkTableStateToString(WorkTable.State));
       Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.State));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
@@ -2202,6 +2212,9 @@ begin
       WorkTable.FlowRate.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
       WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
       WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
+      WorkTable.TimeSet := Ini.ReadInteger(Section, 'TimeSet', 0);
+      WorkTable.LimitImpSet := Ini.ReadInteger(Section, 'LimitImpSet', 0);
+      WorkTable.LimitVolumeSet := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
       WorkTable.State := WorkTableStateFromString(
         Ini.ReadString(Section, 'State',
           Ini.ReadString(Section, 'MeasurementState', 'STATE_NONE'))

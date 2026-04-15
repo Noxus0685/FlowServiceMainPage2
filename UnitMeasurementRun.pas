@@ -227,6 +227,8 @@ type
     function BuildPointSelectionLog(APoint: TDevicePoint): string;
     function BuildEtalonSelectionLog(APoint: TDevicePoint): string;
     function CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
+    function SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+    function SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
 
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
@@ -716,6 +718,8 @@ begin
     ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet;
     ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet;
     ManualPoint.LimitTime := FWorkTable.TimeSet;
+    ManualPoint.LimitImp := FWorkTable.LimitImpSet;
+    ManualPoint.LimitVolume := FWorkTable.LimitVolumeSet;
     ManualPoint.Repeats := FWorkTable.Repeats;
     ManualPoint.RepeatsProtocol := FWorkTable.Repeats;
     ManualPoint.Num := 1;
@@ -1058,6 +1062,60 @@ begin
   Result := Round((TimeByLimit + 10) * 1000);
 end;
 
+
+function TMeasurementRun.SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+begin
+  Result := False;
+  AError := TErrorInfo.Empty(FCurrentStage);
+
+  if (FWorkTable = nil) or (APoint = nil) then
+  begin
+    AError := BuildError(1201, 'Невозможно задать параметры точки');
+    Exit;
+  end;
+
+  if (APoint.Q >= 0) and (FWorkTable.FlowRate <> nil) then
+  begin
+    FWorkTable.FlowRate.DoFlowRateSet(APoint.Q);
+    FWorkTable.FlowRate.DoFlowRateStart;
+  end;
+
+  if (APoint.Temp >= 0) and (FWorkTable.FluidTemp <> nil) then
+    FWorkTable.FluidTemp.DoFluidTempStart(APoint.Temp);
+
+  if (APoint.Pressure >= 0) and (FWorkTable.FluidPress <> nil) then
+    FWorkTable.FluidPress.DoFluidPressStart(APoint.Pressure);
+
+  Result := True;
+end;
+
+function TMeasurementRun.SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+begin
+  Result := False;
+  AError := TErrorInfo.Empty(FCurrentStage);
+
+  if (FWorkTable = nil) or (APoint = nil) then
+  begin
+    AError := BuildError(1202, 'Невозможно настроить параметры измерения');
+    Exit;
+  end;
+
+  FWorkTable.TimeSet := 0;
+  FWorkTable.LimitImpSet := 0;
+  FWorkTable.LimitVolumeSet := 0;
+
+  if APoint.LimitTime > 0 then
+    FWorkTable.TimeSet := Round(APoint.LimitTime);
+
+  if APoint.LimitImp > 0 then
+    FWorkTable.LimitImpSet := APoint.LimitImp;
+
+  if APoint.LimitVolume > 0 then
+    FWorkTable.LimitVolumeSet := APoint.LimitVolume;
+
+  Result := True;
+end;
+
 procedure TMeasurementRun.Process;
 begin
   if IsTerminated then
@@ -1120,25 +1178,14 @@ begin
 
     msSetupPoint:
       begin
-        if (FWorkTable <> nil) and (Point <> nil) then
+        if SetupPoint(Point, Error) and SetupMeasurement(Point, Error) then
         begin
-          if (Point.Q >= 0) and (FWorkTable.FlowRate <> nil) then
-          begin
-            FWorkTable.FlowRate.DoFlowRateSet(Point.Q);
-            FWorkTable.FlowRate.DoFlowRateStart;
-          end;
-          if (Point.Temp >= 0) and (FWorkTable.FluidTemp <> nil) then
-            FWorkTable.FluidTemp.DoFluidTempStart(Point.Temp);
-          if (Point.Pressure >= 0) and (FWorkTable.FluidPress <> nil) then
-            FWorkTable.FluidPress.DoFluidPressStart(Point.Pressure);
-          if Point.LimitTime > 0 then
-            FWorkTable.TimeSet := Round(Point.LimitTime);
           FireEvent(mePointSet);
           SetStage(msWaitStable);
         end
         else
         begin
-          FireEvent(mePointNotSet, BuildError(1201, 'Невозможно задать параметры точки'));
+          FireEvent(mePointNotSet, Error);
           SetStage(msDone);
         end;
       end;
