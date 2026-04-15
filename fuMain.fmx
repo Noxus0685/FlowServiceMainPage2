@@ -454,7 +454,7 @@ object FormMain: TFormMain
                 end>
               TextSettings.Trimming = None
               IsSelected = True
-              Size.Width = 163.000000000000000000
+              Size.Width = 164.000000000000000000
               Size.Height = 26.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'tcsmallheaderstyle'
