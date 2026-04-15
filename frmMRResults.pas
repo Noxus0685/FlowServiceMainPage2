@@ -1,4 +1,4 @@
-unit frmMRResults;
+﻿unit frmMRResults;
 
 interface
 
@@ -339,8 +339,7 @@ function TFrameMRResults.FormatErrorValue(const AValue: Double): string;
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.TableFlow <> nil) and
      (FActiveWorkTable.TableFlow.ValueError <> nil) then
-    Exit(FActiveWorkTable.TableFlow.ValueError.GetStrNum(AValue));
-
+    Exit(FActiveWorkTable.TableFlow.ValueError.GetStrNumLimits(AValue));
   Result := FormatDeviceError(AValue) + '%';
 end;
 
@@ -650,7 +649,7 @@ begin
     Exit;
   end;
 
-  SessionPoint := GetPointByColumn(ACol);
+  SessionPoint := GetPointByColumn(ACol);   // Точка сессии (из MR)
   Value := GetCellText(Channel, SessionPoint);
 end;
 

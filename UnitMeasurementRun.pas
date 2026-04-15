@@ -237,8 +237,8 @@ type
     constructor Create(AWorkTable: TWorkTable);
     destructor Destroy; override;
 
-  class var function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean; overload;
-  class var function IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean; overload;
+  class function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean; overload;
+  class function IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean; overload;
 
     procedure CreateSession;
     procedure CreateSessionPoints;
@@ -418,14 +418,15 @@ begin
     Exit(False);
 end;
 
-function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
+class function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
 begin
   Result := (AP1 <> nil) and (AP2 <> nil)
     and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.Q)
     and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.Temp);
 end;
 
-function TMeasurementRun.IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean;
+class function TMeasurementRun.IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean;
+
 begin
   Result := (AP1 <> nil) and (AP2 <> nil)
     and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.QavgEtalon)
@@ -871,6 +872,8 @@ begin
     LThread.Free;
   end;
 
+  FWorkTable.StopTest;
+
   FIsPaused := False;
  // SetState(msStopping);
   SetStage(msNone);
@@ -1169,6 +1172,7 @@ begin
       begin
         if (FWorkTable <> nil) and (FWorkTable.State = STATE_COMPLETE) then
         begin
+          FWorkTable.SaveMeasurementResults;
           FireEvent(meMeasureCompleted);
           SetStage(msResultsRead);
           Exit;

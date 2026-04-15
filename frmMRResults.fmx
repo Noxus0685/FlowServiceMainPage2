@@ -10,8 +10,10 @@ object FrameMRResults: TFrameMRResults
     Size.Height = 688.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
-    Viewport.Width = 1230.000000000000000000
-    Viewport.Height = 688.000000000000000000
+    OnDrawColumnCell = GridMRResultsDrawColumnCell
+    OnGetValue = GridMRResultsGetValue
+    Viewport.Width = 1210.000000000000000000
+    Viewport.Height = 663.000000000000000000
     object StringColumnName: TStringColumn
       Header = #1055#1088#1080#1073#1086#1088
       HeaderSettings.TextSettings.WordWrap = False
