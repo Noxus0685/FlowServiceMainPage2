@@ -221,8 +221,8 @@ object FrameProceed: TFrameProceed
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
-          Viewport.Width = 941.000000000000000000
-          Viewport.Height = 570.000000000000000000
+          Viewport.Width = 961.000000000000000000
+          Viewport.Height = 611.000000000000000000
           object StringColumnResultName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.Trimming = Character
@@ -464,8 +464,8 @@ object FrameProceed: TFrameProceed
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 277.000000000000000000
-              Viewport.Height = 194.000000000000000000
+              Viewport.Width = 297.000000000000000000
+              Viewport.Height = 219.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end

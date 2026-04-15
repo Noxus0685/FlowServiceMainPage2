@@ -837,15 +837,17 @@ end;
   logic inside GetStringValue(CurrentDimIndex)) and restores object state after call. }
 function TMeterValue.GetStrNumLimits(AValue: Double): string;
 var
-  TempValue: Double;
+  V: Double;
 begin
-  TempValue := Value;
-  Value := AValue;
-  try
-    Result := GetStringValue(CurrentDimIndex);
-  finally
-    Value := TempValue;
-  end;
+  // Переводим значение в текущую размерность (как в GetStrNum)
+  V := AValue * GetDimRate(CurrentDimIndex);
+
+  // Проверка диапазона
+  if (V < MinValue) or (V > MaxValue) then
+    Exit('-');
+
+  // Если в пределах — используем штатное форматирование
+  Result := GetStrNum(AValue);
 end;
 
 { C++ parity for GetStrNum(double):

@@ -548,6 +548,7 @@ private
   procedure StopTest;
   procedure StartMonitor;
   procedure StopMonitor;
+  procedure SaveMeasurementResults;
 
 
   end;
@@ -2753,6 +2754,131 @@ begin
     ResetMeter(Ch.ValueInterface);
   end;
 end;
+
+
+procedure TWorkTable.SaveMeasurementResults;
+var
+  DeviceChannel: TChannel;
+  EtalonChannel: TChannel;
+  Point: TPointSpillage;
+  Session: TSessionSpillage;
+  DeviceRepo: TDeviceRepository;
+  MeterValueCoef: TMeterValue;
+  MeasuredDim: TMeasuredDimension;
+  CurrentCoef: Double;
+begin
+
+  DeviceRepo := nil;
+  if DataManager <> nil then
+    DeviceRepo := DataManager.ActiveDeviceRepo;
+
+  for DeviceChannel in DeviceChannels do
+  begin
+    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) or
+       (DeviceChannel.FlowMeter = nil) or (DeviceChannel.FlowMeter.Device = nil) then
+      Continue;
+
+    Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
+    if Session = nil then
+      Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
+    Session.State := osModified;
+
+    if Session.DateTimeOpen = 0 then
+      Session.DateTimeOpen := Now;
+
+    Point := TPointSpillage.Create(Session.ID);
+    try
+      Point.Num := DeviceChannel.FlowMeter.Device.Spillages.Count + 1;
+      Point.Name := 'Измерение #' + IntToStr(Point.Num);
+      Point.SessionID := Session.ID;
+      Point.DateTime := Now;
+      Point.SpillTime := ValueTime.GetDoubleValue;
+      Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
+
+      Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
+
+      {Это надо поправить! Не первый включенный эталон является эталоном, а тот
+      с которого берут данные кол-ва для расчёта погрешности через   TableFlow.Quantity}
+      for EtalonChannel in EtalonChannels do
+        begin
+      if (EtalonChannel.Enabled=True) and
+         (EtalonChannel.FlowMeter <> nil) and
+         (EtalonChannel.FlowMeter.Device <> nil) then
+      begin
+        Point.EtalonName := EtalonChannel.FlowMeter.Device.Name;
+        Point.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
+      end
+      else
+      begin
+        Point.EtalonName := TableFlow.Name;
+        Point.EtalonUUID := '';
+      end;
+        end;
+
+      Point.EtalonMass := TableFlow.ValueMass.GetDoubleValue;
+
+      Point.EtalonVolumeFlow := Point.EtalonVolume/Point.SpillTime;
+      Point.EtalonMassFlow := Point.EtalonMass/Point.SpillTime;
+
+      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
+      Point.DeviceMass := DeviceChannel.FlowMeter.ValueMass.GetDoubleValue;
+
+      Point.Density := DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
+      Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
+      Point.PulseCount := DeviceChannel.ValueImpResult.GetDoubleValue;
+
+      Point.DeviceMassFlow := Point.DeviceMass/Point.SpillTime;
+      Point.DeviceVolumeFlow := Point.DeviceVolume/Point.SpillTime;
+      Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
+
+      CurrentCoef := 0.0;
+      MeterValueCoef := DeviceChannel.FlowMeter.ValueCoef;
+      if MeterValueCoef <> nil then
+        CurrentCoef := MeterValueCoef.GetDoubleValue
+      else if DeviceChannel.FlowMeter.Device <> nil then
+        CurrentCoef := DeviceChannel.FlowMeter.Device.Coef;
+
+      if SameValue(CurrentCoef, 0.0, 1E-12) and
+         (DeviceChannel.FlowMeter.Device <> nil) then
+      begin
+        MeasuredDim := TMeasuredDimension(DeviceChannel.FlowMeter.Device.MeasuredDimension);
+        case MeasuredDim of
+          mdVolumeFlow, mdVolume:
+            if not SameValue(Point.EtalonVolume, 0.0, 1E-12) then
+              CurrentCoef := Point.PulseCount / Point.EtalonVolume;
+          mdMassFlow, mdMass:
+            if not SameValue(Point.EtalonMass, 0.0, 1E-12) then
+              CurrentCoef := Point.PulseCount / Point.EtalonMass;
+        end;
+      end;
+      Point.Coef := CurrentCoef;
+
+      Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
+      Point.StartTemperature := ValueTempertureBefore.GetDoubleValue;
+      Point.EndTemperature := ValueTempertureAfter.GetDoubleValue;
+      Point.AvgTemperature := ValueTemperture.GetDoubleValue;
+      Point.InputPressure := ValuePressureBefore.GetDoubleValue;
+      Point.OutputPressure := ValuePressureAfter.GetDoubleValue;
+      Point.DeltaPressure :=  Point.InputPressure - Point.OutputPressure;
+      Point.AtmosphericPressure := ValueAirPressure.GetDoubleValue;
+      Point.AmbientTemperature := ValueAirTemperture.GetDoubleValue;
+      Point.RelativeHumidity := ValueHumidity.GetDoubleValue;
+
+      if DeviceChannel.FlowMeter.Device <> nil then
+        Point.Valid := DeviceChannel.FlowMeter.Device.AnalyseDataPoint(Point);
+
+      DeviceChannel.FlowMeter.AddDataPoint(Point);
+
+      if Assigned(DeviceRepo) then
+        DeviceRepo.SaveDevice(DeviceChannel.FlowMeter.Device);
+    finally
+      Point.Free;
+    end;
+  end;
+
+end;
+
+
 
   procedure TWorkTable.StartTest;
   begin

@@ -105,6 +105,7 @@ uses
   UnitFlowMeter,
   UnitMeterValue,
   UnitDataManager,
+  UnitObservable,
 
   System.SysUtils,
   System.Classes,
@@ -122,7 +123,9 @@ type
   TMeasurementRunStateChangedEvent = procedure(ASender: TObject; AState: EMeasurementState) of object;
   TMeasurementRunPointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer) of object;
-  EMeasurementEvent = (
+  TMeasurementEvent = (
+    meStateChanged,
+    mePointChanged,
     meStarted,
     meStopped,
     mePointSelected,
@@ -150,6 +153,8 @@ type
     meAllDone
   );
 
+  EMeasurementEvent = TMeasurementEvent;
+
   EMeasurementCommand = (
     mcStart,
     mcStop,
@@ -175,7 +180,7 @@ type
 
 
 
-  TMeasurementRun = class
+  TMeasurementRun = class(TObservableObject)
 
   private
     FWorkTable: TWorkTable;
@@ -219,6 +224,8 @@ type
     function ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetPoint(Index: Integer; out AError: TErrorInfo): Boolean;
     function SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+    function BuildPointSelectionLog(APoint: TDevicePoint): string;
+    function BuildEtalonSelectionLog(APoint: TDevicePoint): string;
     function CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
 
     procedure RunThreadProc;
@@ -230,7 +237,8 @@ type
     constructor Create(AWorkTable: TWorkTable);
     destructor Destroy; override;
 
-  class var function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
+  class function IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean; overload;
+  class function IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean; overload;
 
     procedure CreateSession;
     procedure CreateSessionPoints;
@@ -410,11 +418,19 @@ begin
     Exit(False);
 end;
 
-function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
+class function TMeasurementRun.IsPointEquivalent(AP1, AP2: TDevicePoint): Boolean;
 begin
   Result := (AP1 <> nil) and (AP2 <> nil)
     and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.Q)
     and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.Temp);
+end;
+
+class function TMeasurementRun.IsPointEquivalent(AP1: TDevicePoint; AP2: TPointSpillage): Boolean;
+
+begin
+  Result := (AP1 <> nil) and (AP2 <> nil)
+    and IsFlowFit(AP1.Q, AP1.FlowAccuracy, AP2.QavgEtalon)
+    and IsTemperatureFit(AP1.Temp, AP1.TempAccuracy, AP2.AvgTemperature);
 end;
 
 procedure MergePointParams(ATarget, ASource: TDevicePoint);
@@ -444,7 +460,7 @@ begin
   FCriticalSection := TCriticalSection.Create;
 
   FCurrentPointIndex := -1;
-  FMode := mrmAutomatic;
+  FMode := mrmManual;
 
   FManualFlowRate := 0;
   FManualFluidTemp := 20;
@@ -456,6 +472,70 @@ begin
   FMaxAttemptCount := 3;
   FAttempt := 0;
   FMeasureTimeoutMs := 0;
+end;
+
+function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
+begin
+  if APoint = nil then
+    Exit('Точка не выбрана');
+
+  Result := Format('Точка: %s; Q=%.6g; Ограничения: имп=%d, объем=%.6g, время=%.6g c', [
+    APoint.Name,
+    APoint.Q,
+    APoint.LimitImp,
+    APoint.LimitVolume,
+    APoint.LimitTime
+  ]);
+end;
+
+function TMeasurementRun.BuildEtalonSelectionLog(APoint: TDevicePoint): string;
+var
+  I: Integer;
+  Channel: TChannel;
+  Details: TStringList;
+  DetailsText: string;
+  EtalonName: string;
+  Accuracy: string;
+begin
+  if (APoint = nil) or (FWorkTable = nil) then
+    Exit('Эталоны не выбраны');
+
+  Details := TStringList.Create;
+  try
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel = nil) or (Channel.FlowMeter = nil) then
+        Continue;
+
+      if (APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax) then
+        Continue;
+
+      EtalonName := Trim(Channel.Name);
+      if EtalonName = '' then
+        EtalonName := Trim(Channel.FlowMeter.DeviceName);
+      if EtalonName = '' then
+        EtalonName := 'Без имени';
+
+      Accuracy := '';
+      if Channel.FlowMeter.Device <> nil then
+        Accuracy := Trim(Channel.FlowMeter.Device.AccuracyClass);
+      if Accuracy = '' then
+        Accuracy := 'не указана';
+
+      Details.Add(Format('%s (точность %s)', [EtalonName, Accuracy]));
+    end;
+
+    if Details.Count = 0 then
+      Exit('Эталоны по расходу не найдены');
+
+    DetailsText := Trim(StringReplace(Details.Text, sLineBreak, '; ', [rfReplaceAll]));
+    if EndsText(';', DetailsText) then
+      Delete(DetailsText, Length(DetailsText), 1);
+    Result := 'Установлены эталоны: ' + DetailsText;
+  finally
+    Details.Free;
+  end;
 end;
 
 destructor TMeasurementRun.Destroy;
@@ -472,6 +552,7 @@ begin
     Exit;
   FCurrentStage := ANewState;
   NotifyStateChanged;
+  Notify(Integer(meStateChanged));
 end;
 
 procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
@@ -527,6 +608,8 @@ begin
 
   if Assigned(FOnEvent) then
     FOnEvent(Self, AEvent, AError);
+
+  Notify(Integer(AEvent));
 end;
 
 procedure TMeasurementRun.FireEvent(AEvent: EMeasurementEvent);
@@ -578,6 +661,8 @@ begin
         if Assigned(FOnPointChangedMain) then
           FOnPointChangedMain(Self, GetCurrentPoint, FCurrentPointIndex);
       end);
+
+  Notify(Integer(mePointChanged), GetCurrentPoint);
 end;
 
 function TMeasurementRun.GetCurrentPoint: TDevicePoint;
@@ -786,6 +871,8 @@ begin
     LThread.WaitFor;
     LThread.Free;
   end;
+
+  FWorkTable.StopTest;
 
   FIsPaused := False;
  // SetState(msStopping);
@@ -1003,6 +1090,8 @@ begin
 
         if SetPoint(FCurrentPointIndex, Error) then
         begin
+          ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
+            'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
           FireEvent(mePointSelected);
           SetStage(msSelectEtalon);
         end
@@ -1017,6 +1106,8 @@ begin
       begin
         if SelectEtalons(Point, Error) then
         begin
+          ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
+            'Выбраны эталоны для точки', BuildEtalonSelectionLog(Point));
           FireEvent(meEtalonSelected);
           SetStage(msSetupPoint);
         end
@@ -1081,6 +1172,7 @@ begin
       begin
         if (FWorkTable <> nil) and (FWorkTable.State = STATE_COMPLETE) then
         begin
+          FWorkTable.SaveMeasurementResults;
           FireEvent(meMeasureCompleted);
           SetStage(msResultsRead);
           Exit;
