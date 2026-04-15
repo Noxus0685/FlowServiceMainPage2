@@ -593,6 +593,11 @@ var
   WorkTable: TWorkTable;
   Pump: tPump;
   FlowRate: TFlowRate;
+  LimitReached: Boolean;
+  HasLimits: Boolean;
+  CurrentImp: Double;
+  CurrentVolume: Double;
+  I: Integer;
 begin
  if FWorkTableManager.WorkTables.Count=0 then
   exit;
@@ -655,7 +660,29 @@ begin
      begin
        UpdateRandomSignals(WorkTable);
 
-       if WorkTable.Time = WorkTable.TimeSet then
+       CurrentImp := 0;
+       for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+       begin
+         if (WorkTable.EtalonChannels[I] = nil) or (not WorkTable.EtalonChannels[I].Enabled) then
+           Continue;
+
+         CurrentImp := Max(CurrentImp, WorkTable.EtalonChannels[I].ImpResult);
+       end;
+
+       CurrentVolume := 0;
+       if WorkTable.ValueQuantity <> nil then
+         CurrentVolume := WorkTable.ValueQuantity.GetDoubleValue;
+
+       HasLimits := (WorkTable.TimeSet > 0) or
+                    (WorkTable.LimitImpSet > 0) or
+                    (WorkTable.LimitVolumeSet > 0);
+
+       LimitReached :=
+         ((WorkTable.TimeSet > 0) and (WorkTable.Time >= WorkTable.TimeSet)) or
+         ((WorkTable.LimitImpSet > 0) and (CurrentImp >= WorkTable.LimitImpSet)) or
+         ((WorkTable.LimitVolumeSet > 0) and (CurrentVolume >= WorkTable.LimitVolumeSet));
+
+       if HasLimits and LimitReached then
           WorkTable.State := STATE_STOPTEST;
      end;
 
