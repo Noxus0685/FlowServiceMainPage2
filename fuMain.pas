@@ -107,7 +107,7 @@ begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
-//1233211
+
   UpdateDeviceImpSecFromFlowRate;
 
   FFrameMainTable.ApplyChannelValues(

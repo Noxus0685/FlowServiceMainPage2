@@ -6,9 +6,17 @@ uses
   System.SysUtils,
   System.Classes,
   System.SyncObjs,
-  System.Generics.Collections;
+  System.Generics.Collections,
+  UnitObservable;
 
 type
+  TProtocolManagerEvent = (
+    pmeMessageQueued,
+    pmePaused,
+    pmeResumed,
+    pmeCleared
+  );
+
   TProtocolCategory = (
     pcNone,
     pcEvent,
@@ -40,7 +48,7 @@ type
 
   TProtocolListener = reference to procedure(Msg: TProtocolMessage);
 
-  TProtocolManager = class
+  TProtocolManager = class(TObservableObject)
   private const
     CQueueCapacity = 10000;
   private
@@ -68,8 +76,8 @@ type
       const AName, ADescription, AParams: string
     );
 
-    procedure Subscribe(AListener: TProtocolListener);
-    procedure Unsubscribe(AListener: TProtocolListener);
+    procedure Subscribe(AListener: TProtocolListener); overload;
+    procedure Unsubscribe(AListener: TProtocolListener); overload;
 
     procedure Pause;
     procedure Resume;
@@ -211,6 +219,8 @@ begin
     if FQueue.PushItem(Msg) <> wrSignaled then
       FreeMessage(Msg);
   end;
+
+  Notify(Integer(pmeMessageQueued));
 end;
 
 procedure TProtocolManager.NotifyListeners(const Msg: TProtocolMessage);
@@ -273,11 +283,13 @@ end;
 procedure TProtocolManager.Pause;
 begin
   FPaused := True;
+  Notify(Integer(pmePaused));
 end;
 
 procedure TProtocolManager.Resume;
 begin
   FPaused := False;
+  Notify(Integer(pmeResumed));
 end;
 
 procedure TProtocolManager.Clear;
@@ -287,7 +299,9 @@ begin
   Msg := nil;
   while FQueue.QueueSize > 0 do
     if FQueue.PopItem(Msg) = wrSignaled then
-    FreeMessage(Msg);
+      FreeMessage(Msg);
+
+  Notify(Integer(pmeCleared));
 end;
 
 class function TProtocolManager.CategoryMarker(
@@ -298,8 +312,8 @@ begin
     pcState: Result := 'STATE';
     pcAction: Result := 'ACTION';
     pcInfo: Result := 'INFO';
-    pcWarning: Result := '¬Õ»Ã¿Õ»≈!';
-    pcError: Result := 'Œÿ»¡ ¿!';
+    pcWarning: Result := '√Ç√ç√à√å√Ä√ç√à√Ö!';
+    pcError: Result := '√é√ò√à√Å√ä√Ä!';
   else
     Result := '';
   end;

@@ -11,6 +11,7 @@ uses
   frmCalibrCoefs,
   frmProceed,
   frmMeasurementRun,
+  frmMRResults,
   frmProtocol,
   frmFlowMeterProperties,
   UnitProtocols,
@@ -449,6 +450,7 @@ type
 
   FActiveWorkTable: TWorkTable;
   FFrameMeasurementRun: TFrameMeasurementRun;
+  FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
     { Private declarations }
@@ -499,7 +501,7 @@ type
     procedure StopMonitor;
     procedure StartTest;
     procedure StopTest;
-    procedure SaveMeasurementResults;
+
 
     procedure UpdateGrids;
 
@@ -663,6 +665,7 @@ end;
 destructor TFrameMainTable.Destroy;
 begin
   FreeAndNil(FFrameMeasurementRun);
+  FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
@@ -824,9 +827,9 @@ begin
   if Run = nil then
     Exit;
 
-    Run.Execute(mcStop);
-    ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь остановил измерение', FActiveWorkTable.Name);
-
+   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь останавливает измерение', FActiveWorkTable.Name);
+   Run.Execute(mcStop);
+ 
 end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
@@ -1045,12 +1048,14 @@ begin
     Exit;
 
   FInitialized := True;
+  SwitchAuto.IsChecked := False;
 
   TMeterValue.LoadFromFile;
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
+  FFrameMRResults := nil;
   FFrameProtocol := nil;
   FFrameFlowMeterProperties := nil;
 
@@ -1088,6 +1093,14 @@ begin
     FFrameMeasurementRun.Align := TAlignLayout.Client;
   end;
   FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameMRResults = nil then
+  begin
+    FFrameMRResults := TFrameMRResults.Create(Self);
+    FFrameMRResults.Parent := TabItemMRResults;
+    FFrameMRResults.Align := TAlignLayout.Client;
+  end;
+  FFrameMRResults.ActiveWorkTable := FActiveWorkTable;
 
   if FFrameProtocol = nil then
   begin
@@ -2079,6 +2092,9 @@ begin
   if FFrameMeasurementRun <> nil then
   FFrameMeasurementRun.UpdateUI;
 
+  if FFrameMRResults <> nil then
+    FFrameMRResults.UpdateUI;
+
 end;
 
 function TFrameMainTable.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
@@ -2133,6 +2149,9 @@ begin
 
   if FFrameMeasurementRun <> nil then
     FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+
+  if FFrameMRResults <> nil then
+    FFrameMRResults.ActiveWorkTable := FActiveWorkTable;
 
   if FFrameProtocol = nil then
   begin
@@ -2784,17 +2803,20 @@ begin
     if (Ch <> Src) and Ch.Enabled then
     begin
 
-      AttachType(Ch, SourceType, FoundRepo, True);
+
 
        If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
       begin
-      Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False)//  (Src.FlowMeter.Device.DN, SourceType);
+      Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False);//  (Src.FlowMeter.Device.DN, SourceType);
+      PersistDeviceAsync(Ch.FlowMeter.Device); //Сохранение прибора
       end
-      else
-       AttachType(Ch, SourceType, FoundRepo, True);
+       else
+      AttachType(Ch, SourceType, FoundRepo, True);
 
   //  If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
   //    Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
+
+
 
       Ch.FlowMeter.RebindCalculatedValues;
 
@@ -3414,7 +3436,7 @@ begin
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
   AChannel.FlowMeter.Device.AttachType(ANewType, RepoName);
   MarkChannelDeviceModified(AChannel);
-  PersistDeviceAsync(AChannel.FlowMeter.Device);
+  PersistDeviceAsync(AChannel.FlowMeter.Device); //Сохранение прибора
 end;
 
 procedure TFrameMainTable.OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean);
@@ -3533,7 +3555,9 @@ begin
 
   if (TestButton.Tag = 6) and SameText(Trim(TestButton.Text), 'Сохранить?') then
   begin
-    SaveMeasurementResults;
+
+    {Здесь должен быть код, который принимает всю сессию измерений или её отменяет}
+
     WorkTable.State := STATE_STANDBY;
     Exit;
   end;
@@ -3542,127 +3566,6 @@ begin
     StopTest
   else
     StartTest;
-end;
-
-procedure TFrameMainTable.SaveMeasurementResults;
-var
-  WorkTable: TWorkTable;
-  DeviceChannel: TChannel;
-  Point: TPointSpillage;
-  Session: TSessionSpillage;
-  DeviceRepo: TDeviceRepository;
-  MeterValueCoef: TMeterValue;
-  MeasuredDim: TMeasuredDimension;
-  CurrentCoef: Double;
-begin
-  WorkTable := FActiveWorkTable;
-  if WorkTable = nil then
-    Exit;
-
-  DeviceRepo := nil;
-  if DataManager <> nil then
-    DeviceRepo := DataManager.ActiveDeviceRepo;
-
-  for DeviceChannel in WorkTable.DeviceChannels do
-  begin
-    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) or
-       (DeviceChannel.FlowMeter = nil) or (DeviceChannel.FlowMeter.Device = nil) then
-      Continue;
-
-    Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
-    if Session = nil then
-      Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
-    Session.State := osModified;
-
-    if Session.DateTimeOpen = 0 then
-      Session.DateTimeOpen := Now;
-
-    Point := TPointSpillage.Create(Session.ID);
-    try
-      Point.Num := DeviceChannel.FlowMeter.Device.Spillages.Count + 1;
-      Point.Name := 'Измерение #' + IntToStr(Point.Num);
-      Point.SessionID := Session.ID;
-      Point.DateTime := Now;
-      Point.SpillTime := WorkTable.ValueTime.GetDoubleValue;
-      Point.QavgEtalon := WorkTable.ValueFlowRate.GetDoubleValue;
-
-      Point.EtalonVolume := WorkTable.TableFlow.ValueVolume.GetDoubleValue;
-      if (WorkTable.EtalonChannels.Count > 0) and
-         (WorkTable.EtalonChannels[0] <> nil) and
-         (WorkTable.EtalonChannels[0].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[0].FlowMeter.Device <> nil) then
-      begin
-        Point.EtalonName := WorkTable.EtalonChannels[0].FlowMeter.Device.Name;
-        Point.EtalonUUID := WorkTable.EtalonChannels[0].FlowMeter.Device.UUID;
-      end
-      else
-      begin
-        Point.EtalonName := WorkTable.TableFlow.Name;
-        Point.EtalonUUID := '';
-      end;
-      Point.EtalonMass := WorkTable.TableFlow.ValueMass.GetDoubleValue;
-
-      Point.EtalonVolumeFlow := Point.EtalonVolume/Point.SpillTime;
-      Point.EtalonMassFlow := Point.EtalonMass/Point.SpillTime;
-
-      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
-      Point.DeviceMass := DeviceChannel.FlowMeter.ValueMass.GetDoubleValue;
-
-      Point.Density := DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
-      Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
-      Point.PulseCount := DeviceChannel.ValueImpResult.GetDoubleValue;
-
-      Point.DeviceMassFlow := Point.DeviceMass/Point.SpillTime;
-      Point.DeviceVolumeFlow := Point.DeviceVolume/Point.SpillTime;
-      Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
-
-      CurrentCoef := 0.0;
-      MeterValueCoef := DeviceChannel.FlowMeter.ValueCoef;
-      if MeterValueCoef <> nil then
-        CurrentCoef := MeterValueCoef.GetDoubleValue
-      else if DeviceChannel.FlowMeter.Device <> nil then
-        CurrentCoef := DeviceChannel.FlowMeter.Device.Coef;
-
-      if SameValue(CurrentCoef, 0.0, 1E-12) and
-         (DeviceChannel.FlowMeter.Device <> nil) then
-      begin
-        MeasuredDim := TMeasuredDimension(DeviceChannel.FlowMeter.Device.MeasuredDimension);
-        case MeasuredDim of
-          mdVolumeFlow, mdVolume:
-            if not SameValue(Point.EtalonVolume, 0.0, 1E-12) then
-              CurrentCoef := Point.PulseCount / Point.EtalonVolume;
-          mdMassFlow, mdMass:
-            if not SameValue(Point.EtalonMass, 0.0, 1E-12) then
-              CurrentCoef := Point.PulseCount / Point.EtalonMass;
-        end;
-      end;
-      Point.Coef := CurrentCoef;
-
-      Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
-      Point.StartTemperature := WorkTable.ValueTempertureBefore.GetDoubleValue;
-      Point.EndTemperature := WorkTable.ValueTempertureAfter.GetDoubleValue;
-      Point.AvgTemperature := WorkTable.ValueTemperture.GetDoubleValue;
-      Point.InputPressure := WorkTable.ValuePressureBefore.GetDoubleValue;
-      Point.OutputPressure := WorkTable.ValuePressureAfter.GetDoubleValue;
-      Point.DeltaPressure :=  Point.InputPressure - Point.OutputPressure;
-      Point.AtmosphericPressure := WorkTable.ValueAirPressure.GetDoubleValue;
-      Point.AmbientTemperature := WorkTable.ValueAirTemperture.GetDoubleValue;
-      Point.RelativeHumidity := WorkTable.ValueHumidity.GetDoubleValue;
-
-      if DeviceChannel.FlowMeter.Device <> nil then
-        Point.Valid := DeviceChannel.FlowMeter.Device.AnalyseDataPoint(Point);
-
-      DeviceChannel.FlowMeter.AddDataPoint(Point);
-      if FFrameProceed <> nil then
-        FFrameProceed.AddProcessingDevice(DeviceChannel.FlowMeter.Device);
-
-      if Assigned(DeviceRepo) then
-        DeviceRepo.SaveDevice(DeviceChannel.FlowMeter.Device);
-    finally
-      Point.Free;
-    end;
-  end;
-
 end;
 
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
