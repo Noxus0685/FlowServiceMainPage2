@@ -427,7 +427,6 @@ type
     procedure SpinBoxFreqMouseEnter(Sender: TObject);
     procedure Rectangle15Click(Sender: TObject);
     procedure SpeedButtonSetFlowRateClick(Sender: TObject);
-    procedure SpinBoxFlowRateChange(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
     procedure EditPresExit(Sender: TObject);
 
@@ -445,6 +444,7 @@ type
     procedure ActionSessionCreatePointsExecute(Sender: TObject);
     procedure EditRepeatsExit(Sender: TObject);
     procedure SwitchAutoSwitch(Sender: TObject);
+    procedure SpinBoxFlowRateChange(Sender: TObject);
 
   private
 
@@ -1311,20 +1311,25 @@ begin
   end;
 end;
 
+
+
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
+StableStatus: Boolean;
 begin
-//AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(FActiveWorkTable.FlowRate.Value,0);
+
+  if  SameValue(FActiveWorkTable.FlowRate.ValueSet ,SpinBoxFlowRate.Value, MinDouble) then
+       Exit;
+
   if  (LayoutFlowRate.tag=0) or (LayoutFlowRate.tag=3)  then
   begin
     AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
     FActiveWorkTable.FlowRate.DoFlowRateSet(AValue);
+    if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
+      FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
   end;
-
-
-
 end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
@@ -4601,6 +4606,7 @@ IF WorkTable.FluidPress.IsRunning THEN
 
 
 end;
+
 
 
 end.

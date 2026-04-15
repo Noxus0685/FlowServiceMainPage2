@@ -91,7 +91,6 @@ type
 
 
   public
-
   end;
 
 var
@@ -174,45 +173,16 @@ FlowRate: Double;
 WorkTable:TWorkTable;
 i:integer;
 EnabledEtalonChannels: TObjectList<TChannel>;
+AValue:Double;
 
 begin
   WorkTable:= FWorkTableManager.ActiveWorkTable;
-  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(FWorkTableManager.ActiveWorkTable.FlowRate.ValueSet)+ ' - Состояние: ' + FWorkTableManager.ActiveWorkTable.FlowRate.GetActionAsString );
-
- {for I := 0 to FWorkTableManager.ActiveWorkTable.EtalonChannels.Count-1 do
-  begin
-     if FWorkTableManager.ActiveWorkTable.EtalonChannels[I].Enabled then
-     begin
-
-         FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet,4);
-
-        FFrameMainTable.ApplyChannelValues(
-          FWorkTableManager.ActiveWorkTable.EtalonChannels,
-          NormalizeFloatInput('0'),
-          UpdateEtalonImpSecFromFlowRate(FlowRate),
-          NormalizeFloatInput('0')
-        );
-     end;
-  end;}
-
-
-  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
-  try
-    for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-      if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
-        EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
-
-      FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet,4)/(EnabledEtalonChannels.Count);
-
-    FFrameMainTable.ApplyChannelValues(
-      EnabledEtalonChannels,
-      NormalizeFloatInput('0'),
-      UpdateEtalonImpSecFromFlowRate(FlowRate),
-      NormalizeFloatInput('0')
-    );
-  finally
-    EnabledEtalonChannels.Free;
-  end;
+  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
+  if WorkTable.FlowRate.ValueSet>=WorkTable.FlowRate.Value then
+    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet+random(5))
+  else
+    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet-random(5));
+  WorkTable.ActivePump.DoPumpStart;
 
 end;
 
@@ -519,6 +489,11 @@ end;
 procedure TFormMain.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
 var
   Flow: Double;
+  FlowRate: Double;
+  WorkTable:TWorkTable;
+  i:integer;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  AValue:Double;
 begin
   if AFlowRate = nil then
     Exit;
@@ -528,12 +503,44 @@ begin
     AFlowRate.Status:=PARAM_STARTED
   else  if (AFlowRate.Action = ACTION_STOP) then
     AFlowRate.Status:=PARAM_STOPPED;
-
+  WorkTable:= FWorkTableManager.ActiveWorkTable;
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
     Flow := (Random * 10);
-    //AFlowRate.SetMin(10,4);
+    if WorkTable=nil then
+    exit;
+
+   if WorkTable.ActivePump.IsRunning=false then
+    exit;
+
+      EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+      try
+        for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+          if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
+            EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
+
+            IF ABS(AFlowRate.Value-AFlowRate.ValueSet)<1 then
+             FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset,4)
+            else IF AFlowRate.Value<AFlowRate.ValueSet then
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value+1,4)
+            else if AFlowRate.Value>AFlowRate.ValueSet then
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value-1,4);
+
+
+            FFrameMainTable.ApplyChannelValues(
+              EnabledEtalonChannels,
+              NormalizeFloatInput('0'),
+              UpdateEtalonImpSecFromFlowRate(FlowRate),
+              NormalizeFloatInput('0')
+            );
+
+
+      finally
+        EnabledEtalonChannels.Free;
+      end;
+
+
     FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
 end;
@@ -601,6 +608,7 @@ begin
 
   if WorkTable = nil then
       Exit;
+
 
   try
       Pump := WorkTable.ActivePump;
