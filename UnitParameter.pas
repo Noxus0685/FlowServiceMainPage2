@@ -392,7 +392,6 @@ end;
 procedure TFlowRate.DoFlowRateSet(ANewFlowRate: Double);
 begin
 
-
   SetParam(ANewFlowRate);
 
 
@@ -420,6 +419,8 @@ begin
   Create;
   Self.FName :=   APumpName;
   Pumps.Add(Self);
+  Value:=TMeterValue.Create;
+  ValueSet:=TMeterValue.Create;
 end;
 
 destructor TPump.Destroy;
@@ -635,8 +636,10 @@ begin
 end;
 
 function TParameter.GetIsChanging: Boolean;
+var
+Status:Boolean;
 begin
-  Result :=  FValueSet.Value<>FValue.Value;
+  Result :=  (FValueSet.Value<>FValue.Value) and not(IsStable(Status));
 end;
 
   {$ENDREGION 'TPump'}

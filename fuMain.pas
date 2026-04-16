@@ -231,7 +231,7 @@ begin
     'Settings\TableSettings.ini'
   );
 
-
+  FWorkTableManager.Load;
 
   //Подумать над динамической привязкой ко всем столам
     if FWorkTableManager.ActiveWorkTable<>nil then
@@ -253,8 +253,7 @@ begin
 
   end;
 
-  FWorkTableManager.Load;
-  SetActivePump('1');
+
 
   FFrameMainTable := TFrameMainTable.Create(Self);
   FFrameMainTable.Parent := TabItemTable;

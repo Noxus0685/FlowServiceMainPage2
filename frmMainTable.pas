@@ -4544,41 +4544,21 @@ begin
 
     Layout9.tag:=2;
 
-IF WorkTable.FluidTemp.IsRunning THEN
-  begin
-     if (WorkTable.FluidTemp.ValueSet.Value=0) or (WorkTable.FluidTemp.Value.Value=0) then
-      Rectangle7.Fill.Color := TAlphaColorRec.White
-     ELSE if WorkTable.FluidTemp.IsStable(TempStableStatus)   THEN
-      Rectangle7.Fill.Color := $ffC9FFC7
-     else
-      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
-  end
+  IF WorkTable.FluidTemp.IsRunning and  WorkTable.FluidTemp.IsChanging THEN
+    Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow
+  else if WorkTable.FluidTemp.IsRunning and  not(WorkTable.FluidTemp.IsChanging)  then
+    Rectangle7.Fill.Color := $ffC9FFC7
   else
-  begin
-     if (WorkTable.FluidTemp.ValueSet.Value=0) or (WorkTable.FluidTemp.Value.Value=0) then
-      Rectangle7.Fill.Color := TAlphaColorRec.White
-     else IF not(WorkTable.FluidTemp.IsStable(TempStableStatus)) then
-      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
-  end;
+    Rectangle7.Fill.Color := TAlphaColorRec.White;
 
-IF WorkTable.FluidPress.IsRunning THEN
-  begin
-   if (WorkTable.FluidPress.ValueSet.Value=0) or (WorkTable.FluidPress.Value.Value=0 )  then
-
-    Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
+  IF WorkTable.FluidPress.IsRunning and  WorkTable.FluidPress.IsChanging THEN
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
-   else
-    Rectangle11.Fill.Color := $ffC9FFC7;
-  end
+  else if WorkTable.FluidPress.IsRunning and  not(WorkTable.FluidPress.IsChanging)  then
+    Rectangle11.Fill.Color := $ffC9FFC7
   else
-  begin
-   if (WorkTable.FluidPress.ValueSet.Value=0) or (WorkTable.FluidPress.Value.Value=0 )  then
-    Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
-    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
+    Rectangle11.Fill.Color := TAlphaColorRec.White;
 
-  end;
+
 
 
     APressset:= WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet.Value);

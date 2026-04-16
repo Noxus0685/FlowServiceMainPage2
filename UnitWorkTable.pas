@@ -1419,60 +1419,47 @@ begin
     EnsureDescription(FTableFlow.ValueCurrent, 'Токовый сигнал стола');
   end;
 
-
+ ///////////////////
   if FlowRate.Value = nil then
   begin
     FlowRate.Value := TMeterValue.Create('', Name);
-    FlowRate.Value.SetAsCurrent;
-    EnsureDescription(FlowRate.Value, 'Токовый сигнал стола');
+    FlowRate.Value.SetAsVolumeFlow;
+    EnsureDescription(FlowRate.Value, 'Расход');
   end;
     if FluidTemp.Value = nil then
   begin
     FluidTemp.Value := TMeterValue.Create('', Name);
-    FluidTemp.Value.SetAsCurrent;
-    EnsureDescription(FluidTemp.Value, 'Токовый сигнал стола');
+    FluidTemp.Value.SetAsAirTemp;
+    EnsureDescription(FluidTemp.Value, 'Температура');
   end;
 
     if FluidPress.Value = nil then
   begin
     FluidPress.Value := TMeterValue.Create('', Name);
-    FluidPress.Value.SetAsCurrent;
-    EnsureDescription(FluidPress.Value, 'Токовый сигнал стола');
+    FluidPress.Value.SetAsPressure;
+    EnsureDescription(FluidPress.Value, 'Давление');
   end;
 
     if FlowRate.Valueset = nil then
   begin
     FlowRate.Valueset := TMeterValue.Create('', Name);
-    FlowRate.Valueset.SetAsCurrent;
-    EnsureDescription(FlowRate.Valueset, 'Токовый сигнал стола');
+    FlowRate.Valueset.SetAsVolumeFlow;
+    EnsureDescription(FlowRate.Valueset, 'Установленный расход');
   end;
     if FluidTemp.Valueset = nil then
   begin
     FluidTemp.Valueset := TMeterValue.Create('', Name);
-    FluidTemp.Valueset.SetAsCurrent;
-    EnsureDescription(FluidTemp.Valueset, 'Токовый сигнал стола');
+    FluidTemp.Valueset.SetAsAirTemp;
+    EnsureDescription(FluidTemp.Valueset, 'Установленная температура');
   end;
 
     if FluidPress.Valueset = nil then
   begin
     FluidPress.Valueset := TMeterValue.Create('', Name);
-    FluidPress.Valueset.SetAsCurrent;
-    EnsureDescription(FluidPress.Valueset, 'Токовый сигнал стола');
+    FluidPress.Valueset.SetAsPressure;
+    EnsureDescription(FluidPress.Valueset, 'Установленное давление');
   end;
-
-
-  if ActivePump.Value = nil then
-  begin
-    ActivePump.Value := TMeterValue.Create('', Name);
-    ActivePump.Value.SetAsCurrent;
-    EnsureDescription(ActivePump.Value, 'Токовый сигнал стола');
-  end;
-    if ActivePump.Valueset = nil then
-  begin
-    ActivePump.Valueset := TMeterValue.Create('', Name);
-    ActivePump.Valueset.SetAsCurrent;
-    EnsureDescription(ActivePump.Valueset, 'Токовый сигнал стола');
-  end;
+ ////////////////////////
 
 
 
@@ -2331,14 +2318,14 @@ begin
 
 
       WorkTable.FluidTemp.Value.Value := 21;
-      WorkTable.FluidPress.Value.Value := 21;
+     { WorkTable.FluidPress.Value.Value :=0;
       WorkTable.FlowRate.Value.Value := 0;
       WorkTable.ActivePump.Value.Value := 0;
 
-      WorkTable.FluidTemp.ValueSet.Value := 21;
-      WorkTable.FluidPress.ValueSet.Value := 21;
+      WorkTable.FluidTemp.ValueSet.Value := 0;
+      WorkTable.FluidPress.ValueSet.Value := 0;
       WorkTable.FlowRate.ValueSet.Value := 0;
-      WorkTable.ActivePump.ValueSet.Value := 0;
+      WorkTable.ActivePump.ValueSet.Value := 0;}
 
 
 
