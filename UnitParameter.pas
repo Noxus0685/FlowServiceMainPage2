@@ -52,8 +52,8 @@ TParameter = class(TObject)
     FMin: Double;
     FAccuracyPlus: Double;
     FAccuracyMinus: Double;
-    FValue: Double;  // òåêóùàÿ
-    FValueSet: Double;   //óñòàíîâëåííàÿ
+    FValue: TMeterValue;  // òåêóùàÿ
+    FValueSet: TMeterValue;   //óñòàíîâëåííàÿ
     FBefore: Double;
     FAfter: Double;
     FDelta: Double;
@@ -82,8 +82,8 @@ TParameter = class(TObject)
     property Hint: string read FHint write FHint;
     property Status: EParamStatus read  FStatus   write SetStatus;
     property Action: EParamAction read FAction write FAction;
-    property ValueSet: Double read FValueSet write SetParam;
-    property Value: Double read FValue write SetValue;
+    property ValueSet: TMeterValue read FValueSet write FValueSet;
+    property Value: TMeterValue read FValue write FValue;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
     property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
@@ -168,8 +168,8 @@ begin
   inherited Create(AName,'');
   FMin := -50;
   FMax := 150;
-  FValue := 20.2;
-  FValueSet := 24;
+  //FValue := 20.2;
+  //FValueSet := 24;
   FBefore := 23;
   FAfter := 25;
   FDelta := 0.1;
@@ -195,7 +195,7 @@ end;
 
 procedure TFluidTemp.DoFluidTempStart(ATempSet: Double);
 begin
-  if not( SameValue(ValueSet ,ATempSet, MinDouble)) then
+  if not( SameValue(ValueSet.Value ,ATempSet, MinDouble)) then
     begin
 
     SetParam(ATempSet);
@@ -236,8 +236,8 @@ begin
   inherited Create(AName,'');
   FMin := 0;
   FMax := 200;
-  FValue := 10;
-  FValueSet := 10;
+  //FValue := 10;
+  //FValueSet := 10;
   FBefore := 9;
   FAfter := 11;
   FDelta := 0.1;
@@ -264,7 +264,7 @@ end;
 procedure TFluidPress.DoFluidPressStart(APressSet: Double);
 begin
 
-  if not( SameValue(ValueSet ,APressSet, MinDouble)) then
+  if not( SameValue(ValueSet.Value ,APressSet, MinDouble)) then
     begin
 
     SetParam(APressSet);
@@ -302,12 +302,14 @@ end;
 
    {$REGION 'TFlowRate'}
 constructor TFlowRate.Create(const AName: string);
+var
+FlowMeter:TFlowMeter;
 begin
   inherited Create(AName,'');
   FMin := 0;
   FMax := 500;
-  FValue := 0;
-  FValueSet := FMin;
+ // FValue := FlowMeter.ValueFlowRate;
+ // FValueSet := FValue;
   AccuracyPlus:=5;
   AccuracyMinus:=5;
   FDim:=0;
@@ -321,11 +323,11 @@ procedure TFlowRate.SetParamFlowRate(ANewValue: Double);
 begin
   ANewValue:=ANewValue/3.6;
   if ANewValue < FMin then
-    FValueSet := FMin
+    FValueSet.Value := FMin
   else if ANewValue > FMax then
-    FValueSet := FMax
+    FValueSet.Value := FMax
   else
-    FValueSet := ANewValue;
+    FValueSet.Value := ANewValue;
 
   FAction := ACTION_SET;
 end;
@@ -356,7 +358,7 @@ end;
 
 procedure TFlowRate.DoFlowRateStart(ANewFlowRate: Double);
 begin
-    if not( SameValue(ValueSet ,ANewFlowRate, MinDouble)) then
+    if not( SameValue(ValueSet.Value ,ANewFlowRate, MinDouble)) then
     begin
 
     SetParam(ANewFlowRate);
@@ -409,8 +411,8 @@ begin
   FMax:= 50;
   FMin:= 0;
 
-  FValue:=10;
-  FValueSet := 12;
+  //FValue:=10;
+  //FValueSet := 12;
 end;
 
 constructor TPump.Create(const APumpName: string);
@@ -512,6 +514,8 @@ begin
   FHint := AHint;
   FStatus := PARAM_STOPPED;
   FAction := ACTION_STOP;
+  //FValue:=TMeterValue.Create;
+  //FValueset:=TMeterValue.Create;
 end;
 
 procedure TParameter.Stop;
@@ -522,16 +526,16 @@ end;
 
 function TParameter.IsStable(var Status: Boolean): Boolean;
 begin
-  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
+  Result:= (Value.Value<=ValueSet.Value*(1+AccuracyPlus/100))
+      AND (Value.Value>=ValueSet.Value*(1-AccuracyMinus/100)) ;
   Status := Result;
 end;
 procedure TParameter.Start;
 begin
-    if FValueSet<FMin then
-      FValueSet:=FMin;
-    if FValueSet>FMax then
-      FValueSet:=FMax;
+    if FValueSet.Value<FMin then
+      FValueSet.Value:=FMin;
+    if FValueSet.Value>FMax then
+      FValueSet.Value:=FMax;
 
   FAction := ACTION_START;
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStart', 'Parameter started', FName);
@@ -582,28 +586,28 @@ end;
 procedure TParameter.SetValue(AValue: Double);
 begin
   if AValue < FMin then
-    FValue := FMin
+    FValue.Value := FMin
   else if AValue > FMax then
-    FValue := FMax
-  else FValue:=AValue;
+    FValue.Value := FMax
+  else FValue.Value:=AValue;
 end;
 
 
 procedure TParameter.SetParam(AValue: Double);
 begin
 
-  if  SameValue(FValueSet ,AValue, MinDouble) then
+  if  SameValue(FValueSet.Value ,AValue, MinDouble) then
        Exit;
 
-  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet]));
+  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
 
       if AValue<FMin then
-        FValueSet:=FMin
+        FValueSet.Value:=FMin
       else if AValue>FMax then
-        FValueSet:=FMax
+        FValueSet.Value:=FMax
       else
-        FValueSet:=AValue;
+        FValueSet.Value:=AValue;
 
       FAction:=ACTION_SET;
 
@@ -632,7 +636,7 @@ end;
 
 function TParameter.GetIsChanging: Boolean;
 begin
-  Result :=  FValueSet<>FValue;
+  Result :=  FValueSet.Value<>FValue.Value;
 end;
 
   {$ENDREGION 'TPump'}
