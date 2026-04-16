@@ -39,6 +39,25 @@ type
 
 type
 
+  EStableStatus = (
+    ssNONE,
+    ssRun_NN,   // no target, no stable
+    ssRun_SN,   // stable, no target
+    ssRun_NS,   // no stable, target
+    ssOk,       // done + stable
+    ssFail_SN,  // stable, no target
+    ssFail_NS,  // no stable, target
+    ssFail_NN   // no stable, no target
+  );
+
+  TStableInfo = record
+    Status: EStableStatus;
+    StatusText: string;
+    CurrentValue: Double;
+  end;
+
+type
+
 TParameter = class(TObject)
   type
   TonStatusEvent =  procedure(AParameters: TParameter ; FStatus : EParamStatus) of object;
@@ -57,6 +76,7 @@ TParameter = class(TObject)
     FBefore: Double;
     FAfter: Double;
     FDelta: Double;
+    FHasTaskHistory: Boolean;
     FDim: integer;
     FOnStatusChange: TonStatusEvent;
     FOnActionChange: TonActionEvent;
@@ -72,7 +92,7 @@ TParameter = class(TObject)
     procedure SetParam(Avalue: Double);
   public
     constructor Create(const AName, AHint: string); virtual;
-    function IsStable(var Status: Boolean): Boolean;
+    function IsStable(out AStableInfo: TStableInfo): Boolean;
     function GetStatusAsString: string;
     procedure Stop;
     procedure Start;
@@ -515,6 +535,7 @@ begin
   FHint := AHint;
   FStatus := PARAM_STOPPED;
   FAction := ACTION_STOP;
+  FHasTaskHistory := False;
   //FValue:=TMeterValue.Create;
   //FValueset:=TMeterValue.Create;
 end;
@@ -525,11 +546,72 @@ begin
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStop', 'Parameter stopped', FName);
 end;
 
-function TParameter.IsStable(var Status: Boolean): Boolean;
+function TParameter.IsStable(out AStableInfo: TStableInfo): Boolean;
+var
+  IsTargetReached: Boolean;
+  HasStabilization: Boolean;
+  HasActiveTask: Boolean;
+  HadTask: Boolean;
+  IsChangingNow: Boolean;
+  ADelta: Double;
 begin
-  Result:= (Value.Value<=ValueSet.Value*(1+AccuracyPlus/100))
+  IsTargetReached := (Value.Value<=ValueSet.Value*(1+AccuracyPlus/100))
       AND (Value.Value>=ValueSet.Value*(1-AccuracyMinus/100)) ;
-  Status := Result;
+  ADelta := Abs(FDelta);
+  if ADelta <= MinDouble then
+    ADelta := 0.001;
+  HasStabilization := Abs(FAfter - FBefore) <= ADelta;
+  HasActiveTask := (FStatus in [PARAM_STARTED, PARAM_CHANGING]) or (FAction in [ACTION_SET, ACTION_START]);
+  HadTask := HasActiveTask or FHasTaskHistory;
+  IsChangingNow := (FValueSet.Value<>FValue.Value) and (not IsTargetReached);
+
+  if not HadTask then
+    AStableInfo.Status := ssNONE
+  else if not IsTargetReached then
+  begin
+    if IsChangingNow then
+    begin
+      if HasStabilization then
+        AStableInfo.Status := ssRun_SN
+      else
+        AStableInfo.Status := ssRun_NN;
+    end
+    else if HasStabilization then
+      AStableInfo.Status := ssFail_SN
+    else
+      AStableInfo.Status := ssFail_NN;
+  end
+  else
+  begin
+    if IsChangingNow then
+      AStableInfo.Status := ssRun_NS
+    else if HasStabilization then
+      AStableInfo.Status := ssOk
+    else
+      AStableInfo.Status := ssFail_NS;
+  end;
+
+  case AStableInfo.Status of
+    ssNONE:
+      AStableInfo.StatusText := 'Не было заданий, поэтому стабилен.';
+    ssRun_NN:
+      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизации нет.';
+    ssRun_SN:
+      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизация есть.';
+    ssRun_NS:
+      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание достигнуто, стабилизации нет.';
+    ssOk:
+      AStableInfo.StatusText := 'Было задание, оно выполнено, стабилизация достигнута.';
+    ssFail_SN:
+      AStableInfo.StatusText := 'Было задание, оно не достигнуто, стабилизация есть.';
+    ssFail_NS:
+      AStableInfo.StatusText := 'Было задание, оно достигнуто, стабилизации нет.';
+    ssFail_NN:
+      AStableInfo.StatusText := 'Было задание, оно не достигнуто и нет стабилизации.';
+  end;
+
+  AStableInfo.CurrentValue := Value.Value;
+  Result := IsTargetReached;
 end;
 procedure TParameter.Start;
 begin
@@ -539,6 +621,7 @@ begin
       FValueSet.Value:=FMax;
 
   FAction := ACTION_START;
+  FHasTaskHistory := True;
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStart', 'Parameter started', FName);
 end;
 
@@ -611,6 +694,7 @@ begin
         FValueSet.Value:=AValue;
 
       FAction:=ACTION_SET;
+      FHasTaskHistory := True;
 
 end;
 
@@ -637,9 +721,9 @@ end;
 
 function TParameter.GetIsChanging: Boolean;
 var
-Status:Boolean;
+  AStableInfo: TStableInfo;
 begin
-  Result :=  (FValueSet.Value<>FValue.Value) and not(IsStable(Status));
+  Result :=  (FValueSet.Value<>FValue.Value) and not(IsStable(AStableInfo));
 end;
 
   {$ENDREGION 'TPump'}

@@ -1316,7 +1316,7 @@ end;
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
-StableStatus: Boolean;
+StableStatus: TStableInfo;
 begin
 
   if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
@@ -4481,7 +4481,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   AMax:Double;
-  StableStatus: Boolean;
+  StableStatus: TStableInfo;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4532,7 +4532,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   ATempSet,APressSet: string;
-  TempStableStatus, PressStableStatus: Boolean;
+  TempStableStatus, PressStableStatus: TStableInfo;
 begin
     WorkTable := FActiveWorkTable;
 
