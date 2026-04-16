@@ -86,7 +86,8 @@ type
     procedure UpdateRandomPress(const AWorkTable: TWorkTable);
 
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
-    function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0):Double;
+    function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
+      AEtalonChannels: TObjectList<TChannel> = nil):Double;
     procedure UpdateDeviceImpSecFromFlowRate;
 
 
@@ -467,17 +468,30 @@ begin
   EditDeviceImpSec.Text := FloatToStr(ImpSec);
 end;
 
-function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0):Double;
+function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
+  AEtalonChannels: TObjectList<TChannel> = nil):Double;
 var
   WorkTable: TWorkTable;
   FlowRate, Coef, ImpSec: Double;
+  EtalonChannel: TChannel;
 begin
+  Result := 0;
+
   WorkTable := FWorkTableManager.WorkTables[0];
-  if (WorkTable = nil) or (WorkTable.EtalonChannels.Count = 0) then
+  if WorkTable = nil then
+    Exit;
+
+  EtalonChannel := nil;
+  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
+    EtalonChannel := AEtalonChannels[0]
+  else if WorkTable.EtalonChannels.Count > 0 then
+    EtalonChannel := WorkTable.EtalonChannels[0];
+
+  if EtalonChannel = nil then
     Exit;
 
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
+  Coef := GetChannelFlowCoef(EtalonChannel);
   if Coef <= 0 then
     Exit;
   if AFlowRate<>0 then
@@ -534,7 +548,7 @@ begin
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
               NormalizeFloatInput('0'),
-              UpdateEtalonImpSecFromFlowRate(FlowRate),
+              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels),
               NormalizeFloatInput('0')
             );
 
