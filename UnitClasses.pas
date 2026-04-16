@@ -78,7 +78,7 @@ type
     otVisual    = 5
   );
 
-  TStdCategory = (
+  EStdCategory = (
     mftUserType = -1,
     mftUnknownType = 0,
     mftMassFlowmeterType = 1,
@@ -239,7 +239,7 @@ type
     {====================================================================}
     MeasuredDimension: TMeasuredDimension; // Измеряемая величина по умолчанию
     DefaultOutputType: TOutputType;         // Тип сигнала по умолчанию
-    StdCategory: TStdCategory;               // Стандартная категория для runtime-логики
+    StdCategory: EStdCategory;               // Стандартная категория для runtime-логики
 
     constructor Create;
 
