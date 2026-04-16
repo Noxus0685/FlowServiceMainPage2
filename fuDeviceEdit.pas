@@ -357,6 +357,41 @@ implementation
 
 {$R *.fmx}
 
+procedure PopulateSpillageTypeCombo(ACombo: TComboBox);
+var
+  SpillageType: ESpillageType;
+begin
+  if ACombo = nil then
+    Exit;
+
+  ACombo.Items.BeginUpdate;
+  try
+    ACombo.Items.Clear;
+    for SpillageType in CSpillageTypeList do
+      ACombo.Items.Add(GetSpillageTypeStr(SpillageType));
+  finally
+    ACombo.Items.EndUpdate;
+  end;
+end;
+
+function SpillageTypeValueToItemIndex(const AValue: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := Low(CSpillageTypeList) to High(CSpillageTypeList) do
+    if Ord(CSpillageTypeList[I]) = AValue then
+      Exit(I);
+end;
+
+function SpillageTypeItemIndexToValue(const AIndex: Integer): Integer;
+begin
+  if (AIndex >= Low(CSpillageTypeList)) and (AIndex <= High(CSpillageTypeList)) then
+    Result := Ord(CSpillageTypeList[AIndex])
+  else
+    Result := Ord(spUnknown);
+end;
+
 procedure TFormDeviceEditor.ApplyMeasuredDimension;
 var
   Dim: TMeasuredDimension;
@@ -1668,10 +1703,8 @@ begin
     // =====================================================
     // == Тип испытания / критерий остановки
     // =====================================================
-    if (FDevice.SpillageType >= 0) and (FDevice.SpillageType < cbSpillageType.Items.Count) then
-      cbSpillageType.ItemIndex := FDevice.SpillageType
-    else
-      cbSpillageType.ItemIndex := 0;
+    PopulateSpillageTypeCombo(cbSpillageType);
+    cbSpillageType.ItemIndex := SpillageTypeValueToItemIndex(FDevice.SpillageType);
 
     PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
@@ -1833,7 +1866,7 @@ begin
   if cbSpillageType.ItemIndex < 0 then
     Exit;
 
-  FDevice.SpillageType := cbSpillageType.ItemIndex;
+  FDevice.SpillageType := SpillageTypeItemIndexToValue(cbSpillageType.ItemIndex);
   SetModified;
 end;
 
