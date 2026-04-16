@@ -171,7 +171,7 @@ begin
       FInvalidPointIndexes.Add(LIdx);
   end;
 
-  MeasurementRunEvent(Sender, EMeasurementEvent(Event), TErrorInfo.Empty(LRun.Stage));
+  MeasurementRunEvent(Sender, EMeasurementEvent(Event), TErrorInfo.Empty(Integer(LRun.Stage)));
 end;
 
 procedure TFrameMeasurementRun.MeasurementRunStateChanged(ASender: TObject;

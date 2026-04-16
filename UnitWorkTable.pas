@@ -367,7 +367,7 @@ private
   //FOnPumpStop: TOnPumpStopEvent;
   //FOnFreqSet: TOnFreqSetEvent;
 
-
+  FCurrentPoint:  TDevicePoint;
 
 
   // События пакетных заданий
@@ -448,6 +448,7 @@ private
     property TimeSet: Integer read FTimeSet write FTimeSet;
     property LimitImpSet: Integer read FLimitImpSet write FLimitImpSet;
     property LimitVolumeSet: Double read FLimitVolumeSet write FLimitVolumeSet;
+    property CurrentPoint:  TDevicePoint read FCurrentPoint write FCurrentPoint;
 
     property Repeats: Integer read FRepeats write FRepeats;
     property &Repeat: Integer read FRepeat write FRepeat;
@@ -1125,6 +1126,8 @@ begin
   FLimitImpSet := 0;
   FLimitVolumeSet := 0;
 
+  FCurrentPoint := TDevicePoint.Create(0);
+
   FLayoutFlowRateVisible := True;
   FLayoutPumpVisible := True;
   FLayoutMainVisible := True;
@@ -1766,6 +1769,10 @@ begin
   FDeviceChannels.Free;
   FEtalonChannels.Free;
   FreeAndNil(FPumps);
+
+  if FCurrentPoint<>nil then
+  FreeAndNil(FCurrentPoint);
+
   inherited;
 end;
 

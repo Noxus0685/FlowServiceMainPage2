@@ -1735,7 +1735,8 @@ begin
 
       ApplyOutputType;
 
-
+      FDevice.SetDimensions;
+      ApplyMeasuredDimension;
 
 
     // =====================================================
@@ -2798,6 +2799,47 @@ begin
     Value := FormatDeviceError(P.Error)
 
   {=====================================================}
+  { {Q и V}
+  {=====================================================}
+   else if ACol = StringColumnPointQ.Index then
+    begin
+      if (P.Q <= 0) then
+        Value := '—'
+      else
+        Value := FormatByBaseError(FDevice.FromBaseUnits(P.Q), P.Error);
+    end
+
+    {---------------------------}
+    { V }
+    {---------------------------}
+    else if (ACol = StringColumnPointVolume.Index) then
+    begin
+      if P.LimitVolume > 0 then
+        Value := FormatByBaseError(P.LimitVolume, P.Error)
+
+      else if (P.Q > 0) and (P.LimitTime > 0) then
+      begin
+        Qmax := FDevice.Qmax;
+        Q := P.FlowRate * Qmax;
+        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error);
+      end
+
+      else
+        Value := '—';
+    end
+    {---------------------------}
+    { IMP }
+    {---------------------------}
+      else if ACol = StringColumnPointImp.Index then
+  begin
+    if P.LimitImp = 0 then
+      Value := '—'
+    else
+      Value := IntToStr(P.LimitImp);
+  end
+
+
+  {=====================================================}
   { INTEGER-КОЛОНКИ }
   {=====================================================}
 
@@ -2830,13 +2872,6 @@ begin
   { ВСЕГДА отображаются }
   {=====================================================}
 
-  else if ACol = StringColumnPointImp.Index then
-  begin
-    if P.LimitImp = 0 then
-      Value := '—'
-    else
-      Value := IntToStr(P.LimitImp);
-  end
 
   else if ACol = StringColumnPointTime.Index then
     Value := FormatTime(P.LimitTime)
@@ -2845,6 +2880,8 @@ begin
   { ЗАВИСЯТ ОТ ПРИБОРА: Q и V }
   {=====================================================}
 
+
+   {
   else if (ACol = StringColumnPointQ.Index) or
           (ACol = StringColumnPointVolume.Index) then
   begin
@@ -2854,12 +2891,6 @@ begin
       Exit;
     end;
 
-    Qmax := FDevice.Qmax;
-    Q := P.FlowRate * Qmax;
-
-    {---------------------------}
-    { Q }
-    {---------------------------}
     if ACol = StringColumnPointQ.Index then
     begin
       if Q <= 0 then
@@ -2868,9 +2899,7 @@ begin
         Value := FormatByBaseError(FDevice.FromBaseUnits(Q), P.Error);
     end
 
-    {---------------------------}
-    { V }
-    {---------------------------}
+
     else
     begin
       if P.LimitVolume > 0 then
@@ -2882,7 +2911,7 @@ begin
       else
         Value := '—';
     end;
-  end;
+  end;    }
 end;
 
 procedure TFormDeviceEditor.GridPointsSetValue(

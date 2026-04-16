@@ -80,6 +80,17 @@ type
   );
 
 
+
+  TErrorInfo = record
+    Code: Integer;
+    Msg: string;
+    Time: TDateTime;
+    Stage: Integer;//EMeasurementState;
+    class function Empty(AStage:Integer{: EMeasurementState}): TErrorInfo; static;
+  end;
+
+
+
 function NormalizeFloatInput(const S: string): Double;
 function FormatPercentPM(const Value: Double): string;
 function ExtractFirstFloat(const S: string): Double;
@@ -113,6 +124,16 @@ function NormalizeFlowAccuracyInput(const S: string): string;
 function BoolToRussianYesNo(const AValue: Boolean): string;
 
 implementation
+
+  { TErrorInfo }
+
+class function TErrorInfo.Empty(AStage: Integer): TErrorInfo;
+begin
+  Result.Code := 0;
+  Result.Msg := '';
+  Result.Time := Now;
+  Result.Stage := AStage;
+end;
 
 function BoolToRussianYesNo(const AValue: Boolean): string;
 begin
