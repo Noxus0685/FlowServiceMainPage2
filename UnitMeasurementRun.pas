@@ -116,6 +116,7 @@ uses
   System.StrUtils,
   System.IniFiles,
   System.Variants,
+  UnitParameter,
   UnitProtocols;
 
 type

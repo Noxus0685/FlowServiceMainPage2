@@ -178,6 +178,9 @@ AValue:Double;
 begin
   WorkTable:= FWorkTableManager.ActiveWorkTable;
   FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet.Value)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
+
+  if WorkTable.ActivePump.ValueSet.Value = 0  then
+    WorkTable.ActivePump.ValueSet.Value:=12;
   if WorkTable.FlowRate.ValueSet.Value>=WorkTable.FlowRate.Value.Value then
     WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.Value+random(5))
   else
@@ -526,7 +529,7 @@ begin
               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
             else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
-
+            // FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
 
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,

@@ -2318,7 +2318,8 @@ begin
 
 
       WorkTable.FluidTemp.Value.Value := 21;
-     { WorkTable.FluidPress.Value.Value :=0;
+      { WorkTable.FlowRate.Value.Value := 0;
+      WorkTable.FluidPress.Value.Value :=0;
       WorkTable.FlowRate.Value.Value := 0;
       WorkTable.ActivePump.Value.Value := 0;
 

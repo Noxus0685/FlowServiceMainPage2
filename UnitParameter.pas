@@ -555,6 +555,8 @@ var
   IsChangingNow: Boolean;
   ADelta: Double;
 begin
+
+  //код кодекса, надо переделывать
   IsTargetReached := (Value.Value<=ValueSet.Value*(1+AccuracyPlus/100))
       AND (Value.Value>=ValueSet.Value*(1-AccuracyMinus/100)) ;
   ADelta := Abs(FDelta);
