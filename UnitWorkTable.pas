@@ -1127,6 +1127,10 @@ begin
   FLimitVolumeSet := 0;
 
   FCurrentPoint := TDevicePoint.Create(0);
+  FCurrentPoint.LimitTime := -1;
+  FCurrentPoint.LimitImp := -1;
+  FCurrentPoint.LimitVolume := -1;
+  FCurrentPoint.StopCriteria := [];
 
   FLayoutFlowRateVisible := True;
   FLayoutPumpVisible := True;
@@ -2113,9 +2117,18 @@ begin
       Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
-      Ini.WriteInteger(Section, 'TimeSet', WorkTable.TimeSet);
-      Ini.WriteInteger(Section, 'LimitImpSet', WorkTable.LimitImpSet);
-      Ini.WriteFloat(Section, 'LimitVolumeSet', WorkTable.LimitVolumeSet);
+      if WorkTable.CurrentPoint <> nil then
+      begin
+        Ini.WriteInteger(Section, 'TimeSet', Round(WorkTable.CurrentPoint.LimitTime));
+        Ini.WriteInteger(Section, 'LimitImpSet', WorkTable.CurrentPoint.LimitImp);
+        Ini.WriteFloat(Section, 'LimitVolumeSet', WorkTable.CurrentPoint.LimitVolume);
+      end
+      else
+      begin
+        Ini.WriteInteger(Section, 'TimeSet', -1);
+        Ini.WriteInteger(Section, 'LimitImpSet', -1);
+        Ini.WriteFloat(Section, 'LimitVolumeSet', -1);
+      end;
       Ini.WriteString(Section, 'State', WorkTableStateToString(WorkTable.State));
       Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.State));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
@@ -2219,9 +2232,13 @@ begin
       WorkTable.FlowRate.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
       WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
       WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
-      WorkTable.TimeSet := Ini.ReadInteger(Section, 'TimeSet', 0);
-      WorkTable.LimitImpSet := Ini.ReadInteger(Section, 'LimitImpSet', 0);
-      WorkTable.LimitVolumeSet := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
+      if WorkTable.CurrentPoint <> nil then
+      begin
+        WorkTable.CurrentPoint.LimitTime := Ini.ReadInteger(Section, 'TimeSet', 0);
+        WorkTable.CurrentPoint.LimitImp := Ini.ReadInteger(Section, 'LimitImpSet', 0);
+        WorkTable.CurrentPoint.LimitVolume := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
+        WorkTable.CurrentPoint.StopCriteria := [];
+      end;
       WorkTable.State := WorkTableStateFromString(
         Ini.ReadString(Section, 'State',
           Ini.ReadString(Section, 'MeasurementState', 'STATE_NONE'))
@@ -2686,6 +2703,9 @@ end;
 procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
   APointIndex: Integer);
 begin
+  if (FCurrentPoint <> nil) and (APoint <> nil) then
+    FCurrentPoint.Assign(APoint, True);
+
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
 end;
 

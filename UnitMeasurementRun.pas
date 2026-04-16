@@ -704,9 +704,13 @@ begin
     ManualPoint.Q := FWorkTable.FlowRate.ValueSet;
     ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet;
     ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet;
-    ManualPoint.LimitTime := FWorkTable.TimeSet;
-    ManualPoint.LimitImp := FWorkTable.LimitImpSet;
-    ManualPoint.LimitVolume := FWorkTable.LimitVolumeSet;
+    if FWorkTable.CurrentPoint <> nil then
+    begin
+      ManualPoint.LimitTime := FWorkTable.CurrentPoint.LimitTime;
+      ManualPoint.LimitImp := FWorkTable.CurrentPoint.LimitImp;
+      ManualPoint.LimitVolume := FWorkTable.CurrentPoint.LimitVolume;
+      ManualPoint.StopCriteria := FWorkTable.CurrentPoint.StopCriteria;
+    end;
     ManualPoint.Repeats := FWorkTable.Repeats;
     ManualPoint.RepeatsProtocol := FWorkTable.Repeats;
     ManualPoint.Num := 1;
@@ -1092,21 +1096,28 @@ begin
     Exit;
   end;
 
-  FWorkTable.TimeSet := -1;
-  FWorkTable.LimitImpSet := -1;
-  FWorkTable.LimitVolumeSet := -1;
+  if FWorkTable.CurrentPoint <> nil then
+  begin
+    FWorkTable.CurrentPoint.LimitTime := -1;
+    FWorkTable.CurrentPoint.LimitImp := -1;
+    FWorkTable.CurrentPoint.LimitVolume := -1;
+    FWorkTable.CurrentPoint.StopCriteria := [];
+  end;
 
-      if (scTime in APoint.StopCriteria) then
+      if (scTime in APoint.StopCriteria) and (FWorkTable.CurrentPoint <> nil) then
        if APoint.LimitTime > 0 then
-    FWorkTable.TimeSet := Round(APoint.LimitTime);
+    FWorkTable.CurrentPoint.LimitTime := Round(APoint.LimitTime);
 
-      if (scVolume in APoint.StopCriteria) then
+      if (scVolume in APoint.StopCriteria) and (FWorkTable.CurrentPoint <> nil) then
         if APoint.LimitVolume > 0 then
-    FWorkTable.LimitVolumeSet := APoint.LimitVolume;
+    FWorkTable.CurrentPoint.LimitVolume := APoint.LimitVolume;
 
-    if (scImpulse in APoint.StopCriteria) then
+    if (scImpulse in APoint.StopCriteria) and (FWorkTable.CurrentPoint <> nil) then
       if APoint.LimitImp > 0 then
-    FWorkTable.LimitImpSet := APoint.LimitImp;
+    FWorkTable.CurrentPoint.LimitImp := APoint.LimitImp;
+
+    if FWorkTable.CurrentPoint <> nil then
+      FWorkTable.CurrentPoint.StopCriteria := APoint.StopCriteria;
 
 
   Result := True;

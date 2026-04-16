@@ -7,6 +7,7 @@ uses
   frmMainTable,
   UnitBaseProcedures,
   UnitWorkTable,
+  UnitClasses,
   UnitDataManager,
   System.UITypes,
   System.SysUtils, System.Classes, FMX.Types, FMX.Controls,  System.Generics.Collections, FMX.Forms, FMX.TabControl,
@@ -673,14 +674,15 @@ begin
        if WorkTable.ValueQuantity <> nil then
          CurrentVolume := WorkTable.ValueQuantity.GetDoubleValue;
 
-       HasLimits := (WorkTable.TimeSet > 0) or
-                    (WorkTable.LimitImpSet > 0) or
-                    (WorkTable.LimitVolumeSet > 0);
+       HasLimits := (WorkTable.CurrentPoint <> nil) and
+         (((scTime in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitTime > 0)) or
+          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitImp > 0)) or
+          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitVolume > 0)));
 
-       LimitReached :=
-         ((WorkTable.TimeSet > 0) and (WorkTable.Time >= WorkTable.TimeSet)) or
-         ((WorkTable.LimitImpSet > 0) and (CurrentImp >= WorkTable.LimitImpSet)) or
-         ((WorkTable.LimitVolumeSet > 0) and (CurrentVolume >= WorkTable.LimitVolumeSet));
+       LimitReached := (WorkTable.CurrentPoint <> nil) and
+         (((scTime in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.Time >= WorkTable.CurrentPoint.LimitTime)) or
+          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and (CurrentImp >= WorkTable.CurrentPoint.LimitImp)) or
+          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and (CurrentVolume >= WorkTable.CurrentPoint.LimitVolume)));
 
        if HasLimits and LimitReached then
           WorkTable.State := STATE_STOPTEST;
