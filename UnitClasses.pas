@@ -78,6 +78,26 @@ type
     otVisual    = 5
   );
 
+  ESpillageType = (
+    spUnknown = -1,
+    spAuto = 0,
+    spCompareNoStop,
+    spWeightNoStop,
+    spCompareStop,
+    spWeightStop
+  );
+
+const
+  CSpillageTypeList: array[0..4] of ESpillageType = (
+    spAuto,
+    spCompareNoStop,
+    spWeightNoStop,
+    spCompareStop,
+    spWeightStop
+  );
+
+type
+
   EStdCategory = (
     mftUserType = -1,
     mftUnknownType = 0,
@@ -455,6 +475,8 @@ type
 
   function GetOutputTypeName(AType: TOutputType): string; overload;
   function GetOutputTypeName(AType: Integer): string; overload;
+  function GetSpillageTypeStr(AType: ESpillageType): string;
+  function StrToSpillageType(const S: string): ESpillageType;
 
 
 implementation
@@ -485,6 +507,35 @@ begin
     Result := GetOutputTypeName(TOutputType(AType))
   else
     Result := ' ';
+end;
+
+function GetSpillageTypeStr(AType: ESpillageType): string;
+begin
+  case AType of
+    spAuto:          Result := 'Авто';
+    spCompareNoStop: Result := 'Сличение без остановки потока';
+    spWeightNoStop:  Result := 'Весовой метод без остановки потока';
+    spCompareStop:   Result := 'Сличение с остановкой потока';
+    spWeightStop:    Result := 'Весовой метод с остановкой потока';
+  else
+    Result := '-';
+  end;
+end;
+
+function StrToSpillageType(const S: string): ESpillageType;
+begin
+  if SameText(S, 'Авто') then
+    Exit(spAuto);
+  if SameText(S, 'Сличение без остановки потока') then
+    Exit(spCompareNoStop);
+  if SameText(S, 'Весовой метод без остановки потока') then
+    Exit(spWeightNoStop);
+  if SameText(S, 'Сличение с остановкой потока') then
+    Exit(spCompareStop);
+  if SameText(S, 'Весовой метод с остановкой потока') then
+    Exit(spWeightStop);
+
+  Result := spUnknown;
 end;
 
 function CriteriaToInt(const C: TSpillageStopCriteria): Integer;
