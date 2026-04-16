@@ -3384,66 +3384,81 @@ end;
 procedure TFrameMainTable.EditTimeExit(Sender: TObject);
 var
   Value: Double;
+  SC: TSpillageStopCriteria;
 begin
   if (FActiveWorkTable = nil) or (FActiveWorkTable.CurrentPoint = nil) then
     Exit;
+
+  SC := FActiveWorkTable.CurrentPoint.StopCriteria;
 
   if (Trim(EditTime.Text) = '-') or
      (TryStrToFloat(EditTime.Text, Value) and SameValue(Value, -1, MinDouble)) then
   begin
     FActiveWorkTable.CurrentPoint.LimitTime := -1;
-    Exclude(FActiveWorkTable.CurrentPoint.StopCriteria, scTime);
+    Exclude(SC, scTime);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
     Exit;
   end;
 
   if TryStrToFloat(EditTime.Text, Value) then
   begin
     FActiveWorkTable.CurrentPoint.LimitTime := Value;
-    Include(FActiveWorkTable.CurrentPoint.StopCriteria, scTime);
+    Include(SC, scTime);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
   end;
 end;
 
 procedure TFrameMainTable.EditVolumeExit(Sender: TObject);
 var
   Value: Double;
+  SC: TSpillageStopCriteria;
 begin
   if (FActiveWorkTable = nil) or (FActiveWorkTable.CurrentPoint = nil) then
     Exit;
+
+  SC := FActiveWorkTable.CurrentPoint.StopCriteria;
 
   if (Trim(EditVolume.Text) = '-') or
      (TryStrToFloat(EditVolume.Text, Value) and SameValue(Value, -1, MinDouble)) then
   begin
     FActiveWorkTable.CurrentPoint.LimitVolume := -1;
-    Exclude(FActiveWorkTable.CurrentPoint.StopCriteria, scVolume);
+    Exclude(SC, scVolume);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
     Exit;
   end;
 
   if TryStrToFloat(EditVolume.Text, Value) then
   begin
     FActiveWorkTable.CurrentPoint.LimitVolume := Value;
-    Include(FActiveWorkTable.CurrentPoint.StopCriteria, scVolume);
+    Include(SC, scVolume);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
   end;
 end;
 
 procedure TFrameMainTable.EditImpExit(Sender: TObject);
 var
   Value: Integer;
+  SC: TSpillageStopCriteria;
 begin
   if (FActiveWorkTable = nil) or (FActiveWorkTable.CurrentPoint = nil) then
     Exit;
+
+  SC := FActiveWorkTable.CurrentPoint.StopCriteria;
 
   if (Trim(EditImp.Text) = '-') or
      (TryStrToInt(EditImp.Text, Value) and (Value = -1)) then
   begin
     FActiveWorkTable.CurrentPoint.LimitImp := -1;
-    Exclude(FActiveWorkTable.CurrentPoint.StopCriteria, scImpulse);
+    Exclude(SC, scImpulse);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
     Exit;
   end;
 
   if TryStrToInt(EditImp.Text, Value) then
   begin
     FActiveWorkTable.CurrentPoint.LimitImp := Value;
-    Include(FActiveWorkTable.CurrentPoint.StopCriteria, scImpulse);
+    Include(SC, scImpulse);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
   end;
 end;
 

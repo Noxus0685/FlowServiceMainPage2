@@ -332,15 +332,24 @@ begin
   if APoint = nil then
     Exit;
 
+
+
+
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
-    QText := FActiveWorkTable.ValueFlowRate.GetStrNum(APoint.Q)  + ' '+
+  begin
+     if (APoint.Q>=0) then
+    QText := ', ' + FActiveWorkTable.ValueFlowRate.GetStrNum(APoint.Q)  + ' '+
     FActiveWorkTable.ValueFlowRate.GetDimName
+      else
+    QText := '';
+
+  end
 
   else
     QText := FormatFloat('0.###', APoint.Q);
 
   if APoint.Name <> '' then
-    Result := APoint.Name + ', ' + QText
+    Result := APoint.Name + QText
   else
     Result := QText;
 end;

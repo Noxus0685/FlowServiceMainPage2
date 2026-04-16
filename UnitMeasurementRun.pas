@@ -254,8 +254,8 @@ type
     procedure ProcessStage;
     procedure SaveMeasurementResults;
 
-    class function SpillStateToString(AState: EMeasurementState): string; static;
-    class function SpillStateFromString(const AValue: string): EMeasurementState; static;
+    class function MeasurementStateToString(AState: EMeasurementState): string; static;
+    class function MeasurementStateFromString(const AValue: string): EMeasurementState; static;
     class function MeasurementEventToString(AEvent: EMeasurementEvent): string; static;
 
     property WorkTable: TWorkTable read FWorkTable;
@@ -548,7 +548,7 @@ procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
 begin
   SetState(ANewStage);
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения', SpillStateToString(ANewStage));
+    'Переход этапа измерения', MeasurementStateToString(ANewStage));
   EnterStage(ANewStage);
 end;
 
@@ -586,7 +586,7 @@ begin
     ErrorDetails := Format('Event=%s; Code=%d; Stage=%s; Time=%s; Msg=%s', [
       MeasurementEventToString(AEvent),
       AError.Code,
-      SpillStateToString(EMeasurementState(AError.Stage)),
+      MeasurementStateToString(EMeasurementState(AError.Stage)),
       FormatDateTime('dd.mm.yyyy hh:nn:ss', AError.Time),
       AError.Msg
     ]);
@@ -675,13 +675,13 @@ begin
   if (FWorkTable = nil) then
     Exit;
 
-  if (FWorkTable.FlowRate <> nil) and (GetCurrentPoint.Q<>0)  then
+  if (FWorkTable.FlowRate <> nil) and (GetCurrentPoint.Q>=0)  then
     Result := Result and FWorkTable.FlowRate.IsStable(ParamStatus);
 
-  if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp<>0) then
+  if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp>=0) then
     Result := Result and FWorkTable.FluidTemp.IsStable(ParamStatus);
 
-  if (FWorkTable.FluidPress <> nil) and  (GetCurrentPoint.Pressure<>0) then
+  if (FWorkTable.FluidPress <> nil) and  (GetCurrentPoint.Pressure>=0) then
     Result := Result and FWorkTable.FluidPress.IsStable(ParamStatus);
 end;
 
@@ -701,7 +701,17 @@ begin
   begin
     ManualPoint := TDevicePoint.Create(0);
     ManualPoint.FlowRate := 1; //FManualFlowRate;
-    ManualPoint.Q := FWorkTable.FlowRate.ValueSet;
+
+    if FWorkTable.FlowRate.ValueSet>=0 then
+    begin
+       ManualPoint.Q := FWorkTable.FlowRate.ValueSet;
+    end else
+    begin
+       ManualPoint.Q := -1;
+    end;
+
+       ManualPoint.Q := -1;
+
     ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet;
     ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet;
     if FWorkTable.CurrentPoint <> nil then
@@ -819,7 +829,7 @@ begin
     if Assigned(FThread) then
       FreeAndNil(FThread);
 
-    CreateSessionPoints;
+    CreateSession;
     if FPoints.Count = 0 then
     begin
       SetState(msNone);
@@ -1019,6 +1029,9 @@ begin
     Exit;
   end;
 
+
+
+
   for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
   begin
     Channel := FWorkTable.EtalonChannels[I];
@@ -1030,6 +1043,10 @@ begin
         Best := Channel;
     end;
   end;
+
+  if (APoint.Q <= 0) then
+     Best :=  FWorkTable.EtalonChannels[FWorkTable.EtalonChannels.Count - 1];
+
 
   Result := Best <> nil;
   if not Result then
@@ -1055,7 +1072,6 @@ begin
     TimeByLimit := 60;
   Result := Round((TimeByLimit + 10) * 1000);
 end;
-
 
 function TMeasurementRun.SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
 begin
@@ -1295,7 +1311,7 @@ begin
 end;
 
 { Converts persisted string to spill state enum value. }
-class function TMeasurementRun.SpillStateFromString(const AValue: string): EMeasurementState;
+class function TMeasurementRun.MeasurementStateFromString(const AValue: string): EMeasurementState;
 var
   S: string;
 begin
@@ -1332,7 +1348,7 @@ begin
 end;
 
 { Converts spill state enum value to persisted string. }
-class function TMeasurementRun.SpillStateToString(AState: EMeasurementState): string;
+class function TMeasurementRun.MeasurementStateToString(AState: EMeasurementState): string;
 begin
   case AState of
     msNone:        Result := '-';

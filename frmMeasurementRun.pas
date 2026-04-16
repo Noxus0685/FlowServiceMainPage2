@@ -330,7 +330,7 @@ begin
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRFlowRate then
   begin
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
-      Value := FActiveWorkTable.ValueFlowRate.GetStrNum(Point.Q)
+      Value := FActiveWorkTable.ValueFlowRate.GetStrNumLimits(Point.Q)
     else
       Value := FormatFloat('0.###', Point.Q);
   end
@@ -474,7 +474,7 @@ begin
   if MeasurementRun = nil then
     Exit;
 
-  MeasurementRun.CreateSessionPoints;
+  MeasurementRun.CreateSession;
   FInvalidPointIndexes.Clear;
   UpdateGridMesurmentRun;
 end;
