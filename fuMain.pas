@@ -279,7 +279,7 @@ end;
 procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double;
-  StableStatus: Boolean;
+  StableStatus: TStableInfo;
 begin
   if AWorkTable = nil then
     Exit;
