@@ -59,6 +59,7 @@ type
     FEnabled: Boolean;
     FText: string;
     FGroup: Integer;
+    FCategory: EStdCategory;
 
     // Channel values (not proxy fields)
     FImpSec: Double;
@@ -93,6 +94,8 @@ type
 
     function GetSignalProxy: Integer;
     procedure SetSignalProxy(const AValue: Integer);
+    function GetCategoryProxy: Integer;
+    procedure SetCategoryProxy(const AValue: Integer);
 
     function GetDeviceUUIDProxy: string;
     procedure SetDeviceUUIDProxy(const AValue: string);
@@ -160,6 +163,8 @@ type
     property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
+    property Category: Integer read GetCategoryProxy write SetCategoryProxy;
+    property Group: Integer read FGroup write FGroup;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
     property TypeUUID: string read GetTypeUUIDProxy write SetTypeUUIDProxy;
     property RepoTypeName: string read GetRepoTypeNameProxy write SetRepoTypeNameProxy;
@@ -702,6 +707,8 @@ begin
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
+  FGroup := 0;
+  FCategory := mftUnknownType;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -839,6 +846,8 @@ begin
   FFlowMeter.PointIndex := ASource.FFlowMeter.PointIndex;
   FFlowMeter.Comment := ASource.FFlowMeter.Comment;
   FFlowMeter.MeterFlowCategory := ASource.FFlowMeter.MeterFlowCategory;
+  FCategory := ASource.FCategory;
+  FGroup := ASource.FGroup;
 
   SrcDevice := ASource.FFlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
@@ -921,6 +930,28 @@ procedure TChannel.SetSignalProxy(const AValue: Integer);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.OutputType := AValue;
+end;
+
+function TChannel.GetCategoryProxy: Integer;
+begin
+  if Assigned(FFlowMeter) and Assigned(FFlowMeter.Device) then
+    Result := FFlowMeter.Device.Category
+  else
+    Result := Ord(FCategory);
+end;
+
+procedure TChannel.SetCategoryProxy(const AValue: Integer);
+begin
+  if Assigned(FFlowMeter) and Assigned(FFlowMeter.Device) then
+  begin
+    FFlowMeter.Device.Category := AValue;
+    FFlowMeter.Device.State := osModified;
+  end
+  else
+    if (AValue >= Ord(Low(EStdCategory))) and (AValue <= Ord(High(EStdCategory))) then
+      FCategory := EStdCategory(AValue)
+    else
+      FCategory := mftUnknownType;
 end;
 
 { Returns bound FlowMeter device UUID for proxy property access. }
@@ -1720,6 +1751,8 @@ procedure TWorkTable.UpdateAggregateMeterValues;
 var
   I: Integer;
   Channel: TChannel;
+  AggregateGroup: Integer;
+  IsAggregateGroupDefined: Boolean;
   IsQuantityTemplateSet: Boolean;
   IsFlowTemplateSet: Boolean;
 begin
@@ -1730,11 +1763,22 @@ begin
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
+  IsAggregateGroupDefined := False;
+  AggregateGroup := 0;
 
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
     if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if not IsAggregateGroupDefined then
+    begin
+      AggregateGroup := Channel.Group;
+      IsAggregateGroupDefined := True;
+    end;
+
+    if Channel.Group <> AggregateGroup then
       Continue;
 
     if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
@@ -2421,6 +2465,8 @@ begin
     AIni.WriteString(Section, 'DeviceName', Channel.DeviceName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
+    AIni.WriteInteger(Section, 'Category', Channel.Category);
+    AIni.WriteInteger(Section, 'Group', Channel.Group);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
     AIni.WriteString(Section, 'TypeUUID', Channel.TypeUUID);
     AIni.WriteString(Section, 'RepoTypeName', Channel.RepoTypeName);
@@ -2476,6 +2522,8 @@ begin
     Channel.DeviceName := AIni.ReadString(Section, 'DeviceName', Channel.TypeName);
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
     Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
+    Channel.Category := AIni.ReadInteger(Section, 'Category', Ord(mftUnknownType));
+    Channel.Group := AIni.ReadInteger(Section, 'Group', 0);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
     Channel.TypeUUID := AIni.ReadString(Section, 'TypeUUID', '');
     Channel.RepoTypeName := AIni.ReadString(Section, 'RepoTypeName', '');

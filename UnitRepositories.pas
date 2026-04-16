@@ -961,7 +961,7 @@ var
     ADimension: TMeasuredDimension;
     AOutputType: TOutputType;
     const AKeyWords: string;
-    AStdCategory: TStdCategory
+    AStdCategory: EStdCategory
   );
   begin
     C := TDeviceCategory.Create;
@@ -2815,7 +2815,7 @@ begin
           );
 
         if Q.FindField('StdCategory') <> nil then
-          C.StdCategory := TStdCategory(Q.FieldByName('StdCategory').AsInteger)
+          C.StdCategory := EStdCategory(Q.FieldByName('StdCategory').AsInteger)
         else
           C.StdCategory := mftUnknownType;
 
