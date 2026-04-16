@@ -763,7 +763,7 @@ begin
       if ExistingPoint = nil then
       begin
         SessionPoint := TDevicePoint.Create(0);
-        SessionPoint.Assign(SourcePoint);
+        SessionPoint.Assign(SourcePoint, False);
         SessionPoint.Status := 0;
         SessionPoint.RepeatsCompleted := 0;
         FPoints.Add(SessionPoint);

@@ -153,7 +153,7 @@ type
     constructor Create(ADeviceID : Integer);
     destructor Destroy; override;
 
-    procedure Assign(ASource: TDevicePoint);
+    procedure Assign(ASource: TDevicePoint; FullAssign: Boolean);
     procedure Apply(ASource: TTypePoint);
     function GetStatus: string;
     function GetStatusHint: string;
@@ -1222,8 +1222,7 @@ begin
   for P in ASource.FPoints do
   begin
     NewP := AddPoint;
-    NewP.Assign(P);
-    NewP.DeviceUUID := UUID;
+    NewP.Assign(P, False);
   end;
 end;
 
@@ -1542,7 +1541,7 @@ begin
   end;
 end;
 
-procedure TDevicePoint.Assign(ASource: TDevicePoint);
+procedure TDevicePoint.Assign(ASource: TDevicePoint; FullAssign: Boolean);
 begin
   if ASource = nil then
     Exit;
@@ -1550,11 +1549,14 @@ begin
   {====================================================================}
   { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
   {====================================================================}
+  if FullAssign then
+  begin
   ID := ASource.ID;
   DeviceID := ASource.DeviceID;
   DeviceUUID := ASource.DeviceUUID;
-  DeviceTypePointID := ASource.DeviceTypePointID;
+  end;
 
+  DeviceTypePointID := ASource.DeviceTypePointID;
   {====================================================================}
   { СОСТОЯНИЕ }
   {====================================================================}
