@@ -511,9 +511,9 @@ function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
   AEtalonChannels: TObjectList<TChannel> = nil):Double;
 var
   WorkTable: TWorkTable;
-  FlowRate, Coef, ImpSec: Double;
-
-  i:integer;
+  FlowRate: Double;
+  Coef: Double;
+  I: Integer;
 begin
   Result := 0;
 
@@ -524,27 +524,28 @@ begin
 
 
 
-  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
-    for I := 0 to AEtalonChannels.Count - 1 do
-      Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
-  else if AEtalonChannels=nil then
-      Coef := GetChannelFlowCoef(AEtalonChannels[0]);
+  if (AEtalonChannels = nil) then
+    AEtalonChannels := WorkTable.EtalonChannels;
 
-  FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-
-
-
-  //for I := 0 to AEtalonChannels.Count - 1 do
- // Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i]);
-
-  if Coef <= 0 then
+  if (AEtalonChannels = nil) or (AEtalonChannels.Count = 0) then
     Exit;
-  if AFlowRate<>0 then
-    ImpSec := (AFlowRate * Coef) / 3.6
+
+  if AFlowRate <> 0 then
+    FlowRate := AFlowRate
   else
-    ImpSec := (FlowRate * Coef) / 3.6;
-  EditEtalonImpSec.Text := FloatToStr(ImpSec);
-  Result:= ImpSec;
+    FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
+
+  for I := 0 to AEtalonChannels.Count - 1 do
+  begin
+    if (AEtalonChannels[I] = nil) or (not AEtalonChannels[I].Enabled) then
+      Continue;
+
+    Coef := GetChannelFlowCoef(AEtalonChannels[I]);
+    if Coef > 0 then
+      Result := Result + (FlowRate * Coef) / 3.6;
+  end;
+
+  EditEtalonImpSec.Text := FloatToStr(Result);
 end;
 
 
@@ -592,6 +593,11 @@ begin
             else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum((AFlowRate.Value.Value-1);
              //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
+
+            ImpSecValues := BuildImpSecValuesForChannels(
+              EnabledEtalonChannels,
+              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+            );
 
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
