@@ -200,6 +200,7 @@ type
     FAttempt: Integer;
     FMaxAttemptCount: Integer;
     FMeasureTimeoutMs: Cardinal;
+    FEtalonSelectError: string;
 
     FOnStateChangedFrame: TMeasurementRunStateChangedEvent;
     FOnStateChangedMain: TMeasurementRunStateChangedEvent;
@@ -219,6 +220,10 @@ type
     function ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetPoint(Index: Integer; out AError: TErrorInfo): Boolean;
     function SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+    function SelectFlowMeters(Q: Double): Boolean;
+    function SelectFlowMeterGroup(Q: Double): Boolean;
+    function SelectWeights(APoint: TDevicePoint): Boolean;
+    function CheckAccuracy(APoint: TDevicePoint): Boolean;
     function BuildPointSelectionLog(APoint: TDevicePoint): string;
     function BuildEtalonSelectionLog(APoint: TDevicePoint): string;
     function CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
@@ -1013,15 +1018,238 @@ begin
   end;
 end;
 
-function TMeasurementRun.SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+function TMeasurementRun.SelectFlowMeterGroup(Q: Double): Boolean;
+type
+  TGroupInfo = record
+    GroupID: Integer;
+    SumFlowMax: Double;
+  end;
+var
+  I, J: Integer;
+  Channel: TChannel;
+  GroupInfos: TList<TGroupInfo>;
+  GroupInfo: TGroupInfo;
+  GroupFound: Boolean;
+  BestGroupID: Integer;
+  BestExcess: Double;
+  CurrentExcess: Double;
+begin
+  Result := False;
+  BestGroupID := -1;
+  BestExcess := MaxDouble;
+  GroupInfos := TList<TGroupInfo>.Create;
+  try
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel = nil) or (Channel.FlowMeter = nil) then
+        Continue;
+      if not (Channel.FlowMeter.MeterFlowCategory in [mftMassFlowmeterType, mftVolumeFlowmeterType]) then
+        Continue;
+      if Channel.Group <= 0 then
+        Continue;
+
+      GroupFound := False;
+      for J := 0 to GroupInfos.Count - 1 do
+      begin
+        if GroupInfos[J].GroupID = Channel.Group then
+        begin
+          GroupInfo := GroupInfos[J];
+          GroupInfo.SumFlowMax := GroupInfo.SumFlowMax + Channel.FlowMeter.FlowMax;
+          GroupInfos[J] := GroupInfo;
+          GroupFound := True;
+          Break;
+        end;
+      end;
+
+      if not GroupFound then
+      begin
+        GroupInfo.GroupID := Channel.Group;
+        GroupInfo.SumFlowMax := Channel.FlowMeter.FlowMax;
+        GroupInfos.Add(GroupInfo);
+      end;
+    end;
+
+    for I := 0 to GroupInfos.Count - 1 do
+    begin
+      if GroupInfos[I].SumFlowMax >= Q then
+      begin
+        CurrentExcess := GroupInfos[I].SumFlowMax - Q;
+        if CurrentExcess < BestExcess then
+        begin
+          BestExcess := CurrentExcess;
+          BestGroupID := GroupInfos[I].GroupID;
+        end;
+      end;
+    end;
+
+    if BestGroupID <= 0 then
+      Exit(False);
+
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel = nil) or (Channel.FlowMeter = nil) then
+        Continue;
+      if (Channel.Group = BestGroupID) and
+         (Channel.FlowMeter.MeterFlowCategory in [mftMassFlowmeterType, mftVolumeFlowmeterType]) then
+      begin
+        Channel.Enabled := True;
+        ProtocolManager.AddMessage(pcAction, psMeasurement, 'SelectEtalons',
+          'SelectEtalons: выбран расходомер из группы',
+          Format('%s; Group=%d; FlowMax=%.6g', [Channel.Name, Channel.Group, Channel.FlowMeter.FlowMax]));
+      end;
+    end;
+    Result := True;
+  finally
+    GroupInfos.Free;
+  end;
+end;
+
+function TMeasurementRun.SelectFlowMeters(Q: Double): Boolean;
 var
   I: Integer;
   Channel: TChannel;
-  Best: TChannel;
+  Candidate: TChannel;
+  HasFlowMeters: Boolean;
+begin
+  Result := False;
+  Candidate := nil;
+  HasFlowMeters := False;
+
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+    if not (Channel.FlowMeter.MeterFlowCategory in [mftMassFlowmeterType, mftVolumeFlowmeterType]) then
+      Continue;
+
+    HasFlowMeters := True;
+    if (Q = 0) or ((Q > 0) and (Channel.FlowMeter.FlowMax >= Q)) then
+    begin
+      if (Candidate = nil) or (Channel.FlowMeter.FlowMax < Candidate.FlowMeter.FlowMax) then
+        Candidate := Channel;
+    end;
+  end;
+
+  if not HasFlowMeters then
+  begin
+    FEtalonSelectError := 'Нет расходомеров';
+    Exit(False);
+  end;
+
+  if Candidate <> nil then
+  begin
+    Candidate.Enabled := True;
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'SelectEtalons',
+      'SelectEtalons: выбран расходомер',
+      Format('%s; FlowMax=%.6g; Q=%.6g', [Candidate.Name, Candidate.FlowMeter.FlowMax, Q]));
+    Exit(True);
+  end;
+
+  if (Q > 0) and SelectFlowMeterGroup(Q) then
+    Exit(True);
+
+  FEtalonSelectError := 'Недостаточный диапазон расхода эталонов';
+end;
+
+function TMeasurementRun.SelectWeights(APoint: TDevicePoint): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  Candidate: TChannel;
+  CurrentBestFlowMax: Double;
+  RequiredVolume: Double;
+  RequiredQ: Double;
+begin
+  Result := False;
+  Candidate := nil;
+  CurrentBestFlowMax := MaxDouble;
+  RequiredVolume := APoint.LimitVolume;
+  RequiredQ := Max(APoint.Q, 0.0);
+
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+    if not (Channel.FlowMeter.MeterFlowCategory in [mftWeightsType, mftTankType]) then
+      Continue;
+
+    if (RequiredQ > 0) and (Channel.FlowMeter.FlowMax < RequiredQ) then
+      Continue;
+    if (RequiredVolume > 0) and (Channel.FlowMeter.QuantityMax < RequiredVolume) then
+      Continue;
+
+    if Channel.FlowMeter.FlowMax < CurrentBestFlowMax then
+    begin
+      CurrentBestFlowMax := Channel.FlowMeter.FlowMax;
+      Candidate := Channel;
+    end;
+  end;
+
+  if Candidate = nil then
+  begin
+    if RequiredVolume > 0 then
+      FEtalonSelectError := 'Недостаточный объем/масса эталона'
+    else
+      FEtalonSelectError := 'Нет весов/мерников при выбранном режиме';
+    Exit(False);
+  end;
+
+  if (RequiredVolume > 0) and (RequiredVolume < Candidate.FlowMeter.QuantityMin) then
+  begin
+    APoint.LimitVolume := Candidate.FlowMeter.QuantityMin;
+    if APoint.Q > 0 then
+      APoint.LimitTime := APoint.LimitVolume / APoint.Q;
+  end;
+
+  Candidate.Enabled := True;
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'SelectEtalons',
+    'SelectEtalons: добавлены весы/мерник',
+    Format('%s; FlowMax=%.6g; QuantityMin=%.6g; QuantityMax=%.6g',
+      [Candidate.Name, Candidate.FlowMeter.FlowMax, Candidate.FlowMeter.QuantityMin, Candidate.FlowMeter.QuantityMax]));
+  Result := True;
+end;
+
+function TMeasurementRun.CheckAccuracy(APoint: TDevicePoint): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  MinEtalonError: Double;
+begin
+  Result := False;
+  MinEtalonError := MaxDouble;
+
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) or (not Channel.Enabled) then
+      Continue;
+    if not (Channel.FlowMeter.MeterFlowCategory in [mftMassFlowmeterType, mftVolumeFlowmeterType]) then
+      Continue;
+
+    MinEtalonError := Min(MinEtalonError, Abs(Channel.FlowMeter.Error));
+  end;
+
+  if MinEtalonError = MaxDouble then
+    Exit(False);
+
+  if APoint.Error <= 0 then
+    Exit(True);
+
+  Result := MinEtalonError <= (Abs(APoint.Error) / 3.0);
+end;
+
+function TMeasurementRun.SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+var
+  I: Integer;
+  SpillageType: ESpillageType;
 begin
   AError := TErrorInfo.Empty(Integer(msSelectEtalon));
   Result := False;
-  Best := nil;
+  FEtalonSelectError := '';
 
   if (APoint = nil) or (FWorkTable = nil) then
   begin
@@ -1029,28 +1257,60 @@ begin
     Exit;
   end;
 
+  if APoint.Q = -1 then
+    Exit(True);
 
-
-
-  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  SpillageType := spAuto;
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
   begin
-    Channel := FWorkTable.EtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
-      Continue;
-    if (APoint.Q >= Channel.FlowMeter.FlowMin) and (APoint.Q <= Channel.FlowMeter.FlowMax) then
+    if (FWorkTable.DeviceChannels[I] <> nil) and
+       (FWorkTable.DeviceChannels[I].FlowMeter <> nil) and
+       (FWorkTable.DeviceChannels[I].FlowMeter.Device <> nil) then
     begin
-      if (Best = nil) or (Channel.FlowMeter.FlowMax < Best.FlowMeter.FlowMax) then
-        Best := Channel;
+      SpillageType := ESpillageType(FWorkTable.DeviceChannels[I].FlowMeter.Device.SpillageType);
+      Break;
     end;
   end;
 
-  if (APoint.Q <= 0) then
-     Best :=  FWorkTable.EtalonChannels[FWorkTable.EtalonChannels.Count - 1];
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    if FWorkTable.EtalonChannels[I] <> nil then
+      FWorkTable.EtalonChannels[I].Enabled := False;
+  end;
 
+  if not SelectFlowMeters(APoint.Q) then
+  begin
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'SelectEtalons',
+      'Ошибка выбора эталонов', FEtalonSelectError);
+    AError := BuildError(1101, FEtalonSelectError);
+    Exit(False);
+  end;
 
-  Result := Best <> nil;
+  case SpillageType of
+    spCompareNoStop, spCompareStop:
+      Result := True;
+    spWeightNoStop, spWeightStop:
+      Result := SelectWeights(APoint);
+  else
+    begin
+      if CheckAccuracy(APoint) then
+        Result := True
+      else
+        Result := SelectWeights(APoint);
+    end;
+  end;
+
   if not Result then
-    AError := BuildError(1101, 'Эталон по расходу не найден');
+  begin
+    if FEtalonSelectError = '' then
+      FEtalonSelectError := 'Ошибка выбора эталонов';
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'SelectEtalons',
+      'Ошибка выбора эталонов', FEtalonSelectError);
+    AError := BuildError(1101, FEtalonSelectError);
+    Exit(False);
+  end;
+
+  Result := True;
 end;
 
 function TMeasurementRun.CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;

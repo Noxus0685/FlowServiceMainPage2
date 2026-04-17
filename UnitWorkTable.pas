@@ -1771,6 +1771,8 @@ begin
     Channel := FEtalonChannels[I];
     if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
       Continue;
+    if not (Channel.FlowMeter.MeterFlowCategory in [mftMassFlowmeterType, mftVolumeFlowmeterType]) then
+      Continue;
 
     if not IsAggregateGroupDefined then
     begin
