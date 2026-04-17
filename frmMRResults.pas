@@ -44,9 +44,11 @@ type
     SpeedButton12: TSpeedButton;
     SpeedButton13: TSpeedButton;
     SpeedButton14: TSpeedButton;
+    SpeedButtonCreatePoints: TSpeedButton;
     procedure GridMRResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridMRResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn;
       const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
+    procedure SpeedButtonCreatePointsClick(Sender: TObject);
   private
     FActiveWorkTable: TWorkTable;
     FPointColumns: TObjectList<TStringColumn>;
@@ -147,6 +149,12 @@ begin
   BuildColumns;
   BuildRows;
   RefreshRows;
+end;
+
+procedure TFrameMRResults.SpeedButtonCreatePointsClick(Sender: TObject);
+begin
+       MeasurementRun.CreateSession;
+        UpdateUI;
 end;
 
 procedure TFrameMRResults.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -324,13 +332,24 @@ begin
   if APoint = nil then
     Exit;
 
+
+
+
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ValueFlowRate <> nil) then
-    QText := FActiveWorkTable.ValueFlowRate.GetStrNum(APoint.Q)
+  begin
+     if (APoint.Q>=0) then
+    QText := ', ' + FActiveWorkTable.ValueFlowRate.GetStrNum(APoint.Q)  + ' '+
+    FActiveWorkTable.ValueFlowRate.GetDimName
+      else
+    QText := '';
+
+  end
+
   else
     QText := FormatFloat('0.###', APoint.Q);
 
   if APoint.Name <> '' then
-    Result := APoint.Name + ', ' + QText
+    Result := APoint.Name + QText
   else
     Result := QText;
 end;

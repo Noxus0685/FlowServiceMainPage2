@@ -439,6 +439,8 @@ type
 
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure EditTimeExit(Sender: TObject);
+    procedure EditVolumeExit(Sender: TObject);
+    procedure EditImpExit(Sender: TObject);
     procedure EditPresCanFocus(Sender: TObject; var ACanFocus: Boolean);
     procedure EditTempCanFocus(Sender: TObject; var ACanFocus: Boolean);
     procedure ActionSessionCreatePointsExecute(Sender: TObject);
@@ -3167,6 +3169,29 @@ begin
   else
     LabelTime.Text := '-';
 
+  if WorkTable.CurrentPoint <> nil then
+  begin
+    if not EditTime.IsFocused then
+      if SameValue(WorkTable.CurrentPoint.LimitTime, -1, MinDouble) or
+         SameValue(WorkTable.CurrentPoint.LimitTime, 0, MinDouble)
+         then
+        EditTime.Text := '-'
+      else
+        EditTime.Text := FormatFloat('0.###', WorkTable.CurrentPoint.LimitTime);
+
+    if not EditVolume.IsFocused then
+      if SameValue(WorkTable.CurrentPoint.LimitVolume, -1, MinDouble) then
+        EditVolume.Text := '-'
+      else
+        EditVolume.Text := FormatFloat('0.###', WorkTable.CurrentPoint.LimitVolume);
+
+    if not EditImp.IsFocused then
+      if WorkTable.CurrentPoint.LimitImp = -1 then
+        EditImp.Text := '-'
+      else
+        EditImp.Text := IntToStr(WorkTable.CurrentPoint.LimitImp);
+  end;
+
   if WorkTable.ValueTemperture <> nil then
     LabelTemp.Text := FormatFloat('0.###', WorkTable.ValueTemperture.GetDoubleValue)
   else
@@ -3224,6 +3249,21 @@ begin
     LabelImp.Text := MinImpValue.GetStrValue
   else
     LabelImp.Text := '0';
+
+  if (WorkTable.CurrentPoint <> nil) and (scTime in WorkTable.CurrentPoint.StopCriteria) then
+    Rectangle3.Fill.Color := $FFFEF9C3
+  else
+    Rectangle3.Fill.Color := TAlphaColorRec.White;
+
+  if (WorkTable.CurrentPoint <> nil) and (scVolume in WorkTable.CurrentPoint.StopCriteria) then
+    Rectangle9.Fill.Color := $FFFEF9C3
+  else
+    Rectangle9.Fill.Color := TAlphaColorRec.White;
+
+  if (WorkTable.CurrentPoint <> nil) and (scImpulse in WorkTable.CurrentPoint.StopCriteria) then
+    Rectangle10.Fill.Color := $FFFEF9C3
+  else
+    Rectangle10.Fill.Color := TAlphaColorRec.White;
 
   if WorkTable.ValueFlowRate <> nil then
   begin
@@ -3344,9 +3384,87 @@ begin
 end;
 
 procedure TFrameMainTable.EditTimeExit(Sender: TObject);
+var
+  Value: Double;
+  SC: TSpillageStopCriteria;
 begin
-      //Установленное время
-       FActiveWorkTable.TimeSet:= StrToInt(EditTime.Text);
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.CurrentPoint = nil) then
+    Exit;
+
+  SC := FActiveWorkTable.CurrentPoint.StopCriteria;
+
+  if (Trim(EditTime.Text) = '-') or
+     (TryStrToFloat(EditTime.Text, Value) and SameValue(Value, -1, MinDouble)) or
+     (TryStrToFloat(EditTime.Text, Value) and SameValue(Value, 0, MinDouble))
+     then
+  begin
+    FActiveWorkTable.CurrentPoint.LimitTime := -1;
+    Exclude(SC, scTime);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    EditTime.Text:='-';
+    Exit;
+  end;
+
+  if TryStrToFloat(EditTime.Text, Value) then
+  begin
+    FActiveWorkTable.CurrentPoint.LimitTime := Value;
+    Include(SC, scTime);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+  end;
+end;
+
+procedure TFrameMainTable.EditVolumeExit(Sender: TObject);
+var
+  Value: Double;
+  SC: TSpillageStopCriteria;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.CurrentPoint = nil) then
+    Exit;
+
+  SC := FActiveWorkTable.CurrentPoint.StopCriteria;
+
+  if (Trim(EditVolume.Text) = '-') or
+     (TryStrToFloat(EditVolume.Text, Value) and SameValue(Value, -1, MinDouble)) then
+  begin
+    FActiveWorkTable.CurrentPoint.LimitVolume := -1;
+    Exclude(SC, scVolume);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    Exit;
+  end;
+
+  if TryStrToFloat(EditVolume.Text, Value) then
+  begin
+    FActiveWorkTable.CurrentPoint.LimitVolume := Value;
+    Include(SC, scVolume);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+  end;
+end;
+
+procedure TFrameMainTable.EditImpExit(Sender: TObject);
+var
+  Value: Integer;
+  SC: TSpillageStopCriteria;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.CurrentPoint = nil) then
+    Exit;
+
+  SC := FActiveWorkTable.CurrentPoint.StopCriteria;
+
+  if (Trim(EditImp.Text) = '-') or
+     (TryStrToInt(EditImp.Text, Value) and (Value = -1)) then
+  begin
+    FActiveWorkTable.CurrentPoint.LimitImp := -1;
+    Exclude(SC, scImpulse);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    Exit;
+  end;
+
+  if TryStrToInt(EditImp.Text, Value) then
+  begin
+    FActiveWorkTable.CurrentPoint.LimitImp := Value;
+    Include(SC, scImpulse);
+    FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+  end;
 end;
 
 procedure TFrameMainTable.EditPresCanFocus(Sender: TObject;

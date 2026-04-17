@@ -7,6 +7,7 @@ uses
   frmMainTable,
   UnitBaseProcedures,
   UnitWorkTable,
+  UnitClasses,
   UnitDataManager,
   System.UITypes,
   System.SysUtils, System.Classes, FMX.Types, FMX.Controls,  System.Generics.Collections, FMX.Forms, FMX.TabControl,
@@ -593,6 +594,11 @@ var
   WorkTable: TWorkTable;
   Pump: tPump;
   FlowRate: TFlowRate;
+  LimitReached: Boolean;
+  HasLimits: Boolean;
+  CurrentImp: Double;
+  CurrentVolume: Double;
+  I: Integer;
 begin
  if FWorkTableManager.WorkTables.Count=0 then
   exit;
@@ -655,7 +661,30 @@ begin
      begin
        UpdateRandomSignals(WorkTable);
 
-       if WorkTable.Time = WorkTable.TimeSet then
+       CurrentImp := 0;
+       for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+       begin
+         if (WorkTable.EtalonChannels[I] = nil) or (not WorkTable.EtalonChannels[I].Enabled) then
+           Continue;
+
+         CurrentImp := Max(CurrentImp, WorkTable.EtalonChannels[I].ImpResult);
+       end;
+
+       CurrentVolume := 0;
+       if WorkTable.ValueQuantity <> nil then
+         CurrentVolume := WorkTable.ValueQuantity.GetDoubleValue;
+
+       HasLimits := (WorkTable.CurrentPoint <> nil) and
+         (((scTime in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitTime > 0)) or
+          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitImp > 0)) or
+          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitVolume > 0)));
+
+       LimitReached := (WorkTable.CurrentPoint <> nil) and
+         (((scTime in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.Time >= WorkTable.CurrentPoint.LimitTime)) or
+          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and (CurrentImp >= WorkTable.CurrentPoint.LimitImp)) or
+          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and (CurrentVolume >= WorkTable.CurrentPoint.LimitVolume)));
+
+       if HasLimits and LimitReached then
           WorkTable.State := STATE_STOPTEST;
      end;
 
