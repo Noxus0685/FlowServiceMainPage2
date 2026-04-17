@@ -473,7 +473,8 @@ function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
 var
   WorkTable: TWorkTable;
   FlowRate, Coef, ImpSec: Double;
-  EtalonChannel: TChannel;
+
+  i:integer;
 begin
   Result := 0;
 
@@ -481,17 +482,22 @@ begin
   if WorkTable = nil then
     Exit;
 
-  EtalonChannel := nil;
-  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
-    EtalonChannel := AEtalonChannels[0]
-  else if WorkTable.EtalonChannels.Count > 0 then
-    EtalonChannel := WorkTable.EtalonChannels[0];
 
-  if EtalonChannel = nil then
-    Exit;
+
+
+  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
+    for I := 0 to AEtalonChannels.Count - 1 do
+      Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
+  else if AEtalonChannels=nil then
+      Coef := GetChannelFlowCoef(AEtalonChannels[0]);
 
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  Coef := GetChannelFlowCoef(EtalonChannel);
+
+
+
+  //for I := 0 to AEtalonChannels.Count - 1 do
+ // Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i]);
+
   if Coef <= 0 then
     Exit;
   if AFlowRate<>0 then
@@ -537,13 +543,16 @@ begin
           if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
             EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
+             if EnabledEtalonChannels.Count>1 then
+             i:=1;
+
             IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4)
             else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
             else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
-              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
-            // FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum((AFlowRate.Value.Value-1);
+             //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
 
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
