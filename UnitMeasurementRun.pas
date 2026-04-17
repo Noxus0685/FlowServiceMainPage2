@@ -116,6 +116,7 @@ uses
   System.StrUtils,
   System.IniFiles,
   System.Variants,
+
   UnitProtocols;
 
 type
@@ -681,13 +682,13 @@ begin
     Exit;
 
   if (FWorkTable.FlowRate <> nil) and (GetCurrentPoint.Q>=0)  then
-    Result := Result and FWorkTable.FlowRate.IsStable(ParamStatus);
+  //  Result := Result and FWorkTable.FlowRate.IsStable(ParamStatus);
 
   if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp>0) then
-    Result := Result and FWorkTable.FluidTemp.IsStable(ParamStatus);
+//    Result := Result and FWorkTable.FluidTemp.IsStable(ParamStatus);
 
   if (FWorkTable.FluidPress <> nil) and  (GetCurrentPoint.Pressure>0) then
-    Result := Result and FWorkTable.FluidPress.IsStable(ParamStatus);
+//    Result := Result and FWorkTable.FluidPress.IsStable(ParamStatus);
 end;
 
 function TMeasurementRun.IsTerminated: Boolean;
@@ -707,9 +708,9 @@ begin
     ManualPoint := TDevicePoint.Create(0);
     ManualPoint.FlowRate := 1; //FManualFlowRate;
 
-    if FWorkTable.FlowRate.ValueSet>=0 then
+    if (FWorkTable.FlowRate.ValueSet.Value>=0) then
     begin
-       ManualPoint.Q := FWorkTable.FlowRate.ValueSet;
+       ManualPoint.Q := FWorkTable.FlowRate.ValueSet.Value;
     end else
     begin
        ManualPoint.Q := -1;
@@ -717,8 +718,8 @@ begin
 
        ManualPoint.Q := -1;
 
-    ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet;
-    ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet;
+    ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet.Value;
+    ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet.Value;
     if FWorkTable.CurrentPoint <> nil then
     begin
       ManualPoint.LimitTime := FWorkTable.CurrentPoint.LimitTime;

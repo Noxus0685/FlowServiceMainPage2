@@ -1463,6 +1463,47 @@ begin
     EnsureDescription(FTableFlow.ValueCurrent, 'Токовый сигнал стола');
   end;
 
+   if FlowRate.Value = nil then
+  begin
+    FlowRate.Value := TMeterValue.Create('', Name);
+    FlowRate.Value.SetAsVolumeFlow;
+    EnsureDescription(FlowRate.Value, 'Расход');
+  end;
+    if FluidTemp.Value = nil then
+  begin
+    FluidTemp.Value := TMeterValue.Create('', Name);
+    FluidTemp.Value.SetAsAirTemp;
+    EnsureDescription(FluidTemp.Value, 'Температура');
+  end;
+
+    if FluidPress.Value = nil then
+  begin
+    FluidPress.Value := TMeterValue.Create('', Name);
+    FluidPress.Value.SetAsPressure;
+    EnsureDescription(FluidPress.Value, 'Давление');
+  end;
+
+    if FlowRate.Valueset = nil then
+  begin
+    FlowRate.Valueset := TMeterValue.Create('', Name);
+    FlowRate.Valueset.SetAsVolumeFlow;
+    EnsureDescription(FlowRate.Valueset, 'Установленный расход');
+  end;
+    if FluidTemp.Valueset = nil then
+  begin
+    FluidTemp.Valueset := TMeterValue.Create('', Name);
+    FluidTemp.Valueset.SetAsAirTemp;
+    EnsureDescription(FluidTemp.Valueset, 'Установленная температура');
+  end;
+
+    if FluidPress.Valueset = nil then
+  begin
+    FluidPress.Valueset := TMeterValue.Create('', Name);
+    FluidPress.Valueset.SetAsPressure;
+    EnsureDescription(FluidPress.Valueset, 'Установленное давление');
+  end;
+
+
   // Настраиваем вычислительные связи для всех инициализированных значений.
   FTableFlow.ValueMassFlow.ValueCorrection := nil;
   FTableFlow.ValueMassFlow.ValueBaseMultiplier := FTableFlow.ValueImp;
@@ -1521,7 +1562,7 @@ end;
 function TWorkTable.GetFlowRate: Double;
 begin
   if FlowRate <> nil then
-    Result := FlowRate.Value
+    Result := FlowRate.Value.Value
   else
     Result := FlowRate.Min;
 end;
@@ -1827,7 +1868,7 @@ end;
 function TWorkTable.GetTemp: Double;
 begin
   if FFluidTemp <> nil then
-    Result := FFluidTemp.Value
+    Result := FFluidTemp.Value.Value
   else
     Result := 0;
 end;
@@ -1843,7 +1884,7 @@ end;
 function TWorkTable.GetPress: Double;
 begin
   if FFluidPress <> nil then
-    Result := FFluidPress.Value
+    Result := FFluidPress.Value.Value
   else
     Result := 0;
 end;
@@ -2154,11 +2195,11 @@ begin
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
       Ini.WriteString(Section, 'Text', WorkTable.Text);
-      Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value);
+      Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value.Value);
       Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
      // Ini.WriteFloat(Section, 'Press', WorkTable.Press);
       Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
-      Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value);
+      Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value.Value);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
       if WorkTable.CurrentPoint <> nil then
@@ -2269,11 +2310,11 @@ begin
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-      WorkTable.FluidTemp.Value := S2F(Ini.ReadString(Section, 'Temp', '0'));
+      //WorkTable.FluidTemp.Value.Value := S2F(Ini.ReadString(Section, 'Temp', '0'));
       WorkTable.TempDelta := S2F(Ini.ReadString(Section, 'TempDelta','0'));
       //WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
       WorkTable.PressDelta := S2F(Ini.ReadString(Section, 'PressDelta','0'));
-      WorkTable.FlowRate.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
+     // WorkTable.FlowRate.Value.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
       WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
       WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
       if WorkTable.CurrentPoint <> nil then
@@ -2351,7 +2392,7 @@ begin
       WorkTable.ValueTempertureBefore.SetValue(21);
       WorkTable.ValueTempertureAfter.SetValue(21);
 
-      WorkTable.FluidTemp.Value := 21;
+      WorkTable.FluidTemp.Value.Value := 21;
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
