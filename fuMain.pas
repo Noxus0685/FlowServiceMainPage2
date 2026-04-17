@@ -301,7 +301,7 @@ end;
 procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double;
-  StableStatus: TStableInfo;
+  StableStatus: RStableInfo;
 begin
   if AWorkTable = nil then
     Exit;
@@ -587,24 +587,12 @@ begin
             if (WorkTable.EtalonChannels[I] <> nil) and (WorkTable.EtalonChannels[I].Enabled) then
               EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
-
-          for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-              if  not(WorkTable.DeviceChannels[I].Enabled) then
-                WorkTable.DeviceChannels[i].ImpResult:=0;
-
-
               IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
-              begin
-               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4);
-               AFlowRate.Action := ACTION_STOP;
-              end
+               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4)
               else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
                 FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
               else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
                 FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
-               //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
-
-
 
               FFrameMainTable.ApplyChannelValues(
                 EnabledEtalonChannels,
@@ -652,10 +640,19 @@ begin
 
     CurDelta := (Random * 0.06) - 0.03;
     ImpDelta := Random(11) - 5;
+    if Channel.Enabled then
+    begin
+      Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
+      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    end
+    else
+    begin
+      Channel.CurSec :=0;
+      Channel.ImpSec := 0;
+      Channel.ImpResult := 0;
+    end;
 
-    Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-    Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
-    Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
   end;
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
@@ -666,10 +663,18 @@ begin
 
     CurDelta := (Random * 0.6) - 0.3;
     ImpDelta := Random(11) - 5;
-
-    Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-    Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
-    Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+        if Channel.Enabled then
+    begin
+      Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
+      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    end
+    else
+    begin
+      Channel.CurSec :=0;
+      Channel.ImpSec := 0;
+      Channel.ImpResult := 0;
+    end;
   end;
 end;
 
@@ -723,8 +728,8 @@ begin
     STATE_STARTMONITORWAIT:
       WorkTable.State := STATE_MONITOR;
 
-   // STATE_MONITOR:
-       //UpdateRandomSignals(WorkTable);
+    STATE_MONITOR:
+       UpdateRandomSignals(WorkTable);
 
     STATE_STOPMONITOR,
     STATE_CONFIGED:

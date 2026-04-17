@@ -50,7 +50,7 @@ type
     ssFail_NN   // no stable, no target
   );
 
-  TStableInfo = record
+  RStableInfo = record
     Status: EStableStatus;
     StatusText: string;
     CurrentValue: Double;
@@ -92,7 +92,7 @@ TParameter = class(TObject)
     procedure SetParam(Avalue: Double);
   public
     constructor Create(const AName, AHint: string); virtual;
-    function IsStable(out AStableInfo: TStableInfo): Boolean;
+    function IsStable(out AStableInfo: RStableInfo): Boolean;
     function GetStatusAsString: string;
     procedure Stop;
     procedure Start;
@@ -546,7 +546,7 @@ begin
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStop', 'Parameter stopped', FName);
 end;
 
-function TParameter.IsStable(out AStableInfo: TStableInfo): Boolean;
+function TParameter.IsStable(out AStableInfo: RStableInfo): Boolean;
 var
   IsTargetReached: Boolean;
   HasStabilization: Boolean;
@@ -723,7 +723,7 @@ end;
 
 function TParameter.GetIsChanging: Boolean;
 var
-  AStableInfo: TStableInfo;
+  AStableInfo: RStableInfo;
 begin
   Result :=  (FValueSet.Value<>FValue.Value) and not(IsStable(AStableInfo));
 end;

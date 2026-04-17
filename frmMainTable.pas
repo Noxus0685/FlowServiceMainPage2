@@ -1316,7 +1316,7 @@ end;
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
-StableStatus: TStableInfo;
+StableStatus: RStableInfo;
 begin
 
   if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
@@ -4494,7 +4494,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   AMax:Double;
-  StableStatus: TStableInfo;
+  StableStatus: RStableInfo;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4531,6 +4531,7 @@ if WorkTable.FlowRate.IsRunning then
   end
   else
   begin
+
     RectangleLabelFR.Fill.Color := TAlphaColorRec.White
   end;
 
@@ -4545,7 +4546,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   ATempSet,APressSet: string;
-  TempStableStatus, PressStableStatus: TStableInfo;
+  TempStableStatus, PressStableStatus: RStableInfo;
 begin
     WorkTable := FActiveWorkTable;
 

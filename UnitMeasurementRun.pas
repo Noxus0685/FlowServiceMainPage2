@@ -680,7 +680,7 @@ end;
 
 function TMeasurementRun.IsStable: Boolean;
 var
-  ParamStatus: TStableInfo;
+  ParamStatus: RStableInfo;
 begin
   Result := True;
 
