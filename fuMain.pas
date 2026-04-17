@@ -511,11 +511,12 @@ end;
 
 procedure TFormMain.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
 var
+  Flow: Double;
   FlowRate: Double;
-  Step: Double;
-  Delta: Double;
   WorkTable:TWorkTable;
+  i:integer;
   EnabledEtalonChannels: TObjectList<TChannel>;
+  AValue:Double;
 begin
   if AFlowRate = nil then
     Exit;
@@ -529,6 +530,7 @@ begin
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
+    Flow := (Random * 10);
     if WorkTable=nil then
     exit;
 
@@ -541,16 +543,16 @@ begin
           if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
             EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
-            Delta := AFlowRate.ValueSet.Value - AFlowRate.Value.Value;
-            if Abs(Delta) < 0.001 then
-              FlowRate := AFlowRate.ValueSet.Value
-            else
-            begin
-              // Плавно приближаемся к уставке без «прогрессии»:
-              // шаг 10% от расхождения, но не меньше 0.1 и не больше самого расхождения.
-              Step := Min(Abs(Delta), Max(0.1, Abs(Delta) * 0.1));
-              FlowRate := AFlowRate.Value.Value + Sign(Delta) * Step;
-            end;
+             if EnabledEtalonChannels.Count>1 then
+             i:=1;
+
+            IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
+             FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4)
+            else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
+            else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum((AFlowRate.Value.Value-1);
+             //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
 
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
