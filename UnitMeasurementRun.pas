@@ -204,7 +204,7 @@ type
     FForceNextPoint: Integer;
     FAttempt: Integer;
     FMaxAttemptCount: Integer;
-    FMeasureTimeoutMs: Cardinal;
+    FMeasureTimeout: Cardinal;
 
     FOnStateChangedFrame: TMeasurementRunStateChangedEvent;
     FOnStateChangedMain: TMeasurementRunStateChangedEvent;
@@ -226,7 +226,7 @@ type
     function SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function BuildPointSelectionLog(APoint: TDevicePoint): string;
     function BuildEtalonSelectionLog(APoint: TDevicePoint): string;
-    function CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
+    function CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
 
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
@@ -471,7 +471,7 @@ begin
   FForceNextPoint := -1;
   FMaxAttemptCount := 3;
   FAttempt := 0;
-  FMeasureTimeoutMs := 0;
+  FMeasureTimeout := 0;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -577,7 +577,7 @@ begin
       begin
         if FWorkTable <> nil then
           FWorkTable.StartTest;
-        FMeasureTimeoutMs := CalcMeasureTimeoutMs(GetCurrentPoint);
+        FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
         FireEvent(meMeasureStarted);
       end;
     msResultsRead:
@@ -1038,24 +1038,32 @@ begin
     AError := BuildError(1101, 'Эталон по расходу не найден');
 end;
 
-function TMeasurementRun.CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
+function TMeasurementRun.CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
 var
   TimeByLimit: Double;
-  Q: Double;
 begin
-  Result := 70000;
+  Result := 3600;
   if APoint = nil then
     Exit;
 
-  Q := Max(APoint.Q, 0.000001);
-  TimeByLimit := APoint.LimitTime;
-  if APoint.LimitVolume > 0 then
-    TimeByLimit := Max(TimeByLimit, APoint.LimitVolume / Q);
-  if APoint.LimitImp > 0 then
-    TimeByLimit := Max(TimeByLimit, APoint.LimitImp / Q);
+  TimeByLimit := 0;
+
+  if scTime in APoint.StopCriteria then
+    TimeByLimit := Max(TimeByLimit, APoint.LimitTime);
+
+  if APoint.Q > 0 then
+  begin
+    if (scVolume in APoint.StopCriteria) and (APoint.LimitVolume > 0) then
+      TimeByLimit := Max(TimeByLimit, APoint.LimitVolume / APoint.Q);
+
+    if (scImpulse in APoint.StopCriteria) and (APoint.LimitImp > 0) then
+      TimeByLimit := Max(TimeByLimit, APoint.LimitImp / APoint.Q);
+  end;
+
   if TimeByLimit <= 0 then
-    TimeByLimit := 60;
-  Result := Round((TimeByLimit + 10) * 1000);
+    TimeByLimit := 3600;
+
+  Result := Round(TimeByLimit + 10);
 end;
 
 procedure TMeasurementRun.Process;
@@ -1178,7 +1186,7 @@ begin
           Exit;
         end;
 
-        if (TThread.GetTickCount64 - FWaitStartedTick) > FMeasureTimeoutMs then
+        if (TThread.GetTickCount64 - FWaitStartedTick) > (UInt64(FMeasureTimeout) * 1000) then
         begin
           FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
           SetStage(msDone);
