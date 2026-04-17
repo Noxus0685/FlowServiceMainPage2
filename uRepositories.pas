@@ -1,12 +1,12 @@
-﻿unit UnitRepositories;
+﻿unit uRepositories;
 
 
 interface
 uses
-  uData,
-  UnitClasses,
-  UnitDeviceClass,
-  UnitBaseProcedures,
+  uTable_Data,
+  uClasses,
+  uDeviceClass,
+  uBaseProcedures,
   System.Classes,
   System.SysUtils,    System.DateUtils,
   System.Generics.Collections,

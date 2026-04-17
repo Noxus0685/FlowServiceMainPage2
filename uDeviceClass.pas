@@ -1,12 +1,12 @@
-﻿unit UnitDeviceClass;
+﻿unit uDeviceClass;
 
 interface
 
  uses
-     UnitClasses,
+    uClasses,
     System.Generics.Defaults, System.DateUtils,     System.Math,
-    System.Generics.Collections,    System.StrUtils,    UnitBaseProcedures,
-  System.SysUtils, UnitMeterValue;
+    System.Generics.Collections,    System.StrUtils,    uBaseProcedures,
+    System.SysUtils, uMeterValue;
 
 
 
@@ -527,8 +527,8 @@ type
 
 implementation
 uses
-  UnitDataManager,
-  UnitRepositories;
+  uDataManager,
+  uRepositories;
 
 procedure MarkDeviceAndRepositoryModified(const ADeviceUUID: string);
 var

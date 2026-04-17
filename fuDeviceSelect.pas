@@ -3,9 +3,9 @@
 interface
 
 uses
-  UnitClasses, UnitDeviceClass, UnitRepositories,
-  UnitBaseProcedures,
-  UnitDataManager,
+  uClasses, uDeviceClass, uRepositories,
+  uBaseProcedures,
+  uDataManager,
 
   fuDeviceEdit,
 

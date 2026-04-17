@@ -1,20 +1,20 @@
-﻿unit fuMain;
+﻿unit fuTable_Main;
 
 interface
 
 uses
   frmProceed,
   frmMainTable,
-  UnitBaseProcedures,
-  UnitWorkTable,
-  UnitClasses,
-  UnitDataManager,
+  uBaseProcedures,
+  uWorkTable,
+  uClasses,
+  uDataManager,
   System.UITypes,
   System.SysUtils, System.Classes, FMX.Types, FMX.Controls,  System.Generics.Collections, FMX.Forms, FMX.TabControl,
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
-  FMX.EditBox, FMX.SpinBox,UnitParameter;
+  FMX.EditBox, FMX.SpinBox,uParameter;
 
 type
   TFormMain = class(TForm)
@@ -474,7 +474,6 @@ begin
   else  if (AWorkTable.FluidPress.Action = ACTION_STOP) then
     AWorkTable.FluidPress.Status:=PARAM_STOPPED;
 
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
   begin
 

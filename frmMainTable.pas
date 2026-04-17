@@ -4,7 +4,7 @@ interface
 
 uses
   fuDeviceSelect,
-  UnitParameter,
+  uParameter,
   fuTypeSelect,
   fuDeviceEdit,
   fuMeterValues,
@@ -14,16 +14,16 @@ uses
   frmMRResults,
   frmProtocol,
   frmFlowMeterProperties,
-  UnitProtocols,
-  UnitDataManager,
-  UnitMeterValue,
-  UnitDeviceClass,
-  UnitFlowMeter,
-  UnitClasses,
-  UnitRepositories,
-  UnitWorkTable,
-  UnitBaseProcedures,
-  UnitMeasurementRun,
+  uProtocols,
+  uDataManager,
+  uMeterValue,
+  uDeviceClass,
+  uFlowMeter,
+  uClasses,
+  uRepositories,
+  uWorkTable,
+  uBaseProcedures,
+  uMeasurementRun,
 
   System.Math, System.Generics.Collections, System.SysUtils, System.Types,
   System.UITypes, System.Classes, System.Variants,
@@ -579,7 +579,7 @@ implementation
 {$R *.fmx}
 
 uses
-  fuMain;
+  fuTable_Main;
 
 
 const

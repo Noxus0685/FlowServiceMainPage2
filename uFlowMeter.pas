@@ -1,18 +1,18 @@
-﻿unit UnitFlowMeter;
+﻿unit uFlowMeter;
 
 interface
 
 uses
-  UnitBaseProcedures,
-  UnitClasses,
+  uBaseProcedures,
+  uClasses,
 
 
   System.SysUtils,
   System.Classes,
   System.JSON,
   System.Generics.Collections,
-  UnitDeviceClass,
-  UnitMeterValue;
+  uDeviceClass,
+  uMeterValue;
 
 const
   XMLVERFLOWMETERS = '5.0';
@@ -412,8 +412,8 @@ end;
 implementation
 
 uses
-  UnitDataManager,
-  UnitRepositories;
+  uDataManager,
+  uRepositories;
 
 { TFlowMeter }
 

@@ -4,9 +4,7 @@ interface
 
 uses
 
-  UnitDataManager, UnitClasses,UnitRepositories, UnitBaseProcedures, UnitDeviceClass,
-
-
+  uDataManager, uClasses,uRepositories, uBaseProcedures, uDeviceClass,
   System.Math, System.DateUtils,
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, System.Rtti,

@@ -1,20 +1,20 @@
-﻿unit UnitParameter;
+﻿unit uParameter;
 
 interface
 
 uses
- UnitBaseProcedures,
-  UnitRepositories,
-  UnitFlowMeter,
-  UnitMeterValue,
-  UnitClasses, UnitDeviceClass,
-  UnitDataManager,
+  uBaseProcedures,
+  uRepositories,
+  uFlowMeter,
+  uMeterValue,
+  uClasses, uDeviceClass,
+  uDataManager,
   System.SysUtils,
   System.Math,
   System.StrUtils,
   System.IniFiles,
   System.Generics.Collections,
-  UnitProtocols
+  uProtocols
 
 
   ;
@@ -161,7 +161,7 @@ end;
 
 implementation
 
-uses UnitWorkTable;
+uses uWorkTable;
 
 
 

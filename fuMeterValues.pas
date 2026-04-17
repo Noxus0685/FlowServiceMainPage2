@@ -8,7 +8,7 @@ uses
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
   FMX.Controls.Presentation, FMX.StdCtrls, FMX.TabControl, FMX.Edit,
   FMX.Layouts, FMX.Objects, FMX.Grid, FMX.Grid.Style, FMX.ScrollBox,
-  UnitMeterValue, System.Rtti, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart;
+  uMeterValue, System.Rtti, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart;
 
 type
   TFormMeterValues = class(TForm)

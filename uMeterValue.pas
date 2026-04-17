@@ -1,4 +1,4 @@
-﻿unit UnitMeterValue;
+﻿unit uMeterValue;
 
 interface
 
@@ -284,7 +284,7 @@ type
 implementation
 
 uses
-  UnitBaseProcedures,FmxHelper;
+  uBaseProcedures,FmxHelper;
 
 { Initializes class-level collections used to store all meter value instances. }
 class constructor TMeterValue.CreateClass;

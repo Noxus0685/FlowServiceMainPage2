@@ -1,13 +1,13 @@
-﻿unit UnitDataManager;
+﻿unit uDataManager;
 
 interface
 
 uses
-  UnitBaseProcedures,
-  uDATA,
-  UnitClasses,
-  UnitDeviceClass,
-  UnitRepositories,
+  uBaseProcedures,
+  uTable_DATA,
+  uClasses,
+  uDeviceClass,
+  uRepositories,
   System.IniFiles,
   System.Classes,
   System.SysUtils,    System.DateUtils,

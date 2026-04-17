@@ -374,21 +374,21 @@ object FrameProceed: TFrameProceed
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            585s
+            606s
             348s
-            585s
+            606s
             348s
-            585s
+            606s
             348s
-            585s)
+            606s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 71.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -398,7 +398,7 @@ object FrameProceed: TFrameProceed
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 585.000000000000000000
+              Size.Height = 606.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -447,8 +447,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 65.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -480,8 +480,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 73.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -495,8 +495,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 61.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0

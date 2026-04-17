@@ -3,12 +3,12 @@
 interface
 
 uses
-  UnitMeasurementRun,
-  UnitWorkTable,
-  UnitDeviceClass,
-  UnitClasses,
-  UnitBaseProcedures,
-  UnitObservable,
+  uMeasurementRun,
+  uWorkTable,
+  uDeviceClass,
+  uClasses,
+  uBaseProcedures,
+  uObservable,
 
     System.Types,
 
