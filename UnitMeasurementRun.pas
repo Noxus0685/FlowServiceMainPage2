@@ -437,6 +437,7 @@ begin
   ATarget.Pressure := Max(ATarget.Pressure, ASource.Pressure);
   ATarget.FlowAccuracy := GetMostStrictAccuracy(ATarget.FlowAccuracy, ASource.FlowAccuracy);
   ATarget.TempAccuracy := GetMostStrictAccuracy(ATarget.TempAccuracy, ASource.TempAccuracy);
+  ATarget.Error := Min(ATarget.Error, ASource.Error);
 end;
 
 { TMeasurementRun }
@@ -516,7 +517,7 @@ begin
     end;
 
     if Details.Count = 0 then
-      Exit('Эталоны по расходу не найдены');
+      Exit('Эталоны по расходу'  +FWorkTable.TableFlow.ValueFlowRate.GetStrNum(APoint.Q) + ' '+FWorkTable.TableFlow.ValueFlowRate.GetDimName+   ' не найдены');
 
     DetailsText := Trim(StringReplace(Details.Text, sLineBreak, '; ', [rfReplaceAll]));
     if EndsText(';', DetailsText) then
@@ -1028,8 +1029,22 @@ begin
     AError := BuildError(1100, 'Нет точки или рабочего стола для выбора эталона');
     Exit;
   end;
+    //Расход не указан, берем текщие эталоны и текущий расход
+  if (APoint.Q < 0) then
+     begin
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) or (not Channel.Enabled) then
+      Continue;
+
+        Best := Channel;
 
 
+  end;
+
+     end
+   else
 
 
   for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
@@ -1042,15 +1057,25 @@ begin
       if (Best = nil) or (Channel.FlowMeter.FlowMax < Best.FlowMeter.FlowMax) then
         Best := Channel;
     end;
+
+
   end;
 
-  if (APoint.Q <= 0) then
+
+  if (APoint.Q = 0) then
      Best :=  FWorkTable.EtalonChannels[FWorkTable.EtalonChannels.Count - 1];
+
+
 
 
   Result := Best <> nil;
   if not Result then
     AError := BuildError(1101, 'Эталон по расходу не найден');
+
+
+   ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
+            'Выбраны эталоны для точки', BuildEtalonSelectionLog(APoint));
+
 end;
 
 function TMeasurementRun.CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
@@ -1069,7 +1094,7 @@ begin
   if APoint.LimitImp > 0 then
     TimeByLimit := Max(TimeByLimit, APoint.LimitImp / Q);
   if TimeByLimit <= 0 then
-    TimeByLimit := 60;
+    TimeByLimit := 600;
   Result := Round((TimeByLimit + 10) * 1000);
 end;
 
@@ -1187,8 +1212,6 @@ begin
       begin
         if SelectEtalons(Point, Error) then
         begin
-          ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
-            'Выбраны эталоны для точки', BuildEtalonSelectionLog(Point));
           FireEvent(meEtalonSelected);
           SetStage(msSetupPoint);
         end
