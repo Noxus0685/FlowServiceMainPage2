@@ -1,4 +1,4 @@
-object DM: TDM
+object TableDM: TTableDM
   Height = 480
   Width = 640
   object TypesConnection: TFDConnection

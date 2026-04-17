@@ -20,11 +20,11 @@ uses
 
 type
 
-  TManagerTDM = class
+  TManagerTTableDM = class
   private
 
     FIniFileName: string;
-    FDms: TObjectDictionary<string, TDM>;
+    FDms: TObjectDictionary<string, TTableDM>;
 
     FRepositories: TObjectDictionary<string, TObject>;
 
@@ -39,11 +39,11 @@ type
     //Загрузка нужного репозитария  (rkType, rkDevice, rkResults);
 
 
-    function CreateRepository(const AName: string; AKind: TRepositoryKind;ADM: TDM ): TBaseRepository;
+    function CreateRepository(const AName: string; AKind: TRepositoryKind;ADM: TTableDM ): TBaseRepository;
 
 
-    function CreateTypeRepository(const AName: string; ADM: TDM): TTypeRepository;
-    function CreateDeviceRepository(const AName: string; ADM: TDM): TDeviceRepository;
+    function CreateTypeRepository(const AName: string; ADM: TTableDM): TTypeRepository;
+    function CreateDeviceRepository(const AName: string; ADM: TTableDM): TDeviceRepository;
     function MakeUniqueRepositoryName(const ABaseName: string): string;
     function NormalizeRepositoryDbFileName(AKind: TRepositoryKind; const ADbFile: string): string;
 
@@ -91,13 +91,13 @@ type
 
  var
 
-  DataManager: TManagerTDM;
+  DataManager: TManagerTTableDM;
 
 implementation
 
 
-{==== TManagerTDM ==================================}
-constructor TManagerTDM.Create(const AIniFileName: string);
+{==== TManagerTTableDM ==================================}
+constructor TManagerTTableDM.Create(const AIniFileName: string);
 begin
   inherited Create;
 
@@ -109,7 +109,7 @@ begin
   {--------------------------------------------------}
   { Контейнеры DataModule }
   {--------------------------------------------------}
-  FDms := TObjectDictionary<string, TDM>.Create([doOwnsValues]);
+  FDms := TObjectDictionary<string, TTableDM>.Create([doOwnsValues]);
 
   {--------------------------------------------------}
   { Общий контейнер репозиториев (если нужен) }
@@ -178,7 +178,7 @@ begin
 end;
 
 
-function TManagerTDM.NormalizeRepositoryDbFileName(
+function TManagerTTableDM.NormalizeRepositoryDbFileName(
   AKind: TRepositoryKind;
   const ADbFile: string
 ): string;
@@ -207,7 +207,7 @@ begin
 end;
 
 
-procedure TManagerTDM.Load;
+procedure TManagerTTableDM.Load;
 begin
   BuildRepositories(rkType);
   BuildRepositories(rkDevice);
@@ -216,7 +216,7 @@ begin
   LoadRepositories(rkDevice);
 end;
 
-procedure TManagerTDM.Save;
+procedure TManagerTTableDM.Save;
 var
   Ini: TIniFile;
   Repo: TBaseRepository;
@@ -263,7 +263,7 @@ begin
       Ini.WriteString(
         'Repositories',
         Repo.Name,
-        Repo.GetDMFileName
+        Repo.GeTDMFileName
       );
 
       Section := 'Repository.' + Repo.Name;
@@ -280,7 +280,7 @@ begin
       Ini.WriteString(
         'Repositories',
         Repo.Name,
-        Repo.GetDMFileName
+        Repo.GeTDMFileName
       );
 
       Section := 'Repository.' + Repo.Name;
@@ -314,7 +314,7 @@ begin
   end;
 end;
 
-procedure TManagerTDM.BuildRepositories(
+procedure TManagerTTableDM.BuildRepositories(
   AKind: TRepositoryKind
 );
 var
@@ -327,7 +327,7 @@ var
   KindStr: string;
   Kind: TRepositoryKind;
 
-  DM: TDM;
+  DM: TTableDM;
   Repo: TBaseRepository;
 
   Section: string;
@@ -394,7 +394,7 @@ begin
       {--------------------------------------------------}
       { Создаём DataModule }
       {--------------------------------------------------}
-      DM := TDM.Create(DbFile);
+      DM := TTableDM.Create(DbFile);
       try
         DM.OpenDB;
 
@@ -453,10 +453,10 @@ begin
   end;
 end;
 
-function TManagerTDM.CreateRepository(
+function TManagerTTableDM.CreateRepository(
   const AName: string;
   AKind: TRepositoryKind;
-  ADM: TDM
+  ADM: TTableDM
 ): TBaseRepository;
 begin
   if AName = '' then
@@ -476,7 +476,7 @@ begin
   end;
 end;
 
-procedure TManagerTDM.LoadRepositories(
+procedure TManagerTTableDM.LoadRepositories(
   AKind: TRepositoryKind
 );
 var
@@ -538,9 +538,9 @@ begin
 end;
 
 
-function TManagerTDM.CreateTypeRepository(
+function TManagerTTableDM.CreateTypeRepository(
   const AName: string;
-  ADM: TDM
+  ADM: TTableDM
 ): TTypeRepository;
 begin
   if (ADM = nil) or (AName = '') then
@@ -563,9 +563,9 @@ begin
   FActiveTypeRepo := Result;
 end;
 
-function TManagerTDM.CreateDeviceRepository(
+function TManagerTTableDM.CreateDeviceRepository(
   const AName: string;
-  ADM: TDM
+  ADM: TTableDM
 ): TDeviceRepository;
 begin
   if (ADM = nil) or (AName = '') then
@@ -588,14 +588,14 @@ begin
   FActiveDeviceRepo := Result;
 end;
 
-procedure TManagerTDM.AddRepository(
+procedure TManagerTTableDM.AddRepository(
   const AName: string;
   AKind: TRepositoryKind;
   const ADbFile: string
 );
 var
   Ini: TIniFile;
-  DM: TDM;
+  DM: TTableDM;
   Repo: TBaseRepository;
   RepoName: string;
   DbFile: string;
@@ -649,7 +649,7 @@ begin
   {--------------------------------------------------}
   { 2. Создаём DataModule и открываем БД }
   {--------------------------------------------------}
-  DM := TDM.Create(DbFile);
+  DM := TTableDM.Create(DbFile);
   try
     DM.OpenDB;
 
@@ -673,12 +673,12 @@ begin
   end;
 end;
 
-procedure TManagerTDM.RemoveRepository(const AName: string);
+procedure TManagerTTableDM.RemoveRepository(const AName: string);
 var
   Ini: TIniFile;
   Obj: TObject;
   Repo: TBaseRepository;
-  DM: TDM;
+  DM: TTableDM;
 begin
   Repo := nil;
 
@@ -766,18 +766,18 @@ begin
   end;
 end;
 
-function TManagerTDM.GetRepository(const AName: string): TObject;
+function TManagerTTableDM.GetRepository(const AName: string): TObject;
 begin
   Result := FRepositories[AName];
 end;
 
-procedure   TManagerTDM.CloseAll;
+procedure   TManagerTTableDM.CloseAll;
 begin
-  FDms.Clear;         // освобождает все TDM
+  FDms.Clear;         // освобождает все TTableDM
   //FRepositories.Clear;
 end;
 
-function TManagerTDM.MakeUniqueRepositoryName(
+function TManagerTTableDM.MakeUniqueRepositoryName(
   const ABaseName: string
 ): string;
 var
@@ -793,7 +793,7 @@ begin
   end;
 end;
 
-procedure TManagerTDM.SetActiveRepository(
+procedure TManagerTTableDM.SetActiveRepository(
   AKind: TRepositoryKind;
   const AName: string
 );
@@ -841,7 +841,7 @@ end;
 
 
 
-procedure TManagerTDM.SetActiveTypeRepository(const AName: string);
+procedure TManagerTTableDM.SetActiveTypeRepository(const AName: string);
 var
   Repo: TObject;
   Ini: TIniFile;
@@ -878,7 +878,7 @@ begin
   end;
 end;
 
-procedure TManagerTDM.SetActiveDeviceRepository(
+procedure TManagerTTableDM.SetActiveDeviceRepository(
   const AName: string
 );
 var
@@ -903,7 +903,7 @@ end;
 
 
 
-destructor  TManagerTDM.Destroy;
+destructor  TManagerTTableDM.Destroy;
 begin
   CloseAll;
   FDms.Free;
@@ -911,7 +911,7 @@ begin
   inherited;
 end;
 
-function TManagerTDM.Categories: TObjectList<TDeviceCategory>;
+function TManagerTTableDM.Categories: TObjectList<TDeviceCategory>;
 var
   C: TDeviceCategory;
 
@@ -1133,7 +1133,7 @@ begin
   Result := FCategories;
 end;
 
-function TManagerTDM.FindCategoryByID(AID: Integer): TDeviceCategory;
+function TManagerTTableDM.FindCategoryByID(AID: Integer): TDeviceCategory;
 var
   C: TDeviceCategory;
 begin
@@ -1151,7 +1151,7 @@ begin
       Exit(C);
 end;
 
-function TManagerTDM.FindType(
+function TManagerTTableDM.FindType(
   const AUUID, AName: string;
   out ARepo: TTypeRepository
 ): TDeviceType;
@@ -1205,7 +1205,7 @@ begin
   end;
 end;
 
-function TManagerTDM.FindDevice(
+function TManagerTTableDM.FindDevice(
   const AUUID: string;
   out ARepo: TDeviceRepository
 ): TDevice;
@@ -1256,7 +1256,7 @@ begin
 end;
 
 
-function TManagerTDM.FindTypeRepositoryByName(
+function TManagerTTableDM.FindTypeRepositoryByName(
   const AName: string
 ): TTypeRepository;
 var
@@ -1273,7 +1273,7 @@ begin
 end;
 
 
-function TManagerTDM.FindDeviceRepositoryByName(const AName: string): TDeviceRepository;
+function TManagerTTableDM.FindDeviceRepositoryByName(const AName: string): TDeviceRepository;
 var
   Repo: TDeviceRepository;
 begin

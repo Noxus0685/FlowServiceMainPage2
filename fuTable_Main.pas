@@ -17,8 +17,8 @@ uses
   FMX.EditBox, FMX.SpinBox,uParameter;
 
 type
-  TFormMain = class(TForm)
-    TabControlMain: TTabControl;
+  TTableMainForm = class(TForm)
+    tcMain: TTabControl;
     TabItemTable: TTabItem;
     TabItemResults: TTabItem;
     TimerSetValues: TTimer;
@@ -49,7 +49,7 @@ type
     Label5: TLabel;
     mPump: TMemo;
     procedure FormCreate(Sender: TObject);
-    procedure TabControlMainChange(Sender: TObject);
+    procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
@@ -99,13 +99,13 @@ type
   end;
 
 var
-  FormMain: TFormMain;
+  TableMainForm: TTableMainForm;
 
 implementation
 
 {$R *.fmx}
 
-procedure TFormMain.ButtonApplyDeviceValuesClick(Sender: TObject);
+procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
   FlowRate: Double;
@@ -132,7 +132,7 @@ begin
 
 end;
 
-procedure TFormMain.ButtonApplyEtalonValuesClick(Sender: TObject);
+procedure TTableMainForm.ButtonApplyEtalonValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
   FlowRate: Double;
@@ -159,25 +159,24 @@ begin
 
 end;
 
-procedure TFormMain.EditTestNumExit(Sender: TObject);
+procedure TTableMainForm.EditTestNumExit(Sender: TObject);
 begin
  LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
 
 
-procedure  TFormMain.PumpStateHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TTableMainForm.PumpStateHandler(AParameters: TParameter; AAction:EParamAction);
 begin
-
-  FormMain.mPump.Lines.Add('Насос: ' + AParameters.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
+  TableMainForm.mPump.Lines.Add('Насос: ' + AParameters.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
 end;
 
-procedure TFormMain.EditDeviceFlowRateExit(Sender: TObject);
+procedure TTableMainForm.EditDeviceFlowRateExit(Sender: TObject);
 begin
   UpdateDeviceImpSecFromFlowRate;
 end;
 
-procedure TFormMain.EditEtalonFlowRateExit(Sender: TObject);
+procedure TTableMainForm.EditEtalonFlowRateExit(Sender: TObject);
 begin
   UpdateEtalonImpSecFromFlowRate;
 end;
@@ -188,7 +187,7 @@ end;
 
 
 
-procedure  TFormMain.FlowRateStateHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TTableMainForm.FlowRateStateHandler(AParameters: TParameter; AAction:EParamAction);
 var
 FlowRate: Double;
 WorkTable:TWorkTable;
@@ -198,7 +197,7 @@ AValue:Double;
 
 begin
   WorkTable:= FWorkTableManager.ActiveWorkTable;
-  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet.value)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
+  TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet.value)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
   if WorkTable.FlowRate.ValueSet.value>=WorkTable.FlowRate.Value.value then
     WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
   else
@@ -207,23 +206,23 @@ begin
 
 end;
 
-procedure  TFormMain.FlowFluidTempHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TTableMainForm.FlowFluidTempHandler(AParameters: TParameter; AAction:EParamAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
+  TableMainForm.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
 
 end;
 
-procedure  TFormMain.FlowFluidPressHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TTableMainForm.FlowFluidPressHandler(AParameters: TParameter; AAction:EParamAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
+  TableMainForm.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
 
 end;
 
 
 
-procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
+procedure TTableMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
        Self.WindowState := TWindowState.wsMinimized;
        DataManager.Save;
@@ -241,7 +240,7 @@ begin
 
 end;
 
-procedure TFormMain.FormCreate(Sender: TObject);
+procedure TTableMainForm.FormCreate(Sender: TObject);
 var
 i:integer;
 begin
@@ -291,13 +290,13 @@ begin
 
 end;
 
-procedure TFormMain.TabControlMainChange(Sender: TObject);
+procedure TTableMainForm.tcMainChange(Sender: TObject);
 begin
-  if (TabControlMain.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
+  if (tcMain.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
     FFrameProceed.RefreshResultsTab;
 end;
 
-procedure TFormMain.UpdateTemp(const AWorkTable: TWorkTable);
+procedure TTableMainForm.UpdateTemp(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double; // Случайные приращения температуры и давления
   StableStatus: RStableInfo;     // Информация о стабильности параметра
@@ -342,7 +341,7 @@ end;
 
 
 
-procedure TFormMain.UpdateRandomTemp(const AWorkTable: TWorkTable);
+procedure TTableMainForm.UpdateRandomTemp(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double; // Случайные приращения температуры и давления
   StableStatus: RStableInfo;     // Информация о стабильности параметра
@@ -462,7 +461,7 @@ end;
 
 
 
-procedure TFormMain.UpdateRandomPress(const AWorkTable: TWorkTable);
+procedure TTableMainForm.UpdateRandomPress(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double;
 begin
@@ -515,7 +514,7 @@ begin
    end;
 end;
 
-procedure TFormMain.UpdateRandomFreq(const APump: TPump);
+procedure TTableMainForm.UpdateRandomFreq(const APump: TPump);
 var
   Freq: Double;
 begin
@@ -557,7 +556,7 @@ begin
    end;
 end;
 
-function TFormMain.GetChannelFlowCoef(const AChannel: TChannel): Double;
+function TTableMainForm.GetChannelFlowCoef(const AChannel: TChannel): Double;
 begin
   Result := 0.0;
   if (AChannel = nil) or (AChannel.FlowMeter = nil) then
@@ -573,7 +572,7 @@ begin
     Result := AChannel.FlowMeter.Kp;
 end;
 
-procedure TFormMain.UpdateDeviceImpSecFromFlowRate;
+procedure TTableMainForm.UpdateDeviceImpSecFromFlowRate;
 var
   WorkTable: TWorkTable;
   FlowRate, Coef, ImpSec: Double;
@@ -591,7 +590,7 @@ begin
   EditDeviceImpSec.Text := FloatToStr(ImpSec);
 end;
 
-function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
+function TTableMainForm.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
   AEtalonChannels: TObjectList<TChannel> = nil):Double;
 var
   WorkTable: TWorkTable;
@@ -623,7 +622,7 @@ begin
   Result:= ImpSec;
 end;
 
-function TFormMain.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
+function TTableMainForm.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
   const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
   I: Integer;
@@ -644,7 +643,7 @@ begin
   end;
 end;
 
-procedure TFormMain.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+procedure TTableMainForm.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
 var
   Flow: Double;
   FlowRate: Double;
@@ -718,7 +717,7 @@ end;
 
 
 
-procedure TFormMain.UpdateRandomSignals(const AWorkTable: TWorkTable);
+procedure TTableMainForm.UpdateRandomSignals(const AWorkTable: TWorkTable);
 var
   I: Integer;
   Channel: TChannel;
@@ -776,7 +775,7 @@ begin
   end;
 end;
 
-procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
+procedure TTableMainForm.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;   // Текущая рабочая таблица (сессия измерения)
   Pump: tPump;             // Активный насос (исполнитель)

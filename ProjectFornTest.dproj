@@ -309,7 +309,7 @@
         <DCCReference Include="uBaseProcedures.pas"/>
         <DCCReference Include="uDataManager.pas"/>
         <DCCReference Include="fuTable_Main.pas">
-            <Form>FormMain</Form>
+            <Form>TableMainForm</Form>
             <FormType>fmx</FormType>
         </DCCReference>
         <DCCReference Include="uDeviceClass.pas"/>
@@ -322,7 +322,7 @@
             <FormType>fmx</FormType>
         </DCCReference>
         <DCCReference Include="uTable_Data.pas">
-            <Form>DM</Form>
+            <Form>TableDM</Form>
             <FormType>dfm</FormType>
             <DesignClass>TDataModule</DesignClass>
         </DCCReference>

@@ -8,11 +8,11 @@ uses
   fuTypeEditor in 'fuTypeEditor.pas' {FormTypeEditor},
   uBaseProcedures in 'uBaseProcedures.pas',
   uDataManager in 'uDataManager.pas',
-  fuTable_Main in 'fuTable_Main.pas' {FormMain},
+  fuTable_Main in 'fuTable_Main.pas' {TableMainForm},
   uDeviceClass in 'uDeviceClass.pas',
   fuDeviceSelect in 'fuDeviceSelect.pas' {FormDeviceSelect},
   fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor},
-  uTable_Data in 'uTable_Data.pas' {DM: TDataModule},
+  uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
   uClasses in 'uClasses.pas',
   uFlowMeter in 'uFlowMeter.pas',
   fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
@@ -45,7 +45,7 @@ begin
   {--------------------------------------------------}
   { Инициализация менеджера БД и репозиториев }
   {--------------------------------------------------}
-  DataManager:= TManagerTDM.Create(
+  DataManager:= TManagerTTableDM.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
     'Settings\\dbsettings.ini'
   );
@@ -64,7 +64,7 @@ begin
  // Application.CreateForm(TFormDeviceSelect, FormDeviceSelect);
  // Application.CreateForm(TFormTypeSelect, FormTypeSelect);
 //  Application.CreateForm(TFormTypeEditor, FormTypeEditor);
-  Application.CreateForm(TFormMain, FormMain);
+  Application.CreateForm(TTableMainForm, TableMainForm);
   Application.CreateForm(TFormMeterValues, FormMeterValues);
   //  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
 //  Application.CreateForm(TDM, DM);
