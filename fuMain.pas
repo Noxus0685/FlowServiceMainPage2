@@ -86,8 +86,11 @@ type
     procedure UpdateRandomPress(const AWorkTable: TWorkTable);
 
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
-    function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0):Double;
+    function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
+      AEtalonChannels: TObjectList<TChannel> = nil):Double;
     procedure UpdateDeviceImpSecFromFlowRate;
+    function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
+      const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
 
   public
@@ -103,17 +106,25 @@ implementation
 procedure TFormMain.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  FlowRate: Double;
+  ImpSecValues: TArray<Double>;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   UpdateDeviceImpSecFromFlowRate;
+  FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
+  ImpSecValues := BuildImpSecValuesForChannels(
+    WorkTable.DeviceChannels,
+    FlowRate,
+    NormalizeFloatInput(EditDeviceImpSec.Text)
+  );
 
   FFrameMainTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
-    NormalizeFloatInput(EditDeviceImpSec.Text),
+    ImpSecValues,
     NormalizeFloatInput(EditDeviceImpResult.Text)
   );
 
@@ -122,17 +133,25 @@ end;
 procedure TFormMain.ButtonApplyEtalonValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  FlowRate: Double;
+  ImpSecValues: TArray<Double>;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   UpdateEtalonImpSecFromFlowRate;
+  FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
+  ImpSecValues := BuildImpSecValuesForChannels(
+    WorkTable.EtalonChannels,
+    FlowRate,
+    NormalizeFloatInput(EditEtalonImpSec.Text)
+  );
 
   FFrameMainTable.ApplyChannelValues(
     WorkTable.EtalonChannels,
     NormalizeFloatInput(EditEtalonCurSec.Text),
-    NormalizeFloatInput(EditEtalonImpSec.Text),
+    ImpSecValues,
     NormalizeFloatInput(EditEtalonImpResult.Text)
   );
 
@@ -177,11 +196,14 @@ AValue:Double;
 
 begin
   WorkTable:= FWorkTableManager.ActiveWorkTable;
-  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
-  if WorkTable.FlowRate.ValueSet>=WorkTable.FlowRate.Value then
-    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet+random(5))
+  FormMain.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet.Value)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
+
+  if WorkTable.ActivePump.ValueSet.Value = 0  then
+    WorkTable.ActivePump.ValueSet.Value:=12;
+  if WorkTable.FlowRate.ValueSet.Value>=WorkTable.FlowRate.Value.Value then
+    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.Value+random(5))
   else
-    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet-random(5));
+    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.Value-random(5));
   WorkTable.ActivePump.DoPumpStart;
 
 end;
@@ -189,14 +211,14 @@ end;
 procedure  TFormMain.FlowFluidTempHandler(AParameters: TParameter; AAction:EParamAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
+  FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet.Value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
 
 end;
 
 procedure  TFormMain.FlowFluidPressHandler(AParameters: TParameter; AAction:EParamAction);
 begin
 
-  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
+  FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet.Value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
 
 end;
 
@@ -231,7 +253,7 @@ begin
     'Settings\TableSettings.ini'
   );
 
-    FWorkTableManager.Load;
+  FWorkTableManager.Load;
 
   //Подумать над динамической привязкой ко всем столам
     if FWorkTableManager.ActiveWorkTable<>nil then
@@ -254,12 +276,12 @@ begin
   end;
 
 
+
   FFrameMainTable := TFrameMainTable.Create(Self);
   FFrameMainTable.Parent := TabItemTable;
   FFrameMainTable.Align := TAlignLayout.Client;
   FFrameMainTable.WorkTableManager := FWorkTableManager ;
   FFrameMainTable.Initialize;
-
 
 
   FFrameProceed := TFrameProceed.Create(Self);
@@ -279,7 +301,7 @@ end;
 procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double;
-  StableStatus: Boolean;
+  StableStatus: TStableInfo;
 begin
   if AWorkTable = nil then
     Exit;
@@ -301,7 +323,7 @@ begin
 
       if NOT(AWorkTable.FluidTemp.IsStable(StableStatus))
 
-      AND  (AWorkTable.FluidTemp.Value<AWorkTable.FluidTemp.ValueSet)  THEN
+      AND  (AWorkTable.FluidTemp.Value.Value<AWorkTable.FluidTemp.ValueSet.Value)  THEN
       begin
         AWorkTable.FluidTemp.BeforeValue:=AWorkTable.FluidTemp.BeforeValue+1;
         AWorkTable.FluidTemp.AfterValue:=(AWorkTable.FluidTemp.AfterValue+1);
@@ -317,7 +339,7 @@ begin
     end;
 
 
-      if AWorkTable.FluidTemp.ValueSet<>0 then
+      if AWorkTable.FluidTemp.ValueSet.Value<>0 then
       begin
         AWorkTable.FluidTemp.BeforeValue:=(EnsureRange(AWorkTable.FluidTemp.BeforeValue + TempDelta, -50.0, 150.0));
         AWorkTable.FluidTemp.AfterValue:=(EnsureRange(AWorkTable.FluidTemp.AfterValue + TempDelta, -50.0, 150.0));
@@ -354,12 +376,12 @@ begin
     PressDelta :=  (Random * 0.06) - 0.03;
     if (AWorkTable.FluidPress.IsRunning) then
     begin
-      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.ValueSet) then
+      if  (AWorkTable.FluidPress.Value.Value<AWorkTable.FluidPress.ValueSet.Value) then
       begin
         AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue+1);
         AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue+1);
       end
-      else if  (AWorkTable.FluidPress.Value>AWorkTable.FluidPress.ValueSet)  then
+      else if  (AWorkTable.FluidPress.Value.Value>AWorkTable.FluidPress.ValueSet.Value)  then
       begin
         AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue-0.3);
         AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue-0.3);
@@ -367,12 +389,12 @@ begin
 
 
     end;
-      if  (AWorkTable.FluidPress.Value<AWorkTable.FluidPress.ValueSet)  then
+      if  (AWorkTable.FluidPress.Value.Value<AWorkTable.FluidPress.ValueSet.Value)  then
       begin
         AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + 0.1, -50.0, 150.0));
         AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + 0.1, -50.0, 150.0));
       end;
-      if AWorkTable.FluidPress.ValueSet<>0 then
+      if AWorkTable.FluidPress.ValueSet.Value<>0 then
       begin
         AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + PressDelta, -50.0, 150.0));
         AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + PressDelta, -50.0, 150.0));
@@ -414,14 +436,14 @@ begin
    if APump.IsRunning = true then
     begin
 
-      APump.Value:=(EnsureRange(APump.Value + Freq,APump.Value , APump.ValueSet));
+      APump.Value.Value:=(EnsureRange(APump.Value.Value + Freq,APump.Value.Value , APump.ValueSet.Value));
 
 
     end
     else
     begin
       //APump.ValueSet:=(APump.ValueSet);
-      APump.Value:=0;
+      APump.Value.Value:=0;
     end;
 
 
@@ -446,6 +468,27 @@ begin
     Result := AChannel.FlowMeter.Kp;
 end;
 
+function TFormMain.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
+  const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+var
+  I: Integer;
+  Coef: Double;
+begin
+  SetLength(Result, 0);
+  if AChannels = nil then
+    Exit;
+
+  SetLength(Result, AChannels.Count);
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Coef := GetChannelFlowCoef(AChannels[I]);
+    if Coef > 0 then
+      Result[I] := (AFlowRate * Coef) / 3.6
+    else
+      Result[I] := AFallbackImpSec;
+  end;
+end;
+
 procedure TFormMain.UpdateDeviceImpSecFromFlowRate;
 var
   WorkTable: TWorkTable;
@@ -464,17 +507,36 @@ begin
   EditDeviceImpSec.Text := FloatToStr(ImpSec);
 end;
 
-function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0):Double;
+function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
+  AEtalonChannels: TObjectList<TChannel> = nil):Double;
 var
   WorkTable: TWorkTable;
   FlowRate, Coef, ImpSec: Double;
+
+  i:integer;
 begin
+  Result := 0;
+
   WorkTable := FWorkTableManager.WorkTables[0];
-  if (WorkTable = nil) or (WorkTable.EtalonChannels.Count = 0) then
+  if WorkTable = nil then
     Exit;
 
+
+
+
+  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
+    for I := 0 to AEtalonChannels.Count - 1 do
+      Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
+  else if AEtalonChannels=nil then
+      Coef := GetChannelFlowCoef(AEtalonChannels[0]);
+
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
+
+
+
+  //for I := 0 to AEtalonChannels.Count - 1 do
+ // Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i]);
+
   if Coef <= 0 then
     Exit;
   if AFlowRate<>0 then
@@ -493,7 +555,7 @@ var
   WorkTable:TWorkTable;
   i:integer;
   EnabledEtalonChannels: TObjectList<TChannel>;
-  AValue:Double;
+  ImpSecValues: TArray<Double>;
 begin
   if AFlowRate = nil then
     Exit;
@@ -520,18 +582,25 @@ begin
           if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
             EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
-            IF ABS(AFlowRate.Value-AFlowRate.ValueSet)<1 then
-             FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset,4)
-            else IF AFlowRate.Value<AFlowRate.ValueSet then
-              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value+1,4)
-            else if AFlowRate.Value>AFlowRate.ValueSet then
-              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value-1,4);
+             if EnabledEtalonChannels.Count>1 then
+             i:=1;
 
+            IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
+             FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4)
+            else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
+            else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
+             //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
 
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
               NormalizeFloatInput('0'),
-              UpdateEtalonImpSecFromFlowRate(FlowRate),
+              BuildImpSecValuesForChannels(
+                EnabledEtalonChannels,
+                FlowRate,
+                UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+              ),
               NormalizeFloatInput('0')
             );
 

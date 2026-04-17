@@ -539,8 +539,8 @@ type
     procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer);
 
-    procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
-      AImpSec, AImpResult: Double);
+    procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
+      const AImpSecValues: TArray<Double>; const AImpResult: Double);
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
@@ -1316,10 +1316,10 @@ end;
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
-StableStatus: Boolean;
+StableStatus: TStableInfo;
 begin
 
-  if  SameValue(FActiveWorkTable.FlowRate.ValueSet ,SpinBoxFlowRate.Value, MinDouble) then
+  if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
        Exit;
 
   if  (LayoutFlowRate.tag=0) or (LayoutFlowRate.tag=3)  then
@@ -3057,13 +3057,13 @@ begin
   WorkTable.RecalculateAllMeterValues;
 
 
-   WorkTable.FluidTemp.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
-   WorkTable.FluidPress.Value:= WorkTable.ValuePressure.GetDoubleValue;
+   WorkTable.FluidTemp.Value.Value:=  WorkTable.ValueTemperture.GetDoubleValue;
+   WorkTable.FluidPress.Value.Value:= WorkTable.ValuePressure.GetDoubleValue;
    // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
 
 
   //if WorkTable.FlowRate.IsRunning then
-    WorkTable.FlowRate.Value:= WorkTable.ValueFlowRate.GetDoubleValue;    //в value записываем в л/с а выводим в label в м3/ч
+    WorkTable.FlowRate.Value.Value:= WorkTable.ValueFlowRate.GetDoubleValue;    //в value записываем в л/с а выводим в label в м3/ч
   //else
   //  WorkTable.FlowRate.Value:=0;
     {if WorkTable.ValueFlowRate <> nil then
@@ -3170,7 +3170,7 @@ begin
   if WorkTable.ValueTemperture <> nil then
     LabelTemp.Text := FormatFloat('0.###', WorkTable.ValueTemperture.GetDoubleValue)
   else
-    LabelTemp.Text := FormatFloat('0.###', WorkTable.FluidTemp.Value);
+    LabelTemp.Text := FormatFloat('0.###', WorkTable.FluidTemp.Value.Value);
 
  { if WorkTable.ValuePressure <> nil then
     LabelPressure.Text := FormatFloat('0.###', WorkTable.ValuePressure.GetDoubleValue)
@@ -4322,23 +4322,35 @@ begin
  // UpdateGridMesurmentRun;
 end;
 
-procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
-  AImpSec, AImpResult: Double);
+procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
+  const AImpSecValues: TArray<Double>; const AImpResult: Double);
 var
   I: Integer;
   Channel: TChannel;
+  ChannelImpSec,a,b: Double;
 begin
   if AChannels = nil then
     Exit;
+   a:=0;
+    for I := 0 to AChannels.Count-1 do
+      begin
+        a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
+      end;
+
 
   for I := 0 to AChannels.Count - 1 do
   begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
+     b:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( Channel.FlowMeter.Device.Qmax,4)/a;
+    if (Length(AImpSecValues) > I) then
+      ChannelImpSec := AImpSecValues[I]
+    else
+      ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := AImpSec;
+    Channel.ImpSec := ChannelImpSec*b;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
@@ -4434,15 +4446,15 @@ begin
       exit;
 
     if WorkTable.ActivePump <> nil then
-      LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Value)
+      LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Value.Value)
     else
       LabelFreq.Text := '-';
 
-    if (WorkTable.ActivePump.Value = 0) or not (WorkTable.ActivePump.IsRunning) then
+    if (WorkTable.ActivePump.Value.Value = 0) or not (WorkTable.ActivePump.IsRunning) then
        Rectangle1.Fill.Color := TAlphaColorRec.White
-    else if (WorkTable.ActivePump.Value < WorkTable.ActivePump.ValueSet) then
+    else if (WorkTable.ActivePump.Value.Value < WorkTable.ActivePump.ValueSet.Value) then
       Rectangle1.Fill.Color := TAlphaColorRec.Lightyellow
-    else if WorkTable.ActivePump.Value = WorkTable.ActivePump.ValueSet then
+    else if WorkTable.ActivePump.Value.Value = WorkTable.ActivePump.ValueSet.Value then
       Rectangle1.Fill.Color := $ffC9FFC7 ;
 
 
@@ -4455,7 +4467,7 @@ begin
    // if ((SpinBoxFreq.Text='12,00') and (WorkTable.ActivePump.FreqSet <> 0)) or
     // ((SpinBoxFreq.Text <>  '12,00') and (WorkTable.ActivePump.FreqSet = 0))  then
 
-    SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet);
+    SpinBoxFreq.Value:= (WorkTable.ActivePump.ValueSet.Value);
     SpinBoxFreq.Min:= WorkTable.ActivePump.Min;
     SpinBoxFreq.Max:= WorkTable.ActivePump.Max;
 
@@ -4481,7 +4493,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   AMax:Double;
-  StableStatus: Boolean;
+  StableStatus: TStableInfo;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4490,7 +4502,7 @@ begin
 
     //if WorkTable.FlowRate.IsRunning then
       LabelFlowRate.Text :=
-      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value) ;
+      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value.Value) ;
    // else
    //   LabelFlowRate.Text := '0';
   // if LayoutFlowRate.tag = 3 then
@@ -4503,13 +4515,13 @@ begin
       LayoutFlowRate.tag:=2;
       SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);
       SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
-      if WorkTable.FlowRate.ValueSet<>0 then
-        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet);
+      if WorkTable.FlowRate.ValueSet.Value<>0 then
+        SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet.Value);
 
 
 if WorkTable.FlowRate.IsRunning then
   begin
-        if WorkTable.FlowRate.Value = 0 then
+        if WorkTable.FlowRate.Value.Value = 0 then
            RectangleLabelFR.Fill.Color := TAlphaColorRec.White
        ELSE if WorkTable.FlowRate.IsStable(StableStatus) THEN
           RectangleLabelFR.Fill.Color := $ffC9FFC7
@@ -4532,7 +4544,7 @@ var
   WorkTable: TWorkTable;
   i:integer;
   ATempSet,APressSet: string;
-  TempStableStatus, PressStableStatus: Boolean;
+  TempStableStatus, PressStableStatus: TStableInfo;
 begin
     WorkTable := FActiveWorkTable;
 
@@ -4544,63 +4556,43 @@ begin
 
     Layout9.tag:=2;
 
-IF WorkTable.FluidTemp.IsRunning THEN
-  begin
-     if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
-      Rectangle7.Fill.Color := TAlphaColorRec.White
-     ELSE if WorkTable.FluidTemp.IsStable(TempStableStatus)   THEN
-      Rectangle7.Fill.Color := $ffC9FFC7
-     else
-      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
-  end
+  IF WorkTable.FluidTemp.IsRunning and  WorkTable.FluidTemp.IsChanging THEN
+    Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow
+  else if WorkTable.FluidTemp.IsRunning and  not(WorkTable.FluidTemp.IsChanging)  then
+    Rectangle7.Fill.Color := $ffC9FFC7
   else
-  begin
-     if (WorkTable.FluidTemp.ValueSet=0) or (WorkTable.FluidTemp.Value=0) then
-      Rectangle7.Fill.Color := TAlphaColorRec.White
-     else IF not(WorkTable.FluidTemp.IsStable(TempStableStatus)) then
-      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
-  end;
+    Rectangle7.Fill.Color := TAlphaColorRec.White;
 
-IF WorkTable.FluidPress.IsRunning THEN
-  begin
-   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
-
-    Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
+  IF WorkTable.FluidPress.IsRunning and  WorkTable.FluidPress.IsChanging THEN
     Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
-   else
-    Rectangle11.Fill.Color := $ffC9FFC7;
-  end
+  else if WorkTable.FluidPress.IsRunning and  not(WorkTable.FluidPress.IsChanging)  then
+    Rectangle11.Fill.Color := $ffC9FFC7
   else
-  begin
-   if (WorkTable.FluidPress.ValueSet=0) or (WorkTable.FluidPress.Value=0 )  then
-    Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
-    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
-
-  end;
+    Rectangle11.Fill.Color := TAlphaColorRec.White;
 
 
-    APressset:= WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet);
-    ATempset:= WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet);
+
+
+    APressset:= WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet.Value);
+    ATempset:= WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet.Value);
 
     if LayoutConditions.tag<>3 then
     begin
       if  SameValue(NormalizeFloatInput(EditTemp.Text) , NormalizeFloatInput(ATempset ), MinDouble)
       or (NormalizeFloatInput(EditTemp.Text) = 0) or (EditTemp.Text <> ATempset) then
-      EditTemp.Text := WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet) ;
+      EditTemp.Text := WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.ValueSet.Value) ;
 
 
       if  SameValue(NormalizeFloatInput(EditPres.Text) , NormalizeFloatInput(APressSet ), MinDouble)
       or (NormalizeFloatInput(EditPres.Text) = 0) or (EditPres.Text <> APressSet)  then
-        EditPres.Text := WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet);
+        EditPres.Text := WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet.Value);
     end;
 
     LabelTemp.text:=
-    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value,WorkTable.ValueTemperture.CurrentDimIndex);
+    WorkTable.ValueTemperture.GetStrNum(WorkTable.FluidTemp.Value.Value,WorkTable.ValueTemperture.CurrentDimIndex);
 
     LabelPressure.text:=
-    WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.Value,WorkTable.ValuePressure.CurrentDimIndex);
+    WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.Value.Value,WorkTable.ValuePressure.CurrentDimIndex);
 
 
 

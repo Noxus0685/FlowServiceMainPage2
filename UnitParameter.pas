@@ -39,6 +39,25 @@ type
 
 type
 
+  EStableStatus = (
+    ssNONE,
+    ssRun_NN,   // no target, no stable
+    ssRun_SN,   // stable, no target
+    ssRun_NS,   // no stable, target
+    ssOk,       // done + stable
+    ssFail_SN,  // stable, no target
+    ssFail_NS,  // no stable, target
+    ssFail_NN   // no stable, no target
+  );
+
+  TStableInfo = record
+    Status: EStableStatus;
+    StatusText: string;
+    CurrentValue: Double;
+  end;
+
+type
+
 TParameter = class(TObject)
   type
   TonStatusEvent =  procedure(AParameters: TParameter ; FStatus : EParamStatus) of object;
@@ -52,11 +71,12 @@ TParameter = class(TObject)
     FMin: Double;
     FAccuracyPlus: Double;
     FAccuracyMinus: Double;
-    FValue: Double;  // òåêóùàÿ
-    FValueSet: Double;   //óñòàíîâëåííàÿ
+    FValue: TMeterValue;  // òåêóùàÿ
+    FValueSet: TMeterValue;   //óñòàíîâëåííàÿ
     FBefore: Double;
     FAfter: Double;
     FDelta: Double;
+    FHasTaskHistory: Boolean;
     FDim: integer;
     FOnStatusChange: TonStatusEvent;
     FOnActionChange: TonActionEvent;
@@ -72,7 +92,7 @@ TParameter = class(TObject)
     procedure SetParam(Avalue: Double);
   public
     constructor Create(const AName, AHint: string); virtual;
-    function IsStable(var Status: Boolean): Boolean;
+    function IsStable(out AStableInfo: TStableInfo): Boolean;
     function GetStatusAsString: string;
     procedure Stop;
     procedure Start;
@@ -82,8 +102,8 @@ TParameter = class(TObject)
     property Hint: string read FHint write FHint;
     property Status: EParamStatus read  FStatus   write SetStatus;
     property Action: EParamAction read FAction write FAction;
-    property ValueSet: Double read FValueSet write SetParam;
-    property Value: Double read FValue write SetValue;
+    property ValueSet: TMeterValue read FValueSet write FValueSet;
+    property Value: TMeterValue read FValue write FValue;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
     property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
@@ -168,8 +188,8 @@ begin
   inherited Create(AName,'');
   FMin := -50;
   FMax := 150;
-  FValue := 20.2;
-  FValueSet := 24;
+  //FValue := 20.2;
+  //FValueSet := 24;
   FBefore := 23;
   FAfter := 25;
   FDelta := 0.1;
@@ -195,7 +215,7 @@ end;
 
 procedure TFluidTemp.DoFluidTempStart(ATempSet: Double);
 begin
-  if not( SameValue(ValueSet ,ATempSet, MinDouble)) then
+  if not( SameValue(ValueSet.Value ,ATempSet, MinDouble)) then
     begin
 
     SetParam(ATempSet);
@@ -236,8 +256,8 @@ begin
   inherited Create(AName,'');
   FMin := 0;
   FMax := 200;
-  FValue := 10;
-  FValueSet := 10;
+  //FValue := 10;
+  //FValueSet := 10;
   FBefore := 9;
   FAfter := 11;
   FDelta := 0.1;
@@ -264,7 +284,7 @@ end;
 procedure TFluidPress.DoFluidPressStart(APressSet: Double);
 begin
 
-  if not( SameValue(ValueSet ,APressSet, MinDouble)) then
+  if not( SameValue(ValueSet.Value ,APressSet, MinDouble)) then
     begin
 
     SetParam(APressSet);
@@ -302,12 +322,14 @@ end;
 
    {$REGION 'TFlowRate'}
 constructor TFlowRate.Create(const AName: string);
+var
+FlowMeter:TFlowMeter;
 begin
   inherited Create(AName,'');
   FMin := 0;
   FMax := 500;
-  FValue := 0;
-  FValueSet := FMin;
+ // FValue := FlowMeter.ValueFlowRate;
+ // FValueSet := FValue;
   AccuracyPlus:=5;
   AccuracyMinus:=5;
   FDim:=0;
@@ -321,11 +343,11 @@ procedure TFlowRate.SetParamFlowRate(ANewValue: Double);
 begin
   ANewValue:=ANewValue/3.6;
   if ANewValue < FMin then
-    FValueSet := FMin
+    FValueSet.Value := FMin
   else if ANewValue > FMax then
-    FValueSet := FMax
+    FValueSet.Value := FMax
   else
-    FValueSet := ANewValue;
+    FValueSet.Value := ANewValue;
 
   FAction := ACTION_SET;
 end;
@@ -356,7 +378,7 @@ end;
 
 procedure TFlowRate.DoFlowRateStart(ANewFlowRate: Double);
 begin
-    if not( SameValue(ValueSet ,ANewFlowRate, MinDouble)) then
+    if not( SameValue(ValueSet.Value ,ANewFlowRate, MinDouble)) then
     begin
 
     SetParam(ANewFlowRate);
@@ -390,7 +412,6 @@ end;
 procedure TFlowRate.DoFlowRateSet(ANewFlowRate: Double);
 begin
 
-
   SetParam(ANewFlowRate);
 
 
@@ -409,8 +430,8 @@ begin
   FMax:= 50;
   FMin:= 0;
 
-  FValue:=10;
-  FValueSet := 12;
+  //FValue:=10;
+  //FValueSet := 12;
 end;
 
 constructor TPump.Create(const APumpName: string);
@@ -418,6 +439,8 @@ begin
   Create;
   Self.FName :=   APumpName;
   Pumps.Add(Self);
+  Value:=TMeterValue.Create;
+  ValueSet:=TMeterValue.Create;
 end;
 
 destructor TPump.Destroy;
@@ -512,6 +535,9 @@ begin
   FHint := AHint;
   FStatus := PARAM_STOPPED;
   FAction := ACTION_STOP;
+  FHasTaskHistory := False;
+  //FValue:=TMeterValue.Create;
+  //FValueset:=TMeterValue.Create;
 end;
 
 procedure TParameter.Stop;
@@ -520,20 +546,84 @@ begin
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStop', 'Parameter stopped', FName);
 end;
 
-function TParameter.IsStable(var Status: Boolean): Boolean;
+function TParameter.IsStable(out AStableInfo: TStableInfo): Boolean;
+var
+  IsTargetReached: Boolean;
+  HasStabilization: Boolean;
+  HasActiveTask: Boolean;
+  HadTask: Boolean;
+  IsChangingNow: Boolean;
+  ADelta: Double;
 begin
-  Result:= (Value<=ValueSet*(1+AccuracyPlus/100))
-      AND (Value>=ValueSet*(1-AccuracyMinus/100)) ;
-  Status := Result;
+
+  //код кодекса, надо переделывать
+  IsTargetReached := (Value.Value<=ValueSet.Value*(1+AccuracyPlus/100))
+      AND (Value.Value>=ValueSet.Value*(1-AccuracyMinus/100)) ;
+  ADelta := Abs(FDelta);
+  if ADelta <= MinDouble then
+    ADelta := 0.001;
+  HasStabilization := Abs(FAfter - FBefore) <= ADelta;
+  HasActiveTask := (FStatus in [PARAM_STARTED, PARAM_CHANGING]) or (FAction in [ACTION_SET, ACTION_START]);
+  HadTask := HasActiveTask or FHasTaskHistory;
+  IsChangingNow := (FValueSet.Value<>FValue.Value) and (not IsTargetReached);
+
+  if not HadTask then
+    AStableInfo.Status := ssNONE
+  else if not IsTargetReached then
+  begin
+    if IsChangingNow then
+    begin
+      if HasStabilization then
+        AStableInfo.Status := ssRun_SN
+      else
+        AStableInfo.Status := ssRun_NN;
+    end
+    else if HasStabilization then
+      AStableInfo.Status := ssFail_SN
+    else
+      AStableInfo.Status := ssFail_NN;
+  end
+  else
+  begin
+    if IsChangingNow then
+      AStableInfo.Status := ssRun_NS
+    else if HasStabilization then
+      AStableInfo.Status := ssOk
+    else
+      AStableInfo.Status := ssFail_NS;
+  end;
+
+  case AStableInfo.Status of
+    ssNONE:
+      AStableInfo.StatusText := 'Не было заданий, поэтому стабилен.';
+    ssRun_NN:
+      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизации нет.';
+    ssRun_SN:
+      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизация есть.';
+    ssRun_NS:
+      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание достигнуто, стабилизации нет.';
+    ssOk:
+      AStableInfo.StatusText := 'Было задание, оно выполнено, стабилизация достигнута.';
+    ssFail_SN:
+      AStableInfo.StatusText := 'Было задание, оно не достигнуто, стабилизация есть.';
+    ssFail_NS:
+      AStableInfo.StatusText := 'Было задание, оно достигнуто, стабилизации нет.';
+    ssFail_NN:
+      AStableInfo.StatusText := 'Было задание, оно не достигнуто и нет стабилизации.';
+  end;
+
+  AStableInfo.CurrentValue := Value.Value;
+  Result := IsTargetReached;
 end;
 procedure TParameter.Start;
 begin
-    if FValueSet<FMin then
-      FValueSet:=FMin;
-    if FValueSet>FMax then
-      FValueSet:=FMax;
+    if FValueSet.Value<FMin then
+      FValueSet.Value:=FMin;
+    if FValueSet.Value>FMax then
+      FValueSet.Value:=FMax;
 
   FAction := ACTION_START;
+  FHasTaskHistory := True;
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStart', 'Parameter started', FName);
 end;
 
@@ -582,30 +672,31 @@ end;
 procedure TParameter.SetValue(AValue: Double);
 begin
   if AValue < FMin then
-    FValue := FMin
+    FValue.Value := FMin
   else if AValue > FMax then
-    FValue := FMax
-  else FValue:=AValue;
+    FValue.Value := FMax
+  else FValue.Value:=AValue;
 end;
 
 
 procedure TParameter.SetParam(AValue: Double);
 begin
 
-  if  SameValue(FValueSet ,AValue, MinDouble) then
+  if  SameValue(FValueSet.Value ,AValue, MinDouble) then
        Exit;
 
-  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet]));
+  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
 
       if AValue<FMin then
-        FValueSet:=FMin
+        FValueSet.Value:=FMin
       else if AValue>FMax then
-        FValueSet:=FMax
+        FValueSet.Value:=FMax
       else
-        FValueSet:=AValue;
+        FValueSet.Value:=AValue;
 
       FAction:=ACTION_SET;
+      FHasTaskHistory := True;
 
 end;
 
@@ -631,8 +722,10 @@ begin
 end;
 
 function TParameter.GetIsChanging: Boolean;
+var
+  AStableInfo: TStableInfo;
 begin
-  Result :=  FValueSet<>FValue;
+  Result :=  (FValueSet.Value<>FValue.Value) and not(IsStable(AStableInfo));
 end;
 
   {$ENDREGION 'TPump'}
