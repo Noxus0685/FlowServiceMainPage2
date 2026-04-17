@@ -2463,8 +2463,8 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 905.000000000000000000
-      Viewport.Height = 46.000000000000000000
+      Viewport.Width = 909.000000000000000000
+      Viewport.Height = 50.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000

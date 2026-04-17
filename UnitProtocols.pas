@@ -1,4 +1,4 @@
-unit UnitProtocols;
+﻿unit UnitProtocols;
 
 interface
 
@@ -312,8 +312,8 @@ begin
     pcState: Result := 'STATE';
     pcAction: Result := 'ACTION';
     pcInfo: Result := 'INFO';
-    pcWarning: Result := 'ÂÍÈÌÀÍÈÅ!';
-    pcError: Result := 'ÎØÈÁÊÀ!';
+    pcWarning: Result := 'Warning!';
+    pcError: Result := 'Error!';
   else
     Result := '';
   end;
