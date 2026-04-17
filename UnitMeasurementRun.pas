@@ -1083,29 +1083,48 @@ begin
 end;
 
 function TMeasurementRun.CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
+const
+  DEFAULT_MEASURE_TIMEOUT_SEC = 3600;
+  MIN_POSITIVE_FLOW = 0.000001;
 var
   TimeByLimit: Double;
   Q: Double;
+  HasRestrictions: Boolean;
 begin
-{  Result := 600;
+  Result := DEFAULT_MEASURE_TIMEOUT_SEC;
+
   if APoint = nil then
     Exit;
 
-  if APoint.Q=0 then
-   if True then
+  TimeByLimit := 0;
+  HasRestrictions := False;
 
-   Result := 600;
+  if (scTime in APoint.StopCriteria) and (APoint.LimitTime > 0) then
+  begin
+    TimeByLimit := Max(TimeByLimit, APoint.LimitTime);
+    HasRestrictions := True;
+  end;
 
-  Q := Max(APoint.Q, 0.000001);
+  // При нулевом/отрицательном расходе ограничения по объему и импульсам не учитываем.
+  if APoint.Q > 0 then
+  begin
+    Q := Max(APoint.Q, MIN_POSITIVE_FLOW);
 
-  TimeByLimit := APoint.LimitTime;
-  if APoint.LimitVolume > 0 then
-    TimeByLimit := Max(TimeByLimit, APoint.LimitVolume / Q);
-  if APoint.LimitImp > 0 then
-    TimeByLimit := Max(TimeByLimit, APoint.LimitImp / Q);
-  if TimeByLimit <= 0 then
-    TimeByLimit := 600;
-  Result := Round((TimeByLimit + 10) * 1000);     }
+    if (scVolume in APoint.StopCriteria) and (APoint.LimitVolume > 0) then
+    begin
+      TimeByLimit := Max(TimeByLimit, APoint.LimitVolume / Q);
+      HasRestrictions := True;
+    end;
+
+    if (scImpulse in APoint.StopCriteria) and (APoint.LimitImp > 0) then
+    begin
+      TimeByLimit := Max(TimeByLimit, APoint.LimitImp / Q);
+      HasRestrictions := True;
+    end;
+  end;
+
+  if HasRestrictions and (TimeByLimit > 0) then
+    Result := Ceil(TimeByLimit);
 end;
 
 function TMeasurementRun.SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
