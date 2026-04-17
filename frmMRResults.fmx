@@ -76,5 +76,15 @@ object FrameMRResults: TFrameMRResults
       TextSettings.Trimming = None
       Visible = False
     end
+    object SpeedButtonCreatePoints: TSpeedButton
+      Align = Left
+      Size.Width = 80.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'refreshtoolbutton'
+      Text = 'SpeedButtonCreatePoints'
+      TextSettings.Trimming = None
+      OnClick = SpeedButtonCreatePointsClick
+    end
   end
 end

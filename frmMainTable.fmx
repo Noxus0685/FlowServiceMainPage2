@@ -786,6 +786,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 KillFocusByReturn = True
+                OnExit = EditVolumeExit
               end
             end
             object Layout51: TLayout
@@ -813,6 +814,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 KillFocusByReturn = True
+                OnExit = EditImpExit
               end
               object Rectangle10: TRectangle
                 Align = Right

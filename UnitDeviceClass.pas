@@ -153,7 +153,7 @@ type
     constructor Create(ADeviceID : Integer);
     destructor Destroy; override;
 
-    procedure Assign(ASource: TDevicePoint);
+    procedure Assign(ASource: TDevicePoint; FullAssign: Boolean);
     procedure Apply(ASource: TTypePoint);
     function GetStatus: string;
     function GetStatusHint: string;
@@ -973,8 +973,8 @@ begin
   DeviceTypePointID := 0;
 
   { Общая информация }
-  Name := 'Новая поверочная точка';
-  Description := 'Наименование точки (Qmax, Qnom, Q1...)';
+  Name := 'Точка измерения';
+  Description := 'Точка измерения с заданными параметрами';
   Num := 0;
   DateTime := 0;
 
@@ -1222,8 +1222,7 @@ begin
   for P in ASource.FPoints do
   begin
     NewP := AddPoint;
-    NewP.Assign(P);
-    NewP.DeviceUUID := UUID;
+    NewP.Assign(P, False);
   end;
 end;
 
@@ -1542,7 +1541,7 @@ begin
   end;
 end;
 
-procedure TDevicePoint.Assign(ASource: TDevicePoint);
+procedure TDevicePoint.Assign(ASource: TDevicePoint; FullAssign: Boolean);
 begin
   if ASource = nil then
     Exit;
@@ -1550,11 +1549,14 @@ begin
   {====================================================================}
   { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
   {====================================================================}
+  if FullAssign then
+  begin
   ID := ASource.ID;
   DeviceID := ASource.DeviceID;
   DeviceUUID := ASource.DeviceUUID;
-  DeviceTypePointID := ASource.DeviceTypePointID;
+  end;
 
+  DeviceTypePointID := ASource.DeviceTypePointID;
   {====================================================================}
   { СОСТОЯНИЕ }
   {====================================================================}
@@ -1658,11 +1660,17 @@ function TDevicePoint.GetStatus: string;
 begin
   case Status of
     0: Result := '-'; // hint :'измерения не проводились';
-    1: Result := 'измерение';// hint :'измерение начато, но не завершено';
-    2: Result := 'прервано';// hint :'измерение начато, но завершено досрочно, не окончено';
-    3: Result := 'закончено';// hint :'измерение завершено корректно';
-    4: Result := 'отменено';// hint :'измерение завершено корректно и результаты отменены';
-    5: Result := 'сохранено';// hint :'измерение завершено корректно и результаты сохранены';
+    1: Result := 'выбрана'; // hint :'измерения не проводились, точка выбрана';
+    2: Result := 'некорректно'; // hint :'измерения не проводились, точка выбрана';
+    3: Result := 'установка'; // hint :'измерения не проводились, устанавливаем расход';
+    4: Result := 'установка темп-ры'; // hint :'измерения не проводились, устанавливаем температуру';
+    5: Result := 'ошибка установки'; // hint :'измерения не проводились, устанавливаем температуру';
+    6: Result := 'измерение';// hint :'измерение начато, но не завершено';  \
+    7: Result := 'ошибка измерения'; // hint :'измерения не проводились, устанавливаем температуру';
+    8: Result := 'прервано';// hint :'измерение начато, но завершено досрочно, не окончено';
+    9: Result := 'закончено';// hint :'измерение завершено корректно';
+    10: Result := 'отменено';// hint :'измерение завершено корректно и результаты отменены';
+    11: Result := 'сохранено';// hint :'измерение завершено корректно и результаты сохранены';
   else
     Result := 'неизвестный статус';
   end;
@@ -1672,11 +1680,17 @@ function TDevicePoint.GetStatusHint: string;
 begin
   case Status of
     0: Result := 'измерения не проводились';
-    1: Result := 'измерение начато, но не завершено';
-    2: Result := 'измерение начато, но завершено досрочно, не окончено';
-    3: Result := 'измерение завершено корректно';
-    4: Result := 'измерение завершено корректно и результаты отменены';
-    5: Result := 'измерение завершено корректно и результаты сохранены';
+    1: Result := 'измерения не проводились, точка выбрана';
+    2: Result := 'точка не корректна';
+    3: Result := 'измерения не проводились, устанавливаем расход';
+    4: Result := 'измерения не проводились, устанавливаем температуру';
+    5: Result := 'ошибка установки';
+    6: Result := 'измерение начато, но не завершено';
+    7: Result := 'измерения не проводились, устанавливаем температуру';
+    8: Result := 'измерение начато, но завершено досрочно, не окончено';
+    9: Result := 'измерение завершено корректно';
+    10: Result := 'измерение завершено корректно и результаты отменены';
+    11: Result := 'измерение завершено корректно и результаты сохранены';
   else
     Result := 'неизвестный статус';
   end;

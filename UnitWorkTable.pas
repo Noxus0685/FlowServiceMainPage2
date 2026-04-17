@@ -59,6 +59,7 @@ type
     FEnabled: Boolean;
     FText: string;
     FGroup: Integer;
+    FCategory: EStdCategory;
 
     // Channel values (not proxy fields)
     FImpSec: Double;
@@ -93,6 +94,8 @@ type
 
     function GetSignalProxy: Integer;
     procedure SetSignalProxy(const AValue: Integer);
+    function GetCategoryProxy: Integer;
+    procedure SetCategoryProxy(const AValue: Integer);
 
     function GetDeviceUUIDProxy: string;
     procedure SetDeviceUUIDProxy(const AValue: string);
@@ -160,6 +163,8 @@ type
     property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
+    property Category: Integer read GetCategoryProxy write SetCategoryProxy;
+    property Group: Integer read FGroup write FGroup;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
     property TypeUUID: string read GetTypeUUIDProxy write SetTypeUUIDProxy;
     property RepoTypeName: string read GetRepoTypeNameProxy write SetRepoTypeNameProxy;
@@ -227,6 +232,8 @@ type
     FActivePump : TPump;
 
     FTimeSet : Integer;
+    FLimitImpSet: Integer;
+    FLimitVolumeSet: Double;
     FRepeats:Integer;
     FRepeat:Integer;
 
@@ -365,7 +372,7 @@ private
   //FOnPumpStop: TOnPumpStopEvent;
   //FOnFreqSet: TOnFreqSetEvent;
 
-
+  FCurrentPoint:  TDevicePoint;
 
 
   // События пакетных заданий
@@ -444,6 +451,9 @@ private
 
     property Time: Double read GetTime write SetTime;
     property TimeSet: Integer read FTimeSet write FTimeSet;
+    property LimitImpSet: Integer read FLimitImpSet write FLimitImpSet;
+    property LimitVolumeSet: Double read FLimitVolumeSet write FLimitVolumeSet;
+    property CurrentPoint:  TDevicePoint read FCurrentPoint write FCurrentPoint;
 
     property Repeats: Integer read FRepeats write FRepeats;
     property &Repeat: Integer read FRepeat write FRepeat;
@@ -697,6 +707,8 @@ begin
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
+  FGroup := 0;
+  FCategory := mftUnknownType;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -834,6 +846,8 @@ begin
   FFlowMeter.PointIndex := ASource.FFlowMeter.PointIndex;
   FFlowMeter.Comment := ASource.FFlowMeter.Comment;
   FFlowMeter.MeterFlowCategory := ASource.FFlowMeter.MeterFlowCategory;
+  FCategory := ASource.FCategory;
+  FGroup := ASource.FGroup;
 
   SrcDevice := ASource.FFlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
@@ -916,6 +930,28 @@ procedure TChannel.SetSignalProxy(const AValue: Integer);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.OutputType := AValue;
+end;
+
+function TChannel.GetCategoryProxy: Integer;
+begin
+  if Assigned(FFlowMeter) and Assigned(FFlowMeter.Device) then
+    Result := FFlowMeter.Device.Category
+  else
+    Result := Ord(FCategory);
+end;
+
+procedure TChannel.SetCategoryProxy(const AValue: Integer);
+begin
+  if Assigned(FFlowMeter) and Assigned(FFlowMeter.Device) then
+  begin
+    FFlowMeter.Device.Category := AValue;
+    FFlowMeter.Device.State := osModified;
+  end
+  else
+    if (AValue >= Ord(Low(EStdCategory))) and (AValue <= Ord(High(EStdCategory))) then
+      FCategory := EStdCategory(AValue)
+    else
+      FCategory := mftUnknownType;
 end;
 
 { Returns bound FlowMeter device UUID for proxy property access. }
@@ -1117,6 +1153,15 @@ begin
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
   FQuantityUnitName := 'м3';
+  FTimeSet := 0;
+  FLimitImpSet := 0;
+  FLimitVolumeSet := 0;
+
+  FCurrentPoint := TDevicePoint.Create(0);
+  FCurrentPoint.LimitTime := -1;
+  FCurrentPoint.LimitImp := -1;
+  FCurrentPoint.LimitVolume := -1;
+  FCurrentPoint.StopCriteria := [];
 
   FLayoutFlowRateVisible := True;
   FLayoutPumpVisible := True;
@@ -1418,6 +1463,47 @@ begin
     EnsureDescription(FTableFlow.ValueCurrent, 'Токовый сигнал стола');
   end;
 
+   if FlowRate.Value = nil then
+  begin
+    FlowRate.Value := TMeterValue.Create('', Name);
+    FlowRate.Value.SetAsVolumeFlow;
+    EnsureDescription(FlowRate.Value, 'Расход');
+  end;
+    if FluidTemp.Value = nil then
+  begin
+    FluidTemp.Value := TMeterValue.Create('', Name);
+    FluidTemp.Value.SetAsAirTemp;
+    EnsureDescription(FluidTemp.Value, 'Температура');
+  end;
+
+    if FluidPress.Value = nil then
+  begin
+    FluidPress.Value := TMeterValue.Create('', Name);
+    FluidPress.Value.SetAsPressure;
+    EnsureDescription(FluidPress.Value, 'Давление');
+  end;
+
+    if FlowRate.Valueset = nil then
+  begin
+    FlowRate.Valueset := TMeterValue.Create('', Name);
+    FlowRate.Valueset.SetAsVolumeFlow;
+    EnsureDescription(FlowRate.Valueset, 'Установленный расход');
+  end;
+    if FluidTemp.Valueset = nil then
+  begin
+    FluidTemp.Valueset := TMeterValue.Create('', Name);
+    FluidTemp.Valueset.SetAsAirTemp;
+    EnsureDescription(FluidTemp.Valueset, 'Установленная температура');
+  end;
+
+    if FluidPress.Valueset = nil then
+  begin
+    FluidPress.Valueset := TMeterValue.Create('', Name);
+    FluidPress.Valueset.SetAsPressure;
+    EnsureDescription(FluidPress.Valueset, 'Установленное давление');
+  end;
+
+
   // Настраиваем вычислительные связи для всех инициализированных значений.
   FTableFlow.ValueMassFlow.ValueCorrection := nil;
   FTableFlow.ValueMassFlow.ValueBaseMultiplier := FTableFlow.ValueImp;
@@ -1476,7 +1562,7 @@ end;
 function TWorkTable.GetFlowRate: Double;
 begin
   if FlowRate <> nil then
-    Result := FlowRate.Value
+    Result := FlowRate.Value.Value
   else
     Result := FlowRate.Min;
 end;
@@ -1706,6 +1792,8 @@ procedure TWorkTable.UpdateAggregateMeterValues;
 var
   I: Integer;
   Channel: TChannel;
+  AggregateGroup: Integer;
+  IsAggregateGroupDefined: Boolean;
   IsQuantityTemplateSet: Boolean;
   IsFlowTemplateSet: Boolean;
 begin
@@ -1716,11 +1804,22 @@ begin
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
+  IsAggregateGroupDefined := False;
+  AggregateGroup := 0;
 
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
     if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if not IsAggregateGroupDefined then
+    begin
+      AggregateGroup := Channel.Group;
+      IsAggregateGroupDefined := True;
+    end;
+
+    if Channel.Group <> AggregateGroup then
       Continue;
 
     if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
@@ -1759,13 +1858,17 @@ begin
   FDeviceChannels.Free;
   FEtalonChannels.Free;
   FreeAndNil(FPumps);
+
+  if FCurrentPoint<>nil then
+  FreeAndNil(FCurrentPoint);
+
   inherited;
 end;
 
 function TWorkTable.GetTemp: Double;
 begin
   if FFluidTemp <> nil then
-    Result := FFluidTemp.Value
+    Result := FFluidTemp.Value.Value
   else
     Result := 0;
 end;
@@ -1781,7 +1884,7 @@ end;
 function TWorkTable.GetPress: Double;
 begin
   if FFluidPress <> nil then
-    Result := FFluidPress.Value
+    Result := FFluidPress.Value.Value
   else
     Result := 0;
 end;
@@ -2092,13 +2195,25 @@ begin
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
       Ini.WriteString(Section, 'Text', WorkTable.Text);
-      Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value);
+      Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value.Value);
       Ini.WriteFloat(Section, 'TempDelta', WorkTable.TempDelta);
      // Ini.WriteFloat(Section, 'Press', WorkTable.Press);
       Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
-      Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value);
+      Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value.Value);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
+      if WorkTable.CurrentPoint <> nil then
+      begin
+        Ini.WriteInteger(Section, 'TimeSet', Round(WorkTable.CurrentPoint.LimitTime));
+        Ini.WriteInteger(Section, 'LimitImpSet', WorkTable.CurrentPoint.LimitImp);
+        Ini.WriteFloat(Section, 'LimitVolumeSet', WorkTable.CurrentPoint.LimitVolume);
+      end
+      else
+      begin
+        Ini.WriteInteger(Section, 'TimeSet', -1);
+        Ini.WriteInteger(Section, 'LimitImpSet', -1);
+        Ini.WriteFloat(Section, 'LimitVolumeSet', -1);
+      end;
       Ini.WriteString(Section, 'State', WorkTableStateToString(WorkTable.State));
       Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.State));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
@@ -2195,13 +2310,20 @@ begin
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-      WorkTable.FluidTemp.Value := S2F(Ini.ReadString(Section, 'Temp', '0'));
+      //WorkTable.FluidTemp.Value.Value := S2F(Ini.ReadString(Section, 'Temp', '0'));
       WorkTable.TempDelta := S2F(Ini.ReadString(Section, 'TempDelta','0'));
       //WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
       WorkTable.PressDelta := S2F(Ini.ReadString(Section, 'PressDelta','0'));
-      WorkTable.FlowRate.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
+     // WorkTable.FlowRate.Value.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
       WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
       WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
+      if WorkTable.CurrentPoint <> nil then
+      begin
+        WorkTable.CurrentPoint.LimitTime := Ini.ReadInteger(Section, 'TimeSet', 0);
+        WorkTable.CurrentPoint.LimitImp := Ini.ReadInteger(Section, 'LimitImpSet', 0);
+        WorkTable.CurrentPoint.LimitVolume := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
+        WorkTable.CurrentPoint.StopCriteria := [];
+      end;
       WorkTable.State := WorkTableStateFromString(
         Ini.ReadString(Section, 'State',
           Ini.ReadString(Section, 'MeasurementState', 'STATE_NONE'))
@@ -2270,7 +2392,7 @@ begin
       WorkTable.ValueTempertureBefore.SetValue(21);
       WorkTable.ValueTempertureAfter.SetValue(21);
 
-      WorkTable.FluidTemp.Value := 21;
+      WorkTable.FluidTemp.Value.Value := 21;
 
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
@@ -2384,6 +2506,8 @@ begin
     AIni.WriteString(Section, 'DeviceName', Channel.DeviceName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
+    AIni.WriteInteger(Section, 'Category', Channel.Category);
+    AIni.WriteInteger(Section, 'Group', Channel.Group);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
     AIni.WriteString(Section, 'TypeUUID', Channel.TypeUUID);
     AIni.WriteString(Section, 'RepoTypeName', Channel.RepoTypeName);
@@ -2439,6 +2563,8 @@ begin
     Channel.DeviceName := AIni.ReadString(Section, 'DeviceName', Channel.TypeName);
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
     Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
+    Channel.Category := AIni.ReadInteger(Section, 'Category', Ord(mftUnknownType));
+    Channel.Group := AIni.ReadInteger(Section, 'Group', 0);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
     Channel.TypeUUID := AIni.ReadString(Section, 'TypeUUID', '');
     Channel.RepoTypeName := AIni.ReadString(Section, 'RepoTypeName', '');
@@ -2666,6 +2792,9 @@ end;
 procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
   APointIndex: Integer);
 begin
+  if (FCurrentPoint <> nil) and (APoint <> nil) then
+    FCurrentPoint.Assign(APoint, True);
+
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
 end;
 
