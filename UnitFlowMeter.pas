@@ -106,8 +106,6 @@ private
   FValueHumidity: TMeterValue;
   FValueCurrent: TMeterValue;
   FValueTime: TMeterValue;
-  FValue: TMeterValue;
-  FValueSet: TMeterValue;
 
   HashValueImp: string;
   HashValueImpTotal: string;
@@ -365,9 +363,6 @@ public
   property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
   property ValueTime: TMeterValue read FValueTime write SetValueTime;
 
-  property Value: TMeterValue read FValue write FValue;
-  property ValueSet: TMeterValue read FValueSet write FValueSet;
-
   constructor Create(); overload;
   constructor Create(AIsEtalon: Boolean); overload;
   destructor Destroy;
@@ -541,7 +536,6 @@ begin
   FRepoTypeUUID := '';
   FRepoDeviceName := '';
   FRepoDeviceUUID := '';
-
 
   MeterFlowCategory := mftUnknownType;
   Name:='Новое устройство';
