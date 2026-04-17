@@ -921,7 +921,7 @@ var
     ADimension: TMeasuredDimension;
     AOutputType: TOutputType;
     const AKeyWords: string;
-    AStdCategory: TStdCategory
+    AStdCategory: EStdCategory
   );
   begin
     C := TDeviceCategory.Create;

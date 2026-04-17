@@ -106,8 +106,6 @@ private
   FValueHumidity: TMeterValue;
   FValueCurrent: TMeterValue;
   FValueTime: TMeterValue;
-  FValue: TMeterValue;
-  FValueSet: TMeterValue;
 
   HashValueImp: string;
   HashValueImpTotal: string;
@@ -331,7 +329,7 @@ public
   PointIndex: Integer;
   Comment: string;
 
-  MeterFlowCategory: TStdCategory;
+  MeterFlowCategory: EStdCategory;
 
   property ValueImp: TMeterValue read FValueImp write SetValueImp;
   property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
@@ -365,9 +363,6 @@ public
   property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
   property ValueTime: TMeterValue read FValueTime write SetValueTime;
 
-  property Value: TMeterValue read FValue write FValue;
-  property ValueSet: TMeterValue read FValueSet write FValueSet;
-
   constructor Create(); overload;
   constructor Create(AIsEtalon: Boolean); overload;
   destructor Destroy;
@@ -381,10 +376,10 @@ public
   procedure SetSendStatus(const AText: string);
 
   procedure SetEtalon(AEtalon: TFlowMeter);
-  procedure SetMeterCategory(AMeterFlowType: TStdCategory); overload;
+  procedure SetMeterCategory(AMeterFlowType: EStdCategory); overload;
   procedure SetMeterCategory(const AMeterFlowType: string); overload;
   function GetMeterCategory: string;
-  function ResolveStdCategoryFromDevice: TStdCategory;
+  function ResolveStdCategoryFromDevice: EStdCategory;
   procedure SetAsEtalon;
 
   procedure SetImpCoef(AK: Double); overload;
@@ -541,7 +536,6 @@ begin
   FRepoTypeUUID := '';
   FRepoDeviceName := '';
   FRepoDeviceUUID := '';
-
 
   MeterFlowCategory := mftUnknownType;
   Name:='Новое устройство';
@@ -1770,7 +1764,7 @@ begin
   ApplyError;
 end;
 
-function TFlowMeter.ResolveStdCategoryFromDevice: TStdCategory;
+function TFlowMeter.ResolveStdCategoryFromDevice: EStdCategory;
 var
   Cat: TDeviceCategory;
 begin
@@ -1787,7 +1781,7 @@ begin
     Exit(Cat.StdCategory);
 end;
 
-procedure TFlowMeter.SetMeterCategory(AMeterFlowType: TStdCategory);
+procedure TFlowMeter.SetMeterCategory(AMeterFlowType: EStdCategory);
 begin
   MeterFlowCategory := AMeterFlowType;
 

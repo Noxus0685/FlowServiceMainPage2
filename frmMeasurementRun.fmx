@@ -1,20 +1,20 @@
 object FrameMeasurementRun: TFrameMeasurementRun
-  Size.Width = 822.000000000000000000
-  Size.Height = 512.000000000000000000
+  Size.Width = 1228.000000000000000000
+  Size.Height = 888.000000000000000000
   Size.PlatformDefault = False
   object GridMeasurmentRun: TGrid
     Align = Client
     CanFocus = True
     ClipChildren = True
-    Size.Width = 822.000000000000000000
-    Size.Height = 480.000000000000000000
+    Size.Width = 1228.000000000000000000
+    Size.Height = 856.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     RowCount = 1
     OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
-    Viewport.Width = 822.000000000000000000
-    Viewport.Height = 480.000000000000000000
+    Viewport.Width = 1228.000000000000000000
+    Viewport.Height = 856.000000000000000000
     object StringColumnPointer: TStringColumn
       HeaderSettings.TextSettings.WordWrap = False
       Size.Width = 50.000000000000000000
@@ -61,7 +61,7 @@ object FrameMeasurementRun: TFrameMeasurementRun
     end
   end
   object ToolBarGridMR: TToolBar
-    Size.Width = 822.000000000000000000
+    Size.Width = 1228.000000000000000000
     Size.Height = 32.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1

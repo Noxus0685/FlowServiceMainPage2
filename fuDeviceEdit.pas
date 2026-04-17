@@ -357,6 +357,41 @@ implementation
 
 {$R *.fmx}
 
+procedure PopulateSpillageTypeCombo(ACombo: TComboBox);
+var
+  SpillageType: ESpillageType;
+begin
+  if ACombo = nil then
+    Exit;
+
+  ACombo.Items.BeginUpdate;
+  try
+    ACombo.Items.Clear;
+    for SpillageType in CSpillageTypeList do
+      ACombo.Items.Add(GetSpillageTypeStr(SpillageType));
+  finally
+    ACombo.Items.EndUpdate;
+  end;
+end;
+
+function SpillageTypeValueToItemIndex(const AValue: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := Low(CSpillageTypeList) to High(CSpillageTypeList) do
+    if Ord(CSpillageTypeList[I]) = AValue then
+      Exit(I);
+end;
+
+function SpillageTypeItemIndexToValue(const AIndex: Integer): Integer;
+begin
+  if (AIndex >= Low(CSpillageTypeList)) and (AIndex <= High(CSpillageTypeList)) then
+    Result := Ord(CSpillageTypeList[AIndex])
+  else
+    Result := Ord(spUnknown);
+end;
+
 procedure TFormDeviceEditor.ApplyMeasuredDimension;
 var
   Dim: TMeasuredDimension;
@@ -1668,10 +1703,8 @@ begin
     // =====================================================
     // == Тип испытания / критерий остановки
     // =====================================================
-    if (FDevice.SpillageType >= 0) and (FDevice.SpillageType < cbSpillageType.Items.Count) then
-      cbSpillageType.ItemIndex := FDevice.SpillageType
-    else
-      cbSpillageType.ItemIndex := 0;
+    PopulateSpillageTypeCombo(cbSpillageType);
+    cbSpillageType.ItemIndex := SpillageTypeValueToItemIndex(FDevice.SpillageType);
 
     PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
@@ -1735,7 +1768,8 @@ begin
 
       ApplyOutputType;
 
-
+      FDevice.SetDimensions;
+      ApplyMeasuredDimension;
 
 
     // =====================================================
@@ -1832,7 +1866,7 @@ begin
   if cbSpillageType.ItemIndex < 0 then
     Exit;
 
-  FDevice.SpillageType := cbSpillageType.ItemIndex;
+  FDevice.SpillageType := SpillageTypeItemIndexToValue(cbSpillageType.ItemIndex);
   SetModified;
 end;
 
@@ -2798,6 +2832,47 @@ begin
     Value := FormatDeviceError(P.Error)
 
   {=====================================================}
+  { {Q и V}
+  {=====================================================}
+   else if ACol = StringColumnPointQ.Index then
+    begin
+      if (P.Q <= 0) then
+        Value := '—'
+      else
+        Value := FormatByBaseError(FDevice.FromBaseUnits(P.Q), P.Error);
+    end
+
+    {---------------------------}
+    { V }
+    {---------------------------}
+    else if (ACol = StringColumnPointVolume.Index) then
+    begin
+      if P.LimitVolume > 0 then
+        Value := FormatByBaseError(P.LimitVolume, P.Error)
+
+      else if (P.Q > 0) and (P.LimitTime > 0) then
+      begin
+        Qmax := FDevice.Qmax;
+        Q := P.FlowRate * Qmax;
+        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error);
+      end
+
+      else
+        Value := '—';
+    end
+    {---------------------------}
+    { IMP }
+    {---------------------------}
+      else if ACol = StringColumnPointImp.Index then
+  begin
+    if P.LimitImp = 0 then
+      Value := '—'
+    else
+      Value := IntToStr(P.LimitImp);
+  end
+
+
+  {=====================================================}
   { INTEGER-КОЛОНКИ }
   {=====================================================}
 
@@ -2830,13 +2905,6 @@ begin
   { ВСЕГДА отображаются }
   {=====================================================}
 
-  else if ACol = StringColumnPointImp.Index then
-  begin
-    if P.LimitImp = 0 then
-      Value := '—'
-    else
-      Value := IntToStr(P.LimitImp);
-  end
 
   else if ACol = StringColumnPointTime.Index then
     Value := FormatTime(P.LimitTime)
@@ -2845,6 +2913,8 @@ begin
   { ЗАВИСЯТ ОТ ПРИБОРА: Q и V }
   {=====================================================}
 
+
+   {
   else if (ACol = StringColumnPointQ.Index) or
           (ACol = StringColumnPointVolume.Index) then
   begin
@@ -2854,12 +2924,6 @@ begin
       Exit;
     end;
 
-    Qmax := FDevice.Qmax;
-    Q := P.FlowRate * Qmax;
-
-    {---------------------------}
-    { Q }
-    {---------------------------}
     if ACol = StringColumnPointQ.Index then
     begin
       if Q <= 0 then
@@ -2868,9 +2932,7 @@ begin
         Value := FormatByBaseError(FDevice.FromBaseUnits(Q), P.Error);
     end
 
-    {---------------------------}
-    { V }
-    {---------------------------}
+
     else
     begin
       if P.LimitVolume > 0 then
@@ -2882,7 +2944,7 @@ begin
       else
         Value := '—';
     end;
-  end;
+  end;    }
 end;
 
 procedure TFormDeviceEditor.GridPointsSetValue(

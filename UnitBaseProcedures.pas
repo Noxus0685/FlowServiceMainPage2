@@ -79,6 +79,33 @@ type
       msDone //— Окончание цикла измерения
   );
 
+  EStableStatus = (
+    ssNONE,
+    ssRun_NN,   // no target, no stable
+    ssRun_SN,   // stable, no target
+    ssRun_NS,   // no stable, target
+    ssOk,       // done + stable
+    ssFail_SN,  // stable, no target
+    ssFail_NS,  // no stable, target
+    ssFail_NN   // no stable, no target
+  );
+
+  RStableInfo = record
+    Status: EStableStatus;
+    StatusText: string;
+    CurrentValue: Double;
+  end;
+
+
+  TErrorInfo = record
+    Code: Integer;
+    Msg: string;
+    Time: TDateTime;
+    Stage: Integer;//EMeasurementState;
+    class function Empty(AStage:Integer{: EMeasurementState}): TErrorInfo; static;
+  end;
+
+
 
 function NormalizeFloatInput(const S: string): Double;
 function FormatPercentPM(const Value: Double): string;
@@ -113,6 +140,16 @@ function NormalizeFlowAccuracyInput(const S: string): string;
 function BoolToRussianYesNo(const AValue: Boolean): string;
 
 implementation
+
+  { TErrorInfo }
+
+class function TErrorInfo.Empty(AStage: Integer): TErrorInfo;
+begin
+  Result.Code := 0;
+  Result.Msg := '';
+  Result.Time := Now;
+  Result.Stage := AStage;
+end;
 
 function BoolToRussianYesNo(const AValue: Boolean): string;
 begin
