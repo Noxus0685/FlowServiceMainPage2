@@ -1,5 +1,5 @@
 ﻿[Closed Files]
-File_0=TSourceModule,'D:\Projects\FlowServiceMainPage\UnitClasses.pas',0,1,507,1,531,0,0,,
+File_0=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.pas',0,1,1,19,14,0,0,,
 File_1=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\data\firedac\FireDAC.Phys.SQLiteWrapper.pas',0,1,1927,52,1931,0,0,,
 File_2=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Rtti.pas',0,1,2793,1,2813,0,0,,
 File_3=TSourceModule,'d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Classes.pas',0,1,2057,1,2077,0,0,,
@@ -14,92 +14,96 @@ File_11=TSourceModule,'D:\Projects\FlowServiceMainPage\UnitDataManager.pas',0,1,
 File_12=TSourceModule,'D:\Projects\FlowServiceMainPage\fuMeterValues.pas',0,1,458,69,551,0,0,,
 
 [Modules]
-Module0=D:\Projects\FlowServiceMainPage\frmMainTable.pas
-Module1=d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.pas
-Module2=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
-Module3=D:\Projects\FlowServiceMainPage\UnitMeasurementRun.pas
-Module4=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
-Module5=D:\Projects\FlowServiceMainPage\frmFlowMeterProperties.pas
-Module6=D:\Projects\FlowServiceMainPage\frmMeasurementRun.pas
-Module7=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
-Module8=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
-Module9=D:\Projects\FlowServiceMainPage\frmMRResults.pas
-Module10=D:\Projects\FlowServiceMainPage\fuMain.pas
-Module11=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
-Module12=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
-Module13=D:\Projects\FlowServiceMainPage\frmProceed.pas
-Module14=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
-Module15=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
-Module16=D:\Projects\FlowServiceMainPage\UnitObservable.pas
-Module17=D:\Projects\FlowServiceMainPage\UnitProtocols.pas
-Module18=D:\Projects\FlowServiceMainPage\UnitParameter.pas
-Module19=D:\Projects\FlowServiceMainPage\frmProtocol.pas
-Count=20
+Module0=D:\Projects\FlowServiceMainPage\UnitMeasurementRun.pas
+Module1=d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Math.pas
+Module2=D:\Projects\FlowServiceMainPage\frmMainTable.pas
+Module3=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
+Module4=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
+Module5=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
+Module6=D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj
+Module7=D:\Projects\FlowServiceMainPage\UnitParameter.pas
+Module8=D:\Projects\FlowServiceMainPage\frmMRResults.pas
+Module9=D:\Projects\FlowServiceMainPage\frmMeasurementRun.pas
+Module10=D:\Projects\FlowServiceMainPage\UnitProtocols.pas
+Module11=D:\Projects\FlowServiceMainPage\fuMain.pas
+Module12=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
+Module13=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
+Module14=D:\Projects\FlowServiceMainPage\UnitClasses.pas
+Module15=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
+Module16=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+Module17=D:\Projects\FlowServiceMainPage\frmProceed.pas
+Module18=D:\Projects\FlowServiceMainPage\frmFlowMeterProperties.pas
+Module19=D:\Projects\FlowServiceMainPage\UnitObservable.pas
+Module20=D:\Projects\FlowServiceMainPage\frmProtocol.pas
+Count=21
 EditWindowCount=1
-
-[D:\Projects\FlowServiceMainPage\frmMainTable.pas]
-ModuleType=TSourceModule
-
-[d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas]
-ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceMainPage\UnitMeasurementRun.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\UnitMeterValue.pas]
+[d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Math.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\frmFlowMeterProperties.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\frmMeasurementRun.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas]
+[D:\Projects\FlowServiceMainPage\frmMainTable.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceMainPage\UnitWorkTable.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\frmMRResults.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\fuMain.pas]
-ModuleType=TSourceModule
-
-[D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas]
+[D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceMainPage\fuTypeEditor.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\frmProceed.pas]
-ModuleType=TSourceModule
-
 [D:\Projects\FlowServiceMainPage\ProjectFornTest.dproj]
 ModuleType=TBaseProject
 
-[D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas]
+[D:\Projects\FlowServiceMainPage\UnitParameter.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\UnitObservable.pas]
+[D:\Projects\FlowServiceMainPage\frmMRResults.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\frmMeasurementRun.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceMainPage\UnitProtocols.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceMainPage\UnitParameter.pas]
+[D:\Projects\FlowServiceMainPage\fuMain.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitClasses.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitMeterValue.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\frmProceed.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\frmFlowMeterProperties.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceMainPage\UnitObservable.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceMainPage\frmProtocol.pas]
 ModuleType=TSourceModule
 
 [EditWindow0]
-ViewCount=20
-CurrentEditView=D:\Projects\FlowServiceMainPage\frmMainTable.pas
+ViewCount=21
+CurrentEditView=D:\Projects\FlowServiceMainPage\UnitMeasurementRun.pas
 View0=0
 View1=1
 View2=2
@@ -120,6 +124,7 @@ View16=16
 View17=17
 View18=18
 View19=19
+View20=20
 PercentageSizes=1
 Create=1
 Visible=1
@@ -158,7 +163,7 @@ CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\fuMain.pas
 CursorX=1
 CursorY=590
-TopLine=590
+TopLine=1
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -167,26 +172,15 @@ EditViewName=D:\Projects\FlowServiceMainPage\fuMain.pas
 [View1]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\frmMainTable.pas
-CursorX=75
-CursorY=3400
-TopLine=3377
+CursorX=55
+CursorY=3176
+TopLine=3162
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\frmMainTable.pas
 
 [View2]
-CustomEditViewType=TEditView
-Module=d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.pas
-CursorX=19
-CursorY=14
-TopLine=1
-LeftCol=1
-Elisions=
-Bookmarks=
-EditViewName=d:\program files (x86)\embarcadero\studio\23.0\SOURCE\RTL\SYS\System.pas
-
-[View3]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitObservable.pas
 CursorX=1
@@ -197,7 +191,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitObservable.pas
 
-[View4]
+[View3]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\frmFlowMeterProperties.pas
 CursorX=90
@@ -208,67 +202,78 @@ Elisions=
 Bookmarks=
 EditViewName=Borland.FormDesignerView
 
-[View5]
+[View4]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
-CursorX=1
-CursorY=559
-TopLine=543
+CursorX=32
+CursorY=319
+TopLine=195
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitFlowMeter.pas
 
-[View6]
+[View5]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
-CursorX=43
-CursorY=1709
-TopLine=1683
+CursorX=34
+CursorY=371
+TopLine=343
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\fuDeviceEdit.pas
 
-[View7]
+[View6]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
-CursorX=1
-CursorY=3577
-TopLine=3552
+CursorX=14
+CursorY=3539
+TopLine=3518
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\fuTypeEditor.pas
 
-[View8]
+[View7]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitProtocols.pas
-CursorX=34
-CursorY=51
-TopLine=43
+CursorX=1
+CursorY=224
+TopLine=192
 LeftCol=1
 Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitProtocols.pas
 
-[View9]
+[View8]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
-CursorX=99
-CursorY=1238
-TopLine=1210
+CursorX=1
+CursorY=560
+TopLine=352
 LeftCol=1
-Elisions={{29,39},{53,6},{''}}{{164,38},{299,6},{''}}{{301,25},{317,6},{''}}{{319,26},{337,6},{''}}{{339,30},{526,6},{''}}{{533,69},{548,3},{''}}{{550,27},{558,3},{''}}{{560,27},{685,3},{''}}{{697,32},{758,3},{''}}{{760,42},{767,3},{''}}{{769,59},{788,3},{''}}{{790,61},{809,3},{''}}{{811,54},{850,3},{''}}{{852,54},{858,3},{''}}{{860,68},{905,3},{''}}{{907,63},{927,3},{''}}{{929,36},{933,3},{''}}{{935,61},{959,3},{''}}{{1017,32},{1022,3},{''}}{{1024,59},{1035,3},{''}}
+Elisions={{29,39},{53,6},{''}}{{164,38},{299,6},{''}}{{301,25},{317,6},{''}}{{319,26},{337,6},{''}}{{533,69},{548,3},{''}}{{550,27},{558,3},{''}}{{560,27},{685,3},{''}}{{697,32},{758,3},{''}}{{760,42},{767,3},{''}}{{769,59},{788,3},{''}}{{790,61},{809,3},{''}}{{811,54},{850,3},{''}}{{852,54},{858,3},{''}}{{860,68},{905,3},{''}}{{907,63},{927,3},{''}}{{929,36},{933,3},{''}}{{935,61},{959,3},{''}}{{1017,32},{1022,3},{''}}{{1024,59},{1035,3},{''}}
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitDeviceClass.pas
+
+[View9]
+CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceMainPage\UnitClasses.pas
+CursorX=11
+CursorY=83
+TopLine=64
+LeftCol=1
+Elisions=
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceMainPage\UnitClasses.pas
 
 [View10]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitParameter.pas
-CursorX=29
-CursorY=601
-TopLine=576
+CursorX=1
+CursorY=528
+TopLine=505
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -277,20 +282,20 @@ EditViewName=D:\Projects\FlowServiceMainPage\UnitParameter.pas
 [View11]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
-CursorX=1
-CursorY=229
-TopLine=199
+CursorX=104
+CursorY=1745
+TopLine=1739
 LeftCol=1
-Elisions=
+Elisions={{595,0},{1128,15},{'TChannel'}}{{3139,5},{3206,36},{'TWorkTableManager'}}
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\UnitWorkTable.pas
 
 [View12]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\frmProceed.pas
-CursorX=79
-CursorY=2308
-TopLine=2264
+CursorX=42
+CursorY=2252
+TopLine=2210
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -299,9 +304,9 @@ EditViewName=D:\Projects\FlowServiceMainPage\frmProceed.pas
 [View13]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
-CursorX=18
-CursorY=26
-TopLine=1
+CursorX=20
+CursorY=427
+TopLine=400
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -310,20 +315,20 @@ EditViewName=D:\Projects\FlowServiceMainPage\UnitBaseProcedures.pas
 [View14]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\frmMeasurementRun.pas
-CursorX=1
-CursorY=333
-TopLine=1
+CursorX=54
+CursorY=337
+TopLine=311
 LeftCol=1
 Elisions=
 Bookmarks=
-EditViewName=Borland.FormDesignerView
+EditViewName=D:\Projects\FlowServiceMainPage\frmMeasurementRun.pas
 
 [View15]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\UnitMeasurementRun.pas
-CursorX=22
-CursorY=766
-TopLine=751
+CursorX=35
+CursorY=1127
+TopLine=1100
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -331,27 +336,38 @@ EditViewName=D:\Projects\FlowServiceMainPage\UnitMeasurementRun.pas
 
 [View16]
 CustomEditViewType=TEditView
-Module=D:\Projects\FlowServiceMainPage\frmMRResults.pas
+Module=d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Math.pas
 CursorX=1
-CursorY=156
-TopLine=131
-LeftCol=1
-Elisions={{160,83},{164,3},{''}}{{174,36},{185,3},{''}}{{187,39},{225,3},{''}}{{227,38},{241,3},{''}}{{243,70},{250,3},{''}}{{252,74},{266,3},{''}}{{299,47},{325,3},{''}}{{356,109},{380,3},{''}}{{425,40},{449,3},{''}}
-Bookmarks=
-EditViewName=D:\Projects\FlowServiceMainPage\frmMRResults.pas
-
-[View17]
-CustomEditViewType=TEditView
-Module=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
-CursorX=1
-CursorY=856
-TopLine=836
+CursorY=3421
+TopLine=3402
 LeftCol=1
 Elisions=
 Bookmarks=
-EditViewName=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+EditViewName=d:\program files (x86)\embarcadero\studio\23.0\source\rtl\common\System.Math.pas
+
+[View17]
+CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceMainPage\frmMRResults.pas
+CursorX=82
+CursorY=488
+TopLine=409
+LeftCol=1
+Elisions={{160,83},{164,3},{''}}{{174,36},{185,3},{''}}{{227,38},{241,3},{''}}{{243,70},{250,3},{''}}{{252,74},{266,3},{''}}{{299,47},{325,3},{''}}{{508,39},{555,3},{''}}{{613,73},{647,3},{''}}{{650,36},{673,3},{''}}{{677,73},{710,3},{''}}
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceMainPage\frmMRResults.pas
 
 [View18]
+CustomEditViewType=TEditView
+Module=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+CursorX=37
+CursorY=838
+TopLine=827
+LeftCol=1
+Elisions={{856,55},{875,3},{''}}
+Bookmarks=
+EditViewName=D:\Projects\FlowServiceMainPage\UnitMeterValue.pas
+
+[View19]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\frmProtocol.pas
 CursorX=18
@@ -362,7 +378,7 @@ Elisions=
 Bookmarks=
 EditViewName=D:\Projects\FlowServiceMainPage\frmProtocol.pas
 
-[View19]
+[View20]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceMainPage\ProjectFornTest.dpr
 CursorX=1
@@ -401,11 +417,12 @@ Dockable=1
 StayOnTop=0
 
 [Breakpoints]
-Count=4
+Count=5
 Breakpoint0='D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas',787,'',0,1,'',1,0,0,'',1,'','','',0,''
 Breakpoint1='D:\Projects\FlowServiceMainPage\fuDeviceSelect.pas',795,'',0,1,'',1,0,0,'',1,'','','',0,''
 Breakpoint2='D:\Projects\FlowServiceMainPage\UnitRepositories.pas',2629,'',0,1,'',1,0,0,'',1,'','','',0,''
-Breakpoint3='D:\Projects\FlowServiceMainPage\frmMRResults.pas',539,'',0,1,'',1,0,0,'',1,'','','',0,''
+Breakpoint3='D:\Projects\FlowServiceMainPage\frmMRResults.pas',548,'',0,1,'',1,0,0,'',1,'','','',0,''
+Breakpoint4='D:\Projects\FlowServiceMainPage\UnitMeasurementRun.pas',1313,'',0,1,'',1,0,0,'',1,'','','',0,''
 
 [EmbarcaderoWin32Debugger_AddressBreakpoints]
 Count=0
@@ -535,8 +552,8 @@ SplitPos=111
 
 [PropInspDesignerSelection]
 ArrangeBy=Name
-SelectedItem=Action,OnExit
-ExpandedItems=Anchors=0,LiveBindings=0,"LiveBindings Designer=0",Margins=0,Options=0,Padding=0,Position=0,RotationCenter=0,Scale=0,Size=0,Touch=0,TouchTargetExpansion=0,Caret=0
+SelectedItem=Name,OnExit
+ExpandedItems=Anchors=0,LiveBindings=0,"LiveBindings Designer=0",Margins=0,Options=0,Padding=0,Position=0,RotationCenter=0,Scale=0,Size=0,Touch=0,TouchTargetExpansion=0,Caret=0,Border=0,BorderIcons=0,Constraints=0,Fill=0,FormFactor=0,StyledSettings=0
 
 [frmDesignPreview]
 PercentageSizes=1
@@ -576,7 +593,7 @@ LRDockWidth=276
 Dockable=1
 StayOnTop=0
 Name=7
-Description=7
+Description=19
 filter=1
 
 [DebugLogView]
