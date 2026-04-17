@@ -1007,13 +1007,16 @@ end;
 //
 function TMeterValue.GetDoubleBaseNum(AValue: Double; Dim: Integer): Double;
 var
-  Temp: Double;
+  DR,Temp: Double;
   FO: Integer;
   TempType:  EValueType;
+
 begin
 
   try
-      Result :=AValue / GetDimRate(Dim);
+      DR:=GetDimRate(Dim);
+      if DR<>0 then
+         Result :=AValue / DR;
 
   finally
 

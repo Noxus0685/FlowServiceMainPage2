@@ -19,10 +19,11 @@ uses
 type
   TTableMainForm = class(TForm)
     tcMain: TTabControl;
-    TabItemTable: TTabItem;
-    TabItemResults: TTabItem;
+    tiTable: TTabItem;
+    tiResults: TTabItem;
+    tiMnemo: TTabItem;
     TimerSetValues: TTimer;
-    TabItemTest: TTabItem;
+    tiTest: TTabItem;
     LayoutTestValues: TLayout;
     GroupBoxEtalonChannels: TGroupBox;
     LabelEtalonCurSec: TLabel;
@@ -70,6 +71,8 @@ type
     FNextClimateChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
+    FT_WorkBench_Last: Double;
+    FT_WorkBench_First: Double;
 
     procedure UpdateTemp(const AWorkTable: TWorkTable);
 
@@ -93,9 +96,13 @@ type
     function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil):Double;
     procedure UpdateDeviceImpSecFromFlowRate;
+    procedure SetT_WorkBench_First(const Value: Double);
+    procedure SetT_WorkBench_Last(const Value: Double);
 
 
   public
+    property T_WorkBench_First:Double read FT_WorkBench_First write SetT_WorkBench_First;
+    property T_WorkBench_Last:Double read FT_WorkBench_Last write SetT_WorkBench_Last;
   end;
 
 var
@@ -171,6 +178,16 @@ begin
   TableMainForm.mPump.Lines.Add('Насос: ' + AParameters.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
 end;
 
+procedure TTableMainForm.SetT_WorkBench_First(const Value: Double);
+begin
+  FT_WorkBench_First := Value;
+end;
+
+procedure TTableMainForm.SetT_WorkBench_Last(const Value: Double);
+begin
+  FT_WorkBench_Last := Value;
+end;
+
 procedure TTableMainForm.EditDeviceFlowRateExit(Sender: TObject);
 begin
   UpdateDeviceImpSecFromFlowRate;
@@ -244,7 +261,9 @@ procedure TTableMainForm.FormCreate(Sender: TObject);
 var
 i:integer;
 begin
-
+  //Значения по умолчанию
+  FT_WorkBench_First:=20;
+  FT_WorkBench_Last:=20;
 
   FWorkTableManager := TWorkTableManager.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
@@ -275,7 +294,7 @@ begin
 
 
   FFrameMainTable := TFrameMainTable.Create(Self);
-  FFrameMainTable.Parent := TabItemTable;
+  FFrameMainTable.Parent := tiTable;
   FFrameMainTable.Align := TAlignLayout.Client;
   FFrameMainTable.WorkTableManager := FWorkTableManager ;
   FFrameMainTable.Initialize;
@@ -283,7 +302,7 @@ begin
 
 
   FFrameProceed := TFrameProceed.Create(Self);
-  FFrameProceed.Parent := TabItemResults;
+  FFrameProceed.Parent := tiResults;
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize(FWorkTableManager);
 
@@ -292,7 +311,7 @@ end;
 
 procedure TTableMainForm.tcMainChange(Sender: TObject);
 begin
-  if (tcMain.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
+  if (tcMain.ActiveTab = tiResults) and (FFrameProceed <> nil) then
     FFrameProceed.RefreshResultsTab;
 end;
 
@@ -307,10 +326,10 @@ begin
 
 
    //Температура до стола
-   AWorkTable.FluidTemp.BeforeValue :=  20 ;
+   AWorkTable.FluidTemp.BeforeValue :=  FT_WorkBench_First;
 
    //Температура после стола
-   AWorkTable.FluidTemp.AfterValue :=  20;
+   AWorkTable.FluidTemp.AfterValue :=  FT_WorkBench_Last;
 
 
 

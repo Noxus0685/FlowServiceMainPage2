@@ -4611,11 +4611,12 @@ procedure TFrameMainTable.UpdateUIFlowRate;
 var
   WorkTable: TWorkTable;
   i:integer;
-  AMax:Double;
+  AMax,tmpMax:Double;
   StableStatus: RStableInfo;
+  tmpDevice:TDevice;
 begin
     WorkTable := FActiveWorkTable;
-
+    tmpMax:=-1;
     if WorkTable = nil then
       Exit;
 
@@ -4628,8 +4629,13 @@ begin
    // begin
       for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
         begin
-          if AMax<FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4) then
-            Amax:=FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
+          tmpDevice:=FActiveWorkTable.EtalonChannels[i].FlowMeter.Device;
+          if Assigned(tmpDevice) then
+          begin
+               tmpMax:=FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(tmpDevice.Qmax,4);
+               if AMax<tmpMax then
+                  Amax:=tmpMax;
+          end;
         end;
       LayoutFlowRate.tag:=2;
       SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);

@@ -29,7 +29,7 @@ object TableMainForm: TTableMainForm
       752s
       1780s
       752s)
-    object TabItemTable: TTabItem
+    object tiTable: TTabItem
       CustomIcon = <
         item
         end>
@@ -44,7 +44,7 @@ object TableMainForm: TTableMainForm
       ExplicitSize.cx = 64.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
     end
-    object TabItemMnemo: TTabItem
+    object tiMnemo: TTabItem
       CustomIcon = <
         item
         end>
@@ -1315,7 +1315,7 @@ object TableMainForm: TTableMainForm
         end
       end
     end
-    object TabItemResults: TTabItem
+    object tiResults: TTabItem
       CustomIcon = <
         item
         end>
@@ -1330,7 +1330,7 @@ object TableMainForm: TTableMainForm
       ExplicitSize.cx = 81.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
     end
-    object TabItemTest: TTabItem
+    object tiTest: TTabItem
       CustomIcon = <
         item
         end>
