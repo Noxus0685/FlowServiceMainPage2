@@ -89,6 +89,8 @@ type
     function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil):Double;
     procedure UpdateDeviceImpSecFromFlowRate;
+    function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
+      const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
 
   public
@@ -104,17 +106,25 @@ implementation
 procedure TFormMain.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  FlowRate: Double;
+  ImpSecValues: TArray<Double>;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   UpdateDeviceImpSecFromFlowRate;
+  FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
+  ImpSecValues := BuildImpSecValuesForChannels(
+    WorkTable.DeviceChannels,
+    FlowRate,
+    NormalizeFloatInput(EditDeviceImpSec.Text)
+  );
 
   FFrameMainTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
-    NormalizeFloatInput(EditDeviceImpSec.Text),
+    ImpSecValues,
     NormalizeFloatInput(EditDeviceImpResult.Text)
   );
 
@@ -123,17 +133,25 @@ end;
 procedure TFormMain.ButtonApplyEtalonValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  FlowRate: Double;
+  ImpSecValues: TArray<Double>;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   UpdateEtalonImpSecFromFlowRate;
+  FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
+  ImpSecValues := BuildImpSecValuesForChannels(
+    WorkTable.EtalonChannels,
+    FlowRate,
+    NormalizeFloatInput(EditEtalonImpSec.Text)
+  );
 
   FFrameMainTable.ApplyChannelValues(
     WorkTable.EtalonChannels,
     NormalizeFloatInput(EditEtalonCurSec.Text),
-    NormalizeFloatInput(EditEtalonImpSec.Text),
+    ImpSecValues,
     NormalizeFloatInput(EditEtalonImpResult.Text)
   );
 
@@ -450,6 +468,27 @@ begin
     Result := AChannel.FlowMeter.Kp;
 end;
 
+function TFormMain.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
+  const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+var
+  I: Integer;
+  Coef: Double;
+begin
+  SetLength(Result, 0);
+  if AChannels = nil then
+    Exit;
+
+  SetLength(Result, AChannels.Count);
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Coef := GetChannelFlowCoef(AChannels[I]);
+    if Coef > 0 then
+      Result[I] := (AFlowRate * Coef) / 3.6
+    else
+      Result[I] := AFallbackImpSec;
+  end;
+end;
+
 procedure TFormMain.UpdateDeviceImpSecFromFlowRate;
 var
   WorkTable: TWorkTable;
@@ -516,7 +555,7 @@ var
   WorkTable:TWorkTable;
   i:integer;
   EnabledEtalonChannels: TObjectList<TChannel>;
-  AValue:Double;
+  ImpSecValues: TArray<Double>;
 begin
   if AFlowRate = nil then
     Exit;
@@ -557,7 +596,11 @@ begin
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
               NormalizeFloatInput('0'),
-              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels),
+              BuildImpSecValuesForChannels(
+                EnabledEtalonChannels,
+                FlowRate,
+                UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+              ),
               NormalizeFloatInput('0')
             );
 
