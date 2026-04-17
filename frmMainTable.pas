@@ -539,8 +539,8 @@ type
     procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer);
 
-    procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
-      AImpSec, AImpResult: Double);
+    procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
+      const AImpSecValues: TArray<Double>; const AImpResult: Double);
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
@@ -4322,11 +4322,12 @@ begin
  // UpdateGridMesurmentRun;
 end;
 
-procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec,
-  AImpSec, AImpResult: Double);
+procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
+  const AImpSecValues: TArray<Double>; const AImpResult: Double);
 var
   I: Integer;
   Channel: TChannel;
+  ChannelImpSec: Double;
 begin
   if AChannels = nil then
     Exit;
@@ -4337,8 +4338,13 @@ begin
     if Channel = nil then
       Continue;
 
+    if (Length(AImpSecValues) > I) then
+      ChannelImpSec := AImpSecValues[I]
+    else
+      ChannelImpSec := 0;
+
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := AImpSec;
+    Channel.ImpSec := ChannelImpSec;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else

@@ -89,6 +89,8 @@ type
     function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil):Double;
     procedure UpdateDeviceImpSecFromFlowRate;
+    function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
+      const ATotalImpSec: Double): TArray<Double>;
 
 
   public
@@ -104,17 +106,22 @@ implementation
 procedure TFormMain.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  ImpSecValues: TArray<Double>;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   UpdateDeviceImpSecFromFlowRate;
+  ImpSecValues := BuildImpSecValuesForChannels(
+    WorkTable.DeviceChannels,
+    NormalizeFloatInput(EditDeviceImpSec.Text)
+  );
 
   FFrameMainTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
-    NormalizeFloatInput(EditDeviceImpSec.Text),
+    ImpSecValues,
     NormalizeFloatInput(EditDeviceImpResult.Text)
   );
 
@@ -123,17 +130,22 @@ end;
 procedure TFormMain.ButtonApplyEtalonValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  ImpSecValues: TArray<Double>;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   UpdateEtalonImpSecFromFlowRate;
+  ImpSecValues := BuildImpSecValuesForChannels(
+    WorkTable.EtalonChannels,
+    NormalizeFloatInput(EditEtalonImpSec.Text)
+  );
 
   FFrameMainTable.ApplyChannelValues(
     WorkTable.EtalonChannels,
     NormalizeFloatInput(EditEtalonCurSec.Text),
-    NormalizeFloatInput(EditEtalonImpSec.Text),
+    ImpSecValues,
     NormalizeFloatInput(EditEtalonImpResult.Text)
   );
 
@@ -450,6 +462,55 @@ begin
     Result := AChannel.FlowMeter.Kp;
 end;
 
+function TFormMain.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
+  const ATotalImpSec: Double): TArray<Double>;
+var
+  I: Integer;
+  Coef: Double;
+  TotalCoef: Double;
+begin
+  SetLength(Result, 0);
+  if AChannels = nil then
+    Exit;
+
+  TotalCoef := 0;
+  for I := 0 to AChannels.Count - 1 do
+    if (AChannels[I] <> nil) and AChannels[I].Enabled then
+    begin
+      Coef := 0;
+      if (AChannels[I].FlowMeter <> nil) and (AChannels[I].FlowMeter.Device <> nil) then
+        Coef := AChannels[I].FlowMeter.Device.Coef;
+      if Coef <= 0 then
+        Coef := GetChannelFlowCoef(AChannels[I]);
+      if Coef <= 0 then
+        Coef := 1;
+      TotalCoef := TotalCoef + Coef;
+    end;
+
+  SetLength(Result, AChannels.Count);
+  if TotalCoef <= 0 then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    if (AChannels[I] = nil) or (not AChannels[I].Enabled) then
+    begin
+      Result[I] := 0;
+      Continue;
+    end;
+
+    Coef := 0;
+    if (AChannels[I].FlowMeter <> nil) and (AChannels[I].FlowMeter.Device <> nil) then
+      Coef := AChannels[I].FlowMeter.Device.Coef;
+    if Coef <= 0 then
+      Coef := GetChannelFlowCoef(AChannels[I]);
+    if Coef <= 0 then
+      Coef := 1;
+
+    Result[I] := ATotalImpSec * (Coef / TotalCoef);
+  end;
+end;
+
 procedure TFormMain.UpdateDeviceImpSecFromFlowRate;
 var
   WorkTable: TWorkTable;
@@ -472,9 +533,9 @@ function TFormMain.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
   AEtalonChannels: TObjectList<TChannel> = nil):Double;
 var
   WorkTable: TWorkTable;
-  FlowRate, Coef, ImpSec: Double;
-
-  i:integer;
+  FlowRate: Double;
+  Coef: Double;
+  I: Integer;
 begin
   Result := 0;
 
@@ -485,27 +546,28 @@ begin
 
 
 
-  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
-    for I := 0 to AEtalonChannels.Count - 1 do
-      Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
-  else if AEtalonChannels=nil then
-      Coef := GetChannelFlowCoef(AEtalonChannels[0]);
+  if (AEtalonChannels = nil) then
+    AEtalonChannels := WorkTable.EtalonChannels;
 
-  FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-
-
-
-  //for I := 0 to AEtalonChannels.Count - 1 do
- // Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i]);
-
-  if Coef <= 0 then
+  if (AEtalonChannels = nil) or (AEtalonChannels.Count = 0) then
     Exit;
-  if AFlowRate<>0 then
-    ImpSec := (AFlowRate * Coef) / 3.6
+
+  if AFlowRate <> 0 then
+    FlowRate := AFlowRate
   else
-    ImpSec := (FlowRate * Coef) / 3.6;
-  EditEtalonImpSec.Text := FloatToStr(ImpSec);
-  Result:= ImpSec;
+    FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
+
+  for I := 0 to AEtalonChannels.Count - 1 do
+  begin
+    if (AEtalonChannels[I] = nil) or (not AEtalonChannels[I].Enabled) then
+      Continue;
+
+    Coef := GetChannelFlowCoef(AEtalonChannels[I]);
+    if Coef > 0 then
+      Result := Result + (FlowRate * Coef) / 3.6;
+  end;
+
+  EditEtalonImpSec.Text := FloatToStr(Result);
 end;
 
 
@@ -516,7 +578,7 @@ var
   WorkTable:TWorkTable;
   i:integer;
   EnabledEtalonChannels: TObjectList<TChannel>;
-  AValue:Double;
+  ImpSecValues: TArray<Double>;
 begin
   if AFlowRate = nil then
     Exit;
@@ -554,10 +616,15 @@ begin
               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum((AFlowRate.Value.Value-1);
              //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
 
+            ImpSecValues := BuildImpSecValuesForChannels(
+              EnabledEtalonChannels,
+              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+            );
+
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
               NormalizeFloatInput('0'),
-              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels),
+              ImpSecValues,
               NormalizeFloatInput('0')
             );
 
