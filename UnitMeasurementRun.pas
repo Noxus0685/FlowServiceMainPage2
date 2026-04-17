@@ -199,7 +199,7 @@ type
     FForceNextPoint: Integer;
     FAttempt: Integer;
     FMaxAttemptCount: Integer;
-    FMeasureTimeoutMs: Cardinal;
+    FMeasureTimeout: Cardinal;
 
     FOnStateChangedFrame: TMeasurementRunStateChangedEvent;
     FOnStateChangedMain: TMeasurementRunStateChangedEvent;
@@ -221,14 +221,14 @@ type
     function SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function BuildPointSelectionLog(APoint: TDevicePoint): string;
     function BuildEtalonSelectionLog(APoint: TDevicePoint): string;
-    function CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
+    function CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
     function SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
 
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
 
-    function IsStable: Boolean;
+    function IsStable(StableInfo: RStableInfo): Boolean;
     function IsTerminated: Boolean;
   public
     constructor Create(AWorkTable: TWorkTable);
@@ -461,7 +461,7 @@ begin
   FForceNextPoint := -1;
   FMaxAttemptCount := 3;
   FAttempt := 0;
-  FMeasureTimeoutMs := 0;
+  FMeasureTimeout := 0;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -557,9 +557,13 @@ procedure TMeasurementRun.EnterStage(const ANewStage: EMeasurementState);
 begin
   FWaitStartedTick := TThread.GetTickCount64;
   case ANewStage of
+    msSelectPoint:
+     begin
+        FAttempt := 0;  // Кол-во выходов на параетры. Сборс попыток.
+     end;
+
     msWaitStable:
       begin
-        FAttempt := 0;
         if FWorkTable <> nil then
           FWorkTable.StartMonitor;
       end;
@@ -567,7 +571,7 @@ begin
       begin
         if FWorkTable <> nil then
           FWorkTable.StartTest;
-        FMeasureTimeoutMs := CalcMeasureTimeoutMs(GetCurrentPoint);
+        FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
         FireEvent(meMeasureStarted);
       end;
     msResultsRead:
@@ -667,7 +671,7 @@ begin
   Result := Assigned(FThread) and (not FThread.Finished);
 end;
 
-function TMeasurementRun.IsStable: Boolean;
+function TMeasurementRun.IsStable(StableInfo: RStableInfo): Boolean;
 var
   ParamStatus: Boolean;
 begin
@@ -1078,16 +1082,22 @@ begin
 
 end;
 
-function TMeasurementRun.CalcMeasureTimeoutMs(APoint: TDevicePoint): Cardinal;
+function TMeasurementRun.CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
 var
   TimeByLimit: Double;
   Q: Double;
 begin
-  Result := 70000;
+{  Result := 600;
   if APoint = nil then
     Exit;
 
+  if APoint.Q=0 then
+   if True then
+
+   Result := 600;
+
   Q := Max(APoint.Q, 0.000001);
+
   TimeByLimit := APoint.LimitTime;
   if APoint.LimitVolume > 0 then
     TimeByLimit := Max(TimeByLimit, APoint.LimitVolume / Q);
@@ -1095,7 +1105,7 @@ begin
     TimeByLimit := Max(TimeByLimit, APoint.LimitImp / Q);
   if TimeByLimit <= 0 then
     TimeByLimit := 600;
-  Result := Round((TimeByLimit + 10) * 1000);
+  Result := Round((TimeByLimit + 10) * 1000);     }
 end;
 
 function TMeasurementRun.SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
@@ -1175,6 +1185,7 @@ procedure TMeasurementRun.ProcessStage;
 var
   Point: TDevicePoint;
   Error: TErrorInfo;
+  StableInfo: RStableInfo;
   RepeatsTarget: Integer;
 begin
   Point := GetCurrentPoint;
@@ -1238,7 +1249,7 @@ begin
 
     msWaitStable:
       begin
-        if IsStable then
+        if IsStable(StableInfo) then
         begin
           GetCurrentPoint.Status:= 6;
           FireEvent(meStableReached);
@@ -1246,16 +1257,21 @@ begin
           Exit;
         end;
 
-        if (TThread.GetTickCount64 - FWaitStartedTick) > 30000 then
+        if (TThread.GetTickCount64 - FWaitStartedTick) > 30000 then  //Здесь должен быть тайм аут по выходу на расход
         begin
           Inc(FAttempt);
           if FAttempt < FMaxAttemptCount then
           begin
+             ProtocolManager.AddMessage(pcWarning, psUnknown, 'Таймаут установки параметров измерения',
+            'Попытка выход на параметры:', IntToStr(FAttempt) + ' из '+ IntToStr(FMaxAttemptCount));
             FireEvent(meStableRetry);
             SetStage(msSetupPoint);
           end
           else
           begin
+             ProtocolManager.AddMessage(pcError, psUnknown, 'Неудача при установке параметров измерения',
+            'Неудалось установить:', StableInfo.StatusText);     {Здесь должна формироваться подробная запись по StableInfo: объект,  заданное значение, текущее значение, отклонение заданного от текущего з в%, требуемое отклонение текущего от заданного в%, отклонение от среднего в%, требуемое отклонение от среднего в %, Время стабилизации потраченное, время стабилизации допустимое (ТаймАут)  }
+
             FireEvent(meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'));
             SetStage(msDone);
           end;
@@ -1273,7 +1289,7 @@ begin
           Exit;
         end;
 
-        if (TThread.GetTickCount64 - FWaitStartedTick) > FMeasureTimeoutMs then
+        if  (Int64(TThread.GetTickCount64 - FWaitStartedTick)  > Int64(FMeasureTimeout*1000)) then
         begin
           FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
           SetStage(msDone);
