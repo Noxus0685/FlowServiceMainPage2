@@ -4354,8 +4354,9 @@ begin
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
-  end;
+      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12)
+    end
+
 end;
 
 procedure TFrameMainTable.GridEtalonsSetValue(Sender: TObject;

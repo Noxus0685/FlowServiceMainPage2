@@ -528,7 +528,7 @@ begin
     for I := 0 to AEtalonChannels.Count - 1 do
       Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
   else if AEtalonChannels=nil then
-      Coef := GetChannelFlowCoef(AEtalonChannels[0]);
+      Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
 
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
 
@@ -565,49 +565,65 @@ begin
     AFlowRate.Status:=PARAM_STARTED
   else  if (AFlowRate.Action = ACTION_STOP) then
     AFlowRate.Status:=PARAM_STOPPED;
+
   WorkTable:= FWorkTableManager.ActiveWorkTable;
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
   begin
-    Flow := (Random * 10);
+
     if WorkTable=nil then
+    exit;
+
+    if WorkTable.ActivePump=nil then
     exit;
 
    if WorkTable.ActivePump.IsRunning=false then
     exit;
+      if AFlowRate.IsRunning then
+      begin
+        EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+        try
+          for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+            if (WorkTable.EtalonChannels[I] <> nil) and (WorkTable.EtalonChannels[I].Enabled) then
+              EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
-      EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
-      try
-        for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-          if (WorkTable.EtalonChannels[I] <> nil) and WorkTable.EtalonChannels[I].Enabled then
-            EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
-             if EnabledEtalonChannels.Count>1 then
-             i:=1;
+          for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+              if  not(WorkTable.DeviceChannels[I].Enabled) then
+                WorkTable.DeviceChannels[i].ImpResult:=0;
 
-            IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
-             FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4)
-            else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
-              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
-            else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
-              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
-             //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
 
-            FFrameMainTable.ApplyChannelValues(
-              EnabledEtalonChannels,
-              NormalizeFloatInput('0'),
-              BuildImpSecValuesForChannels(
+              IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
+              begin
+               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4);
+               AFlowRate.Action := ACTION_STOP;
+              end
+              else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
+                FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
+              else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
+                FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
+               //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
+
+
+
+              FFrameMainTable.ApplyChannelValues(
                 EnabledEtalonChannels,
-                FlowRate,
-                UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
-              ),
-              NormalizeFloatInput('0')
-            );
+                NormalizeFloatInput('0'),
+                BuildImpSecValuesForChannels(
+                  EnabledEtalonChannels,
+                  FlowRate,
+                  UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+                ),
+                NormalizeFloatInput('0')
+              );
 
 
-      finally
-        EnabledEtalonChannels.Free;
+        finally
+          EnabledEtalonChannels.Free;
+        end;
+
       end;
+
 
 
     FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
@@ -707,8 +723,8 @@ begin
     STATE_STARTMONITORWAIT:
       WorkTable.State := STATE_MONITOR;
 
-    STATE_MONITOR:
-       UpdateRandomSignals(WorkTable);
+   // STATE_MONITOR:
+       //UpdateRandomSignals(WorkTable);
 
     STATE_STOPMONITOR,
     STATE_CONFIGED:
