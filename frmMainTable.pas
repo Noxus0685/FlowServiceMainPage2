@@ -3172,7 +3172,9 @@ begin
   if WorkTable.CurrentPoint <> nil then
   begin
     if not EditTime.IsFocused then
-      if SameValue(WorkTable.CurrentPoint.LimitTime, -1, MinDouble) then
+      if SameValue(WorkTable.CurrentPoint.LimitTime, -1, MinDouble) or
+         SameValue(WorkTable.CurrentPoint.LimitTime, 0, MinDouble)
+         then
         EditTime.Text := '-'
       else
         EditTime.Text := FormatFloat('0.###', WorkTable.CurrentPoint.LimitTime);
@@ -3392,11 +3394,14 @@ begin
   SC := FActiveWorkTable.CurrentPoint.StopCriteria;
 
   if (Trim(EditTime.Text) = '-') or
-     (TryStrToFloat(EditTime.Text, Value) and SameValue(Value, -1, MinDouble)) then
+     (TryStrToFloat(EditTime.Text, Value) and SameValue(Value, -1, MinDouble)) or
+     (TryStrToFloat(EditTime.Text, Value) and SameValue(Value, 0, MinDouble))
+     then
   begin
     FActiveWorkTable.CurrentPoint.LimitTime := -1;
     Exclude(SC, scTime);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    EditTime.Text:='-';
     Exit;
   end;
 
