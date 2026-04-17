@@ -4327,24 +4327,30 @@ procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; c
 var
   I: Integer;
   Channel: TChannel;
-  ChannelImpSec: Double;
+  ChannelImpSec,a,b: Double;
 begin
   if AChannels = nil then
     Exit;
+   a:=0;
+    for I := 0 to AChannels.Count-1 do
+      begin
+        a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
+      end;
+
 
   for I := 0 to AChannels.Count - 1 do
   begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
-
+     b:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( Channel.FlowMeter.Device.Qmax,4)/a;
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec;
+    Channel.ImpSec := ChannelImpSec*b;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else

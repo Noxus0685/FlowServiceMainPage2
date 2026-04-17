@@ -590,7 +590,7 @@ begin
             else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
             else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
-              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum((AFlowRate.Value.Value-1);
+              FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
              //FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(1,4);
 
             FFrameMainTable.ApplyChannelValues(
