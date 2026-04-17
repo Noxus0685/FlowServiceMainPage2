@@ -71,8 +71,10 @@ type
     FNextFreqChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
 
+    procedure UpdateTemp(const AWorkTable: TWorkTable);
 
-    procedure UpdateRandomClimate(const AWorkTable: TWorkTable);
+
+    procedure UpdateRandomTemp(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure UpdateRandomFreq(const APump: TPump);
     procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
@@ -295,63 +297,170 @@ begin
     FFrameProceed.RefreshResultsTab;
 end;
 
-procedure TFormMain.UpdateRandomClimate(const AWorkTable: TWorkTable);
+procedure TFormMain.UpdateTemp(const AWorkTable: TWorkTable);
 var
-  TempDelta, PressDelta: Double;
-  StableStatus: RStableInfo;
+  TempDelta, PressDelta: Double; // Случайные приращения температуры и давления
+  StableStatus: RStableInfo;     // Информация о стабильности параметра
 begin
+  // Если рабочая таблица не задана — выходим
   if AWorkTable = nil then
     Exit;
 
-  IF (AWorkTable.FluidTemp.Action = ACTION_START) OR (AWorkTable.FluidTemp.Action = ACTION_SET)THEN
-    AWorkTable.FluidTemp.Status:=PARAM_STARTED
-  else  if (AWorkTable.FluidTemp.Action = ACTION_STOP) then
-    AWorkTable.FluidTemp.Status:=PARAM_STOPPED;
+
+   //Температура до стола
+   AWorkTable.FluidTemp.BeforeValue :=  20 ;
+
+   //Температура после стола
+   AWorkTable.FluidTemp.AfterValue :=  20;
 
 
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
-  if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
-  begin
 
-    TempDelta :=  (Random * 0.30) - 0.15;
-    PressDelta :=  (Random * 0.06) - 0.03;
+
+    // Если система регулирования запущена
     if (AWorkTable.FluidTemp.IsRunning) then
     begin
 
-      if NOT(AWorkTable.FluidTemp.IsStable(StableStatus))
-
-      AND  (AWorkTable.FluidTemp.Value.value<AWorkTable.FluidTemp.ValueSet.value)  THEN
+      // Если температура ещё НЕ стабилизировалась
+      if not AWorkTable.FluidTemp.IsStable(StableStatus) then
       begin
-        AWorkTable.FluidTemp.BeforeValue:=AWorkTable.FluidTemp.BeforeValue+1;
-        AWorkTable.FluidTemp.AfterValue:=(AWorkTable.FluidTemp.AfterValue+1);
+        //   AWorkTable.FluidTemp.ValueSet.Value; //Значение Уставки температуры
+         { }
       end
+      else
+        begin
+         {       }
+        end;
 
-    ELSE if not(AWorkTable.FluidTemp.IsStable(StableStatus))  THEN
+      end;
 
+end;
+
+
+
+
+
+
+
+
+procedure TFormMain.UpdateRandomTemp(const AWorkTable: TWorkTable);
+var
+  TempDelta, PressDelta: Double; // Случайные приращения температуры и давления
+  StableStatus: RStableInfo;     // Информация о стабильности параметра
+begin
+  // ============================================================
+  // 1. Проверка входных данных
+  // ============================================================
+
+  // Если рабочая таблица не задана — выходим
+  if AWorkTable = nil then
+    Exit;
+
+  // ============================================================
+  // 2. Обработка управляющих команд температуры
+  // ============================================================
+
+  // В зависимости от текущего действия (Action)
+  // обновляем статус параметра температуры
+
+  if (AWorkTable.FluidTemp.Action = ACTION_START) or
+     (AWorkTable.FluidTemp.Action = ACTION_SET) then
+
+    // Начато регулирование/установка температуры
+    AWorkTable.FluidTemp.Status := PARAM_STARTED
+
+  else if (AWorkTable.FluidTemp.Action = ACTION_STOP) then
+
+    // Остановка регулирования
+    AWorkTable.FluidTemp.Status := PARAM_STOPPED;
+
+
+  // ============================================================
+  // 3. Ограничение частоты обновления (не каждый тик таймера)
+  // ============================================================
+
+  // Обновляем температуру не постоянно, а раз в несколько секунд
+  if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
+  begin
+
+    // ----------------------------------------------------------
+    // 3.1 Генерация случайных изменений (шум системы)
+    // ----------------------------------------------------------
+
+    // Температура ±0.15
+    TempDelta := (Random * 0.30) - 0.15;
+
+    // Давление ±0.03 (сейчас не используется)
+    PressDelta := (Random * 0.06) - 0.03;
+
+
+    // ----------------------------------------------------------
+    // 3.2 Регулирование температуры (имитация ПИД-подобного поведения)
+    // ----------------------------------------------------------
+
+    // Если система регулирования запущена
+    if (AWorkTable.FluidTemp.IsRunning) then
+    begin
+
+      // Если температура ещё НЕ стабилизировалась
+      if not AWorkTable.FluidTemp.IsStable(StableStatus) then
       begin
-        AWorkTable.FluidTemp.BeforeValue:=(AWorkTable.FluidTemp.BeforeValue-1);
-        AWorkTable.FluidTemp.AfterValue:=(AWorkTable.FluidTemp.AfterValue-1);
+
+        // Если текущая температура меньше заданной → "нагреваем"
+        if AWorkTable.FluidTemp.Value.Value < AWorkTable.FluidTemp.ValueSet.Value then
+        begin
+          AWorkTable.FluidTemp.BeforeValue :=
+            AWorkTable.FluidTemp.BeforeValue + 1;
+
+          AWorkTable.FluidTemp.AfterValue :=
+            AWorkTable.FluidTemp.AfterValue + 1;
+        end
+        else
+        begin
+          // Иначе → "охлаждаем"
+          AWorkTable.FluidTemp.BeforeValue :=
+            AWorkTable.FluidTemp.BeforeValue - 1;
+
+          AWorkTable.FluidTemp.AfterValue :=
+            AWorkTable.FluidTemp.AfterValue - 1;
+        end;
+
       end;
 
     end;
 
 
-      if AWorkTable.FluidTemp.ValueSet.value<>0 then
-      begin
-        AWorkTable.FluidTemp.BeforeValue:=(EnsureRange(AWorkTable.FluidTemp.BeforeValue + TempDelta, -50.0, 150.0));
-        AWorkTable.FluidTemp.AfterValue:=(EnsureRange(AWorkTable.FluidTemp.AfterValue + TempDelta, -50.0, 150.0));
-      end;
+    // ----------------------------------------------------------
+    // 3.3 Добавление случайного шума (реалистичность)
+    // ----------------------------------------------------------
 
+    // Если задано целевое значение температуры
+    if AWorkTable.FluidTemp.ValueSet.Value <> 0 then
+    begin
+      // Добавляем небольшое случайное отклонение
+      // и ограничиваем диапазон допустимых значений
 
+      AWorkTable.FluidTemp.BeforeValue :=
+        EnsureRange(
+          AWorkTable.FluidTemp.BeforeValue + TempDelta,
+          -50.0, 150.0);
 
+      AWorkTable.FluidTemp.AfterValue :=
+        EnsureRange(
+          AWorkTable.FluidTemp.AfterValue + TempDelta,
+          -50.0, 150.0);
+    end;
 
+    // ----------------------------------------------------------
+    // 3.5 Планирование следующего изменения
+    // ----------------------------------------------------------
 
-    //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-    //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
-
+    // Следующее обновление через 3–4 секунды
     FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
-   end;
+  end;
 end;
+
+
+
 
 procedure TFormMain.UpdateRandomPress(const AWorkTable: TWorkTable);
 var
@@ -407,13 +516,13 @@ begin
    end;
 end;
 
-
-
-
 procedure TFormMain.UpdateRandomFreq(const APump: TPump);
 var
   Freq: Double;
 begin
+
+
+
   if APump = nil then
     Exit;
 
@@ -670,114 +779,241 @@ end;
 
 procedure TFormMain.TimerSetValuesTimer(Sender: TObject);
 var
-  WorkTable: TWorkTable;
-  Pump: tPump;
-  FlowRate: TFlowRate;
-  LimitReached: Boolean;
-  HasLimits: Boolean;
-  CurrentImp: Double;
-  CurrentVolume: Double;
+  WorkTable: TWorkTable;   // Текущая рабочая таблица (сессия измерения)
+  Pump: tPump;             // Активный насос (исполнитель)
+  FlowRate: TFlowRate;     // Управление расходом
+  LimitReached: Boolean;   // Флаг: достигнут хотя бы один критерий остановки
+  HasLimits: Boolean;      // Флаг: заданы ли критерии остановки
+  CurrentImp: Double;      // Текущие импульсы (максимум по эталонным каналам)
+  CurrentVolume: Double;   // Текущий измеренный объём/масса
   I: Integer;
 begin
- if FWorkTableManager.WorkTables.Count=0 then
-  exit;
- WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
 
+  // ============================================================
+  // 1. Получение рабочей таблицы
+  // ============================================================
+
+  // Если нет ни одной рабочей таблицы — выходим
+  if FWorkTableManager.WorkTables.Count = 0 then
+    Exit;
+
+  // Берём первую таблицу (по факту — активную)
+  // В будущем лучше заменить на FActiveWorkTable
+  WorkTable := FWorkTableManager.WorkTables[0];
+
+  // Дополнительная защита от nil
   if WorkTable = nil then
     Exit;
 
-   if FWorkTableManager.WorkTables.Count=0 then
-   Exit;
 
-   WorkTable := FWorkTableManager.WorkTables[0]; //FActiveWorkTable;
+  // ============================================================
+  // 2. Получение исполнительных объектов
+  // ============================================================
 
-  if WorkTable = nil then
-      Exit;
+  Pump := WorkTable.ActivePump;   // Насос (может быть nil)
+  FlowRate := WorkTable.FlowRate; // Контроллер расхода
+
+  // ============================================================
+  // 3. Эмуляция физического процесса (стенд)
+  // ============================================================
+
+  // Обновление частоты насоса (имитация работы)
+  UpdateRandomFreq(Pump);
+
+  // Обновление текущего расхода  (имитация работы)
+  UpdateRandomFlowRate(FlowRate);
+
+  // Обновление климатических параметров (температура и др.)
+  UpdateRandomTemp(WorkTable);
+
+  // Обновление давления
+  UpdateRandomPress(WorkTable);
 
 
-  try
-      Pump := WorkTable.ActivePump;
-      FlowRate:= WorkTable.FlowRate;
-  except
-      Exit;
-  end;
-  if Pump <> nil then
-     UpdateRandomFreq(Pump);
-  if Pump <> nil then
-     UpdateRandomFlowRate(FlowRate);
-    UpdateRandomClimate(WorkTable);
-    UpdateRandomPress(WorkTable);
+  UpdateTemp(WorkTable);
 
 
+
+
+  // ============================================================
+  // 4. Машина состояний измерения
+  // ============================================================
 
   case WorkTable.State of
+
+    // ------------------------------------------------------------
+    // Начальное состояние → переход в режим ожидания
+    // ------------------------------------------------------------
     STATE_NONE:
       WorkTable.State := STATE_STANDBY;
 
+
+    // ------------------------------------------------------------
+    // Ожидание → считаем, что система подключена
+    // ------------------------------------------------------------
     STATE_STANDBY:
       WorkTable.State := STATE_CONNECTED;
 
+
+    // ------------------------------------------------------------
+    // Запуск мониторинга
+    // ------------------------------------------------------------
     STATE_STARTMONITOR:
       WorkTable.State := STATE_STARTMONITORWAIT;
 
+
+    // ------------------------------------------------------------
+    // Ожидание запуска мониторинга → переход в мониторинг
+    // ------------------------------------------------------------
     STATE_STARTMONITORWAIT:
       WorkTable.State := STATE_MONITOR;
 
-    STATE_MONITOR:
-       UpdateRandomSignals(WorkTable);
 
+    // ------------------------------------------------------------
+    // Мониторинг (наблюдение без измерения)
+    // ------------------------------------------------------------
+    STATE_MONITOR:
+      UpdateRandomSignals(WorkTable); // обновление показаний
+
+
+    // ------------------------------------------------------------
+    // Остановка мониторинга или конфигурация
+    // → возвращаемся в подключённое состояние
+    // ------------------------------------------------------------
     STATE_STOPMONITOR,
     STATE_CONFIGED:
       WorkTable.State := STATE_CONNECTED;
 
+
+    // ------------------------------------------------------------
+    // Запуск теста
+    // ------------------------------------------------------------
     STATE_STARTTEST:
       WorkTable.State := STATE_STARTWAIT;
 
+
+    // ------------------------------------------------------------
+    // Ожидание старта → переход к выполнению
+    // ------------------------------------------------------------
     STATE_STARTWAIT:
       WorkTable.State := STATE_EXECUTE;
 
+
+    // ============================================================
+    // 5. Основной процесс измерения
+    // ============================================================
     STATE_EXECUTE:
-     begin
-       UpdateRandomSignals(WorkTable);
+    begin
+      // Обновление сигналов (имитация работы датчиков)
+      UpdateRandomSignals(WorkTable);
 
-       CurrentImp := 0;
-       for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-       begin
-         if (WorkTable.EtalonChannels[I] = nil) or (not WorkTable.EtalonChannels[I].Enabled) then
-           Continue;
 
-         CurrentImp := Max(CurrentImp, WorkTable.EtalonChannels[I].ImpResult);
-       end;
+      // ----------------------------------------------------------
+      // 5.1 Расчёт текущих импульсов
+      // ----------------------------------------------------------
 
-       CurrentVolume := 0;
-       if WorkTable.ValueQuantity <> nil then
-         CurrentVolume := WorkTable.ValueQuantity.GetDoubleValue;
+      CurrentImp := 0;
 
-       HasLimits := (WorkTable.CurrentPoint <> nil) and
-         (((scTime in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitTime > 0)) or
-          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitImp > 0)) or
-          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.CurrentPoint.LimitVolume > 0)));
+      for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+      begin
+        // Пропускаем неинициализированные или отключённые каналы
+        if (WorkTable.EtalonChannels[I] = nil) or
+           (not WorkTable.EtalonChannels[I].Enabled) then
+          Continue;
 
-       LimitReached := (WorkTable.CurrentPoint <> nil) and
-         (((scTime in WorkTable.CurrentPoint.StopCriteria) and (WorkTable.Time >= WorkTable.CurrentPoint.LimitTime)) or
-          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and (CurrentImp >= WorkTable.CurrentPoint.LimitImp)) or
-          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and (CurrentVolume >= WorkTable.CurrentPoint.LimitVolume)));
+        // Берём максимальное значение импульсов среди эталонов
+        // (используется как репрезентативное значение)
+        CurrentImp := Max(CurrentImp,
+                          WorkTable.EtalonChannels[I].ImpResult);
+      end;
 
-       if HasLimits and LimitReached then
-          WorkTable.State := STATE_STOPTEST;
-     end;
 
+      // ----------------------------------------------------------
+      // 5.2 Получение текущего объёма/массы
+      // ----------------------------------------------------------
+
+      CurrentVolume := 0;
+
+      // ValueQuantity — агрегированное значение измеренного количества
+      if WorkTable.ValueQuantity <> nil then
+        CurrentVolume := WorkTable.ValueQuantity.GetDoubleValue;
+
+
+      // ----------------------------------------------------------
+      // 5.3 Проверка наличия критериев остановки
+      // ----------------------------------------------------------
+
+      HasLimits :=
+        (WorkTable.CurrentPoint <> nil) and
+        (
+          // Ограничение по времени
+          ((scTime in WorkTable.CurrentPoint.StopCriteria) and
+           (WorkTable.CurrentPoint.LimitTime > 0)) or
+
+          // Ограничение по импульсам
+          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and
+           (WorkTable.CurrentPoint.LimitImp > 0)) or
+
+          // Ограничение по объёму/массе
+          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and
+           (WorkTable.CurrentPoint.LimitVolume > 0))
+        );
+
+
+      // ----------------------------------------------------------
+      // 5.4 Проверка достижения критериев остановки
+      // ----------------------------------------------------------
+
+      LimitReached :=
+        (WorkTable.CurrentPoint <> nil) and
+        (
+          // По времени
+          ((scTime in WorkTable.CurrentPoint.StopCriteria) and
+           (WorkTable.Time >= WorkTable.CurrentPoint.LimitTime)) or
+
+          // По импульсам
+          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and
+           (CurrentImp >= WorkTable.CurrentPoint.LimitImp)) or
+
+          // По объёму/массе
+          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and
+           (CurrentVolume >= WorkTable.CurrentPoint.LimitVolume))
+        );
+
+
+      // ----------------------------------------------------------
+      // 5.5 Завершение измерения
+      // ----------------------------------------------------------
+
+      // Если заданы ограничения и хотя бы одно достигнуто
+      // → инициируем остановку теста
+      if HasLimits and LimitReached then
+        WorkTable.State := STATE_STOPTEST;
+    end;
+
+
+    // ------------------------------------------------------------
+    // Инициация остановки теста
+    // ------------------------------------------------------------
     STATE_STOPTEST:
       WorkTable.State := STATE_STOPWAIT;
 
+
+    // ------------------------------------------------------------
+    // Ожидание полной остановки
+    // ------------------------------------------------------------
     STATE_STOPWAIT:
       WorkTable.State := STATE_COMPLETE;
 
+
+    // ------------------------------------------------------------
+    // Тест завершён → переход к финальному считыванию
+    // ------------------------------------------------------------
     STATE_COMPLETE:
       WorkTable.State := STATE_FINALREAD;
+
   end;
 end;
-
 
 
 
