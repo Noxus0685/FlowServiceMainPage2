@@ -116,7 +116,6 @@ uses
   System.StrUtils,
   System.IniFiles,
   System.Variants,
-  UnitParameter,
   UnitProtocols;
 
 type
@@ -680,7 +679,7 @@ end;
 
 function TMeasurementRun.IsStable: Boolean;
 var
-  ParamStatus: TStableInfo;
+  ParamStatus: Boolean;
 begin
   Result := True;
 
@@ -713,9 +712,9 @@ begin
   begin
     ManualPoint := TDevicePoint.Create(0);
     ManualPoint.FlowRate := 1; //FManualFlowRate;
-    ManualPoint.Q := FWorkTable.FlowRate.ValueSet.Value;
-    ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet.Value;
-    ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet.Value;
+    ManualPoint.Q := FWorkTable.FlowRate.ValueSet;
+    ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet;
+    ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet;
     ManualPoint.LimitTime := FWorkTable.TimeSet;
     ManualPoint.Repeats := FWorkTable.Repeats;
     ManualPoint.RepeatsProtocol := FWorkTable.Repeats;
