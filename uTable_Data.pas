@@ -1,4 +1,4 @@
-﻿unit uDATA;
+﻿unit uTable_Data;
 
 interface
 
@@ -24,7 +24,7 @@ type
 
   TTableColumns = TArray<TTableColumn>;
 
-  TDM = class(TDataModule)
+  TTableDM = class(TDataModule)
     TypesConnection: TFDConnection;
     FDPhysSQLiteDriverLink1: TFDPhysSQLiteDriverLink;
     Types: TFDTable;
@@ -74,8 +74,8 @@ type
 
 
 var
-  DM: TDM;
-  procedure OpenDatabase(ADM: TDM);
+  TableDM: TTableDM;
+  procedure OpenDatabase(ADM: TTableDM);
   procedure CreateTablesIfNotExist(AConnection: TFDConnection);
 
 
@@ -88,7 +88,7 @@ implementation
 uses
   System.IOUtils;
 
-constructor TDM.Create(const AFileName: string);
+constructor TTableDM.Create(const AFileName: string);
 begin
   inherited Create(nil);  // 🔥 КРИТИЧЕСКИ ВАЖНО
 
@@ -100,7 +100,7 @@ begin
 end;
 
 
-procedure TDM.CreateTablesIfNotExist;
+procedure TTableDM.CreateTablesIfNotExist;
 begin
   {--------------------------------------------------}
   { SQLite: включаем внешние ключи }
@@ -186,7 +186,7 @@ begin
     EnsureColumn('DeviceCategory', 'StdCategory', 'INTEGER');
 end;
 
-procedure TDM.CreateEmptyDatabase;
+procedure TTableDM.CreateEmptyDatabase;
 begin
   TFileStream.Create(FDatabaseFileName, fmCreate).Free;
 
@@ -195,7 +195,7 @@ begin
 end;
 
 
-destructor TDM.Destroy;
+destructor TTableDM.Destroy;
 begin
   if Assigned(TypesConnection) then
     TypesConnection.Connected := False;
@@ -206,7 +206,7 @@ begin
   inherited;
 end;
 
-procedure TDM.ApplySQLitePragmas(AConnection: TFDConnection);
+procedure TTableDM.ApplySQLitePragmas(AConnection: TFDConnection);
 var
   Q: TFDQuery;
 begin
@@ -229,7 +229,7 @@ begin
   end;
 end;
 
-procedure TDM.OpenDB;
+procedure TTableDM.OpenDB;
 begin
 
 
@@ -263,34 +263,34 @@ begin
   ApplySQLitePragmas(DevicesConnection);
 end;
 
-procedure TDM.CloseDB;
+procedure TTableDM.CloseDB;
 begin
   TypesConnection.Connected := False;
   DevicesConnection.Connected := False;
 end;
 
-function TDM.CreateQuery: TFDQuery;
+function TTableDM.CreateQuery: TFDQuery;
 begin
   Result := TFDQuery.Create(nil);
   Result.Connection := TypesConnection;
 end;
 
-procedure TDM.StartTransaction;
+procedure TTableDM.StartTransaction;
 begin
   TypesConnection.StartTransaction;
 end;
 
-procedure TDM.Commit;
+procedure TTableDM.Commit;
 begin
   TypesConnection.Commit;
 end;
 
-procedure TDM.Rollback;
+procedure TTableDM.Rollback;
 begin
   TypesConnection.Rollback;
 end;
 
-procedure TDM.ExecSQL(const ASQL: string);
+procedure TTableDM.ExecSQL(const ASQL: string);
 var
   Q: TFDQuery;
 begin
@@ -303,12 +303,12 @@ begin
   end;
 end;
 
-function TDM.IsConnected: Boolean;
+function TTableDM.IsConnected: Boolean;
 begin
   Result := TypesConnection.Connected;
 end;
 
-procedure TDM.EnsureColumn(
+procedure TTableDM.EnsureColumn(
   const ATable, AColumn, AType: string
 );
 begin
@@ -322,7 +322,7 @@ begin
     )
   );
 end;
-procedure TDM.EnsureIndex(
+procedure TTableDM.EnsureIndex(
   const AIndexName, ATable, AColumn: string
 );
 begin
@@ -334,7 +334,7 @@ begin
   );
 end;
 
-procedure TDM.EnsureTable(
+procedure TTableDM.EnsureTable(
   const ATable: string;
   const Columns: TTableColumns
 );
@@ -360,7 +360,7 @@ begin
   end;
 end;
 
-function TDM.ColumnExists(
+function TTableDM.ColumnExists(
   const ATable, AColumn: string
 ): Boolean;
 var
@@ -384,7 +384,7 @@ begin
   end;
 end;
 
-function TDM.GetTableColumns(const ATable: string): TStringList;
+function TTableDM.GetTableColumns(const ATable: string): TStringList;
 var
   Q: TFDQuery;
 begin
@@ -406,7 +406,7 @@ begin
   end;
 end;
 
-function TDM.TableExists(const ATable: string): Boolean;
+function TTableDM.TableExists(const ATable: string): Boolean;
 var
   Q: TFDQuery;
 begin
@@ -426,7 +426,7 @@ begin
   end;
 end;
 
-procedure TDM.CreateTable(
+procedure TTableDM.CreateTable(
   const ATable: string;
   const Columns: TTableColumns
 );
@@ -460,7 +460,7 @@ begin
   end;
 end;
 
-procedure TDM.SetDatabaseFileName(const Value: string);
+procedure TTableDM.SetDatabaseFileName(const Value: string);
 begin
  if FDatabaseFileName <> Value then
   begin
@@ -474,12 +474,12 @@ end;
 
 { }
 
-function TDM.GetDatabaseFileName: string;
+function TTableDM.GetDatabaseFileName: string;
 begin
   result:=FDatabaseFileName;
 end;
 
-procedure OpenDatabase(ADM: TDM);
+procedure OpenDatabase(ADM: TTableDM);
 var
   Q: TFDQuery;
 procedure InitDefaultData(AConnection: TFDConnection);

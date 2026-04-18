@@ -306,13 +306,13 @@
             <Form>FormTypeEditor</Form>
             <FormType>fmx</FormType>
         </DCCReference>
-        <DCCReference Include="UnitBaseProcedures.pas"/>
-        <DCCReference Include="UnitDataManager.pas"/>
-        <DCCReference Include="fuMain.pas">
-            <Form>FormMain</Form>
+        <DCCReference Include="uBaseProcedures.pas"/>
+        <DCCReference Include="uDataManager.pas"/>
+        <DCCReference Include="fuTable_Main.pas">
+            <Form>TableMainForm</Form>
             <FormType>fmx</FormType>
         </DCCReference>
-        <DCCReference Include="UnitDeviceClass.pas"/>
+        <DCCReference Include="uDeviceClass.pas"/>
         <DCCReference Include="fuDeviceSelect.pas">
             <Form>FormDeviceSelect</Form>
             <FormType>fmx</FormType>
@@ -321,18 +321,18 @@
             <Form>FormDeviceEditor</Form>
             <FormType>fmx</FormType>
         </DCCReference>
-        <DCCReference Include="uDATA.pas">
-            <Form>DM</Form>
+        <DCCReference Include="uTable_Data.pas">
+            <Form>TableDM</Form>
             <FormType>dfm</FormType>
             <DesignClass>TDataModule</DesignClass>
         </DCCReference>
-        <DCCReference Include="UnitClasses.pas"/>
-        <DCCReference Include="UnitFlowMeter.pas"/>
+        <DCCReference Include="uClasses.pas"/>
+        <DCCReference Include="uFlowMeter.pas"/>
         <DCCReference Include="fuMeterValues.pas">
             <Form>FormMeterValues</Form>
             <FormType>fmx</FormType>
         </DCCReference>
-        <DCCReference Include="UnitMeterValue.pas"/>
+        <DCCReference Include="uMeterValue.pas"/>
         <DCCReference Include="frmCalibrCoefs.pas">
             <Form>FrameCalibrCoefs</Form>
             <FormType>fmx</FormType>
@@ -348,17 +348,17 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
-        <DCCReference Include="UnitWorkTable.pas"/>
-        <DCCReference Include="UnitRepositories.pas"/>
-        <DCCReference Include="UnitMeasurementRun.pas"/>
+        <DCCReference Include="uWorkTable.pas"/>
+        <DCCReference Include="uRepositories.pas"/>
+        <DCCReference Include="uMeasurementRun.pas"/>
         <DCCReference Include="FmxHelper.pas"/>
-        <DCCReference Include="UnitParameter.pas"/>
+        <DCCReference Include="uParameter.pas"/>
         <DCCReference Include="frmMeasurementRun.pas">
             <Form>FrameMeasurementRun</Form>
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
-        <DCCReference Include="UnitProtocols.pas"/>
+        <DCCReference Include="uProtocols.pas"/>
         <DCCReference Include="frmProtocol.pas">
             <Form>FrameProtocol</Form>
             <FormType>fmx</FormType>
@@ -369,7 +369,7 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
-        <DCCReference Include="UnitObservable.pas"/>
+        <DCCReference Include="uObservable.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -1374,6 +1374,7 @@
                 <Platform value="Android64">True</Platform>
                 <Platform value="iOSDevice64">False</Platform>
                 <Platform value="iOSSimARM64">False</Platform>
+                <Platform value="Linux64">False</Platform>
                 <Platform value="OSX64">False</Platform>
                 <Platform value="OSXARM64">False</Platform>
                 <Platform value="Win32">True</Platform>

@@ -1,12 +1,12 @@
-﻿unit UnitRepositories;
+﻿unit uRepositories;
 
 
 interface
 uses
-  uData,
-  UnitClasses,
-  UnitDeviceClass,
-  UnitBaseProcedures,
+  uTable_Data,
+  uClasses,
+  uDeviceClass,
+  uBaseProcedures,
   System.Classes,
   System.SysUtils,    System.DateUtils,
   System.Generics.Collections,
@@ -35,14 +35,14 @@ type
     FWriteAccess: Boolean;
     FKind: TRepositoryKind;
     FState: TObjectState;
-    FDM: TDM;
+    FDM: TTableDM;
     FDescription: string;
   public
 
     constructor Create(
       const AName: string;
       AKind: TRepositoryKind;
-      ADM: TDM
+      ADM: TTableDM
     ); virtual;
 
      procedure Init(
@@ -167,7 +167,7 @@ type
 
   public
 
-    constructor Create(const AName: string; ADM: TDM);
+    constructor Create(const AName: string; ADM: TTableDM);
     destructor Destroy; override;
 
 
@@ -328,7 +328,7 @@ type
     { ================= META ================= }
 
      {$REGION 'Common'}
-    constructor Create(const AName: string; ADM: TDM);
+    constructor Create(const AName: string; ADM: TTableDM);
     destructor Destroy; override;
 
 
@@ -530,7 +530,7 @@ end;
 constructor TBaseRepository.Create(
   const AName: string;
   AKind: TRepositoryKind;
-  ADM: TDM
+  ADM: TTableDM
 );
 begin
   inherited Create;
@@ -588,7 +588,7 @@ end;
  {$REGION 'TypeRepository Methods'}
 constructor TTypeRepository.Create(
   const AName: string;
-  ADM: TDM
+  ADM: TTableDM
 );
 begin
   inherited Create(AName, rkType, ADM);
@@ -2986,7 +2986,7 @@ end;
  {$REGION 'TDeviceRepository methods'}
 constructor TDeviceRepository.Create(
   const AName: string;
-  ADM: TDM
+  ADM: TTableDM
 );
 begin
   {--------------------------------------------------}

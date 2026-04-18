@@ -4,11 +4,11 @@ interface
 
 uses
   fuTypeSelect,
-  UnitDataManager,
-  UnitDeviceClass,
-  UnitClasses,
-  UnitRepositories,
-  UnitBaseProcedures,
+  uDataManager,
+  uDeviceClass,
+  uClasses,
+  uRepositories,
+  uBaseProcedures,
   System.Math,
   System.Generics.Defaults,
 

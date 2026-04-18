@@ -6,30 +6,30 @@ uses
   FMX.Forms,
   fuTypeSelect in 'fuTypeSelect.pas' {FormTypeSelect},
   fuTypeEditor in 'fuTypeEditor.pas' {FormTypeEditor},
-  UnitBaseProcedures in 'UnitBaseProcedures.pas',
-  UnitDataManager in 'UnitDataManager.pas',
-  fuMain in 'fuMain.pas' {FormMain},
-  UnitDeviceClass in 'UnitDeviceClass.pas',
+  uBaseProcedures in 'uBaseProcedures.pas',
+  uDataManager in 'uDataManager.pas',
+  fuTable_Main in 'fuTable_Main.pas' {TableMainForm},
+  uDeviceClass in 'uDeviceClass.pas',
   fuDeviceSelect in 'fuDeviceSelect.pas' {FormDeviceSelect},
   fuDeviceEdit in 'fuDeviceEdit.pas' {FormDeviceEditor},
-  uDATA in 'uDATA.pas' {DM: TDataModule},
-  UnitClasses in 'UnitClasses.pas',
-  UnitFlowMeter in 'UnitFlowMeter.pas',
+  uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
+  uClasses in 'uClasses.pas',
+  uFlowMeter in 'uFlowMeter.pas',
   fuMeterValues in 'fuMeterValues.pas' {FormMeterValues},
-  UnitMeterValue in 'UnitMeterValue.pas',
+  uMeterValue in 'uMeterValue.pas',
   frmCalibrCoefs in 'frmCalibrCoefs.pas' {FrameCalibrCoefs: TFrame},
   frmProceed in 'frmProceed.pas' {FrameProceed: TFrame},
   frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
-  UnitWorkTable in 'UnitWorkTable.pas',
-  UnitRepositories in 'UnitRepositories.pas',
-  UnitMeasurementRun in 'UnitMeasurementRun.pas',
+  uWorkTable in 'uWorkTable.pas',
+  uRepositories in 'uRepositories.pas',
+  uMeasurementRun in 'uMeasurementRun.pas',
   FmxHelper in 'FmxHelper.pas',
-  UnitParameter in 'UnitParameter.pas',
+  uParameter in 'uParameter.pas',
   frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame},
-  UnitProtocols in 'UnitProtocols.pas',
+  uProtocols in 'uProtocols.pas',
   frmProtocol in 'frmProtocol.pas' {FrameProtocol: TFrame},
   frmFlowMeterProperties in 'frmFlowMeterProperties.pas' {FrameFlowMeterProperties: TFrame},
-  UnitObservable in 'UnitObservable.pas';
+  uObservable in 'uObservable.pas';
 
 {$R *.res}
 
@@ -45,7 +45,7 @@ begin
   {--------------------------------------------------}
   { Инициализация менеджера БД и репозиториев }
   {--------------------------------------------------}
-  DataManager:= TManagerTDM.Create(
+  DataManager:= TManagerTTableDM.Create(
     IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
     'Settings\\dbsettings.ini'
   );
@@ -64,7 +64,7 @@ begin
  // Application.CreateForm(TFormDeviceSelect, FormDeviceSelect);
  // Application.CreateForm(TFormTypeSelect, FormTypeSelect);
 //  Application.CreateForm(TFormTypeEditor, FormTypeEditor);
-  Application.CreateForm(TFormMain, FormMain);
+  Application.CreateForm(TTableMainForm, TableMainForm);
   Application.CreateForm(TFormMeterValues, FormMeterValues);
   //  Application.CreateForm(TFormDeviceEditor, FormDeviceEditor);
 //  Application.CreateForm(TDM, DM);

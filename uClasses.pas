@@ -1,12 +1,12 @@
-﻿unit UnitClasses;
+﻿unit uClasses;
 
 
 
 interface
 uses
     System.Generics.Defaults, System.DateUtils,
-    System.Generics.Collections,    System.StrUtils,    UnitBaseProcedures,
-  System.SysUtils, UnitMeterValue;
+    System.Generics.Collections,    System.StrUtils,    uBaseProcedures,
+    System.SysUtils, uMeterValue;
 const
   DEFAULT_TYPE_CERT_YEARS = 5;
 
@@ -481,8 +481,8 @@ type
 
 implementation
 uses
-  UnitDataManager,
-  UnitRepositories;
+  uDataManager,
+  uRepositories;
 
 function GetOutputTypeName(AType: TOutputType): string;
 begin

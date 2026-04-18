@@ -1,21 +1,21 @@
-﻿unit UnitWorkTable;
+﻿unit uWorkTable;
 
 interface
 
 uses
- UnitBaseProcedures,
-  UnitRepositories,
-  UnitFlowMeter,
-  UnitMeterValue,
-  UnitClasses, UnitDeviceClass,
-  UnitDataManager,
+  uBaseProcedures,
+  uRepositories,
+  uFlowMeter,
+  uMeterValue,
+  uClasses, uDeviceClass,
+  uDataManager,
   System.SysUtils,
   System.Math,
   System.StrUtils,
   System.IniFiles,
   System.Generics.Collections ,
-  UnitParameter,
-  UnitProtocols
+  uParameter,
+  uProtocols
   ;
 
 
@@ -591,7 +591,7 @@ implementation
 uses
   FmxHelper,
   frmMainTable,
-  UnitMeasurementRun;
+  uMeasurementRun;
 {$REGION 'TChannel'}
 
 procedure TChannel.InitMeterValues;
