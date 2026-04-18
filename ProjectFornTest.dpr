@@ -4,7 +4,6 @@ uses
   System.StartUpCopy,
   System.SysUtils,
   FMX.Forms,
-  fuTypeSelect in 'fuTypeSelect.pas' {FormTypeSelect},
   fuTypeEditor in 'fuTypeEditor.pas' {FormTypeEditor},
   uBaseProcedures in 'uBaseProcedures.pas',
   uDataManager in 'uDataManager.pas',
@@ -19,17 +18,18 @@ uses
   uMeterValue in 'uMeterValue.pas',
   frmCalibrCoefs in 'frmCalibrCoefs.pas' {FrameCalibrCoefs: TFrame},
   frmProceed in 'frmProceed.pas' {FrameProceed: TFrame},
-  frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame},
   uWorkTable in 'uWorkTable.pas',
   uRepositories in 'uRepositories.pas',
   uMeasurementRun in 'uMeasurementRun.pas',
   FmxHelper in 'FmxHelper.pas',
   uParameter in 'uParameter.pas',
-  frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame},
   uProtocols in 'uProtocols.pas',
-  frmProtocol in 'frmProtocol.pas' {FrameProtocol: TFrame},
+  uObservable in 'uObservable.pas',
+  fuTypeSelect in 'fuTypeSelect.pas' {FormTypeSelect},
   frmFlowMeterProperties in 'frmFlowMeterProperties.pas' {FrameFlowMeterProperties: TFrame},
-  uObservable in 'uObservable.pas';
+  frmProtocol in 'frmProtocol.pas' {FrameProtocol: TFrame},
+  frmMeasurementRun in 'frmMeasurementRun.pas' {FrameMeasurementRun: TFrame},
+  frmMainTable in 'frmMainTable.pas' {FrameMainTable: TFrame};
 
 {$R *.res}
 
