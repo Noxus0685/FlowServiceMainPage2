@@ -3,12 +3,12 @@
 interface
 
 uses
-  System.SysUtils,
   System.Classes,
-  System.Math,
+  System.Generics.Collections,
   System.IniFiles,
   System.IOUtils,
-  System.Generics.Collections;
+  System.Math,
+  System.SysUtils;
 
   const
   EPS = 1E-12;
@@ -284,7 +284,8 @@ type
 implementation
 
 uses
-  uBaseProcedures,FmxHelper;
+  FmxHelper,
+  uBaseProcedures;
 
 { Initializes class-level collections used to store all meter value instances. }
 class constructor TMeterValue.CreateClass;

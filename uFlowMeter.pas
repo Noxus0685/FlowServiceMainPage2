@@ -3,14 +3,12 @@
 interface
 
 uses
+  System.Classes,
+  System.Generics.Collections,
+  System.JSON,
+  System.SysUtils,
   uBaseProcedures,
   uClasses,
-
-
-  System.SysUtils,
-  System.Classes,
-  System.JSON,
-  System.Generics.Collections,
   uDeviceClass,
   uMeterValue;
 

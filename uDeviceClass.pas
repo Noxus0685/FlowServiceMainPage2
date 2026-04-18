@@ -2,11 +2,16 @@
 
 interface
 
- uses
-    uClasses,
-    System.Generics.Defaults, System.DateUtils,     System.Math,
-    System.Generics.Collections,    System.StrUtils,    uBaseProcedures,
-    System.SysUtils, uMeterValue;
+uses
+  System.DateUtils,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.Math,
+  System.StrUtils,
+  System.SysUtils,
+  uBaseProcedures,
+  uClasses,
+  uMeterValue;
 
 
 

@@ -3,20 +3,19 @@ unit frmProtocol;
 interface
 
 uses
-  uProtocols,
-  System.SysUtils,
-  System.Classes,
-  System.Generics.Collections,
-  System.UITypes,
-
-  FMX.Types,
   FMX.Controls,
+  FMX.Controls.Presentation,
   FMX.Forms,
-  FMX.StdCtrls,
+  FMX.Graphics,
   FMX.Layouts,
   FMX.ListBox,
-  FMX.Graphics,
-  FMX.Controls.Presentation;
+  FMX.StdCtrls,
+  FMX.Types,
+  System.Classes,
+  System.Generics.Collections,
+  System.SysUtils,
+  System.UITypes,
+  uProtocols;
 
 type
   TFrameProtocol = class(TFrame)

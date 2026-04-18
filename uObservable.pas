@@ -4,8 +4,8 @@ interface
 
 uses
   System.Classes,
-  System.SysUtils,
-  System.Generics.Collections;
+  System.Generics.Collections,
+  System.SysUtils;
 
 type
   IEventObserver = interface

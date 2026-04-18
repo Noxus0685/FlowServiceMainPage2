@@ -3,14 +3,36 @@
 interface
 
 uses
-  uClasses,
-  System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
-  System.Rtti, System.Math, System.DateUtils, System.Generics.Collections,
+  FMX.Controls,
+  FMX.Controls.Presentation,
+  FMX.Dialogs,
+  FMX.Forms,
+  FMX.Graphics,
+  FMX.Grid,
+  FMX.Grid.Style,
+  FMX.Layouts,
+  FMX.ListBox,
+  FMX.ScrollBox,
+  FMX.StdCtrls,
+  FMX.Types,
+  FMXTee.Chart,
+  FMXTee.Engine,
+  FMXTee.Procs,
+  FMXTee.Series,
+  System.Classes,
+  System.DateUtils,
+  System.Generics.Collections,
   System.Generics.Defaults,
-  FMX.Types, FMX.Graphics, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.StdCtrls,
-  FMX.Grid.Style, FMX.Layouts, FMX.Controls.Presentation, FMX.ScrollBox, FMX.Grid,
-  FMX.ListBox, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart, FMXTee.Series,
-  uFlowMeter, uMeterValue, uDeviceClass;
+  System.Math,
+  System.Rtti,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  System.Variants,
+  uClasses,
+  uDeviceClass,
+  uFlowMeter,
+  uMeterValue;
 
 type
   TFrameCalibrCoefs = class(TFrame)

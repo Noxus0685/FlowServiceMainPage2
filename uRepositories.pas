@@ -3,24 +3,38 @@
 
 interface
 uses
-  uTable_Data,
+  Data.DB,
+  FireDAC.Comp.Client,
+  FireDAC.Comp.DataSet,
+  FireDAC.DApt,
+  FireDAC.DApt.Intf,
+  FireDAC.DatS,
+  FireDAC.FMXUI.Wait,
+  FireDAC.Phys,
+  FireDAC.Phys.Intf,
+  FireDAC.Phys.SQLite,
+  FireDAC.Phys.SQLiteDef,
+  FireDAC.Phys.SQLiteWrapper.Stat,
+  FireDAC.Stan.Async,
+  FireDAC.Stan.Def,
+  FireDAC.Stan.Error,
+  FireDAC.Stan.ExprFuncs,
+  FireDAC.Stan.Intf,
+  FireDAC.Stan.Option,
+  FireDAC.Stan.Param,
+  FireDAC.Stan.Pool,
+  FireDAC.UI.Intf,
+  FMX.Dialogs,
+  System.Classes,
+  System.DateUtils,
+  System.Generics.Collections,
+  System.IOUtils,
+  System.StrUtils,
+  System.SysUtils,
+  uBaseProcedures,
   uClasses,
   uDeviceClass,
-  uBaseProcedures,
-  System.Classes,
-  System.SysUtils,    System.DateUtils,
-  System.Generics.Collections,
-  System.IOUtils,   System.StrUtils,
-
-  FireDAC.Stan.Intf, FireDAC.Stan.Option,
-  FireDAC.Stan.Error, FireDAC.UI.Intf, FireDAC.Phys.Intf, FireDAC.Stan.Def,
-  FireDAC.Stan.Pool, FireDAC.Stan.Async, FireDAC.Phys, FireDAC.Phys.SQLite,
-  FireDAC.Phys.SQLiteDef, FireDAC.Stan.ExprFuncs,
-  FireDAC.Stan.Param, FireDAC.DatS, FireDAC.DApt.Intf, FireDAC.DApt,
-  Data.DB, FireDAC.Comp.DataSet, FireDAC.Comp.Client, FireDAC.FMXUI.Wait,
-  FireDAC.Phys.SQLiteWrapper.Stat,
-  FMX.Dialogs
-  ;
+  uTable_Data;
 
 type
 
