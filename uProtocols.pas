@@ -3,10 +3,10 @@
 interface
 
 uses
-  System.SysUtils,
   System.Classes,
-  System.SyncObjs,
   System.Generics.Collections,
+  System.SyncObjs,
+  System.SysUtils,
   uObservable;
 
 type

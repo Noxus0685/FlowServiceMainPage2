@@ -3,20 +3,21 @@
 interface
 
 uses
+  FireDAC.Comp.Client,
+  FireDAC.Stan.Intf,
+  FireDAC.Stan.Option,
+  FireDAC.Stan.Param,
+  System.Classes,
+  System.DateUtils,
+  System.Generics.Collections,
+  System.IniFiles,
+  System.IOUtils,
+  System.SysUtils,
   uBaseProcedures,
-  uTable_DATA,
   uClasses,
   uDeviceClass,
   uRepositories,
-  System.IniFiles,
-  System.Classes,
-  System.SysUtils,    System.DateUtils,
-  System.IOUtils,
-  System.Generics.Collections,
-  FireDAC.Comp.Client,
-  FireDAC.Stan.Param,
-  FireDAC.Stan.Option,
-  FireDAC.Stan.Intf;
+  uTable_DATA;
 
 type
 

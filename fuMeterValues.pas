@@ -3,12 +3,31 @@
 interface
 
 uses
-  System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
+  FMX.Controls,
+  FMX.Controls.Presentation,
+  FMX.Dialogs,
+  FMX.Edit,
+  FMX.Forms,
+  FMX.Graphics,
+  FMX.Grid,
+  FMX.Grid.Style,
+  FMX.Layouts,
+  FMX.Objects,
+  FMX.ScrollBox,
+  FMX.StdCtrls,
+  FMX.TabControl,
+  FMX.Types,
+  FMXTee.Chart,
+  FMXTee.Engine,
+  FMXTee.Procs,
+  System.Classes,
   System.Generics.Collections,
-  FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
-  FMX.Controls.Presentation, FMX.StdCtrls, FMX.TabControl, FMX.Edit,
-  FMX.Layouts, FMX.Objects, FMX.Grid, FMX.Grid.Style, FMX.ScrollBox,
-  uMeterValue, System.Rtti, FMXTee.Engine, FMXTee.Procs, FMXTee.Chart;
+  System.Rtti,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  System.Variants,
+  uMeterValue;
 
 type
   TFormMeterValues = class(TForm)

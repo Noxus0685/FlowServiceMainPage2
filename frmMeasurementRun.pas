@@ -3,28 +3,29 @@
 interface
 
 uses
-  uMeasurementRun,
-  uWorkTable,
-  uDeviceClass,
-  uClasses,
-  uBaseProcedures,
-  uObservable,
-
-    System.Types,
-
-  System.Variants,
-  System.UITypes,
-  System.Math,
-  System.Generics.Collections,
-  System.SysUtils,
-  System.Rtti,
-  FMX.Types,
   FMX.Controls,
+  FMX.Controls.Presentation,
   FMX.Forms,
   FMX.Graphics,
   FMX.Grid,
-  FMX.StdCtrls, FMX.Grid.Style, System.Classes, FMX.Controls.Presentation,
-  FMX.ScrollBox;
+  FMX.Grid.Style,
+  FMX.ScrollBox,
+  FMX.StdCtrls,
+  FMX.Types,
+  System.Classes,
+  System.Generics.Collections,
+  System.Math,
+  System.Rtti,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  System.Variants,
+  uBaseProcedures,
+  uClasses,
+  uDeviceClass,
+  uMeasurementRun,
+  uObservable,
+  uWorkTable;
 
 type
   TFrameMeasurementRun = class(TFrame, IEventObserver)

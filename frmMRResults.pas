@@ -3,32 +3,30 @@
 interface
 
 uses
-  uMeasurementRun,
-  uWorkTable,
-  uDeviceClass,
-  uClasses,
-  uBaseProcedures,
-  uObservable,
-
+  FMX.Controls,
+  FMX.Controls.Presentation,
+  FMX.Dialogs,
+  FMX.Forms,
+  FMX.Graphics,
+  FMX.Grid,
+  FMX.Grid.Style,
+  FMX.ScrollBox,
+  FMX.StdCtrls,
+  FMX.Types,
+  System.Classes,
+  System.Generics.Collections,
+  System.Math,
+  System.Rtti,
   System.SysUtils,
   System.Types,
   System.UITypes,
-  System.Classes,
   System.Variants,
-  System.Math,
-  System.Rtti,
-  System.Generics.Collections,
-
-  FMX.Types,
-  FMX.Graphics,
-  FMX.Controls,
-  FMX.Forms,
-  FMX.Dialogs,
-  FMX.StdCtrls,
-  FMX.Grid.Style,
-  FMX.Grid,
-  FMX.Controls.Presentation,
-  FMX.ScrollBox;
+  uBaseProcedures,
+  uClasses,
+  uDeviceClass,
+  uMeasurementRun,
+  uObservable,
+  uWorkTable;
 
 type
   TMRResultCellState = (csEmpty, csPending, csRunning, csDoneValid, csDoneInvalid, csDoneWarning);

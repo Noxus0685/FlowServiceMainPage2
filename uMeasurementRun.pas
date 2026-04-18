@@ -97,27 +97,24 @@
 interface
 
 uses
-  uBaseProcedures,
-  uWorkTable,
-  uDeviceClass,
-  uClasses,
-  uRepositories,
-  uFlowMeter,
-  uMeterValue,
-  uDataManager,
-  uObservable,
-
-  System.SysUtils,
   System.Classes,
-  System.SyncObjs,
   System.Generics.Collections,
-
+  System.IniFiles,
   System.Math,
   System.StrUtils,
-  System.IniFiles,
+  System.SyncObjs,
+  System.SysUtils,
   System.Variants,
-
-  uProtocols;
+  uBaseProcedures,
+  uClasses,
+  uDataManager,
+  uDeviceClass,
+  uFlowMeter,
+  uMeterValue,
+  uObservable,
+  uProtocols,
+  uRepositories,
+  uWorkTable;
 
 type
 

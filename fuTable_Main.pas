@@ -3,18 +3,36 @@
 interface
 
 uses
-  frmProceed,
+  FMX.Colors,
+  FMX.Controls,
+  FMX.Controls.Presentation,
+  FMX.Edit,
+  FMX.EditBox,
+  FMX.Effects,
+  FMX.Filter.Effects,
+  FMX.Forms,
+  FMX.Layouts,
+  FMX.ListBox,
+  FMX.Memo,
+  FMX.Memo.Types,
+  FMX.Objects,
+  FMX.ScrollBox,
+  FMX.SpinBox,
+  FMX.StdCtrls,
+  FMX.TabControl,
+  FMX.Types,
   frmMainTable,
+  frmProceed,
+  System.Classes,
+  System.Generics.Collections,
+  System.Math,
+  System.SysUtils,
+  System.UITypes,
   uBaseProcedures,
-  uWorkTable,
   uClasses,
   uDataManager,
-  System.UITypes,
-  System.SysUtils, System.Classes, FMX.Types, FMX.Controls,  System.Generics.Collections, FMX.Forms, FMX.TabControl,
-  FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
-  FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
-  FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
-  FMX.EditBox, FMX.SpinBox,uParameter;
+  uParameter,
+  uWorkTable;
 
 type
   TTableMainForm = class(TForm)

@@ -1,24 +1,49 @@
 ﻿unit uBaseProcedures;
 
 interface
-   uses
-
-   System.Math,    System.StrUtils, System.Character,
-
-   System.NetEncoding,
-   System.DateUtils,
-   System.JSON,
-   System.Generics.Defaults,
-    System.Generics.Collections,
-
-  System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
-  FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
-  FMX.ListView.Types, FMX.ListView.Appearances, FMX.ListView.Adapters.Base,
-  System.Rtti, FMX.Grid.Style, FMX.StdCtrls, FMX.Menus, FMX.Edit, FMX.Grid,
-  FMX.Controls.Presentation, FMX.ScrollBox, FMX.TreeView, FMX.Layouts,
-  FMX.ListView, System.Actions, FMX.ActnList, FMX.ListBox, FMX.DateTimeCtrls,
-  FMX.Objects, System.Net.URLClient, System.Net.HttpClient,
-  System.Net.HttpClientComponent, FMX.Memo.Types, FMX.Memo;
+uses
+  FMX.ActnList,
+  FMX.Controls,
+  FMX.Controls.Presentation,
+  FMX.DateTimeCtrls,
+  FMX.Dialogs,
+  FMX.Edit,
+  FMX.Forms,
+  FMX.Graphics,
+  FMX.Grid,
+  FMX.Grid.Style,
+  FMX.Layouts,
+  FMX.ListBox,
+  FMX.ListView,
+  FMX.ListView.Adapters.Base,
+  FMX.ListView.Appearances,
+  FMX.ListView.Types,
+  FMX.Memo,
+  FMX.Memo.Types,
+  FMX.Menus,
+  FMX.Objects,
+  FMX.ScrollBox,
+  FMX.StdCtrls,
+  FMX.TreeView,
+  FMX.Types,
+  System.Actions,
+  System.Character,
+  System.Classes,
+  System.DateUtils,
+  System.Generics.Collections,
+  System.Generics.Defaults,
+  System.JSON,
+  System.Math,
+  System.Net.HttpClient,
+  System.Net.HttpClientComponent,
+  System.Net.URLClient,
+  System.NetEncoding,
+  System.Rtti,
+  System.StrUtils,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  System.Variants;
 
   const
   COLOR_INVALID = $FFFFECEC;   // Светло-красный: точка некорректна

@@ -3,10 +3,22 @@
 interface
 
 uses
-  System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
-  FMX.Types, FMX.Graphics, FMX.Controls, FMX.Forms, FMX.Dialogs, FMX.StdCtrls,
-  FMX.Layouts, FMX.Edit, FMX.ListBox,
-  uFlowMeter, uClasses;
+  FMX.Controls,
+  FMX.Dialogs,
+  FMX.Edit,
+  FMX.Forms,
+  FMX.Graphics,
+  FMX.Layouts,
+  FMX.ListBox,
+  FMX.StdCtrls,
+  FMX.Types,
+  System.Classes,
+  System.SysUtils,
+  System.Types,
+  System.UITypes,
+  System.Variants,
+  uClasses,
+  uFlowMeter;
 
 type
   TFrameFlowMeterProperties = class(TFrame)

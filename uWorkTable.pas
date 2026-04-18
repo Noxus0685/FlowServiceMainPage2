@@ -3,20 +3,20 @@
 interface
 
 uses
-  uBaseProcedures,
-  uRepositories,
-  uFlowMeter,
-  uMeterValue,
-  uClasses, uDeviceClass,
-  uDataManager,
-  System.SysUtils,
+  System.Generics.Collections,
+  System.IniFiles,
   System.Math,
   System.StrUtils,
-  System.IniFiles,
-  System.Generics.Collections ,
+  System.SysUtils,
+  uBaseProcedures,
+  uClasses,
+  uDataManager,
+  uDeviceClass,
+  uFlowMeter,
+  uMeterValue,
   uParameter,
-  uProtocols
-  ;
+  uProtocols,
+  uRepositories;
 
 
 type
