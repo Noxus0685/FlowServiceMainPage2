@@ -67,6 +67,9 @@ type
     LabelTestNum: TLabel;
     Label5: TLabel;
     mPump: TMemo;
+    Label1: TLabel;
+    EditStd: TEdit;
+    Label2: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -239,6 +242,9 @@ begin
     WorkTable.FlowRate.Status:=PARAM_STARTED
   else  if (WorkTable.FlowRate.Action = ACTION_STOP) then
     WorkTable.FlowRate.Status:=PARAM_STOPPED;
+
+  if (WorkTable.FlowRate.Action = ACTION_SET) or (WorkTable.FlowRate.Action = ACTION_START) then
+    WorkTable.ResetMeasurementValues;
 
 
    if WorkTable.FlowRate.IsRunning then
@@ -786,9 +792,14 @@ begin
               else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
                 Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
 
-
+          SetLength(ImpSecValues, EnabledDeviceChannels.Count);
            for I := 0 to EnabledDeviceChannels.Count - 1 do
-             ImpSecValues[i] := (Flow*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6;
+            if i in [1,3,6] then
+              ImpSecValues[i] := (Flow*((Random * 0.015) + 1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+            else if i in [2,4,5] then
+              ImpSecValues[i] := (Flow*((Random * 0.008) + 1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+            else
+              ImpSecValues[i] := (Flow*((Random * 0.01) +  1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
 
             FFrameMainTable.ApplyChannelValues(
               EnabledDeviceChannels,

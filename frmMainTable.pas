@@ -821,7 +821,7 @@ procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := STATE_STARTMONITOR;
+    FActiveWorkTable.StartMonitor;
     ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -830,7 +830,7 @@ procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := STATE_STOPMONITOR;
+    FActiveWorkTable.StopMonitor;
     ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -1353,6 +1353,7 @@ procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
 StableStatus: RStableInfo;
+i:integer;
 begin
 
   if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
@@ -1366,6 +1367,8 @@ begin
       FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
   end;
+
+
 end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
