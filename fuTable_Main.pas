@@ -727,7 +727,7 @@ begin
               else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
                 FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
 
-            AValue:= WorkTable.DeviceChannels[0].ValueResult;
+
 
              ImpSecValues := BuildImpSecValuesForChannels(
               EnabledEtalonChannels,
