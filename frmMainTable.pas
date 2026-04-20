@@ -4479,15 +4479,10 @@ procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; c
 var
   I: Integer;
   Channel: TChannel;
-  ChannelImpSec,a,b: Double;
+  ChannelImpSec: Double;
 begin
   if AChannels = nil then
     Exit;
-
-   for I := 0 to AChannels.Count-1 do
-        begin
-          a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
-        end;
 
 
   for I := 0 to AChannels.Count - 1 do
@@ -4495,7 +4490,7 @@ begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
-    b:= (FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(Channel.FlowMeter.Device.Qmax,4))/a;
+
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else

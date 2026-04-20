@@ -685,10 +685,10 @@ begin
   if AChannels = nil then
     Exit;
 
-       for I := 0 to AChannels.Count-1 do
-        begin
-          SUM:=SUM+WorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
-        end;
+   for I := 0 to AChannels.Count-1 do
+    begin
+      SUM:=SUM+WorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
+    end;
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
@@ -710,6 +710,7 @@ var
   FlowRate: TFlowRate;
   i:integer;
   EnabledEtalonChannels: TObjectList<TChannel>;
+  EnabledDeviceChannels: TObjectList<TChannel>;
   AValue:Double;
   ImpSecValues: TArray<Double>;
   TotalQmax: Double;
@@ -769,6 +770,35 @@ begin
 
         finally
           EnabledEtalonChannels.Free;
+        end;
+        EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
+        try
+          for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+            begin
+            if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].Enabled) then
+              EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
+            end;
+
+              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
+               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
+              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
+                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
+                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+
+
+           for I := 0 to EnabledDeviceChannels.Count - 1 do
+             ImpSecValues[i] := (Flow*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6;
+
+            FFrameMainTable.ApplyChannelValues(
+              EnabledDeviceChannels,
+              NormalizeFloatInput('0'),
+              ImpSecValues,
+              NormalizeFloatInput('0')
+            );
+
+        finally
+          EnabledDeviceChannels.Free;
         end;
 
       end;
