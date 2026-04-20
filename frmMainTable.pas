@@ -4484,9 +4484,9 @@ begin
   if AChannels = nil then
     Exit;
 
-   for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
+   for I := 0 to AChannels.Count-1 do
         begin
-          a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
+          a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
         end;
 
 
@@ -4495,7 +4495,7 @@ begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
-    b:= Channel.FlowMeter.Device.Qmax/a;
+    b:= (FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(Channel.FlowMeter.Device.Qmax,4))/a;
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
