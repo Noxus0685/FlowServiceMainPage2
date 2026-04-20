@@ -686,15 +686,12 @@ end;
 
 procedure TTableMainForm.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
 var
+  Flow: Double;
   FlowRate: Double;
   WorkTable:TWorkTable;
   i:integer;
   EnabledEtalonChannels: TObjectList<TChannel>;
-  TotalQmax: Double;
-  ChannelQmax: Double;
-  ChannelFlowRate: Double;
-  ChannelCoef: Double;
-  ChannelRatio: Double;
+  AValue:Double;
   ImpSecValues: TArray<Double>;
 begin
   if AFlowRate = nil then
@@ -732,42 +729,14 @@ begin
               else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
                 FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
 
-            SetLength(ImpSecValues, EnabledEtalonChannels.Count);
-            TotalQmax := 0.0;
-            for I := 0 to EnabledEtalonChannels.Count - 1 do
-            begin
-              ChannelQmax := 0.0;
-              if (EnabledEtalonChannels[I] <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter.Device <> nil) then
-                ChannelQmax := WorkTable.ValueFlowRate.GetDoubleBaseNum(
-                  EnabledEtalonChannels[I].FlowMeter.Device.Qmax, 4
-                );
-              TotalQmax := TotalQmax + ChannelQmax;
-            end;
 
-            for I := 0 to EnabledEtalonChannels.Count - 1 do
-            begin
-              ChannelQmax := 0.0;
-              if (EnabledEtalonChannels[I] <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter.Device <> nil) then
-                ChannelQmax := WorkTable.ValueFlowRate.GetDoubleBaseNum(
-                  EnabledEtalonChannels[I].FlowMeter.Device.Qmax, 4
-                );
 
-              if TotalQmax > 0 then
-                ChannelRatio := ChannelQmax / TotalQmax
-              else
-                ChannelRatio := 0.0;
-
-              ChannelFlowRate := FlowRate * ChannelRatio;
-              ChannelCoef := GetChannelFlowCoef(EnabledEtalonChannels[I]);
-              if ChannelCoef > 0 then
-                ImpSecValues[I] := (ChannelFlowRate * ChannelCoef) / 3.6
-              else
-                ImpSecValues[I] := 0.0;
-            end;
+             ImpSecValues := BuildImpSecValuesForChannels(
+              EnabledEtalonChannels,
+              FlowRate,
+              //UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+              NormalizeFloatInput(EditDeviceImpSec.Text)
+            );
 
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
