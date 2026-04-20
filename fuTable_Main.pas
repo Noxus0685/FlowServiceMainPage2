@@ -677,18 +677,26 @@ function TTableMainForm.BuildImpSecValuesForChannels(AChannels: TObjectList<TCha
   const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
   I: Integer;
-  Coef: Double;
+  Coef,SUM,MaxRatio : Double;
+  WorkTable:tWorkTable;
 begin
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   SetLength(Result, 0);
   if AChannels = nil then
     Exit;
 
+       for I := 0 to AChannels.Count-1 do
+        begin
+          SUM:=SUM+WorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
+        end;
+
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
+    MaxRatio := (WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[i].FlowMeter.Device.Qmax,4))/SUM;
     Coef := GetChannelFlowCoef(AChannels[I]);
     if Coef > 0 then
-      Result[I] := (AFlowRate * Coef) / 3.6
+      Result[I] := (AFlowRate*MaxRatio * Coef) / 3.6
     else
       Result[I] := AFallbackImpSec;
   end;
@@ -704,6 +712,11 @@ var
   EnabledEtalonChannels: TObjectList<TChannel>;
   AValue:Double;
   ImpSecValues: TArray<Double>;
+  TotalQmax: Double;
+  ChannelQmax: Double;
+  ChannelFlowRate: Double;
+  ChannelCoef: Double;
+  ChannelRatio: Double;
 begin
 
   FlowRate := AWorkTable.FlowRate; // Контроллер расхода
@@ -734,7 +747,7 @@ begin
               IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
               else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
               else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
                 Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
 

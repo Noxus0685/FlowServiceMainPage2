@@ -4502,7 +4502,7 @@ begin
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec*b;
+    Channel.ImpSec := ChannelImpSec;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
