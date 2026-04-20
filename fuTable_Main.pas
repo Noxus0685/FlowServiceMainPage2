@@ -689,11 +689,6 @@ var
   EnabledEtalonChannels: TObjectList<TChannel>;
   AValue:Double;
   ImpSecValues: TArray<Double>;
-  FlowRates: TArray<Double>;
-  SumQmax: Double;
-  ChannelQmax: Double;
-  ChannelCoef: Double;
-  FallbackImpSec: Double;
 begin
   if AFlowRate = nil then
     Exit;
@@ -732,43 +727,11 @@ begin
               else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
                 FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
 
-            FallbackImpSec := UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels);
-            SumQmax := 0;
-            SetLength(FlowRates, EnabledEtalonChannels.Count);
-            for I := 0 to EnabledEtalonChannels.Count - 1 do
-              if (EnabledEtalonChannels[I] <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter.Device <> nil) then
-                SumQmax := SumQmax +
-                  WorkTable.ValueFlowRate.GetDoubleBaseNum(
-                    EnabledEtalonChannels[I].FlowMeter.Device.Qmax, 4
-                  );
-
-            for I := 0 to EnabledEtalonChannels.Count - 1 do
-            begin
-              if (EnabledEtalonChannels[I] <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter <> nil) and
-                 (EnabledEtalonChannels[I].FlowMeter.Device <> nil) and
-                 (SumQmax > 0) then
-              begin
-                ChannelQmax := WorkTable.ValueFlowRate.GetDoubleBaseNum(
-                  EnabledEtalonChannels[I].FlowMeter.Device.Qmax, 4
-                );
-                FlowRates[I] := FlowRate * (ChannelQmax / SumQmax);
-              end
-              else
-                FlowRates[I] := FlowRate;
-            end;
-
-            SetLength(ImpSecValues, EnabledEtalonChannels.Count);
-            for I := 0 to EnabledEtalonChannels.Count - 1 do
-            begin
-              ChannelCoef := GetChannelFlowCoef(EnabledEtalonChannels[I]);
-              if ChannelCoef > 0 then
-                ImpSecValues[I] := (FlowRates[I] * ChannelCoef) / 3.6
-              else
-                ImpSecValues[I] := FallbackImpSec;
-            end;
+             ImpSecValues := BuildImpSecValuesForChannels(
+              EnabledEtalonChannels,
+              FlowRate,
+              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+            );
 
             FFrameMainTable.ApplyChannelValues(
               EnabledEtalonChannels,
