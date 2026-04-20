@@ -233,11 +233,16 @@ AValue:Double;
 begin
   WorkTable:= FWorkTableManager.ActiveWorkTable;
   TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet.value)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
-  if WorkTable.FlowRate.ValueSet.value>=WorkTable.FlowRate.Value.value then
-    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
-  else
-    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-random(5));
-  WorkTable.ActivePump.DoPumpStart;
+
+
+    if WorkTable.FlowRate.ValueSet.value>=WorkTable.FlowRate.Value.value then
+      WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
+    else
+      WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-random(5));
+    if WorkTable.ActivePump.Value.value<12 then
+      WorkTable.ActivePump.ValueSet.value:=12;
+    WorkTable.ActivePump.DoPumpStart;
+
 
 end;
 
@@ -342,15 +347,14 @@ begin
   if AWorkTable = nil then
     Exit;
 
-
+ {
    //Температура до стола
    AWorkTable.FluidTemp.BeforeValue :=  FT_WorkBench_First;
 
    //Температура после стола
    AWorkTable.FluidTemp.AfterValue :=  FT_WorkBench_Last;
 
-
-
+}
 
     // Если система регулирования запущена
     if (AWorkTable.FluidTemp.IsRunning) then
@@ -648,7 +652,7 @@ begin
       Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
 
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
+  //Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
   if Coef <= 0 then
     Exit;
   if AFlowRate<>0 then
@@ -710,8 +714,6 @@ begin
     if WorkTable.ActivePump=nil then
     exit;
 
-   if WorkTable.ActivePump.IsRunning=false then
-    exit;
       if AFlowRate.IsRunning then
       begin
         EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
@@ -732,7 +734,8 @@ begin
              ImpSecValues := BuildImpSecValuesForChannels(
               EnabledEtalonChannels,
               FlowRate,
-              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+              //UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+              NormalizeFloatInput(EditDeviceImpSec.Text)
             );
 
             FFrameMainTable.ApplyChannelValues(
