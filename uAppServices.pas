@@ -18,10 +18,10 @@ type
   private
     FBasePath: string;
     FOwnsDataManager: Boolean;
+    FProtocolManager: TProtocolManager;
     FWorkTableManager: TWorkTableManager;
     FInitialized: Boolean;
 
-    function GetProtocolManager: TProtocolManager;
     function BuildSettingsPath(const AFileName: string): string;
     procedure EnsureSettingsDirectory;
     procedure LoadPersistentState;
@@ -51,7 +51,7 @@ type
 
     property WorkTableManager: TWorkTableManager read FWorkTableManager;
     property DataManagerRef: TManagerTTableDM read DataManager;
-    property ProtocolManagerRef: TProtocolManager read GetProtocolManager;
+    property ProtocolManagerRef: TProtocolManager read FProtocolManager;
     property Initialized: Boolean read FInitialized;
   end;
 
@@ -73,6 +73,7 @@ begin
     FBasePath := IncludeTrailingPathDelimiter(ABasePath);
 
   FOwnsDataManager := False;
+  FProtocolManager := nil;
   FWorkTableManager := nil;
   FInitialized := False;
 end;
@@ -88,11 +89,6 @@ end;
 function TAppServices.BuildSettingsPath(const AFileName: string): string;
 begin
   Result := TPath.Combine(TPath.Combine(FBasePath, 'Settings'), AFileName);
-end;
-
-function TAppServices.GetProtocolManager: TProtocolManager;
-begin
-  Result := uProtocols.ProtocolManager;
 end;
 
 procedure TAppServices.EnsureSettingsDirectory;
@@ -114,6 +110,9 @@ begin
     Exit;
 
   EnsureSettingsDirectory;
+
+  if FProtocolManager = nil then
+    FProtocolManager := TProtocolManager.Create;
 
   if DataManager = nil then
   begin
@@ -170,6 +169,8 @@ begin
 
   if FOwnsDataManager and (DataManager <> nil) then
     FreeAndNil(DataManager);
+
+  FreeAndNil(FProtocolManager);
 
   ResetGlobalStatics;
   FOwnsDataManager := False;

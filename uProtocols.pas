@@ -88,10 +88,12 @@ type
     property Paused: Boolean read FPaused;
   end;
 
-var
-  ProtocolManager: TProtocolManager;
+function ProtocolManager: TProtocolManager;
 
 implementation
+
+uses
+  uAppServices;
 
 { TProtocolMessage }
 
@@ -356,10 +358,12 @@ begin
     Result := Result + ' (' + Msg.Params + ')';
 end;
 
-initialization
-  ProtocolManager := TProtocolManager.Create;
-
-finalization
-  FreeAndNil(ProtocolManager);
+function ProtocolManager: TProtocolManager;
+begin
+  if AppServices <> nil then
+    Result := AppServices.ProtocolManagerRef
+  else
+    Result := nil;
+end;
 
 end.
