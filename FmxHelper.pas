@@ -1,4 +1,4 @@
-unit FmxHelper;
+﻿unit FmxHelper;
 
 interface
 uses  System.SysUtils,
@@ -198,13 +198,16 @@ var
   LogCriticalSection: TCriticalSection;
 
 const
-  PICCHAR:array[$C0..$FF] of cHAR=( 'À','Á','Â','Ã','Ä','Å','Æ','Ç','È',
-  'É','Ê',  'Ë','Ì','Í','Î','Ï','Ð','Ñ','Ò','Ó','Ô',
-  'Õ','Ö','×','Ø','Ù','Ú','Û','Ü','Ý','Þ','ß',
-  'à','á','â','ã','ä','å','æ','ç','è','é','ê','ë','ì',
-  'í','î','ï','ð','ñ','ò','ó','ô','õ','ö','÷','ø','ù',
-  'ú','û','ü','ý','þ','ÿ'
-  );
+PICCHAR: array[$C0..$FF] of Char = (
+  Char('À'), Char('Á'), Char('Â'), Char('Ã'), Char('Ä'), Char('Å'), Char('Æ'), Char('Ç'), Char('È'),
+  Char('É'), Char('Ê'), Char('Ë'), Char('Ì'), Char('Í'), Char('Î'), Char('Ï'), Char('Ð'), Char('Ñ'),
+  Char('Ò'), Char('Ó'), Char('Ô'), Char('Õ'), Char('Ö'), Char('×'), Char('Ø'), Char('Ù'), Char('Ú'),
+  Char('Û'), Char('Ü'), Char('Ý'), Char('Þ'), Char('ß'),
+  Char('à'), Char('á'), Char('â'), Char('ã'), Char('ä'), Char('å'), Char('æ'), Char('ç'), Char('è'),
+  Char('é'), Char('ê'), Char('ë'), Char('ì'), Char('í'), Char('î'), Char('ï'), Char('ð'), Char('ñ'),
+  Char('ò'), Char('ó'), Char('ô'), Char('õ'), Char('ö'), Char('÷'), Char('ø'), Char('ù'),
+  Char('ú'), Char('û'), Char('ü'), Char('ý'), Char('þ'), Char('ÿ')
+);
 
 CRCtable:  ARRAY[0..255] OF LongWord =
     ($00000000, $77073096, $EE0E612C, $990951BA,
