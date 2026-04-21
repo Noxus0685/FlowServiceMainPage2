@@ -1,25 +1,26 @@
-object TableMainForm: TTableMainForm
+object FormMain: TFormMain
   Left = 0
   Top = 0
-  Caption = #1058#1072#1073#1083#1080#1095#1085#1086#1077' '#1087#1088#1077#1076#1089#1090#1072#1074#1083#1077#1085#1080#1077
+  Caption = 'fuMain'
   ClientHeight = 778
   ClientWidth = 1780
+  Visible = True
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
   OnCreate = FormCreate
   OnClose = FormClose
   DesignerMasterStyle = 0
-  object tcMain: TTabControl
+  object TabControlMain: TTabControl
     Align = Client
     Size.Width = 1780.000000000000000000
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 0
+    TabIndex = 2
     TabOrder = 0
     TabPosition = PlatformDefault
-    OnChange = tcMainChange
+    OnChange = TabControlMainChange
     Sizes = (
       1780s
       752s
@@ -29,12 +30,12 @@ object TableMainForm: TTableMainForm
       752s
       1780s
       752s)
-    object tiTable: TTabItem
+    object TabItemTable: TTabItem
       CustomIcon = <
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -44,7 +45,7 @@ object TableMainForm: TTableMainForm
       ExplicitSize.cx = 64.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
     end
-    object tiMnemo: TTabItem
+    object TabItemMnemo: TTabItem
       CustomIcon = <
         item
         end>
@@ -1315,12 +1316,12 @@ object TableMainForm: TTableMainForm
         end
       end
     end
-    object tiResults: TTabItem
+    object TabItemResults: TTabItem
       CustomIcon = <
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 81.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1330,7 +1331,7 @@ object TableMainForm: TTableMainForm
       ExplicitSize.cx = 81.000000000000000000
       ExplicitSize.cy = 26.000000000000000000
     end
-    object tiTest: TTabItem
+    object TabItemTest: TTabItem
       CustomIcon = <
         item
         end>
