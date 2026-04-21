@@ -28,6 +28,7 @@ uses
   uParameter in 'uParameter.pas',
   uProtocols in 'uProtocols.pas',
   uRepositories in 'uRepositories.pas',
+  uAppServices in 'uAppServices.pas',
   uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
   uWorkTable in 'uWorkTable.pas';
 
@@ -36,26 +37,8 @@ uses
 
 begin
   Application.Initialize;
-
-  ForceDirectories(
-    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'Settings'
-  );
-
-  {--------------------------------------------------}
-  { Инициализация менеджера БД и репозиториев }
-  {--------------------------------------------------}
-  DataManager:= TManagerTTableDM.Create(
-    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'Settings\\dbsettings.ini'
-  );
-
-  DataManager.Load;
-
-  {--------------------------------------------------}
-  { Передаём менеджер формам (через глобальную ссылку }
-  { или через отдельный модуль AppContext) }
-  {--------------------------------------------------}
+  AppServices := TAppServices.Create;
+  AppServices.Initialize;
 
 
   {--------------------------------------------------}
@@ -71,7 +54,9 @@ begin
   Application.Run;
 
   {--------------------------------------------------}
-  { Завершение }
+  { Централизованное завершение }
   {--------------------------------------------------}
-  FreeAndNil(DataManager);
+  if AppServices <> nil then
+    AppServices.Shutdown;
+  FreeAndNil(AppServices);
 end.
