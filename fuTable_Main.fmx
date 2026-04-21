@@ -453,7 +453,7 @@ object TableMainForm: TTableMainForm
                 end>
               TextSettings.Trimming = None
               IsSelected = True
-              Size.Width = 163.000000000000000000
+              Size.Width = 164.000000000000000000
               Size.Height = 26.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'tcsmallheaderstyle'
@@ -1336,7 +1336,7 @@ object TableMainForm: TTableMainForm
         end>
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 43.000000000000000000
+      Size.Width = 44.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
@@ -1532,23 +1532,22 @@ object TableMainForm: TTableMainForm
       end
       object EditTestNum: TEdit
         Touch.InteractiveGestures = [LongTap, DoubleTap]
-        TabOrder = 2
+        TabOrder = 1
         Position.X = 200.000000000000000000
         Position.Y = 366.000000000000000000
         KillFocusByReturn = True
-        OnExit = EditTestNumExit
       end
       object LabelTestNum: TLabel
         Position.X = 344.000000000000000000
         Position.Y = 371.000000000000000000
         Text = 'LabelTestNum'
-        TabOrder = 6
+        TabOrder = 5
       end
       object Label5: TLabel
         Position.X = 72.000000000000000000
         Position.Y = 366.000000000000000000
         Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-        TabOrder = 5
+        TabOrder = 4
       end
       object mPump: TMemo
         Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
@@ -1566,21 +1565,22 @@ object TableMainForm: TTableMainForm
         Position.X = 72.000000000000000000
         Position.Y = 446.000000000000000000
         Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-        TabOrder = 4
+        TabOrder = 3
       end
-      object EditStd: TEdit
-        Touch.InteractiveGestures = [LongTap, DoubleTap]
-        TabOrder = 1
-        Position.X = 200.000000000000000000
-        Position.Y = 446.000000000000000000
-        KillFocusByReturn = True
-        OnExit = EditTestNumExit
-      end
-      object Label2: TLabel
+      object LabelStd: TLabel
         Position.X = 344.000000000000000000
         Position.Y = 451.000000000000000000
-        Text = 'LabelTestNum'
-        TabOrder = 3
+        Text = '0'
+        TabOrder = 2
+      end
+      object TrackStd: TTrackBar
+        CanParentFocus = True
+        Max = 5.000000000000000000
+        Orientation = Horizontal
+        Position.X = 200.000000000000000000
+        Position.Y = 449.000000000000000000
+        TabOrder = 7
+        OnChange = TrackStdChange
       end
     end
   end

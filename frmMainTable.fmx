@@ -1931,7 +1931,7 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 1
+          TabIndex = 3
           TabOrder = 1
           TabPosition = PlatformDefault
           Sizes = (

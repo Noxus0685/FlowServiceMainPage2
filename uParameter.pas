@@ -359,22 +359,39 @@ end;
 
 procedure TFlowRate.DoFlowRateStart(ANewFlowRate: Double);
 begin
-    if not( SameValue(ValueSet.Value ,ANewFlowRate, MinDouble)) then
+
+    if  IsRunning  then
     begin
+      if not( SameValue(ValueSet.Value ,ANewFlowRate, MinDouble)) then
+        begin
 
-    SetParam(ANewFlowRate);
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self, ACTION_Set);
+          SetParam(ANewFlowRate);
+          if Assigned(FOnActionChange) then
+            FOnActionChange(self, ACTION_Set);
 
+        end;
+
+    end
+    else
+    begin
+      if not( SameValue(ValueSet.Value ,ANewFlowRate, MinDouble)) then
+        begin
+
+        SetParam(ANewFlowRate);
+        if Assigned(FOnActionChange) then
+          FOnActionChange(self, ACTION_Set);
+
+        end;
+     if not( IsRunning)  then
+       begin
+
+        Start;
+        if Assigned(FOnActionChange) then
+          FOnActionChange(self, ACTION_START);
+       end;
     end;
-   if not( IsRunning)  then
-   begin
 
 
-    Start;
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self, ACTION_START);
-   end;
 end;
 
 procedure TFlowRate.DoFlowRateStop;
@@ -666,7 +683,6 @@ begin
   if  SameValue(FValueSet.Value ,AValue, MinDouble) then
        Exit;
 
-  ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
 
       if AValue<FMin then
@@ -675,6 +691,9 @@ begin
         FValueSet.Value:=FMax
       else
         FValueSet.Value:=AValue;
+
+      ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
+
 
       FAction:=ACTION_SET;
       FHasTaskHistory := True;

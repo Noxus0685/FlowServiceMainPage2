@@ -1330,7 +1330,7 @@ begin
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
-  ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход', Format('Q=%.3f', [AValue]));
+  //ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход в л/с', Format('Q=%.3f', [AValue]));
   UpdateUIFlowRate;
 end;
 
@@ -1362,8 +1362,7 @@ begin
   begin
     AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
     FActiveWorkTable.FlowRate.DoFlowRateSet(AValue);
-    if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
-      FActiveWorkTable.FlowRate.Start;
+
     UpdateUIFlowRate;
   end;
 
@@ -2893,6 +2892,8 @@ begin
       LayoutPump.tag:=0;
       FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
       UpdateUIPump;
+      if ComboBoxPumps.Text <> '' then
+      ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Изменен активный насос', ComboBoxPumps.Text);
     end;
 end;
 
@@ -2914,6 +2915,8 @@ begin
   SetDim(UnitName, QuantityUnitName);
 
   GridDevices.SetFocus;
+  ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Изменена размерность расхода', ComboEditUnits.Text);
+
 end;
 
 procedure TFrameMainTable.ActionDevicesAssignEtalonExecute(Sender: TObject);
