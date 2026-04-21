@@ -104,7 +104,10 @@ type
     LabelTestValueWoCorrection: TLabel;
     StringColumnDescription: TStringColumn;
     SpeedButtonResetSettings: TSpeedButton;
+    sbClear: TSpeedButton;
+    sbFind: TSpeedButton;
     EditFindDevice: TEdit;
+    SpeedButtonFindInternet: TSpeedButton;
     procedure FormShow(Sender: TObject);
     procedure AddRowButtonClick(Sender: TObject);
     procedure StringGridCoefsDataEditingDone(Sender: TObject; const ACol,
@@ -133,6 +136,9 @@ type
     procedure StringGridValuesListSelChanged(Sender: TObject);
     procedure EditFindDeviceChangeTracking(Sender: TObject);
     procedure EditFindDeviceExit(Sender: TObject);
+    procedure sbClearClick(Sender: TObject);
+    procedure sbFindClick(Sender: TObject);
+    procedure SpeedButtonFindInternetClick(Sender: TObject);
     procedure EditCoefKExit(Sender: TObject);
     procedure EditCoefPExit(Sender: TObject);
     procedure SpeedButtonResetSettingsClick(Sender: TObject);
@@ -693,6 +699,24 @@ end;
 procedure TFormMeterValues.EditFindDeviceExit(Sender: TObject);
 begin
   EditFindDeviceChangeTracking(Sender);
+end;
+
+procedure TFormMeterValues.sbClearClick(Sender: TObject);
+begin
+  EditFindDevice.Text := '';
+  EditFindDeviceChangeTracking(EditFindDevice);
+  sbFind.IsPressed := False;
+end;
+
+procedure TFormMeterValues.sbFindClick(Sender: TObject);
+begin
+  EditFindDeviceChangeTracking(EditFindDevice);
+  sbFind.IsPressed := Trim(EditFindDevice.Text) <> '';
+end;
+
+procedure TFormMeterValues.SpeedButtonFindInternetClick(Sender: TObject);
+begin
+  sbFindClick(Sender);
 end;
 
 procedure TFormMeterValues.UpdateLayoutCoefs;

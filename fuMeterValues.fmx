@@ -1,4 +1,4 @@
-object FormMeterValues: TFormMeterValues
+﻿object FormMeterValues: TFormMeterValues
   Left = 0
   Top = 0
   Caption = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1084#1077#1090#1088#1086#1083#1086#1075#1080#1095#1077#1089#1082#1080#1093' '#1074#1077#1083#1080#1095#1080#1085
@@ -5627,34 +5627,33 @@ object FormMeterValues: TFormMeterValues
           end
         end
         object Layout23: TLayout
-          Align = MostTop
-          Size.Width = 922.000000000000000000
-          Size.Height = 50.000000000000000000
+          Align = Left
+          Position.X = 150.000000000000000000
+          Size.Width = 347.000000000000000000
+          Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
-          object Label13: TLabel
-            Align = MostLeft
-            StyledSettings = []
-            Padding.Left = 6.000000000000000000
-            Padding.Top = 8.000000000000000000
-            Padding.Right = 6.000000000000000000
-            Padding.Bottom = 8.000000000000000000
-            Margins.Left = 30.000000000000000000
-            Margins.Top = 6.000000000000000000
-            Margins.Right = 6.000000000000000000
-            Margins.Bottom = 6.000000000000000000
-            Position.X = 110.000000000000000000
-            Position.Y = 6.000000000000000000
-            Size.Width = 299.000000000000000000
-            Size.Height = 38.000000000000000000
+          object sbClear: TSpeedButton
+            Align = Left
+            Position.X = 49.000000000000000000
+            Size.Width = 43.000000000000000000
+            Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
-            StyleLookup = 'backtoolbuttonlabel'
-            TextSettings.Font.Family = 'Verdana'
-            TextSettings.Font.Size = 10.000000000000000000
-            TextSettings.FontColor = claWhite
-            TextSettings.Trimming = Word
-            Text = #1057#1087#1080#1089#1086#1082' '#1087#1077#1088#1077#1084#1077#1085#1085#1099#1093
-            TabOrder = 1
+            StyleLookup = 'stoptoolbutton'
+            Text = 'sbClear'
+            TextSettings.Trimming = None
+            OnClick = sbClearClick
+          end
+          object sbFind: TSpeedButton
+            StaysPressed = True
+            Align = MostLeft
+            Size.Width = 49.000000000000000000
+            Size.Height = 32.000000000000000000
+            Size.PlatformDefault = False
+            StyleLookup = 'searcheditbutton'
+            Text = 'sbFind'
+            TextSettings.Trimming = None
+            OnClick = sbFindClick
           end
           object EditFindDevice: TEdit
             Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -5663,21 +5662,23 @@ object FormMeterValues: TFormMeterValues
             ReturnKeyType = Search
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 495.000000000000000000
+            Size.Width = 201.000000000000000000
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
             KillFocusByReturn = True
+            OnChangeTracking = EditFindDeviceChangeTracking
             OnExit = EditFindDeviceExit
           end
-          object SpeedButtonResetSettings: TSpeedButton
-            Align = MostLeft
-            Size.Width = 80.000000000000000000
-            Size.Height = 50.000000000000000000
+          object SpeedButtonFindInternet: TSpeedButton
+            Align = Right
+            Position.X = 868.000000000000000000
+            Size.Width = 54.000000000000000000
+            Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
-            StyleLookup = 'pagecurltoolbutton'
-            Text = 'SpeedButtonResetSettings'
+            StyleLookup = 'infotoolbutton'
+            Text = 'SpeedButtonFindInternet'
             TextSettings.Trimming = None
-            OnClick = SpeedButtonResetSettingsClick
+            OnClick = SpeedButtonFindInternetClick
           end
         end
       end
