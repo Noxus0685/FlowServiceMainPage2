@@ -298,69 +298,9 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="fuTypeSelect.pas">
-            <Form>FormTypeSelect</Form>
-            <FormType>fmx</FormType>
-        </DCCReference>
-        <DCCReference Include="fuTypeEditor.pas">
-            <Form>FormTypeEditor</Form>
-            <FormType>fmx</FormType>
-        </DCCReference>
-        <DCCReference Include="uBaseProcedures.pas"/>
-        <DCCReference Include="uDataManager.pas"/>
-        <DCCReference Include="fuTable_Main.pas">
-            <Form>TableMainForm</Form>
-            <FormType>fmx</FormType>
-        </DCCReference>
-        <DCCReference Include="uDeviceClass.pas"/>
-        <DCCReference Include="fuDeviceSelect.pas">
-            <Form>FormDeviceSelect</Form>
-            <FormType>fmx</FormType>
-        </DCCReference>
-        <DCCReference Include="fuDeviceEdit.pas">
-            <Form>FormDeviceEditor</Form>
-            <FormType>fmx</FormType>
-        </DCCReference>
-        <DCCReference Include="uTable_Data.pas">
-            <Form>TableDM</Form>
-            <FormType>dfm</FormType>
-            <DesignClass>TDataModule</DesignClass>
-        </DCCReference>
-        <DCCReference Include="uClasses.pas"/>
-        <DCCReference Include="uFlowMeter.pas"/>
-        <DCCReference Include="fuMeterValues.pas">
-            <Form>FormMeterValues</Form>
-            <FormType>fmx</FormType>
-        </DCCReference>
-        <DCCReference Include="uMeterValue.pas"/>
+        <DCCReference Include="FmxHelper.pas"/>
         <DCCReference Include="frmCalibrCoefs.pas">
             <Form>FrameCalibrCoefs</Form>
-            <FormType>fmx</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="frmProceed.pas">
-            <Form>FrameProceed</Form>
-            <FormType>fmx</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="frmMainTable.pas">
-            <Form>FrameMainTable</Form>
-            <FormType>fmx</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="uWorkTable.pas"/>
-        <DCCReference Include="uRepositories.pas"/>
-        <DCCReference Include="uMeasurementRun.pas"/>
-        <DCCReference Include="FmxHelper.pas"/>
-        <DCCReference Include="uParameter.pas"/>
-        <DCCReference Include="frmMeasurementRun.pas">
-            <Form>FrameMeasurementRun</Form>
-            <FormType>fmx</FormType>
-            <DesignClass>TFrame</DesignClass>
-        </DCCReference>
-        <DCCReference Include="uProtocols.pas"/>
-        <DCCReference Include="frmProtocol.pas">
-            <Form>FrameProtocol</Form>
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
@@ -369,7 +309,68 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="frmMainTable.pas">
+            <Form>FrameMainTable</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="frmMeasurementRun.pas">
+            <Form>FrameMeasurementRun</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="frmProceed.pas">
+            <Form>FrameProceed</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="frmProtocol.pas">
+            <Form>FrameProtocol</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="fuDeviceEdit.pas">
+            <Form>FormDeviceEditor</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
+        <DCCReference Include="fuDeviceSelect.pas">
+            <Form>FormDeviceSelect</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
+        <DCCReference Include="fuMeterValues.pas">
+            <Form>FormMeterValues</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
+        <DCCReference Include="fuTable_Main.pas">
+            <Form>TableMainForm</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
+        <DCCReference Include="fuTypeEditor.pas">
+            <Form>FormTypeEditor</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
+        <DCCReference Include="fuTypeSelect.pas">
+            <Form>FormTypeSelect</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
+        <DCCReference Include="uBaseProcedures.pas"/>
+        <DCCReference Include="uClasses.pas"/>
+        <DCCReference Include="uDataManager.pas"/>
+        <DCCReference Include="uDeviceClass.pas"/>
+        <DCCReference Include="uFlowMeter.pas"/>
+        <DCCReference Include="uMeasurementRun.pas"/>
+        <DCCReference Include="uMeterValue.pas"/>
         <DCCReference Include="uObservable.pas"/>
+        <DCCReference Include="uParameter.pas"/>
+        <DCCReference Include="uProtocols.pas"/>
+        <DCCReference Include="uRepositories.pas"/>
+        <DCCReference Include="uAppServices.pas"/>
+        <DCCReference Include="uTable_Data.pas">
+            <Form>TableDM</Form>
+            <FormType>dfm</FormType>
+            <DesignClass>TDataModule</DesignClass>
+        </DCCReference>
+        <DCCReference Include="uWorkTable.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -1374,7 +1375,6 @@
                 <Platform value="Android64">True</Platform>
                 <Platform value="iOSDevice64">False</Platform>
                 <Platform value="iOSSimARM64">False</Platform>
-                <Platform value="Linux64">False</Platform>
                 <Platform value="OSX64">False</Platform>
                 <Platform value="OSXARM64">False</Platform>
                 <Platform value="Win32">True</Platform>

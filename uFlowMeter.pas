@@ -410,6 +410,7 @@ end;
 implementation
 
 uses
+  uAppServices,
   uDataManager,
   uRepositories;
 
@@ -1115,17 +1116,17 @@ procedure TFlowMeter.CreateDevice;
     FoundRepo: TTypeRepository;
 begin
 
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
   Exit;
 
-  ActiveRepo := DataManager.ActiveDeviceRepo;
+  ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
    if ActiveRepo = nil then
   Exit;
 
 
   ADevice:= FDevice;
-  AType := DataManager.FindType(DeviceTypeUUID, FTypeName, FoundRepo);
+  AType := AppServices.DataManager.FindType(DeviceTypeUUID, FTypeName, FoundRepo);
 
   if (FDevice = nil) then
    begin
@@ -1151,7 +1152,7 @@ begin
     begin
     if (FoundRepo <> nil) then
     begin
-       DataManager.ActiveTypeRepo := FoundRepo;
+       AppServices.DataManager.ActiveTypeRepo := FoundRepo;
        ADevice.AttachType(AType,FoundRepo.Name);
     end;
 
@@ -1168,10 +1169,10 @@ begin
   FoundDevice := nil;
   Self.DeviceUUID := UUID;
 
-  if DataManager <> nil then
+  if AppServices.DataManager <> nil then
   begin
 
-    FoundDevice := DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
+    FoundDevice := AppServices.DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
 
     if FoundDevice = nil then
       CreateDevice;
@@ -1771,10 +1772,10 @@ begin
   if not Assigned(Device) then
     Exit;
 
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
-  Cat := DataManager.FindCategoryByID(Device.Category);
+  Cat := AppServices.DataManager.FindCategoryByID(Device.Category);
   if Cat <> nil then
     Exit(Cat.StdCategory);
 end;

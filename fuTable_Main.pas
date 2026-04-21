@@ -28,6 +28,7 @@ uses
   System.Math,
   System.SysUtils,
   System.UITypes,
+  uAppServices,
   uBaseProcedures,
   uClasses,
   uDataManager,
@@ -278,20 +279,18 @@ end;
 
 procedure TTableMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-       Self.WindowState := TWindowState.wsMinimized;
-       DataManager.Save;
+  // Сохраняем через централизованный AppServices, а не локальными вызовами.
+  Self.WindowState := TWindowState.wsMinimized;
 
-     if FWorkTableManager = nil then
+  if FWorkTableManager = nil then
     Exit;
 
-    if FFrameMainTable= nil then
+  if FFrameMainTable = nil then
     Exit;
 
   FFrameMainTable.SaveLayoutSettingsToWorkTable;
-  FWorkTableManager.Save;
-
-
-
+ // if AppServices <> nil then
+  //  AppServices.SaveAll;
 end;
 
 procedure TTableMainForm.FormCreate(Sender: TObject);
@@ -302,12 +301,12 @@ begin
   FT_WorkBench_First:=20;
   FT_WorkBench_Last:=20;
 
-  FWorkTableManager := TWorkTableManager.Create(
-    IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))) +
-    'Settings\TableSettings.ini'
-  );
-
-    FWorkTableManager.Load;
+  // Менеджер рабочих столов теперь создаётся и живёт в AppServices.
+  if AppServices = nil then
+    raise Exception.Create('AppServices не инициализирован. Проверьте startup в .dpr');
+  if not AppServices.Initialized then
+    AppServices.Initialize;
+  FWorkTableManager := AppServices.WorkTableManager;
 
   //Подумать над динамической привязкой ко всем столам
     if FWorkTableManager.ActiveWorkTable<>nil then

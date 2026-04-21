@@ -485,6 +485,7 @@ type
 
 implementation
 uses
+  uAppServices,
   uDataManager,
   uRepositories;
 
@@ -590,10 +591,10 @@ var
   AType: TDeviceType;
   Repo: TTypeRepository;
 begin
-  if (Trim(ATypeUUID) = '') or (DataManager = nil) then
+  if (Trim(ATypeUUID) = '') or (AppServices.DataManager = nil) then
     Exit;
 
-  AType := DataManager.FindType(ATypeUUID, '', Repo);
+  AType := AppServices.DataManager.FindType(ATypeUUID, '', Repo);
 
   if (AType <> nil) then
     AType.State := osModified;
@@ -1298,9 +1299,9 @@ begin
   end;
 
   if (Value <> OldState) and (Value in [osNew, osModified, osDeleted]) and
-     (DataManager <> nil) then
+     (AppServices.DataManager <> nil) then
   begin
-    DataManager.FindType(UUID, '', Repo);
+    AppServices.DataManager.FindType(UUID, '', Repo);
     if (Repo <> nil) then
       Repo.State := osModified;
   end;

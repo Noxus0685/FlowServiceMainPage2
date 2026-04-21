@@ -533,17 +533,21 @@ type
 implementation
 uses
   uDataManager,
+  uAppServices,
   uRepositories;
+
 
 procedure MarkDeviceAndRepositoryModified(const ADeviceUUID: string);
 var
   ADevice: TDevice;
   Repo: TDeviceRepository;
 begin
-  if (Trim(ADeviceUUID) = '') or (DataManager = nil) then
+
+
+  if (Trim(ADeviceUUID) = '') or (AppServices.DataManager = nil) then
     Exit;
 
-  ADevice := DataManager.FindDevice(ADeviceUUID, Repo);
+  ADevice := AppServices.DataManager.FindDevice(ADeviceUUID, Repo);
 
   if (ADevice <> nil) then
     ADevice.State := osModified;
@@ -846,9 +850,9 @@ begin
   end;
 
   if (Value <> OldState) and (Value in [osNew, osModified, osDeleted]) and
-     (DataManager <> nil) then
+     (AppServices.DataManager <> nil) then
   begin
-    DataManager.FindDevice(UUID, Repo);
+    AppServices.DataManager.FindDevice(UUID, Repo);
     if (Repo <> nil) then
       Repo.State := osModified;
   end;

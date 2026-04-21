@@ -444,7 +444,8 @@ function CalcKpByDiameter(
 
 
 implementation
-
+uses
+uAppServices;
 {$R *.fmx}
 
 procedure PopulateSpillageTypeCombo(ACombo: TComboBox);
@@ -1027,7 +1028,7 @@ begin
       { Новый тип }
       {----------------------------------}
       FOriginalType := nil;
-      FType := DataManager.ActiveTypeRepo.CreateType(0);
+      FType := AppServices.DataManager.ActiveTypeRepo.CreateType(0);
     end;
 
     InitLocalData;
@@ -1087,13 +1088,13 @@ begin
     if ModalResult <> mrOk then
       Exit;
 
-    if (DataManager = nil) or (DataManager.ActiveTypeRepo = nil) then
+    if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveTypeRepo = nil) then
       raise Exception.Create('Активный репозиторий типов не выбран');
 
     if (FType = nil)  then
       raise Exception.Create('Не задан тип');
 
-    Repo := DataManager.ActiveTypeRepo;
+    Repo := AppServices.DataManager.ActiveTypeRepo;
 
     if FOriginalType <> nil then
     begin
@@ -1694,7 +1695,7 @@ begin
     {----------------------------------}
     { Применяем defaults категории }
     {----------------------------------}
-    C := DataManager.FindCategoryByID(CatID);
+    C := AppServices.DataManager.FindCategoryByID(CatID);
     if C <> nil then
     begin
       if FType.MeasuredDimension <> Ord(C.MeasuredDimension) then
@@ -3429,7 +3430,7 @@ begin
         );
 
       DevType.Category :=
-        DataManager.ActiveTypeRepo
+        AppServices.DataManager.ActiveTypeRepo
           .DetectCategoryByKeywords(DetectText);
 
       {----------------------------------}
@@ -3662,7 +3663,7 @@ begin
   {----------------------------------}
   { Защита }
   {----------------------------------}
-  if (FType = nil) or (DataManager.ActiveTypeRepo = nil) then
+  if (FType = nil) or (AppServices.DataManager.ActiveTypeRepo = nil) then
     Exit;
 
   {----------------------------------}
@@ -3685,7 +3686,7 @@ begin
   {----------------------------------}
   { Защита }
   {----------------------------------}
-  if (FType = nil) or (DataManager.ActiveTypeRepo = nil) then
+  if (FType = nil) or (AppServices.DataManager.ActiveTypeRepo = nil) then
     Exit;
 
   {----------------------------------}
@@ -3769,7 +3770,7 @@ var
   C: TDeviceCategory;
   TextValue: string;
 begin
-  if (DataManager.ActiveTypeRepo = nil) or (FType = nil) then
+  if (AppServices.DataManager.ActiveTypeRepo = nil) or (FType = nil) then
     Exit;
 
   {----------------------------------}
@@ -3797,7 +3798,7 @@ begin
   {----------------------------------}
   if FType.Category > 0 then
     TextValue :=
-      DataManager.ActiveTypeRepo.CategoryToText(
+      AppServices.DataManager.ActiveTypeRepo.CategoryToText(
         FType.Category,
         FType.CategoryName
       )
@@ -3816,7 +3817,7 @@ begin
   {----------------------------------}
   { Защита }
   {----------------------------------}
-  if (FType = nil) or (DataManager.ActiveTypeRepo = nil) then
+  if (FType = nil) or (AppServices.DataManager.ActiveTypeRepo = nil) then
     Exit;
 
   {----------------------------------}
@@ -4213,7 +4214,7 @@ procedure TFormTypeEditor.LoadCategories;
 var
   C: TDeviceCategory;
 begin
-  if (DataManager.ActiveTypeRepo = nil) then
+  if (AppServices.DataManager.ActiveTypeRepo = nil) then
     Exit;
 
   {----------------------------------}
@@ -4224,7 +4225,7 @@ begin
   else
     FCategoriesLocal.Clear;
 
-  for C in DataManager.ActiveTypeRepo.Categories do
+  for C in AppServices.DataManager.ActiveTypeRepo.Categories do
     FCategoriesLocal.Add(C);
 
   {----------------------------------}

@@ -376,6 +376,8 @@ var
   FormDeviceEditor: TFormDeviceEditor;
 
 implementation
+ uses
+  uAppServices;
 
 {$R *.fmx}
 
@@ -551,7 +553,7 @@ begin
        [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes then
     begin
       // Возвращаем форму в исходное состояние
-      DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
+      AppServices.DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
 
       // Закрываем форму с результатом Cancel
       ModalResult := mrCancel;
@@ -800,12 +802,12 @@ begin
       begin
         { редактирование существующего }
         FOriginalDevice.Assign(FDevice,True);
-        DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else
       begin
         { новый прибор }
-        DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
+        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
       end;
     end
     else if ModalResult = mrCancel then
@@ -1297,8 +1299,8 @@ begin
       { Новый прибор }
       {----------------------------------}
       FOriginalDevice := nil;
-      if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-        FDevice := DataManager.ActiveDeviceRepo.CreateDevice(0)
+      if (AppServices.DataManager <> nil) and (AppServices.DataManager.ActiveDeviceRepo <> nil) then
+        FDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
     end;
@@ -1306,12 +1308,12 @@ begin
     {----------------------------------}
     { Поиск типа по UUID и имени }
     {----------------------------------}
-    if (DataManager <> nil) and
+    if (AppServices.DataManager <> nil) and
        ((FDevice.DeviceTypeUUID <> '') or
         (FDevice.DeviceTypeName <> '')) then
     begin
       FoundType :=
-        DataManager.FindType(
+        AppServices.DataManager.FindType(
           FDevice.DeviceTypeUUID,
           FDevice.DeviceTypeName,
           FoundRepo
@@ -1321,7 +1323,7 @@ begin
       begin
         FDeviceType := FoundType;
         if FoundRepo <> nil then
-          DataManager.ActiveTypeRepo := FoundRepo;
+          AppServices.DataManager.ActiveTypeRepo := FoundRepo;
       end;
     end;
 
@@ -1364,7 +1366,7 @@ var
   FoundType: TDeviceType;
   FoundRepo: TTypeRepository;
 begin
-  if (DataManager = nil) or (FDevice = nil) then
+  if (AppServices.DataManager = nil) or (FDevice = nil) then
     Exit;
 
   if (FDevice.DeviceTypeUUID = '') and (FDevice.DeviceTypeName = '') then
@@ -1373,7 +1375,7 @@ begin
     Exit;
   end;
 
-  FoundType := DataManager.FindType(
+  FoundType := AppServices.DataManager.FindType(
     FDevice.DeviceTypeUUID,
     FDevice.DeviceTypeName,
     FoundRepo
@@ -1381,7 +1383,7 @@ begin
 
   FDeviceType := FoundType;
   if FoundRepo <> nil then
-    DataManager.ActiveTypeRepo := FoundRepo;
+    AppServices.DataManager.ActiveTypeRepo := FoundRepo;
 end;
 
 
@@ -1406,7 +1408,7 @@ begin
 end;
 
 begin
-  if (FDevice = nil) or (DataManager = nil) then
+  if (FDevice = nil) or (AppServices.DataManager = nil) then
     Exit;
 
   RefreshDeviceTypeReference;
@@ -1416,10 +1418,10 @@ begin
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    CurrentType := DataManager.FindType(FDevice.DeviceTypeUUID, FDevice.DeviceTypeName, FoundRepo);
+    CurrentType := AppServices.DataManager.FindType(FDevice.DeviceTypeUUID, FDevice.DeviceTypeName, FoundRepo);
     if (CurrentType <> nil) and (FoundRepo <> nil) then
     begin
-      DataManager.ActiveTypeRepo := FoundRepo;
+      AppServices.DataManager.ActiveTypeRepo := FoundRepo;
       Frm.SelectType(CurrentType);
     end;
 
@@ -1433,7 +1435,7 @@ begin
     if NewType = nil then
       Exit;
 
-    FoundRepo := DataManager.ActiveTypeRepo;
+    FoundRepo := AppServices.DataManager.ActiveTypeRepo;
 
     {----------------------------------------------------}
     { 3. Проверяем смену типа }
@@ -2036,7 +2038,7 @@ begin
     FDevice.Category := CatID;
     FDevice.CategoryName := '';
 
-    C := DataManager.FindCategoryByID(CatID);
+    C := AppServices.DataManager.FindCategoryByID(CatID);
     if C <> nil then
     begin
       if FDevice.MeasuredDimension <> Ord(C.MeasuredDimension) then
@@ -3083,7 +3085,7 @@ var
   C: TDeviceCategory;
   TextValue: string;
 begin
-  if (DataManager.ActiveDeviceRepo = nil) or (FDevice = nil) then
+  if (AppServices.DataManager.ActiveDeviceRepo = nil) or (FDevice = nil) then
     Exit;
 
   {----------------------------------}
@@ -3093,7 +3095,7 @@ begin
   try
     ceCategory.Items.Clear;
 
-    for C in DataManager.Categories do
+    for C in AppServices.DataManager.Categories do
     begin
       // ⛔ пропускаем служебную категорию
       if C.ID = -1 then
@@ -3111,7 +3113,7 @@ begin
   {----------------------------------}
   if FDevice.Category > 0 then
     TextValue :=
-      DataManager.ActiveTypeRepo.CategoryToText(
+      AppServices.DataManager.ActiveTypeRepo.CategoryToText(
         FDevice.Category,
         FDevice.CategoryName
       )
@@ -3233,12 +3235,12 @@ begin
         FOriginalDevice.Assign(FDevice,True);
 
 
-        DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end
       else
       begin
         { новый прибор }
-        DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
+        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
       end;
 
       ModalResult := mrOk;

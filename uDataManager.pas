@@ -90,9 +90,7 @@ type
 
   end;
 
- var
 
-  DataManager: TManagerTTableDM;
 
 implementation
 

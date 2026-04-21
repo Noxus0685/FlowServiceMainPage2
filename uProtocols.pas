@@ -357,7 +357,7 @@ begin
 end;
 
 initialization
-  ProtocolManager := TProtocolManager.Create;
+  ProtocolManager := nil;
 
 finalization
   FreeAndNil(ProtocolManager);

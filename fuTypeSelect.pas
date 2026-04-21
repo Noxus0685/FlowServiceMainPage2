@@ -210,20 +210,22 @@ var
 
 
 implementation
+uses uAppServices;
+
 
 procedure TFormTypeSelect.LoadData;
 begin
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория типов }
   {--------------------------------------------------}
-  if (DataManager = nil) or (DataManager.ActiveTypeRepo = nil) then
+  if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveTypeRepo = nil) then
   begin
     ActiveRepo := nil;
     FDeviceTypes := nil;
     Exit;
   end;
 
-  ActiveRepo := DataManager.ActiveTypeRepo;
+  ActiveRepo := AppServices.DataManager.ActiveTypeRepo;
 
   {--------------------------------------------------}
   { Загружаем данные из БД }
@@ -549,7 +551,7 @@ begin
    { --------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
   {--------------------------------------------------}
-  if (DataManager = nil) or (ActiveRepo = nil) then
+  if (AppServices.DataManager = nil) or (ActiveRepo = nil) then
   begin
     Exit;
   end;
@@ -756,7 +758,7 @@ var
   Repo: TTypeRepository;
   Res: TModalResult;
 begin
-  Repo := DataManager.ActiveTypeRepo;
+  Repo := AppServices.DataManager.ActiveTypeRepo;
 
   if (Repo <> nil) and (Repo.State = osModified) then
   begin
@@ -829,18 +831,18 @@ begin
   try
     ComboBoxRepository.Clear;
 
-    if (DataManager = nil) then
+    if (AppServices.DataManager = nil) then
       Exit;
 
     ItemIndex := -1;
 
     // перебираем репозитории типов из менеджера
-    for Repo in DataManager.TypeRepositories do
+    for Repo in AppServices.DataManager.TypeRepositories do
     begin
       ComboBoxRepository.Items.Add(Repo.Name);
 
       // запоминаем индекс активного репозитория
-      if Repo = DataManager.ActiveTypeRepo then
+      if Repo = AppServices.DataManager.ActiveTypeRepo then
         ItemIndex := ComboBoxRepository.Items.Count - 1;
     end;
 
@@ -1049,7 +1051,7 @@ begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
   {----------------------------------}
@@ -1096,7 +1098,7 @@ begin
   {----------------------------------}
   { Добавление репозитория }
   {----------------------------------}
-  DataManager.AddRepository(
+  AppServices.DataManager.AddRepository(
     RepoName,
     rkType,
     DBFileName
@@ -1106,10 +1108,10 @@ begin
   {----------------------------------}
   { Обновление UI }
   {----------------------------------}
-  if DataManager.ActiveTypeRepo = nil then
+  if AppServices.DataManager.ActiveTypeRepo = nil then
     Exit;
 
-  FDeviceTypes := DataManager.ActiveTypeRepo.Types;
+  FDeviceTypes := AppServices.DataManager.ActiveTypeRepo.Types;
 
   FillComboBoxRepository;
   BuildTree;
@@ -1124,10 +1126,10 @@ begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
-  if (DataManager = nil) or (DataManager.ActiveTypeRepo = nil) then
+  if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveTypeRepo = nil) then
     Exit;
 
-  Repo := DataManager.ActiveTypeRepo;
+  Repo := AppServices.DataManager.ActiveTypeRepo;
 
   {----------------------------------}
   { Подтверждение удаления }
@@ -1147,14 +1149,14 @@ begin
   {----------------------------------}
   { Удаление через менеджер }
   {----------------------------------}
-  DataManager.RemoveRepository(Repo.Name);
+  AppServices.DataManager.RemoveRepository(Repo.Name);
 
   {----------------------------------}
   { Обновление UI }
   {----------------------------------}
   FillComboBoxRepository;
 
-  if DataManager.ActiveTypeRepo <> nil then
+  if AppServices.DataManager.ActiveTypeRepo <> nil then
   begin
     LoadData;        // заново загружает данные активного репозитория
     BuildTree;
@@ -1182,7 +1184,7 @@ begin
   {----------------------------------}
   { Проверка менеджера }
   {----------------------------------}
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
   {----------------------------------}
@@ -1223,7 +1225,7 @@ begin
   {----------------------------------}
   { Добавление репозитория }
   {----------------------------------}
-  DataManager.AddRepository(
+  AppServices.DataManager.AddRepository(
     RepoName,
     rkType,
     DbFileName
@@ -1258,7 +1260,7 @@ procedure TFormTypeSelect.miSaveClick(Sender: TObject);
 var
   Repo: TTypeRepository;
 begin
-  Repo := DataManager.ActiveTypeRepo;
+  Repo := AppServices.DataManager.ActiveTypeRepo;
   if Repo = nil then
     Exit;
 
@@ -1365,7 +1367,7 @@ begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
-  if (DataManager = nil) then
+  if (AppServices.DataManager = nil) then
     Exit;
 
   Idx := ComboBoxRepository.ItemIndex;
@@ -1377,7 +1379,7 @@ begin
   {----------------------------------}
   { Смена активного репозитория через менеджер }
   {----------------------------------}
-  DataManager.SetActiveTypeRepository(RepoName);
+  AppServices.DataManager.SetActiveTypeRepository(RepoName);
 
   {----------------------------------}
   { Пересборка UI }
@@ -1658,26 +1660,26 @@ begin
   {----------------------------------}
   { Проверка менеджера }
   {----------------------------------}
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
   {----------------------------------}
   { Проверка активного репозитория }
   {----------------------------------}
-  if DataManager.ActiveTypeRepo = nil then
+  if AppServices.DataManager.ActiveTypeRepo = nil then
     Exit;
 
   {----------------------------------}
   { Проверка данных репозитория }
   {----------------------------------}
-  if DataManager.ActiveTypeRepo.Types = nil then
+  if AppServices.DataManager.ActiveTypeRepo.Types = nil then
     Exit;
 
   {----------------------------------}
   { Обновляем ссылку на данные }
   {----------------------------------}
-  ActiveRepo := DataManager.ActiveTypeRepo;
-  FDeviceTypes := DataManager.ActiveTypeRepo.Types;
+  ActiveRepo := AppServices.DataManager.ActiveTypeRepo;
+  FDeviceTypes := AppServices.DataManager.ActiveTypeRepo.Types;
 
   Result := True;
 end;
@@ -1753,3 +1755,4 @@ end;
 
 
 end.
+

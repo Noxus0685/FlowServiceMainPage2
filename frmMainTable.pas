@@ -607,11 +607,10 @@ type
 
 implementation
 
-
-
 {$R *.fmx}
 
 uses
+  uAppServices,
   fuTable_Main;
 
 
@@ -706,9 +705,9 @@ begin
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
-  TMeterValue.SaveToFile(0);
+  // TMeterValue сохраняется централизованно в AppServices.SaveAll/Shutdown.
   FInstrumentalVisibleOrder.Free;
-  FWorkTableManager.Free;
+  // Владелец менеджера — AppServices, здесь не освобождаем.
   FFlowMeters.Free;
   inherited;
 end;
@@ -1086,7 +1085,7 @@ begin
   FInitialized := True;
   SwitchAuto.IsChecked := False;
 
-  TMeterValue.LoadFromFile;
+  // Загрузка TMeterValue выполняется централизованно в AppServices.Initialize.
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
@@ -2014,8 +2013,8 @@ begin
     FWorkTableManager.Save;
 
 
-  if DataManager <> nil then
-    DataManager.Save;
+  if AppServices.DataManager <> nil then
+    AppServices.DataManager.Save;
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
@@ -2293,7 +2292,7 @@ begin
   Result := nil;
   ARepo := nil;
 
-  if (AChannel = nil) or (DataManager = nil) then
+  if (AChannel = nil) or (AppServices.DataManager = nil) then
     Exit;
 
   TypeUUID := Trim(AChannel.TypeUUID);
@@ -2305,7 +2304,7 @@ begin
   if (TypeName = '') and (AChannel.FlowMeter <> nil) then
     TypeName := Trim(AChannel.FlowMeter.DeviceTypeName);
 
-  Result := DataManager.FindType(TypeUUID, TypeName, ARepo);
+  Result := AppServices.DataManager.FindType(TypeUUID, TypeName, ARepo);
 end;
 
 procedure TFrameMainTable.FillDNItemsForChannel(AChannel: TChannel;
@@ -2445,8 +2444,8 @@ begin
   if AChannel = nil then
     Exit;
 
-  if DataManager <> nil then
-  ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
+  if AppServices.DataManager <> nil then
+  ActiveRepo := AppServices.DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
 
   ADevice := AChannel.FlowMeter.Device;
 
@@ -2651,10 +2650,10 @@ var
   Repo: TDeviceRepository;
   ErrMsg: string;
 begin
-  if (ADevice = nil) or (DataManager = nil) then
+  if (ADevice = nil) or (AppServices.DataManager = nil) then
     Exit;
 
-  Repo := DataManager.ActiveDeviceRepo;
+  Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo = nil then
     Exit;
 
@@ -2822,7 +2821,7 @@ var
 begin
 
   if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
-     (DataManager = nil) then
+     (AppServices.DataManager = nil) then
     Exit;
 
   Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
@@ -2830,7 +2829,7 @@ begin
     Exit;
 
   FoundRepo := nil;
-  SourceType := DataManager.FindType(Src.TypeUUID, Src.TypeName, FoundRepo);
+  SourceType := AppServices.DataManager.FindType(Src.TypeUUID, Src.TypeName, FoundRepo);
   if SourceType = nil then
   begin
     ShowMessage('Тип выбранной строки не найден в подключенных репозиториях.');
@@ -3560,8 +3559,8 @@ begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (ANewType = nil) then
     Exit;
 
-  if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
-    AFoundRepo := DataManager.ActiveTypeRepo;
+  if (AppServices.DataManager <> nil) and (AppServices.DataManager.ActiveTypeRepo <> nil) then
+    AFoundRepo := AppServices.DataManager.ActiveTypeRepo;
 
   if AFoundRepo <> nil then
   begin
@@ -3621,7 +3620,7 @@ begin
       Exit;
   end;
 
-  if (DataManager = nil) then
+  if (AppServices.DataManager = nil) then
     Exit;
 
   if AIsEtalon then
@@ -3641,7 +3640,7 @@ begin
 
     if Ch.FlowMeter.RepoTypeUUID <> '' then
     begin
-      for Repo in DataManager.TypeRepositories do
+      for Repo in AppServices.DataManager.TypeRepositories do
         if SameText(Repo.UUID, Ch.FlowMeter.RepoTypeUUID) then
         begin
           PreferredRepo := Repo;
@@ -3650,9 +3649,9 @@ begin
     end;
 
     if PreferredRepo <> nil then
-      DataManager.ActiveTypeRepo := PreferredRepo;
+      AppServices.DataManager.ActiveTypeRepo := PreferredRepo;
 
-    CurrentType := DataManager.FindType(
+    CurrentType := AppServices.DataManager.FindType(
       Ch.FlowMeter.DeviceTypeUUID,
       '',
       FoundRepo
@@ -3664,11 +3663,11 @@ begin
     end;
 
     if (CurrentType = nil) and (Ch.TypeName <> '') then
-      CurrentType := DataManager.FindType('', Ch.TypeName, FoundRepo);
+      CurrentType := AppServices.DataManager.FindType('', Ch.TypeName, FoundRepo);
 
     if (CurrentType <> nil) and (FoundRepo <> nil) then
     begin
-      DataManager.ActiveTypeRepo := FoundRepo;
+      AppServices.DataManager.ActiveTypeRepo := FoundRepo;
       Frm.SelectType(CurrentType);
     end;
 
@@ -3682,7 +3681,7 @@ begin
     if NewType = nil then
       Exit;
 
-    FoundRepo := DataManager.ActiveTypeRepo;
+    FoundRepo := AppServices.DataManager.ActiveTypeRepo;
 
     {----------------------------------------------------}
     { 3. Проверяем смену типа }

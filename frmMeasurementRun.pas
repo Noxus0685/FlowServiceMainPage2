@@ -101,9 +101,8 @@ end;
 
 destructor TFrameMeasurementRun.Destroy;
 begin
-  DetachMeasurementRunEvents;
-  FreeAndNil(FInvalidPointIndexes);
-  inherited;
+    FreeAndNil(FInvalidPointIndexes);
+    inherited;
 end;
 
 function TFrameMeasurementRun.GetMeasurementRun: TMeasurementRun;
@@ -139,7 +138,6 @@ procedure TFrameMeasurementRun.DetachMeasurementRunEvents;
 begin
   if MeasurementRun = nil then
     Exit;
-
   MeasurementRun.Unsubscribe(Self);
 end;
 

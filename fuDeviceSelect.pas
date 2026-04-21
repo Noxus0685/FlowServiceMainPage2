@@ -219,7 +219,8 @@ var
   FormDeviceSelect: TFormDeviceSelect;
 
 implementation
-
+  uses
+   uAppServices;
 {$R *.fmx}
 function TFormDeviceSelect.GetSelectedDevice: TDevice;
 var
@@ -242,14 +243,14 @@ begin
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория приборов }
   {--------------------------------------------------}
-  if (DataManager = nil) or (DataManager.ActiveDeviceRepo = nil) then
+  if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveDeviceRepo = nil) then
   begin
     ActiveRepo := nil;
     FDevices := nil;
     Exit;
   end;
 
-  ActiveRepo := DataManager.ActiveDeviceRepo;
+  ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
   { Загружаем данные из БД (в репозиторий!) }
@@ -272,7 +273,7 @@ begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
   {----------------------------------}
@@ -321,7 +322,7 @@ begin
   { Менеджер сам создаёт, открывает и
   { делает его активным }
   {----------------------------------}
-  DataManager.AddRepository(
+  AppServices.DataManager.AddRepository(
     RepoName,
     rkDevice,
     DBFileName
@@ -340,7 +341,7 @@ end;
 
 procedure TFormDeviceSelect.miAddTestDataClick(Sender: TObject);
 begin
-  DataManager.ActiveDeviceRepo.InitBulkTestData;
+  AppServices.DataManager.ActiveDeviceRepo.InitBulkTestData;
   BuildTree;
   ApplyFilter;
   UpdateGridDevices;
@@ -354,10 +355,10 @@ begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
-  if (DataManager = nil) or (DataManager.ActiveDeviceRepo = nil) then
+  if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveDeviceRepo = nil) then
     Exit;
 
-  Repo := DataManager.ActiveDeviceRepo;
+  Repo := AppServices.DataManager.ActiveDeviceRepo;
 
   {----------------------------------}
   { Подтверждение удаления }
@@ -377,14 +378,14 @@ begin
   {----------------------------------}
   { Удаление через менеджер }
   {----------------------------------}
-  DataManager.RemoveRepository(Repo.Name);
+  AppServices.DataManager.RemoveRepository(Repo.Name);
 
   {----------------------------------}
   { Обновление UI }
   {----------------------------------}
   FillComboBoxRepository;
 
-  if DataManager.ActiveDeviceRepo <> nil then
+  if AppServices.DataManager.ActiveDeviceRepo <> nil then
   begin
     LoadData;        // заново загружает данные активного репозитория
     BuildTree;
@@ -408,13 +409,13 @@ end;
 procedure TFormDeviceSelect.miLoadClick(Sender: TObject);
 begin
 
-  if DataManager.ActiveDeviceRepo = nil then
+  if AppServices.DataManager.ActiveDeviceRepo = nil then
     Exit;
 
   try
     // TWaitCursor.Create;
 
-    if not DataManager.ActiveDeviceRepo.Load then
+    if not AppServices.DataManager.ActiveDeviceRepo.Load then
       raise Exception.Create('Не удалось загрузить приборы');
 
     UpdateGridDevices; // обновление таблицы приборов
@@ -436,7 +437,7 @@ begin
   {----------------------------------}
   { Проверка менеджера }
   {----------------------------------}
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
   {----------------------------------}
@@ -477,7 +478,7 @@ begin
   {----------------------------------}
   { Добавление репозитория ПРИБОРОВ }
   {----------------------------------}
-  DataManager.AddRepository(
+  AppServices.DataManager.AddRepository(
     RepoName,
     rkDevice,
     DbFileName
@@ -516,7 +517,7 @@ procedure TFormDeviceSelect.miSaveClick(Sender: TObject);
 var
   Repo: TDeviceRepository;
 begin
-  Repo := DataManager.ActiveDeviceRepo;
+  Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo = nil then
     Exit;
 
@@ -684,7 +685,7 @@ begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
   {--------------------------------------------------}
-  if (DataManager = nil) or (ActiveRepo = nil) then
+  if (AppServices.DataManager = nil) or (ActiveRepo = nil) then
     Exit;
 
   {--------------------------------------------------}
@@ -1039,10 +1040,10 @@ var
     Result := nil;
     ARepo := nil;
 
-    if (AReestrNumber = '') or (DataManager = nil) then
+    if (AReestrNumber = '') or (AppServices.DataManager = nil) then
       Exit;
 
-    for Repo in DataManager.TypeRepositories do
+    for Repo in AppServices.DataManager.TypeRepositories do
     begin
       if (Repo = nil) or (Repo.Types = nil) then
         Continue;
@@ -1194,8 +1195,8 @@ begin
           begin
             DetectText := NormalizeSearchText(Dev.CategoryName + ' ' + Dev.DeviceTypeName);
 
-            if DataManager.ActiveTypeRepo <> nil then
-              Dev.Category := DataManager.ActiveTypeRepo.DetectCategoryByKeywords(DetectText);
+            if AppServices.DataManager.ActiveTypeRepo <> nil then
+              Dev.Category := AppServices.DataManager.ActiveTypeRepo.DetectCategoryByKeywords(DetectText);
           end;
 
           Inc(FoundCount);
@@ -1259,25 +1260,25 @@ begin
   {----------------------------------}
   { Проверка менеджера }
   {----------------------------------}
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
   {----------------------------------}
   { Проверка активного репозитория приборов }
   {----------------------------------}
-  if DataManager.ActiveDeviceRepo = nil then
+  if AppServices.DataManager.ActiveDeviceRepo = nil then
     Exit;
 
   {----------------------------------}
   { Проверка данных репозитория }
   {----------------------------------}
-  if DataManager.ActiveDeviceRepo.Devices = nil then
+  if AppServices.DataManager.ActiveDeviceRepo.Devices = nil then
     Exit;
 
   {----------------------------------}
   { Обновляем ссылку на данные }
   {----------------------------------}
-  ActiveRepo := DataManager.ActiveDeviceRepo;
+  ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
   FDevices := ActiveRepo.Devices;
 
   Result := True;
@@ -1347,11 +1348,11 @@ begin
 
   if ADevice.Category > 0 then
   begin
-    if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
-      Result := DataManager.ActiveTypeRepo.CategoryToText(ADevice.Category, ADevice.CategoryName)
-    else if DataManager <> nil then
+    if (AppServices.DataManager <> nil) and (AppServices.DataManager.ActiveTypeRepo <> nil) then
+      Result := AppServices.DataManager.ActiveTypeRepo.CategoryToText(ADevice.Category, ADevice.CategoryName)
+    else if AppServices.DataManager <> nil then
     begin
-      C := DataManager.FindCategoryByID(ADevice.Category);
+      C := AppServices.DataManager.FindCategoryByID(ADevice.Category);
       if C <> nil then
         Result := C.Name
       else
@@ -1552,7 +1553,7 @@ begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
     Exit;
 
   Idx := ComboBoxRepository.ItemIndex;
@@ -1564,7 +1565,7 @@ begin
   {----------------------------------}
   { Смена активного репозитория через менеджер }
   {----------------------------------}
-  DataManager.SetActiveDeviceRepository(RepoName);
+  AppServices.DataManager.SetActiveDeviceRepository(RepoName);
 
   {----------------------------------}
   { Пересборка UI }
@@ -1666,7 +1667,7 @@ begin
   try
     ComboBoxRepository.Clear;
 
-    if DataManager = nil then
+    if AppServices.DataManager = nil then
       Exit;
 
     ItemIndex := -1;
@@ -1674,14 +1675,14 @@ begin
     {----------------------------------}
     { Перебираем репозитории приборов }
     {----------------------------------}
-    for Repo in DataManager.DeviceRepositories do
+    for Repo in AppServices.DataManager.DeviceRepositories do
     begin
       ComboBoxRepository.Items.Add(Repo.Name);
 
       {----------------------------------}
       { Запоминаем активный репозиторий }
       {----------------------------------}
-      if Repo = DataManager.ActiveDeviceRepo then
+      if Repo = AppServices.DataManager.ActiveDeviceRepo then
         ItemIndex := ComboBoxRepository.Items.Count - 1;
     end;
 
@@ -1698,7 +1699,7 @@ end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
-  DataManager.Save;
+  AppServices.DataManager.Save;
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
