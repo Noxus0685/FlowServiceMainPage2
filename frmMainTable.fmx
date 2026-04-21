@@ -1540,8 +1540,8 @@ object FrameMainTable: TFrameMainTable
                 OnSetValue = GridEtalonsSetValue
                 OnCellClick = GridEtalonsCellClick
                 OnCellDblClick = GridEtalonsCellDblClick
-                Viewport.Width = 1049.000000000000000000
-                Viewport.Height = 120.000000000000000000
+                Viewport.Width = 1045.000000000000000000
+                Viewport.Height = 79.000000000000000000
                 object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
@@ -1684,8 +1684,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridDevicesSetValue
               OnCellClick = GridDevicesCellClick
               OnCellDblClick = GridDevicesCellDblClick
-              Viewport.Width = 1049.000000000000000000
-              Viewport.Height = 227.000000000000000000
+              Viewport.Width = 1029.000000000000000000
+              Viewport.Height = 186.000000000000000000
               object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
@@ -1931,7 +1931,7 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 1
+          TabIndex = 3
           TabOrder = 1
           TabPosition = PlatformDefault
           Sizes = (
@@ -1965,7 +1965,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
+            IsSelected = False
             Size.Width = 81.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
@@ -1995,7 +1995,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
+            IsSelected = True
             Size.Width = 74.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False

@@ -68,19 +68,19 @@ type
     Label5: TLabel;
     mPump: TMemo;
     Label1: TLabel;
-    EditStd: TEdit;
-    Label2: TLabel;
+    LabelStd: TLabel;
+    TrackStd: TTrackBar;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
-    procedure EditTestNumExit(Sender: TObject);
     procedure  PumpStateHandler(AParameters: TParameter; AAction:EParamAction);
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
 
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure TrackStdChange(Sender: TObject);
 
 
 
@@ -187,10 +187,8 @@ begin
 
 end;
 
-procedure TTableMainForm.EditTestNumExit(Sender: TObject);
-begin
- LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
-end;
+
+
 
 
 
@@ -795,11 +793,11 @@ begin
           SetLength(ImpSecValues, EnabledDeviceChannels.Count);
            for I := 0 to EnabledDeviceChannels.Count - 1 do
             if i in [1,3,6] then
-              ImpSecValues[i] := (Flow*((Random * 0.015) + 1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/100 + 1)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
             else if i in [2,4,5] then
-              ImpSecValues[i] := (Flow*((Random * 0.008) + 1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/100 + 1.0015)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
             else
-              ImpSecValues[i] := (Flow*((Random * 0.01) +  1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
+              ImpSecValues[i] := (Flow*(Random *  (trackStd.Value)/100 +  1.008)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
 
             FFrameMainTable.ApplyChannelValues(
               EnabledDeviceChannels,
@@ -1115,5 +1113,10 @@ end;
 
 
 
+
+procedure TTableMainForm.TrackStdChange(Sender: TObject);
+begin
+LabelStd.Text:=FormatFloat('0.00',TrackStd.Value);
+end;
 
 end.
