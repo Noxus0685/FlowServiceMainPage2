@@ -18,9 +18,11 @@ type
   private
     FBasePath: string;
     FOwnsDataManager: Boolean;
+    FOwnsProtocolManager: Boolean;
     FWorkTableManager: TWorkTableManager;
     FInitialized: Boolean;
     FDataManager: TManagerTTableDM;
+    FProtocolManager: TProtocolManager;
 
     function GetProtocolManager: TProtocolManager;
     function BuildSettingsPath(const AFileName: string): string;
@@ -74,8 +76,10 @@ begin
     FBasePath := IncludeTrailingPathDelimiter(ABasePath);
 
   FOwnsDataManager := False;
+  FOwnsProtocolManager := False;
   FWorkTableManager := nil;
   FInitialized := False;
+  FProtocolManager := nil;
 end;
 
 destructor TAppServices.Destroy;
@@ -93,7 +97,7 @@ end;
 
 function TAppServices.GetProtocolManager: TProtocolManager;
 begin
-  Result := uProtocols.ProtocolManager;
+  Result := FProtocolManager;
 end;
 
 procedure TAppServices.EnsureSettingsDirectory;
@@ -120,6 +124,13 @@ begin
   begin
     FDataManager := TManagerTTableDM.Create(BuildSettingsPath('dbsettings.ini'));
     FOwnsDataManager := True;
+  end;
+
+  if ProtocolManagerRef = nil then
+  begin
+    FProtocolManager := TProtocolManager.Create;
+    uProtocols.ProtocolManager := FProtocolManager;
+    FOwnsProtocolManager := True;
   end;
 
   DataManager.Load;
@@ -172,8 +183,16 @@ begin
   if FOwnsDataManager and (DataManager <> nil) then
     FreeAndNil(DataManager);
 
+  if FOwnsProtocolManager and (FProtocolManager <> nil) then
+  begin
+    if uProtocols.ProtocolManager = FProtocolManager then
+      uProtocols.ProtocolManager := nil;
+    FreeAndNil(FProtocolManager);
+  end;
+
   ResetGlobalStatics;
   FOwnsDataManager := False;
+  FOwnsProtocolManager := False;
   FInitialized := False;
 end;
 
