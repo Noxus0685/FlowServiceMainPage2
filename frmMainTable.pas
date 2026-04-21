@@ -1331,7 +1331,7 @@ begin
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
-  ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход', Format('Q=%.3f', [AValue]));
+  //ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход в л/с', Format('Q=%.3f', [AValue]));
   UpdateUIFlowRate;
 end;
 

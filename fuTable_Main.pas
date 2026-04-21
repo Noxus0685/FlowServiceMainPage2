@@ -253,7 +253,8 @@ begin
       WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-random(5));
     if WorkTable.ActivePump.Value.value<12 then
       WorkTable.ActivePump.ValueSet.value:=12;
-    WorkTable.ActivePump.DoPumpStart;
+    if not(WorkTable.ActivePump.IsRunning) then
+     WorkTable.ActivePump.DoPumpStart;
    end;
 
 
