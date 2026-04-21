@@ -652,6 +652,7 @@ var
   FlowRate, Coef, ImpSec: Double;
   i:integer;
 begin
+  Coef:=0;
   WorkTable := FWorkTableManager.WorkTables[0];
   if (WorkTable = nil) or (WorkTable.EtalonChannels.Count = 0) then
     Exit;
@@ -685,10 +686,12 @@ var
   WorkTable:tWorkTable;
 begin
   WorkTable := FWorkTableManager.ActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
   SetLength(Result, 0);
   if AChannels = nil then
     Exit;
-
+  SUM:=0;
    for I := 0 to AChannels.Count-1 do
     begin
       SUM:=SUM+WorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
@@ -697,7 +700,10 @@ begin
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
-    MaxRatio := (WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[i].FlowMeter.Device.Qmax,4))/SUM;
+    if SameValue(SUM, 0.0, 1e-12) then
+      MaxRatio:=0
+    else
+      MaxRatio := (WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[i].FlowMeter.Device.Qmax,4))/SUM;
     Coef := GetChannelFlowCoef(AChannels[I]);
     if Coef > 0 then
       Result[I] := (AFlowRate*MaxRatio * Coef) / 3.6
