@@ -706,9 +706,9 @@ begin
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
-  TMeterValue.SaveToFile(0);
+  // TMeterValue сохраняется централизованно в AppServices.SaveAll/Shutdown.
   FInstrumentalVisibleOrder.Free;
-  FWorkTableManager.Free;
+  // Владелец менеджера — AppServices, здесь не освобождаем.
   FFlowMeters.Free;
   inherited;
 end;
@@ -1086,7 +1086,7 @@ begin
   FInitialized := True;
   SwitchAuto.IsChecked := False;
 
-  TMeterValue.LoadFromFile;
+  // Загрузка TMeterValue выполняется централизованно в AppServices.Initialize.
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
