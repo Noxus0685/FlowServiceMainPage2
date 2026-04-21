@@ -9,6 +9,7 @@ uses
   System.StrUtils,
   System.SysUtils,
   uBaseProcedures,
+  uObservable,
   uClasses,
   uDataManager,
   uDeviceClass,
@@ -52,7 +53,7 @@ type
 
 
 type
-  TWorkTable = class (TObservableObject);
+  TWorkTable = class;
 
   TChannel = class(TTypeEntity)
   private
@@ -199,7 +200,7 @@ type
 
   end;
 
-  TWorkTable = class
+  TWorkTable = class  (TObservableObject)
 
   type
   // Обработчики для расхода
