@@ -589,9 +589,11 @@ implementation
 
 
 uses
+  uAppServices,
+  uMeasurementRun,
   FmxHelper,
-  frmMainTable,
-  uMeasurementRun;
+  frmMainTable;
+
 {$REGION 'TChannel'}
 
 procedure TChannel.InitMeterValues;
@@ -778,7 +780,7 @@ end;
     FoundRepo: TTypeRepository;
 begin
 
-  if DataManager = nil then
+  if AppServices.DataManager = nil then
   Exit;
 
   if FFlowMeter = nil then
@@ -850,9 +852,11 @@ begin
   FGroup := ASource.FGroup;
 
   SrcDevice := ASource.FFlowMeter.Device;
-  if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+  if ACloneDeviceToRepo and (SrcDevice <> nil) and
+                            (AppServices.DataManager <> nil) and
+   (AppServices.DataManager.ActiveDeviceRepo <> nil) then
   begin
-    NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
+    NewDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
     FFlowMeter.Device := NewDevice;
   end
   else if SrcDevice <> nil then
@@ -2898,8 +2902,8 @@ var
 begin
 
   DeviceRepo := nil;
-  if DataManager <> nil then
-    DeviceRepo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    DeviceRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   for DeviceChannel in DeviceChannels do
   begin

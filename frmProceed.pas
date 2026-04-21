@@ -264,7 +264,8 @@ type
   end;
 
 implementation
-
+   uses
+    uAppServices;
 {$R *.fmx}
 
 const
@@ -566,8 +567,8 @@ begin
 
       Device := nil;
       Repo := nil;
-      if DataManager <> nil then
-        Device := DataManager.FindDevice(DeviceUUID, Repo);
+      if AppServices.DataManager <> nil then
+        Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
 
       if (Device <> nil) and (FindProcessingDeviceByUUID(Device.UUID) = nil) then
         FProcessingDevices.Add(Device);
@@ -1171,8 +1172,8 @@ begin
     Sess := TSessionSpillage(Item.TagObject);
     if (Item.ParentItem <> nil) and (Item.ParentItem.TagObject is TDevice) then
       Result := TDevice(Item.ParentItem.TagObject)
-    else if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-      Result := DataManager.ActiveDeviceRepo.FindDeviceByUUID(Sess.DeviceUUID);
+    else if (AppServices.DataManager <> nil) and (AppServices.DataManager.ActiveDeviceRepo <> nil) then
+      Result := AppServices.DataManager.ActiveDeviceRepo.FindDeviceByUUID(Sess.DeviceUUID);
   end;
 
   if Result = nil then
@@ -1546,8 +1547,8 @@ begin
   end;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -1605,8 +1606,8 @@ begin
   Session.State := osModified;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -1638,8 +1639,8 @@ begin
   Session.State := osModified;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -1660,8 +1661,8 @@ begin
   //  Session.State := osModified;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -1724,8 +1725,8 @@ begin
     Exit;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -1774,8 +1775,8 @@ begin
     end;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -1810,8 +1811,8 @@ begin
   end;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -1926,8 +1927,8 @@ begin
     Session.State := osModified;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -2053,8 +2054,8 @@ begin
   end;
 
   Repo := nil;
-  if DataManager <> nil then
-    Repo := DataManager.ActiveDeviceRepo;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
   if Repo <> nil then
     Repo.SaveDevice(Device);
 
@@ -2507,8 +2508,8 @@ begin
   if Device <> nil then
   begin
     Repo := nil;
-    if DataManager <> nil then
-      Repo := DataManager.ActiveDeviceRepo;
+    if AppServices.DataManager <> nil then
+      Repo := AppServices.DataManager.ActiveDeviceRepo;
     if Repo <> nil then
       Repo.SaveDevice(Device);
   end;

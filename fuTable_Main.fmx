@@ -16,7 +16,7 @@ object TableMainForm: TTableMainForm
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 3
+    TabIndex = 0
     TabOrder = 0
     TabPosition = PlatformDefault
     OnChange = tcMainChange
@@ -34,7 +34,7 @@ object TableMainForm: TTableMainForm
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False

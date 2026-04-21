@@ -1,4 +1,4 @@
-unit uAppServices;
+﻿unit uAppServices;
 
 interface
 
@@ -20,6 +20,7 @@ type
     FOwnsDataManager: Boolean;
     FWorkTableManager: TWorkTableManager;
     FInitialized: Boolean;
+    FDataManager: TManagerTTableDM;
 
     function GetProtocolManager: TProtocolManager;
     function BuildSettingsPath(const AFileName: string): string;
@@ -50,7 +51,7 @@ type
     procedure Shutdown;
 
     property WorkTableManager: TWorkTableManager read FWorkTableManager;
-    property DataManagerRef: TManagerTTableDM read DataManager;
+    property DataManager: TManagerTTableDM read FDataManager;
     property ProtocolManagerRef: TProtocolManager read GetProtocolManager;
     property Initialized: Boolean read FInitialized;
   end;
@@ -117,7 +118,7 @@ begin
 
   if DataManager = nil then
   begin
-    DataManager := TManagerTTableDM.Create(BuildSettingsPath('dbsettings.ini'));
+    FDataManager := TManagerTTableDM.Create(BuildSettingsPath('dbsettings.ini'));
     FOwnsDataManager := True;
   end;
 
