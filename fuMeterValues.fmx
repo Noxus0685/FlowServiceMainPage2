@@ -1,9 +1,9 @@
-﻿object FormMeterValues: TFormMeterValues
+object FormMeterValues: TFormMeterValues
   Left = 0
   Top = 0
   Caption = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1084#1077#1090#1088#1086#1083#1086#1075#1080#1095#1077#1089#1082#1080#1093' '#1074#1077#1083#1080#1095#1080#1085
-  ClientHeight = 1004
-  ClientWidth = 922
+  ClientHeight = 606
+  ClientWidth = 896
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -3164,7 +3164,7 @@
   end
   object ToolBar1: TToolBar
     Align = MostTop
-    Size.Width = 922.000000000000000000
+    Size.Width = 896.000000000000000000
     Size.Height = 49.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 2
@@ -3181,24 +3181,24 @@
   end
   object TabControlMeterValueSettings: TTabControl
     Align = Client
-    Size.Width = 922.000000000000000000
-    Size.Height = 955.000000000000000000
+    Size.Width = 896.000000000000000000
+    Size.Height = 557.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 4
     TabOrder = 3
     TabPosition = PlatformDefault
     OnChange = TabControlMeterValueSettingsChange
     Sizes = (
-      922s
-      929s
-      922s
-      929s
-      922s
-      929s
-      922s
-      929s
-      922s
-      929s)
+      896s
+      531s
+      896s
+      531s
+      896s
+      531s
+      896s
+      531s
+      896s
+      531s)
     object TabItem1: TTabItem
       CustomIcon = <
         item
@@ -3215,29 +3215,29 @@
       ExplicitSize.cy = 23.000000000000000000
       object Layout8: TLayout
         Align = Client
-        Size.Width = 922.000000000000000000
-        Size.Height = 929.000000000000000000
+        Size.Width = 896.000000000000000000
+        Size.Height = 531.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object VertScrollBox1: TVertScrollBox
           Align = Client
-          Size.Width = 922.000000000000000000
-          Size.Height = 929.000000000000000000
+          Size.Width = 896.000000000000000000
+          Size.Height = 531.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           AutoHide = False
-          Viewport.Width = 906.000000000000000000
-          Viewport.Height = 913.000000000000000000
+          Viewport.Width = 880.000000000000000000
+          Viewport.Height = 515.000000000000000000
           object LayoutCommonSettings: TLayout
             Align = Top
             Position.Y = 50.000000000000000000
-            Size.Width = 906.000000000000000000
+            Size.Width = 880.000000000000000000
             Size.Height = 363.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 2
             object Panel4: TPanel
               Align = Top
-              Size.Width = 906.000000000000000000
+              Size.Width = 880.000000000000000000
               Size.Height = 342.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'panelstyleHSC'
@@ -3245,7 +3245,7 @@
               object Layout56: TLayout
                 Align = Top
                 Position.Y = 37.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 6
@@ -3253,7 +3253,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3318,7 +3318,7 @@
               object Layout66: TLayout
                 Align = Top
                 Position.Y = 137.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 3
@@ -3326,7 +3326,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3394,7 +3394,7 @@
               object Layout67: TLayout
                 Align = Top
                 Position.Y = 187.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 1
@@ -3402,7 +3402,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3481,7 +3481,7 @@
                 Margins.Bottom = 6.000000000000000000
                 Position.X = 30.000000000000000000
                 Position.Y = 6.000000000000000000
-                Size.Width = 870.000000000000000000
+                Size.Width = 844.000000000000000000
                 Size.Height = 25.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'backtoolbuttonlabel'
@@ -3495,7 +3495,7 @@
               object Layout6: TLayout
                 Align = Top
                 Position.Y = 237.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 5
@@ -3503,7 +3503,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3559,7 +3559,7 @@
               object Layout7: TLayout
                 Align = Top
                 Position.Y = 287.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 4
@@ -3567,7 +3567,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3633,7 +3633,7 @@
               object Layout21: TLayout
                 Align = Top
                 Position.Y = 87.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
@@ -3641,7 +3641,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3712,13 +3712,13 @@
           object LayoutValues: TLayout
             Align = Top
             Position.Y = 413.000000000000000000
-            Size.Width = 906.000000000000000000
+            Size.Width = 880.000000000000000000
             Size.Height = 268.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Panel1: TPanel
               Align = Top
-              Size.Width = 906.000000000000000000
+              Size.Width = 880.000000000000000000
               Size.Height = 249.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'panelstyleHSC'
@@ -3726,7 +3726,7 @@
               object Layout2: TLayout
                 Align = Top
                 Position.Y = 37.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 4
@@ -3734,7 +3734,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3799,7 +3799,7 @@
               object Layout3: TLayout
                 Align = Top
                 Position.Y = 87.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 3
@@ -3807,7 +3807,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3875,7 +3875,7 @@
               object Layout4: TLayout
                 Align = Top
                 Position.Y = 137.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 1
@@ -3883,7 +3883,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -3962,7 +3962,7 @@
                 Margins.Bottom = 6.000000000000000000
                 Position.X = 30.000000000000000000
                 Position.Y = 6.000000000000000000
-                Size.Width = 870.000000000000000000
+                Size.Width = 844.000000000000000000
                 Size.Height = 25.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'backtoolbuttonlabel'
@@ -3976,7 +3976,7 @@
               object Layout5: TLayout
                 Align = Top
                 Position.Y = 187.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
@@ -3984,7 +3984,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -4054,7 +4054,7 @@
           end
           object LayoutValue: TLayout
             Align = MostTop
-            Size.Width = 906.000000000000000000
+            Size.Width = 880.000000000000000000
             Size.Height = 50.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 5
@@ -4062,7 +4062,7 @@
               Align = Client
               Fill.Kind = None
               Sides = [Bottom]
-              Size.Width = 864.000000000000000000
+              Size.Width = 838.000000000000000000
               Size.Height = 50.000000000000000000
               Size.PlatformDefault = False
               Stroke.Color = xFF363636
@@ -4127,13 +4127,13 @@
           object LayoutCoefs: TLayout
             Align = Top
             Position.Y = 681.000000000000000000
-            Size.Width = 906.000000000000000000
+            Size.Width = 880.000000000000000000
             Size.Height = 384.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             object Panel5: TPanel
               Align = Top
-              Size.Width = 906.000000000000000000
+              Size.Width = 880.000000000000000000
               Size.Height = 345.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'panelstyleHSC'
@@ -4141,7 +4141,7 @@
               object Layout24: TLayout
                 Align = Top
                 Position.Y = 87.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 5
@@ -4149,7 +4149,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -4246,7 +4246,7 @@
               object Layout25: TLayout
                 Align = Top
                 Position.Y = 187.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 2
@@ -4254,7 +4254,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -4322,7 +4322,7 @@
               object Layout28: TLayout
                 Align = Top
                 Position.Y = 237.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 0
@@ -4330,7 +4330,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -4409,7 +4409,7 @@
                 Margins.Bottom = 6.000000000000000000
                 Position.X = 30.000000000000000000
                 Position.Y = 6.000000000000000000
-                Size.Width = 870.000000000000000000
+                Size.Width = 844.000000000000000000
                 Size.Height = 25.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'backtoolbuttonlabel'
@@ -4423,7 +4423,7 @@
               object Layout30: TLayout
                 Align = Top
                 Position.Y = 137.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 4
@@ -4431,7 +4431,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -4528,7 +4528,7 @@
               object Layout19: TLayout
                 Align = Top
                 Position.Y = 37.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 3
@@ -4536,7 +4536,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -4651,35 +4651,35 @@
       ExplicitSize.cy = 23.000000000000000000
       object Layout9: TLayout
         Align = Client
-        Size.Width = 922.000000000000000000
-        Size.Height = 929.000000000000000000
+        Size.Width = 896.000000000000000000
+        Size.Height = 531.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object VertScrollBox2: TVertScrollBox
           Align = Client
-          Size.Width = 922.000000000000000000
-          Size.Height = 929.000000000000000000
+          Size.Width = 896.000000000000000000
+          Size.Height = 531.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           AutoHide = False
-          Viewport.Width = 906.000000000000000000
-          Viewport.Height = 913.000000000000000000
+          Viewport.Width = 880.000000000000000000
+          Viewport.Height = 515.000000000000000000
           object Layout10: TLayout
             Align = Top
-            Size.Width = 906.000000000000000000
+            Size.Width = 880.000000000000000000
             Size.Height = 697.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Panel2: TPanel
               Align = Top
-              Size.Width = 906.000000000000000000
+              Size.Width = 880.000000000000000000
               Size.Height = 369.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'panelstyleHSC'
               TabOrder = 0
               object Layout26: TLayout
                 Align = Top
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 328.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 6
@@ -4688,7 +4688,7 @@
                   CanFocus = True
                   ClipChildren = True
                   Position.Y = 50.000000000000000000
-                  Size.Width = 906.000000000000000000
+                  Size.Width = 880.000000000000000000
                   Size.Height = 193.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 0
@@ -4696,8 +4696,8 @@
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
                   OnSelChanged = StringGridCoefsDataSelChanged
                   OnEditingDone = StringGridCoefsDataEditingDone
-                  Viewport.Width = 906.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 860.000000000000000000
+                  Viewport.Height = 152.000000000000000000
                   object CheckColumn1: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -4739,7 +4739,7 @@
                 object Layout27: TLayout
                   Align = Top
                   Position.Y = 243.000000000000000000
-                  Size.Width = 906.000000000000000000
+                  Size.Width = 880.000000000000000000
                   Size.Height = 48.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 2
@@ -4818,7 +4818,7 @@
                 end
                 object Layout36: TLayout
                   Align = MostTop
-                  Size.Width = 906.000000000000000000
+                  Size.Width = 880.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 1
@@ -4848,7 +4848,7 @@
                   end
                   object CheckBox2: TCheckBox
                     Align = MostRight
-                    Position.X = 862.000000000000000000
+                    Position.X = 836.000000000000000000
                     Size.Width = 44.000000000000000000
                     Size.Height = 50.000000000000000000
                     Size.PlatformDefault = False
@@ -4859,7 +4859,7 @@
               object Layout13: TLayout
                 Align = Top
                 Position.Y = 328.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 328.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 5
@@ -4868,14 +4868,14 @@
                   CanFocus = True
                   ClipChildren = True
                   Position.Y = 50.000000000000000000
-                  Size.Width = 906.000000000000000000
+                  Size.Width = 880.000000000000000000
                   Size.Height = 193.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 0
                   RowCount = 20
                   Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
-                  Viewport.Width = 906.000000000000000000
-                  Viewport.Height = 193.000000000000000000
+                  Viewport.Width = 860.000000000000000000
+                  Viewport.Height = 152.000000000000000000
                   object CheckColumn2: TCheckColumn
                     HeaderSettings.TextSettings.WordWrap = False
                   end
@@ -4920,7 +4920,7 @@
                 object Layout16: TLayout
                   Align = Top
                   Position.Y = 243.000000000000000000
-                  Size.Width = 906.000000000000000000
+                  Size.Width = 880.000000000000000000
                   Size.Height = 48.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 2
@@ -4994,7 +4994,7 @@
                 end
                 object Layout17: TLayout
                   Align = MostTop
-                  Size.Width = 906.000000000000000000
+                  Size.Width = 880.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   TabOrder = 1
@@ -5024,7 +5024,7 @@
                   end
                   object CheckBox3: TCheckBox
                     Align = MostRight
-                    Position.X = 862.000000000000000000
+                    Position.X = 836.000000000000000000
                     Size.Width = 44.000000000000000000
                     Size.Height = 50.000000000000000000
                     Size.PlatformDefault = False
@@ -5037,13 +5037,13 @@
           object Layout14: TLayout
             Align = Top
             Position.Y = 1025.000000000000000000
-            Size.Width = 906.000000000000000000
+            Size.Width = 880.000000000000000000
             Size.Height = 536.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             object Panel3: TPanel
               Align = Top
-              Size.Width = 906.000000000000000000
+              Size.Width = 880.000000000000000000
               Size.Height = 345.000000000000000000
               Size.PlatformDefault = False
               StyleLookup = 'panelstyleHSC'
@@ -5051,7 +5051,7 @@
               object Layout15: TLayout
                 Align = Top
                 Position.Y = 37.000000000000000000
-                Size.Width = 906.000000000000000000
+                Size.Width = 880.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 1
@@ -5059,7 +5059,7 @@
                   Align = Client
                   Fill.Kind = None
                   Sides = [Bottom]
-                  Size.Width = 864.000000000000000000
+                  Size.Width = 838.000000000000000000
                   Size.Height = 50.000000000000000000
                   Size.PlatformDefault = False
                   Stroke.Color = xFF363636
@@ -5132,7 +5132,7 @@
                 Margins.Bottom = 6.000000000000000000
                 Position.X = 30.000000000000000000
                 Position.Y = 6.000000000000000000
-                Size.Width = 870.000000000000000000
+                Size.Width = 844.000000000000000000
                 Size.Height = 25.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'backtoolbuttonlabel'
@@ -5148,13 +5148,13 @@
           object Layout18: TLayout
             Align = Top
             Position.Y = 697.000000000000000000
-            Size.Width = 906.000000000000000000
+            Size.Width = 880.000000000000000000
             Size.Height = 328.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 6
             object Layout20: TLayout
               Align = MostTop
-              Size.Width = 906.000000000000000000
+              Size.Width = 880.000000000000000000
               Size.Height = 50.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
@@ -5184,7 +5184,7 @@
               end
               object CheckBox4: TCheckBox
                 Align = MostRight
-                Position.X = 862.000000000000000000
+                Position.X = 836.000000000000000000
                 Size.Width = 44.000000000000000000
                 Size.Height = 50.000000000000000000
                 Size.PlatformDefault = False
@@ -5201,7 +5201,7 @@
               Zoom.Pen.Fill.Color = claSilver
               Align = Client
               TabOrder = 1
-              Size.Width = 906.000000000000000000
+              Size.Width = 880.000000000000000000
               Size.Height = 278.000000000000000000
               Size.PlatformDefault = False
               ColorPaletteIndex = 13
@@ -5226,7 +5226,7 @@
       ExplicitSize.cy = 23.000000000000000000
       object Layout1: TLayout
         Align = Top
-        Size.Width = 922.000000000000000000
+        Size.Width = 896.000000000000000000
         Size.Height = 328.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 5
@@ -5235,15 +5235,15 @@
           CanFocus = True
           ClipChildren = True
           Position.Y = 50.000000000000000000
-          Size.Width = 922.000000000000000000
+          Size.Width = 896.000000000000000000
           Size.Height = 193.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridDimensionsSelChanged
-          Viewport.Width = 922.000000000000000000
-          Viewport.Height = 193.000000000000000000
+          Viewport.Width = 876.000000000000000000
+          Viewport.Height = 168.000000000000000000
           object StringColumn8: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False
@@ -5282,7 +5282,7 @@
         object Layout11: TLayout
           Align = Top
           Position.Y = 243.000000000000000000
-          Size.Width = 922.000000000000000000
+          Size.Width = 896.000000000000000000
           Size.Height = 48.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 2
@@ -5357,7 +5357,7 @@
         end
         object Layout12: TLayout
           Align = MostTop
-          Size.Width = 922.000000000000000000
+          Size.Width = 896.000000000000000000
           Size.Height = 50.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
@@ -5387,7 +5387,7 @@
           end
           object CheckBox1: TCheckBox
             Align = MostRight
-            Position.X = 878.000000000000000000
+            Position.X = 852.000000000000000000
             Size.Width = 44.000000000000000000
             Size.Height = 50.000000000000000000
             Size.PlatformDefault = False
@@ -5517,24 +5517,23 @@
       ExplicitSize.cy = 23.000000000000000000
       object LayoutListValues: TLayout
         Align = Client
-        Size.Width = 922.000000000000000000
-        Size.Height = 929.000000000000000000
+        Size.Width = 896.000000000000000000
+        Size.Height = 498.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object StringGridValuesList: TStringGrid
           Align = Top
           CanFocus = True
           ClipChildren = True
-          Position.Y = 50.000000000000000000
-          Size.Width = 922.000000000000000000
+          Size.Width = 896.000000000000000000
           Size.Height = 399.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           RowCount = 20
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = StringGridValuesListSelChanged
-          Viewport.Width = 922.000000000000000000
-          Viewport.Height = 399.000000000000000000
+          Viewport.Width = 876.000000000000000000
+          Viewport.Height = 358.000000000000000000
           object StringColumnNum: TStringColumn
             Header = #8470
             HeaderSettings.TextSettings.WordWrap = False
@@ -5626,18 +5625,27 @@
             HeaderSettings.TextSettings.WordWrap = False
           end
         end
+      end
+      object Layout22: TLayout
+        Align = MostTop
+        Size.Width = 896.000000000000000000
+        Size.Height = 33.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
         object Layout23: TLayout
-          Align = Left
-          Position.X = 150.000000000000000000
-          Size.Width = 347.000000000000000000
-          Size.Height = 32.000000000000000000
+          Align = Right
+          Position.X = 544.000000000000000000
+          Size.Width = 352.000000000000000000
+          Size.Height = 33.000000000000000000
           Size.PlatformDefault = False
+          ParentShowHint = False
+          ShowHint = False
           TabOrder = 1
           object sbClear: TSpeedButton
             Align = Left
             Position.X = 49.000000000000000000
             Size.Width = 43.000000000000000000
-            Size.Height = 32.000000000000000000
+            Size.Height = 33.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = 'stoptoolbutton'
             Text = 'sbClear'
@@ -5648,7 +5656,7 @@
             StaysPressed = True
             Align = MostLeft
             Size.Width = 49.000000000000000000
-            Size.Height = 32.000000000000000000
+            Size.Height = 33.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = 'searcheditbutton'
             Text = 'sbFind'
@@ -5662,8 +5670,8 @@
             ReturnKeyType = Search
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 201.000000000000000000
-            Size.Height = 22.000000000000000000
+            Size.Width = 206.000000000000000000
+            Size.Height = 23.000000000000000000
             Size.PlatformDefault = False
             KillFocusByReturn = True
             OnChangeTracking = EditFindDeviceChangeTracking
@@ -5671,9 +5679,9 @@
           end
           object SpeedButtonFindInternet: TSpeedButton
             Align = Right
-            Position.X = 868.000000000000000000
+            Position.X = 298.000000000000000000
             Size.Width = 54.000000000000000000
-            Size.Height = 32.000000000000000000
+            Size.Height = 33.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = 'infotoolbutton'
             Text = 'SpeedButtonFindInternet'

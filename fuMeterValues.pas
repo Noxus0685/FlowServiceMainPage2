@@ -103,11 +103,11 @@ type
     EditValueRate: TEdit;
     LabelTestValueWoCorrection: TLabel;
     StringColumnDescription: TStringColumn;
-    SpeedButtonResetSettings: TSpeedButton;
     sbClear: TSpeedButton;
     sbFind: TSpeedButton;
     EditFindDevice: TEdit;
     SpeedButtonFindInternet: TSpeedButton;
+    Layout22: TLayout;
     procedure FormShow(Sender: TObject);
     procedure AddRowButtonClick(Sender: TObject);
     procedure StringGridCoefsDataEditingDone(Sender: TObject; const ACol,
