@@ -104,7 +104,7 @@ type
     LabelTestValueWoCorrection: TLabel;
     StringColumnDescription: TStringColumn;
     SpeedButtonResetSettings: TSpeedButton;
-    EditSearchValuesList: TEdit;
+    EditFindDevice: TEdit;
     procedure FormShow(Sender: TObject);
     procedure AddRowButtonClick(Sender: TObject);
     procedure StringGridCoefsDataEditingDone(Sender: TObject; const ACol,
@@ -131,8 +131,8 @@ type
     procedure TabItem4Click(Sender: TObject);
     procedure TabItemListValuesClick(Sender: TObject);
     procedure StringGridValuesListSelChanged(Sender: TObject);
-    procedure EditSearchValuesListChangeTracking(Sender: TObject);
-    procedure EditSearchValuesListExit(Sender: TObject);
+    procedure EditFindDeviceChangeTracking(Sender: TObject);
+    procedure EditFindDeviceExit(Sender: TObject);
     procedure EditCoefKExit(Sender: TObject);
     procedure EditCoefPExit(Sender: TObject);
     procedure SpeedButtonResetSettingsClick(Sender: TObject);
@@ -643,7 +643,7 @@ end;
 procedure TFormMeterValues.TabItemListValuesClick(Sender: TObject);
 begin
   UpdateLayoutValuesList;
-  EditSearchValuesListChangeTracking(EditSearchValuesList);
+  EditFindDeviceChangeTracking(EditFindDevice);
 end;
 
 procedure TFormMeterValues.StringGridValuesListSelChanged(Sender: TObject);
@@ -663,7 +663,7 @@ begin
   UpdateStringGridCoefsData;
 end;
 
-procedure TFormMeterValues.EditSearchValuesListChangeTracking(Sender: TObject);
+procedure TFormMeterValues.EditFindDeviceChangeTracking(Sender: TObject);
 var
   Row, Col: Integer;
   SearchText, CellText: string;
@@ -671,7 +671,7 @@ begin
   if StringGridValuesList.RowCount = 0 then
     Exit;
 
-  SearchText := Trim(LowerCase(EditSearchValuesList.Text));
+  SearchText := Trim(LowerCase(EditFindDevice.Text));
   if SearchText.IsEmpty then
   begin
     StringGridValuesList.Row := 0;
@@ -690,9 +690,9 @@ begin
     end;
 end;
 
-procedure TFormMeterValues.EditSearchValuesListExit(Sender: TObject);
+procedure TFormMeterValues.EditFindDeviceExit(Sender: TObject);
 begin
-  EditSearchValuesListChangeTracking(Sender);
+  EditFindDeviceChangeTracking(Sender);
 end;
 
 procedure TFormMeterValues.UpdateLayoutCoefs;
