@@ -67,6 +67,9 @@ type
     LabelTestNum: TLabel;
     Label5: TLabel;
     mPump: TMemo;
+    Label1: TLabel;
+    EditStd: TEdit;
+    Label2: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -97,8 +100,8 @@ type
 
     procedure UpdateRandomTemp(const AWorkTable: TWorkTable);
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
-    procedure UpdateRandomFreq(const APump: TPump);
-    procedure UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+    procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
+    procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
     function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
       const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
     procedure FlowRateStateHandler(AParameters: TParameter;
@@ -233,11 +236,28 @@ AValue:Double;
 begin
   WorkTable:= FWorkTableManager.ActiveWorkTable;
   TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet.value)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
-  if WorkTable.FlowRate.ValueSet.value>=WorkTable.FlowRate.Value.value then
-    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
-  else
-    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-random(5));
-  WorkTable.ActivePump.DoPumpStart;
+
+
+    IF WorkTable.FlowRate.Action = ACTION_START THEN
+    WorkTable.FlowRate.Status:=PARAM_STARTED
+  else  if (WorkTable.FlowRate.Action = ACTION_STOP) then
+    WorkTable.FlowRate.Status:=PARAM_STOPPED;
+
+  if (WorkTable.FlowRate.Action = ACTION_SET) or (WorkTable.FlowRate.Action = ACTION_START) then
+    WorkTable.ResetMeasurementValues;
+
+
+   if WorkTable.FlowRate.IsRunning then
+   begin
+    if WorkTable.FlowRate.ValueSet.value>=WorkTable.FlowRate.Value.value then
+      WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
+    else
+      WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-random(5));
+    if WorkTable.ActivePump.Value.value<12 then
+      WorkTable.ActivePump.ValueSet.value:=12;
+    WorkTable.ActivePump.DoPumpStart;
+   end;
+
 
 end;
 
@@ -348,7 +368,6 @@ begin
 
    //Температура после стола
    AWorkTable.FluidTemp.AfterValue :=  FT_WorkBench_Last;
-
 
 
 
@@ -551,20 +570,21 @@ begin
    end;
 end;
 
-procedure TTableMainForm.UpdateRandomFreq(const APump: TPump);
+procedure TTableMainForm.UpdateRandomFreq(const AWorkTable: TWorkTable);
 var
+  Pump: tPump;             // Активный насос (исполнитель)
   Freq: Double;
 begin
+  Pump := AWorkTable.ActivePump;   // Насос (может быть nil)
 
 
-
-  if APump = nil then
+  if Pump = nil then
     Exit;
 
-  IF (APump.Action = ACTION_START)  THEN
-    APump.Status:=PARAM_STARTED
-  else  if (APump.Action = ACTION_STOP) then
-    APump.Status:=PARAM_STOPPED;
+  IF (Pump.Action = ACTION_START)  THEN
+    Pump.Status:=PARAM_STARTED
+  else  if (Pump.Action = ACTION_STOP) then
+    Pump.Status:=PARAM_STOPPED;
 
 
 
@@ -574,17 +594,17 @@ begin
   begin
     Freq := (Random * 10);
 
-   if APump.IsRunning = true then
+   if Pump.IsRunning = true then
     begin
 
-      APump.Value.value:=(EnsureRange(APump.Value.value + Freq,APump.Value.value , APump.ValueSet.value));
+      Pump.Value.value:=(EnsureRange(Pump.Value.value + Freq,Pump.Value.value , Pump.ValueSet.value));
 
 
     end
     else
     begin
-      //APump.ValueSet:=(APump.ValueSet);
-      APump.Value.value:=0;
+      //Pump.ValueSet:=(Pump.ValueSet);
+      Pump.Value.value:=0;
     end;
 
 
@@ -648,7 +668,7 @@ begin
       Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
 
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
+  //Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
   if Coef <= 0 then
     Exit;
   if AFlowRate<>0 then
@@ -663,41 +683,54 @@ function TTableMainForm.BuildImpSecValuesForChannels(AChannels: TObjectList<TCha
   const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
   I: Integer;
-  Coef: Double;
+  Coef,SUM,MaxRatio : Double;
+  WorkTable:tWorkTable;
 begin
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   SetLength(Result, 0);
   if AChannels = nil then
     Exit;
 
+   for I := 0 to AChannels.Count-1 do
+    begin
+      SUM:=SUM+WorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
+    end;
+
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
+    MaxRatio := (WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[i].FlowMeter.Device.Qmax,4))/SUM;
     Coef := GetChannelFlowCoef(AChannels[I]);
     if Coef > 0 then
-      Result[I] := (AFlowRate * Coef) / 3.6
+      Result[I] := (AFlowRate*MaxRatio * Coef) / 3.6
     else
       Result[I] := AFallbackImpSec;
   end;
 end;
 
-procedure TTableMainForm.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
+procedure TTableMainForm.UpdateRandomFlowRate(const AWorkTable: TWorkTable);
 var
   Flow: Double;
-  FlowRate: Double;
+
   WorkTable:TWorkTable;
+  FlowRate: TFlowRate;
   i:integer;
   EnabledEtalonChannels: TObjectList<TChannel>;
+  EnabledDeviceChannels: TObjectList<TChannel>;
   AValue:Double;
   ImpSecValues: TArray<Double>;
+  TotalQmax: Double;
+  ChannelQmax: Double;
+  ChannelFlowRate: Double;
+  ChannelCoef: Double;
+  ChannelRatio: Double;
 begin
-  if AFlowRate = nil then
+
+  FlowRate := AWorkTable.FlowRate; // Контроллер расхода
+  if FlowRate = nil then
     Exit;
 
 
-  IF AFlowRate.Action = ACTION_START THEN
-    AFlowRate.Status:=PARAM_STARTED
-  else  if (AFlowRate.Action = ACTION_STOP) then
-    AFlowRate.Status:=PARAM_STOPPED;
 
   WorkTable:= FWorkTableManager.ActiveWorkTable;
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
@@ -710,9 +743,7 @@ begin
     if WorkTable.ActivePump=nil then
     exit;
 
-   if WorkTable.ActivePump.IsRunning=false then
-    exit;
-      if AFlowRate.IsRunning then
+      if FlowRate.IsRunning then
       begin
         EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
         try
@@ -720,17 +751,20 @@ begin
             if (WorkTable.EtalonChannels[I] <> nil) and (WorkTable.EtalonChannels[I].Enabled) then
               EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
-              IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
-               FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Valueset.Value,4)
-              else IF AFlowRate.Value.Value<AFlowRate.ValueSet.Value then
-                FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value+1,4)
-              else if AFlowRate.Value.Value>AFlowRate.ValueSet.Value then
-                FlowRate:=WorkTable.ValueFlowRate.GetDoubleNum(AFlowRate.Value.Value-1,4);
+              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
+               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
+              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
+                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
+                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+
+
 
              ImpSecValues := BuildImpSecValuesForChannels(
               EnabledEtalonChannels,
-              FlowRate,
-              UpdateEtalonImpSecFromFlowRate(FlowRate, EnabledEtalonChannels)
+              Flow,
+              //UpdateEtalonImpSecFromFlowRate(Flow, EnabledEtalonChannels)
+              NormalizeFloatInput(EditDeviceImpSec.Text)
             );
 
             FFrameMainTable.ApplyChannelValues(
@@ -742,6 +776,40 @@ begin
 
         finally
           EnabledEtalonChannels.Free;
+        end;
+        EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
+        try
+          for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+            begin
+            if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].Enabled) then
+              EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
+            end;
+
+              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
+               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
+              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
+                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
+                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+
+          SetLength(ImpSecValues, EnabledDeviceChannels.Count);
+           for I := 0 to EnabledDeviceChannels.Count - 1 do
+            if i in [1,3,6] then
+              ImpSecValues[i] := (Flow*((Random * 0.015) + 1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+            else if i in [2,4,5] then
+              ImpSecValues[i] := (Flow*((Random * 0.008) + 1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+            else
+              ImpSecValues[i] := (Flow*((Random * 0.01) +  1*NormalizeFloatInput(EditStd.text))*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
+
+            FFrameMainTable.ApplyChannelValues(
+              EnabledDeviceChannels,
+              NormalizeFloatInput('0'),
+              ImpSecValues,
+              NormalizeFloatInput('0')
+            );
+
+        finally
+          EnabledDeviceChannels.Free;
         end;
 
       end;
@@ -842,21 +910,14 @@ begin
 
 
   // ============================================================
-  // 2. Получение исполнительных объектов
-  // ============================================================
-
-  Pump := WorkTable.ActivePump;   // Насос (может быть nil)
-  FlowRate := WorkTable.FlowRate; // Контроллер расхода
-
-  // ============================================================
-  // 3. Эмуляция физического процесса (стенд)
+  // 2. Эмуляция физического процесса (стенд)
   // ============================================================
 
   // Обновление частоты насоса (имитация работы)
-  UpdateRandomFreq(Pump);
+  UpdateRandomFreq(WorkTable);
 
   // Обновление текущего расхода  (имитация работы)
-  UpdateRandomFlowRate(FlowRate);
+  UpdateRandomFlowRate(WorkTable);
 
   // Обновление климатических параметров (температура и др.)
   UpdateRandomTemp(WorkTable);
@@ -865,13 +926,13 @@ begin
   UpdateRandomPress(WorkTable);
 
 
-  UpdateTemp(WorkTable);
+  //UpdateTemp(WorkTable);
 
 
 
 
   // ============================================================
-  // 4. Машина состояний измерения
+  // 3. Машина состояний измерения
   // ============================================================
 
   case WorkTable.State of
@@ -935,7 +996,7 @@ begin
 
 
     // ============================================================
-    // 5. Основной процесс измерения
+    // 4. Основной процесс измерения
     // ============================================================
     STATE_EXECUTE:
     begin
@@ -944,7 +1005,7 @@ begin
 
 
       // ----------------------------------------------------------
-      // 5.1 Расчёт текущих импульсов
+      // 4.1 Расчёт текущих импульсов
       // ----------------------------------------------------------
 
       CurrentImp := 0;
@@ -964,7 +1025,7 @@ begin
 
 
       // ----------------------------------------------------------
-      // 5.2 Получение текущего объёма/массы
+      // 4.2 Получение текущего объёма/массы
       // ----------------------------------------------------------
 
       CurrentVolume := 0;
@@ -975,7 +1036,7 @@ begin
 
 
       // ----------------------------------------------------------
-      // 5.3 Проверка наличия критериев остановки
+      // 4.3 Проверка наличия критериев остановки
       // ----------------------------------------------------------
 
       HasLimits :=
@@ -996,7 +1057,7 @@ begin
 
 
       // ----------------------------------------------------------
-      // 5.4 Проверка достижения критериев остановки
+      // 4.4 Проверка достижения критериев остановки
       // ----------------------------------------------------------
 
       LimitReached :=
@@ -1017,7 +1078,7 @@ begin
 
 
       // ----------------------------------------------------------
-      // 5.5 Завершение измерения
+      // 4.5 Завершение измерения
       // ----------------------------------------------------------
 
       // Если заданы ограничения и хотя бы одно достигнуто

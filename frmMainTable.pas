@@ -821,7 +821,7 @@ procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := STATE_STARTMONITOR;
+    FActiveWorkTable.StartMonitor;
     ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -830,7 +830,7 @@ procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := STATE_STOPMONITOR;
+    FActiveWorkTable.StopMonitor;
     ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -1353,6 +1353,7 @@ procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
 StableStatus: RStableInfo;
+i:integer;
 begin
 
   if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
@@ -1366,6 +1367,8 @@ begin
       FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
   end;
+
+
 end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
@@ -4479,15 +4482,10 @@ procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; c
 var
   I: Integer;
   Channel: TChannel;
-  ChannelImpSec,a,b: Double;
+  ChannelImpSec: Double;
 begin
   if AChannels = nil then
     Exit;
-
-   for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
-        begin
-          a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
-        end;
 
 
   for I := 0 to AChannels.Count - 1 do
@@ -4495,14 +4493,14 @@ begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
-    b:= Channel.FlowMeter.Device.Qmax/a;
+
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec*b;
+    Channel.ImpSec := ChannelImpSec;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
@@ -4726,10 +4724,9 @@ IF WorkTable.FluidTemp.IsRunning THEN
   end
   else
   begin
-     if (WorkTable.FluidTemp.ValueSet.Value=0) or (WorkTable.FluidTemp.Value.Value=0) then
+
       Rectangle7.Fill.Color := TAlphaColorRec.White
-     else IF not(WorkTable.FluidTemp.IsStable(TempStableStatus)) then
-      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+
   end;
 
 IF WorkTable.FluidPress.IsRunning THEN
@@ -4744,10 +4741,9 @@ IF WorkTable.FluidPress.IsRunning THEN
   end
   else
   begin
-   if (WorkTable.FluidPress.ValueSet.Value=0) or (WorkTable.FluidPress.Value.Value=0 )  then
+
     Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
-    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
+
 
   end;
 
