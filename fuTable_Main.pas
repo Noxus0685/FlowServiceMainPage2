@@ -90,9 +90,7 @@ type
     FWorkTableManager: TWorkTableManager;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
-    FNextClimateChangeAt: TDateTime;
-    FNextFreqChangeAt: TDateTime;
-    FNextPressChangeAt: TDateTime;
+
     FT_WorkBench_Last: Double;
     FT_WorkBench_First: Double;
 
@@ -105,13 +103,19 @@ type
     procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
     function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
       const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+
+
+
     procedure FlowRateStateHandler(AParameters: TParameter;
       AAction: EParamAction);
-
     procedure FlowFluidTempHandler(AParameters: TParameter;
       AAction: EParamAction);
     procedure FlowFluidPressHandler(AParameters: TParameter;
       AAction: EParamAction);
+
+
+
+
     procedure UpdateRandomPress(const AWorkTable: TWorkTable);
 
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
@@ -388,13 +392,6 @@ begin
 
 end;
 
-
-
-
-
-
-
-
 procedure TTableMainForm.UpdateRandomTemp(const AWorkTable: TWorkTable);
 var
   TempDelta, PressDelta: Double; // Случайные приращения температуры и давления
@@ -432,7 +429,7 @@ begin
   // ============================================================
 
   // Обновляем температуру не постоянно, а раз в несколько секунд
-  if (FNextClimateChangeAt = 0) or (Now >= FNextClimateChangeAt) then
+  if (AWorkTable.NextClimateChangeAt = 0) or (Now >= AWorkTable.NextClimateChangeAt) then
   begin
 
     // ----------------------------------------------------------
@@ -508,12 +505,9 @@ begin
     // ----------------------------------------------------------
 
     // Следующее обновление через 3–4 секунды
-    FNextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
+    AWorkTable.NextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
   end;
 end;
-
-
-
 
 procedure TTableMainForm.UpdateRandomPress(const AWorkTable: TWorkTable);
 var
@@ -527,7 +521,7 @@ begin
   else  if (AWorkTable.FluidPress.Action = ACTION_STOP) then
     AWorkTable.FluidPress.Status:=PARAM_STOPPED;
 
-  if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
+  if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
   begin
 
     TempDelta :=  (Random * 0.30) - 0.15;
@@ -564,7 +558,7 @@ begin
       //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
       //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
 
-      FNextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
+      AWorkTable.NextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
    end;
 end;
 
@@ -588,7 +582,7 @@ begin
 
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
-  if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
+  if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
   begin
     Freq := (Random * 10);
 
@@ -607,7 +601,7 @@ begin
 
 
 
-    FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
+    AWorkTable.NextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
 end;
 
@@ -738,7 +732,7 @@ begin
 
   WorkTable:= FWorkTableManager.ActiveWorkTable;
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
-  if (FNextFreqChangeAt = 0) or (Now >= FNextFreqChangeAt) then
+  if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
   begin
 
     if WorkTable=nil then
@@ -820,11 +814,9 @@ begin
 
 
 
-    FNextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
+    AWorkTable.NextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
 end;
-
-
 
 procedure TTableMainForm.UpdateRandomSignals(const AWorkTable: TWorkTable);
 var
@@ -912,8 +904,7 @@ begin
   if WorkTable = nil then
     Exit;
 
-
-  // ============================================================
+   // ============================================================
   // 2. Эмуляция физического процесса (стенд)
   // ============================================================
 
@@ -1113,6 +1104,8 @@ begin
       WorkTable.State := STATE_FINALREAD;
 
   end;
+
+
 end;
 
 
