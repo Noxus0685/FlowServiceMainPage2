@@ -4653,14 +4653,10 @@ begin
     if WorkTable = nil then
       Exit;
 
-    //if WorkTable.FlowRate.IsRunning then
-      LabelFlowRate.Text :=
-      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value.Value) ;
+    //if WorkTable.FlowRate.IsRunning the
 
-
-    LabelFlowRate.text:=floattostr(WorkTable.FlowRate.Value.GetDoubleValue);
     if( WorkTable.FlowRate.Value.GetDoubleValue<=WorkTable.FlowRate.Max) and (WorkTable.FlowRate.Value.GetDoubleValue>=WorkTable.FlowRate.Min) then
-      LabelFlowRate.text:=WorkTable.FlowRate.Value.GetStringValue
+      LabelFlowRate.text:=WorkTable.FlowRate.Value.GetStrValue
     else
       LabelFlowRate.Text := '-';
    // else

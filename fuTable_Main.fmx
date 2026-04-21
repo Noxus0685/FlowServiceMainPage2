@@ -16,7 +16,7 @@ object TableMainForm: TTableMainForm
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 3
+    TabIndex = 0
     TabOrder = 0
     TabPosition = PlatformDefault
     OnChange = tcMainChange
@@ -34,7 +34,7 @@ object TableMainForm: TTableMainForm
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1335,7 +1335,7 @@ object TableMainForm: TTableMainForm
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 44.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1558,8 +1558,8 @@ object TableMainForm: TTableMainForm
         Size.Height = 243.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 8
-        Viewport.Width = 423.000000000000000000
-        Viewport.Height = 243.000000000000000000
+        Viewport.Width = 419.000000000000000000
+        Viewport.Height = 239.000000000000000000
       end
       object Label1: TLabel
         Position.X = 72.000000000000000000
@@ -1576,10 +1576,12 @@ object TableMainForm: TTableMainForm
       object TrackStd: TTrackBar
         CanParentFocus = True
         Max = 10.000000000000000000
+        Min = 0.100000000000000000
         Orientation = Horizontal
         Position.X = 200.000000000000000000
         Position.Y = 449.000000000000000000
         TabOrder = 7
+        Value = 0.100000000000000000
         OnChange = TrackStdChange
       end
     end
