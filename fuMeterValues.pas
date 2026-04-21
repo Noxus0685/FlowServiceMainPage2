@@ -132,6 +132,7 @@ type
     procedure TabItemListValuesClick(Sender: TObject);
     procedure StringGridValuesListSelChanged(Sender: TObject);
     procedure EditSearchValuesListChangeTracking(Sender: TObject);
+    procedure EditSearchValuesListExit(Sender: TObject);
     procedure EditCoefKExit(Sender: TObject);
     procedure EditCoefPExit(Sender: TObject);
     procedure SpeedButtonResetSettingsClick(Sender: TObject);
@@ -687,6 +688,11 @@ begin
         Exit;
       end;
     end;
+end;
+
+procedure TFormMeterValues.EditSearchValuesListExit(Sender: TObject);
+begin
+  EditSearchValuesListChangeTracking(Sender);
 end;
 
 procedure TFormMeterValues.UpdateLayoutCoefs;

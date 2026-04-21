@@ -5667,8 +5667,11 @@ object FormMeterValues: TFormMeterValues
             Size.Width = 495.000000000000000000
             Size.Height = 38.000000000000000000
             Size.PlatformDefault = False
+            TabOrder = 2
+            ReturnKeyType = Search
+            KillFocusByReturn = True
             TextPrompt = #1055#1086#1080#1089#1082' '#1087#1086' '#1090#1072#1073#1083#1080#1094#1077
-            OnChangeTracking = EditSearchValuesListChangeTracking
+            OnExit = EditSearchValuesListExit
           end
           object SpeedButtonResetSettings: TSpeedButton
             Align = MostLeft
