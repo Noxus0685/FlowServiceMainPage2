@@ -8,7 +8,6 @@ uses
   System.Math,
   System.StrUtils,
   System.SysUtils,
-  uObservable,
   uBaseProcedures,
   uClasses,
   uDataManager,
@@ -49,9 +48,6 @@ type
     Width: Single;
     Visible: Boolean;
   end;
-
-const
-  WORKTABLE_EVENT_STATE_CHANGED = 1;
 
 
 
@@ -203,7 +199,7 @@ type
 
   end;
 
-  TWorkTable = class(TObservableObject)
+  TWorkTable = class
 
   type
   // Обработчики для расхода
@@ -2785,8 +2781,6 @@ procedure TWorkTable.DoStateChanged(ANewState: EWorkTableState);
 begin
   if Assigned(FOnStateChanged) then
     FOnStateChanged(ANewState);
-
-  Notify(WORKTABLE_EVENT_STATE_CHANGED);
 end;
 
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
