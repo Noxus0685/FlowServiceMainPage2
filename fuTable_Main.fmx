@@ -1557,7 +1557,7 @@ object TableMainForm: TTableMainForm
         Size.Width = 423.000000000000000000
         Size.Height = 243.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 7
+        TabOrder = 8
         Viewport.Width = 423.000000000000000000
         Viewport.Height = 243.000000000000000000
       end

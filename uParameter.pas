@@ -64,7 +64,7 @@ TParameter = class(TObject)
 
     procedure SetMin(const Value: Double );
     procedure SetMax(const Value: Double);
-    procedure SetValue(AValue: Double);
+
     procedure SetStatus(AStatus: EParamStatus);
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
@@ -77,6 +77,7 @@ TParameter = class(TObject)
     function GetStatusAsString: string;
     procedure Stop;
     procedure Start;
+    procedure SetValue(AValue: Double);
     property OnStatusChange: TonStatusEvent read FOnStatusChange write FOnStatusChange;
     property OnActionChange: TonActionEvent read FOnActionChange write FOnActionChange;
     property Name: string read FName write FName;
@@ -691,7 +692,6 @@ begin
         FValueSet.Value:=FMax
       else
         FValueSet.Value:=AValue;
-
       ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
 
