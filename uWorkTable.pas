@@ -43,6 +43,10 @@ type
     STATE_FAILURE
   );
 
+  TWorkTableEvent = (
+    weStateChanged = 0
+  );
+
   TGridColumnLayout = record
     Name: string;
     DisplayIndex: Integer;
@@ -2780,6 +2784,8 @@ end;
 
 procedure TWorkTable.DoStateChanged(ANewState: EWorkTableState);
 begin
+  Notify(Integer(weStateChanged));
+
   if Assigned(FOnStateChanged) then
     FOnStateChanged(ANewState);
 end;
