@@ -110,7 +110,7 @@ end;
 
 destructor TFrameMRResults.Destroy;
 begin
-  DetachMeasurementRun;
+ // DetachMeasurementRun;
   FreeAndNil(FRows);
   FreeAndNil(FPointColumns);
   inherited;

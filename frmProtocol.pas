@@ -77,8 +77,11 @@ end;
 
 destructor TFrameProtocol.Destroy;
 begin
-  ProtocolManager.Unsubscribe(FListener);
+ if ProtocolManager<>nil then
+   begin
+   ProtocolManager.Unsubscribe(FListener);
   FreeAndNil(FMessages);
+   end;
   inherited;
 end;
 

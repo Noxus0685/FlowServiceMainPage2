@@ -290,8 +290,8 @@ begin
     Exit;
 
   FFrameMainTable.SaveLayoutSettingsToWorkTable;
-  if AppServices <> nil then
-    AppServices.SaveAll;
+ // if AppServices <> nil then
+  //  AppServices.SaveAll;
 end;
 
 procedure TTableMainForm.FormCreate(Sender: TObject);
