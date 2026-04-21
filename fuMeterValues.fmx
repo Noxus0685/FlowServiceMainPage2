@@ -5656,6 +5656,21 @@ object FormMeterValues: TFormMeterValues
             Text = #1057#1087#1080#1089#1086#1082' '#1087#1077#1088#1077#1084#1077#1085#1085#1099#1093
             TabOrder = 1
           end
+          object EditSearchValuesList: TEdit
+            Align = Client
+            Margins.Left = 6.000000000000000000
+            Margins.Top = 6.000000000000000000
+            Margins.Right = 6.000000000000000000
+            Margins.Bottom = 6.000000000000000000
+            Position.X = 409.000000000000000000
+            Position.Y = 6.000000000000000000
+            Size.Width = 433.000000000000000000
+            Size.Height = 38.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            TextPrompt = #1055#1086#1080#1089#1082' '#1087#1086' '#1090#1072#1073#1083#1080#1094#1077
+            OnChangeTracking = EditSearchValuesListChangeTracking
+          end
           object SpeedButtonResetSettings: TSpeedButton
             Align = MostLeft
             Size.Width = 80.000000000000000000

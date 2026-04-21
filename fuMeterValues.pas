@@ -104,6 +104,7 @@ type
     LabelTestValueWoCorrection: TLabel;
     StringColumnDescription: TStringColumn;
     SpeedButtonResetSettings: TSpeedButton;
+    EditSearchValuesList: TEdit;
     procedure FormShow(Sender: TObject);
     procedure AddRowButtonClick(Sender: TObject);
     procedure StringGridCoefsDataEditingDone(Sender: TObject; const ACol,
@@ -130,6 +131,7 @@ type
     procedure TabItem4Click(Sender: TObject);
     procedure TabItemListValuesClick(Sender: TObject);
     procedure StringGridValuesListSelChanged(Sender: TObject);
+    procedure EditSearchValuesListChangeTracking(Sender: TObject);
     procedure EditCoefKExit(Sender: TObject);
     procedure EditCoefPExit(Sender: TObject);
     procedure SpeedButtonResetSettingsClick(Sender: TObject);
@@ -640,6 +642,7 @@ end;
 procedure TFormMeterValues.TabItemListValuesClick(Sender: TObject);
 begin
   UpdateLayoutValuesList;
+  EditSearchValuesListChangeTracking(EditSearchValuesList);
 end;
 
 procedure TFormMeterValues.StringGridValuesListSelChanged(Sender: TObject);
@@ -657,6 +660,33 @@ begin
   UpdateLayoutValues;
   UpdateStringGridCoefs;
   UpdateStringGridCoefsData;
+end;
+
+procedure TFormMeterValues.EditSearchValuesListChangeTracking(Sender: TObject);
+var
+  Row, Col: Integer;
+  SearchText, CellText: string;
+begin
+  if StringGridValuesList.RowCount = 0 then
+    Exit;
+
+  SearchText := Trim(LowerCase(EditSearchValuesList.Text));
+  if SearchText.IsEmpty then
+  begin
+    StringGridValuesList.Row := 0;
+    Exit;
+  end;
+
+  for Row := 0 to StringGridValuesList.RowCount - 1 do
+    for Col := 0 to StringGridValuesList.ColumnCount - 1 do
+    begin
+      CellText := LowerCase(StringGridValuesList.Cells[Col, Row]);
+      if Pos(SearchText, CellText) > 0 then
+      begin
+        StringGridValuesList.Row := Row;
+        Exit;
+      end;
+    end;
 end;
 
 procedure TFormMeterValues.UpdateLayoutCoefs;
