@@ -4656,6 +4656,13 @@ begin
     //if WorkTable.FlowRate.IsRunning then
       LabelFlowRate.Text :=
       WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value.Value) ;
+
+
+    LabelFlowRate.text:=floattostr(WorkTable.FlowRate.Value.GetDoubleValue);
+    if( WorkTable.FlowRate.Value.GetDoubleValue<=WorkTable.FlowRate.Max) and (WorkTable.FlowRate.Value.GetDoubleValue>=WorkTable.FlowRate.Min) then
+      LabelFlowRate.text:=WorkTable.FlowRate.Value.GetStringValue
+    else
+      LabelFlowRate.Text := '-';
    // else
    //   LabelFlowRate.Text := '0';
   // if LayoutFlowRate.tag = 3 then
@@ -4765,9 +4772,16 @@ IF WorkTable.FluidPress.IsRunning THEN
         EditPres.Text := WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet.Value);
     end;
 
-    LabelTemp.text:=WorkTable.FluidTemp.Value.GetStrValue;
+    if( WorkTable.FluidTemp.Value.GetDoubleValue<=WorkTable.FluidTemp.Max) and (WorkTable.FluidTemp.Value.GetDoubleValue>=WorkTable.FluidTemp.Min) then
+      LabelTemp.text:=WorkTable.FluidTemp.Value.GetStrValue
+    else
+      LabelTemp.Text := '-';
 
-    LabelPressure.text:=WorkTable.FluidPress.Value.GetStrValue;
+    if( WorkTable.FluidPress.Value.GetDoubleValue<=WorkTable.FluidPress.Max) and (WorkTable.FluidPress.Value.GetDoubleValue>=WorkTable.FluidPress.Min) then
+      LabelPressure.text:=WorkTable.FluidPress.Value.GetStrValue
+    else
+      LabelPressure.Text := '-';
+
 
 
 
