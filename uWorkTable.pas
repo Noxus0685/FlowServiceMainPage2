@@ -1467,25 +1467,17 @@ begin
     EnsureDescription(FTableFlow.ValueCurrent, 'Токовый сигнал стола');
   end;
 
-   if FlowRate.Value = nil then
-  begin
-    FlowRate.Value := TMeterValue.Create('', Name);
-    FlowRate.Value.SetAsVolumeFlow;
-    EnsureDescription(FlowRate.Value, 'Расход');
-  end;
-    if FluidTemp.Value = nil then
-  begin
-    FluidTemp.Value := TMeterValue.Create('', Name);
-    FluidTemp.Value.SetAsAirTemp;
-    EnsureDescription(FluidTemp.Value, 'Температура');
-  end;
+  if FTableFlow.ValueFlowRate <> nil then
+    FlowRate.Value := FTableFlow.ValueFlowRate;
+  EnsureDescription(FlowRate.Value, 'Расход');
 
-    if FluidPress.Value = nil then
-  begin
-    FluidPress.Value := TMeterValue.Create('', Name);
-    FluidPress.Value.SetAsPressure;
-    EnsureDescription(FluidPress.Value, 'Давление');
-  end;
+  if FTableFlow.ValueTemperture <> nil then
+    FluidTemp.Value := FTableFlow.ValueTemperture;
+  EnsureDescription(FluidTemp.Value, 'Температура');
+
+  if FTableFlow.ValuePressure <> nil then
+    FluidPress.Value := FTableFlow.ValuePressure;
+  EnsureDescription(FluidPress.Value, 'Давление');
 
     if FlowRate.Valueset = nil then
   begin
