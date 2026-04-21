@@ -64,6 +64,7 @@ uses
   uFlowMeter,
   uMeasurementRun,
   uMeterValue,
+  uObservable,
   uParameter,
   uProtocols,
   uRepositories,
@@ -101,7 +102,7 @@ type
     ResultStatus: Integer;
   end;
 
-  TFrameMainTable = class(TFrame)
+  TFrameMainTable = class(TFrame, IEventObserver)
     TabControlWorkTables: TTabControl;
     TabItemWorkTable1: TTabItem;
     PanelEtalons1: TPanel;
@@ -536,6 +537,9 @@ type
     procedure StopMonitor;
     procedure StartTest;
     procedure StopTest;
+    procedure Subscribe;
+    procedure Unsubscribe;
+    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 
 
     procedure UpdateGrids;
@@ -699,6 +703,7 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  Unsubscribe;
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -901,12 +906,6 @@ end;
 
 procedure TFrameMainTable.OnChangeState(const ANewState: EWorkTableState); //ChangeStateHandler
 begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.State <> ANewState) then
-  begin
-    FActiveWorkTable.State := ANewState;
-    Exit;
-  end;
-
   case ANewState of
     STATE_NONE:
       begin
@@ -1064,6 +1063,35 @@ begin
     begin
       // STATE_NONE
     end;
+  end;
+end;
+
+procedure TFrameMainTable.Subscribe;
+begin
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.Subscribe(Self as IEventObserver);
+end;
+
+procedure TFrameMainTable.Unsubscribe;
+begin
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.Unsubscribe(Self as IEventObserver);
+end;
+
+procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+var
+  WorkTable: TWorkTable;
+begin
+  if not (Sender is TWorkTable) then
+    Exit;
+
+  WorkTable := TWorkTable(Sender);
+  if WorkTable <> FActiveWorkTable then
+    Exit;
+
+  case Event of
+    WORKTABLE_EVENT_STATE_CHANGED:
+      OnChangeState(WorkTable.State);
   end;
 end;
 
@@ -2158,12 +2186,14 @@ begin
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
     TableCount := FWorkTableManager.WorkTables.Count;
 
+  Unsubscribe;
+
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
   FActiveWorkTable := GetWorkTableByIndex(0);
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.OnStateChanged := OnChangeState;
     FActiveWorkTable.OnPointChanged := OnChangePoint;
+    Subscribe;
     FActiveWorkTable.RebindAllFlowMeters;
 
     if FActiveWorkTable.FlowUnitName <> '' then
