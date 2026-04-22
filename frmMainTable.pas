@@ -570,13 +570,11 @@ type
     { Public declarations }
     procedure Initialize;
     destructor Destroy; override;
-    procedure Subscribe;
-    procedure Unsubscribe;
-    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 
     procedure OnChangeState(const ANewState: EWorkTableState);
     procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
-    APointIndex: Integer);
+      APointIndex: Integer);
+    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 
 
     procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
@@ -596,7 +594,6 @@ type
   private
     FDeviceClipboard: TChannelClipboardData;
     FEtalonClipboard: TChannelClipboardData;
-    FSubscribedWorkTable: TWorkTable;
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
@@ -612,10 +609,11 @@ type
 
 implementation
 
+
+
 {$R *.fmx}
 
 uses
-  uAppServices,
   fuTable_Main;
 
 
@@ -704,52 +702,19 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
-  Unsubscribe;
+  if FActiveWorkTable <> nil then
+    FActiveWorkTable.Unsubscribe(Self);
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
-  // TMeterValue сохраняется централизованно в AppServices.SaveAll/Shutdown.
+  TMeterValue.SaveToFile(0);
   FInstrumentalVisibleOrder.Free;
-  // Владелец менеджера — AppServices, здесь не освобождаем.
+  FWorkTableManager.Free;
   FFlowMeters.Free;
   inherited;
-end;
-
-procedure TFrameMainTable.Subscribe;
-begin
-  if (FActiveWorkTable = nil) or (FSubscribedWorkTable = FActiveWorkTable) then
-    Exit;
-
-  Unsubscribe;
-  FActiveWorkTable.Subscribe(Self);
-  FSubscribedWorkTable := FActiveWorkTable;
-end;
-
-procedure TFrameMainTable.Unsubscribe;
-begin
-  if FSubscribedWorkTable = nil then
-    Exit;
-
-  FSubscribedWorkTable.Unsubscribe(Self);
-  FSubscribedWorkTable := nil;
-end;
-
-procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
-var
-  LWorkTable: TWorkTable;
-begin
-  if not (Sender is TWorkTable) then
-    Exit;
-
-  LWorkTable := TWorkTable(Sender);
-  if LWorkTable <> FActiveWorkTable then
-    Exit;
-
-  if Event = Integer(weStateChanged) then
-    OnChangeState(LWorkTable.State);
 end;
 
 function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
@@ -860,7 +825,7 @@ procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.StartMonitor;
+    FActiveWorkTable.State := STATE_STARTMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -869,7 +834,7 @@ procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.StopMonitor;
+    FActiveWorkTable.State := STATE_STOPMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -937,6 +902,34 @@ procedure TFrameMainTable.OnChangePoint(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer);
 begin
   {}
+end;
+
+procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+var
+  AWorkTable: TWorkTable;
+  AEvent: EWorkTableNotifyEvent;
+  APoint: TDevicePoint;
+begin
+  if not (Sender is TWorkTable) then
+    Exit;
+
+  AWorkTable := TWorkTable(Sender);
+  if (FActiveWorkTable <> nil) and (AWorkTable <> FActiveWorkTable) then
+    Exit;
+
+  AEvent := EWorkTableNotifyEvent(Event);
+  case AEvent of
+    wtnWorkTableStateChanged:
+      OnChangeState(AWorkTable.State);
+    wtnWorkTablePointChanged:
+      begin
+        if Data is TDevicePoint then
+          APoint := TDevicePoint(Data)
+        else
+          APoint := AWorkTable.CurrentPoint;
+        OnChangePoint(AWorkTable, APoint, -1);
+      end;
+  end;
 end;
 
 procedure TFrameMainTable.OnChangeState(const ANewState: EWorkTableState); //ChangeStateHandler
@@ -1125,7 +1118,7 @@ begin
   FInitialized := True;
   SwitchAuto.IsChecked := False;
 
-  // Загрузка TMeterValue выполняется централизованно в AppServices.Initialize.
+  TMeterValue.LoadFromFile;
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
@@ -1370,7 +1363,7 @@ begin
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
-  //ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход в л/с', Format('Q=%.3f', [AValue]));
+  ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход', Format('Q=%.3f', [AValue]));
   UpdateUIFlowRate;
 end;
 
@@ -1392,7 +1385,6 @@ procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
 StableStatus: RStableInfo;
-i:integer;
 begin
 
   if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
@@ -1402,11 +1394,10 @@ begin
   begin
     AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
     FActiveWorkTable.FlowRate.DoFlowRateSet(AValue);
-
+    if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
+      FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
   end;
-
-
 end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
@@ -2053,8 +2044,8 @@ begin
     FWorkTableManager.Save;
 
 
-  if AppServices.DataManager <> nil then
-    AppServices.DataManager.Save;
+  if DataManager <> nil then
+    DataManager.Save;
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
@@ -2198,15 +2189,12 @@ begin
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
     TableCount := FWorkTableManager.WorkTables.Count;
 
-  Unsubscribe;
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
   FActiveWorkTable := GetWorkTableByIndex(0);
   if FActiveWorkTable <> nil then
   begin
-    Subscribe;
-    FActiveWorkTable.OnPointChanged := OnChangePoint;
+    FActiveWorkTable.Subscribe(Self);
     FActiveWorkTable.RebindAllFlowMeters;
-    OnChangeState(FActiveWorkTable.State);
 
     if FActiveWorkTable.FlowUnitName <> '' then
     begin
@@ -2334,7 +2322,7 @@ begin
   Result := nil;
   ARepo := nil;
 
-  if (AChannel = nil) or (AppServices.DataManager = nil) then
+  if (AChannel = nil) or (DataManager = nil) then
     Exit;
 
   TypeUUID := Trim(AChannel.TypeUUID);
@@ -2346,7 +2334,7 @@ begin
   if (TypeName = '') and (AChannel.FlowMeter <> nil) then
     TypeName := Trim(AChannel.FlowMeter.DeviceTypeName);
 
-  Result := AppServices.DataManager.FindType(TypeUUID, TypeName, ARepo);
+  Result := DataManager.FindType(TypeUUID, TypeName, ARepo);
 end;
 
 procedure TFrameMainTable.FillDNItemsForChannel(AChannel: TChannel;
@@ -2486,8 +2474,8 @@ begin
   if AChannel = nil then
     Exit;
 
-  if AppServices.DataManager <> nil then
-  ActiveRepo := AppServices.DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
+  if DataManager <> nil then
+  ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
 
   ADevice := AChannel.FlowMeter.Device;
 
@@ -2692,10 +2680,10 @@ var
   Repo: TDeviceRepository;
   ErrMsg: string;
 begin
-  if (ADevice = nil) or (AppServices.DataManager = nil) then
+  if (ADevice = nil) or (DataManager = nil) then
     Exit;
 
-  Repo := AppServices.DataManager.ActiveDeviceRepo;
+  Repo := DataManager.ActiveDeviceRepo;
   if Repo = nil then
     Exit;
 
@@ -2863,7 +2851,7 @@ var
 begin
 
   if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
-     (AppServices.DataManager = nil) then
+     (DataManager = nil) then
     Exit;
 
   Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
@@ -2871,7 +2859,7 @@ begin
     Exit;
 
   FoundRepo := nil;
-  SourceType := AppServices.DataManager.FindType(Src.TypeUUID, Src.TypeName, FoundRepo);
+  SourceType := DataManager.FindType(Src.TypeUUID, Src.TypeName, FoundRepo);
   if SourceType = nil then
   begin
     ShowMessage('Тип выбранной строки не найден в подключенных репозиториях.');
@@ -2934,8 +2922,6 @@ begin
       LayoutPump.tag:=0;
       FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
       UpdateUIPump;
-      if ComboBoxPumps.Text <> '' then
-      ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Изменен активный насос', ComboBoxPumps.Text);
     end;
 end;
 
@@ -2957,8 +2943,6 @@ begin
   SetDim(UnitName, QuantityUnitName);
 
   GridDevices.SetFocus;
-  ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Изменена размерность расхода', ComboEditUnits.Text);
-
 end;
 
 procedure TFrameMainTable.ActionDevicesAssignEtalonExecute(Sender: TObject);
@@ -3601,8 +3585,8 @@ begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (ANewType = nil) then
     Exit;
 
-  if (AppServices.DataManager <> nil) and (AppServices.DataManager.ActiveTypeRepo <> nil) then
-    AFoundRepo := AppServices.DataManager.ActiveTypeRepo;
+  if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
+    AFoundRepo := DataManager.ActiveTypeRepo;
 
   if AFoundRepo <> nil then
   begin
@@ -3662,7 +3646,7 @@ begin
       Exit;
   end;
 
-  if (AppServices.DataManager = nil) then
+  if (DataManager = nil) then
     Exit;
 
   if AIsEtalon then
@@ -3682,7 +3666,7 @@ begin
 
     if Ch.FlowMeter.RepoTypeUUID <> '' then
     begin
-      for Repo in AppServices.DataManager.TypeRepositories do
+      for Repo in DataManager.TypeRepositories do
         if SameText(Repo.UUID, Ch.FlowMeter.RepoTypeUUID) then
         begin
           PreferredRepo := Repo;
@@ -3691,9 +3675,9 @@ begin
     end;
 
     if PreferredRepo <> nil then
-      AppServices.DataManager.ActiveTypeRepo := PreferredRepo;
+      DataManager.ActiveTypeRepo := PreferredRepo;
 
-    CurrentType := AppServices.DataManager.FindType(
+    CurrentType := DataManager.FindType(
       Ch.FlowMeter.DeviceTypeUUID,
       '',
       FoundRepo
@@ -3705,11 +3689,11 @@ begin
     end;
 
     if (CurrentType = nil) and (Ch.TypeName <> '') then
-      CurrentType := AppServices.DataManager.FindType('', Ch.TypeName, FoundRepo);
+      CurrentType := DataManager.FindType('', Ch.TypeName, FoundRepo);
 
     if (CurrentType <> nil) and (FoundRepo <> nil) then
     begin
-      AppServices.DataManager.ActiveTypeRepo := FoundRepo;
+      DataManager.ActiveTypeRepo := FoundRepo;
       Frm.SelectType(CurrentType);
     end;
 
@@ -3723,7 +3707,7 @@ begin
     if NewType = nil then
       Exit;
 
-    FoundRepo := AppServices.DataManager.ActiveTypeRepo;
+    FoundRepo := DataManager.ActiveTypeRepo;
 
     {----------------------------------------------------}
     { 3. Проверяем смену типа }
@@ -4526,10 +4510,15 @@ procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; c
 var
   I: Integer;
   Channel: TChannel;
-  ChannelImpSec: Double;
+  ChannelImpSec,a,b: Double;
 begin
   if AChannels = nil then
     Exit;
+
+   for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
+        begin
+          a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
+        end;
 
 
   for I := 0 to AChannels.Count - 1 do
@@ -4537,14 +4526,14 @@ begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
-
+    b:= Channel.FlowMeter.Device.Qmax/a;
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec;
+    Channel.ImpSec := ChannelImpSec*b;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
@@ -4768,9 +4757,10 @@ IF WorkTable.FluidTemp.IsRunning THEN
   end
   else
   begin
-
+     if (WorkTable.FluidTemp.ValueSet.Value=0) or (WorkTable.FluidTemp.Value.Value=0) then
       Rectangle7.Fill.Color := TAlphaColorRec.White
-
+     else IF not(WorkTable.FluidTemp.IsStable(TempStableStatus)) then
+      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
   end;
 
 IF WorkTable.FluidPress.IsRunning THEN
@@ -4785,9 +4775,10 @@ IF WorkTable.FluidPress.IsRunning THEN
   end
   else
   begin
-
+   if (WorkTable.FluidPress.ValueSet.Value=0) or (WorkTable.FluidPress.Value.Value=0 )  then
     Rectangle11.Fill.Color := TAlphaColorRec.White
-
+   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
+    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
 
   end;
 
