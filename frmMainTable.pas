@@ -719,7 +719,6 @@ begin
   TMeterValue.SaveToFile(0);
   FInstrumentalVisibleOrder.Free;
   FWorkTableManager := nil;
-  FFlowMeters.Free;
   inherited;
 end;
 
