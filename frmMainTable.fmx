@@ -1352,6 +1352,14 @@ object FrameMainTable: TFrameMainTable
         Action = ActionOpenDeviceSelect
         ImageIndex = -1
       end
+      object MenuItem10: TMenuItem
+        Action = ActionDeleteDevice
+        ImageIndex = -1
+      end
+      object MenuItem11: TMenuItem
+        Action = ActionDeleteEtalons
+        ImageIndex = -1
+      end
     end
     object PopupMenuInstrumentalLayOut: TPopupMenu
       OnPopup = PopupMenuInstrumentalLayOutPopup
@@ -1540,8 +1548,8 @@ object FrameMainTable: TFrameMainTable
                 OnSetValue = GridEtalonsSetValue
                 OnCellClick = GridEtalonsCellClick
                 OnCellDblClick = GridEtalonsCellDblClick
-                Viewport.Width = 1049.000000000000000000
-                Viewport.Height = 120.000000000000000000
+                Viewport.Width = 1045.000000000000000000
+                Viewport.Height = 79.000000000000000000
                 object CheckColumnEtalonEnable1: TCheckColumn
                   HorzAlign = Center
                   Header = #1042#1082#1083
@@ -1684,8 +1692,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridDevicesSetValue
               OnCellClick = GridDevicesCellClick
               OnCellDblClick = GridDevicesCellDblClick
-              Viewport.Width = 1049.000000000000000000
-              Viewport.Height = 227.000000000000000000
+              Viewport.Width = 1029.000000000000000000
+              Viewport.Height = 186.000000000000000000
               object CheckColumnDeviceEnable1: TCheckColumn
                 Header = #1042#1082#1083
                 HeaderSettings.TextSettings.Trimming = Character
@@ -2166,6 +2174,15 @@ object FrameMainTable: TFrameMainTable
       Category = 'Session'
       Text = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100
       OnExecute = ActionSessionCreatePointsExecute
+    end
+    object ActionDeleteDevice: TAction
+      Category = 'DeviceChannels'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' Device'
+      OnExecute = ActionDeleteDeviceExecute
+    end
+    object ActionDeleteEtalons: TAction
+      Category = 'EtalonChannels'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' Etalons'
     end
   end
 end

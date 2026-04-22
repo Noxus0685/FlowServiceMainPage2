@@ -376,6 +376,10 @@ type
     TabItemProtocol: TTabItem;
     LayoutProtocolHost: TLayout;
     TabItemDeviceProperties: TTabItem;
+    ActionDeleteDevice: TAction;
+    ActionDeleteEtalons: TAction;
+    MenuItem10: TMenuItem;
+    MenuItem11: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -481,6 +485,7 @@ type
     procedure EditRepeatsExit(Sender: TObject);
     procedure SwitchAutoSwitch(Sender: TObject);
     procedure SpinBoxFlowRateChange(Sender: TObject);
+    procedure ActionDeleteDeviceExecute(Sender: TObject);
 
   private
 
@@ -2959,6 +2964,21 @@ begin
   GridDevices.SetFocus;
   ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Изменена размерность расхода', ComboEditUnits.Text);
 
+end;
+
+procedure TFrameMainTable.ActionDeleteDeviceExecute(Sender: TObject);
+var
+ ADevice: TDevice;
+ ADeviceUUID: string;
+ Repo: TDeviceRepository;
+  Src, Ch: TChannel;
+begin
+  //GridDevices.str  GridDevices.Index
+  //ADevice := AppServices.DataManager.FindDevice(ADeviceUUID, Repo);
+   Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+
+   ADevice := AppServices.DataManager.FindDevice(Src.UUID, Repo);
+   Repo.DeleteDevice(ADevice);
 end;
 
 procedure TFrameMainTable.ActionDevicesAssignEtalonExecute(Sender: TObject);
