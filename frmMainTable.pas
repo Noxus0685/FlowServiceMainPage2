@@ -486,6 +486,7 @@ type
     procedure SwitchAutoSwitch(Sender: TObject);
     procedure SpinBoxFlowRateChange(Sender: TObject);
     procedure ActionDeleteDeviceExecute(Sender: TObject);
+    procedure ActionDeleteEtalonsExecute(Sender: TObject);
 
   private
 
@@ -2968,17 +2969,21 @@ end;
 
 procedure TFrameMainTable.ActionDeleteDeviceExecute(Sender: TObject);
 var
- ADevice: TDevice;
- ADeviceUUID: string;
- Repo: TDeviceRepository;
-  Src, Ch: TChannel;
+ Src: TChannel;
 begin
-  //GridDevices.str  GridDevices.Index
-  //ADevice := AppServices.DataManager.FindDevice(ADeviceUUID, Repo);
    Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+   FActiveWorkTable.DeleteChannel(Src);
+   UpdateGrids;
+end;
 
-   ADevice := AppServices.DataManager.FindDevice(Src.UUID, Repo);
-   Repo.DeleteDevice(ADevice);
+
+procedure TFrameMainTable.ActionDeleteEtalonsExecute(Sender: TObject);
+var
+  Src: TChannel;
+begin
+   Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+   FActiveWorkTable.DeleteChannel(Src);
+   UpdateGrids;
 end;
 
 procedure TFrameMainTable.ActionDevicesAssignEtalonExecute(Sender: TObject);

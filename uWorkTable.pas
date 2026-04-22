@@ -403,6 +403,7 @@ private
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
 
 
+
   public
 
 
@@ -434,6 +435,9 @@ private
   procedure RemovePump(APump: TPump); overload;
   procedure ClearPumps;
   procedure SetActivePump(APumpName: string);
+  function DeleteChannel(AChannel: TChannel): Boolean;
+  procedure ReindexChannels(AChannels: TObjectList<TChannel>;
+      const AEtalonChannels: Boolean);
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
@@ -592,7 +596,6 @@ private
 
     procedure Load;
     procedure Save;
-
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
 
@@ -2638,6 +2641,64 @@ end;
 class function TWorkTable.BuildChannelDefaultText(const AChannelIndex: Integer): string;
 begin
   Result := IntToStr(AChannelIndex);
+end;
+
+
+function TWorkTable.DeleteChannel(AChannel: TChannel): Boolean;
+var
+  ChannelIndex: Integer;
+begin
+  Result := False;
+  if AChannel = nil then
+    Exit;
+
+  ChannelIndex := FDeviceChannels.IndexOf(AChannel);
+  if ChannelIndex >= 0 then
+  begin
+    FDeviceChannels.Delete(ChannelIndex);
+    //ReindexChannels(FDeviceChannels, False);
+    UpdateAggregateMeterValues;
+    AssignTableFlowAsEtalonToDevices;
+    Result := True;
+    Exit;
+  end;
+
+  ChannelIndex := FEtalonChannels.IndexOf(AChannel);
+  if ChannelIndex >= 0 then
+  begin
+    FEtalonChannels.Delete(ChannelIndex);
+    //ReindexChannels(FEtalonChannels, True);
+    UpdateAggregateMeterValues;
+    AssignTableFlowAsEtalonToDevices;
+    Result := True;
+    Exit;
+  end;
+end;
+
+
+//нигде не используется
+procedure TWorkTable.ReindexChannels(AChannels: TObjectList<TChannel>;
+  const AEtalonChannels: Boolean);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if AChannels = nil then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Channel := AChannels[I];
+    if Channel = nil then
+      Continue;
+
+    Channel.ID := I + 1;
+    if AEtalonChannels then
+      Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
+    else
+      Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+
+  end;
 end;
 
 
