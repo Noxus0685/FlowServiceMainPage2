@@ -64,6 +64,7 @@ uses
   uFlowMeter,
   uMeasurementRun,
   uMeterValue,
+  uObservable,
   uParameter,
   uProtocols,
   uRepositories,
@@ -101,7 +102,7 @@ type
     ResultStatus: Integer;
   end;
 
-  TFrameMainTable = class(TFrame)
+  TFrameMainTable = class(TFrame, IEventObserver)
     TabControlWorkTables: TTabControl;
     TabItemWorkTable1: TTabItem;
     PanelEtalons1: TPanel;
@@ -569,6 +570,9 @@ type
     { Public declarations }
     procedure Initialize;
     destructor Destroy; override;
+    procedure Subscribe;
+    procedure Unsubscribe;
+    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 
     procedure OnChangeState(const ANewState: EWorkTableState);
     procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
@@ -592,6 +596,7 @@ type
   private
     FDeviceClipboard: TChannelClipboardData;
     FEtalonClipboard: TChannelClipboardData;
+    FSubscribedWorkTable: TWorkTable;
     procedure SaveChannelToClipboard(AChannel: TChannel; var AClipboard: TChannelClipboardData);
     procedure LoadChannelFromClipboard(AChannel: TChannel; const AClipboard: TChannelClipboardData);
     procedure PersistDeviceAsync(ADevice: TDevice);
@@ -699,6 +704,7 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  Unsubscribe;
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -710,6 +716,40 @@ begin
   // Владелец менеджера — AppServices, здесь не освобождаем.
   FFlowMeters.Free;
   inherited;
+end;
+
+procedure TFrameMainTable.Subscribe;
+begin
+  if (FActiveWorkTable = nil) or (FSubscribedWorkTable = FActiveWorkTable) then
+    Exit;
+
+  Unsubscribe;
+  FActiveWorkTable.Subscribe(Self);
+  FSubscribedWorkTable := FActiveWorkTable;
+end;
+
+procedure TFrameMainTable.Unsubscribe;
+begin
+  if FSubscribedWorkTable = nil then
+    Exit;
+
+  FSubscribedWorkTable.Unsubscribe(Self);
+  FSubscribedWorkTable := nil;
+end;
+
+procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+var
+  LWorkTable: TWorkTable;
+begin
+  if not (Sender is TWorkTable) then
+    Exit;
+
+  LWorkTable := TWorkTable(Sender);
+  if LWorkTable <> FActiveWorkTable then
+    Exit;
+
+  if Event = Integer(weStateChanged) then
+    OnChangeState(LWorkTable.State);
 end;
 
 function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
@@ -2158,13 +2198,15 @@ begin
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
     TableCount := FWorkTableManager.WorkTables.Count;
 
+  Unsubscribe;
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
   FActiveWorkTable := GetWorkTableByIndex(0);
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.OnStateChanged := OnChangeState;
+    Subscribe;
     FActiveWorkTable.OnPointChanged := OnChangePoint;
     FActiveWorkTable.RebindAllFlowMeters;
+    OnChangeState(FActiveWorkTable.State);
 
     if FActiveWorkTable.FlowUnitName <> '' then
     begin

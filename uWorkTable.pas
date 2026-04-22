@@ -9,6 +9,7 @@ uses
   System.StrUtils,
   System.SysUtils,
   uBaseProcedures,
+  uObservable,
   uClasses,
   uDataManager,
   uDeviceClass,
@@ -42,6 +43,10 @@ type
     STATE_FAILURE
   );
 
+  TWorkTableEvent = (
+    weStateChanged = 0
+  );
+
   TGridColumnLayout = record
     Name: string;
     DisplayIndex: Integer;
@@ -66,6 +71,8 @@ type
     FImpResult: Double;
     FCurSec: Double;
     FCurResult: Double;
+    FVolSec: Double;
+    FVolResult: Double;
     FValueSec: Double;
     FValueResult: Double;
 
@@ -176,6 +183,7 @@ type
     property ImpSec: Double read GetImpSecProxy write SetImpSecProxy;
     property ImpResult: Double read GetImpResultProxy write SetImpResultProxy;
     property CurSec: Double read GetCurSecProxy write SetCurSecProxy;
+    property VolSec: Double read FVolSec write FVolSec;
     property CurResult: Double read GetCurResultProxy write SetCurResultProxy;
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
@@ -196,7 +204,7 @@ type
 
   end;
 
-  TWorkTable = class
+  TWorkTable = class  (TObservableObject)
 
   type
   // Обработчики для расхода
@@ -258,6 +266,8 @@ type
     FTableFlow: TFlowMeter;
 
     FNextClimateChangeAt: TDateTime;
+    FNextFreqChangeAt: TDateTime;
+    FNextPressChangeAt: TDateTime;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -394,6 +404,8 @@ private
 
 
   public
+
+
     constructor Create;
     destructor Destroy; override;
 
@@ -499,6 +511,8 @@ private
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
 
     property  NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
+    property  NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
+    property  NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -513,6 +527,7 @@ private
     procedure SetPressureMax(const AValue: Double);
 
   public
+
   property OnFlowRateSet: TOnFlowRateSetEvent read FOnFlowRateSet write FOnFlowRateSet;
 
 
@@ -567,9 +582,11 @@ private
   private
     FIniFileName: string;
     FWorkTables: TObjectList<TWorkTable>;
-
+    FIsSimulationMode: Boolean;
     FActiveWorkTable  :TWorkTable;
   public
+
+
     constructor Create(const AIniFileName: string);
     destructor Destroy; override;
 
@@ -580,8 +597,10 @@ private
     function FindPumpByName(const APumpName: string): TPump;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
+    property IsSimulationMode: Boolean read FIsSimulationMode write FIsSimulationMode;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
+
   end;
 
 implementation
@@ -2757,6 +2776,8 @@ end;
 
 procedure TWorkTable.DoStateChanged(ANewState: EWorkTableState);
 begin
+  Notify(Integer(weStateChanged));
+
   if Assigned(FOnStateChanged) then
     FOnStateChanged(ANewState);
 end;
