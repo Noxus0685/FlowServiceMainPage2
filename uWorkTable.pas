@@ -297,6 +297,8 @@ type
     FTableFlow: TFlowMeter;
 
     FNextClimateChangeAt: TDateTime;
+    FNextPressChangeAt: TDateTime;
+    FNextFreqChangeAt: TDateTime;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -548,6 +550,10 @@ private
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
 
     property  NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
+    property  NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
+    property  NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
+
+
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -618,9 +624,11 @@ private
   private
     FIniFileName: string;
     FWorkTables: TObjectList<TWorkTable>;
-
+    FIsSimulationMode :Boolean;
     FActiveWorkTable  :TWorkTable;
   public
+
+
     constructor Create(const AIniFileName: string);
     destructor Destroy; override;
 
@@ -632,7 +640,11 @@ private
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
+    property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
+
   end;
+
+  var WorkTableManager:   TWorkTableManager ;
 
 implementation
 
@@ -828,8 +840,7 @@ end;
     FoundRepo: TTypeRepository;
 begin
 
-  if DataManager = nil then
-  Exit;
+
 
   if FFlowMeter = nil then
   Exit;
