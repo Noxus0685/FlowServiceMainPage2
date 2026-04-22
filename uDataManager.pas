@@ -2,8 +2,6 @@
 
 interface
 
-
-
 uses
   FireDAC.Comp.Client,
   FireDAC.Stan.Intf,
@@ -92,7 +90,7 @@ type
 
   end;
 
-  var  DataManager:  TManagerTTableDM;
+
 
 implementation
 

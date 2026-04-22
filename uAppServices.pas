@@ -13,44 +13,53 @@ uses
   uWorkTable;
 
 type
+  // Корневой объект приложения: композиция сервисов без "тяжёлого" DI.
   TAppServices = class
   private
     FBasePath: string;
-
     FOwnsDataManager: Boolean;
     FOwnsProtocolManager: Boolean;
-    FOwnsWorkTableManager: Boolean;
-
+    FWorkTableManager: TWorkTableManager;
     FInitialized: Boolean;
-
     FDataManager: TManagerTTableDM;
     FProtocolManager: TProtocolManager;
-    FWorkTableManager: TWorkTableManager;
 
     function GetProtocolManager: TProtocolManager;
-    function GetDataManager: TManagerTTableDM;
-    function GetWorkTableManager: TWorkTableManager;
-
     function BuildSettingsPath(const AFileName: string): string;
     procedure EnsureSettingsDirectory;
     procedure LoadPersistentState;
     procedure ResetGlobalStatics;
-
   public
     constructor Create(const ABasePath: string = '');
     destructor Destroy; override;
 
+    // Полная инициализация прикладных сервисов:
+    // 1) гарантируем каталог Settings;
+    // 2) поднимаем DataManager + загружаем репозитории;
+    // 3) загружаем сохранённые TMeterValue (до загрузки рабочих столов);
+    // 4) создаём/загружаем WorkTableManager.
     procedure Initialize;
+
+    // Централизованное сохранение состояния приложения:
+    // - конфигурация рабочих столов;
+    // - репозитории DataManager;
+    // - все TMeterValue, отмеченные как IsToSave.
     procedure SaveAll;
+
+    // Управляемое завершение приложения:
+    // - безопасное единоразовое SaveAll;
+    // - освобождение владений;
+    // - очистка глобальных статических контейнеров.
     procedure Shutdown;
 
-    property WorkTableManager: TWorkTableManager read GetWorkTableManager;
-    property DataManager: TManagerTTableDM read GetDataManager;
+    property WorkTableManager: TWorkTableManager read FWorkTableManager;
+    property DataManager: TManagerTTableDM read FDataManager;
     property ProtocolManagerRef: TProtocolManager read GetProtocolManager;
     property Initialized: Boolean read FInitialized;
   end;
 
 var
+  // Опциональная глобальная точка входа композиции (создаётся на верхнем уровне приложения).
   AppServices: TAppServices;
 
 implementation
@@ -68,18 +77,16 @@ begin
 
   FOwnsDataManager := False;
   FOwnsProtocolManager := False;
-  FOwnsWorkTableManager := False;
-
-  FDataManager := nil;
-  FProtocolManager := nil;
   FWorkTableManager := nil;
-
   FInitialized := False;
+  FProtocolManager := nil;
 end;
 
 destructor TAppServices.Destroy;
 begin
+  // Важно: если вызывают Destroy напрямую, корректно завершаем жизненный цикл.
   Shutdown;
+
   inherited;
 end;
 
@@ -93,16 +100,6 @@ begin
   Result := FProtocolManager;
 end;
 
-function TAppServices.GetDataManager: TManagerTTableDM;
-begin
-  Result := FDataManager;
-end;
-
-function TAppServices.GetWorkTableManager: TWorkTableManager;
-begin
-  Result := FWorkTableManager;
-end;
-
 procedure TAppServices.EnsureSettingsDirectory;
 begin
   ForceDirectories(TPath.Combine(FBasePath, 'Settings'));
@@ -110,6 +107,9 @@ end;
 
 procedure TAppServices.LoadPersistentState;
 begin
+  // Восстанавливаем все сохранённые значения измерений заранее,
+  // чтобы при загрузке рабочих столов/каналов ссылки на hash-значения
+  // привязывались к уже существующим TMeterValue.
   TMeterValue.LoadFromFile;
 end;
 
@@ -120,58 +120,53 @@ begin
 
   EnsureSettingsDirectory;
 
-  // --- DataManager ---
-  if FDataManager = nil then
+  if DataManager = nil then
   begin
     FDataManager := TManagerTTableDM.Create(BuildSettingsPath('dbsettings.ini'));
-    uDataManager.DataManager := FDataManager;
     FOwnsDataManager := True;
   end;
 
-  // --- ProtocolManager ---
-  if FProtocolManager = nil then
+  if ProtocolManagerRef = nil then
   begin
     FProtocolManager := TProtocolManager.Create;
     uProtocols.ProtocolManager := FProtocolManager;
     FOwnsProtocolManager := True;
   end;
 
-  FDataManager.Load;
+  DataManager.Load;
   LoadPersistentState;
 
-  // --- WorkTableManager ---
   if FWorkTableManager = nil then
-  begin
-    FWorkTableManager := TWorkTableManager.Create(
-      BuildSettingsPath('TableSettings.ini')
-    );
-    uWorkTable.WorkTableManager := FWorkTableManager;
-    FOwnsWorkTableManager := True;
-  end;
+    FWorkTableManager := TWorkTableManager.Create(BuildSettingsPath('TableSettings.ini'));
 
   FWorkTableManager.Load;
-
   FInitialized := True;
 end;
 
 procedure TAppServices.SaveAll;
 begin
+  // В порядке "домен -> инфраструктура -> измерения":
+  // 1) рабочие столы, 2) репозитории, 3) реестр измерений.
   if FWorkTableManager <> nil then
     FWorkTableManager.Save;
 
-  if FDataManager <> nil then
-    FDataManager.Save;
+  if DataManager <> nil then
+    DataManager.Save;
 
   TMeterValue.SaveToFile(0);
 end;
 
 procedure TAppServices.ResetGlobalStatics;
 begin
+  // Глобальный список насосов пересобирается менеджером рабочих столов.
+  // На остановке очищаем и освобождаем явно, чтобы не оставлять "висячие" ссылки.
   FreeAndNil(TPump.Pumps);
 
+  // Эти списки статические и освобождаются в finalization uFlowMeter.
+  // Здесь выполняем мягкую очистку содержимого, чтобы после Shutdown
+  // не было доступа к устаревшим экземплярам.
   if TFlowMeter.FlowMeters <> nil then
     TFlowMeter.FlowMeters.Clear;
-
   if TFlowMeter.Etalons <> nil then
     TFlowMeter.Etalons.Clear;
 end;
@@ -183,39 +178,21 @@ begin
 
   SaveAll;
 
-  // --- WorkTableManager ---
-  if FOwnsWorkTableManager and (FWorkTableManager <> nil) then
-  begin
-    if uWorkTable.WorkTableManager = FWorkTableManager then
-      uWorkTable.WorkTableManager := nil;
+  FreeAndNil(FWorkTableManager);
 
-    FreeAndNil(FWorkTableManager);
-  end;
+  if FOwnsDataManager and (DataManager <> nil) then
+    FreeAndNil(DataManager);
 
-  // --- DataManager ---
-  if FOwnsDataManager and (FDataManager <> nil) then
-  begin
-    if uDataManager.DataManager = FDataManager then
-      uDataManager.DataManager := nil;
-
-    FreeAndNil(FDataManager);
-  end;
-
-  // --- ProtocolManager ---
   if FOwnsProtocolManager and (FProtocolManager <> nil) then
   begin
     if uProtocols.ProtocolManager = FProtocolManager then
       uProtocols.ProtocolManager := nil;
-
     FreeAndNil(FProtocolManager);
   end;
 
   ResetGlobalStatics;
-
   FOwnsDataManager := False;
   FOwnsProtocolManager := False;
-  FOwnsWorkTableManager := False;
-
   FInitialized := False;
 end;
 
