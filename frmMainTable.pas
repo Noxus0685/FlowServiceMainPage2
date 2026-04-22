@@ -718,7 +718,7 @@ begin
   FreeAndNil(FEtalonClipboard.Snapshot);
   TMeterValue.SaveToFile(0);
   FInstrumentalVisibleOrder.Free;
-  FWorkTableManager.Free;
+  FWorkTableManager := nil;
   FFlowMeters.Free;
   inherited;
 end;
@@ -4785,10 +4785,9 @@ IF WorkTable.FluidTemp.IsRunning THEN
   end
   else
   begin
-     if (WorkTable.FluidTemp.ValueSet.Value=0) or (WorkTable.FluidTemp.Value.Value=0) then
+
       Rectangle7.Fill.Color := TAlphaColorRec.White
-     else IF not(WorkTable.FluidTemp.IsStable(TempStableStatus)) then
-      Rectangle7.Fill.Color := TAlphaColorRec.Lightyellow;
+
   end;
 
 IF WorkTable.FluidPress.IsRunning THEN
@@ -4803,10 +4802,9 @@ IF WorkTable.FluidPress.IsRunning THEN
   end
   else
   begin
-   if (WorkTable.FluidPress.ValueSet.Value=0) or (WorkTable.FluidPress.Value.Value=0 )  then
+
     Rectangle11.Fill.Color := TAlphaColorRec.White
-   else IF not(WorkTable.FluidPress.IsStable(PressStableStatus)) then
-    Rectangle11.Fill.Color := TAlphaColorRec.Lightyellow
+
 
   end;
 
