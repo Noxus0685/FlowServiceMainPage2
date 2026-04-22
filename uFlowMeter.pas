@@ -1132,7 +1132,6 @@ begin
    begin
 
     ADevice := ActiveRepo.CreateDevice(-1);
-
     ADevice.DeviceTypeUUID := DeviceTypeUUID;
     ADevice.DeviceTypeName := FTypeName;
     ADevice.SerialNumber := FSerialNumber;

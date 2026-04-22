@@ -376,6 +376,10 @@ type
     TabItemProtocol: TTabItem;
     LayoutProtocolHost: TLayout;
     TabItemDeviceProperties: TTabItem;
+    ActionDeleteDevice: TAction;
+    ActionDeleteEtalons: TAction;
+    MenuItem10: TMenuItem;
+    MenuItem11: TMenuItem;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -481,6 +485,8 @@ type
     procedure EditRepeatsExit(Sender: TObject);
     procedure SwitchAutoSwitch(Sender: TObject);
     procedure SpinBoxFlowRateChange(Sender: TObject);
+    procedure ActionDeleteDeviceExecute(Sender: TObject);
+    procedure ActionDeleteEtalonsExecute(Sender: TObject);
 
   private
 
@@ -2945,6 +2951,25 @@ begin
   GridDevices.SetFocus;
 end;
 
+procedure TFrameMainTable.ActionDeleteDeviceExecute(Sender: TObject);
+var
+ Src: TChannel;
+begin
+   Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+   FActiveWorkTable.DeleteChannel(Src);
+   UpdateGrids;
+end;
+
+
+procedure TFrameMainTable.ActionDeleteEtalonsExecute(Sender: TObject);
+var
+  Src: TChannel;
+begin
+   Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
+   FActiveWorkTable.DeleteChannel(Src);
+   UpdateGrids;
+end;
+
 procedure TFrameMainTable.ActionDevicesAssignEtalonExecute(Sender: TObject);
 var
   Ch: TChannel;
@@ -4684,9 +4709,12 @@ begin
     if WorkTable = nil then
       Exit;
 
-    //if WorkTable.FlowRate.IsRunning then
-      LabelFlowRate.Text :=
-      WorkTable.ValueFlowRate.GetStrNum(WorkTable.FlowRate.Value.Value) ;
+    //if WorkTable.FlowRate.IsRunning the
+
+    if( WorkTable.FlowRate.Value.GetDoubleValue<=WorkTable.FlowRate.Max) and (WorkTable.FlowRate.Value.GetDoubleValue>=WorkTable.FlowRate.Min) then
+      LabelFlowRate.text:=WorkTable.FlowRate.Value.GetStrValue
+    else
+      LabelFlowRate.Text := '-';
    // else
    //   LabelFlowRate.Text := '0';
   // if LayoutFlowRate.tag = 3 then
@@ -4798,9 +4826,16 @@ IF WorkTable.FluidPress.IsRunning THEN
         EditPres.Text := WorkTable.ValuePressure.GetStrNum(WorkTable.FluidPress.ValueSet.Value);
     end;
 
-    LabelTemp.text:=WorkTable.FluidTemp.Value.GetStrValue;
+    if( WorkTable.FluidTemp.Value.GetDoubleValue<=WorkTable.FluidTemp.Max) and (WorkTable.FluidTemp.Value.GetDoubleValue>=WorkTable.FluidTemp.Min) then
+      LabelTemp.text:=WorkTable.FluidTemp.Value.GetStrValue
+    else
+      LabelTemp.Text := '-';
 
-    LabelPressure.text:=WorkTable.FluidPress.Value.GetStrValue;
+    if( WorkTable.FluidPress.Value.GetDoubleValue<=WorkTable.FluidPress.Max) and (WorkTable.FluidPress.Value.GetDoubleValue>=WorkTable.FluidPress.Min) then
+      LabelPressure.text:=WorkTable.FluidPress.Value.GetStrValue
+    else
+      LabelPressure.Text := '-';
+
 
 
 

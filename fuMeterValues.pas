@@ -103,7 +103,11 @@ type
     EditValueRate: TEdit;
     LabelTestValueWoCorrection: TLabel;
     StringColumnDescription: TStringColumn;
-    SpeedButtonResetSettings: TSpeedButton;
+    sbClear: TSpeedButton;
+    sbFind: TSpeedButton;
+    EditFindDevice: TEdit;
+    SpeedButtonFindInternet: TSpeedButton;
+    Layout22: TLayout;
     procedure FormShow(Sender: TObject);
     procedure AddRowButtonClick(Sender: TObject);
     procedure StringGridCoefsDataEditingDone(Sender: TObject; const ACol,
@@ -130,16 +134,25 @@ type
     procedure TabItem4Click(Sender: TObject);
     procedure TabItemListValuesClick(Sender: TObject);
     procedure StringGridValuesListSelChanged(Sender: TObject);
+    procedure EditFindDeviceChangeTracking(Sender: TObject);
+    procedure EditFindDeviceExit(Sender: TObject);
+    procedure sbClearClick(Sender: TObject);
+    procedure sbFindClick(Sender: TObject);
+    procedure SpeedButtonFindInternetClick(Sender: TObject);
     procedure EditCoefKExit(Sender: TObject);
     procedure EditCoefPExit(Sender: TObject);
     procedure SpeedButtonResetSettingsClick(Sender: TObject);
   private
     FCoef: TCoef;
     FCoefHash: string;
+    FFilteredValues: TObjectList<TMeterValue>;
     function SafeFloat(const S: string): Double;
     function SafeInt(const S: string): Integer;
+    function HasActiveFilters: Boolean;
     procedure RefreshLayoutValues;
     procedure RefreshLayoutCoefs;
+    procedure ApplyFilter;
+    procedure UpdateGridDevices;
   public
     MeterValue: TMeterValue;
     procedure UpdateLayoutCommonSettings;
@@ -562,101 +575,175 @@ begin
   UpdateLayoutTest;
 end;
 
-procedure TFormMeterValues.UpdateLayoutValuesList;
+procedure TFormMeterValues.ApplyFilter;
 var
-  I, Col: Integer;
-  Index: Integer;
+  Source: TObjectList<TMeterValue>;
   Item: TMeterValue;
-  List: TObjectList<TMeterValue>;
+  SearchText, SearchArea: string;
+begin
+  Source := TMeterValue.GetMeterValues;
+
+  FreeAndNil(FFilteredValues);
+  FFilteredValues := TObjectList<TMeterValue>.Create(False);
+
+  if Source = nil then
+    Exit;
+
+  SearchText := Trim(LowerCase(EditFindDevice.Text));
+  for Item in Source do
+  begin
+    if SearchText = '' then
+    begin
+      FFilteredValues.Add(Item);
+      Continue;
+    end;
+
+    SearchArea :=
+      LowerCase(Item.NameOwner + ' ' +
+      Item.Description + ' ' +
+      Item.GetStrFullName + ' ' +
+      Item.GetStrValue + ' ' +
+      Item.Hash);
+
+    if Pos(SearchText, SearchArea) > 0 then
+      FFilteredValues.Add(Item);
+  end;
+end;
+
+procedure TFormMeterValues.UpdateGridDevices;
+var
+  I, Col, Index: Integer;
+  Item: TMeterValue;
 begin
   Index := -1;
   StringGridValuesList.BeginUpdate;
   try
     StringGridValuesList.Tag := 1;
-    StringGridValuesList.RowCount := 0;
+    if FFilteredValues <> nil then
+      StringGridValuesList.RowCount := FFilteredValues.Count
+    else
+      StringGridValuesList.RowCount := 0;
 
-    List := TMeterValue.GetMeterValues;
-    if (List <> nil) and (List.Count > 0) then
+    for I := 0 to StringGridValuesList.RowCount - 1 do
     begin
-      StringGridValuesList.RowCount := List.Count;
-      for I := 0 to List.Count - 1 do
+      Item := FFilteredValues[I];
+      Col := 0;
+      StringGridValuesList.Cells[Col, I] := IntToStr(I); Inc(Col);
+      StringGridValuesList.Cells[Col, I] := Item.NameOwner; Inc(Col);
+      StringGridValuesList.Cells[Col, I] := Item.Description; Inc(Col);
+      StringGridValuesList.Cells[Col, I] := Item.GetStrFullName; Inc(Col);
+      StringGridValuesList.Cells[Col, I] := Item.GetStrValue; Inc(Col);
+      StringGridValuesList.Cells[Col, I] := Item.Hash; Inc(Col);
+
+      if Item.ValueRate <> nil then
       begin
-        Item := List[I];
-        Col := 0;
-        StringGridValuesList.Cells[Col, I] := IntToStr(I); Inc(Col);
-        StringGridValuesList.Cells[Col, I] := Item.NameOwner; Inc(Col);
-        StringGridValuesList.Cells[Col, I] := Item.Description; Inc(Col);
-        StringGridValuesList.Cells[Col, I] := Item.GetStrFullName; Inc(Col);
-        StringGridValuesList.Cells[Col, I] := Item.GetStrValue; Inc(Col);
-        StringGridValuesList.Cells[Col, I] := Item.Hash; Inc(Col);
-
-        if Item.ValueRate <> nil then
-        begin
-          StringGridValuesList.Cells[Col, I] := Item.ValueRate.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueRate.GetStrValue; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueRate.Hash; Inc(Col);
-        end;
-
-        if Item.ValueBaseMultiplier <> nil then
-        begin
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.GetStrValue; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.Hash; Inc(Col);
-        end;
-
-        if Item.ValueBaseDevider <> nil then
-        begin
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.GetStrValue; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.Hash; Inc(Col);
-        end;
-
-        if Item.ValueCorrection <> nil then
-        begin
-          StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.GetStrValue; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.Hash; Inc(Col);
-        end;
-
-        if Item.ValueEtalon <> nil then
-        begin
-          StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.GetStrFullName; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.GetStrValue; Inc(Col);
-          StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.Hash; Inc(Col);
-        end;
-
-        if Item.Hash = MeterValue.Hash then
-          Index := I;
+        StringGridValuesList.Cells[Col, I] := Item.ValueRate.GetStrFullName; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueRate.GetStrValue; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueRate.Hash; Inc(Col);
       end;
+
+      if Item.ValueBaseMultiplier <> nil then
+      begin
+        StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.GetStrFullName; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.GetStrValue; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueBaseMultiplier.Hash; Inc(Col);
+      end;
+
+      if Item.ValueBaseDevider <> nil then
+      begin
+        StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.GetStrFullName; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.GetStrValue; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueBaseDevider.Hash; Inc(Col);
+      end;
+
+      if Item.ValueCorrection <> nil then
+      begin
+        StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.GetStrFullName; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.GetStrValue; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueCorrection.Hash; Inc(Col);
+      end;
+
+      if Item.ValueEtalon <> nil then
+      begin
+        StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.GetStrFullName; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.GetStrValue; Inc(Col);
+        StringGridValuesList.Cells[Col, I] := Item.ValueEtalon.Hash; Inc(Col);
+      end;
+
+      if (MeterValue <> nil) and (Item.Hash = MeterValue.Hash) then
+        Index := I;
     end;
 
-    StringGridValuesList.Row := Index;
+    if (Index >= 0) and (StringGridValuesList.RowCount > 0) then
+      StringGridValuesList.Row := Index
+    else if StringGridValuesList.RowCount > 0 then
+      StringGridValuesList.Row := 0;
+
+    sbFind.IsPressed := HasActiveFilters;
     StringGridValuesList.Tag := 0;
   finally
     StringGridValuesList.EndUpdate;
   end;
 end;
 
+function TFormMeterValues.HasActiveFilters: Boolean;
+begin
+  Result := Trim(EditFindDevice.Text) <> '';
+end;
+
+procedure TFormMeterValues.UpdateLayoutValuesList;
+begin
+  ApplyFilter;
+  UpdateGridDevices;
+end;
+
 procedure TFormMeterValues.TabItemListValuesClick(Sender: TObject);
 begin
-  UpdateLayoutValuesList;
+  ApplyFilter;
+  UpdateGridDevices;
 end;
 
 procedure TFormMeterValues.StringGridValuesListSelChanged(Sender: TObject);
-var
-  List: TObjectList<TMeterValue>;
 begin
   if StringGridValuesList.Tag = 0 then
   begin
-    List := TMeterValue.GetMeterValues;
-    if (List <> nil) and (StringGridValuesList.Row >= 0) and
-       (StringGridValuesList.Row < List.Count) then
-      MeterValue := List[StringGridValuesList.Row];
+    if (FFilteredValues <> nil) and (StringGridValuesList.Row >= 0) and
+       (StringGridValuesList.Row < FFilteredValues.Count) then
+      MeterValue := FFilteredValues[StringGridValuesList.Row];
   end;
 
   UpdateLayoutValues;
   UpdateStringGridCoefs;
   UpdateStringGridCoefsData;
+end;
+
+procedure TFormMeterValues.EditFindDeviceChangeTracking(Sender: TObject);
+begin
+  ApplyFilter;
+  UpdateGridDevices;
+end;
+
+procedure TFormMeterValues.EditFindDeviceExit(Sender: TObject);
+begin
+  EditFindDeviceChangeTracking(Sender);
+end;
+
+procedure TFormMeterValues.sbClearClick(Sender: TObject);
+begin
+  EditFindDevice.Text := '';
+  ApplyFilter;
+  UpdateGridDevices;
+end;
+
+procedure TFormMeterValues.sbFindClick(Sender: TObject);
+begin
+  ApplyFilter;
+  UpdateGridDevices;
+end;
+
+procedure TFormMeterValues.SpeedButtonFindInternetClick(Sender: TObject);
+begin
+  sbFindClick(Sender);
 end;
 
 procedure TFormMeterValues.UpdateLayoutCoefs;

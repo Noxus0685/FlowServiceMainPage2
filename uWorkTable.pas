@@ -438,6 +438,7 @@ private
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
 
 
+
   public
     constructor Create;
     destructor Destroy; override;
@@ -467,6 +468,9 @@ private
   procedure RemovePump(APump: TPump); overload;
   procedure ClearPumps;
   procedure SetActivePump(APumpName: string);
+  function DeleteChannel(AChannel: TChannel): Boolean;
+  procedure ReindexChannels(AChannels: TObjectList<TChannel>;
+      const AEtalonChannels: Boolean);
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
@@ -622,7 +626,6 @@ private
 
     procedure Load;
     procedure Save;
-
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
 
@@ -1513,25 +1516,17 @@ begin
     EnsureDescription(FTableFlow.ValueCurrent, 'Токовый сигнал стола');
   end;
 
-   if FlowRate.Value = nil then
-  begin
-    FlowRate.Value := TMeterValue.Create('', Name);
-    FlowRate.Value.SetAsVolumeFlow;
-    EnsureDescription(FlowRate.Value, 'Расход');
-  end;
-    if FluidTemp.Value = nil then
-  begin
-    FluidTemp.Value := TMeterValue.Create('', Name);
-    FluidTemp.Value.SetAsAirTemp;
-    EnsureDescription(FluidTemp.Value, 'Температура');
-  end;
+  if FTableFlow.ValueFlowRate <> nil then
+    FlowRate.Value := FTableFlow.ValueFlowRate;
+  EnsureDescription(FlowRate.Value, 'Расход');
 
-    if FluidPress.Value = nil then
-  begin
-    FluidPress.Value := TMeterValue.Create('', Name);
-    FluidPress.Value.SetAsPressure;
-    EnsureDescription(FluidPress.Value, 'Давление');
-  end;
+  if FTableFlow.ValueTemperture <> nil then
+    FluidTemp.Value := FTableFlow.ValueTemperture;
+  EnsureDescription(FluidTemp.Value, 'Температура');
+
+  if FTableFlow.ValuePressure <> nil then
+    FluidPress.Value := FTableFlow.ValuePressure;
+  EnsureDescription(FluidPress.Value, 'Давление');
 
     if FlowRate.Valueset = nil then
   begin
@@ -2673,6 +2668,64 @@ end;
 class function TWorkTable.BuildChannelDefaultText(const AChannelIndex: Integer): string;
 begin
   Result := IntToStr(AChannelIndex);
+end;
+
+
+function TWorkTable.DeleteChannel(AChannel: TChannel): Boolean;
+var
+  ChannelIndex: Integer;
+begin
+  Result := False;
+  if AChannel = nil then
+    Exit;
+
+  ChannelIndex := FDeviceChannels.IndexOf(AChannel);
+  if ChannelIndex >= 0 then
+  begin
+    FDeviceChannels.Delete(ChannelIndex);
+    //ReindexChannels(FDeviceChannels, False);
+    UpdateAggregateMeterValues;
+    AssignTableFlowAsEtalonToDevices;
+    Result := True;
+    Exit;
+  end;
+
+  ChannelIndex := FEtalonChannels.IndexOf(AChannel);
+  if ChannelIndex >= 0 then
+  begin
+    FEtalonChannels.Delete(ChannelIndex);
+    //ReindexChannels(FEtalonChannels, True);
+    UpdateAggregateMeterValues;
+    AssignTableFlowAsEtalonToDevices;
+    Result := True;
+    Exit;
+  end;
+end;
+
+
+//нигде не используется
+procedure TWorkTable.ReindexChannels(AChannels: TObjectList<TChannel>;
+  const AEtalonChannels: Boolean);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if AChannels = nil then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Channel := AChannels[I];
+    if Channel = nil then
+      Continue;
+
+    Channel.ID := I + 1;
+    if AEtalonChannels then
+      Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
+    else
+      Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+
+  end;
 end;
 
 

@@ -793,11 +793,11 @@ begin
           SetLength(ImpSecValues, EnabledDeviceChannels.Count);
            for I := 0 to EnabledDeviceChannels.Count - 1 do
             if i in [1,3,6] then
-              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/100 + 1)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/10 + 1.00001)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
             else if i in [2,4,5] then
-              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/100 + 1.0015)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
+              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/10 + 1.00015)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
             else
-              ImpSecValues[i] := (Flow*(Random *  (trackStd.Value)/100 +  1.008)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
+              ImpSecValues[i] := (Flow*(Random *  (trackStd.Value)/10 +  1.0008)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
 
             FFrameMainTable.ApplyChannelValues(
               EnabledDeviceChannels,
@@ -859,8 +859,8 @@ begin
     if Channel = nil then
       Continue;
 
-    CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    CurDelta := (Random*(trackStd.Value)/10 * 0.06) - 0.03;
+    ImpDelta := Random(11)*(trackStd.Value)/10 - 5;
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);

@@ -817,6 +817,8 @@ begin
   Result := GetStringValue(CurrentDimIndex);
 end;
 
+
+
 { C++ parity for GetStringNum(double):
   temporarily substitutes internal Value by AValue, formats via GetStringValue(),
   then restores previous Value. This keeps method side-effect free for callers. }
