@@ -237,7 +237,7 @@ type
     FID: Integer;
     FName: string;
     FText: string;
-    FActivePump : TPump;
+
 
     FTimeSet : Integer;
     FLimitImpSet: Integer;
@@ -248,14 +248,16 @@ type
     FDeviceChannels: TObjectList<TChannel>;
     FEtalonChannels: TObjectList<TChannel>;
 
+    FActivePump : TPump;
     FPumps: TObjectList<TPump>;
     FFlowRate: TFlowRate;
+    FFluidTemp: TFluidTemp;
+    FFluidPress: TFluidPress;
 
     FMeasurementRun: TObject;
     FMode:EMeasurementRunMode;
 
-    FFluidTemp: TFluidTemp;
-    FFluidPress: TFluidPress;
+
     FTime: Double;
     FTimeResult: Double;
     FState: EWorkTableState;
