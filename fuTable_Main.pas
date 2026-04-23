@@ -32,11 +32,12 @@ uses
   uBaseProcedures,
   uClasses,
   uDataManager,
+  uObservable,
   uParameter,
   uWorkTable;
 
 type
-  TTableMainForm = class(TForm)
+  TTableMainForm = class(TForm, IEventObserver)
     tcMain: TTabControl;
     tiTable: TTabItem;
     tiResults: TTabItem;
@@ -90,6 +91,7 @@ type
     FWorkTableManager: TWorkTableManager;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
+    FSubscribedWorkTable: TWorkTable;
 
     FT_WorkBench_Last: Double;
     FT_WorkBench_First: Double;
@@ -124,9 +126,17 @@ type
     procedure UpdateDeviceImpSecFromFlowRate;
     procedure SetT_WorkBench_First(const Value: Double);
     procedure SetT_WorkBench_Last(const Value: Double);
+    procedure SubscribeToWorkTable(const AWorkTable: TWorkTable);
+    procedure UnsubscribeFromWorkTable;
+    procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
+    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+    function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
+    function _AddRef: Integer; stdcall;
+    function _Release: Integer; stdcall;
 
 
   public
+    destructor Destroy; override;
     property T_WorkBench_First:Double read FT_WorkBench_First write SetT_WorkBench_First;
     property T_WorkBench_Last:Double read FT_WorkBench_Last write SetT_WorkBench_Last;
   end;
@@ -137,6 +147,12 @@ var
 implementation
 
 {$R *.fmx}
+
+destructor TTableMainForm.Destroy;
+begin
+  UnsubscribeFromWorkTable;
+  inherited Destroy;
+end;
 
 procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
@@ -289,6 +305,8 @@ begin
   if FWorkTableManager = nil then
     Exit;
 
+  UnsubscribeFromWorkTable;
+
   if FFrameMainTable = nil then
     Exit;
 
@@ -311,6 +329,7 @@ begin
   if not AppServices.Initialized then
     AppServices.Initialize;
   FWorkTableManager := AppServices.WorkTableManager;
+  FSubscribedWorkTable := nil;
 
   //Подумать над динамической привязкой ко всем столам
     if FWorkTableManager.ActiveWorkTable<>nil then
@@ -332,6 +351,8 @@ begin
 
   end;
 
+  SubscribeToWorkTable(FWorkTableManager.ActiveWorkTable);
+
 
   FFrameMainTable := TFrameMainTable.Create(Self);
   FFrameMainTable.Parent := tiTable;
@@ -346,6 +367,91 @@ begin
   FFrameProceed.Initialize(FWorkTableManager);
 
 
+end;
+
+procedure TTableMainForm.SubscribeToWorkTable(const AWorkTable: TWorkTable);
+var
+  Observer: IEventObserver;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  if FSubscribedWorkTable = AWorkTable then
+    Exit;
+
+  UnsubscribeFromWorkTable;
+  Observer := Self;
+  AWorkTable.Subscribe(Observer);
+  FSubscribedWorkTable := AWorkTable;
+end;
+
+procedure TTableMainForm.UnsubscribeFromWorkTable;
+var
+  Observer: IEventObserver;
+begin
+  if FSubscribedWorkTable = nil then
+    Exit;
+
+  Observer := Self;
+  FSubscribedWorkTable.Unsubscribe(Observer);
+  FSubscribedWorkTable := nil;
+end;
+
+procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
+  AEvent: EWorkTableNotifyEvent; AData: TObject);
+begin
+  if (ASender = nil) or (FWorkTableManager = nil) then
+    Exit;
+
+  if (FWorkTableManager.ActiveWorkTable = nil) or
+     (ASender <> FWorkTableManager.ActiveWorkTable) then
+    Exit;
+
+  case AEvent of
+    wtnWorkTableStateChanged:
+      mPump.Lines.Add('Notify: состояние стола изменено: ' +
+        TWorkTable.WorkTableStateToString(FWorkTableManager.ActiveWorkTable.State));
+    wtnWorkTablePointChanged:
+      if AData <> nil then
+        mPump.Lines.Add('Notify: изменена текущая точка измерения');
+    wtnWorkTableProcStart:
+      mPump.Lines.Add('Notify: процедура запущена');
+    wtnWorkTableProcStop:
+      mPump.Lines.Add('Notify: процедура остановлена');
+  end;
+end;
+
+procedure TTableMainForm.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+var
+  NotifyEvent: EWorkTableNotifyEvent;
+begin
+  if Sender = nil then
+    Exit;
+
+  if (Event < Ord(Low(EWorkTableNotifyEvent))) or
+     (Event > Ord(High(EWorkTableNotifyEvent))) then
+    Exit;
+
+  NotifyEvent := EWorkTableNotifyEvent(Event);
+  HandleWorkTableNotify(Sender, NotifyEvent, Data);
+end;
+
+function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
+begin
+  if GetInterface(IID, Obj) then
+    Result := 0
+  else
+    Result := HResult($80004002);
+end;
+
+function TTableMainForm._AddRef: Integer;
+begin
+  Result := -1;
+end;
+
+function TTableMainForm._Release: Integer;
+begin
+  Result := -1;
 end;
 
 procedure TTableMainForm.tcMainChange(Sender: TObject);
