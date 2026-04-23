@@ -128,7 +128,7 @@ type
     procedure SetT_WorkBench_Last(const Value: Double);
     procedure SubscribeToWorkTable(const AWorkTable: TWorkTable);
     procedure UnsubscribeFromWorkTable;
-    procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
+    procedure HandleWorkTableNotify(ASender: TObject; AEvent: ENotifyEvent; AData: TObject);
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -394,7 +394,7 @@ begin
 end;
 
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
-  AEvent: EWorkTableNotifyEvent; AData: TObject);
+  AEvent: ENotifyEvent; AData: TObject);
 var
 FlowRate: TFlowRate;
 Pump: TPump;
@@ -405,6 +405,8 @@ AValue:Double;
   begin
   if (ASender = nil) or (FWorkTableManager = nil) then
     Exit;
+  if ASender is TWorkTable then
+    WorkTable:= ASender AS TWorkTable;
 
   if AData is TPump then
     Pump := AData as TPump;
@@ -415,58 +417,72 @@ AValue:Double;
      (ASender <> FWorkTableManager.ActiveWorkTable) then
     Exit;   }
 
-
-
-
   case AEvent of
-    wtnPumpStatusChanged:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
-    wtnPumpActionStart:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
-    wtnPumpActionStop:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
-    wtnPumpActionSet:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString + ' на ' + floattostr(Pump.ValueSet.Value));
+    neAction:
+      begin
+        if AData is TPump then
+          begin
+            mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
+          end;
 
-    wtnFlowRateStatusChanged:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
-    wtnFlowRateActionStart:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
-    wtnFlowRateActionStop:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
-    wtnFlowRateActionSet:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+        if AData is TFlowRate then
+          begin
+            //mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+            if FlowRate.IsRunning then
+              begin
+                if FlowRate.ValueSet.value>=FlowRate.Value.value then
+                  Pump.DoFreqSet(Pump.ValueSet.value+random(5))
+                else
+                  Pump.DoFreqSet(Pump.ValueSet.value-random(5));
+                if Pump.Value.value<12 then
+                  Pump.ValueSet.value:=12;
+                if not(WorkTable.ActivePump.IsRunning) then
+                  Pump.DoPumpStart;
+              end;
 
+          end;
 
-    wtnWorkTableStateChanged:
-      mPump.Lines.Add('Notify: состояние стола изменено: ');//  TWorkTable.WorkTableStateToString(FWorkTableManager.ActiveWorkTable.State));
-    wtnWorkTablePointChanged:
-      if AData <> nil then
-        mPump.Lines.Add('Notify: изменена текущая точка измерения');
-    wtnWorkTableProcStart:
-      mPump.Lines.Add('Notify: процедура запущена');
-    wtnWorkTableProcStop:
-      mPump.Lines.Add('Notify: процедура остановлена');
+      end;
+
+     neStatusChanged:
+      begin
+        if AData is TPump then
+          mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
+        if AData is TFlowRate then
+          begin
+              mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+              IF FlowRate.Action = apStart THEN
+                FlowRate.Status:=spStarted
+              else  if (FlowRate.Action = apStop) then
+                FlowRate.Status:=spStopped;
+
+              if (FlowRate.Action = apSet) or (FlowRate.Action = apStart) then
+                WorkTable.ResetMeasurementValues;
+          end;
+      end;
+
   end;
+
+
 end;
 
 procedure TTableMainForm.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 var
-  NotifyEvent: EWorkTableNotifyEvent;
+  NotifyEvent: ENotifyEvent;
   Pump: TPump;
 begin
   if Sender = nil then
     Exit;
 
 
-  if (Event < Ord(Low(EWorkTableNotifyEvent))) or
-     (Event > Ord(High(EWorkTableNotifyEvent))) then
-    Exit;
+  {if (Event < Ord(Low(ENotifyEvent))) or
+     (Event > Ord(High(ENotifyEvent))) then
+    Exit; }
 
-  NotifyEvent := EWorkTableNotifyEvent(Event);
+  NotifyEvent := ENotifyEvent(Event);
 
   if Sender is TWorkTable then
-    HandleWorkTableNotify(Pump, NotifyEvent, Data);
+    HandleWorkTableNotify(Sender, NotifyEvent, Data);
 end;
 
 function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
