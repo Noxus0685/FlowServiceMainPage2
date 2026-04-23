@@ -273,7 +273,7 @@ type
     FFluidPress: TFluidPress;
     FTime: Double;
     FTimeResult: Double;
-    FState: EStatusWorkTable;
+
     FTableClamped: Boolean;
     FFlowUnitName: string;
     FQuantityUnitName: string;
@@ -498,7 +498,7 @@ private
 
     //property State: TSpillState read FState write FState;
 
-    property State: EStatusWorkTable read FState write SetState;
+
     property Status: EStatusWorkTable read FStatus write FStatus;
     property Action: EActionWorkTable read FAction write FAction;
 
@@ -1221,7 +1221,6 @@ begin
 
   FTableFlow := TFlowMeter.Create;
 
-  FState := swtNONE;
   FStatus := swtNONE;
   FAction := awtNone;
   FTableClamped := False;
@@ -2289,8 +2288,8 @@ begin
         Ini.WriteInteger(Section, 'LimitImpSet', -1);
         Ini.WriteFloat(Section, 'LimitVolumeSet', -1);
       end;
-      Ini.WriteString(Section, 'State', WorkTableStateToString(WorkTable.State));
-      Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.State));
+      Ini.WriteString(Section, 'Status', WorkTableStateToString(WorkTable.Status));
+      Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.Status));
       Ini.WriteBool(Section, 'TableClamped', WorkTable.TableClamped);
       Ini.WriteString(Section, 'FlowUnitName', WorkTable.FlowUnitName);
       Ini.WriteString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName);
@@ -2399,9 +2398,9 @@ begin
         WorkTable.CurrentPoint.LimitVolume := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
         WorkTable.CurrentPoint.StopCriteria := [];
       end;
-      WorkTable.State := WorkTableStateFromString(
-        Ini.ReadString(Section, 'State',
-          Ini.ReadString(Section, 'MeasurementState', 'swtNONE'))
+      WorkTable.Status := WorkTableStateFromString(
+        Ini.ReadString(Section, 'Status',
+          Ini.ReadString(Section, 'MeasurementStatus', 'swtNONE'))
       );
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
       WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
@@ -3014,10 +3013,8 @@ end;
 
 procedure TWorkTable.SetState(const ANewState: EStatusWorkTable);
 begin
-  if FState = ANewState then
+  if FStatus = ANewState then
     Exit;
-
-  FState := ANewState;
   FStatus := ANewState;
   ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
     'Изменено состояние рабочего стола', WorkTableStateToString(ANewState));
@@ -3274,39 +3271,39 @@ begin
 
 end;
 
-  procedure TWorkTable.StartTest;
+procedure TWorkTable.StartTest;
   begin
    ResetMeasurementValues;
-   State := swtSTARTTEST;
+   Status := swtSTARTTEST;
    FAction := awtStartTest;
    Notify(neAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
      'Запуск теста', Name);
   end;
 
-   procedure TWorkTable.StartMonitor;
+procedure TWorkTable.StartMonitor;
   begin
    ResetMeasurementValues;
-   State := swtSTARTMONITOR;
+   Status := swtSTARTMONITOR;
    FAction := awtStartMonitor;
    Notify(neAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
      'Запуск мониторинга', Name);
   end;
 
-  procedure TWorkTable.StopTest;
+procedure TWorkTable.StopTest;
   begin
-    State := swtSTOPTEST;
+    Status := swtSTOPTEST;
     FAction := awtStopTest;
     Notify(neAction, Self);
     ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
       'Остановка теста', Name);
   end;
 
-   procedure TWorkTable.StopMonitor;
+procedure TWorkTable.StopMonitor;
   begin
    ResetMeasurementValues;
-   State := swtSTOPMONITOR;
+   Status := swtSTOPMONITOR;
    FAction := awtStopMonitor;
    Notify(neAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',

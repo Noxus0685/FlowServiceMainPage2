@@ -823,14 +823,14 @@ end;
 procedure TFrameMainTable.SetConfiguration;
 begin
   if FActiveWorkTable <> nil then
-    FActiveWorkTable.State := swtCONFIGED;
+    FActiveWorkTable.Status:= swtCONFIGED;
 end;
 
 procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := swtSTARTMONITOR;
+    FActiveWorkTable.Status := swtSTARTMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -839,7 +839,7 @@ procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := swtSTOPMONITOR;
+    FActiveWorkTable.Status := swtSTOPMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -926,7 +926,7 @@ begin
   case AEvent of
     neStatusChanged:
       begin
-        OnChangeState(AWorkTable.State);
+        OnChangeState(AWorkTable.Status);
         if Data is TDevicePoint then
           APoint := TDevicePoint(Data)
         else
@@ -941,9 +941,9 @@ end;
 
 procedure TFrameMainTable.OnChangeState(const ANewState: EStatusWorkTable); //ChangeStateHandler
 begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.State <> ANewState) then
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.Status <> ANewState) then
   begin
-    FActiveWorkTable.State := ANewState;
+    FActiveWorkTable.Status := ANewState;
     Exit;
   end;
 
@@ -1233,7 +1233,7 @@ begin
   if FActiveWorkTable <> nil then
   begin
     FActiveWorkTable.NextClimateChangeAt := Now;
-    FActiveWorkTable.State := swtNONE;
+    FActiveWorkTable.Status := swtNONE;
   end
   else
     OnChangeState(swtNONE);
@@ -1432,7 +1432,7 @@ begin
   if WorkTable = nil then
     Exit;
 
-  if WorkTable.State = swtMONITOR then
+  if WorkTable.Status = swtMONITOR then
     StopMonitor
   else
     StartMonitor;
@@ -3193,7 +3193,7 @@ begin
 
 
 
-  if not (WorkTable.State in [swtMONITOR, swtEXECUTE]) then
+  if not (WorkTable.Status in [swtMONITOR, swtEXECUTE]) then
     Exit;
 
   IsUpdating := True;
@@ -3440,7 +3440,7 @@ begin
 
 
 
-  if WorkTable.State in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
+  if WorkTable.Status in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
     RefreshMonitorIndicator;
 
 
@@ -3771,11 +3771,11 @@ begin
 
     {Здесь должен быть код, который принимает всю сессию измерений или её отменяет}
 
-    WorkTable.State := swtSTANDBY;
+    WorkTable.Status := swtSTANDBY;
     Exit;
   end;
 
-  if WorkTable.State = swtEXECUTE then
+  if WorkTable.Status = swtEXECUTE then
     StopTest
   else
     StartTest;
@@ -3784,7 +3784,7 @@ end;
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
 begin
   if (FActiveWorkTable <> nil) then
-    FActiveWorkTable.State := swtSTANDBY
+    FActiveWorkTable.Status := swtSTANDBY
   else
     OnChangeState(swtSTANDBY);
 end;

@@ -79,7 +79,7 @@ TParameter = class(TObservableObject)
     procedure SetValue(AValue: Double);
     property Name: string read FName write FName;
     property Hint: string read FHint write FHint;
-    property Status: EStatusParameter read  FStatus   write SetStatus;
+    property Status: EStatusParameter read  FStatus write SetStatus;
     property Action: EActionParameter read FAction write SetAction;
     property ValueSet: TMeterValue read FValueSet write FValueSet;
     property Value: TMeterValue read FValue write FValue;
@@ -210,7 +210,6 @@ begin
 
 end;
 
-
 procedure TFluidTemp.DoFluidTempStop;
 begin
 
@@ -219,9 +218,6 @@ begin
 
   Stop;
 end;
-
-
-
 
 constructor TFluidPress.Create(const AName: string);
 begin
@@ -237,9 +233,6 @@ begin
   FAccuracyMinus := 5;
 end;
 
-
-
-
  function TFluidPress.GetActionAsString: string;
 begin
   case FAction of
@@ -250,8 +243,6 @@ begin
     Result := 'Неизвестно';
   end;
 end;
-
-
 
 procedure TFluidPress.DoFluidPressStart(APressSet: Double);
 begin
@@ -569,6 +560,7 @@ begin
   AStableInfo.CurrentValue := Value.Value;
   Result := IsTargetReached;
 end;
+
 procedure TParameter.Start;
 begin
     if FValueSet.Value<FMin then
@@ -596,8 +588,6 @@ begin
 
   FMax := Value;
 end;
-
-
 
 procedure TParameter.SetStatus(AStatus: EStatusParameter);
 begin
