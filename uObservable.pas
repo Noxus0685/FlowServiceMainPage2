@@ -1,4 +1,4 @@
-unit uObservable;
+﻿unit uObservable;
 
 interface
 
@@ -23,7 +23,7 @@ type
     FObservers: TList<IEventObserver>;
     FObserversLock: TObject;
   protected
-    procedure Notify(Event: Integer; Data: TObject = nil);
+    procedure Notify(Event: Integer; Data: TObject = nil); overload;
     procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
   public
     constructor Create; virtual;

@@ -924,7 +924,7 @@ begin
 
   AEvent := EWorkTableNotifyEvent(Event);
   case AEvent of
-    wtnWorkTableStateChanged:
+    wtnStateChanged:
       OnChangeState(AWorkTable.State);
     wtnWorkTablePointChanged:
       begin

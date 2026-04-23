@@ -2933,7 +2933,7 @@ begin
   if AParameters is TFluidPress then
     Exit(wtnFluidPressStatusChanged);
 
-  Result := wtnWorkTableStateChanged;
+  Result := wtnStateChanged;
 end;
 
 function TWorkTable.ResolveParameterActionEvent(AParameters: TParameter;
@@ -2983,7 +2983,7 @@ begin
     end;
   end;
 
-  Result := wtnWorkTableStateChanged;
+  Result := wtnStateChanged;
 end;
 
 procedure TWorkTable.SetActivePumpObject(const APump: TPump);
@@ -3075,7 +3075,7 @@ end;
 
 procedure TWorkTable.DoStateChanged(ANewState: EWorkTableState);
 begin
-  Notify(wtnWorkTableStateChanged, Self);
+  Notify(wtnStateChanged, Self);
   if Assigned(FOnStateChanged) then
     FOnStateChanged(ANewState);
 end;
