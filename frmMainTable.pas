@@ -577,7 +577,7 @@ type
     procedure Initialize;
     destructor Destroy; override;
 
-    procedure OnChangeState(const ANewState: EWorkTableState);
+    procedure OnChangeState(const ANewState: EStatusWorkTable);
     procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
       APointIndex: Integer);
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -823,14 +823,14 @@ end;
 procedure TFrameMainTable.SetConfiguration;
 begin
   if FActiveWorkTable <> nil then
-    FActiveWorkTable.State := STATE_CONFIGED;
+    FActiveWorkTable.State := swtCONFIGED;
 end;
 
 procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := STATE_STARTMONITOR;
+    FActiveWorkTable.State := swtSTARTMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -839,7 +839,7 @@ procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := STATE_STOPMONITOR;
+    FActiveWorkTable.State := swtSTOPMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -924,20 +924,22 @@ begin
 
   AEvent := EWorkTableNotifyEvent(Event);
   case AEvent of
-    wtnStateChanged:
-      OnChangeState(AWorkTable.State);
-    wtnWorkTablePointChanged:
+    neStatusChanged:
       begin
+        OnChangeState(AWorkTable.State);
         if Data is TDevicePoint then
           APoint := TDevicePoint(Data)
         else
           APoint := AWorkTable.CurrentPoint;
-        OnChangePoint(AWorkTable, APoint, -1);
+        if APoint <> nil then
+          OnChangePoint(AWorkTable, APoint, -1);
       end;
+    neAction:
+      ;
   end;
 end;
 
-procedure TFrameMainTable.OnChangeState(const ANewState: EWorkTableState); //ChangeStateHandler
+procedure TFrameMainTable.OnChangeState(const ANewState: EStatusWorkTable); //ChangeStateHandler
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.State <> ANewState) then
   begin
@@ -946,7 +948,7 @@ begin
   end;
 
   case ANewState of
-    STATE_NONE:
+    swtNONE:
       begin
         TestButton.Tag := 0;
         TestButton.Enabled := False;
@@ -960,7 +962,7 @@ begin
       end;
 
 
-    STATE_STANDBY:
+    swtSTANDBY:
       begin
         TestButton.Text := 'Измерение';
         TestButton.Tag := 0;
@@ -977,7 +979,7 @@ begin
         ButtonCancel.Visible := False;
       end;
 
-    STATE_CONNECTED:
+    swtCONNECTED:
       begin
         TestButton.Text := 'Измерение';
         TestButton.Tag := 1;
@@ -993,12 +995,12 @@ begin
         ButtonCancel.Visible := False;
       end;
 
-    STATE_CONFIGED:
+    swtCONFIGED:
       begin
         // Статус зафиксирован после отправки настроек.
       end;
 
-    STATE_STARTTEST:
+    swtSTARTTEST:
       begin
         ButtonMonitor.Enabled := False;
         TestButton.Text := 'Запуск';
@@ -1007,13 +1009,13 @@ begin
        // ResetMeasurementValues;
       end;
 
-    STATE_STARTMONITOR:
+    swtSTARTMONITOR:
       begin
         ButtonCancel.Visible := False;
        // ResetMeasurementValues;
       end;
 
-    STATE_STARTMONITORWAIT:
+    swtSTARTMONITORWAIT:
       begin
         ApplyMonitorIndicatorColor(GlowMesYellow.GlowColor);
         GlowMesRed.Enabled := False;
@@ -1021,18 +1023,18 @@ begin
         GlowMesYellow.Enabled := False;
       end;
 
-    STATE_MONITOR:
+    swtMONITOR:
       begin
         ApplyMonitorIndicatorColor(GlowMesGreen.GlowColor);
       end;
 
-    STATE_STOPMONITOR:
+    swtSTOPMONITOR:
       begin
         ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
         UpdateForm;
       end;
 
-    STATE_STARTWAIT:
+    swtSTARTWAIT:
       begin
         GlowMesYellow.Enabled := True;
         GlowMesRed.Enabled := False;
@@ -1044,14 +1046,14 @@ begin
        // ResetMeasurementValues;
       end;
 
-    STATE_EXECUTE:
+    swtEXECUTE:
       begin
         GlowMesGreen.Enabled := True;
         GlowMesRed.Enabled := False;
         GlowMesYellow.Enabled := False;
       end;
 
-    STATE_STOPTEST:
+    swtSTOPTEST:
       begin
         TestButton.Text := 'Завершение';
         TestButton.Tag := 4;
@@ -1059,12 +1061,12 @@ begin
         UpdateForm;
       end;
 
-    STATE_STOPWAIT:
+    swtSTOPWAIT:
       begin
         // Ожидание завершения остановки.
       end;
 
-    STATE_COMPLETE:
+    swtCOMPLETE:
       begin
         TestButton.Text := 'Сохранение';
         TestButton.Tag := 5;
@@ -1074,7 +1076,7 @@ begin
         GlowMesGreen.Enabled := False;
       end;
 
-    STATE_FINALREAD:
+    swtFINALREAD:
       begin
         GlowMesYellow.Enabled := False;
         GlowMesRed.Enabled := False;
@@ -1088,7 +1090,7 @@ begin
         UpdateForm;
       end;
 
-    STATE_FAILURE:
+    swtFAILURE:
       begin
         GlowMesRed.Enabled := True;
         GlowMesYellow.Enabled := False;
@@ -1100,7 +1102,7 @@ begin
       end;
   else
     begin
-      // STATE_NONE
+      // swtNONE
     end;
   end;
 end;
@@ -1231,10 +1233,10 @@ begin
   if FActiveWorkTable <> nil then
   begin
     FActiveWorkTable.NextClimateChangeAt := Now;
-    FActiveWorkTable.State := STATE_NONE;
+    FActiveWorkTable.State := swtNONE;
   end
   else
-    OnChangeState(STATE_NONE);
+    OnChangeState(swtNONE);
 end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
@@ -1430,7 +1432,7 @@ begin
   if WorkTable = nil then
     Exit;
 
-  if WorkTable.State = STATE_MONITOR then
+  if WorkTable.State = swtMONITOR then
     StopMonitor
   else
     StartMonitor;
@@ -3191,7 +3193,7 @@ begin
 
 
 
-  if not (WorkTable.State in [STATE_MONITOR, STATE_EXECUTE]) then
+  if not (WorkTable.State in [swtMONITOR, swtEXECUTE]) then
     Exit;
 
   IsUpdating := True;
@@ -3438,7 +3440,7 @@ begin
 
 
 
-  if WorkTable.State in [STATE_STARTMONITORWAIT, STATE_MONITOR, STATE_STOPMONITOR] then
+  if WorkTable.State in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
     RefreshMonitorIndicator;
 
 
@@ -3769,11 +3771,11 @@ begin
 
     {Здесь должен быть код, который принимает всю сессию измерений или её отменяет}
 
-    WorkTable.State := STATE_STANDBY;
+    WorkTable.State := swtSTANDBY;
     Exit;
   end;
 
-  if WorkTable.State = STATE_EXECUTE then
+  if WorkTable.State = swtEXECUTE then
     StopTest
   else
     StartTest;
@@ -3782,9 +3784,9 @@ end;
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
 begin
   if (FActiveWorkTable <> nil) then
-    FActiveWorkTable.State := STATE_STANDBY
+    FActiveWorkTable.State := swtSTANDBY
   else
-    OnChangeState(STATE_STANDBY);
+    OnChangeState(swtSTANDBY);
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);

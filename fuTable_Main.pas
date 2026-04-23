@@ -403,6 +403,9 @@ i:integer;
 EnabledEtalonChannels: TObjectList<TChannel>;
 AValue:Double;
   begin
+  Pump := nil;
+  FlowRate := nil;
+
   if (ASender = nil) or (FWorkTableManager = nil) then
     Exit;
 
@@ -419,34 +422,24 @@ AValue:Double;
 
 
   case AEvent of
-    wtnPumpStatusChanged:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
-    wtnPumpActionStart:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
-    wtnPumpActionStop:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
-    wtnPumpActionSet:
-      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString + ' на ' + floattostr(Pump.ValueSet.Value));
-
-    wtnFlowRateStatusChanged:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
-    wtnFlowRateActionStart:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
-    wtnFlowRateActionStop:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
-    wtnFlowRateActionSet:
-      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
-
-
-    wtnWorkTableStateChanged:
-      mPump.Lines.Add('Notify: состояние стола изменено: ');//  TWorkTable.WorkTableStateToString(FWorkTableManager.ActiveWorkTable.State));
-    wtnWorkTablePointChanged:
-      if AData <> nil then
-        mPump.Lines.Add('Notify: изменена текущая точка измерения');
-    wtnWorkTableProcStart:
-      mPump.Lines.Add('Notify: процедура запущена');
-    wtnWorkTableProcStop:
-      mPump.Lines.Add('Notify: процедура остановлена');
+    neStatusChanged:
+      begin
+        if Pump <> nil then
+          mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString)
+        else if FlowRate <> nil then
+          TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString )
+        else
+          mPump.Lines.Add('Notify: состояние стола изменено');
+      end;
+    neAction:
+      begin
+        if Pump <> nil then
+          mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString)
+        else if FlowRate <> nil then
+          TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString )
+        else if AData <> nil then
+          mPump.Lines.Add('Notify: получено действие рабочего стола');
+      end;
   end;
 end;
 
@@ -466,7 +459,7 @@ begin
   NotifyEvent := EWorkTableNotifyEvent(Event);
 
   if Sender is TWorkTable then
-    HandleWorkTableNotify(Pump, NotifyEvent, Data);
+    HandleWorkTableNotify(Sender, NotifyEvent, Data);
 end;
 
 function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
@@ -1073,35 +1066,35 @@ begin
     // ------------------------------------------------------------
     // Начальное состояние → переход в режим ожидания
     // ------------------------------------------------------------
-    STATE_NONE:
-      WorkTable.State := STATE_STANDBY;
+    swtNONE:
+      WorkTable.State := swtSTANDBY;
 
 
     // ------------------------------------------------------------
     // Ожидание → считаем, что система подключена
     // ------------------------------------------------------------
-    STATE_STANDBY:
-      WorkTable.State := STATE_CONNECTED;
+    swtSTANDBY:
+      WorkTable.State := swtCONNECTED;
 
 
     // ------------------------------------------------------------
     // Запуск мониторинга
     // ------------------------------------------------------------
-    STATE_STARTMONITOR:
-      WorkTable.State := STATE_STARTMONITORWAIT;
+    swtSTARTMONITOR:
+      WorkTable.State := swtSTARTMONITORWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание запуска мониторинга → переход в мониторинг
     // ------------------------------------------------------------
-    STATE_STARTMONITORWAIT:
-      WorkTable.State := STATE_MONITOR;
+    swtSTARTMONITORWAIT:
+      WorkTable.State := swtMONITOR;
 
 
     // ------------------------------------------------------------
     // Мониторинг (наблюдение без измерения)
     // ------------------------------------------------------------
-    STATE_MONITOR:
+    swtMONITOR:
       UpdateRandomSignals(WorkTable); // обновление показаний
 
 
@@ -1109,29 +1102,29 @@ begin
     // Остановка мониторинга или конфигурация
     // → возвращаемся в подключённое состояние
     // ------------------------------------------------------------
-    STATE_STOPMONITOR,
-    STATE_CONFIGED:
-      WorkTable.State := STATE_CONNECTED;
+    swtSTOPMONITOR,
+    swtCONFIGED:
+      WorkTable.State := swtCONNECTED;
 
 
     // ------------------------------------------------------------
     // Запуск теста
     // ------------------------------------------------------------
-    STATE_STARTTEST:
-      WorkTable.State := STATE_STARTWAIT;
+    swtSTARTTEST:
+      WorkTable.State := swtSTARTWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание старта → переход к выполнению
     // ------------------------------------------------------------
-    STATE_STARTWAIT:
-      WorkTable.State := STATE_EXECUTE;
+    swtSTARTWAIT:
+      WorkTable.State := swtEXECUTE;
 
 
     // ============================================================
     // 4. Основной процесс измерения
     // ============================================================
-    STATE_EXECUTE:
+    swtEXECUTE:
     begin
       // Обновление сигналов (имитация работы датчиков)
       UpdateRandomSignals(WorkTable);
@@ -1217,29 +1210,29 @@ begin
       // Если заданы ограничения и хотя бы одно достигнуто
       // → инициируем остановку теста
       if HasLimits and LimitReached then
-        WorkTable.State := STATE_STOPTEST;
+        WorkTable.State := swtSTOPTEST;
     end;
 
 
     // ------------------------------------------------------------
     // Инициация остановки теста
     // ------------------------------------------------------------
-    STATE_STOPTEST:
-      WorkTable.State := STATE_STOPWAIT;
+    swtSTOPTEST:
+      WorkTable.State := swtSTOPWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание полной остановки
     // ------------------------------------------------------------
-    STATE_STOPWAIT:
-      WorkTable.State := STATE_COMPLETE;
+    swtSTOPWAIT:
+      WorkTable.State := swtCOMPLETE;
 
 
     // ------------------------------------------------------------
     // Тест завершён → переход к финальному считыванию
     // ------------------------------------------------------------
-    STATE_COMPLETE:
-      WorkTable.State := STATE_FINALREAD;
+    swtCOMPLETE:
+      WorkTable.State := swtFINALREAD;
 
   end;
 

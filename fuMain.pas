@@ -840,35 +840,35 @@ begin
     // ------------------------------------------------------------
     // Начальное состояние → переход в режим ожидания
     // ------------------------------------------------------------
-    STATE_NONE:
-      WorkTable.State := STATE_STANDBY;
+    swtNONE:
+      WorkTable.State := swtSTANDBY;
 
 
     // ------------------------------------------------------------
     // Ожидание → считаем, что система подключена
     // ------------------------------------------------------------
-    STATE_STANDBY:
-      WorkTable.State := STATE_CONNECTED;
+    swtSTANDBY:
+      WorkTable.State := swtCONNECTED;
 
 
     // ------------------------------------------------------------
     // Запуск мониторинга
     // ------------------------------------------------------------
-    STATE_STARTMONITOR:
-      WorkTable.State := STATE_STARTMONITORWAIT;
+    swtSTARTMONITOR:
+      WorkTable.State := swtSTARTMONITORWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание запуска мониторинга → переход в мониторинг
     // ------------------------------------------------------------
-    STATE_STARTMONITORWAIT:
-      WorkTable.State := STATE_MONITOR;
+    swtSTARTMONITORWAIT:
+      WorkTable.State := swtMONITOR;
 
 
     // ------------------------------------------------------------
     // Мониторинг (наблюдение без измерения)
     // ------------------------------------------------------------
-    STATE_MONITOR:
+    swtMONITOR:
       UpdateRandomSignals(WorkTable); // обновление показаний
 
 
@@ -876,29 +876,29 @@ begin
     // Остановка мониторинга или конфигурация
     // → возвращаемся в подключённое состояние
     // ------------------------------------------------------------
-    STATE_STOPMONITOR,
-    STATE_CONFIGED:
-      WorkTable.State := STATE_CONNECTED;
+    swtSTOPMONITOR,
+    swtCONFIGED:
+      WorkTable.State := swtCONNECTED;
 
 
     // ------------------------------------------------------------
     // Запуск теста
     // ------------------------------------------------------------
-    STATE_STARTTEST:
-      WorkTable.State := STATE_STARTWAIT;
+    swtSTARTTEST:
+      WorkTable.State := swtSTARTWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание старта → переход к выполнению
     // ------------------------------------------------------------
-    STATE_STARTWAIT:
-      WorkTable.State := STATE_EXECUTE;
+    swtSTARTWAIT:
+      WorkTable.State := swtEXECUTE;
 
 
     // ============================================================
     // 5. Основной процесс измерения
     // ============================================================
-    STATE_EXECUTE:
+    swtEXECUTE:
     begin
       // Обновление сигналов (имитация работы датчиков)
       UpdateRandomSignals(WorkTable);
@@ -984,29 +984,29 @@ begin
       // Если заданы ограничения и хотя бы одно достигнуто
       // → инициируем остановку теста
       if HasLimits and LimitReached then
-        WorkTable.State := STATE_STOPTEST;
+        WorkTable.State := swtSTOPTEST;
     end;
 
 
     // ------------------------------------------------------------
     // Инициация остановки теста
     // ------------------------------------------------------------
-    STATE_STOPTEST:
-      WorkTable.State := STATE_STOPWAIT;
+    swtSTOPTEST:
+      WorkTable.State := swtSTOPWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание полной остановки
     // ------------------------------------------------------------
-    STATE_STOPWAIT:
-      WorkTable.State := STATE_COMPLETE;
+    swtSTOPWAIT:
+      WorkTable.State := swtCOMPLETE;
 
 
     // ------------------------------------------------------------
     // Тест завершён → переход к финальному считыванию
     // ------------------------------------------------------------
-    STATE_COMPLETE:
-      WorkTable.State := STATE_FINALREAD;
+    swtCOMPLETE:
+      WorkTable.State := swtFINALREAD;
 
   end;
 end;

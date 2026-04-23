@@ -60,7 +60,7 @@
     - StartTest / StopTest
     - StartMonitor
     - FlowRate / FluidTemp / FluidPress control
-    - State (STATE_EXECUTE, STATE_COMPLETE, etc.)
+    - State (swtEXECUTE, swtCOMPLETE, etc.)
     - Data access (Flow, Temp, Pressure, Quantity, Time)
     - Stability flags (IsStable)
 
@@ -1315,7 +1315,7 @@ begin
 
     msMeasure:
       begin
-        if (FWorkTable <> nil) and (FWorkTable.State = STATE_COMPLETE) then
+        if (FWorkTable <> nil) and (FWorkTable.State = swtCOMPLETE) then
         begin
           GetCurrentPoint.Status:= 9;
           FWorkTable.SaveMeasurementResults;
