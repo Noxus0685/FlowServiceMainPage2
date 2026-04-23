@@ -46,8 +46,10 @@ TParameter = class(TObject)
   private
     FName: string;
     FHint: string;
+
     FStatus: EParamStatus;
     FAction: EParamAction;
+
     FMax: Double;
     FMin: Double;
     FAccuracyPlus: Double;

@@ -581,6 +581,7 @@ begin
         if FWorkTable <> nil then
           FWorkTable.StartMonitor;
       end;
+
     msMeasure:
       begin
         if FWorkTable <> nil then
@@ -588,6 +589,7 @@ begin
         FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
         FireEvent(meMeasureStarted);
       end;
+
     msResultsRead:
       FireEvent(meResultReading);
   end;

@@ -22,43 +22,12 @@ uses
 
 type
 
-  EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
-
-  EWorkTableState = (
-    STATE_NONE = 0,
-    STATE_STANDBY,
-    STATE_CONNECTED,
-    STATE_STARTMONITOR,
-    STATE_STARTMONITORWAIT,
-    STATE_MONITOR,
-    STATE_STOPMONITOR,
-    STATE_CONFIGED,
-    STATE_STARTTEST,
-    STATE_STARTWAIT,
-    STATE_EXECUTE,
-    STATE_STOPTEST,
-    STATE_STOPWAIT,
-    STATE_COMPLETE,
-    STATE_FINALREAD,
-    STATE_FAILURE
-  );
-
-  TGridColumnLayout = record
-    Name: string;
-    DisplayIndex: Integer;
-    Width: Single;
-    Visible: Boolean;
-  end;
-
-
-
-type
-  TWorkTable = class;
-
   EWorkTableNotifyEvent = (
     // TWorkTable: состояние
-    wtnWorkTableStateChanged = 1,
-    wtnWorkTablePointChanged,
+    wtnNone = 0,
+    wtnStateChanged = 1,   //Изменилось  EWorkTableState
+    wtnAction,            //Действие пользователя
+    wtnWorkTablePointChanged,  // Изменилась точка, Data передаёт точку
     // TWorkTable: действия
     wtnWorkTableProcStart,
     wtnWorkTableProcStop,
@@ -92,6 +61,71 @@ type
     wtnFluidPressActionStop,
     wtnFluidPressActionSet
   );
+
+    EStatusWorkTable = (
+    swtNONE = 0,
+    swtSTANDBY,
+    swtCONNECTED,
+    swtSTARTMONITOR,
+    swtSTARTMONITORWAIT,
+    swtMONITOR,
+    swtSTOPMONITOR,
+    swtCONFIGED,
+    swtSTARTTEST,
+    swtSTARTWAIT,
+    swtEXECUTE,
+    swtSTOPTEST,
+    swtSTOPWAIT,
+    swtCOMPLETE,
+    swtFINALREAD,
+    swtFAILURE
+  );
+
+  EActionWorkTable = (
+    awtNone = 0,
+    awtStartTest,
+    awtStopTest,
+    awtStartMonitor,
+    awtStopMonitor,
+    awtClampTable,
+    awtUnClampTable
+  );
+
+  EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
+
+  EWorkTableState = (
+    STATE_NONE = 0,
+    STATE_STANDBY,
+    STATE_CONNECTED,
+    STATE_STARTMONITOR,
+    STATE_STARTMONITORWAIT,
+    STATE_MONITOR,
+    STATE_STOPMONITOR,
+    STATE_CONFIGED,
+    STATE_STARTTEST,
+    STATE_STARTWAIT,
+    STATE_EXECUTE,
+    STATE_STOPTEST,
+    STATE_STOPWAIT,
+    STATE_COMPLETE,
+    STATE_FINALREAD,
+    STATE_FAILURE
+  );
+
+
+
+  TGridColumnLayout = record
+    Name: string;
+    DisplayIndex: Integer;
+    Width: Single;
+    Visible: Boolean;
+  end;
+
+
+
+type
+  TWorkTable = class;
+
 
   TChannel = class(TTypeEntity)
   private
@@ -269,6 +303,9 @@ type
     FName: string;
     FText: string;
     FActivePump : TPump;
+
+    FStatus: EStatusWorkTable;
+    FAction: EActionWorkTable;
 
     FTimeSet : Integer;
     FLimitImpSet: Integer;
