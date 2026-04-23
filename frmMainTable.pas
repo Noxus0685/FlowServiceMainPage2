@@ -380,6 +380,10 @@ type
     ActionDeleteEtalons: TAction;
     MenuItem10: TMenuItem;
     MenuItem11: TMenuItem;
+    ActionPumpAdd: TAction;
+    MenuItemAddPump: TMenuItem;
+    MenuItemDeletePump: TMenuItem;
+    ActionPumpDelete: TAction;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -487,6 +491,8 @@ type
     procedure SpinBoxFlowRateChange(Sender: TObject);
     procedure ActionDeleteDeviceExecute(Sender: TObject);
     procedure ActionDeleteEtalonsExecute(Sender: TObject);
+    procedure ActionPumpAddExecute(Sender: TObject);
+    procedure ActionPumpDeleteExecute(Sender: TObject);
 
   private
 
@@ -1380,9 +1386,20 @@ end;
 
 procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
+
+    if FActiveWorkTable.ActivePump=nil then
+    begin
+
+         ProtocolManager.AddMessage(pcWarning, psForm, 'PumpStart', 'Пользователь запустил насос', 'Активного насоса нет!');
+          Exit;
+    end;
+
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
     ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Пользователь запустил насос', ComboBoxPumps.Text);
+
+
+
     FActiveWorkTable.ActivePump.DoPumpStart ;
     UpdateUIPump;
 
@@ -1497,6 +1514,14 @@ end;
 
 procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
 begin
+
+    if FActiveWorkTable.ActivePump=nil then
+    begin
+         ProtocolManager.AddMessage(pcWarning, psForm, 'PumpStart', 'Пользователь попробовал остановить насос', 'Активного насоса нет!');
+          Exit;
+    end;
+
+
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
       FActiveWorkTable.ActivePump.DoPumpStop ;
@@ -2548,6 +2573,23 @@ begin
     Exit;
 
   SelectDeviceForChannel(Ch);
+end;
+
+procedure TFrameMainTable.ActionPumpAddExecute(Sender: TObject);
+begin
+        FActiveWorkTable.AddPump('1');
+        RefreshPumpsCombo;
+        UpdateUIPump;
+end;
+
+procedure TFrameMainTable.ActionPumpDeleteExecute(Sender: TObject);
+begin
+         if FActiveWorkTable.ActivePump=nil then
+         Exit;
+
+        FActiveWorkTable.RemovePump(FActiveWorkTable.ActivePump);
+        RefreshPumpsCombo;
+        UpdateUIPump;
 end;
 
 procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
