@@ -464,14 +464,15 @@ private
   FOnSpillageStop: TOnSpillageStopEvent;
   FOnStateChanged: TOnWorkTableStateChangedEvent;
   FOnPointChanged: TOnWorkTablePointChangedEvent;
+  FParameterObserver: IEventObserver;
 
   procedure SetState(const ANewState: EWorkTableState);
   procedure SetActivePumpObject(const APump: TPump);
   procedure BindParameterEvents(AParameter: TParameter);
-  procedure ParameterStatusChanged(AParameters: TParameter; FStatus: EParamStatus);
-  procedure ParameterActionChanged(AParameters: TParameter; FAction: EParamAction);
+  procedure UnbindParameterEvents(AParameter: TParameter);
+  procedure HandleParameterNotify(Sender: TObject; Event: Integer; Data: TObject);
   function ResolveParameterStatusEvent(AParameters: TParameter): EWorkTableNotifyEvent;
-  function ResolveParameterActionEvent(AParameters: TParameter; FAction: EParamAction): EWorkTableNotifyEvent;
+  function ResolveParameterActionEvent(AParameters: TParameter; FAction: EActionParameter): EWorkTableNotifyEvent;
 
   procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
@@ -691,6 +692,28 @@ uses
   FmxHelper,
   frmMainTable,
   uMeasurementRun;
+
+type
+  TParameterObserverBridge = class(TInterfacedObject, IEventObserver)
+  private
+    FOwner: TWorkTable;
+  public
+    constructor Create(AOwner: TWorkTable);
+    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+  end;
+
+constructor TParameterObserverBridge.Create(AOwner: TWorkTable);
+begin
+  inherited Create;
+  FOwner := AOwner;
+end;
+
+procedure TParameterObserverBridge.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+begin
+  if FOwner <> nil then
+    FOwner.HandleParameterNotify(Sender, Event, Data);
+end;
+
 {$REGION 'TChannel'}
 
 procedure TChannel.InitMeterValues;
@@ -1234,6 +1257,7 @@ end;
 constructor TWorkTable.Create;
 begin
   inherited Create;
+  FParameterObserver := TParameterObserverBridge.Create(Self);
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
@@ -1943,6 +1967,14 @@ destructor TWorkTable.Destroy;
 begin
   ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableDestroy',
     'Удалён рабочий стол', Name);
+  UnbindParameterEvents(FFluidTemp);
+  UnbindParameterEvents(FFluidPress);
+  UnbindParameterEvents(FlowRate);
+  if FActivePump <> nil then
+    UnbindParameterEvents(FActivePump);
+  ClearPumps;
+  FParameterObserver := nil;
+
   FreeAndNil(FMeasurementRun);
   FreeAndNil(FFluidTemp);
   FreeAndNil(FFluidPress);
@@ -2852,27 +2884,42 @@ end;
 
 procedure TWorkTable.BindParameterEvents(AParameter: TParameter);
 begin
-  if AParameter = nil then
+  if (AParameter = nil) or (FParameterObserver = nil) then
     Exit;
 
-  AParameter.OnStatusChange := ParameterStatusChanged;
-  AParameter.OnActionChange := ParameterActionChanged;
+  AParameter.Subscribe(FParameterObserver);
 end;
 
-procedure TWorkTable.ParameterStatusChanged(AParameters: TParameter; FStatus: EParamStatus);
-var
-  AEvent: EWorkTableNotifyEvent;
+procedure TWorkTable.UnbindParameterEvents(AParameter: TParameter);
 begin
-  AEvent := ResolveParameterStatusEvent(AParameters);
-  Notify(AEvent, AParameters);
+  if (AParameter = nil) or (FParameterObserver = nil) then
+    Exit;
+
+  AParameter.Unsubscribe(FParameterObserver);
 end;
 
-procedure TWorkTable.ParameterActionChanged(AParameters: TParameter; FAction: EParamAction);
+procedure TWorkTable.HandleParameterNotify(Sender: TObject; Event: Integer; Data: TObject);
 var
+  AParameter: TParameter;
   AEvent: EWorkTableNotifyEvent;
 begin
-  AEvent := ResolveParameterActionEvent(AParameters, FAction);
-  Notify(AEvent, AParameters);
+  if Sender is TParameter then
+    AParameter := TParameter(Sender)
+  else if Data is TParameter then
+    AParameter := TParameter(Data)
+  else
+    Exit;
+
+  case Event of
+    Ord(neStatusChanged):
+      AEvent := ResolveParameterStatusEvent(AParameter);
+    Ord(neAction):
+      AEvent := ResolveParameterActionEvent(AParameter, AParameter.Action);
+  else
+    Exit;
+  end;
+
+  Notify(AEvent, AParameter);
 end;
 
 function TWorkTable.ResolveParameterStatusEvent(AParameters: TParameter): EWorkTableNotifyEvent;
@@ -2890,14 +2937,14 @@ begin
 end;
 
 function TWorkTable.ResolveParameterActionEvent(AParameters: TParameter;
-  FAction: EParamAction): EWorkTableNotifyEvent;
+  FAction: EActionParameter): EWorkTableNotifyEvent;
 begin
   if AParameters is TPump then
   begin
     case FAction of
-      ACTION_START: Exit(wtnPumpActionStart);
-      ACTION_STOP: Exit(wtnPumpActionStop);
-      ACTION_SET: Exit(wtnPumpActionSet);
+      apStart: Exit(wtnPumpActionStart);
+      apStop: Exit(wtnPumpActionStop);
+      apSet: Exit(wtnPumpActionSet);
     else
       Exit(wtnPumpStatusChanged);
     end;
@@ -2906,9 +2953,9 @@ begin
   if AParameters is TFlowRate then
   begin
     case FAction of
-      ACTION_START: Exit(wtnFlowRateActionStart);
-      ACTION_STOP: Exit(wtnFlowRateActionStop);
-      ACTION_SET: Exit(wtnFlowRateActionSet);
+      apStart: Exit(wtnFlowRateActionStart);
+      apStop: Exit(wtnFlowRateActionStop);
+      apSet: Exit(wtnFlowRateActionSet);
     else
       Exit(wtnFlowRateStatusChanged);
     end;
@@ -2917,9 +2964,9 @@ begin
   if AParameters is TFluidTemp then
   begin
     case FAction of
-      ACTION_START: Exit(wtnFluidTempActionStart);
-      ACTION_STOP: Exit(wtnFluidTempActionStop);
-      ACTION_SET: Exit(wtnFluidTempActionSet);
+      apStart: Exit(wtnFluidTempActionStart);
+      apStop: Exit(wtnFluidTempActionStop);
+      apSet: Exit(wtnFluidTempActionSet);
     else
       Exit(wtnFluidTempStatusChanged);
     end;
@@ -2928,9 +2975,9 @@ begin
   if AParameters is TFluidPress then
   begin
     case FAction of
-      ACTION_START: Exit(wtnFluidPressActionStart);
-      ACTION_STOP: Exit(wtnFluidPressActionStop);
-      ACTION_SET: Exit(wtnFluidPressActionSet);
+      apStart: Exit(wtnFluidPressActionStart);
+      apStop: Exit(wtnFluidPressActionStop);
+      apSet: Exit(wtnFluidPressActionSet);
     else
       Exit(wtnFluidPressStatusChanged);
     end;
@@ -2941,6 +2988,10 @@ end;
 
 procedure TWorkTable.SetActivePumpObject(const APump: TPump);
 begin
+  if FActivePump = APump then
+    Exit;
+
+  UnbindParameterEvents(FActivePump);
   FActivePump := APump;
   BindParameterEvents(FActivePump);
 end;
@@ -3382,17 +3433,32 @@ var
 begin
   Pump := FindPumpByUUID(APumpUUID);
   if Assigned(Pump) then
+  begin
+    if FActivePump = Pump then
+      FActivePump := nil;
+    UnbindParameterEvents(Pump);
     FPumps.Remove(Pump);
+  end;
 end;
 
 procedure TWorkTable.RemovePump(APump: TPump);
 begin
   if Assigned(APump) then
+  begin
+    if FActivePump = APump then
+      FActivePump := nil;
+    UnbindParameterEvents(APump);
     FPumps.Remove(APump);
+  end;
 end;
 
 procedure TWorkTable.ClearPumps;
+var
+  Pump: TPump;
 begin
+  for Pump in FPumps do
+    UnbindParameterEvents(Pump);
+  FActivePump := nil;
   FPumps.Clear;
 end;
 

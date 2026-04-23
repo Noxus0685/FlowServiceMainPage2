@@ -8,6 +8,11 @@ uses
   System.SysUtils;
 
 type
+  ENotifyEvent = (
+    neStatusChanged = 1,  // Изменилось состояние
+    neAction             // Действие пользователя
+  );
+
   IEventObserver = interface
     ['{7E95DA5C-E734-49FA-868D-4CF8CDFF24B0}']
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -19,6 +24,7 @@ type
     FObserversLock: TObject;
   protected
     procedure Notify(Event: Integer; Data: TObject = nil);
+    procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -119,6 +125,11 @@ begin
           Observer.OnNotify(Self, Event, Data);
       end;
     end);
+end;
+
+procedure TObservableObject.Notify(AEvent: ENotifyEvent; Data: TObject);
+begin
+  Notify(Ord(AEvent), Data);
 end;
 
 end.

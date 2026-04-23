@@ -54,7 +54,7 @@ type
     procedure ButtonApplyEtalonValuesClick(Sender: TObject);
     procedure ButtonApplyDeviceValuesClick(Sender: TObject);
     procedure EditTestNumExit(Sender: TObject);
-    procedure  PumpStateHandler(AParameters: TParameter; AAction:EParamAction);
+    procedure  PumpStateHandler(AParameters: TParameter; AAction:EActionParameter);
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
 
@@ -81,12 +81,12 @@ type
     function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
       const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
     procedure FlowRateStateHandler(AParameters: TParameter;
-      AAction: EParamAction);
+      AAction: EActionParameter);
 
     procedure FlowFluidTempHandler(AParameters: TParameter;
-      AAction: EParamAction);
+      AAction: EActionParameter);
     procedure FlowFluidPressHandler(AParameters: TParameter;
-      AAction: EParamAction);
+      AAction: EActionParameter);
     procedure UpdateRandomPress(const AWorkTable: TWorkTable);
 
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
@@ -166,7 +166,7 @@ end;
 
 
 
-procedure  TFormMain.PumpStateHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TFormMain.PumpStateHandler(AParameters: TParameter; AAction:EActionParameter);
 begin
 
   FormMain.mPump.Lines.Add('Насос: ' + AParameters.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
@@ -188,7 +188,7 @@ end;
 
 
 
-procedure  TFormMain.FlowRateStateHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TFormMain.FlowRateStateHandler(AParameters: TParameter; AAction:EActionParameter);
 var
 FlowRate: Double;
 WorkTable:TWorkTable;
@@ -207,14 +207,14 @@ begin
 
 end;
 
-procedure  TFormMain.FlowFluidTempHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TFormMain.FlowFluidTempHandler(AParameters: TParameter; AAction:EActionParameter);
 begin
 
   FormMain.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
 
 end;
 
-procedure  TFormMain.FlowFluidPressHandler(AParameters: TParameter; AAction:EParamAction);
+procedure  TFormMain.FlowFluidPressHandler(AParameters: TParameter; AAction:EActionParameter);
 begin
 
   FormMain.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
@@ -263,13 +263,9 @@ begin
 
 
 
-    FWorkTableManager.ActiveWorkTable.FlowRate.OnActionChange:=  FlowRateStateHandler;
-    FWorkTableManager.ActiveWorkTable.FluidTemp.OnActionChange:= FlowFluidTempHandler;
-    FWorkTableManager.ActiveWorkTable.FluidPress.OnActionChange:= FlowFluidPressHandler;
     for i := 0 to TPump.Pumps.Count-1 do
     begin
 
-    TPump.Pumps[i].OnActionChange:= PumpStateHandler ;
     end;
 
   end;
@@ -362,16 +358,16 @@ begin
   // В зависимости от текущего действия (Action)
   // обновляем статус параметра температуры
 
-  if (AWorkTable.FluidTemp.Action = ACTION_START) or
-     (AWorkTable.FluidTemp.Action = ACTION_SET) then
+  if (AWorkTable.FluidTemp.Action = apStart) or
+     (AWorkTable.FluidTemp.Action = apSet) then
 
     // Начато регулирование/установка температуры
-    AWorkTable.FluidTemp.Status := PARAM_STARTED
+    AWorkTable.FluidTemp.Status := spStarted
 
-  else if (AWorkTable.FluidTemp.Action = ACTION_STOP) then
+  else if (AWorkTable.FluidTemp.Action = apStop) then
 
     // Остановка регулирования
-    AWorkTable.FluidTemp.Status := PARAM_STOPPED;
+    AWorkTable.FluidTemp.Status := spStopped;
 
 
   // ============================================================
@@ -469,10 +465,10 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  IF AWorkTable.FluidPress.Action = ACTION_START THEN
-    AWorkTable.FluidPress.Status:=PARAM_STARTED
-  else  if (AWorkTable.FluidPress.Action = ACTION_STOP) then
-    AWorkTable.FluidPress.Status:=PARAM_STOPPED;
+  IF AWorkTable.FluidPress.Action = apStart THEN
+    AWorkTable.FluidPress.Status:=spStarted
+  else  if (AWorkTable.FluidPress.Action = apStop) then
+    AWorkTable.FluidPress.Status:=spStopped;
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
@@ -526,10 +522,10 @@ begin
   if APump = nil then
     Exit;
 
-  IF (APump.Action = ACTION_START)  THEN
-    APump.Status:=PARAM_STARTED
-  else  if (APump.Action = ACTION_STOP) then
-    APump.Status:=PARAM_STOPPED;
+  IF (APump.Action = apStart)  THEN
+    APump.Status:=spStarted
+  else  if (APump.Action = apStop) then
+    APump.Status:=spStopped;
 
 
 
@@ -659,10 +655,10 @@ begin
     Exit;
 
 
-  IF AFlowRate.Action = ACTION_START THEN
-    AFlowRate.Status:=PARAM_STARTED
-  else  if (AFlowRate.Action = ACTION_STOP) then
-    AFlowRate.Status:=PARAM_STOPPED;
+  IF AFlowRate.Action = apStart THEN
+    AFlowRate.Status:=spStarted
+  else  if (AFlowRate.Action = apStop) then
+    AFlowRate.Status:=spStopped;
 
   WorkTable:= FWorkTableManager.ActiveWorkTable;
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
