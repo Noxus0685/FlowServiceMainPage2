@@ -589,7 +589,7 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
 
-    property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
+  //  property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
 
 
   private type
@@ -1120,8 +1120,12 @@ begin
   if FInitialized then
     Exit;
 
+
+
   FInitialized := True;
   SwitchAuto.IsChecked := False;
+
+  FWorkTableManager:= WorkTableManager;
 
   TMeterValue.LoadFromFile;
 
@@ -2421,16 +2425,16 @@ procedure TFrameMainTable.ActionAddWorkTableExecute(Sender: TObject);
 var
   WorkTable: TWorkTable;
 begin
-  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+  if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then
     Exit;
 
   WorkTable := TWorkTable.Create;
-  WorkTable.ID := FWorkTableManager.WorkTables.Count + 1;
+  WorkTable.ID := WorkTableManager.WorkTables.Count + 1;
   WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-  FWorkTableManager.WorkTables.Add(WorkTable);
+  WorkTableManager.WorkTables.Add(WorkTable);
 
-   WorkTable.InitMeterValues;
+  WorkTable.InitMeterValues;
 
   WorkTable.RebindAllFlowMeters;
   WorkTable.RecalculateAllMeterValues;
@@ -2438,9 +2442,9 @@ begin
 
   InitTables;
 
-  if FWorkTableManager.WorkTables.Count > 0 then
+  if WorkTableManager.WorkTables.Count > 0 then
     TabControlWorkTables.TabIndex := EnsureRange(
-      FWorkTableManager.WorkTables.Count - 1,
+      WorkTableManager.WorkTables.Count - 1,
       0,
       Max(0, TabControlWorkTables.TabCount - 1)
     );

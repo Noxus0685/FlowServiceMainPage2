@@ -527,8 +527,24 @@ begin
 end;
 
 destructor TMeasurementRun.Destroy;
+var
+  LThread: TThread;
 begin
-  Stop;
+  FCriticalSection.Acquire;
+  try
+    LThread := FThread;
+    FThread := nil;
+  finally
+    FCriticalSection.Release;
+  end;
+
+  if LThread <> nil then
+  begin
+    LThread.Terminate;
+    LThread.WaitFor;
+    LThread.Free;
+  end;
+
   FreeAndNil(FCriticalSection);
   FreeAndNil(FPoints);
   inherited Destroy;

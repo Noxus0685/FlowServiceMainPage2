@@ -3235,8 +3235,6 @@ begin
 
 end;
 
-
-
   procedure TWorkTable.StartTest;
   begin
    ResetMeasurementValues;

@@ -336,7 +336,6 @@ begin
   FFrameMainTable := TFrameMainTable.Create(Self);
   FFrameMainTable.Parent := tiTable;
   FFrameMainTable.Align := TAlignLayout.Client;
-  FFrameMainTable.WorkTableManager := FWorkTableManager ;
   FFrameMainTable.Initialize;
 
 
