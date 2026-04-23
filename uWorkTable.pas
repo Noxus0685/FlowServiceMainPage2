@@ -22,45 +22,9 @@ uses
 
 type
 
-  EWorkTableNotifyEvent = (
-    // TWorkTable: состояние
-    wtnNone = 0,
-    wtnStateChanged = 1,   //Изменилось  EWorkTableState
-    wtnAction,            //Действие пользователя
-    wtnWorkTablePointChanged,  // Изменилась точка, Data передаёт точку
-    // TWorkTable: действия
-    wtnWorkTableProcStart,
-    wtnWorkTableProcStop,
-    wtnWorkTableProcPause,
-    wtnWorkTableProcNextStep,
-    wtnWorkTableProcRepeat,
-    wtnWorkTableSpillageStart,
-    wtnWorkTableSpillageStop,
-    wtnWorkTableStartTest,
-    wtnWorkTableStopTest,
-    wtnWorkTableStartMonitor,
-    wtnWorkTableStopMonitor,
-    // TPump: состояние/действия
-    wtnPumpStatusChanged,
-    wtnPumpActionStart,
-    wtnPumpActionStop,
-    wtnPumpActionSet,
-    // TFlowRate: состояние/действия
-    wtnFlowRateStatusChanged,
-    wtnFlowRateActionStart,
-    wtnFlowRateActionStop,
-    wtnFlowRateActionSet,
-    // TFluidTemp: состояние/действия
-    wtnFluidTempStatusChanged,
-    wtnFluidTempActionStart,
-    wtnFluidTempActionStop,
-    wtnFluidTempActionSet,
-    // TFluidPress: состояние/действия
-    wtnFluidPressStatusChanged,
-    wtnFluidPressActionStart,
-    wtnFluidPressActionStop,
-    wtnFluidPressActionSet
-  );
+  // Используем общий тип уведомлений из uObservable
+  EWorkTableNotifyEvent = ENotifyEvent;
+
 
     EStatusWorkTable = (
     swtNONE = 0,
@@ -93,25 +57,8 @@ type
 
   EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
 
-  EWorkTableState = (
-    STATE_NONE = 0,
-    STATE_STANDBY,
-    STATE_CONNECTED,
-    STATE_STARTMONITOR,
-    STATE_STARTMONITORWAIT,
-    STATE_MONITOR,
-    STATE_STOPMONITOR,
-    STATE_CONFIGED,
-    STATE_STARTTEST,
-    STATE_STARTWAIT,
-    STATE_EXECUTE,
-    STATE_STOPTEST,
-    STATE_STOPWAIT,
-    STATE_COMPLETE,
-    STATE_FINALREAD,
-    STATE_FAILURE
-  );
-
+  // Алиас для обратной совместимости
+  EWorkTableState = EStatusWorkTable;
 
 
   TGridColumnLayout = record
@@ -294,7 +241,7 @@ type
   TOnSpillageStartEvent = procedure(ASender: TObject) of object;
   TOnSpillageStopEvent = procedure(ASender: TObject) of object;
 
-  TOnWorkTableStateChangedEvent = procedure(const ANewState: EWorkTableState) of object;
+  TOnWorkTableStateChangedEvent = procedure(const ANewState: EStatusWorkTable) of object;
   TOnWorkTablePointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
     APointIndex: Integer) of object;
 
@@ -326,7 +273,7 @@ type
     FFluidPress: TFluidPress;
     FTime: Double;
     FTimeResult: Double;
-    FState: EWorkTableState;
+    FState: EStatusWorkTable;
     FTableClamped: Boolean;
     FFlowUnitName: string;
     FQuantityUnitName: string;
@@ -415,8 +362,8 @@ type
     procedure SetValues;
 
 
-    class function WorkTableStateToString(AState: EWorkTableState): string; static;
-    class function WorkTableStateFromString(const AValue: string): EWorkTableState; static;
+    class function WorkTableStateToString(AState: EStatusWorkTable): string; static;
+    class function WorkTableStateFromString(const AValue: string): EStatusWorkTable; static;
 
     class procedure SaveGridColumns(
       AIni: TCustomIniFile;
@@ -466,13 +413,13 @@ private
   FOnPointChanged: TOnWorkTablePointChangedEvent;
   FParameterObserver: IEventObserver;
 
-  procedure SetState(const ANewState: EWorkTableState);
+  procedure SetState(const ANewState: EStatusWorkTable);
   procedure SetActivePumpObject(const APump: TPump);
   procedure BindParameterEvents(AParameter: TParameter);
   procedure UnbindParameterEvents(AParameter: TParameter);
   procedure HandleParameterNotify(Sender: TObject; Event: Integer; Data: TObject);
-  function ResolveParameterStatusEvent(AParameters: TParameter): EWorkTableNotifyEvent;
-  function ResolveParameterActionEvent(AParameters: TParameter; FAction: EActionParameter): EWorkTableNotifyEvent;
+  function ResolveParameterStatusEvent(AParameters: TParameter): ENotifyEvent;
+  function ResolveParameterActionEvent(AParameters: TParameter; AParameterAction: EActionParameter): ENotifyEvent;
 
   procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
@@ -551,8 +498,9 @@ private
 
     //property State: TSpillState read FState write FState;
 
-    property State: EWorkTableState read FState write SetState;
-
+    property State: EStatusWorkTable read FState write SetState;
+    property Status: EStatusWorkTable read FStatus write FStatus;
+    property Action: EActionWorkTable read FAction write FAction;
 
     property TableClamped: Boolean read FTableClamped write FTableClamped;
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
@@ -639,9 +587,9 @@ private
   procedure DoProcRepeat(AProcName: string);
   procedure DoSpillageStart;
   procedure DoSpillageStop;
-  procedure DoStateChanged(ANewState: EWorkTableState);
+  procedure DoStateChanged(ANewState: EStatusWorkTable);
   procedure Notify(Event: Integer; Data: TObject = nil); reintroduce; overload;
-  procedure Notify(AEvent: EWorkTableNotifyEvent; Data: TObject = nil); overload;
+  procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
   procedure StartMeasurementRun(AMode: Integer = 1);
   procedure ResetMeasurementValues;
   procedure StopMeasurementRun;
@@ -1273,7 +1221,9 @@ begin
 
   FTableFlow := TFlowMeter.Create;
 
-  FState := STATE_NONE;
+  FState := swtNONE;
+  FStatus := swtNONE;
+  FAction := awtNone;
   FTableClamped := False;
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
@@ -2451,7 +2401,7 @@ begin
       end;
       WorkTable.State := WorkTableStateFromString(
         Ini.ReadString(Section, 'State',
-          Ini.ReadString(Section, 'MeasurementState', 'STATE_NONE'))
+          Ini.ReadString(Section, 'MeasurementState', 'swtNONE'))
       );
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
       WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
@@ -2811,64 +2761,64 @@ end;
 
 
 class function TWorkTable.WorkTableStateFromString(
-  const AValue: string): EWorkTableState;
+  const AValue: string): EStatusWorkTable;
 begin
-  if SameText(AValue, 'STATE_STANDBY') then
-    Exit(STATE_STANDBY);
-  if SameText(AValue, 'STATE_CONNECTED') then
-    Exit(STATE_CONNECTED);
-  if SameText(AValue, 'STATE_STARTMONITOR') then
-    Exit(STATE_STARTMONITOR);
-  if SameText(AValue, 'STATE_STARTMONITORWAIT') then
-    Exit(STATE_STARTMONITORWAIT);
-  if SameText(AValue, 'STATE_MONITOR') then
-    Exit(STATE_MONITOR);
-  if SameText(AValue, 'STATE_STOPMONITOR') then
-    Exit(STATE_STOPMONITOR);
-  if SameText(AValue, 'STATE_CONFIGED') then
-    Exit(STATE_CONFIGED);
-  if SameText(AValue, 'STATE_STARTTEST') then
-    Exit(STATE_STARTTEST);
-  if SameText(AValue, 'STATE_STARTWAIT') then
-    Exit(STATE_STARTWAIT);
-  if SameText(AValue, 'STATE_EXECUTE') then
-    Exit(STATE_EXECUTE);
-  if SameText(AValue, 'STATE_STOPTEST') then
-    Exit(STATE_STOPTEST);
-  if SameText(AValue, 'STATE_STOPWAIT') then
-    Exit(STATE_STOPWAIT);
-  if SameText(AValue, 'STATE_COMPLETE') then
-    Exit(STATE_COMPLETE);
-  if SameText(AValue, 'STATE_FINALREAD') then
-    Exit(STATE_FINALREAD);
-  if SameText(AValue, 'STATE_FAILURE') then
-    Exit(STATE_FAILURE);
+  if SameText(AValue, 'swtSTANDBY') then
+    Exit(swtSTANDBY);
+  if SameText(AValue, 'swtCONNECTED') then
+    Exit(swtCONNECTED);
+  if SameText(AValue, 'swtSTARTMONITOR') then
+    Exit(swtSTARTMONITOR);
+  if SameText(AValue, 'swtSTARTMONITORWAIT') then
+    Exit(swtSTARTMONITORWAIT);
+  if SameText(AValue, 'swtMONITOR') then
+    Exit(swtMONITOR);
+  if SameText(AValue, 'swtSTOPMONITOR') then
+    Exit(swtSTOPMONITOR);
+  if SameText(AValue, 'swtCONFIGED') then
+    Exit(swtCONFIGED);
+  if SameText(AValue, 'swtSTARTTEST') then
+    Exit(swtSTARTTEST);
+  if SameText(AValue, 'swtSTARTWAIT') then
+    Exit(swtSTARTWAIT);
+  if SameText(AValue, 'swtEXECUTE') then
+    Exit(swtEXECUTE);
+  if SameText(AValue, 'swtSTOPTEST') then
+    Exit(swtSTOPTEST);
+  if SameText(AValue, 'swtSTOPWAIT') then
+    Exit(swtSTOPWAIT);
+  if SameText(AValue, 'swtCOMPLETE') then
+    Exit(swtCOMPLETE);
+  if SameText(AValue, 'swtFINALREAD') then
+    Exit(swtFINALREAD);
+  if SameText(AValue, 'swtFAILURE') then
+    Exit(swtFAILURE);
 
-  Result := STATE_NONE;
+  Result := swtNONE;
 end;
 
 
 class function TWorkTable.WorkTableStateToString(
-  AState: EWorkTableState): string;
+  AState: EStatusWorkTable): string;
 begin
   case AState of
-    STATE_STANDBY: Result := 'STATE_STANDBY';
-    STATE_CONNECTED: Result := 'STATE_CONNECTED';
-    STATE_STARTMONITOR: Result := 'STATE_STARTMONITOR';
-    STATE_STARTMONITORWAIT: Result := 'STATE_STARTMONITORWAIT';
-    STATE_MONITOR: Result := 'STATE_MONITOR';
-    STATE_STOPMONITOR: Result := 'STATE_STOPMONITOR';
-    STATE_CONFIGED: Result := 'STATE_CONFIGED';
-    STATE_STARTTEST: Result := 'STATE_STARTTEST';
-    STATE_STARTWAIT: Result := 'STATE_STARTWAIT';
-    STATE_EXECUTE: Result := 'STATE_EXECUTE';
-    STATE_STOPTEST: Result := 'STATE_STOPTEST';
-    STATE_STOPWAIT: Result := 'STATE_STOPWAIT';
-    STATE_COMPLETE: Result := 'STATE_COMPLETE';
-    STATE_FINALREAD: Result := 'STATE_FINALREAD';
-    STATE_FAILURE: Result := 'STATE_FAILURE';
+    swtSTANDBY: Result := 'swtSTANDBY';
+    swtCONNECTED: Result := 'swtCONNECTED';
+    swtSTARTMONITOR: Result := 'swtSTARTMONITOR';
+    swtSTARTMONITORWAIT: Result := 'swtSTARTMONITORWAIT';
+    swtMONITOR: Result := 'swtMONITOR';
+    swtSTOPMONITOR: Result := 'swtSTOPMONITOR';
+    swtCONFIGED: Result := 'swtCONFIGED';
+    swtSTARTTEST: Result := 'swtSTARTTEST';
+    swtSTARTWAIT: Result := 'swtSTARTWAIT';
+    swtEXECUTE: Result := 'swtEXECUTE';
+    swtSTOPTEST: Result := 'swtSTOPTEST';
+    swtSTOPWAIT: Result := 'swtSTOPWAIT';
+    swtCOMPLETE: Result := 'swtCOMPLETE';
+    swtFINALREAD: Result := 'swtFINALREAD';
+    swtFAILURE: Result := 'swtFAILURE';
   else
-    Result := 'STATE_NONE';
+    Result := 'swtNONE';
   end;
 end;
 
@@ -2877,7 +2827,7 @@ begin
   inherited Notify(Event, Data);
 end;
 
-procedure TWorkTable.Notify(AEvent: EWorkTableNotifyEvent; Data: TObject);
+procedure TWorkTable.Notify(AEvent: ENotifyEvent; Data: TObject);
 begin
   Notify(Ord(AEvent), Data);
 end;
@@ -2901,7 +2851,7 @@ end;
 procedure TWorkTable.HandleParameterNotify(Sender: TObject; Event: Integer; Data: TObject);
 var
   AParameter: TParameter;
-  AEvent: EWorkTableNotifyEvent;
+  AEvent: ENotifyEvent;
 begin
   if Sender is TParameter then
     AParameter := TParameter(Sender)
@@ -2922,68 +2872,68 @@ begin
   Notify(AEvent, AParameter);
 end;
 
-function TWorkTable.ResolveParameterStatusEvent(AParameters: TParameter): EWorkTableNotifyEvent;
+function TWorkTable.ResolveParameterStatusEvent(AParameters: TParameter): ENotifyEvent;
 begin
   if AParameters is TPump then
-    Exit(wtnPumpStatusChanged);
+    Exit(neStatusChanged);
   if AParameters is TFlowRate then
-    Exit(wtnFlowRateStatusChanged);
+    Exit(neStatusChanged);
   if AParameters is TFluidTemp then
-    Exit(wtnFluidTempStatusChanged);
+    Exit(neStatusChanged);
   if AParameters is TFluidPress then
-    Exit(wtnFluidPressStatusChanged);
+    Exit(neStatusChanged);
 
-  Result := wtnStateChanged;
+  Result := neStatusChanged;
 end;
 
 function TWorkTable.ResolveParameterActionEvent(AParameters: TParameter;
-  FAction: EActionParameter): EWorkTableNotifyEvent;
+  AParameterAction: EActionParameter): ENotifyEvent;
 begin
   if AParameters is TPump then
   begin
-    case FAction of
-      apStart: Exit(wtnPumpActionStart);
-      apStop: Exit(wtnPumpActionStop);
-      apSet: Exit(wtnPumpActionSet);
+    case AParameterAction of
+      apStart: Exit(neAction);
+      apStop: Exit(neAction);
+      apSet: Exit(neAction);
     else
-      Exit(wtnPumpStatusChanged);
+      Exit(neStatusChanged);
     end;
   end;
 
   if AParameters is TFlowRate then
   begin
-    case FAction of
-      apStart: Exit(wtnFlowRateActionStart);
-      apStop: Exit(wtnFlowRateActionStop);
-      apSet: Exit(wtnFlowRateActionSet);
+    case AParameterAction of
+      apStart: Exit(neAction);
+      apStop: Exit(neAction);
+      apSet: Exit(neAction);
     else
-      Exit(wtnFlowRateStatusChanged);
+      Exit(neStatusChanged);
     end;
   end;
 
   if AParameters is TFluidTemp then
   begin
-    case FAction of
-      apStart: Exit(wtnFluidTempActionStart);
-      apStop: Exit(wtnFluidTempActionStop);
-      apSet: Exit(wtnFluidTempActionSet);
+    case AParameterAction of
+      apStart: Exit(neAction);
+      apStop: Exit(neAction);
+      apSet: Exit(neAction);
     else
-      Exit(wtnFluidTempStatusChanged);
+      Exit(neStatusChanged);
     end;
   end;
 
   if AParameters is TFluidPress then
   begin
-    case FAction of
-      apStart: Exit(wtnFluidPressActionStart);
-      apStop: Exit(wtnFluidPressActionStop);
-      apSet: Exit(wtnFluidPressActionSet);
+    case AParameterAction of
+      apStart: Exit(neAction);
+      apStop: Exit(neAction);
+      apSet: Exit(neAction);
     else
-      Exit(wtnFluidPressStatusChanged);
+      Exit(neStatusChanged);
     end;
   end;
 
-  Result := wtnStateChanged;
+  Result := neStatusChanged;
 end;
 
 procedure TWorkTable.SetActivePumpObject(const APump: TPump);
@@ -3015,67 +2965,68 @@ end;
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
-  Notify(wtnWorkTableProcStart, Self);
+  Notify(neAction, Self);
   if Assigned(FOnProcStart) then
     FOnProcStart(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcStop(AProcName: string);
 begin
-  Notify(wtnWorkTableProcStop, Self);
+  Notify(neAction, Self);
   if Assigned(FOnProcStop) then
     FOnProcStop(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcPause(AProcName: string);
 begin
-  Notify(wtnWorkTableProcPause, Self);
+  Notify(neAction, Self);
   if Assigned(FOnProcPause) then
     FOnProcPause(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcNextStep(AProcName: string);
 begin
-  Notify(wtnWorkTableProcNextStep, FCurrentPoint);
+  Notify(neAction, FCurrentPoint);
   if Assigned(FOnProcNextStep) then
     FOnProcNextStep(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcRepeat(AProcName: string);
 begin
-  Notify(wtnWorkTableProcRepeat, Self);
+  Notify(neAction, Self);
   if Assigned(FOnProcRepeat) then
     FOnProcRepeat(Self, AProcName);
 end;
 
 procedure TWorkTable.DoSpillageStart;
 begin
-  Notify(wtnWorkTableSpillageStart, Self);
+  Notify(neAction, Self);
   if Assigned(FOnSpillageStart) then
     FOnSpillageStart(Self);
 end;
 
 procedure TWorkTable.DoSpillageStop;
 begin
-  Notify(wtnWorkTableSpillageStop, Self);
+  Notify(neAction, Self);
   if Assigned(FOnSpillageStop) then
     FOnSpillageStop(Self);
 end;
 
-procedure TWorkTable.SetState(const ANewState: EWorkTableState);
+procedure TWorkTable.SetState(const ANewState: EStatusWorkTable);
 begin
   if FState = ANewState then
     Exit;
 
   FState := ANewState;
+  FStatus := ANewState;
   ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
     'Изменено состояние рабочего стола', WorkTableStateToString(ANewState));
   DoStateChanged(ANewState);
 end;
 
-procedure TWorkTable.DoStateChanged(ANewState: EWorkTableState);
+procedure TWorkTable.DoStateChanged(ANewState: EStatusWorkTable);
 begin
-  Notify(wtnStateChanged, Self);
+  Notify(neStatusChanged, Self);
   if Assigned(FOnStateChanged) then
     FOnStateChanged(ANewState);
 end;
@@ -3090,16 +3041,16 @@ begin
    { msStarting:
     begin
       DoSpillageStart;
-         SetState(STATE_STARTWAIT);
+         SetState(swtSTARTWAIT);
     end;
     msOnGoing:
     begin
-        SetState(STATE_EXECUTE);
+        SetState(swtEXECUTE);
     end;
     msStopping:
     begin
       DoSpillageStop;
-      SetState(STATE_STOPTEST);
+      SetState(swtSTOPTEST);
     end;  }
   end;
 end;
@@ -3110,7 +3061,7 @@ begin
   if (FCurrentPoint <> nil) and (APoint <> nil) then
     FCurrentPoint.Assign(APoint, True);
 
-  Notify(wtnWorkTablePointChanged, APoint);
+  Notify(neStatusChanged, APoint);
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
 end;
 
@@ -3326,8 +3277,9 @@ end;
   procedure TWorkTable.StartTest;
   begin
    ResetMeasurementValues;
-   State := STATE_STARTTEST;
-   Notify(wtnWorkTableStartTest, Self);
+   State := swtSTARTTEST;
+   FAction := awtStartTest;
+   Notify(neAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
      'Запуск теста', Name);
   end;
@@ -3335,16 +3287,18 @@ end;
    procedure TWorkTable.StartMonitor;
   begin
    ResetMeasurementValues;
-   State := STATE_STARTMONITOR;
-   Notify(wtnWorkTableStartMonitor, Self);
+   State := swtSTARTMONITOR;
+   FAction := awtStartMonitor;
+   Notify(neAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
      'Запуск мониторинга', Name);
   end;
 
   procedure TWorkTable.StopTest;
   begin
-    State := STATE_STOPTEST;
-    Notify(wtnWorkTableStopTest, Self);
+    State := swtSTOPTEST;
+    FAction := awtStopTest;
+    Notify(neAction, Self);
     ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
       'Остановка теста', Name);
   end;
@@ -3352,8 +3306,9 @@ end;
    procedure TWorkTable.StopMonitor;
   begin
    ResetMeasurementValues;
-   State := STATE_STOPMONITOR;
-   Notify(wtnWorkTableStopMonitor, Self);
+   State := swtSTOPMONITOR;
+   FAction := awtStopMonitor;
+   Notify(neAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
      'Остановка мониторинга', Name);
   end;
