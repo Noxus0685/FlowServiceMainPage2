@@ -586,6 +586,16 @@ type
     procedure OnChangeState(const ANewState: EStatusWorkTable);
     procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
       APointIndex: Integer);
+    procedure HandleWorkTableStatusChanged(const AWorkTable: TWorkTable; AData: TObject);
+    procedure HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
+    procedure HandlePumpStatusChanged(const APump: TPump);
+    procedure HandlePumpAction(const APump: TPump);
+    procedure HandleFlowRateStatusChanged(const AFlowRate: TFlowRate);
+    procedure HandleFlowRateAction(const AFlowRate: TFlowRate);
+    procedure HandleFluidTempStatusChanged(const AFluidTemp: TFluidTemp);
+    procedure HandleFluidTempAction(const AFluidTemp: TFluidTemp);
+    procedure HandleFluidPressStatusChanged(const AFluidPress: TFluidPress);
+    procedure HandleFluidPressAction(const AFluidPress: TFluidPress);
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 
 
@@ -915,33 +925,174 @@ begin
   {}
 end;
 
-procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+procedure TFrameMainTable.HandleWorkTableStatusChanged(const AWorkTable: TWorkTable; AData: TObject);
 var
-  AWorkTable: TWorkTable;
-  AEvent: EWorkTableNotifyEvent;
-  APoint: TDevicePoint;
+  Point: TDevicePoint;
 begin
-  if not (Sender is TWorkTable) then
+  OnChangeState(AWorkTable.Status);
+
+  if AData is TDevicePoint then
+    Point := TDevicePoint(AData)
+  else
+    Point := AWorkTable.CurrentPoint;
+
+  if Point <> nil then
+    OnChangePoint(AWorkTable, Point, -1);
+
+  UpdateForm;
+end;
+
+procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
+begin
+  if AData is TDevicePoint then
+    OnChangePoint(AWorkTable, TDevicePoint(AData), -1);
+
+  UpdateForm;
+end;
+
+procedure TFrameMainTable.HandlePumpStatusChanged(const APump: TPump);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ActivePump = APump) then
+    UpdateUIPump;
+end;
+
+procedure TFrameMainTable.HandlePumpAction(const APump: TPump);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ActivePump = APump) then
+    UpdateUIPump;
+  RefreshPumpsCombo;
+end;
+
+procedure TFrameMainTable.HandleFlowRateStatusChanged(const AFlowRate: TFlowRate);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.FlowRate = AFlowRate) then
+    UpdateUIFlowRate;
+end;
+
+procedure TFrameMainTable.HandleFlowRateAction(const AFlowRate: TFlowRate);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.FlowRate = AFlowRate) then
+    UpdateUIFlowRate;
+end;
+
+procedure TFrameMainTable.HandleFluidTempStatusChanged(const AFluidTemp: TFluidTemp);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.FluidTemp = AFluidTemp) then
+    UpdateUIConditions;
+end;
+
+procedure TFrameMainTable.HandleFluidTempAction(const AFluidTemp: TFluidTemp);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.FluidTemp = AFluidTemp) then
+    UpdateUIConditions;
+end;
+
+procedure TFrameMainTable.HandleFluidPressStatusChanged(const AFluidPress: TFluidPress);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.FluidPress = AFluidPress) then
+    UpdateUIConditions;
+end;
+
+procedure TFrameMainTable.HandleFluidPressAction(const AFluidPress: TFluidPress);
+begin
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.FluidPress = AFluidPress) then
+    UpdateUIConditions;
+end;
+
+procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+const
+  neStatusChanged = 1;
+  neAction = 2;
+type
+  TNotifySenderKind = (
+    nskUnknown,
+    nskWorkTable,
+    nskPump,
+    nskFlowRate,
+    nskFluidTemp,
+    nskFluidPress
+  );
+var
+  SenderKind: TNotifySenderKind;
+begin
+  if not Assigned(Sender) then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
+      Format('[Notify] Event=%d Sender=nil', [Event]), '');
+    Exit;
+  end;
+
+  if Sender is TWorkTable then
+    SenderKind := nskWorkTable
+  else if Sender is TPump then
+    SenderKind := nskPump
+  else if Sender is TFlowRate then
+    SenderKind := nskFlowRate
+  else if Sender is TFluidTemp then
+    SenderKind := nskFluidTemp
+  else if Sender is TFluidPress then
+    SenderKind := nskFluidPress
+  else
+    SenderKind := nskUnknown;
+
+  if (SenderKind = nskWorkTable) and (FActiveWorkTable <> nil) and
+     (TWorkTable(Sender) <> FActiveWorkTable) then
     Exit;
 
-  AWorkTable := TWorkTable(Sender);
-  if (FActiveWorkTable <> nil) and (AWorkTable <> FActiveWorkTable) then
-    Exit;
-
-  AEvent := EWorkTableNotifyEvent(Event);
-  case AEvent of
-    neStatusChanged:
-      begin
-        OnChangeState(AWorkTable.Status);
-        if Data is TDevicePoint then
-          APoint := TDevicePoint(Data)
-        else
-          APoint := AWorkTable.CurrentPoint;
-        if APoint <> nil then
-          OnChangePoint(AWorkTable, APoint, -1);
+  case SenderKind of
+    nskWorkTable:
+      case Event of
+        neStatusChanged: HandleWorkTableStatusChanged(TWorkTable(Sender), Data);
+        neAction: HandleWorkTableAction(TWorkTable(Sender), Data);
+      else
+        ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
+          Format('[WorkTable.Notify] Unknown Event=%d Sender=%s Data=%s',
+            [Event, Sender.ClassName, ObjClassNameOrNil(Data)]), '');
       end;
-    neAction:
-      ;
+
+    nskPump:
+      case Event of
+        neStatusChanged: HandlePumpStatusChanged(TPump(Sender));
+        neAction: HandlePumpAction(TPump(Sender));
+      else
+        ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
+          Format('[Pump.Notify] Unknown Event=%d Sender=%s Data=%s',
+            [Event, Sender.ClassName, ObjClassNameOrNil(Data)]), '');
+      end;
+
+    nskFlowRate:
+      case Event of
+        neStatusChanged: HandleFlowRateStatusChanged(TFlowRate(Sender));
+        neAction: HandleFlowRateAction(TFlowRate(Sender));
+      else
+        ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
+          Format('[FlowRate.Notify] Unknown Event=%d Sender=%s Data=%s',
+            [Event, Sender.ClassName, ObjClassNameOrNil(Data)]), '');
+      end;
+
+    nskFluidTemp:
+      case Event of
+        neStatusChanged: HandleFluidTempStatusChanged(TFluidTemp(Sender));
+        neAction: HandleFluidTempAction(TFluidTemp(Sender));
+      else
+        ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
+          Format('[FluidTemp.Notify] Unknown Event=%d Sender=%s Data=%s',
+            [Event, Sender.ClassName, ObjClassNameOrNil(Data)]), '');
+      end;
+
+    nskFluidPress:
+      case Event of
+        neStatusChanged: HandleFluidPressStatusChanged(TFluidPress(Sender));
+        neAction: HandleFluidPressAction(TFluidPress(Sender));
+      else
+        ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
+          Format('[FluidPress.Notify] Unknown Event=%d Sender=%s Data=%s',
+            [Event, Sender.ClassName, ObjClassNameOrNil(Data)]), '');
+      end;
+  else
+    ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
+      Format('[Notify] Unsupported Sender=%s Event=%d Data=%s',
+        [Sender.ClassName, Event, ObjClassNameOrNil(Data)]), '');
   end;
 end;
 
