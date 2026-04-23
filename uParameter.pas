@@ -14,23 +14,25 @@ uses
   uDeviceClass,
   uFlowMeter,
   uMeterValue,
+  uObservable,
   uProtocols,
   uRepositories;
 
 type
 
-  EParamStatus = (
-    PARAM_STOPPED,
-    PARAM_STARTED,
-    PARAM_NONE,
-    PARAM_CHANGING
+  EStatusParameter = (
+    spNone,
+    spStopped,
+    spStarted,
+    spChanging,
+    spOngoing
   );
 
-  EParamAction = (
-    ACTION_NONE,
-    ACTION_START,
-    ACTION_STOP,
-    ACTION_SET
+  EActionParameter = (
+    apNone,
+    apStart,
+    apStop,
+    apSet
   );
 
 
@@ -39,16 +41,13 @@ type
 
 type
 
-TParameter = class(TObject)
-  type
-  TonStatusEvent =  procedure(AParameters: TParameter ; FStatus : EParamStatus) of object;
-  TonActionEvent =  procedure(AParameters: TParameter ; FAction : EParamAction) of object;
+TParameter = class(TObservableObject)
   private
     FName: string;
     FHint: string;
 
-    FStatus: EParamStatus;
-    FAction: EParamAction;
+    FStatus: EStatusParameter;
+    FAction: EActionParameter;
 
     FMax: Double;
     FMin: Double;
@@ -61,13 +60,11 @@ TParameter = class(TObject)
     FDelta: Double;
     FHasTaskHistory: Boolean;
     FDim: integer;
-    FOnStatusChange: TonStatusEvent;
-    FOnActionChange: TonActionEvent;
-
     procedure SetMin(const Value: Double );
     procedure SetMax(const Value: Double);
 
-    procedure SetStatus(AStatus: EParamStatus);
+    procedure SetStatus(AStatus: EStatusParameter);
+    procedure SetAction(AAction: EActionParameter);
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
     function GetIsRunning: Boolean;
@@ -80,12 +77,10 @@ TParameter = class(TObject)
     procedure Stop;
     procedure Start;
     procedure SetValue(AValue: Double);
-    property OnStatusChange: TonStatusEvent read FOnStatusChange write FOnStatusChange;
-    property OnActionChange: TonActionEvent read FOnActionChange write FOnActionChange;
     property Name: string read FName write FName;
     property Hint: string read FHint write FHint;
-    property Status: EParamStatus read  FStatus   write SetStatus;
-    property Action: EParamAction read FAction write FAction;
+    property Status: EStatusParameter read  FStatus   write SetStatus;
+    property Action: EActionParameter read FAction write SetAction;
     property ValueSet: TMeterValue read FValueSet write FValueSet;
     property Value: TMeterValue read FValue write FValue;
     property IsRunning: Boolean read GetIsRunning;
@@ -125,7 +120,7 @@ end;
     procedure DoPumpStart;
     procedure DoPumpStop;
     procedure DoFreqSet( ANewFreq: Double);
-    procedure PumpSetStatus( AStatus: EParamStatus);
+    procedure PumpSetStatus( AStatus: EStatusParameter);
 
   end;
 //---------------------------------
@@ -186,9 +181,9 @@ end;
  function TFluidTemp.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Запущен';
-    ACTION_SET: Result := 'Изменена утсановленная температура';
-    ACTION_STOP: Result := 'Сброшен';
+    apStart: Result := 'Запущен';
+    apSet: Result := 'Изменена утсановленная температура';
+    apStop: Result := 'Сброшен';
   else
     Result := 'Неизвестно';
   end;
@@ -203,8 +198,6 @@ begin
     begin
 
     SetParam(ATempSet);
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self, ACTION_Set);
 
     end;
    if not( IsRunning)  then
@@ -212,8 +205,6 @@ begin
 
 
     Start;
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self, ACTION_START);
    end;
 
 
@@ -223,13 +214,10 @@ end;
 procedure TFluidTemp.DoFluidTempStop;
 begin
 
-  IF FAction = ACTION_STOP then
+  IF FAction = apStop then
     exit;
 
   Stop;
-
-  if Assigned(FOnActionChange) then
-    FOnActionChange(self, ACTION_STOP);
 end;
 
 
@@ -255,9 +243,9 @@ end;
  function TFluidPress.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Запущен';
-    ACTION_SET: Result := 'Изменено установленное давление';
-    ACTION_STOP: Result := 'Сброшен';
+    apStart: Result := 'Запущен';
+    apSet: Result := 'Изменено установленное давление';
+    apStop: Result := 'Сброшен';
   else
     Result := 'Неизвестно';
   end;
@@ -272,8 +260,6 @@ begin
     begin
 
     SetParam(APressSet);
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self,ACTION_SET);
 
     end;
    if not( IsRunning)  then
@@ -281,8 +267,6 @@ begin
 
 
     Start;
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self, ACTION_START);
    end;
 
 
@@ -291,13 +275,10 @@ end;
 procedure TFluidPress.DoFluidPressStop;
 begin
 
-  if FAction = ACTION_STOP then
+  if FAction = apStop then
     Exit;
 
   Stop;
-
-  if Assigned(FOnActionChange) then
-    FOnActionChange(self,ACTION_STOP);
 end;
 
 
@@ -333,15 +314,15 @@ begin
   else
     FValueSet.Value := ANewValue;
 
-  FAction := ACTION_SET;
+  Action := apSet;
 end;
 
  function TFlowRate.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Запущен';
-    ACTION_SET: Result := 'Изменен расход воды';
-    ACTION_STOP: Result := 'Сброшен';
+    apStart: Result := 'Запущен';
+    apSet: Result := 'Изменен расход воды';
+    apStop: Result := 'Сброшен';
   else
     Result := 'Неизвестно';
   end;
@@ -354,9 +335,6 @@ begin
    begin
 
     Start;
-
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self, ACTION_START);
    end;
 end;
 
@@ -369,8 +347,6 @@ begin
         begin
 
           SetParam(ANewFlowRate);
-          if Assigned(FOnActionChange) then
-            FOnActionChange(self, ACTION_Set);
 
         end;
 
@@ -381,16 +357,12 @@ begin
         begin
 
         SetParam(ANewFlowRate);
-        if Assigned(FOnActionChange) then
-          FOnActionChange(self, ACTION_Set);
 
         end;
      if not( IsRunning)  then
        begin
 
         Start;
-        if Assigned(FOnActionChange) then
-          FOnActionChange(self, ACTION_START);
        end;
     end;
 
@@ -403,9 +375,6 @@ begin
    begin
 
     Stop;
-
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self, ACTION_STOP);
    end;
 end;
 
@@ -414,10 +383,6 @@ procedure TFlowRate.DoFlowRateSet(ANewFlowRate: Double);
 begin
 
   SetParam(ANewFlowRate);
-
-
-  if Assigned(FOnActionChange) then
-    FOnActionChange(SELF, ACTION_SET);
 end;
 
 
@@ -458,9 +423,9 @@ end;
  function TPump.GetActionAsString: string;
 begin
   case FAction of
-    ACTION_START: Result := 'Запущен';
-    ACTION_SET: Result := 'Изменена частота насоса';
-    ACTION_STOP: Result := 'Сброшен';
+    apStart: Result := 'Запущен';
+    apSet: Result := 'Изменена частота насоса';
+    apStop: Result := 'Сброшен';
   else
     Result := 'Неизвестно';
   end;
@@ -474,9 +439,6 @@ begin
     if not( IsRunning)  then
    begin
       Start;
-
-      if Assigned(FOnActionChange) then
-        FOnActionChange(self, ACTION_START);
    end;
 end;
 
@@ -493,9 +455,6 @@ begin
 
 
     Stop;
-
-    if Assigned(FOnActionChange) then
-      FOnActionChange(self,ACTION_STOP);
    end;
 end;
 
@@ -506,21 +465,15 @@ begin
 //    Exit;
 
   SetParam(ANewFreq);
-
-  if Assigned(FOnActionChange) then
-    FOnActionChange(self,ACTION_SET);
 end;
 
-procedure TPump.PumpSetStatus(AStatus: EParamStatus);
+procedure TPump.PumpSetStatus(AStatus: EStatusParameter);
 begin
  // Pump:=FindPumpByName(APumpName);
  // if Pump = nil then
   //  Exit;
 
   SetStatus(AStatus);
-
-  if Assigned(FOnActionChange) then
-    FOnActionChange(self,ACTION_SET);
 end;
 
   {$ENDREGION 'TPump'}
@@ -534,8 +487,8 @@ begin
   FName := AName;
   ProtocolManager.AddMessage(pcState, psParameters, 'ParameterCreate', 'Parameter created', AName);
   FHint := AHint;
-  FStatus := PARAM_STOPPED;
-  FAction := ACTION_STOP;
+  FStatus := spStopped;
+  Action := apStop;
   FHasTaskHistory := False;
   //FValue:=TMeterValue.Create;
   //FValueset:=TMeterValue.Create;
@@ -543,7 +496,7 @@ end;
 
 procedure TParameter.Stop;
 begin
-  FAction := ACTION_STOP;
+  Action := apStop;
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStop', 'Parameter stopped', FName);
 end;
 
@@ -564,7 +517,7 @@ begin
   if ADelta <= MinDouble then
     ADelta := 0.001;
   HasStabilization := Abs(FAfter - FBefore) <= ADelta;
-  HasActiveTask := (FStatus in [PARAM_STARTED, PARAM_CHANGING]) or (FAction in [ACTION_SET, ACTION_START]);
+  HasActiveTask := (FStatus in [spStarted, spChanging]) or (FAction in [apSet, apStart]);
   HadTask := HasActiveTask or FHasTaskHistory;
   IsChangingNow := (FValueSet.Value<>FValue.Value) and (not IsTargetReached);
 
@@ -623,7 +576,7 @@ begin
     if FValueSet.Value>FMax then
       FValueSet.Value:=FMax;
 
-  FAction := ACTION_START;
+  Action := apStart;
   FHasTaskHistory := True;
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStart', 'Parameter started', FName);
 end;
@@ -646,9 +599,22 @@ end;
 
 
 
-procedure TParameter.SetStatus(AStatus: EParamStatus);
+procedure TParameter.SetStatus(AStatus: EStatusParameter);
 begin
+  if FStatus = AStatus then
+    Exit;
+
   FStatus := AStatus;
+  Notify(neStatusChanged, Self);
+end;
+
+procedure TParameter.SetAction(AAction: EActionParameter);
+begin
+  if FAction = AAction then
+    Exit;
+
+  FAction := AAction;
+  Notify(neAction, Self);
 end;
 
 procedure TParameter.SetBefore(ABefore: Double);
@@ -697,7 +663,7 @@ begin
       ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
 
-      FAction:=ACTION_SET;
+      Action := apSet;
       FHasTaskHistory := True;
 
 end;
@@ -705,10 +671,10 @@ end;
 function TParameter.GetStatusAsString: string;
 begin
   case FStatus of
-    PARAM_STARTED: Result := 'Запущен';
-    PARAM_STOPPED: Result := 'Остановлен';
-    PARAM_NONE: Result := 'Бездействует';
-    PARAM_CHANGING: Result := 'Изменяется';
+    spStarted: Result := 'Запущен';
+    spStopped: Result := 'Остановлен';
+    spNone: Result := 'Бездействует';
+    spChanging: Result := 'Изменяется';
 
   else
     Result := 'Неизвестно';
@@ -720,7 +686,7 @@ end;
 
 function TParameter.GetIsRunning: Boolean;
 begin
-  Result := (FStatus = PARAM_STARTED);
+  Result := (FStatus = spStarted);
 end;
 
 function TParameter.GetIsChanging: Boolean;
