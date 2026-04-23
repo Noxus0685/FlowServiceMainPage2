@@ -163,6 +163,7 @@ function ContainsTextAny(const AText, AFind: string): Boolean;
 function IsDateInRange(const ADate, AFrom, ATo: TDate): Boolean;
 function NormalizeFlowAccuracyInput(const S: string): string;
 function BoolToRussianYesNo(const AValue: Boolean): string;
+function ObjClassNameOrNil(const AObject: TObject): string;
 
 implementation
 
@@ -182,6 +183,13 @@ begin
     Result := 'Да'
   else
     Result := 'Нет';
+end;
+
+function ObjClassNameOrNil(const AObject: TObject): string;
+begin
+  if AObject = nil then
+    Exit('nil');
+  Result := AObject.ClassName;
 end;
 
 function NormalizeFloatInput(const S: string): Double;
