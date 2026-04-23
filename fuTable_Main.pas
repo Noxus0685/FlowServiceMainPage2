@@ -399,18 +399,51 @@ end;
 
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
   AEvent: EWorkTableNotifyEvent; AData: TObject);
-begin
+var
+FlowRate: TFlowRate;
+Pump: TPump;
+WorkTable:TWorkTable;
+i:integer;
+EnabledEtalonChannels: TObjectList<TChannel>;
+AValue:Double;
+  begin
   if (ASender = nil) or (FWorkTableManager = nil) then
     Exit;
 
-  if (FWorkTableManager.ActiveWorkTable = nil) or
+  if AData is TPump then
+    Pump := AData as TPump;
+  if AData is TFlowRate then
+    FlowRate := AData as TFlowRate;
+
+ { if (FWorkTableManager.ActiveWorkTable = nil) or
      (ASender <> FWorkTableManager.ActiveWorkTable) then
-    Exit;
+    Exit;   }
+
+
+
 
   case AEvent of
+    wtnPumpStatusChanged:
+      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
+    wtnPumpActionStart:
+      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
+    wtnPumpActionStop:
+      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
+    wtnPumpActionSet:
+      mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString + ' на ' + floattostr(Pump.ValueSet.Value));
+
+    wtnFlowRateStatusChanged:
+      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+    wtnFlowRateActionStart:
+      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+    wtnFlowRateActionStop:
+      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+    wtnFlowRateActionSet:
+      TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+
+
     wtnWorkTableStateChanged:
-      mPump.Lines.Add('Notify: состояние стола изменено: ' +
-        TWorkTable.WorkTableStateToString(FWorkTableManager.ActiveWorkTable.State));
+      mPump.Lines.Add('Notify: состояние стола изменено: ');//  TWorkTable.WorkTableStateToString(FWorkTableManager.ActiveWorkTable.State));
     wtnWorkTablePointChanged:
       if AData <> nil then
         mPump.Lines.Add('Notify: изменена текущая точка измерения');
@@ -424,16 +457,20 @@ end;
 procedure TTableMainForm.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 var
   NotifyEvent: EWorkTableNotifyEvent;
+  Pump: TPump;
 begin
   if Sender = nil then
     Exit;
+
 
   if (Event < Ord(Low(EWorkTableNotifyEvent))) or
      (Event > Ord(High(EWorkTableNotifyEvent))) then
     Exit;
 
   NotifyEvent := EWorkTableNotifyEvent(Event);
-  HandleWorkTableNotify(Sender, NotifyEvent, Data);
+
+  if Sender is TWorkTable then
+    HandleWorkTableNotify(Pump, NotifyEvent, Data);
 end;
 
 function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
