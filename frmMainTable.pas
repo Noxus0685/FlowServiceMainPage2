@@ -1405,8 +1405,8 @@ begin
   begin
     AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
     FActiveWorkTable.FlowRate.DoFlowRateSet(AValue);
-    if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
-      FActiveWorkTable.FlowRate.Start;
+    //if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
+    //  FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
   end;
 end;
@@ -4540,15 +4540,10 @@ procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; c
 var
   I: Integer;
   Channel: TChannel;
-  ChannelImpSec,a,b: Double;
+  ChannelImpSec: Double;
 begin
   if AChannels = nil then
     Exit;
-
-   for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
-        begin
-          a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
-        end;
 
 
   for I := 0 to AChannels.Count - 1 do
@@ -4556,14 +4551,13 @@ begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
-    b:= Channel.FlowMeter.Device.Qmax/a;
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec*b;
+    Channel.ImpSec := ChannelImpSec;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
