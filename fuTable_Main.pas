@@ -483,11 +483,27 @@ AValue:Double;
       begin
         if AData is TPump then
           begin
-          end;
+
+              IF (Pump.Action = apStart)  THEN
+                Pump.Status:=spStarted
+              else  if (Pump.Action = apStop) then
+              Pump.Status := spStopped
+              else  if (Pump.Action = apSet) and not(Pump.IsRunning = true) then
+                Pump.Status:=spChanging
+              else  if (Pump.Action = apSet) and (Pump.IsRunning = true) then
+               Pump.Status:=spOngoing ;
+                      end;
 
         if AData is TFlowRate then
           begin
-
+              IF (FlowRate.Action = apStart)  THEN
+                FlowRate.Status:=spStarted
+              else  if (FlowRate.Action = apStop) then
+                FlowRate.Status := spStopped
+              else  if (FlowRate.Action = apSet) and not(FlowRate.IsRunning = true) then
+                FlowRate.Status:=spChanging
+              else  if (FlowRate.Action = apSet) and (FlowRate.IsRunning = true) then
+               FlowRate.Status:=spOngoing ;
                 {if FlowRate.ValueSet.value>=FlowRate.Value.value then
                   WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
                 else
@@ -637,11 +653,7 @@ begin
   else if (AWorkTable.FluidTemp.Action = apStop) then
 
     // Остановка регулирования
-    AWorkTable.FluidTemp.Status := spStopped
-  else  if (AWorkTable.FluidTemp.Action = apSet) and not(AWorkTable.FluidTemp.IsRunning = true) then
-    AWorkTable.FluidTemp.Status:=spChanging
-  else  if (AWorkTable.FluidTemp.Action = apSet) and (AWorkTable.FluidTemp.IsRunning = true) then
-    AWorkTable.FluidTemp.Status:=spOngoing ;
+
 
   // ============================================================
   // 3. Ограничение частоты обновления (не каждый тик таймера)
@@ -735,14 +747,7 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  IF AWorkTable.FluidPress.Action = apStart THEN
-    AWorkTable.FluidPress.Status:=spStarted
-  else  if (AWorkTable.FluidPress.Action = apStop) then
-    AWorkTable.FluidPress.Status:=spStopped
-    else  if (AWorkTable.FluidPress.Action = apSet) and not(AWorkTable.FluidPress.IsRunning = true) then
-    AWorkTable.FluidPress.Status:=spChanging
-  else  if (AWorkTable.FluidPress.Action = apSet) and (AWorkTable.FluidPress.IsRunning = true) then
-    AWorkTable.FluidPress.Status:=spOngoing ;
+
   if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
   begin
 
@@ -1116,7 +1121,7 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  ActionIndex := Random(11);
+  ActionIndex := 9;// Random(11);
   case ActionIndex of
     0:
       if AWorkTable.ActivePump <> nil then
