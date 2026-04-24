@@ -99,14 +99,6 @@ type
     procedure UpdateTemp(const AWorkTable: TWorkTable);
 
 
-    procedure UpdateRandomTemp(const AWorkTable: TWorkTable);
-    procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
-    procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
-    procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
-    procedure ExecuteRandomControlAction(const AWorkTable: TWorkTable);
-    function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
-      const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
-
 
 
     procedure FlowRateStateHandler(AParameters: TParameter;
@@ -119,12 +111,6 @@ type
 
 
 
-    procedure UpdateRandomPress(const AWorkTable: TWorkTable);
-
-    function GetChannelFlowCoef(const AChannel: TChannel): Double;
-    function UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
-      AEtalonChannels: TObjectList<TChannel> = nil):Double;
-    procedure UpdateDeviceImpSecFromFlowRate;
     procedure SetT_WorkBench_First(const Value: Double);
     procedure SetT_WorkBench_Last(const Value: Double);
     procedure SubscribeToWorkTable(const AWorkTable: TWorkTable);
@@ -169,9 +155,12 @@ begin
   if WorkTable = nil then
     Exit;
 
-  UpdateDeviceImpSecFromFlowRate;
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
-  ImpSecValues := BuildImpSecValuesForChannels(
+  EditDeviceImpSec.Text := FloatToStr(
+    FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
+  );
+  ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
+    WorkTable,
     WorkTable.DeviceChannels,
     FlowRate,
     NormalizeFloatInput(EditDeviceImpSec.Text)
@@ -196,9 +185,12 @@ begin
   if WorkTable = nil then
     Exit;
 
-  UpdateEtalonImpSecFromFlowRate;
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  ImpSecValues := BuildImpSecValuesForChannels(
+  EditEtalonImpSec.Text := FloatToStr(
+    FWorkTableManager.UpdateEtalonImpSecFromFlowRate(WorkTable, FlowRate)
+  );
+  ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
+    WorkTable,
     WorkTable.EtalonChannels,
     FlowRate,
     NormalizeFloatInput(EditEtalonImpSec.Text)
@@ -234,13 +226,33 @@ begin
 end;
 
 procedure TTableMainForm.EditDeviceFlowRateExit(Sender: TObject);
+var
+  WorkTable: TWorkTable;
 begin
-  UpdateDeviceImpSecFromFlowRate;
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+  EditDeviceImpSec.Text := FloatToStr(
+    FWorkTableManager.UpdateDeviceImpSecFromFlowRate(
+      WorkTable,
+      NormalizeFloatInput(EditDeviceFlowRate.Text)
+    )
+  );
 end;
 
 procedure TTableMainForm.EditEtalonFlowRateExit(Sender: TObject);
+var
+  WorkTable: TWorkTable;
 begin
-  UpdateEtalonImpSecFromFlowRate;
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+  EditEtalonImpSec.Text := FloatToStr(
+    FWorkTableManager.UpdateEtalonImpSecFromFlowRate(
+      WorkTable,
+      NormalizeFloatInput(EditEtalonFlowRate.Text)
+    )
+  );
 end;
 
 
@@ -516,11 +528,29 @@ AValue:Double;
                mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
           end;
         if AData is TFluidTemp then
+        begin
           mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FluidTemp.ValueSet.value) + ' Состояние: ' + FluidTemp.GetActionAsString);
-
+          IF (FluidTemp.Action = apStart)  THEN
+            FluidTemp.State:=spStarted
+          else  if (FluidTemp.Action = apStop) then
+            FluidTemp.State := spStopped
+          else  if (FluidTemp.Action = apSet) and not(FluidTemp.IsRunning = true) then
+            FluidTemp.State:=spChanging
+          else  if (FluidTemp.Action = apSet) and (FluidTemp.IsRunning = true) then
+           FluidTemp.State:=spOngoing ;
+        end;
         if AData is TFluidPress then
+        begin
           mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FluidPress.ValueSet.value) + ' Состояние: ' + FluidPress.GetActionAsString);
-
+          IF (FluidPress.Action = apStart)  THEN
+            FluidPress.State:=spStarted
+          else  if (FluidPress.Action = apStop) then
+            FluidPress.State := spStopped
+          else  if (FluidPress.Action = apSet) and not(FluidPress.IsRunning = true) then
+            FluidPress.State:=spChanging
+          else  if (FluidPress.Action = apSet) and (FluidPress.IsRunning = true) then
+           FluidPress.State:=spOngoing ;
+        end;
       end;
 
      notifyStateChanged:
@@ -561,13 +591,24 @@ begin
   NotifyEvent := EWorkTableNotifyEvent(Event);
 
   if Sender is TWorkTable then
+  begin
     HandleWorkTableNotify(Sender, NotifyEvent, Data);
+    Exit;
+  end;
 
   if (Sender is TPump) or
      (Sender is TFlowRate) or
      (Sender is TFluidTemp) or
      (Sender is TFluidPress) then
-    HandleWorkTableNotify(FSubscribedWorkTable, NotifyEvent, Sender);
+  begin
+    // Параметры подписаны напрямую и через TWorkTable (агрегация в HandleParameterNotify).
+    // Чтобы не обрабатывать одно и то же событие дважды, пропускаем прямое уведомление
+    // при активной подписке на рабочий стол.
+    if FSubscribedWorkTable <> nil then
+      Exit;
+
+    HandleWorkTableNotify(Sender, NotifyEvent, Sender);
+  end;
 end;
 
 function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
@@ -631,740 +672,11 @@ begin
 
 end;
 
-procedure TTableMainForm.UpdateRandomTemp(const AWorkTable: TWorkTable);
-var
-  TempDelta, PressDelta: Double; // Случайные приращения температуры и давления
-  StableState: RStableInfo;     // Информация о стабильности параметра
-begin
-  // ============================================================
-  // 1. Проверка входных данных
-  // ============================================================
 
-  // Если рабочая таблица не задана — выходим
-  if AWorkTable = nil then
-    Exit;
-
-
-
-  // ============================================================
-  // 3. Ограничение частоты обновления (не каждый тик таймера)
-  // ============================================================
-
-  // Обновляем температуру не постоянно, а раз в несколько секунд
-  if (AWorkTable.NextClimateChangeAt = 0) or (Now >= AWorkTable.NextClimateChangeAt) then
-  begin
-
-    // ----------------------------------------------------------
-    // 3.1 Генерация случайных изменений (шум системы)
-    // ----------------------------------------------------------
-
-    // Температура ±0.15
-    TempDelta := (Random * 0.30) - 0.15;
-
-    // Давление ±0.03 (сейчас не используется)
-    PressDelta := (Random * 0.06) - 0.03;
-
-
-    // ----------------------------------------------------------
-    // 3.2 Регулирование температуры (имитация ПИД-подобного поведения)
-    // ----------------------------------------------------------
-
-    // Если система регулирования запущена
-    if (AWorkTable.FluidTemp.IsRunning) then
-    begin
-
-      // Если температура ещё НЕ стабилизировалась
-      if not AWorkTable.FluidTemp.IsStable(StableState) then
-      begin
-
-        // Если текущая температура меньше заданной → "нагреваем"
-        if AWorkTable.FluidTemp.Value.Value < AWorkTable.FluidTemp.ValueSet.Value then
-        begin
-          AWorkTable.FluidTemp.BeforeValue :=
-            AWorkTable.FluidTemp.BeforeValue + 1;
-
-          AWorkTable.FluidTemp.AfterValue :=
-            AWorkTable.FluidTemp.AfterValue + 1;
-        end
-        else
-        begin
-          // Иначе → "охлаждаем"
-          AWorkTable.FluidTemp.BeforeValue :=
-            AWorkTable.FluidTemp.BeforeValue - 1;
-
-          AWorkTable.FluidTemp.AfterValue :=
-            AWorkTable.FluidTemp.AfterValue - 1;
-        end;
-
-      end;
-
-    end;
-
-
-    // ----------------------------------------------------------
-    // 3.3 Добавление случайного шума (реалистичность)
-    // ----------------------------------------------------------
-
-    // Если задано целевое значение температуры
-    if AWorkTable.FluidTemp.ValueSet.Value <> 0 then
-    begin
-      // Добавляем небольшое случайное отклонение
-      // и ограничиваем диапазон допустимых значений
-
-      AWorkTable.FluidTemp.BeforeValue :=
-        EnsureRange(
-          AWorkTable.FluidTemp.BeforeValue + TempDelta,
-          -50.0, 150.0);
-
-      AWorkTable.FluidTemp.AfterValue :=
-        EnsureRange(
-          AWorkTable.FluidTemp.AfterValue + TempDelta,
-          -50.0, 150.0);
-    end;
-
-    // ----------------------------------------------------------
-    // 3.5 Планирование следующего изменения
-    // ----------------------------------------------------------
-
-    // Следующее обновление через 3–4 секунды
-    AWorkTable.NextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
-  end;
-end;
-
-procedure TTableMainForm.UpdateRandomPress(const AWorkTable: TWorkTable);
-var
-  TempDelta, PressDelta: Double;
-begin
-  if AWorkTable = nil then
-    Exit;
-
-  if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
-  begin
-
-    TempDelta :=  (Random * 0.30) - 0.15;
-    PressDelta :=  (Random * 0.06) - 0.03;
-    if (AWorkTable.FluidPress.IsRunning) then
-    begin
-      if  (AWorkTable.FluidPress.Value.value<AWorkTable.FluidPress.ValueSet.value) then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue+1);
-        AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue+1);
-      end
-      else if  (AWorkTable.FluidPress.Value.value>AWorkTable.FluidPress.ValueSet.value)  then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(AWorkTable.FluidPress.BeforeValue-0.3);
-        AWorkTable.FluidPress.AfterValue:=(AWorkTable.FluidPress.AfterValue-0.3);
-      end;
-
-
-    end;
-      if  (AWorkTable.FluidPress.Value.value<AWorkTable.FluidPress.ValueSet.value)  then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + 0.1, -50.0, 150.0));
-        AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + 0.1, -50.0, 150.0));
-      end;
-      if AWorkTable.FluidPress.ValueSet.value<>0 then
-      begin
-        AWorkTable.FluidPress.BeforeValue:=(EnsureRange(AWorkTable.FluidPress.BeforeValue + PressDelta, -50.0, 150.0));
-        AWorkTable.FluidPress.AfterValue:=(EnsureRange(AWorkTable.FluidPress.AfterValue + PressDelta, -50.0, 150.0));
-      end;
-
-
-
-
-      //AWorkTable.Temp := EnsureRange(AWorkTable.Temp + TempDelta, -50.0, 150.0);
-      //AWorkTable.Press := EnsureRange(AWorkTable.Press + PressDelta, 0.0, 10.0);
-
-      AWorkTable.NextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
-   end;
-end;
-
-procedure TTableMainForm.UpdateRandomFreq(const AWorkTable: TWorkTable);
-var
-  Pump: tPump;             // Активный насос (исполнитель)
-  Freq: Double;
-begin
-  Pump := AWorkTable.ActivePump;   // Насос (может быть nil)
-
-
-  if Pump = nil then
-    Exit;
-
-
-
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
-  if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
-  begin
-    Freq := (Random * 10);
-
-   if Pump.IsRunning = true then
-    begin
-
-      Pump.Value.value:=(EnsureRange(Pump.Value.value + Freq,Pump.Value.value , Pump.ValueSet.value));
-
-
-    end
-    else
-    begin
-      //Pump.ValueSet:=(Pump.ValueSet);
-      Pump.Value.value:=0;
-    end;
-
-
-
-    AWorkTable.NextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
-   end;
-end;
-
-function TTableMainForm.GetChannelFlowCoef(const AChannel: TChannel): Double;
-begin
-  Result := 0.0;
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
-    Exit;
-
-  if (AChannel.FlowMeter.ValueCoef <> nil) then
-    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
-
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
-
-  if SameValue(Result, 0.0, 1E-12) then
-    Result := AChannel.FlowMeter.Kp;
-end;
-
-procedure TTableMainForm.UpdateDeviceImpSecFromFlowRate;
-var
-  WorkTable: TWorkTable;
-  FlowRate, Coef, ImpSec: Double;
-begin
-  WorkTable := FWorkTableManager.WorkTables[0];
-  if (WorkTable = nil) or (WorkTable.DeviceChannels.Count = 0) then
-    Exit;
-
-  FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
-  Coef := GetChannelFlowCoef(WorkTable.DeviceChannels[0]);
-  if Coef <= 0 then
-    Exit;
-
-  ImpSec := (FlowRate * Coef) / 3.6;
-  EditDeviceImpSec.Text := FloatToStr(ImpSec);
-end;
-
-function TTableMainForm.UpdateEtalonImpSecFromFlowRate(AFlowRate:Double = 0;
-  AEtalonChannels: TObjectList<TChannel> = nil):Double;
-var
-  WorkTable: TWorkTable;
-  FlowRate, Coef, ImpSec: Double;
-  i:integer;
-begin
-  Coef:=0;
-  WorkTable := FWorkTableManager.WorkTables[0];
-  if (WorkTable = nil) or (WorkTable.EtalonChannels.Count = 0) then
-    Exit;
-
-
-
-
-  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
-    for I := 0 to AEtalonChannels.Count - 1 do
-      Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
-  else if AEtalonChannels=nil then
-      Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
-
-  FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  //Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
-  if Coef <= 0 then
-    Exit;
-  if AFlowRate<>0 then
-    ImpSec := (AFlowRate * Coef) / 3.6
-  else
-    ImpSec := (FlowRate * Coef) / 3.6;
-  EditEtalonImpSec.Text := FloatToStr(ImpSec);
-  Result:= ImpSec;
-end;
-
-function TTableMainForm.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
-  const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
-var
-  I: Integer;
-  Coef,SUM,MaxRatio : Double;
-  WorkTable:tWorkTable;
-begin
-  WorkTable := FWorkTableManager.ActiveWorkTable;
-  if WorkTable = nil then
-    Exit;
-  SetLength(Result, 0);
-  if AChannels = nil then
-    Exit;
-  SUM:=0;
-   for I := 0 to AChannels.Count-1 do
-    begin
-      SUM:=SUM+WorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
-    end;
-
-  SetLength(Result, AChannels.Count);
-  for I := 0 to AChannels.Count - 1 do
-  begin
-    if SameValue(SUM, 0.0, 1e-12) then
-      MaxRatio:=0
-    else
-      MaxRatio := (WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[i].FlowMeter.Device.Qmax,4))/SUM;
-    Coef := GetChannelFlowCoef(AChannels[I]);
-    if Coef > 0 then
-      Result[I] := (AFlowRate*MaxRatio * Coef) / 3.6
-    else
-      Result[I] := AFallbackImpSec;
-  end;
-end;
-
-procedure TTableMainForm.UpdateRandomFlowRate(const AWorkTable: TWorkTable);
-var
-  Flow: Double;
-
-  WorkTable:TWorkTable;
-  FlowRate: TFlowRate;
-  i:integer;
-  EnabledEtalonChannels: TObjectList<TChannel>;
-  EnabledDeviceChannels: TObjectList<TChannel>;
-  AValue:Double;
-  ImpSecValues: TArray<Double>;
-  TotalQmax: Double;
-  ChannelQmax: Double;
-  ChannelFlowRate: Double;
-  ChannelCoef: Double;
-  ChannelRatio: Double;
-begin
-
-  FlowRate := AWorkTable.FlowRate; // Контроллер расхода
-  if FlowRate = nil then
-    Exit;
-
-
-
-  WorkTable:= FWorkTableManager.ActiveWorkTable;
-   // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
-  if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
-  begin
-
-    if WorkTable=nil then
-    exit;
-
-    if WorkTable.ActivePump=nil then
-    exit;
-
-      if FlowRate.IsRunning then
-      begin
-        EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
-        try
-          for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-            if (WorkTable.EtalonChannels[I] <> nil) and (WorkTable.EtalonChannels[I].Enabled) then
-              EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
-
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
-
-
-
-             ImpSecValues := BuildImpSecValuesForChannels(
-              EnabledEtalonChannels,
-              Flow,
-              //UpdateEtalonImpSecFromFlowRate(Flow, EnabledEtalonChannels)
-              NormalizeFloatInput(EditDeviceImpSec.Text)
-            );
-
-            WorkTable.ApplyChannelValues(
-              EnabledEtalonChannels,
-              NormalizeFloatInput('0'),
-              ImpSecValues,
-              NormalizeFloatInput('0')
-            );
-
-        finally
-          EnabledEtalonChannels.Free;
-        end;
-        EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
-        try
-          for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-            begin
-            if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].Enabled) then
-              EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
-            end;
-
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
-
-          SetLength(ImpSecValues, EnabledDeviceChannels.Count);
-           for I := 0 to EnabledDeviceChannels.Count - 1 do
-            if i in [1,3,6] then
-              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/10 + 1.00001)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
-            else if i in [2,4,5] then
-              ImpSecValues[i] := (Flow*(Random * (trackStd.Value)/10 + 1.00015)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
-            else
-              ImpSecValues[i] := (Flow*(Random *  (trackStd.Value)/10 +  1.0008)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
-
-            WorkTable.ApplyChannelValues(
-              EnabledDeviceChannels,
-              NormalizeFloatInput('0'),
-              ImpSecValues,
-              NormalizeFloatInput('0')
-            );
-
-        finally
-          EnabledDeviceChannels.Free;
-        end;
-
-      end;
-
-
-
-    AWorkTable.NextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
-   end;
-end;
-
-procedure TTableMainForm.UpdateRandomSignals(const AWorkTable: TWorkTable);
-var
-  I: Integer;
-  Channel: TChannel;
-  CurDelta: Double;
-  ImpDelta: Double;
-begin
-  if AWorkTable = nil then
-    Exit;
-
-    AWorkTable.Time := AWorkTable.Time + 1;
-
-  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-  begin
-    Channel := AWorkTable.EtalonChannels[I];
-    if Channel = nil then
-      Continue;
-
-    CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
-    if Channel.Enabled then
-    begin
-      Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
-    end
-    else
-    begin
-      Channel.CurSec :=0;
-      Channel.ImpSec := 0;
-      Channel.ImpResult := 0;
-    end;
-
-  end;
-
-  for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
-  begin
-    Channel := AWorkTable.DeviceChannels[I];
-    if Channel = nil then
-      Continue;
-
-    CurDelta := (Random*(trackStd.Value)/10 * 0.06) - 0.03;
-    ImpDelta := Random(11)*(trackStd.Value)/10 - 5;
-    if Channel.Enabled then
-    begin
-      Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
-    end
-    else
-    begin
-      Channel.CurSec :=0;
-      Channel.ImpSec := 0;
-      Channel.ImpResult := 0;
-    end;
-  end;
-end;
-
-procedure TTableMainForm.ExecuteRandomControlAction(const AWorkTable: TWorkTable);
-var
-  ActionIndex: Integer;
-begin
-  if AWorkTable = nil then
-    Exit;
-
-  ActionIndex :=  Random(11);
-  case ActionIndex of
-    0:
-      if AWorkTable.ActivePump <> nil then
-        AWorkTable.ActivePump.DoPumpStart;
-    1:
-      if AWorkTable.ActivePump <> nil then
-        AWorkTable.ActivePump.DoFreqSet(Random(10));
-    2:
-      if AWorkTable.ActivePump <> nil then
-        AWorkTable.ActivePump.DoPumpStop;
-    3:
-      if AWorkTable.FlowRate <> nil then
-        AWorkTable.FlowRate.DoFlowRateStart;
-    4:
-      if AWorkTable.FlowRate <> nil then
-        AWorkTable.FlowRate.DoFlowRateStart(Random(10));
-    5:
-      if AWorkTable.FlowRate <> nil then
-        AWorkTable.FlowRate.DoFlowRateStop;
-    6:
-      if AWorkTable.FlowRate <> nil then
-        AWorkTable.FlowRate.DoFlowRateSet(Random(10));
-    7:
-      if AWorkTable.FluidTemp <> nil then
-        AWorkTable.FluidTemp.DoFluidTempStart(Random(10));
-    8:
-      if AWorkTable.FluidTemp <> nil then
-        AWorkTable.FluidTemp.DoFluidTempStop;
-    9:
-      if AWorkTable.FluidPress <> nil then
-        AWorkTable.FluidPress.DoFluidPressStart(Random(10));
-    10:
-      if AWorkTable.FluidPress <> nil then
-        AWorkTable.FluidPress.DoFluidPressStop;
-  end;
-end;
 
 procedure TTableMainForm.TimerSetValuesTimer(Sender: TObject);
-var
-  WorkTable: TWorkTable;   // Текущая рабочая таблица (сессия измерения)
-  Pump: tPump;             // Активный насос (исполнитель)
-  FlowRate: TFlowRate;     // Управление расходом
-  LimitReached: Boolean;   // Флаг: достигнут хотя бы один критерий остановки
-  HasLimits: Boolean;      // Флаг: заданы ли критерии остановки
-  CurrentImp: Double;      // Текущие импульсы (максимум по эталонным каналам)
-  CurrentVolume: Double;   // Текущий измеренный объём/масса
-  I: Integer;
 begin
-
-  // ============================================================
-  // 1. Получение рабочей таблицы
-  // ============================================================
-
-  // Если нет ни одной рабочей таблицы — выходим
-  if FWorkTableManager.WorkTables.Count = 0 then
-    Exit;
-
-  // Берём первую таблицу (по факту — активную)
-  // В будущем лучше заменить на FActiveWorkTable
-  WorkTable := FWorkTableManager.WorkTables[0];
-
-  // Дополнительная защита от nil
-  if WorkTable = nil then
-    Exit;
-
-   // ============================================================
-  // 2. Эмуляция физического процесса (стенд)
-  // ============================================================
-
-  // Обновление частоты насоса (имитация работы)
-  UpdateRandomFreq(WorkTable);
-
-  // Обновление текущего расхода  (имитация работы)
-  UpdateRandomFlowRate(WorkTable);
-
-  // Обновление климатических параметров (температура и др.)
-  UpdateRandomTemp(WorkTable);
-
-  // Обновление давления
-  UpdateRandomPress(WorkTable);
-
-  // Рандомный вызов одной из уникальных управляющих функций
-  //ExecuteRandomControlAction(WorkTable);
-
-
-  //UpdateTemp(WorkTable);
-
-
-
-
-  // ============================================================
-  // 3. Машина состояний измерения
-  // ============================================================
-
-  case WorkTable.State of
-
-    // ------------------------------------------------------------
-    // Начальное состояние → переход в режим ожидания
-    // ------------------------------------------------------------
-    swtNONE:
-      WorkTable.State := swtSTANDBY;
-
-
-    // ------------------------------------------------------------
-    // Ожидание → считаем, что система подключена
-    // ------------------------------------------------------------
-    swtSTANDBY:
-      WorkTable.State := swtCONNECTED;
-
-
-    // ------------------------------------------------------------
-    // Запуск мониторинга
-    // ------------------------------------------------------------
-    swtSTARTMONITOR:
-      WorkTable.State := swtSTARTMONITORWAIT;
-
-
-    // ------------------------------------------------------------
-    // Ожидание запуска мониторинга → переход в мониторинг
-    // ------------------------------------------------------------
-    swtSTARTMONITORWAIT:
-      WorkTable.State := swtMONITOR;
-
-
-    // ------------------------------------------------------------
-    // Мониторинг (наблюдение без измерения)
-    // ------------------------------------------------------------
-    swtMONITOR:
-      UpdateRandomSignals(WorkTable); // обновление показаний
-
-
-    // ------------------------------------------------------------
-    // Остановка мониторинга или конфигурация
-    // → возвращаемся в подключённое состояние
-    // ------------------------------------------------------------
-    swtSTOPMONITOR,
-    swtCONFIGED:
-      WorkTable.State := swtCONNECTED;
-
-
-    // ------------------------------------------------------------
-    // Запуск теста
-    // ------------------------------------------------------------
-    swtSTARTTEST:
-      WorkTable.State := swtSTARTWAIT;
-
-
-    // ------------------------------------------------------------
-    // Ожидание старта → переход к выполнению
-    // ------------------------------------------------------------
-    swtSTARTWAIT:
-      WorkTable.State := swtEXECUTE;
-
-
-    // ============================================================
-    // 4. Основной процесс измерения
-    // ============================================================
-    swtEXECUTE:
-    begin
-      // Обновление сигналов (имитация работы датчиков)
-      UpdateRandomSignals(WorkTable);
-
-
-      // ----------------------------------------------------------
-      // 4.1 Расчёт текущих импульсов
-      // ----------------------------------------------------------
-
-      CurrentImp := 0;
-
-      for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-      begin
-        // Пропускаем неинициализированные или отключённые каналы
-        if (WorkTable.EtalonChannels[I] = nil) or
-           (not WorkTable.EtalonChannels[I].Enabled) then
-          Continue;
-
-        // Берём максимальное значение импульсов среди эталонов
-        // (используется как репрезентативное значение)
-        CurrentImp := Max(CurrentImp,
-                          WorkTable.EtalonChannels[I].ImpResult);
-      end;
-
-
-      // ----------------------------------------------------------
-      // 4.2 Получение текущего объёма/массы
-      // ----------------------------------------------------------
-
-      CurrentVolume := 0;
-
-      // ValueQuantity — агрегированное значение измеренного количества
-      if WorkTable.ValueQuantity <> nil then
-        CurrentVolume := WorkTable.ValueQuantity.GetDoubleValue;
-
-
-      // ----------------------------------------------------------
-      // 4.3 Проверка наличия критериев остановки
-      // ----------------------------------------------------------
-
-      HasLimits :=
-        (WorkTable.CurrentPoint <> nil) and
-        (
-          // Ограничение по времени
-          ((scTime in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.CurrentPoint.LimitTime > 0)) or
-
-          // Ограничение по импульсам
-          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.CurrentPoint.LimitImp > 0)) or
-
-          // Ограничение по объёму/массе
-          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.CurrentPoint.LimitVolume > 0))
-        );
-
-
-      // ----------------------------------------------------------
-      // 4.4 Проверка достижения критериев остановки
-      // ----------------------------------------------------------
-
-      LimitReached :=
-        (WorkTable.CurrentPoint <> nil) and
-        (
-          // По времени
-          ((scTime in WorkTable.CurrentPoint.StopCriteria) and
-           (WorkTable.Time >= WorkTable.CurrentPoint.LimitTime)) or
-
-          // По импульсам
-          ((scImpulse in WorkTable.CurrentPoint.StopCriteria) and
-           (CurrentImp >= WorkTable.CurrentPoint.LimitImp)) or
-
-          // По объёму/массе
-          ((scVolume in WorkTable.CurrentPoint.StopCriteria) and
-           (CurrentVolume >= WorkTable.CurrentPoint.LimitVolume))
-        );
-
-
-      // ----------------------------------------------------------
-      // 4.5 Завершение измерения
-      // ----------------------------------------------------------
-
-      // Если заданы ограничения и хотя бы одно достигнуто
-      // → инициируем остановку теста
-      if HasLimits and LimitReached then
-        WorkTable.State := swtSTOPTEST;
-    end;
-
-
-    // ------------------------------------------------------------
-    // Инициация остановки теста
-    // ------------------------------------------------------------
-    swtSTOPTEST:
-      WorkTable.State := swtSTOPWAIT;
-
-
-    // ------------------------------------------------------------
-    // Ожидание полной остановки
-    // ------------------------------------------------------------
-    swtSTOPWAIT:
-      WorkTable.State := swtCOMPLETE;
-
-
-    // ------------------------------------------------------------
-    // Тест завершён → переход к финальному считыванию
-    // ------------------------------------------------------------
-    swtCOMPLETE:
-      WorkTable.State := swtFINALREAD;
-
-  end;
-
-
+  FWorkTableManager.UpdateSimulation;
 end;
 
 procedure TTableMainForm.TrackStdChange(Sender: TObject);

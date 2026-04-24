@@ -629,6 +629,12 @@ private
     procedure Save;
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
+    function GetChannelFlowCoef(const AChannel: TChannel): Double;
+    function UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable; const AFlowRate: Double): Double;
+    function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate: Double = 0;
+      AEtalonChannels: TObjectList<TChannel> = nil): Double;
+    function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
+      const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
@@ -3549,6 +3555,96 @@ begin
   end;
 end;
 
+function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
+begin
+  Result := 0.0;
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    Exit;
+
+  if (AChannel.FlowMeter.ValueCoef <> nil) then
+    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+
+  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
+    Result := AChannel.FlowMeter.Device.Coef;
+
+  if SameValue(Result, 0.0, 1E-12) then
+    Result := AChannel.FlowMeter.Kp;
+end;
+
+function TWorkTableManager.UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable;
+  const AFlowRate: Double): Double;
+var
+  Coef: Double;
+begin
+  Result := 0;
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels.Count = 0) then
+    Exit;
+
+  Coef := GetChannelFlowCoef(AWorkTable.DeviceChannels[0]);
+  if Coef <= 0 then
+    Exit;
+
+  Result := (AFlowRate * Coef) / 3.6;
+end;
+
+function TWorkTableManager.UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable;
+  AFlowRate: Double; AEtalonChannels: TObjectList<TChannel>): Double;
+var
+  FlowRate, Coef: Double;
+  I: Integer;
+begin
+  Result := 0;
+  Coef := 0;
+  if (AWorkTable = nil) or (AWorkTable.EtalonChannels.Count = 0) then
+    Exit;
+
+  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
+    for I := 0 to AEtalonChannels.Count - 1 do
+      Coef := Coef + GetChannelFlowCoef(AEtalonChannels[I])
+  else
+    Coef := GetChannelFlowCoef(AWorkTable.EtalonChannels[0]);
+
+  if Coef <= 0 then
+    Exit;
+
+  if AFlowRate <> 0 then
+    FlowRate := AFlowRate
+  else
+    FlowRate := AWorkTable.FlowRate.Value.Value;
+
+  Result := (FlowRate * Coef) / 3.6;
+end;
+
+function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkTable;
+  AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+var
+  I: Integer;
+  Coef, SUM, MaxRatio: Double;
+begin
+  SetLength(Result, 0);
+  if (AWorkTable = nil) or (AChannels = nil) then
+    Exit;
+
+  SUM := 0;
+  for I := 0 to AChannels.Count - 1 do
+    SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+
+  SetLength(Result, AChannels.Count);
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    if SameValue(SUM, 0.0, 1e-12) then
+      MaxRatio := 0
+    else
+      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+
+    Coef := GetChannelFlowCoef(AChannels[I]);
+    if Coef > 0 then
+      Result[I] := (AFlowRate * MaxRatio * Coef) / 3.6
+    else
+      Result[I] := AFallbackImpSec;
+  end;
+end;
+
 
 procedure TWorkTableManager.UpdateSimulation;
 
@@ -3573,24 +3669,6 @@ begin
   // Если рабочая таблица не задана — выходим
   if AWorkTable = nil then
     Exit;
-
-  // ============================================================
-  // 2. Обработка управляющих команд температуры
-  // ============================================================
-
-  // В зависимости от текущего действия (Action)
-  // обновляем статус параметра температуры
-
-  if (AWorkTable.FluidTemp.Action = apStart) or
-     (AWorkTable.FluidTemp.Action = apSet) then
-
-    // Начато регулирование/установка температуры
-    AWorkTable.FluidTemp.State := spStarted
-
-  else if (AWorkTable.FluidTemp.Action = apStop) then
-
-    // Остановка регулирования
-    AWorkTable.FluidTemp.State := spStarted;
 
 
   // ============================================================
@@ -3686,10 +3764,6 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  IF AWorkTable.FluidPress.Action = apStart THEN
-    AWorkTable.FluidPress.State:=spStarted
-  else  if (AWorkTable.FluidPress.Action = apStop) then
-    AWorkTable.FluidPress.State:=spStopped;
 
   if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
   begin
@@ -3743,13 +3817,6 @@ begin
   if Pump = nil then
     Exit;
 
-  IF (Pump.Action = apStart)  THEN
-    Pump.State:=spStarted
-  else  if (Pump.Action = apStop) then
-    Pump.State:=spStopped;
-
-
-
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
@@ -3773,102 +3840,6 @@ begin
 
     AWorkTable.NextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
-end;
-
-function GetChannelFlowCoef(const AChannel: TChannel): Double;
-begin
-  Result := 0.0;
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
-    Exit;
-
-  if (AChannel.FlowMeter.ValueCoef <> nil) then
-    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
-
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
-
-  if SameValue(Result, 0.0, 1E-12) then
-    Result := AChannel.FlowMeter.Kp;
-end;
-
-function UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable; FlowRate: Double): double;
-var
-  WorkTable: TWorkTable;
-  Coef, ImpSec: Double;
-begin
-Result:=0;
-
-  if (AWorkTable = nil) or (AWorkTable.DeviceChannels.Count = 0) then
-    Exit;
-
-  Coef := GetChannelFlowCoef(WorkTable.DeviceChannels[0]);
-  if Coef <= 0 then
-    Exit;
-
-  ImpSec := (FlowRate * Coef) / 3.6;
-  Result:=   ImpSec;
-end;
-
-function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate:Double = 0;
-  AEtalonChannels: TObjectList<TChannel> = nil):Double;
-var
-  FlowRate, Coef, ImpSec: Double;
-  i:integer;
-begin
-  Coef:=0;
-
-  if (AWorkTable = nil) or (AWorkTable.EtalonChannels.Count = 0) then
-    Exit;
-
-  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
-    for I := 0 to AEtalonChannels.Count - 1 do
-      Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
-  else if AEtalonChannels=nil then
-      Coef := GetChannelFlowCoef(AWorkTable.EtalonChannels[0]);
-
-  //Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
-  if Coef <= 0 then
-    Exit;
-  if AFlowRate<>0 then
-    ImpSec := (AFlowRate * Coef) / 3.6
-  else
-    ImpSec := (FlowRate * Coef) / 3.6;
-
-  Result:= ImpSec;
-end;
-
-function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
-  const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
-var
-  I: Integer;
-  Coef,SUM,MaxRatio : Double;
-  WorkTable:tWorkTable;
-begin
-
-  if AWorkTable = nil then
-    Exit;
-  SetLength(Result, 0);
-  if AChannels = nil then
-    Exit;
-  SUM:=0;
-   for I := 0 to AChannels.Count-1 do
-    begin
-      SUM:=SUM+AWorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
-    end;
-
-  SetLength(Result, AChannels.Count);
-  for I := 0 to AChannels.Count - 1 do
-  begin
-    if SameValue(SUM, 0.0, 1e-12) then
-      MaxRatio:=0
-    else
-      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[i].FlowMeter.Device.Qmax,4))/SUM;
-    Coef := GetChannelFlowCoef(AChannels[I]);
-    if Coef > 0 then
-      Result[I] := (AFlowRate*MaxRatio * Coef) / 3.6
-    else
-      Result[I] := AFallbackImpSec;
-  end;
 end;
 
 procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
@@ -3897,26 +3868,26 @@ begin
   if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
   begin
 
-    if WorkTable=nil then
+    if AWorkTable=nil then
     exit;
 
-    if WorkTable.ActivePump=nil then
+    if AWorkTable.ActivePump=nil then
     exit;
 
       if FlowRate.IsRunning then
       begin
         EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
         try
-          for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-            if (WorkTable.EtalonChannels[I] <> nil) and (WorkTable.EtalonChannels[I].Enabled) then
-              EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
+          for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+            if (AWorkTable.EtalonChannels[I] <> nil) and (AWorkTable.EtalonChannels[I].Enabled) then
+              EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
 
               IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
+               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
               else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
               else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
 
 
 
@@ -3927,30 +3898,30 @@ begin
               12
             );
 
-           { FFrameMainTable.ApplyChannelValues(
+            AWorkTable.ApplyChannelValues(
               EnabledEtalonChannels,
               NormalizeFloatInput('0'),
               ImpSecValues,
               NormalizeFloatInput('0')
-            ); }
+            );
 
         finally
           EnabledEtalonChannels.Free;
         end;
         EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
         try
-          for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+          for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
             begin
-            if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].Enabled) then
-              EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
+            if (AWorkTable.DeviceChannels[I] <> nil) and (AWorkTable.DeviceChannels[I].Enabled) then
+              EnabledDeviceChannels.Add(AWorkTable.DeviceChannels[I]);
             end;
 
               IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
+               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
               else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
               else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
 
           SetLength(ImpSecValues, EnabledDeviceChannels.Count);
            for I := 0 to EnabledDeviceChannels.Count - 1 do
@@ -3961,7 +3932,7 @@ begin
             else
               ImpSecValues[i] := (Flow*(Random *  ({trackStd.Value}0.1)/100 +  1.008)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
 
-            WorkTable.ApplyChannelValues(
+            AWorkTable.ApplyChannelValues(
               EnabledDeviceChannels,
               NormalizeFloatInput('0'),
               ImpSecValues,
@@ -4058,6 +4029,7 @@ begin
 
   // Обновление давления
   UpdateRandomPress(WorkTable);
+
 
   // ============================================================
   // 3. Машина состояний измерения
