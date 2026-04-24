@@ -504,7 +504,7 @@ private
     //property State: TSpillState read FState write FState;
 
 
-    property State: EStateWorkTable read FState write FState;
+    property State: EStateWorkTable read FState write SetState;
     property Action: EActionWorkTable read FAction write FAction;
 
     property TableClamped: Boolean read FTableClamped write FTableClamped;
@@ -592,7 +592,6 @@ private
   procedure DoProcRepeat(AProcName: string);
   procedure DoSpillageStart;
   procedure DoSpillageStop;
-  procedure DoStateChanged(ANewState: EStateWorkTable);
   procedure Notify(Event: Integer; Data: TObject = nil); reintroduce; overload;
   procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
   procedure StartMeasurementRun(AMode: Integer = 1);
@@ -3007,14 +3006,7 @@ begin
   FState := ANewState;
   ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
     'Изменено состояние рабочего стола', WorkTableStateToString(ANewState));
-  DoStateChanged(ANewState);
-end;
-
-procedure TWorkTable.DoStateChanged(ANewState: EStateWorkTable);
-begin
   Notify(notifyStateChanged, Self);
-  if Assigned(FOnStateChanged) then
-    FOnStateChanged(ANewState);
 end;
 
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
