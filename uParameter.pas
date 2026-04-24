@@ -625,7 +625,6 @@ begin
   FState := AStatus;
   Event := Ord(eparStateChanged);
   Notify(notifyStateChanged, Self);
-  Notify(notifyEvent, Self);
 end;
 
 procedure TParameter.SetAction(AAction: EActionParameter);
