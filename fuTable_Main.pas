@@ -103,6 +103,7 @@ type
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
     procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
+    procedure ExecuteRandomControlAction(const AWorkTable: TWorkTable);
     function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
       const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
@@ -1108,6 +1109,51 @@ begin
   end;
 end;
 
+procedure TTableMainForm.ExecuteRandomControlAction(const AWorkTable: TWorkTable);
+var
+  ActionIndex: Integer;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  ActionIndex := Random(11);
+  case ActionIndex of
+    0:
+      if AWorkTable.ActivePump <> nil then
+        AWorkTable.ActivePump.DoPumpStart;
+    1:
+      if AWorkTable.ActivePump <> nil then
+        AWorkTable.ActivePump.DoFreqSet(Random(10));
+    2:
+      if AWorkTable.ActivePump <> nil then
+        AWorkTable.ActivePump.DoPumpStop;
+    3:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateStart;
+    4:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateStart(Random(10));
+    5:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateStop;
+    6:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateSet(Random(10));
+    7:
+      if AWorkTable.FluidTemp <> nil then
+        AWorkTable.FluidTemp.DoFluidTempStart(Random(10));
+    8:
+      if AWorkTable.FluidTemp <> nil then
+        AWorkTable.FluidTemp.DoFluidTempStop;
+    9:
+      if AWorkTable.FluidPress <> nil then
+        AWorkTable.FluidPress.DoFluidPressStart(Random(10));
+    10:
+      if AWorkTable.FluidPress <> nil then
+        AWorkTable.FluidPress.DoFluidPressStop;
+  end;
+end;
+
 procedure TTableMainForm.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;   // Текущая рабочая таблица (сессия измерения)
@@ -1151,6 +1197,9 @@ begin
 
   // Обновление давления
   UpdateRandomPress(WorkTable);
+
+  // Рандомный вызов одной из уникальных управляющих функций
+  ExecuteRandomControlAction(WorkTable);
 
 
   //UpdateTemp(WorkTable);
