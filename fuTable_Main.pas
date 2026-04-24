@@ -177,7 +177,7 @@ begin
     NormalizeFloatInput(EditDeviceImpSec.Text)
   );
 
-  FFrameMainTable.ApplyChannelValues(
+  WorkTable.ApplyChannelValues(
     WorkTable.DeviceChannels,
     NormalizeFloatInput(EditDeviceCurSec.Text),
     ImpSecValues,
@@ -204,7 +204,7 @@ begin
     NormalizeFloatInput(EditEtalonImpSec.Text)
   );
 
-  FFrameMainTable.ApplyChannelValues(
+  WorkTable.ApplyChannelValues(
     WorkTable.EtalonChannels,
     NormalizeFloatInput(EditEtalonCurSec.Text),
     ImpSecValues,
@@ -976,7 +976,7 @@ begin
               NormalizeFloatInput(EditDeviceImpSec.Text)
             );
 
-            FFrameMainTable.ApplyChannelValues(
+            WorkTable.ApplyChannelValues(
               EnabledEtalonChannels,
               NormalizeFloatInput('0'),
               ImpSecValues,
@@ -1010,7 +1010,7 @@ begin
             else
               ImpSecValues[i] := (Flow*(Random *  (trackStd.Value)/10 +  1.0008)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
 
-            FFrameMainTable.ApplyChannelValues(
+            WorkTable.ApplyChannelValues(
               EnabledDeviceChannels,
               NormalizeFloatInput('0'),
               ImpSecValues,
@@ -1366,11 +1366,6 @@ begin
 
 
 end;
-
-
-
-
-
 
 procedure TTableMainForm.TrackStdChange(Sender: TObject);
 begin
