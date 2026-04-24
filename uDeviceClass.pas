@@ -77,6 +77,23 @@ type
     dsfDateOfManufacture     // Дата изготовления
   );
 
+  EPointSpillageType = (
+    stWithStop = 0,    // с остановкой потока
+    stWithoutStop = 1  // без остановки потока
+  );
+
+  EPointEtalonType = (
+    etAuto = 0,    // автоматически
+    etCompare = 1, // сличение (по расходомеру)
+    etWeight = 2   // весовое устройство
+  );
+
+  EPointFlowSourceType = (
+    fstUnknown = 0,  // не определён
+    fstPump = 1,     // насос (основной источник)
+    fstExternal = 2  // внешний источник (магистраль / подвод)
+  );
+
 
 
 
@@ -130,6 +147,9 @@ type
     LimitVolume: Double;         // Ограничение по объему / массе, л (кг)
     LimitTime: Double;           // Ограничение по времени, сек
     SpillageStop: Integer;       // Критерии остановки (битовая маска)
+    SpillageType: Integer;       // Тип пролива (с/без остановки потока)
+    EtalonType: Integer;         // Тип эталона
+    FlowSorceType: Integer;      // Тип источника расхода
 
     {====================================================================}
     { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
@@ -530,11 +550,80 @@ type
 
   end;
 
+function GetPointSpillageTypeText(const AType: EPointSpillageType): string; overload;
+function GetPointSpillageTypeText(const AType: Integer): string; overload;
+function GetPointEtalonTypeText(const AType: EPointEtalonType): string; overload;
+function GetPointEtalonTypeText(const AType: Integer): string; overload;
+function GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string; overload;
+function GetPointFlowSourceTypeText(const AType: Integer): string; overload;
+
 implementation
 uses
   uDataManager,
   uAppServices,
   uRepositories;
+
+function GetPointSpillageTypeText(const AType: EPointSpillageType): string;
+begin
+  case AType of
+    stWithStop: Result := 'С остановкой потока';
+    stWithoutStop: Result := 'Без остановки потока';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function GetPointSpillageTypeText(const AType: Integer): string;
+begin
+  case AType of
+    Integer(stWithStop), Integer(stWithoutStop):
+      Result := GetPointSpillageTypeText(EPointSpillageType(AType));
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function GetPointEtalonTypeText(const AType: EPointEtalonType): string;
+begin
+  case AType of
+    etAuto: Result := 'Автоматически';
+    etCompare: Result := 'Сличение (по расходомеру)';
+    etWeight: Result := 'Весовое устройство';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function GetPointEtalonTypeText(const AType: Integer): string;
+begin
+  case AType of
+    Integer(etAuto), Integer(etCompare), Integer(etWeight):
+      Result := GetPointEtalonTypeText(EPointEtalonType(AType));
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string;
+begin
+  case AType of
+    fstUnknown: Result := 'Не определён';
+    fstPump: Result := 'Насос';
+    fstExternal: Result := 'Внешний источник';
+  else
+    Result := 'Неизвестно';
+  end;
+end;
+
+function GetPointFlowSourceTypeText(const AType: Integer): string;
+begin
+  case AType of
+    Integer(fstUnknown), Integer(fstPump), Integer(fstExternal):
+      Result := GetPointFlowSourceTypeText(EPointFlowSourceType(AType));
+  else
+    Result := 'Неизвестно';
+  end;
+end;
 
 
 procedure MarkDeviceAndRepositoryModified(const ADeviceUUID: string);
@@ -1002,6 +1091,9 @@ begin
   LimitVolume := 0.0;
   LimitTime := 0.0;
   SpillageStop := STOP_BY_TIME;
+  SpillageType := Integer(stWithStop);
+  EtalonType := Integer(etAuto);
+  FlowSorceType := Integer(fstUnknown);
 
   { Метрология }
   Error := 0.0;
@@ -1601,6 +1693,9 @@ begin
   LimitVolume := ASource.LimitVolume;
   LimitTime := ASource.LimitTime;
   SpillageStop := ASource.SpillageStop;
+  SpillageType := ASource.SpillageType;
+  EtalonType := ASource.EtalonType;
+  FlowSorceType := ASource.FlowSorceType;
 
   {====================================================================}
   { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
@@ -1656,6 +1751,9 @@ begin
   LimitImp := ASource.LimitImp;
   LimitVolume := ASource.LimitVolume;
   LimitTime := ASource.LimitTime;
+  SpillageType := Integer(stWithStop);
+  EtalonType := Integer(etAuto);
+  FlowSorceType := Integer(fstUnknown);
 
   Error := ASource.Error;
   Pause := ASource.Pause;
@@ -2582,4 +2680,3 @@ begin
 end;
 
 end.
-
