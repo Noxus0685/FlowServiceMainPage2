@@ -35,6 +35,40 @@ type
     apSet
   );
 
+  EEventParameter = (
+    eparNone,
+    eparStatusChanged,
+    eparActionChanged
+  );
+
+  EEventPump = (
+    epStart,
+    epStop,
+    epFreqChanged,
+    epError
+  );
+
+  EEventFlowRate = (
+    efrStart,
+    efrStop,
+    efrSetValue,
+    efrError
+  );
+
+  EEventFluidTemp = (
+    eftStart,
+    eftStop,
+    eftSetValue,
+    eftError
+  );
+
+  EEventFluidPress = (
+    efpStart,
+    efpStop,
+    efpSetValue,
+    efpError
+  );
+
 
 
 
@@ -589,7 +623,9 @@ begin
     Exit;
 
   FStatus := AStatus;
-  Notify(neStatusChanged, Self);
+  Event := Ord(eparStatusChanged);
+  Notify(notifyStatusChanged, Self);
+  Notify(notifyEvent, Self);
 end;
 
 procedure TParameter.SetAction(AAction: EActionParameter);
@@ -598,7 +634,50 @@ begin
     Exit;
 
   FAction := AAction;
-  Notify(neAction, Self);
+  Event := Ord(eparActionChanged);
+  if Self is TPump then
+  begin
+    case AAction of
+      apStart: Event := Ord(epStart);
+      apStop: Event := Ord(epStop);
+      apSet: Event := Ord(epFreqChanged);
+    else
+      Event := Ord(epError);
+    end;
+  end
+  else if Self is TFlowRate then
+  begin
+    case AAction of
+      apStart: Event := Ord(efrStart);
+      apStop: Event := Ord(efrStop);
+      apSet: Event := Ord(efrSetValue);
+    else
+      Event := Ord(efrError);
+    end;
+  end
+  else if Self is TFluidTemp then
+  begin
+    case AAction of
+      apStart: Event := Ord(eftStart);
+      apStop: Event := Ord(eftStop);
+      apSet: Event := Ord(eftSetValue);
+    else
+      Event := Ord(eftError);
+    end;
+  end
+  else if Self is TFluidPress then
+  begin
+    case AAction of
+      apStart: Event := Ord(efpStart);
+      apStop: Event := Ord(efpStop);
+      apSet: Event := Ord(efpSetValue);
+    else
+      Event := Ord(efpError);
+    end;
+  end;
+
+  Notify(notifyAction, Self);
+  Notify(notifyEvent, Self);
 end;
 
 procedure TParameter.SetBefore(ABefore: Double);

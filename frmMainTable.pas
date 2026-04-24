@@ -1001,8 +1001,9 @@ end;
 
 procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 const
-  neStatusChanged = 1;
-  neAction = 2;
+  notifyStatusChanged = 1;
+  notifyAction = 2;
+  notifyEvent = 3;
 type
   TNotifySenderKind = (
     nskUnknown,
@@ -1042,8 +1043,9 @@ begin
   case SenderKind of
     nskWorkTable:
       case Event of
-        neStatusChanged: HandleWorkTableStatusChanged(TWorkTable(Sender), Data);
-        neAction: HandleWorkTableAction(TWorkTable(Sender), Data);
+        notifyStatusChanged: HandleWorkTableStatusChanged(TWorkTable(Sender), Data);
+        notifyAction: HandleWorkTableAction(TWorkTable(Sender), Data);
+        notifyEvent: HandleWorkTableAction(TWorkTable(Sender), Data);
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[WorkTable.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1052,8 +1054,9 @@ begin
 
     nskPump:
       case Event of
-        neStatusChanged: HandlePumpStatusChanged(TPump(Sender));
-        neAction: HandlePumpAction(TPump(Sender));
+        notifyStatusChanged: HandlePumpStatusChanged(TPump(Sender));
+        notifyAction: HandlePumpAction(TPump(Sender));
+        notifyEvent: HandlePumpAction(TPump(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[Pump.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1062,8 +1065,9 @@ begin
 
     nskFlowRate:
       case Event of
-        neStatusChanged: HandleFlowRateStatusChanged(TFlowRate(Sender));
-        neAction: HandleFlowRateAction(TFlowRate(Sender));
+        notifyStatusChanged: HandleFlowRateStatusChanged(TFlowRate(Sender));
+        notifyAction: HandleFlowRateAction(TFlowRate(Sender));
+        notifyEvent: HandleFlowRateAction(TFlowRate(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[FlowRate.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1072,8 +1076,9 @@ begin
 
     nskFluidTemp:
       case Event of
-        neStatusChanged: HandleFluidTempStatusChanged(TFluidTemp(Sender));
-        neAction: HandleFluidTempAction(TFluidTemp(Sender));
+        notifyStatusChanged: HandleFluidTempStatusChanged(TFluidTemp(Sender));
+        notifyAction: HandleFluidTempAction(TFluidTemp(Sender));
+        notifyEvent: HandleFluidTempAction(TFluidTemp(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[FluidTemp.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1082,8 +1087,9 @@ begin
 
     nskFluidPress:
       case Event of
-        neStatusChanged: HandleFluidPressStatusChanged(TFluidPress(Sender));
-        neAction: HandleFluidPressAction(TFluidPress(Sender));
+        notifyStatusChanged: HandleFluidPressStatusChanged(TFluidPress(Sender));
+        notifyAction: HandleFluidPressAction(TFluidPress(Sender));
+        notifyEvent: HandleFluidPressAction(TFluidPress(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[FluidPress.Notify] Unknown Event=%d Sender=%s Data=%s',
