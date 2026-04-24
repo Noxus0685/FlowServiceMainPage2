@@ -1540,7 +1540,6 @@ begin
 
     if FActiveWorkTable.ActivePump=nil then
     begin
-
          ProtocolManager.AddMessage(pcWarning, psForm, 'PumpStart', 'Пользователь запустил насос', 'Активного насоса нет!');
           Exit;
     end;
@@ -1548,13 +1547,8 @@ begin
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
   begin
     ProtocolManager.AddMessage(pcAction, psForm, 'PumpStart', 'Пользователь запустил насос', ComboBoxPumps.Text);
-
-
-
     FActiveWorkTable.ActivePump.DoPumpStart ;
     UpdateUIPump;
-
-
   end;
 end;
 
@@ -1665,13 +1659,11 @@ end;
 
 procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
 begin
-
     if FActiveWorkTable.ActivePump=nil then
     begin
          ProtocolManager.AddMessage(pcWarning, psForm, 'PumpStart', 'Пользователь попробовал остановить насос', 'Активного насоса нет!');
           Exit;
     end;
-
 
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
@@ -4733,30 +4725,24 @@ procedure TFrameMainTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; c
 var
   I: Integer;
   Channel: TChannel;
-  ChannelImpSec,a,b: Double;
+  ChannelImpSec: Double;
 begin
   if AChannels = nil then
     Exit;
-
-   for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
-        begin
-          a:=a+FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum( FActiveWorkTable.EtalonChannels[i].FlowMeter.Device.Qmax,4);
-        end;
-
 
   for I := 0 to AChannels.Count - 1 do
   begin
     Channel := AChannels[I];
     if Channel = nil then
       Continue;
-    b:= Channel.FlowMeter.Device.Qmax/a;
+
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec*b;
+    Channel.ImpSec := ChannelImpSec;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
