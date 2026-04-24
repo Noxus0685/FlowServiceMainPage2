@@ -9,7 +9,7 @@ uses
 
 type
   ENotifyEvent = (
-    notifyStatusChanged = 1,  // Изменилось состояние
+    notifyStateChanged = 1,  // Изменилось состояние
     notifyAction,             // Действие пользователя
     notifyEvent               // Событие которое произошло с объектом
   );

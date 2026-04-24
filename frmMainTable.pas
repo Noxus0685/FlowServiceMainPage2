@@ -583,18 +583,18 @@ type
     procedure Initialize;
     destructor Destroy; override;
 
-    procedure OnChangeState(const ANewState: EStatusWorkTable);
+    procedure OnChangeState(const ANewState: EStateWorkTable);
     procedure OnChangePoint(ASender: TObject; APoint: TDevicePoint;
       APointIndex: Integer);
-    procedure HandleWorkTableStatusChanged(const AWorkTable: TWorkTable; AData: TObject);
+    procedure HandleWorkTableStateChanged(const AWorkTable: TWorkTable; AData: TObject);
     procedure HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
-    procedure HandlePumpStatusChanged(const APump: TPump);
+    procedure HandlePumpStateChanged(const APump: TPump);
     procedure HandlePumpAction(const APump: TPump);
-    procedure HandleFlowRateStatusChanged(const AFlowRate: TFlowRate);
+    procedure HandleFlowRateStateChanged(const AFlowRate: TFlowRate);
     procedure HandleFlowRateAction(const AFlowRate: TFlowRate);
-    procedure HandleFluidTempStatusChanged(const AFluidTemp: TFluidTemp);
+    procedure HandleFluidTempStateChanged(const AFluidTemp: TFluidTemp);
     procedure HandleFluidTempAction(const AFluidTemp: TFluidTemp);
-    procedure HandleFluidPressStatusChanged(const AFluidPress: TFluidPress);
+    procedure HandleFluidPressStateChanged(const AFluidPress: TFluidPress);
     procedure HandleFluidPressAction(const AFluidPress: TFluidPress);
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 
@@ -839,14 +839,14 @@ end;
 procedure TFrameMainTable.SetConfiguration;
 begin
   if FActiveWorkTable <> nil then
-    FActiveWorkTable.Status:= swtCONFIGED;
+    FActiveWorkTable.State:= swtCONFIGED;
 end;
 
 procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.Status := swtSTARTMONITOR;
+    FActiveWorkTable.State := swtSTARTMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -855,7 +855,7 @@ procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.Status := swtSTOPMONITOR;
+    FActiveWorkTable.State := swtSTOPMONITOR;
     ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;
@@ -925,11 +925,11 @@ begin
   {}
 end;
 
-procedure TFrameMainTable.HandleWorkTableStatusChanged(const AWorkTable: TWorkTable; AData: TObject);
+procedure TFrameMainTable.HandleWorkTableStateChanged(const AWorkTable: TWorkTable; AData: TObject);
 var
   Point: TDevicePoint;
 begin
-  OnChangeState(AWorkTable.Status);
+  OnChangeState(AWorkTable.State);
 
   if AData is TDevicePoint then
     Point := TDevicePoint(AData)
@@ -950,7 +950,7 @@ begin
   UpdateForm;
 end;
 
-procedure TFrameMainTable.HandlePumpStatusChanged(const APump: TPump);
+procedure TFrameMainTable.HandlePumpStateChanged(const APump: TPump);
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ActivePump = APump) then
     UpdateUIPump;
@@ -963,7 +963,7 @@ begin
   RefreshPumpsCombo;
 end;
 
-procedure TFrameMainTable.HandleFlowRateStatusChanged(const AFlowRate: TFlowRate);
+procedure TFrameMainTable.HandleFlowRateStateChanged(const AFlowRate: TFlowRate);
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.FlowRate = AFlowRate) then
     UpdateUIFlowRate;
@@ -975,7 +975,7 @@ begin
     UpdateUIFlowRate;
 end;
 
-procedure TFrameMainTable.HandleFluidTempStatusChanged(const AFluidTemp: TFluidTemp);
+procedure TFrameMainTable.HandleFluidTempStateChanged(const AFluidTemp: TFluidTemp);
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.FluidTemp = AFluidTemp) then
     UpdateUIConditions;
@@ -987,7 +987,7 @@ begin
     UpdateUIConditions;
 end;
 
-procedure TFrameMainTable.HandleFluidPressStatusChanged(const AFluidPress: TFluidPress);
+procedure TFrameMainTable.HandleFluidPressStateChanged(const AFluidPress: TFluidPress);
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.FluidPress = AFluidPress) then
     UpdateUIConditions;
@@ -1001,7 +1001,7 @@ end;
 
 procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 const
-  notifyStatusChanged = 1;
+  notifyStateChanged = 1;
   notifyAction = 2;
   notifyEvent = 3;
 type
@@ -1043,7 +1043,7 @@ begin
   case SenderKind of
     nskWorkTable:
       case Event of
-        notifyStatusChanged: HandleWorkTableStatusChanged(TWorkTable(Sender), Data);
+        notifyStateChanged: HandleWorkTableStateChanged(TWorkTable(Sender), Data);
         notifyAction: HandleWorkTableAction(TWorkTable(Sender), Data);
         notifyEvent: HandleWorkTableAction(TWorkTable(Sender), Data);
       else
@@ -1054,7 +1054,7 @@ begin
 
     nskPump:
       case Event of
-        notifyStatusChanged: HandlePumpStatusChanged(TPump(Sender));
+        notifyStateChanged: HandlePumpStateChanged(TPump(Sender));
         notifyAction: HandlePumpAction(TPump(Sender));
         notifyEvent: HandlePumpAction(TPump(Sender));
       else
@@ -1065,7 +1065,7 @@ begin
 
     nskFlowRate:
       case Event of
-        notifyStatusChanged: HandleFlowRateStatusChanged(TFlowRate(Sender));
+        notifyStateChanged: HandleFlowRateStateChanged(TFlowRate(Sender));
         notifyAction: HandleFlowRateAction(TFlowRate(Sender));
         notifyEvent: HandleFlowRateAction(TFlowRate(Sender));
       else
@@ -1076,7 +1076,7 @@ begin
 
     nskFluidTemp:
       case Event of
-        notifyStatusChanged: HandleFluidTempStatusChanged(TFluidTemp(Sender));
+        notifyStateChanged: HandleFluidTempStateChanged(TFluidTemp(Sender));
         notifyAction: HandleFluidTempAction(TFluidTemp(Sender));
         notifyEvent: HandleFluidTempAction(TFluidTemp(Sender));
       else
@@ -1087,7 +1087,7 @@ begin
 
     nskFluidPress:
       case Event of
-        notifyStatusChanged: HandleFluidPressStatusChanged(TFluidPress(Sender));
+        notifyStateChanged: HandleFluidPressStateChanged(TFluidPress(Sender));
         notifyAction: HandleFluidPressAction(TFluidPress(Sender));
         notifyEvent: HandleFluidPressAction(TFluidPress(Sender));
       else
@@ -1102,11 +1102,11 @@ begin
   end;
 end;
 
-procedure TFrameMainTable.OnChangeState(const ANewState: EStatusWorkTable); //ChangeStateHandler
+procedure TFrameMainTable.OnChangeState(const ANewState: EStateWorkTable); //ChangeStateHandler
 begin
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.Status <> ANewState) then
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.State <> ANewState) then
   begin
-    FActiveWorkTable.Status := ANewState;
+    FActiveWorkTable.State := ANewState;
     Exit;
   end;
 
@@ -1396,7 +1396,7 @@ begin
   if FActiveWorkTable <> nil then
   begin
     FActiveWorkTable.NextClimateChangeAt := Now;
-    FActiveWorkTable.Status := swtNONE;
+    FActiveWorkTable.State := swtNONE;
   end
   else
     OnChangeState(swtNONE);
@@ -1600,7 +1600,7 @@ begin
   if WorkTable = nil then
     Exit;
 
-  if WorkTable.Status = swtMONITOR then
+  if WorkTable.State = swtMONITOR then
     StopMonitor
   else
     StartMonitor;
@@ -3384,7 +3384,7 @@ begin
 
 
 
-  if not (WorkTable.Status in [swtMONITOR, swtEXECUTE]) then
+  if not (WorkTable.State in [swtMONITOR, swtEXECUTE]) then
     Exit;
 
   IsUpdating := True;
@@ -3631,7 +3631,7 @@ begin
 
 
 
-  if WorkTable.Status in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
+  if WorkTable.State in [swtSTARTMONITORWAIT, swtMONITOR, swtSTOPMONITOR] then
     RefreshMonitorIndicator;
 
 
@@ -3962,11 +3962,11 @@ begin
 
     {Здесь должен быть код, который принимает всю сессию измерений или её отменяет}
 
-    WorkTable.Status := swtSTANDBY;
+    WorkTable.State := swtSTANDBY;
     Exit;
   end;
 
-  if WorkTable.Status = swtEXECUTE then
+  if WorkTable.State = swtEXECUTE then
     StopTest
   else
     StartTest;
@@ -3975,7 +3975,7 @@ end;
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
 begin
   if (FActiveWorkTable <> nil) then
-    FActiveWorkTable.Status := swtSTANDBY
+    FActiveWorkTable.State := swtSTANDBY
   else
     OnChangeState(swtSTANDBY);
 end;
