@@ -1362,6 +1362,14 @@ object FrameMainTable: TFrameMainTable
         Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1101#1090#1072#1083#1086#1085
         ImageIndex = -1
       end
+      object MenuItemAddPump: TMenuItem
+        Action = ActionPumpAdd
+        ImageIndex = -1
+      end
+      object MenuItemDeletePump: TMenuItem
+        Action = ActionPumpDelete
+        ImageIndex = -1
+      end
     end
     object PopupMenuInstrumentalLayOut: TPopupMenu
       OnPopup = PopupMenuInstrumentalLayOutPopup
@@ -2186,6 +2194,18 @@ object FrameMainTable: TFrameMainTable
       Category = 'EtalonChannels'
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' Etalons'
       OnExecute = ActionDeleteEtalonsExecute
+    end
+    object ActionPumpAdd: TAction
+      Category = 'WorkTable'
+      Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1085#1072#1089#1086#1089
+      Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1085#1072#1089#1086#1089
+      OnExecute = ActionPumpAddExecute
+    end
+    object ActionPumpDelete: TAction
+      Category = 'WorkTable'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1085#1072#1089#1086#1089' '
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1085#1072#1089#1086#1089' '
+      OnExecute = ActionPumpDeleteExecute
     end
   end
 end

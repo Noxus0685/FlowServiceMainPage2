@@ -22,6 +22,7 @@ type
   private
     FObservers: TList<IEventObserver>;
     FObserversLock: TObject;
+    FIsDestroying: Boolean;
   protected
     procedure Notify(Event: Integer; Data: TObject = nil); overload;
     procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
@@ -44,17 +45,33 @@ begin
 end;
 
 destructor TObservableObject.Destroy;
+var
+  LocalObservers: TArray<IObserver>;
 begin
-  TMonitor.Enter(FObserversLock);
-  try
-    if FObservers <> nil then
-      FObservers.Clear;
-  finally
-    TMonitor.Exit(FObserversLock);
+  FIsDestroying := True;
+
+  if FObserversLock <> nil then
+  begin
+    TMonitor.Enter(FObserversLock);
+    try
+      if FObservers <> nil then
+      begin
+        // делаем копию и обнуляем список
+       // LocalObservers := FObservers.ToArray;
+        FObservers.Clear;
+      end;
+    finally
+      TMonitor.Exit(FObserversLock);
+    end;
   end;
+
+  // ВАЖНО: освобождение вне lock
+  // и без доступа к FObservers
+ // SetLength(LocalObservers, 0);
 
   FreeAndNil(FObservers);
   FreeAndNil(FObserversLock);
+
   inherited Destroy;
 end;
 
@@ -102,6 +119,9 @@ procedure TObservableObject.Notify(Event: Integer; Data: TObject);
 var
   LocalObservers: TArray<IEventObserver>;
 begin
+    if FIsDestroying then
+    Exit;
+
   if FObservers = nil then
     Exit;
 

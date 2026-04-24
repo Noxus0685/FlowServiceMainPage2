@@ -405,12 +405,6 @@ begin
   inherited;
 end;
 
-
-
-
-
-
-
  function TPump.GetActionAsString: string;
 begin
   case FAction of

@@ -52,7 +52,12 @@ type
     awtStartMonitor,
     awtStopMonitor,
     awtClampTable,
-    awtUnClampTable
+    awtUnClampTable,
+    awtAddPump,
+    awtRemovePump,
+    awtAddChannel,
+    awtRemoveChannel
+
   );
 
   EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
@@ -2867,8 +2872,8 @@ begin
   else
     Exit;
   end;
-
-  Notify(AEvent, AParameter);
+ //// Не ретранслируем события Параметров
+ /// Notify(AEvent, AParameter);
 end;
 
 function TWorkTable.ResolveParameterStatusEvent(AParameters: TParameter): ENotifyEvent;
@@ -2944,23 +2949,6 @@ begin
   FActivePump := APump;
   BindParameterEvents(FActivePump);
 end;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
@@ -3062,7 +3050,6 @@ begin
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
 end;
 
-
 procedure TWorkTable.ResetMeasurementValues;
 var
   Ch: TChannel;
@@ -3147,7 +3134,6 @@ begin
     ResetMeter(Ch.ValueInterface);
   end;
 end;
-
 
 procedure TWorkTable.SaveMeasurementResults;
 var
@@ -3365,6 +3351,9 @@ begin
   BindParameterEvents(NewPump);
   FPumps.Add(NewPump);
   Result := NewPump;
+
+      FAction:=awtAddPump;
+    Notify(neAction, Self);
 end;
 
 function TWorkTable.AddPump(APump: TPump): Boolean;
@@ -3374,9 +3363,14 @@ begin
     BindParameterEvents(APump);
     FPumps.Add(APump);
     Result := True;
+    FAction:=awtAddPump;
+    Notify(neAction, Self);
+
   end
   else
     Result := False;
+
+
 end;
 
 procedure TWorkTable.RemovePump(const APumpUUID: string);
@@ -3390,6 +3384,9 @@ begin
       FActivePump := nil;
     UnbindParameterEvents(Pump);
     FPumps.Remove(Pump);
+
+    FAction:=awtRemovePump;
+    Notify(neAction, Self);
   end;
 end;
 

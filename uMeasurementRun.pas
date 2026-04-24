@@ -530,6 +530,9 @@ destructor TMeasurementRun.Destroy;
 var
   LThread: TThread;
 begin
+  //  if Assigned(FWorkTable) then
+  //  FWorkTable.Unsubscribe(Self);
+
   FCriticalSection.Acquire;
   try
     LThread := FThread;
