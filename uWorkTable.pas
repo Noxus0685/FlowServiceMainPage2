@@ -2865,29 +2865,30 @@ begin
     Exit;
 
   case Event of
-    Ord(neStatusChanged):
+    Ord(notifyStatusChanged):
       AEvent := ResolveParameterStatusEvent(AParameter);
-    Ord(neAction):
+    Ord(notifyAction):
       AEvent := ResolveParameterActionEvent(AParameter, AParameter.Action);
+    Ord(notifyEvent):
+      AEvent := notifyEvent;
   else
     Exit;
   end;
- //// Не ретранслируем события Параметров
- /// Notify(AEvent, AParameter);
+  Notify(AEvent, AParameter);
 end;
 
 function TWorkTable.ResolveParameterStatusEvent(AParameters: TParameter): ENotifyEvent;
 begin
   if AParameters is TPump then
-    Exit(neStatusChanged);
+    Exit(notifyStatusChanged);
   if AParameters is TFlowRate then
-    Exit(neStatusChanged);
+    Exit(notifyStatusChanged);
   if AParameters is TFluidTemp then
-    Exit(neStatusChanged);
+    Exit(notifyStatusChanged);
   if AParameters is TFluidPress then
-    Exit(neStatusChanged);
+    Exit(notifyStatusChanged);
 
-  Result := neStatusChanged;
+  Result := notifyStatusChanged;
 end;
 
 function TWorkTable.ResolveParameterActionEvent(AParameters: TParameter;
@@ -2896,48 +2897,48 @@ begin
   if AParameters is TPump then
   begin
     case AParameterAction of
-      apStart: Exit(neAction);
-      apStop: Exit(neAction);
-      apSet: Exit(neAction);
+      apStart: Exit(notifyAction);
+      apStop: Exit(notifyAction);
+      apSet: Exit(notifyAction);
     else
-      Exit(neStatusChanged);
+      Exit(notifyStatusChanged);
     end;
   end;
 
   if AParameters is TFlowRate then
   begin
     case AParameterAction of
-      apStart: Exit(neAction);
-      apStop: Exit(neAction);
-      apSet: Exit(neAction);
+      apStart: Exit(notifyAction);
+      apStop: Exit(notifyAction);
+      apSet: Exit(notifyAction);
     else
-      Exit(neStatusChanged);
+      Exit(notifyStatusChanged);
     end;
   end;
 
   if AParameters is TFluidTemp then
   begin
     case AParameterAction of
-      apStart: Exit(neAction);
-      apStop: Exit(neAction);
-      apSet: Exit(neAction);
+      apStart: Exit(notifyAction);
+      apStop: Exit(notifyAction);
+      apSet: Exit(notifyAction);
     else
-      Exit(neStatusChanged);
+      Exit(notifyStatusChanged);
     end;
   end;
 
   if AParameters is TFluidPress then
   begin
     case AParameterAction of
-      apStart: Exit(neAction);
-      apStop: Exit(neAction);
-      apSet: Exit(neAction);
+      apStart: Exit(notifyAction);
+      apStop: Exit(notifyAction);
+      apSet: Exit(notifyAction);
     else
-      Exit(neStatusChanged);
+      Exit(notifyStatusChanged);
     end;
   end;
 
-  Result := neStatusChanged;
+  Result := notifyStatusChanged;
 end;
 
 procedure TWorkTable.SetActivePumpObject(const APump: TPump);
@@ -2952,49 +2953,49 @@ end;
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
-  Notify(neAction, Self);
+  Notify(notifyAction, Self);
   if Assigned(FOnProcStart) then
     FOnProcStart(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcStop(AProcName: string);
 begin
-  Notify(neAction, Self);
+  Notify(notifyAction, Self);
   if Assigned(FOnProcStop) then
     FOnProcStop(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcPause(AProcName: string);
 begin
-  Notify(neAction, Self);
+  Notify(notifyAction, Self);
   if Assigned(FOnProcPause) then
     FOnProcPause(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcNextStep(AProcName: string);
 begin
-  Notify(neAction, FCurrentPoint);
+  Notify(notifyAction, FCurrentPoint);
   if Assigned(FOnProcNextStep) then
     FOnProcNextStep(Self, AProcName);
 end;
 
 procedure TWorkTable.DoProcRepeat(AProcName: string);
 begin
-  Notify(neAction, Self);
+  Notify(notifyAction, Self);
   if Assigned(FOnProcRepeat) then
     FOnProcRepeat(Self, AProcName);
 end;
 
 procedure TWorkTable.DoSpillageStart;
 begin
-  Notify(neAction, Self);
+  Notify(notifyAction, Self);
   if Assigned(FOnSpillageStart) then
     FOnSpillageStart(Self);
 end;
 
 procedure TWorkTable.DoSpillageStop;
 begin
-  Notify(neAction, Self);
+  Notify(notifyAction, Self);
   if Assigned(FOnSpillageStop) then
     FOnSpillageStop(Self);
 end;
@@ -3011,7 +3012,7 @@ end;
 
 procedure TWorkTable.DoStateChanged(ANewState: EStatusWorkTable);
 begin
-  Notify(neStatusChanged, Self);
+  Notify(notifyStatusChanged, Self);
   if Assigned(FOnStateChanged) then
     FOnStateChanged(ANewState);
 end;
@@ -3046,7 +3047,7 @@ begin
   if (FCurrentPoint <> nil) and (APoint <> nil) then
     FCurrentPoint.Assign(APoint, True);
 
-  Notify(neStatusChanged, APoint);
+  Notify(notifyStatusChanged, APoint);
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
 end;
 
@@ -3262,7 +3263,7 @@ procedure TWorkTable.StartTest;
    ResetMeasurementValues;
    Status := swtSTARTTEST;
    FAction := awtStartTest;
-   Notify(neAction, Self);
+   Notify(notifyAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
      'Запуск теста', Name);
   end;
@@ -3272,7 +3273,7 @@ procedure TWorkTable.StartMonitor;
    ResetMeasurementValues;
    Status := swtSTARTMONITOR;
    FAction := awtStartMonitor;
-   Notify(neAction, Self);
+   Notify(notifyAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
      'Запуск мониторинга', Name);
   end;
@@ -3281,7 +3282,7 @@ procedure TWorkTable.StopTest;
   begin
     Status := swtSTOPTEST;
     FAction := awtStopTest;
-    Notify(neAction, Self);
+    Notify(notifyAction, Self);
     ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
       'Остановка теста', Name);
   end;
@@ -3291,7 +3292,7 @@ procedure TWorkTable.StopMonitor;
    ResetMeasurementValues;
    Status := swtSTOPMONITOR;
    FAction := awtStopMonitor;
-   Notify(neAction, Self);
+   Notify(notifyAction, Self);
    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
      'Остановка мониторинга', Name);
   end;
@@ -3353,7 +3354,7 @@ begin
   Result := NewPump;
 
       FAction:=awtAddPump;
-    Notify(neAction, Self);
+    Notify(notifyAction, Self);
 end;
 
 function TWorkTable.AddPump(APump: TPump): Boolean;
@@ -3364,7 +3365,7 @@ begin
     FPumps.Add(APump);
     Result := True;
     FAction:=awtAddPump;
-    Notify(neAction, Self);
+    Notify(notifyAction, Self);
 
   end
   else
@@ -3386,7 +3387,7 @@ begin
     FPumps.Remove(Pump);
 
     FAction:=awtRemovePump;
-    Notify(neAction, Self);
+    Notify(notifyAction, Self);
   end;
 end;
 

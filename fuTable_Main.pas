@@ -424,7 +424,7 @@ AValue:Double;
     Exit;   }
 
   case AEvent of
-    neAction:
+    notifyAction:
       begin
         if AData is TPump then
           begin
@@ -446,7 +446,7 @@ AValue:Double;
 
       end;
 
-     neStatusChanged:
+     notifyStatusChanged:
       begin
         if AData is TPump then
           mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
@@ -462,6 +462,18 @@ AValue:Double;
         if AData is TFluidPress then
           mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FluidPress.ValueSet.value) + ' Состояние: ' + FluidPress.GetActionAsString);
 
+      end;
+
+     notifyEvent:
+      begin
+        if AData is TPump then
+          mPump.Lines.Add('Событие насоса, код: ' + IntToStr(TPump(AData).Event));
+        if AData is TFlowRate then
+          mPump.Lines.Add('Событие расхода, код: ' + IntToStr(TFlowRate(AData).Event));
+        if AData is TFluidTemp then
+          mPump.Lines.Add('Событие температуры, код: ' + IntToStr(TFluidTemp(AData).Event));
+        if AData is TFluidPress then
+          mPump.Lines.Add('Событие давления, код: ' + IntToStr(TFluidPress(AData).Event));
       end;
 
   end;
