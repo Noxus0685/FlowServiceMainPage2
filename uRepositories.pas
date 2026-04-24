@@ -4296,6 +4296,9 @@ begin
     Col('LimitVolume', 'REAL'),
     Col('LimitTime', 'REAL'),
     Col('SpillageStop', 'INTEGER'),
+    Col('SpillageType', 'INTEGER'),
+    Col('EtalonType', 'INTEGER'),
+    Col('FlowSorceType', 'INTEGER'),
 
     Col('Error', 'REAL'),
 
@@ -4383,6 +4386,9 @@ begin
   Result.LimitVolume := Q.FieldByName('LimitVolume').AsFloat;
   Result.LimitTime := Q.FieldByName('LimitTime').AsFloat;
   Result.SpillageStop := Q.FieldByName('SpillageStop').AsInteger;
+  Result.SpillageType := Q.FieldByName('SpillageType').AsInteger;
+  Result.EtalonType := Q.FieldByName('EtalonType').AsInteger;
+  Result.FlowSorceType := Q.FieldByName('FlowSorceType').AsInteger;
 
   {================ Погрешности ==================}
   Result.Error := Q.FieldByName('Error').AsFloat;
@@ -4575,13 +4581,13 @@ begin
             'DeviceUUID, DeviceTypePointID, Num, Name, Description, ' +
             'FlowRate, Q, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
-            'LimitImp, LimitVolume, LimitTime, SpillageStop, ' +
+            'LimitImp, LimitVolume, LimitTime, SpillageStop, SpillageType, EtalonType, FlowSorceType, ' +
             'Error, Pause, RepeatsProtocol, Repeats' +
             ') values (' +
             ':DeviceUUID, :DeviceTypePointID, :Num, :Name, :Description, ' +
             ':FlowRate, :Q, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
-            ':LimitImp, :LimitVolume, :LimitTime, :SpillageStop, ' +
+            ':LimitImp, :LimitVolume, :LimitTime, :SpillageStop, :SpillageType, :EtalonType, :FlowSorceType, ' +
             ':Error, :Pause, :RepeatsProtocol, :Repeats' +
             ')';
         end;
@@ -4600,6 +4606,7 @@ begin
             'FlowRate=:FlowRate, Q=:Q, FlowAccuracy=:FlowAccuracy, ' +
             'Pressure=:Pressure, Temp=:Temp, TempAccuracy=:TempAccuracy, ' +
             'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, SpillageStop=:SpillageStop, ' +
+            'SpillageType=:SpillageType, EtalonType=:EtalonType, FlowSorceType=:FlowSorceType, ' +
             'Error=:Error, Pause=:Pause, ' +
             'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats ' +
             'where ID=:ID';
@@ -4633,6 +4640,9 @@ begin
     SetFloatParam(Q, 'LimitVolume', APoint.LimitVolume);
     SetFloatParam(Q, 'LimitTime', APoint.LimitTime);
     SetIntParam(Q, 'SpillageStop', APoint.SpillageStop);
+    SetIntParam(Q, 'SpillageType', APoint.SpillageType);
+    SetIntParam(Q, 'EtalonType', APoint.EtalonType);
+    SetIntParam(Q, 'FlowSorceType', APoint.FlowSorceType);
 
     SetFloatParam(Q, 'Error', APoint.Error);
     SetIntParam(Q, 'Pause', APoint.Pause);
