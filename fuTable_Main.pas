@@ -103,6 +103,7 @@ type
     procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
     procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
     procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
+    procedure ExecuteRandomControlAction(const AWorkTable: TWorkTable);
     function BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
       const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
@@ -128,6 +129,10 @@ type
     procedure SetT_WorkBench_Last(const Value: Double);
     procedure SubscribeToWorkTable(const AWorkTable: TWorkTable);
     procedure UnsubscribeFromWorkTable;
+    procedure SubscribeToRelatedObjects(const AWorkTable: TWorkTable;
+      const AObserver: IEventObserver);
+    procedure UnsubscribeFromRelatedObjects(const AWorkTable: TWorkTable;
+      const AObserver: IEventObserver);
     procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
@@ -378,19 +383,69 @@ begin
   UnsubscribeFromWorkTable;
   Observer := Self;
   AWorkTable.Subscribe(Observer);
+  SubscribeToRelatedObjects(AWorkTable, Observer);
   FSubscribedWorkTable := AWorkTable;
 end;
 
 procedure TTableMainForm.UnsubscribeFromWorkTable;
 var
   Observer: IEventObserver;
+  WorkTable: TWorkTable;
 begin
   if FSubscribedWorkTable = nil then
     Exit;
 
+  WorkTable := FSubscribedWorkTable;
   Observer := Self;
-  FSubscribedWorkTable.Unsubscribe(Observer);
+  UnsubscribeFromRelatedObjects(WorkTable, Observer);
+  WorkTable.Unsubscribe(Observer);
   FSubscribedWorkTable := nil;
+end;
+
+procedure TTableMainForm.SubscribeToRelatedObjects(const AWorkTable: TWorkTable;
+  const AObserver: IEventObserver);
+var
+  Pump: TPump;
+begin
+  if (AWorkTable = nil) or (AObserver = nil) then
+    Exit;
+
+  if AWorkTable.FlowRate <> nil then
+    AWorkTable.FlowRate.Subscribe(AObserver);
+
+  if AWorkTable.FluidTemp <> nil then
+    AWorkTable.FluidTemp.Subscribe(AObserver);
+
+  if AWorkTable.FluidPress <> nil then
+    AWorkTable.FluidPress.Subscribe(AObserver);
+
+  if AWorkTable.Pumps <> nil then
+    for Pump in AWorkTable.Pumps do
+      if Pump <> nil then
+        Pump.Subscribe(AObserver);
+end;
+
+procedure TTableMainForm.UnsubscribeFromRelatedObjects(const AWorkTable: TWorkTable;
+  const AObserver: IEventObserver);
+var
+  Pump: TPump;
+begin
+  if (AWorkTable = nil) or (AObserver = nil) then
+    Exit;
+
+  if AWorkTable.FlowRate <> nil then
+    AWorkTable.FlowRate.Unsubscribe(AObserver);
+
+  if AWorkTable.FluidTemp <> nil then
+    AWorkTable.FluidTemp.Unsubscribe(AObserver);
+
+  if AWorkTable.FluidPress <> nil then
+    AWorkTable.FluidPress.Unsubscribe(AObserver);
+
+  if AWorkTable.Pumps <> nil then
+    for Pump in AWorkTable.Pumps do
+      if Pump <> nil then
+        Pump.Unsubscribe(AObserver);
 end;
 
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
@@ -428,11 +483,27 @@ AValue:Double;
       begin
         if AData is TPump then
           begin
-          end;
+
+              IF (Pump.Action = apStart)  THEN
+                Pump.Status:=spStarted
+              else  if (Pump.Action = apStop) then
+              Pump.Status := spStopped
+              else  if (Pump.Action = apSet) and not(Pump.IsRunning = true) then
+                Pump.Status:=spChanging
+              else  if (Pump.Action = apSet) and (Pump.IsRunning = true) then
+               Pump.Status:=spOngoing ;
+                      end;
 
         if AData is TFlowRate then
           begin
-
+              IF (FlowRate.Action = apStart)  THEN
+                FlowRate.Status:=spStarted
+              else  if (FlowRate.Action = apStop) then
+                FlowRate.Status := spStopped
+              else  if (FlowRate.Action = apSet) and not(FlowRate.IsRunning = true) then
+                FlowRate.Status:=spChanging
+              else  if (FlowRate.Action = apSet) and (FlowRate.IsRunning = true) then
+               FlowRate.Status:=spOngoing ;
                 {if FlowRate.ValueSet.value>=FlowRate.Value.value then
                   WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
                 else
@@ -484,7 +555,6 @@ end;
 procedure TTableMainForm.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 var
   NotifyEvent: EWorkTableNotifyEvent;
-  Pump: TPump;
 begin
   if Sender = nil then
     Exit;
@@ -498,6 +568,12 @@ begin
 
   if Sender is TWorkTable then
     HandleWorkTableNotify(Sender, NotifyEvent, Data);
+
+  if (Sender is TPump) or
+     (Sender is TFlowRate) or
+     (Sender is TFluidTemp) or
+     (Sender is TFluidPress) then
+    HandleWorkTableNotify(FSubscribedWorkTable, NotifyEvent, Sender);
 end;
 
 function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
@@ -1061,6 +1137,51 @@ begin
   end;
 end;
 
+procedure TTableMainForm.ExecuteRandomControlAction(const AWorkTable: TWorkTable);
+var
+  ActionIndex: Integer;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  ActionIndex := 9;// Random(11);
+  case ActionIndex of
+    0:
+      if AWorkTable.ActivePump <> nil then
+        AWorkTable.ActivePump.DoPumpStart;
+    1:
+      if AWorkTable.ActivePump <> nil then
+        AWorkTable.ActivePump.DoFreqSet(Random(10));
+    2:
+      if AWorkTable.ActivePump <> nil then
+        AWorkTable.ActivePump.DoPumpStop;
+    3:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateStart;
+    4:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateStart(Random(10));
+    5:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateStop;
+    6:
+      if AWorkTable.FlowRate <> nil then
+        AWorkTable.FlowRate.DoFlowRateSet(Random(10));
+    7:
+      if AWorkTable.FluidTemp <> nil then
+        AWorkTable.FluidTemp.DoFluidTempStart(Random(10));
+    8:
+      if AWorkTable.FluidTemp <> nil then
+        AWorkTable.FluidTemp.DoFluidTempStop;
+    9:
+      if AWorkTable.FluidPress <> nil then
+        AWorkTable.FluidPress.DoFluidPressStart(Random(10));
+    10:
+      if AWorkTable.FluidPress <> nil then
+        AWorkTable.FluidPress.DoFluidPressStop;
+  end;
+end;
+
 procedure TTableMainForm.TimerSetValuesTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;   // Текущая рабочая таблица (сессия измерения)
@@ -1104,6 +1225,9 @@ begin
 
   // Обновление давления
   UpdateRandomPress(WorkTable);
+
+  // Рандомный вызов одной из уникальных управляющих функций
+  ExecuteRandomControlAction(WorkTable);
 
 
   //UpdateTemp(WorkTable);

@@ -216,7 +216,7 @@ end;
 begin
   case FAction of
     apStart: Result := 'Запущен';
-    apSet: Result := 'Изменена утсановленная температура';
+    apSet: Result := 'Изменена установленная температура';
     apStop: Result := 'Сброшен';
   else
     Result := 'Неизвестно';
