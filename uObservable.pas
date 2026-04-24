@@ -58,7 +58,7 @@ begin
       begin
         // делаем копию и обнуляем список
        // LocalObservers := FObservers.ToArray;
-        FObservers.Clear;
+      //  FObservers.Clear;
       end;
     finally
       TMonitor.Exit(FObserversLock);
@@ -69,8 +69,8 @@ begin
   // и без доступа к FObservers
  // SetLength(LocalObservers, 0);
 
-  FreeAndNil(FObservers);
-  FreeAndNil(FObserversLock);
+  //FreeAndNil(FObservers);
+  //FreeAndNil(FObserversLock);
 
   inherited Destroy;
 end;

@@ -258,7 +258,7 @@ type
     FPointDeleteOwner: TObject;
   public
     { Public declarations }
-    procedure Initialize(AWorkTableManager: TWorkTableManager);
+    procedure Initialize;
     procedure RefreshResultsTab;
     destructor Destroy; override;
   end;
@@ -317,11 +317,11 @@ begin
   inherited;
 end;
 
-procedure TFrameProceed.Initialize(AWorkTableManager: TWorkTableManager);
+procedure TFrameProceed.Initialize;
 var
   UnitName: string;
 begin
-  FWorkTableManager := AWorkTableManager;
+  FWorkTableManager := WorkTableManager;
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
 
   if FProcessingDevices = nil then

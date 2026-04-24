@@ -360,7 +360,7 @@ begin
   FFrameProceed := TFrameProceed.Create(Self);
   FFrameProceed.Parent := tiResults;
   FFrameProceed.Align := TAlignLayout.Client;
-  FFrameProceed.Initialize(FWorkTableManager);
+  FFrameProceed.Initialize;
 
 
 end;
