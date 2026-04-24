@@ -128,6 +128,10 @@ type
     procedure SetT_WorkBench_Last(const Value: Double);
     procedure SubscribeToWorkTable(const AWorkTable: TWorkTable);
     procedure UnsubscribeFromWorkTable;
+    procedure SubscribeToRelatedObjects(const AWorkTable: TWorkTable;
+      const AObserver: IEventObserver);
+    procedure UnsubscribeFromRelatedObjects(const AWorkTable: TWorkTable;
+      const AObserver: IEventObserver);
     procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
@@ -378,19 +382,69 @@ begin
   UnsubscribeFromWorkTable;
   Observer := Self;
   AWorkTable.Subscribe(Observer);
+  SubscribeToRelatedObjects(AWorkTable, Observer);
   FSubscribedWorkTable := AWorkTable;
 end;
 
 procedure TTableMainForm.UnsubscribeFromWorkTable;
 var
   Observer: IEventObserver;
+  WorkTable: TWorkTable;
 begin
   if FSubscribedWorkTable = nil then
     Exit;
 
+  WorkTable := FSubscribedWorkTable;
   Observer := Self;
-  FSubscribedWorkTable.Unsubscribe(Observer);
+  UnsubscribeFromRelatedObjects(WorkTable, Observer);
+  WorkTable.Unsubscribe(Observer);
   FSubscribedWorkTable := nil;
+end;
+
+procedure TTableMainForm.SubscribeToRelatedObjects(const AWorkTable: TWorkTable;
+  const AObserver: IEventObserver);
+var
+  Pump: TPump;
+begin
+  if (AWorkTable = nil) or (AObserver = nil) then
+    Exit;
+
+  if AWorkTable.FlowRate <> nil then
+    AWorkTable.FlowRate.Subscribe(AObserver);
+
+  if AWorkTable.FluidTemp <> nil then
+    AWorkTable.FluidTemp.Subscribe(AObserver);
+
+  if AWorkTable.FluidPress <> nil then
+    AWorkTable.FluidPress.Subscribe(AObserver);
+
+  if AWorkTable.Pumps <> nil then
+    for Pump in AWorkTable.Pumps do
+      if Pump <> nil then
+        Pump.Subscribe(AObserver);
+end;
+
+procedure TTableMainForm.UnsubscribeFromRelatedObjects(const AWorkTable: TWorkTable;
+  const AObserver: IEventObserver);
+var
+  Pump: TPump;
+begin
+  if (AWorkTable = nil) or (AObserver = nil) then
+    Exit;
+
+  if AWorkTable.FlowRate <> nil then
+    AWorkTable.FlowRate.Unsubscribe(AObserver);
+
+  if AWorkTable.FluidTemp <> nil then
+    AWorkTable.FluidTemp.Unsubscribe(AObserver);
+
+  if AWorkTable.FluidPress <> nil then
+    AWorkTable.FluidPress.Unsubscribe(AObserver);
+
+  if AWorkTable.Pumps <> nil then
+    for Pump in AWorkTable.Pumps do
+      if Pump <> nil then
+        Pump.Unsubscribe(AObserver);
 end;
 
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
@@ -472,7 +526,6 @@ end;
 procedure TTableMainForm.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
 var
   NotifyEvent: EWorkTableNotifyEvent;
-  Pump: TPump;
 begin
   if Sender = nil then
     Exit;
@@ -486,6 +539,12 @@ begin
 
   if Sender is TWorkTable then
     HandleWorkTableNotify(Sender, NotifyEvent, Data);
+
+  if (Sender is TPump) or
+     (Sender is TFlowRate) or
+     (Sender is TFluidTemp) or
+     (Sender is TFluidPress) then
+    HandleWorkTableNotify(FSubscribedWorkTable, NotifyEvent, Sender);
 end;
 
 function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
