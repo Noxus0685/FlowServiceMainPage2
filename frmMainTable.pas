@@ -1567,8 +1567,8 @@ begin
   begin
     AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
     FActiveWorkTable.FlowRate.DoFlowRateSet(AValue);
-    if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
-      FActiveWorkTable.FlowRate.Start;
+    //if FActiveWorkTable.FlowRate.IsStable(StableStatus) then
+    //  FActiveWorkTable.FlowRate.Start;
     UpdateUIFlowRate;
   end;
 end;

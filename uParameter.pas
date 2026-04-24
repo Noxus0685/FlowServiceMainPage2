@@ -585,7 +585,7 @@ end;
 
 procedure TParameter.SetStatus(AStatus: EStatusParameter);
 begin
-  if FStatus = AStatus then
+  if FStatus = AStatus  then
     Exit;
 
   FStatus := AStatus;
@@ -670,7 +670,7 @@ end;
 
 function TParameter.GetIsRunning: Boolean;
 begin
-  Result := (FStatus = spStarted);
+  Result := (FStatus = spStarted) or (FStatus = spOngoing  );
 end;
 
 function TParameter.GetIsChanging: Boolean;

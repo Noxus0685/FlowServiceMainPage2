@@ -215,7 +215,7 @@ end;
 
 procedure  TTableMainForm.PumpStateHandler(AParameters: TParameter; AAction:EActionParameter);
 begin
-  TableMainForm.mPump.Lines.Add('Насос: ' + AParameters.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
+  //TableMainForm.mPump.Lines.Add('Насос: ' + AParameters.Name +' Состояние: ' + FWorkTableManager.ActiveWorkTable.ActivePump.GetActionAsString);
 end;
 
 procedure TTableMainForm.SetT_WorkBench_First(const Value: Double);
@@ -253,7 +253,7 @@ EnabledEtalonChannels: TObjectList<TChannel>;
 AValue:Double;
 
 begin
-  WorkTable:= FWorkTableManager.ActiveWorkTable;
+ { WorkTable:= FWorkTableManager.ActiveWorkTable;
   TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(WorkTable.FlowRate.ValueSet.value)+ ' - Состояние: ' + WorkTable.FlowRate.GetActionAsString );
 
 
@@ -278,20 +278,20 @@ begin
      WorkTable.ActivePump.DoPumpStart;
    end;
 
-
+      }
 end;
 
 procedure  TTableMainForm.FlowFluidTempHandler(AParameters: TParameter; AAction:EActionParameter);
 begin
 
-  TableMainForm.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
+  //TableMainForm.mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidTemp.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidTemp.GetActionAsString);
 
 end;
 
 procedure  TTableMainForm.FlowFluidPressHandler(AParameters: TParameter; AAction:EActionParameter);
 begin
 
-  TableMainForm.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
+  //TableMainForm.mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FWorkTableManager.ActiveWorkTable.FluidPress.ValueSet.value) + ' Состояние: ' + FWorkTableManager.ActiveWorkTable.FluidPress.GetActionAsString);
 
 end;
 
@@ -394,53 +394,79 @@ begin
 end;
 
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
-  AEvent: EWorkTableNotifyEvent; AData: TObject);
+  AEvent: ENotifyEvent; AData: TObject);
 var
 FlowRate: TFlowRate;
 Pump: TPump;
 WorkTable:TWorkTable;
+FluidTemp:TFluidTemp;
+FluidPress:TFluidPress;
 i:integer;
 EnabledEtalonChannels: TObjectList<TChannel>;
 AValue:Double;
   begin
-  Pump := nil;
-  FlowRate := nil;
-
   if (ASender = nil) or (FWorkTableManager = nil) then
     Exit;
+  if ASender is TWorkTable then
+    WorkTable:= ASender AS TWorkTable;
 
   if AData is TPump then
     Pump := AData as TPump;
   if AData is TFlowRate then
     FlowRate := AData as TFlowRate;
+  if AData is TFluidTemp then
+    FluidTemp := AData as TFluidTemp;
+  if AData is tFluidPress then
+    FluidPress := AData as TFluidPress;
 
  { if (FWorkTableManager.ActiveWorkTable = nil) or
      (ASender <> FWorkTableManager.ActiveWorkTable) then
     Exit;   }
 
-
-
-
   case AEvent of
-    neStatusChanged:
-      begin
-        if Pump <> nil then
-          mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString)
-        else if FlowRate <> nil then
-          TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString )
-        else
-          mPump.Lines.Add('Notify: состояние стола изменено');
-      end;
     neAction:
       begin
-        if Pump <> nil then
-          mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString)
-        else if FlowRate <> nil then
-          TableMainForm.mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString )
-        else if AData <> nil then
-          mPump.Lines.Add('Notify: получено действие рабочего стола');
+        if AData is TPump then
+          begin
+          end;
+
+        if AData is TFlowRate then
+          begin
+
+                {if FlowRate.ValueSet.value>=FlowRate.Value.value then
+                  WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
+                else
+                  WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-random(5));   }
+                if WorkTable.ActivePump.Value.value<12 then
+                  WorkTable.ActivePump.ValueSet.value:=12;
+                if not(WorkTable.ActivePump.IsRunning) then
+                  WorkTable.ActivePump.DoPumpStart;
+
+          end;
+
       end;
+
+     neStatusChanged:
+      begin
+        if AData is TPump then
+          mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
+        if AData is TFlowRate then
+          begin
+              mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+              if (FlowRate.Action = apSet) or (FlowRate.Action = apStart) then
+                WorkTable.ResetMeasurementValues;
+          end;
+        if AData is TFluidTemp then
+          mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FluidTemp.ValueSet.value) + ' Состояние: ' + FluidTemp.GetActionAsString);
+
+        if AData is TFluidPress then
+          mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FluidPress.ValueSet.value) + ' Состояние: ' + FluidPress.GetActionAsString);
+
+      end;
+
   end;
+
+
 end;
 
 procedure TTableMainForm.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -452,9 +478,9 @@ begin
     Exit;
 
 
-  if (Event < Ord(Low(EWorkTableNotifyEvent))) or
+  {if (Event < Ord(Low(EWorkTableNotifyEvent))) or
      (Event > Ord(High(EWorkTableNotifyEvent))) then
-    Exit;
+    Exit;  }
 
   NotifyEvent := EWorkTableNotifyEvent(Event);
 
@@ -543,8 +569,7 @@ begin
   // В зависимости от текущего действия (Action)
   // обновляем статус параметра температуры
 
-  if (AWorkTable.FluidTemp.Action = apStart) or
-     (AWorkTable.FluidTemp.Action = apSet) then
+  if (AWorkTable.FluidTemp.Action = apStart) then
 
     // Начато регулирование/установка температуры
     AWorkTable.FluidTemp.Status := spStarted
@@ -552,8 +577,11 @@ begin
   else if (AWorkTable.FluidTemp.Action = apStop) then
 
     // Остановка регулирования
-    AWorkTable.FluidTemp.Status := spStopped;
-
+    AWorkTable.FluidTemp.Status := spStopped
+  else  if (AWorkTable.FluidTemp.Action = apSet) and not(AWorkTable.FluidTemp.IsRunning = true) then
+    AWorkTable.FluidTemp.Status:=spChanging
+  else  if (AWorkTable.FluidTemp.Action = apSet) and (AWorkTable.FluidTemp.IsRunning = true) then
+    AWorkTable.FluidTemp.Status:=spOngoing ;
 
   // ============================================================
   // 3. Ограничение частоты обновления (не каждый тик таймера)
@@ -650,8 +678,11 @@ begin
   IF AWorkTable.FluidPress.Action = apStart THEN
     AWorkTable.FluidPress.Status:=spStarted
   else  if (AWorkTable.FluidPress.Action = apStop) then
-    AWorkTable.FluidPress.Status:=spStopped;
-
+    AWorkTable.FluidPress.Status:=spStopped
+    else  if (AWorkTable.FluidPress.Action = apSet) and not(AWorkTable.FluidPress.IsRunning = true) then
+    AWorkTable.FluidPress.Status:=spChanging
+  else  if (AWorkTable.FluidPress.Action = apSet) and (AWorkTable.FluidPress.IsRunning = true) then
+    AWorkTable.FluidPress.Status:=spOngoing ;
   if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
   begin
 
@@ -707,8 +738,11 @@ begin
   IF (Pump.Action = apStart)  THEN
     Pump.Status:=spStarted
   else  if (Pump.Action = apStop) then
-    Pump.Status:=spStopped;
-
+    Pump.Status:=spStopped
+  else  if (Pump.Action = apSet) and not(Pump.IsRunning = true) then
+    Pump.Status:=spChanging
+  else  if (Pump.Action = apSet) and (Pump.IsRunning = true) then
+    Pump.Status:=spOngoing ;
 
 
 
@@ -859,6 +893,14 @@ begin
   if FlowRate = nil then
     Exit;
 
+  IF (FlowRate.Action = apStart)  THEN
+    FlowRate.Status:=spStarted
+  else  if (FlowRate.Action = apStop) then
+    FlowRate.Status:=spStopped
+  else  if (FlowRate.Action = apSet) and not(FlowRate.IsRunning = true) then
+    FlowRate.Status:=spChanging
+  else  if (FlowRate.Action = apSet) and (FlowRate.IsRunning = true) then
+    FlowRate.Status:=spOngoing ;
 
 
   WorkTable:= FWorkTableManager.ActiveWorkTable;
