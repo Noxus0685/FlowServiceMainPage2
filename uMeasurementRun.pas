@@ -1318,7 +1318,7 @@ begin
 
     msMeasure:
       begin
-        if (FWorkTable <> nil) and (FWorkTable.Status = swtCOMPLETE) then
+        if (FWorkTable <> nil) and (FWorkTable.State = swtCOMPLETE) then
         begin
           GetCurrentPoint.Status:= 9;
           FWorkTable.SaveMeasurementResults;
