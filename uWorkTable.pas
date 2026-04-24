@@ -3670,24 +3670,6 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  // ============================================================
-  // 2. Обработка управляющих команд температуры
-  // ============================================================
-
-  // В зависимости от текущего действия (Action)
-  // обновляем статус параметра температуры
-
-  if (AWorkTable.FluidTemp.Action = apStart) or
-     (AWorkTable.FluidTemp.Action = apSet) then
-
-    // Начато регулирование/установка температуры
-    AWorkTable.FluidTemp.State := spStarted
-
-  else if (AWorkTable.FluidTemp.Action = apStop) then
-
-    // Остановка регулирования
-    AWorkTable.FluidTemp.State := spStarted;
-
 
   // ============================================================
   // 3. Ограничение частоты обновления (не каждый тик таймера)
@@ -3782,10 +3764,6 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  IF AWorkTable.FluidPress.Action = apStart THEN
-    AWorkTable.FluidPress.State:=spStarted
-  else  if (AWorkTable.FluidPress.Action = apStop) then
-    AWorkTable.FluidPress.State:=spStopped;
 
   if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
   begin
@@ -3839,13 +3817,6 @@ begin
   if Pump = nil then
     Exit;
 
-  IF (Pump.Action = apStart)  THEN
-    Pump.State:=spStarted
-  else  if (Pump.Action = apStop) then
-    Pump.State:=spStopped;
-
-
-
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
@@ -3897,26 +3868,26 @@ begin
   if (AWorkTable.NextFreqChangeAt = 0) or (Now >= AWorkTable.NextFreqChangeAt) then
   begin
 
-    if WorkTable=nil then
+    if AWorkTable=nil then
     exit;
 
-    if WorkTable.ActivePump=nil then
+    if AWorkTable.ActivePump=nil then
     exit;
 
       if FlowRate.IsRunning then
       begin
         EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
         try
-          for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-            if (WorkTable.EtalonChannels[I] <> nil) and (WorkTable.EtalonChannels[I].Enabled) then
-              EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
+          for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+            if (AWorkTable.EtalonChannels[I] <> nil) and (AWorkTable.EtalonChannels[I].Enabled) then
+              EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
 
               IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
+               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
               else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
               else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
 
 
 
@@ -3927,30 +3898,30 @@ begin
               12
             );
 
-           { FFrameMainTable.ApplyChannelValues(
+            AWorkTable.ApplyChannelValues(
               EnabledEtalonChannels,
               NormalizeFloatInput('0'),
               ImpSecValues,
               NormalizeFloatInput('0')
-            ); }
+            );
 
         finally
           EnabledEtalonChannels.Free;
         end;
         EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
         try
-          for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+          for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
             begin
-            if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].Enabled) then
-              EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
+            if (AWorkTable.DeviceChannels[I] <> nil) and (AWorkTable.DeviceChannels[I].Enabled) then
+              EnabledDeviceChannels.Add(AWorkTable.DeviceChannels[I]);
             end;
 
               IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
+               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
               else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
+                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
               else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=WorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
 
           SetLength(ImpSecValues, EnabledDeviceChannels.Count);
            for I := 0 to EnabledDeviceChannels.Count - 1 do
@@ -3961,7 +3932,7 @@ begin
             else
               ImpSecValues[i] := (Flow*(Random *  ({trackStd.Value}0.1)/100 +  1.008)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6 ;
 
-            WorkTable.ApplyChannelValues(
+            AWorkTable.ApplyChannelValues(
               EnabledDeviceChannels,
               NormalizeFloatInput('0'),
               ImpSecValues,
@@ -4058,6 +4029,7 @@ begin
 
   // Обновление давления
   UpdateRandomPress(WorkTable);
+
 
   // ============================================================
   // 3. Машина состояний измерения
