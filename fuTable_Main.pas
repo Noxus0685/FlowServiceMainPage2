@@ -561,13 +561,24 @@ begin
   NotifyEvent := EWorkTableNotifyEvent(Event);
 
   if Sender is TWorkTable then
+  begin
     HandleWorkTableNotify(Sender, NotifyEvent, Data);
+    Exit;
+  end;
 
   if (Sender is TPump) or
      (Sender is TFlowRate) or
      (Sender is TFluidTemp) or
      (Sender is TFluidPress) then
-    HandleWorkTableNotify(FSubscribedWorkTable, NotifyEvent, Sender);
+  begin
+    // Параметры подписаны напрямую и через TWorkTable (агрегация в HandleParameterNotify).
+    // Чтобы не обрабатывать одно и то же событие дважды, пропускаем прямое уведомление
+    // при активной подписке на рабочий стол.
+    if FSubscribedWorkTable <> nil then
+      Exit;
+
+    HandleWorkTableNotify(Sender, NotifyEvent, Sender);
+  end;
 end;
 
 function TTableMainForm.QueryInterface(const IID: TGUID; out Obj): HResult;
