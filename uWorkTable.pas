@@ -629,6 +629,12 @@ private
     procedure Save;
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
+    function GetChannelFlowCoef(const AChannel: TChannel): Double;
+    function UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable; const AFlowRate: Double): Double;
+    function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate: Double = 0;
+      AEtalonChannels: TObjectList<TChannel> = nil): Double;
+    function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
+      const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
@@ -3549,6 +3555,96 @@ begin
   end;
 end;
 
+function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
+begin
+  Result := 0.0;
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    Exit;
+
+  if (AChannel.FlowMeter.ValueCoef <> nil) then
+    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+
+  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
+    Result := AChannel.FlowMeter.Device.Coef;
+
+  if SameValue(Result, 0.0, 1E-12) then
+    Result := AChannel.FlowMeter.Kp;
+end;
+
+function TWorkTableManager.UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable;
+  const AFlowRate: Double): Double;
+var
+  Coef: Double;
+begin
+  Result := 0;
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels.Count = 0) then
+    Exit;
+
+  Coef := GetChannelFlowCoef(AWorkTable.DeviceChannels[0]);
+  if Coef <= 0 then
+    Exit;
+
+  Result := (AFlowRate * Coef) / 3.6;
+end;
+
+function TWorkTableManager.UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable;
+  AFlowRate: Double; AEtalonChannels: TObjectList<TChannel>): Double;
+var
+  FlowRate, Coef: Double;
+  I: Integer;
+begin
+  Result := 0;
+  Coef := 0;
+  if (AWorkTable = nil) or (AWorkTable.EtalonChannels.Count = 0) then
+    Exit;
+
+  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
+    for I := 0 to AEtalonChannels.Count - 1 do
+      Coef := Coef + GetChannelFlowCoef(AEtalonChannels[I])
+  else
+    Coef := GetChannelFlowCoef(AWorkTable.EtalonChannels[0]);
+
+  if Coef <= 0 then
+    Exit;
+
+  if AFlowRate <> 0 then
+    FlowRate := AFlowRate
+  else
+    FlowRate := AWorkTable.FlowRate.Value.Value;
+
+  Result := (FlowRate * Coef) / 3.6;
+end;
+
+function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkTable;
+  AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+var
+  I: Integer;
+  Coef, SUM, MaxRatio: Double;
+begin
+  SetLength(Result, 0);
+  if (AWorkTable = nil) or (AChannels = nil) then
+    Exit;
+
+  SUM := 0;
+  for I := 0 to AChannels.Count - 1 do
+    SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+
+  SetLength(Result, AChannels.Count);
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    if SameValue(SUM, 0.0, 1e-12) then
+      MaxRatio := 0
+    else
+      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+
+    Coef := GetChannelFlowCoef(AChannels[I]);
+    if Coef > 0 then
+      Result[I] := (AFlowRate * MaxRatio * Coef) / 3.6
+    else
+      Result[I] := AFallbackImpSec;
+  end;
+end;
+
 
 procedure TWorkTableManager.UpdateSimulation;
 
@@ -3773,102 +3869,6 @@ begin
 
     AWorkTable.NextFreqChangeAt := Now + EncodeTime(0, 0, Random(1), 0);
    end;
-end;
-
-function GetChannelFlowCoef(const AChannel: TChannel): Double;
-begin
-  Result := 0.0;
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
-    Exit;
-
-  if (AChannel.FlowMeter.ValueCoef <> nil) then
-    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
-
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
-
-  if SameValue(Result, 0.0, 1E-12) then
-    Result := AChannel.FlowMeter.Kp;
-end;
-
-function UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable; FlowRate: Double): double;
-var
-  WorkTable: TWorkTable;
-  Coef, ImpSec: Double;
-begin
-Result:=0;
-
-  if (AWorkTable = nil) or (AWorkTable.DeviceChannels.Count = 0) then
-    Exit;
-
-  Coef := GetChannelFlowCoef(WorkTable.DeviceChannels[0]);
-  if Coef <= 0 then
-    Exit;
-
-  ImpSec := (FlowRate * Coef) / 3.6;
-  Result:=   ImpSec;
-end;
-
-function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate:Double = 0;
-  AEtalonChannels: TObjectList<TChannel> = nil):Double;
-var
-  FlowRate, Coef, ImpSec: Double;
-  i:integer;
-begin
-  Coef:=0;
-
-  if (AWorkTable = nil) or (AWorkTable.EtalonChannels.Count = 0) then
-    Exit;
-
-  if (AEtalonChannels <> nil) and (AEtalonChannels.Count > 0) then
-    for I := 0 to AEtalonChannels.Count - 1 do
-      Coef :=Coef+ GetChannelFlowCoef(AEtalonChannels[i])
-  else if AEtalonChannels=nil then
-      Coef := GetChannelFlowCoef(AWorkTable.EtalonChannels[0]);
-
-  //Coef := GetChannelFlowCoef(WorkTable.EtalonChannels[0]);
-  if Coef <= 0 then
-    Exit;
-  if AFlowRate<>0 then
-    ImpSec := (AFlowRate * Coef) / 3.6
-  else
-    ImpSec := (FlowRate * Coef) / 3.6;
-
-  Result:= ImpSec;
-end;
-
-function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
-  const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
-var
-  I: Integer;
-  Coef,SUM,MaxRatio : Double;
-  WorkTable:tWorkTable;
-begin
-
-  if AWorkTable = nil then
-    Exit;
-  SetLength(Result, 0);
-  if AChannels = nil then
-    Exit;
-  SUM:=0;
-   for I := 0 to AChannels.Count-1 do
-    begin
-      SUM:=SUM+AWorkTable.ValueFlowRate.GetDoubleBaseNum( AChannels[i].FlowMeter.Device.Qmax,4);
-    end;
-
-  SetLength(Result, AChannels.Count);
-  for I := 0 to AChannels.Count - 1 do
-  begin
-    if SameValue(SUM, 0.0, 1e-12) then
-      MaxRatio:=0
-    else
-      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[i].FlowMeter.Device.Qmax,4))/SUM;
-    Coef := GetChannelFlowCoef(AChannels[I]);
-    if Coef > 0 then
-      Result[I] := (AFlowRate*MaxRatio * Coef) / 3.6
-    else
-      Result[I] := AFallbackImpSec;
-  end;
 end;
 
 procedure UpdateRandomFlowRate(const AWorkTable: TWorkTable);
