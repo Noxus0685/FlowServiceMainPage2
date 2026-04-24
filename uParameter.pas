@@ -20,7 +20,7 @@ uses
 
 type
 
-  EStatusParameter = (
+  EStateParameter = (
     spNone,
     spStopped,
     spStarted,
@@ -35,6 +35,40 @@ type
     apSet
   );
 
+  EEventParameter = (
+    eparNone,
+    eparStateChanged,
+    eparActionChanged
+  );
+
+  EEventPump = (
+    epStart,
+    epStop,
+    epFreqChanged,
+    epError
+  );
+
+  EEventFlowRate = (
+    efrStart,
+    efrStop,
+    efrSetValue,
+    efrError
+  );
+
+  EEventFluidTemp = (
+    eftStart,
+    eftStop,
+    eftSetValue,
+    eftError
+  );
+
+  EEventFluidPress = (
+    efpStart,
+    efpStop,
+    efpSetValue,
+    efpError
+  );
+
 
 
 
@@ -46,7 +80,7 @@ TParameter = class(TObservableObject)
     FName: string;
     FHint: string;
 
-    FStatus: EStatusParameter;
+    FState: EStateParameter;
     FAction: EActionParameter;
 
     FMax: Double;
@@ -63,7 +97,7 @@ TParameter = class(TObservableObject)
     procedure SetMin(const Value: Double );
     procedure SetMax(const Value: Double);
 
-    procedure SetStatus(AStatus: EStatusParameter);
+    procedure SetState(AStatus: EStateParameter);
     procedure SetAction(AAction: EActionParameter);
     procedure SetBefore(ABefore: Double);
     procedure SetAfter(AAfter: Double);
@@ -73,13 +107,13 @@ TParameter = class(TObservableObject)
   public
     constructor Create(const AName, AHint: string); virtual;
     function IsStable(out AStableInfo: rStableInfo): Boolean;
-    function GetStatusAsString: string;
+    function GetStateAsString: string;
     procedure Stop;
     procedure Start;
     procedure SetValue(AValue: Double);
     property Name: string read FName write FName;
     property Hint: string read FHint write FHint;
-    property Status: EStatusParameter read  FStatus write SetStatus;
+    property State: EStateParameter read  FState write SetState;
     property Action: EActionParameter read FAction write SetAction;
     property ValueSet: TMeterValue read FValueSet write FValueSet;
     property Value: TMeterValue read FValue write FValue;
@@ -120,7 +154,7 @@ end;
     procedure DoPumpStart;
     procedure DoPumpStop;
     procedure DoFreqSet( ANewFreq: Double);
-    procedure PumpSetStatus( AStatus: EStatusParameter);
+    procedure PumpSetState( AStatus: EStateParameter);
 
   end;
 //---------------------------------
@@ -452,13 +486,13 @@ begin
   SetParam(ANewFreq);
 end;
 
-procedure TPump.PumpSetStatus(AStatus: EStatusParameter);
+procedure TPump.PumpSetState(AStatus: EStateParameter);
 begin
  // Pump:=FindPumpByName(APumpName);
  // if Pump = nil then
   //  Exit;
 
-  SetStatus(AStatus);
+  SetState(AStatus);
 end;
 
   {$ENDREGION 'TPump'}
@@ -472,7 +506,7 @@ begin
   FName := AName;
   ProtocolManager.AddMessage(pcState, psParameters, 'ParameterCreate', 'Parameter created', AName);
   FHint := AHint;
-  FStatus := spStopped;
+  FState := spStopped;
   Action := apStop;
   FHasTaskHistory := False;
   //FValue:=TMeterValue.Create;
@@ -502,7 +536,7 @@ begin
   if ADelta <= MinDouble then
     ADelta := 0.001;
   HasStabilization := Abs(FAfter - FBefore) <= ADelta;
-  HasActiveTask := (FStatus in [spStarted, spChanging]) or (FAction in [apSet, apStart]);
+  HasActiveTask := (FState in [spStarted, spChanging]) or (FAction in [apSet, apStart]);
   HadTask := HasActiveTask or FHasTaskHistory;
   IsChangingNow := (FValueSet.Value<>FValue.Value) and (not IsTargetReached);
 
@@ -583,13 +617,15 @@ begin
   FMax := Value;
 end;
 
-procedure TParameter.SetStatus(AStatus: EStatusParameter);
+procedure TParameter.SetState(AStatus: EStateParameter);
 begin
-  if FStatus = AStatus  then
+  if FState = AStatus  then
     Exit;
 
-  FStatus := AStatus;
-  Notify(neStatusChanged, Self);
+  FState := AStatus;
+  Event := Ord(eparStateChanged);
+  Notify(notifyStateChanged, Self);
+  Notify(notifyEvent, Self);
 end;
 
 procedure TParameter.SetAction(AAction: EActionParameter);
@@ -598,7 +634,50 @@ begin
     Exit;
 
   FAction := AAction;
-  Notify(neAction, Self);
+  Event := Ord(eparActionChanged);
+  if Self is TPump then
+  begin
+    case AAction of
+      apStart: Event := Ord(epStart);
+      apStop: Event := Ord(epStop);
+      apSet: Event := Ord(epFreqChanged);
+    else
+      Event := Ord(epError);
+    end;
+  end
+  else if Self is TFlowRate then
+  begin
+    case AAction of
+      apStart: Event := Ord(efrStart);
+      apStop: Event := Ord(efrStop);
+      apSet: Event := Ord(efrSetValue);
+    else
+      Event := Ord(efrError);
+    end;
+  end
+  else if Self is TFluidTemp then
+  begin
+    case AAction of
+      apStart: Event := Ord(eftStart);
+      apStop: Event := Ord(eftStop);
+      apSet: Event := Ord(eftSetValue);
+    else
+      Event := Ord(eftError);
+    end;
+  end
+  else if Self is TFluidPress then
+  begin
+    case AAction of
+      apStart: Event := Ord(efpStart);
+      apStop: Event := Ord(efpStop);
+      apSet: Event := Ord(efpSetValue);
+    else
+      Event := Ord(efpError);
+    end;
+  end;
+
+  Notify(notifyAction, Self);
+  Notify(notifyEvent, Self);
 end;
 
 procedure TParameter.SetBefore(ABefore: Double);
@@ -652,9 +731,9 @@ begin
 
 end;
 
-function TParameter.GetStatusAsString: string;
+function TParameter.GetStateAsString: string;
 begin
-  case FStatus of
+  case FState of
     spStarted: Result := 'Запущен';
     spStopped: Result := 'Остановлен';
     spNone: Result := 'Бездействует';
@@ -670,7 +749,7 @@ end;
 
 function TParameter.GetIsRunning: Boolean;
 begin
-  Result := (FStatus = spStarted) or (FStatus = spOngoing  );
+  Result := (FState = spStarted) or (FState = spOngoing  );
 end;
 
 function TParameter.GetIsChanging: Boolean;

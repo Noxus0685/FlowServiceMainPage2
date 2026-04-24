@@ -263,9 +263,9 @@ begin
 
 
     IF WorkTable.FlowRate.Action = apStart THEN
-    WorkTable.FlowRate.Status:=spStarted
+    WorkTable.FlowRate.State:=spStarted
   else  if (WorkTable.FlowRate.Action = apStop) then
-    WorkTable.FlowRate.Status:=spStopped;
+    WorkTable.FlowRate.State:=spStopped;
 
   if (WorkTable.FlowRate.Action = apSet) or (WorkTable.FlowRate.Action = apStart) then
     WorkTable.ResetMeasurementValues;
@@ -365,7 +365,7 @@ begin
   FFrameProceed := TFrameProceed.Create(Self);
   FFrameProceed.Parent := tiResults;
   FFrameProceed.Align := TAlignLayout.Client;
-  FFrameProceed.Initialize(FWorkTableManager);
+  FFrameProceed.Initialize;
 
 
 end;
@@ -479,7 +479,7 @@ AValue:Double;
     Exit;   }
 
   case AEvent of
-    neAction:
+    notifyAction:
       begin
         if AData is TPump then
           begin
@@ -517,7 +517,7 @@ AValue:Double;
 
       end;
 
-     neStatusChanged:
+     notifyStateChanged:
       begin
         if AData is TPump then
           mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
@@ -533,6 +533,18 @@ AValue:Double;
         if AData is TFluidPress then
           mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FluidPress.ValueSet.value) + ' Состояние: ' + FluidPress.GetActionAsString);
 
+      end;
+
+     notifyEvent:
+      begin
+        if AData is TPump then
+          mPump.Lines.Add('Событие насоса, код: ' + IntToStr(TPump(AData).Event));
+        if AData is TFlowRate then
+          mPump.Lines.Add('Событие расхода, код: ' + IntToStr(TFlowRate(AData).Event));
+        if AData is TFluidTemp then
+          mPump.Lines.Add('Событие температуры, код: ' + IntToStr(TFluidTemp(AData).Event));
+        if AData is TFluidPress then
+          mPump.Lines.Add('Событие давления, код: ' + IntToStr(TFluidPress(AData).Event));
       end;
 
   end;
@@ -648,12 +660,16 @@ begin
   if (AWorkTable.FluidTemp.Action = apStart) then
 
     // Начато регулирование/установка температуры
-    AWorkTable.FluidTemp.Status := spStarted
+    AWorkTable.FluidTemp.State := spStarted
 
   else if (AWorkTable.FluidTemp.Action = apStop) then
 
     // Остановка регулирования
-
+    AWorkTable.FluidTemp.State := spStopped
+  else  if (AWorkTable.FluidTemp.Action = apSet) and not(AWorkTable.FluidTemp.IsRunning = true) then
+    AWorkTable.FluidTemp.State:=spChanging
+  else  if (AWorkTable.FluidTemp.Action = apSet) and (AWorkTable.FluidTemp.IsRunning = true) then
+    AWorkTable.FluidTemp.State:=spOngoing ;
 
   // ============================================================
   // 3. Ограничение частоты обновления (не каждый тик таймера)
@@ -747,7 +763,14 @@ begin
   if AWorkTable = nil then
     Exit;
 
-
+  IF AWorkTable.FluidPress.Action = apStart THEN
+    AWorkTable.FluidPress.State:=spStarted
+  else  if (AWorkTable.FluidPress.Action = apStop) then
+    AWorkTable.FluidPress.State:=spStopped
+    else  if (AWorkTable.FluidPress.Action = apSet) and not(AWorkTable.FluidPress.IsRunning = true) then
+    AWorkTable.FluidPress.State:=spChanging
+  else  if (AWorkTable.FluidPress.Action = apSet) and (AWorkTable.FluidPress.IsRunning = true) then
+    AWorkTable.FluidPress.State:=spOngoing ;
   if (AWorkTable.NextPressChangeAt = 0) or (Now >= AWorkTable.NextPressChangeAt) then
   begin
 
@@ -801,13 +824,13 @@ begin
     Exit;
 
   IF (Pump.Action = apStart)  THEN
-    Pump.Status:=spStarted
+    Pump.State:=spStarted
   else  if (Pump.Action = apStop) then
-    Pump.Status:=spStopped
+    Pump.State:=spStopped
   else  if (Pump.Action = apSet) and not(Pump.IsRunning = true) then
-    Pump.Status:=spChanging
+    Pump.State:=spChanging
   else  if (Pump.Action = apSet) and (Pump.IsRunning = true) then
-    Pump.Status:=spOngoing ;
+    Pump.State:=spOngoing ;
 
 
 
@@ -959,13 +982,13 @@ begin
     Exit;
 
   IF (FlowRate.Action = apStart)  THEN
-    FlowRate.Status:=spStarted
+    FlowRate.State:=spStarted
   else  if (FlowRate.Action = apStop) then
-    FlowRate.Status:=spStopped
+    FlowRate.State:=spStopped
   else  if (FlowRate.Action = apSet) and not(FlowRate.IsRunning = true) then
-    FlowRate.Status:=spChanging
+    FlowRate.State:=spChanging
   else  if (FlowRate.Action = apSet) and (FlowRate.IsRunning = true) then
-    FlowRate.Status:=spOngoing ;
+    FlowRate.State:=spOngoing ;
 
 
   WorkTable:= FWorkTableManager.ActiveWorkTable;
@@ -1216,34 +1239,34 @@ begin
   // 3. Машина состояний измерения
   // ============================================================
 
-  case WorkTable.Status of
+  case WorkTable.State of
 
     // ------------------------------------------------------------
     // Начальное состояние → переход в режим ожидания
     // ------------------------------------------------------------
     swtNONE:
-      WorkTable.Status := swtSTANDBY;
+      WorkTable.State := swtSTANDBY;
 
 
     // ------------------------------------------------------------
     // Ожидание → считаем, что система подключена
     // ------------------------------------------------------------
     swtSTANDBY:
-      WorkTable.Status := swtCONNECTED;
+      WorkTable.State := swtCONNECTED;
 
 
     // ------------------------------------------------------------
     // Запуск мониторинга
     // ------------------------------------------------------------
     swtSTARTMONITOR:
-      WorkTable.Status := swtSTARTMONITORWAIT;
+      WorkTable.State := swtSTARTMONITORWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание запуска мониторинга → переход в мониторинг
     // ------------------------------------------------------------
     swtSTARTMONITORWAIT:
-      WorkTable.Status := swtMONITOR;
+      WorkTable.State := swtMONITOR;
 
 
     // ------------------------------------------------------------
@@ -1259,21 +1282,21 @@ begin
     // ------------------------------------------------------------
     swtSTOPMONITOR,
     swtCONFIGED:
-      WorkTable.Status := swtCONNECTED;
+      WorkTable.State := swtCONNECTED;
 
 
     // ------------------------------------------------------------
     // Запуск теста
     // ------------------------------------------------------------
     swtSTARTTEST:
-      WorkTable.Status := swtSTARTWAIT;
+      WorkTable.State := swtSTARTWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание старта → переход к выполнению
     // ------------------------------------------------------------
     swtSTARTWAIT:
-      WorkTable.Status := swtEXECUTE;
+      WorkTable.State := swtEXECUTE;
 
 
     // ============================================================
@@ -1365,7 +1388,7 @@ begin
       // Если заданы ограничения и хотя бы одно достигнуто
       // → инициируем остановку теста
       if HasLimits and LimitReached then
-        WorkTable.Status := swtSTOPTEST;
+        WorkTable.State := swtSTOPTEST;
     end;
 
 
@@ -1373,21 +1396,21 @@ begin
     // Инициация остановки теста
     // ------------------------------------------------------------
     swtSTOPTEST:
-      WorkTable.Status := swtSTOPWAIT;
+      WorkTable.State := swtSTOPWAIT;
 
 
     // ------------------------------------------------------------
     // Ожидание полной остановки
     // ------------------------------------------------------------
     swtSTOPWAIT:
-      WorkTable.Status := swtCOMPLETE;
+      WorkTable.State := swtCOMPLETE;
 
 
     // ------------------------------------------------------------
     // Тест завершён → переход к финальному считыванию
     // ------------------------------------------------------------
     swtCOMPLETE:
-      WorkTable.Status := swtFINALREAD;
+      WorkTable.State := swtFINALREAD;
 
   end;
 

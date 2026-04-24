@@ -362,12 +362,12 @@ begin
      (AWorkTable.FluidTemp.Action = apSet) then
 
     // Начато регулирование/установка температуры
-    AWorkTable.FluidTemp.Status := spStarted
+    AWorkTable.FluidTemp.State := spStarted
 
   else if (AWorkTable.FluidTemp.Action = apStop) then
 
     // Остановка регулирования
-    AWorkTable.FluidTemp.Status := spStopped;
+    AWorkTable.FluidTemp.State := spStopped;
 
 
   // ============================================================
@@ -466,9 +466,9 @@ begin
     Exit;
 
   IF AWorkTable.FluidPress.Action = apStart THEN
-    AWorkTable.FluidPress.Status:=spStarted
+    AWorkTable.FluidPress.State:=spStarted
   else  if (AWorkTable.FluidPress.Action = apStop) then
-    AWorkTable.FluidPress.Status:=spStopped;
+    AWorkTable.FluidPress.State:=spStopped;
 
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó
   if (FNextPressChangeAt = 0) or (Now >= FNextPressChangeAt) then
@@ -523,9 +523,9 @@ begin
     Exit;
 
   IF (APump.Action = apStart)  THEN
-    APump.Status:=spStarted
+    APump.State:=spStarted
   else  if (APump.Action = apStop) then
-    APump.Status:=spStopped;
+    APump.State:=spStopped;
 
 
 
@@ -656,9 +656,9 @@ begin
 
 
   IF AFlowRate.Action = apStart THEN
-    AFlowRate.Status:=spStarted
+    AFlowRate.State:=spStarted
   else  if (AFlowRate.Action = apStop) then
-    AFlowRate.Status:=spStopped;
+    AFlowRate.State:=spStopped;
 
   WorkTable:= FWorkTableManager.ActiveWorkTable;
    // Îáíîâëÿåì íå êàæäóþ ñåêóíäó

@@ -9,8 +9,9 @@ uses
 
 type
   ENotifyEvent = (
-    neStatusChanged = 1,  // Изменилось состояние
-    neAction             // Действие пользователя
+    notifyStateChanged = 1,  // Изменилось состояние
+    notifyAction,             // Действие пользователя
+    notifyEvent               // Событие которое произошло с объектом
   );
 
   IEventObserver = interface
@@ -23,6 +24,8 @@ type
     FObservers: TList<IEventObserver>;
     FObserversLock: TObject;
     FIsDestroying: Boolean;
+    FEvent: Integer;
+    procedure SetEvent(const Value: Integer);
   protected
     procedure Notify(Event: Integer; Data: TObject = nil); overload;
     procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
@@ -33,6 +36,7 @@ type
     procedure Subscribe(const AObserver: IEventObserver);
     procedure Unsubscribe(const AObserver: IEventObserver);
     function ObserverCount: Integer;
+    property Event: Integer read FEvent write SetEvent;
   end;
 
 implementation
@@ -42,6 +46,7 @@ begin
   inherited Create;
   FObservers := TList<IEventObserver>.Create;
   FObserversLock := TObject.Create;
+  FEvent := 0;
 end;
 
 destructor TObservableObject.Destroy;
@@ -58,7 +63,7 @@ begin
       begin
         // делаем копию и обнуляем список
        // LocalObservers := FObservers.ToArray;
-        FObservers.Clear;
+      //  FObservers.Clear;
       end;
     finally
       TMonitor.Exit(FObserversLock);
@@ -69,8 +74,8 @@ begin
   // и без доступа к FObservers
  // SetLength(LocalObservers, 0);
 
-  FreeAndNil(FObservers);
-  FreeAndNil(FObserversLock);
+  //FreeAndNil(FObservers);
+  //FreeAndNil(FObserversLock);
 
   inherited Destroy;
 end;
@@ -150,6 +155,11 @@ end;
 procedure TObservableObject.Notify(AEvent: ENotifyEvent; Data: TObject);
 begin
   Notify(Ord(AEvent), Data);
+end;
+
+procedure TObservableObject.SetEvent(const Value: Integer);
+begin
+  FEvent := Value;
 end;
 
 end.
