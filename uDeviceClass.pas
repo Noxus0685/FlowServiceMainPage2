@@ -78,8 +78,8 @@ type
   );
 
   EPointSpillageType = (
-    stWithStop = 0,    // с остановкой потока
-    stWithoutStop = 1  // без остановки потока
+    stWithoutStop = 0,  // без остановки потока
+    stWithStop = 1    // с остановкой потока
   );
 
   EPointEtalonType = (
