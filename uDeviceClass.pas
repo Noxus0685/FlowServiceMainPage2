@@ -182,6 +182,12 @@ type
     procedure Apply(ASource: TTypePoint);
     function GetStatus: string;
     function GetStatusHint: string;
+    class function GetPointSpillageTypeText(const AType: EPointSpillageType): string; overload; static;
+    class function GetPointSpillageTypeText(const AType: Integer): string; overload; static;
+    class function GetPointEtalonTypeText(const AType: EPointEtalonType): string; overload; static;
+    class function GetPointEtalonTypeText(const AType: Integer): string; overload; static;
+    class function GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string; overload; static;
+    class function GetPointFlowSourceTypeText(const AType: Integer): string; overload; static;
 
     property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
   end;
@@ -550,20 +556,13 @@ type
 
   end;
 
-function GetPointSpillageTypeText(const AType: EPointSpillageType): string; overload;
-function GetPointSpillageTypeText(const AType: Integer): string; overload;
-function GetPointEtalonTypeText(const AType: EPointEtalonType): string; overload;
-function GetPointEtalonTypeText(const AType: Integer): string; overload;
-function GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string; overload;
-function GetPointFlowSourceTypeText(const AType: Integer): string; overload;
-
 implementation
 uses
   uDataManager,
   uAppServices,
   uRepositories;
 
-function GetPointSpillageTypeText(const AType: EPointSpillageType): string;
+class function TDevicePoint.GetPointSpillageTypeText(const AType: EPointSpillageType): string;
 begin
   case AType of
     stWithStop: Result := 'С остановкой потока';
@@ -573,17 +572,17 @@ begin
   end;
 end;
 
-function GetPointSpillageTypeText(const AType: Integer): string;
+class function TDevicePoint.GetPointSpillageTypeText(const AType: Integer): string;
 begin
   case AType of
     Integer(stWithStop), Integer(stWithoutStop):
-      Result := GetPointSpillageTypeText(EPointSpillageType(AType));
+      Result := TDevicePoint.GetPointSpillageTypeText(EPointSpillageType(AType));
   else
     Result := 'Неизвестно';
   end;
 end;
 
-function GetPointEtalonTypeText(const AType: EPointEtalonType): string;
+class function TDevicePoint.GetPointEtalonTypeText(const AType: EPointEtalonType): string;
 begin
   case AType of
     etAuto: Result := 'Автоматически';
@@ -594,17 +593,17 @@ begin
   end;
 end;
 
-function GetPointEtalonTypeText(const AType: Integer): string;
+class function TDevicePoint.GetPointEtalonTypeText(const AType: Integer): string;
 begin
   case AType of
     Integer(etAuto), Integer(etCompare), Integer(etWeight):
-      Result := GetPointEtalonTypeText(EPointEtalonType(AType));
+      Result := TDevicePoint.GetPointEtalonTypeText(EPointEtalonType(AType));
   else
     Result := 'Неизвестно';
   end;
 end;
 
-function GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string;
+class function TDevicePoint.GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string;
 begin
   case AType of
     fstUnknown: Result := '-';
@@ -615,11 +614,11 @@ begin
   end;
 end;
 
-function GetPointFlowSourceTypeText(const AType: Integer): string;
+class function TDevicePoint.GetPointFlowSourceTypeText(const AType: Integer): string;
 begin
   case AType of
     Integer(fstUnknown), Integer(fstPump), Integer(fstExternal):
-      Result := GetPointFlowSourceTypeText(EPointFlowSourceType(AType));
+      Result := TDevicePoint.GetPointFlowSourceTypeText(EPointFlowSourceType(AType));
   else
     Result := 'Неизвестно';
   end;
