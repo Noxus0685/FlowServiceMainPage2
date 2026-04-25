@@ -1091,7 +1091,7 @@ begin
   LimitVolume := 0.0;
   LimitTime := 0.0;
   SpillageStop := STOP_BY_TIME;
-  SpillageType := Integer(stWithStop);
+  SpillageType := Integer(stWithoutStop);
   EtalonType := Integer(etAuto);
   FlowSorceType := Integer(fstUnknown);
 
@@ -1751,7 +1751,7 @@ begin
   LimitImp := ASource.LimitImp;
   LimitVolume := ASource.LimitVolume;
   LimitTime := ASource.LimitTime;
-  SpillageType := Integer(stWithStop);
+  SpillageType := Integer(stWithoutStop);
   EtalonType := Integer(etAuto);
   FlowSorceType := Integer(fstUnknown);
 
