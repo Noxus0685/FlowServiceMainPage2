@@ -2002,6 +2002,10 @@ object FormDeviceEditor: TFormDeviceEditor
             Header = #177#1058#1077#1084#1087' , %'
             HeaderSettings.TextSettings.WordWrap = False
           end
+          object PopupColumnFlowSorce: TPopupColumn
+            Header = #1048#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
+            HeaderSettings.TextSettings.WordWrap = False
+          end
           object StringColumnHash: TStringColumn
             Header = 'HASH'
             HeaderSettings.TextSettings.WordWrap = False
@@ -2061,7 +2065,7 @@ object FormDeviceEditor: TFormDeviceEditor
         object cbSpillageType: TComboBox
           Align = Left
           Items.Strings = (
-            ' '#1040#1074#1090#1086
+            #1040#1074#1090#1086
             #1057#1083#1080#1095#1077#1085#1080#1077' '#1073#1077#1079' '#1086#1089#1090#1072#1085#1086#1074#1082#1080' '#1087#1086#1090#1086#1082#1072
             #1042#1077#1089#1086#1074#1086#1081' '#1084#1077#1090#1086#1076' '#1073#1077#1079' '#1086#1089#1090#1072#1085#1086#1074#1082#1080' '#1087#1086#1090#1086#1082#1072
             #1057#1083#1080#1095#1077#1085#1080#1077' '#1089' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072

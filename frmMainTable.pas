@@ -384,6 +384,7 @@ type
     MenuItemAddPump: TMenuItem;
     MenuItemDeletePump: TMenuItem;
     ActionPumpDelete: TAction;
+    StyleBook1: TStyleBook;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;

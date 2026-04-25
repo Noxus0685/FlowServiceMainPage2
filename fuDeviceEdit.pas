@@ -251,6 +251,7 @@ type
     LayoutUnits: TLayout;
     LabelUnits: TLabel;
     ComboBoxUnits: TComboBox;
+    PopupColumnFlowSorce: TPopupColumn;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
