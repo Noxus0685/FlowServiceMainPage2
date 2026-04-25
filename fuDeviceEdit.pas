@@ -417,6 +417,101 @@ begin
     Result := Ord(spUnknown);
 end;
 
+
+const
+  CPointFlowSourceTypeList: array[0..2] of EPointFlowSourceType = (
+    fstUnknown,
+    fstPump,
+    fstExternal
+  );
+
+procedure PopulateFlowSourceColumn(AColumn: TPopupColumn);
+var
+  FlowSourceType: EPointFlowSourceType;
+begin
+  if AColumn = nil then
+    Exit;
+
+  AColumn.Items.BeginUpdate;
+  try
+    AColumn.Items.Clear;
+    for FlowSourceType in CPointFlowSourceTypeList do
+      AColumn.Items.Add(GetPointFlowSourceTypeText(FlowSourceType));
+  finally
+    AColumn.Items.EndUpdate;
+  end;
+end;
+
+function FlowSourceTypeValueToItemIndex(const AValue: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := 0;
+  for I := Low(CPointFlowSourceTypeList) to High(CPointFlowSourceTypeList) do
+    if Ord(CPointFlowSourceTypeList[I]) = AValue then
+      Exit(I);
+end;
+
+function FlowSourceTypeItemIndexToValue(const AIndex: Integer): Integer;
+begin
+  if (AIndex >= Low(CPointFlowSourceTypeList)) and (AIndex <= High(CPointFlowSourceTypeList)) then
+    Result := Ord(CPointFlowSourceTypeList[AIndex])
+  else
+    Result := Ord(fstUnknown);
+end;
+
+procedure DecodeSpillageType(const AMode: ESpillageType; out ASpillageType, AEtalonType: Integer);
+begin
+  case AMode of
+    spCompareNoStop:
+      begin
+        ASpillageType := Integer(stWithoutStop);
+        AEtalonType := Integer(etCompare);
+      end;
+    spWeightNoStop:
+      begin
+        ASpillageType := Integer(stWithoutStop);
+        AEtalonType := Integer(etWeight);
+      end;
+    spCompareStop:
+      begin
+        ASpillageType := Integer(stWithStop);
+        AEtalonType := Integer(etCompare);
+      end;
+    spWeightStop:
+      begin
+        ASpillageType := Integer(stWithStop);
+        AEtalonType := Integer(etWeight);
+      end;
+  else
+    begin
+      ASpillageType := Integer(stWithoutStop);
+      AEtalonType := Integer(etAuto);
+    end;
+  end;
+end;
+
+function EncodeSpillageType(const ASpillageType, AEtalonType: Integer): ESpillageType;
+begin
+  if AEtalonType = Integer(etAuto) then
+    Exit(spAuto);
+
+  if ASpillageType = Integer(stWithStop) then
+  begin
+    if AEtalonType = Integer(etWeight) then
+      Exit(spWeightStop)
+    else
+      Exit(spCompareStop);
+  end;
+
+  if AEtalonType = Integer(etWeight) then
+    Result := spWeightNoStop
+  else if AEtalonType = Integer(etCompare) then
+    Result := spCompareNoStop
+  else
+    Result := spAuto;
+end;
+
 procedure TFormDeviceEditor.ApplyMeasuredDimension;
 var
   Dim: TMeasuredDimension;
@@ -599,6 +694,7 @@ begin
   NewP.LimitImp  := 10000;
   NewP.LimitTime := 52;
   NewP.SpillageStop := FDevice.SpillageStop;
+  DecodeSpillageType(ESpillageType(SpillageTypeItemIndexToValue(cbSpillageType.ItemIndex)), NewP.SpillageType, NewP.EtalonType);
   NewP.Pause     := 10;
   NewP.Pressure  := 0;
   NewP.Temp      := 0;
@@ -1650,6 +1746,7 @@ procedure TFormDeviceEditor.UpdateUIFromDevice;
 var
   AccErr: Double;
   Idx: Integer;
+  Point: TDevicePoint;
 begin
   FLoading := True;
   try
@@ -1729,7 +1826,18 @@ begin
     // == Тип испытания / критерий остановки
     // =====================================================
     PopulateSpillageTypeCombo(cbSpillageType);
+    PopulateFlowSourceColumn(PopupColumnFlowSource);
+
     cbSpillageType.ItemIndex := SpillageTypeValueToItemIndex(FDevice.SpillageType);
+    if FDevice.Points <> nil then
+      for Point in FDevice.Points do
+        if (Point <> nil) and (Point.State <> osDeleted) then
+        begin
+          cbSpillageType.ItemIndex := SpillageTypeValueToItemIndex(
+            Ord(EncodeSpillageType(Point.SpillageType, Point.EtalonType))
+          );
+          Break;
+        end;
 
     PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
@@ -1884,6 +1992,10 @@ begin
 end;
 
 procedure TFormDeviceEditor.cbSpillageTypeChange(Sender: TObject);
+var
+  P: TDevicePoint;
+  SpillageTypeValue: Integer;
+  EtalonTypeValue: Integer;
 begin
   if FLoading or (FDevice = nil) then
     Exit;
@@ -1892,7 +2004,19 @@ begin
     Exit;
 
   FDevice.SpillageType := SpillageTypeItemIndexToValue(cbSpillageType.ItemIndex);
+  DecodeSpillageType(ESpillageType(FDevice.SpillageType), SpillageTypeValue, EtalonTypeValue);
+
+  if FDevice.Points <> nil then
+    for P in FDevice.Points do
+      if P <> nil then
+      begin
+        P.SpillageType := SpillageTypeValue;
+        P.EtalonType := EtalonTypeValue;
+        P.State := osModified;
+      end;
+
   SetModified;
+  UpdatePointsGrid;
 end;
 
 procedure TFormDeviceEditor.cbSpillageStopChange(Sender: TObject);
@@ -2909,6 +3033,9 @@ begin
       Value := 1;
   end
 
+  else if ACol = PopupColumnFlowSource.Index then
+    Value := GetPointFlowSourceTypeText(P.FlowSorceType)
+
   else if ACol = StringColumnHash.Index then
   begin
       Value := FDevice.UUID;
@@ -3017,6 +3144,16 @@ begin
 
   else if ACol = IntegerColumnPointRepeats.Index then
     P.Repeats := Round(NormalizeFloatInput(S))
+
+  else if ACol = PopupColumnFlowSource.Index then
+  begin
+    if Value.IsOrdinal then
+      P.FlowSorceType := FlowSourceTypeItemIndexToValue(Value.AsOrdinal)
+    else
+      P.FlowSorceType := FlowSourceTypeItemIndexToValue(
+        PopupColumnFlowSource.Items.IndexOf(S)
+      );
+  end
 
   else
   begin
