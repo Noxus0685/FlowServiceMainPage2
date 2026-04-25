@@ -436,7 +436,7 @@ begin
   try
     AColumn.Items.Clear;
     for FlowSourceType in CPointFlowSourceTypeList do
-      AColumn.Items.Add(GetPointFlowSourceTypeText(FlowSourceType));
+      AColumn.Items.Add(TDevicePoint.GetPointFlowSourceTypeText(FlowSourceType));
   finally
     AColumn.Items.EndUpdate;
   end;
@@ -3033,7 +3033,7 @@ begin
   end
 
   else if ACol = PopupColumnFlowSource.Index then
-    Value := GetPointFlowSourceTypeText(P.FlowSorceType)
+    Value := TDevicePoint.GetPointFlowSourceTypeText(P.FlowSorceType)
 
   else if ACol = StringColumnHash.Index then
   begin
