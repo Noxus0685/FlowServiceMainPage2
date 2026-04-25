@@ -2036,7 +2036,6 @@ begin
   SetModified;
 end;
 
-
 procedure TFormDeviceEditor.cbMeasuredDimensionChange(Sender: TObject);
 var
   V: Integer;

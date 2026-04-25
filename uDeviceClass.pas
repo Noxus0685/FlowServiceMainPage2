@@ -587,7 +587,7 @@ function GetPointEtalonTypeText(const AType: EPointEtalonType): string;
 begin
   case AType of
     etAuto: Result := 'Автоматически';
-    etCompare: Result := 'Сличение (по расходомеру)';
+    etCompare: Result := 'Сличение';
     etWeight: Result := 'Весовое устройство';
   else
     Result := 'Неизвестно';
@@ -607,7 +607,7 @@ end;
 function GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string;
 begin
   case AType of
-    fstUnknown: Result := 'Не определён';
+    fstUnknown: Result := '-';
     fstPump: Result := 'Насос';
     fstExternal: Result := 'Внешний источник';
   else
