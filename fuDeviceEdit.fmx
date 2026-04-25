@@ -3,7 +3,7 @@ object FormDeviceEditor: TFormDeviceEditor
   Top = 0
   Caption = 'Form2'
   ClientHeight = 814
-  ClientWidth = 1274
+  ClientWidth = 1456
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
@@ -1889,7 +1889,7 @@ object FormDeviceEditor: TFormDeviceEditor
   object layRight: TLayout
     Align = Client
     Margins.Top = 10.000000000000000000
-    Size.Width = 925.000000000000000000
+    Size.Width = 1107.000000000000000000
     Size.Height = 709.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1
@@ -1902,7 +1902,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Margins.Right = 5.000000000000000000
       Margins.Bottom = 5.000000000000000000
       Position.Y = 91.000000000000000000
-      Size.Width = 920.000000000000000000
+      Size.Width = 1102.000000000000000000
       Size.Height = 377.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'groupstyle'
@@ -1912,7 +1912,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Align = Client
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
-        Size.Width = 910.000000000000000000
+        Size.Width = 1092.000000000000000000
         Size.Height = 321.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 38
@@ -1921,7 +1921,7 @@ object FormDeviceEditor: TFormDeviceEditor
           CanFocus = True
           ClipChildren = True
           Margins.Bottom = 5.000000000000000000
-          Size.Width = 900.000000000000000000
+          Size.Width = 1082.000000000000000000
           Size.Height = 316.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
@@ -1930,7 +1930,7 @@ object FormDeviceEditor: TFormDeviceEditor
           OnHeaderClick = GridPointsHeaderClick
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
-          Viewport.Width = 896.000000000000000000
+          Viewport.Width = 1078.000000000000000000
           Viewport.Height = 275.000000000000000000
           object StringColumnPointName: TStringColumn
             Header = #1048#1084#1103
@@ -2002,7 +2002,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Header = #177#1058#1077#1084#1087' , %'
             HeaderSettings.TextSettings.WordWrap = False
           end
-          object PopupColumnFlowSorce: TPopupColumn
+          object PopupColumnFlowSource: TPopupColumn
             Header = #1048#1089#1090#1086#1095#1085#1080#1082' '#1088#1072#1089#1093#1086#1076#1072
             HeaderSettings.TextSettings.WordWrap = False
           end
@@ -2021,14 +2021,14 @@ object FormDeviceEditor: TFormDeviceEditor
         Margins.Bottom = 3.000000000000000000
         Position.X = 5.000000000000000000
         Position.Y = 18.000000000000000000
-        Size.Width = 910.000000000000000000
+        Size.Width = 1092.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 39
         object Label24: TLabel
           Align = Left
           Margins.Left = 20.000000000000000000
-          Position.X = 461.000000000000000000
+          Position.X = 372.000000000000000000
           Size.Width = 72.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
@@ -2045,9 +2045,9 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Top = 5.000000000000000000
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
-          Position.X = 533.000000000000000000
+          Position.X = 444.000000000000000000
           Position.Y = 5.000000000000000000
-          Size.Width = 172.000000000000000000
+          Size.Width = 156.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
@@ -2056,7 +2056,7 @@ object FormDeviceEditor: TFormDeviceEditor
         object Label28: TLabel
           Align = Left
           Position.X = 145.000000000000000000
-          Size.Width = 73.000000000000000000
+          Size.Width = 56.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
           Text = #1052#1077#1090#1086#1076' '
@@ -2072,9 +2072,9 @@ object FormDeviceEditor: TFormDeviceEditor
             #1042#1077#1089#1086#1074#1086#1081' '#1084#1077#1090#1086#1076' '#1089' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072)
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
-          Position.X = 218.000000000000000000
+          Position.X = 201.000000000000000000
           Position.Y = 5.000000000000000000
-          Size.Width = 223.000000000000000000
+          Size.Width = 151.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 5
@@ -2127,7 +2127,7 @@ object FormDeviceEditor: TFormDeviceEditor
         object Label40: TLabel
           Align = Left
           Margins.Left = 20.000000000000000000
-          Position.X = 730.000000000000000000
+          Position.X = 625.000000000000000000
           Size.Width = 67.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
@@ -2141,7 +2141,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Cursor = crIBeam
           Min = 1.000000000000000000
           Value = 1.000000000000000000
-          Position.X = 797.000000000000000000
+          Position.X = 692.000000000000000000
           Position.Y = 5.000000000000000000
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
@@ -2167,7 +2167,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Padding.Bottom = 5.000000000000000000
       Margins.Right = 5.000000000000000000
       Margins.Bottom = 5.000000000000000000
-      Size.Width = 920.000000000000000000
+      Size.Width = 1102.000000000000000000
       Size.Height = 231.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'groupstyle'
@@ -2180,7 +2180,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Margins.Top = 10.000000000000000000
         Position.X = 5.000000000000000000
         Position.Y = 15.000000000000000000
-        Size.Width = 910.000000000000000000
+        Size.Width = 1092.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 29
@@ -2200,7 +2200,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Hint = #1042#1083#1072#1076#1077#1083#1077#1094' '#1087#1088#1080#1073#1086#1088#1072
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
-          Size.Width = 752.000000000000000000
+          Size.Width = 934.000000000000000000
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           TextPrompt = #1042#1083#1072#1076#1077#1083#1077#1094', '#1086#1088#1075#1072#1085#1080#1079#1072#1094#1080#1103
@@ -2219,7 +2219,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Padding.Right = 5.000000000000000000
         Position.X = 5.000000000000000000
         Position.Y = 45.000000000000000000
-        Size.Width = 910.000000000000000000
+        Size.Width = 1092.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 30
@@ -2241,12 +2241,12 @@ object FormDeviceEditor: TFormDeviceEditor
         Margins.Left = 5.000000000000000000
         Margins.Right = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Size.Width = 900.000000000000000000
+        Size.Width = 1082.000000000000000000
         Size.Height = 146.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
         OnExit = mmoCommentExit
-        Viewport.Width = 896.000000000000000000
+        Viewport.Width = 1078.000000000000000000
         Viewport.Height = 142.000000000000000000
       end
     end
@@ -2258,7 +2258,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Padding.Bottom = 5.000000000000000000
       Margins.Right = 5.000000000000000000
       Margins.Bottom = 5.000000000000000000
-      Size.Width = 920.000000000000000000
+      Size.Width = 1102.000000000000000000
       Size.Height = 86.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'groupstyle'
@@ -2271,7 +2271,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Margins.Top = 10.000000000000000000
         Position.X = 5.000000000000000000
         Position.Y = 15.000000000000000000
-        Size.Width = 910.000000000000000000
+        Size.Width = 1092.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 38
@@ -2307,7 +2307,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Padding.Right = 5.000000000000000000
         Position.X = 5.000000000000000000
         Position.Y = 45.000000000000000000
-        Size.Width = 910.000000000000000000
+        Size.Width = 1092.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 39
@@ -2375,7 +2375,7 @@ object FormDeviceEditor: TFormDeviceEditor
   end
   object layTop: TLayout
     Align = Top
-    Size.Width = 1274.000000000000000000
+    Size.Width = 1456.000000000000000000
     Size.Height = 25.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 3
@@ -2388,7 +2388,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Margins.Left = 5.000000000000000000
       Margins.Right = 5.000000000000000000
       Margins.Bottom = -2.000000000000000000
-      Size.Width = 1264.000000000000000000
+      Size.Width = 1446.000000000000000000
       Size.Height = 27.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'groupstyle'
@@ -2404,7 +2404,7 @@ object FormDeviceEditor: TFormDeviceEditor
     Margins.Bottom = 10.000000000000000000
     Position.X = 10.000000000000000000
     Position.Y = 754.000000000000000000
-    Size.Width = 1254.000000000000000000
+    Size.Width = 1436.000000000000000000
     Size.Height = 50.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
@@ -2415,7 +2415,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 1024.000000000000000000
+      Position.X = 1206.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 100.000000000000000000
@@ -2436,7 +2436,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Margins.Top = 10.000000000000000000
       Margins.Right = 20.000000000000000000
       Margins.Bottom = 10.000000000000000000
-      Position.X = 1134.000000000000000000
+      Position.X = 1316.000000000000000000
       Position.Y = 10.000000000000000000
       Sides = [Top, Left, Bottom, Right]
       Size.Width = 100.000000000000000000
@@ -2478,8 +2478,8 @@ object FormDeviceEditor: TFormDeviceEditor
     end
   end
   object ppmnuCalculateVolume: TPopupMenu
-    Left = 668
-    Top = 199
+    Left = 524
+    Top = 351
     object miCalculateVolume: TMenuItem
       Text = #1056#1072#1089#1095#1077#1090' '#1086#1073#1098#1077#1084#1072
       ImageIndex = 6
