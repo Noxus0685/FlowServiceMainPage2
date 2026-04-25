@@ -199,12 +199,6 @@ type
     FMaxAttemptCount: Integer;
     FMeasureTimeout: Cardinal;
 
-    FOnStateChangedFrame: TMeasurementRunStateChangedEvent;
-    FOnStateChangedMain: TMeasurementRunStateChangedEvent;
-    FOnPointChangedFrame: TMeasurementRunPointChangedEvent;
-    FOnPointChangedMain: TMeasurementRunPointChangedEvent;
-    FOnEvent: TMeasurementRunEvent;
-
     procedure SetState(const ANewState: EMeasurementState);
     procedure SetStage(const ANewStage: EMeasurementState);
     procedure EnterStage(const ANewStage: EMeasurementState);
@@ -271,15 +265,6 @@ type
     property ManualFluidPress: Double read FManualFluidPress write FManualFluidPress;
     property ManualTimeSet: Integer read FManualTimeSet write FManualTimeSet;
 
-    property OnStateChangedFrame: TMeasurementRunStateChangedEvent
-      read FOnStateChangedFrame write FOnStateChangedFrame;
-    property OnStateChangedMain: TMeasurementRunStateChangedEvent
-      read FOnStateChangedMain write FOnStateChangedMain;
-    property OnPointChangedFrame: TMeasurementRunPointChangedEvent
-      read FOnPointChangedFrame write FOnPointChangedFrame;
-    property OnPointChangedMain: TMeasurementRunPointChangedEvent
-      read FOnPointChangedMain write FOnPointChangedMain;
-    property OnEvent: TMeasurementRunEvent read FOnEvent write FOnEvent;
   end;
 
 implementation
@@ -619,9 +604,6 @@ begin
       'Ошибка события измерения', ErrorDetails);
   end;
 
-  if Assigned(FOnEvent) then
-    FOnEvent(Self, AEvent, AError);
-
   Notify(Integer(AEvent));
 end;
 
@@ -636,46 +618,6 @@ begin
   Result.Msg := AMsg;
   Result.Time := Now;
   Result.Stage := Integer(FCurrentStage);
-end;
-
-procedure TMeasurementRun.NotifyStateChanged;
-begin
-  if Assigned(FOnStateChangedFrame) then
-    TThread.Queue(nil,
-      procedure
-      begin
-        if Assigned(FOnStateChangedFrame) then
-          FOnStateChangedFrame(Self, FCurrentStage);
-      end);
-
-  if Assigned(FOnStateChangedMain) then
-    TThread.Queue(nil,
-      procedure
-      begin
-        if Assigned(FOnStateChangedMain) then
-          FOnStateChangedMain(Self, FCurrentStage);
-      end);
-end;
-
-procedure TMeasurementRun.NotifyPointChanged;
-begin
-  if Assigned(FOnPointChangedFrame) then
-    TThread.Queue(nil,
-      procedure
-      begin
-        if Assigned(FOnPointChangedFrame) then
-          FOnPointChangedFrame(Self, GetCurrentPoint, FCurrentPointIndex);
-      end);
-
-  if Assigned(FOnPointChangedMain) then
-    TThread.Queue(nil,
-      procedure
-      begin
-        if Assigned(FOnPointChangedMain) then
-          FOnPointChangedMain(Self, GetCurrentPoint, FCurrentPointIndex);
-      end);
-
-  Notify(Integer(mePointChanged), GetCurrentPoint);
 end;
 
 function TMeasurementRun.GetCurrentPoint: TDevicePoint;

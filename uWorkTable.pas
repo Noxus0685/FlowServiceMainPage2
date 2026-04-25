@@ -60,6 +60,12 @@ type
 
   );
 
+  EEventWorkTable = (
+    ewtNone = 0,
+    ewtWarning = 1,
+    ewtError
+  );
+
   EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
 
   // Алиас для обратной совместимости
@@ -224,31 +230,6 @@ type
   TWorkTable = class(TObservableObject)
 
   type
-  // Обработчики для расхода
-  TOnFlowRateSetEvent = procedure(ASender: TObject; ANewFlowRate: Double) of object;
-
-  // Обработчики для насоса
-  //TOnPumpStartEvent = procedure(APump: TPump) of object;
-  //TOnPumpStopEvent = procedure(ASender: TObject; APumpName: string) of object;
-  //TOnFreqSetEvent = procedure(ASender: TObject; APumpName: string; ANewFreq: Double) of object;
-
-
-
-
-  // Обработчики для пакетных заданий
-  TOnProcStartEvent = procedure(ASender: TObject; AProcName: string) of object;
-  TOnProcStopEvent = procedure(ASender: TObject; AProcName: string) of object;
-  TOnProcPauseEvent = procedure(ASender: TObject; AProcName: string) of object;
-  TOnProcNextStepEvent = procedure(ASender: TObject; AProcName: string) of object;
-  TOnProcRepeatEvent = procedure(ASender: TObject; AProcName: string) of object;
-
-  // Обработчики для измерений
-  TOnSpillageStartEvent = procedure(ASender: TObject) of object;
-  TOnSpillageStopEvent = procedure(ASender: TObject) of object;
-
-  TOnWorkTableStateChangedEvent = procedure(const ANewState: EStateWorkTable) of object;
-  TOnWorkTablePointChangedEvent = procedure(ASender: TObject; APoint: TDevicePoint;
-    APointIndex: Integer) of object;
 
   private
     FID: Integer;
@@ -395,27 +376,7 @@ type
     ); static;
 
 private
-  // События расхода
-  FOnFlowRateSet: TOnFlowRateSetEvent;
-  // События насоса
- // FOnPumpStart: TOnPumpStartEvent;
-  //FOnPumpStop: TOnPumpStopEvent;
-  //FOnFreqSet: TOnFreqSetEvent;
-
   FCurrentPoint:  TDevicePoint;
-
-
-  // События пакетных заданий
-  FOnProcStart: TOnProcStartEvent;
-  FOnProcStop: TOnProcStopEvent;
-  FOnProcPause: TOnProcPauseEvent;
-  FOnProcNextStep: TOnProcNextStepEvent;
-  FOnProcRepeat: TOnProcRepeatEvent;
-  // События измерений
-  FOnSpillageStart: TOnSpillageStartEvent;
-  FOnSpillageStop: TOnSpillageStopEvent;
-  FOnStateChanged: TOnWorkTableStateChangedEvent;
-  FOnPointChanged: TOnWorkTablePointChangedEvent;
   FParameterObserver: IEventObserver;
 
   procedure SetState(const ANewState: EStateWorkTable);
@@ -562,31 +523,6 @@ private
     procedure SetPressureMax(const AValue: Double);
 
   public
-  property OnFlowRateSet: TOnFlowRateSetEvent read FOnFlowRateSet write FOnFlowRateSet;
-
-
-  //property OnPumpStart: TOnPumpStartEvent read FOnPumpStart write FOnPumpStart;
-  //property OnPumpStop: TOnPumpStopEvent read FOnPumpStop write FOnPumpStop;
-  //property OnFreqSet: TOnFreqSetEvent read FOnFreqSet write FOnFreqSet;
-
-
-
-  property OnProcStart: TOnProcStartEvent read FOnProcStart write FOnProcStart;
-  property OnProcStop: TOnProcStopEvent read FOnProcStop write FOnProcStop;
-  property OnProcPause: TOnProcPauseEvent read FOnProcPause write FOnProcPause;
-  property OnProcNextStep: TOnProcNextStepEvent read FOnProcNextStep write FOnProcNextStep;
-  property OnProcRepeat: TOnProcRepeatEvent read FOnProcRepeat write FOnProcRepeat;
-  property OnSpillageStart: TOnSpillageStartEvent read FOnSpillageStart write FOnSpillageStart;
-  property OnSpillageStop: TOnSpillageStopEvent read FOnSpillageStop write FOnSpillageStop;
-  property OnStateChanged: TOnWorkTableStateChangedEvent read FOnStateChanged write FOnStateChanged;
-  property OnPointChanged: TOnWorkTablePointChangedEvent read FOnPointChanged write FOnPointChanged;
-
-
-
-
-
-
-
 
   procedure DoProcStart(AProcName: string);
   procedure DoProcStop(AProcName: string);
@@ -644,7 +580,7 @@ private
 
   end;
 
-  var WorkTableManager:   TWorkTableManager ;
+  var WorkTableManager:   TWorkTableManager;
 
 implementation
 
@@ -2959,50 +2895,41 @@ end;
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
   Notify(notifyAction, Self);
-  if Assigned(FOnProcStart) then
-    FOnProcStart(Self, AProcName);
+
 end;
 
 procedure TWorkTable.DoProcStop(AProcName: string);
 begin
   Notify(notifyAction, Self);
-  if Assigned(FOnProcStop) then
-    FOnProcStop(Self, AProcName);
+
 end;
 
 procedure TWorkTable.DoProcPause(AProcName: string);
 begin
   Notify(notifyAction, Self);
-  if Assigned(FOnProcPause) then
-    FOnProcPause(Self, AProcName);
+
 end;
 
 procedure TWorkTable.DoProcNextStep(AProcName: string);
 begin
   Notify(notifyAction, FCurrentPoint);
-  if Assigned(FOnProcNextStep) then
-    FOnProcNextStep(Self, AProcName);
+
 end;
 
 procedure TWorkTable.DoProcRepeat(AProcName: string);
 begin
   Notify(notifyAction, Self);
-  if Assigned(FOnProcRepeat) then
-    FOnProcRepeat(Self, AProcName);
+
 end;
 
 procedure TWorkTable.DoSpillageStart;
 begin
   Notify(notifyAction, Self);
-  if Assigned(FOnSpillageStart) then
-    FOnSpillageStart(Self);
 end;
 
 procedure TWorkTable.DoSpillageStop;
 begin
   Notify(notifyAction, Self);
-  if Assigned(FOnSpillageStop) then
-    FOnSpillageStop(Self);
 end;
 
 procedure TWorkTable.SetState(const ANewState: EStateWorkTable);
