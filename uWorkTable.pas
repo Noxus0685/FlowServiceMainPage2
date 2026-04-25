@@ -65,6 +65,17 @@ type
     ewtWarning = 1,
     ewtError
   );
+  TWorkTableEvent = EEventWorkTable;
+
+  EWorkTableErrorCode = (
+    wtecNone = 0,
+    wtecGeneral = 2000,
+    wtecStartMonitorFailed = 2001,
+    wtecStartTestFailed = 2002,
+    wtecStopMonitorFailed = 2003,
+    wtecStopTestFailed = 2004,
+    wtecSaveResultsFailed = 2005
+  );
 
   EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
 
@@ -389,6 +400,9 @@ private
 
   procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
+  procedure FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo); overload;
+  procedure FireEvent(AEvent: TWorkTableEvent); overload;
+  class function WorkTableEventToString(AEvent: TWorkTableEvent): string; static;
 
 
 
@@ -2765,6 +2779,46 @@ begin
   else
     Result := 'swtNONE';
   end;
+end;
+
+class function TWorkTable.WorkTableEventToString(AEvent: TWorkTableEvent): string;
+begin
+  case AEvent of
+    ewtWarning: Result := 'ewtWarning';
+    ewtError: Result := 'ewtError';
+  else
+    Result := 'ewtNone';
+  end;
+end;
+
+procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo);
+var
+  ErrorDetails: string;
+begin
+  ProtocolManager.AddMessage(pcEvent, psWorkTable, 'WorkTableEvent',
+    'Событие рабочего стола', WorkTableEventToString(AEvent));
+
+  if (AError.Code <> 0) or (Trim(AError.Msg) <> '') then
+  begin
+    ErrorDetails := Format('Event=%s; Code=%d; State=%s; Time=%s; Msg=%s', [
+      WorkTableEventToString(AEvent),
+      AError.Code,
+      WorkTableStateToString(EStateWorkTable(AError.Stage)),
+      FormatDateTime('dd.mm.yyyy hh:nn:ss', AError.Time),
+      AError.Msg
+    ]);
+
+    ProtocolManager.AddMessage(pcError, psWorkTable, 'WorkTableError',
+      'Ошибка события рабочего стола', ErrorDetails);
+  end;
+
+  Event := Integer(AEvent);
+  Notify(notifyEvent, Self);
+end;
+
+procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent);
+begin
+  FireEvent(AEvent, TErrorInfo.Empty(Integer(FState)));
 end;
 
 procedure TWorkTable.Notify(Event: Integer; Data: TObject);
