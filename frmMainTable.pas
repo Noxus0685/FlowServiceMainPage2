@@ -365,7 +365,7 @@ type
     TabControlDevices: TTabControl;
     TabItemMeasurmentRun: TTabItem;
     TabItemMRResults: TTabItem;
-    TabItem3: TTabItem;
+    TabItemChannelProperties: TTabItem;
     StringColumnDeviceCoef1: TStringColumn;
     ActionSessionCreatePoints: TAction;
     LayoutRepeats: TLayout;
