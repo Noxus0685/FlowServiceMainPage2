@@ -2601,19 +2601,9 @@ begin
   if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then
     Exit;
 
-  WorkTable := TWorkTable.Create;
-  WorkTable.ID := WorkTableManager.WorkTables.Count + 1;
-  WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
-  WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
-  WorkTableManager.WorkTables.Add(WorkTable);
+    WorkTableManager.AddWorkTable;
 
-  WorkTable.InitMeterValues;
-
-  WorkTable.RebindAllFlowMeters;
-  WorkTable.RecalculateAllMeterValues;
-  WorkTable.UpdateAggregateMeterValues;
-
-  InitTables;
+      InitTables;
 
   if WorkTableManager.WorkTables.Count > 0 then
     TabControlWorkTables.TabIndex := EnsureRange(
@@ -2621,6 +2611,7 @@ begin
       0,
       Max(0, TabControlWorkTables.TabCount - 1)
     );
+
 end;
 
 procedure TFrameMainTable.ActionOpenDeviceEditorExecute(Sender: TObject);

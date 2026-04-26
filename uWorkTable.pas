@@ -413,6 +413,7 @@ type
     class function BuildChannelDefaultText(const AChannelIndex: Integer): string; static;
 
     function AddDeviceChannel: TChannel; overload;
+    function AddDeviceChannel(const AName: string): TChannel; overload;
     function AddDeviceChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
         ATypeName, ASerial, ADeviceUUID: string): TChannel; overload;
 
@@ -571,6 +572,9 @@ type
 
     procedure Load;
     procedure Save;
+    procedure AddWorkTable;  overload;
+    procedure AddWorkTable(const WorkTableName: string);  overload;
+    function FindWorkTableName(const WorkTableName: string): TWorkTable;
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
@@ -2067,6 +2071,12 @@ begin
     Result.FlowMeter.SetEtalon(FTableFlow);
 end;
 
+function TWorkTable.AddDeviceChannel(const AName: string): TChannel;
+begin
+  Result:= AddDeviceChannel;
+  Result.Name := AName;
+end;
+
 { Adds and configures a new device channel from provided parameters. }
 function TWorkTable.AddDeviceChannel(const AEnabled: Boolean; const ASignal: Integer; const AName,
   ATypeName, ASerial, ADeviceUUID: string): TChannel;
@@ -3495,6 +3505,32 @@ procedure TWorkTableManager.Save;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
 end;
+
+procedure TWorkTableManager.AddWorkTable;
+ var WorkTable: TWorkTable;
+begin
+   WorkTable := TWorkTable.Create;
+  WorkTable.ID := WorkTables.Count + 1;
+  WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
+  WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+  WorkTables.Add(WorkTable);
+
+  WorkTable.InitMeterValues;
+
+  WorkTable.RebindAllFlowMeters;
+  WorkTable.RecalculateAllMeterValues;
+  WorkTable.UpdateAggregateMeterValues;
+
+
+
+end;
+
+procedure TWorkTableManager.AddWorkTable(const WorkTableName: string);
+begin
+   AddWorkTable;
+   WorkTables[WorkTables.Count].Name :=  WorkTableName;
+end;
+
 
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
 begin
