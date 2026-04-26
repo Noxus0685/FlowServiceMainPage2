@@ -10,6 +10,7 @@ uses
   FMX.Graphics,
   FMX.Layouts,
   FMX.ListBox,
+  FMX.Objects,
   FMX.StdCtrls,
   FMX.Types,
   System.Classes,
@@ -46,10 +47,14 @@ type
     EditFlowMin: TEdit;
     EditQuantityMax: TEdit;
     EditQuantityMin: TEdit;
+    HeaderProperty: TLabel;
+    HeaderValue: TLabel;
 
     procedure BuildUI;
     procedure UpdateHeaders;
     procedure UpdateControls;
+    procedure BuildInspectorHeader;
+    procedure BuildRowBackground(ARow: Integer; AColor: TAlphaColor);
 
     procedure EditDeviceNameExit(Sender: TObject);
     procedure EditDeviceTypeNameExit(Sender: TObject);
@@ -88,26 +93,29 @@ end;
 
 procedure TFrameFlowMeterProperties.BuildUI;
 
-  function MakeHeader(const AText: string): TLabel;
+  function MakePropertyName(const AText: string): TLabel;
   begin
     Result := TLabel.Create(Self);
     Result.Parent := GridProps;
     Result.Text := AText;
     Result.StyledSettings := [];
-    Result.TextSettings.Font.Style := [TFontStyle.fsBold];
+    Result.TextSettings.Font.Style := [];
+    Result.TextSettings.FontColor := $FF1F1F1F;
     Result.TextSettings.HorzAlign := TTextAlign.Leading;
     Result.TextSettings.VertAlign := TTextAlign.Center;
     Result.Align := TAlignLayout.Client;
-    Result.Margins.Rect := TRectF.Create(6, 4, 6, 2);
+    Result.Margins.Rect := TRectF.Create(8, 2, 8, 2);
   end;
 
-  function MakeEdit(AOnExit: TNotifyEvent; const APrompt: string): TEdit;
+  function MakeEdit(AOnExit: TNotifyEvent): TEdit;
   begin
     Result := TEdit.Create(Self);
     Result.Parent := GridProps;
     Result.Align := TAlignLayout.Client;
-    Result.Margins.Rect := TRectF.Create(6, 2, 6, 4);
-    Result.TextPrompt := APrompt;
+    Result.Margins.Rect := TRectF.Create(6, 2, 6, 2);
+    Result.TextPrompt := '';
+    Result.HitTest := True;
+    Result.TabStop := True;
     Result.OnExit := AOnExit;
   end;
 
@@ -115,55 +123,66 @@ begin
   LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
   LayoutRoot.Align := TAlignLayout.Client;
-  LayoutRoot.Padding.Rect := TRectF.Create(8, 8, 8, 8);
+  LayoutRoot.Padding.Rect := TRectF.Create(6, 6, 6, 6);
 
   GridProps := TGridPanelLayout.Create(Self);
   GridProps.Parent := LayoutRoot;
   GridProps.Align := TAlignLayout.Top;
-  GridProps.Height := 340;
+  GridProps.Height := 278;
   GridProps.RowCollection.Clear;
   GridProps.ColumnCollection.Clear;
 
-  GridProps.ColumnCollection.Add.Value := 36;
-  GridProps.ColumnCollection.Add.Value := 64;
+  GridProps.ColumnCollection.Add.Value := 44;
+  GridProps.ColumnCollection.Add.Value := 56;
 
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 42;
-  GridProps.RowCollection.Add.Value := 42;
+  GridProps.RowCollection.Add.Value := 30;
+  GridProps.RowCollection.Add.Value := 31;
+  GridProps.RowCollection.Add.Value := 31;
+  GridProps.RowCollection.Add.Value := 31;
+  GridProps.RowCollection.Add.Value := 31;
+  GridProps.RowCollection.Add.Value := 31;
+  GridProps.RowCollection.Add.Value := 31;
+  GridProps.RowCollection.Add.Value := 31;
+  GridProps.RowCollection.Add.Value := 31;
 
-  LabelDeviceName := MakeHeader('Имя');
-  LabelDeviceTypeName := MakeHeader('Тип');
-  LabelSerialNumber := MakeHeader('Серийный номер');
-  LabelOutputType := MakeHeader('Тип выхода');
-  LabelFlowMax := MakeHeader('Q макс');
-  LabelFlowMin := MakeHeader('Q мин');
-  LabelQuantityMax := MakeHeader('V макс');
-  LabelQuantityMin := MakeHeader('V мин');
-  GridProps.ControlCollection.AddControl(LabelDeviceName, 0, 0);
-  GridProps.ControlCollection.AddControl(LabelDeviceTypeName, 0, 1);
-  GridProps.ControlCollection.AddControl(LabelSerialNumber, 0, 2);
-  GridProps.ControlCollection.AddControl(LabelOutputType, 0, 3);
-  GridProps.ControlCollection.AddControl(LabelFlowMax, 0, 4);
-  GridProps.ControlCollection.AddControl(LabelFlowMin, 0, 5);
-  GridProps.ControlCollection.AddControl(LabelQuantityMax, 0, 6);
-  GridProps.ControlCollection.AddControl(LabelQuantityMin, 0, 7);
+  BuildInspectorHeader;
+  BuildRowBackground(1, $FFF8F8F8);
+  BuildRowBackground(2, $FFFFFFFF);
+  BuildRowBackground(3, $FFF8F8F8);
+  BuildRowBackground(4, $FFFFFFFF);
+  BuildRowBackground(5, $FFF8F8F8);
+  BuildRowBackground(6, $FFFFFFFF);
+  BuildRowBackground(7, $FFF8F8F8);
+  BuildRowBackground(8, $FFFFFFFF);
 
-  EditDeviceName := MakeEdit(EditDeviceNameExit, 'Имя');
-  EditDeviceTypeName := MakeEdit(EditDeviceTypeNameExit, 'Тип');
-  EditSerialNumber := MakeEdit(EditSerialNumberExit, 'Серийный номер');
-  GridProps.ControlCollection.AddControl(EditDeviceName, 1, 0);
-  GridProps.ControlCollection.AddControl(EditDeviceTypeName, 1, 1);
-  GridProps.ControlCollection.AddControl(EditSerialNumber, 1, 2);
+  LabelDeviceName := MakePropertyName('Имя');
+  LabelDeviceTypeName := MakePropertyName('Тип');
+  LabelSerialNumber := MakePropertyName('Серийный номер');
+  LabelOutputType := MakePropertyName('Тип выхода');
+  LabelFlowMax := MakePropertyName('Q макс');
+  LabelFlowMin := MakePropertyName('Q мин');
+  LabelQuantityMax := MakePropertyName('V макс');
+  LabelQuantityMin := MakePropertyName('V мин');
+  GridProps.ControlCollection.AddControl(LabelDeviceName, 0, 1);
+  GridProps.ControlCollection.AddControl(LabelDeviceTypeName, 0, 2);
+  GridProps.ControlCollection.AddControl(LabelSerialNumber, 0, 3);
+  GridProps.ControlCollection.AddControl(LabelOutputType, 0, 4);
+  GridProps.ControlCollection.AddControl(LabelFlowMax, 0, 5);
+  GridProps.ControlCollection.AddControl(LabelFlowMin, 0, 6);
+  GridProps.ControlCollection.AddControl(LabelQuantityMax, 0, 7);
+  GridProps.ControlCollection.AddControl(LabelQuantityMin, 0, 8);
+
+  EditDeviceName := MakeEdit(EditDeviceNameExit);
+  EditDeviceTypeName := MakeEdit(EditDeviceTypeNameExit);
+  EditSerialNumber := MakeEdit(EditSerialNumberExit);
+  GridProps.ControlCollection.AddControl(EditDeviceName, 1, 1);
+  GridProps.ControlCollection.AddControl(EditDeviceTypeName, 1, 2);
+  GridProps.ControlCollection.AddControl(EditSerialNumber, 1, 3);
 
   ComboOutputType := TComboBox.Create(Self);
   ComboOutputType.Parent := GridProps;
   ComboOutputType.Align := TAlignLayout.Client;
-  ComboOutputType.Margins.Rect := TRectF.Create(6, 2, 6, 4);
+  ComboOutputType.Margins.Rect := TRectF.Create(6, 2, 6, 2);
   ComboOutputType.Items.Add('Частота');
   ComboOutputType.Items.Add('Импульсы');
   ComboOutputType.Items.Add('Напряжение');
@@ -171,16 +190,62 @@ begin
   ComboOutputType.Items.Add('Интерфейс');
   ComboOutputType.Items.Add('Визуальный');
   ComboOutputType.OnChange := ComboOutputTypeChange;
-  GridProps.ControlCollection.AddControl(ComboOutputType, 1, 3);
+  GridProps.ControlCollection.AddControl(ComboOutputType, 1, 4);
 
-  EditFlowMax := MakeEdit(EditFlowMaxExit, 'Q макс');
-  EditFlowMin := MakeEdit(EditFlowMinExit, 'Q мин');
-  EditQuantityMax := MakeEdit(EditQuantityMaxExit, 'V макс');
-  EditQuantityMin := MakeEdit(EditQuantityMinExit, 'V мин');
-  GridProps.ControlCollection.AddControl(EditFlowMax, 1, 4);
-  GridProps.ControlCollection.AddControl(EditFlowMin, 1, 5);
-  GridProps.ControlCollection.AddControl(EditQuantityMax, 1, 6);
-  GridProps.ControlCollection.AddControl(EditQuantityMin, 1, 7);
+  EditFlowMax := MakeEdit(EditFlowMaxExit);
+  EditFlowMin := MakeEdit(EditFlowMinExit);
+  EditQuantityMax := MakeEdit(EditQuantityMaxExit);
+  EditQuantityMin := MakeEdit(EditQuantityMinExit);
+  GridProps.ControlCollection.AddControl(EditFlowMax, 1, 5);
+  GridProps.ControlCollection.AddControl(EditFlowMin, 1, 6);
+  GridProps.ControlCollection.AddControl(EditQuantityMax, 1, 7);
+  GridProps.ControlCollection.AddControl(EditQuantityMin, 1, 8);
+end;
+
+procedure TFrameFlowMeterProperties.BuildInspectorHeader;
+begin
+  HeaderProperty := TLabel.Create(Self);
+  HeaderProperty.Parent := GridProps;
+  HeaderProperty.Align := TAlignLayout.Client;
+  HeaderProperty.Text := 'Свойство';
+  HeaderProperty.StyledSettings := [];
+  HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
+  HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
+  HeaderProperty.Margins.Rect := TRectF.Create(8, 0, 8, 0);
+  GridProps.ControlCollection.AddControl(HeaderProperty, 0, 0);
+
+  HeaderValue := TLabel.Create(Self);
+  HeaderValue.Parent := GridProps;
+  HeaderValue.Align := TAlignLayout.Client;
+  HeaderValue.Text := 'Значение';
+  HeaderValue.StyledSettings := [];
+  HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
+  HeaderValue.TextSettings.FontColor := $FF3D3D3D;
+  HeaderValue.Margins.Rect := TRectF.Create(8, 0, 8, 0);
+  GridProps.ControlCollection.AddControl(HeaderValue, 1, 0);
+end;
+
+procedure TFrameFlowMeterProperties.BuildRowBackground(ARow: Integer; AColor: TAlphaColor);
+var
+  LeftRect, RightRect: TRectangle;
+begin
+  LeftRect := TRectangle.Create(Self);
+  LeftRect.Parent := GridProps;
+  LeftRect.Fill.Color := AColor;
+  LeftRect.Stroke.Kind := TBrushKind.None;
+  LeftRect.HitTest := False;
+  LeftRect.Align := TAlignLayout.Client;
+  LeftRect.SendToBack;
+  GridProps.ControlCollection.AddControl(LeftRect, 0, ARow);
+
+  RightRect := TRectangle.Create(Self);
+  RightRect.Parent := GridProps;
+  RightRect.Fill.Color := AColor;
+  RightRect.Stroke.Kind := TBrushKind.None;
+  RightRect.HitTest := False;
+  RightRect.Align := TAlignLayout.Client;
+  RightRect.SendToBack;
+  GridProps.ControlCollection.AddControl(RightRect, 1, ARow);
 end;
 
 procedure TFrameFlowMeterProperties.SetFlowMeter(AFlowMeter: TFlowMeter);
