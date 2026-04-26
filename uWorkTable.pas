@@ -3537,6 +3537,25 @@ begin
     FActiveWorkTable:= AWorkTable;
 end;
 
+function TWorkTableManager.FindWorkTableName(const WorkTableName: string): TWorkTable;
+var
+  WorkTable: TWorkTable;
+begin
+  Result := nil;
+
+  if (FWorkTables = nil) or (Trim(WorkTableName) = '') then
+    Exit;
+
+  for WorkTable in FWorkTables do
+  begin
+    if (WorkTable <> nil) and SameText(WorkTable.Name, WorkTableName) then
+    begin
+      Result := WorkTable;
+      Exit;
+    end;
+  end;
+end;
+
 function TWorkTableManager.FindPumpByName(const APumpName: string): TPump;
 var
   WorkTable: TWorkTable;
