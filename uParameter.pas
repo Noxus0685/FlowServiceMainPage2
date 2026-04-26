@@ -159,7 +159,11 @@ end;
   end;
 //---------------------------------
   TFlowRate = class(TParameter)
+   private
 
+   FCurrentPoint: TDevicePoint;
+   procedure SetPoint(ACurrentPoint: TDevicePoint);
+   function GetPoint :TDevicePoint;
 
   public
     constructor Create(const AName: string = 'FlowRate');
@@ -168,7 +172,10 @@ end;
     procedure DoFlowRateStart(ANewFlowRate: Double);  overload;
     procedure DoFlowRateStart;  overload;
     procedure DoFlowRateStop;
-    procedure DoFlowRateSet(ANewFlowRate: Double);
+    procedure DoFlowRateSet(ANewFlowRate: Double); overload;
+    procedure DoFlowRateSet(ANewFlowRate: Double; ACurrentPoint: TDevicePoint);  overload;
+
+    property  CurrentPoint: TDevicePoint  read  GetPoint write SetPoint;
   end;
 //---------------------------------
   TFluidTemp = class(TParameter)
@@ -406,9 +413,24 @@ end;
 
 procedure TFlowRate.DoFlowRateSet(ANewFlowRate: Double);
 begin
-
   SetParam(ANewFlowRate);
 end;
+
+procedure TFlowRate.DoFlowRateSet(ANewFlowRate: Double; ACurrentPoint: TDevicePoint);
+begin
+   CurrentPoint:=ACurrentPoint;
+   DoFlowRateSet(ANewFlowRate);
+end;
+
+   procedure TFlowRate.SetPoint(ACurrentPoint: TDevicePoint);
+   begin
+     FCurrentPoint:= ACurrentPoint;
+   end;
+
+   function TFlowRate.GetPoint :TDevicePoint;
+   begin
+      Result:=FCurrentPoint;
+   end;
 
 
   {$ENDREGION 'TFlowRate'}
@@ -676,7 +698,6 @@ begin
   end;
 
   Notify(notifyAction, Self);
-  Notify(notifyEvent, Self);
 end;
 
 procedure TParameter.SetBefore(ABefore: Double);
@@ -687,7 +708,6 @@ begin
     FBefore := FMax
   else FBefore:=ABefore;
 end;
-
 
 procedure TParameter.SetAfter(AAfter: Double);
 begin
@@ -707,14 +727,10 @@ begin
   else FValue.Value:=AValue;
 end;
 
-
 procedure TParameter.SetParam(AValue: Double);
 begin
-
-  if  SameValue(FValueSet.Value ,AValue, MinDouble) then
+       if  SameValue(FValueSet.Value ,AValue, MinDouble) then
        Exit;
-
-
 
       if AValue<FMin then
         FValueSet.Value:=FMin
@@ -724,10 +740,8 @@ begin
         FValueSet.Value:=AValue;
       ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
-
       Action := apSet;
       FHasTaskHistory := True;
-
 end;
 
 function TParameter.GetStateAsString: string;

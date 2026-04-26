@@ -1137,7 +1137,6 @@ object FrameMainTable: TFrameMainTable
               end
               object ComboBoxPumps: TComboBox
                 Align = Left
-                ItemIndex = 0
                 Size.Width = 121.000000000000000000
                 Size.Height = 22.000000000000000000
                 Size.PlatformDefault = False

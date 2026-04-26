@@ -204,8 +204,7 @@ type
     procedure EnterStage(const ANewStage: EMeasurementState);
     procedure FireEvent(AEvent: EMeasurementEvent; const AError: TErrorInfo); overload;
     procedure FireEvent(AEvent: EMeasurementEvent); overload;
-    procedure NotifyStateChanged;
-    procedure NotifyPointChanged;
+
     function GetCurrentPoint: TDevicePoint;
     function BuildError(ACode: Integer; const AMsg: string): TErrorInfo;
     function ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
@@ -543,7 +542,7 @@ begin
   if FCurrentStage = ANewState then
     Exit;
   FCurrentStage := ANewState;
-  NotifyStateChanged;
+
   Notify(Integer(meStateChanged));
 end;
 
@@ -810,7 +809,7 @@ begin
     ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
       'Запуск процесса измерения', '');
     FireEvent(meStarted);
-    NotifyPointChanged;
+
 
     FThread := TThread.CreateAnonymousThread(
       procedure
@@ -972,7 +971,7 @@ begin
   begin
     Point.Status := 1; //точка выбрана
     FCurrentRepeat := Point.RepeatsCompleted;
-    NotifyPointChanged;
+
   end else
   begin
     Point.Status := 2; //некорректно

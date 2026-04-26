@@ -83,13 +83,14 @@ type
   );
 
   EPointEtalonType = (
-    etAuto = 0,    // автоматически
-    etCompare = 1, // сличение (по расходомеру)
-    etWeight = 2   // весовое устройство
+    etNone = 0,
+    etAuto = 1,    // автоматически
+    etCompare = 2, // сличение (по расходомеру)
+    etWeight = 3   // весовое устройство
   );
 
   EPointFlowSourceType = (
-    fstUnknown = 0,  // не определён
+    fstNone  = 0,  // не определён
     fstPump = 1,     // насос (основной источник)
     fstExternal = 2  // внешний источник (магистраль / подвод)
   );
@@ -146,6 +147,7 @@ type
     LimitImp: Integer;           // Ограничение по импульсам, шт
     LimitVolume: Double;         // Ограничение по объему / массе, л (кг)
     LimitTime: Double;           // Ограничение по времени, сек
+
     SpillageStop: Integer;       // Критерии остановки (битовая маска)
     SpillageType: Integer;       // Тип пролива (с/без остановки потока)
     EtalonType: Integer;         // Тип эталона
@@ -606,7 +608,7 @@ end;
 class function TDevicePoint.GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string;
 begin
   case AType of
-    fstUnknown: Result := '-';
+    fstNone : Result := '---';
     fstPump: Result := 'Насос';
     fstExternal: Result := 'Внешний источник';
   else
@@ -617,7 +619,7 @@ end;
 class function TDevicePoint.GetPointFlowSourceTypeText(const AType: Integer): string;
 begin
   case AType of
-    Integer(fstUnknown), Integer(fstPump), Integer(fstExternal):
+    Integer(fstNone ), Integer(fstPump), Integer(fstExternal):
       Result := TDevicePoint.GetPointFlowSourceTypeText(EPointFlowSourceType(AType));
   else
     Result := 'Неизвестно';
@@ -1092,7 +1094,7 @@ begin
   SpillageStop := STOP_BY_TIME;
   SpillageType := Integer(stWithoutStop);
   EtalonType := Integer(etAuto);
-  FlowSorceType := Integer(fstUnknown);
+  FlowSorceType := Integer(fstNone );
 
   { Метрология }
   Error := 0.0;
@@ -1752,7 +1754,7 @@ begin
   LimitTime := ASource.LimitTime;
   SpillageType := Integer(stWithoutStop);
   EtalonType := Integer(etAuto);
-  FlowSorceType := Integer(fstUnknown);
+  FlowSorceType := Integer(fstNone);
 
   Error := ASource.Error;
   Pause := ASource.Pause;

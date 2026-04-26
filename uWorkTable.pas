@@ -95,7 +95,6 @@ type
 type
   TWorkTable = class;
 
-
   TChannel = class(TTypeEntity)
   private
     FEnabled: Boolean;
@@ -386,7 +385,8 @@ type
       AChannels: TObjectList<TChannel>
     ); static;
 
-private
+  private
+
   FCurrentPoint:  TDevicePoint;
   FParameterObserver: IEventObserver;
 
@@ -400,15 +400,12 @@ private
 
   procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
-  procedure FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo); overload;
-  procedure FireEvent(AEvent: TWorkTableEvent); overload;
   class function WorkTableEventToString(AEvent: TWorkTableEvent): string; static;
 
-
-
   public
-    constructor Create;
-    destructor Destroy; override;
+
+  constructor Create;
+  destructor Destroy; override;
 
     class function BuildWorkTableServiceName(const ATableIndex: Integer): string; static;
     class function BuildDeviceChannelServiceName(const AChannelIndex: Integer): string; static;
@@ -429,8 +426,8 @@ private
     class procedure Load(const AIniFileName: string;
       AWorkTables: TObjectList<TWorkTable>); static;
 
-      function AddPump(const APumpName: string): TPump; overload;
-      function AddPump(APump: TPump): Boolean; overload;
+  function AddPump(const APumpName: string): TPump; overload;
+  function AddPump(APump: TPump): Boolean; overload;
   procedure RemovePump(const APumpUUID: string); overload;
   procedure RemovePump(APump: TPump); overload;
   procedure ClearPumps;
@@ -466,8 +463,6 @@ private
     property TempDelta: Double read GetTempDelta write SetTempDelta;
     property PressDelta: Double read GetPressDelta write SetPressDelta;
 
-
-
     property Time: Double read GetTime write SetTime;
     property TimeSet: Integer read FTimeSet write FTimeSet;
     property LimitImpSet: Integer read FLimitImpSet write FLimitImpSet;
@@ -480,8 +475,6 @@ private
     property TimeResult: Double read GetTimeResult write SetTimeResult;
 
     //property State: TSpillState read FState write FState;
-
-
     property State: EStateWorkTable read FState write SetState;
     property Action: EActionWorkTable read FAction write FAction;
 
@@ -518,11 +511,9 @@ private
     property DataPointsGridColumns: TArray<TGridColumnLayout> read FDataPointsGridColumns write FDataPointsGridColumns;
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
 
-    property  NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
-    property  NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
-    property  NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
-
-
+    property NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
+    property NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
+    property NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -535,6 +526,9 @@ private
     procedure SetFlowRateMax(const AValue: Double);
     procedure SetPressureMin(const AValue: Double);
     procedure SetPressureMax(const AValue: Double);
+
+    procedure FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo); overload;
+    procedure FireEvent(AEvent: TWorkTableEvent); overload;
 
   public
 
@@ -1216,9 +1210,6 @@ begin
   //FlowRate := 10;
 
   FMeasurementRun := TMeasurementRun.Create(Self);
-
-  TMeasurementRun(FMeasurementRun).OnStateChangedMain := MeasurementRunStateChanged;
-  TMeasurementRun(FMeasurementRun).OnPointChangedMain := MeasurementRunPointChanged;
 
   ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableCreate',
     'Создан рабочий стол', Name);

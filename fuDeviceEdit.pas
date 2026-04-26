@@ -420,7 +420,7 @@ end;
 
 const
   CPointFlowSourceTypeList: array[0..2] of EPointFlowSourceType = (
-    fstUnknown,
+    fstNone,
     fstPump,
     fstExternal
   );
@@ -457,7 +457,7 @@ begin
   if (AIndex >= Low(CPointFlowSourceTypeList)) and (AIndex <= High(CPointFlowSourceTypeList)) then
     Result := Ord(CPointFlowSourceTypeList[AIndex])
   else
-    Result := Ord(fstUnknown);
+    Result := Ord(fstNone);
 end;
 
 procedure DecodeSpillageType(const AMode: ESpillageType; out ASpillageType, AEtalonType: Integer);
