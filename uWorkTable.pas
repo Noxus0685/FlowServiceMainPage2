@@ -63,7 +63,8 @@ type
   EEventWorkTable = (
     ewtNone = 0,
     ewtWarning = 1,
-    ewtError
+    ewtError,
+    ewtActivated
   );
   TWorkTableEvent = EEventWorkTable;
 
@@ -249,6 +250,7 @@ type
 
     FState: EStateWorkTable;
     FAction: EActionWorkTable;
+    FIsActive: Boolean;
 
     FTimeSet : Integer;
     FLimitImpSet: Integer;
@@ -391,6 +393,7 @@ type
   FParameterObserver: IEventObserver;
 
   procedure SetState(const ANewState: EStateWorkTable);
+  procedure SetIsActive(const AValue: Boolean);
   procedure SetActivePumpObject(const APump: TPump);
   procedure BindParameterEvents(AParameter: TParameter);
   procedure UnbindParameterEvents(AParameter: TParameter);
@@ -478,6 +481,7 @@ type
     //property State: TSpillState read FState write FState;
     property State: EStateWorkTable read FState write SetState;
     property Action: EActionWorkTable read FAction write FAction;
+    property IsActive: Boolean read FIsActive write SetIsActive;
 
     property TableClamped: Boolean read FTableClamped write FTableClamped;
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
@@ -1185,6 +1189,7 @@ begin
 
   FState := swtNONE;
   FAction := awtNone;
+  FIsActive := False;
   FTableClamped := False;
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
@@ -2787,6 +2792,7 @@ begin
   case AEvent of
     ewtWarning: Result := 'ewtWarning';
     ewtError: Result := 'ewtError';
+    ewtActivated: Result := 'ewtActivated';
   else
     Result := 'ewtNone';
   end;
@@ -2995,6 +3001,16 @@ begin
   ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
     'Изменено состояние рабочего стола', WorkTableStateToString(ANewState));
   Notify(notifyStateChanged, Self);
+end;
+
+procedure TWorkTable.SetIsActive(const AValue: Boolean);
+begin
+  if FIsActive = AValue then
+    Exit;
+
+  FIsActive := AValue;
+  if FIsActive then
+    FireEvent(ewtActivated);
 end;
 
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
@@ -3533,8 +3549,17 @@ end;
 
 
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
+var
+  WorkTable: TWorkTable;
 begin
-    FActiveWorkTable:= AWorkTable;
+  if (FWorkTables = nil) then
+    Exit;
+
+  for WorkTable in FWorkTables do
+    if WorkTable <> nil then
+      WorkTable.IsActive := WorkTable = AWorkTable;
+
+  FActiveWorkTable := AWorkTable;
 end;
 
 function TWorkTableManager.FindWorkTableName(const WorkTableName: string): TWorkTable;
