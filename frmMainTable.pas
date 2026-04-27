@@ -590,6 +590,7 @@ type
       APointIndex: Integer);
     procedure HandleWorkTableStateChanged(const AWorkTable: TWorkTable; AData: TObject);
     procedure HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
+    procedure HandleWorkTableEvent(const AWorkTable: TWorkTable; AData: TObject);
     procedure HandlePumpStateChanged(const APump: TPump);
     procedure HandlePumpAction(const APump: TPump);
     procedure HandleFlowRateStateChanged(const AFlowRate: TFlowRate);
@@ -948,6 +949,43 @@ begin
   UpdateForm;
 end;
 
+procedure TFrameMainTable.HandleWorkTableEvent(const AWorkTable: TWorkTable; AData: TObject);
+var
+  WorkTableEvent: TWorkTableEvent;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  if (AWorkTable.Event >= Ord(Low(TWorkTableEvent))) and
+     (AWorkTable.Event <= Ord(High(TWorkTableEvent))) then
+    WorkTableEvent := TWorkTableEvent(AWorkTable.Event)
+  else
+    WorkTableEvent := ewtNone;
+
+  if WorkTableEvent = ewtActivated then
+  begin
+    if FActiveWorkTable <> AWorkTable then
+    begin
+      if FActiveWorkTable <> nil then
+        FActiveWorkTable.Unsubscribe(Self);
+
+      FActiveWorkTable := AWorkTable;
+      FActiveWorkTable.Subscribe(Self);
+
+      if FFrameMeasurementRun <> nil then
+        FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+      if FFrameMRResults <> nil then
+        FFrameMRResults.ActiveWorkTable := FActiveWorkTable;
+    end;
+
+    SetValues;
+    UpdateForm;
+    Exit;
+  end;
+
+  HandleWorkTableAction(AWorkTable, AData);
+end;
+
 procedure TFrameMainTable.HandlePumpStateChanged(const APump: TPump);
 begin
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.ActivePump = APump) then
@@ -1036,14 +1074,17 @@ begin
 
   if (SenderKind = nskWorkTable) and (FActiveWorkTable <> nil) and
      (TWorkTable(Sender) <> FActiveWorkTable) then
-    Exit;
+  begin
+    if (Event <> notifyEvent) or (TWorkTable(Sender).Event <> Ord(ewtActivated)) then
+      Exit;
+  end;
 
   case SenderKind of
     nskWorkTable:
       case Event of
         notifyStateChanged: HandleWorkTableStateChanged(TWorkTable(Sender), Data);
         notifyAction: HandleWorkTableAction(TWorkTable(Sender), Data);
-        notifyEvent: HandleWorkTableAction(TWorkTable(Sender), Data);
+        notifyEvent: HandleWorkTableEvent(TWorkTable(Sender), Data);
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[WorkTable.Notify] Unknown Event=%d Sender=%s Data=%s',
