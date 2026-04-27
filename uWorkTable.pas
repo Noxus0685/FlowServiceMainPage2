@@ -3535,7 +3535,10 @@ end;
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
 begin
     if AWorkTable<>nil then
+    begin
       FActiveWorkTable:= AWorkTable;
+      FActiveWorkTable.IsActive:=True;
+    end;
 end;
 
 function TWorkTableManager.FindWorkTableName(const WorkTableName: string): TWorkTable;
