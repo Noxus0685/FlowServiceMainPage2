@@ -1269,6 +1269,8 @@ end;
 
 procedure TFrameMainTable.FormCreate(Sender: TObject);
 begin
+  TestButton.StyleBook := StyleBook1;
+  ButtonCancel.StyleBook := StyleBook1;
   Initialize;
 end;
 
