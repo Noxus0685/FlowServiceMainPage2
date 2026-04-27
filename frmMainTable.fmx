@@ -1057,7 +1057,6 @@ object FrameMainTable: TFrameMainTable
                   Align = Client
                   TabOrder = 1
                   Cursor = crIBeam
-                  Value = 12.000000000000000000
                   ValueType = Float
                   Increment = 0.100000001490116100
                   KeyboardType = NumbersAndPunctuation
@@ -1068,7 +1067,8 @@ object FrameMainTable: TFrameMainTable
                   ParentShowHint = False
                   ShowHint = False
                   OnChange = SpinBoxFreqChange
-                  OnMouseEnter = SpinBoxFreqMouseEnter
+                  OnEnter = SpinBoxFreqEnter
+                  OnExit = SpinBoxFreqExit
                 end
               end
               object Rectangle1: TRectangle
