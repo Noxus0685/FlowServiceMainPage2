@@ -4797,7 +4797,7 @@ object FrameMainTable: TFrameMainTable
         Visible = False
         Sizes = (
           1049s
-          427s)
+          448s)
         object TabItemWorkTable1: TTabItem
           CustomIcon = <
             item
@@ -4805,8 +4805,8 @@ object FrameMainTable: TFrameMainTable
           TextSettings.Trimming = None
           IsSelected = True
           Padding.Left = 10.000000000000000000
-          Size.Width = 143.000000000000000000
-          Size.Height = 26.000000000000000000
+          Size.Width = 1.000000000000000000
+          Size.Height = 5.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = ''
           TabOrder = 0
@@ -4830,7 +4830,7 @@ object FrameMainTable: TFrameMainTable
         Size.Width = 674.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 3
+        TabOrder = 2
         object TabControlDevices: TTabControl
           Align = Client
           Size.Width = 674.000000000000000000

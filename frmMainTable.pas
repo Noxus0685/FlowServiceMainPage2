@@ -1332,18 +1332,12 @@ begin
 
   FWorkTableManager:= WorkTableManager;
 
-  TMeterValue.LoadFromFile;
-
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
   FFrameMRResults := nil;
   FFrameProtocol := nil;
   FFrameFlowMeterProperties := nil;
-
-
-
-
 
   GridDevices.RowCount := 2;
 
@@ -1391,8 +1385,6 @@ begin
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
 
-  UpdateFlowMeterPropertiesFrame;
-
   if FFrameFlowMeterProperties = nil then
   begin
     FFrameFlowMeterProperties := TFrameFlowMeterProperties.Create(Self);
@@ -1424,9 +1416,6 @@ begin
     LayoutProcedures.Visible,
     LayoutOrder
   );
-
-  ButtonMonitor.OnClick := ButtonMonitorClick;
-  ButtonCancel.OnClick := ButtonCancelClick;
 
   EnforceDataPointsColumnsLayout;
 
