@@ -61,9 +61,6 @@ Coordinates=826,234,150,58
 [miAddDeviceChannel]
 Coordinates=151,920,138,36
 
-[TabItemWorkTable1]
-Coordinates=10,920,131,36
-
 [MenuItemDevicesClearRow]
 Coordinates=1498,874,173,36
 
@@ -739,4 +736,3 @@ Coordinates=160,234,53,58
 
 [SwitchAuto]
 Coordinates=1047,302,65,58
-
