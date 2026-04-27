@@ -3327,10 +3327,29 @@ end;
 function TWorkTable.AddPump(const APumpName: string): TPump;
 var
   NewPump: TPump;
+  Pump: TPump;
 begin
-  NewPump := TPump.Create(APumpName);
-  BindParameterEvents(NewPump);
-  FPumps.Add(NewPump);
+  Result := nil;
+  if APumpName = '' then
+    Exit;
+
+  NewPump := nil;
+  for Pump in TPump.Pumps do
+    if Pump.Name = APumpName then
+    begin
+      NewPump := Pump;
+      Break;
+    end;
+
+  if NewPump = nil then
+    NewPump := TPump.Create(APumpName);
+
+  if FPumps.IndexOf(NewPump) < 0 then
+  begin
+    BindParameterEvents(NewPump);
+    FPumps.Add(NewPump);
+  end;
+
   Result := NewPump;
 
       FAction:=awtAddPump;
@@ -3339,7 +3358,7 @@ end;
 
 function TWorkTable.AddPump(APump: TPump): Boolean;
 begin
-  if Assigned(APump) then
+  if Assigned(APump) and (FPumps.IndexOf(APump) < 0) then
   begin
     BindParameterEvents(APump);
     FPumps.Add(APump);
