@@ -1338,10 +1338,6 @@ begin
   FFrameProtocol := nil;
   FFrameFlowMeterProperties := nil;
 
-
-
-
-
   GridDevices.RowCount := 2;
 
   // Заполняем список через имя колонки
@@ -1388,8 +1384,6 @@ begin
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
 
-  UpdateFlowMeterPropertiesFrame;
-
   if FFrameFlowMeterProperties = nil then
   begin
     FFrameFlowMeterProperties := TFrameFlowMeterProperties.Create(Self);
@@ -1421,9 +1415,6 @@ begin
     LayoutProcedures.Visible,
     LayoutOrder
   );
-
-  ButtonMonitor.OnClick := ButtonMonitorClick;
-  ButtonCancel.OnClick := ButtonCancelClick;
 
   EnforceDataPointsColumnsLayout;
 

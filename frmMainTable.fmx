@@ -4814,7 +4814,7 @@ object FrameMainTable: TFrameMainTable
         Size.Width = 674.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 3
+        TabOrder = 2
         object TabControlDevices: TTabControl
           Align = Client
           Size.Width = 674.000000000000000000
