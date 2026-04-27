@@ -359,7 +359,7 @@ type
     PopupColumnDeviceDN1: TPopupColumn;
 
     SpeedButton6: TSpeedButton;
-    LayoutProperties: TLayout;
+    LayoutCenter: TLayout;
     Splitter2: TSplitter;
     PanelProperties: TPanel;
     TabControlDevices: TTabControl;
@@ -385,6 +385,7 @@ type
     MenuItemDeletePump: TMenuItem;
     ActionPumpDelete: TAction;
     StyleBook1: TStyleBook;
+    PanelControlWorkTables: TPanel;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;

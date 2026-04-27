@@ -3528,13 +3528,14 @@ end;
 procedure TWorkTableManager.AddWorkTable(const WorkTableName: string);
 begin
    AddWorkTable;
-   WorkTables[WorkTables.Count].Name :=  WorkTableName;
+   WorkTables[WorkTables.Count-1].Name :=  WorkTableName;
 end;
 
 
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
 begin
-    FActiveWorkTable:= AWorkTable;
+    if AWorkTable<>nil then
+      FActiveWorkTable:= AWorkTable;
 end;
 
 function TWorkTableManager.FindWorkTableName(const WorkTableName: string): TWorkTable;
