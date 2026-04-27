@@ -104,7 +104,6 @@ type
 
   TFrameMainTable = class(TFrame, IEventObserver)
     TabControlWorkTables: TTabControl;
-    TabItemWorkTable1: TTabItem;
     PanelEtalons1: TPanel;
     LayoutEtalons1: TLayout;
     GridEtalons: TGrid;
@@ -723,9 +722,13 @@ begin
 end;
 
 destructor TFrameMainTable.Destroy;
+var
+  WorkTable: TWorkTable;
 begin
-  if FActiveWorkTable <> nil then
-    FActiveWorkTable.Unsubscribe(Self);
+  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+    for WorkTable in FWorkTableManager.WorkTables do
+      if WorkTable <> nil then
+        WorkTable.Unsubscribe(Self);
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -967,11 +970,7 @@ begin
   begin
     if FActiveWorkTable <> AWorkTable then
     begin
-      if FActiveWorkTable <> nil then
-        FActiveWorkTable.Unsubscribe(Self);
-
       FActiveWorkTable := AWorkTable;
-      FActiveWorkTable.Subscribe(Self);
 
       if FFrameMeasurementRun <> nil then
         FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
@@ -1331,8 +1330,6 @@ begin
   SwitchAuto.IsChecked := False;
 
   FWorkTableManager:= WorkTableManager;
-
-  TMeterValue.LoadFromFile;
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
@@ -2413,7 +2410,7 @@ var
   WorkTable: TWorkTable;
   Tab: TTabItem;
   GridEtalonsN, GridDevicesN: TGrid;
-  I, LimitCount, UnitIndex: Integer;
+  I, LimitCount, UnitIndex, WorkTableIndex: Integer;
 begin
   TableCount := 0;
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
@@ -2421,11 +2418,17 @@ begin
 
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
   FActiveWorkTable := GetWorkTableByIndex(0);
+  for WorkTableIndex := 0 to TableCount - 1 do
+  begin
+    WorkTable := GetWorkTableByIndex(WorkTableIndex);
+    if WorkTable = nil then
+      Continue;
+    WorkTable.Subscribe(Self);
+    WorkTable.RebindAllFlowMeters;
+  end;
+
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.Subscribe(Self);
-    FActiveWorkTable.RebindAllFlowMeters;
-
     if FActiveWorkTable.FlowUnitName <> '' then
     begin
       UnitIndex := ComboEditUnits.Items.IndexOf(FActiveWorkTable.FlowUnitName);
@@ -2456,8 +2459,6 @@ begin
     FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
-
-  TabItemWorkTable1.Visible := TableCount >= 1;
 
   Tab := FindComponent('TabItemWorkTable2') as TTabItem;
   if Assigned(Tab) then

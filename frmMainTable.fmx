@@ -4798,22 +4798,6 @@ object FrameMainTable: TFrameMainTable
         Sizes = (
           1049s
           427s)
-        object TabItemWorkTable1: TTabItem
-          CustomIcon = <
-            item
-            end>
-          TextSettings.Trimming = None
-          IsSelected = True
-          Padding.Left = 10.000000000000000000
-          Size.Width = 143.000000000000000000
-          Size.Height = 26.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = ''
-          TabOrder = 0
-          Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083' 1 ('#1044#1059'25)'
-          ExplicitSize.cx = 143.000000000000000000
-          ExplicitSize.cy = 26.000000000000000000
-        end
       end
       object Splitter2: TSplitter
         Align = Right
