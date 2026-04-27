@@ -520,15 +520,15 @@ EnabledEtalonChannels: TObjectList<TChannel>;
             AValue:=random(5);
             if FlowRate.Action=apSet then
               if FlowRate.IsRunning and FHasPrevFlowRateValue then
-                if FlowRate.Value.Value > FPrevFlowRateValue then
+                if FlowRate.ValueSet.Value > FPrevFlowRateValue then
                   WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+AValue)
-                else if FlowRate.Value.Value < FPrevFlowRateValue then
+                else if FlowRate.ValueSet.Value < FPrevFlowRateValue then
                   if (WorkTable.ActivePump.ValueSet.value-AValue)>=WorkTable.ActivePump.Min then
                     WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-AValue)
-                  else if  WorkTable.ActivePump.ValueSet.value<=WorkTable.ActivePump.Min then
+                  else if  (WorkTable.ActivePump.ValueSet.value-AValue)<=WorkTable.ActivePump.Min then
                     WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.Min);
 
-            FPrevFlowRateValue := FlowRate.Value.Value;
+            FPrevFlowRateValue := FlowRate.ValueSet.Value;
             FHasPrevFlowRateValue := True;
             if not(WorkTable.ActivePump.IsRunning) and (FlowRate.IsRunning) then
               WorkTable.ActivePump.DoPumpStart;
