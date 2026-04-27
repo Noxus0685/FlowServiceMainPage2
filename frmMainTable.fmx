@@ -2,6 +2,7 @@ object FrameMainTable: TFrameMainTable
   Size.Width = 1742.000000000000000000
   Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
+  StyleBook = StyleBook1
   object Layout: TLayout
     Align = Client
     Size.Width = 1742.000000000000000000
