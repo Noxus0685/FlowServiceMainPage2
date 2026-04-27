@@ -1282,7 +1282,11 @@ begin
   if FInitialized then
     Exit;
 
-
+  if Assigned(StyleBook1) then
+    begin
+      if Assigned(GetParentForm(Self)) and (GetParentForm(Self).StyleBook = nil) then
+        GetParentForm(Self).StyleBook := StyleBook1;
+    end;
 
   FInitialized := True;
   SwitchAuto.IsChecked := False;
