@@ -353,15 +353,8 @@ begin
   begin
     FWorkTableManager.ActiveWorkTable.AddPump('1');
     FWorkTableManager.ActiveWorkTable.AddPump('2');
+    FWorkTableManager.ActiveWorkTable.AddPump('2');
     FWorkTableManager.ActiveWorkTable.AddPump('3');
-
-
-
-    for i := 0 to TPump.Pumps.Count-1 do
-    begin
-
-    end;
-
   end;
 
   SubscribeToWorkTable(FWorkTableManager.ActiveWorkTable);
@@ -468,9 +461,9 @@ Pump: TPump;
 WorkTable:TWorkTable;
 FluidTemp:TFluidTemp;
 FluidPress:TFluidPress;
+AValue:integer;
 i:integer;
 EnabledEtalonChannels: TObjectList<TChannel>;
-AValue:Double;
   begin
   if (ASender = nil) or (FWorkTableManager = nil) then
     Exit;
@@ -504,7 +497,9 @@ AValue:Double;
                 Pump.State:=spChanging
               else  if (Pump.Action = apSet) and (Pump.IsRunning = true) then
                 Pump.State:=spOngoing ;
-                mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
+              if WorkTable.ActivePump.ValueSet.value<12 then
+                WorkTable.ActivePump.ValueSet.value:=12;
+              mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
           end;
 
         if AData is TFlowRate then
@@ -517,15 +512,18 @@ AValue:Double;
                 FlowRate.State:=spChanging
               else  if (FlowRate.Action = apSet) and (FlowRate.IsRunning = true) then
                FlowRate.State:=spOngoing ;
-                {if FlowRate.ValueSet.value>=FlowRate.Value.value then
-                  WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+random(5))
-                else
-                  WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-random(5));   }
-                if WorkTable.ActivePump.Value.value<12 then
-                  WorkTable.ActivePump.ValueSet.value:=12;
-                if not(WorkTable.ActivePump.IsRunning) then
-                  WorkTable.ActivePump.DoPumpStart;
-               mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
+            AValue:=random(5);
+            if FlowRate.Action=apSet then
+              if (FlowRate.ValueSet.value>=FlowRate.Value.value) and (FlowRate.IsRunning) then
+                WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+AValue)
+              else if  (FlowRate.ValueSet.value<FlowRate.Value.value) and (FlowRate.IsRunning) then
+                if (WorkTable.ActivePump.ValueSet.value-AValue)>=WorkTable.ActivePump.Min then
+                  WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-AValue)
+              else if  WorkTable.ActivePump.ValueSet.value<=WorkTable.ActivePump.Min then
+                WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.Min);
+            if not(WorkTable.ActivePump.IsRunning) and (FlowRate.IsRunning) then
+              WorkTable.ActivePump.DoPumpStart;
+            mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
           end;
         if AData is TFluidTemp then
         begin

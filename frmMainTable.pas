@@ -467,7 +467,6 @@ type
     procedure UpdateUIFlowRate;
     procedure ComboBoxPumpsClick(Sender: TObject);
     procedure SpinBoxFreqChange(Sender: TObject);
-    procedure SpinBoxFreqMouseEnter(Sender: TObject);
     procedure Rectangle15Click(Sender: TObject);
     procedure SpeedButtonSetFlowRateClick(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
@@ -494,6 +493,8 @@ type
     procedure ActionDeleteEtalonsExecute(Sender: TObject);
     procedure ActionPumpAddExecute(Sender: TObject);
     procedure ActionPumpDeleteExecute(Sender: TObject);
+    procedure SpinBoxFreqExit(Sender: TObject);
+    procedure SpinBoxFreqEnter(Sender: TObject);
 
   private
 
@@ -1584,9 +1585,14 @@ begin
     end;
 end;
 
-procedure TFrameMainTable.SpinBoxFreqMouseEnter(Sender: TObject);
+procedure TFrameMainTable.SpinBoxFreqEnter(Sender: TObject);
 begin
   LayoutPump.tag:=3;
+end;
+
+procedure TFrameMainTable.SpinBoxFreqExit(Sender: TObject);
+begin
+  LayoutPump.tag:=2;
 end;
 
 procedure TFrameMainTable.ButtonMonitorClick(Sender: TObject);

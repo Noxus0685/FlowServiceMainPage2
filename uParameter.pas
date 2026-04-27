@@ -441,7 +441,7 @@ constructor TPump.Create;
 begin
   inherited Create('','');
   FMax:= 50;
-  FMin:= 0;
+  FMin:= 12;
 
   //FValue:=10;
   //FValueSet := 12;
@@ -651,8 +651,8 @@ end;
 
 procedure TParameter.SetAction(AAction: EActionParameter);
 begin
-  if FAction = AAction then
-    Exit;
+  //if FAction = AAction then
+  //  Exit;
 
   FAction := AAction;
   Event := Ord(eparActionChanged);
