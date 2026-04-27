@@ -95,6 +95,8 @@ type
 
     FT_WorkBench_Last: Double;
     FT_WorkBench_First: Double;
+    FPrevFlowRateValue: Double;
+    FHasPrevFlowRateValue: Boolean;
 
     procedure UpdateTemp(const AWorkTable: TWorkTable);
 
@@ -336,6 +338,9 @@ procedure TTableMainForm.FormCreate(Sender: TObject);
 var
 i:integer;
 begin
+  FPrevFlowRateValue := 0;
+  FHasPrevFlowRateValue := False;
+
   //Значения по умолчанию
   FT_WorkBench_First:=20;
   FT_WorkBench_Last:=20;
@@ -514,13 +519,17 @@ EnabledEtalonChannels: TObjectList<TChannel>;
                FlowRate.State:=spOngoing ;
             AValue:=random(5);
             if FlowRate.Action=apSet then
-              if (FlowRate.ValueSet.value>=FlowRate.Value.value) and (FlowRate.IsRunning) then
-                WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+AValue)
-              else if  (FlowRate.ValueSet.value<FlowRate.Value.value) and (FlowRate.IsRunning) then
-                if (WorkTable.ActivePump.ValueSet.value-AValue)>=WorkTable.ActivePump.Min then
-                  WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-AValue)
-              else if  WorkTable.ActivePump.ValueSet.value<=WorkTable.ActivePump.Min then
-                WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.Min);
+              if FlowRate.IsRunning and FHasPrevFlowRateValue then
+                if FlowRate.Value.Value > FPrevFlowRateValue then
+                  WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value+AValue)
+                else if FlowRate.Value.Value < FPrevFlowRateValue then
+                  if (WorkTable.ActivePump.ValueSet.value-AValue)>=WorkTable.ActivePump.Min then
+                    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.ValueSet.value-AValue)
+                  else if  WorkTable.ActivePump.ValueSet.value<=WorkTable.ActivePump.Min then
+                    WorkTable.ActivePump.DoFreqSet(WorkTable.ActivePump.Min);
+
+            FPrevFlowRateValue := FlowRate.Value.Value;
+            FHasPrevFlowRateValue := True;
             if not(WorkTable.ActivePump.IsRunning) and (FlowRate.IsRunning) then
               WorkTable.ActivePump.DoPumpStart;
             mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
