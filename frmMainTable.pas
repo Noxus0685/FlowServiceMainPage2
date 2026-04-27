@@ -1277,12 +1277,18 @@ var
   OT: TOutputType;
   UnitName: string;
   LayoutOrder: string;
+  LOwnerForm: TCommonCustomForm;
 
 begin
   if FInitialized then
     Exit;
 
-
+  if Assigned(StyleBook1) and (Owner is TCommonCustomForm) then
+    begin
+      LOwnerForm := TCommonCustomForm(Owner);
+      if LOwnerForm.StyleBook = nil then
+        LOwnerForm.StyleBook := StyleBook1;
+    end;
 
   FInitialized := True;
   SwitchAuto.IsChecked := False;
