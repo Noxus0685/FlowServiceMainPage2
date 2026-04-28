@@ -128,7 +128,6 @@ object FormTypeSelect: TFormTypeSelect
         Viewport.Height = 637.000000000000000000
         object CheckColumnSelect: TCheckColumn
           Header = ''
-          ReadOnly = True
           Size.Width = 28.000000000000000000
         end
         object StringColumnName: TStringColumn
