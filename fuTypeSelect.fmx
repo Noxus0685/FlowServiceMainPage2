@@ -127,6 +127,13 @@ object FormTypeSelect: TFormTypeSelect
         OnCellClick = GridTypesCellClick
         Viewport.Width = 861.000000000000000000
         Viewport.Height = 637.000000000000000000
+        object CheckColumnTypeEnable: TCheckColumn
+          Header = #1042#1082#1083
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Size.Width = 48.000000000000000000
+        end
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103
           HeaderSettings.TextSettings.Trimming = Character
