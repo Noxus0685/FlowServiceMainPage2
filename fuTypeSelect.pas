@@ -133,6 +133,9 @@ type
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure TreeViewTypesChange(Sender: TObject);
+    procedure TreeViewTypesClick(Sender: TObject);
+    procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
     procedure sbClearClick(Sender: TObject);
@@ -174,6 +177,7 @@ type
     FSortColumn: Integer;
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
+    FClearTreeSelectionOnClick: Boolean;
 
     procedure LoadData;
     procedure BuildTree;
@@ -815,6 +819,7 @@ begin
    FSortColumn := -1;
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
+   FClearTreeSelectionOnClick := False;
    TreeViewTypes.MultiSelect := True;
 
 
@@ -1005,6 +1010,51 @@ begin
 
   ApplyFilter;
     UpdateGridTypes;
+end;
+
+procedure TFormTypeSelect.TreeViewTypesClick(Sender: TObject);
+begin
+  if FClearTreeSelectionOnClick then
+  begin
+    TreeViewTypes.Selected := nil;
+    FClearTreeSelectionOnClick := False;
+
+    FreeAndNil(FDevFilteredByTree);
+    FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
+
+    ApplyFilter;
+    UpdateGridTypes;
+  end;
+end;
+
+procedure TFormTypeSelect.TreeViewTypesMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  Obj: TFmxObject;
+  ClickedItem: TTreeViewItem;
+begin
+  FClearTreeSelectionOnClick := False;
+
+  if Button <> TMouseButton.mbLeft then
+    Exit;
+
+  if (ssCtrl in Shift) or (ssShift in Shift) then
+    Exit;
+
+  Obj := TreeViewTypes.ObjectAtPoint(PointF(X, Y));
+  ClickedItem := nil;
+  while Obj <> nil do
+  begin
+    if Obj is TTreeViewItem then
+    begin
+      ClickedItem := TTreeViewItem(Obj);
+      Break;
+    end;
+    Obj := Obj.Parent;
+  end;
+
+  if (ClickedItem <> nil) and ClickedItem.IsSelected then
+    FClearTreeSelectionOnClick := True;
 end;
 
 function TFormTypeSelect.BuildFilteredByTree(
