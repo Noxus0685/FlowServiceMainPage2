@@ -1040,7 +1040,7 @@ begin
   if (ssCtrl in Shift) or (ssShift in Shift) then
     Exit;
 
-  ClickedItem := TreeViewTypes.ItemByPoint(PointF(X, Y));
+  ClickedItem := TreeViewTypes.ItemByPoint(X, Y);
 
   if (ClickedItem <> nil) and ClickedItem.IsSelected then
     FClearTreeSelectionOnClick := True;
