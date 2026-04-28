@@ -135,6 +135,8 @@ type
     procedure TreeViewTypesClick(Sender: TObject);
     procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure TreeViewTypesMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
     procedure sbClearClick(Sender: TObject);
@@ -186,6 +188,7 @@ type
     function ColumnToSortField(ACol: Integer): TDeviceTypeSortField;
 
     procedure ResetSorting;
+    procedure SyncTreeSelectionState(const AResetInputFilters: Boolean);
     procedure ApplyFilter;
     function  BuildFilteredByTree(
   const Source: TObjectList<TDeviceType>
@@ -820,7 +823,7 @@ begin
    FSkipTypeDeleteConfirm := False;
    FClearTreeSelectionOnClick := False;
    TreeViewTypes.MultiSelect := True;
-
+   TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
 
    LoadData;
    FillComboBoxRepository;
@@ -1003,10 +1006,27 @@ begin
 end;
 
 procedure TFormTypeSelect.TreeViewTypesClick(Sender: TObject);
+begin
+  SyncTreeSelectionState(True);
+  {
+  if FClearTreeSelectionOnClick then
+  begin
+    TreeViewTypes.Selected := nil;
+    FClearTreeSelectionOnClick := False;
+
+    FreeAndNil(FDevFilteredByTree);
+    FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
+
+    ApplyFilter;
+    UpdateGridTypes;
+  end;                     }
+end;
+
+procedure TFormTypeSelect.SyncTreeSelectionState(const AResetInputFilters: Boolean);
 var
-Item: TTreeViewItem;
-HasSelection: Boolean;
-I: Integer;
+  Item: TTreeViewItem;
+  HasSelection: Boolean;
+  I: Integer;
 begin
   HasSelection := False;
   for I := 0 to TreeViewTypes.Count - 1 do
@@ -1029,33 +1049,24 @@ begin
   Item := TreeViewTypes.Selected;
   if Assigned(Item) then
   begin
-    // 1. очистка фильтров ввода
-    EditFindType.Text := '';
-    DateEditFilter.IsEmpty := True;
+    if AResetInputFilters then
+    begin
+      // 1. очистка фильтров ввода
+      EditFindType.Text := '';
+      DateEditFilter.IsEmpty := True;
 
-    // 2. пересчёт фильтров
-    ApplyFilter;
-    UpdateGridTypes;
-    // фильтров больше нет
-    sbFind.IsPressed := False;
+      // 2. пересчёт фильтров
+      ApplyFilter;
+      UpdateGridTypes;
+      // фильтров больше нет
+      sbFind.IsPressed := False;
+    end;
   end
   else
   begin
     SelectedType := nil;
     GridTypes.Row := -1;
   end;
-  {
-  if FClearTreeSelectionOnClick then
-  begin
-    TreeViewTypes.Selected := nil;
-    FClearTreeSelectionOnClick := False;
-
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
-
-    ApplyFilter;
-    UpdateGridTypes;
-  end;                     }
 end;
 
 procedure TFormTypeSelect.TreeViewTypesMouseDown(Sender: TObject;
@@ -1075,6 +1086,16 @@ begin
 
   if (ClickedItem <> nil) and ClickedItem.IsSelected then
     FClearTreeSelectionOnClick := True;
+end;
+
+procedure TFormTypeSelect.TreeViewTypesMouseUp(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+begin
+  if Button <> TMouseButton.mbLeft then
+    Exit;
+
+  if (ssCtrl in Shift) or (ssShift in Shift) then
+    SyncTreeSelectionState(False);
 end;
 
 function TFormTypeSelect.BuildFilteredByTree(
