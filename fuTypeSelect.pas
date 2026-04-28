@@ -304,16 +304,29 @@ end;
 function TFormTypeSelect.GetSelectedTreeNodes: TList<TTreeViewItem>;
 var
   I: Integer;
-  Item: TTreeViewItem;
+
+  procedure CollectSelected(AItem: TTreeViewItem);
+  var
+    J: Integer;
+    Child: TTreeViewItem;
+  begin
+    if AItem = nil then
+      Exit;
+
+    if AItem.IsSelected then
+      Result.Add(AItem);
+
+    for J := 0 to AItem.Count - 1 do
+    begin
+      Child := TTreeViewItem(AItem.Items[J]);
+      CollectSelected(Child);
+    end;
+  end;
 begin
   Result := TList<TTreeViewItem>.Create;
 
   for I := 0 to TreeViewTypes.Count - 1 do
-  begin
-    Item := TreeViewTypes.Items[I];
-    if (Item <> nil) and Item.IsSelected then
-      Result.Add(Item);
-  end;
+    CollectSelected(TreeViewTypes.Items[I]);
 
   if (Result.Count = 0) and (TreeViewTypes.Selected <> nil) then
     Result.Add(TreeViewTypes.Selected);
