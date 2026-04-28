@@ -1048,11 +1048,15 @@ procedure TFormTypeSelect.GridTypesDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
 begin
+  { Для активной строки оставляем штатное выделение грида "как было до". }
+  if Row = GridTypes.Row then
+    Exit;
+
   if not IsGridRowSelected(Row) then
     Exit;
 
   Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := $66E5F1FB;
+  Canvas.Fill.Color := $33E5F1FB;
   Canvas.FillRect(Bounds, 0, 0, [], 1);
 end;
 
