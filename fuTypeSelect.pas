@@ -564,6 +564,14 @@ begin
       if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
       begin
         ApplyTreeNodeSelectionToType(NewType, SelectedNode);
+        if (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0) and
+           (FDevFilteredTypes[0] <> nil) then
+        begin
+          NewType.Manufacturer := FDevFilteredTypes[0].Manufacturer;
+          NewType.Category := FDevFilteredTypes[0].Category;
+          NewType.CategoryName := FDevFilteredTypes[0].CategoryName;
+          NewType.Modification := FDevFilteredTypes[0].Modification;
+        end;
         if Trim(BranchAccuracyClass) <> '' then
           NewType.AccuracyClass := BranchAccuracyClass;
       end;
@@ -786,7 +794,10 @@ begin
       Ord(tnCategory):
         begin
           AType.Category := StrToIntDef(Cur.TagString, 0);
-          AType.CategoryName := Cur.Text;
+          if (Trim(Cur.Text) <> '') and (Cur.Text[1] <> '<') then
+            AType.CategoryName := Cur.Text
+          else
+            AType.CategoryName := '';
         end;
 
       Ord(tnModification):
