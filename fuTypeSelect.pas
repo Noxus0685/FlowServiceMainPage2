@@ -63,6 +63,7 @@ type
     TreeViewItem3: TTreeViewItem;
     LayoutRight: TLayout;
     GridTypes: TGrid;
+    CheckColumnTypeEnable: TCheckColumn;
     StringColumnName: TStringColumn;
     StringColumnCategory: TStringColumn;
     StringColumnManufacturer: TStringColumn;
@@ -891,6 +892,12 @@ begin
   GridTypes.Row := Row;
   GridTypes.Selected := Row;
   SelectedType := FDevFilteredTypes[Row];
+
+  if Column = CheckColumnTypeEnable then
+  begin
+    SelectedType.Enable := not SelectedType.Enable;
+    UpdateGridTypes;
+  end;
 end;
 
 procedure TFormTypeSelect.GridTypesGetValue(
@@ -920,7 +927,10 @@ begin
   {----------------------------------}
   { Значения колонок }
   {----------------------------------}
-  if ACol = StringColumnName.Index then
+  if ACol = CheckColumnTypeEnable.Index then
+    Value := T.Enable
+
+  else if ACol = StringColumnName.Index then
     Value := T.Name
 
   else if ACol = StringColumnCategory.Index then
