@@ -108,6 +108,9 @@ type
     FImpResult: Double;
     FCurSec: Double;
     FCurResult: Double;
+    FVolSec: Double;
+    FVolResult: Double;
+
     FValueSec: Double;
     FValueResult: Double;
 
@@ -121,6 +124,7 @@ type
     FHashValueImpTotal: string;
     FHashValueCurrent: string;
     FHashValueInterface: string;
+    FName: string;
 
 
 
@@ -185,6 +189,10 @@ type
     procedure SetValueImpTotal(const AValue: TMeterValue);
     procedure SetValueCurrent(const AValue: TMeterValue);
     procedure SetValueInterface(const AValue: TMeterValue);
+    function GetVolResultProxy: Double;
+    procedure SetVolResultProxy(const AValue: Double);
+    function GetVolSecProxy: Double;
+    procedure SetVolSecProxy(const AValue: Double);
 
   public
     constructor Create; override;
@@ -219,6 +227,8 @@ type
     property ImpResult: Double read GetImpResultProxy write SetImpResultProxy;
     property CurSec: Double read GetCurSecProxy write SetCurSecProxy;
     property CurResult: Double read GetCurResultProxy write SetCurResultProxy;
+    property VolSec: Double read GetVolSecProxy write SetVolSecProxy;
+    property VolResult: Double read GetVolResultProxy write SetVolResultProxy;
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
 
@@ -767,7 +777,7 @@ begin
 
   FFlowMeter.Init(DeviceUUID);
 end;
-
+                                         {TODO -oOwner -cGeneral : ActionItem}
 { Rebinds FlowMeter value references to channel and work table meter values. }
 procedure TChannel.RebindFlowMeterValues(const AWorkTable: TWorkTable);
 begin
@@ -1132,6 +1142,18 @@ begin
   FCurResult := AValue;
 end;
 
+{ Returns channel current result value. }
+function TChannel.GetVolResultProxy: Double;
+begin
+  Result := FCurResult;
+end;
+
+{ Stores channel current result value. }
+procedure TChannel.SetVolResultProxy(const AValue: Double);
+begin
+  FCurResult := AValue;
+end;
+
 { Returns channel secondary runtime value. }
 function TChannel.GetValueSecProxy: Double;
 begin
@@ -1142,6 +1164,18 @@ end;
 procedure TChannel.SetValueSecProxy(const AValue: Double);
 begin
   FValueSec := AValue;
+end;
+
+{ Returns channel secondary runtime value. }
+function TChannel.GetVolSecProxy: Double;
+begin
+  Result := FVolSec;
+end;
+
+{ Stores channel secondary runtime value. }
+procedure TChannel.SetVolSecProxy(const AValue: Double);
+begin
+  FVolSec := AValue;
 end;
 
 { Returns channel secondary result value. }
