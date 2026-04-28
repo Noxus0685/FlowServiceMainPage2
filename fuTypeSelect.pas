@@ -191,7 +191,7 @@ type
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
-    FCopiedType: TDeviceType;
+    FCopiedTypes: TObjectList<TDeviceType>;
     FCheckedTypes: TList<TDeviceType>;
 
     procedure LoadData;
@@ -215,6 +215,7 @@ type
     ): Boolean;
     function BuildSearchURL(const ASearch: string): string;
     procedure ApplyTreeSelectionToType(AType: TDeviceType);
+    procedure ApplyTreeNodeSelectionToType(AType: TDeviceType; ANode: TTreeViewItem);
 
     procedure FillComboBoxRepository;
 
@@ -226,6 +227,7 @@ type
     procedure ClearCheckedTypes;
     function GetCheckedTypes: TObjectList<TDeviceType>;
     function GetSelectedTypes: TObjectList<TDeviceType>;
+    function GetActiveTreeNode: TTreeViewItem;
 
   public
     { Public declarations }
@@ -519,13 +521,13 @@ end;
 procedure TFormTypeSelect.actTypeCopyExecute(Sender: TObject);
 var
   TargetTypes: TObjectList<TDeviceType>;
+  I: Integer;
 begin
   TargetTypes := GetSelectedTypes;
   try
-    if TargetTypes.Count > 0 then
-      FCopiedType := TargetTypes[0]
-    else
-      FCopiedType := nil;
+    FCopiedTypes.Clear;
+    for I := 0 to TargetTypes.Count - 1 do
+      FCopiedTypes.Add(TargetTypes[I]);
   finally
     TargetTypes.Free;
   end;
@@ -534,40 +536,72 @@ end;
 procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
   NewType: TDeviceType;
+  SourceType: TDeviceType;
   I: Integer;
   SelectedNode: TTreeViewItem;
   BranchAccuracyClass: string;
+  NewRows: TObjectList<TDeviceType>;
 begin
-  if (ActiveRepo = nil) or (FCopiedType = nil) then
+  if (ActiveRepo = nil) or (FCopiedTypes = nil) or (FCopiedTypes.Count = 0) then
     Exit;
 
-  NewType := ActiveRepo.CreateType(FCopiedType);
-  SelectedNode := TreeViewTypes.Selected;
-
-  if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-  begin
+  SelectedNode := GetActiveTreeNode;
+  NewRows := TObjectList<TDeviceType>.Create(False);
+  try
     BranchAccuracyClass := '';
     if (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0) and
        (FDevFilteredTypes[0] <> nil) then
       BranchAccuracyClass := FDevFilteredTypes[0].AccuracyClass;
 
-    ApplyTreeSelectionToType(NewType);
-    if Trim(BranchAccuracyClass) <> '' then
-      NewType.AccuracyClass := BranchAccuracyClass;
-  end;
+    for I := 0 to FCopiedTypes.Count - 1 do
+    begin
+      SourceType := FCopiedTypes[I];
+      if SourceType = nil then
+        Continue;
 
-  ApplyFilter;
-  UpdateGridTypes;
+      NewType := ActiveRepo.CreateType(SourceType);
 
-  if FDevFilteredTypes <> nil then
-    for I := 0 to FDevFilteredTypes.Count - 1 do
-      if FDevFilteredTypes[I] = NewType then
+      if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
       begin
-        GridTypes.Row := I;
-        GridTypes.Selected := I;
-        SelectedType := FDevFilteredTypes[I];
-        Break;
+        ApplyTreeNodeSelectionToType(NewType, SelectedNode);
+        if Trim(BranchAccuracyClass) <> '' then
+          NewType.AccuracyClass := BranchAccuracyClass;
       end;
+
+      NewRows.Add(NewType);
+    end;
+
+    ApplyFilter;
+    UpdateGridTypes;
+
+    if (FDevFilteredTypes <> nil) and (NewRows.Count > 0) then
+      for I := 0 to FDevFilteredTypes.Count - 1 do
+        if FDevFilteredTypes[I] = NewRows[0] then
+        begin
+          GridTypes.Row := I;
+          GridTypes.Selected := I;
+          SelectedType := FDevFilteredTypes[I];
+          Break;
+        end;
+  finally
+    NewRows.Free;
+  end;
+end;
+
+function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
+var
+  I: Integer;
+begin
+  Result := TreeViewTypes.Selected;
+  if Result <> nil then
+    Exit;
+
+  for I := 0 to TreeViewTypes.Count - 1 do
+    if TreeViewTypes.ItemByIndex(I).IsSelected then
+    begin
+      Result := TreeViewTypes.ItemByIndex(I);
+      Exit;
+    end;
 end;
 
 procedure TFormTypeSelect.actTypeCutExecute(Sender: TObject);
@@ -684,13 +718,18 @@ begin
 end;
 
 procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType);
+begin
+  ApplyTreeNodeSelectionToType(AType, TreeViewTypes.Selected);
+end;
+
+procedure TFormTypeSelect.ApplyTreeNodeSelectionToType(AType: TDeviceType; ANode: TTreeViewItem);
 var
   Cur: TTreeViewItem;
 begin
   if AType = nil then
     Exit;
 
-  Cur := TreeViewTypes.Selected;
+  Cur := ANode;
   while Cur <> nil do
   begin
     case Cur.Tag of
@@ -914,7 +953,7 @@ begin
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
    FClearTreeSelectionOnClick := False;
-   FCopiedType := nil;
+   FCopiedTypes := TObjectList<TDeviceType>.Create(False);
    FCheckedTypes := TList<TDeviceType>.Create;
    TreeViewTypes.MultiSelect := True;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
@@ -933,6 +972,7 @@ end;
 
 destructor TFormTypeSelect.Destroy;
 begin
+  FreeAndNil(FCopiedTypes);
   FreeAndNil(FCheckedTypes);
   inherited;
 end;
@@ -1446,7 +1486,7 @@ begin
   actTypeDelete.Enabled := HasRepo and HasRows;
   actTypeCopy.Enabled := HasRows;
   actTypeCut.Enabled := HasRepo and HasRows;
-  actTypePaste.Enabled := HasRepo and (FCopiedType <> nil);
+  actTypePaste.Enabled := HasRepo and (FCopiedTypes <> nil) and (FCopiedTypes.Count > 0);
   actTypeClear.Enabled := HasRepo and HasRows;
 
   actFilterFind.Enabled := HasRepo;
