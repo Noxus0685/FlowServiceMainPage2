@@ -104,6 +104,7 @@ TParameter = class(TObservableObject)
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
     procedure SetParam(Avalue: Double);
+    function GetSetValue: Double;
   public
     constructor Create(const AName, AHint: string); virtual;
     function IsStable(out AStableInfo: rStableInfo): Boolean;
@@ -126,6 +127,7 @@ TParameter = class(TObservableObject)
     property BeforeValue: Double read FBefore write SetBefore;
     property AfterValue: Double read FAfter write SetAfter;
     property DeltaValue: Double read FDelta write FDelta;
+    property TargetValue: Double read GetSetValue write SetParam;
 
 
 
@@ -726,6 +728,15 @@ begin
     FValue.Value := FMax
   else FValue.Value:=AValue;
 end;
+
+
+function TParameter.GetSetValue: Double;
+begin
+result:= fValueSet.Value;
+end;
+
+
+
 
 procedure TParameter.SetParam(AValue: Double);
 begin
