@@ -39,6 +39,7 @@ object FormTypeSelect: TFormTypeSelect
     end
     object TreeViewTypes: TTreeView
       Align = Client
+      MultiSelect = True
       PopupMenu = PopupMenu2
       Size.Width = 233.000000000000000000
       Size.Height = 678.000000000000000000

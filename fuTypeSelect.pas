@@ -190,6 +190,8 @@ type
 
 
     function PassTreeFilter(const AType: TDeviceType): Boolean;
+    function PassTreeFilterByNode(const AType: TDeviceType; ANode: TTreeViewItem): Boolean;
+    procedure CollectSelectedTreeItems(AParent: TFmxObject; ASelected: TList<TTreeViewItem>);
     function BuildSearchURL(const ASearch: string): string;
     procedure ApplyTreeSelectionToType(AType: TDeviceType);
 
@@ -289,6 +291,70 @@ begin
 
   // если дошли сюда — ВСЕ уровни прошли проверку
   Result := True;
+end;
+
+function TFormTypeSelect.PassTreeFilterByNode(
+  const AType: TDeviceType;
+  ANode: TTreeViewItem
+): Boolean;
+var
+  Cur: TTreeViewItem;
+begin
+  Result := False;
+
+  if ANode = nil then
+    Exit;
+
+  Cur := ANode;
+  while Cur <> nil do
+  begin
+    case Cur.Tag of
+      Ord(tnAll):
+        Exit(True);
+
+      Ord(tnManufacturer):
+        if AType.Manufacturer <> Cur.TagString then
+          Exit(False);
+
+      Ord(tnCategory):
+        if AType.Category <> StrToIntDef(Cur.TagString, -1) then
+          Exit(False);
+
+      Ord(tnModification):
+        if AType.Modification <> Cur.TagString then
+          Exit(False);
+    end;
+
+    Cur := Cur.ParentItem;
+  end;
+
+  Result := True;
+end;
+
+procedure TFormTypeSelect.CollectSelectedTreeItems(
+  AParent: TFmxObject;
+  ASelected: TList<TTreeViewItem>
+);
+var
+  I: Integer;
+  Child: TFmxObject;
+  Item: TTreeViewItem;
+begin
+  if (AParent = nil) or (ASelected = nil) then
+    Exit;
+
+  for I := 0 to AParent.ChildrenCount - 1 do
+  begin
+    Child := AParent.Children[I];
+    if Child is TTreeViewItem then
+    begin
+      Item := TTreeViewItem(Child);
+      if Item.IsSelected then
+        ASelected.Add(Item);
+
+      CollectSelectedTreeItems(Item, ASelected);
+    end;
+  end;
 end;
 
 procedure TFormTypeSelect.BuildTree;
@@ -809,6 +875,7 @@ begin
    FSortColumn := -1;
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
+   TreeViewTypes.MultiSelect := True;
 
 
    LoadData;
@@ -993,9 +1060,6 @@ end;
 
 procedure TFormTypeSelect.TreeViewTypesChange(Sender: TObject);
 begin
-  if TreeViewTypes.Selected = nil then
-    Exit;
-
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
 
@@ -1007,6 +1071,8 @@ function TFormTypeSelect.BuildFilteredByTree(
   const Source: TObjectList<TDeviceType>
 ): TObjectList<TDeviceType>;
 var
+  SelectedItems: TList<TTreeViewItem>;
+  Node: TTreeViewItem;
   T: TDeviceType;
 begin
   Result := TObjectList<TDeviceType>.Create(False); // ссылки, не владеем
@@ -1014,9 +1080,24 @@ begin
   if Source = nil then
     Exit;
 
-  for T in Source do
-    if PassTreeFilter(T) then
-      Result.Add(T);
+  SelectedItems := TList<TTreeViewItem>.Create;
+  try
+    CollectSelectedTreeItems(TreeViewTypes, SelectedItems);
+
+    if SelectedItems.Count = 0 then
+      Exit;
+
+    for T in Source do
+      for Node in SelectedItems do
+        if PassTreeFilterByNode(T, Node) then
+        begin
+          if Result.IndexOf(T) < 0 then
+            Result.Add(T);
+          Break;
+        end;
+  finally
+    SelectedItems.Free;
+  end;
 end;
 
 procedure TFormTypeSelect.UpdateGridTypes;
@@ -1755,4 +1836,3 @@ end;
 
 
 end.
-
