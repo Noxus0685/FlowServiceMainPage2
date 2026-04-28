@@ -1261,6 +1261,7 @@ begin
   else
     SelectedType := nil;
 
+  GridTypes.Invalidate;
   GridTypes.Repaint;
 
   sbFind.IsPressed := HasActiveFilters;
