@@ -4795,9 +4795,6 @@ object FrameMainTable: TFrameMainTable
         TabOrder = 1
         TabPosition = PlatformDefault
         Visible = False
-        Sizes = (
-          1049s
-          427s)
       end
       object Splitter2: TSplitter
         Align = Right
@@ -5081,7 +5078,8 @@ object FrameMainTable: TFrameMainTable
             TabOrder = 1
             object Label23: TLabel
               Align = Left
-              PopupMenu = PopupMenuDevicesGridLayOut
+              HitTest = True
+              PopupMenu = PopupMenuWorkTables
               Size.Width = 100.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
@@ -5297,7 +5295,8 @@ object FrameMainTable: TFrameMainTable
             Size.PlatformDefault = False
             TabOrder = 1
             object Label30: TLabel
-              PopupMenu = PopupMenuEtalonsGridLayOut
+              HitTest = True
+              PopupMenu = PopupMenuWorkTables
               Position.X = 1.000000000000000000
               Position.Y = 8.000000000000000000
               Size.Width = 100.000000000000000000

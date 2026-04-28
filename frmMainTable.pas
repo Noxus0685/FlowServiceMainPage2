@@ -729,13 +729,13 @@ begin
     for WorkTable in FWorkTableManager.WorkTables do
       if WorkTable <> nil then
         WorkTable.Unsubscribe(Self);
+
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
-  TMeterValue.SaveToFile(0);
   FInstrumentalVisibleOrder.Free;
   FWorkTableManager := nil;
   inherited;
@@ -2258,12 +2258,12 @@ end;
 procedure TFrameMainTable.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
   SaveLayoutSettingsToWorkTable;
-  if FWorkTableManager <> nil then
-    FWorkTableManager.Save;
+ // if FWorkTableManager <> nil then
+  //  FWorkTableManager.Save;
 
 
-  if DataManager <> nil then
-    DataManager.Save;
+ // if DataManager <> nil then
+ //   DataManager.Save;
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);

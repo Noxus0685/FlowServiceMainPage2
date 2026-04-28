@@ -99,6 +99,9 @@ begin
   if (AObserver = nil) or (FObservers = nil) then
     Exit;
 
+    if (FObserversLock= nil) then
+        Exit;
+
   TMonitor.Enter(FObserversLock);
   try
     FObservers.Remove(AObserver);

@@ -430,6 +430,8 @@ type
     class procedure Load(const AIniFileName: string;
       AWorkTables: TObjectList<TWorkTable>); static;
 
+  procedure Rebind;
+
   function AddPump(const APumpName: string): TPump; overload;
   function AddPump(APump: TPump): Boolean; overload;
   procedure RemovePump(const APumpUUID: string); overload;
@@ -578,6 +580,7 @@ type
     procedure Save;
     procedure AddWorkTable;  overload;
     procedure AddWorkTable(const WorkTableName: string);  overload;
+
     function FindWorkTableName(const WorkTableName: string): TWorkTable;
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
@@ -1817,6 +1820,15 @@ begin
     FHashValueFlowRate := '';
 end;
 
+ procedure TWorkTable.Rebind;
+begin
+  InitMeterValues;
+
+  RebindAllFlowMeters;
+  RecalculateAllMeterValues;
+  UpdateAggregateMeterValues;
+end;
+
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
 procedure TWorkTable.UpdateAggregateMeterValues;
 var
@@ -2566,10 +2578,17 @@ begin
     AIni.WriteFloat(Section, 'ValueSec', Channel.ValueSec);
     AIni.WriteFloat(Section, 'ValueResult', Channel.ValueResult);
 
+    if (Channel<>nil) then
+    begin
+    if (Channel.ValueImp<>nil) then
     AIni.WriteString(Section, 'HashValueImp', Channel.ValueImp.Hash);
+    if (Channel.ValueImpTotal<>nil) then
     AIni.WriteString(Section, 'HashValueImpTotal', Channel.ValueImpTotal.Hash);
+    if (Channel.ValueCurrent<>nil) then
     AIni.WriteString(Section, 'HashValueCurrent', Channel.ValueCurrent.Hash);
+    if (Channel.ValueInterface<>nil) then
     AIni.WriteString(Section, 'HashValueInterface', Channel.ValueInterface.Hash);
+    end;
   end;
 end;
 
@@ -3551,11 +3570,7 @@ begin
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
   WorkTables.Add(WorkTable);
 
-  WorkTable.InitMeterValues;
-
-  WorkTable.RebindAllFlowMeters;
-  WorkTable.RecalculateAllMeterValues;
-  WorkTable.UpdateAggregateMeterValues;
+  WorkTable.Rebind;
 
 
 
@@ -3566,7 +3581,6 @@ begin
    AddWorkTable;
    WorkTables[WorkTables.Count-1].Name :=  WorkTableName;
 end;
-
 
 procedure TWorkTableManager.SetActiveWorkTable(AWorkTable: TWorkTable);
 begin
