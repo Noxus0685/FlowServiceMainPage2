@@ -133,6 +133,8 @@ type
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure TreeViewTypesChange(Sender: TObject);
+    procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
     procedure sbClearClick(Sender: TObject);
@@ -328,7 +330,8 @@ begin
   for I := 0 to TreeViewTypes.Count - 1 do
     CollectSelected(TreeViewTypes.Items[I]);
 
-  if (Result.Count = 0) and (TreeViewTypes.Selected <> nil) then
+  if (Result.Count = 0) and (TreeViewTypes.Selected <> nil)
+    and TreeViewTypes.Selected.IsSelected then
     Result.Add(TreeViewTypes.Selected);
 end;
 
@@ -1030,6 +1033,55 @@ begin
   //FilterTypesByTreeNode(TreeViewTypes.Selected);
   ApplyFilter;
     UpdateGridTypes;
+end;
+
+procedure TFormTypeSelect.TreeViewTypesMouseDown(
+  Sender: TObject;
+  Button: TMouseButton;
+  Shift: TShiftState;
+  X, Y: Single
+);
+var
+  AbsPoint: TPointF;
+  Item: TTreeViewItem;
+  I: Integer;
+  NewState: Boolean;
+
+  function FindItemByPoint(AItem: TTreeViewItem): TTreeViewItem;
+  var
+    ChildIndex: Integer;
+    ChildItem: TTreeViewItem;
+  begin
+    Result := nil;
+    if AItem = nil then
+      Exit;
+
+    for ChildIndex := 0 to AItem.Count - 1 do
+    begin
+      ChildItem := FindItemByPoint(TTreeViewItem(AItem.Items[ChildIndex]));
+      if ChildItem <> nil then
+        Exit(ChildItem);
+    end;
+
+    if AItem.AbsoluteRect.Contains(AbsPoint) then
+      Result := AItem;
+  end;
+begin
+  if (Button <> TMouseButton.mbLeft) or not (ssCtrl in Shift) then
+    Exit;
+
+  AbsPoint := TreeViewTypes.LocalToAbsolute(PointF(X, Y));
+  for I := 0 to TreeViewTypes.Count - 1 do
+  begin
+    Item := FindItemByPoint(TreeViewTypes.ItemByIndex(I));
+    if Item <> nil then
+    begin
+      NewState := not Item.IsSelected;
+      Item.IsSelected := NewState;
+      TreeViewTypesChange(TreeViewTypes);
+      Exit;
+    end;
+  end;
 end;
 
 procedure TFormTypeSelect.TreeViewTypesChange(Sender: TObject);
