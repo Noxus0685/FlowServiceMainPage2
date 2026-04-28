@@ -591,10 +591,43 @@ end;
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
 var
   I: Integer;
-  Candidate: TTreeViewItem;
+  RootItem: TTreeViewItem;
   BestDepth: Integer;
   CurDepth: Integer;
   Parent: TTreeViewItem;
+  procedure ConsiderCandidate(const Candidate: TTreeViewItem);
+  var
+    K: Integer;
+    Child: TTreeViewItem;
+  begin
+    if Candidate = nil then
+      Exit;
+
+    if Candidate.IsSelected then
+    begin
+      CurDepth := 0;
+      Parent := Candidate.ParentItem;
+      while Parent <> nil do
+      begin
+        Inc(CurDepth);
+        Parent := Parent.ParentItem;
+      end;
+
+      // При множественном выборе берём самую глубокую выбранную ветку
+      // (подветка имеет приоритет над верхней веткой).
+      if CurDepth >= BestDepth then
+      begin
+        BestDepth := CurDepth;
+        Result := Candidate;
+      end;
+    end;
+
+    for K := 0 to Candidate.Count - 1 do
+    begin
+      Child := Candidate.ItemByIndex(K);
+      ConsiderCandidate(Child);
+    end;
+  end;
 begin
   Result := TreeViewTypes.Selected;
   BestDepth := -1;
@@ -613,25 +646,8 @@ begin
 
   for I := 0 to TreeViewTypes.Count - 1 do
   begin
-    Candidate := TreeViewTypes.ItemByIndex(I);
-    if not Candidate.IsSelected then
-      Continue;
-
-    CurDepth := 0;
-    Parent := Candidate.ParentItem;
-    while Parent <> nil do
-    begin
-      Inc(CurDepth);
-      Parent := Parent.ParentItem;
-    end;
-
-    // При множественном выборе берём самую глубокую выбранную ветку
-    // (подветка имеет приоритет над верхней веткой).
-    if CurDepth >= BestDepth then
-    begin
-      BestDepth := CurDepth;
-      Result := Candidate;
-    end;
+    RootItem := TreeViewTypes.ItemByIndex(I);
+    ConsiderCandidate(RootItem);
   end;
 end;
 
