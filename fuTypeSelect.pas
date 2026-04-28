@@ -539,7 +539,8 @@ var
   SourceType: TDeviceType;
   I: Integer;
   SelectedNode: TTreeViewItem;
-  BranchAccuracyClass: string;
+  BranchSample: TDeviceType;
+  CandidateType: TDeviceType;
   NewRows: TObjectList<TDeviceType>;
 begin
   if (ActiveRepo = nil) or (FCopiedTypes = nil) or (FCopiedTypes.Count = 0) then
@@ -548,10 +549,14 @@ begin
   SelectedNode := GetActiveTreeNode;
   NewRows := TObjectList<TDeviceType>.Create(False);
   try
-    BranchAccuracyClass := '';
-    if (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0) and
-       (FDevFilteredTypes[0] <> nil) then
-      BranchAccuracyClass := FDevFilteredTypes[0].AccuracyClass;
+    BranchSample := nil;
+    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) and (FDeviceTypes <> nil) then
+      for CandidateType in FDeviceTypes do
+        if PassTreeFilter(CandidateType, SelectedNode) then
+        begin
+          BranchSample := CandidateType;
+          Break;
+        end;
 
     for I := 0 to FCopiedTypes.Count - 1 do
     begin
@@ -564,16 +569,12 @@ begin
       if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
       begin
         ApplyTreeNodeSelectionToType(NewType, SelectedNode);
-        if (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0) and
-           (FDevFilteredTypes[0] <> nil) then
+        if BranchSample <> nil then
         begin
-          NewType.Manufacturer := FDevFilteredTypes[0].Manufacturer;
-          NewType.Category := FDevFilteredTypes[0].Category;
-          NewType.CategoryName := FDevFilteredTypes[0].CategoryName;
-          NewType.Modification := FDevFilteredTypes[0].Modification;
+          if Trim(NewType.CategoryName) = '' then
+            NewType.CategoryName := BranchSample.CategoryName;
+          NewType.AccuracyClass := BranchSample.AccuracyClass;
         end;
-        if Trim(BranchAccuracyClass) <> '' then
-          NewType.AccuracyClass := BranchAccuracyClass;
       end;
 
       NewRows.Add(NewType);
