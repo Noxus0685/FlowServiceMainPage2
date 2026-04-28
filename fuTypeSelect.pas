@@ -1013,30 +1013,61 @@ function TFormTypeSelect.BuildFilteredByTree(
 var
   T: TDeviceType;
   I: Integer;
+  J: Integer;
   Item: TTreeViewItem;
   IsMatch: Boolean;
+  SelectedNodes: TList<TTreeViewItem>;
+  procedure CollectSelectedNodes(const ANode: TTreeViewItem);
+  var
+    K: Integer;
+    Child: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    if ANode.IsSelected or (ANode = TreeViewTypes.Selected) then
+      if SelectedNodes.IndexOf(ANode) < 0 then
+        SelectedNodes.Add(ANode);
+
+    for K := 0 to ANode.Count - 1 do
+    begin
+      Child := ANode.ItemByIndex(K);
+      CollectSelectedNodes(Child);
+    end;
+  end;
 begin
   Result := TObjectList<TDeviceType>.Create(False); // ссылки, не владеем
 
   if Source = nil then
     Exit;
 
-  for T in Source do
-  begin
-    IsMatch := False;
-
+  SelectedNodes := TList<TTreeViewItem>.Create;
+  try
     for I := 0 to TreeViewTypes.Count - 1 do
     begin
       Item := TreeViewTypes.ItemByIndex(I);
-      if (Item <> nil) and Item.IsSelected and PassTreeFilter(T, Item) then
-      begin
-        IsMatch := True;
-        Break;
-      end;
+      CollectSelectedNodes(Item);
     end;
 
-    if IsMatch then
-      Result.Add(T);
+    if (SelectedNodes.Count = 0) and (TreeViewTypes.Selected <> nil) then
+      SelectedNodes.Add(TreeViewTypes.Selected);
+
+    for T in Source do
+    begin
+      IsMatch := False;
+
+      for J := 0 to SelectedNodes.Count - 1 do
+        if PassTreeFilter(T, SelectedNodes[J]) then
+        begin
+          IsMatch := True;
+          Break;
+        end;
+
+      if IsMatch then
+        Result.Add(T);
+    end;
+  finally
+    SelectedNodes.Free;
   end;
 end;
 
