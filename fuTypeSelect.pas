@@ -189,7 +189,10 @@ type
 ): TObjectList<TDeviceType>;
 
 
-    function PassTreeFilter(const AType: TDeviceType): Boolean;
+    function PassTreeFilter(
+      const AType: TDeviceType;
+      const ANode: TTreeViewItem
+    ): Boolean;
     function BuildSearchURL(const ASearch: string): string;
     procedure ApplyTreeSelectionToType(AType: TDeviceType);
 
@@ -238,15 +241,18 @@ begin
   FDeviceTypes := ActiveRepo.Types;
 end;
 
-function TFormTypeSelect.PassTreeFilter(const AType: TDeviceType): Boolean;
+function TFormTypeSelect.PassTreeFilter(
+  const AType: TDeviceType;
+  const ANode: TTreeViewItem
+): Boolean;
 var
   Cur: TTreeViewItem;
 begin
   Result := True;
 
-  Cur := TreeViewTypes.Selected;
+  Cur := ANode;
   if Cur = nil then
-    Exit(True);
+    Exit(False);
 
   // Узел "Все"
   if Cur.Tag = Ord(tnAll) then
@@ -809,6 +815,7 @@ begin
    FSortColumn := -1;
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
+   TreeViewTypes.MultiSelect := True;
 
 
    LoadData;
@@ -993,9 +1000,6 @@ end;
 
 procedure TFormTypeSelect.TreeViewTypesChange(Sender: TObject);
 begin
-  if TreeViewTypes.Selected = nil then
-    Exit;
-
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
 
@@ -1008,15 +1012,52 @@ function TFormTypeSelect.BuildFilteredByTree(
 ): TObjectList<TDeviceType>;
 var
   T: TDeviceType;
+  I: Integer;
+  Item: TTreeViewItem;
+  IsMatch: Boolean;
+  HasSelectedItems: Boolean;
 begin
   Result := TObjectList<TDeviceType>.Create(False); // ссылки, не владеем
 
   if Source = nil then
     Exit;
 
+  HasSelectedItems := False;
+  for I := 0 to TreeViewTypes.Count - 1 do
+  begin
+    Item := TreeViewTypes.ItemByIndex(I);
+    if (Item <> nil) and Item.IsSelected then
+    begin
+      HasSelectedItems := True;
+      Break;
+    end;
+  end;
+
   for T in Source do
-    if PassTreeFilter(T) then
+  begin
+    IsMatch := False;
+
+    if HasSelectedItems then
+    begin
+      for I := 0 to TreeViewTypes.Count - 1 do
+      begin
+        Item := TreeViewTypes.ItemByIndex(I);
+        if (Item <> nil) and Item.IsSelected and PassTreeFilter(T, Item) then
+        begin
+          IsMatch := True;
+          Break;
+        end;
+      end;
+    end;
+    // fallback для случаев, когда FMX не держит флаги IsSelected
+    // синхронно с Selected (например, при одиночном выборе)
+    if (not IsMatch) and (not HasSelectedItems) and
+       (TreeViewTypes.Selected <> nil) then
+      IsMatch := PassTreeFilter(T, TreeViewTypes.Selected);
+
+    if IsMatch then
       Result.Add(T);
+  end;
 end;
 
 procedure TFormTypeSelect.UpdateGridTypes;
@@ -1755,4 +1796,3 @@ end;
 
 
 end.
-
