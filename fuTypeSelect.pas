@@ -63,6 +63,7 @@ type
     TreeViewItem3: TTreeViewItem;
     LayoutRight: TLayout;
     GridTypes: TGrid;
+    CheckColumnSelect: TCheckColumn;
     StringColumnName: TStringColumn;
     StringColumnCategory: TStringColumn;
     StringColumnManufacturer: TStringColumn;
@@ -144,9 +145,6 @@ type
     procedure GridTypesHeaderClick(Column: TColumn);
     procedure GridTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
-    procedure GridTypesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
-      const Column: TColumn; const Bounds: TRectF; const Row: Integer;
-      const Value: TValue; const State: TGridDrawStates);
     procedure CornerButtonEditTypeClick(Sender: TObject);
     procedure ButtonTypeClearClick(Sender: TObject);
     procedure ButtonTypeDeleteClick(Sender: TObject);
@@ -184,8 +182,6 @@ type
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
-    FSelectedRows: TDictionary<Integer, Boolean>;
-    FSelectionAnchorRow: Integer;
 
     procedure LoadData;
     procedure BuildTree;
@@ -215,11 +211,6 @@ type
      procedure ClearTreeAndGrid;
      procedure ClearGridSelection;
      function IsValidGridRow(const ARow: Integer): Boolean;
-     function IsGridRowSelected(const ARow: Integer): Boolean;
-     procedure ToggleGridRowSelection(const ARow: Integer);
-     procedure SelectGridRow(const ARow: Integer; const AClearPrevious: Boolean);
-     procedure SelectGridRange(const AFromRow, AToRow: Integer);
-     procedure TrimGridSelectionToBounds;
 
   public
     { Public declarations }
@@ -610,8 +601,9 @@ begin
     for I := 0 to FDevFilteredTypes.Count - 1 do
       if FDevFilteredTypes[I] = NewType then
       begin
-        SelectGridRow(I, True);
-        FSelectionAnchorRow := I;
+        GridTypes.Row := I;
+        GridTypes.Selected := I;
+        SelectedType := FDevFilteredTypes[I];
         Break;
       end;
 end;
@@ -838,12 +830,9 @@ begin
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
    FClearTreeSelectionOnClick := False;
-   FSelectedRows := TDictionary<Integer, Boolean>.Create;
-   FSelectionAnchorRow := -1;
    TreeViewTypes.MultiSelect := True;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
    GridTypes.OnMouseDown := GridTypesMouseDown;
-   GridTypes.OnDrawColumnCell := GridTypesDrawColumnCell;
 
    LoadData;
    FillComboBoxRepository;
@@ -858,7 +847,6 @@ end;
 
 destructor TFormTypeSelect.Destroy;
 begin
-  FreeAndNil(FSelectedRows);
   inherited;
 end;
 
@@ -921,7 +909,10 @@ begin
   {----------------------------------}
   { Значения колонок }
   {----------------------------------}
-  if ACol = StringColumnName.Index then
+  if ACol = CheckColumnSelect.Index then
+    Value := (ARow = GridTypes.Row)
+
+  else if ACol = StringColumnName.Index then
     Value := T.Name
 
   else if ACol = StringColumnCategory.Index then
@@ -1022,42 +1013,29 @@ begin
   if not IsValidGridRow(Row) then
     Exit;
 
-  if ssShift in Shift then
+  if Col = CheckColumnSelect.Index then
   begin
-    if not IsValidGridRow(FSelectionAnchorRow) then
-      FSelectionAnchorRow := Row;
-
-    SelectGridRange(FSelectionAnchorRow, Row);
-  end
-  else if ssCtrl in Shift then
-  begin
-    ToggleGridRowSelection(Row);
-    FSelectionAnchorRow := Row;
+    if GridTypes.Row = Row then
+    begin
+      GridTypes.Row := -1;
+      GridTypes.Selected := -1;
+      SelectedType := nil;
+    end
+    else
+    begin
+      GridTypes.Row := Row;
+      GridTypes.Selected := Row;
+      SelectedType := FDevFilteredTypes[Row];
+    end;
   end
   else
   begin
-    SelectGridRow(Row, True);
-    FSelectionAnchorRow := Row;
+    GridTypes.Row := Row;
+    GridTypes.Selected := Row;
+    SelectedType := FDevFilteredTypes[Row];
   end;
 
-  GridTypes.Selected := GridTypes.Row;
   GridTypes.Repaint;
-end;
-
-procedure TFormTypeSelect.GridTypesDrawColumnCell(Sender: TObject;
-  const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
-  const Row: Integer; const Value: TValue; const State: TGridDrawStates);
-begin
-  { Для активной строки оставляем штатное выделение грида "как было до". }
-  if Row = GridTypes.Row then
-    Exit;
-
-  if not IsGridRowSelected(Row) then
-    Exit;
-
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := $33E5F1FB;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
 end;
 
 
@@ -1251,7 +1229,14 @@ begin
     GridTypes.EndUpdate;
   end;
 
-  TrimGridSelectionToBounds;
+  if (GridTypes.Row >= GridTypes.RowCount) then
+    GridTypes.Row := -1;
+  GridTypes.Selected := GridTypes.Row;
+  if IsValidGridRow(GridTypes.Row) then
+    SelectedType := FDevFilteredTypes[GridTypes.Row]
+  else
+    SelectedType := nil;
+
   GridTypes.Repaint;
 
   sbFind.IsPressed := HasActiveFilters;
@@ -1259,10 +1244,6 @@ end;
 
 procedure TFormTypeSelect.ClearGridSelection;
 begin
-  if FSelectedRows <> nil then
-    FSelectedRows.Clear;
-
-  FSelectionAnchorRow := -1;
   GridTypes.Row := -1;
   GridTypes.Selected := -1;
   SelectedType := nil;
@@ -1274,109 +1255,6 @@ begin
     (FDevFilteredTypes <> nil) and
     (ARow >= 0) and
     (ARow < FDevFilteredTypes.Count);
-end;
-
-function TFormTypeSelect.IsGridRowSelected(const ARow: Integer): Boolean;
-begin
-  Result := IsValidGridRow(ARow) and (FSelectedRows <> nil) and
-    FSelectedRows.ContainsKey(ARow);
-end;
-
-procedure TFormTypeSelect.ToggleGridRowSelection(const ARow: Integer);
-begin
-  if not IsValidGridRow(ARow) then
-    Exit;
-
-  if FSelectedRows.ContainsKey(ARow) then
-    FSelectedRows.Remove(ARow)
-  else
-    FSelectedRows.AddOrSetValue(ARow, True);
-
-  if FSelectedRows.Count = 0 then
-    GridTypes.Row := -1
-  else
-  begin
-    GridTypes.Row := ARow;
-    GridTypes.Selected := ARow;
-  end;
-
-  if IsValidGridRow(GridTypes.Row) then
-    SelectedType := FDevFilteredTypes[GridTypes.Row]
-  else
-    SelectedType := nil;
-end;
-
-procedure TFormTypeSelect.SelectGridRow(const ARow: Integer;
-  const AClearPrevious: Boolean);
-begin
-  if not IsValidGridRow(ARow) then
-    Exit;
-
-  if AClearPrevious then
-    FSelectedRows.Clear;
-
-  FSelectedRows.AddOrSetValue(ARow, True);
-  GridTypes.Row := ARow;
-  GridTypes.Selected := ARow;
-  SelectedType := FDevFilteredTypes[ARow];
-end;
-
-procedure TFormTypeSelect.SelectGridRange(const AFromRow, AToRow: Integer);
-var
-  StartRow, EndRow, I: Integer;
-begin
-  if (not IsValidGridRow(AFromRow)) or (not IsValidGridRow(AToRow)) then
-    Exit;
-
-  if AFromRow <= AToRow then
-  begin
-    StartRow := AFromRow;
-    EndRow := AToRow;
-  end
-  else
-  begin
-    StartRow := AToRow;
-    EndRow := AFromRow;
-  end;
-
-  FSelectedRows.Clear;
-  for I := StartRow to EndRow do
-    FSelectedRows.AddOrSetValue(I, True);
-
-  GridTypes.Row := AToRow;
-  GridTypes.Selected := AToRow;
-  SelectedType := FDevFilteredTypes[AToRow];
-end;
-
-procedure TFormTypeSelect.TrimGridSelectionToBounds;
-var
-  KeysToRemove: TList<Integer>;
-  RowIndex: Integer;
-begin
-  if FSelectedRows = nil then
-    Exit;
-
-  KeysToRemove := TList<Integer>.Create;
-  try
-    for RowIndex in FSelectedRows.Keys do
-      if not IsValidGridRow(RowIndex) then
-        KeysToRemove.Add(RowIndex);
-
-    for RowIndex in KeysToRemove do
-      FSelectedRows.Remove(RowIndex);
-  finally
-    KeysToRemove.Free;
-  end;
-
-  if (FSelectedRows.Count = 0) and (GridTypes.Row >= 0) then
-  begin
-    GridTypes.Row := -1;
-    GridTypes.Selected := -1;
-    SelectedType := nil;
-  end;
-
-  if not IsValidGridRow(FSelectionAnchorRow) then
-    FSelectionAnchorRow := -1;
 end;
 
 function TFormTypeSelect.HasActiveFilters: Boolean;
@@ -2094,9 +1972,9 @@ begin
   for I := 0 to FDevFilteredTypes.Count - 1 do
     if FDevFilteredTypes[I] = AType then
     begin
-      SelectGridRow(I, True);
-      FSelectionAnchorRow := I;
+      GridTypes.Row := I;
       GridTypes.Selected := I;
+      SelectedType := FDevFilteredTypes[I];
       Break;
     end;
 end;
