@@ -53,9 +53,9 @@ type
 
   TFormTypeSelect = class(TForm)
     ActionList1: TActionList;
-    aCreateType: TAction;
-    aEditType: TAction;
-    aDeleteType: TAction;
+    actTypeAdd: TAction;
+    actTypeEdit: TAction;
+    actTypeDelete: TAction;
     LayoutLeft: TLayout;
     TreeViewTypes: TTreeView;
     TreeViewItem1: TTreeViewItem;
@@ -125,9 +125,14 @@ type
     miCopy: TMenuItem;
     miPaste: TMenuItem;
     miCut: TMenuItem;
-    TypeCopy: TAction;
-    TypePaste: TAction;
-    TypeCut: TAction;
+    actTypeCopy: TAction;
+    actTypePaste: TAction;
+    actTypeCut: TAction;
+    actTypeClear: TAction;
+    actTypeSelect: TAction;
+    actFilterFind: TAction;
+    actFilterClear: TAction;
+    actTypeFindInternet: TAction;
     Action3: TAction;
     StringColumnUUID: TStringColumn;
     procedure FormCreate(Sender: TObject);
@@ -140,16 +145,14 @@ type
       Shift: TShiftState; X, Y: Single);
     procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
-    procedure sbClearClick(Sender: TObject);
-    procedure sbFindClick(Sender: TObject);
     procedure GridTypesHeaderClick(Column: TColumn);
     procedure GridTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
-    procedure CornerButtonEditTypeClick(Sender: TObject);
-    procedure ButtonTypeClearClick(Sender: TObject);
-    procedure ButtonTypeDeleteClick(Sender: TObject);
-    procedure ButtonTypeAddClick(Sender: TObject);
-    procedure SpeedButtonFindInternetClick(Sender: TObject);
+    procedure actTypeEditExecute(Sender: TObject);
+    procedure actTypeClearExecute(Sender: TObject);
+    procedure actTypeDeleteExecute(Sender: TObject);
+    procedure actTypeAddExecute(Sender: TObject);
+    procedure actTypeFindInternetExecute(Sender: TObject);
     procedure miDeleteRepositoryClick(Sender: TObject);
     procedure miAddRepositoryClick(Sender: TObject);
     procedure ComboBoxRepositoryChange(Sender: TObject);
@@ -159,8 +162,13 @@ type
     procedure miSaveClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure miLoadRepositoryClick(Sender: TObject);
-    procedure CornerButtonSelectTypeClick(Sender: TObject);
-    procedure TypeCopyExecute(Sender: TObject);
+    procedure actTypeSelectExecute(Sender: TObject);
+    procedure actTypeCopyExecute(Sender: TObject);
+    procedure actTypePasteExecute(Sender: TObject);
+    procedure actTypeCutExecute(Sender: TObject);
+    procedure actFilterFindExecute(Sender: TObject);
+    procedure actFilterClearExecute(Sender: TObject);
+    procedure UpdateTypeActions(Sender: TObject);
     procedure GridTypesCellClick(const Column: TColumn; const Row: Integer);
 
   private
@@ -183,6 +191,7 @@ type
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
+    FCopiedType: TDeviceType;
 
     procedure LoadData;
     procedure BuildTree;
@@ -212,6 +221,7 @@ type
      procedure ClearTreeAndGrid;
      procedure ClearGridSelection;
      function IsValidGridRow(const ARow: Integer): Boolean;
+     function CurrentGridType: TDeviceType;
 
   public
     { Public declarations }
@@ -502,9 +512,39 @@ begin
   end;
 end;
 
-procedure TFormTypeSelect.TypeCopyExecute(Sender: TObject);
+procedure TFormTypeSelect.actTypeCopyExecute(Sender: TObject);
 begin
-     //Здесь копирование Типа в DataManager TypeBufer
+  FCopiedType := CurrentGridType;
+end;
+
+procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
+var
+  NewType: TDeviceType;
+  I: Integer;
+begin
+  if (ActiveRepo = nil) or (FCopiedType = nil) then
+    Exit;
+
+  NewType := ActiveRepo.CreateType(FCopiedType);
+
+  ApplyFilter;
+  UpdateGridTypes;
+
+  if FDevFilteredTypes <> nil then
+    for I := 0 to FDevFilteredTypes.Count - 1 do
+      if FDevFilteredTypes[I] = NewType then
+      begin
+        GridTypes.Row := I;
+        GridTypes.Selected := I;
+        SelectedType := FDevFilteredTypes[I];
+        Break;
+      end;
+end;
+
+procedure TFormTypeSelect.actTypeCutExecute(Sender: TObject);
+begin
+  actTypeCopyExecute(Sender);
+  actTypeDeleteExecute(Sender);
 end;
 
 procedure TFormTypeSelect.ApplyFilter;
@@ -559,7 +599,7 @@ FDevFilteredByDate :=
 
 end;
 
-procedure TFormTypeSelect.ButtonTypeAddClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeAddExecute(Sender: TObject);
 var
   NewType: TDeviceType;
   SelRow: Integer;
@@ -637,7 +677,7 @@ begin
   end;
 end;
 
- procedure TFormTypeSelect.ButtonTypeClearClick(Sender: TObject);
+ procedure TFormTypeSelect.actTypeClearExecute(Sender: TObject);
 var
   I: Integer;
   T: TDeviceType;
@@ -682,7 +722,7 @@ begin
 end;
 
 
-procedure TFormTypeSelect.ButtonTypeDeleteClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeDeleteExecute(Sender: TObject);
 var
   SelRow: Integer;
   SelType: TDeviceType;
@@ -831,6 +871,7 @@ begin
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
    FClearTreeSelectionOnClick := False;
+   FCopiedType := nil;
    TreeViewTypes.MultiSelect := True;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
    GridTypes.OnMouseDown := GridTypesMouseDown;
@@ -1041,7 +1082,7 @@ end;
 
 
 
-procedure TFormTypeSelect.sbClearClick(Sender: TObject);
+procedure TFormTypeSelect.actFilterClearExecute(Sender: TObject);
 begin
   // 1. очистка фильтров ввода
   EditFindType.Text := '';
@@ -1054,7 +1095,7 @@ begin
   sbFind.IsPressed := False;
 end;
 
-procedure TFormTypeSelect.sbFindClick(Sender: TObject);
+procedure TFormTypeSelect.actFilterFindExecute(Sender: TObject);
 begin
    // 2. пересчёт фильтров   обновление таблицы
   //FilterTypesByTreeNode(TreeViewTypes.Selected);
@@ -1257,6 +1298,44 @@ begin
     (FDevFilteredTypes <> nil) and
     (ARow >= 0) and
     (ARow < FDevFilteredTypes.Count);
+end;
+
+function TFormTypeSelect.CurrentGridType: TDeviceType;
+var
+  Row: Integer;
+begin
+  Row := GridTypes.Selected;
+  if Row < 0 then
+    Row := GridTypes.Row;
+
+  if IsValidGridRow(Row) then
+    Result := FDevFilteredTypes[Row]
+  else
+    Result := nil;
+end;
+
+procedure TFormTypeSelect.UpdateTypeActions(Sender: TObject);
+var
+  HasRepo: Boolean;
+  HasSelection: Boolean;
+  HasRows: Boolean;
+begin
+  HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
+  HasSelection := CurrentGridType <> nil;
+  HasRows := (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0);
+
+  actTypeAdd.Enabled := HasRepo;
+  actTypeEdit.Enabled := HasSelection;
+  actTypeSelect.Enabled := HasSelection;
+  actTypeDelete.Enabled := HasSelection;
+  actTypeCopy.Enabled := HasSelection;
+  actTypeCut.Enabled := HasSelection;
+  actTypePaste.Enabled := HasRepo and (FCopiedType <> nil);
+  actTypeClear.Enabled := HasRepo and HasRows;
+
+  actFilterFind.Enabled := HasRepo;
+  actFilterClear.Enabled := HasRepo and HasActiveFilters;
+  actTypeFindInternet.Enabled := HasRepo and (Trim(EditFindType.Text) <> '');
 end;
 
 function TFormTypeSelect.HasActiveFilters: Boolean;
@@ -1621,7 +1700,7 @@ begin
     UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.SpeedButtonFindInternetClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeFindInternetExecute(Sender: TObject);
 var
   Resp: IHTTPResponse;
   Url: string;
@@ -1796,7 +1875,7 @@ if MessageDlg(
   end;
 end;
 
-procedure TFormTypeSelect.CornerButtonSelectTypeClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeSelectExecute(Sender: TObject);
 var
   Row: Integer;
 begin
@@ -1826,7 +1905,7 @@ begin
   ModalResult := mrOk;
 end;
 
-procedure TFormTypeSelect.CornerButtonEditTypeClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeEditExecute(Sender: TObject);
 var
   Row: Integer;
   AType: TDeviceType;
