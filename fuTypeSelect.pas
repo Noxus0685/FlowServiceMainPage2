@@ -174,6 +174,7 @@ type
     FSortColumn: Integer;
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
+    FTreeSelectionUpdatePending: Boolean;
 
     procedure LoadData;
     procedure BuildTree;
@@ -198,7 +199,8 @@ type
     procedure FillComboBoxRepository;
 
      function UpdateConnection: Boolean;
-     procedure ClearTreeAndGrid;
+    procedure ClearTreeAndGrid;
+    procedure RebuildTreeSelectionFilter;
 
   public
     { Public declarations }
@@ -887,6 +889,7 @@ begin
    FSortColumn := -1;
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
+   FTreeSelectionUpdatePending := False;
    TreeViewTypes.MultiSelect := True;
 
 
@@ -1072,11 +1075,29 @@ end;
 
 procedure TFormTypeSelect.TreeViewTypesChange(Sender: TObject);
 begin
+  if FTreeSelectionUpdatePending then
+    Exit;
+
+  FTreeSelectionUpdatePending := True;
+  TThread.Queue(nil,
+    procedure
+    begin
+      FTreeSelectionUpdatePending := False;
+      RebuildTreeSelectionFilter;
+    end
+  );
+end;
+
+procedure TFormTypeSelect.RebuildTreeSelectionFilter;
+begin
+  if csDestroying in ComponentState then
+    Exit;
+
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
 
   ApplyFilter;
-    UpdateGridTypes;
+  UpdateGridTypes;
 end;
 
 function TFormTypeSelect.BuildFilteredByTree(
