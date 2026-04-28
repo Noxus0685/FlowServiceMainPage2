@@ -124,6 +124,7 @@ object FormTypeSelect: TFormTypeSelect
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
+        OnSetValue = GridTypesSetValue
         Viewport.Width = 861.000000000000000000
         Viewport.Height = 637.000000000000000000
         object CheckColumnSelect: TCheckColumn

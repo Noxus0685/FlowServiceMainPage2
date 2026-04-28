@@ -133,6 +133,8 @@ type
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridTypesSetValue(Sender: TObject; const ACol, ARow: Integer;
+      const Value: TValue);
     procedure TreeViewTypesClick(Sender: TObject);
     procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
@@ -965,6 +967,31 @@ begin
 
 end;
 
+procedure TFormTypeSelect.GridTypesSetValue(Sender: TObject; const ACol,
+  ARow: Integer; const Value: TValue);
+begin
+  if ACol <> CheckColumnSelect.Index then
+    Exit;
+
+  if not IsValidGridRow(ARow) then
+    Exit;
+
+  if Value.AsBoolean then
+  begin
+    GridTypes.Row := ARow;
+    GridTypes.Selected := ARow;
+    SelectedType := FDevFilteredTypes[ARow];
+  end
+  else
+  begin
+    GridTypes.Row := -1;
+    GridTypes.Selected := -1;
+    SelectedType := nil;
+  end;
+
+  GridTypes.Repaint;
+end;
+
 
 procedure TFormTypeSelect.GridTypesHeaderClick(Column: TColumn);
 begin
@@ -1013,22 +1040,7 @@ begin
   if not IsValidGridRow(Row) then
     Exit;
 
-  if Col = CheckColumnSelect.Index then
-  begin
-    if GridTypes.Row = Row then
-    begin
-      GridTypes.Row := -1;
-      GridTypes.Selected := -1;
-      SelectedType := nil;
-    end
-    else
-    begin
-      GridTypes.Row := Row;
-      GridTypes.Selected := Row;
-      SelectedType := FDevFilteredTypes[Row];
-    end;
-  end
-  else
+  if Col <> CheckColumnSelect.Index then
   begin
     GridTypes.Row := Row;
     GridTypes.Selected := Row;
