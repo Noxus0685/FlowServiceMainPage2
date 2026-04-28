@@ -999,7 +999,6 @@ begin
     if FDevFilteredTypes[ARow].Enable <> NewEnable then
       FDevFilteredTypes[ARow].Enable := NewEnable;
 
-    GridTypes.Invalidate;
     GridTypes.Repaint;
   end;
 end;
