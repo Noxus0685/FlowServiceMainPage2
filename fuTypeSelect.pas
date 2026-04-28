@@ -1030,7 +1030,6 @@ end;
 procedure TFormTypeSelect.TreeViewTypesMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
 var
-  Obj: TFmxObject;
   ClickedItem: TTreeViewItem;
 begin
   FClearTreeSelectionOnClick := False;
@@ -1041,17 +1040,7 @@ begin
   if (ssCtrl in Shift) or (ssShift in Shift) then
     Exit;
 
-  Obj := TreeViewTypes.ObjectAtPoint(PointF(X, Y));
-  ClickedItem := nil;
-  while Obj <> nil do
-  begin
-    if Obj is TTreeViewItem then
-    begin
-      ClickedItem := TTreeViewItem(Obj);
-      Break;
-    end;
-    Obj := Obj.Parent;
-  end;
+  ClickedItem := TreeViewTypes.ItemByPoint(PointF(X, Y));
 
   if (ClickedItem <> nil) and ClickedItem.IsSelected then
     FClearTreeSelectionOnClick := True;
