@@ -132,7 +132,6 @@ type
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
-    procedure TreeViewTypesChange(Sender: TObject);
     procedure TreeViewTypesClick(Sender: TObject);
     procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
@@ -1003,17 +1002,32 @@ begin
     UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.TreeViewTypesChange(Sender: TObject);
+procedure TFormTypeSelect.TreeViewTypesClick(Sender: TObject);
+var
+Item: TTreeViewItem;
 begin
+
+
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
 
   ApplyFilter;
     UpdateGridTypes;
-end;
+  GridTypes.Row:=-1;
+  Item:= TreeViewTypes.Selected;
+  if Assigned(Item) then
+  begin
+      // 1. очистка фильтров ввода
+  EditFindType.Text := '';
+  DateEditFilter.IsEmpty := True;
 
-procedure TFormTypeSelect.TreeViewTypesClick(Sender: TObject);
-begin
+  // 2. пересчёт фильтров
+  ApplyFilter;
+    UpdateGridTypes;
+    // фильтров больше нет
+  sbFind.IsPressed := False;
+  end;
+  {
   if FClearTreeSelectionOnClick then
   begin
     TreeViewTypes.Selected := nil;
@@ -1024,7 +1038,7 @@ begin
 
     ApplyFilter;
     UpdateGridTypes;
-  end;
+  end;                     }
 end;
 
 procedure TFormTypeSelect.TreeViewTypesMouseDown(Sender: TObject;

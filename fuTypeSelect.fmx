@@ -44,9 +44,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.Height = 678.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
-      OnMouseDown = TreeViewTypesMouseDown
       OnClick = TreeViewTypesClick
-      OnChange = TreeViewTypesChange
+      OnMouseDown = TreeViewTypesMouseDown
       Viewport.Width = 229.000000000000000000
       Viewport.Height = 674.000000000000000000
       object TreeViewItem1: TTreeViewItem
@@ -374,8 +373,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 883.000000000000000000
-      Viewport.Height = 102.000000000000000000
+      Viewport.Width = 879.000000000000000000
+      Viewport.Height = 98.000000000000000000
     end
   end
   object lyt1: TLayout
