@@ -521,13 +521,22 @@ end;
 procedure TFormTypeSelect.actTypeCopyExecute(Sender: TObject);
 var
   TargetTypes: TObjectList<TDeviceType>;
+  CopiedType: TDeviceType;
   I: Integer;
 begin
   TargetTypes := GetSelectedTypes;
   try
     FCopiedTypes.Clear;
     for I := 0 to TargetTypes.Count - 1 do
-      FCopiedTypes.Add(TargetTypes[I]);
+    begin
+      if TargetTypes[I] = nil then
+        Continue;
+
+      // Копируем полный снимок типа (все поля + вложенные коллекции),
+      // чтобы последующие изменения исходной строки не влияли на буфер.
+      CopiedType := TargetTypes[I].Clone;
+      FCopiedTypes.Add(CopiedType);
+    end;
   finally
     TargetTypes.Free;
   end;
@@ -538,26 +547,13 @@ var
   NewType: TDeviceType;
   SourceType: TDeviceType;
   I: Integer;
-  SelectedNode: TTreeViewItem;
-  BranchSample: TDeviceType;
-  CandidateType: TDeviceType;
   NewRows: TObjectList<TDeviceType>;
 begin
   if (ActiveRepo = nil) or (FCopiedTypes = nil) or (FCopiedTypes.Count = 0) then
     Exit;
 
-  SelectedNode := GetActiveTreeNode;
   NewRows := TObjectList<TDeviceType>.Create(False);
   try
-    BranchSample := nil;
-    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) and (FDeviceTypes <> nil) then
-      for CandidateType in FDeviceTypes do
-        if PassTreeFilter(CandidateType, SelectedNode) then
-        begin
-          BranchSample := CandidateType;
-          Break;
-        end;
-
     for I := 0 to FCopiedTypes.Count - 1 do
     begin
       SourceType := FCopiedTypes[I];
@@ -565,18 +561,6 @@ begin
         Continue;
 
       NewType := ActiveRepo.CreateType(SourceType);
-
-      if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-      begin
-        ApplyTreeNodeSelectionToType(NewType, SelectedNode);
-        if BranchSample <> nil then
-        begin
-          if Trim(NewType.CategoryName) = '' then
-            NewType.CategoryName := BranchSample.CategoryName;
-          NewType.AccuracyClass := BranchSample.AccuracyClass;
-        end;
-      end;
-
       NewRows.Add(NewType);
     end;
 
@@ -1012,7 +996,7 @@ begin
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
    FClearTreeSelectionOnClick := False;
-   FCopiedTypes := TObjectList<TDeviceType>.Create(False);
+   FCopiedTypes := TObjectList<TDeviceType>.Create(True);
    FCheckedTypes := TList<TDeviceType>.Create;
    TreeViewTypes.MultiSelect := True;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
