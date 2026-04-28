@@ -591,17 +591,48 @@ end;
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
 var
   I: Integer;
+  Candidate: TTreeViewItem;
+  BestDepth: Integer;
+  CurDepth: Integer;
+  Parent: TTreeViewItem;
 begin
   Result := TreeViewTypes.Selected;
+  BestDepth := -1;
+
   if Result <> nil then
-    Exit;
+  begin
+    CurDepth := 0;
+    Parent := Result.ParentItem;
+    while Parent <> nil do
+    begin
+      Inc(CurDepth);
+      Parent := Parent.ParentItem;
+    end;
+    BestDepth := CurDepth;
+  end;
 
   for I := 0 to TreeViewTypes.Count - 1 do
-    if TreeViewTypes.ItemByIndex(I).IsSelected then
+  begin
+    Candidate := TreeViewTypes.ItemByIndex(I);
+    if not Candidate.IsSelected then
+      Continue;
+
+    CurDepth := 0;
+    Parent := Candidate.ParentItem;
+    while Parent <> nil do
     begin
-      Result := TreeViewTypes.ItemByIndex(I);
-      Exit;
+      Inc(CurDepth);
+      Parent := Parent.ParentItem;
     end;
+
+    // При множественном выборе берём самую глубокую выбранную ветку
+    // (подветка имеет приоритет над верхней веткой).
+    if CurDepth >= BestDepth then
+    begin
+      BestDepth := CurDepth;
+      Result := Candidate;
+    end;
+  end;
 end;
 
 procedure TFormTypeSelect.actTypeCutExecute(Sender: TObject);
