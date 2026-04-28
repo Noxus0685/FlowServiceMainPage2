@@ -911,7 +911,8 @@ begin
   {----------------------------------}
   { Значения колонок }
   {----------------------------------}
-  if ACol = CheckColumnSelect.Index then
+  if (ACol >= 0) and (ACol < GridTypes.ColumnCount) and
+     (GridTypes.Columns[ACol] = CheckColumnTypeEnable) then
     Value := (ARow = GridTypes.Row)
 
   else if ACol = StringColumnName.Index then
@@ -970,7 +971,8 @@ end;
 procedure TFormTypeSelect.GridTypesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 begin
-  if ACol <> CheckColumnSelect.Index then
+  if (ACol < 0) or (ACol >= GridTypes.ColumnCount) or
+     (GridTypes.Columns[ACol] <> CheckColumnTypeEnable) then
     Exit;
 
   if not IsValidGridRow(ARow) then
@@ -1040,7 +1042,8 @@ begin
   if not IsValidGridRow(Row) then
     Exit;
 
-  if Col <> CheckColumnSelect.Index then
+  if (Col < 0) or (Col >= GridTypes.ColumnCount) or
+     (GridTypes.Columns[Col] <> CheckColumnTypeEnable) then
   begin
     GridTypes.Row := Row;
     GridTypes.Selected := Row;
