@@ -191,7 +191,7 @@ type
 
     function PassTreeFilter(const AType: TDeviceType): Boolean;
     function PassTreeFilterByNode(const AType: TDeviceType; ANode: TTreeViewItem): Boolean;
-    procedure CollectSelectedTreeItems(AParent: TFmxObject; ASelected: TList<TTreeViewItem>);
+    procedure CollectSelectedTreeItems(ASelected: TList<TTreeViewItem>);
     function BuildSearchURL(const ASearch: string): string;
     procedure ApplyTreeSelectionToType(AType: TDeviceType);
 
@@ -331,30 +331,42 @@ begin
   Result := True;
 end;
 
-procedure TFormTypeSelect.CollectSelectedTreeItems(
-  AParent: TFmxObject;
-  ASelected: TList<TTreeViewItem>
-);
+procedure TFormTypeSelect.CollectSelectedTreeItems(ASelected: TList<TTreeViewItem>);
 var
   I: Integer;
-  Child: TFmxObject;
-  Item: TTreeViewItem;
-begin
-  if (AParent = nil) or (ASelected = nil) then
-    Exit;
+  RootItem: TTreeViewItem;
 
-  for I := 0 to AParent.ChildrenCount - 1 do
+  procedure CollectFromNode(ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildItem: TTreeViewItem;
   begin
-    Child := AParent.Children[I];
-    if Child is TTreeViewItem then
-    begin
-      Item := TTreeViewItem(Child);
-      if Item.IsSelected then
-        ASelected.Add(Item);
+    if ANode = nil then
+      Exit;
 
-      CollectSelectedTreeItems(Item, ASelected);
+    if ANode.IsSelected then
+      ASelected.Add(ANode);
+
+    for J := 0 to ANode.Count - 1 do
+    begin
+      ChildItem := TTreeViewItem(ANode.Items[J]);
+      CollectFromNode(ChildItem);
     end;
   end;
+begin
+  if ASelected = nil then
+    Exit;
+
+  for I := 0 to TreeViewTypes.Count - 1 do
+  begin
+    RootItem := TTreeViewItem(TreeViewTypes.Items[I]);
+    CollectFromNode(RootItem);
+  end;
+
+  // fallback для одиночного выбора на платформах,
+  // где IsSelected не обновляется для узла сразу
+  if (ASelected.Count = 0) and (TreeViewTypes.Selected <> nil) then
+    ASelected.Add(TreeViewTypes.Selected);
 end;
 
 procedure TFormTypeSelect.BuildTree;
@@ -1082,7 +1094,7 @@ begin
 
   SelectedItems := TList<TTreeViewItem>.Create;
   try
-    CollectSelectedTreeItems(TreeViewTypes, SelectedItems);
+    CollectSelectedTreeItems(SelectedItems);
 
     if SelectedItems.Count = 0 then
       Exit;
