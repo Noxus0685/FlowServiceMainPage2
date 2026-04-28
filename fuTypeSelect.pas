@@ -913,7 +913,7 @@ begin
   {----------------------------------}
   if (ACol >= 0) and (ACol < GridTypes.ColumnCount) and
      (GridTypes.Columns[ACol] = CheckColumnTypeEnable) then
-    Value := (ARow = GridTypes.Row)
+    Value := T.Enable
 
   else if ACol = StringColumnName.Index then
     Value := T.Name
@@ -971,25 +971,14 @@ end;
 procedure TFormTypeSelect.GridTypesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 begin
-  if (ACol < 0) or (ACol >= GridTypes.ColumnCount) or
-     (GridTypes.Columns[ACol] <> CheckColumnTypeEnable) then
+  if (ACol < 0) or (ACol >= GridTypes.ColumnCount) then
     Exit;
 
   if not IsValidGridRow(ARow) then
     Exit;
 
-  if Value.AsBoolean then
-  begin
-    GridTypes.Row := ARow;
-    GridTypes.Selected := ARow;
-    SelectedType := FDevFilteredTypes[ARow];
-  end
-  else
-  begin
-    GridTypes.Row := -1;
-    GridTypes.Selected := -1;
-    SelectedType := nil;
-  end;
+  if GridTypes.Columns[ACol] = CheckColumnTypeEnable then
+    FDevFilteredTypes[ARow].Enable := Value.AsBoolean;
 
   GridTypes.Repaint;
 end;
@@ -1042,8 +1031,12 @@ begin
   if not IsValidGridRow(Row) then
     Exit;
 
-  if (Col < 0) or (Col >= GridTypes.ColumnCount) or
-     (GridTypes.Columns[Col] <> CheckColumnTypeEnable) then
+  if (Col < 0) or (Col >= GridTypes.ColumnCount) then
+    Exit;
+
+  if GridTypes.Columns[Col] = CheckColumnTypeEnable then
+    FDevFilteredTypes[Row].Enable := not FDevFilteredTypes[Row].Enable
+  else
   begin
     GridTypes.Row := Row;
     GridTypes.Selected := Row;
