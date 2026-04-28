@@ -44,7 +44,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.Height = 678.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
-      OnChange = TreeViewTypesChange
+      OnClick = TreeViewTypesClick
+      OnMouseDown = TreeViewTypesMouseDown
       Viewport.Width = 229.000000000000000000
       Viewport.Height = 674.000000000000000000
       object TreeViewItem1: TTreeViewItem
@@ -116,6 +117,7 @@ object FormTypeSelect: TFormTypeSelect
         CanFocus = True
         ClipChildren = True
         Margins.Left = 2.000000000000000000
+        PopupMenu = PopupMenu1
         Size.Width = 881.000000000000000000
         Size.Height = 678.000000000000000000
         Size.PlatformDefault = False
@@ -123,8 +125,16 @@ object FormTypeSelect: TFormTypeSelect
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
+        OnCellClick = GridTypesCellClick
         Viewport.Width = 861.000000000000000000
         Viewport.Height = 637.000000000000000000
+        object CheckColumnTypeEnable: TCheckColumn
+          Header = #1042#1099#1073
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Size.Width = 48.000000000000000000
+        end
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103
           HeaderSettings.TextSettings.Trimming = Character
@@ -226,41 +236,41 @@ object FormTypeSelect: TFormTypeSelect
         Size.PlatformDefault = False
         TabOrder = 38
         object ButtonTypeDelete: TButton
+          Action = actTypeDelete
           Align = Left
+          ImageIndex = -1
           Position.X = 49.000000000000000000
           Size.Width = 40.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'trashtoolbutton'
           TabOrder = 2
-          Text = 'ButtonTypeDelete'
           TextSettings.Trimming = None
-          OnClick = ButtonTypeDeleteClick
         end
         object ButtonTypeAdd: TButton
+          Action = actTypeAdd
           Align = Left
           Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1086#1087#1080#1102' '#1074#1099#1073#1088#1072#1085#1085#1086#1075#1086
+          ImageIndex = -1
           Position.X = 89.000000000000000000
           Size.Width = 47.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'additembutton'
           TabOrder = 1
-          Text = 'ButtonTypeAdd'
           TextSettings.Trimming = None
-          OnClick = ButtonTypeAddClick
         end
         object ButtonTypeClear: TButton
+          Action = actTypeClear
           Align = Left
+          ImageIndex = -1
           Position.X = 5.000000000000000000
           Size.Width = 44.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'pagecurltoolbutton'
           TabOrder = 0
-          Text = 'ButtonTypeClear'
           TextSettings.Trimming = None
-          OnClick = ButtonTypeClearClick
         end
       end
       object Layout2: TLayout
@@ -271,26 +281,25 @@ object FormTypeSelect: TFormTypeSelect
         Size.PlatformDefault = False
         TabOrder = 37
         object sbClear: TSpeedButton
+          Action = actFilterClear
           Align = Left
+          ImageIndex = -1
           Position.X = 49.000000000000000000
           Size.Width = 43.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'stoptoolbutton'
-          Text = 'sbClear'
           TextSettings.Trimming = None
-          OnClick = sbClearClick
         end
         object sbFind: TSpeedButton
-          StaysPressed = True
+          Action = actFilterFind
           Align = MostLeft
+          ImageIndex = -1
           Size.Width = 49.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'searcheditbutton'
-          Text = 'sbFind'
           TextSettings.Trimming = None
-          OnClick = sbFindClick
         end
         object EditFindType: TEdit
           Touch.InteractiveGestures = [LongTap, DoubleTap]
@@ -306,15 +315,15 @@ object FormTypeSelect: TFormTypeSelect
           OnExit = EditFindTypeExit
         end
         object SpeedButtonFindInternet: TSpeedButton
+          Action = actTypeFindInternet
           Align = Right
+          ImageIndex = -1
           Position.X = 293.000000000000000000
           Size.Width = 54.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'infotoolbutton'
-          Text = 'SpeedButtonFindInternet'
           TextSettings.Trimming = None
-          OnClick = SpeedButtonFindInternetClick
         end
       end
       object Layout3: TLayout
@@ -372,8 +381,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 883.000000000000000000
-      Viewport.Height = 102.000000000000000000
+      Viewport.Width = 879.000000000000000000
+      Viewport.Height = 98.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -405,8 +414,10 @@ object FormTypeSelect: TFormTypeSelect
       YRadius = 3.000000000000000000
     end
     object CornerButtonSelectType: TCornerButton
+      Action = actTypeSelect
       Align = Right
       StyledSettings = [Family, Size, Style]
+      ImageIndex = -1
       ModalResult = 1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
@@ -419,16 +430,16 @@ object FormTypeSelect: TFormTypeSelect
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
-      Text = #1042#1099#1073#1088#1072#1090#1100
       TextSettings.FontColor = claDarkgreen
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
-      OnClick = CornerButtonSelectTypeClick
     end
     object CornerButtonEditType: TCornerButton
+      Action = actTypeEdit
       Align = Right
       StyledSettings = [Family, Size, Style]
+      ImageIndex = -1
       ModalResult = 1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
@@ -446,7 +457,6 @@ object FormTypeSelect: TFormTypeSelect
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
-      OnClick = CornerButtonEditTypeClick
     end
   end
   object MainMenu: TMenuBar
@@ -457,12 +467,12 @@ object FormTypeSelect: TFormTypeSelect
     object miFile: TMenuItem
       Text = #1060#1072#1081#1083
       object miCreate: TMenuItem
-        Action = aCreateType
+        Action = actTypeAdd
         Locked = True
         ImageIndex = 0
       end
       object miDelete: TMenuItem
-        Action = aDeleteType
+        Action = actTypeDelete
         Locked = True
         ImageIndex = 18
       end
@@ -499,17 +509,19 @@ object FormTypeSelect: TFormTypeSelect
     object miEdit: TMenuItem
       Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100
       object miCopy: TMenuItem
-        Action = TypeCopy
+        Action = actTypeCopy
         Locked = True
         ImageIndex = -1
       end
       object miPaste: TMenuItem
+        Action = actTypePaste
         Locked = True
-        Text = 'miPaste'
+        ImageIndex = -1
       end
       object miCut: TMenuItem
+        Action = actTypeCut
         Locked = True
-        Text = 'miCut'
+        ImageIndex = -1
       end
     end
   end
@@ -517,16 +529,31 @@ object FormTypeSelect: TFormTypeSelect
     Left = 237
     Top = 197
     object MenuItem1: TMenuItem
-      Action = aCreateType
+      Action = actTypeAdd
       ImageIndex = 14
     end
     object MenuItem2: TMenuItem
-      Action = aEditType
+      Action = actTypeEdit
       ImageIndex = 15
     end
     object MenuItem3: TMenuItem
-      Action = aDeleteType
+      Action = actTypeDelete
       ImageIndex = 16
+    end
+    object MenuItem4: TMenuItem
+      Text = '-'
+    end
+    object MenuItem5: TMenuItem
+      Action = actTypeCopy
+      ImageIndex = -1
+    end
+    object MenuItem6: TMenuItem
+      Action = actTypePaste
+      ImageIndex = -1
+    end
+    object MenuItem7: TMenuItem
+      Action = actTypeCut
+      ImageIndex = -1
     end
   end
   object StatusBar1: TStatusBar
@@ -577,33 +604,69 @@ object FormTypeSelect: TFormTypeSelect
   object ActionList1: TActionList
     Left = 277
     Top = 117
-    object aCreateType: TAction
+    object actTypeAdd: TAction
       Text = #1057#1086#1079#1076#1072#1090#1100'...'
       ImageIndex = 14
+      OnExecute = actTypeAddExecute
+      OnUpdate = UpdateTypeActions
       ImageIndex = 14
     end
-    object aEditType: TAction
+    object actTypeEdit: TAction
       Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100'...'
       ImageIndex = 15
+      OnExecute = actTypeEditExecute
+      OnUpdate = UpdateTypeActions
       ImageIndex = 15
     end
-    object aDeleteType: TAction
+    object actTypeDelete: TAction
       Text = #1059#1076#1072#1083#1080#1090#1100'...'
       ImageIndex = 16
+      OnExecute = actTypeDeleteExecute
+      OnUpdate = UpdateTypeActions
       ImageIndex = 16
     end
-    object TypeCopy: TAction
+    object actTypeCopy: TAction
       Category = 'Edit'
       Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
-      OnExecute = TypeCopyExecute
+      OnExecute = actTypeCopyExecute
+      OnUpdate = UpdateTypeActions
     end
-    object TypePaste: TAction
+    object actTypePaste: TAction
       Category = 'Edit'
       Text = #1042#1089#1090#1072#1074#1080#1090#1100
+      OnExecute = actTypePasteExecute
+      OnUpdate = UpdateTypeActions
     end
-    object TypeCut: TAction
+    object actTypeCut: TAction
       Category = 'Edit'
       Text = #1042#1099#1088#1077#1079#1072#1090#1100
+      OnExecute = actTypeCutExecute
+      OnUpdate = UpdateTypeActions
+    end
+    object actTypeClear: TAction
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1089#1087#1080#1089#1086#1082
+      OnExecute = actTypeClearExecute
+      OnUpdate = UpdateTypeActions
+    end
+    object actTypeSelect: TAction
+      Text = #1042#1099#1073#1088#1072#1090#1100
+      OnExecute = actTypeSelectExecute
+      OnUpdate = UpdateTypeActions
+    end
+    object actFilterFind: TAction
+      Text = #1053#1072#1081#1090#1080
+      OnExecute = actFilterFindExecute
+      OnUpdate = UpdateTypeActions
+    end
+    object actFilterClear: TAction
+      Text = #1057#1073#1088#1086#1089' '#1092#1080#1083#1100#1090#1088#1086#1074
+      OnExecute = actFilterClearExecute
+      OnUpdate = UpdateTypeActions
+    end
+    object actTypeFindInternet: TAction
+      Text = #1055#1086#1080#1089#1082' '#1074' '#1040#1056#1064#1048#1053
+      OnExecute = actTypeFindInternetExecute
+      OnUpdate = UpdateTypeActions
     end
     object Action3: TAction
       Text = 'Action3'
