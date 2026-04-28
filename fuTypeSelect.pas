@@ -887,15 +887,16 @@ end;
 
 procedure TFormTypeSelect.GridTypesCellClick(const Column: TColumn;
   const Row: Integer);
-var
-b:Boolean;
-  begin
-
+begin
   if not IsValidGridRow(Row) then
     Exit;
-  if Column = CheckColumnTypeEnable then
-    FDevFilteredTypes[Row].Enable :=not(FDevFilteredTypes[Row].Enable) ;
-  UpdateGridTypes;
+
+  if Column <> CheckColumnTypeEnable then
+  begin
+    GridTypes.Row := Row;
+    GridTypes.Selected := Row;
+    SelectedType := FDevFilteredTypes[Row];
+  end;
 end;
 
 procedure TFormTypeSelect.GridTypesGetValue(
@@ -925,8 +926,7 @@ begin
   {----------------------------------}
   { Значения колонок }
   {----------------------------------}
-  if (ACol >= 0) and (ACol < GridTypes.ColumnCount) and
-     (GridTypes.Columns[ACol] = CheckColumnTypeEnable) then
+  if ACol = CheckColumnTypeEnable.Index then
     Value := T.Enable
 
   else if ACol = StringColumnName.Index then
@@ -984,6 +984,8 @@ end;
 
 procedure TFormTypeSelect.GridTypesSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
+var
+  NewEnable: Boolean;
 begin
   if (ACol < 0) or (ACol >= GridTypes.ColumnCount) then
     Exit;
@@ -992,9 +994,14 @@ begin
     Exit;
 
   if GridTypes.Columns[ACol] = CheckColumnTypeEnable then
-    FDevFilteredTypes[ARow].Enable := Value.AsBoolean;
+  begin
+    NewEnable := Value.AsBoolean;
+    if FDevFilteredTypes[ARow].Enable <> NewEnable then
+      FDevFilteredTypes[ARow].Enable := NewEnable;
 
-  GridTypes.Repaint;
+    GridTypes.Invalidate;
+    GridTypes.Repaint;
+  end;
 end;
 
 
@@ -1048,16 +1055,12 @@ begin
   if (Col < 0) or (Col >= GridTypes.ColumnCount) then
     Exit;
 
-  if GridTypes.Columns[Col] = CheckColumnTypeEnable then
-    FDevFilteredTypes[Row].Enable := not FDevFilteredTypes[Row].Enable
-  else
+  if GridTypes.Columns[Col] <> CheckColumnTypeEnable then
   begin
     GridTypes.Row := Row;
     GridTypes.Selected := Row;
     SelectedType := FDevFilteredTypes[Row];
   end;
-
-  GridTypes.Repaint;
 end;
 
 
@@ -1259,6 +1262,7 @@ begin
   else
     SelectedType := nil;
 
+  GridTypes.Invalidate;
   GridTypes.Repaint;
 
   sbFind.IsPressed := HasActiveFilters;
