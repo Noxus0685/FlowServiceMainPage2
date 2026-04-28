@@ -133,6 +133,9 @@ type
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure TreeViewTypesChange(Sender: TObject);
+    procedure TreeViewTypesClick(Sender: TObject);
+    procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
     procedure sbClearClick(Sender: TObject);
@@ -174,6 +177,7 @@ type
     FSortColumn: Integer;
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
+    FClearTreeSelectionOnClick: Boolean;
 
     procedure LoadData;
     procedure BuildTree;
@@ -189,7 +193,10 @@ type
 ): TObjectList<TDeviceType>;
 
 
-    function PassTreeFilter(const AType: TDeviceType): Boolean;
+    function PassTreeFilter(
+      const AType: TDeviceType;
+      const ANode: TTreeViewItem
+    ): Boolean;
     function BuildSearchURL(const ASearch: string): string;
     procedure ApplyTreeSelectionToType(AType: TDeviceType);
 
@@ -238,15 +245,18 @@ begin
   FDeviceTypes := ActiveRepo.Types;
 end;
 
-function TFormTypeSelect.PassTreeFilter(const AType: TDeviceType): Boolean;
+function TFormTypeSelect.PassTreeFilter(
+  const AType: TDeviceType;
+  const ANode: TTreeViewItem
+): Boolean;
 var
   Cur: TTreeViewItem;
 begin
   Result := True;
 
-  Cur := TreeViewTypes.Selected;
+  Cur := ANode;
   if Cur = nil then
-    Exit(True);
+    Exit(False);
 
   // Узел "Все"
   if Cur.Tag = Ord(tnAll) then
@@ -809,6 +819,8 @@ begin
    FSortColumn := -1;
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
+   FClearTreeSelectionOnClick := False;
+   TreeViewTypes.MultiSelect := True;
 
 
    LoadData;
@@ -993,9 +1005,6 @@ end;
 
 procedure TFormTypeSelect.TreeViewTypesChange(Sender: TObject);
 begin
-  if TreeViewTypes.Selected = nil then
-    Exit;
-
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
 
@@ -1003,20 +1012,102 @@ begin
     UpdateGridTypes;
 end;
 
+procedure TFormTypeSelect.TreeViewTypesClick(Sender: TObject);
+begin
+  if FClearTreeSelectionOnClick then
+  begin
+    TreeViewTypes.Selected := nil;
+    FClearTreeSelectionOnClick := False;
+
+    FreeAndNil(FDevFilteredByTree);
+    FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
+
+    ApplyFilter;
+    UpdateGridTypes;
+  end;
+end;
+
+procedure TFormTypeSelect.TreeViewTypesMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  ClickedItem: TTreeViewItem;
+begin
+  FClearTreeSelectionOnClick := False;
+
+  if Button <> TMouseButton.mbLeft then
+    Exit;
+
+  if (ssCtrl in Shift) or (ssShift in Shift) then
+    Exit;
+
+  ClickedItem := TreeViewTypes.ItemByPoint(X, Y);
+
+  if (ClickedItem <> nil) and ClickedItem.IsSelected then
+    FClearTreeSelectionOnClick := True;
+end;
+
 function TFormTypeSelect.BuildFilteredByTree(
   const Source: TObjectList<TDeviceType>
 ): TObjectList<TDeviceType>;
 var
   T: TDeviceType;
+  I: Integer;
+  J: Integer;
+  Item: TTreeViewItem;
+  IsMatch: Boolean;
+  SelectedNodes: TList<TTreeViewItem>;
+  procedure CollectSelectedNodes(const ANode: TTreeViewItem);
+  var
+    K: Integer;
+    Child: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    if ANode.IsSelected or (ANode = TreeViewTypes.Selected) then
+      if SelectedNodes.IndexOf(ANode) < 0 then
+        SelectedNodes.Add(ANode);
+
+    for K := 0 to ANode.Count - 1 do
+    begin
+      Child := ANode.ItemByIndex(K);
+      CollectSelectedNodes(Child);
+    end;
+  end;
 begin
   Result := TObjectList<TDeviceType>.Create(False); // ссылки, не владеем
 
   if Source = nil then
     Exit;
 
-  for T in Source do
-    if PassTreeFilter(T) then
-      Result.Add(T);
+  SelectedNodes := TList<TTreeViewItem>.Create;
+  try
+    for I := 0 to TreeViewTypes.Count - 1 do
+    begin
+      Item := TreeViewTypes.ItemByIndex(I);
+      CollectSelectedNodes(Item);
+    end;
+
+    if (SelectedNodes.Count = 0) and (TreeViewTypes.Selected <> nil) then
+      SelectedNodes.Add(TreeViewTypes.Selected);
+
+    for T in Source do
+    begin
+      IsMatch := False;
+
+      for J := 0 to SelectedNodes.Count - 1 do
+        if PassTreeFilter(T, SelectedNodes[J]) then
+        begin
+          IsMatch := True;
+          Break;
+        end;
+
+      if IsMatch then
+        Result.Add(T);
+    end;
+  finally
+    SelectedNodes.Free;
+  end;
 end;
 
 procedure TFormTypeSelect.UpdateGridTypes;
@@ -1755,4 +1846,3 @@ end;
 
 
 end.
-
