@@ -129,12 +129,9 @@ type
     TypeCut: TAction;
     Action3: TAction;
     StringColumnUUID: TStringColumn;
-    CheckColumnTypeEnable: TCheckColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
-    procedure GridTypesSetValue(Sender: TObject; const ACol, ARow: Integer;
-      const Value: TValue);
     procedure TreeViewTypesClick(Sender: TObject);
     procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
@@ -891,12 +888,9 @@ begin
   if not IsValidGridRow(Row) then
     Exit;
 
-  if Column <> CheckColumnTypeEnable then
-  begin
-    GridTypes.Row := Row;
-    GridTypes.Selected := Row;
-    SelectedType := FDevFilteredTypes[Row];
-  end;
+  GridTypes.Row := Row;
+  GridTypes.Selected := Row;
+  SelectedType := FDevFilteredTypes[Row];
 end;
 
 procedure TFormTypeSelect.GridTypesGetValue(
@@ -926,10 +920,7 @@ begin
   {----------------------------------}
   { Значения колонок }
   {----------------------------------}
-  if ACol = CheckColumnTypeEnable.Index then
-    Value := T.Enable
-
-  else if ACol = StringColumnName.Index then
+  if ACol = StringColumnName.Index then
     Value := T.Name
 
   else if ACol = StringColumnCategory.Index then
@@ -980,27 +971,6 @@ begin
    else if ACol =  StringColumnUUID.Index  then
     Value := T.UUID;
 
-end;
-
-procedure TFormTypeSelect.GridTypesSetValue(Sender: TObject; const ACol,
-  ARow: Integer; const Value: TValue);
-var
-  NewEnable: Boolean;
-begin
-  if (ACol < 0) or (ACol >= GridTypes.ColumnCount) then
-    Exit;
-
-  if not IsValidGridRow(ARow) then
-    Exit;
-
-  if GridTypes.Columns[ACol] = CheckColumnTypeEnable then
-  begin
-    NewEnable := Value.AsBoolean;
-    if FDevFilteredTypes[ARow].Enable <> NewEnable then
-      FDevFilteredTypes[ARow].Enable := NewEnable;
-
-    GridTypes.Repaint;
-  end;
 end;
 
 
@@ -1054,12 +1024,9 @@ begin
   if (Col < 0) or (Col >= GridTypes.ColumnCount) then
     Exit;
 
-  if GridTypes.Columns[Col] <> CheckColumnTypeEnable then
-  begin
-    GridTypes.Row := Row;
-    GridTypes.Selected := Row;
-    SelectedType := FDevFilteredTypes[Row];
-  end;
+  GridTypes.Row := Row;
+  GridTypes.Selected := Row;
+  SelectedType := FDevFilteredTypes[Row];
 end;
 
 
