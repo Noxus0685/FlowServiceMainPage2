@@ -163,6 +163,7 @@ type
     procedure miLoadRepositoryClick(Sender: TObject);
     procedure CornerButtonSelectTypeClick(Sender: TObject);
     procedure TypeCopyExecute(Sender: TObject);
+    procedure GridTypesCellClick(const Column: TColumn; const Row: Integer);
 
   private
 
@@ -882,6 +883,19 @@ begin
   finally
     ComboBoxRepository.EndUpdate;
   end;
+end;
+
+procedure TFormTypeSelect.GridTypesCellClick(const Column: TColumn;
+  const Row: Integer);
+var
+b:Boolean;
+  begin
+
+  if not IsValidGridRow(Row) then
+    Exit;
+  if Column = CheckColumnTypeEnable then
+    FDevFilteredTypes[Row].Enable :=not(FDevFilteredTypes[Row].Enable) ;
+  UpdateGridTypes;
 end;
 
 procedure TFormTypeSelect.GridTypesGetValue(
