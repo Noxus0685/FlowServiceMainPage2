@@ -535,11 +535,26 @@ procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
   NewType: TDeviceType;
   I: Integer;
+  SelectedNode: TTreeViewItem;
+  BranchAccuracyClass: string;
 begin
   if (ActiveRepo = nil) or (FCopiedType = nil) then
     Exit;
 
   NewType := ActiveRepo.CreateType(FCopiedType);
+  SelectedNode := TreeViewTypes.Selected;
+
+  if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
+  begin
+    BranchAccuracyClass := '';
+    if (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0) and
+       (FDevFilteredTypes[0] <> nil) then
+      BranchAccuracyClass := FDevFilteredTypes[0].AccuracyClass;
+
+    ApplyTreeSelectionToType(NewType);
+    if Trim(BranchAccuracyClass) <> '' then
+      NewType.AccuracyClass := BranchAccuracyClass;
+  end;
 
   ApplyFilter;
   UpdateGridTypes;
