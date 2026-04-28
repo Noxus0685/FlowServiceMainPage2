@@ -63,7 +63,6 @@ type
     TreeViewItem3: TTreeViewItem;
     LayoutRight: TLayout;
     GridTypes: TGrid;
-    CheckColumnSelect: TCheckColumn;
     StringColumnName: TStringColumn;
     StringColumnCategory: TStringColumn;
     StringColumnManufacturer: TStringColumn;
@@ -130,6 +129,7 @@ type
     TypeCut: TAction;
     Action3: TAction;
     StringColumnUUID: TStringColumn;
+    CheckColumnTypeEnable: TCheckColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

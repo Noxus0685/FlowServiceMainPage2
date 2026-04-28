@@ -125,11 +125,10 @@ object FormTypeSelect: TFormTypeSelect
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
         OnSetValue = GridTypesSetValue
-        Viewport.Width = 861.000000000000000000
-        Viewport.Height = 637.000000000000000000
-        object CheckColumnSelect: TCheckColumn
-          Header = ''
-          Size.Width = 28.000000000000000000
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 678.000000000000000000
+        object CheckColumnTypeEnable: TCheckColumn
+          HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103
@@ -378,8 +377,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout
