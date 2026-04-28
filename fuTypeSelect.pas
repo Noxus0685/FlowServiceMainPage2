@@ -1056,7 +1056,7 @@ begin
     Exit;
 
   Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := $33E5F1FB;
+  Canvas.Fill.Color := TAlphaColorRec.Dodgerblue;
   Canvas.FillRect(Bounds, 0, 0, [], 1);
 end;
 
