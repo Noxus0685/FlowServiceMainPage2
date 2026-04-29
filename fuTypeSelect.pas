@@ -569,9 +569,46 @@ end;
 
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
 var
-  I: Integer;
-  Candidate: TTreeViewItem;
   BestDepth: Integer;
+  procedure CheckCandidate(const ACandidate: TTreeViewItem);
+  var
+    CurDepth: Integer;
+    Parent: TTreeViewItem;
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ACandidate = nil then
+      Exit;
+
+    if ACandidate.IsSelected then
+    begin
+      CurDepth := 0;
+      Parent := ACandidate.ParentItem;
+      while Parent <> nil do
+      begin
+        Inc(CurDepth);
+        Parent := Parent.ParentItem;
+      end;
+
+      // При множественном выборе берём самую глубокую выбранную ветку
+      // (подветка имеет приоритет над верхней веткой).
+      if CurDepth >= BestDepth then
+      begin
+        BestDepth := CurDepth;
+        Result := ACandidate;
+      end;
+    end;
+
+    // ВАЖНО: обходим все подпункты дерева, а не только первый уровень.
+    for J := 0 to ACandidate.Count - 1 do
+      if ACandidate.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ACandidate.ItemByIndex(J));
+        CheckCandidate(ChildNode);
+      end;
+  end;
+var
+  I: Integer;
   CurDepth: Integer;
   Parent: TTreeViewItem;
 begin
@@ -590,28 +627,9 @@ begin
     BestDepth := CurDepth;
   end;
 
+  // Запускаем полный обход дерева от корневых узлов.
   for I := 0 to TreeViewTypes.Count - 1 do
-  begin
-    Candidate := TreeViewTypes.ItemByIndex(I);
-    if not Candidate.IsSelected then
-      Continue;
-
-    CurDepth := 0;
-    Parent := Candidate.ParentItem;
-    while Parent <> nil do
-    begin
-      Inc(CurDepth);
-      Parent := Parent.ParentItem;
-    end;
-
-    // При множественном выборе берём самую глубокую выбранную ветку
-    // (подветка имеет приоритет над верхней веткой).
-    if CurDepth >= BestDepth then
-    begin
-      BestDepth := CurDepth;
-      Result := Candidate;
-    end;
-  end;
+    CheckCandidate(TreeViewTypes.ItemByIndex(I));
 end;
 
 procedure TFormTypeSelect.actTypeCutExecute(Sender: TObject);
