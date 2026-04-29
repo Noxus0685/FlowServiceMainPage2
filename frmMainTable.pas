@@ -565,7 +565,6 @@ type
   private
     FInitialized: Boolean;
     FChange: string ;
-    FWorkTableManager: TWorkTableManager;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
@@ -603,8 +602,6 @@ type
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
-
-  //  property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
 
 
   private type
@@ -722,14 +719,7 @@ begin
 end;
 
 destructor TFrameMainTable.Destroy;
-var
-  WorkTable: TWorkTable;
 begin
-  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-    for WorkTable in FWorkTableManager.WorkTables do
-      if WorkTable <> nil then
-        WorkTable.Unsubscribe(Self);
-
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -737,7 +727,6 @@ begin
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   FInstrumentalVisibleOrder.Free;
-  FWorkTableManager := nil;
   inherited;
 end;
 
@@ -745,14 +734,14 @@ function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
     begin
       result:= nil;
 
-      if FWorkTableManager=nil then
+      if WorkTableManager=nil then
       Exit;
-      if FWorkTableManager.ActiveWorkTable=nil then
+      if WorkTableManager.ActiveWorkTable=nil then
       Exit;
-      if FWorkTableManager.ActiveWorkTable.MeasurementRun=nil then
+      if WorkTableManager.ActiveWorkTable.MeasurementRun=nil then
       Exit;
 
-      result:= TMeasurementRun (FWorkTableManager.ActiveWorkTable.MeasurementRun);
+      result:= TMeasurementRun (WorkTableManager.ActiveWorkTable.MeasurementRun);
     end;
 
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
@@ -1328,8 +1317,6 @@ begin
 
   FInitialized := True;
   SwitchAuto.IsChecked := False;
-
-  FWorkTableManager:= WorkTableManager;
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
@@ -2386,13 +2373,13 @@ end;
 function TFrameMainTable.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
 begin
   Result := nil;
-  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+  if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then
     Exit;
 
-  if (AIndex < 0) or (AIndex >= FWorkTableManager.WorkTables.Count) then
+  if (AIndex < 0) or (AIndex >= WorkTableManager.WorkTables.Count) then
     Exit;
 
-  Result := FWorkTableManager.WorkTables[AIndex];
+  Result := WorkTableManager.WorkTables[AIndex];
 end;
 
 procedure TFrameMainTable.InitTables;
@@ -2404,8 +2391,8 @@ var
   I, LimitCount, UnitIndex, WorkTableIndex: Integer;
 begin
   TableCount := 0;
-  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-    TableCount := FWorkTableManager.WorkTables.Count;
+  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
+    TableCount := WorkTableManager.WorkTables.Count;
 
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
   FActiveWorkTable := GetWorkTableByIndex(0);
@@ -2846,11 +2833,11 @@ end;
 
 procedure TFrameMainTable.ActionSaveWorkTableExecute(Sender: TObject);
 begin
-  if FWorkTableManager = nil then
+  if WorkTableManager = nil then
     Exit;
 
   SaveLayoutSettingsToWorkTable;
-  FWorkTableManager.Save;
+  WorkTableManager.Save;
 end;
 
 procedure TFrameMainTable.ActionSessionCreatePointsExecute(Sender: TObject);
