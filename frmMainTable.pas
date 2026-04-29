@@ -38,6 +38,7 @@ uses
   FMXTee.Engine,
   FMXTee.Procs,
   frmCalibrCoefs,
+  frmChannelProperties,
   frmFlowMeterProperties,
   frmMeasurementRun,
   frmMRResults,
@@ -503,6 +504,7 @@ type
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
+  FFrameChannelProperties: TFrameChannelProperties;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -724,6 +726,7 @@ begin
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
   FreeAndNil(FFrameFlowMeterProperties);
+  FreeAndNil(FFrameChannelProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   FInstrumentalVisibleOrder.Free;
@@ -1324,6 +1327,7 @@ begin
   FFrameMRResults := nil;
   FFrameProtocol := nil;
   FFrameFlowMeterProperties := nil;
+  FFrameChannelProperties := nil;
 
   GridDevices.RowCount := 2;
 
@@ -1378,6 +1382,13 @@ begin
     FFrameFlowMeterProperties.Align := TAlignLayout.Client;
   end;
   UpdateFlowMeterPropertiesFrame;
+
+  if FFrameChannelProperties = nil then
+  begin
+    FFrameChannelProperties := TFrameChannelProperties.Create(Self);
+    FFrameChannelProperties.Parent := TabItemChannelProperties;
+    FFrameChannelProperties.Align := TAlignLayout.Client;
+  end;
 
   RefreshPumpsCombo;
 
