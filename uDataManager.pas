@@ -40,7 +40,6 @@ type
 
     FCategories: TObjectList<TDeviceCategory>;
     FCopiedTypes: TObjectList<TDeviceType>;
-    FBufferTypesBusy: Boolean;
 
     //Загрузка нужного репозитария  (rkType, rkDevice, rkResults);
 
@@ -177,11 +176,6 @@ var
   I: Integer;
   CopiedType: TDeviceType;
 begin
-  // Защита от повторного входа, чтобы исключить рекурсивные сценарии и переполнение стека.
-  if FBufferTypesBusy then
-    Exit;
-  FBufferTypesBusy := True;
-  try
   // Очищаем буфер и формируем полный снимок каждого типа через Clone.
   FCopiedTypes.Clear;
   if ATypes = nil then
@@ -194,9 +188,6 @@ begin
     CopiedType := ATypes[I].Clone;
     FCopiedTypes.Add(CopiedType);
   end;
-  finally
-    FBufferTypesBusy := False;
-  end;
 end;
 
 function TManagerTTableDM.GetBufferTypes: TList<TDeviceType>;
@@ -204,20 +195,12 @@ var
   I: Integer;
   ClonedTypes: TObjectList<TDeviceType>;
 begin
-  // Защита от повторного входа, чтобы исключить рекурсивные сценарии и переполнение стека.
-  if FBufferTypesBusy then
-    Exit(TObjectList<TDeviceType>.Create(True));
-  FBufferTypesBusy := True;
-  try
   // При чтении возвращаем новые экземпляры, чтобы не выдавать ссылки на внутренний буфер.
   ClonedTypes := TObjectList<TDeviceType>.Create(True);
   for I := 0 to FCopiedTypes.Count - 1 do
     if FCopiedTypes[I] <> nil then
       ClonedTypes.Add(FCopiedTypes[I].Clone);
   Result := ClonedTypes;
-  finally
-    FBufferTypesBusy := False;
-  end;
 end;
 
 procedure TManagerTTableDM.CopyTypesToBuffer(const ATypes: TList<TDeviceType>);
@@ -277,15 +260,13 @@ begin
   while Cur <> nil do
   begin
     case Cur.Tag of
-      Ord(tnManufacturer):
-        AType.Manufacturer := Cur.TagString;
-      Ord(tnCategory):
+      1: AType.Manufacturer := Cur.TagString;
+      2:
         begin
           AType.Category := StrToIntDef(Cur.TagString, 0);
           AType.CategoryName := Cur.Text;
         end;
-      Ord(tnModification):
-        AType.Modification := Cur.TagString;
+      3: AType.Modification := Cur.TagString;
     end;
     Cur := Cur.ParentItem;
   end;
