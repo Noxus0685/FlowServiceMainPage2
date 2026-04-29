@@ -263,7 +263,8 @@ begin
       Ord(tnCategory):
         begin
           AType.Category := StrToIntDef(Cur.TagString, 0);
-          AType.CategoryName := Cur.Text;
+          if Cur.Text <> '<категория>' then
+            AType.CategoryName := Cur.Text;
         end;
       Ord(tnModification):
         AType.Modification := Cur.TagString;
