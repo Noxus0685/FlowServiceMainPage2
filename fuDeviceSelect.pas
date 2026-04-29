@@ -69,6 +69,7 @@ type
     LayoutRight: TLayout;
     Layout4: TLayout;
     GridDevices: TGrid;
+    CheckColumnDeviceEnable: TCheckColumn;
     StringColumnName: TStringColumn;
     StringColumnManufacturer: TStringColumn;
     StringColumnCategory: TStringColumn;
@@ -146,6 +147,7 @@ type
     procedure sbFindClick(Sender: TObject);
     procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure miAddRepositoryClick(Sender: TObject);
     procedure miDeleteRepositoryClick(Sender: TObject);
@@ -1877,7 +1879,10 @@ begin
   {----------------------------------}
   { Значения колонок }
   {----------------------------------}
-  if ACol = StringColumnName.Index then
+  if ACol = CheckColumnDeviceEnable.Index then
+    Value := D.Enabled
+
+  else if ACol = StringColumnName.Index then
     Value := D.Name
 
   else if ACol = StringColumnSerial.Index then
@@ -1941,6 +1946,22 @@ begin
 
   else if ACol = StringColumnProcedure.Index then
     Value := D.ProcedureName;
+end;
+
+procedure TFormDeviceSelect.GridDevicesCellClick(const Column: TColumn;
+  const Row: Integer);
+var
+  SelectedDevice: TDevice;
+begin
+  if Column <> CheckColumnDeviceEnable then
+    Exit;
+
+  SelectedDevice := GetSelectedDevice;
+  if SelectedDevice = nil then
+    Exit;
+
+  SelectedDevice.Enabled := not SelectedDevice.Enabled;
+  UpdateGridDevices;
 end;
 
 procedure TFormDeviceSelect.GridDevicesHeaderClick(Column: TColumn);
