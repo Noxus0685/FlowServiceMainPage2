@@ -2,6 +2,8 @@ unit frmChannelProperties;
 
 interface
 
+{$CODEPAGE UTF8}
+
 uses
   FMX.ComboEdit,
   FMX.Controls,
@@ -186,7 +188,7 @@ begin
   HeaderProperty := TLabel.Create(Self);
   HeaderProperty.Parent := HeaderGrid;
   HeaderProperty.Align := TAlignLayout.Client;
-  HeaderProperty.Text := 'Ñâîéñòâî';
+  HeaderProperty.Text := 'Свойство';
   HeaderProperty.StyledSettings := [];
   HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
@@ -209,7 +211,7 @@ begin
   LabelChannelHash.TextSettings.VertAlign := TTextAlign.Center;
   AddPropertyRow(CategoryGeneral, 'HASH ', LabelChannelHash);
 
-  HeaderValue.Text := 'Çíà÷åíèå';
+  HeaderValue.Text := 'Значение';
   HeaderValue.StyledSettings := [];
   HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderValue.TextSettings.FontColor := $FF3D3D3D;
@@ -232,29 +234,29 @@ begin
   TreeInspector.HitTest := True;
   TreeInspector.Stored := False;
 
-  CategoryFreqPulse := AddCategory('×àñòîòíî-èìïóëüñíûé ñèãíàë');
-  AddPropertyRow(CategoryFreqPulse, 'Òèï âûõîäà ïðèáîðà', CreateComboBox(['Àâòî', 'Ïàññèâíûé (+Namur)', 'Àêòèâíûé', 'Óíèâåðñàëüíûé', 'Åìêîñòíîé']));
-  AddPropertyRow(CategoryFreqPulse, 'Ñèíõðîíèçàöèÿ', CreateComboBox(['Âûêë', 'Ïî ôðîíòó', 'Ïî ôðîíòó + âðåìÿ']));
-  AddPropertyRow(CategoryFreqPulse, 'Ôèëüòð ïîìåõ', CreateComboBox(['Âûêë', 'Àâòî', '10 ìñ', '50 ìñ', '100 ìñ']));
-  AddPropertyRow(CategoryFreqPulse, 'Óñðåäíåíèå', CreateComboBox(['Âûêë', 'Àâòî', '2 ñåê', '4 ñåê']));
-  AddPropertyRow(CategoryFreqPulse, 'Òåêóùàÿ ÷àñòîòà, Ãö', TLabel.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'Òåêóùàÿ äëèòåëüíîñòü èìïóëüñà', TLabel.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'Êâàäðàòè÷íîå îòêëîíåíèå, %', TLabel.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'Äåâèàöèÿ, Ãö', TLabel.Create(Self));
+  CategoryFreqPulse := AddCategory('Частотно-импульсный сигнал');
+  AddPropertyRow(CategoryFreqPulse, 'Тип выхода прибора', CreateComboBox(['Авто', 'Пассивный (+Namur)', 'Активный', 'Универсальный', 'Емкостной']));
+  AddPropertyRow(CategoryFreqPulse, 'Синхронизация', CreateComboBox(['Выкл', 'По фронту', 'По фронту + время']));
+  AddPropertyRow(CategoryFreqPulse, 'Фильтр помех', CreateComboBox(['Выкл', 'Авто', '10 мс', '50 мс', '100 мс']));
+  AddPropertyRow(CategoryFreqPulse, 'Усреднение', CreateComboBox(['Выкл', 'Авто', '2 сек', '4 сек']));
+  AddPropertyRow(CategoryFreqPulse, 'Текущая частота, Гц', TLabel.Create(Self));
+  AddPropertyRow(CategoryFreqPulse, 'Текущая длительность импульса', TLabel.Create(Self));
+  AddPropertyRow(CategoryFreqPulse, 'Квадратичное отклонение, %', TLabel.Create(Self));
+  AddPropertyRow(CategoryFreqPulse, 'Девиация, Гц', TLabel.Create(Self));
 
-  CategoryAnalogCurrent := AddCategory('Àíàëîãîâûé ñèãíàë (òîê)');
-  AddPropertyRow(CategoryAnalogCurrent, 'Òèï âûõîäà ïðèáîðà', CreateComboBox(['0..20ìÀ', '4..20ìÀ', '-20ìÀ..20ìÀ']));
-  AddPropertyRow(CategoryAnalogCurrent, 'Óñðåäíåíèå', CreateComboBox(['Âûêë', '2 ñåê', '4 ñåê']));
-  AddPropertyRow(CategoryAnalogCurrent, 'Òåêóùèé òîê', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogCurrent, 'Êâàäðàòè÷íîå îòêëîíåíèå, %', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogCurrent, 'Äåâèàöèÿ, ìÀ', TLabel.Create(Self));
+  CategoryAnalogCurrent := AddCategory('Аналоговый сигнал (ток)');
+  AddPropertyRow(CategoryAnalogCurrent, 'Тип выхода прибора', CreateComboBox(['0..20мА', '4..20мА', '-20мА..20мА']));
+  AddPropertyRow(CategoryAnalogCurrent, 'Усреднение', CreateComboBox(['Выкл', '2 сек', '4 сек']));
+  AddPropertyRow(CategoryAnalogCurrent, 'Текущий ток', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogCurrent, 'Квадратичное отклонение, %', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogCurrent, 'Девиация, мА', TLabel.Create(Self));
 
-  CategoryAnalogVoltage := AddCategory('Àíàëîãîâûé ñèãíàë (íàïðÿæåíèå)');
-  AddPropertyRow(CategoryAnalogVoltage, 'Òèï âûõîäà ïðèáîðà', CreateComboBox(['0..10Â', '1..10Â', '-10Â..10Â']));
-  AddPropertyRow(CategoryAnalogVoltage, 'Óñðåäíåíèå', CreateComboBox(['Âûêë', '2 ñåê', '4 ñåê']));
-  AddPropertyRow(CategoryAnalogVoltage, 'Òåêóùèé òîê', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogVoltage, 'Êâàäðàòè÷íîå îòêëîíåíèå, %', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogVoltage, 'Äåâèàöèÿ, Â', TLabel.Create(Self));
+  CategoryAnalogVoltage := AddCategory('Аналоговый сигнал (напряжение)');
+  AddPropertyRow(CategoryAnalogVoltage, 'Тип выхода прибора', CreateComboBox(['0..10В', '1..10В', '-10В..10В']));
+  AddPropertyRow(CategoryAnalogVoltage, 'Усреднение', CreateComboBox(['Выкл', '2 сек', '4 сек']));
+  AddPropertyRow(CategoryAnalogVoltage, 'Текущий ток', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение, %', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
 end;
 
 end.
