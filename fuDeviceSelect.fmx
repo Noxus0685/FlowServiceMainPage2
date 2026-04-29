@@ -44,6 +44,7 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.Height = 610.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
+      MultiSelect = True
       OnChange = TreeViewDevicesChange
       Viewport.Width = 229.000000000000000000
       Viewport.Height = 606.000000000000000000
@@ -116,6 +117,7 @@ object FormDeviceSelect: TFormDeviceSelect
         CanFocus = True
         ClipChildren = True
         Margins.Left = 2.000000000000000000
+        PopupMenu = PopupMenu1
         Size.Width = 917.000000000000000000
         Size.Height = 610.000000000000000000
         Size.PlatformDefault = False
@@ -123,8 +125,15 @@ object FormDeviceSelect: TFormDeviceSelect
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
         OnHeaderClick = GridDevicesHeaderClick
         OnGetValue = GridDevicesGetValue
+        OnCellClick = GridDevicesCellClick
         Viewport.Width = 897.000000000000000000
         Viewport.Height = 569.000000000000000000
+        object CheckColumnDeviceEnable: TCheckColumn
+          Header = #1042#1082#1083
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Width = 32.000000000000000000
+          ReadOnly = False
+        end
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103
           HeaderSettings.TextSettings.Trimming = Character
@@ -397,8 +406,8 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 883.000000000000000000
-      Viewport.Height = 102.000000000000000000
+      Viewport.Width = 879.000000000000000000
+      Viewport.Height = 98.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -551,6 +560,18 @@ object FormDeviceSelect: TFormDeviceSelect
       Action = aDeleteType
       ImageIndex = 16
     end
+    object MenuItem4: TMenuItem
+      Action = aDeviceCopy
+      ImageIndex = 5
+    end
+    object MenuItem5: TMenuItem
+      Action = aDevicePaste
+      ImageIndex = 6
+    end
+    object MenuItem6: TMenuItem
+      Action = aDeviceCut
+      ImageIndex = 7
+    end
   end
   object PopupMenu2: TPopupMenu
     Left = 80
@@ -601,17 +622,38 @@ object FormDeviceSelect: TFormDeviceSelect
     object aCreateType: TAction
       Text = #1057#1086#1079#1076#1072#1090#1100'...'
       ImageIndex = 14
+      OnExecute = aCreateTypeExecute
+      OnUpdate = UpdateDeviceActions
       ImageIndex = 14
     end
     object aEditType: TAction
       Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100'...'
       ImageIndex = 15
+      OnExecute = aEditTypeExecute
+      OnUpdate = UpdateDeviceActions
       ImageIndex = 15
     end
     object aDeleteType: TAction
       Text = #1059#1076#1072#1083#1080#1090#1100'...'
       ImageIndex = 16
+      OnExecute = aDeleteTypeExecute
+      OnUpdate = UpdateDeviceActions
       ImageIndex = 16
+    end
+    object aDeviceCopy: TAction
+      Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
+      OnExecute = aDeviceCopyExecute
+      OnUpdate = UpdateDeviceActions
+    end
+    object aDevicePaste: TAction
+      Text = #1042#1089#1090#1072#1074#1080#1090#1100
+      OnExecute = aDevicePasteExecute
+      OnUpdate = UpdateDeviceActions
+    end
+    object aDeviceCut: TAction
+      Text = #1042#1099#1088#1077#1079#1072#1090#1100
+      OnExecute = aDeviceCutExecute
+      OnUpdate = UpdateDeviceActions
     end
   end
   object NetHTTPClient1: TNetHTTPClient
