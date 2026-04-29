@@ -371,6 +371,11 @@
             <DesignClass>TDataModule</DesignClass>
         </DCCReference>
         <DCCReference Include="uWorkTable.pas"/>
+        <DCCReference Include="frmChannelProperties.pas">
+            <Form>FrameChannelProperties</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -33,11 +33,14 @@ type
       AControl: TControl): TLabel;
     function CreateEditCombo(const AItems: array of string): TComboEdit;
     procedure BuildUI;
+    function CreateComboBox(const AItems: array of string): TComboBox;
   public
     constructor Create(AOwner: TComponent); override;
   end;
 
 implementation
+
+{$R *.fmx}
 
 constructor TFrameChannelProperties.Create(AOwner: TComponent);
 begin
@@ -119,6 +122,16 @@ begin
     Result.Items.Add(AItems[I]);
 end;
 
+function TFrameChannelProperties.CreateComboBox(
+  const AItems: array of string): TComboBox;
+var
+  I: Integer;
+begin
+  Result := TComboBox.Create(Self);
+  for I := Low(AItems) to High(AItems) do
+    Result.Items.Add(AItems[I]);
+end;
+
 procedure TFrameChannelProperties.BuildUI;
 var
   CategoryFreqPulse: TTreeViewItem;
@@ -143,7 +156,7 @@ begin
   HeaderProperty := TLabel.Create(Self);
   HeaderProperty.Parent := HeaderGrid;
   HeaderProperty.Align := TAlignLayout.Client;
-  HeaderProperty.Text := 'РЎРІРѕР№СЃС‚РІРѕ';
+  HeaderProperty.Text := 'Свойство';
   HeaderProperty.StyledSettings := [];
   HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
@@ -153,7 +166,7 @@ begin
   HeaderValue := TLabel.Create(Self);
   HeaderValue.Parent := HeaderGrid;
   HeaderValue.Align := TAlignLayout.Client;
-  HeaderValue.Text := 'Р—РЅР°С‡РµРЅРёРµ';
+  HeaderValue.Text := 'Значение';
   HeaderValue.StyledSettings := [];
   HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderValue.TextSettings.FontColor := $FF3D3D3D;
@@ -176,29 +189,29 @@ begin
   TreeInspector.HitTest := True;
   TreeInspector.Stored := False;
 
-  CategoryFreqPulse := AddCategory('Р§Р°СЃС‚РѕС‚РЅРѕ-РёРјРїСѓР»СЊСЃРЅС‹Р№ СЃРёРіРЅР°Р»');
-  AddPropertyRow(CategoryFreqPulse, 'РўРёРї РІС‹С…РѕРґР° РїСЂРёР±РѕСЂР°', CreateEditCombo(['РђРІС‚Рѕ', 'РџР°СЃСЃРёРІРЅС‹Р№ (+Namur)', 'РђРєС‚РёРІРЅС‹Р№', 'РЈРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№', 'Р•РјРєРѕСЃС‚РЅРѕР№']));
-  AddPropertyRow(CategoryFreqPulse, 'РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ', CreateEditCombo(['Р’С‹РєР»', 'РџРѕ С„СЂРѕРЅС‚Сѓ', 'РџРѕ С„СЂРѕРЅС‚Сѓ + РІСЂРµРјСЏ']));
-  AddPropertyRow(CategoryFreqPulse, 'Р¤РёР»СЊС‚СЂ РїРѕРјРµС…', CreateEditCombo(['Р’С‹РєР»', 'РђРІС‚Рѕ', '10 РјСЃ', '50 РјСЃ', '100 РјСЃ']));
-  AddPropertyRow(CategoryFreqPulse, 'РЈСЃСЂРµРґРЅРµРЅРёРµ', CreateEditCombo(['Р’С‹РєР»', 'РђРІС‚Рѕ', '2 СЃРµРє', '4 СЃРµРє']));
-  AddPropertyRow(CategoryFreqPulse, 'РўРµРєСѓС‰Р°СЏ С‡Р°СЃС‚РѕС‚Р°, Р“С†', TEdit.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'РўРµРєСѓС‰Р°СЏ РґР»РёС‚РµР»СЊРЅРѕСЃС‚СЊ РёРјРїСѓР»СЊСЃР°', TEdit.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'РљРІР°РґСЂР°С‚РёС‡РЅРѕРµ РѕС‚РєР»РѕРЅРµРЅРёРµ, %', TEdit.Create(Self));
-  AddPropertyRow(CategoryFreqPulse, 'Р”РµРІРёР°С†РёСЏ, Р“С†', TEdit.Create(Self));
+  CategoryFreqPulse := AddCategory('Частотно-импульсный сигнал');
+  AddPropertyRow(CategoryFreqPulse, 'Тип выхода прибора', CreateComboBox(['Авто', 'Пассивный (+Namur)', 'Активный', 'Универсальный', 'Емкостной']));
+  AddPropertyRow(CategoryFreqPulse, 'Синхронизация', CreateComboBox(['Выкл', 'По фронту', 'По фронту + время']));
+  AddPropertyRow(CategoryFreqPulse, 'Фильтр помех', CreateComboBox(['Выкл', 'Авто', '10 мс', '50 мс', '100 мс']));
+  AddPropertyRow(CategoryFreqPulse, 'Усреднение', CreateComboBox(['Выкл', 'Авто', '2 сек', '4 сек']));
+  AddPropertyRow(CategoryFreqPulse, 'Текущая частота, Гц', TLabel.Create(Self));
+  AddPropertyRow(CategoryFreqPulse, 'Текущая длительность импульса', TLabel.Create(Self));
+  AddPropertyRow(CategoryFreqPulse, 'Квадратичное отклонение, %', TLabel.Create(Self));
+  AddPropertyRow(CategoryFreqPulse, 'Девиация, Гц', TLabel.Create(Self));
 
-  CategoryAnalogCurrent := AddCategory('РђРЅР°Р»РѕРіРѕРІС‹Р№ СЃРёРіРЅР°Р» (С‚РѕРє)');
-  AddPropertyRow(CategoryAnalogCurrent, 'РўРёРї РІС‹С…РѕРґР° РїСЂРёР±РѕСЂР°', CreateEditCombo(['0..20РјРђ', '4..20РјРђ', '-20РјРђ..20РјРђ']));
-  AddPropertyRow(CategoryAnalogCurrent, 'РЈСЃСЂРµРґРЅРµРЅРёРµ', CreateEditCombo(['Р’С‹РєР»', '2 СЃРµРє', '4 СЃРµРє']));
-  AddPropertyRow(CategoryAnalogCurrent, 'РўРµРєСѓС‰РёР№ С‚РѕРє', TEdit.Create(Self));
-  AddPropertyRow(CategoryAnalogCurrent, 'РљРІР°РґСЂР°С‚РёС‡РЅРѕРµ РѕС‚РєР»РѕРЅРµРЅРёРµ, %', TEdit.Create(Self));
-  AddPropertyRow(CategoryAnalogCurrent, 'Р”РµРІРёР°С†РёСЏ, РјРђ', TEdit.Create(Self));
+  CategoryAnalogCurrent := AddCategory('Аналоговый сигнал (ток)');
+  AddPropertyRow(CategoryAnalogCurrent, 'Тип выхода прибора', CreateComboBox(['0..20мА', '4..20мА', '-20мА..20мА']));
+  AddPropertyRow(CategoryAnalogCurrent, 'Усреднение', CreateComboBox(['Выкл', '2 сек', '4 сек']));
+  AddPropertyRow(CategoryAnalogCurrent, 'Текущий ток', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogCurrent, 'Квадратичное отклонение, %', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogCurrent, 'Девиация, мА', TLabel.Create(Self));
 
-  CategoryAnalogVoltage := AddCategory('РђРЅР°Р»РѕРіРѕРІС‹Р№ СЃРёРіРЅР°Р» (РЅР°РїСЂСЏР¶РµРЅРёРµ)');
-  AddPropertyRow(CategoryAnalogVoltage, 'РўРёРї РІС‹С…РѕРґР° РїСЂРёР±РѕСЂР°', CreateEditCombo(['0..10Р’', '1..10Р’', '-10Р’..10Р’']));
-  AddPropertyRow(CategoryAnalogVoltage, 'РЈСЃСЂРµРґРЅРµРЅРёРµ', CreateEditCombo(['Р’С‹РєР»', '2 СЃРµРє', '4 СЃРµРє']));
-  AddPropertyRow(CategoryAnalogVoltage, 'РўРµРєСѓС‰РёР№ С‚РѕРє', TEdit.Create(Self));
-  AddPropertyRow(CategoryAnalogVoltage, 'РљРІР°РґСЂР°С‚РёС‡РЅРѕРµ РѕС‚РєР»РѕРЅРµРЅРёРµ, %', TEdit.Create(Self));
-  AddPropertyRow(CategoryAnalogVoltage, 'Р”РµРІРёР°С†РёСЏ, Р’', TEdit.Create(Self));
+  CategoryAnalogVoltage := AddCategory('Аналоговый сигнал (напряжение)');
+  AddPropertyRow(CategoryAnalogVoltage, 'Тип выхода прибора', CreateComboBox(['0..10В', '1..10В', '-10В..10В']));
+  AddPropertyRow(CategoryAnalogVoltage, 'Усреднение', CreateComboBox(['Выкл', '2 сек', '4 сек']));
+  AddPropertyRow(CategoryAnalogVoltage, 'Текущий ток', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение, %', TLabel.Create(Self));
+  AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
 end;
 
 end.
