@@ -1037,7 +1037,7 @@ end;
 
 procedure   TManagerTTableDM.CloseAll;
 begin
-  FDms.Clear;         // освобождает все TTableDM
+         // освобождает все TTableDM
   //FRepositories.Clear;
 end;
 
@@ -1169,9 +1169,8 @@ end;
 
 destructor  TManagerTTableDM.Destroy;
 begin
-  CloseAll;
-  FDms.Free;
-    FreeAndNil(FCopiedTypes);
+  FDms.Clear;
+  FreeAndNil(FCopiedTypes);
   FreeAndNil(FCategories);
   FreeAndNil(FDeviceRepositories);
   FreeAndNil(FTypeRepositories);
