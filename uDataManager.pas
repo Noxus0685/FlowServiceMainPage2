@@ -260,13 +260,15 @@ begin
   while Cur <> nil do
   begin
     case Cur.Tag of
-      1: AType.Manufacturer := Cur.TagString;
-      2:
+      Ord(tnManufacturer):
+        AType.Manufacturer := Cur.TagString;
+      Ord(tnCategory):
         begin
           AType.Category := StrToIntDef(Cur.TagString, 0);
           AType.CategoryName := Cur.Text;
         end;
-      3: AType.Modification := Cur.TagString;
+      Ord(tnModification):
+        AType.Modification := Cur.TagString;
     end;
     Cur := Cur.ParentItem;
   end;
