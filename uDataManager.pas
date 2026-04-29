@@ -40,7 +40,9 @@ type
 
     FCategories: TObjectList<TDeviceCategory>;
     FCopiedTypes: TObjectList<TDeviceType>;
+    FCopiedDevices: TObjectList<TDevice>;
     FBufferTypesBusy: Boolean;
+    FBufferDevicesBusy: Boolean;
 
     //Загрузка нужного репозитария  (rkType, rkDevice, rkResults);
 
@@ -54,6 +56,8 @@ type
     function NormalizeRepositoryDbFileName(AKind: TRepositoryKind; const ADbFile: string): string;
     function GetBufferTypes: TList<TDeviceType>;
     procedure SetBufferTypes(const ATypes: TList<TDeviceType>);
+    function GetBufferDevices: TList<TDevice>;
+    procedure SetBufferDevices(const ADevices: TList<TDevice>);
 
   public
 
@@ -78,6 +82,8 @@ type
   property DeviceRepositories: TObjectList<TDeviceRepository> read FDeviceRepositories;
   // Буфер копирования типов. Чтение возвращает новые клоны из внутреннего буфера.
   property BufferTypes: TList<TDeviceType> read GetBufferTypes write SetBufferTypes;
+  // Буфер копирования приборов. Чтение возвращает ссылки только для просмотра.
+  property BufferDevices: TList<TDevice> read GetBufferDevices write SetBufferDevices;
 
   procedure AddRepository(const AName: string; AKind: TRepositoryKind; const ADbFile: string);
   procedure RemoveRepository(const AName: string);
@@ -104,6 +110,16 @@ type
   procedure CutTypesToBuffer(const ATypes: TList<TDeviceType>);
   // Проверка наличия данных в буфере типов.
   function HasBufferTypes: Boolean;
+  // Копирование списка приборов во внутренний буфер через Clone.
+  procedure CopyDevicesToBuffer(const ADevices: TList<TDevice>);
+  // Вставка приборов из буфера в активный репозиторий с созданием новых экземпляров.
+  function PasteBufferDevices: TObjectList<TDevice>;
+  // Вырезание приборов: копирование в буфер и удаление из активного репозитория.
+  procedure CutDevicesToBuffer(const ADevices: TList<TDevice>);
+  // Проверка наличия данных в буфере приборов.
+  function HasBufferDevices: Boolean;
+  // Назначение полей прибора по выбранной ветке дерева.
+  procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
   procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
 
@@ -146,6 +162,7 @@ begin
   FDeviceRepositories := TObjectList<TDeviceRepository>.Create(False);
   FActiveDeviceRepo := nil;
   FCopiedTypes := TObjectList<TDeviceType>.Create(True);
+  FCopiedDevices := TObjectList<TDevice>.Create(True);
 
   {--------------------------------------------------}
   { Репозитории результатов }
@@ -164,6 +181,7 @@ end;
 destructor TManagerTTableDM.Destroy;
 begin
   FreeAndNil(FCopiedTypes);
+  FreeAndNil(FCopiedDevices);
   FreeAndNil(FCategories);
   FreeAndNil(FDeviceRepositories);
   FreeAndNil(FTypeRepositories);
@@ -261,6 +279,112 @@ end;
 function TManagerTTableDM.HasBufferTypes: Boolean;
 begin
   Result := (FCopiedTypes <> nil) and (FCopiedTypes.Count > 0);
+end;
+
+procedure TManagerTTableDM.SetBufferDevices(const ADevices: TList<TDevice>);
+var
+  I: Integer;
+  CopiedDevice: TDevice;
+begin
+  // Логика буфера устройств: формируем полный снимок каждого прибора через Clone.
+  if FBufferDevicesBusy then
+    Exit;
+  FBufferDevicesBusy := True;
+  try
+    FCopiedDevices.Clear;
+    if ADevices = nil then
+      Exit;
+
+    for I := 0 to ADevices.Count - 1 do
+    begin
+      if ADevices[I] = nil then
+        Continue;
+
+      CopiedDevice := ADevices[I].Clone;
+      FCopiedDevices.Add(CopiedDevice);
+    end;
+  finally
+    FBufferDevicesBusy := False;
+  end;
+end;
+
+function TManagerTTableDM.GetBufferDevices: TList<TDevice>;
+begin
+  // Возвращаем ссылки на буфер только для просмотра содержимого буфера.
+  Result := FCopiedDevices;
+end;
+
+procedure TManagerTTableDM.CopyDevicesToBuffer(const ADevices: TList<TDevice>);
+begin
+  // Бизнес-логика Copy для приборов через менеджер данных.
+  SetBufferDevices(ADevices);
+end;
+
+function TManagerTTableDM.PasteBufferDevices: TObjectList<TDevice>;
+var
+  SourceDevice: TDevice;
+  NewDevice: TDevice;
+begin
+  // Бизнес-логика Paste: создаём новые экземпляры приборов через репозиторий.
+  Result := TObjectList<TDevice>.Create(False);
+  if (ActiveDeviceRepo = nil) or (FCopiedDevices.Count = 0) then
+    Exit;
+
+  for SourceDevice in FCopiedDevices do
+  begin
+    if SourceDevice = nil then
+      Continue;
+    NewDevice := ActiveDeviceRepo.CreateDevice(SourceDevice);
+    Result.Add(NewDevice);
+  end;
+end;
+
+procedure TManagerTTableDM.CutDevicesToBuffer(const ADevices: TList<TDevice>);
+var
+  Device: TDevice;
+begin
+  // Бизнес-логика Cut: сначала копирование в буфер, затем удаление исходных строк.
+  SetBufferDevices(ADevices);
+  if ActiveDeviceRepo = nil then
+    Exit;
+  for Device in ADevices do
+    if Device <> nil then
+      ActiveDeviceRepo.DeleteDevice(Device);
+end;
+
+function TManagerTTableDM.HasBufferDevices: Boolean;
+begin
+  // Проверка наличия данных в буфере устройств.
+  Result := (FCopiedDevices <> nil) and (FCopiedDevices.Count > 0);
+end;
+
+procedure TManagerTTableDM.AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
+var
+  Cur: TTreeViewItem;
+begin
+  // Логика замены полей прибора по выбранной ветке дерева.
+  if (ADevice = nil) or (ANode = nil) then
+    Exit;
+
+  Cur := ANode;
+  while Cur <> nil do
+  begin
+    case Cur.Tag of
+      Ord(tnManufacturer):
+        ADevice.Manufacturer := Cur.TagString;
+      Ord(tnCategory):
+        begin
+          ADevice.Category := StrToIntDef(Cur.TagString, 0);
+          if Cur.Text <> '<категория>' then
+            ADevice.CategoryName := Cur.Text;
+        end;
+      Ord(tnModification):
+        ADevice.Modification := Cur.TagString;
+      Ord(tnOwner):
+        ADevice.Owner := Cur.TagString;
+    end;
+    Cur := Cur.ParentItem;
+  end;
 end;
 
 procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
