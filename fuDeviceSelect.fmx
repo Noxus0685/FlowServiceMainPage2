@@ -116,7 +116,6 @@ object FormDeviceSelect: TFormDeviceSelect
         CanFocus = True
         ClipChildren = True
         Margins.Left = 2.000000000000000000
-        PopupMenu = PopupMenu1
         Size.Width = 917.000000000000000000
         Size.Height = 610.000000000000000000
         Size.PlatformDefault = False
@@ -603,22 +602,16 @@ object FormDeviceSelect: TFormDeviceSelect
       Text = #1057#1086#1079#1076#1072#1090#1100'...'
       ImageIndex = 14
       ImageIndex = 14
-      OnExecute = aCreateTypeExecute
-      OnUpdate = UpdateDeviceActions
     end
     object aEditType: TAction
       Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100'...'
       ImageIndex = 15
       ImageIndex = 15
-      OnExecute = aEditTypeExecute
-      OnUpdate = UpdateDeviceActions
     end
     object aDeleteType: TAction
       Text = #1059#1076#1072#1083#1080#1090#1100'...'
       ImageIndex = 16
       ImageIndex = 16
-      OnExecute = aDeleteTypeExecute
-      OnUpdate = UpdateDeviceActions
     end
   end
   object NetHTTPClient1: TNetHTTPClient
