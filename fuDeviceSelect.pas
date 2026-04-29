@@ -132,9 +132,9 @@ type
     StringColumnDateOfManufacture: TStringColumn;
     miAddTestData: TMenuItem;
     miLoad: TMenuItem;
-    aTypeCopy: TAction;
-    aTypePaste: TAction;
-    aTypeCut: TAction;
+    aDevicePaste: TAction;
+    aDeviceCut: TAction;
+    aDeviceCopy: TAction;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -161,9 +161,9 @@ type
     procedure aCreateTypeExecute(Sender: TObject);
     procedure aEditTypeExecute(Sender: TObject);
     procedure aDeleteTypeExecute(Sender: TObject);
-    procedure aTypeCopyExecute(Sender: TObject);
-    procedure aTypePasteExecute(Sender: TObject);
-    procedure aTypeCutExecute(Sender: TObject);
+    procedure aDeviceCopyExecute(Sender: TObject);
+    procedure aDevicePasteExecute(Sender: TObject);
+    procedure aDeviceCutExecute(Sender: TObject);
     procedure UpdateDeviceActions(Sender: TObject);
 
 private
@@ -762,7 +762,7 @@ begin
   CornerButtonEditDeviceClick(Sender);
 end;
 
-procedure TFormDeviceSelect.aTypeCopyExecute(Sender: TObject);
+procedure TFormDeviceSelect.aDeviceCopyExecute(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
 begin
@@ -774,7 +774,7 @@ begin
   end;
 end;
 
-procedure TFormDeviceSelect.aTypeCutExecute(Sender: TObject);
+procedure TFormDeviceSelect.aDeviceCutExecute(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
 begin
@@ -788,7 +788,7 @@ begin
   UpdateGridDevices;
 end;
 
-procedure TFormDeviceSelect.aTypePasteExecute(Sender: TObject);
+procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
   NewRows: TObjectList<TDevice>;
   I: Integer;
@@ -829,9 +829,9 @@ begin
   aCreateType.Enabled := HasRepo;
   aEditType.Enabled := HasSelectedRow;
   aDeleteType.Enabled := HasSelectedRow;
-  aTypeCopy.Enabled := HasRows;
-  aTypeCut.Enabled := HasRepo and HasRows;
-  aTypePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferDevices;
+  aDeviceCopy.Enabled := HasRows;
+  aDeviceCut.Enabled := HasRepo and HasRows;
+  aDevicePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferDevices;
 end;
 
 function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;

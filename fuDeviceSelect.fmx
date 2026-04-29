@@ -44,6 +44,7 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.Height = 610.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
+      MultiSelect = True
       OnChange = TreeViewDevicesChange
       Viewport.Width = 229.000000000000000000
       Viewport.Height = 606.000000000000000000
@@ -398,8 +399,8 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 883.000000000000000000
-      Viewport.Height = 102.000000000000000000
+      Viewport.Width = 879.000000000000000000
+      Viewport.Height = 98.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -553,15 +554,15 @@ object FormDeviceSelect: TFormDeviceSelect
       ImageIndex = 16
     end
     object MenuItem4: TMenuItem
-      Action = aTypeCopy
+      Action = aDeviceCopy
       ImageIndex = 5
     end
     object MenuItem5: TMenuItem
-      Action = aTypePaste
+      Action = aDevicePaste
       ImageIndex = 6
     end
     object MenuItem6: TMenuItem
-      Action = aTypeCut
+      Action = aDeviceCut
       ImageIndex = 7
     end
   end
@@ -614,37 +615,37 @@ object FormDeviceSelect: TFormDeviceSelect
     object aCreateType: TAction
       Text = #1057#1086#1079#1076#1072#1090#1100'...'
       ImageIndex = 14
-      ImageIndex = 14
       OnExecute = aCreateTypeExecute
       OnUpdate = UpdateDeviceActions
+      ImageIndex = 14
     end
     object aEditType: TAction
       Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100'...'
       ImageIndex = 15
-      ImageIndex = 15
       OnExecute = aEditTypeExecute
       OnUpdate = UpdateDeviceActions
+      ImageIndex = 15
     end
     object aDeleteType: TAction
       Text = #1059#1076#1072#1083#1080#1090#1100'...'
       ImageIndex = 16
-      ImageIndex = 16
       OnExecute = aDeleteTypeExecute
       OnUpdate = UpdateDeviceActions
+      ImageIndex = 16
     end
-    object aTypeCopy: TAction
+    object aDeviceCopy: TAction
       Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100
-      OnExecute = aTypeCopyExecute
+      OnExecute = aDeviceCopyExecute
       OnUpdate = UpdateDeviceActions
     end
-    object aTypePaste: TAction
+    object aDevicePaste: TAction
       Text = #1042#1089#1090#1072#1074#1080#1090#1100
-      OnExecute = aTypePasteExecute
+      OnExecute = aDevicePasteExecute
       OnUpdate = UpdateDeviceActions
     end
-    object aTypeCut: TAction
+    object aDeviceCut: TAction
       Text = #1042#1099#1088#1077#1079#1072#1090#1100
-      OnExecute = aTypeCutExecute
+      OnExecute = aDeviceCutExecute
       OnUpdate = UpdateDeviceActions
     end
   end

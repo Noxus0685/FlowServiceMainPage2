@@ -178,17 +178,7 @@ begin
   // когда это действительно необходимо
 end;
 
-destructor TManagerTTableDM.Destroy;
-begin
-  FreeAndNil(FCopiedTypes);
-  FreeAndNil(FCopiedDevices);
-  FreeAndNil(FCategories);
-  FreeAndNil(FDeviceRepositories);
-  FreeAndNil(FTypeRepositories);
-  FreeAndNil(FRepositories);
-  FreeAndNil(FDms);
-  inherited;
-end;
+
 
 procedure TManagerTTableDM.SetBufferTypes(const ATypes: TList<TDeviceType>);
 var
@@ -273,7 +263,7 @@ begin
     Exit;
   for DeviceType in ATypes do
     if DeviceType <> nil then
-      ActiveTypeRepo.RemoveType(DeviceType);
+      ActiveTypeRepo.DeleteType(DeviceType);
 end;
 
 function TManagerTTableDM.HasBufferTypes: Boolean;
