@@ -160,16 +160,6 @@ begin
   // когда это действительно необходимо
 end;
 
-destructor TManagerTTableDM.Destroy;
-begin
-  FreeAndNil(FCopiedTypes);
-  FreeAndNil(FCategories);
-  FreeAndNil(FDeviceRepositories);
-  FreeAndNil(FTypeRepositories);
-  FreeAndNil(FRepositories);
-  FreeAndNil(FDms);
-  inherited;
-end;
 
 procedure TManagerTTableDM.SetBufferTypes(const ATypes: TList<TDeviceType>);
 var
@@ -238,7 +228,7 @@ begin
     Exit;
   for DeviceType in ATypes do
     if DeviceType <> nil then
-      ActiveTypeRepo.RemoveType(DeviceType);
+      ActiveTypeRepo.DeleteType(DeviceType);
 end;
 
 function TManagerTTableDM.HasBufferTypes: Boolean;
@@ -1037,6 +1027,12 @@ destructor  TManagerTTableDM.Destroy;
 begin
   CloseAll;
   FDms.Free;
+    FreeAndNil(FCopiedTypes);
+  FreeAndNil(FCategories);
+  FreeAndNil(FDeviceRepositories);
+  FreeAndNil(FTypeRepositories);
+  FreeAndNil(FRepositories);
+  FreeAndNil(FDms);
 //  FRepositories.Free;        // Надо разобраться почему тут возикает ошибка и устранить её
   inherited;
 end;
