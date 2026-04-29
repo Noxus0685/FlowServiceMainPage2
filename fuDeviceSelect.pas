@@ -152,6 +152,10 @@ type
     procedure miAddTestDataClick(Sender: TObject);
     procedure miLoadClick(Sender: TObject);
     procedure SpeedButtonFindInternetClick(Sender: TObject);
+    procedure aCreateTypeExecute(Sender: TObject);
+    procedure aEditTypeExecute(Sender: TObject);
+    procedure aDeleteTypeExecute(Sender: TObject);
+    procedure UpdateDeviceActions(Sender: TObject);
 
 private
 
@@ -731,6 +735,39 @@ begin
 
   if (GridDevices.Row < 0) and (GridDevices.RowCount > 0) then
     GridDevices.Row := GridDevices.RowCount - 1;
+end;
+
+procedure TFormDeviceSelect.aCreateTypeExecute(Sender: TObject);
+begin
+  ButtonDeviceAddClick(Sender);
+end;
+
+procedure TFormDeviceSelect.aDeleteTypeExecute(Sender: TObject);
+begin
+  ButtonDeviceDeleteClick(Sender);
+end;
+
+procedure TFormDeviceSelect.aEditTypeExecute(Sender: TObject);
+begin
+  CornerButtonEditDeviceClick(Sender);
+end;
+
+procedure TFormDeviceSelect.UpdateDeviceActions(Sender: TObject);
+var
+  HasRepo: Boolean;
+  HasRows: Boolean;
+  HasSelectedRow: Boolean;
+begin
+  HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
+  HasRows := (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0);
+  HasSelectedRow :=
+    HasRows and
+    (GridDevices.Row >= 0) and
+    (GridDevices.Row < FDevFilteredDevices.Count);
+
+  aCreateType.Enabled := HasRepo;
+  aEditType.Enabled := HasSelectedRow;
+  aDeleteType.Enabled := HasSelectedRow;
 end;
 
 procedure TFormDeviceSelect.ButtonDeviceClearClick(Sender: TObject);
