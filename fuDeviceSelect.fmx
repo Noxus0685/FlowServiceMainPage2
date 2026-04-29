@@ -123,8 +123,15 @@ object FormDeviceSelect: TFormDeviceSelect
         Options = [ColumnResize, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
         OnHeaderClick = GridDevicesHeaderClick
         OnGetValue = GridDevicesGetValue
+        OnCellClick = GridDevicesCellClick
         Viewport.Width = 897.000000000000000000
         Viewport.Height = 569.000000000000000000
+        object CheckColumnDeviceEnable: TCheckColumn
+          Header = #1042#1082#1083
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Width = 32.000000000000000000
+          ReadOnly = False
+        end
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103
           HeaderSettings.TextSettings.Trimming = Character
