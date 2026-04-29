@@ -117,6 +117,9 @@ type
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
     MenuItem3: TMenuItem;
+    MenuItem4: TMenuItem;
+    MenuItem5: TMenuItem;
+    MenuItem6: TMenuItem;
     PopupMenu2: TPopupMenu;
     mpExpandAll: TMenuItem;
     mpCollapseAll: TMenuItem;
@@ -130,6 +133,9 @@ type
     StringColumnDateOfManufacture: TStringColumn;
     miAddTestData: TMenuItem;
     miLoad: TMenuItem;
+    aDevicePaste: TAction;
+    aDeviceCut: TAction;
+    aDeviceCopy: TAction;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -154,6 +160,13 @@ type
     procedure miAddTestDataClick(Sender: TObject);
     procedure miLoadClick(Sender: TObject);
     procedure SpeedButtonFindInternetClick(Sender: TObject);
+    procedure aCreateTypeExecute(Sender: TObject);
+    procedure aEditTypeExecute(Sender: TObject);
+    procedure aDeleteTypeExecute(Sender: TObject);
+    procedure aDeviceCopyExecute(Sender: TObject);
+    procedure aDevicePasteExecute(Sender: TObject);
+    procedure aDeviceCutExecute(Sender: TObject);
+    procedure UpdateDeviceActions(Sender: TObject);
 
 private
 
@@ -210,6 +223,7 @@ private
   procedure FillComboBoxRepository;              // список репозиториев приборов
   function UpdateConnection: Boolean;             // смена активного репозитория
   procedure ClearTreeAndGrid;                     // очистка UI при смене репозитория
+  function GetSelectedDevices: TObjectList<TDevice>;
 
 public
   { Public declarations }
@@ -733,6 +747,114 @@ begin
 
   if (GridDevices.Row < 0) and (GridDevices.RowCount > 0) then
     GridDevices.Row := GridDevices.RowCount - 1;
+end;
+
+procedure TFormDeviceSelect.aCreateTypeExecute(Sender: TObject);
+begin
+  ButtonDeviceAddClick(Sender);
+end;
+
+procedure TFormDeviceSelect.aDeleteTypeExecute(Sender: TObject);
+begin
+  ButtonDeviceDeleteClick(Sender);
+end;
+
+procedure TFormDeviceSelect.aEditTypeExecute(Sender: TObject);
+begin
+  CornerButtonEditDeviceClick(Sender);
+end;
+
+procedure TFormDeviceSelect.aDeviceCopyExecute(Sender: TObject);
+var
+  TargetDevices: TObjectList<TDevice>;
+begin
+  TargetDevices := GetSelectedDevices;
+  try
+    AppServices.DataManager.CopyDevicesToBuffer(TargetDevices);
+  finally
+    TargetDevices.Free;
+  end;
+end;
+
+procedure TFormDeviceSelect.aDeviceCutExecute(Sender: TObject);
+var
+  TargetDevices: TObjectList<TDevice>;
+begin
+  TargetDevices := GetSelectedDevices;
+  try
+    AppServices.DataManager.CutDevicesToBuffer(TargetDevices);
+  finally
+    TargetDevices.Free;
+  end;
+  ApplyFilter;
+  UpdateGridDevices;
+end;
+
+procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
+var
+  NewRows: TObjectList<TDevice>;
+  I: Integer;
+begin
+  if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferDevices) then
+    Exit;
+
+  NewRows := AppServices.DataManager.PasteBufferDevices;
+  try
+    ApplyFilter;
+    UpdateGridDevices;
+
+    if (FDevFilteredDevices <> nil) and (NewRows.Count > 0) then
+      for I := 0 to FDevFilteredDevices.Count - 1 do
+        if FDevFilteredDevices[I] = NewRows[0] then
+        begin
+          GridDevices.Row := I;
+          Break;
+        end;
+  finally
+    NewRows.Free;
+  end;
+end;
+
+procedure TFormDeviceSelect.UpdateDeviceActions(Sender: TObject);
+var
+  HasRepo: Boolean;
+  HasRows: Boolean;
+  HasSelectedRow: Boolean;
+begin
+  HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
+  HasRows := (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0);
+  HasSelectedRow :=
+    HasRows and
+    (GridDevices.Row >= 0) and
+    (GridDevices.Row < FDevFilteredDevices.Count);
+
+  aCreateType.Enabled := HasRepo;
+  aEditType.Enabled := HasSelectedRow;
+  aDeleteType.Enabled := HasSelectedRow;
+  aDeviceCopy.Enabled := HasRows;
+  aDeviceCut.Enabled := HasRepo and HasRows;
+  aDevicePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferDevices;
+end;
+
+function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;
+var
+  SelectedDevice: TDevice;
+  I: Integer;
+begin
+  Result := TObjectList<TDevice>.Create(False);
+
+  SelectedDevice := GetSelectedDevice;
+  if SelectedDevice <> nil then
+  begin
+    Result.Add(SelectedDevice);
+    Exit;
+  end;
+
+  if FDevFilteredDevices = nil then
+    Exit;
+
+  for I := 0 to FDevFilteredDevices.Count - 1 do
+    Result.Add(FDevFilteredDevices[I]);
 end;
 
 procedure TFormDeviceSelect.ButtonDeviceClearClick(Sender: TObject);

@@ -53,9 +53,9 @@ type
 
   TFormTypeSelect = class(TForm)
     ActionList1: TActionList;
-    aCreateType: TAction;
-    aEditType: TAction;
-    aDeleteType: TAction;
+    actTypeAdd: TAction;
+    actTypeEdit: TAction;
+    actTypeDelete: TAction;
     LayoutLeft: TLayout;
     TreeViewTypes: TTreeView;
     TreeViewItem1: TTreeViewItem;
@@ -125,9 +125,14 @@ type
     miCopy: TMenuItem;
     miPaste: TMenuItem;
     miCut: TMenuItem;
-    TypeCopy: TAction;
-    TypePaste: TAction;
-    TypeCut: TAction;
+    actTypeCopy: TAction;
+    actTypePaste: TAction;
+    actTypeCut: TAction;
+    actTypeClear: TAction;
+    actTypeSelect: TAction;
+    actFilterFind: TAction;
+    actFilterClear: TAction;
+    actTypeFindInternet: TAction;
     Action3: TAction;
     StringColumnUUID: TStringColumn;
     procedure FormCreate(Sender: TObject);
@@ -140,16 +145,14 @@ type
       Shift: TShiftState; X, Y: Single);
     procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
-    procedure sbClearClick(Sender: TObject);
-    procedure sbFindClick(Sender: TObject);
     procedure GridTypesHeaderClick(Column: TColumn);
     procedure GridTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
-    procedure CornerButtonEditTypeClick(Sender: TObject);
-    procedure ButtonTypeClearClick(Sender: TObject);
-    procedure ButtonTypeDeleteClick(Sender: TObject);
-    procedure ButtonTypeAddClick(Sender: TObject);
-    procedure SpeedButtonFindInternetClick(Sender: TObject);
+    procedure actTypeEditExecute(Sender: TObject);
+    procedure actTypeClearExecute(Sender: TObject);
+    procedure actTypeDeleteExecute(Sender: TObject);
+    procedure actTypeAddExecute(Sender: TObject);
+    procedure actTypeFindInternetExecute(Sender: TObject);
     procedure miDeleteRepositoryClick(Sender: TObject);
     procedure miAddRepositoryClick(Sender: TObject);
     procedure ComboBoxRepositoryChange(Sender: TObject);
@@ -159,8 +162,13 @@ type
     procedure miSaveClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure miLoadRepositoryClick(Sender: TObject);
-    procedure CornerButtonSelectTypeClick(Sender: TObject);
-    procedure TypeCopyExecute(Sender: TObject);
+    procedure actTypeSelectExecute(Sender: TObject);
+    procedure actTypeCopyExecute(Sender: TObject);
+    procedure actTypePasteExecute(Sender: TObject);
+    procedure actTypeCutExecute(Sender: TObject);
+    procedure actFilterFindExecute(Sender: TObject);
+    procedure actFilterClearExecute(Sender: TObject);
+    procedure UpdateTypeActions(Sender: TObject);
     procedure GridTypesCellClick(const Column: TColumn; const Row: Integer);
 
   private
@@ -183,6 +191,7 @@ type
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
+    FCheckedTypes: TList<TDeviceType>;
 
     procedure LoadData;
     procedure BuildTree;
@@ -210,8 +219,13 @@ type
 
      function UpdateConnection: Boolean;
      procedure ClearTreeAndGrid;
-     procedure ClearGridSelection;
-     function IsValidGridRow(const ARow: Integer): Boolean;
+    procedure ClearGridSelection;
+    function IsValidGridRow(const ARow: Integer): Boolean;
+    function CurrentGridType: TDeviceType;
+    procedure ClearCheckedTypes;
+    function GetCheckedTypes: TObjectList<TDeviceType>;
+    function GetSelectedTypes: TObjectList<TDeviceType>;
+    function GetActiveTreeNode: TTreeViewItem;
 
   public
     { Public declarations }
@@ -502,9 +516,135 @@ begin
   end;
 end;
 
-procedure TFormTypeSelect.TypeCopyExecute(Sender: TObject);
+procedure TFormTypeSelect.actTypeCopyExecute(Sender: TObject);
+var
+  TargetTypes: TObjectList<TDeviceType>;
 begin
-     //Здесь копирование Типа в DataManager TypeBufer
+  TargetTypes := GetSelectedTypes;
+  try
+    // UI вызывает бизнес-логику копирования через менеджер данных.
+    AppServices.DataManager.CopyTypesToBuffer(TargetTypes);
+  finally
+    TargetTypes.Free;
+  end;
+end;
+
+procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
+var
+  NewType: TDeviceType;
+  I: Integer;
+  SelectedNode: TTreeViewItem;
+  NewRows: TObjectList<TDeviceType>;
+begin
+  if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferTypes) then
+    Exit;
+
+  SelectedNode := GetActiveTreeNode;
+  // Создание новых типов выполняется в DataManager.
+  NewRows := AppServices.DataManager.PasteBufferTypes;
+  try
+    for I := 0 to NewRows.Count - 1 do
+    begin
+      NewType := NewRows[I];
+      if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
+        AppServices.DataManager.AssignTypeTreeFields(NewType, SelectedNode);
+    end;
+
+    ApplyFilter;
+    UpdateGridTypes;
+
+    if (FDevFilteredTypes <> nil) and (NewRows.Count > 0) then
+      for I := 0 to FDevFilteredTypes.Count - 1 do
+        if FDevFilteredTypes[I] = NewRows[0] then
+        begin
+          GridTypes.Row := I;
+          GridTypes.Selected := I;
+          SelectedType := FDevFilteredTypes[I];
+          Break;
+        end;
+  finally
+    NewRows.Free;
+  end;
+end;
+
+function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
+var
+  BestDepth: Integer;
+  procedure CheckCandidate(const ACandidate: TTreeViewItem);
+  var
+    CurDepth: Integer;
+    Parent: TTreeViewItem;
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ACandidate = nil then
+      Exit;
+
+    if ACandidate.IsSelected then
+    begin
+      CurDepth := 0;
+      Parent := ACandidate.ParentItem;
+      while Parent <> nil do
+      begin
+        Inc(CurDepth);
+        Parent := Parent.ParentItem;
+      end;
+
+      // При множественном выборе берём самую глубокую выбранную ветку
+      // (подветка имеет приоритет над верхней веткой).
+      if CurDepth >= BestDepth then
+      begin
+        BestDepth := CurDepth;
+        Result := ACandidate;
+      end;
+    end;
+
+    // ВАЖНО: обходим все подпункты дерева, а не только первый уровень.
+    for J := 0 to ACandidate.Count - 1 do
+      if ACandidate.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ACandidate.ItemByIndex(J));
+        CheckCandidate(ChildNode);
+      end;
+  end;
+var
+  I: Integer;
+  CurDepth: Integer;
+  Parent: TTreeViewItem;
+begin
+  Result := TreeViewTypes.Selected;
+  BestDepth := -1;
+
+  if Result <> nil then
+  begin
+    CurDepth := 0;
+    Parent := Result.ParentItem;
+    while Parent <> nil do
+    begin
+      Inc(CurDepth);
+      Parent := Parent.ParentItem;
+    end;
+    BestDepth := CurDepth;
+  end;
+
+  // Запускаем полный обход дерева от корневых узлов.
+  for I := 0 to TreeViewTypes.Count - 1 do
+    CheckCandidate(TreeViewTypes.ItemByIndex(I));
+end;
+
+procedure TFormTypeSelect.actTypeCutExecute(Sender: TObject);
+var
+  TargetTypes: TObjectList<TDeviceType>;
+begin
+  // UI вызывает бизнес-логику Cut через менеджер данных.
+  TargetTypes := GetSelectedTypes;
+  try
+    AppServices.DataManager.CutTypesToBuffer(TargetTypes);
+  finally
+    TargetTypes.Free;
+  end;
+  ApplyFilter;
+  UpdateGridTypes;
 end;
 
 procedure TFormTypeSelect.ApplyFilter;
@@ -559,7 +699,7 @@ FDevFilteredByDate :=
 
 end;
 
-procedure TFormTypeSelect.ButtonTypeAddClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeAddExecute(Sender: TObject);
 var
   NewType: TDeviceType;
   SelRow: Integer;
@@ -610,34 +750,11 @@ begin
 end;
 
 procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType);
-var
-  Cur: TTreeViewItem;
 begin
-  if AType = nil then
-    Exit;
-
-  Cur := TreeViewTypes.Selected;
-  while Cur <> nil do
-  begin
-    case Cur.Tag of
-      Ord(tnManufacturer):
-        AType.Manufacturer := Cur.TagString;
-
-      Ord(tnCategory):
-        begin
-          AType.Category := StrToIntDef(Cur.TagString, 0);
-          AType.CategoryName := Cur.Text;
-        end;
-
-      Ord(tnModification):
-        AType.Modification := Cur.TagString;
-    end;
-
-    Cur := Cur.ParentItem;
-  end;
+  AppServices.DataManager.AssignTypeTreeFields(AType, TreeViewTypes.Selected);
 end;
 
- procedure TFormTypeSelect.ButtonTypeClearClick(Sender: TObject);
+ procedure TFormTypeSelect.actTypeClearExecute(Sender: TObject);
 var
   I: Integer;
   T: TDeviceType;
@@ -674,7 +791,8 @@ begin
   //FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
   BuildTree;
   ApplyFilter;
-    UpdateGridTypes;
+  UpdateGridTypes;
+  ClearCheckedTypes;
   {----------------------------------}
   { Сброс выделения }
   {----------------------------------}
@@ -682,54 +800,62 @@ begin
 end;
 
 
-procedure TFormTypeSelect.ButtonTypeDeleteClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeDeleteExecute(Sender: TObject);
 var
-  SelRow: Integer;
+  I: Integer;
   SelType: TDeviceType;
+  TargetTypes: TObjectList<TDeviceType>;
 begin
   if (FDevFilteredTypes = nil) or (FDevFilteredTypes.Count = 0) then
     Exit;
 
-  SelRow := GridTypes.Row;
-  if (SelRow < 0) or (SelRow >= FDevFilteredTypes.Count) then
-    Exit;
-
-  { Явно подсвечиваем строку для удаления }
-  GridTypes.Row := SelRow;
-
-  SelType := FDevFilteredTypes[SelRow];
-  if SelType = nil then
-    Exit;
-
-  if not FSkipTypeDeleteConfirm then
-  begin
-    if MessageDlg(
-         'Удалить выбранный тип безвозвратно?',
-         TMsgDlgType.mtWarning,
-         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-         0
-       ) <> mrYes then
+  TargetTypes := GetSelectedTypes;
+  try
+    if TargetTypes.Count = 0 then
       Exit;
 
-    FSkipTypeDeleteConfirm := True;
-  end;
+    if not FSkipTypeDeleteConfirm then
+    begin
+      if TargetTypes.Count = 1 then
+      begin
+        if MessageDlg(
+             'Удалить выбранный тип безвозвратно?',
+             TMsgDlgType.mtWarning,
+             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+             0
+           ) <> mrYes then
+          Exit;
+      end
+      else
+      begin
+        if MessageDlg(
+             'Удалить выбранные типы безвозвратно?',
+             TMsgDlgType.mtWarning,
+             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+             0
+           ) <> mrYes then
+          Exit;
+      end;
 
-  {----------------------------------}
-  { Удаление через репозиторий }
-  {----------------------------------}
+    end;
 
+    for I := TargetTypes.Count - 1 downto 0 do
+    begin
+      SelType := TargetTypes[I];
+      if SelType <> nil then
+        ActiveRepo.DeleteType(SelType);
+    end;
 
-  ActiveRepo.DeleteType(SelType);
+    FreeAndNil(FDevFilteredByTree);
+    FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
 
-  {----------------------------------}
-  { Пересборка фильтров }
-  {----------------------------------}
-  FreeAndNil(FDevFilteredByTree);
-  FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
-
-  ApplyFilter;
+    ApplyFilter;
     UpdateGridTypes;
-  ClearGridSelection;
+    ClearCheckedTypes;
+    ClearGridSelection;
+  finally
+    TargetTypes.Free;
+  end;
 end;
 
 procedure TFormTypeSelect.DateEditFilterChange(Sender: TObject);
@@ -831,6 +957,7 @@ begin
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
    FClearTreeSelectionOnClick := False;
+   FCheckedTypes := TList<TDeviceType>.Create;
    TreeViewTypes.MultiSelect := True;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
    GridTypes.OnMouseDown := GridTypesMouseDown;
@@ -848,6 +975,7 @@ end;
 
 destructor TFormTypeSelect.Destroy;
 begin
+  FreeAndNil(FCheckedTypes);
   inherited;
 end;
 
@@ -895,8 +1023,12 @@ begin
 
   if Column = CheckColumnTypeEnable then
   begin
-    SelectedType.Enable := not SelectedType.Enable;
+    if FCheckedTypes.IndexOf(SelectedType) >= 0 then
+      FCheckedTypes.Remove(SelectedType)
+    else
+      FCheckedTypes.Add(SelectedType);
     UpdateGridTypes;
+    Exit;
   end;
 end;
 
@@ -928,7 +1060,7 @@ begin
   { Значения колонок }
   {----------------------------------}
   if ACol = CheckColumnTypeEnable.Index then
-    Value := T.Enable
+    Value := FCheckedTypes.IndexOf(T) >= 0
 
   else if ACol = StringColumnName.Index then
     Value := T.Name
@@ -1034,6 +1166,9 @@ begin
   if (Col < 0) or (Col >= GridTypes.ColumnCount) then
     Exit;
 
+  if GridTypes.Columns[Col] = CheckColumnTypeEnable then
+    Exit;
+
   GridTypes.Row := Row;
   GridTypes.Selected := Row;
   SelectedType := FDevFilteredTypes[Row];
@@ -1041,25 +1176,27 @@ end;
 
 
 
-procedure TFormTypeSelect.sbClearClick(Sender: TObject);
+procedure TFormTypeSelect.actFilterClearExecute(Sender: TObject);
 begin
   // 1. очистка фильтров ввода
   EditFindType.Text := '';
   DateEditFilter.IsEmpty := True;
 
   // 2. пересчёт фильтров
+  ClearCheckedTypes;
   ApplyFilter;
-    UpdateGridTypes;
-    // фильтров больше нет
+  UpdateGridTypes;
+  // фильтров больше нет
   sbFind.IsPressed := False;
 end;
 
-procedure TFormTypeSelect.sbFindClick(Sender: TObject);
+procedure TFormTypeSelect.actFilterFindExecute(Sender: TObject);
 begin
    // 2. пересчёт фильтров   обновление таблицы
   //FilterTypesByTreeNode(TreeViewTypes.Selected);
+  ClearCheckedTypes;
   ApplyFilter;
-    UpdateGridTypes;
+  UpdateGridTypes;
 end;
 
 procedure TFormTypeSelect.TreeViewTypesClick(Sender: TObject);
@@ -1099,6 +1236,7 @@ begin
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
 
+  ClearCheckedTypes;
   ApplyFilter;
   UpdateGridTypes;
 
@@ -1219,7 +1357,14 @@ begin
 end;
 
 procedure TFormTypeSelect.UpdateGridTypes;
+var
+  I: Integer;
 begin
+  if FCheckedTypes <> nil then
+    for I := FCheckedTypes.Count - 1 downto 0 do
+      if (FDevFilteredTypes = nil) or (FDevFilteredTypes.IndexOf(FCheckedTypes[I]) < 0) then
+        FCheckedTypes.Delete(I);
+
   GridTypes.BeginUpdate;
   try
     if FDevFilteredTypes <> nil then
@@ -1238,7 +1383,6 @@ begin
   else
     SelectedType := nil;
 
-  GridTypes.Invalidate;
   GridTypes.Repaint;
 
   sbFind.IsPressed := HasActiveFilters;
@@ -1257,6 +1401,99 @@ begin
     (FDevFilteredTypes <> nil) and
     (ARow >= 0) and
     (ARow < FDevFilteredTypes.Count);
+end;
+
+function TFormTypeSelect.CurrentGridType: TDeviceType;
+var
+  Row: Integer;
+begin
+  Row := GridTypes.Selected;
+  if Row < 0 then
+    Row := GridTypes.Row;
+
+  if IsValidGridRow(Row) then
+    Result := FDevFilteredTypes[Row]
+  else
+    Result := nil;
+end;
+
+procedure TFormTypeSelect.ClearCheckedTypes;
+begin
+  if FCheckedTypes <> nil then
+    FCheckedTypes.Clear;
+end;
+
+function TFormTypeSelect.GetCheckedTypes: TObjectList<TDeviceType>;
+var
+  I: Integer;
+  AType: TDeviceType;
+begin
+  Result := TObjectList<TDeviceType>.Create(False);
+  if (FCheckedTypes = nil) or (FDevFilteredTypes = nil) then
+    Exit;
+
+  for I := 0 to FCheckedTypes.Count - 1 do
+  begin
+    AType := FCheckedTypes[I];
+    if (AType <> nil) and (FDevFilteredTypes.IndexOf(AType) >= 0) then
+      Result.Add(AType);
+  end;
+end;
+
+function TFormTypeSelect.GetSelectedTypes: TObjectList<TDeviceType>;
+var
+  I: Integer;
+  CheckedTypes: TObjectList<TDeviceType>;
+  AType: TDeviceType;
+begin
+  Result := TObjectList<TDeviceType>.Create(False);
+
+  CheckedTypes := GetCheckedTypes;
+  try
+    if CheckedTypes.Count > 0 then
+    begin
+      for I := 0 to CheckedTypes.Count - 1 do
+        Result.Add(CheckedTypes[I]);
+      Exit;
+    end;
+  finally
+    CheckedTypes.Free;
+  end;
+
+  AType := CurrentGridType;
+  if AType <> nil then
+  begin
+    Result.Add(AType);
+    Exit;
+  end;
+
+  if FDevFilteredTypes = nil then
+    Exit;
+
+  for I := 0 to FDevFilteredTypes.Count - 1 do
+    Result.Add(FDevFilteredTypes[I]);
+end;
+
+procedure TFormTypeSelect.UpdateTypeActions(Sender: TObject);
+var
+  HasRepo: Boolean;
+  HasRows: Boolean;
+begin
+  HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
+  HasRows := (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0);
+
+  actTypeAdd.Enabled := HasRepo;
+  actTypeEdit.Enabled := HasRows;
+  actTypeSelect.Enabled := HasRows;
+  actTypeDelete.Enabled := HasRepo and HasRows;
+  actTypeCopy.Enabled := HasRows;
+  actTypeCut.Enabled := HasRepo and HasRows;
+  actTypePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferTypes;
+  actTypeClear.Enabled := HasRepo and HasRows;
+
+  actFilterFind.Enabled := HasRepo;
+  actFilterClear.Enabled := HasRepo and HasActiveFilters;
+  actTypeFindInternet.Enabled := HasRepo and (Trim(EditFindType.Text) <> '');
 end;
 
 function TFormTypeSelect.HasActiveFilters: Boolean;
@@ -1621,7 +1858,7 @@ begin
     UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.SpeedButtonFindInternetClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeFindInternetExecute(Sender: TObject);
 var
   Resp: IHTTPResponse;
   Url: string;
@@ -1796,58 +2033,45 @@ if MessageDlg(
   end;
 end;
 
-procedure TFormTypeSelect.CornerButtonSelectTypeClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeSelectExecute(Sender: TObject);
 var
-  Row: Integer;
+  TargetTypes: TObjectList<TDeviceType>;
 begin
-  {----------------------------------}
-  { Проверка выбора }
-  {----------------------------------}
-  Row := GridTypes.Selected;
-  if Row < 0 then
-    Row := GridTypes.Row;
+  TargetTypes := GetSelectedTypes;
+  try
+    if TargetTypes.Count = 0 then
+    begin
+      ShowMessage('Выберите тип');
+      Exit;
+    end;
 
-  if (Row < 0) then
-  begin
-    ShowMessage('Выберите тип');
-    Exit;
+    SelectedType := TargetTypes[0];
+    if SelectedType = nil then
+      Exit;
+
+    ModalResult := mrOk;
+  finally
+    TargetTypes.Free;
   end;
-
-  if (FDevFilteredTypes = nil) or (Row >= FDevFilteredTypes.Count) then
-    Exit;
-
-  SelectedType := FDevFilteredTypes[Row];
-  if SelectedType = nil then
-    Exit;
-
-  {----------------------------------}
-  { Подтверждаем выбор }
-  {----------------------------------}
-  ModalResult := mrOk;
 end;
 
-procedure TFormTypeSelect.CornerButtonEditTypeClick(Sender: TObject);
+procedure TFormTypeSelect.actTypeEditExecute(Sender: TObject);
 var
-  Row: Integer;
+  TargetTypes: TObjectList<TDeviceType>;
   AType: TDeviceType;
 begin
-  {----------------------------------}
-  { Проверка выбора }
-  {----------------------------------}
-  Row := GridTypes.Row;
-  if (Row < 0) then
-  begin
-    ShowMessage('Выберите тип для редактирования');
-    Exit;
+  TargetTypes := GetSelectedTypes;
+  try
+    if TargetTypes.Count = 0 then
+    begin
+      ShowMessage('Выберите тип для редактирования');
+      Exit;
+    end;
+    AType := TargetTypes[0];
+  finally
+    TargetTypes.Free;
   end;
 
-  if (FDevFilteredTypes = nil) or (Row >= FDevFilteredTypes.Count) then
-    Exit;
-
-  {----------------------------------}
-  { Получаем ТИП как объект }
-  {----------------------------------}
-  AType := FDevFilteredTypes[Row];
   if AType = nil then
     Exit;
 

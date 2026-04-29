@@ -5,6 +5,7 @@ interface
 
 
 uses
+  FMX.TreeView,
   FireDAC.Comp.Client,
   FireDAC.Stan.Intf,
   FireDAC.Stan.Option,
@@ -38,6 +39,10 @@ type
     FActiveDeviceRepo:  TDeviceRepository;
 
     FCategories: TObjectList<TDeviceCategory>;
+    FCopiedTypes: TObjectList<TDeviceType>;
+    FCopiedDevices: TObjectList<TDevice>;
+    FBufferTypesBusy: Boolean;
+    FBufferDevicesBusy: Boolean;
 
     //Загрузка нужного репозитария  (rkType, rkDevice, rkResults);
 
@@ -49,6 +54,10 @@ type
     function CreateDeviceRepository(const AName: string; ADM: TTableDM): TDeviceRepository;
     function MakeUniqueRepositoryName(const ABaseName: string): string;
     function NormalizeRepositoryDbFileName(AKind: TRepositoryKind; const ADbFile: string): string;
+    function GetBufferTypes: TList<TDeviceType>;
+    procedure SetBufferTypes(const ATypes: TList<TDeviceType>);
+    function GetBufferDevices: TList<TDevice>;
+    procedure SetBufferDevices(const ADevices: TList<TDevice>);
 
   public
 
@@ -71,6 +80,10 @@ type
 
   property ActiveDeviceRepo: TDeviceRepository read FActiveDeviceRepo write FActiveDeviceRepo;
   property DeviceRepositories: TObjectList<TDeviceRepository> read FDeviceRepositories;
+  // Буфер копирования типов. Чтение возвращает новые клоны из внутреннего буфера.
+  property BufferTypes: TList<TDeviceType> read GetBufferTypes write SetBufferTypes;
+  // Буфер копирования приборов. Чтение возвращает ссылки только для просмотра.
+  property BufferDevices: TList<TDevice> read GetBufferDevices write SetBufferDevices;
 
   procedure AddRepository(const AName: string; AKind: TRepositoryKind; const ADbFile: string);
   procedure RemoveRepository(const AName: string);
@@ -89,6 +102,26 @@ type
   function FindDevice(const AUUID: string; out ARepo: TDeviceRepository): TDevice;
   function FindTypeRepositoryByName(const AName: string): TTypeRepository;
   function FindDeviceRepositoryByName(const AName: string): TDeviceRepository;
+  // Копирование списка типов во внутренний буфер через Clone.
+  procedure CopyTypesToBuffer(const ATypes: TList<TDeviceType>);
+  // Вставка типов из буфера в активный репозиторий с созданием новых экземпляров.
+  function PasteBufferTypes: TObjectList<TDeviceType>;
+  // Вырезание: копирование в буфер и удаление из активного репозитория.
+  procedure CutTypesToBuffer(const ATypes: TList<TDeviceType>);
+  // Проверка наличия данных в буфере типов.
+  function HasBufferTypes: Boolean;
+  // Копирование списка приборов во внутренний буфер через Clone.
+  procedure CopyDevicesToBuffer(const ADevices: TList<TDevice>);
+  // Вставка приборов из буфера в активный репозиторий с созданием новых экземпляров.
+  function PasteBufferDevices: TObjectList<TDevice>;
+  // Вырезание приборов: копирование в буфер и удаление из активного репозитория.
+  procedure CutDevicesToBuffer(const ADevices: TList<TDevice>);
+  // Проверка наличия данных в буфере приборов.
+  function HasBufferDevices: Boolean;
+  // Назначение полей прибора по выбранной ветке дерева.
+  procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
+  // Назначение полей типа по выбранной ветке дерева.
+  procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
 
   end;
 
@@ -128,6 +161,8 @@ begin
   {--------------------------------------------------}
   FDeviceRepositories := TObjectList<TDeviceRepository>.Create(False);
   FActiveDeviceRepo := nil;
+  FCopiedTypes := TObjectList<TDeviceType>.Create(True);
+  FCopiedDevices := TObjectList<TDevice>.Create(True);
 
   {--------------------------------------------------}
   { Репозитории результатов }
@@ -142,6 +177,234 @@ begin
   // BuildRepositories(...) вызываются снаружи,
   // когда это действительно необходимо
 end;
+
+
+
+procedure TManagerTTableDM.SetBufferTypes(const ATypes: TList<TDeviceType>);
+var
+  I: Integer;
+  CopiedType: TDeviceType;
+begin
+  // Защита от повторного входа, чтобы исключить рекурсивные сценарии и переполнение стека.
+  if FBufferTypesBusy then
+    Exit;
+  FBufferTypesBusy := True;
+  try
+  // Очищаем буфер и формируем полный снимок каждого типа через Clone.
+  FCopiedTypes.Clear;
+  if ATypes = nil then
+    Exit;
+
+  for I := 0 to ATypes.Count - 1 do
+  begin
+    if ATypes[I] = nil then
+      Continue;
+    CopiedType := ATypes[I].Clone;
+    FCopiedTypes.Add(CopiedType);
+  end;
+  finally
+    FBufferTypesBusy := False;
+  end;
+end;
+
+function TManagerTTableDM.GetBufferTypes: TList<TDeviceType>;
+var
+  I: Integer;
+  ClonedTypes: TObjectList<TDeviceType>;
+begin
+  // Защита от повторного входа, чтобы исключить рекурсивные сценарии и переполнение стека.
+  if FBufferTypesBusy then
+    Exit(TObjectList<TDeviceType>.Create(True));
+  FBufferTypesBusy := True;
+  try
+  // При чтении возвращаем новые экземпляры, чтобы не выдавать ссылки на внутренний буфер.
+  ClonedTypes := TObjectList<TDeviceType>.Create(True);
+  for I := 0 to FCopiedTypes.Count - 1 do
+    if FCopiedTypes[I] <> nil then
+      ClonedTypes.Add(FCopiedTypes[I].Clone);
+  Result := ClonedTypes;
+  finally
+    FBufferTypesBusy := False;
+  end;
+end;
+
+procedure TManagerTTableDM.CopyTypesToBuffer(const ATypes: TList<TDeviceType>);
+begin
+  // Бизнес-логика Copy: копируем переданные типы во внутренний буфер.
+  SetBufferTypes(ATypes);
+end;
+
+function TManagerTTableDM.PasteBufferTypes: TObjectList<TDeviceType>;
+var
+  SourceType: TDeviceType;
+  NewType: TDeviceType;
+begin
+  // Бизнес-логика Paste: создаём новые типы в активном репозитории по снимку буфера.
+  Result := TObjectList<TDeviceType>.Create(False);
+  if (ActiveTypeRepo = nil) or (FCopiedTypes.Count = 0) then
+    Exit;
+
+  for SourceType in FCopiedTypes do
+  begin
+    if SourceType = nil then
+      Continue;
+    NewType := ActiveTypeRepo.CreateType(SourceType);
+    Result.Add(NewType);
+  end;
+end;
+
+procedure TManagerTTableDM.CutTypesToBuffer(const ATypes: TList<TDeviceType>);
+var
+  DeviceType: TDeviceType;
+begin
+  // Бизнес-логика Cut: сначала копируем в буфер, затем удаляем исходные типы.
+  SetBufferTypes(ATypes);
+  if ActiveTypeRepo = nil then
+    Exit;
+  for DeviceType in ATypes do
+    if DeviceType <> nil then
+      ActiveTypeRepo.DeleteType(DeviceType);
+end;
+
+function TManagerTTableDM.HasBufferTypes: Boolean;
+begin
+  Result := (FCopiedTypes <> nil) and (FCopiedTypes.Count > 0);
+end;
+
+procedure TManagerTTableDM.SetBufferDevices(const ADevices: TList<TDevice>);
+var
+  I: Integer;
+  CopiedDevice: TDevice;
+begin
+  // Логика буфера устройств: формируем полный снимок каждого прибора через Clone.
+  if FBufferDevicesBusy then
+    Exit;
+  FBufferDevicesBusy := True;
+  try
+    FCopiedDevices.Clear;
+    if ADevices = nil then
+      Exit;
+
+    for I := 0 to ADevices.Count - 1 do
+    begin
+      if ADevices[I] = nil then
+        Continue;
+
+      CopiedDevice := ADevices[I].Clone;
+      FCopiedDevices.Add(CopiedDevice);
+    end;
+  finally
+    FBufferDevicesBusy := False;
+  end;
+end;
+
+function TManagerTTableDM.GetBufferDevices: TList<TDevice>;
+begin
+  // Возвращаем ссылки на буфер только для просмотра содержимого буфера.
+  Result := FCopiedDevices;
+end;
+
+procedure TManagerTTableDM.CopyDevicesToBuffer(const ADevices: TList<TDevice>);
+begin
+  // Бизнес-логика Copy для приборов через менеджер данных.
+  SetBufferDevices(ADevices);
+end;
+
+function TManagerTTableDM.PasteBufferDevices: TObjectList<TDevice>;
+var
+  SourceDevice: TDevice;
+  NewDevice: TDevice;
+begin
+  // Бизнес-логика Paste: создаём новые экземпляры приборов через репозиторий.
+  Result := TObjectList<TDevice>.Create(False);
+  if (ActiveDeviceRepo = nil) or (FCopiedDevices.Count = 0) then
+    Exit;
+
+  for SourceDevice in FCopiedDevices do
+  begin
+    if SourceDevice = nil then
+      Continue;
+    NewDevice := ActiveDeviceRepo.CreateDevice(SourceDevice);
+    Result.Add(NewDevice);
+  end;
+end;
+
+procedure TManagerTTableDM.CutDevicesToBuffer(const ADevices: TList<TDevice>);
+var
+  Device: TDevice;
+begin
+  // Бизнес-логика Cut: сначала копирование в буфер, затем удаление исходных строк.
+  SetBufferDevices(ADevices);
+  if ActiveDeviceRepo = nil then
+    Exit;
+  for Device in ADevices do
+    if Device <> nil then
+      ActiveDeviceRepo.DeleteDevice(Device);
+end;
+
+function TManagerTTableDM.HasBufferDevices: Boolean;
+begin
+  // Проверка наличия данных в буфере устройств.
+  Result := (FCopiedDevices <> nil) and (FCopiedDevices.Count > 0);
+end;
+
+procedure TManagerTTableDM.AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
+var
+  Cur: TTreeViewItem;
+begin
+  // Логика замены полей прибора по выбранной ветке дерева.
+  if (ADevice = nil) or (ANode = nil) then
+    Exit;
+
+  Cur := ANode;
+  while Cur <> nil do
+  begin
+    case Cur.Tag of
+      Ord(tnManufacturer):
+        ADevice.Manufacturer := Cur.TagString;
+      Ord(tnCategory):
+        begin
+          ADevice.Category := StrToIntDef(Cur.TagString, 0);
+          if Cur.Text <> '<категория>' then
+            ADevice.CategoryName := Cur.Text;
+        end;
+      Ord(tnModification):
+        ADevice.Modification := Cur.TagString;
+    end;
+    Cur := Cur.ParentItem;
+  end;
+end;
+
+procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+var
+  Cur: TTreeViewItem;
+begin
+  // Замена полей назначения по выбранной ветке:
+  // Modification -> Modification/Category/Manufacturer,
+  // Category -> Category/Manufacturer, Manufacturer -> только Manufacturer.
+  if (AType = nil) or (ANode = nil) then
+    Exit;
+
+  Cur := ANode;
+  while Cur <> nil do
+  begin
+    case Cur.Tag of
+      Ord(tnManufacturer):
+        AType.Manufacturer := Cur.TagString;
+      Ord(tnCategory):
+        begin
+          AType.Category := StrToIntDef(Cur.TagString, 0);
+          AType.CategoryName := Cur.Text;
+        end;
+      Ord(tnModification):
+        AType.Modification := Cur.TagString;
+    end;
+    Cur := Cur.ParentItem;
+  end;
+end;
+
+
+
 
 
 
@@ -908,6 +1171,12 @@ destructor  TManagerTTableDM.Destroy;
 begin
   CloseAll;
   FDms.Free;
+    FreeAndNil(FCopiedTypes);
+  FreeAndNil(FCategories);
+  FreeAndNil(FDeviceRepositories);
+  FreeAndNil(FTypeRepositories);
+  FreeAndNil(FRepositories);
+  FreeAndNil(FDms);
 //  FRepositories.Free;        // Надо разобраться почему тут возикает ошибка и устранить её
   inherited;
 end;
