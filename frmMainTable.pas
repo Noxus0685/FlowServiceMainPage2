@@ -4099,6 +4099,9 @@ begin
   end;
 
   UpdateFlowMeterPropertiesFrame(Row);
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (Row >= 0) and (Row < WorkTable.DeviceChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
@@ -4199,6 +4202,9 @@ begin
   end;
 
   UpdateFlowMeterPropertiesFrame(Row);
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (Row >= 0) and (Row < WorkTable.DeviceChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -4311,6 +4317,10 @@ procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
   UpdateFlowMeterPropertiesFrame(ARow);
+
+  if (FFrameChannelProperties <> nil) and (FActiveWorkTable <> nil) and
+     (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[ARow]);
 
     if not IsUpdating then
 
@@ -4477,6 +4487,10 @@ begin
   finally
     GridEtalons.EndUpdate;
   end;
+
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[Row]);
 end;
 
 procedure TFrameMainTable.GridEtalonsCellDblClick(const Column: TColumn;
