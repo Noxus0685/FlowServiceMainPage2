@@ -54,7 +54,7 @@ type
     function CreateComboWithIndicator(ACombo: TComboBox; out AIndicator: TCircle): TControl;
     procedure ApplyIndicatorColor(AIndicator: TCircle; const AColor: TAlphaColor);
     procedure RefreshRegisterColors;
-    procedure HandleChannelNameChange(Sender: TObject);
+    procedure HandleChannelNameExit(Sender: TObject);
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
@@ -206,7 +206,7 @@ begin
   ApplyIndicatorColor(IndicatorNoiseFilter, FChannel.GetNoiseFilterStateColor);
 end;
 
-procedure TFrameChannelProperties.HandleChannelNameChange(Sender: TObject);
+procedure TFrameChannelProperties.HandleChannelNameExit(Sender: TObject);
 var
   NewValue: string;
 begin
@@ -362,7 +362,7 @@ begin
   EditChannelName := TEdit.Create(Self);
   AddPropertyRow(CategoryGeneral, 'Имя канала', EditChannelName);
   EditChannelName.KillFocusByReturn:=True;
-  EditChannelName.OnChangeTracking := HandleChannelNameChange;
+  EditChannelName.OnExit := HandleChannelNameExit;
 
   ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
   AddPropertyRow(CategoryGeneral, 'Тип канала', ComboChannelType);
