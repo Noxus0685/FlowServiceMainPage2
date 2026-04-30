@@ -2154,10 +2154,10 @@ begin
   {----------------------------------}
   OpenTypeEditor(AType);
 
-  SelectedType := AType;
+  SelectedType:=AType;
 
-  // Не закрываем форму выбора типов после редактирования.
-  // Обновление UI выполняется внутри OpenTypeEditor при mrOk.
+  ModalResult := mrOk;
+
 end;
 
 
