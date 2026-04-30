@@ -441,7 +441,7 @@ object FormTypeSelect: TFormTypeSelect
       Align = Right
       StyledSettings = [Family, Size, Style]
       ImageIndex = -1
-      ModalResult = 0
+      ModalResult = 1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
