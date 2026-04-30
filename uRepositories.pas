@@ -82,6 +82,7 @@ type
     procedure AssertSchema; virtual; abstract;
 
     function GetDMFileName:string;
+    function CategoryToText(ACategory: Integer; const ACategoryName: string): string;
 
   end;
 
@@ -216,7 +217,6 @@ type
 
     property Categories: TObjectList<TDeviceCategory> read FCategories;
     function DetectCategoryByKeywords(const Text: string): Integer;  //Вспомогательная функция
-    function CategoryToText(ACategory: Integer;const ACategoryName: string): string;  //Вспомогательная функция
 
     function FindTypeByUUID(const AUUID: string): TDeviceType;
     function FindTypeByName(const AName: string): TDeviceType;
@@ -1324,7 +1324,7 @@ begin
   Result := CreateType(Src);
 end;
 
-function TTypeRepository.CategoryToText(
+function TBaseRepository.CategoryToText(
   ACategory: Integer;
   const ACategoryName: string
 ): string;
@@ -1351,11 +1351,10 @@ begin
   // --------------------------------------------------
   // > 0 → ищем в справочнике
   // --------------------------------------------------
-  if FCategories<>nil then
-
-  for C in FCategories do
-    if C.ID = ACategory then
-      Exit(C.Name);
+  if Self is TTypeRepository then
+    for C in TTypeRepository(Self).Categories do
+      if C.ID = ACategory then
+        Exit(C.Name);
 
   // --------------------------------------------------
   // не найдено
