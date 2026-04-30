@@ -288,6 +288,15 @@ begin
   LayoutRoot.Align := TAlignLayout.Client;
   LayoutRoot.Padding.Rect := TRectF.Create(6, 6, 6, 6);
 
+
+  TreeInspector := TTreeView.Create(Self);
+  TreeInspector.Parent := LayoutRoot;
+  TreeInspector.Align := TAlignLayout.Client;
+  TreeInspector.ShowCheckboxes := False;
+  TreeInspector.ItemHeight := 32;
+  TreeInspector.HitTest := True;
+  TreeInspector.Stored := False;
+
   HeaderGrid := TGridPanelLayout.Create(Self);
   HeaderGrid.Parent := LayoutRoot;
   HeaderGrid.Align := TAlignLayout.Top;
@@ -311,13 +320,14 @@ begin
   HeaderValue := TLabel.Create(Self);
   HeaderValue.Parent := HeaderGrid;
   HeaderValue.Align := TAlignLayout.Client;
-  CategoryGeneral := AddCategory('');
+
+  CategoryGeneral := AddCategory('Общий');
   EditChannelName := TEdit.Create(Self);
-  AddPropertyRow(CategoryGeneral, ' ', EditChannelName);
+  AddPropertyRow(CategoryGeneral, 'Имя канала', EditChannelName);
   EditChannelName.OnChangeTracking := HandleChannelNameChange;
 
-  ComboChannelType := CreateComboBox(['', '', '', '', '', '']);
-  AddPropertyRow(CategoryGeneral, ' ', ComboChannelType);
+  ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
+  AddPropertyRow(CategoryGeneral, 'Тип канала', ComboChannelType);
 
   LabelChannelHash := TLabel.Create(Self);
   LabelChannelHash.StyledSettings := [];
@@ -339,14 +349,6 @@ begin
   HeaderDivider.LineType := TLineType.Bottom;
   HeaderDivider.Stroke.Color := $FFCDCDCD;
   HeaderDivider.Stored := False;
-
-  TreeInspector := TTreeView.Create(Self);
-  TreeInspector.Parent := LayoutRoot;
-  TreeInspector.Align := TAlignLayout.Client;
-  TreeInspector.ShowCheckboxes := False;
-  TreeInspector.ItemHeight := 32;
-  TreeInspector.HitTest := True;
-  TreeInspector.Stored := False;
 
   CategoryFreqPulse := AddCategory('Частотно-импульсный сигнал');
   ComboOutputSet := CreateComboBox(['Авто', 'Пассивный', 'Активный', 'Универсальный', 'Емкостной']);
