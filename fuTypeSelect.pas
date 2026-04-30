@@ -532,7 +532,7 @@ end;
 
 procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
-  I, J: Integer;
+  I: Integer;
   SelectedNode: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
   ExpandedPaths: TStringList;
@@ -549,6 +549,45 @@ var
       Cur := Cur.ParentItem;
     end;
   end;
+  procedure CollectExpandedPaths(const ANode: TTreeViewItem);
+  var
+    K: Integer;
+  begin
+    if ANode = nil then
+      Exit;
+    if ANode.IsExpanded then
+      ExpandedPaths.Add(NodePath(ANode));
+    for K := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(K) is TTreeViewItem then
+        CollectExpandedPaths(TTreeViewItem(ANode.ItemByIndex(K)));
+  end;
+  procedure RestoreExpandedPaths(const ANode: TTreeViewItem);
+  var
+    K: Integer;
+  begin
+    if ANode = nil then
+      Exit;
+    if ExpandedPaths.IndexOf(NodePath(ANode)) >= 0 then
+      ANode.IsExpanded := True;
+    for K := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(K) is TTreeViewItem then
+        RestoreExpandedPaths(TTreeViewItem(ANode.ItemByIndex(K)));
+  end;
+  procedure RestoreSelectedNode(const ANode: TTreeViewItem);
+  var
+    K: Integer;
+  begin
+    if (ANode = nil) or (TreeViewTypes.Selected <> nil) then
+      Exit;
+    if NodePath(ANode) = SelectedPath then
+    begin
+      TreeViewTypes.Selected := ANode;
+      Exit;
+    end;
+    for K := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(K) is TTreeViewItem then
+        RestoreSelectedNode(TTreeViewItem(ANode.ItemByIndex(K)));
+  end;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferTypes) then
     Exit;
@@ -562,24 +601,24 @@ begin
   // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
   ExpandedPaths := TStringList.Create;
   try
-    for J := 0 to TreeViewTypes.Count - 1 do
-      if TreeViewTypes.ItemByIndex(J).IsExpanded then
-        ExpandedPaths.Add(NodePath(TreeViewTypes.ItemByIndex(J)));
+    for I := 0 to TreeViewTypes.Count - 1 do
+      if TreeViewTypes.ItemByIndex(I) is TTreeViewItem then
+        CollectExpandedPaths(TTreeViewItem(TreeViewTypes.ItemByIndex(I)));
 
     NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
     BuildTree;
-    for J := 0 to TreeViewTypes.Count - 1 do
-      if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
-        TreeViewTypes.ItemByIndex(J).IsExpanded := True;
+    for I := 0 to TreeViewTypes.Count - 1 do
+      if TreeViewTypes.ItemByIndex(I) is TTreeViewItem then
+        RestoreExpandedPaths(TTreeViewItem(TreeViewTypes.ItemByIndex(I)));
 
     if SelectedPath <> '' then
-      for J := 0 to TreeViewTypes.Count - 1 do
-        if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
-        begin
-          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
-          Break;
-        end;
+    begin
+      TreeViewTypes.Selected := nil;
+      for I := 0 to TreeViewTypes.Count - 1 do
+        if TreeViewTypes.ItemByIndex(I) is TTreeViewItem then
+          RestoreSelectedNode(TTreeViewItem(TreeViewTypes.ItemByIndex(I)));
+    end;
 
     SyncTreeSelectionState(False);
     ApplyFilter;
