@@ -626,16 +626,20 @@ begin
           TreeViewDevices.AddObject(ManNode);
         end;
 
-        {========== КАТЕГОРИИ > 0 И ПОЛЬЗОВАТЕЛЬСКАЯ (-1) =========}
+        {========== КАТЕГОРИЯ =========}
+        CategoryText := GetDeviceCategoryText(D, True);
         if D.Category <> 0 then
         begin
-          CatText := ActiveRepo.CategoryToText(D.Category, D.CategoryName);
-          CatKey  := IntToStr(D.Category);
+          if Trim(CategoryText) <> '' then
+            CatText := CategoryText
+          else
+            CatText := ActiveRepo.CategoryToText(D.Category, D.CategoryName);
+          CatKey := IntToStr(D.Category);
         end
         else
         begin
           CatText := '<категория>';
-          CatKey  := '';
+          CatKey := '';
         end;
 
         CatNode := FindChildInNode(
