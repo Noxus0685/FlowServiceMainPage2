@@ -15,6 +15,7 @@ uses
   FMX.StdCtrls,
   FMX.TreeView,
   FMX.Graphics,
+  System.Generics.Collections,
   FMX.Types,
   System.Classes,
   System.SysUtils,
@@ -29,6 +30,8 @@ type
   private
     LayoutRoot: TLayout;
     HeaderGrid: TGridPanelLayout;
+    HeaderPropertyLayout: TLayout;
+    HeaderSplitter: TSplitter;
     TreeInspector: TTreeView;
     HeaderProperty: TLabel;
     HeaderValue: TLabel;
@@ -44,6 +47,10 @@ type
     LabelChannelHash: TLabel;
     FChannel: TChannel;
     FLoading: Boolean;
+    FPropertyColumnWidth: Single;
+    FPropertyLabels: TObjectList<TControl>;
+    FValueControls: TObjectList<TControl>;
+    FRowSplitters: TObjectList<TSplitter>;
 
     function AddCategory(const ACaption: string): TTreeViewItem;
     function AddPropertyRow(AParent: TTreeViewItem; const ACaption: string;
@@ -58,8 +65,11 @@ type
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
+    procedure HandlePropertySplitterMoved(Sender: TObject);
+    procedure ApplyPropertyColumnWidth;
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure LoadFromChannel(AChannel: TChannel);
   end;
 
@@ -70,7 +80,19 @@ implementation
 constructor TFrameChannelProperties.Create(AOwner: TComponent);
 begin
   inherited;
+  FPropertyColumnWidth := 170;
+  FPropertyLabels := TObjectList<TControl>.Create(False);
+  FValueControls := TObjectList<TControl>.Create(False);
+  FRowSplitters := TObjectList<TSplitter>.Create(False);
   BuildUI;
+end;
+
+destructor TFrameChannelProperties.Destroy;
+begin
+  FRowSplitters.Free;
+  FValueControls.Free;
+  FPropertyLabels.Free;
+  inherited;
 end;
 
 function TFrameChannelProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -91,6 +113,7 @@ var
   Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   Divider: TLine;
+  Splitter: TSplitter;
 begin
   Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
@@ -103,8 +126,9 @@ begin
   RowGrid.Align := TAlignLayout.Client;
   RowGrid.RowCollection.Clear;
   RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 45;
-  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.ColumnCollection.Add.Value := FPropertyColumnWidth;
+  RowGrid.ColumnCollection.Add.Value := 8;
+  RowGrid.ColumnCollection.Add.Value := 100;
   RowGrid.RowCollection.Add.Value := 100;
   RowGrid.Stored := False;
 
@@ -119,6 +143,16 @@ begin
   Result.Margins.Rect := TRectF.Create(26, 0, 8, 0);
   Result.HitTest := False;
   RowGrid.ControlCollection.AddControl(Result, 0, 0);
+  FPropertyLabels.Add(Result);
+
+  Splitter := TSplitter.Create(Self);
+  Splitter.Parent := RowGrid;
+  Splitter.Align := TAlignLayout.Client;
+  Splitter.Width := 8;
+  Splitter.OnMoved := HandlePropertySplitterMoved;
+  Splitter.Stored := False;
+  RowGrid.ControlCollection.AddControl(Splitter, 1, 0);
+  FRowSplitters.Add(Splitter);
 
   AControl.Parent := RowGrid;
   AControl.Align := TAlignLayout.Client;
@@ -126,7 +160,8 @@ begin
   AControl.HitTest := True;
   if AControl is TStyledControl then
     TStyledControl(AControl).TabStop := True;
-  RowGrid.ControlCollection.AddControl(AControl, 1, 0);
+  RowGrid.ControlCollection.AddControl(AControl, 2, 0);
+  FValueControls.Add(AControl);
 
   Divider := TLine.Create(Self);
   Divider.Parent := Item;
@@ -239,6 +274,40 @@ begin
   RefreshRegisterColors;
 end;
 
+procedure TFrameChannelProperties.HandlePropertySplitterMoved(Sender: TObject);
+begin
+  if Sender is TSplitter then
+  begin
+    FPropertyColumnWidth := TSplitter(Sender).Position.X;
+    ApplyPropertyColumnWidth;
+  end;
+end;
+
+procedure TFrameChannelProperties.ApplyPropertyColumnWidth;
+var
+  I: Integer;
+begin
+  if FPropertyColumnWidth < 120 then
+    FPropertyColumnWidth := 120;
+  if FPropertyColumnWidth > 380 then
+    FPropertyColumnWidth := 380;
+
+  if HeaderPropertyLayout <> nil then
+    HeaderPropertyLayout.Width := FPropertyColumnWidth;
+
+  for I := 0 to FPropertyLabels.Count - 1 do
+    if FPropertyLabels[I] <> nil then
+      FPropertyLabels[I].Width := FPropertyColumnWidth;
+
+  for I := 0 to FValueControls.Count - 1 do
+    if FValueControls[I] <> nil then
+      FValueControls[I].Position.X := FPropertyColumnWidth + 8;
+
+  for I := 0 to FRowSplitters.Count - 1 do
+    if FRowSplitters[I] <> nil then
+      FRowSplitters[I].Position.X := FPropertyColumnWidth;
+end;
+
 
 procedure TFrameChannelProperties.LoadFromChannel(AChannel: TChannel);
 var
@@ -294,43 +363,53 @@ begin
   HeaderGrid.Height := 30;
   HeaderGrid.RowCollection.Clear;
   HeaderGrid.ColumnCollection.Clear;
-  HeaderGrid.ColumnCollection.Add.Value := 45;
-  HeaderGrid.ColumnCollection.Add.Value := 55;
+  HeaderGrid.ColumnCollection.Add.Value := 100;
   HeaderGrid.RowCollection.Add.Value := 100;
 
+  HeaderPropertyLayout := TLayout.Create(Self);
+  HeaderPropertyLayout.Parent := HeaderGrid;
+  HeaderPropertyLayout.Align := TAlignLayout.Left;
+  HeaderPropertyLayout.Width := FPropertyColumnWidth;
+  HeaderGrid.ControlCollection.AddControl(HeaderPropertyLayout, 0, 0);
+
   HeaderProperty := TLabel.Create(Self);
-  HeaderProperty.Parent := HeaderGrid;
+  HeaderProperty.Parent := HeaderPropertyLayout;
   HeaderProperty.Align := TAlignLayout.Client;
   HeaderProperty.Text := 'Свойство';
   HeaderProperty.StyledSettings := [];
   HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
   HeaderProperty.Margins.Rect := TRectF.Create(10, 0, 8, 0);
-  HeaderGrid.ControlCollection.AddControl(HeaderProperty, 0, 0);
+  HeaderSplitter := TSplitter.Create(Self);
+  HeaderSplitter.Parent := HeaderGrid;
+  HeaderSplitter.Align := TAlignLayout.Left;
+  HeaderSplitter.Width := 8;
+  HeaderSplitter.OnMoved := HandlePropertySplitterMoved;
+  HeaderGrid.ControlCollection.AddControl(HeaderSplitter, 0, 0);
 
   HeaderValue := TLabel.Create(Self);
   HeaderValue.Parent := HeaderGrid;
   HeaderValue.Align := TAlignLayout.Client;
-  CategoryGeneral := AddCategory('');
-  EditChannelName := TEdit.Create(Self);
-  AddPropertyRow(CategoryGeneral, ' ', EditChannelName);
-  EditChannelName.OnChangeTracking := HandleChannelNameChange;
-
-  ComboChannelType := CreateComboBox(['', '', '', '', '', '']);
-  AddPropertyRow(CategoryGeneral, ' ', ComboChannelType);
-
-  LabelChannelHash := TLabel.Create(Self);
-  LabelChannelHash.StyledSettings := [];
-  LabelChannelHash.TextSettings.HorzAlign := TTextAlign.Leading;
-  LabelChannelHash.TextSettings.VertAlign := TTextAlign.Center;
-  AddPropertyRow(CategoryGeneral, 'HASH ', LabelChannelHash);
-
   HeaderValue.Text := 'Значение';
   HeaderValue.StyledSettings := [];
   HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderValue.TextSettings.FontColor := $FF3D3D3D;
   HeaderValue.Margins.Rect := TRectF.Create(8, 0, 10, 0);
-  HeaderGrid.ControlCollection.AddControl(HeaderValue, 1, 0);
+  HeaderGrid.ControlCollection.AddControl(HeaderValue, 0, 0);
+
+  CategoryGeneral := AddCategory('Общий');
+  EditChannelName := TEdit.Create(Self);
+  AddPropertyRow(CategoryGeneral, 'Имя канала', EditChannelName);
+  EditChannelName.OnChangeTracking := HandleChannelNameChange;
+
+  ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
+  AddPropertyRow(CategoryGeneral, 'Тип канала', ComboChannelType);
+
+  LabelChannelHash := TLabel.Create(Self);
+  LabelChannelHash.StyledSettings := [];
+  LabelChannelHash.TextSettings.HorzAlign := TTextAlign.Leading;
+  LabelChannelHash.TextSettings.VertAlign := TTextAlign.Center;
+  AddPropertyRow(CategoryGeneral, 'HASH канала', LabelChannelHash);
 
   HeaderDivider := TLine.Create(Self);
   HeaderDivider.Parent := LayoutRoot;
@@ -377,6 +456,8 @@ begin
   AddPropertyRow(CategoryAnalogVoltage, 'Текущий ток', TLabel.Create(Self));
   AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение, %', TLabel.Create(Self));
   AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
+
+  ApplyPropertyColumnWidth;
 end;
 
 end.
