@@ -144,17 +144,6 @@ begin
   Result.Margins.Rect := TRectF.Create(26, 0, 8, 0);
   Result.HitTest := False;
   RowGrid.ControlCollection.AddControl(Result, 0, 0);
-  FPropertyLabels.Add(Result);
-
-  Splitter := TSplitter.Create(Self);
-  Splitter.Parent := RowGrid;
-  Splitter.Align := TAlignLayout.Client;
-  Splitter.Width := 8;
-  Splitter.OnMouseUp := HandlePropertySplitterMouseUp;
-  Splitter.Stored := False;
-  RowGrid.ControlCollection.AddControl(Splitter, 1, 0);
-  FRowSplitters.Add(Splitter);
-
   AControl.Parent := RowGrid;
   AControl.Align := TAlignLayout.Client;
   AControl.Margins.Rect := TRectF.Create(6, 3, 10, 3);
@@ -275,42 +264,6 @@ begin
   RefreshRegisterColors;
 end;
 
-procedure TFrameChannelProperties.HandlePropertySplitterMouseUp(Sender: TObject;
-  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
-begin
-  if Sender is TSplitter then
-  begin
-    FPropertyColumnWidth := TSplitter(Sender).Position.X;
-    ApplyPropertyColumnWidth;
-  end;
-end;
-
-procedure TFrameChannelProperties.ApplyPropertyColumnWidth;
-var
-  I: Integer;
-begin
-  if FPropertyColumnWidth < 120 then
-    FPropertyColumnWidth := 120;
-  if FPropertyColumnWidth > 380 then
-    FPropertyColumnWidth := 380;
-
-  if HeaderPropertyLayout <> nil then
-    HeaderPropertyLayout.Width := FPropertyColumnWidth;
-
-  for I := 0 to FPropertyLabels.Count - 1 do
-    if FPropertyLabels[I] <> nil then
-      FPropertyLabels[I].Width := FPropertyColumnWidth;
-
-  for I := 0 to FValueControls.Count - 1 do
-    if FValueControls[I] <> nil then
-      FValueControls[I].Position.X := FPropertyColumnWidth + 8;
-
-  for I := 0 to FRowSplitters.Count - 1 do
-    if FRowSplitters[I] <> nil then
-      FRowSplitters[I].Position.X := FPropertyColumnWidth;
-end;
-
-
 procedure TFrameChannelProperties.LoadFromChannel(AChannel: TChannel);
 var
   SignalName: string;
@@ -397,7 +350,7 @@ begin
   HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderValue.TextSettings.FontColor := $FF3D3D3D;
   HeaderValue.Margins.Rect := TRectF.Create(8, 0, 10, 0);
-  HeaderGrid.ControlCollection.AddControl(HeaderValue, 0, 0);
+  HeaderGrid.ControlCollection.AddControl(HeaderValue, 1, 0);
 
   CategoryGeneral := AddCategory('Общий');
   EditChannelName := TEdit.Create(Self);
@@ -459,7 +412,6 @@ begin
   AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение, %', TLabel.Create(Self));
   AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
 
-  ApplyPropertyColumnWidth;
 end;
 
 end.
