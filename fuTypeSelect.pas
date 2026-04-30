@@ -540,6 +540,19 @@ var
   TargetManKey, TargetCatKey, TargetModKey: string;
   TargetNode: TTreeViewItem;
   HasTargetBranch: Boolean;
+  ExpandedPaths: TStringList;
+  function NodePath(ANode: TTreeViewItem): string;
+  var
+    Cur: TTreeViewItem;
+  begin
+    Result := '';
+    Cur := ANode;
+    while Cur <> nil do
+    begin
+      Result := IntToStr(Cur.Tag) + ':' + Cur.TagString + '|' + Result;
+      Cur := Cur.ParentItem;
+    end;
+  end;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferTypes) then
     Exit;
@@ -576,7 +589,13 @@ begin
     end;
   end;
   // Создание новых типов выполняется в DataManager.
-  NewRows := AppServices.DataManager.PasteBufferTypes;
+  ExpandedPaths := TStringList.Create;
+  try
+    for J := 0 to TreeViewTypes.Count - 1 do
+      if TreeViewTypes.ItemByIndex(J).IsExpanded then
+        ExpandedPaths.Add(NodePath(TreeViewTypes.ItemByIndex(J)));
+
+    NewRows := AppServices.DataManager.PasteBufferTypes;
   try
     for I := 0 to NewRows.Count - 1 do
     begin
@@ -586,6 +605,10 @@ begin
     end;
 
     BuildTree;
+    for J := 0 to TreeViewTypes.Count - 1 do
+      if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
+        TreeViewTypes.ItemByIndex(J).IsExpanded := True;
+
     if HasTargetBranch then
     begin
       TargetNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), TargetManKey);
@@ -616,6 +639,9 @@ begin
         end;
   finally
     NewRows.Free;
+  end;
+  finally
+    ExpandedPaths.Free;
   end;
 end;
 

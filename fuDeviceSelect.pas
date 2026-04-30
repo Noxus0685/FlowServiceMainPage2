@@ -860,6 +860,19 @@ var
   TargetManKey, TargetCatKey, TargetModKey: string;
   TargetNode: TTreeViewItem;
   HasTargetBranch: Boolean;
+  ExpandedPaths: TStringList;
+  function NodePath(ANode: TTreeViewItem): string;
+  var
+    Cur: TTreeViewItem;
+  begin
+    Result := '';
+    Cur := ANode;
+    while Cur <> nil do
+    begin
+      Result := IntToStr(Cur.Tag) + ':' + Cur.TagString + '|' + Result;
+      Cur := Cur.ParentItem;
+    end;
+  end;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferDevices) then
     Exit;
@@ -893,7 +906,13 @@ begin
           end;
         end;
     end;
-  NewRows := AppServices.DataManager.PasteBufferDevices;
+  ExpandedPaths := TStringList.Create;
+  try
+    for J := 0 to TreeViewDevices.Count - 1 do
+      if TreeViewDevices.ItemByIndex(J).IsExpanded then
+        ExpandedPaths.Add(NodePath(TreeViewDevices.ItemByIndex(J)));
+
+    NewRows := AppServices.DataManager.PasteBufferDevices;
   try
     // По аналогии с FormTypeSelect:
     // создаём новый прибор из буфера и, если выбрана ветка назначения,
@@ -906,6 +925,10 @@ begin
     end;
 
     BuildTree;
+    for J := 0 to TreeViewDevices.Count - 1 do
+      if ExpandedPaths.IndexOf(NodePath(TreeViewDevices.ItemByIndex(J))) >= 0 then
+        TreeViewDevices.ItemByIndex(J).IsExpanded := True;
+
     if HasTargetBranch then
     begin
       TargetNode := FindChildInTree(TreeViewDevices, Ord(tnManufacturer), TargetManKey);
@@ -933,6 +956,9 @@ begin
         end;
   finally
     NewRows.Free;
+  end;
+  finally
+    ExpandedPaths.Free;
   end;
 end;
 
