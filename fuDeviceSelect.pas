@@ -637,63 +637,120 @@ begin
           TreeViewDevices.AddObject(ManNode);
         end;
 
-        {========== КАТЕГОРИЯ =========}
-        CategoryText := GetDeviceCategoryText(D, True);
-        if D.Category <> 0 then
+        {========== КАТЕГОРИИ > 0 =========}
+        if D.Category > 0 then
         begin
+          CategoryText := GetDeviceCategoryText(D, True);
           if Trim(CategoryText) <> '' then
             CatText := CategoryText
           else
             CatText := ActiveRepo.CategoryToText(D.Category, D.CategoryName);
           CatKey := IntToStr(D.Category);
-        end
-        else
-        begin
-          CatText := '<категория>';
-          CatKey := '';
+          CatNode := FindChildInNode(
+            ManNode,
+            Ord(tnCategory),
+            CatKey
+          );
+
+          if CatNode = nil then
+          begin
+            CatNode := TTreeViewItem.Create(TreeViewDevices);
+            CatNode.Text := CatText;
+            CatNode.Tag := Ord(tnCategory);
+            CatNode.TagString := CatKey;
+            ManNode.AddObject(CatNode);
+          end;
+
+          {========== МОДИФИКАЦИИ =========}
+          if Trim(D.Modification) <> '' then
+          begin
+            ModText := D.Modification;
+            ModKey  := D.Modification;
+          end
+          else
+          begin
+            ModText := '<модификация>';
+            ModKey  := '';
+          end;
+
+          ModNode := FindChildInNode(
+            CatNode,
+            Ord(tnModification),
+            ModKey
+          );
+
+          if ModNode = nil then
+          begin
+            ModNode := TTreeViewItem.Create(TreeViewDevices);
+            ModNode.Text := ModText;
+            ModNode.Tag := Ord(tnModification);
+            ModNode.TagString := ModKey;
+            CatNode.AddObject(ModNode);
+          end;
         end;
+      end;
+    end;
 
-        CatNode := FindChildInNode(
-          ManNode,
-          Ord(tnCategory),
-          CatKey
-        );
+    {----------------------------------}
+    { Второй проход: Category <= 0 }
+    {----------------------------------}
+    for D in FDevices do
+    begin
+      if D.Category > 0 then
+        Continue;
 
-        if CatNode = nil then
-        begin
-          CatNode := TTreeViewItem.Create(TreeViewDevices);
-          CatNode.Text := CatText;
-          CatNode.Tag := Ord(tnCategory);
-          CatNode.TagString := CatKey;
-          ManNode.AddObject(CatNode);
-        end;
+      ManKey := D.Manufacturer;
+      ManNode := FindChildInTree(
+        TreeViewDevices,
+        Ord(tnManufacturer),
+        ManKey
+      );
 
-        {========== МОДИФИКАЦИИ =========}
-        if Trim(D.Modification) <> '' then
-        begin
-          ModText := D.Modification;
-          ModKey  := D.Modification;
-        end
-        else
-        begin
-          ModText := '<модификация>';
-          ModKey  := '';
-        end;
+      if ManNode = nil then
+        Continue;
 
-        ModNode := FindChildInNode(
-          CatNode,
-          Ord(tnModification),
-          ModKey
-        );
+      CatText := '<категория>';
+      CatKey  := IntToStr(D.Category); // -1 / 0
 
-        if ModNode = nil then
-        begin
-          ModNode := TTreeViewItem.Create(TreeViewDevices);
-          ModNode.Text := ModText;
-          ModNode.Tag := Ord(tnModification);
-          ModNode.TagString := ModKey;
-          CatNode.AddObject(ModNode);
-        end;
+      CatNode := FindChildInNode(
+        ManNode,
+        Ord(tnCategory),
+        CatKey
+      );
+
+      if CatNode = nil then
+      begin
+        CatNode := TTreeViewItem.Create(TreeViewDevices);
+        CatNode.Text := CatText;
+        CatNode.Tag := Ord(tnCategory);
+        CatNode.TagString := CatKey;
+        ManNode.AddObject(CatNode);
+      end;
+
+      if Trim(D.Modification) <> '' then
+      begin
+        ModText := D.Modification;
+        ModKey  := D.Modification;
+      end
+      else
+      begin
+        ModText := '<модификация>';
+        ModKey  := '';
+      end;
+
+      ModNode := FindChildInNode(
+        CatNode,
+        Ord(tnModification),
+        ModKey
+      );
+
+      if ModNode = nil then
+      begin
+        ModNode := TTreeViewItem.Create(TreeViewDevices);
+        ModNode.Text := ModText;
+        ModNode.Tag := Ord(tnModification);
+        ModNode.TagString := ModKey;
+        CatNode.AddObject(ModNode);
       end;
     end;
 
