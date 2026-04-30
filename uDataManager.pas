@@ -349,12 +349,21 @@ begin
 end;
 
 procedure TManagerTTableDM.AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
+const
+  UNDEFINED_CATEGORY_TEXT = '<категория>';
 var
   Cur: TTreeViewItem;
 begin
   // Логика замены полей прибора по выбранной ветке дерева.
   if (ADevice = nil) or (ANode = nil) then
     Exit;
+
+  // Вставка в производителя: CategoryName сохраняется как в источнике.
+  if ANode.Tag = Ord(tnManufacturer) then
+  begin
+    ADevice.Manufacturer := ANode.TagString;
+    Exit;
+  end;
 
   Cur := ANode;
   while Cur <> nil do
@@ -364,27 +373,59 @@ begin
         ADevice.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          // По аналогии с AssignTypeTreeFields:
-          // TagString узла категории содержит ID категории в виде строки.
-          ADevice.Category := StrToIntDef(Cur.TagString, 0);
-          ADevice.CategoryName := Cur.Text;
+          // Для узла "<категория>" обнуляем категорию.
+          if SameText(Trim(Cur.Text), UNDEFINED_CATEGORY_TEXT) then
+          begin
+            ADevice.Category := 0;
+            ADevice.CategoryName := '';
+          end
+          else
+          begin
+            ADevice.Category := StrToIntDef(Cur.TagString, 0);
+            ADevice.CategoryName := Cur.Text;
+          end;
         end;
       Ord(tnModification):
-        ADevice.Modification := Cur.TagString;
+        begin
+          ADevice.Modification := Cur.TagString;
+
+          // Для модификации учитываем категорию-родителя.
+          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) then
+            if SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
+            begin
+              ADevice.Category := 0;
+              ADevice.CategoryName := '';
+            end
+            else
+            begin
+              ADevice.Category := StrToIntDef(Cur.ParentItem.TagString, 0);
+              ADevice.CategoryName := Cur.ParentItem.Text;
+            end;
+        end;
     end;
     Cur := Cur.ParentItem;
   end;
 end;
 
 procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+const
+  UNDEFINED_CATEGORY_TEXT = '<категория>';
 var
   Cur: TTreeViewItem;
 begin
   // Замена полей назначения по выбранной ветке:
-  // Modification -> Modification/Category/Manufacturer,
-  // Category -> Category/Manufacturer, Manufacturer -> только Manufacturer.
+  // Manufacturer -> только Manufacturer,
+  // Category -> Category/Manufacturer,
+  // Modification -> Modification/Category/Manufacturer.
   if (AType = nil) or (ANode = nil) then
     Exit;
+
+  // Вставка в производителя: CategoryName сохраняется как в источнике.
+  if ANode.Tag = Ord(tnManufacturer) then
+  begin
+    AType.Manufacturer := ANode.TagString;
+    Exit;
+  end;
 
   Cur := ANode;
   while Cur <> nil do
@@ -394,11 +435,33 @@ begin
         AType.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          AType.Category := StrToIntDef(Cur.TagString, 0);
-          AType.CategoryName := Cur.Text;
+          if SameText(Trim(Cur.Text), UNDEFINED_CATEGORY_TEXT) then
+          begin
+            AType.Category := 0;
+            AType.CategoryName := '';
+          end
+          else
+          begin
+            AType.Category := StrToIntDef(Cur.TagString, 0);
+            AType.CategoryName := Cur.Text;
+          end;
         end;
       Ord(tnModification):
-        AType.Modification := Cur.TagString;
+        begin
+          AType.Modification := Cur.TagString;
+
+          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) then
+            if SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
+            begin
+              AType.Category := 0;
+              AType.CategoryName := '';
+            end
+            else
+            begin
+              AType.Category := StrToIntDef(Cur.ParentItem.TagString, 0);
+              AType.CategoryName := Cur.ParentItem.Text;
+            end;
+        end;
     end;
     Cur := Cur.ParentItem;
   end;
