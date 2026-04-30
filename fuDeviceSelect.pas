@@ -187,6 +187,7 @@ private
   FSortColumn: Integer;
   FSortAscending: Boolean;
   FSkipDeviceDeleteConfirm: Boolean;
+  FCheckedDevices: TList<TDevice>;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -225,10 +226,13 @@ private
   procedure ClearTreeAndGrid;                     // очистка UI при смене репозитория
   function GetSelectedDevices: TObjectList<TDevice>;
   function GetActiveTreeNode: TTreeViewItem;
+  procedure ClearCheckedDevices;
+  function GetCheckedDevices: TObjectList<TDevice>;
 
 public
   { Public declarations }
   function GetSelectedDevice: TDevice;
+  destructor Destroy; override;
 
   end;
 
@@ -239,6 +243,12 @@ implementation
   uses
    uAppServices;
 {$R *.fmx}
+destructor TFormDeviceSelect.Destroy;
+begin
+  FreeAndNil(FCheckedDevices);
+  inherited;
+end;
+
 function TFormDeviceSelect.GetSelectedDevice: TDevice;
 var
   Row: Integer;
@@ -354,6 +364,7 @@ begin
   BuildTree;
   ApplyFilter;
   UpdateGridDevices;
+  ClearCheckedDevices;
 end;
 
 procedure TFormDeviceSelect.miAddTestDataClick(Sender: TObject);
@@ -918,9 +929,23 @@ end;
 
 function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;
 var
+  I: Integer;
+  CheckedDevices: TObjectList<TDevice>;
   SelectedDevice: TDevice;
 begin
   Result := TObjectList<TDevice>.Create(False);
+
+  CheckedDevices := GetCheckedDevices;
+  try
+    if CheckedDevices.Count > 0 then
+    begin
+      for I := 0 to CheckedDevices.Count - 1 do
+        Result.Add(CheckedDevices[I]);
+      Exit;
+    end;
+  finally
+    CheckedDevices.Free;
+  end;
 
   SelectedDevice := GetSelectedDevice;
   if SelectedDevice <> nil then
@@ -931,6 +956,32 @@ begin
 
   if FDevFilteredDevices = nil then
     Exit;
+
+  for I := 0 to FDevFilteredDevices.Count - 1 do
+    Result.Add(FDevFilteredDevices[I]);
+end;
+
+procedure TFormDeviceSelect.ClearCheckedDevices;
+begin
+  if FCheckedDevices <> nil then
+    FCheckedDevices.Clear;
+end;
+
+function TFormDeviceSelect.GetCheckedDevices: TObjectList<TDevice>;
+var
+  I: Integer;
+  ADevice: TDevice;
+begin
+  Result := TObjectList<TDevice>.Create(False);
+  if (FCheckedDevices = nil) or (FDevFilteredDevices = nil) then
+    Exit;
+
+  for I := 0 to FCheckedDevices.Count - 1 do
+  begin
+    ADevice := FCheckedDevices[I];
+    if (ADevice <> nil) and (FDevFilteredDevices.IndexOf(ADevice) >= 0) then
+      Result.Add(ADevice);
+  end;
 end;
 
 procedure TFormDeviceSelect.ButtonDeviceClearClick(Sender: TObject);
@@ -974,6 +1025,7 @@ begin
   { Сброс выделения }
   {----------------------------------}
   GridDevices.Row := -1;
+  ClearCheckedDevices;
 end;
 
 procedure TFormDeviceSelect.ButtonDeviceDeleteClick(Sender: TObject);
@@ -1045,6 +1097,7 @@ begin
     { Сброс выделения }
     {----------------------------------}
     GridDevices.Row := -1;
+    ClearCheckedDevices;
   finally
     TargetDevices.Free;
   end;
@@ -1118,7 +1171,14 @@ begin
 end;
 
 procedure TFormDeviceSelect.UpdateGridDevices;
+var
+  I: Integer;
 begin
+  if FCheckedDevices <> nil then
+    for I := FCheckedDevices.Count - 1 downto 0 do
+      if (FDevFilteredDevices = nil) or (FDevFilteredDevices.IndexOf(FCheckedDevices[I]) < 0) then
+        FCheckedDevices.Delete(I);
+
   GridDevices.BeginUpdate;
   try
     if FDevFilteredDevices <> nil then
@@ -1129,6 +1189,7 @@ begin
     GridDevices.EndUpdate;
   end;
 
+  GridDevices.Repaint;
   sbFind.IsPressed := HasActiveFilters;
 end;
 
@@ -1935,6 +1996,7 @@ begin
   FSortColumn := -1;
   FSortAscending := True;
   FSkipDeviceDeleteConfirm := False;
+  FCheckedDevices := TList<TDevice>.Create;
 
   {----------------------------------}
   { Загрузка данных и репозиториев }
@@ -1981,7 +2043,7 @@ begin
   { Значения колонок }
   {----------------------------------}
   if ACol = CheckColumnDeviceEnable.Index then
-    Value := D.Enabled
+    Value := FCheckedDevices.IndexOf(D) >= 0
 
   else if ACol = StringColumnName.Index then
     Value := D.Name
@@ -2054,14 +2116,22 @@ procedure TFormDeviceSelect.GridDevicesCellClick(const Column: TColumn;
 var
   SelectedDevice: TDevice;
 begin
-  if Column <> CheckColumnDeviceEnable then
+  if (Column <> CheckColumnDeviceEnable) or (FDevFilteredDevices = nil) then
     Exit;
 
-  SelectedDevice := GetSelectedDevice;
+  if (Row < 0) or (Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  SelectedDevice := FDevFilteredDevices[Row];
   if SelectedDevice = nil then
     Exit;
 
-  SelectedDevice.Enabled := not SelectedDevice.Enabled;
+  if FCheckedDevices.IndexOf(SelectedDevice) >= 0 then
+    FCheckedDevices.Remove(SelectedDevice)
+  else
+    FCheckedDevices.Add(SelectedDevice);
+
+  GridDevices.Row := Row;
   UpdateGridDevices;
 end;
 
