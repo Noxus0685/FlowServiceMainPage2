@@ -564,7 +564,6 @@ var
   ModText, ModKey: string;
 
   ManPass: Integer;
-  CategoryText: string;
 begin
   if ActiveRepo = nil then
   begin
