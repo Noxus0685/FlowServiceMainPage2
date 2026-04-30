@@ -259,6 +259,10 @@ type
     procedure SetValues;
     procedure CreateDevice;
 
+    function GetOutputSetStateColor: TAlphaColor;
+    function GetSyncModeStateColor: TAlphaColor;
+    function GetNoiseFilterStateColor: TAlphaColor;
+
   end;
 
   TWorkTable = class(TObservableObject)
@@ -1048,6 +1052,31 @@ procedure TChannel.SetNoiseFilterProxy(const AValue: Integer);
 begin
   if FNoiseFilter <> nil then
     FNoiseFilter.SetValue(AValue);
+end;
+
+
+function TChannel.GetOutputSetStateColor: TAlphaColor;
+begin
+  if FOutputSet <> nil then
+    Result := FOutputSet.GetStateColor
+  else
+    Result := TAlphaColors.Gray;
+end;
+
+function TChannel.GetSyncModeStateColor: TAlphaColor;
+begin
+  if FSyncMode <> nil then
+    Result := FSyncMode.GetStateColor
+  else
+    Result := TAlphaColors.Gray;
+end;
+
+function TChannel.GetNoiseFilterStateColor: TAlphaColor;
+begin
+  if FNoiseFilter <> nil then
+    Result := FNoiseFilter.GetStateColor
+  else
+    Result := TAlphaColors.Gray;
 end;
 
 function TChannel.GetCategoryProxy: Integer;
