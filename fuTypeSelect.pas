@@ -135,6 +135,7 @@ type
     actTypeFindInternet: TAction;
     Action3: TAction;
     StringColumnUUID: TStringColumn;
+    aRefreshRepository: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

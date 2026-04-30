@@ -406,8 +406,8 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -521,7 +521,6 @@ object FormDeviceSelect: TFormDeviceSelect
       object miRefreshRepository: TMenuItem
         Locked = True
         Text = #1054#1073#1085#1086#1074#1080#1090#1100
-        OnClick = miRefreshRepositoryClick
       end
       object miAddRepository: TMenuItem
         Locked = True
@@ -583,7 +582,8 @@ object FormDeviceSelect: TFormDeviceSelect
       Text = #1057#1074#1077#1088#1085#1091#1090#1100' '#1089#1087#1080#1089#1086#1082
     end
     object mpRefresh: TMenuItem
-      Text = #1054#1073#1085#1086#1074#1080#1090#1100
+      Action = aRefreshRepository
+      ImageIndex = -1
     end
   end
   object Splitter1: TSplitter
@@ -654,6 +654,10 @@ object FormDeviceSelect: TFormDeviceSelect
       Text = #1042#1099#1088#1077#1079#1072#1090#1100
       OnExecute = aDeviceCutExecute
       OnUpdate = UpdateDeviceActions
+    end
+    object aRefreshRepository: TAction
+      Text = #1054#1073#1085#1086#1074#1080#1090#1100
+      OnExecute = aRefreshRepositoryExecute
     end
   end
   object NetHTTPClient1: TNetHTTPClient
