@@ -121,6 +121,13 @@ type
     CurrentValue: Double;
   end;
 
+  EOutPutSet = (
+    optAuto = 0,
+    optPassive,
+    optActive,
+    optUniversal,
+    optCapacity
+  );
 
   TErrorInfo = record
     Code: Integer;
@@ -164,6 +171,9 @@ function IsDateInRange(const ADate, AFrom, ATo: TDate): Boolean;
 function NormalizeFlowAccuracyInput(const S: string): string;
 function BoolToRussianYesNo(const AValue: Boolean): string;
 function ObjClassNameOrNil(const AObject: TObject): string;
+function OutputSetToStr(AValue: EOutPutSet): string;
+function StrToOutputSet(const AValue: string): EOutPutSet;
+function IntToOutputSet(const AValue: Integer): EOutPutSet;
 
 implementation
 
@@ -190,6 +200,42 @@ begin
   if AObject = nil then
     Exit('nil');
   Result := AObject.ClassName;
+end;
+
+function OutputSetToStr(AValue: EOutPutSet): string;
+begin
+  case AValue of
+    optPassive: Result := 'Пассивный';
+    optActive: Result := 'Активный';
+    optUniversal: Result := 'Универсальный';
+    optCapacity: Result := 'Емкостной';
+  else
+    Result := 'Авто';
+  end;
+end;
+
+function StrToOutputSet(const AValue: string): EOutPutSet;
+var
+  LValue: string;
+begin
+  LValue := Trim(LowerCase(AValue));
+  if LValue = LowerCase('Пассивный') then
+    Exit(optPassive);
+  if LValue = LowerCase('Активный') then
+    Exit(optActive);
+  if LValue = LowerCase('Универсальный') then
+    Exit(optUniversal);
+  if LValue = LowerCase('Емкостной') then
+    Exit(optCapacity);
+  Result := optAuto;
+end;
+
+function IntToOutputSet(const AValue: Integer): EOutPutSet;
+begin
+  if (AValue >= Ord(Low(EOutPutSet))) and (AValue <= Ord(High(EOutPutSet))) then
+    Result := EOutPutSet(AValue)
+  else
+    Result := optAuto;
 end;
 
 function NormalizeFloatInput(const S: string): Double;
