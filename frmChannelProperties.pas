@@ -65,9 +65,7 @@ type
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
-    procedure HandlePropertySplitterMouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Single);
-    procedure ApplyPropertyColumnWidth;
+
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -339,7 +337,6 @@ begin
   HeaderSplitter.Parent := HeaderGrid;
   HeaderSplitter.Align := TAlignLayout.Left;
   HeaderSplitter.Width := 8;
-  HeaderSplitter.OnMouseUp := HandlePropertySplitterMouseUp;
   HeaderGrid.ControlCollection.AddControl(HeaderSplitter, 0, 0);
 
   HeaderValue := TLabel.Create(Self);

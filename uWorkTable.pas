@@ -8,6 +8,7 @@ uses
   System.Math,
   System.StrUtils,
   System.SysUtils,
+  System.UITypes,
   uBaseProcedures,
   uClasses,
   uControlRegister,
