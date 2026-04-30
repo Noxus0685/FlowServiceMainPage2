@@ -38,6 +38,9 @@ type
     ComboOutputSet: TComboBox;
     ComboSyncMode: TComboBox;
     ComboNoiseFilter: TComboBox;
+    IndicatorOutputSet: TCircle;
+    IndicatorSyncMode: TCircle;
+    IndicatorNoiseFilter: TCircle;
     LabelChannelHash: TLabel;
     FChannel: TChannel;
     FLoading: Boolean;
@@ -48,7 +51,8 @@ type
     function CreateEditCombo(const AItems: array of string): TComboEdit;
     procedure BuildUI;
     function CreateComboBox(const AItems: array of string): TComboBox;
-    procedure ApplyComboStatusColor(ACombo: TComboBox; const AColor: TAlphaColor);
+    function CreateComboWithIndicator(ACombo: TComboBox; out AIndicator: TCircle): TControl;
+    procedure ApplyIndicatorColor(AIndicator: TCircle; const AColor: TAlphaColor);
     procedure RefreshRegisterColors;
     procedure HandleChannelNameChange(Sender: TObject);
     procedure HandleOutputSetChange(Sender: TObject);
@@ -154,27 +158,51 @@ begin
 end;
 
 
-procedure TFrameChannelProperties.ApplyComboStatusColor(ACombo: TComboBox; const AColor: TAlphaColor);
+function TFrameChannelProperties.CreateComboWithIndicator(ACombo: TComboBox; out AIndicator: TCircle): TControl;
+var
+  LWrap: TLayout;
 begin
-  if ACombo = nil then
+  LWrap := TLayout.Create(Self);
+  LWrap.Stored := False;
+
+  ACombo.Parent := LWrap;
+  ACombo.Align := TAlignLayout.Client;
+  ACombo.Margins.Right := 20;
+
+  AIndicator := TCircle.Create(Self);
+  AIndicator.Parent := LWrap;
+  AIndicator.Align := TAlignLayout.Right;
+  AIndicator.Width := 12;
+  AIndicator.Height := 12;
+  AIndicator.Margins.Rect := TRectF.Create(4, 8, 2, 8);
+  AIndicator.Stored := False;
+  AIndicator.HitTest := False;
+  AIndicator.Stroke.Kind := TBrushKind.None;
+  AIndicator.Fill.Color := TAlphaColors.Gray;
+
+  Result := LWrap;
+end;
+
+procedure TFrameChannelProperties.ApplyIndicatorColor(AIndicator: TCircle; const AColor: TAlphaColor);
+begin
+  if AIndicator = nil then
     Exit;
-  ACombo.StyledSettings := ACombo.StyledSettings - [TStyledSetting.FontColor];
-  ACombo.TextSettings.FontColor := AColor;
+  AIndicator.Fill.Color := AColor;
 end;
 
 procedure TFrameChannelProperties.RefreshRegisterColors;
 begin
   if FChannel = nil then
   begin
-    ApplyComboStatusColor(ComboOutputSet, TAlphaColors.Gray);
-    ApplyComboStatusColor(ComboSyncMode, TAlphaColors.Gray);
-    ApplyComboStatusColor(ComboNoiseFilter, TAlphaColors.Gray);
+    ApplyIndicatorColor(IndicatorOutputSet, TAlphaColors.Gray);
+    ApplyIndicatorColor(IndicatorSyncMode, TAlphaColors.Gray);
+    ApplyIndicatorColor(IndicatorNoiseFilter, TAlphaColors.Gray);
     Exit;
   end;
 
-  ApplyComboStatusColor(ComboOutputSet, FChannel.GetOutputSetStateColor);
-  ApplyComboStatusColor(ComboSyncMode, FChannel.GetSyncModeStateColor);
-  ApplyComboStatusColor(ComboNoiseFilter, FChannel.GetNoiseFilterStateColor);
+  ApplyIndicatorColor(IndicatorOutputSet, FChannel.GetOutputSetStateColor);
+  ApplyIndicatorColor(IndicatorSyncMode, FChannel.GetSyncModeStateColor);
+  ApplyIndicatorColor(IndicatorNoiseFilter, FChannel.GetNoiseFilterStateColor);
 end;
 
 procedure TFrameChannelProperties.HandleChannelNameChange(Sender: TObject);
@@ -322,13 +350,13 @@ begin
 
   CategoryFreqPulse := AddCategory('Частотно-импульсный сигнал');
   ComboOutputSet := CreateComboBox(['Авто', 'Пассивный', 'Активный', 'Универсальный', 'Емкостной']);
-  AddPropertyRow(CategoryFreqPulse, 'Тип выхода прибора', ComboOutputSet);
+  AddPropertyRow(CategoryFreqPulse, 'Тип выхода прибора', CreateComboWithIndicator(ComboOutputSet, IndicatorOutputSet));
   ComboOutputSet.OnChange := HandleOutputSetChange;
   ComboSyncMode := CreateComboBox(['Выкл', 'По фронту', 'По фронту + время']);
-  AddPropertyRow(CategoryFreqPulse, 'Синхронизация', ComboSyncMode);
+  AddPropertyRow(CategoryFreqPulse, 'Синхронизация', CreateComboWithIndicator(ComboSyncMode, IndicatorSyncMode));
   ComboSyncMode.OnChange := HandleSyncModeChange;
   ComboNoiseFilter := CreateComboBox(['Выкл', 'Авто', '10 мс', '50 мс', '100 мс']);
-  AddPropertyRow(CategoryFreqPulse, 'Фильтр помех', ComboNoiseFilter);
+  AddPropertyRow(CategoryFreqPulse, 'Фильтр помех', CreateComboWithIndicator(ComboNoiseFilter, IndicatorNoiseFilter));
   ComboNoiseFilter.OnChange := HandleNoiseFilterChange;
   AddPropertyRow(CategoryFreqPulse, 'Усреднение', CreateComboBox(['Выкл', 'Авто', '2 сек', '4 сек']));
   AddPropertyRow(CategoryFreqPulse, 'Текущая частота, Гц', TLabel.Create(Self));
