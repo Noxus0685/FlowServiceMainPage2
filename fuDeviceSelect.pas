@@ -629,17 +629,18 @@ begin
 
         {========== КАТЕГОРИЯ =========}
         CategoryText := GetDeviceCategoryText(D, True);
-        if Trim(CategoryText) <> '' then
+        if D.Category <> 0 then
         begin
-          CatText := CategoryText;
-          // По аналогии с деревом типов:
-          // в ключе/TagString храним ID категории, а не отображаемый текст.
-          CatKey  := IntToStr(D.Category);
+          if Trim(CategoryText) <> '' then
+            CatText := CategoryText
+          else
+            CatText := ActiveRepo.CategoryToText(D.Category, D.CategoryName);
+          CatKey := IntToStr(D.Category);
         end
         else
         begin
           CatText := '<категория>';
-          CatKey  := '';
+          CatKey := '';
         end;
 
         CatNode := FindChildInNode(
@@ -1605,7 +1606,7 @@ begin
   if ManNode = nil then
     Exit;
 
-  if ADevice.Category > 0 then
+  if ADevice.Category <> 0 then
     CatKey := IntToStr(ADevice.Category)
   else
     CatKey := '';
@@ -1693,7 +1694,7 @@ begin
         begin
           // TagString = '' → без категории,
           // иначе TagString хранит числовой ID категории.
-          if ADevice.Category > 0 then
+          if ADevice.Category <> 0 then
           begin
             if IntToStr(ADevice.Category) <> Cur.TagString then
               Exit(False);
