@@ -562,22 +562,22 @@ begin
   // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
   ExpandedPaths := TStringList.Create;
   try
-    for J := 0 to TreeViewTypes.GlobalCount - 1 do
-      if TreeViewTypes.GlobalItems[J].IsExpanded then
-        ExpandedPaths.Add(NodePath(TreeViewTypes.GlobalItems[J]));
+    for J := 0 to TreeViewTypes.Count - 1 do
+      if TreeViewTypes.ItemByIndex(J).IsExpanded then
+        ExpandedPaths.Add(NodePath(TreeViewTypes.ItemByIndex(J)));
 
     NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
     BuildTree;
-    for J := 0 to TreeViewTypes.GlobalCount - 1 do
-      if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.GlobalItems[J])) >= 0 then
-        TreeViewTypes.GlobalItems[J].IsExpanded := True;
+    for J := 0 to TreeViewTypes.Count - 1 do
+      if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
+        TreeViewTypes.ItemByIndex(J).IsExpanded := True;
 
     if SelectedPath <> '' then
-      for J := 0 to TreeViewTypes.GlobalCount - 1 do
-        if NodePath(TreeViewTypes.GlobalItems[J]) = SelectedPath then
+      for J := 0 to TreeViewTypes.Count - 1 do
+        if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
         begin
-          TreeViewTypes.Selected := TreeViewTypes.GlobalItems[J];
+          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
           Break;
         end;
 
