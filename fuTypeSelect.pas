@@ -537,6 +537,7 @@ var
   NewRows: TObjectList<TDeviceType>;
   ExpandedPaths: TStringList;
   SelectedPath: string;
+  AllNodes: TList<TTreeViewItem>;
   function NodePath(ANode: TTreeViewItem): string;
   var
     Cur: TTreeViewItem;
@@ -545,9 +546,35 @@ var
     Cur := ANode;
     while Cur <> nil do
     begin
-      Result := IntToStr(Cur.Tag) + ':' + Cur.TagString + '|' + Result;
+      Result := IntToStr(Cur.Tag) + '':'' + Cur.TagString + ''|'' + Result;
       Cur := Cur.ParentItem;
     end;
+  end;
+  procedure CollectNodes(const ANode: TTreeViewItem);
+  var
+    K: Integer;
+    Child: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    AllNodes.Add(ANode);
+
+    for K := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(K) is TTreeViewItem then
+      begin
+        Child := TTreeViewItem(ANode.ItemByIndex(K));
+        CollectNodes(Child);
+      end;
+  end;
+  procedure RebuildNodeCache;
+  var
+    RootIndex: Integer;
+  begin
+    AllNodes.Clear;
+    for RootIndex := 0 to TreeViewTypes.Count - 1 do
+      if TreeViewTypes.ItemByIndex(RootIndex) is TTreeViewItem then
+        CollectNodes(TTreeViewItem(TreeViewTypes.ItemByIndex(RootIndex)));
   end;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferTypes) then
@@ -561,23 +588,27 @@ begin
 
   // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
   ExpandedPaths := TStringList.Create;
+  AllNodes := TList<TTreeViewItem>.Create;
   try
-    for J := 0 to TreeViewTypes.GlobalCount - 1 do
-      if TreeViewTypes.GlobalItems[J].IsExpanded then
-        ExpandedPaths.Add(NodePath(TreeViewTypes.GlobalItems[J]));
+    RebuildNodeCache;
+    for J := 0 to AllNodes.Count - 1 do
+      if AllNodes[J].IsExpanded then
+        ExpandedPaths.Add(NodePath(AllNodes[J]));
 
     NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
     BuildTree;
-    for J := 0 to TreeViewTypes.GlobalCount - 1 do
-      if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.GlobalItems[J])) >= 0 then
-        TreeViewTypes.GlobalItems[J].IsExpanded := True;
+    RebuildNodeCache;
+
+    for J := 0 to AllNodes.Count - 1 do
+      if ExpandedPaths.IndexOf(NodePath(AllNodes[J])) >= 0 then
+        AllNodes[J].IsExpanded := True;
 
     if SelectedPath <> '' then
-      for J := 0 to TreeViewTypes.GlobalCount - 1 do
-        if NodePath(TreeViewTypes.GlobalItems[J]) = SelectedPath then
+      for J := 0 to AllNodes.Count - 1 do
+        if NodePath(AllNodes[J]) = SelectedPath then
         begin
-          TreeViewTypes.Selected := TreeViewTypes.GlobalItems[J];
+          TreeViewTypes.Selected := AllNodes[J];
           Break;
         end;
 
@@ -598,6 +629,7 @@ begin
     NewRows.Free;
   end;
   finally
+    AllNodes.Free;
     ExpandedPaths.Free;
   end;
 end;
