@@ -119,7 +119,6 @@ begin
   Result.Margins.Rect := TRectF.Create(26, 0, 8, 0);
   Result.HitTest := False;
   RowGrid.ControlCollection.AddControl(Result, 0, 0);
-
   AControl.Parent := RowGrid;
   AControl.Align := TAlignLayout.Client;
   AControl.Margins.Rect := TRectF.Create(6, 3, 10, 3);
@@ -239,7 +238,6 @@ begin
   RefreshRegisterColors;
 end;
 
-
 procedure TFrameChannelProperties.LoadFromChannel(AChannel: TChannel);
 var
   SignalName: string;
@@ -311,26 +309,26 @@ begin
   HeaderValue := TLabel.Create(Self);
   HeaderValue.Parent := HeaderGrid;
   HeaderValue.Align := TAlignLayout.Client;
-  CategoryGeneral := AddCategory('');
-  EditChannelName := TEdit.Create(Self);
-  AddPropertyRow(CategoryGeneral, ' ', EditChannelName);
-  EditChannelName.OnChangeTracking := HandleChannelNameChange;
-
-  ComboChannelType := CreateComboBox(['', '', '', '', '', '']);
-  AddPropertyRow(CategoryGeneral, ' ', ComboChannelType);
-
-  LabelChannelHash := TLabel.Create(Self);
-  LabelChannelHash.StyledSettings := [];
-  LabelChannelHash.TextSettings.HorzAlign := TTextAlign.Leading;
-  LabelChannelHash.TextSettings.VertAlign := TTextAlign.Center;
-  AddPropertyRow(CategoryGeneral, 'HASH ', LabelChannelHash);
-
   HeaderValue.Text := 'Значение';
   HeaderValue.StyledSettings := [];
   HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderValue.TextSettings.FontColor := $FF3D3D3D;
   HeaderValue.Margins.Rect := TRectF.Create(8, 0, 10, 0);
   HeaderGrid.ControlCollection.AddControl(HeaderValue, 1, 0);
+
+  CategoryGeneral := AddCategory('Общий');
+  EditChannelName := TEdit.Create(Self);
+  AddPropertyRow(CategoryGeneral, 'Имя канала', EditChannelName);
+  EditChannelName.OnChangeTracking := HandleChannelNameChange;
+
+  ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
+  AddPropertyRow(CategoryGeneral, 'Тип канала', ComboChannelType);
+
+  LabelChannelHash := TLabel.Create(Self);
+  LabelChannelHash.StyledSettings := [];
+  LabelChannelHash.TextSettings.HorzAlign := TTextAlign.Leading;
+  LabelChannelHash.TextSettings.VertAlign := TTextAlign.Center;
+  AddPropertyRow(CategoryGeneral, 'HASH канала', LabelChannelHash);
 
   HeaderDivider := TLine.Create(Self);
   HeaderDivider.Parent := LayoutRoot;
@@ -377,6 +375,7 @@ begin
   AddPropertyRow(CategoryAnalogVoltage, 'Текущий ток', TLabel.Create(Self));
   AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение, %', TLabel.Create(Self));
   AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
+
 end;
 
 end.
