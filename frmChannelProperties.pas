@@ -15,6 +15,7 @@ uses
   FMX.StdCtrls,
   FMX.TreeView,
   FMX.Graphics,
+  System.Generics.Collections,
   FMX.Types,
   System.Classes,
   System.SysUtils,
@@ -29,6 +30,8 @@ type
   private
     LayoutRoot: TLayout;
     HeaderGrid: TGridPanelLayout;
+    HeaderPropertyLayout: TLayout;
+    HeaderSplitter: TSplitter;
     TreeInspector: TTreeView;
     HeaderProperty: TLabel;
     HeaderValue: TLabel;
@@ -44,6 +47,10 @@ type
     LabelChannelHash: TLabel;
     FChannel: TChannel;
     FLoading: Boolean;
+    FPropertyColumnWidth: Single;
+    FPropertyLabels: TObjectList<TControl>;
+    FValueControls: TObjectList<TControl>;
+    FRowSplitters: TObjectList<TSplitter>;
 
     function AddCategory(const ACaption: string): TTreeViewItem;
     function AddPropertyRow(AParent: TTreeViewItem; const ACaption: string;
@@ -58,8 +65,12 @@ type
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
+    procedure HandlePropertySplitterMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure ApplyPropertyColumnWidth;
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure LoadFromChannel(AChannel: TChannel);
   end;
 
@@ -70,7 +81,19 @@ implementation
 constructor TFrameChannelProperties.Create(AOwner: TComponent);
 begin
   inherited;
+  FPropertyColumnWidth := 170;
+  FPropertyLabels := TObjectList<TControl>.Create(False);
+  FValueControls := TObjectList<TControl>.Create(False);
+  FRowSplitters := TObjectList<TSplitter>.Create(False);
   BuildUI;
+end;
+
+destructor TFrameChannelProperties.Destroy;
+begin
+  FRowSplitters.Free;
+  FValueControls.Free;
+  FPropertyLabels.Free;
+  inherited;
 end;
 
 function TFrameChannelProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -91,6 +114,7 @@ var
   Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   Divider: TLine;
+  Splitter: TSplitter;
 begin
   Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
@@ -103,8 +127,9 @@ begin
   RowGrid.Align := TAlignLayout.Client;
   RowGrid.RowCollection.Clear;
   RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 45;
-  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.ColumnCollection.Add.Value := FPropertyColumnWidth;
+  RowGrid.ColumnCollection.Add.Value := 8;
+  RowGrid.ColumnCollection.Add.Value := 100;
   RowGrid.RowCollection.Add.Value := 100;
   RowGrid.Stored := False;
 
@@ -125,7 +150,8 @@ begin
   AControl.HitTest := True;
   if AControl is TStyledControl then
     TStyledControl(AControl).TabStop := True;
-  RowGrid.ControlCollection.AddControl(AControl, 1, 0);
+  RowGrid.ControlCollection.AddControl(AControl, 2, 0);
+  FValueControls.Add(AControl);
 
   Divider := TLine.Create(Self);
   Divider.Parent := Item;
@@ -292,19 +318,29 @@ begin
   HeaderGrid.Height := 30;
   HeaderGrid.RowCollection.Clear;
   HeaderGrid.ColumnCollection.Clear;
-  HeaderGrid.ColumnCollection.Add.Value := 45;
-  HeaderGrid.ColumnCollection.Add.Value := 55;
+  HeaderGrid.ColumnCollection.Add.Value := 100;
   HeaderGrid.RowCollection.Add.Value := 100;
 
+  HeaderPropertyLayout := TLayout.Create(Self);
+  HeaderPropertyLayout.Parent := HeaderGrid;
+  HeaderPropertyLayout.Align := TAlignLayout.Left;
+  HeaderPropertyLayout.Width := FPropertyColumnWidth;
+  HeaderGrid.ControlCollection.AddControl(HeaderPropertyLayout, 0, 0);
+
   HeaderProperty := TLabel.Create(Self);
-  HeaderProperty.Parent := HeaderGrid;
+  HeaderProperty.Parent := HeaderPropertyLayout;
   HeaderProperty.Align := TAlignLayout.Client;
   HeaderProperty.Text := 'Свойство';
   HeaderProperty.StyledSettings := [];
   HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
   HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
   HeaderProperty.Margins.Rect := TRectF.Create(10, 0, 8, 0);
-  HeaderGrid.ControlCollection.AddControl(HeaderProperty, 0, 0);
+  HeaderSplitter := TSplitter.Create(Self);
+  HeaderSplitter.Parent := HeaderGrid;
+  HeaderSplitter.Align := TAlignLayout.Left;
+  HeaderSplitter.Width := 8;
+  HeaderSplitter.OnMouseUp := HandlePropertySplitterMouseUp;
+  HeaderGrid.ControlCollection.AddControl(HeaderSplitter, 0, 0);
 
   HeaderValue := TLabel.Create(Self);
   HeaderValue.Parent := HeaderGrid;
