@@ -884,6 +884,10 @@ begin
         AppServices.DataManager.AssignDeviceTreeFields(NewDevice, SelectedNode);
     end;
 
+    BuildTree;
+    if NewRows.Count > 0 then
+      SelectEditedDevice(NewRows[0]);
+
     ApplyFilter;
     UpdateGridDevices;
 

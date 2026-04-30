@@ -550,6 +550,10 @@ begin
         AppServices.DataManager.AssignTypeTreeFields(NewType, SelectedNode);
     end;
 
+    BuildTree;
+    if NewRows.Count > 0 then
+      SelectType(NewRows[0]);
+
     ApplyFilter;
     UpdateGridTypes;
 
