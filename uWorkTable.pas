@@ -68,8 +68,8 @@ type
     ewtNone = 0,
     ewtWarning = 1,
     ewtError,
-    ewtRefresh,
-    ewtActivated
+    ewtActivated,
+    ewtRefresh
   );
   TWorkTableEvent = EEventWorkTable;
 
@@ -130,6 +130,7 @@ type
     FHashValueCurrent: string;
     FHashValueInterface: string;
     FName: string;
+    FWorkTabeID: Integer;
     FOutputSet: TControlRegister<EOutPutSet>;
     FSyncMode: TControlRegister<ESyncChannelMode>;
     FNoiseFilter: TControlRegister<Integer>;
@@ -219,6 +220,7 @@ type
     property Enabled: Boolean read FEnabled write FEnabled;
     property Name: string read FName write FName;
     property Text: string read FText write FText;
+    property WorkTabeID: Integer read FWorkTabeID write FWorkTabeID;
 
 
 
@@ -415,7 +417,8 @@ type
     class procedure LoadChannelList(
       AIni: TCustomIniFile;
       const ASectionPrefix: string;
-      AChannels: TObjectList<TChannel>
+      AChannels: TObjectList<TChannel>;
+      const AWorkTableID: Integer
     ); static;
 
   private
@@ -613,6 +616,7 @@ type
     procedure AddWorkTable(const WorkTableName: string);  overload;
 
     function FindWorkTableName(const WorkTableName: string): TWorkTable;
+    function FindWorkTableByID(const WorkTableID: Integer): TWorkTable;
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
@@ -782,6 +786,7 @@ begin
   FValueResult := 0;
   FGroup := 0;
   FCategory := mftUnknownType;
+  FWorkTabeID := 0;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -2219,6 +2224,7 @@ begin
   Result.ID := ChannelIndex;
   Result.Name := BuildDeviceChannelServiceName(ChannelIndex);
   Result.Text := BuildChannelDefaultText(ChannelIndex);
+  Result.WorkTabeID := Self.ID;
   FDeviceChannels.Add(Result);
   Result.RebindFlowMeterValues(Self);
   if (Result.FlowMeter <> nil) and (FTableFlow <> nil) then
@@ -2257,6 +2263,7 @@ begin
   Result.ID := ChannelIndex;
   Result.Name := BuildEtalonChannelServiceName(ChannelIndex);
   Result.Text := BuildChannelDefaultText(ChannelIndex);
+  Result.WorkTabeID := Self.ID;
   FEtalonChannels.Add(Result);
   Result.RebindFlowMeterValues(Self);
 end;
@@ -2587,8 +2594,8 @@ begin
 
       WorkTable.FluidTemp.Value.Value := 21;
 
-      LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
-      LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
+      LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels, WorkTable.ID);
+      LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels, WorkTable.ID);
       LoadGridColumns(Ini, Section + '.EtalonGrid', WorkTable.FEtalonsGridColumns);
       LoadGridColumns(Ini, Section + '.DeviceGrid', WorkTable.FDevicesGridColumns);
       LoadGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.FDataPointsGridColumns);
@@ -2692,6 +2699,7 @@ begin
 
     AIni.WriteInteger(Section, 'ID', Channel.ID);
     AIni.WriteString(Section, 'UUID', Channel.UUID);
+    AIni.WriteInteger(Section, 'WorkTabeID', Channel.WorkTabeID);
     AIni.WriteBool(Section, 'Enabled', Channel.Enabled);
     AIni.WriteString(Section, 'Name', Channel.Name);
     AIni.WriteString(Section, 'Text', Channel.Text);
@@ -2734,7 +2742,7 @@ end;
 
 { Restores channel collection metadata from INI storage. }
 class procedure TWorkTable.LoadChannelList(AIni: TCustomIniFile;
-  const ASectionPrefix: string; AChannels: TObjectList<TChannel>);
+  const ASectionPrefix: string; AChannels: TObjectList<TChannel>; const AWorkTableID: Integer);
 var
   Count, I: Integer;
   Channel: TChannel;
@@ -2754,6 +2762,7 @@ begin
     Channel := TChannel.Create;
     Channel.ID := AIni.ReadInteger(Section, 'ID', I + 1);
     Channel.UUID := AIni.ReadString(Section, 'UUID', '');
+    Channel.WorkTabeID := AIni.ReadInteger(Section, 'WorkTabeID', AWorkTableID);
     Channel.Enabled := AIni.ReadBool(Section, 'Enabled', True);
     if EndsText('.Etalon', ASectionPrefix) then
       Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
@@ -2959,6 +2968,7 @@ begin
     ewtWarning: Result := 'ewtWarning';
     ewtError: Result := 'ewtError';
     ewtActivated: Result := 'ewtActivated';
+    ewtRefresh: Result := 'ewtRefresh';
   else
     Result := 'ewtNone';
   end;
@@ -3709,10 +3719,22 @@ begin
 end;
 
 procedure TWorkTableManager.AddWorkTable;
- var WorkTable: TWorkTable;
+ var
+  WorkTable: TWorkTable;
+  NextID: Integer;
+  Existing: TWorkTable;
 begin
-   WorkTable := TWorkTable.Create;
-  WorkTable.ID := WorkTables.Count + 1;
+  NextID := 1;
+  while True do
+  begin
+    Existing := FindWorkTableByID(NextID);
+    if Existing = nil then
+      Break;
+    Inc(NextID);
+  end;
+
+  WorkTable := TWorkTable.Create;
+  WorkTable.ID := NextID;
   WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
   WorkTables.Add(WorkTable);
@@ -3760,6 +3782,19 @@ begin
       Exit;
     end;
   end;
+end;
+
+function TWorkTableManager.FindWorkTableByID(const WorkTableID: Integer): TWorkTable;
+var
+  WorkTable: TWorkTable;
+begin
+  Result := nil;
+  if (FWorkTables = nil) or (WorkTableID <= 0) then
+    Exit;
+
+  for WorkTable in FWorkTables do
+    if (WorkTable <> nil) and (WorkTable.ID = WorkTableID) then
+      Exit(WorkTable);
 end;
 
 function TWorkTableManager.FindPumpByName(const APumpName: string): TPump;

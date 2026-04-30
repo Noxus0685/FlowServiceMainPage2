@@ -58,6 +58,7 @@ type
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
+    procedure NotifyWorkTableRefreshIfChanged(const AChanged: Boolean);
   public
     constructor Create(AOwner: TComponent); override;
     procedure LoadFromChannel(AChannel: TChannel);
@@ -206,37 +207,73 @@ begin
 end;
 
 procedure TFrameChannelProperties.HandleChannelNameChange(Sender: TObject);
+var
+  NewValue: string;
 begin
   if FLoading or (FChannel = nil) then
     Exit;
-  FChannel.Text := Trim(EditChannelName.Text);
+  NewValue := Trim(EditChannelName.Text);
+  NotifyWorkTableRefreshIfChanged(FChannel.Text <> NewValue);
+  FChannel.Text := NewValue;
 end;
 
 procedure TFrameChannelProperties.HandleOutputSetChange(Sender: TObject);
+var
+  NewValue: EOutPutSet;
 begin
   if FLoading or (FChannel = nil) or (ComboOutputSet = nil) then
     Exit;
   if ComboOutputSet.ItemIndex >= 0 then
-    FChannel.OutputSet := EOutPutSet(ComboOutputSet.ItemIndex);
+  begin
+    NewValue := EOutPutSet(ComboOutputSet.ItemIndex);
+    NotifyWorkTableRefreshIfChanged(FChannel.OutputSet <> NewValue);
+    FChannel.OutputSet := NewValue;
+  end;
   RefreshRegisterColors;
 end;
 
 procedure TFrameChannelProperties.HandleSyncModeChange(Sender: TObject);
+var
+  NewValue: ESyncChannelMode;
 begin
   if FLoading or (FChannel = nil) or (ComboSyncMode = nil) then
     Exit;
   if ComboSyncMode.ItemIndex >= 0 then
-    FChannel.SyncMode := ESyncChannelMode(ComboSyncMode.ItemIndex);
+  begin
+    NewValue := ESyncChannelMode(ComboSyncMode.ItemIndex);
+    NotifyWorkTableRefreshIfChanged(FChannel.SyncMode <> NewValue);
+    FChannel.SyncMode := NewValue;
+  end;
   RefreshRegisterColors;
 end;
 
 procedure TFrameChannelProperties.HandleNoiseFilterChange(Sender: TObject);
+var
+  NewValue: Integer;
 begin
   if FLoading or (FChannel = nil) or (ComboNoiseFilter = nil) then
     Exit;
   if ComboNoiseFilter.ItemIndex >= 0 then
-    FChannel.NoiseFilter := StrToNoiseFilter(ComboNoiseFilter.Items[ComboNoiseFilter.ItemIndex]);
+  begin
+    NewValue := StrToNoiseFilter(ComboNoiseFilter.Items[ComboNoiseFilter.ItemIndex]);
+    NotifyWorkTableRefreshIfChanged(FChannel.NoiseFilter <> NewValue);
+    FChannel.NoiseFilter := NewValue;
+  end;
   RefreshRegisterColors;
+end;
+
+procedure TFrameChannelProperties.NotifyWorkTableRefreshIfChanged(const AChanged: Boolean);
+var
+  WorkTable: TWorkTable;
+begin
+  if not AChanged then
+    Exit;
+  if (FChannel = nil) or (WorkTableManager = nil) then
+    Exit;
+
+  WorkTable := WorkTableManager.FindWorkTableByID(FChannel.WorkTabeID);
+  if WorkTable <> nil then
+    WorkTable.FireEvent(ewtRefresh);
 end;
 
 
