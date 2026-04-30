@@ -564,7 +564,6 @@ var
   ModText, ModKey: string;
 
   ManPass: Integer;
-  CategoryText: string;
 begin
   if ActiveRepo = nil then
   begin
@@ -627,13 +626,10 @@ begin
           TreeViewDevices.AddObject(ManNode);
         end;
 
-        {========== КАТЕГОРИЯ =========}
-        CategoryText := GetDeviceCategoryText(D, True);
-        if Trim(CategoryText) <> '' then
+        {========== КАТЕГОРИИ > 0 И ПОЛЬЗОВАТЕЛЬСКАЯ (-1) =========}
+        if D.Category <> 0 then
         begin
-          CatText := CategoryText;
-          // По аналогии с деревом типов:
-          // в ключе/TagString храним ID категории, а не отображаемый текст.
+          CatText := ActiveRepo.CategoryToText(D.Category, D.CategoryName);
           CatKey  := IntToStr(D.Category);
         end
         else
@@ -1605,7 +1601,7 @@ begin
   if ManNode = nil then
     Exit;
 
-  if ADevice.Category > 0 then
+  if ADevice.Category <> 0 then
     CatKey := IntToStr(ADevice.Category)
   else
     CatKey := '';
@@ -1693,7 +1689,7 @@ begin
         begin
           // TagString = '' → без категории,
           // иначе TagString хранит числовой ID категории.
-          if ADevice.Category > 0 then
+          if ADevice.Category <> 0 then
           begin
             if IntToStr(ADevice.Category) <> Cur.TagString then
               Exit(False);
