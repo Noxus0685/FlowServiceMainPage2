@@ -917,6 +917,7 @@ end;
 function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;
 var
   SelectedDevice: TDevice;
+  I: Integer;
 begin
   Result := TObjectList<TDevice>.Create(False);
 
@@ -929,6 +930,9 @@ begin
 
   if FDevFilteredDevices = nil then
     Exit;
+
+  for I := 0 to FDevFilteredDevices.Count - 1 do
+    Result.Add(FDevFilteredDevices[I]);
 end;
 
 procedure TFormDeviceSelect.ButtonDeviceClearClick(Sender: TObject);
@@ -976,9 +980,8 @@ end;
 
 procedure TFormDeviceSelect.ButtonDeviceDeleteClick(Sender: TObject);
 var
-  TargetDevices: TObjectList<TDevice>;
+  SelRow: Integer;
   SelDevice: TDevice;
-  I: Integer;
 begin
   {----------------------------------}
   { Проверка списка }
@@ -986,66 +989,51 @@ begin
   if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
     Exit;
 
-  TargetDevices := GetSelectedDevices;
-  try
-    if TargetDevices.Count = 0 then
+  SelRow := GridDevices.Row;
+  if (SelRow < 0) or (SelRow >= FDevFilteredDevices.Count) then
+    Exit;
+
+  { Явно подсвечиваем строку для удаления }
+  GridDevices.Row := SelRow;
+
+  SelDevice := FDevFilteredDevices[SelRow];
+  if SelDevice = nil then
+    Exit;
+
+  {----------------------------------}
+  { Подтверждение удаления }
+  {----------------------------------}
+  if not FSkipDeviceDeleteConfirm then
+  begin
+    if MessageDlg(
+         'Удалить выбранный прибор безвозвратно?',
+         TMsgDlgType.mtWarning,
+         [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+         0
+       ) <> mrYes then
       Exit;
 
-    {----------------------------------}
-    { Подтверждение удаления }
-    {----------------------------------}
-    if not FSkipDeviceDeleteConfirm then
-    begin
-      if TargetDevices.Count = 1 then
-      begin
-        if MessageDlg(
-             'Удалить выбранный прибор безвозвратно?',
-             TMsgDlgType.mtWarning,
-             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-             0
-           ) <> mrYes then
-          Exit;
-      end
-      else
-      begin
-        if MessageDlg(
-             'Удалить выбранные приборы безвозвратно?',
-             TMsgDlgType.mtWarning,
-             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-             0
-           ) <> mrYes then
-          Exit;
-      end;
-
-      FSkipDeviceDeleteConfirm := True;
-    end;
-
-    {----------------------------------}
-    { Удаление через репозиторий }
-    {----------------------------------}
-    for I := TargetDevices.Count - 1 downto 0 do
-    begin
-      SelDevice := TargetDevices[I];
-      if SelDevice <> nil then
-        ActiveRepo.DeleteDevice(SelDevice);
-    end;
-
-    {----------------------------------}
-    { Пересборка фильтров }
-    {----------------------------------}
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDevices);
-
-    ApplyFilter;
-    UpdateGridDevices;
-
-    {----------------------------------}
-    { Сброс выделения }
-    {----------------------------------}
-    GridDevices.Row := -1;
-  finally
-    TargetDevices.Free;
+    FSkipDeviceDeleteConfirm := True;
   end;
+
+  {----------------------------------}
+  { Удаление через репозиторий }
+  {----------------------------------}
+  ActiveRepo.DeleteDevice(SelDevice);
+
+  {----------------------------------}
+  { Пересборка фильтров }
+  {----------------------------------}
+  FreeAndNil(FDevFilteredByTree);
+  FDevFilteredByTree := BuildFilteredByTree(FDevices);
+
+  ApplyFilter;
+  UpdateGridDevices;
+
+  {----------------------------------}
+  { Сброс выделения }
+  {----------------------------------}
+  GridDevices.Row := -1;
 end;
 
 procedure TFormDeviceSelect.ApplyFilter;
