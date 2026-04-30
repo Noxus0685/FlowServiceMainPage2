@@ -563,6 +563,7 @@ type
     procedure ClearChannelData(AChannel: TChannel);
     procedure CopyChannelData(ASource, ADest: TChannel);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
+    procedure UpdateChannelPropertiesFromSelection(AGrid: TGrid; const ARow: Integer);
 
 
 
@@ -4101,9 +4102,7 @@ begin
   end;
 
   UpdateFlowMeterPropertiesFrame(Row);
-  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
-     (Row >= 0) and (Row < WorkTable.DeviceChannels.Count) then
-    FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
+  UpdateChannelPropertiesFromSelection(GridDevices, Row);
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
@@ -4204,9 +4203,7 @@ begin
   end;
 
   UpdateFlowMeterPropertiesFrame(Row);
-  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
-     (Row >= 0) and (Row < WorkTable.DeviceChannels.Count) then
-    FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
+  UpdateChannelPropertiesFromSelection(GridDevices, Row);
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -4319,10 +4316,7 @@ procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
   UpdateFlowMeterPropertiesFrame(ARow);
-
-  if (FFrameChannelProperties <> nil) and (FActiveWorkTable <> nil) and
-     (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
-    FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[ARow]);
+  UpdateChannelPropertiesFromSelection(GridDevices, ARow);
 
     if not IsUpdating then
 
@@ -4492,7 +4486,7 @@ begin
 
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
      (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
-    FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[Row]);
+    UpdateChannelPropertiesFromSelection(GridEtalons, Row);
 end;
 
 procedure TFrameMainTable.GridEtalonsCellDblClick(const Column: TColumn;
@@ -4544,13 +4538,31 @@ end;
 
 procedure TFrameMainTable.GridEtalonsSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
-var
-  WorkTable: TWorkTable;
 begin
-  WorkTable := GetWorkTableByIndex(0);
-  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
-     (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
-    FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[ARow]);
+  UpdateChannelPropertiesFromSelection(GridEtalons, ARow);
+end;
+
+procedure TFrameMainTable.UpdateChannelPropertiesFromSelection(AGrid: TGrid; const ARow: Integer);
+begin
+  if (FFrameChannelProperties = nil) or (FActiveWorkTable = nil) then
+    Exit;
+
+  if AGrid = GridDevices then
+  begin
+    if (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
+      FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[ARow])
+    else
+      FFrameChannelProperties.LoadFromChannel(nil);
+    Exit;
+  end;
+
+  if AGrid = GridEtalons then
+  begin
+    if (ARow >= 0) and (ARow < FActiveWorkTable.EtalonChannels.Count) then
+      FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.EtalonChannels[ARow])
+    else
+      FFrameChannelProperties.LoadFromChannel(nil);
+  end;
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
