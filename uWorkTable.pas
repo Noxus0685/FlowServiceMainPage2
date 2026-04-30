@@ -58,7 +58,9 @@ type
     awtAddPump,
     awtRemovePump,
     awtAddChannel,
-    awtRemoveChannel
+    awtRemoveChannel,
+    awtWriteRegister,
+    awtReadRegister
 
   );
 

@@ -361,6 +361,7 @@ begin
   CategoryGeneral := AddCategory('Общий');
   EditChannelName := TEdit.Create(Self);
   AddPropertyRow(CategoryGeneral, 'Имя канала', EditChannelName);
+  EditChannelName.KillFocusByReturn:=True;
   EditChannelName.OnChangeTracking := HandleChannelNameChange;
 
   ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
