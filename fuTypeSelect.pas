@@ -534,12 +534,46 @@ var
   NewType: TDeviceType;
   I: Integer;
   SelectedNode: TTreeViewItem;
+  SelectedParent: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
+  TargetManKey, TargetCatKey, TargetModKey: string;
+  TargetNode: TTreeViewItem;
+  HasTargetBranch: Boolean;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferTypes) then
     Exit;
 
   SelectedNode := GetActiveTreeNode;
+  TargetManKey := '';
+  TargetCatKey := '';
+  TargetModKey := '';
+  HasTargetBranch := (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll));
+  if HasTargetBranch then
+  begin
+    case SelectedNode.Tag of
+      Ord(tnManufacturer):
+        TargetManKey := SelectedNode.TagString;
+      Ord(tnCategory):
+        begin
+          TargetCatKey := SelectedNode.TagString;
+          SelectedParent := SelectedNode.ParentItem;
+          if SelectedParent <> nil then
+            TargetManKey := SelectedParent.TagString;
+        end;
+      Ord(tnModification):
+        begin
+          TargetModKey := SelectedNode.TagString;
+          SelectedParent := SelectedNode.ParentItem;
+          if SelectedParent <> nil then
+          begin
+            TargetCatKey := SelectedParent.TagString;
+            SelectedParent := SelectedParent.ParentItem;
+            if SelectedParent <> nil then
+              TargetManKey := SelectedParent.TagString;
+          end;
+        end;
+    end;
+  end;
   // Создание новых типов выполняется в DataManager.
   NewRows := AppServices.DataManager.PasteBufferTypes;
   try
@@ -548,6 +582,18 @@ begin
       NewType := NewRows[I];
       if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
         AppServices.DataManager.AssignTypeTreeFields(NewType, SelectedNode);
+    end;
+
+    BuildTree;
+    if HasTargetBranch then
+    begin
+      TargetNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), TargetManKey);
+      if (TargetNode <> nil) and (TargetCatKey <> '') then
+        TargetNode := FindChildInNode(TargetNode, Ord(tnCategory), TargetCatKey);
+      if (TargetNode <> nil) and (TargetModKey <> '') then
+        TargetNode := FindChildInNode(TargetNode, Ord(tnModification), TargetModKey);
+      if TargetNode <> nil then
+        TreeViewTypes.Selected := TargetNode;
     end;
 
     ApplyFilter;
