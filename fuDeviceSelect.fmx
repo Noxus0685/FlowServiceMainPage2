@@ -130,9 +130,9 @@ object FormDeviceSelect: TFormDeviceSelect
         Viewport.Height = 569.000000000000000000
         object CheckColumnDeviceEnable: TCheckColumn
           Header = #1042#1082#1083
+          HeaderSettings.TextSettings.WordWrap = False
           HeaderSettings.TextSettings.HorzAlign = Center
-          Width = 32.000000000000000000
-          ReadOnly = False
+          Size.Width = 32.000000000000000000
         end
         object StringColumnName: TStringColumn
           Header = #1048#1084#1103

@@ -348,22 +348,14 @@ begin
   Result := (FCopiedDevices <> nil) and (FCopiedDevices.Count > 0);
 end;
 
+
 procedure TManagerTTableDM.AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
-const
-  UNDEFINED_CATEGORY_TEXT = '<категория>';
 var
   Cur: TTreeViewItem;
 begin
   // Логика замены полей прибора по выбранной ветке дерева.
   if (ADevice = nil) or (ANode = nil) then
     Exit;
-
-  // Вставка в производителя: CategoryName сохраняется как в источнике.
-  if ANode.Tag = Ord(tnManufacturer) then
-  begin
-    ADevice.Manufacturer := ANode.TagString;
-    Exit;
-  end;
 
   Cur := ANode;
   while Cur <> nil do
@@ -373,51 +365,29 @@ begin
         ADevice.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          // Для узла "<категория>" обнуляем категорию.
-          if SameText(Trim(Cur.Text), UNDEFINED_CATEGORY_TEXT) then
-          begin
-            ADevice.Category := 0;
-            ADevice.CategoryName := '';
-          end
-          else
-          begin
-            ADevice.Category := StrToIntDef(Cur.TagString, 0);
+          // По аналогии с AssignTypeTreeFields:
+          // TagString узла категории содержит ID категории в виде строки.
+          ADevice.Category := StrToIntDef(Cur.TagString, 0);
+          if Cur.Text <>'<категория>' then
             ADevice.CategoryName := Cur.Text;
-          end;
         end;
       Ord(tnModification):
-        begin
-          // Если модификация выбрана внутри "<категория>", то очищаем модификацию.
-          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) and
-             SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
-            ADevice.Modification := ''
-          else
-            ADevice.Modification := Cur.TagString;
-        end;
+        ADevice.Modification := Cur.TagString;
     end;
     Cur := Cur.ParentItem;
   end;
 end;
 
+
 procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
-const
-  UNDEFINED_CATEGORY_TEXT = '<категория>';
 var
   Cur: TTreeViewItem;
 begin
   // Замена полей назначения по выбранной ветке:
-  // Manufacturer -> только Manufacturer,
-  // Category -> Category/Manufacturer,
-  // Modification -> Modification/Category/Manufacturer.
+  // Modification -> Modification/Category/Manufacturer,
+  // Category -> Category/Manufacturer, Manufacturer -> только Manufacturer.
   if (AType = nil) or (ANode = nil) then
     Exit;
-
-  // Вставка в производителя: CategoryName сохраняется как в источнике.
-  if ANode.Tag = Ord(tnManufacturer) then
-  begin
-    AType.Manufacturer := ANode.TagString;
-    Exit;
-  end;
 
   Cur := ANode;
   while Cur <> nil do
@@ -427,25 +397,12 @@ begin
         AType.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          if SameText(Trim(Cur.Text), UNDEFINED_CATEGORY_TEXT) then
-          begin
-            AType.Category := 0;
-            AType.CategoryName := '';
-          end
-          else
-          begin
-            AType.Category := StrToIntDef(Cur.TagString, 0);
+          AType.Category := StrToIntDef(Cur.TagString, 0);
+          if Cur.Text <>'<категория>' then
             AType.CategoryName := Cur.Text;
-          end;
         end;
       Ord(tnModification):
-        begin
-          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) and
-             SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
-            AType.Modification := ''
-          else
-            AType.Modification := Cur.TagString;
-        end;
+        AType.Modification := Cur.TagString;
     end;
     Cur := Cur.ParentItem;
   end;

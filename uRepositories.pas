@@ -1339,7 +1339,8 @@ begin
     if Trim(ACategoryName) <> '' then
       Exit(ACategoryName)
     else
-      Exit('<категория>');
+      //Exit('<категория>');
+      Exit('');
   end;
 
   // --------------------------------------------------

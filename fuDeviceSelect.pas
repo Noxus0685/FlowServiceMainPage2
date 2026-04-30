@@ -573,7 +573,7 @@ var
   ManText, ManKey: string;
   CatText, CatKey: string;
   ModText, ModKey: string;
-
+  CategoryText:String;
   ManPass: Integer;
 begin
   if ActiveRepo = nil then
