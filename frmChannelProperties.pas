@@ -14,11 +14,13 @@ uses
   FMX.Objects,
   FMX.StdCtrls,
   FMX.TreeView,
+  FMX.Graphics,
   FMX.Types,
   System.Classes,
   System.SysUtils,
   System.Types,
   System.UITypes,
+  uBaseProcedures,
   uClasses,
   uWorkTable;
 
@@ -33,7 +35,15 @@ type
     HeaderDivider: TLine;
     EditChannelName: TEdit;
     ComboChannelType: TComboBox;
+    ComboOutputSet: TComboBox;
+    ComboSyncMode: TComboBox;
+    ComboNoiseFilter: TComboBox;
+    IndicatorOutputSet: TCircle;
+    IndicatorSyncMode: TCircle;
+    IndicatorNoiseFilter: TCircle;
     LabelChannelHash: TLabel;
+    FChannel: TChannel;
+    FLoading: Boolean;
 
     function AddCategory(const ACaption: string): TTreeViewItem;
     function AddPropertyRow(AParent: TTreeViewItem; const ACaption: string;
@@ -41,6 +51,13 @@ type
     function CreateEditCombo(const AItems: array of string): TComboEdit;
     procedure BuildUI;
     function CreateComboBox(const AItems: array of string): TComboBox;
+    function CreateComboWithIndicator(ACombo: TComboBox; out AIndicator: TCircle): TControl;
+    procedure ApplyIndicatorColor(AIndicator: TCircle; const AColor: TAlphaColor);
+    procedure RefreshRegisterColors;
+    procedure HandleChannelNameChange(Sender: TObject);
+    procedure HandleOutputSetChange(Sender: TObject);
+    procedure HandleSyncModeChange(Sender: TObject);
+    procedure HandleNoiseFilterChange(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
     procedure LoadFromChannel(AChannel: TChannel);
@@ -141,26 +158,122 @@ begin
 end;
 
 
+function TFrameChannelProperties.CreateComboWithIndicator(ACombo: TComboBox; out AIndicator: TCircle): TControl;
+var
+  LWrap: TLayout;
+begin
+  LWrap := TLayout.Create(Self);
+  LWrap.Stored := False;
+
+  ACombo.Parent := LWrap;
+  ACombo.Align := TAlignLayout.Client;
+  ACombo.Margins.Right := 20;
+
+  AIndicator := TCircle.Create(Self);
+  AIndicator.Parent := LWrap;
+  AIndicator.Align := TAlignLayout.Right;
+  AIndicator.Width := 12;
+  AIndicator.Height := 12;
+  AIndicator.Margins.Rect := TRectF.Create(4, 8, 2, 8);
+  AIndicator.Stored := False;
+  AIndicator.HitTest := False;
+  AIndicator.Stroke.Kind := TBrushKind.None;
+  AIndicator.Fill.Color := TAlphaColors.Gray;
+
+  Result := LWrap;
+end;
+
+procedure TFrameChannelProperties.ApplyIndicatorColor(AIndicator: TCircle; const AColor: TAlphaColor);
+begin
+  if AIndicator = nil then
+    Exit;
+  AIndicator.Fill.Color := AColor;
+end;
+
+procedure TFrameChannelProperties.RefreshRegisterColors;
+begin
+  if FChannel = nil then
+  begin
+    ApplyIndicatorColor(IndicatorOutputSet, TAlphaColors.Gray);
+    ApplyIndicatorColor(IndicatorSyncMode, TAlphaColors.Gray);
+    ApplyIndicatorColor(IndicatorNoiseFilter, TAlphaColors.Gray);
+    Exit;
+  end;
+
+  ApplyIndicatorColor(IndicatorOutputSet, FChannel.GetOutputSetStateColor);
+  ApplyIndicatorColor(IndicatorSyncMode, FChannel.GetSyncModeStateColor);
+  ApplyIndicatorColor(IndicatorNoiseFilter, FChannel.GetNoiseFilterStateColor);
+end;
+
+procedure TFrameChannelProperties.HandleChannelNameChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) then
+    Exit;
+  FChannel.Text := Trim(EditChannelName.Text);
+end;
+
+procedure TFrameChannelProperties.HandleOutputSetChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboOutputSet = nil) then
+    Exit;
+  if ComboOutputSet.ItemIndex >= 0 then
+    FChannel.OutputSet := EOutPutSet(ComboOutputSet.ItemIndex);
+  RefreshRegisterColors;
+end;
+
+procedure TFrameChannelProperties.HandleSyncModeChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboSyncMode = nil) then
+    Exit;
+  if ComboSyncMode.ItemIndex >= 0 then
+    FChannel.SyncMode := ESyncChannelMode(ComboSyncMode.ItemIndex);
+  RefreshRegisterColors;
+end;
+
+procedure TFrameChannelProperties.HandleNoiseFilterChange(Sender: TObject);
+begin
+  if FLoading or (FChannel = nil) or (ComboNoiseFilter = nil) then
+    Exit;
+  if ComboNoiseFilter.ItemIndex >= 0 then
+    FChannel.NoiseFilter := StrToNoiseFilter(ComboNoiseFilter.Items[ComboNoiseFilter.ItemIndex]);
+  RefreshRegisterColors;
+end;
+
+
 procedure TFrameChannelProperties.LoadFromChannel(AChannel: TChannel);
 var
   SignalName: string;
 begin
-  if AChannel = nil then
-  begin
-    EditChannelName.Text := '';
-    ComboChannelType.ItemIndex := -1;
-    LabelChannelHash.Text := '';
-    Exit;
+  FLoading := True;
+  try
+    FChannel := AChannel;
+    if AChannel = nil then
+    begin
+      EditChannelName.Text := '';
+      ComboChannelType.ItemIndex := -1;
+      ComboOutputSet.ItemIndex := -1;
+      ComboSyncMode.ItemIndex := -1;
+      ComboNoiseFilter.ItemIndex := -1;
+      LabelChannelHash.Text := '';
+      Exit;
+    end;
+
+    EditChannelName.Text := AChannel.Text;
+
+    SignalName := GetOutputTypeName(TOutputType(AChannel.Signal));
+    ComboChannelType.ItemIndex := ComboChannelType.Items.IndexOf(SignalName);
+    if ComboChannelType.ItemIndex < 0 then
+      ComboChannelType.ItemIndex := 0;
+
+    ComboOutputSet.ItemIndex := Ord(AChannel.OutputSet);
+    ComboSyncMode.ItemIndex := Ord(AChannel.SyncMode);
+    ComboNoiseFilter.ItemIndex := ComboNoiseFilter.Items.IndexOf(NoiseFilterToStr(AChannel.NoiseFilter));
+
+    LabelChannelHash.Text := AChannel.UUID;
+  finally
+    FLoading := False;
+    RefreshRegisterColors;
   end;
-
-  EditChannelName.Text := AChannel.Text;
-
-  SignalName := GetOutputTypeName(TOutputType(AChannel.Signal));
-  ComboChannelType.ItemIndex := ComboChannelType.Items.IndexOf(SignalName);
-  if ComboChannelType.ItemIndex < 0 then
-    ComboChannelType.ItemIndex := 0;
-
-  LabelChannelHash.Text := AChannel.UUID;
 end;
 
 procedure TFrameChannelProperties.BuildUI;
@@ -201,6 +314,7 @@ begin
   CategoryGeneral := AddCategory('');
   EditChannelName := TEdit.Create(Self);
   AddPropertyRow(CategoryGeneral, ' ', EditChannelName);
+  EditChannelName.OnChangeTracking := HandleChannelNameChange;
 
   ComboChannelType := CreateComboBox(['', '', '', '', '', '']);
   AddPropertyRow(CategoryGeneral, ' ', ComboChannelType);
@@ -235,9 +349,15 @@ begin
   TreeInspector.Stored := False;
 
   CategoryFreqPulse := AddCategory('Частотно-импульсный сигнал');
-  AddPropertyRow(CategoryFreqPulse, 'Тип выхода прибора', CreateComboBox(['Авто', 'Пассивный (+Namur)', 'Активный', 'Универсальный', 'Емкостной']));
-  AddPropertyRow(CategoryFreqPulse, 'Синхронизация', CreateComboBox(['Выкл', 'По фронту', 'По фронту + время']));
-  AddPropertyRow(CategoryFreqPulse, 'Фильтр помех', CreateComboBox(['Выкл', 'Авто', '10 мс', '50 мс', '100 мс']));
+  ComboOutputSet := CreateComboBox(['Авто', 'Пассивный', 'Активный', 'Универсальный', 'Емкостной']);
+  AddPropertyRow(CategoryFreqPulse, 'Тип выхода прибора', CreateComboWithIndicator(ComboOutputSet, IndicatorOutputSet));
+  ComboOutputSet.OnChange := HandleOutputSetChange;
+  ComboSyncMode := CreateComboBox(['Выкл', 'По фронту', 'По фронту + время']);
+  AddPropertyRow(CategoryFreqPulse, 'Синхронизация', CreateComboWithIndicator(ComboSyncMode, IndicatorSyncMode));
+  ComboSyncMode.OnChange := HandleSyncModeChange;
+  ComboNoiseFilter := CreateComboBox(['Выкл', 'Авто', '10 мс', '50 мс', '100 мс']);
+  AddPropertyRow(CategoryFreqPulse, 'Фильтр помех', CreateComboWithIndicator(ComboNoiseFilter, IndicatorNoiseFilter));
+  ComboNoiseFilter.OnChange := HandleNoiseFilterChange;
   AddPropertyRow(CategoryFreqPulse, 'Усреднение', CreateComboBox(['Выкл', 'Авто', '2 сек', '4 сек']));
   AddPropertyRow(CategoryFreqPulse, 'Текущая частота, Гц', TLabel.Create(Self));
   AddPropertyRow(CategoryFreqPulse, 'Текущая длительность импульса', TLabel.Create(Self));
