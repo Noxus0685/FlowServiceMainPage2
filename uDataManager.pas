@@ -356,6 +356,17 @@ begin
   if (ADevice = nil) or (ANode = nil) then
     Exit;
 
+  case ANode.Tag of
+    Ord(tnManufacturer):
+      begin
+        ADevice.Category := 0;
+        ADevice.CategoryName := '';
+        ADevice.Modification := '';
+      end;
+    Ord(tnCategory):
+      ADevice.Modification := '';
+  end;
+
   Cur := ANode;
   while Cur <> nil do
   begin
@@ -367,7 +378,10 @@ begin
           // По аналогии с AssignTypeTreeFields:
           // TagString узла категории содержит ID категории в виде строки.
           ADevice.Category := StrToIntDef(Cur.TagString, 0);
-          ADevice.CategoryName := Cur.Text;
+          if ADevice.Category > 0 then
+            ADevice.CategoryName := ''
+          else
+            ADevice.CategoryName := Cur.Text;
         end;
       Ord(tnModification):
         ADevice.Modification := Cur.TagString;
@@ -386,6 +400,17 @@ begin
   if (AType = nil) or (ANode = nil) then
     Exit;
 
+  case ANode.Tag of
+    Ord(tnManufacturer):
+      begin
+        AType.Category := 0;
+        AType.CategoryName := '';
+        AType.Modification := '';
+      end;
+    Ord(tnCategory):
+      AType.Modification := '';
+  end;
+
   Cur := ANode;
   while Cur <> nil do
   begin
@@ -395,7 +420,10 @@ begin
       Ord(tnCategory):
         begin
           AType.Category := StrToIntDef(Cur.TagString, 0);
-          AType.CategoryName := Cur.Text;
+          if AType.Category > 0 then
+            AType.CategoryName := ''
+          else
+            AType.CategoryName := Cur.Text;
         end;
       Ord(tnModification):
         AType.Modification := Cur.TagString;
