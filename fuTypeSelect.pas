@@ -227,8 +227,6 @@ type
     function GetCheckedTypes: TObjectList<TDeviceType>;
     function GetSelectedTypes: TObjectList<TDeviceType>;
     function GetActiveTreeNode: TTreeViewItem;
-    function BuildTreeNodePath(ANode: TTreeViewItem): string;
-    procedure RestoreTreeSelection(const ASelectedPath: string; const ASelectedNode: TTreeViewItem);
 
   public
     { Public declarations }
@@ -519,42 +517,6 @@ begin
   end;
 end;
 
-function TFormTypeSelect.BuildTreeNodePath(ANode: TTreeViewItem): string;
-var
-  Cur: TTreeViewItem;
-begin
-  Result := '';
-  Cur := ANode;
-  while Cur <> nil do
-  begin
-    Result := IntToStr(Cur.Tag) + ':' + Cur.TagString + '|' + Result;
-    Cur := Cur.ParentItem;
-  end;
-end;
-
-procedure TFormTypeSelect.RestoreTreeSelection(const ASelectedPath: string; const ASelectedNode: TTreeViewItem);
-var
-  J: Integer;
-  Candidate: TTreeViewItem;
-begin
-  if (ASelectedNode <> nil) and (ASelectedNode.TreeView = TreeViewTypes) then
-  begin
-    TreeViewTypes.Selected := ASelectedNode;
-    Exit;
-  end;
-
-  if ASelectedPath = '' then
-    Exit;
-
-  for J := 0 to TreeViewTypes.Count - 1 do
-    if BuildTreeNodePath(TreeViewTypes.ItemByIndex(J)) = ASelectedPath then
-    begin
-      Candidate := TreeViewTypes.ItemByIndex(J);
-      TreeViewTypes.Selected := Candidate;
-      Exit;
-    end;
-end;
-
 procedure TFormTypeSelect.actTypeCopyExecute(Sender: TObject);
 var
   TargetTypes: TObjectList<TDeviceType>;
@@ -575,13 +537,25 @@ var
   NewRows: TObjectList<TDeviceType>;
   ExpandedPaths: TStringList;
   SelectedPath: string;
+  function NodePath(ANode: TTreeViewItem): string;
+  var
+    Cur: TTreeViewItem;
+  begin
+    Result := '';
+    Cur := ANode;
+    while Cur <> nil do
+    begin
+      Result := IntToStr(Cur.Tag) + ':' + Cur.TagString + '|' + Result;
+      Cur := Cur.ParentItem;
+    end;
+  end;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferTypes) then
     Exit;
 
   SelectedNode := GetActiveTreeNode;
   if SelectedNode <> nil then
-    SelectedPath := BuildTreeNodePath(SelectedNode)
+    SelectedPath := NodePath(SelectedNode)
   else
     SelectedPath := '';
 
@@ -590,16 +564,22 @@ begin
   try
     for J := 0 to TreeViewTypes.Count - 1 do
       if TreeViewTypes.ItemByIndex(J).IsExpanded then
-        ExpandedPaths.Add(BuildTreeNodePath(TreeViewTypes.ItemByIndex(J)));
+        ExpandedPaths.Add(NodePath(TreeViewTypes.ItemByIndex(J)));
 
     NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
     BuildTree;
     for J := 0 to TreeViewTypes.Count - 1 do
-      if ExpandedPaths.IndexOf(BuildTreeNodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
+      if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
         TreeViewTypes.ItemByIndex(J).IsExpanded := True;
 
-    RestoreTreeSelection(SelectedPath, SelectedNode);
+    if SelectedPath <> '' then
+      for J := 0 to TreeViewTypes.Count - 1 do
+        if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
+        begin
+          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
+          Break;
+        end;
 
     SyncTreeSelectionState(False);
     ApplyFilter;
@@ -690,14 +670,7 @@ end;
 procedure TFormTypeSelect.actTypeCutExecute(Sender: TObject);
 var
   TargetTypes: TObjectList<TDeviceType>;
-  SelectedNode: TTreeViewItem;
-  SelectedPath: string;
 begin
-  SelectedNode := GetActiveTreeNode;
-  if SelectedNode <> nil then
-    SelectedPath := BuildTreeNodePath(SelectedNode)
-  else
-    SelectedPath := '';
   // UI вызывает бизнес-логику Cut через менеджер данных.
   TargetTypes := GetSelectedTypes;
   try
@@ -706,7 +679,6 @@ begin
     TargetTypes.Free;
   end;
   ApplyFilter;
-  RestoreTreeSelection(SelectedPath, SelectedNode);
   UpdateGridTypes;
 end;
 
