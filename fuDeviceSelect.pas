@@ -224,6 +224,7 @@ private
   function UpdateConnection: Boolean;             // смена активного репозитория
   procedure ClearTreeAndGrid;                     // очистка UI при смене репозитория
   function GetSelectedDevices: TObjectList<TDevice>;
+  function GetActiveTreeNode: TTreeViewItem;
 
 public
   { Public declarations }
@@ -793,13 +794,26 @@ end;
 procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
   NewRows: TObjectList<TDevice>;
+  NewDevice: TDevice;
   I: Integer;
+  SelectedNode: TTreeViewItem;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferDevices) then
     Exit;
 
+  SelectedNode := GetActiveTreeNode;
   NewRows := AppServices.DataManager.PasteBufferDevices;
   try
+    // По аналогии с FormTypeSelect:
+    // создаём новый прибор из буфера и, если выбрана ветка назначения,
+    // переопределяем только поля привязки к дереву для НОВОГО экземпляра.
+    for I := 0 to NewRows.Count - 1 do
+    begin
+      NewDevice := NewRows[I];
+      if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
+        AppServices.DataManager.AssignDeviceTreeFields(NewDevice, SelectedNode);
+    end;
+
     ApplyFilter;
     UpdateGridDevices;
 
@@ -813,6 +827,70 @@ begin
   finally
     NewRows.Free;
   end;
+end;
+
+function TFormDeviceSelect.GetActiveTreeNode: TTreeViewItem;
+var
+  BestDepth: Integer;
+  procedure CheckCandidate(const ACandidate: TTreeViewItem);
+  var
+    CurDepth: Integer;
+    Parent: TTreeViewItem;
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ACandidate = nil then
+      Exit;
+
+    if ACandidate.IsSelected then
+    begin
+      CurDepth := 0;
+      Parent := ACandidate.ParentItem;
+      while Parent <> nil do
+      begin
+        Inc(CurDepth);
+        Parent := Parent.ParentItem;
+      end;
+
+      // При множественном выборе берём наиболее глубокий выбранный узел,
+      // чтобы подветка имела приоритет над родительской веткой.
+      if CurDepth >= BestDepth then
+      begin
+        BestDepth := CurDepth;
+        Result := ACandidate;
+      end;
+    end;
+
+    // Обходим всё дерево рекурсивно, а не только корневые элементы.
+    for J := 0 to ACandidate.Count - 1 do
+      if ACandidate.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ACandidate.ItemByIndex(J));
+        CheckCandidate(ChildNode);
+      end;
+  end;
+var
+  I: Integer;
+  CurDepth: Integer;
+  Parent: TTreeViewItem;
+begin
+  Result := TreeViewDevices.Selected;
+  BestDepth := -1;
+
+  if Result <> nil then
+  begin
+    CurDepth := 0;
+    Parent := Result.ParentItem;
+    while Parent <> nil do
+    begin
+      Inc(CurDepth);
+      Parent := Parent.ParentItem;
+    end;
+    BestDepth := CurDepth;
+  end;
+
+  for I := 0 to TreeViewDevices.Count - 1 do
+    CheckCandidate(TreeViewDevices.ItemByIndex(I));
 end;
 
 procedure TFormDeviceSelect.UpdateDeviceActions(Sender: TObject);
