@@ -387,12 +387,20 @@ begin
         end;
       Ord(tnModification):
         begin
-          // Если модификация выбрана внутри "<категория>", то очищаем модификацию.
-          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) and
-             SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
-            ADevice.Modification := ''
-          else
-            ADevice.Modification := Cur.TagString;
+          ADevice.Modification := Cur.TagString;
+
+          // Для модификации учитываем категорию-родителя.
+          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) then
+            if SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
+            begin
+              ADevice.Category := 0;
+              ADevice.CategoryName := '';
+            end
+            else
+            begin
+              ADevice.Category := StrToIntDef(Cur.ParentItem.TagString, 0);
+              ADevice.CategoryName := Cur.ParentItem.Text;
+            end;
         end;
     end;
     Cur := Cur.ParentItem;
@@ -440,11 +448,19 @@ begin
         end;
       Ord(tnModification):
         begin
-          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) and
-             SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
-            AType.Modification := ''
-          else
-            AType.Modification := Cur.TagString;
+          AType.Modification := Cur.TagString;
+
+          if (Cur.ParentItem <> nil) and (Cur.ParentItem.Tag = Ord(tnCategory)) then
+            if SameText(Trim(Cur.ParentItem.Text), UNDEFINED_CATEGORY_TEXT) then
+            begin
+              AType.Category := 0;
+              AType.CategoryName := '';
+            end
+            else
+            begin
+              AType.Category := StrToIntDef(Cur.ParentItem.TagString, 0);
+              AType.CategoryName := Cur.ParentItem.Text;
+            end;
         end;
     end;
     Cur := Cur.ParentItem;
