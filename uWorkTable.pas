@@ -58,7 +58,9 @@ type
     awtAddPump,
     awtRemovePump,
     awtAddChannel,
-    awtRemoveChannel
+    awtRemoveChannel,
+    awtWriteRegister,
+    awtReadRegister
 
   );
 
@@ -66,6 +68,7 @@ type
     ewtNone = 0,
     ewtWarning = 1,
     ewtError,
+    ewtRefresh,
     ewtActivated
   );
   TWorkTableEvent = EEventWorkTable;
