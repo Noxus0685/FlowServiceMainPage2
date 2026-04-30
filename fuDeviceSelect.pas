@@ -853,14 +853,10 @@ end;
 procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
   NewRows: TObjectList<TDevice>;
-  NewDevice: TDevice;
   I, J: Integer;
   SelectedNode: TTreeViewItem;
-  SelectedParent: TTreeViewItem;
-  TargetManKey, TargetCatKey, TargetModKey: string;
-  TargetNode: TTreeViewItem;
-  HasTargetBranch: Boolean;
   ExpandedPaths: TStringList;
+  SelectedPath: string;
   function NodePath(ANode: TTreeViewItem): string;
   var
     Cur: TTreeViewItem;
@@ -878,71 +874,30 @@ begin
     Exit;
 
   SelectedNode := GetActiveTreeNode;
-  TargetManKey := '';
-  TargetCatKey := '';
-  TargetModKey := '';
-  HasTargetBranch := (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll));
-  if HasTargetBranch then
-    case SelectedNode.Tag of
-      Ord(tnManufacturer):
-        TargetManKey := SelectedNode.TagString;
-      Ord(tnCategory):
-        begin
-          TargetCatKey := SelectedNode.TagString;
-          SelectedParent := SelectedNode.ParentItem;
-          if SelectedParent <> nil then
-            TargetManKey := SelectedParent.TagString;
-        end;
-      Ord(tnModification):
-        begin
-          TargetModKey := SelectedNode.TagString;
-          SelectedParent := SelectedNode.ParentItem;
-          if SelectedParent <> nil then
-          begin
-            TargetCatKey := SelectedParent.TagString;
-            SelectedParent := SelectedParent.ParentItem;
-            if SelectedParent <> nil then
-              TargetManKey := SelectedParent.TagString;
-          end;
-        end;
-    end;
+  if SelectedNode <> nil then
+    SelectedPath := NodePath(SelectedNode)
+  else
+    SelectedPath := '';
   ExpandedPaths := TStringList.Create;
   try
     for J := 0 to TreeViewDevices.Count - 1 do
       if TreeViewDevices.ItemByIndex(J).IsExpanded then
         ExpandedPaths.Add(NodePath(TreeViewDevices.ItemByIndex(J)));
 
-    NewRows := AppServices.DataManager.PasteBufferDevices;
+    NewRows := AppServices.DataManager.PasteBufferDevices(SelectedNode);
   try
-    // По аналогии с FormTypeSelect:
-    // создаём новый прибор из буфера и, если выбрана ветка назначения,
-    // переопределяем только поля привязки к дереву для НОВОГО экземпляра.
-    for I := 0 to NewRows.Count - 1 do
-    begin
-      NewDevice := NewRows[I];
-      if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-        AppServices.DataManager.AssignDeviceTreeFields(NewDevice, SelectedNode);
-    end;
-
     BuildTree;
     for J := 0 to TreeViewDevices.Count - 1 do
       if ExpandedPaths.IndexOf(NodePath(TreeViewDevices.ItemByIndex(J))) >= 0 then
         TreeViewDevices.ItemByIndex(J).IsExpanded := True;
 
-    if HasTargetBranch then
-    begin
-      TargetNode := FindChildInTree(TreeViewDevices, Ord(tnManufacturer), TargetManKey);
-      if (TargetNode <> nil) and (TargetCatKey <> '') then
-        TargetNode := FindChildInNode(TargetNode, Ord(tnCategory), TargetCatKey);
-      if (TargetNode <> nil) and (TargetModKey <> '') then
-        TargetNode := FindChildInNode(TargetNode, Ord(tnModification), TargetModKey);
-      if TargetNode <> nil then
-      begin
-        for J := 0 to TreeViewDevices.Count - 1 do
-          TreeViewDevices.ItemByIndex(J).IsSelected := False;
-        TreeViewDevices.Selected := TargetNode;
-      end;
-    end;
+    if SelectedPath <> '' then
+      for J := 0 to TreeViewDevices.Count - 1 do
+        if NodePath(TreeViewDevices.ItemByIndex(J)) = SelectedPath then
+        begin
+          TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(J);
+          Break;
+        end;
 
     ApplyFilter;
     UpdateGridDevices;

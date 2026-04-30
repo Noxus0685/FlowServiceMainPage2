@@ -105,7 +105,8 @@ type
   // Копирование списка типов во внутренний буфер через Clone.
   procedure CopyTypesToBuffer(const ATypes: TList<TDeviceType>);
   // Вставка типов из буфера в активный репозиторий с созданием новых экземпляров.
-  function PasteBufferTypes: TObjectList<TDeviceType>;
+  // Если передан узел дерева, выполняется привязка новых объектов к выбранной ветке.
+  function PasteBufferTypes(const ATargetNode: TTreeViewItem): TObjectList<TDeviceType>;
   // Вырезание: копирование в буфер и удаление из активного репозитория.
   procedure CutTypesToBuffer(const ATypes: TList<TDeviceType>);
   // Проверка наличия данных в буфере типов.
@@ -113,7 +114,8 @@ type
   // Копирование списка приборов во внутренний буфер через Clone.
   procedure CopyDevicesToBuffer(const ADevices: TList<TDevice>);
   // Вставка приборов из буфера в активный репозиторий с созданием новых экземпляров.
-  function PasteBufferDevices: TObjectList<TDevice>;
+  // Если передан узел дерева, выполняется привязка новых объектов к выбранной ветке.
+  function PasteBufferDevices(const ATargetNode: TTreeViewItem): TObjectList<TDevice>;
   // Вырезание приборов: копирование в буфер и удаление из активного репозитория.
   procedure CutDevicesToBuffer(const ADevices: TList<TDevice>);
   // Проверка наличия данных в буфере приборов.
@@ -234,12 +236,13 @@ begin
   SetBufferTypes(ATypes);
 end;
 
-function TManagerTTableDM.PasteBufferTypes: TObjectList<TDeviceType>;
+function TManagerTTableDM.PasteBufferTypes(const ATargetNode: TTreeViewItem): TObjectList<TDeviceType>;
 var
   SourceType: TDeviceType;
   NewType: TDeviceType;
 begin
   // Бизнес-логика Paste: создаём новые типы в активном репозитории по снимку буфера.
+  // ВАЖНО: создаются новые объекты, а не ссылки на внутренний буфер.
   Result := TObjectList<TDeviceType>.Create(False);
   if (ActiveTypeRepo = nil) or (FCopiedTypes.Count = 0) then
     Exit;
@@ -249,6 +252,9 @@ begin
     if SourceType = nil then
       Continue;
     NewType := ActiveTypeRepo.CreateType(SourceType);
+    // При вставке в выбранную ветку дерева применяем её как контекст назначения.
+    if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
+      AssignTypeTreeFields(NewType, ATargetNode);
     Result.Add(NewType);
   end;
 end;
@@ -310,12 +316,13 @@ begin
   SetBufferDevices(ADevices);
 end;
 
-function TManagerTTableDM.PasteBufferDevices: TObjectList<TDevice>;
+function TManagerTTableDM.PasteBufferDevices(const ATargetNode: TTreeViewItem): TObjectList<TDevice>;
 var
   SourceDevice: TDevice;
   NewDevice: TDevice;
 begin
   // Бизнес-логика Paste: создаём новые экземпляры приборов через репозиторий.
+  // ВАЖНО: создаются новые объекты, а не ссылки на внутренний буфер.
   Result := TObjectList<TDevice>.Create(False);
   if (ActiveDeviceRepo = nil) or (FCopiedDevices.Count = 0) then
     Exit;
@@ -325,6 +332,9 @@ begin
     if SourceDevice = nil then
       Continue;
     NewDevice := ActiveDeviceRepo.CreateDevice(SourceDevice);
+    // При вставке в выбранную ветку дерева применяем её как контекст назначения.
+    if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
+      AssignDeviceTreeFields(NewDevice, ATargetNode);
     Result.Add(NewDevice);
   end;
 end;
