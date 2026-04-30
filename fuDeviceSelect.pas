@@ -865,13 +865,45 @@ procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
   NewRows: TObjectList<TDevice>;
   NewDevice: TDevice;
-  I: Integer;
+  I, J: Integer;
   SelectedNode: TTreeViewItem;
+  SelectedParent: TTreeViewItem;
+  TargetManKey, TargetCatKey, TargetModKey: string;
+  TargetNode: TTreeViewItem;
+  HasTargetBranch: Boolean;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferDevices) then
     Exit;
 
   SelectedNode := GetActiveTreeNode;
+  TargetManKey := '';
+  TargetCatKey := '';
+  TargetModKey := '';
+  HasTargetBranch := (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll));
+  if HasTargetBranch then
+    case SelectedNode.Tag of
+      Ord(tnManufacturer):
+        TargetManKey := SelectedNode.TagString;
+      Ord(tnCategory):
+        begin
+          TargetCatKey := SelectedNode.TagString;
+          SelectedParent := SelectedNode.ParentItem;
+          if SelectedParent <> nil then
+            TargetManKey := SelectedParent.TagString;
+        end;
+      Ord(tnModification):
+        begin
+          TargetModKey := SelectedNode.TagString;
+          SelectedParent := SelectedNode.ParentItem;
+          if SelectedParent <> nil then
+          begin
+            TargetCatKey := SelectedParent.TagString;
+            SelectedParent := SelectedParent.ParentItem;
+            if SelectedParent <> nil then
+              TargetManKey := SelectedParent.TagString;
+          end;
+        end;
+    end;
   NewRows := AppServices.DataManager.PasteBufferDevices;
   try
     // По аналогии с FormTypeSelect:
@@ -882,6 +914,22 @@ begin
       NewDevice := NewRows[I];
       if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
         AppServices.DataManager.AssignDeviceTreeFields(NewDevice, SelectedNode);
+    end;
+
+    BuildTree;
+    if HasTargetBranch then
+    begin
+      TargetNode := FindChildInTree(TreeViewDevices, Ord(tnManufacturer), TargetManKey);
+      if (TargetNode <> nil) and (TargetCatKey <> '') then
+        TargetNode := FindChildInNode(TargetNode, Ord(tnCategory), TargetCatKey);
+      if (TargetNode <> nil) and (TargetModKey <> '') then
+        TargetNode := FindChildInNode(TargetNode, Ord(tnModification), TargetModKey);
+      if TargetNode <> nil then
+      begin
+        for J := 0 to TreeViewDevices.Count - 1 do
+          TreeViewDevices.ItemByIndex(J).IsSelected := False;
+        TreeViewDevices.Selected := TargetNode;
+      end;
     end;
 
     ApplyFilter;
