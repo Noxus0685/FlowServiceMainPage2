@@ -393,6 +393,8 @@ type
     procedure GridEtalonsSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridEtalonsCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridEtalonsSelectCell(Sender: TObject; const ACol, ARow: Integer;
+      var CanSelect: Boolean);
     procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -4538,6 +4540,17 @@ begin
     GridEtalons.EndUpdate;
   end;
 
+end;
+
+procedure TFrameMainTable.GridEtalonsSelectCell(Sender: TObject; const ACol,
+  ARow: Integer; var CanSelect: Boolean);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetWorkTableByIndex(0);
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[ARow]);
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
