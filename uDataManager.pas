@@ -364,20 +364,9 @@ begin
         ADevice.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          // В дереве приборов TagString у категории хранит текст категории,
-          // а не числовой ID. Поэтому StrToIntDef здесь даёт 0 и "теряет" категорию.
-          // Для пользовательской текстовой категории фиксируем Category = -1
-          // и переносим имя категории из узла назначения.
-          if Cur.TagString = '' then
-          begin
-            ADevice.Category := -1;
-            ADevice.CategoryName := '';
-          end
-          else
-          begin
-            ADevice.Category := -1;
-            ADevice.CategoryName := Cur.TagString;
-          end;
+          ADevice.Category := StrToIntDef(Cur.TagString, 0);
+          if Cur.Text <> '<категория>' then
+            ADevice.CategoryName := Cur.Text;
         end;
       Ord(tnModification):
         ADevice.Modification := Cur.TagString;
