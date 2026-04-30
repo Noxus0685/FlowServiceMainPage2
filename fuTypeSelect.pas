@@ -533,7 +533,7 @@ end;
 procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
   NewType: TDeviceType;
-  I: Integer;
+  I, J: Integer;
   SelectedNode: TTreeViewItem;
   SelectedParent: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
@@ -594,9 +594,14 @@ begin
       if (TargetNode <> nil) and (TargetModKey <> '') then
         TargetNode := FindChildInNode(TargetNode, Ord(tnModification), TargetModKey);
       if TargetNode <> nil then
+      begin
+        for J := 0 to TreeViewTypes.Count - 1 do
+          TreeViewTypes.ItemByIndex(J).IsSelected := False;
         TreeViewTypes.Selected := TargetNode;
+      end;
     end;
 
+    SyncTreeSelectionState(False);
     ApplyFilter;
     UpdateGridTypes;
 

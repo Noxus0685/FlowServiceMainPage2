@@ -854,7 +854,7 @@ procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
   NewRows: TObjectList<TDevice>;
   NewDevice: TDevice;
-  I: Integer;
+  I, J: Integer;
   SelectedNode: TTreeViewItem;
   SelectedParent: TTreeViewItem;
   TargetManKey, TargetCatKey, TargetModKey: string;
@@ -914,7 +914,11 @@ begin
       if (TargetNode <> nil) and (TargetModKey <> '') then
         TargetNode := FindChildInNode(TargetNode, Ord(tnModification), TargetModKey);
       if TargetNode <> nil then
+      begin
+        for J := 0 to TreeViewDevices.Count - 1 do
+          TreeViewDevices.ItemByIndex(J).IsSelected := False;
         TreeViewDevices.Selected := TargetNode;
+      end;
     end;
 
     ApplyFilter;
