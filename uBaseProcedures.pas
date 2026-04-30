@@ -129,6 +129,12 @@ type
     optCapacity
   );
 
+  ESyncChannelMode = (
+    scmOff = 0,
+    scmByEdge,
+    scmByEdgeTime
+  );
+
   TErrorInfo = record
     Code: Integer;
     Msg: string;
@@ -174,6 +180,11 @@ function ObjClassNameOrNil(const AObject: TObject): string;
 function OutputSetToStr(AValue: EOutPutSet): string;
 function StrToOutputSet(const AValue: string): EOutPutSet;
 function IntToOutputSet(const AValue: Integer): EOutPutSet;
+function SyncChannelModeToStr(AValue: ESyncChannelMode): string;
+function StrToSyncChannelMode(const AValue: string): ESyncChannelMode;
+function IntToSyncChannelMode(const AValue: Integer): ESyncChannelMode;
+function NoiseFilterToStr(AValue: Integer): string;
+function StrToNoiseFilter(const AValue: string): Integer;
 
 implementation
 
@@ -236,6 +247,63 @@ begin
     Result := EOutPutSet(AValue)
   else
     Result := optAuto;
+end;
+
+function SyncChannelModeToStr(AValue: ESyncChannelMode): string;
+begin
+  case AValue of
+    scmByEdge: Result := 'По фронту';
+    scmByEdgeTime: Result := 'По фронту + время';
+  else
+    Result := 'Выкл';
+  end;
+end;
+
+function StrToSyncChannelMode(const AValue: string): ESyncChannelMode;
+var
+  LValue: string;
+begin
+  LValue := Trim(LowerCase(AValue));
+  if LValue = LowerCase('По фронту') then
+    Exit(scmByEdge);
+  if LValue = LowerCase('По фронту + время') then
+    Exit(scmByEdgeTime);
+  Result := scmOff;
+end;
+
+function IntToSyncChannelMode(const AValue: Integer): ESyncChannelMode;
+begin
+  if (AValue >= Ord(Low(ESyncChannelMode))) and
+     (AValue <= Ord(High(ESyncChannelMode))) then
+    Result := ESyncChannelMode(AValue)
+  else
+    Result := scmOff;
+end;
+
+function NoiseFilterToStr(AValue: Integer): string;
+begin
+  case AValue of
+    -1: Result := 'Выкл';
+    0: Result := 'Авто';
+  else
+    Result := IntToStr(AValue) + ' мс';
+  end;
+end;
+
+function StrToNoiseFilter(const AValue: string): Integer;
+var
+  LValue: string;
+  LInt: Integer;
+begin
+  LValue := Trim(LowerCase(AValue));
+  if LValue = LowerCase('Выкл') then
+    Exit(-1);
+  if LValue = LowerCase('Авто') then
+    Exit(0);
+  if ExtractInt(LValue, LInt) then
+    Result := LInt
+  else
+    Result := 0;
 end;
 
 function NormalizeFloatInput(const S: string): Double;

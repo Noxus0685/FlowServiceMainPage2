@@ -127,6 +127,8 @@ type
     FHashValueInterface: string;
     FName: string;
     FOutputSet: TControlRegister<EOutPutSet>;
+    FSyncMode: TControlRegister<ESyncChannelMode>;
+    FNoiseFilter: TControlRegister<Integer>;
 
 
 
@@ -144,6 +146,10 @@ type
     procedure SetSignalProxy(const AValue: Integer);
     function GetOutputSetProxy: EOutPutSet;
     procedure SetOutputSetProxy(const AValue: EOutPutSet);
+    function GetSyncModeProxy: ESyncChannelMode;
+    procedure SetSyncModeProxy(const AValue: ESyncChannelMode);
+    function GetNoiseFilterProxy: Integer;
+    procedure SetNoiseFilterProxy(const AValue: Integer);
     function GetCategoryProxy: Integer;
     procedure SetCategoryProxy(const AValue: Integer);
 
@@ -218,6 +224,8 @@ type
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
     property OutputSet: EOutPutSet read GetOutputSetProxy write SetOutputSetProxy;
+    property SyncMode: ESyncChannelMode read GetSyncModeProxy write SetSyncModeProxy;
+    property NoiseFilter: Integer read GetNoiseFilterProxy write SetNoiseFilterProxy;
     property Category: Integer read GetCategoryProxy write SetCategoryProxy;
     property Group: Integer read FGroup write FGroup;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
@@ -752,6 +760,8 @@ begin
 
   FFlowMeter := TFlowMeter.Create;
   FOutputSet := TControlRegister<EOutPutSet>.Create;
+  FSyncMode := TControlRegister<ESyncChannelMode>.Create;
+  FNoiseFilter := TControlRegister<Integer>.Create;
 
   FEnabled := False;
   FName:= 'Канал';
@@ -772,6 +782,8 @@ end;
 destructor TChannel.Destroy;
 begin
   FreeAndNil(FOutputSet);
+  FreeAndNil(FSyncMode);
+  FreeAndNil(FNoiseFilter);
   FreeAndNil(FFlowMeter);
   inherited Destroy;
 end;
@@ -784,7 +796,11 @@ begin
 
   FFlowMeter.Init(DeviceUUID);
   if (FFlowMeter.Device <> nil) then
+  begin
     FOutputSet.FromDefault(IntToOutputSet(FFlowMeter.Device.OutputSet));
+    FSyncMode.FromDefault(IntToSyncChannelMode(FFlowMeter.Device.SyncMode));
+    FNoiseFilter.FromDefault(FFlowMeter.Device.NoiseFilter);
+  end;
 end;
                                          {TODO -oOwner -cGeneral : ActionItem}
 { Rebinds FlowMeter value references to channel and work table meter values. }
@@ -906,6 +922,8 @@ begin
   FCategory := ASource.FCategory;
   FGroup := ASource.FGroup;
   OutputSet := ASource.OutputSet;
+  SyncMode := ASource.SyncMode;
+  NoiseFilter := ASource.NoiseFilter;
 
   SrcDevice := ASource.FFlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
@@ -1002,6 +1020,34 @@ procedure TChannel.SetOutputSetProxy(const AValue: EOutPutSet);
 begin
   if FOutputSet <> nil then
     FOutputSet.SetValue(AValue);
+end;
+
+function TChannel.GetSyncModeProxy: ESyncChannelMode;
+begin
+  if FSyncMode <> nil then
+    Result := FSyncMode.Value
+  else
+    Result := scmOff;
+end;
+
+procedure TChannel.SetSyncModeProxy(const AValue: ESyncChannelMode);
+begin
+  if FSyncMode <> nil then
+    FSyncMode.SetValue(AValue);
+end;
+
+function TChannel.GetNoiseFilterProxy: Integer;
+begin
+  if FNoiseFilter <> nil then
+    Result := FNoiseFilter.Value
+  else
+    Result := 0;
+end;
+
+procedure TChannel.SetNoiseFilterProxy(const AValue: Integer);
+begin
+  if FNoiseFilter <> nil then
+    FNoiseFilter.SetValue(AValue);
 end;
 
 function TChannel.GetCategoryProxy: Integer;
@@ -2621,6 +2667,8 @@ begin
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
     AIni.WriteInteger(Section, 'OutputSet', Ord(Channel.OutputSet));
+    AIni.WriteInteger(Section, 'SyncMode', Ord(Channel.SyncMode));
+    AIni.WriteInteger(Section, 'NoiseFilter', Channel.NoiseFilter);
     AIni.WriteInteger(Section, 'Category', Channel.Category);
     AIni.WriteInteger(Section, 'Group', Channel.Group);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
@@ -2688,6 +2736,10 @@ begin
     Channel.OutputSet := IntToOutputSet(
       AIni.ReadInteger(Section, 'OutputSet', Ord(optAuto))
     );
+    Channel.SyncMode := IntToSyncChannelMode(
+      AIni.ReadInteger(Section, 'SyncMode', Ord(scmOff))
+    );
+    Channel.NoiseFilter := AIni.ReadInteger(Section, 'NoiseFilter', 0);
     Channel.Category := AIni.ReadInteger(Section, 'Category', Ord(mftUnknownType));
     Channel.Group := AIni.ReadInteger(Section, 'Group', 0);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
