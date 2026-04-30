@@ -1,8 +1,8 @@
-unit frmChannelProperties;
+﻿unit frmChannelProperties;
 
 interface
 
-{$CODEPAGE UTF8}
+//{$CODEPAGE UTF8}
 
 uses
   FMX.ComboEdit,

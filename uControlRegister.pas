@@ -1,4 +1,4 @@
-unit UnitControlRegister;
+﻿unit uControlRegister;
 
 interface
 
@@ -111,7 +111,7 @@ begin
     FComparer := AComparer
   else
     FComparer :=
-      function(const A, B: T): Boolean
+      function(A, B: T): Boolean
       var
         Kind: TTypeKind;
       begin
@@ -124,6 +124,7 @@ begin
         // Для Integer/Enum и остальных типов используем стандартное равенство.
         Result := TEqualityComparer<T>.Default.Equals(A, B);
       end;
+
 
   FState := crsUnknown;
   FAction := craNone;
