@@ -136,6 +136,7 @@ type
     aDevicePaste: TAction;
     aDeviceCut: TAction;
     aDeviceCopy: TAction;
+    aRefreshRepository: TAction;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -152,7 +153,6 @@ type
     procedure miAddRepositoryClick(Sender: TObject);
     procedure miDeleteRepositoryClick(Sender: TObject);
     procedure miLoadRepositoryClick(Sender: TObject);
-    procedure miRefreshRepositoryClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -167,6 +167,7 @@ type
     procedure aDevicePasteExecute(Sender: TObject);
     procedure aDeviceCutExecute(Sender: TObject);
     procedure UpdateDeviceActions(Sender: TObject);
+    procedure aRefreshRepositoryExecute(Sender: TObject);
 
 private
 
@@ -527,19 +528,7 @@ begin
   UpdateGridDevices;
 end;
 
-procedure TFormDeviceSelect.miRefreshRepositoryClick(Sender: TObject);
-begin
-  {----------------------------------}
-  { Пересборка дерева }
-  {----------------------------------}
-  BuildTree;
 
-  {----------------------------------}
-  { Полная пересборка фильтров + сортировка }
-  {----------------------------------}
-  ApplyFilter;
-  UpdateGridDevices;
-end;
 
 procedure TFormDeviceSelect.miSaveClick(Sender: TObject);
 var
@@ -1257,6 +1246,20 @@ begin
         Ord(ColumnToSortField(FSortColumn)),
         FSortAscending
       );
+end;
+
+procedure TFormDeviceSelect.aRefreshRepositoryExecute(Sender: TObject);
+begin
+  {----------------------------------}
+  { Пересборка дерева }
+  {----------------------------------}
+  BuildTree;
+
+  {----------------------------------}
+  { Полная пересборка фильтров + сортировка }
+  {----------------------------------}
+  ApplyFilter;
+  UpdateGridDevices;
 end;
 
 function TFormDeviceSelect.BuildFilteredByTree(

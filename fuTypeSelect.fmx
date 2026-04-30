@@ -672,6 +672,9 @@ object FormTypeSelect: TFormTypeSelect
     object Action3: TAction
       Text = 'Action3'
     end
+    object aRefreshRepository: TAction
+      Text = #1054#1073#1085#1086#1074#1080#1090#1100
+    end
   end
   object NetHTTPClient1: TNetHTTPClient
     Accept = 'application/json'
