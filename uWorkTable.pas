@@ -10,6 +10,7 @@ uses
   System.SysUtils,
   uBaseProcedures,
   uClasses,
+  uControlRegister,
   uDataManager,
   uDeviceClass,
   uFlowMeter,
@@ -125,6 +126,7 @@ type
     FHashValueCurrent: string;
     FHashValueInterface: string;
     FName: string;
+    FOutputSet: TControlRegister<EOutPutSet>;
 
 
 
@@ -140,6 +142,8 @@ type
 
     function GetSignalProxy: Integer;
     procedure SetSignalProxy(const AValue: Integer);
+    function GetOutputSetProxy: EOutPutSet;
+    procedure SetOutputSetProxy(const AValue: EOutPutSet);
     function GetCategoryProxy: Integer;
     procedure SetCategoryProxy(const AValue: Integer);
 
@@ -213,6 +217,7 @@ type
     property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
+    property OutputSet: EOutPutSet read GetOutputSetProxy write SetOutputSetProxy;
     property Category: Integer read GetCategoryProxy write SetCategoryProxy;
     property Group: Integer read FGroup write FGroup;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
@@ -746,6 +751,7 @@ begin
   inherited Create;
 
   FFlowMeter := TFlowMeter.Create;
+  FOutputSet := TControlRegister<EOutPutSet>.Create;
 
   FEnabled := False;
   FName:= 'Канал';
@@ -765,6 +771,7 @@ end;
 { Releases channel-owned resources and removes linked values from shared storage. }
 destructor TChannel.Destroy;
 begin
+  FreeAndNil(FOutputSet);
   FreeAndNil(FFlowMeter);
   inherited Destroy;
 end;
@@ -776,6 +783,8 @@ begin
     Exit;
 
   FFlowMeter.Init(DeviceUUID);
+  if (FFlowMeter.Device <> nil) then
+    FOutputSet.FromDefault(IntToOutputSet(FFlowMeter.Device.OutputSet));
 end;
                                          {TODO -oOwner -cGeneral : ActionItem}
 { Rebinds FlowMeter value references to channel and work table meter values. }
@@ -896,6 +905,7 @@ begin
   FFlowMeter.MeterFlowCategory := ASource.FFlowMeter.MeterFlowCategory;
   FCategory := ASource.FCategory;
   FGroup := ASource.FGroup;
+  OutputSet := ASource.OutputSet;
 
   SrcDevice := ASource.FFlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
@@ -978,6 +988,20 @@ procedure TChannel.SetSignalProxy(const AValue: Integer);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.OutputType := AValue;
+end;
+
+function TChannel.GetOutputSetProxy: EOutPutSet;
+begin
+  if FOutputSet <> nil then
+    Result := FOutputSet.Value
+  else
+    Result := optAuto;
+end;
+
+procedure TChannel.SetOutputSetProxy(const AValue: EOutPutSet);
+begin
+  if FOutputSet <> nil then
+    FOutputSet.SetValue(AValue);
 end;
 
 function TChannel.GetCategoryProxy: Integer;
@@ -2596,6 +2620,7 @@ begin
     AIni.WriteString(Section, 'DeviceName', Channel.DeviceName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
+    AIni.WriteInteger(Section, 'OutputSet', Ord(Channel.OutputSet));
     AIni.WriteInteger(Section, 'Category', Channel.Category);
     AIni.WriteInteger(Section, 'Group', Channel.Group);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
@@ -2660,6 +2685,9 @@ begin
     Channel.DeviceName := AIni.ReadString(Section, 'DeviceName', Channel.TypeName);
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
     Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
+    Channel.OutputSet := IntToOutputSet(
+      AIni.ReadInteger(Section, 'OutputSet', Ord(optAuto))
+    );
     Channel.Category := AIni.ReadInteger(Section, 'Category', Ord(mftUnknownType));
     Channel.Group := AIni.ReadInteger(Section, 'Group', 0);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
