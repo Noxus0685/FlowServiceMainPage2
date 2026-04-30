@@ -65,8 +65,7 @@ type
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
-    procedure HandlePropertySplitterMouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Single);
+    procedure HandlePropertySplitterMoved(Sender: TObject);
     procedure ApplyPropertyColumnWidth;
   public
     constructor Create(AOwner: TComponent); override;
@@ -150,7 +149,7 @@ begin
   Splitter.Parent := RowGrid;
   Splitter.Align := TAlignLayout.Client;
   Splitter.Width := 8;
-  Splitter.OnMouseUp := HandlePropertySplitterMouseUp;
+  Splitter.OnMoved := HandlePropertySplitterMoved;
   Splitter.Stored := False;
   RowGrid.ControlCollection.AddControl(Splitter, 1, 0);
   FRowSplitters.Add(Splitter);
@@ -275,8 +274,7 @@ begin
   RefreshRegisterColors;
 end;
 
-procedure TFrameChannelProperties.HandlePropertySplitterMouseUp(Sender: TObject;
-  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+procedure TFrameChannelProperties.HandlePropertySplitterMoved(Sender: TObject);
 begin
   if Sender is TSplitter then
   begin
@@ -386,7 +384,7 @@ begin
   HeaderSplitter.Parent := HeaderGrid;
   HeaderSplitter.Align := TAlignLayout.Left;
   HeaderSplitter.Width := 8;
-  HeaderSplitter.OnMouseUp := HandlePropertySplitterMouseUp;
+  HeaderSplitter.OnMoved := HandlePropertySplitterMoved;
   HeaderGrid.ControlCollection.AddControl(HeaderSplitter, 0, 0);
 
   HeaderValue := TLabel.Create(Self);
