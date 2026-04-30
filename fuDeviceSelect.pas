@@ -1601,7 +1601,7 @@ begin
   if ManNode = nil then
     Exit;
 
-  if ADevice.Category > 0 then
+  if ADevice.Category <> 0 then
     CatKey := IntToStr(ADevice.Category)
   else
     CatKey := '';
@@ -1689,7 +1689,7 @@ begin
         begin
           // TagString = '' → без категории,
           // иначе TagString хранит числовой ID категории.
-          if ADevice.Category > 0 then
+          if ADevice.Category <> 0 then
           begin
             if IntToStr(ADevice.Category) <> Cur.TagString then
               Exit(False);
