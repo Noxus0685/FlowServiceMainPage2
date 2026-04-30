@@ -1330,7 +1330,6 @@ function TBaseRepository.CategoryToText(
 ): string;
 var
   C: TDeviceCategory;
-  Q: TFDQuery;
 begin
   // --------------------------------------------------
   // -1 → пользовательская категория (CategoryName)
@@ -1356,21 +1355,6 @@ begin
     for C in TTypeRepository(Self).Categories do
       if C.ID = ACategory then
         Exit(C.Name);
-
-  if FDM <> nil then
-  begin
-    Q := FDM.GetQuery;
-    try
-      Q.SQL.Text := 'select Name from DeviceCategory where ID = :ID';
-      Q.ParamByName('ID').AsInteger := ACategory;
-      Q.Open;
-      if not Q.Eof then
-        Exit(Q.FieldByName('Name').AsString);
-    finally
-      Q.Close;
-      Q.Free;
-    end;
-  end;
 
   // --------------------------------------------------
   // не найдено
