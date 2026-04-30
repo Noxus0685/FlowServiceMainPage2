@@ -532,15 +532,11 @@ end;
 
 procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
-  NewType: TDeviceType;
   I, J: Integer;
   SelectedNode: TTreeViewItem;
-  SelectedParent: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
-  TargetManKey, TargetCatKey, TargetModKey: string;
-  TargetNode: TTreeViewItem;
-  HasTargetBranch: Boolean;
   ExpandedPaths: TStringList;
+  SelectedPath: string;
   function NodePath(ANode: TTreeViewItem): string;
   var
     Cur: TTreeViewItem;
@@ -558,71 +554,32 @@ begin
     Exit;
 
   SelectedNode := GetActiveTreeNode;
-  TargetManKey := '';
-  TargetCatKey := '';
-  TargetModKey := '';
-  HasTargetBranch := (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll));
-  if HasTargetBranch then
-  begin
-    case SelectedNode.Tag of
-      Ord(tnManufacturer):
-        TargetManKey := SelectedNode.TagString;
-      Ord(tnCategory):
-        begin
-          TargetCatKey := SelectedNode.TagString;
-          SelectedParent := SelectedNode.ParentItem;
-          if SelectedParent <> nil then
-            TargetManKey := SelectedParent.TagString;
-        end;
-      Ord(tnModification):
-        begin
-          TargetModKey := SelectedNode.TagString;
-          SelectedParent := SelectedNode.ParentItem;
-          if SelectedParent <> nil then
-          begin
-            TargetCatKey := SelectedParent.TagString;
-            SelectedParent := SelectedParent.ParentItem;
-            if SelectedParent <> nil then
-              TargetManKey := SelectedParent.TagString;
-          end;
-        end;
-    end;
-  end;
-  // Создание новых типов выполняется в DataManager.
+  if SelectedNode <> nil then
+    SelectedPath := NodePath(SelectedNode)
+  else
+    SelectedPath := '';
+
+  // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
   ExpandedPaths := TStringList.Create;
   try
     for J := 0 to TreeViewTypes.Count - 1 do
       if TreeViewTypes.ItemByIndex(J).IsExpanded then
         ExpandedPaths.Add(NodePath(TreeViewTypes.ItemByIndex(J)));
 
-    NewRows := AppServices.DataManager.PasteBufferTypes;
+    NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
-    for I := 0 to NewRows.Count - 1 do
-    begin
-      NewType := NewRows[I];
-      if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-        AppServices.DataManager.AssignTypeTreeFields(NewType, SelectedNode);
-    end;
-
     BuildTree;
     for J := 0 to TreeViewTypes.Count - 1 do
       if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
         TreeViewTypes.ItemByIndex(J).IsExpanded := True;
 
-    if HasTargetBranch then
-    begin
-      TargetNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), TargetManKey);
-      if (TargetNode <> nil) and (TargetCatKey <> '') then
-        TargetNode := FindChildInNode(TargetNode, Ord(tnCategory), TargetCatKey);
-      if (TargetNode <> nil) and (TargetModKey <> '') then
-        TargetNode := FindChildInNode(TargetNode, Ord(tnModification), TargetModKey);
-      if TargetNode <> nil then
-      begin
-        for J := 0 to TreeViewTypes.Count - 1 do
-          TreeViewTypes.ItemByIndex(J).IsSelected := False;
-        TreeViewTypes.Selected := TargetNode;
-      end;
-    end;
+    if SelectedPath <> '' then
+      for J := 0 to TreeViewTypes.Count - 1 do
+        if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
+        begin
+          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
+          Break;
+        end;
 
     SyncTreeSelectionState(False);
     ApplyFilter;
