@@ -672,16 +672,21 @@ begin
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
-    TreeViewDevices.Clear;
+
+        //TreeViewTypes.Clear;
 
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
-    AllNode := TTreeViewItem.Create(TreeViewDevices);
-    AllNode.Text := '...';
-    AllNode.Tag := Ord(tnAll);
-    AllNode.TagString := '';
-    TreeViewDevices.AddObject(AllNode);
+    if (TreeViewDevices.Count = 0) or (TreeViewDevices.Items[0].Tag <> Ord(tnAll)) then
+    begin
+      AllNode := TTreeViewItem.Create(TreeViewDevices);
+      AllNode.Text := '...';
+      AllNode.Tag := Ord(tnAll);
+      AllNode.TagString := '';
+      TreeViewDevices.AddObject(AllNode);
+    end ;
+
 
     {----------------------------------}
     { Проход по изготовителям }
@@ -839,7 +844,7 @@ begin
       end;
     end;
 
-    TreeViewDevices.Selected := AllNode;
+    //TreeViewDevices.Selected := AllNode;
 
     RestoredNode := nil;
     if PrevSelectedNode <> nil then
