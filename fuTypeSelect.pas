@@ -330,11 +330,15 @@ var
   T: TDeviceType;
 
   AllNode, ManNode, CatNode, ModNode: TTreeViewItem;
+  PrevSelectedNode, RestoredNode: TTreeViewItem;
+  PrevNodeText, PrevNodeTagString: string;
+  PrevNodeTag: NativeInt;
   ManText, ManKey: string;
   CatText, CatKey: string;
   ModText, ModKey: string;
 
   ManPass: Integer;
+  I: Integer;
 begin
   if ActiveRepo = nil then
   begin
@@ -346,6 +350,17 @@ begin
 
   TreeViewTypes.BeginUpdate;
   try
+    PrevSelectedNode := TreeViewTypes.Selected;
+    PrevNodeText := '';
+    PrevNodeTagString := '';
+    PrevNodeTag := -1;
+    if PrevSelectedNode <> nil then
+    begin
+      PrevNodeText := PrevSelectedNode.Text;
+      PrevNodeTagString := PrevSelectedNode.TagString;
+      PrevNodeTag := PrevSelectedNode.Tag;
+    end;
+
     TreeViewTypes.Clear;
 
     {----------------------------------}
@@ -510,7 +525,21 @@ begin
       end;
     end;
 
-    TreeViewTypes.Selected := AllNode;
+    RestoredNode := nil;
+    if PrevSelectedNode <> nil then
+      for I := 0 to TreeViewTypes.Count - 1 do
+        if (TreeViewTypes.ItemByIndex(I).Tag = PrevNodeTag)
+          and (TreeViewTypes.ItemByIndex(I).TagString = PrevNodeTagString)
+          and (TreeViewTypes.ItemByIndex(I).Text = PrevNodeText) then
+        begin
+          RestoredNode := TreeViewTypes.ItemByIndex(I);
+          Break;
+        end;
+
+    if RestoredNode <> nil then
+      TreeViewTypes.Selected := RestoredNode
+    else
+      TreeViewTypes.Selected := AllNode;
 
   finally
     TreeViewTypes.EndUpdate;
@@ -534,9 +563,11 @@ procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
   I, J: Integer;
   SelectedNode: TTreeViewItem;
+  RestoredNode: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
   ExpandedPaths: TStringList;
   SelectedPath: string;
+  WasTreeFocused: Boolean;
   function NodePath(ANode: TTreeViewItem): string;
   var
     Cur: TTreeViewItem;
@@ -554,6 +585,7 @@ begin
     Exit;
 
   SelectedNode := GetActiveTreeNode;
+  WasTreeFocused := TreeViewTypes.IsFocused;
   if SelectedNode <> nil then
     SelectedPath := NodePath(SelectedNode)
   else
@@ -573,15 +605,21 @@ begin
       if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
         TreeViewTypes.ItemByIndex(J).IsExpanded := True;
 
+    RestoredNode := nil;
     if SelectedPath <> '' then
       for J := 0 to TreeViewTypes.Count - 1 do
         if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
         begin
-          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
+          RestoredNode := TreeViewTypes.ItemByIndex(J);
           Break;
         end;
 
+    if RestoredNode <> nil then
+      TreeViewTypes.Selected := RestoredNode;
+
     SyncTreeSelectionState(False);
+    if WasTreeFocused and (TreeViewTypes.Selected <> nil) then
+      TreeViewTypes.SetFocus;
     ApplyFilter;
     UpdateGridTypes;
 
