@@ -575,10 +575,7 @@ begin
       if ManNode = nil then
         Continue;
 
-      if Trim(T.CategoryName) <> '' then
-        CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName)
-      else
-        CatText := '<категория>';
+      CatText := '<категория>';
       CatKey  := IntToStr(T.Category); // -1 / 0
 
       CatNode := FindChildInNode(
@@ -693,6 +690,7 @@ begin
   finally
     TreeViewTypes.Visible := True;
   end;
+
 end;
 
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
