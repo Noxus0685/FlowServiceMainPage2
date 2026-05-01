@@ -789,12 +789,21 @@ begin
   FType.AccuracyClass     := EditAccuracyClass.Text;
   FType.RangeDynamic      := StrToFloatDef(EditRangeDynamic.Text, 0);
 
-  if ceCategory.ItemIndex >= 0 then
-  FType.Category := ceCategory.ItemIndex + 1
+  if (ceCategory.ItemIndex >= 0) and (ceCategory.ItemIndex < ceCategory.Items.Count) then
+  begin
+    FType.Category := Integer(ceCategory.Items.Objects[ceCategory.ItemIndex]);
+    if (FType.Category = 0) and SameText(Trim(ceCategory.Text), '<не указана>') then
+    begin
+      FType.Category := -1;
+      FType.CategoryName := '';
+    end
+    else
+      FType.CategoryName := '';
+  end
   else
   begin
-  FType.Category := -1;
-  FType.CategoryName := ceCategory.Name;
+    FType.Category := -1;
+    FType.CategoryName := Trim(ceCategory.Text);
   end;
 
 
@@ -1690,7 +1699,13 @@ begin
     CatID := Integer(ceCategory.Items.Objects[Idx]);
 
     FType.Category := CatID;
-    FType.CategoryName := '';
+    if (FType.Category = 0) and SameText(Trim(ceCategory.Text), '<не указана>') then
+    begin
+      FType.Category := -1;
+      FType.CategoryName := '';
+    end
+    else
+      FType.CategoryName := '';
 
     {----------------------------------}
     { Применяем defaults категории }
