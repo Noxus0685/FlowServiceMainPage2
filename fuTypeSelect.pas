@@ -458,7 +458,7 @@ begin
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
-    if TreeViewTypes=nil then
+    if (TreeViewTypes.Count = 0) or (TreeViewTypes.Items[0].Tag <> Ord(tnAll)) then
     begin
       AllNode := TTreeViewItem.Create(TreeViewTypes);
       AllNode.Text := '...';
@@ -2024,10 +2024,60 @@ procedure TFormTypeSelect.ComboBoxRepositoryChange(Sender: TObject);
 var
   Idx: Integer;
   RepoName: string;
+  Repo: TTypeRepository;
+  Res: TModalResult;
 begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
+
+
+
+begin
+  Repo := AppServices.DataManager.ActiveTypeRepo;
+
+  if (Repo <> nil) and (Repo.State = osModified) then
+  begin
+    Res := MessageDlg(
+      'Есть несохранённые изменения. Сохранить перед выходом?',
+      TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo, TMsgDlgBtn.mbCancel],
+      0
+    );
+
+    case Res of
+      mrYes:
+        begin
+          try
+            if not Repo.Save then
+            begin
+              //Action := TCloseAction.caNone;
+              Exit;
+            end;
+          except
+            on E: Exception do
+            begin
+              ShowMessage('Ошибка сохранения: ' + E.Message);
+             // Action := TCloseAction.caNone;
+              Exit;
+            end;
+          end;
+        end;
+
+      mrNo:
+        begin
+          // закрываем без сохранения
+        end;
+
+      mrCancel:
+        begin
+          //Action := TCloseAction.caNone;
+          Exit;
+        end;
+    end;
+  end;
+end;
+
   if (AppServices.DataManager = nil) then
     Exit;
 
