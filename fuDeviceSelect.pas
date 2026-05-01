@@ -526,6 +526,7 @@ begin
   BuildTree;
   ApplyFilter;
   UpdateGridDevices;
+  UpdateDeviceActions(nil);
 end;
 
 
@@ -834,6 +835,7 @@ begin
   finally
     TargetDevices.Free;
   end;
+  UpdateDeviceActions(nil);
 end;
 
 procedure TFormDeviceSelect.aDeviceCutExecute(Sender: TObject);
@@ -848,14 +850,14 @@ begin
   end;
   ApplyFilter;
   UpdateGridDevices;
+  UpdateDeviceActions(nil);
 end;
 
 procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
-  NewRows: TObjectList<TDevice>;
-  I, J: Integer;
   SelectedNode: TTreeViewItem;
-  ExpandedPaths: TStringList;
+  NewRows: TObjectList<TDevice>;
+  I: Integer;
   SelectedPath: string;
   function NodePath(ANode: TTreeViewItem): string;
   var
@@ -878,43 +880,34 @@ begin
     SelectedPath := NodePath(SelectedNode)
   else
     SelectedPath := '';
-  ExpandedPaths := TStringList.Create;
+
+  // UI-слой: передаём выбранный узел, вставка выполняется в DataManager.
+  NewRows := AppServices.DataManager.PasteBufferDevices(SelectedNode);
   try
-    for J := 0 to TreeViewDevices.Count - 1 do
-      if TreeViewDevices.ItemByIndex(J).IsExpanded then
-        ExpandedPaths.Add(NodePath(TreeViewDevices.ItemByIndex(J)));
-
-    NewRows := AppServices.DataManager.PasteBufferDevices(SelectedNode);
-  try
-    BuildTree;
-    for J := 0 to TreeViewDevices.Count - 1 do
-      if ExpandedPaths.IndexOf(NodePath(TreeViewDevices.ItemByIndex(J))) >= 0 then
-        TreeViewDevices.ItemByIndex(J).IsExpanded := True;
-
-    if SelectedPath <> '' then
-      for J := 0 to TreeViewDevices.Count - 1 do
-        if NodePath(TreeViewDevices.ItemByIndex(J)) = SelectedPath then
-        begin
-          TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(J);
-          Break;
-        end;
-
-    ApplyFilter;
-    UpdateGridDevices;
-
-    if (FDevFilteredDevices <> nil) and (NewRows.Count > 0) then
-      for I := 0 to FDevFilteredDevices.Count - 1 do
-        if FDevFilteredDevices[I] = NewRows[0] then
-        begin
-          GridDevices.Row := I;
-          Break;
-        end;
+    // Обновление UI выполняется ниже централизованно.
   finally
     NewRows.Free;
   end;
+
+  ApplyFilter;
+  TreeViewDevices.Visible := False;
+  try
+    UpdateGridDevices;
+    BuildTree;
+
+    if SelectedPath <> '' then
+      for I := 0 to TreeViewDevices.Count - 1 do
+        if NodePath(TreeViewDevices.ItemByIndex(I)) = SelectedPath then
+        begin
+          TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(I);
+          Break;
+        end;
   finally
-    ExpandedPaths.Free;
+    TreeViewDevices.Visible := True;
   end;
+
+  if TreeViewDevices.Selected <> nil then
+    TreeViewDevices.SetFocus;
 end;
 
 function TFormDeviceSelect.GetActiveTreeNode: TTreeViewItem;
@@ -1173,6 +1166,7 @@ begin
     {----------------------------------}
     GridDevices.Row := -1;
     ClearCheckedDevices;
+    UpdateDeviceActions(nil);
   finally
     TargetDevices.Free;
   end;
