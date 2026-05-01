@@ -1014,7 +1014,7 @@ begin
 
         SelectedNode.DisposeOf;
 
-        CurrentNode := ReplacementNode;
+        CurrentNode := ParentNode;
         while (CurrentNode <> nil)
           and (CurrentNode.Tag <> Ord(tnAll))
           and (CurrentNode.Count = 0) do
