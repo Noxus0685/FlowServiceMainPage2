@@ -576,6 +576,11 @@ begin
   finally
     NewRows.Free;
   end;
+
+  ApplyFilter;
+  UpdateGridTypes;
+  BuildTree;
+  //TreeViewTypes.Selected:=SelectedNode;
 end;
 
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
