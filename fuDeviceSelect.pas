@@ -839,6 +839,8 @@ begin
       end;
     end;
 
+    TreeViewDevices.Selected := AllNode;
+
     RestoredNode := nil;
     if PrevSelectedNode <> nil then
       for I := 0 to TreeViewDevices.Count - 1 do
@@ -964,6 +966,7 @@ end;
 
 procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
+  SelectedNode: TTreeViewItem;
   NewRows: TObjectList<TDevice>;
   RestoredNode: TTreeViewItem;
   I: Integer;
@@ -996,8 +999,10 @@ begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferDevices) then
     Exit;
 
+  SelectedNode := GetActiveTreeNode;
+
   // UI-слой: передаём выбранный узел, вставка выполняется в DataManager.
-  NewRows := AppServices.DataManager.PasteBufferDevices(GetActiveTreeNode);
+  NewRows := AppServices.DataManager.PasteBufferDevices(SelectedNode);
   try
     // Обновление UI выполняется ниже централизованно.
   finally
