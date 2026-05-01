@@ -563,52 +563,46 @@ procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
   I, J: Integer;
   SelectedNode: TTreeViewItem;
+  RestoredNode: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
-  ExpandedPaths: TStringList;
-  SelectedPath: string;
-  function NodePath(ANode: TTreeViewItem): string;
-  var
-    Cur: TTreeViewItem;
-  begin
-    Result := '';
-    Cur := ANode;
-    while Cur <> nil do
-    begin
-      Result := IntToStr(Cur.Tag) + ':' + Cur.TagString + '|' + Result;
-      Cur := Cur.ParentItem;
-    end;
-  end;
+  PrevNodeText: string;
+  PrevNodeTag: NativeInt;
+  PrevNodeTagString: string;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferTypes) then
     Exit;
 
   SelectedNode := GetActiveTreeNode;
   if SelectedNode <> nil then
-    SelectedPath := NodePath(SelectedNode)
+  begin
+    PrevNodeText := SelectedNode.Text;
+    PrevNodeTag := SelectedNode.Tag;
+    PrevNodeTagString := SelectedNode.TagString;
+  end
   else
-    SelectedPath := '';
+  begin
+    PrevNodeText := '';
+    PrevNodeTag := 0;
+    PrevNodeTagString := '';
+  end;
 
   // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
-  ExpandedPaths := TStringList.Create;
-  try
-    for J := 0 to TreeViewTypes.Count - 1 do
-      if TreeViewTypes.ItemByIndex(J).IsExpanded then
-        ExpandedPaths.Add(NodePath(TreeViewTypes.ItemByIndex(J)));
-
-    NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
+  NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
     BuildTree;
-    for J := 0 to TreeViewTypes.Count - 1 do
-      if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
-        TreeViewTypes.ItemByIndex(J).IsExpanded := True;
 
-    if SelectedPath <> '' then
+    RestoredNode := nil;
+    if PrevNodeText <> '' then
       for J := 0 to TreeViewTypes.Count - 1 do
-        if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
+        if (TreeViewTypes.ItemByIndex(J).Text = PrevNodeText)
+          and (TreeViewTypes.ItemByIndex(J).Tag = PrevNodeTag)
+          and (TreeViewTypes.ItemByIndex(J).TagString = PrevNodeTagString) then
         begin
-          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
+          RestoredNode := TreeViewTypes.ItemByIndex(J);
           Break;
         end;
+    if RestoredNode <> nil then
+      TreeViewTypes.Selected := RestoredNode;
 
     SyncTreeSelectionState(False);
     ApplyFilter;
@@ -625,9 +619,6 @@ begin
         end;
   finally
     NewRows.Free;
-  end;
-  finally
-    ExpandedPaths.Free;
   end;
 end;
 
