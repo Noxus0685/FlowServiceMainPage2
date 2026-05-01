@@ -192,6 +192,7 @@ type
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
+    FExpandSelectedOneLevelAfterBuild: Boolean;
     FCheckedTypes: TList<TDeviceType>;
 
     procedure LoadData;
@@ -586,6 +587,10 @@ begin
     else
       TreeViewTypes.Selected := AllNode;
 
+    if FExpandSelectedOneLevelAfterBuild and (TreeViewTypes.Selected <> nil) then
+      TreeViewTypes.Selected.Expanded := True;
+    FExpandSelectedOneLevelAfterBuild := False;
+
   finally
     TreeViewTypes.EndUpdate;
   end;
@@ -624,6 +629,7 @@ begin
 
   ApplyFilter;
   UpdateGridTypes;
+  FExpandSelectedOneLevelAfterBuild := True;
   BuildTree;
   //TreeViewTypes.Selected:=SelectedNode;
 end;
