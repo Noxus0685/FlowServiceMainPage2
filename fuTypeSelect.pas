@@ -563,11 +563,9 @@ procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
   I, J: Integer;
   SelectedNode: TTreeViewItem;
-  RestoredNode: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
   ExpandedPaths: TStringList;
   SelectedPath: string;
-  WasTreeFocused: Boolean;
   function NodePath(ANode: TTreeViewItem): string;
   var
     Cur: TTreeViewItem;
@@ -585,7 +583,6 @@ begin
     Exit;
 
   SelectedNode := GetActiveTreeNode;
-  WasTreeFocused := TreeViewTypes.IsFocused;
   if SelectedNode <> nil then
     SelectedPath := NodePath(SelectedNode)
   else
@@ -605,21 +602,15 @@ begin
       if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
         TreeViewTypes.ItemByIndex(J).IsExpanded := True;
 
-    RestoredNode := nil;
     if SelectedPath <> '' then
       for J := 0 to TreeViewTypes.Count - 1 do
         if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
         begin
-          RestoredNode := TreeViewTypes.ItemByIndex(J);
+          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
           Break;
         end;
 
-    if RestoredNode <> nil then
-      TreeViewTypes.Selected := RestoredNode;
-
     SyncTreeSelectionState(False);
-    if WasTreeFocused and (TreeViewTypes.Selected <> nil) then
-      TreeViewTypes.SetFocus;
     ApplyFilter;
     UpdateGridTypes;
 
