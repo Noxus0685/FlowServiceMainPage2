@@ -193,6 +193,7 @@ type
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
     FExpandSelectedOneLevelAfterBuild: Boolean;
+    FForceFullTreeRebuild: Boolean;
     FCheckedTypes: TList<TDeviceType>;
 
     procedure LoadData;
@@ -437,10 +438,14 @@ begin
     PrevExpandedPaths.Sorted := True;
     PrevExpandedPaths.Duplicates := TDuplicates.dupIgnore;
 
-    for I := 0 to TreeViewTypes.Count - 1 do
-      CollectExpandedNodes(TreeViewTypes.ItemByIndex(I));
+    PrevSelectedNode := nil;
+    if not FForceFullTreeRebuild then
+    begin
+      for I := 0 to TreeViewTypes.Count - 1 do
+        CollectExpandedNodes(TreeViewTypes.ItemByIndex(I));
+      PrevSelectedNode := GetActiveTreeNode;
+    end;
 
-    PrevSelectedNode := GetActiveTreeNode;
     PrevNodeText := '';
     PrevNodeTagString := '';
     PrevNodeTag := -1;
@@ -575,7 +580,10 @@ begin
       if ManNode = nil then
         Continue;
 
-      CatText := '<категория>';
+      if Trim(T.CategoryName) <> '' then
+        CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName)
+      else
+        CatText := '<категория>';
       CatKey  := IntToStr(T.Category); // -1 / 0
 
       CatNode := FindChildInNode(
@@ -636,12 +644,14 @@ begin
     else
       TreeViewTypes.Selected := AllNode;
 
-    for I := 0 to TreeViewTypes.Count - 1 do
-      RestoreExpandedNodes(TreeViewTypes.ItemByIndex(I));
+    if not FForceFullTreeRebuild then
+      for I := 0 to TreeViewTypes.Count - 1 do
+        RestoreExpandedNodes(TreeViewTypes.ItemByIndex(I));
 
     if FExpandSelectedOneLevelAfterBuild and (TreeViewTypes.Selected <> nil) then
       TreeViewTypes.Selected.Expand;
     FExpandSelectedOneLevelAfterBuild := False;
+    FForceFullTreeRebuild := False;
 
   finally
     PrevExpandedPaths.Free;
@@ -690,7 +700,6 @@ begin
   finally
     TreeViewTypes.Visible := True;
   end;
-
 end;
 
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
@@ -975,78 +984,7 @@ begin
         ActiveRepo.DeleteType(SelType);
     end;
 
-    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-    begin
-      SectionHasTypes := False;
-      if FDeviceTypes <> nil then
-        for I := 0 to FDeviceTypes.Count - 1 do
-          if PassTreeFilter(FDeviceTypes[I], SelectedNode) then
-          begin
-            SectionHasTypes := True;
-            Break;
-          end;
-
-      if not SectionHasTypes then
-      begin
-        ParentNode := SelectedNode.ParentItem;
-        ReplacementNode := ParentNode;
-
-        if ParentNode <> nil then
-        begin
-          NodeIndex := -1;
-          for J := 0 to ParentNode.Count - 1 do
-            if ParentNode.ItemByIndex(J) = SelectedNode then
-            begin
-              NodeIndex := J;
-              Break;
-            end;
-
-          if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
-            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
-          else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1)
-            and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
-            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
-
-          ParentNode.RemoveObject(SelectedNode);
-        end
-        else
-          TreeViewTypes.RemoveObject(SelectedNode);
-
-        SelectedNode.DisposeOf;
-
-        CurrentNode := ParentNode;
-        while (CurrentNode <> nil)
-          and (CurrentNode.Tag <> Ord(tnAll))
-          and (CurrentNode.Count = 0) do
-        begin
-          SectionHasTypes := False;
-          if FDeviceTypes <> nil then
-            for I := 0 to FDeviceTypes.Count - 1 do
-              if PassTreeFilter(FDeviceTypes[I], CurrentNode) then
-              begin
-                SectionHasTypes := True;
-                Break;
-              end;
-
-          if SectionHasTypes then
-            Break;
-
-          ParentNode := CurrentNode.ParentItem;
-          if ParentNode <> nil then
-            ParentNode.RemoveObject(CurrentNode)
-          else
-            TreeViewTypes.RemoveObject(CurrentNode);
-          CurrentNode.DisposeOf;
-          CurrentNode := ParentNode;
-        end;
-
-        TreeViewTypes.Selected := CurrentNode;
-      end;
-    end;
-
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
-
+    BuildTree;
     ApplyFilter;
     UpdateGridTypes;
     ClearCheckedTypes;
@@ -1909,6 +1847,7 @@ end;
 
 procedure TFormTypeSelect.miRefreshRepositoryClick(Sender: TObject);
 begin
+      FForceFullTreeRebuild := True;
       { Пересборка дерева (с восстановлением выбора) }
       BuildTree;
 
