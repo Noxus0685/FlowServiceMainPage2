@@ -857,11 +857,29 @@ procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
   SelectedNode: TTreeViewItem;
   NewRows: TObjectList<TDevice>;
+  I: Integer;
+  SelectedPath: string;
+  function NodePath(ANode: TTreeViewItem): string;
+  var
+    Cur: TTreeViewItem;
+  begin
+    Result := '';
+    Cur := ANode;
+    while Cur <> nil do
+    begin
+      Result := IntToStr(Cur.Tag) + ':' + Cur.TagString + '|' + Result;
+      Cur := Cur.ParentItem;
+    end;
+  end;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferDevices) then
     Exit;
 
   SelectedNode := GetActiveTreeNode;
+  if SelectedNode <> nil then
+    SelectedPath := NodePath(SelectedNode)
+  else
+    SelectedPath := '';
 
   // UI-слой: передаём выбранный узел, вставка выполняется в DataManager.
   NewRows := AppServices.DataManager.PasteBufferDevices(SelectedNode);
@@ -876,9 +894,20 @@ begin
   try
     UpdateGridDevices;
     BuildTree;
+
+    if SelectedPath <> '' then
+      for I := 0 to TreeViewDevices.Count - 1 do
+        if NodePath(TreeViewDevices.ItemByIndex(I)) = SelectedPath then
+        begin
+          TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(I);
+          Break;
+        end;
   finally
     TreeViewDevices.Visible := True;
   end;
+
+  if TreeViewDevices.Selected <> nil then
+    TreeViewDevices.SetFocus;
 end;
 
 function TFormDeviceSelect.GetActiveTreeNode: TTreeViewItem;
