@@ -931,9 +931,88 @@ var
   I: Integer;
   SelType: TDeviceType;
   TargetTypes: TObjectList<TDeviceType>;
+  SelectedNode, ReplacementNode: TTreeViewItem;
+  function SectionHasTypes(const ANode: TTreeViewItem): Boolean;
+  var
+    J: Integer;
+  begin
+    Result := False;
+    if (ANode = nil) or (FDeviceTypes = nil) then
+      Exit;
+
+    for J := 0 to FDeviceTypes.Count - 1 do
+      if PassTreeFilter(FDeviceTypes[J], ANode) then
+        Exit(True);
+  end;
+
+  function GetReplacementNode(const ANode: TTreeViewItem): TTreeViewItem;
+  var
+    ParentNode: TTreeViewItem;
+    J, NodeIndex: Integer;
+  begin
+    Result := nil;
+    if ANode = nil then
+      Exit;
+
+    ParentNode := ANode.ParentItem;
+    if ParentNode = nil then
+      Exit;
+
+    NodeIndex := -1;
+    for J := 0 to ParentNode.Count - 1 do
+      if ParentNode.ItemByIndex(J) = ANode then
+      begin
+        NodeIndex := J;
+        Break;
+      end;
+
+    if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
+      Result := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
+    else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1) and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
+      Result := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1))
+    else
+      Result := ParentNode;
+  end;
+
+  procedure RemoveNode(var ANode: TTreeViewItem);
+  var
+    ParentNode: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    ParentNode := ANode.ParentItem;
+    if ParentNode <> nil then
+      ParentNode.RemoveObject(ANode)
+    else
+      TreeViewTypes.RemoveObject(ANode);
+
+    ANode.DisposeOf;
+    ANode := nil;
+  end;
+
+  procedure CleanupEmptyParents(var AStartNode: TTreeViewItem);
+  var
+    CurrentNode, ParentNode: TTreeViewItem;
+  begin
+    CurrentNode := AStartNode;
+    while (CurrentNode <> nil)
+      and (CurrentNode.Tag <> Ord(tnAll))
+      and (CurrentNode.Count = 0)
+      and (not SectionHasTypes(CurrentNode)) do
+    begin
+      ParentNode := CurrentNode.ParentItem;
+      RemoveNode(CurrentNode);
+      CurrentNode := ParentNode;
+    end;
+
+    AStartNode := CurrentNode;
+  end;
 begin
   if (FDevFilteredTypes = nil) or (FDevFilteredTypes.Count = 0) then
     Exit;
+
+  SelectedNode := GetActiveTreeNode;
 
   TargetTypes := GetSelectedTypes;
   try
@@ -962,7 +1041,6 @@ begin
            ) <> mrYes then
           Exit;
       end;
-
     end;
 
     for I := TargetTypes.Count - 1 downto 0 do
@@ -970,6 +1048,16 @@ begin
       SelType := TargetTypes[I];
       if SelType <> nil then
         ActiveRepo.DeleteType(SelType);
+    end;
+
+    if (SelectedNode <> nil)
+      and (SelectedNode.Tag <> Ord(tnAll))
+      and (not SectionHasTypes(SelectedNode)) then
+    begin
+      ReplacementNode := GetReplacementNode(SelectedNode);
+      RemoveNode(SelectedNode);
+      CleanupEmptyParents(ReplacementNode);
+      TreeViewTypes.Selected := ReplacementNode;
     end;
 
     FreeAndNil(FDevFilteredByTree);
@@ -983,6 +1071,7 @@ begin
     TargetTypes.Free;
   end;
 end;
+
 
 procedure TFormTypeSelect.DateEditFilterChange(Sender: TObject);
 begin
