@@ -334,7 +334,6 @@ var
   PrevSelectedNode, RestoredNode: TTreeViewItem;
   PrevNodeText, PrevNodeTagString, PrevNodePath: string;
   PrevNodeTag: NativeInt;
-  PrevExpandedPaths: TStringList;
   ManText, ManKey: string;
   CatText, CatKey: string;
   ModText, ModKey: string;
@@ -384,44 +383,6 @@ var
           Exit;
       end;
   end;
-
-  procedure CollectExpandedNodes(const ANode: TTreeViewItem);
-  var
-    J: Integer;
-    ChildNode: TTreeViewItem;
-  begin
-    if ANode = nil then
-      Exit;
-
-    if ANode.IsExpanded then
-      PrevExpandedPaths.Add(BuildNodePath(ANode));
-
-    for J := 0 to ANode.Count - 1 do
-      if ANode.ItemByIndex(J) is TTreeViewItem then
-      begin
-        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
-        CollectExpandedNodes(ChildNode);
-      end;
-  end;
-
-  procedure RestoreExpandedNodes(const ANode: TTreeViewItem);
-  var
-    J: Integer;
-    ChildNode: TTreeViewItem;
-  begin
-    if ANode = nil then
-      Exit;
-
-    if PrevExpandedPaths.IndexOf(BuildNodePath(ANode)) >= 0 then
-      ANode.Expand;
-
-    for J := 0 to ANode.Count - 1 do
-      if ANode.ItemByIndex(J) is TTreeViewItem then
-      begin
-        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
-        RestoreExpandedNodes(ChildNode);
-      end;
-  end;
 begin
   if ActiveRepo = nil then
   begin
@@ -433,13 +394,6 @@ begin
 
   TreeViewTypes.BeginUpdate;
   try
-    PrevExpandedPaths := TStringList.Create;
-    PrevExpandedPaths.Sorted := True;
-    PrevExpandedPaths.Duplicates := TDuplicates.dupIgnore;
-
-    for I := 0 to TreeViewTypes.Count - 1 do
-      CollectExpandedNodes(TreeViewTypes.ItemByIndex(I));
-
     PrevSelectedNode := GetActiveTreeNode;
     PrevNodeText := '';
     PrevNodeTagString := '';
@@ -633,15 +587,11 @@ begin
     else
       TreeViewTypes.Selected := AllNode;
 
-    for I := 0 to TreeViewTypes.Count - 1 do
-      RestoreExpandedNodes(TreeViewTypes.ItemByIndex(I));
-
     if FExpandSelectedOneLevelAfterBuild and (TreeViewTypes.Selected <> nil) then
       TreeViewTypes.Selected.Expand;
     FExpandSelectedOneLevelAfterBuild := False;
 
   finally
-    PrevExpandedPaths.Free;
     TreeViewTypes.EndUpdate;
   end;
 end;
