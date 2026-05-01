@@ -458,16 +458,19 @@ begin
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
-    TreeViewTypes.Clear;
+    //TreeViewTypes.Clear;
 
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
-    AllNode := TTreeViewItem.Create(TreeViewTypes);
-    AllNode.Text := '...';
-    AllNode.Tag := Ord(tnAll);
-    AllNode.TagString := '';
-    TreeViewTypes.AddObject(AllNode);
+    if (TreeViewTypes.Count = 0) or (TreeViewTypes.Items[0].Tag <> Ord(tnAll)) then
+    begin
+      AllNode := TTreeViewItem.Create(TreeViewTypes);
+      AllNode.Text := '...';
+      AllNode.Tag := Ord(tnAll);
+      AllNode.TagString := '';
+      TreeViewTypes.AddObject(AllNode);
+    end ;
 
     {----------------------------------}
     { Проход по изготовителям }
@@ -934,12 +937,16 @@ end;
 
 procedure TFormTypeSelect.actTypeDeleteExecute(Sender: TObject);
 var
-  I: Integer;
+  I, J, NodeIndex: Integer;
   SelType: TDeviceType;
   TargetTypes: TObjectList<TDeviceType>;
+  SelectedNode, ParentNode, ReplacementNode, CurrentNode: TTreeViewItem;
+  SectionHasTypes: Boolean;
 begin
   if (FDevFilteredTypes = nil) or (FDevFilteredTypes.Count = 0) then
     Exit;
+
+  SelectedNode := GetActiveTreeNode;
 
   TargetTypes := GetSelectedTypes;
   try
@@ -968,7 +975,6 @@ begin
            ) <> mrYes then
           Exit;
       end;
-
     end;
 
     for I := TargetTypes.Count - 1 downto 0 do
@@ -987,6 +993,7 @@ begin
     TargetTypes.Free;
   end;
 end;
+
 
 procedure TFormTypeSelect.DateEditFilterChange(Sender: TObject);
 begin
@@ -1956,10 +1963,60 @@ procedure TFormTypeSelect.ComboBoxRepositoryChange(Sender: TObject);
 var
   Idx: Integer;
   RepoName: string;
+  Repo: TTypeRepository;
+  Res: TModalResult;
 begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
+
+
+
+begin
+  Repo := AppServices.DataManager.ActiveTypeRepo;
+
+  if (Repo <> nil) and (Repo.State = osModified) then
+  begin
+    Res := MessageDlg(
+      'Есть несохранённые изменения. Сохранить перед выходом?',
+      TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo, TMsgDlgBtn.mbCancel],
+      0
+    );
+
+    case Res of
+      mrYes:
+        begin
+          try
+            if not Repo.Save then
+            begin
+              //Action := TCloseAction.caNone;
+              Exit;
+            end;
+          except
+            on E: Exception do
+            begin
+              ShowMessage('Ошибка сохранения: ' + E.Message);
+             // Action := TCloseAction.caNone;
+              Exit;
+            end;
+          end;
+        end;
+
+      mrNo:
+        begin
+          // закрываем без сохранения
+        end;
+
+      mrCancel:
+        begin
+          //Action := TCloseAction.caNone;
+          Exit;
+        end;
+    end;
+  end;
+end;
+
   if (AppServices.DataManager = nil) then
     Exit;
 
