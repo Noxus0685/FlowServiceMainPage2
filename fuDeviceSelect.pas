@@ -1068,6 +1068,18 @@ var
   I, J, NodeIndex: Integer;
   SelectedNode, ParentNode, ReplacementNode, CurrentNode: TTreeViewItem;
   SectionHasDevices: Boolean;
+  function PassTreeFilterForNode(const ADevice: TDevice; const ANode: TTreeViewItem): Boolean;
+  var
+    PrevSelected: TTreeViewItem;
+  begin
+    PrevSelected := TreeViewDevices.Selected;
+    TreeViewDevices.Selected := ANode;
+    try
+      Result := PassTreeFilter(ADevice);
+    finally
+      TreeViewDevices.Selected := PrevSelected;
+    end;
+  end;
 begin
   {----------------------------------}
   { Проверка списка }
@@ -1126,7 +1138,7 @@ begin
       SectionHasDevices := False;
       if FDevices <> nil then
         for I := 0 to FDevices.Count - 1 do
-          if PassTreeFilter(FDevices[I], SelectedNode) then
+          if PassTreeFilterForNode(FDevices[I], SelectedNode) then
           begin
             SectionHasDevices := True;
             Break;
@@ -1168,7 +1180,7 @@ begin
           SectionHasDevices := False;
           if FDevices <> nil then
             for I := 0 to FDevices.Count - 1 do
-              if PassTreeFilter(FDevices[I], CurrentNode) then
+              if PassTreeFilterForNode(FDevices[I], CurrentNode) then
               begin
                 SectionHasDevices := True;
                 Break;
