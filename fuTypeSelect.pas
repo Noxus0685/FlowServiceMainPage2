@@ -563,6 +563,9 @@ procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
   I, J: Integer;
   SelectedNode: TTreeViewItem;
+  SelectedNodeText, SelectedNodeTagString: string;
+  SelectedNodeTag: NativeInt;
+  SelectedPathRestored: Boolean;
   NewRows: TObjectList<TDeviceType>;
   ExpandedPaths: TStringList;
   SelectedPath: string;
@@ -584,9 +587,19 @@ begin
 
   SelectedNode := GetActiveTreeNode;
   if SelectedNode <> nil then
+  begin
     SelectedPath := NodePath(SelectedNode)
+    SelectedNodeText := SelectedNode.Text;
+    SelectedNodeTag := SelectedNode.Tag;
+    SelectedNodeTagString := SelectedNode.TagString;
+  end
   else
+  begin
     SelectedPath := '';
+    SelectedNodeText := '';
+    SelectedNodeTag := 0;
+    SelectedNodeTagString := '';
+  end;
 
   // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
   ExpandedPaths := TStringList.Create;
@@ -602,9 +615,21 @@ begin
       if ExpandedPaths.IndexOf(NodePath(TreeViewTypes.ItemByIndex(J))) >= 0 then
         TreeViewTypes.ItemByIndex(J).IsExpanded := True;
 
+    SelectedPathRestored := False;
     if SelectedPath <> '' then
       for J := 0 to TreeViewTypes.Count - 1 do
         if NodePath(TreeViewTypes.ItemByIndex(J)) = SelectedPath then
+        begin
+          TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
+          SelectedPathRestored := True;
+          Break;
+        end;
+
+    if (SelectedPath <> '') and (not SelectedPathRestored) then
+      for J := 0 to TreeViewTypes.Count - 1 do
+        if (TreeViewTypes.ItemByIndex(J).Tag = SelectedNodeTag)
+          and (TreeViewTypes.ItemByIndex(J).TagString = SelectedNodeTagString)
+          and (TreeViewTypes.ItemByIndex(J).Text = SelectedNodeText) then
         begin
           TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(J);
           Break;
