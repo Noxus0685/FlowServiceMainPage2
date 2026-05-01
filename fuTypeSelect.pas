@@ -331,7 +331,7 @@ var
 
   AllNode, ManNode, CatNode, ModNode: TTreeViewItem;
   PrevSelectedNode, RestoredNode: TTreeViewItem;
-  PrevNodeText, PrevNodeTagString, PrevNodePath: string;
+  PrevNodeText, PrevNodeTagString: string;
   PrevNodeTag: NativeInt;
   ManText, ManKey: string;
   CatText, CatKey: string;
@@ -339,49 +339,6 @@ var
 
   ManPass: Integer;
   I: Integer;
-
-  function BuildNodePath(const ANode: TTreeViewItem): string;
-  var
-    Cur: TTreeViewItem;
-  begin
-    Result := '';
-    Cur := ANode;
-    while Cur <> nil do
-    begin
-      if Result = '' then
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
-      else
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
-      Cur := Cur.ParentItem;
-    end;
-  end;
-
-  procedure FindNodeRecursive(const ANode: TTreeViewItem);
-  var
-    J: Integer;
-    ChildNode: TTreeViewItem;
-  begin
-    if (ANode = nil) or (RestoredNode <> nil) then
-      Exit;
-
-    if (ANode.Tag = PrevNodeTag)
-      and (ANode.TagString = PrevNodeTagString)
-      and (ANode.Text = PrevNodeText)
-      and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
-    begin
-      RestoredNode := ANode;
-      Exit;
-    end;
-
-    for J := 0 to ANode.Count - 1 do
-      if ANode.ItemByIndex(J) is TTreeViewItem then
-      begin
-        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
-        FindNodeRecursive(ChildNode);
-        if RestoredNode <> nil then
-          Exit;
-      end;
-  end;
 begin
   if ActiveRepo = nil then
   begin
@@ -397,13 +354,11 @@ begin
     PrevNodeText := '';
     PrevNodeTagString := '';
     PrevNodeTag := -1;
-    PrevNodePath := '';
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
       PrevNodeTagString := PrevSelectedNode.TagString;
       PrevNodeTag := PrevSelectedNode.Tag;
-      PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
     TreeViewTypes.Clear;
@@ -572,14 +527,14 @@ begin
 
     RestoredNode := nil;
     if PrevSelectedNode <> nil then
-    begin
       for I := 0 to TreeViewTypes.Count - 1 do
-      begin
-        FindNodeRecursive(TreeViewTypes.ItemByIndex(I));
-        if RestoredNode <> nil then
+        if (TreeViewTypes.ItemByIndex(I).Tag = PrevNodeTag)
+          and (TreeViewTypes.ItemByIndex(I).TagString = PrevNodeTagString)
+          and (TreeViewTypes.ItemByIndex(I).Text = PrevNodeText) then
+        begin
+          RestoredNode := TreeViewTypes.ItemByIndex(I);
           Break;
-      end;
-    end;
+        end;
 
     if RestoredNode <> nil then
       TreeViewTypes.Selected := RestoredNode
