@@ -192,6 +192,7 @@ type
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
+    FExpandSelectedOneLevelAfterBuild: Boolean;
     FCheckedTypes: TList<TDeviceType>;
 
     procedure LoadData;
@@ -331,14 +332,96 @@ var
 
   AllNode, ManNode, CatNode, ModNode: TTreeViewItem;
   PrevSelectedNode, RestoredNode: TTreeViewItem;
-  PrevNodeText, PrevNodeTagString: string;
+  PrevNodeText, PrevNodeTagString, PrevNodePath: string;
   PrevNodeTag: NativeInt;
+  PrevExpandedPaths: TStringList;
   ManText, ManKey: string;
   CatText, CatKey: string;
   ModText, ModKey: string;
 
   ManPass: Integer;
   I: Integer;
+
+  function BuildNodePath(const ANode: TTreeViewItem): string;
+  var
+    Cur: TTreeViewItem;
+  begin
+    Result := '';
+    Cur := ANode;
+    while Cur <> nil do
+    begin
+      if Result = '' then
+        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
+      else
+        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
+      Cur := Cur.ParentItem;
+    end;
+  end;
+
+  procedure FindNodeRecursive(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if (ANode = nil) or (RestoredNode <> nil) then
+      Exit;
+
+    if (ANode.Tag = PrevNodeTag)
+      and (ANode.TagString = PrevNodeTagString)
+      and (ANode.Text = PrevNodeText)
+      and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
+    begin
+      RestoredNode := ANode;
+      Exit;
+    end;
+
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        FindNodeRecursive(ChildNode);
+        if RestoredNode <> nil then
+          Exit;
+      end;
+  end;
+
+  procedure CollectExpandedNodes(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    if ANode.IsExpanded then
+      PrevExpandedPaths.Add(BuildNodePath(ANode));
+
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        CollectExpandedNodes(ChildNode);
+      end;
+  end;
+
+  procedure RestoreExpandedNodes(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    if PrevExpandedPaths.IndexOf(BuildNodePath(ANode)) >= 0 then
+      ANode.Expand;
+
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        RestoreExpandedNodes(ChildNode);
+      end;
+  end;
 begin
   if ActiveRepo = nil then
   begin
@@ -350,15 +433,24 @@ begin
 
   TreeViewTypes.BeginUpdate;
   try
-    PrevSelectedNode := TreeViewTypes.Selected;
+    PrevExpandedPaths := TStringList.Create;
+    PrevExpandedPaths.Sorted := True;
+    PrevExpandedPaths.Duplicates := TDuplicates.dupIgnore;
+
+    for I := 0 to TreeViewTypes.Count - 1 do
+      CollectExpandedNodes(TreeViewTypes.ItemByIndex(I));
+
+    PrevSelectedNode := GetActiveTreeNode;
     PrevNodeText := '';
     PrevNodeTagString := '';
     PrevNodeTag := -1;
+    PrevNodePath := '';
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
       PrevNodeTagString := PrevSelectedNode.TagString;
       PrevNodeTag := PrevSelectedNode.Tag;
+      PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
     TreeViewTypes.Clear;
@@ -480,7 +572,10 @@ begin
       if ManNode = nil then
         Continue;
 
-      CatText := '<категория>';
+      if Trim(T.CategoryName) <> '' then
+        CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName)
+      else
+        CatText := '<категория>';
       CatKey  := IntToStr(T.Category); // -1 / 0
 
       CatNode := FindChildInNode(
@@ -527,21 +622,29 @@ begin
 
     RestoredNode := nil;
     if PrevSelectedNode <> nil then
+    begin
       for I := 0 to TreeViewTypes.Count - 1 do
-        if (TreeViewTypes.ItemByIndex(I).Tag = PrevNodeTag)
-          and (TreeViewTypes.ItemByIndex(I).TagString = PrevNodeTagString)
-          and (TreeViewTypes.ItemByIndex(I).Text = PrevNodeText) then
-        begin
-          RestoredNode := TreeViewTypes.ItemByIndex(I);
+      begin
+        FindNodeRecursive(TreeViewTypes.ItemByIndex(I));
+        if RestoredNode <> nil then
           Break;
-        end;
+      end;
+    end;
 
     if RestoredNode <> nil then
       TreeViewTypes.Selected := RestoredNode
     else
       TreeViewTypes.Selected := AllNode;
 
+    for I := 0 to TreeViewTypes.Count - 1 do
+      RestoreExpandedNodes(TreeViewTypes.ItemByIndex(I));
+
+    if FExpandSelectedOneLevelAfterBuild and (TreeViewTypes.Selected <> nil) then
+      TreeViewTypes.Selected.Expand;
+    FExpandSelectedOneLevelAfterBuild := False;
+
   finally
+    PrevExpandedPaths.Free;
     TreeViewTypes.EndUpdate;
   end;
 end;
@@ -578,9 +681,15 @@ begin
   end;
 
   ApplyFilter;
-  UpdateGridTypes;
-  BuildTree;
-  //TreeViewTypes.Selected:=SelectedNode;
+  TreeViewTypes.Visible := False;
+  try
+    UpdateGridTypes;
+    FExpandSelectedOneLevelAfterBuild := True;
+    BuildTree;
+    //TreeViewTypes.Selected:=SelectedNode;
+  finally
+    TreeViewTypes.Visible := True;
+  end;
 end;
 
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
