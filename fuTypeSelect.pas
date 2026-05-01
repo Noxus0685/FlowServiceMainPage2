@@ -453,16 +453,19 @@ begin
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
-    TreeViewTypes.Clear;
+    //TreeViewTypes.Clear;
 
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
-    AllNode := TTreeViewItem.Create(TreeViewTypes);
-    AllNode.Text := '...';
-    AllNode.Tag := Ord(tnAll);
-    AllNode.TagString := '';
-    TreeViewTypes.AddObject(AllNode);
+    if TreeViewTypes=nil then
+    begin
+      AllNode := TTreeViewItem.Create(TreeViewTypes);
+      AllNode.Text := '...';
+      AllNode.Tag := Ord(tnAll);
+      AllNode.TagString := '';
+      TreeViewTypes.AddObject(AllNode);
+    end ;
 
     {----------------------------------}
     { Проход по изготовителям }
@@ -687,6 +690,7 @@ begin
   finally
     TreeViewTypes.Visible := True;
   end;
+
 end;
 
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
