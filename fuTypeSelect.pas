@@ -928,12 +928,16 @@ end;
 
 procedure TFormTypeSelect.actTypeDeleteExecute(Sender: TObject);
 var
-  I: Integer;
+  I, NodeIndex: Integer;
   SelType: TDeviceType;
   TargetTypes: TObjectList<TDeviceType>;
+  SelectedNode, ParentNode, ReplacementNode: TTreeViewItem;
+  IsSectionEmpty: Boolean;
 begin
   if (FDevFilteredTypes = nil) or (FDevFilteredTypes.Count = 0) then
     Exit;
+
+  SelectedNode := GetActiveTreeNode;
 
   TargetTypes := GetSelectedTypes;
   try
@@ -970,6 +974,52 @@ begin
       SelType := TargetTypes[I];
       if SelType <> nil then
         ActiveRepo.DeleteType(SelType);
+    end;
+
+    IsSectionEmpty := False;
+    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
+    begin
+      IsSectionEmpty := True;
+      if FDeviceTypes <> nil then
+        for I := 0 to FDeviceTypes.Count - 1 do
+          if PassTreeFilter(FDeviceTypes[I], SelectedNode) then
+          begin
+            IsSectionEmpty := False;
+            Break;
+          end;
+
+      if IsSectionEmpty then
+      begin
+        ParentNode := SelectedNode.ParentItem;
+        NodeIndex := -1;
+
+        if ParentNode <> nil then
+          for I := 0 to ParentNode.Count - 1 do
+            if ParentNode.ItemByIndex(I) = SelectedNode then
+            begin
+              NodeIndex := I;
+              Break;
+            end;
+
+        ReplacementNode := nil;
+
+        if ParentNode <> nil then
+        begin
+          if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
+            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
+          else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1) and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
+            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1))
+          else
+            ReplacementNode := ParentNode;
+
+          ParentNode.RemoveObject(SelectedNode);
+        end
+        else
+          TreeViewTypes.RemoveObject(SelectedNode);
+
+        SelectedNode.DisposeOf;
+        TreeViewTypes.Selected := ReplacementNode;
+      end;
     end;
 
     FreeAndNil(FDevFilteredByTree);
