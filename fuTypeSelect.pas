@@ -681,14 +681,13 @@ begin
   end;
 
   ApplyFilter;
-  TreeViewTypes.Visible := False;
   try
     UpdateGridTypes;
     FExpandSelectedOneLevelAfterBuild := True;
     BuildTree;
     //TreeViewTypes.Selected:=SelectedNode;
   finally
-    TreeViewTypes.Visible := True;
+
   end;
 
 end;
