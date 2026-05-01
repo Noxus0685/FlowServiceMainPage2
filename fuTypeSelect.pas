@@ -331,7 +331,7 @@ var
 
   AllNode, ManNode, CatNode, ModNode: TTreeViewItem;
   PrevSelectedNode, RestoredNode: TTreeViewItem;
-  PrevNodeText, PrevNodeTagString, PrevNodePath: string;
+  PrevNodeText, PrevNodeTagString: string;
   PrevNodeTag: NativeInt;
   ManText, ManKey: string;
   CatText, CatKey: string;
@@ -339,22 +339,6 @@ var
 
   ManPass: Integer;
   I: Integer;
-
-  function BuildNodePath(const ANode: TTreeViewItem): string;
-  var
-    Cur: TTreeViewItem;
-  begin
-    Result := '';
-    Cur := ANode;
-    while Cur <> nil do
-    begin
-      if Result = '' then
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
-      else
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
-      Cur := Cur.ParentItem;
-    end;
-  end;
 begin
   if ActiveRepo = nil then
   begin
@@ -370,13 +354,11 @@ begin
     PrevNodeText := '';
     PrevNodeTagString := '';
     PrevNodeTag := -1;
-    PrevNodePath := '';
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
       PrevNodeTagString := PrevSelectedNode.TagString;
       PrevNodeTag := PrevSelectedNode.Tag;
-      PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
     TreeViewTypes.Clear;
@@ -548,8 +530,7 @@ begin
       for I := 0 to TreeViewTypes.Count - 1 do
         if (TreeViewTypes.ItemByIndex(I).Tag = PrevNodeTag)
           and (TreeViewTypes.ItemByIndex(I).TagString = PrevNodeTagString)
-          and (TreeViewTypes.ItemByIndex(I).Text = PrevNodeText)
-          and ((PrevNodePath = '') or (BuildNodePath(TreeViewTypes.ItemByIndex(I)) = PrevNodePath)) then
+          and (TreeViewTypes.ItemByIndex(I).Text = PrevNodeText) then
         begin
           RestoredNode := TreeViewTypes.ItemByIndex(I);
           Break;
