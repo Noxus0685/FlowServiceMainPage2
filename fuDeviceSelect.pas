@@ -965,6 +965,33 @@ end;
 procedure TFormDeviceSelect.aDevicePasteExecute(Sender: TObject);
 var
   NewRows: TObjectList<TDevice>;
+  RestoredNode: TTreeViewItem;
+  I: Integer;
+  procedure FindNodeRecursive(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if (ANode = nil) or (RestoredNode <> nil) then
+      Exit;
+
+    if (SelectedNode <> nil)
+      and (ANode.Tag = SelectedNode.Tag)
+      and (ANode.TagString = SelectedNode.TagString) then
+    begin
+      RestoredNode := ANode;
+      Exit;
+    end;
+
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        FindNodeRecursive(ChildNode);
+        if RestoredNode <> nil then
+          Exit;
+      end;
+  end;
 begin
   if (ActiveRepo = nil) or (AppServices.DataManager = nil) or (not AppServices.DataManager.HasBufferDevices) then
     Exit;
