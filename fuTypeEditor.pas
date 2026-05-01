@@ -1068,6 +1068,8 @@ end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
 begin
+  UpdateTypeFromUI;
+
   // --------------------------------------------------
   // Валидация данных
   // --------------------------------------------------
