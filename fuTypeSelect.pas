@@ -588,7 +588,7 @@ begin
       TreeViewTypes.Selected := AllNode;
 
     if FExpandSelectedOneLevelAfterBuild and (TreeViewTypes.Selected <> nil) then
-      TreeViewTypes.Selected.Expanded := True;
+      TreeViewTypes.Selected.Expand;
     FExpandSelectedOneLevelAfterBuild := False;
 
   finally
