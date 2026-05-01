@@ -560,11 +560,87 @@ var
   D: TDevice;
 
   AllNode, ManNode, CatNode, ModNode: TTreeViewItem;
+  PrevSelectedNode, RestoredNode: TTreeViewItem;
+  PrevNodeText, PrevNodeTagString, PrevNodePath: string;
+  PrevNodeTag: NativeInt;
+  PrevExpandedPaths: TStringList;
   ManText, ManKey: string;
   CatText, CatKey: string;
   ModText, ModKey: string;
   CategoryText:String;
   ManPass: Integer;
+  I: Integer;
+  function BuildNodePath(const ANode: TTreeViewItem): string;
+  var
+    Cur: TTreeViewItem;
+  begin
+    Result := '';
+    Cur := ANode;
+    while Cur <> nil do
+    begin
+      if Result = '' then
+        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
+      else
+        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
+      Cur := Cur.ParentItem;
+    end;
+  end;
+  procedure FindNodeRecursive(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if (ANode = nil) or (RestoredNode <> nil) then
+      Exit;
+    if (ANode.Tag = PrevNodeTag)
+      and (ANode.TagString = PrevNodeTagString)
+      and (ANode.Text = PrevNodeText)
+      and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
+    begin
+      RestoredNode := ANode;
+      Exit;
+    end;
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        FindNodeRecursive(ChildNode);
+        if RestoredNode <> nil then
+          Exit;
+      end;
+  end;
+  procedure CollectExpandedNodes(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+    if ANode.IsExpanded then
+      PrevExpandedPaths.Add(BuildNodePath(ANode));
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        CollectExpandedNodes(ChildNode);
+      end;
+  end;
+  procedure RestoreExpandedNodes(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+    if PrevExpandedPaths.IndexOf(BuildNodePath(ANode)) >= 0 then
+      ANode.Expand;
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        RestoreExpandedNodes(ChildNode);
+      end;
+  end;
 begin
   if ActiveRepo = nil then
   begin
@@ -577,6 +653,25 @@ begin
 
   TreeViewDevices.BeginUpdate;
   try
+    PrevExpandedPaths := TStringList.Create;
+    PrevExpandedPaths.Sorted := True;
+    PrevExpandedPaths.Duplicates := TDuplicates.dupIgnore;
+    for I := 0 to TreeViewDevices.Count - 1 do
+      CollectExpandedNodes(TreeViewDevices.ItemByIndex(I));
+
+    PrevSelectedNode := GetActiveTreeNode;
+    PrevNodeText := '';
+    PrevNodeTagString := '';
+    PrevNodeTag := -1;
+    PrevNodePath := '';
+    if PrevSelectedNode <> nil then
+    begin
+      PrevNodeText := PrevSelectedNode.Text;
+      PrevNodeTagString := PrevSelectedNode.TagString;
+      PrevNodeTag := PrevSelectedNode.Tag;
+      PrevNodePath := BuildNodePath(PrevSelectedNode);
+    end;
+
     TreeViewDevices.Clear;
 
     {----------------------------------}
@@ -744,9 +839,24 @@ begin
       end;
     end;
 
-    TreeViewDevices.Selected := AllNode;
+    RestoredNode := nil;
+    if PrevSelectedNode <> nil then
+      for I := 0 to TreeViewDevices.Count - 1 do
+      begin
+        FindNodeRecursive(TreeViewDevices.ItemByIndex(I));
+        if RestoredNode <> nil then
+          Break;
+      end;
 
+    if RestoredNode <> nil then
+      TreeViewDevices.Selected := RestoredNode
+    else
+      TreeViewDevices.Selected := AllNode;
+
+    for I := 0 to TreeViewDevices.Count - 1 do
+      RestoreExpandedNodes(TreeViewDevices.ItemByIndex(I));
   finally
+    PrevExpandedPaths.Free;
     TreeViewDevices.EndUpdate;
   end;
 end;
@@ -835,7 +945,6 @@ begin
   finally
     TargetDevices.Free;
   end;
-  UpdateDeviceActions(nil);
 end;
 
 procedure TFormDeviceSelect.aDeviceCutExecute(Sender: TObject);
@@ -872,13 +981,8 @@ begin
   end;
 
   ApplyFilter;
-  TreeViewDevices.Visible := False;
-  try
-    UpdateGridDevices;
-    BuildTree;
-  finally
-    TreeViewDevices.Visible := True;
-  end;
+  UpdateGridDevices;
+  BuildTree;
 end;
 
 function TFormDeviceSelect.GetActiveTreeNode: TTreeViewItem;
@@ -1071,13 +1175,29 @@ procedure TFormDeviceSelect.ButtonDeviceDeleteClick(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
   SelDevice: TDevice;
-  I: Integer;
+  I, J, NodeIndex: Integer;
+  SelectedNode, ParentNode, ReplacementNode, CurrentNode: TTreeViewItem;
+  SectionHasDevices: Boolean;
+  function PassTreeFilterForNode(const ADevice: TDevice; const ANode: TTreeViewItem): Boolean;
+  var
+    PrevSelected: TTreeViewItem;
+  begin
+    PrevSelected := TreeViewDevices.Selected;
+    TreeViewDevices.Selected := ANode;
+    try
+      Result := PassTreeFilter(ADevice);
+    finally
+      TreeViewDevices.Selected := PrevSelected;
+    end;
+  end;
 begin
   {----------------------------------}
   { Проверка списка }
   {----------------------------------}
   if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
     Exit;
+
+  SelectedNode := GetActiveTreeNode;
 
   TargetDevices := GetSelectedDevices;
   try
@@ -1123,9 +1243,78 @@ begin
         ActiveRepo.DeleteDevice(SelDevice);
     end;
 
-    {----------------------------------}
-    { Пересборка фильтров }
-    {----------------------------------}
+    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
+    begin
+      SectionHasDevices := False;
+      if FDevices <> nil then
+        for I := 0 to FDevices.Count - 1 do
+          if PassTreeFilterForNode(FDevices[I], SelectedNode) then
+          begin
+            SectionHasDevices := True;
+            Break;
+          end;
+
+      if not SectionHasDevices then
+      begin
+        ParentNode := SelectedNode.ParentItem;
+        ReplacementNode := ParentNode;
+
+        if ParentNode <> nil then
+        begin
+          NodeIndex := -1;
+          for J := 0 to ParentNode.Count - 1 do
+            if ParentNode.ItemByIndex(J) = SelectedNode then
+            begin
+              NodeIndex := J;
+              Break;
+            end;
+
+          if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
+            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
+          else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1)
+            and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
+            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
+
+          ParentNode.RemoveObject(SelectedNode);
+        end
+        else
+          TreeViewDevices.RemoveObject(SelectedNode);
+
+        SelectedNode.DisposeOf;
+
+        CurrentNode := ParentNode;
+        while (CurrentNode <> nil)
+          and (CurrentNode.Tag <> Ord(tnAll))
+          and (CurrentNode.Count = 0) do
+        begin
+          SectionHasDevices := False;
+          if FDevices <> nil then
+            for I := 0 to FDevices.Count - 1 do
+              if PassTreeFilterForNode(FDevices[I], CurrentNode) then
+              begin
+                SectionHasDevices := True;
+                Break;
+              end;
+
+          if SectionHasDevices then
+            Break;
+
+          ParentNode := CurrentNode.ParentItem;
+          if ParentNode <> nil then
+            ParentNode.RemoveObject(CurrentNode)
+          else
+            TreeViewDevices.RemoveObject(CurrentNode);
+          CurrentNode.DisposeOf;
+          CurrentNode := ParentNode;
+        end;
+
+        if ReplacementNode <> nil then
+          TreeViewDevices.Selected := ReplacementNode
+        else
+          TreeViewDevices.Selected := CurrentNode;
+      end;
+    end;
+
     FreeAndNil(FDevFilteredByTree);
     FDevFilteredByTree := BuildFilteredByTree(FDevices);
 
