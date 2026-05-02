@@ -2261,55 +2261,8 @@ end;
 
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
-var
-  Repo: TDeviceRepository;
-  Res: TModalResult;
 begin
-  Repo := AppServices.DataManager.ActiveDeviceRepo;
-
-  if (Repo <> nil) and (Repo.State = osModified) then
-  begin
-    Res := MessageDlg(
-      'Есть несохранённые изменения. Сохранить перед выходом?',
-      TMsgDlgType.mtConfirmation,
-      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo, TMsgDlgBtn.mbCancel],
-      0
-    );
-
-    case Res of
-      mrYes:
-        begin
-          try
-            if not Repo.Save then
-            begin
-              Action := TCloseAction.caNone;
-              Exit;
-            end;
-          except
-            on E: Exception do
-            begin
-              ShowMessage('Ошибка сохранения: ' + E.Message);
-              Action := TCloseAction.caNone;
-              Exit;
-            end;
-          end;
-        end;
-      mrNo:
-        begin
-          if not AppServices.DataManager.RevertActiveDeviceRepo then
-          begin
-            ShowMessage('Не удалось откатить изменения приборов');
-            Action := TCloseAction.caNone;
-            Exit;
-          end;
-        end;
-      mrCancel:
-        begin
-          Action := TCloseAction.caNone;
-          Exit;
-        end;
-    end;
-  end;
+  AppServices.DataManager.Save;
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
