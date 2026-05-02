@@ -8,8 +8,10 @@ uses
   System.Math,
   System.StrUtils,
   System.SysUtils,
+  System.UITypes,
   uBaseProcedures,
   uClasses,
+  uControlRegister,
   uDataManager,
   uDeviceClass,
   uFlowMeter,
@@ -56,7 +58,9 @@ type
     awtAddPump,
     awtRemovePump,
     awtAddChannel,
-    awtRemoveChannel
+    awtRemoveChannel,
+    awtWriteRegister,
+    awtReadRegister
 
   );
 
@@ -64,7 +68,8 @@ type
     ewtNone = 0,
     ewtWarning = 1,
     ewtError,
-    ewtActivated
+    ewtActivated,
+    ewtRefresh
   );
   TWorkTableEvent = EEventWorkTable;
 
@@ -125,6 +130,10 @@ type
     FHashValueCurrent: string;
     FHashValueInterface: string;
     FName: string;
+    FWorkTabeID: Integer;
+    FOutputSet: TControlRegister<EOutPutSet>;
+    FSyncMode: TControlRegister<ESyncChannelMode>;
+    FNoiseFilter: TControlRegister<Integer>;
 
 
 
@@ -140,6 +149,12 @@ type
 
     function GetSignalProxy: Integer;
     procedure SetSignalProxy(const AValue: Integer);
+    function GetOutputSetProxy: EOutPutSet;
+    procedure SetOutputSetProxy(const AValue: EOutPutSet);
+    function GetSyncModeProxy: ESyncChannelMode;
+    procedure SetSyncModeProxy(const AValue: ESyncChannelMode);
+    function GetNoiseFilterProxy: Integer;
+    procedure SetNoiseFilterProxy(const AValue: Integer);
     function GetCategoryProxy: Integer;
     procedure SetCategoryProxy(const AValue: Integer);
 
@@ -205,6 +220,7 @@ type
     property Enabled: Boolean read FEnabled write FEnabled;
     property Name: string read FName write FName;
     property Text: string read FText write FText;
+    property WorkTabeID: Integer read FWorkTabeID write FWorkTabeID;
 
 
 
@@ -213,6 +229,9 @@ type
     property TypeName: string read GetTypeNameProxy write SetTypeNameProxy;
     property Serial: string read GetSerialProxy write SetSerialProxy;
     property Signal: Integer read GetSignalProxy write SetSignalProxy;
+    property OutputSet: EOutPutSet read GetOutputSetProxy write SetOutputSetProxy;
+    property SyncMode: ESyncChannelMode read GetSyncModeProxy write SetSyncModeProxy;
+    property NoiseFilter: Integer read GetNoiseFilterProxy write SetNoiseFilterProxy;
     property Category: Integer read GetCategoryProxy write SetCategoryProxy;
     property Group: Integer read FGroup write FGroup;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
@@ -245,6 +264,10 @@ type
       const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
     procedure CreateDevice;
+
+    function GetOutputSetStateColor: TAlphaColor;
+    function GetSyncModeStateColor: TAlphaColor;
+    function GetNoiseFilterStateColor: TAlphaColor;
 
   end;
 
@@ -394,7 +417,8 @@ type
     class procedure LoadChannelList(
       AIni: TCustomIniFile;
       const ASectionPrefix: string;
-      AChannels: TObjectList<TChannel>
+      AChannels: TObjectList<TChannel>;
+      const AWorkTableID: Integer
     ); static;
 
   private
@@ -592,6 +616,7 @@ type
     procedure AddWorkTable(const WorkTableName: string);  overload;
 
     function FindWorkTableName(const WorkTableName: string): TWorkTable;
+    function FindWorkTableByID(const WorkTableID: Integer): TWorkTable;
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
@@ -746,6 +771,9 @@ begin
   inherited Create;
 
   FFlowMeter := TFlowMeter.Create;
+  FOutputSet := TControlRegister<EOutPutSet>.Create;
+  FSyncMode := TControlRegister<ESyncChannelMode>.Create;
+  FNoiseFilter := TControlRegister<Integer>.Create;
 
   FEnabled := False;
   FName:= 'Канал';
@@ -758,6 +786,7 @@ begin
   FValueResult := 0;
   FGroup := 0;
   FCategory := mftUnknownType;
+  FWorkTabeID := 0;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -765,6 +794,9 @@ end;
 { Releases channel-owned resources and removes linked values from shared storage. }
 destructor TChannel.Destroy;
 begin
+  FreeAndNil(FOutputSet);
+  FreeAndNil(FSyncMode);
+  FreeAndNil(FNoiseFilter);
   FreeAndNil(FFlowMeter);
   inherited Destroy;
 end;
@@ -776,6 +808,12 @@ begin
     Exit;
 
   FFlowMeter.Init(DeviceUUID);
+  if (FFlowMeter.Device <> nil) then
+  begin
+    FOutputSet.FromDefault(IntToOutputSet(FFlowMeter.Device.OutputSet));
+    FSyncMode.FromDefault(IntToSyncChannelMode(FFlowMeter.Device.SyncMode));
+    FNoiseFilter.FromDefault(FFlowMeter.Device.NoiseFilter);
+  end;
 end;
                                          {TODO -oOwner -cGeneral : ActionItem}
 { Rebinds FlowMeter value references to channel and work table meter values. }
@@ -896,6 +934,9 @@ begin
   FFlowMeter.MeterFlowCategory := ASource.FFlowMeter.MeterFlowCategory;
   FCategory := ASource.FCategory;
   FGroup := ASource.FGroup;
+  OutputSet := ASource.OutputSet;
+  SyncMode := ASource.SyncMode;
+  NoiseFilter := ASource.NoiseFilter;
 
   SrcDevice := ASource.FFlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
@@ -978,6 +1019,73 @@ procedure TChannel.SetSignalProxy(const AValue: Integer);
 begin
   if Assigned(FFlowMeter) then
     FFlowMeter.OutputType := AValue;
+end;
+
+function TChannel.GetOutputSetProxy: EOutPutSet;
+begin
+  if FOutputSet <> nil then
+    Result := FOutputSet.Value
+  else
+    Result := optAuto;
+end;
+
+procedure TChannel.SetOutputSetProxy(const AValue: EOutPutSet);
+begin
+  if FOutputSet <> nil then
+    FOutputSet.SetValue(AValue);
+end;
+
+function TChannel.GetSyncModeProxy: ESyncChannelMode;
+begin
+  if FSyncMode <> nil then
+    Result := FSyncMode.Value
+  else
+    Result := scmOff;
+end;
+
+procedure TChannel.SetSyncModeProxy(const AValue: ESyncChannelMode);
+begin
+  if FSyncMode <> nil then
+    FSyncMode.SetValue(AValue);
+end;
+
+function TChannel.GetNoiseFilterProxy: Integer;
+begin
+  if FNoiseFilter <> nil then
+    Result := FNoiseFilter.Value
+  else
+    Result := 0;
+end;
+
+procedure TChannel.SetNoiseFilterProxy(const AValue: Integer);
+begin
+  if FNoiseFilter <> nil then
+    FNoiseFilter.SetValue(AValue);
+end;
+
+
+function TChannel.GetOutputSetStateColor: TAlphaColor;
+begin
+  if FOutputSet <> nil then
+    Result := FOutputSet.GetStateColor
+  else
+    Result := TAlphaColors.Gray;
+end;
+
+function TChannel.GetSyncModeStateColor: TAlphaColor;
+begin
+  if FSyncMode <> nil then
+    Result := FSyncMode.GetStateColor
+  else
+    Result := TAlphaColors.Gray;
+end;
+
+function TChannel.GetNoiseFilterStateColor: TAlphaColor;
+begin
+  if FNoiseFilter <> nil then
+    Result := FNoiseFilter.GetStateColor
+  else
+    Result := TAlphaColors.Gray;
 end;
 
 function TChannel.GetCategoryProxy: Integer;
@@ -2116,6 +2224,7 @@ begin
   Result.ID := ChannelIndex;
   Result.Name := BuildDeviceChannelServiceName(ChannelIndex);
   Result.Text := BuildChannelDefaultText(ChannelIndex);
+  Result.WorkTabeID := Self.ID;
   FDeviceChannels.Add(Result);
   Result.RebindFlowMeterValues(Self);
   if (Result.FlowMeter <> nil) and (FTableFlow <> nil) then
@@ -2154,6 +2263,7 @@ begin
   Result.ID := ChannelIndex;
   Result.Name := BuildEtalonChannelServiceName(ChannelIndex);
   Result.Text := BuildChannelDefaultText(ChannelIndex);
+  Result.WorkTabeID := Self.ID;
   FEtalonChannels.Add(Result);
   Result.RebindFlowMeterValues(Self);
 end;
@@ -2484,8 +2594,8 @@ begin
 
       WorkTable.FluidTemp.Value.Value := 21;
 
-      LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
-      LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
+      LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels, WorkTable.ID);
+      LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels, WorkTable.ID);
       LoadGridColumns(Ini, Section + '.EtalonGrid', WorkTable.FEtalonsGridColumns);
       LoadGridColumns(Ini, Section + '.DeviceGrid', WorkTable.FDevicesGridColumns);
       LoadGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.FDataPointsGridColumns);
@@ -2589,6 +2699,7 @@ begin
 
     AIni.WriteInteger(Section, 'ID', Channel.ID);
     AIni.WriteString(Section, 'UUID', Channel.UUID);
+    AIni.WriteInteger(Section, 'WorkTabeID', Channel.WorkTabeID);
     AIni.WriteBool(Section, 'Enabled', Channel.Enabled);
     AIni.WriteString(Section, 'Name', Channel.Name);
     AIni.WriteString(Section, 'Text', Channel.Text);
@@ -2596,6 +2707,9 @@ begin
     AIni.WriteString(Section, 'DeviceName', Channel.DeviceName);
     AIni.WriteString(Section, 'Serial', Channel.Serial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
+    AIni.WriteInteger(Section, 'OutputSet', Ord(Channel.OutputSet));
+    AIni.WriteInteger(Section, 'SyncMode', Ord(Channel.SyncMode));
+    AIni.WriteInteger(Section, 'NoiseFilter', Channel.NoiseFilter);
     AIni.WriteInteger(Section, 'Category', Channel.Category);
     AIni.WriteInteger(Section, 'Group', Channel.Group);
     AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
@@ -2628,7 +2742,7 @@ end;
 
 { Restores channel collection metadata from INI storage. }
 class procedure TWorkTable.LoadChannelList(AIni: TCustomIniFile;
-  const ASectionPrefix: string; AChannels: TObjectList<TChannel>);
+  const ASectionPrefix: string; AChannels: TObjectList<TChannel>; const AWorkTableID: Integer);
 var
   Count, I: Integer;
   Channel: TChannel;
@@ -2648,6 +2762,7 @@ begin
     Channel := TChannel.Create;
     Channel.ID := AIni.ReadInteger(Section, 'ID', I + 1);
     Channel.UUID := AIni.ReadString(Section, 'UUID', '');
+    Channel.WorkTabeID := AIni.ReadInteger(Section, 'WorkTabeID', AWorkTableID);
     Channel.Enabled := AIni.ReadBool(Section, 'Enabled', True);
     if EndsText('.Etalon', ASectionPrefix) then
       Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
@@ -2660,6 +2775,13 @@ begin
     Channel.DeviceName := AIni.ReadString(Section, 'DeviceName', Channel.TypeName);
     Channel.Serial := AIni.ReadString(Section, 'Serial', '');
     Channel.Signal := AIni.ReadInteger(Section, 'Signal', -1);
+    Channel.OutputSet := IntToOutputSet(
+      AIni.ReadInteger(Section, 'OutputSet', Ord(optAuto))
+    );
+    Channel.SyncMode := IntToSyncChannelMode(
+      AIni.ReadInteger(Section, 'SyncMode', Ord(scmOff))
+    );
+    Channel.NoiseFilter := AIni.ReadInteger(Section, 'NoiseFilter', 0);
     Channel.Category := AIni.ReadInteger(Section, 'Category', Ord(mftUnknownType));
     Channel.Group := AIni.ReadInteger(Section, 'Group', 0);
     Channel.DeviceUUID := AIni.ReadString(Section, 'DeviceUUID', '');
@@ -2846,6 +2968,7 @@ begin
     ewtWarning: Result := 'ewtWarning';
     ewtError: Result := 'ewtError';
     ewtActivated: Result := 'ewtActivated';
+    ewtRefresh: Result := 'ewtRefresh';
   else
     Result := 'ewtNone';
   end;
@@ -3596,10 +3719,22 @@ begin
 end;
 
 procedure TWorkTableManager.AddWorkTable;
- var WorkTable: TWorkTable;
+ var
+  WorkTable: TWorkTable;
+  NextID: Integer;
+  Existing: TWorkTable;
 begin
-   WorkTable := TWorkTable.Create;
-  WorkTable.ID := WorkTables.Count + 1;
+  NextID := 1;
+  while True do
+  begin
+    Existing := FindWorkTableByID(NextID);
+    if Existing = nil then
+      Break;
+    Inc(NextID);
+  end;
+
+  WorkTable := TWorkTable.Create;
+  WorkTable.ID := NextID;
   WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
   WorkTables.Add(WorkTable);
@@ -3647,6 +3782,19 @@ begin
       Exit;
     end;
   end;
+end;
+
+function TWorkTableManager.FindWorkTableByID(const WorkTableID: Integer): TWorkTable;
+var
+  WorkTable: TWorkTable;
+begin
+  Result := nil;
+  if (FWorkTables = nil) or (WorkTableID <= 0) then
+    Exit;
+
+  for WorkTable in FWorkTables do
+    if (WorkTable <> nil) and (WorkTable.ID = WorkTableID) then
+      Exit(WorkTable);
 end;
 
 function TWorkTableManager.FindPumpByName(const APumpName: string): TPump;

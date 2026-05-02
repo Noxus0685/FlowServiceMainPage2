@@ -975,6 +975,18 @@ begin
     Exit;
   end;
 
+  if WorkTableEvent = ewtRefresh then
+  begin
+    if FActiveWorkTable = AWorkTable then
+    begin
+      UpdateForm;
+      if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
+         (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
+        FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[GridDevices.Row]);
+    end;
+    Exit;
+  end;
+
   HandleWorkTableAction(AWorkTable, AData);
 end;
 

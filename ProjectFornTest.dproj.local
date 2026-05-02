@@ -13,6 +13,7 @@
     <Transaction>1899.12.30 00:00:00.000.277,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\dmFakeDB.pas=</Transaction>
     <Transaction>1899.12.30 00:00:00.000.847,D:\FlowServiceMainPage2\Parameters.pas=D:\FlowServiceMainPage2\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.872,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitManagerData.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitManager.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.701,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitManagerData.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\UnitManager.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.101,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuTypeEditor.pas=C:\Users\yak02\OneDrive\Документы\Embarcadero\Studio\Projects\Unit3.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.436,D:\Projects\FlowServiceMainPage\UnitFrameCalibrCoefs.pas=D:\Projects\FlowServiceMainPage\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.774,D:\Projects\FlowServiceMainPage\fuMeterValues.fmx=D:\Projects\FlowServiceMainPage\Unit1.fmx</Transaction>
@@ -82,11 +83,11 @@
     <Transaction>1899.12.30 00:00:00.000.317,=D:\Projects\FlowServiceMainPage\uDATA.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.435,D:\Projects\FlowServiceMainPage\frmMRResults.fmx=D:\Projects\FlowServiceMainPage\Unit2.fmx</Transaction>
     <Transaction>1899.12.30 00:00:00.000.670,D:\Projects\FlowServiceMainPage\fuMeterValues.pas=</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.849,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\FormTypeSearch.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuTypeSelect.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.877,D:\Projects\FlowServiceMainPage\frmProcceed.fmx=D:\Projects\FlowServiceMainPage\frmProceed.fmx</Transaction>
     <Transaction>1899.12.30 00:00:00.000.602,D:\Projects\FlowServiceMainPage\Unit2.pas=D:\Projects\FlowServiceMainPage\frmProcceed.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.156,=D:\Projects\FlowServiceMainPage\Unit2.pas</Transaction>
+    <Transaction>1899.12.30 00:00:00.000.934,=D:\Projects\FlowServiceMainPage\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.849,D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\FormTypeSearch.pas=D:\Projects\FlowServiceX\FlowPlantFMX\source\fmxfp\FormsTest\fuTypeSelect.pas</Transaction>
-    <Transaction>1899.12.30 00:00:00.000.877,D:\Projects\FlowServiceMainPage\frmProcceed.fmx=D:\Projects\FlowServiceMainPage\frmProceed.fmx</Transaction>
     <Transaction>1899.12.30 00:00:00.000.847,D:\FlowServiceMainPage2\Unit2.pas=D:\FlowServiceMainPage2\Parameters.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.689,=D:\FlowServiceMainPage2\Unit2.pas</Transaction>
     <Transaction>1899.12.30 00:00:00.000.637,D:\Projects\FlowServiceMainPage\UnitMeterValue.pas=D:\Projects\FlowServiceMainPage\Unit1.pas</Transaction>
@@ -301,6 +302,8 @@
     <File Path="FmxHelper.pas"/>
     <File Path="frmCalibrCoefs.pas"/>
     <File Path="frmCalibrCoefs.fmx"/>
+    <File Path="frmChannelProperties.pas"/>
+    <File Path="frmChannelProperties.fmx"/>
     <File Path="frmFlowMeterProperties.pas"/>
     <File Path="frmFlowMeterProperties.fmx"/>
     <File Path="frmMainTable.pas"/>
@@ -338,7 +341,6 @@
     <File Path="uTable_Data.pas"/>
     <File Path="uTable_Data.dfm"/>
     <File Path="uWorkTable.pas"/>
-    <File Path="frmChannelProperties.pas"/>
-    <File Path="frmChannelProperties.fmx"/>
+    <File Path="uControlRegister.pas"/>
   </ProjectSortOrder>
 </BorlandProject>

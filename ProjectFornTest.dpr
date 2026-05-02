@@ -31,7 +31,8 @@ uses
   uAppServices in 'uAppServices.pas',
   uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
   uWorkTable in 'uWorkTable.pas',
-  frmChannelProperties in 'frmChannelProperties.pas' {FrameChannelProperties: TFrame};
+  frmChannelProperties in 'frmChannelProperties.pas' {FrameChannelProperties: TFrame},
+  uControlRegister in 'uControlRegister.pas';
 
 {$R *.res}
 

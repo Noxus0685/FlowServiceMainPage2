@@ -461,6 +461,8 @@ type
     { ИМПУЛЬСНЫЙ / ЧАСТОТНЫЙ ВЫХОД }
     {====================================================================}
     OutputSet: Integer;         // Тип выхода
+    SyncMode: Integer;          // Режим синхронизации канала (Ord(ESyncChannelMode))
+    NoiseFilter: Integer;       // Фильтр помех, мс (-1=off, 0=auto, >0=ms)
     Freq: Integer;              // Максимальная частота, Гц
     Coef: Double;               // Коэффициент преобразования
     FreqFlowRate: Double;       // Отношение расхода к частоте
@@ -733,6 +735,8 @@ begin
   { Импульс / частота }
   {----------------------------------}
   OutputSet := 0;
+  SyncMode := 0;
+  NoiseFilter := 0;
   Freq := 1000;                     // Гц
   Coef := 1.0;
   FreqFlowRate := 1.0;
@@ -1275,6 +1279,8 @@ begin
   DimensionCoef := ASource.DimensionCoef;
 
   OutputSet := ASource.OutputSet;
+  SyncMode := ASource.SyncMode;
+  NoiseFilter := ASource.NoiseFilter;
   Freq := ASource.Freq;
   Coef := ASource.Coef;
   FreqFlowRate := ASource.FreqFlowRate;
@@ -2682,6 +2688,5 @@ begin
 end;
 
 end.
-
 
 
