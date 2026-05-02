@@ -950,30 +950,6 @@ begin
     if TargetTypes.Count = 0 then
       Exit;
 
-    {if not FSkipTypeDeleteConfirm then
-    begin
-      if TargetTypes.Count = 1 then
-      begin
-        if MessageDlg(
-             'Удалить выбранный тип безвозвратно?',
-             TMsgDlgType.mtWarning,
-             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-             0
-           ) <> mrYes then
-          Exit;
-      end
-      else
-      begin
-        if MessageDlg(
-             'Удалить выбранные типы безвозвратно?',
-             TMsgDlgType.mtWarning,
-             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-             0
-           ) <> mrYes then
-          Exit;
-      end;
-    end;        }
-
     for I := TargetTypes.Count - 1 downto 0 do
     begin
       SelType := TargetTypes[I];
