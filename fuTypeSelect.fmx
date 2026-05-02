@@ -127,8 +127,8 @@ object FormTypeSelect: TFormTypeSelect
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
         OnCellClick = GridTypesCellClick
-        Viewport.Width = 861.000000000000000000
-        Viewport.Height = 637.000000000000000000
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 678.000000000000000000
         object CheckColumnTypeEnable: TCheckColumn
           Header = #1042#1082#1083
           HeaderSettings.TextSettings.Trimming = Character
@@ -382,8 +382,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -441,7 +441,6 @@ object FormTypeSelect: TFormTypeSelect
       Align = Right
       StyledSettings = [Family, Size, Style]
       ImageIndex = -1
-      ModalResult = 1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -671,6 +670,9 @@ object FormTypeSelect: TFormTypeSelect
     end
     object Action3: TAction
       Text = 'Action3'
+    end
+    object aRefreshRepository: TAction
+      Text = #1054#1073#1085#1086#1074#1080#1090#1100
     end
   end
   object NetHTTPClient1: TNetHTTPClient

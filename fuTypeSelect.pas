@@ -135,6 +135,7 @@ type
     actTypeFindInternet: TAction;
     Action3: TAction;
     StringColumnUUID: TStringColumn;
+    aRefreshRepository: TAction;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -191,6 +192,7 @@ type
     FSortAscending: Boolean;
     FSkipTypeDeleteConfirm: Boolean;
     FClearTreeSelectionOnClick: Boolean;
+    FExpandSelectedOneLevelAfterBuild: Boolean;
     FCheckedTypes: TList<TDeviceType>;
 
     procedure LoadData;
@@ -329,11 +331,97 @@ var
   T: TDeviceType;
 
   AllNode, ManNode, CatNode, ModNode: TTreeViewItem;
+  PrevSelectedNode, RestoredNode: TTreeViewItem;
+  PrevNodeText, PrevNodeTagString, PrevNodePath: string;
+  PrevNodeTag: NativeInt;
+  PrevExpandedPaths: TStringList;
   ManText, ManKey: string;
   CatText, CatKey: string;
   ModText, ModKey: string;
 
   ManPass: Integer;
+  I: Integer;
+
+  function BuildNodePath(const ANode: TTreeViewItem): string;
+  var
+    Cur: TTreeViewItem;
+  begin
+    Result := '';
+    Cur := ANode;
+    while Cur <> nil do
+    begin
+      if Result = '' then
+        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
+      else
+        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
+      Cur := Cur.ParentItem;
+    end;
+  end;
+
+  procedure FindNodeRecursive(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if (ANode = nil) or (RestoredNode <> nil) then
+      Exit;
+
+    if (ANode.Tag = PrevNodeTag)
+      and (ANode.TagString = PrevNodeTagString)
+      and (ANode.Text = PrevNodeText)
+      and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
+    begin
+      RestoredNode := ANode;
+      Exit;
+    end;
+
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        FindNodeRecursive(ChildNode);
+        if RestoredNode <> nil then
+          Exit;
+      end;
+  end;
+
+  procedure CollectExpandedNodes(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    if ANode.IsExpanded then
+      PrevExpandedPaths.Add(BuildNodePath(ANode));
+
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        CollectExpandedNodes(ChildNode);
+      end;
+  end;
+
+  procedure RestoreExpandedNodes(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+    ChildNode: TTreeViewItem;
+  begin
+    if ANode = nil then
+      Exit;
+
+    if PrevExpandedPaths.IndexOf(BuildNodePath(ANode)) >= 0 then
+      ANode.Expand;
+
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+      begin
+        ChildNode := TTreeViewItem(ANode.ItemByIndex(J));
+        RestoreExpandedNodes(ChildNode);
+      end;
+  end;
 begin
   if ActiveRepo = nil then
   begin
@@ -345,16 +433,39 @@ begin
 
   TreeViewTypes.BeginUpdate;
   try
-    TreeViewTypes.Clear;
+    PrevExpandedPaths := TStringList.Create;
+    PrevExpandedPaths.Sorted := True;
+    PrevExpandedPaths.Duplicates := TDuplicates.dupIgnore;
+
+    for I := 0 to TreeViewTypes.Count - 1 do
+      CollectExpandedNodes(TreeViewTypes.ItemByIndex(I));
+
+    PrevSelectedNode := GetActiveTreeNode;
+    PrevNodeText := '';
+    PrevNodeTagString := '';
+    PrevNodeTag := -1;
+    PrevNodePath := '';
+    if PrevSelectedNode <> nil then
+    begin
+      PrevNodeText := PrevSelectedNode.Text;
+      PrevNodeTagString := PrevSelectedNode.TagString;
+      PrevNodeTag := PrevSelectedNode.Tag;
+      PrevNodePath := BuildNodePath(PrevSelectedNode);
+    end;
+
+    //TreeViewTypes.Clear;
 
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
-    AllNode := TTreeViewItem.Create(TreeViewTypes);
-    AllNode.Text := '...';
-    AllNode.Tag := Ord(tnAll);
-    AllNode.TagString := '';
-    TreeViewTypes.AddObject(AllNode);
+    if (TreeViewTypes.Count = 0) or (TreeViewTypes.Items[0].Tag <> Ord(tnAll)) then
+    begin
+      AllNode := TTreeViewItem.Create(TreeViewTypes);
+      AllNode.Text := '...';
+      AllNode.Tag := Ord(tnAll);
+      AllNode.TagString := '';
+      TreeViewTypes.AddObject(AllNode);
+    end ;
 
     {----------------------------------}
     { Проход по изготовителям }
@@ -509,9 +620,31 @@ begin
       end;
     end;
 
-    TreeViewTypes.Selected := AllNode;
+    RestoredNode := nil;
+    if PrevSelectedNode <> nil then
+    begin
+      for I := 0 to TreeViewTypes.Count - 1 do
+      begin
+        FindNodeRecursive(TreeViewTypes.ItemByIndex(I));
+        if RestoredNode <> nil then
+          Break;
+      end;
+    end;
+
+    if RestoredNode <> nil then
+      TreeViewTypes.Selected := RestoredNode
+    else
+      TreeViewTypes.Selected := AllNode;
+
+    for I := 0 to TreeViewTypes.Count - 1 do
+      RestoreExpandedNodes(TreeViewTypes.ItemByIndex(I));
+
+    if FExpandSelectedOneLevelAfterBuild and (TreeViewTypes.Selected <> nil) then
+      TreeViewTypes.Selected.Expand;
+    FExpandSelectedOneLevelAfterBuild := False;
 
   finally
+    PrevExpandedPaths.Free;
     TreeViewTypes.EndUpdate;
   end;
 end;
@@ -531,8 +664,6 @@ end;
 
 procedure TFormTypeSelect.actTypePasteExecute(Sender: TObject);
 var
-  NewType: TDeviceType;
-  I: Integer;
   SelectedNode: TTreeViewItem;
   NewRows: TObjectList<TDeviceType>;
 begin
@@ -540,31 +671,25 @@ begin
     Exit;
 
   SelectedNode := GetActiveTreeNode;
-  // Создание новых типов выполняется в DataManager.
-  NewRows := AppServices.DataManager.PasteBufferTypes;
+
+  // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
+  NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
-    for I := 0 to NewRows.Count - 1 do
-    begin
-      NewType := NewRows[I];
-      if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-        AppServices.DataManager.AssignTypeTreeFields(NewType, SelectedNode);
-    end;
-
-    ApplyFilter;
-    UpdateGridTypes;
-
-    if (FDevFilteredTypes <> nil) and (NewRows.Count > 0) then
-      for I := 0 to FDevFilteredTypes.Count - 1 do
-        if FDevFilteredTypes[I] = NewRows[0] then
-        begin
-          GridTypes.Row := I;
-          GridTypes.Selected := I;
-          SelectedType := FDevFilteredTypes[I];
-          Break;
-        end;
+    // Обновление UI выполняется централизованно в других обработчиках.
   finally
     NewRows.Free;
   end;
+
+  ApplyFilter;
+  try
+    UpdateGridTypes;
+    FExpandSelectedOneLevelAfterBuild := True;
+    BuildTree;
+    //TreeViewTypes.Selected:=SelectedNode;
+  finally
+
+  end;
+
 end;
 
 function TFormTypeSelect.GetActiveTreeNode: TTreeViewItem;
@@ -802,12 +927,16 @@ end;
 
 procedure TFormTypeSelect.actTypeDeleteExecute(Sender: TObject);
 var
-  I: Integer;
+  I, J, NodeIndex: Integer;
   SelType: TDeviceType;
   TargetTypes: TObjectList<TDeviceType>;
+  SelectedNode, ParentNode, ReplacementNode, CurrentNode: TTreeViewItem;
+  SectionHasTypes: Boolean;
 begin
   if (FDevFilteredTypes = nil) or (FDevFilteredTypes.Count = 0) then
     Exit;
+
+  SelectedNode := GetActiveTreeNode;
 
   TargetTypes := GetSelectedTypes;
   try
@@ -836,7 +965,6 @@ begin
            ) <> mrYes then
           Exit;
       end;
-
     end;
 
     for I := TargetTypes.Count - 1 downto 0 do
@@ -844,6 +972,75 @@ begin
       SelType := TargetTypes[I];
       if SelType <> nil then
         ActiveRepo.DeleteType(SelType);
+    end;
+
+    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
+    begin
+      SectionHasTypes := False;
+      if FDeviceTypes <> nil then
+        for I := 0 to FDeviceTypes.Count - 1 do
+          if PassTreeFilter(FDeviceTypes[I], SelectedNode) then
+          begin
+            SectionHasTypes := True;
+            Break;
+          end;
+
+      if not SectionHasTypes then
+      begin
+        ParentNode := SelectedNode.ParentItem;
+        ReplacementNode := ParentNode;
+
+        if ParentNode <> nil then
+        begin
+          NodeIndex := -1;
+          for J := 0 to ParentNode.Count - 1 do
+            if ParentNode.ItemByIndex(J) = SelectedNode then
+            begin
+              NodeIndex := J;
+              Break;
+            end;
+
+          if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
+            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
+          else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1)
+            and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
+            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
+
+          ParentNode.RemoveObject(SelectedNode);
+        end
+        else
+          TreeViewTypes.RemoveObject(SelectedNode);
+
+        SelectedNode.DisposeOf;
+
+        CurrentNode := ParentNode;
+        while (CurrentNode <> nil)
+          and (CurrentNode.Tag <> Ord(tnAll))
+          and (CurrentNode.Count = 0) do
+        begin
+          SectionHasTypes := False;
+          if FDeviceTypes <> nil then
+            for I := 0 to FDeviceTypes.Count - 1 do
+              if PassTreeFilter(FDeviceTypes[I], CurrentNode) then
+              begin
+                SectionHasTypes := True;
+                Break;
+              end;
+
+          if SectionHasTypes then
+            Break;
+
+          ParentNode := CurrentNode.ParentItem;
+          if ParentNode <> nil then
+            ParentNode.RemoveObject(CurrentNode)
+          else
+            TreeViewTypes.RemoveObject(CurrentNode);
+          CurrentNode.DisposeOf;
+          CurrentNode := ParentNode;
+        end;
+
+        TreeViewTypes.Selected := CurrentNode;
+      end;
     end;
 
     FreeAndNil(FDevFilteredByTree);
@@ -857,6 +1054,7 @@ begin
     TargetTypes.Free;
   end;
 end;
+
 
 procedure TFormTypeSelect.DateEditFilterChange(Sender: TObject);
 begin
@@ -1825,10 +2023,60 @@ procedure TFormTypeSelect.ComboBoxRepositoryChange(Sender: TObject);
 var
   Idx: Integer;
   RepoName: string;
+  Repo: TTypeRepository;
+  Res: TModalResult;
 begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
+
+
+
+begin
+  Repo := AppServices.DataManager.ActiveTypeRepo;
+
+  if (Repo <> nil) and (Repo.State = osModified) then
+  begin
+    Res := MessageDlg(
+      'Есть несохранённые изменения. Сохранить перед выходом?',
+      TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo, TMsgDlgBtn.mbCancel],
+      0
+    );
+
+    case Res of
+      mrYes:
+        begin
+          try
+            if not Repo.Save then
+            begin
+              //Action := TCloseAction.caNone;
+              Exit;
+            end;
+          except
+            on E: Exception do
+            begin
+              ShowMessage('Ошибка сохранения: ' + E.Message);
+             // Action := TCloseAction.caNone;
+              Exit;
+            end;
+          end;
+        end;
+
+      mrNo:
+        begin
+          // закрываем без сохранения
+        end;
+
+      mrCancel:
+        begin
+          //Action := TCloseAction.caNone;
+          Exit;
+        end;
+    end;
+  end;
+end;
+
   if (AppServices.DataManager = nil) then
     Exit;
 
@@ -2080,10 +2328,10 @@ begin
   {----------------------------------}
   OpenTypeEditor(AType);
 
-  SelectedType:=AType;
+  SelectedType := AType;
 
-  ModalResult := mrOk;
-
+  // Не закрываем форму выбора типов после редактирования.
+  // Обновление UI выполняется внутри OpenTypeEditor при mrOk.
 end;
 
 
