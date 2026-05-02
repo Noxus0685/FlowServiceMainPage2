@@ -1135,7 +1135,12 @@ begin
 
       mrNo:
         begin
-          // закрываем без сохранения
+          if not AppServices.DataManager.RevertActiveTypeRepo then
+          begin
+            ShowMessage('Не удалось откатить изменения типов');
+            Action := TCloseAction.caNone;
+            Exit;
+          end;
         end;
 
       mrCancel:
@@ -2065,7 +2070,11 @@ begin
 
       mrNo:
         begin
-          // закрываем без сохранения
+          if not AppServices.DataManager.RevertActiveTypeRepo then
+          begin
+            ShowMessage('Не удалось откатить изменения типов');
+            Exit;
+          end;
         end;
 
       mrCancel:
