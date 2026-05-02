@@ -283,6 +283,9 @@ begin
   if Cur = nil then
     Exit(False);
 
+    if AType.State = osDeleted then
+    Exit(False);
+
   // Узел "Все"
   if Cur.Tag = Ord(tnAll) then
     Exit(True);
@@ -476,10 +479,14 @@ begin
     begin
       for T in FDeviceTypes do
       begin
+
+         if T.State=osDeleted then
+           Continue;
+
         if (Trim(T.Manufacturer) = '') xor (ManPass = 1) then
           Continue;
 
-        {========== ИЗГОТОВИТЕЛЬ =========}
+         {========== ИЗГОТОВИТЕЛЬ =========}
         if Trim(T.Manufacturer) <> '' then
         begin
           ManText := T.Manufacturer;
@@ -943,7 +950,7 @@ begin
     if TargetTypes.Count = 0 then
       Exit;
 
-    if not FSkipTypeDeleteConfirm then
+    {if not FSkipTypeDeleteConfirm then
     begin
       if TargetTypes.Count = 1 then
       begin
@@ -965,7 +972,7 @@ begin
            ) <> mrYes then
           Exit;
       end;
-    end;
+    end;        }
 
     for I := TargetTypes.Count - 1 downto 0 do
     begin
