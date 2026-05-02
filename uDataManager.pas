@@ -124,10 +124,6 @@ type
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
   procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
-  // Откатить несохранённые изменения активного репозитория типов.
-  function RevertActiveTypeRepo: Boolean;
-  // Откатить несохранённые изменения активного репозитория приборов.
-  function RevertActiveDeviceRepo: Boolean;
 
   end;
 
@@ -360,16 +356,6 @@ function TManagerTTableDM.HasBufferDevices: Boolean;
 begin
   // Проверка наличия данных в буфере устройств.
   Result := (FCopiedDevices <> nil) and (FCopiedDevices.Count > 0);
-end;
-
-function TManagerTTableDM.RevertActiveTypeRepo: Boolean;
-begin
-  Result := (FActiveTypeRepo <> nil) and FActiveTypeRepo.Load;
-end;
-
-function TManagerTTableDM.RevertActiveDeviceRepo: Boolean;
-begin
-  Result := (FActiveDeviceRepo <> nil) and FActiveDeviceRepo.Load;
 end;
 
 
