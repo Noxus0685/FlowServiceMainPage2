@@ -367,6 +367,8 @@ begin
   LoadData;              // берёт данные из ActiveDeviceRepo
 
   FillComboBoxRepository;
+  TreeViewDevices.Clear;
+  TreeViewDevices.Clear;
   BuildTree;
   ApplyFilter;
   UpdateGridDevices;
@@ -422,6 +424,8 @@ begin
   if AppServices.DataManager.ActiveDeviceRepo <> nil then
   begin
     LoadData;        // заново загружает данные активного репозитория
+    TreeViewDevices.Clear;
+    TreeViewDevices.Clear;
     BuildTree;
     ApplyFilter;
     UpdateGridDevices;
