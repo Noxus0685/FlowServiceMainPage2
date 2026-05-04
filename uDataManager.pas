@@ -23,6 +23,13 @@ uses
   uTable_DATA;
 
 type
+  TDeviceSelectionContext = record
+    DeviceUUID: string;
+    Manufacturer: string;
+    Category: string;
+    Modification: string;
+    DeviceFound: Boolean;
+  end;
 
   TManagerTTableDM = class
   private
@@ -43,6 +50,7 @@ type
     FCopiedDevices: TObjectList<TDevice>;
     FBufferTypesBusy: Boolean;
     FBufferDevicesBusy: Boolean;
+    FPendingSelectedDeviceUUID: string;
 
     //Загрузка нужного репозитария  (rkType, rkDevice, rkResults);
 
@@ -88,6 +96,7 @@ type
   property BufferTypes: TList<TDeviceType> read GetBufferTypes write SetBufferTypes;
   // Буфер копирования приборов. Чтение возвращает ссылки только для просмотра.
   property BufferDevices: TList<TDevice> read GetBufferDevices write SetBufferDevices;
+  property PendingSelectedDeviceUUID: string read FPendingSelectedDeviceUUID write FPendingSelectedDeviceUUID;
 
   procedure AddRepository(const AName: string; AKind: TRepositoryKind; const ADbFile: string);
   procedure RemoveRepository(const AName: string);
@@ -139,6 +148,10 @@ type
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
   procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+  function BuildDeviceSelectionContext(
+    const ARepo: TDeviceRepository;
+    const APreferredUUID: string
+  ): TDeviceSelectionContext;
 
   end;
 
@@ -1693,6 +1706,46 @@ begin
   if AOldManufacturer = ANewManufacturer then
     Exit;
   Result := not HasOtherTypesByManufacturer(ATypes, AOldManufacturer, AType);
+end;
+
+function TManagerTTableDM.BuildDeviceSelectionContext(
+  const ARepo: TDeviceRepository;
+  const APreferredUUID: string
+): TDeviceSelectionContext;
+var
+  I: Integer;
+  Device: TDevice;
+  PreferredUUID: string;
+begin
+  Result.DeviceUUID := '';
+  Result.Manufacturer := '';
+  Result.Category := '';
+  Result.Modification := '';
+  Result.DeviceFound := False;
+
+  if ARepo = nil then
+    Exit;
+
+  PreferredUUID := Trim(APreferredUUID);
+  if PreferredUUID = '' then
+    PreferredUUID := Trim(FPendingSelectedDeviceUUID);
+
+  if PreferredUUID = '' then
+    Exit;
+
+  for I := 0 to ARepo.Devices.Count - 1 do
+  begin
+    Device := ARepo.Devices[I];
+    if (Device = nil) or (not SameText(Device.UUID, PreferredUUID)) then
+      Continue;
+
+    Result.DeviceUUID := Device.UUID;
+    Result.Manufacturer := Device.Manufacturer;
+    Result.Category := Device.Category;
+    Result.Modification := Device.Modification;
+    Result.DeviceFound := True;
+    Exit;
+  end;
 end;
 
 end.
