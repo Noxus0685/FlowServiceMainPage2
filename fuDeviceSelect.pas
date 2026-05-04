@@ -232,7 +232,7 @@ private
   function GetActiveTreeNode: TTreeViewItem;
   procedure ClearCheckedDevices;
   function GetCheckedDevices: TObjectList<TDevice>;
-    procedure ClearGridSelection;
+  procedure ClearGridSelection;
 
 public
   { Public declarations }
@@ -962,14 +962,24 @@ procedure TFormDeviceSelect.aDeviceCutExecute(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
 begin
+  if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
+    Exit;
+
   TargetDevices := GetSelectedDevices;
   try
-    AppServices.DataManager.CutDevicesToBuffer(TargetDevices);
+    if TargetDevices.Count = 0 then
+      Exit;
+
+    AppServices.DataManager.CutDevicesToBufferWithResult(TargetDevices);
   finally
     TargetDevices.Free;
   end;
+
+  BuildTree;
   ApplyFilter;
   UpdateGridDevices;
+  ClearCheckedDevices;
+  GridDevices.Row := -1;
   UpdateDeviceActions(nil);
 end;
 
@@ -1212,22 +1222,6 @@ end;
 procedure TFormDeviceSelect.ButtonDeviceDeleteClick(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
-  SelDevice: TDevice;
-  I, J, NodeIndex: Integer;
-  SelectedNode, ParentNode, ReplacementNode, CurrentNode: TTreeViewItem;
-  SectionHasDevices: Boolean;
-  function PassTreeFilterForNode(const ADevice: TDevice; const ANode: TTreeViewItem): Boolean;
-  var
-    PrevSelected: TTreeViewItem;
-  begin
-    PrevSelected := TreeViewDevices.Selected;
-    TreeViewDevices.Selected := ANode;
-    try
-      Result := PassTreeFilter(ADevice);
-    finally
-      TreeViewDevices.Selected := PrevSelected;
-    end;
-  end;
 begin
   {----------------------------------}
   { Проверка списка }
@@ -1235,94 +1229,14 @@ begin
   if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
     Exit;
 
-  SelectedNode := GetActiveTreeNode;
-
   TargetDevices := GetSelectedDevices;
   try
     if TargetDevices.Count = 0 then
       Exit;
 
-    {----------------------------------}
-    { Удаление через репозиторий }
-    {----------------------------------}
-    for I := TargetDevices.Count - 1 downto 0 do
-    begin
-      SelDevice := TargetDevices[I];
-      if SelDevice <> nil then
-        ActiveRepo.DeleteDevice(SelDevice);
-    end;
+    AppServices.DataManager.DeleteDevices(TargetDevices);
 
-    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-    begin
-      SectionHasDevices := False;
-      if FDevices <> nil then
-        for I := 0 to FDevices.Count - 1 do
-          if PassTreeFilterForNode(FDevices[I], SelectedNode) then
-          begin
-            SectionHasDevices := True;
-            Break;
-          end;
-
-      if not SectionHasDevices then
-      begin
-        ParentNode := SelectedNode.ParentItem;
-        ReplacementNode := ParentNode;
-
-        if ParentNode <> nil then
-        begin
-          NodeIndex := -1;
-          for J := 0 to ParentNode.Count - 1 do
-            if ParentNode.ItemByIndex(J) = SelectedNode then
-            begin
-              NodeIndex := J;
-              Break;
-            end;
-
-          if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
-            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
-          else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1)
-            and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
-            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
-
-          ParentNode.RemoveObject(SelectedNode);
-        end
-        else
-          TreeViewDevices.RemoveObject(SelectedNode);
-
-        SelectedNode.DisposeOf;
-
-        CurrentNode := ParentNode;
-        while (CurrentNode <> nil)
-          and (CurrentNode.Tag <> Ord(tnAll))
-          and (CurrentNode.Count = 0) do
-        begin
-          SectionHasDevices := False;
-          if FDevices <> nil then
-            for I := 0 to FDevices.Count - 1 do
-              if PassTreeFilterForNode(FDevices[I], CurrentNode) then
-              begin
-                SectionHasDevices := True;
-                Break;
-              end;
-
-          if SectionHasDevices then
-            Break;
-
-          ParentNode := CurrentNode.ParentItem;
-          if ParentNode <> nil then
-            ParentNode.RemoveObject(CurrentNode)
-          else
-            TreeViewDevices.RemoveObject(CurrentNode);
-          CurrentNode.DisposeOf;
-          CurrentNode := ParentNode;
-        end;
-
-        if ReplacementNode <> nil then
-          TreeViewDevices.Selected := ReplacementNode
-        else
-          TreeViewDevices.Selected := CurrentNode;
-      end;
-    end;
+    BuildTree;
 
     FreeAndNil(FDevFilteredByTree);
     FDevFilteredByTree := BuildFilteredByTree(FDevices);
