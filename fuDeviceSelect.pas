@@ -203,6 +203,7 @@ private
   function FindDeviceTreeNode(const ADevice: TDevice): TTreeViewItem;
   procedure SelectEditedDevice(const ADevice: TDevice);
   procedure ClearTreeSelectionFlags;
+  procedure ApplyInitialSelection;
 
   { ================= ФИЛЬТРЫ ================= }
 
@@ -2359,6 +2360,8 @@ begin
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
+var
+  SelectionContext: TDeviceSelectionContext;
 begin
   {----------------------------------}
   { Инициализация сортировки }
@@ -2382,10 +2385,36 @@ begin
     BuildTree;
     ApplyFilter;
     UpdateGridDevices;
-
-    if (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0) then
-      SelectEditedDevice(FDevFilteredDevices[0]);
+    SelectionContext := AppServices.DataManager.BuildDeviceSelectionContext(
+      ActiveRepo,
+      ''
+    );
+    if SelectionContext.DeviceFound then
+      AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
+    ApplyInitialSelection;
   end;
+end;
+
+procedure TFormDeviceSelect.ApplyInitialSelection;
+var
+  TargetUUID: string;
+  I: Integer;
+begin
+  if (AppServices.DataManager = nil) or (ActiveRepo = nil) then
+    Exit;
+
+  TargetUUID := Trim(AppServices.DataManager.PendingSelectedDeviceUUID);
+  AppServices.DataManager.PendingSelectedDeviceUUID := '';
+
+  if TargetUUID = '' then
+    Exit;
+
+  for I := 0 to ActiveRepo.Devices.Count - 1 do
+    if (ActiveRepo.Devices[I] <> nil) and SameText(ActiveRepo.Devices[I].UUID, TargetUUID) then
+    begin
+      SelectEditedDevice(ActiveRepo.Devices[I]);
+      Exit;
+    end;
 end;
 
 procedure TFormDeviceSelect.GridDevicesGetValue(
