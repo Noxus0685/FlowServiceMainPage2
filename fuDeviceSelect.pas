@@ -1979,8 +1979,8 @@ begin
       ParentNode := ParentNode.ParentItem;
     end;
 
+    Node.IsSelected := True;
     TreeViewDevices.Selected := Node;
-    TreeViewDevices.SetFocus;
   end;
 
   FreeAndNil(FDevFilteredByTree);
@@ -1999,6 +1999,7 @@ begin
     if FDevFilteredDevices[I] = ADevice then
     begin
       GridDevices.Row := I;
+      GridDevices.SetFocus;
       Break;
     end;
 
