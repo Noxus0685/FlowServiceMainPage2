@@ -784,6 +784,7 @@ begin
   finally
     TargetTypes.Free;
   end;
+  TreeViewTypes.Clear;
   BuildTree;
   ApplyFilter;
   UpdateGridTypes;
@@ -958,6 +959,7 @@ begin
 
     AppServices.DataManager.DeleteTypes(TargetTypes);
 
+    TreeViewTypes.Clear;
     BuildTree;
 
     FreeAndNil(FDevFilteredByTree);
