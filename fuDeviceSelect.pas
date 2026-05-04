@@ -233,6 +233,7 @@ private
   procedure ClearCheckedDevices;
   function GetCheckedDevices: TObjectList<TDevice>;
   procedure ClearGridSelection;
+  procedure SyncTreeAfterGridRowsRemoved;
 
 public
   { Public declarations }
@@ -974,12 +975,12 @@ begin
     if TargetDevices.Count = 0 then
       Exit;
 
-    AppServices.DataManager.CutDevicesToBufferWithResult(TargetDevices);
+    AppServices.DataManager.CutDevicesToBuffer(TargetDevices);
   finally
     TargetDevices.Free;
   end;
 
-  BuildTree;
+  SyncTreeAfterGridRowsRemoved;
   ApplyFilter;
   UpdateGridDevices;
   ClearCheckedDevices;
@@ -1238,9 +1239,12 @@ begin
     if TargetDevices.Count = 0 then
       Exit;
 
+    {----------------------------------}
+    { Удаление через репозиторий }
+    {----------------------------------}
     AppServices.DataManager.DeleteDevices(TargetDevices);
 
-    BuildTree;
+    SyncTreeAfterGridRowsRemoved;
 
     FreeAndNil(FDevFilteredByTree);
     FDevFilteredByTree := BuildFilteredByTree(FDevices);
