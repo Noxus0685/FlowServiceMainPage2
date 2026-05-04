@@ -109,6 +109,8 @@ type
   function PasteBufferTypes(const ATargetNode: TTreeViewItem): TObjectList<TDeviceType>;
   // Вырезание: копирование в буфер и удаление из активного репозитория.
   procedure CutTypesToBuffer(const ATypes: TList<TDeviceType>);
+  function CutTypesToBufferWithResult(const ATypes: TList<TDeviceType>): Integer;
+  function DeleteTypes(const ATypes: TList<TDeviceType>): Integer;
   // Проверка наличия данных в буфере типов.
   function HasBufferTypes: Boolean;
   // Копирование списка приборов во внутренний буфер через Clone.
@@ -118,6 +120,8 @@ type
   function PasteBufferDevices(const ATargetNode: TTreeViewItem): TObjectList<TDevice>;
   // Вырезание приборов: копирование в буфер и удаление из активного репозитория.
   procedure CutDevicesToBuffer(const ADevices: TList<TDevice>);
+  function CutDevicesToBufferWithResult(const ADevices: TList<TDevice>): Integer;
+  function DeleteDevices(const ADevices: TList<TDevice>): Integer;
   // Проверка наличия данных в буфере приборов.
   function HasBufferDevices: Boolean;
   // Назначение полей прибора по выбранной ветке дерева.
@@ -260,16 +264,39 @@ begin
 end;
 
 procedure TManagerTTableDM.CutTypesToBuffer(const ATypes: TList<TDeviceType>);
+begin
+  CutTypesToBufferWithResult(ATypes);
+end;
+
+function TManagerTTableDM.CutTypesToBufferWithResult(const ATypes: TList<TDeviceType>): Integer;
 var
   DeviceType: TDeviceType;
 begin
-  // Бизнес-логика Cut: сначала копируем в буфер, затем удаляем исходные типы.
+  Result := 0;
   SetBufferTypes(ATypes);
   if ActiveTypeRepo = nil then
     Exit;
   for DeviceType in ATypes do
     if DeviceType <> nil then
+    begin
       ActiveTypeRepo.DeleteType(DeviceType);
+      Inc(Result);
+    end;
+end;
+
+function TManagerTTableDM.DeleteTypes(const ATypes: TList<TDeviceType>): Integer;
+var
+  DeviceType: TDeviceType;
+begin
+  Result := 0;
+  if ActiveTypeRepo = nil then
+    Exit;
+  for DeviceType in ATypes do
+    if DeviceType <> nil then
+    begin
+      ActiveTypeRepo.DeleteType(DeviceType);
+      Inc(Result);
+    end;
 end;
 
 function TManagerTTableDM.HasBufferTypes: Boolean;
@@ -340,16 +367,39 @@ begin
 end;
 
 procedure TManagerTTableDM.CutDevicesToBuffer(const ADevices: TList<TDevice>);
+begin
+  CutDevicesToBufferWithResult(ADevices);
+end;
+
+function TManagerTTableDM.CutDevicesToBufferWithResult(const ADevices: TList<TDevice>): Integer;
 var
   Device: TDevice;
 begin
-  // Бизнес-логика Cut: сначала копирование в буфер, затем удаление исходных строк.
+  Result := 0;
   SetBufferDevices(ADevices);
   if ActiveDeviceRepo = nil then
     Exit;
   for Device in ADevices do
     if Device <> nil then
+    begin
       ActiveDeviceRepo.DeleteDevice(Device);
+      Inc(Result);
+    end;
+end;
+
+function TManagerTTableDM.DeleteDevices(const ADevices: TList<TDevice>): Integer;
+var
+  Device: TDevice;
+begin
+  Result := 0;
+  if ActiveDeviceRepo = nil then
+    Exit;
+  for Device in ADevices do
+    if Device <> nil then
+    begin
+      ActiveDeviceRepo.DeleteDevice(Device);
+      Inc(Result);
+    end;
 end;
 
 function TManagerTTableDM.HasBufferDevices: Boolean;
