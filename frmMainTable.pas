@@ -2702,7 +2702,7 @@ begin
 
   ADevice := AChannel.FlowMeter.Device;
 
-   if (ADevice = nil) and
+  if (ADevice = nil) and
      ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
@@ -2787,6 +2787,9 @@ begin
   if AChannel = nil then
     Exit;
 
+  if DataManager <> nil then
+    DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
+
   Frm := TFormDeviceSelect.Create(Self);
   try
     if Frm.ShowModal <> mrOk then
@@ -2805,6 +2808,8 @@ begin
     MarkChannelDeviceModified(AChannel);
     UpdateGrids;
   finally
+    if DataManager <> nil then
+      DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
   end;
 end;

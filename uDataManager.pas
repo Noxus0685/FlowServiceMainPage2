@@ -23,6 +23,13 @@ uses
   uTable_DATA;
 
 type
+  TDeviceSelectionContext = record
+    DeviceUUID: string;
+    Manufacturer: string;
+    Category: string;
+    Modification: string;
+    DeviceFound: Boolean;
+  end;
 
   TManagerTTableDM = class
   private
@@ -43,6 +50,7 @@ type
     FCopiedDevices: TObjectList<TDevice>;
     FBufferTypesBusy: Boolean;
     FBufferDevicesBusy: Boolean;
+    FPendingSelectedDeviceUUID: string;
 
     //Загрузка нужного репозитария  (rkType, rkDevice, rkResults);
 
@@ -58,6 +66,10 @@ type
     procedure SetBufferTypes(const ATypes: TList<TDeviceType>);
     function GetBufferDevices: TList<TDevice>;
     procedure SetBufferDevices(const ADevices: TList<TDevice>);
+    function CutDevicesToBufferWithResult(
+      const ADevices: TList<TDevice>): Integer;
+    function CutTypesToBufferWithResult(
+      const ATypes: TList<TDeviceType>): Integer;
 
   public
 
@@ -84,6 +96,7 @@ type
   property BufferTypes: TList<TDeviceType> read GetBufferTypes write SetBufferTypes;
   // Буфер копирования приборов. Чтение возвращает ссылки только для просмотра.
   property BufferDevices: TList<TDevice> read GetBufferDevices write SetBufferDevices;
+  property PendingSelectedDeviceUUID: string read FPendingSelectedDeviceUUID write FPendingSelectedDeviceUUID;
 
   procedure AddRepository(const AName: string; AKind: TRepositoryKind; const ADbFile: string);
   procedure RemoveRepository(const AName: string);
@@ -109,6 +122,7 @@ type
   function PasteBufferTypes(const ATargetNode: TTreeViewItem): TObjectList<TDeviceType>;
   // Вырезание: копирование в буфер и удаление из активного репозитория.
   procedure CutTypesToBuffer(const ATypes: TList<TDeviceType>);
+  function DeleteTypes(const ATypes: TList<TDeviceType>): Integer;
   // Проверка наличия данных в буфере типов.
   function HasBufferTypes: Boolean;
   // Копирование списка приборов во внутренний буфер через Clone.
@@ -118,12 +132,26 @@ type
   function PasteBufferDevices(const ATargetNode: TTreeViewItem): TObjectList<TDevice>;
   // Вырезание приборов: копирование в буфер и удаление из активного репозитория.
   procedure CutDevicesToBuffer(const ADevices: TList<TDevice>);
+  function DeleteDevices(const ADevices: TList<TDevice>): Integer;
   // Проверка наличия данных в буфере приборов.
   function HasBufferDevices: Boolean;
+
+  function HasOtherDevicesByManufacturer(const ADevices: TList<TDevice>; const AManufacturer: string;
+    const AExcludedDevice: TDevice): Boolean;
+  function HasOtherTypesByManufacturer(const ATypes: TList<TDeviceType>; const AManufacturer: string;
+    const AExcludedType: TDeviceType): Boolean;
+  function NeedRemoveOldManufacturerBranchForDevice(const ADevices: TList<TDevice>; const ADevice: TDevice;
+    const AOldManufacturer, ANewManufacturer: string): Boolean;
+  function NeedRemoveOldManufacturerBranchForType(const ATypes: TList<TDeviceType>; const AType: TDeviceType;
+    const AOldManufacturer, ANewManufacturer: string): Boolean;
   // Назначение полей прибора по выбранной ветке дерева.
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
   procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+  function BuildDeviceSelectionContext(
+    const ARepo: TDeviceRepository;
+    const APreferredUUID: string
+  ): TDeviceSelectionContext;
 
   end;
 
@@ -260,17 +288,42 @@ begin
 end;
 
 procedure TManagerTTableDM.CutTypesToBuffer(const ATypes: TList<TDeviceType>);
+begin
+  CutTypesToBufferWithResult(ATypes);
+end;
+
+function TManagerTTableDM.CutTypesToBufferWithResult(const ATypes: TList<TDeviceType>): Integer;
 var
   DeviceType: TDeviceType;
 begin
-  // Бизнес-логика Cut: сначала копируем в буфер, затем удаляем исходные типы.
+  Result := 0;
   SetBufferTypes(ATypes);
   if ActiveTypeRepo = nil then
     Exit;
   for DeviceType in ATypes do
     if DeviceType <> nil then
+    begin
       ActiveTypeRepo.DeleteType(DeviceType);
+      Inc(Result);
+    end;
 end;
+
+function TManagerTTableDM.DeleteTypes(const ATypes: TList<TDeviceType>): Integer;
+var
+  DeviceType: TDeviceType;
+begin
+  Result := 0;
+  if ActiveTypeRepo = nil then
+    Exit;
+  for DeviceType in ATypes do
+    if DeviceType <> nil then
+    begin
+      ActiveTypeRepo.DeleteType(DeviceType);
+      Inc(Result);
+    end;
+end;
+
+
 
 function TManagerTTableDM.HasBufferTypes: Boolean;
 begin
@@ -340,16 +393,40 @@ begin
 end;
 
 procedure TManagerTTableDM.CutDevicesToBuffer(const ADevices: TList<TDevice>);
+begin
+  CutDevicesToBufferWithResult(ADevices);
+end;
+
+function TManagerTTableDM.CutDevicesToBufferWithResult(const ADevices: TList<TDevice>): Integer;
 var
   Device: TDevice;
 begin
-  // Бизнес-логика Cut: сначала копирование в буфер, затем удаление исходных строк.
+  Result := 0;
   SetBufferDevices(ADevices);
   if ActiveDeviceRepo = nil then
     Exit;
   for Device in ADevices do
     if Device <> nil then
+    begin
       ActiveDeviceRepo.DeleteDevice(Device);
+      Inc(Result);
+    end;
+end;
+
+
+function TManagerTTableDM.DeleteDevices(const ADevices: TList<TDevice>): Integer;
+var
+  Device: TDevice;
+begin
+  Result := 0;
+  if (ActiveDeviceRepo = nil) or (ADevices = nil) then
+    Exit;
+  for Device in ADevices do
+    if Device <> nil then
+    begin
+      ActiveDeviceRepo.DeleteDevice(Device);
+      Inc(Result);
+    end;
 end;
 
 function TManagerTTableDM.HasBufferDevices: Boolean;
@@ -1573,5 +1650,102 @@ end;
 
 
 
+
+
+function TManagerTTableDM.HasOtherDevicesByManufacturer(const ADevices: TList<TDevice>;
+  const AManufacturer: string; const AExcludedDevice: TDevice): Boolean;
+var
+  I: Integer;
+  D: TDevice;
+begin
+  Result := False;
+  if ADevices = nil then
+    Exit;
+  for I := 0 to ADevices.Count - 1 do
+  begin
+    D := ADevices[I];
+    if (D = nil) or (D = AExcludedDevice) then
+      Continue;
+    if D.Manufacturer = AManufacturer then
+      Exit(True);
+  end;
+end;
+
+function TManagerTTableDM.HasOtherTypesByManufacturer(const ATypes: TList<TDeviceType>;
+  const AManufacturer: string; const AExcludedType: TDeviceType): Boolean;
+var
+  I: Integer;
+  T: TDeviceType;
+begin
+  Result := False;
+  if ATypes = nil then
+    Exit;
+  for I := 0 to ATypes.Count - 1 do
+  begin
+    T := ATypes[I];
+    if (T = nil) or (T = AExcludedType) then
+      Continue;
+    if T.Manufacturer = AManufacturer then
+      Exit(True);
+  end;
+end;
+
+function TManagerTTableDM.NeedRemoveOldManufacturerBranchForDevice(const ADevices: TList<TDevice>;
+  const ADevice: TDevice; const AOldManufacturer, ANewManufacturer: string): Boolean;
+begin
+  Result := False;
+  if AOldManufacturer = ANewManufacturer then
+    Exit;
+  Result := not HasOtherDevicesByManufacturer(ADevices, AOldManufacturer, ADevice);
+end;
+
+function TManagerTTableDM.NeedRemoveOldManufacturerBranchForType(const ATypes: TList<TDeviceType>;
+  const AType: TDeviceType; const AOldManufacturer, ANewManufacturer: string): Boolean;
+begin
+  Result := False;
+  if AOldManufacturer = ANewManufacturer then
+    Exit;
+  Result := not HasOtherTypesByManufacturer(ATypes, AOldManufacturer, AType);
+end;
+
+function TManagerTTableDM.BuildDeviceSelectionContext(
+  const ARepo: TDeviceRepository;
+  const APreferredUUID: string
+): TDeviceSelectionContext;
+var
+  I: Integer;
+  Device: TDevice;
+  PreferredUUID: string;
+begin
+  Result.DeviceUUID := '';
+  Result.Manufacturer := '';
+  Result.Category := '';
+  Result.Modification := '';
+  Result.DeviceFound := False;
+
+  if ARepo = nil then
+    Exit;
+
+  PreferredUUID := Trim(APreferredUUID);
+  if PreferredUUID = '' then
+    PreferredUUID := Trim(FPendingSelectedDeviceUUID);
+
+  if PreferredUUID = '' then
+    Exit;
+
+  for I := 0 to ARepo.Devices.Count - 1 do
+  begin
+    Device := ARepo.Devices[I];
+    if (Device = nil) or (not SameText(Device.UUID, PreferredUUID)) then
+      Continue;
+
+    Result.DeviceUUID := Device.UUID;
+    Result.Manufacturer := Device.Manufacturer;
+    Result.Category := inttostr(Device.Category);
+    Result.Modification := Device.Modification;
+    Result.DeviceFound := True;
+    Exit;
+  end;
+end;
 
 end.

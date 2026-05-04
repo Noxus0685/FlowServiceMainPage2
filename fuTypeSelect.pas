@@ -136,6 +136,9 @@ type
     Action3: TAction;
     StringColumnUUID: TStringColumn;
     aRefreshRepository: TAction;
+    MenuItem8: TMenuItem;
+    MenuItem9: TMenuItem;
+    MenuItem10: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -204,6 +207,7 @@ type
 
     procedure ResetSorting;
     procedure SyncTreeSelectionState(const AResetInputFilters: Boolean);
+    procedure ClearTreeSelectionFlags;
     procedure ApplyFilter;
     function  BuildFilteredByTree(
   const Source: TObjectList<TDeviceType>
@@ -228,6 +232,7 @@ type
     function GetCheckedTypes: TObjectList<TDeviceType>;
     function GetSelectedTypes: TObjectList<TDeviceType>;
     function GetActiveTreeNode: TTreeViewItem;
+    procedure SyncTreeAfterGridRowsRemoved;
 
   public
     { Public declarations }
@@ -768,15 +773,24 @@ procedure TFormTypeSelect.actTypeCutExecute(Sender: TObject);
 var
   TargetTypes: TObjectList<TDeviceType>;
 begin
+  if (FDevFilteredTypes = nil) or (FDevFilteredTypes.Count = 0) then
+    Exit;
+
   // UI вызывает бизнес-логику Cut через менеджер данных.
   TargetTypes := GetSelectedTypes;
   try
+    if TargetTypes.Count = 0 then
+      Exit;
+
     AppServices.DataManager.CutTypesToBuffer(TargetTypes);
   finally
     TargetTypes.Free;
   end;
+  SyncTreeAfterGridRowsRemoved;
   ApplyFilter;
   UpdateGridTypes;
+  ClearCheckedTypes;
+  ClearGridSelection;
 end;
 
 procedure TFormTypeSelect.ApplyFilter;
@@ -934,97 +948,19 @@ end;
 
 procedure TFormTypeSelect.actTypeDeleteExecute(Sender: TObject);
 var
-  I, J, NodeIndex: Integer;
-  SelType: TDeviceType;
   TargetTypes: TObjectList<TDeviceType>;
-  SelectedNode, ParentNode, ReplacementNode, CurrentNode: TTreeViewItem;
-  SectionHasTypes: Boolean;
 begin
   if (FDevFilteredTypes = nil) or (FDevFilteredTypes.Count = 0) then
     Exit;
-
-  SelectedNode := GetActiveTreeNode;
 
   TargetTypes := GetSelectedTypes;
   try
     if TargetTypes.Count = 0 then
       Exit;
 
-    for I := TargetTypes.Count - 1 downto 0 do
-    begin
-      SelType := TargetTypes[I];
-      if SelType <> nil then
-        ActiveRepo.DeleteType(SelType);
-    end;
+    AppServices.DataManager.DeleteTypes(TargetTypes);
 
-    if (SelectedNode <> nil) and (SelectedNode.Tag <> Ord(tnAll)) then
-    begin
-      SectionHasTypes := False;
-      if FDeviceTypes <> nil then
-        for I := 0 to FDeviceTypes.Count - 1 do
-          if PassTreeFilter(FDeviceTypes[I], SelectedNode) then
-          begin
-            SectionHasTypes := True;
-            Break;
-          end;
-
-      if not SectionHasTypes then
-      begin
-        ParentNode := SelectedNode.ParentItem;
-        ReplacementNode := ParentNode;
-
-        if ParentNode <> nil then
-        begin
-          NodeIndex := -1;
-          for J := 0 to ParentNode.Count - 1 do
-            if ParentNode.ItemByIndex(J) = SelectedNode then
-            begin
-              NodeIndex := J;
-              Break;
-            end;
-
-          if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
-            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
-          else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1)
-            and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
-            ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
-
-          ParentNode.RemoveObject(SelectedNode);
-        end
-        else
-          TreeViewTypes.RemoveObject(SelectedNode);
-
-        SelectedNode.DisposeOf;
-
-        CurrentNode := ParentNode;
-        while (CurrentNode <> nil)
-          and (CurrentNode.Tag <> Ord(tnAll))
-          and (CurrentNode.Count = 0) do
-        begin
-          SectionHasTypes := False;
-          if FDeviceTypes <> nil then
-            for I := 0 to FDeviceTypes.Count - 1 do
-              if PassTreeFilter(FDeviceTypes[I], CurrentNode) then
-              begin
-                SectionHasTypes := True;
-                Break;
-              end;
-
-          if SectionHasTypes then
-            Break;
-
-          ParentNode := CurrentNode.ParentItem;
-          if ParentNode <> nil then
-            ParentNode.RemoveObject(CurrentNode)
-          else
-            TreeViewTypes.RemoveObject(CurrentNode);
-          CurrentNode.DisposeOf;
-          CurrentNode := ParentNode;
-        end;
-
-        TreeViewTypes.Selected := CurrentNode;
-      end;
-    end;
+    SyncTreeAfterGridRowsRemoved;
 
     FreeAndNil(FDevFilteredByTree);
     FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
@@ -1036,6 +972,80 @@ begin
   finally
     TargetTypes.Free;
   end;
+end;
+
+procedure TFormTypeSelect.SyncTreeAfterGridRowsRemoved;
+var
+  I, J, NodeIndex: Integer;
+  SelectedNode, ParentNode, ReplacementNode, CurrentNode: TTreeViewItem;
+  SectionHasTypes: Boolean;
+begin
+  SelectedNode := GetActiveTreeNode;
+  if (SelectedNode = nil) or (SelectedNode.Tag = Ord(tnAll)) then
+    Exit;
+
+  SectionHasTypes := False;
+  if FDeviceTypes <> nil then
+    for I := 0 to FDeviceTypes.Count - 1 do
+      if PassTreeFilter(FDeviceTypes[I], SelectedNode) then
+      begin
+        SectionHasTypes := True;
+        Break;
+      end;
+  if SectionHasTypes then
+    Exit;
+
+  ParentNode := SelectedNode.ParentItem;
+  ReplacementNode := ParentNode;
+  if ParentNode <> nil then
+  begin
+    NodeIndex := -1;
+    for J := 0 to ParentNode.Count - 1 do
+      if ParentNode.ItemByIndex(J) = SelectedNode then
+      begin
+        NodeIndex := J;
+        Break;
+      end;
+
+    if (NodeIndex > 0) and (ParentNode.ItemByIndex(NodeIndex - 1) is TTreeViewItem) then
+      ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex - 1))
+    else if (NodeIndex >= 0) and (NodeIndex < ParentNode.Count - 1)
+      and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
+      ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
+
+    ParentNode.RemoveObject(SelectedNode);
+  end
+  else
+    TreeViewTypes.RemoveObject(SelectedNode);
+  SelectedNode.DisposeOf;
+
+  CurrentNode := ParentNode;
+  while (CurrentNode <> nil) and (CurrentNode.Tag <> Ord(tnAll)) and (CurrentNode.Count = 0) do
+  begin
+    SectionHasTypes := False;
+    if FDeviceTypes <> nil then
+      for I := 0 to FDeviceTypes.Count - 1 do
+        if PassTreeFilter(FDeviceTypes[I], CurrentNode) then
+        begin
+          SectionHasTypes := True;
+          Break;
+        end;
+    if SectionHasTypes then
+      Break;
+
+    ParentNode := CurrentNode.ParentItem;
+    if ParentNode <> nil then
+      ParentNode.RemoveObject(CurrentNode)
+    else
+      TreeViewTypes.RemoveObject(CurrentNode);
+    CurrentNode.DisposeOf;
+    CurrentNode := ParentNode;
+  end;
+
+  if ReplacementNode <> nil then
+    TreeViewTypes.Selected := ReplacementNode
+  else
+    TreeViewTypes.Selected := CurrentNode;
 end;
 
 
@@ -1937,10 +1947,12 @@ procedure TFormTypeSelect.OpenTypeEditor(AType: TDeviceType);
 var
   Form: TFormTypeEditor;
   Res: TModalResult;
+  OldManufacturer: string;
 begin
   if AType = nil then
     Exit;
 
+  OldManufacturer := AType.Manufacturer;
   Form := TFormTypeEditor.Create(Self, AType);
 
   try
@@ -1948,11 +1960,14 @@ begin
 
     if (Res = mrOk) and Form.Modified then
     begin
-      { Репозиторий уже обновлён редактором }
+      if (AppServices.DataManager <> nil) and
+         (OldManufacturer <> AType.Manufacturer) then
+        AppServices.DataManager.NeedRemoveOldManufacturerBranchForType(
+          FDeviceTypes, AType, OldManufacturer, AType.Manufacturer
+        );
 
-      // Пересборка UI
-      // BuildTree;
-      // ApplyFilter;
+      BuildTree;
+      ApplyFilter;
       UpdateGridTypes;
     end;
 
@@ -2315,6 +2330,12 @@ begin
 
   // Не закрываем форму выбора типов после редактирования.
   // Обновление UI выполняется внутри OpenTypeEditor при mrOk.
+  BuildTree;
+  TreeViewTypes.CollapseAll;
+  UpdateGridTypes;
+  SelectType(AType);
+  SyncTreeSelectionState(False);
+  TreeViewTypes.SetFocus;
 end;
 
 
@@ -2419,11 +2440,22 @@ begin
   if ModNode = nil then
     Exit;
 
-  {---------------- Раскрываем дерево ----------------}
-  TreeViewTypes.ExpandAll;
+  {---------------- Очищаем текущее выделение ----------------}
+  ClearTreeSelectionFlags;
+
+  {---------------- Сворачиваем дерево перед точечным раскрытием ----------------}
+  TreeViewTypes.CollapseAll;
+
+  {---------------- Раскрываем только путь к нужному узлу ----------------}
+  ManNode.Expand;
+  CatNode.Expand;
 
   {---------------- Выбираем узел ----------------}
+  ModNode.IsSelected := True;
   TreeViewTypes.Selected := ModNode;
+
+  {---------------- Синхронизируем фильтрацию грида с выбранным узлом ----------------}
+  SyncTreeSelectionState(False);
 
   {---------------- Выбираем строку в отфильтрованном гриде ----------------}
   for I := 0 to FDevFilteredTypes.Count - 1 do
@@ -2432,8 +2464,33 @@ begin
       GridTypes.Row := I;
       GridTypes.Selected := I;
       SelectedType := FDevFilteredTypes[I];
+      GridTypes.SetFocus;
       Break;
     end;
+end;
+
+procedure TFormTypeSelect.ClearTreeSelectionFlags;
+  procedure ClearNodeRecursive(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+  begin
+    if ANode = nil then
+      Exit;
+    ANode.IsSelected := False;
+    for J := 0 to ANode.Count - 1 do
+      ClearNodeRecursive(ANode.ItemByIndex(J));
+  end;
+var
+  I: Integer;
+begin
+  TreeViewTypes.BeginUpdate;
+  try
+  for I := 0 to TreeViewTypes.Count - 1 do
+    ClearNodeRecursive(TreeViewTypes.ItemByIndex(I));
+  TreeViewTypes.Selected := nil;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
 end;
 
 
