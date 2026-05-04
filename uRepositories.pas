@@ -1247,13 +1247,15 @@ begin
   {----------------------------------}
   { Сам тип — удаляем СРАЗУ из БД }
   {----------------------------------}
-  case AType.State of
+   AType.State := osDeleted;
+{  case AType.State of
 
     osNew:
       begin
         // тип ещё не был сохранён — просто убираем из памяти
-        if FTypes <> nil then
-          FTypes.Remove(AType);
+       /// if FTypes <> nil then
+       //   FTypes.Remove(AType);
+          AType.State := osDeleted;
       end;
 
   else
@@ -1261,14 +1263,14 @@ begin
       // тип есть в БД — помечаем и удаляем штатным способом
       AType.State := osDeleted;
 
-      if not UpdateType(AType) then
-        raise Exception.Create('Ошибка удаления типа из БД');
+      //if not UpdateType(AType) then
+       // raise Exception.Create('Ошибка удаления типа из БД');
 
-      if FTypes <> nil then
-        FTypes.Remove(AType);
+     // if FTypes <> nil then
+     //   FTypes.Remove(AType);
     end;
 
-  end;
+  end;      }
 
   {----------------------------------}
   { Репозиторий изменён }

@@ -1239,35 +1239,6 @@ begin
       Exit;
 
     {----------------------------------}
-    { Подтверждение удаления }
-    {----------------------------------}
-    if not FSkipDeviceDeleteConfirm then
-    begin
-      if TargetDevices.Count = 1 then
-      begin
-        if MessageDlg(
-             'Удалить выбранный прибор безвозвратно?',
-             TMsgDlgType.mtWarning,
-             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-             0
-           ) <> mrYes then
-          Exit;
-      end
-      else
-      begin
-        if MessageDlg(
-             'Удалить выбранные приборы безвозвратно?',
-             TMsgDlgType.mtWarning,
-             [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
-             0
-           ) <> mrYes then
-          Exit;
-      end;
-
-      FSkipDeviceDeleteConfirm := True;
-    end;
-
-    {----------------------------------}
     { Удаление через репозиторий }
     {----------------------------------}
     for I := TargetDevices.Count - 1 downto 0 do
