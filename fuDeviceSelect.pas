@@ -1767,9 +1767,6 @@ begin
   if TreeViewDevices.Selected = nil then
     Exit;
 
-  ClearGridSelection;
-  TreeViewDevices.SetFocus;
-
   {----------------------------------}
   { Фильтр по дереву }
   {----------------------------------}
@@ -1781,6 +1778,14 @@ begin
   {----------------------------------}
   ApplyFilter;
   UpdateGridDevices;
+
+  if (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0) then
+  begin
+    GridDevices.Row := 0;
+    GridDevices.Selected := 0;
+  end
+  else
+    GridDevices.Row := -1;
 end;
 
 procedure TFormDeviceSelect.ClearGridSelection;
