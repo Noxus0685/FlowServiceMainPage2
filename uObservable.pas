@@ -5,7 +5,8 @@ interface
 uses
   System.Classes,
   System.Generics.Collections,
-  System.SysUtils;
+  System.SysUtils,
+  uBaseProcedures;
 
 type
   ENotifyEvent = (
@@ -25,7 +26,7 @@ type
     FObserversLock: TObject;
     FIsDestroying: Boolean;
     FEvent: Integer;
-    procedure SetEvent(const Value: Integer);
+    FLastError: TErrorInfo;
   protected
     procedure Notify(Event: Integer; Data: TObject = nil); overload;
     procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
@@ -36,7 +37,12 @@ type
     procedure Subscribe(const AObserver: IEventObserver);
     procedure Unsubscribe(const AObserver: IEventObserver);
     function ObserverCount: Integer;
-    property Event: Integer read FEvent write SetEvent;
+    procedure FireEvent(AEvent: Integer; const AError: TErrorInfo); overload; virtual;
+    procedure FireEvent(AEvent: Integer); overload; virtual;
+    property Event: Integer read FEvent;
+    property LastError: TErrorInfo read FLastError;
+  protected
+    procedure DoFireEvent(AEvent: Integer; const AError: TErrorInfo); virtual;
   end;
 
 implementation
@@ -47,11 +53,12 @@ begin
   FObservers := TList<IEventObserver>.Create;
   FObserversLock := TObject.Create;
   FEvent := 0;
+  FLastError := TErrorInfo.Empty(0);
 end;
 
 destructor TObservableObject.Destroy;
 var
-  LocalObservers: TArray<IObserver>;
+  LocalObservers: TArray<IEventObserver>;
 begin
   FIsDestroying := True;
 
@@ -160,9 +167,21 @@ begin
   Notify(Ord(AEvent), Data);
 end;
 
-procedure TObservableObject.SetEvent(const Value: Integer);
+procedure TObservableObject.FireEvent(AEvent: Integer; const AError: TErrorInfo);
 begin
-  FEvent := Value;
+  FEvent := AEvent;
+  FLastError := AError;
+  DoFireEvent(AEvent, AError);
+end;
+
+procedure TObservableObject.FireEvent(AEvent: Integer);
+begin
+  FireEvent(AEvent, TErrorInfo.Empty(0));
+end;
+
+procedure TObservableObject.DoFireEvent(AEvent: Integer; const AError: TErrorInfo);
+begin
+  Notify(notifyEvent, Self);
 end;
 
 end.
