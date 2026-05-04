@@ -1963,6 +1963,7 @@ var
   Node: TTreeViewItem;
   ParentNode: TTreeViewItem;
   I: Integer;
+  FoundRow: Boolean;
 begin
   BuildTree;
   Node := FindDeviceTreeNode(ADevice);
@@ -1979,8 +1980,8 @@ begin
       ParentNode := ParentNode.ParentItem;
     end;
 
+    Node.IsSelected := True;
     TreeViewDevices.Selected := Node;
-    TreeViewDevices.SetFocus;
   end;
 
   FreeAndNil(FDevFilteredByTree);
@@ -1995,12 +1996,18 @@ begin
   if FDevFilteredDevices = nil then
     Exit;
 
+  FoundRow := False;
   for I := 0 to FDevFilteredDevices.Count - 1 do
     if FDevFilteredDevices[I] = ADevice then
     begin
       GridDevices.Row := I;
+      GridDevices.Selected := I;
+      FoundRow := True;
       Break;
     end;
+
+  if FoundRow then
+    GridDevices.SetFocus;
 
 end;
 
