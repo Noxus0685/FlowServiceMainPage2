@@ -1946,10 +1946,12 @@ procedure TFormTypeSelect.OpenTypeEditor(AType: TDeviceType);
 var
   Form: TFormTypeEditor;
   Res: TModalResult;
+  OldManufacturer: string;
 begin
   if AType = nil then
     Exit;
 
+  OldManufacturer := AType.Manufacturer;
   Form := TFormTypeEditor.Create(Self, AType);
 
   try
@@ -1957,11 +1959,14 @@ begin
 
     if (Res = mrOk) and Form.Modified then
     begin
-      { Репозиторий уже обновлён редактором }
+      if (AppServices.DataManager <> nil) and
+         (OldManufacturer <> AType.Manufacturer) then
+        AppServices.DataManager.NeedRemoveOldManufacturerBranchForType(
+          FDeviceTypes, AType, OldManufacturer, AType.Manufacturer
+        );
 
-      // Пересборка UI
-      // BuildTree;
-      // ApplyFilter;
+      BuildTree;
+      ApplyFilter;
       UpdateGridTypes;
     end;
 

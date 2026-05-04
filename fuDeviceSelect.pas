@@ -2141,6 +2141,7 @@ procedure TFormDeviceSelect.CornerButtonEditDeviceClick(Sender: TObject);
 var
   Row: Integer;
   ADevice: TDevice;
+  OldManufacturer: string;
 begin
   {----------------------------------}
   { Проверка выбора }
@@ -2165,11 +2166,15 @@ begin
   {----------------------------------}
   { Открываем редактор }
   {----------------------------------}
+  OldManufacturer := ADevice.Manufacturer;
   if OpenDeviceEditor(ADevice) then
   begin
-    {----------------------------------}
-    { Перестраиваем дерево/таблицу и возвращаем выделение на отредактированный прибор }
-    {----------------------------------}
+    if (AppServices.DataManager <> nil) and
+       (OldManufacturer <> ADevice.Manufacturer) then
+      AppServices.DataManager.NeedRemoveOldManufacturerBranchForDevice(
+        FDevices, ADevice, OldManufacturer, ADevice.Manufacturer
+      );
+
     BuildTree;
     SelectEditedDevice(ADevice);
   end;
