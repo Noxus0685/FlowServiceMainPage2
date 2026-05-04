@@ -232,7 +232,7 @@ type
   public
     { Public declarations }
     SelectedType:   TDeviceType;
-    procedure SelectType (AType: TDeviceType; const AManufacturerKeyForSelection: string = '');
+    procedure SelectType (AType: TDeviceType);
     destructor Destroy; override;
   end;
 
@@ -1937,13 +1937,10 @@ procedure TFormTypeSelect.OpenTypeEditor(AType: TDeviceType);
 var
   Form: TFormTypeEditor;
   Res: TModalResult;
-  OldManufacturerKey: string;
-  TargetManufacturerKey: string;
 begin
   if AType = nil then
     Exit;
 
-  OldManufacturerKey := Trim(AType.Manufacturer);
   Form := TFormTypeEditor.Create(Self, AType);
 
   try
@@ -1954,12 +1951,9 @@ begin
       { Репозиторий уже обновлён редактором }
 
       // Пересборка UI
-      TargetManufacturerKey := OldManufacturerKey;
-      if AppServices.DataManager <> nil then
-        TargetManufacturerKey := AppServices.DataManager.TypeManBranch(OldManufacturerKey, AType.Manufacturer);
-
-      BuildTree;
-      SelectType(AType, TargetManufacturerKey);
+      // BuildTree;
+      // ApplyFilter;
+      UpdateGridTypes;
     end;
 
   finally
@@ -2398,7 +2392,7 @@ begin
   UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.SelectType(AType: TDeviceType; const AManufacturerKeyForSelection: string = '');
+procedure TFormTypeSelect.SelectType(AType: TDeviceType);
 var
   ManKey, CatKey, ModKey: string;
   ManNode, CatNode, ModNode: TTreeViewItem;
@@ -2409,47 +2403,27 @@ begin
 
   {---------------- Изготовитель ----------------}
   ManKey := Trim(AType.Manufacturer);
-  if Trim(AManufacturerKeyForSelection) <> '' then
-    ManKey := Trim(AManufacturerKeyForSelection);
-
   ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), ManKey);
   if ManNode = nil then
-    ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), Trim(AType.Manufacturer));
-
-  if ManNode = nil then
-  begin
-    if TreeViewTypes.Items.Count > 0 then
-      TreeViewTypes.Selected := TreeViewTypes.Items[0];
-    TreeViewTypes.SetFocus;
     Exit;
-  end;
 
   {---------------- Категория ----------------}
   CatKey := IntToStr(AType.Category);
   CatNode := FindChildInNode(ManNode, Ord(tnCategory), CatKey);
   if CatNode = nil then
-  begin
-    TreeViewTypes.Selected := ManNode;
-    TreeViewTypes.SetFocus;
     Exit;
-  end;
 
   {---------------- Модификация ----------------}
   ModKey := Trim(AType.Modification);
   ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
   if ModNode = nil then
-  begin
-    TreeViewTypes.Selected := CatNode;
-    TreeViewTypes.SetFocus;
     Exit;
-  end;
 
   {---------------- Раскрываем дерево ----------------}
   TreeViewTypes.ExpandAll;
 
   {---------------- Выбираем узел ----------------}
   TreeViewTypes.Selected := ModNode;
-  TreeViewTypes.SetFocus;
 
   {---------------- Выбираем строку в отфильтрованном гриде ----------------}
   for I := 0 to FDevFilteredTypes.Count - 1 do

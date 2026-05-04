@@ -198,7 +198,7 @@ private
   function OpenDeviceEditor(ADevice: TDevice): Boolean;  // открытие редактора прибора
   function GetDeviceCategoryText(const ADevice: TDevice; AForTree: Boolean = False): string;
   function FindDeviceTreeNode(const ADevice: TDevice): TTreeViewItem;
-  procedure SelectEditedDevice(const ADevice: TDevice; const AManufacturerKeyForSelection: string);
+  procedure SelectEditedDevice(const ADevice: TDevice);
 
   { ================= ФИЛЬТРЫ ================= }
 
@@ -1934,26 +1934,14 @@ begin
   Result := CatNode;
 end;
 
-procedure TFormDeviceSelect.SelectEditedDevice(const ADevice: TDevice; const AManufacturerKeyForSelection: string);
+procedure TFormDeviceSelect.SelectEditedDevice(const ADevice: TDevice);
 var
   Node: TTreeViewItem;
   I: Integer;
-  ManufacturerNode: TTreeViewItem;
 begin
   Node := FindDeviceTreeNode(ADevice);
-  if Node = nil then
-  begin
-    ManufacturerNode := FindChildInTree(TreeViewDevices, Ord(tnManufacturer), Trim(AManufacturerKeyForSelection));
-    if ManufacturerNode <> nil then
-      Node := ManufacturerNode;
-  end;
-
   if Node <> nil then
-    TreeViewDevices.Selected := Node
-  else if TreeViewDevices.Items.Count > 0 then
-    TreeViewDevices.Selected := TreeViewDevices.Items[0];
-
-  TreeViewDevices.SetFocus;
+    TreeViewDevices.Selected := Node;
 
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDevices);
@@ -2130,8 +2118,6 @@ procedure TFormDeviceSelect.CornerButtonEditDeviceClick(Sender: TObject);
 var
   Row: Integer;
   ADevice: TDevice;
-  OldManufacturerKey: string;
-  TargetManufacturerKey: string;
 begin
   {----------------------------------}
   { Проверка выбора }
@@ -2153,8 +2139,6 @@ begin
   if ADevice = nil then
     Exit;
 
-  OldManufacturerKey := Trim(ADevice.Manufacturer);
-
   {----------------------------------}
   { Открываем редактор }
   {----------------------------------}
@@ -2163,12 +2147,8 @@ begin
     {----------------------------------}
     { Перестраиваем дерево/таблицу и возвращаем выделение на отредактированный прибор }
     {----------------------------------}
-    TargetManufacturerKey := OldManufacturerKey;
-    if AppServices.DataManager <> nil then
-      TargetManufacturerKey := AppServices.DataManager.DevManBranch(OldManufacturerKey, ADevice.Manufacturer);
-
     BuildTree;
-    SelectEditedDevice(ADevice, TargetManufacturerKey);
+    SelectEditedDevice(ADevice);
   end;
 end;
 
