@@ -151,6 +151,8 @@ type
     procedure sbFindClick(Sender: TObject);
     procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
+      const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure miAddRepositoryClick(Sender: TObject);
@@ -2276,6 +2278,7 @@ begin
   FSortAscending := True;
   FSkipDeviceDeleteConfirm := False;
   FCheckedDevices := TList<TDevice>.Create;
+  GridDevices.OnSetValue := GridDevicesSetValue;
 
   {----------------------------------}
   { Загрузка данных и репозиториев }
@@ -2292,6 +2295,30 @@ begin
     ApplyFilter;
     UpdateGridDevices;
   end;
+end;
+
+procedure TFormDeviceSelect.GridDevicesSetValue(
+  Sender: TObject;
+  const ACol, ARow: Integer;
+  const Value: TValue
+);
+var
+  D: TDevice;
+  ChangeInfo: TManufacturerTreeUpdate;
+begin
+  if (ACol <> StringColumnManufacturer.Index) or (FDevFilteredDevices = nil) then
+    Exit;
+  if (ARow < 0) or (ARow >= FDevFilteredDevices.Count) then
+    Exit;
+  D := FDevFilteredDevices[ARow];
+  if D = nil then
+    Exit;
+  ChangeInfo := AppServices.DataManager.HandleDeviceManufacturerChanged(D, Value.ToString);
+  if not ChangeInfo.ManufacturerChanged then
+    Exit;
+  BuildTree;
+  ApplyFilter;
+  UpdateGridDevices;
 end;
 
 procedure TFormDeviceSelect.GridDevicesGetValue(
