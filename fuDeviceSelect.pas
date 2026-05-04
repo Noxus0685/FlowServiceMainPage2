@@ -1763,12 +1763,14 @@ end;
 
 
 procedure TFormDeviceSelect.TreeViewDevicesChange(Sender: TObject);
+var
+  PrevDevice: TDevice;
+  I: Integer;
 begin
   if TreeViewDevices.Selected = nil then
     Exit;
 
-  ClearGridSelection;
-  TreeViewDevices.SetFocus;
+  PrevDevice := GetSelectedDevice;
 
   {----------------------------------}
   { Фильтр по дереву }
@@ -1781,6 +1783,25 @@ begin
   {----------------------------------}
   ApplyFilter;
   UpdateGridDevices;
+
+  if (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0) then
+  begin
+    GridDevices.Row := -1;
+    if PrevDevice <> nil then
+      for I := 0 to FDevFilteredDevices.Count - 1 do
+        if FDevFilteredDevices[I] = PrevDevice then
+        begin
+          GridDevices.Row := I;
+          Break;
+        end;
+
+    if GridDevices.Row < 0 then
+      GridDevices.Row := 0;
+
+    GridDevices.Selected := GridDevices.Row;
+  end
+  else
+    GridDevices.Row := -1;
 end;
 
 procedure TFormDeviceSelect.ClearGridSelection;
@@ -1963,6 +1984,7 @@ var
   Node: TTreeViewItem;
   ParentNode: TTreeViewItem;
   I: Integer;
+  FoundRow: Boolean;
 begin
   BuildTree;
   Node := FindDeviceTreeNode(ADevice);
@@ -1980,7 +2002,6 @@ begin
     end;
 
     TreeViewDevices.Selected := Node;
-    TreeViewDevices.SetFocus;
   end;
 
   FreeAndNil(FDevFilteredByTree);
@@ -1995,12 +2016,32 @@ begin
   if FDevFilteredDevices = nil then
     Exit;
 
+  FoundRow := False;
   for I := 0 to FDevFilteredDevices.Count - 1 do
     if FDevFilteredDevices[I] = ADevice then
     begin
       GridDevices.Row := I;
+      GridDevices.Selected := I;
+      FoundRow := True;
       Break;
     end;
+
+  if FoundRow then
+    TThread.ForceQueue(nil,
+      procedure
+      begin
+        if (GridDevices <> nil) and GridDevices.Visible then
+        begin
+          GridDevices.SetFocus;
+          if not GridDevices.IsFocused then
+            TThread.ForceQueue(nil,
+              procedure
+              begin
+                if (GridDevices <> nil) and GridDevices.Visible then
+                  GridDevices.SetFocus;
+              end);
+        end;
+      end);
 
 end;
 
@@ -2340,6 +2381,9 @@ begin
     BuildTree;
     ApplyFilter;
     UpdateGridDevices;
+
+    if (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0) then
+      SelectEditedDevice(FDevFilteredDevices[0]);
   end;
 end;
 
