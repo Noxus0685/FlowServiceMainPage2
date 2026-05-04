@@ -1763,9 +1763,14 @@ end;
 
 
 procedure TFormDeviceSelect.TreeViewDevicesChange(Sender: TObject);
+var
+  PrevDevice: TDevice;
+  I: Integer;
 begin
   if TreeViewDevices.Selected = nil then
     Exit;
+
+  PrevDevice := GetSelectedDevice;
 
   {----------------------------------}
   { Фильтр по дереву }
@@ -1781,8 +1786,19 @@ begin
 
   if (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0) then
   begin
-    GridDevices.Row := 0;
-    GridDevices.Selected := 0;
+    GridDevices.Row := -1;
+    if PrevDevice <> nil then
+      for I := 0 to FDevFilteredDevices.Count - 1 do
+        if FDevFilteredDevices[I] = PrevDevice then
+        begin
+          GridDevices.Row := I;
+          Break;
+        end;
+
+    if GridDevices.Row < 0 then
+      GridDevices.Row := 0;
+
+    GridDevices.Selected := GridDevices.Row;
   end
   else
     GridDevices.Row := -1;
