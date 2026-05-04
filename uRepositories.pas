@@ -4563,7 +4563,7 @@ begin
   if (APoint = nil) or (FDM = nil) then
     Exit;
 
-  EnsurePointSchema;
+  EnsureDevicePointSchema;
 
  // if APoint.State = osClean then
  //   Exit(True);
