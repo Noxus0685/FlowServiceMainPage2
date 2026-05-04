@@ -207,6 +207,7 @@ type
 
     procedure ResetSorting;
     procedure SyncTreeSelectionState(const AResetInputFilters: Boolean);
+    procedure ClearTreeSelectionFlags;
     procedure ApplyFilter;
     function  BuildFilteredByTree(
   const Source: TObjectList<TDeviceType>
@@ -2329,9 +2330,12 @@ begin
 
   // Не закрываем форму выбора типов после редактирования.
   // Обновление UI выполняется внутри OpenTypeEditor при mrOk.
-  TreeViewTypes.Clear;
   BuildTree;
+  TreeViewTypes.CollapseAll;
   UpdateGridTypes;
+  SelectType(AType);
+  SyncTreeSelectionState(False);
+  TreeViewTypes.SetFocus;
 end;
 
 
@@ -2436,8 +2440,15 @@ begin
   if ModNode = nil then
     Exit;
 
-  {---------------- Раскрываем дерево ----------------}
-  TreeViewTypes.ExpandAll;
+  {---------------- Очищаем текущее выделение ----------------}
+  ClearTreeSelectionFlags;
+
+  {---------------- Сворачиваем дерево перед точечным раскрытием ----------------}
+  TreeViewTypes.CollapseAll;
+
+  {---------------- Раскрываем только путь к нужному узлу ----------------}
+  ManNode.Expand;
+  CatNode.Expand;
 
   {---------------- Выбираем узел ----------------}
   TreeViewTypes.Selected := ModNode;
@@ -2451,6 +2462,30 @@ begin
       SelectedType := FDevFilteredTypes[I];
       Break;
     end;
+end;
+
+procedure TFormTypeSelect.ClearTreeSelectionFlags;
+  procedure ClearNodeRecursive(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+  begin
+    if ANode = nil then
+      Exit;
+    ANode.IsSelected := False;
+    for J := 0 to ANode.Count - 1 do
+      ClearNodeRecursive(ANode.ItemByIndex(J));
+  end;
+var
+  I: Integer;
+begin
+  TreeViewTypes.BeginUpdate;
+  try
+  for I := 0 to TreeViewTypes.Count - 1 do
+    ClearNodeRecursive(TreeViewTypes.ItemByIndex(I));
+  TreeViewTypes.Selected := nil;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
 end;
 
 
