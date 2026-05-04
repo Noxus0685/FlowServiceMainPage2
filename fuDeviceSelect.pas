@@ -202,6 +202,7 @@ private
   function GetDeviceCategoryText(const ADevice: TDevice; AForTree: Boolean = False): string;
   function FindDeviceTreeNode(const ADevice: TDevice): TTreeViewItem;
   procedure SelectEditedDevice(const ADevice: TDevice);
+  procedure ClearTreeSelectionFlags;
 
   { ================= ФИЛЬТРЫ ================= }
 
@@ -1962,19 +1963,31 @@ end;
 procedure TFormDeviceSelect.SelectEditedDevice(const ADevice: TDevice);
 var
   Node: TTreeViewItem;
+  ParentNode: TTreeViewItem;
   I: Integer;
 begin
   Node := FindDeviceTreeNode(ADevice);
 
-    if Node <> nil then
+  if Node <> nil then
+  begin
+    ClearTreeSelectionFlags;
+    TreeViewDevices.CollapseAll;
+
+    ParentNode := Node.ParentItem;
+    while ParentNode <> nil do
+    begin
+      ParentNode.Expand;
+      ParentNode := ParentNode.ParentItem;
+    end;
+
     TreeViewDevices.Selected := Node;
+    TreeViewDevices.SetFocus;
+  end;
 
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDevices);
 
   ApplyFilter;
-  TreeViewDevices.Clear;
-  BuildTree;
   UpdateGridDevices;
 
 
@@ -1990,6 +2003,31 @@ begin
       Break;
     end;
 
+end;
+
+procedure TFormDeviceSelect.ClearTreeSelectionFlags;
+  procedure ClearNodeRecursive(const ANode: TTreeViewItem);
+  var
+    J: Integer;
+  begin
+    if ANode = nil then
+      Exit;
+    ANode.IsSelected := False;
+    for J := 0 to ANode.Count - 1 do
+      if ANode.ItemByIndex(J) is TTreeViewItem then
+        ClearNodeRecursive(TTreeViewItem(ANode.ItemByIndex(J)));
+  end;
+var
+  I: Integer;
+begin
+  TreeViewDevices.BeginUpdate;
+  try
+    for I := 0 to TreeViewDevices.Count - 1 do
+      ClearNodeRecursive(TreeViewDevices.ItemByIndex(I));
+    TreeViewDevices.Selected := nil;
+  finally
+    TreeViewDevices.EndUpdate;
+  end;
 end;
 
 function TFormDeviceSelect.PassTreeFilter(
