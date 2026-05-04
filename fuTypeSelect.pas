@@ -2451,11 +2451,7 @@ begin
   CatNode.Expand;
 
   {---------------- Выбираем узел ----------------}
-  ModNode.IsSelected := True;
   TreeViewTypes.Selected := ModNode;
-
-  {---------------- Синхронизируем фильтрацию грида с выбранным узлом ----------------}
-  SyncTreeSelectionState(False);
 
   {---------------- Выбираем строку в отфильтрованном гриде ----------------}
   for I := 0 to FDevFilteredTypes.Count - 1 do
