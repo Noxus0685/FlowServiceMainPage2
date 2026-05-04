@@ -142,6 +142,8 @@ type
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridTypesSetValue(Sender: TObject; const ACol, ARow: Integer;
+      const Value: TValue);
     procedure TreeViewTypesClick(Sender: TObject);
     procedure TreeViewTypesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
@@ -460,8 +462,6 @@ begin
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
-    //TreeViewTypes.Clear;
-
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
@@ -493,8 +493,8 @@ begin
          {========== ИЗГОТОВИТЕЛЬ =========}
         if Trim(T.Manufacturer) <> '' then
         begin
-          ManText := T.Manufacturer;
-          ManKey  := T.Manufacturer;
+          ManText := Trim(T.Manufacturer);
+          ManKey  := Trim(T.Manufacturer);
         end
         else
         begin
@@ -576,7 +576,7 @@ begin
       if T.Category > 0 then
         Continue;
 
-      ManKey := T.Manufacturer;
+      ManKey := Trim(T.Manufacturer);
       ManNode := FindChildInTree(
         TreeViewTypes,
         Ord(tnManufacturer),
@@ -1151,6 +1151,7 @@ begin
    TreeViewTypes.MultiSelect := True;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
    GridTypes.OnMouseDown := GridTypesMouseDown;
+   GridTypes.OnSetValue := GridTypesSetValue;
 
    LoadData;
    FillComboBoxRepository;
@@ -1161,6 +1162,41 @@ begin
      UpdateGridTypes;
    end;
 
+end;
+
+procedure TFormTypeSelect.GridTypesSetValue(
+  Sender: TObject;
+  const ACol, ARow: Integer;
+  const Value: TValue
+);
+var
+  T: TDeviceType;
+  ChangeInfo: TManufacturerTreeUpdate;
+  OldManNode: TTreeViewItem;
+begin
+  if (ACol <> StringColumnManufacturer.Index) or (FDevFilteredTypes = nil) then
+    Exit;
+  if (ARow < 0) or (ARow >= FDevFilteredTypes.Count) then
+    Exit;
+  T := FDevFilteredTypes[ARow];
+  if T = nil then
+    Exit;
+  ChangeInfo := AppServices.DataManager.HandleTypeManufacturerChanged(T, Value.ToString);
+  if not ChangeInfo.ManufacturerChanged then
+    Exit;
+  if ChangeInfo.NeedRemoveOldBranch then
+  begin
+    OldManNode := FindChildInTree(
+      TreeViewTypes,
+      Ord(tnManufacturer),
+      ChangeInfo.OldManufacturer
+    );
+    if OldManNode <> nil then
+      TreeViewTypes.RemoveObject(OldManNode);
+  end;
+  BuildTree;
+  ApplyFilter;
+  UpdateGridTypes;
 end;
 
 destructor TFormTypeSelect.Destroy;

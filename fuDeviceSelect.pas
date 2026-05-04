@@ -151,6 +151,8 @@ type
     procedure sbFindClick(Sender: TObject);
     procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
+      const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDevicesHeaderClick(Column: TColumn);
     procedure miAddRepositoryClick(Sender: TObject);
@@ -191,6 +193,7 @@ private
   FSortColumn: Integer;
   FSortAscending: Boolean;
   FSkipDeviceDeleteConfirm: Boolean;
+  FInternalTreeSync: Boolean;
   FCheckedDevices: TList<TDevice>;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
@@ -660,6 +663,7 @@ begin
 
   FDevices := ActiveRepo.Devices;
 
+  FInternalTreeSync := True;
   TreeViewDevices.BeginUpdate;
   try
     PrevExpandedPaths := TStringList.Create;
@@ -680,9 +684,6 @@ begin
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
-
-
-        //TreeViewTypes.Clear;
 
     {----------------------------------}
     { Корневой узел }
@@ -712,8 +713,8 @@ begin
         {========== ИЗГОТОВИТЕЛЬ =========}
         if Trim(D.Manufacturer) <> '' then
         begin
-          ManText := D.Manufacturer;
-          ManKey  := D.Manufacturer;
+          ManText := Trim(D.Manufacturer);
+          ManKey  := Trim(D.Manufacturer);
         end
         else
         begin
@@ -798,7 +799,7 @@ begin
       if D.Category > 0 then
         Continue;
 
-      ManKey := D.Manufacturer;
+      ManKey := Trim(D.Manufacturer);
       ManNode := FindChildInTree(
         TreeViewDevices,
         Ord(tnManufacturer),
@@ -874,6 +875,7 @@ begin
   finally
     PrevExpandedPaths.Free;
     TreeViewDevices.EndUpdate;
+    FInternalTreeSync := False;
   end;
 end;
 
@@ -1763,6 +1765,8 @@ end;
 
 procedure TFormDeviceSelect.TreeViewDevicesChange(Sender: TObject);
 begin
+  if FInternalTreeSync then
+    Exit;
   if TreeViewDevices.Selected = nil then
     Exit;
 
@@ -2276,6 +2280,7 @@ begin
   FSortAscending := True;
   FSkipDeviceDeleteConfirm := False;
   FCheckedDevices := TList<TDevice>.Create;
+  GridDevices.OnSetValue := GridDevicesSetValue;
 
   {----------------------------------}
   { Загрузка данных и репозиториев }
@@ -2292,6 +2297,41 @@ begin
     ApplyFilter;
     UpdateGridDevices;
   end;
+end;
+
+procedure TFormDeviceSelect.GridDevicesSetValue(
+  Sender: TObject;
+  const ACol, ARow: Integer;
+  const Value: TValue
+);
+var
+  D: TDevice;
+  ChangeInfo: TManufacturerTreeUpdate;
+  OldManNode: TTreeViewItem;
+begin
+  if (ACol <> StringColumnManufacturer.Index) or (FDevFilteredDevices = nil) then
+    Exit;
+  if (ARow < 0) or (ARow >= FDevFilteredDevices.Count) then
+    Exit;
+  D := FDevFilteredDevices[ARow];
+  if D = nil then
+    Exit;
+  ChangeInfo := AppServices.DataManager.HandleDeviceManufacturerChanged(D, Value.ToString);
+  if not ChangeInfo.ManufacturerChanged then
+    Exit;
+  if ChangeInfo.NeedRemoveOldBranch then
+  begin
+    OldManNode := FindChildInTree(
+      TreeViewDevices,
+      Ord(tnManufacturer),
+      ChangeInfo.OldManufacturer
+    );
+    if OldManNode <> nil then
+      TreeViewDevices.RemoveObject(OldManNode);
+  end;
+  BuildTree;
+  ApplyFilter;
+  UpdateGridDevices;
 end;
 
 procedure TFormDeviceSelect.GridDevicesGetValue(
