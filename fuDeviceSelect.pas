@@ -1966,6 +1966,7 @@ var
   ParentNode: TTreeViewItem;
   I: Integer;
 begin
+  BuildTree;
   Node := FindDeviceTreeNode(ADevice);
 
   if Node <> nil then
@@ -2221,7 +2222,6 @@ begin
         FDevices, ADevice, OldManufacturer, ADevice.Manufacturer
       );
 
-    BuildTree;
     SelectEditedDevice(ADevice);
   end;
 end;
