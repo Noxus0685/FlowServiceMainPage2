@@ -2011,7 +2011,16 @@ begin
       procedure
       begin
         if (GridDevices <> nil) and GridDevices.Visible then
+        begin
           GridDevices.SetFocus;
+          if not GridDevices.IsFocused then
+            TThread.ForceQueue(nil,
+              procedure
+              begin
+                if (GridDevices <> nil) and GridDevices.Visible then
+                  GridDevices.SetFocus;
+              end);
+        end;
       end);
 
 end;
@@ -2352,6 +2361,9 @@ begin
     BuildTree;
     ApplyFilter;
     UpdateGridDevices;
+
+    if (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0) then
+      SelectEditedDevice(FDevFilteredDevices[0]);
   end;
 end;
 
