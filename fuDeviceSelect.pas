@@ -1758,6 +1758,9 @@ begin
   if TreeViewDevices.Selected = nil then
     Exit;
 
+  ClearGridSelection;
+  TreeViewDevices.SetFocus;
+
   {----------------------------------}
   { Фильтр по дереву }
   {----------------------------------}
@@ -1769,6 +1772,12 @@ begin
   {----------------------------------}
   ApplyFilter;
   UpdateGridDevices;
+end;
+
+procedure TFormDeviceSelect.ClearGridSelection;
+begin
+  GridDevices.Row := -1;
+  TreeViewDevices.SetFocus;
 end;
 
 
@@ -2239,7 +2248,15 @@ end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
-  AppServices.DataManager.Save;
+  if  MessageDlg(
+      'Есть несохранённые изменения. Сохранить перед выходом?',
+      TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo, TMsgDlgBtn.mbCancel],
+      0
+    ) = mrYes then
+  AppServices.DataManager.Save
+  else
+    Abort;
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
