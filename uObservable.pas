@@ -39,7 +39,7 @@ type
     function ObserverCount: Integer;
     procedure FireEvent(AEvent: Integer; const AError: TErrorInfo); overload; virtual;
     procedure FireEvent(AEvent: Integer); overload; virtual;
-    property Event: Integer read FEvent;
+    property Event: Integer read FEvent write   FEvent;
     property LastError: TErrorInfo read FLastError;
   protected
     procedure DoFireEvent(AEvent: Integer; const AError: TErrorInfo); virtual;

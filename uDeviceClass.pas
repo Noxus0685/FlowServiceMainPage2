@@ -102,6 +102,10 @@ type
   private
     function GetStopCriteria: TSpillageStopCriteria;
     procedure SetStopCriteria(const Value: TSpillageStopCriteria);
+    function GettargetEtalonType: integer;
+    procedure SettargetEtalonType(etalonType:integer);
+
+
   protected
     procedure SetState(const Value: TObjectState); override;
    public
@@ -192,6 +196,10 @@ type
     class function GetPointFlowSourceTypeText(const AType: Integer): string; overload; static;
 
     property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
+
+
+    property target_EtalonType: integer read GettargetEtalonType  write SettargetEtalonType;
+
   end;
 
   TPointSpillage = class (TTypeEntity)
@@ -327,8 +335,9 @@ type
 
     constructor Create (ASessionID : Integer);
 
-
     procedure Assign(ASource: TPointSpillage);
+
+
   end;
 
   TCalibrCoefItem = class
@@ -628,6 +637,36 @@ begin
     Result := 'Неизвестно';
   end;
 end;
+
+function TDevicePoint.GettargetEtalonType : integer;
+begin
+    if (EtalonType=0) then
+    begin
+      Result:= 0;
+    end
+
+    else if (EtalonType=1) then
+    begin
+      Result:= 0;
+    end
+
+     else if (EtalonType=2) then
+    begin
+      Result:= 0;
+    end
+
+    else if (EtalonType=3) then
+    begin
+      Result:= 1;
+    end
+end;
+
+
+procedure TDevicePoint.SettargetEtalonType(etalonType:integer);
+begin
+   EtalonType:= etalonType;
+end;
+
 
 
 procedure MarkDeviceAndRepositoryModified(const ADeviceUUID: string);

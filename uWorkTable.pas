@@ -3063,7 +3063,9 @@ begin
   else
     Exit;
   end;
+
   Notify(AEvent, AParameter);
+
 end;
 
 function TWorkTable.ResolveParameterStateEvent(AParameters: TParameter): ENotifyEvent;

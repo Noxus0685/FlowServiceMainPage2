@@ -52,6 +52,7 @@ type
     efrStart,
     efrStop,
     efrSetValue,
+    efrWarning,
     efrError
   );
 
@@ -163,25 +164,24 @@ end;
   end;
 //---------------------------------
   TFlowRate = class(TParameter)
-   private
+ private
+    FCurrentPoint: TDevicePoint;
+    procedure   SetPoint(ACurrentPoint: TDevicePoint);
+    function    GetPoint :TDevicePoint;
 
-   FCurrentPoint: TDevicePoint;
-   procedure SetPoint(ACurrentPoint: TDevicePoint);
-   function GetPoint :TDevicePoint;
-
-  public
+ public
     constructor Create(const AName: string = 'FlowRate');
-    procedure SetParamFlowRate(ANewValue: Double);
-    function GetActionAsString: string;
-    procedure DoFlowRateStart(ANewFlowRate: Double);  overload;
-    procedure DoFlowRateStart;  overload;
-    procedure DoFlowRateStop;
-    procedure DoFlowRateSet(ANewFlowRate: Double); overload;
-    procedure DoFlowRateSet(ANewFlowRate: Double; ACurrentPoint: TDevicePoint);  overload;
-    procedure FireEvent(AEvent: EEventFlowRate; const AError: TErrorInfo); overload;
-    procedure FireEvent(AEvent: EEventFlowRate); overload;
+    procedure   SetParamFlowRate(ANewValue: Double);
+    function    GetActionAsString: string;
+    procedure   DoFlowRateStart(ANewFlowRate: Double);  overload;
+    procedure   DoFlowRateStart;  overload;
+    procedure   DoFlowRateStop;
+    procedure   DoFlowRateSet(ANewFlowRate: Double); overload;
+    procedure   DoFlowRateSet(ANewFlowRate: Double; ACurrentPoint: TDevicePoint);  overload;
+    procedure   FireEvent(AEvent: EEventFlowRate; const AError: TErrorInfo); overload;
+    procedure   FireEvent(AEvent: EEventFlowRate); overload;
+    property    CurrentPoint: TDevicePoint  read  GetPoint write SetPoint;
 
-    property  CurrentPoint: TDevicePoint  read  GetPoint write SetPoint;
   end;
 //---------------------------------
   TFluidTemp = class(TParameter)
