@@ -681,9 +681,7 @@ begin
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
-
-
-        //TreeViewTypes.Clear;
+    TreeViewDevices.Clear;
 
     {----------------------------------}
     { Корневой узел }
