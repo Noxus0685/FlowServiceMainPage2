@@ -58,6 +58,7 @@ type
     procedure SetBufferTypes(const ATypes: TList<TDeviceType>);
     function GetBufferDevices: TList<TDevice>;
     procedure SetBufferDevices(const ADevices: TList<TDevice>);
+    function ManBranch(const AOldManufacturer, ANewManufacturer: string): string;
 
   public
 
@@ -124,6 +125,12 @@ type
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
   procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+
+  // Определяет, какую ветку производителя выбирать после редактирования прибора.
+  function DevManBranch(const AOldManufacturer, ANewManufacturer: string): string;
+  // Определяет, какую ветку производителя выбирать после редактирования типа.
+  function TypeManBranch(const AOldManufacturer, ANewManufacturer: string): string;
+
 
   end;
 
@@ -422,6 +429,37 @@ end;
 
 
 
+
+
+function TManagerTTableDM.DevManBranch(
+  const AOldManufacturer, ANewManufacturer: string
+): string;
+begin
+  Result := ManBranch(AOldManufacturer, ANewManufacturer);
+end;
+
+function TManagerTTableDM.TypeManBranch(
+  const AOldManufacturer, ANewManufacturer: string
+): string;
+begin
+  Result := ManBranch(AOldManufacturer, ANewManufacturer);
+end;
+
+function TManagerTTableDM.ManBranch(
+  const AOldManufacturer, ANewManufacturer: string
+): string;
+var
+  OldKey, NewKey: string;
+begin
+  OldKey := Trim(AOldManufacturer);
+  NewKey := Trim(ANewManufacturer);
+
+  if SameText(OldKey, NewKey) then
+    Exit(OldKey);
+
+  // При изменении производителя выбираем новую ветку (существующую или созданную).
+  Result := NewKey;
+end;
 
 function RepositoryKindFromString(const S: string): TRepositoryKind;
 begin
