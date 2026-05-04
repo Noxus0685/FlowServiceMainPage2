@@ -462,7 +462,6 @@ object FormDeviceSelect: TFormDeviceSelect
     object CornerButtonEditDevice: TCornerButton
       Align = Right
       StyledSettings = [Family, Size, Style]
-      ModalResult = 1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -583,6 +582,18 @@ object FormDeviceSelect: TFormDeviceSelect
     end
     object mpRefresh: TMenuItem
       Action = aRefreshRepository
+      ImageIndex = -1
+    end
+    object MenuItem7: TMenuItem
+      Action = aDeviceCopy
+      ImageIndex = -1
+    end
+    object MenuItem8: TMenuItem
+      Action = aDeviceCut
+      ImageIndex = -1
+    end
+    object MenuItem9: TMenuItem
+      Action = aDevicePaste
       ImageIndex = -1
     end
   end

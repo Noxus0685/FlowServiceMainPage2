@@ -600,6 +600,18 @@ object FormTypeSelect: TFormTypeSelect
     object mpRefresh: TMenuItem
       Text = #1054#1073#1085#1086#1074#1080#1090#1100
     end
+    object MenuItem8: TMenuItem
+      Action = actTypeCopy
+      ImageIndex = -1
+    end
+    object MenuItem9: TMenuItem
+      Action = actTypeCut
+      ImageIndex = -1
+    end
+    object MenuItem10: TMenuItem
+      Action = actTypePaste
+      ImageIndex = -1
+    end
   end
   object ActionList1: TActionList
     Left = 277

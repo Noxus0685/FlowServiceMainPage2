@@ -136,6 +136,9 @@ type
     Action3: TAction;
     StringColumnUUID: TStringColumn;
     aRefreshRepository: TAction;
+    MenuItem8: TMenuItem;
+    MenuItem9: TMenuItem;
+    MenuItem10: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

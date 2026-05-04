@@ -137,6 +137,9 @@ type
     aDeviceCut: TAction;
     aDeviceCopy: TAction;
     aRefreshRepository: TAction;
+    MenuItem7: TMenuItem;
+    MenuItem8: TMenuItem;
+    MenuItem9: TMenuItem;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -229,6 +232,7 @@ private
   function GetActiveTreeNode: TTreeViewItem;
   procedure ClearCheckedDevices;
   function GetCheckedDevices: TObjectList<TDevice>;
+    procedure ClearGridSelection;
 
 public
   { Public declarations }
@@ -1776,6 +1780,8 @@ begin
     '&start=0&rows=20';
 end;
 
+
+
 function TFormDeviceSelect.UpdateConnection: Boolean;
 begin
   Result := False;
@@ -2380,6 +2386,7 @@ begin
     FCheckedDevices.Add(SelectedDevice);
 
   GridDevices.Row := Row;
+
   UpdateGridDevices;
 end;
 
