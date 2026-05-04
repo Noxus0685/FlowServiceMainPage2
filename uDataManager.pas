@@ -122,6 +122,15 @@ type
   function DeleteDevices(const ADevices: TList<TDevice>): Integer;
   // Проверка наличия данных в буфере приборов.
   function HasBufferDevices: Boolean;
+
+  function HasOtherDevicesByManufacturer(const ADevices: TList<TDevice>; const AManufacturer: string;
+    const AExcludedDevice: TDevice): Boolean;
+  function HasOtherTypesByManufacturer(const ATypes: TList<TDeviceType>; const AManufacturer: string;
+    const AExcludedType: TDeviceType): Boolean;
+  function NeedRemoveOldManufacturerBranchForDevice(const ADevices: TList<TDevice>; const ADevice: TDevice;
+    const AOldManufacturer, ANewManufacturer: string): Boolean;
+  function NeedRemoveOldManufacturerBranchForType(const ATypes: TList<TDeviceType>; const AType: TDeviceType;
+    const AOldManufacturer, ANewManufacturer: string): Boolean;
   // Назначение полей прибора по выбранной ветке дерева.
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
@@ -1651,5 +1660,62 @@ end;
 
 
 
+
+
+function TManagerTTableDM.HasOtherDevicesByManufacturer(const ADevices: TList<TDevice>;
+  const AManufacturer: string; const AExcludedDevice: TDevice): Boolean;
+var
+  I: Integer;
+  D: TDevice;
+begin
+  Result := False;
+  if ADevices = nil then
+    Exit;
+  for I := 0 to ADevices.Count - 1 do
+  begin
+    D := ADevices[I];
+    if (D = nil) or (D = AExcludedDevice) then
+      Continue;
+    if D.Manufacturer = AManufacturer then
+      Exit(True);
+  end;
+end;
+
+function TManagerTTableDM.HasOtherTypesByManufacturer(const ATypes: TList<TDeviceType>;
+  const AManufacturer: string; const AExcludedType: TDeviceType): Boolean;
+var
+  I: Integer;
+  T: TDeviceType;
+begin
+  Result := False;
+  if ATypes = nil then
+    Exit;
+  for I := 0 to ATypes.Count - 1 do
+  begin
+    T := ATypes[I];
+    if (T = nil) or (T = AExcludedType) then
+      Continue;
+    if T.Manufacturer = AManufacturer then
+      Exit(True);
+  end;
+end;
+
+function TManagerTTableDM.NeedRemoveOldManufacturerBranchForDevice(const ADevices: TList<TDevice>;
+  const ADevice: TDevice; const AOldManufacturer, ANewManufacturer: string): Boolean;
+begin
+  Result := False;
+  if AOldManufacturer = ANewManufacturer then
+    Exit;
+  Result := not HasOtherDevicesByManufacturer(ADevices, AOldManufacturer, ADevice);
+end;
+
+function TManagerTTableDM.NeedRemoveOldManufacturerBranchForType(const ATypes: TList<TDeviceType>;
+  const AType: TDeviceType; const AOldManufacturer, ANewManufacturer: string): Boolean;
+begin
+  Result := False;
+  if AOldManufacturer = ANewManufacturer then
+    Exit;
+  Result := not HasOtherTypesByManufacturer(ATypes, AOldManufacturer, AType);
+end;
 
 end.
