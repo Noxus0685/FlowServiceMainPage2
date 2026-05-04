@@ -2007,7 +2007,12 @@ begin
     end;
 
   if FoundRow then
-    GridDevices.SetFocus;
+    TThread.ForceQueue(nil,
+      procedure
+      begin
+        if (GridDevices <> nil) and GridDevices.Visible then
+          GridDevices.SetFocus;
+      end);
 
 end;
 
