@@ -979,6 +979,7 @@ begin
   { Идентификация и связи }
   {----------------------------------}
   ID := ASource.ID;
+  UUID := ASource.UUID;
   DeviceTypeID := ASource.DeviceTypeID;
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
@@ -1091,6 +1092,7 @@ begin
   { Идентификация и связи }
   {----------------------------------}
   ID := ASource.ID;
+  UUID := ASource.UUID;
   DeviceTypeID := ASource.DeviceTypeID;
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
