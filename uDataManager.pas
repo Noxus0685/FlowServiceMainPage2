@@ -23,6 +23,13 @@ uses
   uTable_DATA;
 
 type
+  TManufacturerTreeUpdate = record
+    OldManufacturer: string;
+    NewManufacturer: string;
+    ManufacturerChanged: Boolean;
+    NeedEnsureNewBranch: Boolean;
+    NeedRemoveOldBranch: Boolean;
+  end;
 
   TManagerTTableDM = class
   private
@@ -130,6 +137,14 @@ type
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
   procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+  function HandleDeviceManufacturerChanged(
+    const ADevice: TDevice;
+    const ANewManufacturer: string
+  ): TManufacturerTreeUpdate;
+  function HandleTypeManufacturerChanged(
+    const AType: TDeviceType;
+    const ANewManufacturer: string
+  ): TManufacturerTreeUpdate;
 
   end;
 
@@ -471,6 +486,54 @@ begin
     end;
     Cur := Cur.ParentItem;
   end;
+end;
+
+function TManagerTTableDM.HandleDeviceManufacturerChanged(
+  const ADevice: TDevice;
+  const ANewManufacturer: string
+): TManufacturerTreeUpdate;
+var
+  D: TDevice;
+begin
+  Result.OldManufacturer := '';
+  Result.NewManufacturer := Trim(ANewManufacturer);
+  Result.ManufacturerChanged := False;
+  Result.NeedEnsureNewBranch := False;
+  Result.NeedRemoveOldBranch := False;
+  if ADevice = nil then Exit;
+  Result.OldManufacturer := Trim(ADevice.Manufacturer);
+  Result.ManufacturerChanged := not SameText(Result.OldManufacturer, Result.NewManufacturer);
+  if not Result.ManufacturerChanged then Exit;
+  Result.NeedEnsureNewBranch := Result.NewManufacturer <> '';
+  ADevice.Manufacturer := Result.NewManufacturer;
+  if (ActiveDeviceRepo = nil) or (ActiveDeviceRepo.Devices = nil) or (Result.OldManufacturer = '') then Exit;
+  for D in ActiveDeviceRepo.Devices do
+    if (D <> nil) and (D <> ADevice) and SameText(Trim(D.Manufacturer), Result.OldManufacturer) then Exit;
+  Result.NeedRemoveOldBranch := True;
+end;
+
+function TManagerTTableDM.HandleTypeManufacturerChanged(
+  const AType: TDeviceType;
+  const ANewManufacturer: string
+): TManufacturerTreeUpdate;
+var
+  T: TDeviceType;
+begin
+  Result.OldManufacturer := '';
+  Result.NewManufacturer := Trim(ANewManufacturer);
+  Result.ManufacturerChanged := False;
+  Result.NeedEnsureNewBranch := False;
+  Result.NeedRemoveOldBranch := False;
+  if AType = nil then Exit;
+  Result.OldManufacturer := Trim(AType.Manufacturer);
+  Result.ManufacturerChanged := not SameText(Result.OldManufacturer, Result.NewManufacturer);
+  if not Result.ManufacturerChanged then Exit;
+  Result.NeedEnsureNewBranch := Result.NewManufacturer <> '';
+  AType.Manufacturer := Result.NewManufacturer;
+  if (ActiveTypeRepo = nil) or (ActiveTypeRepo.Types = nil) or (Result.OldManufacturer = '') then Exit;
+  for T in ActiveTypeRepo.Types do
+    if (T <> nil) and (T <> AType) and SameText(Trim(T.Manufacturer), Result.OldManufacturer) then Exit;
+  Result.NeedRemoveOldBranch := True;
 end;
 
 
