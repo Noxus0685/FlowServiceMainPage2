@@ -2329,6 +2329,9 @@ begin
 
   // Не закрываем форму выбора типов после редактирования.
   // Обновление UI выполняется внутри OpenTypeEditor при mrOk.
+  TreeViewTypes.Clear;
+  BuildTree;
+  UpdateGridTypes;
 end;
 
 

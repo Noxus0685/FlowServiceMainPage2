@@ -58,6 +58,10 @@ type
     procedure SetBufferTypes(const ATypes: TList<TDeviceType>);
     function GetBufferDevices: TList<TDevice>;
     procedure SetBufferDevices(const ADevices: TList<TDevice>);
+    function CutDevicesToBufferWithResult(
+      const ADevices: TList<TDevice>): Integer;
+    function CutTypesToBufferWithResult(
+      const ATypes: TList<TDeviceType>): Integer;
 
   public
 
@@ -306,20 +310,7 @@ begin
     end;
 end;
 
-function TManagerTTableDM.DeleteTypes(const ATypes: TList<TDeviceType>): Integer;
-var
-  DeviceType: TDeviceType;
-begin
-  Result := 0;
-  if (ActiveTypeRepo = nil) or (ATypes = nil) then
-    Exit;
-  for DeviceType in ATypes do
-    if DeviceType <> nil then
-    begin
-      ActiveTypeRepo.DeleteType(DeviceType);
-      Inc(Result);
-    end;
-end;
+
 
 function TManagerTTableDM.HasBufferTypes: Boolean;
 begin
@@ -409,20 +400,6 @@ begin
     end;
 end;
 
-function TManagerTTableDM.DeleteDevices(const ADevices: TList<TDevice>): Integer;
-var
-  Device: TDevice;
-begin
-  Result := 0;
-  if ActiveDeviceRepo = nil then
-    Exit;
-  for Device in ADevices do
-    if Device <> nil then
-    begin
-      ActiveDeviceRepo.DeleteDevice(Device);
-      Inc(Result);
-    end;
-end;
 
 function TManagerTTableDM.DeleteDevices(const ADevices: TList<TDevice>): Integer;
 var

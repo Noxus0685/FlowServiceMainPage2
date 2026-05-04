@@ -1244,10 +1244,11 @@ begin
     {----------------------------------}
     AppServices.DataManager.DeleteDevices(TargetDevices);
 
-    SyncTreeAfterGridRowsRemoved;
+    //SyncTreeAfterGridRowsRemoved;
 
     FreeAndNil(FDevFilteredByTree);
     FDevFilteredByTree := BuildFilteredByTree(FDevices);
+
 
     ApplyFilter;
     UpdateGridDevices;
@@ -1260,6 +1261,7 @@ begin
     UpdateDeviceActions(nil);
   finally
     TargetDevices.Free;
+
   end;
 end;
 
@@ -1963,14 +1965,19 @@ var
   I: Integer;
 begin
   Node := FindDeviceTreeNode(ADevice);
-  if Node <> nil then
+
+    if Node <> nil then
     TreeViewDevices.Selected := Node;
 
   FreeAndNil(FDevFilteredByTree);
   FDevFilteredByTree := BuildFilteredByTree(FDevices);
 
   ApplyFilter;
+  TreeViewDevices.Clear;
+  BuildTree;
   UpdateGridDevices;
+
+
 
   GridDevices.Row := -1;
   if FDevFilteredDevices = nil then
@@ -1982,6 +1989,7 @@ begin
       GridDevices.Row := I;
       Break;
     end;
+
 end;
 
 function TFormDeviceSelect.PassTreeFilter(
