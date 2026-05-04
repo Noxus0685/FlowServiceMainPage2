@@ -462,8 +462,6 @@ begin
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
-    //TreeViewTypes.Clear;
-
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
@@ -1174,6 +1172,7 @@ procedure TFormTypeSelect.GridTypesSetValue(
 var
   T: TDeviceType;
   ChangeInfo: TManufacturerTreeUpdate;
+  OldManNode: TTreeViewItem;
 begin
   if (ACol <> StringColumnManufacturer.Index) or (FDevFilteredTypes = nil) then
     Exit;
@@ -1185,6 +1184,16 @@ begin
   ChangeInfo := AppServices.DataManager.HandleTypeManufacturerChanged(T, Value.ToString);
   if not ChangeInfo.ManufacturerChanged then
     Exit;
+  if ChangeInfo.NeedRemoveOldBranch then
+  begin
+    OldManNode := FindChildInTree(
+      TreeViewTypes,
+      Ord(tnManufacturer),
+      ChangeInfo.OldManufacturer
+    );
+    if OldManNode <> nil then
+      TreeViewTypes.RemoveObject(OldManNode);
+  end;
   BuildTree;
   ApplyFilter;
   UpdateGridTypes;

@@ -683,9 +683,6 @@ begin
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
-
-        //TreeViewTypes.Clear;
-
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
@@ -2305,6 +2302,7 @@ procedure TFormDeviceSelect.GridDevicesSetValue(
 var
   D: TDevice;
   ChangeInfo: TManufacturerTreeUpdate;
+  OldManNode: TTreeViewItem;
 begin
   if (ACol <> StringColumnManufacturer.Index) or (FDevFilteredDevices = nil) then
     Exit;
@@ -2316,6 +2314,16 @@ begin
   ChangeInfo := AppServices.DataManager.HandleDeviceManufacturerChanged(D, Value.ToString);
   if not ChangeInfo.ManufacturerChanged then
     Exit;
+  if ChangeInfo.NeedRemoveOldBranch then
+  begin
+    OldManNode := FindChildInTree(
+      TreeViewDevices,
+      Ord(tnManufacturer),
+      ChangeInfo.OldManufacturer
+    );
+    if OldManNode <> nil then
+      TreeViewDevices.RemoveObject(OldManNode);
+  end;
   BuildTree;
   ApplyFilter;
   UpdateGridDevices;
