@@ -1741,7 +1741,7 @@ begin
 
     Result.DeviceUUID := Device.UUID;
     Result.Manufacturer := Device.Manufacturer;
-    Result.Category := Device.Category;
+    Result.Category := inttostr(Device.Category);
     Result.Modification := Device.Modification;
     Result.DeviceFound := True;
     Exit;
