@@ -271,6 +271,8 @@ type
       const Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
+    procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure ButtonDiameterAddClick(Sender: TObject);
@@ -3401,6 +3403,36 @@ begin
   P.State:=osModified;
   SetModified;
   UpdatePointsGrid;
+end;
+
+procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn; const Row: Integer);
+var
+  D: TDiameter;
+begin
+  if Column <> CheckColumnDNEnable then
+    Exit;
+  D := GetDiameterByVisibleRow(Row);
+  if D = nil then
+    Exit;
+  D.Enable := not D.Enable;
+  D.State := osModified;
+  SetModified;
+  GridDiameters.Repaint;
+end;
+
+procedure TFormTypeEditor.GridPointsCellClick(const Column: TColumn; const Row: Integer);
+var
+  P: TTypePoint;
+begin
+  if Column <> CheckColumnPointEnable then
+    Exit;
+  P := GetPointByVisibleRow(Row);
+  if P = nil then
+    Exit;
+  P.Enable := not P.Enable;
+  P.State := osModified;
+  SetModified;
+  GridPoints.Repaint;
 end;
 
 procedure TFormTypeEditor.RecalcPointsBySelectedDiameter;
