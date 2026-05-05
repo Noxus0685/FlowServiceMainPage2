@@ -2207,6 +2207,14 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.HorzAlign = Center
           Size.Width = 75.000000000000000000
         end
+        object StringColumnDNQnom: TStringColumn
+          Header = 'Qnom, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNQtr: TStringColumn
+          Header = 'Qtr, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
         object StringColumnDNQmax: TStringColumn
           Header = 'Qmax, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False

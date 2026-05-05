@@ -232,6 +232,8 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
+    StringColumnDNQnom: TStringColumn;
+    StringColumnDNQtr: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQF: TStringColumn;
@@ -2992,6 +2994,28 @@ begin
     Value := StrToIntDef(D.DN, 0)
 
   // =====================================================
+  // == Qnom
+  // =====================================================
+  else if ACol = StringColumnDNQnom.Index then
+  begin
+    if D.Qmax = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
+  end
+
+  // =====================================================
+  // == Qtr
+  // =====================================================
+  else if ACol = StringColumnDNQtr.Index then
+  begin
+    if D.Qmax = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
+  end
+
+  // =====================================================
   // == Qmax
   // =====================================================
   else if ACol = StringColumnDNQmax.Index then
@@ -3141,9 +3165,11 @@ begin
     D.DN := IntToStr(Round(NormalizeFloatInput(S)))
 
   {=====================================================}
-  { Qmax }
+  { Qnom / Qtr / Qmax }
   {=====================================================}
-  else if ACol = StringColumnDNQmax.Index then
+  else if (ACol = StringColumnDNQnom.Index) or
+          (ACol = StringColumnDNQtr.Index) or
+          (ACol = StringColumnDNQmax.Index) then
   begin
     Qmax := FType.ToBaseUnits(NormalizeFloatInput(S));
     D.Qmax := Qmax;
@@ -4064,6 +4090,8 @@ begin
   // ==================================================
   // СБРОС ЗАГОЛОВКОВ
   // ==================================================
+  StringColumnDNQnom.Header := '';
+  StringColumnDNQtr.Header := '';
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
   StringColumnDNQF.Header   := '';
@@ -4174,6 +4202,8 @@ procedure TFormTypeEditor.ApplyVolumeMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
@@ -4197,6 +4227,8 @@ procedure TFormTypeEditor.ApplyMassMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
