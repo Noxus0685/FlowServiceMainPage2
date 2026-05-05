@@ -862,6 +862,7 @@ begin
       Add(FloatToStr(D.QFmax));
       Add(FloatToStr(D.Vmax));
       Add(FloatToStr(D.Vmin));
+      Add(BoolToStr(D.Enable, True));
     end;
 
     for P in FPoints do
@@ -883,6 +884,7 @@ begin
       Add(IntToStr(P.Pause));
       Add(IntToStr(P.RepeatsProtocol));
       Add(IntToStr(P.Repeats));
+      Add(BoolToStr(P.Enable, True));
     end;
 
     Result := Trim(B.ToString);
