@@ -1986,11 +1986,6 @@ object FormTypeEditor: TFormTypeEditor
           OnSetValue = GridDiametersSetValue
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 267.000000000000000000
-          object CheckColumnDNSelect: TCheckColumn
-            Header = #10003
-            HeaderSettings.TextSettings.WordWrap = False
-            Size.Width = 36.000000000000000000
-          end
           object StringColumnDNName: TStringColumn
             Header = #1053#1072#1080#1084#1077#1085#1086#1074#1072#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
@@ -2263,11 +2258,6 @@ object FormTypeEditor: TFormTypeEditor
           OnSetValue = GridPointsSetValue
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 233.000000000000000000
-          object CheckColumnPointSelect: TCheckColumn
-            Header = #10003
-            HeaderSettings.TextSettings.WordWrap = False
-            Size.Width = 36.000000000000000000
-          end
           object StringColumnPointName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.WordWrap = False
