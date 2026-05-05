@@ -1258,7 +1258,7 @@ begin
   {====================================================================}
   Error := 0.0;
 
-  Enable := True;
+  Enable := False;
 
   SetDimensions;
 end;
