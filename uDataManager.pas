@@ -133,6 +133,10 @@ type
   // Вырезание приборов: копирование в буфер и удаление из активного репозитория.
   procedure CutDevicesToBuffer(const ADevices: TList<TDevice>);
   function DeleteDevices(const ADevices: TList<TDevice>): Integer;
+  function DeleteDiameters(const ADiameters: TObjectList<TDiameter>;
+    const AItemsToDelete: TList<TDiameter>): Integer;
+  function DeleteTypePoints(const APoints: TObjectList<TTypePoint>;
+    const AItemsToDelete: TList<TTypePoint>): Integer;
   // Проверка наличия данных в буфере приборов.
   function HasBufferDevices: Boolean;
 
@@ -427,6 +431,56 @@ begin
       ActiveDeviceRepo.DeleteDevice(Device);
       Inc(Result);
     end;
+end;
+
+function TManagerTTableDM.DeleteDiameters(
+  const ADiameters: TObjectList<TDiameter>;
+  const AItemsToDelete: TList<TDiameter>): Integer;
+var
+  I: Integer;
+  D: TDiameter;
+begin
+  Result := 0;
+  if (ADiameters = nil) or (AItemsToDelete = nil) then
+    Exit;
+
+  for I := 0 to AItemsToDelete.Count - 1 do
+  begin
+    D := AItemsToDelete[I];
+    if D = nil then
+      Continue;
+
+    if D.State = osNew then
+      ADiameters.Remove(D)
+    else
+      D.State := osDeleted;
+    Inc(Result);
+  end;
+end;
+
+function TManagerTTableDM.DeleteTypePoints(
+  const APoints: TObjectList<TTypePoint>;
+  const AItemsToDelete: TList<TTypePoint>): Integer;
+var
+  I: Integer;
+  P: TTypePoint;
+begin
+  Result := 0;
+  if (APoints = nil) or (AItemsToDelete = nil) then
+    Exit;
+
+  for I := 0 to AItemsToDelete.Count - 1 do
+  begin
+    P := AItemsToDelete[I];
+    if P = nil then
+      Continue;
+
+    if P.State = osNew then
+      APoints.Remove(P)
+    else
+      P.State := osDeleted;
+    Inc(Result);
+  end;
 end;
 
 function TManagerTTableDM.HasBufferDevices: Boolean;
