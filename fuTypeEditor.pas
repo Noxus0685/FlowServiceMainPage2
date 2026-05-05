@@ -256,6 +256,11 @@ type
     CheckColumnPointEnable: TCheckColumn;
     Layout12: TLayout;
     Layout14: TLayout;
+    StringColumn1: TStringColumn;
+    StringColumn2: TStringColumn;
+    Layout48: TLayout;
+    Label4: TLabel;
+    Edit1: TEdit;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;

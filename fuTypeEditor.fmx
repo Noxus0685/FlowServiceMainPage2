@@ -2106,7 +2106,7 @@ object FormTypeEditor: TFormTypeEditor
           Size.Width = 237.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 45
+          TabOrder = 46
           object Label33: TLabel
             Align = Left
             Position.X = 5.000000000000000000
@@ -2127,6 +2127,44 @@ object FormTypeEditor: TFormTypeEditor
             Size.Height = 20.000000000000000000
             Size.PlatformDefault = False
             TextPrompt = '1:80'
+            KillFocusByReturn = True
+            ParentShowHint = False
+            ShowHint = True
+            OnEnter = EditRangeDynamicEnter
+            OnExit = EditRangeDynamicExit
+            Left = 276
+            Top = 15
+          end
+        end
+        object Layout48: TLayout
+          Align = Left
+          Padding.Left = 5.000000000000000000
+          Padding.Right = 5.000000000000000000
+          Position.X = 377.000000000000000000
+          Size.Width = 168.000000000000000000
+          Size.Height = 30.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 45
+          object Label4: TLabel
+            Align = Left
+            Position.X = 5.000000000000000000
+            Size.Width = 108.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072
+            TabOrder = 1
+          end
+          object Edit1: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            Align = Client
+            TabOrder = 0
+            Hint = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
+            Margins.Top = 5.000000000000000000
+            Margins.Bottom = 5.000000000000000000
+            Size.Width = 50.000000000000000000
+            Size.Height = 20.000000000000000000
+            Size.PlatformDefault = False
+            TextPrompt = '10'
             KillFocusByReturn = True
             ParentShowHint = False
             ShowHint = True
@@ -2197,6 +2235,12 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.WordWrap = False
           Visible = False
           Size.Width = 71.000000000000000000
+        end
+        object StringColumn1: TStringColumn
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumn2: TStringColumn
+          HeaderSettings.TextSettings.WordWrap = False
         end
       end
     end
