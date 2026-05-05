@@ -174,6 +174,7 @@ type
     grpPrivate: TGroupBox;
     Layout16: TLayout;
     GridDiameters: TGrid;
+    CheckColumnDNEnable: TCheckColumn;
     StringColumnDNName: TStringColumn;
     IntegerColumnDNSize: TIntegerColumn;
     FloatColumnVmax: TFloatColumn;
@@ -194,6 +195,7 @@ type
     grpWorkShedule: TGroupBox;
     Layout15: TLayout;
     GridPoints: TGrid;
+    CheckColumnPointEnable: TCheckColumn;
     StringColumnPointName: TStringColumn;
     IntegerColumnPointRepeatsForm: TIntegerColumn;
     IntegerColumnPointRepeats: TIntegerColumn;
@@ -1221,10 +1223,53 @@ end;
 procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
   D: TDiameter;
-  SelRow: Integer;
+  SelRow, I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if (FDiametersLocal[I].State <> osDeleted) and FDiametersLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipDiameterDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранные диаметры?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipDiameterDeleteConfirm := True;
+    end;
+
+    for I := FDiametersLocal.Count - 1 downto 0 do
+    begin
+      D := FDiametersLocal[I];
+      if (D.State <> osDeleted) and D.Enable then
+      begin
+        if D.State = osNew then
+          FDiametersLocal.Delete(I)
+        else
+          D.State := osDeleted;
+      end;
+    end;
+
+    GridDiameters.Row := -1;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridDiameters.Row;
   if SelRow < 0 then
@@ -1347,10 +1392,52 @@ procedure TFormTypeEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TTypePoint;
   PointIdx: Integer;
-  SelRow: Integer;
+  SelRow, I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FPointsLocal.Count - 1 do
+    if (FPointsLocal[I].State <> osDeleted) and FPointsLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipPointDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранные точки?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipPointDeleteConfirm := True;
+    end;
+
+    for I := FPointsLocal.Count - 1 downto 0 do
+    begin
+      Point := FPointsLocal[I];
+      if (Point.State <> osDeleted) and Point.Enable then
+      begin
+        if Point.State = osNew then
+          FPointsLocal.Delete(I)
+        else
+          Point.State := osDeleted;
+      end;
+    end;
+
+    GridPoints.Row := -1;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridPoints.Row;
   if SelRow < 0 then
@@ -2824,7 +2911,10 @@ begin
   // =====================================================
   // == Наименование
   // =====================================================
-  if ACol = StringColumnDNName.Index then
+  if ACol = CheckColumnDNEnable.Index then
+    Value := D.Enable
+
+  else if ACol = StringColumnDNName.Index then
     Value := D.Name
 
   // =====================================================
@@ -2993,7 +3083,10 @@ begin
   {=====================================================}
   { ИМЯ }
   {=====================================================}
-  if ACol = StringColumnDNName.Index then
+  if ACol = CheckColumnDNEnable.Index then
+    D.Enable := Value.AsBoolean
+
+  else if ACol = StringColumnDNName.Index then
     D.Name := S
 
   {=====================================================}
@@ -3159,7 +3252,10 @@ begin
   { 1. НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = StringColumnPointName.Index then
+  if ACol = CheckColumnPointEnable.Index then
+    P.Enable := Value.AsBoolean
+
+  else if ACol = StringColumnPointName.Index then
     P.Name := S
 
   else if ACol = StringColumnPointStab.Index then
@@ -3618,7 +3714,10 @@ begin
   { НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = StringColumnPointName.Index then
+  if ACol = CheckColumnPointEnable.Index then
+    Value := P.Enable
+
+  else if ACol = StringColumnPointName.Index then
     Value := P.Name
 
   else if ACol = StringColumnPointFlowRate.Index then

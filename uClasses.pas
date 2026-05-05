@@ -182,6 +182,7 @@ type
     {====================================================================}
     Vmax: Double;                // Максимальный объем / масса, л (кг)
     Vmin: Double;                // Минимальный объем / масса, л (кг)
+    Enable: Boolean;
 
     constructor Create(ADeviceTypeUUID : string);
     procedure Assign(ASource: TDiameter);
@@ -240,6 +241,7 @@ type
     {====================================================================}
     RepeatsProtocol: Integer;    // Кол-во повторов, идущих в зачёт
     Repeats: Integer;            // Общее кол-во измерений в серии
+    Enable: Boolean;
 
     constructor Create(ADeviceTypeUUID : String);
     procedure Assign(ASource: TTypePoint);
@@ -969,6 +971,7 @@ begin
   {====================================================================}
   Vmax := 0.0;
   Vmin := 0.0;
+  Enable := False;
 end;
 
 procedure TDiameter.Assign(ASource: TDiameter);
@@ -1007,6 +1010,7 @@ begin
   {----------------------------------}
   Vmax := ASource.Vmax;
   Vmin := ASource.Vmin;
+  Enable := ASource.Enable;
 
   {----------------------------------}
   { Состояние }
@@ -1077,6 +1081,7 @@ begin
   {====================================================================}
   RepeatsProtocol := 0;
   Repeats := 0;
+  Enable := False;
 end;
 
 procedure TTypePoint.Assign(ASource: TTypePoint);
@@ -1137,6 +1142,7 @@ begin
   {----------------------------------}
   RepeatsProtocol := ASource.RepeatsProtocol;
   Repeats := ASource.Repeats;
+  Enable := ASource.Enable;
 end;
 
 procedure TTypePoint.SetState(const Value: TObjectState);
