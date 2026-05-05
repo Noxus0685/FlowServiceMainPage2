@@ -2121,7 +2121,10 @@ procedure TFormTypeEditor.EditAccuracyClassTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2468,7 +2471,10 @@ procedure TFormTypeEditor.EditModificationTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2501,7 +2507,10 @@ procedure TFormTypeEditor.EditNameTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // пример: убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2707,7 +2716,10 @@ procedure TFormTypeEditor.edtDocumentationTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2766,7 +2778,10 @@ procedure TFormTypeEditor.edtReestrNumberTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
