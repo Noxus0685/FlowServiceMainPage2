@@ -2911,22 +2911,22 @@ begin
   // =====================================================
   // == Наименование
   // =====================================================
-  if ACol = CheckColumnDNEnable.Index then
+  if GridDiameters.Columns[ACol] = CheckColumnDNEnable then
     Value := D.Enable
 
-  else if ACol = StringColumnDNName.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNName then
     Value := D.Name
 
   // =====================================================
   // == DN (мм) — INTEGER
   // =====================================================
-  else if ACol = IntegerColumnDNSize.Index then
+  else if GridDiameters.Columns[ACol] = IntegerColumnDNSize then
     Value := StrToIntDef(D.DN, 0)
 
   // =====================================================
   // == Qmax
   // =====================================================
-  else if ACol = StringColumnDNQmax.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmax then
   begin
     if D.Qmax = 0 then
       Value := '—'
@@ -2937,7 +2937,7 @@ begin
   // =====================================================
   // == Qmin
   // =====================================================
-  else if ACol = StringColumnDNQmin.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmin then
   begin
     if D.Qmin = 0 then
       Value := '—'
@@ -2948,7 +2948,7 @@ begin
   // =====================================================
   // == Qnom
   // =====================================================
-  else if ACol = StringColumnDNQnom.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQnom then
   begin
     if D.Qnom = 0 then
       Value := '—'
@@ -2959,7 +2959,7 @@ begin
   // =====================================================
   // == Qper
   // =====================================================
-  else if ACol = StringColumnDNQper.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQper then
   begin
     if D.Qper = 0 then
       Value := '—'
@@ -2971,7 +2971,7 @@ begin
   // =====================================================
   // == QF
   // =====================================================
-  else if ACol = StringColumnDNQF.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQF then
   begin
     if D.QFmax = 0 then
       Value := '—'
@@ -2982,7 +2982,7 @@ begin
   // =====================================================
   // == Kp (коэффициент)
   // =====================================================
-  else if ACol = StringColumnDNKp.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNKp then
   begin
     if D.Kp = 0 then
       Value := '—'
@@ -3081,10 +3081,10 @@ begin
   {=====================================================}
   { ИМЯ }
   {=====================================================}
-  if ACol = CheckColumnDNEnable.Index then
+  if GridDiameters.Columns[ACol] = CheckColumnDNEnable then
     D.Enable := Value.AsBoolean
 
-  else if ACol = StringColumnDNName.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNName then
   begin
     S := Trim(Value.AsString);
     D.Name := S
@@ -3093,7 +3093,7 @@ begin
   {=====================================================}
   { DN (мм) }
   {=====================================================}
-  else if ACol = IntegerColumnDNSize.Index then
+  else if GridDiameters.Columns[ACol] = IntegerColumnDNSize then
   begin
     S := Trim(Value.AsString);
     D.DN := IntToStr(Round(NormalizeFloatInput(S)))
@@ -3102,7 +3102,7 @@ begin
   {=====================================================}
   { Qmax }
   {=====================================================}
-  else if ACol = StringColumnDNQmax.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmax then
   begin
     S := Trim(Value.AsString);
     Qmax := FType.ToBaseUnits(NormalizeFloatInput(S));
@@ -3129,7 +3129,7 @@ begin
   {=====================================================}
   { Qmin (ручной ввод) }
   {=====================================================}
-  else if ACol = StringColumnDNQmin.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmin then
   begin
     S := Trim(Value.AsString);
     D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
@@ -3144,7 +3144,7 @@ begin
     {=====================================================}
   { Qnom (ручной ввод) }
   {=====================================================}
-  else if ACol = StringColumnDNQnom.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQnom then
   begin
     S := Trim(Value.AsString);
     D.Qnom := FType.ToBaseUnits(NormalizeFloatInput(S));
@@ -3160,7 +3160,7 @@ begin
     {=====================================================}
   { Qper (ручной ввод) }
   {=====================================================}
-  else if ACol = StringColumnDNQper.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQper then
   begin
     S := Trim(Value.AsString);
     D.Qper := FType.ToBaseUnits(NormalizeFloatInput(S));
@@ -3176,7 +3176,7 @@ begin
   {=====================================================}
   { QF }
   {=====================================================}
-  else if ACol = StringColumnDNQF.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQF then
   begin
     S := Trim(Value.AsString);
     D.QFmax := FType.ToBaseUnits(NormalizeFloatInput(S));
@@ -3205,7 +3205,7 @@ begin
   {=====================================================}
   { Kp }
   {=====================================================}
-  else if ACol = StringColumnDNKp.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNKp then
   begin
     S := Trim(Value.AsString);
     D.Kp := NormalizeFloatInput(S);
@@ -3260,46 +3260,46 @@ begin
   { 1. НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = CheckColumnPointEnable.Index then
+  if GridPoints.Columns[ACol] = CheckColumnPointEnable then
     P.Enable := Value.AsBoolean
 
-  else if ACol = StringColumnPointName.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointName then
   begin
     S := Trim(Value.AsString);
     P.Name := S
   end
 
-  else if ACol = StringColumnPointStab.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointStab then
   begin
     S := Trim(Value.AsString);
     P.Pause := Round(NormalizeFloatInput(S))
   end
 
-  else if ACol = StringColumnPointPres.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointPres then
   begin
     S := Trim(Value.AsString);
     P.Pressure := NormalizeFloatInput(S)
   end
 
-  else if ACol = StringColumnPontTemp.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPontTemp then
   begin
     S := Trim(Value.AsString);
     P.Temp := NormalizeFloatInput(S)
   end
 
-  else if ACol = StringColumnPointTempError.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointTempError then
   begin
     S := Trim(Value.AsString);
     P.TempAccuracy := NormalizeAccuracyInput(S)
   end
 
-  else if ACol = StringColumnPointFlowError.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointFlowError then
   begin
     S := Trim(Value.AsString);
     P.FlowAccuracy := NormalizeAccuracyInput(S)
   end
 
-  else if ACol = StringColumnPointError.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointError then
   begin
     S := Trim(Value.AsString);
     P.Error := NormalizeFloatInput(S)
@@ -3324,7 +3324,7 @@ begin
     {---------------------------------}
     { Q / Qmax }
     {---------------------------------}
-    if ACol = StringColumnPointFlowRate.Index then
+    if GridPoints.Columns[ACol] = StringColumnPointFlowRate then
     begin
       S := Trim(Value.AsString);
       P.FlowRate := NormalizeFloatInput(S)
@@ -3333,7 +3333,7 @@ begin
     {---------------------------------}
     { Q (абсолютный) }
     {---------------------------------}
-    else if ACol = StringColumnPointQ.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointQ then
     begin
       S := Trim(Value.AsString);
       Q := FType.ToBaseUnits(NormalizeFloatInput(S));
@@ -3344,7 +3344,7 @@ begin
     {---------------------------------}
     { V → T и Imp }
     {---------------------------------}
-    else if ACol = StringColumnPointVolume.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointVolume then
     begin
       S := Trim(Value.AsString);
       V := NormalizeFloatInput(S);
@@ -3360,7 +3360,7 @@ begin
     {---------------------------------}
     { Imp → V и T }
     {---------------------------------}
-    else if ACol = StringColumnPointImp.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointImp then
     begin
       S := Trim(Value.AsString);
       P.LimitImp := Round(NormalizeFloatInput(S));
@@ -3378,7 +3378,7 @@ begin
     {---------------------------------}
     { T → V и Imp }
     {---------------------------------}
-    else if ACol = StringColumnPointTime.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointTime then
     begin
       S := Trim(Value.AsString);
       Tm := NormalizeFloatInput(S);
@@ -3750,13 +3750,13 @@ begin
   { НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = CheckColumnPointEnable.Index then
+  if GridPoints.Columns[ACol] = CheckColumnPointEnable then
     Value := P.Enable
 
-  else if ACol = StringColumnPointName.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointName then
     Value := P.Name
 
-  else if ACol = StringColumnPointFlowRate.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointFlowRate then
     Value :=  FormatFloat('0.###', P.FlowRate)
 
   else if ACol = StringColumnPointFlowError.Index then
