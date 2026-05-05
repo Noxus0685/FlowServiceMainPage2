@@ -170,7 +170,6 @@ type
     Label38: TLabel;
     EditFreqFlowRate: TEdit;
     shdwfct1: TShadowEffect;
-    layRight: TLayout;
     grpPrivate: TGroupBox;
     Layout16: TLayout;
     GridDiameters: TGrid;
@@ -255,6 +254,8 @@ type
     ComboBoxUnits: TComboBox;
     CheckColumnDNEnable: TCheckColumn;
     CheckColumnPointEnable: TCheckColumn;
+    Layout12: TLayout;
+    Layout14: TLayout;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -394,6 +395,8 @@ type
   procedure UpdateUnitsCombo;
     procedure UpdateUIFreq;
     procedure UpdateUICoef;
+    procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
 
   public
 
@@ -879,6 +882,8 @@ begin
   Result := FCalibrCoefItemsLocal[ARow];
 end;
 
+
+
 procedure TFormTypeEditor.GridCoefsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -898,7 +903,10 @@ begin
     6: Value := FloatToStr(Item.b);
   end;
 end;
-
+procedure TFormTypeEditor.TestGridGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+begin
+  Value := True;
+end;
 procedure TFormTypeEditor.GridCoefsSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 var
@@ -2979,7 +2987,7 @@ begin
 
     D.State:=osModified;
 
-  S := Trim(Value.AsString);
+  S := Trim(Value.ToString);
 
   if ACol = StringColumnPointName.Index then
     D.Enable := not D.Enable
@@ -3117,7 +3125,7 @@ begin
   if P = nil then
     Exit;
 
-  S := Trim(Value.AsString);
+  S := Trim(Value.toString);
 
   {=====================================================}
   { 1. НЕ зависят от диаметра }
