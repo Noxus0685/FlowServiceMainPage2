@@ -3051,9 +3051,10 @@ begin
 
     { ручной ввод => диапазон не актуален }
     FType.RangeDynamic := 0;
-    EditRangeDynamic.Text := '';
 
-    UpdateRangeDynamicPromptBySelectedDiameter;
+    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if SelD = D then
+      RecalcPointsBySelectedDiameter;
   end
 
     {=====================================================}
@@ -3065,9 +3066,10 @@ begin
 
     { ручной ввод => диапазон не актуален }
     FType.RangeDynamic := 0;
-    EditRangeDynamic.Text := '';
 
-    UpdateRangeDynamicPromptBySelectedDiameter;
+    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if SelD = D then
+      RecalcPointsBySelectedDiameter;
   end
 
   {=====================================================}
