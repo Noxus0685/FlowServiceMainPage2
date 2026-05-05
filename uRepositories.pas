@@ -82,6 +82,7 @@ type
     procedure AssertSchema; virtual; abstract;
 
     function GetDMFileName:string;
+    function CategoryToText(ACategory: Integer; const ACategoryName: string): string;
 
   end;
 
@@ -216,7 +217,6 @@ type
 
     property Categories: TObjectList<TDeviceCategory> read FCategories;
     function DetectCategoryByKeywords(const Text: string): Integer;  //Вспомогательная функция
-    function CategoryToText(ACategory: Integer;const ACategoryName: string): string;  //Вспомогательная функция
 
     function FindTypeByUUID(const AUUID: string): TDeviceType;
     function FindTypeByName(const AName: string): TDeviceType;
@@ -1247,13 +1247,15 @@ begin
   {----------------------------------}
   { Сам тип — удаляем СРАЗУ из БД }
   {----------------------------------}
-  case AType.State of
+   AType.State := osDeleted;
+{  case AType.State of
 
     osNew:
       begin
         // тип ещё не был сохранён — просто убираем из памяти
-        if FTypes <> nil then
-          FTypes.Remove(AType);
+       /// if FTypes <> nil then
+       //   FTypes.Remove(AType);
+          AType.State := osDeleted;
       end;
 
   else
@@ -1261,14 +1263,14 @@ begin
       // тип есть в БД — помечаем и удаляем штатным способом
       AType.State := osDeleted;
 
-      if not UpdateType(AType) then
-        raise Exception.Create('Ошибка удаления типа из БД');
+      //if not UpdateType(AType) then
+       // raise Exception.Create('Ошибка удаления типа из БД');
 
-      if FTypes <> nil then
-        FTypes.Remove(AType);
+     // if FTypes <> nil then
+     //   FTypes.Remove(AType);
     end;
 
-  end;
+  end;      }
 
   {----------------------------------}
   { Репозиторий изменён }
@@ -1324,7 +1326,7 @@ begin
   Result := CreateType(Src);
 end;
 
-function TTypeRepository.CategoryToText(
+function TBaseRepository.CategoryToText(
   ACategory: Integer;
   const ACategoryName: string
 ): string;
@@ -1339,7 +1341,8 @@ begin
     if Trim(ACategoryName) <> '' then
       Exit(ACategoryName)
     else
-      Exit('<категория>');
+      //Exit('<категория>');
+      Exit('');
   end;
 
   // --------------------------------------------------
@@ -1351,16 +1354,18 @@ begin
   // --------------------------------------------------
   // > 0 → ищем в справочнике
   // --------------------------------------------------
-  if FCategories<>nil then
-
-  for C in FCategories do
-    if C.ID = ACategory then
-      Exit(C.Name);
+  if Self is TTypeRepository then
+    for C in TTypeRepository(Self).Categories do
+      if C.ID = ACategory then
+        Exit(C.Name);
 
   // --------------------------------------------------
   // не найдено
   // --------------------------------------------------
-  Result := 'Неизвестная категория';
+  if Trim(ACategoryName) <> '' then
+    Result := ACategoryName
+  else
+    Result := '<категория>';
 end;
 
 
@@ -1553,6 +1558,8 @@ begin
 
   if (ATypeUUID = '') or (FDM = nil) then
     Exit;
+
+  EnsurePointSchema;
 
   Q := FDM.CreateQuery;
   try
@@ -2012,6 +2019,7 @@ begin
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('DeviceTypeID', 'INTEGER'),
     Col('DeviceTypeUUID', 'TEXT'),
+    Col('UUID', 'TEXT'),
     Col('Name', 'TEXT'),
     Col('DN', 'TEXT'),
     Col('Description', 'TEXT'),
@@ -2071,6 +2079,10 @@ end;
   Result := AType.AddDiameter;
 
   Result.ID := Q.FieldByName('ID').AsInteger;
+  if Q.FindField('UUID') <> nil then
+    Result.UUID := Q.FieldByName('UUID').AsString
+  else
+    Result.UUID := '';
 
   Result.DeviceTypeUUID:= ADeviceTypeUUID;
 
@@ -2232,10 +2244,10 @@ begin
         begin
           Q.SQL.Text :=
             'insert into DeviceDiameter (' +
-            'DeviceTypeID, DeviceTypeUUID, Name, DN, Description, ' +
+            'DeviceTypeID, DeviceTypeUUID, UUID, Name, DN, Description, ' +
             'Qmax, Qmin, Kp, QFmax, Vmax, Vmin' +
             ') values (' +
-            ':DeviceTypeID, :DeviceTypeUUID,:Name, :DN, :Description, ' +
+            ':DeviceTypeID, :DeviceTypeUUID, :UUID, :Name, :DN, :Description, ' +
             ':Qmax, :Qmin, :Kp, :QFmax, :Vmax, :Vmin' +
             ')';
         end;
@@ -2252,7 +2264,7 @@ begin
           Q.SQL.Text :=
             'update DeviceDiameter set ' +
             'DeviceTypeID=:DeviceTypeID, ' +
-            'DeviceTypeUUID=:DeviceTypeUUID, ' +
+            'DeviceTypeUUID=:DeviceTypeUUID, UUID=:UUID, ' +
             'Name=:Name, DN=:DN, Description=:Description, ' +
             'Qmax=:Qmax, Qmin=:Qmin, Kp=:Kp, ' +
             'QFmax=:QFmax, Vmax=:Vmax, Vmin=:Vmin ' +
@@ -2270,6 +2282,7 @@ begin
 
     SetIntParam(Q, 'DeviceTypeID', ADiameter.DeviceTypeID);
     SetStrParam(Q, 'DeviceTypeUUID', ADiameter.DeviceTypeUUID);
+    SetStrParam(Q, 'UUID', ADiameter.UUID);
     SetStrParam(Q, 'Name', ADiameter.Name);
     SetStrParam(Q, 'DN', ADiameter.DN);
     SetStrParam(Q, 'Description', ADiameter.Description);
@@ -2375,6 +2388,7 @@ begin
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('DeviceTypeID', 'INTEGER'),
      Col('DeviceTypeUUID', 'TEXT'),
+    Col('UUID', 'TEXT'),
 
     Col('Name', 'TEXT'),
     Col('Description', 'TEXT'),
@@ -2446,6 +2460,10 @@ var
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
+  if Q.FindField('UUID') <> nil then
+    Result.UUID := Q.FieldByName('UUID').AsString
+  else
+    Result.UUID := '';
   Result.DeviceTypeID := Q.FieldByName('DeviceTypeID').AsInteger;
   Result.DeviceTypeUUID:= DeviceTypeUUID;
   {================ Общая информация =============}
@@ -2489,6 +2507,8 @@ begin
 
   if (ATypeUUID = '') or (FDM = nil) then
     Exit;
+
+  EnsurePointSchema;
 
   Q := FDM.CreateQuery;
   try
@@ -2581,6 +2601,8 @@ begin
   if (APoint = nil) or (FDM = nil) then
     Exit;
 
+  EnsurePointSchema;
+
  // if APoint.State = osClean then
  //   Exit(True);
 
@@ -2643,13 +2665,13 @@ begin
         begin
           Q.SQL.Text :=
             'insert into DeviceTypePoint (' +
-            'DeviceTypeID, DeviceTypeUUID, Name, Description, ' +
+            'DeviceTypeID, DeviceTypeUUID, UUID, Name, Description, ' +
             'FlowRate, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, ' +
             'Error, Pause, RepeatsProtocol, Repeats' +
             ') values (' +
-            ':DeviceTypeID,:DeviceTypeUUID, :Name, :Description, ' +
+            ':DeviceTypeID,:DeviceTypeUUID, :UUID, :Name, :Description, ' +
             ':FlowRate, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, ' +
@@ -2666,7 +2688,7 @@ begin
           Q.SQL.Text :=
             'update DeviceTypePoint set ' +
             'DeviceTypeID=:DeviceTypeID, ' +
-            'DeviceTypeUUID=:DeviceTypeUUID, ' +
+            'DeviceTypeUUID=:DeviceTypeUUID, UUID=:UUID, ' +
             'Name=:Name, Description=:Description, ' +
             'FlowRate=:FlowRate, FlowAccuracy=:FlowAccuracy, ' +
             'Pressure=:Pressure, Temp=:Temp, TempAccuracy=:TempAccuracy, ' +
@@ -2687,6 +2709,7 @@ begin
 
     SetIntParam(Q, 'DeviceTypeID', APoint.DeviceTypeID);
     SetStrParam(Q, 'DeviceTypeUUID', APoint.DeviceTypeUUID);
+    SetStrParam(Q, 'UUID', APoint.UUID);
     SetStrParam(Q, 'Name', APoint.Name);
     SetStrParam(Q, 'Description', APoint.Description);
 
@@ -4539,6 +4562,8 @@ begin
 
   if (APoint = nil) or (FDM = nil) then
     Exit;
+
+  EnsureDevicePointSchema;
 
  // if APoint.State = osClean then
  //   Exit(True);

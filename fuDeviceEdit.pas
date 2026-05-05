@@ -515,10 +515,11 @@ end;
 procedure TFormDeviceEditor.ApplyMeasuredDimension;
 var
   Dim: TMeasuredDimension;
+  ALoading:Boolean;
 begin
   if FDevice = nil then
     Exit;
-
+  ALoading:=FLoading;
   FLoading := True;
   try
     {----------------------------------}
@@ -594,7 +595,7 @@ begin
     UpdatePointsGrid;
 
   finally
-    FLoading := False;
+    FLoading := ALoading;
   end;
 end;
 
@@ -1747,7 +1748,9 @@ var
   AccErr: Double;
   Idx: Integer;
   Point: TDevicePoint;
+  ALoading:Boolean;
 begin
+  ALoading:= FLoading;
   FLoading := True;
   try
     RefreshDeviceTypeReference;
@@ -1916,7 +1919,7 @@ begin
  // =====================================================
 // == Диаметр (DN)
 // =====================================================
- UpdateComboEditDN;
+    UpdateComboEditDN;
 
     // =====================================================
     // == Точки прибора
@@ -1925,7 +1928,7 @@ begin
     UpdateCoefsGrid;
 
         finally
-        FLoading := False;
+        FLoading := ALoading;
     end;
   end;
 

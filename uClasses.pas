@@ -169,7 +169,8 @@ type
     {====================================================================}
     Qmax: Double;                // Максимальный расход, м3/ч (или т/ч)
     Qmin: Double;                // Минимальный расход, м3/ч (или т/ч)
-
+    Qper: Double;
+    Qnom: Double;
     {====================================================================}
     { ИМПУЛЬСНЫЕ / ЧАСТОТНЫЕ ПАРАМЕТРЫ }
     {====================================================================}
@@ -181,6 +182,7 @@ type
     {====================================================================}
     Vmax: Double;                // Максимальный объем / масса, л (кг)
     Vmin: Double;                // Минимальный объем / масса, л (кг)
+    Enable: Boolean;
 
     constructor Create(ADeviceTypeUUID : string);
     procedure Assign(ASource: TDiameter);
@@ -239,6 +241,7 @@ type
     {====================================================================}
     RepeatsProtocol: Integer;    // Кол-во повторов, идущих в зачёт
     Repeats: Integer;            // Общее кол-во измерений в серии
+    Enable: Boolean;
 
     constructor Create(ADeviceTypeUUID : String);
     procedure Assign(ASource: TTypePoint);
@@ -859,6 +862,7 @@ begin
       Add(FloatToStr(D.QFmax));
       Add(FloatToStr(D.Vmax));
       Add(FloatToStr(D.Vmin));
+      Add(BoolToStr(D.Enable, True));
     end;
 
     for P in FPoints do
@@ -880,6 +884,7 @@ begin
       Add(IntToStr(P.Pause));
       Add(IntToStr(P.RepeatsProtocol));
       Add(IntToStr(P.Repeats));
+      Add(BoolToStr(P.Enable, True));
     end;
 
     Result := Trim(B.ToString);
@@ -968,6 +973,7 @@ begin
   {====================================================================}
   Vmax := 0.0;
   Vmin := 0.0;
+  Enable := False;
 end;
 
 procedure TDiameter.Assign(ASource: TDiameter);
@@ -979,6 +985,7 @@ begin
   { Идентификация и связи }
   {----------------------------------}
   ID := ASource.ID;
+  UUID := ASource.UUID;
   DeviceTypeID := ASource.DeviceTypeID;
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
@@ -1005,6 +1012,7 @@ begin
   {----------------------------------}
   Vmax := ASource.Vmax;
   Vmin := ASource.Vmin;
+  Enable := ASource.Enable;
 
   {----------------------------------}
   { Состояние }
@@ -1075,6 +1083,7 @@ begin
   {====================================================================}
   RepeatsProtocol := 0;
   Repeats := 0;
+  Enable := False;
 end;
 
 procedure TTypePoint.Assign(ASource: TTypePoint);
@@ -1091,6 +1100,7 @@ begin
   { Идентификация и связи }
   {----------------------------------}
   ID := ASource.ID;
+  UUID := ASource.UUID;
   DeviceTypeID := ASource.DeviceTypeID;
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   {----------------------------------}
@@ -1134,6 +1144,7 @@ begin
   {----------------------------------}
   RepeatsProtocol := ASource.RepeatsProtocol;
   Repeats := ASource.Repeats;
+  Enable := ASource.Enable;
 end;
 
 procedure TTypePoint.SetState(const Value: TObjectState);

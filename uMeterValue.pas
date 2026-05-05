@@ -2248,6 +2248,7 @@ begin
 end;
 
 { Loads meter values from persistent INI storage and restores relations. }
+{ TODO -oAndrey -cError : В список попадают явно лишние значения, которые там остаются и не удаляются. Загрузка из-за этого происходит медленно }
 class procedure TMeterValue.LoadFromFile;
 var
   Ini: TIniFile;

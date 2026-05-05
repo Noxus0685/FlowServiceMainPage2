@@ -664,7 +664,6 @@ begin
     if (AWorkTable.FluidTemp.IsRunning) then
     begin
 
-      // Если температура ещё НЕ стабилизировалась
       if not AWorkTable.FluidTemp.IsStable(StableState) then
       begin
         //   AWorkTable.FluidTemp.ValueSet.Value; //Значение Уставки температуры

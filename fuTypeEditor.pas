@@ -255,6 +255,12 @@ type
     LayoutUnits: TLayout;
     LabelUnits: TLabel;
     ComboBoxUnits: TComboBox;
+    StyleBook1: TStyleBook;
+    Layout12: TLayout;
+    Label4: TLabel;
+    EditFlowVelocity: TEdit;
+    StringColumnDNQnom: TStringColumn;
+    StringColumnDNQper: TStringColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -801,12 +807,21 @@ begin
   FType.AccuracyClass     := EditAccuracyClass.Text;
   FType.RangeDynamic      := StrToFloatDef(EditRangeDynamic.Text, 0);
 
-  if ceCategory.ItemIndex >= 0 then
-  FType.Category := ceCategory.ItemIndex + 1
+    if (ceCategory.ItemIndex >= 0) and (ceCategory.ItemIndex < ceCategory.Items.Count) then
+  begin
+    FType.Category := Integer(ceCategory.Items.Objects[ceCategory.ItemIndex]);
+    if (FType.Category = 0) and SameText(Trim(ceCategory.Text), '<не указана>') then
+    begin
+      FType.Category := -1;
+      FType.CategoryName := '';
+    end
+    else
+      FType.CategoryName := '';
+  end
   else
   begin
   FType.Category := -1;
-  FType.CategoryName := ceCategory.Name;
+  FType.CategoryName := Trim(ceCategory.Text);
   end;
 
 
@@ -1089,6 +1104,7 @@ end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
 begin
+  UpdateTypeFromUI;
   // --------------------------------------------------
   // Валидация данных
   // --------------------------------------------------
@@ -1235,10 +1251,53 @@ end;
 procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
   D: TDiameter;
-  SelRow: Integer;
+  SelRow, I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if (FDiametersLocal[I].State <> osDeleted) and FDiametersLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipDiameterDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранные диаметры?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipDiameterDeleteConfirm := True;
+    end;
+
+    for I := FDiametersLocal.Count - 1 downto 0 do
+    begin
+      D := FDiametersLocal[I];
+      if (D.State <> osDeleted) and D.Enable then
+      begin
+        if D.State = osNew then
+          FDiametersLocal.Delete(I)
+        else
+          D.State := osDeleted;
+      end;
+    end;
+
+    GridDiameters.Row := -1;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridDiameters.Row;
   if SelRow < 0 then
@@ -1361,10 +1420,52 @@ procedure TFormTypeEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TTypePoint;
   PointIdx: Integer;
-  SelRow: Integer;
+  SelRow, I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FPointsLocal.Count - 1 do
+    if (FPointsLocal[I].State <> osDeleted) and FPointsLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipPointDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранные точки?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipPointDeleteConfirm := True;
+    end;
+
+    for I := FPointsLocal.Count - 1 downto 0 do
+    begin
+      Point := FPointsLocal[I];
+      if (Point.State <> osDeleted) and Point.Enable then
+      begin
+        if Point.State = osNew then
+          FPointsLocal.Delete(I)
+        else
+          Point.State := osDeleted;
+      end;
+    end;
+
+    GridPoints.Row := -1;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridPoints.Row;
   if SelRow < 0 then
@@ -2846,13 +2947,13 @@ begin
   // =====================================================
   // == DN (мм) — INTEGER
   // =====================================================
-  else if ACol = IntegerColumnDNSize.Index then
+  else if GridDiameters.Columns[ACol] = IntegerColumnDNSize then
     Value := StrToIntDef(D.DN, 0)
 
   // =====================================================
   // == Qmax
   // =====================================================
-  else if ACol = StringColumnDNQmax.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmax then
   begin
     if D.Qmax = 0 then
       Value := '—'
@@ -2863,7 +2964,7 @@ begin
   // =====================================================
   // == Qmin
   // =====================================================
-  else if ACol = StringColumnDNQmin.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmin then
   begin
     if D.Qmin = 0 then
       Value := '—'
@@ -2872,9 +2973,32 @@ begin
   end
 
   // =====================================================
+  // == Qnom
+  // =====================================================
+  else if GridDiameters.Columns[ACol] = StringColumnDNQnom then
+  begin
+    if D.Qnom = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qnom), FType.Error);
+  end
+
+  // =====================================================
+  // == Qper
+  // =====================================================
+  else if GridDiameters.Columns[ACol] = StringColumnDNQper then
+  begin
+    if D.Qper = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qper), FType.Error);
+  end
+
+
+  // =====================================================
   // == QF
   // =====================================================
-  else if ACol = StringColumnDNQF.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQF then
   begin
     if D.QFmax = 0 then
       Value := '—'
@@ -2885,7 +3009,7 @@ begin
   // =====================================================
   // == Kp (коэффициент)
   // =====================================================
-  else if ACol = StringColumnDNKp.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNKp then
   begin
     if D.Kp = 0 then
       Value := '—'
@@ -2981,8 +3105,6 @@ begin
 
     D.State:=osModified;
 
-  S := Trim(Value.AsString);
-
   {=====================================================}
   { ИМЯ }
   {=====================================================}
@@ -2998,18 +3120,23 @@ begin
   end
   else if ACol = StringColumnDNName.Index then
     D.Name := S
+  end
 
   {=====================================================}
   { DN (мм) }
   {=====================================================}
-  else if ACol = IntegerColumnDNSize.Index then
+  else if GridDiameters.Columns[ACol] = IntegerColumnDNSize then
+  begin
+    S := Trim(Value.AsString);
     D.DN := IntToStr(Round(NormalizeFloatInput(S)))
+  end
 
   {=====================================================}
   { Qmax }
   {=====================================================}
-  else if ACol = StringColumnDNQmax.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmax then
   begin
+    S := Trim(Value.AsString);
     Qmax := FType.ToBaseUnits(NormalizeFloatInput(S));
     D.Qmax := Qmax;
 
@@ -3034,8 +3161,9 @@ begin
   {=====================================================}
   { Qmin (ручной ввод) }
   {=====================================================}
-  else if ACol = StringColumnDNQmin.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQmin then
   begin
+    S := Trim(Value.AsString);
     D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     { ручной ввод => диапазон не актуален }
@@ -3045,11 +3173,44 @@ begin
     UpdateRangeDynamicPromptBySelectedDiameter;
   end
 
+    {=====================================================}
+  { Qnom (ручной ввод) }
+  {=====================================================}
+  else if GridDiameters.Columns[ACol] = StringColumnDNQnom then
+  begin
+    S := Trim(Value.AsString);
+    D.Qnom := FType.ToBaseUnits(NormalizeFloatInput(S));
+
+    { ручной ввод => диапазон не актуален }
+    FType.RangeDynamic := 0;
+
+    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if SelD = D then
+      RecalcPointsBySelectedDiameter;
+  end
+
+    {=====================================================}
+  { Qper (ручной ввод) }
+  {=====================================================}
+  else if GridDiameters.Columns[ACol] = StringColumnDNQper then
+  begin
+    S := Trim(Value.AsString);
+    D.Qper := FType.ToBaseUnits(NormalizeFloatInput(S));
+
+    { ручной ввод => диапазон не актуален }
+    FType.RangeDynamic := 0;
+
+    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if SelD = D then
+      RecalcPointsBySelectedDiameter;
+  end
+
   {=====================================================}
   { QF }
   {=====================================================}
-  else if ACol = StringColumnDNQF.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNQF then
   begin
+    S := Trim(Value.AsString);
     D.QFmax := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     if D.Qmax > 0 then
@@ -3076,8 +3237,9 @@ begin
   {=====================================================}
   { Kp }
   {=====================================================}
-  else if ACol = StringColumnDNKp.Index then
+  else if GridDiameters.Columns[ACol] = StringColumnDNKp then
   begin
+    S := Trim(Value.AsString);
     D.Kp := NormalizeFloatInput(S);
 
     if D.Qmax > 0 then
@@ -3144,8 +3306,6 @@ begin
   if P = nil then
     Exit;
 
-  S := Trim(Value.AsString);
-
   {=====================================================}
   { 1. НЕ зависят от диаметра }
   {=====================================================}
@@ -3162,24 +3322,43 @@ begin
   end
   else if ACol = StringColumnPointName.Index then
     P.Name := S
+  end
 
-  else if ACol = StringColumnPointStab.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointStab then
+  begin
+    S := Trim(Value.AsString);
     P.Pause := Round(NormalizeFloatInput(S))
+  end
 
-  else if ACol = StringColumnPointPres.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointPres then
+  begin
+    S := Trim(Value.AsString);
     P.Pressure := NormalizeFloatInput(S)
+  end
 
-  else if ACol = StringColumnPontTemp.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPontTemp then
+  begin
+    S := Trim(Value.AsString);
     P.Temp := NormalizeFloatInput(S)
+  end
 
-  else if ACol = StringColumnPointTempError.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointTempError then
+  begin
+    S := Trim(Value.AsString);
     P.TempAccuracy := NormalizeAccuracyInput(S)
+  end
 
-  else if ACol = StringColumnPointFlowError.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointFlowError then
+  begin
+    S := Trim(Value.AsString);
     P.FlowAccuracy := NormalizeAccuracyInput(S)
+  end
 
-  else if ACol = StringColumnPointError.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointError then
+  begin
+    S := Trim(Value.AsString);
     P.Error := NormalizeFloatInput(S)
+  end
 
   {=====================================================}
   { 2. Зависят от диаметра }
@@ -3200,14 +3379,18 @@ begin
     {---------------------------------}
     { Q / Qmax }
     {---------------------------------}
-    if ACol = StringColumnPointFlowRate.Index then
+    if GridPoints.Columns[ACol] = StringColumnPointFlowRate then
+    begin
+      S := Trim(Value.AsString);
       P.FlowRate := NormalizeFloatInput(S)
+    end
 
     {---------------------------------}
     { Q (абсолютный) }
     {---------------------------------}
-    else if ACol = StringColumnPointQ.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointQ then
     begin
+      S := Trim(Value.AsString);
       Q := FType.ToBaseUnits(NormalizeFloatInput(S));
       if Qmax > 0 then
         P.FlowRate := Q / Qmax;
@@ -3216,8 +3399,9 @@ begin
     {---------------------------------}
     { V → T и Imp }
     {---------------------------------}
-    else if ACol = StringColumnPointVolume.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointVolume then
     begin
+      S := Trim(Value.AsString);
       V := NormalizeFloatInput(S);
       P.LimitVolume := V;
 
@@ -3231,8 +3415,9 @@ begin
     {---------------------------------}
     { Imp → V и T }
     {---------------------------------}
-    else if ACol = StringColumnPointImp.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointImp then
     begin
+      S := Trim(Value.AsString);
       P.LimitImp := Round(NormalizeFloatInput(S));
 
       if (P.LimitImp > 0) and (Coef > 0) then
@@ -3248,8 +3433,9 @@ begin
     {---------------------------------}
     { T → V и Imp }
     {---------------------------------}
-    else if ACol = StringColumnPointTime.Index then
+    else if GridPoints.Columns[ACol] = StringColumnPointTime then
     begin
+      S := Trim(Value.AsString);
       Tm := NormalizeFloatInput(S);
       P.LimitTime := Tm;
 
@@ -3642,7 +3828,7 @@ begin
   else if ACol = StringColumnPointName.Index then
     Value := P.Name
 
-  else if ACol = StringColumnPointFlowRate.Index then
+  else if GridPoints.Columns[ACol] = StringColumnPointFlowRate then
     Value :=  FormatFloat('0.###', P.FlowRate)
 
   else if ACol = StringColumnPointFlowError.Index then
@@ -3956,6 +4142,8 @@ begin
   // ==================================================
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
+  StringColumnDNQnom.Header := '';
+  StringColumnDNQper.Header := '';
   StringColumnDNQF.Header   := '';
   StringColumnDNKp.Header   := '';
 
@@ -4066,6 +4254,8 @@ begin
   // ===== Диаметры =====
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQper.Header := 'Qper, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
@@ -4089,6 +4279,8 @@ begin
   // ===== Диаметры =====
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQper.Header := 'Qper, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 

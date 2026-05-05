@@ -38,6 +38,7 @@ uses
   FMXTee.Engine,
   FMXTee.Procs,
   frmCalibrCoefs,
+  frmChannelProperties,
   frmFlowMeterProperties,
   frmMeasurementRun,
   frmMRResults,
@@ -503,6 +504,7 @@ type
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
+  FFrameChannelProperties: TFrameChannelProperties;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -565,7 +567,6 @@ type
   private
     FInitialized: Boolean;
     FChange: string ;
-    FWorkTableManager: TWorkTableManager;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
@@ -603,8 +604,6 @@ type
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
-
-  //  property WorkTableManager: TWorkTableManager read FWorkTableManager write FWorkTableManager;
 
 
   private type
@@ -722,22 +721,15 @@ begin
 end;
 
 destructor TFrameMainTable.Destroy;
-var
-  WorkTable: TWorkTable;
 begin
-  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-    for WorkTable in FWorkTableManager.WorkTables do
-      if WorkTable <> nil then
-        WorkTable.Unsubscribe(Self);
-
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
   FreeAndNil(FFrameFlowMeterProperties);
+  FreeAndNil(FFrameChannelProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   FInstrumentalVisibleOrder.Free;
-  FWorkTableManager := nil;
   inherited;
 end;
 
@@ -745,14 +737,14 @@ function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
     begin
       result:= nil;
 
-      if FWorkTableManager=nil then
+      if WorkTableManager=nil then
       Exit;
-      if FWorkTableManager.ActiveWorkTable=nil then
+      if WorkTableManager.ActiveWorkTable=nil then
       Exit;
-      if FWorkTableManager.ActiveWorkTable.MeasurementRun=nil then
+      if WorkTableManager.ActiveWorkTable.MeasurementRun=nil then
       Exit;
 
-      result:= TMeasurementRun (FWorkTableManager.ActiveWorkTable.MeasurementRun);
+      result:= TMeasurementRun (WorkTableManager.ActiveWorkTable.MeasurementRun);
     end;
 
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
@@ -980,6 +972,18 @@ begin
 
     SetValues;
     UpdateForm;
+    Exit;
+  end;
+
+  if WorkTableEvent = ewtRefresh then
+  begin
+    if FActiveWorkTable = AWorkTable then
+    begin
+      UpdateForm;
+      if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
+         (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
+        FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[GridDevices.Row]);
+    end;
     Exit;
   end;
 
@@ -1329,14 +1333,13 @@ begin
   FInitialized := True;
   SwitchAuto.IsChecked := False;
 
-  FWorkTableManager:= WorkTableManager;
-
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
   FFrameMRResults := nil;
   FFrameProtocol := nil;
   FFrameFlowMeterProperties := nil;
+  FFrameChannelProperties := nil;
 
   GridDevices.RowCount := 2;
 
@@ -1391,6 +1394,13 @@ begin
     FFrameFlowMeterProperties.Align := TAlignLayout.Client;
   end;
   UpdateFlowMeterPropertiesFrame;
+
+  if FFrameChannelProperties = nil then
+  begin
+    FFrameChannelProperties := TFrameChannelProperties.Create(Self);
+    FFrameChannelProperties.Parent := TabItemChannelProperties;
+    FFrameChannelProperties.Align := TAlignLayout.Client;
+  end;
 
   RefreshPumpsCombo;
 
@@ -2386,13 +2396,13 @@ end;
 function TFrameMainTable.GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
 begin
   Result := nil;
-  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+  if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then
     Exit;
 
-  if (AIndex < 0) or (AIndex >= FWorkTableManager.WorkTables.Count) then
+  if (AIndex < 0) or (AIndex >= WorkTableManager.WorkTables.Count) then
     Exit;
 
-  Result := FWorkTableManager.WorkTables[AIndex];
+  Result := WorkTableManager.WorkTables[AIndex];
 end;
 
 procedure TFrameMainTable.InitTables;
@@ -2404,8 +2414,8 @@ var
   I, LimitCount, UnitIndex, WorkTableIndex: Integer;
 begin
   TableCount := 0;
-  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-    TableCount := FWorkTableManager.WorkTables.Count;
+  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
+    TableCount := WorkTableManager.WorkTables.Count;
 
   //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
   FActiveWorkTable := GetWorkTableByIndex(0);
@@ -2692,7 +2702,7 @@ begin
 
   ADevice := AChannel.FlowMeter.Device;
 
-   if (ADevice = nil) and
+  if (ADevice = nil) and
      ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
@@ -2777,6 +2787,9 @@ begin
   if AChannel = nil then
     Exit;
 
+  if DataManager <> nil then
+    DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
+
   Frm := TFormDeviceSelect.Create(Self);
   try
     if Frm.ShowModal <> mrOk then
@@ -2795,6 +2808,8 @@ begin
     MarkChannelDeviceModified(AChannel);
     UpdateGrids;
   finally
+    if DataManager <> nil then
+      DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
   end;
 end;
@@ -2846,11 +2861,11 @@ end;
 
 procedure TFrameMainTable.ActionSaveWorkTableExecute(Sender: TObject);
 begin
-  if FWorkTableManager = nil then
+  if WorkTableManager = nil then
     Exit;
 
   SaveLayoutSettingsToWorkTable;
-  FWorkTableManager.Save;
+  WorkTableManager.Save;
 end;
 
 procedure TFrameMainTable.ActionSessionCreatePointsExecute(Sender: TObject);
@@ -4101,6 +4116,9 @@ begin
   end;
 
   UpdateFlowMeterPropertiesFrame(Row);
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (Row >= 0) and (Row < WorkTable.DeviceChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
 procedure TFrameMainTable.GridDevicesHeaderClick(Column: TColumn);
@@ -4201,6 +4219,9 @@ begin
   end;
 
   UpdateFlowMeterPropertiesFrame(Row);
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (Row >= 0) and (Row < WorkTable.DeviceChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -4313,6 +4334,10 @@ procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
   UpdateFlowMeterPropertiesFrame(ARow);
+
+  if (FFrameChannelProperties <> nil) and (FActiveWorkTable <> nil) and
+     (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[ARow]);
 
     if not IsUpdating then
 
@@ -4479,6 +4504,10 @@ begin
   finally
     GridEtalons.EndUpdate;
   end;
+
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[Row]);
 end;
 
 procedure TFrameMainTable.GridEtalonsCellDblClick(const Column: TColumn;
