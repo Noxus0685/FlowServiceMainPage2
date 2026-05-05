@@ -2915,12 +2915,7 @@ begin
   // =====================================================
   if (ACol = CheckColumnDNEnable.Index) or
      (GridDiameters.Columns[ACol] = CheckColumnDNEnable) then
-  begin
-    if D.Enable then
-      Value := 'True'
-    else
-      Value := 'False';
-  end
+    Value := D.Enable
 
   else if GridDiameters.Columns[ACol] = StringColumnDNName then
     Value := D.Name
@@ -3091,7 +3086,7 @@ begin
   {=====================================================}
   if (ACol = CheckColumnDNEnable.Index) or
      (GridDiameters.Columns[ACol] = CheckColumnDNEnable) then
-    D.Enable := SameText(Trim(Value.ToString), 'True') or (Trim(Value.ToString) = '1')
+    D.Enable := Value.AsBoolean
 
   else if GridDiameters.Columns[ACol] = StringColumnDNName then
   begin
@@ -3271,7 +3266,7 @@ begin
 
   if (ACol = CheckColumnPointEnable.Index) or
      (GridPoints.Columns[ACol] = CheckColumnPointEnable) then
-    P.Enable := SameText(Trim(Value.ToString), 'True') or (Trim(Value.ToString) = '1')
+    P.Enable := Value.AsBoolean
 
   else if GridPoints.Columns[ACol] = StringColumnPointName then
   begin
@@ -3796,12 +3791,7 @@ begin
 
   if (ACol = CheckColumnPointEnable.Index) or
      (GridPoints.Columns[ACol] = CheckColumnPointEnable) then
-  begin
-    if P.Enable then
-      Value := 'True'
-    else
-      Value := 'False';
-  end
+    Value := P.Enable
 
   else if GridPoints.Columns[ACol] = StringColumnPointName then
     Value := P.Name
