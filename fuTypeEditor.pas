@@ -253,6 +253,10 @@ type
     LayoutUnits: TLayout;
     LabelUnits: TLabel;
     ComboBoxUnits: TComboBox;
+    StyleBook1: TStyleBook;
+    Layout12: TLayout;
+    Label4: TLabel;
+    EditFlowVelocity: TEdit;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
