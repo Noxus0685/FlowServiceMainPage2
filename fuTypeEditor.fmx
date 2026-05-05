@@ -1988,6 +1988,7 @@ object FormTypeEditor: TFormTypeEditor
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 267.000000000000000000
           object CheckColumnDNEnable: TCheckColumn
+            HorzAlign = Center
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
@@ -2279,6 +2280,7 @@ object FormTypeEditor: TFormTypeEditor
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 233.000000000000000000
           object CheckColumnPointEnable: TCheckColumn
+            HorzAlign = Center
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
