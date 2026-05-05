@@ -174,6 +174,7 @@ type
     grpPrivate: TGroupBox;
     Layout16: TLayout;
     GridDiameters: TGrid;
+    CheckColumnDNSelect: TCheckColumn;
     StringColumnDNName: TStringColumn;
     IntegerColumnDNSize: TIntegerColumn;
     FloatColumnVmax: TFloatColumn;
@@ -194,6 +195,7 @@ type
     grpWorkShedule: TGroupBox;
     Layout15: TLayout;
     GridPoints: TGrid;
+    CheckColumnPointSelect: TCheckColumn;
     StringColumnPointName: TStringColumn;
     IntegerColumnPointRepeatsForm: TIntegerColumn;
     IntegerColumnPointRepeats: TIntegerColumn;
@@ -321,6 +323,8 @@ type
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
+    procedure GridDiametersKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char; Shift: TShiftState);
+    procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char; Shift: TShiftState);
 
 
 
@@ -356,11 +360,14 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
-
-
+  FCheckedDiameters: TDictionary<NativeInt, Boolean>;
+  FCheckedPoints: TDictionary<NativeInt, Boolean>;
 
 
   procedure SetModified;
+  function IsEditingGridCell(AGrid: TGrid): Boolean;
+  function DeleteSelectedDiameterRows: Boolean;
+  function DeleteSelectedTypePointRows: Boolean;
   procedure UpdateUIFromType;
   procedure UpdateTypeFromUI;
 
@@ -1041,6 +1048,14 @@ begin
     end;
 
     InitLocalData;
+    GridDiameters.OnKeyDown := GridDiametersKeyDown;
+    GridPoints.OnKeyDown := GridPointsKeyDown;
+    if FCheckedDiameters = nil then
+      FCheckedDiameters := TDictionary<NativeInt, Boolean>.Create;
+    if FCheckedPoints = nil then
+      FCheckedPoints := TDictionary<NativeInt, Boolean>.Create;
+    FCheckedDiameters.Clear;
+    FCheckedPoints.Clear;
     UpdateUIFromType;
 
   finally
@@ -1212,11 +1227,106 @@ begin
 
   SetModified;
 end;
+
+function TFormTypeEditor.IsEditingGridCell(AGrid: TGrid): Boolean;
+begin
+  Result := (AGrid <> nil) and (AGrid.EditorMode);
+end;
+
+function TFormTypeEditor.DeleteSelectedDiameterRows: Boolean;
+var
+  I: Integer;
+  D: TDiameter;
+  ToDelete: TObjectList<TDiameter>;
+  AnyChecked: Boolean;
+begin
+  Result := False;
+  if (FType = nil) or (FDiametersLocal = nil) then Exit;
+
+  ToDelete := TObjectList<TDiameter>.Create(False);
+  try
+    for I := 0 to FDiametersLocal.Count - 1 do
+    begin
+      D := FDiametersLocal[I];
+      if (D <> nil) and (D.State <> osDeleted) and FCheckedDiameters.ContainsKey(NativeInt(D)) then
+        ToDelete.Add(D);
+    end;
+    AnyChecked := ToDelete.Count > 0;
+
+    if not AnyChecked then
+    begin
+      ButtonDiameterDeleteClick(nil);
+      Exit(True);
+    end;
+
+    if MessageDlg(''Удалить выбранные диаметры?'', TMsgDlgType.mtWarning, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit(False);
+
+    if AppServices.DataManager.DeleteDiameters(FDiametersLocal, ToDelete) = 0 then
+      Exit(False);
+
+    FCheckedDiameters.Clear;
+    GridDiameters.Row := -1;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+    SetModified;
+    Result := True;
+  finally
+    ToDelete.Free;
+  end;
+end;
+
+function TFormTypeEditor.DeleteSelectedTypePointRows: Boolean;
+var
+  I: Integer;
+  P: TTypePoint;
+  ToDelete: TObjectList<TTypePoint>;
+  AnyChecked: Boolean;
+begin
+  Result := False;
+  if (FType = nil) or (FPointsLocal = nil) then Exit;
+
+  ToDelete := TObjectList<TTypePoint>.Create(False);
+  try
+    for I := 0 to FPointsLocal.Count - 1 do
+    begin
+      P := FPointsLocal[I];
+      if (P <> nil) and (P.State <> osDeleted) and FCheckedPoints.ContainsKey(NativeInt(P)) then
+        ToDelete.Add(P);
+    end;
+    AnyChecked := ToDelete.Count > 0;
+
+    if not AnyChecked then
+    begin
+      ButtonPointDeleteClick(nil);
+      Exit(True);
+    end;
+
+    if MessageDlg(''Удалить выбранные точки?'', TMsgDlgType.mtWarning, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit(False);
+
+    if AppServices.DataManager.DeleteTypePoints(FPointsLocal, ToDelete) = 0 then
+      Exit(False);
+
+    FCheckedPoints.Clear;
+    GridPoints.Row := -1;
+    UpdatePointsGrid;
+    SetModified;
+    Result := True;
+  finally
+    ToDelete.Free;
+  end;
+end;
+
 procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
   D: TDiameter;
   SelRow: Integer;
+  ToDelete: TList<TDiameter>;
 begin
+  if DeleteSelectedDiameterRows then
+    Exit;
+
   if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
 
@@ -1245,11 +1355,16 @@ begin
     FSkipDiameterDeleteConfirm := True;
   end;
 
-  if D.State = osNew then
-    FDiametersLocal.Remove(D)
-  else
-    D.State := osDeleted;
+  ToDelete := TList<TDiameter>.Create;
+  try
+    ToDelete.Add(D);
+    if AppServices.DataManager.DeleteDiameters(FDiametersLocal, ToDelete) = 0 then
+      Exit;
+  finally
+    ToDelete.Free;
+  end;
 
+  FCheckedDiameters.Clear;
   GridDiameters.Row := -1;
   UpdateDiametersGrid;
   UpdatePointsGrid;
@@ -1340,9 +1455,12 @@ end;
 procedure TFormTypeEditor.ButtonPointDeleteClick(Sender: TObject);
 var
   Point: TTypePoint;
-  PointIdx: Integer;
   SelRow: Integer;
+  ToDelete: TList<TTypePoint>;
 begin
+  if DeleteSelectedTypePointRows then
+    Exit;
+
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
 
@@ -1371,15 +1489,16 @@ begin
     FSkipPointDeleteConfirm := True;
   end;
 
-  if Point.State = osNew then
-  begin
-    PointIdx := FPointsLocal.IndexOf(Point);
-    if PointIdx >= 0 then
-      FPointsLocal.Delete(PointIdx);
-  end
-  else
-    Point.State := osDeleted;
+  ToDelete := TList<TTypePoint>.Create;
+  try
+    ToDelete.Add(Point);
+    if AppServices.DataManager.DeleteTypePoints(FPointsLocal, ToDelete) = 0 then
+      Exit;
+  finally
+    ToDelete.Free;
+  end;
 
+  FCheckedPoints.Clear;
   GridPoints.Row := -1;
   UpdatePointsGrid;
 
@@ -2818,7 +2937,9 @@ begin
   // =====================================================
   // == Наименование
   // =====================================================
-  if ACol = StringColumnDNName.Index then
+  if GridDiameters.Columns[ACol] = CheckColumnDNSelect then
+    Value := FCheckedDiameters.ContainsKey(NativeInt(D))
+  else if ACol = StringColumnDNName.Index then
     Value := D.Name
 
   // =====================================================
@@ -2964,7 +3085,15 @@ begin
   {=====================================================}
   { ИМЯ }
   {=====================================================}
-  if ACol = StringColumnDNName.Index then
+  if GridDiameters.Columns[ACol] = CheckColumnDNSelect then
+  begin
+    if Value.AsBoolean then
+      FCheckedDiameters.AddOrSetValue(NativeInt(D), True)
+    else
+      FCheckedDiameters.Remove(NativeInt(D));
+    Exit;
+  end
+  else if ACol = StringColumnDNName.Index then
     D.Name := S
 
   {=====================================================}
@@ -3100,7 +3229,15 @@ begin
   { 1. НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = StringColumnPointName.Index then
+  if GridPoints.Columns[ACol] = CheckColumnPointSelect then
+  begin
+    if Value.AsBoolean then
+      FCheckedPoints.AddOrSetValue(NativeInt(P), True)
+    else
+      FCheckedPoints.Remove(NativeInt(P));
+    Exit;
+  end
+  else if ACol = StringColumnPointName.Index then
     P.Name := S
 
   else if ACol = StringColumnPointStab.Index then
@@ -3559,7 +3696,9 @@ begin
   { НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = StringColumnPointName.Index then
+  if GridPoints.Columns[ACol] = CheckColumnPointSelect then
+    Value := FCheckedPoints.ContainsKey(NativeInt(P))
+  else if ACol = StringColumnPointName.Index then
     Value := P.Name
 
   else if ACol = StringColumnPointFlowRate.Index then
@@ -4287,5 +4426,24 @@ begin
     EditFreqFlowRate.TextPrompt := '-';
 end;
 
+
+
+procedure TFormTypeEditor.GridDiametersKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char; Shift: TShiftState);
+begin
+  if (Key = vkDelete) and not IsEditingGridCell(GridDiameters) then
+  begin
+    DeleteSelectedDiameterRows;
+    Key := 0;
+  end;
+end;
+
+procedure TFormTypeEditor.GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char; Shift: TShiftState);
+begin
+  if (Key = vkDelete) and not IsEditingGridCell(GridPoints) then
+  begin
+    DeleteSelectedTypePointRows;
+    Key := 0;
+  end;
+end;
 
 end.
