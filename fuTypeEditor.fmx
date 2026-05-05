@@ -1980,7 +1980,7 @@ object FormTypeEditor: TFormTypeEditor
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
-          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
+          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridDiametersSelChanged
           OnGetValue = GridDiametersGetValue
           OnSetValue = GridDiametersSetValue
@@ -1991,7 +1991,6 @@ object FormTypeEditor: TFormTypeEditor
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
-            ReadOnly = True
             Size.Width = 30.000000000000000000
           end
           object StringColumnDNName: TStringColumn
@@ -2272,6 +2271,7 @@ object FormTypeEditor: TFormTypeEditor
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
+          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
           OnCellClick = GridPointsCellClick
@@ -2281,7 +2281,6 @@ object FormTypeEditor: TFormTypeEditor
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
-            ReadOnly = True
             Size.Width = 30.000000000000000000
           end
           object StringColumnPointName: TStringColumn
