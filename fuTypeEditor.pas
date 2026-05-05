@@ -3078,8 +3078,6 @@ begin
 
     D.State:=osModified;
 
-  S := Trim(Value.AsString);
-
   {=====================================================}
   { ИМЯ }
   {=====================================================}
@@ -3087,19 +3085,26 @@ begin
     D.Enable := Value.AsBoolean
 
   else if ACol = StringColumnDNName.Index then
+  begin
+    S := Trim(Value.AsString);
     D.Name := S
+  end
 
   {=====================================================}
   { DN (мм) }
   {=====================================================}
   else if ACol = IntegerColumnDNSize.Index then
+  begin
+    S := Trim(Value.AsString);
     D.DN := IntToStr(Round(NormalizeFloatInput(S)))
+  end
 
   {=====================================================}
   { Qmax }
   {=====================================================}
   else if ACol = StringColumnDNQmax.Index then
   begin
+    S := Trim(Value.AsString);
     Qmax := FType.ToBaseUnits(NormalizeFloatInput(S));
     D.Qmax := Qmax;
 
@@ -3126,6 +3131,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNQmin.Index then
   begin
+    S := Trim(Value.AsString);
     D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     { ручной ввод => диапазон не актуален }
@@ -3140,6 +3146,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNQnom.Index then
   begin
+    S := Trim(Value.AsString);
     D.Qnom := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     { ручной ввод => диапазон не актуален }
@@ -3155,6 +3162,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNQper.Index then
   begin
+    S := Trim(Value.AsString);
     D.Qper := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     { ручной ввод => диапазон не актуален }
@@ -3170,6 +3178,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNQF.Index then
   begin
+    S := Trim(Value.AsString);
     D.QFmax := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     if D.Qmax > 0 then
@@ -3198,6 +3207,7 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNKp.Index then
   begin
+    S := Trim(Value.AsString);
     D.Kp := NormalizeFloatInput(S);
 
     if D.Qmax > 0 then
@@ -3246,8 +3256,6 @@ begin
   if P = nil then
     Exit;
 
-  S := Trim(Value.AsString);
-
   {=====================================================}
   { 1. НЕ зависят от диаметра }
   {=====================================================}
@@ -3256,25 +3264,46 @@ begin
     P.Enable := Value.AsBoolean
 
   else if ACol = StringColumnPointName.Index then
+  begin
+    S := Trim(Value.AsString);
     P.Name := S
+  end
 
   else if ACol = StringColumnPointStab.Index then
+  begin
+    S := Trim(Value.AsString);
     P.Pause := Round(NormalizeFloatInput(S))
+  end
 
   else if ACol = StringColumnPointPres.Index then
+  begin
+    S := Trim(Value.AsString);
     P.Pressure := NormalizeFloatInput(S)
+  end
 
   else if ACol = StringColumnPontTemp.Index then
+  begin
+    S := Trim(Value.AsString);
     P.Temp := NormalizeFloatInput(S)
+  end
 
   else if ACol = StringColumnPointTempError.Index then
+  begin
+    S := Trim(Value.AsString);
     P.TempAccuracy := NormalizeAccuracyInput(S)
+  end
 
   else if ACol = StringColumnPointFlowError.Index then
+  begin
+    S := Trim(Value.AsString);
     P.FlowAccuracy := NormalizeAccuracyInput(S)
+  end
 
   else if ACol = StringColumnPointError.Index then
+  begin
+    S := Trim(Value.AsString);
     P.Error := NormalizeFloatInput(S)
+  end
 
   {=====================================================}
   { 2. Зависят от диаметра }
@@ -3296,13 +3325,17 @@ begin
     { Q / Qmax }
     {---------------------------------}
     if ACol = StringColumnPointFlowRate.Index then
+    begin
+      S := Trim(Value.AsString);
       P.FlowRate := NormalizeFloatInput(S)
+    end
 
     {---------------------------------}
     { Q (абсолютный) }
     {---------------------------------}
     else if ACol = StringColumnPointQ.Index then
     begin
+      S := Trim(Value.AsString);
       Q := FType.ToBaseUnits(NormalizeFloatInput(S));
       if Qmax > 0 then
         P.FlowRate := Q / Qmax;
@@ -3313,6 +3346,7 @@ begin
     {---------------------------------}
     else if ACol = StringColumnPointVolume.Index then
     begin
+      S := Trim(Value.AsString);
       V := NormalizeFloatInput(S);
       P.LimitVolume := V;
 
@@ -3328,6 +3362,7 @@ begin
     {---------------------------------}
     else if ACol = StringColumnPointImp.Index then
     begin
+      S := Trim(Value.AsString);
       P.LimitImp := Round(NormalizeFloatInput(S));
 
       if (P.LimitImp > 0) and (Coef > 0) then
@@ -3345,6 +3380,7 @@ begin
     {---------------------------------}
     else if ACol = StringColumnPointTime.Index then
     begin
+      S := Trim(Value.AsString);
       Tm := NormalizeFloatInput(S);
       P.LimitTime := Tm;
 
