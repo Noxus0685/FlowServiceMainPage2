@@ -273,6 +273,10 @@ type
     procedure ButtonDiameterClearClick(Sender: TObject);
     procedure ButtonPointAddClick(Sender: TObject);
     procedure ButtonPointDeleteClick(Sender: TObject);
+    procedure GridDiametersKeyDown(Sender: TObject; var Key: Word;
+      var KeyChar: Char; Shift: TShiftState);
+    procedure GridPointsKeyDown(Sender: TObject; var Key: Word;
+      var KeyChar: Char; Shift: TShiftState);
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
@@ -492,6 +496,8 @@ end;
  begin
    inherited Create(AOwner);
    TabItemCoefs.Visible := False;
+   GridDiameters.OnKeyDown := GridDiametersKeyDown;
+   GridPoints.OnKeyDown := GridPointsKeyDown;
    LoadType(AType);
  end;
 
@@ -1226,9 +1232,53 @@ procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
   D: TDiameter;
   SelRow: Integer;
+  I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if (FDiametersLocal[I].State <> osDeleted) and FDiametersLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipDiameterDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранный диаметр?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipDiameterDeleteConfirm := True;
+    end;
+
+    for I := FDiametersLocal.Count - 1 downto 0 do
+    begin
+      D := FDiametersLocal[I];
+      if (D.State = osDeleted) or not D.Enable then
+        Continue;
+
+      if D.State = osNew then
+        FDiametersLocal.Remove(D)
+      else
+        D.State := osDeleted;
+    end;
+
+    GridDiameters.Row := -1;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridDiameters.Row;
   if SelRow < 0 then
@@ -1352,9 +1402,52 @@ var
   Point: TTypePoint;
   PointIdx: Integer;
   SelRow: Integer;
+  I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FPointsLocal.Count - 1 do
+    if (FPointsLocal[I].State <> osDeleted) and FPointsLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipPointDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранную точку?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipPointDeleteConfirm := True;
+    end;
+
+    for I := FPointsLocal.Count - 1 downto 0 do
+    begin
+      Point := FPointsLocal[I];
+      if (Point.State = osDeleted) or not Point.Enable then
+        Continue;
+
+      if Point.State = osNew then
+        FPointsLocal.Delete(I)
+      else
+        Point.State := osDeleted;
+    end;
+
+    GridPoints.Row := -1;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridPoints.Row;
   if SelRow < 0 then
@@ -1394,6 +1487,26 @@ begin
   UpdatePointsGrid;
 
   SetModified;
+end;
+
+procedure TFormTypeEditor.GridDiametersKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if (Key = vkDelete) and not GridDiameters.EditorMode then
+  begin
+    ButtonDiameterDeleteClick(ButtonDiameterDelete);
+    Key := 0;
+  end;
+end;
+
+procedure TFormTypeEditor.GridPointsKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if (Key = vkDelete) and not GridPoints.EditorMode then
+  begin
+    ButtonPointDeleteClick(ButtonPointDelete);
+    Key := 0;
+  end;
 end;
 
 procedure TFormTypeEditor.ButtonPointsClearClick(Sender: TObject);
