@@ -1498,12 +1498,16 @@ end;
 
 procedure TFormTypeEditor.GridDiametersKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
-begin
+  var
+  i:integer;
+  begin
   if (Key = vkDelete) and not GridDiameters.EditorMode then
   begin
+    i:=GridDiameters.Row;
     ButtonDiameterDeleteClick(ButtonDiameterDelete);
     Key := 0;
-
+    if GridDiameters.RowCount>0 then
+      GridDiameters.Row:=(i-1);
   end;
 end;
 
