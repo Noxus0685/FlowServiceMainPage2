@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 21
+    TabOrder = 22
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -2152,6 +2152,7 @@ object FormTypeEditor: TFormTypeEditor
         OnSelChanged = GridDiametersSelChanged
         OnGetValue = GridDiametersGetValue
         OnSetValue = GridDiametersSetValue
+        OnCellClick = GridDiametersCellClick
         Viewport.Width = 1062.000000000000000000
         Viewport.Height = 267.000000000000000000
         object CheckColumnDNEnable: TCheckColumn
@@ -2233,6 +2234,7 @@ object FormTypeEditor: TFormTypeEditor
           RowCount = 3
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
+          OnCellClick = GridPointsCellClick
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 243.000000000000000000
           object CheckColumnPointEnable: TCheckColumn

@@ -328,6 +328,8 @@ type
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
+    procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
 
 
 
@@ -2941,6 +2943,22 @@ begin
       '1:' + IntToStr(Round(Qmax / Qmin));
 end;
 
+procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
+  const Row: Integer);
+  var
+    D: TDiameter;
+  begin
+
+  if Column<>CheckColumnDNEnable then
+    Exit;
+
+
+  D := GetDiameterByVisibleRow(Row);
+  d.Enable:=not  d.Enable;
+  UpdateDiametersGrid;
+
+end;
+
 procedure TFormTypeEditor.GridDiametersGetValue(
   Sender: TObject;
   const ACol, ARow: Integer;
@@ -3683,6 +3701,22 @@ begin
   UpdatePointsGrid;
 
   SetModified;
+end;
+
+procedure TFormTypeEditor.GridPointsCellClick(const Column: TColumn;
+  const Row: Integer);
+var
+    D: TDiameter;
+  begin
+
+  if Column<>CheckColumnDNEnable then
+    Exit;
+
+
+  D := GetDiameterByVisibleRow(Row);
+  d.Enable:=not  d.Enable;
+  UpdateDiametersGrid;
+
 end;
 
 procedure TFormTypeEditor.GridPointsGetValue(
