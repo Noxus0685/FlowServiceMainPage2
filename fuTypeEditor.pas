@@ -3568,7 +3568,7 @@ begin
 
 
   if ACol = CheckColumnPointEnable.Index then
-    Value :=  D.Enable
+    Value :=  P.Enable
 
   {=====================================================}
   { НЕ зависят от диаметра }
