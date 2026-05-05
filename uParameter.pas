@@ -157,6 +157,8 @@ end;
     procedure DoPumpStop;
     procedure DoFreqSet( ANewFreq: Double);
     procedure PumpSetState( AStatus: EStateParameter);
+    procedure FireEvent(AEvent: EEventPump; const AError: TErrorInfo); overload;
+    procedure FireEvent(AEvent: EEventPump); overload;
 
   end;
 //---------------------------------
@@ -176,6 +178,8 @@ end;
     procedure DoFlowRateStop;
     procedure DoFlowRateSet(ANewFlowRate: Double); overload;
     procedure DoFlowRateSet(ANewFlowRate: Double; ACurrentPoint: TDevicePoint);  overload;
+    procedure FireEvent(AEvent: EEventFlowRate; const AError: TErrorInfo); overload;
+    procedure FireEvent(AEvent: EEventFlowRate); overload;
 
     property  CurrentPoint: TDevicePoint  read  GetPoint write SetPoint;
   end;
@@ -435,6 +439,17 @@ end;
    end;
 
 
+
+procedure TFlowRate.FireEvent(AEvent: EEventFlowRate; const AError: TErrorInfo);
+begin
+  inherited FireEvent(Ord(AEvent), AError);
+end;
+
+procedure TFlowRate.FireEvent(AEvent: EEventFlowRate);
+begin
+  FireEvent(AEvent, TErrorInfo.Empty(Integer(State)));
+end;
+
   {$ENDREGION 'TFlowRate'}
 
    {$REGION 'TPump'}
@@ -517,6 +532,17 @@ begin
   //  Exit;
 
   SetState(AStatus);
+end;
+
+
+procedure TPump.FireEvent(AEvent: EEventPump; const AError: TErrorInfo);
+begin
+  inherited FireEvent(Ord(AEvent), AError);
+end;
+
+procedure TPump.FireEvent(AEvent: EEventPump);
+begin
+  FireEvent(AEvent, TErrorInfo.Empty(Integer(State)));
 end;
 
   {$ENDREGION 'TPump'}
@@ -647,7 +673,7 @@ begin
     Exit;
 
   FState := AStatus;
-  Event := Ord(eparStateChanged);
+  FireEvent(Ord(eparStateChanged));
   Notify(notifyStateChanged, Self);
 end;
 
@@ -657,45 +683,45 @@ begin
   //  Exit;
 
   FAction := AAction;
-  Event := Ord(eparActionChanged);
+  FireEvent(Ord(eparActionChanged));
   if Self is TPump then
   begin
     case AAction of
-      apStart: Event := Ord(epStart);
-      apStop: Event := Ord(epStop);
-      apSet: Event := Ord(epFreqChanged);
+      apStart: TPump(Self).FireEvent(epStart);
+      apStop: TPump(Self).FireEvent(epStop);
+      apSet: TPump(Self).FireEvent(epFreqChanged);
     else
-      Event := Ord(epError);
+      TPump(Self).FireEvent(epError);
     end;
   end
   else if Self is TFlowRate then
   begin
     case AAction of
-      apStart: Event := Ord(efrStart);
-      apStop: Event := Ord(efrStop);
-      apSet: Event := Ord(efrSetValue);
+      apStart: TFlowRate(Self).FireEvent(efrStart);
+      apStop: TFlowRate(Self).FireEvent(efrStop);
+      apSet: TFlowRate(Self).FireEvent(efrSetValue);
     else
-      Event := Ord(efrError);
+      TFlowRate(Self).FireEvent(efrError);
     end;
   end
   else if Self is TFluidTemp then
   begin
     case AAction of
-      apStart: Event := Ord(eftStart);
-      apStop: Event := Ord(eftStop);
-      apSet: Event := Ord(eftSetValue);
+      apStart: FireEvent(Ord(eftStart));
+      apStop: FireEvent(Ord(eftStop));
+      apSet: FireEvent(Ord(eftSetValue));
     else
-      Event := Ord(eftError);
+      FireEvent(Ord(eftError));
     end;
   end
   else if Self is TFluidPress then
   begin
     case AAction of
-      apStart: Event := Ord(efpStart);
-      apStop: Event := Ord(efpStop);
-      apSet: Event := Ord(efpSetValue);
+      apStart: FireEvent(Ord(efpStart));
+      apStop: FireEvent(Ord(efpStop));
+      apSet: FireEvent(Ord(efpSetValue));
     else
-      Event := Ord(efpError);
+      FireEvent(Ord(efpError));
     end;
   end;
 
