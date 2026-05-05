@@ -253,6 +253,8 @@ type
     LayoutUnits: TLayout;
     LabelUnits: TLabel;
     ComboBoxUnits: TComboBox;
+    CheckColumnDNEnable: TCheckColumn;
+    CheckColumnPointEnable: TCheckColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -2815,10 +2817,13 @@ begin
   if D = nil then
     Exit;
 
+  if ACol = CheckColumnDNEnable.Index then
+    Value :=  D.Enable
+
   // =====================================================
   // == Наименование
   // =====================================================
-  if ACol = StringColumnDNName.Index then
+  else if ACol = StringColumnDNName.Index then
     Value := D.Name
 
   // =====================================================
@@ -2961,10 +2966,13 @@ begin
 
   S := Trim(Value.AsString);
 
+  if ACol = StringColumnPointName.Index then
+    D.Enable := not D.Enable
+
   {=====================================================}
   { ИМЯ }
   {=====================================================}
-  if ACol = StringColumnDNName.Index then
+  else if ACol = StringColumnDNName.Index then
     D.Name := S
 
   {=====================================================}
@@ -3101,6 +3109,9 @@ begin
   {=====================================================}
 
   if ACol = StringColumnPointName.Index then
+    P.Enable := not P.Enable
+
+  else if ACol = StringColumnPointName.Index then
     P.Name := S
 
   else if ACol = StringColumnPointStab.Index then
@@ -3555,11 +3566,15 @@ begin
   if P = nil then
     Exit;
 
+
+  if ACol = CheckColumnPointEnable.Index then
+    Value :=  D.Enable
+
   {=====================================================}
   { НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = StringColumnPointName.Index then
+  else if ACol = StringColumnPointName.Index then
     Value := P.Name
 
   else if ACol = StringColumnPointFlowRate.Index then
