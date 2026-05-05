@@ -1980,12 +1980,20 @@ object FormTypeEditor: TFormTypeEditor
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
-          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
+          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridDiametersSelChanged
           OnGetValue = GridDiametersGetValue
           OnSetValue = GridDiametersSetValue
+          OnCellClick = GridDiametersCellClick
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 267.000000000000000000
+          object CheckColumnDNEnable: TCheckColumn
+            Header = #1042#1082#1083
+            HeaderSettings.TextSettings.WordWrap = False
+            HeaderSettings.TextSettings.HorzAlign = Center
+            ReadOnly = True
+            Size.Width = 30.000000000000000000
+          end
           object StringColumnDNName: TStringColumn
             Header = #1053#1072#1080#1084#1077#1085#1086#1074#1072#1085#1080#1077
             HeaderSettings.TextSettings.WordWrap = False
@@ -2264,10 +2272,19 @@ object FormTypeEditor: TFormTypeEditor
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
+          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
+          OnCellClick = GridPointsCellClick
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 233.000000000000000000
+          object CheckColumnPointEnable: TCheckColumn
+            Header = #1042#1082#1083
+            HeaderSettings.TextSettings.WordWrap = False
+            HeaderSettings.TextSettings.HorzAlign = Center
+            ReadOnly = True
+            Size.Width = 30.000000000000000000
+          end
           object StringColumnPointName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.WordWrap = False
