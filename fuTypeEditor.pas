@@ -2856,7 +2856,7 @@ begin
   end
 
   // =====================================================
-  // == Qmin
+  // == Qnom
   // =====================================================
   else if ACol = StringColumnDNQnom.Index then
   begin
@@ -2867,7 +2867,7 @@ begin
   end
 
   // =====================================================
-  // == Qmin
+  // == Qper
   // =====================================================
   else if ACol = StringColumnDNQper.Index then
   begin
@@ -3034,6 +3034,34 @@ begin
   else if ACol = StringColumnDNQmin.Index then
   begin
     D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
+
+    { ручной ввод => диапазон не актуален }
+    FType.RangeDynamic := 0;
+    EditRangeDynamic.Text := '';
+
+    UpdateRangeDynamicPromptBySelectedDiameter;
+  end
+
+    {=====================================================}
+  { Qnom (ручной ввод) }
+  {=====================================================}
+  else if ACol = StringColumnDNQnom.Index then
+  begin
+    D.Qnom := FType.ToBaseUnits(NormalizeFloatInput(S));
+
+    { ручной ввод => диапазон не актуален }
+    FType.RangeDynamic := 0;
+    EditRangeDynamic.Text := '';
+
+    UpdateRangeDynamicPromptBySelectedDiameter;
+  end
+
+    {=====================================================}
+  { Qper (ручной ввод) }
+  {=====================================================}
+  else if ACol = StringColumnDNQper.Index then
+  begin
+    D.Qper := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     { ручной ввод => диапазон не актуален }
     FType.RangeDynamic := 0;
