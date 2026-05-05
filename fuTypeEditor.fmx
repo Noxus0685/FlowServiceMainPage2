@@ -1984,6 +1984,7 @@ object FormTypeEditor: TFormTypeEditor
           OnSelChanged = GridDiametersSelChanged
           OnGetValue = GridDiametersGetValue
           OnSetValue = GridDiametersSetValue
+          OnCellClick = GridDiametersCellClick
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 267.000000000000000000
           object CheckColumnDNEnable: TCheckColumn
@@ -2273,6 +2274,7 @@ object FormTypeEditor: TFormTypeEditor
           Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
+          OnCellClick = GridPointsCellClick
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 233.000000000000000000
           object CheckColumnPointEnable: TCheckColumn
