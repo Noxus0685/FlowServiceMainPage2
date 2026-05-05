@@ -3006,8 +3006,9 @@ begin
       'Ошибка события рабочего стола', ErrorDetails);
   end;
 
-  Event := Integer(AEvent);
-  Notify(notifyEvent, Self);
+  //Event := Integer(AEvent);
+  //Notify(notifyEvent, Self);
+  Notify(Ord(AEvent), Self);
 end;
 
 procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent);

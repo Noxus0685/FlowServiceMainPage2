@@ -257,6 +257,8 @@ type
     Layout12: TLayout;
     Label4: TLabel;
     EditFlowVelocity: TEdit;
+    StringColumnDNQnom: TStringColumn;
+    StringColumnDNQper: TStringColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -2854,6 +2856,29 @@ begin
   end
 
   // =====================================================
+  // == Qmin
+  // =====================================================
+  else if ACol = StringColumnDNQnom.Index then
+  begin
+    if D.Qnom = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qnom), FType.Error);
+  end
+
+  // =====================================================
+  // == Qmin
+  // =====================================================
+  else if ACol = StringColumnDNQper.Index then
+  begin
+    if D.Qper = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qper), FType.Error);
+  end
+
+
+  // =====================================================
   // == QF
   // =====================================================
   else if ACol = StringColumnDNQF.Index then
@@ -3880,6 +3905,8 @@ begin
   // ==================================================
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
+  StringColumnDNQnom.Header := '';
+  StringColumnDNQper.Header := '';
   StringColumnDNQF.Header   := '';
   StringColumnDNKp.Header   := '';
 
@@ -3990,6 +4017,8 @@ begin
   // ===== Диаметры =====
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQper.Header := 'Qper, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
@@ -4013,6 +4042,8 @@ begin
   // ===== Диаметры =====
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQper.Header := 'Qper, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
