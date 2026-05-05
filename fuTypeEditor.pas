@@ -3409,34 +3409,30 @@ procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn; const Ro
 var
   D: TDiameter;
 begin
-  if (Column <> CheckColumnDNEnable) or (Row < 0) then
+  if Column <> CheckColumnDNEnable then
     Exit;
-
   D := GetDiameterByVisibleRow(Row);
   if D = nil then
     Exit;
-
   D.Enable := not D.Enable;
   D.State := osModified;
   SetModified;
-  UpdateDiametersGrid;
+  GridDiameters.Repaint;
 end;
 
 procedure TFormTypeEditor.GridPointsCellClick(const Column: TColumn; const Row: Integer);
 var
   P: TTypePoint;
 begin
-  if (Column <> CheckColumnPointEnable) or (Row < 0) then
+  if Column <> CheckColumnPointEnable then
     Exit;
-
   P := GetPointByVisibleRow(Row);
   if P = nil then
     Exit;
-
   P.Enable := not P.Enable;
   P.State := osModified;
   SetModified;
-  UpdatePointsGrid;
+  GridPoints.Repaint;
 end;
 
 procedure TFormTypeEditor.RecalcPointsBySelectedDiameter;
