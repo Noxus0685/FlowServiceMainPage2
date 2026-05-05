@@ -1991,6 +1991,7 @@ object FormTypeEditor: TFormTypeEditor
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
+            ReadOnly = True
             Size.Width = 30.000000000000000000
           end
           object StringColumnDNName: TStringColumn
@@ -2281,6 +2282,7 @@ object FormTypeEditor: TFormTypeEditor
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
+            ReadOnly = True
             Size.Width = 30.000000000000000000
           end
           object StringColumnPointName: TStringColumn
