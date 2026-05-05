@@ -1984,14 +1984,12 @@ object FormTypeEditor: TFormTypeEditor
           OnSelChanged = GridDiametersSelChanged
           OnGetValue = GridDiametersGetValue
           OnSetValue = GridDiametersSetValue
-          OnCellClick = GridDiametersCellClick
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 267.000000000000000000
           object CheckColumnDNEnable: TCheckColumn
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
-            ReadOnly = True
             Size.Width = 30.000000000000000000
           end
           object StringColumnDNName: TStringColumn
@@ -2274,14 +2272,12 @@ object FormTypeEditor: TFormTypeEditor
           RowCount = 3
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
-          OnCellClick = GridPointsCellClick
           Viewport.Width = 1052.000000000000000000
           Viewport.Height = 233.000000000000000000
           object CheckColumnPointEnable: TCheckColumn
             Header = #1042#1082#1083
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
-            ReadOnly = True
             Size.Width = 30.000000000000000000
           end
           object StringColumnPointName: TStringColumn
