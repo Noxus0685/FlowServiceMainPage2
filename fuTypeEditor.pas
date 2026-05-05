@@ -2913,7 +2913,8 @@ begin
   // =====================================================
   // == Наименование
   // =====================================================
-  if GridDiameters.Columns[ACol] = CheckColumnDNEnable then
+  if (ACol = CheckColumnDNEnable.Index) or
+     (GridDiameters.Columns[ACol] = CheckColumnDNEnable) then
     Value := D.Enable
 
   else if GridDiameters.Columns[ACol] = StringColumnDNName then
@@ -3083,7 +3084,8 @@ begin
   {=====================================================}
   { ИМЯ }
   {=====================================================}
-  if GridDiameters.Columns[ACol] = CheckColumnDNEnable then
+  if (ACol = CheckColumnDNEnable.Index) or
+     (GridDiameters.Columns[ACol] = CheckColumnDNEnable) then
     D.Enable := Value.AsBoolean
 
   else if GridDiameters.Columns[ACol] = StringColumnDNName then
@@ -3262,7 +3264,8 @@ begin
   { 1. НЕ зависят от диаметра }
   {=====================================================}
 
-  if GridPoints.Columns[ACol] = CheckColumnPointEnable then
+  if (ACol = CheckColumnPointEnable.Index) or
+     (GridPoints.Columns[ACol] = CheckColumnPointEnable) then
     P.Enable := Value.AsBoolean
 
   else if GridPoints.Columns[ACol] = StringColumnPointName then
@@ -3786,7 +3789,8 @@ begin
   { НЕ зависят от диаметра }
   {=====================================================}
 
-  if GridPoints.Columns[ACol] = CheckColumnPointEnable then
+  if (ACol = CheckColumnPointEnable.Index) or
+     (GridPoints.Columns[ACol] = CheckColumnPointEnable) then
     Value := P.Enable
 
   else if GridPoints.Columns[ACol] = StringColumnPointName then
