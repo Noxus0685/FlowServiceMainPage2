@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 22
+    TabOrder = 23
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -2243,12 +2243,6 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.WordWrap = False
           Visible = False
           Size.Width = 71.000000000000000000
-        end
-        object StringColumn1: TStringColumn
-          HeaderSettings.TextSettings.WordWrap = False
-        end
-        object StringColumn2: TStringColumn
-          HeaderSettings.TextSettings.WordWrap = False
         end
       end
     end

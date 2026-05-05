@@ -258,8 +258,6 @@ type
     CheckColumnPointEnable: TCheckColumn;
     Layout12: TLayout;
     Layout14: TLayout;
-    StringColumn1: TStringColumn;
-    StringColumn2: TStringColumn;
     Layout48: TLayout;
     Label4: TLabel;
     Edit1: TEdit;
@@ -1505,6 +1503,7 @@ begin
   begin
     ButtonDiameterDeleteClick(ButtonDiameterDelete);
     Key := 0;
+
   end;
 end;
 
@@ -3737,16 +3736,16 @@ end;
 procedure TFormTypeEditor.GridPointsCellClick(const Column: TColumn;
   const Row: Integer);
 var
-    D: TDiameter;
+    P: TTypePoint;
   begin
 
-  if Column<>CheckColumnDNEnable then
+  if Column<>CheckColumnPointEnable then
     Exit;
 
 
-  D := GetDiameterByVisibleRow(Row);
-  d.Enable:=not  d.Enable;
-  UpdateDiametersGrid;
+  P := GetPointByVisibleRow(Row);
+  P.Enable:=not  P.Enable;
+  UpdatePointsGrid;
 
 end;
 
