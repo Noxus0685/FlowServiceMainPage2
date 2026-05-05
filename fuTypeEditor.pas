@@ -391,7 +391,6 @@ type
   function GetCoefByVisibleRow(ARow: Integer): TCalibrCoefItem;
   procedure GridCoefsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
   procedure GridCoefsSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
-  procedure GridCoefsCellClick(const Column: TColumn; const Row: Integer);
   procedure ButtonCoefAddClick(Sender: TObject);
   procedure ButtonCoefDeleteClick(Sender: TObject);
   procedure ButtonCoefClearClick(Sender: TObject);
@@ -551,14 +550,7 @@ begin
   FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
   FGridCoefs.OnGetValue := GridCoefsGetValue;
   FGridCoefs.OnSetValue := GridCoefsSetValue;
-  FGridCoefs.OnCellClick := GridCoefsCellClick;
 
-  with TCheckColumn.Create(FGridCoefs) do
-  begin
-    Header := 'Вкл';
-    Width := 42;
-    Parent := FGridCoefs;
-  end;
   NewCol('Наименование', 170);
   NewCol('Value', 90);
   NewCol('Arg', 90);
@@ -905,14 +897,13 @@ begin
     Exit;
 
   case ACol of
-    0: Value := Item.Enable;
-    1: Value := Item.Name;
-    2: Value := FloatToStr(Item.Value);
-    3: Value := FloatToStr(Item.Arg);
-    4: Value := FloatToStr(Item.QFrom);
-    5: Value := FloatToStr(Item.QTo);
-    6: Value := FloatToStr(Item.K);
-    7: Value := FloatToStr(Item.b);
+    0: Value := Item.Name;
+    1: Value := FloatToStr(Item.Value);
+    2: Value := FloatToStr(Item.Arg);
+    3: Value := FloatToStr(Item.QFrom);
+    4: Value := FloatToStr(Item.QTo);
+    5: Value := FloatToStr(Item.K);
+    6: Value := FloatToStr(Item.b);
   end;
 end;
 
@@ -928,32 +919,15 @@ begin
 
   S := Value.ToString;
   case ACol of
-    0: ; // переключается в GridCoefsCellClick
-    1: Item.Name := S;
-    2: Item.Value := StrToFloatDef(S, Item.Value);
-    3: Item.Arg := StrToFloatDef(S, Item.Arg);
-    4: Item.QFrom := StrToFloatDef(S, Item.QFrom);
-    5: Item.QTo := StrToFloatDef(S, Item.QTo);
-    6: Item.K := StrToFloatDef(S, Item.K);
-    7: Item.b := StrToFloatDef(S, Item.b);
+    0: Item.Name := S;
+    1: Item.Value := StrToFloatDef(S, Item.Value);
+    2: Item.Arg := StrToFloatDef(S, Item.Arg);
+    3: Item.QFrom := StrToFloatDef(S, Item.QFrom);
+    4: Item.QTo := StrToFloatDef(S, Item.QTo);
+    5: Item.K := StrToFloatDef(S, Item.K);
+    6: Item.b := StrToFloatDef(S, Item.b);
   end;
 
-  SetModified;
-end;
-
-procedure TFormTypeEditor.GridCoefsCellClick(const Column: TColumn; const Row: Integer);
-var
-  Item: TCalibrCoefItem;
-begin
-  if (Column = nil) or (Column.Index <> 0) then
-    Exit;
-
-  Item := GetCoefByVisibleRow(Row);
-  if Item = nil then
-    Exit;
-
-  Item.Enable := not Item.Enable;
-  UpdateCoefsGrid;
   SetModified;
 end;
 
@@ -2939,9 +2913,11 @@ begin
   // =====================================================
   // == Наименование
   // =====================================================
-  if ACol = CheckColumnDNEnable.Index then
-    Value := D.State <> osDeleted
-  else if ACol = StringColumnDNName.Index then
+  if (ACol = CheckColumnDNEnable.Index) or
+     (GridDiameters.Columns[ACol] = CheckColumnDNEnable) then
+    Value := D.Enable
+
+  else if GridDiameters.Columns[ACol] = StringColumnDNName then
     Value := D.Name
 
   // =====================================================
@@ -3108,17 +3084,13 @@ begin
   {=====================================================}
   { ИМЯ }
   {=====================================================}
-  if ACol = CheckColumnDNEnable.Index then
+  if (ACol = CheckColumnDNEnable.Index) or
+     (GridDiameters.Columns[ACol] = CheckColumnDNEnable) then
+    D.Enable := Value.AsBoolean
+
+  else if GridDiameters.Columns[ACol] = StringColumnDNName then
   begin
-    if Value.AsBoolean then
-    begin
-      if D.State = osDeleted then
-        D.State := osModified;
-    end
-    else
-      D.State := osDeleted;
-  end
-  else if ACol = StringColumnDNName.Index then
+    S := Trim(Value.AsString);
     D.Name := S
   end
 
@@ -3267,24 +3239,6 @@ begin
   UpdateDiametersGrid;
 end;
 
-procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
-  const Row: Integer);
-var
-  D: TDiameter;
-begin
-  if (Column <> CheckColumnDNEnable) then
-    Exit;
-  D := GetDiameterByVisibleRow(Row);
-  if D = nil then
-    Exit;
-  if D.State = osDeleted then
-    D.State := osModified
-  else
-    D.State := osDeleted;
-  UpdateDiametersGrid;
-  SetModified;
-end;
-
 procedure TFormTypeEditor.GridPointsSetValue(
   Sender: TObject;
   const ACol, ARow: Integer;
@@ -3310,17 +3264,13 @@ begin
   { 1. НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = CheckColumnPointEnable.Index then
+  if (ACol = CheckColumnPointEnable.Index) or
+     (GridPoints.Columns[ACol] = CheckColumnPointEnable) then
+    P.Enable := Value.AsBoolean
+
+  else if GridPoints.Columns[ACol] = StringColumnPointName then
   begin
-    if Value.AsBoolean then
-    begin
-      if P.State = osDeleted then
-        P.State := osModified;
-    end
-    else
-      P.State := osDeleted;
-  end
-  else if ACol = StringColumnPointName.Index then
+    S := Trim(Value.AsString);
     P.Name := S
   end
 
@@ -3455,22 +3405,38 @@ begin
   UpdatePointsGrid;
 end;
 
-procedure TFormTypeEditor.GridPointsCellClick(const Column: TColumn;
-  const Row: Integer);
+procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn; const Row: Integer);
+var
+  D: TDiameter;
+begin
+  if (Column <> CheckColumnDNEnable) or (Row < 0) then
+    Exit;
+
+  D := GetDiameterByVisibleRow(Row);
+  if D = nil then
+    Exit;
+
+  D.Enable := not D.Enable;
+  D.State := osModified;
+  SetModified;
+  UpdateDiametersGrid;
+end;
+
+procedure TFormTypeEditor.GridPointsCellClick(const Column: TColumn; const Row: Integer);
 var
   P: TTypePoint;
 begin
-  if (Column <> CheckColumnPointEnable) then
+  if (Column <> CheckColumnPointEnable) or (Row < 0) then
     Exit;
+
   P := GetPointByVisibleRow(Row);
   if P = nil then
     Exit;
-  if P.State = osDeleted then
-    P.State := osModified
-  else
-    P.State := osDeleted;
-  UpdatePointsGrid;
+
+  P.Enable := not P.Enable;
+  P.State := osModified;
   SetModified;
+  UpdatePointsGrid;
 end;
 
 procedure TFormTypeEditor.RecalcPointsBySelectedDiameter;
@@ -3823,9 +3789,11 @@ begin
   { НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = CheckColumnPointEnable.Index then
-    Value := P.State <> osDeleted
-  else if ACol = StringColumnPointName.Index then
+  if (ACol = CheckColumnPointEnable.Index) or
+     (GridPoints.Columns[ACol] = CheckColumnPointEnable) then
+    Value := P.Enable
+
+  else if GridPoints.Columns[ACol] = StringColumnPointName then
     Value := P.Name
 
   else if GridPoints.Columns[ACol] = StringColumnPointFlowRate then
