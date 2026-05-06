@@ -387,6 +387,7 @@ type
 
   //procedure LoadDiametersForType;
 
+  procedure EnsureUniqueDiameterIDs;
   procedure UpdateDiametersGrid;
   procedure UpdatePointsGrid;
   function GetDiameterByVisibleRow(ARow: Integer): TDiameter;
@@ -913,6 +914,39 @@ begin
   FType.ReportingForm     := EditReportingForm.Text;
 end;
 
+
+procedure TFormTypeEditor.EnsureUniqueDiameterIDs;
+var
+  Seen: TDictionary<Integer, Byte>;
+  D: TDiameter;
+  NextTmpID: Integer;
+begin
+  if FDiametersLocal = nil then
+    Exit;
+
+  Seen := TDictionary<Integer, Byte>.Create;
+  try
+    NextTmpID := -1;
+    for D in FDiametersLocal do
+    begin
+      if D = nil then
+        Continue;
+
+      if (D.ID = 0) or Seen.ContainsKey(D.ID) then
+      begin
+        while Seen.ContainsKey(NextTmpID) do
+          Dec(NextTmpID);
+        D.ID := NextTmpID;
+        Dec(NextTmpID);
+      end;
+
+      Seen.AddOrSetValue(D.ID, 1);
+    end;
+  finally
+    Seen.Free;
+  end;
+end;
+
 procedure TFormTypeEditor.UpdateDiametersGrid;
 var
   D: TDiameter;
@@ -920,6 +954,8 @@ var
 begin
   if FDiametersLocal = nil then
     Exit;
+
+  EnsureUniqueDiameterIDs;
 
   VisibleCount := 0;
   for D in FDiametersLocal do
