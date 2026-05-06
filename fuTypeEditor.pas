@@ -3248,7 +3248,21 @@ begin
           (ACol = StringColumnDNQF.Index) then
   begin
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
-    RecalcQRowFromKnown(D, ACol, QValueBase);
+
+    if Trim(EditFlowRate.Text) = '' then
+    begin
+      if ACol = StringColumnDNQ2.Index then
+        SetQValue(FDiameterQ2, D.ID, QValueBase)
+      else if ACol = StringColumnDNQmax.Index then
+        D.Qmax := QValueBase
+      else if ACol = StringColumnDNQmin.Index then
+        D.Qmin := QValueBase
+      else if ACol = StringColumnDNQF.Index then
+        SetQValue(FDiameterQ4, D.ID, QValueBase);
+    end
+    else
+      RecalcQRowFromKnown(D, ACol, QValueBase);
+
     Qmax := D.Qmax;
 
     { Не ломаем существующий расчетный QFmax для частотного выхода }
