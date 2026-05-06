@@ -3602,8 +3602,16 @@ begin
       'https://fgis.gost.ru/fundmetrology/eapi/mit/' +
       '?search=*' + TNetEncoding.URL.Encode(ReestrNum);
 
-    Resp := NetHTTPClient1.Get(Url);
-    ResponseText := Resp.ContentAsString;
+    try
+      Resp := NetHTTPClient1.Get(Url);
+      ResponseText := Resp.ContentAsString;
+    except
+      on E: ENetHTTPClientException do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        Exit;
+      end;
+    end;
 
     MemoLog.Lines.Add('URL поиска: ' + Url);
     MemoLog.Lines.Add(ResponseText);
@@ -3637,8 +3645,16 @@ begin
       'https://fgis.gost.ru/fundmetrology/eapi/mit/' +
       UUID;
 
-    Resp := NetHTTPClient1.Get(Url);
-    ResponseText := Resp.ContentAsString;
+    try
+      Resp := NetHTTPClient1.Get(Url);
+      ResponseText := Resp.ContentAsString;
+    except
+      on E: ENetHTTPClientException do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        Exit;
+      end;
+    end;
 
     MemoLog.Lines.Add('URL карточки: ' + Url);
     MemoLog.Lines.Add(ResponseText);
@@ -3768,8 +3784,13 @@ begin
 
             FileStream := TFileStream.Create(FilePath, fmCreate);
             try
-              NetHTTPClient1.Get(DocUrl, FileStream);
-              DevType.Documentation := FilePath;
+              try
+                NetHTTPClient1.Get(DocUrl, FileStream);
+                DevType.Documentation := FilePath;
+              except
+                on E: ENetHTTPClientException do
+                  MemoLog.Lines.Add('ERROR: ' + E.Message);
+              end;
             finally
               FileStream.Free;
             end;
