@@ -563,14 +563,16 @@ begin
   if K2 <= 0 then K2 := C_QTR_TO_QNOM;
   if K4 <= 0 then K4 := C_Q4_TO_QNOM;
 
-  case KnownCol of
-    StringColumnDNQ2.Index: Qmax := KnownValue / K2;
-    StringColumnDNQmin.Index: Qmax := KnownValue / K1;
-    StringColumnDNQmax.Index: Qmax := KnownValue;
-    StringColumnDNQF.Index: Qmax := KnownValue / K4;
+  if KnownCol = StringColumnDNQ2.Index then
+    Qmax := KnownValue / K2
+  else if KnownCol = StringColumnDNQmin.Index then
+    Qmax := KnownValue / K1
+  else if KnownCol = StringColumnDNQmax.Index then
+    Qmax := KnownValue
+  else if KnownCol = StringColumnDNQF.Index then
+    Qmax := KnownValue / K4
   else
     Exit;
-  end;
 
   if Qmax <= 0 then
     Exit;
