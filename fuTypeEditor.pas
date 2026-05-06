@@ -545,7 +545,7 @@ const
   C_QMIN_TO_QNOM = 0.02;
   C_Q4_TO_QNOM = 1.25;
 var
-  K1, K2, K4, Qnom, Qmin, Q2, Q4: Double;
+  K1, K2, K4, Qnom,Qmax, Qmin, Q2, Q4: Double;
 begin
   if (D = nil) or (KnownValue <= 0) then
     Exit;
@@ -573,7 +573,7 @@ begin
     Qmax := KnownValue / K1
   else if KnownCol = StringColumnDNQmax.Index then
     Qnom := KnownValue / K4
-  else if KnownCol = StringColumnDNQF.Index then
+  else if KnownCol = StringColumnDNQnom.Index then
     Qnom := KnownValue
   else
     Exit;
@@ -976,7 +976,7 @@ begin
 
       if (D.Qnom > 0) and ((D.Qmax <= 0) or (D.Qmin <= 0) or
          (not SameValue(D.Qmax, D.Qnom * 1.25, 0.0001))) then
-        RecalcQRowFromKnown(D, StringColumnDNQF.Index, D.Qnom);
+        RecalcQRowFromKnown(D, StringColumnDNQnom.Index, D.Qnom);
       Inc(VisibleCount);
     end;
 
@@ -3354,7 +3354,7 @@ begin
       if (FlowRateVal > 0) and (DNmm > 0) then
       begin
         D.Qmax := 0.002827 * FlowRateVal * Sqr(DNmm);
-        RecalcQRowFromKnown(D, StringColumnDNQF.Index, D.Qnom);
+        RecalcQRowFromKnown(D, StringColumnDNQnom.Index, D.Qnom);
       end
       else
         RecalcQRowFromKnown(D, ACol, QValueBase);
@@ -4403,7 +4403,7 @@ begin
   StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
-  StringColumnDNQF.Header   := 'Qnom (Q3), ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header   := 'Qnom (Q3), ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4427,7 +4427,7 @@ begin
   StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
-  StringColumnDNQF.Header   := 'Qnom (Q3), ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header   := 'Qnom (Q3), ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
