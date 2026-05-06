@@ -260,7 +260,7 @@ type
     Layout14: TLayout;
     Layout48: TLayout;
     Label4: TLabel;
-    Edit1: TEdit;
+    EditFlowRate: TEdit;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
