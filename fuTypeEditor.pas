@@ -3318,7 +3318,8 @@ begin
   if D = nil then
     Exit;
 
-    D.State:=osModified;
+  if D.State <> osNew then
+    D.State := osModified;
 
   S := Trim(Value.ToString);
 
