@@ -232,7 +232,7 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
-        StringColumnDNQ2: TStringColumn;
+    StringColumnDNQ2: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQF: TStringColumn;
