@@ -3346,7 +3346,18 @@ begin
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     if Trim(EditFlowRate.Text) = '' then
-      RecalcQRowFromKnown(D, ACol, QValueBase)
+      begin
+        // Если скорость потока не задана, меняем только редактируемое поле,
+        // без пересчёта остальных Q-столбцов.
+        if ACol = StringColumnDNQ2.Index then
+          D.Q2 := QValueBase
+        else if ACol = StringColumnDNQmax.Index then
+          D.Qmax := QValueBase
+        else if ACol = StringColumnDNQmin.Index then
+          D.Qmin := QValueBase
+        else if ACol = StringColumnDNQnom.Index then
+          D.Qnom := QValueBase;
+      end
     else
     begin
       FlowRateVal := NormalizeFloatInput(EditFlowRate.Text);
