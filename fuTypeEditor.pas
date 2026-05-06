@@ -1319,6 +1319,7 @@ begin
 
   if NewD.Qmax > 0 then
   begin
+
     NewD.Q2 := 0;
     NewD.Qmin := 0;
     NewD.Qnom := NewD.Qmax * 1.25;
