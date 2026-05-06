@@ -177,7 +177,6 @@ type
     {====================================================================}
     Kp: Double;                  // Базовый коэффициент преобразования (имп/л или имп/кг)
     QFmax: Double;               // Расход, соответствующий максимальной частоте выхода
-
     {====================================================================}
     { ОБЪЕМ / МАССА (для емкостей и весов) }
     {====================================================================}
@@ -416,7 +415,7 @@ type
 
     class function CalcQmaxByDiameter(
       const OldQmax: Double;
-      const OldDN, NewDN: Integer
+      const oldDN,NewDN: Integer
     ): Double; static;
 
     class function CalcKpByDiameter(
@@ -1734,13 +1733,16 @@ procedure TDeviceType.AddPointData(const AName, ADesc: string; AFlowRate: Double
 
   class function TDeviceType.CalcQmaxByDiameter(
   const OldQmax: Double;
-  const OldDN, NewDN: Integer
+  const oldDN,NewDN: Integer
 ): Double;
+var
+FL:Double;
 begin
-  if (OldQmax <= 0) or (OldDN <= 0) or (NewDN <= 0) then
+    FL :=  (  OldQmax/(0.002827* Sqr(oldDN))  ) ;
+  if (OldQmax <= 0) or (NewDN <= 0) then
     Exit(OldQmax);
 
-  Result := OldQmax * Sqr(NewDN / OldDN);
+  Result := 0.002827*FL * Sqr(NewDN);
 end;
 
 class function TDeviceType.CalcKpByDiameter(
