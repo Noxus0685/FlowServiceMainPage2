@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 26
+    TabOrder = 28
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -2218,8 +2218,8 @@ object FormTypeEditor: TFormTypeEditor
           Header = 'Qmin, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
-        object StringColumnDNQF: TStringColumn
-          Header = 'QF, '#1084'3/'#1095
+        object StringColumnDNQnom: TStringColumn
+          Header = 'Qnom, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNKp: TStringColumn
