@@ -546,6 +546,7 @@ const
   C_QOVER_TO_QMAX = 1.25;
 var
   DCoef: TDiameter;
+  QmaxForCoef: Double;
   K1, K2, Qmax, Qmin, Q2, QOver: Double;
 begin
   if (ANewD = nil) or (KnownValue <= 0) then
@@ -555,10 +556,14 @@ begin
   if DCoef = nil then
     DCoef := ANewD;
 
-  if DCoef.Qmax > 0 then
+  QmaxForCoef := DCoef.Qmax;
+  if (QmaxForCoef <= 0) and (DCoef.Qnom > 0) then
+    QmaxForCoef := DCoef.Qnom / C_QOVER_TO_QMAX;
+
+  if QmaxForCoef > 0 then
   begin
-    K1 := DCoef.Qmin / DCoef.Qmax;
-    K2 := DCoef.Q2 / DCoef.Qmax;
+    K1 := DCoef.Qmin / QmaxForCoef;
+    K2 := DCoef.Q2 / QmaxForCoef;
   end
   else
   begin
@@ -3300,8 +3305,7 @@ procedure TFormTypeEditor.GridDiametersSetValue(
 var
   D: TDiameter;
   S: string;
-  Qmax, RangeDynamic, NewCoef, QValueBase, FlowRateVal: Double;
-  DNmm: Integer;
+  Qmax, RangeDynamic, NewCoef, QValueBase: Double;
   SelD: TDiameter;
 begin
   {-----------------------------------------------------}
@@ -3358,16 +3362,7 @@ begin
     end
     else
     begin
-      FlowRateVal := NormalizeFloatInput(EditFlowRate.Text);
-      DNmm := StrToIntDef(D.DN, 0);
-
-      if (FlowRateVal > 0) and (DNmm > 0) then
-      begin
-        D.Qmax := 0.002827 * FlowRateVal * Sqr(DNmm);
-        RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
-      end
-      else
-        RecalcQRowFromKnown(D, ACol, QValueBase);
+      RecalcQRowFromKnown(D, ACol, QValueBase);
     end;
 
     Qmax := D.Qmax;
