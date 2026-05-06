@@ -3092,16 +3092,22 @@ begin
   if V <= 0 then
     Exit;
 
-  D := GetDiameterByVisibleRow(GridDiameters.Selected);
-  if D = nil then
+  if FDiametersLocal = nil then
     Exit;
 
-  DNmm := StrToIntDef(D.DN, 0);
-  if DNmm <= 0 then
-    Exit;
+  for D in FDiametersLocal do
+  begin
+    if (D = nil) or (D.State = osDeleted) then
+      Continue;
 
-  Qmax := 0.002827 * V * Sqr(DNmm);
-  RecalcQRowFromKnown(D, StringColumnDNQmax.Index, Qmax);
+    DNmm := StrToIntDef(D.DN, 0);
+    if DNmm <= 0 then
+      Continue;
+
+    Qmax := 0.002827 * V * Sqr(DNmm);
+    RecalcQRowFromKnown(D, StringColumnDNQmax.Index, Qmax);
+  end;
+
   SetModified;
   UpdateDiametersGrid;
 end;
@@ -3383,6 +3389,11 @@ begin
 
     if Trim(EditFlowRate.Text) = '' then
       UpdateFlowRateFromDiameter(D);
+    if ACol = StringColumnDNQmax.Index then
+    begin
+      EditFlowRate.Text := '';
+      UpdateFlowRateFromDiameter(D);
+    end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
