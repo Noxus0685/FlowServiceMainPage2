@@ -540,7 +540,7 @@ end;
 
 procedure TFormTypeEditor.RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
 const
-  C_QTR_TO_QNOM = 0.05;
+  C_QTR_TO_QNOM = 0.0075;
   C_QMIN_TO_QNOM = 0.02;
   C_Q4_TO_QNOM = 1.25;
 var
@@ -563,8 +563,8 @@ begin
   end;
 
   if K1 <= 0 then K1 := C_QMIN_TO_QNOM;
-  if K2 <= 0 then K2 := C_QTR_TO_QNOM;
-  if K4 <= 0 then K4 := C_Q4_TO_QNOM;
+  if (K2 <= 0) or (K2 > 0.02) then K2 := C_QTR_TO_QNOM;
+  if (K4 <= 0) or (K4 < 1) then K4 := C_Q4_TO_QNOM;
 
   if KnownCol = StringColumnDNQ2.Index then
     Qmax := KnownValue / K2
@@ -925,7 +925,8 @@ begin
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      if (D.Qmax <= 0) or (D.Qmin <= 0) or (GetQValue(FDiameterQ2, D.ID) <= 0) or (GetQValue(FDiameterQ4, D.ID) <= 0) then
+      if (D.Qmax <= 0) or (D.Qmin <= 0) or (GetQValue(FDiameterQ2, D.ID) <= 0) or (GetQValue(FDiameterQ4, D.ID) <= 0) or
+         (not SameValue(GetQValue(FDiameterQ4, D.ID), D.Qmax * 1.25, 0.0001)) then
         RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
       Inc(VisibleCount);
     end;
