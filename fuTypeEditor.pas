@@ -289,6 +289,8 @@ type
     procedure EditRangeDynamicEnter(Sender: TObject);
     procedure UpdateRangeDynamicPrompt;
     procedure UpdateRangeDynamicPromptBySelectedDiameter;
+    procedure UpdateFlowRatePromptBySelectedDiameter;
+    procedure UpdateFlowRateFromDiameter(const D: TDiameter);
     procedure EditErrorExit(Sender: TObject);
     procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
@@ -3188,6 +3190,9 @@ begin
   if Trim(EditRangeDynamic.Text) = '' then
     UpdateRangeDynamicPromptBySelectedDiameter;
 
+  if Trim(EditFlowRate.Text) = '' then
+    UpdateFlowRatePromptBySelectedDiameter;
+
   // ----------------------------------------
   // FreqFlowRate не задан — считаем и показываем подсказку
   // ----------------------------------------
@@ -3312,12 +3317,8 @@ begin
     else
       D.QFmax := Qmax;
 
-    DNmm := StrToIntDef(D.DN, 0);
-    if (Trim(EditFlowRate.Text) = '') and (DNmm > 0) and (D.Qmax > 0) then
-    begin
-      EditFlowRate.TextPrompt := FormatFloat('0.###', D.Qmax / (0.002827 * Sqr(DNmm)));
-      EditFlowRate.Text := '';
-    end;
+    if Trim(EditFlowRate.Text) = '' then
+      UpdateFlowRateFromDiameter(D);
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
@@ -4041,6 +4042,37 @@ begin
     Exit(OldKp);
 
   Result := OldKp * Sqr(OldDN / NewDN); // ∝ 1 / D²
+end;
+
+
+procedure TFormTypeEditor.UpdateFlowRateFromDiameter(const D: TDiameter);
+var
+  DNmm: Integer;
+  V: Double;
+begin
+  if D = nil then
+    Exit;
+
+  DNmm := StrToIntDef(D.DN, 0);
+  if (DNmm > 0) and (D.Qmax > 0) then
+  begin
+    V := D.Qmax / (0.002827 * Sqr(DNmm));
+    EditFlowRate.Text := '';
+    EditFlowRate.TextPrompt := FormatFloat('0.###', V);
+  end
+  else
+  begin
+    EditFlowRate.Text := '';
+    EditFlowRate.TextPrompt := '-';
+  end;
+end;
+
+procedure TFormTypeEditor.UpdateFlowRatePromptBySelectedDiameter;
+var
+  D: TDiameter;
+begin
+  D := GetDiameterByVisibleRow(GridDiameters.Selected);
+  UpdateFlowRateFromDiameter(D);
 end;
 
 procedure TFormTypeEditor.UpdateRangeDynamicPromptBySelectedDiameter;
