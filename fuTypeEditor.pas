@@ -571,9 +571,9 @@ begin
   else if KnownCol = StringColumnDNQmin.Index then
     Qmax := KnownValue / K1
   else if KnownCol = StringColumnDNQmax.Index then
-    Qmax := KnownValue / K4
-  else if KnownCol = StringColumnDNQF.Index then
     Qmax := KnownValue
+  else if KnownCol = StringColumnDNQF.Index then
+    Qmax := KnownValue / K4
   else
     Exit;
 
@@ -3126,10 +3126,10 @@ begin
   // =====================================================
   else if ACol = StringColumnDNQmax.Index then
   begin
-    if GetQValue(FDiameterQ4, D.ID) = 0 then
+    if D.Qmax = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQ4, D.ID)), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
   end
 
   // =====================================================
@@ -3148,10 +3148,10 @@ begin
   // =====================================================
   else if ACol = StringColumnDNQF.Index then
   begin
-    if D.Qmax = 0 then
+    if GetQValue(FDiameterQ4, D.ID) = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQ4, D.ID)), FType.Error);
   end
 
   // =====================================================
@@ -3289,11 +3289,11 @@ begin
       if ACol = StringColumnDNQ2.Index then
         SetQValue(FDiameterQ2, D.ID, QValueBase)
       else if ACol = StringColumnDNQmax.Index then
-        SetQValue(FDiameterQ4, D.ID, QValueBase)
+        D.Qmax := QValueBase
       else if ACol = StringColumnDNQmin.Index then
         D.Qmin := QValueBase
       else if ACol = StringColumnDNQF.Index then
-        D.Qmax := QValueBase;
+        SetQValue(FDiameterQ4, D.ID, QValueBase);
     end
     else
     begin
@@ -4350,9 +4350,9 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Q перегрузочный, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
-  StringColumnDNQF.Header   := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4374,9 +4374,9 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Q перегрузочный, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
-  StringColumnDNQF.Header   := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
