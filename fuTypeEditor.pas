@@ -235,7 +235,7 @@ type
     StringColumnDNQ2: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
-    StringColumnDNQF: TStringColumn;
+    StringColumnDNQnom: TStringColumn;
     StringColumnDNKp: TStringColumn;
     EditRegDate: TEdit;
     Layout47: TLayout;
@@ -3206,7 +3206,7 @@ begin
   // =====================================================
   // == Q перегрузочный (Q4)
   // =====================================================
-  else if ACol = StringColumnDNQF.Index then
+  else if ACol = StringColumnDNQnom.Index then
   begin
     if D.Qnom = 0 then
       Value := '—'
@@ -3340,7 +3340,7 @@ begin
   else if (ACol = StringColumnDNQ2.Index) or
           (ACol = StringColumnDNQmax.Index) or
           (ACol = StringColumnDNQmin.Index) or
-          (ACol = StringColumnDNQF.Index) then
+          (ACol = StringColumnDNQnom.Index) then
   begin
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
 
@@ -4292,7 +4292,7 @@ begin
   StringColumnDNQ2.Header := '';
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
-  StringColumnDNQF.Header   := '';
+  StringColumnDNQnom.Header   := '';
   StringColumnDNKp.Header   := '';
 
   FloatColumnVmax.Header   := '';
@@ -4579,13 +4579,13 @@ begin
       begin
         StringColumnDNKp.Visible       := True;
         StringColumnPointImp.Visible   := True;
-        StringColumnDNQF.Visible   := True;
+        StringColumnDNQnom.Visible   := True;
       end;
   else
     begin
       StringColumnDNKp.Visible       := False;
       StringColumnPointImp.Visible   := False;
-      StringColumnDNQF.Visible   := False;
+      StringColumnDNQnom.Visible   := False;
     end;
   end;
 end;
