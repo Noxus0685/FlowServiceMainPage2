@@ -170,7 +170,6 @@ type
     Label38: TLabel;
     EditFreqFlowRate: TEdit;
     shdwfct1: TShadowEffect;
-    layRight: TLayout;
     grpPrivate: TGroupBox;
     Layout16: TLayout;
     GridDiameters: TGrid;
@@ -233,6 +232,8 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
+    StringColumnDNQnom: TStringColumn;
+    StringColumnDNQtr: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQF: TStringColumn;
@@ -253,6 +254,13 @@ type
     LayoutUnits: TLayout;
     LabelUnits: TLabel;
     ComboBoxUnits: TComboBox;
+    CheckColumnDNEnable: TCheckColumn;
+    CheckColumnPointEnable: TCheckColumn;
+    Layout12: TLayout;
+    Layout14: TLayout;
+    Layout48: TLayout;
+    Label4: TLabel;
+    Edit1: TEdit;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -270,6 +278,10 @@ type
     procedure ButtonDiameterClearClick(Sender: TObject);
     procedure ButtonPointAddClick(Sender: TObject);
     procedure ButtonPointDeleteClick(Sender: TObject);
+    procedure GridDiametersKeyDown(Sender: TObject; var Key: Word;
+      var KeyChar: Char; Shift: TShiftState);
+    procedure GridPointsKeyDown(Sender: TObject; var Key: Word;
+      var KeyChar: Char; Shift: TShiftState);
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
@@ -321,6 +333,8 @@ type
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
+    procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
 
 
 
@@ -392,6 +406,8 @@ type
   procedure UpdateUnitsCombo;
     procedure UpdateUIFreq;
     procedure UpdateUICoef;
+    procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
+      var Value: TValue);
 
   public
 
@@ -487,6 +503,8 @@ end;
  begin
    inherited Create(AOwner);
    TabItemCoefs.Visible := False;
+   GridDiameters.OnKeyDown := GridDiametersKeyDown;
+   GridPoints.OnKeyDown := GridPointsKeyDown;
    LoadType(AType);
  end;
 
@@ -877,6 +895,8 @@ begin
   Result := FCalibrCoefItemsLocal[ARow];
 end;
 
+
+
 procedure TFormTypeEditor.GridCoefsGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -896,7 +916,10 @@ begin
     6: Value := FloatToStr(Item.b);
   end;
 end;
-
+procedure TFormTypeEditor.TestGridGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+begin
+  Value := True;
+end;
 procedure TFormTypeEditor.GridCoefsSetValue(Sender: TObject; const ACol,
   ARow: Integer; const Value: TValue);
 var
@@ -1216,9 +1239,53 @@ procedure TFormTypeEditor.ButtonDiameterDeleteClick(Sender: TObject);
 var
   D: TDiameter;
   SelRow: Integer;
+  I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FDiametersLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if (FDiametersLocal[I].State <> osDeleted) and FDiametersLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipDiameterDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранный диаметр?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipDiameterDeleteConfirm := True;
+    end;
+
+    for I := FDiametersLocal.Count - 1 downto 0 do
+    begin
+      D := FDiametersLocal[I];
+      if (D.State = osDeleted) or not D.Enable then
+        Continue;
+
+      if D.State = osNew then
+        FDiametersLocal.Remove(D)
+      else
+        D.State := osDeleted;
+    end;
+
+    GridDiameters.Row := -1;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridDiameters.Row;
   if SelRow < 0 then
@@ -1342,9 +1409,52 @@ var
   Point: TTypePoint;
   PointIdx: Integer;
   SelRow: Integer;
+  I: Integer;
+  HasChecked: Boolean;
 begin
   if (FType = nil) or (FPointsLocal = nil) then
     Exit;
+
+  HasChecked := False;
+  for I := 0 to FPointsLocal.Count - 1 do
+    if (FPointsLocal[I].State <> osDeleted) and FPointsLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  if HasChecked then
+  begin
+    if not FSkipPointDeleteConfirm then
+    begin
+      if MessageDlg(
+           'Удалить выбранную точку?',
+           TMsgDlgType.mtWarning,
+           [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+           0
+         ) <> mrYes then
+        Exit;
+
+      FSkipPointDeleteConfirm := True;
+    end;
+
+    for I := FPointsLocal.Count - 1 downto 0 do
+    begin
+      Point := FPointsLocal[I];
+      if (Point.State = osDeleted) or not Point.Enable then
+        Continue;
+
+      if Point.State = osNew then
+        FPointsLocal.Delete(I)
+      else
+        Point.State := osDeleted;
+    end;
+
+    GridPoints.Row := -1;
+    UpdatePointsGrid;
+    SetModified;
+    Exit;
+  end;
 
   SelRow := GridPoints.Row;
   if SelRow < 0 then
@@ -1384,6 +1494,31 @@ begin
   UpdatePointsGrid;
 
   SetModified;
+end;
+
+procedure TFormTypeEditor.GridDiametersKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+  var
+  i:integer;
+  begin
+  if (Key = vkDelete) and not GridDiameters.EditorMode then
+  begin
+    i:=GridDiameters.Row;
+    ButtonDiameterDeleteClick(ButtonDiameterDelete);
+    Key := 0;
+    if GridDiameters.RowCount>0 then
+      GridDiameters.Row:=(i-1);
+  end;
+end;
+
+procedure TFormTypeEditor.GridPointsKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if (Key = vkDelete) and not GridPoints.EditorMode then
+  begin
+    ButtonPointDeleteClick(ButtonPointDelete);
+    Key := 0;
+  end;
 end;
 
 procedure TFormTypeEditor.ButtonPointsClearClick(Sender: TObject);
@@ -2119,7 +2254,10 @@ procedure TFormTypeEditor.EditAccuracyClassTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2466,7 +2604,10 @@ procedure TFormTypeEditor.EditModificationTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2499,7 +2640,10 @@ procedure TFormTypeEditor.EditNameTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // пример: убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2705,7 +2849,10 @@ procedure TFormTypeEditor.edtDocumentationTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2764,7 +2911,10 @@ procedure TFormTypeEditor.edtReestrNumberTyping(Sender: TObject);
 var
   E: TEdit;
 begin
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   // убираем двойные пробелы
   while Pos('  ', E.Text) > 0 do
@@ -2803,6 +2953,22 @@ begin
       '1:' + IntToStr(Round(Qmax / Qmin));
 end;
 
+procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
+  const Row: Integer);
+  var
+    D: TDiameter;
+  begin
+
+  if Column<>CheckColumnDNEnable then
+    Exit;
+
+
+  D := GetDiameterByVisibleRow(Row);
+  d.Enable:=not  d.Enable;
+  UpdateDiametersGrid;
+
+end;
+
 procedure TFormTypeEditor.GridDiametersGetValue(
   Sender: TObject;
   const ACol, ARow: Integer;
@@ -2815,10 +2981,13 @@ begin
   if D = nil then
     Exit;
 
+  if ACol = CheckColumnDNEnable.Index then
+    Value :=  D.Enable
+
   // =====================================================
   // == Наименование
   // =====================================================
-  if ACol = StringColumnDNName.Index then
+  else if ACol = StringColumnDNName.Index then
     Value := D.Name
 
   // =====================================================
@@ -2826,6 +2995,28 @@ begin
   // =====================================================
   else if ACol = IntegerColumnDNSize.Index then
     Value := StrToIntDef(D.DN, 0)
+
+  // =====================================================
+  // == Qnom
+  // =====================================================
+  else if ACol = StringColumnDNQnom.Index then
+  begin
+    if D.Qmax = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
+  end
+
+  // =====================================================
+  // == Qtr
+  // =====================================================
+  else if ACol = StringColumnDNQtr.Index then
+  begin
+    if D.Qmax = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
+  end
 
   // =====================================================
   // == Qmax
@@ -2959,12 +3150,15 @@ begin
 
     D.State:=osModified;
 
-  S := Trim(Value.AsString);
+  S := Trim(Value.ToString);
+
+  if ACol = StringColumnPointName.Index then
+    D.Enable := not D.Enable
 
   {=====================================================}
   { ИМЯ }
   {=====================================================}
-  if ACol = StringColumnDNName.Index then
+  else if ACol = StringColumnDNName.Index then
     D.Name := S
 
   {=====================================================}
@@ -2974,9 +3168,11 @@ begin
     D.DN := IntToStr(Round(NormalizeFloatInput(S)))
 
   {=====================================================}
-  { Qmax }
+  { Qnom / Qtr / Qmax }
   {=====================================================}
-  else if ACol = StringColumnDNQmax.Index then
+  else if (ACol = StringColumnDNQnom.Index) or
+          (ACol = StringColumnDNQtr.Index) or
+          (ACol = StringColumnDNQmax.Index) then
   begin
     Qmax := FType.ToBaseUnits(NormalizeFloatInput(S));
     D.Qmax := Qmax;
@@ -3094,13 +3290,16 @@ begin
   if P = nil then
     Exit;
 
-  S := Trim(Value.AsString);
+  S := Trim(Value.toString);
 
   {=====================================================}
   { 1. НЕ зависят от диаметра }
   {=====================================================}
 
   if ACol = StringColumnPointName.Index then
+    P.Enable := not P.Enable
+
+  else if ACol = StringColumnPointName.Index then
     P.Name := S
 
   else if ACol = StringColumnPointStab.Index then
@@ -3538,6 +3737,22 @@ begin
   SetModified;
 end;
 
+procedure TFormTypeEditor.GridPointsCellClick(const Column: TColumn;
+  const Row: Integer);
+var
+    P: TTypePoint;
+  begin
+
+  if Column<>CheckColumnPointEnable then
+    Exit;
+
+
+  P := GetPointByVisibleRow(Row);
+  P.Enable:=not  P.Enable;
+  UpdatePointsGrid;
+
+end;
+
 procedure TFormTypeEditor.GridPointsGetValue(
   Sender: TObject;
   const ACol, ARow: Integer;
@@ -3555,11 +3770,15 @@ begin
   if P = nil then
     Exit;
 
+
+  if ACol = CheckColumnPointEnable.Index then
+    Value :=  P.Enable
+
   {=====================================================}
   { НЕ зависят от диаметра }
   {=====================================================}
 
-  if ACol = StringColumnPointName.Index then
+  else if ACol = StringColumnPointName.Index then
     Value := P.Name
 
   else if ACol = StringColumnPointFlowRate.Index then
@@ -3874,6 +4093,8 @@ begin
   // ==================================================
   // СБРОС ЗАГОЛОВКОВ
   // ==================================================
+  StringColumnDNQnom.Header := '';
+  StringColumnDNQtr.Header := '';
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
   StringColumnDNQF.Header   := '';
@@ -3984,6 +4205,8 @@ procedure TFormTypeEditor.ApplyVolumeMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
@@ -4007,6 +4230,8 @@ procedure TFormTypeEditor.ApplyMassMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
+  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
+  StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;

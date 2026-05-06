@@ -15,7 +15,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Width = 1430.000000000000000000
     Size.Height = 25.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 2
+    TabOrder = 1
     object GroupBox1: TGroupBox
       Align = Client
       Padding.Left = 5.000000000000000000
@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 20
+    TabOrder = 23
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -185,7 +185,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Width = 343.000000000000000000
     Size.Height = 693.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 3
+    TabOrder = 2
     object grpCommonInfo: TGroupBox
       Align = Top
       Padding.Left = 5.000000000000000000
@@ -1939,13 +1939,86 @@ object FormTypeEditor: TFormTypeEditor
       ShadowColor = claBlack
     end
   end
-  object layRight: TLayout
+  object Layout12: TLayout
     Align = Client
-    Margins.Top = 10.000000000000000000
     Size.Width = 1081.000000000000000000
-    Size.Height = 693.000000000000000000
+    Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
-    TabOrder = 1
+    TabOrder = 24
+    object shdwfct2: TShadowEffect
+      Distance = 3.000000000000000000
+      Direction = 45.000000000000000000
+      Softness = 0.300000011920929000
+      Opacity = 0.100000001490116100
+      ShadowColor = claBlack
+    end
+  end
+  object Layout14: TLayout
+    Align = Client
+    Size.Width = 1081.000000000000000000
+    Size.Height = 703.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 25
+    object GroupBox2: TGroupBox
+      Align = Top
+      Padding.Left = 5.000000000000000000
+      Padding.Top = 5.000000000000000000
+      Padding.Right = 5.000000000000000000
+      Padding.Bottom = 5.000000000000000000
+      Margins.Left = 5.000000000000000000
+      Margins.Right = 5.000000000000000000
+      Margins.Bottom = 5.000000000000000000
+      Position.X = 5.000000000000000000
+      Position.Y = 326.000000000000000000
+      Size.Width = 655.000000000000000000
+      Size.Height = 82.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'groupstyle'
+      Text = #1055#1088#1077#1076#1077#1083#1099' '#1080#1079#1084#1077#1088#1077#1085#1080#1081
+      Visible = False
+      TabOrder = 1
+      object Layout21: TLayout
+        Align = Top
+        Padding.Left = 5.000000000000000000
+        Padding.Right = 5.000000000000000000
+        Position.X = 5.000000000000000000
+        Position.Y = 45.000000000000000000
+        Size.Width = 645.000000000000000000
+        Size.Height = 30.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 38
+        object Label19: TLabel
+          Align = Left
+          Position.X = 5.000000000000000000
+          Size.Width = 148.000000000000000000
+          Size.Height = 30.000000000000000000
+          Size.PlatformDefault = False
+          Text = #1053#1080#1078#1085#1080#1081
+          TabOrder = 0
+        end
+      end
+      object Layout20: TLayout
+        Align = Top
+        Padding.Left = 5.000000000000000000
+        Padding.Right = 5.000000000000000000
+        Margins.Top = 10.000000000000000000
+        Position.X = 5.000000000000000000
+        Position.Y = 15.000000000000000000
+        Size.Width = 645.000000000000000000
+        Size.Height = 30.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 40
+        object Label18: TLabel
+          Align = Left
+          Position.X = 5.000000000000000000
+          Size.Width = 148.000000000000000000
+          Size.Height = 30.000000000000000000
+          Size.PlatformDefault = False
+          Text = #1042#1077#1088#1093#1085#1080#1081
+          TabOrder = 0
+        end
+      end
+    end
     object grpPrivate: TGroupBox
       Align = Top
       Padding.Left = 5.000000000000000000
@@ -1968,64 +2041,6 @@ object FormTypeEditor: TFormTypeEditor
         Size.Height = 297.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 38
-        object GridDiameters: TGrid
-          Align = Client
-          CanFocus = True
-          ClipChildren = True
-          Margins.Bottom = 5.000000000000000000
-          Size.Width = 1056.000000000000000000
-          Size.Height = 292.000000000000000000
-          Size.PlatformDefault = False
-          TabOrder = 0
-          RowHeight = 18.000000000000000000
-          RowCount = 3
-          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
-          OnSelChanged = GridDiametersSelChanged
-          OnGetValue = GridDiametersGetValue
-          OnSetValue = GridDiametersSetValue
-          Viewport.Width = 1052.000000000000000000
-          Viewport.Height = 267.000000000000000000
-          object StringColumnDNName: TStringColumn
-            Header = #1053#1072#1080#1084#1077#1085#1086#1074#1072#1085#1080#1077
-            HeaderSettings.TextSettings.WordWrap = False
-            Size.Width = 93.000000000000000000
-          end
-          object IntegerColumnDNSize: TIntegerColumn
-            Header = #1044#1059', '#1084#1084
-            HeaderSettings.TextSettings.WordWrap = False
-            HeaderSettings.TextSettings.HorzAlign = Center
-            Size.Width = 75.000000000000000000
-          end
-          object StringColumnDNQmax: TStringColumn
-            Header = 'Qmax, '#1084'3/'#1095
-            HeaderSettings.TextSettings.WordWrap = False
-          end
-          object StringColumnDNQmin: TStringColumn
-            Header = 'Qmin, '#1084'3/'#1095
-            HeaderSettings.TextSettings.WordWrap = False
-          end
-          object StringColumnDNQF: TStringColumn
-            Header = 'QF, '#1084'3/'#1095
-            HeaderSettings.TextSettings.WordWrap = False
-          end
-          object StringColumnDNKp: TStringColumn
-            Header = 'Kp, '#1080#1084#1087'/'#1084
-            HeaderSettings.TextSettings.WordWrap = False
-          end
-          object FloatColumnVmax: TFloatColumn
-            Header = 'Vmax, '#1083
-            HeaderSettings.TextSettings.WordWrap = False
-            HeaderSettings.TextSettings.HorzAlign = Center
-            Visible = False
-            Size.Width = 71.000000000000000000
-          end
-          object StringColumnVmin: TStringColumn
-            Header = 'Vmin, '#1083
-            HeaderSettings.TextSettings.WordWrap = False
-            Visible = False
-            Size.Width = 71.000000000000000000
-          end
-        end
       end
       object Layout44: TLayout
         Align = MostTop
@@ -2091,7 +2106,7 @@ object FormTypeEditor: TFormTypeEditor
           Size.Width = 237.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
-          TabOrder = 45
+          TabOrder = 46
           object Label33: TLabel
             Align = Left
             Position.X = 5.000000000000000000
@@ -2121,65 +2136,113 @@ object FormTypeEditor: TFormTypeEditor
             Top = 15
           end
         end
-      end
-    end
-    object GroupBox2: TGroupBox
-      Align = Top
-      Padding.Left = 5.000000000000000000
-      Padding.Top = 5.000000000000000000
-      Padding.Right = 5.000000000000000000
-      Padding.Bottom = 5.000000000000000000
-      Margins.Left = 5.000000000000000000
-      Margins.Right = 5.000000000000000000
-      Margins.Bottom = 5.000000000000000000
-      Position.X = 5.000000000000000000
-      Position.Y = 326.000000000000000000
-      Size.Width = 655.000000000000000000
-      Size.Height = 82.000000000000000000
-      Size.PlatformDefault = False
-      StyleLookup = 'groupstyle'
-      Text = #1055#1088#1077#1076#1077#1083#1099' '#1080#1079#1084#1077#1088#1077#1085#1080#1081
-      Visible = False
-      TabOrder = 1
-      object Layout21: TLayout
-        Align = Top
-        Padding.Left = 5.000000000000000000
-        Padding.Right = 5.000000000000000000
-        Position.X = 5.000000000000000000
-        Position.Y = 45.000000000000000000
-        Size.Width = 645.000000000000000000
-        Size.Height = 30.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 38
-        object Label19: TLabel
+        object Layout48: TLayout
           Align = Left
-          Position.X = 5.000000000000000000
-          Size.Width = 148.000000000000000000
+          Padding.Left = 5.000000000000000000
+          Padding.Right = 5.000000000000000000
+          Position.X = 377.000000000000000000
+          Size.Width = 168.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
-          Text = #1053#1080#1078#1085#1080#1081
-          TabOrder = 0
+          TabOrder = 45
+          object Label4: TLabel
+            Align = Left
+            Position.X = 5.000000000000000000
+            Size.Width = 108.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072
+            TabOrder = 1
+          end
+          object Edit1: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            Align = Client
+            TabOrder = 0
+            Hint = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
+            Margins.Top = 5.000000000000000000
+            Margins.Bottom = 5.000000000000000000
+            Size.Width = 50.000000000000000000
+            Size.Height = 20.000000000000000000
+            Size.PlatformDefault = False
+            TextPrompt = '10'
+            KillFocusByReturn = True
+            ParentShowHint = False
+            ShowHint = True
+            OnEnter = EditRangeDynamicEnter
+            OnExit = EditRangeDynamicExit
+            Left = 276
+            Top = 15
+          end
         end
       end
-      object Layout20: TLayout
-        Align = Top
-        Padding.Left = 5.000000000000000000
-        Padding.Right = 5.000000000000000000
-        Margins.Top = 10.000000000000000000
-        Position.X = 5.000000000000000000
-        Position.Y = 15.000000000000000000
-        Size.Width = 645.000000000000000000
-        Size.Height = 30.000000000000000000
+      object GridDiameters: TGrid
+        Align = Client
+        CanFocus = True
+        ClipChildren = True
+        Margins.Bottom = 5.000000000000000000
+        Size.Width = 1066.000000000000000000
+        Size.Height = 292.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 39
-        object Label18: TLabel
-          Align = Left
-          Position.X = 5.000000000000000000
-          Size.Width = 148.000000000000000000
-          Size.Height = 30.000000000000000000
-          Size.PlatformDefault = False
-          Text = #1042#1077#1088#1093#1085#1080#1081
-          TabOrder = 0
+        TabOrder = 0
+        RowHeight = 18.000000000000000000
+        RowCount = 3
+        Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
+        OnSelChanged = GridDiametersSelChanged
+        OnGetValue = GridDiametersGetValue
+        OnSetValue = GridDiametersSetValue
+        OnCellClick = GridDiametersCellClick
+        Viewport.Width = 1062.000000000000000000
+        Viewport.Height = 267.000000000000000000
+        object CheckColumnDNEnable: TCheckColumn
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNName: TStringColumn
+          Header = #1053#1072#1080#1084#1077#1085#1086#1074#1072#1085#1080#1077
+          HeaderSettings.TextSettings.WordWrap = False
+          Size.Width = 93.000000000000000000
+        end
+        object IntegerColumnDNSize: TIntegerColumn
+          Header = #1044#1059', '#1084#1084
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Size.Width = 75.000000000000000000
+        end
+        object StringColumnDNQnom: TStringColumn
+          Header = 'Qnom, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNQtr: TStringColumn
+          Header = 'Qtr, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNQmax: TStringColumn
+          Header = 'Qmax, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNQmin: TStringColumn
+          Header = 'Qmin, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNQF: TStringColumn
+          Header = 'QF, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNKp: TStringColumn
+          Header = 'Kp, '#1080#1084#1087'/'#1084
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object FloatColumnVmax: TFloatColumn
+          Header = 'Vmax, '#1083
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+          Visible = False
+          Size.Width = 71.000000000000000000
+        end
+        object StringColumnVmin: TStringColumn
+          Header = 'Vmin, '#1083
+          HeaderSettings.TextSettings.WordWrap = False
+          Visible = False
+          Size.Width = 71.000000000000000000
         end
       end
     end
@@ -2191,7 +2254,7 @@ object FormTypeEditor: TFormTypeEditor
       Padding.Bottom = 5.000000000000000000
       Margins.Right = 5.000000000000000000
       Size.Width = 1076.000000000000000000
-      Size.Height = 335.000000000000000000
+      Size.Height = 345.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'groupstyle'
       Text = #1055#1086#1074#1077#1088#1086#1095#1085#1099#1077' '#1090#1086#1095#1082#1080
@@ -2201,7 +2264,7 @@ object FormTypeEditor: TFormTypeEditor
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
         Size.Width = 1066.000000000000000000
-        Size.Height = 279.000000000000000000
+        Size.Height = 289.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 38
         object GridPoints: TGrid
@@ -2210,15 +2273,19 @@ object FormTypeEditor: TFormTypeEditor
           ClipChildren = True
           Margins.Bottom = 5.000000000000000000
           Size.Width = 1056.000000000000000000
-          Size.Height = 274.000000000000000000
+          Size.Height = 284.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
+          OnCellClick = GridPointsCellClick
           Viewport.Width = 1052.000000000000000000
-          Viewport.Height = 233.000000000000000000
+          Viewport.Height = 243.000000000000000000
+          object CheckColumnPointEnable: TCheckColumn
+            HeaderSettings.TextSettings.WordWrap = False
+          end
           object StringColumnPointName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.WordWrap = False
@@ -2348,7 +2415,7 @@ object FormTypeEditor: TFormTypeEditor
             #1042#1077#1089#1086#1074#1086#1081' '#1084#1077#1090#1086#1076' '#1073#1077#1079' '#1086#1089#1090#1072#1085#1086#1074#1082#1080' '#1087#1086#1090#1086#1082#1072
             #1057#1083#1080#1095#1077#1085#1080#1077' '#1089' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072
             #1042#1077#1089#1086#1074#1086#1081' '#1084#1077#1090#1086#1076' '#1089' '#1086#1089#1090#1072#1085#1086#1074#1082#1086#1081' '#1087#1086#1090#1086#1082#1072)
-          ItemIndex = 0
+          ItemIndex = 1
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Position.X = 218.000000000000000000
@@ -2431,13 +2498,6 @@ object FormTypeEditor: TFormTypeEditor
           OnChange = sbRepeatsChange
         end
       end
-    end
-    object shdwfct2: TShadowEffect
-      Distance = 3.000000000000000000
-      Direction = 45.000000000000000000
-      Softness = 0.300000011920929000
-      Opacity = 0.100000001490116100
-      ShadowColor = claBlack
     end
   end
   object NetHTTPClient1: TNetHTTPClient

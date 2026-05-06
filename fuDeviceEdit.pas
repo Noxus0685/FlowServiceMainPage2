@@ -2618,7 +2618,10 @@ begin
   if FLoading then
     Exit;
 
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   { убираем двойные пробелы }
   while Pos('  ', E.Text) > 0 do
@@ -2855,7 +2858,10 @@ begin
   if FLoading then
     Exit;
 
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   { убираем двойные пробелы }
   while Pos('  ', E.Text) > 0 do
@@ -2927,7 +2933,10 @@ begin
   if FLoading then
     Exit;
 
-  E := Sender as TEdit;
+  if not (Sender is TEdit) then
+    Exit;
+
+  E := TEdit(Sender);
 
   { убираем двойные пробелы }
   while Pos('  ', E.Text) > 0 do
