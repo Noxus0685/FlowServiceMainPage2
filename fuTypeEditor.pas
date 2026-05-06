@@ -377,7 +377,7 @@ type
 
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
-  procedure RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
+  procedure RecalcQRowFromKnown(const ANewD: TDiameter; const KnownCol: Integer; const KnownValue: Double; const AOldD: TDiameter = nil);
 
 
 
@@ -539,21 +539,26 @@ begin
   AMap.AddOrSetValue(ADiameterID, AValue);
 end;
 
-procedure TFormTypeEditor.RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
+procedure TFormTypeEditor.RecalcQRowFromKnown(const ANewD: TDiameter; const KnownCol: Integer; const KnownValue: Double; const AOldD: TDiameter = nil);
 const
-  C_Q2_TO_QMAX = 0.0075;
-  C_QMIN_TO_QMAX = 0.02;
+  C_Q2_TO_QMAX = 1 / 150; // Q2 ~= 0.006667 * Q3
+  C_QMIN_TO_QMAX = 1 / 375; // Q1 ~= 0.002667 * Q3
   C_QOVER_TO_QMAX = 1.25;
 var
+  DCoef: TDiameter;
   K1, K2, Qmax, Qmin, Q2, QOver: Double;
 begin
-  if (D = nil) or (KnownValue <= 0) then
+  if (ANewD = nil) or (KnownValue <= 0) then
     Exit;
 
-  if D.Qmax > 0 then
+  DCoef := AOldD;
+  if DCoef = nil then
+    DCoef := ANewD;
+
+  if DCoef.Qmax > 0 then
   begin
-    K1 := D.Qmin / D.Qmax;
-    K2 := D.Q2 / D.Qmax;
+    K1 := DCoef.Qmin / DCoef.Qmax;
+    K2 := DCoef.Q2 / DCoef.Qmax;
   end
   else
   begin
@@ -582,12 +587,12 @@ begin
   Qmin := Qmax * K1;
   QOver := Qmax * C_QOVER_TO_QMAX;
 
-  D.Qmax := Qmax;
-  D.Q2 := Q2;
-  D.Qmin := Qmin;
-  D.Qnom := QOver;
-  SetQValue(FDiameterQ2, D.ID, Q2);
-  SetQValue(FDiameterQ4, D.ID, QOver);
+  ANewD.Qmax := Qmax;
+  ANewD.Q2 := Q2;
+  ANewD.Qmin := Qmin;
+  ANewD.Qnom := QOver;
+  SetQValue(FDiameterQ2, ANewD.ID, Q2);
+  SetQValue(FDiameterQ4, ANewD.ID, QOver);
 end;
 
 procedure TFormTypeEditor.InitCoefsTab;
@@ -2843,16 +2848,9 @@ begin
   FType.RangeDynamic := RangeDynamic;
 
   // -----------------------------------------------------
-  // Пересчитываем Qmin для всех ЛОКАЛЬНЫХ диаметров
+  // Qmin больше не пересчитываем от динамического диапазона:
+  // для Q-таблицы он задаётся коэффициентами/табличными значениями.
   // -----------------------------------------------------
-  for I := 0 to FDiametersLocal.Count-1 do
-  begin
-    if FDiametersLocal[I].Qmax > 0 then
-      FDiametersLocal[I].Qmin :=
-        FDiametersLocal[I].Qmax / RangeDynamic
-    else
-      FDiametersLocal[I].Qmin := 0;
-  end;
 
   // -----------------------------------------------------
   // Форматируем отображение 1:X
@@ -3346,18 +3344,18 @@ begin
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     if Trim(EditFlowRate.Text) = '' then
-      begin
-        // Если скорость потока не задана, меняем только редактируемое поле,
-        // без пересчёта остальных Q-столбцов.
-        if ACol = StringColumnDNQ2.Index then
-          D.Q2 := QValueBase
-        else if ACol = StringColumnDNQmax.Index then
-          D.Qmax := QValueBase
-        else if ACol = StringColumnDNQmin.Index then
-          D.Qmin := QValueBase
-        else if ACol = StringColumnDNQnom.Index then
-          D.Qnom := QValueBase;
-      end
+    begin
+      // Если скорость потока не задана, меняем только редактируемое поле,
+      // без пересчёта остальных Q-столбцов.
+      if ACol = StringColumnDNQ2.Index then
+        D.Q2 := QValueBase
+      else if ACol = StringColumnDNQmax.Index then
+        D.Qmax := QValueBase
+      else if ACol = StringColumnDNQmin.Index then
+        D.Qmin := QValueBase
+      else if ACol = StringColumnDNQnom.Index then
+        D.Qnom := QValueBase;
+    end
     else
     begin
       FlowRateVal := NormalizeFloatInput(EditFlowRate.Text);
