@@ -376,7 +376,7 @@ type
 
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
-  procedure RecalcQRowFromKnown(const D: TDiameter; const KnownKind: Integer; const KnownValue: Double);
+  procedure RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
 
 
 
@@ -539,13 +539,8 @@ begin
   AMap.AddOrSetValue(ADiameterID, AValue);
 end;
 
-procedure TFormTypeEditor.RecalcQRowFromKnown(const D: TDiameter; const KnownKind: Integer; const KnownValue: Double);
+procedure TFormTypeEditor.RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
 const
-  QK_QNOM = 1;
-  QK_QTR = 2;
-  QK_QMIN = 3;
-  QK_QMAX = 4;
-  QK_Q4 = 5;
   C_QTR_TO_QNOM = 0.05;
   C_QMIN_TO_QNOM = 0.02;
   C_Q4_TO_QNOM = 1.25;
@@ -555,12 +550,12 @@ begin
   if (D = nil) or (KnownValue <= 0) then
     Exit;
 
-  case KnownKind of
-    QK_QNOM: Qnom := KnownValue;
-    QK_QTR: Qnom := KnownValue / C_QTR_TO_QNOM;
-    QK_QMIN: Qnom := KnownValue / C_QMIN_TO_QNOM;
-    QK_QMAX: Qnom := KnownValue;
-    QK_Q4: Qnom := KnownValue / C_Q4_TO_QNOM;
+  case KnownCol of
+    -1,  StringColumnDNQnom.Index: Qnom := KnownValue;
+    StringColumnDNQtr.Index: Qnom := KnownValue / C_QTR_TO_QNOM;
+    StringColumnDNQmin.Index: Qnom := KnownValue / C_QMIN_TO_QNOM;
+    StringColumnDNQmax.Index: Qnom := KnownValue;
+    StringColumnDNQF.Index: Qnom := KnownValue / C_Q4_TO_QNOM;
   else
     Exit;
   end;
@@ -916,7 +911,7 @@ begin
     if (D <> nil) and (D.State <> osDeleted) then
     begin
       if GetQValue(FDiameterQnom, D.ID) <= 0 then
-        RecalcQRowFromKnown(D, 4, D.Qmax);
+        RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
       Inc(VisibleCount);
     end;
 
@@ -3253,16 +3248,7 @@ begin
           (ACol = StringColumnDNQF.Index) then
   begin
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
-    if ACol = StringColumnDNQnom.Index then
-      RecalcQRowFromKnown(D, 1, QValueBase)
-    else if ACol = StringColumnDNQtr.Index then
-      RecalcQRowFromKnown(D, 2, QValueBase)
-    else if ACol = StringColumnDNQmin.Index then
-      RecalcQRowFromKnown(D, 3, QValueBase)
-    else if ACol = StringColumnDNQmax.Index then
-      RecalcQRowFromKnown(D, 4, QValueBase)
-    else if ACol = StringColumnDNQF.Index then
-      RecalcQRowFromKnown(D, 5, QValueBase);
+    RecalcQRowFromKnown(D, ACol, QValueBase);
     Qmax := D.Qmax;
 
     { Не ломаем существующий расчетный QFmax для частотного выхода }
