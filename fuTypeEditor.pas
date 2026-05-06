@@ -1313,6 +1313,11 @@ begin
   if NewD.ID = 0 then
     NewD.ID := -(FType.Diameters.Count + 1);
 
+  NewD.Q2 := 0;
+  NewD.Qmin := 0;
+  if NewD.Qnom <= 0 then
+    NewD.Qnom := NewD.Qmax / 1.25;
+
   RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
 
   {--------------------------------------------------}
