@@ -370,7 +370,13 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
+  FDiameterQnom: TDictionary<Integer, Double>;
+  FDiameterQtr: TDictionary<Integer, Double>;
+  FDiameterQ4: TDictionary<Integer, Double>;
 
+  function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
+  procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
+  procedure RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
 
 
 
@@ -412,6 +418,7 @@ type
   public
 
      constructor Create(AOwner: TComponent; AType: TDeviceType);
+     destructor Destroy; override;
 
     { Public declarations }
     procedure LoadType(AType: TDeviceType);
@@ -502,11 +509,71 @@ end;
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
  begin
    inherited Create(AOwner);
+   FDiameterQnom := TDictionary<Integer, Double>.Create;
+   FDiameterQtr := TDictionary<Integer, Double>.Create;
+   FDiameterQ4 := TDictionary<Integer, Double>.Create;
    TabItemCoefs.Visible := False;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
    LoadType(AType);
  end;
+
+destructor TFormTypeEditor.Destroy;
+begin
+  FDiameterQnom.Free;
+  FDiameterQtr.Free;
+  FDiameterQ4.Free;
+  inherited;
+end;
+
+function TFormTypeEditor.GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
+begin
+  if (AMap = nil) or (not AMap.TryGetValue(ADiameterID, Result)) then
+    Result := 0;
+end;
+
+procedure TFormTypeEditor.SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
+begin
+  if AMap = nil then
+    Exit;
+  AMap.AddOrSetValue(ADiameterID, AValue);
+end;
+
+procedure TFormTypeEditor.RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
+const
+  C_QTR_TO_QNOM = 0.05;
+  C_QMIN_TO_QNOM = 0.02;
+  C_Q4_TO_QNOM = 1.25;
+var
+  Qnom, Qtr, Qmin, Qmax, Q4: Double;
+begin
+  if (D = nil) or (KnownValue <= 0) then
+    Exit;
+
+  case KnownCol of
+    -1,  StringColumnDNQnom.Index: Qnom := KnownValue;
+    StringColumnDNQtr.Index: Qnom := KnownValue / C_QTR_TO_QNOM;
+    StringColumnDNQmin.Index: Qnom := KnownValue / C_QMIN_TO_QNOM;
+    StringColumnDNQmax.Index: Qnom := KnownValue;
+    StringColumnDNQF.Index: Qnom := KnownValue / C_Q4_TO_QNOM;
+  else
+    Exit;
+  end;
+
+  if Qnom <= 0 then
+    Exit;
+
+  Qtr := Qnom * C_QTR_TO_QNOM;
+  Qmin := Qnom * C_QMIN_TO_QNOM;
+  Qmax := Qnom;
+  Q4 := Qnom * C_Q4_TO_QNOM;
+
+  D.Qmax := Qmax;
+  D.Qmin := Qmin;
+  SetQValue(FDiameterQnom, D.ID, Qnom);
+  SetQValue(FDiameterQtr, D.ID, Qtr);
+  SetQValue(FDiameterQ4, D.ID, Q4);
+end;
 
 procedure TFormTypeEditor.InitCoefsTab;
 
@@ -842,7 +909,11 @@ begin
   VisibleCount := 0;
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
+    begin
+      if GetQValue(FDiameterQnom, D.ID) <= 0 then
+        RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
       Inc(VisibleCount);
+    end;
 
   GridDiameters.BeginUpdate;
   try
@@ -3001,10 +3072,10 @@ begin
   // =====================================================
   else if ACol = StringColumnDNQnom.Index then
   begin
-    if D.Qmax = 0 then
+    if GetQValue(FDiameterQnom, D.ID) = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQnom, D.ID)), FType.Error);
   end
 
   // =====================================================
@@ -3012,10 +3083,10 @@ begin
   // =====================================================
   else if ACol = StringColumnDNQtr.Index then
   begin
-    if D.Qmax = 0 then
+    if GetQValue(FDiameterQtr, D.ID) = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmax), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQtr, D.ID)), FType.Error);
   end
 
   // =====================================================
@@ -3041,14 +3112,14 @@ begin
   end
 
   // =====================================================
-  // == QF
+  // == Q перегрузочный (Q4)
   // =====================================================
   else if ACol = StringColumnDNQF.Index then
   begin
-    if D.QFmax = 0 then
+    if GetQValue(FDiameterQ4, D.ID) = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.QFmax), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQ4, D.ID)), FType.Error);
   end
 
   // =====================================================
@@ -3135,7 +3206,7 @@ procedure TFormTypeEditor.GridDiametersSetValue(
 var
   D: TDiameter;
   S: string;
-  Qmax, RangeDynamic, NewCoef: Double;
+  Qmax, RangeDynamic, NewCoef, QValueBase: Double;
   SelD: TDiameter;
 begin
   {-----------------------------------------------------}
@@ -3172,23 +3243,19 @@ begin
   {=====================================================}
   else if (ACol = StringColumnDNQnom.Index) or
           (ACol = StringColumnDNQtr.Index) or
-          (ACol = StringColumnDNQmax.Index) then
+          (ACol = StringColumnDNQmax.Index) or
+          (ACol = StringColumnDNQmin.Index) or
+          (ACol = StringColumnDNQF.Index) then
   begin
-    Qmax := FType.ToBaseUnits(NormalizeFloatInput(S));
-    D.Qmax := Qmax;
+    QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
+    RecalcQRowFromKnown(D, ACol, QValueBase);
+    Qmax := D.Qmax;
 
-    { QF = Qmax }
+    { Не ломаем существующий расчетный QFmax для частотного выхода }
     if FType.FreqFlowRate > 0 then
       D.QFmax := Qmax * FType.FreqFlowRate
     else
       D.QFmax := Qmax;
-
-    { Qmin из динамического диапазона типа }
-    RangeDynamic := FType.RangeDynamic;
-    if (RangeDynamic > 0) and (Qmax > 0) then
-      D.Qmin := Qmax / RangeDynamic
-    else
-      D.Qmin := 0;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
@@ -3198,44 +3265,7 @@ begin
   {=====================================================}
   { Qmin (ручной ввод) }
   {=====================================================}
-  else if ACol = StringColumnDNQmin.Index then
-  begin
-    D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
-
-    { ручной ввод => диапазон не актуален }
-    FType.RangeDynamic := 0;
-    EditRangeDynamic.Text := '';
-
-    UpdateRangeDynamicPromptBySelectedDiameter;
-  end
-
-  {=====================================================}
-  { QF }
-  {=====================================================}
-  else if ACol = StringColumnDNQF.Index then
-  begin
-    D.QFmax := FType.ToBaseUnits(NormalizeFloatInput(S));
-
-    if D.Qmax > 0 then
-      NewCoef := D.QFmax / D.Qmax
-    else
-      NewCoef := 0;
-
-    if not SameValue(NewCoef, FType.FreqFlowRate) then
-    begin
-      FType.FreqFlowRate := 0;
-      EditFreqFlowRate.Text := '';
-
-      if NewCoef > 0 then
-        EditFreqFlowRate.TextPrompt := FloatToStr(NewCoef)
-      else
-        EditFreqFlowRate.TextPrompt := '-';
-    end;
-
-    SelD := GetDiameterByVisibleRow(GridDiameters.Row);
-    if SelD = D then
-      RecalcPointsBySelectedDiameter;
-  end
+  else if False then begin end
 
   {=====================================================}
   { Kp }
@@ -4209,7 +4239,7 @@ begin
   StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
-  StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4234,7 +4264,7 @@ begin
   StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
-  StringColumnDNQF.Header   := 'QF, ' + FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
