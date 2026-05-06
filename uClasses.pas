@@ -177,7 +177,7 @@ type
     {====================================================================}
     Kp: Double;                  // Базовый коэффициент преобразования (имп/л или имп/кг)
     QFmax: Double;               // Расход, соответствующий максимальной частоте выхода
-
+    FlowRate: double;
     {====================================================================}
     { ОБЪЕМ / МАССА (для емкостей и весов) }
     {====================================================================}
@@ -415,8 +415,8 @@ type
     procedure GetNextStdDN(const ADN: string; out NextDNStr: string; out NextDNmm: Integer);
 
     class function CalcQmaxByDiameter(
-      const OldQmax: Double;
-      const OldDN, NewDN: Integer
+      const OldQmax,FlowRate: Double;
+      const oldDN,NewDN: Integer
     ): Double; static;
 
     class function CalcKpByDiameter(
@@ -967,6 +967,7 @@ begin
   Kp := 0.0;
   QFmax := 0.0;
   Enable:=false;
+  flowrate:=0;
   {====================================================================}
   { Объем / масса }
   {====================================================================}
@@ -1574,6 +1575,7 @@ begin
   {--- Qmax ∝ D² ---}
   Result.Qmax := CalcQmaxByDiameter(
     Src.Qmax,
+    Src.FlowRate,
     OldDNmm,
     NewDNmm
   );
@@ -1733,14 +1735,21 @@ procedure TDeviceType.AddPointData(const AName, ADesc: string; AFlowRate: Double
 
 
   class function TDeviceType.CalcQmaxByDiameter(
-  const OldQmax: Double;
-  const OldDN, NewDN: Integer
+  const OldQmax,FlowRate: Double;
+  const oldDN,NewDN: Integer
 ): Double;
+var
+FL:Double;
 begin
-  if (OldQmax <= 0) or (OldDN <= 0) or (NewDN <= 0) then
+  if FlowRate = 0 then
+    FL :=  (  OldQmax/(0.002827* Sqr(oldDN))  )
+  else
+    FL :=  FlowRate;
+
+  if (OldQmax <= 0) or (NewDN <= 0) then
     Exit(OldQmax);
 
-  Result := OldQmax * Sqr(NewDN / OldDN);
+  Result := 0.002827*FL * Sqr(NewDN);
 end;
 
 class function TDeviceType.CalcKpByDiameter(
