@@ -2853,9 +2853,16 @@ begin
   FType.RangeDynamic := RangeDynamic;
 
   // -----------------------------------------------------
-  // Qmin больше не пересчитываем от динамического диапазона:
-  // для Q-таблицы он задаётся коэффициентами/табличными значениями.
+  // Пересчитываем Qmin по динамическому диапазону (как было ранее):
+  // изменение EditRangeDynamic должно влиять на значения в гриде.
   // -----------------------------------------------------
+  for I := 0 to FDiametersLocal.Count - 1 do
+  begin
+    if FDiametersLocal[I].Qmax > 0 then
+      FDiametersLocal[I].Qmin := FDiametersLocal[I].Qmax / RangeDynamic
+    else
+      FDiametersLocal[I].Qmin := 0;
+  end;
 
   // -----------------------------------------------------
   // Форматируем отображение 1:X
@@ -3318,7 +3325,8 @@ begin
   if D = nil then
     Exit;
 
-    D.State:=osModified;
+  if D.State <> osNew then
+    D.State := osModified;
 
   S := Trim(Value.ToString);
 
