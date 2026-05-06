@@ -232,8 +232,7 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
-    StringColumnDNQnom: TStringColumn;
-    StringColumnDNQtr: TStringColumn;
+    StringColumnDNQ2: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQF: TStringColumn;
@@ -267,6 +266,7 @@ type
       var Value: TValue);
     procedure GridDiametersSelChanged(Sender: TObject);
     procedure EditRangeDynamicExit(Sender: TObject);
+    procedure EditFlowRateExit(Sender: TObject);
     procedure GridDiametersSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -289,6 +289,8 @@ type
     procedure EditRangeDynamicEnter(Sender: TObject);
     procedure UpdateRangeDynamicPrompt;
     procedure UpdateRangeDynamicPromptBySelectedDiameter;
+    procedure UpdateFlowRatePromptBySelectedDiameter;
+    procedure UpdateFlowRateFromDiameter(const D: TDiameter);
     procedure EditErrorExit(Sender: TObject);
     procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
@@ -370,8 +372,7 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
-  FDiameterQnom: TDictionary<Integer, Double>;
-  FDiameterQtr: TDictionary<Integer, Double>;
+  FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
@@ -386,6 +387,7 @@ type
 
   //procedure LoadDiametersForType;
 
+  procedure EnsureUniqueDiameterIDs;
   procedure UpdateDiametersGrid;
   procedure UpdatePointsGrid;
   function GetDiameterByVisibleRow(ARow: Integer): TDiameter;
@@ -509,8 +511,7 @@ end;
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
  begin
    inherited Create(AOwner);
-   FDiameterQnom := TDictionary<Integer, Double>.Create;
-   FDiameterQtr := TDictionary<Integer, Double>.Create;
+   FDiameterQ2 := TDictionary<Integer, Double>.Create;
    FDiameterQ4 := TDictionary<Integer, Double>.Create;
    TabItemCoefs.Visible := False;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
@@ -520,8 +521,7 @@ end;
 
 destructor TFormTypeEditor.Destroy;
 begin
-  FDiameterQnom.Free;
-  FDiameterQtr.Free;
+  FDiameterQ2.Free;
   FDiameterQ4.Free;
   inherited;
 end;
@@ -541,37 +541,53 @@ end;
 
 procedure TFormTypeEditor.RecalcQRowFromKnown(const D: TDiameter; const KnownCol: Integer; const KnownValue: Double);
 const
-  C_QTR_TO_QNOM = 0.05;
+  C_QTR_TO_QNOM = 0.0075;
   C_QMIN_TO_QNOM = 0.02;
   C_Q4_TO_QNOM = 1.25;
 var
-  Qnom, Qtr, Qmin, Qmax, Q4: Double;
+  K1, K2, K4, Qmin, Q2, Qmax, Q4: Double;
 begin
   if (D = nil) or (KnownValue <= 0) then
     Exit;
 
-  case KnownCol of
-    -1,  StringColumnDNQnom.Index: Qnom := KnownValue;
-    StringColumnDNQtr.Index: Qnom := KnownValue / C_QTR_TO_QNOM;
-    StringColumnDNQmin.Index: Qnom := KnownValue / C_QMIN_TO_QNOM;
-    StringColumnDNQmax.Index: Qnom := KnownValue;
-    StringColumnDNQF.Index: Qnom := KnownValue / C_Q4_TO_QNOM;
+    if D.Qmax > 0 then
+  begin
+    K1 := D.Qmin / D.Qmax;
+    K2 := GetQValue(FDiameterQ2, D.ID) / D.Qmax;
+    K4 := GetQValue(FDiameterQ4, D.ID) / D.Qmax;
+  end
   else
-    Exit;
+  begin
+    K1 := C_QMIN_TO_QNOM;
+    K2 := C_QTR_TO_QNOM;
+    K4 := C_Q4_TO_QNOM;
   end;
 
-  if Qnom <= 0 then
+  if K1 <= 0 then K1 := C_QMIN_TO_QNOM;
+  if (K2 <= 0) or (K2 > 0.02) then K2 := C_QTR_TO_QNOM;
+  if (K4 <= 0) or (K4 < 1) then K4 := C_Q4_TO_QNOM;
+
+  if KnownCol = StringColumnDNQ2.Index then
+    Qmax := KnownValue / K2
+  else if KnownCol = StringColumnDNQmin.Index then
+    Qmax := KnownValue / K1
+  else if KnownCol = StringColumnDNQmax.Index then
+    Qmax := KnownValue
+  else if KnownCol = StringColumnDNQF.Index then
+    Qmax := KnownValue / K4
+  else
     Exit;
 
-  Qtr := Qnom * C_QTR_TO_QNOM;
-  Qmin := Qnom * C_QMIN_TO_QNOM;
-  Qmax := Qnom;
-  Q4 := Qnom * C_Q4_TO_QNOM;
+  if Qmax <= 0 then
+    Exit;
+
+  Q2 := Qmax * K2;
+  Qmin := Qmax * K1;
+  Q4 := Qmax * K4;
 
   D.Qmax := Qmax;
   D.Qmin := Qmin;
-  SetQValue(FDiameterQnom, D.ID, Qnom);
-  SetQValue(FDiameterQtr, D.ID, Qtr);
+  SetQValue(FDiameterQ2, D.ID, Q2);
   SetQValue(FDiameterQ4, D.ID, Q4);
 end;
 
@@ -898,6 +914,39 @@ begin
   FType.ReportingForm     := EditReportingForm.Text;
 end;
 
+
+procedure TFormTypeEditor.EnsureUniqueDiameterIDs;
+var
+  Seen: TDictionary<Integer, Byte>;
+  D: TDiameter;
+  NextTmpID: Integer;
+begin
+  if FDiametersLocal = nil then
+    Exit;
+
+  Seen := TDictionary<Integer, Byte>.Create;
+  try
+    NextTmpID := -1;
+    for D in FDiametersLocal do
+    begin
+      if D = nil then
+        Continue;
+
+      if (D.ID = 0) or Seen.ContainsKey(D.ID) then
+      begin
+        while Seen.ContainsKey(NextTmpID) do
+          Dec(NextTmpID);
+        D.ID := NextTmpID;
+        Dec(NextTmpID);
+      end;
+
+      Seen.AddOrSetValue(D.ID, 1);
+    end;
+  finally
+    Seen.Free;
+  end;
+end;
+
 procedure TFormTypeEditor.UpdateDiametersGrid;
 var
   D: TDiameter;
@@ -906,11 +955,14 @@ begin
   if FDiametersLocal = nil then
     Exit;
 
+  EnsureUniqueDiameterIDs;
+
   VisibleCount := 0;
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      if GetQValue(FDiameterQnom, D.ID) <= 0 then
+      if (D.Qmax <= 0) or (D.Qmin <= 0) or (GetQValue(FDiameterQ2, D.ID) <= 0) or (GetQValue(FDiameterQ4, D.ID) <= 0) or
+         (not SameValue(GetQValue(FDiameterQ4, D.ID), D.Qmax * 1.25, 0.0001)) then
         RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
       Inc(VisibleCount);
     end;
@@ -1244,6 +1296,11 @@ begin
   NewD := FType.CopyDiameter(SrcIndex);
   if NewD = nil then
     Exit;
+
+  if NewD.ID = 0 then
+    NewD.ID := -(FType.Diameters.Count + 1);
+
+  RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
 
   {--------------------------------------------------}
   { Обновляем локальный список }
@@ -2992,6 +3049,34 @@ begin
     E.Text := StringReplace(E.Text, '  ', ' ', [rfReplaceAll]);
 end;
 
+
+procedure TFormTypeEditor.EditFlowRateExit(Sender: TObject);
+var
+  D: TDiameter;
+  V, Qmax: Double;
+  DNmm: Integer;
+begin
+  if FLoading then
+    Exit;
+
+  V := NormalizeFloatInput(EditFlowRate.Text);
+  if V <= 0 then
+    Exit;
+
+  D := GetDiameterByVisibleRow(GridDiameters.Selected);
+  if D = nil then
+    Exit;
+
+  DNmm := StrToIntDef(D.DN, 0);
+  if DNmm <= 0 then
+    Exit;
+
+  Qmax := 0.002827 * V * Sqr(DNmm);
+  RecalcQRowFromKnown(D, StringColumnDNQmax.Index, Qmax);
+  SetModified;
+  UpdateDiametersGrid;
+end;
+
 procedure TFormTypeEditor.UpdateRangeDynamicPrompt;
 var
   Idx: Integer;
@@ -3068,25 +3153,14 @@ begin
     Value := StrToIntDef(D.DN, 0)
 
   // =====================================================
-  // == Qnom
+  // == Q2
   // =====================================================
-  else if ACol = StringColumnDNQnom.Index then
+  else if ACol = StringColumnDNQ2.Index then
   begin
-    if GetQValue(FDiameterQnom, D.ID) = 0 then
+    if GetQValue(FDiameterQ2, D.ID) = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQnom, D.ID)), FType.Error);
-  end
-
-  // =====================================================
-  // == Qtr
-  // =====================================================
-  else if ACol = StringColumnDNQtr.Index then
-  begin
-    if GetQValue(FDiameterQtr, D.ID) = 0 then
-      Value := '—'
-    else
-      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQtr, D.ID)), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(GetQValue(FDiameterQ2, D.ID)), FType.Error);
   end
 
   // =====================================================
@@ -3158,6 +3232,9 @@ begin
   if Trim(EditRangeDynamic.Text) = '' then
     UpdateRangeDynamicPromptBySelectedDiameter;
 
+  if Trim(EditFlowRate.Text) = '' then
+    UpdateFlowRatePromptBySelectedDiameter;
+
   // ----------------------------------------
   // FreqFlowRate не задан — считаем и показываем подсказку
   // ----------------------------------------
@@ -3206,7 +3283,8 @@ procedure TFormTypeEditor.GridDiametersSetValue(
 var
   D: TDiameter;
   S: string;
-  Qmax, RangeDynamic, NewCoef, QValueBase: Double;
+  Qmax, RangeDynamic, NewCoef, QValueBase, FlowRateVal: Double;
+  DNmm: Integer;
   SelD: TDiameter;
 begin
   {-----------------------------------------------------}
@@ -3239,16 +3317,31 @@ begin
     D.DN := IntToStr(Round(NormalizeFloatInput(S)))
 
   {=====================================================}
-  { Qnom / Qtr / Qmax }
+  { Q2 / Qmax / Qmin / Q перегрузочный }
   {=====================================================}
-  else if (ACol = StringColumnDNQnom.Index) or
-          (ACol = StringColumnDNQtr.Index) or
+  else if (ACol = StringColumnDNQ2.Index) or
           (ACol = StringColumnDNQmax.Index) or
           (ACol = StringColumnDNQmin.Index) or
           (ACol = StringColumnDNQF.Index) then
   begin
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
-    RecalcQRowFromKnown(D, ACol, QValueBase);
+
+    if Trim(EditFlowRate.Text) = '' then
+      RecalcQRowFromKnown(D, ACol, QValueBase)
+    else
+    begin
+      FlowRateVal := NormalizeFloatInput(EditFlowRate.Text);
+      DNmm := StrToIntDef(D.DN, 0);
+
+      if (FlowRateVal > 0) and (DNmm > 0) then
+      begin
+        D.Qmax := 0.002827 * FlowRateVal * Sqr(DNmm);
+        RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
+      end
+      else
+        RecalcQRowFromKnown(D, ACol, QValueBase);
+    end;
+
     Qmax := D.Qmax;
 
     { Не ломаем существующий расчетный QFmax для частотного выхода }
@@ -3256,6 +3349,9 @@ begin
       D.QFmax := Qmax * FType.FreqFlowRate
     else
       D.QFmax := Qmax;
+
+    if Trim(EditFlowRate.Text) = '' then
+      UpdateFlowRateFromDiameter(D);
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
@@ -3539,8 +3635,16 @@ begin
       'https://fgis.gost.ru/fundmetrology/eapi/mit/' +
       '?search=*' + TNetEncoding.URL.Encode(ReestrNum);
 
-    Resp := NetHTTPClient1.Get(Url);
-    ResponseText := Resp.ContentAsString;
+    try
+      Resp := NetHTTPClient1.Get(Url);
+      ResponseText := Resp.ContentAsString;
+    except
+      on E: ENetHTTPClientException do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        Exit;
+      end;
+    end;
 
     MemoLog.Lines.Add('URL поиска: ' + Url);
     MemoLog.Lines.Add(ResponseText);
@@ -3574,8 +3678,16 @@ begin
       'https://fgis.gost.ru/fundmetrology/eapi/mit/' +
       UUID;
 
-    Resp := NetHTTPClient1.Get(Url);
-    ResponseText := Resp.ContentAsString;
+    try
+      Resp := NetHTTPClient1.Get(Url);
+      ResponseText := Resp.ContentAsString;
+    except
+      on E: ENetHTTPClientException do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        Exit;
+      end;
+    end;
 
     MemoLog.Lines.Add('URL карточки: ' + Url);
     MemoLog.Lines.Add(ResponseText);
@@ -3705,8 +3817,13 @@ begin
 
             FileStream := TFileStream.Create(FilePath, fmCreate);
             try
-              NetHTTPClient1.Get(DocUrl, FileStream);
-              DevType.Documentation := FilePath;
+              try
+                NetHTTPClient1.Get(DocUrl, FileStream);
+                DevType.Documentation := FilePath;
+              except
+                on E: ENetHTTPClientException do
+                  MemoLog.Lines.Add('ERROR: ' + E.Message);
+              end;
             finally
               FileStream.Free;
             end;
@@ -3981,6 +4098,37 @@ begin
   Result := OldKp * Sqr(OldDN / NewDN); // ∝ 1 / D²
 end;
 
+
+procedure TFormTypeEditor.UpdateFlowRateFromDiameter(const D: TDiameter);
+var
+  DNmm: Integer;
+  V: Double;
+begin
+  if D = nil then
+    Exit;
+
+  DNmm := StrToIntDef(D.DN, 0);
+  if (DNmm > 0) and (D.Qmax > 0) then
+  begin
+    V := D.Qmax / (0.002827 * Sqr(DNmm));
+    EditFlowRate.Text := '';
+    EditFlowRate.TextPrompt := FormatFloat('0.###', V);
+  end
+  else
+  begin
+    EditFlowRate.Text := '';
+    EditFlowRate.TextPrompt := '-';
+  end;
+end;
+
+procedure TFormTypeEditor.UpdateFlowRatePromptBySelectedDiameter;
+var
+  D: TDiameter;
+begin
+  D := GetDiameterByVisibleRow(GridDiameters.Selected);
+  UpdateFlowRateFromDiameter(D);
+end;
+
 procedure TFormTypeEditor.UpdateRangeDynamicPromptBySelectedDiameter;
 var
   D: TDiameter;
@@ -4123,8 +4271,7 @@ begin
   // ==================================================
   // СБРОС ЗАГОЛОВКОВ
   // ==================================================
-  StringColumnDNQnom.Header := '';
-  StringColumnDNQtr.Header := '';
+  StringColumnDNQ2.Header := '';
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
   StringColumnDNQF.Header   := '';
@@ -4235,9 +4382,8 @@ procedure TFormTypeEditor.ApplyVolumeMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
-  StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
+  StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qnom (Q3), ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
@@ -4260,9 +4406,8 @@ procedure TFormTypeEditor.ApplyMassMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQnom.Header := 'Qnom, ' + FType.GetDimensionName;
-  StringColumnDNQtr.Header := 'Qtr, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
+  StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qnom (Q3), ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
