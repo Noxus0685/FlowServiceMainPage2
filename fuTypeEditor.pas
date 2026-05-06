@@ -974,9 +974,11 @@ begin
       if D.Q2 <= 0 then
         D.Q2 := D.Qnom * 0.0075;
 
-      if (D.State <> osNew) and (D.Qnom > 0) and ((D.Qmax <= 0) or (D.Qmin <= 0) or
-         (not SameValue(D.Qmax, D.Qnom * 1.25, 0.0001))) then
+      if (D.State <> osNew) and (D.Qnom <= 0) and (D.Qmax > 0) then
+      begin
+        D.Qnom := D.Qmax / 1.25;
         RecalcQRowFromKnown(D, StringColumnDNQF.Index, D.Qnom);
+      end;
       Inc(VisibleCount);
     end;
 
@@ -1313,12 +1315,13 @@ begin
   if NewD.ID = 0 then
     NewD.ID := -(FType.Diameters.Count + 1);
 
-  NewD.Q2 := 0;
-  NewD.Qmin := 0;
-  if NewD.Qnom <= 0 then
+  if NewD.Qmax > 0 then
+  begin
+    NewD.Q2 := 0;
+    NewD.Qmin := 0;
     NewD.Qnom := NewD.Qmax / 1.25;
-
-  RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
+    RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
+  end;
 
   {--------------------------------------------------}
   { Обновляем локальный список }
