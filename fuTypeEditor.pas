@@ -925,7 +925,7 @@ begin
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      if (D.Qmax <= 0) or (GetQValue(FDiameterQ2, D.ID) <= 0) or (GetQValue(FDiameterQ4, D.ID) <= 0) then
+      if (D.Qmax <= 0) or (D.Qmin <= 0) or (GetQValue(FDiameterQ2, D.ID) <= 0) or (GetQValue(FDiameterQ4, D.ID) <= 0) then
         RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
       Inc(VisibleCount);
     end;
@@ -3285,16 +3285,7 @@ begin
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     if Trim(EditFlowRate.Text) = '' then
-    begin
-      if ACol = StringColumnDNQ2.Index then
-        SetQValue(FDiameterQ2, D.ID, QValueBase)
-      else if ACol = StringColumnDNQmax.Index then
-        D.Qmax := QValueBase
-      else if ACol = StringColumnDNQmin.Index then
-        D.Qmin := QValueBase
-      else if ACol = StringColumnDNQF.Index then
-        SetQValue(FDiameterQ4, D.ID, QValueBase);
-    end
+      RecalcQRowFromKnown(D, ACol, QValueBase)
     else
     begin
       FlowRateVal := NormalizeFloatInput(EditFlowRate.Text);
@@ -4350,7 +4341,7 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qnom (Q3), ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
@@ -4374,7 +4365,7 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Qmax, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qnom (Q3), ' + FType.GetDimensionName;
   StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
   StringColumnDNQF.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
