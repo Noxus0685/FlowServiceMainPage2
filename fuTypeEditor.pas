@@ -3207,7 +3207,8 @@ procedure TFormTypeEditor.GridDiametersSetValue(
 var
   D: TDiameter;
   S: string;
-  Qmax, RangeDynamic, NewCoef, QValueBase: Double;
+  Qmax, RangeDynamic, NewCoef, QValueBase, FlowRateVal: Double;
+  DNmm: Integer;
   SelD: TDiameter;
 begin
   {-----------------------------------------------------}
@@ -3261,7 +3262,18 @@ begin
         SetQValue(FDiameterQ4, D.ID, QValueBase);
     end
     else
-      RecalcQRowFromKnown(D, ACol, QValueBase);
+    begin
+      FlowRateVal := NormalizeFloatInput(EditFlowRate.Text);
+      DNmm := StrToIntDef(D.DN, 0);
+
+      if (FlowRateVal > 0) and (DNmm > 0) then
+      begin
+        D.Qmax := 0.002827 * FlowRateVal * Sqr(DNmm);
+        RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
+      end
+      else
+        RecalcQRowFromKnown(D, ACol, QValueBase);
+    end;
 
     Qmax := D.Qmax;
 
