@@ -266,6 +266,7 @@ type
       var Value: TValue);
     procedure GridDiametersSelChanged(Sender: TObject);
     procedure EditRangeDynamicExit(Sender: TObject);
+    procedure EditFlowRateExit(Sender: TObject);
     procedure GridDiametersSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -3004,6 +3005,34 @@ begin
     E.Text := StringReplace(E.Text, '  ', ' ', [rfReplaceAll]);
 end;
 
+
+procedure TFormTypeEditor.EditFlowRateExit(Sender: TObject);
+var
+  D: TDiameter;
+  V, Qmax: Double;
+  DNmm: Integer;
+begin
+  if FLoading then
+    Exit;
+
+  V := NormalizeFloatInput(EditFlowRate.Text);
+  if V <= 0 then
+    Exit;
+
+  D := GetDiameterByVisibleRow(GridDiameters.Selected);
+  if D = nil then
+    Exit;
+
+  DNmm := StrToIntDef(D.DN, 0);
+  if DNmm <= 0 then
+    Exit;
+
+  Qmax := 0.002827 * V * Sqr(DNmm);
+  RecalcQRowFromKnown(D, StringColumnDNQmax.Index, Qmax);
+  SetModified;
+  UpdateDiametersGrid;
+end;
+
 procedure TFormTypeEditor.UpdateRangeDynamicPrompt;
 var
   Idx: Integer;
@@ -3282,6 +3311,13 @@ begin
       D.QFmax := Qmax * FType.FreqFlowRate
     else
       D.QFmax := Qmax;
+
+    DNmm := StrToIntDef(D.DN, 0);
+    if (Trim(EditFlowRate.Text) = '') and (DNmm > 0) and (D.Qmax > 0) then
+    begin
+      EditFlowRate.TextPrompt := FormatFloat('0.###', D.Qmax / (0.002827 * Sqr(DNmm)));
+      EditFlowRate.Text := '';
+    end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then

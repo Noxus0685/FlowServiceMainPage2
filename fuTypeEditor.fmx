@@ -2168,8 +2168,7 @@ object FormTypeEditor: TFormTypeEditor
             KillFocusByReturn = True
             ParentShowHint = False
             ShowHint = True
-            OnEnter = EditRangeDynamicEnter
-            OnExit = EditRangeDynamicExit
+            OnExit = EditFlowRateExit
             Left = 276
             Top = 15
           end
