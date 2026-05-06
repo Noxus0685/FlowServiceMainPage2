@@ -1261,6 +1261,11 @@ begin
   if NewD = nil then
     Exit;
 
+  if NewD.ID = 0 then
+    NewD.ID := -(FType.Diameters.Count + 1);
+
+  RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
+
   {--------------------------------------------------}
   { Обновляем локальный список }
   {--------------------------------------------------}
