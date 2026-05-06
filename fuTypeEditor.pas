@@ -3322,7 +3322,7 @@ begin
 
   S := Trim(Value.ToString);
 
-  if ACol = StringColumnPointName.Index then
+  if ACol = CheckColumnDNEnable.Index then
     D.Enable := not D.Enable
 
   {=====================================================}
