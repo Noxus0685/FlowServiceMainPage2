@@ -232,12 +232,11 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
-    StringColumnDNQTr: TStringColumn;
-    StringColumnDNQF: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQnom: TStringColumn;
     StringColumnDNKp: TStringColumn;
+    StringColumnDNQTr: TStringColumn;
     EditRegDate: TEdit;
     Layout47: TLayout;
     Label42: TLabel;
@@ -261,6 +260,7 @@ type
     Layout48: TLayout;
     Label4: TLabel;
     EditFlowRate: TEdit;
+    StringColumnDNQF: TStringColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
