@@ -3621,15 +3621,17 @@ procedure TFormTypeEditor.GridPointsSetValue(
 
   function TryApplyPointNameFormula(const AText: string; AP: TTypePoint): Boolean;
   var
-    SepPos, I: Integer;
+    SepPos, I, StartColPos: Integer;
     CoefText, ColText: string;
     K, ColValue: Double;
     LocalD: TDiameter;
+    Ch: Char;
   begin
     Result := False;
     if (AP = nil) then
       Exit;
 
+    K := 1;
     SepPos := Pos('*', AText);
     if SepPos = 0 then
     begin
@@ -3641,15 +3643,45 @@ procedure TFormTypeEditor.GridPointsSetValue(
         end;
     end;
 
-    if SepPos <= 1 then
+    if SepPos > 0 then
+    begin
+      CoefText := Trim(Copy(AText, 1, SepPos - 1));
+      ColText := Trim(Copy(AText, SepPos + 1, MaxInt));
+      if ColText = '' then
+        Exit;
+      if CoefText <> '' then
+        K := NormalizeFloatInput(CoefText);
+    end
+    else
+    begin
+      StartColPos := 0;
+      for I := 1 to Length(AText) do
+      begin
+        Ch := AText[I];
+        if not (Ch in ['0'..'9', ',', '.', ' ']) then
+        begin
+          StartColPos := I;
+          Break;
+        end;
+      end;
+
+      if StartColPos > 1 then
+      begin
+        CoefText := Trim(Copy(AText, 1, StartColPos - 1));
+        ColText := Trim(Copy(AText, StartColPos, MaxInt));
+        if CoefText <> '' then
+          K := NormalizeFloatInput(CoefText);
+      end
+      else
+      begin
+        CoefText := '';
+        ColText := Trim(AText);
+      end;
+    end;
+
+    if ColText = '' then
       Exit;
 
-    CoefText := Trim(Copy(AText, 1, SepPos - 1));
-    ColText := Trim(Copy(AText, SepPos + 1, MaxInt));
-    if (CoefText = '') or (ColText = '') then
-      Exit;
-
-    K := NormalizeFloatInput(CoefText);
     LocalD := GetDiameterByVisibleRow(GridDiameters.Row);
     if (LocalD = nil) or (not TryGetDiameterColumnValueByName(LocalD, ColText, ColValue)) then
       Exit;
