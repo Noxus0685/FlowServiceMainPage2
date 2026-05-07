@@ -3213,6 +3213,16 @@ begin
   // =====================================================
   // == Qmin
   // =====================================================
+
+    else if ACol = StringColumnDNQmin.Index then
+  begin
+    if D.Qmin = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmin), FType.Error);
+  end
+
+
   else if ACol = StringColumnDNQF.Index then
     begin
       if D.QFmax = 0 then
@@ -3404,11 +3414,15 @@ begin
       UpdateFlowRateFromDiameter(D);
     end;
 
-    if ACol = StringColumnDNQmin.Index then
+   if ACol = StringColumnDNQmin.Index then
     begin
-      FType.RangeDynamic := 0;
-      EditRangeDynamic.Text := '';
-      UpdateRangeDynamicPromptBySelectedDiameter;
+    D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
+
+    { ручной ввод => диапазон не актуален }
+    FType.RangeDynamic := 0;
+    EditRangeDynamic.Text := '';
+
+    UpdateRangeDynamicPromptBySelectedDiameter;
     end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
