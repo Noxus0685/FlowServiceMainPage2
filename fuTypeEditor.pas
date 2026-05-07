@@ -4512,11 +4512,11 @@ procedure TFormTypeEditor.ApplyVolumeMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQmin.Header := 'Qmin';
-  StringColumnDNQTr.Header := 'Qtr';
-  StringColumnDNQnom.Header := 'Qnom';
-  StringColumnDNQmax.Header := 'Qmax';
-  StringColumnDNQF.Header   := 'qF';
+  StringColumnDNQmin.Header := 'Qmin '+ FType.GetDimensionName;
+  StringColumnDNQTr.Header := 'Qtr '+ FType.GetDimensionName;
+  StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4537,11 +4537,11 @@ procedure TFormTypeEditor.ApplyMassMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQmin.Header := 'Qmin';
-  StringColumnDNQTr.Header := 'Qtr';
-  StringColumnDNQnom.Header := 'Qnom';
-  StringColumnDNQmax.Header := 'Qmax';
-  StringColumnDNQF.Header   := 'qF';
+  StringColumnDNQmin.Header := 'Qmin '+ FType.GetDimensionName;
+  StringColumnDNQTr.Header := 'Qtr '+ FType.GetDimensionName;
+  StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
+  StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
