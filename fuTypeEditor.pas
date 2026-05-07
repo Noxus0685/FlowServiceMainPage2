@@ -3176,11 +3176,16 @@ begin
 end;
 
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
+var
+  HintText: string;
 begin
   if Column = nil then
-    GridDiameters.Hint := ''
+    HintText := ''
   else
-    GridDiameters.Hint := GetDiameterColumnHint(Column.Index);
+    HintText := GetDiameterColumnHint(Column.Index);
+
+  GridDiameters.Hint := HintText;
+  Hint := HintText;
 end;
 
 procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
