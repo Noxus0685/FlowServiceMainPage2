@@ -3165,7 +3165,31 @@ end;
 procedure TFormTypeEditor.GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
 var
   ACol, ARow: Integer;
+  I: Integer;
+  CurX: Single;
 begin
+  // Для header CellByPoint в FMX может не срабатывать,
+  // поэтому определяем колонку вручную по X.
+  if Y <= GridDiameters.HeaderHeight then
+  begin
+    CurX := 0;
+    for I := 0 to GridDiameters.ColumnCount - 1 do
+    begin
+      if not GridDiameters.Columns[I].Visible then
+        Continue;
+
+      CurX := CurX + GridDiameters.Columns[I].Width;
+      if X <= CurX then
+      begin
+        GridDiameters.Hint := GetDiameterColumnHint(I);
+        Exit;
+      end;
+    end;
+
+    GridDiameters.Hint := '';
+    Exit;
+  end;
+
   if not GridDiameters.CellByPoint(X, Y, ACol, ARow) then
   begin
     GridDiameters.Hint := '';
@@ -3185,7 +3209,6 @@ begin
     HintText := GetDiameterColumnHint(Column.Index);
 
   GridDiameters.Hint := HintText;
-  Hint := HintText;
 end;
 
 procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
