@@ -471,8 +471,25 @@ function CalcKpByDiameter(
 
 implementation
 uses
-uAppServices;
+uAppServices
+{$IFDEF MSWINDOWS}
+  , Winapi.WinInet
+{$ENDIF}
+  ;
 {$R *.fmx}
+
+function IsArshinReachable: Boolean;
+{$IFDEF MSWINDOWS}
+const
+  ARSHIN_URL = 'https://fgis.gost.ru';
+{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InternetCheckConnection(PChar(ARSHIN_URL), FLAG_ICC_FORCE_CONNECTION, 0);
+{$ELSE}
+  Result := True;
+{$ENDIF}
+end;
 
 procedure PopulateSpillageTypeCombo(ACombo: TComboBox);
 var
@@ -3689,6 +3706,8 @@ begin
 end;
 
 procedure TFormTypeEditor.sbFindReestrNumberClick(Sender: TObject);
+const
+  REQUEST_TIMEOUT_MS = 10000;
 var
   Resp: IHTTPResponse;
   Url: string;
@@ -3741,6 +3760,13 @@ begin
     Exit;
   end;
 
+  if not IsArshinReachable then
+  begin
+    MemoLog.Lines.Add('ERROR: нет доступа к сайту АРШИН');
+    ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
+    Exit;
+  end;
+
   DevType := FType;
 
   try
@@ -3751,6 +3777,9 @@ begin
       'https://fgis.gost.ru/fundmetrology/eapi/mit/' +
       '?search=*' + TNetEncoding.URL.Encode(ReestrNum);
 
+    NetHTTPClient1.ConnectionTimeout := REQUEST_TIMEOUT_MS;
+    NetHTTPClient1.ResponseTimeout := REQUEST_TIMEOUT_MS;
+
     try
       Resp := NetHTTPClient1.Get(Url);
       ResponseText := Resp.ContentAsString;
@@ -3758,6 +3787,13 @@ begin
       on E: ENetHTTPClientException do
       begin
         MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
+        Exit;
+      end;
+      on E: Exception do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
         Exit;
       end;
     end;
@@ -3801,6 +3837,13 @@ begin
       on E: ENetHTTPClientException do
       begin
         MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
+        Exit;
+      end;
+      on E: Exception do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
         Exit;
       end;
     end;
