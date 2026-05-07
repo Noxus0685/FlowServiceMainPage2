@@ -340,6 +340,7 @@ type
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
+    procedure GridDiametersHeaderClick(Column: TColumn);
 
 
   private
@@ -3177,6 +3178,14 @@ begin
     GridDiameters.Hint := '';
 end;
 
+procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
+begin
+  if Column = nil then
+    GridDiameters.Hint := ''
+  else
+    GridDiameters.Hint := GetDiameterColumnHint(Column.Index);
+end;
+
 procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
   const Row: Integer);
   var
@@ -3450,19 +3459,9 @@ begin
 
    if ACol = StringColumnDNQmin.Index then
     begin
-<<<<<<< HEAD
-    D.Qmin := FType.ToBaseUnits(NormalizeFloatInput(S));
-
-    { ручной ввод => диапазон не актуален }
-    FType.RangeDynamic := 0;
-    EditRangeDynamic.Text := '';
-
-    UpdateRangeDynamicPromptBySelectedDiameter;
-=======
       FType.RangeDynamic := 0;
       EditRangeDynamic.Text := '';
       EditRangeDynamic.TextPrompt := '';
->>>>>>> 4d7c61e440c1c59f9a2ea84af804b8e085cde2a9
     end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
@@ -4431,6 +4430,7 @@ begin
   StringColumnDNQmax.ShowHint := True;
   StringColumnDNQF.ShowHint := True;
   GridDiameters.OnMouseMove := GridDiametersMouseMove;
+  GridDiameters.OnHeaderClick := GridDiametersHeaderClick;
 
   // ==================================================
   // КРИТЕРИЙ ОСТАНОВКИ (cbSpillageStop)
