@@ -1323,13 +1323,20 @@ begin
   if NewD.ID = 0 then
     NewD.ID := -(FType.Diameters.Count + 1);
 
-  if NewD.Qnom > 0 then
-  begin
+  if (NewD.Qnom <= 0) and (NewD.Qmax > 0) then
+    NewD.Qnom := NewD.Qmax / 1.25;
 
+  if (NewD.Qnom > 0) or (NewD.Qmax > 0) then
+  begin
     NewD.Q2 := 0;
     NewD.Qmin := 0;
-    NewD.Qmax := NewD.Qnom * 1.25;
-    RecalcQRowFromKnown(NewD, StringColumnDNQnom.Index, NewD.Qnom);
+    if NewD.Qnom > 0 then
+    begin
+      NewD.Qmax := NewD.Qnom * 1.25;
+      RecalcQRowFromKnown(NewD, StringColumnDNQnom.Index, NewD.Qnom);
+    end
+    else
+      RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
   end;
 
   {--------------------------------------------------}
