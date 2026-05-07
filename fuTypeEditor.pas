@@ -232,7 +232,7 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
-    StringColumnDNQTr: TStringColumn;
+    StringColumnDNQ2: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQnom: TStringColumn;
@@ -574,7 +574,7 @@ begin
   if K1 <= 0 then K1 := C_QMIN_TO_QMAX;
   if (K2 <= 0) or (K2 > 0.02) then K2 := C_Q2_TO_QMAX;
 
-  if KnownCol = StringColumnDNQTr.Index then
+  if KnownCol = StringColumnDNQ2.Index then
     Qmax := KnownValue / K2
   else if KnownCol = StringColumnDNQmin.Index then
     Qmax := KnownValue / K1
@@ -3190,7 +3190,7 @@ begin
   // =====================================================
   // == Q2
   // =====================================================
-  else if ACol = StringColumnDNQTr.Index then
+  else if ACol = StringColumnDNQ2.Index then
   begin
     if D.Q2 = 0 then
       Value := '—'
@@ -3354,7 +3354,7 @@ begin
   {=====================================================}
   { Q2 / Qmax / Qmin / Q перегрузочный }
   {=====================================================}
-  else if (ACol = StringColumnDNQTr.Index) or
+  else if (ACol = StringColumnDNQ2.Index) or
           (ACol = StringColumnDNQmax.Index) or
           (ACol = StringColumnDNQmin.Index) or
           (ACol = StringColumnDNQnom.Index) then
@@ -3365,7 +3365,7 @@ begin
     begin
       // Если скорость потока не задана, меняем только редактируемое поле,
       // без пересчёта остальных Q-столбцов.
-      if ACol = StringColumnDNQTr.Index then
+      if ACol = StringColumnDNQ2.Index then
         D.Q2 := QValueBase
       else if ACol = StringColumnDNQmax.Index then
         D.Qmax := QValueBase
@@ -3390,7 +3390,10 @@ begin
     if Trim(EditFlowRate.Text) = '' then
       UpdateFlowRateFromDiameter(D);
     if ACol = StringColumnDNQmax.Index then
+    begin
+      EditFlowRate.Text := '';
       UpdateFlowRateFromDiameter(D);
+    end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
@@ -4150,10 +4153,12 @@ begin
   if (DNmm > 0) and (D.Qmax > 0) then
   begin
     V := D.Qmax / (0.002827 * Sqr(DNmm));
+    EditFlowRate.Text := '';
     EditFlowRate.TextPrompt := FormatFloat('0.###', V);
   end
   else
   begin
+    EditFlowRate.Text := '';
     EditFlowRate.TextPrompt := '-';
   end;
 end;
@@ -4308,7 +4313,7 @@ begin
   // ==================================================
   // СБРОС ЗАГОЛОВКОВ
   // ==================================================
-  StringColumnDNQTr.Header := '';
+  StringColumnDNQ2.Header := '';
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
   StringColumnDNQnom.Header   := '';
@@ -4419,10 +4424,10 @@ procedure TFormTypeEditor.ApplyVolumeMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQTr.Header := 'Qtr (Q2) переходный, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Q3 номинальный расход, ' + FType.GetDimensionName;
-  StringColumnDNQmin.Header := 'Q1 минимальный расход, ' + FType.GetDimensionName;
-  StringColumnDNQnom.Header   := 'Q4 наибольший (перегрузочный), ' + FType.GetDimensionName;
+  StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qmax (Q3), ' + FType.GetDimensionName;
+  StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4443,10 +4448,10 @@ procedure TFormTypeEditor.ApplyMassMode;
 begin
   FType.SetDimensions;
   // ===== Диаметры =====
-  StringColumnDNQTr.Header := 'Qtr (Q2) переходный, ' + FType.GetDimensionName;
-  StringColumnDNQmax.Header := 'Q3 номинальный расход, ' + FType.GetDimensionName;
-  StringColumnDNQmin.Header := 'Q1 минимальный расход, ' + FType.GetDimensionName;
-  StringColumnDNQnom.Header   := 'Q4 наибольший (перегрузочный), ' + FType.GetDimensionName;
+  StringColumnDNQ2.Header := 'Q2, ' + FType.GetDimensionName;
+  StringColumnDNQmax.Header := 'Qmax (Q3), ' + FType.GetDimensionName;
+  StringColumnDNQmin.Header := 'Qmin, ' + FType.GetDimensionName;
+  StringColumnDNQnom.Header   := 'Q перегрузочный, ' + FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';

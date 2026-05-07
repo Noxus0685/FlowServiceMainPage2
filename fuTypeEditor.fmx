@@ -2206,20 +2206,20 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.HorzAlign = Center
           Size.Width = 75.000000000000000000
         end
-        object StringColumnDNQTr: TStringColumn
-          Header = 'Qtr (Q2), '#1084'3/'#1095
+        object StringColumnDNQ2: TStringColumn
+          Header = 'Q2, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNQmax: TStringColumn
-          Header = 'Q3 '#1085#1086#1084#1080#1085#1072#1083#1100#1085#1099#1081', '#1084'3/'#1095
+          Header = 'Qmax, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNQmin: TStringColumn
-          Header = 'Q1 '#1084#1080#1085#1080#1084#1072#1083#1100#1085#1099#1081', '#1084'3/'#1095
+          Header = 'Qmin, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNQnom: TStringColumn
-          Header = 'Q4 '#1087#1077#1088#1077#1075#1088#1091#1079#1086#1095#1085#1099#1081', '#1084'3/'#1095
+          Header = 'Qnom, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNKp: TStringColumn
