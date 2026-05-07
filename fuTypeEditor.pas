@@ -559,10 +559,6 @@ begin
 end;
 
 procedure TFormTypeEditor.RecalcQRowFromKnown(const ANewD: TDiameter; const KnownCol: Integer; const KnownValue: Double; const AOldD: TDiameter = nil);
-const
-  C_Q2_TO_QMAX = 1 / 150; // Q2 ~= 0.006667 * Q3
-  C_QMIN_TO_QMAX = 1 / 375; // Q1 ~= 0.002667 * Q3
-  C_QOVER_TO_QMAX = 1.25;
 var
   DCoef: TDiameter;
   QmaxForCoef: Double;
@@ -577,21 +573,13 @@ begin
 
   QmaxForCoef := DCoef.Qmax;
   if (QmaxForCoef <= 0) and (DCoef.Qnom > 0) then
-    QmaxForCoef := DCoef.Qnom * C_QOVER_TO_QMAX;
+    QmaxForCoef := DCoef.Qmax * 1.25;
 
   if QmaxForCoef > 0 then
   begin
     K1 := DCoef.Qmin / QmaxForCoef;
     K2 := DCoef.Q2 / QmaxForCoef;
-  end
-  else
-  begin
-    K1 := C_QMIN_TO_QMAX;
-    K2 := C_Q2_TO_QMAX;
   end;
-
-  if K1 <= 0 then K1 := C_QMIN_TO_QMAX;
-  if (K2 <= 0) or (K2 > 0.02) then K2 := C_Q2_TO_QMAX;
 
   if KnownCol = StringColumnDNQTr.Index then
     Qmax := KnownValue / K2
@@ -600,7 +588,7 @@ begin
   else if KnownCol = StringColumnDNQmax.Index then
     Qmax := KnownValue
   else if KnownCol = StringColumnDNQnom.Index then
-    Qmax := KnownValue * C_QOVER_TO_QMAX
+    Qmax := KnownValue * 1.25
   else
     Exit;
 
@@ -609,7 +597,7 @@ begin
 
   Q2 := Qmax * K2;
   Qmin := Qmax * K1;
-  QOver := Qmax / C_QOVER_TO_QMAX;
+  QOver := Qmax / 1.25;
 
   ANewD.Qmax := Qmax;
   ANewD.Q2 := Q2;
@@ -1343,10 +1331,6 @@ begin
 
   if NewD.Qmax > 0 then
   begin
-
-    NewD.Q2 := 0;
-    NewD.Qmin := 0;
-    NewD.Qnom := NewD.Qmax / 1.25;
     RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
   end;
 
@@ -3709,7 +3693,7 @@ begin
     Exit;
 
   S := Trim(Value.toString);
-
+  D := GetDiameterByVisibleRow(GridDiameters.Row);
   {=====================================================}
   { 1. НЕ зависят от диаметра }
   {=====================================================}
@@ -3718,6 +3702,8 @@ begin
   begin
     P.Name := S;
     TryApplyPointNameFormula(S, P);
+    V := P.FlowRate * D.Qmax * P.LimitTime ;
+    P.LimitVolume := V;
   end
 
   else if ACol = StringColumnPointStab.Index then
@@ -3758,8 +3744,17 @@ begin
     { Q / Qmax }
     {---------------------------------}
     if ACol = StringColumnPointFlowRate.Index then
-      P.FlowRate := NormalizeFloatInput(S)
+    begin
+      P.FlowRate := NormalizeFloatInput(S);
+      V := P.FlowRate * Qmax * P.LimitTime ;
+      P.LimitVolume := V;
+    end
 
+    else if ACol = StringColumnPointName.Index then
+    begin
+       V := P.FlowRate * Qmax * P.LimitTime ;
+       P.LimitVolume := V;
+    end
     {---------------------------------}
     { Q (абсолютный) }
     {---------------------------------}
@@ -3768,6 +3763,8 @@ begin
       Q := FType.ToBaseUnits(NormalizeFloatInput(S));
       if Qmax > 0 then
         P.FlowRate := Q / Qmax;
+      V := P.FlowRate * Qmax * P.LimitTime ;
+       P.LimitVolume := V;
     end
 
     {---------------------------------}
@@ -3849,7 +3846,7 @@ begin
   for I := 0 to FPointsLocal.Count-1 do
   begin
     // Q = (Q/Qmax) * Qmax
-    Q := FPointsLocal[I].FlowRate * Qmax;
+    Q := FPointsLocal[I].FlowRate *  Qmax;
 
     // если задано время
     if (Q > 0) and (FPointsLocal[I].LimitTime > 0) then
