@@ -232,7 +232,6 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
-    StringColumnDNQ2: TStringColumn;
     StringColumnDNQF: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
@@ -262,7 +261,6 @@ type
     Layout48: TLayout;
     Label4: TLabel;
     EditFlowRate: TEdit;
-    StringColumnDNQF: TStringColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -4360,7 +4358,7 @@ begin
   StringColumnPointVolume.Header := '';
 
   StringColumnDNQmin.Hint := 'Q1 – минимальный расход';
-  StringColumnDNQ2.Hint := 'Q2 – переходный расход';
+  StringColumnDNQTr.Hint := 'Q2 – переходный расход';
   StringColumnDNQnom.Hint := 'Q3 – номинальный расход';
   StringColumnDNQmax.Hint := 'Q4 – наибольший (перегрузочный) расход';
   StringColumnDNQF.Hint := 'qF – расход поверочной точки / контрольный расход';
@@ -4466,7 +4464,7 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQmin.Header := 'Qmin';
-  StringColumnDNQ2.Header := 'Qtr';
+  StringColumnDNQTr.Header := 'Qtr';
   StringColumnDNQnom.Header := 'Qnom';
   StringColumnDNQmax.Header := 'Qmax';
   StringColumnDNQF.Header   := 'qF';
@@ -4491,7 +4489,7 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQmin.Header := 'Qmin';
-  StringColumnDNQ2.Header := 'Qtr';
+  StringColumnDNQTr.Header := 'Qtr';
   StringColumnDNQnom.Header := 'Qnom';
   StringColumnDNQmax.Header := 'Qmax';
   StringColumnDNQF.Header   := 'qF';
