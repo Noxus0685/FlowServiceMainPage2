@@ -3404,6 +3404,13 @@ begin
       UpdateFlowRateFromDiameter(D);
     end;
 
+    if ACol = StringColumnDNQmin.Index then
+    begin
+      FType.RangeDynamic := 0;
+      EditRangeDynamic.Text := '';
+      UpdateRangeDynamicPromptBySelectedDiameter;
+    end;
+
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
       RecalcPointsBySelectedDiameter;
