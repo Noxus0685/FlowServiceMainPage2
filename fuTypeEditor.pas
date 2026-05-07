@@ -3213,13 +3213,13 @@ begin
   // =====================================================
   // == Qmin
   // =====================================================
-  else if ACol = StringColumnDNQmin.Index then
-  begin
-    if D.Qmin = 0 then
-      Value := '—'
-    else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.Qmin), FType.Error);
-  end
+  else if ACol = StringColumnDNQF.Index then
+    begin
+      if D.QFmax = 0 then
+        Value := '—'
+      else
+        Value := FormatByBaseError(FType.FromBaseUnits(D.QFmax), FType.Error);
+    end
 
   // =====================================================
   // == Qnom (Q3)
@@ -3402,6 +3402,13 @@ begin
     begin
       EditFlowRate.Text := '';
       UpdateFlowRateFromDiameter(D);
+    end;
+
+    if ACol = StringColumnDNQmin.Index then
+    begin
+      FType.RangeDynamic := 0;
+      EditRangeDynamic.Text := '';
+      UpdateRangeDynamicPromptBySelectedDiameter;
     end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
