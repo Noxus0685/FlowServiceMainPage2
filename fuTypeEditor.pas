@@ -238,6 +238,7 @@ type
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQnom: TStringColumn;
     StringColumnDNKp: TStringColumn;
+    StringColumnDNQTr: TStringColumn;
     EditRegDate: TEdit;
     Layout47: TLayout;
     Label42: TLabel;
@@ -261,6 +262,7 @@ type
     Layout48: TLayout;
     Label4: TLabel;
     EditFlowRate: TEdit;
+    StringColumnDNQF: TStringColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -575,7 +577,7 @@ begin
   if K1 <= 0 then K1 := C_QMIN_TO_QMAX;
   if (K2 <= 0) or (K2 > 0.02) then K2 := C_Q2_TO_QMAX;
 
-  if KnownCol = StringColumnDNQ2.Index then
+  if KnownCol = StringColumnDNQTr.Index then
     Qmax := KnownValue / K2
   else if KnownCol = StringColumnDNQmin.Index then
     Qmax := KnownValue / K1
@@ -3191,7 +3193,7 @@ begin
   // =====================================================
   // == Qtr
   // =====================================================
-  else if ACol = StringColumnDNQ2.Index then
+  else if ACol = StringColumnDNQTr.Index then
   begin
     if D.Q2 = 0 then
       Value := '—'
@@ -3363,7 +3365,7 @@ begin
   {=====================================================}
   { Q2 / Qmax / Qmin / Q перегрузочный }
   {=====================================================}
-  else if (ACol = StringColumnDNQ2.Index) or
+  else if (ACol = StringColumnDNQTr.Index) or
           (ACol = StringColumnDNQmax.Index) or
           (ACol = StringColumnDNQmin.Index) or
           (ACol = StringColumnDNQnom.Index) then
@@ -3374,7 +3376,7 @@ begin
     begin
       // Если скорость потока не задана, меняем только редактируемое поле,
       // без пересчёта остальных Q-столбцов.
-      if ACol = StringColumnDNQ2.Index then
+      if ACol = StringColumnDNQTr.Index then
         D.Q2 := QValueBase
       else if ACol = StringColumnDNQmax.Index then
         D.Qmax := QValueBase
@@ -4344,7 +4346,7 @@ begin
   // ==================================================
   // СБРОС ЗАГОЛОВКОВ
   // ==================================================
-  StringColumnDNQ2.Header := '';
+  StringColumnDNQTr.Header := '';
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
   StringColumnDNQnom.Header   := '';
