@@ -339,8 +339,6 @@ type
     procedure EditCurrentQminExit(Sender: TObject);
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
-    procedure GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
-    procedure GridDiametersHeaderClick(Column: TColumn);
 
 
   private
@@ -3162,54 +3160,7 @@ begin
     Result := StringColumnDNQF.Hint;
 end;
 
-procedure TFormTypeEditor.GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
-var
-  ACol, ARow: Integer;
-  I: Integer;
-  CurX: Single;
-begin
-  // Для header CellByPoint в FMX может не срабатывать,
-  // поэтому определяем колонку вручную по X.
-  if Y <= GridDiameters.HeaderHeight then
-  begin
-    CurX := 0;
-    for I := 0 to GridDiameters.ColumnCount - 1 do
-    begin
-      if not GridDiameters.Columns[I].Visible then
-        Continue;
 
-      CurX := CurX + GridDiameters.Columns[I].Width;
-      if X <= CurX then
-      begin
-        GridDiameters.Hint := GetDiameterColumnHint(I);
-        Exit;
-      end;
-    end;
-
-    GridDiameters.Hint := '';
-    Exit;
-  end;
-
-  if not GridDiameters.CellByPoint(X, Y, ACol, ARow) then
-  begin
-    GridDiameters.Hint := '';
-    Exit;
-  end;
-
-  GridDiameters.Hint := GetDiameterColumnHint(ACol);
-end;
-
-procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
-var
-  HintText: string;
-begin
-  if Column = nil then
-    HintText := ''
-  else
-    HintText := GetDiameterColumnHint(Column.Index);
-
-  GridDiameters.Hint := HintText;
-end;
 
 procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
   const Row: Integer);
@@ -3217,7 +3168,6 @@ procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
     D: TDiameter;
   begin
 
-  GridDiameters.Hint := GetDiameterColumnHint(Column.Index);
 
   if Column<>CheckColumnDNEnable then
     Exit;
@@ -4462,8 +4412,6 @@ begin
   StringColumnDNQnom.ShowHint := True;
   StringColumnDNQmax.ShowHint := True;
   StringColumnDNQF.ShowHint := True;
-  GridDiameters.OnMouseMove := GridDiametersMouseMove;
-  GridDiameters.OnHeaderClick := GridDiametersHeaderClick;
 
   // ==================================================
   // КРИТЕРИЙ ОСТАНОВКИ (cbSpillageStop)
