@@ -232,6 +232,7 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
+    StringColumnDNQF: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQnom: TStringColumn;
@@ -260,7 +261,6 @@ type
     Layout48: TLayout;
     Label4: TLabel;
     EditFlowRate: TEdit;
-    StringColumnDNQF: TStringColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -2856,8 +2856,8 @@ begin
   FType.RangeDynamic := RangeDynamic;
 
   // -----------------------------------------------------
-  // Пересчитываем Qmin по динамическому диапазону (как было ранее):
-  // изменение EditRangeDynamic должно влиять на значения в гриде.
+  // Пересчитываем Qmin по динамическому диапазону:
+  // изменение EditRangeDynamic влияет на значения в гриде.
   // -----------------------------------------------------
   for I := 0 to FDiametersLocal.Count - 1 do
   begin
@@ -3256,13 +3256,23 @@ begin
   // =====================================================
   // == Qmin
   // =====================================================
-  else if ACol = StringColumnDNQmin.Index then
+
+    else if ACol = StringColumnDNQmin.Index then
   begin
     if D.Qmin = 0 then
       Value := '—'
     else
       Value := FormatByBaseError(FType.FromBaseUnits(D.Qmin), FType.Error);
   end
+
+
+  else if ACol = StringColumnDNQF.Index then
+    begin
+      if D.QFmax = 0 then
+        Value := '—'
+      else
+        Value := FormatByBaseError(FType.FromBaseUnits(D.QFmax), FType.Error);
+    end
 
   // =====================================================
   // == Qnom (Q3)
@@ -3447,7 +3457,7 @@ begin
       UpdateFlowRateFromDiameter(D);
     end;
 
-    if ACol = StringColumnDNQmin.Index then
+   if ACol = StringColumnDNQmin.Index then
     begin
       FType.RangeDynamic := 0;
       EditRangeDynamic.Text := '';
