@@ -4448,10 +4448,12 @@ begin
   for I := 0 to FType.Dimensions.Count - 1 do
     ComboBoxUnits.Items.Add(FType.Dimensions[I].Name);
 
-  if (FType.Units >= 0) and (FType.Units < ComboBoxUnits.Items.Count) then
-    ComboBoxUnits.ItemIndex := FType.Units
-  else if ComboBoxUnits.Items.Count > 0 then
-    ComboBoxUnits.ItemIndex := 0
+  if ComboBoxUnits.Items.Count > 0 then
+  begin
+    ComboBoxUnits.ItemIndex := ComboBoxUnits.Items.IndexOf('м3/ч');
+    if ComboBoxUnits.ItemIndex < 0 then
+      ComboBoxUnits.ItemIndex := 0;
+  end
   else
     ComboBoxUnits.ItemIndex := -1;
 
