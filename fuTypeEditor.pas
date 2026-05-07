@@ -482,6 +482,7 @@ function IsArshinReachable: Boolean;
 {$IFDEF MSWINDOWS}
 const
   ARSHIN_URL = 'https://fgis.gost.ru';
+  FLAG_ICC_FORCE_CONNECTION = $00000001;
 {$ENDIF}
 begin
 {$IFDEF MSWINDOWS}
