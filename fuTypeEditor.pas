@@ -3450,16 +3450,24 @@ begin
 
     if Trim(EditFlowRate.Text) = '' then
     begin
-      // Если скорость потока не задана, меняем только редактируемое поле,
-      // без пересчёта остальных Q-столбцов.
+      // Если скорость потока не задана, меняем редактируемое поле.
+      // Для пары Qnom/Qmax сохраняем взаимосвязь по формулам 1.25.
       if ACol = StringColumnDNQTr.Index then
         D.Q2 := QValueBase
       else if ACol = StringColumnDNQmax.Index then
-        D.Qmax := QValueBase
+      begin
+        D.Qmax := QValueBase;
+        if D.Qmax > 0 then
+          D.Qnom := D.Qmax / 1.25;
+      end
       else if ACol = StringColumnDNQmin.Index then
         D.Qmin := QValueBase
       else if ACol = StringColumnDNQnom.Index then
+      begin
         D.Qnom := QValueBase;
+        if D.Qnom > 0 then
+          D.Qmax := D.Qnom * 1.25;
+      end;
     end
     else
     begin
