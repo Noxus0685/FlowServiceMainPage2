@@ -3812,7 +3812,7 @@ begin
 
       if (Tm > 0) and (Q > 0) then
       begin
-        V := Q * Tm / 3.6;
+        V := Q * Tm ;
         P.LimitVolume := V;
 
         if Coef > 0 then
@@ -3855,7 +3855,7 @@ begin
     if (Q > 0) and (FPointsLocal[I].LimitTime > 0) then
     begin
       Tm := FPointsLocal[I].LimitTime;
-      V  := Q * Tm / 3.6;
+      V  := Q * Tm ;
 
       FPointsLocal[I].LimitVolume := V;
       FPointsLocal[I].LimitImp    := Round(V * Coef);
