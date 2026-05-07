@@ -3689,6 +3689,8 @@ begin
 end;
 
 procedure TFormTypeEditor.sbFindReestrNumberClick(Sender: TObject);
+const
+  REQUEST_TIMEOUT_MS = 10000;
 var
   Resp: IHTTPResponse;
   Url: string;
@@ -3751,6 +3753,9 @@ begin
       'https://fgis.gost.ru/fundmetrology/eapi/mit/' +
       '?search=*' + TNetEncoding.URL.Encode(ReestrNum);
 
+    NetHTTPClient1.ConnectionTimeout := REQUEST_TIMEOUT_MS;
+    NetHTTPClient1.ResponseTimeout := REQUEST_TIMEOUT_MS;
+
     try
       Resp := NetHTTPClient1.Get(Url);
       ResponseText := Resp.ContentAsString;
@@ -3758,6 +3763,13 @@ begin
       on E: ENetHTTPClientException do
       begin
         MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
+        Exit;
+      end;
+      on E: Exception do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
         Exit;
       end;
     end;
@@ -3801,6 +3813,13 @@ begin
       on E: ENetHTTPClientException do
       begin
         MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
+        Exit;
+      end;
+      on E: Exception do
+      begin
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+        ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
         Exit;
       end;
     end;
