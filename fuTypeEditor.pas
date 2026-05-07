@@ -292,6 +292,7 @@ type
     procedure UpdateRangeDynamicPromptBySelectedDiameter;
     procedure UpdateFlowRatePromptBySelectedDiameter;
     procedure UpdateFlowRateFromDiameter(const D: TDiameter);
+    function GetDiameterColumnHint(const ACol: Integer): string;
     procedure EditErrorExit(Sender: TObject);
     procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
@@ -338,7 +339,7 @@ type
     procedure EditCurrentQminExit(Sender: TObject);
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
-
+    procedure GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
 
 
   private
@@ -3145,11 +3146,44 @@ begin
       '1:' + IntToStr(Round(Qmax / Qmin));
 end;
 
+function TFormTypeEditor.GetDiameterColumnHint(const ACol: Integer): string;
+begin
+  Result := '';
+  if ACol = StringColumnDNQmin.Index then
+    Result := StringColumnDNQmin.Hint
+  else if ACol = StringColumnDNQTr.Index then
+    Result := StringColumnDNQTr.Hint
+  else if ACol = StringColumnDNQnom.Index then
+    Result := StringColumnDNQnom.Hint
+  else if ACol = StringColumnDNQmax.Index then
+    Result := StringColumnDNQmax.Hint
+  else if ACol = StringColumnDNQF.Index then
+    Result := StringColumnDNQF.Hint;
+end;
+
+procedure TFormTypeEditor.GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
+var
+  ACol, ARow: Integer;
+begin
+  if not GridDiameters.CellByPoint(X, Y, ACol, ARow) then
+  begin
+    GridDiameters.Hint := '';
+    Exit;
+  end;
+
+  if ARow = -1 then
+    GridDiameters.Hint := GetDiameterColumnHint(ACol)
+  else
+    GridDiameters.Hint := '';
+end;
+
 procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
   const Row: Integer);
   var
     D: TDiameter;
   begin
+
+  GridDiameters.Hint := GetDiameterColumnHint(Column.Index);
 
   if Column<>CheckColumnDNEnable then
     Exit;
@@ -3402,6 +3436,13 @@ begin
     begin
       EditFlowRate.Text := '';
       UpdateFlowRateFromDiameter(D);
+    end;
+
+    if ACol = StringColumnDNQmin.Index then
+    begin
+      FType.RangeDynamic := 0;
+      EditRangeDynamic.Text := '';
+      EditRangeDynamic.TextPrompt := '';
     end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
@@ -4363,6 +4404,13 @@ begin
   StringColumnDNQmax.Hint := 'Q4 – наибольший (перегрузочный) расход';
   StringColumnDNQF.Hint := 'qF – расход поверочной точки / контрольный расход';
 
+  GridDiameters.ShowHint := True;
+  StringColumnDNQmin.ShowHint := True;
+  StringColumnDNQTr.ShowHint := True;
+  StringColumnDNQnom.ShowHint := True;
+  StringColumnDNQmax.ShowHint := True;
+  StringColumnDNQF.ShowHint := True;
+  GridDiameters.OnMouseMove := GridDiametersMouseMove;
 
   // ==================================================
   // КРИТЕРИЙ ОСТАНОВКИ (cbSpillageStop)
