@@ -3172,10 +3172,7 @@ begin
     Exit;
   end;
 
-  if ARow = -1 then
-    GridDiameters.Hint := GetDiameterColumnHint(ACol)
-  else
-    GridDiameters.Hint := '';
+  GridDiameters.Hint := GetDiameterColumnHint(ACol);
 end;
 
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
@@ -3457,7 +3454,7 @@ begin
       UpdateFlowRateFromDiameter(D);
     end;
 
-   if ACol = StringColumnDNQmin.Index then
+    if ACol = StringColumnDNQmin.Index then
     begin
       FType.RangeDynamic := 0;
       EditRangeDynamic.Text := '';
