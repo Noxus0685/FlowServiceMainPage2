@@ -338,7 +338,7 @@ type
     procedure EditCurrentQminExit(Sender: TObject);
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
-
+    procedure GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
 
 
   private
@@ -3145,6 +3145,28 @@ begin
       '1:' + IntToStr(Round(Qmax / Qmin));
 end;
 
+procedure TFormTypeEditor.GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
+var
+  ACol, ARow: Integer;
+  HintText: string;
+begin
+  GridDiameters.MouseToCell(X, Y, ACol, ARow);
+
+  HintText := '';
+  if ACol = StringColumnDNQmin.Index then
+    HintText := StringColumnDNQmin.Hint
+  else if ACol = StringColumnDNQTr.Index then
+    HintText := StringColumnDNQTr.Hint
+  else if ACol = StringColumnDNQnom.Index then
+    HintText := StringColumnDNQnom.Hint
+  else if ACol = StringColumnDNQmax.Index then
+    HintText := StringColumnDNQmax.Hint
+  else if ACol = StringColumnDNQF.Index then
+    HintText := StringColumnDNQF.Hint;
+
+  GridDiameters.Hint := HintText;
+end;
+
 procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
   const Row: Integer);
   var
@@ -4384,6 +4406,13 @@ begin
   StringColumnDNQmax.Hint := 'Q4 – наибольший (перегрузочный) расход';
   StringColumnDNQF.Hint := 'qF – расход поверочной точки / контрольный расход';
 
+  GridDiameters.ShowHint := True;
+  StringColumnDNQmin.ShowHint := True;
+  StringColumnDNQTr.ShowHint := True;
+  StringColumnDNQnom.ShowHint := True;
+  StringColumnDNQmax.ShowHint := True;
+  StringColumnDNQF.ShowHint := True;
+  GridDiameters.OnMouseMove := GridDiametersMouseMove;
 
   // ==================================================
   // КРИТЕРИЙ ОСТАНОВКИ (cbSpillageStop)
