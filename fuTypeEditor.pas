@@ -3567,7 +3567,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
     end;
     if NameNorm = 'QF' then
     begin
-      AValue := AD.QF;
+      AValue := AD.QFmax;
       Exit(True);
     end;
     if NameNorm = 'KP' then
@@ -3607,7 +3607,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
     HeaderNorm := UpperCase(StringColumnDNQF.Header);
     if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
     begin
-      AValue := AD.QF;
+      AValue := AD.QFmax;
       Exit(True);
     end;
 
