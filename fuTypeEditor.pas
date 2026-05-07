@@ -557,9 +557,9 @@ begin
   if DCoef = nil then
     DCoef := ANewD;
 
-  QmaxForCoef := DCoef.Qmax;
-  if (QmaxForCoef <= 0) and (DCoef.Qnom > 0) then
-    QmaxForCoef := DCoef.Qnom / C_QOVER_TO_QMAX;
+  QmaxForCoef := DCoef.Qnom;
+  if (QmaxForCoef <= 0) and (DCoef.Qmax > 0) then
+    QmaxForCoef := DCoef.Qmax / C_QOVER_TO_QMAX;
 
   if QmaxForCoef > 0 then
   begin
@@ -576,22 +576,22 @@ begin
   if (K2 <= 0) or (K2 > 0.02) then K2 := C_Q2_TO_QMAX;
 
   if KnownCol = StringColumnDNQTr.Index then
-    Qmax := KnownValue / K2
+    Qmax := (KnownValue / K2) * C_QOVER_TO_QMAX
   else if KnownCol = StringColumnDNQmin.Index then
-    Qmax := KnownValue / K1
+    Qmax := (KnownValue / K1) * C_QOVER_TO_QMAX
   else if KnownCol = StringColumnDNQmax.Index then
     Qmax := KnownValue
   else if KnownCol = StringColumnDNQnom.Index then
-    Qmax := KnownValue / C_QOVER_TO_QMAX
+    Qmax := KnownValue * C_QOVER_TO_QMAX
   else
     Exit;
 
   if Qmax <= 0 then
     Exit;
 
-  Q2 := Qmax * K2;
-  Qmin := Qmax * K1;
-  QOver := Qmax * C_QOVER_TO_QMAX;
+  Q2 := (Qmax / C_QOVER_TO_QMAX) * K2;
+  Qmin := (Qmax / C_QOVER_TO_QMAX) * K1;
+  QOver := Qmax / C_QOVER_TO_QMAX;
 
   ANewD.Qmax := Qmax;
   ANewD.Q2 := Q2;
@@ -974,18 +974,18 @@ begin
       if D.Qnom <= 0 then
       begin
         if D.Qmax > 0 then
-          D.Qnom := D.Qmax * 1.25
+          D.Qnom := D.Qmax / 1.25
         else
           D.Qnom := 0;
       end;
 
       if D.Q2 <= 0 then
-        D.Q2 := D.Qmax * 0.0075;
+        D.Q2 := D.Qnom * 0.006667;
 
-      if (D.State <> osNew) and (D.Qmax > 0) then
+      if (D.State <> osNew) and (D.Qnom > 0) then
       begin
-        D.Qnom := D.Qmax * 1.25;
-        RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
+        D.Qmax := D.Qnom * 1.25;
+        RecalcQRowFromKnown(D, StringColumnDNQnom.Index, D.Qnom);
       end;
       Inc(VisibleCount);
     end;
@@ -1323,13 +1323,13 @@ begin
   if NewD.ID = 0 then
     NewD.ID := -(FType.Diameters.Count + 1);
 
-  if NewD.Qmax > 0 then
+  if NewD.Qnom > 0 then
   begin
 
     NewD.Q2 := 0;
     NewD.Qmin := 0;
-    NewD.Qnom := NewD.Qmax * 1.25;
-    RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
+    NewD.Qmax := NewD.Qnom * 1.25;
+    RecalcQRowFromKnown(NewD, StringColumnDNQnom.Index, NewD.Qnom);
   end;
 
   {--------------------------------------------------}
