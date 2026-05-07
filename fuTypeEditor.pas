@@ -232,8 +232,6 @@ type
     StringColumnPointError: TStringColumn;
     StringColumnPointFlowError: TStringColumn;
     StringColumnPointStab: TStringColumn;
-    StringColumnDNQ2: TStringColumn;
-    StringColumnDNQF: TStringColumn;
     StringColumnDNQmax: TStringColumn;
     StringColumnDNQmin: TStringColumn;
     StringColumnDNQnom: TStringColumn;
@@ -2856,8 +2854,8 @@ begin
   FType.RangeDynamic := RangeDynamic;
 
   // -----------------------------------------------------
-  // Пересчитываем Qmin по динамическому диапазону:
-  // изменение EditRangeDynamic влияет на значения в гриде.
+  // Пересчитываем Qmin по динамическому диапазону (как было ранее):
+  // изменение EditRangeDynamic должно влиять на значения в гриде.
   // -----------------------------------------------------
   for I := 0 to FDiametersLocal.Count - 1 do
   begin
@@ -4360,7 +4358,7 @@ begin
   StringColumnPointVolume.Header := '';
 
   StringColumnDNQmin.Hint := 'Q1 – минимальный расход';
-  StringColumnDNQ2.Hint := 'Q2 – переходный расход';
+  StringColumnDNQTr.Hint := 'Q2 – переходный расход';
   StringColumnDNQnom.Hint := 'Q3 – номинальный расход';
   StringColumnDNQmax.Hint := 'Q4 – наибольший (перегрузочный) расход';
   StringColumnDNQF.Hint := 'qF – расход поверочной точки / контрольный расход';
@@ -4466,7 +4464,7 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQmin.Header := 'Qmin';
-  StringColumnDNQ2.Header := 'Qtr';
+  StringColumnDNQTr.Header := 'Qtr';
   StringColumnDNQnom.Header := 'Qnom';
   StringColumnDNQmax.Header := 'Qmax';
   StringColumnDNQF.Header   := 'qF';
@@ -4491,7 +4489,7 @@ begin
   FType.SetDimensions;
   // ===== Диаметры =====
   StringColumnDNQmin.Header := 'Qmin';
-  StringColumnDNQ2.Header := 'Qtr';
+  StringColumnDNQTr.Header := 'Qtr';
   StringColumnDNQnom.Header := 'Qnom';
   StringColumnDNQmax.Header := 'Qmax';
   StringColumnDNQF.Header   := 'qF';
