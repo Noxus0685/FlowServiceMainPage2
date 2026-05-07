@@ -1,4 +1,4 @@
-object FormTypeEditor: TFormTypeEditor
+﻿object FormTypeEditor: TFormTypeEditor
   Left = 0
   Top = 0
   Caption = 'fuTypeEditor'
@@ -2206,7 +2206,7 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.HorzAlign = Center
           Size.Width = 75.000000000000000000
         end
-        object StringColumnDNQ2: TStringColumn
+        object StringColumnDNQTr: TStringColumn
           Header = 'Q2, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
