@@ -292,6 +292,7 @@ type
     procedure UpdateRangeDynamicPromptBySelectedDiameter;
     procedure UpdateFlowRatePromptBySelectedDiameter;
     procedure UpdateFlowRateFromDiameter(const D: TDiameter);
+    function GetDiameterColumnHint(const ACol: Integer): string;
     procedure EditErrorExit(Sender: TObject);
     procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
@@ -3145,26 +3146,35 @@ begin
       '1:' + IntToStr(Round(Qmax / Qmin));
 end;
 
+function TFormTypeEditor.GetDiameterColumnHint(const ACol: Integer): string;
+begin
+  Result := '';
+  if ACol = StringColumnDNQmin.Index then
+    Result := StringColumnDNQmin.Hint
+  else if ACol = StringColumnDNQTr.Index then
+    Result := StringColumnDNQTr.Hint
+  else if ACol = StringColumnDNQnom.Index then
+    Result := StringColumnDNQnom.Hint
+  else if ACol = StringColumnDNQmax.Index then
+    Result := StringColumnDNQmax.Hint
+  else if ACol = StringColumnDNQF.Index then
+    Result := StringColumnDNQF.Hint;
+end;
+
 procedure TFormTypeEditor.GridDiametersMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Single);
 var
   ACol, ARow: Integer;
-  HintText: string;
 begin
-  GridDiameters.MouseToCell(X, Y, ACol, ARow);
+  if not GridDiameters.CellByPoint(X, Y, ACol, ARow) then
+  begin
+    GridDiameters.Hint := '';
+    Exit;
+  end;
 
-  HintText := '';
-  if ACol = StringColumnDNQmin.Index then
-    HintText := StringColumnDNQmin.Hint
-  else if ACol = StringColumnDNQTr.Index then
-    HintText := StringColumnDNQTr.Hint
-  else if ACol = StringColumnDNQnom.Index then
-    HintText := StringColumnDNQnom.Hint
-  else if ACol = StringColumnDNQmax.Index then
-    HintText := StringColumnDNQmax.Hint
-  else if ACol = StringColumnDNQF.Index then
-    HintText := StringColumnDNQF.Hint;
-
-  GridDiameters.Hint := HintText;
+  if ARow = -1 then
+    GridDiameters.Hint := GetDiameterColumnHint(ACol)
+  else
+    GridDiameters.Hint := '';
 end;
 
 procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
@@ -3172,6 +3182,8 @@ procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
   var
     D: TDiameter;
   begin
+
+  GridDiameters.Hint := GetDiameterColumnHint(Column.Index);
 
   if Column<>CheckColumnDNEnable then
     Exit;
@@ -3430,7 +3442,7 @@ begin
     begin
       FType.RangeDynamic := 0;
       EditRangeDynamic.Text := '';
-      UpdateRangeDynamicPromptBySelectedDiameter;
+      EditRangeDynamic.TextPrompt := '';
     end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
