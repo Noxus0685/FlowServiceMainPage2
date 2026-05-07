@@ -3534,6 +3534,132 @@ procedure TFormTypeEditor.GridPointsSetValue(
   const ACol, ARow: Integer;
   const Value: TValue
 );
+  function TryGetDiameterColumnValueByName(const AD: TDiameter; const AColumnName: string; out AValue: Double): Boolean;
+  var
+    NameNorm, HeaderNorm: string;
+  begin
+    Result := False;
+    AValue := 0;
+    if (AD = nil) or (AColumnName = '') then
+      Exit;
+
+    NameNorm := UpperCase(Trim(AColumnName));
+
+    if NameNorm = 'QMIN' then
+    begin
+      AValue := AD.Qmin;
+      Exit(True);
+    end;
+    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
+    begin
+      AValue := AD.Q2;
+      Exit(True);
+    end;
+    if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
+    begin
+      AValue := AD.Qnom;
+      Exit(True);
+    end;
+    if (NameNorm = 'QMAX') or (NameNorm = 'Q4') then
+    begin
+      AValue := AD.Qmax;
+      Exit(True);
+    end;
+    if NameNorm = 'QF' then
+    begin
+      AValue := AD.QF;
+      Exit(True);
+    end;
+    if NameNorm = 'KP' then
+    begin
+      AValue := AD.Kp;
+      Exit(True);
+    end;
+
+    HeaderNorm := UpperCase(StringColumnDNQmin.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Qmin;
+      Exit(True);
+    end;
+
+    HeaderNorm := UpperCase(StringColumnDNQTr.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Q2;
+      Exit(True);
+    end;
+
+    HeaderNorm := UpperCase(StringColumnDNQnom.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Qnom;
+      Exit(True);
+    end;
+
+    HeaderNorm := UpperCase(StringColumnDNQmax.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Qmax;
+      Exit(True);
+    end;
+
+    HeaderNorm := UpperCase(StringColumnDNQF.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.QF;
+      Exit(True);
+    end;
+
+    HeaderNorm := UpperCase(StringColumnDNKp.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Kp;
+      Exit(True);
+    end;
+  end;
+
+  function TryApplyPointNameFormula(const AText: string; AP: TTypePoint): Boolean;
+  var
+    SepPos, I: Integer;
+    CoefText, ColText: string;
+    K, ColValue: Double;
+    LocalD: TDiameter;
+  begin
+    Result := False;
+    if (AP = nil) then
+      Exit;
+
+    SepPos := Pos('*', AText);
+    if SepPos = 0 then
+    begin
+      for I := 1 to Length(AText) do
+        if AText[I] = ' ' then
+        begin
+          SepPos := I;
+          Break;
+        end;
+    end;
+
+    if SepPos <= 1 then
+      Exit;
+
+    CoefText := Trim(Copy(AText, 1, SepPos - 1));
+    ColText := Trim(Copy(AText, SepPos + 1, MaxInt));
+    if (CoefText = '') or (ColText = '') then
+      Exit;
+
+    K := NormalizeFloatInput(CoefText);
+    LocalD := GetDiameterByVisibleRow(GridDiameters.Row);
+    if (LocalD = nil) or (not TryGetDiameterColumnValueByName(LocalD, ColText, ColValue)) then
+      Exit;
+
+    if LocalD.Qmax > 0 then
+    begin
+      AP.FlowRate := (K * ColValue) / LocalD.Qmax;
+      Result := True;
+    end;
+  end;
 var
   P: TTypePoint;
   D: TDiameter;
@@ -3557,10 +3683,10 @@ begin
   {=====================================================}
 
   if ACol = StringColumnPointName.Index then
-    P.Enable := not P.Enable
-
-  else if ACol = StringColumnPointName.Index then
-    P.Name := S
+  begin
+    P.Name := S;
+    TryApplyPointNameFormula(S, P);
+  end
 
   else if ACol = StringColumnPointStab.Index then
     P.Pause := Round(NormalizeFloatInput(S))
