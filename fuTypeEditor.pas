@@ -471,8 +471,25 @@ function CalcKpByDiameter(
 
 implementation
 uses
-uAppServices;
+uAppServices
+{$IFDEF MSWINDOWS}
+  , Winapi.WinInet
+{$ENDIF}
+  ;
 {$R *.fmx}
+
+function IsArshinReachable: Boolean;
+{$IFDEF MSWINDOWS}
+const
+  ARSHIN_URL = 'https://fgis.gost.ru';
+{$ENDIF}
+begin
+{$IFDEF MSWINDOWS}
+  Result := InternetCheckConnection(PChar(ARSHIN_URL), FLAG_ICC_FORCE_CONNECTION, 0);
+{$ELSE}
+  Result := True;
+{$ENDIF}
+end;
 
 procedure PopulateSpillageTypeCombo(ACombo: TComboBox);
 var
@@ -3740,6 +3757,13 @@ begin
   if FType = nil then
   begin
     MemoLog.Lines.Add('Тип прибора не инициализирован');
+    Exit;
+  end;
+
+  if not IsArshinReachable then
+  begin
+    MemoLog.Lines.Add('ERROR: нет доступа к сайту АРШИН');
+    ShowMessage('Нет доступа к сайту АРШИН. Проверьте интернет-соединение и повторите попытку.');
     Exit;
   end;
 
