@@ -850,6 +850,8 @@ var
   NewType: TDeviceType;
   SelRow: Integer;
   SourceType: TDeviceType;
+  SelectedTreeNode: TTreeViewItem;
+  HasGridSelection: Boolean;
   I: Integer;
 begin
 
@@ -866,12 +868,20 @@ begin
   {-------------------------------------------------}
   SelRow := GridTypes.Selected;
   SourceType := nil;
+  SelectedTreeNode := TreeViewTypes.Selected;
 
-  if (FDevFilteredTypes <> nil) and (SelRow >= 0) and (SelRow < FDevFilteredTypes.Count) then
+  HasGridSelection :=
+    (FDevFilteredTypes <> nil) and
+    (SelRow >= 0) and
+    (SelRow < FDevFilteredTypes.Count);
+
+  if HasGridSelection then
     SourceType := FDevFilteredTypes[SelRow];
 
   NewType := ActiveRepo.CreateType(SourceType);
-  if SourceType = nil then
+  if (SourceType = nil) and
+     (SelectedTreeNode <> nil) and
+     (SelectedTreeNode.Tag <> Ord(tnAll)) then
     ApplyTreeSelectionToType(NewType);
 
   {-------------------------------------------------}
