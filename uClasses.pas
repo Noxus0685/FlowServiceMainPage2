@@ -999,6 +999,7 @@ begin
   {----------------------------------}
   Qnom := ASource.Qnom;
   Qtr := ASource.Qtr;
+  Q2tr := ASource.Q2tr;
   Qmax := ASource.Qmax;
   Qmin := ASource.Qmin;
 
