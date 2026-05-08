@@ -3130,7 +3130,7 @@ begin
     if DNmm <= 0 then
       Continue;
 
-    Qmax := 0.002827 * V * Sqr(DNmm);
+    Qmax := (0.002827 * V * Sqr(DNmm))/3.6;
     RecalcQRowFromKnown(D, StringColumnDNQmax.Index, Qmax);
   end;
 
