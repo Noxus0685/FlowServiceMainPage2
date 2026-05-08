@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 33
+    TabOrder = 34
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -2141,17 +2141,17 @@ object FormTypeEditor: TFormTypeEditor
           Padding.Left = 5.000000000000000000
           Padding.Right = 5.000000000000000000
           Position.X = 377.000000000000000000
-          Size.Width = 168.000000000000000000
+          Size.Width = 227.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 45
-          object Label4: TLabel
+          object LFLowEate: TLabel
             Align = Left
             Position.X = 5.000000000000000000
-            Size.Width = 108.000000000000000000
+            Size.Width = 160.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072
+            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072' Qmax'
             TabOrder = 1
           end
           object EditFlowRate: TEdit
@@ -2161,7 +2161,7 @@ object FormTypeEditor: TFormTypeEditor
             Hint = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 50.000000000000000000
+            Size.Width = 57.000000000000000000
             Size.Height = 20.000000000000000000
             Size.PlatformDefault = False
             TextPrompt = '10'

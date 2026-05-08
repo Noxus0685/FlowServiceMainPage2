@@ -259,7 +259,7 @@ type
     Layout12: TLayout;
     Layout14: TLayout;
     Layout48: TLayout;
-    Label4: TLabel;
+    LFLowEate: TLabel;
     EditFlowRate: TEdit;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -598,6 +598,11 @@ begin
   Q2 := Qmax * K2;
   Qmin := Qmax * K1;
   QOver := Qmax / 1.25;
+
+  if FType.FreqFlowRate > 0 then
+    ANewD.QFmax := Qmax * FType.FreqFlowRate
+  else
+    ANewD.QFmax := Qmax;
 
   ANewD.Qmax := Qmax;
   ANewD.Q2 := Q2;
@@ -1331,7 +1336,7 @@ begin
 
   if NewD.Qmax > 0 then
   begin
-    RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax);
+    RecalcQRowFromKnown(NewD, StringColumnDNQmax.Index, NewD.Qmax,SrcD);
   end;
 
   {--------------------------------------------------}
@@ -3242,15 +3247,6 @@ begin
       Value := FormatByBaseError(FType.FromBaseUnits(D.Qmin), FType.Error);
   end
 
-
-  else if ACol = StringColumnDNQF.Index then
-    begin
-      if D.QFmax = 0 then
-        Value := '—'
-      else
-        Value := FormatByBaseError(FType.FromBaseUnits(D.QFmax), FType.Error);
-    end
-
   // =====================================================
   // == Qnom (Q3)
   // =====================================================
@@ -3398,6 +3394,11 @@ begin
           (ACol = StringColumnDNQmin.Index) or
           (ACol = StringColumnDNQnom.Index) then
   begin
+      if ACol = StringColumnDNQmax.Index then
+    begin
+      EditFlowRate.Text := '';
+      UpdateFlowRateFromDiameter(D);
+    end;
     QValueBase := FType.ToBaseUnits(NormalizeFloatInput(S));
 
     if Trim(EditFlowRate.Text) = '' then
@@ -3423,7 +3424,7 @@ begin
     end
     else
     begin
-      RecalcQRowFromKnown(D, ACol, QValueBase);
+     // RecalcQRowFromKnown(D, ACol, QValueBase);
     end;
 
     Qmax := D.Qmax;
@@ -3436,11 +3437,7 @@ begin
 
     if Trim(EditFlowRate.Text) = '' then
       UpdateFlowRateFromDiameter(D);
-    if ACol = StringColumnDNQmax.Index then
-    begin
-      EditFlowRate.Text := '';
-      UpdateFlowRateFromDiameter(D);
-    end;
+
 
     if ACol = StringColumnDNQmin.Index then
     begin
@@ -4716,6 +4713,7 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
+  LFLowEate.Text:= 'Скорость потока Qmax '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4741,6 +4739,7 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
+  LFLowEate.Text:= 'Скорость потока Qmax '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
