@@ -2219,6 +2219,10 @@ object FormTypeEditor: TFormTypeEditor
           Header = 'Q2, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
+        object StringColumnDNQ2Tr: TStringColumn
+          Header = 'Q2Tr, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
         object StringColumnDNQmin: TStringColumn
           Header = 'Qmin, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
