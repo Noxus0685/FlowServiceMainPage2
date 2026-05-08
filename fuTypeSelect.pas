@@ -874,9 +874,9 @@ begin
     (FDevFilteredTypes <> nil) and
     (SelRow >= 0) and
     (SelRow < FDevFilteredTypes.Count);
-
-  if HasGridSelection then
-    SourceType := FDevFilteredTypes[SelRow];
+  //копия выбранной строки
+  //if HasGridSelection then
+  //  SourceType := FDevFilteredTypes[SelRow];
 
   NewType := ActiveRepo.CreateType(SourceType);
   if (SelectedTreeNode <> nil) and
