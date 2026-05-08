@@ -2152,7 +2152,7 @@ object FormTypeEditor: TFormTypeEditor
             Size.Width = 160.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072' Qmax'
+            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072' Qmax, '#1084'/'#1089
             TabOrder = 1
           end
           object EditFlowRate: TEdit
@@ -2207,20 +2207,20 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.HorzAlign = Center
           Size.Width = 75.000000000000000000
         end
-        object StringColumnDNQTr: TStringColumn
-          Header = 'Q2, '#1084'3/'#1095
-          HeaderSettings.TextSettings.WordWrap = False
-        end
         object StringColumnDNQmax: TStringColumn
           Header = 'Qmax, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
-        object StringColumnDNQmin: TStringColumn
-          Header = 'Qmin, '#1084'3/'#1095
-          HeaderSettings.TextSettings.WordWrap = False
-        end
         object StringColumnDNQnom: TStringColumn
           Header = 'Qnom, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNQTr: TStringColumn
+          Header = 'Q2, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
+        end
+        object StringColumnDNQmin: TStringColumn
+          Header = 'Qmin, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNKp: TStringColumn

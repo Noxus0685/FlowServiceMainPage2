@@ -4436,7 +4436,7 @@ begin
   DNmm := StrToIntDef(D.DN, 0);
   if (DNmm > 0) and (D.Qmax > 0) then
   begin
-    V := D.Qmax / (0.002827 * Sqr(DNmm));
+    V := (D.Qmax / (0.002827 * Sqr(DNmm)))*3.6;
     EditFlowRate.Text := '';
     EditFlowRate.TextPrompt := FormatFloat('0.###', V);
   end
@@ -4473,7 +4473,7 @@ begin
   Qmin := D.Qmin;
 
   // считаем только если оба значения осмысленные
-  if (Qmax > 0) and (Qmin > 0) and IsInfinite(Qmin) and IsInfinite(Qmax) then
+  if (Qmax > 0) and (Qmin > 0) and not(IsInfinite(Qmin)) and not(IsInfinite(Qmax)) then
   begin
     RangeDynamic := Round(Qmax / Qmin);
     EditRangeDynamic.TextPrompt := '1:' + IntToStr(RangeDynamic);
@@ -4728,7 +4728,6 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
-  LFLowEate.Text:= 'Скорость потока Qmax '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4754,7 +4753,6 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
-  LFLowEate.Text:= 'Скорость потока Qmax '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
