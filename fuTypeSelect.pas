@@ -868,7 +868,7 @@ begin
   {-------------------------------------------------}
   SelRow := GridTypes.Selected;
   SourceType := nil;
-  SelectedTreeNode := TreeViewTypes.Selected;
+  SelectedTreeNode := GetActiveTreeNode;
 
   HasGridSelection :=
     (FDevFilteredTypes <> nil) and
@@ -879,8 +879,7 @@ begin
     SourceType := FDevFilteredTypes[SelRow];
 
   NewType := ActiveRepo.CreateType(SourceType);
-  if (SourceType = nil) and
-     (SelectedTreeNode <> nil) and
+  if (SelectedTreeNode <> nil) and
      (SelectedTreeNode.Tag <> Ord(tnAll)) then
     ApplyTreeSelectionToType(NewType);
 
@@ -907,7 +906,7 @@ end;
 
 procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType);
 begin
-  AppServices.DataManager.AssignTypeTreeFields(AType, TreeViewTypes.Selected);
+  AppServices.DataManager.AssignTypeTreeFields(AType,GetActiveTreeNode{ TreeViewTypes.Selected});
 end;
 
  procedure TFormTypeSelect.actTypeClearExecute(Sender: TObject);
