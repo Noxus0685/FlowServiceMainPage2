@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 34
+    TabOrder = 35
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -2130,6 +2130,7 @@ object FormTypeEditor: TFormTypeEditor
             KillFocusByReturn = True
             ParentShowHint = False
             ShowHint = True
+            OnCanFocus = EditRangeDynamicCanFocus
             OnEnter = EditRangeDynamicEnter
             OnExit = EditRangeDynamicExit
             Left = 276

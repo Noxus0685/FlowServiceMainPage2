@@ -339,6 +339,7 @@ type
     procedure EditCurrentQminExit(Sender: TObject);
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
+    procedure EditRangeDynamicCanFocus(Sender: TObject; var ACanFocus: Boolean);
 
 
   private
@@ -1423,7 +1424,7 @@ begin
     if not FSkipDiameterDeleteConfirm then
     begin
       if MessageDlg(
-           'Удалить выбранный диаметр?',
+           'Удалить выбранные диаметры?',
            TMsgDlgType.mtWarning,
            [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
            0
@@ -1676,15 +1677,22 @@ procedure TFormTypeEditor.GridDiametersKeyDown(Sender: TObject; var Key: Word;
   end;
 end;
 
+
 procedure TFormTypeEditor.GridPointsKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
-begin
+  var
+  i:integer;
+  begin
   if (Key = vkDelete) and not GridPoints.EditorMode then
   begin
+    i:=GridPoints.Row;
     ButtonPointDeleteClick(ButtonPointDelete);
     Key := 0;
+    if GridPoints.RowCount>0 then
+      GridPoints.Row:=(i-1);
   end;
 end;
+
 
 procedure TFormTypeEditor.ButtonPointsClearClick(Sender: TObject);
 var
@@ -2816,6 +2824,12 @@ begin
 end;
 
 
+
+procedure TFormTypeEditor.EditRangeDynamicCanFocus(Sender: TObject;
+  var ACanFocus: Boolean);
+begin
+ EditRangeDynamic.Text := EditRangeDynamic.TextPrompt;
+end;
 
 procedure TFormTypeEditor.EditRangeDynamicEnter(Sender: TObject);
 var
