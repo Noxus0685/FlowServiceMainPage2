@@ -564,7 +564,7 @@ procedure TFormTypeEditor.RecalcQRowFromKnown(const ANewD: TDiameter; const Know
 var
   DCoef: TDiameter;
   QmaxForCoef: Double;
-  K1, K2, Qmax, Qmin, Q2, QOver: Double;
+  K1, K2,K2tr, Qmax, Qmin, Q2,Q2tr, QOver: Double;
 begin
   if (ANewD = nil) or (KnownValue <= 0) then
     Exit;
@@ -580,7 +580,8 @@ begin
   if QmaxForCoef > 0 then
   begin
     K1 := DCoef.Qmin / QmaxForCoef;
-    K2 := DCoef.Q2 / QmaxForCoef;
+    K2 := DCoef.Qtr / QmaxForCoef;
+    K2tr := DCoef.Q2tr / QmaxForCoef;
   end;
 
   if (KnownCol = StringColumnDNQTr.Index) or (KnownCol = StringColumnDNQ2Tr.Index) then
@@ -598,6 +599,7 @@ begin
     Exit;
 
   Q2 := Qmax * K2;
+  Q2tr := Qmax * K2tr;
   Qmin := Qmax * K1;
   QOver := Qmax / 1.25;
 
@@ -607,7 +609,8 @@ begin
     ANewD.QFmax := Qmax;
 
   ANewD.Qmax := Qmax;
-  ANewD.Q2 := Q2;
+  ANewD.Qtr := Q2;
+  ANewD.Q2tr :=Q2tr;
   ANewD.Qmin := Qmin;
   ANewD.Qnom := QOver;
   SetQValue(FDiameterQ2, ANewD.ID, Q2);
@@ -992,8 +995,8 @@ begin
           D.Qnom := 0;
       end;
 
-      if D.Q2 <= 0 then
-        D.Q2 := D.Qmax * 0.0075;
+      if D.Qtr <= 0 then
+        D.Qtr := D.Qmax * 0.0075;
 
       if (D.State <> osNew) and (D.Qmax > 0) then
       begin
@@ -3235,17 +3238,17 @@ begin
   // =====================================================
   else if ACol = StringColumnDNQTr.Index then
   begin
-    if D.Q2 = 0 then
+    if D.Qtr = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.Q2), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qtr), FType.Error);
   end
   else if ACol = StringColumnDNQ2Tr.Index then
   begin
-    if D.Q2 = 0 then
+    if D.Q2tr = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.Q2), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Q2tr), FType.Error);
   end
 
   // =====================================================
@@ -3430,8 +3433,10 @@ begin
     begin
       // Если скорость потока не задана, меняем редактируемое поле.
       // Для пары Qnom/Qmax сохраняем взаимосвязь по формулам 1.25.
-      if (ACol = StringColumnDNQTr.Index) or (ACol = StringColumnDNQ2Tr.Index) then
-        D.Q2 := QValueBase
+      if (ACol = StringColumnDNQTr.Index)  then
+        D.Qtr := QValueBase
+      else  if (ACol = StringColumnDNQ2Tr.Index) then
+        D.Q2tr := QValueBase
       else if ACol = StringColumnDNQmax.Index then
       begin
         D.Qmax := QValueBase;
@@ -3558,7 +3563,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
     end;
     if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
     begin
-      AValue := AD.Q2;
+      AValue := AD.Qtr;
       Exit(True);
     end;
     if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
@@ -3592,14 +3597,14 @@ procedure TFormTypeEditor.GridPointsSetValue(
     HeaderNorm := UpperCase(StringColumnDNQTr.Header);
     if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
     begin
-      AValue := AD.Q2;
+      AValue := AD.Qtr;
       Exit(True);
     end;
 
     HeaderNorm := UpperCase(StringColumnDNQ2Tr.Header);
     if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
     begin
-      AValue := AD.Q2;
+      AValue := AD.Q2tr;
       Exit(True);
     end;
 
@@ -3671,7 +3676,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
       for I := 1 to Length(AText) do
       begin
         Ch := AText[I];
-        if not (Ch in ['0'..'9', ',', '.', ' ']) then
+        if not (Ch in ['0'..'9', ',', '.', ' ','·']) then
         begin
           StartColPos := I;
           Break;
