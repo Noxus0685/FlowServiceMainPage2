@@ -167,7 +167,9 @@ type
     {====================================================================}
     { РАСХОДЫ (для расходомеров / счетчиков) }
     {====================================================================}
-    Qmax: Double;                // Максимальный расход, м3/ч (или т/ч)
+    Qnom: Double;                // Номинальный расход (Q3)
+    Q2: Double;                  // Переходный расход (Q2)
+    Qmax: Double;                // Перегрузочный расход (Q4)
     Qmin: Double;                // Минимальный расход, м3/ч (или т/ч)
 
     {====================================================================}
@@ -175,7 +177,6 @@ type
     {====================================================================}
     Kp: Double;                  // Базовый коэффициент преобразования (имп/л или имп/кг)
     QFmax: Double;               // Расход, соответствующий максимальной частоте выхода
-
     {====================================================================}
     { ОБЪЕМ / МАССА (для емкостей и весов) }
     {====================================================================}
@@ -414,7 +415,7 @@ type
 
     class function CalcQmaxByDiameter(
       const OldQmax: Double;
-      const OldDN, NewDN: Integer
+      const oldDN,NewDN: Integer
     ): Double; static;
 
     class function CalcKpByDiameter(
@@ -954,6 +955,8 @@ begin
   {====================================================================}
   { Расходы }
   {====================================================================}
+  Qnom := 0.0;
+  Q2 := 0.0;
   Qmax := 0.0;
   Qmin := 0.0;
 
@@ -992,6 +995,8 @@ begin
   {----------------------------------}
   { Расходы }
   {----------------------------------}
+  Qnom := ASource.Qnom;
+  Q2 := ASource.Q2;
   Qmax := ASource.Qmax;
   Qmin := ASource.Qmin;
 
@@ -1207,7 +1212,7 @@ begin
   { Измерения и сигналы (общее) }
   {====================================================================}
   MeasuredDimension := 0;   // если enum — лучше явное значение
-  Units := 0;
+  Units := 4;
   OutputType := 0;
   DimensionCoef := 0;
 
@@ -1728,13 +1733,16 @@ procedure TDeviceType.AddPointData(const AName, ADesc: string; AFlowRate: Double
 
   class function TDeviceType.CalcQmaxByDiameter(
   const OldQmax: Double;
-  const OldDN, NewDN: Integer
+  const oldDN,NewDN: Integer
 ): Double;
+var
+FL:Double;
 begin
-  if (OldQmax <= 0) or (OldDN <= 0) or (NewDN <= 0) then
+    FL :=  (  OldQmax/(0.002827* Sqr(oldDN))  ) ;
+  if (OldQmax <= 0) or (NewDN <= 0) then
     Exit(OldQmax);
 
-  Result := OldQmax * Sqr(NewDN / OldDN);
+  Result := 0.002827*FL * Sqr(NewDN);
 end;
 
 class function TDeviceType.CalcKpByDiameter(

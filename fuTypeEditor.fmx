@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 23
+    TabOrder = 35
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -2130,6 +2130,7 @@ object FormTypeEditor: TFormTypeEditor
             KillFocusByReturn = True
             ParentShowHint = False
             ShowHint = True
+            OnCanFocus = EditRangeDynamicCanFocus
             OnEnter = EditRangeDynamicEnter
             OnExit = EditRangeDynamicExit
             Left = 276
@@ -2141,35 +2142,34 @@ object FormTypeEditor: TFormTypeEditor
           Padding.Left = 5.000000000000000000
           Padding.Right = 5.000000000000000000
           Position.X = 377.000000000000000000
-          Size.Width = 168.000000000000000000
+          Size.Width = 227.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 45
-          object Label4: TLabel
+          object LFLowEate: TLabel
             Align = Left
             Position.X = 5.000000000000000000
-            Size.Width = 108.000000000000000000
+            Size.Width = 160.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072
+            Text = #1057#1082#1086#1088#1086#1089#1090#1100' '#1087#1086#1090#1086#1082#1072' Qmax'
             TabOrder = 1
           end
-          object Edit1: TEdit
+          object EditFlowRate: TEdit
             Touch.InteractiveGestures = [LongTap, DoubleTap]
             Align = Client
             TabOrder = 0
             Hint = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 50.000000000000000000
+            Size.Width = 57.000000000000000000
             Size.Height = 20.000000000000000000
             Size.PlatformDefault = False
             TextPrompt = '10'
             KillFocusByReturn = True
             ParentShowHint = False
             ShowHint = True
-            OnEnter = EditRangeDynamicEnter
-            OnExit = EditRangeDynamicExit
+            OnExit = EditFlowRateExit
             Left = 276
             Top = 15
           end
@@ -2207,12 +2207,8 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.HorzAlign = Center
           Size.Width = 75.000000000000000000
         end
-        object StringColumnDNQnom: TStringColumn
-          Header = 'Qnom, '#1084'3/'#1095
-          HeaderSettings.TextSettings.WordWrap = False
-        end
-        object StringColumnDNQtr: TStringColumn
-          Header = 'Qtr, '#1084'3/'#1095
+        object StringColumnDNQTr: TStringColumn
+          Header = 'Q2, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNQmax: TStringColumn
@@ -2223,8 +2219,8 @@ object FormTypeEditor: TFormTypeEditor
           Header = 'Qmin, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
-        object StringColumnDNQF: TStringColumn
-          Header = 'QF, '#1084'3/'#1095
+        object StringColumnDNQnom: TStringColumn
+          Header = 'Qnom, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
         object StringColumnDNKp: TStringColumn
@@ -2243,6 +2239,10 @@ object FormTypeEditor: TFormTypeEditor
           HeaderSettings.TextSettings.WordWrap = False
           Visible = False
           Size.Width = 71.000000000000000000
+        end
+        object StringColumnDNQF: TStringColumn
+          Header = 'QF, '#1084'3/'#1095
+          HeaderSettings.TextSettings.WordWrap = False
         end
       end
     end
