@@ -4463,7 +4463,8 @@ var
 begin
   // очищаем prompt по умолчанию
   EditRangeDynamic.TextPrompt := '';
-
+  Qmin:=0;
+  Qmax:=0;
   D := GetDiameterByVisibleRow(GridDiameters.Row);
   if D = nil then
     Exit;
@@ -4472,7 +4473,7 @@ begin
   Qmin := D.Qmin;
 
   // считаем только если оба значения осмысленные
-  if (Qmax > 0) and (Qmin > 0) then
+  if (Qmax > 0) and (Qmin > 0) and IsInfinite(Qmin) and IsInfinite(Qmax) then
   begin
     RangeDynamic := Round(Qmax / Qmin);
     EditRangeDynamic.TextPrompt := '1:' + IntToStr(RangeDynamic);
