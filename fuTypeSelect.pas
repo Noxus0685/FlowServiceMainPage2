@@ -853,36 +853,6 @@ var
   SelectedTreeNode: TTreeViewItem;
   HasGridSelection: Boolean;
   I: Integer;
-
-  function BuildTreePathCaption(ANode: TTreeViewItem): string;
-  var
-    CurNode: TTreeViewItem;
-    ManufacturerText: string;
-    CategoryText: string;
-  begin
-    Result := '';
-    ManufacturerText := '';
-    CategoryText := '';
-
-    CurNode := ANode;
-    while CurNode <> nil do
-    begin
-      case CurNode.Tag of
-        Ord(tnManufacturer):
-          ManufacturerText := Trim(CurNode.Text);
-        Ord(tnCategory):
-          CategoryText := Trim(CurNode.Text);
-      end;
-      CurNode := CurNode.ParentItem;
-    end;
-
-    if (ManufacturerText <> '') and (CategoryText <> '') then
-      Result := ManufacturerText + '  ' + CategoryText
-    else if ManufacturerText <> '' then
-      Result := ManufacturerText
-    else
-      Result := CategoryText;
-  end;
 begin
 
    { --------------------------------------------------}
@@ -912,11 +882,7 @@ begin
   if (SourceType = nil) and
      (SelectedTreeNode <> nil) and
      (SelectedTreeNode.Tag <> Ord(tnAll)) then
-  begin
     ApplyTreeSelectionToType(NewType);
-    if Trim(NewType.Name) = '' then
-      NewType.Name := BuildTreePathCaption(SelectedTreeNode);
-  end;
 
   {-------------------------------------------------}
   { Обновляем ТОЛЬКО фильтрованные списки }
