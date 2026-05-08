@@ -3645,12 +3645,15 @@ procedure TFormTypeEditor.GridPointsSetValue(
     LocalD: TDiameter;
     Ch: Char;
   begin
+    SepPos:=0;
     Result := False;
     if (AP = nil) then
       Exit;
 
     K := 1;
     SepPos := Pos('*', AText);
+    if SepPos = 0 then
+      SepPos := Pos('·', AText);
     if SepPos = 0 then
     begin
       for I := 1 to Length(AText) do
@@ -3676,7 +3679,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
       for I := 1 to Length(AText) do
       begin
         Ch := AText[I];
-        if not (Ch in ['0'..'9', ',', '.', ' ','·']) then
+        if not (Ch in ['0'..'9', ',', '.', ' ']) then
         begin
           StartColPos := I;
           Break;
@@ -3719,6 +3722,8 @@ begin
   {-----------------------------------------------------}
   { Защита }
   {-----------------------------------------------------}
+  if GridDiameters.Selected = -1 then
+    Exit;
   if (FPointsLocal = nil) then
     Exit;
 
