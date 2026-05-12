@@ -316,7 +316,6 @@ type
     procedure ComboBoxUnitsChange(Sender: TObject);
     procedure ComboBoxOutputTypeChange(Sender: TObject);
     procedure cbOutPutType2Change(Sender: TObject);
-    procedure ppmnuCalculateVolumePopup(Sender: TObject);
     procedure cbCoefViewTypeChange(Sender: TObject);
     procedure EditCoefExit(Sender: TObject);
     procedure EditFreqFlowRateExit(Sender: TObject);
@@ -530,28 +529,16 @@ begin
     Result := Ord(spUnknown);
 end;
 
-constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
+ constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
  begin
    inherited Create(AOwner);
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
    FDiameterQ4 := TDictionary<Integer, Double>.Create;
    TabItemCoefs.Visible := False;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
-   GridDiameters.PopupMenu := ppmnuCalculateVolume;
    GridPoints.OnKeyDown := GridPointsKeyDown;
    LoadType(AType);
  end;
-
-procedure TFormTypeEditor.ppmnuCalculateVolumePopup(Sender: TObject);
-const
-  CGridHeaderHeight = 30;
-var
-  P: TPointF;
-begin
-  P := GridDiameters.AbsoluteToLocal(PointF(Screen.MousePos.X, Screen.MousePos.Y));
-  if P.Y > CGridHeaderHeight then
-    ppmnuCalculateVolume.CloseMenu;
-end;
 
 destructor TFormTypeEditor.Destroy;
 begin
