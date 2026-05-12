@@ -262,6 +262,7 @@ type
     Layout48: TLayout;
     LFLowEate: TLabel;
     EditFlowRate: TEdit;
+    StyleBook1: TStyleBook;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -4866,6 +4867,8 @@ begin
   end;
 end;
 
+
+
 function TFormTypeEditor.SpillageStopValueToItemIndex(const AValue: Integer): Integer;
 begin
   case AValue of
@@ -4880,6 +4883,8 @@ begin
     Result := 0;
   end;
 end;
+
+
 
 function TFormTypeEditor.SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
 begin
