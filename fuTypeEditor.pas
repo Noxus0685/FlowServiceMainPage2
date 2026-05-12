@@ -1266,8 +1266,8 @@ begin
   FRectGridDiametersHeader.Position.X := GridDiameters.Position.X;
   FRectGridDiametersHeader.Position.Y := GridDiameters.Position.Y;
   FRectGridDiametersHeader.Width := GridDiameters.Width;
-  FRectGridDiametersHeader.Height := GridDiameters.HeaderHeight;
-  FRectGridDiametersHeader.Visible := GridDiameters.Visible and (GridDiameters.HeaderHeight > 0);
+  FRectGridDiametersHeader.Height := GridDiameters.RowHeight;
+  FRectGridDiametersHeader.Visible := GridDiameters.Visible and (GridDiameters.RowHeight > 0);
   FRectGridDiametersHeader.BringToFront;
 end;
 
