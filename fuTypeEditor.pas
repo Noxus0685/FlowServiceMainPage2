@@ -3889,7 +3889,7 @@ begin
   // -----------------------------------------------------
   // Проверка выбранного диаметра
   // -----------------------------------------------------
-  if (FSelectedDiameter = nil) then
+  if (FSelectedDiameter = nil) or (FPointsLocal = nil) then
     Exit;
 
   Qmax := FSelectedDiameter.Qmax;
