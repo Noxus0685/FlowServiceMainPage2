@@ -1756,7 +1756,7 @@ begin
       osNew:
         Q.SQL.Text :=
           'insert into DeviceType (' +
-          'UUID, Name, Modification, Manufacturer, ReestrNumber, ' +
+          'ID, UUID, Name, Modification, Manufacturer, ReestrNumber, ' +
           'Category, CategoryName, AccuracyClass, ' +
           'RegDate, ValidityDate, IVI, RangeDynamic, ' +
           'VerificationMethod, ProcedureName, ' +
@@ -1769,7 +1769,7 @@ begin
           'ProtocolName, BaudRate, Parity, DeviceAddress, ' +
           'InputType, SpillageType, SpillageStop, Repeats, RepeatsProtocol, Error' +
           ') values (' +
-          ':UUID, :Name, :Modification, :Manufacturer, :ReestrNumber, ' +
+          ':ID, :UUID, :Name, :Modification, :Manufacturer, :ReestrNumber, ' +
           ':Category, :CategoryName, :AccuracyClass, ' +
           ':RegDate, :ValidityDate, :IVI, :RangeDynamic, ' +
           ':VerificationMethod, :ProcedureName, ' +
@@ -1807,8 +1807,7 @@ begin
     end;
 
     {---------------- ПАРАМЕТРЫ ----------------}
-    if AType.State = osModified then
-      SetIntParam(Q, 'ID', AType.ID);
+    SetIntParam(Q, 'ID', AType.ID);
     SetStrParam(Q, 'UUID', AType.UUID);
     SetStrParam(Q, 'Name', AType.Name);
     SetStrParam(Q, 'Modification', AType.Modification);
@@ -1871,9 +1870,6 @@ begin
     SetFloatParam(Q, 'Error', AType.Error);
 
     Q.ExecSQL;
-
-    if AType.State = osNew then
-      AType.ID := FDM.TypesConnection.ExecSQLScalar('select last_insert_rowid()');
 
     {================ ДОЧЕРНИЕ СУЩНОСТИ =================}
     if AType.Diameters <> nil then
