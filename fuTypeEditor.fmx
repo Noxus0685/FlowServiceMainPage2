@@ -2211,6 +2211,10 @@ object FormTypeEditor: TFormTypeEditor
           Header = 'Q2, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
+        object StringColumnDNQ2Tr: TStringColumn
+          Header = 'Q2Tr'
+          HeaderSettings.TextSettings.WordWrap = False
+        end
         object StringColumnDNQmax: TStringColumn
           Header = 'Qmax, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False

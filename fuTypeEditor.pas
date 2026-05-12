@@ -238,6 +238,7 @@ type
     StringColumnDNQnom: TStringColumn;
     StringColumnDNKp: TStringColumn;
     StringColumnDNQTr: TStringColumn;
+    StringColumnDNQ2Tr: TStringColumn;
     EditRegDate: TEdit;
     Layout47: TLayout;
     Label42: TLabel;
@@ -3173,6 +3174,8 @@ begin
     Result := StringColumnDNQmin.Hint
   else if ACol = StringColumnDNQTr.Index then
     Result := StringColumnDNQTr.Hint
+  else if ACol = StringColumnDNQ2Tr.Index then
+    Result := StringColumnDNQ2Tr.Hint
   else if ACol = StringColumnDNQnom.Index then
     Result := StringColumnDNQnom.Hint
   else if ACol = StringColumnDNQmax.Index then
@@ -3236,6 +3239,13 @@ begin
       Value := '—'
     else
       Value := FormatByBaseError(FType.FromBaseUnits(D.Q2), FType.Error);
+  end
+  else if ACol = StringColumnDNQ2Tr.Index then
+  begin
+    if D.Q2Tr = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Q2Tr), FType.Error);
   end
 
   // =====================================================
@@ -3404,6 +3414,7 @@ begin
   { Q2 / Qmax / Qmin / Q перегрузочный }
   {=====================================================}
   else if (ACol = StringColumnDNQTr.Index) or
+          (ACol = StringColumnDNQ2Tr.Index) or
           (ACol = StringColumnDNQmax.Index) or
           (ACol = StringColumnDNQmin.Index) or
           (ACol = StringColumnDNQnom.Index) then
@@ -3421,6 +3432,8 @@ begin
       // Для пары Qnom/Qmax сохраняем взаимосвязь по формулам 1.25.
       if ACol = StringColumnDNQTr.Index then
         D.Q2 := QValueBase
+      else if ACol = StringColumnDNQ2Tr.Index then
+        D.Q2Tr := QValueBase
       else if ACol = StringColumnDNQmax.Index then
       begin
         D.Qmax := QValueBase;
@@ -3550,6 +3563,11 @@ procedure TFormTypeEditor.GridPointsSetValue(
       AValue := AD.Q2;
       Exit(True);
     end;
+    if NameNorm = 'Q2TR' then
+    begin
+      AValue := AD.Q2Tr;
+      Exit(True);
+    end;
     if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
     begin
       AValue := AD.Qnom;
@@ -3582,6 +3600,12 @@ procedure TFormTypeEditor.GridPointsSetValue(
     if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
     begin
       AValue := AD.Q2;
+      Exit(True);
+    end;
+    HeaderNorm := UpperCase(StringColumnDNQ2Tr.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Q2Tr;
       Exit(True);
     end;
 
@@ -4599,6 +4623,7 @@ begin
   // СБРОС ЗАГОЛОВКОВ
   // ==================================================
   StringColumnDNQTr.Header := '';
+  StringColumnDNQ2Tr.Header := '';
   StringColumnDNQmax.Header := '';
   StringColumnDNQmin.Header := '';
   StringColumnDNQnom.Header   := '';
@@ -4613,6 +4638,7 @@ begin
 
   StringColumnDNQmin.Hint := 'Q1 – минимальный расход';
   StringColumnDNQTr.Hint := 'Q2 – переходный расход';
+  StringColumnDNQ2Tr.Hint := 'Q2Tr – переходный расход';
   StringColumnDNQnom.Hint := 'Q3 – номинальный расход';
   StringColumnDNQmax.Hint := 'Q4 – наибольший (перегрузочный) расход';
   StringColumnDNQF.Hint := 'qF – расход поверочной точки / контрольный расход';
@@ -4620,6 +4646,7 @@ begin
   GridDiameters.ShowHint := True;
   StringColumnDNQmin.ShowHint := True;
   StringColumnDNQTr.ShowHint := True;
+  StringColumnDNQ2Tr.ShowHint := True;
   StringColumnDNQnom.ShowHint := True;
   StringColumnDNQmax.ShowHint := True;
   StringColumnDNQF.ShowHint := True;
@@ -4725,6 +4752,7 @@ begin
   // ===== Диаметры =====
   StringColumnDNQmin.Header := 'Qmin '+ FType.GetDimensionName;
   StringColumnDNQTr.Header := 'Qtr '+ FType.GetDimensionName;
+  StringColumnDNQ2Tr.Header := 'Q2Tr '+ FType.GetDimensionName;
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
@@ -4751,6 +4779,7 @@ begin
   // ===== Диаметры =====
   StringColumnDNQmin.Header := 'Qmin '+ FType.GetDimensionName;
   StringColumnDNQTr.Header := 'Qtr '+ FType.GetDimensionName;
+  StringColumnDNQ2Tr.Header := 'Q2Tr '+ FType.GetDimensionName;
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
