@@ -351,8 +351,6 @@ type
       Shift: TShiftState; X, Y: Single);
     procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
     procedure GridDiametersResize(Sender: TObject);
-    procedure GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Single);
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
 
@@ -565,12 +563,13 @@ end;
 
    // Создаем невидимую кликабельную область над заголовком грида для отдельного header-popup.
    FRectGridDiametersHeader := TRectangle.Create(Self);
-   FRectGridDiametersHeader.Parent := GridDiameters.Parent;
+   FRectGridDiametersHeader.Parent := GridDiameters;
    FRectGridDiametersHeader.Stored := False;
    FRectGridDiametersHeader.Fill.Kind := TBrushKind.None;
    FRectGridDiametersHeader.Stroke.Kind := TBrushKind.None;
-   // Rectangle остается как геометрический слой заголовка, но ЛКМ не блокируем для штатного header.
-   FRectGridDiametersHeader.HitTest := False;
+   // Rectangle размещается внутри грида поверх header и принимает ПКМ для контекстного меню.
+   FRectGridDiametersHeader.Align := TAlignLayout.Top;
+   FRectGridDiametersHeader.HitTest := True;
    FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
    FRectGridDiametersHeader.BringToFront;
 
@@ -588,7 +587,6 @@ end;
    end;
 
    GridDiameters.OnResize := GridDiametersResize;
-   GridDiameters.OnMouseDown := GridDiametersMouseDown;
 
    LoadType(AType);
    UpdateGridDiametersHeaderRect;
@@ -1271,8 +1269,8 @@ begin
     Exit;
 
   // Прозрачный rectangle повторяет геометрию области заголовка и перехватывает ПКМ только в header.
-  FRectGridDiametersHeader.Position.X := GridDiameters.Position.X;
-  FRectGridDiametersHeader.Position.Y := GridDiameters.Position.Y;
+  FRectGridDiametersHeader.Position.X := 0;
+  FRectGridDiametersHeader.Position.Y := 0;
   FRectGridDiametersHeader.Width := GridDiameters.Width;
   FRectGridDiametersHeader.Height := GridDiameters.RowHeight;
   FRectGridDiametersHeader.Visible := GridDiameters.Visible and (GridDiameters.RowHeight > 0);
@@ -1314,19 +1312,6 @@ begin
   end;
 end;
 
-procedure TFormTypeEditor.GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Single);
-begin
-  if Button <> TMouseButton.mbRight then
-    Exit;
-
-  // ПКМ ловим на самом гриде в зоне header, чтобы ЛКМ по заголовку продолжал работать штатно.
-  if Y > GridDiameters.RowHeight then
-    Exit;
-
-  RectGridDiametersHeaderMouseDown(FRectGridDiametersHeader, Button, Shift, X, Y);
-end;
-
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
 var
@@ -1362,7 +1347,7 @@ begin
   // Перед показом меню синхронизируем checkbox с текущим Visible колонок.
   SyncGridDiametersHeaderPopupMenu;
 
-  P := GridDiameters.LocalToScreen(PointF(X, Y));
+  P := FRectGridDiametersHeader.LocalToScreen(PointF(X, Y));
   FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
 end;
