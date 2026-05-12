@@ -977,11 +977,14 @@ procedure TFormTypeEditor.UpdateDiametersGrid;
 var
   D: TDiameter;
   VisibleCount: Integer;
+  PrevRow: Integer;
 begin
-  if FDiametersLocal = nil then
+  if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
 
   EnsureUniqueDiameterIDs;
+
+  PrevRow := GridDiameters.Row;
 
   VisibleCount := 0;
   for D in FDiametersLocal do
@@ -1009,6 +1012,17 @@ begin
   GridDiameters.BeginUpdate;
   try
     GridDiameters.RowCount := VisibleCount;
+
+    if VisibleCount <= 0 then
+      GridDiameters.Row := -1
+    else if PrevRow < 0 then
+      GridDiameters.Row := 0
+    else if PrevRow >= VisibleCount then
+      GridDiameters.Row := VisibleCount - 1
+    else
+      GridDiameters.Row := PrevRow;
+
+    GridDiameters.Selected := GridDiameters.Row;
   finally
     GridDiameters.EndUpdate;
   end;
