@@ -577,7 +577,7 @@ end;
      MenuItem.Tag := I;
      MenuItem.AutoCheck := False;
      MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
-     FPopupMenuGridDiametersHeader.AddObject(MenuItem);
+     MenuItem.Parent := FPopupMenuGridDiametersHeader;
    end;
 
    GridDiameters.OnResize := GridDiametersResize;
@@ -1342,6 +1342,7 @@ begin
   SyncGridDiametersHeaderPopupMenu;
 
   P := FRectGridDiametersHeader.LocalToScreen(PointF(X, Y));
+  FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
 end;
 
