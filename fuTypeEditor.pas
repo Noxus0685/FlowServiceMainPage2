@@ -263,7 +263,11 @@ type
     Layout48: TLayout;
     LFLowEate: TLabel;
     EditFlowRate: TEdit;
-    StyleBook1: TStyleBook;
+    Column1: TColumn;
+    Column2: TColumn;
+    Column3: TColumn;
+    Column4: TColumn;
+    Column5: TColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
