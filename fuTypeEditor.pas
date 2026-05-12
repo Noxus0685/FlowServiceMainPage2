@@ -351,6 +351,8 @@ type
       Shift: TShiftState; X, Y: Single);
     procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
     procedure GridDiametersResize(Sender: TObject);
+    procedure GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
 
@@ -567,7 +569,8 @@ end;
    FRectGridDiametersHeader.Stored := False;
    FRectGridDiametersHeader.Fill.Kind := TBrushKind.None;
    FRectGridDiametersHeader.Stroke.Kind := TBrushKind.None;
-   FRectGridDiametersHeader.HitTest := True;
+   // Не перехватываем ЛКМ/drag по header: клики должны доходить до нативного заголовка грида.
+   FRectGridDiametersHeader.HitTest := False;
    FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
    FRectGridDiametersHeader.BringToFront;
 
@@ -585,6 +588,7 @@ end;
    end;
 
    GridDiameters.OnResize := GridDiametersResize;
+   GridDiameters.OnMouseDown := GridDiametersMouseDown;
 
    LoadType(AType);
    UpdateGridDiametersHeaderRect;
@@ -1310,6 +1314,22 @@ begin
   end;
 end;
 
+procedure TFormTypeEditor.GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+var
+  LocalPoint: TPointF;
+begin
+  if Button <> TMouseButton.mbRight then
+    Exit;
+
+  // ПКМ обрабатываем на самом гриде, чтобы ЛКМ по заголовку продолжал работать штатно.
+  LocalPoint := GridDiameters.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(X, Y)));
+  if LocalPoint.Y > GridDiameters.RowHeight then
+    Exit;
+
+  RectGridDiametersHeaderMouseDown(FRectGridDiametersHeader, Button, Shift, LocalPoint.X, LocalPoint.Y);
+end;
+
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
 var
@@ -1345,7 +1365,7 @@ begin
   // Перед показом меню синхронизируем checkbox с текущим Visible колонок.
   SyncGridDiametersHeaderPopupMenu;
 
-  P := FRectGridDiametersHeader.LocalToScreen(PointF(X, Y));
+  P := GridDiameters.LocalToScreen(PointF(X, Y));
   FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
 end;
