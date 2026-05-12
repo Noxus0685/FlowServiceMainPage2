@@ -3016,7 +3016,6 @@ begin
 
       else if (Q > 0) and (P.LimitTime > 0) then
       begin
-
         Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error);
       end
 
@@ -3118,6 +3117,93 @@ procedure TFormDeviceEditor.GridPointsSetValue(
   const ACol, ARow: Integer;
   const Value: TValue
 );
+  function TryGetDeviceValueByName(const AName: string; out AValue: Double): Boolean;
+  var
+    NameNorm: string;
+  begin
+    NameNorm := UpperCase(Trim(AName));
+    Result := True;
+    if (NameNorm = 'QNOM') then
+      AValue := FDevice.Qnom
+    else if (NameNorm = 'QMAX') then
+      AValue := FDevice.Qmax
+    else if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
+      AValue := FDevice.QFmax
+    else if (NameNorm = 'KP') then
+      AValue := FDevice.Coef
+    else
+      Result := False;
+  end;
+
+  function TryApplyPointNameFormula(const AText: string; AP: TDevicePoint): Boolean;
+  var
+    SepPos, I, StartColPos: Integer;
+    CoefText, ColText: string;
+    K, ColValue: Double;
+    Ch: Char;
+  begin
+    Result := False;
+    if (AP = nil) then
+      Exit;
+
+    K := 1;
+    SepPos := Pos('*', AText);
+    if SepPos = 0 then
+      SepPos := Pos('·', AText);
+    if SepPos = 0 then
+    begin
+      for I := 1 to Length(AText) do
+        if AText[I] = ' ' then
+        begin
+          SepPos := I;
+          Break;
+        end;
+    end;
+
+    if SepPos > 0 then
+    begin
+      CoefText := Trim(Copy(AText, 1, SepPos - 1));
+      ColText := Trim(Copy(AText, SepPos + 1, MaxInt));
+      if ColText = '' then
+        Exit;
+      if CoefText <> '' then
+        K := NormalizeFloatInput(CoefText);
+    end
+    else
+    begin
+      StartColPos := 0;
+      for I := 1 to Length(AText) do
+      begin
+        Ch := AText[I];
+        if not (Ch in ['0'..'9', ',', '.', ' ']) then
+        begin
+          StartColPos := I;
+          Break;
+        end;
+      end;
+
+      if StartColPos > 1 then
+      begin
+        CoefText := Trim(Copy(AText, 1, StartColPos - 1));
+        ColText := Trim(Copy(AText, StartColPos, MaxInt));
+        if CoefText <> '' then
+          K := NormalizeFloatInput(CoefText);
+      end
+      else
+      begin
+        ColText := Trim(AText);
+      end;
+    end;
+
+    if (ColText = '') or (not TryGetDeviceValueByName(ColText, ColValue)) then
+      Exit;
+
+    if FDevice.Qmax > 0 then
+    begin
+      AP.FlowRate := (K * ColValue) / FDevice.Qmax;
+      Result := True;
+    end;
+  end;
 var
   P: TDevicePoint;
   Qmax, Q, V, Tm, Coef: Double;
@@ -3133,7 +3219,12 @@ begin
   S := Trim(Value.AsString);
 
   if ACol = StringColumnPointName.Index then
-    P.Name := S
+  begin
+    P.Name := S;
+    TryApplyPointNameFormula(S, P);
+    V := P.FlowRate * FDevice.Qmax * P.LimitTime;
+    P.LimitVolume := V;
+  end
 
   else if ACol = StringColumnPointStab.Index then
     P.Pause := Round(NormalizeFloatInput(S))
