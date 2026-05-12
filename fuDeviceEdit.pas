@@ -2996,10 +2996,12 @@ begin
   {=====================================================}
    else if ACol = StringColumnPointQ.Index then
     begin
-      if (P.Q <= 0) then
+      Qmax := FDevice.Qmax;
+      Q := P.FlowRate * Qmax;
+      if (Q <= 0) then
         Value := '—'
       else
-        Value := FormatByBaseError(FDevice.FromBaseUnits(P.Q), P.Error);
+        Value := FormatByBaseError(FDevice.FromBaseUnits(Q), P.Error);
     end
 
     {---------------------------}
@@ -3007,13 +3009,14 @@ begin
     {---------------------------}
     else if (ACol = StringColumnPointVolume.Index) then
     begin
+      Qmax := FDevice.Qmax;
+      Q := P.FlowRate * Qmax;
       if P.LimitVolume > 0 then
         Value := FormatByBaseError(P.LimitVolume, P.Error)
 
-      else if (P.Q > 0) and (P.LimitTime > 0) then
+      else if (Q > 0) and (P.LimitTime > 0) then
       begin
-        Qmax := FDevice.Qmax;
-        Q := P.FlowRate * Qmax;
+
         Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error);
       end
 
