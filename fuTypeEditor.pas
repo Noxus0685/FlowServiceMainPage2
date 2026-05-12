@@ -569,7 +569,7 @@ end;
    FRectGridDiametersHeader.Stored := False;
    FRectGridDiametersHeader.Fill.Kind := TBrushKind.None;
    FRectGridDiametersHeader.Stroke.Kind := TBrushKind.None;
-   // Не перехватываем ЛКМ/drag по header: клики должны доходить до нативного заголовка грида.
+   // Rectangle остается как геометрический слой заголовка, но ЛКМ не блокируем для штатного header.
    FRectGridDiametersHeader.HitTest := False;
    FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
    FRectGridDiametersHeader.BringToFront;
@@ -1316,18 +1316,15 @@ end;
 
 procedure TFormTypeEditor.GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
-var
-  LocalPoint: TPointF;
 begin
   if Button <> TMouseButton.mbRight then
     Exit;
 
-  // ПКМ обрабатываем на самом гриде, чтобы ЛКМ по заголовку продолжал работать штатно.
-  LocalPoint := GridDiameters.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(X, Y)));
-  if LocalPoint.Y > GridDiameters.RowHeight then
+  // ПКМ ловим на самом гриде в зоне header, чтобы ЛКМ по заголовку продолжал работать штатно.
+  if Y > GridDiameters.RowHeight then
     Exit;
 
-  RectGridDiametersHeaderMouseDown(FRectGridDiametersHeader, Button, Shift, LocalPoint.X, LocalPoint.Y);
+  RectGridDiametersHeaderMouseDown(FRectGridDiametersHeader, Button, Shift, X, Y);
 end;
 
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
