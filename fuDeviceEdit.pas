@@ -3123,14 +3123,45 @@ procedure TFormDeviceEditor.GridPointsSetValue(
   begin
     NameNorm := UpperCase(Trim(AName));
     Result := True;
-    if (NameNorm = 'QMAX') then
+  {  if (NameNorm = 'QMAX') then
       AValue := FDevice.Qmax
     else if (NameNorm = 'QMIN') then
       AValue := FDevice.Qmin
     else if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
       AValue := FDevice.FreqFlowRate
     else if (NameNorm = 'KP') then
-      AValue := FDevice.Coef
+      AValue := FDevice.Coef     }
+
+    if NameNorm = 'QMIN' then
+    begin
+      AValue := FDevice.Qmin;
+      Exit(True);
+    end;
+    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
+    begin
+      AValue := FDevice.Qtr;
+      Exit(True);
+    end;
+    if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
+    begin
+      AValue := FDevice.Qnom;
+      Exit(True);
+    end;
+    if (NameNorm = 'QMAX') or (NameNorm = 'Q4') then
+    begin
+      AValue := FDevice.Qmax;
+      Exit(True);
+    end;
+    if NameNorm = 'QF' then
+    begin
+      AValue := FDevice.QFmax;
+      Exit(True);
+    end;
+    if NameNorm = 'KP' then
+    begin
+      AValue := FDevice.Kp;
+      Exit(True);
+    end
     else
       Result := False;
   end;
