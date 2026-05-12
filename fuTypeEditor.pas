@@ -563,12 +563,11 @@ end;
 
    // Создаем невидимую кликабельную область над заголовком грида для отдельного header-popup.
    FRectGridDiametersHeader := TRectangle.Create(Self);
-   FRectGridDiametersHeader.Parent := GridDiameters;
+   FRectGridDiametersHeader.Parent := GridDiameters.Parent;
    FRectGridDiametersHeader.Stored := False;
    FRectGridDiametersHeader.Fill.Kind := TBrushKind.None;
    FRectGridDiametersHeader.Stroke.Kind := TBrushKind.None;
-   // Rectangle размещается внутри грида поверх header и принимает ПКМ для контекстного меню.
-   FRectGridDiametersHeader.Align := TAlignLayout.Top;
+   // Rectangle размещается над визуальным header грида и принимает ПКМ для контекстного меню.
    FRectGridDiametersHeader.HitTest := True;
    FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
    FRectGridDiametersHeader.BringToFront;
@@ -1268,9 +1267,10 @@ begin
   if (FRectGridDiametersHeader = nil) or (GridDiameters = nil) then
     Exit;
 
-  // Прозрачный rectangle повторяет геометрию области заголовка и перехватывает ПКМ только в header.
-  FRectGridDiametersHeader.Position.X := 0;
-  FRectGridDiametersHeader.Position.Y := 0;
+  // Прозрачный rectangle ставим в координатах родителя грида точно над областью header.
+  var GridTopLeft := FRectGridDiametersHeader.Parent.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(0, 0)));
+  FRectGridDiametersHeader.Position.X := GridTopLeft.X;
+  FRectGridDiametersHeader.Position.Y := GridTopLeft.Y;
   FRectGridDiametersHeader.Width := GridDiameters.Width;
   FRectGridDiametersHeader.Height := GridDiameters.RowHeight;
   FRectGridDiametersHeader.Visible := GridDiameters.Visible and (GridDiameters.RowHeight > 0);
