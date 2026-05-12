@@ -103,8 +103,8 @@ object FormTypeEditor: TFormTypeEditor
       Size.Height = 51.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
-      Viewport.Width = 790.000000000000000000
-      Viewport.Height = 47.000000000000000000
+      Viewport.Width = 794.000000000000000000
+      Viewport.Height = 51.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000
@@ -141,10 +141,10 @@ object FormTypeEditor: TFormTypeEditor
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
-      1077s
-      676s
-      1077s
-      676s)
+      1081s
+      677s
+      1081s
+      677s)
     object TabItemDevice: TTabItem
       CustomIcon = <
         item
@@ -152,7 +152,7 @@ object FormTypeEditor: TFormTypeEditor
       TextSettings.Trimming = None
       IsSelected = True
       Size.Width = 71.000000000000000000
-      Size.Height = 23.000000000000000000
+      Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -167,7 +167,7 @@ object FormTypeEditor: TFormTypeEditor
       TextSettings.Trimming = None
       IsSelected = False
       Size.Width = 86.000000000000000000
-      Size.Height = 23.000000000000000000
+      Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -210,7 +210,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 40
+        TabOrder = 39
         object labName: TLabel
           Align = Left
           Margins.Left = 4.000000000000000000
@@ -251,7 +251,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 39
+        TabOrder = 38
         object Label11: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -698,7 +698,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 38
+        TabOrder = 37
         object Label41: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -2187,12 +2187,13 @@ object FormTypeEditor: TFormTypeEditor
         RowHeight = 18.000000000000000000
         RowCount = 3
         Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
+        OnHeaderClick = GridDiametersHeaderClick
         OnSelChanged = GridDiametersSelChanged
         OnGetValue = GridDiametersGetValue
         OnSetValue = GridDiametersSetValue
         OnCellClick = GridDiametersCellClick
-        Viewport.Width = 1062.000000000000000000
-        Viewport.Height = 251.000000000000000000
+        Viewport.Width = 1066.000000000000000000
+        Viewport.Height = 292.000000000000000000
         object CheckColumnDNEnable: TCheckColumn
           HeaderSettings.TextSettings.WordWrap = False
         end
@@ -2251,21 +2252,6 @@ object FormTypeEditor: TFormTypeEditor
           Header = 'QF, '#1084'3/'#1095
           HeaderSettings.TextSettings.WordWrap = False
         end
-        object Column1: TColumn
-          HeaderSettings.TextSettings.WordWrap = False
-        end
-        object Column2: TColumn
-          HeaderSettings.TextSettings.WordWrap = False
-        end
-        object Column3: TColumn
-          HeaderSettings.TextSettings.WordWrap = False
-        end
-        object Column4: TColumn
-          HeaderSettings.TextSettings.WordWrap = False
-        end
-        object Column5: TColumn
-          HeaderSettings.TextSettings.WordWrap = False
-        end
       end
     end
     object grpWorkShedule: TGroupBox
@@ -2303,8 +2289,8 @@ object FormTypeEditor: TFormTypeEditor
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
           OnCellClick = GridPointsCellClick
-          Viewport.Width = 1052.000000000000000000
-          Viewport.Height = 243.000000000000000000
+          Viewport.Width = 1056.000000000000000000
+          Viewport.Height = 284.000000000000000000
           object CheckColumnPointEnable: TCheckColumn
             HeaderSettings.TextSettings.WordWrap = False
           end

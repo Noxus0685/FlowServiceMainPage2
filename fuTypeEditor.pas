@@ -263,11 +263,6 @@ type
     Layout48: TLayout;
     LFLowEate: TLabel;
     EditFlowRate: TEdit;
-    Column1: TColumn;
-    Column2: TColumn;
-    Column3: TColumn;
-    Column4: TColumn;
-    Column5: TColumn;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -353,6 +348,7 @@ type
     procedure GridDiametersResize(Sender: TObject);
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
+    procedure GridDiametersHeaderClick(Column: TColumn);
 
   private
     { Private declarations }
@@ -437,6 +433,7 @@ type
     procedure UpdateUICoef;
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure CreateMenu;
 
   public
 
@@ -548,9 +545,7 @@ begin
 end;
 
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
- var
-   I: Integer;
-   MenuItem: TMenuItem;
+
  begin
    inherited Create(AOwner);
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
@@ -570,26 +565,45 @@ end;
    // Rectangle размещается над визуальным header грида и принимает ПКМ для контекстного меню.
    FRectGridDiametersHeader.HitTest := True;
    FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
+   GridDiameters.OnMouseDown := RectGridDiametersHeaderMouseDown;
    FRectGridDiametersHeader.BringToFront;
 
    // Создаем popup-меню заголовка; пункты 1..9 управляют Visible соответствующих колонок.
    FPopupMenuGridDiametersHeader := TPopupMenu.Create(Self);
    FPopupMenuGridDiametersHeader.Stored := False;
-   for I := 0 to 8 do
-   begin
-     MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-     MenuItem.Text := (I + 1).ToString;
-     MenuItem.Tag := I;
-     MenuItem.AutoCheck := False;
-     MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
-     MenuItem.Parent := FPopupMenuGridDiametersHeader;
-   end;
+   CreateMenu;
 
    GridDiameters.OnResize := GridDiametersResize;
 
    LoadType(AType);
    UpdateGridDiametersHeaderRect;
  end;
+
+
+
+procedure TFormTypeEditor.CreateMenu;
+ var
+   I: Integer;
+   MenuItem: TMenuItem;
+begin
+
+  while FPopupMenuGridDiametersHeader.ItemsCount > 0 do
+  FPopupMenuGridDiametersHeader.Items[0].Free;
+
+  for I := 0 to GridDiameters.ColumnCount-1  do
+   begin
+
+     MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+     if GridDiameters.Columns[i].Header<>'' then
+      MenuItem.Text := GridDiameters.Columns[i].Header
+     else
+      MenuItem.Text := GridDiameters.Columns[i].Name;
+     MenuItem.Tag := I;
+     MenuItem.AutoCheck := False;
+     MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
+     MenuItem.Parent := FPopupMenuGridDiametersHeader;
+   end;
+end;
 
 destructor TFormTypeEditor.Destroy;
 begin
@@ -1329,9 +1343,13 @@ var
   ColRight: Single;
   P: TPointF;
 begin
-  if Button <> TMouseButton.mbRight then
-    Exit;
-
+  if (Button = TMouseButton.mbRight)then
+    FRectGridDiametersHeader.HitTest := true;
+  if Button = TMouseButton.mbLeft then
+    begin
+    FRectGridDiametersHeader.HitTest := false;
+    exit;
+    end;
   FGridDiametersHeaderColumnIndex := -1;
   ColLeft := 0;
 
@@ -1359,6 +1377,13 @@ begin
   P := FRectGridDiametersHeader.LocalToScreen(PointF(X, Y));
   FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
+end;
+
+
+
+procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
+begin
+FRectGridDiametersHeader.HitTest := true;
 end;
 
 procedure TFormTypeEditor.GridDiametersHeaderMenuItemClick(Sender: TObject);
@@ -2079,6 +2104,7 @@ begin
   FType.SetDimensions;
   ApplyMeasuredDimension;
   SetModified;
+  CreateMenu;
 end;
 
 procedure TFormTypeEditor.cbOutPutTypeChange(Sender: TObject);
