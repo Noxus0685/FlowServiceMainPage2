@@ -979,7 +979,7 @@ var
   VisibleCount: Integer;
   PrevRow: Integer;
 begin
-  if FDiametersLocal = nil then
+  if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
 
   EnsureUniqueDiameterIDs;
