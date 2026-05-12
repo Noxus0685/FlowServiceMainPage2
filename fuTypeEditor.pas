@@ -19,6 +19,7 @@ uses
   FMX.Memo,
   FMX.Memo.Types,
   FMX.Menus,
+  FMX.Objects,
   FMX.ScrollBox,
   FMX.SpinBox,
   FMX.StdCtrls,
@@ -342,7 +343,12 @@ type
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure EditRangeDynamicCanFocus(Sender: TObject; var ACanFocus: Boolean);
-
+    procedure RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
+    procedure GridDiametersResize(Sender: TObject);
+    procedure UpdateGridDiametersHeaderRect;
+    procedure SyncGridDiametersHeaderPopupMenu;
 
   private
     { Private declarations }
@@ -378,6 +384,13 @@ type
   FSkipPointDeleteConfirm: Boolean;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
+
+  // Индекс колонки заголовка GridDiameters, по которой нажали ПКМ.
+  FGridDiametersHeaderColumnIndex: Integer;
+  // Невидимая кликабельная область поверх заголовка GridDiameters.
+  FRectGridDiametersHeader: TRectangle;
+  // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
+  FPopupMenuGridDiametersHeader: TPopupMenu;
 
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
@@ -531,6 +544,9 @@ begin
 end;
 
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
+ var
+   I: Integer;
+   MenuItem: TMenuItem;
  begin
    inherited Create(AOwner);
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
@@ -538,7 +554,37 @@ end;
    TabItemCoefs.Visible := False;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
+
+   FGridDiametersHeaderColumnIndex := -1;
+
+   // Создаем невидимую кликабельную область над заголовком грида для отдельного header-popup.
+   FRectGridDiametersHeader := TRectangle.Create(Self);
+   FRectGridDiametersHeader.Parent := GridDiameters.Parent;
+   FRectGridDiametersHeader.Stored := False;
+   FRectGridDiametersHeader.Fill.Kind := TBrushKind.None;
+   FRectGridDiametersHeader.Stroke.Kind := TBrushKind.None;
+   // Rectangle размещается над визуальным header грида и принимает ПКМ для контекстного меню.
+   FRectGridDiametersHeader.HitTest := True;
+   FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
+   FRectGridDiametersHeader.BringToFront;
+
+   // Создаем popup-меню заголовка; пункты 1..9 управляют Visible соответствующих колонок.
+   FPopupMenuGridDiametersHeader := TPopupMenu.Create(Self);
+   FPopupMenuGridDiametersHeader.Stored := False;
+   for I := 0 to 8 do
+   begin
+     MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+     MenuItem.Text := (I + 1).ToString;
+     MenuItem.Tag := I;
+     MenuItem.AutoCheck := False;
+     MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
+     MenuItem.Parent := FPopupMenuGridDiametersHeader;
+   end;
+
+   GridDiameters.OnResize := GridDiametersResize;
+
    LoadType(AType);
+   UpdateGridDiametersHeaderRect;
  end;
 
 destructor TFormTypeEditor.Destroy;
@@ -1209,6 +1255,127 @@ begin
         Exit(P);
     end;
   end;
+end;
+
+
+procedure TFormTypeEditor.UpdateGridDiametersHeaderRect;
+begin
+  if (FRectGridDiametersHeader = nil) or (GridDiameters = nil) then
+    Exit;
+
+  // Прозрачный rectangle ставим в координатах родителя грида точно над областью header.
+  var GridTopLeft: TPointF;
+  var ParentCtrl: TControl;
+  if FRectGridDiametersHeader.Parent is TControl then
+  begin
+    ParentCtrl := TControl(FRectGridDiametersHeader.Parent);
+    GridTopLeft := ParentCtrl.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(0, 0)));
+  end
+  else
+    GridTopLeft := PointF(GridDiameters.Position.X, GridDiameters.Position.Y);
+
+  FRectGridDiametersHeader.Position.X := GridTopLeft.X;
+  FRectGridDiametersHeader.Position.Y := GridTopLeft.Y;
+  FRectGridDiametersHeader.Width := GridDiameters.Width;
+  FRectGridDiametersHeader.Height := GridDiameters.RowHeight;
+  FRectGridDiametersHeader.Visible := GridDiameters.Visible and (GridDiameters.RowHeight > 0);
+  FRectGridDiametersHeader.BringToFront;
+end;
+
+procedure TFormTypeEditor.GridDiametersResize(Sender: TObject);
+begin
+  UpdateGridDiametersHeaderRect;
+end;
+
+procedure TFormTypeEditor.SyncGridDiametersHeaderPopupMenu;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  ColIndex: Integer;
+begin
+  if FPopupMenuGridDiametersHeader = nil then
+    Exit;
+
+  for I := 0 to FPopupMenuGridDiametersHeader.ItemsCount - 1 do
+  begin
+    if not (FPopupMenuGridDiametersHeader.Items[I] is TMenuItem) then
+      Continue;
+
+    MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
+    ColIndex := MenuItem.Tag;
+
+    if (ColIndex >= 0) and (ColIndex < GridDiameters.ColumnCount) then
+    begin
+      MenuItem.Enabled := True;
+      MenuItem.IsChecked := GridDiameters.Columns[ColIndex].Visible;
+    end
+    else
+    begin
+      MenuItem.Enabled := False;
+      MenuItem.IsChecked := False;
+    end;
+  end;
+end;
+
+procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+var
+  I: Integer;
+  ColLeft: Single;
+  ColRight: Single;
+  P: TPointF;
+begin
+  if Button <> TMouseButton.mbRight then
+    Exit;
+
+  FGridDiametersHeaderColumnIndex := -1;
+  ColLeft := 0;
+
+  // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
+  for I := 0 to GridDiameters.ColumnCount - 1 do
+  begin
+    if not GridDiameters.Columns[I].Visible then
+      Continue;
+
+    ColRight := ColLeft + GridDiameters.Columns[I].Width;
+    if (X >= ColLeft) and (X <= ColRight) then
+    begin
+      FGridDiametersHeaderColumnIndex := I;
+      Break;
+    end;
+    ColLeft := ColRight;
+  end;
+
+  if FGridDiametersHeaderColumnIndex < 0 then
+    Exit;
+
+  // Перед показом меню синхронизируем checkbox с текущим Visible колонок.
+  SyncGridDiametersHeaderPopupMenu;
+
+  P := FRectGridDiametersHeader.LocalToScreen(PointF(X, Y));
+  FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
+  FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
+end;
+
+procedure TFormTypeEditor.GridDiametersHeaderMenuItemClick(Sender: TObject);
+var
+  Index: Integer;
+  MenuItem: TMenuItem;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  Index := MenuItem.Tag;
+  if (Index < 0) or (Index >= GridDiameters.ColumnCount) then
+    Exit;
+
+  // Пункты меню управляют Visible колонок, чтобы пользователь мог скрывать/показывать столбцы header.
+  GridDiameters.Columns[Index].Visible := not GridDiameters.Columns[Index].Visible;
+  MenuItem.IsChecked := GridDiameters.Columns[Index].Visible;
+
+  GridDiameters.Repaint;
+  UpdateGridDiametersHeaderRect;
 end;
 
 procedure TFormTypeEditor.LoadType(AType: TDeviceType);
