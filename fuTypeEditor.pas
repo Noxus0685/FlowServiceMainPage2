@@ -1268,7 +1268,16 @@ begin
     Exit;
 
   // Прозрачный rectangle ставим в координатах родителя грида точно над областью header.
-  var GridTopLeft := FRectGridDiametersHeader.Parent.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(0, 0)));
+  var GridTopLeft: TPointF;
+  var ParentCtrl: TControl;
+  if FRectGridDiametersHeader.Parent is TControl then
+  begin
+    ParentCtrl := TControl(FRectGridDiametersHeader.Parent);
+    GridTopLeft := ParentCtrl.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(0, 0)));
+  end
+  else
+    GridTopLeft := PointF(GridDiameters.Position.X, GridDiameters.Position.Y);
+
   FRectGridDiametersHeader.Position.X := GridTopLeft.X;
   FRectGridDiametersHeader.Position.Y := GridTopLeft.Y;
   FRectGridDiametersHeader.Width := GridDiameters.Width;
