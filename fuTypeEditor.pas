@@ -3451,6 +3451,8 @@ begin
         if D.Qnom > 0 then
           D.Qmax := D.Qnom * 1.25;
       end;
+
+
     end
     else
     begin
@@ -3474,6 +3476,7 @@ begin
       FType.RangeDynamic := 0;
       EditRangeDynamic.Text := '';
       EditRangeDynamic.TextPrompt := '';
+      UpdateRangeDynamicPromptBySelectedDiameter;
     end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
@@ -3535,7 +3538,6 @@ begin
     if SelD = D then
       RecalcPointsBySelectedDiameter;
   end;
-
   SetModified;
   UpdateDiametersGrid;
 end;
