@@ -2783,7 +2783,6 @@ procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
 var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
-  OldDevice: TDevice;
 begin
   if AChannel = nil then
     Exit;
@@ -2803,18 +2802,12 @@ begin
     if AChannel.FlowMeter = nil then
       Exit;
 
-    OldDevice := AChannel.FlowMeter.Device;
-
-    if (FFrameProceed <> nil) and (OldDevice <> nil) then
-      FFrameProceed.RemoveProcessingDevice(OldDevice);
-
     // Полностью переинициализируем расходомер выбранным прибором,
-    // чтобы DeviceUUID канала и FlowMeter.Device.UUID не расходились.
+    // чтобы в канал попали все данные нового прибора и его типа.
     AChannel.FlowMeter.Init(SelDevice.UUID);
 
-    // Если репозиторий/инициализация не вернули экземпляр прибора,
-    // используем выбранный в диалоге объект как совместимый fallback.
-    if AChannel.FlowMeter.Device = nil then
+    if (AChannel.FlowMeter.Device = nil) or
+       (not SameText(Trim(AChannel.FlowMeter.Device.UUID), Trim(SelDevice.UUID))) then
       AChannel.FlowMeter.Device := SelDevice;
 
     // После Init берём данные уже из нового прибора внутри FlowMeter.
