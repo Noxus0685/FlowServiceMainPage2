@@ -2028,7 +2028,7 @@ begin
     Col('Qmin', 'REAL'),
     Col('Qtr', 'REAL'),
     Col('Q2tr', 'REAL'),
-
+    Col('Qnom', 'REAL'),
     Col('Kp', 'REAL'),
     Col('QFmax', 'REAL'),
 

@@ -1055,20 +1055,20 @@ begin
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      if D.Qnom <= 0 then
+     { if D.Qnom <= 0 then
       begin
         if D.Qmax > 0 then
           D.Qnom := D.Qmax / 1.25
         else
           D.Qnom := 0;
       end;
-
+    }
       if D.Qtr <= 0 then
         D.Qtr := D.Qmax * 0.0075;
 
       if (D.State <> osNew) and (D.Qmax > 0) then
       begin
-        D.Qnom := D.Qmax / 1.25;
+        //D.Qnom := D.Qmax / 1.25;
         RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
       end;
       Inc(VisibleCount);
