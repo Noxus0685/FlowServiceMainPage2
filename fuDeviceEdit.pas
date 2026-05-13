@@ -1388,8 +1388,27 @@ begin
       { Редактирование существующего прибора }
       {----------------------------------}
       FOriginalDevice := ADevice;
-      //Создаем новый прибор в новой области памяти идентичный данному.
-      FDevice := ADevice.Clone;
+
+      // В некоторых сценариях в ADevice могут быть не загружены точки.
+      // Для редактора всегда берем полностью загруженный объект из репозитория.
+      if (AppServices.DataManager <> nil) and
+         (AppServices.DataManager.ActiveDeviceRepo <> nil) and
+         (Trim(ADevice.UUID) <> '') then
+      begin
+        var LoadedDevice := AppServices.DataManager.ActiveDeviceRepo.LoadDevice(ADevice);
+        if LoadedDevice <> nil then
+        begin
+          try
+            FDevice := LoadedDevice.Clone;
+          finally
+            LoadedDevice.Free;
+          end;
+        end
+        else
+          FDevice := ADevice.Clone;
+      end
+      else
+        FDevice := ADevice.Clone;
     end
     else
     begin

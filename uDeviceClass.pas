@@ -1374,7 +1374,7 @@ begin
   for P in ASource.FPoints do
   begin
     NewP := AddPoint;
-    NewP.Assign(P, False);
+    NewP.Assign(P, True);
   end;
 end;
 
@@ -1713,7 +1713,10 @@ begin
   { СОСТОЯНИЕ }
   {====================================================================}
 
-  State  := osModified;     //????????????????
+  if FullAssign then
+    State := ASource.State
+  else
+    State := osModified;
 
   {====================================================================}
   { ОБЩАЯ ИНФОРМАЦИЯ }
