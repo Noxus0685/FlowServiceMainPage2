@@ -3137,7 +3137,12 @@ procedure TFormDeviceEditor.GridPointsSetValue(
       AValue := FDevice.Qmin;
       Exit(True);
     end;
-    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
+    if (NameNorm = 'QTR') then
+    begin
+      AValue := FDevice.Qtr;
+      Exit(True);
+    end;
+    if (NameNorm = 'Q2TR')  then
     begin
       AValue := FDevice.Qtr;
       Exit(True);

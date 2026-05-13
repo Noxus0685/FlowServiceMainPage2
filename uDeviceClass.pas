@@ -2596,6 +2596,9 @@ begin
   DN := ADiameter.Name;
   Qmax := ADiameter.Qmax;
   Qmin := ADiameter.Qmin;
+  Qnom := ADiameter.Qnom;
+  Qtr := ADiameter.Qtr;
+  Q2tr := ADiameter.Q2tr;
 
   if Qmin > 0 then
     RangeDynamic := Qmax / Qmin
