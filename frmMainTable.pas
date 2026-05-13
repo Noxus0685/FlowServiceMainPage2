@@ -2716,6 +2716,26 @@ begin
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
 
+      if AChannel.FlowMeter.Device <> nil then
+      begin
+        AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
+        AChannel.TypeUUID := AChannel.FlowMeter.Device.DeviceTypeUUID;
+        AChannel.TypeName := AChannel.FlowMeter.Device.DeviceTypeName;
+        AChannel.Serial := AChannel.FlowMeter.Device.SerialNumber;
+        AChannel.Signal := AChannel.FlowMeter.Device.OutputType;
+
+        AChannel.RepoTypeName := AChannel.FlowMeter.Device.RepoTypeName;
+        AChannel.RepoTypeUUID := AChannel.FlowMeter.Device.RepoTypeUUID;
+        AChannel.RepoDeviceName := AChannel.FlowMeter.Device.RepoDeviceName;
+        AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
+
+        AChannel.FlowMeter.UpdateByDevice;
+      end;
+
+      MarkChannelDeviceModified(AChannel);
+      UpdateGrids;
+      GridDevices.Repaint;
+
     finally
       SelectFrm.Free;
     end;
@@ -4064,7 +4084,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
     Exit;
 
@@ -4206,7 +4226,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
     Exit;
 
@@ -4782,17 +4802,21 @@ begin
     SoftReloadGridByGrowingRowCount(
       GridDevices,
       WT.DeviceChannels.Count,
-      [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
+      [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
+       StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
+       StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
+       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
+       StringColumnDeviceCoef1, StringColumnDeviceError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
       GridDevices,
       Length(FFlowMeterRows),
-      [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
+      [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
+       StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
+       StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
+       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
+       StringColumnDeviceCoef1, StringColumnDeviceError1]
     );
 
   if WT <> nil then
