@@ -2025,6 +2025,7 @@ begin
     Col('Description', 'TEXT'),
 
     Col('Qmax', 'REAL'),
+    Col('Qnom', 'REAL'),
     Col('Qmin', 'REAL'),
     Col('Qtr', 'REAL'),
     Col('Q2tr', 'REAL'),
@@ -2093,6 +2094,10 @@ end;
   Result.Description := Q.FieldByName('Description').AsString;
 
   Result.Qmax := Q.FieldByName('Qmax').AsFloat;
+  if Q.FindField('Qnom') <> nil then
+    Result.Qnom := Q.FieldByName('Qnom').AsFloat
+  else
+    Result.Qnom := 0;
   Result.Qmin := Q.FieldByName('Qmin').AsFloat;
   if Q.FindField('Qtr') <> nil then
     Result.Qtr := Q.FieldByName('Qtr').AsFloat
@@ -2255,10 +2260,10 @@ begin
           Q.SQL.Text :=
             'insert into DeviceDiameter (' +
             'DeviceTypeID, DeviceTypeUUID, UUID, Name, DN, Description, ' +
-            'Qmax, Qmin, Qtr, Q2tr, Kp, QFmax, Vmax, Vmin' +
+            'Qmax, Qnom, Qmin, Qtr, Q2tr, Kp, QFmax, Vmax, Vmin' +
             ') values (' +
             ':DeviceTypeID, :DeviceTypeUUID, :UUID, :Name, :DN, :Description, ' +
-            ':Qmax, :Qmin, :Qtr, :Q2tr, :Kp, :QFmax, :Vmax, :Vmin' +
+            ':Qmax, :Qnom, :Qmin, :Qtr, :Q2tr, :Kp, :QFmax, :Vmax, :Vmin' +
             ')';
         end;
 
@@ -2276,7 +2281,7 @@ begin
             'DeviceTypeID=:DeviceTypeID, ' +
             'DeviceTypeUUID=:DeviceTypeUUID, UUID=:UUID, ' +
             'Name=:Name, DN=:DN, Description=:Description, ' +
-            'Qmax=:Qmax, Qmin=:Qmin, Qtr=:Qtr, Q2tr=:Q2tr, Kp=:Kp, ' +
+            'Qmax=:Qmax, Qnom=:Qnom, Qmin=:Qmin, Qtr=:Qtr, Q2tr=:Q2tr, Kp=:Kp, ' +
             'QFmax=:QFmax, Vmax=:Vmax, Vmin=:Vmin ' +
             'where ID=:ID';
         end;
@@ -2298,6 +2303,7 @@ begin
     SetStrParam(Q, 'Description', ADiameter.Description);
 
     SetFloatParam(Q, 'Qmax', ADiameter.Qmax);
+    SetFloatParam(Q, 'Qnom', ADiameter.Qnom);
     SetFloatParam(Q, 'Qmin', ADiameter.Qmin);
     SetFloatParam(Q, 'Qtr', ADiameter.Qtr);
     SetFloatParam(Q, 'Q2tr', ADiameter.Q2tr);
