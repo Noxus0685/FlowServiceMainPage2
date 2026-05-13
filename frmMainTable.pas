@@ -3121,6 +3121,9 @@ begin
   if OldUUID = '' then
     Exit;
 
+  if not SameText(OldUUID, Trim(AChangedChannel.DeviceUUID)) then
+    Exit;
+
   for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
   begin
     Ch := FActiveWorkTable.DeviceChannels[I];
