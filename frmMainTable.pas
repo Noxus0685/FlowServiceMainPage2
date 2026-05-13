@@ -2799,41 +2799,13 @@ begin
     if SelDevice = nil then
       Exit;
 
-    if AChannel.FlowMeter = nil then
-      Exit;
-
-    // Полностью переинициализируем расходомер выбранным прибором,
-    // чтобы в канал попали все данные нового прибора и его типа.
-    AChannel.FlowMeter.Init(SelDevice.UUID);
-
-    // После Init берём данные уже из нового прибора внутри FlowMeter.
-    if AChannel.FlowMeter.Device <> nil then
-    begin
-      AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
-      AChannel.TypeUUID := AChannel.FlowMeter.Device.DeviceTypeUUID;
-      AChannel.TypeName := AChannel.FlowMeter.Device.DeviceTypeName;
-      AChannel.Serial := AChannel.FlowMeter.Device.SerialNumber;
-      AChannel.Signal := AChannel.FlowMeter.Device.OutputType;
-
-      AChannel.RepoTypeName := AChannel.FlowMeter.Device.RepoTypeName;
-      AChannel.RepoTypeUUID := AChannel.FlowMeter.Device.RepoTypeUUID;
-      AChannel.RepoDeviceName := AChannel.FlowMeter.Device.RepoDeviceName;
-      AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
-
-      AChannel.FlowMeter.UpdateByDevice;
-
-      if FFrameProceed <> nil then
-        FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
-    end;
-
+    AChannel.DeviceUUID := SelDevice.UUID;
+    AChannel.TypeName := SelDevice.DeviceTypeName;
+    AChannel.Serial := SelDevice.SerialNumber;
+    AChannel.Signal := SelDevice.OutputType;
+    if FFrameProceed <> nil then
+      FFrameProceed.AddProcessingDevice(SelDevice);
     MarkChannelDeviceModified(AChannel);
-
-    if FActiveWorkTable <> nil then
-    begin
-      FActiveWorkTable.RecalculateAllMeterValues;
-      FActiveWorkTable.RebindAllFlowMeters;
-    end;
-
     UpdateGrids;
   finally
     if DataManager <> nil then
