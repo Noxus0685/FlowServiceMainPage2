@@ -2094,6 +2094,7 @@ end;
   Result.Description := Q.FieldByName('Description').AsString;
 
   Result.Qmax := Q.FieldByName('Qmax').AsFloat;
+
   if Q.FindField('Qnom') <> nil then
     Result.Qnom := Q.FieldByName('Qnom').AsFloat
   else
