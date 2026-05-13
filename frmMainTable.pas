@@ -560,6 +560,7 @@ type
        procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
     procedure CopyChannelData(ASource, ADest: TChannel);
+    procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
 
 
@@ -2693,6 +2694,7 @@ var
   SelDevice: TDevice;
   SelectFrm: TFormDeviceSelect;
   Frm: TFormDeviceEditor;
+  OldDeviceUUID: string;
 begin
   if AChannel = nil then
     Exit;
@@ -2700,6 +2702,7 @@ begin
   if DataManager <> nil then
   ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
 
+  OldDeviceUUID := Trim(AChannel.DeviceUUID);
   ADevice := AChannel.FlowMeter.Device;
 
   if (ADevice = nil) and
@@ -2733,6 +2736,7 @@ begin
       end;
 
       MarkChannelDeviceModified(AChannel);
+      SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
 
@@ -2803,9 +2807,12 @@ procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
 var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
+  OldDeviceUUID: string;
 begin
   if AChannel = nil then
     Exit;
+
+  OldDeviceUUID := Trim(AChannel.DeviceUUID);
 
   if DataManager <> nil then
     DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
@@ -2851,6 +2858,7 @@ begin
     end;
 
     MarkChannelDeviceModified(AChannel);
+    SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
 
     if FActiveWorkTable <> nil then
     begin
@@ -3098,6 +3106,48 @@ begin
   if FFrameProceed <> nil then
     FFrameProceed.AddProcessingDevice(ADest.FlowMeter.Device);
   MarkChannelDeviceModified(ADest);
+end;
+
+procedure TFrameMainTable.SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
+var
+  I: Integer;
+  Ch: TChannel;
+  OldUUID: string;
+begin
+  if (FActiveWorkTable = nil) or (AChangedChannel = nil) then
+    Exit;
+
+  OldUUID := Trim(AOldUUID);
+  if OldUUID = '' then
+    Exit;
+
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Ch := FActiveWorkTable.DeviceChannels[I];
+    if (Ch = nil) or (Ch = AChangedChannel) then
+      Continue;
+
+    if not SameText(Trim(Ch.DeviceUUID), OldUUID) then
+      Continue;
+
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Init(AChangedChannel.DeviceUUID);
+
+    Ch.DeviceUUID := AChangedChannel.DeviceUUID;
+    Ch.TypeUUID := AChangedChannel.TypeUUID;
+    Ch.TypeName := AChangedChannel.TypeName;
+    Ch.Serial := AChangedChannel.Serial;
+    Ch.Signal := AChangedChannel.Signal;
+    Ch.RepoTypeName := AChangedChannel.RepoTypeName;
+    Ch.RepoTypeUUID := AChangedChannel.RepoTypeUUID;
+    Ch.RepoDeviceName := AChangedChannel.RepoDeviceName;
+    Ch.RepoDeviceUUID := AChangedChannel.RepoDeviceUUID;
+
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.UpdateByDevice;
+
+    MarkChannelDeviceModified(Ch);
+  end;
 end;
 
 procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
