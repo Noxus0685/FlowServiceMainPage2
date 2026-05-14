@@ -284,14 +284,14 @@ begin
     Exit;
 
   Details :=
-    'Action=' + AAction + sLineBreak +
-    'Form=fuDeviceSelect' + sLineBreak +
-    'UUID=' + string(ADevice.UUID) + sLineBreak +
-    'Name=' + ADevice.Name + sLineBreak +
-    'Serial=' + ADevice.SerialNumber + sLineBreak +
-    'TypeUUID=' + string(ADevice.DeviceTypeUUID) + sLineBreak +
-    'TypeName=' + ADevice.DeviceTypeName + sLineBreak +
-    'Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
+    'Action   =' + AAction + ' | ' +
+    'Form     =fuDeviceSelect | ' +
+    'UUID     =' + string(ADevice.UUID) + ' | ' +
+    'Name     =' + ADevice.Name + ' | ' +
+    'Serial   =' + ADevice.SerialNumber + ' | ' +
+    'TypeUUID =' + string(ADevice.DeviceTypeUUID) + ' | ' +
+    'TypeName =' + ADevice.DeviceTypeName + ' | ' +
+    'Time     =' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
   if Trim(ADetails) <> '' then
     Details := Details + '; ' + ADetails;
 
@@ -326,11 +326,11 @@ begin
       if UUIDMap[U] > 1 then
         ProtocolManager.AddMessage(
           pcError, psForm, 'DeviceActionError', 'Обнаружены дубли UUID приборов',
-          'Action=DuplicateUUID' + sLineBreak +
-          'Form=fuDeviceSelect' + sLineBreak +
-          'UUID=' + U + sLineBreak +
-          'Count=' + IntToStr(UUIDMap[U]) + sLineBreak +
-          'Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now));
+          'Action   =DuplicateUUID | ' +
+          'Form     =fuDeviceSelect | ' +
+          'UUID     =' + U + ' | ' +
+          'Count    =' + IntToStr(UUIDMap[U]) + ' | ' +
+          'Time     =' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now));
   finally
     UUIDMap.Free;
   end;

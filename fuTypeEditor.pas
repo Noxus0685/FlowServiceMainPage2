@@ -1416,13 +1416,13 @@ var
 begin
   if (AType = nil) or (ProtocolManager = nil) then Exit;
   Details :=
-    'Action=' + AAction + sLineBreak +
-    'Form=fuTypeEditor' + sLineBreak +
-    'UUID=' + string(AType.UUID) + sLineBreak +
-    'Name=' + AType.Name + sLineBreak +
-    'Manufacturer=' + AType.Manufacturer + sLineBreak +
-    'Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
-  if Trim(ADetails) <> '' then Details := Details + sLineBreak + ADetails;
+    'Action       =' + AAction + ' | ' +
+    'Form         =fuTypeEditor | ' +
+    'UUID         =' + string(AType.UUID) + ' | ' +
+    'Name         =' + AType.Name + ' | ' +
+    'Manufacturer =' + AType.Manufacturer + ' | ' +
+    'Time         =' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
+  if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceTypeAction', 'Действие с типом прибора', Details);
 end;
 
