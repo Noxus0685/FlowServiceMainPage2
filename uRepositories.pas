@@ -2024,6 +2024,7 @@ begin
     Col('DN', 'TEXT'),
     Col('Description', 'TEXT'),
 
+    Col('Q2Tr', 'REAL'),
     Col('Qmax', 'REAL'),
     Col('Qnom', 'REAL'),
     Col('Qmin', 'REAL'),
@@ -2093,6 +2094,7 @@ end;
   Result.DN := Q.FieldByName('DN').AsString;
   Result.Description := Q.FieldByName('Description').AsString;
 
+  Result.Q2Tr := Q.FieldByName('Q2Tr').AsFloat;
   Result.Qmax := Q.FieldByName('Qmax').AsFloat;
 
   if Q.FindField('Qnom') <> nil then
@@ -2303,6 +2305,7 @@ begin
     SetStrParam(Q, 'DN', ADiameter.DN);
     SetStrParam(Q, 'Description', ADiameter.Description);
 
+    SetFloatParam(Q, 'Q2Tr', ADiameter.Q2Tr);
     SetFloatParam(Q, 'Qmax', ADiameter.Qmax);
     SetFloatParam(Q, 'Qnom', ADiameter.Qnom);
     SetFloatParam(Q, 'Qmin', ADiameter.Qmin);

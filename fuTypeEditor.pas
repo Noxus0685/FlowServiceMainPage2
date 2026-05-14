@@ -3462,6 +3462,13 @@ begin
     else
       Value := FormatByBaseError(FType.FromBaseUnits(D.Q2tr), FType.Error);
   end
+  else if ACol = StringColumnDNQ2Tr.Index then
+  begin
+    if D.Q2Tr = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Q2Tr), FType.Error);
+  end
 
   // =====================================================
   // == Qmax
@@ -3780,6 +3787,11 @@ procedure TFormTypeEditor.GridPointsSetValue(
       AValue := AD.Qtr;
       Exit(True);
     end;
+    if NameNorm = 'Q2TR' then
+    begin
+      AValue := AD.Q2Tr;
+      Exit(True);
+    end;
     if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
     begin
       AValue := AD.Qnom;
@@ -3819,6 +3831,12 @@ procedure TFormTypeEditor.GridPointsSetValue(
     if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
     begin
       AValue := AD.Q2tr;
+      Exit(True);
+    end;
+    HeaderNorm := UpperCase(StringColumnDNQ2Tr.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Q2Tr;
       Exit(True);
     end;
 
