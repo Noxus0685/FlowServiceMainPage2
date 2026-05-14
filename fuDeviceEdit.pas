@@ -41,7 +41,8 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
-  uRepositories;
+  uRepositories,
+  uProtocols;
 
 type
   TFormDeviceEditor = class(TForm)
@@ -371,6 +372,7 @@ type
   public
     { Public declarations }
      procedure LoadDevice(ADevice: TDevice);
+     procedure WriteDeviceEditActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   end;
 
 var
@@ -640,6 +642,18 @@ begin
   FillConversionCoefVolume;
 end;
 
+
+procedure TFormDeviceEditor.WriteDeviceEditActionLog(const AAction: string; ADevice: TDevice; const ADetails: string);
+var
+  Details: string;
+begin
+  if (ADevice = nil) or (ProtocolManager = nil) then Exit;
+  Details := Format('Action=%s; Form=%s; Object=Device; UUID=%s; Name=%s; Serial=%s; TypeUUID=%s; TypeName=%s; Time=%s',
+    [AAction, 'fuDeviceEdit', ADevice.UUID, ADevice.Name, ADevice.SerialNumber, ADevice.DeviceTypeUUID, ADevice.DeviceTypeName, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
+  if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
+  ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
+end;
+
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
 begin
   // Отменяем все изменения
@@ -653,7 +667,9 @@ begin
       AppServices.DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
 
       // Закрываем форму с результатом Cancel
-      ModalResult := mrCancel;
+      WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
+      WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
+    ModalResult := mrCancel;
     end;
   end
   else
@@ -906,6 +922,7 @@ begin
       begin
         { новый прибор }
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
+        WriteDeviceEditActionLog('Сохранён прибор', FDevice);
       end;
     end
     else if ModalResult = mrCancel then
@@ -1529,6 +1546,7 @@ begin
     if Frm.ShowModal <> mrOk then
       Exit;
 
+    OldTypeUUID := FDevice.DeviceTypeUUID;
     NewType := Frm.SelectedType;
     if NewType = nil then
       Exit;
