@@ -63,12 +63,6 @@ var
 begin
   inherited;
   FMessages := TObjectList<TProtocolMessage>.Create(True);
-  ListBoxProtocol.ShowScrollBars := True;
-  ListBoxProtocol.AniCalculations.AutoShowing := False;
-  ListBoxProtocol.VertScrollBar.Visible := True;
-  ListBoxProtocol.VertScrollBar.Enabled := True;
-  ListBoxProtocol.HorzScrollBar.Visible := True;
-  ListBoxProtocol.HorzScrollBar.Enabled := True;
 
   CheckBoxEvent.IsChecked := True;
   CheckBoxState.IsChecked := True;
