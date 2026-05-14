@@ -113,6 +113,7 @@ begin
   Item.Text := TProtocolManager.FormatMessage(Msg);
   Item.Selectable := False;
   Item.StyledSettings := Item.StyledSettings - [TStyledSetting.FontColor];
+  Item.TextSettings.WordWrap := False;
   Item.TextSettings.Font.Family := 'Consolas';
   Item.TextSettings.Font.Size := 12;
 
