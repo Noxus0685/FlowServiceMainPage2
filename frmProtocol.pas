@@ -5,6 +5,7 @@ interface
 uses
   FMX.Controls,
   FMX.Controls.Presentation,
+  FMX.Dialogs,
   FMX.Forms,
   FMX.Graphics,
   FMX.Layouts,
@@ -13,6 +14,7 @@ uses
   FMX.Types,
   System.Classes,
   System.Generics.Collections,
+  System.IOUtils,
   System.SysUtils,
   System.UITypes,
   uProtocols;
@@ -35,6 +37,7 @@ type
     procedure SpeedButtonResumeClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonClearClick(Sender: TObject);
+    procedure SpeedButtonExportClick(Sender: TObject);
     procedure FilterChanged(Sender: TObject);
   private
     FMessages: TObjectList<TProtocolMessage>;
@@ -44,6 +47,7 @@ type
     procedure AddProtocolItem(const Msg: TProtocolMessage);
     function IsAllowedByFilters(Msg: TProtocolMessage): Boolean;
     procedure RebuildMemo;
+    procedure ExportProtocolToFile;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -54,6 +58,8 @@ implementation
 {$R *.fmx}
 
 constructor TFrameProtocol.Create(AOwner: TComponent);
+var
+  BtnExport: TSpeedButton;
 begin
   inherited;
   FMessages := TObjectList<TProtocolMessage>.Create(True);
@@ -72,6 +78,13 @@ begin
   CheckBoxWorkTable.IsChecked := True;
   CheckBoxMeasurement.IsChecked := True;
 
+  BtnExport := TSpeedButton.Create(ToolBarProtocol);
+  BtnExport.Parent := ToolBarProtocol;
+  BtnExport.Align := TAlignLayout.Left;
+  BtnExport.Text := 'Выгрузить в файл';
+  BtnExport.Width := 140;
+  BtnExport.OnClick := SpeedButtonExportClick;
+
   FListener :=
     procedure(Msg: TProtocolMessage)
     begin
@@ -79,6 +92,31 @@ begin
     end;
 
   ProtocolManager.Subscribe(FListener);
+end;
+
+procedure TFrameProtocol.ExportProtocolToFile;
+var
+  Lines: TStringList;
+  I: Integer;
+  FileName: string;
+  Item: TListBoxItem;
+begin
+  Lines := TStringList.Create;
+  try
+    for I := 0 to ListBoxProtocol.Count - 1 do
+      if ListBoxProtocol.ItemByIndex(I) is TListBoxItem then
+      begin
+        Item := TListBoxItem(ListBoxProtocol.ItemByIndex(I));
+        Lines.Add(Item.Text);
+      end;
+
+    FileName := TPath.Combine(TPath.GetDocumentsPath,
+      'protocol_export_' + FormatDateTime('yyyymmdd_hhnnss', Now) + '.txt');
+    Lines.SaveToFile(FileName, TEncoding.UTF8);
+    ShowMessage('Журнал выгружен: ' + FileName);
+  finally
+    Lines.Free;
+  end;
 end;
 
 destructor TFrameProtocol.Destroy;
@@ -176,6 +214,11 @@ begin
   ProtocolManager.Clear;
   FMessages.Clear;
   ListBoxProtocol.Clear;
+end;
+
+procedure TFrameProtocol.SpeedButtonExportClick(Sender: TObject);
+begin
+  ExportProtocolToFile;
 end;
 
 procedure TFrameProtocol.SpeedButtonPauseClick(Sender: TObject);

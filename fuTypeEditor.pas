@@ -1415,8 +1415,9 @@ var
   Details: string;
 begin
   if (AType = nil) or (ProtocolManager = nil) then Exit;
-  Details := Format('Action=%s; Form=%s; UUID=%s; TypeUUID=%s; Time=%s',
-    [AAction, 'fuTypeEditor', string(AType.UUID), '-', FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
+  Details := Format('Action=%s; Form=%s; Object=%s; UUID=%s; Name=%s; Manufacturer=%s; Category=%s; Modification=%s; Time=%s',
+    [AAction, 'fuTypeEditor', 'DeviceType', string(AType.UUID), AType.Name, AType.Manufacturer,
+     IntToStr(AType.Category), AType.Modification, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceTypeAction', 'Действие с типом прибора', Details);
 end;

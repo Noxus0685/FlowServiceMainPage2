@@ -283,8 +283,9 @@ begin
   if (ADevice = nil) or (ProtocolManager = nil) then
     Exit;
 
-  Details := Format('Action=%s; Form=%s; UUID=%s; TypeUUID=%s; Time=%s',
-    [AAction, 'fuDeviceSelect', string(ADevice.UUID), string(ADevice.DeviceTypeUUID), FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
+  Details := Format('Action=%s; Form=%s; Object=%s; UUID=%s; Name=%s; Serial=%s; TypeUUID=%s; TypeName=%s; Time=%s',
+    [AAction, 'fuDeviceSelect', 'Device', string(ADevice.UUID), ADevice.Name, ADevice.SerialNumber,
+     string(ADevice.DeviceTypeUUID), ADevice.DeviceTypeName, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then
     Details := Details + '; ' + ADetails;
 
