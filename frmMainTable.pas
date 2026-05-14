@@ -560,6 +560,7 @@ type
        procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
     procedure CopyChannelData(ASource, ADest: TChannel);
+    procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
 
 
@@ -2693,6 +2694,7 @@ var
   SelDevice: TDevice;
   SelectFrm: TFormDeviceSelect;
   Frm: TFormDeviceEditor;
+  OldDeviceUUID: string;
 begin
   if AChannel = nil then
     Exit;
@@ -2700,6 +2702,7 @@ begin
   if DataManager <> nil then
   ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
 
+  OldDeviceUUID := Trim(AChannel.DeviceUUID);
   ADevice := AChannel.FlowMeter.Device;
 
   if (ADevice = nil) and
@@ -2715,6 +2718,27 @@ begin
         Exit;
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
+
+      if AChannel.FlowMeter.Device <> nil then
+      begin
+        AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
+        AChannel.TypeUUID := AChannel.FlowMeter.Device.DeviceTypeUUID;
+        AChannel.TypeName := AChannel.FlowMeter.Device.DeviceTypeName;
+        AChannel.Serial := AChannel.FlowMeter.Device.SerialNumber;
+        AChannel.Signal := AChannel.FlowMeter.Device.OutputType;
+
+        AChannel.RepoTypeName := AChannel.FlowMeter.Device.RepoTypeName;
+        AChannel.RepoTypeUUID := AChannel.FlowMeter.Device.RepoTypeUUID;
+        AChannel.RepoDeviceName := AChannel.FlowMeter.Device.RepoDeviceName;
+        AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
+
+        AChannel.FlowMeter.UpdateByDevice;
+      end;
+
+      MarkChannelDeviceModified(AChannel);
+      SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
+      UpdateGrids;
+      GridDevices.Repaint;
 
     finally
       SelectFrm.Free;
@@ -2783,9 +2807,14 @@ procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
 var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
+  LinkedChannel: TChannel;
+  I: Integer;
+  SelectedUUID: string;
 begin
   if AChannel = nil then
     Exit;
+
+  OldDeviceUUID := Trim(AChannel.DeviceUUID);
 
   if DataManager <> nil then
     DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
@@ -2799,13 +2828,75 @@ begin
     if SelDevice = nil then
       Exit;
 
-    AChannel.DeviceUUID := SelDevice.UUID;
-    AChannel.TypeName := SelDevice.DeviceTypeName;
-    AChannel.Serial := SelDevice.SerialNumber;
-    AChannel.Signal := SelDevice.OutputType;
-    if FFrameProceed <> nil then
-      FFrameProceed.AddProcessingDevice(SelDevice);
+    if AChannel.FlowMeter = nil then
+      Exit;
+
+    SelectedUUID := Trim(SelDevice.UUID);
+
+    // Полностью переинициализируем расходомер выбранным прибором,
+    // чтобы в канал попали все данные нового прибора и его типа.
+    AChannel.FlowMeter.Init(SelDevice.UUID);
+
+    if (AChannel.FlowMeter.Device = nil) or
+       (not SameText(Trim(AChannel.FlowMeter.Device.UUID), Trim(SelDevice.UUID))) or
+       (not SameText(Trim(AChannel.FlowMeter.Device.DeviceTypeUUID), Trim(SelDevice.DeviceTypeUUID))) then
+      AChannel.FlowMeter.Device := SelDevice;
+
+    // После Init берём данные уже из нового прибора внутри FlowMeter.
+    if AChannel.FlowMeter.Device <> nil then
+    begin
+      AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
+      AChannel.TypeUUID := AChannel.FlowMeter.Device.DeviceTypeUUID;
+      AChannel.TypeName := AChannel.FlowMeter.Device.DeviceTypeName;
+      AChannel.Serial := AChannel.FlowMeter.Device.SerialNumber;
+      AChannel.Signal := AChannel.FlowMeter.Device.OutputType;
+
+      AChannel.RepoTypeName := AChannel.FlowMeter.Device.RepoTypeName;
+      AChannel.RepoTypeUUID := AChannel.FlowMeter.Device.RepoTypeUUID;
+      AChannel.RepoDeviceName := AChannel.FlowMeter.Device.RepoDeviceName;
+      AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
+
+      AChannel.FlowMeter.UpdateByDevice;
+
+      if FFrameProceed <> nil then
+        FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
+
+      if (FActiveWorkTable <> nil) and (SelectedUUID <> '') then
+        for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+        begin
+          LinkedChannel := FActiveWorkTable.DeviceChannels[I];
+          if (LinkedChannel = nil) or (LinkedChannel = AChannel) then
+            Continue;
+          if not SameText(Trim(LinkedChannel.DeviceUUID), SelectedUUID) then
+            Continue;
+          if LinkedChannel.FlowMeter = nil then
+            Continue;
+
+          LinkedChannel.FlowMeter.Device := AChannel.FlowMeter.Device;
+          LinkedChannel.FlowMeter.UpdateByDevice;
+
+          LinkedChannel.DeviceUUID := AChannel.DeviceUUID;
+          LinkedChannel.TypeUUID := AChannel.TypeUUID;
+          LinkedChannel.TypeName := AChannel.TypeName;
+          LinkedChannel.Serial := AChannel.Serial;
+          LinkedChannel.Signal := AChannel.Signal;
+          LinkedChannel.RepoTypeName := AChannel.RepoTypeName;
+          LinkedChannel.RepoTypeUUID := AChannel.RepoTypeUUID;
+          LinkedChannel.RepoDeviceName := AChannel.RepoDeviceName;
+          LinkedChannel.RepoDeviceUUID := AChannel.RepoDeviceUUID;
+
+          MarkChannelDeviceModified(LinkedChannel);
+        end;
+    end;
+
     MarkChannelDeviceModified(AChannel);
+
+    if FActiveWorkTable <> nil then
+    begin
+      FActiveWorkTable.RecalculateAllMeterValues;
+      FActiveWorkTable.RebindAllFlowMeters;
+    end;
+
     UpdateGrids;
   finally
     if DataManager <> nil then
@@ -3046,6 +3137,51 @@ begin
   if FFrameProceed <> nil then
     FFrameProceed.AddProcessingDevice(ADest.FlowMeter.Device);
   MarkChannelDeviceModified(ADest);
+end;
+
+procedure TFrameMainTable.SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
+var
+  I: Integer;
+  Ch: TChannel;
+  OldUUID: string;
+begin
+  if (FActiveWorkTable = nil) or (AChangedChannel = nil) then
+    Exit;
+
+  OldUUID := Trim(AOldUUID);
+  if OldUUID = '' then
+    Exit;
+
+  if not SameText(OldUUID, Trim(AChangedChannel.DeviceUUID)) then
+    Exit;
+
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Ch := FActiveWorkTable.DeviceChannels[I];
+    if (Ch = nil) or (Ch = AChangedChannel) then
+      Continue;
+
+    if not SameText(Trim(Ch.DeviceUUID), OldUUID) then
+      Continue;
+
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.Init(AChangedChannel.DeviceUUID);
+
+    Ch.DeviceUUID := AChangedChannel.DeviceUUID;
+    Ch.TypeUUID := AChangedChannel.TypeUUID;
+    Ch.TypeName := AChangedChannel.TypeName;
+    Ch.Serial := AChangedChannel.Serial;
+    Ch.Signal := AChangedChannel.Signal;
+    Ch.RepoTypeName := AChangedChannel.RepoTypeName;
+    Ch.RepoTypeUUID := AChangedChannel.RepoTypeUUID;
+    Ch.RepoDeviceName := AChangedChannel.RepoDeviceName;
+    Ch.RepoDeviceUUID := AChangedChannel.RepoDeviceUUID;
+
+    if Ch.FlowMeter <> nil then
+      Ch.FlowMeter.UpdateByDevice;
+
+    MarkChannelDeviceModified(Ch);
+  end;
 end;
 
 procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
@@ -4032,7 +4168,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
     Exit;
 
@@ -4174,7 +4310,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
-  WorkTable := GetWorkTableByIndex(0);
+  WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
     Exit;
 
@@ -4750,17 +4886,21 @@ begin
     SoftReloadGridByGrowingRowCount(
       GridDevices,
       WT.DeviceChannels.Count,
-      [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
+      [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
+       StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
+       StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
+       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
+       StringColumnDeviceCoef1, StringColumnDeviceError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
       GridDevices,
       Length(FFlowMeterRows),
-      [StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1,
-       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
+      [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
+       StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
+       StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
+       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
+       StringColumnDeviceCoef1, StringColumnDeviceError1]
     );
 
   if WT <> nil then

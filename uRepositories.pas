@@ -2026,8 +2026,11 @@ begin
 
     Col('Q2Tr', 'REAL'),
     Col('Qmax', 'REAL'),
+    Col('Qnom', 'REAL'),
     Col('Qmin', 'REAL'),
-
+    Col('Qtr', 'REAL'),
+    Col('Q2tr', 'REAL'),
+    Col('Qnom', 'REAL'),
     Col('Kp', 'REAL'),
     Col('QFmax', 'REAL'),
 
@@ -2093,7 +2096,20 @@ end;
 
   Result.Q2Tr := Q.FieldByName('Q2Tr').AsFloat;
   Result.Qmax := Q.FieldByName('Qmax').AsFloat;
+
+  if Q.FindField('Qnom') <> nil then
+    Result.Qnom := Q.FieldByName('Qnom').AsFloat
+  else
+    Result.Qnom := 0;
   Result.Qmin := Q.FieldByName('Qmin').AsFloat;
+  if Q.FindField('Qtr') <> nil then
+    Result.Qtr := Q.FieldByName('Qtr').AsFloat
+  else
+    Result.Qtr := 0;
+  if Q.FindField('Q2tr') <> nil then
+    Result.Q2tr := Q.FieldByName('Q2tr').AsFloat
+  else
+    Result.Q2tr := 0;
 
   Result.Kp := Q.FieldByName('Kp').AsFloat;
   Result.QFmax := Q.FieldByName('QFmax').AsFloat;
@@ -2247,10 +2263,10 @@ begin
           Q.SQL.Text :=
             'insert into DeviceDiameter (' +
             'DeviceTypeID, DeviceTypeUUID, UUID, Name, DN, Description, ' +
-            'Q2Tr, Qmax, Qmin, Kp, QFmax, Vmax, Vmin' +
+            'Qmax, Qnom, Qmin, Qtr, Q2tr, Kp, QFmax, Vmax, Vmin' +
             ') values (' +
             ':DeviceTypeID, :DeviceTypeUUID, :UUID, :Name, :DN, :Description, ' +
-            ':Q2Tr, :Qmax, :Qmin, :Kp, :QFmax, :Vmax, :Vmin' +
+            ':Qmax, :Qnom, :Qmin, :Qtr, :Q2tr, :Kp, :QFmax, :Vmax, :Vmin' +
             ')';
         end;
 
@@ -2268,7 +2284,7 @@ begin
             'DeviceTypeID=:DeviceTypeID, ' +
             'DeviceTypeUUID=:DeviceTypeUUID, UUID=:UUID, ' +
             'Name=:Name, DN=:DN, Description=:Description, ' +
-            'Q2Tr=:Q2Tr, Qmax=:Qmax, Qmin=:Qmin, Kp=:Kp, ' +
+            'Qmax=:Qmax, Qnom=:Qnom, Qmin=:Qmin, Qtr=:Qtr, Q2tr=:Q2tr, Kp=:Kp, ' +
             'QFmax=:QFmax, Vmax=:Vmax, Vmin=:Vmin ' +
             'where ID=:ID';
         end;
@@ -2291,7 +2307,10 @@ begin
 
     SetFloatParam(Q, 'Q2Tr', ADiameter.Q2Tr);
     SetFloatParam(Q, 'Qmax', ADiameter.Qmax);
+    SetFloatParam(Q, 'Qnom', ADiameter.Qnom);
     SetFloatParam(Q, 'Qmin', ADiameter.Qmin);
+    SetFloatParam(Q, 'Qtr', ADiameter.Qtr);
+    SetFloatParam(Q, 'Q2tr', ADiameter.Q2tr);
     SetFloatParam(Q, 'Kp', ADiameter.Kp);
     SetFloatParam(Q, 'QFmax', ADiameter.QFmax);
     SetFloatParam(Q, 'Vmax', ADiameter.Vmax);

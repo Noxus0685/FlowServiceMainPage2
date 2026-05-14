@@ -448,7 +448,11 @@ type
     Qmax: Double;               // Максимальный расход
     Qmin: Double;               // Минимальный расход
     RangeDynamic: Double;       // Динамический диапазон (Qmax / Qmin)
-
+    Qtr: Double;
+    Q2tr: Double;
+    Qnom: Double;
+    QFmax : Double;
+    Kp: Double;
     Error: Double;              // Допустимая погрешность, %
     Enabled: Boolean;
 
@@ -2592,6 +2596,9 @@ begin
   DN := ADiameter.Name;
   Qmax := ADiameter.Qmax;
   Qmin := ADiameter.Qmin;
+  Qnom := ADiameter.Qnom;
+  Qtr := ADiameter.Qtr;
+  Q2tr := ADiameter.Q2tr;
 
   if Qmin > 0 then
     RangeDynamic := Qmax / Qmin

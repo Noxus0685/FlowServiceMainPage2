@@ -19,6 +19,7 @@ uses
   FMX.Memo,
   FMX.Memo.Types,
   FMX.Menus,
+  FMX.Objects,
   FMX.ScrollBox,
   FMX.SpinBox,
   FMX.StdCtrls,
@@ -341,7 +342,13 @@ type
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure EditRangeDynamicCanFocus(Sender: TObject; var ACanFocus: Boolean);
-
+    procedure RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
+    procedure GridDiametersResize(Sender: TObject);
+    procedure UpdateGridDiametersHeaderRect;
+    procedure SyncGridDiametersHeaderPopupMenu;
+    procedure GridDiametersHeaderClick(Column: TColumn);
 
   private
     { Private declarations }
@@ -377,6 +384,13 @@ type
   FSkipPointDeleteConfirm: Boolean;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
+
+  // Индекс колонки заголовка GridDiameters, по которой нажали ПКМ.
+  FGridDiametersHeaderColumnIndex: Integer;
+  // Невидимая кликабельная область поверх заголовка GridDiameters.
+  FRectGridDiametersHeader: TRectangle;
+  // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
+  FPopupMenuGridDiametersHeader: TPopupMenu;
 
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
@@ -419,6 +433,7 @@ type
     procedure UpdateUICoef;
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure CreateMenu;
 
   public
 
@@ -530,6 +545,7 @@ begin
 end;
 
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
+
  begin
    inherited Create(AOwner);
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
@@ -537,8 +553,57 @@ end;
    TabItemCoefs.Visible := False;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
+
+   FGridDiametersHeaderColumnIndex := -1;
+
+   // Создаем невидимую кликабельную область над заголовком грида для отдельного header-popup.
+   FRectGridDiametersHeader := TRectangle.Create(Self);
+   FRectGridDiametersHeader.Parent := GridDiameters.Parent;
+   FRectGridDiametersHeader.Stored := False;
+   FRectGridDiametersHeader.Fill.Kind := TBrushKind.None;
+   FRectGridDiametersHeader.Stroke.Kind := TBrushKind.None;
+   // Rectangle размещается над визуальным header грида и принимает ПКМ для контекстного меню.
+   FRectGridDiametersHeader.HitTest := True;
+   FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
+   GridDiameters.OnMouseDown := RectGridDiametersHeaderMouseDown;
+   FRectGridDiametersHeader.BringToFront;
+
+   // Создаем popup-меню заголовка; пункты 1..9 управляют Visible соответствующих колонок.
+   FPopupMenuGridDiametersHeader := TPopupMenu.Create(Self);
+   FPopupMenuGridDiametersHeader.Stored := False;
+   CreateMenu;
+
+   GridDiameters.OnResize := GridDiametersResize;
+
    LoadType(AType);
+   UpdateGridDiametersHeaderRect;
  end;
+
+
+
+procedure TFormTypeEditor.CreateMenu;
+ var
+   I: Integer;
+   MenuItem: TMenuItem;
+begin
+
+  while FPopupMenuGridDiametersHeader.ItemsCount > 0 do
+  FPopupMenuGridDiametersHeader.Items[0].Free;
+
+  for I := 0 to GridDiameters.ColumnCount-1  do
+   begin
+
+     MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+     if GridDiameters.Columns[i].Header<>'' then
+      MenuItem.Text := GridDiameters.Columns[i].Header
+     else
+      MenuItem.Text := GridDiameters.Columns[i].Name;
+     MenuItem.Tag := I;
+     MenuItem.AutoCheck := False;
+     MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
+     MenuItem.Parent := FPopupMenuGridDiametersHeader;
+   end;
+end;
 
 destructor TFormTypeEditor.Destroy;
 begin
@@ -564,7 +629,7 @@ procedure TFormTypeEditor.RecalcQRowFromKnown(const ANewD: TDiameter; const Know
 var
   DCoef: TDiameter;
   QmaxForCoef: Double;
-  K1, K2, Qmax, Qmin, Q2, QOver: Double;
+  K1, K2,K2tr, Qmax, Qmin, Q2,Q2tr, QOver: Double;
 begin
   if (ANewD = nil) or (KnownValue <= 0) then
     Exit;
@@ -580,10 +645,11 @@ begin
   if QmaxForCoef > 0 then
   begin
     K1 := DCoef.Qmin / QmaxForCoef;
-    K2 := DCoef.Q2 / QmaxForCoef;
+    K2 := DCoef.Qtr / QmaxForCoef;
+    K2tr := DCoef.Q2tr / QmaxForCoef;
   end;
 
-  if KnownCol = StringColumnDNQTr.Index then
+  if (KnownCol = StringColumnDNQTr.Index) or (KnownCol = StringColumnDNQ2Tr.Index) then
     Qmax := KnownValue / K2
   else if KnownCol = StringColumnDNQmin.Index then
     Qmax := KnownValue / K1
@@ -598,6 +664,7 @@ begin
     Exit;
 
   Q2 := Qmax * K2;
+  Q2tr := Qmax * K2tr;
   Qmin := Qmax * K1;
   QOver := Qmax / 1.25;
 
@@ -607,7 +674,8 @@ begin
     ANewD.QFmax := Qmax;
 
   ANewD.Qmax := Qmax;
-  ANewD.Q2 := Q2;
+  ANewD.Qtr := Q2;
+  ANewD.Q2tr :=Q2tr;
   ANewD.Qmin := Qmin;
   ANewD.Qnom := QOver;
   SetQValue(FDiameterQ2, ANewD.ID, Q2);
@@ -974,30 +1042,33 @@ procedure TFormTypeEditor.UpdateDiametersGrid;
 var
   D: TDiameter;
   VisibleCount: Integer;
+  PrevRow: Integer;
 begin
-  if FDiametersLocal = nil then
+  if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
 
   EnsureUniqueDiameterIDs;
+
+  PrevRow := GridDiameters.Row;
 
   VisibleCount := 0;
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      if D.Qnom <= 0 then
+     { if D.Qnom <= 0 then
       begin
         if D.Qmax > 0 then
           D.Qnom := D.Qmax / 1.25
         else
           D.Qnom := 0;
       end;
-
-      if D.Q2 <= 0 then
-        D.Q2 := D.Qmax * 0.0075;
+    }
+      if D.Qtr <= 0 then
+        D.Qtr := D.Qmax * 0.0075;
 
       if (D.State <> osNew) and (D.Qmax > 0) then
       begin
-        D.Qnom := D.Qmax / 1.25;
+        //D.Qnom := D.Qmax / 1.25;
         RecalcQRowFromKnown(D, StringColumnDNQmax.Index, D.Qmax);
       end;
       Inc(VisibleCount);
@@ -1006,6 +1077,17 @@ begin
   GridDiameters.BeginUpdate;
   try
     GridDiameters.RowCount := VisibleCount;
+
+    if VisibleCount <= 0 then
+      GridDiameters.Row := -1
+    else if PrevRow < 0 then
+      GridDiameters.Row := 0
+    else if PrevRow >= VisibleCount then
+      GridDiameters.Row := VisibleCount - 1
+    else
+      GridDiameters.Row := PrevRow;
+
+    GridDiameters.Selected := GridDiameters.Row;
   finally
     GridDiameters.EndUpdate;
   end;
@@ -1191,6 +1273,138 @@ begin
         Exit(P);
     end;
   end;
+end;
+
+
+procedure TFormTypeEditor.UpdateGridDiametersHeaderRect;
+begin
+  if (FRectGridDiametersHeader = nil) or (GridDiameters = nil) then
+    Exit;
+
+  // Прозрачный rectangle ставим в координатах родителя грида точно над областью header.
+  var GridTopLeft: TPointF;
+  var ParentCtrl: TControl;
+  if FRectGridDiametersHeader.Parent is TControl then
+  begin
+    ParentCtrl := TControl(FRectGridDiametersHeader.Parent);
+    GridTopLeft := ParentCtrl.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(0, 0)));
+  end
+  else
+    GridTopLeft := PointF(GridDiameters.Position.X, GridDiameters.Position.Y);
+
+  FRectGridDiametersHeader.Position.X := GridTopLeft.X;
+  FRectGridDiametersHeader.Position.Y := GridTopLeft.Y;
+  FRectGridDiametersHeader.Width := GridDiameters.Width;
+  FRectGridDiametersHeader.Height := GridDiameters.RowHeight;
+  FRectGridDiametersHeader.Visible := GridDiameters.Visible and (GridDiameters.RowHeight > 0);
+  FRectGridDiametersHeader.BringToFront;
+end;
+
+procedure TFormTypeEditor.GridDiametersResize(Sender: TObject);
+begin
+  UpdateGridDiametersHeaderRect;
+end;
+
+procedure TFormTypeEditor.SyncGridDiametersHeaderPopupMenu;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  ColIndex: Integer;
+begin
+  if FPopupMenuGridDiametersHeader = nil then
+    Exit;
+
+  for I := 0 to FPopupMenuGridDiametersHeader.ItemsCount - 1 do
+  begin
+    if not (FPopupMenuGridDiametersHeader.Items[I] is TMenuItem) then
+      Continue;
+
+    MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
+    ColIndex := MenuItem.Tag;
+
+    if (ColIndex >= 0) and (ColIndex < GridDiameters.ColumnCount) then
+    begin
+      MenuItem.Enabled := True;
+      MenuItem.IsChecked := GridDiameters.Columns[ColIndex].Visible;
+    end
+    else
+    begin
+      MenuItem.Enabled := False;
+      MenuItem.IsChecked := False;
+    end;
+  end;
+end;
+
+procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+var
+  I: Integer;
+  ColLeft: Single;
+  ColRight: Single;
+  P: TPointF;
+begin
+  if (Button = TMouseButton.mbRight)then
+    FRectGridDiametersHeader.HitTest := true;
+  if Button = TMouseButton.mbLeft then
+    begin
+    FRectGridDiametersHeader.HitTest := false;
+    exit;
+    end;
+  FGridDiametersHeaderColumnIndex := -1;
+  ColLeft := 0;
+
+  // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
+  for I := 0 to GridDiameters.ColumnCount - 1 do
+  begin
+    if not GridDiameters.Columns[I].Visible then
+      Continue;
+
+    ColRight := ColLeft + GridDiameters.Columns[I].Width;
+    if (X >= ColLeft) and (X <= ColRight) then
+    begin
+      FGridDiametersHeaderColumnIndex := I;
+      Break;
+    end;
+    ColLeft := ColRight;
+  end;
+
+  if FGridDiametersHeaderColumnIndex < 0 then
+    Exit;
+
+  // Перед показом меню синхронизируем checkbox с текущим Visible колонок.
+  SyncGridDiametersHeaderPopupMenu;
+
+  P := FRectGridDiametersHeader.LocalToScreen(PointF(X, Y));
+  FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
+  FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
+end;
+
+
+
+procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
+begin
+FRectGridDiametersHeader.HitTest := true;
+end;
+
+procedure TFormTypeEditor.GridDiametersHeaderMenuItemClick(Sender: TObject);
+var
+  Index: Integer;
+  MenuItem: TMenuItem;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  Index := MenuItem.Tag;
+  if (Index < 0) or (Index >= GridDiameters.ColumnCount) then
+    Exit;
+
+  // Пункты меню управляют Visible колонок, чтобы пользователь мог скрывать/показывать столбцы header.
+  GridDiameters.Columns[Index].Visible := not GridDiameters.Columns[Index].Visible;
+  MenuItem.IsChecked := GridDiameters.Columns[Index].Visible;
+
+  GridDiameters.Repaint;
+  UpdateGridDiametersHeaderRect;
 end;
 
 procedure TFormTypeEditor.LoadType(AType: TDeviceType);
@@ -1890,6 +2104,7 @@ begin
   FType.SetDimensions;
   ApplyMeasuredDimension;
   SetModified;
+  CreateMenu;
 end;
 
 procedure TFormTypeEditor.cbOutPutTypeChange(Sender: TObject);
@@ -3127,7 +3342,7 @@ begin
     if DNmm <= 0 then
       Continue;
 
-    Qmax := 0.002827 * V * Sqr(DNmm);
+    Qmax := (0.002827 * V * Sqr(DNmm))/3.6;
     RecalcQRowFromKnown(D, StringColumnDNQmax.Index, Qmax);
   end;
 
@@ -3235,10 +3450,17 @@ begin
   // =====================================================
   else if ACol = StringColumnDNQTr.Index then
   begin
-    if D.Q2 = 0 then
+    if D.Qtr = 0 then
       Value := '—'
     else
-      Value := FormatByBaseError(FType.FromBaseUnits(D.Q2), FType.Error);
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Qtr), FType.Error);
+  end
+  else if ACol = StringColumnDNQ2Tr.Index then
+  begin
+    if D.Q2tr = 0 then
+      Value := '—'
+    else
+      Value := FormatByBaseError(FType.FromBaseUnits(D.Q2tr), FType.Error);
   end
   else if ACol = StringColumnDNQ2Tr.Index then
   begin
@@ -3430,10 +3652,10 @@ begin
     begin
       // Если скорость потока не задана, меняем редактируемое поле.
       // Для пары Qnom/Qmax сохраняем взаимосвязь по формулам 1.25.
-      if ACol = StringColumnDNQTr.Index then
-        D.Q2 := QValueBase
-      else if ACol = StringColumnDNQ2Tr.Index then
-        D.Q2Tr := QValueBase
+      if (ACol = StringColumnDNQTr.Index)  then
+        D.Qtr := QValueBase
+      else  if (ACol = StringColumnDNQ2Tr.Index) then
+        D.Q2tr := QValueBase
       else if ACol = StringColumnDNQmax.Index then
       begin
         D.Qmax := QValueBase;
@@ -3448,6 +3670,8 @@ begin
         if D.Qnom > 0 then
           D.Qmax := D.Qnom * 1.25;
       end;
+
+
     end
     else
     begin
@@ -3471,6 +3695,7 @@ begin
       FType.RangeDynamic := 0;
       EditRangeDynamic.Text := '';
       EditRangeDynamic.TextPrompt := '';
+      UpdateRangeDynamicPromptBySelectedDiameter;
     end;
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
@@ -3532,7 +3757,6 @@ begin
     if SelD = D then
       RecalcPointsBySelectedDiameter;
   end;
-
   SetModified;
   UpdateDiametersGrid;
 end;
@@ -3560,7 +3784,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
     end;
     if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
     begin
-      AValue := AD.Q2;
+      AValue := AD.Qtr;
       Exit(True);
     end;
     if NameNorm = 'Q2TR' then
@@ -3599,7 +3823,14 @@ procedure TFormTypeEditor.GridPointsSetValue(
     HeaderNorm := UpperCase(StringColumnDNQTr.Header);
     if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
     begin
-      AValue := AD.Q2;
+      AValue := AD.Qtr;
+      Exit(True);
+    end;
+
+    HeaderNorm := UpperCase(StringColumnDNQ2Tr.Header);
+    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    begin
+      AValue := AD.Q2tr;
       Exit(True);
     end;
     HeaderNorm := UpperCase(StringColumnDNQ2Tr.Header);
@@ -3646,12 +3877,15 @@ procedure TFormTypeEditor.GridPointsSetValue(
     LocalD: TDiameter;
     Ch: Char;
   begin
+    SepPos:=0;
     Result := False;
     if (AP = nil) then
       Exit;
 
     K := 1;
     SepPos := Pos('*', AText);
+    if SepPos = 0 then
+      SepPos := Pos('·', AText);
     if SepPos = 0 then
     begin
       for I := 1 to Length(AText) do
@@ -3720,6 +3954,8 @@ begin
   {-----------------------------------------------------}
   { Защита }
   {-----------------------------------------------------}
+  if GridDiameters.Selected = -1 then
+    Exit;
   if (FPointsLocal = nil) then
     Exit;
 
@@ -3869,7 +4105,7 @@ begin
   // -----------------------------------------------------
   // Проверка выбранного диаметра
   // -----------------------------------------------------
-  if (FSelectedDiameter = nil) then
+  if (FSelectedDiameter = nil) or (FPointsLocal = nil) then
     Exit;
 
   Qmax := FSelectedDiameter.Qmax;
@@ -4460,7 +4696,7 @@ begin
   DNmm := StrToIntDef(D.DN, 0);
   if (DNmm > 0) and (D.Qmax > 0) then
   begin
-    V := D.Qmax / (0.002827 * Sqr(DNmm));
+    V := (D.Qmax / (0.002827 * Sqr(DNmm)))*3.6;
     EditFlowRate.Text := '';
     EditFlowRate.TextPrompt := FormatFloat('0.###', V);
   end
@@ -4497,7 +4733,7 @@ begin
   Qmin := D.Qmin;
 
   // считаем только если оба значения осмысленные
-  if (Qmax > 0) and (Qmin > 0) and IsInfinite(Qmin) and IsInfinite(Qmax) then
+  if (Qmax > 0) and (Qmin > 0) and not(IsInfinite(Qmin)) and not(IsInfinite(Qmax)) then
   begin
     RangeDynamic := Round(Qmax / Qmin);
     EditRangeDynamic.TextPrompt := '1:' + IntToStr(RangeDynamic);
@@ -4638,7 +4874,7 @@ begin
 
   StringColumnDNQmin.Hint := 'Q1 – минимальный расход';
   StringColumnDNQTr.Hint := 'Q2 – переходный расход';
-  StringColumnDNQ2Tr.Hint := 'Q2Tr – переходный расход';
+  StringColumnDNQ2Tr.Hint := 'Q2 – переходный расход';
   StringColumnDNQnom.Hint := 'Q3 – номинальный расход';
   StringColumnDNQmax.Hint := 'Q4 – наибольший (перегрузочный) расход';
   StringColumnDNQF.Hint := 'qF – расход поверочной точки / контрольный расход';
@@ -4756,7 +4992,6 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
-  LFLowEate.Text:= 'Скорость потока Qmax '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/л';
 
   FloatColumnVmax.Header   := 'Vmax, л';
@@ -4783,7 +5018,6 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
-  LFLowEate.Text:= 'Скорость потока Qmax '+ FType.GetDimensionName;
   StringColumnDNKp.Header   := 'Kp, имп/кг';
 
   FloatColumnVmax.Header   := 'Mmax, кг';
@@ -4848,6 +5082,8 @@ begin
   end;
 end;
 
+
+
 function TFormTypeEditor.SpillageStopValueToItemIndex(const AValue: Integer): Integer;
 begin
   case AValue of
@@ -4862,6 +5098,8 @@ begin
     Result := 0;
   end;
 end;
+
+
 
 function TFormTypeEditor.SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
 begin
