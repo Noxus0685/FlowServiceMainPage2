@@ -256,24 +256,11 @@ uses uAppServices;
 procedure TFormTypeSelect.WriteTypeActionLog(const AAction: string; AType: TDeviceType; const ADetails: string);
 var
   Details: string;
-  function FixedText(const AValue: string; const AWidth: Integer): string;
-  var
-    S: string;
-  begin
-    S := Trim(AValue);
-    if Length(S) > AWidth then
-      S := Copy(S, 1, AWidth - 3) + '...';
-    Result := S;
-  end;
 begin
   if (AType = nil) or (ProtocolManager = nil) then
     Exit;
-  Details := Format(
-    'Action=%-28s | Form=%-14s | Object=%-10s | UUID=%-38s | Name=%-24s | Manufacturer=%-24s | Category=%-20s | Modification=%-20s | Time=%s',
-    [FixedText(AAction, 28), FixedText('fuTypeSelect', 14), 'DeviceType',
-     FixedText(string(AType.UUID), 38), FixedText(AType.Name, 24), FixedText(AType.Manufacturer, 24),
-     FixedText(IntToStr(AType.Category), 20), FixedText(AType.Modification, 20),
-     FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
+  Details := Format('Action=%s; Form=%s; UUID=%s; TypeUUID=%s; Time=%s',
+    [AAction, 'fuTypeSelect', string(AType.UUID), '-', FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then
     Details := Details + '; ' + ADetails;
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceTypeAction', 'Действие с типом прибора', Details);

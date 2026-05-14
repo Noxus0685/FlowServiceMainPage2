@@ -279,25 +279,12 @@ end;
 procedure TFormDeviceSelect.WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string);
 var
   Details: string;
-  function FixedText(const AValue: string; const AWidth: Integer): string;
-  var
-    S: string;
-  begin
-    S := Trim(AValue);
-    if Length(S) > AWidth then
-      S := Copy(S, 1, AWidth - 3) + '...';
-    Result := S;
-  end;
 begin
   if (ADevice = nil) or (ProtocolManager = nil) then
     Exit;
 
-  Details := Format(
-    'Action=%-28s | Form=%-14s | Object=%-10s | UUID=%-38s | Name=%-24s | Serial=%-16s | TypeUUID=%-38s | TypeName=%-24s | Time=%s',
-    [FixedText(AAction, 28), FixedText('fuDeviceSelect', 14), 'Device',
-     FixedText(string(ADevice.UUID), 38), FixedText(ADevice.Name, 24),
-     FixedText(ADevice.SerialNumber, 16), FixedText(string(ADevice.DeviceTypeUUID), 38),
-     FixedText(ADevice.DeviceTypeName, 24), FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
+  Details := Format('Action=%s; Form=%s; UUID=%s; TypeUUID=%s; Time=%s',
+    [AAction, 'fuDeviceSelect', string(ADevice.UUID), string(ADevice.DeviceTypeUUID), FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then
     Details := Details + '; ' + ADetails;
 
@@ -332,8 +319,8 @@ begin
       if UUIDMap[U] > 1 then
         ProtocolManager.AddMessage(
           pcError, psForm, 'DeviceActionError', 'Обнаружены дубли UUID приборов',
-          Format('Action=%-28s | Form=%-14s | Object=%-10s | UUID=%-38s | Count=%-6s | Time=%s',
-            ['DuplicateUUID', 'fuDeviceSelect', 'Device', U, IntToStr(UUIDMap[U]), FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]));
+          Format('Action=%s; Form=%s; UUID=%s; TypeUUID=%s; Count=%d; Time=%s',
+            ['DuplicateUUID', 'fuDeviceSelect', U, '-', UUIDMap[U], FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]));
   finally
     UUIDMap.Free;
   end;
