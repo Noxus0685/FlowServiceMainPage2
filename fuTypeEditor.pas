@@ -44,7 +44,8 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
-  uRepositories;
+  uRepositories,
+  uProtocols;
 
 type
 
@@ -442,6 +443,7 @@ type
 
     { Public declarations }
     procedure LoadType(AType: TDeviceType);
+    procedure WriteTypeEditActionLog(const AAction: string; AType: TDeviceType; const ADetails: string = '');
     function Modified: Boolean;
 
     procedure InitCategoryComboEdit;
@@ -1407,6 +1409,26 @@ begin
   UpdateGridDiametersHeaderRect;
 end;
 
+
+procedure TFormTypeEditor.WriteTypeEditActionLog(const AAction: string; AType: TDeviceType; const ADetails: string);
+var
+  Details: string;
+begin
+  if (AType = nil) or (ProtocolManager = nil) then Exit;
+  Details :=
+    'Action=' + AAction +
+    '; Form=fuTypeEditor' +
+    '; Object=DeviceType' +
+    '; UUID=' + string(AType.UUID) +
+    '; Name=' + AType.Name +
+    '; Manufacturer=' + AType.Manufacturer +
+    '; Category=' + AType.Category +
+    '; Modification=' + AType.Modification +
+    '; Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
+  if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
+  ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceTypeAction', 'Действие с типом прибора', Details);
+end;
+
 procedure TFormTypeEditor.LoadType(AType: TDeviceType);
 begin
   FLoading := True;
@@ -1459,7 +1481,8 @@ end;
 
 procedure TFormTypeEditor.btnCancelClick(Sender: TObject);
 begin
- ModalResult := mrCancel;
+  WriteTypeEditActionLog('Редактирование типа прибора отменено', FType);
+  ModalResult := mrCancel;
 end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
@@ -1474,6 +1497,7 @@ begin
     Exit;
   end;
 
+  WriteTypeEditActionLog('Сохранён тип прибора', FType);
   ModalResult := mrOk;
 end;
 
@@ -2279,7 +2303,8 @@ end;
 
 procedure TFormTypeEditor.CornerButtonCancelClick(Sender: TObject);
 begin
-     ModalResult := mrCancel;
+     WriteTypeEditActionLog('Редактирование типа прибора отменено', FType);
+  ModalResult := mrCancel;
 end;
 procedure SendTypeDescriptionToDeepSeek(
   const FilePath: string;
