@@ -1516,6 +1516,7 @@ var
   FoundRepo: TTypeRepository;
   NeedFill, IsTypeChanged: Boolean;
   RepoName: string;
+  OldTypeUUID : string;
 
 function AskFillFromType: Boolean;
 begin
