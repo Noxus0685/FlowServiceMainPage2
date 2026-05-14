@@ -1422,7 +1422,7 @@ begin
     '; UUID=' + string(AType.UUID) +
     '; Name=' + AType.Name +
     '; Manufacturer=' + AType.Manufacturer +
-    '; Category=' + AType.Category +
+    '; Category=' + IntToStr(AType.Category) +
     '; Modification=' + AType.Modification +
     '; Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
   if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;

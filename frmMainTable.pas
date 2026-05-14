@@ -2810,6 +2810,7 @@ var
   LinkedChannel: TChannel;
   I: Integer;
   SelectedUUID: string;
+  OldDeviceUUID : string;
 begin
   if AChannel = nil then
     Exit;
