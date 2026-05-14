@@ -650,7 +650,7 @@ var
 begin
   if (ADevice = nil) or (ProtocolManager = nil) then Exit;
   Details := Format(
-    'Action=%-28s | Form=%-14s | UUID=%-38s | Name=%-20s | Serial=%-16s | TypeUUID=%-38s | TypeName=%-20s | Time=%s',
+    'Action=%-42s | Form=%-14s | UUID=%-38s | Name=%-28s | Serial=%-18s | TypeUUID=%-38s | TypeName=%-28s | Time=%s',
     [AAction, 'fuDeviceEdit', string(ADevice.UUID), ADevice.Name, ADevice.SerialNumber,
      string(ADevice.DeviceTypeUUID), ADevice.DeviceTypeName, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;

@@ -284,7 +284,7 @@ begin
     Exit;
 
   Details := Format(
-    'Action=%-28s | Form=%-14s | UUID=%-38s | Name=%-20s | Serial=%-16s | TypeUUID=%-38s | TypeName=%-20s | Time=%s',
+    'Action=%-42s | Form=%-14s | UUID=%-38s | Name=%-28s | Serial=%-18s | TypeUUID=%-38s | TypeName=%-28s | Time=%s',
     [AAction, 'fuDeviceSelect', string(ADevice.UUID), ADevice.Name, ADevice.SerialNumber,
      string(ADevice.DeviceTypeUUID), ADevice.DeviceTypeName, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then
@@ -321,7 +321,7 @@ begin
       if UUIDMap[U] > 1 then
         ProtocolManager.AddMessage(
           pcError, psForm, 'DeviceActionError', 'Обнаружены дубли UUID приборов',
-          Format('Action=%-28s | Form=%-14s | UUID=%-38s | Count=%-6s | Time=%s',
+          Format('Action=%-42s | Form=%-14s | UUID=%-38s | Count=%-6s | Time=%s',
             ['DuplicateUUID', 'fuDeviceSelect', U, IntToStr(UUIDMap[U]), FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]));
   finally
     UUIDMap.Free;
