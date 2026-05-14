@@ -41,7 +41,8 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
-  uRepositories;
+  uRepositories,
+  uProtocols;
 
 type
   TFormDeviceEditor = class(TForm)
@@ -306,6 +307,7 @@ type
     { Private declarations }
      FDevice: TDevice;
      FOriginalDevice: TDevice;
+     FInitialTypeUUID: string;
 
 
      FDeviceType: TDeviceType; // ссылка на найденный тип
@@ -371,6 +373,7 @@ type
   public
     { Public declarations }
      procedure LoadDevice(ADevice: TDevice);
+     procedure WriteDeviceEditActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   end;
 
 var
@@ -640,6 +643,31 @@ begin
   FillConversionCoefVolume;
 end;
 
+
+procedure TFormDeviceEditor.WriteDeviceEditActionLog(const AAction: string; ADevice: TDevice; const ADetails: string);
+var
+  Details: string;
+  function FixedText(const AValue: string; const AWidth: Integer): string;
+  var
+    S: string;
+  begin
+    S := Trim(AValue);
+    if Length(S) > AWidth then
+      S := Copy(S, 1, AWidth - 3) + '...';
+    Result := S;
+  end;
+begin
+  if (ADevice = nil) or (ProtocolManager = nil) then Exit;
+  Details := Format(
+    'Action=%-28s | Form=%-14s | Object=%-10s | UUID=%-38s | Name=%-24s | Serial=%-16s | TypeUUID=%-38s | TypeName=%-24s | Time=%s',
+    [FixedText(AAction, 28), FixedText('fuDeviceEdit', 14), 'Device',
+     FixedText(string(ADevice.UUID), 38), FixedText(ADevice.Name, 24), FixedText(ADevice.SerialNumber, 16),
+     FixedText(string(ADevice.DeviceTypeUUID), 38), FixedText(ADevice.DeviceTypeName, 24),
+     FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
+  if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
+  ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
+end;
+
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
 begin
   // Отменяем все изменения
@@ -653,7 +681,8 @@ begin
       AppServices.DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
 
       // Закрываем форму с результатом Cancel
-      ModalResult := mrCancel;
+      WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
+    ModalResult := mrCancel;
     end;
   end
   else
@@ -901,12 +930,18 @@ begin
         { редактирование существующего }
         FOriginalDevice.Assign(FDevice,True);
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+        WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
       end
       else
       begin
         { новый прибор }
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
+        WriteDeviceEditActionLog('Сохранён прибор', FDevice);
       end;
+
+      if not SameText(FInitialTypeUUID, string(FDevice.DeviceTypeUUID)) then
+        WriteDeviceEditActionLog('Изменен тип прибора', FDevice,
+          'OldTypeUUID=' + FInitialTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
     end
     else if ModalResult = mrCancel then
     begin
@@ -1390,6 +1425,7 @@ begin
       FOriginalDevice := ADevice;
       //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
+      FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
     end
     else
     begin
@@ -1401,6 +1437,7 @@ begin
         FDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
+      FInitialTypeUUID := string(FDevice.DeviceTypeUUID);
     end;
 
     {----------------------------------}
@@ -1529,6 +1566,7 @@ begin
     if Frm.ShowModal <> mrOk then
       Exit;
 
+    OldTypeUUID := FDevice.DeviceTypeUUID;
     NewType := Frm.SelectedType;
     if NewType = nil then
       Exit;
@@ -1570,6 +1608,8 @@ begin
   begin
     FDevice.AttachType(NewType, RepoName);
     FDeviceType := NewType;
+    WriteDeviceEditActionLog('Изменён тип прибора', FDevice,
+      'OldTypeUUID=' + OldTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
   end;
 
 
