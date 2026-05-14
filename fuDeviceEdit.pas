@@ -308,6 +308,7 @@ type
      FDevice: TDevice;
      FOriginalDevice: TDevice;
      FInitialTypeUUID: string;
+     FTypeChangedDuringEdit: Boolean;
 
 
      FDeviceType: TDeviceType; // ссылка на найденный тип
@@ -918,18 +919,23 @@ begin
         { редактирование существующего }
         FOriginalDevice.Assign(FDevice,True);
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
-        WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
+        if not FTypeChangedDuringEdit then
+          WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
       end
       else
       begin
         { новый прибор }
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
-        WriteDeviceEditActionLog('Сохранён прибор', FDevice);
+        if not FTypeChangedDuringEdit then
+          WriteDeviceEditActionLog('Сохранён прибор', FDevice);
       end;
 
       if not SameText(FInitialTypeUUID, string(FDevice.DeviceTypeUUID)) then
+      begin
+        FTypeChangedDuringEdit := True;
         WriteDeviceEditActionLog('Изменен тип прибора', FDevice,
           'OldTypeUUID=' + FInitialTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
+      end;
     end
     else if ModalResult = mrCancel then
     begin
@@ -1414,6 +1420,7 @@ begin
       //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
       FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
+      FTypeChangedDuringEdit := False;
     end
     else
     begin
@@ -1425,7 +1432,9 @@ begin
         FDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
+
       FInitialTypeUUID := string(FDevice.DeviceTypeUUID);
+      FTypeChangedDuringEdit := False;
     end;
 
     {----------------------------------}
@@ -1597,6 +1606,8 @@ begin
   begin
     FDevice.AttachType(NewType, RepoName);
     FDeviceType := NewType;
+    FTypeChangedDuringEdit := not SameText(OldTypeUUID, string(FDevice.DeviceTypeUUID));
+
     WriteDeviceEditActionLog('Изменён тип прибора', FDevice,
       'OldTypeUUID=' + OldTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
   end;
