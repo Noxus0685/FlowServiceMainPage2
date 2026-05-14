@@ -2347,16 +2347,36 @@ end;
 
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
+var
+  Repo: TDeviceRepository;
+  Res: TModalResult;
 begin
-  if  MessageDlg(
+  Repo := AppServices.DataManager.ActiveDeviceRepo;
+
+  if (Repo <> nil) and (Repo.State = osModified) then
+  begin
+    Res := MessageDlg(
       'Есть несохранённые изменения. Сохранить перед выходом?',
       TMsgDlgType.mtConfirmation,
       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo, TMsgDlgBtn.mbCancel],
       0
-    ) = mrYes then
-  AppServices.DataManager.Save
-  else
-    Abort;
+    );
+
+    case Res of
+      mrYes:
+        begin
+            AppServices.DataManager.Save;
+        end;
+
+      mrNo:
+        begin
+          { закрываем без сохранения }
+        end;
+
+      mrCancel:
+        Action := TCloseAction.caNone;
+    end;
+  end;
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
