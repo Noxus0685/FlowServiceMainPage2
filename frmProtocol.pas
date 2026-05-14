@@ -57,8 +57,6 @@ constructor TFrameProtocol.Create(AOwner: TComponent);
 begin
   inherited;
   FMessages := TObjectList<TProtocolMessage>.Create(True);
-  ListBoxProtocol.ShowScrollBars := True;
-  ListBoxProtocol.AniCalculations.AutoShowing := False;
 
   CheckBoxEvent.IsChecked := True;
   CheckBoxState.IsChecked := True;
@@ -113,9 +111,6 @@ begin
   Item.Text := TProtocolManager.FormatMessage(Msg);
   Item.Selectable := False;
   Item.StyledSettings := Item.StyledSettings - [TStyledSetting.FontColor];
-  Item.TextSettings.WordWrap := False;
-  Item.TextSettings.Font.Family := 'Consolas';
-  Item.TextSettings.Font.Size := 12;
 
   case Msg.Category of
     pcInfo: Item.TextSettings.FontColor := TAlphaColorRec.Dodgerblue;

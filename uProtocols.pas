@@ -333,21 +333,27 @@ end;
 
 class function TProtocolManager.FormatMessage(const Msg: TProtocolMessage): string;
 var
-  Cat, Src: string;
+  Cat, Src, Prefix: string;
 begin
   if Msg = nil then
     Exit('');
 
   Cat := CategoryMarker(Msg.Category);
   Src := SourceMarker(Msg.Source);
-  Result := Format('[%s] %-8s %-3s | %-18s | %-28s | %s', [
+  Prefix := Trim(Cat + ' ' + Src);
+
+  if Prefix <> '' then
+    Prefix := Prefix + ': ';
+
+  Result := Format('[%s] %s%s - %s', [
     FormatDateTime('hh:nn:ss', Msg.TimeStamp),
-    Cat,
-    Src,
+    Prefix,
     Msg.Name,
-    Msg.Description,
-    Msg.Params
+    Msg.Description
   ]);
+
+  if Trim(Msg.Params) <> '' then
+    Result := Result + ' (' + Msg.Params + ')';
 end;
 
 initialization
