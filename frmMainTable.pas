@@ -2834,7 +2834,8 @@ begin
     AChannel.FlowMeter.Init(SelDevice.UUID);
 
     if (AChannel.FlowMeter.Device = nil) or
-       (not SameText(Trim(AChannel.FlowMeter.Device.UUID), Trim(SelDevice.UUID))) then
+       (not SameText(Trim(AChannel.FlowMeter.Device.UUID), Trim(SelDevice.UUID))) or
+       (not SameText(Trim(AChannel.FlowMeter.Device.DeviceTypeUUID), Trim(SelDevice.DeviceTypeUUID))) then
       AChannel.FlowMeter.Device := SelDevice;
 
     // После Init берём данные уже из нового прибора внутри FlowMeter.
@@ -2858,7 +2859,6 @@ begin
     end;
 
     MarkChannelDeviceModified(AChannel);
-    SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
 
     if FActiveWorkTable <> nil then
     begin
