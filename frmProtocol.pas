@@ -59,7 +59,6 @@ begin
   FMessages := TObjectList<TProtocolMessage>.Create(True);
   ListBoxProtocol.ShowScrollBars := True;
   ListBoxProtocol.AniCalculations.AutoShowing := False;
-  ListBoxProtocol.ScrollDirections := [TScrollDirection.sdVertical, TScrollDirection.sdHorizontal];
   ListBoxProtocol.VertScrollBar.Visible := True;
   ListBoxProtocol.VertScrollBar.Enabled := True;
   ListBoxProtocol.HorzScrollBar.Visible := True;
