@@ -47,7 +47,8 @@ uses
   uBaseProcedures,
   uClasses,
   uDataManager,
-  uRepositories;
+  uRepositories,
+  uProtocols;
 type
 
 
@@ -233,6 +234,7 @@ type
     function GetSelectedTypes: TObjectList<TDeviceType>;
     function GetActiveTreeNode: TTreeViewItem;
     procedure SyncTreeAfterGridRowsRemoved;
+    procedure WriteTypeActionLog(const AAction: string; AType: TDeviceType; const ADetails: string = '');
 
   public
     { Public declarations }
@@ -249,6 +251,25 @@ var
 implementation
 uses uAppServices;
 
+
+
+procedure TFormTypeSelect.WriteTypeActionLog(const AAction: string; AType: TDeviceType; const ADetails: string);
+var
+  Details: string;
+begin
+  if (AType = nil) or (ProtocolManager = nil) then
+    Exit;
+  Details :=
+    'Action=' + AAction + sLineBreak +
+    'Form=fuTypeSelect' + sLineBreak +
+    'UUID=' + string(AType.UUID) + sLineBreak +
+    'Name=' + AType.Name + sLineBreak +
+    'Manufacturer=' + AType.Manufacturer + sLineBreak +
+    'Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
+  if Trim(ADetails) <> '' then
+    Details := Details + sLineBreak + ADetails;
+  ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceTypeAction', 'Действие с типом прибора', Details);
+end;
 
 procedure TFormTypeSelect.LoadData;
 begin
@@ -669,6 +690,8 @@ begin
   try
     // UI вызывает бизнес-логику копирования через менеджер данных.
     AppServices.DataManager.CopyTypesToBuffer(TargetTypes);
+    if TargetTypes.Count > 0 then
+      WriteTypeActionLog('Скопирован тип прибора', TargetTypes[0]);
   finally
     TargetTypes.Free;
   end;
@@ -687,7 +710,8 @@ begin
   // UI-слой: передаём выбранный узел, бизнес-логика вставки выполняется в DataManager.
   NewRows := AppServices.DataManager.PasteBufferTypes(SelectedNode);
   try
-    // Обновление UI выполняется централизованно в других обработчиках.
+    if (NewRows <> nil) and (NewRows.Count > 0) then
+      WriteTypeActionLog('Вставлен тип прибора', NewRows[0], Format('Count=%d', [NewRows.Count]));
   finally
     NewRows.Free;
   end;
@@ -783,6 +807,7 @@ begin
       Exit;
 
     AppServices.DataManager.CutTypesToBuffer(TargetTypes);
+    WriteTypeActionLog('Вырезан тип прибора', TargetTypes[0]);
   finally
     TargetTypes.Free;
   end;
@@ -879,6 +904,7 @@ begin
   //  SourceType := FDevFilteredTypes[SelRow];
 
   NewType := ActiveRepo.CreateType(SourceType);
+  WriteTypeActionLog('Создан тип прибора', NewType);
   if (SelectedTreeNode <> nil) and
      (SelectedTreeNode.Tag <> Ord(tnAll)) then
     ApplyTreeSelectionToType(NewType);
@@ -967,6 +993,7 @@ begin
     if TargetTypes.Count = 0 then
       Exit;
 
+    WriteTypeActionLog('Удалён тип прибора', TargetTypes[0], Format('Count=%d', [TargetTypes.Count]));
     AppServices.DataManager.DeleteTypes(TargetTypes);
 
     SyncTreeAfterGridRowsRemoved;
@@ -1969,6 +1996,7 @@ begin
 
     if (Res = mrOk) and Form.Modified then
     begin
+      WriteTypeActionLog('Отредактирован тип прибора', AType);
       if (AppServices.DataManager <> nil) and
          (OldManufacturer <> AType.Manufacturer) then
         AppServices.DataManager.NeedRemoveOldManufacturerBranchForType(
@@ -2304,6 +2332,7 @@ begin
     if SelectedType = nil then
       Exit;
 
+    WriteTypeActionLog('Выбран тип прибора', SelectedType);
     ModalResult := mrOk;
   finally
     TargetTypes.Free;
