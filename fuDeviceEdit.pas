@@ -650,16 +650,15 @@ var
 begin
   if (ADevice = nil) or (ProtocolManager = nil) then Exit;
   Details :=
-    'Action=' + AAction +
-    '; Form=fuDeviceEdit' +
-    '; Object=Device' +
-    '; UUID=' + string(ADevice.UUID) +
-    '; Name=' + ADevice.Name +
-    '; Serial=' + ADevice.SerialNumber +
-    '; TypeUUID=' + string(ADevice.DeviceTypeUUID) +
-    '; TypeName=' + ADevice.DeviceTypeName +
-    '; Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
-  if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
+    'Action=' + AAction + sLineBreak +
+    'Form=fuDeviceEdit' + sLineBreak +
+    'UUID=' + string(ADevice.UUID) + sLineBreak +
+    'Name=' + ADevice.Name + sLineBreak +
+    'Serial=' + ADevice.SerialNumber + sLineBreak +
+    'TypeUUID=' + string(ADevice.DeviceTypeUUID) + sLineBreak +
+    'TypeName=' + ADevice.DeviceTypeName + sLineBreak +
+    'Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
+  if Trim(ADetails) <> '' then Details := Details + sLineBreak + ADetails;
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
 end;
 

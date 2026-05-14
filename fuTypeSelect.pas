@@ -260,17 +260,14 @@ begin
   if (AType = nil) or (ProtocolManager = nil) then
     Exit;
   Details :=
-    'Action=' + AAction +
-    '; Form=fuTypeSelect' +
-    '; Object=DeviceType' +
-    '; UUID=' + string(AType.UUID) +
-    '; Name=' + AType.Name +
-    '; Manufacturer=' + AType.Manufacturer +
-    '; Category=' + IntToStr(AType.Category) +
-    '; Modification=' + AType.Modification +
-    '; Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
+    'Action=' + AAction + sLineBreak +
+    'Form=fuTypeSelect' + sLineBreak +
+    'UUID=' + string(AType.UUID) + sLineBreak +
+    'Name=' + AType.Name + sLineBreak +
+    'Manufacturer=' + AType.Manufacturer + sLineBreak +
+    'Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now);
   if Trim(ADetails) <> '' then
-    Details := Details + '; ' + ADetails;
+    Details := Details + sLineBreak + ADetails;
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceTypeAction', 'Действие с типом прибора', Details);
 end;
 
