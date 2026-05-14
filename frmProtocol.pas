@@ -111,7 +111,7 @@ begin
   Item.Text := TProtocolManager.FormatMessage(Msg);
   Item.Selectable := False;
   Item.StyledSettings := Item.StyledSettings - [TStyledSetting.FontColor];
-  Item.TextSettings.Font.Family := 'Consolas';
+  Item.TextSettings.Font.Family := 'Courier New';
 
   case Msg.Category of
     pcInfo: Item.TextSettings.FontColor := TAlphaColorRec.Dodgerblue;
