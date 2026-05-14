@@ -909,7 +909,7 @@ begin
      (SelRow < FDevFilteredDevices.Count) then
     SrcDevice := FDevFilteredDevices[SelRow];
 
-  NewDevice := ActiveRepo.CreateDevice(SrcDevice);
+  ActiveRepo.CreateDevice(SrcDevice);
 
 
 
@@ -1518,7 +1518,6 @@ var
   FoundCount: Integer;
 
   Dev: TDevice;
-  ExistingDevice: TDevice;
   FoundType: TDeviceType;
   FoundRepo: TTypeRepository;
 
@@ -1528,7 +1527,6 @@ var
   ImportedModification: string;
   ImportedSerialNumber: string;
   ImportedOwner: string;
-  ImportedUUID: string;
   ImportedRegDate: TDate;
   ImportedValidityDate: TDate;
   ImportedDocNum: string;
@@ -1673,17 +1671,7 @@ begin
           Dev := ActiveRepo.CreateDevice(-1);
 
           if Item.GetValue('vri_id') <> nil then
-          begin
-            ImportedUUID := Trim(Item.GetValue('vri_id').Value);
-            ExistingDevice := ActiveRepo.FindDeviceByUUID(ImportedUUID);
-            if (ImportedUUID <> '') and (ExistingDevice <> nil) then
-            begin
-              ActiveRepo.DeleteDevice(Dev);
-              Dev := ExistingDevice;
-            end
-            else if ImportedUUID <> '' then
-              Dev.UUID := ImportedUUID;
-          end;
+            Dev.UUID := Item.GetValue('vri_id').Value;
 
           ImportedOwner := '';
           ImportedReestr := '';

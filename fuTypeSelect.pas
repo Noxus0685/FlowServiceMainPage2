@@ -2126,11 +2126,9 @@ var
 
   I: Integer;
   DevType: TDeviceType;
-  ExistingType: TDeviceType;
 
   SearchText: string;
   DetectText: string;
-  ImportedUUID: string;
   TotalCount: Integer;
 begin
   {----------------------------------}
@@ -2233,17 +2231,7 @@ if MessageDlg(
 
         {------------ mit_uuid ------------}
         if Item.GetValue('mit_uuid') <> nil then
-        begin
-          ImportedUUID := Trim(Item.GetValue('mit_uuid').Value);
-          ExistingType := ActiveRepo.FindTypeByUUID(ImportedUUID);
-          if (ImportedUUID <> '') and (ExistingType <> nil) then
-          begin
-            ActiveRepo.DeleteType(DevType);
-            DevType := ExistingType;
-          end
-          else if ImportedUUID <> '' then
-            DevType.UUID := ImportedUUID;
-        end;
+          DevType.UUID := Item.GetValue('mit_uuid').Value;
 
         {------------ ГРСИ ------------}
         if Item.GetValue('number') <> nil then
