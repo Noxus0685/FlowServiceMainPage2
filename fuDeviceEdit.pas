@@ -307,6 +307,7 @@ type
     { Private declarations }
      FDevice: TDevice;
      FOriginalDevice: TDevice;
+     FInitialTypeUUID: string;
 
 
      FDeviceType: TDeviceType; // ссылка на найденный тип
@@ -924,6 +925,7 @@ begin
         { редактирование существующего }
         FOriginalDevice.Assign(FDevice,True);
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+        WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
       end
       else
       begin
@@ -931,6 +933,10 @@ begin
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
         WriteDeviceEditActionLog('Сохранён прибор', FDevice);
       end;
+
+      if not SameText(FInitialTypeUUID, string(FDevice.DeviceTypeUUID)) then
+        WriteDeviceEditActionLog('Изменен тип прибора', FDevice,
+          'OldTypeUUID=' + FInitialTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
     end
     else if ModalResult = mrCancel then
     begin
@@ -1414,6 +1420,7 @@ begin
       FOriginalDevice := ADevice;
       //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
+      FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
     end
     else
     begin
@@ -1425,6 +1432,7 @@ begin
         FDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
+      FInitialTypeUUID := string(FDevice.DeviceTypeUUID);
     end;
 
     {----------------------------------}
