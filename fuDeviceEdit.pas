@@ -1596,6 +1596,8 @@ begin
   begin
     FDevice.AttachType(NewType, RepoName);
     FDeviceType := NewType;
+    WriteDeviceEditActionLog('Изменён тип прибора', FDevice,
+      'OldTypeUUID=' + OldTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
   end;
 
 

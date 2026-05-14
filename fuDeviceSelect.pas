@@ -238,6 +238,7 @@ private
   procedure ClearGridSelection;
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
+  procedure LogDuplicateDeviceUUIDs;
 
 public
   { Public declarations }
@@ -298,6 +299,41 @@ begin
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
 end;
 
+procedure TFormDeviceSelect.LogDuplicateDeviceUUIDs;
+var
+  I: Integer;
+  D: TDevice;
+  UUIDMap: TDictionary<string, Integer>;
+  U: string;
+begin
+  if (ProtocolManager = nil) or (FDevices = nil) then
+    Exit;
+  UUIDMap := TDictionary<string, Integer>.Create;
+  try
+    for I := 0 to FDevices.Count - 1 do
+    begin
+      D := FDevices[I];
+      if D = nil then
+        Continue;
+      U := Trim(string(D.UUID));
+      if U = '' then
+        Continue;
+      if UUIDMap.ContainsKey(U) then
+        UUIDMap[U] := UUIDMap[U] + 1
+      else
+        UUIDMap.Add(U, 1);
+    end;
+    for U in UUIDMap.Keys do
+      if UUIDMap[U] > 1 then
+        ProtocolManager.AddMessage(
+          pcError, psForm, 'DeviceActionError', 'Обнаружены дубли UUID приборов',
+          'Action=DuplicateUUID; Form=fuDeviceSelect; Object=Device; UUID=' + U +
+          '; Count=' + IntToStr(UUIDMap[U]) + '; Time=' + FormatDateTime('dd.mm.yyyy hh:nn:ss', Now));
+  finally
+    UUIDMap.Free;
+  end;
+end;
+
 procedure TFormDeviceSelect.LoadData;
 begin
   {--------------------------------------------------}
@@ -321,6 +357,7 @@ begin
   { Берём ссылку на данные репозитория }
   {--------------------------------------------------}
   FDevices := ActiveRepo.Devices;
+  LogDuplicateDeviceUUIDs;
 end;
 
 procedure TFormDeviceSelect.miAddRepositoryClick(Sender: TObject);
@@ -961,6 +998,7 @@ begin
     GridDevices.Row := GridDevices.RowCount - 1;
 
   WriteDeviceActionLog('Создан прибор', NewDevice);
+  LogDuplicateDeviceUUIDs;
 end;
 
 procedure TFormDeviceSelect.aCreateTypeExecute(Sender: TObject);
@@ -1067,6 +1105,7 @@ begin
   ApplyFilter;
   UpdateGridDevices;
   BuildTree;
+  LogDuplicateDeviceUUIDs;
 end;
 
 function TFormDeviceSelect.GetActiveTreeNode: TTreeViewItem;
@@ -2286,6 +2325,7 @@ begin
   {----------------------------------}
   { Открываем редактор }
   {----------------------------------}
+  WriteDeviceActionLog('Выбран прибор', ADevice);
   OldManufacturer := ADevice.Manufacturer;
   if OpenDeviceEditor(ADevice) then
   begin
