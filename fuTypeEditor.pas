@@ -217,6 +217,7 @@ type
     GroupBox1: TGroupBox;
     lytButtons: TLayout;
     btnOK: TCornerButton;
+    btnPdfToText: TCornerButton;
     btnCancel: TCornerButton;
     shdwfct3: TShadowEffect;
     ppmnuCalculateVolume: TPopupMenu;
@@ -337,6 +338,7 @@ type
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
+    procedure btnPdfToTextClick(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
@@ -350,6 +352,12 @@ type
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
+    // Выбор PDF-файла вручную через диалог.
+    function SelectPdfFile(var APdfFilePath: string): Boolean;
+    // Получение текста из PDF через внешний OCR/API.
+    function ExtractTextFromPdfByOcr(const APdfFilePath: string): string;
+    // Сохранение распознанного текста в отдельный TXT-файл.
+    procedure SaveExtractedPdfText(const AText: string);
 
   private
     { Private declarations }
@@ -383,6 +391,7 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
+  FilePath: string;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
@@ -1476,6 +1485,86 @@ procedure TFormTypeEditor.btnCancelClick(Sender: TObject);
 begin
   WriteTypeEditActionLog('Редактирование типа прибора отменено', FType);
   ModalResult := mrCancel;
+end;
+
+procedure TFormTypeEditor.btnPdfToTextClick(Sender: TObject);
+var
+  PdfText: string;
+begin
+  // Выбираем PDF-файл вручную.
+  if not SelectPdfFile(FilePath) then
+    Exit;
+
+  // Получаем текст из PDF через внешний OCR/API.
+  PdfText := ExtractTextFromPdfByOcr(FilePath);
+
+  // Если OCR не вернул текст — ничего не сохраняем.
+  if Trim(PdfText) = '' then
+  begin
+    ShowMessage('OCR не вернул текст из PDF-файла');
+    Exit;
+  end;
+
+  // В MemoLog НЕ записываем, сохраняем текст только в отдельный файл.
+  SaveExtractedPdfText(PdfText);
+end;
+
+function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
+var
+  OpenDialog: TOpenDialog;
+begin
+  Result := False;
+  OpenDialog := TOpenDialog.Create(Self);
+  try
+    OpenDialog.Filter := 'PDF files (*.pdf)|*.pdf';
+    OpenDialog.DefaultExt := 'pdf';
+    OpenDialog.Options := [TOpenOption.ofFileMustExist];
+
+    if OpenDialog.Execute then
+    begin
+      APdfFilePath := OpenDialog.FileName;
+      Result := True;
+    end;
+  finally
+    OpenDialog.Free;
+  end;
+end;
+
+function TFormTypeEditor.ExtractTextFromPdfByOcr(const APdfFilePath: string): string;
+begin
+  Result := '';
+
+  // Проверяем, что PDF-файл существует.
+  if not FileExists(APdfFilePath) then
+  begin
+    ShowMessage('PDF-файл не найден');
+    Exit;
+  end;
+
+  // Проверяем, что выбран именно PDF-файл.
+  if not SameText(ExtractFileExt(APdfFilePath), '.pdf') then
+  begin
+    ShowMessage('Выбранный файл не является PDF');
+    Exit;
+  end;
+
+  // TODO: Подключить внешний OCR/API и вернуть распознанный текст.
+end;
+
+procedure TFormTypeEditor.SaveExtractedPdfText(const AText: string);
+var
+  SaveDialog: TSaveDialog;
+begin
+  SaveDialog := TSaveDialog.Create(Self);
+  try
+    SaveDialog.Filter := 'Text files (*.txt)|*.txt';
+    SaveDialog.DefaultExt := 'txt';
+
+    if SaveDialog.Execute then
+      TFile.WriteAllText(SaveDialog.FileName, AText, TEncoding.UTF8);
+  finally
+    SaveDialog.Free;
+  end;
 end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
