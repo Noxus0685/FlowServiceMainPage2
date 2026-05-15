@@ -350,6 +350,14 @@ type
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
+    // Выбор PDF-файла вручную через диалог.
+    function SelectPdfFile(var APdfFilePath: string): Boolean;
+    // Извлечение текстового слоя из PDF через pdftotext.exe.
+    function ExtractTextLayerFromPdf(const APdfFilePath, AOutputTxtPath: string): Boolean;
+    // Отправка текста и JSON-шаблона в DeepSeek.
+    function SendTextToDeepSeekTemplate(const AText, ATemplate: string; out AResponse: string): Boolean;
+    // Применение JSON-ответа DeepSeek к форме типа прибора.
+    function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
 
   private
     { Private declarations }
@@ -383,6 +391,7 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
+  FilePath: string;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
@@ -492,6 +501,7 @@ implementation
 uses
 uAppServices
 {$IFDEF MSWINDOWS}
+  , Winapi.Windows
   , Winapi.WinInet
 {$ENDIF}
   ;
@@ -508,6 +518,46 @@ begin
   Result := InternetCheckConnection(PChar(ARSHIN_URL), FLAG_ICC_FORCE_CONNECTION, 0);
 {$ELSE}
   Result := True;
+{$ENDIF}
+end;
+
+function RunProcessAndWait(const AExeFile, AParams: string): Cardinal;
+{$IFDEF MSWINDOWS}
+var
+  StartInfo: TStartupInfo;
+  ProcInfo: TProcessInformation;
+  CmdLine: string;
+{$ENDIF}
+begin
+  Result := Cardinal(-1);
+{$IFDEF MSWINDOWS}
+  ZeroMemory(@StartInfo, SizeOf(StartInfo));
+  ZeroMemory(@ProcInfo, SizeOf(ProcInfo));
+
+  StartInfo.cb := SizeOf(StartInfo);
+  CmdLine := '"' + AExeFile + '" ' + AParams;
+
+  if not CreateProcess(
+    nil,
+    PChar(CmdLine),
+    nil,
+    nil,
+    False,
+    CREATE_NO_WINDOW,
+    nil,
+    nil,
+    StartInfo,
+    ProcInfo
+  ) then
+    Exit;
+
+  try
+    WaitForSingleObject(ProcInfo.hProcess, INFINITE);
+    GetExitCodeProcess(ProcInfo.hProcess, Result);
+  finally
+    CloseHandle(ProcInfo.hProcess);
+    CloseHandle(ProcInfo.hThread);
+  end;
 {$ENDIF}
 end;
 
@@ -1476,6 +1526,195 @@ procedure TFormTypeEditor.btnCancelClick(Sender: TObject);
 begin
   WriteTypeEditActionLog('Редактирование типа прибора отменено', FType);
   ModalResult := mrCancel;
+end;
+
+function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
+var
+  OpenDialog: TOpenDialog;
+begin
+  Result := False;
+  OpenDialog := TOpenDialog.Create(Self);
+  try
+    OpenDialog.Filter := 'PDF files (*.pdf)|*.pdf';
+    OpenDialog.DefaultExt := 'pdf';
+    OpenDialog.Options := [TOpenOption.ofFileMustExist];
+
+    if OpenDialog.Execute then
+    begin
+      APdfFilePath := OpenDialog.FileName;
+      Result := True;
+    end;
+  finally
+    OpenDialog.Free;
+  end;
+end;
+
+function TFormTypeEditor.ExtractTextLayerFromPdf(const APdfFilePath,
+  AOutputTxtPath: string): Boolean;
+var
+  PdfToTextPath: string;
+  Params: string;
+  ExitCode: Cardinal;
+begin
+  Result := False;
+
+  // Проверяем, что PDF-файл существует.
+  if not FileExists(APdfFilePath) then
+  begin
+    ShowMessage('PDF-файл не найден');
+    Exit;
+  end;
+
+  // Проверяем, что выбран именно PDF-файл.
+  if not SameText(ExtractFileExt(APdfFilePath), '.pdf') then
+  begin
+    ShowMessage('Выбранный файл не является PDF');
+    Exit;
+  end;
+
+  // Ищем pdftotext.exe рядом с программой.
+  PdfToTextPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'pdftotext.exe');
+  if not FileExists(PdfToTextPath) then
+  begin
+    ShowMessage('Не найден pdftotext.exe рядом с программой');
+    Exit;
+  end;
+
+  // Запускаем pdftotext.exe для извлечения текста в UTF-8.
+  Params := '-layout -enc UTF-8 ' +
+    '"' + APdfFilePath + '" ' +
+    '"' + AOutputTxtPath + '"';
+
+  ExitCode := RunProcessAndWait(PdfToTextPath, Params);
+  if ExitCode <> 0 then
+  begin
+    ShowMessage('Ошибка извлечения текста из PDF. Код: ' + ExitCode.ToString);
+    Exit;
+  end;
+
+  // Проверяем, что файл результата создан.
+  if not FileExists(AOutputTxtPath) then
+  begin
+    ShowMessage('Файл результата не был создан');
+    Exit;
+  end;
+
+  // Проверяем, что текстовый слой действительно найден.
+  if Trim(TFile.ReadAllText(AOutputTxtPath, TEncoding.UTF8)) = '' then
+  begin
+    ShowMessage('В PDF не найден текстовый слой. Для такого файла нужен OCR.');
+    Exit;
+  end;
+
+  Result := True;
+end;
+
+function TFormTypeEditor.SendTextToDeepSeekTemplate(const AText, ATemplate: string;
+  out AResponse: string): Boolean;
+var
+  Http: TNetHTTPClient;
+  ReqBody: TStringStream;
+  Resp: IHTTPResponse;
+  JsonReq, MsgSys, MsgUser: TJSONObject;
+  Messages: TJSONArray;
+  ApiKey: string;
+  LimitedText: string;
+const
+  MAX_TEXT_LENGTH = 12000;
+begin
+  Result := False;
+  AResponse := '';
+  ApiKey := 'sk-3b7259d5fd2642b5b394f3d839d83fc7';
+  if Length(AText) > MAX_TEXT_LENGTH then
+    LimitedText := Copy(AText, 1, MAX_TEXT_LENGTH)
+  else
+    LimitedText := AText;
+
+  JsonReq := TJSONObject.Create;
+  Messages := TJSONArray.Create;
+  MsgSys := TJSONObject.Create;
+  MsgUser := TJSONObject.Create;
+  ReqBody := nil;
+  Http := TNetHTTPClient.Create(nil);
+  try
+    MsgSys.AddPair('role', 'system');
+    MsgSys.AddPair('content', 'Ты инженер-метролог. Заполни шаблон JSON на основе текста.');
+    MsgUser.AddPair('role', 'user');
+    MsgUser.AddPair('content',
+      'Заполни JSON по данным из переданного текста или PDF.' + sLineBreak +
+      'Верни только JSON без пояснений.' + sLineBreak +
+      'Не добавляй markdown.' + sLineBreak +
+      'Не добавляй ```json.' + sLineBreak +
+      'Если данных нет — оставь null.' + sLineBreak +
+      'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
+      'Числа возвращай без единиц измерения.' + sLineBreak +
+      'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
+      'Структуру JSON не менять.' + sLineBreak + sLineBreak +
+      'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
+      'Текст:' + sLineBreak + LimitedText);
+    Messages.Add(MsgSys);
+    Messages.Add(MsgUser);
+    JsonReq.AddPair('model', 'deepseek-chat');
+    JsonReq.AddPair('messages', Messages);
+    JsonReq.AddPair('temperature', TJSONNumber.Create(0));
+    JsonReq.AddPair('stream', TJSONBool.Create(False));
+    ReqBody := TStringStream.Create(JsonReq.ToJSON, TEncoding.UTF8);
+
+    Http.CustomHeaders['Authorization'] := 'Bearer ' + ApiKey;
+    Http.CustomHeaders['Content-Type'] := 'application/json';
+    Resp := Http.Post('https://api.deepseek.com/chat/completions', ReqBody);
+    AResponse := Resp.ContentAsString(TEncoding.UTF8);
+    Result := Resp.StatusCode = 200;
+  finally
+    Http.Free;
+    ReqBody.Free;
+    JsonReq.Free;
+  end;
+end;
+
+function TFormTypeEditor.ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
+var
+  Root, DeviceTypeObj, GeneralInfoObj: TJSONObject;
+  JsonVal: TJSONValue;
+begin
+  Result := False;
+  JsonVal := TJSONObject.ParseJSONValue(AResponse);
+  try
+    if not (JsonVal is TJSONObject) then
+      Exit;
+    Root := JsonVal as TJSONObject;
+
+    DeviceTypeObj := Root.GetValue('device_type') as TJSONObject;
+    if DeviceTypeObj = nil then
+      Exit;
+    GeneralInfoObj := DeviceTypeObj.GetValue('general_info') as TJSONObject;
+    if GeneralInfoObj = nil then
+      Exit;
+
+    if GeneralInfoObj.GetValue('name') <> nil then
+      FType.Name := GeneralInfoObj.GetValue<string>('name', FType.Name);
+    if GeneralInfoObj.GetValue('manufacturer') <> nil then
+      FType.Manufacturer := GeneralInfoObj.GetValue<string>('manufacturer', FType.Manufacturer);
+    if GeneralInfoObj.GetValue('modification') <> nil then
+      FType.Modification := GeneralInfoObj.GetValue<string>('modification', FType.Modification);
+    if GeneralInfoObj.GetValue('procedure') <> nil then
+      FType.VerificationMethod := GeneralInfoObj.GetValue<string>('procedure', FType.VerificationMethod);
+    if GeneralInfoObj.GetValue('grsi_number') <> nil then
+      FType.ReestrNumber := GeneralInfoObj.GetValue<string>('grsi_number', FType.ReestrNumber);
+    if GeneralInfoObj.GetValue('mpi') <> nil then
+      FType.IVI := GeneralInfoObj.GetValue<Integer>('mpi', FType.IVI);
+    if GeneralInfoObj.GetValue('accuracy_class') <> nil then
+      FType.AccuracyClass := GeneralInfoObj.GetValue<string>('accuracy_class', FType.AccuracyClass);
+    if GeneralInfoObj.GetValue('base_error') <> nil then
+      FType.Error := GeneralInfoObj.GetValue<Double>('base_error', FType.Error);
+
+    Result := True;
+    UpdateUIFromType;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+  finally
+    JsonVal.Free;
+  end;
 end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
@@ -4180,6 +4419,10 @@ var
   FileName: string;
   FilePath: string;
   FileStream: TFileStream;
+  TxtPath: string;
+  PdfText: string;
+  JsonTemplate: string;
+  DeepSeekResponse: string;
 
   DevType: TDeviceType;
 
@@ -4424,6 +4667,56 @@ begin
               try
                 NetHTTPClient1.Get(DocUrl, FileStream);
                 DevType.Documentation := FilePath;
+                TxtPath := ChangeFileExt(FilePath, '.txt');
+                if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+                begin
+                  PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+                  JsonTemplate :=
+                    '{' + sLineBreak +
+                    '  "device_type": {' + sLineBreak +
+                    '    "general_info": {' + sLineBreak +
+                    '      "name": null,' + sLineBreak +
+                    '      "category": null,' + sLineBreak +
+                    '      "manufacturer": null,' + sLineBreak +
+                    '      "modification": null,' + sLineBreak +
+                    '      "procedure": null,' + sLineBreak +
+                    '      "grsi_number": null,' + sLineBreak +
+                    '      "valid_from": null,' + sLineBreak +
+                    '      "valid_to": null,' + sLineBreak +
+                    '      "mpi": null,' + sLineBreak +
+                    '      "verification_method": null,' + sLineBreak +
+                    '      "accuracy_class": null,' + sLineBreak +
+                    '      "base_error": null,' + sLineBreak +
+                    '      "report_form_file": null' + sLineBreak +
+                    '    },' + sLineBreak +
+                    '    "signal": {' + sLineBreak +
+                    '      "measured_value": null,' + sLineBreak +
+                    '      "measurement_unit": null,' + sLineBreak +
+                    '      "signal_type": null' + sLineBreak +
+                    '    },' + sLineBreak +
+                    '    "pulses": {' + sLineBreak +
+                    '      "output_type": null,' + sLineBreak +
+                    '      "representation": null,' + sLineBreak +
+                    '      "kp_qmax": null' + sLineBreak +
+                    '    }' + sLineBreak +
+                    '  },' + sLineBreak +
+                    '  "diameters": [],' + sLineBreak +
+                    '  "verification_points": [],' + sLineBreak +
+                    '  "calculation_parameters": {' + sLineBreak +
+                    '    "dynamic_range": null,' + sLineBreak +
+                    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+                    '  },' + sLineBreak +
+                    '  "deepseek_result": {' + sLineBreak +
+                    '    "status": null,' + sLineBreak +
+                    '    "warnings": [],' + sLineBreak +
+                    '    "missing_fields": [],' + sLineBreak +
+                    '    "raw_notes": null' + sLineBreak +
+                    '  }' + sLineBreak +
+                    '}';
+
+                  if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+                    ApplyDeepSeekJsonToType(DeepSeekResponse);
+                end;
               except
                 on E: ENetHTTPClientException do
                   MemoLog.Lines.Add('ERROR: ' + E.Message);
