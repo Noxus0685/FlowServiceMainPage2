@@ -1766,7 +1766,7 @@ begin
         D.Qmin := DObj.GetValue<Double>('qmin_l_s', 0);
         D.Kp := DObj.GetValue<Double>('kp_imp_l', 0);
         D.QFmax := DObj.GetValue<Double>('qf_l_s', 0);
-        D.State := osAdded;
+        D.State := osNew;
         FDiametersLocal.Add(D);
       end;
     end;
@@ -1793,7 +1793,7 @@ begin
         P.RepeatsProtocol := PObj.GetValue<Integer>('repeat_count', 0);
         P.Repeats := PObj.GetValue<Integer>('measurement_series_count', 0);
         P.Pressure := PObj.GetValue<Double>('pressure', 0);
-        P.State := osAdded;
+        P.State := osNew;
         FPointsLocal.Add(P);
       end;
     end;
