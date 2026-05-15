@@ -33,9 +33,11 @@ uses
   System.Math,
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
+  System.Net.Mime,
   System.Net.URLClient,
   System.NetEncoding,
   System.Rtti,
+  System.StrUtils,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -217,6 +219,7 @@ type
     GroupBox1: TGroupBox;
     lytButtons: TLayout;
     btnOK: TCornerButton;
+    btnPdfToText: TCornerButton;
     btnCancel: TCornerButton;
     shdwfct3: TShadowEffect;
     ppmnuCalculateVolume: TPopupMenu;
@@ -337,6 +340,7 @@ type
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
+    procedure btnPdfToTextClick(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
@@ -350,6 +354,14 @@ type
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
+    // Выбор PDF-файла вручную через диалог.
+    function SelectPdfFile(var APdfFilePath: string): Boolean;
+    // Получение текста из PDF через внешний OCR/API.
+    function ExtractTextFromPdfByOcr(const APdfFilePath: string): string;
+    // Сохранение распознанного текста в отдельный TXT-файл.
+    procedure SaveExtractedPdfText(const AText: string);
+    // Определение количества страниц PDF по содержимому файла.
+    function GetPdfPageCount(const APdfFilePath: string): Integer;
 
   private
     { Private declarations }
@@ -383,6 +395,7 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
+  FilePath: string;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
@@ -1476,6 +1489,237 @@ procedure TFormTypeEditor.btnCancelClick(Sender: TObject);
 begin
   WriteTypeEditActionLog('Редактирование типа прибора отменено', FType);
   ModalResult := mrCancel;
+end;
+
+procedure TFormTypeEditor.btnPdfToTextClick(Sender: TObject);
+var
+  PdfText: string;
+begin
+  // Выбираем PDF-файл вручную.
+  if not SelectPdfFile(FilePath) then
+    Exit;
+
+  // Получаем текст из PDF через внешний OCR/API.
+  PdfText := ExtractTextFromPdfByOcr(FilePath);
+
+  // Если OCR не вернул текст — ничего не сохраняем.
+  if Trim(PdfText) = '' then
+  begin
+    ShowMessage('OCR не вернул текст из PDF-файла');
+    Exit;
+  end;
+
+  // В MemoLog НЕ записываем, сохраняем текст только в отдельный файл.
+  SaveExtractedPdfText(PdfText);
+end;
+
+function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
+var
+  OpenDialog: TOpenDialog;
+begin
+  Result := False;
+  OpenDialog := TOpenDialog.Create(Self);
+  try
+    OpenDialog.Filter := 'PDF files (*.pdf)|*.pdf';
+    OpenDialog.DefaultExt := 'pdf';
+    OpenDialog.Options := [TOpenOption.ofFileMustExist];
+
+    if OpenDialog.Execute then
+    begin
+      APdfFilePath := OpenDialog.FileName;
+      Result := True;
+    end;
+  finally
+    OpenDialog.Free;
+  end;
+end;
+
+function TFormTypeEditor.ExtractTextFromPdfByOcr(const APdfFilePath: string): string;
+const
+  OCR_SPACE_URL = 'https://api.ocr.space/parse/image';
+  OCR_SPACE_API_KEY = 'K88906835688957';
+var
+  Http: TNetHTTPClient;
+  FormData: TMultipartFormData;
+  Resp: IHTTPResponse;
+  Json: TJSONObject;
+  ParsedResults: TJSONArray;
+  ParsedItem: TJSONObject;
+  ParsedTextValue: TJSONValue;
+  ErrorMessageValue: TJSONValue;
+  I: Integer;
+  PageCount: Integer;
+  PageStart: Integer;
+  PageEnd: Integer;
+  ResponseText: string;
+  ChunkText: string;
+begin
+  Result := '';
+
+  // Проверяем, что PDF-файл существует.
+  if not FileExists(APdfFilePath) then
+  begin
+    ShowMessage('PDF-файл не найден');
+    Exit;
+  end;
+
+  // Проверяем, что выбран именно PDF-файл.
+  if not SameText(ExtractFileExt(APdfFilePath), '.pdf') then
+  begin
+    ShowMessage('Выбранный файл не является PDF');
+    Exit;
+  end;
+
+  // Определяем количество страниц PDF для разбиения по 3 страницы.
+  PageCount := GetPdfPageCount(APdfFilePath);
+  if PageCount <= 0 then
+  begin
+    ShowMessage('Не удалось определить количество страниц PDF');
+    Exit;
+  end;
+
+  // Отправляем PDF-файл во внешний OCR API (OCR.space) частями по 3 страницы.
+  Http := TNetHTTPClient.Create(nil);
+  try
+    Http.ConnectionTimeout := 60000;
+    Http.ResponseTimeout := 180000;
+    Http.CustomHeaders['apikey'] := OCR_SPACE_API_KEY;
+
+    PageStart := 1;
+    while PageStart <= PageCount do
+    begin
+      PageEnd := PageStart + 2;
+      if PageEnd > PageCount then
+        PageEnd := PageCount;
+
+      FormData := TMultipartFormData.Create;
+      try
+        FormData.AddField('language', 'rus');
+        FormData.AddField('isOverlayRequired', 'false');
+        FormData.AddField('isCreateSearchablePdf', 'false');
+        FormData.AddField('scale', 'true');
+        FormData.AddField('OCREngine', '2');
+        FormData.AddField('pages', Format('%d-%d', [PageStart, PageEnd]));
+        FormData.AddFile('file', APdfFilePath, 'application/pdf');
+
+        Resp := Http.Post(OCR_SPACE_URL, FormData);
+      finally
+        FormData.Free;
+      end;
+
+      if Resp = nil then
+      begin
+        ShowMessage('OCR API не вернул ответ');
+        Exit;
+      end;
+
+      if (Resp.StatusCode < 200) or (Resp.StatusCode >= 300) then
+      begin
+        ShowMessage('Ошибка OCR API. Код: ' + Resp.StatusCode.ToString);
+        Exit;
+      end;
+
+      ResponseText := Resp.ContentAsString(TEncoding.UTF8);
+      Json := TJSONObject.ParseJSONValue(ResponseText) as TJSONObject;
+      try
+        if Json = nil then
+        begin
+          ShowMessage('OCR API вернул некорректный JSON');
+          Exit;
+        end;
+
+        if SameText(Json.GetValue<string>('IsErroredOnProcessing', 'False'), 'True') then
+        begin
+          ErrorMessageValue := Json.GetValue('ErrorMessage');
+          if ErrorMessageValue <> nil then
+            ShowMessage('OCR ошибка: ' + ErrorMessageValue.ToJSON)
+          else
+            ShowMessage('OCR вернул ошибку обработки PDF');
+          Exit;
+        end;
+
+        ParsedResults := Json.GetValue<TJSONArray>('ParsedResults');
+        if (ParsedResults <> nil) and (ParsedResults.Count > 0) then
+        begin
+          ChunkText := '';
+          for I := 0 to ParsedResults.Count - 1 do
+          begin
+            ParsedItem := ParsedResults.Items[I] as TJSONObject;
+            if ParsedItem <> nil then
+            begin
+              ParsedTextValue := ParsedItem.GetValue('ParsedText');
+              if ParsedTextValue <> nil then
+                ChunkText := ChunkText + ParsedTextValue.Value + sLineBreak;
+            end;
+          end;
+
+          if Trim(ChunkText) <> '' then
+            Result := Result + ChunkText;
+        end;
+      finally
+        Json.Free;
+      end;
+
+      PageStart := PageEnd + 1;
+    end;
+
+    if Trim(Result) = '' then
+      ShowMessage('OCR API не вернул ParsedText');
+  finally
+    Http.Free;
+  end;
+end;
+
+function TFormTypeEditor.GetPdfPageCount(const APdfFilePath: string): Integer;
+var
+  PdfBytes: TBytes;
+  PdfText: string;
+  SearchFrom: Integer;
+  FoundPos: Integer;
+const
+  PAGE_MARKER = '/Type /Page';
+begin
+  Result := 0;
+
+  // Считываем PDF и считаем вхождения маркера страниц.
+  if not FileExists(APdfFilePath) then
+    Exit;
+
+  PdfBytes := TFile.ReadAllBytes(APdfFilePath);
+  if Length(PdfBytes) = 0 then
+    Exit;
+
+  PdfText := TEncoding.ANSI.GetString(PdfBytes);
+  SearchFrom := 1;
+  while True do
+  begin
+    FoundPos := PosEx(PAGE_MARKER, PdfText, SearchFrom);
+    if FoundPos = 0 then
+      Break;
+
+    Inc(Result);
+    SearchFrom := FoundPos + Length(PAGE_MARKER);
+  end;
+
+  // Если точный подсчёт не удался — используем минимум 1 страницу.
+  if Result <= 0 then
+    Result := 1;
+end;
+
+procedure TFormTypeEditor.SaveExtractedPdfText(const AText: string);
+var
+  SaveDialog: TSaveDialog;
+begin
+  SaveDialog := TSaveDialog.Create(Self);
+  try
+    SaveDialog.Filter := 'Text files (*.txt)|*.txt';
+    SaveDialog.DefaultExt := 'txt';
+
+    if SaveDialog.Execute then
+      TFile.WriteAllText(SaveDialog.FileName, AText, TEncoding.UTF8);
+  finally
+    SaveDialog.Free;
+  end;
 end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
