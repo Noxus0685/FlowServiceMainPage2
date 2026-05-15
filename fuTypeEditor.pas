@@ -218,6 +218,7 @@ type
     layTop: TLayout;
     GroupBox1: TGroupBox;
     lytButtons: TLayout;
+    btnPdfToText: TCornerButton;
     btnOK: TCornerButton;
     btnPdfToText: TCornerButton;
     btnCancel: TCornerButton;
@@ -339,6 +340,7 @@ type
     procedure sbFindReestrNumberClick(Sender: TObject);
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
+    procedure btnPdfToTextClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
@@ -1532,6 +1534,55 @@ begin
   ModalResult := mrCancel;
 end;
 
+procedure TFormTypeEditor.btnPdfToTextClick(Sender: TObject);
+var
+  PdfPath: string;
+  TxtPath: string;
+  JsonPath: string;
+  PdfText: string;
+  JsonTemplate: string;
+  DeepSeekResponse: string;
+begin
+  if not SelectPdfFile(PdfPath) then
+    Exit;
+
+  TxtPath := ChangeFileExt(PdfPath, '.txt');
+  if not ExtractTextLayerFromPdf(PdfPath, TxtPath) then
+    Exit;
+
+  PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+  JsonTemplate :=
+    '{' + sLineBreak +
+    '  "device_type": {' + sLineBreak +
+    '    "general_info": {' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "category": null,' + sLineBreak +
+    '      "manufacturer": null,' + sLineBreak +
+    '      "modification": null,' + sLineBreak +
+    '      "procedure": null,' + sLineBreak +
+    '      "grsi_number": null,' + sLineBreak +
+    '      "valid_from": null,' + sLineBreak +
+    '      "valid_to": null,' + sLineBreak +
+    '      "mpi": null,' + sLineBreak +
+    '      "verification_method": null,' + sLineBreak +
+    '      "accuracy_class": null,' + sLineBreak +
+    '      "base_error": null,' + sLineBreak +
+    '      "report_form_file": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "diameters": [],' + sLineBreak +
+    '  "verification_points": []' + sLineBreak +
+    '}';
+
+  if not SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+    Exit;
+
+  JsonPath := ChangeFileExt(TxtPath, '.json');
+  TFile.WriteAllText(JsonPath, DeepSeekResponse, TEncoding.UTF8);
+  ApplyDeepSeekJsonToType(DeepSeekResponse);
+  ShowMessage('JSON сохранён: ' + JsonPath);
+end;
+
 function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
 var
   OpenDialog: TOpenDialog;
@@ -1624,6 +1675,8 @@ var
   ApiKey: string;
   LimitedText: string;
   ApiJson: TJSONObject;
+  ErrorObj: TJSONObject;
+  ErrorMessage: string;
   Choices: TJSONArray;
   ChoiceObj, MessageObj: TJSONObject;
   ContentValue: TJSONValue;
@@ -1632,7 +1685,7 @@ const
 begin
   Result := False;
   AResponse := '';
-  ApiKey := 'sk-3b7259d5fd2642b5b394f3d839d83fc7';
+  ApiKey := 'sk-c1757a521c694238b64baf78a707c86b';
   if Length(AText) > MAX_TEXT_LENGTH then
     LimitedText := Copy(AText, 1, MAX_TEXT_LENGTH)
   else
@@ -1673,7 +1726,32 @@ begin
     Resp := Http.Post('https://api.deepseek.com/chat/completions', ReqBody);
     AResponse := Resp.ContentAsString(TEncoding.UTF8);
     if Resp.StatusCode <> 200 then
+    begin
+      ApiJson := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
+      try
+        if ApiJson <> nil then
+        begin
+          ErrorObj := ApiJson.GetValue('error') as TJSONObject;
+          if ErrorObj <> nil then
+          begin
+            ErrorMessage := ErrorObj.GetValue<string>('message', '');
+            if SameText(Trim(ErrorMessage), 'Insufficient Balance') then
+              ShowMessage('Ошибка DeepSeek: недостаточно баланса на аккаунте API')
+            else if Trim(ErrorMessage) <> '' then
+              ShowMessage('Ошибка DeepSeek: ' + ErrorMessage)
+            else
+              ShowMessage('Ошибка DeepSeek. Код HTTP: ' + Resp.StatusCode.ToString);
+          end
+          else
+            ShowMessage('Ошибка DeepSeek. Код HTTP: ' + Resp.StatusCode.ToString);
+        end
+        else
+          ShowMessage('Ошибка DeepSeek. Код HTTP: ' + Resp.StatusCode.ToString);
+      finally
+        ApiJson.Free;
+      end;
       Exit;
+    end;
 
     ApiJson := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
     try
