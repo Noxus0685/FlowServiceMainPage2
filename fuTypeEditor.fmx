@@ -113,13 +113,6 @@ object FormTypeEditor: TFormTypeEditor
       TextSettings.Trimming = None
       OnClick = DeepSeekClick
     end
-    object ButtonSelectPdf: TSpeedButton
-      Position.X = 872.000000000000000000
-      Position.Y = 48.000000000000000000
-      Text = 'Выбрать PDF'
-      TextSettings.Trimming = None
-      OnClick = ButtonSelectPdfClick
-    end
   end
   object ppmnuCalculateVolume: TPopupMenu
     Left = 632
