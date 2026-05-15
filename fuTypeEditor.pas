@@ -1675,6 +1675,11 @@ end;
 function TFormTypeEditor.ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
 var
   Root, DeviceTypeObj, GeneralInfoObj: TJSONObject;
+  DiametersArr, PointsArr: TJSONArray;
+  DObj, PObj: TJSONObject;
+  D: TDiameter;
+  P: TTypePoint;
+  I: Integer;
   JsonVal: TJSONValue;
 begin
   Result := False;
@@ -1707,6 +1712,58 @@ begin
       FType.AccuracyClass := GeneralInfoObj.GetValue<string>('accuracy_class', FType.AccuracyClass);
     if GeneralInfoObj.GetValue('base_error') <> nil then
       FType.Error := GeneralInfoObj.GetValue<Double>('base_error', FType.Error);
+
+    DiametersArr := Root.GetValue('diameters') as TJSONArray;
+    if DiametersArr <> nil then
+    begin
+      FDiametersLocal.Clear;
+      for I := 0 to DiametersArr.Count - 1 do
+      begin
+        DObj := DiametersArr.Items[I] as TJSONObject;
+        if DObj = nil then
+          Continue;
+        D := TDiameter.Create(FType.UUID);
+        D.Enable := DObj.GetValue<Boolean>('enabled', True);
+        D.Name := DObj.GetValue<string>('name', '');
+        D.DN := DObj.GetValue<string>('dn_mm', '');
+        D.Qmax := DObj.GetValue<Double>('qmax_l_s', 0);
+        D.Qnom := DObj.GetValue<Double>('qnom_l_s', 0);
+        D.Qtr := DObj.GetValue<Double>('qtr_l_s', 0);
+        D.Q2tr := DObj.GetValue<Double>('q2tr_l_s', 0);
+        D.Qmin := DObj.GetValue<Double>('qmin_l_s', 0);
+        D.Kp := DObj.GetValue<Double>('kp_imp_l', 0);
+        D.QFmax := DObj.GetValue<Double>('qf_l_s', 0);
+        D.State := osAdded;
+        FDiametersLocal.Add(D);
+      end;
+    end;
+
+    PointsArr := Root.GetValue('verification_points') as TJSONArray;
+    if PointsArr <> nil then
+    begin
+      FPointsLocal.Clear;
+      for I := 0 to PointsArr.Count - 1 do
+      begin
+        PObj := PointsArr.Items[I] as TJSONObject;
+        if PObj = nil then
+          Continue;
+        P := TTypePoint.Create(FType.UUID);
+        P.Enable := PObj.GetValue<Boolean>('enabled', True);
+        P.Name := PObj.GetValue<string>('name', '');
+        P.FlowRate := PObj.GetValue<Double>('q_qmax', 0);
+        P.LimitVolume := PObj.GetValue<Double>('volume_l', 0);
+        P.LimitImp := PObj.GetValue<Integer>('impulses_count', 0);
+        P.LimitTime := PObj.GetValue<Double>('time_s', 0);
+        P.Error := PObj.GetValue<Double>('error_percent', 0);
+        P.FlowAccuracy := PObj.GetValue<string>('expanded_uncertainty_percent', '');
+        P.Pause := PObj.GetValue<Integer>('stabilization_time_s', 0);
+        P.RepeatsProtocol := PObj.GetValue<Integer>('repeat_count', 0);
+        P.Repeats := PObj.GetValue<Integer>('measurement_series_count', 0);
+        P.Pressure := PObj.GetValue<Double>('pressure', 0);
+        P.State := osAdded;
+        FPointsLocal.Add(P);
+      end;
+    end;
 
     Result := True;
     UpdateUIFromType;
