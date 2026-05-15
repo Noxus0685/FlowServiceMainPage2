@@ -4785,6 +4785,62 @@ begin
             finally
               FileStream.Free;
             end;
+
+            // Конвертируем PDF в TXT только после полного закрытия потока файла.
+            TxtPath := ChangeFileExt(FilePath, '.txt');
+            if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+            begin
+              PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+              JsonTemplate :=
+                '{' + sLineBreak +
+                '  "device_type": {' + sLineBreak +
+                '    "general_info": {' + sLineBreak +
+                '      "name": null,' + sLineBreak +
+                '      "category": null,' + sLineBreak +
+                '      "manufacturer": null,' + sLineBreak +
+                '      "modification": null,' + sLineBreak +
+                '      "procedure": null,' + sLineBreak +
+                '      "grsi_number": null,' + sLineBreak +
+                '      "valid_from": null,' + sLineBreak +
+                '      "valid_to": null,' + sLineBreak +
+                '      "mpi": null,' + sLineBreak +
+                '      "verification_method": null,' + sLineBreak +
+                '      "accuracy_class": null,' + sLineBreak +
+                '      "base_error": null,' + sLineBreak +
+                '      "report_form_file": null' + sLineBreak +
+                '    },' + sLineBreak +
+                '    "signal": {' + sLineBreak +
+                '      "measured_value": null,' + sLineBreak +
+                '      "measurement_unit": null,' + sLineBreak +
+                '      "signal_type": null' + sLineBreak +
+                '    },' + sLineBreak +
+                '    "pulses": {' + sLineBreak +
+                '      "output_type": null,' + sLineBreak +
+                '      "representation": null,' + sLineBreak +
+                '      "kp_qmax": null' + sLineBreak +
+                '    }' + sLineBreak +
+                '  },' + sLineBreak +
+                '  "diameters": [],' + sLineBreak +
+                '  "verification_points": [],' + sLineBreak +
+                '  "calculation_parameters": {' + sLineBreak +
+                '    "dynamic_range": null,' + sLineBreak +
+                '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+                '  },' + sLineBreak +
+                '  "deepseek_result": {' + sLineBreak +
+                '    "status": null,' + sLineBreak +
+                '    "warnings": [],' + sLineBreak +
+                '    "missing_fields": [],' + sLineBreak +
+                '    "raw_notes": null' + sLineBreak +
+                '  }' + sLineBreak +
+                '}';
+
+              if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+                ApplyDeepSeekJsonToType(DeepSeekResponse);
+            end;
+
+            // Удаляем исходный PDF после успешной конвертации в текст.
+            if FileExists(TxtPath) and FileExists(FilePath) then
+              TFile.Delete(FilePath);
           end;
         end;
       end;
