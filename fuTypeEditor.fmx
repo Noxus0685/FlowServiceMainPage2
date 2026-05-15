@@ -62,7 +62,6 @@ object FormTypeEditor: TFormTypeEditor
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
-      OnClick = btnPdfToTextClick
     end
     object btnOK: TCornerButton
       Align = Right
