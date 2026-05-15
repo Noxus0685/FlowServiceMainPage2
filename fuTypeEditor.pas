@@ -33,9 +33,11 @@ uses
   System.Math,
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
+  System.Net.Mime,
   System.Net.URLClient,
   System.NetEncoding,
   System.Rtti,
+  System.StrUtils,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -217,6 +219,7 @@ type
     GroupBox1: TGroupBox;
     lytButtons: TLayout;
     btnOK: TCornerButton;
+    btnPdfToText: TCornerButton;
     btnCancel: TCornerButton;
     shdwfct3: TShadowEffect;
     ppmnuCalculateVolume: TPopupMenu;
@@ -337,6 +340,7 @@ type
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
+    procedure btnPdfToTextClick(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
