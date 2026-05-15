@@ -114,6 +114,8 @@ type
       ARow: Integer);
     procedure SaveConfigButtonClick(Sender: TObject);
     procedure DeleteRowButtonClick(Sender: TObject);
+    procedure StringGridCoefsDataKeyDown(Sender: TObject; var Key: Word;
+      var KeyChar: Char; Shift: TShiftState);
     procedure RefreshConfigButtonClick(Sender: TObject);
     procedure LoadConfigButtonClick(Sender: TObject);
     procedure StringGridDimensionsSelChanged(Sender: TObject);
@@ -238,6 +240,7 @@ end;
 
 procedure TFormMeterValues.FormShow(Sender: TObject);
 begin
+  StringGridCoefsData.OnKeyDown := StringGridCoefsDataKeyDown;
   if MeterValue <> nil then
   begin
     UpdateLayoutCommonSettings;
@@ -247,6 +250,17 @@ begin
     UpdateStringGridCoefs;
     UpdateLayoutCoefs;
     UpdateLayoutValuesList;
+  end;
+end;
+
+procedure TFormMeterValues.StringGridCoefsDataKeyDown(Sender: TObject;
+  var Key: Word; var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkDelete then
+  begin
+    DeleteRowButtonClick(DeleteRowButton);
+    Key := 0;
+    KeyChar := #0;
   end;
 end;
 

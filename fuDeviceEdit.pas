@@ -301,6 +301,8 @@ type
     procedure GridPointsHeaderClick(Column: TColumn);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
+    procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
 
 
   private
@@ -368,6 +370,8 @@ type
      procedure ButtonCoefAddClick(Sender: TObject);
      procedure ButtonCoefDeleteClick(Sender: TObject);
      procedure ButtonCoefClearClick(Sender: TObject);
+     procedure GridCoefsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+       Shift: TShiftState);
 
      procedure  UpdateComboEditDN;
 
@@ -852,6 +856,17 @@ begin
   UpdatePointsGrid;  // обновить UI
 end;
 
+procedure TFormDeviceEditor.GridPointsKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkDelete then
+  begin
+    ButtonPointDeleteClick(ButtonPointDelete);
+    Key := 0;
+    KeyChar := #0;
+  end;
+end;
+
 procedure TFormDeviceEditor.ButtonPointsClearClick(Sender: TObject);
 var
   I: Integer;
@@ -1254,6 +1269,7 @@ begin
   FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
   FGridCoefs.OnGetValue := GridCoefsGetValue;
   FGridCoefs.OnSetValue := GridCoefsSetValue;
+  FGridCoefs.OnKeyDown := GridCoefsKeyDown;
 
   NewCol('Наименование', 170);
   NewCol('Value', 90);
@@ -1265,6 +1281,17 @@ begin
 
   FTabControlMain.ActiveTab := FTabItemDevice;
   FCoefsTabInitialized := True;
+end;
+
+procedure TFormDeviceEditor.GridCoefsKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkDelete then
+  begin
+    ButtonCoefDeleteClick(FButtonCoefDelete);
+    Key := 0;
+    KeyChar := #0;
+  end;
 end;
 
 procedure TFormDeviceEditor.UpdateCoefsGrid;
@@ -1401,6 +1428,7 @@ var
   FoundRepo: TTypeRepository;
 begin
   InitCoefsTab;
+  GridPoints.OnKeyDown := GridPointsKeyDown;
 
   FLoading := True;
   try
