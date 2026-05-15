@@ -356,10 +356,12 @@ type
     procedure GridDiametersHeaderClick(Column: TColumn);
     // Выбор PDF-файла вручную через диалог.
     function SelectPdfFile(var APdfFilePath: string): Boolean;
-    // Выбор пути сохранения TXT-файла вручную через диалог.
-    function SelectTxtSaveFile(var ATxtFilePath: string): Boolean;
     // Извлечение текстового слоя из PDF через pdftotext.exe.
     function ExtractTextLayerFromPdf(const APdfFilePath, AOutputTxtPath: string): Boolean;
+    // Отправка текста и JSON-шаблона в DeepSeek.
+    function SendTextToDeepSeekTemplate(const AText, ATemplate: string; out AResponse: string): Boolean;
+    // Применение JSON-ответа DeepSeek к форме типа прибора.
+    function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
 
   private
     { Private declarations }
@@ -1530,25 +1532,6 @@ begin
   ModalResult := mrCancel;
 end;
 
-procedure TFormTypeEditor.btnPdfToTextClick(Sender: TObject);
-var
-  TxtFilePath: string;
-begin
-  // Выбираем PDF-файл вручную.
-  if not SelectPdfFile(FilePath) then
-    Exit;
-
-  // Предлагаем пользователю выбрать, куда сохранить TXT.
-  if not SelectTxtSaveFile(TxtFilePath) then
-    Exit;
-
-  // Извлекаем текстовый слой PDF через pdftotext.exe.
-  if not ExtractTextLayerFromPdf(FilePath, TxtFilePath) then
-    Exit;
-
-  ShowMessage('Текст из PDF успешно сохранён');
-end;
-
 function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
 var
   OpenDialog: TOpenDialog;
@@ -1567,26 +1550,6 @@ begin
     end;
   finally
     OpenDialog.Free;
-  end;
-end;
-
-function TFormTypeEditor.SelectTxtSaveFile(var ATxtFilePath: string): Boolean;
-var
-  SaveDialog: TSaveDialog;
-begin
-  Result := False;
-  SaveDialog := TSaveDialog.Create(Self);
-  try
-    SaveDialog.Filter := 'Text files (*.txt)|*.txt';
-    SaveDialog.DefaultExt := 'txt';
-
-    if SaveDialog.Execute then
-    begin
-      ATxtFilePath := SaveDialog.FileName;
-      Result := True;
-    end;
-  finally
-    SaveDialog.Free;
   end;
 end;
 
@@ -1648,6 +1611,171 @@ begin
   end;
 
   Result := True;
+end;
+
+function TFormTypeEditor.SendTextToDeepSeekTemplate(const AText, ATemplate: string;
+  out AResponse: string): Boolean;
+var
+  Http: TNetHTTPClient;
+  ReqBody: TStringStream;
+  Resp: IHTTPResponse;
+  JsonReq, MsgSys, MsgUser: TJSONObject;
+  Messages: TJSONArray;
+  ApiKey: string;
+  LimitedText: string;
+const
+  MAX_TEXT_LENGTH = 12000;
+begin
+  Result := False;
+  AResponse := '';
+  ApiKey := 'sk-3b7259d5fd2642b5b394f3d839d83fc7';
+  if Length(AText) > MAX_TEXT_LENGTH then
+    LimitedText := Copy(AText, 1, MAX_TEXT_LENGTH)
+  else
+    LimitedText := AText;
+
+  JsonReq := TJSONObject.Create;
+  Messages := TJSONArray.Create;
+  MsgSys := TJSONObject.Create;
+  MsgUser := TJSONObject.Create;
+  ReqBody := nil;
+  Http := TNetHTTPClient.Create(nil);
+  try
+    MsgSys.AddPair('role', 'system');
+    MsgSys.AddPair('content', 'Ты инженер-метролог. Заполни шаблон JSON на основе текста.');
+    MsgUser.AddPair('role', 'user');
+    MsgUser.AddPair('content',
+      'Заполни JSON по данным из переданного текста или PDF.' + sLineBreak +
+      'Верни только JSON без пояснений.' + sLineBreak +
+      'Не добавляй markdown.' + sLineBreak +
+      'Не добавляй ```json.' + sLineBreak +
+      'Если данных нет — оставь null.' + sLineBreak +
+      'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
+      'Числа возвращай без единиц измерения.' + sLineBreak +
+      'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
+      'Структуру JSON не менять.' + sLineBreak + sLineBreak +
+      'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
+      'Текст:' + sLineBreak + LimitedText);
+    Messages.Add(MsgSys);
+    Messages.Add(MsgUser);
+    JsonReq.AddPair('model', 'deepseek-chat');
+    JsonReq.AddPair('messages', Messages);
+    JsonReq.AddPair('temperature', TJSONNumber.Create(0));
+    JsonReq.AddPair('stream', TJSONBool.Create(False));
+    ReqBody := TStringStream.Create(JsonReq.ToJSON, TEncoding.UTF8);
+
+    Http.CustomHeaders['Authorization'] := 'Bearer ' + ApiKey;
+    Http.CustomHeaders['Content-Type'] := 'application/json';
+    Resp := Http.Post('https://api.deepseek.com/chat/completions', ReqBody);
+    AResponse := Resp.ContentAsString(TEncoding.UTF8);
+    Result := Resp.StatusCode = 200;
+  finally
+    Http.Free;
+    ReqBody.Free;
+    JsonReq.Free;
+  end;
+end;
+
+function TFormTypeEditor.ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
+var
+  Root, DeviceTypeObj, GeneralInfoObj: TJSONObject;
+  DiametersArr, PointsArr: TJSONArray;
+  DObj, PObj: TJSONObject;
+  D: TDiameter;
+  P: TTypePoint;
+  I: Integer;
+  JsonVal: TJSONValue;
+begin
+  Result := False;
+  JsonVal := TJSONObject.ParseJSONValue(AResponse);
+  try
+    if not (JsonVal is TJSONObject) then
+      Exit;
+    Root := JsonVal as TJSONObject;
+
+    DeviceTypeObj := Root.GetValue('device_type') as TJSONObject;
+    if DeviceTypeObj = nil then
+      Exit;
+    GeneralInfoObj := DeviceTypeObj.GetValue('general_info') as TJSONObject;
+    if GeneralInfoObj = nil then
+      Exit;
+
+    if GeneralInfoObj.GetValue('name') <> nil then
+      FType.Name := GeneralInfoObj.GetValue<string>('name', FType.Name);
+    if GeneralInfoObj.GetValue('manufacturer') <> nil then
+      FType.Manufacturer := GeneralInfoObj.GetValue<string>('manufacturer', FType.Manufacturer);
+    if GeneralInfoObj.GetValue('modification') <> nil then
+      FType.Modification := GeneralInfoObj.GetValue<string>('modification', FType.Modification);
+    if GeneralInfoObj.GetValue('procedure') <> nil then
+      FType.VerificationMethod := GeneralInfoObj.GetValue<string>('procedure', FType.VerificationMethod);
+    if GeneralInfoObj.GetValue('grsi_number') <> nil then
+      FType.ReestrNumber := GeneralInfoObj.GetValue<string>('grsi_number', FType.ReestrNumber);
+    if GeneralInfoObj.GetValue('mpi') <> nil then
+      FType.IVI := GeneralInfoObj.GetValue<Integer>('mpi', FType.IVI);
+    if GeneralInfoObj.GetValue('accuracy_class') <> nil then
+      FType.AccuracyClass := GeneralInfoObj.GetValue<string>('accuracy_class', FType.AccuracyClass);
+    if GeneralInfoObj.GetValue('base_error') <> nil then
+      FType.Error := GeneralInfoObj.GetValue<Double>('base_error', FType.Error);
+
+    DiametersArr := Root.GetValue('diameters') as TJSONArray;
+    if DiametersArr <> nil then
+    begin
+      FDiametersLocal.Clear;
+      for I := 0 to DiametersArr.Count - 1 do
+      begin
+        DObj := DiametersArr.Items[I] as TJSONObject;
+        if DObj = nil then
+          Continue;
+        D := TDiameter.Create(FType.UUID);
+        D.Enable := DObj.GetValue<Boolean>('enabled', True);
+        D.Name := DObj.GetValue<string>('name', '');
+        D.DN := DObj.GetValue<string>('dn_mm', '');
+        D.Qmax := DObj.GetValue<Double>('qmax_l_s', 0);
+        D.Qnom := DObj.GetValue<Double>('qnom_l_s', 0);
+        D.Qtr := DObj.GetValue<Double>('qtr_l_s', 0);
+        D.Q2tr := DObj.GetValue<Double>('q2tr_l_s', 0);
+        D.Qmin := DObj.GetValue<Double>('qmin_l_s', 0);
+        D.Kp := DObj.GetValue<Double>('kp_imp_l', 0);
+        D.QFmax := DObj.GetValue<Double>('qf_l_s', 0);
+        D.State := osAdded;
+        FDiametersLocal.Add(D);
+      end;
+    end;
+
+    PointsArr := Root.GetValue('verification_points') as TJSONArray;
+    if PointsArr <> nil then
+    begin
+      FPointsLocal.Clear;
+      for I := 0 to PointsArr.Count - 1 do
+      begin
+        PObj := PointsArr.Items[I] as TJSONObject;
+        if PObj = nil then
+          Continue;
+        P := TTypePoint.Create(FType.UUID);
+        P.Enable := PObj.GetValue<Boolean>('enabled', True);
+        P.Name := PObj.GetValue<string>('name', '');
+        P.FlowRate := PObj.GetValue<Double>('q_qmax', 0);
+        P.LimitVolume := PObj.GetValue<Double>('volume_l', 0);
+        P.LimitImp := PObj.GetValue<Integer>('impulses_count', 0);
+        P.LimitTime := PObj.GetValue<Double>('time_s', 0);
+        P.Error := PObj.GetValue<Double>('error_percent', 0);
+        P.FlowAccuracy := PObj.GetValue<string>('expanded_uncertainty_percent', '');
+        P.Pause := PObj.GetValue<Integer>('stabilization_time_s', 0);
+        P.RepeatsProtocol := PObj.GetValue<Integer>('repeat_count', 0);
+        P.Repeats := PObj.GetValue<Integer>('measurement_series_count', 0);
+        P.Pressure := PObj.GetValue<Double>('pressure', 0);
+        P.State := osAdded;
+        FPointsLocal.Add(P);
+      end;
+    end;
+
+    Result := True;
+    UpdateUIFromType;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+  finally
+    JsonVal.Free;
+  end;
 end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
@@ -4352,6 +4480,10 @@ var
   FileName: string;
   FilePath: string;
   FileStream: TFileStream;
+  TxtPath: string;
+  PdfText: string;
+  JsonTemplate: string;
+  DeepSeekResponse: string;
 
   DevType: TDeviceType;
 
@@ -4596,6 +4728,56 @@ begin
               try
                 NetHTTPClient1.Get(DocUrl, FileStream);
                 DevType.Documentation := FilePath;
+                TxtPath := ChangeFileExt(FilePath, '.txt');
+                if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+                begin
+                  PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+                  JsonTemplate :=
+                    '{' + sLineBreak +
+                    '  "device_type": {' + sLineBreak +
+                    '    "general_info": {' + sLineBreak +
+                    '      "name": null,' + sLineBreak +
+                    '      "category": null,' + sLineBreak +
+                    '      "manufacturer": null,' + sLineBreak +
+                    '      "modification": null,' + sLineBreak +
+                    '      "procedure": null,' + sLineBreak +
+                    '      "grsi_number": null,' + sLineBreak +
+                    '      "valid_from": null,' + sLineBreak +
+                    '      "valid_to": null,' + sLineBreak +
+                    '      "mpi": null,' + sLineBreak +
+                    '      "verification_method": null,' + sLineBreak +
+                    '      "accuracy_class": null,' + sLineBreak +
+                    '      "base_error": null,' + sLineBreak +
+                    '      "report_form_file": null' + sLineBreak +
+                    '    },' + sLineBreak +
+                    '    "signal": {' + sLineBreak +
+                    '      "measured_value": null,' + sLineBreak +
+                    '      "measurement_unit": null,' + sLineBreak +
+                    '      "signal_type": null' + sLineBreak +
+                    '    },' + sLineBreak +
+                    '    "pulses": {' + sLineBreak +
+                    '      "output_type": null,' + sLineBreak +
+                    '      "representation": null,' + sLineBreak +
+                    '      "kp_qmax": null' + sLineBreak +
+                    '    }' + sLineBreak +
+                    '  },' + sLineBreak +
+                    '  "diameters": [],' + sLineBreak +
+                    '  "verification_points": [],' + sLineBreak +
+                    '  "calculation_parameters": {' + sLineBreak +
+                    '    "dynamic_range": null,' + sLineBreak +
+                    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+                    '  },' + sLineBreak +
+                    '  "deepseek_result": {' + sLineBreak +
+                    '    "status": null,' + sLineBreak +
+                    '    "warnings": [],' + sLineBreak +
+                    '    "missing_fields": [],' + sLineBreak +
+                    '    "raw_notes": null' + sLineBreak +
+                    '  }' + sLineBreak +
+                    '}';
+
+                  if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+                    ApplyDeepSeekJsonToType(DeepSeekResponse);
+                end;
               except
                 on E: ENetHTTPClientException do
                   MemoLog.Lines.Add('ERROR: ' + E.Message);
