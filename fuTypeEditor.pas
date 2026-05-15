@@ -575,6 +575,7 @@ begin
 
   ACombo.Items.BeginUpdate;
   try
+    try
     ACombo.Items.Clear;
     for SpillageType in CSpillageTypeList do
       ACombo.Items.Add(GetSpillageTypeStr(SpillageType));
@@ -1793,7 +1794,7 @@ begin
         P.RepeatsProtocol := PObj.GetValue<Integer>('repeat_count', 0);
         P.Repeats := PObj.GetValue<Integer>('measurement_series_count', 0);
         P.Pressure := PObj.GetValue<Double>('pressure', 0);
-        P.State := osNew;
+        P.State := osAdded;
         FPointsLocal.Add(P);
       end;
     end;
@@ -4553,6 +4554,7 @@ begin
   DevType := FType;
 
   try
+    try
     {=================================================}
     { 1. Поиск ГРСИ → mit_uuid }
     {=================================================}
