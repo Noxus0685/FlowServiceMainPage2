@@ -45,6 +45,25 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 50.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
+    object btnPdfToText: TCornerButton
+      Align = Right
+      StyledSettings = [Family, Size, Style]
+      Margins.Top = 10.000000000000000000
+      Margins.Right = 10.000000000000000000
+      Margins.Bottom = 10.000000000000000000
+      Position.X = 1062.000000000000000000
+      Position.Y = 10.000000000000000000
+      Sides = [Top, Left, Bottom, Right]
+      Size.Width = 110.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      Text = 'PDF '#8594' '#1090#1077#1082#1089#1090
+      TextSettings.Trimming = None
+      XRadius = 3.000000000000000000
+      YRadius = 3.000000000000000000
+      OnClick = btnPdfToTextClick
+    end
     object btnOK: TCornerButton
       Align = Right
       StyledSettings = [Family, Size, Style]
@@ -137,7 +156,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 43
+    TabOrder = 44
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
