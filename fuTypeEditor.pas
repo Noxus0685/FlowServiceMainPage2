@@ -396,6 +396,7 @@ type
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
   FilePath: string;
+  FArshinRequestInProgress: Boolean;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
@@ -1623,6 +1624,10 @@ var
   Messages: TJSONArray;
   ApiKey: string;
   LimitedText: string;
+  ApiJson: TJSONObject;
+  Choices: TJSONArray;
+  ChoiceObj, MessageObj: TJSONObject;
+  ContentValue: TJSONValue;
 const
   MAX_TEXT_LENGTH = 12000;
 begin
@@ -1668,7 +1673,31 @@ begin
     Http.CustomHeaders['Content-Type'] := 'application/json';
     Resp := Http.Post('https://api.deepseek.com/chat/completions', ReqBody);
     AResponse := Resp.ContentAsString(TEncoding.UTF8);
-    Result := Resp.StatusCode = 200;
+    if Resp.StatusCode <> 200 then
+      Exit;
+
+    ApiJson := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
+    try
+      if ApiJson = nil then
+        Exit;
+      Choices := ApiJson.GetValue('choices') as TJSONArray;
+      if (Choices = nil) or (Choices.Count = 0) then
+        Exit;
+      ChoiceObj := Choices.Items[0] as TJSONObject;
+      if ChoiceObj = nil then
+        Exit;
+      MessageObj := ChoiceObj.GetValue('message') as TJSONObject;
+      if MessageObj = nil then
+        Exit;
+      ContentValue := MessageObj.GetValue('content');
+      if ContentValue = nil then
+        Exit;
+
+      AResponse := Trim(ContentValue.Value);
+      Result := AResponse <> '';
+    finally
+      ApiJson.Free;
+    end;
   finally
     Http.Free;
     ReqBody.Free;
@@ -4493,6 +4522,10 @@ var
   Y, M, D: Word;
   Dt: TDateTime;
 begin
+  if FArshinRequestInProgress then
+    Exit;
+  FArshinRequestInProgress := True;
+  sbFindReestrNumber.Enabled := False;
 
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
@@ -4864,6 +4897,9 @@ begin
   except
     on E: Exception do
       MemoLog.Lines.Add('ERROR: ' + E.Message);
+  finally
+    sbFindReestrNumber.Enabled := True;
+    FArshinRequestInProgress := False;
   end;
 end;
 
