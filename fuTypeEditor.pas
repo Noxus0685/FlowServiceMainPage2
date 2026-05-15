@@ -557,7 +557,6 @@ begin
     Exit;
 
   try
-    try
     WaitForSingleObject(ProcInfo.hProcess, INFINITE);
     GetExitCodeProcess(ProcInfo.hProcess, Result);
   finally
