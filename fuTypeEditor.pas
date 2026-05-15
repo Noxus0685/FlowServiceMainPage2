@@ -37,6 +37,7 @@ uses
   System.Net.URLClient,
   System.NetEncoding,
   System.Rtti,
+  System.StrUtils,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -359,6 +360,8 @@ type
     function ExtractTextFromPdfByOcr(const APdfFilePath: string): string;
     // Сохранение распознанного текста в отдельный TXT-файл.
     procedure SaveExtractedPdfText(const AText: string);
+    // Определение количества страниц PDF по содержимому файла.
+    function GetPdfPageCount(const APdfFilePath: string): Integer;
 
   private
     { Private declarations }
@@ -1544,6 +1547,12 @@ var
   ParsedItem: TJSONObject;
   ParsedTextValue: TJSONValue;
   ErrorMessageValue: TJSONValue;
+  I: Integer;
+  PageCount: Integer;
+  PageStart: Integer;
+  PageEnd: Integer;
+  ResponseText: string;
+  ChunkText: string;
 begin
   Result := '';
 
@@ -1561,74 +1570,140 @@ begin
     Exit;
   end;
 
-  // Отправляем PDF-файл во внешний OCR API (OCR.space).
+  // Определяем количество страниц PDF для разбиения по 3 страницы.
+  PageCount := GetPdfPageCount(APdfFilePath);
+  if PageCount <= 0 then
+  begin
+    ShowMessage('Не удалось определить количество страниц PDF');
+    Exit;
+  end;
+
+  // Отправляем PDF-файл во внешний OCR API (OCR.space) частями по 3 страницы.
   Http := TNetHTTPClient.Create(nil);
-  FormData := TMultipartFormData.Create;
   try
     Http.ConnectionTimeout := 60000;
     Http.ResponseTimeout := 180000;
-    Http.ContentType := 'multipart/form-data';
-
-    FormData.AddField('language', 'rus');
-    FormData.AddField('isOverlayRequired', 'false');
-    FormData.AddField('isCreateSearchablePdf', 'false');
-    FormData.AddField('scale', 'true');
-    FormData.AddField('OCREngine', '2');
-    FormData.AddFile('file', APdfFilePath, 'application/pdf');
-
     Http.CustomHeaders['apikey'] := OCR_SPACE_API_KEY;
-    Resp := Http.Post(OCR_SPACE_URL, FormData);
 
-    if Resp = nil then
+    PageStart := 1;
+    while PageStart <= PageCount do
     begin
-      ShowMessage('OCR API не вернул ответ');
-      Exit;
-    end;
+      PageEnd := PageStart + 2;
+      if PageEnd > PageCount then
+        PageEnd := PageCount;
 
-    if (Resp.StatusCode < 200) or (Resp.StatusCode >= 300) then
-    begin
-      ShowMessage('Ошибка OCR API. Код: ' + Resp.StatusCode.ToString);
-      Exit;
-    end;
+      FormData := TMultipartFormData.Create;
+      try
+        FormData.AddField('language', 'rus');
+        FormData.AddField('isOverlayRequired', 'false');
+        FormData.AddField('isCreateSearchablePdf', 'false');
+        FormData.AddField('scale', 'true');
+        FormData.AddField('OCREngine', '2');
+        FormData.AddField('pages', Format('%d-%d', [PageStart, PageEnd]));
+        FormData.AddFile('file', APdfFilePath, 'application/pdf');
 
-    Json := TJSONObject.ParseJSONValue(Resp.ContentAsString(TEncoding.UTF8)) as TJSONObject;
-    try
-      if Json = nil then
+        Resp := Http.Post(OCR_SPACE_URL, FormData);
+      finally
+        FormData.Free;
+      end;
+
+      if Resp = nil then
       begin
-        ShowMessage('OCR API вернул некорректный JSON');
+        ShowMessage('OCR API не вернул ответ');
         Exit;
       end;
 
-      if SameText(Json.GetValue<string>('IsErroredOnProcessing', 'False'), 'True') then
+      if (Resp.StatusCode < 200) or (Resp.StatusCode >= 300) then
       begin
-        ErrorMessageValue := Json.GetValue('ErrorMessage');
-        if ErrorMessageValue <> nil then
-          ShowMessage('OCR ошибка: ' + ErrorMessageValue.ToJSON)
-        else
-          ShowMessage('OCR вернул ошибку обработки PDF');
+        ShowMessage('Ошибка OCR API. Код: ' + Resp.StatusCode.ToString);
         Exit;
       end;
 
-      ParsedResults := Json.GetValue<TJSONArray>('ParsedResults');
-      if (ParsedResults <> nil) and (ParsedResults.Count > 0) then
-      begin
-        ParsedItem := ParsedResults.Items[0] as TJSONObject;
-        if ParsedItem <> nil then
+      ResponseText := Resp.ContentAsString(TEncoding.UTF8);
+      Json := TJSONObject.ParseJSONValue(ResponseText) as TJSONObject;
+      try
+        if Json = nil then
         begin
-          ParsedTextValue := ParsedItem.GetValue('ParsedText');
-          if ParsedTextValue <> nil then
-            Result := ParsedTextValue.Value;
+          ShowMessage('OCR API вернул некорректный JSON');
+          Exit;
         end;
+
+        if SameText(Json.GetValue<string>('IsErroredOnProcessing', 'False'), 'True') then
+        begin
+          ErrorMessageValue := Json.GetValue('ErrorMessage');
+          if ErrorMessageValue <> nil then
+            ShowMessage('OCR ошибка: ' + ErrorMessageValue.ToJSON)
+          else
+            ShowMessage('OCR вернул ошибку обработки PDF');
+          Exit;
+        end;
+
+        ParsedResults := Json.GetValue<TJSONArray>('ParsedResults');
+        if (ParsedResults <> nil) and (ParsedResults.Count > 0) then
+        begin
+          ChunkText := '';
+          for I := 0 to ParsedResults.Count - 1 do
+          begin
+            ParsedItem := ParsedResults.Items[I] as TJSONObject;
+            if ParsedItem <> nil then
+            begin
+              ParsedTextValue := ParsedItem.GetValue('ParsedText');
+              if ParsedTextValue <> nil then
+                ChunkText := ChunkText + ParsedTextValue.Value + sLineBreak;
+            end;
+          end;
+
+          if Trim(ChunkText) <> '' then
+            Result := Result + ChunkText;
+        end;
+      finally
+        Json.Free;
       end;
-      if Trim(Result) = '' then
-        ShowMessage('OCR API не вернул ParsedText');
-    finally
-      Json.Free;
+
+      PageStart := PageEnd + 1;
     end;
+
+    if Trim(Result) = '' then
+      ShowMessage('OCR API не вернул ParsedText');
   finally
-    FormData.Free;
     Http.Free;
   end;
+end;
+
+function TFormTypeEditor.GetPdfPageCount(const APdfFilePath: string): Integer;
+var
+  PdfBytes: TBytes;
+  PdfText: string;
+  SearchFrom: Integer;
+  FoundPos: Integer;
+const
+  PAGE_MARKER = '/Type /Page';
+begin
+  Result := 0;
+
+  // Считываем PDF и считаем вхождения маркера страниц.
+  if not FileExists(APdfFilePath) then
+    Exit;
+
+  PdfBytes := TFile.ReadAllBytes(APdfFilePath);
+  if Length(PdfBytes) = 0 then
+    Exit;
+
+  PdfText := TEncoding.ANSI.GetString(PdfBytes);
+  SearchFrom := 1;
+  while True do
+  begin
+    FoundPos := PosEx(PAGE_MARKER, PdfText, SearchFrom);
+    if FoundPos = 0 then
+      Break;
+
+    Inc(Result);
+    SearchFrom := FoundPos + Length(PAGE_MARKER);
+  end;
+
+  // Если точный подсчёт не удался — используем минимум 1 страницу.
+  if Result <= 0 then
+    Result := 1;
 end;
 
 procedure TFormTypeEditor.SaveExtractedPdfText(const AText: string);
