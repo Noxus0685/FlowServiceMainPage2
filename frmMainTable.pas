@@ -503,6 +503,7 @@ type
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
+  FProtocolHostScroll: TVertScrollBox;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
   FFrameChannelProperties: TFrameChannelProperties;
     { Private declarations }
@@ -726,6 +727,7 @@ begin
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
+  FreeAndNil(FProtocolHostScroll);
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FFrameChannelProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
@@ -1383,8 +1385,16 @@ begin
 
   if FFrameProtocol = nil then
   begin
+    if FProtocolHostScroll = nil then
+    begin
+      FProtocolHostScroll := TVertScrollBox.Create(Self);
+      FProtocolHostScroll.Parent := LayoutProtocolHost;
+      FProtocolHostScroll.Align := TAlignLayout.Client;
+      FProtocolHostScroll.Stored := False;
+      FProtocolHostScroll.ShowScrollBars := True;
+    end;
     FFrameProtocol := TFrameProtocol.Create(Self);
-    FFrameProtocol.Parent := LayoutProtocolHost;
+    FFrameProtocol.Parent := FProtocolHostScroll;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
 
@@ -2457,8 +2467,16 @@ begin
 
   if FFrameProtocol = nil then
   begin
+    if FProtocolHostScroll = nil then
+    begin
+      FProtocolHostScroll := TVertScrollBox.Create(Self);
+      FProtocolHostScroll.Parent := LayoutProtocolHost;
+      FProtocolHostScroll.Align := TAlignLayout.Client;
+      FProtocolHostScroll.Stored := False;
+      FProtocolHostScroll.ShowScrollBars := True;
+    end;
     FFrameProtocol := TFrameProtocol.Create(Self);
-    FFrameProtocol.Parent := LayoutProtocolHost;
+    FFrameProtocol.Parent := FProtocolHostScroll;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
 
@@ -2810,7 +2828,7 @@ var
   LinkedChannel: TChannel;
   I: Integer;
   SelectedUUID: string;
-  OldDeviceUUID: string;
+  OldDeviceUUID : string;
 begin
   if AChannel = nil then
     Exit;
@@ -3516,13 +3534,9 @@ begin
     if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
       Continue;
 
-    if DeviceChannel.ValueCurrent<>nil then
     DeviceChannel.ValueCurrent.SetValue(DeviceChannel.CurSec);
-    if DeviceChannel.ValueImp<>nil then
     DeviceChannel.ValueImp.SetValue(DeviceChannel.ImpSec);
-    if DeviceChannel.ValueImpTotal<>nil then
     DeviceChannel.ValueImpTotal.SetValue(DeviceChannel.ImpResult);
-    if DeviceChannel.ValueInterface<>nil then
     DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
   end;
 
