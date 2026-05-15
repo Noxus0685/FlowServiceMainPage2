@@ -576,6 +576,7 @@ begin
 
   ACombo.Items.BeginUpdate;
   try
+    try
     ACombo.Items.Clear;
     for SpillageType in CSpillageTypeList do
       ACombo.Items.Add(GetSpillageTypeStr(SpillageType));
@@ -1568,10 +1569,30 @@ begin
     '      "accuracy_class": null,' + sLineBreak +
     '      "base_error": null,' + sLineBreak +
     '      "report_form_file": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "signal": {' + sLineBreak +
+    '      "measured_value": null,' + sLineBreak +
+    '      "measurement_unit": null,' + sLineBreak +
+    '      "signal_type": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "pulses": {' + sLineBreak +
+    '      "output_type": null,' + sLineBreak +
+    '      "representation": null,' + sLineBreak +
+    '      "kp_qmax": null' + sLineBreak +
     '    }' + sLineBreak +
     '  },' + sLineBreak +
     '  "diameters": [],' + sLineBreak +
-    '  "verification_points": []' + sLineBreak +
+    '  "verification_points": [],' + sLineBreak +
+    '  "calculation_parameters": {' + sLineBreak +
+    '    "dynamic_range": null,' + sLineBreak +
+    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "deepseek_result": {' + sLineBreak +
+    '    "status": null,' + sLineBreak +
+    '    "warnings": [],' + sLineBreak +
+    '    "missing_fields": [],' + sLineBreak +
+    '    "raw_notes": null' + sLineBreak +
+    '  }' + sLineBreak +
     '}';
 
   if not SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
@@ -1843,7 +1864,7 @@ begin
         D.Qmin := DObj.GetValue<Double>('qmin_l_s', 0);
         D.Kp := DObj.GetValue<Double>('kp_imp_l', 0);
         D.QFmax := DObj.GetValue<Double>('qf_l_s', 0);
-        D.State := osNew;
+        D.State := osAdded;
         FDiametersLocal.Add(D);
       end;
     end;
