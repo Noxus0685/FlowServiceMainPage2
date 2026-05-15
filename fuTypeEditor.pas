@@ -557,6 +557,7 @@ begin
     Exit;
 
   try
+    try
     WaitForSingleObject(ProcInfo.hProcess, INFINITE);
     GetExitCodeProcess(ProcInfo.hProcess, Result);
   finally
@@ -1766,7 +1767,7 @@ begin
         D.Qmin := DObj.GetValue<Double>('qmin_l_s', 0);
         D.Kp := DObj.GetValue<Double>('kp_imp_l', 0);
         D.QFmax := DObj.GetValue<Double>('qf_l_s', 0);
-        D.State := osNew;
+        D.State := osAdded;
         FDiametersLocal.Add(D);
       end;
     end;
@@ -4894,9 +4895,10 @@ begin
 
     ShowMessage('ГРСИ подтверждено. Данные загружены из АРШИН');
 
-  except
-    on E: Exception do
-      MemoLog.Lines.Add('ERROR: ' + E.Message);
+    except
+      on E: Exception do
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+    end;
   finally
     sbFindReestrNumber.Enabled := True;
     FArshinRequestInProgress := False;
