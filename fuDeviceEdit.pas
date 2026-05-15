@@ -41,7 +41,8 @@ uses
   uClasses,
   uDataManager,
   uDeviceClass,
-  uRepositories;
+  uRepositories,
+  uProtocols;
 
 type
   TFormDeviceEditor = class(TForm)
@@ -306,6 +307,8 @@ type
     { Private declarations }
      FDevice: TDevice;
      FOriginalDevice: TDevice;
+     FInitialTypeUUID: string;
+     FTypeChangedDuringEdit: Boolean;
 
 
      FDeviceType: TDeviceType; // ссылка на найденный тип
@@ -371,6 +374,7 @@ type
   public
     { Public declarations }
      procedure LoadDevice(ADevice: TDevice);
+     procedure WriteDeviceEditActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   end;
 
 var
@@ -640,6 +644,19 @@ begin
   FillConversionCoefVolume;
 end;
 
+
+procedure TFormDeviceEditor.WriteDeviceEditActionLog(const AAction: string; ADevice: TDevice; const ADetails: string);
+var
+  Details: string;
+begin
+  if (ADevice = nil) or (ProtocolManager = nil) then Exit;
+  Details := Format('Action=%s; Form=%s; Object=%s; UUID=%s; Name=%s; Serial=%s; TypeUUID=%s; TypeName=%s; Time=%s',
+    [AAction, 'fuDeviceEdit', 'Device', string(ADevice.UUID), ADevice.Name, ADevice.SerialNumber,
+     string(ADevice.DeviceTypeUUID), ADevice.DeviceTypeName, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
+  if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
+  ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
+end;
+
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
 begin
   // Отменяем все изменения
@@ -653,7 +670,8 @@ begin
       AppServices.DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
 
       // Закрываем форму с результатом Cancel
-      ModalResult := mrCancel;
+      WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
+    ModalResult := mrCancel;
     end;
   end
   else
@@ -901,11 +919,22 @@ begin
         { редактирование существующего }
         FOriginalDevice.Assign(FDevice,True);
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+        if not FTypeChangedDuringEdit then
+          WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
       end
       else
       begin
         { новый прибор }
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
+        if not FTypeChangedDuringEdit then
+          WriteDeviceEditActionLog('Сохранён прибор', FDevice);
+      end;
+
+      if not SameText(FInitialTypeUUID, string(FDevice.DeviceTypeUUID)) then
+      begin
+        FTypeChangedDuringEdit := True;
+        WriteDeviceEditActionLog('Изменен тип прибора', FDevice,
+          'OldTypeUUID=' + FInitialTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
       end;
     end
     else if ModalResult = mrCancel then
@@ -1390,6 +1419,8 @@ begin
       FOriginalDevice := ADevice;
       //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
+      FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
+      FTypeChangedDuringEdit := False;
     end
     else
     begin
@@ -1401,6 +1432,9 @@ begin
         FDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
+
+      FInitialTypeUUID := string(FDevice.DeviceTypeUUID);
+      FTypeChangedDuringEdit := False;
     end;
 
     {----------------------------------}
@@ -1492,6 +1526,7 @@ var
   FoundRepo: TTypeRepository;
   NeedFill, IsTypeChanged: Boolean;
   RepoName: string;
+  OldTypeUUID : string;
 
 function AskFillFromType: Boolean;
 begin
@@ -1529,6 +1564,7 @@ begin
     if Frm.ShowModal <> mrOk then
       Exit;
 
+    OldTypeUUID := FDevice.DeviceTypeUUID;
     NewType := Frm.SelectedType;
     if NewType = nil then
       Exit;
@@ -1570,6 +1606,10 @@ begin
   begin
     FDevice.AttachType(NewType, RepoName);
     FDeviceType := NewType;
+    FTypeChangedDuringEdit := not SameText(OldTypeUUID, string(FDevice.DeviceTypeUUID));
+
+    WriteDeviceEditActionLog('Изменён тип прибора', FDevice,
+      'OldTypeUUID=' + OldTypeUUID + '; NewTypeUUID=' + string(FDevice.DeviceTypeUUID));
   end;
 
 
