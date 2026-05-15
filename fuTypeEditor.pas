@@ -251,6 +251,7 @@ type
     MemoLog: TMemo;
     NetHTTPClient1: TNetHTTPClient;
     DeepSeek: TSpeedButton;
+    ButtonSelectPdf: TSpeedButton;
     TabControlMain: TTabControl;
     TabItemDevice: TTabItem;
     TabItemCoefs: TTabItem;
@@ -335,6 +336,7 @@ type
     procedure ceCategoryChange(Sender: TObject);
     procedure sbFindReestrNumberClick(Sender: TObject);
     procedure DeepSeekClick(Sender: TObject);
+    procedure ButtonSelectPdfClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
@@ -378,6 +380,7 @@ type
 
   FCalibrCoefItemsLocal: TObjectList<TCalibrCoefItem>;
   FGridCoefs: TGrid;
+  FDeepSeekFilePath: string; // путь к выбранному PDF для DeepSeek
   FButtonCoefAdd: TButton;
   FButtonCoefDelete: TButton;
   FButtonCoefClear: TButton;
@@ -2482,61 +2485,141 @@ begin
 end;
 
 
+procedure SendPromptAndPdfToDeepSeek(
+  const APromptText: string;
+  const APdfPath: string;
+  out ResponseText: string
+);
+var
+  Http: TNetHTTPClient;
+  ReqBody: TStringStream;
+  Resp: IHTTPResponse;
+  JsonReq, MsgSys, MsgUser: TJSONObject;
+  Messages: TJSONArray;
+  ApiKey: string;
+  PdfBase64: string;
+  PromptText: string;
+begin
+  ApiKey := '';
+  if ApiKey = '' then
+    raise Exception.Create('DEEPSEEK_API_KEY не задан');
+
+  PromptText := Trim(APromptText);
+  if PromptText = '' then
+    PromptText := 'Проанализируй приложенный PDF и верни ключевые параметры.';
+
+  JsonReq := TJSONObject.Create;
+  Messages := TJSONArray.Create;
+  MsgSys := TJSONObject.Create;
+  MsgUser := TJSONObject.Create;
+  ReqBody := nil;
+  Http := nil;
+  try
+    MsgSys.AddPair('role', 'system');
+    MsgSys.AddPair('content', 'Ты инженер-метролог. Отвечай структурированно и по делу.');
+
+    MsgUser.AddPair('role', 'user');
+    if APdfPath <> '' then
+    begin
+      PdfBase64 := TNetEncoding.Base64.EncodeBytesToString(TFile.ReadAllBytes(APdfPath));
+      MsgUser.AddPair('content', PromptText + sLineBreak + sLineBreak +
+        'PDF (base64):' + sLineBreak + PdfBase64);
+    end
+    else
+      MsgUser.AddPair('content', PromptText);
+
+    Messages.Add(MsgSys);
+    Messages.Add(MsgUser);
+
+    JsonReq.AddPair('model', 'deepseek-chat');
+    JsonReq.AddPair('messages', Messages);
+    JsonReq.AddPair('temperature', TJSONNumber.Create(0));
+    JsonReq.AddPair('stream', TJSONBool.Create(False));
+
+    ReqBody := TStringStream.Create(JsonReq.ToJSON, TEncoding.UTF8);
+
+    Http := TNetHTTPClient.Create(nil);
+    Http.CustomHeaders['Authorization'] := 'Bearer ' + ApiKey;
+    Http.CustomHeaders['Content-Type'] := 'application/json';
+
+    Resp := Http.Post('https://api.deepseek.com/chat/completions', ReqBody);
+    ResponseText := Resp.ContentAsString(TEncoding.UTF8);
+  finally
+    Http.Free;
+    ReqBody.Free;
+    JsonReq.Free;
+  end;
+end;
+
+procedure TFormTypeEditor.ButtonSelectPdfClick(Sender: TObject);
+var
+  Dlg: TOpenDialog;
+begin
+  { Выбор PDF-файла для отправки в DeepSeek }
+  Dlg := TOpenDialog.Create(nil);
+  try
+    Dlg.Filter := 'PDF files (*.pdf)|*.pdf';
+    Dlg.Options := Dlg.Options + [TOpenOption.ofFileMustExist];
+
+    if Dlg.Execute then
+    begin
+      FDeepSeekFilePath := Dlg.FileName;
+      if Assigned(edtDocumentation) then
+        edtDocumentation.Text := FDeepSeekFilePath;
+    end;
+  finally
+    Dlg.Free;
+  end;
+end;
+
 procedure TFormTypeEditor.DeepSeekClick(Sender: TObject);
 var
+  PromptText: string;
   FilePath: string;
   AIResponse: string;
 begin
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
 
-  {----------------------------------}
-  { Проверки }
-  {----------------------------------}
-  if FType = nil then
+  { Берём текст запроса из лога }
+  PromptText := Trim(MemoLog.Text);
+  FilePath := Trim(FDeepSeekFilePath);
+
+  if (PromptText = '') and (FilePath = '') then
   begin
-    MemoLog.Lines.Add('Тип прибора не инициализирован');
+    ShowMessage('Введите текст запроса или выберите PDF-файл');
     Exit;
   end;
 
-  FilePath := FType.Documentation;
-
-  if FilePath = '' then
+  if FilePath <> '' then
   begin
-    MemoLog.Lines.Add('Файл описания типа не привязан');
-    ShowMessage('Нет файла описания типа для отправки в DeepSeek');
-    Exit;
+    if not FileExists(FilePath) then
+    begin
+      ShowMessage('Файл не найден: ' + FilePath);
+      Exit;
+    end;
+
+    if not SameText(ExtractFileExt(FilePath), '.pdf') then
+    begin
+      ShowMessage('Выбранный файл не является PDF');
+      Exit;
+    end;
   end;
 
-  if not FileExists(FilePath) then
-  begin
-    MemoLog.Lines.Add('Файл не найден: ' + FilePath);
-    ShowMessage('Файл описания типа не найден');
-    Exit;
-  end;
-
-  {----------------------------------}
-  { Отправка файла в DeepSeek }
-  {----------------------------------}
+  { Отправка текста и/или PDF в DeepSeek }
   try
-    MemoLog.Lines.Add('Отправка описания типа в DeepSeek...');
-    MemoLog.Lines.Add(FilePath);
+    MemoLog.Lines.Add('Отправка запроса в DeepSeek...');
+    if PromptText <> '' then
+      MemoLog.Lines.Add('Текст запроса: заполнен');
+    if FilePath <> '' then
+      MemoLog.Lines.Add('PDF: ' + FilePath);
     MemoLog.Lines.Add('------------------------------');
 
-    SendTypeDescriptionToDeepSeek(
-      FilePath,
-      AIResponse
-    );
+    SendPromptAndPdfToDeepSeek(PromptText, FilePath, AIResponse);
 
     MemoLog.Lines.Add('Ответ DeepSeek:');
     MemoLog.Lines.Add(AIResponse);
     MemoLog.Lines.Add('------------------------------');
-
-    ShowMessage(
-      'DeepSeek обработал описание типа.' + sLineBreak +
-      'Результат выведен в лог.'
-    );
-
   except
     on E: Exception do
     begin
