@@ -217,6 +217,7 @@ type
     GroupBox1: TGroupBox;
     lytButtons: TLayout;
     btnOK: TCornerButton;
+    btnPdfToText: TCornerButton;
     btnCancel: TCornerButton;
     shdwfct3: TShadowEffect;
     ppmnuCalculateVolume: TPopupMenu;
@@ -337,6 +338,7 @@ type
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
+    procedure btnPdfToTextClick(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
@@ -350,6 +352,12 @@ type
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
+    // Выбор PDF-файла вручную через диалог.
+    function SelectPdfFile(var APdfFilePath: string): Boolean;
+    // Выбор пути сохранения TXT-файла вручную через диалог.
+    function SelectTxtSaveFile(var ATxtFilePath: string): Boolean;
+    // Извлечение текстового слоя из PDF через pdftotext.exe.
+    function ExtractTextLayerFromPdf(const APdfFilePath, AOutputTxtPath: string): Boolean;
 
   private
     { Private declarations }
@@ -383,6 +391,7 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
+  FilePath: string;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
@@ -492,6 +501,7 @@ implementation
 uses
 uAppServices
 {$IFDEF MSWINDOWS}
+  , Winapi.Windows
   , Winapi.WinInet
 {$ENDIF}
   ;
@@ -508,6 +518,46 @@ begin
   Result := InternetCheckConnection(PChar(ARSHIN_URL), FLAG_ICC_FORCE_CONNECTION, 0);
 {$ELSE}
   Result := True;
+{$ENDIF}
+end;
+
+function RunProcessAndWait(const AExeFile, AParams: string): Cardinal;
+{$IFDEF MSWINDOWS}
+var
+  StartInfo: TStartupInfo;
+  ProcInfo: TProcessInformation;
+  CmdLine: string;
+{$ENDIF}
+begin
+  Result := Cardinal(-1);
+{$IFDEF MSWINDOWS}
+  ZeroMemory(@StartInfo, SizeOf(StartInfo));
+  ZeroMemory(@ProcInfo, SizeOf(ProcInfo));
+
+  StartInfo.cb := SizeOf(StartInfo);
+  CmdLine := '"' + AExeFile + '" ' + AParams;
+
+  if not CreateProcess(
+    nil,
+    PChar(CmdLine),
+    nil,
+    nil,
+    False,
+    CREATE_NO_WINDOW,
+    nil,
+    nil,
+    StartInfo,
+    ProcInfo
+  ) then
+    Exit;
+
+  try
+    WaitForSingleObject(ProcInfo.hProcess, INFINITE);
+    GetExitCodeProcess(ProcInfo.hProcess, Result);
+  finally
+    CloseHandle(ProcInfo.hProcess);
+    CloseHandle(ProcInfo.hThread);
+  end;
 {$ENDIF}
 end;
 
@@ -1476,6 +1526,126 @@ procedure TFormTypeEditor.btnCancelClick(Sender: TObject);
 begin
   WriteTypeEditActionLog('Редактирование типа прибора отменено', FType);
   ModalResult := mrCancel;
+end;
+
+procedure TFormTypeEditor.btnPdfToTextClick(Sender: TObject);
+var
+  TxtFilePath: string;
+begin
+  // Выбираем PDF-файл вручную.
+  if not SelectPdfFile(FilePath) then
+    Exit;
+
+  // Предлагаем пользователю выбрать, куда сохранить TXT.
+  if not SelectTxtSaveFile(TxtFilePath) then
+    Exit;
+
+  // Извлекаем текстовый слой PDF через pdftotext.exe.
+  if not ExtractTextLayerFromPdf(FilePath, TxtFilePath) then
+    Exit;
+
+  ShowMessage('Текст из PDF успешно сохранён');
+end;
+
+function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
+var
+  OpenDialog: TOpenDialog;
+begin
+  Result := False;
+  OpenDialog := TOpenDialog.Create(Self);
+  try
+    OpenDialog.Filter := 'PDF files (*.pdf)|*.pdf';
+    OpenDialog.DefaultExt := 'pdf';
+    OpenDialog.Options := [TOpenOption.ofFileMustExist];
+
+    if OpenDialog.Execute then
+    begin
+      APdfFilePath := OpenDialog.FileName;
+      Result := True;
+    end;
+  finally
+    OpenDialog.Free;
+  end;
+end;
+
+function TFormTypeEditor.SelectTxtSaveFile(var ATxtFilePath: string): Boolean;
+var
+  SaveDialog: TSaveDialog;
+begin
+  Result := False;
+  SaveDialog := TSaveDialog.Create(Self);
+  try
+    SaveDialog.Filter := 'Text files (*.txt)|*.txt';
+    SaveDialog.DefaultExt := 'txt';
+
+    if SaveDialog.Execute then
+    begin
+      ATxtFilePath := SaveDialog.FileName;
+      Result := True;
+    end;
+  finally
+    SaveDialog.Free;
+  end;
+end;
+
+function TFormTypeEditor.ExtractTextLayerFromPdf(const APdfFilePath,
+  AOutputTxtPath: string): Boolean;
+var
+  PdfToTextPath: string;
+  Params: string;
+  ExitCode: Cardinal;
+begin
+  Result := False;
+
+  // Проверяем, что PDF-файл существует.
+  if not FileExists(APdfFilePath) then
+  begin
+    ShowMessage('PDF-файл не найден');
+    Exit;
+  end;
+
+  // Проверяем, что выбран именно PDF-файл.
+  if not SameText(ExtractFileExt(APdfFilePath), '.pdf') then
+  begin
+    ShowMessage('Выбранный файл не является PDF');
+    Exit;
+  end;
+
+  // Ищем pdftotext.exe рядом с программой.
+  PdfToTextPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'pdftotext.exe');
+  if not FileExists(PdfToTextPath) then
+  begin
+    ShowMessage('Не найден pdftotext.exe рядом с программой');
+    Exit;
+  end;
+
+  // Запускаем pdftotext.exe для извлечения текста в UTF-8.
+  Params := '-layout -enc UTF-8 ' +
+    '"' + APdfFilePath + '" ' +
+    '"' + AOutputTxtPath + '"';
+
+  ExitCode := RunProcessAndWait(PdfToTextPath, Params);
+  if ExitCode <> 0 then
+  begin
+    ShowMessage('Ошибка извлечения текста из PDF. Код: ' + ExitCode.ToString);
+    Exit;
+  end;
+
+  // Проверяем, что файл результата создан.
+  if not FileExists(AOutputTxtPath) then
+  begin
+    ShowMessage('Файл результата не был создан');
+    Exit;
+  end;
+
+  // Проверяем, что текстовый слой действительно найден.
+  if Trim(TFile.ReadAllText(AOutputTxtPath, TEncoding.UTF8)) = '' then
+  begin
+    ShowMessage('В PDF не найден текстовый слой. Для такого файла нужен OCR.');
+    Exit;
+  end;
+
+  Result := True;
 end;
 
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
