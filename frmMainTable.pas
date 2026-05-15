@@ -3534,9 +3534,13 @@ begin
     if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
       Continue;
 
+         if DeviceChannel.ValueCurrent<>nil then
     DeviceChannel.ValueCurrent.SetValue(DeviceChannel.CurSec);
+         if DeviceChannel.ValueImp<>nil then
     DeviceChannel.ValueImp.SetValue(DeviceChannel.ImpSec);
+         if DeviceChannel.ValueImpTotal<>nil then
     DeviceChannel.ValueImpTotal.SetValue(DeviceChannel.ImpResult);
+         if DeviceChannel.ValueInterface<>nil then
     DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
   end;
 
