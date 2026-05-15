@@ -33,6 +33,7 @@ uses
   System.Math,
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
+  System.Net.Mime,
   System.Net.URLClient,
   System.NetEncoding,
   System.Rtti,
@@ -1531,6 +1532,18 @@ begin
 end;
 
 function TFormTypeEditor.ExtractTextFromPdfByOcr(const APdfFilePath: string): string;
+const
+  OCR_SPACE_URL = 'https://api.ocr.space/parse/image';
+  OCR_SPACE_API_KEY = 'K88906835688957';
+var
+  Http: TNetHTTPClient;
+  FormData: TMultipartFormData;
+  Resp: IHTTPResponse;
+  Json: TJSONObject;
+  ParsedResults: TJSONArray;
+  ParsedItem: TJSONObject;
+  ParsedTextValue: TJSONValue;
+  ErrorMessageValue: TJSONValue;
 begin
   Result := '';
 
@@ -1548,7 +1561,74 @@ begin
     Exit;
   end;
 
-  // TODO: Подключить внешний OCR/API и вернуть распознанный текст.
+  // Отправляем PDF-файл во внешний OCR API (OCR.space).
+  Http := TNetHTTPClient.Create(nil);
+  FormData := TMultipartFormData.Create;
+  try
+    Http.ConnectionTimeout := 60000;
+    Http.ResponseTimeout := 180000;
+    Http.ContentType := 'multipart/form-data';
+
+    FormData.AddField('language', 'rus');
+    FormData.AddField('isOverlayRequired', 'false');
+    FormData.AddField('isCreateSearchablePdf', 'false');
+    FormData.AddField('scale', 'true');
+    FormData.AddField('OCREngine', '2');
+    FormData.AddFile('file', APdfFilePath, 'application/pdf');
+
+    Http.CustomHeaders['apikey'] := OCR_SPACE_API_KEY;
+    Resp := Http.Post(OCR_SPACE_URL, FormData);
+
+    if Resp = nil then
+    begin
+      ShowMessage('OCR API не вернул ответ');
+      Exit;
+    end;
+
+    if (Resp.StatusCode < 200) or (Resp.StatusCode >= 300) then
+    begin
+      ShowMessage('Ошибка OCR API. Код: ' + Resp.StatusCode.ToString);
+      Exit;
+    end;
+
+    Json := TJSONObject.ParseJSONValue(Resp.ContentAsString(TEncoding.UTF8)) as TJSONObject;
+    try
+      if Json = nil then
+      begin
+        ShowMessage('OCR API вернул некорректный JSON');
+        Exit;
+      end;
+
+      if SameText(Json.GetValue<string>('IsErroredOnProcessing', 'False'), 'True') then
+      begin
+        ErrorMessageValue := Json.GetValue('ErrorMessage');
+        if ErrorMessageValue <> nil then
+          ShowMessage('OCR ошибка: ' + ErrorMessageValue.ToJSON)
+        else
+          ShowMessage('OCR вернул ошибку обработки PDF');
+        Exit;
+      end;
+
+      ParsedResults := Json.GetValue<TJSONArray>('ParsedResults');
+      if (ParsedResults <> nil) and (ParsedResults.Count > 0) then
+      begin
+        ParsedItem := ParsedResults.Items[0] as TJSONObject;
+        if ParsedItem <> nil then
+        begin
+          ParsedTextValue := ParsedItem.GetValue('ParsedText');
+          if ParsedTextValue <> nil then
+            Result := ParsedTextValue.Value;
+        end;
+      end;
+      if Trim(Result) = '' then
+        ShowMessage('OCR API не вернул ParsedText');
+    finally
+      Json.Free;
+    end;
+  finally
+    FormData.Free;
+    Http.Free;
+  end;
 end;
 
 procedure TFormTypeEditor.SaveExtractedPdfText(const AText: string);
