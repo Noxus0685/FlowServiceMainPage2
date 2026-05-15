@@ -172,6 +172,8 @@ type
     procedure aDeviceCutExecute(Sender: TObject);
     procedure UpdateDeviceActions(Sender: TObject);
     procedure aRefreshRepositoryExecute(Sender: TObject);
+    procedure GridDevicesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
 
 private
 
@@ -2448,6 +2450,8 @@ procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
 begin
+  GridDevices.OnKeyDown := GridDevicesKeyDown;
+
   {----------------------------------}
   { Инициализация сортировки }
   {----------------------------------}
@@ -2477,6 +2481,17 @@ begin
     if SelectionContext.DeviceFound then
       AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
     ApplyInitialSelection;
+  end;
+end;
+
+procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkDelete then
+  begin
+    ButtonDeviceDeleteClick(ButtonDeviceDelete);
+    Key := 0;
+    KeyChar := #0;
   end;
 end;
 
