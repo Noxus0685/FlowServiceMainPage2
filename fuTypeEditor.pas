@@ -4481,6 +4481,7 @@ var
   FilePath: string;
   FileStream: TFileStream;
   TxtPath: string;
+  JsonPath: string;
   PdfText: string;
   JsonTemplate: string;
   DeepSeekResponse: string;
@@ -4835,7 +4836,11 @@ begin
                 '}';
 
               if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+              begin
+                JsonPath := ChangeFileExt(TxtPath, '.json');
+                TFile.WriteAllText(JsonPath, DeepSeekResponse, TEncoding.UTF8);
                 ApplyDeepSeekJsonToType(DeepSeekResponse);
+              end;
             end;
 
             // Удаляем исходный PDF после успешной конвертации в текст.
