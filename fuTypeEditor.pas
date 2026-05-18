@@ -1871,6 +1871,10 @@ begin
       'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
       'Числа возвращай без единиц измерения.' + sLineBreak +
       'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
+      'Верни ТОЛЬКО объект из шаблона output (без оберток input/output_schema/_parsing_instructions).' + sLineBreak +
+      'Класс точности бери из поля device_type.general_info.accuracy_class в шаблоне.' + sLineBreak +
+      'Если класс не определен в тексте — используй уже переданный класс из шаблона.' + sLineBreak +
+      'Для base_error верни минимальную погрешность в % для выбранного класса точности.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
       'Текст:' + sLineBreak + LimitedText);
@@ -1961,26 +1965,73 @@ function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass: string): st
 begin
   Result :=
     '{' + sLineBreak +
-    '  "_comment": "УНИВЕРСАЛЬНЫЙ ШАБЛОН ДЛЯ ПАРСИНГА ОПИСАНИЙ ТИПА СИ",' + sLineBreak +
-    '  "input": {' + sLineBreak +
-    '    "text": "ЗДЕСЬ ТЕКСТ ДОКУМЕНТА",' + sLineBreak +
-    '    "accuracy_class": "' + StringReplace(AAccuracyClass, '"', '\"', [rfReplaceAll]) + '"' + sLineBreak +
-    '  },' + sLineBreak +
-    '  "output_schema": {' + sLineBreak +
-    '    "device_type": {' + sLineBreak +
-    '      "general_info": {"name": null, "category": null, "manufacturer": null, "modification": null, "procedure": null, "grsi_number": null, "valid_from": null, "valid_to": null, "mpi": null, "verification_method": null, "accuracy_class": null, "base_error": null, "report_form_file": null},' + sLineBreak +
-    '      "signal": {"measured_value": null, "measurement_unit": null, "signal_type": null},' + sLineBreak +
-    '      "pulses": {"output_type": null, "representation": null, "kp_qmax": null}' + sLineBreak +
+    '  "device_type": {' + sLineBreak +
+    '    "general_info": {' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "category": null,' + sLineBreak +
+    '      "manufacturer": null,' + sLineBreak +
+    '      "modification": null,' + sLineBreak +
+    '      "procedure": null,' + sLineBreak +
+    '      "grsi_number": null,' + sLineBreak +
+    '      "valid_from": null,' + sLineBreak +
+    '      "valid_to": null,' + sLineBreak +
+    '      "mpi": null,' + sLineBreak +
+    '      "verification_method": null,' + sLineBreak +
+    '      "accuracy_class": "' + StringReplace(AAccuracyClass, '"', '\"', [rfReplaceAll]) + '",' + sLineBreak +
+    '      "base_error": null,' + sLineBreak +
+    '      "report_form_file": null' + sLineBreak +
     '    },' + sLineBreak +
-    '    "diameters": [{"enabled": false, "name": null, "dn_mm": null, "qmax_l_s": null, "qnom_l_s": null, "qtr_l_s": null, "q2tr_l_s": null, "qmin_l_s": null, "kp_imp_l": null, "qf_l_s": null}],' + sLineBreak +
-    '    "verification_points": [{"enabled": false, "name": null, "q_qmax": null, "q_l_s": null, "volume_l": null, "impulses_count": null, "time_s": null, "error_percent": null, "expanded_uncertainty_percent": null, "stabilization_time_s": null, "repeat_count": null, "measurement_series_count": null, "pressure": null}],' + sLineBreak +
-    '    "calculation_parameters": {"dynamic_range": null, "flow_velocity_qmax_m_s": null},' + sLineBreak +
-    '    "deepseek_result": {"status": null, "warnings": [], "missing_fields": [], "raw_notes": null}' + sLineBreak +
+    '    "signal": {' + sLineBreak +
+    '      "measured_value": null,' + sLineBreak +
+    '      "measurement_unit": null,' + sLineBreak +
+    '      "signal_type": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "pulses": {' + sLineBreak +
+    '      "output_type": null,' + sLineBreak +
+    '      "representation": null,' + sLineBreak +
+    '      "kp_qmax": null' + sLineBreak +
+    '    }' + sLineBreak +
     '  },' + sLineBreak +
-    '  "_parsing_instructions": {' + sLineBreak +
-    '    "general_info": {"accuracy_class": "скопировать из входного параметра accuracy_class", "base_error": "извлечь минимальную погрешность в % для выбранного класса точности"},' + sLineBreak +
-    '    "verification_points": {"count": "создать N точек поверки (обычно 5-6)"},' + sLineBreak +
-    '    "calculation_parameters": {"dynamic_range": "рассчитать как Q3/Q1"}' + sLineBreak +
+    '  "diameters": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "dn_mm": null,' + sLineBreak +
+    '      "qmax_l_s": null,' + sLineBreak +
+    '      "qnom_l_s": null,' + sLineBreak +
+    '      "qtr_l_s": null,' + sLineBreak +
+    '      "q2tr_l_s": null,' + sLineBreak +
+    '      "qmin_l_s": null,' + sLineBreak +
+    '      "kp_imp_l": null,' + sLineBreak +
+    '      "qf_l_s": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "verification_points": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "q_qmax": null,' + sLineBreak +
+    '      "q_l_s": null,' + sLineBreak +
+    '      "volume_l": null,' + sLineBreak +
+    '      "impulses_count": null,' + sLineBreak +
+    '      "time_s": null,' + sLineBreak +
+    '      "error_percent": null,' + sLineBreak +
+    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+    '      "stabilization_time_s": null,' + sLineBreak +
+    '      "repeat_count": null,' + sLineBreak +
+    '      "measurement_series_count": null,' + sLineBreak +
+    '      "pressure": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "calculation_parameters": {' + sLineBreak +
+    '    "dynamic_range": null,' + sLineBreak +
+    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "deepseek_result": {' + sLineBreak +
+    '    "status": null,' + sLineBreak +
+    '    "warnings": [],' + sLineBreak +
+    '    "missing_fields": [],' + sLineBreak +
+    '    "raw_notes": null' + sLineBreak +
     '  }' + sLineBreak +
     '}';
 end;
