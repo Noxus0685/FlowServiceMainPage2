@@ -4790,72 +4790,71 @@ const
     '{' + sLineBreak +
     '  "device_type": {' + sLineBreak +
     '    "general_info": {' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "category": null,' + sLineBreak +
-    '      "manufacturer": null,' + sLineBreak +
-    '      "modification": null,' + sLineBreak +
-    '      "procedure": null,' + sLineBreak +
-    '      "grsi_number": null,' + sLineBreak +
-    '      "valid_from": null,' + sLineBreak +
-    '      "valid_to": null,' + sLineBreak +
-    '      "mpi": null,' + sLineBreak +
-    '      "verification_method": null,' + sLineBreak +
-    '      "accuracy_class": null,' + sLineBreak +
-    '      "base_error": null,' + sLineBreak +
-    '      "report_form_file": null' + sLineBreak +
+    '      "name": "string - полное наименование СИ",' + sLineBreak +
+    '      "category": "string - категория (например, Расходомеры-счетчики)",' + sLineBreak +
+    '      "manufacturer": "string - производитель с формой ООО/АО",' + sLineBreak +
+    '      "modification": "string - исполнения через запятую",' + sLineBreak +
+    '      "procedure": "string - методика поверки или нормативный документ",' + sLineBreak +
+    '      "grsi_number": "string - номер ГРСИ (формат ХХХХХ-ХХ)",' + sLineBreak +
+    '      "valid_from": "string - дата утверждения (формат ГГГГ-ММ-ДД)",' + sLineBreak +
+    '      "valid_to": "string - дата окончания срока или null",' + sLineBreak +
+    '      "mpi": "string - межповерочный интервал",' + sLineBreak +
+    '      "verification_method": "string - метод поверки",' + sLineBreak +
+    '      "accuracy_class": "string - классы точности через запятую",' + sLineBreak +
+    '      "base_error": "string - основная погрешность",' + sLineBreak +
+    '      "report_form_file": "string или null - ссылка на файл протокола"' + sLineBreak +
     '    },' + sLineBreak +
     '    "signal": {' + sLineBreak +
-    '      "measured_value": null,' + sLineBreak +
-    '      "measurement_unit": null,' + sLineBreak +
-    '      "signal_type": null' + sLineBreak +
+    '      "measured_value": "string - измеряемая величина",' + sLineBreak +
+    '      "measurement_unit": "string - единицы измерения",' + sLineBreak +
+    '      "signal_type": "string - типы выходных сигналов"' + sLineBreak +
     '    },' + sLineBreak +
     '    "pulses": {' + sLineBreak +
-    '      "output_type": null,' + sLineBreak +
-    '      "representation": null,' + sLineBreak +
-    '      "kp_qmax": null' + sLineBreak +
+    '      "output_type": "string - тип импульсного выхода",' + sLineBreak +
+    '      "representation": "string - описание импульсного сигнала",' + sLineBreak +
+    '      "kp_qmax": "number или null - коэффициент пересчета при Qmax"' + sLineBreak +
     '    }' + sLineBreak +
     '  },' + sLineBreak +
     '  "diameters": [' + sLineBreak +
     '    {' + sLineBreak +
-    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
-    '      "enabled": false,' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "dn_mm": null,' + sLineBreak +
-    '      "qmax_l_s": null,' + sLineBreak +
-    '      "qnom_l_s": null,' + sLineBreak +
-    '      "qtr_l_s": null,' + sLineBreak +
-    '      "q2tr_l_s": null,' + sLineBreak +
-    '      "qmin_l_s": null,' + sLineBreak +
-    '      "kp_imp_l": null,' + sLineBreak +
-    '      "qf_l_s": null' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": "string - DN15",' + sLineBreak +
+    '      "dn_mm": "number - диаметр в мм",' + sLineBreak +
+    '      "qmax_l_s": "number - Q4 (максимальный расход) в л/с",' + sLineBreak +
+    '      "qnom_l_s": "number - Q3 (номинальный расход) в л/с",' + sLineBreak +
+    '      "qtr_l_s": "number - Q2 (первый переходный расход) в л/с",' + sLineBreak +
+    '      "q2tr_l_s": "number - Q2t (второй переходный расход, только для классов A,B,C) в л/с, для других классов null",' + sLineBreak +
+    '      "qmin_l_s": "number - Q1 (минимальный расход) в л/с",' + sLineBreak +
+    '      "kp_imp_l": "number или null - коэффициент импульсов",' + sLineBreak +
+    '      "qf_l_s": "number или null - расход для точки поверки"' + sLineBreak +
     '    }' + sLineBreak +
     '  ],' + sLineBreak +
     '  "verification_points": [' + sLineBreak +
     '    {' + sLineBreak +
-    '      "enabled": false,' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "q_qmax": null,' + sLineBreak +
-    '      "q_l_s": null,' + sLineBreak +
-    '      "volume_l": null,' + sLineBreak +
-    '      "impulses_count": null,' + sLineBreak +
-    '      "time_s": null,' + sLineBreak +
-    '      "error_percent": null,' + sLineBreak +
-    '      "expanded_uncertainty_percent": null,' + sLineBreak +
-    '      "stabilization_time_s": null,' + sLineBreak +
-    '      "repeat_count": null,' + sLineBreak +
-    '      "measurement_series_count": null,' + sLineBreak +
-    '      "pressure": null' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": "string - название точки поверки",' + sLineBreak +
+    '      "q_qmax": "number - доля от Qmax (0..1)",' + sLineBreak +
+    '      "q_l_s": "number - расход в л/с",' + sLineBreak +
+    '      "volume_l": "number или null - объем в литрах",' + sLineBreak +
+    '      "impulses_count": "number или null - количество импульсов",' + sLineBreak +
+    '      "time_s": "number или null - время в секундах",' + sLineBreak +
+    '      "error_percent": "number - допускаемая погрешность в %",' + sLineBreak +
+    '      "expanded_uncertainty_percent": "number - расширенная неопределенность в %",' + sLineBreak +
+    '      "stabilization_time_s": "number - время стабилизации в секундах",' + sLineBreak +
+    '      "repeat_count": "number - количество повторений",' + sLineBreak +
+    '      "measurement_series_count": "number - количество серий измерений",' + sLineBreak +
+    '      "pressure": "number или null - давление"' + sLineBreak +
     '    }' + sLineBreak +
     '  ],' + sLineBreak +
     '  "calculation_parameters": {' + sLineBreak +
-    '    "dynamic_range": null,' + sLineBreak +
-    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+    '    "dynamic_range": "string - динамический диапазон (формат 1:ХХХ)",' + sLineBreak +
+    '    "flow_velocity_qmax_m_s": "number или null - скорость потока при Qmax в м/с"' + sLineBreak +
     '  },' + sLineBreak +
     '  "deepseek_result": {' + sLineBreak +
-    '    "status": null,' + sLineBreak +
-    '    "warnings": [],' + sLineBreak +
-    '    "missing_fields": [],' + sLineBreak +
-    '    "raw_notes": null' + sLineBreak +
+    '    "status": "string - ''completed'', ''partial'' или ''error''",' + sLineBreak +
+    '    "warnings": ["string - массив предупреждений"],' + sLineBreak +
+    '    "missing_fields": ["string - массив незаполненных полей"],' + sLineBreak +
+    '    "raw_notes": "string - примечания по парсингу"' + sLineBreak +
     '  }' + sLineBreak +
     '}';
 var
@@ -5203,72 +5202,71 @@ begin
                     '{' + sLineBreak +
                     '  "device_type": {' + sLineBreak +
                     '    "general_info": {' + sLineBreak +
-                    '      "name": null,' + sLineBreak +
-                    '      "category": null,' + sLineBreak +
-                    '      "manufacturer": null,' + sLineBreak +
-                    '      "modification": null,' + sLineBreak +
-                    '      "procedure": null,' + sLineBreak +
-                    '      "grsi_number": null,' + sLineBreak +
-                    '      "valid_from": null,' + sLineBreak +
-                    '      "valid_to": null,' + sLineBreak +
-                    '      "mpi": null,' + sLineBreak +
-                    '      "verification_method": null,' + sLineBreak +
-                    '      "accuracy_class": null,' + sLineBreak +
-                    '      "base_error": null,' + sLineBreak +
-                    '      "report_form_file": null' + sLineBreak +
+                    '      "name": "string - полное наименование СИ",' + sLineBreak +
+                    '      "category": "string - категория (например, Расходомеры-счетчики)",' + sLineBreak +
+                    '      "manufacturer": "string - производитель с формой ООО/АО",' + sLineBreak +
+                    '      "modification": "string - исполнения через запятую",' + sLineBreak +
+                    '      "procedure": "string - методика поверки или нормативный документ",' + sLineBreak +
+                    '      "grsi_number": "string - номер ГРСИ (формат ХХХХХ-ХХ)",' + sLineBreak +
+                    '      "valid_from": "string - дата утверждения (формат ГГГГ-ММ-ДД)",' + sLineBreak +
+                    '      "valid_to": "string - дата окончания срока или null",' + sLineBreak +
+                    '      "mpi": "string - межповерочный интервал",' + sLineBreak +
+                    '      "verification_method": "string - метод поверки",' + sLineBreak +
+                    '      "accuracy_class": "string - классы точности через запятую",' + sLineBreak +
+                    '      "base_error": "string - основная погрешность",' + sLineBreak +
+                    '      "report_form_file": "string или null - ссылка на файл протокола"' + sLineBreak +
                     '    },' + sLineBreak +
                     '    "signal": {' + sLineBreak +
-                    '      "measured_value": null,' + sLineBreak +
-                    '      "measurement_unit": null,' + sLineBreak +
-                    '      "signal_type": null' + sLineBreak +
+                    '      "measured_value": "string - измеряемая величина",' + sLineBreak +
+                    '      "measurement_unit": "string - единицы измерения",' + sLineBreak +
+                    '      "signal_type": "string - типы выходных сигналов"' + sLineBreak +
                     '    },' + sLineBreak +
                     '    "pulses": {' + sLineBreak +
-                    '      "output_type": null,' + sLineBreak +
-                    '      "representation": null,' + sLineBreak +
-                    '      "kp_qmax": null' + sLineBreak +
+                    '      "output_type": "string - тип импульсного выхода",' + sLineBreak +
+                    '      "representation": "string - описание импульсного сигнала",' + sLineBreak +
+                    '      "kp_qmax": "number или null - коэффициент пересчета при Qmax"' + sLineBreak +
                     '    }' + sLineBreak +
                     '  },' + sLineBreak +
                     '  "diameters": [' + sLineBreak +
                     '    {' + sLineBreak +
-                    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
-                    '      "enabled": false,' + sLineBreak +
-                    '      "name": null,' + sLineBreak +
-                    '      "dn_mm": null,' + sLineBreak +
-                    '      "qmax_l_s": null,' + sLineBreak +
-                    '      "qnom_l_s": null,' + sLineBreak +
-                    '      "qtr_l_s": null,' + sLineBreak +
-                    '      "q2tr_l_s": null,' + sLineBreak +
-                    '      "qmin_l_s": null,' + sLineBreak +
-                    '      "kp_imp_l": null,' + sLineBreak +
-                    '      "qf_l_s": null' + sLineBreak +
+                    '      "enabled": true,' + sLineBreak +
+                    '      "name": "string - DN15",' + sLineBreak +
+                    '      "dn_mm": "number - диаметр в мм",' + sLineBreak +
+                    '      "qmax_l_s": "number - Q4 (максимальный расход) в л/с",' + sLineBreak +
+                    '      "qnom_l_s": "number - Q3 (номинальный расход) в л/с",' + sLineBreak +
+                    '      "qtr_l_s": "number - Q2 (первый переходный расход) в л/с",' + sLineBreak +
+                    '      "q2tr_l_s": "number - Q2t (второй переходный расход, только для классов A,B,C) в л/с, для других классов null",' + sLineBreak +
+                    '      "qmin_l_s": "number - Q1 (минимальный расход) в л/с",' + sLineBreak +
+                    '      "kp_imp_l": "number или null - коэффициент импульсов",' + sLineBreak +
+                    '      "qf_l_s": "number или null - расход для точки поверки"' + sLineBreak +
                     '    }' + sLineBreak +
                     '  ],' + sLineBreak +
                     '  "verification_points": [' + sLineBreak +
                     '    {' + sLineBreak +
-                    '      "enabled": false,' + sLineBreak +
-                    '      "name": null,' + sLineBreak +
-                    '      "q_qmax": null,' + sLineBreak +
-                    '      "q_l_s": null,' + sLineBreak +
-                    '      "volume_l": null,' + sLineBreak +
-                    '      "impulses_count": null,' + sLineBreak +
-                    '      "time_s": null,' + sLineBreak +
-                    '      "error_percent": null,' + sLineBreak +
-                    '      "expanded_uncertainty_percent": null,' + sLineBreak +
-                    '      "stabilization_time_s": null,' + sLineBreak +
-                    '      "repeat_count": null,' + sLineBreak +
-                    '      "measurement_series_count": null,' + sLineBreak +
-                    '      "pressure": null' + sLineBreak +
+                    '      "enabled": true,' + sLineBreak +
+                    '      "name": "string - название точки поверки",' + sLineBreak +
+                    '      "q_qmax": "number - доля от Qmax (0..1)",' + sLineBreak +
+                    '      "q_l_s": "number - расход в л/с",' + sLineBreak +
+                    '      "volume_l": "number или null - объем в литрах",' + sLineBreak +
+                    '      "impulses_count": "number или null - количество импульсов",' + sLineBreak +
+                    '      "time_s": "number или null - время в секундах",' + sLineBreak +
+                    '      "error_percent": "number - допускаемая погрешность в %",' + sLineBreak +
+                    '      "expanded_uncertainty_percent": "number - расширенная неопределенность в %",' + sLineBreak +
+                    '      "stabilization_time_s": "number - время стабилизации в секундах",' + sLineBreak +
+                    '      "repeat_count": "number - количество повторений",' + sLineBreak +
+                    '      "measurement_series_count": "number - количество серий измерений",' + sLineBreak +
+                    '      "pressure": "number или null - давление"' + sLineBreak +
                     '    }' + sLineBreak +
                     '  ],' + sLineBreak +
                     '  "calculation_parameters": {' + sLineBreak +
-                    '    "dynamic_range": null,' + sLineBreak +
-                    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+                    '    "dynamic_range": "string - динамический диапазон (формат 1:ХХХ)",' + sLineBreak +
+                    '    "flow_velocity_qmax_m_s": "number или null - скорость потока при Qmax в м/с"' + sLineBreak +
                     '  },' + sLineBreak +
                     '  "deepseek_result": {' + sLineBreak +
-                    '    "status": null,' + sLineBreak +
-                    '    "warnings": [],' + sLineBreak +
-                    '    "missing_fields": [],' + sLineBreak +
-                    '    "raw_notes": null' + sLineBreak +
+                    '    "status": "string - ''completed'', ''partial'' или ''error''",' + sLineBreak +
+                    '    "warnings": ["string - массив предупреждений"],' + sLineBreak +
+                    '    "missing_fields": ["string - массив незаполненных полей"],' + sLineBreak +
+                    '    "raw_notes": "string - примечания по парсингу"' + sLineBreak +
                     '  }' + sLineBreak +
                     '}';
 
@@ -5295,72 +5293,71 @@ begin
                 '{' + sLineBreak +
                 '  "device_type": {' + sLineBreak +
                 '    "general_info": {' + sLineBreak +
-                '      "name": null,' + sLineBreak +
-                '      "category": null,' + sLineBreak +
-                '      "manufacturer": null,' + sLineBreak +
-                '      "modification": null,' + sLineBreak +
-                '      "procedure": null,' + sLineBreak +
-                '      "grsi_number": null,' + sLineBreak +
-                '      "valid_from": null,' + sLineBreak +
-                '      "valid_to": null,' + sLineBreak +
-                '      "mpi": null,' + sLineBreak +
-                '      "verification_method": null,' + sLineBreak +
-                '      "accuracy_class": null,' + sLineBreak +
-                '      "base_error": null,' + sLineBreak +
-                '      "report_form_file": null' + sLineBreak +
+                '      "name": "string - полное наименование СИ",' + sLineBreak +
+                '      "category": "string - категория (например, Расходомеры-счетчики)",' + sLineBreak +
+                '      "manufacturer": "string - производитель с формой ООО/АО",' + sLineBreak +
+                '      "modification": "string - исполнения через запятую",' + sLineBreak +
+                '      "procedure": "string - методика поверки или нормативный документ",' + sLineBreak +
+                '      "grsi_number": "string - номер ГРСИ (формат ХХХХХ-ХХ)",' + sLineBreak +
+                '      "valid_from": "string - дата утверждения (формат ГГГГ-ММ-ДД)",' + sLineBreak +
+                '      "valid_to": "string - дата окончания срока или null",' + sLineBreak +
+                '      "mpi": "string - межповерочный интервал",' + sLineBreak +
+                '      "verification_method": "string - метод поверки",' + sLineBreak +
+                '      "accuracy_class": "string - классы точности через запятую",' + sLineBreak +
+                '      "base_error": "string - основная погрешность",' + sLineBreak +
+                '      "report_form_file": "string или null - ссылка на файл протокола"' + sLineBreak +
                 '    },' + sLineBreak +
                 '    "signal": {' + sLineBreak +
-                '      "measured_value": null,' + sLineBreak +
-                '      "measurement_unit": null,' + sLineBreak +
-                '      "signal_type": null' + sLineBreak +
+                '      "measured_value": "string - измеряемая величина",' + sLineBreak +
+                '      "measurement_unit": "string - единицы измерения",' + sLineBreak +
+                '      "signal_type": "string - типы выходных сигналов"' + sLineBreak +
                 '    },' + sLineBreak +
                 '    "pulses": {' + sLineBreak +
-                '      "output_type": null,' + sLineBreak +
-                '      "representation": null,' + sLineBreak +
-                '      "kp_qmax": null' + sLineBreak +
+                '      "output_type": "string - тип импульсного выхода",' + sLineBreak +
+                '      "representation": "string - описание импульсного сигнала",' + sLineBreak +
+                '      "kp_qmax": "number или null - коэффициент пересчета при Qmax"' + sLineBreak +
                 '    }' + sLineBreak +
                 '  },' + sLineBreak +
                 '  "diameters": [' + sLineBreak +
                 '    {' + sLineBreak +
-                '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
-                '      "enabled": false,' + sLineBreak +
-                '      "name": null,' + sLineBreak +
-                '      "dn_mm": null,' + sLineBreak +
-                '      "qmax_l_s": null,' + sLineBreak +
-                '      "qnom_l_s": null,' + sLineBreak +
-                '      "qtr_l_s": null,' + sLineBreak +
-                '      "q2tr_l_s": null,' + sLineBreak +
-                '      "qmin_l_s": null,' + sLineBreak +
-                '      "kp_imp_l": null,' + sLineBreak +
-                '      "qf_l_s": null' + sLineBreak +
+                '      "enabled": true,' + sLineBreak +
+                '      "name": "string - DN15",' + sLineBreak +
+                '      "dn_mm": "number - диаметр в мм",' + sLineBreak +
+                '      "qmax_l_s": "number - Q4 (максимальный расход) в л/с",' + sLineBreak +
+                '      "qnom_l_s": "number - Q3 (номинальный расход) в л/с",' + sLineBreak +
+                '      "qtr_l_s": "number - Q2 (первый переходный расход) в л/с",' + sLineBreak +
+                '      "q2tr_l_s": "number - Q2t (второй переходный расход, только для классов A,B,C) в л/с, для других классов null",' + sLineBreak +
+                '      "qmin_l_s": "number - Q1 (минимальный расход) в л/с",' + sLineBreak +
+                '      "kp_imp_l": "number или null - коэффициент импульсов",' + sLineBreak +
+                '      "qf_l_s": "number или null - расход для точки поверки"' + sLineBreak +
                 '    }' + sLineBreak +
                 '  ],' + sLineBreak +
                 '  "verification_points": [' + sLineBreak +
                 '    {' + sLineBreak +
-                '      "enabled": false,' + sLineBreak +
-                '      "name": null,' + sLineBreak +
-                '      "q_qmax": null,' + sLineBreak +
-                '      "q_l_s": null,' + sLineBreak +
-                '      "volume_l": null,' + sLineBreak +
-                '      "impulses_count": null,' + sLineBreak +
-                '      "time_s": null,' + sLineBreak +
-                '      "error_percent": null,' + sLineBreak +
-                '      "expanded_uncertainty_percent": null,' + sLineBreak +
-                '      "stabilization_time_s": null,' + sLineBreak +
-                '      "repeat_count": null,' + sLineBreak +
-                '      "measurement_series_count": null,' + sLineBreak +
-                '      "pressure": null' + sLineBreak +
+                '      "enabled": true,' + sLineBreak +
+                '      "name": "string - название точки поверки",' + sLineBreak +
+                '      "q_qmax": "number - доля от Qmax (0..1)",' + sLineBreak +
+                '      "q_l_s": "number - расход в л/с",' + sLineBreak +
+                '      "volume_l": "number или null - объем в литрах",' + sLineBreak +
+                '      "impulses_count": "number или null - количество импульсов",' + sLineBreak +
+                '      "time_s": "number или null - время в секундах",' + sLineBreak +
+                '      "error_percent": "number - допускаемая погрешность в %",' + sLineBreak +
+                '      "expanded_uncertainty_percent": "number - расширенная неопределенность в %",' + sLineBreak +
+                '      "stabilization_time_s": "number - время стабилизации в секундах",' + sLineBreak +
+                '      "repeat_count": "number - количество повторений",' + sLineBreak +
+                '      "measurement_series_count": "number - количество серий измерений",' + sLineBreak +
+                '      "pressure": "number или null - давление"' + sLineBreak +
                 '    }' + sLineBreak +
                 '  ],' + sLineBreak +
                 '  "calculation_parameters": {' + sLineBreak +
-                '    "dynamic_range": null,' + sLineBreak +
-                '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+                '    "dynamic_range": "string - динамический диапазон (формат 1:ХХХ)",' + sLineBreak +
+                '    "flow_velocity_qmax_m_s": "number или null - скорость потока при Qmax в м/с"' + sLineBreak +
                 '  },' + sLineBreak +
                 '  "deepseek_result": {' + sLineBreak +
-                '    "status": null,' + sLineBreak +
-                '    "warnings": [],' + sLineBreak +
-                '    "missing_fields": [],' + sLineBreak +
-                '    "raw_notes": null' + sLineBreak +
+                '    "status": "string - ''completed'', ''partial'' или ''error''",' + sLineBreak +
+                '    "warnings": ["string - массив предупреждений"],' + sLineBreak +
+                '    "missing_fields": ["string - массив незаполненных полей"],' + sLineBreak +
+                '    "raw_notes": "string - примечания по парсингу"' + sLineBreak +
                 '  }' + sLineBreak +
                 '}';
 
