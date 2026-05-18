@@ -1877,10 +1877,11 @@ begin
       'Если класс не определен в тексте — используй уже переданный класс из шаблона.' + sLineBreak +
       'Для base_error верни минимальную погрешность в % для выбранного класса точности (например 1, а не 5).' + sLineBreak +
       'В этом документе для одного диаметра могут идти несколько СТРОК с расходами; считай их относящимися к одному DN.' + sLineBreak +
-      'Для каждого DN выбери МАКСИМАЛЬНЫЕ значения расходных полей между всеми относящимися к этому DN строками: qmax_l_s, qnom_l_s, qtr_l_s, q2tr_l_s, qmin_l_s, qf_l_s.' + sLineBreak +
-      'Не выбирай минимум и не смешивай строки между разными DN.' + sLineBreak +
+      'Для каждого DN собери все относящиеся строки и выбери ОДНУ строку: с максимальным qnom_l_s (Q3); при равенстве qnom_l_s выбери с максимальным qmax_l_s (Q4).' + sLineBreak +
+      'После выбора строки возьми из нее все расходные поля целиком (qmax_l_s, qnom_l_s, qtr_l_s, q2tr_l_s, qmin_l_s, qf_l_s); не смешивай поля из разных строк одного DN.' + sLineBreak +
       'Если в тексте строка DN идет ПОСЛЕ чисел (ошибка извлечения PDF), привяжи эти числа к ближайшему DN ниже; при конфликте оставь вариант с БОЛЬШИМИ расходами.' + sLineBreak +
       'Значения qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
+      'В deepseek_result.raw_notes добавь фразу: Выбрана строка с максимальным расходом для каждого DN.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
       'Текст:' + sLineBreak + LimitedText);
@@ -2219,20 +2220,35 @@ var
         Exit(K);
   end;
 
-  procedure MergeDiameterMaxValues(const TargetD, SourceD: TDiameter);
+  function IsBetterDiameterRow(const CandidateD, CurrentD: TDiameter): Boolean;
   begin
-    if SourceD.Qmax > TargetD.Qmax then TargetD.Qmax := SourceD.Qmax;
-    if SourceD.Qnom > TargetD.Qnom then TargetD.Qnom := SourceD.Qnom;
-    if SourceD.Qtr > TargetD.Qtr then TargetD.Qtr := SourceD.Qtr;
-    if SourceD.Q2tr > TargetD.Q2tr then TargetD.Q2tr := SourceD.Q2tr;
-    if SourceD.Qmin > TargetD.Qmin then TargetD.Qmin := SourceD.Qmin;
-    if SourceD.QFmax > TargetD.QFmax then TargetD.QFmax := SourceD.QFmax;
-    if SourceD.Kp > TargetD.Kp then TargetD.Kp := SourceD.Kp;
-    if (TargetD.Name = '') and (SourceD.Name <> '') then
-      TargetD.Name := SourceD.Name;
-    if SourceD.Enable then
-      TargetD.Enable := True;
+    if CandidateD.Qnom > CurrentD.Qnom then
+      Exit(True);
+    if CandidateD.Qnom < CurrentD.Qnom then
+      Exit(False);
+
+    if CandidateD.Qmax > CurrentD.Qmax then
+      Exit(True);
+    if CandidateD.Qmax < CurrentD.Qmax then
+      Exit(False);
+
+    Result := False;
   end;
+
+  procedure CopyDiameterValues(const TargetD, SourceD: TDiameter);
+  begin
+    TargetD.Enable := SourceD.Enable;
+    TargetD.Name := SourceD.Name;
+    TargetD.DN := SourceD.DN;
+    TargetD.Qmax := SourceD.Qmax;
+    TargetD.Qnom := SourceD.Qnom;
+    TargetD.Qtr := SourceD.Qtr;
+    TargetD.Q2tr := SourceD.Q2tr;
+    TargetD.Qmin := SourceD.Qmin;
+    TargetD.Kp := SourceD.Kp;
+    TargetD.QFmax := SourceD.QFmax;
+  end;
+
 begin
   Result := False;
   JsonVal := TJSONObject.ParseJSONValue(AResponse);
@@ -2310,7 +2326,8 @@ begin
         ExistingIdx := FindDiameterByDN(D.DN);
         if ExistingIdx >= 0 then
         begin
-          MergeDiameterMaxValues(FDiametersLocal[ExistingIdx], D);
+          if IsBetterDiameterRow(D, FDiametersLocal[ExistingIdx]) then
+            CopyDiameterValues(FDiametersLocal[ExistingIdx], D);
           D.Free;
         end
         else
