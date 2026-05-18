@@ -1878,6 +1878,7 @@ begin
       'Для base_error верни минимальную погрешность в % для выбранного класса точности (например 1, а не 5).' + sLineBreak +
       'Если для расхода в строке/ячейке указано несколько чисел (диапазон, через тире, slash и т.п.), для полей диаметра выбирай МАКСИМАЛЬНОЕ число.' + sLineBreak +
       'Поля diameters.qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s заполняй из ОДНОЙ строки соответствующего диаметра, не смешивай числа из других строк.' + sLineBreak +
+      'Если в тексте строка DN идет ПОСЛЕ чисел (ошибка извлечения PDF), привяжи эти числа к ближайшему DN ниже; при конфликте для одного DN выбирай строку с БОЛЬШИМИ Qnom/Qmax.' + sLineBreak +
       'Значения qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
@@ -2057,7 +2058,7 @@ var
   DObj, PObj: TJSONObject;
   D: TDiameter;
   P: TTypePoint;
-  I: Integer;
+  I, ExistingIdx: Integer;
   JsonVal: TJSONValue;
   function IsFlowUnitM3h(const AUnit: string): Boolean;
   var
@@ -2206,6 +2207,31 @@ var
     if (V is TJSONString) and ExtractMaxFloatFromText(TJSONString(V).Value, Parsed) then
       Exit(Parsed);
   end;
+
+  function FindDiameterByDN(const ADN: string): Integer;
+  var
+    K: Integer;
+  begin
+    Result := -1;
+    for K := 0 to FDiametersLocal.Count - 1 do
+      if SameText(Trim(FDiametersLocal[K].DN), Trim(ADN)) then
+        Exit(K);
+  end;
+
+  procedure MergeDiameterMaxValues(const TargetD, SourceD: TDiameter);
+  begin
+    if SourceD.Qmax > TargetD.Qmax then TargetD.Qmax := SourceD.Qmax;
+    if SourceD.Qnom > TargetD.Qnom then TargetD.Qnom := SourceD.Qnom;
+    if SourceD.Qtr > TargetD.Qtr then TargetD.Qtr := SourceD.Qtr;
+    if SourceD.Q2tr > TargetD.Q2tr then TargetD.Q2tr := SourceD.Q2tr;
+    if SourceD.Qmin > TargetD.Qmin then TargetD.Qmin := SourceD.Qmin;
+    if SourceD.QFmax > TargetD.QFmax then TargetD.QFmax := SourceD.QFmax;
+    if SourceD.Kp > TargetD.Kp then TargetD.Kp := SourceD.Kp;
+    if (TargetD.Name = '') and (SourceD.Name <> '') then
+      TargetD.Name := SourceD.Name;
+    if SourceD.Enable then
+      TargetD.Enable := True;
+  end;
 begin
   Result := False;
   JsonVal := TJSONObject.ParseJSONValue(AResponse);
@@ -2280,8 +2306,17 @@ begin
           D.Q2tr := D.Qtr - D.Q2tr;
           D.Qtr := D.Qtr - D.Q2tr;
         end;
-        D.State := osNew;
-        FDiametersLocal.Add(D);
+        ExistingIdx := FindDiameterByDN(D.DN);
+        if ExistingIdx >= 0 then
+        begin
+          MergeDiameterMaxValues(FDiametersLocal[ExistingIdx], D);
+          D.Free;
+        end
+        else
+        begin
+          D.State := osNew;
+          FDiametersLocal.Add(D);
+        end;
       end;
     end;
 
