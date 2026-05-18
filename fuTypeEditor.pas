@@ -3108,8 +3108,8 @@ begin
   except
     on E: Exception do
     begin
-      MemoLog.Lines.Add('ERROR DeepSeek: ' + E.Message);
-      ShowMessage('Ошибка при обращении к DeepSeek');
+      MemoLog.Lines.Add('ERROR DeepSeek [' + ExtractFileName(FilePath) + ']: ' + E.Message);
+      ShowMessage('Файл: ' + ExtractFileName(FilePath) + sLineBreak + 'Ошибка при обращении к DeepSeek');
     end;
   end;
 end;
@@ -4872,11 +4872,19 @@ var
     FilePath := ResolveReestrFilePath(AEdit);
     TxtPath := ChangeFileExt(FilePath, '.txt');
 
-    if ExtractTextLayerFromPdf(FilePath, TxtPath) then
-    begin
-      PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-      if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
-        ApplyDeepSeekJsonToType(DeepSeekResponse);
+    try
+      if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+      begin
+        PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+        if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+          ApplyDeepSeekJsonToType(DeepSeekResponse);
+      end;
+    except
+      on E: Exception do
+      begin
+        MemoLog.Lines.Add('ERROR [' + ExtractFileName(FilePath) + ']: ' + E.Message);
+        ShowMessage('Файл: ' + ExtractFileName(FilePath) + sLineBreak + E.Message);
+      end;
     end;
   end;
 begin
@@ -5269,7 +5277,10 @@ begin
                 end;
               except
                 on E: ENetHTTPClientException do
-                  MemoLog.Lines.Add('ERROR: ' + E.Message);
+                begin
+                  MemoLog.Lines.Add('ERROR [' + ExtractFileName(FilePath) + ']: ' + E.Message);
+                  ShowMessage('Файл: ' + ExtractFileName(FilePath) + sLineBreak + E.Message);
+                end;
               end;
             finally
               FileStream.Free;
