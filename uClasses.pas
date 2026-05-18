@@ -335,6 +335,9 @@ type
 
     Documentation: string;       // Документация / ссылки
     ReportingForm: string;       // Отчетная форма
+    FileName1: string;           // Файл 1 для типа прибора
+    FileName2: string;           // Файл 2 для типа прибора
+    FileName3: string;           // Файл 3 для типа прибора
     SerialNumTemplate: string;   // Шаблон серийного номера
 
     {====================================================================}
@@ -1209,6 +1212,9 @@ begin
   Description := '';
   Documentation := '';
   ReportingForm := '';
+  FileName1 := '';
+  FileName2 := '';
+  FileName3 := '';
   SerialNumTemplate := '';
 
   {====================================================================}
@@ -1837,6 +1843,9 @@ begin
   Description := ASource.Description;
   Documentation := ASource.Documentation;
   ReportingForm := ASource.ReportingForm;
+  FileName1 := ASource.FileName1;
+  FileName2 := ASource.FileName2;
+  FileName3 := ASource.FileName3;
   SerialNumTemplate := ASource.SerialNumTemplate;
 
   {====================================================================}
