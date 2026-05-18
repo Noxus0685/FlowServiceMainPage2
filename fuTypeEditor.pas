@@ -630,6 +630,40 @@ begin
     Result := Ord(spUnknown);
 end;
 
+function ResolveProjectDocsFolder: string;
+var
+  SearchDir: string;
+begin
+  Result := '';
+  SearchDir := TPath.GetFullPath(GetCurrentDir);
+
+  while SearchDir <> '' do
+  begin
+    if Length(TDirectory.GetFiles(SearchDir, '*.dproj')) > 0 then
+      Exit(TPath.Combine(SearchDir, 'docs'));
+    SearchDir := TPath.GetDirectoryName(SearchDir);
+  end;
+
+  Result := TPath.Combine(TPath.GetFullPath(GetCurrentDir), 'docs');
+end;
+
+function SaveDeepSeekJsonToDocs(const ADocumentationPath, AJsonContent: string): string;
+var
+  DocsDir: string;
+  BaseName: string;
+begin
+  DocsDir := ResolveProjectDocsFolder;
+  if not TDirectory.Exists(DocsDir) then
+    TDirectory.CreateDirectory(DocsDir);
+
+  BaseName := TPath.GetFileNameWithoutExtension(ADocumentationPath);
+  if BaseName = '' then
+    BaseName := 'deepseek_result';
+
+  Result := TPath.Combine(DocsDir, BaseName + '_deepseek.json');
+  TFile.WriteAllText(Result, AJsonContent, TEncoding.UTF8);
+end;
+
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
 
  begin
@@ -3017,6 +3051,7 @@ procedure TFormTypeEditor.DeepSeekClick(Sender: TObject);
 var
   FilePath: string;
   AIResponse: string;
+  SavedJsonPath: string;
 begin
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
@@ -3062,10 +3097,12 @@ begin
     MemoLog.Lines.Add('Ответ DeepSeek:');
     MemoLog.Lines.Add(AIResponse);
     MemoLog.Lines.Add('------------------------------');
+    SavedJsonPath := SaveDeepSeekJsonToDocs(FilePath, AIResponse);
+    MemoLog.Lines.Add('JSON сохранен: ' + SavedJsonPath);
 
     ShowMessage(
       'DeepSeek обработал описание типа.' + sLineBreak +
-      'Результат выведен в лог.'
+      'JSON сохранен в папку docs проекта.'
     );
 
   except
