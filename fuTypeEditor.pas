@@ -379,6 +379,8 @@ type
     function SendTextToDeepSeekTemplate(const AText, ATemplate: string; out AResponse: string): Boolean;
     // Применение JSON-ответа DeepSeek к форме типа прибора.
     function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
+    function GetSelectedAccuracyClass: string;
+    function BuildDeepSeekTemplate(const AAccuracyClass: string): string;
 
   private
     { Private declarations }
@@ -1941,6 +1943,48 @@ begin
   end;
 end;
 
+function TFormTypeEditor.GetSelectedAccuracyClass: string;
+var
+  S: string;
+  P: Integer;
+begin
+  S := Trim(FType.AccuracyClass);
+  P := Pos(',', S);
+  if P > 0 then
+    S := Trim(Copy(S, 1, P - 1));
+  if S = '' then
+    S := 'A';
+  Result := S;
+end;
+
+function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass: string): string;
+begin
+  Result :=
+    '{' + sLineBreak +
+    '  "_comment": "УНИВЕРСАЛЬНЫЙ ШАБЛОН ДЛЯ ПАРСИНГА ОПИСАНИЙ ТИПА СИ",' + sLineBreak +
+    '  "input": {' + sLineBreak +
+    '    "text": "ЗДЕСЬ ТЕКСТ ДОКУМЕНТА",' + sLineBreak +
+    '    "accuracy_class": "' + StringReplace(AAccuracyClass, '"', '\"', [rfReplaceAll]) + '"' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "output_schema": {' + sLineBreak +
+    '    "device_type": {' + sLineBreak +
+    '      "general_info": {"name": null, "category": null, "manufacturer": null, "modification": null, "procedure": null, "grsi_number": null, "valid_from": null, "valid_to": null, "mpi": null, "verification_method": null, "accuracy_class": null, "base_error": null, "report_form_file": null},' + sLineBreak +
+    '      "signal": {"measured_value": null, "measurement_unit": null, "signal_type": null},' + sLineBreak +
+    '      "pulses": {"output_type": null, "representation": null, "kp_qmax": null}' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "diameters": [{"enabled": false, "name": null, "dn_mm": null, "qmax_l_s": null, "qnom_l_s": null, "qtr_l_s": null, "q2tr_l_s": null, "qmin_l_s": null, "kp_imp_l": null, "qf_l_s": null}],' + sLineBreak +
+    '    "verification_points": [{"enabled": false, "name": null, "q_qmax": null, "q_l_s": null, "volume_l": null, "impulses_count": null, "time_s": null, "error_percent": null, "expanded_uncertainty_percent": null, "stabilization_time_s": null, "repeat_count": null, "measurement_series_count": null, "pressure": null}],' + sLineBreak +
+    '    "calculation_parameters": {"dynamic_range": null, "flow_velocity_qmax_m_s": null},' + sLineBreak +
+    '    "deepseek_result": {"status": null, "warnings": [], "missing_fields": [], "raw_notes": null}' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "_parsing_instructions": {' + sLineBreak +
+    '    "general_info": {"accuracy_class": "скопировать из входного параметра accuracy_class", "base_error": "извлечь минимальную погрешность в % для выбранного класса точности"},' + sLineBreak +
+    '    "verification_points": {"count": "создать N точек поверки (обычно 5-6)"},' + sLineBreak +
+    '    "calculation_parameters": {"dynamic_range": "рассчитать как Q3/Q1"}' + sLineBreak +
+    '  }' + sLineBreak +
+    '}';
+end;
+
 function TFormTypeEditor.ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
 var
   Root, DeviceTypeObj, GeneralInfoObj: TJSONObject;
@@ -1950,6 +1994,94 @@ var
   P: TTypePoint;
   I: Integer;
   JsonVal: TJSONValue;
+  function ExtractFirstFloat(const S: string; out AValue: Double): Boolean;
+  var
+    I, StartPos: Integer;
+    Buf, NumStr: string;
+    FS: TFormatSettings;
+  begin
+    Result := False;
+    AValue := 0;
+    Buf := Trim(S);
+    if Buf = '' then
+      Exit;
+
+    FS := TFormatSettings.Invariant;
+    if TryStrToFloat(StringReplace(Buf, ',', '.', [rfReplaceAll]), AValue, FS) then
+      Exit(True);
+
+    StartPos := 0;
+    for I := 1 to Length(Buf) do
+      if CharInSet(Buf[I], ['0'..'9', '-', '+']) then
+      begin
+        StartPos := I;
+        Break;
+      end;
+    if StartPos = 0 then
+      Exit;
+
+    NumStr := '';
+    for I := StartPos to Length(Buf) do
+    begin
+      if CharInSet(Buf[I], ['0'..'9', '.', ',', '-', '+', 'e', 'E']) then
+        NumStr := NumStr + Buf[I]
+      else
+        Break;
+    end;
+    NumStr := StringReplace(NumStr, ',', '.', [rfReplaceAll]);
+    Result := TryStrToFloat(NumStr, AValue, FS);
+  end;
+
+  function GetJsonDoubleDef(const AObj: TJSONObject; const AName: string; const ADefault: Double): Double;
+  var
+    V: TJSONValue;
+    Parsed: Double;
+  begin
+    Result := ADefault;
+    if AObj = nil then
+      Exit;
+    V := AObj.GetValue(AName);
+    if V = nil then
+      Exit;
+    if V is TJSONNumber then
+      Exit(TJSONNumber(V).AsDouble);
+    if (V is TJSONString) and ExtractFirstFloat(TJSONString(V).Value, Parsed) then
+      Exit(Parsed);
+  end;
+  function ExtractMinFloatFromText(const S: string; out AValue: Double): Boolean;
+  var
+    I, J: Integer;
+    Token: string;
+    FS: TFormatSettings;
+    V: Double;
+    HasVal: Boolean;
+  begin
+    Result := False;
+    AValue := 0;
+    FS := TFormatSettings.Invariant;
+    HasVal := False;
+    I := 1;
+    while I <= Length(S) do
+    begin
+      if CharInSet(S[I], ['0'..'9', '-', '+']) then
+      begin
+        J := I;
+        while (J <= Length(S)) and CharInSet(S[J], ['0'..'9', '.', ',', '-', '+']) do
+          Inc(J);
+        Token := StringReplace(Copy(S, I, J - I), ',', '.', [rfReplaceAll]);
+        if TryStrToFloat(Token, V, FS) then
+        begin
+          if (not HasVal) or (V < AValue) then
+            AValue := V;
+          HasVal := True;
+        end;
+        I := J;
+      end
+      else
+        Inc(I);
+    end;
+    Result := HasVal;
+  end;
 begin
   Result := False;
   JsonVal := TJSONObject.ParseJSONValue(AResponse);
@@ -1980,7 +2112,8 @@ begin
     if GeneralInfoObj.GetValue('accuracy_class') <> nil then
       FType.AccuracyClass := GeneralInfoObj.GetValue<string>('accuracy_class', FType.AccuracyClass);
     if GeneralInfoObj.GetValue('base_error') <> nil then
-      FType.Error := GeneralInfoObj.GetValue<Double>('base_error', FType.Error);
+      if not ExtractMinFloatFromText(GeneralInfoObj.GetValue<string>('base_error', ''), FType.Error) then
+        FType.Error := GetJsonDoubleDef(GeneralInfoObj, 'base_error', FType.Error);
 
     DiametersArr := Root.GetValue('diameters') as TJSONArray;
     if DiametersArr <> nil then
@@ -1995,13 +2128,13 @@ begin
         D.Enable := DObj.GetValue<Boolean>('enabled', True);
         D.Name := DObj.GetValue<string>('name', '');
         D.DN := DObj.GetValue<string>('dn_mm', '');
-        D.Qmax := DObj.GetValue<Double>('qmax_l_s', 0);
-        D.Qnom := DObj.GetValue<Double>('qnom_l_s', 0);
-        D.Qtr := DObj.GetValue<Double>('qtr_l_s', 0);
-        D.Q2tr := DObj.GetValue<Double>('q2tr_l_s', 0);
-        D.Qmin := DObj.GetValue<Double>('qmin_l_s', 0);
-        D.Kp := DObj.GetValue<Double>('kp_imp_l', 0);
-        D.QFmax := DObj.GetValue<Double>('qf_l_s', 0);
+        D.Qmax := GetJsonDoubleDef(DObj, 'qmax_l_s', 0);
+        D.Qnom := GetJsonDoubleDef(DObj, 'qnom_l_s', 0);
+        D.Qtr := GetJsonDoubleDef(DObj, 'qtr_l_s', 0);
+        D.Q2tr := GetJsonDoubleDef(DObj, 'q2tr_l_s', 0);
+        D.Qmin := GetJsonDoubleDef(DObj, 'qmin_l_s', 0);
+        D.Kp := GetJsonDoubleDef(DObj, 'kp_imp_l', 0);
+        D.QFmax := GetJsonDoubleDef(DObj, 'qf_l_s', 0);
         D.State := osNew;
         FDiametersLocal.Add(D);
       end;
@@ -2019,16 +2152,16 @@ begin
         P := TTypePoint.Create(FType.UUID);
         P.Enable := PObj.GetValue<Boolean>('enabled', True);
         P.Name := PObj.GetValue<string>('name', '');
-        P.FlowRate := PObj.GetValue<Double>('q_qmax', 0);
-        P.LimitVolume := PObj.GetValue<Double>('volume_l', 0);
+        P.FlowRate := GetJsonDoubleDef(PObj, 'q_qmax', 0);
+        P.LimitVolume := GetJsonDoubleDef(PObj, 'volume_l', 0);
         P.LimitImp := PObj.GetValue<Integer>('impulses_count', 0);
-        P.LimitTime := PObj.GetValue<Double>('time_s', 0);
-        P.Error := PObj.GetValue<Double>('error_percent', 0);
+        P.LimitTime := GetJsonDoubleDef(PObj, 'time_s', 0);
+        P.Error := GetJsonDoubleDef(PObj, 'error_percent', 0);
         P.FlowAccuracy := PObj.GetValue<string>('expanded_uncertainty_percent', '');
         P.Pause := PObj.GetValue<Integer>('stabilization_time_s', 0);
         P.RepeatsProtocol := PObj.GetValue<Integer>('repeat_count', 0);
         P.Repeats := PObj.GetValue<Integer>('measurement_series_count', 0);
-        P.Pressure := PObj.GetValue<Double>('pressure', 0);
+        P.Pressure := GetJsonDoubleDef(PObj, 'pressure', 0);
         P.State := osNew;
         FPointsLocal.Add(P);
       end;
@@ -4785,79 +4918,8 @@ begin
 end;
 
 procedure TFormTypeEditor.ProcessLocalReestrFiles;
-const
-  JsonTemplate: string =
-    '{' + sLineBreak +
-    '  "device_type": {' + sLineBreak +
-    '    "general_info": {' + sLineBreak +
-    '      "name": "string - полное наименование СИ",' + sLineBreak +
-    '      "category": "string - категория (например, Расходомеры-счетчики)",' + sLineBreak +
-    '      "manufacturer": "string - производитель с формой ООО/АО",' + sLineBreak +
-    '      "modification": "string - исполнения через запятую",' + sLineBreak +
-    '      "procedure": "string - методика поверки или нормативный документ",' + sLineBreak +
-    '      "grsi_number": "string - номер ГРСИ (формат ХХХХХ-ХХ)",' + sLineBreak +
-    '      "valid_from": "string - дата утверждения (формат ГГГГ-ММ-ДД)",' + sLineBreak +
-    '      "valid_to": "string - дата окончания срока или null",' + sLineBreak +
-    '      "mpi": "string - межповерочный интервал",' + sLineBreak +
-    '      "verification_method": "string - метод поверки",' + sLineBreak +
-    '      "accuracy_class": "string - классы точности через запятую",' + sLineBreak +
-    '      "base_error": "string - основная погрешность",' + sLineBreak +
-    '      "report_form_file": "string или null - ссылка на файл протокола"' + sLineBreak +
-    '    },' + sLineBreak +
-    '    "signal": {' + sLineBreak +
-    '      "measured_value": "string - измеряемая величина",' + sLineBreak +
-    '      "measurement_unit": "string - единицы измерения",' + sLineBreak +
-    '      "signal_type": "string - типы выходных сигналов"' + sLineBreak +
-    '    },' + sLineBreak +
-    '    "pulses": {' + sLineBreak +
-    '      "output_type": "string - тип импульсного выхода",' + sLineBreak +
-    '      "representation": "string - описание импульсного сигнала",' + sLineBreak +
-    '      "kp_qmax": "number или null - коэффициент пересчета при Qmax"' + sLineBreak +
-    '    }' + sLineBreak +
-    '  },' + sLineBreak +
-    '  "diameters": [' + sLineBreak +
-    '    {' + sLineBreak +
-    '      "enabled": true,' + sLineBreak +
-    '      "name": "string - DN15",' + sLineBreak +
-    '      "dn_mm": "number - диаметр в мм",' + sLineBreak +
-    '      "qmax_l_s": "number - Q4 (максимальный расход) в л/с",' + sLineBreak +
-    '      "qnom_l_s": "number - Q3 (номинальный расход) в л/с",' + sLineBreak +
-    '      "qtr_l_s": "number - Q2 (первый переходный расход) в л/с",' + sLineBreak +
-    '      "q2tr_l_s": "number - Q2t (второй переходный расход, только для классов A,B,C) в л/с, для других классов null",' + sLineBreak +
-    '      "qmin_l_s": "number - Q1 (минимальный расход) в л/с",' + sLineBreak +
-    '      "kp_imp_l": "number или null - коэффициент импульсов",' + sLineBreak +
-    '      "qf_l_s": "number или null - расход для точки поверки"' + sLineBreak +
-    '    }' + sLineBreak +
-    '  ],' + sLineBreak +
-    '  "verification_points": [' + sLineBreak +
-    '    {' + sLineBreak +
-    '      "enabled": true,' + sLineBreak +
-    '      "name": "string - название точки поверки",' + sLineBreak +
-    '      "q_qmax": "number - доля от Qmax (0..1)",' + sLineBreak +
-    '      "q_l_s": "number - расход в л/с",' + sLineBreak +
-    '      "volume_l": "number или null - объем в литрах",' + sLineBreak +
-    '      "impulses_count": "number или null - количество импульсов",' + sLineBreak +
-    '      "time_s": "number или null - время в секундах",' + sLineBreak +
-    '      "error_percent": "number - допускаемая погрешность в %",' + sLineBreak +
-    '      "expanded_uncertainty_percent": "number - расширенная неопределенность в %",' + sLineBreak +
-    '      "stabilization_time_s": "number - время стабилизации в секундах",' + sLineBreak +
-    '      "repeat_count": "number - количество повторений",' + sLineBreak +
-    '      "measurement_series_count": "number - количество серий измерений",' + sLineBreak +
-    '      "pressure": "number или null - давление"' + sLineBreak +
-    '    }' + sLineBreak +
-    '  ],' + sLineBreak +
-    '  "calculation_parameters": {' + sLineBreak +
-    '    "dynamic_range": "string - динамический диапазон (формат 1:ХХХ)",' + sLineBreak +
-    '    "flow_velocity_qmax_m_s": "number или null - скорость потока при Qmax в м/с"' + sLineBreak +
-    '  },' + sLineBreak +
-    '  "deepseek_result": {' + sLineBreak +
-    '    "status": "string - ''completed'', ''partial'' или ''error''",' + sLineBreak +
-    '    "warnings": ["string - массив предупреждений"],' + sLineBreak +
-    '    "missing_fields": ["string - массив незаполненных полей"],' + sLineBreak +
-    '    "raw_notes": "string - примечания по парсингу"' + sLineBreak +
-    '  }' + sLineBreak +
-    '}';
 var
+  JsonTemplate: string;
   FilePath: string;
   TxtPath: string;
   PdfText: string;
@@ -4865,6 +4927,7 @@ var
 
   procedure ProcessOneFile(const AEdit: TEdit);
   begin
+  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
     if (AEdit = nil) or (Trim(AEdit.Text) = '') then
       Exit;
 
@@ -5198,77 +5261,7 @@ begin
                 if ExtractTextLayerFromPdf(FilePath, TxtPath) then
                 begin
                   PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-                  JsonTemplate :=
-                    '{' + sLineBreak +
-                    '  "device_type": {' + sLineBreak +
-                    '    "general_info": {' + sLineBreak +
-                    '      "name": "string - полное наименование СИ",' + sLineBreak +
-                    '      "category": "string - категория (например, Расходомеры-счетчики)",' + sLineBreak +
-                    '      "manufacturer": "string - производитель с формой ООО/АО",' + sLineBreak +
-                    '      "modification": "string - исполнения через запятую",' + sLineBreak +
-                    '      "procedure": "string - методика поверки или нормативный документ",' + sLineBreak +
-                    '      "grsi_number": "string - номер ГРСИ (формат ХХХХХ-ХХ)",' + sLineBreak +
-                    '      "valid_from": "string - дата утверждения (формат ГГГГ-ММ-ДД)",' + sLineBreak +
-                    '      "valid_to": "string - дата окончания срока или null",' + sLineBreak +
-                    '      "mpi": "string - межповерочный интервал",' + sLineBreak +
-                    '      "verification_method": "string - метод поверки",' + sLineBreak +
-                    '      "accuracy_class": "string - классы точности через запятую",' + sLineBreak +
-                    '      "base_error": "string - основная погрешность",' + sLineBreak +
-                    '      "report_form_file": "string или null - ссылка на файл протокола"' + sLineBreak +
-                    '    },' + sLineBreak +
-                    '    "signal": {' + sLineBreak +
-                    '      "measured_value": "string - измеряемая величина",' + sLineBreak +
-                    '      "measurement_unit": "string - единицы измерения",' + sLineBreak +
-                    '      "signal_type": "string - типы выходных сигналов"' + sLineBreak +
-                    '    },' + sLineBreak +
-                    '    "pulses": {' + sLineBreak +
-                    '      "output_type": "string - тип импульсного выхода",' + sLineBreak +
-                    '      "representation": "string - описание импульсного сигнала",' + sLineBreak +
-                    '      "kp_qmax": "number или null - коэффициент пересчета при Qmax"' + sLineBreak +
-                    '    }' + sLineBreak +
-                    '  },' + sLineBreak +
-                    '  "diameters": [' + sLineBreak +
-                    '    {' + sLineBreak +
-                    '      "enabled": true,' + sLineBreak +
-                    '      "name": "string - DN15",' + sLineBreak +
-                    '      "dn_mm": "number - диаметр в мм",' + sLineBreak +
-                    '      "qmax_l_s": "number - Q4 (максимальный расход) в л/с",' + sLineBreak +
-                    '      "qnom_l_s": "number - Q3 (номинальный расход) в л/с",' + sLineBreak +
-                    '      "qtr_l_s": "number - Q2 (первый переходный расход) в л/с",' + sLineBreak +
-                    '      "q2tr_l_s": "number - Q2t (второй переходный расход, только для классов A,B,C) в л/с, для других классов null",' + sLineBreak +
-                    '      "qmin_l_s": "number - Q1 (минимальный расход) в л/с",' + sLineBreak +
-                    '      "kp_imp_l": "number или null - коэффициент импульсов",' + sLineBreak +
-                    '      "qf_l_s": "number или null - расход для точки поверки"' + sLineBreak +
-                    '    }' + sLineBreak +
-                    '  ],' + sLineBreak +
-                    '  "verification_points": [' + sLineBreak +
-                    '    {' + sLineBreak +
-                    '      "enabled": true,' + sLineBreak +
-                    '      "name": "string - название точки поверки",' + sLineBreak +
-                    '      "q_qmax": "number - доля от Qmax (0..1)",' + sLineBreak +
-                    '      "q_l_s": "number - расход в л/с",' + sLineBreak +
-                    '      "volume_l": "number или null - объем в литрах",' + sLineBreak +
-                    '      "impulses_count": "number или null - количество импульсов",' + sLineBreak +
-                    '      "time_s": "number или null - время в секундах",' + sLineBreak +
-                    '      "error_percent": "number - допускаемая погрешность в %",' + sLineBreak +
-                    '      "expanded_uncertainty_percent": "number - расширенная неопределенность в %",' + sLineBreak +
-                    '      "stabilization_time_s": "number - время стабилизации в секундах",' + sLineBreak +
-                    '      "repeat_count": "number - количество повторений",' + sLineBreak +
-                    '      "measurement_series_count": "number - количество серий измерений",' + sLineBreak +
-                    '      "pressure": "number или null - давление"' + sLineBreak +
-                    '    }' + sLineBreak +
-                    '  ],' + sLineBreak +
-                    '  "calculation_parameters": {' + sLineBreak +
-                    '    "dynamic_range": "string - динамический диапазон (формат 1:ХХХ)",' + sLineBreak +
-                    '    "flow_velocity_qmax_m_s": "number или null - скорость потока при Qmax в м/с"' + sLineBreak +
-                    '  },' + sLineBreak +
-                    '  "deepseek_result": {' + sLineBreak +
-                    '    "status": "string - ''completed'', ''partial'' или ''error''",' + sLineBreak +
-                    '    "warnings": ["string - массив предупреждений"],' + sLineBreak +
-                    '    "missing_fields": ["string - массив незаполненных полей"],' + sLineBreak +
-                    '    "raw_notes": "string - примечания по парсингу"' + sLineBreak +
-                    '  }' + sLineBreak +
-                    '}';
+                  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
 
                   if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
                     ApplyDeepSeekJsonToType(DeepSeekResponse);
@@ -5289,77 +5282,7 @@ begin
             if ExtractTextLayerFromPdf(FilePath, TxtPath) then
             begin
               PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-              JsonTemplate :=
-                '{' + sLineBreak +
-                '  "device_type": {' + sLineBreak +
-                '    "general_info": {' + sLineBreak +
-                '      "name": "string - полное наименование СИ",' + sLineBreak +
-                '      "category": "string - категория (например, Расходомеры-счетчики)",' + sLineBreak +
-                '      "manufacturer": "string - производитель с формой ООО/АО",' + sLineBreak +
-                '      "modification": "string - исполнения через запятую",' + sLineBreak +
-                '      "procedure": "string - методика поверки или нормативный документ",' + sLineBreak +
-                '      "grsi_number": "string - номер ГРСИ (формат ХХХХХ-ХХ)",' + sLineBreak +
-                '      "valid_from": "string - дата утверждения (формат ГГГГ-ММ-ДД)",' + sLineBreak +
-                '      "valid_to": "string - дата окончания срока или null",' + sLineBreak +
-                '      "mpi": "string - межповерочный интервал",' + sLineBreak +
-                '      "verification_method": "string - метод поверки",' + sLineBreak +
-                '      "accuracy_class": "string - классы точности через запятую",' + sLineBreak +
-                '      "base_error": "string - основная погрешность",' + sLineBreak +
-                '      "report_form_file": "string или null - ссылка на файл протокола"' + sLineBreak +
-                '    },' + sLineBreak +
-                '    "signal": {' + sLineBreak +
-                '      "measured_value": "string - измеряемая величина",' + sLineBreak +
-                '      "measurement_unit": "string - единицы измерения",' + sLineBreak +
-                '      "signal_type": "string - типы выходных сигналов"' + sLineBreak +
-                '    },' + sLineBreak +
-                '    "pulses": {' + sLineBreak +
-                '      "output_type": "string - тип импульсного выхода",' + sLineBreak +
-                '      "representation": "string - описание импульсного сигнала",' + sLineBreak +
-                '      "kp_qmax": "number или null - коэффициент пересчета при Qmax"' + sLineBreak +
-                '    }' + sLineBreak +
-                '  },' + sLineBreak +
-                '  "diameters": [' + sLineBreak +
-                '    {' + sLineBreak +
-                '      "enabled": true,' + sLineBreak +
-                '      "name": "string - DN15",' + sLineBreak +
-                '      "dn_mm": "number - диаметр в мм",' + sLineBreak +
-                '      "qmax_l_s": "number - Q4 (максимальный расход) в л/с",' + sLineBreak +
-                '      "qnom_l_s": "number - Q3 (номинальный расход) в л/с",' + sLineBreak +
-                '      "qtr_l_s": "number - Q2 (первый переходный расход) в л/с",' + sLineBreak +
-                '      "q2tr_l_s": "number - Q2t (второй переходный расход, только для классов A,B,C) в л/с, для других классов null",' + sLineBreak +
-                '      "qmin_l_s": "number - Q1 (минимальный расход) в л/с",' + sLineBreak +
-                '      "kp_imp_l": "number или null - коэффициент импульсов",' + sLineBreak +
-                '      "qf_l_s": "number или null - расход для точки поверки"' + sLineBreak +
-                '    }' + sLineBreak +
-                '  ],' + sLineBreak +
-                '  "verification_points": [' + sLineBreak +
-                '    {' + sLineBreak +
-                '      "enabled": true,' + sLineBreak +
-                '      "name": "string - название точки поверки",' + sLineBreak +
-                '      "q_qmax": "number - доля от Qmax (0..1)",' + sLineBreak +
-                '      "q_l_s": "number - расход в л/с",' + sLineBreak +
-                '      "volume_l": "number или null - объем в литрах",' + sLineBreak +
-                '      "impulses_count": "number или null - количество импульсов",' + sLineBreak +
-                '      "time_s": "number или null - время в секундах",' + sLineBreak +
-                '      "error_percent": "number - допускаемая погрешность в %",' + sLineBreak +
-                '      "expanded_uncertainty_percent": "number - расширенная неопределенность в %",' + sLineBreak +
-                '      "stabilization_time_s": "number - время стабилизации в секундах",' + sLineBreak +
-                '      "repeat_count": "number - количество повторений",' + sLineBreak +
-                '      "measurement_series_count": "number - количество серий измерений",' + sLineBreak +
-                '      "pressure": "number или null - давление"' + sLineBreak +
-                '    }' + sLineBreak +
-                '  ],' + sLineBreak +
-                '  "calculation_parameters": {' + sLineBreak +
-                '    "dynamic_range": "string - динамический диапазон (формат 1:ХХХ)",' + sLineBreak +
-                '    "flow_velocity_qmax_m_s": "number или null - скорость потока при Qmax в м/с"' + sLineBreak +
-                '  },' + sLineBreak +
-                '  "deepseek_result": {' + sLineBreak +
-                '    "status": "string - ''completed'', ''partial'' или ''error''",' + sLineBreak +
-                '    "warnings": ["string - массив предупреждений"],' + sLineBreak +
-                '    "missing_fields": ["string - массив незаполненных полей"],' + sLineBreak +
-                '    "raw_notes": "string - примечания по парсингу"' + sLineBreak +
-                '  }' + sLineBreak +
-                '}';
+              JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
 
               if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
               begin
