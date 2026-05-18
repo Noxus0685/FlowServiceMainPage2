@@ -1875,7 +1875,9 @@ begin
       'Верни ТОЛЬКО объект из шаблона output (без оберток input/output_schema/_parsing_instructions).' + sLineBreak +
       'Класс точности бери из поля device_type.general_info.accuracy_class в шаблоне.' + sLineBreak +
       'Если класс не определен в тексте — используй уже переданный класс из шаблона.' + sLineBreak +
-      'Для base_error верни минимальную погрешность в % для выбранного класса точности.' + sLineBreak +
+      'Для base_error верни минимальную погрешность в % для выбранного класса точности (например 1, а не 5).' + sLineBreak +
+      'Если для расхода в строке/ячейке указано несколько чисел (диапазон, через тире, slash и т.п.), для полей диаметра выбирай МАКСИМАЛЬНОЕ число.' + sLineBreak +
+      'Поля diameters.qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s заполняй из ОДНОЙ строки соответствующего диаметра, не смешивай числа из других строк.' + sLineBreak +
       'Значения qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
@@ -2152,6 +2154,58 @@ var
     end;
     Result := HasVal;
   end;
+
+  function ExtractMaxFloatFromText(const S: string; out AValue: Double): Boolean;
+  var
+    I, J: Integer;
+    Token: string;
+    FS: TFormatSettings;
+    V: Double;
+    HasVal: Boolean;
+  begin
+    Result := False;
+    AValue := 0;
+    FS := TFormatSettings.Invariant;
+    HasVal := False;
+    I := 1;
+    while I <= Length(S) do
+    begin
+      if CharInSet(S[I], ['0'..'9', '-', '+']) then
+      begin
+        J := I;
+        while (J <= Length(S)) and CharInSet(S[J], ['0'..'9', '.', ',', '-', '+']) do
+          Inc(J);
+        Token := StringReplace(Copy(S, I, J - I), ',', '.', [rfReplaceAll]);
+        if TryStrToFloat(Token, V, FS) then
+        begin
+          if (not HasVal) or (V > AValue) then
+            AValue := V;
+          HasVal := True;
+        end;
+        I := J;
+      end
+      else
+        Inc(I);
+    end;
+    Result := HasVal;
+  end;
+
+  function GetJsonFlowDoubleDef(const AObj: TJSONObject; const AName: string; const ADefault: Double): Double;
+  var
+    V: TJSONValue;
+    Parsed: Double;
+  begin
+    Result := ADefault;
+    if AObj = nil then
+      Exit;
+    V := AObj.GetValue(AName);
+    if V = nil then
+      Exit;
+    if V is TJSONNumber then
+      Exit(TJSONNumber(V).AsDouble);
+    if (V is TJSONString) and ExtractMaxFloatFromText(TJSONString(V).Value, Parsed) then
+      Exit(Parsed);
+  end;
 begin
   Result := False;
   JsonVal := TJSONObject.ParseJSONValue(AResponse);
@@ -2198,13 +2252,13 @@ begin
         D.Enable := DObj.GetValue<Boolean>('enabled', True);
         D.Name := DObj.GetValue<string>('name', '');
         D.DN := DObj.GetValue<string>('dn_mm', '');
-        D.Qmax := GetJsonDoubleDef(DObj, 'qmax_l_s', 0);
-        D.Qnom := GetJsonDoubleDef(DObj, 'qnom_l_s', 0);
-        D.Qtr := GetJsonDoubleDef(DObj, 'qtr_l_s', 0);
-        D.Q2tr := GetJsonDoubleDef(DObj, 'q2tr_l_s', 0);
-        D.Qmin := GetJsonDoubleDef(DObj, 'qmin_l_s', 0);
+        D.Qmax := GetJsonFlowDoubleDef(DObj, 'qmax_l_s', 0);
+        D.Qnom := GetJsonFlowDoubleDef(DObj, 'qnom_l_s', 0);
+        D.Qtr := GetJsonFlowDoubleDef(DObj, 'qtr_l_s', 0);
+        D.Q2tr := GetJsonFlowDoubleDef(DObj, 'q2tr_l_s', 0);
+        D.Qmin := GetJsonFlowDoubleDef(DObj, 'qmin_l_s', 0);
         D.Kp := GetJsonDoubleDef(DObj, 'kp_imp_l', 0);
-        D.QFmax := GetJsonDoubleDef(DObj, 'qf_l_s', 0);
+        D.QFmax := GetJsonFlowDoubleDef(DObj, 'qf_l_s', 0);
         if IsFlowUnitM3h(GetSelectedFlowUnit) then
         begin
           D.Qmax := FType.ToBaseUnits(D.Qmax);
@@ -2213,6 +2267,12 @@ begin
           D.Q2tr := FType.ToBaseUnits(D.Q2tr);
           D.Qmin := FType.ToBaseUnits(D.Qmin);
           D.QFmax := FType.ToBaseUnits(D.QFmax);
+        end;
+        if (D.Qmax > 0) and (D.Qnom > 0) and (D.Qnom > D.Qmax) then
+        begin
+          D.Qmax := D.Qmax + D.Qnom;
+          D.Qnom := D.Qmax - D.Qnom;
+          D.Qmax := D.Qmax - D.Qnom;
         end;
         if (D.Qtr > 0) and (D.Q2tr > 0) and (D.Q2tr < D.Qtr) then
         begin
