@@ -1843,7 +1843,7 @@ var
   ChoiceObj, MessageObj: TJSONObject;
   ContentValue: TJSONValue;
 const
-  MAX_TEXT_LENGTH = 12000;
+  MAX_TEXT_LENGTH = 50000;
 begin
   Result := False;
   AResponse := '';
@@ -3214,7 +3214,7 @@ var
   ApiKey: string;
 
 const
-  MAX_TEXT_LENGTH = 12000; // ⬅ безопасно для DeepSeek
+  MAX_TEXT_LENGTH = 50000; // ⬅ безопасно для DeepSeek
 begin
   if not FileExists(FilePath) then
     raise Exception.Create('Файл не найден: ' + FilePath);
