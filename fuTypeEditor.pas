@@ -834,6 +834,21 @@ begin
 end;
 
 procedure TFormTypeEditor.UpdateUIFromType;
+  procedure SetFileEditFromStoredPath(const ALayoutName, AStoredPath: string);
+  var
+    E: TEdit;
+    S: string;
+  begin
+    E := FindLayoutEdit(ALayoutName);
+    if E = nil then
+      Exit;
+    S := Trim(AStoredPath);
+    E.Hint := S; // Храним полный путь в Hint, в Edit показываем только имя файла.
+    if S <> '' then
+      E.Text := ExtractFileName(S)
+    else
+      E.Text := '';
+  end;
 var
   AccErr: Double;
   Idx: Integer;
@@ -845,12 +860,9 @@ begin
     // =====================================================
     EditName.Text          := FType.Name;
     // Файлы типа прибора: загрузка из БД в Edit внутри Layout49/51/52.
-    if FindLayoutEdit('Layout49') <> nil then
-      FindLayoutEdit('Layout49').Text := FType.FileName1;
-    if FindLayoutEdit('Layout51') <> nil then
-      FindLayoutEdit('Layout51').Text := FType.FileName2;
-    if FindLayoutEdit('Layout52') <> nil then
-      FindLayoutEdit('Layout52').Text := FType.FileName3;
+    SetFileEditFromStoredPath('Layout49', FType.FileName1);
+    SetFileEditFromStoredPath('Layout51', FType.FileName2);
+    SetFileEditFromStoredPath('Layout52', FType.FileName3);
     EditModification.Text := FType.Modification;
     edtReestrNumber.Text  := FType.ReestrNumber;
 
@@ -1058,15 +1070,26 @@ cbOutPutType2.Hint := cbOutPutType2.Text;
 end;
 
 procedure TFormTypeEditor.UpdateTypeFromUI;
+  function GetStoredPathFromEdit(const ALayoutName: string): string;
+  var
+    E: TEdit;
+  begin
+    Result := '';
+    E := FindLayoutEdit(ALayoutName);
+    if E = nil then
+      Exit;
+    if Trim(E.Text) = '' then
+      Exit(''); // Если Edit очищен, очищаем и сохраненное значение.
+    if Trim(E.Hint) <> '' then
+      Exit(Trim(E.Hint)); // Предпочитаем полный путь из Hint.
+    Result := Trim(E.Text); // Для обратной совместимости, если пути нет.
+  end;
 begin
   FType.Name              := EditName.Text;
   // Файлы типа прибора: сохранение рядом с EditName.
-  if FindLayoutEdit('Layout49') <> nil then
-    FType.FileName1 := Trim(FindLayoutEdit('Layout49').Text);
-  if FindLayoutEdit('Layout51') <> nil then
-    FType.FileName2 := Trim(FindLayoutEdit('Layout51').Text);
-  if FindLayoutEdit('Layout52') <> nil then
-    FType.FileName3 := Trim(FindLayoutEdit('Layout52').Text);
+  FType.FileName1 := GetStoredPathFromEdit('Layout49');
+  FType.FileName2 := GetStoredPathFromEdit('Layout51');
+  FType.FileName3 := GetStoredPathFromEdit('Layout52');
   FType.Modification      := EditModification.Text;
   FType.Manufacturer      := edtManufacturer.Text;
   FType.ReestrNumber      := edtReestrNumber.Text;
@@ -1631,7 +1654,10 @@ begin
   Dlg := TOpenDialog.Create(nil);
   try
     if Dlg.Execute then
-      E.Text := ExtractFileName(Dlg.FileName);
+    begin
+      E.Hint := Dlg.FileName; // Сохраняем полный путь в Hint.
+      E.Text := ExtractFileName(Dlg.FileName); // В Edit показываем только имя.
+    end;
   finally
     Dlg.Free;
   end;
