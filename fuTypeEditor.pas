@@ -1629,16 +1629,18 @@ end;
 procedure TFormTypeEditor.AddFileClick(Sender: TObject);
 begin
 
+   if (Edit1.text <> '') and (Edit2.text <> '') then
+    Layout52.Visible := not(Layout52.Visible)
+   else  if (Edit1.text <> '') and (Edit2.text = '') then
+    begin
+      Layout52.Visible :=false;
+     Layout51.Visible := not(Layout51.Visible);
+    end;
 
-  if (FType.FileName1 <> '')  then
-    Layout51.Visible := true
-  else
-    Layout51.Visible := False;
 
-  if (FType.FileName2 <> '')then
-    Layout52.Visible := true
-  else
-    Layout52.Visible := False;
+
+
+
 
 
 end;

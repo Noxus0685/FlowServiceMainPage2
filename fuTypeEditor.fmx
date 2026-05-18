@@ -156,7 +156,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 47
+    TabOrder = 48
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
