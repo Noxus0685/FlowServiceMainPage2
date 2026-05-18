@@ -1882,6 +1882,8 @@ begin
       'После выбора строки возьми из нее все расходные поля целиком (qmax_l_s, qnom_l_s, qtr_l_s, q2tr_l_s, qmin_l_s, qf_l_s); не смешивай поля из разных строк одного DN.' + sLineBreak +
       'Если в тексте строка DN идет ПОСЛЕ чисел (ошибка извлечения PDF), привяжи эти числа к ближайшему DN ниже; при конфликте оставь вариант с БОЛЬШИМИ расходами.' + sLineBreak +
       'Значения qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
+      'Не угадывай q2tr_l_s по имени класса. Определи по таблице выбранного класса точности: если в строке класса есть только Q1,Q2,Q3,Q4 — верни q2tr_l_s = null; если есть Q1,Q2,Q2t,Q3,Q4 — заполни q2tr_l_s.' + sLineBreak +
+      'Сначала смотри таблицу именно для выбранного класса точности из device_type.general_info.accuracy_class и по количеству Q-порогов заполняй поля расходов.' + sLineBreak +
       'В deepseek_result.raw_notes добавь фразу: Выбрана строка с максимальным расходом для каждого DN.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
@@ -2070,6 +2072,7 @@ var
     U := LowerCase(Trim(AUnit));
     Result := (Pos('м3/ч', U) > 0) or (Pos('m3/h', U) > 0);
   end;
+
   function ExtractFirstFloat(const S: string; out AValue: Double): Boolean;
   var
     I, StartPos: Integer;
