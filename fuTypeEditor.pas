@@ -218,7 +218,6 @@ type
     layTop: TLayout;
     GroupBox1: TGroupBox;
     lytButtons: TLayout;
-    btnPdfToText: TCornerButton;
     btnOK: TCornerButton;
     btnCancel: TCornerButton;
     shdwfct3: TShadowEffect;
@@ -354,7 +353,6 @@ type
     procedure sbFindReestrNumberClick(Sender: TObject);
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
-    procedure btnPdfToTextClick(Sender: TObject);
     procedure AddFileClick(Sender: TObject);
     procedure SpeedButton2Click(Sender: TObject);
     procedure SpeedButton4Click(Sender: TObject);
@@ -1650,7 +1648,6 @@ begin
 
 
 
-
 end;
 
 procedure TFormTypeEditor.SelectFileToLayoutEdit(const ALayoutName: string);
@@ -1710,104 +1707,6 @@ begin
   ModalResult := mrCancel;
 end;
 
-procedure TFormTypeEditor.btnPdfToTextClick(Sender: TObject);
-var
-  PdfPath: string;
-  TxtPath: string;
-  JsonPath: string;
-  PdfText: string;
-  JsonTemplate: string;
-  DeepSeekResponse: string;
-begin
-  if not SelectPdfFile(PdfPath) then
-    Exit;
-
-  TxtPath := ChangeFileExt(PdfPath, '.txt');
-  if not ExtractTextLayerFromPdf(PdfPath, TxtPath) then
-    Exit;
-
-  PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-  JsonTemplate :=
-    '{' + sLineBreak +
-    '  "device_type": {' + sLineBreak +
-    '    "general_info": {' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "category": null,' + sLineBreak +
-    '      "manufacturer": null,' + sLineBreak +
-    '      "modification": null,' + sLineBreak +
-    '      "procedure": null,' + sLineBreak +
-    '      "grsi_number": null,' + sLineBreak +
-    '      "valid_from": null,' + sLineBreak +
-    '      "valid_to": null,' + sLineBreak +
-    '      "mpi": null,' + sLineBreak +
-    '      "verification_method": null,' + sLineBreak +
-    '      "accuracy_class": null,' + sLineBreak +
-    '      "base_error": null,' + sLineBreak +
-    '      "report_form_file": null' + sLineBreak +
-    '    },' + sLineBreak +
-    '    "signal": {' + sLineBreak +
-    '      "measured_value": null,' + sLineBreak +
-    '      "measurement_unit": null,' + sLineBreak +
-    '      "signal_type": null' + sLineBreak +
-    '    },' + sLineBreak +
-    '    "pulses": {' + sLineBreak +
-    '      "output_type": null,' + sLineBreak +
-    '      "representation": null,' + sLineBreak +
-    '      "kp_qmax": null' + sLineBreak +
-    '    }' + sLineBreak +
-    '  },' + sLineBreak +
-    '  "diameters": [' + sLineBreak +
-    '    {' + sLineBreak +
-    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
-    '      "enabled": false,' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "dn_mm": null,' + sLineBreak +
-    '      "qmax_l_s": null,' + sLineBreak +
-    '      "qnom_l_s": null,' + sLineBreak +
-    '      "qtr_l_s": null,' + sLineBreak +
-    '      "q2tr_l_s": null,' + sLineBreak +
-    '      "qmin_l_s": null,' + sLineBreak +
-    '      "kp_imp_l": null,' + sLineBreak +
-    '      "qf_l_s": null' + sLineBreak +
-    '    }' + sLineBreak +
-    '  ],' + sLineBreak +
-    '  "verification_points": [' + sLineBreak +
-    '    {' + sLineBreak +
-    '      "enabled": false,' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "q_qmax": null,' + sLineBreak +
-    '      "q_l_s": null,' + sLineBreak +
-    '      "volume_l": null,' + sLineBreak +
-    '      "impulses_count": null,' + sLineBreak +
-    '      "time_s": null,' + sLineBreak +
-    '      "error_percent": null,' + sLineBreak +
-    '      "expanded_uncertainty_percent": null,' + sLineBreak +
-    '      "stabilization_time_s": null,' + sLineBreak +
-    '      "repeat_count": null,' + sLineBreak +
-    '      "measurement_series_count": null,' + sLineBreak +
-    '      "pressure": null' + sLineBreak +
-    '    }' + sLineBreak +
-    '  ],' + sLineBreak +
-    '  "calculation_parameters": {' + sLineBreak +
-    '    "dynamic_range": null,' + sLineBreak +
-    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
-    '  },' + sLineBreak +
-    '  "deepseek_result": {' + sLineBreak +
-    '    "status": null,' + sLineBreak +
-    '    "warnings": [],' + sLineBreak +
-    '    "missing_fields": [],' + sLineBreak +
-    '    "raw_notes": null' + sLineBreak +
-    '  }' + sLineBreak +
-    '}';
-
-  if not SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
-    Exit;
-
-  JsonPath := ChangeFileExt(TxtPath, '.json');
-  TFile.WriteAllText(JsonPath, DeepSeekResponse, TEncoding.UTF8);
-  ApplyDeepSeekJsonToType(DeepSeekResponse);
-  ShowMessage('JSON сохранён: ' + JsonPath);
-end;
 
 function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
 var
