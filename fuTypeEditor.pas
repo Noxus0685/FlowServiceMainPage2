@@ -1862,6 +1862,7 @@ begin
   try
     MsgSys.AddPair('role', 'system');
     MsgSys.AddPair('content', 'Ты инженер-метролог. Заполни шаблон JSON на основе текста.');
+
     MsgUser.AddPair('role', 'user');
     MsgUser.AddPair('content',
       'Заполни JSON по данным из переданного текста или PDF.' + sLineBreak +
@@ -1869,25 +1870,33 @@ begin
       'Не добавляй markdown.' + sLineBreak +
       'Не добавляй ```json.' + sLineBreak +
       'Если данных нет — оставь null.' + sLineBreak +
+      'qmax_l_s = Q4, qnom_l_s = Q3, qtr_l_s = Q2, q2tr_l_s = Q2t, qmin_l_s = Q1' + sLineBreak +
       'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
       'Числа возвращай без единиц измерения.' + sLineBreak +
       'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
-      'Верни ТОЛЬКО объект из шаблона output (без оберток input/output_schema/_parsing_instructions).' + sLineBreak +
-      'Класс точности бери из поля device_type.general_info.accuracy_class в шаблоне.' + sLineBreak +
-      'Если класс не определен в тексте — используй уже переданный класс из шаблона.' + sLineBreak +
-      'Для base_error верни минимальную погрешность в % для выбранного класса точности (например 1, а не 5).' + sLineBreak +
-      'В этом документе для одного диаметра могут идти несколько СТРОК с расходами; считай их относящимися к одному DN.' + sLineBreak +
-      'Выбирай для каждого DN строку с максимальным Q3 (номинальным расходом).' + sLineBreak +
-      'Для каждого DN собери все относящиеся строки и выбери ОДНУ строку: с максимальным qnom_l_s (Q3); при равенстве qnom_l_s выбери с максимальным qmax_l_s (Q4).' + sLineBreak +
-      'После выбора строки возьми из нее все расходные поля целиком (qmax_l_s, qnom_l_s, qtr_l_s, q2tr_l_s, qmin_l_s, qf_l_s); не смешивай поля из разных строк одного DN.' + sLineBreak +
-      'Если в тексте строка DN идет ПОСЛЕ чисел (ошибка извлечения PDF), привяжи эти числа к ближайшему DN ниже; при конфликте оставь вариант с БОЛЬШИМИ расходами.' + sLineBreak +
-      'Значения qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
-      'Не угадывай q2tr_l_s по имени класса. Определи по таблице выбранного класса точности: если в строке класса есть только Q1,Q2,Q3,Q4 — верни q2tr_l_s = null; если есть Q1,Q2,Q2t,Q3,Q4 — заполни q2tr_l_s.' + sLineBreak +
-      'Сначала смотри таблицу именно для выбранного класса точности из device_type.general_info.accuracy_class и по количеству Q-порогов заполняй поля расходов.' + sLineBreak +
-      'В deepseek_result.raw_notes добавь фразу: Выбрана строка с максимальным расходом для каждого DN.' + sLineBreak +
+      'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
+      'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
+      'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
+      'Для base_error верни минимальную погрешность в % для выбранного класса.' + sLineBreak +
+      sLineBreak +
+      '=== ВАЖНОЕ ПРАВИЛО ВЫБОРА СТРОКИ ДЛЯ КАЖДОГО DN: ===' + sLineBreak +
+      '1. В таблице для одного DN может быть НЕСКОЛЬКО строк (например, две строки для DN15).' + sLineBreak +
+      '2. Каждая строка имеет свои значения Q1, Q2, Q2t, Q3, Q4.' + sLineBreak +
+      '3. Из ВСЕХ строк для данного DN выбери ОДНУ строку, у которой Q3 (qnom_l_s) — САМЫЙ БОЛЬШОЙ.' + sLineBreak +
+      '4. Пример: для DN15 есть строка с Q3=3 и строка с Q3=6. Выбери строку с Q3=6.' + sLineBreak +
+      '5. Если Q3 одинаковый в нескольких строках — выбери строку с максимальным Q4 (qmax_l_s).' + sLineBreak +
+      '6. После выбора строки возьми ИЗ НЕЕ ЖЕ все пять расходных полей (Q1, Q2, Q2t, Q3, Q4).' + sLineBreak +
+      '7. НЕ смешивай поля из разных строк одного DN.' + sLineBreak +
+      sLineBreak +
+      '=== ДОПОЛНИТЕЛЬНЫЕ УКАЗАНИЯ: ===' + sLineBreak +
+      'Если в тексте строка DN идет ПОСЛЕ чисел — привяжи числа к ближайшему DN снизу.' + sLineBreak +
+      'Значения расходов верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
+      'Если в таблице класса точности нет Q2t — верни q2tr_l_s = null.' + sLineBreak +
+      'В deepseek_result.raw_notes добавь: "Выбрана строка с максимальным Q3 для каждого DN."' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
-      'Текст:' + sLineBreak + LimitedText);
+      'Текст:' + sLineBreak + LimitedText
+    );
     Messages.Add(MsgSys);
     Messages.Add(MsgUser);
     JsonReq.AddPair('model', 'deepseek-chat');
