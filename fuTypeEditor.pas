@@ -380,6 +380,7 @@ type
     // Применение JSON-ответа DeepSeek к форме типа прибора.
     function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
     function GetSelectedAccuracyClass: string;
+    function GetSelectedFlowUnit: string;
     function BuildDeepSeekTemplate(const AAccuracyClass: string): string;
 
   private
@@ -1875,6 +1876,7 @@ begin
       'Класс точности бери из поля device_type.general_info.accuracy_class в шаблоне.' + sLineBreak +
       'Если класс не определен в тексте — используй уже переданный класс из шаблона.' + sLineBreak +
       'Для base_error верни минимальную погрешность в % для выбранного класса точности.' + sLineBreak +
+      'Значения qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
       'Текст:' + sLineBreak + LimitedText);
@@ -1961,6 +1963,16 @@ begin
   Result := S;
 end;
 
+function TFormTypeEditor.GetSelectedFlowUnit: string;
+var
+  S: string;
+begin
+  S := Trim(ComboBoxUnits.Text);
+  if S = '' then
+    S := 'л/с';
+  Result := S;
+end;
+
 function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass: string): string;
 begin
   Result :=
@@ -1983,7 +1995,7 @@ begin
     '    },' + sLineBreak +
     '    "signal": {' + sLineBreak +
     '      "measured_value": null,' + sLineBreak +
-    '      "measurement_unit": null,' + sLineBreak +
+    '      "measurement_unit": "' + StringReplace(GetSelectedFlowUnit, '"', '\"', [rfReplaceAll]) + '",' + sLineBreak +
     '      "signal_type": null' + sLineBreak +
     '    },' + sLineBreak +
     '    "pulses": {' + sLineBreak +
@@ -2045,6 +2057,13 @@ var
   P: TTypePoint;
   I: Integer;
   JsonVal: TJSONValue;
+  function IsFlowUnitM3h(const AUnit: string): Boolean;
+  var
+    U: string;
+  begin
+    U := LowerCase(Trim(AUnit));
+    Result := (Pos('м3/ч', U) > 0) or (Pos('m3/h', U) > 0);
+  end;
   function ExtractFirstFloat(const S: string; out AValue: Double): Boolean;
   var
     I, StartPos: Integer;
@@ -2186,6 +2205,21 @@ begin
         D.Qmin := GetJsonDoubleDef(DObj, 'qmin_l_s', 0);
         D.Kp := GetJsonDoubleDef(DObj, 'kp_imp_l', 0);
         D.QFmax := GetJsonDoubleDef(DObj, 'qf_l_s', 0);
+        if IsFlowUnitM3h(GetSelectedFlowUnit) then
+        begin
+          D.Qmax := FType.ToBaseUnits(D.Qmax);
+          D.Qnom := FType.ToBaseUnits(D.Qnom);
+          D.Qtr := FType.ToBaseUnits(D.Qtr);
+          D.Q2tr := FType.ToBaseUnits(D.Q2tr);
+          D.Qmin := FType.ToBaseUnits(D.Qmin);
+          D.QFmax := FType.ToBaseUnits(D.QFmax);
+        end;
+        if (D.Qtr > 0) and (D.Q2tr > 0) and (D.Q2tr < D.Qtr) then
+        begin
+          D.Qtr := D.Qtr + D.Q2tr;
+          D.Q2tr := D.Qtr - D.Q2tr;
+          D.Qtr := D.Qtr - D.Q2tr;
+        end;
         D.State := osNew;
         FDiametersLocal.Add(D);
       end;
