@@ -1061,11 +1061,11 @@ begin
   FType.Name              := EditName.Text;
   // Файлы типа прибора: сохранение рядом с EditName.
   if FindLayoutEdit('Layout49') <> nil then
-    FType.FileName1 := FindLayoutEdit('Layout49').Text;
+    FType.FileName1 := Trim(FindLayoutEdit('Layout49').Text);
   if FindLayoutEdit('Layout51') <> nil then
-    FType.FileName2 := FindLayoutEdit('Layout51').Text;
+    FType.FileName2 := Trim(FindLayoutEdit('Layout51').Text);
   if FindLayoutEdit('Layout52') <> nil then
-    FType.FileName3 := FindLayoutEdit('Layout52').Text;
+    FType.FileName3 := Trim(FindLayoutEdit('Layout52').Text);
   FType.Modification      := EditModification.Text;
   FType.Manufacturer      := edtManufacturer.Text;
   FType.ReestrNumber      := edtReestrNumber.Text;
@@ -1604,15 +1604,32 @@ end;
 
 procedure TFormTypeEditor.AddFileClick(Sender: TObject);
 var
-  E1, E2: TEdit;
+  E1, E2, E3: TEdit;
+  L51, L52: TLayout;
 begin
   // Последовательное открытие Layout51/52 по заполнению предыдущего файла.
   E1 := FindLayoutEdit('Layout49');
   E2 := FindLayoutEdit('Layout51');
-  if (FindComponent('Layout49') is TLayout) and TLayout(FindComponent('Layout49')).Visible and (E1 <> nil) and (Trim(E1.Text) <> '') then
-    if FindComponent('Layout51') is TLayout then TLayout(FindComponent('Layout51')).Visible := True;
-  if (FindComponent('Layout51') is TLayout) and TLayout(FindComponent('Layout51')).Visible and (E2 <> nil) and (Trim(E2.Text) <> '') then
-    if FindComponent('Layout52') is TLayout then TLayout(FindComponent('Layout52')).Visible := True;
+  E3 := FindLayoutEdit('Layout52');
+  if FindComponent('Layout51') is TLayout then
+    L51 := TLayout(FindComponent('Layout51'))
+  else
+    L51 := nil;
+  if FindComponent('Layout52') is TLayout then
+    L52 := TLayout(FindComponent('Layout52'))
+  else
+    L52 := nil;
+
+  if (FindComponent('Layout49') is TLayout) and TLayout(FindComponent('Layout49')).Visible and (E1 <> nil) and (Trim(E1.Text) <> '') and (L51 <> nil) then
+    L51.Visible := True;
+  if (L51 <> nil) and L51.Visible and (E2 <> nil) and (Trim(E2.Text) <> '') and (L52 <> nil) then
+    L52.Visible := True;
+
+  // По кнопке AddFile: последний пустой блок скрываем обратно.
+  if (L52 <> nil) and L52.Visible and (E3 <> nil) and (Trim(E3.Text) = '') then
+    L52.Visible := False
+  else if (L51 <> nil) and L51.Visible and (E2 <> nil) and (Trim(E2.Text) = '') then
+    L51.Visible := False;
 end;
 
 procedure TFormTypeEditor.SelectFileToLayoutEdit(const ALayoutName: string);
