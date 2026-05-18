@@ -267,6 +267,21 @@ type
     Layout48: TLayout;
     LFLowEate: TLabel;
     EditFlowRate: TEdit;
+    Layout49: TLayout;
+    Label4: TLabel;
+    Edit1: TEdit;
+    SpeedButton2: TSpeedButton;
+    Layout50: TLayout;
+    AddFile: TSpeedButton;
+    Layout51: TLayout;
+    Label7: TLabel;
+    Edit2: TEdit;
+    SpeedButton4: TSpeedButton;
+    Layout52: TLayout;
+    Label43: TLabel;
+    Edit3: TEdit;
+    SpeedButton5: TSpeedButton;
+    Layout53: TLayout;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -1612,33 +1627,20 @@ begin
 end;
 
 procedure TFormTypeEditor.AddFileClick(Sender: TObject);
-var
-  E1, E2, E3: TEdit;
-  L51, L52: TLayout;
 begin
-  // Последовательное открытие Layout51/52 по заполнению предыдущего файла.
-  E1 := FindLayoutEdit('Layout49');
-  E2 := FindLayoutEdit('Layout51');
-  E3 := FindLayoutEdit('Layout52');
-  if FindComponent('Layout51') is TLayout then
-    L51 := TLayout(FindComponent('Layout51'))
-  else
-    L51 := nil;
-  if FindComponent('Layout52') is TLayout then
-    L52 := TLayout(FindComponent('Layout52'))
-  else
-    L52 := nil;
 
-  if (FindComponent('Layout49') is TLayout) and TLayout(FindComponent('Layout49')).Visible and (E1 <> nil) and (Trim(E1.Text) <> '') and (L51 <> nil) then
-    L51.Visible := True;
-  if (L51 <> nil) and L51.Visible and (E2 <> nil) and (Trim(E2.Text) <> '') and (L52 <> nil) then
-    L52.Visible := True;
 
-  // По кнопке AddFile: последний пустой блок скрываем обратно.
-  if (L52 <> nil) and L52.Visible and (E3 <> nil) and (Trim(E3.Text) = '') then
-    L52.Visible := False
-  else if (L51 <> nil) and L51.Visible and (E2 <> nil) and (Trim(E2.Text) = '') then
-    L51.Visible := False;
+  if (FType.FileName1 <> '')  then
+    Layout51.Visible := true
+  else
+    Layout51.Visible := False;
+
+  if (FType.FileName2 <> '')then
+    Layout52.Visible := true
+  else
+    Layout52.Visible := False;
+
+
 end;
 
 procedure TFormTypeEditor.SelectFileToLayoutEdit(const ALayoutName: string);
