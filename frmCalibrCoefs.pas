@@ -87,6 +87,8 @@ type
     procedure SpeedButtonAddTableClick(Sender: TObject);
     procedure ComboBoxUnitsCorrectionChange(Sender: TObject);
     procedure SpeedButtonShowGraphClick(Sender: TObject);
+    procedure GridCoefsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
   private
     FFlowMeter: TFlowMeter;
     FValue: TMeterValue;   //Корректируемое значение
@@ -152,6 +154,7 @@ begin
 
   GridCoefs.OnGetValue := GridCoefsGetValue;
   GridCoefs.OnSetValue := GridCoefsSetValue;
+  GridCoefs.OnKeyDown := GridCoefsKeyDown;
 
   ComboBoxCoefType.OnChange := ComboBoxCoefTypeChange;
   ComboBoxCoefTable.OnChange := ComboBoxCoefTableChange;
@@ -165,6 +168,17 @@ begin
 
   EnsureChartSeries;
   FillCoefTypes;
+end;
+
+procedure TFrameCalibrCoefs.GridCoefsKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkDelete then
+  begin
+    SpeedButtonCoefDeleteClick(SpeedButtonCoefDelete);
+    Key := 0;
+    KeyChar := #0;
+  end;
 end;
 
 destructor TFrameCalibrCoefs.Destroy;
