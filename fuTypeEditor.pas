@@ -433,6 +433,14 @@ type
   procedure SetupFileLayoutsForNewType;
   procedure SetupFileLayoutsForExistingType;
   procedure SelectFileToLayoutEdit(const ALayoutName: string);
+  // Проверка наличия локально выбранных файлов реестра в Edit1/Edit2/Edit3.
+  function HasLocalReestrFiles: Boolean;
+  // Преобразование значения Edit/Hint в полный путь к локальному файлу.
+  function ResolveReestrFilePath(const AEdit: TEdit): string;
+  // Проверка существования локально выбранных файлов реестра.
+  function CheckLocalReestrFiles: Boolean;
+  // Обработка локально выбранных файлов без скачивания с АРШИН.
+  procedure ProcessLocalReestrFiles;
 
 
 
@@ -1748,8 +1756,38 @@ begin
     '      "kp_qmax": null' + sLineBreak +
     '    }' + sLineBreak +
     '  },' + sLineBreak +
-    '  "diameters": [],' + sLineBreak +
-    '  "verification_points": [],' + sLineBreak +
+    '  "diameters": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "dn_mm": null,' + sLineBreak +
+    '      "qmax_l_s": null,' + sLineBreak +
+    '      "qnom_l_s": null,' + sLineBreak +
+    '      "qtr_l_s": null,' + sLineBreak +
+    '      "q2tr_l_s": null,' + sLineBreak +
+    '      "qmin_l_s": null,' + sLineBreak +
+    '      "kp_imp_l": null,' + sLineBreak +
+    '      "qf_l_s": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "verification_points": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "q_qmax": null,' + sLineBreak +
+    '      "q_l_s": null,' + sLineBreak +
+    '      "volume_l": null,' + sLineBreak +
+    '      "impulses_count": null,' + sLineBreak +
+    '      "time_s": null,' + sLineBreak +
+    '      "error_percent": null,' + sLineBreak +
+    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+    '      "stabilization_time_s": null,' + sLineBreak +
+    '      "repeat_count": null,' + sLineBreak +
+    '      "measurement_series_count": null,' + sLineBreak +
+    '      "pressure": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
     '  "calculation_parameters": {' + sLineBreak +
     '    "dynamic_range": null,' + sLineBreak +
     '    "flow_velocity_qmax_m_s": null' + sLineBreak +
@@ -4744,6 +4782,177 @@ begin
 
 end;
 
+
+function TFormTypeEditor.HasLocalReestrFiles: Boolean;
+begin
+  // Проверяем, выбрал ли пользователь хотя бы один локальный файл.
+  Result :=
+    (Trim(Edit1.Text) <> '') or
+    (Trim(Edit2.Text) <> '') or
+    (Trim(Edit3.Text) <> '');
+end;
+
+function TFormTypeEditor.ResolveReestrFilePath(const AEdit: TEdit): string;
+var
+  Candidate: string;
+begin
+  Result := '';
+  if AEdit = nil then
+    Exit;
+
+  // Сначала пробуем полный путь, который хранится в Hint.
+  Candidate := Trim(AEdit.Hint);
+  if (Candidate <> '') and FileExists(Candidate) then
+    Exit(Candidate);
+
+  // Затем проверяем значение из Edit как абсолютный/относительный путь.
+  Candidate := Trim(AEdit.Text);
+  if Candidate = '' then
+    Exit;
+
+  if (ExtractFilePath(Candidate) <> '') and FileExists(Candidate) then
+    Exit(Candidate);
+
+  // Если в Edit только имя файла, формируем путь в стандартной папке хранения.
+  Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Docs\Types'), Candidate);
+end;
+
+function TFormTypeEditor.CheckLocalReestrFiles: Boolean;
+var
+  FilePath1, FilePath2, FilePath3: string;
+begin
+  // Проверяем существование каждого заполненного файла.
+  Result := False;
+
+  FilePath1 := ResolveReestrFilePath(Edit1);
+  if (Trim(Edit1.Text) <> '') and (not FileExists(FilePath1)) then
+  begin
+    ShowMessage('Файл из Edit1 не найден: ' + FilePath1);
+    Exit;
+  end;
+
+  FilePath2 := ResolveReestrFilePath(Edit2);
+  if (Trim(Edit2.Text) <> '') and (not FileExists(FilePath2)) then
+  begin
+    ShowMessage('Файл из Edit2 не найден: ' + FilePath2);
+    Exit;
+  end;
+
+  FilePath3 := ResolveReestrFilePath(Edit3);
+  if (Trim(Edit3.Text) <> '') and (not FileExists(FilePath3)) then
+  begin
+    ShowMessage('Файл из Edit3 не найден: ' + FilePath3);
+    Exit;
+  end;
+
+  Result := True;
+end;
+
+procedure TFormTypeEditor.ProcessLocalReestrFiles;
+const
+  JsonTemplate: string =
+    '{' + sLineBreak +
+    '  "device_type": {' + sLineBreak +
+    '    "general_info": {' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "category": null,' + sLineBreak +
+    '      "manufacturer": null,' + sLineBreak +
+    '      "modification": null,' + sLineBreak +
+    '      "procedure": null,' + sLineBreak +
+    '      "grsi_number": null,' + sLineBreak +
+    '      "valid_from": null,' + sLineBreak +
+    '      "valid_to": null,' + sLineBreak +
+    '      "mpi": null,' + sLineBreak +
+    '      "verification_method": null,' + sLineBreak +
+    '      "accuracy_class": null,' + sLineBreak +
+    '      "base_error": null,' + sLineBreak +
+    '      "report_form_file": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "signal": {' + sLineBreak +
+    '      "measured_value": null,' + sLineBreak +
+    '      "measurement_unit": null,' + sLineBreak +
+    '      "signal_type": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "pulses": {' + sLineBreak +
+    '      "output_type": null,' + sLineBreak +
+    '      "representation": null,' + sLineBreak +
+    '      "kp_qmax": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "diameters": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "dn_mm": null,' + sLineBreak +
+    '      "qmax_l_s": null,' + sLineBreak +
+    '      "qnom_l_s": null,' + sLineBreak +
+    '      "qtr_l_s": null,' + sLineBreak +
+    '      "q2tr_l_s": null,' + sLineBreak +
+    '      "qmin_l_s": null,' + sLineBreak +
+    '      "kp_imp_l": null,' + sLineBreak +
+    '      "qf_l_s": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "verification_points": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "q_qmax": null,' + sLineBreak +
+    '      "q_l_s": null,' + sLineBreak +
+    '      "volume_l": null,' + sLineBreak +
+    '      "impulses_count": null,' + sLineBreak +
+    '      "time_s": null,' + sLineBreak +
+    '      "error_percent": null,' + sLineBreak +
+    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+    '      "stabilization_time_s": null,' + sLineBreak +
+    '      "repeat_count": null,' + sLineBreak +
+    '      "measurement_series_count": null,' + sLineBreak +
+    '      "pressure": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "calculation_parameters": {' + sLineBreak +
+    '    "dynamic_range": null,' + sLineBreak +
+    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "deepseek_result": {' + sLineBreak +
+    '    "status": null,' + sLineBreak +
+    '    "warnings": [],' + sLineBreak +
+    '    "missing_fields": [],' + sLineBreak +
+    '    "raw_notes": null' + sLineBreak +
+    '  }' + sLineBreak +
+    '}';
+var
+  FilePath: string;
+  TxtPath: string;
+  PdfText: string;
+  DeepSeekResponse: string;
+
+  procedure ProcessOneFile(const AEdit: TEdit);
+  begin
+    if (AEdit = nil) or (Trim(AEdit.Text) = '') then
+      Exit;
+
+    FilePath := ResolveReestrFilePath(AEdit);
+    TxtPath := ChangeFileExt(FilePath, '.txt');
+
+    if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+    begin
+      PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+      if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+        ApplyDeepSeekJsonToType(DeepSeekResponse);
+    end;
+  end;
+begin
+  // Используем уже выбранные локальные файлы.
+  ProcessOneFile(Edit1);
+  ProcessOneFile(Edit2);
+  ProcessOneFile(Edit3);
+
+  UpdateUIFromType;
+  ShowMessage('Данные обработаны из локальных файлов.');
+end;
+
 procedure TFormTypeEditor.sbFindReestrNumberClick(Sender: TObject);
 const
   REQUEST_TIMEOUT_MS = 10000;
@@ -4781,6 +4990,7 @@ var
   DeepSeekResponse: string;
 
   DevType: TDeviceType;
+  LocalFilesProcessed: Boolean;
 
   P: Integer;
   YY: Integer;
@@ -4795,10 +5005,23 @@ begin
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
 
+  LocalFilesProcessed := False;
+
+  // Если файлы выбраны вручную — сначала обрабатываем их.
+  if HasLocalReestrFiles then
+  begin
+    if not CheckLocalReestrFiles then
+      Exit;
+
+    ProcessLocalReestrFiles;
+    LocalFilesProcessed := True;
+  end;
+
   ReestrNum := edtReestrNumber.Text.Trim;
   if ReestrNum = '' then
   begin
-    MemoLog.Lines.Add('ГРСИ не указан');
+    if not LocalFilesProcessed then
+      MemoLog.Lines.Add('ГРСИ не указан');
     Exit;
   end;
 
@@ -5061,8 +5284,38 @@ begin
                     '      "kp_qmax": null' + sLineBreak +
                     '    }' + sLineBreak +
                     '  },' + sLineBreak +
-                    '  "diameters": [],' + sLineBreak +
-                    '  "verification_points": [],' + sLineBreak +
+                    '  "diameters": [' + sLineBreak +
+                    '    {' + sLineBreak +
+                    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+                    '      "enabled": false,' + sLineBreak +
+                    '      "name": null,' + sLineBreak +
+                    '      "dn_mm": null,' + sLineBreak +
+                    '      "qmax_l_s": null,' + sLineBreak +
+                    '      "qnom_l_s": null,' + sLineBreak +
+                    '      "qtr_l_s": null,' + sLineBreak +
+                    '      "q2tr_l_s": null,' + sLineBreak +
+                    '      "qmin_l_s": null,' + sLineBreak +
+                    '      "kp_imp_l": null,' + sLineBreak +
+                    '      "qf_l_s": null' + sLineBreak +
+                    '    }' + sLineBreak +
+                    '  ],' + sLineBreak +
+                    '  "verification_points": [' + sLineBreak +
+                    '    {' + sLineBreak +
+                    '      "enabled": false,' + sLineBreak +
+                    '      "name": null,' + sLineBreak +
+                    '      "q_qmax": null,' + sLineBreak +
+                    '      "q_l_s": null,' + sLineBreak +
+                    '      "volume_l": null,' + sLineBreak +
+                    '      "impulses_count": null,' + sLineBreak +
+                    '      "time_s": null,' + sLineBreak +
+                    '      "error_percent": null,' + sLineBreak +
+                    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+                    '      "stabilization_time_s": null,' + sLineBreak +
+                    '      "repeat_count": null,' + sLineBreak +
+                    '      "measurement_series_count": null,' + sLineBreak +
+                    '      "pressure": null' + sLineBreak +
+                    '    }' + sLineBreak +
+                    '  ],' + sLineBreak +
                     '  "calculation_parameters": {' + sLineBreak +
                     '    "dynamic_range": null,' + sLineBreak +
                     '    "flow_velocity_qmax_m_s": null' + sLineBreak +
@@ -5120,8 +5373,38 @@ begin
                 '      "kp_qmax": null' + sLineBreak +
                 '    }' + sLineBreak +
                 '  },' + sLineBreak +
-                '  "diameters": [],' + sLineBreak +
-                '  "verification_points": [],' + sLineBreak +
+                '  "diameters": [' + sLineBreak +
+                '    {' + sLineBreak +
+                '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+                '      "enabled": false,' + sLineBreak +
+                '      "name": null,' + sLineBreak +
+                '      "dn_mm": null,' + sLineBreak +
+                '      "qmax_l_s": null,' + sLineBreak +
+                '      "qnom_l_s": null,' + sLineBreak +
+                '      "qtr_l_s": null,' + sLineBreak +
+                '      "q2tr_l_s": null,' + sLineBreak +
+                '      "qmin_l_s": null,' + sLineBreak +
+                '      "kp_imp_l": null,' + sLineBreak +
+                '      "qf_l_s": null' + sLineBreak +
+                '    }' + sLineBreak +
+                '  ],' + sLineBreak +
+                '  "verification_points": [' + sLineBreak +
+                '    {' + sLineBreak +
+                '      "enabled": false,' + sLineBreak +
+                '      "name": null,' + sLineBreak +
+                '      "q_qmax": null,' + sLineBreak +
+                '      "q_l_s": null,' + sLineBreak +
+                '      "volume_l": null,' + sLineBreak +
+                '      "impulses_count": null,' + sLineBreak +
+                '      "time_s": null,' + sLineBreak +
+                '      "error_percent": null,' + sLineBreak +
+                '      "expanded_uncertainty_percent": null,' + sLineBreak +
+                '      "stabilization_time_s": null,' + sLineBreak +
+                '      "repeat_count": null,' + sLineBreak +
+                '      "measurement_series_count": null,' + sLineBreak +
+                '      "pressure": null' + sLineBreak +
+                '    }' + sLineBreak +
+                '  ],' + sLineBreak +
                 '  "calculation_parameters": {' + sLineBreak +
                 '    "dynamic_range": null,' + sLineBreak +
                 '    "flow_velocity_qmax_m_s": null' + sLineBreak +
