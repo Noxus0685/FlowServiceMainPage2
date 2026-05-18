@@ -340,6 +340,10 @@ type
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
     procedure btnPdfToTextClick(Sender: TObject);
+    procedure AddFileClick(Sender: TObject);
+    procedure SpeedButton2Click(Sender: TObject);
+    procedure SpeedButton4Click(Sender: TObject);
+    procedure SpeedButton5Click(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
@@ -410,6 +414,10 @@ type
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
   procedure RecalcQRowFromKnown(const ANewD: TDiameter; const KnownCol: Integer; const KnownValue: Double; const AOldD: TDiameter = nil);
+  function FindLayoutEdit(const ALayoutName: string): TEdit;
+  procedure SetupFileLayoutsForNewType;
+  procedure SetupFileLayoutsForExistingType;
+  procedure SelectFileToLayoutEdit(const ALayoutName: string);
 
 
 
@@ -633,6 +641,15 @@ end;
    GridDiameters.OnResize := GridDiametersResize;
 
    LoadType(AType);
+   // Настройка кнопок работы с файлами по именам компонентов из .fmx.
+   if FindComponent('AddFile') is TSpeedButton then
+     TSpeedButton(FindComponent('AddFile')).OnClick := AddFileClick;
+   if FindComponent('SpeedButton2') is TSpeedButton then
+     TSpeedButton(FindComponent('SpeedButton2')).OnClick := SpeedButton2Click;
+   if FindComponent('SpeedButton4') is TSpeedButton then
+     TSpeedButton(FindComponent('SpeedButton4')).OnClick := SpeedButton4Click;
+   if FindComponent('SpeedButton5') is TSpeedButton then
+     TSpeedButton(FindComponent('SpeedButton5')).OnClick := SpeedButton5Click;
    UpdateGridDiametersHeaderRect;
  end;
 
@@ -802,6 +819,21 @@ begin
 end;
 
 procedure TFormTypeEditor.UpdateUIFromType;
+  procedure SetFileEditFromStoredPath(const ALayoutName, AStoredPath: string);
+  var
+    E: TEdit;
+    S: string;
+  begin
+    E := FindLayoutEdit(ALayoutName);
+    if E = nil then
+      Exit;
+    S := Trim(AStoredPath);
+    E.Hint := S; // Храним полный путь в Hint, в Edit показываем только имя файла.
+    if S <> '' then
+      E.Text := ExtractFileName(S)
+    else
+      E.Text := '';
+  end;
 var
   AccErr: Double;
   Idx: Integer;
@@ -812,6 +844,10 @@ begin
     // == Основные текстовые поля
     // =====================================================
     EditName.Text          := FType.Name;
+    // Файлы типа прибора: загрузка из БД в Edit внутри Layout49/51/52.
+    SetFileEditFromStoredPath('Layout49', FType.FileName1);
+    SetFileEditFromStoredPath('Layout51', FType.FileName2);
+    SetFileEditFromStoredPath('Layout52', FType.FileName3);
     EditModification.Text := FType.Modification;
     edtReestrNumber.Text  := FType.ReestrNumber;
 
@@ -1010,6 +1046,8 @@ cbOutPutType2.Hint := cbOutPutType2.Text;
     // == Точки
     // =====================================================
     UpdatePointsGrid;
+    // Видимость файловых блоков при открытии существующего типа.
+    SetupFileLayoutsForExistingType;
 
   finally
     FLoading := False;
@@ -1017,8 +1055,26 @@ cbOutPutType2.Hint := cbOutPutType2.Text;
 end;
 
 procedure TFormTypeEditor.UpdateTypeFromUI;
+  function GetStoredPathFromEdit(const ALayoutName: string): string;
+  var
+    E: TEdit;
+  begin
+    Result := '';
+    E := FindLayoutEdit(ALayoutName);
+    if E = nil then
+      Exit;
+    if Trim(E.Text) = '' then
+      Exit(''); // Если Edit очищен, очищаем и сохраненное значение.
+    if Trim(E.Hint) <> '' then
+      Exit(Trim(E.Hint)); // Предпочитаем полный путь из Hint.
+    Result := Trim(E.Text); // Для обратной совместимости, если пути нет.
+  end;
 begin
   FType.Name              := EditName.Text;
+  // Файлы типа прибора: сохранение рядом с EditName.
+  FType.FileName1 := GetStoredPathFromEdit('Layout49');
+  FType.FileName2 := GetStoredPathFromEdit('Layout51');
+  FType.FileName3 := GetStoredPathFromEdit('Layout52');
   FType.Modification      := EditModification.Text;
   FType.Manufacturer      := edtManufacturer.Text;
   FType.ReestrNumber      := edtReestrNumber.Text;
@@ -1508,10 +1564,119 @@ begin
 
     InitLocalData;
     UpdateUIFromType;
+    // Начальная видимость файловых блоков.
+    if AType = nil then
+      SetupFileLayoutsForNewType
+    else
+      SetupFileLayoutsForExistingType;
 
   finally
     FLoading := False;
   end;
+end;
+
+function TFormTypeEditor.FindLayoutEdit(const ALayoutName: string): TEdit;
+var
+  L: TLayout;
+  I: Integer;
+begin
+  Result := nil;
+  if not (FindComponent(ALayoutName) is TLayout) then
+    Exit;
+  L := TLayout(FindComponent(ALayoutName));
+  for I := 0 to L.ChildrenCount - 1 do
+    if L.Children[I] is TEdit then
+      Exit(TEdit(L.Children[I]));
+end;
+
+procedure TFormTypeEditor.SetupFileLayoutsForNewType;
+begin
+  // Новый тип прибора: показываем только первый файловый блок.
+  if FindComponent('Layout49') is TLayout then TLayout(FindComponent('Layout49')).Visible := True;
+  if FindComponent('Layout51') is TLayout then TLayout(FindComponent('Layout51')).Visible := False;
+  if FindComponent('Layout52') is TLayout then TLayout(FindComponent('Layout52')).Visible := False;
+end;
+
+procedure TFormTypeEditor.SetupFileLayoutsForExistingType;
+var
+  E1, E2: TEdit;
+begin
+  // Существующий тип: показываем следующий блок только если заполнен предыдущий.
+  E1 := FindLayoutEdit('Layout49');
+  E2 := FindLayoutEdit('Layout51');
+  if FindComponent('Layout49') is TLayout then TLayout(FindComponent('Layout49')).Visible := True;
+  if (FindComponent('Layout51') is TLayout) and (E1 <> nil) then
+    TLayout(FindComponent('Layout51')).Visible := Trim(E1.Text) <> '';
+  if (FindComponent('Layout52') is TLayout) and (E2 <> nil) then
+    TLayout(FindComponent('Layout52')).Visible := Trim(E2.Text) <> '';
+end;
+
+procedure TFormTypeEditor.AddFileClick(Sender: TObject);
+var
+  E1, E2, E3: TEdit;
+  L51, L52: TLayout;
+begin
+  // Последовательное открытие Layout51/52 по заполнению предыдущего файла.
+  E1 := FindLayoutEdit('Layout49');
+  E2 := FindLayoutEdit('Layout51');
+  E3 := FindLayoutEdit('Layout52');
+  if FindComponent('Layout51') is TLayout then
+    L51 := TLayout(FindComponent('Layout51'))
+  else
+    L51 := nil;
+  if FindComponent('Layout52') is TLayout then
+    L52 := TLayout(FindComponent('Layout52'))
+  else
+    L52 := nil;
+
+  if (FindComponent('Layout49') is TLayout) and TLayout(FindComponent('Layout49')).Visible and (E1 <> nil) and (Trim(E1.Text) <> '') and (L51 <> nil) then
+    L51.Visible := True;
+  if (L51 <> nil) and L51.Visible and (E2 <> nil) and (Trim(E2.Text) <> '') and (L52 <> nil) then
+    L52.Visible := True;
+
+  // По кнопке AddFile: последний пустой блок скрываем обратно.
+  if (L52 <> nil) and L52.Visible and (E3 <> nil) and (Trim(E3.Text) = '') then
+    L52.Visible := False
+  else if (L51 <> nil) and L51.Visible and (E2 <> nil) and (Trim(E2.Text) = '') then
+    L51.Visible := False;
+end;
+
+procedure TFormTypeEditor.SelectFileToLayoutEdit(const ALayoutName: string);
+var
+  Dlg: TOpenDialog;
+  E: TEdit;
+begin
+  // Выбор файла и сохранение только имени файла (без пути).
+  E := FindLayoutEdit(ALayoutName);
+  if E = nil then Exit;
+  Dlg := TOpenDialog.Create(nil);
+  try
+    if Dlg.Execute then
+    begin
+      E.Hint := Dlg.FileName; // Сохраняем полный путь в Hint.
+      E.Text := ExtractFileName(Dlg.FileName); // В Edit показываем только имя.
+    end;
+  finally
+    Dlg.Free;
+  end;
+end;
+
+procedure TFormTypeEditor.SpeedButton2Click(Sender: TObject);
+begin
+  // Кнопка первого файлового блока.
+  SelectFileToLayoutEdit('Layout49');
+end;
+
+procedure TFormTypeEditor.SpeedButton4Click(Sender: TObject);
+begin
+  // Кнопка второго файлового блока.
+  SelectFileToLayoutEdit('Layout51');
+end;
+
+procedure TFormTypeEditor.SpeedButton5Click(Sender: TObject);
+begin
+  // Кнопка третьего файлового блока.
+  SelectFileToLayoutEdit('Layout52');
 end;
 
  procedure TFormTypeEditor.SetModified;
