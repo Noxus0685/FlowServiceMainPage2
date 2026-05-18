@@ -156,7 +156,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 46
+    TabOrder = 47
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -229,7 +229,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 44
+        TabOrder = 45
         object labName: TLabel
           Align = Left
           Margins.Left = 4.000000000000000000
@@ -270,7 +270,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 43
+        TabOrder = 44
         object Label11: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -304,7 +304,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 38
+        TabOrder = 39
         object Label1: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -441,7 +441,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 37
+        TabOrder = 38
         object Label29: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -592,7 +592,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 40
+        TabOrder = 41
         object Label32: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -631,7 +631,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 39
+        TabOrder = 40
         object Label23: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -717,7 +717,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 42
+        TabOrder = 43
         object Label41: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -806,7 +806,7 @@ object FormTypeEditor: TFormTypeEditor
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 30
-        object SpeedButton3: TSpeedButton
+        object AddFile: TSpeedButton
           Align = Client
           Size.Width = 313.000000000000000000
           Size.Height = 30.000000000000000000
@@ -814,7 +814,7 @@ object FormTypeEditor: TFormTypeEditor
           StyleLookup = 'additembutton'
           Text = 'arrowdowntoolbutton'
           TextSettings.Trimming = None
-          OnClick = sbFindReestrNumberClick
+          OnClick = AddFileClick
         end
       end
       object Layout51: TLayout

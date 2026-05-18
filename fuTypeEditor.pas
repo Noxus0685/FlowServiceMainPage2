@@ -272,7 +272,7 @@ type
     Edit1: TEdit;
     SpeedButton2: TSpeedButton;
     Layout50: TLayout;
-    SpeedButton3: TSpeedButton;
+    AddFile: TSpeedButton;
     Layout51: TLayout;
     Label7: TLabel;
     Edit2: TEdit;
