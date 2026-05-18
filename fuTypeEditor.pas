@@ -1756,8 +1756,38 @@ begin
     '      "kp_qmax": null' + sLineBreak +
     '    }' + sLineBreak +
     '  },' + sLineBreak +
-    '  "diameters": [],' + sLineBreak +
-    '  "verification_points": [],' + sLineBreak +
+    '  "diameters": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "dn_mm": null,' + sLineBreak +
+    '      "qmax_l_s": null,' + sLineBreak +
+    '      "qnom_l_s": null,' + sLineBreak +
+    '      "qtr_l_s": null,' + sLineBreak +
+    '      "q2tr_l_s": null,' + sLineBreak +
+    '      "qmin_l_s": null,' + sLineBreak +
+    '      "kp_imp_l": null,' + sLineBreak +
+    '      "qf_l_s": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "verification_points": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "q_qmax": null,' + sLineBreak +
+    '      "q_l_s": null,' + sLineBreak +
+    '      "volume_l": null,' + sLineBreak +
+    '      "impulses_count": null,' + sLineBreak +
+    '      "time_s": null,' + sLineBreak +
+    '      "error_percent": null,' + sLineBreak +
+    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+    '      "stabilization_time_s": null,' + sLineBreak +
+    '      "repeat_count": null,' + sLineBreak +
+    '      "measurement_series_count": null,' + sLineBreak +
+    '      "pressure": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
     '  "calculation_parameters": {' + sLineBreak +
     '    "dynamic_range": null,' + sLineBreak +
     '    "flow_velocity_qmax_m_s": null' + sLineBreak +
@@ -4770,20 +4800,21 @@ begin
   if AEdit = nil then
     Exit;
 
-  // Сначала используем полный путь, который хранится в Hint.
+  // Сначала пробуем полный путь, который хранится в Hint.
   Candidate := Trim(AEdit.Hint);
-  if Candidate <> '' then
+  if (Candidate <> '') and FileExists(Candidate) then
     Exit(Candidate);
 
-  // Если в Edit только имя файла, формируем путь в стандартной папке хранения.
+  // Затем проверяем значение из Edit как абсолютный/относительный путь.
   Candidate := Trim(AEdit.Text);
   if Candidate = '' then
     Exit;
 
-  if ExtractFilePath(Candidate) <> '' then
-    Result := Candidate
-  else
-    Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Docs\Types'), Candidate);
+  if (ExtractFilePath(Candidate) <> '') and FileExists(Candidate) then
+    Exit(Candidate);
+
+  // Если в Edit только имя файла, формируем путь в стандартной папке хранения.
+  Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Docs\Types'), Candidate);
 end;
 
 function TFormTypeEditor.CheckLocalReestrFiles: Boolean;
@@ -4848,8 +4879,38 @@ const
     '      "kp_qmax": null' + sLineBreak +
     '    }' + sLineBreak +
     '  },' + sLineBreak +
-    '  "diameters": [],' + sLineBreak +
-    '  "verification_points": [],' + sLineBreak +
+    '  "diameters": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "dn_mm": null,' + sLineBreak +
+    '      "qmax_l_s": null,' + sLineBreak +
+    '      "qnom_l_s": null,' + sLineBreak +
+    '      "qtr_l_s": null,' + sLineBreak +
+    '      "q2tr_l_s": null,' + sLineBreak +
+    '      "qmin_l_s": null,' + sLineBreak +
+    '      "kp_imp_l": null,' + sLineBreak +
+    '      "qf_l_s": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "verification_points": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": false,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "q_qmax": null,' + sLineBreak +
+    '      "q_l_s": null,' + sLineBreak +
+    '      "volume_l": null,' + sLineBreak +
+    '      "impulses_count": null,' + sLineBreak +
+    '      "time_s": null,' + sLineBreak +
+    '      "error_percent": null,' + sLineBreak +
+    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+    '      "stabilization_time_s": null,' + sLineBreak +
+    '      "repeat_count": null,' + sLineBreak +
+    '      "measurement_series_count": null,' + sLineBreak +
+    '      "pressure": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
     '  "calculation_parameters": {' + sLineBreak +
     '    "dynamic_range": null,' + sLineBreak +
     '    "flow_velocity_qmax_m_s": null' + sLineBreak +
@@ -4883,7 +4944,7 @@ var
     end;
   end;
 begin
-  // Используем уже выбранные локальные файлы и не выполняем загрузку с АРШИН.
+  // Используем уже выбранные локальные файлы.
   ProcessOneFile(Edit1);
   ProcessOneFile(Edit2);
   ProcessOneFile(Edit3);
@@ -4929,6 +4990,7 @@ var
   DeepSeekResponse: string;
 
   DevType: TDeviceType;
+  LocalFilesProcessed: Boolean;
 
   P: Integer;
   YY: Integer;
@@ -4943,20 +5005,23 @@ begin
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
 
-  // Если файлы уже выбраны вручную, используем их и не загружаем с АРШИН.
+  LocalFilesProcessed := False;
+
+  // Если файлы выбраны вручную — сначала обрабатываем их.
   if HasLocalReestrFiles then
   begin
     if not CheckLocalReestrFiles then
       Exit;
 
     ProcessLocalReestrFiles;
-    Exit;
+    LocalFilesProcessed := True;
   end;
 
   ReestrNum := edtReestrNumber.Text.Trim;
   if ReestrNum = '' then
   begin
-    MemoLog.Lines.Add('ГРСИ не указан');
+    if not LocalFilesProcessed then
+      MemoLog.Lines.Add('ГРСИ не указан');
     Exit;
   end;
 
@@ -5219,8 +5284,38 @@ begin
                     '      "kp_qmax": null' + sLineBreak +
                     '    }' + sLineBreak +
                     '  },' + sLineBreak +
-                    '  "diameters": [],' + sLineBreak +
-                    '  "verification_points": [],' + sLineBreak +
+                    '  "diameters": [' + sLineBreak +
+                    '    {' + sLineBreak +
+                    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+                    '      "enabled": false,' + sLineBreak +
+                    '      "name": null,' + sLineBreak +
+                    '      "dn_mm": null,' + sLineBreak +
+                    '      "qmax_l_s": null,' + sLineBreak +
+                    '      "qnom_l_s": null,' + sLineBreak +
+                    '      "qtr_l_s": null,' + sLineBreak +
+                    '      "q2tr_l_s": null,' + sLineBreak +
+                    '      "qmin_l_s": null,' + sLineBreak +
+                    '      "kp_imp_l": null,' + sLineBreak +
+                    '      "qf_l_s": null' + sLineBreak +
+                    '    }' + sLineBreak +
+                    '  ],' + sLineBreak +
+                    '  "verification_points": [' + sLineBreak +
+                    '    {' + sLineBreak +
+                    '      "enabled": false,' + sLineBreak +
+                    '      "name": null,' + sLineBreak +
+                    '      "q_qmax": null,' + sLineBreak +
+                    '      "q_l_s": null,' + sLineBreak +
+                    '      "volume_l": null,' + sLineBreak +
+                    '      "impulses_count": null,' + sLineBreak +
+                    '      "time_s": null,' + sLineBreak +
+                    '      "error_percent": null,' + sLineBreak +
+                    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+                    '      "stabilization_time_s": null,' + sLineBreak +
+                    '      "repeat_count": null,' + sLineBreak +
+                    '      "measurement_series_count": null,' + sLineBreak +
+                    '      "pressure": null' + sLineBreak +
+                    '    }' + sLineBreak +
+                    '  ],' + sLineBreak +
                     '  "calculation_parameters": {' + sLineBreak +
                     '    "dynamic_range": null,' + sLineBreak +
                     '    "flow_velocity_qmax_m_s": null' + sLineBreak +
@@ -5278,8 +5373,38 @@ begin
                 '      "kp_qmax": null' + sLineBreak +
                 '    }' + sLineBreak +
                 '  },' + sLineBreak +
-                '  "diameters": [],' + sLineBreak +
-                '  "verification_points": [],' + sLineBreak +
+                '  "diameters": [' + sLineBreak +
+                '    {' + sLineBreak +
+                '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
+                '      "enabled": false,' + sLineBreak +
+                '      "name": null,' + sLineBreak +
+                '      "dn_mm": null,' + sLineBreak +
+                '      "qmax_l_s": null,' + sLineBreak +
+                '      "qnom_l_s": null,' + sLineBreak +
+                '      "qtr_l_s": null,' + sLineBreak +
+                '      "q2tr_l_s": null,' + sLineBreak +
+                '      "qmin_l_s": null,' + sLineBreak +
+                '      "kp_imp_l": null,' + sLineBreak +
+                '      "qf_l_s": null' + sLineBreak +
+                '    }' + sLineBreak +
+                '  ],' + sLineBreak +
+                '  "verification_points": [' + sLineBreak +
+                '    {' + sLineBreak +
+                '      "enabled": false,' + sLineBreak +
+                '      "name": null,' + sLineBreak +
+                '      "q_qmax": null,' + sLineBreak +
+                '      "q_l_s": null,' + sLineBreak +
+                '      "volume_l": null,' + sLineBreak +
+                '      "impulses_count": null,' + sLineBreak +
+                '      "time_s": null,' + sLineBreak +
+                '      "error_percent": null,' + sLineBreak +
+                '      "expanded_uncertainty_percent": null,' + sLineBreak +
+                '      "stabilization_time_s": null,' + sLineBreak +
+                '      "repeat_count": null,' + sLineBreak +
+                '      "measurement_series_count": null,' + sLineBreak +
+                '      "pressure": null' + sLineBreak +
+                '    }' + sLineBreak +
+                '  ],' + sLineBreak +
                 '  "calculation_parameters": {' + sLineBreak +
                 '    "dynamic_range": null,' + sLineBreak +
                 '    "flow_velocity_qmax_m_s": null' + sLineBreak +
