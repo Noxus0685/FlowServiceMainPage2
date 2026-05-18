@@ -2220,12 +2220,17 @@ var
   begin
     Result := -1;
     for K := 0 to FDiametersLocal.Count - 1 do
-      if SameText(Trim(FDiametersLocal[K].DN), Trim(ADN)) then
+      if (FDiametersLocal[K] <> nil) and SameText(Trim(FDiametersLocal[K].DN), Trim(ADN)) then
         Exit(K);
   end;
 
   function IsBetterDiameterRow(const CandidateD, CurrentD: TDiameter): Boolean;
   begin
+    if (CandidateD = nil) then
+      Exit(False);
+    if (CurrentD = nil) then
+      Exit(True);
+
     if CandidateD.Qnom > CurrentD.Qnom then
       Exit(True);
     if CandidateD.Qnom < CurrentD.Qnom then
@@ -2241,6 +2246,8 @@ var
 
   procedure CopyDiameterValues(const TargetD, SourceD: TDiameter);
   begin
+    if (TargetD = nil) or (SourceD = nil) then
+      Exit;
     TargetD.Enable := SourceD.Enable;
     TargetD.Name := SourceD.Name;
     TargetD.DN := SourceD.DN;
@@ -2292,9 +2299,9 @@ begin
       FDiametersLocal.Clear;
       for I := 0 to DiametersArr.Count - 1 do
       begin
-        DObj := DiametersArr.Items[I] as TJSONObject;
-        if DObj = nil then
+        if not (DiametersArr.Items[I] is TJSONObject) then
           Continue;
+        DObj := DiametersArr.Items[I] as TJSONObject;
         D := TDiameter.Create(FType.UUID);
         D.Enable := DObj.GetValue<Boolean>('enabled', True);
         D.Name := DObj.GetValue<string>('name', '');
@@ -2328,7 +2335,7 @@ begin
           D.Qtr := D.Qtr - D.Q2tr;
         end;
         ExistingIdx := FindDiameterByDN(D.DN);
-        if ExistingIdx >= 0 then
+        if (ExistingIdx >= 0) and (ExistingIdx < FDiametersLocal.Count) then
         begin
           if IsBetterDiameterRow(D, FDiametersLocal[ExistingIdx]) then
             CopyDiameterValues(FDiametersLocal[ExistingIdx], D);
