@@ -2403,6 +2403,11 @@ end;
 
 procedure TFormTypeEditor.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  // Разрываем ссылки на коллекции FType до освобождения FType,
+  // чтобы поздние UI-события при закрытии не обращались к освобождённой памяти.
+  FDiametersLocal := nil;
+  FPointsLocal := nil;
+
   FreeAndNil(FType);
   FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
