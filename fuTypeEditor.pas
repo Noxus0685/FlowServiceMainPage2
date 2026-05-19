@@ -1781,14 +1781,14 @@ begin
   // Проверяем, что PDF-файл существует.
   if not FileExists(APdfFilePath) then
   begin
-    ShowMessage('PDF-файл не найден');
+    ShowMessage('PDF-файл не найден: ' + ExtractFileName(APdfFilePath));
     Exit;
   end;
 
   // Проверяем, что выбран именно PDF-файл.
   if not SameText(ExtractFileExt(APdfFilePath), '.pdf') then
   begin
-    ShowMessage('Выбранный файл не является PDF');
+    ShowMessage('Выбранный файл не является PDF: ' + ExtractFileName(APdfFilePath));
     Exit;
   end;
 
@@ -1808,21 +1808,23 @@ begin
   ExitCode := RunProcessAndWait(PdfToTextPath, Params);
   if ExitCode <> 0 then
   begin
-    ShowMessage('Ошибка извлечения текста из PDF. Код: ' + ExitCode.ToString);
+    ShowMessage('Ошибка извлечения текста из PDF. Файл: ' + ExtractFileName(APdfFilePath) +
+      '. Код: ' + ExitCode.ToString);
     Exit;
   end;
 
   // Проверяем, что файл результата создан.
   if not FileExists(AOutputTxtPath) then
   begin
-    ShowMessage('Файл результата не был создан');
+    ShowMessage('Файл результата не был создан: ' + ExtractFileName(AOutputTxtPath));
     Exit;
   end;
 
   // Проверяем, что текстовый слой действительно найден.
   if Trim(TFile.ReadAllText(AOutputTxtPath, TEncoding.UTF8)) = '' then
   begin
-    ShowMessage('В PDF не найден текстовый слой. Для такого файла нужен OCR.');
+    ShowMessage('В PDF не найден текстовый слой: ' + ExtractFileName(APdfFilePath) +
+      '. Для такого файла нужен OCR.');
     Exit;
   end;
 
@@ -1841,6 +1843,7 @@ var
   LimitedText: string;
   ApiJson: TJSONObject;
   ErrorObj: TJSONObject;
+  ErrorCode: string;
   ErrorMessage: string;
   Choices: TJSONArray;
   ChoiceObj, MessageObj: TJSONObject;
@@ -1880,7 +1883,7 @@ begin
       'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
       'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
       'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
-      'Если таблицы различаютя не по классам точности то ищи нужную талицу по модификации' + sLineBreak +
+      'Если таблицы различаются не по классам точности, а по модификациям, то при переданной модификации ищи и выбирай таблицу по этой модификации (если такая таблица есть).' + sLineBreak +
       'Для base_error верни минимальную погрешность в % для выбранного класса.' + sLineBreak +
       sLineBreak +
       '=== ВАЖНОЕ ПРАВИЛО ВЫБОРА СТРОКИ ДЛЯ КАЖДОГО DN: ===' + sLineBreak +
@@ -1922,8 +1925,12 @@ begin
           ErrorObj := ApiJson.GetValue('error') as TJSONObject;
           if ErrorObj <> nil then
           begin
+            ErrorCode := Trim(ErrorObj.GetValue<string>('code', ''));
             ErrorMessage := ErrorObj.GetValue<string>('message', '');
-            if SameText(Trim(ErrorMessage), 'Insufficient Balance') then
+            if SameText(ErrorCode, '1') then
+              ShowMessage('Ошибка DeepSeek (код 1): не удалось обработать запрос. ' +
+                'Проверьте корректность исходного текста/файла и повторите попытку.')
+            else if SameText(Trim(ErrorMessage), 'Insufficient Balance') then
               ShowMessage('Ошибка DeepSeek: недостаточно баланса на аккаунте API')
             else if Trim(ErrorMessage) <> '' then
               ShowMessage('Ошибка DeepSeek: ' + ErrorMessage)
