@@ -379,6 +379,9 @@ type
     function SendTextToDeepSeekTemplate(const AText, ATemplate: string; out AResponse: string): Boolean;
     // Применение JSON-ответа DeepSeek к форме типа прибора.
     function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
+    function GetSelectedAccuracyClass: string;
+    function GetSelectedFlowUnit: string;
+    function BuildDeepSeekTemplate(const AAccuracyClass: string): string;
 
   private
     { Private declarations }
@@ -1869,6 +1872,20 @@ begin
       'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
       'Числа возвращай без единиц измерения.' + sLineBreak +
       'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
+      'Верни ТОЛЬКО объект из шаблона output (без оберток input/output_schema/_parsing_instructions).' + sLineBreak +
+      'Класс точности бери из поля device_type.general_info.accuracy_class в шаблоне.' + sLineBreak +
+      'Если класс не определен в тексте — используй уже переданный класс из шаблона.' + sLineBreak +
+      'Если в шаблоне передана modification, сначала ищи и используй таблицу для этой модификации; если такой таблицы нет — используй общую таблицу.' + sLineBreak +
+      'Для base_error верни минимальную погрешность в % для выбранного класса точности (например 1, а не 5).' + sLineBreak +
+      'В этом документе для одного диаметра могут идти несколько СТРОК с расходами; считай их относящимися к одному DN.' + sLineBreak +
+      'Выбирай для каждого DN строку с максимальным Q3 (номинальным расходом).' + sLineBreak +
+      'Для каждого DN собери все относящиеся строки и выбери ОДНУ строку: с максимальным qnom_l_s (Q3); при равенстве qnom_l_s выбери с максимальным qmax_l_s (Q4).' + sLineBreak +
+      'После выбора строки возьми из нее все расходные поля целиком (qmax_l_s, qnom_l_s, qtr_l_s, q2tr_l_s, qmin_l_s, qf_l_s); не смешивай поля из разных строк одного DN.' + sLineBreak +
+      'Если в тексте строка DN идет ПОСЛЕ чисел (ошибка извлечения PDF), привяжи эти числа к ближайшему DN ниже; при конфликте оставь вариант с БОЛЬШИМИ расходами.' + sLineBreak +
+      'Значения qmax_l_s/qnom_l_s/qtr_l_s/q2tr_l_s/qmin_l_s/qf_l_s верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
+      'Не угадывай q2tr_l_s по имени класса. Определи по таблице выбранного класса точности: если в строке класса есть только Q1,Q2,Q3,Q4 — верни q2tr_l_s = null; если есть Q1,Q2,Q2t,Q3,Q4 — заполни q2tr_l_s.' + sLineBreak +
+      'Сначала смотри таблицу именно для выбранного класса точности из device_type.general_info.accuracy_class и по количеству Q-порогов заполняй поля расходов.' + sLineBreak +
+      'В deepseek_result.raw_notes добавь фразу: Выбрана строка с максимальным расходом для каждого DN.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
       'Текст:' + sLineBreak + LimitedText);
@@ -1941,6 +1958,105 @@ begin
   end;
 end;
 
+function TFormTypeEditor.GetSelectedAccuracyClass: string;
+var
+  S: string;
+  P: Integer;
+begin
+  S := Trim(FType.AccuracyClass);
+  P := Pos(',', S);
+  if P > 0 then
+    S := Trim(Copy(S, 1, P - 1));
+  if S = '' then
+    S := 'A';
+  Result := S;
+end;
+
+function TFormTypeEditor.GetSelectedFlowUnit: string;
+var
+  S: string;
+begin
+  S := Trim(ComboBoxUnits.Text);
+  if S = '' then
+    S := 'л/с';
+  Result := S;
+end;
+
+function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass: string): string;
+begin
+  Result :=
+    '{' + sLineBreak +
+    '  "device_type": {' + sLineBreak +
+    '    "general_info": {' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "category": null,' + sLineBreak +
+    '      "manufacturer": null,' + sLineBreak +
+    '      "modification": "' + StringReplace(Trim(FType.Modification), '"', '\"', [rfReplaceAll]) + '",' + sLineBreak +
+    '      "procedure": null,' + sLineBreak +
+    '      "grsi_number": null,' + sLineBreak +
+    '      "valid_from": null,' + sLineBreak +
+    '      "valid_to": null,' + sLineBreak +
+    '      "mpi": null,' + sLineBreak +
+    '      "verification_method": null,' + sLineBreak +
+    '      "accuracy_class": "' + StringReplace(AAccuracyClass, '"', '\"', [rfReplaceAll]) + '",' + sLineBreak +
+    '      "base_error": null,' + sLineBreak +
+    '      "report_form_file": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "signal": {' + sLineBreak +
+    '      "measured_value": null,' + sLineBreak +
+    '      "measurement_unit": "' + StringReplace(GetSelectedFlowUnit, '"', '\"', [rfReplaceAll]) + '",' + sLineBreak +
+    '      "signal_type": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "pulses": {' + sLineBreak +
+    '      "output_type": null,' + sLineBreak +
+    '      "representation": null,' + sLineBreak +
+    '      "kp_qmax": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "diameters": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "dn_mm": null,' + sLineBreak +
+    '      "qmax_l_s": null,' + sLineBreak +
+    '      "qnom_l_s": null,' + sLineBreak +
+    '      "qtr_l_s": null,' + sLineBreak +
+    '      "q2tr_l_s": null,' + sLineBreak +
+    '      "qmin_l_s": null,' + sLineBreak +
+    '      "kp_imp_l": null,' + sLineBreak +
+    '      "qf_l_s": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "verification_points": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "q_qmax": null,' + sLineBreak +
+    '      "q_l_s": null,' + sLineBreak +
+    '      "volume_l": null,' + sLineBreak +
+    '      "impulses_count": null,' + sLineBreak +
+    '      "time_s": null,' + sLineBreak +
+    '      "error_percent": null,' + sLineBreak +
+    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+    '      "stabilization_time_s": null,' + sLineBreak +
+    '      "repeat_count": null,' + sLineBreak +
+    '      "measurement_series_count": null,' + sLineBreak +
+    '      "pressure": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "calculation_parameters": {' + sLineBreak +
+    '    "dynamic_range": null,' + sLineBreak +
+    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "deepseek_result": {' + sLineBreak +
+    '    "status": null,' + sLineBreak +
+    '    "warnings": [],' + sLineBreak +
+    '    "missing_fields": [],' + sLineBreak +
+    '    "raw_notes": null' + sLineBreak +
+    '  }' + sLineBreak +
+    '}';
+end;
+
 function TFormTypeEditor.ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
 var
   Root, DeviceTypeObj, GeneralInfoObj: TJSONObject;
@@ -1948,8 +2064,203 @@ var
   DObj, PObj: TJSONObject;
   D: TDiameter;
   P: TTypePoint;
-  I: Integer;
+  I, ExistingIdx: Integer;
   JsonVal: TJSONValue;
+  function IsFlowUnitM3h(const AUnit: string): Boolean;
+  var
+    U: string;
+  begin
+    U := LowerCase(Trim(AUnit));
+    Result := (Pos('м3/ч', U) > 0) or (Pos('m3/h', U) > 0);
+  end;
+
+  function ExtractFirstFloat(const S: string; out AValue: Double): Boolean;
+  var
+    I, StartPos: Integer;
+    Buf, NumStr: string;
+    FS: TFormatSettings;
+  begin
+    Result := False;
+    AValue := 0;
+    Buf := Trim(S);
+    if Buf = '' then
+      Exit;
+
+    FS := TFormatSettings.Invariant;
+    if TryStrToFloat(StringReplace(Buf, ',', '.', [rfReplaceAll]), AValue, FS) then
+      Exit(True);
+
+    StartPos := 0;
+    for I := 1 to Length(Buf) do
+      if CharInSet(Buf[I], ['0'..'9', '-', '+']) then
+      begin
+        StartPos := I;
+        Break;
+      end;
+    if StartPos = 0 then
+      Exit;
+
+    NumStr := '';
+    for I := StartPos to Length(Buf) do
+    begin
+      if CharInSet(Buf[I], ['0'..'9', '.', ',', '-', '+', 'e', 'E']) then
+        NumStr := NumStr + Buf[I]
+      else
+        Break;
+    end;
+    NumStr := StringReplace(NumStr, ',', '.', [rfReplaceAll]);
+    Result := TryStrToFloat(NumStr, AValue, FS);
+  end;
+
+  function GetJsonDoubleDef(const AObj: TJSONObject; const AName: string; const ADefault: Double): Double;
+  var
+    V: TJSONValue;
+    Parsed: Double;
+  begin
+    Result := ADefault;
+    if AObj = nil then
+      Exit;
+    V := AObj.GetValue(AName);
+    if V = nil then
+      Exit;
+    if V is TJSONNumber then
+      Exit(TJSONNumber(V).AsDouble);
+    if (V is TJSONString) and ExtractFirstFloat(TJSONString(V).Value, Parsed) then
+      Exit(Parsed);
+  end;
+  function ExtractMinFloatFromText(const S: string; out AValue: Double): Boolean;
+  var
+    I, J: Integer;
+    Token: string;
+    FS: TFormatSettings;
+    V: Double;
+    HasVal: Boolean;
+  begin
+    Result := False;
+    AValue := 0;
+    FS := TFormatSettings.Invariant;
+    HasVal := False;
+    I := 1;
+    while I <= Length(S) do
+    begin
+      if CharInSet(S[I], ['0'..'9', '-', '+']) then
+      begin
+        J := I;
+        while (J <= Length(S)) and CharInSet(S[J], ['0'..'9', '.', ',', '-', '+']) do
+          Inc(J);
+        Token := StringReplace(Copy(S, I, J - I), ',', '.', [rfReplaceAll]);
+        if TryStrToFloat(Token, V, FS) then
+        begin
+          if (not HasVal) or (V < AValue) then
+            AValue := V;
+          HasVal := True;
+        end;
+        I := J;
+      end
+      else
+        Inc(I);
+    end;
+    Result := HasVal;
+  end;
+
+  function ExtractMaxFloatFromText(const S: string; out AValue: Double): Boolean;
+  var
+    I, J: Integer;
+    Token: string;
+    FS: TFormatSettings;
+    V: Double;
+    HasVal: Boolean;
+  begin
+    Result := False;
+    AValue := 0;
+    FS := TFormatSettings.Invariant;
+    HasVal := False;
+    I := 1;
+    while I <= Length(S) do
+    begin
+      if CharInSet(S[I], ['0'..'9', '-', '+']) then
+      begin
+        J := I;
+        while (J <= Length(S)) and CharInSet(S[J], ['0'..'9', '.', ',', '-', '+']) do
+          Inc(J);
+        Token := StringReplace(Copy(S, I, J - I), ',', '.', [rfReplaceAll]);
+        if TryStrToFloat(Token, V, FS) then
+        begin
+          if (not HasVal) or (V > AValue) then
+            AValue := V;
+          HasVal := True;
+        end;
+        I := J;
+      end
+      else
+        Inc(I);
+    end;
+    Result := HasVal;
+  end;
+
+  function GetJsonFlowDoubleDef(const AObj: TJSONObject; const AName: string; const ADefault: Double): Double;
+  var
+    V: TJSONValue;
+    Parsed: Double;
+  begin
+    Result := ADefault;
+    if AObj = nil then
+      Exit;
+    V := AObj.GetValue(AName);
+    if V = nil then
+      Exit;
+    if V is TJSONNumber then
+      Exit(TJSONNumber(V).AsDouble);
+    if (V is TJSONString) and ExtractMaxFloatFromText(TJSONString(V).Value, Parsed) then
+      Exit(Parsed);
+  end;
+
+  function FindDiameterByDN(const ADN: string): Integer;
+  var
+    K: Integer;
+  begin
+    Result := -1;
+    for K := 0 to FDiametersLocal.Count - 1 do
+      if (FDiametersLocal[K] <> nil) and SameText(Trim(FDiametersLocal[K].DN), Trim(ADN)) then
+        Exit(K);
+  end;
+
+  function IsBetterDiameterRow(const CandidateD, CurrentD: TDiameter): Boolean;
+  begin
+    if (CandidateD = nil) then
+      Exit(False);
+    if (CurrentD = nil) then
+      Exit(True);
+
+    if CandidateD.Qnom > CurrentD.Qnom then
+      Exit(True);
+    if CandidateD.Qnom < CurrentD.Qnom then
+      Exit(False);
+
+    if CandidateD.Qmax > CurrentD.Qmax then
+      Exit(True);
+    if CandidateD.Qmax < CurrentD.Qmax then
+      Exit(False);
+
+    Result := False;
+  end;
+
+  procedure CopyDiameterValues(const TargetD, SourceD: TDiameter);
+  begin
+    if (TargetD = nil) or (SourceD = nil) then
+      Exit;
+    TargetD.Enable := SourceD.Enable;
+    TargetD.Name := SourceD.Name;
+    TargetD.DN := SourceD.DN;
+    TargetD.Qmax := SourceD.Qmax;
+    TargetD.Qnom := SourceD.Qnom;
+    TargetD.Qtr := SourceD.Qtr;
+    TargetD.Q2tr := SourceD.Q2tr;
+    TargetD.Qmin := SourceD.Qmin;
+    TargetD.Kp := SourceD.Kp;
+    TargetD.QFmax := SourceD.QFmax;
+  end;
+
 begin
   Result := False;
   JsonVal := TJSONObject.ParseJSONValue(AResponse);
@@ -1980,7 +2291,8 @@ begin
     if GeneralInfoObj.GetValue('accuracy_class') <> nil then
       FType.AccuracyClass := GeneralInfoObj.GetValue<string>('accuracy_class', FType.AccuracyClass);
     if GeneralInfoObj.GetValue('base_error') <> nil then
-      FType.Error := GeneralInfoObj.GetValue<Double>('base_error', FType.Error);
+      if not ExtractMinFloatFromText(GeneralInfoObj.GetValue<string>('base_error', ''), FType.Error) then
+        FType.Error := GetJsonDoubleDef(GeneralInfoObj, 'base_error', FType.Error);
 
     DiametersArr := Root.GetValue('diameters') as TJSONArray;
     if DiametersArr <> nil then
@@ -1988,22 +2300,53 @@ begin
       FDiametersLocal.Clear;
       for I := 0 to DiametersArr.Count - 1 do
       begin
-        DObj := DiametersArr.Items[I] as TJSONObject;
-        if DObj = nil then
+        if not (DiametersArr.Items[I] is TJSONObject) then
           Continue;
+        DObj := DiametersArr.Items[I] as TJSONObject;
         D := TDiameter.Create(FType.UUID);
         D.Enable := DObj.GetValue<Boolean>('enabled', True);
         D.Name := DObj.GetValue<string>('name', '');
         D.DN := DObj.GetValue<string>('dn_mm', '');
-        D.Qmax := DObj.GetValue<Double>('qmax_l_s', 0);
-        D.Qnom := DObj.GetValue<Double>('qnom_l_s', 0);
-        D.Qtr := DObj.GetValue<Double>('qtr_l_s', 0);
-        D.Q2tr := DObj.GetValue<Double>('q2tr_l_s', 0);
-        D.Qmin := DObj.GetValue<Double>('qmin_l_s', 0);
-        D.Kp := DObj.GetValue<Double>('kp_imp_l', 0);
-        D.QFmax := DObj.GetValue<Double>('qf_l_s', 0);
-        D.State := osNew;
-        FDiametersLocal.Add(D);
+        D.Qmax := GetJsonFlowDoubleDef(DObj, 'qmax_l_s', 0);
+        D.Qnom := GetJsonFlowDoubleDef(DObj, 'qnom_l_s', 0);
+        D.Qtr := GetJsonFlowDoubleDef(DObj, 'qtr_l_s', 0);
+        D.Q2tr := GetJsonFlowDoubleDef(DObj, 'q2tr_l_s', 0);
+        D.Qmin := GetJsonFlowDoubleDef(DObj, 'qmin_l_s', 0);
+        D.Kp := GetJsonDoubleDef(DObj, 'kp_imp_l', 0);
+        D.QFmax := GetJsonFlowDoubleDef(DObj, 'qf_l_s', 0);
+        if IsFlowUnitM3h(GetSelectedFlowUnit) then
+        begin
+          D.Qmax := FType.ToBaseUnits(D.Qmax);
+          D.Qnom := FType.ToBaseUnits(D.Qnom);
+          D.Qtr := FType.ToBaseUnits(D.Qtr);
+          D.Q2tr := FType.ToBaseUnits(D.Q2tr);
+          D.Qmin := FType.ToBaseUnits(D.Qmin);
+          D.QFmax := FType.ToBaseUnits(D.QFmax);
+        end;
+        if (D.Qmax > 0) and (D.Qnom > 0) and (D.Qnom > D.Qmax) then
+        begin
+          D.Qmax := D.Qmax + D.Qnom;
+          D.Qnom := D.Qmax - D.Qnom;
+          D.Qmax := D.Qmax - D.Qnom;
+        end;
+        if (D.Qtr > 0) and (D.Q2tr > 0) and (D.Q2tr < D.Qtr) then
+        begin
+          D.Qtr := D.Qtr + D.Q2tr;
+          D.Q2tr := D.Qtr - D.Q2tr;
+          D.Qtr := D.Qtr - D.Q2tr;
+        end;
+        ExistingIdx := FindDiameterByDN(D.DN);
+        if (ExistingIdx >= 0) and (ExistingIdx < FDiametersLocal.Count) then
+        begin
+          if IsBetterDiameterRow(D, FDiametersLocal[ExistingIdx]) then
+            CopyDiameterValues(FDiametersLocal[ExistingIdx], D);
+          D.Free;
+        end
+        else
+        begin
+          D.State := osNew;
+          FDiametersLocal.Add(D);
+        end;
       end;
     end;
 
@@ -2019,16 +2362,16 @@ begin
         P := TTypePoint.Create(FType.UUID);
         P.Enable := PObj.GetValue<Boolean>('enabled', True);
         P.Name := PObj.GetValue<string>('name', '');
-        P.FlowRate := PObj.GetValue<Double>('q_qmax', 0);
-        P.LimitVolume := PObj.GetValue<Double>('volume_l', 0);
+        P.FlowRate := GetJsonDoubleDef(PObj, 'q_qmax', 0);
+        P.LimitVolume := GetJsonDoubleDef(PObj, 'volume_l', 0);
         P.LimitImp := PObj.GetValue<Integer>('impulses_count', 0);
-        P.LimitTime := PObj.GetValue<Double>('time_s', 0);
-        P.Error := PObj.GetValue<Double>('error_percent', 0);
+        P.LimitTime := GetJsonDoubleDef(PObj, 'time_s', 0);
+        P.Error := GetJsonDoubleDef(PObj, 'error_percent', 0);
         P.FlowAccuracy := PObj.GetValue<string>('expanded_uncertainty_percent', '');
         P.Pause := PObj.GetValue<Integer>('stabilization_time_s', 0);
         P.RepeatsProtocol := PObj.GetValue<Integer>('repeat_count', 0);
         P.Repeats := PObj.GetValue<Integer>('measurement_series_count', 0);
-        P.Pressure := PObj.GetValue<Double>('pressure', 0);
+        P.Pressure := GetJsonDoubleDef(PObj, 'pressure', 0);
         P.State := osNew;
         FPointsLocal.Add(P);
       end;
@@ -2061,6 +2404,11 @@ end;
 
 procedure TFormTypeEditor.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  // Разрываем ссылки на коллекции FType до освобождения FType,
+  // чтобы поздние UI-события при закрытии не обращались к освобождённой памяти.
+  FDiametersLocal := nil;
+  FPointsLocal := nil;
+
   FreeAndNil(FType);
   FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
@@ -4785,80 +5133,8 @@ begin
 end;
 
 procedure TFormTypeEditor.ProcessLocalReestrFiles;
-const
-  JsonTemplate: string =
-    '{' + sLineBreak +
-    '  "device_type": {' + sLineBreak +
-    '    "general_info": {' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "category": null,' + sLineBreak +
-    '      "manufacturer": null,' + sLineBreak +
-    '      "modification": null,' + sLineBreak +
-    '      "procedure": null,' + sLineBreak +
-    '      "grsi_number": null,' + sLineBreak +
-    '      "valid_from": null,' + sLineBreak +
-    '      "valid_to": null,' + sLineBreak +
-    '      "mpi": null,' + sLineBreak +
-    '      "verification_method": null,' + sLineBreak +
-    '      "accuracy_class": null,' + sLineBreak +
-    '      "base_error": null,' + sLineBreak +
-    '      "report_form_file": null' + sLineBreak +
-    '    },' + sLineBreak +
-    '    "signal": {' + sLineBreak +
-    '      "measured_value": null,' + sLineBreak +
-    '      "measurement_unit": null,' + sLineBreak +
-    '      "signal_type": null' + sLineBreak +
-    '    },' + sLineBreak +
-    '    "pulses": {' + sLineBreak +
-    '      "output_type": null,' + sLineBreak +
-    '      "representation": null,' + sLineBreak +
-    '      "kp_qmax": null' + sLineBreak +
-    '    }' + sLineBreak +
-    '  },' + sLineBreak +
-    '  "diameters": [' + sLineBreak +
-    '    {' + sLineBreak +
-    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
-    '      "enabled": false,' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "dn_mm": null,' + sLineBreak +
-    '      "qmax_l_s": null,' + sLineBreak +
-    '      "qnom_l_s": null,' + sLineBreak +
-    '      "qtr_l_s": null,' + sLineBreak +
-    '      "q2tr_l_s": null,' + sLineBreak +
-    '      "qmin_l_s": null,' + sLineBreak +
-    '      "kp_imp_l": null,' + sLineBreak +
-    '      "qf_l_s": null' + sLineBreak +
-    '    }' + sLineBreak +
-    '  ],' + sLineBreak +
-    '  "verification_points": [' + sLineBreak +
-    '    {' + sLineBreak +
-    '      "enabled": false,' + sLineBreak +
-    '      "name": null,' + sLineBreak +
-    '      "q_qmax": null,' + sLineBreak +
-    '      "q_l_s": null,' + sLineBreak +
-    '      "volume_l": null,' + sLineBreak +
-    '      "impulses_count": null,' + sLineBreak +
-    '      "time_s": null,' + sLineBreak +
-    '      "error_percent": null,' + sLineBreak +
-    '      "expanded_uncertainty_percent": null,' + sLineBreak +
-    '      "stabilization_time_s": null,' + sLineBreak +
-    '      "repeat_count": null,' + sLineBreak +
-    '      "measurement_series_count": null,' + sLineBreak +
-    '      "pressure": null' + sLineBreak +
-    '    }' + sLineBreak +
-    '  ],' + sLineBreak +
-    '  "calculation_parameters": {' + sLineBreak +
-    '    "dynamic_range": null,' + sLineBreak +
-    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
-    '  },' + sLineBreak +
-    '  "deepseek_result": {' + sLineBreak +
-    '    "status": null,' + sLineBreak +
-    '    "warnings": [],' + sLineBreak +
-    '    "missing_fields": [],' + sLineBreak +
-    '    "raw_notes": null' + sLineBreak +
-    '  }' + sLineBreak +
-    '}';
 var
+  JsonTemplate: string;
   FilePath: string;
   TxtPath: string;
   PdfText: string;
@@ -4866,6 +5142,7 @@ var
 
   procedure ProcessOneFile(const AEdit: TEdit);
   begin
+  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
     if (AEdit = nil) or (Trim(AEdit.Text) = '') then
       Exit;
 
@@ -5199,78 +5476,7 @@ begin
                 if ExtractTextLayerFromPdf(FilePath, TxtPath) then
                 begin
                   PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-                  JsonTemplate :=
-                    '{' + sLineBreak +
-                    '  "device_type": {' + sLineBreak +
-                    '    "general_info": {' + sLineBreak +
-                    '      "name": null,' + sLineBreak +
-                    '      "category": null,' + sLineBreak +
-                    '      "manufacturer": null,' + sLineBreak +
-                    '      "modification": null,' + sLineBreak +
-                    '      "procedure": null,' + sLineBreak +
-                    '      "grsi_number": null,' + sLineBreak +
-                    '      "valid_from": null,' + sLineBreak +
-                    '      "valid_to": null,' + sLineBreak +
-                    '      "mpi": null,' + sLineBreak +
-                    '      "verification_method": null,' + sLineBreak +
-                    '      "accuracy_class": null,' + sLineBreak +
-                    '      "base_error": null,' + sLineBreak +
-                    '      "report_form_file": null' + sLineBreak +
-                    '    },' + sLineBreak +
-                    '    "signal": {' + sLineBreak +
-                    '      "measured_value": null,' + sLineBreak +
-                    '      "measurement_unit": null,' + sLineBreak +
-                    '      "signal_type": null' + sLineBreak +
-                    '    },' + sLineBreak +
-                    '    "pulses": {' + sLineBreak +
-                    '      "output_type": null,' + sLineBreak +
-                    '      "representation": null,' + sLineBreak +
-                    '      "kp_qmax": null' + sLineBreak +
-                    '    }' + sLineBreak +
-                    '  },' + sLineBreak +
-                    '  "diameters": [' + sLineBreak +
-                    '    {' + sLineBreak +
-                    '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
-                    '      "enabled": false,' + sLineBreak +
-                    '      "name": null,' + sLineBreak +
-                    '      "dn_mm": null,' + sLineBreak +
-                    '      "qmax_l_s": null,' + sLineBreak +
-                    '      "qnom_l_s": null,' + sLineBreak +
-                    '      "qtr_l_s": null,' + sLineBreak +
-                    '      "q2tr_l_s": null,' + sLineBreak +
-                    '      "qmin_l_s": null,' + sLineBreak +
-                    '      "kp_imp_l": null,' + sLineBreak +
-                    '      "qf_l_s": null' + sLineBreak +
-                    '    }' + sLineBreak +
-                    '  ],' + sLineBreak +
-                    '  "verification_points": [' + sLineBreak +
-                    '    {' + sLineBreak +
-                    '      "enabled": false,' + sLineBreak +
-                    '      "name": null,' + sLineBreak +
-                    '      "q_qmax": null,' + sLineBreak +
-                    '      "q_l_s": null,' + sLineBreak +
-                    '      "volume_l": null,' + sLineBreak +
-                    '      "impulses_count": null,' + sLineBreak +
-                    '      "time_s": null,' + sLineBreak +
-                    '      "error_percent": null,' + sLineBreak +
-                    '      "expanded_uncertainty_percent": null,' + sLineBreak +
-                    '      "stabilization_time_s": null,' + sLineBreak +
-                    '      "repeat_count": null,' + sLineBreak +
-                    '      "measurement_series_count": null,' + sLineBreak +
-                    '      "pressure": null' + sLineBreak +
-                    '    }' + sLineBreak +
-                    '  ],' + sLineBreak +
-                    '  "calculation_parameters": {' + sLineBreak +
-                    '    "dynamic_range": null,' + sLineBreak +
-                    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
-                    '  },' + sLineBreak +
-                    '  "deepseek_result": {' + sLineBreak +
-                    '    "status": null,' + sLineBreak +
-                    '    "warnings": [],' + sLineBreak +
-                    '    "missing_fields": [],' + sLineBreak +
-                    '    "raw_notes": null' + sLineBreak +
-                    '  }' + sLineBreak +
-                    '}';
+                  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
 
                   if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
                     ApplyDeepSeekJsonToType(DeepSeekResponse);
@@ -5291,78 +5497,7 @@ begin
             if ExtractTextLayerFromPdf(FilePath, TxtPath) then
             begin
               PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-              JsonTemplate :=
-                '{' + sLineBreak +
-                '  "device_type": {' + sLineBreak +
-                '    "general_info": {' + sLineBreak +
-                '      "name": null,' + sLineBreak +
-                '      "category": null,' + sLineBreak +
-                '      "manufacturer": null,' + sLineBreak +
-                '      "modification": null,' + sLineBreak +
-                '      "procedure": null,' + sLineBreak +
-                '      "grsi_number": null,' + sLineBreak +
-                '      "valid_from": null,' + sLineBreak +
-                '      "valid_to": null,' + sLineBreak +
-                '      "mpi": null,' + sLineBreak +
-                '      "verification_method": null,' + sLineBreak +
-                '      "accuracy_class": null,' + sLineBreak +
-                '      "base_error": null,' + sLineBreak +
-                '      "report_form_file": null' + sLineBreak +
-                '    },' + sLineBreak +
-                '    "signal": {' + sLineBreak +
-                '      "measured_value": null,' + sLineBreak +
-                '      "measurement_unit": null,' + sLineBreak +
-                '      "signal_type": null' + sLineBreak +
-                '    },' + sLineBreak +
-                '    "pulses": {' + sLineBreak +
-                '      "output_type": null,' + sLineBreak +
-                '      "representation": null,' + sLineBreak +
-                '      "kp_qmax": null' + sLineBreak +
-                '    }' + sLineBreak +
-                '  },' + sLineBreak +
-                '  "diameters": [' + sLineBreak +
-                '    {' + sLineBreak +
-                '      "_comment": "Для классов A,B,C: qtr_l_s = Q2, q2tr_l_s = Q2t. Для классов A1,B1,C1 и 1,2: qtr_l_s = Q2, q2tr_l_s = null",' + sLineBreak +
-                '      "enabled": false,' + sLineBreak +
-                '      "name": null,' + sLineBreak +
-                '      "dn_mm": null,' + sLineBreak +
-                '      "qmax_l_s": null,' + sLineBreak +
-                '      "qnom_l_s": null,' + sLineBreak +
-                '      "qtr_l_s": null,' + sLineBreak +
-                '      "q2tr_l_s": null,' + sLineBreak +
-                '      "qmin_l_s": null,' + sLineBreak +
-                '      "kp_imp_l": null,' + sLineBreak +
-                '      "qf_l_s": null' + sLineBreak +
-                '    }' + sLineBreak +
-                '  ],' + sLineBreak +
-                '  "verification_points": [' + sLineBreak +
-                '    {' + sLineBreak +
-                '      "enabled": false,' + sLineBreak +
-                '      "name": null,' + sLineBreak +
-                '      "q_qmax": null,' + sLineBreak +
-                '      "q_l_s": null,' + sLineBreak +
-                '      "volume_l": null,' + sLineBreak +
-                '      "impulses_count": null,' + sLineBreak +
-                '      "time_s": null,' + sLineBreak +
-                '      "error_percent": null,' + sLineBreak +
-                '      "expanded_uncertainty_percent": null,' + sLineBreak +
-                '      "stabilization_time_s": null,' + sLineBreak +
-                '      "repeat_count": null,' + sLineBreak +
-                '      "measurement_series_count": null,' + sLineBreak +
-                '      "pressure": null' + sLineBreak +
-                '    }' + sLineBreak +
-                '  ],' + sLineBreak +
-                '  "calculation_parameters": {' + sLineBreak +
-                '    "dynamic_range": null,' + sLineBreak +
-                '    "flow_velocity_qmax_m_s": null' + sLineBreak +
-                '  },' + sLineBreak +
-                '  "deepseek_result": {' + sLineBreak +
-                '    "status": null,' + sLineBreak +
-                '    "warnings": [],' + sLineBreak +
-                '    "missing_fields": [],' + sLineBreak +
-                '    "raw_notes": null' + sLineBreak +
-                '  }' + sLineBreak +
-                '}';
+              JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
 
               if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
               begin
