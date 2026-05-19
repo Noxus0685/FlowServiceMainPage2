@@ -898,7 +898,7 @@ begin
   for I := 0 to ATree.Count - 1 do
   begin
     Item := ATree.Items[I];
-    if (Item.Tag = ATag) and (Item.TagString = AKey) then
+    if (Item.Tag = ATag) and SameText(Item.TagString, AKey) then
       Exit(Item);
   end;
 end;
@@ -917,7 +917,7 @@ begin
   for I := 0 to AParent.Count - 1 do
   begin
     Item := TTreeViewItem(AParent.Items[I]);
-    if (Item.Tag = ATag) and (Item.TagString = AKey) then
+    if (Item.Tag = ATag) and SameText(Item.TagString, AKey) then
       Exit(Item);
   end;
 end;
