@@ -384,7 +384,7 @@ type
     function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
     function GetSelectedAccuracyClass: string;
     function GetSelectedFlowUnit: string;
-    function BuildDeepSeekTemplate(const AAccuracyClass: string): string;
+    function BuildDeepSeekTemplate(const AAccuracyClass, AModification: string): string;
 
   private
     { Private declarations }
@@ -1901,11 +1901,12 @@ begin
       sLineBreak +
       '=== ОПРЕДЕЛЕНИЕ ТАБЛИЦЫ (ЕСЛИ ИХ НЕСКОЛЬКО) ===' + sLineBreak +
       '1. Посмотри, как в тексте называются РАЗНЫЕ ТАБЛИЦЫ.' + sLineBreak +
-      '2. Если есть поле "модификация" (ОП, ПТ, РС, К, СВ, М) — запиши в device_type.general_info.modification и выбери нужную таблицу.' + sLineBreak +
-      '3. Если есть "класс точности" (A, B, C, 1, 2) — запиши в accuracy_class и выбери таблицу по классу.' + sLineBreak +
-      '4. Если таблицы подписаны как "модификация ОП" и "модификация ПТ" — это НЕ классы точности. Они идут в modification, accuracy_class = null.' + sLineBreak +
-      '5. Если не понятно, какую таблицу выбрать — бери первую полную и укажи в raw_notes.' + sLineBreak +
-      '6. Для base_error возьми погрешность из той же таблицы или из текста рядом.' + sLineBreak +
+      '2. Если в шаблоне уже передана modification (например, ПТ) — сначала выбери таблицу именно для этой modification.' + sLineBreak +
+      '3. Если есть поле "модификация" (ОП, ПТ, РС, К, СВ, М) — запиши в device_type.general_info.modification и выбери нужную таблицу.' + sLineBreak +
+      '4. Если есть "класс точности" (A, B, C, 1, 2) — запиши в accuracy_class и выбери таблицу по классу.' + sLineBreak +
+      '5. Если таблицы подписаны как "модификация ОП" и "модификация ПТ" — это НЕ классы точности. Они идут в modification, accuracy_class = null.' + sLineBreak +
+      '6. Если не понятно, какую таблицу выбрать — бери первую полную и укажи в raw_notes.' + sLineBreak +
+      '7. Для base_error возьми погрешность из той же таблицы или из текста рядом.' + sLineBreak +
       sLineBreak +
       '=== ВЫБОР СТРОКИ ДЛЯ ОДНОГО DN (ЕСЛИ ИХ НЕСКОЛЬКО) ===' + sLineBreak +
       '1. Если для одного DN есть несколько строк — выбери строку с САМЫМ БОЛЬШИМ qmax_l_s.' + sLineBreak +
@@ -2026,8 +2027,15 @@ begin
   Result := S;
 end;
 
-function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass: string): string;
+function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass, AModification: string): string;
+var
+  ModificationJsonValue: string;
 begin
+  if Trim(AModification) = '' then
+    ModificationJsonValue := 'null'
+  else
+    ModificationJsonValue := '"' + StringReplace(Trim(AModification), '"', '\"', [rfReplaceAll]) + '"';
+
   Result :=
     '{' + sLineBreak +
     '  "device_type": {' + sLineBreak +
@@ -2035,7 +2043,7 @@ begin
     '      "name": null,' + sLineBreak +
     '      "category": null,' + sLineBreak +
     '      "manufacturer": null,' + sLineBreak +
-    '      "modification": null,' + sLineBreak +
+    '      "modification": ' + ModificationJsonValue + ',' + sLineBreak +
     '      "procedure": null,' + sLineBreak +
     '      "grsi_number": null,' + sLineBreak +
     '      "valid_from": null,' + sLineBreak +
@@ -5186,7 +5194,7 @@ var
 
   procedure ProcessOneFile(const AEdit: TEdit);
   begin
-  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
+  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
     if (AEdit = nil) or (Trim(AEdit.Text) = '') then
       Exit;
 
@@ -5517,7 +5525,7 @@ begin
                 if ExtractTextLayerFromPdf(FilePath, TxtPath) then
                 begin
                   PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-                  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
+                  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
 
                   if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
                     ApplyDeepSeekJsonToType(DeepSeekResponse);
@@ -5538,7 +5546,7 @@ begin
             if ExtractTextLayerFromPdf(FilePath, TxtPath) then
             begin
               PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-              JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
+              JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
 
               if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
               begin
