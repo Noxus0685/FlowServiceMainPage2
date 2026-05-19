@@ -1222,6 +1222,10 @@ begin
   if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
 
+  // Если в гриде нет строк, видимость столбцов не меняем.
+  if GridDiameters.RowCount <= 0 then
+    Exit;
+
   EnsureUniqueDiameterIDs;
 
   PrevRow := GridDiameters.Row;
@@ -1267,6 +1271,47 @@ begin
   finally
     GridDiameters.EndUpdate;
   end;
+
+end;
+
+procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
+var
+  D: TDiameter;
+  HasName, HasQnom, HasQtr, HasQ2tr, HasKp, HasQf: Boolean;
+  function HasNonZeroValue(const AValue: Double): Boolean;
+  begin
+    Result := not SameValue(AValue, 0, MinDouble);
+  end;
+begin
+  if (FDiametersLocal = nil) or (GridDiameters = nil) then
+    Exit;
+
+  HasName := False;
+  HasQnom := False;
+  HasQtr := False;
+  HasQ2tr := False;
+  HasKp := False;
+  HasQf := False;
+
+  for D in FDiametersLocal do
+    if (D <> nil) and (D.State <> osDeleted) then
+    begin
+      HasName := HasName or ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
+      HasQnom := HasQnom or HasNonZeroValue(D.Qnom);
+      HasQtr := HasQtr or HasNonZeroValue(D.Qtr);
+      HasQ2tr := HasQ2tr or HasNonZeroValue(D.Q2tr);
+      HasKp := HasKp or HasNonZeroValue(D.Kp);
+      HasQf := HasQf or HasNonZeroValue(D.QFmax);
+    end;
+
+  StringColumnDNName.Visible := HasName;
+  StringColumnDNQnom.Visible := HasQnom;
+  StringColumnDNQTr.Visible := HasQtr;
+  StringColumnDNQ2tr.Visible := HasQ2tr;
+  StringColumnDNKp.Visible := HasKp;
+  StringColumnDNQF.Visible := HasQf;
+  SyncGridDiametersHeaderPopupMenu;
+  UpdateGridDiametersHeaderRect;
 end;
 
 procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
@@ -6376,6 +6421,11 @@ begin
       StringColumnDNQF.Visible     := False;
     end;
   end;
+
+  // При загрузке из АРШИН ApplyOutputType может снова сделать
+  // некоторые колонки видимыми. Повторно применяем автоскрытие.
+  if FArshinRequestInProgress then
+    AutoHideEmptyDiameterColumns;
 end;
 
 
