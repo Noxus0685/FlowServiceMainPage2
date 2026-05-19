@@ -1314,6 +1314,42 @@ begin
   UpdateGridDiametersHeaderRect;
 end;
 
+procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
+var
+  D: TDiameter;
+  HasName, HasQnom, HasQtr, HasQ2tr, HasKp, HasQf: Boolean;
+begin
+  if (FDiametersLocal = nil) or (GridDiameters = nil) then
+    Exit;
+
+  HasName := False;
+  HasQnom := False;
+  HasQtr := False;
+  HasQ2tr := False;
+  HasKp := False;
+  HasQf := False;
+
+  for D in FDiametersLocal do
+    if (D <> nil) and (D.State <> osDeleted) then
+    begin
+      HasName := HasName or ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
+      HasQnom := HasQnom or (D.Qnom > 0);
+      HasQtr := HasQtr or (D.Qtr > 0);
+      HasQ2tr := HasQ2tr or (D.Q2tr > 0);
+      HasKp := HasKp or (D.Kp > 0);
+      HasQf := HasQf or (D.QFmax > 0);
+    end;
+
+  StringColumnDNName.Visible := HasName;
+  StringColumnDNQnom.Visible := HasQnom;
+  StringColumnDNQTr.Visible := HasQtr;
+  StringColumnDNQ2tr.Visible := HasQ2tr;
+  StringColumnDNKp.Visible := HasKp;
+  StringColumnDNQF.Visible := HasQf;
+  SyncGridDiametersHeaderPopupMenu;
+  UpdateGridDiametersHeaderRect;
+end;
+
 
 procedure TFormTypeEditor.UpdatePointsGrid;
 var
@@ -1926,6 +1962,10 @@ begin
       'Числа возвращай без единиц измерения.' + sLineBreak +
       'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
       'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
+      'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
+      'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
+      'Если таблицы различаются не по классам точности, а по модификациям, то при переданной модификации ищи и выбирай таблицу по этой модификации (если такая таблица есть).' + sLineBreak +
+      'Для base_error верни минимальную погрешность в % для выбранного класса.' + sLineBreak +
       sLineBreak +
       '=== ГЛАВНОЕ ПРАВИЛО: НЕ ПРИВЯЗЫВАЙСЯ К БУКВАМ ===' + sLineBreak +
       'Не ищи конкретно Q1, Q2, Q3, Q4, Qнаим, Qt, Qнаиб.' + sLineBreak +
