@@ -1972,7 +1972,7 @@ begin
       'Если данных нет — оставь null.' + sLineBreak +
       'Числа возвращай без единиц измерения.' + sLineBreak +
       'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
-      'Для поля device_type.general_info.manufacturer указывай только краткое название изготовителя без организационно-правовой формы и без скобок (например: "ВТК Прибор", а не "Общество с ограниченной ответственностью «ВТК Прибор» (ООО «ВТК Прибор»)").' + sLineBreak +
+      'Для поля device_type.general_info.manufacturer указывай только краткое название изготовителя без организационно-правовой формы и без скобок и кавычек (например: ВТК Прибор, а не "Общество с ограниченной ответственностью «ВТК Прибор» (ООО «ВТК Прибор»)").' + sLineBreak +
       'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
       'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
       'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
@@ -5513,7 +5513,7 @@ begin
       JVal := GeneralObj.GetValue('valid_to');
       if (JVal <> nil) and (JVal.Value <> '') then
       begin
-        if not TryISO8601ToDate(JVal.Value, ValidToDate, True) then
+        if not TryISO8601ToDate(JVal.Value, dt, True) then
           ValidToDate := 0;
       end;
       DevType.ValidityDate := ValidToDate;
