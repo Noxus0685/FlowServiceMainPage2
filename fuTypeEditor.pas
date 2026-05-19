@@ -281,6 +281,9 @@ type
     Edit3: TEdit;
     SpeedButton5: TSpeedButton;
     Layout53: TLayout;
+    TabControl1: TTabControl;
+    TabItem1: TTabItem;
+    TabItem2: TTabItem;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -1877,6 +1880,7 @@ begin
       'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
       'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
       'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
+      'Если таблицы различаютя не по классам точности то ищи нужную талицу по модификации' + sLineBreak +
       'Для base_error верни минимальную погрешность в % для выбранного класса.' + sLineBreak +
       sLineBreak +
       '=== ВАЖНОЕ ПРАВИЛО ВЫБОРА СТРОКИ ДЛЯ КАЖДОГО DN: ===' + sLineBreak +
