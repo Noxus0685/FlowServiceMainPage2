@@ -45,6 +45,21 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 50.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
+    object btnLoadLocalJson: TSpeedButton
+      Align = Right
+      Margins.Top = 10.000000000000000000
+      Margins.Right = 10.000000000000000000
+      Margins.Bottom = 10.000000000000000000
+      Position.X = 1047.000000000000000000
+      Position.Y = 10.000000000000000000
+      Size.Width = 125.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 3
+      Text = 'JSON 97957-26'
+      TextSettings.Trimming = None
+      OnClick = btnLoadLocalJsonClick
+    end
     object btnOK: TCornerButton
       Align = Right
       StyledSettings = [Family, Size, Style]
