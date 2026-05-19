@@ -1273,6 +1273,7 @@ begin
   finally
     GridDiameters.EndUpdate;
   end;
+  GridDiameters.Repaint;
 
 end;
 
