@@ -1334,7 +1334,7 @@ begin
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      HasName := HasName or ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
+      HasName := HasName or (Trim(D.Name) <> '');
       HasQnom := HasQnom or (D.Qnom > 0);
       HasQtr := HasQtr or (D.Qtr > 0);
       HasQ2tr := HasQ2tr or (D.Q2tr > 0);
@@ -2445,7 +2445,7 @@ begin
         D.Name := DObj.GetValue<string>('name', '');
         D.DN := DObj.GetValue<string>('dn_mm', '');
         if (Trim(D.Name) = '') and (Trim(D.DN) <> '') then
-          D.Name := 'DN' + Trim(D.DN);
+          D.Name := 'DN ' + Trim(D.DN);
         D.Qmax := GetJsonFlowDoubleDef(DObj, 'qmax_l_s', 0);
         D.Qnom := GetJsonFlowDoubleDef(DObj, 'qnom_l_s', 0);
         D.Qtr := GetJsonFlowDoubleDef(DObj, 'qtr_l_s', 0);
