@@ -977,6 +977,7 @@ begin
     // == Диаметры
     // =====================================================
     UpdateDiametersGrid;
+    AutoHideEmptyDiameterColumns;
 
     // =====================================================
     // == Динамический диапазон
@@ -1285,6 +1286,8 @@ var
 begin
   if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
+  if GridDiameters.RowCount <= 0 then
+    Exit;
 
   HasName := False;
   HasQnom := False;
@@ -1302,42 +1305,6 @@ begin
       HasQ2tr := HasQ2tr or HasNonZeroValue(D.Q2tr);
       HasKp := HasKp or HasNonZeroValue(D.Kp);
       HasQf := HasQf or HasNonZeroValue(D.QFmax);
-    end;
-
-  StringColumnDNName.Visible := HasName;
-  StringColumnDNQnom.Visible := HasQnom;
-  StringColumnDNQTr.Visible := HasQtr;
-  StringColumnDNQ2tr.Visible := HasQ2tr;
-  StringColumnDNKp.Visible := HasKp;
-  StringColumnDNQF.Visible := HasQf;
-  SyncGridDiametersHeaderPopupMenu;
-  UpdateGridDiametersHeaderRect;
-end;
-
-procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
-var
-  D: TDiameter;
-  HasName, HasQnom, HasQtr, HasQ2tr, HasKp, HasQf: Boolean;
-begin
-  if (FDiametersLocal = nil) or (GridDiameters = nil) then
-    Exit;
-
-  HasName := False;
-  HasQnom := False;
-  HasQtr := False;
-  HasQ2tr := False;
-  HasKp := False;
-  HasQf := False;
-
-  for D in FDiametersLocal do
-    if (D <> nil) and (D.State <> osDeleted) then
-    begin
-      HasName := HasName or ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
-      HasQnom := HasQnom or (D.Qnom > 0);
-      HasQtr := HasQtr or (D.Qtr > 0);
-      HasQ2tr := HasQ2tr or (D.Q2tr > 0);
-      HasKp := HasKp or (D.Kp > 0);
-      HasQf := HasQf or (D.QFmax > 0);
     end;
 
   StringColumnDNName.Visible := HasName;
