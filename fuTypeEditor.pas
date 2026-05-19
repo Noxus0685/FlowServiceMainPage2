@@ -5359,9 +5359,6 @@ begin
       GeneralObj := Json.GetValue('general') as TJSONObject;
       if GeneralObj = nil then Exit;
 
-      DevType.UUID :=
-        GeneralObj.GetValue('mit_uuid').Value;
-
       DevType.ReestrNumber :=
         GeneralObj.GetValue('number').Value;
 

@@ -2253,10 +2253,6 @@ if MessageDlg(
 
         DevType := ActiveRepo.CreateType(0);
 
-        {------------ mit_uuid ------------}
-        if Item.GetValue('mit_uuid') <> nil then
-          DevType.UUID := Item.GetValue('mit_uuid').Value;
-
         {------------ ГРСИ ------------}
         if Item.GetValue('number') <> nil then
           DevType.ReestrNumber := Item.GetValue('number').Value;
