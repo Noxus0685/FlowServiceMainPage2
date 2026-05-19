@@ -2555,7 +2555,7 @@ begin
   // чтобы поздние UI-события при закрытии не обращались к освобождённой памяти.
   FDiametersLocal := nil;
   FPointsLocal := nil;
-
+  FLoading := True;
   FreeAndNil(FType);
   FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
