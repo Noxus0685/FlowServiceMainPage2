@@ -1026,7 +1026,6 @@ begin
     ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
 
     ApplyOutputType;
-    AutoHideEmptyDiameterColumns;
 
 // =====================================================
 // == Тип выхода (OutputSet) — ДВА ComboBox
@@ -1110,6 +1109,9 @@ cbOutPutType2.Hint := cbOutPutType2.Text;
     // == Точки
     // =====================================================
     UpdatePointsGrid;
+    // Применяем автоскрытие только после всех UI-обновлений,
+    // т.к. часть процедур выше может менять видимость столбцов.
+    AutoHideEmptyDiameterColumns;
     // Видимость файловых блоков при открытии существующего типа.
     SetupFileLayoutsForExistingType;
 
