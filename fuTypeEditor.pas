@@ -253,7 +253,6 @@ type
     MemoLog: TMemo;
     NetHTTPClient1: TNetHTTPClient;
     DeepSeek: TSpeedButton;
-    btnLoadLocalJson: TSpeedButton;
     TabControlMain: TTabControl;
     TabItemDevice: TTabItem;
     TabItemCoefs: TTabItem;
@@ -356,7 +355,6 @@ type
     procedure ceCategoryChange(Sender: TObject);
     procedure sbFindReestrNumberClick(Sender: TObject);
     procedure DeepSeekClick(Sender: TObject);
-    procedure btnLoadLocalJsonClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
     procedure AddFileClick(Sender: TObject);
     procedure SpeedButton2Click(Sender: TObject);
@@ -1274,45 +1272,6 @@ begin
   end;
   GridDiameters.Repaint;
 
-end;
-
-procedure TFormTypeEditor.btnLoadLocalJsonClick(Sender: TObject);
-var
-  OpenDialog: TOpenDialog;
-  JsonFilePath: string;
-  JsonText: string;
-begin
-  OpenDialog := TOpenDialog.Create(Self);
-  try
-    OpenDialog.Filter := 'JSON files (*.json)|*.json|Text files (*.txt)|*.txt|All files (*.*)|*.*';
-    OpenDialog.Options := [TOpenOption.ofFileMustExist];
-    OpenDialog.DefaultExt := 'json';
-
-    if not OpenDialog.Execute then
-      Exit;
-
-    JsonFilePath := OpenDialog.FileName;
-  finally
-    OpenDialog.Free;
-  end;
-
-  if not TFile.Exists(JsonFilePath) then
-  begin
-    ShowMessage('Файл не найден: ' + JsonFilePath);
-    Exit;
-  end;
-
-  JsonText := TFile.ReadAllText(JsonFilePath, TEncoding.UTF8);
-  if not ApplyDeepSeekJsonToType(JsonText) then
-  begin
-    ShowMessage('Не удалось применить данные из файла: ' + ExtractFileName(JsonFilePath));
-    Exit;
-  end;
-
-  UpdateUIFromType;
-  MemoLog.Visible := True;
-  MemoLog.Lines.Add('Данные применены из локального файла: ' + ExtractFileName(JsonFilePath));
-  ShowMessage('Данные загружены из файла: ' + ExtractFileName(JsonFilePath));
 end;
 
 procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
