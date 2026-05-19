@@ -1921,6 +1921,8 @@ end;
 
 procedure TFormTypeEditor.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  FLoading := True;
+
   FreeAndNil(FType);
   FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
@@ -3729,6 +3731,9 @@ var
   S: string;
 begin
   if FLoading then Exit;
+
+  if FType = nil then
+    Exit;
 
   S := Trim(edtReestrNumber.Text);
 
