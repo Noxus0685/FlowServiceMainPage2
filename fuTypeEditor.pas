@@ -1224,6 +1224,10 @@ begin
   if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
 
+  // Если в гриде нет строк, видимость столбцов не меняем.
+  if GridDiameters.RowCount <= 0 then
+    Exit;
+
   EnsureUniqueDiameterIDs;
 
   PrevRow := GridDiameters.Row;
@@ -1926,6 +1930,10 @@ begin
       'Числа возвращай без единиц измерения.' + sLineBreak +
       'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
       'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
+      'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
+      'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
+      'Если таблицы различаются не по классам точности, а по модификациям, то при переданной модификации ищи и выбирай таблицу по этой модификации (если такая таблица есть).' + sLineBreak +
+      'Для base_error верни минимальную погрешность в % для выбранного класса.' + sLineBreak +
       sLineBreak +
       '=== ГЛАВНОЕ ПРАВИЛО: НЕ ПРИВЯЗЫВАЙСЯ К БУКВАМ ===' + sLineBreak +
       'Не ищи конкретно Q1, Q2, Q3, Q4, Qнаим, Qt, Qнаиб.' + sLineBreak +
