@@ -384,7 +384,7 @@ type
     function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
     function GetSelectedAccuracyClass: string;
     function GetSelectedFlowUnit: string;
-    function BuildDeepSeekTemplate(const AAccuracyClass: string): string;
+    function BuildDeepSeekTemplate(const AAccuracyClass, AModification: string): string;
 
   private
     { Private declarations }
@@ -456,6 +456,7 @@ type
 
   procedure EnsureUniqueDiameterIDs;
   procedure UpdateDiametersGrid;
+  procedure AutoHideEmptyDiameterColumns;
   procedure UpdatePointsGrid;
   function GetDiameterByVisibleRow(ARow: Integer): TDiameter;
   function GetPointByVisibleRow(ARow: Integer): TTypePoint;
@@ -1237,8 +1238,9 @@ begin
           D.Qnom := 0;
       end;
     }
-      if D.Qtr <= 0 then
-        D.Qtr := D.Qmax * 0.0075;
+      // Не подставляем Qtr автоматически, если он отсутствует в источнике.
+      // Иначе при импорте (например, из DeepSeek) null/0 превращается в вычисленное значение,
+      // что визуально выглядит как будто Qt был найден в таблице.
 
       if (D.State <> osNew) and (D.Qmax > 0) then
       begin
@@ -1265,6 +1267,42 @@ begin
   finally
     GridDiameters.EndUpdate;
   end;
+end;
+
+procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
+var
+  D: TDiameter;
+  HasName, HasQnom, HasQtr, HasQ2tr, HasKp, HasQf: Boolean;
+begin
+  if (FDiametersLocal = nil) or (GridDiameters = nil) then
+    Exit;
+
+  HasName := False;
+  HasQnom := False;
+  HasQtr := False;
+  HasQ2tr := False;
+  HasKp := False;
+  HasQf := False;
+
+  for D in FDiametersLocal do
+    if (D <> nil) and (D.State <> osDeleted) then
+    begin
+      HasName := HasName or (Trim(D.Name) <> '');
+      HasQnom := HasQnom or (D.Qnom > 0);
+      HasQtr := HasQtr or (D.Qtr > 0);
+      HasQ2tr := HasQ2tr or (D.Q2tr > 0);
+      HasKp := HasKp or (D.Kp > 0);
+      HasQf := HasQf or (D.QFmax > 0);
+    end;
+
+  StringColumnDNName.Visible := HasName;
+  StringColumnDNQnom.Visible := HasQnom;
+  StringColumnDNQTr.Visible := HasQtr;
+  StringColumnDNQ2tr.Visible := HasQ2tr;
+  StringColumnDNKp.Visible := HasKp;
+  StringColumnDNQF.Visible := HasQf;
+  SyncGridDiametersHeaderPopupMenu;
+  UpdateGridDiametersHeaderRect;
 end;
 
 
@@ -1781,14 +1819,14 @@ begin
   // Проверяем, что PDF-файл существует.
   if not FileExists(APdfFilePath) then
   begin
-    ShowMessage('PDF-файл не найден');
+    ShowMessage('PDF-файл не найден: ' + ExtractFileName(APdfFilePath));
     Exit;
   end;
 
   // Проверяем, что выбран именно PDF-файл.
   if not SameText(ExtractFileExt(APdfFilePath), '.pdf') then
   begin
-    ShowMessage('Выбранный файл не является PDF');
+    ShowMessage('Выбранный файл не является PDF: ' + ExtractFileName(APdfFilePath));
     Exit;
   end;
 
@@ -1808,21 +1846,23 @@ begin
   ExitCode := RunProcessAndWait(PdfToTextPath, Params);
   if ExitCode <> 0 then
   begin
-    ShowMessage('Ошибка извлечения текста из PDF. Код: ' + ExitCode.ToString);
+    ShowMessage('Ошибка извлечения текста из PDF. Файл: ' + ExtractFileName(APdfFilePath) +
+      '. Код: ' + ExitCode.ToString);
     Exit;
   end;
 
   // Проверяем, что файл результата создан.
   if not FileExists(AOutputTxtPath) then
   begin
-    ShowMessage('Файл результата не был создан');
+    ShowMessage('Файл результата не был создан: ' + ExtractFileName(AOutputTxtPath));
     Exit;
   end;
 
   // Проверяем, что текстовый слой действительно найден.
   if Trim(TFile.ReadAllText(AOutputTxtPath, TEncoding.UTF8)) = '' then
   begin
-    ShowMessage('В PDF не найден текстовый слой. Для такого файла нужен OCR.');
+    ShowMessage('В PDF не найден текстовый слой: ' + ExtractFileName(APdfFilePath) +
+      '. Для такого файла нужен OCR.');
     Exit;
   end;
 
@@ -1841,6 +1881,7 @@ var
   LimitedText: string;
   ApiJson: TJSONObject;
   ErrorObj: TJSONObject;
+  ErrorCode: string;
   ErrorMessage: string;
   Choices: TJSONArray;
   ChoiceObj, MessageObj: TJSONObject;
@@ -1873,30 +1914,52 @@ begin
       'Не добавляй markdown.' + sLineBreak +
       'Не добавляй ```json.' + sLineBreak +
       'Если данных нет — оставь null.' + sLineBreak +
-      'qmax_l_s = Q4, qnom_l_s = Q3, qtr_l_s = Q2, q2tr_l_s = Q2t, qmin_l_s = Q1' + sLineBreak +
-      'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
       'Числа возвращай без единиц измерения.' + sLineBreak +
       'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
       'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
-      'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
-      'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
-      'Если таблицы различаютя не по классам точности то ищи нужную талицу по модификации' + sLineBreak +
-      'Для base_error верни минимальную погрешность в % для выбранного класса.' + sLineBreak +
       sLineBreak +
-      '=== ВАЖНОЕ ПРАВИЛО ВЫБОРА СТРОКИ ДЛЯ КАЖДОГО DN: ===' + sLineBreak +
-      '1. В таблице для одного DN может быть НЕСКОЛЬКО строк (например, две строки для DN15).' + sLineBreak +
-      '2. Каждая строка имеет свои значения Q1, Q2, Q2t, Q3, Q4.' + sLineBreak +
-      '3. Из ВСЕХ строк для данного DN выбери ОДНУ строку, у которой Q3 (qnom_l_s) — САМЫЙ БОЛЬШОЙ.' + sLineBreak +
-      '4. Пример: для DN15 есть строка с Q3=3 и строка с Q3=6. Выбери строку с Q3=6.' + sLineBreak +
-      '5. Если Q3 одинаковый в нескольких строках — выбери строку с максимальным Q4 (qmax_l_s).' + sLineBreak +
-      '6. После выбора строки возьми ИЗ НЕЕ ЖЕ все пять расходных полей (Q1, Q2, Q2t, Q3, Q4).' + sLineBreak +
-      '7. НЕ смешивай поля из разных строк одного DN.' + sLineBreak +
+      '=== ГЛАВНОЕ ПРАВИЛО: НЕ ПРИВЯЗЫВАЙСЯ К БУКВАМ ===' + sLineBreak +
+      'Не ищи конкретно Q1, Q2, Q3, Q4, Qнаим, Qt, Qнаиб.' + sLineBreak +
+      'Разные документы используют разные обозначения.' + sLineBreak +
+      'Определяй смысл столбца ПО ЗАГОЛОВКУ или ПРИМЕЧАНИЮ.' + sLineBreak +
+      sLineBreak +
+      '=== СОПОСТАВЛЕНИЕ ЗАГОЛОВКОВ СТОЛБЦОВ С ПОЛЯМИ JSON ===' + sLineBreak +
+      'минимальный/наименьший/Qmin/Q1 -> qmin_l_s' + sLineBreak +
+      'переходный/Qtr/Qt/Q2 -> qtr_l_s (первый переходный)' + sLineBreak +
+      'второй переходный/Q2t -> q2tr_l_s (если есть, иначе null)' + sLineBreak +
+      'номинальный/Qnom/Q3 -> qnom_l_s' + sLineBreak +
+      'максимальный/наибольший/перегрузочный/Qmax/Q4 -> qmax_l_s' + sLineBreak +
+      sLineBreak +
+      'Если столбец не подписан — ищи описание в тексте НАД или ПОД таблицей.' + sLineBreak +
+      'Если в таблице нет какого-то из этих столбцов — оставь соответствующее поле null.' + sLineBreak +
+      sLineBreak +
+      '=== ОПРЕДЕЛЕНИЕ ТАБЛИЦЫ (ЕСЛИ ИХ НЕСКОЛЬКО) ===' + sLineBreak +
+      '1. Посмотри, как в тексте называются РАЗНЫЕ ТАБЛИЦЫ.' + sLineBreak +
+      '2. Если в шаблоне уже передана modification (например, ПТ) — сначала выбери таблицу именно для этой modification.' + sLineBreak +
+      '3. Если есть поле "модификация" (ОП, ПТ, РС, К, СВ, М) — запиши в device_type.general_info.modification и выбери нужную таблицу.' + sLineBreak +
+      '4. Если есть "класс точности" (A, B, C, 1, 2) — запиши в accuracy_class и выбери таблицу по классу.' + sLineBreak +
+      '5. Если таблицы подписаны как "модификация ОП" и "модификация ПТ" — это НЕ классы точности. Они идут в modification, accuracy_class = null.' + sLineBreak +
+      '6. Если не понятно, какую таблицу выбрать — бери первую полную и укажи в raw_notes.' + sLineBreak +
+      '7. Для base_error возьми погрешность из той же таблицы или из текста рядом.' + sLineBreak +
+      sLineBreak +
+      '=== ВЫБОР СТРОКИ ДЛЯ ОДНОГО DN (ЕСЛИ ИХ НЕСКОЛЬКО) ===' + sLineBreak +
+      '1. Если для одного DN есть несколько строк — выбери строку с САМЫМ БОЛЬШИМ qmax_l_s.' + sLineBreak +
+      '2. Если qmax_l_s одинаковый — выбери строку с самым большим qnom_l_s (если он есть).' + sLineBreak +
+      '3. Все поля (qmin, qtr, q2tr, qnom, qmax) бери ИЗ ОДНОЙ выбранной строки.' + sLineBreak +
+      '4. Если для DN только одна строка — бери её.' + sLineBreak +
       sLineBreak +
       '=== ДОПОЛНИТЕЛЬНЫЕ УКАЗАНИЯ: ===' + sLineBreak +
-      'Если в тексте строка DN идет ПОСЛЕ чисел — привяжи числа к ближайшему DN снизу.' + sLineBreak +
-      'Значения расходов верни в единицах из device_type.signal.measurement_unit.' + sLineBreak +
-      'Если в таблице класса точности нет Q2t — верни q2tr_l_s = null.' + sLineBreak +
-      'В deepseek_result.raw_notes добавь: "Выбрана строка с максимальным Q3 для каждого DN."' + sLineBreak +
+      'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
+      'Если DN указан не в первом столбце — ищи ближайший DN сверху или слева.' + sLineBreak +
+      'Значения расходов верни в единицах, указанных в таблице или в примечании к ней.' + sLineBreak +
+      'Единицу измерения запиши в device_type.signal.measurement_unit.' + sLineBreak +
+      'Если в таблице нет столбца "номинальный расход" (Q3) — qnom_l_s = null.' + sLineBreak +
+      'Если в таблице нет столбца "второй переходный" (Q2t) — q2tr_l_s = null.' + sLineBreak +
+      sLineBreak +
+      '=== ЧТО ЗАПИСАТЬ В deepseek_result.raw_notes ===' + sLineBreak +
+      '1. Какую таблицу выбрал (по какому признаку: модификация/класс/первая попавшаяся).' + sLineBreak +
+      '2. Какие столбцы нашёл и как сопоставил с полями JSON.' + sLineBreak +
+      '3. Если какие-то поля остались null — объясни почему.' + sLineBreak +
       'Структуру JSON не менять.' + sLineBreak + sLineBreak +
       'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
       'Текст:' + sLineBreak + LimitedText
@@ -1922,8 +1985,12 @@ begin
           ErrorObj := ApiJson.GetValue('error') as TJSONObject;
           if ErrorObj <> nil then
           begin
+            ErrorCode := Trim(ErrorObj.GetValue<string>('code', ''));
             ErrorMessage := ErrorObj.GetValue<string>('message', '');
-            if SameText(Trim(ErrorMessage), 'Insufficient Balance') then
+            if SameText(ErrorCode, '1') then
+              ShowMessage('Ошибка DeepSeek (код 1): не удалось обработать запрос. ' +
+                'Проверьте корректность исходного текста/файла и повторите попытку.')
+            else if SameText(Trim(ErrorMessage), 'Insufficient Balance') then
               ShowMessage('Ошибка DeepSeek: недостаточно баланса на аккаунте API')
             else if Trim(ErrorMessage) <> '' then
               ShowMessage('Ошибка DeepSeek: ' + ErrorMessage)
@@ -1994,8 +2061,15 @@ begin
   Result := S;
 end;
 
-function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass: string): string;
+function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass, AModification: string): string;
+var
+  ModificationJsonValue: string;
 begin
+  if Trim(AModification) = '' then
+    ModificationJsonValue := 'null'
+  else
+    ModificationJsonValue := '"' + StringReplace(Trim(AModification), '"', '\"', [rfReplaceAll]) + '"';
+
   Result :=
     '{' + sLineBreak +
     '  "device_type": {' + sLineBreak +
@@ -2003,7 +2077,7 @@ begin
     '      "name": null,' + sLineBreak +
     '      "category": null,' + sLineBreak +
     '      "manufacturer": null,' + sLineBreak +
-    '      "modification": null,' + sLineBreak +
+    '      "modification": ' + ModificationJsonValue + ',' + sLineBreak +
     '      "procedure": null,' + sLineBreak +
     '      "grsi_number": null,' + sLineBreak +
     '      "valid_from": null,' + sLineBreak +
@@ -2319,6 +2393,8 @@ begin
         D.Enable := DObj.GetValue<Boolean>('enabled', True);
         D.Name := DObj.GetValue<string>('name', '');
         D.DN := DObj.GetValue<string>('dn_mm', '');
+        if (Trim(D.Name) = '') and (Trim(D.DN) <> '') then
+          D.Name := 'DN ' + Trim(D.DN);
         D.Qmax := GetJsonFlowDoubleDef(DObj, 'qmax_l_s', 0);
         D.Qnom := GetJsonFlowDoubleDef(DObj, 'qnom_l_s', 0);
         D.Qtr := GetJsonFlowDoubleDef(DObj, 'qtr_l_s', 0);
@@ -2392,6 +2468,8 @@ begin
     Result := True;
     UpdateUIFromType;
     UpdateDiametersGrid;
+    if FArshinRequestInProgress then
+      AutoHideEmptyDiameterColumns;
     UpdatePointsGrid;
   finally
     JsonVal.Free;
@@ -5154,7 +5232,7 @@ var
 
   procedure ProcessOneFile(const AEdit: TEdit);
   begin
-  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
+  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
     if (AEdit = nil) or (Trim(AEdit.Text) = '') then
       Exit;
 
@@ -5485,7 +5563,7 @@ begin
                 if ExtractTextLayerFromPdf(FilePath, TxtPath) then
                 begin
                   PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-                  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
+                  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
 
                   if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
                     ApplyDeepSeekJsonToType(DeepSeekResponse);
@@ -5506,7 +5584,7 @@ begin
             if ExtractTextLayerFromPdf(FilePath, TxtPath) then
             begin
               PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
-              JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass);
+              JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
 
               if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
               begin
