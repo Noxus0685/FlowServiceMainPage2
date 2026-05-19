@@ -1275,10 +1275,24 @@ end;
 
 procedure TFormTypeEditor.btnLoadLocalJsonClick(Sender: TObject);
 var
+  OpenDialog: TOpenDialog;
   JsonFilePath: string;
   JsonText: string;
 begin
-  JsonFilePath := TPath.Combine(ExtractFilePath(ParamStr(0)), '97957-26.json');
+  OpenDialog := TOpenDialog.Create(Self);
+  try
+    OpenDialog.Filter := 'JSON files (*.json)|*.json|Text files (*.txt)|*.txt|All files (*.*)|*.*';
+    OpenDialog.Options := [TOpenOption.ofFileMustExist];
+    OpenDialog.DefaultExt := 'json';
+
+    if not OpenDialog.Execute then
+      Exit;
+
+    JsonFilePath := OpenDialog.FileName;
+  finally
+    OpenDialog.Free;
+  end;
+
   if not TFile.Exists(JsonFilePath) then
   begin
     ShowMessage('Файл не найден: ' + JsonFilePath);
@@ -1295,7 +1309,7 @@ begin
   UpdateUIFromType;
   MemoLog.Visible := True;
   MemoLog.Lines.Add('Данные применены из локального файла: ' + ExtractFileName(JsonFilePath));
-  ShowMessage('Данные загружены из файла 97957-26.json');
+  ShowMessage('Данные загружены из файла: ' + ExtractFileName(JsonFilePath));
 end;
 
 procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;

@@ -56,7 +56,7 @@ object FormTypeEditor: TFormTypeEditor
       Size.Height = 30.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 3
-      Text = 'JSON 97957-26'
+      Text = 'Загрузить JSON'
       TextSettings.Trimming = None
       OnClick = btnLoadLocalJsonClick
     end
