@@ -486,6 +486,7 @@ type
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
+    procedure AutoHideEmptyDiameterColumns;
 
   public
 
@@ -1317,7 +1318,7 @@ end;
 procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
 var
   D: TDiameter;
-  HasName, HasQnom, HasQtr, HasQ2tr, HasKp, HasQf: Boolean;
+  HasName, HasQnom, HasQtr,HasQmax,HasQmin, HasQ2tr, HasKp, HasQf: Boolean;
   function HasNonZeroValue(const AValue: Double): Boolean;
   begin
     Result := not SameValue(AValue, 0, MinDouble);
@@ -1326,22 +1327,26 @@ begin
   if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
 
-  HasName := False;
-  HasQnom := False;
-  HasQtr := False;
-  HasQ2tr := False;
-  HasKp := False;
-  HasQf := False;
+  HasName := true;
+  HasQnom := true;
+  HasQtr := true;
+  HasQ2tr := true;
+  HasKp := true;
+  HasQf := true;
+  HasQmax := true;
+  HasQmin := true;
 
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      HasName := HasName or ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
-      HasQnom := HasQnom or HasNonZeroValue(D.Qnom);
-      HasQtr := HasQtr or HasNonZeroValue(D.Qtr);
-      HasQ2tr := HasQ2tr or HasNonZeroValue(D.Q2tr);
-      HasKp := HasKp or HasNonZeroValue(D.Kp);
-      HasQf := HasQf or HasNonZeroValue(D.QFmax);
+      HasName := HasName and ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
+      HasQnom := HasQnom and HasNonZeroValue(D.Qnom);
+      HasQtr := HasQtr and HasNonZeroValue(D.Qtr);
+      HasQ2tr := HasQ2tr and HasNonZeroValue(D.Q2tr);
+      HasKp := HasKp and HasNonZeroValue(D.Kp);
+      HasQf := HasQf and HasNonZeroValue(D.QFmax);
+      HasQmax := HasQmax and HasNonZeroValue(D.Qmax);
+      HasQmin := HasQmin and HasNonZeroValue(D.Qmin);
     end;
 
   StringColumnDNName.Visible := HasName;
@@ -1350,6 +1355,8 @@ begin
   StringColumnDNQ2tr.Visible := HasQ2tr;
   StringColumnDNKp.Visible := HasKp;
   StringColumnDNQF.Visible := HasQf;
+  StringColumnDNQmin.Visible := HasQmax;
+  StringColumnDNQmax.Visible := HasQmin;
   SyncGridDiametersHeaderPopupMenu;
   UpdateGridDiametersHeaderRect;
 end;

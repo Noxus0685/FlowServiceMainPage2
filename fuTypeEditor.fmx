@@ -55,8 +55,7 @@ object FormTypeEditor: TFormTypeEditor
       Size.Width = 125.000000000000000000
       Size.Height = 30.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 3
-      Text = 'Загрузить JSON'
+      Text = #1056#8212#1056#176#1056#1110#1057#1026#1057#1107#1056#183#1056#1105#1057#8218#1057#1034' JSON'
       TextSettings.Trimming = None
       OnClick = btnLoadLocalJsonClick
     end
@@ -118,8 +117,8 @@ object FormTypeEditor: TFormTypeEditor
       Size.Height = 51.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
-      Viewport.Width = 790.000000000000000000
-      Viewport.Height = 47.000000000000000000
+      Viewport.Width = 794.000000000000000000
+      Viewport.Height = 51.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000
@@ -152,7 +151,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 49
+    TabOrder = 50
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -1437,6 +1436,8 @@ object FormTypeEditor: TFormTypeEditor
         StyleLookup = ''
         TabOrder = 0
         Text = #1054#1073#1097#1080#1077
+        ExplicitSize.cx = 60.000000000000000000
+        ExplicitSize.cy = 26.000000000000000000
         object grpCommonInfo: TGroupBox
           Align = Top
           Padding.Left = 5.000000000000000000
@@ -1461,7 +1462,7 @@ object FormTypeEditor: TFormTypeEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 40
+            TabOrder = 39
             object labName: TLabel
               Align = Left
               Margins.Left = 4.000000000000000000
@@ -1502,7 +1503,7 @@ object FormTypeEditor: TFormTypeEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 39
+            TabOrder = 38
             object Label11: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1949,7 +1950,7 @@ object FormTypeEditor: TFormTypeEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 38
+            TabOrder = 37
             object Label41: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1993,6 +1994,8 @@ object FormTypeEditor: TFormTypeEditor
         StyleLookup = ''
         TabOrder = 0
         Text = #1060#1072#1081#1083#1099
+        ExplicitSize.cx = 57.000000000000000000
+        ExplicitSize.cy = 26.000000000000000000
         object Layout53: TLayout
           Align = Top
           Size.Width = 343.000000000000000000
@@ -2422,8 +2425,8 @@ object FormTypeEditor: TFormTypeEditor
         OnGetValue = GridDiametersGetValue
         OnSetValue = GridDiametersSetValue
         OnCellClick = GridDiametersCellClick
-        Viewport.Width = 1062.000000000000000000
-        Viewport.Height = 267.000000000000000000
+        Viewport.Width = 1066.000000000000000000
+        Viewport.Height = 292.000000000000000000
         object CheckColumnDNEnable: TCheckColumn
           HeaderSettings.TextSettings.WordWrap = False
         end
@@ -2519,8 +2522,8 @@ object FormTypeEditor: TFormTypeEditor
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
           OnCellClick = GridPointsCellClick
-          Viewport.Width = 1052.000000000000000000
-          Viewport.Height = 225.000000000000000000
+          Viewport.Width = 1056.000000000000000000
+          Viewport.Height = 266.000000000000000000
           object CheckColumnPointEnable: TCheckColumn
             HeaderSettings.TextSettings.WordWrap = False
           end
