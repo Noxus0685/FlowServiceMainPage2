@@ -1025,7 +1025,8 @@ begin
       ComboBoxOutputType.ItemIndex := 0;
     ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
 
-      ApplyOutputType;
+    ApplyOutputType;
+    AutoHideEmptyDiameterColumns;
 
 // =====================================================
 // == Тип выхода (OutputSet) — ДВА ComboBox
