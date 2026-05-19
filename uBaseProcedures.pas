@@ -169,6 +169,7 @@ function ExtractManufacturerName(const S: string): string;
 function NormalizeNameCase(const S: string): string;
 function NormalizeSearchText(const S: string): string;
 function NormalizeTreeText(const S: string): string;
+function NormalizeTreeKey(const S: string): string;
 function FindChildInNode(AParent: TTreeViewItem; ATag: Integer; const AKey: string): TTreeViewItem;
 function FindChildInTree(ATree: TTreeView; ATag: Integer; const AKey: string): TTreeViewItem;
 function NewGuidString: string;
@@ -882,6 +883,11 @@ begin
     Result := '<пусто>'
   else
     Result := Trim(S);
+end;
+
+function NormalizeTreeKey(const S: string): string;
+begin
+  Result := UpperCase(Trim(S));
 end;
 
 function FindChildInTree(
