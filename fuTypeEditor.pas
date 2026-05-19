@@ -5323,6 +5323,7 @@ var
 
   Json, ResultObj, Item: TJSONObject;
   GeneralObj: TJSONObject;
+  JVal: TJSONValue;
   Items: TJSONArray;
 
   MPIArr: TJSONArray;
@@ -5500,10 +5501,13 @@ begin
         GeneralObj.GetValue('title').Value;
 
       {---------- Действие до ----------}
-      ValidToDate :=
-        ISO8601ToDate(
-          GeneralObj.GetValue('valid_to').Value
-        );
+      ValidToDate := 0;
+      JVal := GeneralObj.GetValue('valid_to');
+      if (JVal <> nil) and (JVal.Value <> '') then
+      begin
+        if not TryISO8601ToDate(JVal.Value, ValidToDate, True) then
+          ValidToDate := 0;
+      end;
       DevType.ValidityDate := ValidToDate;
 
      // DevType.RegDate :=
