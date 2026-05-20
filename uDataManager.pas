@@ -147,7 +147,6 @@ type
   // Назначение полей прибора по выбранной ветке дерева.
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
-  procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
   function BuildDeviceSelectionContext(
     const ARepo: TDeviceRepository;
     const APreferredUUID: string
@@ -280,9 +279,6 @@ begin
     if SourceType = nil then
       Continue;
     NewType := ActiveTypeRepo.CreateType(SourceType);
-    // При вставке в выбранную ветку дерева применяем её как контекст назначения.
-    if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
-      AssignTypeTreeFields(NewType, ATargetNode);
     Result.Add(NewType);
   end;
 end;
@@ -467,36 +463,6 @@ begin
 end;
 
 
-procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
-var
-  Cur: TTreeViewItem;
-begin
-  // Замена полей назначения по выбранной ветке:
-  // Modification -> Modification/Category/Manufacturer,
-  // Category -> Category/Manufacturer, Manufacturer -> только Manufacturer.
-  if (AType = nil) or (ANode = nil) then
-    Exit;
-
-  Cur := ANode;
-  while Cur <> nil do
-  begin
-    case Cur.Tag of
-      Ord(tnManufacturer):
-        AType.Manufacturer := Cur.TagString;
-      Ord(tnCategory):
-        begin
-          AType.Category := StrToIntDef(Cur.TagString.Split(['|'])[0], 0);
-          if Cur.Text <> '<категория>' then
-            AType.CategoryName := Cur.Text
-          else
-            AType.CategoryName := '';
-        end;
-      Ord(tnModification):
-        AType.Modification := Cur.TagString;
-    end;
-    Cur := Cur.ParentItem;
-  end;
-end;
 
 
 
