@@ -252,7 +252,9 @@ type
     ceCategory: TComboEdit;
     MemoLog: TMemo;
     NetHTTPClient1: TNetHTTPClient;
-    DeepSeek: TSpeedButton;   TabItemDevice: TTabItem;
+    DeepSeek: TSpeedButton;
+    TabControlMain: TTabControl;
+    TabItemDevice: TTabItem;
     TabItemCoefs: TTabItem;
     LayoutUnits: TLayout;
     LabelUnits: TLabel;
