@@ -201,6 +201,7 @@ type
 
     procedure LoadData;
     procedure BuildTree;
+    procedure RebuildTreeFull;
     procedure UpdateGridTypes;
     procedure OpenTypeEditor(AType: TDeviceType);
     function HasActiveFilters: Boolean;
@@ -538,6 +539,8 @@ begin
         if T.Category > 0 then
         begin
           CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName);
+          if Trim(CatText) = '' then
+            CatText := '<категория>';
           CatKey  := IntToStr(T.Category);
 
           CatNode := FindChildInNode(
@@ -604,6 +607,8 @@ begin
         Continue;
 
       CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName);
+      if Trim(CatText) = '' then
+        CatText := '<категория>';
       CatKey  := IntToStr(T.Category) + '|' + NormalizeTreeKey(CatText); // -1 / 0 + имя
 
       CatNode := FindChildInNode(
@@ -1942,12 +1947,24 @@ end;
 
 procedure TFormTypeSelect.miRefreshRepositoryClick(Sender: TObject);
 begin
-      { Пересборка дерева (с восстановлением выбора) }
-      BuildTree;
+      { Полное обновление дерева по кнопке "Обновить" }
+      RebuildTreeFull;
 
       { Полная пересборка фильтров + сортировка }
       ApplyFilter;
         UpdateGridTypes;
+end;
+
+procedure TFormTypeSelect.RebuildTreeFull;
+begin
+  TreeViewTypes.BeginUpdate;
+  try
+    TreeViewTypes.Clear;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
+
+  BuildTree;
 end;
 
 procedure TFormTypeSelect.miSaveClick(Sender: TObject);
