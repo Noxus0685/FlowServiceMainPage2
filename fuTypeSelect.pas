@@ -332,9 +332,20 @@ begin
       // ---------- КАТЕГОРИЯ ----------
       Ord(tnCategory):
         begin
-          // TagString содержит ID категории
-          if AType.Category <> StrToIntDef(Cur.TagString, -1) then
-            Exit(False);
+          // Для Category > 0 TagString содержит только ID.
+          // Для Category <= 0 TagString хранится как "ID|НормализованноеИмя",
+          // чтобы разделять 0 (пустая) и -1 (произвольная) категории.
+          if AType.Category > 0 then
+          begin
+            if AType.Category <> StrToIntDef(Cur.TagString, -1) then
+              Exit(False);
+          end
+          else
+          begin
+            if Cur.TagString <> (IntToStr(AType.Category) + '|' +
+              NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName))) then
+              Exit(False);
+          end;
         end;
 
       // ---------- МОДИФИКАЦИЯ ----------
