@@ -770,7 +770,7 @@ begin
         if Trim(D.Manufacturer) <> '' then
         begin
           ManText := D.Manufacturer;
-          ManKey  := D.Manufacturer;
+          ManKey  := NormalizeTreeKey(D.Manufacturer);
         end
         else
         begin
@@ -821,7 +821,7 @@ begin
           if Trim(D.Modification) <> '' then
           begin
             ModText := D.Modification;
-            ModKey  := D.Modification;
+            ModKey  := NormalizeTreeKey(D.Modification);
           end
           else
           begin
@@ -855,7 +855,7 @@ begin
       if D.Category > 0 then
         Continue;
 
-      ManKey := D.Manufacturer;
+      ManKey := NormalizeTreeKey(D.Manufacturer);
       ManNode := FindChildInTree(
         TreeViewDevices,
         Ord(tnManufacturer),
@@ -886,7 +886,7 @@ begin
       if Trim(D.Modification) <> '' then
       begin
         ModText := D.Modification;
-        ModKey  := D.Modification;
+        ModKey  := NormalizeTreeKey(D.Modification);
       end
       else
       begin
@@ -2018,7 +2018,7 @@ begin
     Exit;
 
   if Trim(ADevice.Manufacturer) <> '' then
-    ManKey := ADevice.Manufacturer
+    ManKey := NormalizeTreeKey(ADevice.Manufacturer)
   else
     ManKey := '';
 
@@ -2035,7 +2035,7 @@ begin
     Exit(ManNode);
 
   if Trim(ADevice.Modification) <> '' then
-    ModKey := ADevice.Modification
+    ModKey := NormalizeTreeKey(ADevice.Modification)
   else
     ModKey := '';
 
