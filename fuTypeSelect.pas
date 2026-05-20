@@ -325,37 +325,33 @@ begin
       Ord(tnManufacturer):
         begin
           // TagString = ''  → пустой изготовитель
-          if NormalizeTreeKey(AType.Manufacturer) <> NormalizeTreeKey(Cur.TagString) then
+          if not (
+            SameText(Trim(AType.Manufacturer), Trim(Cur.TagString))
+            or SameText(NormalizeTreeKey(AType.Manufacturer), Trim(Cur.TagString))
+          ) then
             Exit(False);
         end;
 
       // ---------- КАТЕГОРИЯ ----------
       Ord(tnCategory):
         begin
-          // TagString категории: "ID" или "ID|НормализованноеИмя".
-          // Для узла "<категория>" пропускаем только пустую категорию.
-          var CatParts := Cur.TagString.Split(['|']);
-          var NodeCatID := StrToIntDef(CatParts[0], -1);
-
-          if Cur.Text = '<категория>' then
+          // Для узлов с составным ключом (Category <= 0) сравниваем полный ключ:
+          // "ID|НормализованноеИмя". Это синхронизирует фильтр грида с деревом.
+          if Pos('|', Cur.TagString) > 0 then
           begin
-            if not ((AType.Category = 0) or ((AType.Category = -1) and (Trim(AType.CategoryName) = ''))) then
+            var TypeCatText := ActiveRepo.CategoryToText(AType.Category, AType.CategoryName);
+            if Trim(TypeCatText) = '' then
+              TypeCatText := '<категория>';
+
+            var TypeCatKey := IntToStr(AType.Category) + '|' + NormalizeTreeKey(TypeCatText);
+            if not SameText(Cur.TagString, TypeCatKey) then
               Exit(False);
           end
           else
           begin
-            if AType.Category <> NodeCatID then
+            // Категории > 0: ключ только по ID.
+            if IntToStr(AType.Category) <> Cur.TagString then
               Exit(False);
-
-            if NodeCatID = -1 then
-            begin
-              var NodeCatNameKey := '';
-              if Length(CatParts) > 1 then
-                NodeCatNameKey := CatParts[1];
-
-              if NodeCatNameKey <> NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName)) then
-                Exit(False);
-            end;
           end;
         end;
 
@@ -363,7 +359,10 @@ begin
       Ord(tnModification):
         begin
           // TagString = '' → пустая модификация
-          if NormalizeTreeKey(AType.Modification) <> NormalizeTreeKey(Cur.TagString) then
+          if not (
+            SameText(Trim(AType.Modification), Trim(Cur.TagString))
+            or SameText(NormalizeTreeKey(AType.Modification), Trim(Cur.TagString))
+          ) then
             Exit(False);
         end;
     end;
@@ -416,7 +415,7 @@ var
       Exit;
 
     if (ANode.Tag = PrevNodeTag)
-      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(PrevNodeTagString))
+      and SameText(Trim(ANode.TagString), Trim(PrevNodeTagString))
       and (ANode.Text = PrevNodeText)
       and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
     begin
@@ -497,7 +496,7 @@ begin
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
+      PrevNodeTagString := Trim(PrevSelectedNode.TagString);
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
@@ -534,7 +533,7 @@ begin
         if Trim(T.Manufacturer) <> '' then
         begin
           ManText := T.Manufacturer;
-          ManKey  := T.Manufacturer;
+          ManKey  := NormalizeTreeKey(T.Manufacturer);
         end
         else
         begin
@@ -584,7 +583,7 @@ begin
           if Trim(T.Modification) <> '' then
           begin
             ModText := T.Modification;
-            ModKey  := T.Modification;
+            ModKey  := NormalizeTreeKey(T.Modification);
           end
           else
           begin
@@ -618,7 +617,7 @@ begin
       if T.Category > 0 then
         Continue;
 
-      ManKey := T.Manufacturer;
+      ManKey := NormalizeTreeKey(T.Manufacturer);
       ManNode := FindChildInTree(
         TreeViewTypes,
         Ord(tnManufacturer),
@@ -651,7 +650,7 @@ begin
       if Trim(T.Modification) <> '' then
       begin
         ModText := T.Modification;
-        ModKey  := T.Modification;
+        ModKey  := NormalizeTreeKey(T.Modification);
       end
       else
       begin
@@ -1598,6 +1597,9 @@ begin
       CollectSelectedNodes(Item);
     end;
 
+    if (SelectedNodes.Count = 0) and (TreeViewTypes.Selected <> nil) then
+      SelectedNodes.Add(TreeViewTypes.Selected);
+
     if SelectedNodes.Count = 0 then
       Exit;
 
@@ -2509,7 +2511,7 @@ begin
     Exit;
 
   {---------------- Изготовитель ----------------}
-  ManKey := AType.Manufacturer;
+  ManKey := NormalizeTreeKey(AType.Manufacturer);
   ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), ManKey);
   if ManNode = nil then
     Exit;
@@ -2525,7 +2527,7 @@ begin
     Exit;
 
   {---------------- Модификация ----------------}
-  ModKey := AType.Modification;
+  ModKey := NormalizeTreeKey(AType.Modification);
   ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
   if ModNode = nil then
     Exit;
