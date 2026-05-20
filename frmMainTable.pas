@@ -4128,7 +4128,16 @@ begin
 
     NewType := Frm.SelectedType;
     if NewType = nil then
+    begin
+      // Если выбранный тип был удалён в окне выбора,
+      // очищаем текущую строку прибора через штатное действие.
+      if not AIsEtalon then
+      begin
+        GridDevices.Row := ARow;
+        ActionDevicesClearRowExecute(nil);
+      end;
       Exit;
+    end;
 
     FoundRepo := DataManager.ActiveTypeRepo;
 
