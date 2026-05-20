@@ -1256,7 +1256,6 @@ begin
    FClearTreeSelectionOnClick := False;
    FCheckedTypes := TList<TDeviceType>.Create;
    TreeViewTypes.MultiSelect := True;
-   KeyPreview := True;
    OnKeyDown := FormKeyDown;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
    GridTypes.OnMouseDown := GridTypesMouseDown;

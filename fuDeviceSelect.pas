@@ -2454,7 +2454,6 @@ procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
 begin
-  KeyPreview := True;
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
   GridDevices.OnMouseDown := GridDevicesMouseDown;
