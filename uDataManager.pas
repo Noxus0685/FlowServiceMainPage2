@@ -147,7 +147,7 @@ type
   // Назначение полей прибора по выбранной ветке дерева.
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
-  procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+  procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem; const ASourceType: TDeviceType = nil);
   function BuildDeviceSelectionContext(
     const ARepo: TDeviceRepository;
     const APreferredUUID: string
@@ -282,7 +282,7 @@ begin
     NewType := ActiveTypeRepo.CreateType(SourceType);
     // При вставке в выбранную ветку дерева применяем её как контекст назначения.
     if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
-      AssignTypeTreeFields(NewType, ATargetNode);
+      AssignTypeTreeFields(NewType, ATargetNode, SourceType);
     Result.Add(NewType);
   end;
 end;
@@ -467,14 +467,27 @@ begin
 end;
 
 
-procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem; const ASourceType: TDeviceType);
 var
   Cur: TTreeViewItem;
 begin
   // Замена полей назначения по выбранной ветке:
   // Modification -> Modification/Category/Manufacturer,
   // Category -> Category/Manufacturer, Manufacturer -> только Manufacturer.
-  if (AType = nil) or (ANode = nil) then
+  if AType = nil then
+    Exit;
+
+  // Если передана исходная строка, копируем поля из неё (без чтения дерева).
+  if ASourceType <> nil then
+  begin
+    AType.Modification := ASourceType.Modification;
+    AType.Category := ASourceType.Category;
+    AType.CategoryName := ASourceType.CategoryName;
+    AType.Manufacturer := ASourceType.Manufacturer;
+    Exit;
+  end;
+
+  if ANode = nil then
     Exit;
 
   Cur := ANode;
