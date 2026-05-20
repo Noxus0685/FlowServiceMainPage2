@@ -225,7 +225,6 @@ type
       const ANode: TTreeViewItem
     ): Boolean;
     function BuildSearchURL(const ASearch: string): string;
-    procedure ApplyTreeSelectionToType(AType: TDeviceType);
 
     procedure FillComboBoxRepository;
 
@@ -967,9 +966,6 @@ begin
   end;
 
   WriteTypeActionLog('Создан тип прибора', NewType);
-  if (SelectedTreeNode <> nil) and
-     (SelectedTreeNode.Tag <> Ord(tnAll)) then
-    ApplyTreeSelectionToType(NewType);
 
   {-------------------------------------------------}
   { Синхронизируем дерево: для новых типов без      }
@@ -997,10 +993,7 @@ begin
       end;
 end;
 
-procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType);
-begin
-  AppServices.DataManager.AssignTypeTreeFields(AType,GetActiveTreeNode{ TreeViewTypes.Selected});
-end;
+
 
  procedure TFormTypeSelect.actTypeClearExecute(Sender: TObject);
 var
