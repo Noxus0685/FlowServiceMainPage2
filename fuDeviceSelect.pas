@@ -2492,7 +2492,7 @@ procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkReturn then
   begin
-    btnOK.Click;
+    ModalResult := mrOk;
     Key := 0;
     KeyChar := #0;
     Exit;

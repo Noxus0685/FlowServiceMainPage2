@@ -1478,7 +1478,7 @@ procedure TFormTypeSelect.GridTypesKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkReturn then
   begin
-    btnOK.Click;
+    actTypeSelectExecute(actTypeSelect);
     Key := 0;
     KeyChar := #0;
   end;
