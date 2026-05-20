@@ -647,9 +647,9 @@ var
     while Cur <> nil do
     begin
       if Result = '' then
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text
       else
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text + '/' + Result;
       Cur := Cur.ParentItem;
     end;
   end;
@@ -661,7 +661,7 @@ var
     if (ANode = nil) or (RestoredNode <> nil) then
       Exit;
     if (ANode.Tag = PrevNodeTag)
-      and (ANode.TagString = PrevNodeTagString)
+      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(PrevNodeTagString))
       and (ANode.Text = PrevNodeText)
       and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
     begin
@@ -735,7 +735,7 @@ begin
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := PrevSelectedNode.TagString;
+      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
@@ -1067,7 +1067,7 @@ var
 
     if (SelectedNode <> nil)
       and (ANode.Tag = SelectedNode.Tag)
-      and (ANode.TagString = SelectedNode.TagString) then
+      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(SelectedNode.TagString)) then
     begin
       RestoredNode := ANode;
       Exit;
@@ -2170,7 +2170,7 @@ begin
       Ord(tnManufacturer):
         begin
           // TagString = '' → пустой изготовитель
-          if ADevice.Manufacturer <> Cur.TagString then
+          if NormalizeTreeKey(ADevice.Manufacturer) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
 
@@ -2192,7 +2192,7 @@ begin
       Ord(tnModification):
         begin
           // TagString = '' → пустая модификация
-          if ADevice.Modification <> Cur.TagString then
+          if NormalizeTreeKey(ADevice.Modification) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
     end;
