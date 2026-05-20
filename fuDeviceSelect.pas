@@ -176,6 +176,8 @@ type
       Shift: TShiftState);
     procedure GridDevicesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
 
 private
 
@@ -2452,6 +2454,8 @@ procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
 begin
+  KeyPreview := True;
+  OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
   GridDevices.OnMouseDown := GridDevicesMouseDown;
 
@@ -2487,9 +2491,28 @@ begin
   end;
 end;
 
+procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrOk;
+    Key := 0;
+    KeyChar := #0;
+  end;
+end;
+
 procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrOk;
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
   if Key = vkReturn then
   begin
     ModalResult := mrOk;
