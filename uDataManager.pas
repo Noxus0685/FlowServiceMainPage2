@@ -482,7 +482,10 @@ begin
   begin
     case Cur.Tag of
       Ord(tnManufacturer):
-        AType.Manufacturer := Cur.TagString;
+        if Cur.Text <> '' then
+          AType.Manufacturer := Cur.Text
+        else
+          AType.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
           AType.Category := StrToIntDef(Cur.TagString.Split(['|'])[0], 0);
@@ -492,7 +495,10 @@ begin
             AType.CategoryName := '';
         end;
       Ord(tnModification):
-        AType.Modification := Cur.TagString;
+        if Cur.Text <> '<модификация>' then
+          AType.Modification := Cur.Text
+        else
+          AType.Modification := '';
     end;
     Cur := Cur.ParentItem;
   end;
