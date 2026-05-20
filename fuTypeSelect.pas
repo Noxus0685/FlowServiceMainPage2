@@ -332,9 +332,31 @@ begin
       // ---------- КАТЕГОРИЯ ----------
       Ord(tnCategory):
         begin
-          // TagString содержит ID категории
-          if AType.Category <> StrToIntDef(Cur.TagString, -1) then
-            Exit(False);
+          // TagString категории: "ID" или "ID|НормализованноеИмя".
+          // Для узла "<категория>" пропускаем только пустую категорию.
+          var CatParts := Cur.TagString.Split(['|']);
+          var NodeCatID := StrToIntDef(CatParts[0], -1);
+
+          if Cur.Text = '<категория>' then
+          begin
+            if not ((AType.Category = 0) or ((AType.Category = -1) and (Trim(AType.CategoryName) = ''))) then
+              Exit(False);
+          end
+          else
+          begin
+            if AType.Category <> NodeCatID then
+              Exit(False);
+
+            if NodeCatID = -1 then
+            begin
+              var NodeCatNameKey := '';
+              if Length(CatParts) > 1 then
+                NodeCatNameKey := CatParts[1];
+
+              if NodeCatNameKey <> NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName)) then
+                Exit(False);
+            end;
+          end;
         end;
 
       // ---------- МОДИФИКАЦИЯ ----------
@@ -511,8 +533,8 @@ begin
          {========== ИЗГОТОВИТЕЛЬ =========}
         if Trim(T.Manufacturer) <> '' then
         begin
-          ManText := NormalizeTreeKey(T.Manufacturer);
-          ManKey  := NormalizeTreeKey(T.Manufacturer);
+          ManText := T.Manufacturer;
+          ManKey  := T.Manufacturer;
         end
         else
         begin
@@ -562,7 +584,7 @@ begin
           if Trim(T.Modification) <> '' then
           begin
             ModText := T.Modification;
-            ModKey  := NormalizeTreeKey(T.Modification);
+            ModKey  := T.Modification;
           end
           else
           begin
@@ -596,7 +618,7 @@ begin
       if T.Category > 0 then
         Continue;
 
-      ManKey := NormalizeTreeKey(T.Manufacturer);
+      ManKey := T.Manufacturer;
       ManNode := FindChildInTree(
         TreeViewTypes,
         Ord(tnManufacturer),
@@ -629,7 +651,7 @@ begin
       if Trim(T.Modification) <> '' then
       begin
         ModText := T.Modification;
-        ModKey  := NormalizeTreeKey(T.Modification);
+        ModKey  := T.Modification;
       end
       else
       begin
@@ -899,13 +921,16 @@ begin
     (FDevFilteredTypes <> nil) and
     (SelRow >= 0) and
     (SelRow < FDevFilteredTypes.Count);
-  //копия выбранной строки
-  //if HasGridSelection then
-  //  SourceType := FDevFilteredTypes[SelRow];
+  // Копия выбранной строки (с сохранением регистра полей).
+  if HasGridSelection then
+    SourceType := FDevFilteredTypes[SelRow];
 
   NewType := ActiveRepo.CreateType(SourceType);
   WriteTypeActionLog('Создан тип прибора', NewType);
-  if (SelectedTreeNode <> nil) and
+  // Если копии строки нет — заполняем поля по выбранной ветке дерева.
+  // Для копии строки не применяем ветку, чтобы не перетирать исходный регистр.
+  if (SourceType = nil) and
+     (SelectedTreeNode <> nil) and
      (SelectedTreeNode.Tag <> Ord(tnAll)) then
     ApplyTreeSelectionToType(NewType);
 
@@ -2487,19 +2512,23 @@ begin
     Exit;
 
   {---------------- Изготовитель ----------------}
-  ManKey := NormalizeTreeKey(AType.Manufacturer);
+  ManKey := AType.Manufacturer;
   ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), ManKey);
   if ManNode = nil then
     Exit;
 
   {---------------- Категория ----------------}
-  CatKey := IntToStr(AType.Category);
+  if AType.Category > 0 then
+    CatKey := IntToStr(AType.Category)
+  else
+    CatKey := IntToStr(AType.Category) +
+      '|' + NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName));
   CatNode := FindChildInNode(ManNode, Ord(tnCategory), CatKey);
   if CatNode = nil then
     Exit;
 
   {---------------- Модификация ----------------}
-  ModKey := NormalizeTreeKey(AType.Modification);
+  ModKey := AType.Modification;
   ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
   if ModNode = nil then
     Exit;
