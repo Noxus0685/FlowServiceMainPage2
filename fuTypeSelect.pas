@@ -2079,7 +2079,7 @@ begin
     Result := sfName; // безопасный дефолт
 end;
 
-procedure  .ComboBoxRepositoryChange(Sender: TObject);
+procedure  TFormTypeSelect.ComboBoxRepositoryChange(Sender: TObject);
 var
   Idx: Integer;
   RepoName: string;
