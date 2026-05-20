@@ -886,8 +886,15 @@ begin
 end;
 
 function NormalizeTreeKey(const S: string): string;
+var
+  T: string;
 begin
-  Result := UpperCase(Trim(S));
+  T := Trim(S).ToLower;
+
+  if T = '' then
+    Exit('');
+
+  Result := T.Substring(0, 1).ToUpper + T.Substring(1);
 end;
 
 function FindChildInTree(
