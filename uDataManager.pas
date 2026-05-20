@@ -148,6 +148,8 @@ type
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
   procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+  // Копирование полей типа (Modification/Category/Manufacturer) из исходной строки в целевую.
+  procedure AssignTypeFieldsFromSource(const ATargetType, ASourceType: TDeviceType);
   function BuildDeviceSelectionContext(
     const ARepo: TDeviceRepository;
     const APreferredUUID: string
@@ -282,7 +284,7 @@ begin
     NewType := ActiveTypeRepo.CreateType(SourceType);
     // При вставке в выбранную ветку дерева применяем её как контекст назначения.
     if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
-      AssignTypeTreeFields(NewType, ATargetNode);
+      AssignTypeFieldsFromSource(NewType, SourceType);
     Result.Add(NewType);
   end;
 end;
@@ -464,6 +466,20 @@ begin
     end;
     Cur := Cur.ParentItem;
   end;
+end;
+
+
+procedure TManagerTTableDM.AssignTypeFieldsFromSource(const ATargetType, ASourceType: TDeviceType);
+begin
+  // Для операции копирования используем исходную строку как источник полей,
+  // а не дерево назначения: переносим Modification/Category/Manufacturer.
+  if (ATargetType = nil) or (ASourceType = nil) then
+    Exit;
+
+  ATargetType.Modification := ASourceType.Modification;
+  ATargetType.Category := ASourceType.Category;
+  ATargetType.CategoryName := ASourceType.CategoryName;
+  ATargetType.Manufacturer := ASourceType.Manufacturer;
 end;
 
 
