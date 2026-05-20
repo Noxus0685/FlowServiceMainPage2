@@ -1591,6 +1591,9 @@ begin
       CollectSelectedNodes(Item);
     end;
 
+    if (SelectedNodes.Count = 0) and (TreeViewTypes.Selected <> nil) then
+      SelectedNodes.Add(TreeViewTypes.Selected);
+
     if SelectedNodes.Count = 0 then
       Exit;
 
