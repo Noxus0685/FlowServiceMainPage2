@@ -221,7 +221,7 @@ type
       const ANode: TTreeViewItem
     ): Boolean;
     function BuildSearchURL(const ASearch: string): string;
-    procedure ApplyTreeSelectionToType(AType: TDeviceType);
+    procedure ApplyTreeSelectionToType(AType: TDeviceType; ASourceType: TDeviceType = nil);
 
     procedure FillComboBoxRepository;
 
@@ -921,15 +921,15 @@ begin
     (FDevFilteredTypes <> nil) and
     (SelRow >= 0) and
     (SelRow < FDevFilteredTypes.Count);
-  //копия выбранной строки
-  //if HasGridSelection then
-  //  SourceType := FDevFilteredTypes[SelRow];
+  // копия выбранной строки
+  if HasGridSelection then
+    SourceType := FDevFilteredTypes[SelRow];
 
   NewType := ActiveRepo.CreateType(SourceType);
   WriteTypeActionLog('Создан тип прибора', NewType);
   if (SelectedTreeNode <> nil) and
      (SelectedTreeNode.Tag <> Ord(tnAll)) then
-    ApplyTreeSelectionToType(NewType);
+    ApplyTreeSelectionToType(NewType, SourceType);
 
   {-------------------------------------------------}
   { Синхронизируем дерево: для новых типов без      }
@@ -957,9 +957,9 @@ begin
       end;
 end;
 
-procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType);
+procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType; ASourceType: TDeviceType = nil);
 begin
-  AppServices.DataManager.AssignTypeTreeFields(AType,GetActiveTreeNode{ TreeViewTypes.Selected});
+  AppServices.DataManager.AssignTypeTreeFields(AType, GetActiveTreeNode{ TreeViewTypes.Selected}, ASourceType);
 end;
 
  procedure TFormTypeSelect.actTypeClearExecute(Sender: TObject);
