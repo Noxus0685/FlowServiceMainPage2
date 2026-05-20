@@ -416,7 +416,7 @@ var
       Exit;
 
     if (ANode.Tag = PrevNodeTag)
-      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(PrevNodeTagString))
+      and SameText(Trim(ANode.TagString), Trim(PrevNodeTagString))
       and (ANode.Text = PrevNodeText)
       and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
     begin
@@ -497,7 +497,7 @@ begin
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
+      PrevNodeTagString := Trim(PrevSelectedNode.TagString);
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
@@ -2509,7 +2509,7 @@ begin
     Exit;
 
   {---------------- Изготовитель ----------------}
-  ManKey := AType.Manufacturer;
+  ManKey := NormalizeTreeKey(AType.Manufacturer);
   ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), ManKey);
   if ManNode = nil then
     Exit;
@@ -2525,7 +2525,7 @@ begin
     Exit;
 
   {---------------- Модификация ----------------}
-  ModKey := AType.Modification;
+  ModKey := NormalizeTreeKey(AType.Modification);
   ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
   if ModNode = nil then
     Exit;
