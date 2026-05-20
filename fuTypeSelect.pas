@@ -534,7 +534,7 @@ begin
         if Trim(T.Manufacturer) <> '' then
         begin
           ManText := T.Manufacturer;
-          ManKey  := T.Manufacturer;
+          ManKey  := NormalizeTreeKey(T.Manufacturer);
         end
         else
         begin
@@ -584,7 +584,7 @@ begin
           if Trim(T.Modification) <> '' then
           begin
             ModText := T.Modification;
-            ModKey  := T.Modification;
+            ModKey  := NormalizeTreeKey(T.Modification);
           end
           else
           begin
@@ -618,7 +618,7 @@ begin
       if T.Category > 0 then
         Continue;
 
-      ManKey := T.Manufacturer;
+      ManKey := NormalizeTreeKey(T.Manufacturer);
       ManNode := FindChildInTree(
         TreeViewTypes,
         Ord(tnManufacturer),
@@ -651,7 +651,7 @@ begin
       if Trim(T.Modification) <> '' then
       begin
         ModText := T.Modification;
-        ModKey  := T.Modification;
+        ModKey  := NormalizeTreeKey(T.Modification);
       end
       else
       begin
