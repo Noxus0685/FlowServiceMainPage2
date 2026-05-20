@@ -899,6 +899,7 @@ var
   SourceType: TDeviceType;
   SelectedTreeNode: TTreeViewItem;
   HasGridSelection: Boolean;
+  SelectedNodeTag: Integer;
   I: Integer;
 begin
 
@@ -921,11 +922,44 @@ begin
     (FDevFilteredTypes <> nil) and
     (SelRow >= 0) and
     (SelRow < FDevFilteredTypes.Count);
-  //копия выбранной строки
-  //if HasGridSelection then
-  //  SourceType := FDevFilteredTypes[SelRow];
 
-  NewType := ActiveRepo.CreateType(SourceType);
+  { Берём источник только из выбранной строки грида }
+  if HasGridSelection then
+    SourceType := FDevFilteredTypes[SelRow];
+
+  if SelectedTreeNode <> nil then
+    SelectedNodeTag := SelectedTreeNode.Tag
+  else
+    SelectedNodeTag := Ord(tnAll);
+
+  { Для Modification создаём полную копию выбранной строки, иначе — пустой тип }
+  if (SourceType <> nil) and (SelectedNodeTag = Ord(tnModification)) then
+    NewType := ActiveRepo.CreateType(SourceType)
+  else
+    { По умолчанию сохраняем прежнее поведение: если строки нет, создаём пустой тип }
+    NewType := ActiveRepo.CreateType(nil);
+
+  if SourceType <> nil then
+  begin
+    case SelectedNodeTag of
+      Ord(tnManufacturer):
+        begin
+          { Уровень Manufacturer: копируем только производителя }
+          NewType.Manufacturer := SourceType.Manufacturer;
+        end;
+
+      Ord(tnCategory):
+        begin
+          { Уровень Category: копируем производителя и категорию }
+          NewType.Manufacturer := SourceType.Manufacturer;
+          NewType.Category := SourceType.Category;
+          NewType.CategoryName := SourceType.CategoryName;
+        end;
+    else
+      { Для остальных узлов оставляем прежнюю логику через выбор в дереве }
+    end;
+  end;
+
   WriteTypeActionLog('Создан тип прибора', NewType);
   if (SelectedTreeNode <> nil) and
      (SelectedTreeNode.Tag <> Ord(tnAll)) then
