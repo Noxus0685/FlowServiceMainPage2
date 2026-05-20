@@ -2521,7 +2521,7 @@ begin
     CatKey := IntToStr(AType.Category)
   else
     CatKey := IntToStr(AType.Category) +
-      '|' + NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName));
+      '|' + Trim(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName));
   CatNode := FindChildInNode(ManNode, Ord(tnCategory), CatKey);
   if CatNode = nil then
     Exit;
