@@ -452,11 +452,12 @@ begin
         ADevice.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          // По аналогии с AssignTypeTreeFields:
-          // TagString узла категории содержит ID категории в виде строки.
-          ADevice.Category := StrToIntDef(Cur.TagString, 0);
-          if Cur.Text <>'<категория>' then
-            ADevice.CategoryName := Cur.Text;
+          // TagString может быть в формате "ID" или "ID|НормализованноеИмя".
+          ADevice.Category := StrToIntDef(Cur.TagString.Split(['|'])[0], 0);
+          if Cur.Text <> '<категория>' then
+            ADevice.CategoryName := Cur.Text
+          else
+            ADevice.CategoryName := '';
         end;
       Ord(tnModification):
         ADevice.Modification := Cur.TagString;
@@ -484,9 +485,11 @@ begin
         AType.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          AType.Category := StrToIntDef(Cur.TagString, 0);
-          if Cur.Text <>'<категория>' then
-            AType.CategoryName := Cur.Text;
+          AType.Category := StrToIntDef(Cur.TagString.Split(['|'])[0], 0);
+          if Cur.Text <> '<категория>' then
+            AType.CategoryName := Cur.Text
+          else
+            AType.CategoryName := '';
         end;
       Ord(tnModification):
         AType.Modification := Cur.TagString;
