@@ -332,30 +332,23 @@ begin
       // ---------- КАТЕГОРИЯ ----------
       Ord(tnCategory):
         begin
-          // TagString категории: "ID" или "ID|НормализованноеИмя".
-          // Для узла "<категория>" пропускаем только пустую категорию.
-          var CatParts := Cur.TagString.Split(['|']);
-          var NodeCatID := StrToIntDef(CatParts[0], -1);
-
-          if Cur.Text = '<категория>' then
+          // Для узлов с составным ключом (Category <= 0) сравниваем полный ключ:
+          // "ID|НормализованноеИмя". Это синхронизирует фильтр грида с деревом.
+          if Pos('|', Cur.TagString) > 0 then
           begin
-            if not ((AType.Category = 0) or ((AType.Category = -1) and (Trim(AType.CategoryName) = ''))) then
+            var TypeCatText := ActiveRepo.CategoryToText(AType.Category, AType.CategoryName);
+            if Trim(TypeCatText) = '' then
+              TypeCatText := '<категория>';
+
+            var TypeCatKey := IntToStr(AType.Category) + '|' + NormalizeTreeKey(TypeCatText);
+            if not SameText(Cur.TagString, TypeCatKey) then
               Exit(False);
           end
           else
           begin
-            if AType.Category <> NodeCatID then
+            // Категории > 0: ключ только по ID.
+            if IntToStr(AType.Category) <> Cur.TagString then
               Exit(False);
-
-            if NodeCatID = -1 then
-            begin
-              var NodeCatNameKey := '';
-              if Length(CatParts) > 1 then
-                NodeCatNameKey := CatParts[1];
-
-              if not SameText(NodeCatNameKey, Trim(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName))) then
-                Exit(False);
-            end;
           end;
         end;
 
