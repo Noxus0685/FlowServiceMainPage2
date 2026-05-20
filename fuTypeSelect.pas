@@ -323,7 +323,7 @@ begin
       Ord(tnManufacturer):
         begin
           // TagString = ''  → пустой изготовитель
-          if AType.Manufacturer <> Cur.TagString then
+          if NormalizeTreeKey(AType.Manufacturer) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
 
@@ -339,7 +339,7 @@ begin
       Ord(tnModification):
         begin
           // TagString = '' → пустая модификация
-          if AType.Modification <> Cur.TagString then
+          if NormalizeTreeKey(AType.Modification) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
     end;
@@ -376,9 +376,9 @@ var
     while Cur <> nil do
     begin
       if Result = '' then
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text
       else
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text + '/' + Result;
       Cur := Cur.ParentItem;
     end;
   end;
@@ -392,7 +392,7 @@ var
       Exit;
 
     if (ANode.Tag = PrevNodeTag)
-      and (ANode.TagString = PrevNodeTagString)
+      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(PrevNodeTagString))
       and (ANode.Text = PrevNodeText)
       and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
     begin
@@ -473,7 +473,7 @@ begin
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := PrevSelectedNode.TagString;
+      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
@@ -512,7 +512,7 @@ begin
         if Trim(T.Manufacturer) <> '' then
         begin
           ManText := T.Manufacturer;
-          ManKey  := T.Manufacturer;
+          ManKey  := NormalizeTreeKey(T.Manufacturer);
         end
         else
         begin
@@ -560,7 +560,7 @@ begin
           if Trim(T.Modification) <> '' then
           begin
             ModText := T.Modification;
-            ModKey  := T.Modification;
+            ModKey  := NormalizeTreeKey(T.Modification);
           end
           else
           begin
@@ -594,7 +594,7 @@ begin
       if T.Category > 0 then
         Continue;
 
-      ManKey := T.Manufacturer;
+      ManKey := NormalizeTreeKey(T.Manufacturer);
       ManNode := FindChildInTree(
         TreeViewTypes,
         Ord(tnManufacturer),
@@ -625,7 +625,7 @@ begin
       if Trim(T.Modification) <> '' then
       begin
         ModText := T.Modification;
-        ModKey  := T.Modification;
+        ModKey  := NormalizeTreeKey(T.Modification);
       end
       else
       begin
@@ -2453,7 +2453,7 @@ begin
     Exit;
 
   {---------------- Изготовитель ----------------}
-  ManKey := Trim(AType.Manufacturer);
+  ManKey := NormalizeTreeKey(AType.Manufacturer);
   ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), ManKey);
   if ManNode = nil then
     Exit;
@@ -2465,7 +2465,7 @@ begin
     Exit;
 
   {---------------- Модификация ----------------}
-  ModKey := Trim(AType.Modification);
+  ModKey := NormalizeTreeKey(AType.Modification);
   ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
   if ModNode = nil then
     Exit;
