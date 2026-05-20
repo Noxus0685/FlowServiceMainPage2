@@ -234,6 +234,7 @@ type
     function GetSelectedTypes: TObjectList<TDeviceType>;
     function GetActiveTreeNode: TTreeViewItem;
     procedure SyncTreeAfterGridRowsRemoved;
+    procedure RemoveTreeNode(ANode: TTreeViewItem);
     procedure WriteTypeActionLog(const AAction: string; AType: TDeviceType; const ADetails: string = '');
 
   public
@@ -478,8 +479,6 @@ begin
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
 
-    //TreeViewTypes.Clear;
-
     {----------------------------------}
     { Корневой узел }
     {----------------------------------}
@@ -604,7 +603,7 @@ begin
       if ManNode = nil then
         Continue;
 
-      CatText := '<категория>';
+      CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName);
       CatKey  := IntToStr(T.Category); // -1 / 0
 
       CatNode := FindChildInNode(
@@ -1045,11 +1044,10 @@ begin
       and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
       ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
 
-    ParentNode.RemoveObject(SelectedNode);
+    RemoveTreeNode(SelectedNode);
   end
   else
-    TreeViewTypes.RemoveObject(SelectedNode);
-  SelectedNode.DisposeOf;
+    RemoveTreeNode(SelectedNode);
 
   CurrentNode := ParentNode;
   while (CurrentNode <> nil) and (CurrentNode.Tag <> Ord(tnAll)) and (CurrentNode.Count = 0) do
@@ -1066,11 +1064,7 @@ begin
       Break;
 
     ParentNode := CurrentNode.ParentItem;
-    if ParentNode <> nil then
-      ParentNode.RemoveObject(CurrentNode)
-    else
-      TreeViewTypes.RemoveObject(CurrentNode);
-    CurrentNode.DisposeOf;
+    RemoveTreeNode(CurrentNode);
     CurrentNode := ParentNode;
   end;
 
@@ -1078,6 +1072,21 @@ begin
     TreeViewTypes.Selected := ReplacementNode
   else
     TreeViewTypes.Selected := CurrentNode;
+end;
+
+procedure TFormTypeSelect.RemoveTreeNode(ANode: TTreeViewItem);
+var
+  ParentNode: TTreeViewItem;
+begin
+  if ANode = nil then
+    Exit;
+
+  ParentNode := ANode.ParentItem;
+  if ParentNode <> nil then
+    ParentNode.RemoveObject(ANode)
+  else
+    TreeViewTypes.RemoveObject(ANode);
+  ANode.DisposeOf;
 end;
 
 
@@ -1995,9 +2004,12 @@ begin
       WriteTypeActionLog('Отредактирован тип прибора', AType);
       if (AppServices.DataManager <> nil) and
          (OldManufacturer <> AType.Manufacturer) then
+      begin
         AppServices.DataManager.NeedRemoveOldManufacturerBranchForType(
           FDeviceTypes, AType, OldManufacturer, AType.Manufacturer
         );
+        SyncTreeAfterGridRowsRemoved;
+      end;
 
       BuildTree;
       ApplyFilter;
