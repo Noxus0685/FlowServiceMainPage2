@@ -147,7 +147,7 @@ type
   // Назначение полей прибора по выбранной ветке дерева.
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
-  procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+  procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem; const ASourceType: TDeviceType = nil);
   function BuildDeviceSelectionContext(
     const ARepo: TDeviceRepository;
     const APreferredUUID: string
@@ -282,7 +282,7 @@ begin
     NewType := ActiveTypeRepo.CreateType(SourceType);
     // При вставке в выбранную ветку дерева применяем её как контекст назначения.
     if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
-      AssignTypeTreeFields(NewType, ATargetNode);
+      AssignTypeTreeFields(NewType, ATargetNode, SourceType);
     Result.Add(NewType);
   end;
 end;
@@ -467,14 +467,61 @@ begin
 end;
 
 
-procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem; const ASourceType: TDeviceType);
 var
   Cur: TTreeViewItem;
 begin
   // Замена полей назначения по выбранной ветке:
   // Modification -> Modification/Category/Manufacturer,
   // Category -> Category/Manufacturer, Manufacturer -> только Manufacturer.
-  if (AType = nil) or (ANode = nil) then
+  if AType = nil then
+    Exit;
+
+  // Если передана исходная строка, копируем поля по уровню выбранной ветки.
+  // Manufacturer -> только Manufacturer
+  // Category -> Manufacturer + Category
+  // Modification -> Manufacturer + Category + Modification
+  if ASourceType <> nil then
+  begin
+    if ANode = nil then
+      Exit;
+
+    case ANode.Tag of
+      Ord(tnManufacturer):
+        begin
+          AType.Manufacturer := ASourceType.Manufacturer;
+          AType.Category := 0;
+          AType.CategoryName := '';
+          AType.Modification := '';
+        end;
+
+      Ord(tnCategory):
+        begin
+          AType.Manufacturer := ASourceType.Manufacturer;
+          AType.Category := ASourceType.Category;
+          AType.CategoryName := ASourceType.CategoryName;
+          AType.Modification := '';
+        end;
+
+      Ord(tnModification):
+        begin
+          AType.Manufacturer := ASourceType.Manufacturer;
+          AType.Category := ASourceType.Category;
+          AType.CategoryName := ASourceType.CategoryName;
+          AType.Modification := ASourceType.Modification;
+        end;
+    else
+      begin
+        AType.Manufacturer := ASourceType.Manufacturer;
+        AType.Category := ASourceType.Category;
+        AType.CategoryName := ASourceType.CategoryName;
+        AType.Modification := ASourceType.Modification;
+      end;
+    end;
+    Exit;
+  end;
+
+  if ANode = nil then
     Exit;
 
   Cur := ANode;
