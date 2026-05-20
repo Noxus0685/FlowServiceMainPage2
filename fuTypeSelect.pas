@@ -511,7 +511,7 @@ begin
          {========== ИЗГОТОВИТЕЛЬ =========}
         if Trim(T.Manufacturer) <> '' then
         begin
-          ManText := T.Manufacturer;
+          ManText := NormalizeTreeKey(T.Manufacturer);
           ManKey  := NormalizeTreeKey(T.Manufacturer);
         end
         else
