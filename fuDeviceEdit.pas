@@ -298,6 +298,8 @@ type
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure ComboEditDNChange(Sender: TObject);
     procedure mmoCommentExit(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure GridPointsHeaderClick(Column: TColumn);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
@@ -1428,6 +1430,7 @@ var
   FoundRepo: TTypeRepository;
 begin
   InitCoefsTab;
+  OnKeyDown := FormKeyDown;
   GridPoints.OnKeyDown := GridPointsKeyDown;
 
   FLoading := True;
@@ -1492,6 +1495,17 @@ begin
 
   finally
     FLoading := False;
+  end;
+end;
+
+procedure TFormDeviceEditor.FormKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrCancel;
+    Key := 0;
+    KeyChar := #0;
   end;
 end;
 

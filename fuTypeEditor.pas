@@ -361,6 +361,8 @@ type
     procedure SpeedButton4Click(Sender: TObject);
     procedure SpeedButton5Click(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
@@ -678,6 +680,7 @@ end;
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
    FDiameterQ4 := TDictionary<Integer, Double>.Create;
    TabItemCoefs.Visible := False;
+   OnKeyDown := FormKeyDown;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
 
@@ -739,6 +742,17 @@ begin
      MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
      MenuItem.Parent := FPopupMenuGridDiametersHeader;
    end;
+end;
+
+procedure TFormTypeEditor.FormKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrCancel;
+    Key := 0;
+    KeyChar := #0;
+  end;
 end;
 
 destructor TFormTypeEditor.Destroy;
