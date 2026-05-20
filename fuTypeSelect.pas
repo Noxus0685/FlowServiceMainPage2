@@ -175,6 +175,8 @@ type
     procedure actFilterClearExecute(Sender: TObject);
     procedure UpdateTypeActions(Sender: TObject);
     procedure GridTypesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridTypesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
 
   private
 
@@ -1254,6 +1256,7 @@ begin
    TreeViewTypes.MultiSelect := True;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
    GridTypes.OnMouseDown := GridTypesMouseDown;
+   GridTypes.OnKeyDown := GridTypesKeyDown;
 
    LoadData;
    FillComboBoxRepository;
@@ -1465,6 +1468,20 @@ begin
   GridTypes.Row := Row;
   GridTypes.Selected := Row;
   SelectedType := FDevFilteredTypes[Row];
+
+  if ssDouble in Shift then
+    actTypeEditExecute(actTypeEdit);
+end;
+
+procedure TFormTypeSelect.GridTypesKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkReturn then
+  begin
+    btnOK.Click;
+    Key := 0;
+    KeyChar := #0;
+  end;
 end;
 
 
