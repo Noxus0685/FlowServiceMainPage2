@@ -661,7 +661,7 @@ var
     if (ANode = nil) or (RestoredNode <> nil) then
       Exit;
     if (ANode.Tag = PrevNodeTag)
-      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(PrevNodeTagString))
+      and SameText(Trim(ANode.TagString), Trim(PrevNodeTagString))
       and (ANode.Text = PrevNodeText)
       and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
     begin
@@ -735,7 +735,7 @@ begin
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
+      PrevNodeTagString := Trim(PrevSelectedNode.TagString);
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
@@ -1067,7 +1067,7 @@ var
 
     if (SelectedNode <> nil)
       and (ANode.Tag = SelectedNode.Tag)
-      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(SelectedNode.TagString)) then
+      and SameText(Trim(ANode.TagString), Trim(SelectedNode.TagString)) then
     begin
       RestoredNode := ANode;
       Exit;
