@@ -325,7 +325,7 @@ begin
       Ord(tnManufacturer):
         begin
           // TagString = ''  → пустой изготовитель
-          if NormalizeTreeKey(AType.Manufacturer) <> NormalizeTreeKey(Cur.TagString) then
+          if not SameText(Trim(AType.Manufacturer), Trim(Cur.TagString)) then
             Exit(False);
         end;
 
@@ -356,7 +356,7 @@ begin
       Ord(tnModification):
         begin
           // TagString = '' → пустая модификация
-          if NormalizeTreeKey(AType.Modification) <> NormalizeTreeKey(Cur.TagString) then
+          if not SameText(Trim(AType.Modification), Trim(Cur.TagString)) then
             Exit(False);
         end;
     end;
@@ -2512,7 +2512,7 @@ begin
     CatKey := IntToStr(AType.Category)
   else
     CatKey := IntToStr(AType.Category) +
-      '|' + NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName));
+      '|' + Trim(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName));
   CatNode := FindChildInNode(ManNode, Ord(tnCategory), CatKey);
   if CatNode = nil then
     Exit;

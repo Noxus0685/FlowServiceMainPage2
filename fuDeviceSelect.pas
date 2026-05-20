@@ -770,7 +770,7 @@ begin
         if Trim(D.Manufacturer) <> '' then
         begin
           ManText := D.Manufacturer;
-          ManKey  := NormalizeTreeKey(D.Manufacturer);
+          ManKey  := D.Manufacturer;
         end
         else
         begin
@@ -821,7 +821,7 @@ begin
           if Trim(D.Modification) <> '' then
           begin
             ModText := D.Modification;
-            ModKey  := NormalizeTreeKey(D.Modification);
+            ModKey  := D.Modification;
           end
           else
           begin
@@ -855,7 +855,7 @@ begin
       if D.Category > 0 then
         Continue;
 
-      ManKey := NormalizeTreeKey(D.Manufacturer);
+      ManKey := D.Manufacturer;
       ManNode := FindChildInTree(
         TreeViewDevices,
         Ord(tnManufacturer),
@@ -886,7 +886,7 @@ begin
       if Trim(D.Modification) <> '' then
       begin
         ModText := D.Modification;
-        ModKey  := NormalizeTreeKey(D.Modification);
+        ModKey  := D.Modification;
       end
       else
       begin
@@ -2018,7 +2018,7 @@ begin
     Exit;
 
   if Trim(ADevice.Manufacturer) <> '' then
-    ManKey := NormalizeTreeKey(ADevice.Manufacturer)
+    ManKey := ADevice.Manufacturer
   else
     ManKey := '';
 
@@ -2035,7 +2035,7 @@ begin
     Exit(ManNode);
 
   if Trim(ADevice.Modification) <> '' then
-    ModKey := NormalizeTreeKey(ADevice.Modification)
+    ModKey := ADevice.Modification
   else
     ModKey := '';
 
@@ -2170,7 +2170,7 @@ begin
       Ord(tnManufacturer):
         begin
           // TagString = '' → пустой изготовитель
-          if NormalizeTreeKey(ADevice.Manufacturer) <> NormalizeTreeKey(Cur.TagString) then
+          if not SameText(Trim(ADevice.Manufacturer), Trim(Cur.TagString)) then
             Exit(False);
         end;
 
@@ -2192,7 +2192,7 @@ begin
       Ord(tnModification):
         begin
           // TagString = '' → пустая модификация
-          if NormalizeTreeKey(ADevice.Modification) <> NormalizeTreeKey(Cur.TagString) then
+          if not SameText(Trim(ADevice.Modification), Trim(Cur.TagString)) then
             Exit(False);
         end;
     end;
