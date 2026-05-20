@@ -2509,7 +2509,7 @@ begin
     Exit;
 
   {---------------- Изготовитель ----------------}
-  ManKey := AType.Manufacturer;
+  ManKey := NormalizeTreeKey(AType.Manufacturer);
   ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), ManKey);
   if ManNode = nil then
     Exit;
@@ -2525,7 +2525,7 @@ begin
     Exit;
 
   {---------------- Модификация ----------------}
-  ModKey := AType.Modification;
+  ModKey := NormalizeTreeKey(AType.Modification);
   ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
   if ModNode = nil then
     Exit;
