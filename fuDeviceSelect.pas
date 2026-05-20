@@ -174,6 +174,8 @@ type
     procedure aRefreshRepositoryExecute(Sender: TObject);
     procedure GridDevicesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
+    procedure GridDevicesMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
 
 private
 
@@ -2451,6 +2453,7 @@ var
   SelectionContext: TDeviceSelectionContext;
 begin
   GridDevices.OnKeyDown := GridDevicesKeyDown;
+  GridDevices.OnMouseDown := GridDevicesMouseDown;
 
   {----------------------------------}
   { Инициализация сортировки }
@@ -2487,12 +2490,38 @@ end;
 procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
+  if Key = vkReturn then
+  begin
+    btnOK.Click;
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
   if Key = vkDelete then
   begin
     ButtonDeviceDeleteClick(ButtonDeviceDelete);
     Key := 0;
     KeyChar := #0;
   end;
+end;
+
+procedure TFormDeviceSelect.GridDevicesMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  Col, Row: Integer;
+begin
+  if Button <> TMouseButton.mbLeft then
+    Exit;
+
+  if not GridDevices.CellByPoint(X, Y, Col, Row) then
+    Exit;
+
+  if (FDevFilteredDevices = nil) or (Row < 0) or (Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  if ssDouble in Shift then
+    CornerButtonEditDeviceClick(CornerButtonEditDevice);
 end;
 
 procedure TFormDeviceSelect.ApplyInitialSelection;
