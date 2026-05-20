@@ -944,16 +944,18 @@ begin
     case SelectedNodeTag of
       Ord(tnManufacturer):
         begin
-          { Уровень Manufacturer: копируем только производителя }
+          { Уровень Manufacturer: копируем производителя и имя }
           NewType.Manufacturer := SourceType.Manufacturer;
+          NewType.Name := SourceType.Name;
         end;
 
       Ord(tnCategory):
         begin
-          { Уровень Category: копируем производителя и категорию }
+          { Уровень Category: копируем производителя, категорию и имя }
           NewType.Manufacturer := SourceType.Manufacturer;
           NewType.Category := SourceType.Category;
           NewType.CategoryName := SourceType.CategoryName;
+          NewType.Name := SourceType.Name;
         end;
     else
       { Для остальных узлов оставляем прежнюю логику через выбор в дереве }
