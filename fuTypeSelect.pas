@@ -604,7 +604,7 @@ begin
         Continue;
 
       CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName);
-      CatKey  := IntToStr(T.Category); // -1 / 0
+      CatKey  := IntToStr(T.Category) + '|' + NormalizeTreeKey(CatText); // -1 / 0 + имя
 
       CatNode := FindChildInNode(
         ManNode,
