@@ -729,7 +729,7 @@ begin
   while FPopupMenuGridDiametersHeader.ItemsCount > 0 do
   FPopupMenuGridDiametersHeader.Items[0].Free;
 
-  for I := 0 to GridDiameters.ColumnCount-1  do
+  for I := 0 to GridDiameters.Columns.Count - 1 do
    begin
 
      MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
@@ -1563,7 +1563,7 @@ begin
     MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
     ColIndex := MenuItem.Tag;
 
-    if (ColIndex >= 0) and (ColIndex < GridDiameters.ColumnCount) then
+    if (ColIndex >= 0) and (ColIndex < GridDiameters.Columns.Count) then
     begin
       MenuItem.Enabled := True;
       MenuItem.IsChecked := GridDiameters.Columns[ColIndex].Visible;
@@ -1595,7 +1595,7 @@ begin
   ColLeft := 0;
 
   // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
-  for I := 0 to GridDiameters.ColumnCount - 1 do
+  for I := 0 to GridDiameters.Columns.Count - 1 do
   begin
     if not GridDiameters.Columns[I].Visible then
       Continue;
@@ -1637,7 +1637,7 @@ begin
 
   MenuItem := TMenuItem(Sender);
   Index := MenuItem.Tag;
-  if (Index < 0) or (Index >= GridDiameters.ColumnCount) then
+  if (Index < 0) or (Index >= GridDiameters.Columns.Count) then
     Exit;
 
   // Пункты меню управляют Visible колонок, чтобы пользователь мог скрывать/показывать столбцы header.
