@@ -166,6 +166,7 @@ type
     procedure mpCollapseAllClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure btnOKClick(Sender: TObject);
     procedure miLoadRepositoryClick(Sender: TObject);
     procedure actTypeSelectExecute(Sender: TObject);
     procedure actTypeCopyExecute(Sender: TObject);
@@ -1194,6 +1195,11 @@ end;
 
 {$R *.fmx}
 
+procedure TFormTypeSelect.btnOKClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
+
 procedure TFormTypeSelect.FormClose(
   Sender: TObject;
   var Action: TCloseAction
@@ -1481,7 +1487,7 @@ procedure TFormTypeSelect.FormKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkEscape then
   begin
-    ModalResult := mrOk;
+    ModalResult := mrCancel;
     Key := 0;
     KeyChar := #0;
   end;
@@ -1492,7 +1498,7 @@ procedure TFormTypeSelect.GridTypesKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkEscape then
   begin
-    ModalResult := mrOk;
+    ModalResult := mrCancel;
     Key := 0;
     KeyChar := #0;
     Exit;
