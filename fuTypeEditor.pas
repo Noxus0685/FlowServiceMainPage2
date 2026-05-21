@@ -1583,6 +1583,8 @@ var
   ColLeft: Single;
   ColRight: Single;
   P: TPointF;
+  MenuItem: TMenuItem;
+  Column: TColumn;
 begin
   if (Button = TMouseButton.mbRight)then
     FRectGridDiametersHeader.HitTest := true;
@@ -1595,15 +1597,23 @@ begin
   ColLeft := 0;
 
   // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
-  for I := 0 to GridDiameters.Columns.Count - 1 do
+  for I := 0 to FPopupMenuGridDiametersHeader.ItemsCount - 1 do
   begin
-    if not GridDiameters.Columns[I].Visible then
+    if not (FPopupMenuGridDiametersHeader.Items[I] is TMenuItem) then
       Continue;
 
-    ColRight := ColLeft + GridDiameters.Columns[I].Width;
+    MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
+    if not (MenuItem.TagObject is TColumn) then
+      Continue;
+
+    Column := TColumn(MenuItem.TagObject);
+    if not Column.Visible then
+      Continue;
+
+    ColRight := ColLeft + Column.Width;
     if (X >= ColLeft) and (X <= ColRight) then
     begin
-      FGridDiametersHeaderColumnIndex := I;
+      FGridDiametersHeaderColumnIndex := MenuItem.Tag;
       Break;
     end;
     ColLeft := ColRight;
