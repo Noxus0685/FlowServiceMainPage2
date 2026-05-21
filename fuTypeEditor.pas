@@ -729,7 +729,7 @@ begin
   while FPopupMenuGridDiametersHeader.ItemsCount > 0 do
   FPopupMenuGridDiametersHeader.Items[0].Free;
 
-  for I := 0 to GridDiameters.ColumnCount-1  do
+  for I := 0 to GridDiameters.ColumnCount - 1 do
    begin
 
      MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
@@ -738,6 +738,7 @@ begin
      else
       MenuItem.Text := GridDiameters.Columns[i].Name;
      MenuItem.Tag := I;
+     MenuItem.TagObject := GridDiameters.Columns[I];
      MenuItem.AutoCheck := False;
      MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
      MenuItem.Parent := FPopupMenuGridDiametersHeader;
@@ -1550,7 +1551,7 @@ procedure TFormTypeEditor.SyncGridDiametersHeaderPopupMenu;
 var
   I: Integer;
   MenuItem: TMenuItem;
-  ColIndex: Integer;
+  Column: TColumn;
 begin
   if FPopupMenuGridDiametersHeader = nil then
     Exit;
@@ -1561,12 +1562,11 @@ begin
       Continue;
 
     MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
-    ColIndex := MenuItem.Tag;
-
-    if (ColIndex >= 0) and (ColIndex < GridDiameters.ColumnCount) then
+    if MenuItem.TagObject is TColumn then
     begin
+      Column := TColumn(MenuItem.TagObject);
       MenuItem.Enabled := True;
-      MenuItem.IsChecked := GridDiameters.Columns[ColIndex].Visible;
+      MenuItem.IsChecked := Column.Visible;
     end
     else
     begin
@@ -1583,6 +1583,8 @@ var
   ColLeft: Single;
   ColRight: Single;
   P: TPointF;
+  MenuItem: TMenuItem;
+  Column: TColumn;
 begin
   if (Button = TMouseButton.mbRight)then
     FRectGridDiametersHeader.HitTest := true;
@@ -1595,15 +1597,23 @@ begin
   ColLeft := 0;
 
   // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
-  for I := 0 to GridDiameters.ColumnCount - 1 do
+  for I := 0 to FPopupMenuGridDiametersHeader.ItemsCount - 1 do
   begin
-    if not GridDiameters.Columns[I].Visible then
+    if not (FPopupMenuGridDiametersHeader.Items[I] is TMenuItem) then
       Continue;
 
-    ColRight := ColLeft + GridDiameters.Columns[I].Width;
+    MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
+    if not (MenuItem.TagObject is TColumn) then
+      Continue;
+
+    Column := TColumn(MenuItem.TagObject);
+    if not Column.Visible then
+      Continue;
+
+    ColRight := ColLeft + Column.Width;
     if (X >= ColLeft) and (X <= ColRight) then
     begin
-      FGridDiametersHeaderColumnIndex := I;
+      FGridDiametersHeaderColumnIndex := MenuItem.Tag;
       Break;
     end;
     ColLeft := ColRight;
@@ -1631,18 +1641,23 @@ procedure TFormTypeEditor.GridDiametersHeaderMenuItemClick(Sender: TObject);
 var
   Index: Integer;
   MenuItem: TMenuItem;
+  Column: TColumn;
 begin
   if not (Sender is TMenuItem) then
     Exit;
 
   MenuItem := TMenuItem(Sender);
   Index := MenuItem.Tag;
-  if (Index < 0) or (Index >= GridDiameters.ColumnCount) then
+  if MenuItem.TagObject is TColumn then
+    Column := TColumn(MenuItem.TagObject)
+  else if (Index >= 0) and (Index < GridDiameters.ColumnCount) then
+    Column := GridDiameters.Columns[Index]
+  else
     Exit;
 
   // Пункты меню управляют Visible колонок, чтобы пользователь мог скрывать/показывать столбцы header.
-  GridDiameters.Columns[Index].Visible := not GridDiameters.Columns[Index].Visible;
-  MenuItem.IsChecked := GridDiameters.Columns[Index].Visible;
+  Column.Visible := not Column.Visible;
+  MenuItem.IsChecked := Column.Visible;
 
   GridDiameters.Repaint;
   UpdateGridDiametersHeaderRect;
