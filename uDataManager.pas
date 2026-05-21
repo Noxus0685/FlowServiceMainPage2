@@ -147,6 +147,7 @@ type
   // Назначение полей прибора по выбранной ветке дерева.
   procedure AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
   // Назначение полей типа по выбранной ветке дерева.
+  procedure AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
   function BuildDeviceSelectionContext(
     const ARepo: TDeviceRepository;
     const APreferredUUID: string
@@ -279,6 +280,8 @@ begin
     if SourceType = nil then
       Continue;
     NewType := ActiveTypeRepo.CreateType(SourceType);
+    if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
+      AssignTypeTreeFields(NewType, ATargetNode);
     Result.Add(NewType);
   end;
 end;
@@ -429,6 +432,36 @@ function TManagerTTableDM.HasBufferDevices: Boolean;
 begin
   // Проверка наличия данных в буфере устройств.
   Result := (FCopiedDevices <> nil) and (FCopiedDevices.Count > 0);
+end;
+
+procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+var
+  Cur: TTreeViewItem;
+begin
+  // Логика замены полей типа по выбранной ветке дерева.
+  if (AType = nil) or (ANode = nil) then
+    Exit;
+
+  Cur := ANode;
+  while Cur <> nil do
+  begin
+    case Cur.Tag of
+      Ord(tnManufacturer):
+        AType.Manufacturer := Cur.TagString;
+      Ord(tnCategory):
+        begin
+          // TagString может быть в формате "ID" или "ID|НормализованноеИмя".
+          AType.Category := StrToIntDef(Cur.TagString.Split(['|'])[0], 0);
+          if Cur.Text <> '<категория>' then
+            AType.CategoryName := Cur.Text
+          else
+            AType.CategoryName := '';
+        end;
+      Ord(tnModification):
+        AType.Modification := Cur.TagString;
+    end;
+    Cur := Cur.ParentItem;
+  end;
 end;
 
 
