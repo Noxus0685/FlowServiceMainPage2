@@ -1816,13 +1816,17 @@ procedure TFormTypeSelect.UpdateTypeActions(Sender: TObject);
 var
   HasRepo: Boolean;
   HasRows: Boolean;
+  HasGridFocus: Boolean;
+  HasCurrentSelection: Boolean;
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0);
+  HasGridFocus := (GridTypes <> nil) and GridTypes.IsFocused;
+  HasCurrentSelection := CurrentGridType <> nil;
 
   actTypeAdd.Enabled := HasRepo;
-  actTypeEdit.Enabled := HasRows;
-  actTypeSelect.Enabled := HasRows;
+  actTypeEdit.Enabled := HasRows and (HasGridFocus or HasCurrentSelection);
+  actTypeSelect.Enabled := HasRows and (HasGridFocus or HasCurrentSelection);
   actTypeDelete.Enabled := HasRepo and HasRows;
   actTypeCopy.Enabled := HasRows;
   actTypeCut.Enabled := HasRepo and HasRows;
