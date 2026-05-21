@@ -160,6 +160,7 @@ type
     procedure miSaveClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure btnOKClick(Sender: TObject);
     procedure CornerButtonEditDeviceClick(Sender: TObject);
     procedure miAddTestDataClick(Sender: TObject);
     procedure miLoadClick(Sender: TObject);
@@ -2416,6 +2417,11 @@ begin
   end;
 end;
 
+
+procedure TFormDeviceSelect.btnOKClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
 var
@@ -2495,7 +2501,7 @@ procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkEscape then
   begin
-    ModalResult := mrOk;
+    ModalResult := mrCancel;
     Key := 0;
     KeyChar := #0;
   end;
@@ -2506,7 +2512,7 @@ procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkEscape then
   begin
-    ModalResult := mrOk;
+    ModalResult := mrCancel;
     Key := 0;
     KeyChar := #0;
     Exit;
