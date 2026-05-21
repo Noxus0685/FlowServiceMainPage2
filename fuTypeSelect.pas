@@ -1823,7 +1823,7 @@ begin
   HasGridFocus := (GridTypes <> nil) and GridTypes.IsFocused;
 
   actTypeAdd.Enabled := HasRepo;
-  actTypeEdit.Enabled := HasRows;
+  actTypeEdit.Enabled := HasRows and HasGridFocus;
   actTypeSelect.Enabled := HasRows and HasGridFocus;
   actTypeDelete.Enabled := HasRepo and HasRows;
   actTypeCopy.Enabled := HasRows;
