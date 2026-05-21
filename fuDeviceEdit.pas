@@ -1503,7 +1503,7 @@ procedure TFormDeviceEditor.FormKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkEscape then
   begin
-    ModalResult := mrCancel;
+    ModalResult := mrOk;
     Key := 0;
     KeyChar := #0;
   end;
