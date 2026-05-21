@@ -1595,7 +1595,7 @@ begin
   ColLeft := 0;
 
   // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
-  for I := 0 to GridDiameters.ColumnCount - 1 do
+  for I := 0 to GridDiameters.Columns.Count - 1 do
   begin
     if not GridDiameters.Columns[I].Visible then
       Continue;
