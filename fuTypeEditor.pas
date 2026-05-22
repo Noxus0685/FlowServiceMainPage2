@@ -1574,15 +1574,27 @@ begin
     if MenuItem.TagObject is TColumn then
       Column := TColumn(MenuItem.TagObject);
 
+    if (Column = nil) and (MenuItem.Hint <> '') and (FindComponent(MenuItem.Hint) is TColumn) then
+      Column := TColumn(FindComponent(MenuItem.Hint));
+
     if (Column = nil) and (MenuItem.Hint <> '') then
       for J := 0 to GridDiameters.ColumnCount - 1 do
         if SameText(GridDiameters.Columns[J].Name, MenuItem.Hint) then
         begin
           Column := GridDiameters.Columns[J];
-          MenuItem.TagObject := Column;
+          Break;
+        end;
+
+    if Column <> nil then
+    begin
+      MenuItem.TagObject := Column;
+      for J := 0 to GridDiameters.ColumnCount - 1 do
+        if GridDiameters.Columns[J] = Column then
+        begin
           MenuItem.Tag := J;
           Break;
         end;
+    end;
 
     if Column <> nil then
     begin
@@ -1673,6 +1685,10 @@ begin
   Column := nil;
   if MenuItem.TagObject is TColumn then
     Column := TColumn(MenuItem.TagObject)
+  else if (MenuItem.Hint <> '') and (FindComponent(MenuItem.Hint) is TColumn) then
+  begin
+    Column := TColumn(FindComponent(MenuItem.Hint));
+  end
   else if MenuItem.Hint <> '' then
   begin
     for Index := 0 to GridDiameters.ColumnCount - 1 do
