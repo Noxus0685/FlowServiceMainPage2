@@ -1586,6 +1586,7 @@ begin
 
     if Column <> nil then
     begin
+      Column := TColumn(MenuItem.TagObject);
       MenuItem.Enabled := True;
       MenuItem.IsChecked := Column.Visible;
     end
