@@ -4356,6 +4356,9 @@ var
 begin
   if FLoading then Exit;
 
+  if FType = nil then
+    Exit;
+
   S := Trim(edtReestrNumber.Text);
 
   // сохраняем в модель
