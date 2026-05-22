@@ -2458,13 +2458,11 @@ object FormTypeEditor: TFormTypeEditor
           Header = 'Vmax, '#1083
           HeaderSettings.TextSettings.WordWrap = False
           HeaderSettings.TextSettings.HorzAlign = Center
-          Visible = False
           Size.Width = 71.000000000000000000
         end
         object StringColumnVmin: TStringColumn
           Header = 'Vmin, '#1083
           HeaderSettings.TextSettings.WordWrap = False
-          Visible = False
           Size.Width = 71.000000000000000000
         end
         object StringColumnDNQF: TStringColumn
