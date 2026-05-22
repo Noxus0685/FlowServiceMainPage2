@@ -729,7 +729,7 @@ begin
   while FPopupMenuGridDiametersHeader.ItemsCount > 0 do
   FPopupMenuGridDiametersHeader.Items[0].Free;
 
-  for I := 0 to GridDiameters.ColumnCount-1  do
+  for I := 0 to GridDiameters.ColumnCount - 1 do
    begin
 
      MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
@@ -738,6 +738,8 @@ begin
      else
       MenuItem.Text := GridDiameters.Columns[i].Name;
      MenuItem.Tag := I;
+     MenuItem.TagObject := GridDiameters.Columns[I];
+     MenuItem.Hint := GridDiameters.Columns[I].Name;
      MenuItem.AutoCheck := False;
      MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
      MenuItem.Parent := FPopupMenuGridDiametersHeader;
@@ -1122,9 +1124,6 @@ cbOutPutType2.Hint := cbOutPutType2.Text;
     // == Точки
     // =====================================================
     UpdatePointsGrid;
-    // Применяем автоскрытие только после всех UI-обновлений,
-    // т.к. часть процедур выше может менять видимость столбцов.
-    AutoHideEmptyDiameterColumns;
     // Видимость файловых блоков при открытии существующего типа.
     SetupFileLayoutsForExistingType;
 
@@ -1289,49 +1288,8 @@ begin
 end;
 
 procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
-var
-  D: TDiameter;
-  HasName, HasQnom, HasQtr,HasQmax,HasQmin, HasQ2tr, HasKp, HasQf: Boolean;
-  function HasNonZeroValue(const AValue: Double): Boolean;
-  begin
-    Result := not SameValue(AValue, 0, MinDouble);
-  end;
 begin
-  if (FDiametersLocal = nil) or (GridDiameters = nil) then
-    Exit;
-
-  HasName := true;
-  HasQnom := true;
-  HasQtr := true;
-  HasQ2tr := true;
-  HasKp := true;
-  HasQf := true;
-  HasQmax := true;
-  HasQmin := true;
-
-  for D in FDiametersLocal do
-    if (D <> nil) and (D.State <> osDeleted) then
-    begin
-      HasName := HasName and ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
-      HasQnom := HasQnom and HasNonZeroValue(D.Qnom);
-      HasQtr := HasQtr and HasNonZeroValue(D.Qtr);
-      HasQ2tr := HasQ2tr and HasNonZeroValue(D.Q2tr);
-      HasKp := HasKp and HasNonZeroValue(D.Kp);
-      HasQf := HasQf and HasNonZeroValue(D.QFmax);
-      HasQmax := HasQmax and HasNonZeroValue(D.Qmax);
-      HasQmin := HasQmin and HasNonZeroValue(D.Qmin);
-    end;
-
-  StringColumnDNName.Visible := HasName;
-  StringColumnDNQnom.Visible := HasQnom;
-  StringColumnDNQTr.Visible := HasQtr;
-  StringColumnDNQ2tr.Visible := HasQ2tr;
-  StringColumnDNKp.Visible := HasKp;
-  StringColumnDNQF.Visible := HasQf;
-  StringColumnDNQmin.Visible := HasQmax;
-  StringColumnDNQmax.Visible := HasQmin;
-  SyncGridDiametersHeaderPopupMenu;
-  UpdateGridDiametersHeaderRect;
+  // По запросу: никакой логики изменения/синхронизации видимости столбцов.
 end;
 
 
@@ -1549,8 +1507,9 @@ end;
 procedure TFormTypeEditor.SyncGridDiametersHeaderPopupMenu;
 var
   I: Integer;
+  J: Integer;
   MenuItem: TMenuItem;
-  ColIndex: Integer;
+  Column: TColumn;
 begin
   if FPopupMenuGridDiametersHeader = nil then
     Exit;
@@ -1561,18 +1520,39 @@ begin
       Continue;
 
     MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
-    ColIndex := MenuItem.Tag;
+    Column := nil;
+    if MenuItem.TagObject is TColumn then
+      Column := TColumn(MenuItem.TagObject);
 
-    if (ColIndex >= 0) and (ColIndex < GridDiameters.ColumnCount) then
+    if (Column = nil) and (MenuItem.Hint <> '') and (FindComponent(MenuItem.Hint) is TColumn) then
+      Column := TColumn(FindComponent(MenuItem.Hint));
+
+    if (Column = nil) and (MenuItem.Hint <> '') then
+      for J := 0 to GridDiameters.ColumnCount - 1 do
+        if SameText(GridDiameters.Columns[J].Name, MenuItem.Hint) then
+        begin
+          Column := GridDiameters.Columns[J];
+          Break;
+        end;
+
+    if Column <> nil then
     begin
+      MenuItem.TagObject := Column;
+      for J := 0 to GridDiameters.ColumnCount - 1 do
+        if GridDiameters.Columns[J] = Column then
+        begin
+          MenuItem.Tag := J;
+          Break;
+        end;
       MenuItem.Enabled := True;
-      MenuItem.IsChecked := GridDiameters.Columns[ColIndex].Visible;
     end
     else
-    begin
       MenuItem.Enabled := False;
+
+    if Column <> nil then
+      MenuItem.IsChecked := Column.Visible
+    else
       MenuItem.IsChecked := False;
-    end;
   end;
 end;
 
@@ -1583,27 +1563,31 @@ var
   ColLeft: Single;
   ColRight: Single;
   P: TPointF;
+  MenuItem: TMenuItem;
+  Column: TColumn;
 begin
-  if (Button = TMouseButton.mbRight)then
-    FRectGridDiametersHeader.HitTest := true;
+  FRectGridDiametersHeader.HitTest := True;
   if Button = TMouseButton.mbLeft then
-    begin
-    FRectGridDiametersHeader.HitTest := false;
-    exit;
-    end;
+    Exit;
   FGridDiametersHeaderColumnIndex := -1;
   ColLeft := 0;
 
   // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
-  for I := 0 to GridDiameters.ColumnCount - 1 do
+  for I := 0 to FPopupMenuGridDiametersHeader.ItemsCount - 1 do
   begin
-    if not GridDiameters.Columns[I].Visible then
+    if not (FPopupMenuGridDiametersHeader.Items[I] is TMenuItem) then
       Continue;
 
-    ColRight := ColLeft + GridDiameters.Columns[I].Width;
+    MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
+    if not (MenuItem.TagObject is TColumn) then
+      Continue;
+
+    Column := TColumn(MenuItem.TagObject);
+
+    ColRight := ColLeft + Column.Width;
     if (X >= ColLeft) and (X <= ColRight) then
     begin
-      FGridDiametersHeaderColumnIndex := I;
+      FGridDiametersHeaderColumnIndex := MenuItem.Tag;
       Break;
     end;
     ColLeft := ColRight;
@@ -1631,18 +1615,41 @@ procedure TFormTypeEditor.GridDiametersHeaderMenuItemClick(Sender: TObject);
 var
   Index: Integer;
   MenuItem: TMenuItem;
+  Column: TColumn;
 begin
   if not (Sender is TMenuItem) then
     Exit;
 
   MenuItem := TMenuItem(Sender);
   Index := MenuItem.Tag;
-  if (Index < 0) or (Index >= GridDiameters.ColumnCount) then
+  Column := nil;
+  if MenuItem.TagObject is TColumn then
+    Column := TColumn(MenuItem.TagObject)
+  else if (MenuItem.Hint <> '') and (FindComponent(MenuItem.Hint) is TColumn) then
+  begin
+    Column := TColumn(FindComponent(MenuItem.Hint));
+  end
+  else if MenuItem.Hint <> '' then
+  begin
+    for Index := 0 to GridDiameters.ColumnCount - 1 do
+      if SameText(GridDiameters.Columns[Index].Name, MenuItem.Hint) then
+      begin
+        Column := GridDiameters.Columns[Index];
+        MenuItem.TagObject := Column;
+        MenuItem.Tag := Index;
+        Break;
+      end;
+  end;
+
+  if (Column = nil) and (Index >= 0) and (Index < GridDiameters.ColumnCount) then
+    Column := GridDiameters.Columns[Index]
+  else if Column = nil then
     Exit;
 
-  // Пункты меню управляют Visible колонок, чтобы пользователь мог скрывать/показывать столбцы header.
-  GridDiameters.Columns[Index].Visible := not GridDiameters.Columns[Index].Visible;
-  MenuItem.IsChecked := GridDiameters.Columns[Index].Visible;
+  Column.Visible := not Column.Visible;
+  MenuItem.IsChecked := Column.Visible;
+
+  SyncGridDiametersHeaderPopupMenu;
 
   GridDiameters.Repaint;
   UpdateGridDiametersHeaderRect;
@@ -6059,15 +6066,17 @@ var
   Dim: TMeasuredDimension;
 begin
 
-      FLoading := True;
+  FLoading := True;
 
     if (FType.MeasuredDimension >= 0) and
        (FType.MeasuredDimension < cbMeasuredDimension.Items.Count) then
       cbMeasuredDimension.ItemIndex := FType.MeasuredDimension
     else
     begin
-      cbMeasuredDimension.ItemIndex := -1;
-      Exit;
+      // Возвращаем поведение "как раньше": используем первый режим вместо раннего Exit,
+      // чтобы ApplyVolumeMode/ApplyMassMode точно применили заголовки колонок.
+      FType.MeasuredDimension := Ord(mdVolumeFlow);
+      cbMeasuredDimension.ItemIndex := FType.MeasuredDimension;
     end;
 
    Dim := TMeasuredDimension(FType.MeasuredDimension);
@@ -6388,29 +6397,7 @@ begin
     5: tcOutPutType.ActiveTab := tiVisual;     // Визуальный
   end;
 
-  // --- столбцы коэффициентов / импульсов ---
-  case FType.OutputType of
-    0, // Частота
-    1: // Импульсы
-      begin
-        StringColumnDNKp.Visible       := True;
-        StringColumnPointImp.Visible   := True;
-        StringColumnDNQnom.Visible   := True;
-        StringColumnDNQF.Visible     := True;
-      end;
-  else
-    begin
-      StringColumnDNKp.Visible       := False;
-      StringColumnPointImp.Visible   := False;
-      StringColumnDNQnom.Visible   := False;
-      StringColumnDNQF.Visible     := False;
-    end;
-  end;
-
-  // При загрузке из АРШИН ApplyOutputType может снова сделать
-  // некоторые колонки видимыми. Повторно применяем автоскрытие.
-  if FArshinRequestInProgress then
-    AutoHideEmptyDiameterColumns;
+  // Видимость столбцов не меняем: используются значения по умолчанию формы.
 end;
 
 
