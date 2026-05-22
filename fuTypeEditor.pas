@@ -1294,50 +1294,8 @@ begin
 end;
 
 procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
-var
-  D: TDiameter;
-  HasName, HasQnom, HasQtr,HasQmax,HasQmin, HasQ2tr, HasKp, HasQf: Boolean;
-  function HasNonZeroValue(const AValue: Double): Boolean;
-  begin
-    Result := not SameValue(AValue, 0, MinDouble);
-  end;
 begin
-  if FUserCustomizedDiameterColumns then
-    Exit;
-
-  if (FDiametersLocal = nil) or (GridDiameters = nil) then
-    Exit;
-
-  HasName := true;
-  HasQnom := true;
-  HasQtr := true;
-  HasQ2tr := true;
-  HasKp := true;
-  HasQf := true;
-  HasQmax := true;
-  HasQmin := true;
-
-  for D in FDiametersLocal do
-    if (D <> nil) and (D.State <> osDeleted) then
-    begin
-      HasName := HasName and ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
-      HasQnom := HasQnom and HasNonZeroValue(D.Qnom);
-      HasQtr := HasQtr and HasNonZeroValue(D.Qtr);
-      HasQ2tr := HasQ2tr and HasNonZeroValue(D.Q2tr);
-      HasKp := HasKp and HasNonZeroValue(D.Kp);
-      HasQf := HasQf and HasNonZeroValue(D.QFmax);
-      HasQmax := HasQmax and HasNonZeroValue(D.Qmax);
-      HasQmin := HasQmin and HasNonZeroValue(D.Qmin);
-    end;
-
-  StringColumnDNName.Visible := HasName;
-  StringColumnDNQnom.Visible := HasQnom;
-  StringColumnDNQTr.Visible := HasQtr;
-  StringColumnDNQ2tr.Visible := HasQ2tr;
-  StringColumnDNKp.Visible := HasKp;
-  StringColumnDNQF.Visible := HasQf;
-  StringColumnDNQmin.Visible := HasQmax;
-  StringColumnDNQmax.Visible := HasQmin;
+  // По запросу: отключена любая автоматическая работа с Visible колонок.
   SyncGridDiametersHeaderPopupMenu;
   UpdateGridDiametersHeaderRect;
 end;
@@ -1594,19 +1552,12 @@ begin
           MenuItem.Tag := J;
           Break;
         end;
-    end;
-
-    if Column <> nil then
-    begin
-      Column := TColumn(MenuItem.TagObject);
       MenuItem.Enabled := True;
-      MenuItem.IsChecked := Column.Visible;
     end
     else
-    begin
       MenuItem.Enabled := False;
-      MenuItem.IsChecked := False;
-    end;
+
+    MenuItem.IsChecked := False;
   end;
 end;
 
@@ -1641,8 +1592,6 @@ begin
       Continue;
 
     Column := TColumn(MenuItem.TagObject);
-    if not Column.Visible then
-      Continue;
 
     ColRight := ColLeft + Column.Width;
     if (X >= ColLeft) and (X <= ColRight) then
@@ -1706,10 +1655,9 @@ begin
   else if Column = nil then
     Exit;
 
-  // Пункты меню управляют Visible колонок, чтобы пользователь мог скрывать/показывать столбцы header.
+  // По запросу: переключение Visible колонок отключено.
   FUserCustomizedDiameterColumns := True;
-  Column.Visible := not Column.Visible;
-  MenuItem.IsChecked := Column.Visible;
+  MenuItem.IsChecked := False;
 
   GridDiameters.Repaint;
   UpdateGridDiametersHeaderRect;
