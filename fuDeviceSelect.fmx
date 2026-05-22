@@ -421,7 +421,6 @@ object FormDeviceSelect: TFormDeviceSelect
       Align = Right
       StyledSettings = [Family, Size, Style]
       ModalResult = 2
-      OnClick = btnOKClick
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -438,6 +437,7 @@ object FormDeviceSelect: TFormDeviceSelect
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
+      OnClick = btnOKClick
     end
     object CornerButton1: TCornerButton
       Align = Right
