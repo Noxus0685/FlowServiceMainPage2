@@ -6404,27 +6404,7 @@ begin
     5: tcOutPutType.ActiveTab := tiVisual;     // Визуальный
   end;
 
-  // --- столбцы коэффициентов / импульсов ---
-  case FType.OutputType of
-    0, // Частота
-    1: // Импульсы
-      begin
-        StringColumnDNKp.Visible       := True;
-        StringColumnPointImp.Visible   := True;
-        StringColumnDNQnom.Visible   := True;
-        StringColumnDNQF.Visible     := True;
-      end;
-  else
-    begin
-      StringColumnDNKp.Visible       := False;
-      StringColumnPointImp.Visible   := False;
-      StringColumnDNQnom.Visible   := False;
-      StringColumnDNQF.Visible     := False;
-    end;
-  end;
-
-  // При загрузке из АРШИН ApplyOutputType может снова сделать
-  // некоторые колонки видимыми. Повторно применяем автоскрытие.
+  // Видимость столбцов не меняем: используются значения по умолчанию формы.
   if FArshinRequestInProgress then
     AutoHideEmptyDiameterColumns;
 end;
