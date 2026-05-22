@@ -396,7 +396,8 @@ object FormTypeSelect: TFormTypeSelect
     object btnOK: TCornerButton
       Align = Right
       StyledSettings = [Family, Size, Style]
-      ModalResult = 1
+      ModalResult = 2
+      OnClick = btnOKClick
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000

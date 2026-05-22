@@ -1407,6 +1407,9 @@ begin
     Col('Description', 'TEXT'),
     Col('Documentation', 'TEXT'),
     Col('ReportingForm', 'TEXT'),
+    Col('FileName1', 'TEXT'),
+    Col('FileName2', 'TEXT'),
+    Col('FileName3', 'TEXT'),
     Col('SerialNumTemplate', 'TEXT'),
 
     Col('MeasuredDimension', 'INTEGER'),
@@ -1513,6 +1516,9 @@ begin
   Result.Description := Q.FieldByName('Description').AsString;
   Result.Documentation := Q.FieldByName('Documentation').AsString;
   Result.ReportingForm := Q.FieldByName('ReportingForm').AsString;
+  Result.FileName1 := Q.FieldByName('FileName1').AsString;
+  Result.FileName2 := Q.FieldByName('FileName2').AsString;
+  Result.FileName3 := Q.FieldByName('FileName3').AsString;
   Result.SerialNumTemplate := Q.FieldByName('SerialNumTemplate').AsString;
 
   Result.MeasuredDimension := Q.FieldByName('MeasuredDimension').AsInteger;
@@ -1761,7 +1767,7 @@ begin
           'RegDate, ValidityDate, IVI, RangeDynamic, ' +
           'VerificationMethod, ProcedureName, ' +
           'ProcedureCmd1, ProcedureCmd2, ProcedureCmd3, ProcedureCmd4, ProcedureCmd5, ' +
-          'Description, Documentation, ReportingForm, SerialNumTemplate, ' +
+          'Description, Documentation, ReportingForm, FileName1, FileName2, FileName3, SerialNumTemplate, ' +
           'MeasuredDimension, Units, OutputType, DimensionCoef, ' +
           'OutputSet, Freq, Coef, FreqFlowRate, ' +
           'VoltageRange, VoltageQminRate, VoltageQmaxRate, ' +
@@ -1774,7 +1780,7 @@ begin
           ':RegDate, :ValidityDate, :IVI, :RangeDynamic, ' +
           ':VerificationMethod, :ProcedureName, ' +
           ':ProcedureCmd1, :ProcedureCmd2, :ProcedureCmd3, :ProcedureCmd4, :ProcedureCmd5, ' +
-          ':Description, :Documentation, :ReportingForm, :SerialNumTemplate, ' +
+          ':Description, :Documentation, :ReportingForm, :FileName1, :FileName2, :FileName3, :SerialNumTemplate, ' +
           ':MeasuredDimension, :Units, :OutputType, :DimensionCoef, ' +
           ':OutputSet, :Freq, :Coef, :FreqFlowRate, ' +
           ':VoltageRange, :VoltageQminRate, :VoltageQmaxRate, ' +
@@ -1795,7 +1801,7 @@ begin
           'VerificationMethod=:VerificationMethod, ProcedureName=:ProcedureName, ' +
           'ProcedureCmd1=:ProcedureCmd1, ProcedureCmd2=:ProcedureCmd2, ProcedureCmd3=:ProcedureCmd3, ' +
           'ProcedureCmd4=:ProcedureCmd4, ProcedureCmd5=:ProcedureCmd5, ' +
-          'Description=:Description, Documentation=:Documentation, ReportingForm=:ReportingForm, SerialNumTemplate=:SerialNumTemplate, ' +
+          'Description=:Description, Documentation=:Documentation, ReportingForm=:ReportingForm, FileName1=:FileName1, FileName2=:FileName2, FileName3=:FileName3, SerialNumTemplate=:SerialNumTemplate, ' +
           'MeasuredDimension=:MeasuredDimension, Units=:Units, OutputType=:OutputType, DimensionCoef=:DimensionCoef, ' +
           'OutputSet=:OutputSet, Freq=:Freq, Coef=:Coef, FreqFlowRate=:FreqFlowRate, ' +
           'VoltageRange=:VoltageRange, VoltageQminRate=:VoltageQminRate, VoltageQmaxRate=:VoltageQmaxRate, ' +
@@ -1836,6 +1842,9 @@ begin
     SetStrParam(Q, 'Description', AType.Description);
     SetStrParam(Q, 'Documentation', AType.Documentation);
     SetStrParam(Q, 'ReportingForm', AType.ReportingForm);
+    SetStrParam(Q, 'FileName1', AType.FileName1);
+    SetStrParam(Q, 'FileName2', AType.FileName2);
+    SetStrParam(Q, 'FileName3', AType.FileName3);
     SetStrParam(Q, 'SerialNumTemplate', AType.SerialNumTemplate);
 
     SetIntParam(Q, 'MeasuredDimension', Ord(AType.MeasuredDimension));
@@ -2029,7 +2038,6 @@ begin
     Col('Qnom', 'REAL'),
     Col('Qmin', 'REAL'),
     Col('Qtr', 'REAL'),
-    Col('Q2tr', 'REAL'),
     Col('Kp', 'REAL'),
     Col('QFmax', 'REAL'),
 

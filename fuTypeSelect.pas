@@ -166,6 +166,7 @@ type
     procedure mpCollapseAllClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure btnOKClick(Sender: TObject);
     procedure miLoadRepositoryClick(Sender: TObject);
     procedure actTypeSelectExecute(Sender: TObject);
     procedure actTypeCopyExecute(Sender: TObject);
@@ -175,6 +176,10 @@ type
     procedure actFilterClearExecute(Sender: TObject);
     procedure UpdateTypeActions(Sender: TObject);
     procedure GridTypesCellClick(const Column: TColumn; const Row: Integer);
+    procedure GridTypesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
 
   private
 
@@ -201,6 +206,7 @@ type
 
     procedure LoadData;
     procedure BuildTree;
+    procedure RebuildTreeFull;
     procedure UpdateGridTypes;
     procedure OpenTypeEditor(AType: TDeviceType);
     function HasActiveFilters: Boolean;
@@ -220,7 +226,6 @@ type
       const ANode: TTreeViewItem
     ): Boolean;
     function BuildSearchURL(const ASearch: string): string;
-    procedure ApplyTreeSelectionToType(AType: TDeviceType);
 
     procedure FillComboBoxRepository;
 
@@ -234,6 +239,7 @@ type
     function GetSelectedTypes: TObjectList<TDeviceType>;
     function GetActiveTreeNode: TTreeViewItem;
     procedure SyncTreeAfterGridRowsRemoved;
+    procedure RemoveTreeNode(ANode: TTreeViewItem);
     procedure WriteTypeActionLog(const AAction: string; AType: TDeviceType; const ADetails: string = '');
 
   public
@@ -323,23 +329,45 @@ begin
       Ord(tnManufacturer):
         begin
           // TagString = ''  → пустой изготовитель
-          if AType.Manufacturer <> Cur.TagString then
+          if NormalizeTreeKey(AType.Manufacturer) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
 
       // ---------- КАТЕГОРИЯ ----------
       Ord(tnCategory):
         begin
-          // TagString содержит ID категории
-          if AType.Category <> StrToIntDef(Cur.TagString, -1) then
-            Exit(False);
+          // TagString категории: "ID" или "ID|НормализованноеИмя".
+          // Для узла "<категория>" пропускаем только пустую категорию.
+          var CatParts := Cur.TagString.Split(['|']);
+          var NodeCatID := StrToIntDef(CatParts[0], -1);
+
+          if Cur.Text = '<категория>' then
+          begin
+            if not ((AType.Category = 0) or ((AType.Category = -1) and (Trim(AType.CategoryName) = ''))) then
+              Exit(False);
+          end
+          else
+          begin
+            if AType.Category <> NodeCatID then
+              Exit(False);
+
+            if NodeCatID = -1 then
+            begin
+              var NodeCatNameKey := '';
+              if Length(CatParts) > 1 then
+                NodeCatNameKey := CatParts[1];
+
+              if NodeCatNameKey <> NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName)) then
+                Exit(False);
+            end;
+          end;
         end;
 
       // ---------- МОДИФИКАЦИЯ ----------
       Ord(tnModification):
         begin
           // TagString = '' → пустая модификация
-          if AType.Modification <> Cur.TagString then
+          if NormalizeTreeKey(AType.Modification) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
     end;
@@ -376,9 +404,9 @@ var
     while Cur <> nil do
     begin
       if Result = '' then
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text
       else
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text + '/' + Result;
       Cur := Cur.ParentItem;
     end;
   end;
@@ -392,7 +420,7 @@ var
       Exit;
 
     if (ANode.Tag = PrevNodeTag)
-      and (ANode.TagString = PrevNodeTagString)
+      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(PrevNodeTagString))
       and (ANode.Text = PrevNodeText)
       and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
     begin
@@ -473,12 +501,10 @@ begin
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := PrevSelectedNode.TagString;
+      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
-
-    //TreeViewTypes.Clear;
 
     {----------------------------------}
     { Корневой узел }
@@ -539,6 +565,8 @@ begin
         if T.Category > 0 then
         begin
           CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName);
+          if Trim(CatText) = '' then
+            CatText := '<категория>';
           CatKey  := IntToStr(T.Category);
 
           CatNode := FindChildInNode(
@@ -604,8 +632,10 @@ begin
       if ManNode = nil then
         Continue;
 
-      CatText := '<категория>';
-      CatKey  := IntToStr(T.Category); // -1 / 0
+      CatText := ActiveRepo.CategoryToText(T.Category, T.CategoryName);
+      if Trim(CatText) = '' then
+        CatText := '<категория>';
+      CatKey  := IntToStr(T.Category) + '|' + NormalizeTreeKey(CatText); // -1 / 0 + имя
 
       CatNode := FindChildInNode(
         ManNode,
@@ -873,6 +903,7 @@ var
   SourceType: TDeviceType;
   SelectedTreeNode: TTreeViewItem;
   HasGridSelection: Boolean;
+  SelectedNodeTag: Integer;
   I: Integer;
 begin
 
@@ -895,16 +926,53 @@ begin
     (FDevFilteredTypes <> nil) and
     (SelRow >= 0) and
     (SelRow < FDevFilteredTypes.Count);
-  //копия выбранной строки
-  //if HasGridSelection then
-  //  SourceType := FDevFilteredTypes[SelRow];
 
-  NewType := ActiveRepo.CreateType(SourceType);
+  { Берём источник только из выбранной строки грида }
+  if HasGridSelection then
+    SourceType := FDevFilteredTypes[SelRow];
+
+  if SelectedTreeNode <> nil then
+    SelectedNodeTag := SelectedTreeNode.Tag
+  else
+    SelectedNodeTag := Ord(tnAll);
+
+  { Для Modification создаём полную копию выбранной строки, иначе — пустой тип }
+  if (SourceType <> nil) and (SelectedNodeTag = Ord(tnModification)) then
+    NewType := ActiveRepo.CreateType(SourceType)
+  else
+    { По умолчанию сохраняем прежнее поведение: если строки нет, создаём пустой тип }
+    NewType := ActiveRepo.CreateType(nil);
+
+  if SourceType <> nil then
+  begin
+    case SelectedNodeTag of
+      Ord(tnManufacturer):
+        begin
+          { Уровень Manufacturer: копируем производителя и имя }
+          NewType.Manufacturer := SourceType.Manufacturer;
+          NewType.Name := SourceType.Name;
+        end;
+
+      Ord(tnCategory):
+        begin
+          { Уровень Category: копируем производителя, категорию и имя }
+          NewType.Manufacturer := SourceType.Manufacturer;
+          NewType.Category := SourceType.Category;
+          NewType.CategoryName := SourceType.CategoryName;
+          NewType.Name := SourceType.Name;
+        end;
+    else
+      { Для остальных узлов оставляем прежнюю логику через выбор в дереве }
+    end;
+  end;
+
   WriteTypeActionLog('Создан тип прибора', NewType);
-  if (SelectedTreeNode <> nil) and
-     (SelectedTreeNode.Tag <> Ord(tnAll)) then
-    ApplyTreeSelectionToType(NewType);
 
+  {-------------------------------------------------}
+  { Синхронизируем дерево: для новых типов без      }
+  { категории должна появиться новая ветка          }
+  {-------------------------------------------------}
+  BuildTree;
   {-------------------------------------------------}
   { Обновляем ТОЛЬКО фильтрованные списки }
   {-------------------------------------------------}
@@ -926,10 +994,7 @@ begin
       end;
 end;
 
-procedure TFormTypeSelect.ApplyTreeSelectionToType(AType: TDeviceType);
-begin
-  AppServices.DataManager.AssignTypeTreeFields(AType,GetActiveTreeNode{ TreeViewTypes.Selected});
-end;
+
 
  procedure TFormTypeSelect.actTypeClearExecute(Sender: TObject);
 var
@@ -1045,11 +1110,10 @@ begin
       and (ParentNode.ItemByIndex(NodeIndex + 1) is TTreeViewItem) then
       ReplacementNode := TTreeViewItem(ParentNode.ItemByIndex(NodeIndex + 1));
 
-    ParentNode.RemoveObject(SelectedNode);
+    RemoveTreeNode(SelectedNode);
   end
   else
-    TreeViewTypes.RemoveObject(SelectedNode);
-  SelectedNode.DisposeOf;
+    RemoveTreeNode(SelectedNode);
 
   CurrentNode := ParentNode;
   while (CurrentNode <> nil) and (CurrentNode.Tag <> Ord(tnAll)) and (CurrentNode.Count = 0) do
@@ -1066,11 +1130,7 @@ begin
       Break;
 
     ParentNode := CurrentNode.ParentItem;
-    if ParentNode <> nil then
-      ParentNode.RemoveObject(CurrentNode)
-    else
-      TreeViewTypes.RemoveObject(CurrentNode);
-    CurrentNode.DisposeOf;
+    RemoveTreeNode(CurrentNode);
     CurrentNode := ParentNode;
   end;
 
@@ -1078,6 +1138,21 @@ begin
     TreeViewTypes.Selected := ReplacementNode
   else
     TreeViewTypes.Selected := CurrentNode;
+end;
+
+procedure TFormTypeSelect.RemoveTreeNode(ANode: TTreeViewItem);
+var
+  ParentNode: TTreeViewItem;
+begin
+  if ANode = nil then
+    Exit;
+
+  ParentNode := ANode.ParentItem;
+  if ParentNode <> nil then
+    ParentNode.RemoveObject(ANode)
+  else
+    TreeViewTypes.RemoveObject(ANode);
+  ANode.DisposeOf;
 end;
 
 
@@ -1119,6 +1194,11 @@ begin
 end;
 
 {$R *.fmx}
+
+procedure TFormTypeSelect.btnOKClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
 
 procedure TFormTypeSelect.FormClose(
   Sender: TObject;
@@ -1182,8 +1262,10 @@ begin
    FClearTreeSelectionOnClick := False;
    FCheckedTypes := TList<TDeviceType>.Create;
    TreeViewTypes.MultiSelect := True;
+   OnKeyDown := FormKeyDown;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
    GridTypes.OnMouseDown := GridTypesMouseDown;
+   GridTypes.OnKeyDown := GridTypesKeyDown;
 
    LoadData;
    FillComboBoxRepository;
@@ -1395,6 +1477,39 @@ begin
   GridTypes.Row := Row;
   GridTypes.Selected := Row;
   SelectedType := FDevFilteredTypes[Row];
+
+  if ssDouble in Shift then
+    actTypeEditExecute(actTypeEdit);
+end;
+
+procedure TFormTypeSelect.FormKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrCancel;
+    Key := 0;
+    KeyChar := #0;
+  end;
+end;
+
+procedure TFormTypeSelect.GridTypesKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrCancel;
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
+  if Key = vkReturn then
+  begin
+    actTypeSelectExecute(actTypeSelect);
+    Key := 0;
+    KeyChar := #0;
+  end;
 end;
 
 
@@ -1701,13 +1816,17 @@ procedure TFormTypeSelect.UpdateTypeActions(Sender: TObject);
 var
   HasRepo: Boolean;
   HasRows: Boolean;
+  HasGridFocus: Boolean;
+  HasCurrentSelection: Boolean;
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0);
+  HasGridFocus := (GridTypes <> nil) and GridTypes.IsFocused;
+  HasCurrentSelection := CurrentGridType <> nil;
 
   actTypeAdd.Enabled := HasRepo;
-  actTypeEdit.Enabled := HasRows;
-  actTypeSelect.Enabled := HasRows;
+  actTypeEdit.Enabled := HasRows and (HasGridFocus or HasCurrentSelection);
+  actTypeSelect.Enabled := HasRows and (HasGridFocus or HasCurrentSelection);
   actTypeDelete.Enabled := HasRepo and HasRows;
   actTypeCopy.Enabled := HasRows;
   actTypeCut.Enabled := HasRepo and HasRows;
@@ -1933,12 +2052,24 @@ end;
 
 procedure TFormTypeSelect.miRefreshRepositoryClick(Sender: TObject);
 begin
-      { Пересборка дерева (с восстановлением выбора) }
-      BuildTree;
+      { Полное обновление дерева по кнопке "Обновить" }
+      RebuildTreeFull;
 
       { Полная пересборка фильтров + сортировка }
       ApplyFilter;
         UpdateGridTypes;
+end;
+
+procedure TFormTypeSelect.RebuildTreeFull;
+begin
+  TreeViewTypes.BeginUpdate;
+  try
+    TreeViewTypes.Clear;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
+
+  BuildTree;
 end;
 
 procedure TFormTypeSelect.miSaveClick(Sender: TObject);
@@ -1995,9 +2126,12 @@ begin
       WriteTypeActionLog('Отредактирован тип прибора', AType);
       if (AppServices.DataManager <> nil) and
          (OldManufacturer <> AType.Manufacturer) then
+      begin
         AppServices.DataManager.NeedRemoveOldManufacturerBranchForType(
           FDeviceTypes, AType, OldManufacturer, AType.Manufacturer
         );
+        SyncTreeAfterGridRowsRemoved;
+      end;
 
       BuildTree;
       ApplyFilter;
@@ -2050,7 +2184,7 @@ begin
     Result := sfName; // безопасный дефолт
 end;
 
-procedure TFormTypeSelect.ComboBoxRepositoryChange(Sender: TObject);
+procedure  TFormTypeSelect.ComboBoxRepositoryChange(Sender: TObject);
 var
   Idx: Integer;
   RepoName: string;
@@ -2253,10 +2387,6 @@ if MessageDlg(
 
         DevType := ActiveRepo.CreateType(0);
 
-        {------------ mit_uuid ------------}
-        if Item.GetValue('mit_uuid') <> nil then
-          DevType.UUID := Item.GetValue('mit_uuid').Value;
-
         {------------ ГРСИ ------------}
         if Item.GetValue('number') <> nil then
           DevType.ReestrNumber := Item.GetValue('number').Value;
@@ -2457,19 +2587,23 @@ begin
     Exit;
 
   {---------------- Изготовитель ----------------}
-  ManKey := Trim(AType.Manufacturer);
+  ManKey := AType.Manufacturer;
   ManNode := FindChildInTree(TreeViewTypes, Ord(tnManufacturer), ManKey);
   if ManNode = nil then
     Exit;
 
   {---------------- Категория ----------------}
-  CatKey := IntToStr(AType.Category);
+  if AType.Category > 0 then
+    CatKey := IntToStr(AType.Category)
+  else
+    CatKey := IntToStr(AType.Category) +
+      '|' + NormalizeTreeKey(ActiveRepo.CategoryToText(AType.Category, AType.CategoryName));
   CatNode := FindChildInNode(ManNode, Ord(tnCategory), CatKey);
   if CatNode = nil then
     Exit;
 
   {---------------- Модификация ----------------}
-  ModKey := Trim(AType.Modification);
+  ModKey := AType.Modification;
   ModNode := FindChildInNode(CatNode, Ord(tnModification), ModKey);
   if ModNode = nil then
     Exit;
