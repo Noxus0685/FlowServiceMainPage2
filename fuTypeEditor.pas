@@ -1291,7 +1291,8 @@ end;
 procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
 var
   D: TDiameter;
-  HasName, HasQnom, HasQtr,HasQmax,HasQmin, HasQ2tr, HasKp, HasQf: Boolean;
+  VisibleCount: Integer;
+  HasName, HasQnom, HasQtr, HasQmax, HasQmin, HasQ2tr, HasKp, HasQf: Boolean;
   function HasNonZeroValue(const AValue: Double): Boolean;
   begin
     Result := not SameValue(AValue, 0, MinDouble);
@@ -1300,27 +1301,41 @@ begin
   if (FDiametersLocal = nil) or (GridDiameters = nil) then
     Exit;
 
-  HasName := true;
-  HasQnom := true;
-  HasQtr := true;
-  HasQ2tr := true;
-  HasKp := true;
-  HasQf := true;
-  HasQmax := true;
-  HasQmin := true;
+  VisibleCount := 0;
+  HasName := False;
+  HasQnom := False;
+  HasQtr := False;
+  HasQ2tr := False;
+  HasKp := False;
+  HasQf := False;
+  HasQmax := False;
+  HasQmin := False;
 
   for D in FDiametersLocal do
     if (D <> nil) and (D.State <> osDeleted) then
     begin
-      HasName := HasName and ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
-      HasQnom := HasQnom and HasNonZeroValue(D.Qnom);
-      HasQtr := HasQtr and HasNonZeroValue(D.Qtr);
-      HasQ2tr := HasQ2tr and HasNonZeroValue(D.Q2tr);
-      HasKp := HasKp and HasNonZeroValue(D.Kp);
-      HasQf := HasQf and HasNonZeroValue(D.QFmax);
-      HasQmax := HasQmax and HasNonZeroValue(D.Qmax);
-      HasQmin := HasQmin and HasNonZeroValue(D.Qmin);
+      Inc(VisibleCount);
+      HasName := HasName or ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
+      HasQnom := HasQnom or HasNonZeroValue(D.Qnom);
+      HasQtr := HasQtr or HasNonZeroValue(D.Qtr);
+      HasQ2tr := HasQ2tr or HasNonZeroValue(D.Q2tr);
+      HasKp := HasKp or HasNonZeroValue(D.Kp);
+      HasQf := HasQf or HasNonZeroValue(D.QFmax);
+      HasQmax := HasQmax or HasNonZeroValue(D.Qmax);
+      HasQmin := HasQmin or HasNonZeroValue(D.Qmin);
     end;
+
+  if VisibleCount = 0 then
+  begin
+    HasName := True;
+    HasQnom := True;
+    HasQtr := True;
+    HasQ2tr := True;
+    HasKp := True;
+    HasQf := True;
+    HasQmax := True;
+    HasQmin := True;
+  end;
 
   StringColumnDNName.Visible := HasName;
   StringColumnDNQnom.Visible := HasQnom;
@@ -1328,8 +1343,8 @@ begin
   StringColumnDNQ2tr.Visible := HasQ2tr;
   StringColumnDNKp.Visible := HasKp;
   StringColumnDNQF.Visible := HasQf;
-  StringColumnDNQmin.Visible := HasQmax;
-  StringColumnDNQmax.Visible := HasQmin;
+  StringColumnDNQmin.Visible := HasQmin;
+  StringColumnDNQmax.Visible := HasQmax;
   SyncGridDiametersHeaderPopupMenu;
   UpdateGridDiametersHeaderRect;
 end;
