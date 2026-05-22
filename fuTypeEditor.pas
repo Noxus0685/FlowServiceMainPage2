@@ -431,6 +431,8 @@ type
   FRectGridDiametersHeader: TRectangle;
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
+  // После ручного переключения колонок пользователем не перезаписываем Visible авто-логикой.
+  FUserCustomizedDiameterColumns: Boolean;
 
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
@@ -685,6 +687,7 @@ end;
    GridPoints.OnKeyDown := GridPointsKeyDown;
 
    FGridDiametersHeaderColumnIndex := -1;
+   FUserCustomizedDiameterColumns := False;
 
    // Создаем невидимую кликабельную область над заголовком грида для отдельного header-popup.
    FRectGridDiametersHeader := TRectangle.Create(Self);
@@ -1676,6 +1679,7 @@ procedure TFormTypeEditor.LoadType(AType: TDeviceType);
 begin
   FLoading := True;
   try
+    FUserCustomizedDiameterColumns := False;
     FSkipDiameterDeleteConfirm := False;
     FSkipPointDeleteConfirm := False;
 
