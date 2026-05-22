@@ -742,6 +742,7 @@ begin
       MenuItem.Text := GridDiameters.Columns[i].Name;
      MenuItem.Tag := I;
      MenuItem.TagObject := GridDiameters.Columns[I];
+     MenuItem.Hint := GridDiameters.Columns[I].Name;
      MenuItem.AutoCheck := False;
      MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
      MenuItem.Parent := FPopupMenuGridDiametersHeader;
@@ -1556,6 +1557,7 @@ end;
 procedure TFormTypeEditor.SyncGridDiametersHeaderPopupMenu;
 var
   I: Integer;
+  J: Integer;
   MenuItem: TMenuItem;
   Column: TColumn;
 begin
@@ -1568,7 +1570,21 @@ begin
       Continue;
 
     MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
+    Column := nil;
     if MenuItem.TagObject is TColumn then
+      Column := TColumn(MenuItem.TagObject);
+
+    if (Column = nil) and (MenuItem.Hint <> '') then
+      for J := 0 to GridDiameters.ColumnCount - 1 do
+        if SameText(GridDiameters.Columns[J].Name, MenuItem.Hint) then
+        begin
+          Column := GridDiameters.Columns[J];
+          MenuItem.TagObject := Column;
+          MenuItem.Tag := J;
+          Break;
+        end;
+
+    if Column <> nil then
     begin
       Column := TColumn(MenuItem.TagObject);
       MenuItem.Enabled := True;
@@ -1654,11 +1670,24 @@ begin
 
   MenuItem := TMenuItem(Sender);
   Index := MenuItem.Tag;
+  Column := nil;
   if MenuItem.TagObject is TColumn then
     Column := TColumn(MenuItem.TagObject)
-  else if (Index >= 0) and (Index < GridDiameters.ColumnCount) then
+  else if MenuItem.Hint <> '' then
+  begin
+    for Index := 0 to GridDiameters.ColumnCount - 1 do
+      if SameText(GridDiameters.Columns[Index].Name, MenuItem.Hint) then
+      begin
+        Column := GridDiameters.Columns[Index];
+        MenuItem.TagObject := Column;
+        MenuItem.Tag := Index;
+        Break;
+      end;
+  end;
+
+  if (Column = nil) and (Index >= 0) and (Index < GridDiameters.ColumnCount) then
     Column := GridDiameters.Columns[Index]
-  else
+  else if Column = nil then
     Exit;
 
   // Пункты меню управляют Visible колонок, чтобы пользователь мог скрывать/показывать столбцы header.
