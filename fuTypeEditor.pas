@@ -1656,7 +1656,6 @@ begin
     Exit;
 
   // По запросу: переключение Visible колонок отключено.
-  FUserCustomizedDiameterColumns := True;
   MenuItem.IsChecked := False;
 
   GridDiameters.Repaint;
