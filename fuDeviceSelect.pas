@@ -1534,12 +1534,19 @@ begin
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
   DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
-  FDevFilteredByDate :=
-    TEntityFilters<TDevice>.ApplyDateFilter(
-      FDevFilteredByText,
-      DateEditFilter.Date,
-      DateFilterEnabled
-    );
+  FDevFilteredByDate := TObjectList<TDevice>.Create(False);
+
+  if (not DateFilterEnabled) or (FDevFilteredByText = nil) then
+  begin
+    if FDevFilteredByText <> nil then
+      FDevFilteredByDate.AddRange(FDevFilteredByText);
+  end
+  else
+    for var D in FDevFilteredByText do
+      if (D.RegDate > 0) and (D.ValidityDate > 0) and
+         (D.RegDate <= DateEditFilter.Date) and
+         (DateEditFilter.Date <= D.ValidityDate) then
+        FDevFilteredByDate.Add(D);
 
   {----------------------------------}
   { 4. Сортировка }
@@ -2401,12 +2408,19 @@ begin
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
   DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
-  FDevFilteredByDate :=
-    TEntityFilters<TDevice>.ApplyDateFilter(
-      FDevFilteredByText,
-      DateEditFilter.Date,
-      DateFilterEnabled
-    );
+  FDevFilteredByDate := TObjectList<TDevice>.Create(False);
+
+  if (not DateFilterEnabled) or (FDevFilteredByText = nil) then
+  begin
+    if FDevFilteredByText <> nil then
+      FDevFilteredByDate.AddRange(FDevFilteredByText);
+  end
+  else
+    for var D in FDevFilteredByText do
+      if (D.RegDate > 0) and (D.ValidityDate > 0) and
+         (D.RegDate <= DateEditFilter.Date) and
+         (DateEditFilter.Date <= D.ValidityDate) then
+        FDevFilteredByDate.Add(D);
 
   {----------------------------------}
   { Сортировка }
