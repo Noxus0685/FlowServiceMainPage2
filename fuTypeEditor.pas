@@ -1634,20 +1634,21 @@ end;
 
 procedure TFormTypeEditor.GridDiametersMenuCopyClick(Sender: TObject);
 var
-  CellText: string;
+  CellValue: TValue;
 begin
   if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
     Exit;
 
-  CellText := GridDiameters.Cells[GridDiameters.Col, GridDiameters.Row];
-  CopyTextToClipboard(CellText);
+  CellValue := TValue.Empty;
+  GridDiametersGetValue(GridDiameters, GridDiameters.Col, GridDiameters.Row, CellValue);
+  CopyTextToClipboard(CellValue.ToString);
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuCutClick(Sender: TObject);
 begin
   GridDiametersMenuCopyClick(Sender);
   if (GridDiameters.Col >= 0) and (GridDiameters.Row >= 0) then
-    GridDiameters.SetValue(GridDiameters.Col, GridDiameters.Row, '');
+    GridDiametersSetValue(GridDiameters, GridDiameters.Col, GridDiameters.Row, '');
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuPasteClick(Sender: TObject);
@@ -1658,7 +1659,7 @@ begin
     Exit;
 
   ClipText := GetTextFromClipboard;
-  GridDiameters.SetValue(GridDiameters.Col, GridDiameters.Row, ClipText);
+  GridDiametersSetValue(GridDiameters, GridDiameters.Col, GridDiameters.Row, ClipText);
 end;
 
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
