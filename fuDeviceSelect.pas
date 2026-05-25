@@ -247,6 +247,7 @@ private
   procedure ClearCheckedDevices;
   function GetCheckedDevices: TObjectList<TDevice>;
   procedure ClearGridSelection;
+  function IsGridInputFocused: Boolean;
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
@@ -1190,7 +1191,7 @@ var
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0);
-  HasGridFocus := (GridDevices <> nil) and GridDevices.IsFocused;
+  HasGridFocus := IsGridInputFocused;
   HasSelectedRow :=
     HasRows and
     HasGridFocus and
@@ -1240,6 +1241,24 @@ begin
 
   for I := 0 to FDevFilteredDevices.Count - 1 do
     Result.Add(FDevFilteredDevices[I]);
+end;
+
+function TFormDeviceSelect.IsGridInputFocused: Boolean;
+var
+  Ref: IInterfaceComponentReference;
+begin
+  Result := False;
+
+  if (GridDevices = nil) or (not GridDevices.IsFocused) then
+    Exit;
+
+  if ActiveControl = nil then
+    Exit;
+
+  if not Supports(ActiveControl, IInterfaceComponentReference, Ref) then
+    Exit;
+
+  Result := Ref.GetComponent = GridDevices;
 end;
 
 procedure TFormDeviceSelect.ClearCheckedDevices;
@@ -2445,7 +2464,7 @@ end;
 
 procedure TFormDeviceSelect.btnOKClick(Sender: TObject);
 begin
-  if (GridDevices = nil) or (not GridDevices.IsFocused) then
+  if not IsGridInputFocused then
     Exit;
 
   if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
@@ -2532,7 +2551,7 @@ end;
 procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if (Key = vkEscape) and (GridDevices <> nil) and GridDevices.IsFocused then
+  if (Key = vkEscape) and IsGridInputFocused then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2543,7 +2562,7 @@ end;
 procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if (Key = vkEscape) and ((GridDevices <> nil) and GridDevices.IsFocused) then
+  if (Key = vkEscape) and IsGridInputFocused then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2551,7 +2570,7 @@ begin
     Exit;
   end;
 
-  if (Key = vkReturn) and ((GridDevices <> nil) and GridDevices.IsFocused) then
+  if (Key = vkReturn) and IsGridInputFocused then
   begin
     ModalResult := mrOk;
     Key := 0;
