@@ -148,6 +148,7 @@ type
       Shift: TShiftState; X, Y: Single);
     procedure TreeViewTypesMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure EditFindTypeChangeTracking(Sender: TObject);
     procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
     procedure GridTypesHeaderClick(Column: TColumn);
@@ -1203,6 +1204,11 @@ begin
     UpdateGridTypes;
 end;
 
+procedure TFormTypeSelect.EditFindTypeChangeTracking(Sender: TObject);
+begin
+  actFilterFind.Checked := Trim(EditFindType.Text) <> '';
+end;
+
 {$R *.fmx}
 
 procedure TFormTypeSelect.btnOKClick(Sender: TObject);
@@ -1274,6 +1280,7 @@ begin
    TreeViewTypes.MultiSelect := True;
    OnKeyDown := FormKeyDown;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
+   EditFindType.OnChangeTracking := EditFindTypeChangeTracking;
    GridTypes.OnMouseDown := GridTypesMouseDown;
    GridTypes.OnKeyDown := GridTypesKeyDown;
 
@@ -1535,7 +1542,7 @@ begin
   ApplyFilter;
   UpdateGridTypes;
   // фильтров больше нет
-  sbFind.IsPressed := False;
+  actFilterFind.Checked := False;
 end;
 
 procedure TFormTypeSelect.actFilterFindExecute(Sender: TObject);
@@ -1602,7 +1609,7 @@ begin
       ApplyFilter;
       UpdateGridTypes;
       // фильтров больше нет
-      sbFind.IsPressed := False;
+      actFilterFind.Checked := False;
     end;
   end
   else
@@ -1733,7 +1740,7 @@ begin
 
   GridTypes.Repaint;
 
-  sbFind.IsPressed := HasActiveFilters;
+  actFilterFind.Checked := HasActiveFilters;
 end;
 
 procedure TFormTypeSelect.ClearGridSelection;
