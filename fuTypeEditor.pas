@@ -1705,9 +1705,17 @@ begin
 end;
 
 procedure TFormTypeEditor.ActionGridDiametersCutExecute(Sender: TObject);
+var
+  PrevSkipConfirm: Boolean;
 begin
   ActionGridDiametersCopyExecute(Sender);
-  ActionGridDiametersDeleteExecute(Sender);
+  PrevSkipConfirm := FSkipDiameterDeleteConfirm;
+  FSkipDiameterDeleteConfirm := True;
+  try
+    ActionGridDiametersDeleteExecute(Sender);
+  finally
+    FSkipDiameterDeleteConfirm := PrevSkipConfirm;
+  end;
 end;
 
 procedure TFormTypeEditor.ActionGridDiametersPasteExecute(Sender: TObject);
