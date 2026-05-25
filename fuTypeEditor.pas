@@ -1806,7 +1806,13 @@ begin
         Result := LBool - RBool;
       end
       else if ACol = StringColumnDNName.Index then
-        Result := CompareText(Trim(Left.Name), Trim(Right.Name))
+      begin
+        // Для DN-имен вида "DN10"/"DN2" сначала сравниваем числовую часть.
+        if TryParseNumericTextForSort(Left.Name, LNum) and TryParseNumericTextForSort(Right.Name, RNum) then
+          Result := CompareValue(LNum, RNum)
+        else
+          Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+      end
       else if ACol = IntegerColumnDNSize.Index then
       begin
         LNum := NormalizeFloatInput(Left.DN);
