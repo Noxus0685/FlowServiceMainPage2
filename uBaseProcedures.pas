@@ -169,6 +169,7 @@ function ExtractManufacturerName(const S: string): string;
 function NormalizeNameCase(const S: string): string;
 function NormalizeSearchText(const S: string): string;
 function NormalizeTreeText(const S: string): string;
+function NormalizeTreeKey(const S: string): string;
 function FindChildInNode(AParent: TTreeViewItem; ATag: Integer; const AKey: string): TTreeViewItem;
 function FindChildInTree(ATree: TTreeView; ATag: Integer; const AKey: string): TTreeViewItem;
 function NewGuidString: string;
@@ -884,6 +885,18 @@ begin
     Result := Trim(S);
 end;
 
+function NormalizeTreeKey(const S: string): string;
+var
+  T: string;
+begin
+  T := Trim(S).ToLower;
+
+  if T = '' then
+    Exit('');
+
+  Result := T.Substring(0, 1).ToUpper + T.Substring(1);
+end;
+
 function FindChildInTree(
   ATree: TTreeView;
   ATag: Integer;
@@ -898,7 +911,7 @@ begin
   for I := 0 to ATree.Count - 1 do
   begin
     Item := ATree.Items[I];
-    if (Item.Tag = ATag) and (Item.TagString = AKey) then
+    if (Item.Tag = ATag) and SameText(NormalizeTreeKey(Item.TagString), NormalizeTreeKey(AKey)) then
       Exit(Item);
   end;
 end;
@@ -917,7 +930,7 @@ begin
   for I := 0 to AParent.Count - 1 do
   begin
     Item := TTreeViewItem(AParent.Items[I]);
-    if (Item.Tag = ATag) and (Item.TagString = AKey) then
+    if (Item.Tag = ATag) and SameText(NormalizeTreeKey(Item.TagString), NormalizeTreeKey(AKey)) then
       Exit(Item);
   end;
 end;

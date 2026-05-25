@@ -298,9 +298,13 @@ type
     procedure ButtonPointsClearClick(Sender: TObject);
     procedure ComboEditDNChange(Sender: TObject);
     procedure mmoCommentExit(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure GridPointsHeaderClick(Column: TColumn);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
+    procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
 
 
   private
@@ -368,6 +372,8 @@ type
      procedure ButtonCoefAddClick(Sender: TObject);
      procedure ButtonCoefDeleteClick(Sender: TObject);
      procedure ButtonCoefClearClick(Sender: TObject);
+     procedure GridCoefsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+       Shift: TShiftState);
 
      procedure  UpdateComboEditDN;
 
@@ -852,6 +858,17 @@ begin
   UpdatePointsGrid;  // обновить UI
 end;
 
+procedure TFormDeviceEditor.GridPointsKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkDelete then
+  begin
+    ButtonPointDeleteClick(ButtonPointDelete);
+    Key := 0;
+    KeyChar := #0;
+  end;
+end;
+
 procedure TFormDeviceEditor.ButtonPointsClearClick(Sender: TObject);
 var
   I: Integer;
@@ -1254,6 +1271,7 @@ begin
   FGridCoefs.Options := FGridCoefs.Options + [TGridOption.Editing];
   FGridCoefs.OnGetValue := GridCoefsGetValue;
   FGridCoefs.OnSetValue := GridCoefsSetValue;
+  FGridCoefs.OnKeyDown := GridCoefsKeyDown;
 
   NewCol('Наименование', 170);
   NewCol('Value', 90);
@@ -1265,6 +1283,17 @@ begin
 
   FTabControlMain.ActiveTab := FTabItemDevice;
   FCoefsTabInitialized := True;
+end;
+
+procedure TFormDeviceEditor.GridCoefsKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkDelete then
+  begin
+    ButtonCoefDeleteClick(FButtonCoefDelete);
+    Key := 0;
+    KeyChar := #0;
+  end;
 end;
 
 procedure TFormDeviceEditor.UpdateCoefsGrid;
@@ -1401,6 +1430,8 @@ var
   FoundRepo: TTypeRepository;
 begin
   InitCoefsTab;
+  OnKeyDown := FormKeyDown;
+  GridPoints.OnKeyDown := GridPointsKeyDown;
 
   FLoading := True;
   try
@@ -1464,6 +1495,17 @@ begin
 
   finally
     FLoading := False;
+  end;
+end;
+
+procedure TFormDeviceEditor.FormKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrOk;
+    Key := 0;
+    KeyChar := #0;
   end;
 end;
 

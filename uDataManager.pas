@@ -280,7 +280,6 @@ begin
     if SourceType = nil then
       Continue;
     NewType := ActiveTypeRepo.CreateType(SourceType);
-    // При вставке в выбранную ветку дерева применяем её как контекст назначения.
     if (ATargetNode <> nil) and (ATargetNode.Tag <> Ord(tnAll)) then
       AssignTypeTreeFields(NewType, ATargetNode);
     Result.Add(NewType);
@@ -435,6 +434,36 @@ begin
   Result := (FCopiedDevices <> nil) and (FCopiedDevices.Count > 0);
 end;
 
+procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
+var
+  Cur: TTreeViewItem;
+begin
+  // Логика замены полей типа по выбранной ветке дерева.
+  if (AType = nil) or (ANode = nil) then
+    Exit;
+
+  Cur := ANode;
+  while Cur <> nil do
+  begin
+    case Cur.Tag of
+      Ord(tnManufacturer):
+        AType.Manufacturer := Cur.TagString;
+      Ord(tnCategory):
+        begin
+          // TagString может быть в формате "ID" или "ID|НормализованноеИмя".
+          AType.Category := StrToIntDef(Cur.TagString.Split(['|'])[0], 0);
+          if Cur.Text <> '<категория>' then
+            AType.CategoryName := Cur.Text
+          else
+            AType.CategoryName := '';
+        end;
+      Ord(tnModification):
+        AType.Modification := Cur.TagString;
+    end;
+    Cur := Cur.ParentItem;
+  end;
+end;
+
 
 procedure TManagerTTableDM.AssignDeviceTreeFields(const ADevice: TDevice; const ANode: TTreeViewItem);
 var
@@ -452,11 +481,12 @@ begin
         ADevice.Manufacturer := Cur.TagString;
       Ord(tnCategory):
         begin
-          // По аналогии с AssignTypeTreeFields:
-          // TagString узла категории содержит ID категории в виде строки.
-          ADevice.Category := StrToIntDef(Cur.TagString, 0);
-          if Cur.Text <>'<категория>' then
-            ADevice.CategoryName := Cur.Text;
+          // TagString может быть в формате "ID" или "ID|НормализованноеИмя".
+          ADevice.Category := StrToIntDef(Cur.TagString.Split(['|'])[0], 0);
+          if Cur.Text <> '<категория>' then
+            ADevice.CategoryName := Cur.Text
+          else
+            ADevice.CategoryName := '';
         end;
       Ord(tnModification):
         ADevice.Modification := Cur.TagString;
@@ -466,34 +496,6 @@ begin
 end;
 
 
-procedure TManagerTTableDM.AssignTypeTreeFields(const AType: TDeviceType; const ANode: TTreeViewItem);
-var
-  Cur: TTreeViewItem;
-begin
-  // Замена полей назначения по выбранной ветке:
-  // Modification -> Modification/Category/Manufacturer,
-  // Category -> Category/Manufacturer, Manufacturer -> только Manufacturer.
-  if (AType = nil) or (ANode = nil) then
-    Exit;
-
-  Cur := ANode;
-  while Cur <> nil do
-  begin
-    case Cur.Tag of
-      Ord(tnManufacturer):
-        AType.Manufacturer := Cur.TagString;
-      Ord(tnCategory):
-        begin
-          AType.Category := StrToIntDef(Cur.TagString, 0);
-          if Cur.Text <>'<категория>' then
-            AType.CategoryName := Cur.Text;
-        end;
-      Ord(tnModification):
-        AType.Modification := Cur.TagString;
-    end;
-    Cur := Cur.ParentItem;
-  end;
-end;
 
 
 

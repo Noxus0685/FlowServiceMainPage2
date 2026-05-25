@@ -4053,6 +4053,7 @@ var
   CurrentType, NewType: TDeviceType;
   FoundRepo, PreferredRepo: TTypeRepository;
   IsTypeChanged: Boolean;
+  IsCurrentTypeDeletedInSelector: Boolean;
   Ch: TChannel;
   Repo: TTypeRepository;
 begin
@@ -4130,7 +4131,22 @@ begin
 
     NewType := Frm.SelectedType;
     if NewType = nil then
+    begin
+      IsCurrentTypeDeletedInSelector := False;
+      if (CurrentType <> nil) and (CurrentType.UUID <> '') then
+        IsCurrentTypeDeletedInSelector :=
+          DataManager.FindType(CurrentType.UUID, '', FoundRepo) = nil;
+
+      // Очищаем строку только если удалили именно текущий тип
+      // в окне выбора. При простом закрытии окна без выбора
+      // текущую строку не трогаем.
+      if IsCurrentTypeDeletedInSelector and (not AIsEtalon) then
+      begin
+        GridDevices.Row := ARow;
+        ActionDevicesClearRowExecute(nil);
+      end;
       Exit;
+    end;
 
     FoundRepo := DataManager.ActiveTypeRepo;
 

@@ -160,6 +160,7 @@ type
     procedure miSaveClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure btnOKClick(Sender: TObject);
     procedure CornerButtonEditDeviceClick(Sender: TObject);
     procedure miAddTestDataClick(Sender: TObject);
     procedure miLoadClick(Sender: TObject);
@@ -172,6 +173,12 @@ type
     procedure aDeviceCutExecute(Sender: TObject);
     procedure UpdateDeviceActions(Sender: TObject);
     procedure aRefreshRepositoryExecute(Sender: TObject);
+    procedure GridDevicesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
+    procedure GridDevicesMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
 
 private
 
@@ -645,9 +652,9 @@ var
     while Cur <> nil do
     begin
       if Result = '' then
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text
       else
-        Result := IntToStr(Cur.Tag) + '|' + Cur.TagString + '|' + Cur.Text + '/' + Result;
+        Result := IntToStr(Cur.Tag) + '|' + NormalizeTreeKey(Cur.TagString) + '|' + Cur.Text + '/' + Result;
       Cur := Cur.ParentItem;
     end;
   end;
@@ -659,7 +666,7 @@ var
     if (ANode = nil) or (RestoredNode <> nil) then
       Exit;
     if (ANode.Tag = PrevNodeTag)
-      and (ANode.TagString = PrevNodeTagString)
+      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(PrevNodeTagString))
       and (ANode.Text = PrevNodeText)
       and ((PrevNodePath = '') or (BuildNodePath(ANode) = PrevNodePath)) then
     begin
@@ -733,7 +740,7 @@ begin
     if PrevSelectedNode <> nil then
     begin
       PrevNodeText := PrevSelectedNode.Text;
-      PrevNodeTagString := PrevSelectedNode.TagString;
+      PrevNodeTagString := NormalizeTreeKey(PrevSelectedNode.TagString);
       PrevNodeTag := PrevSelectedNode.Tag;
       PrevNodePath := BuildNodePath(PrevSelectedNode);
     end;
@@ -768,7 +775,7 @@ begin
         if Trim(D.Manufacturer) <> '' then
         begin
           ManText := D.Manufacturer;
-          ManKey  := D.Manufacturer;
+          ManKey  := NormalizeTreeKey(D.Manufacturer);
         end
         else
         begin
@@ -819,7 +826,7 @@ begin
           if Trim(D.Modification) <> '' then
           begin
             ModText := D.Modification;
-            ModKey  := D.Modification;
+            ModKey  := NormalizeTreeKey(D.Modification);
           end
           else
           begin
@@ -853,7 +860,7 @@ begin
       if D.Category > 0 then
         Continue;
 
-      ManKey := D.Manufacturer;
+      ManKey := NormalizeTreeKey(D.Manufacturer);
       ManNode := FindChildInTree(
         TreeViewDevices,
         Ord(tnManufacturer),
@@ -884,7 +891,7 @@ begin
       if Trim(D.Modification) <> '' then
       begin
         ModText := D.Modification;
-        ModKey  := D.Modification;
+        ModKey  := NormalizeTreeKey(D.Modification);
       end
       else
       begin
@@ -1065,7 +1072,7 @@ var
 
     if (SelectedNode <> nil)
       and (ANode.Tag = SelectedNode.Tag)
-      and (ANode.TagString = SelectedNode.TagString) then
+      and (NormalizeTreeKey(ANode.TagString) = NormalizeTreeKey(SelectedNode.TagString)) then
     begin
       RestoredNode := ANode;
       Exit;
@@ -2016,7 +2023,7 @@ begin
     Exit;
 
   if Trim(ADevice.Manufacturer) <> '' then
-    ManKey := ADevice.Manufacturer
+    ManKey := NormalizeTreeKey(ADevice.Manufacturer)
   else
     ManKey := '';
 
@@ -2033,7 +2040,7 @@ begin
     Exit(ManNode);
 
   if Trim(ADevice.Modification) <> '' then
-    ModKey := ADevice.Modification
+    ModKey := NormalizeTreeKey(ADevice.Modification)
   else
     ModKey := '';
 
@@ -2168,7 +2175,7 @@ begin
       Ord(tnManufacturer):
         begin
           // TagString = '' → пустой изготовитель
-          if ADevice.Manufacturer <> Cur.TagString then
+          if NormalizeTreeKey(ADevice.Manufacturer) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
 
@@ -2190,7 +2197,7 @@ begin
       Ord(tnModification):
         begin
           // TagString = '' → пустая модификация
-          if ADevice.Modification <> Cur.TagString then
+          if NormalizeTreeKey(ADevice.Modification) <> NormalizeTreeKey(Cur.TagString) then
             Exit(False);
         end;
     end;
@@ -2410,6 +2417,11 @@ begin
   end;
 end;
 
+
+procedure TFormDeviceSelect.btnOKClick(Sender: TObject);
+begin
+  ModalResult := mrCancel;
+end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
 var
@@ -2448,6 +2460,10 @@ procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
 begin
+  OnKeyDown := FormKeyDown;
+  GridDevices.OnKeyDown := GridDevicesKeyDown;
+  GridDevices.OnMouseDown := GridDevicesMouseDown;
+
   {----------------------------------}
   { Инициализация сортировки }
   {----------------------------------}
@@ -2478,6 +2494,62 @@ begin
       AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
     ApplyInitialSelection;
   end;
+end;
+
+procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrCancel;
+    Key := 0;
+    KeyChar := #0;
+  end;
+end;
+
+procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrCancel;
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
+  if Key = vkReturn then
+  begin
+    ModalResult := mrOk;
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
+  if Key = vkDelete then
+  begin
+    ButtonDeviceDeleteClick(ButtonDeviceDelete);
+    Key := 0;
+    KeyChar := #0;
+  end;
+end;
+
+procedure TFormDeviceSelect.GridDevicesMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  Col, Row: Integer;
+begin
+  if Button <> TMouseButton.mbLeft then
+    Exit;
+
+  if not GridDevices.CellByPoint(X, Y, Col, Row) then
+    Exit;
+
+  if (FDevFilteredDevices = nil) or (Row < 0) or (Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  if ssDouble in Shift then
+    CornerButtonEditDeviceClick(CornerButtonEditDevice);
 end;
 
 procedure TFormDeviceSelect.ApplyInitialSelection;

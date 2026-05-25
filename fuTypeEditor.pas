@@ -33,9 +33,11 @@ uses
   System.Math,
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
+  System.Net.Mime,
   System.Net.URLClient,
   System.NetEncoding,
   System.Rtti,
+  System.StrUtils,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -264,6 +266,24 @@ type
     Layout48: TLayout;
     LFLowEate: TLabel;
     EditFlowRate: TEdit;
+    Layout49: TLayout;
+    Label4: TLabel;
+    Edit1: TEdit;
+    SpeedButton2: TSpeedButton;
+    Layout50: TLayout;
+    AddFile: TSpeedButton;
+    Layout51: TLayout;
+    Label7: TLabel;
+    Edit2: TEdit;
+    SpeedButton4: TSpeedButton;
+    Layout52: TLayout;
+    Label43: TLabel;
+    Edit3: TEdit;
+    SpeedButton5: TSpeedButton;
+    Layout53: TLayout;
+    TabControl1: TTabControl;
+    TabItem1: TTabItem;
+    TabItem2: TTabItem;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -336,7 +356,13 @@ type
     procedure sbFindReestrNumberClick(Sender: TObject);
     procedure DeepSeekClick(Sender: TObject);
     procedure ChatGPTClick(Sender: TObject);
+    procedure AddFileClick(Sender: TObject);
+    procedure SpeedButton2Click(Sender: TObject);
+    procedure SpeedButton4Click(Sender: TObject);
+    procedure SpeedButton5Click(Sender: TObject);
     procedure btnCancelClick(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure cbCurrentRangeChange(Sender: TObject);
     procedure EditCurrentQmaxExit(Sender: TObject);
     procedure EditCurrentQminExit(Sender: TObject);
@@ -350,6 +376,17 @@ type
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
+    // Выбор PDF-файла вручную через диалог.
+    function SelectPdfFile(var APdfFilePath: string): Boolean;
+    // Извлечение текстового слоя из PDF через pdftotext.exe.
+    function ExtractTextLayerFromPdf(const APdfFilePath, AOutputTxtPath: string): Boolean;
+    // Отправка текста и JSON-шаблона в DeepSeek.
+    function SendTextToDeepSeekTemplate(const AText, ATemplate: string; out AResponse: string): Boolean;
+    // Применение JSON-ответа DeepSeek к форме типа прибора.
+    function ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
+    function GetSelectedAccuracyClass: string;
+    function GetSelectedFlowUnit: string;
+    function BuildDeepSeekTemplate(const AAccuracyClass, AModification: string): string;
 
   private
     { Private declarations }
@@ -383,6 +420,8 @@ type
   FButtonCoefClear: TButton;
   FSkipDiameterDeleteConfirm: Boolean;
   FSkipPointDeleteConfirm: Boolean;
+  FilePath: string;
+  FArshinRequestInProgress: Boolean;
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
@@ -396,6 +435,18 @@ type
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
   procedure RecalcQRowFromKnown(const ANewD: TDiameter; const KnownCol: Integer; const KnownValue: Double; const AOldD: TDiameter = nil);
+  function FindLayoutEdit(const ALayoutName: string): TEdit;
+  procedure SetupFileLayoutsForNewType;
+  procedure SetupFileLayoutsForExistingType;
+  procedure SelectFileToLayoutEdit(const ALayoutName: string);
+  // Проверка наличия локально выбранных файлов реестра в Edit1/Edit2/Edit3.
+  function HasLocalReestrFiles: Boolean;
+  // Преобразование значения Edit/Hint в полный путь к локальному файлу.
+  function ResolveReestrFilePath(const AEdit: TEdit): string;
+  // Проверка существования локально выбранных файлов реестра.
+  function CheckLocalReestrFiles: Boolean;
+  // Обработка локально выбранных файлов без скачивания с АРШИН.
+  procedure ProcessLocalReestrFiles;
 
 
 
@@ -435,6 +486,7 @@ type
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
+    procedure AutoHideEmptyDiameterColumns;
 
   public
 
@@ -492,6 +544,7 @@ implementation
 uses
 uAppServices
 {$IFDEF MSWINDOWS}
+  , Winapi.Windows
   , Winapi.WinInet
 {$ENDIF}
   ;
@@ -508,6 +561,46 @@ begin
   Result := InternetCheckConnection(PChar(ARSHIN_URL), FLAG_ICC_FORCE_CONNECTION, 0);
 {$ELSE}
   Result := True;
+{$ENDIF}
+end;
+
+function RunProcessAndWait(const AExeFile, AParams: string): Cardinal;
+{$IFDEF MSWINDOWS}
+var
+  StartInfo: TStartupInfo;
+  ProcInfo: TProcessInformation;
+  CmdLine: string;
+{$ENDIF}
+begin
+  Result := Cardinal(-1);
+{$IFDEF MSWINDOWS}
+  ZeroMemory(@StartInfo, SizeOf(StartInfo));
+  ZeroMemory(@ProcInfo, SizeOf(ProcInfo));
+
+  StartInfo.cb := SizeOf(StartInfo);
+  CmdLine := '"' + AExeFile + '" ' + AParams;
+
+  if not CreateProcess(
+    nil,
+    PChar(CmdLine),
+    nil,
+    nil,
+    False,
+    CREATE_NO_WINDOW,
+    nil,
+    nil,
+    StartInfo,
+    ProcInfo
+  ) then
+    Exit;
+
+  try
+    WaitForSingleObject(ProcInfo.hProcess, INFINITE);
+    GetExitCodeProcess(ProcInfo.hProcess, Result);
+  finally
+    CloseHandle(ProcInfo.hProcess);
+    CloseHandle(ProcInfo.hThread);
+  end;
 {$ENDIF}
 end;
 
@@ -546,6 +639,40 @@ begin
     Result := Ord(spUnknown);
 end;
 
+function ResolveProjectDocsFolder: string;
+var
+  SearchDir: string;
+begin
+  Result := '';
+  SearchDir := TPath.GetFullPath(GetCurrentDir);
+
+  while SearchDir <> '' do
+  begin
+    if Length(TDirectory.GetFiles(SearchDir, '*.dproj')) > 0 then
+      Exit(TPath.Combine(SearchDir, 'docs'));
+    SearchDir := TPath.GetDirectoryName(SearchDir);
+  end;
+
+  Result := TPath.Combine(TPath.GetFullPath(GetCurrentDir), 'docs');
+end;
+
+function SaveDeepSeekJsonToDocs(const ADocumentationPath, AJsonContent: string): string;
+var
+  DocsDir: string;
+  BaseName: string;
+begin
+  DocsDir := ResolveProjectDocsFolder;
+  if not TDirectory.Exists(DocsDir) then
+    TDirectory.CreateDirectory(DocsDir);
+
+  BaseName := TPath.GetFileNameWithoutExtension(ADocumentationPath);
+  if BaseName = '' then
+    BaseName := 'deepseek_result';
+
+  Result := TPath.Combine(DocsDir, BaseName + '_deepseek.json');
+  TFile.WriteAllText(Result, AJsonContent, TEncoding.UTF8);
+end;
+
  constructor TFormTypeEditor.Create(AOwner: TComponent; AType: TDeviceType);
 
  begin
@@ -553,6 +680,7 @@ end;
    FDiameterQ2 := TDictionary<Integer, Double>.Create;
    FDiameterQ4 := TDictionary<Integer, Double>.Create;
    TabItemCoefs.Visible := False;
+   OnKeyDown := FormKeyDown;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
 
@@ -578,6 +706,15 @@ end;
    GridDiameters.OnResize := GridDiametersResize;
 
    LoadType(AType);
+   // Настройка кнопок работы с файлами по именам компонентов из .fmx.
+   if FindComponent('AddFile') is TSpeedButton then
+     TSpeedButton(FindComponent('AddFile')).OnClick := AddFileClick;
+   if FindComponent('SpeedButton2') is TSpeedButton then
+     TSpeedButton(FindComponent('SpeedButton2')).OnClick := SpeedButton2Click;
+   if FindComponent('SpeedButton4') is TSpeedButton then
+     TSpeedButton(FindComponent('SpeedButton4')).OnClick := SpeedButton4Click;
+   if FindComponent('SpeedButton5') is TSpeedButton then
+     TSpeedButton(FindComponent('SpeedButton5')).OnClick := SpeedButton5Click;
    UpdateGridDiametersHeaderRect;
  end;
 
@@ -605,6 +742,17 @@ begin
      MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
      MenuItem.Parent := FPopupMenuGridDiametersHeader;
    end;
+end;
+
+procedure TFormTypeEditor.FormKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key = vkEscape then
+  begin
+    ModalResult := mrOk;
+    Key := 0;
+    KeyChar := #0;
+  end;
 end;
 
 destructor TFormTypeEditor.Destroy;
@@ -747,6 +895,21 @@ begin
 end;
 
 procedure TFormTypeEditor.UpdateUIFromType;
+  procedure SetFileEditFromStoredPath(const ALayoutName, AStoredPath: string);
+  var
+    E: TEdit;
+    S: string;
+  begin
+    E := FindLayoutEdit(ALayoutName);
+    if E = nil then
+      Exit;
+    S := Trim(AStoredPath);
+    E.Hint := S; // Храним полный путь в Hint, в Edit показываем только имя файла.
+    if S <> '' then
+      E.Text := ExtractFileName(S)
+    else
+      E.Text := '';
+  end;
 var
   AccErr: Double;
   Idx: Integer;
@@ -757,6 +920,10 @@ begin
     // == Основные текстовые поля
     // =====================================================
     EditName.Text          := FType.Name;
+    // Файлы типа прибора: загрузка из БД в Edit внутри Layout49/51/52.
+    SetFileEditFromStoredPath('Layout49', FType.FileName1);
+    SetFileEditFromStoredPath('Layout51', FType.FileName2);
+    SetFileEditFromStoredPath('Layout52', FType.FileName3);
     EditModification.Text := FType.Modification;
     edtReestrNumber.Text  := FType.ReestrNumber;
 
@@ -871,7 +1038,7 @@ begin
       ComboBoxOutputType.ItemIndex := 0;
     ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
 
-      ApplyOutputType;
+    ApplyOutputType;
 
 // =====================================================
 // == Тип выхода (OutputSet) — ДВА ComboBox
@@ -955,6 +1122,11 @@ cbOutPutType2.Hint := cbOutPutType2.Text;
     // == Точки
     // =====================================================
     UpdatePointsGrid;
+    // Применяем автоскрытие только после всех UI-обновлений,
+    // т.к. часть процедур выше может менять видимость столбцов.
+    AutoHideEmptyDiameterColumns;
+    // Видимость файловых блоков при открытии существующего типа.
+    SetupFileLayoutsForExistingType;
 
   finally
     FLoading := False;
@@ -962,8 +1134,26 @@ cbOutPutType2.Hint := cbOutPutType2.Text;
 end;
 
 procedure TFormTypeEditor.UpdateTypeFromUI;
+  function GetStoredPathFromEdit(const ALayoutName: string): string;
+  var
+    E: TEdit;
+  begin
+    Result := '';
+    E := FindLayoutEdit(ALayoutName);
+    if E = nil then
+      Exit;
+    if Trim(E.Text) = '' then
+      Exit(''); // Если Edit очищен, очищаем и сохраненное значение.
+    if Trim(E.Hint) <> '' then
+      Exit(Trim(E.Hint)); // Предпочитаем полный путь из Hint.
+    Result := Trim(E.Text); // Для обратной совместимости, если пути нет.
+  end;
 begin
   FType.Name              := EditName.Text;
+  // Файлы типа прибора: сохранение рядом с EditName.
+  FType.FileName1 := GetStoredPathFromEdit('Layout49');
+  FType.FileName2 := GetStoredPathFromEdit('Layout51');
+  FType.FileName3 := GetStoredPathFromEdit('Layout52');
   FType.Modification      := EditModification.Text;
   FType.Manufacturer      := edtManufacturer.Text;
   FType.ReestrNumber      := edtReestrNumber.Text;
@@ -1065,8 +1255,9 @@ begin
           D.Qnom := 0;
       end;
     }
-      if D.Qtr <= 0 then
-        D.Qtr := D.Qmax * 0.0075;
+      // Не подставляем Qtr автоматически, если он отсутствует в источнике.
+      // Иначе при импорте (например, из DeepSeek) null/0 превращается в вычисленное значение,
+      // что визуально выглядит как будто Qt был найден в таблице.
 
       if (D.State <> osNew) and (D.Qmax > 0) then
       begin
@@ -1093,6 +1284,69 @@ begin
   finally
     GridDiameters.EndUpdate;
   end;
+  GridDiameters.Repaint;
+
+end;
+
+procedure TFormTypeEditor.AutoHideEmptyDiameterColumns;
+var
+  D: TDiameter;
+  VisibleCount: Integer;
+  HasName, HasQnom, HasQtr, HasQmax, HasQmin, HasQ2tr, HasKp, HasQf: Boolean;
+  function HasNonZeroValue(const AValue: Double): Boolean;
+  begin
+    Result := not SameValue(AValue, 0, MinDouble);
+  end;
+begin
+  if (FDiametersLocal = nil) or (GridDiameters = nil) then
+    Exit;
+
+  VisibleCount := 0;
+  HasName := False;
+  HasQnom := False;
+  HasQtr := False;
+  HasQ2tr := False;
+  HasKp := False;
+  HasQf := False;
+  HasQmax := False;
+  HasQmin := False;
+
+  for D in FDiametersLocal do
+    if (D <> nil) and (D.State <> osDeleted) then
+    begin
+      Inc(VisibleCount);
+      HasName := HasName or ((Trim(D.Name) <> '') and (Trim(D.Name) <> '-'));
+      HasQnom := HasQnom or HasNonZeroValue(D.Qnom);
+      HasQtr := HasQtr or HasNonZeroValue(D.Qtr);
+      HasQ2tr := HasQ2tr or HasNonZeroValue(D.Q2tr);
+      HasKp := HasKp or HasNonZeroValue(D.Kp);
+      HasQf := HasQf or HasNonZeroValue(D.QFmax);
+      HasQmax := HasQmax or HasNonZeroValue(D.Qmax);
+      HasQmin := HasQmin or HasNonZeroValue(D.Qmin);
+    end;
+
+  if VisibleCount = 0 then
+  begin
+    HasName := True;
+    HasQnom := True;
+    HasQtr := True;
+    HasQ2tr := True;
+    HasKp := True;
+    HasQf := True;
+    HasQmax := True;
+    HasQmin := True;
+  end;
+
+  StringColumnDNName.Visible := HasName;
+  StringColumnDNQnom.Visible := HasQnom;
+  StringColumnDNQTr.Visible := HasQtr;
+  StringColumnDNQ2tr.Visible := HasQ2tr;
+  StringColumnDNKp.Visible := HasKp;
+  StringColumnDNQF.Visible := HasQf;
+  StringColumnDNQmin.Visible := HasQmin;
+  StringColumnDNQmax.Visible := HasQmax;
+  SyncGridDiametersHeaderPopupMenu;
+  UpdateGridDiametersHeaderRect;
 end;
 
 
@@ -1453,10 +1707,107 @@ begin
 
     InitLocalData;
     UpdateUIFromType;
+    // Начальная видимость файловых блоков.
+    if AType = nil then
+      SetupFileLayoutsForNewType
+    else
+      SetupFileLayoutsForExistingType;
 
   finally
     FLoading := False;
   end;
+end;
+
+function TFormTypeEditor.FindLayoutEdit(const ALayoutName: string): TEdit;
+var
+  L: TLayout;
+  I: Integer;
+begin
+  Result := nil;
+  if not (FindComponent(ALayoutName) is TLayout) then
+    Exit;
+  L := TLayout(FindComponent(ALayoutName));
+  for I := 0 to L.ChildrenCount - 1 do
+    if L.Children[I] is TEdit then
+      Exit(TEdit(L.Children[I]));
+end;
+
+procedure TFormTypeEditor.SetupFileLayoutsForNewType;
+begin
+  // Новый тип прибора: показываем только первый файловый блок.
+  if FindComponent('Layout49') is TLayout then TLayout(FindComponent('Layout49')).Visible := True;
+  if FindComponent('Layout51') is TLayout then TLayout(FindComponent('Layout51')).Visible := False;
+  if FindComponent('Layout52') is TLayout then TLayout(FindComponent('Layout52')).Visible := False;
+end;
+
+procedure TFormTypeEditor.SetupFileLayoutsForExistingType;
+var
+  E1, E2: TEdit;
+begin
+  // Существующий тип: показываем следующий блок только если заполнен предыдущий.
+  E1 := FindLayoutEdit('Layout49');
+  E2 := FindLayoutEdit('Layout51');
+  if FindComponent('Layout49') is TLayout then TLayout(FindComponent('Layout49')).Visible := True;
+  if (FindComponent('Layout51') is TLayout) and (E1 <> nil) then
+    TLayout(FindComponent('Layout51')).Visible := Trim(E1.Text) <> '';
+  if (FindComponent('Layout52') is TLayout) and (E2 <> nil) then
+    TLayout(FindComponent('Layout52')).Visible := Trim(E2.Text) <> '';
+end;
+
+procedure TFormTypeEditor.AddFileClick(Sender: TObject);
+begin
+
+   if (Edit1.text <> '') and (Edit2.text <> '') then
+    Layout52.Visible := not(Layout52.Visible)
+   else  if (Edit1.text <> '') and (Edit2.text = '') then
+    begin
+      Layout52.Visible :=false;
+     Layout51.Visible := not(Layout51.Visible);
+    end;
+
+
+
+
+
+
+end;
+
+procedure TFormTypeEditor.SelectFileToLayoutEdit(const ALayoutName: string);
+var
+  Dlg: TOpenDialog;
+  E: TEdit;
+begin
+  // Выбор файла и сохранение только имени файла (без пути).
+  E := FindLayoutEdit(ALayoutName);
+  if E = nil then Exit;
+  Dlg := TOpenDialog.Create(nil);
+  try
+    if Dlg.Execute then
+    begin
+      E.Hint := Dlg.FileName; // Сохраняем полный путь в Hint.
+      E.Text := ExtractFileName(Dlg.FileName); // В Edit показываем только имя.
+    end;
+  finally
+    Dlg.Free;
+  end;
+end;
+
+procedure TFormTypeEditor.SpeedButton2Click(Sender: TObject);
+begin
+  // Кнопка первого файлового блока.
+  SelectFileToLayoutEdit('Layout49');
+end;
+
+procedure TFormTypeEditor.SpeedButton4Click(Sender: TObject);
+begin
+  // Кнопка второго файлового блока.
+  SelectFileToLayoutEdit('Layout51');
+end;
+
+procedure TFormTypeEditor.SpeedButton5Click(Sender: TObject);
+begin
+  // Кнопка третьего файлового блока.
+  SelectFileToLayoutEdit('Layout52');
 end;
 
  procedure TFormTypeEditor.SetModified;
@@ -1478,6 +1829,698 @@ begin
   ModalResult := mrCancel;
 end;
 
+
+function TFormTypeEditor.SelectPdfFile(var APdfFilePath: string): Boolean;
+var
+  OpenDialog: TOpenDialog;
+begin
+  Result := False;
+  OpenDialog := TOpenDialog.Create(Self);
+  try
+    OpenDialog.Filter := 'PDF files (*.pdf)|*.pdf';
+    OpenDialog.DefaultExt := 'pdf';
+    OpenDialog.Options := [TOpenOption.ofFileMustExist];
+
+    if OpenDialog.Execute then
+    begin
+      APdfFilePath := OpenDialog.FileName;
+      Result := True;
+    end;
+  finally
+    OpenDialog.Free;
+  end;
+end;
+
+function TFormTypeEditor.ExtractTextLayerFromPdf(const APdfFilePath,
+  AOutputTxtPath: string): Boolean;
+var
+  PdfToTextPath: string;
+  Params: string;
+  ExitCode: Cardinal;
+begin
+  Result := False;
+
+  // Проверяем, что PDF-файл существует.
+  if not FileExists(APdfFilePath) then
+  begin
+    ShowMessage('PDF-файл не найден: ' + ExtractFileName(APdfFilePath));
+    Exit;
+  end;
+
+  // Проверяем, что выбран именно PDF-файл.
+  if not SameText(ExtractFileExt(APdfFilePath), '.pdf') then
+  begin
+    ShowMessage('Выбранный файл не является PDF: ' + ExtractFileName(APdfFilePath));
+    Exit;
+  end;
+
+  // Ищем pdftotext.exe рядом с программой.
+  PdfToTextPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'pdftotext.exe');
+  if not FileExists(PdfToTextPath) then
+  begin
+    ShowMessage('Не найден pdftotext.exe рядом с программой');
+    Exit;
+  end;
+
+  // Запускаем pdftotext.exe для извлечения текста в UTF-8.
+  Params := '-layout -enc UTF-8 ' +
+    '"' + APdfFilePath + '" ' +
+    '"' + AOutputTxtPath + '"';
+
+  ExitCode := RunProcessAndWait(PdfToTextPath, Params);
+  if ExitCode <> 0 then
+  begin
+    ShowMessage('Ошибка извлечения текста из PDF. Файл: ' + ExtractFileName(APdfFilePath) +
+      '. Код: ' + ExitCode.ToString);
+    Exit;
+  end;
+
+  // Проверяем, что файл результата создан.
+  if not FileExists(AOutputTxtPath) then
+  begin
+    ShowMessage('Файл результата не был создан: ' + ExtractFileName(AOutputTxtPath));
+    Exit;
+  end;
+
+  // Проверяем, что текстовый слой действительно найден.
+  if Trim(TFile.ReadAllText(AOutputTxtPath, TEncoding.UTF8)) = '' then
+  begin
+    ShowMessage('В PDF не найден текстовый слой: ' + ExtractFileName(APdfFilePath) +
+      '. Для такого файла нужен OCR.');
+    Exit;
+  end;
+
+  Result := True;
+end;
+
+function TFormTypeEditor.SendTextToDeepSeekTemplate(const AText, ATemplate: string;
+  out AResponse: string): Boolean;
+var
+  Http: TNetHTTPClient;
+  ReqBody: TStringStream;
+  Resp: IHTTPResponse;
+  JsonReq, MsgSys, MsgUser: TJSONObject;
+  Messages: TJSONArray;
+  ApiKey: string;
+  LimitedText: string;
+  ApiJson: TJSONObject;
+  ErrorObj: TJSONObject;
+  ErrorCode: string;
+  ErrorMessage: string;
+  Choices: TJSONArray;
+  ChoiceObj, MessageObj: TJSONObject;
+  ContentValue: TJSONValue;
+const
+  MAX_TEXT_LENGTH = 50000;
+begin
+  Result := False;
+  AResponse := '';
+  ApiKey := 'sk-c1757a521c694238b64baf78a707c86b';
+  if Length(AText) > MAX_TEXT_LENGTH then
+    LimitedText := Copy(AText, 1, MAX_TEXT_LENGTH)
+  else
+    LimitedText := AText;
+
+  JsonReq := TJSONObject.Create;
+  Messages := TJSONArray.Create;
+  MsgSys := TJSONObject.Create;
+  MsgUser := TJSONObject.Create;
+  ReqBody := nil;
+  Http := TNetHTTPClient.Create(nil);
+  try
+    MsgSys.AddPair('role', 'system');
+    MsgSys.AddPair('content', 'Ты инженер-метролог. Заполни шаблон JSON на основе текста.');
+
+    MsgUser.AddPair('role', 'user');
+    MsgUser.AddPair('content',
+      'Заполни JSON по данным из переданного текста или PDF.' + sLineBreak +
+      'Верни только JSON без пояснений.' + sLineBreak +
+      'Не добавляй markdown.' + sLineBreak +
+      'Не добавляй ```json.' + sLineBreak +
+      'Если данных нет — оставь null.' + sLineBreak +
+      'Числа возвращай без единиц измерения.' + sLineBreak +
+      'Даты возвращай в формате DD.MM.YYYY.' + sLineBreak +
+      'Для поля device_type.general_info.manufacturer указывай только краткое название изготовителя без организационно-правовой формы и без скобок и кавычек (например: ВТК Прибор, а не "Общество с ограниченной ответственностью «ВТК Прибор» (ООО «ВТК Прибор»)").' + sLineBreak +
+      'Верни ТОЛЬКО объект из шаблона output (без оберток).' + sLineBreak +
+      'Класс точности бери из поля device_type.general_info.accuracy_class.' + sLineBreak +
+      'Если класс не определен — используй уже переданный класс из шаблона.' + sLineBreak +
+      'Если таблицы различаются не по классам точности, а по модификациям, то при переданной модификации ищи и выбирай таблицу по этой модификации (если такая таблица есть).' + sLineBreak +
+      'Для base_error верни минимальную погрешность в % для выбранного класса.' + sLineBreak +
+      sLineBreak +
+      '=== ГЛАВНОЕ ПРАВИЛО: НЕ ПРИВЯЗЫВАЙСЯ К БУКВАМ ===' + sLineBreak +
+      'Не ищи конкретно Q1, Q2, Q3, Q4, Qнаим, Qt, Qнаиб.' + sLineBreak +
+      'Разные документы используют разные обозначения.' + sLineBreak +
+      'Определяй смысл столбца ПО ЗАГОЛОВКУ или ПРИМЕЧАНИЮ.' + sLineBreak +
+      sLineBreak +
+      '=== СОПОСТАВЛЕНИЕ ЗАГОЛОВКОВ СТОЛБЦОВ С ПОЛЯМИ JSON ===' + sLineBreak +
+      'минимальный/наименьший/Qmin/Q1 -> qmin_l_s' + sLineBreak +
+      'переходный/Qtr/Qt/Q2 -> qtr_l_s (первый переходный)' + sLineBreak +
+      'второй переходный/Q2t -> q2tr_l_s (если есть, иначе null)' + sLineBreak +
+      'номинальный/Qnom/Q3 -> qnom_l_s' + sLineBreak +
+      'максимальный/наибольший/перегрузочный/Qmax/Q4 -> qmax_l_s' + sLineBreak +
+      sLineBreak +
+      'Если столбец не подписан — ищи описание в тексте НАД или ПОД таблицей.' + sLineBreak +
+      'Если в таблице нет какого-то из этих столбцов — оставь соответствующее поле null.' + sLineBreak +
+      sLineBreak +
+      '=== ОПРЕДЕЛЕНИЕ ТАБЛИЦЫ (ЕСЛИ ИХ НЕСКОЛЬКО) ===' + sLineBreak +
+      '1. Посмотри, как в тексте называются РАЗНЫЕ ТАБЛИЦЫ.' + sLineBreak +
+      '2. Если в шаблоне уже передана modification (например, ПТ) — сначала выбери таблицу именно для этой modification.' + sLineBreak +
+      '3. Если есть поле "модификация" (ОП, ПТ, РС, К, СВ, М) — запиши в device_type.general_info.modification и выбери нужную таблицу.' + sLineBreak +
+      '4. Если есть "класс точности" (A, B, C, 1, 2) — запиши в accuracy_class и выбери таблицу по классу.' + sLineBreak +
+      '5. Если таблицы подписаны как "модификация ОП" и "модификация ПТ" — это НЕ классы точности. Они идут в modification, accuracy_class = null.' + sLineBreak +
+      '6. Если не понятно, какую таблицу выбрать — бери первую полную и укажи в raw_notes.' + sLineBreak +
+      '7. Для base_error возьми погрешность из той же таблицы или из текста рядом.' + sLineBreak +
+      sLineBreak +
+      '=== ВЫБОР СТРОКИ ДЛЯ ОДНОГО DN (ЕСЛИ ИХ НЕСКОЛЬКО) ===' + sLineBreak +
+      '1. Если для одного DN есть несколько строк — выбери строку с САМЫМ БОЛЬШИМ qmax_l_s.' + sLineBreak +
+      '2. Если qmax_l_s одинаковый — выбери строку с самым большим qnom_l_s (если он есть).' + sLineBreak +
+      '3. Все поля (qmin, qtr, q2tr, qnom, qmax) бери ИЗ ОДНОЙ выбранной строки.' + sLineBreak +
+      '4. Если для DN только одна строка — бери её.' + sLineBreak +
+      sLineBreak +
+      '=== ДОПОЛНИТЕЛЬНЫЕ УКАЗАНИЯ: ===' + sLineBreak +
+      'Если есть таблицы диаметров или поверочных точек — заполни массивы.' + sLineBreak +
+      'Если DN указан не в первом столбце — ищи ближайший DN сверху или слева.' + sLineBreak +
+      'Значения расходов верни в единицах, указанных в таблице или в примечании к ней.' + sLineBreak +
+      'Единицу измерения запиши в device_type.signal.measurement_unit.' + sLineBreak +
+      'Если в таблице нет столбца "номинальный расход" (Q3) — qnom_l_s = null.' + sLineBreak +
+      'Если в таблице нет столбца "второй переходный" (Q2t) — q2tr_l_s = null.' + sLineBreak +
+      sLineBreak +
+      '=== ЧТО ЗАПИСАТЬ В deepseek_result.raw_notes ===' + sLineBreak +
+      '1. Какую таблицу выбрал (по какому признаку: модификация/класс/первая попавшаяся).' + sLineBreak +
+      '2. Какие столбцы нашёл и как сопоставил с полями JSON.' + sLineBreak +
+      '3. Если какие-то поля остались null — объясни почему.' + sLineBreak +
+      'Структуру JSON не менять.' + sLineBreak + sLineBreak +
+      'Шаблон:' + sLineBreak + ATemplate + sLineBreak + sLineBreak +
+      'Текст:' + sLineBreak + LimitedText
+    );
+    Messages.Add(MsgSys);
+    Messages.Add(MsgUser);
+    JsonReq.AddPair('model', 'deepseek-chat');
+    JsonReq.AddPair('messages', Messages);
+    JsonReq.AddPair('temperature', TJSONNumber.Create(0));
+    JsonReq.AddPair('stream', TJSONBool.Create(False));
+    ReqBody := TStringStream.Create(JsonReq.ToJSON, TEncoding.UTF8);
+
+    Http.CustomHeaders['Authorization'] := 'Bearer ' + ApiKey;
+    Http.CustomHeaders['Content-Type'] := 'application/json';
+    Resp := Http.Post('https://api.deepseek.com/chat/completions', ReqBody);
+    AResponse := Resp.ContentAsString(TEncoding.UTF8);
+    if Resp.StatusCode <> 200 then
+    begin
+      ApiJson := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
+      try
+        if ApiJson <> nil then
+        begin
+          ErrorObj := ApiJson.GetValue('error') as TJSONObject;
+          if ErrorObj <> nil then
+          begin
+            ErrorCode := Trim(ErrorObj.GetValue<string>('code', ''));
+            ErrorMessage := ErrorObj.GetValue<string>('message', '');
+            if SameText(ErrorCode, '1') then
+              ShowMessage('Ошибка DeepSeek (код 1): не удалось обработать запрос. ' +
+                'Проверьте корректность исходного текста/файла и повторите попытку.')
+            else if SameText(Trim(ErrorMessage), 'Insufficient Balance') then
+              ShowMessage('Ошибка DeepSeek: недостаточно баланса на аккаунте API')
+            else if Trim(ErrorMessage) <> '' then
+              ShowMessage('Ошибка DeepSeek: ' + ErrorMessage)
+            else
+              ShowMessage('Ошибка DeepSeek. Код HTTP: ' + Resp.StatusCode.ToString);
+          end
+          else
+            ShowMessage('Ошибка DeepSeek. Код HTTP: ' + Resp.StatusCode.ToString);
+        end
+        else
+          ShowMessage('Ошибка DeepSeek. Код HTTP: ' + Resp.StatusCode.ToString);
+      finally
+        ApiJson.Free;
+      end;
+      Exit;
+    end;
+
+    ApiJson := TJSONObject.ParseJSONValue(AResponse) as TJSONObject;
+    try
+      if ApiJson = nil then
+        Exit;
+      Choices := ApiJson.GetValue('choices') as TJSONArray;
+      if (Choices = nil) or (Choices.Count = 0) then
+        Exit;
+      ChoiceObj := Choices.Items[0] as TJSONObject;
+      if ChoiceObj = nil then
+        Exit;
+      MessageObj := ChoiceObj.GetValue('message') as TJSONObject;
+      if MessageObj = nil then
+        Exit;
+      ContentValue := MessageObj.GetValue('content');
+      if ContentValue = nil then
+        Exit;
+
+      AResponse := Trim(ContentValue.Value);
+      Result := AResponse <> '';
+    finally
+      ApiJson.Free;
+    end;
+  finally
+    Http.Free;
+    ReqBody.Free;
+    JsonReq.Free;
+  end;
+end;
+
+function TFormTypeEditor.GetSelectedAccuracyClass: string;
+var
+  S: string;
+  P: Integer;
+begin
+  S := Trim(FType.AccuracyClass);
+  P := Pos(',', S);
+  if P > 0 then
+    S := Trim(Copy(S, 1, P - 1));
+  if S = '' then
+    S := 'A';
+  Result := S;
+end;
+
+function TFormTypeEditor.GetSelectedFlowUnit: string;
+var
+  S: string;
+begin
+  S := Trim(ComboBoxUnits.Text);
+  if S = '' then
+    S := 'л/с';
+  Result := S;
+end;
+
+function TFormTypeEditor.BuildDeepSeekTemplate(const AAccuracyClass, AModification: string): string;
+var
+  ModificationJsonValue: string;
+begin
+  if Trim(AModification) = '' then
+    ModificationJsonValue := 'null'
+  else
+    ModificationJsonValue := '"' + StringReplace(Trim(AModification), '"', '\"', [rfReplaceAll]) + '"';
+
+  Result :=
+    '{' + sLineBreak +
+    '  "device_type": {' + sLineBreak +
+    '    "general_info": {' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "category": null,' + sLineBreak +
+    '      "manufacturer": null,' + sLineBreak +
+    '      "modification": ' + ModificationJsonValue + ',' + sLineBreak +
+    '      "procedure": null,' + sLineBreak +
+    '      "grsi_number": null,' + sLineBreak +
+    '      "valid_from": null,' + sLineBreak +
+    '      "valid_to": null,' + sLineBreak +
+    '      "mpi": null,' + sLineBreak +
+    '      "verification_method": null,' + sLineBreak +
+    '      "accuracy_class": "' + StringReplace(AAccuracyClass, '"', '\"', [rfReplaceAll]) + '",' + sLineBreak +
+    '      "base_error": null,' + sLineBreak +
+    '      "report_form_file": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "signal": {' + sLineBreak +
+    '      "measured_value": null,' + sLineBreak +
+    '      "measurement_unit": "' + StringReplace(GetSelectedFlowUnit, '"', '\"', [rfReplaceAll]) + '",' + sLineBreak +
+    '      "signal_type": null' + sLineBreak +
+    '    },' + sLineBreak +
+    '    "pulses": {' + sLineBreak +
+    '      "output_type": null,' + sLineBreak +
+    '      "representation": null,' + sLineBreak +
+    '      "kp_qmax": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "diameters": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "dn_mm": null,' + sLineBreak +
+    '      "qmax_l_s": null,' + sLineBreak +
+    '      "qnom_l_s": null,' + sLineBreak +
+    '      "qtr_l_s": null,' + sLineBreak +
+    '      "q2tr_l_s": null,' + sLineBreak +
+    '      "qmin_l_s": null,' + sLineBreak +
+    '      "kp_imp_l": null,' + sLineBreak +
+    '      "qf_l_s": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "verification_points": [' + sLineBreak +
+    '    {' + sLineBreak +
+    '      "enabled": true,' + sLineBreak +
+    '      "name": null,' + sLineBreak +
+    '      "q_qmax": null,' + sLineBreak +
+    '      "q_l_s": null,' + sLineBreak +
+    '      "volume_l": null,' + sLineBreak +
+    '      "impulses_count": null,' + sLineBreak +
+    '      "time_s": null,' + sLineBreak +
+    '      "error_percent": null,' + sLineBreak +
+    '      "expanded_uncertainty_percent": null,' + sLineBreak +
+    '      "stabilization_time_s": null,' + sLineBreak +
+    '      "repeat_count": null,' + sLineBreak +
+    '      "measurement_series_count": null,' + sLineBreak +
+    '      "pressure": null' + sLineBreak +
+    '    }' + sLineBreak +
+    '  ],' + sLineBreak +
+    '  "calculation_parameters": {' + sLineBreak +
+    '    "dynamic_range": null,' + sLineBreak +
+    '    "flow_velocity_qmax_m_s": null' + sLineBreak +
+    '  },' + sLineBreak +
+    '  "deepseek_result": {' + sLineBreak +
+    '    "status": null,' + sLineBreak +
+    '    "warnings": [],' + sLineBreak +
+    '    "missing_fields": [],' + sLineBreak +
+    '    "raw_notes": null' + sLineBreak +
+    '  }' + sLineBreak +
+    '}';
+end;
+
+function TFormTypeEditor.ApplyDeepSeekJsonToType(const AResponse: string): Boolean;
+var
+  Root, DeviceTypeObj, GeneralInfoObj: TJSONObject;
+  DiametersArr, PointsArr: TJSONArray;
+  DObj, PObj: TJSONObject;
+  D: TDiameter;
+  P: TTypePoint;
+  I, ExistingIdx: Integer;
+  JsonVal: TJSONValue;
+  function IsFlowUnitM3h(const AUnit: string): Boolean;
+  var
+    U: string;
+  begin
+    U := LowerCase(Trim(AUnit));
+    Result := (Pos('м3/ч', U) > 0) or (Pos('m3/h', U) > 0);
+  end;
+
+  function ExtractFirstFloat(const S: string; out AValue: Double): Boolean;
+  var
+    I, StartPos: Integer;
+    Buf, NumStr: string;
+    FS: TFormatSettings;
+  begin
+    Result := False;
+    AValue := 0;
+    Buf := Trim(S);
+    if Buf = '' then
+      Exit;
+
+    FS := TFormatSettings.Invariant;
+    if TryStrToFloat(StringReplace(Buf, ',', '.', [rfReplaceAll]), AValue, FS) then
+      Exit(True);
+
+    StartPos := 0;
+    for I := 1 to Length(Buf) do
+      if CharInSet(Buf[I], ['0'..'9', '-', '+']) then
+      begin
+        StartPos := I;
+        Break;
+      end;
+    if StartPos = 0 then
+      Exit;
+
+    NumStr := '';
+    for I := StartPos to Length(Buf) do
+    begin
+      if CharInSet(Buf[I], ['0'..'9', '.', ',', '-', '+', 'e', 'E']) then
+        NumStr := NumStr + Buf[I]
+      else
+        Break;
+    end;
+    NumStr := StringReplace(NumStr, ',', '.', [rfReplaceAll]);
+    Result := TryStrToFloat(NumStr, AValue, FS);
+  end;
+
+  function GetJsonDoubleDef(const AObj: TJSONObject; const AName: string; const ADefault: Double): Double;
+  var
+    V: TJSONValue;
+    Parsed: Double;
+  begin
+    Result := ADefault;
+    if AObj = nil then
+      Exit;
+    V := AObj.GetValue(AName);
+    if V = nil then
+      Exit;
+    if V is TJSONNumber then
+      Exit(TJSONNumber(V).AsDouble);
+    if (V is TJSONString) and ExtractFirstFloat(TJSONString(V).Value, Parsed) then
+      Exit(Parsed);
+  end;
+  function ExtractMinFloatFromText(const S: string; out AValue: Double): Boolean;
+  var
+    I, J: Integer;
+    Token: string;
+    FS: TFormatSettings;
+    V: Double;
+    HasVal: Boolean;
+  begin
+    Result := False;
+    AValue := 0;
+    FS := TFormatSettings.Invariant;
+    HasVal := False;
+    I := 1;
+    while I <= Length(S) do
+    begin
+      if CharInSet(S[I], ['0'..'9', '-', '+']) then
+      begin
+        J := I;
+        while (J <= Length(S)) and CharInSet(S[J], ['0'..'9', '.', ',', '-', '+']) do
+          Inc(J);
+        Token := StringReplace(Copy(S, I, J - I), ',', '.', [rfReplaceAll]);
+        if TryStrToFloat(Token, V, FS) then
+        begin
+          if (not HasVal) or (V < AValue) then
+            AValue := V;
+          HasVal := True;
+        end;
+        I := J;
+      end
+      else
+        Inc(I);
+    end;
+    Result := HasVal;
+  end;
+
+  function ExtractMaxFloatFromText(const S: string; out AValue: Double): Boolean;
+  var
+    I, J: Integer;
+    Token: string;
+    FS: TFormatSettings;
+    V: Double;
+    HasVal: Boolean;
+  begin
+    Result := False;
+    AValue := 0;
+    FS := TFormatSettings.Invariant;
+    HasVal := False;
+    I := 1;
+    while I <= Length(S) do
+    begin
+      if CharInSet(S[I], ['0'..'9', '-', '+']) then
+      begin
+        J := I;
+        while (J <= Length(S)) and CharInSet(S[J], ['0'..'9', '.', ',', '-', '+']) do
+          Inc(J);
+        Token := StringReplace(Copy(S, I, J - I), ',', '.', [rfReplaceAll]);
+        if TryStrToFloat(Token, V, FS) then
+        begin
+          if (not HasVal) or (V > AValue) then
+            AValue := V;
+          HasVal := True;
+        end;
+        I := J;
+      end
+      else
+        Inc(I);
+    end;
+    Result := HasVal;
+  end;
+
+  function GetJsonFlowDoubleDef(const AObj: TJSONObject; const AName: string; const ADefault: Double): Double;
+  var
+    V: TJSONValue;
+    Parsed: Double;
+  begin
+    Result := ADefault;
+    if AObj = nil then
+      Exit;
+    V := AObj.GetValue(AName);
+    if V = nil then
+      Exit;
+    if V is TJSONNumber then
+      Exit(TJSONNumber(V).AsDouble);
+    if (V is TJSONString) and ExtractMaxFloatFromText(TJSONString(V).Value, Parsed) then
+      Exit(Parsed);
+  end;
+
+  function FindDiameterByDN(const ADN: string): Integer;
+  var
+    K: Integer;
+  begin
+    Result := -1;
+    for K := 0 to FDiametersLocal.Count - 1 do
+      if (FDiametersLocal[K] <> nil) and SameText(Trim(FDiametersLocal[K].DN), Trim(ADN)) then
+        Exit(K);
+  end;
+
+  function IsBetterDiameterRow(const CandidateD, CurrentD: TDiameter): Boolean;
+  begin
+    if (CandidateD = nil) then
+      Exit(False);
+    if (CurrentD = nil) then
+      Exit(True);
+
+    if CandidateD.Qnom > CurrentD.Qnom then
+      Exit(True);
+    if CandidateD.Qnom < CurrentD.Qnom then
+      Exit(False);
+
+    if CandidateD.Qmax > CurrentD.Qmax then
+      Exit(True);
+    if CandidateD.Qmax < CurrentD.Qmax then
+      Exit(False);
+
+    Result := False;
+  end;
+
+  procedure CopyDiameterValues(const TargetD, SourceD: TDiameter);
+  begin
+    if (TargetD = nil) or (SourceD = nil) then
+      Exit;
+    TargetD.Enable := SourceD.Enable;
+    TargetD.Name := SourceD.Name;
+    TargetD.DN := SourceD.DN;
+    TargetD.Qmax := SourceD.Qmax;
+    TargetD.Qnom := SourceD.Qnom;
+    TargetD.Qtr := SourceD.Qtr;
+    TargetD.Q2tr := SourceD.Q2tr;
+    TargetD.Qmin := SourceD.Qmin;
+    TargetD.Kp := SourceD.Kp;
+    TargetD.QFmax := SourceD.QFmax;
+  end;
+
+begin
+  Result := False;
+  JsonVal := TJSONObject.ParseJSONValue(AResponse);
+  try
+    if not (JsonVal is TJSONObject) then
+      Exit;
+    Root := JsonVal as TJSONObject;
+
+    DeviceTypeObj := Root.GetValue('device_type') as TJSONObject;
+    if DeviceTypeObj = nil then
+      Exit;
+    GeneralInfoObj := DeviceTypeObj.GetValue('general_info') as TJSONObject;
+    if GeneralInfoObj = nil then
+      Exit;
+
+    if GeneralInfoObj.GetValue('name') <> nil then
+      FType.Name := GeneralInfoObj.GetValue<string>('name', FType.Name);
+    if GeneralInfoObj.GetValue('manufacturer') <> nil then
+      FType.Manufacturer := GeneralInfoObj.GetValue<string>('manufacturer', FType.Manufacturer);
+    if GeneralInfoObj.GetValue('modification') <> nil then
+      FType.Modification := GeneralInfoObj.GetValue<string>('modification', FType.Modification);
+    if GeneralInfoObj.GetValue('procedure') <> nil then
+      FType.VerificationMethod := GeneralInfoObj.GetValue<string>('procedure', FType.VerificationMethod);
+    if GeneralInfoObj.GetValue('grsi_number') <> nil then
+      FType.ReestrNumber := GeneralInfoObj.GetValue<string>('grsi_number', FType.ReestrNumber);
+    if GeneralInfoObj.GetValue('mpi') <> nil then
+      FType.IVI := GeneralInfoObj.GetValue<Integer>('mpi', FType.IVI);
+    if GeneralInfoObj.GetValue('accuracy_class') <> nil then
+      FType.AccuracyClass := GeneralInfoObj.GetValue<string>('accuracy_class', FType.AccuracyClass);
+    if GeneralInfoObj.GetValue('base_error') <> nil then
+      if not ExtractMinFloatFromText(GeneralInfoObj.GetValue<string>('base_error', ''), FType.Error) then
+        FType.Error := GetJsonDoubleDef(GeneralInfoObj, 'base_error', FType.Error);
+
+    DiametersArr := Root.GetValue('diameters') as TJSONArray;
+    if DiametersArr <> nil then
+    begin
+      FDiametersLocal.Clear;
+      for I := 0 to DiametersArr.Count - 1 do
+      begin
+        if not (DiametersArr.Items[I] is TJSONObject) then
+          Continue;
+        DObj := DiametersArr.Items[I] as TJSONObject;
+        D := TDiameter.Create(FType.UUID);
+        D.Enable := DObj.GetValue<Boolean>('enabled', True);
+        D.Name := DObj.GetValue<string>('name', '');
+        D.DN := DObj.GetValue<string>('dn_mm', '');
+        D.Qmax := GetJsonFlowDoubleDef(DObj, 'qmax_l_s', 0);
+        D.Qnom := GetJsonFlowDoubleDef(DObj, 'qnom_l_s', 0);
+        D.Qtr := GetJsonFlowDoubleDef(DObj, 'qtr_l_s', 0);
+        D.Q2tr := GetJsonFlowDoubleDef(DObj, 'q2tr_l_s', 0);
+        D.Qmin := GetJsonFlowDoubleDef(DObj, 'qmin_l_s', 0);
+        D.Kp := GetJsonDoubleDef(DObj, 'kp_imp_l', 0);
+        D.QFmax := GetJsonFlowDoubleDef(DObj, 'qf_l_s', 0);
+        if IsFlowUnitM3h(GetSelectedFlowUnit) then
+        begin
+          D.Qmax := FType.ToBaseUnits(D.Qmax);
+          D.Qnom := FType.ToBaseUnits(D.Qnom);
+          D.Qtr := FType.ToBaseUnits(D.Qtr);
+          D.Q2tr := FType.ToBaseUnits(D.Q2tr);
+          D.Qmin := FType.ToBaseUnits(D.Qmin);
+          D.QFmax := FType.ToBaseUnits(D.QFmax);
+        end;
+        if (D.Qmax > 0) and (D.Qnom > 0) and (D.Qnom > D.Qmax) then
+        begin
+          D.Qmax := D.Qmax + D.Qnom;
+          D.Qnom := D.Qmax - D.Qnom;
+          D.Qmax := D.Qmax - D.Qnom;
+        end;
+        if (D.Qtr > 0) and (D.Q2tr > 0) and (D.Q2tr < D.Qtr) then
+        begin
+          D.Qtr := D.Qtr + D.Q2tr;
+          D.Q2tr := D.Qtr - D.Q2tr;
+          D.Qtr := D.Qtr - D.Q2tr;
+        end;
+        ExistingIdx := FindDiameterByDN(D.DN);
+        if (ExistingIdx >= 0) and (ExistingIdx < FDiametersLocal.Count) then
+        begin
+          if IsBetterDiameterRow(D, FDiametersLocal[ExistingIdx]) then
+            CopyDiameterValues(FDiametersLocal[ExistingIdx], D);
+          D.Free;
+        end
+        else
+        begin
+          D.State := osNew;
+          FDiametersLocal.Add(D);
+        end;
+      end;
+    end;
+
+    PointsArr := Root.GetValue('verification_points') as TJSONArray;
+    if PointsArr <> nil then
+    begin
+      FPointsLocal.Clear;
+      for I := 0 to PointsArr.Count - 1 do
+      begin
+        PObj := PointsArr.Items[I] as TJSONObject;
+        if PObj = nil then
+          Continue;
+        P := TTypePoint.Create(FType.UUID);
+        P.Enable := PObj.GetValue<Boolean>('enabled', True);
+        P.Name := PObj.GetValue<string>('name', '');
+        P.FlowRate := GetJsonDoubleDef(PObj, 'q_qmax', 0);
+        P.LimitVolume := GetJsonDoubleDef(PObj, 'volume_l', 0);
+        P.LimitImp := PObj.GetValue<Integer>('impulses_count', 0);
+        P.LimitTime := GetJsonDoubleDef(PObj, 'time_s', 0);
+        P.Error := GetJsonDoubleDef(PObj, 'error_percent', 0);
+        P.FlowAccuracy := PObj.GetValue<string>('expanded_uncertainty_percent', '');
+        P.Pause := PObj.GetValue<Integer>('stabilization_time_s', 0);
+        P.RepeatsProtocol := PObj.GetValue<Integer>('repeat_count', 0);
+        P.Repeats := PObj.GetValue<Integer>('measurement_series_count', 0);
+        P.Pressure := GetJsonDoubleDef(PObj, 'pressure', 0);
+        P.State := osNew;
+        FPointsLocal.Add(P);
+      end;
+    end;
+
+    Result := True;
+    UpdateUIFromType;
+    UpdateDiametersGrid;
+    UpdatePointsGrid;
+  finally
+    JsonVal.Free;
+  end;
+end;
+
 procedure TFormTypeEditor.btnOKClick(Sender: TObject);
 begin
   UpdateTypeFromUI;
@@ -1496,6 +2539,11 @@ end;
 
 procedure TFormTypeEditor.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  // Разрываем ссылки на коллекции FType до освобождения FType,
+  // чтобы поздние UI-события при закрытии не обращались к освобождённой памяти.
+  FDiametersLocal := nil;
+  FPointsLocal := nil;
+  FLoading := True;
   FreeAndNil(FType);
   FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
@@ -2317,7 +3365,7 @@ var
   ApiKey: string;
 
 const
-  MAX_TEXT_LENGTH = 12000; // ⬅ безопасно для DeepSeek
+  MAX_TEXT_LENGTH = 50000; // ⬅ безопасно для DeepSeek
 begin
   if not FileExists(FilePath) then
     raise Exception.Create('Файл не найден: ' + FilePath);
@@ -2486,6 +3534,7 @@ procedure TFormTypeEditor.DeepSeekClick(Sender: TObject);
 var
   FilePath: string;
   AIResponse: string;
+  SavedJsonPath: string;
 begin
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
@@ -2531,17 +3580,19 @@ begin
     MemoLog.Lines.Add('Ответ DeepSeek:');
     MemoLog.Lines.Add(AIResponse);
     MemoLog.Lines.Add('------------------------------');
+    SavedJsonPath := SaveDeepSeekJsonToDocs(FilePath, AIResponse);
+    MemoLog.Lines.Add('JSON сохранен: ' + SavedJsonPath);
 
     ShowMessage(
       'DeepSeek обработал описание типа.' + sLineBreak +
-      'Результат выведен в лог.'
+      'JSON сохранен в папку docs проекта.'
     );
 
   except
     on E: Exception do
     begin
-      MemoLog.Lines.Add('ERROR DeepSeek: ' + E.Message);
-      ShowMessage('Ошибка при обращении к DeepSeek');
+      MemoLog.Lines.Add('ERROR DeepSeek [' + ExtractFileName(FilePath) + ']: ' + E.Message);
+      ShowMessage('Файл: ' + ExtractFileName(FilePath) + sLineBreak + 'Ошибка при обращении к DeepSeek');
     end;
   end;
 end;
@@ -3304,6 +4355,9 @@ var
   S: string;
 begin
   if FLoading then Exit;
+
+  if FType = nil then
+    Exit;
 
   S := Trim(edtReestrNumber.Text);
 
@@ -4150,6 +5204,114 @@ begin
 
 end;
 
+
+function TFormTypeEditor.HasLocalReestrFiles: Boolean;
+begin
+  // Проверяем, выбрал ли пользователь хотя бы один локальный файл.
+  Result :=
+    (Trim(Edit1.Text) <> '') or
+    (Trim(Edit2.Text) <> '') or
+    (Trim(Edit3.Text) <> '');
+end;
+
+function TFormTypeEditor.ResolveReestrFilePath(const AEdit: TEdit): string;
+var
+  Candidate: string;
+begin
+  Result := '';
+  if AEdit = nil then
+    Exit;
+
+  // Сначала пробуем полный путь, который хранится в Hint.
+  Candidate := Trim(AEdit.Hint);
+  if (Candidate <> '') and FileExists(Candidate) then
+    Exit(Candidate);
+
+  // Затем проверяем значение из Edit как абсолютный/относительный путь.
+  Candidate := Trim(AEdit.Text);
+  if Candidate = '' then
+    Exit;
+
+  if (ExtractFilePath(Candidate) <> '') and FileExists(Candidate) then
+    Exit(Candidate);
+
+  // Если в Edit только имя файла, формируем путь в стандартной папке хранения.
+  Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Docs\Types'), Candidate);
+end;
+
+function TFormTypeEditor.CheckLocalReestrFiles: Boolean;
+var
+  FilePath1, FilePath2, FilePath3: string;
+begin
+  // Проверяем существование каждого заполненного файла.
+  Result := False;
+
+  FilePath1 := ResolveReestrFilePath(Edit1);
+  if (Trim(Edit1.Text) <> '') and (not FileExists(FilePath1)) then
+  begin
+    ShowMessage('Файл из Edit1 не найден: ' + FilePath1);
+    Exit;
+  end;
+
+  FilePath2 := ResolveReestrFilePath(Edit2);
+  if (Trim(Edit2.Text) <> '') and (not FileExists(FilePath2)) then
+  begin
+    ShowMessage('Файл из Edit2 не найден: ' + FilePath2);
+    Exit;
+  end;
+
+  FilePath3 := ResolveReestrFilePath(Edit3);
+  if (Trim(Edit3.Text) <> '') and (not FileExists(FilePath3)) then
+  begin
+    ShowMessage('Файл из Edit3 не найден: ' + FilePath3);
+    Exit;
+  end;
+
+  Result := True;
+end;
+
+procedure TFormTypeEditor.ProcessLocalReestrFiles;
+var
+  JsonTemplate: string;
+  FilePath: string;
+  TxtPath: string;
+  PdfText: string;
+  DeepSeekResponse: string;
+
+  procedure ProcessOneFile(const AEdit: TEdit);
+  begin
+  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
+    if (AEdit = nil) or (Trim(AEdit.Text) = '') then
+      Exit;
+
+    FilePath := ResolveReestrFilePath(AEdit);
+    TxtPath := ChangeFileExt(FilePath, '.txt');
+
+    try
+      if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+      begin
+        PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+        if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+          ApplyDeepSeekJsonToType(DeepSeekResponse);
+      end;
+    except
+      on E: Exception do
+      begin
+        MemoLog.Lines.Add('ERROR [' + ExtractFileName(FilePath) + ']: ' + E.Message);
+        ShowMessage('Файл: ' + ExtractFileName(FilePath) + sLineBreak + E.Message);
+      end;
+    end;
+  end;
+begin
+  // Используем уже выбранные локальные файлы.
+  ProcessOneFile(Edit1);
+  ProcessOneFile(Edit2);
+  ProcessOneFile(Edit3);
+
+  UpdateUIFromType;
+  ShowMessage('Данные обработаны из локальных файлов.');
+end;
+
 procedure TFormTypeEditor.sbFindReestrNumberClick(Sender: TObject);
 const
   REQUEST_TIMEOUT_MS = 10000;
@@ -4160,6 +5322,7 @@ var
 
   Json, ResultObj, Item: TJSONObject;
   GeneralObj: TJSONObject;
+  JVal: TJSONValue;
   Items: TJSONArray;
 
   MPIArr: TJSONArray;
@@ -4180,22 +5343,45 @@ var
   FileName: string;
   FilePath: string;
   FileStream: TFileStream;
+  TxtPath: string;
+  JsonPath: string;
+  PdfText: string;
+  JsonTemplate: string;
+  DeepSeekResponse: string;
 
   DevType: TDeviceType;
+  LocalFilesProcessed: Boolean;
 
   P: Integer;
   YY: Integer;
   Y, M, D: Word;
   Dt: TDateTime;
 begin
+  if FArshinRequestInProgress then
+    Exit;
+  FArshinRequestInProgress := True;
+  sbFindReestrNumber.Enabled := False;
 
   MemoLog.Visible := True;
   MemoLog.Lines.Clear;
 
+  LocalFilesProcessed := False;
+
+  // Если файлы выбраны вручную — сначала обрабатываем их.
+  if HasLocalReestrFiles then
+  begin
+    if not CheckLocalReestrFiles then
+      Exit;
+
+    ProcessLocalReestrFiles;
+    LocalFilesProcessed := True;
+  end;
+
   ReestrNum := edtReestrNumber.Text.Trim;
   if ReestrNum = '' then
   begin
-    MemoLog.Lines.Add('ГРСИ не указан');
+    if not LocalFilesProcessed then
+      MemoLog.Lines.Add('ГРСИ не указан');
     Exit;
   end;
 
@@ -4215,6 +5401,7 @@ begin
   DevType := FType;
 
   try
+    try
     {=================================================}
     { 1. Поиск ГРСИ → mit_uuid }
     {=================================================}
@@ -4303,9 +5490,6 @@ begin
       GeneralObj := Json.GetValue('general') as TJSONObject;
       if GeneralObj = nil then Exit;
 
-      DevType.UUID :=
-        GeneralObj.GetValue('mit_uuid').Value;
-
       DevType.ReestrNumber :=
         GeneralObj.GetValue('number').Value;
 
@@ -4316,10 +5500,13 @@ begin
         GeneralObj.GetValue('title').Value;
 
       {---------- Действие до ----------}
-      ValidToDate :=
-        ISO8601ToDate(
-          GeneralObj.GetValue('valid_to').Value
-        );
+      ValidToDate := 0;
+      JVal := GeneralObj.GetValue('valid_to');
+      if (JVal <> nil) and (JVal.Value <> '') then
+      begin
+        if not TryISO8601ToDate(JVal.Value, dt, True) then
+          ValidToDate := 0;
+      end;
       DevType.ValidityDate := ValidToDate;
 
      // DevType.RegDate :=
@@ -4424,13 +5611,44 @@ begin
               try
                 NetHTTPClient1.Get(DocUrl, FileStream);
                 DevType.Documentation := FilePath;
+                TxtPath := ChangeFileExt(FilePath, '.txt');
+                if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+                begin
+                  PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+                  JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
+
+                  if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+                    ApplyDeepSeekJsonToType(DeepSeekResponse);
+                end;
               except
                 on E: ENetHTTPClientException do
-                  MemoLog.Lines.Add('ERROR: ' + E.Message);
+                begin
+                  MemoLog.Lines.Add('ERROR [' + ExtractFileName(FilePath) + ']: ' + E.Message);
+                  ShowMessage('Файл: ' + ExtractFileName(FilePath) + sLineBreak + E.Message);
+                end;
               end;
             finally
               FileStream.Free;
             end;
+
+            // Конвертируем PDF в TXT только после полного закрытия потока файла.
+            TxtPath := ChangeFileExt(FilePath, '.txt');
+            if ExtractTextLayerFromPdf(FilePath, TxtPath) then
+            begin
+              PdfText := TFile.ReadAllText(TxtPath, TEncoding.UTF8);
+              JsonTemplate := BuildDeepSeekTemplate(GetSelectedAccuracyClass, Trim(EditModification.Text));
+
+              if SendTextToDeepSeekTemplate(PdfText, JsonTemplate, DeepSeekResponse) then
+              begin
+                JsonPath := ChangeFileExt(TxtPath, '.json');
+                TFile.WriteAllText(JsonPath, DeepSeekResponse, TEncoding.UTF8);
+                ApplyDeepSeekJsonToType(DeepSeekResponse);
+              end;
+            end;
+
+            // Удаляем исходный PDF после успешной конвертации в текст.
+            if FileExists(TxtPath) and FileExists(FilePath) then
+              TFile.Delete(FilePath);
           end;
         end;
       end;
@@ -4446,9 +5664,13 @@ begin
 
     ShowMessage('ГРСИ подтверждено. Данные загружены из АРШИН');
 
-  except
-    on E: Exception do
-      MemoLog.Lines.Add('ERROR: ' + E.Message);
+    except
+      on E: Exception do
+        MemoLog.Lines.Add('ERROR: ' + E.Message);
+    end;
+  finally
+    sbFindReestrNumber.Enabled := True;
+    FArshinRequestInProgress := False;
   end;
 end;
 
@@ -5202,6 +6424,11 @@ begin
       StringColumnDNQF.Visible     := False;
     end;
   end;
+
+  // При загрузке из АРШИН ApplyOutputType может снова сделать
+  // некоторые колонки видимыми. Повторно применяем автоскрытие.
+  if FArshinRequestInProgress then
+    AutoHideEmptyDiameterColumns;
 end;
 
 
