@@ -1,4 +1,4 @@
-object FormDeviceSelect: TFormDeviceSelect
+﻿object FormDeviceSelect: TFormDeviceSelect
   Left = 0
   Top = 0
   Caption = #1055#1086#1080#1089#1082' '#1087#1088#1080#1073#1086#1088#1072
@@ -421,7 +421,6 @@ object FormDeviceSelect: TFormDeviceSelect
       Align = Right
       StyledSettings = [Family, Size, Style]
       ModalResult = 2
-      OnClick = btnOKClick
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -442,7 +441,7 @@ object FormDeviceSelect: TFormDeviceSelect
     object CornerButton1: TCornerButton
       Align = Right
       StyledSettings = [Family, Size, Style]
-      ModalResult = 1
+      ModalResult = 0
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -457,6 +456,7 @@ object FormDeviceSelect: TFormDeviceSelect
       Text = #1042#1099#1073#1088#1072#1090#1100
       TextSettings.FontColor = claDarkgreen
       TextSettings.Trimming = None
+      OnClick = btnOKClick
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
     end
