@@ -1650,6 +1650,7 @@ function TFormTypeEditor.TryParseNumericTextForSort(const S: string; out AValue:
 var
   N: Double;
   T: string;
+  I, StartPos: Integer;
 begin
   T := Trim(S);
   Result := T <> '';
@@ -1659,6 +1660,26 @@ begin
   N := NormalizeFloatInput(T);
   Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
     SameText(T, '0,0') or SameText(T, '0.0');
+  if (not Result) then
+  begin
+    StartPos := 0;
+    for I := 1 to Length(T) do
+      if CharInSet(T[I], ['0'..'9', '-', '+']) then
+      begin
+        StartPos := I;
+        Break;
+      end;
+
+    if StartPos > 0 then
+    begin
+      N := NormalizeFloatInput(Copy(T, StartPos, MaxInt));
+      Result := not SameValue(N, 0, MinDouble) or
+        SameText(Trim(Copy(T, StartPos, MaxInt)), '0') or
+        SameText(Trim(Copy(T, StartPos, MaxInt)), '0,0') or
+        SameText(Trim(Copy(T, StartPos, MaxInt)), '0.0');
+    end;
+  end;
+
   if Result then
     AValue := N;
 end;
