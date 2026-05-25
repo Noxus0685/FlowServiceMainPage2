@@ -1113,7 +1113,7 @@ begin
     Exit;
 
   ParentNode := SelectedNode.ParentItem;
-  ReplacementNode := ParentNode;
+  ReplacementNode := nil;
   if ParentNode <> nil then
   begin
     NodeIndex := -1;
@@ -1154,10 +1154,14 @@ begin
     CurrentNode := ParentNode;
   end;
 
-  if ReplacementNode <> nil then
+  if (ReplacementNode <> nil) and (ReplacementNode.TreeView = TreeViewTypes) then
     TreeViewTypes.Selected := ReplacementNode
+  else if (CurrentNode <> nil) and (CurrentNode.TreeView = TreeViewTypes) then
+    TreeViewTypes.Selected := CurrentNode
+  else if TreeViewTypes.Count > 0 then
+    TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(0)
   else
-    TreeViewTypes.Selected := CurrentNode;
+    TreeViewTypes.Selected := nil;
 end;
 
 procedure TFormTypeSelect.RemoveTreeNode(ANode: TTreeViewItem);
