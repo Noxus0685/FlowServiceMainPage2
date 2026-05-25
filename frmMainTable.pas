@@ -844,7 +844,9 @@ procedure TFrameMainTable.StartMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := swtSTARTMONITOR;
+    FActiveWorkTable.StartMonitor;
+    //FActiveWorkTable.State := swtSTARTMONITOR;
+
     ProtocolManager.AddMessage(pcAction, psForm, 'StartMonitor', 'Запуск мониторинга из UI', FActiveWorkTable.Name);
   end;
 end;

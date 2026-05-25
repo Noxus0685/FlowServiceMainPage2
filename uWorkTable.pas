@@ -3446,6 +3446,9 @@ procedure TWorkTable.StartTest;
 procedure TWorkTable.StartMonitor;
   begin
    ResetMeasurementValues;
+
+  FireAction(awtStartMonitor, 'StartMonitor', 'Запрос запуска мониторинга');
+
    State := swtSTARTMONITOR;
    FAction := awtStartMonitor;
    Notify(notifyAction, Self);
