@@ -1650,6 +1650,22 @@ end;
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
 var
   SortColumn: Integer;
+  function TryParseNumericText(const S: string; out AValue: Double): Boolean;
+  var
+    N: Double;
+    T: string;
+  begin
+    T := Trim(S);
+    Result := T <> '';
+    if not Result then
+      Exit;
+
+    N := NormalizeFloatInput(T);
+    Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
+      SameText(T, '0,0') or SameText(T, '0.0');
+    if Result then
+      AValue := N;
+  end;
 begin
   if FRectGridDiametersHeader <> nil then
     FRectGridDiametersHeader.HitTest := True;
@@ -1688,7 +1704,13 @@ begin
         Exit(-1);
 
       case FDiametersSortColumn of
-        0: Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+        0:
+        begin
+          if TryParseNumericText(Left.Name, LNum) and TryParseNumericText(Right.Name, RNum) then
+            Result := CompareValue(LNum, RNum)
+          else
+            Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+        end;
         1: Result := CompareValue(Left.Qmin, Right.Qmin);
         2: Result := CompareValue(Left.Qtr, Right.Qtr);
         3: Result := CompareValue(Left.Q2tr, Right.Q2tr);
@@ -1722,6 +1744,22 @@ end;
 procedure TFormTypeEditor.GridPointsHeaderClick(Column: TColumn);
 var
   SortColumn: Integer;
+  function TryParseNumericText(const S: string; out AValue: Double): Boolean;
+  var
+    N: Double;
+    T: string;
+  begin
+    T := Trim(S);
+    Result := T <> '';
+    if not Result then
+      Exit;
+
+    N := NormalizeFloatInput(T);
+    Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
+      SameText(T, '0,0') or SameText(T, '0.0');
+    if Result then
+      AValue := N;
+  end;
 begin
   if (Column = nil) or (FPointsLocal = nil) then
     Exit;
@@ -1737,6 +1775,8 @@ begin
 
   FPointsLocal.Sort(TComparer<TTypePoint>.Construct(
     function(const Left, Right: TTypePoint): Integer
+    var
+      LNum, RNum: Double;
     begin
       if Left = Right then
         Exit(0);
@@ -1754,7 +1794,12 @@ begin
         Exit(-1);
 
       if FPointsSortColumn = StringColumnPointName.Index then
-        Result := CompareText(Trim(Left.Name), Trim(Right.Name))
+      begin
+        if TryParseNumericText(Left.Name, LNum) and TryParseNumericText(Right.Name, RNum) then
+          Result := CompareValue(LNum, RNum)
+        else
+          Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+      end
       else if FPointsSortColumn = StringColumnPointFlowRate.Index then
         Result := CompareValue(Left.FlowRate, Right.FlowRate)
       else if FPointsSortColumn = StringColumnPointQ.Index then
