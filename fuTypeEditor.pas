@@ -43,6 +43,7 @@ uses
   System.Types,
   System.UITypes,
   System.Variants,
+  FmxHelper,
   uBaseProcedures,
   uClasses,
   uDataManager,
@@ -373,6 +374,9 @@ type
     procedure RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
+    procedure GridDiametersMenuCopyClick(Sender: TObject);
+    procedure GridDiametersMenuCutClick(Sender: TObject);
+    procedure GridDiametersMenuPasteClick(Sender: TObject);
     procedure GridDiametersResize(Sender: TObject);
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
@@ -438,6 +442,7 @@ type
   FRectGridDiametersHeader: TRectangle;
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
+  FMenuItemGridDiametersDisplay: TMenuItem;
   // Текущая колонка сортировки GridDiameters (-1, если сортировка ещё не выбрана).
   FGridDiametersSortColumnIndex: Integer;
   // Текущее направление сортировки GridDiameters (True = ASC, False = DESC).
@@ -740,27 +745,44 @@ end;
 
 
 procedure TFormTypeEditor.CreateMenu;
- var
-   I: Integer;
-   MenuItem: TMenuItem;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
 begin
-
   while FPopupMenuGridDiametersHeader.ItemsCount > 0 do
-  FPopupMenuGridDiametersHeader.Items[0].Free;
+    FPopupMenuGridDiametersHeader.Items[0].Free;
 
-  for I := 0 to GridDiameters.ColumnCount-1  do
-   begin
+  MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+  MenuItem.Text := 'Копировать';
+  MenuItem.OnClick := GridDiametersMenuCopyClick;
+  MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
-     MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-     if GridDiameters.Columns[i].Header<>'' then
-      MenuItem.Text := GridDiameters.Columns[i].Header
-     else
-      MenuItem.Text := GridDiameters.Columns[i].Name;
-     MenuItem.Tag := I;
-     MenuItem.AutoCheck := False;
-     MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
-     MenuItem.Parent := FPopupMenuGridDiametersHeader;
-   end;
+  MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+  MenuItem.Text := 'Вырезать';
+  MenuItem.OnClick := GridDiametersMenuCutClick;
+  MenuItem.Parent := FPopupMenuGridDiametersHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+  MenuItem.Text := 'Вставить';
+  MenuItem.OnClick := GridDiametersMenuPasteClick;
+  MenuItem.Parent := FPopupMenuGridDiametersHeader;
+
+  FMenuItemGridDiametersDisplay := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+  FMenuItemGridDiametersDisplay.Text := 'Отображение';
+  FMenuItemGridDiametersDisplay.Parent := FPopupMenuGridDiametersHeader;
+
+  for I := 0 to GridDiameters.ColumnCount - 1 do
+  begin
+    MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+    if GridDiameters.Columns[I].Header <> '' then
+      MenuItem.Text := GridDiameters.Columns[I].Header
+    else
+      MenuItem.Text := GridDiameters.Columns[I].Name;
+    MenuItem.Tag := I;
+    MenuItem.AutoCheck := False;
+    MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
+    MenuItem.Parent := FMenuItemGridDiametersDisplay;
+  end;
 end;
 
 procedure TFormTypeEditor.FormKeyDown(Sender: TObject; var Key: Word;
@@ -1586,15 +1608,15 @@ var
   MenuItem: TMenuItem;
   ColIndex: Integer;
 begin
-  if FPopupMenuGridDiametersHeader = nil then
+  if (FPopupMenuGridDiametersHeader = nil) or (FMenuItemGridDiametersDisplay = nil) then
     Exit;
 
-  for I := 0 to FPopupMenuGridDiametersHeader.ItemsCount - 1 do
+  for I := 0 to FMenuItemGridDiametersDisplay.ItemsCount - 1 do
   begin
-    if not (FPopupMenuGridDiametersHeader.Items[I] is TMenuItem) then
+    if not (FMenuItemGridDiametersDisplay.Items[I] is TMenuItem) then
       Continue;
 
-    MenuItem := TMenuItem(FPopupMenuGridDiametersHeader.Items[I]);
+    MenuItem := TMenuItem(FMenuItemGridDiametersDisplay.Items[I]);
     ColIndex := MenuItem.Tag;
 
     if (ColIndex >= 0) and (ColIndex < GridDiameters.ColumnCount) then
@@ -1608,6 +1630,35 @@ begin
       MenuItem.IsChecked := False;
     end;
   end;
+end;
+
+procedure TFormTypeEditor.GridDiametersMenuCopyClick(Sender: TObject);
+var
+  V: TValue;
+begin
+  if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
+    Exit;
+
+  V := GridDiameters.GetValue(GridDiameters.Col, GridDiameters.Row);
+  CopyTextToClipboard(V.ToString);
+end;
+
+procedure TFormTypeEditor.GridDiametersMenuCutClick(Sender: TObject);
+begin
+  GridDiametersMenuCopyClick(Sender);
+  if (GridDiameters.Col >= 0) and (GridDiameters.Row >= 0) then
+    GridDiameters.SetValue(GridDiameters.Col, GridDiameters.Row, '');
+end;
+
+procedure TFormTypeEditor.GridDiametersMenuPasteClick(Sender: TObject);
+var
+  ClipText: string;
+begin
+  if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
+    Exit;
+
+  ClipText := GetTextFromClipboard;
+  GridDiameters.SetValue(GridDiameters.Col, GridDiameters.Row, ClipText);
 end;
 
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
