@@ -1514,7 +1514,7 @@ begin
     Exit;
   end;
 
-  if (Key = vkReturn) and (actTypeSelect.Enabled=true) then
+  if (Key = vkReturn) and (actTypeSelect.Enabled=true) and (GridTypes.Row>=0) then
   begin
     actTypeSelectExecute(actTypeSelect);
     Key := 0;
@@ -1831,7 +1831,7 @@ var
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0);
-  HasGridFocus := (GridTypes <> nil) and GridTypes.IsFocused;
+  HasGridFocus := (GridTypes <> nil) and GridTypes.IsFocused and  (GridTypes.Row>=0);
   HasCurrentSelection := CurrentGridType <> nil;
 
   actTypeAdd.Enabled := HasRepo;
