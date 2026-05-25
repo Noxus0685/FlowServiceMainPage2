@@ -377,6 +377,8 @@ type
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
+    // Сортировка локального списка диаметров по выбранной колонке грида.
+    procedure SortGridDiametersByColumn(const ACol: Integer);
     procedure GridPointsHeaderClick(Column: TColumn);
     function TryParseNumericTextForSort(const S: string; out AValue: Double): Boolean;
     // Выбор PDF-файла вручную через диалог.
@@ -434,8 +436,10 @@ type
   FRectGridDiametersHeader: TRectangle;
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
-  FDiametersSortColumn: Integer;
-  FDiametersSortAscending: Boolean;
+  // Текущая колонка сортировки GridDiameters (-1, если сортировка ещё не выбрана).
+  FGridDiametersSortColumnIndex: Integer;
+  // Текущее направление сортировки GridDiameters (True = ASC, False = DESC).
+  FGridDiametersSortAscending: Boolean;
   FPointsSortColumn: Integer;
   FPointsSortAscending: Boolean;
 
@@ -692,8 +696,9 @@ end;
    GridPoints.OnKeyDown := GridPointsKeyDown;
 
    FGridDiametersHeaderColumnIndex := -1;
-   FDiametersSortColumn := -1;
-   FDiametersSortAscending := True;
+   // Инициализация состояния сортировки GridDiameters.
+   FGridDiametersSortColumnIndex := -1;
+   FGridDiametersSortAscending := True;
    FPointsSortColumn := -1;
    FPointsSortAscending := True;
 
@@ -1610,13 +1615,35 @@ var
   ColRight: Single;
   P: TPointF;
 begin
-  if (Button = TMouseButton.mbRight)then
-    FRectGridDiametersHeader.HitTest := true;
+  // Для ЛКМ выполняем сортировку по колонке заголовка под курсором.
   if Button = TMouseButton.mbLeft then
+  begin
+    FGridDiametersHeaderColumnIndex := -1;
+    ColLeft := 0;
+    for I := 0 to GridDiameters.ColumnCount - 1 do
     begin
-    FRectGridDiametersHeader.HitTest := false;
-    exit;
+      if not GridDiameters.Columns[I].Visible then
+        Continue;
+
+      ColRight := ColLeft + GridDiameters.Columns[I].Width;
+      if (X >= ColLeft) and (X <= ColRight) then
+      begin
+        FGridDiametersHeaderColumnIndex := I;
+        Break;
+      end;
+      ColLeft := ColRight;
     end;
+
+    if FGridDiametersHeaderColumnIndex >= 0 then
+      SortGridDiametersByColumn(FGridDiametersHeaderColumnIndex);
+    Exit;
+  end;
+
+  // Для ПКМ сохраняем текущую логику вызова popup-меню видимости колонок.
+  if (Button = TMouseButton.mbRight) then
+    FRectGridDiametersHeader.HitTest := True
+  else
+    Exit;
   FGridDiametersHeaderColumnIndex := -1;
   ColLeft := 0;
 
@@ -1687,29 +1714,38 @@ end;
 
 
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
-var
-  SortColumn: Integer;
 begin
   if FRectGridDiametersHeader <> nil then
     FRectGridDiametersHeader.HitTest := True;
 
-  if (Column = nil) or (FDiametersLocal = nil) then
+  if Column = nil then
     Exit;
 
-  SortColumn := Column.Index;
-  if SortColumn = FDiametersSortColumn then
-    FDiametersSortAscending := not FDiametersSortAscending
+  // Клик по заголовку делегируем в единый метод сортировки.
+  SortGridDiametersByColumn(Column.Index);
+end;
+
+procedure TFormTypeEditor.SortGridDiametersByColumn(const ACol: Integer);
+begin
+  if (FDiametersLocal = nil) or (ACol < 0) then
+    Exit;
+
+  // Переключаем направление только при повторном клике по той же колонке.
+  if ACol = FGridDiametersSortColumnIndex then
+    FGridDiametersSortAscending := not FGridDiametersSortAscending
   else
   begin
-    FDiametersSortColumn := SortColumn;
-    FDiametersSortAscending := True;
+    FGridDiametersSortColumnIndex := ACol;
+    FGridDiametersSortAscending := True;
   end;
 
+  // Сортируем именно локальную коллекцию FDiametersLocal с учетом типа колонки.
   FDiametersLocal.Sort(TComparer<TDiameter>.Construct(
     function(const Left, Right: TDiameter): Integer
     var
       LStr, RStr: string;
       LNum, RNum: Double;
+      LBool, RBool: Integer;
     begin
       if Left = Right then
         Exit(0);
@@ -1726,27 +1762,40 @@ begin
       if Right.State = osDeleted then
         Exit(-1);
 
-      case FDiametersSortColumn of
-        0:
-        begin
-          if TryParseNumericTextForSort(Left.Name, LNum) and TryParseNumericTextForSort(Right.Name, RNum) then
-            Result := CompareValue(LNum, RNum)
-          else
-            Result := CompareText(Trim(Left.Name), Trim(Right.Name));
-        end;
-        1: Result := CompareValue(Left.Qmin, Right.Qmin);
-        2: Result := CompareValue(Left.Qtr, Right.Qtr);
-        3: Result := CompareValue(Left.Q2tr, Right.Q2tr);
-        4: Result := CompareValue(Left.Qnom, Right.Qnom);
-        5: Result := CompareValue(Left.Qmax, Right.Qmax);
-        6: Result := CompareValue(Left.QFmax, Right.QFmax);
-        7: Result := CompareValue(Left.Kp, Right.Kp);
+      if ACol = CheckColumnDNEnable.Index then
+      begin
+        if Left.Enable then LBool := 1 else LBool := 0;
+        if Right.Enable then RBool := 1 else RBool := 0;
+        Result := LBool - RBool;
+      end
+      else if ACol = StringColumnDNName.Index then
+        Result := CompareText(Trim(Left.Name), Trim(Right.Name))
+      else if ACol = IntegerColumnDNSize.Index then
+      begin
+        LNum := NormalizeFloatInput(Left.DN);
+        RNum := NormalizeFloatInput(Right.DN);
+        Result := CompareValue(LNum, RNum);
+      end
+      else if ACol = StringColumnDNQmin.Index then
+        Result := CompareValue(Left.Qmin, Right.Qmin)
+      else if ACol = StringColumnDNQTr.Index then
+        Result := CompareValue(Left.Qtr, Right.Qtr)
+      else if ACol = StringColumnDNQ2Tr.Index then
+        Result := CompareValue(Left.Q2tr, Right.Q2tr)
+      else if ACol = StringColumnDNQnom.Index then
+        Result := CompareValue(Left.Qnom, Right.Qnom)
+      else if ACol = StringColumnDNQmax.Index then
+        Result := CompareValue(Left.Qmax, Right.Qmax)
+      else if ACol = StringColumnDNQF.Index then
+        Result := CompareValue(Left.QFmax, Right.QFmax)
+      else if ACol = StringColumnDNKp.Index then
+        Result := CompareValue(Left.Kp, Right.Kp)
       else
       begin
-        LNum := Left.ID;
-        RNum := Right.ID;
-        Result := CompareValue(LNum, RNum);
-      end;
+        // Прочие колонки сортируем как текст (по отображаемому значению ячейки).
+        LStr := Trim(DiameterValueByCol(Left, ACol));
+        RStr := Trim(DiameterValueByCol(Right, ACol));
+        Result := CompareText(LStr, RStr);
       end;
 
       if Result = 0 then
@@ -1756,11 +1805,12 @@ begin
         Result := CompareText(LStr, RStr);
       end;
 
-      if not FDiametersSortAscending then
+      if not FGridDiametersSortAscending then
         Result := -Result;
     end
   ));
 
+  // После изменения порядка данных перерисовываем грид.
   UpdateDiametersGrid;
 end;
 
