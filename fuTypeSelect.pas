@@ -876,12 +876,19 @@ begin
   { 3. Фильтр по дате }
   {----------------------------------}
 FreeAndNil(FDevFilteredByDate);
-FDevFilteredByDate :=
-  TEntityFilters<TDeviceType>.ApplyDateFilter(
-    FDevFilteredByText,
-    DateEditFilter.Date,
-    not DateEditFilter.IsEmpty
-  );
+FDevFilteredByDate := TObjectList<TDeviceType>.Create(False);
+
+if DateEditFilter.IsEmpty or (FDevFilteredByText = nil) then
+begin
+  if FDevFilteredByText <> nil then
+    FDevFilteredByDate.AddRange(FDevFilteredByText);
+end
+else
+  for var T in FDevFilteredByText do
+    if (T.RegDate > 0) and (T.ValidityDate > 0) and
+       (T.RegDate <= DateEditFilter.Date) and
+       (DateEditFilter.Date <= T.ValidityDate) then
+      FDevFilteredByDate.Add(T);
 
 
   {----------------------------------}
@@ -1173,12 +1180,19 @@ begin
   { Фильтр по дате поверх текста }
   {----------------------------------}
 FreeAndNil(FDevFilteredByDate);
-FDevFilteredByDate :=
-  TEntityFilters<TDeviceType>.ApplyDateFilter(
-    FDevFilteredByText,
-    DateEditFilter.Date,
-    not DateEditFilter.IsEmpty
-  );
+FDevFilteredByDate := TObjectList<TDeviceType>.Create(False);
+
+if DateEditFilter.IsEmpty or (FDevFilteredByText = nil) then
+begin
+  if FDevFilteredByText <> nil then
+    FDevFilteredByDate.AddRange(FDevFilteredByText);
+end
+else
+  for var T in FDevFilteredByText do
+    if (T.RegDate > 0) and (T.ValidityDate > 0) and
+       (T.RegDate <= DateEditFilter.Date) and
+       (DateEditFilter.Date <= T.ValidityDate) then
+      FDevFilteredByDate.Add(T);
 
 
   {----------------------------------}
