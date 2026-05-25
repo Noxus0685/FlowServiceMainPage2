@@ -28,6 +28,7 @@ uses
   System.Classes,
   System.DateUtils,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.IOUtils,
   System.JSON,
   System.Math,
@@ -376,6 +377,7 @@ type
     procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
+    procedure GridPointsHeaderClick(Column: TColumn);
     // Выбор PDF-файла вручную через диалог.
     function SelectPdfFile(var APdfFilePath: string): Boolean;
     // Извлечение текстового слоя из PDF через pdftotext.exe.
@@ -431,6 +433,10 @@ type
   FRectGridDiametersHeader: TRectangle;
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
+  FDiametersSortColumn: Integer;
+  FDiametersSortAscending: Boolean;
+  FPointsSortColumn: Integer;
+  FPointsSortAscending: Boolean;
 
   function GetQValue(const AMap: TDictionary<Integer, Double>; const ADiameterID: Integer): Double;
   procedure SetQValue(AMap: TDictionary<Integer, Double>; const ADiameterID: Integer; const AValue: Double);
@@ -685,6 +691,10 @@ end;
    GridPoints.OnKeyDown := GridPointsKeyDown;
 
    FGridDiametersHeaderColumnIndex := -1;
+   FDiametersSortColumn := -1;
+   FDiametersSortAscending := True;
+   FPointsSortColumn := -1;
+   FPointsSortAscending := True;
 
    // Создаем невидимую кликабельную область над заголовком грида для отдельного header-popup.
    FRectGridDiametersHeader := TRectangle.Create(Self);
@@ -1638,8 +1648,188 @@ end;
 
 
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
+var
+  SortColumn: Integer;
+  function TryParseNumericText(const S: string; out AValue: Double): Boolean;
+  var
+    N: Double;
+    T: string;
+  begin
+    T := Trim(S);
+    Result := T <> '';
+    if not Result then
+      Exit;
+
+    N := NormalizeFloatInput(T);
+    Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
+      SameText(T, '0,0') or SameText(T, '0.0');
+    if Result then
+      AValue := N;
+  end;
 begin
-FRectGridDiametersHeader.HitTest := true;
+  if FRectGridDiametersHeader <> nil then
+    FRectGridDiametersHeader.HitTest := True;
+
+  if (Column = nil) or (FDiametersLocal = nil) then
+    Exit;
+
+  SortColumn := Column.Index;
+  if SortColumn = FDiametersSortColumn then
+    FDiametersSortAscending := not FDiametersSortAscending
+  else
+  begin
+    FDiametersSortColumn := SortColumn;
+    FDiametersSortAscending := True;
+  end;
+
+  FDiametersLocal.Sort(TComparer<TDiameter>.Construct(
+    function(const Left, Right: TDiameter): Integer
+    var
+      LStr, RStr: string;
+      LNum, RNum: Double;
+    begin
+      if Left = Right then
+        Exit(0);
+      if Left = nil then
+        Exit(1);
+      if Right = nil then
+        Exit(-1);
+      if Left.State = osDeleted then
+      begin
+        if Right.State = osDeleted then
+          Exit(0);
+        Exit(1);
+      end;
+      if Right.State = osDeleted then
+        Exit(-1);
+
+      case FDiametersSortColumn of
+        0:
+        begin
+          if TryParseNumericText(Left.Name, LNum) and TryParseNumericText(Right.Name, RNum) then
+            Result := CompareValue(LNum, RNum)
+          else
+            Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+        end;
+        1: Result := CompareValue(Left.Qmin, Right.Qmin);
+        2: Result := CompareValue(Left.Qtr, Right.Qtr);
+        3: Result := CompareValue(Left.Q2tr, Right.Q2tr);
+        4: Result := CompareValue(Left.Qnom, Right.Qnom);
+        5: Result := CompareValue(Left.Qmax, Right.Qmax);
+        6: Result := CompareValue(Left.QFmax, Right.QFmax);
+        7: Result := CompareValue(Left.Kp, Right.Kp);
+      else
+      begin
+        LNum := Left.ID;
+        RNum := Right.ID;
+        Result := CompareValue(LNum, RNum);
+      end;
+      end;
+
+      if Result = 0 then
+      begin
+        LStr := Trim(Left.Name);
+        RStr := Trim(Right.Name);
+        Result := CompareText(LStr, RStr);
+      end;
+
+      if not FDiametersSortAscending then
+        Result := -Result;
+    end
+  ));
+
+  UpdateDiametersGrid;
+end;
+
+procedure TFormTypeEditor.GridPointsHeaderClick(Column: TColumn);
+var
+  SortColumn: Integer;
+  function TryParseNumericText(const S: string; out AValue: Double): Boolean;
+  var
+    N: Double;
+    T: string;
+  begin
+    T := Trim(S);
+    Result := T <> '';
+    if not Result then
+      Exit;
+
+    N := NormalizeFloatInput(T);
+    Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
+      SameText(T, '0,0') or SameText(T, '0.0');
+    if Result then
+      AValue := N;
+  end;
+begin
+  if (Column = nil) or (FPointsLocal = nil) then
+    Exit;
+
+  SortColumn := Column.Index;
+  if SortColumn = FPointsSortColumn then
+    FPointsSortAscending := not FPointsSortAscending
+  else
+  begin
+    FPointsSortColumn := SortColumn;
+    FPointsSortAscending := True;
+  end;
+
+  FPointsLocal.Sort(TComparer<TTypePoint>.Construct(
+    function(const Left, Right: TTypePoint): Integer
+    var
+      LNum, RNum: Double;
+    begin
+      if Left = Right then
+        Exit(0);
+      if Left = nil then
+        Exit(1);
+      if Right = nil then
+        Exit(-1);
+      if Left.State = osDeleted then
+      begin
+        if Right.State = osDeleted then
+          Exit(0);
+        Exit(1);
+      end;
+      if Right.State = osDeleted then
+        Exit(-1);
+
+      if FPointsSortColumn = StringColumnPointName.Index then
+      begin
+        if TryParseNumericText(Left.Name, LNum) and TryParseNumericText(Right.Name, RNum) then
+          Result := CompareValue(LNum, RNum)
+        else
+          Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+      end
+      else if FPointsSortColumn = StringColumnPointFlowRate.Index then
+        Result := CompareValue(Left.FlowRate, Right.FlowRate)
+      else if FPointsSortColumn = StringColumnPointQ.Index then
+        Result := CompareValue(Left.FlowRate, Right.FlowRate)
+      else if FPointsSortColumn = StringColumnPointVolume.Index then
+        Result := CompareValue(Left.LimitVolume, Right.LimitVolume)
+      else if FPointsSortColumn = StringColumnPointImp.Index then
+        Result := CompareValue(Left.LimitImp, Right.LimitImp)
+      else if FPointsSortColumn = StringColumnPointTime.Index then
+        Result := CompareValue(Left.LimitTime, Right.LimitTime)
+      else if FPointsSortColumn = StringColumnPointError.Index then
+        Result := CompareValue(Left.Error, Right.Error)
+      else if FPointsSortColumn = StringColumnPointStab.Index then
+        Result := CompareValue(Left.Pause, Right.Pause)
+      else if FPointsSortColumn = IntegerColumnPointRepeatsForm.Index then
+        Result := CompareValue(Left.RepeatsProtocol, Right.RepeatsProtocol)
+      else if FPointsSortColumn = IntegerColumnPointRepeats.Index then
+        Result := CompareValue(Left.Repeats, Right.Repeats)
+      else
+        Result := 0;
+
+      if (Result = 0) and (FPointsSortColumn <> 0) then
+        Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+
+      if not FPointsSortAscending then
+        Result := -Result;
+    end
+  ));
+
+  UpdatePointsGrid;
 end;
 
 procedure TFormTypeEditor.GridDiametersHeaderMenuItemClick(Sender: TObject);
