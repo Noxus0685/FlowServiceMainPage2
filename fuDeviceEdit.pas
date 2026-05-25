@@ -2164,34 +2164,7 @@ begin
   SetModified;
 end;
 
-procedure TFormDeviceEditor.sbRepeatsChange(Sender: TObject);
-var
-  P: TDevicePoint;
-  RepeatsValue: Integer;
-begin
-  if FLoading or (FDevice = nil) then
-    Exit;
 
-  RepeatsValue := Max(Round(sbRepeats.Value), 1);
-
-  if not SameValue(sbRepeats.Value, RepeatsValue, 0.001) then
-    sbRepeats.Value := RepeatsValue;
-
-  FDevice.Repeats := RepeatsValue;
-
-  if FDevice.Points <> nil then
-    for P in FDevice.Points do
-      if P <> nil then
-      begin
-        P.RepeatsProtocol := RepeatsValue;
-        P.Repeats := RepeatsValue;
-        if P.State <> osNew then
-          P.State := osModified;
-      end;
-
-  UpdatePointsGrid;
-  SetModified;
-end;
 
 procedure TFormDeviceEditor.cbMeasuredDimensionChange(Sender: TObject);
 var
