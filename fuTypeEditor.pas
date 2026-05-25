@@ -713,7 +713,8 @@ end;
    // Rectangle размещается над визуальным header грида и принимает ПКМ для контекстного меню.
    FRectGridDiametersHeader.HitTest := True;
    FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
-   GridDiameters.OnMouseDown := RectGridDiametersHeaderMouseDown;
+   // Важно: не назначаем обработчик на весь Grid, чтобы сортировка срабатывала
+   // только по клику в header-область, а не по клику в строки данных.
    FRectGridDiametersHeader.BringToFront;
 
    // Создаем popup-меню заголовка; пункты 1..9 управляют Visible соответствующих колонок.
