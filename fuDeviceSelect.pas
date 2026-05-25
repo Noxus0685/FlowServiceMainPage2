@@ -141,6 +141,7 @@ type
     MenuItem7: TMenuItem;
     MenuItem8: TMenuItem;
     MenuItem9: TMenuItem;
+    actDeviceSelect: TAction;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -160,8 +161,6 @@ type
     procedure miSaveClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure btnOKClick(Sender: TObject);
-    procedure CornerButtonEditDeviceClick(Sender: TObject);
     procedure miAddTestDataClick(Sender: TObject);
     procedure miLoadClick(Sender: TObject);
     procedure SpeedButtonFindInternetClick(Sender: TObject);
@@ -182,6 +181,7 @@ type
     procedure GridDevicesExit(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
+    procedure actDeviceSelectExecute(Sender: TObject);
 
 private
 
@@ -1016,14 +1016,63 @@ begin
   ButtonDeviceAddClick(Sender);
 end;
 
+procedure TFormDeviceSelect.actDeviceSelectExecute(Sender: TObject);
+begin
+  if not IsGridInputFocused then
+    Exit;
+
+  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  ModalResult := mrOk;
+end;
+
 procedure TFormDeviceSelect.aDeleteTypeExecute(Sender: TObject);
 begin
   ButtonDeviceDeleteClick(Sender);
 end;
 
 procedure TFormDeviceSelect.aEditTypeExecute(Sender: TObject);
+  var
+  Row: Integer;
+  ADevice: TDevice;
+  OldManufacturer: string;
 begin
-  CornerButtonEditDeviceClick(Sender);
+  {----------------------------------}
+  { Проверка выбора }
+  {----------------------------------}
+  Row := GridDevices.Row;
+  if (Row < 0) then
+  begin
+    ShowMessage('Выберите прибор для редактирования');
+    Exit;
+  end;
+
+  if (FDevFilteredDevices = nil) or (Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  {----------------------------------}
+  { Получаем ПРИБОР как объект }
+  {----------------------------------}
+  ADevice := FDevFilteredDevices[Row];
+  if ADevice = nil then
+    Exit;
+
+  {----------------------------------}
+  { Открываем редактор }
+  {----------------------------------}
+  WriteDeviceActionLog('Выбран прибор', ADevice);
+  OldManufacturer := ADevice.Manufacturer;
+  if OpenDeviceEditor(ADevice) then
+  begin
+    if (AppServices.DataManager <> nil) and
+       (OldManufacturer <> ADevice.Manufacturer) then
+      AppServices.DataManager.NeedRemoveOldManufacturerBranchForDevice(
+        FDevices, ADevice, OldManufacturer, ADevice.Manufacturer
+      );
+
+    SelectEditedDevice(ADevice);
+  end;
 end;
 
 procedure TFormDeviceSelect.aDeviceCopyExecute(Sender: TObject);
@@ -2340,48 +2389,7 @@ begin
   UpdateGridDevices;
 end;
 
-procedure TFormDeviceSelect.CornerButtonEditDeviceClick(Sender: TObject);
-var
-  Row: Integer;
-  ADevice: TDevice;
-  OldManufacturer: string;
-begin
-  {----------------------------------}
-  { Проверка выбора }
-  {----------------------------------}
-  Row := GridDevices.Row;
-  if (Row < 0) then
-  begin
-    ShowMessage('Выберите прибор для редактирования');
-    Exit;
-  end;
 
-  if (FDevFilteredDevices = nil) or (Row >= FDevFilteredDevices.Count) then
-    Exit;
-
-  {----------------------------------}
-  { Получаем ПРИБОР как объект }
-  {----------------------------------}
-  ADevice := FDevFilteredDevices[Row];
-  if ADevice = nil then
-    Exit;
-
-  {----------------------------------}
-  { Открываем редактор }
-  {----------------------------------}
-  WriteDeviceActionLog('Выбран прибор', ADevice);
-  OldManufacturer := ADevice.Manufacturer;
-  if OpenDeviceEditor(ADevice) then
-  begin
-    if (AppServices.DataManager <> nil) and
-       (OldManufacturer <> ADevice.Manufacturer) then
-      AppServices.DataManager.NeedRemoveOldManufacturerBranchForDevice(
-        FDevices, ADevice, OldManufacturer, ADevice.Manufacturer
-      );
-
-    SelectEditedDevice(ADevice);
-  end;
-end;
 
 
 procedure TFormDeviceSelect.DateEditFilterChange(Sender: TObject);
@@ -2462,16 +2470,6 @@ begin
 end;
 
 
-procedure TFormDeviceSelect.btnOKClick(Sender: TObject);
-begin
-  if not IsGridInputFocused then
-    Exit;
-
-  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
-    Exit;
-
-  ModalResult := mrOk;
-end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
 var
@@ -2570,7 +2568,7 @@ begin
     Exit;
   end;
 
-  if (Key = vkReturn) and IsGridInputFocused then
+  if (Key = vkReturn) and GridDevices.IsFocused and  IsGridInputFocused then
   begin
     ModalResult := mrOk;
     Key := 0;
@@ -2601,7 +2599,8 @@ begin
     Exit;
 
   if ssDouble in Shift then
-    CornerButtonEditDeviceClick(CornerButtonEditDevice);
+    aEditTypeExecute(CornerButtonEditDevice) ;
+    //CornerButtonEditDeviceClick(CornerButtonEditDevice);
 end;
 
 procedure TFormDeviceSelect.GridDevicesEnter(Sender: TObject);

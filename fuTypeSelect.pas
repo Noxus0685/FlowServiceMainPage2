@@ -161,7 +161,6 @@ type
     procedure miDeleteRepositoryClick(Sender: TObject);
     procedure miAddRepositoryClick(Sender: TObject);
     procedure ComboBoxRepositoryChange(Sender: TObject);
-    procedure miRefreshRepositoryClick(Sender: TObject);
     procedure mpExpandAllClick(Sender: TObject);
     procedure mpCollapseAllClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
@@ -180,6 +179,7 @@ type
       Shift: TShiftState);
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
+    procedure aRefreshRepositoryExecute(Sender: TObject);
 
   private
 
@@ -896,6 +896,16 @@ FDevFilteredByDate :=
 
 end;
 
+procedure TFormTypeSelect.aRefreshRepositoryExecute(Sender: TObject);
+begin
+      { Полное обновление дерева по кнопке "Обновить" }
+      RebuildTreeFull;
+
+      { Полная пересборка фильтров + сортировка }
+      ApplyFilter;
+        UpdateGridTypes;
+end;
+
 procedure TFormTypeSelect.actTypeAddExecute(Sender: TObject);
 var
   NewType: TDeviceType;
@@ -1504,7 +1514,7 @@ begin
     Exit;
   end;
 
-  if Key = vkReturn then
+  if (Key = vkReturn) and (actTypeSelect.Enabled=true) then
   begin
     actTypeSelectExecute(actTypeSelect);
     Key := 0;
@@ -2059,15 +2069,6 @@ begin
   UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.miRefreshRepositoryClick(Sender: TObject);
-begin
-      { Полное обновление дерева по кнопке "Обновить" }
-      RebuildTreeFull;
-
-      { Полная пересборка фильтров + сортировка }
-      ApplyFilter;
-        UpdateGridTypes;
-end;
 
 procedure TFormTypeSelect.RebuildTreeFull;
 begin

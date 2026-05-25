@@ -1,4 +1,4 @@
-﻿object FormDeviceSelect: TFormDeviceSelect
+object FormDeviceSelect: TFormDeviceSelect
   Left = 0
   Top = 0
   Caption = #1055#1086#1080#1089#1082' '#1087#1088#1080#1073#1086#1088#1072
@@ -126,8 +126,8 @@
         OnHeaderClick = GridDevicesHeaderClick
         OnGetValue = GridDevicesGetValue
         OnCellClick = GridDevicesCellClick
-        Viewport.Width = 917.000000000000000000
-        Viewport.Height = 610.000000000000000000
+        Viewport.Width = 897.000000000000000000
+        Viewport.Height = 569.000000000000000000
         object CheckColumnDeviceEnable: TCheckColumn
           Header = #1042#1082#1083
           HeaderSettings.TextSettings.WordWrap = False
@@ -406,8 +406,8 @@
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 883.000000000000000000
-      Viewport.Height = 102.000000000000000000
+      Viewport.Width = 879.000000000000000000
+      Viewport.Height = 98.000000000000000000
     end
   end
   object lyt1: TLayout
@@ -439,9 +439,10 @@
       YRadius = 3.000000000000000000
     end
     object CornerButton1: TCornerButton
+      Action = actDeviceSelect
       Align = Right
       StyledSettings = [Family, Size, Style]
-      ModalResult = 0
+      ImageIndex = -1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -453,16 +454,16 @@
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
-      Text = #1042#1099#1073#1088#1072#1090#1100
       TextSettings.FontColor = claDarkgreen
       TextSettings.Trimming = None
-      OnClick = btnOKClick
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
     end
     object CornerButtonEditDevice: TCornerButton
+      Action = aEditType
       Align = Right
       StyledSettings = [Family, Size, Style]
+      ImageIndex = 15
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -474,12 +475,10 @@
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
-      Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100
       TextSettings.FontColor = claDarkgreen
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
-      OnClick = CornerButtonEditDeviceClick
     end
   end
   object MainMenu: TMenuBar
@@ -670,6 +669,10 @@
     object aRefreshRepository: TAction
       Text = #1054#1073#1085#1086#1074#1080#1090#1100
       OnExecute = aRefreshRepositoryExecute
+    end
+    object actDeviceSelect: TAction
+      Text = #1042#1099#1073#1088#1072#1090#1100
+      OnExecute = actDeviceSelectExecute
     end
   end
   object NetHTTPClient1: TNetHTTPClient
