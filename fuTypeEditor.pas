@@ -376,6 +376,8 @@ type
       Shift: TShiftState; X, Y: Single);
     procedure GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
     procedure GridDiametersMenuCopyClick(Sender: TObject);
     procedure GridDiametersMenuCutClick(Sender: TObject);
@@ -452,6 +454,14 @@ type
   FActionGridDiametersCut: TAction;
   FActionGridDiametersPaste: TAction;
   FClipboardDiameter: TDiameter;
+  FPopupMenuGridPoints: TPopupMenu;
+  FMenuItemGridPointsDisplay: TMenuItem;
+  FActionListGridPoints: TActionList;
+  FActionGridPointsDelete: TAction;
+  FActionGridPointsCopy: TAction;
+  FActionGridPointsCut: TAction;
+  FActionGridPointsPaste: TAction;
+  FClipboardPoint: TTypePoint;
   // Текущая колонка сортировки GridDiameters (-1, если сортировка ещё не выбрана).
   FGridDiametersSortColumnIndex: Integer;
   // Текущее направление сортировки GridDiameters (True = ASC, False = DESC).
@@ -513,10 +523,17 @@ type
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
+    procedure CreatePointsMenu;
+    procedure SyncGridPointsPopupMenu;
+    procedure GridPointsHeaderMenuItemClick(Sender: TObject);
     procedure ActionGridDiametersDeleteExecute(Sender: TObject);
     procedure ActionGridDiametersCopyExecute(Sender: TObject);
     procedure ActionGridDiametersCutExecute(Sender: TObject);
     procedure ActionGridDiametersPasteExecute(Sender: TObject);
+    procedure ActionGridPointsDeleteExecute(Sender: TObject);
+    procedure ActionGridPointsCopyExecute(Sender: TObject);
+    procedure ActionGridPointsCutExecute(Sender: TObject);
+    procedure ActionGridPointsPasteExecute(Sender: TObject);
     procedure AutoHideEmptyDiameterColumns;
 
   public
@@ -715,7 +732,9 @@ end;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
    GridDiameters.OnMouseDown := GridDiametersMouseDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
+   GridPoints.OnMouseDown := GridPointsMouseDown;
    FClipboardDiameter := nil;
+   FClipboardPoint := nil;
 
    FActionListGridDiameters := TActionList.Create(Self);
    FActionGridDiametersDelete := TAction.Create(FActionListGridDiameters);
@@ -737,6 +756,24 @@ end;
    FActionGridDiametersPaste.Text := 'Вставить';
    FActionGridDiametersPaste.OnExecute := ActionGridDiametersPasteExecute;
    FActionGridDiametersPaste.ActionList := FActionListGridDiameters;
+
+   FActionListGridPoints := TActionList.Create(Self);
+   FActionGridPointsDelete := TAction.Create(FActionListGridPoints);
+   FActionGridPointsDelete.Text := 'Удалить';
+   FActionGridPointsDelete.OnExecute := ActionGridPointsDeleteExecute;
+   FActionGridPointsDelete.ActionList := FActionListGridPoints;
+   FActionGridPointsCopy := TAction.Create(FActionListGridPoints);
+   FActionGridPointsCopy.Text := 'Копировать';
+   FActionGridPointsCopy.OnExecute := ActionGridPointsCopyExecute;
+   FActionGridPointsCopy.ActionList := FActionListGridPoints;
+   FActionGridPointsCut := TAction.Create(FActionListGridPoints);
+   FActionGridPointsCut.Text := 'Вырезать';
+   FActionGridPointsCut.OnExecute := ActionGridPointsCutExecute;
+   FActionGridPointsCut.ActionList := FActionListGridPoints;
+   FActionGridPointsPaste := TAction.Create(FActionListGridPoints);
+   FActionGridPointsPaste.Text := 'Вставить';
+   FActionGridPointsPaste.OnExecute := ActionGridPointsPasteExecute;
+   FActionGridPointsPaste.ActionList := FActionListGridPoints;
 
    FGridDiametersHeaderColumnIndex := -1;
    // Инициализация состояния сортировки GridDiameters.
@@ -762,7 +799,9 @@ end;
    FPopupMenuGridDiametersHeader := TPopupMenu.Create(Self);
    FPopupMenuGridDiametersHeader.Stored := False;
    CreateMenu;
+   CreatePointsMenu;
    ButtonDiameterDelete.Action := FActionGridDiametersDelete;
+   ButtonPointDelete.Action := FActionGridPointsDelete;
 
    GridDiameters.OnResize := GridDiametersResize;
 
@@ -823,6 +862,49 @@ begin
   end;
 end;
 
+procedure TFormTypeEditor.CreatePointsMenu;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+begin
+  if FPopupMenuGridPoints = nil then
+  begin
+    FPopupMenuGridPoints := TPopupMenu.Create(Self);
+    FPopupMenuGridPoints.Stored := False;
+  end;
+
+  while FPopupMenuGridPoints.ItemsCount > 0 do
+    FPopupMenuGridPoints.Items[0].Free;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
+  MenuItem.Action := FActionGridPointsDelete;
+  MenuItem.Parent := FPopupMenuGridPoints;
+  MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
+  MenuItem.Action := FActionGridPointsCopy;
+  MenuItem.Parent := FPopupMenuGridPoints;
+  MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
+  MenuItem.Action := FActionGridPointsCut;
+  MenuItem.Parent := FPopupMenuGridPoints;
+  MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
+  MenuItem.Action := FActionGridPointsPaste;
+  MenuItem.Parent := FPopupMenuGridPoints;
+
+  FMenuItemGridPointsDisplay := TMenuItem.Create(FPopupMenuGridPoints);
+  FMenuItemGridPointsDisplay.Text := 'Отображение';
+  FMenuItemGridPointsDisplay.Parent := FPopupMenuGridPoints;
+  for I := 0 to GridPoints.ColumnCount - 1 do
+  begin
+    MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
+    if GridPoints.Columns[I].Header <> '' then
+      MenuItem.Text := GridPoints.Columns[I].Header
+    else
+      MenuItem.Text := GridPoints.Columns[I].Name;
+    MenuItem.Tag := I;
+    MenuItem.OnClick := GridPointsHeaderMenuItemClick;
+    MenuItem.Parent := FMenuItemGridPointsDisplay;
+  end;
+end;
+
 procedure TFormTypeEditor.FormKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
@@ -837,6 +919,7 @@ end;
 destructor TFormTypeEditor.Destroy;
 begin
   FreeAndNil(FClipboardDiameter);
+  FreeAndNil(FClipboardPoint);
   FDiameterQ2.Free;
   FDiameterQ4.Free;
   inherited;
@@ -1754,6 +1837,99 @@ begin
   P := GridDiameters.LocalToScreen(PointF(X, Y));
   FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
+end;
+
+procedure TFormTypeEditor.GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+var
+  P: TPointF;
+begin
+  if Button <> TMouseButton.mbRight then
+    Exit;
+  SyncGridPointsPopupMenu;
+  P := GridPoints.LocalToScreen(PointF(X, Y));
+  FPopupMenuGridPoints.PopupComponent := GridPoints;
+  FPopupMenuGridPoints.Popup(P.X, P.Y);
+end;
+
+procedure TFormTypeEditor.SyncGridPointsPopupMenu;
+var
+  I, ColIndex: Integer;
+  MenuItem: TMenuItem;
+begin
+  if (FPopupMenuGridPoints = nil) or (FMenuItemGridPointsDisplay = nil) then
+    Exit;
+  for I := 0 to FMenuItemGridPointsDisplay.ItemsCount - 1 do
+  begin
+    MenuItem := TMenuItem(FMenuItemGridPointsDisplay.Items[I]);
+    ColIndex := MenuItem.Tag;
+    if (ColIndex >= 0) and (ColIndex < GridPoints.ColumnCount) then
+      MenuItem.IsChecked := GridPoints.Columns[ColIndex].Visible
+    else
+      MenuItem.IsChecked := False;
+  end;
+end;
+
+procedure TFormTypeEditor.GridPointsHeaderMenuItemClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  Index: Integer;
+begin
+  if not (Sender is TMenuItem) then Exit;
+  MenuItem := TMenuItem(Sender);
+  Index := MenuItem.Tag;
+  if (Index < 0) or (Index >= GridPoints.ColumnCount) then Exit;
+  GridPoints.Columns[Index].Visible := not GridPoints.Columns[Index].Visible;
+  MenuItem.IsChecked := GridPoints.Columns[Index].Visible;
+  GridPoints.Repaint;
+end;
+
+procedure TFormTypeEditor.ActionGridPointsDeleteExecute(Sender: TObject);
+begin
+  ButtonPointDeleteClick(ButtonPointDelete);
+end;
+
+procedure TFormTypeEditor.ActionGridPointsCopyExecute(Sender: TObject);
+var
+  P: TTypePoint;
+begin
+  P := GetPointByVisibleRow(GridPoints.Row);
+  if P = nil then Exit;
+  FreeAndNil(FClipboardPoint);
+  FClipboardPoint := TTypePoint.Create(FType.UUID);
+  FClipboardPoint.Assign(P);
+end;
+
+procedure TFormTypeEditor.ActionGridPointsCutExecute(Sender: TObject);
+var PrevSkipConfirm: Boolean;
+begin
+  ActionGridPointsCopyExecute(Sender);
+  PrevSkipConfirm := FSkipPointDeleteConfirm;
+  FSkipPointDeleteConfirm := True;
+  try
+    ActionGridPointsDeleteExecute(Sender);
+  finally
+    FSkipPointDeleteConfirm := PrevSkipConfirm;
+  end;
+end;
+
+procedure TFormTypeEditor.ActionGridPointsPasteExecute(Sender: TObject);
+var
+  NewP: TTypePoint;
+begin
+  if (FType = nil) or (FClipboardPoint = nil) then Exit;
+  NewP := FType.AddTypePoint;
+  if NewP = nil then Exit;
+  NewP.Assign(FClipboardPoint);
+  NewP.ID := TEntityHelpers<TTypePoint>.NextID(FType.Points);
+  NewP.DeviceTypeID := FType.ID;
+  NewP.DeviceTypeUUID := FType.UUID;
+  NewP.State := osNew;
+  NewP.Enable := False;
+  UpdatePointsGrid;
+  if GridPoints.RowCount > 0 then
+    GridPoints.Selected := GridPoints.RowCount - 1;
+  SetModified;
 end;
 
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
