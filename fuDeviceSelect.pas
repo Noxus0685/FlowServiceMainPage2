@@ -173,6 +173,7 @@ type
     procedure aDeviceCutExecute(Sender: TObject);
     procedure UpdateDeviceActions(Sender: TObject);
     procedure aRefreshRepositoryExecute(Sender: TObject);
+    procedure FullRefreshDevicesView;
     procedure GridDevicesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure GridDevicesMouseDown(Sender: TObject; Button: TMouseButton;
@@ -238,6 +239,7 @@ private
   procedure FillComboBoxRepository;              // список репозиториев приборов
   function UpdateConnection: Boolean;             // смена активного репозитория
   procedure ClearTreeAndGrid;                     // очистка UI при смене репозитория
+  procedure RebuildTreeFull;                      // полная перерисовка дерева
   function GetSelectedDevices: TObjectList<TDevice>;
   function GetActiveTreeNode: TTreeViewItem;
   procedure ClearCheckedDevices;
@@ -529,9 +531,7 @@ begin
     if not AppServices.DataManager.ActiveDeviceRepo.Load then
       raise Exception.Create('Не удалось загрузить приборы');
 
-    UpdateGridDevices; // обновление таблицы приборов
-    BuildTree;         // если есть дерево
-    ApplyFilter;
+    FullRefreshDevicesView;
 
     ShowMessage('Приборы загружены');
   finally
@@ -627,9 +627,7 @@ begin
     if not Repo.Save then
       raise Exception.Create('Не удалось сохранить изменения приборов');
 
-    UpdateGridDevices; // обновление таблицы приборов
-    BuildTree;         // если есть дерево
-    ApplyFilter;
+    FullRefreshDevicesView;
 
     ShowMessage('Изменения успешно сохранены');
   finally
@@ -1185,12 +1183,15 @@ procedure TFormDeviceSelect.UpdateDeviceActions(Sender: TObject);
 var
   HasRepo: Boolean;
   HasRows: Boolean;
+  HasGridFocus: Boolean;
   HasSelectedRow: Boolean;
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0);
+  HasGridFocus := (GridDevices <> nil) and GridDevices.IsFocused;
   HasSelectedRow :=
     HasRows and
+    HasGridFocus and
     (GridDevices.Row >= 0) and
     (GridDevices.Row < FDevFilteredDevices.Count);
 
@@ -1484,14 +1485,12 @@ end;
 
 procedure TFormDeviceSelect.aRefreshRepositoryExecute(Sender: TObject);
 begin
-  {----------------------------------}
-  { Пересборка дерева }
-  {----------------------------------}
-  BuildTree;
+  FullRefreshDevicesView;
+end;
 
-  {----------------------------------}
-  { Полная пересборка фильтров + сортировка }
-  {----------------------------------}
+procedure TFormDeviceSelect.FullRefreshDevicesView;
+begin
+  RebuildTreeFull;
   ApplyFilter;
   UpdateGridDevices;
 end;
@@ -1933,6 +1932,18 @@ begin
   FDevices := ActiveRepo.Devices;
 
   Result := True;
+end;
+
+procedure TFormDeviceSelect.RebuildTreeFull;
+begin
+  TreeViewDevices.BeginUpdate;
+  try
+    TreeViewDevices.Clear;
+  finally
+    TreeViewDevices.EndUpdate;
+  end;
+
+  BuildTree;
 end;
 
 procedure TFormDeviceSelect.ClearTreeAndGrid;
@@ -2519,7 +2530,7 @@ end;
 procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if Key = vkEscape then
+  if (Key = vkEscape) and ((GridDevices <> nil) and GridDevices.IsFocused) then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2527,7 +2538,7 @@ begin
     Exit;
   end;
 
-  if Key = vkReturn then
+  if (Key = vkReturn) and ((GridDevices <> nil) and GridDevices.IsFocused) then
   begin
     ModalResult := mrOk;
     Key := 0;
