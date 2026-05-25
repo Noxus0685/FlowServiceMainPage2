@@ -43,6 +43,7 @@ uses
   System.Types,
   System.UITypes,
   System.Variants,
+  FmxHelper,
   uBaseProcedures,
   uClasses,
   uDataManager,
@@ -1632,20 +1633,32 @@ begin
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuCopyClick(Sender: TObject);
+var
+  V: TValue;
 begin
-  GridDiameters.CopyToClipboard;
+  if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
+    Exit;
+
+  V := GridDiameters.GetValue(GridDiameters.Col, GridDiameters.Row);
+  CopyTextToClipboard(V.ToString);
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuCutClick(Sender: TObject);
 begin
-  GridDiameters.CopyToClipboard;
+  GridDiametersMenuCopyClick(Sender);
   if (GridDiameters.Col >= 0) and (GridDiameters.Row >= 0) then
     GridDiameters.SetValue(GridDiameters.Col, GridDiameters.Row, '');
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuPasteClick(Sender: TObject);
+var
+  ClipText: string;
 begin
-  GridDiameters.PasteFromClipboard;
+  if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
+    Exit;
+
+  ClipText := GetTextFromClipboard;
+  GridDiameters.SetValue(GridDiameters.Col, GridDiameters.Row, ClipText);
 end;
 
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
