@@ -1878,6 +1878,15 @@ begin
     Exit;
   end;
 
+  if AppServices.DataManager.RepositoryNameExists(RepoName) then
+  begin
+    ShowMessage(Format(
+      'Репозиторий с именем "%s" уже существует. Создание отменено.',
+      [RepoName]
+    ));
+    Exit;
+  end;
+
   {----------------------------------}
   { Диалог выбора файла БД }
   {----------------------------------}
