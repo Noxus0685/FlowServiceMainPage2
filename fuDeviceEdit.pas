@@ -303,6 +303,7 @@ type
     procedure GridPointsHeaderClick(Column: TColumn);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
+    procedure sbRepeatsChange(Sender: TObject);
     procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
 
@@ -743,8 +744,8 @@ begin
   {-----------------------------------------------------}
   { Повторы }
   {-----------------------------------------------------}
-  NewP.RepeatsProtocol := 3;
-  NewP.Repeats := 3;
+  NewP.RepeatsProtocol := Max(FDevice.Repeats, 1);
+  NewP.Repeats := Max(FDevice.Repeats, 1);
 
 
   {-----------------------------------------------------}
@@ -2118,6 +2119,35 @@ begin
       if P <> nil then
         P.SpillageStop := FDevice.SpillageStop;
 
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.sbRepeatsChange(Sender: TObject);
+var
+  P: TDevicePoint;
+  RepeatsValue: Integer;
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  RepeatsValue := Max(Round(sbRepeats.Value), 1);
+
+  if not SameValue(sbRepeats.Value, RepeatsValue, 0.001) then
+    sbRepeats.Value := RepeatsValue;
+
+  FDevice.Repeats := RepeatsValue;
+
+  if FDevice.Points <> nil then
+    for P in FDevice.Points do
+      if P <> nil then
+      begin
+        P.RepeatsProtocol := RepeatsValue;
+        P.Repeats := RepeatsValue;
+        if P.State <> osNew then
+          P.State := osModified;
+      end;
+
+  UpdatePointsGrid;
   SetModified;
 end;
 
