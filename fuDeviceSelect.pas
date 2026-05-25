@@ -2568,7 +2568,7 @@ begin
     Exit;
   end;
 
-  if (Key = vkReturn) and GridDevices.IsFocused and  IsGridInputFocused then
+  if (Key = vkReturn) and (GridDevices.Row>=0) then
   begin
     ModalResult := mrOk;
     Key := 0;
@@ -2576,7 +2576,7 @@ begin
     Exit;
   end;
 
-  if Key = vkDelete then
+  if (Key = vkDelete) and (GridDevices.Row>=0) then
   begin
     ButtonDeviceDeleteClick(ButtonDeviceDelete);
     Key := 0;
