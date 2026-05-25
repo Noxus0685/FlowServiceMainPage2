@@ -1206,7 +1206,7 @@ end;
 
 procedure TFormTypeSelect.EditFindTypeChangeTracking(Sender: TObject);
 begin
-  sbFind.IsPressed := Trim(EditFindType.Text) <> '';
+  actFilterFind.Checked := Trim(EditFindType.Text) <> '';
 end;
 
 {$R *.fmx}
@@ -1542,7 +1542,7 @@ begin
   ApplyFilter;
   UpdateGridTypes;
   // фильтров больше нет
-  sbFind.IsPressed := False;
+  actFilterFind.Checked := False;
 end;
 
 procedure TFormTypeSelect.actFilterFindExecute(Sender: TObject);
@@ -1609,7 +1609,7 @@ begin
       ApplyFilter;
       UpdateGridTypes;
       // фильтров больше нет
-      sbFind.IsPressed := False;
+      actFilterFind.Checked := False;
     end;
   end
   else
@@ -1740,7 +1740,7 @@ begin
 
   GridTypes.Repaint;
 
-  sbFind.IsPressed := HasActiveFilters;
+  actFilterFind.Checked := HasActiveFilters;
 end;
 
 procedure TFormTypeSelect.ClearGridSelection;
