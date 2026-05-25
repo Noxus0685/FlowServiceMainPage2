@@ -378,6 +378,7 @@ type
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
     procedure GridPointsHeaderClick(Column: TColumn);
+    function TryParseNumericTextForSort(const S: string; out AValue: Double): Boolean;
     // Выбор PDF-файла вручную через диалог.
     function SelectPdfFile(var APdfFilePath: string): Boolean;
     // Извлечение текстового слоя из PDF через pdftotext.exe.
@@ -1645,27 +1646,28 @@ begin
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
 end;
 
+function TFormTypeEditor.TryParseNumericTextForSort(const S: string; out AValue: Double): Boolean;
+var
+  N: Double;
+  T: string;
+begin
+  T := Trim(S);
+  Result := T <> '';
+  if not Result then
+    Exit;
+
+  N := NormalizeFloatInput(T);
+  Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
+    SameText(T, '0,0') or SameText(T, '0.0');
+  if Result then
+    AValue := N;
+end;
+
 
 
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
 var
   SortColumn: Integer;
-  function TryParseNumericText(const S: string; out AValue: Double): Boolean;
-  var
-    N: Double;
-    T: string;
-  begin
-    T := Trim(S);
-    Result := T <> '';
-    if not Result then
-      Exit;
-
-    N := NormalizeFloatInput(T);
-    Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
-      SameText(T, '0,0') or SameText(T, '0.0');
-    if Result then
-      AValue := N;
-  end;
 begin
   if FRectGridDiametersHeader <> nil then
     FRectGridDiametersHeader.HitTest := True;
@@ -1706,7 +1708,7 @@ begin
       case FDiametersSortColumn of
         0:
         begin
-          if TryParseNumericText(Left.Name, LNum) and TryParseNumericText(Right.Name, RNum) then
+          if TryParseNumericTextForSort(Left.Name, LNum) and TryParseNumericTextForSort(Right.Name, RNum) then
             Result := CompareValue(LNum, RNum)
           else
             Result := CompareText(Trim(Left.Name), Trim(Right.Name));
@@ -1744,22 +1746,6 @@ end;
 procedure TFormTypeEditor.GridPointsHeaderClick(Column: TColumn);
 var
   SortColumn: Integer;
-  function TryParseNumericText(const S: string; out AValue: Double): Boolean;
-  var
-    N: Double;
-    T: string;
-  begin
-    T := Trim(S);
-    Result := T <> '';
-    if not Result then
-      Exit;
-
-    N := NormalizeFloatInput(T);
-    Result := not SameValue(N, 0, MinDouble) or SameText(T, '0') or
-      SameText(T, '0,0') or SameText(T, '0.0');
-    if Result then
-      AValue := N;
-  end;
 begin
   if (Column = nil) or (FPointsLocal = nil) then
     Exit;
@@ -1795,7 +1781,7 @@ begin
 
       if FPointsSortColumn = StringColumnPointName.Index then
       begin
-        if TryParseNumericText(Left.Name, LNum) and TryParseNumericText(Right.Name, RNum) then
+        if TryParseNumericTextForSort(Left.Name, LNum) and TryParseNumericTextForSort(Right.Name, RNum) then
           Result := CompareValue(LNum, RNum)
         else
           Result := CompareText(Trim(Left.Name), Trim(Right.Name));
