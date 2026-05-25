@@ -1240,7 +1240,7 @@ var
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0);
-  HasGridFocus := IsGridInputFocused;
+  HasGridFocus := GridDevices.Row>=0;// IsGridInputFocused;
   HasSelectedRow :=
     HasRows and
     HasGridFocus and
