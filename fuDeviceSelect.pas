@@ -178,6 +178,8 @@ type
       Shift: TShiftState);
     procedure GridDevicesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure GridDevicesEnter(Sender: TObject);
+    procedure GridDevicesExit(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
 
@@ -1201,6 +1203,9 @@ begin
   aDeviceCopy.Enabled := HasRows;
   aDeviceCut.Enabled := HasRepo and HasRows;
   aDevicePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferDevices;
+
+  CornerButtonEditDevice.Enabled := aEditType.Enabled;
+  CornerButton1.Enabled := HasSelectedRow;
 end;
 
 function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;
@@ -2440,7 +2445,13 @@ end;
 
 procedure TFormDeviceSelect.btnOKClick(Sender: TObject);
 begin
-  ModalResult := mrCancel;
+  if (GridDevices = nil) or (not GridDevices.IsFocused) then
+    Exit;
+
+  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  ModalResult := mrOk;
 end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
@@ -2483,6 +2494,8 @@ begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
   GridDevices.OnMouseDown := GridDevicesMouseDown;
+  GridDevices.OnEnter := GridDevicesEnter;
+  GridDevices.OnExit := GridDevicesExit;
 
   {----------------------------------}
   { Инициализация сортировки }
@@ -2519,7 +2532,7 @@ end;
 procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if Key = vkEscape then
+  if (Key = vkEscape) and (GridDevices <> nil) and GridDevices.IsFocused then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2570,6 +2583,16 @@ begin
 
   if ssDouble in Shift then
     CornerButtonEditDeviceClick(CornerButtonEditDevice);
+end;
+
+procedure TFormDeviceSelect.GridDevicesEnter(Sender: TObject);
+begin
+  UpdateDeviceActions(nil);
+end;
+
+procedure TFormDeviceSelect.GridDevicesExit(Sender: TObject);
+begin
+  UpdateDeviceActions(nil);
 end;
 
 procedure TFormDeviceSelect.ApplyInitialSelection;
