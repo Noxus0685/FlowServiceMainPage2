@@ -855,8 +855,8 @@ procedure TFrameMainTable.StopMonitor;
 begin
   if FActiveWorkTable <> nil then
   begin
-    FActiveWorkTable.State := swtSTOPMONITOR;
-    ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Остановка мониторинга из UI', FActiveWorkTable.Name);
+    FActiveWorkTable.StopMonitor;
+    ProtocolManager.AddMessage(pcAction, psForm, 'StopMonitor', 'Пользователь запросил остановку мониторинга', FActiveWorkTable.Name);
   end;
 end;
 
@@ -944,6 +944,8 @@ end;
 
 procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
 begin
+  AWorkTable.ExecuteAction;
+
   if AData is TDevicePoint then
     OnChangePoint(AWorkTable, TDevicePoint(AData), -1);
 
