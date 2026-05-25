@@ -1547,6 +1547,14 @@ begin
     actTypeSelectExecute(actTypeSelect);
     Key := 0;
     KeyChar := #0;
+    Exit;
+  end;
+
+  if (Key = vkDelete) and (GridTypes.Row >= 0) and actTypeDelete.Enabled then
+  begin
+    actTypeDeleteExecute(actTypeDelete);
+    Key := 0;
+    KeyChar := #0;
   end;
 end;
 
