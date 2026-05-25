@@ -1454,7 +1454,7 @@ begin
     Exit;
 
   ParentNode := SelectedNode.ParentItem;
-  ReplacementNode := ParentNode;
+  ReplacementNode := nil;
   if ParentNode <> nil then
   begin
     NodeIndex := -1;
@@ -1499,10 +1499,14 @@ begin
     CurrentNode := ParentNode;
   end;
 
-  if ReplacementNode <> nil then
+  if (ReplacementNode <> nil) and (ReplacementNode.TreeView = TreeViewDevices) then
     TreeViewDevices.Selected := ReplacementNode
+  else if (CurrentNode <> nil) and (CurrentNode.TreeView = TreeViewDevices) then
+    TreeViewDevices.Selected := CurrentNode
+  else if TreeViewDevices.Count > 0 then
+    TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0)
   else
-    TreeViewDevices.Selected := CurrentNode;
+    TreeViewDevices.Selected := nil;
 end;
 
 procedure TFormDeviceSelect.ApplyFilter;
