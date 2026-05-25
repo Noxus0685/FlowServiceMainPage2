@@ -373,6 +373,8 @@ type
     procedure EditRangeDynamicCanFocus(Sender: TObject; var ACanFocus: Boolean);
     procedure RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
     procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
     procedure GridDiametersMenuCopyClick(Sender: TObject);
     procedure GridDiametersMenuCutClick(Sender: TObject);
@@ -700,6 +702,7 @@ end;
    TabItemCoefs.Visible := False;
    OnKeyDown := FormKeyDown;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
+   GridDiameters.OnMouseDown := GridDiametersMouseDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
 
    FGridDiametersHeaderColumnIndex := -1;
@@ -1662,13 +1665,26 @@ begin
   GridDiametersSetValue(GridDiameters, GridDiameters.Col, GridDiameters.Row, ClipText);
 end;
 
+procedure TFormTypeEditor.GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Single);
+var
+  P: TPointF;
+begin
+  if Button <> TMouseButton.mbRight then
+    Exit;
+
+  SyncGridDiametersHeaderPopupMenu;
+  P := GridDiameters.LocalToScreen(PointF(X, Y));
+  FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
+  FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
+end;
+
 procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
 var
   I: Integer;
   ColLeft: Single;
   ColRight: Single;
-  P: TPointF;
 begin
   // Для ЛКМ выполняем сортировку по колонке заголовка под курсором.
   if Button = TMouseButton.mbLeft then
@@ -1694,38 +1710,8 @@ begin
     Exit;
   end;
 
-  // Для ПКМ сохраняем текущую логику вызова popup-меню видимости колонок.
-  if (Button = TMouseButton.mbRight) then
-    FRectGridDiametersHeader.HitTest := True
-  else
-    Exit;
-  FGridDiametersHeaderColumnIndex := -1;
-  ColLeft := 0;
-
-  // Определяем индекс колонки заголовка по X, учитывая только видимые колонки.
-  for I := 0 to GridDiameters.ColumnCount - 1 do
-  begin
-    if not GridDiameters.Columns[I].Visible then
-      Continue;
-
-    ColRight := ColLeft + GridDiameters.Columns[I].Width;
-    if (X >= ColLeft) and (X <= ColRight) then
-    begin
-      FGridDiametersHeaderColumnIndex := I;
-      Break;
-    end;
-    ColLeft := ColRight;
-  end;
-
-  if FGridDiametersHeaderColumnIndex < 0 then
-    Exit;
-
-  // Перед показом меню синхронизируем checkbox с текущим Visible колонок.
-  SyncGridDiametersHeaderPopupMenu;
-
-  P := FRectGridDiametersHeader.LocalToScreen(PointF(X, Y));
-  FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
-  FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
+  // На header больше не открываем контекстное меню.
+  // Контекстное меню доступно только по ПКМ на самом GridDiameters.
 end;
 
 function TFormTypeEditor.TryParseNumericTextForSort(const S: string; out AValue: Double): Boolean;
