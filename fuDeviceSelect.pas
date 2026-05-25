@@ -173,10 +173,13 @@ type
     procedure aDeviceCutExecute(Sender: TObject);
     procedure UpdateDeviceActions(Sender: TObject);
     procedure aRefreshRepositoryExecute(Sender: TObject);
+    procedure FullRefreshDevicesView;
     procedure GridDevicesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure GridDevicesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure GridDevicesEnter(Sender: TObject);
+    procedure GridDevicesExit(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
 
@@ -238,11 +241,13 @@ private
   procedure FillComboBoxRepository;              // список репозиториев приборов
   function UpdateConnection: Boolean;             // смена активного репозитория
   procedure ClearTreeAndGrid;                     // очистка UI при смене репозитория
+  procedure RebuildTreeFull;                      // полная перерисовка дерева
   function GetSelectedDevices: TObjectList<TDevice>;
   function GetActiveTreeNode: TTreeViewItem;
   procedure ClearCheckedDevices;
   function GetCheckedDevices: TObjectList<TDevice>;
   procedure ClearGridSelection;
+  function IsGridInputFocused: Boolean;
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
@@ -529,9 +534,7 @@ begin
     if not AppServices.DataManager.ActiveDeviceRepo.Load then
       raise Exception.Create('Не удалось загрузить приборы');
 
-    UpdateGridDevices; // обновление таблицы приборов
-    BuildTree;         // если есть дерево
-    ApplyFilter;
+    FullRefreshDevicesView;
 
     ShowMessage('Приборы загружены');
   finally
@@ -627,9 +630,7 @@ begin
     if not Repo.Save then
       raise Exception.Create('Не удалось сохранить изменения приборов');
 
-    UpdateGridDevices; // обновление таблицы приборов
-    BuildTree;         // если есть дерево
-    ApplyFilter;
+    FullRefreshDevicesView;
 
     ShowMessage('Изменения успешно сохранены');
   finally
@@ -1185,12 +1186,15 @@ procedure TFormDeviceSelect.UpdateDeviceActions(Sender: TObject);
 var
   HasRepo: Boolean;
   HasRows: Boolean;
+  HasGridFocus: Boolean;
   HasSelectedRow: Boolean;
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0);
+  HasGridFocus := IsGridInputFocused;
   HasSelectedRow :=
     HasRows and
+    HasGridFocus and
     (GridDevices.Row >= 0) and
     (GridDevices.Row < FDevFilteredDevices.Count);
 
@@ -1200,6 +1204,9 @@ begin
   aDeviceCopy.Enabled := HasRows;
   aDeviceCut.Enabled := HasRepo and HasRows;
   aDevicePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferDevices;
+
+  CornerButtonEditDevice.Enabled := aEditType.Enabled;
+  CornerButton1.Enabled := HasSelectedRow;
 end;
 
 function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;
@@ -1234,6 +1241,24 @@ begin
 
   for I := 0 to FDevFilteredDevices.Count - 1 do
     Result.Add(FDevFilteredDevices[I]);
+end;
+
+function TFormDeviceSelect.IsGridInputFocused: Boolean;
+var
+  Ref: IInterfaceComponentReference;
+begin
+  Result := False;
+
+  if (GridDevices = nil) or (not GridDevices.IsFocused) then
+    Exit;
+
+  if ActiveControl = nil then
+    Exit;
+
+  if not Supports(ActiveControl, IInterfaceComponentReference, Ref) then
+    Exit;
+
+  Result := Ref.GetComponent = GridDevices;
 end;
 
 procedure TFormDeviceSelect.ClearCheckedDevices;
@@ -1484,14 +1509,12 @@ end;
 
 procedure TFormDeviceSelect.aRefreshRepositoryExecute(Sender: TObject);
 begin
-  {----------------------------------}
-  { Пересборка дерева }
-  {----------------------------------}
-  BuildTree;
+  FullRefreshDevicesView;
+end;
 
-  {----------------------------------}
-  { Полная пересборка фильтров + сортировка }
-  {----------------------------------}
+procedure TFormDeviceSelect.FullRefreshDevicesView;
+begin
+  RebuildTreeFull;
   ApplyFilter;
   UpdateGridDevices;
 end;
@@ -1933,6 +1956,18 @@ begin
   FDevices := ActiveRepo.Devices;
 
   Result := True;
+end;
+
+procedure TFormDeviceSelect.RebuildTreeFull;
+begin
+  TreeViewDevices.BeginUpdate;
+  try
+    TreeViewDevices.Clear;
+  finally
+    TreeViewDevices.EndUpdate;
+  end;
+
+  BuildTree;
 end;
 
 procedure TFormDeviceSelect.ClearTreeAndGrid;
@@ -2429,7 +2464,13 @@ end;
 
 procedure TFormDeviceSelect.btnOKClick(Sender: TObject);
 begin
-  ModalResult := mrCancel;
+  if not IsGridInputFocused then
+    Exit;
+
+  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  ModalResult := mrOk;
 end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
@@ -2472,6 +2513,8 @@ begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
   GridDevices.OnMouseDown := GridDevicesMouseDown;
+  GridDevices.OnEnter := GridDevicesEnter;
+  GridDevices.OnExit := GridDevicesExit;
 
   {----------------------------------}
   { Инициализация сортировки }
@@ -2508,7 +2551,7 @@ end;
 procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if Key = vkEscape then
+  if (Key = vkEscape) and IsGridInputFocused then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2519,7 +2562,7 @@ end;
 procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if Key = vkEscape then
+  if (Key = vkEscape) and IsGridInputFocused then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2527,7 +2570,7 @@ begin
     Exit;
   end;
 
-  if Key = vkReturn then
+  if (Key = vkReturn) and IsGridInputFocused then
   begin
     ModalResult := mrOk;
     Key := 0;
@@ -2559,6 +2602,16 @@ begin
 
   if ssDouble in Shift then
     CornerButtonEditDeviceClick(CornerButtonEditDevice);
+end;
+
+procedure TFormDeviceSelect.GridDevicesEnter(Sender: TObject);
+begin
+  UpdateDeviceActions(nil);
+end;
+
+procedure TFormDeviceSelect.GridDevicesExit(Sender: TObject);
+begin
+  UpdateDeviceActions(nil);
 end;
 
 procedure TFormDeviceSelect.ApplyInitialSelection;
