@@ -1380,6 +1380,7 @@ begin
   finally
     GridPoints.EndUpdate;
   end;
+  GridPoints.Repaint;
 end;
 
 procedure TFormTypeEditor.UpdateCoefsGrid;
@@ -1726,27 +1727,32 @@ begin
       if Right.State = osDeleted then
         Exit(-1);
 
-      case FDiametersSortColumn of
-        0:
-        begin
-          if TryParseNumericTextForSort(Left.Name, LNum) and TryParseNumericTextForSort(Right.Name, RNum) then
-            Result := CompareValue(LNum, RNum)
-          else
-            Result := CompareText(Trim(Left.Name), Trim(Right.Name));
-        end;
-        1: Result := CompareValue(Left.Qmin, Right.Qmin);
-        2: Result := CompareValue(Left.Qtr, Right.Qtr);
-        3: Result := CompareValue(Left.Q2tr, Right.Q2tr);
-        4: Result := CompareValue(Left.Qnom, Right.Qnom);
-        5: Result := CompareValue(Left.Qmax, Right.Qmax);
-        6: Result := CompareValue(Left.QFmax, Right.QFmax);
-        7: Result := CompareValue(Left.Kp, Right.Kp);
+      if FDiametersSortColumn = StringColumnDNName.Index then
+      begin
+        if TryParseNumericTextForSort(Left.Name, LNum) and TryParseNumericTextForSort(Right.Name, RNum) then
+          Result := CompareValue(LNum, RNum)
+        else
+          Result := CompareText(Trim(Left.Name), Trim(Right.Name));
+      end
+      else if FDiametersSortColumn = StringColumnDNQmin.Index then
+        Result := CompareValue(Left.Qmin, Right.Qmin)
+      else if FDiametersSortColumn = StringColumnDNQTr.Index then
+        Result := CompareValue(Left.Qtr, Right.Qtr)
+      else if FDiametersSortColumn = StringColumnDNQ2tr.Index then
+        Result := CompareValue(Left.Q2tr, Right.Q2tr)
+      else if FDiametersSortColumn = StringColumnDNQnom.Index then
+        Result := CompareValue(Left.Qnom, Right.Qnom)
+      else if FDiametersSortColumn = StringColumnDNQmax.Index then
+        Result := CompareValue(Left.Qmax, Right.Qmax)
+      else if FDiametersSortColumn = StringColumnDNQF.Index then
+        Result := CompareValue(Left.QFmax, Right.QFmax)
+      else if FDiametersSortColumn = StringColumnDNKp.Index then
+        Result := CompareValue(Left.Kp, Right.Kp)
       else
       begin
         LNum := Left.ID;
         RNum := Right.ID;
         Result := CompareValue(LNum, RNum);
-      end;
       end;
 
       if Result = 0 then
