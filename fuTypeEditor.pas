@@ -1634,13 +1634,13 @@ end;
 
 procedure TFormTypeEditor.GridDiametersMenuCopyClick(Sender: TObject);
 var
-  V: TValue;
+  CellText: string;
 begin
   if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
     Exit;
 
-  V := GridDiameters.GetValue(GridDiameters.Col, GridDiameters.Row);
-  CopyTextToClipboard(V.ToString);
+  CellText := GridDiameters.Cells[GridDiameters.Col, GridDiameters.Row];
+  CopyTextToClipboard(CellText);
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuCutClick(Sender: TObject);
