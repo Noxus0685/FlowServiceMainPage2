@@ -149,7 +149,6 @@ type
     procedure TreeViewTypesMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure EditFindTypeChangeTracking(Sender: TObject);
-    procedure EditFindTypeExit(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
     procedure GridTypesHeaderClick(Column: TColumn);
     procedure GridTypesMouseDown(Sender: TObject; Button: TMouseButton;
@@ -181,6 +180,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure aRefreshRepositoryExecute(Sender: TObject);
+    procedure EditFindTypeChange(Sender: TObject);
 
   private
 
@@ -1198,10 +1198,11 @@ FDevFilteredByDate :=
   UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.EditFindTypeExit(Sender: TObject);
+procedure TFormTypeSelect.EditFindTypeChange(Sender: TObject);
 begin
     ApplyFilter;
     UpdateGridTypes;
+    EditFindTypeChangeTracking(self);
 end;
 
 procedure TFormTypeSelect.EditFindTypeChangeTracking(Sender: TObject);
@@ -1280,7 +1281,7 @@ begin
    TreeViewTypes.MultiSelect := True;
    OnKeyDown := FormKeyDown;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
-   EditFindType.OnChangeTracking := EditFindTypeChangeTracking;
+   //EditFindType.OnChangeTracking := EditFindTypeChangeTracking;
    GridTypes.OnMouseDown := GridTypesMouseDown;
    GridTypes.OnKeyDown := GridTypesKeyDown;
 

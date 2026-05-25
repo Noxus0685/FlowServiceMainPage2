@@ -103,8 +103,8 @@ object FormTypeEditor: TFormTypeEditor
       Size.Height = 51.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
-      Viewport.Width = 790.000000000000000000
-      Viewport.Height = 47.000000000000000000
+      Viewport.Width = 794.000000000000000000
+      Viewport.Height = 51.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000
@@ -227,6 +227,7 @@ object FormTypeEditor: TFormTypeEditor
         end
         object ComboBoxOutputType: TComboBox
           Align = Client
+          Hint = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
           Items.Strings = (
             #1063#1072#1089#1090#1086#1090#1072
             #1048#1084#1087#1091#1083#1100#1089#1099
@@ -269,6 +270,7 @@ object FormTypeEditor: TFormTypeEditor
         end
         object cbMeasuredDimension: TComboBox
           Align = Client
+          Hint = #1048#1079#1084#1077#1088#1103#1077#1084#1072#1103' '#1074#1077#1083#1080#1095#1080#1085#1072
           Items.Strings = (
             #1054#1073#1098#1077#1084#1085#1099#1081' '#1088#1072#1089#1093#1086#1076
             #1052#1072#1089#1089#1086#1074#1099#1081' '#1088#1072#1089#1093#1086#1076
@@ -310,6 +312,7 @@ object FormTypeEditor: TFormTypeEditor
         end
         object ComboBoxUnits: TComboBox
           Align = Client
+          Hint = #1045#1076#1080#1085#1080#1094#1099' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
           Items.Strings = (
             #1083'/'#1089
             #1083'/'#1084#1080#1085
@@ -1255,11 +1258,12 @@ object FormTypeEditor: TFormTypeEditor
             end
             object cbOutPutType: TComboBox
               Align = Client
+              Hint = #1058#1080#1087' '#1074#1099#1093#1086#1076#1072
               Items.Strings = (
                 #1055#1072#1089#1089#1080#1074#1085#1099#1081
                 #1040#1082#1090#1080#1074#1085#1099#1081
                 #1054#1087#1090#1086#1089#1095#1080#1090#1099#1074#1072#1090#1077#1083#1100)
-              ItemIndex = 1
+              ItemIndex = 2
               Margins.Top = 1.000000000000000000
               Margins.Bottom = 1.000000000000000000
               Size.Width = 141.000000000000000000
@@ -1295,7 +1299,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1040#1076#1088#1077#1089' '#1087#1088#1080#1073#1086#1088#1072
+              Hint = #1063#1072#1089#1090#1086#1090#1072
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 141.000000000000000000
@@ -1373,7 +1377,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1040#1076#1088#1077#1089' '#1087#1088#1080#1073#1086#1088#1072
+              Hint = #1056#1072#1089#1093#1086#1076
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 141.000000000000000000
@@ -1448,7 +1452,7 @@ object FormTypeEditor: TFormTypeEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 40
+            TabOrder = 39
             object labName: TLabel
               Align = Left
               Margins.Left = 4.000000000000000000
@@ -1463,7 +1467,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1048#1079#1075#1086#1090#1086#1074#1080#1090#1077#1083#1100
+              Hint = #1053#1072#1080#1084#1077#1085#1086#1074#1072#1085#1080#1077' '#1090#1080#1087#1072' '#1087#1088#1080#1073#1086#1088#1072
               Margins.Top = 5.000000000000000000
               Margins.Right = 4.000000000000000000
               Margins.Bottom = 5.000000000000000000
@@ -1489,7 +1493,7 @@ object FormTypeEditor: TFormTypeEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 39
+            TabOrder = 38
             object Label11: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1505,6 +1509,7 @@ object FormTypeEditor: TFormTypeEditor
               TabOrder = 1
               ItemHeight = 19.000000000000000000
               ItemIndex = -1
+              Hint = #1050#1072#1090#1077#1075#1086#1088#1080#1103' '#1089#1088#1077#1076#1089#1090#1074#1072' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 177.000000000000000000
@@ -1537,7 +1542,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1048#1079#1075#1086#1090#1086#1074#1080#1090#1077#1083#1100
+              Hint = #1048#1079#1075#1086#1090#1086#1074#1080#1090#1077#1083#1100' '#1089#1088#1077#1076#1089#1090#1074' '#1080#1079#1084#1077#1088#1077#1085#1080#1081
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 177.000000000000000000
@@ -1575,7 +1580,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1048#1079#1075#1086#1090#1086#1074#1080#1090#1077#1083#1100
+              Hint = #1053#1072#1079#1074#1072#1085#1080#1077' '#1076#1086#1082#1091#1084#1077#1085#1090#1072' '#1052#1055
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 147.000000000000000000
@@ -1674,7 +1679,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1048#1079#1075#1086#1090#1086#1074#1080#1090#1077#1083#1100
+              Hint = #1052#1086#1076#1080#1092#1080#1082#1072#1094#1080#1103
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 177.000000000000000000
@@ -1719,7 +1724,7 @@ object FormTypeEditor: TFormTypeEditor
                 Touch.InteractiveGestures = [LongTap, DoubleTap]
                 Align = Client
                 TabOrder = 1
-                Hint = #1055#1086#1089#1083#1077
+                Hint = #1044#1072#1090#1072' '#1086#1082#1086#1085#1095#1072#1085#1080#1103' '#1076#1077#1081#1089#1090#1074#1080#1103' '#1091#1090#1074#1077#1088#1078#1076#1077#1085#1080#1103' '#1090#1080#1087#1072
                 Margins.Top = 5.000000000000000000
                 Margins.Bottom = 5.000000000000000000
                 Size.Width = 80.000000000000000000
@@ -1748,7 +1753,7 @@ object FormTypeEditor: TFormTypeEditor
                 Align = Left
                 TabOrder = 0
                 Position.Y = 5.000000000000000000
-                Hint = #1053#1086#1084#1077#1088' '#1074' '#1075#1086#1089#1088#1077#1077#1089#1090#1088#1077
+                Hint = #1044#1072#1090#1072' '#1091#1090#1074#1077#1088#1078#1076#1077#1085#1080#1103' '#1090#1080#1087#1072
                 Margins.Top = 5.000000000000000000
                 Margins.Bottom = 5.000000000000000000
                 Size.Width = 73.000000000000000000
@@ -1787,7 +1792,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1053#1086#1084#1077#1088' '#1074' '#1075#1086#1089#1088#1077#1077#1089#1090#1088#1077
+              Hint = #1052#1077#1078#1087#1086#1074#1077#1088#1086#1095#1085#1099#1081' '#1080#1085#1090#1077#1088#1074#1072#1083
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 177.000000000000000000
@@ -1864,7 +1869,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1060#1072#1081#1083' '#1086#1090#1095#1077#1090#1085#1086#1081' '#1092#1086#1088#1084#1099
+              Hint = #1054#1090#1095#1077#1090#1085#1072#1103' '#1092#1086#1088#1084#1072
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 147.000000000000000000
@@ -1919,6 +1924,7 @@ object FormTypeEditor: TFormTypeEditor
                 #1048#1089#1087#1099#1090#1072#1085#1080#1103)
               ItemIndex = 0
               Text = #1055#1086#1074#1077#1088#1082#1072
+              Hint = #1042#1080#1076' '#1080#1079#1084#1077#1088#1077#1085#1080#1081
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 177.000000000000000000
@@ -1936,7 +1942,7 @@ object FormTypeEditor: TFormTypeEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 38
+            TabOrder = 37
             object Label41: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1950,7 +1956,7 @@ object FormTypeEditor: TFormTypeEditor
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
               TabOrder = 0
-              Hint = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
+              Hint = #1053#1072#1080#1084#1077#1085#1100#1096#1072#1103' '#1087#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
               Size.Width = 177.000000000000000000
@@ -2281,6 +2287,7 @@ object FormTypeEditor: TFormTypeEditor
           TabOrder = 38
           object ButtonDiameterDelete: TButton
             Align = Left
+            Hint = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1081' '#1076#1080#1072#1084#1077#1090#1088
             Position.X = 49.000000000000000000
             Size.Width = 40.000000000000000000
             Size.Height = 30.000000000000000000
@@ -2293,7 +2300,7 @@ object FormTypeEditor: TFormTypeEditor
           end
           object ButtonDiameterAdd: TButton
             Align = Left
-            Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1082#1086#1087#1080#1102' '#1074#1099#1073#1088#1072#1085#1085#1086#1075#1086
+            Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1089#1083#1077#1076#1091#1102#1097#1080#1081' '#1076#1080#1072#1084#1077#1090#1088
             Position.X = 89.000000000000000000
             Size.Width = 47.000000000000000000
             Size.Height = 30.000000000000000000
@@ -2306,6 +2313,7 @@ object FormTypeEditor: TFormTypeEditor
           end
           object ButtonDiameterClear: TButton
             Align = Left
+            Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1090#1072#1073#1083#1080#1094#1091
             Position.X = 5.000000000000000000
             Size.Width = 44.000000000000000000
             Size.Height = 30.000000000000000000
@@ -2411,8 +2419,8 @@ object FormTypeEditor: TFormTypeEditor
         OnGetValue = GridDiametersGetValue
         OnSetValue = GridDiametersSetValue
         OnCellClick = GridDiametersCellClick
-        Viewport.Width = 1062.000000000000000000
-        Viewport.Height = 267.000000000000000000
+        Viewport.Width = 1066.000000000000000000
+        Viewport.Height = 292.000000000000000000
         object CheckColumnDNEnable: TCheckColumn
           HeaderSettings.TextSettings.WordWrap = False
         end
@@ -2509,8 +2517,8 @@ object FormTypeEditor: TFormTypeEditor
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
           OnCellClick = GridPointsCellClick
-          Viewport.Width = 1052.000000000000000000
-          Viewport.Height = 225.000000000000000000
+          Viewport.Width = 1056.000000000000000000
+          Viewport.Height = 266.000000000000000000
           object CheckColumnPointEnable: TCheckColumn
             HeaderSettings.TextSettings.WordWrap = False
           end
@@ -2663,6 +2671,7 @@ object FormTypeEditor: TFormTypeEditor
           TabOrder = 6
           object ButtonPointDelete: TButton
             Align = Left
+            Hint = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1073#1088#1072#1085#1085#1099#1081' '#1076#1080#1072#1084#1077#1090#1088
             Position.X = 44.000000000000000000
             Size.Width = 40.000000000000000000
             Size.Height = 30.000000000000000000
@@ -2675,7 +2684,7 @@ object FormTypeEditor: TFormTypeEditor
           end
           object ButtonPointAdd: TButton
             Align = Left
-            Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1090#1086#1095#1082#1091' '#1082#1086#1087#1080#1102' '#1074#1099#1073#1088#1072#1085#1085#1086#1081
+            Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1089#1083#1077#1076#1091#1102#1097#1091#1102' '#1090#1086#1095#1082#1091
             Position.X = 84.000000000000000000
             Size.Width = 47.000000000000000000
             Size.Height = 30.000000000000000000
@@ -2688,6 +2697,7 @@ object FormTypeEditor: TFormTypeEditor
           end
           object ButtonPointsClear: TButton
             Align = Left
+            Hint = #1054#1095#1080#1089#1090#1080#1090#1100' '#1090#1072#1073#1083#1080#1094#1091
             Size.Width = 44.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
