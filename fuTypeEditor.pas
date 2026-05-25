@@ -381,6 +381,8 @@ type
     procedure SortGridDiametersByColumn(const ACol: Integer);
     procedure GridPointsHeaderClick(Column: TColumn);
     function TryParseNumericTextForSort(const S: string; out AValue: Double): Boolean;
+    // Получение текстового представления значения диаметра для сортировки строковых колонок.
+    function DiameterValueByCol(const ADiameter: TDiameter; const ACol: Integer): string;
     // Выбор PDF-файла вручную через диалог.
     function SelectPdfFile(var APdfFilePath: string): Boolean;
     // Извлечение текстового слоя из PDF через pdftotext.exe.
@@ -1709,6 +1711,40 @@ begin
 
   if Result then
     AValue := N;
+end;
+
+function TFormTypeEditor.DiameterValueByCol(const ADiameter: TDiameter; const ACol: Integer): string;
+begin
+  // Возвращаем строковое значение колонки для текстовой сортировки.
+  Result := '';
+  if ADiameter = nil then
+    Exit;
+
+  if ACol = StringColumnDNName.Index then
+    Result := ADiameter.Name
+  else if ACol = IntegerColumnDNSize.Index then
+    Result := ADiameter.DN
+  else if ACol = StringColumnDNQmin.Index then
+    Result := FloatToStr(ADiameter.Qmin)
+  else if ACol = StringColumnDNQTr.Index then
+    Result := FloatToStr(ADiameter.Qtr)
+  else if ACol = StringColumnDNQ2Tr.Index then
+    Result := FloatToStr(ADiameter.Q2tr)
+  else if ACol = StringColumnDNQnom.Index then
+    Result := FloatToStr(ADiameter.Qnom)
+  else if ACol = StringColumnDNQmax.Index then
+    Result := FloatToStr(ADiameter.Qmax)
+  else if ACol = StringColumnDNQF.Index then
+    Result := FloatToStr(ADiameter.QFmax)
+  else if ACol = StringColumnDNKp.Index then
+    Result := FloatToStr(ADiameter.Kp)
+  else if ACol = CheckColumnDNEnable.Index then
+  begin
+    if ADiameter.Enable then
+      Result := '1'
+    else
+      Result := '0';
+  end;
 end;
 
 
