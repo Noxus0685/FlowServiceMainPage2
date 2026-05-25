@@ -142,6 +142,7 @@ type
     MenuItem8: TMenuItem;
     MenuItem9: TMenuItem;
     actDeviceSelect: TAction;
+    sbClearDate: TSpeedButton;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -182,6 +183,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure actDeviceSelectExecute(Sender: TObject);
+    procedure sbClearDateClick(Sender: TObject);
 
 private
 
@@ -1654,6 +1656,21 @@ begin
     UpdateGridDevices;
 end;
 
+
+procedure TFormDeviceSelect.sbClearDateClick(Sender: TObject);
+begin
+  {----------------------------------}
+  { 1. Очистка фильтров ввода }
+  {----------------------------------}
+  EditFindDevice.Text := '';
+  DateEditFilter.IsEmpty := True;
+
+  {----------------------------------}
+  { 2. Пересчёт фильтров }
+  {----------------------------------}
+  ApplyFilter;
+  UpdateGridDevices;
+end;
 
 procedure TFormDeviceSelect.SpeedButtonFindInternetClick(Sender: TObject);
 var

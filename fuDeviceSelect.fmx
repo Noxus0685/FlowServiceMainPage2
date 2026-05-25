@@ -361,7 +361,7 @@ object FormDeviceSelect: TFormDeviceSelect
         object Label1: TLabel
           Align = Left
           Margins.Left = 10.000000000000000000
-          Position.X = 10.000000000000000000
+          Position.X = 53.000000000000000000
           Size.Width = 46.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
@@ -375,12 +375,22 @@ object FormDeviceSelect: TFormDeviceSelect
           Align = Left
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
-          Position.X = 56.000000000000000000
+          Position.X = 99.000000000000000000
           Position.Y = 5.000000000000000000
           Size.Width = 100.000000000000000000
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
+        end
+        object sbClearDate: TSpeedButton
+          Align = Left
+          Size.Width = 43.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'stoptoolbutton'
+          Text = 'sbClear'
+          TextSettings.Trimming = None
+          OnClick = sbClearDateClick
         end
       end
       object Line1: TLine

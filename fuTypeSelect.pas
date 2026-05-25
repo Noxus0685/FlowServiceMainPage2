@@ -140,6 +140,7 @@ type
     MenuItem8: TMenuItem;
     MenuItem9: TMenuItem;
     MenuItem10: TMenuItem;
+    sbClearDate: TSpeedButton;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -181,6 +182,7 @@ type
       Shift: TShiftState);
     procedure aRefreshRepositoryExecute(Sender: TObject);
     procedure EditFindTypeChange(Sender: TObject);
+    procedure sbClearDateClick(Sender: TObject);
 
   private
 
@@ -2667,6 +2669,18 @@ begin
       GridTypes.SetFocus;
       Break;
     end;
+end;
+
+procedure TFormTypeSelect.sbClearDateClick(Sender: TObject);
+begin
+  // 1. очистка фильтров ввода
+  EditFindType.Text := '';
+  DateEditFilter.IsEmpty := True;
+
+  // 2. пересчёт фильтров
+  ClearCheckedTypes;
+  ApplyFilter;
+  UpdateGridTypes;
 end;
 
 procedure TFormTypeSelect.ClearTreeSelectionFlags;

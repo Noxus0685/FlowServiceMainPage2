@@ -127,8 +127,8 @@ object FormTypeSelect: TFormTypeSelect
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
         OnCellClick = GridTypesCellClick
-        Viewport.Width = 861.000000000000000000
-        Viewport.Height = 637.000000000000000000
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 678.000000000000000000
         object CheckColumnTypeEnable: TCheckColumn
           Header = #1042#1082#1083
           HeaderSettings.TextSettings.Trimming = Character
@@ -337,7 +337,7 @@ object FormTypeSelect: TFormTypeSelect
         object Label1: TLabel
           Align = Left
           Margins.Left = 10.000000000000000000
-          Position.X = 10.000000000000000000
+          Position.X = 53.000000000000000000
           Size.Width = 46.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
@@ -351,12 +351,23 @@ object FormTypeSelect: TFormTypeSelect
           Align = Left
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
-          Position.X = 56.000000000000000000
+          Position.X = 99.000000000000000000
           Position.Y = 5.000000000000000000
           Size.Width = 100.000000000000000000
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
+        end
+        object sbClearDate: TSpeedButton
+          Action = actFilterClear
+          Align = Left
+          ImageIndex = -1
+          Size.Width = 43.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'stoptoolbutton'
+          TextSettings.Trimming = None
+          OnClick = sbClearDateClick
         end
       end
       object Line1: TLine
@@ -382,8 +393,8 @@ object FormTypeSelect: TFormTypeSelect
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout
