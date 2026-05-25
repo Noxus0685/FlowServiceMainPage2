@@ -1927,6 +1927,14 @@ begin
 
     PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
+    if FDevice.Points <> nil then
+      for Point in FDevice.Points do
+        if (Point <> nil) and (Point.State <> osDeleted) then
+        begin
+          cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(Point.SpillageStop);
+          FDevice.SpillageStop := Point.SpillageStop;
+          Break;
+        end;
 
     // =====================================================
     // == Повторы
