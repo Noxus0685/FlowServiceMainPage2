@@ -293,7 +293,6 @@ object FormTypeSelect: TFormTypeSelect
           TextSettings.Trimming = None
         end
         object sbFind: TSpeedButton
-          Action = actFilterFind
           Align = MostLeft
           ImageIndex = -1
           Size.Width = 49.000000000000000000
@@ -301,6 +300,7 @@ object FormTypeSelect: TFormTypeSelect
           Size.PlatformDefault = False
           StyleLookup = 'searcheditbutton'
           TextSettings.Trimming = None
+          OnClick = actFilterFindExecute
         end
         object EditFindType: TEdit
           Touch.InteractiveGestures = [LongTap, DoubleTap]

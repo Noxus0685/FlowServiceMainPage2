@@ -1206,7 +1206,7 @@ end;
 
 procedure TFormTypeSelect.EditFindTypeChangeTracking(Sender: TObject);
 begin
-  actFilterFind.Checked := Trim(EditFindType.Text) <> '';
+  sbFind.IsPressed := Trim(EditFindType.Text) <> '';
 end;
 
 {$R *.fmx}
