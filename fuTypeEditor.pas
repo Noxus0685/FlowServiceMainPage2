@@ -1753,18 +1753,28 @@ begin
       if Right.State = osDeleted then
         Exit(-1);
 
-      case FPointsSortColumn of
-        0: Result := CompareText(Trim(Left.Name), Trim(Right.Name));
-        1: Result := CompareValue(Left.FlowRateQ, Right.FlowRateQ);
-        2: Result := CompareValue(Left.VolumeV, Right.VolumeV);
-        3: Result := CompareValue(Left.ImpulsesN, Right.ImpulsesN);
-        4: Result := CompareValue(Left.TimeT, Right.TimeT);
-        5: Result := CompareValue(Left.ErrorP, Right.ErrorP);
-        6: Result := CompareValue(Left.StabTime, Right.StabTime);
-        7: Result := CompareValue(Left.Repeats, Right.Repeats);
+      if FPointsSortColumn = StringColumnPointName.Index then
+        Result := CompareText(Trim(Left.Name), Trim(Right.Name))
+      else if FPointsSortColumn = StringColumnPointFlowRate.Index then
+        Result := CompareValue(Left.FlowRate, Right.FlowRate)
+      else if FPointsSortColumn = StringColumnPointQ.Index then
+        Result := CompareValue(Left.FlowRate, Right.FlowRate)
+      else if FPointsSortColumn = StringColumnPointVolume.Index then
+        Result := CompareValue(Left.LimitVolume, Right.LimitVolume)
+      else if FPointsSortColumn = StringColumnPointImp.Index then
+        Result := CompareValue(Left.LimitImp, Right.LimitImp)
+      else if FPointsSortColumn = StringColumnPointTime.Index then
+        Result := CompareValue(Left.LimitTime, Right.LimitTime)
+      else if FPointsSortColumn = StringColumnPointError.Index then
+        Result := CompareValue(Left.Error, Right.Error)
+      else if FPointsSortColumn = StringColumnPointStab.Index then
+        Result := CompareValue(Left.Pause, Right.Pause)
+      else if FPointsSortColumn = IntegerColumnPointRepeatsForm.Index then
+        Result := CompareValue(Left.RepeatsProtocol, Right.RepeatsProtocol)
+      else if FPointsSortColumn = IntegerColumnPointRepeats.Index then
+        Result := CompareValue(Left.Repeats, Right.Repeats)
       else
         Result := 0;
-      end;
 
       if (Result = 0) and (FPointsSortColumn <> 0) then
         Result := CompareText(Trim(Left.Name), Trim(Right.Name));
