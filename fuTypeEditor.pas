@@ -4,6 +4,7 @@ interface
 
 uses
   FMX.ComboEdit,
+  FMX.ActnList,
   FMX.Controls,
   FMX.Controls.Presentation,
   FMX.Dialogs,
@@ -445,6 +446,12 @@ type
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
   FMenuItemGridDiametersDisplay: TMenuItem;
+  FActionListGridDiameters: TActionList;
+  FActionGridDiametersDelete: TAction;
+  FActionGridDiametersCopy: TAction;
+  FActionGridDiametersCut: TAction;
+  FActionGridDiametersPaste: TAction;
+  FClipboardDiameter: TDiameter;
   // Текущая колонка сортировки GridDiameters (-1, если сортировка ещё не выбрана).
   FGridDiametersSortColumnIndex: Integer;
   // Текущее направление сортировки GridDiameters (True = ASC, False = DESC).
@@ -506,6 +513,10 @@ type
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
+    procedure ActionGridDiametersDeleteExecute(Sender: TObject);
+    procedure ActionGridDiametersCopyExecute(Sender: TObject);
+    procedure ActionGridDiametersCutExecute(Sender: TObject);
+    procedure ActionGridDiametersPasteExecute(Sender: TObject);
     procedure AutoHideEmptyDiameterColumns;
 
   public
@@ -704,6 +715,28 @@ end;
    GridDiameters.OnKeyDown := GridDiametersKeyDown;
    GridDiameters.OnMouseDown := GridDiametersMouseDown;
    GridPoints.OnKeyDown := GridPointsKeyDown;
+   FClipboardDiameter := nil;
+
+   FActionListGridDiameters := TActionList.Create(Self);
+   FActionGridDiametersDelete := TAction.Create(FActionListGridDiameters);
+   FActionGridDiametersDelete.Text := 'Удалить';
+   FActionGridDiametersDelete.OnExecute := ActionGridDiametersDeleteExecute;
+   FActionGridDiametersDelete.ActionList := FActionListGridDiameters;
+
+   FActionGridDiametersCopy := TAction.Create(FActionListGridDiameters);
+   FActionGridDiametersCopy.Text := 'Копировать';
+   FActionGridDiametersCopy.OnExecute := ActionGridDiametersCopyExecute;
+   FActionGridDiametersCopy.ActionList := FActionListGridDiameters;
+
+   FActionGridDiametersCut := TAction.Create(FActionListGridDiameters);
+   FActionGridDiametersCut.Text := 'Вырезать';
+   FActionGridDiametersCut.OnExecute := ActionGridDiametersCutExecute;
+   FActionGridDiametersCut.ActionList := FActionListGridDiameters;
+
+   FActionGridDiametersPaste := TAction.Create(FActionListGridDiameters);
+   FActionGridDiametersPaste.Text := 'Вставить';
+   FActionGridDiametersPaste.OnExecute := ActionGridDiametersPasteExecute;
+   FActionGridDiametersPaste.ActionList := FActionListGridDiameters;
 
    FGridDiametersHeaderColumnIndex := -1;
    // Инициализация состояния сортировки GridDiameters.
@@ -729,6 +762,7 @@ end;
    FPopupMenuGridDiametersHeader := TPopupMenu.Create(Self);
    FPopupMenuGridDiametersHeader.Stored := False;
    CreateMenu;
+   ButtonDiameterDelete.Action := FActionGridDiametersDelete;
 
    GridDiameters.OnResize := GridDiametersResize;
 
@@ -756,18 +790,19 @@ begin
     FPopupMenuGridDiametersHeader.Items[0].Free;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-  MenuItem.Text := 'Копировать';
-  MenuItem.OnClick := GridDiametersMenuCopyClick;
+  MenuItem.Action := FActionGridDiametersDelete;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-  MenuItem.Text := 'Вырезать';
-  MenuItem.OnClick := GridDiametersMenuCutClick;
+  MenuItem.Action := FActionGridDiametersCopy;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-  MenuItem.Text := 'Вставить';
-  MenuItem.OnClick := GridDiametersMenuPasteClick;
+  MenuItem.Action := FActionGridDiametersCut;
+  MenuItem.Parent := FPopupMenuGridDiametersHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+  MenuItem.Action := FActionGridDiametersPaste;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
   FMenuItemGridDiametersDisplay := TMenuItem.Create(FPopupMenuGridDiametersHeader);
@@ -801,6 +836,7 @@ end;
 
 destructor TFormTypeEditor.Destroy;
 begin
+  FreeAndNil(FClipboardDiameter);
   FDiameterQ2.Free;
   FDiameterQ4.Free;
   inherited;
@@ -1636,33 +1672,66 @@ begin
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuCopyClick(Sender: TObject);
-var
-  CellValue: TValue;
 begin
-  if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
+  ActionGridDiametersCopyExecute(Sender);
+end;
+
+procedure TFormTypeEditor.ActionGridDiametersDeleteExecute(Sender: TObject);
+begin
+  ButtonDiameterDeleteClick(ButtonDiameterDelete);
+end;
+
+procedure TFormTypeEditor.ActionGridDiametersCopyExecute(Sender: TObject);
+var
+  D: TDiameter;
+begin
+  D := GetDiameterByVisibleRow(GridDiameters.Row);
+  if D = nil then
     Exit;
 
-  CellValue := TValue.Empty;
-  GridDiametersGetValue(GridDiameters, GridDiameters.Col, GridDiameters.Row, CellValue);
-  CopyTextToClipboard(CellValue.ToString);
+  FreeAndNil(FClipboardDiameter);
+  FClipboardDiameter := TDiameter.Create(D.DeviceTypeUUID);
+  FClipboardDiameter.Assign(D);
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuCutClick(Sender: TObject);
 begin
-  GridDiametersMenuCopyClick(Sender);
-  if (GridDiameters.Col >= 0) and (GridDiameters.Row >= 0) then
-    GridDiametersSetValue(GridDiameters, GridDiameters.Col, GridDiameters.Row, '');
+  ActionGridDiametersCutExecute(Sender);
 end;
 
 procedure TFormTypeEditor.GridDiametersMenuPasteClick(Sender: TObject);
-var
-  ClipText: string;
 begin
-  if (GridDiameters.Col < 0) or (GridDiameters.Row < 0) then
+  ActionGridDiametersPasteExecute(Sender);
+end;
+
+procedure TFormTypeEditor.ActionGridDiametersCutExecute(Sender: TObject);
+begin
+  ActionGridDiametersCopyExecute(Sender);
+  ActionGridDiametersDeleteExecute(Sender);
+end;
+
+procedure TFormTypeEditor.ActionGridDiametersPasteExecute(Sender: TObject);
+var
+  NewD: TDiameter;
+begin
+  if (FType = nil) or (FClipboardDiameter = nil) then
     Exit;
 
-  ClipText := GetTextFromClipboard;
-  GridDiametersSetValue(GridDiameters, GridDiameters.Col, GridDiameters.Row, ClipText);
+  NewD := FType.AddDiameter;
+  if NewD = nil then
+    Exit;
+
+  NewD.Assign(FClipboardDiameter);
+  NewD.ID := TEntityHelpers<TDiameter>.NextID(FType.Diameters);
+  NewD.DeviceTypeID := FType.ID;
+  NewD.DeviceTypeUUID := FType.UUID;
+  NewD.State := osNew;
+  NewD.Enable := False;
+
+  UpdateDiametersGrid;
+  if GridDiameters.RowCount > 0 then
+    GridDiameters.Selected := GridDiameters.RowCount - 1;
+  SetModified;
 end;
 
 procedure TFormTypeEditor.GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
