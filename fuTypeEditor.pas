@@ -1141,6 +1141,14 @@ begin
 
     PopulateSpillageStopCombo(TMeasuredDimension(FType.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
+    if FPointsLocal <> nil then
+      for Idx := 0 to FPointsLocal.Count - 1 do
+        if (FPointsLocal[Idx] <> nil) and (FPointsLocal[Idx].State <> osDeleted) then
+        begin
+          cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FPointsLocal[Idx].SpillageStop);
+          FType.SpillageStop := FPointsLocal[Idx].SpillageStop;
+          Break;
+        end;
 
     // =====================================================
     // == Повторы
@@ -3803,6 +3811,8 @@ begin
 end;
 
 procedure TFormTypeEditor.cbSpillageStopChange(Sender: TObject);
+var
+  I: Integer;
 begin
   if FLoading then Exit;
 
@@ -3812,6 +3822,19 @@ begin
   // сохраняем критерий остановки как битовую маску
   FType.SpillageStop := SpillageStopItemIndexToValue(cbSpillageStop.ItemIndex);
 
+  if FPointsLocal = nil then
+    FPointsLocal := FType.Points;
+
+  if FPointsLocal <> nil then
+    for I := 0 to FPointsLocal.Count - 1 do
+      if FPointsLocal[I] <> nil then
+      begin
+        FPointsLocal[I].SpillageStop := FType.SpillageStop;
+        if FPointsLocal[I].State <> osNew then
+          FPointsLocal[I].State := osModified;
+      end;
+
+  UpdatePointsGrid;
   SetModified;
 end;
 
