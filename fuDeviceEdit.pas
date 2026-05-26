@@ -303,6 +303,7 @@ type
     procedure GridPointsHeaderClick(Column: TColumn);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
+    procedure sbRepeatsChange(Sender: TObject);
     procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
 
@@ -743,8 +744,8 @@ begin
   {-----------------------------------------------------}
   { Повторы }
   {-----------------------------------------------------}
-  NewP.RepeatsProtocol := 3;
-  NewP.Repeats := 3;
+  NewP.RepeatsProtocol := Max(FDevice.Repeats, 1);
+  NewP.Repeats := Max(FDevice.Repeats, 1);
 
 
   {-----------------------------------------------------}
@@ -910,6 +911,7 @@ end;
 procedure TFormDeviceEditor.FillSpillageStopVolume;
 begin
   PopulateSpillageStopCombo(mdVolume);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 end;
 
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
@@ -975,6 +977,7 @@ end;
 procedure TFormDeviceEditor.FillSpillageStopMass;
 begin
   PopulateSpillageStopCombo(mdMass);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 end;
 
 function TFormDeviceEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
@@ -1926,6 +1929,14 @@ begin
 
     PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
+    if FDevice.Points <> nil then
+      for Point in FDevice.Points do
+        if (Point <> nil) and (Point.State <> osDeleted) then
+        begin
+          cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(Point.SpillageStop);
+          FDevice.SpillageStop := Point.SpillageStop;
+          Break;
+        end;
 
     // =====================================================
     // == Повторы
@@ -2116,8 +2127,42 @@ begin
   if FDevice.Points <> nil then
     for P in FDevice.Points do
       if P <> nil then
+      begin
         P.SpillageStop := FDevice.SpillageStop;
+        if P.State <> osNew then
+          P.State := osModified;
+      end;
 
+  UpdatePointsGrid;
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.sbRepeatsChange(Sender: TObject);
+var
+  P: TDevicePoint;
+  RepeatsValue: Integer;
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  RepeatsValue := Max(Round(sbRepeats.Value), 1);
+
+  if not SameValue(sbRepeats.Value, RepeatsValue, 0.001) then
+    sbRepeats.Value := RepeatsValue;
+
+  FDevice.Repeats := RepeatsValue;
+
+  if FDevice.Points <> nil then
+    for P in FDevice.Points do
+      if P <> nil then
+      begin
+        P.RepeatsProtocol := RepeatsValue;
+        P.Repeats := RepeatsValue;
+        if P.State <> osNew then
+          P.State := osModified;
+      end;
+
+  UpdatePointsGrid;
   SetModified;
 end;
 

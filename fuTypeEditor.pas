@@ -3414,8 +3414,8 @@ begin
   {-----------------------------------------------------}
   { Повторы }
   {-----------------------------------------------------}
-  NewP.RepeatsProtocol := 3;
-  NewP.Repeats := 3;
+  NewP.RepeatsProtocol := Max(FType.Repeats, 1);
+  NewP.Repeats := Max(FType.Repeats, 1);
 
 
   {-----------------------------------------------------}
@@ -6277,11 +6277,17 @@ begin
   // -----------------------------------------------------
   // Применяем ко всем ЛОКАЛЬНЫМ точкам
   // -----------------------------------------------------
-  for I := 0 to FPointsLocal.Count-1 do
-  begin
-    FPointsLocal[I].RepeatsProtocol := R;
-    FPointsLocal[I].Repeats := R;
-  end;
+  if FPointsLocal = nil then
+    FPointsLocal := FType.Points;
+
+  if FPointsLocal <> nil then
+    for I := 0 to FPointsLocal.Count-1 do
+    begin
+      FPointsLocal[I].RepeatsProtocol := R;
+      FPointsLocal[I].Repeats := R;
+      if FPointsLocal[I].State <> osNew then
+        FPointsLocal[I].State := osModified;
+    end;
 
   // -----------------------------------------------------
   // Обновляем таблицу точек через единый метод
@@ -6858,11 +6864,13 @@ end;
 procedure TFormTypeEditor.FillSpillageStopVolume;
 begin
   PopulateSpillageStopCombo(mdVolume);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
 end;
 
 procedure TFormTypeEditor.FillSpillageStopMass;
 begin
   PopulateSpillageStopCombo(mdMass);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
 end;
 
 function TFormTypeEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
