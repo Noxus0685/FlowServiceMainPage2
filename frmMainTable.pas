@@ -4604,9 +4604,11 @@ begin
     var
       Edit: TCustomEdit;
     begin
-      if GridDevices.Editor is TCustomEdit then
+      // В FMX 12.3 у TGrid нет публичного свойства Editor, поэтому
+      // берём активный контрол-фокус (инлайн-редактор ячейки).
+      if Screen.ActiveControl is TCustomEdit then
       begin
-        Edit := TCustomEdit(GridDevices.Editor);
+        Edit := TCustomEdit(Screen.ActiveControl);
         Edit.SelectAll;
       end;
     end);
