@@ -4669,25 +4669,36 @@ begin
   if Row < 0 then
     Exit;
 
-  // Сохраняем текущее значение по существующей логике SetValue/модели.
+  // К моменту OnEditingDone значение уже применено через штатный OnSetValue,
+  // поэтому берём актуальный Serial из модели.
   if (FActiveWorkTable <> nil) and (Row < FActiveWorkTable.DeviceChannels.Count) then
-  begin
-    SerialValue := FActiveWorkTable.DeviceChannels[Row].Serial;
-    GridDevicesSetValue(GridDevices, StringColumnDeviceSerial1.Index, Row, SerialValue);
-  end;
+    SerialValue := FActiveWorkTable.DeviceChannels[Row].Serial
+  else
+    Exit;
 
   // При дубле остаёмся в текущей ячейке и даём возможность сразу заменить текст.
   if IsDeviceSerialDuplicate(SerialValue, Row) then
   begin
     ShowMessage('Серийный номер уже существует.');
-    EditDeviceSerialCell(Row);
+    // Отложенный возврат в редактирование: даём FMX завершить внутренний цикл
+    // закрытия редактора, иначе фокус/переход может не примениться.
+    TThread.Queue(nil,
+      procedure
+      begin
+        EditDeviceSerialCell(Row);
+      end);
     Exit;
   end;
 
   // Для уникального значения переходим только на следующую отмеченную строку.
   NextRow := FindNextCheckedDeviceRow(Row);
   if NextRow >= 0 then
-    EditDeviceSerialCell(NextRow)
+    // Отложенный переход по той же причине: в FMX 12.3 надёжнее после EditingDone.
+    TThread.Queue(nil,
+      procedure
+      begin
+        EditDeviceSerialCell(NextRow);
+      end)
   else
     // Ниже нет отмеченных строк: завершаем редактирование без перехода.
     GridDevices.EditorMode := False;
