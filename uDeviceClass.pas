@@ -757,6 +757,8 @@ begin
   DN := '';
   Qmax := 10.0;                     // м³/ч — типовое значение
   Qmin := 0.1;
+  Qnom:=1;
+  Qtr:=1;
   RangeDynamic := 100.0;            // Qmax / Qmin
   Error := 1.0;                     // %
 
@@ -1309,6 +1311,8 @@ begin
   DN := ASource.DN;
   Qmax := ASource.Qmax;
   Qmin := ASource.Qmin;
+  Qnom := ASource.Qnom;
+  Qtr := ASource.Qtr;
   RangeDynamic := ASource.RangeDynamic;
   Error := ASource.Error;
 

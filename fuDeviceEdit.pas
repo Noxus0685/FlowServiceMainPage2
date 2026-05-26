@@ -253,6 +253,14 @@ type
     LabelUnits: TLabel;
     ComboBoxUnits: TComboBox;
     PopupColumnFlowSource: TPopupColumn;
+    Layout12: TLayout;
+    Layout14: TLayout;
+    Layout20: TLayout;
+    EditQtr: TEdit;
+    Label4: TLabel;
+    Layout21: TLayout;
+    EditQnom: TEdit;
+    Label7: TLabel;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -612,8 +620,9 @@ end;
 
 procedure TFormDeviceEditor.UpdateUnitsCombo;
 var
-  I: Integer;
+  I,Num: Integer;
 begin
+  num:=  ComboBoxUnits.ItemIndex;
   ComboBoxUnits.Items.Clear;
 
   if (FDevice = nil) or (FDevice.Dimensions = nil) then
@@ -625,8 +634,12 @@ begin
   for I := 0 to FDevice.Dimensions.Count - 1 do
     ComboBoxUnits.Items.Add(FDevice.Dimensions[I].Name);
 
-  if (FDevice.Units >= 0) and (FDevice.Units < ComboBoxUnits.Items.Count) then
+   if (FDevice.Units > 0) and (FDevice.Units < ComboBoxUnits.Items.Count) then
     ComboBoxUnits.ItemIndex := FDevice.Units
+  else if (num>0) and  (num < ComboBoxUnits.Items.Count)  then
+     ComboBoxUnits.ItemIndex :=num
+  else if (num>0) and  (num > ComboBoxUnits.Items.Count)  then
+     ComboBoxUnits.ItemIndex :=ComboBoxUnits.Items.Count - 1
   else if ComboBoxUnits.Items.Count > 0 then
     ComboBoxUnits.ItemIndex := 0
   else
@@ -1695,6 +1708,29 @@ if FDevice.Qmin > 0 then
   EditQmin.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qmin), FDevice.Error)
 else
   EditQmin.TextPrompt := '—';
+
+  // =====================================================
+// == Номинальный расход
+// =====================================================
+EditQnom.Text := '';
+EditQnom.TextPrompt := '';
+
+if FDevice.Qnom > 0 then
+  EditQnom.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qnom), FDevice.Error)
+else
+  EditQnom.TextPrompt := '—';
+
+    // =====================================================
+// == Переходный расход
+// =====================================================
+EditQtr.Text := '';
+EditQtr.TextPrompt := '';
+
+if FDevice.Qtr > 0 then
+  EditQtr.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qtr), FDevice.Error)
+else
+  EditQtr.TextPrompt := '—';
+
 end;
 
 procedure TFormDeviceEditor.EditQmaxExit(Sender: TObject);

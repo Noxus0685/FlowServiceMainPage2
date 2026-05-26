@@ -496,6 +496,8 @@ type
     procedure ActionPumpDeleteExecute(Sender: TObject);
     procedure SpinBoxFreqExit(Sender: TObject);
     procedure SpinBoxFreqEnter(Sender: TObject);
+    procedure GridDevicesEditingDone(Sender: TObject; const ACol,
+      ARow: Integer);
 
   private
 
@@ -513,7 +515,6 @@ type
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
-
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
@@ -1335,7 +1336,6 @@ begin
 
   FInitialized := True;
   SwitchAuto.IsChecked := False;
-
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
@@ -4399,12 +4399,108 @@ begin
     FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
+procedure TFrameMainTable.GridDevicesEditingDone(
+  Sender: TObject;
+  const ACol, ARow: Integer
+);
+var
+  NextRow: Integer;
+  WorkTable: TWorkTable;
+  i: integer;
+  CurrentValue: string;
+  NewValue: string;
+  DuplicateFound: boolean;
+begin
+  WorkTable := FActiveWorkTable;
+
+  // Проверка дубликатов только для столбца серийных номеров
+  if ACol = StringColumnDeviceSerial1.Index then
+  begin
+    // Получаем новое значение из источника данных
+    NewValue := workTable.DeviceChannels[ARow].Serial;
+    DuplicateFound := False;
+
+    // Проверяем все строки на наличие дубликата
+    for i := 0 to workTable.DeviceChannels.Count - 1 do
+    begin
+      if i <> ARow then // Пропускаем текущую строку
+      begin
+        CurrentValue := workTable.DeviceChannels[i].Serial;
+        // Сравниваем значения
+        if (NewValue <> '') and (CurrentValue = NewValue) then
+        begin
+          DuplicateFound := True;
+          Break;
+        end;
+      end;
+    end;
+
+    // Если найден дубликат - остаемся в ячейке, не очищая значение
+    if DuplicateFound then
+    begin
+      TThread.Queue(nil,
+        procedure
+        begin
+          // Остаемся в этой же ячейке для исправления
+          GridDevices.SetFocus;
+          GridDevices.SelectCell(ACol, ARow);
+          TThread.ForceQueue(nil,
+            procedure
+            begin
+              if GridDevices.Model <> nil then
+                GridDevices.Model.ShowEditor;
+            end
+          );
+        end
+      );
+      Exit; // Выходим, не переходим на следующую строку
+    end;
+  end;
+
+  // Переход на следующую строку (только если нет дубликата)
+  if ACol <> StringColumnDeviceSerial1.Index then
+    Exit;
+
+  // Поиск следующей включенной строки
+  NextRow := -1;
+  for i := ARow to workTable.DeviceChannels.Count - 2 do
+  begin
+    NextRow := i + 1;
+    if not workTable.DeviceChannels[NextRow].Enabled then
+      Continue
+    else
+      Break;
+  end;
+
+  if (ARow = workTable.DeviceChannels.Count - 1) then
+    Exit;
+
+  if NextRow >= GridDevices.RowCount then
+    Exit;
+
+  TThread.Queue(nil,
+    procedure
+    begin
+      GridDevices.SetFocus;
+      GridDevices.SelectCell(StringColumnDeviceSerial1.Index, NextRow);
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          if GridDevices.Model <> nil then
+            GridDevices.Model.ShowEditor;
+        end
+      );
+    end
+  );
+end;
+
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
 begin
   WorkTable := FActiveWorkTable;
+
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
@@ -4508,7 +4604,7 @@ end;
 procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
-  UpdateFlowMeterPropertiesFrame(ARow);
+{  UpdateFlowMeterPropertiesFrame(ARow);
 
   if (FFrameChannelProperties <> nil) and (FActiveWorkTable <> nil) and
      (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
@@ -4531,7 +4627,7 @@ begin
       GridDevices.ReadOnly:=False;
       GridDevices.EditorMode := True;
     end);
-  end;
+  end;   }
 
 
 end;
@@ -4591,6 +4687,11 @@ begin
 
   GridDevices.ReadOnly := True;
 end;
+
+
+
+
+
 
 procedure TFrameMainTable.GridEtalonsCellClick(const Column: TColumn;
   const Row: Integer);
