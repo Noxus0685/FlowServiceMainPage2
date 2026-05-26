@@ -479,6 +479,8 @@ type
       const Row: Integer);
     procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
       var CanSelect: Boolean);
+    procedure GridDevicesKeyDown(Sender: TObject; var Key: Word;
+      var KeyChar: Char; Shift: TShiftState);
 
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure EditTimeExit(Sender: TObject);
@@ -548,6 +550,10 @@ type
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
+    function IsDeviceSerialDuplicate(const ASerial: string;
+      const ACurrentRow: Integer): Boolean;
+    function FindNextCheckedDeviceRow(const ACurrentRow: Integer): Integer;
+    procedure EditDeviceSerialCell(const ARow: Integer);
 
     procedure SetConfiguration;
     procedure StartMonitor;
@@ -1334,6 +1340,8 @@ begin
 
 
   FInitialized := True;
+  // Подключаем обработчик Enter в гриде приборов без изменения других обработчиков.
+  GridDevices.OnKeyDown := GridDevicesKeyDown;
   SwitchAuto.IsChecked := False;
 
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
@@ -4534,6 +4542,153 @@ begin
   end;
 
 
+end;
+
+function TFrameMainTable.IsDeviceSerialDuplicate(const ASerial: string;
+  const ACurrentRow: Integer): Boolean;
+var
+  WorkTable: TWorkTable;
+  I: Integer;
+  SerialTrimmed: string;
+begin
+  Result := False;
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  // Сравнение выполняем по Trim; пустые значения не считаем дублями.
+  SerialTrimmed := Trim(ASerial);
+  if SerialTrimmed = '' then
+    Exit;
+
+  for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+  begin
+    if I = ACurrentRow then
+      Continue;
+    if SameText(Trim(WorkTable.DeviceChannels[I].Serial), SerialTrimmed) then
+      Exit(True);
+  end;
+end;
+
+function TFrameMainTable.FindNextCheckedDeviceRow(const ACurrentRow: Integer): Integer;
+var
+  WorkTable: TWorkTable;
+  I: Integer;
+begin
+  Result := -1;
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  // Ищем следующую строку ниже текущей только среди отмеченных Enable=True.
+  for I := ACurrentRow + 1 to WorkTable.DeviceChannels.Count - 1 do
+    if WorkTable.DeviceChannels[I].Enabled then
+      Exit(I);
+end;
+
+procedure TFrameMainTable.EditDeviceSerialCell(const ARow: Integer);
+begin
+  if (ARow < 0) or (ARow >= GridDevices.RowCount) then
+    Exit;
+
+  // Переходим в нужную строку/колонку и открываем редактор серийного номера.
+  GridDevices.Row := ARow;
+  GridDevices.Selected := StringColumnDeviceSerial1.Index;
+  GridDevices.SetFocus;
+  GridDevices.ReadOnly := False;
+  GridDevices.EditorMode := True;
+
+  // Отложенно выделяем весь текст в активном редакторе (FMX-safe подход).
+  TThread.Queue(nil,
+    procedure
+    var
+      Edit: TCustomEdit;
+      I: Integer;
+      Obj: TFmxObject;
+      function FindFocusedEdit(AParent: TFmxObject): TCustomEdit;
+      var
+        J: Integer;
+        ChildObj: TFmxObject;
+      begin
+        Result := nil;
+        if AParent = nil then
+          Exit;
+        for J := 0 to AParent.ChildrenCount - 1 do
+        begin
+          ChildObj := AParent.Children[J];
+          if (ChildObj is TCustomEdit) and TCustomEdit(ChildObj).IsFocused then
+            Exit(TCustomEdit(ChildObj));
+          Result := FindFocusedEdit(ChildObj);
+          if Result <> nil then
+            Exit;
+        end;
+      end;
+    begin
+      // В FMX 12.3 ищем сфокусированный inline-редактор рекурсивно
+      // внутри грида (без использования VCL-свойств вроде ActiveControl).
+      Edit := FindFocusedEdit(GridDevices);
+      if Edit = nil then
+      begin
+        for I := 0 to GridDevices.ChildrenCount - 1 do
+        begin
+          Obj := GridDevices.Children[I];
+          if Obj is TCustomEdit then
+          begin
+            Edit := TCustomEdit(Obj);
+            Break;
+          end;
+        end;
+      end;
+      if Edit <> nil then
+        Edit.SelectAll;
+    end);
+end;
+
+procedure TFrameMainTable.GridDevicesKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+var
+  Row, NextRow: Integer;
+  SerialValue: string;
+begin
+  SerialValue := '';
+  // Для не-Enter поведение грида не меняем.
+  if Key <> vkReturn then
+    Exit;
+
+  // Для других колонок поведение не меняем.
+  if GridDevices.Selected <> StringColumnDeviceSerial1.Index then
+    Exit;
+
+  Row := GridDevices.Row;
+  if Row < 0 then
+    Exit;
+
+  // Фиксируем Enter в нашей ветке, чтобы не срабатывала стандартная навигация.
+  Key := 0;
+  KeyChar := #0;
+
+  // Сохраняем текущее значение по существующей логике SetValue/модели.
+  if (FActiveWorkTable <> nil) and (Row < FActiveWorkTable.DeviceChannels.Count) then
+  begin
+    SerialValue := FActiveWorkTable.DeviceChannels[Row].Serial;
+    GridDevicesSetValue(GridDevices, StringColumnDeviceSerial1.Index, Row, SerialValue);
+  end;
+
+  // При дубле остаёмся в текущей ячейке и даём возможность сразу заменить текст.
+  if IsDeviceSerialDuplicate(SerialValue, Row) then
+  begin
+    ShowMessage('Серийный номер уже существует.');
+    EditDeviceSerialCell(Row);
+    Exit;
+  end;
+
+  // Для уникального значения переходим только на следующую отмеченную строку.
+  NextRow := FindNextCheckedDeviceRow(Row);
+  if NextRow >= 0 then
+    EditDeviceSerialCell(NextRow)
+  else
+    // Ниже нет отмеченных строк: завершаем редактирование без перехода.
+    GridDevices.EditorMode := False;
 end;
 
 procedure TFrameMainTable.GridDevicesSetValue(Sender: TObject; const ACol,
