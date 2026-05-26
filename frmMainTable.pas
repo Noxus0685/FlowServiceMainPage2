@@ -479,6 +479,7 @@ type
       const Row: Integer);
     procedure GridDevicesSelectCell(Sender: TObject; const ACol, ARow: Integer;
       var CanSelect: Boolean);
+    procedure GridDevicesEditingDone(Sender: TObject; const ACol, ARow: Integer);
     procedure GridDevicesKeyDown(Sender: TObject; var Key: Word;
       var KeyChar: Char; Shift: TShiftState);
 
@@ -1340,7 +1341,9 @@ begin
 
 
   FInitialized := True;
-  // Подключаем обработчик Enter в гриде приборов без изменения других обработчиков.
+  // Навигацию после ввода серийного номера делаем по завершению редактирования.
+  // Это совместимо с FMX 12.3: Enter обрабатывается редактором ячейки, а не самим гридом.
+  GridDevices.OnEditingDone := GridDevicesEditingDone;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
   SwitchAuto.IsChecked := False;
 
@@ -4646,26 +4649,25 @@ end;
 
 procedure TFrameMainTable.GridDevicesKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
+begin
+  // Оставлено пустым намеренно: в FMX 12.3 при редактировании ячейки Enter
+  // не всегда приходит в OnKeyDown грида. Основная логика перенесена в
+  // GridDevicesEditingDone, чтобы не ломать поведение остальных колонок.
+end;
+
+procedure TFrameMainTable.GridDevicesEditingDone(Sender: TObject; const ACol,
+  ARow: Integer);
 var
   Row, NextRow: Integer;
   SerialValue: string;
 begin
-  SerialValue := '';
-  // Для не-Enter поведение грида не меняем.
-  if Key <> vkReturn then
-    Exit;
-
   // Для других колонок поведение не меняем.
-  if GridDevices.Selected <> StringColumnDeviceSerial1.Index then
+  if GridDevices.Columns[ACol] <> StringColumnDeviceSerial1 then
     Exit;
 
-  Row := GridDevices.Row;
+  Row := ARow;
   if Row < 0 then
     Exit;
-
-  // Фиксируем Enter в нашей ветке, чтобы не срабатывала стандартная навигация.
-  Key := 0;
-  KeyChar := #0;
 
   // Сохраняем текущее значение по существующей логике SetValue/модели.
   if (FActiveWorkTable <> nil) and (Row < FActiveWorkTable.DeviceChannels.Count) then
