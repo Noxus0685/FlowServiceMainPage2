@@ -6887,11 +6887,13 @@ end;
 procedure TFormTypeEditor.FillSpillageStopVolume;
 begin
   PopulateSpillageStopCombo(mdVolume);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
 end;
 
 procedure TFormTypeEditor.FillSpillageStopMass;
 begin
   PopulateSpillageStopCombo(mdMass);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
 end;
 
 function TFormTypeEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;

@@ -911,6 +911,7 @@ end;
 procedure TFormDeviceEditor.FillSpillageStopVolume;
 begin
   PopulateSpillageStopCombo(mdVolume);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 end;
 
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
@@ -976,6 +977,7 @@ end;
 procedure TFormDeviceEditor.FillSpillageStopMass;
 begin
   PopulateSpillageStopCombo(mdMass);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 end;
 
 function TFormDeviceEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
