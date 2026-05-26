@@ -2544,8 +2544,11 @@ begin
   TreeViewTypes.CollapseAll;
   UpdateGridTypes;
   SelectType(AType);
-  SyncTreeSelectionState(False);
-  TreeViewTypes.SetFocus;
+
+  if (GridTypes.Row >= 0) and (GridTypes.Row < GridTypes.RowCount) then
+    GridTypes.SetFocus
+  else
+    TreeViewTypes.SetFocus;
 end;
 
 
