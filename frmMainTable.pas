@@ -4603,14 +4603,44 @@ begin
     procedure
     var
       Edit: TCustomEdit;
-    begin
-      // В FMX 12.3 у TGrid нет публичного свойства Editor, поэтому
-      // берём активный контрол-фокус (инлайн-редактор ячейки).
-      if Screen.ActiveControl is TCustomEdit then
+      I: Integer;
+      Obj: TFmxObject;
+      function FindFocusedEdit(AParent: TFmxObject): TCustomEdit;
+      var
+        J: Integer;
+        ChildObj: TFmxObject;
       begin
-        Edit := TCustomEdit(Screen.ActiveControl);
-        Edit.SelectAll;
+        Result := nil;
+        if AParent = nil then
+          Exit;
+        for J := 0 to AParent.ChildrenCount - 1 do
+        begin
+          ChildObj := AParent.Children[J];
+          if (ChildObj is TCustomEdit) and TCustomEdit(ChildObj).IsFocused then
+            Exit(TCustomEdit(ChildObj));
+          Result := FindFocusedEdit(ChildObj);
+          if Result <> nil then
+            Exit;
+        end;
       end;
+    begin
+      // В FMX 12.3 ищем сфокусированный inline-редактор рекурсивно
+      // внутри грида (без использования VCL-свойств вроде ActiveControl).
+      Edit := FindFocusedEdit(GridDevices);
+      if Edit = nil then
+      begin
+        for I := 0 to GridDevices.ChildrenCount - 1 do
+        begin
+          Obj := GridDevices.Children[I];
+          if Obj is TCustomEdit then
+          begin
+            Edit := TCustomEdit(Obj);
+            Break;
+          end;
+        end;
+      end;
+      if Edit <> nil then
+        Edit.SelectAll;
     end);
 end;
 
