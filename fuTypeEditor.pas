@@ -1141,14 +1141,14 @@ begin
 
     PopulateSpillageStopCombo(TMeasuredDimension(FType.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
-    if FPointsLocal <> nil then
+  {  if FPointsLocal <> nil then
       for Idx := 0 to FPointsLocal.Count - 1 do
         if (FPointsLocal[Idx] <> nil) and (FPointsLocal[Idx].State <> osDeleted) then
         begin
           cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FPointsLocal[Idx].SpillageStop);
           FType.SpillageStop := FPointsLocal[Idx].SpillageStop;
           Break;
-        end;
+        end;     }
 
     // =====================================================
     // == Повторы
@@ -3829,7 +3829,7 @@ begin
     for I := 0 to FPointsLocal.Count - 1 do
       if FPointsLocal[I] <> nil then
       begin
-        FPointsLocal[I].SpillageStop := FType.SpillageStop;
+       // FPointsLocal[I].SpillageStop := FType.SpillageStop;
         if FPointsLocal[I].State <> osNew then
           FPointsLocal[I].State := osModified;
       end;
