@@ -1141,6 +1141,14 @@ begin
 
     PopulateSpillageStopCombo(TMeasuredDimension(FType.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FType.SpillageStop);
+    if FPointsLocal <> nil then
+      for Idx := 0 to FPointsLocal.Count - 1 do
+        if (FPointsLocal[Idx] <> nil) and (FPointsLocal[Idx].State <> osDeleted) then
+        begin
+          cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FPointsLocal[Idx].SpillageStop);
+          FType.SpillageStop := FPointsLocal[Idx].SpillageStop;
+          Break;
+        end;
 
     // =====================================================
     // == Повторы
@@ -3414,8 +3422,8 @@ begin
   {-----------------------------------------------------}
   { Повторы }
   {-----------------------------------------------------}
-  NewP.RepeatsProtocol := 3;
-  NewP.Repeats := 3;
+  NewP.RepeatsProtocol := Max(FType.Repeats, 1);
+  NewP.Repeats := Max(FType.Repeats, 1);
 
 
   {-----------------------------------------------------}
@@ -3803,6 +3811,8 @@ begin
 end;
 
 procedure TFormTypeEditor.cbSpillageStopChange(Sender: TObject);
+var
+  I: Integer;
 begin
   if FLoading then Exit;
 
@@ -3812,6 +3822,19 @@ begin
   // сохраняем критерий остановки как битовую маску
   FType.SpillageStop := SpillageStopItemIndexToValue(cbSpillageStop.ItemIndex);
 
+  if FPointsLocal = nil then
+    FPointsLocal := FType.Points;
+
+  if FPointsLocal <> nil then
+    for I := 0 to FPointsLocal.Count - 1 do
+      if FPointsLocal[I] <> nil then
+      begin
+        FPointsLocal[I].SpillageStop := FType.SpillageStop;
+        if FPointsLocal[I].State <> osNew then
+          FPointsLocal[I].State := osModified;
+      end;
+
+  UpdatePointsGrid;
   SetModified;
 end;
 
@@ -6277,11 +6300,17 @@ begin
   // -----------------------------------------------------
   // Применяем ко всем ЛОКАЛЬНЫМ точкам
   // -----------------------------------------------------
-  for I := 0 to FPointsLocal.Count-1 do
-  begin
-    FPointsLocal[I].RepeatsProtocol := R;
-    FPointsLocal[I].Repeats := R;
-  end;
+  if FPointsLocal = nil then
+    FPointsLocal := FType.Points;
+
+  if FPointsLocal <> nil then
+    for I := 0 to FPointsLocal.Count-1 do
+    begin
+      FPointsLocal[I].RepeatsProtocol := R;
+      FPointsLocal[I].Repeats := R;
+      if FPointsLocal[I].State <> osNew then
+        FPointsLocal[I].State := osModified;
+    end;
 
   // -----------------------------------------------------
   // Обновляем таблицу точек через единый метод
