@@ -2149,6 +2149,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Size.Height = 20.000000000000000000
           Size.PlatformDefault = False
           KillFocusByReturn = True
+          OnChange = sbRepeatsChange
         end
       end
     end
