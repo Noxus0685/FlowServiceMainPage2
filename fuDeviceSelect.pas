@@ -183,6 +183,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure actDeviceSelectExecute(Sender: TObject);
+    procedure CornerButton1Click(Sender: TObject);
     procedure sbClearDateClick(Sender: TObject);
 
 private
@@ -958,6 +959,9 @@ var
   SelRow: Integer;
   NewDevice: TDevice;
   NewRow: Integer;
+  SelectedTreeNode: TTreeViewItem;
+  HasGridSelection: Boolean;
+  SelectedNodeTag: Integer;
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
@@ -976,16 +980,63 @@ begin
 
   SelRow := GridDevices.Row;
   SrcDevice := nil;
+  SelectedTreeNode := GetActiveTreeNode;
 
+  HasGridSelection :=
+    (FDevFilteredDevices <> nil) and
+    (SelRow >= 0) and
+    (SelRow < FDevFilteredDevices.Count);
 
-  if (FDevFilteredDevices <> nil) and
-     (SelRow >= 0) and
-     (SelRow < FDevFilteredDevices.Count) then
+  if HasGridSelection then
     SrcDevice := FDevFilteredDevices[SelRow];
 
-  NewDevice := ActiveRepo.CreateDevice(SrcDevice);
+  if SelectedTreeNode <> nil then
+    SelectedNodeTag := SelectedTreeNode.Tag
+  else
+    SelectedNodeTag := Ord(tnAll);
 
+  if (SrcDevice <> nil) and (SelectedNodeTag = Ord(tnModification)) then
+    NewDevice := ActiveRepo.CreateDevice(SrcDevice)
+  else
+    NewDevice := ActiveRepo.CreateDevice(nil);
 
+  if SrcDevice <> nil then
+  begin
+    case SelectedNodeTag of
+      Ord(tnManufacturer):
+        begin
+          NewDevice.Manufacturer := SrcDevice.Manufacturer;
+          NewDevice.Name := SrcDevice.Name;
+          NewDevice.AccuracyClass := '';
+          NewDevice.VerificationMethod := '';
+          NewDevice.ProcedureName := '';
+          NewDevice.ProcedureCmd1 := '';
+          NewDevice.ProcedureCmd2 := '';
+          NewDevice.ProcedureCmd3 := '';
+          NewDevice.ProcedureCmd4 := '';
+          NewDevice.ProcedureCmd5 := '';
+        end;
+
+      Ord(tnCategory):
+        begin
+          NewDevice.Manufacturer := SrcDevice.Manufacturer;
+          NewDevice.Category := SrcDevice.Category;
+          NewDevice.CategoryName := SrcDevice.CategoryName;
+          NewDevice.Name := SrcDevice.Name;
+          NewDevice.AccuracyClass := '';
+          NewDevice.VerificationMethod := '';
+          NewDevice.ProcedureName := '';
+          NewDevice.ProcedureCmd1 := '';
+          NewDevice.ProcedureCmd2 := '';
+          NewDevice.ProcedureCmd3 := '';
+          NewDevice.ProcedureCmd4 := '';
+          NewDevice.ProcedureCmd5 := '';
+        end;
+    else
+    end;
+  end;
+
+  BuildTree;
 
   {--------------------------------------------------}
   { 3. Обновляем ТОЛЬКО фильтрованные списки }
@@ -1016,6 +1067,11 @@ end;
 procedure TFormDeviceSelect.aCreateTypeExecute(Sender: TObject);
 begin
   ButtonDeviceAddClick(Sender);
+end;
+
+procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
+begin
+  ModalResult := mrOk;
 end;
 
 procedure TFormDeviceSelect.actDeviceSelectExecute(Sender: TObject);
