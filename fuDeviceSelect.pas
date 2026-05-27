@@ -958,6 +958,10 @@ var
   SrcDevice: TDevice;
   SelRow: Integer;
   NewDevice: TDevice;
+  NewRow: Integer;
+  SelectedTreeNode: TTreeViewItem;
+  HasGridSelection: Boolean;
+  SelectedNodeTag: Integer;
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
@@ -976,14 +980,45 @@ begin
 
   SelRow := GridDevices.Row;
   SrcDevice := nil;
+  SelectedTreeNode := GetActiveTreeNode;
 
+  HasGridSelection :=
+    (FDevFilteredDevices <> nil) and
+    (SelRow >= 0) and
+    (SelRow < FDevFilteredDevices.Count);
 
-  if (FDevFilteredDevices <> nil) and
-     (SelRow >= 0) and
-     (SelRow < FDevFilteredDevices.Count) then
+  if HasGridSelection then
     SrcDevice := FDevFilteredDevices[SelRow];
 
-  NewDevice := ActiveRepo.CreateDevice(SrcDevice);
+  if SelectedTreeNode <> nil then
+    SelectedNodeTag := SelectedTreeNode.Tag
+  else
+    SelectedNodeTag := Ord(tnAll);
+
+  if (SrcDevice <> nil) and (SelectedNodeTag = Ord(tnModification)) then
+    NewDevice := ActiveRepo.CreateDevice(SrcDevice)
+  else
+    NewDevice := ActiveRepo.CreateDevice(nil);
+
+  if SrcDevice <> nil then
+  begin
+    case SelectedNodeTag of
+      Ord(tnManufacturer):
+        begin
+          NewDevice.Manufacturer := SrcDevice.Manufacturer;
+          NewDevice.Name := SrcDevice.Name;
+        end;
+
+      Ord(tnCategory):
+        begin
+          NewDevice.Manufacturer := SrcDevice.Manufacturer;
+          NewDevice.Category := SrcDevice.Category;
+          NewDevice.CategoryName := SrcDevice.CategoryName;
+          NewDevice.Name := SrcDevice.Name;
+        end;
+    else
+    end;
+  end;
 
   BuildTree;
 
