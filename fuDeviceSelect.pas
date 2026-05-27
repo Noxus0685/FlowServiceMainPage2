@@ -1010,11 +1010,6 @@ begin
           NewDevice.AccuracyClass := '';
           NewDevice.VerificationMethod := '';
           NewDevice.ProcedureName := '';
-          NewDevice.ProcedureCmd1 := '';
-          NewDevice.ProcedureCmd2 := '';
-          NewDevice.ProcedureCmd3 := '';
-          NewDevice.ProcedureCmd4 := '';
-          NewDevice.ProcedureCmd5 := '';
         end;
 
       Ord(tnCategory):
@@ -1026,11 +1021,6 @@ begin
           NewDevice.AccuracyClass := '';
           NewDevice.VerificationMethod := '';
           NewDevice.ProcedureName := '';
-          NewDevice.ProcedureCmd1 := '';
-          NewDevice.ProcedureCmd2 := '';
-          NewDevice.ProcedureCmd3 := '';
-          NewDevice.ProcedureCmd4 := '';
-          NewDevice.ProcedureCmd5 := '';
         end;
     else
     end;
