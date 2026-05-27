@@ -104,6 +104,7 @@ type
   procedure SetActiveRepository(AKind: TRepositoryKind; const AName: string);
   procedure SetActiveTypeRepository(const AName: string);
   procedure SetActiveDeviceRepository(const AName: string);
+  function RepositoryNameExists(const AName: string): Boolean;
 
   function GetRepository(const AName: string): TObject;
   procedure CloseAll;
@@ -962,10 +963,13 @@ begin
   if (AName = '') or (ADbFile = '') then
     raise Exception.Create('AddRepository: invalid parameters');
 
-  {--------------------------------------------------}
-  { Подбираем уникальное имя репозитория }
-  {--------------------------------------------------}
-  RepoName := MakeUniqueRepositoryName(AName);
+  if RepositoryNameExists(AName) then
+    raise Exception.CreateFmt(
+      'Репозиторий с именем "%s" уже существует. Создание отменено.',
+      [AName]
+    );
+
+  RepoName := Trim(AName);
 
   {--------------------------------------------------}
   { Файл БД (используем тот, что передали) }
@@ -1029,6 +1033,11 @@ begin
     DM.Free;
     raise;
   end;
+end;
+
+function TManagerTTableDM.RepositoryNameExists(const AName: string): Boolean;
+begin
+  Result := FRepositories.ContainsKey(Trim(AName));
 end;
 
 procedure TManagerTTableDM.RemoveRepository(const AName: string);

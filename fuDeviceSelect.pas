@@ -141,6 +141,8 @@ type
     MenuItem7: TMenuItem;
     MenuItem8: TMenuItem;
     MenuItem9: TMenuItem;
+    actDeviceSelect: TAction;
+    sbClearDate: TSpeedButton;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
@@ -160,8 +162,6 @@ type
     procedure miSaveClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure btnOKClick(Sender: TObject);
-    procedure CornerButtonEditDeviceClick(Sender: TObject);
     procedure miAddTestDataClick(Sender: TObject);
     procedure miLoadClick(Sender: TObject);
     procedure SpeedButtonFindInternetClick(Sender: TObject);
@@ -173,12 +173,18 @@ type
     procedure aDeviceCutExecute(Sender: TObject);
     procedure UpdateDeviceActions(Sender: TObject);
     procedure aRefreshRepositoryExecute(Sender: TObject);
+    procedure FullRefreshDevicesView;
     procedure GridDevicesKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure GridDevicesMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
+    procedure GridDevicesEnter(Sender: TObject);
+    procedure GridDevicesExit(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
+    procedure actDeviceSelectExecute(Sender: TObject);
+    procedure CornerButton1Click(Sender: TObject);
+    procedure sbClearDateClick(Sender: TObject);
 
 private
 
@@ -238,11 +244,13 @@ private
   procedure FillComboBoxRepository;              // список репозиториев приборов
   function UpdateConnection: Boolean;             // смена активного репозитория
   procedure ClearTreeAndGrid;                     // очистка UI при смене репозитория
+  procedure RebuildTreeFull;                      // полная перерисовка дерева
   function GetSelectedDevices: TObjectList<TDevice>;
   function GetActiveTreeNode: TTreeViewItem;
   procedure ClearCheckedDevices;
   function GetCheckedDevices: TObjectList<TDevice>;
   procedure ClearGridSelection;
+  function IsGridInputFocused: Boolean;
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
@@ -393,6 +401,15 @@ begin
     Exit;
   end;
 
+  if AppServices.DataManager.RepositoryNameExists(RepoName) then
+  begin
+    ShowMessage(Format(
+      'Репозиторий с именем "%s" уже существует. Создание отменено.',
+      [RepoName]
+    ));
+    Exit;
+  end;
+
   {----------------------------------}
   { Диалог выбора файла БД }
   {----------------------------------}
@@ -520,9 +537,7 @@ begin
     if not AppServices.DataManager.ActiveDeviceRepo.Load then
       raise Exception.Create('Не удалось загрузить приборы');
 
-    UpdateGridDevices; // обновление таблицы приборов
-    BuildTree;         // если есть дерево
-    ApplyFilter;
+    FullRefreshDevicesView;
 
     ShowMessage('Приборы загружены');
   finally
@@ -618,9 +633,7 @@ begin
     if not Repo.Save then
       raise Exception.Create('Не удалось сохранить изменения приборов');
 
-    UpdateGridDevices; // обновление таблицы приборов
-    BuildTree;         // если есть дерево
-    ApplyFilter;
+    FullRefreshDevicesView;
 
     ShowMessage('Изменения успешно сохранены');
   finally
@@ -946,6 +959,9 @@ var
   SelRow: Integer;
   NewDevice: TDevice;
   NewRow: Integer;
+  SelectedTreeNode: TTreeViewItem;
+  HasGridSelection: Boolean;
+  SelectedNodeTag: Integer;
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
@@ -964,16 +980,53 @@ begin
 
   SelRow := GridDevices.Row;
   SrcDevice := nil;
+  SelectedTreeNode := GetActiveTreeNode;
 
+  HasGridSelection :=
+    (FDevFilteredDevices <> nil) and
+    (SelRow >= 0) and
+    (SelRow < FDevFilteredDevices.Count);
 
-  if (FDevFilteredDevices <> nil) and
-     (SelRow >= 0) and
-     (SelRow < FDevFilteredDevices.Count) then
+  if HasGridSelection then
     SrcDevice := FDevFilteredDevices[SelRow];
 
-  NewDevice := ActiveRepo.CreateDevice(SrcDevice);
+  if SelectedTreeNode <> nil then
+    SelectedNodeTag := SelectedTreeNode.Tag
+  else
+    SelectedNodeTag := Ord(tnAll);
 
+  if (SrcDevice <> nil) and (SelectedNodeTag = Ord(tnModification)) then
+    NewDevice := ActiveRepo.CreateDevice(SrcDevice)
+  else
+    NewDevice := ActiveRepo.CreateDevice(nil);
 
+  if SrcDevice <> nil then
+  begin
+    case SelectedNodeTag of
+      Ord(tnManufacturer):
+        begin
+          NewDevice.Manufacturer := SrcDevice.Manufacturer;
+          NewDevice.Name := SrcDevice.Name;
+          NewDevice.AccuracyClass := '';
+          NewDevice.VerificationMethod := '';
+          NewDevice.ProcedureName := '';
+        end;
+
+      Ord(tnCategory):
+        begin
+          NewDevice.Manufacturer := SrcDevice.Manufacturer;
+          NewDevice.Category := SrcDevice.Category;
+          NewDevice.CategoryName := SrcDevice.CategoryName;
+          NewDevice.Name := SrcDevice.Name;
+          NewDevice.AccuracyClass := '';
+          NewDevice.VerificationMethod := '';
+          NewDevice.ProcedureName := '';
+        end;
+    else
+    end;
+  end;
+
+  BuildTree;
 
   {--------------------------------------------------}
   { 3. Обновляем ТОЛЬКО фильтрованные списки }
@@ -1006,14 +1059,68 @@ begin
   ButtonDeviceAddClick(Sender);
 end;
 
+procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
+begin
+  ModalResult := mrOk;
+end;
+
+procedure TFormDeviceSelect.actDeviceSelectExecute(Sender: TObject);
+begin
+  if not IsGridInputFocused then
+    Exit;
+
+  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  ModalResult := mrOk;
+end;
+
 procedure TFormDeviceSelect.aDeleteTypeExecute(Sender: TObject);
 begin
   ButtonDeviceDeleteClick(Sender);
 end;
 
 procedure TFormDeviceSelect.aEditTypeExecute(Sender: TObject);
+  var
+  Row: Integer;
+  ADevice: TDevice;
+  OldManufacturer: string;
 begin
-  CornerButtonEditDeviceClick(Sender);
+  {----------------------------------}
+  { Проверка выбора }
+  {----------------------------------}
+  Row := GridDevices.Row;
+  if (Row < 0) then
+  begin
+    ShowMessage('Выберите прибор для редактирования');
+    Exit;
+  end;
+
+  if (FDevFilteredDevices = nil) or (Row >= FDevFilteredDevices.Count) then
+    Exit;
+
+  {----------------------------------}
+  { Получаем ПРИБОР как объект }
+  {----------------------------------}
+  ADevice := FDevFilteredDevices[Row];
+  if ADevice = nil then
+    Exit;
+
+  {----------------------------------}
+  { Открываем редактор }
+  {----------------------------------}
+  WriteDeviceActionLog('Выбран прибор', ADevice);
+  OldManufacturer := ADevice.Manufacturer;
+  if OpenDeviceEditor(ADevice) then
+  begin
+    if (AppServices.DataManager <> nil) and
+       (OldManufacturer <> ADevice.Manufacturer) then
+      AppServices.DataManager.NeedRemoveOldManufacturerBranchForDevice(
+        FDevices, ADevice, OldManufacturer, ADevice.Manufacturer
+      );
+
+    SelectEditedDevice(ADevice);
+  end;
 end;
 
 procedure TFormDeviceSelect.aDeviceCopyExecute(Sender: TObject);
@@ -1176,12 +1283,15 @@ procedure TFormDeviceSelect.UpdateDeviceActions(Sender: TObject);
 var
   HasRepo: Boolean;
   HasRows: Boolean;
+  HasGridFocus: Boolean;
   HasSelectedRow: Boolean;
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredDevices <> nil) and (FDevFilteredDevices.Count > 0);
+  HasGridFocus := GridDevices.Row>=0;// IsGridInputFocused;
   HasSelectedRow :=
     HasRows and
+    HasGridFocus and
     (GridDevices.Row >= 0) and
     (GridDevices.Row < FDevFilteredDevices.Count);
 
@@ -1191,6 +1301,9 @@ begin
   aDeviceCopy.Enabled := HasRows;
   aDeviceCut.Enabled := HasRepo and HasRows;
   aDevicePaste.Enabled := HasRepo and (AppServices.DataManager <> nil) and AppServices.DataManager.HasBufferDevices;
+
+  CornerButtonEditDevice.Enabled := aEditType.Enabled;
+  CornerButton1.Enabled := HasSelectedRow;
 end;
 
 function TFormDeviceSelect.GetSelectedDevices: TObjectList<TDevice>;
@@ -1225,6 +1338,24 @@ begin
 
   for I := 0 to FDevFilteredDevices.Count - 1 do
     Result.Add(FDevFilteredDevices[I]);
+end;
+
+function TFormDeviceSelect.IsGridInputFocused: Boolean;
+var
+  Ref: IInterfaceComponentReference;
+begin
+  Result := False;
+
+  if (GridDevices = nil) or (not GridDevices.IsFocused) then
+    Exit;
+
+  if ActiveControl = nil then
+    Exit;
+
+  if not Supports(ActiveControl, IInterfaceComponentReference, Ref) then
+    Exit;
+
+  Result := Ref.GetComponent = GridDevices;
 end;
 
 procedure TFormDeviceSelect.ClearCheckedDevices;
@@ -1371,7 +1502,7 @@ begin
     Exit;
 
   ParentNode := SelectedNode.ParentItem;
-  ReplacementNode := ParentNode;
+  ReplacementNode := nil;
   if ParentNode <> nil then
   begin
     NodeIndex := -1;
@@ -1416,10 +1547,14 @@ begin
     CurrentNode := ParentNode;
   end;
 
-  if ReplacementNode <> nil then
+  if (ReplacementNode <> nil) and (ReplacementNode.TreeView = TreeViewDevices) then
     TreeViewDevices.Selected := ReplacementNode
+  else if (CurrentNode <> nil) and (CurrentNode.TreeView = TreeViewDevices) then
+    TreeViewDevices.Selected := CurrentNode
+  else if TreeViewDevices.Count > 0 then
+    TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0)
   else
-    TreeViewDevices.Selected := CurrentNode;
+    TreeViewDevices.Selected := nil;
 end;
 
 procedure TFormDeviceSelect.ApplyFilter;
@@ -1451,12 +1586,19 @@ begin
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
   DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
-  FDevFilteredByDate :=
-    TEntityFilters<TDevice>.ApplyDateFilter(
-      FDevFilteredByText,
-      DateEditFilter.Date,
-      DateFilterEnabled
-    );
+  FDevFilteredByDate := TObjectList<TDevice>.Create(False);
+
+  if (not DateFilterEnabled) or (FDevFilteredByText = nil) then
+  begin
+    if FDevFilteredByText <> nil then
+      FDevFilteredByDate.AddRange(FDevFilteredByText);
+  end
+  else
+    for var D in FDevFilteredByText do
+      if (D.RegDate > 0) and (D.ValidityDate > 0) and
+         (D.RegDate <= DateEditFilter.Date) and
+         (DateEditFilter.Date <= D.ValidityDate) then
+        FDevFilteredByDate.Add(D);
 
   {----------------------------------}
   { 4. Сортировка }
@@ -1475,14 +1617,12 @@ end;
 
 procedure TFormDeviceSelect.aRefreshRepositoryExecute(Sender: TObject);
 begin
-  {----------------------------------}
-  { Пересборка дерева }
-  {----------------------------------}
-  BuildTree;
+  FullRefreshDevicesView;
+end;
 
-  {----------------------------------}
-  { Полная пересборка фильтров + сортировка }
-  {----------------------------------}
+procedure TFormDeviceSelect.FullRefreshDevicesView;
+begin
+  RebuildTreeFull;
   ApplyFilter;
   UpdateGridDevices;
 end;
@@ -1566,6 +1706,21 @@ begin
     UpdateGridDevices;
 end;
 
+
+procedure TFormDeviceSelect.sbClearDateClick(Sender: TObject);
+begin
+  {----------------------------------}
+  { 1. Очистка фильтров ввода }
+  {----------------------------------}
+  EditFindDevice.Text := '';
+  DateEditFilter.IsEmpty := True;
+
+  {----------------------------------}
+  { 2. Пересчёт фильтров }
+  {----------------------------------}
+  ApplyFilter;
+  UpdateGridDevices;
+end;
 
 procedure TFormDeviceSelect.SpeedButtonFindInternetClick(Sender: TObject);
 var
@@ -1924,6 +2079,18 @@ begin
   FDevices := ActiveRepo.Devices;
 
   Result := True;
+end;
+
+procedure TFormDeviceSelect.RebuildTreeFull;
+begin
+  TreeViewDevices.BeginUpdate;
+  try
+    TreeViewDevices.Clear;
+  finally
+    TreeViewDevices.EndUpdate;
+  end;
+
+  BuildTree;
 end;
 
 procedure TFormDeviceSelect.ClearTreeAndGrid;
@@ -2296,48 +2463,7 @@ begin
   UpdateGridDevices;
 end;
 
-procedure TFormDeviceSelect.CornerButtonEditDeviceClick(Sender: TObject);
-var
-  Row: Integer;
-  ADevice: TDevice;
-  OldManufacturer: string;
-begin
-  {----------------------------------}
-  { Проверка выбора }
-  {----------------------------------}
-  Row := GridDevices.Row;
-  if (Row < 0) then
-  begin
-    ShowMessage('Выберите прибор для редактирования');
-    Exit;
-  end;
 
-  if (FDevFilteredDevices = nil) or (Row >= FDevFilteredDevices.Count) then
-    Exit;
-
-  {----------------------------------}
-  { Получаем ПРИБОР как объект }
-  {----------------------------------}
-  ADevice := FDevFilteredDevices[Row];
-  if ADevice = nil then
-    Exit;
-
-  {----------------------------------}
-  { Открываем редактор }
-  {----------------------------------}
-  WriteDeviceActionLog('Выбран прибор', ADevice);
-  OldManufacturer := ADevice.Manufacturer;
-  if OpenDeviceEditor(ADevice) then
-  begin
-    if (AppServices.DataManager <> nil) and
-       (OldManufacturer <> ADevice.Manufacturer) then
-      AppServices.DataManager.NeedRemoveOldManufacturerBranchForDevice(
-        FDevices, ADevice, OldManufacturer, ADevice.Manufacturer
-      );
-
-    SelectEditedDevice(ADevice);
-  end;
-end;
 
 
 procedure TFormDeviceSelect.DateEditFilterChange(Sender: TObject);
@@ -2349,12 +2475,19 @@ begin
   {----------------------------------}
   FreeAndNil(FDevFilteredByDate);
   DateFilterEnabled := (not DateEditFilter.IsEmpty) and (DateEditFilter.Date > 0);
-  FDevFilteredByDate :=
-    TEntityFilters<TDevice>.ApplyDateFilter(
-      FDevFilteredByText,
-      DateEditFilter.Date,
-      DateFilterEnabled
-    );
+  FDevFilteredByDate := TObjectList<TDevice>.Create(False);
+
+  if (not DateFilterEnabled) or (FDevFilteredByText = nil) then
+  begin
+    if FDevFilteredByText <> nil then
+      FDevFilteredByDate.AddRange(FDevFilteredByText);
+  end
+  else
+    for var D in FDevFilteredByText do
+      if (D.RegDate > 0) and (D.ValidityDate > 0) and
+         (D.RegDate <= DateEditFilter.Date) and
+         (DateEditFilter.Date <= D.ValidityDate) then
+        FDevFilteredByDate.Add(D);
 
   {----------------------------------}
   { Сортировка }
@@ -2418,10 +2551,6 @@ begin
 end;
 
 
-procedure TFormDeviceSelect.btnOKClick(Sender: TObject);
-begin
-  ModalResult := mrCancel;
-end;
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
 var
@@ -2463,6 +2592,8 @@ begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
   GridDevices.OnMouseDown := GridDevicesMouseDown;
+  GridDevices.OnEnter := GridDevicesEnter;
+  GridDevices.OnExit := GridDevicesExit;
 
   {----------------------------------}
   { Инициализация сортировки }
@@ -2499,7 +2630,7 @@ end;
 procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if Key = vkEscape then
+  if (Key = vkEscape) and IsGridInputFocused then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2510,7 +2641,7 @@ end;
 procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
-  if Key = vkEscape then
+  if (Key = vkEscape) and IsGridInputFocused then
   begin
     ModalResult := mrCancel;
     Key := 0;
@@ -2518,7 +2649,7 @@ begin
     Exit;
   end;
 
-  if Key = vkReturn then
+  if (Key = vkReturn) and (GridDevices.Row>=0) then
   begin
     ModalResult := mrOk;
     Key := 0;
@@ -2526,7 +2657,7 @@ begin
     Exit;
   end;
 
-  if Key = vkDelete then
+  if (Key = vkDelete) and (GridDevices.Row>=0) then
   begin
     ButtonDeviceDeleteClick(ButtonDeviceDelete);
     Key := 0;
@@ -2549,7 +2680,18 @@ begin
     Exit;
 
   if ssDouble in Shift then
-    CornerButtonEditDeviceClick(CornerButtonEditDevice);
+    aEditTypeExecute(CornerButtonEditDevice) ;
+    //CornerButtonEditDeviceClick(CornerButtonEditDevice);
+end;
+
+procedure TFormDeviceSelect.GridDevicesEnter(Sender: TObject);
+begin
+  UpdateDeviceActions(nil);
+end;
+
+procedure TFormDeviceSelect.GridDevicesExit(Sender: TObject);
+begin
+  UpdateDeviceActions(nil);
 end;
 
 procedure TFormDeviceSelect.ApplyInitialSelection;

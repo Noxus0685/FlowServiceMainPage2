@@ -361,7 +361,7 @@ object FormDeviceSelect: TFormDeviceSelect
         object Label1: TLabel
           Align = Left
           Margins.Left = 10.000000000000000000
-          Position.X = 10.000000000000000000
+          Position.X = 53.000000000000000000
           Size.Width = 46.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
@@ -375,12 +375,22 @@ object FormDeviceSelect: TFormDeviceSelect
           Align = Left
           Margins.Top = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
-          Position.X = 56.000000000000000000
+          Position.X = 99.000000000000000000
           Position.Y = 5.000000000000000000
           Size.Width = 100.000000000000000000
           Size.Height = 22.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
+        end
+        object sbClearDate: TSpeedButton
+          Align = Left
+          Size.Width = 43.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'stoptoolbutton'
+          Text = 'sbClear'
+          TextSettings.Trimming = None
+          OnClick = sbClearDateClick
         end
       end
       object Line1: TLine
@@ -421,7 +431,6 @@ object FormDeviceSelect: TFormDeviceSelect
       Align = Right
       StyledSettings = [Family, Size, Style]
       ModalResult = 2
-      OnClick = btnOKClick
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -440,9 +449,11 @@ object FormDeviceSelect: TFormDeviceSelect
       YRadius = 3.000000000000000000
     end
     object CornerButton1: TCornerButton
+      Action = actDeviceSelect
+      OnClick = CornerButton1Click
       Align = Right
       StyledSettings = [Family, Size, Style]
-      ModalResult = 1
+      ImageIndex = -1
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -454,15 +465,16 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 1
-      Text = #1042#1099#1073#1088#1072#1090#1100
       TextSettings.FontColor = claDarkgreen
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
     end
     object CornerButtonEditDevice: TCornerButton
+      Action = aEditType
       Align = Right
       StyledSettings = [Family, Size, Style]
+      ImageIndex = 15
       Margins.Left = 10.000000000000000000
       Margins.Top = 10.000000000000000000
       Margins.Right = 10.000000000000000000
@@ -474,12 +486,10 @@ object FormDeviceSelect: TFormDeviceSelect
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
-      Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100
       TextSettings.FontColor = claDarkgreen
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
-      OnClick = CornerButtonEditDeviceClick
     end
   end
   object MainMenu: TMenuBar
@@ -670,6 +680,10 @@ object FormDeviceSelect: TFormDeviceSelect
     object aRefreshRepository: TAction
       Text = #1054#1073#1085#1086#1074#1080#1090#1100
       OnExecute = aRefreshRepositoryExecute
+    end
+    object actDeviceSelect: TAction
+      Text = #1042#1099#1073#1088#1072#1090#1100
+      OnExecute = actDeviceSelectExecute
     end
   end
   object NetHTTPClient1: TNetHTTPClient

@@ -496,6 +496,8 @@ type
     procedure ActionPumpDeleteExecute(Sender: TObject);
     procedure SpinBoxFreqExit(Sender: TObject);
     procedure SpinBoxFreqEnter(Sender: TObject);
+    procedure GridDevicesEditingDone(Sender: TObject; const ACol,
+      ARow: Integer);
 
   private
 
@@ -513,7 +515,6 @@ type
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
-
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
@@ -558,8 +559,9 @@ type
 
     procedure UpdateGrids;
 
-       procedure UpdateForm;
+    procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
+    procedure ClearChannelsByMissingDevices;
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -1339,7 +1341,6 @@ begin
 
   FInitialized := True;
   SwitchAuto.IsChecked := False;
-
   FInstrumentalVisibleOrder := TList<TLayout>.Create;
   FFrameProceed := nil;
   FFrameMeasurementRun := nil;
@@ -2711,7 +2712,6 @@ end;
 procedure TFrameMainTable.OpenChannelDeviceEditor(AChannel: TChannel);
 var
   ADevice: TDevice;
-  ActiveRepo: TDeviceRepository;
   FoundRepo: TDeviceRepository;
   SelDevice: TDevice;
   SelectFrm: TFormDeviceSelect;
@@ -2721,23 +2721,30 @@ begin
   if AChannel = nil then
     Exit;
 
-  if DataManager <> nil then
-  ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
-
   OldDeviceUUID := Trim(AChannel.DeviceUUID);
-  ADevice := AChannel.FlowMeter.Device;
+  ADevice := nil;
+  if AChannel.FlowMeter <> nil then
+    ADevice := AChannel.FlowMeter.Device;
 
-  if (ADevice = nil) and
-     ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
+  if (ADevice = nil) and (DataManager <> nil) then
+    ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
+
+  if ADevice = nil then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
       if SelectFrm.ShowModal <> mrOk then
+      begin
+        ClearChannelsByMissingDevices;
         Exit;
+      end;
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
+      begin
+        ClearChannelsByMissingDevices;
         Exit;
+      end;
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
 
@@ -2761,6 +2768,7 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
+      ClearChannelsByMissingDevices;
 
     finally
       SelectFrm.Free;
@@ -2775,14 +2783,31 @@ begin
     begin
       if ADevice <> nil then
       begin
-      AChannel.FlowMeter.Init(ADevice.UUID);
-       end;
+        AChannel.DeviceUUID := ADevice.UUID;
+        AChannel.TypeUUID := ADevice.DeviceTypeUUID;
+        AChannel.TypeName := ADevice.DeviceTypeName;
+        AChannel.Serial := ADevice.SerialNumber;
+        AChannel.Signal := ADevice.OutputType;
+        AChannel.RepoTypeName := ADevice.RepoTypeName;
+        AChannel.RepoTypeUUID := ADevice.RepoTypeUUID;
+        AChannel.RepoDeviceName := ADevice.RepoDeviceName;
+        AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
+
+        if AChannel.FlowMeter <> nil then
+        begin
+          AChannel.FlowMeter.Device := ADevice;
+          AChannel.FlowMeter.UpdateByDevice;
+        end;
+      end;
+
+      MarkChannelDeviceModified(AChannel);
+      SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
     end;
   finally
     Frm.Free;
   end;
 
- UpdateGrids;
+  UpdateGrids;
 
 end;
 
@@ -2922,6 +2947,7 @@ begin
 
     UpdateGrids;
   finally
+    ClearChannelsByMissingDevices;
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
@@ -3141,6 +3167,61 @@ begin
   AChannel.RepoDeviceName := '';
   AChannel.RepoDeviceUUID := '';
   MarkChannelDeviceModified(AChannel);
+end;
+
+procedure TFrameMainTable.ClearChannelsByMissingDevices;
+var
+  I: Integer;
+  Ch: TChannel;
+  Repo: TDeviceRepository;
+  SourceRepo: TDeviceRepository;
+  DeviceUUID: string;
+  RepoName: string;
+  Device: TDevice;
+  HasChanges: Boolean;
+begin
+  if (FActiveWorkTable = nil) or (DataManager = nil) then
+    Exit;
+
+  HasChanges := False;
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Ch := FActiveWorkTable.DeviceChannels[I];
+    if Ch = nil then
+      Continue;
+
+    DeviceUUID := Trim(Ch.DeviceUUID);
+    if DeviceUUID = '' then
+      Continue;
+
+    Device := nil;
+    RepoName := Trim(Ch.RepoDeviceName);
+    if RepoName <> '' then
+    begin
+      SourceRepo := DataManager.FindDeviceRepositoryByName(RepoName);
+      if (SourceRepo <> nil) and (SourceRepo.Devices <> nil) then
+      begin
+        for Device in SourceRepo.Devices do
+          if SameText(Trim(Device.UUID), DeviceUUID) then
+            Break;
+
+        if (Device = nil) or (not SameText(Trim(Device.UUID), DeviceUUID)) then
+          Device := nil;
+      end;
+    end;
+
+    if Device = nil then
+      Device := DataManager.FindDevice(DeviceUUID, Repo);
+
+    if Device <> nil then
+      Continue;
+
+    ClearChannelData(Ch);
+    HasChanges := True;
+  end;
+
+  if HasChanges then
+    UpdateGrids;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
@@ -4403,12 +4484,108 @@ begin
     FFrameChannelProperties.LoadFromChannel(WorkTable.DeviceChannels[Row]);
 end;
 
+procedure TFrameMainTable.GridDevicesEditingDone(
+  Sender: TObject;
+  const ACol, ARow: Integer
+);
+var
+  NextRow: Integer;
+  WorkTable: TWorkTable;
+  i: integer;
+  CurrentValue: string;
+  NewValue: string;
+  DuplicateFound: boolean;
+begin
+  WorkTable := FActiveWorkTable;
+
+  // Проверка дубликатов только для столбца серийных номеров
+  if ACol = StringColumnDeviceSerial1.Index then
+  begin
+    // Получаем новое значение из источника данных
+    NewValue := workTable.DeviceChannels[ARow].Serial;
+    DuplicateFound := False;
+
+    // Проверяем все строки на наличие дубликата
+    for i := 0 to workTable.DeviceChannels.Count - 1 do
+    begin
+      if i <> ARow then // Пропускаем текущую строку
+      begin
+        CurrentValue := workTable.DeviceChannels[i].Serial;
+        // Сравниваем значения
+        if (NewValue <> '') and (CurrentValue = NewValue) then
+        begin
+          DuplicateFound := True;
+          Break;
+        end;
+      end;
+    end;
+
+    // Если найден дубликат - остаемся в ячейке, не очищая значение
+    if DuplicateFound then
+    begin
+      TThread.Queue(nil,
+        procedure
+        begin
+          // Остаемся в этой же ячейке для исправления
+          GridDevices.SetFocus;
+          GridDevices.SelectCell(ACol, ARow);
+          TThread.ForceQueue(nil,
+            procedure
+            begin
+              if GridDevices.Model <> nil then
+                GridDevices.Model.ShowEditor;
+            end
+          );
+        end
+      );
+      Exit; // Выходим, не переходим на следующую строку
+    end;
+  end;
+
+  // Переход на следующую строку (только если нет дубликата)
+  if ACol <> StringColumnDeviceSerial1.Index then
+    Exit;
+
+  // Поиск следующей включенной строки
+  NextRow := -1;
+  for i := ARow to workTable.DeviceChannels.Count - 2 do
+  begin
+    NextRow := i + 1;
+    if not workTable.DeviceChannels[NextRow].Enabled then
+      Continue
+    else
+      Break;
+  end;
+
+  if (ARow = workTable.DeviceChannels.Count - 1) then
+    Exit;
+
+  if NextRow >= GridDevices.RowCount then
+    Exit;
+
+  TThread.Queue(nil,
+    procedure
+    begin
+      GridDevices.SetFocus;
+      GridDevices.SelectCell(StringColumnDeviceSerial1.Index, NextRow);
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          if GridDevices.Model <> nil then
+            GridDevices.Model.ShowEditor;
+        end
+      );
+    end
+  );
+end;
+
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
   WorkTable: TWorkTable;
 begin
   WorkTable := FActiveWorkTable;
+
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
@@ -4512,7 +4689,7 @@ end;
 procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
-  UpdateFlowMeterPropertiesFrame(ARow);
+{  UpdateFlowMeterPropertiesFrame(ARow);
 
   if (FFrameChannelProperties <> nil) and (FActiveWorkTable <> nil) and
      (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
@@ -4535,7 +4712,7 @@ begin
       GridDevices.ReadOnly:=False;
       GridDevices.EditorMode := True;
     end);
-  end;
+  end;   }
 
 
 end;
@@ -4595,6 +4772,11 @@ begin
 
   GridDevices.ReadOnly := True;
 end;
+
+
+
+
+
 
 procedure TFrameMainTable.GridEtalonsCellClick(const Column: TColumn;
   const Row: Integer);

@@ -140,6 +140,7 @@ type
     MenuItem8: TMenuItem;
     MenuItem9: TMenuItem;
     MenuItem10: TMenuItem;
+    sbClearDate: TSpeedButton;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
@@ -148,7 +149,7 @@ type
       Shift: TShiftState; X, Y: Single);
     procedure TreeViewTypesMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
-    procedure EditFindTypeExit(Sender: TObject);
+    procedure EditFindTypeChangeTracking(Sender: TObject);
     procedure DateEditFilterChange(Sender: TObject);
     procedure GridTypesHeaderClick(Column: TColumn);
     procedure GridTypesMouseDown(Sender: TObject; Button: TMouseButton;
@@ -161,7 +162,6 @@ type
     procedure miDeleteRepositoryClick(Sender: TObject);
     procedure miAddRepositoryClick(Sender: TObject);
     procedure ComboBoxRepositoryChange(Sender: TObject);
-    procedure miRefreshRepositoryClick(Sender: TObject);
     procedure mpExpandAllClick(Sender: TObject);
     procedure mpCollapseAllClick(Sender: TObject);
     procedure miSaveClick(Sender: TObject);
@@ -180,6 +180,9 @@ type
       Shift: TShiftState);
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
+    procedure aRefreshRepositoryExecute(Sender: TObject);
+    procedure EditFindTypeChange(Sender: TObject);
+    procedure sbClearDateClick(Sender: TObject);
 
   private
 
@@ -875,12 +878,19 @@ begin
   { 3. Фильтр по дате }
   {----------------------------------}
 FreeAndNil(FDevFilteredByDate);
-FDevFilteredByDate :=
-  TEntityFilters<TDeviceType>.ApplyDateFilter(
-    FDevFilteredByText,
-    DateEditFilter.Date,
-    not DateEditFilter.IsEmpty
-  );
+FDevFilteredByDate := TObjectList<TDeviceType>.Create(False);
+
+if DateEditFilter.IsEmpty or (FDevFilteredByText = nil) then
+begin
+  if FDevFilteredByText <> nil then
+    FDevFilteredByDate.AddRange(FDevFilteredByText);
+end
+else
+  for var T in FDevFilteredByText do
+    if (T.RegDate > 0) and (T.ValidityDate > 0) and
+       (T.RegDate <= DateEditFilter.Date) and
+       (DateEditFilter.Date <= T.ValidityDate) then
+      FDevFilteredByDate.Add(T);
 
 
   {----------------------------------}
@@ -894,6 +904,16 @@ FDevFilteredByDate :=
       FSortAscending
     );
 
+end;
+
+procedure TFormTypeSelect.aRefreshRepositoryExecute(Sender: TObject);
+begin
+      { Полное обновление дерева по кнопке "Обновить" }
+      RebuildTreeFull;
+
+      { Полная пересборка фильтров + сортировка }
+      ApplyFilter;
+        UpdateGridTypes;
 end;
 
 procedure TFormTypeSelect.actTypeAddExecute(Sender: TObject);
@@ -1093,7 +1113,7 @@ begin
     Exit;
 
   ParentNode := SelectedNode.ParentItem;
-  ReplacementNode := ParentNode;
+  ReplacementNode := nil;
   if ParentNode <> nil then
   begin
     NodeIndex := -1;
@@ -1134,10 +1154,14 @@ begin
     CurrentNode := ParentNode;
   end;
 
-  if ReplacementNode <> nil then
+  if (ReplacementNode <> nil) and (ReplacementNode.TreeView = TreeViewTypes) then
     TreeViewTypes.Selected := ReplacementNode
+  else if (CurrentNode <> nil) and (CurrentNode.TreeView = TreeViewTypes) then
+    TreeViewTypes.Selected := CurrentNode
+  else if TreeViewTypes.Count > 0 then
+    TreeViewTypes.Selected := TreeViewTypes.ItemByIndex(0)
   else
-    TreeViewTypes.Selected := CurrentNode;
+    TreeViewTypes.Selected := nil;
 end;
 
 procedure TFormTypeSelect.RemoveTreeNode(ANode: TTreeViewItem);
@@ -1162,12 +1186,19 @@ begin
   { Фильтр по дате поверх текста }
   {----------------------------------}
 FreeAndNil(FDevFilteredByDate);
-FDevFilteredByDate :=
-  TEntityFilters<TDeviceType>.ApplyDateFilter(
-    FDevFilteredByText,
-    DateEditFilter.Date,
-    not DateEditFilter.IsEmpty
-  );
+FDevFilteredByDate := TObjectList<TDeviceType>.Create(False);
+
+if DateEditFilter.IsEmpty or (FDevFilteredByText = nil) then
+begin
+  if FDevFilteredByText <> nil then
+    FDevFilteredByDate.AddRange(FDevFilteredByText);
+end
+else
+  for var T in FDevFilteredByText do
+    if (T.RegDate > 0) and (T.ValidityDate > 0) and
+       (T.RegDate <= DateEditFilter.Date) and
+       (DateEditFilter.Date <= T.ValidityDate) then
+      FDevFilteredByDate.Add(T);
 
 
   {----------------------------------}
@@ -1187,10 +1218,16 @@ FDevFilteredByDate :=
   UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.EditFindTypeExit(Sender: TObject);
+procedure TFormTypeSelect.EditFindTypeChange(Sender: TObject);
 begin
     ApplyFilter;
     UpdateGridTypes;
+    EditFindTypeChangeTracking(self);
+end;
+
+procedure TFormTypeSelect.EditFindTypeChangeTracking(Sender: TObject);
+begin
+  sbFind.IsPressed := Trim(EditFindType.Text) <> '';
 end;
 
 {$R *.fmx}
@@ -1264,6 +1301,7 @@ begin
    TreeViewTypes.MultiSelect := True;
    OnKeyDown := FormKeyDown;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
+   //EditFindType.OnChangeTracking := EditFindTypeChangeTracking;
    GridTypes.OnMouseDown := GridTypesMouseDown;
    GridTypes.OnKeyDown := GridTypesKeyDown;
 
@@ -1504,9 +1542,17 @@ begin
     Exit;
   end;
 
-  if Key = vkReturn then
+  if (Key = vkReturn) and (actTypeSelect.Enabled=true) and (GridTypes.Row>=0) then
   begin
     actTypeSelectExecute(actTypeSelect);
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
+  if (Key = vkDelete) and (GridTypes.Row >= 0) and actTypeDelete.Enabled then
+  begin
+    actTypeDeleteExecute(actTypeDelete);
     Key := 0;
     KeyChar := #0;
   end;
@@ -1525,7 +1571,7 @@ begin
   ApplyFilter;
   UpdateGridTypes;
   // фильтров больше нет
-  sbFind.IsPressed := False;
+  actFilterFind.Checked := False;
 end;
 
 procedure TFormTypeSelect.actFilterFindExecute(Sender: TObject);
@@ -1592,7 +1638,7 @@ begin
       ApplyFilter;
       UpdateGridTypes;
       // фильтров больше нет
-      sbFind.IsPressed := False;
+      actFilterFind.Checked := False;
     end;
   end
   else
@@ -1723,7 +1769,7 @@ begin
 
   GridTypes.Repaint;
 
-  sbFind.IsPressed := HasActiveFilters;
+  actFilterFind.Checked := HasActiveFilters;
 end;
 
 procedure TFormTypeSelect.ClearGridSelection;
@@ -1821,7 +1867,7 @@ var
 begin
   HasRepo := (AppServices.DataManager <> nil) and (ActiveRepo <> nil);
   HasRows := (FDevFilteredTypes <> nil) and (FDevFilteredTypes.Count > 0);
-  HasGridFocus := (GridTypes <> nil) and GridTypes.IsFocused;
+  HasGridFocus := (GridTypes <> nil) and GridTypes.IsFocused and  (GridTypes.Row>=0);
   HasCurrentSelection := CurrentGridType <> nil;
 
   actTypeAdd.Enabled := HasRepo;
@@ -1875,6 +1921,15 @@ begin
   if RepoName = '' then
   begin
     ShowMessage('Имя репозитория не может быть пустым');
+    Exit;
+  end;
+
+  if AppServices.DataManager.RepositoryNameExists(RepoName) then
+  begin
+    ShowMessage(Format(
+      'Репозиторий с именем "%s" уже существует. Создание отменено.',
+      [RepoName]
+    ));
     Exit;
   end;
 
@@ -2050,15 +2105,6 @@ begin
   UpdateGridTypes;
 end;
 
-procedure TFormTypeSelect.miRefreshRepositoryClick(Sender: TObject);
-begin
-      { Полное обновление дерева по кнопке "Обновить" }
-      RebuildTreeFull;
-
-      { Полная пересборка фильтров + сортировка }
-      ApplyFilter;
-        UpdateGridTypes;
-end;
 
 procedure TFormTypeSelect.RebuildTreeFull;
 begin
@@ -2498,8 +2544,11 @@ begin
   TreeViewTypes.CollapseAll;
   UpdateGridTypes;
   SelectType(AType);
-  SyncTreeSelectionState(False);
-  TreeViewTypes.SetFocus;
+
+  if (GridTypes.Row >= 0) and (GridTypes.Row < GridTypes.RowCount) then
+    GridTypes.SetFocus
+  else
+    TreeViewTypes.SetFocus;
 end;
 
 
@@ -2635,6 +2684,18 @@ begin
       GridTypes.SetFocus;
       Break;
     end;
+end;
+
+procedure TFormTypeSelect.sbClearDateClick(Sender: TObject);
+begin
+  // 1. очистка фильтров ввода
+  EditFindType.Text := '';
+  DateEditFilter.IsEmpty := True;
+
+  // 2. пересчёт фильтров
+  ClearCheckedTypes;
+  ApplyFilter;
+  UpdateGridTypes;
 end;
 
 procedure TFormTypeSelect.ClearTreeSelectionFlags;
