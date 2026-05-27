@@ -183,6 +183,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure actDeviceSelectExecute(Sender: TObject);
+    procedure CornerButton1Click(Sender: TObject);
     procedure sbClearDateClick(Sender: TObject);
 
 private
@@ -985,7 +986,7 @@ begin
 
   NewDevice := ActiveRepo.CreateDevice(SrcDevice);
 
-
+  BuildTree;
 
   {--------------------------------------------------}
   { 3. Обновляем ТОЛЬКО фильтрованные списки }
@@ -1016,6 +1017,11 @@ end;
 procedure TFormDeviceSelect.aCreateTypeExecute(Sender: TObject);
 begin
   ButtonDeviceAddClick(Sender);
+end;
+
+procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
+begin
+  ModalResult := mrOk;
 end;
 
 procedure TFormDeviceSelect.actDeviceSelectExecute(Sender: TObject);
