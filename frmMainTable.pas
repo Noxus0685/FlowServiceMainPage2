@@ -2707,12 +2707,30 @@ end;
 procedure TFrameMainTable.OpenChannelDeviceEditor(AChannel: TChannel);
 var
   ADevice: TDevice;
+  RepoDevice: TDevice;
+  ActiveRepo: TDeviceRepository;
   Frm: TFormDeviceEditor;
 begin
   if AChannel = nil then
     Exit;
 
+  ActiveRepo := nil;
+  if DataManager <> nil then
+    ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
+
   ADevice := AChannel.FlowMeter.Device;
+  RepoDevice := nil;
+
+  if (ADevice <> nil) and (ActiveRepo <> nil) then
+  begin
+    RepoDevice := ActiveRepo.FindDeviceByUUID(ADevice.UUID);
+    if RepoDevice <> nil then
+    begin
+      ADevice := RepoDevice;
+      if AChannel.FlowMeter <> nil then
+        AChannel.FlowMeter.Device := RepoDevice;
+    end;
+  end;
 
   if ADevice = nil then
   begin
