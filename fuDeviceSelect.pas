@@ -183,6 +183,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure actDeviceSelectExecute(Sender: TObject);
+    procedure CornerButton1Click(Sender: TObject);
     procedure sbClearDateClick(Sender: TObject);
 
 private
@@ -957,7 +958,6 @@ var
   SrcDevice: TDevice;
   SelRow: Integer;
   NewDevice: TDevice;
-  NewRow: Integer;
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
@@ -985,37 +985,32 @@ begin
 
   NewDevice := ActiveRepo.CreateDevice(SrcDevice);
 
+  if OpenDeviceEditor(NewDevice) then
+  begin
+    BuildTree;
+    ApplyFilter;
+    UpdateGridDevices;
+    SelectEditedDevice(NewDevice);
+    WriteDeviceActionLog('Создан прибор', NewDevice);
+  end
+  else
+  begin
+    ActiveRepo.DeleteDevice(NewDevice);
+    ApplyFilter;
+    UpdateGridDevices;
+  end;
 
-
-  {--------------------------------------------------}
-  { 3. Обновляем ТОЛЬКО фильтрованные списки }
-  {--------------------------------------------------}
-  ApplyFilter; // Tree → Text → Date → Sort
-
-  UpdateGridDevices;
-
-  {--------------------------------------------------}
-  { 4. Выделяем добавленную строку }
-  {--------------------------------------------------}
-  GridDevices.Row := -1;
-  if (NewDevice <> nil) and (FDevFilteredDevices <> nil) then
-    for NewRow := 0 to FDevFilteredDevices.Count - 1 do
-      if FDevFilteredDevices[NewRow] = NewDevice then
-      begin
-        GridDevices.Row := NewRow;
-        Break;
-      end;
-
-  if (GridDevices.Row < 0) and (GridDevices.RowCount > 0) then
-    GridDevices.Row := GridDevices.RowCount - 1;
-
-  WriteDeviceActionLog('Создан прибор', NewDevice);
   LogDuplicateDeviceUUIDs;
 end;
 
 procedure TFormDeviceSelect.aCreateTypeExecute(Sender: TObject);
 begin
   ButtonDeviceAddClick(Sender);
+end;
+
+procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
+begin
+  ModalResult := mrOk;
 end;
 
 procedure TFormDeviceSelect.actDeviceSelectExecute(Sender: TObject);
