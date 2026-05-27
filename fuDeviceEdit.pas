@@ -281,7 +281,9 @@ type
     procedure cbMeasuredDimensionChange(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
     procedure EditQmaxExit(Sender: TObject);
+    procedure EditQnomExit(Sender: TObject);
     procedure EditQminExit(Sender: TObject);
+    procedure EditQtrExit(Sender: TObject);
     procedure ComboBoxOutputTypeChange(Sender: TObject);
     procedure cbVoltageRangeChange(Sender: TObject);
     procedure EditVoltageQmaxExit(Sender: TObject);
@@ -1760,6 +1762,36 @@ begin
   FDevice.Qmin := NewValue;
   SetModified;
   UpdateQmaxQmin;
+end;
+
+procedure TFormDeviceEditor.EditQnomExit(Sender: TObject);
+var
+  NewValue: Double;
+begin
+  if (FDevice = nil) or FLoading then
+    Exit;
+  NewValue := FDevice.ToBaseUnits(NormalizeFloatInput(EditQnom.Text));
+  if SameValue(NewValue, FDevice.Qnom) then
+    Exit;
+  FDevice.Qnom := NewValue;
+  SetModified;
+  UpdateQmaxQmin;
+  UpdatePointsGrid;
+end;
+
+procedure TFormDeviceEditor.EditQtrExit(Sender: TObject);
+var
+  NewValue: Double;
+begin
+  if (FDevice = nil) or FLoading then
+    Exit;
+  NewValue := FDevice.ToBaseUnits(NormalizeFloatInput(EditQtr.Text));
+  if SameValue(NewValue, FDevice.Qtr) then
+    Exit;
+  FDevice.Qtr := NewValue;
+  SetModified;
+  UpdateQmaxQmin;
+  UpdatePointsGrid;
 end;
 
 procedure  TFormDeviceEditor.UpdateComboEditDN;
