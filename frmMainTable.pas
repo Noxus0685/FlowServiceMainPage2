@@ -2721,8 +2721,13 @@ begin
 
   ADevice := AChannel.FlowMeter.Device;
 
-  if (ADevice = nil) and
-     ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
+  if ADevice = nil then
+  begin
+    SelectDeviceForChannel(AChannel);
+    Exit;
+  end;
+
+  if (ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0) then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
