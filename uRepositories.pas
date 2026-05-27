@@ -717,6 +717,7 @@ begin
   {--------------------------------------------------}
   { ТРАНЗАКЦИЯ }
   {--------------------------------------------------}
+  if FTypes.Count>0 then
   FDM.TypesConnection.StartTransaction;
   try
     for T in FTypes do
@@ -2033,7 +2034,6 @@ begin
     Col('DN', 'TEXT'),
     Col('Description', 'TEXT'),
 
-    Col('Q2Tr', 'REAL'),
     Col('Qmax', 'REAL'),
     Col('Qnom', 'REAL'),
     Col('Qmin', 'REAL'),

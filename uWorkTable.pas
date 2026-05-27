@@ -437,6 +437,11 @@ type
 
   procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
+  procedure FireAction(AAction: EActionWorkTable; const ASourceName: string; const ADescription: string);
+  procedure DoStartMonitor;
+  procedure DoStopMonitor;
+  procedure DoStartTest;
+  procedure DoStopTest;
   class function WorkTableEventToString(AEvent: TWorkTableEvent): string; static;
 
   public
@@ -588,6 +593,7 @@ type
   procedure PauseMeasurementRun;
   procedure ResumeMeasurementRun;
   procedure NextMeasurementPoint;
+  procedure ExecuteAction;
 
   procedure StartTest;
   procedure StopTest;
@@ -3192,6 +3198,56 @@ begin
   Notify(notifyStateChanged, Self);
 end;
 
+procedure TWorkTable.FireAction(AAction: EActionWorkTable; const ASourceName: string;
+  const ADescription: string);
+begin
+  FAction := AAction;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, ASourceName, ADescription, Name);
+  Notify(notifyAction, Self);
+end;
+
+procedure TWorkTable.ExecuteAction;
+begin
+  case FAction of
+    awtStartMonitor: DoStartMonitor;
+    awtStopMonitor: DoStopMonitor;
+    awtStartTest: DoStartTest;
+    awtStopTest: DoStopTest;
+  end;
+end;
+
+procedure TWorkTable.DoStartMonitor;
+begin
+  ResetMeasurementValues;
+  SetState(swtSTARTMONITOR);
+  SetState(swtMONITOR);
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
+    'Мониторинг запущен', Name);
+end;
+
+procedure TWorkTable.DoStopMonitor;
+begin
+  SetState(swtSTOPMONITOR);
+  SetState(swtSTANDBY);
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopMonitor',
+    'Мониторинг остановлен', Name);
+end;
+
+procedure TWorkTable.DoStartTest;
+begin
+  ResetMeasurementValues;
+  SetState(swtSTARTTEST);
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
+    'Тест запущен', Name);
+end;
+
+procedure TWorkTable.DoStopTest;
+begin
+  SetState(swtSTOPTEST);
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
+    'Тест остановлен', Name);
+end;
+
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
 begin
   case AState of
@@ -3434,43 +3490,24 @@ begin
 end;
 
 procedure TWorkTable.StartTest;
-  begin
-   ResetMeasurementValues;
-   State := swtSTARTTEST;
-   FAction := awtStartTest;
-   Notify(notifyAction, Self);
-   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartTest',
-     'Запуск теста', Name);
-  end;
+begin
+  FireAction(awtStartTest, 'StartTest', 'Запрошен запуск теста');
+end;
 
 procedure TWorkTable.StartMonitor;
-  begin
-   ResetMeasurementValues;
-   State := swtSTARTMONITOR;
-   FAction := awtStartMonitor;
-   Notify(notifyAction, Self);
-   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMonitor',
-     'Запуск мониторинга', Name);
-  end;
+begin
+  FireAction(awtStartMonitor, 'StartMonitor', 'Запрошен запуск мониторинга');
+end;
 
 procedure TWorkTable.StopTest;
-  begin
-    State := swtSTOPTEST;
-    FAction := awtStopTest;
-    Notify(notifyAction, Self);
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopTest',
-      'Остановка теста', Name);
-  end;
+begin
+  FireAction(awtStopTest, 'StopTest', 'Запрошена остановка теста');
+end;
 
 procedure TWorkTable.StopMonitor;
-  begin
-   ResetMeasurementValues;
-   State := swtSTOPMONITOR;
-   FAction := awtStopMonitor;
-   Notify(notifyAction, Self);
-   ProtocolManager.AddMessage(pcAction, psWorkTable, 'StopMonitor',
-     'Остановка мониторинга', Name);
-  end;
+begin
+  FireAction(awtStopMonitor, 'StopMonitor', 'Запрошена остановка мониторинга');
+end;
 
 procedure TWorkTable.StartMeasurementRun(AMode: Integer);
 begin
