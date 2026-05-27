@@ -2616,7 +2616,7 @@ begin
 
       // Объём / масса:
       // Q [м³/ч] * T [с] / 3600
-      V := Q * Tm / 3.6;
+      V := Q * Tm;
 
       P.LimitVolume := V;
       P.LimitImp    := Round(V * Coef);
@@ -3218,7 +3218,7 @@ begin
 
       else if (Q > 0) and (P.LimitTime > 0) then
       begin
-        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error);
+        Value := FormatByBaseError(Q * P.LimitTime, P.Error);
       end
 
       else
@@ -3306,7 +3306,7 @@ begin
         Value := FormatByBaseError(P.LimitVolume, P.Error)
 
       else if (Q > 0) and (P.LimitTime > 0) then
-        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error)
+        Value := FormatByBaseError(Q * P.LimitTime, P.Error)
 
       else
         Value := '—';
@@ -3524,7 +3524,7 @@ begin
       P.LimitVolume := V;
 
       if (V > 0) and (Q > 0) then
-        P.LimitTime := V * 3.6 / Q;
+        P.LimitTime := V / Q;
 
       if (V > 0) and (Coef > 0) then
         P.LimitImp := Round(V * Coef);
@@ -3540,7 +3540,7 @@ begin
         P.LimitVolume := V;
 
         if Q > 0 then
-          P.LimitTime := V * 3.6 / Q;
+          P.LimitTime := V / Q;
       end;
     end
 
@@ -3551,7 +3551,7 @@ begin
 
       if (Tm > 0) and (Q > 0) then
       begin
-        V := Q * Tm / 3.6;
+        V := Q * Tm;
         P.LimitVolume := V;
 
         if Coef > 0 then
