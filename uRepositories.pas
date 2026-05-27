@@ -271,6 +271,7 @@ type
 
 
     function DeviceExistsInDB(const AUUID: string): Boolean;
+    function DeviceUUIDExists(const AUUID: string; const AExceptDevice: TDevice = nil): Boolean;
     function ShouldSaveDevice(ADevice: TDevice): Boolean;
 
     function GenerateDevicePointID: Integer;
@@ -3463,6 +3464,29 @@ begin
             ((ADevice.Spillages <> nil) and (ADevice.Spillages.Count > 0));
 end;
 
+function TDeviceRepository.DeviceUUIDExists(const AUUID: string; const AExceptDevice: TDevice = nil): Boolean;
+var
+  D: TDevice;
+  DeviceUUID: string;
+begin
+  Result := False;
+  DeviceUUID := Trim(AUUID);
+  if DeviceUUID = '' then
+    Exit;
+
+  if FDevices <> nil then
+    for D in FDevices do
+    begin
+      if (D = nil) or (D = AExceptDevice) then
+        Continue;
+      if SameText(Trim(D.UUID), DeviceUUID) then
+        Exit(True);
+    end;
+
+  if DeviceExistsInDB(DeviceUUID) then
+    Result := (AExceptDevice = nil) or (not SameText(Trim(AExceptDevice.UUID), DeviceUUID));
+end;
+
 
 function TDeviceRepository.Save: Boolean;
 var
@@ -3556,6 +3580,20 @@ begin
       SaveErrors.Add(Format('При сохранении прибора "%s", серийный номер "%s" был присвоен новый UUID.', [ADevice.Name, ADevice.SerialNumber]));
     end;
 
+    if DeviceUUIDExists(ADevice.UUID, ADevice) then
+    begin
+      if ADevice.State = osNew then
+      begin
+        ADevice.UUID := TGUID.NewGuid.ToString;
+        SaveErrors.Add(Format('Для нового прибора "%s" сгенерирован новый UUID из-за конфликта.', [ADevice.Name]));
+      end
+      else
+      begin
+        SaveErrors.Add(Format('Конфликт UUID при сохранении прибора "%s". Сохранение отменено.', [ADevice.Name]));
+        Exit(False);
+      end;
+    end;
+
     if not ShouldSaveDevice(ADevice) then
       Exit(True);
 
@@ -3627,6 +3665,7 @@ begin
   Result := CreateNewDevice;
   Result.Assign(ASource, False);
   Result.ID := GenerateDeviceID;
+  Result.UUID := TGUID.NewGuid.ToString;
   Result.State := osNew;
 end;
 
