@@ -3170,7 +3170,9 @@ var
   I: Integer;
   Ch: TChannel;
   Repo: TDeviceRepository;
+  SourceRepo: TDeviceRepository;
   DeviceUUID: string;
+  RepoName: string;
   Device: TDevice;
   HasChanges: Boolean;
 begin
@@ -3188,7 +3190,25 @@ begin
     if DeviceUUID = '' then
       Continue;
 
-    Device := DataManager.FindDevice(DeviceUUID, Repo);
+    Device := nil;
+    RepoName := Trim(Ch.RepoDeviceName);
+    if RepoName <> '' then
+    begin
+      SourceRepo := DataManager.FindDeviceRepositoryByName(RepoName);
+      if (SourceRepo <> nil) and (SourceRepo.Devices <> nil) then
+      begin
+        for Device in SourceRepo.Devices do
+          if SameText(Trim(Device.UUID), DeviceUUID) then
+            Break;
+
+        if (Device = nil) or (not SameText(Trim(Device.UUID), DeviceUUID)) then
+          Device := nil;
+      end;
+    end;
+
+    if Device = nil then
+      Device := DataManager.FindDevice(DeviceUUID, Repo);
+
     if Device <> nil then
       Continue;
 
