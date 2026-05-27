@@ -3542,6 +3542,7 @@ function TDeviceRepository.SaveDevice(
 ): Boolean;
 var
   SaveErrors: TStringList;
+  ExistingDevice: TDevice;
 begin
   Result := False;
 
@@ -3554,6 +3555,14 @@ begin
     begin
       ADevice.UUID := TGUID.NewGuid.ToString;
       SaveErrors.Add(Format('При сохранении прибора "%s", серийный номер "%s" был присвоен новый UUID.', [ADevice.Name, ADevice.SerialNumber]));
+    end;
+
+    ExistingDevice := FindDeviceByUUID(ADevice.UUID);
+    if (ExistingDevice <> nil) and (ExistingDevice <> ADevice) then
+    begin
+      SaveErrors.Add(Format('Нельзя сохранить прибор "%s": UUID %s уже принадлежит другому объекту.',
+        [ADevice.Name, ADevice.UUID]));
+      Exit(False);
     end;
 
     if not ShouldSaveDevice(ADevice) then
