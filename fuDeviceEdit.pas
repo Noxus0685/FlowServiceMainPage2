@@ -705,6 +705,11 @@ end;
 
 procedure TFormDeviceEditor.btnOKClick(Sender: TObject);
 begin
+  { Гарантируем фиксацию значений даже если OnExit у поля не сработал до нажатия OK }
+  EditQmaxExit(EditQmax);
+  EditQnomExit(EditQnom);
+  EditQminExit(EditQmin);
+  EditQtrExit(EditQtr);
   ModalResult := mrOk;
 end;
 
