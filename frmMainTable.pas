@@ -2722,7 +2722,7 @@ begin
     ADevice := AChannel.FlowMeter.Device;
 
   if (ADevice = nil) and (DataManager <> nil) then
-    ADevice := DataManager.FindDevice(AChannel.DeviceUUID, '', FoundRepo);
+    ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
 
   if ADevice = nil then
   begin
