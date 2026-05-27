@@ -985,21 +985,31 @@ begin
 
   NewDevice := ActiveRepo.CreateDevice(SrcDevice);
 
-  if OpenDeviceEditor(NewDevice) then
-  begin
-    BuildTree;
-    ApplyFilter;
-    UpdateGridDevices;
-    SelectEditedDevice(NewDevice);
-    WriteDeviceActionLog('Создан прибор', NewDevice);
-  end
-  else
-  begin
-    ActiveRepo.DeleteDevice(NewDevice);
-    ApplyFilter;
-    UpdateGridDevices;
-  end;
+  BuildTree;
 
+  {--------------------------------------------------}
+  { 3. Обновляем ТОЛЬКО фильтрованные списки }
+  {--------------------------------------------------}
+  ApplyFilter; // Tree → Text → Date → Sort
+
+  UpdateGridDevices;
+
+  {--------------------------------------------------}
+  { 4. Выделяем добавленную строку }
+  {--------------------------------------------------}
+  GridDevices.Row := -1;
+  if (NewDevice <> nil) and (FDevFilteredDevices <> nil) then
+    for NewRow := 0 to FDevFilteredDevices.Count - 1 do
+      if FDevFilteredDevices[NewRow] = NewDevice then
+      begin
+        GridDevices.Row := NewRow;
+        Break;
+      end;
+
+  if (GridDevices.Row < 0) and (GridDevices.RowCount > 0) then
+    GridDevices.Row := GridDevices.RowCount - 1;
+
+  WriteDeviceActionLog('Создан прибор', NewDevice);
   LogDuplicateDeviceUUIDs;
 end;
 
