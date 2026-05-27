@@ -4941,6 +4941,7 @@ object FrameMainTable: TFrameMainTable
             OnSelectCell = GridDevicesSelectCell
             OnGetValue = GridDevicesGetValue
             OnSetValue = GridDevicesSetValue
+            OnEditingDone = GridDevicesEditingDone
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
             Viewport.Width = 1059.000000000000000000
@@ -4979,6 +4980,7 @@ object FrameMainTable: TFrameMainTable
               Header = #1055#1088#1080#1073#1086#1088
               HeaderSettings.TextSettings.WordWrap = False
               HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
             end
             object StringColumnDeviceSerial1: TStringColumn
               Tag = 2

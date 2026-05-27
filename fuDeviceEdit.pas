@@ -253,6 +253,14 @@ type
     LabelUnits: TLabel;
     ComboBoxUnits: TComboBox;
     PopupColumnFlowSource: TPopupColumn;
+    Layout12: TLayout;
+    Layout14: TLayout;
+    Layout20: TLayout;
+    EditQtr: TEdit;
+    Label4: TLabel;
+    Layout21: TLayout;
+    EditQnom: TEdit;
+    Label7: TLabel;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -273,7 +281,9 @@ type
     procedure cbMeasuredDimensionChange(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
     procedure EditQmaxExit(Sender: TObject);
+    procedure EditQnomExit(Sender: TObject);
     procedure EditQminExit(Sender: TObject);
+    procedure EditQtrExit(Sender: TObject);
     procedure ComboBoxOutputTypeChange(Sender: TObject);
     procedure cbVoltageRangeChange(Sender: TObject);
     procedure EditVoltageQmaxExit(Sender: TObject);
@@ -303,6 +313,7 @@ type
     procedure GridPointsHeaderClick(Column: TColumn);
     procedure cbSpillageTypeChange(Sender: TObject);
     procedure cbSpillageStopChange(Sender: TObject);
+    procedure sbRepeatsChange(Sender: TObject);
     procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
 
@@ -611,8 +622,9 @@ end;
 
 procedure TFormDeviceEditor.UpdateUnitsCombo;
 var
-  I: Integer;
+  I,Num: Integer;
 begin
+  num:=  ComboBoxUnits.ItemIndex;
   ComboBoxUnits.Items.Clear;
 
   if (FDevice = nil) or (FDevice.Dimensions = nil) then
@@ -624,8 +636,12 @@ begin
   for I := 0 to FDevice.Dimensions.Count - 1 do
     ComboBoxUnits.Items.Add(FDevice.Dimensions[I].Name);
 
-  if (FDevice.Units >= 0) and (FDevice.Units < ComboBoxUnits.Items.Count) then
+   if (FDevice.Units > 0) and (FDevice.Units < ComboBoxUnits.Items.Count) then
     ComboBoxUnits.ItemIndex := FDevice.Units
+  else if (num>0) and  (num < ComboBoxUnits.Items.Count)  then
+     ComboBoxUnits.ItemIndex :=num
+  else if (num>0) and  (num > ComboBoxUnits.Items.Count)  then
+     ComboBoxUnits.ItemIndex :=ComboBoxUnits.Items.Count - 1
   else if ComboBoxUnits.Items.Count > 0 then
     ComboBoxUnits.ItemIndex := 0
   else
@@ -689,6 +705,11 @@ end;
 
 procedure TFormDeviceEditor.btnOKClick(Sender: TObject);
 begin
+  { Гарантируем фиксацию значений даже если OnExit у поля не сработал до нажатия OK }
+  EditQmaxExit(EditQmax);
+  EditQnomExit(EditQnom);
+  EditQminExit(EditQmin);
+  EditQtrExit(EditQtr);
   ModalResult := mrOk;
 end;
 
@@ -743,8 +764,8 @@ begin
   {-----------------------------------------------------}
   { Повторы }
   {-----------------------------------------------------}
-  NewP.RepeatsProtocol := 3;
-  NewP.Repeats := 3;
+  NewP.RepeatsProtocol := Max(FDevice.Repeats, 1);
+  NewP.Repeats := Max(FDevice.Repeats, 1);
 
 
   {-----------------------------------------------------}
@@ -910,6 +931,7 @@ end;
 procedure TFormDeviceEditor.FillSpillageStopVolume;
 begin
   PopulateSpillageStopCombo(mdVolume);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 end;
 
 procedure TFormDeviceEditor.FormClose(Sender: TObject;
@@ -921,6 +943,8 @@ end;
 
 procedure TFormDeviceEditor.FormCloseQuery(Sender: TObject;
   var CanClose: Boolean);
+var
+  OldUUID: string;
 begin
   CanClose := True;
 
@@ -934,7 +958,9 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
+        OldUUID := FOriginalDevice.UUID;
         FOriginalDevice.Assign(FDevice,True);
+        FOriginalDevice.UUID := OldUUID;
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
         if not FTypeChangedDuringEdit then
           WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
@@ -975,6 +1001,7 @@ end;
 procedure TFormDeviceEditor.FillSpillageStopMass;
 begin
   PopulateSpillageStopCombo(mdMass);
+  cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
 end;
 
 function TFormDeviceEditor.GetStopVolumeCaption(const ADim: TMeasuredDimension): string;
@@ -1692,6 +1719,29 @@ if FDevice.Qmin > 0 then
   EditQmin.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qmin), FDevice.Error)
 else
   EditQmin.TextPrompt := '—';
+
+  // =====================================================
+// == Номинальный расход
+// =====================================================
+EditQnom.Text := '';
+EditQnom.TextPrompt := '';
+
+if FDevice.Qnom > 0 then
+  EditQnom.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qnom), FDevice.Error)
+else
+  EditQnom.TextPrompt := '—';
+
+    // =====================================================
+// == Переходный расход
+// =====================================================
+EditQtr.Text := '';
+EditQtr.TextPrompt := '';
+
+if FDevice.Qtr > 0 then
+  EditQtr.Text :=  FormatByBaseError(FDevice.FromBaseUnits(FDevice.Qtr), FDevice.Error)
+else
+  EditQtr.TextPrompt := '—';
+
 end;
 
 procedure TFormDeviceEditor.EditQmaxExit(Sender: TObject);
@@ -1721,6 +1771,36 @@ begin
   FDevice.Qmin := NewValue;
   SetModified;
   UpdateQmaxQmin;
+end;
+
+procedure TFormDeviceEditor.EditQnomExit(Sender: TObject);
+var
+  NewValue: Double;
+begin
+  if (FDevice = nil) or FLoading then
+    Exit;
+  NewValue := FDevice.ToBaseUnits(NormalizeFloatInput(EditQnom.Text));
+  if SameValue(NewValue, FDevice.Qnom) then
+    Exit;
+  FDevice.Qnom := NewValue;
+  SetModified;
+  UpdateQmaxQmin;
+  UpdatePointsGrid;
+end;
+
+procedure TFormDeviceEditor.EditQtrExit(Sender: TObject);
+var
+  NewValue: Double;
+begin
+  if (FDevice = nil) or FLoading then
+    Exit;
+  NewValue := FDevice.ToBaseUnits(NormalizeFloatInput(EditQtr.Text));
+  if SameValue(NewValue, FDevice.Qtr) then
+    Exit;
+  FDevice.Qtr := NewValue;
+  SetModified;
+  UpdateQmaxQmin;
+  UpdatePointsGrid;
 end;
 
 procedure  TFormDeviceEditor.UpdateComboEditDN;
@@ -1926,6 +2006,14 @@ begin
 
     PopulateSpillageStopCombo(TMeasuredDimension(FDevice.MeasuredDimension));
     cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(FDevice.SpillageStop);
+    if FDevice.Points <> nil then
+      for Point in FDevice.Points do
+        if (Point <> nil) and (Point.State <> osDeleted) then
+        begin
+          cbSpillageStop.ItemIndex := SpillageStopValueToItemIndex(Point.SpillageStop);
+          FDevice.SpillageStop := Point.SpillageStop;
+          Break;
+        end;
 
     // =====================================================
     // == Повторы
@@ -2116,10 +2204,46 @@ begin
   if FDevice.Points <> nil then
     for P in FDevice.Points do
       if P <> nil then
+      begin
         P.SpillageStop := FDevice.SpillageStop;
+        if P.State <> osNew then
+          P.State := osModified;
+      end;
 
+  UpdatePointsGrid;
   SetModified;
 end;
+
+procedure TFormDeviceEditor.sbRepeatsChange(Sender: TObject);
+var
+  P: TDevicePoint;
+  RepeatsValue: Integer;
+begin
+  if FLoading or (FDevice = nil) then
+    Exit;
+
+  RepeatsValue := Max(Round(sbRepeats.Value), 1);
+
+  if not SameValue(sbRepeats.Value, RepeatsValue, 0.001) then
+    sbRepeats.Value := RepeatsValue;
+
+  FDevice.Repeats := RepeatsValue;
+
+  if FDevice.Points <> nil then
+    for P in FDevice.Points do
+      if P <> nil then
+      begin
+        P.RepeatsProtocol := RepeatsValue;
+        P.Repeats := RepeatsValue;
+        if P.State <> osNew then
+          P.State := osModified;
+      end;
+
+  UpdatePointsGrid;
+  SetModified;
+end;
+
+
 
 procedure TFormDeviceEditor.cbMeasuredDimensionChange(Sender: TObject);
 var
@@ -2496,7 +2620,7 @@ begin
 
       // Объём / масса:
       // Q [м³/ч] * T [с] / 3600
-      V := Q * Tm / 3.6;
+      V := Q * Tm;
 
       P.LimitVolume := V;
       P.LimitImp    := Round(V * Coef);
@@ -3098,7 +3222,7 @@ begin
 
       else if (Q > 0) and (P.LimitTime > 0) then
       begin
-        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error);
+        Value := FormatByBaseError(Q * P.LimitTime, P.Error);
       end
 
       else
@@ -3186,7 +3310,7 @@ begin
         Value := FormatByBaseError(P.LimitVolume, P.Error)
 
       else if (Q > 0) and (P.LimitTime > 0) then
-        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error)
+        Value := FormatByBaseError(Q * P.LimitTime, P.Error)
 
       else
         Value := '—';
@@ -3203,8 +3327,9 @@ procedure TFormDeviceEditor.GridPointsSetValue(
   var
     NameNorm: string;
   begin
+    Result := False;
+    AValue := 0;
     NameNorm := UpperCase(Trim(AName));
-    Result := True;
   {  if (NameNorm = 'QMAX') then
       AValue := FDevice.Qmax
     else if (NameNorm = 'QMIN') then
@@ -3214,12 +3339,12 @@ procedure TFormDeviceEditor.GridPointsSetValue(
     else if (NameNorm = 'KP') then
       AValue := FDevice.Coef     }
 
-    if NameNorm = 'QMIN' then
+    if (NameNorm = 'QMIN') or (NameNorm = 'Q1') then
     begin
       AValue := FDevice.Qmin;
       Exit(True);
     end;
-    if (NameNorm = 'QTR') then
+    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
     begin
       AValue := FDevice.Qtr;
       Exit(True);
@@ -3239,7 +3364,7 @@ procedure TFormDeviceEditor.GridPointsSetValue(
       AValue := FDevice.Qmax;
       Exit(True);
     end;
-    if NameNorm = 'QF' then
+    if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
     begin
       AValue := FDevice.QFmax;
       Exit(True);
@@ -3249,8 +3374,11 @@ procedure TFormDeviceEditor.GridPointsSetValue(
       AValue := FDevice.Kp;
       Exit(True);
     end
-    else
-      Result := False;
+    else if NameNorm = 'COEF' then
+    begin
+      AValue := FDevice.Coef;
+      Exit(True);
+    end;
   end;
 
   function TryApplyPointNameFormula(const AText: string; AP: TDevicePoint): Boolean;
@@ -3400,7 +3528,7 @@ begin
       P.LimitVolume := V;
 
       if (V > 0) and (Q > 0) then
-        P.LimitTime := V * 3.6 / Q;
+        P.LimitTime := V / Q;
 
       if (V > 0) and (Coef > 0) then
         P.LimitImp := Round(V * Coef);
@@ -3416,7 +3544,7 @@ begin
         P.LimitVolume := V;
 
         if Q > 0 then
-          P.LimitTime := V * 3.6 / Q;
+          P.LimitTime := V / Q;
       end;
     end
 
@@ -3427,7 +3555,7 @@ begin
 
       if (Tm > 0) and (Q > 0) then
       begin
-        V := Q * Tm / 3.6;
+        V := Q * Tm;
         P.LimitVolume := V;
 
         if Coef > 0 then
