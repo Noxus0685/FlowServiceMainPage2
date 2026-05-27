@@ -958,7 +958,6 @@ var
   SrcDevice: TDevice;
   SelRow: Integer;
   NewDevice: TDevice;
-  NewRow: Integer;
 begin
   {--------------------------------------------------}
   { Если нет активного репозитория — некуда добавлять }
