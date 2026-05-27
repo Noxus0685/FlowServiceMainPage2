@@ -2707,7 +2707,6 @@ end;
 procedure TFrameMainTable.OpenChannelDeviceEditor(AChannel: TChannel);
 var
   ADevice: TDevice;
-  ActiveRepo: TDeviceRepository;
   FoundRepo: TDeviceRepository;
   SelDevice: TDevice;
   SelectFrm: TFormDeviceSelect;
@@ -2717,14 +2716,15 @@ begin
   if AChannel = nil then
     Exit;
 
-  if DataManager <> nil then
-  ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
-
   OldDeviceUUID := Trim(AChannel.DeviceUUID);
-  ADevice := AChannel.FlowMeter.Device;
+  ADevice := nil;
+  if AChannel.FlowMeter <> nil then
+    ADevice := AChannel.FlowMeter.Device;
 
-  if (ADevice = nil) and
-     ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
+  if (ADevice = nil) and (DataManager <> nil) then
+    ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
+
+  if ADevice = nil then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
@@ -2771,14 +2771,31 @@ begin
     begin
       if ADevice <> nil then
       begin
-      AChannel.FlowMeter.Init(ADevice.UUID);
-       end;
+        AChannel.DeviceUUID := ADevice.UUID;
+        AChannel.TypeUUID := ADevice.DeviceTypeUUID;
+        AChannel.TypeName := ADevice.DeviceTypeName;
+        AChannel.Serial := ADevice.SerialNumber;
+        AChannel.Signal := ADevice.OutputType;
+        AChannel.RepoTypeName := ADevice.RepoTypeName;
+        AChannel.RepoTypeUUID := ADevice.RepoTypeUUID;
+        AChannel.RepoDeviceName := ADevice.RepoDeviceName;
+        AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
+
+        if AChannel.FlowMeter <> nil then
+        begin
+          AChannel.FlowMeter.Device := ADevice;
+          AChannel.FlowMeter.UpdateByDevice;
+        end;
+      end;
+
+      MarkChannelDeviceModified(AChannel);
+      SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
     end;
   finally
     Frm.Free;
   end;
 
- UpdateGrids;
+  UpdateGrids;
 
 end;
 
