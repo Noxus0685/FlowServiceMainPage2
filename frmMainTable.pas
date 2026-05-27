@@ -2708,23 +2708,26 @@ procedure TFrameMainTable.OpenChannelDeviceEditor(AChannel: TChannel);
 var
   ADevice: TDevice;
   ActiveRepo: TDeviceRepository;
-  FoundRepo: TDeviceRepository;
   SelDevice: TDevice;
   SelectFrm: TFormDeviceSelect;
   Frm: TFormDeviceEditor;
-  OldDeviceUUID: string;
 begin
   if AChannel = nil then
     Exit;
 
+  ActiveRepo := nil;
   if DataManager <> nil then
-  ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
+    ActiveRepo := DataManager.FindDeviceRepositoryByName(AChannel.FlowMeter.RepoDeviceName);
 
-  OldDeviceUUID := Trim(AChannel.DeviceUUID);
   ADevice := AChannel.FlowMeter.Device;
 
-  if (ADevice = nil) and
-     ((ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0)) then
+  if ADevice = nil then
+  begin
+    SelectDeviceForChannel(AChannel);
+    Exit;
+  end;
+
+  if (ActiveRepo = nil) or (ActiveRepo.Devices = nil) or (ActiveRepo.Devices.Count = 0) then
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
@@ -2754,7 +2757,6 @@ begin
       end;
 
       MarkChannelDeviceModified(AChannel);
-      SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
 
@@ -2771,8 +2773,19 @@ begin
     begin
       if ADevice <> nil then
       begin
-      AChannel.FlowMeter.Init(ADevice.UUID);
-       end;
+        AChannel.FlowMeter.Init(ADevice.UUID);
+        AChannel.DeviceUUID := ADevice.UUID;
+        AChannel.TypeUUID := ADevice.DeviceTypeUUID;
+        AChannel.TypeName := ADevice.DeviceTypeName;
+        AChannel.Serial := ADevice.SerialNumber;
+        AChannel.Signal := ADevice.OutputType;
+        AChannel.RepoTypeName := ADevice.RepoTypeName;
+        AChannel.RepoTypeUUID := ADevice.RepoTypeUUID;
+        AChannel.RepoDeviceName := ADevice.RepoDeviceName;
+        AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
+        AChannel.FlowMeter.UpdateByDevice;
+        MarkChannelDeviceModified(AChannel);
+      end;
     end;
   finally
     Frm.Free;
@@ -2825,15 +2838,9 @@ procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
 var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
-  LinkedChannel: TChannel;
-  I: Integer;
-  SelectedUUID: string;
-  OldDeviceUUID : string;
 begin
   if AChannel = nil then
     Exit;
-
-  OldDeviceUUID := Trim(AChannel.DeviceUUID);
 
   if DataManager <> nil then
     DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
@@ -2849,8 +2856,6 @@ begin
 
     if AChannel.FlowMeter = nil then
       Exit;
-
-    SelectedUUID := Trim(SelDevice.UUID);
 
     // Полностью переинициализируем расходомер выбранным прибором,
     // чтобы в канал попали все данные нового прибора и его типа.
@@ -2880,32 +2885,6 @@ begin
       if FFrameProceed <> nil then
         FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
 
-      if (FActiveWorkTable <> nil) and (SelectedUUID <> '') then
-        for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
-        begin
-          LinkedChannel := FActiveWorkTable.DeviceChannels[I];
-          if (LinkedChannel = nil) or (LinkedChannel = AChannel) then
-            Continue;
-          if not SameText(Trim(LinkedChannel.DeviceUUID), SelectedUUID) then
-            Continue;
-          if LinkedChannel.FlowMeter = nil then
-            Continue;
-
-          LinkedChannel.FlowMeter.Device := AChannel.FlowMeter.Device;
-          LinkedChannel.FlowMeter.UpdateByDevice;
-
-          LinkedChannel.DeviceUUID := AChannel.DeviceUUID;
-          LinkedChannel.TypeUUID := AChannel.TypeUUID;
-          LinkedChannel.TypeName := AChannel.TypeName;
-          LinkedChannel.Serial := AChannel.Serial;
-          LinkedChannel.Signal := AChannel.Signal;
-          LinkedChannel.RepoTypeName := AChannel.RepoTypeName;
-          LinkedChannel.RepoTypeUUID := AChannel.RepoTypeUUID;
-          LinkedChannel.RepoDeviceName := AChannel.RepoDeviceName;
-          LinkedChannel.RepoDeviceUUID := AChannel.RepoDeviceUUID;
-
-          MarkChannelDeviceModified(LinkedChannel);
-        end;
     end;
 
     MarkChannelDeviceModified(AChannel);
@@ -3159,48 +3138,8 @@ begin
 end;
 
 procedure TFrameMainTable.SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
-var
-  I: Integer;
-  Ch: TChannel;
-  OldUUID: string;
 begin
-  if (FActiveWorkTable = nil) or (AChangedChannel = nil) then
-    Exit;
-
-  OldUUID := Trim(AOldUUID);
-  if OldUUID = '' then
-    Exit;
-
-  if not SameText(OldUUID, Trim(AChangedChannel.DeviceUUID)) then
-    Exit;
-
-  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
-  begin
-    Ch := FActiveWorkTable.DeviceChannels[I];
-    if (Ch = nil) or (Ch = AChangedChannel) then
-      Continue;
-
-    if not SameText(Trim(Ch.DeviceUUID), OldUUID) then
-      Continue;
-
-    if Ch.FlowMeter <> nil then
-      Ch.FlowMeter.Init(AChangedChannel.DeviceUUID);
-
-    Ch.DeviceUUID := AChangedChannel.DeviceUUID;
-    Ch.TypeUUID := AChangedChannel.TypeUUID;
-    Ch.TypeName := AChangedChannel.TypeName;
-    Ch.Serial := AChangedChannel.Serial;
-    Ch.Signal := AChangedChannel.Signal;
-    Ch.RepoTypeName := AChangedChannel.RepoTypeName;
-    Ch.RepoTypeUUID := AChangedChannel.RepoTypeUUID;
-    Ch.RepoDeviceName := AChangedChannel.RepoDeviceName;
-    Ch.RepoDeviceUUID := AChangedChannel.RepoDeviceUUID;
-
-    if Ch.FlowMeter <> nil then
-      Ch.FlowMeter.UpdateByDevice;
-
-    MarkChannelDeviceModified(Ch);
-  end;
+  // Отключено: редактирование прибора в строке не должно изменять другие строки.
 end;
 
 procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
