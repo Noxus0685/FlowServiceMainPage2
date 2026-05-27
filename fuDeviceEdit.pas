@@ -3323,8 +3323,9 @@ procedure TFormDeviceEditor.GridPointsSetValue(
   var
     NameNorm: string;
   begin
+    Result := False;
+    AValue := 0;
     NameNorm := UpperCase(Trim(AName));
-    Result := True;
   {  if (NameNorm = 'QMAX') then
       AValue := FDevice.Qmax
     else if (NameNorm = 'QMIN') then
@@ -3334,12 +3335,12 @@ procedure TFormDeviceEditor.GridPointsSetValue(
     else if (NameNorm = 'KP') then
       AValue := FDevice.Coef     }
 
-    if NameNorm = 'QMIN' then
+    if (NameNorm = 'QMIN') or (NameNorm = 'Q1') then
     begin
       AValue := FDevice.Qmin;
       Exit(True);
     end;
-    if (NameNorm = 'QTR') then
+    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
     begin
       AValue := FDevice.Qtr;
       Exit(True);
@@ -3359,7 +3360,7 @@ procedure TFormDeviceEditor.GridPointsSetValue(
       AValue := FDevice.Qmax;
       Exit(True);
     end;
-    if NameNorm = 'QF' then
+    if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
     begin
       AValue := FDevice.QFmax;
       Exit(True);
@@ -3369,8 +3370,11 @@ procedure TFormDeviceEditor.GridPointsSetValue(
       AValue := FDevice.Kp;
       Exit(True);
     end
-    else
-      Result := False;
+    else if NameNorm = 'COEF' then
+    begin
+      AValue := FDevice.Coef;
+      Exit(True);
+    end;
   end;
 
   function TryApplyPointNameFormula(const AText: string; AP: TDevicePoint): Boolean;
