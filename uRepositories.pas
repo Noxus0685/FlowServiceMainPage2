@@ -3743,7 +3743,9 @@ begin
     {--------------------------------------------------}
     Col('DN',                'TEXT'),
     Col('Qmax',              'REAL'),
+    Col('Qnom',              'REAL'),
     Col('Qmin',              'REAL'),
+    Col('Qtr',               'REAL'),
     Col('RangeDynamic',      'REAL'),
 
     Col('Error',             'REAL'),
@@ -3894,7 +3896,15 @@ begin
 
   Result.DN := Q.FieldByName('DN').AsString;
   Result.Qmax := Q.FieldByName('Qmax').AsFloat;
+  if Q.FindField('Qnom') <> nil then
+    Result.Qnom := Q.FieldByName('Qnom').AsFloat
+  else
+    Result.Qnom := 0;
   Result.Qmin := Q.FieldByName('Qmin').AsFloat;
+  if Q.FindField('Qtr') <> nil then
+    Result.Qtr := Q.FieldByName('Qtr').AsFloat
+  else
+    Result.Qtr := 0;
   Result.RangeDynamic := Q.FieldByName('RangeDynamic').AsFloat;
 
   Result.Error := Q.FieldByName('Error').AsFloat;
@@ -4158,7 +4168,7 @@ begin
           'Manufacturer, Owner, ReestrNumber, ' +
           'CategoryName, Category, AccuracyClass, ' +
           'RegDate, ValidityDate, DateOfManufacture, IVI, ' +
-          'DN, Qmax, Qmin, RangeDynamic, Error, ' +
+          'DN, Qmax, Qnom, Qmin, Qtr, RangeDynamic, Error, ' +
           'VerificationMethod, ProcedureName, ' +
           'MeasuredDimension, Units, OutputType, DimensionCoef, ' +
           'OutputSet, Freq, Coef, FreqFlowRate, ' +
@@ -4173,7 +4183,7 @@ begin
           ':Manufacturer, :Owner, :ReestrNumber, ' +
           ':CategoryName, :Category, :AccuracyClass, ' +
           ':RegDate, :ValidityDate, :DateOfManufacture, :IVI, ' +
-          ':DN, :Qmax, :Qmin, :RangeDynamic, :Error, ' +
+          ':DN, :Qmax, :Qnom, :Qmin, :Qtr, :RangeDynamic, :Error, ' +
           ':VerificationMethod, :ProcedureName, ' +
           ':MeasuredDimension, :Units, :OutputType, :DimensionCoef, ' +
           ':OutputSet, :Freq, :Coef, :FreqFlowRate, ' +
@@ -4196,7 +4206,7 @@ begin
           'Manufacturer = :Manufacturer, Owner = :Owner, ReestrNumber = :ReestrNumber, ' +
           'CategoryName = :CategoryName, Category = :Category, AccuracyClass = :AccuracyClass, ' +
           'RegDate = :RegDate, ValidityDate = :ValidityDate, DateOfManufacture = :DateOfManufacture, IVI = :IVI, ' +
-          'DN = :DN, Qmax = :Qmax, Qmin = :Qmin, RangeDynamic = :RangeDynamic, Error = :Error, ' +
+          'DN = :DN, Qmax = :Qmax, Qnom = :Qnom, Qmin = :Qmin, Qtr = :Qtr, RangeDynamic = :RangeDynamic, Error = :Error, ' +
           'VerificationMethod = :VerificationMethod, ProcedureName = :ProcedureName, ' +
           'MeasuredDimension = :MeasuredDimension, Units = :Units, OutputType = :OutputType, DimensionCoef = :DimensionCoef, ' +
           'OutputSet = :OutputSet, Freq = :Freq, Coef = :Coef, FreqFlowRate = :FreqFlowRate, ' +
@@ -4238,7 +4248,9 @@ begin
 
     SetStrParam(Q, 'DN', ADevice.DN);
     SetFloatParam(Q, 'Qmax', ADevice.Qmax);
+    SetFloatParam(Q, 'Qnom', ADevice.Qnom);
     SetFloatParam(Q, 'Qmin', ADevice.Qmin);
+    SetFloatParam(Q, 'Qtr', ADevice.Qtr);
     SetFloatParam(Q, 'RangeDynamic', ADevice.RangeDynamic);
     SetFloatParam(Q, 'Error', ADevice.Error);
 
