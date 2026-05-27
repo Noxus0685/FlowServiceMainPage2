@@ -559,8 +559,9 @@ type
 
     procedure UpdateGrids;
 
-       procedure UpdateForm;
+    procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
+    procedure ClearChannelsByMissingDevices;
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -2729,11 +2730,17 @@ begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
       if SelectFrm.ShowModal <> mrOk then
+      begin
+        ClearChannelsByMissingDevices;
         Exit;
+      end;
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
+      begin
+        ClearChannelsByMissingDevices;
         Exit;
+      end;
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
 
@@ -2757,6 +2764,7 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
+      ClearChannelsByMissingDevices;
 
     finally
       SelectFrm.Free;
@@ -2858,11 +2866,17 @@ begin
   Frm := TFormDeviceSelect.Create(Self);
   try
     if Frm.ShowModal <> mrOk then
+    begin
+      ClearChannelsByMissingDevices;
       Exit;
+    end;
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
+    begin
+      ClearChannelsByMissingDevices;
       Exit;
+    end;
 
     if AChannel.FlowMeter = nil then
       Exit;
@@ -2934,6 +2948,7 @@ begin
     end;
 
     UpdateGrids;
+    ClearChannelsByMissingDevices;
   finally
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
@@ -3154,6 +3169,41 @@ begin
   AChannel.RepoDeviceName := '';
   AChannel.RepoDeviceUUID := '';
   MarkChannelDeviceModified(AChannel);
+end;
+
+procedure TFrameMainTable.ClearChannelsByMissingDevices;
+var
+  I: Integer;
+  Ch: TChannel;
+  Repo: TDeviceRepository;
+  DeviceUUID: string;
+  Device: TDevice;
+  HasChanges: Boolean;
+begin
+  if (FActiveWorkTable = nil) or (DataManager = nil) then
+    Exit;
+
+  HasChanges := False;
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Ch := FActiveWorkTable.DeviceChannels[I];
+    if Ch = nil then
+      Continue;
+
+    DeviceUUID := Trim(Ch.DeviceUUID);
+    if DeviceUUID = '' then
+      Continue;
+
+    Device := DataManager.FindDevice(DeviceUUID, Repo);
+    if Device <> nil then
+      Continue;
+
+    ClearChannelData(Ch);
+    HasChanges := True;
+  end;
+
+  if HasChanges then
+    UpdateGrids;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
