@@ -206,6 +206,7 @@ private
   FSortAscending: Boolean;
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
+  FDeletedDeviceUUIDs: TStringList;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -257,8 +258,10 @@ private
 
 public
   { Public declarations }
+  constructor Create(AOwner: TComponent); override;
   function GetSelectedDevice: TDevice;
   destructor Destroy; override;
+  property DeletedDeviceUUIDs: TStringList read FDeletedDeviceUUIDs;
 
   end;
 
@@ -269,8 +272,17 @@ implementation
   uses
    uAppServices;
 {$R *.fmx}
+constructor TFormDeviceSelect.Create(AOwner: TComponent);
+begin
+  inherited;
+  FDeletedDeviceUUIDs := TStringList.Create;
+  FDeletedDeviceUUIDs.Duplicates := dupIgnore;
+  FDeletedDeviceUUIDs.CaseSensitive := False;
+end;
+
 destructor TFormDeviceSelect.Destroy;
 begin
+  FreeAndNil(FDeletedDeviceUUIDs);
   FreeAndNil(FCheckedDevices);
   inherited;
 end;
@@ -1428,6 +1440,8 @@ end;
 procedure TFormDeviceSelect.ButtonDeviceDeleteClick(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
+  D: TDevice;
+  DeviceUUID: string;
 begin
   {----------------------------------}
   { Проверка списка }
@@ -1444,6 +1458,16 @@ begin
     { Удаление через репозиторий }
     {----------------------------------}
     WriteDeviceActionLog('Удалён прибор', TargetDevices[0], Format('Count=%d', [TargetDevices.Count]));
+
+    for D in TargetDevices do
+    begin
+      if D = nil then
+        Continue;
+      DeviceUUID := Trim(D.UUID);
+      if DeviceUUID <> '' then
+        FDeletedDeviceUUIDs.Add(DeviceUUID);
+    end;
+
     AppServices.DataManager.DeleteDevices(TargetDevices);
 
     //SyncTreeAfterGridRowsRemoved;

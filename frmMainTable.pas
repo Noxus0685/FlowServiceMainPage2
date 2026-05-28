@@ -560,8 +560,11 @@ type
     procedure UpdateGrids;
 
     procedure UpdateForm;
-    procedure ClearChannelData(AChannel: TChannel);
+    procedure ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable = nil);
     procedure ClearChannelsByMissingDevices;
+    procedure RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
+    procedure RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
+      AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -2293,11 +2296,26 @@ begin
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
+var
+  RepoDevice: TDevice;
+  FoundRepo: TDeviceRepository;
 begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
     Exit;
 
   AChannel.FlowMeter.Device.State := osModified;
+
+  RepoDevice := nil;
+  if DataManager <> nil then
+    RepoDevice := DataManager.FindDevice(AChannel.FlowMeter.Device.UUID, FoundRepo);
+
+  if (RepoDevice <> nil) and (RepoDevice <> AChannel.FlowMeter.Device) then
+  begin
+    RepoDevice.Assign(AChannel.FlowMeter.Device, True);
+    RepoDevice.State := osModified;
+    AChannel.FlowMeter.Device := RepoDevice;
+  end;
+
   AChannel.FlowMeter.RebindCalculatedValues;
   PersistDeviceAsync(AChannel.FlowMeter.Device);
 
@@ -2717,6 +2735,7 @@ var
   SelectFrm: TFormDeviceSelect;
   Frm: TFormDeviceEditor;
   OldDeviceUUID: string;
+  DeviceSelectResult: TModalResult;
 begin
   if AChannel = nil then
     Exit;
@@ -2733,7 +2752,10 @@ begin
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
-      if SelectFrm.ShowModal <> mrOk then
+      DeviceSelectResult := SelectFrm.ShowModal;
+      RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+
+      if DeviceSelectResult <> mrOk then
       begin
         ClearChannelsByMissingDevices;
         Exit;
@@ -2858,6 +2880,7 @@ var
   I: Integer;
   SelectedUUID: string;
   OldDeviceUUID : string;
+  DeviceSelectResult: TModalResult;
 begin
   if AChannel = nil then
     Exit;
@@ -2869,7 +2892,10 @@ begin
 
   Frm := TFormDeviceSelect.Create(Self);
   try
-    if Frm.ShowModal <> mrOk then
+    DeviceSelectResult := Frm.ShowModal;
+    RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
+
+    if DeviceSelectResult <> mrOk then
       Exit;
 
     SelDevice := Frm.GetSelectedDevice;
@@ -3141,21 +3167,26 @@ begin
   Result := AChannels[Row];
 end;
 
-procedure TFrameMainTable.ClearChannelData(AChannel: TChannel);
+procedure TFrameMainTable.ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable);
 var
   Device: TDevice;
+  WorkTable: TWorkTable;
 begin
   if AChannel = nil then
     Exit;
 
-
-  if (AChannel.FlowMeter <> nil) then
+  Device := nil;
+  if AChannel.FlowMeter <> nil then
     Device := AChannel.FlowMeter.Device;
 
   if FFrameProceed <> nil then
     FFrameProceed.RemoveProcessingDevice(Device);
 
-  AChannel.RecreateFlowMeter(FActiveWorkTable);
+  WorkTable := AWorkTable;
+  if WorkTable = nil then
+    WorkTable := FActiveWorkTable;
+
+  AChannel.RecreateFlowMeter(WorkTable);
 
   AChannel.TypeName := '';
   AChannel.Serial := '';
@@ -3222,6 +3253,47 @@ begin
 
   if HasChanges then
     UpdateGrids;
+end;
+
+procedure TFrameMainTable.RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
+  AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
+var
+  I: Integer;
+  Channel: TChannel;
+  DeviceUUID: string;
+begin
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := AWorkTable.DeviceChannels.Count - 1 downto 0 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+
+    DeviceUUID := Trim(Channel.DeviceUUID);
+    if DeviceUUID = '' then
+      Continue;
+
+    if ADeletedUUIDs.IndexOf(DeviceUUID) >= 0 then
+      ClearChannelData(Channel, AWorkTable);
+  end;
+end;
+
+procedure TFrameMainTable.RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
+var
+  WorkTable: TWorkTable;
+begin
+  if (ADeletedUUIDs = nil) or (ADeletedUUIDs.Count = 0) then
+    Exit;
+
+  if WorkTableManager = nil then
+    Exit;
+
+  for WorkTable in WorkTableManager.WorkTables do
+    RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(WorkTable, ADeletedUUIDs);
+
+  UpdateGridDevices;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
@@ -4723,6 +4795,7 @@ var
   WorkTable: TWorkTable;
   Signal: Integer;
   Changed: Boolean;
+  DeviceFieldsChanged: Boolean;
 begin
   if IsUpdating then
     Exit;
@@ -4731,6 +4804,7 @@ begin
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     Changed := False;
+    DeviceFieldsChanged := False;
 
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     begin
@@ -4746,23 +4820,42 @@ begin
     begin
       Changed := WorkTable.DeviceChannels[ARow].TypeName <> Value.AsString;
       WorkTable.DeviceChannels[ARow].TypeName := Value.AsString;
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        WorkTable.DeviceChannels[ARow].FlowMeter.Device.DeviceTypeName := Value.AsString;
+      DeviceFieldsChanged := True;
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
     begin
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        WorkTable.DeviceChannels[ARow].FlowMeter.Device.SerialNumber := Value.AsString;
+      DeviceFieldsChanged := True;
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
-      Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString)
+    begin
+      Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString);
+      DeviceFieldsChanged := Changed;
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
         Changed := WorkTable.DeviceChannels[ARow].Signal <> Signal;
         WorkTable.DeviceChannels[ARow].Signal := Signal;
+        if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+           (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+          WorkTable.DeviceChannels[ARow].FlowMeter.Device.OutputType := Signal;
+        DeviceFieldsChanged := True;
       end;
 
     if Changed then
+    begin
       MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
+      if DeviceFieldsChanged then
+        SyncChannelsWithSameDeviceUUID(WorkTable.DeviceChannels[ARow], WorkTable.DeviceChannels[ARow].DeviceUUID);
+    end;
 
     Exit;
   end;
