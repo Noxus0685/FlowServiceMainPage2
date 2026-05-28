@@ -4163,6 +4163,9 @@ var
   IsCurrentTypeDeletedInSelector: Boolean;
   Ch: TChannel;
   Repo: TTypeRepository;
+  DeviceRepo: TDeviceRepository;
+  Device: TDevice;
+  HasDeviceForType: Boolean;
 begin
 
   if (FActiveWorkTable = nil) then
@@ -4234,7 +4237,26 @@ begin
     { 2. Открываем форму выбора }
     {----------------------------------------------------}
     if Frm.ShowModal <> mrOk then
+    begin
+      if (not AIsEtalon) and (Trim(Ch.TypeUUID) <> '') and (Trim(Ch.Serial) = '') then
+      begin
+        HasDeviceForType := False;
+        if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+        begin
+          DeviceRepo := DataManager.ActiveDeviceRepo;
+          for Device in DeviceRepo.Devices do
+            if (Device <> nil) and SameText(Trim(Device.DeviceTypeUUID), Trim(Ch.TypeUUID)) then
+            begin
+              HasDeviceForType := True;
+              Break;
+            end;
+        end;
+
+        if not HasDeviceForType then
+          ShowMessage('Прибор не сохранён без серийного номера.');
+      end;
       Exit;
+    end;
 
     NewType := Frm.SelectedType;
     if NewType = nil then
