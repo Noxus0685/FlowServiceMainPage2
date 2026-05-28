@@ -944,6 +944,7 @@ end;
 procedure TFormDeviceEditor.FormCloseQuery(Sender: TObject;
   var CanClose: Boolean);
 var
+  OldID: Integer;
   OldUUID: string;
 begin
   CanClose := True;
@@ -958,9 +959,12 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
+        OldID := FOriginalDevice.ID;
         OldUUID := FOriginalDevice.UUID;
         FOriginalDevice.Assign(FDevice,True);
+        FOriginalDevice.ID := OldID;
         FOriginalDevice.UUID := OldUUID;
+        FOriginalDevice.State := osModified;
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
         if not FTypeChangedDuringEdit then
           WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
@@ -3721,7 +3725,14 @@ begin
       if FOriginalDevice <> nil then
       begin
         { редактирование существующего }
+        // Гарантированно обновляем текущий прибор, а не создаём новый
+        // (сохраняем идентификаторы оригинала).
+        var OldID := FOriginalDevice.ID;
+        var OldUUID := FOriginalDevice.UUID;
         FOriginalDevice.Assign(FDevice,True);
+        FOriginalDevice.ID := OldID;
+        FOriginalDevice.UUID := OldUUID;
+        FOriginalDevice.State := osModified;
 
 
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
