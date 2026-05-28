@@ -4164,11 +4164,12 @@ var
   Ch: TChannel;
   Repo: TTypeRepository;
   DeviceRepo: TDeviceRepository;
-  Device: TDevice;
   HasDeviceForType: Boolean;
   function HasSavedDeviceForType(const ATypeUUID: string): Boolean;
   var
     LTypeUUID: string;
+    I: Integer;
+    LDevice: TDevice;
   begin
     Result := False;
     LTypeUUID := Trim(ATypeUUID);
@@ -4179,9 +4180,12 @@ var
       Exit;
 
     DeviceRepo := DataManager.ActiveDeviceRepo;
-    for Device in DeviceRepo.Devices do
-      if (Device <> nil) and SameText(Trim(Device.DeviceTypeUUID), LTypeUUID) then
+    for I := 0 to DeviceRepo.Devices.Count - 1 do
+    begin
+      LDevice := DeviceRepo.Devices[I];
+      if (LDevice <> nil) and SameText(Trim(LDevice.DeviceTypeUUID), LTypeUUID) then
         Exit(True);
+    end;
   end;
 begin
 
