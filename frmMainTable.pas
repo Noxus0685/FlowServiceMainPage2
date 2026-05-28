@@ -2296,11 +2296,26 @@ begin
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
+var
+  RepoDevice: TDevice;
+  FoundRepo: TDeviceRepository;
 begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
     Exit;
 
   AChannel.FlowMeter.Device.State := osModified;
+
+  RepoDevice := nil;
+  if DataManager <> nil then
+    RepoDevice := DataManager.FindDevice(AChannel.FlowMeter.Device.UUID, FoundRepo);
+
+  if (RepoDevice <> nil) and (RepoDevice <> AChannel.FlowMeter.Device) then
+  begin
+    RepoDevice.Assign(AChannel.FlowMeter.Device, True);
+    RepoDevice.State := osModified;
+    AChannel.FlowMeter.Device := RepoDevice;
+  end;
+
   AChannel.FlowMeter.RebindCalculatedValues;
   PersistDeviceAsync(AChannel.FlowMeter.Device);
 
@@ -4784,6 +4799,7 @@ var
   WorkTable: TWorkTable;
   Signal: Integer;
   Changed: Boolean;
+  DeviceFieldsChanged: Boolean;
 begin
   if IsUpdating then
     Exit;
@@ -4792,6 +4808,7 @@ begin
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
     Changed := False;
+    DeviceFieldsChanged := False;
 
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     begin
@@ -4807,23 +4824,42 @@ begin
     begin
       Changed := WorkTable.DeviceChannels[ARow].TypeName <> Value.AsString;
       WorkTable.DeviceChannels[ARow].TypeName := Value.AsString;
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        WorkTable.DeviceChannels[ARow].FlowMeter.Device.DeviceTypeName := Value.AsString;
+      DeviceFieldsChanged := True;
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceSerial1 then
     begin
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        WorkTable.DeviceChannels[ARow].FlowMeter.Device.SerialNumber := Value.AsString;
+      DeviceFieldsChanged := True;
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
-      Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString)
+    begin
+      Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString);
+      DeviceFieldsChanged := Changed;
+    end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
         Changed := WorkTable.DeviceChannels[ARow].Signal <> Signal;
         WorkTable.DeviceChannels[ARow].Signal := Signal;
+        if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+           (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+          WorkTable.DeviceChannels[ARow].FlowMeter.Device.OutputType := Signal;
+        DeviceFieldsChanged := True;
       end;
 
     if Changed then
+    begin
       MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
+      if DeviceFieldsChanged then
+        SyncChannelsWithSameDeviceUUID(WorkTable.DeviceChannels[ARow], WorkTable.DeviceChannels[ARow].DeviceUUID);
+    end;
 
     Exit;
   end;
