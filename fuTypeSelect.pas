@@ -47,6 +47,7 @@ uses
   uBaseProcedures,
   uClasses,
   uDataManager,
+  uDeviceClass,
   uRepositories,
   uProtocols;
 type
