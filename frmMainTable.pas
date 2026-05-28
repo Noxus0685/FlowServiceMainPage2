@@ -2734,17 +2734,11 @@ begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
       if SelectFrm.ShowModal <> mrOk then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
 
@@ -2768,9 +2762,10 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
-      ClearChannelsByMissingDevices;
 
     finally
+      // Очищаем GridDevices только после закрытия окна fuDeviceSelect.
+      ClearChannelsByMissingDevices;
       SelectFrm.Free;
     end;
     Exit;
