@@ -560,7 +560,7 @@ type
     procedure UpdateGrids;
 
     procedure UpdateForm;
-    procedure ClearChannelData(AChannel: TChannel);
+    procedure ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable = nil);
     procedure ClearChannelsByMissingDevices;
     procedure RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
     procedure RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
@@ -3156,21 +3156,26 @@ begin
   Result := AChannels[Row];
 end;
 
-procedure TFrameMainTable.ClearChannelData(AChannel: TChannel);
+procedure TFrameMainTable.ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable);
 var
   Device: TDevice;
+  WorkTable: TWorkTable;
 begin
   if AChannel = nil then
     Exit;
 
-
-  if (AChannel.FlowMeter <> nil) then
+  Device := nil;
+  if AChannel.FlowMeter <> nil then
     Device := AChannel.FlowMeter.Device;
 
   if FFrameProceed <> nil then
     FFrameProceed.RemoveProcessingDevice(Device);
 
-  AChannel.RecreateFlowMeter(FActiveWorkTable);
+  WorkTable := AWorkTable;
+  if WorkTable = nil then
+    WorkTable := FActiveWorkTable;
+
+  AChannel.RecreateFlowMeter(WorkTable);
 
   AChannel.TypeName := '';
   AChannel.Serial := '';
@@ -3260,7 +3265,7 @@ begin
       Continue;
 
     if ADeletedUUIDs.IndexOf(DeviceUUID) >= 0 then
-      AWorkTable.DeviceChannels.Delete(I);
+      ClearChannelData(Channel, AWorkTable);
   end;
 end;
 
