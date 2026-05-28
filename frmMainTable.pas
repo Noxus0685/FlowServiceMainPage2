@@ -562,6 +562,7 @@ type
     procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
     procedure ClearChannelsByMissingDevices;
+    procedure ClearChannelsByDeletedDeviceUUIDs;
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -2765,7 +2766,7 @@ begin
 
     finally
       // Очищаем GridDevices только после закрытия окна fuDeviceSelect.
-      ClearChannelsByMissingDevices;
+      ClearChannelsByDeletedDeviceUUIDs;
       SelectFrm.Free;
     end;
     Exit;
@@ -2942,7 +2943,7 @@ begin
 
     UpdateGrids;
   finally
-    ClearChannelsByMissingDevices;
+    ClearChannelsByDeletedDeviceUUIDs;
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
@@ -3234,6 +3235,42 @@ begin
 
   if HasChanges then
     UpdateGrids;
+end;
+
+procedure TFrameMainTable.ClearChannelsByDeletedDeviceUUIDs;
+var
+  I, J: Integer;
+  Ch: TChannel;
+  DelUUID: string;
+  HasChanges: Boolean;
+begin
+  if (FActiveWorkTable = nil) or (DataManager = nil) or
+     (DataManager.DeletedDeviceUUIDs = nil) or (DataManager.DeletedDeviceUUIDs.Count = 0) then
+    Exit;
+
+  HasChanges := False;
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Ch := FActiveWorkTable.DeviceChannels[I];
+    if (Ch = nil) or (Trim(Ch.DeviceUUID) = '') then
+      Continue;
+
+    for J := 0 to DataManager.DeletedDeviceUUIDs.Count - 1 do
+    begin
+      DelUUID := Trim(DataManager.DeletedDeviceUUIDs[J]);
+      if (DelUUID <> '') and SameText(Trim(Ch.DeviceUUID), DelUUID) then
+      begin
+        ClearChannelData(Ch);
+        HasChanges := True;
+        Break;
+      end;
+    end;
+  end;
+
+  if HasChanges then
+    UpdateGrids;
+
+  DataManager.ClearDeletedDeviceUUIDs;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
