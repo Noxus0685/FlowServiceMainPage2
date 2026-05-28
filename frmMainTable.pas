@@ -2746,6 +2746,8 @@ begin
         Exit;
       end;
 
+      RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
       begin
@@ -2882,6 +2884,8 @@ begin
 
     if DeviceSelectResult <> mrOk then
       Exit;
+
+    RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
