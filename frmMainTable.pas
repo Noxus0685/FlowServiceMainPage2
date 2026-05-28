@@ -3221,11 +3221,16 @@ begin
   if Manager = nil then
     Manager := uWorkTable.WorkTableManager;
 
-  if (Manager = nil) or (Manager.WorkTables = nil) then
+  if (Manager <> nil) and (Manager.WorkTables <> nil) then
+  begin
+    for WorkTable in Manager.WorkTables do
+      RemoveMissingDeviceChannelsFromWorkTable(WorkTable);
     Exit;
+  end;
 
-  for WorkTable in Manager.WorkTables do
-    RemoveMissingDeviceChannelsFromWorkTable(WorkTable);
+  // Fallback: менеджер может быть уже освобождён в ходе закрытия приложения,
+  // но активный стол фрейма ещё доступен и тоже должен быть очищен.
+  RemoveMissingDeviceChannelsFromWorkTable(FActiveWorkTable);
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
