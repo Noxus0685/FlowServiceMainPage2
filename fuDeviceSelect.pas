@@ -206,6 +206,8 @@ private
   FSortAscending: Boolean;
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
+  FRequiredTypeUUID: string;
+  FRequireSerialWarning: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -251,11 +253,14 @@ private
   function GetCheckedDevices: TObjectList<TDevice>;
   procedure ClearGridSelection;
   function IsGridInputFocused: Boolean;
+  function HasSavedDeviceForType(const ATypeUUID: string): Boolean;
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
 
 public
+  property RequiredTypeUUID: string read FRequiredTypeUUID write FRequiredTypeUUID;
+  property RequireSerialWarning: Boolean read FRequireSerialWarning write FRequireSerialWarning;
   { Public declarations }
   function GetSelectedDevice: TDevice;
   destructor Destroy; override;
@@ -289,6 +294,28 @@ begin
     Exit;
 
   Result := FDevFilteredDevices[Row];
+end;
+
+function TFormDeviceSelect.HasSavedDeviceForType(const ATypeUUID: string): Boolean;
+var
+  I: Integer;
+  LTypeUUID: string;
+  LDevice: TDevice;
+begin
+  Result := False;
+  LTypeUUID := Trim(ATypeUUID);
+  if LTypeUUID = '' then
+    Exit;
+
+  if ActiveRepo = nil then
+    Exit;
+
+  for I := 0 to ActiveRepo.Devices.Count - 1 do
+  begin
+    LDevice := ActiveRepo.Devices[I];
+    if (LDevice <> nil) and SameText(Trim(LDevice.DeviceTypeUUID), LTypeUUID) then
+      Exit(True);
+  end;
 end;
 
 procedure TFormDeviceSelect.WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string);
@@ -2603,6 +2630,8 @@ begin
   FSortAscending := True;
   FSkipDeviceDeleteConfirm := False;
   FCheckedDevices := TList<TDevice>.Create;
+  FRequiredTypeUUID := '';
+  FRequireSerialWarning := False;
 
   {----------------------------------}
   { Загрузка данных и репозиториев }
