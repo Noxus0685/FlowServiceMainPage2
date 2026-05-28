@@ -562,6 +562,9 @@ type
     procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
     procedure ClearChannelsByMissingDevices;
+    procedure RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
+    procedure RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
+      AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -2739,6 +2742,8 @@ begin
         Exit;
       end;
 
+      RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
       begin
@@ -2871,6 +2876,8 @@ begin
   try
     if Frm.ShowModal <> mrOk then
       Exit;
+
+    RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
@@ -3222,6 +3229,47 @@ begin
 
   if HasChanges then
     UpdateGrids;
+end;
+
+procedure TFrameMainTable.RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
+  AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
+var
+  I: Integer;
+  Channel: TChannel;
+  DeviceUUID: string;
+begin
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := AWorkTable.DeviceChannels.Count - 1 downto 0 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+
+    DeviceUUID := Trim(Channel.DeviceUUID);
+    if DeviceUUID = '' then
+      Continue;
+
+    if ADeletedUUIDs.IndexOf(DeviceUUID) >= 0 then
+      AWorkTable.DeviceChannels.Delete(I);
+  end;
+end;
+
+procedure TFrameMainTable.RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
+var
+  WorkTable: TWorkTable;
+begin
+  if (ADeletedUUIDs = nil) or (ADeletedUUIDs.Count = 0) then
+    Exit;
+
+  if WorkTableManager = nil then
+    Exit;
+
+  for WorkTable in WorkTableManager.WorkTables do
+    RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(WorkTable, ADeletedUUIDs);
+
+  UpdateGridDevices;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
