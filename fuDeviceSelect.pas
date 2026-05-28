@@ -1440,6 +1440,8 @@ end;
 procedure TFormDeviceSelect.ButtonDeviceDeleteClick(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
+  D: TDevice;
+  DeviceUUID: string;
 begin
   {----------------------------------}
   { Проверка списка }

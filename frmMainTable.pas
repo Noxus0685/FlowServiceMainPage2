@@ -2720,6 +2720,7 @@ var
   SelectFrm: TFormDeviceSelect;
   Frm: TFormDeviceEditor;
   OldDeviceUUID: string;
+  DeviceSelectResult: TModalResult;
 begin
   if AChannel = nil then
     Exit;
@@ -2736,7 +2737,10 @@ begin
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
-      if SelectFrm.ShowModal <> mrOk then
+      DeviceSelectResult := SelectFrm.ShowModal;
+      RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+
+      if DeviceSelectResult <> mrOk then
       begin
         ClearChannelsByMissingDevices;
         Exit;
@@ -2863,6 +2867,7 @@ var
   I: Integer;
   SelectedUUID: string;
   OldDeviceUUID : string;
+  DeviceSelectResult: TModalResult;
 begin
   if AChannel = nil then
     Exit;
@@ -2874,7 +2879,10 @@ begin
 
   Frm := TFormDeviceSelect.Create(Self);
   try
-    if Frm.ShowModal <> mrOk then
+    DeviceSelectResult := Frm.ShowModal;
+    RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
+
+    if DeviceSelectResult <> mrOk then
       Exit;
 
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
