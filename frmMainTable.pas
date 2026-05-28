@@ -562,6 +562,9 @@ type
     procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
     procedure ClearChannelsByMissingDevices;
+    procedure RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
+    procedure RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
+      AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -2717,6 +2720,7 @@ var
   SelectFrm: TFormDeviceSelect;
   Frm: TFormDeviceEditor;
   OldDeviceUUID: string;
+  DeviceSelectResult: TModalResult;
 begin
   if AChannel = nil then
     Exit;
@@ -2733,7 +2737,10 @@ begin
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
-      if SelectFrm.ShowModal <> mrOk then
+      DeviceSelectResult := SelectFrm.ShowModal;
+      RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+
+      if DeviceSelectResult <> mrOk then
       begin
         ClearChannelsByMissingDevices;
         Exit;
@@ -2858,6 +2865,7 @@ var
   I: Integer;
   SelectedUUID: string;
   OldDeviceUUID : string;
+  DeviceSelectResult: TModalResult;
 begin
   if AChannel = nil then
     Exit;
@@ -2869,7 +2877,10 @@ begin
 
   Frm := TFormDeviceSelect.Create(Self);
   try
-    if Frm.ShowModal <> mrOk then
+    DeviceSelectResult := Frm.ShowModal;
+    RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
+
+    if DeviceSelectResult <> mrOk then
       Exit;
 
     SelDevice := Frm.GetSelectedDevice;
@@ -3222,6 +3233,47 @@ begin
 
   if HasChanges then
     UpdateGrids;
+end;
+
+procedure TFrameMainTable.RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
+  AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
+var
+  I: Integer;
+  Channel: TChannel;
+  DeviceUUID: string;
+begin
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := AWorkTable.DeviceChannels.Count - 1 downto 0 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+
+    DeviceUUID := Trim(Channel.DeviceUUID);
+    if DeviceUUID = '' then
+      Continue;
+
+    if ADeletedUUIDs.IndexOf(DeviceUUID) >= 0 then
+      AWorkTable.DeviceChannels.Delete(I);
+  end;
+end;
+
+procedure TFrameMainTable.RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
+var
+  WorkTable: TWorkTable;
+begin
+  if (ADeletedUUIDs = nil) or (ADeletedUUIDs.Count = 0) then
+    Exit;
+
+  if WorkTableManager = nil then
+    Exit;
+
+  for WorkTable in WorkTableManager.WorkTables do
+    RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(WorkTable, ADeletedUUIDs);
+
+  UpdateGridDevices;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
