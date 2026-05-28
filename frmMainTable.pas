@@ -3197,12 +3197,8 @@ begin
       // Если UUID уже очищен, но в строке остались следы выбранного прибора,
       // нужно дочистить канал, иначе строка визуально выглядит заполненной.
       HasResidualDeviceData :=
-        (Trim(Ch.TypeName) <> '') or
         (Trim(Ch.Serial) <> '') or
         (Ch.Signal <> -1) or
-        (Trim(Ch.TypeUUID) <> '') or
-        (Trim(Ch.RepoTypeName) <> '') or
-        (Trim(Ch.RepoTypeUUID) <> '') or
         (Trim(Ch.RepoDeviceName) <> '') or
         (Trim(Ch.RepoDeviceUUID) <> '') or
         ((Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil));
