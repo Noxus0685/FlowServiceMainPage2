@@ -2583,6 +2583,7 @@ begin
         Action := TCloseAction.caNone;
     end;
   end;
+
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
