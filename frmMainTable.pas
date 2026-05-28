@@ -2734,17 +2734,11 @@ begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
       if SelectFrm.ShowModal <> mrOk then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
 
@@ -2768,9 +2762,10 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
-      ClearChannelsByMissingDevices;
 
     finally
+      // Очищаем GridDevices только после закрытия окна fuDeviceSelect.
+      ClearChannelsByMissingDevices;
       SelectFrm.Free;
     end;
     Exit;
@@ -3179,6 +3174,7 @@ var
   RepoName: string;
   Device: TDevice;
   HasChanges: Boolean;
+  HasResidualDeviceData: Boolean;
 begin
   if (FActiveWorkTable = nil) or (DataManager = nil) then
     Exit;
@@ -3192,7 +3188,23 @@ begin
 
     DeviceUUID := Trim(Ch.DeviceUUID);
     if DeviceUUID = '' then
+    begin
+      // Если UUID уже очищен, но в строке остались следы выбранного прибора,
+      // нужно дочистить канал, иначе строка визуально выглядит заполненной.
+      HasResidualDeviceData :=
+        (Trim(Ch.Serial) <> '') or
+        (Ch.Signal <> -1) or
+        (Trim(Ch.RepoDeviceName) <> '') or
+        (Trim(Ch.RepoDeviceUUID) <> '') or
+        ((Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil));
+
+      if HasResidualDeviceData then
+      begin
+        ClearChannelData(Ch);
+        HasChanges := True;
+      end;
       Continue;
+    end;
 
     Device := nil;
     RepoName := Trim(Ch.RepoDeviceName);
