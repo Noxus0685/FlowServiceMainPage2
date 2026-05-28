@@ -4166,6 +4166,23 @@ var
   DeviceRepo: TDeviceRepository;
   Device: TDevice;
   HasDeviceForType: Boolean;
+  function HasSavedDeviceForType(const ATypeUUID: string): Boolean;
+  var
+    LTypeUUID: string;
+  begin
+    Result := False;
+    LTypeUUID := Trim(ATypeUUID);
+    if LTypeUUID = '' then
+      Exit;
+
+    if (DataManager = nil) or (DataManager.ActiveDeviceRepo = nil) then
+      Exit;
+
+    DeviceRepo := DataManager.ActiveDeviceRepo;
+    for Device in DeviceRepo.Devices do
+      if (Device <> nil) and SameText(Trim(Device.DeviceTypeUUID), LTypeUUID) then
+        Exit(True);
+  end;
 begin
 
   if (FActiveWorkTable = nil) then
@@ -4240,18 +4257,7 @@ begin
     begin
       if (not AIsEtalon) and (Trim(Ch.TypeUUID) <> '') and (Trim(Ch.Serial) = '') then
       begin
-        HasDeviceForType := False;
-        if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-        begin
-          DeviceRepo := DataManager.ActiveDeviceRepo;
-          for Device in DeviceRepo.Devices do
-            if (Device <> nil) and SameText(Trim(Device.DeviceTypeUUID), Trim(Ch.TypeUUID)) then
-            begin
-              HasDeviceForType := True;
-              Break;
-            end;
-        end;
-
+        HasDeviceForType := HasSavedDeviceForType(Ch.TypeUUID);
         if not HasDeviceForType then
           ShowMessage('Прибор не сохранён без серийного номера.');
       end;
@@ -4284,6 +4290,13 @@ begin
     {----------------------------------------------------}
     IsTypeChanged := True;
     AttachType(Ch, NewType, FoundRepo, IsTypeChanged);
+
+    if (not AIsEtalon) and (Trim(Ch.TypeUUID) <> '') and (Trim(Ch.Serial) = '') then
+    begin
+      HasDeviceForType := HasSavedDeviceForType(Ch.TypeUUID);
+      if not HasDeviceForType then
+        ShowMessage('Прибор не сохранён без серийного номера.');
+    end;
 
     {----------------------------------------------------}
     { 4. Обновляем UI }
