@@ -641,7 +641,8 @@ implementation
 {$R *.fmx}
 
 uses
-  fuTable_Main;
+  fuTable_Main,
+  uAppServices;
 
 
 const
@@ -3211,12 +3212,19 @@ end;
 
 procedure TFrameMainTable.RemoveDeviceChannelsWithMissingDevicesOnClose;
 var
+  Manager: TWorkTableManager;
   WorkTable: TWorkTable;
 begin
-  if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then
+  Manager := WorkTableManager;
+  if (Manager = nil) and (AppServices <> nil) then
+    Manager := AppServices.WorkTableManager;
+  if Manager = nil then
+    Manager := uWorkTable.WorkTableManager;
+
+  if (Manager = nil) or (Manager.WorkTables = nil) then
     Exit;
 
-  for WorkTable in WorkTableManager.WorkTables do
+  for WorkTable in Manager.WorkTables do
     RemoveMissingDeviceChannelsFromWorkTable(WorkTable);
 end;
 
