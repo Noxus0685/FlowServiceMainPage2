@@ -2733,6 +2733,8 @@ begin
   begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
+      SelectFrm.RequiredTypeUUID := AChannel.TypeUUID;
+      SelectFrm.RequireSerialWarning := Trim(AChannel.Serial) = '';
       if SelectFrm.ShowModal <> mrOk then
       begin
         ClearChannelsByMissingDevices;
@@ -2869,6 +2871,8 @@ begin
 
   Frm := TFormDeviceSelect.Create(Self);
   try
+    Frm.RequiredTypeUUID := AChannel.TypeUUID;
+    Frm.RequireSerialWarning := Trim(AChannel.Serial) = '';
     if Frm.ShowModal <> mrOk then
       Exit;
 
