@@ -572,6 +572,7 @@ type
 
   private
     FInitialized: Boolean;
+    FCloseCleanupDone: Boolean;
     FChange: string ;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
@@ -728,6 +729,15 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  if not FCloseCleanupDone then
+  begin
+    RemoveDeviceChannelsWithMissingDevicesOnClose;
+    SaveLayoutSettingsToWorkTable;
+    if WorkTableManager <> nil then
+      WorkTableManager.Save;
+    FCloseCleanupDone := True;
+  end;
+
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -2285,10 +2295,14 @@ end;
 
 procedure TFrameMainTable.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  if FCloseCleanupDone then
+    Exit;
+
   RemoveDeviceChannelsWithMissingDevicesOnClose;
   SaveLayoutSettingsToWorkTable;
   if WorkTableManager <> nil then
     WorkTableManager.Save;
+  FCloseCleanupDone := True;
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
