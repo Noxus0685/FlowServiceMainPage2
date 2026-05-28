@@ -51,6 +51,7 @@ type
     FBufferTypesBusy: Boolean;
     FBufferDevicesBusy: Boolean;
     FPendingSelectedDeviceUUID: string;
+    FDeletedDeviceUUIDs: TList<string>;
 
     //Загрузка нужного репозитария  (rkType, rkDevice, rkResults);
 
@@ -97,6 +98,7 @@ type
   // Буфер копирования приборов. Чтение возвращает ссылки только для просмотра.
   property BufferDevices: TList<TDevice> read GetBufferDevices write SetBufferDevices;
   property PendingSelectedDeviceUUID: string read FPendingSelectedDeviceUUID write FPendingSelectedDeviceUUID;
+  property DeletedDeviceUUIDs: TList<string> read FDeletedDeviceUUIDs;
 
   procedure AddRepository(const AName: string; AKind: TRepositoryKind; const ADbFile: string);
   procedure RemoveRepository(const AName: string);
@@ -134,6 +136,7 @@ type
   // Вырезание приборов: копирование в буфер и удаление из активного репозитория.
   procedure CutDevicesToBuffer(const ADevices: TList<TDevice>);
   function DeleteDevices(const ADevices: TList<TDevice>): Integer;
+  procedure ClearDeletedDeviceUUIDs;
   // Проверка наличия данных в буфере приборов.
   function HasBufferDevices: Boolean;
 
@@ -194,6 +197,7 @@ begin
   FActiveDeviceRepo := nil;
   FCopiedTypes := TObjectList<TDeviceType>.Create(True);
   FCopiedDevices := TObjectList<TDevice>.Create(True);
+  FDeletedDeviceUUIDs := TList<string>.Create;
 
   {--------------------------------------------------}
   { Репозитории результатов }
@@ -400,6 +404,7 @@ end;
 function TManagerTTableDM.CutDevicesToBufferWithResult(const ADevices: TList<TDevice>): Integer;
 var
   Device: TDevice;
+  DeviceUUID: string;
 begin
   Result := 0;
   SetBufferDevices(ADevices);
@@ -408,6 +413,10 @@ begin
   for Device in ADevices do
     if Device <> nil then
     begin
+      DeviceUUID := Trim(Device.UUID);
+      if (DeviceUUID <> '') and (FDeletedDeviceUUIDs <> nil) and
+         (FDeletedDeviceUUIDs.IndexOf(DeviceUUID) < 0) then
+        FDeletedDeviceUUIDs.Add(DeviceUUID);
       ActiveDeviceRepo.DeleteDevice(Device);
       Inc(Result);
     end;
@@ -417,6 +426,7 @@ end;
 function TManagerTTableDM.DeleteDevices(const ADevices: TList<TDevice>): Integer;
 var
   Device: TDevice;
+  DeviceUUID: string;
 begin
   Result := 0;
   if (ActiveDeviceRepo = nil) or (ADevices = nil) then
@@ -424,9 +434,19 @@ begin
   for Device in ADevices do
     if Device <> nil then
     begin
+      DeviceUUID := Trim(Device.UUID);
+      if (DeviceUUID <> '') and (FDeletedDeviceUUIDs <> nil) and
+         (FDeletedDeviceUUIDs.IndexOf(DeviceUUID) < 0) then
+        FDeletedDeviceUUIDs.Add(DeviceUUID);
       ActiveDeviceRepo.DeleteDevice(Device);
       Inc(Result);
     end;
+end;
+
+procedure TManagerTTableDM.ClearDeletedDeviceUUIDs;
+begin
+  if FDeletedDeviceUUIDs <> nil then
+    FDeletedDeviceUUIDs.Clear;
 end;
 
 function TManagerTTableDM.HasBufferDevices: Boolean;
@@ -1273,6 +1293,8 @@ end;
 destructor  TManagerTTableDM.Destroy;
 begin
   FDms.Clear;
+  FreeAndNil(FDeletedDeviceUUIDs);
+  FreeAndNil(FCopiedDevices);
   FreeAndNil(FCopiedTypes);
   FreeAndNil(FCategories);
   FreeAndNil(FDeviceRepositories);
