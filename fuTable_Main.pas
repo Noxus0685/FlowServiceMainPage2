@@ -329,7 +329,7 @@ begin
   if FFrameMainTable = nil then
     Exit;
 
-  FFrameMainTable.SaveLayoutSettingsToWorkTable;
+  FFrameMainTable.RunCloseCleanup;
  // if AppServices <> nil then
   //  AppServices.SaveAll;
 end;

@@ -234,7 +234,7 @@ begin
     if FFrameMainTable= nil then
     Exit;
 
-  FFrameMainTable.SaveLayoutSettingsToWorkTable;
+  FFrameMainTable.RunCloseCleanup;
   FWorkTableManager.Save;
 
 
