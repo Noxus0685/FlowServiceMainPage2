@@ -2858,6 +2858,10 @@ var
   I: Integer;
   SelectedUUID: string;
   OldDeviceUUID : string;
+  Repo: TDeviceRepository;
+  Device: TDevice;
+  HasDeviceForType: Boolean;
+  TypeUUID: string;
 begin
   if AChannel = nil then
     Exit;
@@ -2870,7 +2874,27 @@ begin
   Frm := TFormDeviceSelect.Create(Self);
   try
     if Frm.ShowModal <> mrOk then
+    begin
+      TypeUUID := Trim(AChannel.TypeUUID);
+      if (TypeUUID <> '') and (Trim(AChannel.Serial) = '') then
+      begin
+        HasDeviceForType := False;
+        if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+        begin
+          Repo := DataManager.ActiveDeviceRepo;
+          for Device in Repo.Devices do
+            if (Device <> nil) and SameText(Trim(Device.DeviceTypeUUID), TypeUUID) then
+            begin
+              HasDeviceForType := True;
+              Break;
+            end;
+        end;
+
+        if not HasDeviceForType then
+          ShowMessage('Прибор не сохранён без серийного номера.');
+      end;
       Exit;
+    end;
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
@@ -4139,6 +4163,9 @@ var
   IsCurrentTypeDeletedInSelector: Boolean;
   Ch: TChannel;
   Repo: TTypeRepository;
+  DeviceRepo: TDeviceRepository;
+  Device: TDevice;
+  HasDeviceForType: Boolean;
 begin
 
   if (FActiveWorkTable = nil) then
@@ -4210,7 +4237,26 @@ begin
     { 2. Открываем форму выбора }
     {----------------------------------------------------}
     if Frm.ShowModal <> mrOk then
+    begin
+      if (not AIsEtalon) and (Trim(Ch.TypeUUID) <> '') and (Trim(Ch.Serial) = '') then
+      begin
+        HasDeviceForType := False;
+        if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+        begin
+          DeviceRepo := DataManager.ActiveDeviceRepo;
+          for Device in DeviceRepo.Devices do
+            if (Device <> nil) and SameText(Trim(Device.DeviceTypeUUID), Trim(Ch.TypeUUID)) then
+            begin
+              HasDeviceForType := True;
+              Break;
+            end;
+        end;
+
+        if not HasDeviceForType then
+          ShowMessage('Прибор не сохранён без серийного номера.');
+      end;
       Exit;
+    end;
 
     NewType := Frm.SelectedType;
     if NewType = nil then
