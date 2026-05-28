@@ -563,6 +563,7 @@ type
     procedure ClearChannelData(AChannel: TChannel);
     procedure ClearChannelsByMissingDevices;
     procedure ClearChannelsByDeletedDeviceUUIDs;
+    procedure RemoveEmptyDeviceChannelsBeforeSave(AWorkTable: TWorkTable);
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -2998,9 +2999,19 @@ begin
 end;
 
 procedure TFrameMainTable.ActionSaveWorkTableExecute(Sender: TObject);
+var
+  I: Integer;
+  WT: TWorkTable;
 begin
   if WorkTableManager = nil then
     Exit;
+
+  for I := 0 to WorkTableManager.WorkTables.Count - 1 do
+  begin
+    WT := GetWorkTableByIndex(I);
+    if WT <> nil then
+      RemoveEmptyDeviceChannelsBeforeSave(WT);
+  end;
 
   SaveLayoutSettingsToWorkTable;
   WorkTableManager.Save;
@@ -3273,6 +3284,22 @@ begin
     UpdateGrids;
 
   DataManager.ClearDeletedDeviceUUIDs;
+end;
+
+procedure TFrameMainTable.RemoveEmptyDeviceChannelsBeforeSave(AWorkTable: TWorkTable);
+var
+  I: Integer;
+  Ch: TChannel;
+begin
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := AWorkTable.DeviceChannels.Count - 1 downto 0 do
+  begin
+    Ch := AWorkTable.DeviceChannels[I];
+    if (Ch <> nil) and (Trim(Ch.DeviceUUID) = '') then
+      AWorkTable.DeleteChannel(Ch);
+  end;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
