@@ -244,6 +244,7 @@ type
     procedure SyncTreeAfterGridRowsRemoved;
     procedure RemoveTreeNode(ANode: TTreeViewItem);
     procedure WriteTypeActionLog(const AAction: string; AType: TDeviceType; const ADetails: string = '');
+    function HasSavedDeviceForType(const ATypeUUID: string): Boolean;
 
   public
     { Public declarations }
@@ -299,6 +300,31 @@ begin
   { Привязываем реальные данные ПОСЛЕ загрузки }
   {--------------------------------------------------}
   FDeviceTypes := ActiveRepo.Types;
+end;
+
+function TFormTypeSelect.HasSavedDeviceForType(const ATypeUUID: string): Boolean;
+var
+  DeviceRepo: TDeviceRepository;
+  I: Integer;
+  LDevice: TDevice;
+begin
+  Result := False;
+  if Trim(ATypeUUID) = '' then
+    Exit;
+
+  if (AppServices.DataManager = nil) then
+    Exit;
+
+  DeviceRepo := AppServices.DataManager.ActiveDeviceRepo;
+  if (DeviceRepo = nil) or (DeviceRepo.Devices = nil) then
+    Exit;
+
+  for I := 0 to DeviceRepo.Devices.Count - 1 do
+  begin
+    LDevice := DeviceRepo.Devices[I];
+    if (LDevice <> nil) and SameText(Trim(LDevice.DeviceTypeUUID), Trim(ATypeUUID)) then
+      Exit(True);
+  end;
 end;
 
 function TFormTypeSelect.PassTreeFilter(
@@ -1287,6 +1313,11 @@ begin
         end;
     end;
   end;
+
+  if (ModalResult = mrOk) and (SelectedType <> nil) and
+     (Trim(SelectedType.UUID) <> '') and
+     (not HasSavedDeviceForType(SelectedType.UUID)) then
+    ShowMessage('Прибор не сохранён без серийного номера.');
 end;
 
 
