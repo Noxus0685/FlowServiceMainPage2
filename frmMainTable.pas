@@ -562,6 +562,8 @@ type
     procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
     procedure ClearChannelsByMissingDevices;
+    procedure ClearChannelsByDeletedDeviceUUIDs;
+    procedure RemoveEmptyDeviceChannelsBeforeSave(AWorkTable: TWorkTable);
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -2734,17 +2736,11 @@ begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
       if SelectFrm.ShowModal <> mrOk then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
 
@@ -2768,9 +2764,11 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
-      ClearChannelsByMissingDevices;
 
     finally
+      // Очищаем GridDevices только после закрытия окна fuDeviceSelect.
+      ClearChannelsByDeletedDeviceUUIDs;
+      ClearChannelsByMissingDevices;
       SelectFrm.Free;
     end;
     Exit;
@@ -2947,6 +2945,7 @@ begin
 
     UpdateGrids;
   finally
+    ClearChannelsByDeletedDeviceUUIDs;
     ClearChannelsByMissingDevices;
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
@@ -3000,9 +2999,19 @@ begin
 end;
 
 procedure TFrameMainTable.ActionSaveWorkTableExecute(Sender: TObject);
+var
+  I: Integer;
+  WT: TWorkTable;
 begin
   if WorkTableManager = nil then
     Exit;
+
+  for I := 0 to WorkTableManager.WorkTables.Count - 1 do
+  begin
+    WT := GetWorkTableByIndex(I);
+    if WT <> nil then
+      RemoveEmptyDeviceChannelsBeforeSave(WT);
+  end;
 
   SaveLayoutSettingsToWorkTable;
   WorkTableManager.Save;
@@ -3179,12 +3188,13 @@ var
   RepoName: string;
   Device: TDevice;
   HasChanges: Boolean;
+  HasResidualDeviceData: Boolean;
 begin
   if (FActiveWorkTable = nil) or (DataManager = nil) then
     Exit;
 
   HasChanges := False;
-  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  for I := FActiveWorkTable.DeviceChannels.Count - 1 downto 0 do
   begin
     Ch := FActiveWorkTable.DeviceChannels[I];
     if Ch = nil then
@@ -3192,7 +3202,35 @@ begin
 
     DeviceUUID := Trim(Ch.DeviceUUID);
     if DeviceUUID = '' then
+    begin
+      // Если UUID уже очищен, но в строке остались следы выбранного прибора,
+      // нужно дочистить канал, иначе строка визуально выглядит заполненной.
+      HasResidualDeviceData :=
+        (Trim(Ch.Serial) <> '') or
+        (Trim(Ch.RepoDeviceName) <> '') or
+        (Trim(Ch.RepoDeviceUUID) <> '') or
+        ((Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil));
+
+      if HasResidualDeviceData then
+      begin
+        ClearChannelData(Ch);
+        HasChanges := True;
+      end;
+
+      if (Trim(Ch.TypeName) = '') and
+         (Trim(Ch.TypeUUID) = '') and
+         (Trim(Ch.RepoTypeName) = '') and
+         (Trim(Ch.RepoTypeUUID) = '') and
+         (Trim(Ch.RepoDeviceName) = '') and
+         (Trim(Ch.RepoDeviceUUID) = '') and
+         (Trim(Ch.Serial) = '') and
+         (Ch.Signal <= 0) then
+      begin
+        FActiveWorkTable.DeleteChannel(Ch);
+        HasChanges := True;
+      end;
       Continue;
+    end;
 
     Device := nil;
     RepoName := Trim(Ch.RepoDeviceName);
@@ -3222,6 +3260,58 @@ begin
 
   if HasChanges then
     UpdateGrids;
+end;
+
+procedure TFrameMainTable.ClearChannelsByDeletedDeviceUUIDs;
+var
+  I, J: Integer;
+  Ch: TChannel;
+  DelUUID: string;
+  HasChanges: Boolean;
+begin
+  if (FActiveWorkTable = nil) or (DataManager = nil) or
+     (DataManager.DeletedDeviceUUIDs = nil) or (DataManager.DeletedDeviceUUIDs.Count = 0) then
+    Exit;
+
+  HasChanges := False;
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Ch := FActiveWorkTable.DeviceChannels[I];
+    if (Ch = nil) or (Trim(Ch.DeviceUUID) = '') then
+      Continue;
+
+    for J := 0 to DataManager.DeletedDeviceUUIDs.Count - 1 do
+    begin
+      DelUUID := Trim(DataManager.DeletedDeviceUUIDs[J]);
+      if (DelUUID <> '') and SameText(Trim(Ch.DeviceUUID), DelUUID) then
+      begin
+        ClearChannelData(Ch);
+        HasChanges := True;
+        Break;
+      end;
+    end;
+  end;
+
+  if HasChanges then
+    UpdateGrids;
+
+  DataManager.ClearDeletedDeviceUUIDs;
+end;
+
+procedure TFrameMainTable.RemoveEmptyDeviceChannelsBeforeSave(AWorkTable: TWorkTable);
+var
+  I: Integer;
+  Ch: TChannel;
+begin
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := AWorkTable.DeviceChannels.Count - 1 downto 0 do
+  begin
+    Ch := AWorkTable.DeviceChannels[I];
+    if (Ch <> nil) and (Trim(Ch.DeviceUUID) = '') then
+      AWorkTable.DeleteChannel(Ch);
+  end;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
@@ -4136,7 +4226,6 @@ var
   CurrentType, NewType: TDeviceType;
   FoundRepo, PreferredRepo: TTypeRepository;
   IsTypeChanged: Boolean;
-  IsCurrentTypeDeletedInSelector: Boolean;
   Ch: TChannel;
   Repo: TTypeRepository;
 begin
@@ -4214,22 +4303,7 @@ begin
 
     NewType := Frm.SelectedType;
     if NewType = nil then
-    begin
-      IsCurrentTypeDeletedInSelector := False;
-      if (CurrentType <> nil) and (CurrentType.UUID <> '') then
-        IsCurrentTypeDeletedInSelector :=
-          DataManager.FindType(CurrentType.UUID, '', FoundRepo) = nil;
-
-      // Очищаем строку только если удалили именно текущий тип
-      // в окне выбора. При простом закрытии окна без выбора
-      // текущую строку не трогаем.
-      if IsCurrentTypeDeletedInSelector and (not AIsEtalon) then
-      begin
-        GridDevices.Row := ARow;
-        ActionDevicesClearRowExecute(nil);
-      end;
       Exit;
-    end;
 
     FoundRepo := DataManager.ActiveTypeRepo;
 

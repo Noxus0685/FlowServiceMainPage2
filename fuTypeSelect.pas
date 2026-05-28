@@ -1234,7 +1234,7 @@ end;
 
 procedure TFormTypeSelect.btnOKClick(Sender: TObject);
 begin
-  ModalResult := mrCancel;
+  actTypeSelectExecute(Sender);
 end;
 
 procedure TFormTypeSelect.FormClose(
