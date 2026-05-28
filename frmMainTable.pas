@@ -2767,6 +2767,7 @@ begin
     finally
       // Очищаем GridDevices только после закрытия окна fuDeviceSelect.
       ClearChannelsByDeletedDeviceUUIDs;
+      ClearChannelsByMissingDevices;
       SelectFrm.Free;
     end;
     Exit;
@@ -2944,6 +2945,7 @@ begin
     UpdateGrids;
   finally
     ClearChannelsByDeletedDeviceUUIDs;
+    ClearChannelsByMissingDevices;
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
