@@ -561,7 +561,9 @@ type
 
     procedure UpdateForm;
     procedure ClearChannelData(AChannel: TChannel);
-    procedure ClearChannelsByMissingDevices;
+    function DeviceExistsInBase(const ADeviceUUID: string): Boolean;
+    procedure RemoveMissingDeviceChannelsFromWorkTable(AWorkTable: TWorkTable);
+    procedure RemoveDeviceChannelsWithMissingDevicesOnClose;
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -570,6 +572,7 @@ type
 
   private
     FInitialized: Boolean;
+    FCloseCleanupDone: Boolean;
     FChange: string ;
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
@@ -638,7 +641,8 @@ implementation
 {$R *.fmx}
 
 uses
-  fuTable_Main;
+  fuTable_Main,
+  uAppServices;
 
 
 const
@@ -726,6 +730,15 @@ end;
 
 destructor TFrameMainTable.Destroy;
 begin
+  if not FCloseCleanupDone then
+  begin
+    RemoveDeviceChannelsWithMissingDevicesOnClose;
+    SaveLayoutSettingsToWorkTable;
+    if WorkTableManager <> nil then
+      WorkTableManager.Save;
+    FCloseCleanupDone := True;
+  end;
+
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
@@ -2283,13 +2296,14 @@ end;
 
 procedure TFrameMainTable.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+  if FCloseCleanupDone then
+    Exit;
+
+  RemoveDeviceChannelsWithMissingDevicesOnClose;
   SaveLayoutSettingsToWorkTable;
- // if FWorkTableManager <> nil then
-  //  FWorkTableManager.Save;
-
-
- // if DataManager <> nil then
- //   DataManager.Save;
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
+  FCloseCleanupDone := True;
 end;
 
 procedure TFrameMainTable.MarkChannelDeviceModified(AChannel: TChannel);
@@ -2735,14 +2749,12 @@ begin
     try
       if SelectFrm.ShowModal <> mrOk then
       begin
-        ClearChannelsByMissingDevices;
         Exit;
       end;
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
       begin
-        ClearChannelsByMissingDevices;
         Exit;
       end;
 
@@ -2768,8 +2780,6 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
-      ClearChannelsByMissingDevices;
-
     finally
       SelectFrm.Free;
     end;
@@ -2947,7 +2957,6 @@ begin
 
     UpdateGrids;
   finally
-    ClearChannelsByMissingDevices;
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
@@ -3169,59 +3178,54 @@ begin
   MarkChannelDeviceModified(AChannel);
 end;
 
-procedure TFrameMainTable.ClearChannelsByMissingDevices;
+function TFrameMainTable.DeviceExistsInBase(const ADeviceUUID: string): Boolean;
+var
+  Repo: TDeviceRepository;
+begin
+  Result := False;
+  if (DataManager = nil) or (Trim(ADeviceUUID) = '') then
+    Exit;
+
+  Result := DataManager.FindDevice(Trim(ADeviceUUID), Repo) <> nil;
+end;
+
+procedure TFrameMainTable.RemoveMissingDeviceChannelsFromWorkTable(AWorkTable: TWorkTable);
 var
   I: Integer;
   Ch: TChannel;
-  Repo: TDeviceRepository;
-  SourceRepo: TDeviceRepository;
   DeviceUUID: string;
-  RepoName: string;
-  Device: TDevice;
-  HasChanges: Boolean;
 begin
-  if (FActiveWorkTable = nil) or (DataManager = nil) then
+  if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
     Exit;
 
-  HasChanges := False;
-  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  for I := AWorkTable.DeviceChannels.Count - 1 downto 0 do
   begin
-    Ch := FActiveWorkTable.DeviceChannels[I];
+    Ch := AWorkTable.DeviceChannels[I];
     if Ch = nil then
       Continue;
 
     DeviceUUID := Trim(Ch.DeviceUUID);
-    if DeviceUUID = '' then
-      Continue;
-
-    Device := nil;
-    RepoName := Trim(Ch.RepoDeviceName);
-    if RepoName <> '' then
-    begin
-      SourceRepo := DataManager.FindDeviceRepositoryByName(RepoName);
-      if (SourceRepo <> nil) and (SourceRepo.Devices <> nil) then
-      begin
-        for Device in SourceRepo.Devices do
-          if SameText(Trim(Device.UUID), DeviceUUID) then
-            Break;
-
-        if (Device = nil) or (not SameText(Trim(Device.UUID), DeviceUUID)) then
-          Device := nil;
-      end;
-    end;
-
-    if Device = nil then
-      Device := DataManager.FindDevice(DeviceUUID, Repo);
-
-    if Device <> nil then
-      Continue;
-
-    ClearChannelData(Ch);
-    HasChanges := True;
+    if (DeviceUUID = '') or (not DeviceExistsInBase(DeviceUUID)) then
+      AWorkTable.DeviceChannels.Delete(I);
   end;
+end;
 
-  if HasChanges then
-    UpdateGrids;
+procedure TFrameMainTable.RemoveDeviceChannelsWithMissingDevicesOnClose;
+var
+  Manager: TWorkTableManager;
+  WorkTable: TWorkTable;
+begin
+  Manager := WorkTableManager;
+  if (Manager = nil) and (AppServices <> nil) then
+    Manager := AppServices.WorkTableManager;
+  if Manager = nil then
+    Manager := uWorkTable.WorkTableManager;
+
+  if (Manager = nil) or (Manager.WorkTables = nil) then
+    Exit;
+
+  for WorkTable in Manager.WorkTables do
+    RemoveMissingDeviceChannelsFromWorkTable(WorkTable);
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);
