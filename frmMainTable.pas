@@ -4297,6 +4297,7 @@ begin
     UpdateGrids;
     // SetModified;
   finally
+    ClearChannelsByMissingDevices;
     Frm.Free;
   end;
 end;
