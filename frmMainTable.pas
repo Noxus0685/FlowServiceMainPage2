@@ -543,6 +543,7 @@ type
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure EnforceDataPointsColumnsLayout;
     procedure MarkChannelDeviceModified(AChannel: TChannel);
+    function CanSaveDeviceRowToDB(AChannel: TChannel): Boolean;
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure RefreshPumpsCombo;
@@ -2297,10 +2298,38 @@ begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
     Exit;
 
+  // Сохраняем в БД только полностью заполненные строки:
+  // прибор выбран через DeviceSelect и указан серийный номер.
+  if not CanSaveDeviceRowToDB(AChannel) then
+    Exit;
+
   AChannel.FlowMeter.Device.State := osModified;
   AChannel.FlowMeter.RebindCalculatedValues;
   PersistDeviceAsync(AChannel.FlowMeter.Device);
 
+end;
+
+function TFrameMainTable.CanSaveDeviceRowToDB(AChannel: TChannel): Boolean;
+var
+  DeviceSelectedViaDeviceSelect: Boolean;
+  SerialNumber: string;
+begin
+  Result := False;
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
+    Exit;
+
+  SerialNumber := Trim(AChannel.Serial);
+  if SerialNumber = '' then
+    SerialNumber := Trim(AChannel.FlowMeter.Device.SerialNumber);
+
+  DeviceSelectedViaDeviceSelect :=
+    (Trim(AChannel.DeviceUUID) <> '') and
+    SameText(Trim(AChannel.DeviceUUID), Trim(AChannel.FlowMeter.Device.UUID));
+
+  // Обязательные условия:
+  // 1) прибор выбран через DeviceSelect (есть валидный UUID в канале);
+  // 2) заполнен серийный номер.
+  Result := DeviceSelectedViaDeviceSelect and (SerialNumber <> '');
 end;
 
 procedure TFrameMainTable.SetDim(FlowUnitName: string; QuantityUnitName: string);
@@ -3072,7 +3101,7 @@ begin
   if Repo = nil then
     Exit;
 
-  if ADevice.SerialNumber = '' then
+  if Trim(ADevice.SerialNumber) = '' then
   Exit;
 
   TThread.CreateAnonymousThread(
@@ -4751,6 +4780,11 @@ begin
     begin
       Changed := WorkTable.DeviceChannels[ARow].Serial <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Serial := Value.AsString;
+      // Для выбранного прибора держим серийный номер синхронным,
+      // чтобы в БД сохранялось актуальное значение после валидации строки.
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
+        WorkTable.DeviceChannels[ARow].FlowMeter.Device.SerialNumber := Value.AsString;
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceDN1 then
       Changed := ApplyChannelDNChange(WorkTable.DeviceChannels[ARow], Value.AsString)

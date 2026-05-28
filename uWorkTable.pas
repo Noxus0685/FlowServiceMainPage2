@@ -2679,9 +2679,22 @@ var
   I, OldCount: Integer;
   Channel: TChannel;
   Section: string;
+  IsDeviceSection: Boolean;
+  CanPersistDeviceBinding: Boolean;
+  StoredTypeName: string;
+  StoredDeviceName: string;
+  StoredSerial: string;
+  StoredDeviceUUID: string;
+  StoredTypeUUID: string;
+  StoredRepoTypeName: string;
+  StoredRepoTypeUUID: string;
+  StoredRepoDeviceName: string;
+  StoredRepoDeviceUUID: string;
 begin
   if (AIni = nil) or (AChannels = nil) then
     Exit;
+
+  IsDeviceSection := EndsText('.Device', ASectionPrefix);
 
   OldCount := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
   AIni.WriteInteger(ASectionPrefix, 'Count', AChannels.Count);
@@ -2703,27 +2716,57 @@ begin
     else
       Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
 
+    StoredTypeName := Channel.TypeName;
+    StoredDeviceName := Channel.DeviceName;
+    StoredSerial := Channel.Serial;
+    StoredDeviceUUID := Channel.DeviceUUID;
+    StoredTypeUUID := Channel.TypeUUID;
+    StoredRepoTypeName := Channel.RepoTypeName;
+    StoredRepoTypeUUID := Channel.RepoTypeUUID;
+    StoredRepoDeviceName := Channel.RepoDeviceName;
+    StoredRepoDeviceUUID := Channel.RepoDeviceUUID;
+
+    // Для строк GridDevices сохраняем привязку прибора только
+    // когда выбрано устройство и заполнен серийный номер.
+    CanPersistDeviceBinding := True;
+    if IsDeviceSection then
+      CanPersistDeviceBinding :=
+        (Trim(StoredDeviceUUID) <> '') and (Trim(StoredSerial) <> '');
+
+    if not CanPersistDeviceBinding then
+    begin
+      StoredTypeName := '';
+      StoredDeviceName := '';
+      StoredSerial := '';
+      StoredDeviceUUID := '';
+      StoredTypeUUID := '';
+      StoredRepoTypeName := '';
+      StoredRepoTypeUUID := '';
+      StoredRepoDeviceName := '';
+      StoredRepoDeviceUUID := '';
+    end;
+
     AIni.WriteInteger(Section, 'ID', Channel.ID);
     AIni.WriteString(Section, 'UUID', Channel.UUID);
     AIni.WriteInteger(Section, 'WorkTabeID', Channel.WorkTabeID);
     AIni.WriteBool(Section, 'Enabled', Channel.Enabled);
     AIni.WriteString(Section, 'Name', Channel.Name);
     AIni.WriteString(Section, 'Text', Channel.Text);
-    AIni.WriteString(Section, 'TypeName', Channel.TypeName);
-    AIni.WriteString(Section, 'DeviceName', Channel.DeviceName);
-    AIni.WriteString(Section, 'Serial', Channel.Serial);
+    AIni.WriteString(Section, 'TypeName', StoredTypeName);
+    AIni.WriteString(Section, 'DeviceName', StoredDeviceName);
+    AIni.WriteString(Section, 'Serial', StoredSerial);
     AIni.WriteInteger(Section, 'Signal', Channel.Signal);
     AIni.WriteInteger(Section, 'OutputSet', Ord(Channel.OutputSet));
     AIni.WriteInteger(Section, 'SyncMode', Ord(Channel.SyncMode));
     AIni.WriteInteger(Section, 'NoiseFilter', Channel.NoiseFilter);
     AIni.WriteInteger(Section, 'Category', Channel.Category);
     AIni.WriteInteger(Section, 'Group', Channel.Group);
-    AIni.WriteString(Section, 'DeviceUUID', Channel.DeviceUUID);
-    AIni.WriteString(Section, 'TypeUUID', Channel.TypeUUID);
-    AIni.WriteString(Section, 'RepoTypeName', Channel.RepoTypeName);
-    AIni.WriteString(Section, 'RepoTypeUUID', Channel.RepoTypeUUID);
-    AIni.WriteString(Section, 'RepoDeviceName', Channel.RepoDeviceName);
-    AIni.WriteString(Section, 'RepoDeviceUUID', Channel.RepoDeviceUUID);
+    AIni.WriteString(Section, 'DeviceUUID', StoredDeviceUUID);
+    AIni.WriteString(Section, 'TypeUUID', StoredTypeUUID);
+    AIni.WriteString(Section, 'RepoTypeName', StoredRepoTypeName);
+    AIni.WriteString(Section, 'RepoTypeUUID', StoredRepoTypeUUID);
+    AIni.WriteString(Section, 'RepoDeviceName', StoredRepoDeviceName);
+    AIni.WriteString(Section, 'RepoDeviceUUID', StoredRepoDeviceUUID);
 
     AIni.WriteFloat(Section, 'ImpSec', Channel.ImpSec);
     AIni.WriteFloat(Section, 'ImpResult', Channel.ImpResult);
