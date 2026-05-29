@@ -10,7 +10,8 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
-  uMeterValue;
+  uMeterValue,
+  uProtocols;
 
 const
   XMLVERFLOWMETERS = '5.0';
@@ -1160,6 +1161,16 @@ begin
     ADevice.RepoDeviceName := Self.RepoDeviceName;
     ADevice.RepoDeviceUUID := Self.RepoDeviceUUID;
     ADevice.OutputType := Self.OutputType;
+
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(
+        pcAction,
+        psWorkTable,
+        'CreateDevice',
+        'Создан прибор для строки GridDevices',
+        Format('UUID=%s; Name=%s; Serial=%s',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber])
+      );
 
     FDevice:= ADevice;
 

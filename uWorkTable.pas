@@ -3382,13 +3382,15 @@ var
   CurrentCoef: Double;
   Device: TDevice;
   DevicePoint: TDevicePoint;
+  DeviceWasPromoted: Boolean;
 
   procedure PromotePlaceholderDevice(AChannel: TChannel; ADevice: TDevice);
   begin
     if (AChannel = nil) or (ADevice = nil) then
       Exit;
 
-    if SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment) then
+    DeviceWasPromoted := SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment);
+    if DeviceWasPromoted then
       ADevice.Comment := '';
 
     if Trim(ADevice.Name) = '' then
@@ -3426,6 +3428,16 @@ var
 
     if ADevice.State = osClean then
       ADevice.State := osModified;
+
+    if DeviceWasPromoted and (ProtocolManager <> nil) then
+      ProtocolManager.AddMessage(
+        pcAction,
+        psWorkTable,
+        'CreateDeviceFromGridPlaceholder',
+        'Создан прибор из строки GridDevices после проливки',
+        Format('UUID=%s; Name=%s; Serial=%s; Channel=%s',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber, AChannel.Text])
+      );
   end;
 
 begin
