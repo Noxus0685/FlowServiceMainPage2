@@ -450,7 +450,6 @@ object FormDeviceSelect: TFormDeviceSelect
     end
     object CornerButton1: TCornerButton
       Action = actDeviceSelect
-      OnClick = CornerButton1Click
       Align = Right
       StyledSettings = [Family, Size, Style]
       ImageIndex = -1
@@ -469,6 +468,7 @@ object FormDeviceSelect: TFormDeviceSelect
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
+      OnClick = CornerButton1Click
     end
     object CornerButtonEditDevice: TCornerButton
       Action = aEditType
