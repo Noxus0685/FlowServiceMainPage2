@@ -1131,6 +1131,9 @@ begin
   if (FDevice = nil) then
    begin
 
+    if Trim(Self.DeviceUUID) = '' then
+      Self.DeviceUUID := TGUID.NewGuid.ToString;
+
     ADevice := ActiveRepo.CreateDevice(-1);
     ADevice.DeviceTypeUUID := DeviceTypeUUID;
     ADevice.DeviceTypeName := FTypeName;
