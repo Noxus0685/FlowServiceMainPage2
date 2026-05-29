@@ -264,6 +264,8 @@ type
     function GetNewUUID: string;
     class procedure SaveToFile(IsBackUp: Integer); static;
     class procedure LoadFromFile; static;
+    // Удаляет указанные значения из памяти и физически перезаписывает MeterValues.ini.
+    class procedure DeleteFromFile(const AHashes: TStrings); static;
 
     procedure SetCoef(ACoef: TCoef); overload;
     function SetCoef(AValue, AArg: Double): string; overload;
@@ -2245,6 +2247,30 @@ begin
   finally
     Ini.Free;
   end;
+end;
+
+class procedure TMeterValue.DeleteFromFile(const AHashes: TStrings);
+var
+  I: Integer;
+  MV: TMeterValue;
+begin
+  if (AHashes = nil) or (AHashes.Count = 0) or (FMeterValues = nil) then
+    Exit;
+
+  // Удаляем все значения с переданными Hash из глобальных списков.
+  for I := FMeterValues.Count - 1 downto 0 do
+  begin
+    MV := FMeterValues[I];
+    if (MV <> nil) and (AHashes.IndexOf(MV.Hash) >= 0) then
+    begin
+      MV.SetToSave(False);
+      MV.DeleteFromVector;
+    end;
+  end;
+
+  // SaveToFile делает Ini.Clear и записывает только оставшиеся IsToSave-значения,
+  // поэтому секции удалённого рабочего стола физически исчезают из MeterValues.ini.
+  SaveToFile(0);
 end;
 
 { Loads meter values from persistent INI storage and restores relations. }

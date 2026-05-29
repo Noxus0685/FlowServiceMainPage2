@@ -527,6 +527,10 @@ type
     function FindTypeIndex(const ATypeName: string): Integer;
     function FindSerialIndex(const ASerialNumber: string): Integer;
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
+    // Проверяет, что ссылка на рабочий стол ещё принадлежит менеджеру.
+    function IsManagedWorkTable(AWorkTable: TWorkTable): Boolean;
+    // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
+    procedure NormalizeActiveWorkTable;
     procedure UpdateGridDevices;
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
@@ -919,6 +923,13 @@ end;
 
 procedure TFrameMainTable.UpdateForm;
  begin
+          NormalizeActiveWorkTable;
+          if FActiveWorkTable = nil then
+          begin
+            UpdateGrids;
+            Exit;
+          end;
+
           IsUpdating := True;
             try
                UpdateUIFromValues;
@@ -2443,6 +2454,55 @@ begin
   Result := WorkTableManager.WorkTables[AIndex];
 end;
 
+function TFrameMainTable.IsManagedWorkTable(AWorkTable: TWorkTable): Boolean;
+begin
+  // Не разыменовываем AWorkTable: после удаления это может быть висячая ссылка.
+  Result := (AWorkTable <> nil) and
+    (WorkTableManager <> nil) and
+    (WorkTableManager.WorkTables <> nil) and
+    (WorkTableManager.WorkTables.IndexOf(AWorkTable) >= 0);
+end;
+
+procedure TFrameMainTable.NormalizeActiveWorkTable;
+var
+  NewActiveWorkTable: TWorkTable;
+begin
+  // После удаления рабочего стола другие формы могут ещё хранить старый указатель.
+  // Перед любым доступом заменяем его на актуальный объект из менеджера или nil.
+  if IsManagedWorkTable(FActiveWorkTable) then
+    Exit;
+
+  NewActiveWorkTable := nil;
+  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
+  begin
+    if IsManagedWorkTable(WorkTableManager.ActiveWorkTable) then
+      NewActiveWorkTable := WorkTableManager.ActiveWorkTable
+    else
+    begin
+      if WorkTableManager.WorkTables.Count > 0 then
+        NewActiveWorkTable := WorkTableManager.WorkTables[0];
+
+      // Нельзя вызывать SetActiveWorkTable, если ActiveWorkTable уже удалён:
+      // сеттер сначала обращается к старому объекту и может вызвать AV.
+      WorkTableManager.ActiveWorkTable := NewActiveWorkTable;
+      if NewActiveWorkTable <> nil then
+        NewActiveWorkTable.IsActive := True;
+    end;
+  end;
+
+  FActiveWorkTable := NewActiveWorkTable;
+  if FActiveWorkTable = nil then
+  begin
+    SetLength(FRows, 0);
+    SetLength(FFlowMeterRows, 0);
+  end;
+
+  if FFrameMeasurementRun <> nil then
+    FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
+  if FFrameMRResults <> nil then
+    FFrameMRResults.ActiveWorkTable := FActiveWorkTable;
+end;
+
 procedure TFrameMainTable.InitTables;
 var
   TableCount: Integer;
@@ -3867,6 +3927,7 @@ var
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
 begin
+  NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
@@ -3938,11 +3999,15 @@ procedure TFrameMainTable.TimerMainTimer(Sender: TObject);
 var
   WorkTable: TWorkTable;
 begin
+  NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
   SetValues;
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
 
   IsUpdating := True;
   try
@@ -4017,6 +4082,7 @@ var
       end;
   end;
 begin
+  NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
@@ -5434,7 +5500,8 @@ procedure TFrameMainTable.UpdateGrids;
 var
   WT: TWorkTable;
 begin
-  WT := GetWorkTableByIndex(0);
+  NormalizeActiveWorkTable;
+  WT := FActiveWorkTable;
 
   if WT <> nil then
     SoftReloadGridByGrowingRowCount(
@@ -5449,7 +5516,7 @@ begin
   else
     SoftReloadGridByGrowingRowCount(
       GridDevices,
-      Length(FFlowMeterRows),
+      0,
       [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
        StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
        StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
@@ -5468,7 +5535,7 @@ begin
   else
     SoftReloadGridByGrowingRowCount(
       GridEtalons,
-      GridEtalons.RowCount,
+      0,
       [StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
        StringColumnEtalonFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]

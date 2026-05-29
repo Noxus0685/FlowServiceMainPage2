@@ -269,7 +269,8 @@ type
 
 implementation
    uses
-    uAppServices;
+    uAppServices,
+    uMeterValue;
 {$R *.fmx}
 
 const
@@ -1478,6 +1479,7 @@ var
   NextWorkTable: TWorkTable;
   Ch: TChannel;
   DeviceUUIDsToCheck: TStringList;
+  DeletedMeterValueHashes: TStringList;
   I: Integer;
   Device: TDevice;
   DeviceUsedOnOtherTable: Boolean;
@@ -1504,9 +1506,12 @@ begin
     Exit;
 
   DeviceUUIDsToCheck := TStringList.Create;
+  DeletedMeterValueHashes := TStringList.Create;
   try
     DeviceUUIDsToCheck.Sorted := False;
     DeviceUUIDsToCheck.Duplicates := TDuplicates.dupIgnore;
+    DeletedMeterValueHashes.Sorted := False;
+    DeletedMeterValueHashes.Duplicates := TDuplicates.dupIgnore;
 
     // Запоминаем приборы удаляемого рабочего стола до освобождения его каналов.
     if WorkTable.DeviceChannels <> nil then
@@ -1530,6 +1535,9 @@ begin
       FActiveWorkTable := NextWorkTable;
     if FWorkTableManager.ActiveWorkTable = WorkTable then
       FWorkTableManager.SetActiveWorkTable(NextWorkTable);
+
+    // Перед освобождением собираем Hash и убираем MeterValues этого стола из памяти.
+    WorkTable.RemoveMeterValuesFromStorage(DeletedMeterValueHashes);
 
     // Удаление из TObjectList освобождает сам рабочий стол вместе с его каналами и строками.
     FWorkTableManager.WorkTables.Delete(DeleteIndex);
@@ -1567,6 +1575,8 @@ begin
     // Используем существующий механизм сохранения менеджера рабочих столов.
     SaveProcessingDevices;
     FWorkTableManager.Save;
+    // Физически перезаписываем MeterValues.ini без секций удалённого рабочего стола.
+    TMeterValue.DeleteFromFile(DeletedMeterValueHashes);
 
     // Перестраиваем дерево и очищаем/обновляем таблицы без обращения к удалённому TTreeViewItem.
     PopulateTreeViewDevices;
@@ -1588,6 +1598,7 @@ begin
 
     UpdateSessionItems;
   finally
+    DeletedMeterValueHashes.Free;
     DeviceUUIDsToCheck.Free;
   end;
 end;
