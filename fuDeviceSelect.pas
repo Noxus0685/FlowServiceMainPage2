@@ -270,7 +270,8 @@ var
 
 implementation
   uses
-   uAppServices;
+   uAppServices,
+   uWorkTable;
 {$R *.fmx}
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
@@ -1008,9 +1009,9 @@ begin
     SelectedNodeTag := Ord(tnAll);
 
   if (SrcDevice <> nil) and (SelectedNodeTag = Ord(tnModification)) then
-    NewDevice := ActiveRepo.CreateDevice(SrcDevice)
+    NewDevice := TDeviceCreationService.CreateDevice(ActiveRepo, dcmUserCreated, SrcDevice)
   else
-    NewDevice := ActiveRepo.CreateDevice(nil);
+    NewDevice := TDeviceCreationService.CreateDevice(ActiveRepo, dcmUserCreated, nil);
 
   if SrcDevice <> nil then
   begin
