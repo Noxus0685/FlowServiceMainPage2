@@ -264,6 +264,9 @@ type
     function GetNewUUID: string;
     class procedure SaveToFile(IsBackUp: Integer); static;
     class procedure LoadFromFile; static;
+    // Удаляет указанные значения/владельцев из памяти и физически перезаписывает MeterValues.ini.
+    class procedure DeleteFromFile(const AHashes: TStrings;
+      const AOwnerNames: TStrings = nil); static;
 
     procedure SetCoef(ACoef: TCoef); overload;
     function SetCoef(AValue, AArg: Double): string; overload;
@@ -2245,6 +2248,137 @@ begin
   finally
     Ini.Free;
   end;
+end;
+
+class procedure TMeterValue.DeleteFromFile(const AHashes: TStrings;
+  const AOwnerNames: TStrings);
+var
+  I: Integer;
+  MV: TMeterValue;
+  FileName: string;
+
+  function InList(AList: TStrings; const AValue: string): Boolean;
+  begin
+    Result := (AList <> nil) and (Trim(AValue) <> '') and
+      (AList.IndexOf(Trim(AValue)) >= 0);
+  end;
+
+  function IsDeletedEntry(const AHash, ANameOwner, AHashOwner: string): Boolean;
+  begin
+    Result := InList(AHashes, AHash) or InList(AOwnerNames, ANameOwner) or
+      InList(AOwnerNames, AHashOwner);
+  end;
+
+  procedure CopySection(ASourceIni, ADestIni: TMemIniFile;
+    const ASourceSection, ADestSection: string);
+  var
+    Values: TStringList;
+    J: Integer;
+  begin
+    Values := TStringList.Create;
+    try
+      ASourceIni.ReadSectionValues(ASourceSection, Values);
+      for J := 0 to Values.Count - 1 do
+        ADestIni.WriteString(ADestSection, Values.Names[J], Values.ValueFromIndex[J]);
+    finally
+      Values.Free;
+    end;
+  end;
+
+  procedure PurgeMeterValuesIni;
+  var
+    SourceIni: TMemIniFile;
+    DestIni: TMemIniFile;
+    Count: Integer;
+    ReadIndex: Integer;
+    WriteIndex: Integer;
+    DimIndex: Integer;
+    CoefIndex: Integer;
+    DimensionsCount: Integer;
+    CoefsCount: Integer;
+    SourceSection: string;
+    DestSection: string;
+    Hash: string;
+    NameOwner: string;
+    HashOwner: string;
+  begin
+    if not FileExists(FileName) then
+      Exit;
+
+    SourceIni := TMemIniFile.Create(FileName);
+    DestIni := TMemIniFile.Create(FileName);
+    try
+      DestIni.Clear;
+      DestIni.WriteString('MeterValues', 'VER',
+        SourceIni.ReadString('MeterValues', 'VER', '1.0'));
+      DestIni.WriteString('MeterValues', 'InitDensity',
+        SourceIni.ReadString('MeterValues', 'InitDensity', FloatToStr(FInitDensity)));
+
+      Count := SourceIni.ReadInteger('MeterValues', 'ValuesCount', 0);
+      WriteIndex := 0;
+
+      for ReadIndex := 0 to Count - 1 do
+      begin
+        SourceSection := 'MeterValue.' + IntToStr(ReadIndex);
+        Hash := SourceIni.ReadString(SourceSection, 'Hash', '');
+        NameOwner := SourceIni.ReadString(SourceSection, 'NameOwner', '');
+        HashOwner := SourceIni.ReadString(SourceSection, 'HashOwner', '');
+
+        if IsDeletedEntry(Hash, NameOwner, HashOwner) then
+          Continue;
+
+        DestSection := 'MeterValue.' + IntToStr(WriteIndex);
+        CopySection(SourceIni, DestIni, SourceSection, DestSection);
+
+        DimensionsCount := SourceIni.ReadInteger(SourceSection, 'DimensionsCount', 0);
+        for DimIndex := 0 to DimensionsCount - 1 do
+          CopySection(SourceIni, DestIni,
+            SourceSection + '.Dimension.' + IntToStr(DimIndex),
+            DestSection + '.Dimension.' + IntToStr(DimIndex));
+
+        CoefsCount := SourceIni.ReadInteger(SourceSection, 'CoefsCount', 0);
+        for CoefIndex := 0 to CoefsCount - 1 do
+          CopySection(SourceIni, DestIni,
+            SourceSection + '.Coef.' + IntToStr(CoefIndex),
+            DestSection + '.Coef.' + IntToStr(CoefIndex));
+
+        Inc(WriteIndex);
+      end;
+
+      // Физически пересобираем файл без удаляемых секций и без дыр в нумерации.
+      DestIni.WriteInteger('MeterValues', 'ValuesCount', WriteIndex);
+      DestIni.UpdateFile;
+    finally
+      DestIni.Free;
+      SourceIni.Free;
+    end;
+  end;
+
+begin
+  if ((AHashes = nil) or (AHashes.Count = 0)) and
+     ((AOwnerNames = nil) or (AOwnerNames.Count = 0)) then
+    Exit;
+
+  // Удаляем значения не только по Hash, но и по владельцу рабочего стола.
+  // Это закрывает старые записи MeterValues.ini, которые уже не привязаны к полям TWorkTable,
+  // но всё ещё имеют NameOwner вроде "Рабочий стол 1".
+  if FMeterValues <> nil then
+    for I := FMeterValues.Count - 1 downto 0 do
+    begin
+      MV := FMeterValues[I];
+      if (MV <> nil) and IsDeletedEntry(MV.Hash, MV.NameOwner, MV.HashOwner) then
+      begin
+        MV.SetToSave(False);
+        MV.DeleteFromVector;
+      end;
+    end;
+
+  // Сначала сохраняем актуальное состояние памяти, затем отдельно чистим сам файл:
+  // в нём могут быть старые секции, которых уже нет в FMeterValues.
+  SaveToFile(0);
+  FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'),
+    'MeterValues.ini');
+  PurgeMeterValuesIni;
 end;
 
 { Loads meter values from persistent INI storage and restores relations. }

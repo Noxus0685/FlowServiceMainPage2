@@ -3,6 +3,7 @@
 interface
 
 uses
+  System.Classes,
   System.Generics.Collections,
   System.IniFiles,
   System.Math,
@@ -566,6 +567,8 @@ type
     procedure UpdateAggregateMeterValues;
 
     procedure InitMeterValues;
+    // Собирает Hash и удаляет из глобального списка сохранения MeterValues значения этого рабочего стола.
+    procedure RemoveMeterValuesFromStorage(ADeletedHashes: TStrings = nil);
     procedure SetTemperature(ATempBefore, ATempAfter: Double);
     procedure SetPressure(APressBefore, APressAfter: Double);
     procedure SetFlowRateMin(const AValue: Double);
@@ -1971,6 +1974,90 @@ begin
     FHashValueFlowRate := '';
 end;
 
+
+procedure TWorkTable.RemoveMeterValuesFromStorage(ADeletedHashes: TStrings);
+var
+  Channel: TChannel;
+
+  procedure RemoveMeterValue(AMeterValue: TMeterValue);
+  begin
+    // Запоминаем Hash: по этому списку затем физически чистится MeterValues.ini.
+    if AMeterValue <> nil then
+    begin
+      if (ADeletedHashes <> nil) and (Trim(AMeterValue.Hash) <> '') and
+         (ADeletedHashes.IndexOf(AMeterValue.Hash) < 0) then
+        ADeletedHashes.Add(AMeterValue.Hash);
+
+      AMeterValue.SetToSave(False);
+      AMeterValue.DeleteFromVector;
+    end;
+  end;
+
+  procedure RemoveChannelMeterValues(AChannel: TChannel);
+  begin
+    if AChannel = nil then
+      Exit;
+
+    RemoveMeterValue(AChannel.ValueImp);
+    RemoveMeterValue(AChannel.ValueImpTotal);
+    RemoveMeterValue(AChannel.ValueCurrent);
+    RemoveMeterValue(AChannel.ValueInterface);
+  end;
+
+begin
+  // Сначала удаляем значения каналов, относящиеся только к этому рабочему столу.
+  if FDeviceChannels <> nil then
+    for Channel in FDeviceChannels do
+      RemoveChannelMeterValues(Channel);
+
+  if FEtalonChannels <> nil then
+    for Channel in FEtalonChannels do
+      RemoveChannelMeterValues(Channel);
+
+  // Затем удаляем собственные значения расходомера рабочего стола.
+  if FTableFlow <> nil then
+  begin
+    RemoveMeterValue(FTableFlow.ValueTempertureBefore);
+    RemoveMeterValue(FTableFlow.ValueTempertureAfter);
+    RemoveMeterValue(FTableFlow.ValueTempertureDelta);
+    RemoveMeterValue(FTableFlow.ValueTemperture);
+    RemoveMeterValue(FTableFlow.ValuePressureBefore);
+    RemoveMeterValue(FTableFlow.ValuePressureAfter);
+    RemoveMeterValue(FTableFlow.ValuePressureDelta);
+    RemoveMeterValue(FTableFlow.ValuePressure);
+    RemoveMeterValue(FTableFlow.ValueDensity);
+    RemoveMeterValue(FTableFlow.ValueAirPressure);
+    RemoveMeterValue(FTableFlow.ValueAirTemperture);
+    RemoveMeterValue(FTableFlow.ValueHumidity);
+    RemoveMeterValue(FTableFlow.ValueTime);
+    RemoveMeterValue(FTableFlow.ValueQuantity);
+    RemoveMeterValue(FTableFlow.ValueFlowRate);
+    RemoveMeterValue(FTableFlow.ValueImp);
+    RemoveMeterValue(FTableFlow.ValueImpTotal);
+    RemoveMeterValue(FTableFlow.ValueCoef);
+    RemoveMeterValue(FTableFlow.ValueMassCoef);
+    RemoveMeterValue(FTableFlow.ValueVolumeCoef);
+    RemoveMeterValue(FTableFlow.ValueMassFlow);
+    RemoveMeterValue(FTableFlow.ValueVolumeFlow);
+    RemoveMeterValue(FTableFlow.ValueVolume);
+    RemoveMeterValue(FTableFlow.ValueMass);
+    RemoveMeterValue(FTableFlow.ValueVolumeMeter);
+    RemoveMeterValue(FTableFlow.ValueMassMeter);
+    RemoveMeterValue(FTableFlow.ValueVolumeError);
+    RemoveMeterValue(FTableFlow.ValueMassError);
+    RemoveMeterValue(FTableFlow.ValueError);
+    RemoveMeterValue(FTableFlow.ValueCurrent);
+  end;
+
+  // Установочные значения параметров создаются отдельно от FTableFlow.
+  if FFlowRate <> nil then
+    RemoveMeterValue(FFlowRate.ValueSet);
+  if FFluidTemp <> nil then
+    RemoveMeterValue(FFluidTemp.ValueSet);
+  if FFluidPress <> nil then
+    RemoveMeterValue(FFluidPress.ValueSet);
+end;
+
  procedure TWorkTable.Rebind;
 begin
   InitMeterValues;
@@ -2147,6 +2234,10 @@ end;
 
 procedure TWorkTable.SetTemperature(ATempBefore, ATempAfter: Double);
 begin
+  // При удалении/переключении рабочего стола параметры могут быть уже освобождены.
+  if FFluidTemp = nil then
+    Exit;
+
   if (ATempBefore = 0)  then
     FFluidTemp.BeforeValue:= ATempAfter ;
   if ATempAfter = 0 then
@@ -2157,6 +2248,9 @@ end;
 procedure TWorkTable.SetPressure( APressBefore, APressAfter: Double);
 
 begin
+  // Не обращаемся к параметру давления, если рабочий стол уже очищается.
+  if FFluidPress = nil then
+    Exit;
 
   if (APressBefore = 0)  then
     FFluidPress.BeforeValue:= APressAfter ;
