@@ -3,6 +3,7 @@
 interface
 
 uses
+  System.Classes,
   System.Generics.Collections,
   System.IniFiles,
   System.Math,
@@ -99,7 +100,40 @@ type
 
 
 type
+  TChannel = class;
   TWorkTable = class;
+
+  TDeviceCreateMode = (
+    dcmUserCreated,
+    dcmGridPlaceholder,
+    dcmMeasurementPromoted
+  );
+
+  TDeviceCreationService = class
+  private
+    class procedure FillDeviceFromChannel(ADevice: TDevice; AChannel: TChannel;
+      AMode: TDeviceCreateMode); static;
+    class procedure SyncChannelAndFlowMeter(ADevice: TDevice; AChannel: TChannel); static;
+    class procedure AddProtocol(AMode: TDeviceCreateMode; const AAction: string;
+      ADevice: TDevice; AChannel: TChannel); static;
+    class function FindDeviceByUUID(const ADeviceUUID: string; ARepo: TDeviceRepository): TDevice; static;
+  public
+    class function CreateDevice(
+      ARepo: TDeviceRepository;
+      AMode: TDeviceCreateMode;
+      ASourceDevice: TDevice = nil;
+      const ADeviceUUID: string = ''
+    ): TDevice; static;
+
+    class function EnsureDeviceForChannel(
+      AChannel: TChannel;
+      AWorkTable: TWorkTable;
+      ARepo: TDeviceRepository;
+      AMode: TDeviceCreateMode;
+      ASourceDevice: TDevice = nil;
+      ACurrentPoint: TDevicePoint = nil
+    ): TDevice; static;
+  end;
 
   TChannel = class(TTypeEntity)
   private
@@ -566,6 +600,8 @@ type
     procedure UpdateAggregateMeterValues;
 
     procedure InitMeterValues;
+    // Собирает Hash и удаляет из глобального списка сохранения MeterValues значения этого рабочего стола.
+    procedure RemoveMeterValuesFromStorage(ADeletedHashes: TStrings = nil);
     procedure SetTemperature(ATempBefore, ATempAfter: Double);
     procedure SetPressure(APressBefore, APressAfter: Double);
     procedure SetFlowRateMin(const AValue: Double);
@@ -650,6 +686,287 @@ uses
   FmxHelper,
   frmMainTable,
   uMeasurementRun;
+
+const
+  CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
+
+class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
+  const AAction: string; ADevice: TDevice; AChannel: TChannel);
+var
+  Source: TProtocolSource;
+  Name: string;
+  Description: string;
+  Params: string;
+
+  function ChannelText: string;
+  begin
+    if AChannel <> nil then
+      Result := AChannel.Text
+    else
+      Result := '';
+  end;
+begin
+  if (ProtocolManager = nil) or (ADevice = nil) then
+    Exit;
+
+  Source := psWorkTable;
+  case AMode of
+    dcmUserCreated:
+      begin
+        Source := psForm;
+        Name := 'DeviceUserCreated';
+        Description := 'Создан прибор пользователем';
+        Params := Format('UUID=%s; Name=%s; Serial=%s; Source=DeviceSelect',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber]);
+      end;
+    dcmGridPlaceholder:
+      begin
+        Name := 'GridPlaceholderDeviceCreated';
+        Description := 'Создан технический пустой прибор для строки GridDevices';
+        Params := Format('UUID=%s; Channel=%s', [ADevice.UUID, ChannelText]);
+      end;
+    dcmMeasurementPromoted:
+      begin
+        Name := 'GridPlaceholderDevicePromoted';
+        Description := 'Placeholder-прибор преобразован в прибор после проливки';
+        Params := Format('UUID=%s; Name=%s; Serial=%s; Channel=%s',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber, ChannelText]);
+      end;
+  else
+    Name := 'DeviceCreationService';
+    Description := AAction;
+    Params := ADevice.UUID;
+  end;
+
+  if SameText(AAction, 'Reuse') then
+  begin
+    Name := 'GridExistingDeviceBound';
+    Description := 'Строка GridDevices привязана к существующему прибору';
+    Params := Format('UUID=%s; Name=%s; Serial=%s; Channel=%s',
+      [ADevice.UUID, ADevice.Name, ADevice.SerialNumber, ChannelText]);
+  end;
+
+  ProtocolManager.AddMessage(pcAction, Source, Name, Description, Params);
+end;
+
+class function TDeviceCreationService.CreateDevice(ARepo: TDeviceRepository;
+  AMode: TDeviceCreateMode; ASourceDevice: TDevice;
+  const ADeviceUUID: string): TDevice;
+begin
+  Result := nil;
+  if ARepo = nil then
+    Exit;
+
+  Result := ARepo.CreateDevice(ASourceDevice);
+  if Result = nil then
+    Exit;
+
+  if Trim(ADeviceUUID) <> '' then
+    Result.UUID := Trim(ADeviceUUID)
+  else if Trim(Result.UUID) = '' then
+    Result.UUID := TGUID.NewGuid.ToString;
+
+  Result.State := osNew;
+
+  case AMode of
+    dcmUserCreated:
+      begin
+        Result.Comment := '';
+        AddProtocol(AMode, 'Create', Result, nil);
+      end;
+    dcmGridPlaceholder:
+      begin
+        Result.Comment := CEmptyGridDeviceComment;
+        Result.Name := '';
+        Result.SerialNumber := '';
+        AddProtocol(AMode, 'Create', Result, nil);
+      end;
+    dcmMeasurementPromoted:
+      begin
+        if SameText(Trim(Result.Comment), CEmptyGridDeviceComment) then
+          Result.Comment := '';
+        AddProtocol(AMode, 'Create', Result, nil);
+      end;
+  end;
+end;
+
+class function TDeviceCreationService.FindDeviceByUUID(const ADeviceUUID: string;
+  ARepo: TDeviceRepository): TDevice;
+var
+  Repo: TDeviceRepository;
+begin
+  Result := nil;
+  if Trim(ADeviceUUID) = '' then
+    Exit;
+
+  if (ARepo <> nil) then
+    Result := ARepo.FindDeviceByUUID(ADeviceUUID);
+  if Result <> nil then
+    Exit;
+
+  if DataManager <> nil then
+    Result := DataManager.FindDevice(ADeviceUUID, Repo);
+end;
+
+class procedure TDeviceCreationService.FillDeviceFromChannel(ADevice: TDevice;
+  AChannel: TChannel; AMode: TDeviceCreateMode);
+
+  function MergeStringIfNeeded(const ATarget, ASource: string): string;
+  begin
+    Result := ATarget;
+    if Trim(ASource) <> '' then
+      Result := Trim(ASource)
+    else if Trim(Result) = '' then
+      Result := Trim(ASource);
+  end;
+
+begin
+  if (ADevice = nil) or (AChannel = nil) then
+    Exit;
+
+  if AMode = dcmGridPlaceholder then
+  begin
+    ADevice.Comment := CEmptyGridDeviceComment;
+    ADevice.Name := '';
+    ADevice.SerialNumber := '';
+    Exit;
+  end;
+
+  ADevice.Name := MergeStringIfNeeded(ADevice.Name, AChannel.DeviceName);
+  if Trim(ADevice.Name) = '' then
+    ADevice.Name := 'Прибор ' + Trim(AChannel.Text);
+  ADevice.SerialNumber := MergeStringIfNeeded(ADevice.SerialNumber, AChannel.Serial);
+  ADevice.DeviceTypeName := MergeStringIfNeeded(ADevice.DeviceTypeName, AChannel.TypeName);
+  ADevice.DeviceTypeUUID := MergeStringIfNeeded(ADevice.DeviceTypeUUID, AChannel.TypeUUID);
+  ADevice.RepoTypeName := MergeStringIfNeeded(ADevice.RepoTypeName, AChannel.RepoTypeName);
+  ADevice.RepoTypeUUID := MergeStringIfNeeded(ADevice.RepoTypeUUID, AChannel.RepoTypeUUID);
+  ADevice.RepoDeviceName := MergeStringIfNeeded(ADevice.RepoDeviceName, AChannel.RepoDeviceName);
+  ADevice.RepoDeviceUUID := MergeStringIfNeeded(ADevice.RepoDeviceUUID, AChannel.RepoDeviceUUID);
+
+  if AChannel.Signal >= 0 then
+    ADevice.OutputType := AChannel.Signal;
+end;
+
+class procedure TDeviceCreationService.SyncChannelAndFlowMeter(ADevice: TDevice;
+  AChannel: TChannel);
+begin
+  if (ADevice = nil) or (AChannel = nil) then
+    Exit;
+
+  AChannel.DeviceUUID := ADevice.UUID;
+  if AChannel.FlowMeter <> nil then
+  begin
+    AChannel.FlowMeter.Device := ADevice;
+    AChannel.FlowMeter.DeviceUUID := ADevice.UUID;
+    AChannel.FlowMeter.UpdateByDevice;
+  end;
+
+  if Trim(ADevice.DeviceTypeUUID) <> '' then
+    AChannel.TypeUUID := ADevice.DeviceTypeUUID;
+  if Trim(ADevice.DeviceTypeName) <> '' then
+    AChannel.TypeName := ADevice.DeviceTypeName;
+  if Trim(ADevice.SerialNumber) <> '' then
+    AChannel.Serial := ADevice.SerialNumber;
+  if (ADevice.OutputType >= 0) and
+     (not SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment)) then
+    AChannel.Signal := ADevice.OutputType;
+  if Trim(ADevice.RepoTypeName) <> '' then
+    AChannel.RepoTypeName := ADevice.RepoTypeName;
+  if Trim(ADevice.RepoTypeUUID) <> '' then
+    AChannel.RepoTypeUUID := ADevice.RepoTypeUUID;
+  if Trim(ADevice.RepoDeviceName) <> '' then
+    AChannel.RepoDeviceName := ADevice.RepoDeviceName;
+  if Trim(ADevice.RepoDeviceUUID) <> '' then
+    AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
+end;
+
+class function TDeviceCreationService.EnsureDeviceForChannel(AChannel: TChannel;
+  AWorkTable: TWorkTable; ARepo: TDeviceRepository; AMode: TDeviceCreateMode;
+  ASourceDevice: TDevice; ACurrentPoint: TDevicePoint): TDevice;
+var
+  DeviceUUID: string;
+  WasCreated: Boolean;
+  WasPlaceholder: Boolean;
+  DevicePoint: TDevicePoint;
+begin
+  Result := nil;
+  if (AChannel = nil) or (ARepo = nil) then
+    Exit;
+
+  if AChannel.FlowMeter = nil then
+    AChannel.RecreateFlowMeter(AWorkTable);
+
+  DeviceUUID := Trim(AChannel.DeviceUUID);
+  if (DeviceUUID = '') and (AChannel.FlowMeter <> nil) then
+    DeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+  if DeviceUUID = '' then
+    DeviceUUID := TGUID.NewGuid.ToString;
+
+  Result := FindDeviceByUUID(DeviceUUID, ARepo);
+  WasCreated := Result = nil;
+  if WasCreated then
+  begin
+    Result := ARepo.CreateDevice(ASourceDevice);
+    if Result = nil then
+      Exit;
+    Result.UUID := DeviceUUID;
+    Result.State := osNew;
+  end
+  else
+    AddProtocol(AMode, 'Reuse', Result, AChannel);
+
+  WasPlaceholder := SameText(Trim(Result.Comment), CEmptyGridDeviceComment);
+
+  case AMode of
+    dcmUserCreated:
+      begin
+        Result.Comment := '';
+        Result.State := osNew;
+      end;
+    dcmGridPlaceholder:
+      begin
+        if WasCreated or WasPlaceholder then
+        begin
+          Result.Comment := CEmptyGridDeviceComment;
+          Result.Name := '';
+          Result.SerialNumber := '';
+        end;
+      end;
+    dcmMeasurementPromoted:
+      begin
+        if WasPlaceholder then
+          Result.Comment := '';
+      end;
+  end;
+
+  if (AMode <> dcmGridPlaceholder) or WasCreated or WasPlaceholder then
+    FillDeviceFromChannel(Result, AChannel, AMode);
+  SyncChannelAndFlowMeter(Result, AChannel);
+
+  if AMode = dcmMeasurementPromoted then
+  begin
+    if (ACurrentPoint <> nil) and ((Result.Points = nil) or (Result.Points.Count = 0)) then
+    begin
+      DevicePoint := Result.AddPoint;
+      if DevicePoint <> nil then
+      begin
+        DevicePoint.Assign(ACurrentPoint, False);
+        DevicePoint.DeviceID := Result.ID;
+        DevicePoint.DeviceUUID := Result.UUID;
+        DevicePoint.State := osNew;
+      end;
+    end;
+
+    if Result.State = osClean then
+      Result.State := osModified;
+  end;
+
+  if WasCreated then
+    AddProtocol(AMode, 'Create', Result, AChannel)
+  else if (AMode = dcmMeasurementPromoted) and WasPlaceholder then
+    AddProtocol(AMode, 'Promote', Result, AChannel);
+end;
+
 
 type
   TParameterObserverBridge = class(TInterfacedObject, IEventObserver)
@@ -1968,6 +2285,90 @@ begin
     FHashValueFlowRate := '';
 end;
 
+
+procedure TWorkTable.RemoveMeterValuesFromStorage(ADeletedHashes: TStrings);
+var
+  Channel: TChannel;
+
+  procedure RemoveMeterValue(AMeterValue: TMeterValue);
+  begin
+    // Запоминаем Hash: по этому списку затем физически чистится MeterValues.ini.
+    if AMeterValue <> nil then
+    begin
+      if (ADeletedHashes <> nil) and (Trim(AMeterValue.Hash) <> '') and
+         (ADeletedHashes.IndexOf(AMeterValue.Hash) < 0) then
+        ADeletedHashes.Add(AMeterValue.Hash);
+
+      AMeterValue.SetToSave(False);
+      AMeterValue.DeleteFromVector;
+    end;
+  end;
+
+  procedure RemoveChannelMeterValues(AChannel: TChannel);
+  begin
+    if AChannel = nil then
+      Exit;
+
+    RemoveMeterValue(AChannel.ValueImp);
+    RemoveMeterValue(AChannel.ValueImpTotal);
+    RemoveMeterValue(AChannel.ValueCurrent);
+    RemoveMeterValue(AChannel.ValueInterface);
+  end;
+
+begin
+  // Сначала удаляем значения каналов, относящиеся только к этому рабочему столу.
+  if FDeviceChannels <> nil then
+    for Channel in FDeviceChannels do
+      RemoveChannelMeterValues(Channel);
+
+  if FEtalonChannels <> nil then
+    for Channel in FEtalonChannels do
+      RemoveChannelMeterValues(Channel);
+
+  // Затем удаляем собственные значения расходомера рабочего стола.
+  if FTableFlow <> nil then
+  begin
+    RemoveMeterValue(FTableFlow.ValueTempertureBefore);
+    RemoveMeterValue(FTableFlow.ValueTempertureAfter);
+    RemoveMeterValue(FTableFlow.ValueTempertureDelta);
+    RemoveMeterValue(FTableFlow.ValueTemperture);
+    RemoveMeterValue(FTableFlow.ValuePressureBefore);
+    RemoveMeterValue(FTableFlow.ValuePressureAfter);
+    RemoveMeterValue(FTableFlow.ValuePressureDelta);
+    RemoveMeterValue(FTableFlow.ValuePressure);
+    RemoveMeterValue(FTableFlow.ValueDensity);
+    RemoveMeterValue(FTableFlow.ValueAirPressure);
+    RemoveMeterValue(FTableFlow.ValueAirTemperture);
+    RemoveMeterValue(FTableFlow.ValueHumidity);
+    RemoveMeterValue(FTableFlow.ValueTime);
+    RemoveMeterValue(FTableFlow.ValueQuantity);
+    RemoveMeterValue(FTableFlow.ValueFlowRate);
+    RemoveMeterValue(FTableFlow.ValueImp);
+    RemoveMeterValue(FTableFlow.ValueImpTotal);
+    RemoveMeterValue(FTableFlow.ValueCoef);
+    RemoveMeterValue(FTableFlow.ValueMassCoef);
+    RemoveMeterValue(FTableFlow.ValueVolumeCoef);
+    RemoveMeterValue(FTableFlow.ValueMassFlow);
+    RemoveMeterValue(FTableFlow.ValueVolumeFlow);
+    RemoveMeterValue(FTableFlow.ValueVolume);
+    RemoveMeterValue(FTableFlow.ValueMass);
+    RemoveMeterValue(FTableFlow.ValueVolumeMeter);
+    RemoveMeterValue(FTableFlow.ValueMassMeter);
+    RemoveMeterValue(FTableFlow.ValueVolumeError);
+    RemoveMeterValue(FTableFlow.ValueMassError);
+    RemoveMeterValue(FTableFlow.ValueError);
+    RemoveMeterValue(FTableFlow.ValueCurrent);
+  end;
+
+  // Установочные значения параметров создаются отдельно от FTableFlow.
+  if FFlowRate <> nil then
+    RemoveMeterValue(FFlowRate.ValueSet);
+  if FFluidTemp <> nil then
+    RemoveMeterValue(FFluidTemp.ValueSet);
+  if FFluidPress <> nil then
+    RemoveMeterValue(FFluidPress.ValueSet);
+end;
+
  procedure TWorkTable.Rebind;
 begin
   InitMeterValues;
@@ -2144,6 +2545,10 @@ end;
 
 procedure TWorkTable.SetTemperature(ATempBefore, ATempAfter: Double);
 begin
+  // При удалении/переключении рабочего стола параметры могут быть уже освобождены.
+  if FFluidTemp = nil then
+    Exit;
+
   if (ATempBefore = 0)  then
     FFluidTemp.BeforeValue:= ATempAfter ;
   if ATempAfter = 0 then
@@ -2154,6 +2559,9 @@ end;
 procedure TWorkTable.SetPressure( APressBefore, APressAfter: Double);
 
 begin
+  // Не обращаемся к параметру давления, если рабочий стол уже очищается.
+  if FFluidPress = nil then
+    Exit;
 
   if (APressBefore = 0)  then
     FFluidPress.BeforeValue:= APressAfter ;
@@ -3377,6 +3785,7 @@ var
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
+  Device: TDevice;
 begin
 
   DeviceRepo := nil;
@@ -3385,13 +3794,23 @@ begin
 
   for DeviceChannel in DeviceChannels do
   begin
-    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) or
-       (DeviceChannel.FlowMeter = nil) or (DeviceChannel.FlowMeter.Device = nil) then
+    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) then
       Continue;
 
-    Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
+    Device := TDeviceCreationService.EnsureDeviceForChannel(
+      DeviceChannel,
+      Self,
+      DeviceRepo,
+      dcmMeasurementPromoted,
+      nil,
+      CurrentPoint
+    );
+    if Device = nil then
+      Continue;
+
+    Session := Device.GetActiveSessionSpillage;
     if Session = nil then
-      Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
+      Session := Device.AddSessionSpillage;
     Session.State := osModified;
 
     if Session.DateTimeOpen = 0 then
@@ -3399,7 +3818,7 @@ begin
 
     Point := TPointSpillage.Create(Session.ID);
     try
-      Point.Num := DeviceChannel.FlowMeter.Device.Spillages.Count + 1;
+      Point.Num := Device.Spillages.Count + 1;
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.SessionID := Session.ID;
       Point.DateTime := Now;
@@ -3475,13 +3894,13 @@ begin
       Point.AmbientTemperature := ValueAirTemperture.GetDoubleValue;
       Point.RelativeHumidity := ValueHumidity.GetDoubleValue;
 
-      if DeviceChannel.FlowMeter.Device <> nil then
-        Point.Valid := DeviceChannel.FlowMeter.Device.AnalyseDataPoint(Point);
+      if Device <> nil then
+        Point.Valid := Device.AnalyseDataPoint(Point);
 
       DeviceChannel.FlowMeter.AddDataPoint(Point);
 
       if Assigned(DeviceRepo) then
-        DeviceRepo.SaveDevice(DeviceChannel.FlowMeter.Device);
+        DeviceRepo.SaveDevice(Device);
     finally
       Point.Free;
     end;

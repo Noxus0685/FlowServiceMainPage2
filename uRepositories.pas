@@ -3560,9 +3560,20 @@ begin
     ExistingDevice := FindDeviceByUUID(ADevice.UUID);
     if (ExistingDevice <> nil) and (ExistingDevice <> ADevice) then
     begin
-      SaveErrors.Add(Format('Нельзя сохранить прибор "%s": UUID %s уже принадлежит другому объекту.',
-        [ADevice.Name, ADevice.UUID]));
-      Exit(False);
+      if ADevice.State = osNew then
+      begin
+        SaveErrors.Add(Format('Нельзя сохранить прибор "%s": UUID %s уже принадлежит другому объекту.',
+          [ADevice.Name, ADevice.UUID]));
+        Exit(False);
+      end;
+
+      if ADevice.State <> osClean then
+      begin
+        ExistingDevice.Assign(ADevice, True);
+        ADevice := ExistingDevice;
+      end
+      else
+        Exit(True);
     end;
 
     if not ShouldSaveDevice(ADevice) then

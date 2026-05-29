@@ -10,7 +10,8 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
-  uMeterValue;
+  uMeterValue,
+  uProtocols;
 
 const
   XMLVERFLOWMETERS = '5.0';
@@ -412,7 +413,8 @@ implementation
 uses
   uAppServices,
   uDataManager,
-  uRepositories;
+  uRepositories,
+  uWorkTable;
 
 { TFlowMeter }
 
@@ -559,9 +561,24 @@ end;
 
 procedure TFlowMeter.SetDevice(const ADevice: TDevice);
 begin
-   if Assigned(ADevice) then
- begin
-   FDevice := ADevice;
+  if not Assigned(ADevice) then
+  begin
+    FDevice := nil;
+    FDeviceUUID := '';
+    UUID := '';
+    FSerialNumber := '';
+    FDeviceTypeUUID := '';
+    FTypeName := '';
+    FRepoTypeName := '';
+    FRepoTypeUUID := '';
+    FRepoDeviceName := '';
+    FRepoDeviceUUID := '';
+    FOutputType := 0;
+    MeterFlowCategory := mftUnknownType;
+    Exit;
+  end;
+
+  FDevice := ADevice;
 
   Self.UUID := FDevice.UUID;
   Self.Name := FDevice.Name;
@@ -577,8 +594,6 @@ begin
   FlowMin := FDevice.Qmin;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
   UpdateByDevice;
-
- end;
 end;
 
 procedure TFlowMeter.AddDataPoint(const APoint: TPointSpillage);
@@ -1109,54 +1124,42 @@ begin
 end;
 
 procedure TFlowMeter.CreateDevice;
- var
-    ADevice: TDevice;
-    AType: TDeviceType;
-    ActiveRepo:  TDeviceRepository;
-    FoundRepo: TTypeRepository;
+var
+  ADevice: TDevice;
+  ActiveRepo: TDeviceRepository;
 begin
-
   if AppServices.DataManager = nil then
-  Exit;
+    Exit;
 
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
+  if ActiveRepo = nil then
+    Exit;
 
-   if ActiveRepo = nil then
-  Exit;
+  if FDevice <> nil then
+    Exit;
 
+  if Trim(Self.DeviceUUID) = '' then
+    Self.DeviceUUID := TGUID.NewGuid.ToString;
 
-  ADevice:= FDevice;
-  AType := AppServices.DataManager.FindType(DeviceTypeUUID, FTypeName, FoundRepo);
+  ADevice := TDeviceCreationService.CreateDevice(
+    ActiveRepo,
+    dcmGridPlaceholder,
+    nil,
+    Self.DeviceUUID
+  );
+  if ADevice = nil then
+    Exit;
 
-  if (FDevice = nil) then
-   begin
+  ADevice.DeviceTypeUUID := Self.DeviceTypeUUID;
+  ADevice.DeviceTypeName := Self.DeviceTypeName;
+  ADevice.SerialNumber := Self.SerialNumber;
+  ADevice.RepoTypeName := Self.RepoTypeName;
+  ADevice.RepoTypeUUID := Self.RepoTypeUUID;
+  ADevice.RepoDeviceName := Self.RepoDeviceName;
+  ADevice.RepoDeviceUUID := Self.RepoDeviceUUID;
+  ADevice.OutputType := Self.OutputType;
 
-    ADevice := ActiveRepo.CreateDevice(-1);
-    ADevice.DeviceTypeUUID := DeviceTypeUUID;
-    ADevice.DeviceTypeName := FTypeName;
-    ADevice.SerialNumber := FSerialNumber;
-    ADevice.UUID := Self.DeviceUUID;
-    ADevice.SerialNumber := Self.SerialNumber;
-    ADevice.DeviceTypeName := Self.DeviceTypeName;
-    ADevice.DeviceTypeUUID := Self.DeviceTypeUUID;
-    ADevice.RepoTypeName := Self.RepoTypeName;
-    ADevice.RepoTypeUUID := Self.RepoTypeUUID;
-    ADevice.RepoDeviceName := Self.RepoDeviceName;
-    ADevice.RepoDeviceUUID := Self.RepoDeviceUUID;
-    ADevice.OutputType := Self.OutputType;
-
-    FDevice:= ADevice;
-
-    if (AType <> nil) then
-    begin
-    if (FoundRepo <> nil) then
-    begin
-       AppServices.DataManager.ActiveTypeRepo := FoundRepo;
-       ADevice.AttachType(AType,FoundRepo.Name);
-    end;
-
-    end;
-   end;
+  Self.Device := ADevice;
 end;
 
 procedure TFlowMeter.Init(UUID: string);
