@@ -100,7 +100,40 @@ type
 
 
 type
+  TChannel = class;
   TWorkTable = class;
+
+  TDeviceCreateMode = (
+    dcmUserCreated,
+    dcmGridPlaceholder,
+    dcmMeasurementPromoted
+  );
+
+  TDeviceCreationService = class
+  private
+    class procedure FillDeviceFromChannel(ADevice: TDevice; AChannel: TChannel;
+      AMode: TDeviceCreateMode); static;
+    class procedure SyncChannelAndFlowMeter(ADevice: TDevice; AChannel: TChannel); static;
+    class procedure AddProtocol(AMode: TDeviceCreateMode; const AAction: string;
+      ADevice: TDevice; AChannel: TChannel); static;
+    class function FindDeviceByUUID(const ADeviceUUID: string; ARepo: TDeviceRepository): TDevice; static;
+  public
+    class function CreateDevice(
+      ARepo: TDeviceRepository;
+      AMode: TDeviceCreateMode;
+      ASourceDevice: TDevice = nil;
+      const ADeviceUUID: string = ''
+    ): TDevice; static;
+
+    class function EnsureDeviceForChannel(
+      AChannel: TChannel;
+      AWorkTable: TWorkTable;
+      ARepo: TDeviceRepository;
+      AMode: TDeviceCreateMode;
+      ASourceDevice: TDevice = nil;
+      ACurrentPoint: TDevicePoint = nil
+    ): TDevice; static;
+  end;
 
   TChannel = class(TTypeEntity)
   private
@@ -656,6 +689,284 @@ uses
 
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
+
+class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
+  const AAction: string; ADevice: TDevice; AChannel: TChannel);
+var
+  Source: TProtocolSource;
+  Name: string;
+  Description: string;
+  Params: string;
+
+  function ChannelText: string;
+  begin
+    if AChannel <> nil then
+      Result := AChannel.Text
+    else
+      Result := '';
+  end;
+begin
+  if (ProtocolManager = nil) or (ADevice = nil) then
+    Exit;
+
+  Source := psWorkTable;
+  case AMode of
+    dcmUserCreated:
+      begin
+        Source := psForm;
+        Name := 'DeviceUserCreated';
+        Description := 'Создан прибор пользователем';
+        Params := Format('UUID=%s; Name=%s; Serial=%s; Source=DeviceSelect',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber]);
+      end;
+    dcmGridPlaceholder:
+      begin
+        Name := 'GridPlaceholderDeviceCreated';
+        Description := 'Создан технический пустой прибор для строки GridDevices';
+        Params := Format('UUID=%s; Channel=%s', [ADevice.UUID, ChannelText]);
+      end;
+    dcmMeasurementPromoted:
+      begin
+        Name := 'GridPlaceholderDevicePromoted';
+        Description := 'Placeholder-прибор преобразован в прибор после проливки';
+        Params := Format('UUID=%s; Name=%s; Serial=%s; Channel=%s',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber, ChannelText]);
+      end;
+  else
+    Name := 'DeviceCreationService';
+    Description := AAction;
+    Params := ADevice.UUID;
+  end;
+
+  if SameText(AAction, 'Reuse') then
+  begin
+    Name := 'GridExistingDeviceBound';
+    Description := 'Строка GridDevices привязана к существующему прибору';
+    Params := Format('UUID=%s; Name=%s; Serial=%s; Channel=%s',
+      [ADevice.UUID, ADevice.Name, ADevice.SerialNumber, ChannelText]);
+  end;
+
+  ProtocolManager.AddMessage(pcAction, Source, Name, Description, Params);
+end;
+
+class function TDeviceCreationService.CreateDevice(ARepo: TDeviceRepository;
+  AMode: TDeviceCreateMode; ASourceDevice: TDevice;
+  const ADeviceUUID: string): TDevice;
+begin
+  Result := nil;
+  if ARepo = nil then
+    Exit;
+
+  Result := ARepo.CreateDevice(ASourceDevice);
+  if Result = nil then
+    Exit;
+
+  if Trim(ADeviceUUID) <> '' then
+    Result.UUID := Trim(ADeviceUUID)
+  else if Trim(Result.UUID) = '' then
+    Result.UUID := TGUID.NewGuid.ToString;
+
+  Result.State := osNew;
+
+  case AMode of
+    dcmUserCreated:
+      begin
+        Result.Comment := '';
+        AddProtocol(AMode, 'Create', Result, nil);
+      end;
+    dcmGridPlaceholder:
+      begin
+        Result.Comment := CEmptyGridDeviceComment;
+        Result.Name := '';
+        Result.SerialNumber := '';
+        AddProtocol(AMode, 'Create', Result, nil);
+      end;
+    dcmMeasurementPromoted:
+      begin
+        if SameText(Trim(Result.Comment), CEmptyGridDeviceComment) then
+          Result.Comment := '';
+        AddProtocol(AMode, 'Create', Result, nil);
+      end;
+  end;
+end;
+
+class function TDeviceCreationService.FindDeviceByUUID(const ADeviceUUID: string;
+  ARepo: TDeviceRepository): TDevice;
+var
+  Repo: TDeviceRepository;
+begin
+  Result := nil;
+  if Trim(ADeviceUUID) = '' then
+    Exit;
+
+  if (ARepo <> nil) then
+    Result := ARepo.FindDeviceByUUID(ADeviceUUID);
+  if Result <> nil then
+    Exit;
+
+  if DataManager <> nil then
+    Result := DataManager.FindDevice(ADeviceUUID, Repo);
+end;
+
+class procedure TDeviceCreationService.FillDeviceFromChannel(ADevice: TDevice;
+  AChannel: TChannel; AMode: TDeviceCreateMode);
+
+  function MergeStringIfNeeded(const ATarget, ASource: string): string;
+  begin
+    Result := ATarget;
+    if Trim(ASource) <> '' then
+      Result := Trim(ASource)
+    else if Trim(Result) = '' then
+      Result := Trim(ASource);
+  end;
+
+begin
+  if (ADevice = nil) or (AChannel = nil) then
+    Exit;
+
+  if AMode = dcmGridPlaceholder then
+  begin
+    ADevice.Comment := CEmptyGridDeviceComment;
+    ADevice.Name := '';
+    ADevice.SerialNumber := '';
+    Exit;
+  end;
+
+  ADevice.Name := MergeStringIfNeeded(ADevice.Name, AChannel.DeviceName);
+  if Trim(ADevice.Name) = '' then
+    ADevice.Name := 'Прибор ' + Trim(AChannel.Text);
+  ADevice.SerialNumber := MergeStringIfNeeded(ADevice.SerialNumber, AChannel.Serial);
+  ADevice.DeviceTypeName := MergeStringIfNeeded(ADevice.DeviceTypeName, AChannel.TypeName);
+  ADevice.DeviceTypeUUID := MergeStringIfNeeded(ADevice.DeviceTypeUUID, AChannel.TypeUUID);
+  ADevice.RepoTypeName := MergeStringIfNeeded(ADevice.RepoTypeName, AChannel.RepoTypeName);
+  ADevice.RepoTypeUUID := MergeStringIfNeeded(ADevice.RepoTypeUUID, AChannel.RepoTypeUUID);
+  ADevice.RepoDeviceName := MergeStringIfNeeded(ADevice.RepoDeviceName, AChannel.RepoDeviceName);
+  ADevice.RepoDeviceUUID := MergeStringIfNeeded(ADevice.RepoDeviceUUID, AChannel.RepoDeviceUUID);
+
+  if AChannel.Signal >= 0 then
+    ADevice.OutputType := AChannel.Signal;
+end;
+
+class procedure TDeviceCreationService.SyncChannelAndFlowMeter(ADevice: TDevice;
+  AChannel: TChannel);
+begin
+  if (ADevice = nil) or (AChannel = nil) then
+    Exit;
+
+  AChannel.DeviceUUID := ADevice.UUID;
+  if AChannel.FlowMeter <> nil then
+  begin
+    AChannel.FlowMeter.Device := ADevice;
+    AChannel.FlowMeter.DeviceUUID := ADevice.UUID;
+    AChannel.FlowMeter.UpdateByDevice;
+  end;
+
+  if Trim(ADevice.DeviceTypeUUID) <> '' then
+    AChannel.TypeUUID := ADevice.DeviceTypeUUID;
+  if Trim(ADevice.DeviceTypeName) <> '' then
+    AChannel.TypeName := ADevice.DeviceTypeName;
+  if Trim(ADevice.SerialNumber) <> '' then
+    AChannel.Serial := ADevice.SerialNumber;
+  if (ADevice.OutputType >= 0) and
+     (not SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment)) then
+    AChannel.Signal := ADevice.OutputType;
+  if Trim(ADevice.RepoTypeName) <> '' then
+    AChannel.RepoTypeName := ADevice.RepoTypeName;
+  if Trim(ADevice.RepoTypeUUID) <> '' then
+    AChannel.RepoTypeUUID := ADevice.RepoTypeUUID;
+  if Trim(ADevice.RepoDeviceName) <> '' then
+    AChannel.RepoDeviceName := ADevice.RepoDeviceName;
+  if Trim(ADevice.RepoDeviceUUID) <> '' then
+    AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
+end;
+
+class function TDeviceCreationService.EnsureDeviceForChannel(AChannel: TChannel;
+  AWorkTable: TWorkTable; ARepo: TDeviceRepository; AMode: TDeviceCreateMode;
+  ASourceDevice: TDevice; ACurrentPoint: TDevicePoint): TDevice;
+var
+  DeviceUUID: string;
+  WasCreated: Boolean;
+  WasPlaceholder: Boolean;
+  DevicePoint: TDevicePoint;
+begin
+  Result := nil;
+  if (AChannel = nil) or (ARepo = nil) then
+    Exit;
+
+  if AChannel.FlowMeter = nil then
+    AChannel.RecreateFlowMeter(AWorkTable);
+
+  DeviceUUID := Trim(AChannel.DeviceUUID);
+  if (DeviceUUID = '') and (AChannel.FlowMeter <> nil) then
+    DeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+  if DeviceUUID = '' then
+    DeviceUUID := TGUID.NewGuid.ToString;
+
+  Result := FindDeviceByUUID(DeviceUUID, ARepo);
+  WasCreated := Result = nil;
+  if WasCreated then
+  begin
+    Result := ARepo.CreateDevice(ASourceDevice);
+    if Result = nil then
+      Exit;
+    Result.UUID := DeviceUUID;
+    Result.State := osNew;
+  end
+  else
+    AddProtocol(AMode, 'Reuse', Result, AChannel);
+
+  WasPlaceholder := SameText(Trim(Result.Comment), CEmptyGridDeviceComment);
+
+  case AMode of
+    dcmUserCreated:
+      begin
+        Result.Comment := '';
+        Result.State := osNew;
+      end;
+    dcmGridPlaceholder:
+      begin
+        if WasCreated or WasPlaceholder then
+        begin
+          Result.Comment := CEmptyGridDeviceComment;
+          Result.Name := '';
+          Result.SerialNumber := '';
+        end;
+      end;
+    dcmMeasurementPromoted:
+      begin
+        if WasPlaceholder then
+          Result.Comment := '';
+      end;
+  end;
+
+  if (AMode <> dcmGridPlaceholder) or WasCreated or WasPlaceholder then
+    FillDeviceFromChannel(Result, AChannel, AMode);
+  SyncChannelAndFlowMeter(Result, AChannel);
+
+  if AMode = dcmMeasurementPromoted then
+  begin
+    if (ACurrentPoint <> nil) and ((Result.Points = nil) or (Result.Points.Count = 0)) then
+    begin
+      DevicePoint := Result.AddPoint;
+      if DevicePoint <> nil then
+      begin
+        DevicePoint.Assign(ACurrentPoint, False);
+        DevicePoint.DeviceID := Result.ID;
+        DevicePoint.DeviceUUID := Result.UUID;
+        DevicePoint.State := osNew;
+      end;
+    end;
+
+    if Result.State = osClean then
+      Result.State := osModified;
+  end;
+
+  if WasCreated then
+    AddProtocol(AMode, 'Create', Result, AChannel)
+  else if (AMode = dcmMeasurementPromoted) and WasPlaceholder then
+    AddProtocol(AMode, 'Promote', Result, AChannel);
+end;
+
 
 type
   TParameterObserverBridge = class(TInterfacedObject, IEventObserver)
@@ -3475,65 +3786,6 @@ var
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
   Device: TDevice;
-  DevicePoint: TDevicePoint;
-  DeviceWasPromoted: Boolean;
-
-  procedure PromotePlaceholderDevice(AChannel: TChannel; ADevice: TDevice);
-  begin
-    if (AChannel = nil) or (ADevice = nil) then
-      Exit;
-
-    DeviceWasPromoted := SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment);
-    if DeviceWasPromoted then
-      ADevice.Comment := '';
-
-    if Trim(ADevice.Name) = '' then
-      ADevice.Name := Trim(AChannel.DeviceName);
-    if Trim(ADevice.Name) = '' then
-      ADevice.Name := 'Прибор ' + Trim(AChannel.Text);
-
-    if Trim(ADevice.SerialNumber) = '' then
-      ADevice.SerialNumber := Trim(AChannel.Serial);
-
-    if Trim(ADevice.DeviceTypeName) = '' then
-      ADevice.DeviceTypeName := Trim(AChannel.TypeName);
-    if Trim(ADevice.DeviceTypeUUID) = '' then
-      ADevice.DeviceTypeUUID := Trim(AChannel.TypeUUID);
-    if Trim(ADevice.RepoTypeName) = '' then
-      ADevice.RepoTypeName := Trim(AChannel.RepoTypeName);
-    if Trim(ADevice.RepoTypeUUID) = '' then
-      ADevice.RepoTypeUUID := Trim(AChannel.RepoTypeUUID);
-    if Trim(ADevice.RepoDeviceName) = '' then
-      ADevice.RepoDeviceName := Trim(AChannel.RepoDeviceName);
-    if Trim(ADevice.RepoDeviceUUID) = '' then
-      ADevice.RepoDeviceUUID := Trim(AChannel.RepoDeviceUUID);
-
-    if (CurrentPoint <> nil) and ((ADevice.Points = nil) or (ADevice.Points.Count = 0)) then
-    begin
-      DevicePoint := ADevice.AddPoint;
-      if DevicePoint <> nil then
-      begin
-        DevicePoint.Assign(CurrentPoint, False);
-        DevicePoint.DeviceID := ADevice.ID;
-        DevicePoint.DeviceUUID := ADevice.UUID;
-        DevicePoint.State := osNew;
-      end;
-    end;
-
-    if ADevice.State = osClean then
-      ADevice.State := osModified;
-
-    if DeviceWasPromoted and (ProtocolManager <> nil) then
-      ProtocolManager.AddMessage(
-        pcAction,
-        psWorkTable,
-        'CreateDeviceFromGridPlaceholder',
-        'Создан прибор из строки GridDevices после проливки',
-        Format('UUID=%s; Name=%s; Serial=%s; Channel=%s',
-          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber, AChannel.Text])
-      );
-  end;
-
 begin
 
   DeviceRepo := nil;
@@ -3542,12 +3794,19 @@ begin
 
   for DeviceChannel in DeviceChannels do
   begin
-    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) or
-       (DeviceChannel.FlowMeter = nil) or (DeviceChannel.FlowMeter.Device = nil) then
+    if (DeviceChannel = nil) or (not DeviceChannel.Enabled) then
       Continue;
 
-    Device := DeviceChannel.FlowMeter.Device;
-    PromotePlaceholderDevice(DeviceChannel, Device);
+    Device := TDeviceCreationService.EnsureDeviceForChannel(
+      DeviceChannel,
+      Self,
+      DeviceRepo,
+      dcmMeasurementPromoted,
+      nil,
+      CurrentPoint
+    );
+    if Device = nil then
+      Continue;
 
     Session := Device.GetActiveSessionSpillage;
     if Session = nil then
