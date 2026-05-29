@@ -1063,7 +1063,6 @@ begin
   if (GridDevices.Row < 0) and (GridDevices.RowCount > 0) then
     GridDevices.Row := GridDevices.RowCount - 1;
 
-  WriteDeviceActionLog('Создан прибор', NewDevice);
   LogDuplicateDeviceUUIDs;
 end;
 
