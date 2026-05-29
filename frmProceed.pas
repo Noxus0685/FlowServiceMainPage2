@@ -1483,8 +1483,23 @@ var
   DeletedMeterValueOwners: TStringList;
   I: Integer;
   Device: TDevice;
+  DeviceUUID: string;
   DeviceUsedOnOtherTable: Boolean;
   OtherWT: TWorkTable;
+
+  function GetChannelStoredDeviceUUID(AChannel: TChannel): string;
+  begin
+    // Для проверки принадлежности не трогаем FlowMeter/Device: эти ссылки могут уже
+    // быть освобождены при удалении стола. Используем только UUID, сохранённые в строке.
+    Result := '';
+    if AChannel = nil then
+      Exit;
+
+    Result := Trim(AChannel.DeviceUUID);
+    if Result = '' then
+      Result := Trim(AChannel.RepoDeviceUUID);
+  end;
+
 begin
   // Защита от удаления невалидного узла или рабочего стола вне менеджера.
   if not IsSelectedTreeWorkTable(WorkTable) then
@@ -1531,9 +1546,11 @@ begin
     // Запоминаем приборы удаляемого рабочего стола до освобождения его каналов.
     if WorkTable.DeviceChannels <> nil then
       for Ch in WorkTable.DeviceChannels do
-        if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
-           (Trim(Ch.FlowMeter.Device.UUID) <> '') then
-          DeviceUUIDsToCheck.Add(Trim(Ch.FlowMeter.Device.UUID));
+      begin
+        DeviceUUID := GetChannelStoredDeviceUUID(Ch);
+        if DeviceUUID <> '' then
+          DeviceUUIDsToCheck.Add(DeviceUUID);
+      end;
 
     // Выбираем ближайший рабочий стол заранее и не обращаемся к удалённому узлу после удаления.
     if FWorkTableManager.WorkTables.Count > 1 then
@@ -1572,12 +1589,14 @@ begin
             Continue;
 
           for Ch in OtherWT.DeviceChannels do
-            if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
-               SameText(Trim(Ch.FlowMeter.Device.UUID), Trim(Device.UUID)) then
+          begin
+            DeviceUUID := GetChannelStoredDeviceUUID(Ch);
+            if (DeviceUUID <> '') and SameText(DeviceUUID, Trim(Device.UUID)) then
             begin
               DeviceUsedOnOtherTable := True;
               Break;
             end;
+          end;
 
           if DeviceUsedOnOtherTable then
             Break;
