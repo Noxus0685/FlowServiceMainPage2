@@ -529,8 +529,7 @@ type
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
     procedure EnsureEmptyDevicesForGridRows;
-    function IsEmptyGridDeviceChannel(AChannel: TChannel): Boolean;
-    function IsEmptyTechnicalDevice(ADevice: TDevice): Boolean;
+    function ShouldReleaseGridDeviceBeforeSave(ADevice: TDevice): Boolean;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -3180,31 +3179,16 @@ end;
 
 
 
-function TFrameMainTable.IsEmptyGridDeviceChannel(AChannel: TChannel): Boolean;
-begin
-  Result := False;
-  if AChannel = nil then
-    Exit;
 
-  Result := (Trim(AChannel.TypeName) = '') and
-            (Trim(AChannel.Serial) = '') and
-            (Trim(AChannel.TypeUUID) = '') and
-            (Trim(AChannel.RepoTypeName) = '') and
-            (Trim(AChannel.RepoTypeUUID) = '') and
-            (Trim(AChannel.RepoDeviceName) = '') and
-            (Trim(AChannel.RepoDeviceUUID) = '');
-end;
-
-function TFrameMainTable.IsEmptyTechnicalDevice(ADevice: TDevice): Boolean;
+function TFrameMainTable.ShouldReleaseGridDeviceBeforeSave(ADevice: TDevice): Boolean;
 begin
   Result := False;
   if ADevice = nil then
     Exit;
 
-  Result := (Trim(ADevice.SerialNumber) = '') and
-            ((ADevice.Points = nil) or (ADevice.Points.Count = 0)) and
-            ((ADevice.Spillages = nil) or (ADevice.Spillages.Count = 0)) and
-            ((ADevice.Sessions = nil) or (ADevice.Sessions.Count = 0));
+  Result := (Trim(ADevice.SerialNumber) = '') or
+            (ADevice.Points = nil) or
+            (ADevice.Points.Count = 0);
 end;
 
 procedure TFrameMainTable.ReleaseEmptyGridDevicesBeforeSave;
@@ -3225,7 +3209,7 @@ begin
 
     for Channel in WorkTable.DeviceChannels do
     begin
-      if (Channel = nil) or (not IsEmptyGridDeviceChannel(Channel)) then
+      if Channel = nil then
         Continue;
 
       DeviceUUID := Trim(Channel.DeviceUUID);
@@ -3238,12 +3222,15 @@ begin
          SameText(Trim(Channel.FlowMeter.Device.UUID), DeviceUUID) then
         Device := Channel.FlowMeter.Device;
 
-      if (Device = nil) and (DataManager <> nil) then
-        Device := DataManager.FindDevice(DeviceUUID, Repo)
-      else if DataManager <> nil then
-        DataManager.FindDevice(DeviceUUID, Repo);
+      if DataManager <> nil then
+      begin
+        if Device = nil then
+          Device := DataManager.FindDevice(DeviceUUID, Repo)
+        else
+          DataManager.FindDevice(DeviceUUID, Repo);
+      end;
 
-      if not IsEmptyTechnicalDevice(Device) then
+      if not ShouldReleaseGridDeviceBeforeSave(Device) then
         Continue;
 
       Channel.DeviceUUID := '';
