@@ -3322,68 +3322,10 @@ var
   Channel: TChannel;
   Device: TDevice;
   Repo: TDeviceRepository;
-  SourceRepo: TDeviceRepository;
   DeviceUUID: string;
-  RepoName: string;
-  NeedBind: Boolean;
-
-  function FindDeviceByUUIDForChannel(const AChannel: TChannel;
-    const ADeviceUUID: string): TDevice;
-  var
-    Candidate: TDevice;
-  begin
-    Result := nil;
-    if (DataManager = nil) or (Trim(ADeviceUUID) = '') then
-      Exit;
-
-    RepoName := Trim(AChannel.RepoDeviceName);
-    if RepoName <> '' then
-    begin
-      SourceRepo := DataManager.FindDeviceRepositoryByName(RepoName);
-      if (SourceRepo <> nil) and (SourceRepo.Devices <> nil) then
-        for Candidate in SourceRepo.Devices do
-          if (Candidate <> nil) and SameText(Trim(Candidate.UUID), ADeviceUUID) then
-          begin
-            Repo := SourceRepo;
-            Exit(Candidate);
-          end;
-    end;
-
-    Result := DataManager.FindDevice(ADeviceUUID, Repo);
-  end;
-
-  procedure BindChannelToDevice(const AChannel: TChannel; const ADevice: TDevice);
-  begin
-    if (AChannel = nil) or (ADevice = nil) then
-      Exit;
-
-    if AChannel.FlowMeter = nil then
-      AChannel.RecreateFlowMeter(FActiveWorkTable);
-
-    if AChannel.FlowMeter <> nil then
-    begin
-      AChannel.FlowMeter.Device := ADevice;
-      AChannel.DeviceUUID := ADevice.UUID;
-    end;
-  end;
-
-  procedure CreateEmptyDeviceForChannel(const AChannel: TChannel);
-  begin
-    if AChannel = nil then
-      Exit;
-
-    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
-    AChannel.RecreateFlowMeter(FActiveWorkTable);
-
-    if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
-    begin
-      AChannel.FlowMeter.Device.Comment := CEmptyGridDeviceComment;
-      AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
-    end;
-  end;
-
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
+     (DataManager = nil) or (DataManager.ActiveDeviceRepo = nil) then
     Exit;
 
   for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
@@ -3393,38 +3335,24 @@ begin
       Continue;
 
     DeviceUUID := Trim(Channel.DeviceUUID);
-    Device := FindDeviceByUUIDForChannel(Channel, DeviceUUID);
+    Device := nil;
+    Repo := nil;
+    if DeviceUUID <> '' then
+      Device := DataManager.FindDevice(DeviceUUID, Repo);
 
-    if (DeviceUUID <> '') and (Device <> nil) then
+    if (DeviceUUID <> '') and (Device = nil) then
     begin
-      if ShouldReleaseGridDeviceBeforeSave(Channel, Device) then
-      begin
-        Channel.DeviceUUID := '';
-        if Channel.FlowMeter <> nil then
-          Channel.FlowMeter.Device := nil;
-
-        if Repo <> nil then
-          Repo.DeleteDevice(Device);
-
-        CreateEmptyDeviceForChannel(Channel);
-        Continue;
-      end;
-
-      NeedBind := Channel.FlowMeter = nil;
-      if not NeedBind then
-      begin
-        NeedBind := Channel.FlowMeter.Device = nil;
-        if not NeedBind then
-          NeedBind := not SameText(Trim(Channel.FlowMeter.Device.UUID), DeviceUUID);
-      end;
-
-      if NeedBind then
-        BindChannelToDevice(Channel, Device);
-
-      Continue;
+      Channel.DeviceUUID := '';
+      if Channel.FlowMeter <> nil then
+        Channel.FlowMeter.Device := nil;
     end;
 
-    CreateEmptyDeviceForChannel(Channel);
+    TDeviceCreationService.EnsureDeviceForChannel(
+      Channel,
+      FActiveWorkTable,
+      DataManager.ActiveDeviceRepo,
+      dcmGridPlaceholder
+    );
   end;
 end;
 
@@ -3455,15 +3383,17 @@ begin
   AChannel.RepoTypeUUID := '';
   AChannel.RepoDeviceName := '';
   AChannel.RepoDeviceUUID := '';
+  AChannel.DeviceUUID := '';
+  if AChannel.FlowMeter <> nil then
+    AChannel.FlowMeter.Device := nil;
 
-  AChannel.DeviceUUID := TGUID.NewGuid.ToString;
-  AChannel.RecreateFlowMeter(WorkTable);
-
-  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
-  begin
-    AChannel.FlowMeter.Device.Comment := CEmptyGridDeviceComment;
-    AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
-  end;
+  if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+    TDeviceCreationService.EnsureDeviceForChannel(
+      AChannel,
+      WorkTable,
+      DataManager.ActiveDeviceRepo,
+      dcmGridPlaceholder
+    );
 
   MarkChannelDeviceModified(AChannel);
 end;

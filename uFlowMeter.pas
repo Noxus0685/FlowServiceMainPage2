@@ -413,7 +413,8 @@ implementation
 uses
   uAppServices,
   uDataManager,
-  uRepositories;
+  uRepositories,
+  uWorkTable;
 
 { TFlowMeter }
 
@@ -1123,67 +1124,42 @@ begin
 end;
 
 procedure TFlowMeter.CreateDevice;
- var
-    ADevice: TDevice;
-    AType: TDeviceType;
-    ActiveRepo:  TDeviceRepository;
-    FoundRepo: TTypeRepository;
+var
+  ADevice: TDevice;
+  ActiveRepo: TDeviceRepository;
 begin
-
   if AppServices.DataManager = nil then
-  Exit;
+    Exit;
 
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
+  if ActiveRepo = nil then
+    Exit;
 
-   if ActiveRepo = nil then
-  Exit;
+  if FDevice <> nil then
+    Exit;
 
+  if Trim(Self.DeviceUUID) = '' then
+    Self.DeviceUUID := TGUID.NewGuid.ToString;
 
-  ADevice:= FDevice;
-  AType := AppServices.DataManager.FindType(DeviceTypeUUID, FTypeName, FoundRepo);
+  ADevice := TDeviceCreationService.CreateDevice(
+    ActiveRepo,
+    dcmGridPlaceholder,
+    nil,
+    Self.DeviceUUID
+  );
+  if ADevice = nil then
+    Exit;
 
-  if (FDevice = nil) then
-   begin
+  ADevice.DeviceTypeUUID := Self.DeviceTypeUUID;
+  ADevice.DeviceTypeName := Self.DeviceTypeName;
+  ADevice.SerialNumber := Self.SerialNumber;
+  ADevice.RepoTypeName := Self.RepoTypeName;
+  ADevice.RepoTypeUUID := Self.RepoTypeUUID;
+  ADevice.RepoDeviceName := Self.RepoDeviceName;
+  ADevice.RepoDeviceUUID := Self.RepoDeviceUUID;
+  ADevice.OutputType := Self.OutputType;
 
-    if Trim(Self.DeviceUUID) = '' then
-      Self.DeviceUUID := TGUID.NewGuid.ToString;
-
-    ADevice := ActiveRepo.CreateDevice(-1);
-    ADevice.DeviceTypeUUID := DeviceTypeUUID;
-    ADevice.DeviceTypeName := FTypeName;
-    ADevice.SerialNumber := FSerialNumber;
-    ADevice.UUID := Self.DeviceUUID;
-    ADevice.SerialNumber := Self.SerialNumber;
-    ADevice.DeviceTypeName := Self.DeviceTypeName;
-    ADevice.DeviceTypeUUID := Self.DeviceTypeUUID;
-    ADevice.RepoTypeName := Self.RepoTypeName;
-    ADevice.RepoTypeUUID := Self.RepoTypeUUID;
-    ADevice.RepoDeviceName := Self.RepoDeviceName;
-    ADevice.RepoDeviceUUID := Self.RepoDeviceUUID;
-    ADevice.OutputType := Self.OutputType;
-
-    if ProtocolManager <> nil then
-      ProtocolManager.AddMessage(
-        pcAction,
-        psWorkTable,
-        'CreateDevice',
-        'Создан прибор для строки GridDevices',
-        Format('UUID=%s; Name=%s; Serial=%s',
-          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber])
-      );
-
-    FDevice:= ADevice;
-
-    if (AType <> nil) then
-    begin
-    if (FoundRepo <> nil) then
-    begin
-       AppServices.DataManager.ActiveTypeRepo := FoundRepo;
-       ADevice.AttachType(AType,FoundRepo.Name);
-    end;
-
-    end;
-   end;
+  Self.Device := ADevice;
 end;
 
 procedure TFlowMeter.Init(UUID: string);
