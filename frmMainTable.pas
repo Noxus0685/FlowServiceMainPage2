@@ -680,6 +680,7 @@ const
   CProcessingDevicesSection = 'ProcessingDevices';
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
+  CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
 
 function IsVolumeFlowUnit(const AUnit: string): Boolean;
 var
@@ -3040,7 +3041,8 @@ begin
     Exit;
 
   SaveLayoutSettingsToWorkTable;
-  ReleaseEmptyGridDevicesBeforeSave;
+  if DataManager <> nil then
+    DataManager.Save;
   WorkTableManager.Save;
 end;
 
@@ -3187,14 +3189,10 @@ begin
   if (AChannel = nil) or (ADevice = nil) then
     Exit;
 
-  Result := (Trim(AChannel.TypeName) = '') and
+  Result := SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment) and
+            (Trim(AChannel.TypeName) = '') and
             (Trim(AChannel.DeviceName) = '') and
             (Trim(AChannel.Serial) = '') and
-            (Trim(AChannel.TypeUUID) = '') and
-            (Trim(AChannel.RepoTypeName) = '') and
-            (Trim(AChannel.RepoTypeUUID) = '') and
-            (Trim(AChannel.RepoDeviceName) = '') and
-            (Trim(AChannel.RepoDeviceUUID) = '') and
             (Trim(ADevice.Name) = '') and
             (Trim(ADevice.DeviceTypeName) = '') and
             (Trim(ADevice.DeviceTypeUUID) = '') and
@@ -3317,7 +3315,10 @@ var
     AChannel.RecreateFlowMeter(FActiveWorkTable);
 
     if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+    begin
+      AChannel.FlowMeter.Device.Comment := CEmptyGridDeviceComment;
       AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
+    end;
   end;
 
 begin
@@ -3398,7 +3399,10 @@ begin
   AChannel.RecreateFlowMeter(WorkTable);
 
   if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+  begin
+    AChannel.FlowMeter.Device.Comment := CEmptyGridDeviceComment;
     AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
+  end;
 
   MarkChannelDeviceModified(AChannel);
 end;
