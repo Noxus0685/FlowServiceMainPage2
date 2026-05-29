@@ -529,6 +529,8 @@ type
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
     procedure EnsureEmptyDevicesForGridRows;
+    function IsEmptyGridDeviceChannel(AChannel: TChannel): Boolean;
+    function IsEmptyTechnicalDevice(ADevice: TDevice): Boolean;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -612,6 +614,7 @@ type
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
+    procedure ReleaseEmptyGridDevicesBeforeSave;
 
 
   private type
@@ -3038,6 +3041,7 @@ begin
     Exit;
 
   SaveLayoutSettingsToWorkTable;
+  ReleaseEmptyGridDevicesBeforeSave;
   WorkTableManager.Save;
 end;
 
@@ -3174,6 +3178,83 @@ begin
   Result := AChannels[Row];
 end;
 
+
+
+function TFrameMainTable.IsEmptyGridDeviceChannel(AChannel: TChannel): Boolean;
+begin
+  Result := False;
+  if AChannel = nil then
+    Exit;
+
+  Result := (Trim(AChannel.TypeName) = '') and
+            (Trim(AChannel.Serial) = '') and
+            (Trim(AChannel.TypeUUID) = '') and
+            (Trim(AChannel.RepoTypeName) = '') and
+            (Trim(AChannel.RepoTypeUUID) = '') and
+            (Trim(AChannel.RepoDeviceName) = '') and
+            (Trim(AChannel.RepoDeviceUUID) = '');
+end;
+
+function TFrameMainTable.IsEmptyTechnicalDevice(ADevice: TDevice): Boolean;
+begin
+  Result := False;
+  if ADevice = nil then
+    Exit;
+
+  Result := (Trim(ADevice.SerialNumber) = '') and
+            ((ADevice.Points = nil) or (ADevice.Points.Count = 0)) and
+            ((ADevice.Spillages = nil) or (ADevice.Spillages.Count = 0)) and
+            ((ADevice.Sessions = nil) or (ADevice.Sessions.Count = 0));
+end;
+
+procedure TFrameMainTable.ReleaseEmptyGridDevicesBeforeSave;
+var
+  WorkTable: TWorkTable;
+  Channel: TChannel;
+  Device: TDevice;
+  Repo: TDeviceRepository;
+  DeviceUUID: string;
+begin
+  if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then
+    Exit;
+
+  for WorkTable in WorkTableManager.WorkTables do
+  begin
+    if (WorkTable = nil) or (WorkTable.DeviceChannels = nil) then
+      Continue;
+
+    for Channel in WorkTable.DeviceChannels do
+    begin
+      if (Channel = nil) or (not IsEmptyGridDeviceChannel(Channel)) then
+        Continue;
+
+      DeviceUUID := Trim(Channel.DeviceUUID);
+      if DeviceUUID = '' then
+        Continue;
+
+      Device := nil;
+      Repo := nil;
+      if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) and
+         SameText(Trim(Channel.FlowMeter.Device.UUID), DeviceUUID) then
+        Device := Channel.FlowMeter.Device;
+
+      if (Device = nil) and (DataManager <> nil) then
+        Device := DataManager.FindDevice(DeviceUUID, Repo)
+      else if DataManager <> nil then
+        DataManager.FindDevice(DeviceUUID, Repo);
+
+      if not IsEmptyTechnicalDevice(Device) then
+        Continue;
+
+      Channel.DeviceUUID := '';
+      if Channel.FlowMeter <> nil then
+        Channel.FlowMeter.Device := nil;
+
+      if (Repo <> nil) and (Device <> nil) then
+        Repo.DeleteDevice(Device);
+    end;
+  end;
+end;
 
 procedure TFrameMainTable.EnsureEmptyDevicesForGridRows;
 var

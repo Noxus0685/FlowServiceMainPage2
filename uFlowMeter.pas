@@ -559,9 +559,24 @@ end;
 
 procedure TFlowMeter.SetDevice(const ADevice: TDevice);
 begin
-   if Assigned(ADevice) then
- begin
-   FDevice := ADevice;
+  if not Assigned(ADevice) then
+  begin
+    FDevice := nil;
+    FDeviceUUID := '';
+    UUID := '';
+    FSerialNumber := '';
+    FDeviceTypeUUID := '';
+    FTypeName := '';
+    FRepoTypeName := '';
+    FRepoTypeUUID := '';
+    FRepoDeviceName := '';
+    FRepoDeviceUUID := '';
+    FOutputType := 0;
+    MeterFlowCategory := mftUnknownType;
+    Exit;
+  end;
+
+  FDevice := ADevice;
 
   Self.UUID := FDevice.UUID;
   Self.Name := FDevice.Name;
@@ -577,8 +592,6 @@ begin
   FlowMin := FDevice.Qmin;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
   UpdateByDevice;
-
- end;
 end;
 
 procedure TFlowMeter.AddDataPoint(const APoint: TPointSpillage);
