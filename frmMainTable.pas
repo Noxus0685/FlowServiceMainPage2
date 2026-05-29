@@ -4622,21 +4622,21 @@ begin
   if ACol <> StringColumnDeviceSerial1.Index then
     Exit;
 
-  // Поиск следующей включенной строки
-  NextRow := -1;
-  for i := ARow to workTable.DeviceChannels.Count - 2 do
-  begin
-    NextRow := i + 1;
-    if not workTable.DeviceChannels[NextRow].Enabled then
-      Continue
-    else
-      Break;
-  end;
-
-  if (ARow = workTable.DeviceChannels.Count - 1) then
+  if (WorkTable = nil) or (ARow < 0) or (ARow >= WorkTable.DeviceChannels.Count) then
     Exit;
 
-  if NextRow >= GridDevices.RowCount then
+  // Поиск следующей включенной строки. Переходить можно только на строку,
+  // у которой CheckColumnDeviceEnable1=True; если дальше включенных строк нет,
+  // остаемся на текущей строке и не открываем редактор на отключенной строке.
+  NextRow := -1;
+  for i := ARow + 1 to WorkTable.DeviceChannels.Count - 1 do
+    if WorkTable.DeviceChannels[i].Enabled then
+    begin
+      NextRow := i;
+      Break;
+    end;
+
+  if (NextRow < 0) or (NextRow >= GridDevices.RowCount) then
     Exit;
 
   TThread.Queue(nil,
