@@ -529,7 +529,7 @@ type
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
     procedure EnsureEmptyDevicesForGridRows;
-    function ShouldReleaseGridDeviceBeforeSave(ADevice: TDevice): Boolean;
+    function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -3180,15 +3180,29 @@ end;
 
 
 
-function TFrameMainTable.ShouldReleaseGridDeviceBeforeSave(ADevice: TDevice): Boolean;
+function TFrameMainTable.ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel;
+  ADevice: TDevice): Boolean;
 begin
   Result := False;
-  if ADevice = nil then
+  if (AChannel = nil) or (ADevice = nil) then
     Exit;
 
-  Result := (Trim(ADevice.SerialNumber) = '') or
-            (ADevice.Points = nil) or
-            (ADevice.Points.Count = 0);
+  Result := (Trim(AChannel.TypeName) = '') and
+            (Trim(AChannel.DeviceName) = '') and
+            (Trim(AChannel.Serial) = '') and
+            (Trim(AChannel.TypeUUID) = '') and
+            (Trim(AChannel.RepoTypeName) = '') and
+            (Trim(AChannel.RepoTypeUUID) = '') and
+            (Trim(AChannel.RepoDeviceName) = '') and
+            (Trim(AChannel.RepoDeviceUUID) = '') and
+            (Trim(ADevice.Name) = '') and
+            (Trim(ADevice.DeviceTypeName) = '') and
+            (Trim(ADevice.DeviceTypeUUID) = '') and
+            (Trim(ADevice.SerialNumber) = '') and
+            (Trim(ADevice.DN) = '') and
+            ((ADevice.Points = nil) or (ADevice.Points.Count = 0)) and
+            ((ADevice.Sessions = nil) or (ADevice.Sessions.Count = 0)) and
+            ((ADevice.Spillages = nil) or (ADevice.Spillages.Count = 0));
 end;
 
 procedure TFrameMainTable.ReleaseEmptyGridDevicesBeforeSave;
@@ -3230,7 +3244,7 @@ begin
           DataManager.FindDevice(DeviceUUID, Repo);
       end;
 
-      if not ShouldReleaseGridDeviceBeforeSave(Device) then
+      if not ShouldReleaseGridDeviceBeforeSave(Channel, Device) then
         Continue;
 
       Channel.DeviceUUID := '';
@@ -3321,7 +3335,7 @@ begin
 
     if (DeviceUUID <> '') and (Device <> nil) then
     begin
-      if ShouldReleaseGridDeviceBeforeSave(Device) then
+      if ShouldReleaseGridDeviceBeforeSave(Channel, Device) then
       begin
         Channel.DeviceUUID := '';
         if Channel.FlowMeter <> nil then
