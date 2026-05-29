@@ -1525,6 +1525,8 @@ begin
       DeletedMeterValueOwners.Add(Trim(WorkTable.Name));
     if DeletedMeterValueOwners.IndexOf(TWorkTable.BuildWorkTableServiceName(WorkTable.ID)) < 0 then
       DeletedMeterValueOwners.Add(TWorkTable.BuildWorkTableServiceName(WorkTable.ID));
+    if DeletedMeterValueOwners.IndexOf('Рабочий стол ' + IntToStr(WorkTable.ID)) < 0 then
+      DeletedMeterValueOwners.Add('Рабочий стол ' + IntToStr(WorkTable.ID));
 
     // Запоминаем приборы удаляемого рабочего стола до освобождения его каналов.
     if WorkTable.DeviceChannels <> nil then
