@@ -264,8 +264,9 @@ type
     function GetNewUUID: string;
     class procedure SaveToFile(IsBackUp: Integer); static;
     class procedure LoadFromFile; static;
-    // Удаляет указанные значения из памяти и физически перезаписывает MeterValues.ini.
-    class procedure DeleteFromFile(const AHashes: TStrings); static;
+    // Удаляет указанные значения/владельцев из памяти и физически перезаписывает MeterValues.ini.
+    class procedure DeleteFromFile(const AHashes: TStrings;
+      const AOwnerNames: TStrings = nil); static;
 
     procedure SetCoef(ACoef: TCoef); overload;
     function SetCoef(AValue, AArg: Double): string; overload;
@@ -2249,19 +2250,33 @@ begin
   end;
 end;
 
-class procedure TMeterValue.DeleteFromFile(const AHashes: TStrings);
+class procedure TMeterValue.DeleteFromFile(const AHashes: TStrings;
+  const AOwnerNames: TStrings);
 var
   I: Integer;
   MV: TMeterValue;
+
+  function InList(AList: TStrings; const AValue: string): Boolean;
+  begin
+    Result := (AList <> nil) and (Trim(AValue) <> '') and (AList.IndexOf(Trim(AValue)) >= 0);
+  end;
+
 begin
-  if (AHashes = nil) or (AHashes.Count = 0) or (FMeterValues = nil) then
+  if (FMeterValues = nil) or
+     (((AHashes = nil) or (AHashes.Count = 0)) and
+      ((AOwnerNames = nil) or (AOwnerNames.Count = 0))) then
     Exit;
 
-  // Удаляем все значения с переданными Hash из глобальных списков.
+  // Удаляем значения не только по Hash, но и по владельцу рабочего стола.
+  // Это закрывает старые записи MeterValues.ini, которые уже не привязаны к полям TWorkTable,
+  // но всё ещё имеют NameOwner вроде "Рабочий стол 2".
   for I := FMeterValues.Count - 1 downto 0 do
   begin
     MV := FMeterValues[I];
-    if (MV <> nil) and (AHashes.IndexOf(MV.Hash) >= 0) then
+    if (MV <> nil) and
+       (InList(AHashes, MV.Hash) or
+        InList(AOwnerNames, MV.NameOwner) or
+        InList(AOwnerNames, MV.HashOwner)) then
     begin
       MV.SetToSave(False);
       MV.DeleteFromVector;

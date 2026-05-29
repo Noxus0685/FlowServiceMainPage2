@@ -1480,6 +1480,7 @@ var
   Ch: TChannel;
   DeviceUUIDsToCheck: TStringList;
   DeletedMeterValueHashes: TStringList;
+  DeletedMeterValueOwners: TStringList;
   I: Integer;
   Device: TDevice;
   DeviceUsedOnOtherTable: Boolean;
@@ -1507,11 +1508,23 @@ begin
 
   DeviceUUIDsToCheck := TStringList.Create;
   DeletedMeterValueHashes := TStringList.Create;
+  DeletedMeterValueOwners := TStringList.Create;
   try
     DeviceUUIDsToCheck.Sorted := False;
     DeviceUUIDsToCheck.Duplicates := TDuplicates.dupIgnore;
     DeletedMeterValueHashes.Sorted := False;
     DeletedMeterValueHashes.Duplicates := TDuplicates.dupIgnore;
+    DeletedMeterValueOwners.Sorted := False;
+    DeletedMeterValueOwners.Duplicates := TDuplicates.dupIgnore;
+
+    // Старые значения в MeterValues.ini могут не быть привязаны к полям TWorkTable,
+    // поэтому дополнительно удаляем всё с владельцем рабочего стола.
+    if Trim(WorkTable.Text) <> '' then
+      DeletedMeterValueOwners.Add(Trim(WorkTable.Text));
+    if (Trim(WorkTable.Name) <> '') and (DeletedMeterValueOwners.IndexOf(Trim(WorkTable.Name)) < 0) then
+      DeletedMeterValueOwners.Add(Trim(WorkTable.Name));
+    if DeletedMeterValueOwners.IndexOf(TWorkTable.BuildWorkTableServiceName(WorkTable.ID)) < 0 then
+      DeletedMeterValueOwners.Add(TWorkTable.BuildWorkTableServiceName(WorkTable.ID));
 
     // Запоминаем приборы удаляемого рабочего стола до освобождения его каналов.
     if WorkTable.DeviceChannels <> nil then
@@ -1576,7 +1589,7 @@ begin
     SaveProcessingDevices;
     FWorkTableManager.Save;
     // Физически перезаписываем MeterValues.ini без секций удалённого рабочего стола.
-    TMeterValue.DeleteFromFile(DeletedMeterValueHashes);
+    TMeterValue.DeleteFromFile(DeletedMeterValueHashes, DeletedMeterValueOwners);
 
     // Перестраиваем дерево и очищаем/обновляем таблицы без обращения к удалённому TTreeViewItem.
     PopulateTreeViewDevices;
@@ -1598,6 +1611,7 @@ begin
 
     UpdateSessionItems;
   finally
+    DeletedMeterValueOwners.Free;
     DeletedMeterValueHashes.Free;
     DeviceUUIDsToCheck.Free;
   end;
