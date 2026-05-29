@@ -811,12 +811,13 @@ end;
 class procedure TDeviceCreationService.FillDeviceFromChannel(ADevice: TDevice;
   AChannel: TChannel; AMode: TDeviceCreateMode);
 
-  procedure AssignStringIfNeeded(var ATarget: string; const ASource: string);
+  function MergeStringIfNeeded(const ATarget, ASource: string): string;
   begin
+    Result := ATarget;
     if Trim(ASource) <> '' then
-      ATarget := Trim(ASource)
-    else if Trim(ATarget) = '' then
-      ATarget := Trim(ASource);
+      Result := Trim(ASource)
+    else if Trim(Result) = '' then
+      Result := Trim(ASource);
   end;
 
 begin
@@ -831,16 +832,16 @@ begin
     Exit;
   end;
 
-  AssignStringIfNeeded(ADevice.Name, AChannel.DeviceName);
+  ADevice.Name := MergeStringIfNeeded(ADevice.Name, AChannel.DeviceName);
   if Trim(ADevice.Name) = '' then
     ADevice.Name := 'Прибор ' + Trim(AChannel.Text);
-  AssignStringIfNeeded(ADevice.SerialNumber, AChannel.Serial);
-  AssignStringIfNeeded(ADevice.DeviceTypeName, AChannel.TypeName);
-  AssignStringIfNeeded(ADevice.DeviceTypeUUID, AChannel.TypeUUID);
-  AssignStringIfNeeded(ADevice.RepoTypeName, AChannel.RepoTypeName);
-  AssignStringIfNeeded(ADevice.RepoTypeUUID, AChannel.RepoTypeUUID);
-  AssignStringIfNeeded(ADevice.RepoDeviceName, AChannel.RepoDeviceName);
-  AssignStringIfNeeded(ADevice.RepoDeviceUUID, AChannel.RepoDeviceUUID);
+  ADevice.SerialNumber := MergeStringIfNeeded(ADevice.SerialNumber, AChannel.Serial);
+  ADevice.DeviceTypeName := MergeStringIfNeeded(ADevice.DeviceTypeName, AChannel.TypeName);
+  ADevice.DeviceTypeUUID := MergeStringIfNeeded(ADevice.DeviceTypeUUID, AChannel.TypeUUID);
+  ADevice.RepoTypeName := MergeStringIfNeeded(ADevice.RepoTypeName, AChannel.RepoTypeName);
+  ADevice.RepoTypeUUID := MergeStringIfNeeded(ADevice.RepoTypeUUID, AChannel.RepoTypeUUID);
+  ADevice.RepoDeviceName := MergeStringIfNeeded(ADevice.RepoDeviceName, AChannel.RepoDeviceName);
+  ADevice.RepoDeviceUUID := MergeStringIfNeeded(ADevice.RepoDeviceUUID, AChannel.RepoDeviceUUID);
 
   if AChannel.Signal >= 0 then
     ADevice.OutputType := AChannel.Signal;
