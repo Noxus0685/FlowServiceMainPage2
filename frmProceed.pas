@@ -212,6 +212,10 @@ type
     procedure ActionSessionSynchTableExecute(Sender: TObject);
     procedure MenuTreeViewDevicesAddClick(Sender: TObject);
     procedure MenuTreeViewDevicesDeleteClick(Sender: TObject);
+    // Проверяет, что выбранный узел дерева является рабочим столом.
+    function IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
+    // Полностью удаляет выбранный рабочий стол и обновляет дерево/таблицы.
+    procedure MenuTreeViewDevicesDeleteWorkTableClick(Sender: TObject);
     procedure ActionSessionDeleteExecute(Sender: TObject);
     procedure ActionSessionDeviceAddExecute(Sender: TObject);
     procedure ActionSessionDeviceRemoveExecute(Sender: TObject);
@@ -265,7 +269,8 @@ type
 
 implementation
    uses
-    uAppServices;
+    uAppServices,
+    uMeterValue;
 {$R *.fmx}
 
 const
@@ -1261,6 +1266,7 @@ begin
   if Item.TagObject is TWorkTable then
   begin
     AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
+    AddSimpleMenuItem('Удалить рабочий стол', MenuTreeViewDevicesDeleteWorkTableClick);
     AddActionMenuItem(ActionSessionSynchTable);
     Exit;
   end;
@@ -1445,6 +1451,158 @@ begin
   AddProcessingDeviceFromSelection;
   RefreshResultsAfterDevicesAction;
 end;
+function TFrameProceed.IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
+var
+  Item: TTreeViewItem;
+begin
+  // Рабочим столом считается только узел, у которого TagObject указывает на TWorkTable.
+  AWorkTable := nil;
+  Result := False;
+
+  if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
+    Exit;
+
+  Item := TreeViewDevices.Selected;
+  if not (Item.TagObject is TWorkTable) then
+    Exit;
+
+  AWorkTable := TWorkTable(Item.TagObject);
+  Result := AWorkTable <> nil;
+end;
+
+procedure TFrameProceed.MenuTreeViewDevicesDeleteWorkTableClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+  WorkTableName: string;
+  DeleteIndex: Integer;
+  SelectIndex: Integer;
+  NextWorkTable: TWorkTable;
+  Ch: TChannel;
+  DeviceUUIDsToCheck: TStringList;
+  DeletedMeterValueHashes: TStringList;
+  I: Integer;
+  Device: TDevice;
+  DeviceUsedOnOtherTable: Boolean;
+  OtherWT: TWorkTable;
+begin
+  // Защита от удаления невалидного узла или рабочего стола вне менеджера.
+  if not IsSelectedTreeWorkTable(WorkTable) then
+    Exit;
+
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+    Exit;
+
+  DeleteIndex := FWorkTableManager.WorkTables.IndexOf(WorkTable);
+  if DeleteIndex < 0 then
+    Exit;
+
+  WorkTableName := Trim(WorkTable.Text);
+  if WorkTableName = '' then
+    WorkTableName := WorkTable.Name;
+
+  if MessageDlg(Format('Удалить рабочий стол "%s"?'#13#10 +
+      'Все связанные данные этого рабочего стола будут удалены.', [WorkTableName]),
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+    Exit;
+
+  DeviceUUIDsToCheck := TStringList.Create;
+  DeletedMeterValueHashes := TStringList.Create;
+  try
+    DeviceUUIDsToCheck.Sorted := False;
+    DeviceUUIDsToCheck.Duplicates := TDuplicates.dupIgnore;
+    DeletedMeterValueHashes.Sorted := False;
+    DeletedMeterValueHashes.Duplicates := TDuplicates.dupIgnore;
+
+    // Запоминаем приборы удаляемого рабочего стола до освобождения его каналов.
+    if WorkTable.DeviceChannels <> nil then
+      for Ch in WorkTable.DeviceChannels do
+        if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
+           (Trim(Ch.FlowMeter.Device.UUID) <> '') then
+          DeviceUUIDsToCheck.Add(Trim(Ch.FlowMeter.Device.UUID));
+
+    // Выбираем ближайший рабочий стол заранее и не обращаемся к удалённому узлу после удаления.
+    if FWorkTableManager.WorkTables.Count > 1 then
+    begin
+      SelectIndex := DeleteIndex;
+      if SelectIndex >= FWorkTableManager.WorkTables.Count - 1 then
+        SelectIndex := FWorkTableManager.WorkTables.Count - 2;
+      NextWorkTable := FWorkTableManager.WorkTables[SelectIndex];
+    end
+    else
+      NextWorkTable := nil;
+
+    if FActiveWorkTable = WorkTable then
+      FActiveWorkTable := NextWorkTable;
+    if FWorkTableManager.ActiveWorkTable = WorkTable then
+      FWorkTableManager.SetActiveWorkTable(NextWorkTable);
+
+    // Перед освобождением собираем Hash и убираем MeterValues этого стола из памяти.
+    WorkTable.RemoveMeterValuesFromStorage(DeletedMeterValueHashes);
+
+    // Удаление из TObjectList освобождает сам рабочий стол вместе с его каналами и строками.
+    FWorkTableManager.WorkTables.Delete(DeleteIndex);
+
+    // Убираем из списка обработки приборы, которые были привязаны только к удалённому рабочему столу.
+    if FProcessingDevices <> nil then
+      for I := FProcessingDevices.Count - 1 downto 0 do
+      begin
+        Device := FProcessingDevices[I];
+        if (Device = nil) or (DeviceUUIDsToCheck.IndexOf(Trim(Device.UUID)) < 0) then
+          Continue;
+
+        DeviceUsedOnOtherTable := False;
+        for OtherWT in FWorkTableManager.WorkTables do
+        begin
+          if (OtherWT = nil) or (OtherWT.DeviceChannels = nil) then
+            Continue;
+
+          for Ch in OtherWT.DeviceChannels do
+            if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
+               SameText(Trim(Ch.FlowMeter.Device.UUID), Trim(Device.UUID)) then
+            begin
+              DeviceUsedOnOtherTable := True;
+              Break;
+            end;
+
+          if DeviceUsedOnOtherTable then
+            Break;
+        end;
+
+        if not DeviceUsedOnOtherTable then
+          FProcessingDevices.Delete(I);
+      end;
+
+    // Используем существующий механизм сохранения менеджера рабочих столов.
+    SaveProcessingDevices;
+    FWorkTableManager.Save;
+    // Физически перезаписываем MeterValues.ini без секций удалённого рабочего стола.
+    TMeterValue.DeleteFromFile(DeletedMeterValueHashes);
+
+    // Перестраиваем дерево и очищаем/обновляем таблицы без обращения к удалённому TTreeViewItem.
+    PopulateTreeViewDevices;
+    if NextWorkTable <> nil then
+    begin
+      SelectTreeItemByTagObject(NextWorkTable);
+      ShowWorkTableResults(NextWorkTable);
+    end
+    else
+    begin
+      FCurrentSession := nil;
+      SetLength(FCurrentResultRows, 0);
+      SetLength(FCurrentSpillages, 0);
+      if GridResults <> nil then
+        GridResults.RowCount := 0;
+      if GridDataPoints <> nil then
+        GridDataPoints.RowCount := 0;
+    end;
+
+    UpdateSessionItems;
+  finally
+    DeletedMeterValueHashes.Free;
+    DeviceUUIDsToCheck.Free;
+  end;
+end;
+
 procedure TFrameProceed.MenuTreeViewDevicesDeleteClick(Sender: TObject);
 var
   Item: TTreeViewItem;
