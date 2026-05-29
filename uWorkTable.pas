@@ -651,6 +651,9 @@ uses
   frmMainTable,
   uMeasurementRun;
 
+const
+  CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
+
 type
   TParameterObserverBridge = class(TInterfacedObject, IEventObserver)
   private
@@ -3377,6 +3380,66 @@ var
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
+  Device: TDevice;
+  DevicePoint: TDevicePoint;
+  DeviceWasPromoted: Boolean;
+
+  procedure PromotePlaceholderDevice(AChannel: TChannel; ADevice: TDevice);
+  begin
+    if (AChannel = nil) or (ADevice = nil) then
+      Exit;
+
+    DeviceWasPromoted := SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment);
+    if DeviceWasPromoted then
+      ADevice.Comment := '';
+
+    if Trim(ADevice.Name) = '' then
+      ADevice.Name := Trim(AChannel.DeviceName);
+    if Trim(ADevice.Name) = '' then
+      ADevice.Name := 'Прибор ' + Trim(AChannel.Text);
+
+    if Trim(ADevice.SerialNumber) = '' then
+      ADevice.SerialNumber := Trim(AChannel.Serial);
+
+    if Trim(ADevice.DeviceTypeName) = '' then
+      ADevice.DeviceTypeName := Trim(AChannel.TypeName);
+    if Trim(ADevice.DeviceTypeUUID) = '' then
+      ADevice.DeviceTypeUUID := Trim(AChannel.TypeUUID);
+    if Trim(ADevice.RepoTypeName) = '' then
+      ADevice.RepoTypeName := Trim(AChannel.RepoTypeName);
+    if Trim(ADevice.RepoTypeUUID) = '' then
+      ADevice.RepoTypeUUID := Trim(AChannel.RepoTypeUUID);
+    if Trim(ADevice.RepoDeviceName) = '' then
+      ADevice.RepoDeviceName := Trim(AChannel.RepoDeviceName);
+    if Trim(ADevice.RepoDeviceUUID) = '' then
+      ADevice.RepoDeviceUUID := Trim(AChannel.RepoDeviceUUID);
+
+    if (CurrentPoint <> nil) and ((ADevice.Points = nil) or (ADevice.Points.Count = 0)) then
+    begin
+      DevicePoint := ADevice.AddPoint;
+      if DevicePoint <> nil then
+      begin
+        DevicePoint.Assign(CurrentPoint, False);
+        DevicePoint.DeviceID := ADevice.ID;
+        DevicePoint.DeviceUUID := ADevice.UUID;
+        DevicePoint.State := osNew;
+      end;
+    end;
+
+    if ADevice.State = osClean then
+      ADevice.State := osModified;
+
+    if DeviceWasPromoted and (ProtocolManager <> nil) then
+      ProtocolManager.AddMessage(
+        pcAction,
+        psWorkTable,
+        'CreateDeviceFromGridPlaceholder',
+        'Создан прибор из строки GridDevices после проливки',
+        Format('UUID=%s; Name=%s; Serial=%s; Channel=%s',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber, AChannel.Text])
+      );
+  end;
+
 begin
 
   DeviceRepo := nil;
@@ -3389,9 +3452,12 @@ begin
        (DeviceChannel.FlowMeter = nil) or (DeviceChannel.FlowMeter.Device = nil) then
       Continue;
 
-    Session := DeviceChannel.FlowMeter.Device.GetActiveSessionSpillage;
+    Device := DeviceChannel.FlowMeter.Device;
+    PromotePlaceholderDevice(DeviceChannel, Device);
+
+    Session := Device.GetActiveSessionSpillage;
     if Session = nil then
-      Session := DeviceChannel.FlowMeter.Device.AddSessionSpillage;
+      Session := Device.AddSessionSpillage;
     Session.State := osModified;
 
     if Session.DateTimeOpen = 0 then
@@ -3399,7 +3465,7 @@ begin
 
     Point := TPointSpillage.Create(Session.ID);
     try
-      Point.Num := DeviceChannel.FlowMeter.Device.Spillages.Count + 1;
+      Point.Num := Device.Spillages.Count + 1;
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.SessionID := Session.ID;
       Point.DateTime := Now;
@@ -3475,13 +3541,13 @@ begin
       Point.AmbientTemperature := ValueAirTemperture.GetDoubleValue;
       Point.RelativeHumidity := ValueHumidity.GetDoubleValue;
 
-      if DeviceChannel.FlowMeter.Device <> nil then
-        Point.Valid := DeviceChannel.FlowMeter.Device.AnalyseDataPoint(Point);
+      if Device <> nil then
+        Point.Valid := Device.AnalyseDataPoint(Point);
 
       DeviceChannel.FlowMeter.AddDataPoint(Point);
 
       if Assigned(DeviceRepo) then
-        DeviceRepo.SaveDevice(DeviceChannel.FlowMeter.Device);
+        DeviceRepo.SaveDevice(Device);
     finally
       Point.Free;
     end;

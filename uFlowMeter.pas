@@ -10,7 +10,8 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
-  uMeterValue;
+  uMeterValue,
+  uProtocols;
 
 const
   XMLVERFLOWMETERS = '5.0';
@@ -559,9 +560,24 @@ end;
 
 procedure TFlowMeter.SetDevice(const ADevice: TDevice);
 begin
-   if Assigned(ADevice) then
- begin
-   FDevice := ADevice;
+  if not Assigned(ADevice) then
+  begin
+    FDevice := nil;
+    FDeviceUUID := '';
+    UUID := '';
+    FSerialNumber := '';
+    FDeviceTypeUUID := '';
+    FTypeName := '';
+    FRepoTypeName := '';
+    FRepoTypeUUID := '';
+    FRepoDeviceName := '';
+    FRepoDeviceUUID := '';
+    FOutputType := 0;
+    MeterFlowCategory := mftUnknownType;
+    Exit;
+  end;
+
+  FDevice := ADevice;
 
   Self.UUID := FDevice.UUID;
   Self.Name := FDevice.Name;
@@ -577,8 +593,6 @@ begin
   FlowMin := FDevice.Qmin;
   MeterFlowCategory := ResolveStdCategoryFromDevice;
   UpdateByDevice;
-
- end;
 end;
 
 procedure TFlowMeter.AddDataPoint(const APoint: TPointSpillage);
@@ -1131,6 +1145,9 @@ begin
   if (FDevice = nil) then
    begin
 
+    if Trim(Self.DeviceUUID) = '' then
+      Self.DeviceUUID := TGUID.NewGuid.ToString;
+
     ADevice := ActiveRepo.CreateDevice(-1);
     ADevice.DeviceTypeUUID := DeviceTypeUUID;
     ADevice.DeviceTypeName := FTypeName;
@@ -1144,6 +1161,16 @@ begin
     ADevice.RepoDeviceName := Self.RepoDeviceName;
     ADevice.RepoDeviceUUID := Self.RepoDeviceUUID;
     ADevice.OutputType := Self.OutputType;
+
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(
+        pcAction,
+        psWorkTable,
+        'CreateDevice',
+        'Создан прибор для строки GridDevices',
+        Format('UUID=%s; Name=%s; Serial=%s',
+          [ADevice.UUID, ADevice.Name, ADevice.SerialNumber])
+      );
 
     FDevice:= ADevice;
 
