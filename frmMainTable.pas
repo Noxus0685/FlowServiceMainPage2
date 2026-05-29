@@ -528,6 +528,8 @@ type
     function FindSerialIndex(const ASerialNumber: string): Integer;
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     procedure UpdateGridDevices;
+    procedure EnsureEmptyDevicesForGridRows;
+    function ShouldReleaseGridDeviceBeforeSave(ADevice: TDevice): Boolean;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -611,6 +613,7 @@ type
 
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
+    procedure ReleaseEmptyGridDevicesBeforeSave;
 
 
   private type
@@ -2462,6 +2465,8 @@ begin
     WorkTable.RebindAllFlowMeters;
   end;
 
+  EnsureEmptyDevicesForGridRows;
+
   if FActiveWorkTable <> nil then
   begin
     if FActiveWorkTable.FlowUnitName <> '' then
@@ -3035,6 +3040,7 @@ begin
     Exit;
 
   SaveLayoutSettingsToWorkTable;
+  ReleaseEmptyGridDevicesBeforeSave;
   WorkTableManager.Save;
 end;
 
@@ -3171,6 +3177,165 @@ begin
   Result := AChannels[Row];
 end;
 
+
+
+
+function TFrameMainTable.ShouldReleaseGridDeviceBeforeSave(ADevice: TDevice): Boolean;
+begin
+  Result := False;
+  if ADevice = nil then
+    Exit;
+
+  Result := (Trim(ADevice.SerialNumber) = '') or
+            (ADevice.Points = nil) or
+            (ADevice.Points.Count = 0);
+end;
+
+procedure TFrameMainTable.ReleaseEmptyGridDevicesBeforeSave;
+var
+  WorkTable: TWorkTable;
+  Channel: TChannel;
+  Device: TDevice;
+  Repo: TDeviceRepository;
+  DeviceUUID: string;
+begin
+  if (WorkTableManager = nil) or (WorkTableManager.WorkTables = nil) then
+    Exit;
+
+  for WorkTable in WorkTableManager.WorkTables do
+  begin
+    if (WorkTable = nil) or (WorkTable.DeviceChannels = nil) then
+      Continue;
+
+    for Channel in WorkTable.DeviceChannels do
+    begin
+      if Channel = nil then
+        Continue;
+
+      DeviceUUID := Trim(Channel.DeviceUUID);
+      if DeviceUUID = '' then
+        Continue;
+
+      Device := nil;
+      Repo := nil;
+      if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) and
+         SameText(Trim(Channel.FlowMeter.Device.UUID), DeviceUUID) then
+        Device := Channel.FlowMeter.Device;
+
+      if DataManager <> nil then
+      begin
+        if Device = nil then
+          Device := DataManager.FindDevice(DeviceUUID, Repo)
+        else
+          DataManager.FindDevice(DeviceUUID, Repo);
+      end;
+
+      if not ShouldReleaseGridDeviceBeforeSave(Device) then
+        Continue;
+
+      Channel.DeviceUUID := '';
+      if Channel.FlowMeter <> nil then
+        Channel.FlowMeter.Device := nil;
+
+      if (Repo <> nil) and (Device <> nil) then
+        Repo.DeleteDevice(Device);
+    end;
+  end;
+end;
+
+procedure TFrameMainTable.EnsureEmptyDevicesForGridRows;
+var
+  I: Integer;
+  Channel: TChannel;
+  Device: TDevice;
+  Repo: TDeviceRepository;
+  SourceRepo: TDeviceRepository;
+  DeviceUUID: string;
+  RepoName: string;
+  NeedBind: Boolean;
+
+  function FindDeviceByUUIDForChannel(const AChannel: TChannel;
+    const ADeviceUUID: string): TDevice;
+  var
+    Candidate: TDevice;
+  begin
+    Result := nil;
+    if (DataManager = nil) or (Trim(ADeviceUUID) = '') then
+      Exit;
+
+    RepoName := Trim(AChannel.RepoDeviceName);
+    if RepoName <> '' then
+    begin
+      SourceRepo := DataManager.FindDeviceRepositoryByName(RepoName);
+      if (SourceRepo <> nil) and (SourceRepo.Devices <> nil) then
+        for Candidate in SourceRepo.Devices do
+          if (Candidate <> nil) and SameText(Trim(Candidate.UUID), ADeviceUUID) then
+            Exit(Candidate);
+    end;
+
+    Result := DataManager.FindDevice(ADeviceUUID, Repo);
+  end;
+
+  procedure BindChannelToDevice(const AChannel: TChannel; const ADevice: TDevice);
+  begin
+    if (AChannel = nil) or (ADevice = nil) then
+      Exit;
+
+    if AChannel.FlowMeter = nil then
+      AChannel.RecreateFlowMeter(FActiveWorkTable);
+
+    if AChannel.FlowMeter <> nil then
+    begin
+      AChannel.FlowMeter.Device := ADevice;
+      AChannel.DeviceUUID := ADevice.UUID;
+    end;
+  end;
+
+  procedure CreateEmptyDeviceForChannel(const AChannel: TChannel);
+  begin
+    if AChannel = nil then
+      Exit;
+
+    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
+    AChannel.RecreateFlowMeter(FActiveWorkTable);
+
+    if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+      AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
+  end;
+
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FActiveWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+
+    DeviceUUID := Trim(Channel.DeviceUUID);
+    Device := FindDeviceByUUIDForChannel(Channel, DeviceUUID);
+
+    if (DeviceUUID <> '') and (Device <> nil) then
+    begin
+      NeedBind := Channel.FlowMeter = nil;
+      if not NeedBind then
+      begin
+        NeedBind := Channel.FlowMeter.Device = nil;
+        if not NeedBind then
+          NeedBind := not SameText(Trim(Channel.FlowMeter.Device.UUID), DeviceUUID);
+      end;
+
+      if NeedBind then
+        BindChannelToDevice(Channel, Device);
+
+      Continue;
+    end;
+
+    CreateEmptyDeviceForChannel(Channel);
+  end;
+end;
+
 procedure TFrameMainTable.ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable);
 var
   Device: TDevice;
@@ -3190,17 +3355,21 @@ begin
   if WorkTable = nil then
     WorkTable := FActiveWorkTable;
 
-  AChannel.RecreateFlowMeter(WorkTable);
-
   AChannel.TypeName := '';
   AChannel.Serial := '';
   AChannel.Signal := -1;
-  AChannel.DeviceUUID := '';
   AChannel.TypeUUID := '';
   AChannel.RepoTypeName := '';
   AChannel.RepoTypeUUID := '';
   AChannel.RepoDeviceName := '';
   AChannel.RepoDeviceUUID := '';
+
+  AChannel.DeviceUUID := TGUID.NewGuid.ToString;
+  AChannel.RecreateFlowMeter(WorkTable);
+
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+    AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
+
   MarkChannelDeviceModified(AChannel);
 end;
 
@@ -4749,10 +4918,13 @@ begin
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal)
     else if GridDevices.Columns[ACol] = StringColumnUUID1 then
-        begin
-        if WorkTable.DeviceChannels[ARow].FlowMeter.Device<>nil then
-           Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID;
-        end;
+    begin
+      Value := WorkTable.DeviceChannels[ARow].DeviceUUID;
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) and
+         (Trim(WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID) <> '') then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID;
+    end;
 
 
           Exit;
