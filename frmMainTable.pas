@@ -3469,6 +3469,7 @@ var
   I: Integer;
   Channel: TChannel;
   DeviceUUID: string;
+  Repo: TDeviceRepository;
 begin
   if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
     Exit;
@@ -3483,8 +3484,13 @@ begin
     if DeviceUUID = '' then
       Continue;
 
-    if ADeletedUUIDs.IndexOf(DeviceUUID) >= 0 then
-      ClearChannelData(Channel, AWorkTable);
+    if ADeletedUUIDs.IndexOf(DeviceUUID) < 0 then
+      Continue;
+
+    if (DataManager <> nil) and (DataManager.FindDevice(DeviceUUID, Repo) <> nil) then
+      Continue;
+
+    ClearChannelData(Channel, AWorkTable);
   end;
 end;
 
@@ -4535,6 +4541,8 @@ end;
 procedure TFrameMainTable.TestButtonClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  Channel: TChannel;
+  NeedSaveResults: Boolean;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
@@ -4542,8 +4550,25 @@ begin
 
   if (TestButton.Tag = 6) and SameText(Trim(TestButton.Text), 'Сохранить?') then
   begin
+    NeedSaveResults := False;
+    for Channel in WorkTable.DeviceChannels do
+      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) and
+         (Channel.FlowMeter.Device <> nil) and
+         ((Channel.FlowMeter.Device.Spillages = nil) or
+          (Channel.FlowMeter.Device.Spillages.Count = 0)) then
+      begin
+        NeedSaveResults := True;
+        Break;
+      end;
 
-    {Здесь должен быть код, который принимает всю сессию измерений или её отменяет}
+    if NeedSaveResults then
+      WorkTable.SaveMeasurementResults;
+
+    if DataManager <> nil then
+      DataManager.Save;
+
+    if WorkTableManager <> nil then
+      WorkTableManager.Save;
 
     WorkTable.State := swtSTANDBY;
     Exit;
