@@ -228,10 +228,7 @@ begin
   Self.WindowState := TWindowState.wsMinimized;
 
   if FFrameMainTable <> nil then
-  begin
     FFrameMainTable.SaveLayoutSettingsToWorkTable;
-    FFrameMainTable.ReleaseEmptyGridDevicesBeforeSave;
-  end;
 
   DataManager.Save;
 

@@ -3189,7 +3189,8 @@ begin
   if (AChannel = nil) or (ADevice = nil) then
     Exit;
 
-  Result := SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment) and
+  Result := (SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment) or
+             (ADevice.State = osNew)) and
             (Trim(AChannel.TypeName) = '') and
             (Trim(AChannel.DeviceName) = '') and
             (Trim(AChannel.Serial) = '') and
