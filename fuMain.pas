@@ -225,21 +225,17 @@ end;
 
 procedure TFormMain.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-       Self.WindowState := TWindowState.wsMinimized;
-       DataManager.Save;
+  Self.WindowState := TWindowState.wsMinimized;
 
-     if FWorkTableManager = nil then
-    Exit;
+  if FFrameMainTable <> nil then
+    FFrameMainTable.SaveLayoutSettingsToWorkTable;
 
-    if FFrameMainTable= nil then
-    Exit;
+  DataManager.Save;
 
-  FFrameMainTable.SaveLayoutSettingsToWorkTable;
-  FWorkTableManager.Save;
-
-
-
+  if FWorkTableManager <> nil then
+    FWorkTableManager.Save;
 end;
+
 
 procedure TFormMain.FormCreate(Sender: TObject);
 var
