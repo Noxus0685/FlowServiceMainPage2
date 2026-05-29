@@ -3270,7 +3270,10 @@ var
       if (SourceRepo <> nil) and (SourceRepo.Devices <> nil) then
         for Candidate in SourceRepo.Devices do
           if (Candidate <> nil) and SameText(Trim(Candidate.UUID), ADeviceUUID) then
+          begin
+            Repo := SourceRepo;
             Exit(Candidate);
+          end;
     end;
 
     Result := DataManager.FindDevice(ADeviceUUID, Repo);
@@ -3318,6 +3321,19 @@ begin
 
     if (DeviceUUID <> '') and (Device <> nil) then
     begin
+      if ShouldReleaseGridDeviceBeforeSave(Device) then
+      begin
+        Channel.DeviceUUID := '';
+        if Channel.FlowMeter <> nil then
+          Channel.FlowMeter.Device := nil;
+
+        if Repo <> nil then
+          Repo.DeleteDevice(Device);
+
+        CreateEmptyDeviceForChannel(Channel);
+        Continue;
+      end;
+
       NeedBind := Channel.FlowMeter = nil;
       if not NeedBind then
       begin
