@@ -2818,7 +2818,8 @@ begin
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
       DeviceSelectResult := SelectFrm.ShowModal;
-      RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+      if SelectFrm.DeletionCommitted then
+        RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
 
       if DeviceSelectResult <> mrOk then
       begin
@@ -2826,7 +2827,8 @@ begin
         Exit;
       end;
 
-      RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+      if SelectFrm.DeletionCommitted then
+        RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
@@ -2960,12 +2962,14 @@ begin
   Frm := TFormDeviceSelect.Create(Self);
   try
     DeviceSelectResult := Frm.ShowModal;
-    RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
+    if Frm.DeletionCommitted then
+      RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     if DeviceSelectResult <> mrOk then
       Exit;
 
-    RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
+    if Frm.DeletionCommitted then
+      RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
