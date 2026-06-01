@@ -3677,6 +3677,7 @@ begin
       P.State := osDeleted;
 
   ADevice.State := osDeleted;
+  FState := osModified;
 end;
 
 function TDeviceRepository.GenerateDeviceID: Integer;
