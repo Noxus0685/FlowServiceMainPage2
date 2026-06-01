@@ -1123,15 +1123,12 @@ begin
       DeviceUUID := Trim(D.UUID);
       if DeviceUUID <> '' then
         FDeletedDeviceUUIDs.Add(DeviceUUID);
+
+      if ActiveRepo <> nil then
+        ActiveRepo.DeleteDevice(D);
     end;
 
-    AppServices.DataManager.DeleteDevices(TargetDevices);
-
-    SyncTreeAfterGridRowsRemoved;
-
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDevices);
-
+    BuildTree;
     ApplyFilter;
     UpdateGridDevices;
 
@@ -1206,6 +1203,7 @@ end;
 procedure TFormDeviceSelect.aDeviceCutExecute(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
+  D: TDevice;
 begin
   if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
     Exit;
@@ -1215,13 +1213,26 @@ begin
     if TargetDevices.Count = 0 then
       Exit;
 
-    AppServices.DataManager.CutDevicesToBuffer(TargetDevices);
+    AppServices.DataManager.CopyDevicesToBuffer(TargetDevices);
+
+    for D in TargetDevices do
+    begin
+      if D = nil then
+        Continue;
+
+      if Trim(D.UUID) <> '' then
+        FDeletedDeviceUUIDs.Add(Trim(D.UUID));
+
+      if ActiveRepo <> nil then
+        ActiveRepo.DeleteDevice(D);
+    end;
+
     WriteDeviceActionLog('Вырезан прибор', TargetDevices[0]);
   finally
     TargetDevices.Free;
   end;
 
-  SyncTreeAfterGridRowsRemoved;
+  BuildTree;
   ApplyFilter;
   UpdateGridDevices;
   ClearCheckedDevices;
@@ -1474,7 +1485,11 @@ begin
   begin
     D := FDevFilteredDevices[I];
     if D <> nil then
+    begin
+      if Trim(D.UUID) <> '' then
+        FDeletedDeviceUUIDs.Add(Trim(D.UUID));
       ActiveRepo.DeleteDevice(D);
+    end;
   end;
 
   {----------------------------------}
@@ -1683,13 +1698,15 @@ begin
 
   GridDevices.BeginUpdate;
   try
+    GridDevices.RowCount := 0;
     if FDevFilteredDevices <> nil then
-      GridDevices.RowCount := FDevFilteredDevices.Count
-    else
-      GridDevices.RowCount := 0;
+      GridDevices.RowCount := FDevFilteredDevices.Count;
   finally
     GridDevices.EndUpdate;
   end;
+
+  if (GridDevices.Row < 0) or (GridDevices.Row >= GridDevices.RowCount) then
+    GridDevices.Row := -1;
 
   GridDevices.Repaint;
   sbFind.IsPressed := HasActiveFilters;

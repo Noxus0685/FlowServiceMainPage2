@@ -72,6 +72,7 @@ type
     Label1: TLabel;
     LabelStd: TLabel;
     TrackStd: TTrackBar;
+    ActiveWorkTable: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -80,6 +81,9 @@ type
     procedure  PumpStateHandler(AParameters: TParameter; AAction:EActionParameter);
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
+    procedure ActiveWorkTableChangeTracking(Sender: TObject);
+    procedure ActiveWorkTableExit(Sender: TObject);
+    procedure ActiveWorkTableKeyDown(Sender: TObject; var Key: Word; var KeyChar: WideChar; Shift: TShiftState);
 
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure TrackStdChange(Sender: TObject);
@@ -97,6 +101,7 @@ type
     FT_WorkBench_First: Double;
     FPrevFlowRateValue: Double;
     FHasPrevFlowRateValue: Boolean;
+    FUpdatingActiveWorkTableEdit: Boolean;
 
     procedure UpdateTemp(const AWorkTable: TWorkTable);
 
@@ -122,6 +127,8 @@ type
     procedure UnsubscribeFromRelatedObjects(const AWorkTable: TWorkTable;
       const AObserver: IEventObserver);
     procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
+    procedure UpdateActiveWorkTableEdit(const AForce: Boolean = False);
+    procedure ApplyActiveWorkTableName;
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -145,6 +152,55 @@ destructor TTableMainForm.Destroy;
 begin
   UnsubscribeFromWorkTable;
   inherited Destroy;
+end;
+
+procedure TTableMainForm.ActiveWorkTableChangeTracking(Sender: TObject);
+begin
+  ApplyActiveWorkTableName;
+end;
+
+procedure TTableMainForm.ActiveWorkTableExit(Sender: TObject);
+begin
+  ApplyActiveWorkTableName;
+end;
+
+procedure TTableMainForm.ActiveWorkTableKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: WideChar; Shift: TShiftState);
+begin
+  if Key = vkReturn then
+  begin
+    ApplyActiveWorkTableName;
+    Key := 0;
+  end;
+end;
+
+procedure TTableMainForm.ApplyActiveWorkTableName;
+var
+  WorkTable: TWorkTable;
+  NewName: string;
+begin
+  if FUpdatingActiveWorkTableEdit or (FWorkTableManager = nil) or
+     (ActiveWorkTable = nil) then
+    Exit;
+
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  NewName := Trim(ActiveWorkTable.Text);
+  if NewName = '' then
+  begin
+    if not ActiveWorkTable.IsFocused then
+      UpdateActiveWorkTableEdit(True);
+    Exit;
+  end;
+
+  if WorkTable.Name = NewName then
+    Exit;
+
+  WorkTable.Name := NewName;
+  WorkTable.FireEvent(ewtRefresh);
+  FWorkTableManager.Save;
 end;
 
 procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
@@ -340,6 +396,7 @@ i:integer;
 begin
   FPrevFlowRateValue := 0;
   FHasPrevFlowRateValue := False;
+  FUpdatingActiveWorkTableEdit := False;
 
   //Значения по умолчанию
   FT_WorkBench_First:=20;
@@ -363,6 +420,7 @@ begin
   end;
 
   SubscribeToWorkTable(FWorkTableManager.ActiveWorkTable);
+  UpdateActiveWorkTableEdit;
 
 
   FFrameMainTable := TFrameMainTable.Create(Self);
@@ -568,6 +626,10 @@ EnabledEtalonChannels: TObjectList<TChannel>;
 
      notifyEvent:
       begin
+        if (ASender is TWorkTable) and
+           (TWorkTable(ASender).Event in [Ord(ewtActivated), Ord(ewtRefresh)]) then
+          UpdateActiveWorkTableEdit;
+
         if AData is TPump then
           mPump.Lines.Add('Событие насоса, код: ' + IntToStr(TPump(AData).Event));
         if AData is TFlowRate then
@@ -640,7 +702,44 @@ procedure TTableMainForm.tcMainChange(Sender: TObject);
 begin
   if (tcMain.ActiveTab = tiResults) and (FFrameProceed <> nil) then
     FFrameProceed.RefreshResultsTab;
-  FFrameMainTable.UpdateForm;
+  if (tcMain.ActiveTab =  tiTable ) then
+    FFrameMainTable.UpdateForm;
+end;
+
+procedure TTableMainForm.UpdateActiveWorkTableEdit(const AForce: Boolean);
+var
+  WorkTable: TWorkTable;
+  DisplayName: string;
+begin
+  if (FWorkTableManager = nil) or (ActiveWorkTable = nil) or
+     (ActiveWorkTable.IsFocused and not AForce) then
+    Exit;
+
+  WorkTable := FWorkTableManager.ActiveWorkTable;
+  if WorkTable = nil then
+    DisplayName := ''
+  else
+  begin
+<<<<<<< HEAD
+    //DisplayName := Trim(WorkTable.Text);
+    //if DisplayName = '' then
+    DisplayName := WorkTable.Name;
+=======
+    DisplayName := Trim(WorkTable.Name);
+    if DisplayName = '' then
+      DisplayName := WorkTable.Text;
+>>>>>>> 7761f505cd29247127a60afa5d541285729b0333
+  end;
+
+  if ActiveWorkTable.Text = DisplayName then
+    Exit;
+
+  FUpdatingActiveWorkTableEdit := True;
+  try
+    ActiveWorkTable.Text := DisplayName;
+  finally
+    FUpdatingActiveWorkTableEdit := False;
+  end;
 end;
 
 procedure TTableMainForm.UpdateTemp(const AWorkTable: TWorkTable);
@@ -684,6 +783,17 @@ end;
 
 procedure TTableMainForm.TimerSetValuesTimer(Sender: TObject);
 begin
+  if FWorkTableManager = nil then
+    Exit;
+
+  if FSubscribedWorkTable <> FWorkTableManager.ActiveWorkTable then
+  begin
+    SubscribeToWorkTable(FWorkTableManager.ActiveWorkTable);
+    UpdateActiveWorkTableEdit;
+  end
+  else
+    UpdateActiveWorkTableEdit;
+
   FWorkTableManager.UpdateSimulation;
 end;
 
