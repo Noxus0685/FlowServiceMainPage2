@@ -4196,11 +4196,7 @@ begin
   WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
   WorkTables.Add(WorkTable);
-
   WorkTable.Rebind;
-
-
-
 end;
 
 procedure TWorkTableManager.AddWorkTable(const WorkTableName: string);
