@@ -207,6 +207,9 @@ private
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
+  FPendingDeletedDeviceStates: TDictionary<TDevice, TObjectState>;
+  FRepoStateBeforeDeletion: TObjectState;
+  FHasRepoStateBeforeDeletion: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -255,6 +258,7 @@ private
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
+  procedure RollbackPendingDeletedDevices;
 
 public
   { Public declarations }
@@ -272,6 +276,18 @@ implementation
   uses
    uAppServices,
    uWorkTable;
+
+type
+  TDeviceStateRestorer = class(TDevice)
+  public
+    procedure RestoreStateDirect(const AState: TObjectState);
+  end;
+
+procedure TDeviceStateRestorer.RestoreStateDirect(const AState: TObjectState);
+begin
+  FState := AState;
+end;
+
 {$R *.fmx}
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
@@ -279,10 +295,13 @@ begin
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
+  FPendingDeletedDeviceStates := TDictionary<TDevice, TObjectState>.Create;
+  FHasRepoStateBeforeDeletion := False;
 end;
 
 destructor TFormDeviceSelect.Destroy;
 begin
+  FreeAndNil(FPendingDeletedDeviceStates);
   FreeAndNil(FDeletedDeviceUUIDs);
   FreeAndNil(FCheckedDevices);
   inherited;
@@ -791,6 +810,9 @@ begin
     begin
       for D in FDevices do
       begin
+        if (D = nil) or (D.State = osDeleted) then
+          Continue;
+
         if (Trim(D.Manufacturer) = '') xor (ManPass = 1) then
           Continue;
 
@@ -880,6 +902,9 @@ begin
     {----------------------------------}
     for D in FDevices do
     begin
+      if (D = nil) or (D.State = osDeleted) then
+        Continue;
+
       if D.Category > 0 then
         Continue;
 
@@ -1452,27 +1477,32 @@ begin
       Exit;
 
     {----------------------------------}
-    { Удаление через репозиторий }
+    { Пометка удаления без физического удаления из репозитория }
     {----------------------------------}
     WriteDeviceActionLog('Удалён прибор', TargetDevices[0], Format('Count=%d', [TargetDevices.Count]));
+
+    if (not FHasRepoStateBeforeDeletion) and (ActiveRepo <> nil) then
+    begin
+      FRepoStateBeforeDeletion := ActiveRepo.State;
+      FHasRepoStateBeforeDeletion := True;
+    end;
 
     for D in TargetDevices do
     begin
       if D = nil then
         Continue;
+
+      if not FPendingDeletedDeviceStates.ContainsKey(D) then
+        FPendingDeletedDeviceStates.Add(D, D.State);
+
+      D.State := osDeleted;
+
       DeviceUUID := Trim(D.UUID);
       if DeviceUUID <> '' then
         FDeletedDeviceUUIDs.Add(DeviceUUID);
     end;
 
-    AppServices.DataManager.DeleteDevices(TargetDevices);
-
-    //SyncTreeAfterGridRowsRemoved;
-
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDevices);
-
-
+    SyncTreeAfterGridRowsRemoved;
     ApplyFilter;
     UpdateGridDevices;
 
@@ -1660,8 +1690,13 @@ begin
     Exit;
 
   for D in Source do
+  begin
+    if (D = nil) or (D.State = osDeleted) then
+      Continue;
+
     if PassTreeFilter(D) then
       Result.Add(D);
+  end;
 end;
 
 procedure TFormDeviceSelect.UpdateGridDevices;
@@ -2342,6 +2377,9 @@ begin
   if ADevice = nil then
     Exit(True);
 
+  if ADevice.State = osDeleted then
+    Exit(False);
+
   Cur := TreeViewDevices.Selected;
   if Cur = nil then
     Exit(True);
@@ -2572,6 +2610,26 @@ begin
 end;
 
 
+procedure TFormDeviceSelect.RollbackPendingDeletedDevices;
+var
+  Pair: TPair<TDevice, TObjectState>;
+begin
+  if FPendingDeletedDeviceStates <> nil then
+  begin
+    for Pair in FPendingDeletedDeviceStates do
+      if Pair.Key <> nil then
+        TDeviceStateRestorer(Pair.Key).RestoreStateDirect(Pair.Value);
+
+    FPendingDeletedDeviceStates.Clear;
+  end;
+
+  if FHasRepoStateBeforeDeletion and (ActiveRepo <> nil) then
+    ActiveRepo.State := FRepoStateBeforeDeletion;
+
+  FHasRepoStateBeforeDeletion := False;
+end;
+
+
 procedure TFormDeviceSelect.FormClose(Sender: TObject;
   var Action: TCloseAction);
 var
@@ -2597,7 +2655,8 @@ begin
 
       mrNo:
         begin
-          { закрываем без сохранения }
+          RollbackPendingDeletedDevices;
+          FDeletedDeviceUUIDs.Clear;
         end;
 
       mrCancel:
