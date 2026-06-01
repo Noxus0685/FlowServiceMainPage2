@@ -3139,10 +3139,13 @@ begin
     Section := ASectionPrefix + '.' + IntToStr(I);
 
     Channel.ID := I + 1;
-    if EndsText('.Etalon', ASectionPrefix) then
-      Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
-    else
-      Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+    if Trim(Channel.Name) = '' then
+    begin
+      if EndsText('.Etalon', ASectionPrefix) then
+        Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
+      else
+        Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+    end;
 
     AIni.WriteInteger(Section, 'ID', Channel.ID);
     AIni.WriteString(Section, 'UUID', Channel.UUID);
@@ -3212,9 +3215,16 @@ begin
     Channel.WorkTabeID := AIni.ReadInteger(Section, 'WorkTabeID', AWorkTableID);
     Channel.Enabled := AIni.ReadBool(Section, 'Enabled', True);
     if EndsText('.Etalon', ASectionPrefix) then
-      Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
+      Channel.Name := AIni.ReadString(Section, 'Name', BuildEtalonChannelServiceName(Channel.ID))
     else
-      Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+      Channel.Name := AIni.ReadString(Section, 'Name', BuildDeviceChannelServiceName(Channel.ID));
+    if Trim(Channel.Name) = '' then
+    begin
+      if EndsText('.Etalon', ASectionPrefix) then
+        Channel.Name := BuildEtalonChannelServiceName(Channel.ID)
+      else
+        Channel.Name := BuildDeviceChannelServiceName(Channel.ID);
+    end;
     Channel.Text := AIni.ReadString(Section, 'Text', BuildChannelDefaultText(I + 1));
     if Trim(Channel.Text) = '' then
       Channel.Text := BuildChannelDefaultText(I + 1);
