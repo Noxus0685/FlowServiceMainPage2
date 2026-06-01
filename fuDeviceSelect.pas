@@ -379,6 +379,8 @@ begin
 end;
 
 procedure TFormDeviceSelect.LoadData;
+var
+  PrevRepoState: TBaseObjectState;
 begin
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория приборов }
@@ -391,14 +393,18 @@ begin
   end;
 
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
-
-  {--------------------------------------------------}
-  { Берём текущие данные репозитория без перезагрузки из БД. }
-  { Важно: DeviceChannel хранит ссылки на TDevice через FlowMeter; }
-  { простое открытие DeviceSelect не должно пересоздавать эти объекты. }
-  {--------------------------------------------------}
-  FDevices := ActiveRepo.Devices;
-  LogDuplicateDeviceUUIDs;
+  PrevRepoState := ActiveRepo.State;
+  try
+    {--------------------------------------------------}
+    { Берём текущие данные репозитория без перезагрузки из БД. }
+    { Важно: DeviceChannel хранит ссылки на TDevice через FlowMeter; }
+    { простое открытие DeviceSelect не должно пересоздавать эти объекты. }
+    {--------------------------------------------------}
+    FDevices := ActiveRepo.Devices;
+    LogDuplicateDeviceUUIDs;
+  finally
+    ActiveRepo.State := PrevRepoState;
+  end;
 end;
 
 procedure TFormDeviceSelect.miAddRepositoryClick(Sender: TObject);
@@ -2706,6 +2712,8 @@ end;
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
+  InitialRepoState: TBaseObjectState;
+  HasInitialRepoState: Boolean;
 begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
@@ -2721,10 +2729,17 @@ begin
   FSkipDeviceDeleteConfirm := False;
   FCheckedDevices := TList<TDevice>.Create;
 
+  HasInitialRepoState := False;
+
   {----------------------------------}
   { Загрузка данных и репозиториев }
   {----------------------------------}
   LoadData;
+  if ActiveRepo <> nil then
+  begin
+    InitialRepoState := ActiveRepo.State;
+    HasInitialRepoState := True;
+  end;
   FillComboBoxRepository;
 
   {----------------------------------}
