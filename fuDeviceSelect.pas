@@ -260,6 +260,8 @@ private
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
+  function DeviceRepoHasPendingChanges(const ARepo: TDeviceRepository): Boolean;
+  procedure NormalizeDeviceRepoStateIfNoPendingChanges(const ARepo: TDeviceRepository);
   procedure RollbackPendingDeletedDevices;
 
 public
@@ -2623,6 +2625,31 @@ begin
 end;
 
 
+function TFormDeviceSelect.DeviceRepoHasPendingChanges(
+  const ARepo: TDeviceRepository
+): Boolean;
+var
+  D: TDevice;
+begin
+  Result := False;
+
+  if (ARepo = nil) or (ARepo.Devices = nil) then
+    Exit;
+
+  for D in ARepo.Devices do
+    if (D <> nil) and (D.State in [osNew, osModified, osDeleted]) then
+      Exit(True);
+end;
+
+procedure TFormDeviceSelect.NormalizeDeviceRepoStateIfNoPendingChanges(
+  const ARepo: TDeviceRepository
+);
+begin
+  if (ARepo <> nil) and (ARepo.State = osModified) and
+     (not DeviceRepoHasPendingChanges(ARepo)) then
+    ARepo.State := osLoaded;
+end;
+
 procedure TFormDeviceSelect.RollbackPendingDeletedDevices;
 var
   Pair: TPair<TDevice, TBaseObjectState>;
@@ -2650,6 +2677,7 @@ var
   Res: TModalResult;
 begin
   Repo := AppServices.DataManager.ActiveDeviceRepo;
+  NormalizeDeviceRepoStateIfNoPendingChanges(Repo);
 
   if (Repo <> nil) and (Repo.State = osModified) then
   begin
@@ -2729,9 +2757,7 @@ begin
     if SelectionContext.DeviceFound then
       AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
     ApplyInitialSelection;
-    if HasInitialRepoState and (ActiveRepo <> nil) and
-       (InitialRepoState <> osModified) and (ActiveRepo.State = osModified) then
-      ActiveRepo.State := InitialRepoState;
+    NormalizeDeviceRepoStateIfNoPendingChanges(ActiveRepo);
   end;
 end;
 
