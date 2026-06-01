@@ -377,6 +377,8 @@ begin
 end;
 
 procedure TFormDeviceSelect.LoadData;
+var
+  PrevRepoState: TBaseObjectState;
 begin
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория приборов }
@@ -389,14 +391,18 @@ begin
   end;
 
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
-
-  {--------------------------------------------------}
-  { Берём текущие данные репозитория без перезагрузки из БД. }
-  { Важно: DeviceChannel хранит ссылки на TDevice через FlowMeter; }
-  { простое открытие DeviceSelect не должно пересоздавать эти объекты. }
-  {--------------------------------------------------}
-  FDevices := ActiveRepo.Devices;
-  LogDuplicateDeviceUUIDs;
+  PrevRepoState := ActiveRepo.State;
+  try
+    {--------------------------------------------------}
+    { Берём текущие данные репозитория без перезагрузки из БД. }
+    { Важно: DeviceChannel хранит ссылки на TDevice через FlowMeter; }
+    { простое открытие DeviceSelect не должно пересоздавать эти объекты. }
+    {--------------------------------------------------}
+    FDevices := ActiveRepo.Devices;
+    LogDuplicateDeviceUUIDs;
+  finally
+    ActiveRepo.State := PrevRepoState;
+  end;
 end;
 
 procedure TFormDeviceSelect.miAddRepositoryClick(Sender: TObject);
@@ -663,6 +669,10 @@ begin
 
     if not Repo.Save then
       raise Exception.Create('Не удалось сохранить изменения приборов');
+
+    if FPendingDeletedDeviceStates <> nil then
+      FPendingDeletedDeviceStates.Clear;
+    FHasRepoStateBeforeDeletion := False;
 
     FullRefreshDevicesView;
 
@@ -1240,7 +1250,9 @@ begin
   NewRows := AppServices.DataManager.PasteBufferDevices(SelectedNode);
   try
     if (NewRows <> nil) and (NewRows.Count > 0) then
+    begin
       WriteDeviceActionLog('Вставлен прибор', NewRows[0], Format('Count=%d', [NewRows.Count]));
+    end;
   finally
     NewRows.Free;
   end;
@@ -2651,7 +2663,10 @@ begin
     case Res of
       mrYes:
         begin
-            AppServices.DataManager.Save;
+          AppServices.DataManager.Save;
+          if FPendingDeletedDeviceStates <> nil then
+            FPendingDeletedDeviceStates.Clear;
+          FHasRepoStateBeforeDeletion := False;
         end;
 
       mrNo:
@@ -2669,6 +2684,8 @@ end;
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
+  InitialRepoState: TBaseObjectState;
+  HasInitialRepoState: Boolean;
 begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
@@ -2684,10 +2701,17 @@ begin
   FSkipDeviceDeleteConfirm := False;
   FCheckedDevices := TList<TDevice>.Create;
 
+  HasInitialRepoState := False;
+
   {----------------------------------}
   { Загрузка данных и репозиториев }
   {----------------------------------}
   LoadData;
+  if ActiveRepo <> nil then
+  begin
+    InitialRepoState := ActiveRepo.State;
+    HasInitialRepoState := True;
+  end;
   FillComboBoxRepository;
 
   {----------------------------------}
@@ -2705,6 +2729,9 @@ begin
     if SelectionContext.DeviceFound then
       AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
     ApplyInitialSelection;
+    if HasInitialRepoState and (ActiveRepo <> nil) and
+       (InitialRepoState <> osModified) and (ActiveRepo.State = osModified) then
+      ActiveRepo.State := InitialRepoState;
   end;
 end;
 
