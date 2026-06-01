@@ -2835,9 +2835,16 @@ begin
       WorkTable := AWorkTables[I];
       Section := 'WorkTable.' + IntToStr(I);
 
+<<<<<<< HEAD
       //WorkTable.Name := BuildWorkTableServiceName(WorkTable.ID);
       //if Trim(WorkTable.Text) = '' then
       //  WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+=======
+      if Trim(WorkTable.Name) = '' then
+        WorkTable.Name := BuildWorkTableServiceName(WorkTable.ID);
+      if Trim(WorkTable.Text) = '' then
+        WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+>>>>>>> 7761f505cd29247127a60afa5d541285729b0333
 
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
@@ -2953,7 +2960,13 @@ begin
       WorkTable := TWorkTable.Create;
 
       WorkTable.ID := Ini.ReadInteger(Section, 'ID', I + 1);
+<<<<<<< HEAD
       WorkTable.Name := Ini.ReadString(Section, 'Name','0'); //BuildWorkTableServiceName(WorkTable.ID);
+=======
+      WorkTable.Name := Ini.ReadString(Section, 'Name', BuildWorkTableServiceName(WorkTable.ID));
+      if Trim(WorkTable.Name) = '' then
+        WorkTable.Name := BuildWorkTableServiceName(WorkTable.ID);
+>>>>>>> 7761f505cd29247127a60afa5d541285729b0333
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
         WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);

@@ -195,7 +195,7 @@ begin
     Exit;
   end;
 
-  if WorkTable.Text = NewName then
+  if WorkTable.Name = NewName then
     Exit;
 
   WorkTable.Name := NewName;
@@ -720,9 +720,15 @@ begin
     DisplayName := ''
   else
   begin
+<<<<<<< HEAD
     //DisplayName := Trim(WorkTable.Text);
     //if DisplayName = '' then
     DisplayName := WorkTable.Name;
+=======
+    DisplayName := Trim(WorkTable.Name);
+    if DisplayName = '' then
+      DisplayName := WorkTable.Text;
+>>>>>>> 7761f505cd29247127a60afa5d541285729b0333
   end;
 
   if ActiveWorkTable.Text = DisplayName then
