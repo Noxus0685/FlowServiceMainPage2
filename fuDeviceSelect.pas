@@ -1123,15 +1123,12 @@ begin
       DeviceUUID := Trim(D.UUID);
       if DeviceUUID <> '' then
         FDeletedDeviceUUIDs.Add(DeviceUUID);
+
+      if ActiveRepo <> nil then
+        ActiveRepo.DeleteDevice(D);
     end;
 
-    AppServices.DataManager.DeleteDevices(TargetDevices);
-
-    SyncTreeAfterGridRowsRemoved;
-
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDevices);
-
+    BuildTree;
     ApplyFilter;
     UpdateGridDevices;
 
@@ -1206,6 +1203,7 @@ end;
 procedure TFormDeviceSelect.aDeviceCutExecute(Sender: TObject);
 var
   TargetDevices: TObjectList<TDevice>;
+  D: TDevice;
 begin
   if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
     Exit;
@@ -1215,17 +1213,26 @@ begin
     if TargetDevices.Count = 0 then
       Exit;
 
-    for var D in TargetDevices do
-      if (D <> nil) and (Trim(D.UUID) <> '') then
+    AppServices.DataManager.CopyDevicesToBuffer(TargetDevices);
+
+    for D in TargetDevices do
+    begin
+      if D = nil then
+        Continue;
+
+      if Trim(D.UUID) <> '' then
         FDeletedDeviceUUIDs.Add(Trim(D.UUID));
 
-    AppServices.DataManager.CutDevicesToBuffer(TargetDevices);
+      if ActiveRepo <> nil then
+        ActiveRepo.DeleteDevice(D);
+    end;
+
     WriteDeviceActionLog('Вырезан прибор', TargetDevices[0]);
   finally
     TargetDevices.Free;
   end;
 
-  SyncTreeAfterGridRowsRemoved;
+  BuildTree;
   ApplyFilter;
   UpdateGridDevices;
   ClearCheckedDevices;

@@ -3467,9 +3467,11 @@ end;
 function TDeviceRepository.Save: Boolean;
 var
   D: TDevice;
+  I: Integer;
   SeenUUIDs: TDictionary<string, TDevice>;
   DeviceUUID: string;
   SaveErrors: TStringList;
+  WasDeleted: Boolean;
 begin
   Result := False;
 
@@ -3479,8 +3481,12 @@ begin
   SaveErrors := TStringList.Create;
   SeenUUIDs := TDictionary<string, TDevice>.Create;
   try
-    for D in FDevices do
+    for I := FDevices.Count - 1 downto 0 do
     begin
+      D := FDevices[I];
+      if D = nil then
+        Continue;
+
       DeviceUUID := Trim(D.UUID);
 
       if DeviceUUID = '' then
@@ -3504,15 +3510,20 @@ begin
         Continue;
       end;
 
-      if not ShouldSaveDevice(D) then
+      if (D.State <> osDeleted) and (not ShouldSaveDevice(D)) then
         Continue;
 
       FDM.StartTransaction;
       try
+        WasDeleted := D.State = osDeleted;
+
         if (D.State <> osClean) and not UpdateDevice(D) then
           raise Exception.Create('Ошибка сохранения прибора');
 
         FDM.Commit;
+
+        if WasDeleted then
+          FDevices.Delete(I);
       except
         on E: Exception do
         begin
