@@ -2822,20 +2822,14 @@ begin
         RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
 
       if DeviceSelectResult <> mrOk then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       if SelectFrm.DeletionCommitted then
         RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
-      begin
-        ClearChannelsByMissingDevices;
         Exit;
-      end;
 
       AChannel.FlowMeter.Init(SelDevice.UUID);
 
@@ -2859,7 +2853,6 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
-      ClearChannelsByMissingDevices;
 
     finally
       SelectFrm.Free;
@@ -2946,6 +2939,7 @@ var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
   LinkedChannel: TChannel;
+  DeviceChanged: Boolean;
   I: Integer;
   SelectedUUID: string;
   OldDeviceUUID : string;
@@ -2955,6 +2949,7 @@ begin
     Exit;
 
   OldDeviceUUID := Trim(AChannel.DeviceUUID);
+  DeviceChanged := False;
 
   if DataManager <> nil then
     DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
@@ -3037,6 +3032,7 @@ begin
     end;
 
     MarkChannelDeviceModified(AChannel);
+    DeviceChanged := True;
 
     if FActiveWorkTable <> nil then
     begin
@@ -3046,7 +3042,8 @@ begin
 
     UpdateGrids;
   finally
-    ClearChannelsByMissingDevices;
+    if DeviceChanged then
+      ClearChannelsByMissingDevices;
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
