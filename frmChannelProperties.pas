@@ -209,25 +209,30 @@ end;
 procedure TFrameChannelProperties.HandleChannelNameExit(Sender: TObject);
 var
   NewValue: string;
+  Changed: Boolean;
 begin
   if FLoading or (FChannel = nil) then
     Exit;
   NewValue := Trim(EditChannelName.Text);
-  NotifyWorkTableRefreshIfChanged(FChannel.Text <> NewValue);
+  Changed := FChannel.Text <> NewValue;
   FChannel.Text := NewValue;
+  EditChannelName.Text := NewValue;
+  NotifyWorkTableRefreshIfChanged(Changed);
 end;
 
 procedure TFrameChannelProperties.HandleOutputSetChange(Sender: TObject);
 var
   NewValue: EOutPutSet;
+  Changed: Boolean;
 begin
   if FLoading or (FChannel = nil) or (ComboOutputSet = nil) then
     Exit;
   if ComboOutputSet.ItemIndex >= 0 then
   begin
     NewValue := EOutPutSet(ComboOutputSet.ItemIndex);
-    NotifyWorkTableRefreshIfChanged(FChannel.OutputSet <> NewValue);
+    Changed := FChannel.OutputSet <> NewValue;
     FChannel.OutputSet := NewValue;
+    NotifyWorkTableRefreshIfChanged(Changed);
   end;
   RefreshRegisterColors;
 end;
@@ -235,14 +240,16 @@ end;
 procedure TFrameChannelProperties.HandleSyncModeChange(Sender: TObject);
 var
   NewValue: ESyncChannelMode;
+  Changed: Boolean;
 begin
   if FLoading or (FChannel = nil) or (ComboSyncMode = nil) then
     Exit;
   if ComboSyncMode.ItemIndex >= 0 then
   begin
     NewValue := ESyncChannelMode(ComboSyncMode.ItemIndex);
-    NotifyWorkTableRefreshIfChanged(FChannel.SyncMode <> NewValue);
+    Changed := FChannel.SyncMode <> NewValue;
     FChannel.SyncMode := NewValue;
+    NotifyWorkTableRefreshIfChanged(Changed);
   end;
   RefreshRegisterColors;
 end;
@@ -250,14 +257,16 @@ end;
 procedure TFrameChannelProperties.HandleNoiseFilterChange(Sender: TObject);
 var
   NewValue: Integer;
+  Changed: Boolean;
 begin
   if FLoading or (FChannel = nil) or (ComboNoiseFilter = nil) then
     Exit;
   if ComboNoiseFilter.ItemIndex >= 0 then
   begin
     NewValue := StrToNoiseFilter(ComboNoiseFilter.Items[ComboNoiseFilter.ItemIndex]);
-    NotifyWorkTableRefreshIfChanged(FChannel.NoiseFilter <> NewValue);
+    Changed := FChannel.NoiseFilter <> NewValue;
     FChannel.NoiseFilter := NewValue;
+    NotifyWorkTableRefreshIfChanged(Changed);
   end;
   RefreshRegisterColors;
 end;
