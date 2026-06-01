@@ -198,7 +198,7 @@ begin
   if WorkTable.Text = NewName then
     Exit;
 
-  WorkTable.Text := NewName;
+  WorkTable.Name := NewName;
   WorkTable.FireEvent(ewtRefresh);
   FWorkTableManager.Save;
 end;
@@ -720,9 +720,9 @@ begin
     DisplayName := ''
   else
   begin
-    DisplayName := Trim(WorkTable.Text);
-    if DisplayName = '' then
-      DisplayName := WorkTable.Name;
+    //DisplayName := Trim(WorkTable.Text);
+    //if DisplayName = '' then
+    DisplayName := WorkTable.Name;
   end;
 
   if ActiveWorkTable.Text = DisplayName then
