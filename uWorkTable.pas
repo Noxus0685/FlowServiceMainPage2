@@ -657,7 +657,7 @@ type
     procedure AddWorkTable;  overload;
     procedure AddWorkTable(const WorkTableName: string);  overload;
     function DeleteWorkTableByName(const AWorkTableName: string): Boolean;
-    function DeleteWorkTablesByNames(const AWorkTableNames: TStrings): Integer;
+    function DeleteWorkTablesByNames: Integer;
 
     function FindWorkTableName(const WorkTableName: string): TWorkTable;
     function FindWorkTableByID(const WorkTableID: Integer): TWorkTable;
@@ -4308,32 +4308,16 @@ begin
   end;
 end;
 
-function TWorkTableManager.DeleteWorkTablesByNames(
-  const AWorkTableNames: TStrings): Integer;
+function TWorkTableManager.DeleteWorkTablesByNames: Integer;
 var
   I: Integer;
   WorkTable: TWorkTable;
   NamesToDelete: TStringList;
-
-  function ContainsWorkTableName(const AName: string): Boolean;
-  var
-    J: Integer;
-    WorkTableName: string;
-  begin
-    Result := False;
-
-    for J := 0 to AWorkTableNames.Count - 1 do
-    begin
-      WorkTableName := Trim(AWorkTableNames[J]);
-      if (WorkTableName <> '') and SameText(Trim(AName), WorkTableName) then
-        Exit(True);
-    end;
-  end;
-
+  WorkTableName: string;
 begin
   Result := 0;
 
-  if (AWorkTableNames = nil) or (FWorkTables = nil) then
+  if FWorkTables = nil then
     Exit;
 
   NamesToDelete := TStringList.Create;
@@ -4347,14 +4331,12 @@ begin
       if WorkTable = nil then
         Continue;
 
-      if ContainsWorkTableName(WorkTable.Name) or
-         ContainsWorkTableName(WorkTable.Text) then
-      begin
-        if Trim(WorkTable.Name) <> '' then
-          NamesToDelete.Add(WorkTable.Name)
-        else
-          NamesToDelete.Add(WorkTable.Text);
-      end;
+      WorkTableName := Trim(WorkTable.Name);
+      if WorkTableName = '' then
+        WorkTableName := Trim(WorkTable.Text);
+
+      if WorkTableName <> '' then
+        NamesToDelete.Add(WorkTableName);
     end;
 
     for I := 0 to NamesToDelete.Count - 1 do

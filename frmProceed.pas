@@ -216,7 +216,6 @@ type
     procedure MenuTreeViewDevicesDeleteClick(Sender: TObject);
     // Проверяет, что выбранный узел дерева является рабочим столом.
     function IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
-    procedure CollectSelectedWorkTableNames(ANames: TStrings);
     procedure ClearCurrentResultsView;
     procedure RefreshAfterWorkTableDeletion;
     procedure MenuTreeViewDevicesDeleteWorkTableClick(Sender: TObject);
@@ -1479,25 +1478,6 @@ begin
   Result := AWorkTable <> nil;
 end;
 
-procedure TFrameProceed.CollectSelectedWorkTableNames(ANames: TStrings);
-var
-  WorkTable: TWorkTable;
-  WorkTableName: string;
-begin
-  if ANames = nil then
-    Exit;
-
-  if not IsSelectedTreeWorkTable(WorkTable) then
-    Exit;
-
-  WorkTableName := Trim(WorkTable.Name);
-  if WorkTableName = '' then
-    WorkTableName := Trim(WorkTable.Text);
-
-  if (WorkTableName <> '') and (ANames.IndexOf(WorkTableName) < 0) then
-    ANames.Add(WorkTableName);
-end;
-
 procedure TFrameProceed.ClearCurrentResultsView;
 begin
   FCurrentSession := nil;
@@ -1576,43 +1556,32 @@ end;
 
 procedure TFrameProceed.ActionDeleteSelectedWorkTablesExecute(Sender: TObject);
 var
-  Names: TStringList;
   DeletedCount: Integer;
+  WorkTableCount: Integer;
 begin
-  if FWorkTableManager = nil then
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
     Exit;
 
-  Names := TStringList.Create;
-  try
-    CollectSelectedWorkTableNames(Names);
+  WorkTableCount := FWorkTableManager.WorkTables.Count;
+  if WorkTableCount = 0 then
+    Exit;
 
-    if Names.Count = 0 then
-      Exit;
+  if MessageDlg(Format('Удалить все рабочие столы: %d шт.?', [WorkTableCount]),
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+    Exit;
 
-    if MessageDlg(Format('Удалить рабочие столы: %d шт.?', [Names.Count]),
-        TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
-      Exit;
+  DeletedCount := FWorkTableManager.DeleteWorkTablesByNames;
 
-    DeletedCount := FWorkTableManager.DeleteWorkTablesByNames(Names);
-
-    if DeletedCount > 0 then
-      RefreshAfterWorkTableDeletion;
-  finally
-    Names.Free;
-  end;
+  if DeletedCount > 0 then
+    RefreshAfterWorkTableDeletion;
 end;
 
 procedure TFrameProceed.ActionDeleteSelectedWorkTablesUpdate(Sender: TObject);
-var
-  Names: TStringList;
 begin
-  Names := TStringList.Create;
-  try
-    CollectSelectedWorkTableNames(Names);
-    ActionDeleteSelectedWorkTables.Enabled := Names.Count > 0;
-  finally
-    Names.Free;
-  end;
+  ActionDeleteSelectedWorkTables.Enabled :=
+    (FWorkTableManager <> nil) and
+    (FWorkTableManager.WorkTables <> nil) and
+    (FWorkTableManager.WorkTables.Count > 0);
 end;
 
 procedure TFrameProceed.MenuTreeViewDevicesDeleteClick(Sender: TObject);
