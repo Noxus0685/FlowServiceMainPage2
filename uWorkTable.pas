@@ -4312,22 +4312,56 @@ function TWorkTableManager.DeleteWorkTablesByNames(
   const AWorkTableNames: TStrings): Integer;
 var
   I: Integer;
-  WorkTableName: string;
+  WorkTable: TWorkTable;
+  NamesToDelete: TStringList;
+
+  function ContainsWorkTableName(const AName: string): Boolean;
+  var
+    J: Integer;
+    WorkTableName: string;
+  begin
+    Result := False;
+
+    for J := 0 to AWorkTableNames.Count - 1 do
+    begin
+      WorkTableName := Trim(AWorkTableNames[J]);
+      if (WorkTableName <> '') and SameText(Trim(AName), WorkTableName) then
+        Exit(True);
+    end;
+  end;
+
 begin
   Result := 0;
 
-  if AWorkTableNames = nil then
+  if (AWorkTableNames = nil) or (FWorkTables = nil) then
     Exit;
 
-  for I := 0 to AWorkTableNames.Count - 1 do
-  begin
-    WorkTableName := Trim(AWorkTableNames[I]);
+  NamesToDelete := TStringList.Create;
+  try
+    NamesToDelete.Sorted := False;
+    NamesToDelete.Duplicates := TDuplicates.dupAccept;
 
-    if WorkTableName = '' then
-      Continue;
+    for I := FWorkTables.Count - 1 downto 0 do
+    begin
+      WorkTable := FWorkTables[I];
+      if WorkTable = nil then
+        Continue;
 
-    if DeleteWorkTableByName(WorkTableName) then
-      Inc(Result);
+      if ContainsWorkTableName(WorkTable.Name) or
+         ContainsWorkTableName(WorkTable.Text) then
+      begin
+        if Trim(WorkTable.Name) <> '' then
+          NamesToDelete.Add(WorkTable.Name)
+        else
+          NamesToDelete.Add(WorkTable.Text);
+      end;
+    end;
+
+    for I := 0 to NamesToDelete.Count - 1 do
+      if DeleteWorkTableByName(NamesToDelete[I]) then
+        Inc(Result);
+  finally
+    NamesToDelete.Free;
   end;
 end;
 
