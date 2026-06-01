@@ -72,6 +72,7 @@ type
     Label1: TLabel;
     LabelStd: TLabel;
     TrackStd: TTrackBar;
+    ActiveWorkTable: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -640,7 +641,8 @@ procedure TTableMainForm.tcMainChange(Sender: TObject);
 begin
   if (tcMain.ActiveTab = tiResults) and (FFrameProceed <> nil) then
     FFrameProceed.RefreshResultsTab;
-  FFrameMainTable.UpdateForm;
+  if (tcMain.ActiveTab =  tiTable ) then
+    FFrameMainTable.UpdateForm;
 end;
 
 procedure TTableMainForm.UpdateTemp(const AWorkTable: TWorkTable);

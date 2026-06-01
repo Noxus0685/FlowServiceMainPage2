@@ -4,6 +4,7 @@ object FrameMainTable: TFrameMainTable
   Size.PlatformDefault = False
   object Layout: TLayout
     Align = Client
+    Padding.Left = 5.000000000000000000
     Size.Width = 1742.000000000000000000
     Size.Height = 686.000000000000000000
     Size.PlatformDefault = False
@@ -11,18 +12,19 @@ object FrameMainTable: TFrameMainTable
     object PanelInstruments: TPanel
       Align = MostTop
       PopupMenu = PopupMenuInstrumentalLayOut
-      Size.Width = 1742.000000000000000000
+      Position.X = 5.000000000000000000
+      Size.Width = 1737.000000000000000000
       Size.Height = 137.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       object HorzScrollBoxInstrumental: THorzScrollBox
         Align = Client
         PopupMenu = PopupMenuInstrumentalLayOut
-        Size.Width = 1742.000000000000000000
+        Size.Width = 1737.000000000000000000
         Size.Height = 137.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        Viewport.Width = 1742.000000000000000000
+        Viewport.Width = 1737.000000000000000000
         Viewport.Height = 137.000000000000000000
         object LayoutConditions: TLayout
           Align = Left
@@ -1174,8 +1176,9 @@ object FrameMainTable: TFrameMainTable
     end
     object LayoutControl: TLayout
       Align = MostBottom
+      Position.X = 5.000000000000000000
       Position.Y = 590.000000000000000000
-      Size.Width = 1742.000000000000000000
+      Size.Width = 1737.000000000000000000
       Size.Height = 96.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
@@ -4780,7 +4783,7 @@ object FrameMainTable: TFrameMainTable
     end
     object LayoutCenter: TLayout
       Align = Client
-      Size.Width = 1742.000000000000000000
+      Size.Width = 1737.000000000000000000
       Size.Height = 453.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 4
@@ -4800,14 +4803,14 @@ object FrameMainTable: TFrameMainTable
         Align = Right
         Cursor = crHSplit
         MinSize = 20.000000000000000000
-        Position.X = 1062.000000000000000000
+        Position.X = 1057.000000000000000000
         Size.Width = 6.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
       end
       object PanelProperties: TPanel
         Align = Right
-        Position.X = 1068.000000000000000000
+        Position.X = 1063.000000000000000000
         Size.Width = 674.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
@@ -4917,13 +4920,13 @@ object FrameMainTable: TFrameMainTable
       end
       object PanelControlWorkTables: TPanel
         Align = Client
-        Size.Width = 1062.000000000000000000
+        Size.Width = 1057.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 4
         object PanelDevices1: TPanel
           Align = Client
-          Size.Width = 1062.000000000000000000
+          Size.Width = 1057.000000000000000000
           Size.Height = 285.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
@@ -4932,7 +4935,7 @@ object FrameMainTable: TFrameMainTable
             CanFocus = True
             ClipChildren = True
             PopupMenu = PopupMenuDevicesGrid
-            Size.Width = 1062.000000000000000000
+            Size.Width = 1057.000000000000000000
             Size.Height = 253.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
@@ -4944,8 +4947,8 @@ object FrameMainTable: TFrameMainTable
             OnEditingDone = GridDevicesEditingDone
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1042.000000000000000000
-            Viewport.Height = 212.000000000000000000
+            Viewport.Width = 1057.000000000000000000
+            Viewport.Height = 253.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -5074,7 +5077,7 @@ object FrameMainTable: TFrameMainTable
           end
           object ToolBar1: TToolBar
             PopupMenu = PopupMenuDevicesGridLayOut
-            Size.Width = 1062.000000000000000000
+            Size.Width = 1057.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
@@ -5162,13 +5165,13 @@ object FrameMainTable: TFrameMainTable
         end
         object PanelEtalons1: TPanel
           Align = Top
-          Size.Width = 1062.000000000000000000
+          Size.Width = 1057.000000000000000000
           Size.Height = 152.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 2
           object LayoutEtalons1: TLayout
             Align = Client
-            Size.Width = 1062.000000000000000000
+            Size.Width = 1057.000000000000000000
             Size.Height = 120.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
@@ -5177,7 +5180,7 @@ object FrameMainTable: TFrameMainTable
               CanFocus = True
               ClipChildren = True
               PopupMenu = PopupMenuEtalonsGrid
-              Size.Width = 1062.000000000000000000
+              Size.Width = 1057.000000000000000000
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
@@ -5186,8 +5189,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1058.000000000000000000
-              Viewport.Height = 79.000000000000000000
+              Viewport.Width = 1057.000000000000000000
+              Viewport.Height = 120.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -5292,7 +5295,7 @@ object FrameMainTable: TFrameMainTable
           end
           object ToolBarEtalons1: TToolBar
             PopupMenu = PopupMenuEtalonsGridLayOut
-            Size.Width = 1062.000000000000000000
+            Size.Width = 1057.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
@@ -5315,7 +5318,7 @@ object FrameMainTable: TFrameMainTable
           MinSize = 20.000000000000000000
           Position.Y = 152.000000000000000000
           ShowGrip = False
-          Size.Width = 1062.000000000000000000
+          Size.Width = 1057.000000000000000000
           Size.Height = 16.000000000000000000
           Size.PlatformDefault = False
         end
