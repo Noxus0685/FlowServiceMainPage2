@@ -53,6 +53,8 @@ uses
   uProtocols;
 
 type
+  TBaseObjectState = uBaseProcedures.TObjectState;
+
   TFormDeviceSelect = class(TForm)
     ActionList1: TActionList;
     aCreateType: TAction;
@@ -207,8 +209,8 @@ private
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
-  FPendingDeletedDeviceStates: TDictionary<TDevice, TObjectState>;
-  FRepoStateBeforeDeletion: TObjectState;
+  FPendingDeletedDeviceStates: TDictionary<TDevice, TBaseObjectState>;
+  FRepoStateBeforeDeletion: TBaseObjectState;
   FHasRepoStateBeforeDeletion: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
@@ -280,10 +282,10 @@ implementation
 type
   TDeviceStateRestorer = class(TDevice)
   public
-    procedure RestoreStateDirect(const AState: TObjectState);
+    procedure RestoreStateDirect(const AState: TBaseObjectState);
   end;
 
-procedure TDeviceStateRestorer.RestoreStateDirect(const AState: TObjectState);
+procedure TDeviceStateRestorer.RestoreStateDirect(const AState: TBaseObjectState);
 begin
   FState := AState;
 end;
@@ -295,7 +297,7 @@ begin
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
-  FPendingDeletedDeviceStates := TDictionary<TDevice, TObjectState>.Create;
+  FPendingDeletedDeviceStates := TDictionary<TDevice, TBaseObjectState>.Create;
   FHasRepoStateBeforeDeletion := False;
 end;
 
@@ -1502,7 +1504,6 @@ begin
         FDeletedDeviceUUIDs.Add(DeviceUUID);
     end;
 
-    SyncTreeAfterGridRowsRemoved;
     ApplyFilter;
     UpdateGridDevices;
 
@@ -2612,7 +2613,7 @@ end;
 
 procedure TFormDeviceSelect.RollbackPendingDeletedDevices;
 var
-  Pair: TPair<TDevice, TObjectState>;
+  Pair: TPair<TDevice, TBaseObjectState>;
 begin
   if FPendingDeletedDeviceStates <> nil then
   begin
