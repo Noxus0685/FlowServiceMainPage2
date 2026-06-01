@@ -752,18 +752,17 @@ begin
 end;
 
 function TFrameMainTable.GetMeasurementRun: TMeasurementRun;
-    begin
-      result:= nil;
+begin
+  Result := nil;
 
-      if WorkTableManager=nil then
-      Exit;
-      if WorkTableManager.ActiveWorkTable=nil then
-      Exit;
-      if WorkTableManager.ActiveWorkTable.MeasurementRun=nil then
-      Exit;
+  if FActiveWorkTable = nil then
+    Exit;
 
-      result:= TMeasurementRun (WorkTableManager.ActiveWorkTable.MeasurementRun);
-    end;
+  if FActiveWorkTable.MeasurementRun = nil then
+    Exit;
+
+  Result := TMeasurementRun(FActiveWorkTable.MeasurementRun);
+end;
 
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
 var
