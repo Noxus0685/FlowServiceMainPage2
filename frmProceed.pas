@@ -1545,6 +1545,7 @@ begin
 
   if FWorkTableManager.DeleteWorkTableByName(WorkTableName) then
     RefreshAfterWorkTableDeletion;
+
 end;
 
 procedure TFrameProceed.ActionDeleteWorkTableUpdate(Sender: TObject);
