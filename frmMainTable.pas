@@ -3500,7 +3500,7 @@ begin
   for WorkTable in WorkTableManager.WorkTables do
     RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(WorkTable, ADeletedUUIDs);
 
-  UpdateGridDevices;
+  UpdateGrids;
 end;
 
 procedure TFrameMainTable.CopyChannelData(ASource, ADest: TChannel);

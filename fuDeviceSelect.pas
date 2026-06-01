@@ -1215,6 +1215,10 @@ begin
     if TargetDevices.Count = 0 then
       Exit;
 
+    for var D in TargetDevices do
+      if (D <> nil) and (Trim(D.UUID) <> '') then
+        FDeletedDeviceUUIDs.Add(Trim(D.UUID));
+
     AppServices.DataManager.CutDevicesToBuffer(TargetDevices);
     WriteDeviceActionLog('Вырезан прибор', TargetDevices[0]);
   finally
@@ -1474,7 +1478,11 @@ begin
   begin
     D := FDevFilteredDevices[I];
     if D <> nil then
+    begin
+      if Trim(D.UUID) <> '' then
+        FDeletedDeviceUUIDs.Add(Trim(D.UUID));
       ActiveRepo.DeleteDevice(D);
+    end;
   end;
 
   {----------------------------------}
@@ -1683,13 +1691,15 @@ begin
 
   GridDevices.BeginUpdate;
   try
+    GridDevices.RowCount := 0;
     if FDevFilteredDevices <> nil then
-      GridDevices.RowCount := FDevFilteredDevices.Count
-    else
-      GridDevices.RowCount := 0;
+      GridDevices.RowCount := FDevFilteredDevices.Count;
   finally
     GridDevices.EndUpdate;
   end;
+
+  if (GridDevices.Row < 0) or (GridDevices.Row >= GridDevices.RowCount) then
+    GridDevices.Row := -1;
 
   GridDevices.Repaint;
   sbFind.IsPressed := HasActiveFilters;

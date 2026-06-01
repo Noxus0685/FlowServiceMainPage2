@@ -1583,11 +1583,13 @@ function TManagerTTableDM.FindDevice(
 ): TDevice;
 var
   Repo: TDeviceRepository;
+  SearchUUID: string;
 begin
   Result := nil;
   ARepo := nil;
 
-  if AUUID = '' then
+  SearchUUID := Trim(AUUID);
+  if SearchUUID = '' then
     Exit;
 
   // --------------------------------------------------
@@ -1596,7 +1598,7 @@ begin
   if (ActiveDeviceRepo <> nil) and (ActiveDeviceRepo.Devices <> nil) then
   begin
     for Result in ActiveDeviceRepo.Devices do
-      if SameText(Result.UUID, AUUID) then
+      if (Result <> nil) and (Result.State <> osDeleted) and SameText(Trim(Result.UUID), SearchUUID) then
       begin
         ARepo := ActiveDeviceRepo;
         Exit;
@@ -1617,7 +1619,7 @@ begin
       Continue;
 
     for Result in Repo.Devices do
-      if SameText(Result.UUID, AUUID) then
+      if (Result <> nil) and (Result.State <> osDeleted) and SameText(Trim(Result.UUID), SearchUUID) then
       begin
         ARepo := Repo;
         Exit;
