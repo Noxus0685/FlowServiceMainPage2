@@ -776,9 +776,10 @@ begin
       end;
     dcmGridPlaceholder:
       begin
-        Result.Comment := CEmptyGridDeviceComment;
+        Result.Comment := '';
         Result.Name := '';
         Result.SerialNumber := '';
+        Result.OutputType := -1;
         AddProtocol(AMode, 'Create', Result, nil);
       end;
     dcmMeasurementPromoted:
@@ -826,9 +827,10 @@ begin
 
   if AMode = dcmGridPlaceholder then
   begin
-    ADevice.Comment := CEmptyGridDeviceComment;
+    ADevice.Comment := '';
     ADevice.Name := '';
     ADevice.SerialNumber := '';
+    ADevice.OutputType := -1;
     Exit;
   end;
 
@@ -927,9 +929,10 @@ begin
       begin
         if WasCreated or WasPlaceholder then
         begin
-          Result.Comment := CEmptyGridDeviceComment;
+          Result.Comment := '';
           Result.Name := '';
           Result.SerialNumber := '';
+          Result.OutputType := -1;
         end;
       end;
     dcmMeasurementPromoted:
