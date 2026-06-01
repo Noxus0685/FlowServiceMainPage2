@@ -3504,7 +3504,7 @@ begin
         Continue;
       end;
 
-      if not ShouldSaveDevice(D) then
+      if (D.State <> osDeleted) and not ShouldSaveDevice(D) then
         Continue;
 
       FDM.StartTransaction;
@@ -4033,6 +4033,7 @@ begin
 
   FState := osLoading;
 
+  FreeAndNil(FDevices);
   FDevices := TObjectList<TDevice>.Create(True);
   LoadErrors := TStringList.Create;
 

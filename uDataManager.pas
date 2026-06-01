@@ -81,6 +81,7 @@ type
 
   procedure Save;
   procedure Load;
+  procedure ReloadActiveDeviceRepo;
 
   procedure BuildRepositories(AKind: TRepositoryKind);
   procedure LoadRepositories(AKind: TRepositoryKind);
@@ -573,6 +574,14 @@ begin
 
   LoadRepositories(rkType);
   LoadRepositories(rkDevice);
+end;
+
+procedure TManagerTTableDM.ReloadActiveDeviceRepo;
+begin
+  if FActiveDeviceRepo = nil then
+    Exit;
+
+  FActiveDeviceRepo.Load;
 end;
 
 procedure TManagerTTableDM.Save;
