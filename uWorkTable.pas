@@ -117,6 +117,8 @@ type
     class procedure AddProtocol(AMode: TDeviceCreateMode; const AAction: string;
       ADevice: TDevice; AChannel: TChannel); static;
     class function FindDeviceByUUID(const ADeviceUUID: string; ARepo: TDeviceRepository): TDevice; static;
+    class function HasLegacyEmptyGridDeviceComment(ADevice: TDevice): Boolean; static;
+    class procedure ClearLegacyEmptyGridDeviceComment(ADevice: TDevice); static;
   public
     class function CreateDevice(
       ARepo: TDeviceRepository;
@@ -133,6 +135,8 @@ type
       ASourceDevice: TDevice = nil;
       ACurrentPoint: TDevicePoint = nil
     ): TDevice; static;
+
+    class function IsGridPlaceholderDevice(ADevice: TDevice): Boolean; static;
   end;
 
   TChannel = class(TTypeEntity)
@@ -688,7 +692,7 @@ uses
   uMeasurementRun;
 
 const
-  CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
+  CLegacyEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
 
 class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
   const AAction: string; ADevice: TDevice; AChannel: TChannel);
@@ -776,15 +780,14 @@ begin
       end;
     dcmGridPlaceholder:
       begin
-        Result.Comment := CEmptyGridDeviceComment;
+        Result.Comment := '';
         Result.Name := '';
         Result.SerialNumber := '';
         AddProtocol(AMode, 'Create', Result, nil);
       end;
     dcmMeasurementPromoted:
       begin
-        if SameText(Trim(Result.Comment), CEmptyGridDeviceComment) then
-          Result.Comment := '';
+        ClearLegacyEmptyGridDeviceComment(Result);
         AddProtocol(AMode, 'Create', Result, nil);
       end;
   end;
@@ -808,6 +811,41 @@ begin
     Result := DataManager.FindDevice(ADeviceUUID, Repo);
 end;
 
+class function TDeviceCreationService.HasLegacyEmptyGridDeviceComment(
+  ADevice: TDevice): Boolean;
+begin
+  Result := (ADevice <> nil) and
+    SameText(Trim(ADevice.Comment), CLegacyEmptyGridDeviceComment);
+end;
+
+class procedure TDeviceCreationService.ClearLegacyEmptyGridDeviceComment(
+  ADevice: TDevice);
+begin
+  if HasLegacyEmptyGridDeviceComment(ADevice) then
+    ADevice.Comment := '';
+end;
+
+class function TDeviceCreationService.IsGridPlaceholderDevice(
+  ADevice: TDevice): Boolean;
+begin
+  Result := False;
+  if ADevice = nil then
+    Exit;
+
+  if HasLegacyEmptyGridDeviceComment(ADevice) then
+    Exit(True);
+
+  Result := (Trim(ADevice.Comment) = '') and
+            (Trim(ADevice.Name) = '') and
+            (Trim(ADevice.DeviceTypeName) = '') and
+            (Trim(ADevice.DeviceTypeUUID) = '') and
+            (Trim(ADevice.SerialNumber) = '') and
+            (Trim(ADevice.DN) = '') and
+            ((ADevice.Points = nil) or (ADevice.Points.Count = 0)) and
+            ((ADevice.Sessions = nil) or (ADevice.Sessions.Count = 0)) and
+            ((ADevice.Spillages = nil) or (ADevice.Spillages.Count = 0));
+end;
+
 class procedure TDeviceCreationService.FillDeviceFromChannel(ADevice: TDevice;
   AChannel: TChannel; AMode: TDeviceCreateMode);
 
@@ -826,7 +864,7 @@ begin
 
   if AMode = dcmGridPlaceholder then
   begin
-    ADevice.Comment := CEmptyGridDeviceComment;
+    ADevice.Comment := '';
     ADevice.Name := '';
     ADevice.SerialNumber := '';
     Exit;
@@ -868,7 +906,7 @@ begin
   if Trim(ADevice.SerialNumber) <> '' then
     AChannel.Serial := ADevice.SerialNumber;
   if (ADevice.OutputType >= 0) and
-     (not SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment)) then
+     (not IsGridPlaceholderDevice(ADevice)) then
     AChannel.Signal := ADevice.OutputType;
   if Trim(ADevice.RepoTypeName) <> '' then
     AChannel.RepoTypeName := ADevice.RepoTypeName;
@@ -915,7 +953,8 @@ begin
   else
     AddProtocol(AMode, 'Reuse', Result, AChannel);
 
-  WasPlaceholder := SameText(Trim(Result.Comment), CEmptyGridDeviceComment);
+  WasPlaceholder := IsGridPlaceholderDevice(Result);
+  ClearLegacyEmptyGridDeviceComment(Result);
 
   case AMode of
     dcmUserCreated:
@@ -927,15 +966,14 @@ begin
       begin
         if WasCreated or WasPlaceholder then
         begin
-          Result.Comment := CEmptyGridDeviceComment;
+          Result.Comment := '';
           Result.Name := '';
           Result.SerialNumber := '';
         end;
       end;
     dcmMeasurementPromoted:
       begin
-        if WasPlaceholder then
-          Result.Comment := '';
+        ClearLegacyEmptyGridDeviceComment(Result);
       end;
   end;
 
