@@ -1591,6 +1591,9 @@ object TableMainForm: TTableMainForm
         Position.X = 200.000000000000000000
         Position.Y = 312.000000000000000000
         KillFocusByReturn = True
+        OnChangeTracking = ActiveWorkTableChangeTracking
+        OnExit = ActiveWorkTableExit
+        OnKeyDown = ActiveWorkTableKeyDown
       end
     end
   end
