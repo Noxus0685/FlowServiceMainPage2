@@ -207,7 +207,6 @@ private
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
-  FDeletionCommitted: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -263,7 +262,6 @@ public
   function GetSelectedDevice: TDevice;
   destructor Destroy; override;
   property DeletedDeviceUUIDs: TStringList read FDeletedDeviceUUIDs;
-  property DeletionCommitted: Boolean read FDeletionCommitted;
 
   end;
 
@@ -281,7 +279,6 @@ begin
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
-  FDeletionCommitted := False;
 end;
 
 destructor TFormDeviceSelect.Destroy;
@@ -794,9 +791,6 @@ begin
     begin
       for D in FDevices do
       begin
-        if (D = nil) or (D.State = osDeleted) then
-          Continue;
-
         if (Trim(D.Manufacturer) = '') xor (ManPass = 1) then
           Continue;
 
@@ -886,9 +880,6 @@ begin
     {----------------------------------}
     for D in FDevices do
     begin
-      if (D = nil) or (D.State = osDeleted) then
-        Continue;
-
       if D.Category > 0 then
         Continue;
 
@@ -1461,7 +1452,7 @@ begin
       Exit;
 
     {----------------------------------}
-    { Отложенное удаление: только помечаем приборы }
+    { Удаление через репозиторий }
     {----------------------------------}
     WriteDeviceActionLog('Удалён прибор', TargetDevices[0], Format('Count=%d', [TargetDevices.Count]));
 
@@ -1469,18 +1460,19 @@ begin
     begin
       if D = nil then
         Continue;
-
       DeviceUUID := Trim(D.UUID);
       if DeviceUUID <> '' then
         FDeletedDeviceUUIDs.Add(DeviceUUID);
-
-      D.State := osDeleted;
     end;
 
-    if AppServices.DataManager.ActiveDeviceRepo <> nil then
-      AppServices.DataManager.ActiveDeviceRepo.State := osModified;
+    AppServices.DataManager.DeleteDevices(TargetDevices);
 
-    RebuildTreeFull;
+    //SyncTreeAfterGridRowsRemoved;
+
+    FreeAndNil(FDevFilteredByTree);
+    FDevFilteredByTree := BuildFilteredByTree(FDevices);
+
+
     ApplyFilter;
     UpdateGridDevices;
 
@@ -1668,13 +1660,8 @@ begin
     Exit;
 
   for D in Source do
-  begin
-    if (D = nil) or (D.State = osDeleted) then
-      Continue;
-
     if PassTreeFilter(D) then
       Result.Add(D);
-  end;
 end;
 
 procedure TFormDeviceSelect.UpdateGridDevices;
@@ -2353,10 +2340,7 @@ begin
   Result := True;
 
   if ADevice = nil then
-    Exit(False);
-
-  if ADevice.State = osDeleted then
-    Exit(False);
+    Exit(True);
 
   Cur := TreeViewDevices.Selected;
   if Cur = nil then
@@ -2608,22 +2592,16 @@ begin
     case Res of
       mrYes:
         begin
-          AppServices.DataManager.Save;
-          FDeletionCommitted := FDeletedDeviceUUIDs.Count > 0;
+            AppServices.DataManager.Save;
         end;
 
       mrNo:
         begin
-          AppServices.DataManager.ReloadActiveDeviceRepo;
-          FDeletionCommitted := False;
-          FDeletedDeviceUUIDs.Clear;
+          { закрываем без сохранения }
         end;
 
       mrCancel:
-        begin
-          Action := TCloseAction.caNone;
-          Exit;
-        end;
+        Action := TCloseAction.caNone;
     end;
   end;
 end;
