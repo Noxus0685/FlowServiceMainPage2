@@ -716,10 +716,7 @@ end;
 
 function TFlowMeter.GetDeviceUUID: string;
 begin
- if Assigned(FDevice) then
-   Result := FDevice.UUID
-   else
-   Result :=  FDeviceUUID;
+  Result := FDeviceUUID;
 end;
 
 procedure TFlowMeter.SetDeviceUUID(const ADevice: string);

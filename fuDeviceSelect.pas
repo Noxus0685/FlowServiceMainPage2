@@ -207,6 +207,7 @@ private
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
+  FDeletionCommitted: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -262,6 +263,7 @@ public
   function GetSelectedDevice: TDevice;
   destructor Destroy; override;
   property DeletedDeviceUUIDs: TStringList read FDeletedDeviceUUIDs;
+  property DeletionCommitted: Boolean read FDeletionCommitted;
 
   end;
 
@@ -279,6 +281,7 @@ begin
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
+  FDeletionCommitted := False;
 end;
 
 destructor TFormDeviceSelect.Destroy;
@@ -370,12 +373,9 @@ begin
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
-  { Загружаем данные из БД (в репозиторий!) }
-  {--------------------------------------------------}
-  ActiveRepo.Load;
-
-  {--------------------------------------------------}
-  { Берём ссылку на данные репозитория }
+  { Берём текущие данные репозитория без перезагрузки из БД. }
+  { Важно: DeviceChannel хранит ссылки на TDevice через FlowMeter; }
+  { простое открытие DeviceSelect не должно пересоздавать эти объекты. }
   {--------------------------------------------------}
   FDevices := ActiveRepo.Devices;
   LogDuplicateDeviceUUIDs;
@@ -794,6 +794,9 @@ begin
     begin
       for D in FDevices do
       begin
+        if (D = nil) or (D.State = osDeleted) then
+          Continue;
+
         if (Trim(D.Manufacturer) = '') xor (ManPass = 1) then
           Continue;
 
@@ -883,6 +886,9 @@ begin
     {----------------------------------}
     for D in FDevices do
     begin
+      if (D = nil) or (D.State = osDeleted) then
+        Continue;
+
       if D.Category > 0 then
         Continue;
 
@@ -1455,7 +1461,7 @@ begin
       Exit;
 
     {----------------------------------}
-    { Удаление через репозиторий }
+    { Отложенное удаление: только помечаем приборы }
     {----------------------------------}
     WriteDeviceActionLog('Удалён прибор', TargetDevices[0], Format('Count=%d', [TargetDevices.Count]));
 
@@ -1463,19 +1469,18 @@ begin
     begin
       if D = nil then
         Continue;
+
       DeviceUUID := Trim(D.UUID);
       if DeviceUUID <> '' then
         FDeletedDeviceUUIDs.Add(DeviceUUID);
+
+      D.State := osDeleted;
     end;
 
-    AppServices.DataManager.DeleteDevices(TargetDevices);
+    if AppServices.DataManager.ActiveDeviceRepo <> nil then
+      AppServices.DataManager.ActiveDeviceRepo.State := osModified;
 
-    //SyncTreeAfterGridRowsRemoved;
-
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDevices);
-
-
+    RebuildTreeFull;
     ApplyFilter;
     UpdateGridDevices;
 
@@ -1663,8 +1668,13 @@ begin
     Exit;
 
   for D in Source do
+  begin
+    if (D = nil) or (D.State = osDeleted) then
+      Continue;
+
     if PassTreeFilter(D) then
       Result.Add(D);
+  end;
 end;
 
 procedure TFormDeviceSelect.UpdateGridDevices;
@@ -2343,7 +2353,10 @@ begin
   Result := True;
 
   if ADevice = nil then
-    Exit(True);
+    Exit(False);
+
+  if ADevice.State = osDeleted then
+    Exit(False);
 
   Cur := TreeViewDevices.Selected;
   if Cur = nil then
@@ -2595,16 +2608,22 @@ begin
     case Res of
       mrYes:
         begin
-            AppServices.DataManager.Save;
+          AppServices.DataManager.Save;
+          FDeletionCommitted := FDeletedDeviceUUIDs.Count > 0;
         end;
 
       mrNo:
         begin
-          { закрываем без сохранения }
+          AppServices.DataManager.ReloadActiveDeviceRepo;
+          FDeletionCommitted := False;
+          FDeletedDeviceUUIDs.Clear;
         end;
 
       mrCancel:
-        Action := TCloseAction.caNone;
+        begin
+          Action := TCloseAction.caNone;
+          Exit;
+        end;
     end;
   end;
 end;
