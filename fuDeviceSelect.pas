@@ -210,6 +210,10 @@ private
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
   FPendingDeletedDeviceStates: TDictionary<TDevice, TBaseObjectState>;
+  FInitialDeviceStates: TDictionary<TDevice, TBaseObjectState>;
+  FInitialRepo: TDeviceRepository;
+  FInitialRepoState: TBaseObjectState;
+  FHasInitialRepoState: Boolean;
   FRepoStateBeforeDeletion: TBaseObjectState;
   FHasRepoStateBeforeDeletion: Boolean;
 
@@ -262,6 +266,9 @@ private
   procedure LogDuplicateDeviceUUIDs;
   function DeviceRepoHasPendingChanges(const ARepo: TDeviceRepository): Boolean;
   procedure NormalizeDeviceRepoStateIfNoPendingChanges(const ARepo: TDeviceRepository);
+  procedure SnapshotInitialDeviceStates(const ARepo: TDeviceRepository);
+  procedure ClearInitialDeviceStateSnapshot;
+  procedure RollbackUnsavedDeviceStates;
   procedure RollbackPendingDeletedDevices;
 
 public
@@ -300,11 +307,15 @@ begin
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
   FPendingDeletedDeviceStates := TDictionary<TDevice, TBaseObjectState>.Create;
+  FInitialDeviceStates := TDictionary<TDevice, TBaseObjectState>.Create;
+  FInitialRepo := nil;
+  FHasInitialRepoState := False;
   FHasRepoStateBeforeDeletion := False;
 end;
 
 destructor TFormDeviceSelect.Destroy;
 begin
+  FreeAndNil(FInitialDeviceStates);
   FreeAndNil(FPendingDeletedDeviceStates);
   FreeAndNil(FDeletedDeviceUUIDs);
   FreeAndNil(FCheckedDevices);
@@ -2650,6 +2661,86 @@ begin
     ARepo.State := osLoaded;
 end;
 
+procedure TFormDeviceSelect.SnapshotInitialDeviceStates(
+  const ARepo: TDeviceRepository
+);
+var
+  D: TDevice;
+begin
+  ClearInitialDeviceStateSnapshot;
+
+  FInitialRepo := ARepo;
+  if ARepo = nil then
+    Exit;
+
+  FInitialRepoState := ARepo.State;
+  FHasInitialRepoState := True;
+
+  if ARepo.Devices = nil then
+    Exit;
+
+  for D in ARepo.Devices do
+    if (D <> nil) and (not FInitialDeviceStates.ContainsKey(D)) then
+      FInitialDeviceStates.Add(D, D.State);
+end;
+
+procedure TFormDeviceSelect.ClearInitialDeviceStateSnapshot;
+begin
+  if FInitialDeviceStates <> nil then
+    FInitialDeviceStates.Clear;
+
+  FInitialRepo := nil;
+  FHasInitialRepoState := False;
+end;
+
+procedure TFormDeviceSelect.RollbackUnsavedDeviceStates;
+var
+  Repo: TDeviceRepository;
+  I: Integer;
+  D: TDevice;
+  InitialDeviceState: TBaseObjectState;
+begin
+  Repo := FInitialRepo;
+  if Repo = nil then
+    Repo := ActiveRepo;
+
+  if (Repo <> nil) and (Repo.Devices <> nil) and (FInitialDeviceStates <> nil) then
+  begin
+    for I := Repo.Devices.Count - 1 downto 0 do
+    begin
+      D := Repo.Devices[I];
+      if D = nil then
+        Continue;
+
+      if FInitialDeviceStates.TryGetValue(D, InitialDeviceState) then
+      begin
+        if InitialDeviceState = osNew then
+          Repo.Devices.Remove(D)
+        else if InitialDeviceState in [osModified, osDeleted] then
+          TDeviceStateRestorer(D).RestoreStateDirect(osLoaded)
+        else
+          TDeviceStateRestorer(D).RestoreStateDirect(InitialDeviceState);
+      end
+      else if D.State in [osNew, osModified, osDeleted] then
+        Repo.Devices.Remove(D);
+    end;
+  end;
+
+  if FPendingDeletedDeviceStates <> nil then
+    FPendingDeletedDeviceStates.Clear;
+  FHasRepoStateBeforeDeletion := False;
+
+  if FHasInitialRepoState and (Repo <> nil) then
+  begin
+    if FInitialRepoState = osModified then
+      Repo.State := osLoaded
+    else
+      Repo.State := FInitialRepoState;
+  end
+  else
+    NormalizeDeviceRepoStateIfNoPendingChanges(Repo);
+end;
+
 procedure TFormDeviceSelect.RollbackPendingDeletedDevices;
 var
   Pair: TPair<TDevice, TBaseObjectState>;
@@ -2695,12 +2786,14 @@ begin
           if FPendingDeletedDeviceStates <> nil then
             FPendingDeletedDeviceStates.Clear;
           FHasRepoStateBeforeDeletion := False;
+          ClearInitialDeviceStateSnapshot;
         end;
 
       mrNo:
         begin
-          RollbackPendingDeletedDevices;
+          RollbackUnsavedDeviceStates;
           FDeletedDeviceUUIDs.Clear;
+          ClearInitialDeviceStateSnapshot;
         end;
 
       mrCancel:
@@ -2712,9 +2805,6 @@ end;
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
-  InitialRepo: TDeviceRepository;
-  InitialRepoState: TBaseObjectState;
-  HasInitialRepoState: Boolean;
 begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
@@ -2730,19 +2820,11 @@ begin
   FSkipDeviceDeleteConfirm := False;
   FCheckedDevices := TList<TDevice>.Create;
 
-  InitialRepo := nil;
-  HasInitialRepoState := False;
-
   {----------------------------------}
   { Загрузка данных и репозиториев }
   {----------------------------------}
   LoadData;
-  if ActiveRepo <> nil then
-  begin
-    InitialRepo := ActiveRepo;
-    InitialRepoState := ActiveRepo.State;
-    HasInitialRepoState := True;
-  end;
+  SnapshotInitialDeviceStates(ActiveRepo);
 
   try
     FillComboBoxRepository;
@@ -2770,8 +2852,8 @@ begin
       которое было до инициализации формы; реальные изменения пользователя
       (добавление, редактирование, удаление) по-прежнему выставляют
       osModified в обработчиках действий и через TDevice.SetState. }
-    if HasInitialRepoState and (InitialRepo <> nil) then
-      InitialRepo.State := InitialRepoState;
+    if FHasInitialRepoState and (FInitialRepo <> nil) then
+      FInitialRepo.State := FInitialRepoState;
   end;
 end;
 
