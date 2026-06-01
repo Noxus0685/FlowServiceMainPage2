@@ -2789,6 +2789,31 @@ var
   WorkTable: TWorkTable;
   Section: string;
   WorkTableValuesFileName: string;
+
+  procedure ClearOldWorkTableSections(AIni: TMemIniFile);
+  var
+    Sections: TStringList;
+    J: Integer;
+    SectionName: string;
+  begin
+    if AIni = nil then
+      Exit;
+
+    Sections := TStringList.Create;
+    try
+      AIni.ReadSections(Sections);
+
+      for J := Sections.Count - 1 downto 0 do
+      begin
+        SectionName := Trim(Sections[J]);
+
+        if StartsText('WorkTable.', SectionName) then
+          AIni.EraseSection(SectionName);
+      end;
+    finally
+      Sections.Free;
+    end;
+  end;
 begin
   if (AIniFileName = '') or (AWorkTables = nil) then
     Exit;
@@ -2797,6 +2822,9 @@ begin
   WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
   ValuesIni := TMemIniFile.Create(WorkTableValuesFileName);
   try
+    ClearOldWorkTableSections(Ini);
+    ClearOldWorkTableSections(ValuesIni);
+
     Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
 
     if AWorkTables.Count > 0 then
