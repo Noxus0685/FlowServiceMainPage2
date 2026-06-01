@@ -1649,6 +1649,9 @@ begin
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
 
+  Name := BuildWorkTableServiceName(ID);
+      if Trim(Text) = '' then
+        Text := 'Рабочий стол ' + IntToStr(ID);
 
   FPumps := TObjectList<TPump>.Create(false); // True — автоосвобождение объектов   False- хрантся копии
   FlowRate := TFlowRate.Create('Расход');
@@ -2834,10 +2837,6 @@ begin
     begin
       WorkTable := AWorkTables[I];
       Section := 'WorkTable.' + IntToStr(I);
-
-      WorkTable.Name := BuildWorkTableServiceName(WorkTable.ID);
-      if Trim(WorkTable.Text) = '' then
-        WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
 
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
