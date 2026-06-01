@@ -2712,6 +2712,7 @@ end;
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
 var
   SelectionContext: TDeviceSelectionContext;
+  InitialRepo: TDeviceRepository;
   InitialRepoState: TBaseObjectState;
   HasInitialRepoState: Boolean;
 begin
@@ -2729,6 +2730,7 @@ begin
   FSkipDeviceDeleteConfirm := False;
   FCheckedDevices := TList<TDevice>.Create;
 
+  InitialRepo := nil;
   HasInitialRepoState := False;
 
   {----------------------------------}
@@ -2737,27 +2739,39 @@ begin
   LoadData;
   if ActiveRepo <> nil then
   begin
+    InitialRepo := ActiveRepo;
     InitialRepoState := ActiveRepo.State;
     HasInitialRepoState := True;
   end;
-  FillComboBoxRepository;
 
-  {----------------------------------}
-  { Подключение и первичная отрисовка UI }
-  {----------------------------------}
-  if UpdateConnection then
-  begin
-    BuildTree;
-    ApplyFilter;
-    UpdateGridDevices;
-    SelectionContext := AppServices.DataManager.BuildDeviceSelectionContext(
-      ActiveRepo,
-      ''
-    );
-    if SelectionContext.DeviceFound then
-      AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
-    ApplyInitialSelection;
-    NormalizeDeviceRepoStateIfNoPendingChanges(ActiveRepo);
+  try
+    FillComboBoxRepository;
+
+    {----------------------------------}
+    { Подключение и первичная отрисовка UI }
+    {----------------------------------}
+    if UpdateConnection then
+    begin
+      BuildTree;
+      ApplyFilter;
+      UpdateGridDevices;
+      SelectionContext := AppServices.DataManager.BuildDeviceSelectionContext(
+        ActiveRepo,
+        ''
+      );
+      if SelectionContext.DeviceFound then
+        AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
+      ApplyInitialSelection;
+      NormalizeDeviceRepoStateIfNoPendingChanges(ActiveRepo);
+    end;
+  finally
+    { Первичное открытие формы только строит UI и не должно переводить
+      репозиторий приборов в состояние osModified. Сохраняем состояние,
+      которое было до инициализации формы; реальные изменения пользователя
+      (добавление, редактирование, удаление) по-прежнему выставляют
+      osModified в обработчиках действий и через TDevice.SetState. }
+    if HasInitialRepoState and (InitialRepo <> nil) then
+      InitialRepo.State := InitialRepoState;
   end;
 end;
 
