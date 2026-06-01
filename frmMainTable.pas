@@ -684,7 +684,6 @@ const
   CProcessingDevicesSection = 'ProcessingDevices';
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
-  CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
 
 function IsVolumeFlowUnit(const AUnit: string): Boolean;
 var
@@ -3249,7 +3248,7 @@ begin
   if (AChannel = nil) or (ADevice = nil) then
     Exit;
 
-  Result := (SameText(Trim(ADevice.Comment), CEmptyGridDeviceComment) or
+  Result := (TDeviceCreationService.IsGridPlaceholderDevice(ADevice) or
              (ADevice.State = osNew)) and
             (Trim(AChannel.TypeName) = '') and
             (Trim(AChannel.DeviceName) = '') and
