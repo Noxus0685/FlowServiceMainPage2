@@ -794,6 +794,9 @@ begin
     begin
       for D in FDevices do
       begin
+        if D.State = osDeleted then
+          Continue;
+
         if (Trim(D.Manufacturer) = '') xor (ManPass = 1) then
           Continue;
 
@@ -883,6 +886,9 @@ begin
     {----------------------------------}
     for D in FDevices do
     begin
+      if D.State = osDeleted then
+        Continue;
+
       if D.Category > 0 then
         Continue;
 
@@ -1088,8 +1094,56 @@ begin
 end;
 
 procedure TFormDeviceSelect.aDeleteTypeExecute(Sender: TObject);
+var
+  TargetDevices: TObjectList<TDevice>;
+  D: TDevice;
+  DeviceUUID: string;
 begin
-  ButtonDeviceDeleteClick(Sender);
+  {----------------------------------}
+  { Проверка списка }
+  {----------------------------------}
+  if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
+    Exit;
+
+  TargetDevices := GetSelectedDevices;
+  try
+    if TargetDevices.Count = 0 then
+      Exit;
+
+    {----------------------------------}
+    { Мягкое удаление по аналогии с TypeSelect }
+    {----------------------------------}
+    WriteDeviceActionLog('Удалён прибор', TargetDevices[0], Format('Count=%d', [TargetDevices.Count]));
+
+    for D in TargetDevices do
+    begin
+      if D = nil then
+        Continue;
+
+      DeviceUUID := Trim(D.UUID);
+      if DeviceUUID <> '' then
+        FDeletedDeviceUUIDs.Add(DeviceUUID);
+    end;
+
+    AppServices.DataManager.DeleteDevices(TargetDevices);
+
+    SyncTreeAfterGridRowsRemoved;
+
+    FreeAndNil(FDevFilteredByTree);
+    FDevFilteredByTree := BuildFilteredByTree(FDevices);
+
+    ApplyFilter;
+    UpdateGridDevices;
+
+    {----------------------------------}
+    { Сброс выделения }
+    {----------------------------------}
+    GridDevices.Row := -1;
+    ClearCheckedDevices;
+    UpdateDeviceActions(nil);
+  finally
+    TargetDevices.Free;
+  end;
 end;
 
 procedure TFormDeviceSelect.aEditTypeExecute(Sender: TObject);
@@ -1438,57 +1492,8 @@ begin
 end;
 
 procedure TFormDeviceSelect.ButtonDeviceDeleteClick(Sender: TObject);
-var
-  TargetDevices: TObjectList<TDevice>;
-  D: TDevice;
-  DeviceUUID: string;
 begin
-  {----------------------------------}
-  { Проверка списка }
-  {----------------------------------}
-  if (FDevFilteredDevices = nil) or (FDevFilteredDevices.Count = 0) then
-    Exit;
-
-  TargetDevices := GetSelectedDevices;
-  try
-    if TargetDevices.Count = 0 then
-      Exit;
-
-    {----------------------------------}
-    { Удаление через репозиторий }
-    {----------------------------------}
-    WriteDeviceActionLog('Удалён прибор', TargetDevices[0], Format('Count=%d', [TargetDevices.Count]));
-
-    for D in TargetDevices do
-    begin
-      if D = nil then
-        Continue;
-      DeviceUUID := Trim(D.UUID);
-      if DeviceUUID <> '' then
-        FDeletedDeviceUUIDs.Add(DeviceUUID);
-    end;
-
-    AppServices.DataManager.DeleteDevices(TargetDevices);
-
-    //SyncTreeAfterGridRowsRemoved;
-
-    FreeAndNil(FDevFilteredByTree);
-    FDevFilteredByTree := BuildFilteredByTree(FDevices);
-
-
-    ApplyFilter;
-    UpdateGridDevices;
-
-    {----------------------------------}
-    { Сброс выделения }
-    {----------------------------------}
-    GridDevices.Row := -1;
-    ClearCheckedDevices;
-    UpdateDeviceActions(nil);
-  finally
-    TargetDevices.Free;
-
-  end;
+  aDeleteTypeExecute(Sender);
 end;
 
 procedure TFormDeviceSelect.SyncTreeAfterGridRowsRemoved;
@@ -2345,6 +2350,9 @@ begin
   if ADevice = nil then
     Exit(True);
 
+  if ADevice.State = osDeleted then
+    Exit(False);
+
   Cur := TreeViewDevices.Selected;
   if Cur = nil then
     Exit(True);
@@ -2683,7 +2691,7 @@ begin
 
   if (Key = vkDelete) and (GridDevices.Row>=0) then
   begin
-    ButtonDeviceDeleteClick(ButtonDeviceDelete);
+    aDeleteTypeExecute(aDeleteType);
     Key := 0;
     KeyChar := #0;
   end;

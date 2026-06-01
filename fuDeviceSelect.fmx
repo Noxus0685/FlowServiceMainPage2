@@ -269,7 +269,7 @@ object FormDeviceSelect: TFormDeviceSelect
           TabOrder = 2
           Text = 'ButtonDeviceDelete'
           TextSettings.Trimming = None
-          OnClick = ButtonDeviceDeleteClick
+          OnClick = aDeleteTypeExecute
         end
         object ButtonDeviceAdd: TButton
           Align = Left

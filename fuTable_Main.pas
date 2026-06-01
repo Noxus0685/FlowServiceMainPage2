@@ -640,6 +640,7 @@ procedure TTableMainForm.tcMainChange(Sender: TObject);
 begin
   if (tcMain.ActiveTab = tiResults) and (FFrameProceed <> nil) then
     FFrameProceed.RefreshResultsTab;
+  FFrameMainTable.UpdateForm;
 end;
 
 procedure TTableMainForm.UpdateTemp(const AWorkTable: TWorkTable);
@@ -685,6 +686,8 @@ procedure TTableMainForm.TimerSetValuesTimer(Sender: TObject);
 begin
   FWorkTableManager.UpdateSimulation;
 end;
+
+
 
 procedure TTableMainForm.TrackStdChange(Sender: TObject);
 begin

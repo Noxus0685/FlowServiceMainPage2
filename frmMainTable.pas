@@ -498,6 +498,8 @@ type
     procedure SpinBoxFreqEnter(Sender: TObject);
     procedure GridDevicesEditingDone(Sender: TObject; const ACol,
       ARow: Integer);
+    procedure Button1Click(Sender: TObject);
+    procedure UpdateForm;
 
   private
 
@@ -565,7 +567,7 @@ type
 
     procedure UpdateGrids;
 
-    procedure UpdateForm;
+
     procedure ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable = nil);
     procedure ClearChannelsByMissingDevices;
     procedure RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
@@ -1975,6 +1977,8 @@ begin
 
   SaveLayoutSettingsToWorkTable;
 end;
+
+
 
 procedure TFrameMainTable.FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
 var
@@ -4574,6 +4578,11 @@ begin
     StopTest
   else
     StartTest;
+end;
+
+procedure TFrameMainTable.Button1Click(Sender: TObject);
+begin
+UpdateForm;
 end;
 
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
