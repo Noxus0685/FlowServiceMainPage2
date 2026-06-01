@@ -3668,38 +3668,15 @@ begin
   if (ADevice = nil) or (FDM = nil) then
     Exit;
 
-  case ADevice.State of
+  {----------------------------------------------}
+  { Мягкое удаление по аналогии с DeleteType: }
+  { объект остаётся в списке, но получает osDeleted }
+  {----------------------------------------------}
+  if ADevice.Points <> nil then
+    for P in ADevice.Points do
+      P.State := osDeleted;
 
-    {----------------------------------------------}
-    { Новый, не сохранённый — просто убираем }
-    {----------------------------------------------}
-    osNew:
-      begin
-        FDevices.Remove(ADevice);
-        Exit;
-      end;
-
-    {----------------------------------------------}
-    { Уже сохранённый — удаляем СРАЗУ }
-    {----------------------------------------------}
-    osClean, osLoaded, osModified:
-      begin
-        { помечаем точки }
-        if ADevice.Points <> nil then
-          for P in ADevice.Points do
-            P.State := osDeleted;
-
-        { помечаем устройство }
-        ADevice.State := osDeleted;
-
-        { сразу пишем в БД }
-        if not UpdateDevice(ADevice) then
-          raise Exception.Create('Ошибка удаления прибора');
-
-        { убираем из памяти }
-        FDevices.Remove(ADevice);
-      end;
-  end;
+  ADevice.State := osDeleted;
 end;
 
 function TDeviceRepository.GenerateDeviceID: Integer;
