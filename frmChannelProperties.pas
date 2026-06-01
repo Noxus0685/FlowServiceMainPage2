@@ -33,6 +33,7 @@ type
     HeaderProperty: TLabel;
     HeaderValue: TLabel;
     HeaderDivider: TLine;
+    EditChannelText: TEdit;
     EditChannelName: TEdit;
     ComboChannelType: TComboBox;
     ComboOutputSet: TComboBox;
@@ -54,6 +55,7 @@ type
     function CreateComboWithIndicator(ACombo: TComboBox; out AIndicator: TCircle): TControl;
     procedure ApplyIndicatorColor(AIndicator: TCircle; const AColor: TAlphaColor);
     procedure RefreshRegisterColors;
+    procedure HandleChannelTextExit(Sender: TObject);
     procedure HandleChannelNameExit(Sender: TObject);
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
@@ -206,6 +208,20 @@ begin
   ApplyIndicatorColor(IndicatorNoiseFilter, FChannel.GetNoiseFilterStateColor);
 end;
 
+procedure TFrameChannelProperties.HandleChannelTextExit(Sender: TObject);
+var
+  NewValue: string;
+  Changed: Boolean;
+begin
+  if FLoading or (FChannel = nil) then
+    Exit;
+  NewValue := Trim(EditChannelText.Text);
+  Changed := FChannel.Text <> NewValue;
+  FChannel.Text := NewValue;
+  EditChannelText.Text := NewValue;
+  NotifyWorkTableRefreshIfChanged(Changed);
+end;
+
 procedure TFrameChannelProperties.HandleChannelNameExit(Sender: TObject);
 var
   NewValue: string;
@@ -214,8 +230,8 @@ begin
   if FLoading or (FChannel = nil) then
     Exit;
   NewValue := Trim(EditChannelName.Text);
-  Changed := FChannel.Text <> NewValue;
-  FChannel.Text := NewValue;
+  Changed := FChannel.Name <> NewValue;
+  FChannel.Name := NewValue;
   EditChannelName.Text := NewValue;
   NotifyWorkTableRefreshIfChanged(Changed);
 end;
@@ -295,6 +311,7 @@ begin
     FChannel := AChannel;
     if AChannel = nil then
     begin
+      EditChannelText.Text := '';
       EditChannelName.Text := '';
       ComboChannelType.ItemIndex := -1;
       ComboOutputSet.ItemIndex := -1;
@@ -304,7 +321,8 @@ begin
       Exit;
     end;
 
-    EditChannelName.Text := AChannel.Text;
+    EditChannelText.Text := AChannel.Text;
+    EditChannelName.Text := AChannel.Name;
 
     SignalName := GetOutputTypeName(TOutputType(AChannel.Signal));
     ComboChannelType.ItemIndex := ComboChannelType.Items.IndexOf(SignalName);
@@ -368,6 +386,11 @@ begin
   HeaderValue.Align := TAlignLayout.Client;
 
   CategoryGeneral := AddCategory('Общий');
+  EditChannelText := TEdit.Create(Self);
+  AddPropertyRow(CategoryGeneral, 'Название канала', EditChannelText);
+  EditChannelText.KillFocusByReturn:=True;
+  EditChannelText.OnExit := HandleChannelTextExit;
+
   EditChannelName := TEdit.Create(Self);
   AddPropertyRow(CategoryGeneral, 'Имя канала', EditChannelName);
   EditChannelName.KillFocusByReturn:=True;
