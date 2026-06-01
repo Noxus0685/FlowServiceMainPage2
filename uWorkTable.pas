@@ -656,6 +656,8 @@ type
     procedure Save;
     procedure AddWorkTable;  overload;
     procedure AddWorkTable(const WorkTableName: string);  overload;
+    function DeleteWorkTableByName(const AWorkTableName: string): Boolean;
+    function DeleteWorkTablesByNames(const AWorkTableNames: TStrings): Integer;
 
     function FindWorkTableName(const WorkTableName: string): TWorkTable;
     function FindWorkTableByID(const WorkTableID: Integer): TWorkTable;
@@ -4224,6 +4226,143 @@ begin
 
   if FActiveWorkTable <> nil then
     FActiveWorkTable.IsActive := True;
+end;
+
+function TWorkTableManager.DeleteWorkTableByName(
+  const AWorkTableName: string): Boolean;
+var
+  I: Integer;
+  WorkTable: TWorkTable;
+  WorkTableName: string;
+  DeletedMeterValueHashes: TStringList;
+  DeletedMeterValueOwners: TStringList;
+
+  procedure AddOwnerName(const AOwnerName: string);
+  var
+    OwnerName: string;
+  begin
+    OwnerName := Trim(AOwnerName);
+    if (OwnerName <> '') and (DeletedMeterValueOwners.IndexOf(OwnerName) < 0) then
+      DeletedMeterValueOwners.Add(OwnerName);
+  end;
+
+begin
+  Result := False;
+  WorkTableName := Trim(AWorkTableName);
+
+  if WorkTableName = '' then
+    Exit;
+
+  if FWorkTables = nil then
+    Exit;
+
+  DeletedMeterValueHashes := TStringList.Create;
+  DeletedMeterValueOwners := TStringList.Create;
+  try
+    DeletedMeterValueHashes.Sorted := False;
+    DeletedMeterValueHashes.Duplicates := TDuplicates.dupIgnore;
+    DeletedMeterValueOwners.Sorted := False;
+    DeletedMeterValueOwners.Duplicates := TDuplicates.dupIgnore;
+
+    for I := FWorkTables.Count - 1 downto 0 do
+    begin
+      WorkTable := FWorkTables[I];
+
+      if WorkTable = nil then
+        Continue;
+
+      if SameText(Trim(WorkTable.Name), WorkTableName) or
+         SameText(Trim(WorkTable.Text), WorkTableName) then
+      begin
+        AddOwnerName(WorkTable.Text);
+        AddOwnerName(WorkTable.Name);
+        AddOwnerName(TWorkTable.BuildWorkTableServiceName(WorkTable.ID));
+        AddOwnerName('Рабочий стол ' + IntToStr(WorkTable.ID));
+
+        WorkTable.RemoveMeterValuesFromStorage(DeletedMeterValueHashes);
+
+        if FActiveWorkTable = WorkTable then
+          SetActiveWorkTable(nil);
+
+        FWorkTables.Delete(I);
+
+        if FWorkTables.Count = 0 then
+          SetActiveWorkTable(nil)
+        else if FActiveWorkTable = nil then
+        begin
+          if I < FWorkTables.Count then
+            SetActiveWorkTable(FWorkTables[I])
+          else
+            SetActiveWorkTable(FWorkTables[FWorkTables.Count - 1]);
+        end;
+
+        TMeterValue.DeleteFromFile(DeletedMeterValueHashes, DeletedMeterValueOwners);
+
+        Result := True;
+        Break;
+      end;
+    end;
+  finally
+    DeletedMeterValueOwners.Free;
+    DeletedMeterValueHashes.Free;
+  end;
+end;
+
+function TWorkTableManager.DeleteWorkTablesByNames(
+  const AWorkTableNames: TStrings): Integer;
+var
+  I: Integer;
+  WorkTable: TWorkTable;
+  NamesToDelete: TStringList;
+
+  function ContainsWorkTableName(const AName: string): Boolean;
+  var
+    J: Integer;
+    WorkTableName: string;
+  begin
+    Result := False;
+
+    for J := 0 to AWorkTableNames.Count - 1 do
+    begin
+      WorkTableName := Trim(AWorkTableNames[J]);
+      if (WorkTableName <> '') and SameText(Trim(AName), WorkTableName) then
+        Exit(True);
+    end;
+  end;
+
+begin
+  Result := 0;
+
+  if (AWorkTableNames = nil) or (FWorkTables = nil) then
+    Exit;
+
+  NamesToDelete := TStringList.Create;
+  try
+    NamesToDelete.Sorted := False;
+    NamesToDelete.Duplicates := TDuplicates.dupAccept;
+
+    for I := FWorkTables.Count - 1 downto 0 do
+    begin
+      WorkTable := FWorkTables[I];
+      if WorkTable = nil then
+        Continue;
+
+      if ContainsWorkTableName(WorkTable.Name) or
+         ContainsWorkTableName(WorkTable.Text) then
+      begin
+        if Trim(WorkTable.Name) <> '' then
+          NamesToDelete.Add(WorkTable.Name)
+        else
+          NamesToDelete.Add(WorkTable.Text);
+      end;
+    end;
+
+    for I := 0 to NamesToDelete.Count - 1 do
+      if DeleteWorkTableByName(NamesToDelete[I]) then
+        Inc(Result);
+  finally
+    NamesToDelete.Free;
+  end;
 end;
 
 function TWorkTableManager.FindWorkTableName(const WorkTableName: string): TWorkTable;
