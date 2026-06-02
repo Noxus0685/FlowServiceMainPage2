@@ -1,0 +1,5 @@
+object FrameMeterValueEdit: TFrameMeterValueEdit
+  Size.Width = 520.000000000000000000
+  Size.Height = 300.000000000000000000
+  Size.PlatformDefault = False
+end
