@@ -315,7 +315,7 @@ begin
   if EditedMeterValue = nil then
     Exit;
 
-  Form := TForm.Create(Self);
+  Form := TForm.CreateNew(Self);
   try
     Form.Caption := 'Редактирование MeterValue';
     Form.Width := 620;
