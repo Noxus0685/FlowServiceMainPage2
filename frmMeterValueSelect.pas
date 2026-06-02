@@ -5,6 +5,7 @@ interface
 uses
   FMX.Controls,
   FMX.Controls.Presentation,
+  FMX.Edit,
   FMX.Forms,
   FMX.Grid,
   FMX.Layouts,
