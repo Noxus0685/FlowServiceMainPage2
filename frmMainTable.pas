@@ -2168,14 +2168,22 @@ var
   CanEdit: Boolean;
 begin
   CanEdit := CanEditActiveWorkTable;
-  miAddTable.Enabled := CanEdit;
-  miAddDeviceChannel.Enabled := CanEdit;
-  miAddEtalonChannel.Enabled := CanEdit;
-  miSaveWorkTable.Enabled := CanEdit;
-  ActionAddWorkTable.Enabled := CanEdit;
-  ActionAddDeviceChannel.Enabled := CanEdit;
-  ActionAddEtalonChannel.Enabled := CanEdit;
-  ActionSaveWorkTable.Enabled := CanEdit;
+  if miAddTable <> nil then
+    miAddTable.Enabled := CanEdit;
+  if miAddDeviceChannel <> nil then
+    miAddDeviceChannel.Enabled := CanEdit;
+  if miAddEtalonChannel <> nil then
+    miAddEtalonChannel.Enabled := CanEdit;
+  if miSaveWorkTable <> nil then
+    miSaveWorkTable.Enabled := CanEdit;
+  if ActionAddWorkTable <> nil then
+    ActionAddWorkTable.Enabled := CanEdit;
+  if ActionAddDeviceChannel <> nil then
+    ActionAddDeviceChannel.Enabled := CanEdit;
+  if ActionAddEtalonChannel <> nil then
+    ActionAddEtalonChannel.Enabled := CanEdit;
+  if ActionSaveWorkTable <> nil then
+    ActionSaveWorkTable.Enabled := CanEdit;
 end;
 
 procedure TFrameMainTable.PopupMenuDevicesGridLayOutPopup(Sender: TObject);
@@ -2544,10 +2552,14 @@ var
 begin
   CanEdit := CanEditActiveWorkTable;
 
-  ActionAddWorkTable.Enabled := CanEdit;
-  ActionAddDeviceChannel.Enabled := CanEdit;
-  ActionAddEtalonChannel.Enabled := CanEdit;
-  ActionSaveWorkTable.Enabled := CanEdit;
+  if ActionAddWorkTable <> nil then
+    ActionAddWorkTable.Enabled := CanEdit;
+  if ActionAddDeviceChannel <> nil then
+    ActionAddDeviceChannel.Enabled := CanEdit;
+  if ActionAddEtalonChannel <> nil then
+    ActionAddEtalonChannel.Enabled := CanEdit;
+  if ActionSaveWorkTable <> nil then
+    ActionSaveWorkTable.Enabled := CanEdit;
 
   if TabControlWorkTables <> nil then
     if CanEdit then
@@ -2567,20 +2579,51 @@ begin
     else
       Label30.PopupMenu := nil;
 
-  if CanEdit then
-    Exit;
-
   if GridDevices <> nil then
   begin
-    GridDevices.ReadOnly := True;
     GridDevices.EditorMode := False;
+    if CanEdit then
+    begin
+      GridDevices.PopupMenu := PopupMenuDevicesGrid;
+      if StringColumnDeviceSerial1 <> nil then
+        StringColumnDeviceSerial1.PopupMenu := PopupMenu1;
+      GridDevices.Options := GridDevices.Options + [TGridOption.Editing];
+    end
+    else
+    begin
+      GridDevices.PopupMenu := nil;
+      if StringColumnDeviceSerial1 <> nil then
+        StringColumnDeviceSerial1.PopupMenu := nil;
+      GridDevices.Options := GridDevices.Options - [TGridOption.Editing];
+    end;
   end;
 
   if GridEtalons <> nil then
   begin
-    GridEtalons.ReadOnly := True;
     GridEtalons.EditorMode := False;
+    if CanEdit then
+    begin
+      GridEtalons.PopupMenu := PopupMenuEtalonsGrid;
+      GridEtalons.Options := GridEtalons.Options + [TGridOption.Editing];
+    end
+    else
+    begin
+      GridEtalons.PopupMenu := nil;
+      GridEtalons.Options := GridEtalons.Options - [TGridOption.Editing];
+    end;
   end;
+
+  if ToolBar1 <> nil then
+    if CanEdit then
+      ToolBar1.PopupMenu := PopupMenuDevicesGridLayOut
+    else
+      ToolBar1.PopupMenu := nil;
+
+  if ToolBarEtalons1 <> nil then
+    if CanEdit then
+      ToolBarEtalons1.PopupMenu := PopupMenuEtalonsGridLayOut
+    else
+      ToolBarEtalons1.PopupMenu := nil;
 end;
 
 procedure TFrameMainTable.NormalizeActiveWorkTable;
