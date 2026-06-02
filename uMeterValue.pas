@@ -1130,6 +1130,7 @@ var
   ValueLocal: Double;
   Q: Single;
   MeterValue: TMeterValue;
+  I: Integer;
 begin
 
   ValueLocal := Value;
@@ -1145,10 +1146,16 @@ begin
     else if ValueType = AGGREGATE_TYPE then
     begin
       ValueLocal := 0;
-      for MeterValue in FAggregateMeterValues do
+      for I := FAggregateMeterValues.Count - 1 downto 0 do
       begin
-        if (MeterValue = nil) or (MeterValue = Self) then
+        MeterValue := FAggregateMeterValues[I];
+        if (MeterValue = nil) or (MeterValue = Self) or
+           (TMeterValue.GetMeterValues.IndexOf(MeterValue) < 0) then
+        begin
+          FAggregateMeterValues.Delete(I);
           Continue;
+        end;
+
         ValueLocal := ValueLocal + MeterValue.GetDoubleValue;
       end;
     end

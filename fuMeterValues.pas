@@ -27,6 +27,7 @@ uses
   System.Types,
   System.UITypes,
   System.Variants,
+  frmMeterValueEditFrame,
   uMeterValue;
 
 type
@@ -148,6 +149,8 @@ type
     FCoef: TCoef;
     FCoefHash: string;
     FFilteredValues: TObjectList<TMeterValue>;
+    FFrameMeterValueEdit: TFrameMeterValueEdit;
+    procedure EnsureMeterValueEditFrame;
     function SafeFloat(const S: string): Double;
     function SafeInt(const S: string): Integer;
     function HasActiveFilters: Boolean;
@@ -173,6 +176,25 @@ var
 implementation
 
 {$R *.fmx}
+
+procedure TFormMeterValues.EnsureMeterValueEditFrame;
+var
+  OldLayout: TComponent;
+begin
+  if FFrameMeterValueEdit = nil then
+  begin
+    FFrameMeterValueEdit := TFrameMeterValueEdit.Create(Self);
+    FFrameMeterValueEdit.Parent := TabItem1;
+    FFrameMeterValueEdit.Align := TAlignLayout.Client;
+  end;
+
+  OldLayout := FindComponent('Layout8');
+  if OldLayout is TControl then
+    TControl(OldLayout).Visible := False;
+
+  FFrameMeterValueEdit.BringToFront;
+  FFrameMeterValueEdit.LoadFromMeterValue(MeterValue);
+end;
 
 function AbsoluteError(const AValue, AArg: Double): Double;
 begin
@@ -201,6 +223,7 @@ end;
 
 procedure TFormMeterValues.UpdateLayoutCommonSettings;
 begin
+  EnsureMeterValueEditFrame;
   EditName.Text := MeterValue.Name;
   EditValueType.Text := MeterValue.&Type;
   EditShrtName.Text := MeterValue.ShrtName;
@@ -241,6 +264,7 @@ end;
 procedure TFormMeterValues.FormShow(Sender: TObject);
 begin
   StringGridCoefsData.OnKeyDown := StringGridCoefsDataKeyDown;
+  EnsureMeterValueEditFrame;
   if MeterValue <> nil then
   begin
     UpdateLayoutCommonSettings;
