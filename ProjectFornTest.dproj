@@ -376,6 +376,15 @@
             <FormType>fmx</FormType>
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
+        <DCCReference Include="frmWorkTableProperties.pas">
+            <Form>FrameWorkTableProperties</Form>
+            <FormType>fmx</FormType>
+            <DesignClass>TFrame</DesignClass>
+        </DCCReference>
+        <DCCReference Include="frmMeterValueSelect.pas">
+            <Form>FormMeterValueSelect</Form>
+            <FormType>fmx</FormType>
+        </DCCReference>
         <DCCReference Include="uControlRegister.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
