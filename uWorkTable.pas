@@ -9,6 +9,7 @@ uses
   System.Math,
   System.StrUtils,
   System.SysUtils,
+  System.TypInfo,
   System.UITypes,
   uBaseProcedures,
   uClasses,
@@ -67,7 +68,11 @@ type
 
   EEventWorkTable = (
     ewtNone = 0,
-    ewtWarning = 1,
+    ewtEvent = 1,
+    ewtState,
+    ewtAction,
+    ewtInfo,
+    ewtWarning,
     ewtError,
     ewtActivated,
     ewtRefresh
@@ -474,7 +479,9 @@ type
   procedure DoStopMonitor;
   procedure DoStartTest;
   procedure DoStopTest;
+  class function WorkTableEventToText(AEvent: TWorkTableEvent): string; static;
   class function WorkTableEventToString(AEvent: TWorkTableEvent): string; static;
+  class function WorkTableEventToProtocolCategory(AEvent: TWorkTableEvent): EProtocolCategory; static;
 
   public
 
@@ -2971,10 +2978,11 @@ begin
         WorkTable.CurrentPoint.LimitVolume := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
         WorkTable.CurrentPoint.StopCriteria := [];
       end;
-      WorkTable.State := WorkTableStateFromString(
+       //Нет смысла восстанавливать состояние
+     { WorkTable.State := WorkTableStateFromString(
         Ini.ReadString(Section, 'Status',
           Ini.ReadString(Section, 'MeasurementState', 'swtNONE'))
-      );
+      );   }
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
       WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
       WorkTable.QuantityUnitName := Trim(Ini.ReadString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName));
@@ -3419,15 +3427,44 @@ begin
   end;
 end;
 
+class function TWorkTable.WorkTableEventToText(AEvent: TWorkTableEvent): string;
+begin
+  Result := GetEnumName(TypeInfo(TWorkTableEvent), Ord(AEvent));
+end;
+
 class function TWorkTable.WorkTableEventToString(AEvent: TWorkTableEvent): string;
 begin
+  Result := WorkTableEventToText(AEvent);
+end;
+
+class function TWorkTable.WorkTableEventToProtocolCategory(
+  AEvent: TWorkTableEvent): EProtocolCategory;
+begin
   case AEvent of
-    ewtWarning: Result := 'ewtWarning';
-    ewtError: Result := 'ewtError';
-    ewtActivated: Result := 'ewtActivated';
-    ewtRefresh: Result := 'ewtRefresh';
+    ewtNone:
+      Result := pcNone;
+
+    ewtEvent:
+      Result := pcEvent;
+
+    ewtState,
+    ewtRefresh:
+      Result := pcState;
+
+    ewtAction,
+    ewtActivated:
+      Result := pcAction;
+
+    ewtInfo:
+      Result := pcInfo;
+
+    ewtWarning:
+      Result := pcWarning;
+
+    ewtError:
+      Result := pcError;
   else
-    Result := 'ewtNone';
+    Result := pcEvent;
   end;
 end;
 
@@ -3444,15 +3481,20 @@ end;
 
 procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo);
 var
+  Category: EProtocolCategory;
+  EventText: string;
   ErrorDetails: string;
 begin
-  ProtocolManager.AddMessage(pcEvent, psWorkTable, 'WorkTableEvent',
-    'Событие рабочего стола', WorkTableEventToString(AEvent));
+  Category := WorkTableEventToProtocolCategory(AEvent);
+  EventText := WorkTableEventToText(AEvent);
+
+  ProtocolManager.AddMessage(Category, psWorkTable, 'WorkTableEvent',
+    'Событие рабочего стола', EventText);
 
   if (AError.Code <> 0) or (Trim(AError.Msg) <> '') then
   begin
     ErrorDetails := Format('Event=%s; Code=%d; State=%s; Time=%s; Msg=%s', [
-      WorkTableEventToString(AEvent),
+      EventText,
       AError.Code,
       WorkTableStateToString(EStateWorkTable(AError.Stage)),
       FormatDateTime('dd.mm.yyyy hh:nn:ss', AError.Time),
@@ -3670,33 +3712,33 @@ end;
 procedure TWorkTable.DoStartMonitor;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTMONITOR);
+  {SetState(swtSTARTMONITOR);
   SetState(swtMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
-    'Мониторинг запущен', Name);
+    'Мониторинг запущен', Name);  }
 end;
 
 procedure TWorkTable.DoStopMonitor;
 begin
-  SetState(swtSTOPMONITOR);
+ { SetState(swtSTOPMONITOR);
   SetState(swtSTANDBY);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopMonitor',
-    'Мониторинг остановлен', Name);
+    'Мониторинг остановлен', Name); }
 end;
 
 procedure TWorkTable.DoStartTest;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTTEST);
+ { SetState(swtSTARTTEST);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
-    'Тест запущен', Name);
+    'Тест запущен', Name);   }
 end;
 
 procedure TWorkTable.DoStopTest;
 begin
-  SetState(swtSTOPTEST);
+ { SetState(swtSTOPTEST);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
-    'Тест остановлен', Name);
+    'Тест остановлен', Name); }
 end;
 
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
