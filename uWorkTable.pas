@@ -3682,12 +3682,18 @@ begin
 end;
 
 procedure TWorkTable.SetState(const ANewState: EStateWorkTable);
+var
+  OldState: EStateWorkTable;
 begin
   if FState = ANewState then
     Exit;
+
+  OldState := FState;
   FState := ANewState;
   ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
-    'Изменено состояние рабочего стола', WorkTableStateToString(ANewState));
+    'Изменено состояние рабочего стола',
+    Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
+      WorkTableStateToString(ANewState)]));
   Notify(notifyStateChanged, Self);
 end;
 
