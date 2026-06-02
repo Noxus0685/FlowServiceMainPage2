@@ -38,6 +38,7 @@ type
     swtSTARTMONITORWAIT,
     swtMONITOR,
     swtSTOPMONITOR,
+    swtSTOPMONITORWAIT,
     swtCONFIGED,
     swtSTARTTEST,
     swtSTARTWAIT,
