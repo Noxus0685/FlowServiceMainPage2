@@ -26,6 +26,7 @@ type
     FFilteredValues: TObjectList<TMeterValue>;
     ButtonSelect: TButton;
     ButtonCancel: TButton;
+    ButtonEdit: TButton;
     EditFindDevice: TEdit;
     sbClear: TSpeedButton;
     sbFind: TSpeedButton;
@@ -39,6 +40,7 @@ type
     procedure sbClearClick(Sender: TObject);
     procedure sbFindClick(Sender: TObject);
     procedure FocusMeterValue(AMeterValue: TMeterValue);
+    procedure ButtonEditClick(Sender: TObject);
     procedure ButtonSelectClick(Sender: TObject);
     procedure ButtonCancelClick(Sender: TObject);
     procedure StringGridValuesListSelChanged(Sender: TObject);
@@ -53,6 +55,9 @@ type
   end;
 
 implementation
+
+uses
+  frmMeterValueEditFrame;
 
 {$R *.fmx}
 
@@ -137,6 +142,14 @@ begin
   ButtonCancel.Text := 'Отмена';
   ButtonCancel.ModalResult := mrCancel;
   ButtonCancel.OnClick := ButtonCancelClick;
+
+  ButtonEdit := TButton.Create(Self);
+  ButtonEdit.Parent := ButtonsLayout;
+  ButtonEdit.Align := TAlignLayout.Right;
+  ButtonEdit.Width := 110;
+  ButtonEdit.Margins.Right := 8;
+  ButtonEdit.Text := 'Редактировать';
+  ButtonEdit.OnClick := ButtonEditClick;
 
   ButtonSelect := TButton.Create(Self);
   ButtonSelect.Parent := ButtonsLayout;
@@ -286,6 +299,63 @@ procedure TFormMeterValueSelect.StringGridValuesListSelChanged(Sender: TObject);
 begin
   if StringGridValuesList.Tag = 0 then
     SelectCurrentRow;
+end;
+
+procedure TFormMeterValueSelect.ButtonEditClick(Sender: TObject);
+var
+  Form: TForm;
+  Frame: TFrameMeterValueEdit;
+  ButtonsLayout: TLayout;
+  ButtonSave: TButton;
+  ButtonCancelEdit: TButton;
+  EditedMeterValue: TMeterValue;
+begin
+  SelectCurrentRow;
+  EditedMeterValue := FSelectedMeterValue;
+  if EditedMeterValue = nil then
+    Exit;
+
+  Form := TForm.Create(Self);
+  try
+    Form.Caption := 'Редактирование MeterValue';
+    Form.Width := 620;
+    Form.Height := 360;
+
+    ButtonsLayout := TLayout.Create(Form);
+    ButtonsLayout.Parent := Form;
+    ButtonsLayout.Align := TAlignLayout.Bottom;
+    ButtonsLayout.Height := 44;
+    ButtonsLayout.Padding.Rect := TRectF.Create(8, 4, 8, 8);
+
+    ButtonCancelEdit := TButton.Create(Form);
+    ButtonCancelEdit.Parent := ButtonsLayout;
+    ButtonCancelEdit.Align := TAlignLayout.Right;
+    ButtonCancelEdit.Width := 110;
+    ButtonCancelEdit.Text := 'Отмена';
+    ButtonCancelEdit.ModalResult := mrCancel;
+
+    ButtonSave := TButton.Create(Form);
+    ButtonSave.Parent := ButtonsLayout;
+    ButtonSave.Align := TAlignLayout.Right;
+    ButtonSave.Width := 110;
+    ButtonSave.Margins.Right := 8;
+    ButtonSave.Text := 'Сохранить';
+    ButtonSave.ModalResult := mrOk;
+
+    Frame := TFrameMeterValueEdit.Create(Form);
+    Frame.Parent := Form;
+    Frame.Align := TAlignLayout.Client;
+    Frame.LoadFromMeterValue(EditedMeterValue);
+
+    if Form.ShowModal = mrOk then
+    begin
+      Frame.SaveChanges;
+      FillValuesList;
+      FocusMeterValue(EditedMeterValue);
+    end;
+  finally
+    Form.Free;
+  end;
 end;
 
 procedure TFormMeterValueSelect.ButtonSelectClick(Sender: TObject);

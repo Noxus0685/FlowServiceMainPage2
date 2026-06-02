@@ -34,6 +34,7 @@ uses
   frmChannelProperties in 'frmChannelProperties.pas' {FrameChannelProperties: TFrame},
   frmWorkTableProperties in 'frmWorkTableProperties.pas' {FrameWorkTableProperties: TFrame},
   frmMeterValueSelect in 'frmMeterValueSelect.pas' {FormMeterValueSelect},
+  frmMeterValueEditFrame in 'frmMeterValueEditFrame.pas' {FrameMeterValueEdit: TFrame},
   uControlRegister in 'uControlRegister.pas';
 
 {$R *.res}

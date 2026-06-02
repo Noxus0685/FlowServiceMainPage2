@@ -47,6 +47,7 @@ type
     procedure AddMeterValueRow(const ACaption: string; out AEdit: TEdit; out AButton: TButton;
       AOnClick: TNotifyEvent);
     function MeterValueToText(AMeterValue: TMeterValue): string;
+    function WorkTableStateToCaption(AState: EStateWorkTable): string;
     procedure RefreshValues;
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
@@ -230,6 +231,29 @@ begin
   Result := AMeterValue.Hash;
 end;
 
+function TFrameWorkTableProperties.WorkTableStateToCaption(AState: EStateWorkTable): string;
+begin
+  case AState of
+    swtSTANDBY: Result := 'Ожидание';
+    swtCONNECTED: Result := 'Подключен';
+    swtSTARTMONITOR: Result := 'Запуск мониторинга';
+    swtSTARTMONITORWAIT: Result := 'Ожидание запуска мониторинга';
+    swtMONITOR: Result := 'Мониторинг';
+    swtSTOPMONITOR: Result := 'Остановка мониторинга';
+    swtCONFIGED: Result := 'Настроен';
+    swtSTARTTEST: Result := 'Запуск измерения';
+    swtSTARTWAIT: Result := 'Ожидание запуска';
+    swtEXECUTE: Result := 'Выполнение';
+    swtSTOPTEST: Result := 'Остановка измерения';
+    swtSTOPWAIT: Result := 'Ожидание остановки';
+    swtCOMPLETE: Result := 'Завершен';
+    swtFINALREAD: Result := 'Финальное чтение';
+    swtFAILURE: Result := 'Ошибка';
+  else
+    Result := 'Не задано';
+  end;
+end;
+
 function TFrameWorkTableProperties.CanEditWorkTable: Boolean;
 begin
   Result := (FWorkTable <> nil) and (ComboEditMode.ItemIndex = 0);
@@ -263,7 +287,7 @@ begin
     EditWorkTableText.Text := FWorkTable.Text;
     EditWorkTableName.Text := FWorkTable.Name;
     LabelWorkTableUUID.Text := FWorkTable.UUID;
-    LabelWorkTableState.Text := TWorkTable.WorkTableStateToString(FWorkTable.State);
+    LabelWorkTableState.Text := WorkTableStateToCaption(FWorkTable.State);
     ComboEditMode.Enabled := True;
     EditPressure.Text := MeterValueToText(FWorkTable.ValuePressure);
     EditTemperture.Text := MeterValueToText(FWorkTable.ValueTemperture);
