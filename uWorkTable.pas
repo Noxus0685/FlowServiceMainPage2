@@ -316,6 +316,7 @@ type
 
   private
     FID: Integer;
+    FUUID: string;
     FName: string;
     FText: string;
     FActivePump : TPump;
@@ -432,9 +433,6 @@ type
     procedure SetValues;
 
 
-    class function WorkTableStateToString(AState: EStateWorkTable): string; static;
-    class function WorkTableStateFromString(const AValue: string): EStateWorkTable; static;
-
     class procedure SaveGridColumns(
       AIni: TCustomIniFile;
       const ASectionPrefix: string;
@@ -490,6 +488,8 @@ type
   constructor Create;
   destructor Destroy; override;
 
+    class function WorkTableStateToString(AState: EStateWorkTable): string; static;
+    class function WorkTableStateFromString(const AValue: string): EStateWorkTable; static;
     class function BuildWorkTableServiceName(const ATableIndex: Integer): string; static;
     class function BuildDeviceChannelServiceName(const AChannelIndex: Integer): string; static;
     class function BuildEtalonChannelServiceName(const AChannelIndex: Integer): string; static;
@@ -539,6 +539,7 @@ type
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
 
     property ID: Integer read FID write FID;
+    property UUID: string read FUUID write FUUID;
     property Name: string read FName write FName;
     property Text: string read FText write FText;
 
@@ -1065,13 +1066,7 @@ begin
   end;
 
   if ATarget <> nil then
-  begin
     TMeterValue.RebindReferences(ATarget, AValue);
-
-    if TMeterValue.GetMeterValues <> nil then
-      TMeterValue.GetMeterValues.Remove(ATarget);
-    ATarget.Free;
-  end;
 
   ATarget := AValue;
   if ATarget <> nil then
@@ -1653,6 +1648,7 @@ constructor TWorkTable.Create;
 begin
   inherited Create;
   FParameterObserver := TParameterObserverBridge.Create(Self);
+  FUUID := TGUID.NewGuid.ToString;
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
@@ -2848,6 +2844,7 @@ begin
 
 
       Ini.WriteInteger(Section, 'ID', WorkTable.ID);
+      Ini.WriteString(Section, 'UUID', WorkTable.UUID);
       Ini.WriteString(Section, 'Name', WorkTable.Name);
       Ini.WriteString(Section, 'Text', WorkTable.Text);
       Ini.WriteFloat(Section, 'Temp', WorkTable.FluidTemp.Value.Value);
@@ -2961,6 +2958,9 @@ begin
       WorkTable := TWorkTable.Create;
 
       WorkTable.ID := Ini.ReadInteger(Section, 'ID', I + 1);
+      WorkTable.UUID := Ini.ReadString(Section, 'UUID', WorkTable.UUID);
+      if Trim(WorkTable.UUID) = '' then
+        WorkTable.UUID := TGUID.NewGuid.ToString;
       WorkTable.Name := Ini.ReadString(Section, 'Name','0'); //BuildWorkTableServiceName(WorkTable.ID);
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
