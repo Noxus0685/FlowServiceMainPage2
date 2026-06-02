@@ -2573,6 +2573,8 @@ begin
   OutputSet := AType.OutputSet;
   DimensionCoef := AType.DimensionCoef;
   SpillageStop := AType.SpillageStop;
+  Repeats := AType.Repeats;
+  RepeatsProtocol := AType.RepeatsProtocol;
 
   Freq := AType.Freq;
   VoltageRange := AType.VoltageRange;
@@ -2656,6 +2658,19 @@ begin
     DP := AddPoint;
     DP.Apply(TP);
     DP.SpillageStop := SpillageStop;
+  end;
+
+  if Points.Count > 0 then
+  begin
+    if Points[0].Repeats > 0 then
+      Repeats := Points[0].Repeats
+    else
+      Repeats := Max(AType.Repeats, 1);
+
+    if Points[0].RepeatsProtocol > 0 then
+      RepeatsProtocol := Points[0].RepeatsProtocol
+    else
+      RepeatsProtocol := Max(AType.RepeatsProtocol, 1);
   end;
 end;
 
