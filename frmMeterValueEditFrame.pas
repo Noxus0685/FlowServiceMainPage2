@@ -28,10 +28,25 @@ type
     EditDescription: TEdit;
     EditHash: TEdit;
     CheckBoxIsToSave: TCheckBox;
+    EditValueFull: TEdit;
+    EditValue: TEdit;
+    EditValueDim: TEdit;
+    EditMin: TEdit;
+    EditMax: TEdit;
+    EditNameValueRate: TEdit;
+    EditValueRate: TEdit;
+    EditNameValueMultiplier: TEdit;
+    EditValueMultiplier: TEdit;
+    EditNameValueDevider: TEdit;
+    EditValueDevider: TEdit;
+    EditCoefK: TEdit;
+    EditCoefP: TEdit;
 
     procedure BuildUI;
     procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
     procedure AddCheckRow(const ACaption: string; out ACheckBox: TCheckBox);
+    procedure AddSectionRow(const ACaption: string);
+    function SafeFloat(const S: string): Double;
   public
     constructor Create(AOwner: TComponent); override;
     procedure LoadFromMeterValue(AMeterValue: TMeterValue);
@@ -56,12 +71,28 @@ begin
   LayoutRoot.Padding.Rect := TRectF.Create(8, 8, 8, 8);
   LayoutRoot.Stored := False;
 
+  AddEditRow('Полное название', EditValueFull);
+  AddEditRow('Текущее значение', EditValue);
+  AddSectionRow('Основные свойства');
   AddEditRow('Название', EditName);
   AddEditRow('Тип', EditType);
   AddEditRow('Краткое имя', EditShrtName);
   AddEditRow('Описание', EditDescription);
   AddEditRow('Hash', EditHash);
   AddCheckRow('Сохранять', CheckBoxIsToSave);
+  AddSectionRow('Значения');
+  AddEditRow('Размерность', EditValueDim);
+  AddEditRow('Минимальное значение', EditMin);
+  AddEditRow('Максимальное значение', EditMax);
+  AddSectionRow('Коэффициенты');
+  AddEditRow('Наименование Rate', EditNameValueRate);
+  AddEditRow('Значение Rate', EditValueRate);
+  AddEditRow('Наименование множителя', EditNameValueMultiplier);
+  AddEditRow('Значение множителя', EditValueMultiplier);
+  AddEditRow('Наименование делителя', EditNameValueDevider);
+  AddEditRow('Значение делителя', EditValueDevider);
+  AddEditRow('Коэффициент K', EditCoefK);
+  AddEditRow('Коэффициент P', EditCoefP);
 end;
 
 procedure TFrameMeterValueEdit.AddEditRow(const ACaption: string; out AEdit: TEdit);
@@ -143,6 +174,32 @@ begin
   RowGrid.ControlCollection.AddControl(ACheckBox, 1, 0);
 end;
 
+procedure TFrameMeterValueEdit.AddSectionRow(const ACaption: string);
+var
+  Item: TLayout;
+  CaptionLabel: TLabel;
+begin
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 30;
+  Item.Margins.Top := 8;
+  Item.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := Item;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.Margins.Rect := TRectF.Create(10, 0, 8, 0);
+  CaptionLabel.HitTest := False;
+end;
+
+function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
+begin
+  Result := StrToFloatDef(StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]), 0);
+end;
+
 procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
 begin
   FMeterValue := AMeterValue;
@@ -155,16 +212,70 @@ begin
       EditShrtName.Text := '';
       EditDescription.Text := '';
       EditHash.Text := '';
+      EditValueFull.Text := '';
+      EditValue.Text := '';
+      EditValueDim.Text := '';
+      EditMin.Text := '';
+      EditMax.Text := '';
+      EditNameValueRate.Text := '';
+      EditValueRate.Text := '';
+      EditNameValueMultiplier.Text := '';
+      EditValueMultiplier.Text := '';
+      EditNameValueDevider.Text := '';
+      EditValueDevider.Text := '';
+      EditCoefK.Text := '';
+      EditCoefP.Text := '';
       CheckBoxIsToSave.IsChecked := False;
       Exit;
     end;
 
+    EditValueFull.Text := FMeterValue.GetStrFullName;
+    EditValue.Text := FloatToStr(FMeterValue.GetDoubleValueDim);
+    EditValueDim.Text := FMeterValue.GetDimName;
+    EditMin.Text := FMeterValue.GetStringNum(FMeterValue.MinValue);
+    EditMax.Text := FMeterValue.GetStringNum(FMeterValue.MaxValue);
     EditName.Text := FMeterValue.Name;
     EditType.Text := FMeterValue.&Type;
     EditShrtName.Text := FMeterValue.ShrtName;
     EditDescription.Text := FMeterValue.Description;
     EditHash.Text := FMeterValue.Hash;
     CheckBoxIsToSave.IsChecked := FMeterValue.IsToSave;
+
+    if FMeterValue.ValueRate <> nil then
+    begin
+      EditNameValueRate.Text := FMeterValue.ValueRate.GetStrFullName;
+      EditValueRate.Text := FMeterValue.ValueRate.GetStrValue;
+    end
+    else
+    begin
+      EditNameValueRate.Text := '-';
+      EditValueRate.Text := '-';
+    end;
+
+    if FMeterValue.ValueBaseMultiplier <> nil then
+    begin
+      EditNameValueMultiplier.Text := FMeterValue.ValueBaseMultiplier.GetStrFullName;
+      EditValueMultiplier.Text := FMeterValue.ValueBaseMultiplier.GetStrValue;
+    end
+    else
+    begin
+      EditNameValueMultiplier.Text := '-';
+      EditValueMultiplier.Text := '-';
+    end;
+
+    if FMeterValue.ValueBaseDevider <> nil then
+    begin
+      EditNameValueDevider.Text := FMeterValue.ValueBaseDevider.GetStrFullName;
+      EditValueDevider.Text := FMeterValue.ValueBaseDevider.GetStrValue;
+    end
+    else
+    begin
+      EditNameValueDevider.Text := '-';
+      EditValueDevider.Text := '-';
+    end;
+
+    EditCoefK.Text := FloatToStr(FMeterValue.CoefK);
+    EditCoefP.Text := FloatToStr(FMeterValue.CoefP);
   finally
     FLoading := False;
   end;
@@ -180,6 +291,11 @@ begin
   FMeterValue.ShrtName := EditShrtName.Text;
   FMeterValue.Description := EditDescription.Text;
   FMeterValue.Hash := EditHash.Text;
+  FMeterValue.SetValue(EditValue.Text);
+  FMeterValue.MinValue := FMeterValue.GetDoubleNum(EditMin.Text);
+  FMeterValue.MaxValue := FMeterValue.GetDoubleNum(EditMax.Text);
+  FMeterValue.CoefK := SafeFloat(EditCoefK.Text);
+  FMeterValue.CoefP := SafeFloat(EditCoefP.Text);
   FMeterValue.SetToSave(CheckBoxIsToSave.IsChecked);
   TMeterValue.SaveToFile(0);
 end;
