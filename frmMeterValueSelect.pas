@@ -213,7 +213,10 @@ begin
     end;
 
     if StringGridValuesList.RowCount > 0 then
+    begin
       StringGridValuesList.Row := 0;
+      StringGridValuesList.Selected := 0;
+    end;
     sbFind.IsPressed := HasActiveFilters;
     StringGridValuesList.Tag := 0;
   finally
@@ -256,8 +259,10 @@ begin
     if (FFilteredValues[I] <> nil) and (FFilteredValues[I].Hash = AMeterValue.Hash) then
     begin
       StringGridValuesList.Row := I;
+      StringGridValuesList.Selected := I;
       FSelectedMeterValue := FFilteredValues[I];
       StringGridValuesList.SetFocus;
+      StringGridValuesList.Repaint;
       Exit;
     end;
 end;
