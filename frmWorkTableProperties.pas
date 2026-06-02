@@ -343,9 +343,24 @@ begin
       Exit;
 
     case AKind of
-      0: FWorkTable.ValuePressure := SelectedMeterValue;
-      1: FWorkTable.ValueTemperture := SelectedMeterValue;
-      2: FWorkTable.ValueFlowRate := SelectedMeterValue;
+      0:
+        begin
+          FWorkTable.ValuePressure := SelectedMeterValue;
+          if FWorkTable.FluidPress <> nil then
+            FWorkTable.FluidPress.Value := SelectedMeterValue;
+        end;
+      1:
+        begin
+          FWorkTable.ValueTemperture := SelectedMeterValue;
+          if FWorkTable.FluidTemp <> nil then
+            FWorkTable.FluidTemp.Value := SelectedMeterValue;
+        end;
+      2:
+        begin
+          FWorkTable.ValueFlowRate := SelectedMeterValue;
+          if FWorkTable.FlowRate <> nil then
+            FWorkTable.FlowRate.Value := SelectedMeterValue;
+        end;
       3: FWorkTable.ValueQuantity := SelectedMeterValue;
     else
       Exit;

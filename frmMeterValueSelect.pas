@@ -25,10 +25,18 @@ type
     FFilteredValues: TObjectList<TMeterValue>;
     ButtonSelect: TButton;
     ButtonCancel: TButton;
+    EditFindDevice: TEdit;
+    sbClear: TSpeedButton;
+    sbFind: TSpeedButton;
 
     procedure BuildUI;
+    procedure ApplyFilter;
     procedure FillValuesList;
     procedure SelectCurrentRow;
+    function HasActiveFilters: Boolean;
+    procedure EditFindDeviceChangeTracking(Sender: TObject);
+    procedure sbClearClick(Sender: TObject);
+    procedure sbFindClick(Sender: TObject);
     procedure ButtonSelectClick(Sender: TObject);
     procedure ButtonCancelClick(Sender: TObject);
     procedure StringGridValuesListSelChanged(Sender: TObject);
@@ -72,6 +80,7 @@ procedure TFormMeterValueSelect.BuildUI;
   end;
 
 var
+  FilterLayout: TLayout;
   ButtonsLayout: TLayout;
 begin
   Caption := 'Выбор MeterValue';
@@ -83,6 +92,33 @@ begin
   Layout22.Align := TAlignLayout.Client;
   Layout22.Padding.Rect := TRectF.Create(8, 8, 8, 8);
   Layout22.Stored := False;
+
+  FilterLayout := TLayout.Create(Self);
+  FilterLayout.Parent := Layout22;
+  FilterLayout.Align := TAlignLayout.Top;
+  FilterLayout.Height := 36;
+  FilterLayout.Margins.Bottom := 6;
+  FilterLayout.Stored := False;
+
+  sbClear := TSpeedButton.Create(Self);
+  sbClear.Parent := FilterLayout;
+  sbClear.Align := TAlignLayout.Right;
+  sbClear.Width := 34;
+  sbClear.Text := 'X';
+  sbClear.OnClick := sbClearClick;
+
+  sbFind := TSpeedButton.Create(Self);
+  sbFind.Parent := FilterLayout;
+  sbFind.Align := TAlignLayout.Right;
+  sbFind.Width := 34;
+  sbFind.Text := '?';
+  sbFind.OnClick := sbFindClick;
+
+  EditFindDevice := TEdit.Create(Self);
+  EditFindDevice.Parent := FilterLayout;
+  EditFindDevice.Align := TAlignLayout.Client;
+  EditFindDevice.TextPrompt := 'Фильтр';
+  EditFindDevice.OnChangeTracking := EditFindDeviceChangeTracking;
 
   ButtonsLayout := TLayout.Create(Self);
   ButtonsLayout.Parent := Layout22;
@@ -121,20 +157,43 @@ begin
   AddColumn('Hash', 220);
 end;
 
-procedure TFormMeterValueSelect.FillValuesList;
+procedure TFormMeterValueSelect.ApplyFilter;
 var
   Source: TObjectList<TMeterValue>;
   Item: TMeterValue;
-  I: Integer;
+  SearchText, SearchArea: string;
 begin
+  Source := TMeterValue.GetMeterValues;
+
   FreeAndNil(FFilteredValues);
   FFilteredValues := TObjectList<TMeterValue>.Create(False);
 
-  Source := TMeterValue.GetMeterValues;
-  if Source <> nil then
-    for Item in Source do
-      FFilteredValues.Add(Item);
+  if Source = nil then
+    Exit;
 
+  SearchText := Trim(LowerCase(EditFindDevice.Text));
+  for Item in Source do
+  begin
+    if SearchText = '' then
+    begin
+      FFilteredValues.Add(Item);
+      Continue;
+    end;
+
+    SearchArea := LowerCase(Item.NameOwner + ' ' + Item.Description + ' ' +
+      Item.GetStrFullName + ' ' + Item.GetStrValue + ' ' + Item.Hash);
+
+    if Pos(SearchText, SearchArea) > 0 then
+      FFilteredValues.Add(Item);
+  end;
+end;
+
+procedure TFormMeterValueSelect.FillValuesList;
+var
+  Item: TMeterValue;
+  I: Integer;
+begin
+  ApplyFilter;
   StringGridValuesList.BeginUpdate;
   try
     StringGridValuesList.Tag := 1;
@@ -152,10 +211,35 @@ begin
 
     if StringGridValuesList.RowCount > 0 then
       StringGridValuesList.Row := 0;
+    sbFind.IsPressed := HasActiveFilters;
     StringGridValuesList.Tag := 0;
   finally
     StringGridValuesList.EndUpdate;
   end;
+end;
+
+function TFormMeterValueSelect.HasActiveFilters: Boolean;
+begin
+  Result := Trim(EditFindDevice.Text) <> '';
+end;
+
+procedure TFormMeterValueSelect.EditFindDeviceChangeTracking(Sender: TObject);
+begin
+  FillValuesList;
+  SelectCurrentRow;
+end;
+
+procedure TFormMeterValueSelect.sbClearClick(Sender: TObject);
+begin
+  EditFindDevice.Text := '';
+  FillValuesList;
+  SelectCurrentRow;
+end;
+
+procedure TFormMeterValueSelect.sbFindClick(Sender: TObject);
+begin
+  FillValuesList;
+  SelectCurrentRow;
 end;
 
 procedure TFormMeterValueSelect.SelectCurrentRow;
