@@ -40,6 +40,7 @@ uses
   frmCalibrCoefs,
   frmChannelProperties,
   frmFlowMeterProperties,
+  frmWorkTableProperties,
   frmMeasurementRun,
   frmMRResults,
   frmProceed,
@@ -366,6 +367,7 @@ type
     TabItemMeasurmentRun: TTabItem;
     TabItemMRResults: TTabItem;
     TabItemChannelProperties: TTabItem;
+    TabItemWorkTableProperties: TTabItem;
     StringColumnDeviceCoef1: TStringColumn;
     ActionSessionCreatePoints: TAction;
     LayoutRepeats: TLayout;
@@ -416,6 +418,7 @@ type
     procedure SpeedButtonMinimizeProceduresClick(Sender: TObject);
     procedure SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
     procedure PopupMenuInstrumentalLayOutPopup(Sender: TObject);
+    procedure PopupMenuWorkTablesPopup(Sender: TObject);
     procedure MenuInstrumentalLayOutClick(Sender: TObject);
     procedure PopupMenuDevicesGridLayOutPopup(Sender: TObject);
     procedure PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
@@ -510,6 +513,7 @@ type
   FProtocolHostScroll: TVertScrollBox;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
   FFrameChannelProperties: TFrameChannelProperties;
+  FFrameWorkTableProperties: TFrameWorkTableProperties;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -531,6 +535,7 @@ type
     function GetWorkTableByIndex(const AIndex: Integer): TWorkTable;
     // Проверяет, что ссылка на рабочий стол ещё принадлежит менеджеру.
     function IsManagedWorkTable(AWorkTable: TWorkTable): Boolean;
+    function CanEditActiveWorkTable: Boolean;
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
     procedure UpdateGridDevices;
@@ -542,6 +547,7 @@ type
     function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
     procedure FillDNItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
     function ApplyChannelDNChange(AChannel: TChannel; const ANewDN: string): Boolean;
+    procedure ApplyActiveWorkTableEditMode;
     procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
     procedure FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
     procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
@@ -746,6 +752,7 @@ begin
   FreeAndNil(FProtocolHostScroll);
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FFrameChannelProperties);
+  FreeAndNil(FFrameWorkTableProperties);
   FreeAndNil(FDeviceClipboard.Snapshot);
   FreeAndNil(FEtalonClipboard.Snapshot);
   FInstrumentalVisibleOrder.Free;
@@ -929,6 +936,9 @@ procedure TFrameMainTable.UpdateForm;
           if FActiveWorkTable = nil then
           begin
             UpdateGrids;
+            if FFrameWorkTableProperties <> nil then
+              FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+            ApplyActiveWorkTableEditMode;
             Exit;
           end;
 
@@ -936,6 +946,9 @@ procedure TFrameMainTable.UpdateForm;
             try
                UpdateUIFromValues;
                 UpdateGrids;
+                if FFrameWorkTableProperties <> nil then
+                  FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+                ApplyActiveWorkTableEditMode;
             finally
           IsUpdating := False;
           end;
@@ -999,6 +1012,9 @@ begin
         FFrameMRResults.ActiveWorkTable := FActiveWorkTable;
     end;
 
+    if FFrameWorkTableProperties <> nil then
+      FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+
     SetValues;
     UpdateForm;
     Exit;
@@ -1012,6 +1028,8 @@ begin
       if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
          (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
         FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[GridDevices.Row]);
+      if FFrameWorkTableProperties <> nil then
+        FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
     end;
     Exit;
   end;
@@ -1368,6 +1386,7 @@ begin
   FFrameProtocol := nil;
   FFrameFlowMeterProperties := nil;
   FFrameChannelProperties := nil;
+  FFrameWorkTableProperties := nil;
 
   GridDevices.RowCount := 2;
 
@@ -1438,6 +1457,16 @@ begin
     FFrameChannelProperties.Align := TAlignLayout.Client;
   end;
 
+  if FFrameWorkTableProperties = nil then
+  begin
+    FFrameWorkTableProperties := TFrameWorkTableProperties.Create(Self);
+    FFrameWorkTableProperties.Parent := TabItemWorkTableProperties;
+    FFrameWorkTableProperties.Align := TAlignLayout.Client;
+  end;
+  FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+  PopupMenuWorkTables.OnPopup := PopupMenuWorkTablesPopup;
+  ApplyActiveWorkTableEditMode;
+
   RefreshPumpsCombo;
 
   FLastClickRow := -1;
@@ -1471,6 +1500,8 @@ begin
   begin
     FActiveWorkTable.NextClimateChangeAt := Now;
     FActiveWorkTable.State := swtNONE;
+    if FFrameWorkTableProperties <> nil then
+      FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
   end
   else
     OnChangeState(swtNONE);
@@ -1490,12 +1521,18 @@ end;
 
 procedure TFrameMainTable.PopupMenuGridDataPointsPopup(Sender: TObject);
 begin
+  if not CanEditActiveWorkTable then
+    Exit;
+
  // if FFrameProceed <> nil then
  //   FFrameProceed.PopupMenuGridDataPointsPopup(Sender);
 end;
 
 procedure TFrameMainTable.PopupMenuGridResultsPopup(Sender: TObject);
 begin
+  if not CanEditActiveWorkTable then
+    Exit;
+
  // if FFrameProceed <> nil then
  //   FFrameProceed.PopupMenuGridResultsPopup(Sender);
 end;
@@ -2126,8 +2163,29 @@ begin
   // Здесь будут обработчики действий с приборами.
 end;
 
+procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
+var
+  CanEdit: Boolean;
+begin
+  CanEdit := CanEditActiveWorkTable;
+  miAddTable.Enabled := CanEdit;
+  miAddDeviceChannel.Enabled := CanEdit;
+  miAddEtalonChannel.Enabled := CanEdit;
+  miSaveWorkTable.Enabled := CanEdit;
+  ActionAddWorkTable.Enabled := CanEdit;
+  ActionAddDeviceChannel.Enabled := CanEdit;
+  ActionAddEtalonChannel.Enabled := CanEdit;
+  ActionSaveWorkTable.Enabled := CanEdit;
+end;
+
 procedure TFrameMainTable.PopupMenuDevicesGridLayOutPopup(Sender: TObject);
 begin
+  if not CanEditActiveWorkTable then
+  begin
+    PopupMenuDevicesGridLayOut.Clear;
+    Exit;
+  end;
+
   if IsHeaderPopup(PopupMenuDevicesGridLayOut, GridDevices) then
     FillGridLayOutPopup(PopupMenuDevicesGridLayOut, GridDevices)
   else
@@ -2136,6 +2194,12 @@ end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
 begin
+  if not CanEditActiveWorkTable then
+  begin
+    PopupMenuEtalonsGridLayOut.Clear;
+    Exit;
+  end;
+
   if IsHeaderPopup(PopupMenuEtalonsGridLayOut, GridEtalons) then
     FillGridLayOutPopup(PopupMenuEtalonsGridLayOut, GridEtalons)
   else
@@ -2465,6 +2529,58 @@ begin
     (WorkTableManager <> nil) and
     (WorkTableManager.WorkTables <> nil) and
     (WorkTableManager.WorkTables.IndexOf(AWorkTable) >= 0);
+end;
+
+function TFrameMainTable.CanEditActiveWorkTable: Boolean;
+begin
+  Result := FActiveWorkTable <> nil;
+  if Result and (FFrameWorkTableProperties <> nil) then
+    Result := FFrameWorkTableProperties.CanEditWorkTable;
+end;
+
+procedure TFrameMainTable.ApplyActiveWorkTableEditMode;
+var
+  CanEdit: Boolean;
+begin
+  CanEdit := CanEditActiveWorkTable;
+
+  ActionAddWorkTable.Enabled := CanEdit;
+  ActionAddDeviceChannel.Enabled := CanEdit;
+  ActionAddEtalonChannel.Enabled := CanEdit;
+  ActionSaveWorkTable.Enabled := CanEdit;
+
+  if TabControlWorkTables <> nil then
+    if CanEdit then
+      TabControlWorkTables.PopupMenu := PopupMenuWorkTables
+    else
+      TabControlWorkTables.PopupMenu := nil;
+
+  if Label23 <> nil then
+    if CanEdit then
+      Label23.PopupMenu := PopupMenuWorkTables
+    else
+      Label23.PopupMenu := nil;
+
+  if Label30 <> nil then
+    if CanEdit then
+      Label30.PopupMenu := PopupMenuWorkTables
+    else
+      Label30.PopupMenu := nil;
+
+  if CanEdit then
+    Exit;
+
+  if GridDevices <> nil then
+  begin
+    GridDevices.ReadOnly := True;
+    GridDevices.EditorMode := False;
+  end;
+
+  if GridEtalons <> nil then
+  begin
+    GridEtalons.ReadOnly := True;
+    GridEtalons.EditorMode := False;
+  end;
 end;
 
 procedure TFrameMainTable.NormalizeActiveWorkTable;
@@ -4617,6 +4733,9 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  if not CanEditActiveWorkTable then
+    Exit;
+
   WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
     Exit;
@@ -4821,6 +4940,9 @@ var
   NewValue: string;
   DuplicateFound: boolean;
 begin
+  if not CanEditActiveWorkTable then
+    Exit;
+
   WorkTable := FActiveWorkTable;
 
   // Проверка дубликатов только для столбца серийных номеров
@@ -5056,6 +5178,9 @@ begin
   if IsUpdating then
     Exit;
 
+  if not CanEditActiveWorkTable then
+    Exit;
+
   WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.DeviceChannels.Count) then
   begin
@@ -5135,6 +5260,9 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  if not CanEditActiveWorkTable then
+    Exit;
+
   WorkTable := GetWorkTableByIndex(0);
 
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
@@ -5506,6 +5634,9 @@ var
   Changed: Boolean;
 begin
   if IsUpdating then
+    Exit;
+
+  if not CanEditActiveWorkTable then
     Exit;
 
   WorkTable := FActiveWorkTable;
