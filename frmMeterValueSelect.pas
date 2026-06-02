@@ -115,13 +115,6 @@ begin
   sbClear.Text := 'X';
   sbClear.OnClick := sbClearClick;
 
-  sbFind := TSpeedButton.Create(Self);
-  sbFind.Parent := FilterLayout;
-  sbFind.Align := TAlignLayout.Right;
-  sbFind.Width := 34;
-  sbFind.Text := '?';
-  sbFind.OnClick := sbFindClick;
-
   EditFindDevice := TEdit.Create(Self);
   EditFindDevice.Parent := FilterLayout;
   EditFindDevice.Align := TAlignLayout.Client;
@@ -147,7 +140,7 @@ begin
   ButtonEdit.Parent := ButtonsLayout;
   ButtonEdit.Align := TAlignLayout.Right;
   ButtonEdit.Width := 110;
-  ButtonEdit.Margins.Right := 8;
+  ButtonEdit.Margins.Left := 8;
   ButtonEdit.Text := 'Редактировать';
   ButtonEdit.OnClick := ButtonEditClick;
 
@@ -232,7 +225,8 @@ begin
       StringGridValuesList.Row := 0;
       StringGridValuesList.Selected := 0;
     end;
-    sbFind.IsPressed := HasActiveFilters;
+    if sbFind <> nil then
+      sbFind.IsPressed := HasActiveFilters;
     StringGridValuesList.Tag := 0;
   finally
     StringGridValuesList.EndUpdate;
@@ -318,8 +312,8 @@ begin
   Form := TForm.CreateNew(Self);
   try
     Form.Caption := 'Редактирование MeterValue';
-    Form.Width := 620;
-    Form.Height := 360;
+    Form.Width := 820;
+    Form.Height := 520;
 
     ButtonsLayout := TLayout.Create(Form);
     ButtonsLayout.Parent := Form;
