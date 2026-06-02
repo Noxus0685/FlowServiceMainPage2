@@ -236,7 +236,7 @@ procedure TFrameWorkTableProperties.ApplyEditState;
 var
   CanEdit: Boolean;
 begin
-  CanEdit := (FWorkTable <> nil) and (FWorkTable.State in [swtNONE, swtSTANDBY]);
+  CanEdit := (FWorkTable <> nil) and (FWorkTable.State in [swtNONE, swtSTANDBY, swtCONFIGED]);
 
   EditWorkTableText.Enabled := CanEdit;
   EditWorkTableName.Enabled := CanEdit;
@@ -287,7 +287,7 @@ var
   Form: TFormMeterValueSelect;
   SelectedMeterValue: TMeterValue;
 begin
-  if (FWorkTable = nil) or not (FWorkTable.State in [swtNONE, swtSTANDBY]) then
+  if (FWorkTable = nil) or not (FWorkTable.State in [swtNONE, swtSTANDBY, swtCONFIGED]) then
     Exit;
 
   Form := TFormMeterValueSelect.Create(Self);

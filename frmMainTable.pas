@@ -1494,6 +1494,8 @@ begin
   begin
     FActiveWorkTable.NextClimateChangeAt := Now;
     FActiveWorkTable.State := swtNONE;
+    if FFrameWorkTableProperties <> nil then
+      FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
   end
   else
     OnChangeState(swtNONE);
@@ -2511,7 +2513,7 @@ end;
 function TFrameMainTable.CanEditActiveWorkTable: Boolean;
 begin
   Result := (FActiveWorkTable <> nil) and
-            (FActiveWorkTable.State in [swtNONE, swtSTANDBY]);
+            (FActiveWorkTable.State in [swtNONE, swtSTANDBY, swtCONFIGED]);
 end;
 
 procedure TFrameMainTable.NormalizeActiveWorkTable;

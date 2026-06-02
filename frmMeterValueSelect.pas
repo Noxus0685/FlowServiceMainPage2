@@ -111,7 +111,6 @@ begin
   StringGridValuesList.Parent := Layout22;
   StringGridValuesList.Align := TAlignLayout.Client;
   StringGridValuesList.ReadOnly := True;
-  StringGridValuesList.Options := StringGridValuesList.Options + [TGridOption.RowSelect];
   StringGridValuesList.OnSelChanged := StringGridValuesListSelChanged;
 
   AddColumn('№', 45);
