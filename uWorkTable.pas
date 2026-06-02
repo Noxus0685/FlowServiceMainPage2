@@ -9,6 +9,7 @@ uses
   System.Math,
   System.StrUtils,
   System.SysUtils,
+  System.TypInfo,
   System.UITypes,
   uBaseProcedures,
   uClasses,
@@ -67,9 +68,12 @@ type
 
   EEventWorkTable = (
     ewtNone = 0,
-    ewtWarning = 1,
-    ewtError,
+    ewtEvent = 1,
+    ewtState,
+    ewtAction,
     ewtInfo,
+    ewtWarning,
+    ewtError,
     ewtActivated,
     ewtRefresh
   );
@@ -477,7 +481,9 @@ type
   procedure DoStopMonitor;
   procedure DoStartTest;
   procedure DoStopTest;
+  class function WorkTableEventToText(AEvent: TWorkTableEvent): string; static;
   class function WorkTableEventToString(AEvent: TWorkTableEvent): string; static;
+  class function WorkTableEventToProtocolCategory(AEvent: TWorkTableEvent): EProtocolCategory; static;
 
   public
 
@@ -3421,15 +3427,44 @@ begin
   end;
 end;
 
+class function TWorkTable.WorkTableEventToText(AEvent: TWorkTableEvent): string;
+begin
+  Result := GetEnumName(TypeInfo(TWorkTableEvent), Ord(AEvent));
+end;
+
 class function TWorkTable.WorkTableEventToString(AEvent: TWorkTableEvent): string;
 begin
+  Result := WorkTableEventToText(AEvent);
+end;
+
+class function TWorkTable.WorkTableEventToProtocolCategory(
+  AEvent: TWorkTableEvent): EProtocolCategory;
+begin
   case AEvent of
-    ewtWarning: Result := 'ewtWarning';
-    ewtError: Result := 'ewtError';
-    ewtActivated: Result := 'ewtActivated';
-    ewtRefresh: Result := 'ewtRefresh';
+    ewtNone:
+      Result := pcNone;
+
+    ewtEvent:
+      Result := pcEvent;
+
+    ewtState,
+    ewtRefresh:
+      Result := pcState;
+
+    ewtAction,
+    ewtActivated:
+      Result := pcAction;
+
+    ewtInfo:
+      Result := pcInfo;
+
+    ewtWarning:
+      Result := pcWarning;
+
+    ewtError:
+      Result := pcError;
   else
-    Result := 'ewtNone';
+    Result := pcEvent;
   end;
 end;
 
@@ -3446,18 +3481,20 @@ end;
 
 procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo);
 var
+  Category: EProtocolCategory;
+  EventText: string;
   ErrorDetails: string;
 begin
+  Category := WorkTableEventToProtocolCategory(AEvent);
+  EventText := WorkTableEventToText(AEvent);
 
-
-
-  ProtocolManager.AddMessage(pcEvent, psWorkTable, 'WorkTableEvent',
-    'Событие рабочего стола', WorkTableEventToString(AEvent));
+  ProtocolManager.AddMessage(Category, psWorkTable, 'WorkTableEvent',
+    'Событие рабочего стола', EventText);
 
   if (AError.Code <> 0) or (Trim(AError.Msg) <> '') then
   begin
     ErrorDetails := Format('Event=%s; Code=%d; State=%s; Time=%s; Msg=%s', [
-      WorkTableEventToString(AEvent),
+      EventText,
       AError.Code,
       WorkTableStateToString(EStateWorkTable(AError.Stage)),
       FormatDateTime('dd.mm.yyyy hh:nn:ss', AError.Time),
