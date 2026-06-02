@@ -60,6 +60,7 @@ type
     procedure ButtonSelectQuantityClick(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
+    function CanEditWorkTable: Boolean;
     procedure LoadFromWorkTable(AWorkTable: TWorkTable);
   end;
 
@@ -229,6 +230,11 @@ begin
   Result := AMeterValue.Hash;
 end;
 
+function TFrameWorkTableProperties.CanEditWorkTable: Boolean;
+begin
+  Result := (FWorkTable <> nil) and (ComboEditMode.ItemIndex = 0);
+end;
+
 procedure TFrameWorkTableProperties.LoadFromWorkTable(AWorkTable: TWorkTable);
 begin
   FWorkTable := AWorkTable;
@@ -272,7 +278,7 @@ procedure TFrameWorkTableProperties.ApplyEditState;
 var
   CanEdit: Boolean;
 begin
-  CanEdit := (FWorkTable <> nil) and (ComboEditMode.ItemIndex = 0);
+  CanEdit := CanEditWorkTable;
 
   EditWorkTableText.Enabled := CanEdit;
   EditWorkTableName.Enabled := CanEdit;
@@ -285,6 +291,8 @@ end;
 procedure TFrameWorkTableProperties.HandleEditModeChange(Sender: TObject);
 begin
   ApplyEditState;
+  if (not FLoading) and (FWorkTable <> nil) then
+    FWorkTable.FireEvent(ewtRefresh);
 end;
 
 procedure TFrameWorkTableProperties.NotifyRefreshIfChanged(const AChanged: Boolean);

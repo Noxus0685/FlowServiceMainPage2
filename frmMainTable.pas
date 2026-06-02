@@ -418,6 +418,7 @@ type
     procedure SpeedButtonMinimizeProceduresClick(Sender: TObject);
     procedure SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
     procedure PopupMenuInstrumentalLayOutPopup(Sender: TObject);
+    procedure PopupMenuWorkTablesPopup(Sender: TObject);
     procedure MenuInstrumentalLayOutClick(Sender: TObject);
     procedure PopupMenuDevicesGridLayOutPopup(Sender: TObject);
     procedure PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
@@ -546,6 +547,7 @@ type
     function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
     procedure FillDNItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
     function ApplyChannelDNChange(AChannel: TChannel; const ANewDN: string): Boolean;
+    procedure ApplyActiveWorkTableEditMode;
     procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
     procedure FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
     procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
@@ -936,6 +938,7 @@ procedure TFrameMainTable.UpdateForm;
             UpdateGrids;
             if FFrameWorkTableProperties <> nil then
               FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+            ApplyActiveWorkTableEditMode;
             Exit;
           end;
 
@@ -945,6 +948,7 @@ procedure TFrameMainTable.UpdateForm;
                 UpdateGrids;
                 if FFrameWorkTableProperties <> nil then
                   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+                ApplyActiveWorkTableEditMode;
             finally
           IsUpdating := False;
           end;
@@ -1460,6 +1464,8 @@ begin
     FFrameWorkTableProperties.Align := TAlignLayout.Client;
   end;
   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+  PopupMenuWorkTables.OnPopup := PopupMenuWorkTablesPopup;
+  ApplyActiveWorkTableEditMode;
 
   RefreshPumpsCombo;
 
@@ -2157,6 +2163,21 @@ begin
   // Здесь будут обработчики действий с приборами.
 end;
 
+procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
+var
+  CanEdit: Boolean;
+begin
+  CanEdit := CanEditActiveWorkTable;
+  miAddTable.Enabled := CanEdit;
+  miAddDeviceChannel.Enabled := CanEdit;
+  miAddEtalonChannel.Enabled := CanEdit;
+  miSaveWorkTable.Enabled := CanEdit;
+  ActionAddWorkTable.Enabled := CanEdit;
+  ActionAddDeviceChannel.Enabled := CanEdit;
+  ActionAddEtalonChannel.Enabled := CanEdit;
+  ActionSaveWorkTable.Enabled := CanEdit;
+end;
+
 procedure TFrameMainTable.PopupMenuDevicesGridLayOutPopup(Sender: TObject);
 begin
   if not CanEditActiveWorkTable then
@@ -2512,8 +2533,54 @@ end;
 
 function TFrameMainTable.CanEditActiveWorkTable: Boolean;
 begin
-  Result := (FActiveWorkTable <> nil) and
-            (FActiveWorkTable.State in [swtNONE, swtSTANDBY, swtCONFIGED]);
+  Result := FActiveWorkTable <> nil;
+  if Result and (FFrameWorkTableProperties <> nil) then
+    Result := FFrameWorkTableProperties.CanEditWorkTable;
+end;
+
+procedure TFrameMainTable.ApplyActiveWorkTableEditMode;
+var
+  CanEdit: Boolean;
+begin
+  CanEdit := CanEditActiveWorkTable;
+
+  ActionAddWorkTable.Enabled := CanEdit;
+  ActionAddDeviceChannel.Enabled := CanEdit;
+  ActionAddEtalonChannel.Enabled := CanEdit;
+  ActionSaveWorkTable.Enabled := CanEdit;
+
+  if TabControlWorkTables <> nil then
+    if CanEdit then
+      TabControlWorkTables.PopupMenu := PopupMenuWorkTables
+    else
+      TabControlWorkTables.PopupMenu := nil;
+
+  if Label23 <> nil then
+    if CanEdit then
+      Label23.PopupMenu := PopupMenuWorkTables
+    else
+      Label23.PopupMenu := nil;
+
+  if Label30 <> nil then
+    if CanEdit then
+      Label30.PopupMenu := PopupMenuWorkTables
+    else
+      Label30.PopupMenu := nil;
+
+  if CanEdit then
+    Exit;
+
+  if GridDevices <> nil then
+  begin
+    GridDevices.ReadOnly := True;
+    GridDevices.EditorMode := False;
+  end;
+
+  if GridEtalons <> nil then
+  begin
+    GridEtalons.ReadOnly := True;
+    GridEtalons.EditorMode := False;
+  end;
 end;
 
 procedure TFrameMainTable.NormalizeActiveWorkTable;
