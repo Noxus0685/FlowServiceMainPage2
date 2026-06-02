@@ -2620,12 +2620,37 @@ begin
     case Res of
       mrYes:
         begin
-            AppServices.DataManager.Save;
+          try
+            if not Repo.Save then
+            begin
+              Action := TCloseAction.caNone;
+              Exit;
+            end;
+          except
+            on E: Exception do
+            begin
+              ShowMessage('Ошибка сохранения: ' + E.Message);
+              Action := TCloseAction.caNone;
+              Exit;
+            end;
+          end;
         end;
 
       mrNo:
         begin
-          { закрываем без сохранения }
+          { Откатываем изменения в памяти, чтобы вызывающая форма не считала
+            несохранённо удалённые приборы реально удалёнными. }
+          FDeletedDeviceUUIDs.Clear;
+          if not Repo.Load then
+          begin
+            ShowMessage('Не удалось отменить несохранённые изменения приборов');
+            Action := TCloseAction.caNone;
+            Exit;
+          end;
+          LoadData;
+          BuildTree;
+          ApplyFilter;
+          UpdateGridDevices;
         end;
 
       mrCancel:
