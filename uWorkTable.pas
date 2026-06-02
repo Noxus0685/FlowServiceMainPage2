@@ -4140,6 +4140,9 @@ begin
       FActivePump := nil;
     UnbindParameterEvents(APump);
     FPumps.Remove(APump);
+
+    FAction := awtRemovePump;
+    Notify(notifyAction, Self);
   end;
 end;
 
