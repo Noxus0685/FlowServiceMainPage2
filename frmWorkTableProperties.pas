@@ -428,6 +428,13 @@ begin
   Form := TFormMeterValueSelect.Create(Self);
   try
     case AKind of
+      0: Form.SetFilterText('Давление');
+      1: Form.SetFilterText('Температура');
+      2: Form.SetFilterText('Расход');
+      3: Form.SetFilterText('Объем');
+    end;
+
+    case AKind of
       0: Form.SelectMeterValue(FWorkTable.ValuePressure);
       1: Form.SelectMeterValue(FWorkTable.ValueTemperture);
       2: Form.SelectMeterValue(FWorkTable.ValueFlowRate);

@@ -50,6 +50,7 @@ type
 
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure SetFilterText(const AFilterText: string);
     procedure SelectMeterValue(AMeterValue: TMeterValue);
     property SelectedMeterValue: TMeterValue read FSelectedMeterValue;
   end;
@@ -275,6 +276,19 @@ begin
       StringGridValuesList.Repaint;
       Exit;
     end;
+end;
+
+procedure TFormMeterValueSelect.SetFilterText(const AFilterText: string);
+begin
+  EditFindDevice.OnChangeTracking := nil;
+  try
+    EditFindDevice.Text := AFilterText;
+  finally
+    EditFindDevice.OnChangeTracking := EditFindDeviceChangeTracking;
+  end;
+
+  FillValuesList;
+  SelectCurrentRow;
 end;
 
 procedure TFormMeterValueSelect.SelectMeterValue(AMeterValue: TMeterValue);
