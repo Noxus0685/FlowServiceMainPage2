@@ -109,107 +109,166 @@ end;
 
 procedure TFrameWorkTableProperties.AddEditRow(const ACaption: string; out AEdit: TEdit);
 var
-  Row: TLayout;
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Row := TLayout.Create(Self);
-  Row.Parent := LayoutRoot;
-  Row.Align := TAlignLayout.Top;
-  Row.Height := 36;
-  Row.Margins.Bottom := 4;
-  Row.Stored := False;
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
 
   CaptionLabel := TLabel.Create(Self);
-  CaptionLabel.Parent := Row;
-  CaptionLabel.Align := TAlignLayout.Left;
-  CaptionLabel.Width := 180;
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   AEdit := TEdit.Create(Self);
-  AEdit.Parent := Row;
+  AEdit.Parent := RowGrid;
   AEdit.Align := TAlignLayout.Client;
-  AEdit.Margins.Left := 8;
+  AEdit.Margins.Rect := TRectF.Create(6, 3, 10, 3);
   AEdit.KillFocusByReturn := True;
+  RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
 end;
 
 procedure TFrameWorkTableProperties.AddLabelRow(const ACaption: string; out ALabel: TLabel);
 var
-  Row: TLayout;
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Row := TLayout.Create(Self);
-  Row.Parent := LayoutRoot;
-  Row.Align := TAlignLayout.Top;
-  Row.Height := 32;
-  Row.Margins.Bottom := 4;
-  Row.Stored := False;
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 32;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
 
   CaptionLabel := TLabel.Create(Self);
-  CaptionLabel.Parent := Row;
-  CaptionLabel.Align := TAlignLayout.Left;
-  CaptionLabel.Width := 180;
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   ALabel := TLabel.Create(Self);
-  ALabel.Parent := Row;
+  ALabel.Parent := RowGrid;
   ALabel.Align := TAlignLayout.Client;
-  ALabel.Margins.Left := 8;
+  ALabel.Margins.Rect := TRectF.Create(6, 0, 10, 0);
   ALabel.TextSettings.VertAlign := TTextAlign.Center;
+  RowGrid.ControlCollection.AddControl(ALabel, 1, 0);
 end;
 
 procedure TFrameWorkTableProperties.AddComboRow(const ACaption: string; out ACombo: TComboBox);
 var
-  Row: TLayout;
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Row := TLayout.Create(Self);
-  Row.Parent := LayoutRoot;
-  Row.Align := TAlignLayout.Top;
-  Row.Height := 36;
-  Row.Margins.Bottom := 4;
-  Row.Stored := False;
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
 
   CaptionLabel := TLabel.Create(Self);
-  CaptionLabel.Parent := Row;
-  CaptionLabel.Align := TAlignLayout.Left;
-  CaptionLabel.Width := 180;
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   ACombo := TComboBox.Create(Self);
-  ACombo.Parent := Row;
+  ACombo.Parent := RowGrid;
   ACombo.Align := TAlignLayout.Client;
-  ACombo.Margins.Left := 8;
+  ACombo.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  RowGrid.ControlCollection.AddControl(ACombo, 1, 0);
 end;
 
 procedure TFrameWorkTableProperties.AddMeterValueRow(const ACaption: string; out AEdit: TEdit;
   out AButton: TButton; AOnClick: TNotifyEvent);
 var
-  Row: TLayout;
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
+  ValueLayout: TLayout;
 begin
-  Row := TLayout.Create(Self);
-  Row.Parent := LayoutRoot;
-  Row.Align := TAlignLayout.Top;
-  Row.Height := 36;
-  Row.Margins.Bottom := 4;
-  Row.Stored := False;
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
 
   CaptionLabel := TLabel.Create(Self);
-  CaptionLabel.Parent := Row;
-  CaptionLabel.Align := TAlignLayout.Left;
-  CaptionLabel.Width := 180;
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  ValueLayout := TLayout.Create(Self);
+  ValueLayout.Parent := RowGrid;
+  ValueLayout.Align := TAlignLayout.Client;
+  ValueLayout.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  ValueLayout.Stored := False;
+  RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
 
   AButton := TButton.Create(Self);
-  AButton.Parent := Row;
+  AButton.Parent := ValueLayout;
   AButton.Align := TAlignLayout.Right;
   AButton.Width := 36;
   AButton.Margins.Left := 8;
@@ -217,9 +276,8 @@ begin
   AButton.OnClick := AOnClick;
 
   AEdit := TEdit.Create(Self);
-  AEdit.Parent := Row;
+  AEdit.Parent := ValueLayout;
   AEdit.Align := TAlignLayout.Client;
-  AEdit.Margins.Left := 8;
   AEdit.ReadOnly := True;
 end;
 

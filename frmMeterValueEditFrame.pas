@@ -66,55 +66,81 @@ end;
 
 procedure TFrameMeterValueEdit.AddEditRow(const ACaption: string; out AEdit: TEdit);
 var
-  Row: TLayout;
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Row := TLayout.Create(Self);
-  Row.Parent := LayoutRoot;
-  Row.Align := TAlignLayout.Top;
-  Row.Height := 36;
-  Row.Margins.Bottom := 4;
-  Row.Stored := False;
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
 
   CaptionLabel := TLabel.Create(Self);
-  CaptionLabel.Parent := Row;
-  CaptionLabel.Align := TAlignLayout.Left;
-  CaptionLabel.Width := 160;
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   AEdit := TEdit.Create(Self);
-  AEdit.Parent := Row;
+  AEdit.Parent := RowGrid;
   AEdit.Align := TAlignLayout.Client;
-  AEdit.Margins.Left := 8;
+  AEdit.Margins.Rect := TRectF.Create(6, 3, 10, 3);
   AEdit.KillFocusByReturn := True;
+  RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
 end;
 
 procedure TFrameMeterValueEdit.AddCheckRow(const ACaption: string; out ACheckBox: TCheckBox);
 var
-  Row: TLayout;
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Row := TLayout.Create(Self);
-  Row.Parent := LayoutRoot;
-  Row.Align := TAlignLayout.Top;
-  Row.Height := 36;
-  Row.Margins.Bottom := 4;
-  Row.Stored := False;
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
 
   CaptionLabel := TLabel.Create(Self);
-  CaptionLabel.Parent := Row;
-  CaptionLabel.Align := TAlignLayout.Left;
-  CaptionLabel.Width := 160;
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   ACheckBox := TCheckBox.Create(Self);
-  ACheckBox.Parent := Row;
+  ACheckBox.Parent := RowGrid;
   ACheckBox.Align := TAlignLayout.Client;
-  ACheckBox.Margins.Left := 8;
+  ACheckBox.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  RowGrid.ControlCollection.AddControl(ACheckBox, 1, 0);
 end;
 
 procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
