@@ -4833,6 +4833,8 @@ object FrameMainTable: TFrameMainTable
             674s
             427s
             674s
+            427s
+            674s
             427s)
           object TabItemMeasurmentRun: TTabItem
             CustomIcon = <
@@ -4877,6 +4879,21 @@ object FrameMainTable: TFrameMainTable
             TabOrder = 0
             Text = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1082#1072#1085#1072#1083#1072
             ExplicitSize.cx = 120.000000000000000000
+            ExplicitSize.cy = 26.000000000000000000
+          end
+          object TabItemWorkTableProperties: TTabItem
+            CustomIcon = <
+              item
+              end>
+            TextSettings.Trimming = None
+            IsSelected = False
+            Size.Width = 105.000000000000000000
+            Size.Height = 26.000000000000000000
+            Size.PlatformDefault = False
+            StyleLookup = ''
+            TabOrder = 0
+            Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+            ExplicitSize.cx = 105.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
           end
           object TabItemProtocol: TTabItem
