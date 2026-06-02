@@ -855,14 +855,7 @@ begin
   end;
 
   if ATarget <> nil then
-  begin
-
     TMeterValue.RebindReferences(ATarget, AValue);
-
-    if TMeterValue.GetMeterValues <> nil then
-      TMeterValue.GetMeterValues.Remove(ATarget);
-    ATarget.Free;
-  end;
 
   ATarget := AValue;
   if ATarget <> nil then
