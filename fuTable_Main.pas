@@ -1021,74 +1021,74 @@ end;
 
 procedure TTableMainForm.OnNotify(Sender: TObject; AEvent: Integer; Data: TObject);
 var
-  NotifyEvent: ENotifyEvent;
+  LNotifyEvent: ENotifyEvent;
 begin
   if Sender = nil then
     Exit;
 
-  NotifyEvent := ENotifyEvent(AEvent);
+  LNotifyEvent := ENotifyEvent(AEvent);
 
   if Sender is TWorkTable then
   begin
-    case NotifyEvent of
+    case LNotifyEvent of
       notifyStateChanged:
-        WorkTableStateChangedHandler(TWorkTable(Sender), NotifyEvent, Data);
+        WorkTableStateChangedHandler(TWorkTable(Sender), LNotifyEvent, Data);
       notifyAction:
-        WorkTableActionHandler(TWorkTable(Sender), NotifyEvent, Data);
+        WorkTableActionHandler(TWorkTable(Sender), LNotifyEvent, Data);
       notifyEvent:
-        WorkTableEventHandler(TWorkTable(Sender), NotifyEvent, Data);
+        WorkTableEventHandler(TWorkTable(Sender), LNotifyEvent, Data);
     end;
     Exit;
   end;
 
   if Sender is TPump then
   begin
-    case NotifyEvent of
+    case LNotifyEvent of
       notifyStateChanged:
-        PumpStateChangedHandler(TPump(Sender), NotifyEvent, Data);
+        PumpStateChangedHandler(TPump(Sender), LNotifyEvent, Data);
       notifyAction:
-        PumpActionHandler(TPump(Sender), NotifyEvent, Data);
+        PumpActionHandler(TPump(Sender), LNotifyEvent, Data);
       notifyEvent:
-        PumpEventHandler(TPump(Sender), NotifyEvent, Data);
+        PumpEventHandler(TPump(Sender), LNotifyEvent, Data);
     end;
     Exit;
   end;
 
   if Sender is TFlowRate then
   begin
-    case NotifyEvent of
+    case LNotifyEvent of
       notifyStateChanged:
-        FlowRateStateChangedHandler(TFlowRate(Sender), NotifyEvent, Data);
+        FlowRateStateChangedHandler(TFlowRate(Sender), LNotifyEvent, Data);
       notifyAction:
-        FlowRateActionHandler(TFlowRate(Sender), NotifyEvent, Data);
+        FlowRateActionHandler(TFlowRate(Sender), LNotifyEvent, Data);
       notifyEvent:
-        FlowRateEventHandler(TFlowRate(Sender), NotifyEvent, Data);
+        FlowRateEventHandler(TFlowRate(Sender), LNotifyEvent, Data);
     end;
     Exit;
   end;
 
   if Sender is TFluidTemp then
   begin
-    case NotifyEvent of
+    case LNotifyEvent of
       notifyStateChanged:
-        FluidTempStateChangedHandler(TFluidTemp(Sender), NotifyEvent, Data);
+        FluidTempStateChangedHandler(TFluidTemp(Sender), LNotifyEvent, Data);
       notifyAction:
-        FluidTempActionHandler(TFluidTemp(Sender), NotifyEvent, Data);
+        FluidTempActionHandler(TFluidTemp(Sender), LNotifyEvent, Data);
       notifyEvent:
-        FluidTempEventHandler(TFluidTemp(Sender), NotifyEvent, Data);
+        FluidTempEventHandler(TFluidTemp(Sender), LNotifyEvent, Data);
     end;
     Exit;
   end;
 
   if Sender is TFluidPress then
   begin
-    case NotifyEvent of
+    case LNotifyEvent of
       notifyStateChanged:
-        FluidPressStateChangedHandler(TFluidPress(Sender), NotifyEvent, Data);
+        FluidPressStateChangedHandler(TFluidPress(Sender), LNotifyEvent, Data);
       notifyAction:
-        FluidPressActionHandler(TFluidPress(Sender), NotifyEvent, Data);
+        FluidPressActionHandler(TFluidPress(Sender), LNotifyEvent, Data);
       notifyEvent:
-        FluidPressEventHandler(TFluidPress(Sender), NotifyEvent, Data);
+        FluidPressEventHandler(TFluidPress(Sender), LNotifyEvent, Data);
     end;
   end;
 end;
