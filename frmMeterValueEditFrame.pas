@@ -46,6 +46,8 @@ type
     procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
     procedure AddCheckRow(const ACaption: string; out ACheckBox: TCheckBox);
     procedure AddSectionRow(const ACaption: string);
+    procedure HandleControlExit(Sender: TObject);
+    procedure HandleCheckBoxChange(Sender: TObject);
     function SafeFloat(const S: string): Double;
   public
     constructor Create(AOwner: TComponent); override;
@@ -132,6 +134,7 @@ begin
   AEdit.Align := TAlignLayout.Client;
   AEdit.Margins.Rect := TRectF.Create(6, 3, 10, 3);
   AEdit.KillFocusByReturn := True;
+  AEdit.OnExit := HandleControlExit;
   RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
 end;
 
@@ -171,6 +174,7 @@ begin
   ACheckBox.Parent := RowGrid;
   ACheckBox.Align := TAlignLayout.Client;
   ACheckBox.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  ACheckBox.OnChange := HandleCheckBoxChange;
   RowGrid.ControlCollection.AddControl(ACheckBox, 1, 0);
 end;
 
@@ -198,6 +202,16 @@ end;
 function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
 begin
   Result := StrToFloatDef(StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]), 0);
+end;
+
+procedure TFrameMeterValueEdit.HandleControlExit(Sender: TObject);
+begin
+  SaveChanges;
+end;
+
+procedure TFrameMeterValueEdit.HandleCheckBoxChange(Sender: TObject);
+begin
+  SaveChanges;
 end;
 
 procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
