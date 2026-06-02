@@ -184,7 +184,7 @@ begin
   if Source = nil then
     Exit;
 
-  SearchText := Trim(LowerCase(EditFindDevice.Text));
+  SearchText := Trim(AnsiLowerCase(EditFindDevice.Text));
   for Item in Source do
   begin
     if SearchText = '' then
@@ -193,7 +193,7 @@ begin
       Continue;
     end;
 
-    SearchArea := LowerCase(Item.NameOwner + ' ' + Item.Description + ' ' +
+    SearchArea := AnsiLowerCase(Item.NameOwner + ' ' + Item.Description + ' ' +
       Item.GetStrFullName + ' ' + Item.GetStrValue + ' ' + Item.Hash);
 
     if Pos(SearchText, SearchArea) > 0 then

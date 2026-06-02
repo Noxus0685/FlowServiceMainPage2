@@ -428,10 +428,10 @@ begin
   Form := TFormMeterValueSelect.Create(Self);
   try
     case AKind of
-      0: Form.SetFilterText('Давление');
-      1: Form.SetFilterText('Температура');
-      2: Form.SetFilterText('Расход');
-      3: Form.SetFilterText('Объем');
+      0: Form.SetFilterText('давление');
+      1: Form.SetFilterText('температура');
+      2: Form.SetFilterText('расход');
+      3: Form.SetFilterText('объем');
     end;
 
     case AKind of
