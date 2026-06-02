@@ -4777,7 +4777,10 @@ var
   WorkTable: TWorkTable;
 begin
   if not CanEditActiveWorkTable then
+  begin
+    ApplyActiveWorkTableEditMode;
     Exit;
+  end;
 
   WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
@@ -4875,6 +4878,12 @@ var
   AllEnabled: Boolean;
   NewEnabled: Boolean;
 begin
+  if not CanEditActiveWorkTable then
+  begin
+    ApplyActiveWorkTableEditMode;
+    Exit;
+  end;
+
   if Column = CheckColumnDeviceEnable1 then
   begin
 
@@ -4921,6 +4930,12 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  if not CanEditActiveWorkTable then
+  begin
+    ApplyActiveWorkTableEditMode;
+    Exit;
+  end;
+
   WorkTable := FActiveWorkTable;
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.DeviceChannels.Count)) then
     Exit;
@@ -5182,6 +5197,13 @@ end;
 procedure TFrameMainTable.GridDevicesSelectCell(Sender: TObject; const ACol,
   ARow: Integer; var CanSelect: Boolean);
 begin
+  if not CanEditActiveWorkTable then
+  begin
+    ApplyActiveWorkTableEditMode;
+    CanSelect := True;
+    Exit;
+  end;
+
 {  UpdateFlowMeterPropertiesFrame(ARow);
 
   if (FFrameChannelProperties <> nil) and (FActiveWorkTable <> nil) and
@@ -5304,7 +5326,10 @@ var
   WorkTable: TWorkTable;
 begin
   if not CanEditActiveWorkTable then
+  begin
+    ApplyActiveWorkTableEditMode;
     Exit;
+  end;
 
   WorkTable := GetWorkTableByIndex(0);
 
@@ -5399,6 +5424,12 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
+  if not CanEditActiveWorkTable then
+  begin
+    ApplyActiveWorkTableEditMode;
+    Exit;
+  end;
+
   WorkTable := GetWorkTableByIndex(0);
 
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
