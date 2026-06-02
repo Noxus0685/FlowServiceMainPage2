@@ -11,30 +11,33 @@ File_8=TSourceModule,'D:\Projects\FlowServiceX\FlowServiceMainPage\uMeterValue.p
 File_9=TSourceModule,'D:\Projects\FlowServiceX\FlowServiceMainPage\uAppServices.pas',0,1,63,1,82,0,0,,
 
 [Modules]
-Module0=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas
-Module1=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas
+Module0=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas
+Module1=D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas
 Module2=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMainTable.pas
-Module3=D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas
-Module4=D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas
-Module5=D:\Projects\FlowServiceX\FlowServiceMainPage\uParameter.pas
-Module6=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeasurementRun.pas
-Module7=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeasurementRun.pas
-Module8=D:\Projects\FlowServiceX\FlowServiceMainPage\frmProceed.pas
-Module9=D:\Projects\FlowServiceX\FlowServiceMainPage\uRepositories.pas
-Module10=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas
+Module3=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas
+Module4=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas
+Module5=D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas
+Module6=D:\Projects\FlowServiceX\FlowServiceMainPage\uParameter.pas
+Module7=D:\Projects\FlowServiceX\FlowServiceMainPage\uMeasurementRun.pas
+Module8=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMeasurementRun.pas
+Module9=D:\Projects\FlowServiceX\FlowServiceMainPage\frmProceed.pas
+Module10=D:\Projects\FlowServiceX\FlowServiceMainPage\uRepositories.pas
 Count=11
 EditWindowCount=1
 
-[D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas]
+[D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas]
+[D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceX\FlowServiceMainPage\frmMainTable.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas]
+[D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas]
+ModuleType=TSourceModule
+
+[D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeSelect.pas]
 ModuleType=TSourceModule
 
 [D:\Projects\FlowServiceX\FlowServiceMainPage\uObservable.pas]
@@ -55,12 +58,9 @@ ModuleType=TSourceModule
 [D:\Projects\FlowServiceX\FlowServiceMainPage\uRepositories.pas]
 ModuleType=TSourceModule
 
-[D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas]
-ModuleType=TSourceModule
-
 [EditWindow0]
 ViewCount=11
-CurrentEditView=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTypeEditor.pas
+CurrentEditView=D:\Projects\FlowServiceX\FlowServiceMainPage\fuTable_Main.pas
 View0=0
 View1=1
 View2=2
@@ -141,9 +141,9 @@ EditViewName=D:\Projects\FlowServiceX\FlowServiceMainPage\frmMainTable.pas
 [View3]
 CustomEditViewType=TEditView
 Module=D:\Projects\FlowServiceX\FlowServiceMainPage\uWorkTable.pas
-CursorX=7
-CursorY=3018
-TopLine=2989
+CursorX=10
+CursorY=2668
+TopLine=2639
 LeftCol=1
 Elisions=
 Bookmarks=
@@ -326,7 +326,7 @@ Visible=0
 Docked=1
 State=0
 Left=0
-Top=0
+Top=40
 Width=2771
 Height=1418
 MaxLeft=-1
@@ -373,7 +373,7 @@ ClientWidth=1896
 ClientHeight=5259
 PixelsPerInch=144
 MonitorNum=1
-TBDockHeight=7011
+TBDockHeight=9057
 LRDockWidth=1896
 Dockable=1
 StayOnTop=0
@@ -388,11 +388,11 @@ State=0
 Left=0
 Top=0
 Width=1997
-Height=6810
+Height=8855
 MaxLeft=-1
 MaxTop=-1
 ClientWidth=1997
-ClientHeight=6810
+ClientHeight=8855
 TBDockHeight=5958
 LRDockWidth=2510
 Dockable=1
@@ -416,8 +416,8 @@ TBDockHeight=364
 LRDockWidth=276
 Dockable=1
 StayOnTop=0
-Name=53
-Description=149
+Name=80
+Description=223
 filter=1
 
 [DebugLogView]
@@ -528,11 +528,11 @@ State=0
 Left=0
 Top=0
 Width=2339
-Height=1044
+Height=1274
 MaxLeft=-1
 MaxTop=-1
 ClientWidth=2339
-ClientHeight=1044
+ClientHeight=1274
 TBDockHeight=2318
 LRDockWidth=2823
 Dockable=1
@@ -593,11 +593,11 @@ State=0
 Left=0
 Top=0
 Width=1997
-Height=6810
+Height=8855
 MaxLeft=-1
 MaxTop=-1
 ClientWidth=1997
-ClientHeight=6810
+ClientHeight=8855
 TBDockHeight=4885
 LRDockWidth=7148
 Dockable=1
@@ -733,11 +733,11 @@ State=0
 Left=0
 Top=0
 Width=1997
-Height=6810
+Height=8855
 MaxLeft=-1
 MaxTop=-1
 ClientWidth=1997
-ClientHeight=6810
+ClientHeight=8855
 TBDockHeight=4885
 LRDockWidth=5307
 Dockable=1
@@ -835,7 +835,7 @@ ClientWidth=1997
 ClientHeight=4593
 PixelsPerInch=144
 MonitorNum=1
-TBDockHeight=7011
+TBDockHeight=9057
 LRDockWidth=1997
 Dockable=1
 StayOnTop=0
@@ -861,7 +861,7 @@ ClientWidth=1896
 ClientHeight=3549
 PixelsPerInch=144
 MonitorNum=1
-TBDockHeight=7011
+TBDockHeight=9057
 LRDockWidth=1896
 Dockable=1
 StayOnTop=0
@@ -887,7 +887,7 @@ ClientWidth=1997
 ClientHeight=4215
 PixelsPerInch=144
 MonitorNum=1
-TBDockHeight=7011
+TBDockHeight=9057
 LRDockWidth=1997
 Dockable=1
 StayOnTop=0
