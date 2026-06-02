@@ -38,6 +38,7 @@ type
     procedure EditFindDeviceChangeTracking(Sender: TObject);
     procedure sbClearClick(Sender: TObject);
     procedure sbFindClick(Sender: TObject);
+    procedure FocusMeterValue(AMeterValue: TMeterValue);
     procedure ButtonSelectClick(Sender: TObject);
     procedure ButtonCancelClick(Sender: TObject);
     procedure StringGridValuesListSelChanged(Sender: TObject);
@@ -47,6 +48,7 @@ type
 
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    procedure SelectMeterValue(AMeterValue: TMeterValue);
     property SelectedMeterValue: TMeterValue read FSelectedMeterValue;
   end;
 
@@ -241,6 +243,28 @@ procedure TFormMeterValueSelect.sbFindClick(Sender: TObject);
 begin
   FillValuesList;
   SelectCurrentRow;
+end;
+
+procedure TFormMeterValueSelect.FocusMeterValue(AMeterValue: TMeterValue);
+var
+  I: Integer;
+begin
+  if (AMeterValue = nil) or (FFilteredValues = nil) then
+    Exit;
+
+  for I := 0 to FFilteredValues.Count - 1 do
+    if (FFilteredValues[I] <> nil) and (FFilteredValues[I].Hash = AMeterValue.Hash) then
+    begin
+      StringGridValuesList.Row := I;
+      FSelectedMeterValue := FFilteredValues[I];
+      StringGridValuesList.SetFocus;
+      Exit;
+    end;
+end;
+
+procedure TFormMeterValueSelect.SelectMeterValue(AMeterValue: TMeterValue);
+begin
+  FocusMeterValue(AMeterValue);
 end;
 
 procedure TFormMeterValueSelect.SelectCurrentRow;

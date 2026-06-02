@@ -226,9 +226,7 @@ begin
   if AMeterValue = nil then
     Exit('');
 
-  Result := AMeterValue.Name;
-  if Trim(Result) = '' then
-    Result := AMeterValue.GetStrFullName;
+  Result := AMeterValue.Hash;
 end;
 
 procedure TFrameWorkTableProperties.LoadFromWorkTable(AWorkTable: TWorkTable);
@@ -292,7 +290,11 @@ end;
 procedure TFrameWorkTableProperties.NotifyRefreshIfChanged(const AChanged: Boolean);
 begin
   if AChanged and (FWorkTable <> nil) then
+  begin
     FWorkTable.FireEvent(ewtRefresh);
+    if WorkTableManager <> nil then
+      WorkTableManager.Save;
+  end;
 end;
 
 procedure TFrameWorkTableProperties.HandleWorkTableTextExit(Sender: TObject);
@@ -335,6 +337,13 @@ begin
 
   Form := TFormMeterValueSelect.Create(Self);
   try
+    case AKind of
+      0: Form.SelectMeterValue(FWorkTable.ValuePressure);
+      1: Form.SelectMeterValue(FWorkTable.ValueTemperture);
+      2: Form.SelectMeterValue(FWorkTable.ValueFlowRate);
+      3: Form.SelectMeterValue(FWorkTable.ValueQuantity);
+    end;
+
     if Form.ShowModal <> mrOk then
       Exit;
 
@@ -368,6 +377,8 @@ begin
 
     RefreshValues;
     FWorkTable.FireEvent(ewtRefresh);
+    if WorkTableManager <> nil then
+      WorkTableManager.Save;
   finally
     Form.Free;
   end;
