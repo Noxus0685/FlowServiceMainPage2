@@ -8,6 +8,7 @@ uses
   FMX.Edit,
   FMX.Forms,
   FMX.Layouts,
+  FMX.ListBox,
   FMX.StdCtrls,
   FMX.Types,
   System.Classes,
@@ -30,7 +31,7 @@ type
     CheckBoxIsToSave: TCheckBox;
     EditValueFull: TEdit;
     EditValue: TEdit;
-    EditValueDim: TEdit;
+    ComboValueDim: TComboBox;
     EditMin: TEdit;
     EditMax: TEdit;
     EditNameValueRate: TEdit;
@@ -45,9 +46,12 @@ type
     procedure BuildUI;
     procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
     procedure AddCheckRow(const ACaption: string; out ACheckBox: TCheckBox);
+    procedure AddComboRow(const ACaption: string; out AComboBox: TComboBox);
     procedure AddSectionRow(const ACaption: string);
     procedure HandleControlExit(Sender: TObject);
     procedure HandleCheckBoxChange(Sender: TObject);
+    procedure HandleComboChange(Sender: TObject);
+    procedure FillDimensionCombo;
     function SafeFloat(const S: string): Double;
   public
     constructor Create(AOwner: TComponent); override;
@@ -81,9 +85,10 @@ begin
   AddEditRow('Краткое имя', EditShrtName);
   AddEditRow('Описание', EditDescription);
   AddEditRow('Hash', EditHash);
+  EditHash.ReadOnly := True;
   AddCheckRow('Сохранять', CheckBoxIsToSave);
   AddSectionRow('Значения');
-  AddEditRow('Размерность', EditValueDim);
+  AddComboRow('Размерность', ComboValueDim);
   AddEditRow('Минимальное значение', EditMin);
   AddEditRow('Максимальное значение', EditMax);
   AddSectionRow('Коэффициенты');
@@ -106,8 +111,8 @@ begin
   Item := TLayout.Create(Self);
   Item.Parent := LayoutRoot;
   Item.Align := TAlignLayout.Top;
-  Item.Height := 36;
-  Item.Margins.Bottom := 4;
+  Item.Height := 30;
+  Item.Margins.Bottom := 2;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -126,13 +131,13 @@ begin
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
-  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  CaptionLabel.Margins.Rect := TRectF.Create(18, 0, 6, 0);
   RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   AEdit := TEdit.Create(Self);
   AEdit.Parent := RowGrid;
   AEdit.Align := TAlignLayout.Client;
-  AEdit.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  AEdit.Margins.Rect := TRectF.Create(4, 1, 8, 1);
   AEdit.KillFocusByReturn := True;
   AEdit.OnExit := HandleControlExit;
   RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
@@ -147,8 +152,8 @@ begin
   Item := TLayout.Create(Self);
   Item.Parent := LayoutRoot;
   Item.Align := TAlignLayout.Top;
-  Item.Height := 36;
-  Item.Margins.Bottom := 4;
+  Item.Height := 30;
+  Item.Margins.Bottom := 2;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -167,15 +172,55 @@ begin
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
-  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  CaptionLabel.Margins.Rect := TRectF.Create(18, 0, 6, 0);
   RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   ACheckBox := TCheckBox.Create(Self);
   ACheckBox.Parent := RowGrid;
   ACheckBox.Align := TAlignLayout.Client;
-  ACheckBox.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  ACheckBox.Margins.Rect := TRectF.Create(4, 1, 8, 1);
   ACheckBox.OnChange := HandleCheckBoxChange;
   RowGrid.ControlCollection.AddControl(ACheckBox, 1, 0);
+end;
+
+procedure TFrameMeterValueEdit.AddComboRow(const ACaption: string; out AComboBox: TComboBox);
+var
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
+  CaptionLabel: TLabel;
+begin
+  Item := TLayout.Create(Self);
+  Item.Parent := LayoutRoot;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 30;
+  Item.Margins.Bottom := 2;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(18, 0, 6, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  AComboBox := TComboBox.Create(Self);
+  AComboBox.Parent := RowGrid;
+  AComboBox.Align := TAlignLayout.Client;
+  AComboBox.Margins.Rect := TRectF.Create(4, 1, 8, 1);
+  AComboBox.OnChange := HandleComboChange;
+  RowGrid.ControlCollection.AddControl(AComboBox, 1, 0);
 end;
 
 procedure TFrameMeterValueEdit.AddSectionRow(const ACaption: string);
@@ -186,8 +231,8 @@ begin
   Item := TLayout.Create(Self);
   Item.Parent := LayoutRoot;
   Item.Align := TAlignLayout.Top;
-  Item.Height := 30;
-  Item.Margins.Top := 8;
+  Item.Height := 26;
+  Item.Margins.Top := 4;
   Item.Stored := False;
 
   CaptionLabel := TLabel.Create(Self);
@@ -214,6 +259,41 @@ begin
   SaveChanges;
 end;
 
+procedure TFrameMeterValueEdit.HandleComboChange(Sender: TObject);
+begin
+  if FLoading or (FMeterValue = nil) or (ComboValueDim.ItemIndex < 0) then
+    Exit;
+
+  if FMeterValue.SetDim(ComboValueDim.ItemIndex) then
+  begin
+    FLoading := True;
+    try
+      EditValue.Text := FloatToStr(FMeterValue.GetDoubleValueDim);
+    finally
+      FLoading := False;
+    end;
+    TMeterValue.SaveToFile(0);
+  end;
+end;
+
+procedure TFrameMeterValueEdit.FillDimensionCombo;
+var
+  I: Integer;
+begin
+  ComboValueDim.Items.Clear;
+  ComboValueDim.ItemIndex := -1;
+
+  if FMeterValue = nil then
+    Exit;
+
+  for I := 0 to FMeterValue.Dimensions.Count - 1 do
+    ComboValueDim.Items.Add(FMeterValue.GetDimName(I));
+
+  if (FMeterValue.CurrentDimIndex >= 0) and
+     (FMeterValue.CurrentDimIndex < ComboValueDim.Items.Count) then
+    ComboValueDim.ItemIndex := FMeterValue.CurrentDimIndex;
+end;
+
 procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
 begin
   FMeterValue := AMeterValue;
@@ -228,7 +308,8 @@ begin
       EditHash.Text := '';
       EditValueFull.Text := '';
       EditValue.Text := '';
-      EditValueDim.Text := '';
+      ComboValueDim.Items.Clear;
+      ComboValueDim.ItemIndex := -1;
       EditMin.Text := '';
       EditMax.Text := '';
       EditNameValueRate.Text := '';
@@ -245,7 +326,7 @@ begin
 
     EditValueFull.Text := FMeterValue.GetStrFullName;
     EditValue.Text := FloatToStr(FMeterValue.GetDoubleValueDim);
-    EditValueDim.Text := FMeterValue.GetDimName;
+    FillDimensionCombo;
     EditMin.Text := FMeterValue.GetStringNum(FMeterValue.MinValue);
     EditMax.Text := FMeterValue.GetStringNum(FMeterValue.MaxValue);
     EditName.Text := FMeterValue.Name;
@@ -253,6 +334,7 @@ begin
     EditShrtName.Text := FMeterValue.ShrtName;
     EditDescription.Text := FMeterValue.Description;
     EditHash.Text := FMeterValue.Hash;
+    EditHash.ReadOnly := True;
     CheckBoxIsToSave.IsChecked := FMeterValue.IsToSave;
 
     if FMeterValue.ValueRate <> nil then
@@ -304,7 +386,9 @@ begin
   FMeterValue.&Type := EditType.Text;
   FMeterValue.ShrtName := EditShrtName.Text;
   FMeterValue.Description := EditDescription.Text;
-  FMeterValue.Hash := EditHash.Text;
+  if ComboValueDim.ItemIndex >= 0 then
+    FMeterValue.SetDim(ComboValueDim.ItemIndex);
+
   FMeterValue.SetValue(EditValue.Text);
   FMeterValue.MinValue := FMeterValue.GetDoubleNum(EditMin.Text);
   FMeterValue.MaxValue := FMeterValue.GetDoubleNum(EditMax.Text);
