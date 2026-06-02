@@ -573,6 +573,7 @@ type
     procedure RemoveDeviceChannelsByDeletedUUIDs(ADeletedUUIDs: TStrings);
     procedure RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
       AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
+    function ChannelMatchesDeletedDevice(AChannel: TChannel; ADeletedUUIDs: TStrings): Boolean;
     procedure CopyChannelData(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
@@ -3410,6 +3411,7 @@ var
   DeviceUUID: string;
   RepoName: string;
   Device: TDevice;
+  FoundDevice: TDevice;
   HasChanges: Boolean;
 begin
   if (FActiveWorkTable = nil) or (DataManager = nil) then
@@ -3433,12 +3435,16 @@ begin
       SourceRepo := DataManager.FindDeviceRepositoryByName(RepoName);
       if (SourceRepo <> nil) and (SourceRepo.Devices <> nil) then
       begin
+        FoundDevice := nil;
         for Device in SourceRepo.Devices do
-          if SameText(Trim(Device.UUID), DeviceUUID) then
+          if (Device <> nil) and (Device.State <> osDeleted) and
+             SameText(Trim(Device.UUID), DeviceUUID) then
+          begin
+            FoundDevice := Device;
             Break;
+          end;
 
-        if (Device = nil) or (not SameText(Trim(Device.UUID), DeviceUUID)) then
-          Device := nil;
+        Device := FoundDevice;
       end;
     end;
 
@@ -3456,13 +3462,33 @@ begin
     UpdateGrids;
 end;
 
+function TFrameMainTable.ChannelMatchesDeletedDevice(AChannel: TChannel;
+  ADeletedUUIDs: TStrings): Boolean;
+var
+  DeviceUUID: string;
+begin
+  Result := False;
+
+  if (AChannel = nil) or (ADeletedUUIDs = nil) then
+    Exit;
+
+  DeviceUUID := Trim(AChannel.DeviceUUID);
+  if (DeviceUUID <> '') and (ADeletedUUIDs.IndexOf(DeviceUUID) >= 0) then
+    Exit(True);
+
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+  begin
+    DeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
+    if (DeviceUUID <> '') and (ADeletedUUIDs.IndexOf(DeviceUUID) >= 0) then
+      Exit(True);
+  end;
+end;
+
 procedure TFrameMainTable.RemoveDeviceChannelsByDeletedUUIDsFromWorkTable(
   AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
 var
   I: Integer;
   Channel: TChannel;
-  DeviceUUID: string;
-  Repo: TDeviceRepository;
 begin
   if (AWorkTable = nil) or (AWorkTable.DeviceChannels = nil) then
     Exit;
@@ -3470,17 +3496,7 @@ begin
   for I := AWorkTable.DeviceChannels.Count - 1 downto 0 do
   begin
     Channel := AWorkTable.DeviceChannels[I];
-    if Channel = nil then
-      Continue;
-
-    DeviceUUID := Trim(Channel.DeviceUUID);
-    if DeviceUUID = '' then
-      Continue;
-
-    if ADeletedUUIDs.IndexOf(DeviceUUID) < 0 then
-      Continue;
-
-    if (DataManager <> nil) and (DataManager.FindDevice(DeviceUUID, Repo) <> nil) then
+    if not ChannelMatchesDeletedDevice(Channel, ADeletedUUIDs) then
       Continue;
 
     ClearChannelData(Channel, AWorkTable);
