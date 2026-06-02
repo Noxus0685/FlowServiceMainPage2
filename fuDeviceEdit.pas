@@ -764,8 +764,8 @@ begin
   {-----------------------------------------------------}
   { Повторы }
   {-----------------------------------------------------}
-  NewP.RepeatsProtocol := Max(FDevice.Repeats, 1);
-  NewP.Repeats := Max(FDevice.Repeats, 1);
+  NewP.RepeatsProtocol := Max(FDevice.RepeatsProtocol, 1);
+  NewP.Repeats := Max(FDevice.RepeatsProtocol, 1);
 
 
   {-----------------------------------------------------}
@@ -2018,7 +2018,9 @@ begin
     // =====================================================
     // == Повторы
     // =====================================================
-    if FDevice.Repeats > 0 then
+    if FDevice.RepeatsProtocol > 0 then
+      sbRepeats.Value := FDevice.RepeatsProtocol
+    else if FDevice.Repeats > 0 then
       sbRepeats.Value := FDevice.Repeats
     else
       sbRepeats.Value := 1;
@@ -2228,6 +2230,7 @@ begin
     sbRepeats.Value := RepeatsValue;
 
   FDevice.Repeats := RepeatsValue;
+  FDevice.RepeatsProtocol := RepeatsValue;
 
   if FDevice.Points <> nil then
     for P in FDevice.Points do
