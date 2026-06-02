@@ -125,12 +125,13 @@ begin
   ButtonsLayout.Parent := Layout22;
   ButtonsLayout.Align := TAlignLayout.Bottom;
   ButtonsLayout.Height := 44;
+  ButtonsLayout.Margins.Top := 8;
   ButtonsLayout.Stored := False;
 
   ButtonCancel := TButton.Create(Self);
   ButtonCancel.Parent := ButtonsLayout;
   ButtonCancel.Align := TAlignLayout.Right;
-  ButtonCancel.Width := 110;
+  ButtonCancel.Width := 100;
   ButtonCancel.Margins.Left := 8;
   ButtonCancel.Text := 'Отмена';
   ButtonCancel.ModalResult := mrCancel;
@@ -139,7 +140,7 @@ begin
   ButtonEdit := TButton.Create(Self);
   ButtonEdit.Parent := ButtonsLayout;
   ButtonEdit.Align := TAlignLayout.Right;
-  ButtonEdit.Width := 110;
+  ButtonEdit.Width := 100;
   ButtonEdit.Margins.Left := 8;
   ButtonEdit.Text := 'Редактировать';
   ButtonEdit.OnClick := ButtonEditClick;
@@ -147,7 +148,7 @@ begin
   ButtonSelect := TButton.Create(Self);
   ButtonSelect.Parent := ButtonsLayout;
   ButtonSelect.Align := TAlignLayout.Right;
-  ButtonSelect.Width := 110;
+  ButtonSelect.Width := 100;
   ButtonSelect.Text := 'Выбрать';
   ButtonSelect.ModalResult := mrOk;
   ButtonSelect.OnClick := ButtonSelectClick;
