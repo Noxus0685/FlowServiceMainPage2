@@ -4637,7 +4637,7 @@ object FrameMainTable: TFrameMainTable
       end
       object MenuItem10: TMenuItem
         Action = ActionDeleteDevice
-        Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1087#1088#1080#1073#1086#1088
+        Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1082#1072#1085#1072#1083
         ImageIndex = -1
       end
       object MenuItem11: TMenuItem
