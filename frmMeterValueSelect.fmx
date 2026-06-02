@@ -1,0 +1,7 @@
+object FormMeterValueSelect: TFormMeterValueSelect
+  Left = 0
+  Top = 0
+  Caption = 'Выбор MeterValue'
+  ClientHeight = 520
+  ClientWidth = 900
+end
