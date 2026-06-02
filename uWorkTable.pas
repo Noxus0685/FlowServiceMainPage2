@@ -69,6 +69,7 @@ type
     ewtNone = 0,
     ewtWarning = 1,
     ewtError,
+    ewtInfo,
     ewtActivated,
     ewtRefresh
   );
@@ -2971,10 +2972,11 @@ begin
         WorkTable.CurrentPoint.LimitVolume := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
         WorkTable.CurrentPoint.StopCriteria := [];
       end;
-      WorkTable.State := WorkTableStateFromString(
+       //Нет смысла восстанавливать состояние
+     { WorkTable.State := WorkTableStateFromString(
         Ini.ReadString(Section, 'Status',
           Ini.ReadString(Section, 'MeasurementState', 'swtNONE'))
-      );
+      );   }
       WorkTable.TableClamped := Ini.ReadBool(Section, 'TableClamped', False);
       WorkTable.FlowUnitName := Trim(Ini.ReadString(Section, 'FlowUnitName', WorkTable.FlowUnitName));
       WorkTable.QuantityUnitName := Trim(Ini.ReadString(Section, 'QuantityUnitName', WorkTable.QuantityUnitName));
@@ -3446,6 +3448,9 @@ procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo
 var
   ErrorDetails: string;
 begin
+
+
+
   ProtocolManager.AddMessage(pcEvent, psWorkTable, 'WorkTableEvent',
     'Событие рабочего стола', WorkTableEventToString(AEvent));
 
@@ -3670,33 +3675,33 @@ end;
 procedure TWorkTable.DoStartMonitor;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTMONITOR);
+  {SetState(swtSTARTMONITOR);
   SetState(swtMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
-    'Мониторинг запущен', Name);
+    'Мониторинг запущен', Name);  }
 end;
 
 procedure TWorkTable.DoStopMonitor;
 begin
-  SetState(swtSTOPMONITOR);
+ { SetState(swtSTOPMONITOR);
   SetState(swtSTANDBY);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopMonitor',
-    'Мониторинг остановлен', Name);
+    'Мониторинг остановлен', Name); }
 end;
 
 procedure TWorkTable.DoStartTest;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTTEST);
+ { SetState(swtSTARTTEST);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
-    'Тест запущен', Name);
+    'Тест запущен', Name);   }
 end;
 
 procedure TWorkTable.DoStopTest;
 begin
-  SetState(swtSTOPTEST);
+ { SetState(swtSTOPTEST);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
-    'Тест остановлен', Name);
+    'Тест остановлен', Name); }
 end;
 
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);

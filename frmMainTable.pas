@@ -1470,7 +1470,7 @@ begin
   if FActiveWorkTable <> nil then
   begin
     FActiveWorkTable.NextClimateChangeAt := Now;
-    FActiveWorkTable.State := swtNONE;
+    FActiveWorkTable.State := swtStandBy;
   end
   else
     OnChangeState(swtNONE);
