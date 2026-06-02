@@ -32,6 +32,8 @@ uses
   uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
   uWorkTable in 'uWorkTable.pas',
   frmChannelProperties in 'frmChannelProperties.pas' {FrameChannelProperties: TFrame},
+  frmWorkTableProperties in 'frmWorkTableProperties.pas' {FrameWorkTableProperties: TFrame},
+  frmMeterValueSelect in 'frmMeterValueSelect.pas' {FormMeterValueSelect},
   uControlRegister in 'uControlRegister.pas';
 
 {$R *.res}
