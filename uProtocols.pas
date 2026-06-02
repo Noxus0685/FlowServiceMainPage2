@@ -17,7 +17,7 @@ type
     pmeCleared
   );
 
-  TProtocolCategory = (
+  EProtocolCategory = (
     pcNone,
     pcEvent,
     pcState,
@@ -38,7 +38,7 @@ type
   TProtocolMessage = class
   public
     TimeStamp: TDateTime;
-    Category: TProtocolCategory;
+    Category: EProtocolCategory;
     Source: TProtocolSource;
     Name: string;
     Description: string;
@@ -58,7 +58,7 @@ type
     FPaused: Boolean;
     FWorkerThread: TThread;
 
-    class function CategoryMarker(ACategory: TProtocolCategory): string; static;
+    class function CategoryMarker(ACategory: EProtocolCategory): string; static;
     class function SourceMarker(ASource: TProtocolSource): string; static;
 
     procedure NotifyListeners(const Msg: TProtocolMessage);
@@ -71,7 +71,7 @@ type
     destructor Destroy; override;
 
     procedure AddMessage(
-      ACategory: TProtocolCategory;
+      ACategory: EProtocolCategory;
       ASource: TProtocolSource;
       const AName, ADescription, AParams: string
     );
@@ -194,7 +194,7 @@ begin
   FreeAndNil(Msg);
 end;
 
-procedure TProtocolManager.AddMessage(ACategory: TProtocolCategory;
+procedure TProtocolManager.AddMessage(ACategory: EProtocolCategory;
   ASource: TProtocolSource; const AName, ADescription, AParams: string);
 var
   Msg: TProtocolMessage;
@@ -305,7 +305,7 @@ begin
 end;
 
 class function TProtocolManager.CategoryMarker(
-  ACategory: TProtocolCategory): string;
+  ACategory: EProtocolCategory): string;
 begin
   case ACategory of
     pcEvent: Result := 'EVENT';
