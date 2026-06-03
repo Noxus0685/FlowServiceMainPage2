@@ -3771,7 +3771,9 @@ begin
   case AState of
     msNone:
       begin
-        if FState in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE, swtSTOPTEST, swtSTOPWAIT] then
+        if FState in [swtSTOPTEST, swtSTOPWAIT, swtEXECUTE] then
+          SetState(swtCOMPLETE)
+        else if FState in [swtSTARTTEST, swtSTARTWAIT] then
           SetState(swtSTANDBY);
         FAction := awtNone;
       end;
