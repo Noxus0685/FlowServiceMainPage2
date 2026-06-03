@@ -835,14 +835,12 @@ begin
     FCriticalSection.Release;
   end;
 
-  if LThread <> nil then
-  begin
-    LThread.Terminate;
-    LThread.WaitFor;
-    LThread.Free;
-  end;
+  if LThread = nil then
+    Exit;
 
-  FWorkTable.StopTest;
+  LThread.Terminate;
+  LThread.WaitFor;
+  LThread.Free;
 
   FIsPaused := False;
  // SetState(msStopping);
