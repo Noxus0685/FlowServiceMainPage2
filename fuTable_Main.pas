@@ -872,6 +872,11 @@ begin
     Exit;
 
   case Sender.Action of
+    awtStartTest,
+    awtStopTest,
+    awtStartMonitor,
+    awtStopMonitor:
+      Sender.ExecuteAction;
     awtAddPump:
       SubscribeWorkTableObjects(Sender);
     awtRemovePump:
