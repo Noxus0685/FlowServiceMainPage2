@@ -872,10 +872,48 @@ begin
     Exit;
 
   case Sender.Action of
+    awtStartTest:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: запуск измерения');
+    awtStopTest:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: остановка измерения');
+    awtStartMonitor:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: запуск мониторинга');
+    awtStopMonitor:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: остановка мониторинга');
+    awtClampTable:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: зажим стола');
+    awtUnClampTable:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: разжим стола');
     awtAddPump:
-      SubscribeWorkTableObjects(Sender);
+      begin
+        SubscribeWorkTableObjects(Sender);
+        if mPump <> nil then
+          mPump.Lines.Add('Рабочий стол: насос добавлен');
+      end;
     awtRemovePump:
-      SyncWorkTableObservers;
+      begin
+        SyncWorkTableObservers;
+        if mPump <> nil then
+          mPump.Lines.Add('Рабочий стол: насос удалён');
+      end;
+    awtAddChannel:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: канал добавлен');
+    awtRemoveChannel:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: канал удалён');
+    awtWriteRegister:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: запись регистра');
+    awtReadRegister:
+      if mPump <> nil then
+        mPump.Lines.Add('Рабочий стол: чтение регистра');
   end;
 
   if (Data is TPump) or (Data is TFlowRate) or (Data is TFluidTemp) or
