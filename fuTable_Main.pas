@@ -860,6 +860,13 @@ begin
     Exit;
 
   case Sender.Action of
+    awtStartTest,
+    awtStopTest:
+      begin
+        if FFrameMainTable <> nil then
+          FFrameMainTable.HandleWorkTableAction(Sender, Data);
+        Exit;
+      end;
     awtAddPump:
       SubscribeWorkTableObjects(Sender);
     awtRemovePump:
