@@ -4764,6 +4764,7 @@ procedure TFrameMainTable.TestButtonClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
   Channel: TChannel;
+  Run: TMeasurementRun;
   NeedSaveResults: Boolean;
 begin
   WorkTable := FActiveWorkTable;
@@ -4796,7 +4797,8 @@ begin
     Exit;
   end;
 
-  if (TestButton.Tag = 3) or
+  Run := MeasurementRun;
+  if ((Run <> nil) and not (Run.Stage in [msNone, msDone])) or
      (WorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
     StopTest
   else
