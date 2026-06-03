@@ -95,7 +95,11 @@ type
     FWorkTableManager: TWorkTableManager;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
-    FSubscribedWorkTable: TWorkTable;
+    FSubscribedWorkTables: TList<TWorkTable>;
+    FSubscribedPumps: TList<TPump>;
+    FSubscribedFlowRates: TList<TFlowRate>;
+    FSubscribedFluidTemps: TList<TFluidTemp>;
+    FSubscribedFluidPresses: TList<TFluidPress>;
 
     FT_WorkBench_Last: Double;
     FT_WorkBench_First: Double;
@@ -120,16 +124,30 @@ type
 
     procedure SetT_WorkBench_First(const Value: Double);
     procedure SetT_WorkBench_Last(const Value: Double);
-    procedure SubscribeToWorkTable(const AWorkTable: TWorkTable);
-    procedure UnsubscribeFromWorkTable;
-    procedure SubscribeToRelatedObjects(const AWorkTable: TWorkTable;
-      const AObserver: IEventObserver);
-    procedure UnsubscribeFromRelatedObjects(const AWorkTable: TWorkTable;
-      const AObserver: IEventObserver);
+    procedure SyncWorkTableObservers;
+    procedure SubscribeWorkTableObjects(AWorkTable: TWorkTable);
+    procedure UnsubscribeWorkTableObjects(AWorkTable: TWorkTable);
+    procedure ClearWorkTableObservers;
+    function FindWorkTableForObject(AObject: TObject): TWorkTable;
     procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
+    procedure WorkTableActionHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
+    procedure WorkTableStateChangedHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
+    procedure WorkTableEventHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
+    procedure PumpActionHandler(Sender: TPump; AEvent: ENotifyEvent; Data: TObject);
+    procedure PumpStateChangedHandler(Sender: TPump; AEvent: ENotifyEvent; Data: TObject);
+    procedure PumpEventHandler(Sender: TPump; AEvent: ENotifyEvent; Data: TObject);
+    procedure FlowRateActionHandler(Sender: TFlowRate; AEvent: ENotifyEvent; Data: TObject);
+    procedure FlowRateStateChangedHandler(Sender: TFlowRate; AEvent: ENotifyEvent; Data: TObject);
+    procedure FlowRateEventHandler(Sender: TFlowRate; AEvent: ENotifyEvent; Data: TObject);
+    procedure FluidTempActionHandler(Sender: TFluidTemp; AEvent: ENotifyEvent; Data: TObject);
+    procedure FluidTempStateChangedHandler(Sender: TFluidTemp; AEvent: ENotifyEvent; Data: TObject);
+    procedure FluidTempEventHandler(Sender: TFluidTemp; AEvent: ENotifyEvent; Data: TObject);
+    procedure FluidPressActionHandler(Sender: TFluidPress; AEvent: ENotifyEvent; Data: TObject);
+    procedure FluidPressStateChangedHandler(Sender: TFluidPress; AEvent: ENotifyEvent; Data: TObject);
+    procedure FluidPressEventHandler(Sender: TFluidPress; AEvent: ENotifyEvent; Data: TObject);
     procedure UpdateActiveWorkTableEdit(const AForce: Boolean = False);
     procedure ApplyActiveWorkTableName;
-    procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+    procedure OnNotify(Sender: TObject; AEvent: Integer; Data: TObject);
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
     function _Release: Integer; stdcall;
@@ -150,7 +168,12 @@ implementation
 
 destructor TTableMainForm.Destroy;
 begin
-  UnsubscribeFromWorkTable;
+  ClearWorkTableObservers;
+  FreeAndNil(FSubscribedWorkTables);
+  FreeAndNil(FSubscribedPumps);
+  FreeAndNil(FSubscribedFlowRates);
+  FreeAndNil(FSubscribedFluidTemps);
+  FreeAndNil(FSubscribedFluidPresses);
   inherited Destroy;
 end;
 
@@ -380,7 +403,7 @@ begin
   if FWorkTableManager = nil then
     Exit;
 
-  UnsubscribeFromWorkTable;
+  ClearWorkTableObservers;
 
   if FFrameMainTable = nil then
     Exit;
@@ -408,7 +431,17 @@ begin
   if not AppServices.Initialized then
     AppServices.Initialize;
   FWorkTableManager := AppServices.WorkTableManager;
-  FSubscribedWorkTable := nil;
+
+  if FSubscribedWorkTables = nil then
+    FSubscribedWorkTables := TList<TWorkTable>.Create;
+  if FSubscribedPumps = nil then
+    FSubscribedPumps := TList<TPump>.Create;
+  if FSubscribedFlowRates = nil then
+    FSubscribedFlowRates := TList<TFlowRate>.Create;
+  if FSubscribedFluidTemps = nil then
+    FSubscribedFluidTemps := TList<TFluidTemp>.Create;
+  if FSubscribedFluidPresses = nil then
+    FSubscribedFluidPresses := TList<TFluidPress>.Create;
 
   //Подумать над динамической привязкой ко всем столам
     if FWorkTableManager.ActiveWorkTable<>nil then
@@ -419,7 +452,7 @@ begin
     FWorkTableManager.ActiveWorkTable.AddPump('3');
   end;
 
-  SubscribeToWorkTable(FWorkTableManager.ActiveWorkTable);
+  SyncWorkTableObservers;
   UpdateActiveWorkTableEdit;
 
 
@@ -438,82 +471,253 @@ begin
 
 end;
 
-procedure TTableMainForm.SubscribeToWorkTable(const AWorkTable: TWorkTable);
+procedure TTableMainForm.SyncWorkTableObservers;
 var
+  WorkTable: TWorkTable;
+  Pump: TPump;
+  FlowRate: TFlowRate;
+  FluidTemp: TFluidTemp;
+  FluidPress: TFluidPress;
+  I: Integer;
+  Observer: IEventObserver;
+begin
+  if FSubscribedWorkTables = nil then
+    Exit;
+
+  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+  begin
+    ClearWorkTableObservers;
+    Exit;
+  end;
+
+  Observer := Self;
+
+  for WorkTable in FWorkTableManager.WorkTables do
+  begin
+    if WorkTable = nil then
+      Continue;
+
+    if not FSubscribedWorkTables.Contains(WorkTable) then
+    begin
+      WorkTable.Subscribe(Observer);
+      FSubscribedWorkTables.Add(WorkTable);
+    end;
+
+    SubscribeWorkTableObjects(WorkTable);
+  end;
+
+  for I := FSubscribedWorkTables.Count - 1 downto 0 do
+  begin
+    WorkTable := FSubscribedWorkTables[I];
+    if (WorkTable = nil) or (FWorkTableManager.WorkTables.IndexOf(WorkTable) < 0) then
+    begin
+      if WorkTable <> nil then
+      begin
+        UnsubscribeWorkTableObjects(WorkTable);
+        WorkTable.Unsubscribe(Observer);
+      end;
+      FSubscribedWorkTables.Delete(I);
+    end;
+  end;
+
+  if FSubscribedPumps <> nil then
+    for I := FSubscribedPumps.Count - 1 downto 0 do
+    begin
+      Pump := FSubscribedPumps[I];
+      if (Pump = nil) or (FindWorkTableForObject(Pump) = nil) then
+      begin
+        if Pump <> nil then
+          Pump.Unsubscribe(Observer);
+        FSubscribedPumps.Delete(I);
+      end;
+    end;
+
+  if FSubscribedFlowRates <> nil then
+    for I := FSubscribedFlowRates.Count - 1 downto 0 do
+    begin
+      FlowRate := FSubscribedFlowRates[I];
+      if (FlowRate = nil) or (FindWorkTableForObject(FlowRate) = nil) then
+      begin
+        if FlowRate <> nil then
+          FlowRate.Unsubscribe(Observer);
+        FSubscribedFlowRates.Delete(I);
+      end;
+    end;
+
+  if FSubscribedFluidTemps <> nil then
+    for I := FSubscribedFluidTemps.Count - 1 downto 0 do
+    begin
+      FluidTemp := FSubscribedFluidTemps[I];
+      if (FluidTemp = nil) or (FindWorkTableForObject(FluidTemp) = nil) then
+      begin
+        if FluidTemp <> nil then
+          FluidTemp.Unsubscribe(Observer);
+        FSubscribedFluidTemps.Delete(I);
+      end;
+    end;
+
+  if FSubscribedFluidPresses <> nil then
+    for I := FSubscribedFluidPresses.Count - 1 downto 0 do
+    begin
+      FluidPress := FSubscribedFluidPresses[I];
+      if (FluidPress = nil) or (FindWorkTableForObject(FluidPress) = nil) then
+      begin
+        if FluidPress <> nil then
+          FluidPress.Unsubscribe(Observer);
+        FSubscribedFluidPresses.Delete(I);
+      end;
+    end;
+end;
+
+procedure TTableMainForm.SubscribeWorkTableObjects(AWorkTable: TWorkTable);
+var
+  Pump: TPump;
   Observer: IEventObserver;
 begin
   if AWorkTable = nil then
     Exit;
 
-  if FSubscribedWorkTable = AWorkTable then
-    Exit;
-
-  UnsubscribeFromWorkTable;
   Observer := Self;
-  AWorkTable.Subscribe(Observer);
-  SubscribeToRelatedObjects(AWorkTable, Observer);
-  FSubscribedWorkTable := AWorkTable;
+
+  if Assigned(AWorkTable.FlowRate) and Assigned(FSubscribedFlowRates) and
+     not FSubscribedFlowRates.Contains(AWorkTable.FlowRate) then
+  begin
+    AWorkTable.FlowRate.Subscribe(Observer);
+    FSubscribedFlowRates.Add(AWorkTable.FlowRate);
+  end;
+
+  if Assigned(AWorkTable.FluidTemp) and Assigned(FSubscribedFluidTemps) and
+     not FSubscribedFluidTemps.Contains(AWorkTable.FluidTemp) then
+  begin
+    AWorkTable.FluidTemp.Subscribe(Observer);
+    FSubscribedFluidTemps.Add(AWorkTable.FluidTemp);
+  end;
+
+  if Assigned(AWorkTable.FluidPress) and Assigned(FSubscribedFluidPresses) and
+     not FSubscribedFluidPresses.Contains(AWorkTable.FluidPress) then
+  begin
+    AWorkTable.FluidPress.Subscribe(Observer);
+    FSubscribedFluidPresses.Add(AWorkTable.FluidPress);
+  end;
+
+  if AWorkTable.Pumps <> nil then
+    for Pump in AWorkTable.Pumps do
+      if Assigned(Pump) and Assigned(FSubscribedPumps) and
+         not FSubscribedPumps.Contains(Pump) then
+      begin
+        Pump.Subscribe(Observer);
+        FSubscribedPumps.Add(Pump);
+      end;
 end;
 
-procedure TTableMainForm.UnsubscribeFromWorkTable;
+procedure TTableMainForm.UnsubscribeWorkTableObjects(AWorkTable: TWorkTable);
+var
+  Pump: TPump;
+  Observer: IEventObserver;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  Observer := Self;
+
+  if Assigned(AWorkTable.FlowRate) and Assigned(FSubscribedFlowRates) and
+     FSubscribedFlowRates.Contains(AWorkTable.FlowRate) then
+  begin
+    AWorkTable.FlowRate.Unsubscribe(Observer);
+    FSubscribedFlowRates.Remove(AWorkTable.FlowRate);
+  end;
+
+  if Assigned(AWorkTable.FluidTemp) and Assigned(FSubscribedFluidTemps) and
+     FSubscribedFluidTemps.Contains(AWorkTable.FluidTemp) then
+  begin
+    AWorkTable.FluidTemp.Unsubscribe(Observer);
+    FSubscribedFluidTemps.Remove(AWorkTable.FluidTemp);
+  end;
+
+  if Assigned(AWorkTable.FluidPress) and Assigned(FSubscribedFluidPresses) and
+     FSubscribedFluidPresses.Contains(AWorkTable.FluidPress) then
+  begin
+    AWorkTable.FluidPress.Unsubscribe(Observer);
+    FSubscribedFluidPresses.Remove(AWorkTable.FluidPress);
+  end;
+
+  if AWorkTable.Pumps <> nil then
+    for Pump in AWorkTable.Pumps do
+      if Assigned(Pump) and Assigned(FSubscribedPumps) and
+         FSubscribedPumps.Contains(Pump) then
+      begin
+        Pump.Unsubscribe(Observer);
+        FSubscribedPumps.Remove(Pump);
+      end;
+end;
+
+procedure TTableMainForm.ClearWorkTableObservers;
 var
   Observer: IEventObserver;
+begin
+  Observer := Self;
+
+  if Assigned(FSubscribedWorkTables) then
+    while FSubscribedWorkTables.Count > 0 do
+    begin
+      if FSubscribedWorkTables[FSubscribedWorkTables.Count - 1] <> nil then
+        FSubscribedWorkTables[FSubscribedWorkTables.Count - 1].Unsubscribe(Observer);
+      FSubscribedWorkTables.Delete(FSubscribedWorkTables.Count - 1);
+    end;
+
+  if Assigned(FSubscribedPumps) then
+    while FSubscribedPumps.Count > 0 do
+    begin
+      if FSubscribedPumps[FSubscribedPumps.Count - 1] <> nil then
+        FSubscribedPumps[FSubscribedPumps.Count - 1].Unsubscribe(Observer);
+      FSubscribedPumps.Delete(FSubscribedPumps.Count - 1);
+    end;
+
+  if Assigned(FSubscribedFlowRates) then
+    while FSubscribedFlowRates.Count > 0 do
+    begin
+      if FSubscribedFlowRates[FSubscribedFlowRates.Count - 1] <> nil then
+        FSubscribedFlowRates[FSubscribedFlowRates.Count - 1].Unsubscribe(Observer);
+      FSubscribedFlowRates.Delete(FSubscribedFlowRates.Count - 1);
+    end;
+
+  if Assigned(FSubscribedFluidTemps) then
+    while FSubscribedFluidTemps.Count > 0 do
+    begin
+      if FSubscribedFluidTemps[FSubscribedFluidTemps.Count - 1] <> nil then
+        FSubscribedFluidTemps[FSubscribedFluidTemps.Count - 1].Unsubscribe(Observer);
+      FSubscribedFluidTemps.Delete(FSubscribedFluidTemps.Count - 1);
+    end;
+
+  if Assigned(FSubscribedFluidPresses) then
+    while FSubscribedFluidPresses.Count > 0 do
+    begin
+      if FSubscribedFluidPresses[FSubscribedFluidPresses.Count - 1] <> nil then
+        FSubscribedFluidPresses[FSubscribedFluidPresses.Count - 1].Unsubscribe(Observer);
+      FSubscribedFluidPresses.Delete(FSubscribedFluidPresses.Count - 1);
+    end;
+end;
+
+function TTableMainForm.FindWorkTableForObject(AObject: TObject): TWorkTable;
+var
   WorkTable: TWorkTable;
 begin
-  if FSubscribedWorkTable = nil then
+  Result := nil;
+  if (AObject = nil) or (FWorkTableManager = nil) or
+     (FWorkTableManager.WorkTables = nil) then
     Exit;
 
-  WorkTable := FSubscribedWorkTable;
-  Observer := Self;
-  UnsubscribeFromRelatedObjects(WorkTable, Observer);
-  WorkTable.Unsubscribe(Observer);
-  FSubscribedWorkTable := nil;
-end;
+  for WorkTable in FWorkTableManager.WorkTables do
+  begin
+    if WorkTable = nil then
+      Continue;
 
-procedure TTableMainForm.SubscribeToRelatedObjects(const AWorkTable: TWorkTable;
-  const AObserver: IEventObserver);
-var
-  Pump: TPump;
-begin
-  if (AWorkTable = nil) or (AObserver = nil) then
-    Exit;
-
-  if AWorkTable.FlowRate <> nil then
-    AWorkTable.FlowRate.Subscribe(AObserver);
-
-  if AWorkTable.FluidTemp <> nil then
-    AWorkTable.FluidTemp.Subscribe(AObserver);
-
-  if AWorkTable.FluidPress <> nil then
-    AWorkTable.FluidPress.Subscribe(AObserver);
-
-  if AWorkTable.Pumps <> nil then
-    for Pump in AWorkTable.Pumps do
-      if Pump <> nil then
-        Pump.Subscribe(AObserver);
-end;
-
-procedure TTableMainForm.UnsubscribeFromRelatedObjects(const AWorkTable: TWorkTable;
-  const AObserver: IEventObserver);
-var
-  Pump: TPump;
-begin
-  if (AWorkTable = nil) or (AObserver = nil) then
-    Exit;
-
-  if AWorkTable.FlowRate <> nil then
-    AWorkTable.FlowRate.Unsubscribe(AObserver);
-
-  if AWorkTable.FluidTemp <> nil then
-    AWorkTable.FluidTemp.Unsubscribe(AObserver);
-
-  if AWorkTable.FluidPress <> nil then
-    AWorkTable.FluidPress.Unsubscribe(AObserver);
-
-  if AWorkTable.Pumps <> nil then
-    for Pump in AWorkTable.Pumps do
-      if Pump <> nil then
-        Pump.Unsubscribe(AObserver);
+    if (AObject = WorkTable) or (AObject = WorkTable.FlowRate) or
+       (AObject = WorkTable.FluidTemp) or (AObject = WorkTable.FluidPress) or
+       ((AObject is TPump) and (WorkTable.Pumps <> nil) and
+        (WorkTable.Pumps.IndexOf(TPump(AObject)) >= 0)) then
+      Exit(WorkTable);
+  end;
 end;
 
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
@@ -528,10 +732,18 @@ AValue:integer;
 i:integer;
 EnabledEtalonChannels: TObjectList<TChannel>;
   begin
+  FlowRate := nil;
+  Pump := nil;
+  WorkTable := nil;
+  FluidTemp := nil;
+  FluidPress := nil;
+
   if (ASender = nil) or (FWorkTableManager = nil) then
     Exit;
   if ASender is TWorkTable then
-    WorkTable:= ASender AS TWorkTable;
+    WorkTable:= ASender AS TWorkTable
+  else
+    WorkTable := FindWorkTableForObject(ASender);
 
   if AData is TPump then
     Pump := AData as TPump;
@@ -546,11 +758,16 @@ EnabledEtalonChannels: TObjectList<TChannel>;
      (ASender <> FWorkTableManager.ActiveWorkTable) then
     Exit;   }
 
+  if WorkTable = nil then
+    WorkTable := FWorkTableManager.ActiveWorkTable;
+
   case AEvent of
     notifyAction:
       begin
         if AData is TPump then
           begin
+            if (WorkTable = nil) or (WorkTable.ActivePump = nil) then
+              Exit;
 
               IF (Pump.Action = apStart)  THEN
                 Pump.State:=spStarted
@@ -567,6 +784,9 @@ EnabledEtalonChannels: TObjectList<TChannel>;
 
         if AData is TFlowRate then
           begin
+            if (WorkTable = nil) or (WorkTable.ActivePump = nil) then
+              Exit;
+
               IF (FlowRate.Action = apStart)  THEN
                 FlowRate.State:=spStarted
               else  if (FlowRate.Action = apStop) then
@@ -645,38 +865,231 @@ EnabledEtalonChannels: TObjectList<TChannel>;
 
 end;
 
-procedure TTableMainForm.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
-var
-  NotifyEvent: EWorkTableNotifyEvent;
+procedure TTableMainForm.WorkTableActionHandler(Sender: TWorkTable;
+  AEvent: ENotifyEvent; Data: TObject);
 begin
   if Sender = nil then
     Exit;
 
+  case Sender.Action of
+    awtAddPump:
+      SubscribeWorkTableObjects(Sender);
+    awtRemovePump:
+      SyncWorkTableObservers;
+  end;
 
-  {if (Event < Ord(Low(EWorkTableNotifyEvent))) or
-     (Event > Ord(High(EWorkTableNotifyEvent))) then
-    Exit;  }
+  if (Data is TPump) or (Data is TFlowRate) or (Data is TFluidTemp) or
+     (Data is TFluidPress) then
+    Exit;
 
-  NotifyEvent := EWorkTableNotifyEvent(Event);
+  HandleWorkTableNotify(Sender, AEvent, Data);
+end;
+
+procedure TTableMainForm.WorkTableStateChangedHandler(Sender: TWorkTable;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  if (Data is TPump) or (Data is TFlowRate) or (Data is TFluidTemp) or
+     (Data is TFluidPress) then
+    Exit;
+
+  HandleWorkTableNotify(Sender, AEvent, Data);
+end;
+
+procedure TTableMainForm.WorkTableEventHandler(Sender: TWorkTable;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  if (Data is TPump) or (Data is TFlowRate) or (Data is TFluidTemp) or
+     (Data is TFluidPress) then
+    Exit;
+
+  HandleWorkTableNotify(Sender, AEvent, Data);
+end;
+
+procedure TTableMainForm.PumpActionHandler(Sender: TPump; AEvent: ENotifyEvent;
+  Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.PumpStateChangedHandler(Sender: TPump;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.PumpEventHandler(Sender: TPump; AEvent: ENotifyEvent;
+  Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FlowRateActionHandler(Sender: TFlowRate;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FlowRateStateChangedHandler(Sender: TFlowRate;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FlowRateEventHandler(Sender: TFlowRate;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FluidTempActionHandler(Sender: TFluidTemp;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FluidTempStateChangedHandler(Sender: TFluidTemp;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FluidTempEventHandler(Sender: TFluidTemp;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FluidPressActionHandler(Sender: TFluidPress;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FluidPressStateChangedHandler(Sender: TFluidPress;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.FluidPressEventHandler(Sender: TFluidPress;
+  AEvent: ENotifyEvent; Data: TObject);
+begin
+  if Sender = nil then
+    Exit;
+
+  HandleWorkTableNotify(FindWorkTableForObject(Sender), AEvent, Sender);
+end;
+
+procedure TTableMainForm.OnNotify(Sender: TObject; AEvent: Integer; Data: TObject);
+var
+  LNotifyEvent: ENotifyEvent;
+begin
+  if Sender = nil then
+    Exit;
+
+  LNotifyEvent := ENotifyEvent(AEvent);
 
   if Sender is TWorkTable then
   begin
-    HandleWorkTableNotify(Sender, NotifyEvent, Data);
+    case LNotifyEvent of
+      notifyStateChanged:
+        WorkTableStateChangedHandler(TWorkTable(Sender), LNotifyEvent, Data);
+      notifyAction:
+        WorkTableActionHandler(TWorkTable(Sender), LNotifyEvent, Data);
+      notifyEvent:
+        WorkTableEventHandler(TWorkTable(Sender), LNotifyEvent, Data);
+    end;
     Exit;
   end;
 
-  if (Sender is TPump) or
-     (Sender is TFlowRate) or
-     (Sender is TFluidTemp) or
-     (Sender is TFluidPress) then
+  if Sender is TPump then
   begin
-    // Параметры подписаны напрямую и через TWorkTable (агрегация в HandleParameterNotify).
-    // Чтобы не обрабатывать одно и то же событие дважды, пропускаем прямое уведомление
-    // при активной подписке на рабочий стол.
-    if FSubscribedWorkTable <> nil then
-      Exit;
+    case LNotifyEvent of
+      notifyStateChanged:
+        PumpStateChangedHandler(TPump(Sender), LNotifyEvent, Data);
+      notifyAction:
+        PumpActionHandler(TPump(Sender), LNotifyEvent, Data);
+      notifyEvent:
+        PumpEventHandler(TPump(Sender), LNotifyEvent, Data);
+    end;
+    Exit;
+  end;
 
-    HandleWorkTableNotify(Sender, NotifyEvent, Sender);
+  if Sender is TFlowRate then
+  begin
+    case LNotifyEvent of
+      notifyStateChanged:
+        FlowRateStateChangedHandler(TFlowRate(Sender), LNotifyEvent, Data);
+      notifyAction:
+        FlowRateActionHandler(TFlowRate(Sender), LNotifyEvent, Data);
+      notifyEvent:
+        FlowRateEventHandler(TFlowRate(Sender), LNotifyEvent, Data);
+    end;
+    Exit;
+  end;
+
+  if Sender is TFluidTemp then
+  begin
+    case LNotifyEvent of
+      notifyStateChanged:
+        FluidTempStateChangedHandler(TFluidTemp(Sender), LNotifyEvent, Data);
+      notifyAction:
+        FluidTempActionHandler(TFluidTemp(Sender), LNotifyEvent, Data);
+      notifyEvent:
+        FluidTempEventHandler(TFluidTemp(Sender), LNotifyEvent, Data);
+    end;
+    Exit;
+  end;
+
+  if Sender is TFluidPress then
+  begin
+    case LNotifyEvent of
+      notifyStateChanged:
+        FluidPressStateChangedHandler(TFluidPress(Sender), LNotifyEvent, Data);
+      notifyAction:
+        FluidPressActionHandler(TFluidPress(Sender), LNotifyEvent, Data);
+      notifyEvent:
+        FluidPressEventHandler(TFluidPress(Sender), LNotifyEvent, Data);
+    end;
   end;
 end;
 
@@ -782,13 +1195,8 @@ begin
   if FWorkTableManager = nil then
     Exit;
 
-  if FSubscribedWorkTable <> FWorkTableManager.ActiveWorkTable then
-  begin
-    SubscribeToWorkTable(FWorkTableManager.ActiveWorkTable);
-    UpdateActiveWorkTableEdit;
-  end
-  else
-    UpdateActiveWorkTableEdit;
+  SyncWorkTableObservers;
+  UpdateActiveWorkTableEdit;
 
   FWorkTableManager.UpdateSimulation;
 end;
