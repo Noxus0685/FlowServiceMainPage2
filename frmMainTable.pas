@@ -104,6 +104,9 @@ type
     ResultStatus: Integer;
   end;
 
+  TWorkTableCommandEvent = procedure(AWorkTable: TWorkTable;
+    AAction: EActionWorkTable) of object;
+
   TFrameMainTable = class(TFrame, IEventObserver)
     TabControlWorkTables: TTabControl;
     PanelEtalons1: TPanel;
@@ -569,6 +572,8 @@ type
     procedure StopMonitor;
     procedure StartTest;
     procedure StopTest;
+    procedure RequestStartTest;
+    procedure RequestStopTest;
 
 
     procedure UpdateGrids;
@@ -592,6 +597,7 @@ type
     FInstrumentalVisibleOrder: TList<TLayout>;
     FFrameProceed: TFrameProceed;
     FFrameMainTable: TFrameMainTable;
+    FOnWorkTableCommand: TWorkTableCommandEvent;
     function GetLayoutByMenuItem(AMenuItem: TMenuItem): TLayout;
     procedure RebuildInstrumentalVisibleOrder;
     procedure ApplyInstrumentalVisibleOrder;
@@ -627,6 +633,7 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
     procedure ReleaseEmptyGridDevicesBeforeSave;
+    property OnWorkTableCommand: TWorkTableCommandEvent read FOnWorkTableCommand write FOnWorkTableCommand;
 
 
   private type
@@ -882,36 +889,51 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.RequestStartTest;
+begin
+  if Assigned(FOnWorkTableCommand) and (FActiveWorkTable <> nil) then
+    FOnWorkTableCommand(FActiveWorkTable, awtStartTest);
+end;
+
+procedure TFrameMainTable.RequestStopTest;
+begin
+  if Assigned(FOnWorkTableCommand) and (FActiveWorkTable <> nil) then
+    FOnWorkTableCommand(FActiveWorkTable, awtStopTest);
+end;
+
 procedure TFrameMainTable.StartTest;
-var
-  Run: TMeasurementRun;
 begin
   if FActiveWorkTable = nil then
     Exit;
 
-  Run := MeasurementRun;
-  if Run = nil then
+  if MeasurementRun = nil then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psForm, 'StartTest',
+      'Невозможно запустить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
     Exit;
+  end;
 
-  Run.Execute(mcStart);
+  FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
+  RequestStartTest;
   ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Пользователь запустил измерение', FActiveWorkTable.Name);
 
   end;
 
 procedure TFrameMainTable.StopTest;
-var
-  Run: TMeasurementRun;
 begin
 
   if FActiveWorkTable = nil then
     Exit;
 
-  Run := MeasurementRun;
-  if Run = nil then
+  if MeasurementRun = nil then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psForm, 'StopTest',
+      'Невозможно остановить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
     Exit;
+  end;
 
+   RequestStopTest;
    ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь останавливает измерение', FActiveWorkTable.Name);
-   Run.Execute(mcStop);
  
 end;
 
@@ -924,9 +946,17 @@ begin
         end;
 
            if SwitchAuto.IsChecked then
-           MeasurementRun.Mode:= EMeasurementRunMode.mrmAutomatic
+           begin
+             MeasurementRun.Mode:= EMeasurementRunMode.mrmAutomatic;
+             if FActiveWorkTable <> nil then
+               FActiveWorkTable.MeasurementMode := EMeasurementRunMode.mrmAutomatic;
+           end
            else
-           MeasurementRun.Mode:= EMeasurementRunMode.mrmManual;
+           begin
+             MeasurementRun.Mode:= EMeasurementRunMode.mrmManual;
+             if FActiveWorkTable <> nil then
+               FActiveWorkTable.MeasurementMode := EMeasurementRunMode.mrmManual;
+           end;
 
 end;
 
