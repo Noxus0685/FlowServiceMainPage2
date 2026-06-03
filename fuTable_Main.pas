@@ -130,6 +130,7 @@ type
     procedure ClearWorkTableObservers;
     function FindWorkTableForObject(AObject: TObject): TWorkTable;
     procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
+    procedure WorkTableCommandHandler(AWorkTable: TWorkTable; AAction: EActionWorkTable);
     procedure WorkTableActionHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
     procedure WorkTableStateChangedHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
     procedure WorkTableEventHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
@@ -459,6 +460,7 @@ begin
   FFrameMainTable := TFrameMainTable.Create(Self);
   FFrameMainTable.Parent := tiTable;
   FFrameMainTable.Align := TAlignLayout.Client;
+  FFrameMainTable.OnWorkTableCommand := WorkTableCommandHandler;
   FFrameMainTable.Initialize;
 
 
@@ -853,6 +855,20 @@ EnabledEtalonChannels: TObjectList<TChannel>;
 
 end;
 
+procedure TTableMainForm.WorkTableCommandHandler(AWorkTable: TWorkTable;
+  AAction: EActionWorkTable);
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  case AAction of
+    awtStartTest:
+      AWorkTable.StartTest;
+    awtStopTest:
+      AWorkTable.StopTest;
+  end;
+end;
+
 procedure TTableMainForm.WorkTableActionHandler(Sender: TWorkTable;
   AEvent: ENotifyEvent; Data: TObject);
 begin
@@ -860,13 +876,6 @@ begin
     Exit;
 
   case Sender.Action of
-    awtStartTest,
-    awtStopTest:
-      begin
-        if FFrameMainTable <> nil then
-          FFrameMainTable.HandleWorkTableAction(Sender, Data);
-        Exit;
-      end;
     awtAddPump:
       SubscribeWorkTableObjects(Sender);
     awtRemovePump:

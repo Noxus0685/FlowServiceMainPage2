@@ -543,6 +543,9 @@ begin
     Exit;
   FCurrentStage := ANewState;
 
+  if FWorkTable <> nil then
+    FWorkTable.MeasurementRunStateChanged(Self, ANewState);
+
   Notify(Integer(meStateChanged));
 end;
 
@@ -571,8 +574,6 @@ begin
 
     msMeasure:
       begin
-        if FWorkTable <> nil then
-          FWorkTable.StartTest;
         FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
         FireEvent(meMeasureStarted);
       end;
@@ -836,7 +837,12 @@ begin
   end;
 
   if LThread = nil then
+  begin
+    if FWorkTable <> nil then
+      FWorkTable.MeasurementRunStateChanged(Self, msNone);
+    SetStage(msNone);
     Exit;
+  end;
 
   LThread.Terminate;
   LThread.WaitFor;

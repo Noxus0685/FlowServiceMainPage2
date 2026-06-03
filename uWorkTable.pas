@@ -473,7 +473,6 @@ type
   function ResolveParameterStateEvent(AParameters: TParameter): ENotifyEvent;
   function ResolveParameterActionEvent(AParameters: TParameter; AParameterAction: EActionParameter): ENotifyEvent;
 
-  procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
   procedure FireAction(AAction: EActionWorkTable; const ASourceName: string; const ADescription: string);
   procedure DoStartMonitor;
@@ -621,6 +620,7 @@ type
     procedure FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo); overload;
     procedure FireEvent(AEvent: TWorkTableEvent; const AMsg: String ); overload;
     procedure FireEvent(AEvent: TWorkTableEvent); overload;
+    procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
 
   public
 
@@ -1670,6 +1670,7 @@ begin
 
   FState := swtNONE;
   FAction := awtNone;
+  FMode := mrmAutomatic;
   FTableClamped := False;
   FText := 'Рабочий стол 1';
   FFlowUnitName := 'м3/ч';
@@ -3736,12 +3737,14 @@ end;
 procedure TWorkTable.DoStartMonitor;
 begin
   ResetMeasurementValues;
+  SetState(swtSTARTMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
     'Мониторинг запущен', Name);
 end;
 
 procedure TWorkTable.DoStopMonitor;
 begin
+  SetState(swtSTOPMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopMonitor',
     'Мониторинг остановлен', Name);
 end;
@@ -3749,12 +3752,16 @@ end;
 procedure TWorkTable.DoStartTest;
 begin
   ResetMeasurementValues;
+  SetState(swtSTARTTEST);
+  StartMeasurementRun(Ord(FMode));
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
     'Тест запущен', Name);
 end;
 
 procedure TWorkTable.DoStopTest;
 begin
+  SetState(swtSTOPTEST);
+  StopMeasurementRun;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
     'Тест остановлен', Name);
 end;
@@ -3762,24 +3769,25 @@ end;
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
 begin
   case AState of
-  msNone:
-  begin
+    msNone:
+      begin
+        if FState in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE, swtSTOPTEST, swtSTOPWAIT] then
+          SetState(swtSTANDBY);
+        FAction := awtNone;
+      end;
 
-  end;
-   { msStarting:
-    begin
-      DoSpillageStart;
-         SetState(swtSTARTWAIT);
-    end;
-    msOnGoing:
-    begin
-        SetState(swtEXECUTE);
-    end;
-    msStopping:
-    begin
-      DoSpillageStop;
-      SetState(swtSTOPTEST);
-    end;  }
+    msSelectPoint:
+      begin
+        FAction := awtNone;
+        DoSpillageStart;
+        SetState(swtSTARTWAIT);
+      end;
+
+    msMeasure:
+      SetState(swtEXECUTE);
+
+    msDone:
+      SetState(swtSTANDBY);
   end;
 end;
 
@@ -4043,6 +4051,8 @@ begin
     TMeasurementRun(FMeasurementRun).Mode := mrmAutomatic;
 
   TMeasurementRun(FMeasurementRun).Start;
+  if TMeasurementRun(FMeasurementRun).Stage = msNone then
+    SetState(swtSTANDBY);
 
 end;
 
