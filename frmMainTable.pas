@@ -894,6 +894,7 @@ begin
     Exit;
 
   FActiveWorkTable.StartTest;
+  Run.Execute(mcStart);
   ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Пользователь запустил измерение', FActiveWorkTable.Name);
 
   end;
@@ -911,6 +912,7 @@ begin
     Exit;
 
    FActiveWorkTable.StopTest;
+   Run.Execute(mcStop);
    ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь останавливает измерение', FActiveWorkTable.Name);
  
 end;
