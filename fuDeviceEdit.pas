@@ -764,8 +764,8 @@ begin
   {-----------------------------------------------------}
   { Повторы }
   {-----------------------------------------------------}
-  NewP.RepeatsProtocol := Max(FDevice.Repeats, 1);
-  NewP.Repeats := Max(FDevice.Repeats, 1);
+  NewP.RepeatsProtocol := Max(FDevice.RepeatsProtocol, 1);
+  NewP.Repeats := Max(FDevice.RepeatsProtocol, 1);
 
 
   {-----------------------------------------------------}
@@ -1910,6 +1910,7 @@ var
   AccErr: Double;
   Idx: Integer;
   Point: TDevicePoint;
+  RepeatsValue: Integer;
   ALoading:Boolean;
 begin
   ALoading:= FLoading;
@@ -2018,10 +2019,28 @@ begin
     // =====================================================
     // == Повторы
     // =====================================================
-    if FDevice.Repeats > 0 then
-      sbRepeats.Value := FDevice.Repeats
-    else
-      sbRepeats.Value := 1;
+    RepeatsValue := 0;
+    if FDevice.Points <> nil then
+      for Point in FDevice.Points do
+        if (Point <> nil) and (Point.State <> osDeleted) then
+        begin
+          RepeatsValue := Max(Point.RepeatsProtocol, 1);
+          Break;
+        end;
+
+    if RepeatsValue = 0 then
+    begin
+      if FDevice.RepeatsProtocol > 0 then
+        RepeatsValue := FDevice.RepeatsProtocol
+      else if FDevice.Repeats > 0 then
+        RepeatsValue := FDevice.Repeats
+      else
+        RepeatsValue := 1;
+    end;
+
+    sbRepeats.Value := RepeatsValue;
+    FDevice.Repeats := RepeatsValue;
+    FDevice.RepeatsProtocol := RepeatsValue;
 
     // =====================================================
     // == Базовая погрешность
@@ -2228,6 +2247,7 @@ begin
     sbRepeats.Value := RepeatsValue;
 
   FDevice.Repeats := RepeatsValue;
+  FDevice.RepeatsProtocol := RepeatsValue;
 
   if FDevice.Points <> nil then
     for P in FDevice.Points do
