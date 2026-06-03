@@ -38,6 +38,7 @@ type
     swtSTARTMONITORWAIT,
     swtMONITOR,
     swtSTOPMONITOR,
+    swtSTOPMONITORWAIT,
     swtCONFIGED,
     swtSTARTTEST,
     swtSTARTWAIT,
@@ -617,6 +618,7 @@ type
     procedure SetPressureMax(const AValue: Double);
 
     procedure FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo); overload;
+    procedure FireEvent(AEvent: TWorkTableEvent; const AMsg: String ); overload;
     procedure FireEvent(AEvent: TWorkTableEvent); overload;
     procedure MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
 
@@ -3478,6 +3480,22 @@ begin
 
   if FIsActive then
     FireEvent(ewtActivated);
+end;
+
+procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent; const AMsg: String );
+var
+  Category: EProtocolCategory;
+  EventText: string;
+  ErrorDetails: string;
+begin
+  Category := WorkTableEventToProtocolCategory(AEvent);
+  EventText := WorkTableEventToText(AEvent);
+
+  ProtocolManager.AddMessage(Category, psWorkTable, 'WorkTableEvent',
+    'Событие рабочего стола', AMsg);
+
+  Event := Integer(AEvent);
+  Notify(notifyEvent, Self);
 end;
 
 procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo);
