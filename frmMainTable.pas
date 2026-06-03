@@ -4796,7 +4796,8 @@ begin
     Exit;
   end;
 
-  if WorkTable.State = swtEXECUTE then
+  if (TestButton.Tag = 3) or
+     (WorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
     StopTest
   else
     StartTest;

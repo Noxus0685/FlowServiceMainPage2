@@ -568,7 +568,8 @@ begin
 
     msWaitStable:
       begin
-        if FWorkTable <> nil then
+        if (FWorkTable <> nil) and
+           not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
           FWorkTable.StartMonitor;
       end;
 
