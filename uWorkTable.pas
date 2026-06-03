@@ -3787,7 +3787,10 @@ begin
       SetState(swtEXECUTE);
 
     msDone:
-      SetState(swtSTANDBY);
+      begin
+        DoSpillageStop;
+        SetState(swtCOMPLETE);
+      end;
   end;
 end;
 
