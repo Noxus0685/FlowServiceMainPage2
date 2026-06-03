@@ -893,6 +893,7 @@ begin
   if Run = nil then
     Exit;
 
+  FActiveWorkTable.StartTest;
   Run.Execute(mcStart);
   ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Пользователь запустил измерение', FActiveWorkTable.Name);
 
@@ -910,8 +911,9 @@ begin
   if Run = nil then
     Exit;
 
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь останавливает измерение', FActiveWorkTable.Name);
+   FActiveWorkTable.StopTest;
    Run.Execute(mcStop);
+   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь останавливает измерение', FActiveWorkTable.Name);
  
 end;
 
@@ -979,7 +981,25 @@ end;
 
 procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
 begin
-  AWorkTable.ExecuteAction;
+  case AWorkTable.Action of
+    awtStartTest:
+      begin
+        AWorkTable.ExecuteAction;
+        if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
+          MeasurementRun.Execute(mcStart);
+        Exit;
+      end;
+
+    awtStopTest:
+      begin
+        AWorkTable.ExecuteAction;
+        if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
+          MeasurementRun.Execute(mcStop);
+        Exit;
+      end;
+  else
+    AWorkTable.ExecuteAction;
+  end;
 
   if AData is TDevicePoint then
     OnChangePoint(AWorkTable, TDevicePoint(AData), -1);
