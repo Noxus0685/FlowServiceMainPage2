@@ -3736,14 +3736,12 @@ end;
 procedure TWorkTable.DoStartMonitor;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
     'Мониторинг запущен', Name);
 end;
 
 procedure TWorkTable.DoStopMonitor;
 begin
-  SetState(swtSTOPMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopMonitor',
     'Мониторинг остановлен', Name);
 end;
@@ -3751,14 +3749,12 @@ end;
 procedure TWorkTable.DoStartTest;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTTEST);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
     'Тест запущен', Name);
 end;
 
 procedure TWorkTable.DoStopTest;
 begin
-  SetState(swtSTOPTEST);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
     'Тест остановлен', Name);
 end;
