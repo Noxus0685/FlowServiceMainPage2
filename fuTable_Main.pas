@@ -779,7 +779,6 @@ EnabledEtalonChannels: TObjectList<TChannel>;
                 Pump.State:=spOngoing ;
               if WorkTable.ActivePump.ValueSet.value<12 then
                 WorkTable.ActivePump.ValueSet.value:=12;
-              mPump.Lines.Add('Насос: ' + Pump.Name +' Состояние: ' + Pump.GetActionAsString);
           end;
 
         if AData is TFlowRate then
@@ -810,11 +809,9 @@ EnabledEtalonChannels: TObjectList<TChannel>;
             FHasPrevFlowRateValue := True;
             if not(WorkTable.ActivePump.IsRunning) and (FlowRate.IsRunning) then
               WorkTable.ActivePump.DoPumpStart;
-            mPump.Lines.Add('Расход воды: ' + floattostr(FlowRate.ValueSet.value)+ ' - Состояние: ' + FlowRate.GetActionAsString );
           end;
         if AData is TFluidTemp then
         begin
-          mPump.Lines.Add('Изменилась заданная температура: '  + floattostr(FluidTemp.ValueSet.value) + ' Состояние: ' + FluidTemp.GetActionAsString);
           IF (FluidTemp.Action = apStart)  THEN
             FluidTemp.State:=spStarted
           else  if (FluidTemp.Action = apStop) then
@@ -826,7 +823,6 @@ EnabledEtalonChannels: TObjectList<TChannel>;
         end;
         if AData is TFluidPress then
         begin
-          mPump.Lines.Add('Изменилась заданное давление: '  + floattostr(FluidPress.ValueSet.value) + ' Состояние: ' + FluidPress.GetActionAsString);
           IF (FluidPress.Action = apStart)  THEN
             FluidPress.State:=spStarted
           else  if (FluidPress.Action = apStop) then
@@ -850,14 +846,6 @@ EnabledEtalonChannels: TObjectList<TChannel>;
            (TWorkTable(ASender).Event in [Ord(ewtActivated), Ord(ewtRefresh)]) then
           UpdateActiveWorkTableEdit;
 
-        if AData is TPump then
-          mPump.Lines.Add('Событие насоса, код: ' + IntToStr(TPump(AData).Event));
-        if AData is TFlowRate then
-          mPump.Lines.Add('Событие расхода, код: ' + IntToStr(TFlowRate(AData).Event));
-        if AData is TFluidTemp then
-          mPump.Lines.Add('Событие температуры, код: ' + IntToStr(TFluidTemp(AData).Event));
-        if AData is TFluidPress then
-          mPump.Lines.Add('Событие давления, код: ' + IntToStr(TFluidPress(AData).Event));
       end;
 
   end;

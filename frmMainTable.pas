@@ -985,6 +985,7 @@ begin
         AWorkTable.ExecuteAction;
         if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
           MeasurementRun.Execute(mcStart);
+        Exit;
       end;
 
     awtStopTest:
@@ -992,6 +993,7 @@ begin
         AWorkTable.ExecuteAction;
         if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
           MeasurementRun.Execute(mcStop);
+        Exit;
       end;
   else
     AWorkTable.ExecuteAction;
