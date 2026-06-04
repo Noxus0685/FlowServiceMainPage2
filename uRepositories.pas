@@ -3568,6 +3568,9 @@ begin
       SaveErrors.Add(Format('При сохранении прибора "%s", серийный номер "%s" был присвоен новый UUID.', [ADevice.Name, ADevice.SerialNumber]));
     end;
 
+    if (ADevice.State = osNew) and DeviceExistsInDB(ADevice.UUID) then
+      ADevice.State := osModified;
+
     ExistingDevice := FindDeviceByUUID(ADevice.UUID);
     if (ExistingDevice <> nil) and (ExistingDevice <> ADevice) then
     begin
@@ -4022,7 +4025,10 @@ begin
 
   FState := osLoading;
 
-  FDevices := TObjectList<TDevice>.Create(True);
+  if FDevices = nil then
+    FDevices := TObjectList<TDevice>.Create(True)
+  else
+    FDevices.Clear;
   LoadErrors := TStringList.Create;
 
   Q := FDM.CreateQuery;
