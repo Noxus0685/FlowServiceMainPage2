@@ -1232,6 +1232,7 @@ begin
     TargetDevices.Free;
   end;
 
+  SyncTreeAfterGridRowsRemoved;
   BuildTree;
   ApplyFilter;
   UpdateGridDevices;
