@@ -1191,6 +1191,7 @@ var
   T: TDeviceType;
   MaxID: Integer;
   Q: TFDQuery;
+  HasDeviceTypeTable: Boolean;
 begin
   MaxID := 0;
 
@@ -1199,15 +1200,25 @@ begin
       if T.ID > MaxID then
         MaxID := T.ID;
 
-  if (FDM <> nil) and FDM.TableExists('DeviceType') then
+  if FDM <> nil then
   begin
     Q := FDM.CreateQuery;
     try
-      Q.SQL.Text := 'select max(ID) as MaxID from DeviceType';
+      Q.SQL.Text :=
+        'select name from sqlite_master ' +
+        'where type = ''table'' and name = ''DeviceType''';
       Q.Open;
-      if (not Q.Eof) and (not Q.FieldByName('MaxID').IsNull) and
-         (Q.FieldByName('MaxID').AsInteger > MaxID) then
-        MaxID := Q.FieldByName('MaxID').AsInteger;
+      HasDeviceTypeTable := not Q.Eof;
+      Q.Close;
+
+      if HasDeviceTypeTable then
+      begin
+        Q.SQL.Text := 'select max(ID) as MaxID from DeviceType';
+        Q.Open;
+        if (not Q.Eof) and (not Q.FieldByName('MaxID').IsNull) and
+           (Q.FieldByName('MaxID').AsInteger > MaxID) then
+          MaxID := Q.FieldByName('MaxID').AsInteger;
+      end;
     finally
       Q.Free;
     end;
