@@ -1190,6 +1190,7 @@ function TTypeRepository.GenerateTypeID: Integer;
 var
   T: TDeviceType;
   MaxID: Integer;
+  Q: TFDQuery;
 begin
   MaxID := 0;
 
@@ -1197,6 +1198,20 @@ begin
     for T in FTypes do
       if T.ID > MaxID then
         MaxID := T.ID;
+
+  if (FDM <> nil) and FDM.TableExists('DeviceType') then
+  begin
+    Q := FDM.CreateQuery;
+    try
+      Q.SQL.Text := 'select max(ID) as MaxID from DeviceType';
+      Q.Open;
+      if (not Q.Eof) and (not Q.FieldByName('MaxID').IsNull) and
+         (Q.FieldByName('MaxID').AsInteger > MaxID) then
+        MaxID := Q.FieldByName('MaxID').AsInteger;
+    finally
+      Q.Free;
+    end;
+  end;
 
   Result := MaxID + 1;
 end;
@@ -1742,7 +1757,17 @@ begin
   Q := FDM.CreateQuery;
   try
     try
-    case AType.State of
+      if AType.State = osNew then
+      begin
+        Q.SQL.Text := 'select 1 from DeviceType where ID = :ID';
+        SetIntParam(Q, 'ID', AType.ID);
+        Q.Open;
+        if not Q.Eof then
+          AType.ID := GenerateTypeID;
+        Q.Close;
+      end;
+
+      case AType.State of
 
       {==================================================}
       { DELETE — ЖЁСТКИЙ КАСКАД }
@@ -2891,13 +2916,13 @@ begin
       end;
 
       // ----------------------------------
-      // Если список пуст — считаем, что не загрузились
+      // Новая БД создаётся с пустой таблицей категорий.
+      // Заполняем её стандартным списком в памяти, чтобы редактор типа
+      // сразу показывал варианты в поле "Категория СИ".
       // ----------------------------------
       if FCategories.Count = 0 then
       begin
-        FState := osEmpty;   // данных нет, но ошибки тоже нет
-        Result := True;
-        Exit;
+        InitCategories;
       end;
 
       FState := osClean;
