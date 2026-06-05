@@ -843,6 +843,7 @@ begin
     TargetTypes.Free;
   end;
   SyncTreeAfterGridRowsRemoved;
+  BuildTree;
   ApplyFilter;
   UpdateGridTypes;
   ClearCheckedTypes;
