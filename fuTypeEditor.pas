@@ -3133,7 +3133,15 @@ begin
   FDiametersLocal := nil;
   FPointsLocal := nil;
   FLoading := True;
-  FreeAndNil(FType);
+
+  if (FOriginalType = nil) and (ModalResult <> mrOk) and (FType <> nil) then
+    FType.State := osDeleted;
+
+  if FOriginalType <> nil then
+    FreeAndNil(FType)
+  else
+    FType := nil;
+
   FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
 end;

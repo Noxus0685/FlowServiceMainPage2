@@ -843,6 +843,7 @@ begin
     TargetTypes.Free;
   end;
   SyncTreeAfterGridRowsRemoved;
+  BuildTree;
   ApplyFilter;
   UpdateGridTypes;
   ClearCheckedTypes;
@@ -1246,6 +1247,8 @@ procedure TFormTypeSelect.FormClose(
 var
   Repo: TTypeRepository;
   Res: TModalResult;
+  I: Integer;
+  T: TDeviceType;
 begin
   Repo := AppServices.DataManager.ActiveTypeRepo;
 
@@ -1279,7 +1282,22 @@ begin
 
       mrNo:
         begin
-          // закрываем без сохранения
+          // Удалённые несохранённые типы возвращаем в список; новые — скрываем через osDeleted.
+          if FDeviceTypes <> nil then
+            for I := 0 to FDeviceTypes.Count - 1 do
+            begin
+              T := FDeviceTypes[I];
+              if T = nil then
+                Continue;
+
+              if T.State = osDeleted then
+                T.State := osClean
+              else if T.State = osNew then
+                T.State := osDeleted;
+            end;
+          BuildTree;
+          ApplyFilter;
+          UpdateGridTypes;
         end;
 
       mrCancel:
@@ -2241,6 +2259,8 @@ var
   RepoName: string;
   Repo: TTypeRepository;
   Res: TModalResult;
+  I: Integer;
+  T: TDeviceType;
 begin
   {----------------------------------}
   { Проверки }
@@ -2281,7 +2301,22 @@ begin
 
       mrNo:
         begin
-          // закрываем без сохранения
+          // Удалённые несохранённые типы возвращаем в список; новые — скрываем через osDeleted.
+          if FDeviceTypes <> nil then
+            for I := 0 to FDeviceTypes.Count - 1 do
+            begin
+              T := FDeviceTypes[I];
+              if T = nil then
+                Continue;
+
+              if T.State = osDeleted then
+                T.State := osClean
+              else if T.State = osNew then
+                T.State := osDeleted;
+            end;
+          BuildTree;
+          ApplyFilter;
+          UpdateGridTypes;
         end;
 
       mrCancel:
