@@ -186,6 +186,8 @@ type
 
   private
 
+  FUpdatingRepositoryCombo: Boolean;
+
   { ================= НОВАЯ АРХИТЕКТУРА ================= }
 
   FDeviceTypes: TObjectList<TDeviceType>;        // все типы из репозитория
@@ -1297,6 +1299,7 @@ begin
    FSortAscending := True;
    FSkipTypeDeleteConfirm := False;
    FClearTreeSelectionOnClick := False;
+   FUpdatingRepositoryCombo := False;
    FCheckedTypes := TList<TDeviceType>.Create;
    TreeViewTypes.MultiSelect := True;
    OnKeyDown := FormKeyDown;
@@ -1327,6 +1330,7 @@ var
   Repo: TTypeRepository;
   ItemIndex: Integer;
 begin
+  FUpdatingRepositoryCombo := True;
   ComboBoxRepository.BeginUpdate;
   try
     ComboBoxRepository.Clear;
@@ -1351,6 +1355,7 @@ begin
 
   finally
     ComboBoxRepository.EndUpdate;
+    FUpdatingRepositoryCombo := False;
   end;
 end;
 
@@ -2240,8 +2245,8 @@ begin
   {----------------------------------}
   { Проверки }
   {----------------------------------}
-
-
+  if FUpdatingRepositoryCombo then
+    Exit;
 
 begin
   Repo := AppServices.DataManager.ActiveTypeRepo;
