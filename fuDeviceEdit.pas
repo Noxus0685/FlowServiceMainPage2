@@ -2081,10 +2081,7 @@ begin
     // =====================================================
     // == Температура
     // =====================================================
-    if FDevice.Temp > 0 then
-      EditTemp.Text := FloatToStr(FDevice.Temp)
-    else
-      EditTemp.Text := '';
+    EditTemp.Text := FDevice.Temp;
 
     // =====================================================
     // == Базовая погрешность
@@ -2733,8 +2730,6 @@ begin
 end;
 
 procedure TFormDeviceEditor.EditTempExit(Sender: TObject);
-var
-  Temp: Double;
 begin
   if FLoading then
     Exit;
@@ -2742,14 +2737,7 @@ begin
   if FDevice = nil then
     Exit;
 
-  Temp := NormalizeFloatInput(EditTemp.Text);
-  FDevice.Temp := Temp;
-
-  if Temp > 0 then
-    EditTemp.Text := FloatToStr(Temp)
-  else
-    EditTemp.Text := '';
-
+  FDevice.Temp := EditTemp.Text;
   SetModified;
 end;
 

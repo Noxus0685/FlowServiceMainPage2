@@ -1203,10 +1203,7 @@ begin
     // =====================================================
     // == Температура
     // =====================================================
-    if FType.Temp > 0 then
-      EditTemp.Text := FloatToStr(FType.Temp)
-    else
-      EditTemp.Text := '';
+    EditTemp.Text := FType.Temp;
 
     // =====================================================
     // == Базовая погрешность
@@ -1377,7 +1374,7 @@ begin
   FType.IVI               := StrToIntDef(EditIVI.Text, 0);
   FType.AccuracyClass     := EditAccuracyClass.Text;
   FType.RangeDynamic      := StrToFloatDef(EditRangeDynamic.Text, 0);
-  FType.Temp              := NormalizeFloatInput(EditTemp.Text);
+  FType.Temp              := EditTemp.Text;
 
     if (ceCategory.ItemIndex >= 0) and (ceCategory.ItemIndex < ceCategory.Items.Count) then
   begin
@@ -4693,19 +4690,10 @@ begin
 end;
 
 procedure TFormTypeEditor.EditTempExit(Sender: TObject);
-var
-  Temp: Double;
 begin
   if FLoading then Exit;
 
-  Temp := NormalizeFloatInput(EditTemp.Text);
-  FType.Temp := Temp;
-
-  if Temp > 0 then
-    EditTemp.Text := FloatToStr(Temp)
-  else
-    EditTemp.Text := '';
-
+  FType.Temp := EditTemp.Text;
   SetModified;
 end;
 

@@ -2832,12 +2832,7 @@ begin
     Value := D.AccuracyClass
 
   else if ACol = StringTemp.Index then
-  begin
-    if D.Temp > 0 then
-      Value := FloatToStr(D.Temp)
-    else
-      Value := '';
-  end
+    Value := D.Temp
 
   else if ACol = StringColumnReestrNumber.Index then
     Value := D.ReestrNumber

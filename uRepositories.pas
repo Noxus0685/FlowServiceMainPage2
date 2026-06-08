@@ -1470,7 +1470,7 @@ begin
     Col('Repeats', 'INTEGER'),
     Col('RepeatsProtocol', 'INTEGER'),
 
-    Col('Temp', 'REAL'),
+    Col('Temp', 'TEXT'),
     Col('Error', 'REAL')
   ];
 end;
@@ -1579,7 +1579,7 @@ begin
   Result.SpillageStop := Q.FieldByName('SpillageStop').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
-  Result.Temp := Q.FieldByName('Temp').AsFloat;
+  Result.Temp := Q.FieldByName('Temp').AsString;
   Result.Error := Q.FieldByName('Error').AsFloat;
 
   Result.State := osClean;
@@ -1915,7 +1915,7 @@ begin
     SetIntParam(Q, 'SpillageStop', AType.SpillageStop);
     SetIntParam(Q, 'Repeats', AType.Repeats);
     SetIntParam(Q, 'RepeatsProtocol', AType.RepeatsProtocol);
-    SetFloatParam(Q, 'Temp', AType.Temp);
+    SetStrParam(Q, 'Temp', AType.Temp);
     SetFloatParam(Q, 'Error', AType.Error);
 
     Q.ExecSQL;
@@ -3800,7 +3800,7 @@ begin
     Col('Qtr',               'REAL'),
     Col('RangeDynamic',      'REAL'),
 
-    Col('Temp',              'REAL'),
+    Col('Temp',              'TEXT'),
     Col('Error',             'REAL'),
 
     {--------------------------------------------------}
@@ -3961,7 +3961,7 @@ begin
     Result.Qtr := 0;
   Result.RangeDynamic := Q.FieldByName('RangeDynamic').AsFloat;
 
-  Result.Temp := Q.FieldByName('Temp').AsFloat;
+  Result.Temp := Q.FieldByName('Temp').AsString;
   Result.Error := Q.FieldByName('Error').AsFloat;
 
   Result.VerificationMethod := Q.FieldByName('VerificationMethod').AsString;
@@ -4310,7 +4310,7 @@ begin
     SetFloatParam(Q, 'Qmin', ADevice.Qmin);
     SetFloatParam(Q, 'Qtr', ADevice.Qtr);
     SetFloatParam(Q, 'RangeDynamic', ADevice.RangeDynamic);
-    SetFloatParam(Q, 'Temp', ADevice.Temp);
+    SetStrParam(Q, 'Temp', ADevice.Temp);
     SetFloatParam(Q, 'Error', ADevice.Error);
 
     SetStrParam(Q, 'VerificationMethod', ADevice.VerificationMethod);
