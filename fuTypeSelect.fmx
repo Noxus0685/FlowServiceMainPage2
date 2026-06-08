@@ -127,8 +127,8 @@
         OnHeaderClick = GridTypesHeaderClick
         OnGetValue = GridTypesGetValue
         OnCellClick = GridTypesCellClick
-        Viewport.Width = 861.000000000000000000
-        Viewport.Height = 637.000000000000000000
+        Viewport.Width = 881.000000000000000000
+        Viewport.Height = 678.000000000000000000
         object CheckColumnTypeEnable: TCheckColumn
           Header = #1042#1082#1083
           HeaderSettings.TextSettings.Trimming = Character
@@ -212,6 +212,11 @@
         end
         object StringColumnUUID: TStringColumn
           Header = 'UUID'
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringTemp: TColumn
+          Header = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
           HeaderSettings.TextSettings.WordWrap = False
           HeaderSettings.TextSettings.HorzAlign = Center
         end
@@ -399,8 +404,8 @@
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 879.000000000000000000
-      Viewport.Height = 98.000000000000000000
+      Viewport.Width = 883.000000000000000000
+      Viewport.Height = 102.000000000000000000
     end
   end
   object lyt1: TLayout

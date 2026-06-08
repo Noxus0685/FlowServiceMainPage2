@@ -264,6 +264,9 @@ type
     Layout21: TLayout;
     EditQnom: TEdit;
     Label7: TLabel;
+    Layout34: TLayout;
+    Label18: TLabel;
+    EditError: TEdit;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -2695,7 +2698,7 @@ begin
 end;
 
 
-procedure TFormDeviceEditor.EditErrorExit(Sender: TObject);
+procedure TFormDeviceEditor.EditTempExit(Sender: TObject);
 var
   Err: Double;
 begin
