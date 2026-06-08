@@ -379,6 +379,7 @@ type
     procedure GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
+    procedure GridDiametersConvertUnitClick(Sender: TObject);
     procedure GridDiametersMenuCopyClick(Sender: TObject);
     procedure GridDiametersMenuCutClick(Sender: TObject);
     procedure GridDiametersMenuPasteClick(Sender: TObject);
@@ -448,6 +449,7 @@ type
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
   FMenuItemGridDiametersDisplay: TMenuItem;
+  FMenuItemGridDiametersConvertUnits: TMenuItem;
   FActionListGridDiameters: TActionList;
   FActionGridDiametersDelete: TAction;
   FActionGridDiametersCopy: TAction;
@@ -530,6 +532,7 @@ type
     procedure ActionGridDiametersCopyExecute(Sender: TObject);
     procedure ActionGridDiametersCutExecute(Sender: TObject);
     procedure ActionGridDiametersPasteExecute(Sender: TObject);
+    procedure ConvertDiameterFlowValuesFromUnit(const AUnitIndex: Integer);
     procedure ActionGridPointsDeleteExecute(Sender: TObject);
     procedure ActionGridPointsCopyExecute(Sender: TObject);
     procedure ActionGridPointsCutExecute(Sender: TObject);
@@ -843,6 +846,19 @@ begin
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
   MenuItem.Action := FActionGridDiametersPaste;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
+
+  FMenuItemGridDiametersConvertUnits := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+  FMenuItemGridDiametersConvertUnits.Text := 'Поменять ед.и.';
+  FMenuItemGridDiametersConvertUnits.Parent := FPopupMenuGridDiametersHeader;
+
+  for I := 0 to ComboBoxUnits.Items.Count - 1 do
+  begin
+    MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+    MenuItem.Text := ComboBoxUnits.Items[I];
+    MenuItem.Tag := I;
+    MenuItem.OnClick := GridDiametersConvertUnitClick;
+    MenuItem.Parent := FMenuItemGridDiametersConvertUnits;
+  end;
 
   FMenuItemGridDiametersDisplay := TMenuItem.Create(FPopupMenuGridDiametersHeader);
   FMenuItemGridDiametersDisplay.Text := 'Отображение';
@@ -2252,6 +2268,121 @@ begin
   UpdateGridDiametersHeaderRect;
 end;
 
+
+procedure TFormTypeEditor.GridDiametersConvertUnitClick(Sender: TObject);
+begin
+  if Sender is TMenuItem then
+    ConvertDiameterFlowValuesFromUnit(TMenuItem(Sender).Tag);
+end;
+
+procedure TFormTypeEditor.ConvertDiameterFlowValuesFromUnit(const AUnitIndex: Integer);
+var
+  I: Integer;
+  OldUnits: Integer;
+  UnitName: string;
+  D: TDiameter;
+  HasChecked: Boolean;
+  TargetCount: Integer;
+  ChangedCount: Integer;
+  NewQmax: Double;
+  NewQnom: Double;
+  NewQmin: Double;
+  NewQtr: Double;
+  NewQ2tr: Double;
+  NewQFmax: Double;
+  RowChanged: Boolean;
+
+  function IsTargetDiameter(const ADiameter: TDiameter): Boolean;
+  begin
+    Result := (ADiameter <> nil) and (ADiameter.State <> osDeleted) and
+      ((not HasChecked) or ADiameter.Enable);
+  end;
+
+  function ConvertValue(const AValue: Double; out AConvertedValue: Double): Boolean;
+  begin
+    AConvertedValue := FType.ToBaseUnits(AValue);
+    Result := not SameValue(AValue, AConvertedValue);
+  end;
+begin
+  if (FType = nil) or (FDiametersLocal = nil) or (FDiametersLocal.Count = 0) then
+    Exit;
+
+  if (AUnitIndex < 0) or (AUnitIndex >= ComboBoxUnits.Items.Count) then
+    Exit;
+
+  HasChecked := False;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if (FDiametersLocal[I] <> nil) and (FDiametersLocal[I].State <> osDeleted) and
+      FDiametersLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  TargetCount := 0;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if IsTargetDiameter(FDiametersLocal[I]) then
+      Inc(TargetCount);
+
+  if TargetCount = 0 then
+    Exit;
+
+  UnitName := ComboBoxUnits.Items[AUnitIndex];
+  if MessageDlg(
+       Format('Пересчитать расходные значения выбранных строк как значения в единицах "%s"?', [UnitName]),
+       TMsgDlgType.mtConfirmation,
+       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+       0
+     ) <> mrYes then
+    Exit;
+
+  ChangedCount := 0;
+  OldUnits := FType.Units;
+  try
+    FType.Units := AUnitIndex;
+    FType.SetDimensions;
+
+    for I := 0 to FDiametersLocal.Count - 1 do
+    begin
+      D := FDiametersLocal[I];
+      if not IsTargetDiameter(D) then
+        Continue;
+
+      RowChanged := False;
+      RowChanged := ConvertValue(D.Qmax, NewQmax) or RowChanged;
+      RowChanged := ConvertValue(D.Qnom, NewQnom) or RowChanged;
+      RowChanged := ConvertValue(D.Qmin, NewQmin) or RowChanged;
+      RowChanged := ConvertValue(D.Qtr, NewQtr) or RowChanged;
+      RowChanged := ConvertValue(D.Q2tr, NewQ2tr) or RowChanged;
+      RowChanged := ConvertValue(D.QFmax, NewQFmax) or RowChanged;
+
+      if RowChanged then
+      begin
+        D.Qmax := NewQmax;
+        D.Qnom := NewQnom;
+        D.Qmin := NewQmin;
+        D.Qtr := NewQtr;
+        D.Q2tr := NewQ2tr;
+        D.QFmax := NewQFmax;
+
+        if D.State <> osNew then
+          D.State := osModified;
+        Inc(ChangedCount);
+      end;
+    end;
+  finally
+    FType.Units := OldUnits;
+    FType.SetDimensions;
+  end;
+
+  if ChangedCount = 0 then
+    Exit;
+
+  GridDiameters.Repaint;
+  UpdateDiametersGrid;
+  UpdateFlowRatePromptBySelectedDiameter;
+  SetModified;
+end;
 
 procedure TFormTypeEditor.WriteTypeEditActionLog(const AAction: string; AType: TDeviceType; const ADetails: string);
 var
@@ -6848,6 +6979,9 @@ begin
     ComboBoxUnits.ItemIndex := -1;
 
   ComboBoxUnits.Hint := ComboBoxUnits.Text;
+
+  if FPopupMenuGridDiametersHeader <> nil then
+    CreateMenu;
 end;
 
 procedure TFormTypeEditor.ApplyVolumeMode;
