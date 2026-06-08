@@ -228,7 +228,7 @@ type
     miCalculateVolume: TMenuItem;
     Layout45: TLayout;
     Label41: TLabel;
-    EditError: TEdit;
+    EditTemp: TEdit;
     Splitter1: TSplitter;
     Layout46: TLayout;
     StringColumnPointFlowRate: TStringColumn;
@@ -289,7 +289,7 @@ type
     TabItem2: TTabItem;
     Layout54: TLayout;
     Label44: TLabel;
-    Edit4: TEdit;
+    EditError: TEdit;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -322,8 +322,8 @@ type
     procedure UpdateFlowRatePromptBySelectedDiameter;
     procedure UpdateFlowRateFromDiameter(const D: TDiameter);
     function GetDiameterColumnHint(const ACol: Integer): string;
-    procedure EditErrorExit(Sender: TObject);
-    procedure EditErrorEnter(Sender: TObject);
+    procedure EditTempExit(Sender: TObject);
+    procedure EditTempEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
     procedure EditNameTyping(Sender: TObject);
     procedure edtManufacturerExit(Sender: TObject);
@@ -4641,7 +4641,7 @@ begin
 end;
 
 
-procedure TFormTypeEditor.EditErrorEnter(Sender: TObject);
+procedure TFormTypeEditor.EditTempEnter(Sender: TObject);
 begin
   if FLoading then Exit;
 
@@ -4651,7 +4651,7 @@ begin
     EditError.Text := '';
 end;
 
-procedure TFormTypeEditor.EditErrorExit(Sender: TObject);
+procedure TFormTypeEditor.EditTempExit(Sender: TObject);
 var
   Err: Double;
 begin

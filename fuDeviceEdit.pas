@@ -89,7 +89,7 @@ type
     cbProcedure: TComboEdit;
     Layout45: TLayout;
     Label41: TLabel;
-    EditError: TEdit;
+    EditTemp: TEdit;
     grpTypeOfCheck: TGroupBox;
     LayoutOutPutType: TLayout;
     LabelOutputType: TLabel;
@@ -263,7 +263,7 @@ type
     Label7: TLabel;
     Layout34: TLayout;
     Label18: TLabel;
-    Edit1: TEdit;
+    EditError: TEdit;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -279,7 +279,7 @@ type
     procedure edtReestrNumberTyping(Sender: TObject);
     procedure edtDocumentationExit(Sender: TObject);
     procedure EditAccuracyClassExit(Sender: TObject);
-    procedure EditErrorExit(Sender: TObject);
+    procedure EditTempExit(Sender: TObject);
     procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
@@ -2685,7 +2685,7 @@ begin
 end;
 
 
-procedure TFormDeviceEditor.EditErrorExit(Sender: TObject);
+procedure TFormDeviceEditor.EditTempExit(Sender: TObject);
 var
   Err: Double;
 begin

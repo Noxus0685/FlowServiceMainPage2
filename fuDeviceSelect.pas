@@ -143,6 +143,7 @@ type
     MenuItem9: TMenuItem;
     actDeviceSelect: TAction;
     sbClearDate: TSpeedButton;
+    StringTemp: TColumn;
     procedure ButtonDeviceAddClick(Sender: TObject);
     procedure ButtonDeviceDeleteClick(Sender: TObject);
     procedure ButtonDeviceClearClick(Sender: TObject);
