@@ -90,6 +90,9 @@ type
     Layout45: TLayout;
     Label41: TLabel;
     EditError: TEdit;
+    LayoutTemp: TLayout;
+    LabelTemp: TLabel;
+    EditTemp: TEdit;
     grpTypeOfCheck: TGroupBox;
     LayoutOutPutType: TLayout;
     LabelOutputType: TLabel;
@@ -277,6 +280,7 @@ type
     procedure edtDocumentationExit(Sender: TObject);
     procedure EditAccuracyClassExit(Sender: TObject);
     procedure EditErrorExit(Sender: TObject);
+    procedure EditTempExit(Sender: TObject);
     procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
@@ -753,6 +757,7 @@ begin
   EditQnomExit(EditQnom);
   EditQminExit(EditQmin);
   EditQtrExit(EditQtr);
+  EditTempExit(EditTemp);
   ModalResult := mrOk;
 end;
 
@@ -2071,6 +2076,14 @@ begin
     FDevice.RepeatsProtocol := RepeatsValue;
 
     // =====================================================
+    // == Температура
+    // =====================================================
+    if FDevice.Temp > 0 then
+      EditTemp.Text := FloatToStr(FDevice.Temp)
+    else
+      EditTemp.Text := '';
+
+    // =====================================================
     // == Базовая погрешность
     // =====================================================
     EditError.Text := '';
@@ -2712,6 +2725,27 @@ begin
   //UpdateDevicePointsError;     // ← аналог UpdatePointsErrorFromType
   UpdatePointsGrid;            // ← обновление таблицы точек прибора
   UpdateQmaxQmin;
+
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.EditTempExit(Sender: TObject);
+var
+  Temp: Double;
+begin
+  if FLoading then
+    Exit;
+
+  if FDevice = nil then
+    Exit;
+
+  Temp := NormalizeFloatInput(EditTemp.Text);
+  FDevice.Temp := Temp;
+
+  if Temp > 0 then
+    EditTemp.Text := FloatToStr(Temp)
+  else
+    EditTemp.Text := '';
 
   SetModified;
 end;

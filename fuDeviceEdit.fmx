@@ -1,4 +1,4 @@
-object FormDeviceEditor: TFormDeviceEditor
+﻿object FormDeviceEditor: TFormDeviceEditor
   Left = 0
   Top = 0
   Caption = 'Form2'
@@ -552,6 +552,41 @@ object FormDeviceEditor: TFormDeviceEditor
           ParentShowHint = False
           ShowHint = True
           OnExit = EditErrorExit
+          Left = 276
+          Top = 15
+        end
+      end
+      object LayoutTemp: TLayout
+        Align = Top
+        Padding.Left = 5.000000000000000000
+        Padding.Right = 5.000000000000000000
+        Position.X = 5.000000000000000000
+        Position.Y = 345.000000000000000000
+        Size.Width = 323.000000000000000000
+        Size.Height = 30.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 38
+        object LabelTemp: TLabel
+          Align = Left
+          Position.X = 5.000000000000000000
+          Size.Width = 136.000000000000000000
+          Size.Height = 30.000000000000000000
+          Size.PlatformDefault = False
+          Text = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
+          TabOrder = 1
+        end
+        object EditTemp: TEdit
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          Align = Client
+          TabOrder = 0
+          Margins.Top = 5.000000000000000000
+          Margins.Bottom = 5.000000000000000000
+          Size.Width = 177.000000000000000000
+          Size.Height = 20.000000000000000000
+          Size.PlatformDefault = False
+          TextPrompt = '-'
+          KillFocusByReturn = True
+          OnExit = EditTempExit
           Left = 276
           Top = 15
         end

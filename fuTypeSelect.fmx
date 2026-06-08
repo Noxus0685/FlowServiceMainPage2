@@ -1,4 +1,4 @@
-object FormTypeSelect: TFormTypeSelect
+﻿object FormTypeSelect: TFormTypeSelect
   Left = 0
   Top = 0
   Caption = #1042#1099#1073#1086#1088' '#1090#1080#1087#1072
@@ -163,6 +163,12 @@ object FormTypeSelect: TFormTypeSelect
         end
         object StringColumnAccuracyClass: TStringColumn
           Header = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
+          HeaderSettings.TextSettings.Trimming = Character
+          HeaderSettings.TextSettings.WordWrap = False
+          HeaderSettings.TextSettings.HorzAlign = Center
+        end
+        object StringTemp: TStringColumn
+          Header = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
           HeaderSettings.TextSettings.Trimming = Character
           HeaderSettings.TextSettings.WordWrap = False
           HeaderSettings.TextSettings.HorzAlign = Center
