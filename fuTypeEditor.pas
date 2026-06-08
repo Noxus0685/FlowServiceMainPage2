@@ -2285,11 +2285,18 @@ procedure TFormTypeEditor.ConvertDiameterFlowValuesFromUnit(const AUnitIndex: In
 var
   I: Integer;
   OldUnits: Integer;
+  OldUnitName: string;
   UnitName: string;
   D: TDiameter;
   HasChecked: Boolean;
   TargetCount: Integer;
   ChangedCount: Integer;
+  DisplayQmax: Double;
+  DisplayQnom: Double;
+  DisplayQmin: Double;
+  DisplayQtr: Double;
+  DisplayQ2tr: Double;
+  DisplayQFmax: Double;
   NewQmax: Double;
   NewQnom: Double;
   NewQmin: Double;
@@ -2304,17 +2311,16 @@ var
       ((not HasChecked) or ADiameter.Enable);
   end;
 
-  function ConvertValue(const AValue: Double; out AConvertedValue: Double): Boolean;
-  begin
-    AConvertedValue := FType.ToBaseUnits(AValue);
-    Result := not SameValue(AValue, AConvertedValue);
-  end;
 begin
   if (FType = nil) or (FDiametersLocal = nil) or (FDiametersLocal.Count = 0) then
     Exit;
 
+  OldUnits := ComboBoxUnits.ItemIndex;
+  if (OldUnits < 0) or (OldUnits >= ComboBoxUnits.Items.Count) then
+    Exit;
+
   if (AUnitIndex < 0) or (AUnitIndex >= ComboBoxUnits.Items.Count) or
-    (AUnitIndex = ComboBoxUnits.ItemIndex) then
+    (AUnitIndex = OldUnits) then
     Exit;
 
   HasChecked := False;
@@ -2334,9 +2340,10 @@ begin
   if TargetCount = 0 then
     Exit;
 
+  OldUnitName := ComboBoxUnits.Items[OldUnits];
   UnitName := ComboBoxUnits.Items[AUnitIndex];
   if MessageDlg(
-       Format('Пересчитать расходные значения выбранных строк как значения в единицах "%s"?', [UnitName]),
+       Format('Пересчитать расходные значения выбранных строк из единиц "%s" в единицы "%s"?', [OldUnitName, UnitName]),
        TMsgDlgType.mtConfirmation,
        [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
        0
@@ -2344,51 +2351,61 @@ begin
     Exit;
 
   ChangedCount := 0;
-  OldUnits := FType.Units;
-  try
-    FType.Units := AUnitIndex;
-    FType.SetDimensions;
+  for I := 0 to FDiametersLocal.Count - 1 do
+  begin
+    D := FDiametersLocal[I];
+    if not IsTargetDiameter(D) then
+      Continue;
 
-    for I := 0 to FDiametersLocal.Count - 1 do
-    begin
-      D := FDiametersLocal[I];
-      if not IsTargetDiameter(D) then
-        Continue;
-
-      RowChanged := False;
-      RowChanged := ConvertValue(D.Qmax, NewQmax) or RowChanged;
-      RowChanged := ConvertValue(D.Qnom, NewQnom) or RowChanged;
-      RowChanged := ConvertValue(D.Qmin, NewQmin) or RowChanged;
-      RowChanged := ConvertValue(D.Qtr, NewQtr) or RowChanged;
-      RowChanged := ConvertValue(D.Q2tr, NewQ2tr) or RowChanged;
-      RowChanged := ConvertValue(D.QFmax, NewQFmax) or RowChanged;
-
-      if RowChanged then
-      begin
-        D.Qmax := NewQmax;
-        D.Qnom := NewQnom;
-        D.Qmin := NewQmin;
-        D.Qtr := NewQtr;
-        D.Q2tr := NewQ2tr;
-        D.QFmax := NewQFmax;
-
-        if D.State <> osNew then
-          D.State := osModified;
-        Inc(ChangedCount);
-      end;
-    end;
-  finally
     FType.Units := OldUnits;
     FType.SetDimensions;
+    DisplayQmax := FType.FromBaseUnits(D.Qmax);
+    DisplayQnom := FType.FromBaseUnits(D.Qnom);
+    DisplayQmin := FType.FromBaseUnits(D.Qmin);
+    DisplayQtr := FType.FromBaseUnits(D.Qtr);
+    DisplayQ2tr := FType.FromBaseUnits(D.Q2tr);
+    DisplayQFmax := FType.FromBaseUnits(D.QFmax);
+
+    FType.Units := AUnitIndex;
+    FType.SetDimensions;
+    NewQmax := FType.ToBaseUnits(DisplayQmax);
+    NewQnom := FType.ToBaseUnits(DisplayQnom);
+    NewQmin := FType.ToBaseUnits(DisplayQmin);
+    NewQtr := FType.ToBaseUnits(DisplayQtr);
+    NewQ2tr := FType.ToBaseUnits(DisplayQ2tr);
+    NewQFmax := FType.ToBaseUnits(DisplayQFmax);
+
+    RowChanged := not SameValue(D.Qmax, NewQmax) or
+      not SameValue(D.Qnom, NewQnom) or
+      not SameValue(D.Qmin, NewQmin) or
+      not SameValue(D.Qtr, NewQtr) or
+      not SameValue(D.Q2tr, NewQ2tr) or
+      not SameValue(D.QFmax, NewQFmax);
+
+    if RowChanged then
+    begin
+      D.Qmax := NewQmax;
+      D.Qnom := NewQnom;
+      D.Qmin := NewQmin;
+      D.Qtr := NewQtr;
+      D.Q2tr := NewQ2tr;
+      D.QFmax := NewQFmax;
+
+      if D.State <> osNew then
+        D.State := osModified;
+      Inc(ChangedCount);
+    end;
   end;
 
-  if ChangedCount = 0 then
-    Exit;
-
+  FType.Units := AUnitIndex;
+  FType.SetDimensions;
+  ApplyMeasuredDimension;
   GridDiameters.Repaint;
-  UpdateDiametersGrid;
   UpdateFlowRatePromptBySelectedDiameter;
   SetModified;
+
+  if ChangedCount > 0 then
+    UpdateDiametersGrid;
 end;
 
 procedure TFormTypeEditor.WriteTypeEditActionLog(const AAction: string; AType: TDeviceType; const ADetails: string);
