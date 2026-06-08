@@ -1502,6 +1502,11 @@ begin
        ((FDevice.DeviceTypeUUID <> '') or
         (FDevice.DeviceTypeName <> '')) then
     begin
+      if Trim(FDevice.DeviceTypeRepo) <> '' then
+        AppServices.DataManager.SetActiveTypeRepository(FDevice.DeviceTypeRepo)
+      else if Trim(FDevice.RepoTypeName) <> '' then
+        AppServices.DataManager.SetActiveTypeRepository(FDevice.RepoTypeName);
+
       FoundType :=
         AppServices.DataManager.FindType(
           FDevice.DeviceTypeUUID,
@@ -1575,6 +1580,11 @@ begin
     FDeviceType := nil;
     Exit;
   end;
+
+  if Trim(FDevice.DeviceTypeRepo) <> '' then
+    AppServices.DataManager.SetActiveTypeRepository(FDevice.DeviceTypeRepo)
+  else if Trim(FDevice.RepoTypeName) <> '' then
+    AppServices.DataManager.SetActiveTypeRepository(FDevice.RepoTypeName);
 
   FoundType := AppServices.DataManager.FindType(
     FDevice.DeviceTypeUUID,
