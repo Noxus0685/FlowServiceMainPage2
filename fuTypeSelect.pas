@@ -2671,9 +2671,27 @@ var
   ManKey, CatKey, ModKey: string;
   ManNode, CatNode, ModNode: TTreeViewItem;
   I: Integer;
+  Repo: TTypeRepository;
 begin
   if (AType = nil) or (FDevFilteredTypes = nil) then
     Exit;
+
+  if AppServices.DataManager <> nil then
+    for Repo in AppServices.DataManager.TypeRepositories do
+      if (Repo <> nil) and (Repo.Types <> nil) and
+         (Repo.Types.IndexOf(AType) >= 0) and
+         (Repo <> AppServices.DataManager.ActiveTypeRepo) then
+      begin
+        AppServices.DataManager.ActiveTypeRepo := Repo;
+        LoadData;
+        FillComboBoxRepository;
+        if not UpdateConnection then
+          Exit;
+        BuildTree;
+        ApplyFilter;
+        UpdateGridTypes;
+        Break;
+      end;
 
   {---------------- Изготовитель ----------------}
   ManKey := AType.Manufacturer;
