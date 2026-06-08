@@ -326,6 +326,7 @@ type
     procedure UpdateFlowRateFromDiameter(const D: TDiameter);
     function GetDiameterColumnHint(const ACol: Integer): string;
     procedure EditErrorExit(Sender: TObject);
+    procedure EditTempEnter(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
     procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
@@ -4661,7 +4662,12 @@ begin
     EditError.Text := '';
 end;
 
-procedure TFormTypeEditor.EditTempExit(Sender: TObject);
+procedure TFormTypeEditor.EditTempEnter(Sender: TObject);
+begin
+  // Строковое поле температуры: обработчик нужен для совместимости с FMX-событием.
+end;
+
+procedure TFormTypeEditor.EditErrorExit(Sender: TObject);
 var
   Err: Double;
 begin

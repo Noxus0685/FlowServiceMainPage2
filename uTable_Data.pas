@@ -194,6 +194,9 @@ begin
   EnsureColumn('DeviceType', 'Temp', 'TEXT');
   EnsureColumn('DeviceType', 'Error', 'REAL');
 
+  if TableExists('Devices') then
+    EnsureColumn('Devices', 'Temp', 'TEXT');
+
   {--------------------------------------------------}
   { Миграция категорий (если таблица уже существует) }
   {--------------------------------------------------}

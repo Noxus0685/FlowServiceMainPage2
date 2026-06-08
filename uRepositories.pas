@@ -1579,7 +1579,10 @@ begin
   Result.SpillageStop := Q.FieldByName('SpillageStop').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
-  Result.Temp := Q.FieldByName('Temp').AsString;
+  if Q.FindField('Temp') <> nil then
+    Result.Temp := Q.FieldByName('Temp').AsString
+  else
+    Result.Temp := '';
   Result.Error := Q.FieldByName('Error').AsFloat;
 
   Result.State := osClean;
@@ -3961,7 +3964,10 @@ begin
     Result.Qtr := 0;
   Result.RangeDynamic := Q.FieldByName('RangeDynamic').AsFloat;
 
-  Result.Temp := Q.FieldByName('Temp').AsString;
+  if Q.FindField('Temp') <> nil then
+    Result.Temp := Q.FieldByName('Temp').AsString
+  else
+    Result.Temp := '';
   Result.Error := Q.FieldByName('Error').AsFloat;
 
   Result.VerificationMethod := Q.FieldByName('VerificationMethod').AsString;

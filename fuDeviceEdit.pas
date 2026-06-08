@@ -283,6 +283,7 @@ type
     procedure edtDocumentationExit(Sender: TObject);
     procedure EditAccuracyClassExit(Sender: TObject);
     procedure EditErrorExit(Sender: TObject);
+    procedure EditTempEnter(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
     procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
@@ -2727,6 +2728,11 @@ begin
   UpdateQmaxQmin;
 
   SetModified;
+end;
+
+procedure TFormDeviceEditor.EditTempEnter(Sender: TObject);
+begin
+  // Строковое поле температуры: обработчик нужен для совместимости с FMX-событием.
 end;
 
 procedure TFormDeviceEditor.EditTempExit(Sender: TObject);
