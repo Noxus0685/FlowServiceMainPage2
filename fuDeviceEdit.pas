@@ -261,6 +261,9 @@ type
     Layout21: TLayout;
     EditQnom: TEdit;
     Label7: TLabel;
+    Layout34: TLayout;
+    Label18: TLabel;
+    Edit1: TEdit;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
