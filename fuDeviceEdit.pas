@@ -342,6 +342,7 @@ type
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
 
+     function ResolveDeviceType(out ARepo: TTypeRepository): TDeviceType;
      procedure ApplyMassMode;
      procedure ApplyVolumeMode;
      procedure ApplyMeasuredDimension;
@@ -461,6 +462,48 @@ begin
   finally
     AColumn.Items.EndUpdate;
   end;
+end;
+
+
+function TFormDeviceEditor.ResolveDeviceType(out ARepo: TTypeRepository): TDeviceType;
+var
+  RepoName: string;
+  Repo: TTypeRepository;
+begin
+  Result := nil;
+  ARepo := nil;
+
+  if (AppServices.DataManager = nil) or (FDevice = nil) then
+    Exit;
+
+  RepoName := Trim(FDevice.DeviceTypeRepo);
+  if RepoName = '' then
+    RepoName := Trim(FDevice.RepoTypeName);
+
+  if RepoName <> '' then
+  begin
+    Repo := AppServices.DataManager.FindTypeRepositoryByName(RepoName);
+    if Repo <> nil then
+    begin
+      if FDevice.DeviceTypeUUID <> '' then
+        Result := Repo.FindTypeByUUID(FDevice.DeviceTypeUUID);
+
+      if (Result = nil) and (FDevice.DeviceTypeName <> '') then
+        Result := Repo.FindTypeByName(FDevice.DeviceTypeName);
+
+      if Result <> nil then
+      begin
+        ARepo := Repo;
+        Exit;
+      end;
+    end;
+  end;
+
+  Result := AppServices.DataManager.FindType(
+    FDevice.DeviceTypeUUID,
+    FDevice.DeviceTypeName,
+    ARepo
+  );
 end;
 
 function FlowSourceTypeValueToItemIndex(const AValue: Integer): Integer;
@@ -1502,19 +1545,10 @@ begin
        ((FDevice.DeviceTypeUUID <> '') or
         (FDevice.DeviceTypeName <> '')) then
     begin
-      FoundType :=
-        AppServices.DataManager.FindType(
-          FDevice.DeviceTypeUUID,
-          FDevice.DeviceTypeName,
-          FoundRepo
-        );
+      FoundType := ResolveDeviceType(FoundRepo);
 
       if FoundType <> nil then
-      begin
         FDeviceType := FoundType;
-        if FoundRepo <> nil then
-          AppServices.DataManager.ActiveTypeRepo := FoundRepo;
-      end;
     end;
 
     UpdateUIFromDevice;
@@ -1576,15 +1610,9 @@ begin
     Exit;
   end;
 
-  FoundType := AppServices.DataManager.FindType(
-    FDevice.DeviceTypeUUID,
-    FDevice.DeviceTypeName,
-    FoundRepo
-  );
+  FoundType := ResolveDeviceType(FoundRepo);
 
   FDeviceType := FoundType;
-  if FoundRepo <> nil then
-    AppServices.DataManager.ActiveTypeRepo := FoundRepo;
 end;
 
 
@@ -1614,18 +1642,18 @@ begin
     Exit;
 
   RefreshDeviceTypeReference;
+  CurrentType := ResolveDeviceType(FoundRepo);
+
+  if (CurrentType <> nil) and (FoundRepo <> nil) then
+    AppServices.DataManager.ActiveTypeRepo := FoundRepo;
 
   Frm := TFormTypeSelect.Create(Self);
   try
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    CurrentType := AppServices.DataManager.FindType(FDevice.DeviceTypeUUID, FDevice.DeviceTypeName, FoundRepo);
     if (CurrentType <> nil) and (FoundRepo <> nil) then
-    begin
-      AppServices.DataManager.ActiveTypeRepo := FoundRepo;
       Frm.SelectType(CurrentType);
-    end;
 
     {----------------------------------------------------}
     { 2. Открываем форму выбора }

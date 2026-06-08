@@ -3916,6 +3916,7 @@ begin
   Result.DeviceTypeUUID := Q.FieldByName('DeviceTypeUUID').AsString;
   Result.DeviceTypeName := Q.FieldByName('DeviceTypeName').AsString;
   Result.DeviceTypeRepo := Q.FieldByName('DeviceTypeRepo').AsString;
+  Result.RepoTypeName := Result.DeviceTypeRepo;
 
   Result.Name := Q.FieldByName('Name').AsString;
   Result.SerialNumber := Q.FieldByName('SerialNumber').AsString;
