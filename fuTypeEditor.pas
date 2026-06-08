@@ -229,6 +229,9 @@ type
     Layout45: TLayout;
     Label41: TLabel;
     EditError: TEdit;
+    LayoutTemp: TLayout;
+    LabelTemp: TLabel;
+    EditTemp: TEdit;
     Splitter1: TSplitter;
     Layout46: TLayout;
     StringColumnPointFlowRate: TStringColumn;
@@ -320,6 +323,8 @@ type
     procedure UpdateFlowRateFromDiameter(const D: TDiameter);
     function GetDiameterColumnHint(const ACol: Integer): string;
     procedure EditErrorExit(Sender: TObject);
+    procedure EditTempEnter(Sender: TObject);
+    procedure EditTempExit(Sender: TObject);
     procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
     procedure EditNameTyping(Sender: TObject);
@@ -379,6 +384,7 @@ type
     procedure GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GridDiametersHeaderMenuItemClick(Sender: TObject);
+    procedure GridDiametersConvertUnitClick(Sender: TObject);
     procedure GridDiametersMenuCopyClick(Sender: TObject);
     procedure GridDiametersMenuCutClick(Sender: TObject);
     procedure GridDiametersMenuPasteClick(Sender: TObject);
@@ -448,6 +454,7 @@ type
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
   FMenuItemGridDiametersDisplay: TMenuItem;
+  FMenuItemGridDiametersConvertUnits: TMenuItem;
   FActionListGridDiameters: TActionList;
   FActionGridDiametersDelete: TAction;
   FActionGridDiametersCopy: TAction;
@@ -530,6 +537,7 @@ type
     procedure ActionGridDiametersCopyExecute(Sender: TObject);
     procedure ActionGridDiametersCutExecute(Sender: TObject);
     procedure ActionGridDiametersPasteExecute(Sender: TObject);
+    procedure ConvertDiameterFlowValuesFromUnit(const AUnitIndex: Integer);
     procedure ActionGridPointsDeleteExecute(Sender: TObject);
     procedure ActionGridPointsCopyExecute(Sender: TObject);
     procedure ActionGridPointsCutExecute(Sender: TObject);
@@ -843,6 +851,22 @@ begin
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
   MenuItem.Action := FActionGridDiametersPaste;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
+
+  FMenuItemGridDiametersConvertUnits := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+  FMenuItemGridDiametersConvertUnits.Text := 'Поменять ед.и.';
+  FMenuItemGridDiametersConvertUnits.Parent := FPopupMenuGridDiametersHeader;
+
+  for I := 0 to ComboBoxUnits.Items.Count - 1 do
+  begin
+    if I = ComboBoxUnits.ItemIndex then
+      Continue;
+
+    MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
+    MenuItem.Text := ComboBoxUnits.Items[I];
+    MenuItem.Tag := I;
+    MenuItem.OnClick := GridDiametersConvertUnitClick;
+    MenuItem.Parent := FMenuItemGridDiametersConvertUnits;
+  end;
 
   FMenuItemGridDiametersDisplay := TMenuItem.Create(FPopupMenuGridDiametersHeader);
   FMenuItemGridDiametersDisplay.Text := 'Отображение';
@@ -1175,6 +1199,11 @@ begin
       UpdateRangeDynamicPrompt;
 
     // =====================================================
+    // == Температура
+    // =====================================================
+    EditTemp.Text := FType.Temp;
+
+    // =====================================================
     // == Базовая погрешность
     // =====================================================
     EditError.Text := '';
@@ -1343,6 +1372,7 @@ begin
   FType.IVI               := StrToIntDef(EditIVI.Text, 0);
   FType.AccuracyClass     := EditAccuracyClass.Text;
   FType.RangeDynamic      := StrToFloatDef(EditRangeDynamic.Text, 0);
+  FType.Temp              := EditTemp.Text;
 
     if (ceCategory.ItemIndex >= 0) and (ceCategory.ItemIndex < ceCategory.Items.Count) then
   begin
@@ -2252,6 +2282,139 @@ begin
   UpdateGridDiametersHeaderRect;
 end;
 
+
+procedure TFormTypeEditor.GridDiametersConvertUnitClick(Sender: TObject);
+begin
+  if Sender is TMenuItem then
+    ConvertDiameterFlowValuesFromUnit(TMenuItem(Sender).Tag);
+end;
+
+procedure TFormTypeEditor.ConvertDiameterFlowValuesFromUnit(const AUnitIndex: Integer);
+var
+  I: Integer;
+  OldUnits: Integer;
+  OldUnitName: string;
+  UnitName: string;
+  D: TDiameter;
+  HasChecked: Boolean;
+  TargetCount: Integer;
+  ChangedCount: Integer;
+  DisplayQmax: Double;
+  DisplayQnom: Double;
+  DisplayQmin: Double;
+  DisplayQtr: Double;
+  DisplayQ2tr: Double;
+  DisplayQFmax: Double;
+  NewQmax: Double;
+  NewQnom: Double;
+  NewQmin: Double;
+  NewQtr: Double;
+  NewQ2tr: Double;
+  NewQFmax: Double;
+  RowChanged: Boolean;
+
+  function IsTargetDiameter(const ADiameter: TDiameter): Boolean;
+  begin
+    Result := (ADiameter <> nil) and (ADiameter.State <> osDeleted) and
+      ((not HasChecked) or ADiameter.Enable);
+  end;
+
+begin
+  if (FType = nil) or (FDiametersLocal = nil) or (FDiametersLocal.Count = 0) then
+    Exit;
+
+  OldUnits := ComboBoxUnits.ItemIndex;
+  if (OldUnits < 0) or (OldUnits >= ComboBoxUnits.Items.Count) then
+    Exit;
+
+  if (AUnitIndex < 0) or (AUnitIndex >= ComboBoxUnits.Items.Count) or
+    (AUnitIndex = OldUnits) then
+    Exit;
+
+  HasChecked := False;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if (FDiametersLocal[I] <> nil) and (FDiametersLocal[I].State <> osDeleted) and
+      FDiametersLocal[I].Enable then
+    begin
+      HasChecked := True;
+      Break;
+    end;
+
+  TargetCount := 0;
+  for I := 0 to FDiametersLocal.Count - 1 do
+    if IsTargetDiameter(FDiametersLocal[I]) then
+      Inc(TargetCount);
+
+  if TargetCount = 0 then
+    Exit;
+
+  OldUnitName := ComboBoxUnits.Items[OldUnits];
+  UnitName := ComboBoxUnits.Items[AUnitIndex];
+  if MessageDlg(
+       Format('Пересчитать расходные значения выбранных строк из единиц "%s" в единицы "%s"?', [OldUnitName, UnitName]),
+       TMsgDlgType.mtConfirmation,
+       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+       0
+     ) <> mrYes then
+    Exit;
+
+  ChangedCount := 0;
+  for I := 0 to FDiametersLocal.Count - 1 do
+  begin
+    D := FDiametersLocal[I];
+    if not IsTargetDiameter(D) then
+      Continue;
+
+    FType.Units := OldUnits;
+    FType.SetDimensions;
+    DisplayQmax := FType.FromBaseUnits(D.Qmax);
+    DisplayQnom := FType.FromBaseUnits(D.Qnom);
+    DisplayQmin := FType.FromBaseUnits(D.Qmin);
+    DisplayQtr := FType.FromBaseUnits(D.Qtr);
+    DisplayQ2tr := FType.FromBaseUnits(D.Q2tr);
+    DisplayQFmax := FType.FromBaseUnits(D.QFmax);
+
+    FType.Units := AUnitIndex;
+    FType.SetDimensions;
+    NewQmax := FType.ToBaseUnits(DisplayQmax);
+    NewQnom := FType.ToBaseUnits(DisplayQnom);
+    NewQmin := FType.ToBaseUnits(DisplayQmin);
+    NewQtr := FType.ToBaseUnits(DisplayQtr);
+    NewQ2tr := FType.ToBaseUnits(DisplayQ2tr);
+    NewQFmax := FType.ToBaseUnits(DisplayQFmax);
+
+    RowChanged := not SameValue(D.Qmax, NewQmax) or
+      not SameValue(D.Qnom, NewQnom) or
+      not SameValue(D.Qmin, NewQmin) or
+      not SameValue(D.Qtr, NewQtr) or
+      not SameValue(D.Q2tr, NewQ2tr) or
+      not SameValue(D.QFmax, NewQFmax);
+
+    if RowChanged then
+    begin
+      D.Qmax := NewQmax;
+      D.Qnom := NewQnom;
+      D.Qmin := NewQmin;
+      D.Qtr := NewQtr;
+      D.Q2tr := NewQ2tr;
+      D.QFmax := NewQFmax;
+
+      if D.State <> osNew then
+        D.State := osModified;
+      Inc(ChangedCount);
+    end;
+  end;
+
+  FType.Units := AUnitIndex;
+  FType.SetDimensions;
+  ApplyMeasuredDimension;
+  GridDiameters.Repaint;
+  UpdateFlowRatePromptBySelectedDiameter;
+  SetModified;
+
+  if ChangedCount > 0 then
+    UpdateDiametersGrid;
+end;
 
 procedure TFormTypeEditor.WriteTypeEditActionLog(const AAction: string; AType: TDeviceType; const ADetails: string);
 var
@@ -4496,6 +4659,11 @@ begin
     EditError.Text := '';
 end;
 
+procedure TFormTypeEditor.EditTempEnter(Sender: TObject);
+begin
+  // Строковое поле температуры: обработчик нужен для совместимости с FMX-событием.
+end;
+
 procedure TFormTypeEditor.EditErrorExit(Sender: TObject);
 var
   Err: Double;
@@ -4521,6 +4689,14 @@ begin
   UpdatePointsErrorFromType;
   UpdateDiametersGrid;
 
+  SetModified;
+end;
+
+procedure TFormTypeEditor.EditTempExit(Sender: TObject);
+begin
+  if FLoading then Exit;
+
+  FType.Temp := EditTemp.Text;
   SetModified;
 end;
 
@@ -6848,6 +7024,9 @@ begin
     ComboBoxUnits.ItemIndex := -1;
 
   ComboBoxUnits.Hint := ComboBoxUnits.Text;
+
+  if FPopupMenuGridDiametersHeader <> nil then
+    CreateMenu;
 end;
 
 procedure TFormTypeEditor.ApplyVolumeMode;

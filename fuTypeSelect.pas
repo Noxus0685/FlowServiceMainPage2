@@ -73,6 +73,7 @@ type
     StringColumnValidityDate: TStringColumn;
     StringColumnVerificationMethod: TStringColumn;
     StringColumnAccuracyClass: TStringColumn;
+    StringTemp: TStringColumn;
     EditFindType: TEdit;
     sbFind: TSpeedButton;
     lyt1: TLayout;
@@ -1447,6 +1448,9 @@ begin
 
   else if ACol = StringColumnAccuracyClass.Index then
     Value := T.AccuracyClass
+
+  else if ACol = StringTemp.Index then
+    Value := T.Temp
 
   else if ACol = StringColumnReestrNumber.Index then
     Value := T.ReestrNumber

@@ -90,6 +90,9 @@ type
     Layout45: TLayout;
     Label41: TLabel;
     EditError: TEdit;
+    LayoutTemp: TLayout;
+    LabelTemp: TLabel;
+    EditTemp: TEdit;
     grpTypeOfCheck: TGroupBox;
     LayoutOutPutType: TLayout;
     LabelOutputType: TLabel;
@@ -277,6 +280,8 @@ type
     procedure edtDocumentationExit(Sender: TObject);
     procedure EditAccuracyClassExit(Sender: TObject);
     procedure EditErrorExit(Sender: TObject);
+    procedure EditTempEnter(Sender: TObject);
+    procedure EditTempExit(Sender: TObject);
     procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
     procedure ComboBoxUnitsChange(Sender: TObject);
@@ -753,6 +758,7 @@ begin
   EditQnomExit(EditQnom);
   EditQminExit(EditQmin);
   EditQtrExit(EditQtr);
+  EditTempExit(EditTemp);
   ModalResult := mrOk;
 end;
 
@@ -2071,6 +2077,11 @@ begin
     FDevice.RepeatsProtocol := RepeatsValue;
 
     // =====================================================
+    // == Температура
+    // =====================================================
+    EditTemp.Text := FDevice.Temp;
+
+    // =====================================================
     // == Базовая погрешность
     // =====================================================
     EditError.Text := '';
@@ -2713,6 +2724,23 @@ begin
   UpdatePointsGrid;            // ← обновление таблицы точек прибора
   UpdateQmaxQmin;
 
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.EditTempEnter(Sender: TObject);
+begin
+  // Строковое поле температуры: обработчик нужен для совместимости с FMX-событием.
+end;
+
+procedure TFormDeviceEditor.EditTempExit(Sender: TObject);
+begin
+  if FLoading then
+    Exit;
+
+  if FDevice = nil then
+    Exit;
+
+  FDevice.Temp := EditTemp.Text;
   SetModified;
 end;
 
