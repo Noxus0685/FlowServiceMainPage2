@@ -30,7 +30,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Margins.Bottom = 5.000000000000000000
       Position.X = 5.000000000000000000
       Size.Width = 333.000000000000000000
-      Size.Height = 409.000000000000000000
+      Size.Height = 433.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'groupstyle'
       Text = #1054#1073#1097#1072#1103' '#1080#1085#1092#1086#1088#1084#1072#1094#1080#1103
@@ -43,7 +43,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 50
+        TabOrder = 51
         object labName: TLabel
           Align = Left
           Margins.Left = 4.000000000000000000
@@ -84,7 +84,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 49
+        TabOrder = 50
         object Label11: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -402,7 +402,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 48
+        TabOrder = 49
         object Label32: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -436,7 +436,7 @@ object FormDeviceEditor: TFormDeviceEditor
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
         Position.X = 5.000000000000000000
-        Position.Y = 375.000000000000000000
+        Position.Y = 405.000000000000000000
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
@@ -527,14 +527,14 @@ object FormDeviceEditor: TFormDeviceEditor
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 47
+        TabOrder = 48
         object Label41: TLabel
           Align = Left
           Position.X = 5.000000000000000000
           Size.Width = 136.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
-          Text = #1041#1072#1079#1086#1074#1072#1103' '#1087#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+          Text = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
           TabOrder = 1
         end
         object EditError: TEdit
@@ -675,6 +675,44 @@ object FormDeviceEditor: TFormDeviceEditor
           TabOrder = 4
         end
       end
+      object Layout34: TLayout
+        Align = Top
+        Padding.Left = 5.000000000000000000
+        Padding.Right = 5.000000000000000000
+        Position.X = 5.000000000000000000
+        Position.Y = 375.000000000000000000
+        Size.Width = 323.000000000000000000
+        Size.Height = 30.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 47
+        object Label18: TLabel
+          Align = Left
+          Position.X = 5.000000000000000000
+          Size.Width = 136.000000000000000000
+          Size.Height = 30.000000000000000000
+          Size.PlatformDefault = False
+          Text = #1041#1072#1079#1086#1074#1072#1103' '#1087#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100
+          TabOrder = 1
+        end
+        object Edit1: TEdit
+          Touch.InteractiveGestures = [LongTap, DoubleTap]
+          Align = Client
+          TabOrder = 0
+          Hint = #1050#1083#1072#1089#1089' '#1090#1086#1095#1085#1086#1089#1090#1080
+          Margins.Top = 5.000000000000000000
+          Margins.Bottom = 5.000000000000000000
+          Size.Width = 177.000000000000000000
+          Size.Height = 20.000000000000000000
+          Size.PlatformDefault = False
+          TextPrompt = '-'
+          KillFocusByReturn = True
+          ParentShowHint = False
+          ShowHint = True
+          OnExit = EditErrorExit
+          Left = 276
+          Top = 15
+        end
+      end
     end
     object grpTypeOfCheck: TGroupBox
       Align = Top
@@ -686,7 +724,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Margins.Right = 5.000000000000000000
       Margins.Bottom = 5.000000000000000000
       Position.X = 5.000000000000000000
-      Position.Y = 414.000000000000000000
+      Position.Y = 438.000000000000000000
       Size.Width = 333.000000000000000000
       Size.Height = 115.000000000000000000
       Size.PlatformDefault = False
@@ -820,24 +858,24 @@ object FormDeviceEditor: TFormDeviceEditor
     object tcOutPutType: TTabControl
       Align = Client
       Size.Width = 343.000000000000000000
-      Size.Height = 175.000000000000000000
+      Size.Height = 151.000000000000000000
       Size.PlatformDefault = False
       TabIndex = 2
       TabOrder = 42
       TabPosition = None
       Sizes = (
         343s
-        175s
+        151s
         343s
-        175s
+        151s
         343s
-        175s
+        151s
         343s
-        175s
+        151s
         343s
-        175s
+        151s
         343s
-        175s)
+        151s)
       object tiVoltage: TTabItem
         CustomIcon = <
           item
@@ -862,7 +900,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 170.000000000000000000
+          Size.Height = 146.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1053#1072#1087#1088#1103#1078#1077#1085#1080#1077
@@ -1026,7 +1064,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 170.000000000000000000
+          Size.Height = 146.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1058#1086#1082
@@ -1190,7 +1228,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 170.000000000000000000
+          Size.Height = 146.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1048#1084#1087#1091#1083#1100#1089#1099
@@ -1339,7 +1377,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 170.000000000000000000
+          Size.Height = 146.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1062#1080#1092#1088#1086#1074#1086#1081' '#1080#1085#1090#1077#1088#1092#1077#1081#1089
@@ -1522,7 +1560,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 170.000000000000000000
+          Size.Height = 146.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1042#1080#1079#1091#1072#1083#1100#1085#1099#1081' '#1082#1086#1085#1090#1086#1083#1100
@@ -1706,7 +1744,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 170.000000000000000000
+          Size.Height = 146.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1063#1072#1089#1090#1086#1090#1072
@@ -2552,8 +2590,8 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 909.000000000000000000
-      Viewport.Height = 50.000000000000000000
+      Viewport.Width = 905.000000000000000000
+      Viewport.Height = 46.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000
