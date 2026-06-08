@@ -572,7 +572,10 @@ begin
       'DN TEXT,' +
       'Description TEXT,' +
       'Qmax REAL,' +
+      'Qnom REAL,' +
       'Qmin REAL,' +
+      'Qtr REAL,' +
+      'Q2tr REAL,' +
       'Kp REAL,' +
       'QFmax REAL,' +
       'Vmax REAL,' +

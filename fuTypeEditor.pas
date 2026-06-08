@@ -1346,7 +1346,7 @@ begin
 
     if (ceCategory.ItemIndex >= 0) and (ceCategory.ItemIndex < ceCategory.Items.Count) then
   begin
-    FType.Category := Integer(ceCategory.Items.Objects[ceCategory.ItemIndex]);
+    FType.Category := Integer(NativeInt(ceCategory.Items.Objects[ceCategory.ItemIndex]));
     if (FType.Category = 0) and SameText(Trim(ceCategory.Text), '<не указана>') then
     begin
       FType.Category := -1;
@@ -3133,7 +3133,15 @@ begin
   FDiametersLocal := nil;
   FPointsLocal := nil;
   FLoading := True;
-  FreeAndNil(FType);
+
+  if (FOriginalType = nil) and (ModalResult <> mrOk) and (FType <> nil) then
+    FType.State := osDeleted;
+
+  if FOriginalType <> nil then
+    FreeAndNil(FType)
+  else
+    FType := nil;
+
   FreeAndNil(FCalibrCoefItemsLocal);
   FOriginalType := nil;
 end;
@@ -3890,7 +3898,7 @@ begin
     {----------------------------------}
     { Выбор из справочника }
     {----------------------------------}
-    CatID := Integer(ceCategory.Items.Objects[Idx]);
+    CatID := Integer(NativeInt(ceCategory.Items.Objects[Idx]));
 
     FType.Category := CatID;
     FType.CategoryName := '';
@@ -6613,15 +6621,19 @@ procedure TFormTypeEditor.InitCategoryComboEdit;
 var
   C: TDeviceCategory;
   TextValue: string;
+  SelectedIndex: Integer;
 begin
   if (AppServices.DataManager.ActiveTypeRepo = nil) or (FType = nil) then
     Exit;
+
+  SelectedIndex := -1;
 
   {----------------------------------}
   { Заполняем список категорий }
   {----------------------------------}
   ceCategory.Items.BeginUpdate;
   try
+    ceCategory.ItemIndex := -1;
     ceCategory.Items.Clear;
 
     for C in FCategoriesLocal do
@@ -6630,8 +6642,10 @@ begin
       if C.ID = -1 then
         Continue;
 
-      // ✅ сохраняем ID в Objects
-      ceCategory.Items.AddObject(C.Name, TObject(C.ID));
+      // ✅ сохраняем ID в Objects через NativeInt — совместимо с Win64/FMХ
+      ceCategory.Items.AddObject(C.Name, TObject(NativeInt(C.ID)));
+      if C.ID = FType.Category then
+        SelectedIndex := ceCategory.Items.Count - 1;
     end;
   finally
     ceCategory.Items.EndUpdate;
@@ -6651,7 +6665,11 @@ begin
   else
     TextValue := '';
 
-  ceCategory.Text := TextValue;
+  if SelectedIndex >= 0 then
+    ceCategory.ItemIndex := SelectedIndex
+  else
+    ceCategory.Text := TextValue;
+
   ceCategory.Hint := TextValue;
 end;
 

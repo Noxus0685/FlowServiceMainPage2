@@ -1190,6 +1190,8 @@ function TTypeRepository.GenerateTypeID: Integer;
 var
   T: TDeviceType;
   MaxID: Integer;
+  Q: TFDQuery;
+  HasDeviceTypeTable: Boolean;
 begin
   MaxID := 0;
 
@@ -1197,6 +1199,30 @@ begin
     for T in FTypes do
       if T.ID > MaxID then
         MaxID := T.ID;
+
+  if FDM <> nil then
+  begin
+    Q := FDM.CreateQuery;
+    try
+      Q.SQL.Text :=
+        'select name from sqlite_master ' +
+        'where type = ''table'' and name = ''DeviceType''';
+      Q.Open;
+      HasDeviceTypeTable := not Q.Eof;
+      Q.Close;
+
+      if HasDeviceTypeTable then
+      begin
+        Q.SQL.Text := 'select max(ID) as MaxID from DeviceType';
+        Q.Open;
+        if (not Q.Eof) and (not Q.FieldByName('MaxID').IsNull) and
+           (Q.FieldByName('MaxID').AsInteger > MaxID) then
+          MaxID := Q.FieldByName('MaxID').AsInteger;
+      end;
+    finally
+      Q.Free;
+    end;
+  end;
 
   Result := MaxID + 1;
 end;
@@ -1742,7 +1768,17 @@ begin
   Q := FDM.CreateQuery;
   try
     try
-    case AType.State of
+      if AType.State = osNew then
+      begin
+        Q.SQL.Text := 'select 1 from DeviceType where ID = :ID';
+        SetIntParam(Q, 'ID', AType.ID);
+        Q.Open;
+        if not Q.Eof then
+          AType.ID := GenerateTypeID;
+        Q.Close;
+      end;
+
+      case AType.State of
 
       {==================================================}
       { DELETE — ЖЁСТКИЙ КАСКАД }
@@ -2038,6 +2074,7 @@ begin
     Col('Qnom', 'REAL'),
     Col('Qmin', 'REAL'),
     Col('Qtr', 'REAL'),
+    Col('Q2tr', 'REAL'),
     Col('Kp', 'REAL'),
     Col('QFmax', 'REAL'),
 
@@ -2890,13 +2927,13 @@ begin
       end;
 
       // ----------------------------------
-      // Если список пуст — считаем, что не загрузились
+      // Новая БД создаётся с пустой таблицей категорий.
+      // Заполняем её стандартным списком в памяти, чтобы редактор типа
+      // сразу показывал варианты в поле "Категория СИ".
       // ----------------------------------
       if FCategories.Count = 0 then
       begin
-        FState := osEmpty;   // данных нет, но ошибки тоже нет
-        Result := True;
-        Exit;
+        InitCategories;
       end;
 
       FState := osClean;
@@ -3568,6 +3605,9 @@ begin
       SaveErrors.Add(Format('При сохранении прибора "%s", серийный номер "%s" был присвоен новый UUID.', [ADevice.Name, ADevice.SerialNumber]));
     end;
 
+    if (ADevice.State = osNew) and DeviceExistsInDB(ADevice.UUID) then
+      ADevice.State := osModified;
+
     ExistingDevice := FindDeviceByUUID(ADevice.UUID);
     if (ExistingDevice <> nil) and (ExistingDevice <> ADevice) then
     begin
@@ -4022,7 +4062,10 @@ begin
 
   FState := osLoading;
 
-  FDevices := TObjectList<TDevice>.Create(True);
+  if FDevices = nil then
+    FDevices := TObjectList<TDevice>.Create(True)
+  else
+    FDevices.Clear;
   LoadErrors := TStringList.Create;
 
   Q := FDM.CreateQuery;
