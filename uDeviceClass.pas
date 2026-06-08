@@ -453,6 +453,7 @@ type
     Qnom: Double;
     QFmax : Double;
     Kp: Double;
+    Temp: string;               // Температура
     Error: Double;              // Допустимая погрешность, %
     Enabled: Boolean;
 
@@ -760,6 +761,7 @@ begin
   Qnom:=1;
   Qtr:=1;
   RangeDynamic := 100.0;            // Qmax / Qmin
+  Temp := '';
   Error := 1.0;                     // %
 
   {----------------------------------}
@@ -1314,6 +1316,7 @@ begin
   Qnom := ASource.Qnom;
   Qtr := ASource.Qtr;
   RangeDynamic := ASource.RangeDynamic;
+  Temp := ASource.Temp;
   Error := ASource.Error;
 
   VerificationMethod := ASource.VerificationMethod;
@@ -1497,6 +1500,7 @@ begin
     Add(FloatToStr(Qmax));
     Add(FloatToStr(Qmin));
     Add(FloatToStr(RangeDynamic));
+    Add(Temp);
     Add(FloatToStr(Error));
 
     Add(VerificationMethod);

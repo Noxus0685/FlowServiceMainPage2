@@ -191,6 +191,7 @@ begin
   EnsureColumn('DeviceType', 'Repeats', 'INTEGER');
   EnsureColumn('DeviceType', 'RepeatsProtocol', 'INTEGER');
 
+  EnsureColumn('DeviceType', 'Temp', 'TEXT');
   EnsureColumn('DeviceType', 'Error', 'REAL');
 
   {--------------------------------------------------}

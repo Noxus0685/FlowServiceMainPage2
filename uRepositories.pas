@@ -1470,6 +1470,7 @@ begin
     Col('Repeats', 'INTEGER'),
     Col('RepeatsProtocol', 'INTEGER'),
 
+    Col('Temp', 'TEXT'),
     Col('Error', 'REAL')
   ];
 end;
@@ -1578,6 +1579,7 @@ begin
   Result.SpillageStop := Q.FieldByName('SpillageStop').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
+  Result.Temp := Q.FieldByName('Temp').AsString;
   Result.Error := Q.FieldByName('Error').AsFloat;
 
   Result.State := osClean;
@@ -1810,7 +1812,7 @@ begin
           'VoltageRange, VoltageQminRate, VoltageQmaxRate, ' +
           'CurrentRange, CurrentQminRate, CurrentQmaxRate, IntegrationTime, ' +
           'ProtocolName, BaudRate, Parity, DeviceAddress, ' +
-          'InputType, SpillageType, SpillageStop, Repeats, RepeatsProtocol, Error' +
+          'InputType, SpillageType, SpillageStop, Repeats, RepeatsProtocol, Temp, Error' +
           ') values (' +
           ':ID, :UUID, :Name, :Modification, :Manufacturer, :ReestrNumber, ' +
           ':Category, :CategoryName, :AccuracyClass, ' +
@@ -1823,7 +1825,7 @@ begin
           ':VoltageRange, :VoltageQminRate, :VoltageQmaxRate, ' +
           ':CurrentRange, :CurrentQminRate, :CurrentQmaxRate, :IntegrationTime, ' +
           ':ProtocolName, :BaudRate, :Parity, :DeviceAddress, ' +
-          ':InputType, :SpillageType, :SpillageStop, :Repeats, :RepeatsProtocol, :Error' +
+          ':InputType, :SpillageType, :SpillageStop, :Repeats, :RepeatsProtocol, :Temp, :Error' +
           ')';
 
       {==================================================}
@@ -1845,7 +1847,7 @@ begin
           'CurrentRange=:CurrentRange, CurrentQminRate=:CurrentQminRate, CurrentQmaxRate=:CurrentQmaxRate, IntegrationTime=:IntegrationTime, ' +
           'ProtocolName=:ProtocolName, BaudRate=:BaudRate, Parity=:Parity, DeviceAddress=:DeviceAddress, ' +
           'InputType=:InputType, SpillageType=:SpillageType, SpillageStop=:SpillageStop, ' +
-          'Repeats=:Repeats, RepeatsProtocol=:RepeatsProtocol, Error=:Error ' +
+          'Repeats=:Repeats, RepeatsProtocol=:RepeatsProtocol, Temp=:Temp, Error=:Error ' +
           'where ID=:ID';
     end;
 
@@ -1913,6 +1915,7 @@ begin
     SetIntParam(Q, 'SpillageStop', AType.SpillageStop);
     SetIntParam(Q, 'Repeats', AType.Repeats);
     SetIntParam(Q, 'RepeatsProtocol', AType.RepeatsProtocol);
+    SetStrParam(Q, 'Temp', AType.Temp);
     SetFloatParam(Q, 'Error', AType.Error);
 
     Q.ExecSQL;
@@ -3797,6 +3800,7 @@ begin
     Col('Qtr',               'REAL'),
     Col('RangeDynamic',      'REAL'),
 
+    Col('Temp',              'TEXT'),
     Col('Error',             'REAL'),
 
     {--------------------------------------------------}
@@ -3957,6 +3961,7 @@ begin
     Result.Qtr := 0;
   Result.RangeDynamic := Q.FieldByName('RangeDynamic').AsFloat;
 
+  Result.Temp := Q.FieldByName('Temp').AsString;
   Result.Error := Q.FieldByName('Error').AsFloat;
 
   Result.VerificationMethod := Q.FieldByName('VerificationMethod').AsString;
@@ -4221,7 +4226,7 @@ begin
           'Manufacturer, Owner, ReestrNumber, ' +
           'CategoryName, Category, AccuracyClass, ' +
           'RegDate, ValidityDate, DateOfManufacture, IVI, ' +
-          'DN, Qmax, Qnom, Qmin, Qtr, RangeDynamic, Error, ' +
+          'DN, Qmax, Qnom, Qmin, Qtr, RangeDynamic, Temp, Error, ' +
           'VerificationMethod, ProcedureName, ' +
           'MeasuredDimension, Units, OutputType, DimensionCoef, ' +
           'OutputSet, Freq, Coef, FreqFlowRate, ' +
@@ -4236,7 +4241,7 @@ begin
           ':Manufacturer, :Owner, :ReestrNumber, ' +
           ':CategoryName, :Category, :AccuracyClass, ' +
           ':RegDate, :ValidityDate, :DateOfManufacture, :IVI, ' +
-          ':DN, :Qmax, :Qnom, :Qmin, :Qtr, :RangeDynamic, :Error, ' +
+          ':DN, :Qmax, :Qnom, :Qmin, :Qtr, :RangeDynamic, :Temp, :Error, ' +
           ':VerificationMethod, :ProcedureName, ' +
           ':MeasuredDimension, :Units, :OutputType, :DimensionCoef, ' +
           ':OutputSet, :Freq, :Coef, :FreqFlowRate, ' +
@@ -4259,7 +4264,7 @@ begin
           'Manufacturer = :Manufacturer, Owner = :Owner, ReestrNumber = :ReestrNumber, ' +
           'CategoryName = :CategoryName, Category = :Category, AccuracyClass = :AccuracyClass, ' +
           'RegDate = :RegDate, ValidityDate = :ValidityDate, DateOfManufacture = :DateOfManufacture, IVI = :IVI, ' +
-          'DN = :DN, Qmax = :Qmax, Qnom = :Qnom, Qmin = :Qmin, Qtr = :Qtr, RangeDynamic = :RangeDynamic, Error = :Error, ' +
+          'DN = :DN, Qmax = :Qmax, Qnom = :Qnom, Qmin = :Qmin, Qtr = :Qtr, RangeDynamic = :RangeDynamic, Temp = :Temp, Error = :Error, ' +
           'VerificationMethod = :VerificationMethod, ProcedureName = :ProcedureName, ' +
           'MeasuredDimension = :MeasuredDimension, Units = :Units, OutputType = :OutputType, DimensionCoef = :DimensionCoef, ' +
           'OutputSet = :OutputSet, Freq = :Freq, Coef = :Coef, FreqFlowRate = :FreqFlowRate, ' +
@@ -4305,6 +4310,7 @@ begin
     SetFloatParam(Q, 'Qmin', ADevice.Qmin);
     SetFloatParam(Q, 'Qtr', ADevice.Qtr);
     SetFloatParam(Q, 'RangeDynamic', ADevice.RangeDynamic);
+    SetStrParam(Q, 'Temp', ADevice.Temp);
     SetFloatParam(Q, 'Error', ADevice.Error);
 
     SetStrParam(Q, 'VerificationMethod', ADevice.VerificationMethod);
