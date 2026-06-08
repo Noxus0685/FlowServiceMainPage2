@@ -228,6 +228,9 @@ type
     miCalculateVolume: TMenuItem;
     Layout45: TLayout;
     Label41: TLabel;
+    EditError: TEdit;
+    LayoutTemp: TLayout;
+    LabelTemp: TLabel;
     EditTemp: TEdit;
     Splitter1: TSplitter;
     Layout46: TLayout;
@@ -322,8 +325,9 @@ type
     procedure UpdateFlowRatePromptBySelectedDiameter;
     procedure UpdateFlowRateFromDiameter(const D: TDiameter);
     function GetDiameterColumnHint(const ACol: Integer): string;
+    procedure EditErrorExit(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
-    procedure EditTempEnter(Sender: TObject);
+    procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
     procedure EditNameTyping(Sender: TObject);
     procedure edtManufacturerExit(Sender: TObject);
@@ -1197,6 +1201,14 @@ begin
       UpdateRangeDynamicPrompt;
 
     // =====================================================
+    // == Температура
+    // =====================================================
+    if FType.Temp > 0 then
+      EditTemp.Text := FloatToStr(FType.Temp)
+    else
+      EditTemp.Text := '';
+
+    // =====================================================
     // == Базовая погрешность
     // =====================================================
     EditError.Text := '';
@@ -1365,6 +1377,7 @@ begin
   FType.IVI               := StrToIntDef(EditIVI.Text, 0);
   FType.AccuracyClass     := EditAccuracyClass.Text;
   FType.RangeDynamic      := StrToFloatDef(EditRangeDynamic.Text, 0);
+  FType.Temp              := NormalizeFloatInput(EditTemp.Text);
 
     if (ceCategory.ItemIndex >= 0) and (ceCategory.ItemIndex < ceCategory.Items.Count) then
   begin
@@ -4675,6 +4688,23 @@ begin
   // 🔴 КЛЮЧЕВОЕ МЕСТО
   UpdatePointsErrorFromType;
   UpdateDiametersGrid;
+
+  SetModified;
+end;
+
+procedure TFormTypeEditor.EditTempExit(Sender: TObject);
+var
+  Temp: Double;
+begin
+  if FLoading then Exit;
+
+  Temp := NormalizeFloatInput(EditTemp.Text);
+  FType.Temp := Temp;
+
+  if Temp > 0 then
+    EditTemp.Text := FloatToStr(Temp)
+  else
+    EditTemp.Text := '';
 
   SetModified;
 end;

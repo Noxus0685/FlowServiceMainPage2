@@ -76,6 +76,7 @@ type
     StringColumnCategory: TStringColumn;
     StringColumnModification: TStringColumn;
     StringColumnAccuracyClass: TStringColumn;
+    StringTemp: TStringColumn;
     StringColumnReestrNumber: TStringColumn;
     StringColumnRegDate: TStringColumn;
     StringColumnValidityDate: TStringColumn;
@@ -2829,6 +2830,14 @@ begin
 
   else if ACol = StringColumnAccuracyClass.Index then
     Value := D.AccuracyClass
+
+  else if ACol = StringTemp.Index then
+  begin
+    if D.Temp > 0 then
+      Value := FloatToStr(D.Temp)
+    else
+      Value := '';
+  end
 
   else if ACol = StringColumnReestrNumber.Index then
     Value := D.ReestrNumber
