@@ -856,6 +856,9 @@ begin
 
   for I := 0 to ComboBoxUnits.Items.Count - 1 do
   begin
+    if I = ComboBoxUnits.ItemIndex then
+      Continue;
+
     MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
     MenuItem.Text := ComboBoxUnits.Items[I];
     MenuItem.Tag := I;
@@ -2310,7 +2313,8 @@ begin
   if (FType = nil) or (FDiametersLocal = nil) or (FDiametersLocal.Count = 0) then
     Exit;
 
-  if (AUnitIndex < 0) or (AUnitIndex >= ComboBoxUnits.Items.Count) then
+  if (AUnitIndex < 0) or (AUnitIndex >= ComboBoxUnits.Items.Count) or
+    (AUnitIndex = ComboBoxUnits.ItemIndex) then
     Exit;
 
   HasChecked := False;
