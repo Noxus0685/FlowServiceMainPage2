@@ -2013,6 +2013,12 @@ begin
     DBFileName
   );
 
+  TreeViewTypes.BeginUpdate;
+  try
+    TreeViewTypes.Clear;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
 
   {----------------------------------}
   { Обновление UI }
@@ -2059,6 +2065,13 @@ begin
   { Удаление через менеджер }
   {----------------------------------}
   AppServices.DataManager.RemoveRepository(Repo.Name);
+
+  TreeViewTypes.BeginUpdate;
+  try
+    TreeViewTypes.Clear;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
 
   {----------------------------------}
   { Обновление UI }
