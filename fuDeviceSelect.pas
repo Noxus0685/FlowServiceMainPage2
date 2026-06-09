@@ -371,9 +371,12 @@ begin
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
-  { Загружаем данные из БД (в репозиторий!) }
+  { Не перезагружаем уже открытый репозиторий при простом открытии формы:
+    каналы GridDevices держат ссылки на приборы из него, а повторный Load
+    пересоздаёт объекты и может визуально менять UUID при Cancel/Close. }
   {--------------------------------------------------}
-  ActiveRepo.Load;
+  if not (ActiveRepo.State in [osLoaded, osClean, osModified]) then
+    ActiveRepo.Load;
 
   {--------------------------------------------------}
   { Берём ссылку на данные репозитория }
@@ -2293,22 +2296,8 @@ begin
       Break;
     end;
 
-  if FoundRow then
-    TThread.ForceQueue(nil,
-      procedure
-      begin
-        if (GridDevices <> nil) and GridDevices.Visible then
-        begin
-          GridDevices.SetFocus;
-          if not GridDevices.IsFocused then
-            TThread.ForceQueue(nil,
-              procedure
-              begin
-                if (GridDevices <> nil) and GridDevices.Visible then
-                  GridDevices.SetFocus;
-              end);
-        end;
-      end);
+  if FoundRow and (GridDevices <> nil) and GridDevices.Visible then
+    GridDevices.SetFocus;
 
 end;
 
@@ -2589,6 +2578,12 @@ var
 begin
   Repo := AppServices.DataManager.ActiveDeviceRepo;
 
+  if ModalResult <> mrOk then
+  begin
+    FDeletedDeviceUUIDs.Clear;
+    Exit;
+  end;
+
   if (Repo <> nil) and (Repo.State = osModified) then
   begin
     Res := MessageDlg(
@@ -2641,8 +2636,6 @@ begin
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
-var
-  SelectionContext: TDeviceSelectionContext;
 begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
@@ -2672,12 +2665,6 @@ begin
     BuildTree;
     ApplyFilter;
     UpdateGridDevices;
-    SelectionContext := AppServices.DataManager.BuildDeviceSelectionContext(
-      ActiveRepo,
-      ''
-    );
-    if SelectionContext.DeviceFound then
-      AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
     ApplyInitialSelection;
   end;
 end;
