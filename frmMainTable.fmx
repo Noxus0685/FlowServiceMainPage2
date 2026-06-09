@@ -4802,7 +4802,7 @@ object FrameMainTable: TFrameMainTable
           object MenuItemDevicesColumn9: TMenuItem
             Tag = 9
             IsChecked = True
-            Text = #1054#1073#1098#1077#1084', '#1084'3
+            Text = #1054#1073#1098#1077#1084', '#1084'3'
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn12: TMenuItem
@@ -5042,7 +5042,7 @@ object FrameMainTable: TFrameMainTable
           object MenuItemEtalonsColumn8: TMenuItem
             Tag = 8
             IsChecked = True
-            Text = #1054#1073#1098#1077#1084', '#1084'3
+            Text = #1054#1073#1098#1077#1084', '#1084'3'
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn14: TMenuItem
