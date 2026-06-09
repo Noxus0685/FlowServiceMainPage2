@@ -2199,13 +2199,11 @@ begin
       WriteTypeActionLog('Отредактирован тип прибора', AType);
       if (AppServices.DataManager <> nil) and
          (OldManufacturer <> AType.Manufacturer) then
-      begin
         AppServices.DataManager.NeedRemoveOldManufacturerBranchForType(
           FDeviceTypes, AType, OldManufacturer, AType.Manufacturer
         );
-        SyncTreeAfterGridRowsRemoved;
-      end;
 
+      SyncTreeAfterGridRowsRemoved;
       BuildTree;
       ApplyFilter;
       UpdateGridTypes;
