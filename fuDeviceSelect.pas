@@ -2293,22 +2293,8 @@ begin
       Break;
     end;
 
-  if FoundRow then
-    TThread.ForceQueue(nil,
-      procedure
-      begin
-        if (GridDevices <> nil) and GridDevices.Visible then
-        begin
-          GridDevices.SetFocus;
-          if not GridDevices.IsFocused then
-            TThread.ForceQueue(nil,
-              procedure
-              begin
-                if (GridDevices <> nil) and GridDevices.Visible then
-                  GridDevices.SetFocus;
-              end);
-        end;
-      end);
+  if FoundRow and (GridDevices <> nil) and GridDevices.Visible then
+    GridDevices.SetFocus;
 
 end;
 
