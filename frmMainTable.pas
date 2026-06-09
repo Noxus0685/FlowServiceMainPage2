@@ -3088,9 +3088,13 @@ begin
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
       UpdateGrids;
       GridDevices.Repaint;
-      ClearChannelsByMissingDevices;
 
     finally
+      if DeviceSelectResult <> mrOk then
+      begin
+        RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+        EnsureDeviceChannelUUIDs;
+      end;
       SelectFrm.Free;
     end;
     Exit;
@@ -3307,9 +3311,7 @@ begin
 
     UpdateGrids;
   finally
-    if DeviceSelectResult = mrOk then
-      ClearChannelsByMissingDevices
-    else
+    if DeviceSelectResult <> mrOk then
     begin
       if (Frm.DeletedDeviceUUIDs <> nil) and (Frm.DeletedDeviceUUIDs.Count > 0) then
       begin
