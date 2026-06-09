@@ -5384,14 +5384,7 @@ begin
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       Value := GetOutputTypeName(WorkTable.DeviceChannels[ARow].Signal)
     else if GridDevices.Columns[ACol] = StringColumnUUID1 then
-    begin
       Value := WorkTable.DeviceChannels[ARow].DeviceUUID;
-      if (Trim(Value.AsString) = '') and
-         (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) and
-         (Trim(WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID) <> '') then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.Device.UUID;
-    end;
 
 
           Exit;
