@@ -251,6 +251,8 @@ type
   public
     { Public declarations }
     SelectedType:   TDeviceType;
+    SelectedRepository: TTypeRepository;
+    procedure SetInitialRepository(ARepo: TTypeRepository);
     procedure SelectType (AType: TDeviceType);
     destructor Destroy; override;
   end;
@@ -1320,6 +1322,8 @@ begin
    FClearTreeSelectionOnClick := False;
    FUpdatingRepositoryCombo := False;
    FCheckedTypes := TList<TDeviceType>.Create;
+   SelectedType := nil;
+   SelectedRepository := nil;
    TreeViewTypes.MultiSelect := True;
    OnKeyDown := FormKeyDown;
    TreeViewTypes.OnMouseUp := TreeViewTypesMouseUp;
@@ -1342,6 +1346,25 @@ destructor TFormTypeSelect.Destroy;
 begin
   FreeAndNil(FCheckedTypes);
   inherited;
+end;
+
+procedure TFormTypeSelect.SetInitialRepository(ARepo: TTypeRepository);
+begin
+  if (ARepo = nil) or (AppServices.DataManager = nil) then
+    Exit;
+
+  if AppServices.DataManager.ActiveTypeRepo <> ARepo then
+    AppServices.DataManager.ActiveTypeRepo := ARepo;
+
+  SelectedRepository := nil;
+  FillComboBoxRepository;
+  LoadData;
+  if UpdateConnection then
+  begin
+    BuildTree;
+    ApplyFilter;
+    UpdateGridTypes;
+  end;
 end;
 
 procedure TFormTypeSelect.FillComboBoxRepository;
@@ -2544,6 +2567,11 @@ begin
     SelectedType := TargetTypes[0];
     if SelectedType = nil then
       Exit;
+
+    if AppServices.DataManager <> nil then
+      SelectedRepository := AppServices.DataManager.ActiveTypeRepo
+    else
+      SelectedRepository := nil;
 
     WriteTypeActionLog('Выбран тип прибора', SelectedType);
     ModalResult := mrOk;

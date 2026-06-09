@@ -4598,12 +4598,22 @@ procedure TFrameMainTable.AttachType(AChannel: TChannel; ANewType: TDeviceType;
 var
   RepoName: string;
   RepoUUID: string;
+  Repo: TTypeRepository;
 begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (ANewType = nil) then
     Exit;
 
-  if (DataManager <> nil) and (DataManager.ActiveTypeRepo <> nil) then
-    AFoundRepo := DataManager.ActiveTypeRepo;
+  if (AFoundRepo = nil) and (DataManager <> nil) then
+    for Repo in DataManager.TypeRepositories do
+      if (Repo <> nil) and (Repo.Types <> nil) and
+         (Repo.Types.IndexOf(ANewType) >= 0) then
+      begin
+        AFoundRepo := Repo;
+        Break;
+      end;
+
+  if AFoundRepo = nil then
+    ResolveTypeForChannel(AChannel, AFoundRepo);
 
   if AFoundRepo <> nil then
   begin
@@ -4643,11 +4653,117 @@ procedure TFrameMainTable.OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean
 var
   Frm: TFormTypeSelect;
   CurrentType, NewType: TDeviceType;
-  FoundRepo, PreferredRepo: TTypeRepository;
+  FoundRepo: TTypeRepository;
   IsTypeChanged: Boolean;
   IsCurrentTypeDeletedInSelector: Boolean;
   Ch: TChannel;
-  Repo: TTypeRepository;
+
+  function FindRepoByUUID(const AUUID: string): TTypeRepository;
+  var
+    Repo: TTypeRepository;
+  begin
+    Result := nil;
+    if Trim(AUUID) = '' then
+      Exit;
+
+    for Repo in DataManager.TypeRepositories do
+      if (Repo <> nil) and SameText(Trim(Repo.UUID), Trim(AUUID)) then
+        Exit(Repo);
+  end;
+
+  function FindRepoByName(const AName: string): TTypeRepository;
+  var
+    Repo: TTypeRepository;
+  begin
+    Result := nil;
+    if Trim(AName) = '' then
+      Exit;
+
+    for Repo in DataManager.TypeRepositories do
+      if (Repo <> nil) and SameText(Trim(Repo.Name), Trim(AName)) then
+        Exit(Repo);
+  end;
+
+  function FindTypeInRepo(ARepo: TTypeRepository; const AUUID,
+    AName: string): TDeviceType;
+  begin
+    Result := nil;
+    if ARepo = nil then
+      Exit;
+
+    if Trim(AUUID) <> '' then
+      Result := ARepo.FindTypeByUUID(Trim(AUUID));
+
+    if (Result = nil) and (Trim(AName) <> '') then
+      Result := ARepo.FindTypeByName(Trim(AName));
+  end;
+
+  function FindTypeByUUIDInAnyRepo(const AUUID: string;
+    out ARepo: TTypeRepository): TDeviceType;
+  var
+    Repo: TTypeRepository;
+  begin
+    Result := nil;
+    ARepo := nil;
+    if Trim(AUUID) = '' then
+      Exit;
+
+    for Repo in DataManager.TypeRepositories do
+    begin
+      if Repo = nil then
+        Continue;
+
+      Result := Repo.FindTypeByUUID(Trim(AUUID));
+      if Result <> nil then
+      begin
+        ARepo := Repo;
+        Exit;
+      end;
+    end;
+  end;
+
+  function FindTypeByNameInAnyRepo(const AName: string;
+    out ARepo: TTypeRepository): TDeviceType;
+  var
+    Repo: TTypeRepository;
+  begin
+    Result := nil;
+    ARepo := nil;
+    if Trim(AName) = '' then
+      Exit;
+
+    for Repo in DataManager.TypeRepositories do
+    begin
+      if Repo = nil then
+        Continue;
+
+      Result := Repo.FindTypeByName(Trim(AName));
+      if Result <> nil then
+      begin
+        ARepo := Repo;
+        Exit;
+      end;
+    end;
+  end;
+
+  procedure ResolveInitialTypeRepository;
+  begin
+    FoundRepo := FindRepoByUUID(Ch.RepoTypeUUID);
+
+    if FoundRepo = nil then
+      FoundRepo := FindRepoByName(Ch.RepoTypeName);
+
+    if FoundRepo <> nil then
+    begin
+      CurrentType := FindTypeInRepo(FoundRepo, Ch.TypeUUID, Ch.TypeName);
+      Exit;
+    end;
+
+    CurrentType := FindTypeByUUIDInAnyRepo(Ch.TypeUUID, FoundRepo);
+
+    if CurrentType = nil then
+      CurrentType := FindTypeByNameInAnyRepo(Ch.TypeName, FoundRepo);
+  end;
 begin
 
   if (FActiveWorkTable = nil) then
@@ -4674,46 +4790,25 @@ begin
   if (Ch = nil) or (Ch.FlowMeter = nil) then
     Exit;
 
+  CurrentType := nil;
+  FoundRepo := nil;
+  ResolveInitialTypeRepository;
+
+  if FoundRepo <> nil then
+    DataManager.ActiveTypeRepo := FoundRepo;
+
   Frm := TFormTypeSelect.Create(Self);
   try
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    PreferredRepo := nil;
-    FoundRepo := nil;
-
-    if Ch.FlowMeter.RepoTypeUUID <> '' then
-    begin
-      for Repo in DataManager.TypeRepositories do
-        if SameText(Repo.UUID, Ch.FlowMeter.RepoTypeUUID) then
-        begin
-          PreferredRepo := Repo;
-          Break;
-        end;
-    end;
-
-    if PreferredRepo <> nil then
-      DataManager.ActiveTypeRepo := PreferredRepo;
-
-    CurrentType := DataManager.FindType(
-      Ch.FlowMeter.DeviceTypeUUID,
-      '',
-      FoundRepo
-    );
-
-    if (CurrentType = nil) and (Ch.FlowMeter.DeviceTypeUUID <> '') then
-    begin
-      ShowMessage('Данный тип не найден. Загрузите репозитарий ' + Ch.FlowMeter.RepoTypeName);
-    end;
-
-    if (CurrentType = nil) and (Ch.TypeName <> '') then
-      CurrentType := DataManager.FindType('', Ch.TypeName, FoundRepo);
+    if FoundRepo <> nil then
+      Frm.SetInitialRepository(FoundRepo);
 
     if (CurrentType <> nil) and (FoundRepo <> nil) then
-    begin
-      DataManager.ActiveTypeRepo := FoundRepo;
-      Frm.SelectType(CurrentType);
-    end;
+      Frm.SelectType(CurrentType)
+    else if (Ch.TypeUUID <> '') and (CurrentType = nil) then
+      ShowMessage('Данный тип не найден. Загрузите репозитарий ' + Ch.RepoTypeName);
 
     {----------------------------------------------------}
     { 2. Открываем форму выбора }
@@ -4727,7 +4822,7 @@ begin
       IsCurrentTypeDeletedInSelector := False;
       if (CurrentType <> nil) and (CurrentType.UUID <> '') then
         IsCurrentTypeDeletedInSelector :=
-          DataManager.FindType(CurrentType.UUID, '', FoundRepo) = nil;
+          FindTypeByUUIDInAnyRepo(CurrentType.UUID, FoundRepo) = nil;
 
       // Очищаем строку только если удалили именно текущий тип
       // в окне выбора. При простом закрытии окна без выбора
@@ -4740,7 +4835,9 @@ begin
       Exit;
     end;
 
-    FoundRepo := DataManager.ActiveTypeRepo;
+    FoundRepo := Frm.SelectedRepository;
+    if FoundRepo = nil then
+      FindTypeByUUIDInAnyRepo(NewType.UUID, FoundRepo);
 
     {----------------------------------------------------}
     { 3. Проверяем смену типа }
