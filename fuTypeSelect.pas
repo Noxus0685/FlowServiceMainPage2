@@ -2205,8 +2205,7 @@ begin
 
       SyncTreeAfterGridRowsRemoved;
       BuildTree;
-      ApplyFilter;
-      UpdateGridTypes;
+      SelectType(AType);
     end;
 
   finally
