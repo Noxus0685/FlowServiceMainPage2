@@ -1079,9 +1079,25 @@ end;
 
 procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
 begin
+  if AWorkTable = nil then
+    Exit;
+
   case AWorkTable.Action of
+    awtStartMonitor:
+      begin
+        AWorkTable.State := swtSTARTMONITOR;
+        AWorkTable.ExecuteAction;
+      end;
+
+    awtStopMonitor:
+      begin
+        AWorkTable.State := swtSTOPMONITOR;
+        AWorkTable.ExecuteAction;
+      end;
+
     awtStartTest:
       begin
+        AWorkTable.State := swtSTARTTEST;
         AWorkTable.ExecuteAction;
         if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
           MeasurementRun.Execute(mcStart);
@@ -1090,6 +1106,7 @@ begin
 
     awtStopTest:
       begin
+        AWorkTable.State := swtSTOPTEST;
         AWorkTable.ExecuteAction;
         if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
           MeasurementRun.Execute(mcStop);
