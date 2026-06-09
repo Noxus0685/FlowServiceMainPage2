@@ -73,6 +73,7 @@ type
     StringColumnValidityDate: TStringColumn;
     StringColumnVerificationMethod: TStringColumn;
     StringColumnAccuracyClass: TStringColumn;
+    StringTemp: TStringColumn;
     EditFindType: TEdit;
     sbFind: TSpeedButton;
     lyt1: TLayout;
@@ -1448,6 +1449,9 @@ begin
   else if ACol = StringColumnAccuracyClass.Index then
     Value := T.AccuracyClass
 
+  else if ACol = StringTemp.Index then
+    Value := T.Temp
+
   else if ACol = StringColumnReestrNumber.Index then
     Value := T.ReestrNumber
 
@@ -2195,16 +2199,13 @@ begin
       WriteTypeActionLog('Отредактирован тип прибора', AType);
       if (AppServices.DataManager <> nil) and
          (OldManufacturer <> AType.Manufacturer) then
-      begin
         AppServices.DataManager.NeedRemoveOldManufacturerBranchForType(
           FDeviceTypes, AType, OldManufacturer, AType.Manufacturer
         );
-        SyncTreeAfterGridRowsRemoved;
-      end;
 
+      SyncTreeAfterGridRowsRemoved;
       BuildTree;
-      ApplyFilter;
-      UpdateGridTypes;
+      SelectType(AType);
     end;
 
   finally
@@ -2671,9 +2672,27 @@ var
   ManKey, CatKey, ModKey: string;
   ManNode, CatNode, ModNode: TTreeViewItem;
   I: Integer;
+  Repo: TTypeRepository;
 begin
   if (AType = nil) or (FDevFilteredTypes = nil) then
     Exit;
+
+  if AppServices.DataManager <> nil then
+    for Repo in AppServices.DataManager.TypeRepositories do
+      if (Repo <> nil) and (Repo.Types <> nil) and
+         (Repo.Types.IndexOf(AType) >= 0) and
+         (Repo <> AppServices.DataManager.ActiveTypeRepo) then
+      begin
+        AppServices.DataManager.ActiveTypeRepo := Repo;
+        LoadData;
+        FillComboBoxRepository;
+        if not UpdateConnection then
+          Exit;
+        BuildTree;
+        ApplyFilter;
+        UpdateGridTypes;
+        Break;
+      end;
 
   {---------------- Изготовитель ----------------}
   ManKey := AType.Manufacturer;
