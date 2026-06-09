@@ -2762,6 +2762,7 @@ begin
 
   EnsureDeviceChannelUUIDs;
   EnsureEmptyDevicesForGridRows;
+  EnsureDeviceChannelUUIDs;
 
   if FActiveWorkTable <> nil then
   begin
@@ -3187,6 +3188,20 @@ var
   OldRepoDeviceUUID: string;
   OldFlowMeterDevice: TDevice;
   DeviceSelectResult: TModalResult;
+
+  function DeletedUUIDsContain(const AUUID: string): Boolean;
+  var
+    J: Integer;
+  begin
+    Result := False;
+    if (Frm = nil) or (Frm.DeletedDeviceUUIDs = nil) or (Trim(AUUID) = '') then
+      Exit;
+
+    for J := 0 to Frm.DeletedDeviceUUIDs.Count - 1 do
+      if SameText(Trim(Frm.DeletedDeviceUUIDs[J]), Trim(AUUID)) then
+        Exit(True);
+  end;
+
 begin
   if AChannel = nil then
     Exit;
@@ -3296,27 +3311,42 @@ begin
       ClearChannelsByMissingDevices
     else
     begin
-      AChannel.DeviceUUID := OldDeviceUUID;
-      AChannel.TypeUUID := OldTypeUUID;
-      AChannel.TypeName := OldTypeName;
-      AChannel.Serial := OldSerial;
-      AChannel.Signal := OldSignal;
-      AChannel.RepoTypeName := OldRepoTypeName;
-      AChannel.RepoTypeUUID := OldRepoTypeUUID;
-      AChannel.RepoDeviceName := OldRepoDeviceName;
-      AChannel.RepoDeviceUUID := OldRepoDeviceUUID;
-      if AChannel.FlowMeter <> nil then
+      if (Frm.DeletedDeviceUUIDs <> nil) and (Frm.DeletedDeviceUUIDs.Count > 0) then
       begin
-        AChannel.FlowMeter.Device := OldFlowMeterDevice;
-        AChannel.FlowMeter.DeviceUUID := OldDeviceUUID;
-        AChannel.FlowMeter.DeviceTypeUUID := OldTypeUUID;
-        AChannel.FlowMeter.DeviceTypeName := OldTypeName;
-        AChannel.FlowMeter.SerialNumber := OldSerial;
-        AChannel.FlowMeter.OutputType := OldSignal;
-        AChannel.FlowMeter.RepoTypeName := OldRepoTypeName;
-        AChannel.FlowMeter.RepoTypeUUID := OldRepoTypeUUID;
-        AChannel.FlowMeter.RepoDeviceName := OldRepoDeviceName;
-        AChannel.FlowMeter.RepoDeviceUUID := OldRepoDeviceUUID;
+        RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
+        EnsureDeviceChannelUUIDs;
+      end;
+
+      if DeletedUUIDsContain(OldDeviceUUID) or
+         ((OldFlowMeterDevice <> nil) and DeletedUUIDsContain(OldFlowMeterDevice.UUID)) then
+      begin
+        ClearChannelData(AChannel);
+        AChannel.DeviceUUID := NewUniqueDeviceChannelUUID;
+      end
+      else
+      begin
+        AChannel.DeviceUUID := OldDeviceUUID;
+        AChannel.TypeUUID := OldTypeUUID;
+        AChannel.TypeName := OldTypeName;
+        AChannel.Serial := OldSerial;
+        AChannel.Signal := OldSignal;
+        AChannel.RepoTypeName := OldRepoTypeName;
+        AChannel.RepoTypeUUID := OldRepoTypeUUID;
+        AChannel.RepoDeviceName := OldRepoDeviceName;
+        AChannel.RepoDeviceUUID := OldRepoDeviceUUID;
+        if AChannel.FlowMeter <> nil then
+        begin
+          AChannel.FlowMeter.Device := OldFlowMeterDevice;
+          AChannel.FlowMeter.DeviceUUID := OldDeviceUUID;
+          AChannel.FlowMeter.DeviceTypeUUID := OldTypeUUID;
+          AChannel.FlowMeter.DeviceTypeName := OldTypeName;
+          AChannel.FlowMeter.SerialNumber := OldSerial;
+          AChannel.FlowMeter.OutputType := OldSignal;
+          AChannel.FlowMeter.RepoTypeName := OldRepoTypeName;
+          AChannel.FlowMeter.RepoTypeUUID := OldRepoTypeUUID;
+          AChannel.FlowMeter.RepoDeviceName := OldRepoDeviceName;
+          AChannel.FlowMeter.RepoDeviceUUID := OldRepoDeviceUUID;
+        end;
       end;
       UpdateGrids;
     end;
