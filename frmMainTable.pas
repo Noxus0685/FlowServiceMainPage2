@@ -3717,6 +3717,11 @@ begin
   else
     AChannel.DeviceUUID := TGUID.NewGuid.ToString;
 
+  if WorkTable = FActiveWorkTable then
+    AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
+  else
+    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
+
   MarkChannelDeviceModified(AChannel);
 end;
 
