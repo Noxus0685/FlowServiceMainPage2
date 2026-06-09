@@ -618,7 +618,11 @@ type
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
     procedure UpdateGridDevices;
+    function ActiveWorkTableHasDeviceUUID(const AUUID: string): Boolean;
+    function NewUniqueDeviceChannelUUID: string;
+    procedure EnsureDeviceChannelUUIDs;
     procedure EnsureEmptyDevicesForGridRows;
+    procedure ClearDeviceRowByMenu(ARow: Integer);
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
 
     procedure UpdateUIFromValues;
@@ -1044,6 +1048,7 @@ procedure TFrameMainTable.UpdateForm;
 
           IsUpdating := True;
             try
+               EnsureDeviceChannelUUIDs;
                UpdateUIFromValues;
                 UpdateGrids;
                 if FFrameWorkTableProperties <> nil then
@@ -2755,6 +2760,7 @@ begin
     WorkTable.RebindAllFlowMeters;
   end;
 
+  EnsureDeviceChannelUUIDs;
   EnsureEmptyDevicesForGridRows;
 
   if FActiveWorkTable <> nil then
@@ -3586,6 +3592,60 @@ begin
   end;
 end;
 
+function TFrameMainTable.ActiveWorkTableHasDeviceUUID(const AUUID: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+    if (FActiveWorkTable.DeviceChannels[I] <> nil) and
+       SameText(Trim(FActiveWorkTable.DeviceChannels[I].DeviceUUID), Trim(AUUID)) then
+      Exit(True);
+end;
+
+function TFrameMainTable.NewUniqueDeviceChannelUUID: string;
+begin
+  repeat
+    Result := TGUID.NewGuid.ToString;
+  until not ActiveWorkTableHasDeviceUUID(Result);
+end;
+
+procedure TFrameMainTable.EnsureDeviceChannelUUIDs;
+var
+  I, J: Integer;
+  Channel: TChannel;
+  DeviceUUID: string;
+  HasDuplicate: Boolean;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FActiveWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+
+    DeviceUUID := Trim(Channel.DeviceUUID);
+    HasDuplicate := False;
+    if DeviceUUID <> '' then
+      for J := 0 to I - 1 do
+        if (FActiveWorkTable.DeviceChannels[J] <> nil) and
+           SameText(Trim(FActiveWorkTable.DeviceChannels[J].DeviceUUID), DeviceUUID) then
+        begin
+          HasDuplicate := True;
+          Break;
+        end;
+
+    if (DeviceUUID = '') or HasDuplicate then
+      Channel.DeviceUUID := NewUniqueDeviceChannelUUID;
+  end;
+end;
+
 procedure TFrameMainTable.EnsureEmptyDevicesForGridRows;
 var
   I: Integer;
@@ -3616,6 +3676,9 @@ begin
       if Channel.FlowMeter <> nil then
         Channel.FlowMeter.Device := nil;
     end;
+
+    if Trim(Channel.DeviceUUID) = '' then
+      Channel.DeviceUUID := NewUniqueDeviceChannelUUID;
 
     TDeviceCreationService.EnsureDeviceForChannel(
       Channel,
@@ -3849,14 +3912,27 @@ begin
   end;
 end;
 
-procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
+procedure TFrameMainTable.ClearDeviceRowByMenu(ARow: Integer);
 var
-  Ch: TChannel;
+  Channel: TChannel;
 begin
-  if FActiveWorkTable = nil then
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
     Exit;
-  Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
-  ClearChannelData(Ch);
+
+  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+    Exit;
+
+  Channel := FActiveWorkTable.DeviceChannels[ARow];
+  if Channel = nil then
+    Exit;
+
+  ClearChannelData(Channel);
+  Channel.DeviceUUID := NewUniqueDeviceChannelUUID;
+end;
+
+procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
+begin
+  ClearDeviceRowByMenu(GridDevices.Row);
   UpdateGrids;
 end;
 
