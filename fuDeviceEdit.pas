@@ -266,7 +266,6 @@ type
     Label7: TLabel;
     Layout34: TLayout;
     Label18: TLabel;
-    EditError: TEdit;
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsSetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -282,8 +281,6 @@ type
     procedure edtReestrNumberTyping(Sender: TObject);
     procedure edtDocumentationExit(Sender: TObject);
     procedure EditAccuracyClassExit(Sender: TObject);
-    procedure EditErrorExit(Sender: TObject);
-    procedure EditTempEnter(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
     procedure EditReportingFormExit(Sender: TObject);
     procedure cbMeasuredDimensionChange(Sender: TObject);
@@ -2730,22 +2727,6 @@ begin
   SetModified;
 end;
 
-procedure TFormDeviceEditor.EditTempEnter(Sender: TObject);
-begin
-  // Строковое поле температуры: обработчик нужен для совместимости с FMX-событием.
-end;
-
-procedure TFormDeviceEditor.EditTempExit(Sender: TObject);
-begin
-  if FLoading then
-    Exit;
-
-  if FDevice = nil then
-    Exit;
-
-  FDevice.Temp := EditTemp.Text;
-  SetModified;
-end;
 
 procedure TFormDeviceEditor.EditFreqExit(Sender: TObject);
 var

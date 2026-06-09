@@ -1,4 +1,4 @@
-﻿object FormDeviceSelect: TFormDeviceSelect
+object FormDeviceSelect: TFormDeviceSelect
   Left = 0
   Top = 0
   Caption = #1055#1086#1080#1089#1082' '#1087#1088#1080#1073#1086#1088#1072
@@ -126,8 +126,8 @@
         OnHeaderClick = GridDevicesHeaderClick
         OnGetValue = GridDevicesGetValue
         OnCellClick = GridDevicesCellClick
-        Viewport.Width = 917.000000000000000000
-        Viewport.Height = 610.000000000000000000
+        Viewport.Width = 897.000000000000000000
+        Viewport.Height = 569.000000000000000000
         object CheckColumnDeviceEnable: TCheckColumn
           Header = #1042#1082#1083
           HeaderSettings.TextSettings.WordWrap = False
@@ -237,11 +237,6 @@
           HeaderSettings.TextSettings.WordWrap = False
           HeaderSettings.TextSettings.HorzAlign = Center
           Size.Width = 160.000000000000000000
-        end
-        object StringTemp: TColumn
-          Header = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
-          HeaderSettings.TextSettings.WordWrap = False
-          HeaderSettings.TextSettings.HorzAlign = Center
         end
       end
     end
@@ -427,8 +422,8 @@
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 883.000000000000000000
-      Viewport.Height = 102.000000000000000000
+      Viewport.Width = 879.000000000000000000
+      Viewport.Height = 98.000000000000000000
     end
   end
   object lyt1: TLayout

@@ -1,4 +1,4 @@
-﻿object FormTypeSelect: TFormTypeSelect
+object FormTypeSelect: TFormTypeSelect
   Left = 0
   Top = 0
   Caption = #1042#1099#1073#1086#1088' '#1090#1080#1087#1072
@@ -212,11 +212,6 @@
         end
         object StringColumnUUID: TStringColumn
           Header = 'UUID'
-          HeaderSettings.TextSettings.WordWrap = False
-          HeaderSettings.TextSettings.HorzAlign = Center
-        end
-        object StringTemp: TColumn
-          Header = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
           HeaderSettings.TextSettings.WordWrap = False
           HeaderSettings.TextSettings.HorzAlign = Center
         end

@@ -142,7 +142,6 @@ type
     MenuItem9: TMenuItem;
     MenuItem10: TMenuItem;
     sbClearDate: TSpeedButton;
-    StringTemp: TColumn;
     procedure FormCreate(Sender: TObject);
     procedure GridTypesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);

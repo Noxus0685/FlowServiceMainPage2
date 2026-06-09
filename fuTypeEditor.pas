@@ -292,7 +292,6 @@ type
     TabItem2: TTabItem;
     Layout54: TLayout;
     Label44: TLabel;
-    EditError: TEdit;
     procedure GridDiametersGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure GridPointsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -328,7 +327,6 @@ type
     procedure EditErrorExit(Sender: TObject);
     procedure EditTempEnter(Sender: TObject);
     procedure EditTempExit(Sender: TObject);
-    procedure EditErrorEnter(Sender: TObject);
     procedure EditNameExit(Sender: TObject);
     procedure EditNameTyping(Sender: TObject);
     procedure edtManufacturerExit(Sender: TObject);
@@ -4662,10 +4660,7 @@ begin
     EditError.Text := '';
 end;
 
-procedure TFormTypeEditor.EditTempEnter(Sender: TObject);
-begin
-  // Строковое поле температуры: обработчик нужен для совместимости с FMX-событием.
-end;
+
 
 procedure TFormTypeEditor.EditErrorExit(Sender: TObject);
 var

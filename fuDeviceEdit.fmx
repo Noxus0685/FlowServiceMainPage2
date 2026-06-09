@@ -1,4 +1,4 @@
-﻿object FormDeviceEditor: TFormDeviceEditor
+object FormDeviceEditor: TFormDeviceEditor
   Left = 0
   Top = 0
   Caption = 'Form2'
@@ -43,7 +43,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 50
+        TabOrder = 53
         object labName: TLabel
           Align = Left
           Margins.Left = 4.000000000000000000
@@ -84,7 +84,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 49
+        TabOrder = 52
         object Label11: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -118,7 +118,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 44
+        TabOrder = 47
         object Label1: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -156,7 +156,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 42
+        TabOrder = 44
         object Label2: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -204,7 +204,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 40
+        TabOrder = 42
         object Label3: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -253,7 +253,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 43
+        TabOrder = 45
         object Label29: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -292,7 +292,7 @@
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
         Visible = False
-        TabOrder = 38
+        TabOrder = 40
         object Label30: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -402,7 +402,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 48
+        TabOrder = 51
         object Label32: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -436,11 +436,11 @@
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
         Position.X = 5.000000000000000000
-        Position.Y = 405.000000000000000000
+        Position.Y = 435.000000000000000000
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 45
+        TabOrder = 48
         object Label23: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -488,7 +488,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 41
+        TabOrder = 43
         object Label39: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -527,7 +527,7 @@
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
-        TabOrder = 47
+        TabOrder = 50
         object Label41: TLabel
           Align = Left
           Position.X = 5.000000000000000000
@@ -561,7 +561,7 @@
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
         Position.X = 5.000000000000000000
-        Position.Y = 345.000000000000000000
+        Position.Y = 375.000000000000000000
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
@@ -574,91 +574,6 @@
           Size.PlatformDefault = False
           Text = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
           TabOrder = 1
-        end
-        object EditTemp: TEdit
-          Touch.InteractiveGestures = [LongTap, DoubleTap]
-          Align = Client
-          TabOrder = 0
-          Margins.Top = 5.000000000000000000
-          Margins.Bottom = 5.000000000000000000
-          Size.Width = 177.000000000000000000
-          Size.Height = 20.000000000000000000
-          Size.PlatformDefault = False
-          TextPrompt = '-'
-          KillFocusByReturn = True
-          OnExit = EditTempExit
-          Left = 276
-          Top = 15
-        end
-      end
-      object LayoutTemp: TLayout
-        Align = Top
-        Padding.Left = 5.000000000000000000
-        Padding.Right = 5.000000000000000000
-        Position.X = 5.000000000000000000
-        Position.Y = 345.000000000000000000
-        Size.Width = 323.000000000000000000
-        Size.Height = 30.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 38
-        object LabelTemp: TLabel
-          Align = Left
-          Position.X = 5.000000000000000000
-          Size.Width = 136.000000000000000000
-          Size.Height = 30.000000000000000000
-          Size.PlatformDefault = False
-          Text = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
-          TabOrder = 1
-        end
-        object EditTemp: TEdit
-          Touch.InteractiveGestures = [LongTap, DoubleTap]
-          Align = Client
-          TabOrder = 0
-          Margins.Top = 5.000000000000000000
-          Margins.Bottom = 5.000000000000000000
-          Size.Width = 177.000000000000000000
-          Size.Height = 20.000000000000000000
-          Size.PlatformDefault = False
-          TextPrompt = '-'
-          KillFocusByReturn = True
-          OnExit = EditTempExit
-          Left = 276
-          Top = 15
-        end
-      end
-      object LayoutTemp: TLayout
-        Align = Top
-        Padding.Left = 5.000000000000000000
-        Padding.Right = 5.000000000000000000
-        Position.X = 5.000000000000000000
-        Position.Y = 345.000000000000000000
-        Size.Width = 323.000000000000000000
-        Size.Height = 30.000000000000000000
-        Size.PlatformDefault = False
-        TabOrder = 38
-        object LabelTemp: TLabel
-          Align = Left
-          Position.X = 5.000000000000000000
-          Size.Width = 136.000000000000000000
-          Size.Height = 30.000000000000000000
-          Size.PlatformDefault = False
-          Text = #1058#1077#1084#1087#1077#1088#1072#1090#1091#1088#1072
-          TabOrder = 1
-        end
-        object EditTemp: TEdit
-          Touch.InteractiveGestures = [LongTap, DoubleTap]
-          Align = Client
-          TabOrder = 0
-          Margins.Top = 5.000000000000000000
-          Margins.Bottom = 5.000000000000000000
-          Size.Width = 177.000000000000000000
-          Size.Height = 20.000000000000000000
-          Size.PlatformDefault = False
-          TextPrompt = '-'
-          KillFocusByReturn = True
-          OnExit = EditTempExit
-          Left = 276
-          Top = 15
         end
       end
       object Layout50: TLayout
@@ -785,7 +700,7 @@
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
         Position.X = 5.000000000000000000
-        Position.Y = 375.000000000000000000
+        Position.Y = 405.000000000000000000
         Size.Width = 323.000000000000000000
         Size.Height = 30.000000000000000000
         Size.PlatformDefault = False
