@@ -3737,30 +3737,30 @@ end;
 procedure TWorkTable.DoStartMonitor;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTMONITOR);
+ // SetState(swtSTARTMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
-    'Мониторинг запущен', Name);
+    'Подготовка к запуску монитра. Очищены данные', Name);
 end;
 
 procedure TWorkTable.DoStopMonitor;
 begin
-  SetState(swtSTOPMONITOR);
+ // SetState(swtSTOPMONITOR);
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopMonitor',
-    'Мониторинг остановлен', Name);
+    'Подготовка к остановке монитора. Ничего тут нет.', Name);
 end;
 
 procedure TWorkTable.DoStartTest;
 begin
   ResetMeasurementValues;
-  SetState(swtSTARTTEST);
+  //SetState(swtSTARTTEST);
   StartMeasurementRun(Ord(FMode));
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
-    'Тест запущен', Name);
+    'Подготовка к запуску измерения. Очистка данных', Name);
 end;
 
 procedure TWorkTable.DoStopTest;
 begin
-  SetState(swtSTOPTEST);
+  //SetState(swtSTOPTEST);
   StopMeasurementRun;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
     'Тест остановлен', Name);
@@ -4031,7 +4031,7 @@ end;
 
 procedure TWorkTable.StartMonitor;
 begin
-  FireAction(awtStartMonitor, 'StartMonitor', 'Запрошен запуск мониторинга');
+  FireAction(awtStartMonitor, 'StartMonitor', 'Действие: запуск монитора');
 end;
 
 procedure TWorkTable.StopTest;
