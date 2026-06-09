@@ -3763,7 +3763,7 @@ begin
   //SetState(swtSTOPTEST);
   StopMeasurementRun;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
-    'Тест остановлен', Name);
+    'Подготовка к остановке измеиения.', Name);
 end;
 
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
