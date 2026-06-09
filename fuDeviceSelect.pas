@@ -2578,6 +2578,12 @@ var
 begin
   Repo := AppServices.DataManager.ActiveDeviceRepo;
 
+  if ModalResult <> mrOk then
+  begin
+    FDeletedDeviceUUIDs.Clear;
+    Exit;
+  end;
+
   if (Repo <> nil) and (Repo.State = osModified) then
   begin
     Res := MessageDlg(
