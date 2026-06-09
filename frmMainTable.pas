@@ -3170,16 +3170,6 @@ var
   LinkedChannel: TChannel;
   I: Integer;
   SelectedUUID: string;
-  OldDeviceUUID : string;
-  OldTypeUUID: string;
-  OldTypeName: string;
-  OldSerial: string;
-  OldSignal: Integer;
-  OldRepoTypeName: string;
-  OldRepoTypeUUID: string;
-  OldRepoDeviceName: string;
-  OldRepoDeviceUUID: string;
-  OldFlowMeterDevice: TDevice;
   DeviceSelectResult: TModalResult;
 
 
@@ -3187,18 +3177,6 @@ begin
   if AChannel = nil then
     Exit;
 
-  OldDeviceUUID := Trim(AChannel.DeviceUUID);
-  OldTypeUUID := AChannel.TypeUUID;
-  OldTypeName := AChannel.TypeName;
-  OldSerial := AChannel.Serial;
-  OldSignal := AChannel.Signal;
-  OldRepoTypeName := AChannel.RepoTypeName;
-  OldRepoTypeUUID := AChannel.RepoTypeUUID;
-  OldRepoDeviceName := AChannel.RepoDeviceName;
-  OldRepoDeviceUUID := AChannel.RepoDeviceUUID;
-  OldFlowMeterDevice := nil;
-  if AChannel.FlowMeter <> nil then
-    OldFlowMeterDevice := AChannel.FlowMeter.Device;
   DeviceSelectResult := mrCancel;
 
   if DataManager <> nil then
@@ -3286,32 +3264,6 @@ begin
 
     UpdateGrids;
   finally
-    if DeviceSelectResult <> mrOk then
-    begin
-      AChannel.DeviceUUID := OldDeviceUUID;
-      AChannel.TypeUUID := OldTypeUUID;
-      AChannel.TypeName := OldTypeName;
-      AChannel.Serial := OldSerial;
-      AChannel.Signal := OldSignal;
-      AChannel.RepoTypeName := OldRepoTypeName;
-      AChannel.RepoTypeUUID := OldRepoTypeUUID;
-      AChannel.RepoDeviceName := OldRepoDeviceName;
-      AChannel.RepoDeviceUUID := OldRepoDeviceUUID;
-      if AChannel.FlowMeter <> nil then
-      begin
-        AChannel.FlowMeter.Device := OldFlowMeterDevice;
-        AChannel.FlowMeter.DeviceUUID := OldDeviceUUID;
-        AChannel.FlowMeter.DeviceTypeUUID := OldTypeUUID;
-        AChannel.FlowMeter.DeviceTypeName := OldTypeName;
-        AChannel.FlowMeter.SerialNumber := OldSerial;
-        AChannel.FlowMeter.OutputType := OldSignal;
-        AChannel.FlowMeter.RepoTypeName := OldRepoTypeName;
-        AChannel.FlowMeter.RepoTypeUUID := OldRepoTypeUUID;
-        AChannel.FlowMeter.RepoDeviceName := OldRepoDeviceName;
-        AChannel.FlowMeter.RepoDeviceUUID := OldRepoDeviceUUID;
-      end;
-      UpdateGrids;
-    end;
     if DataManager <> nil then
       DataManager.PendingSelectedDeviceUUID := '';
     Frm.Free;
