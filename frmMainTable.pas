@@ -3707,7 +3707,15 @@ begin
   AChannel.RepoDeviceUUID := '';
   AChannel.DeviceUUID := '';
   if AChannel.FlowMeter <> nil then
+  begin
     AChannel.FlowMeter.Device := nil;
+    AChannel.FlowMeter.DeviceUUID := '';
+  end;
+
+  if WorkTable = FActiveWorkTable then
+    AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
+  else
+    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
 
   MarkChannelDeviceModified(AChannel);
 end;
@@ -3894,6 +3902,23 @@ begin
 end;
 
 procedure TFrameMainTable.ClearDeviceRowByMenu(ARow: Integer);
+var
+  Channel: TChannel;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+    Exit;
+
+  Channel := FActiveWorkTable.DeviceChannels[ARow];
+  if Channel = nil then
+    Exit;
+
+  ClearChannelData(Channel);
+end;
+
+procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
 var
   Channel: TChannel;
 begin
