@@ -4686,99 +4686,464 @@ object FrameMainTable: TFrameMainTable
         OnClick = MenuInstrumentalLayOutClick
       end
     end
-    object PopupMenuEtalonsGridLayOut: TPopupMenu
-      OnPopup = PopupMenuEtalonsGridLayOutPopup
-      Left = 1610
-      Top = 405
-    end
     object PopupMenuDevicesGrid: TPopupMenu
+      OnPopup = PopupMenuDevicesGridPopup
       Left = 1660
       Top = 405
-      object MenuItemDevicesClearRow: TMenuItem
-        Action = ActionDevicesClearRow
-        ImageIndex = -1
+      object MenuItemDevicesWorkTablesGroup: TMenuItem
+        Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+        object MenuItemDevicesWorkTablesAddTable: TMenuItem
+          Action = ActionAddWorkTable
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesAddDeviceChannel: TMenuItem
+          Action = ActionAddDeviceChannel
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesAddEtalonChannel: TMenuItem
+          Action = ActionAddEtalonChannel
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesSaveWorkTable: TMenuItem
+          Action = ActionSaveWorkTable
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesMeterValueProperties: TMenuItem
+          Action = ActionMeterValueProperties
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesOpenDeviceSelect: TMenuItem
+          Action = ActionOpenDeviceSelect
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesDeleteDevice: TMenuItem
+          Action = ActionDeleteDevice
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1082#1072#1085#1072#1083
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesDeleteEtalons: TMenuItem
+          Action = ActionDeleteEtalons
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1101#1090#1072#1083#1086#1085
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesAddPump: TMenuItem
+          Action = ActionPumpAdd
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesDeletePump: TMenuItem
+          Action = ActionPumpDelete
+          ImageIndex = -1
+        end
       end
-      object MenuItemDevicesCopy: TMenuItem
-        Action = ActionDevicesCopy
-        ImageIndex = -1
+      object MenuItemDevicesColumnsGroup: TMenuItem
+        Text = #1050#1086#1083#1086#1085#1082#1080
+        object MenuItemDevicesColumnsChannelGroup: TMenuItem
+          Text = #1050#1072#1085#1072#1083
+          object MenuItemDevicesColumn1: TMenuItem
+            Tag = 1
+            IsChecked = True
+            Text = #1050#1072#1085#1072#1083
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn6: TMenuItem
+            Tag = 6
+            IsChecked = True
+            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemDevicesColumnsDeviceGroup: TMenuItem
+          Text = #1055#1088#1080#1073#1086#1088
+          object MenuItemDevicesColumn2: TMenuItem
+            Tag = 2
+            IsChecked = True
+            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn3: TMenuItem
+            Tag = 3
+            IsChecked = True
+            Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn4: TMenuItem
+            Tag = 4
+            IsChecked = True
+            Text = #1055#1088#1080#1073#1086#1088
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn5: TMenuItem
+            Tag = 5
+            IsChecked = True
+            Text = #1057#1077#1088#1080#1081#1085#1099#1081
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn18: TMenuItem
+            Tag = 18
+            IsChecked = True
+            Text = #1050#1086#1101#1092'-'#1085#1090
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemDevicesColumnsMeasureGroup: TMenuItem
+          Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
+          object MenuItemDevicesColumn7: TMenuItem
+            Tag = 7
+            IsChecked = True
+            Text = #1057#1080#1075#1085#1072#1083
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn8: TMenuItem
+            Tag = 8
+            IsChecked = True
+            Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn9: TMenuItem
+            Tag = 9
+            IsChecked = True
+            Text = #1054#1073#1098#1077#1084', '#1084'3
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn12: TMenuItem
+            Tag = 12
+            IsChecked = True
+            Text = #1054#1073#1098#1077#1084' '#1076#1086
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn13: TMenuItem
+            Tag = 13
+            IsChecked = True
+            Text = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn16: TMenuItem
+            Tag = 16
+            IsChecked = True
+            Text = #1047#1085#1072#1095#1077#1085#1080#1077
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemDevicesColumnsStatGroup: TMenuItem
+          Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
+          object MenuItemDevicesColumn10: TMenuItem
+            Tag = 10
+            IsChecked = True
+            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn11: TMenuItem
+            Tag = 11
+            IsChecked = True
+            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemDevicesColumnsOtherGroup: TMenuItem
+          Text = #1055#1088#1086#1095#1077#1077
+          object MenuItemDevicesColumn0: TMenuItem
+            Tag = 0
+            IsChecked = True
+            Text = #1042#1082#1083
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn14: TMenuItem
+            Tag = 14
+            IsChecked = True
+            Text = #1055#1088#1077#1087#1072#1076
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn15: TMenuItem
+            Tag = 15
+            IsChecked = True
+            Text = #1057#1090#1072#1090#1091#1089
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemDevicesColumn17: TMenuItem
+            Tag = 17
+            IsChecked = True
+            Text = 'UUID'
+            OnClick = MenuGridLayOutClick
+          end
+        end
       end
-      object MenuItemDevicesPaste: TMenuItem
-        Action = ActionDevicesPaste
-        ImageIndex = -1
+      object MenuItemDevicesAddGroup: TMenuItem
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100
+        object MenuItemDevicesAddChannel: TMenuItem
+          Action = ActionAddDeviceChannel
+          ImageIndex = -1
+        end
+        object MenuItemDevicesSelectDevice: TMenuItem
+          Action = ActionOpenDeviceSelect
+          ImageIndex = -1
+        end
+        object MenuItemDevicesFromArchive: TMenuItem
+          Action = ActionDevicesFromArchive
+          ImageIndex = -1
+        end
       end
-      object MenuItemDevicesSep1: TMenuItem
-        Text = '-'
+      object MenuItemDevicesEditGroup: TMenuItem
+        Text = #1048#1079#1084#1077#1085#1080#1090#1100
+        object MenuItemDevicesProperties: TMenuItem
+          Action = ActionMeterValueProperties
+          ImageIndex = -1
+        end
+        object MenuItemDevicesClearRow: TMenuItem
+          Action = ActionDevicesClearRow
+          ImageIndex = -1
+        end
+        object MenuItemDevicesSep1: TMenuItem
+          Text = '-'
+        end
+        object MenuItemDevicesCopy: TMenuItem
+          Action = ActionDevicesCopy
+          ImageIndex = -1
+        end
+        object MenuItemDevicesPaste: TMenuItem
+          Action = ActionDevicesPaste
+          ImageIndex = -1
+        end
+        object MenuItemDevicesFillAllBySelected: TMenuItem
+          Action = ActionDevicesFillAllBySelected
+          ImageIndex = -1
+        end
       end
-      object MenuItemDevicesClearAll: TMenuItem
-        Action = ActionDevicesClearAll
-        ImageIndex = -1
+      object MenuItemDevicesDeleteGroup: TMenuItem
+        Text = #1059#1076#1072#1083#1080#1090#1100
+        object MenuItemDevicesDeleteChannel: TMenuItem
+          Action = ActionDeleteDevice
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1087#1088#1080#1073#1086#1088' '#1080#1079' '#1089#1090#1088#1086#1082#1080
+          ImageIndex = -1
+        end
+        object MenuItemDevicesClearAll: TMenuItem
+          Action = ActionDevicesClearAll
+          ImageIndex = -1
+        end
       end
-      object MenuItemDevicesFillAllBySelected: TMenuItem
-        Action = ActionDevicesFillAllBySelected
-        ImageIndex = -1
-      end
-      object MenuItemDevicesSep2: TMenuItem
-        Text = '-'
-      end
-      object MenuItemDevicesFromArchive: TMenuItem
-        Action = ActionDevicesFromArchive
-        ImageIndex = -1
-      end
-      object MenuItemDevicesSep3: TMenuItem
-        Text = '-'
-      end
-      object MenuItemDevicesSetFlowSource: TMenuItem
-        Action = ActionDevicesSetFlowSource
-        ImageIndex = -1
-      end
-      object MenuItemDevicesAssignEtalon: TMenuItem
-        Action = ActionDevicesAssignEtalon
-        ImageIndex = -1
+      object MenuItemDevicesOtherGroup: TMenuItem
+        Text = #1055#1088#1086#1095#1077#1077
+        object MenuItemDevicesSetFlowSource: TMenuItem
+          Action = ActionDevicesSetFlowSource
+          ImageIndex = -1
+        end
+        object MenuItemDevicesAssignEtalon: TMenuItem
+          Action = ActionDevicesAssignEtalon
+          ImageIndex = -1
+        end
       end
     end
     object PopupMenuEtalonsGrid: TPopupMenu
+      OnPopup = PopupMenuEtalonsGridPopup
       Left = 1710
       Top = 405
-      object MenuItemEtalonsClearRow: TMenuItem
-        Action = ActionEtalonsClearRow
-        ImageIndex = -1
+      object MenuItemEtalonsWorkTablesGroup: TMenuItem
+        Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
+        object MenuItemEtalonsWorkTablesAddTable: TMenuItem
+          Action = ActionAddWorkTable
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesAddDeviceChannel: TMenuItem
+          Action = ActionAddDeviceChannel
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesAddEtalonChannel: TMenuItem
+          Action = ActionAddEtalonChannel
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesSaveWorkTable: TMenuItem
+          Action = ActionSaveWorkTable
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesMeterValueProperties: TMenuItem
+          Action = ActionMeterValueProperties
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesOpenDeviceSelect: TMenuItem
+          Action = ActionOpenDeviceSelect
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesDeleteDevice: TMenuItem
+          Action = ActionDeleteDevice
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1082#1072#1085#1072#1083
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesDeleteEtalons: TMenuItem
+          Action = ActionDeleteEtalons
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1101#1090#1072#1083#1086#1085
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesAddPump: TMenuItem
+          Action = ActionPumpAdd
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesDeletePump: TMenuItem
+          Action = ActionPumpDelete
+          ImageIndex = -1
+        end
       end
-      object MenuItemEtalonsCopy: TMenuItem
-        Action = ActionEtalonsCopy
-        ImageIndex = -1
+      object MenuItemEtalonsColumnsGroup: TMenuItem
+        Text = #1050#1086#1083#1086#1085#1082#1080
+        object MenuItemEtalonsColumnsChannelGroup: TMenuItem
+          Text = #1050#1072#1085#1072#1083
+          object MenuItemEtalonsColumn1: TMenuItem
+            Tag = 1
+            IsChecked = True
+            Text = #1050#1072#1085#1072#1083
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn5: TMenuItem
+            Tag = 5
+            IsChecked = True
+            Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemEtalonsColumnsDeviceGroup: TMenuItem
+          Text = #1055#1088#1080#1073#1086#1088
+          object MenuItemEtalonsColumn2: TMenuItem
+            Tag = 2
+            IsChecked = True
+            Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn3: TMenuItem
+            Tag = 3
+            IsChecked = True
+            Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn4: TMenuItem
+            Tag = 4
+            IsChecked = True
+            Text = #1055#1088#1080#1073#1086#1088
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn9: TMenuItem
+            Tag = 9
+            IsChecked = True
+            Text = #1057#1077#1088#1080#1081#1085#1099#1081' '
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemEtalonsColumnsMeasureGroup: TMenuItem
+          Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
+          object MenuItemEtalonsColumn6: TMenuItem
+            Tag = 6
+            IsChecked = True
+            Text = #1057#1080#1075#1085#1072#1083
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn7: TMenuItem
+            Tag = 7
+            IsChecked = True
+            Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn8: TMenuItem
+            Tag = 8
+            IsChecked = True
+            Text = #1054#1073#1098#1077#1084', '#1084'3
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn14: TMenuItem
+            Tag = 14
+            IsChecked = True
+            Text = #1047#1085#1072#1095#1077#1085#1080#1077
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemEtalonsColumnsStatGroup: TMenuItem
+          Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
+          object MenuItemEtalonsColumn10: TMenuItem
+            Tag = 10
+            IsChecked = True
+            Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn11: TMenuItem
+            Tag = 11
+            IsChecked = True
+            Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
+            OnClick = MenuGridLayOutClick
+          end
+        end
+        object MenuItemEtalonsColumnsOtherGroup: TMenuItem
+          Text = #1055#1088#1086#1095#1077#1077
+          object MenuItemEtalonsColumn0: TMenuItem
+            Tag = 0
+            IsChecked = True
+            Text = #1042#1082#1083
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn12: TMenuItem
+            Tag = 12
+            IsChecked = True
+            Text = #1055#1077#1088#1077#1087#1072#1076
+            OnClick = MenuGridLayOutClick
+          end
+          object MenuItemEtalonsColumn13: TMenuItem
+            Tag = 13
+            IsChecked = True
+            Text = #1057#1090#1072#1090#1091#1089
+            OnClick = MenuGridLayOutClick
+          end
+        end
       end
-      object MenuItemEtalonsPaste: TMenuItem
-        Action = ActionEtalonsPaste
-        ImageIndex = -1
+      object MenuItemEtalonsAddGroup: TMenuItem
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100
+        object MenuItemEtalonsAddChannel: TMenuItem
+          Action = ActionAddEtalonChannel
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsFromArchive: TMenuItem
+          Action = ActionEtalonsFromArchive
+          ImageIndex = -1
+        end
       end
-      object MenuItemEtalonsSep1: TMenuItem
-        Text = '-'
+      object MenuItemEtalonsEditGroup: TMenuItem
+        Text = #1048#1079#1084#1077#1085#1080#1090#1100
+        object MenuItemEtalonsClearRow: TMenuItem
+          Action = ActionEtalonsClearRow
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsSep1: TMenuItem
+          Text = '-'
+        end
+        object MenuItemEtalonsCopy: TMenuItem
+          Action = ActionEtalonsCopy
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsPaste: TMenuItem
+          Action = ActionEtalonsPaste
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsFillAllBySelected: TMenuItem
+          Action = ActionEtalonsFillAllBySelected
+          ImageIndex = -1
+        end
       end
-      object MenuItemEtalonsClearAll: TMenuItem
-        Action = ActionEtalonsClearAll
-        ImageIndex = -1
+      object MenuItemEtalonsDeleteGroup: TMenuItem
+        Text = #1059#1076#1072#1083#1080#1090#1100
+        object MenuItemEtalonsDeleteChannel: TMenuItem
+          Action = ActionDeleteEtalons
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1101#1090#1072#1083#1086#1085' '#1080#1079' '#1089#1090#1088#1086#1082#1080
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsClearAll: TMenuItem
+          Action = ActionEtalonsClearAll
+          ImageIndex = -1
+        end
       end
-      object MenuItemEtalonsFillAllBySelected: TMenuItem
-        Action = ActionEtalonsFillAllBySelected
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsSep2: TMenuItem
-        Text = '-'
-      end
-      object MenuItemEtalonsFromArchive: TMenuItem
-        Action = ActionEtalonsFromArchive
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsSep3: TMenuItem
-        Text = '-'
-      end
-      object MenuItemEtalonsSetFlowSource: TMenuItem
-        Action = ActionEtalonsSetFlowSource
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsAssignEtalon: TMenuItem
-        Action = ActionEtalonsAssignEtalon
-        ImageIndex = -1
+      object MenuItemEtalonsOtherGroup: TMenuItem
+        Text = #1055#1088#1086#1095#1077#1077
+        object MenuItemEtalonsSetFlowSource: TMenuItem
+          Action = ActionEtalonsSetFlowSource
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsAssignEtalon: TMenuItem
+          Action = ActionEtalonsAssignEtalon
+          ImageIndex = -1
+        end
       end
     end
     object LayoutCenter: TLayout
@@ -5093,7 +5458,6 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBar1: TToolBar
-            PopupMenu = PopupMenuDevicesGridLayOut
             Size.Width = 1057.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
@@ -5101,17 +5465,11 @@ object FrameMainTable: TFrameMainTable
             object Label23: TLabel
               Align = Left
               HitTest = True
-              PopupMenu = PopupMenuWorkTables
               Size.Width = 100.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
               TabOrder = 0
-            end
-            object PopupMenuDevicesGridLayOut: TPopupMenu
-              OnPopup = PopupMenuDevicesGridLayOutPopup
-              Left = 1610
-              Top = 461
             end
             object SpeedButton1: TSpeedButton
               Action = ActionDevicesFillAllBySelected
@@ -5311,14 +5669,12 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBarEtalons1: TToolBar
-            PopupMenu = PopupMenuEtalonsGridLayOut
             Size.Width = 1057.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Label30: TLabel
               HitTest = True
-              PopupMenu = PopupMenuWorkTables
               Position.X = 1.000000000000000000
               Position.Y = 8.000000000000000000
               Size.Width = 100.000000000000000000
