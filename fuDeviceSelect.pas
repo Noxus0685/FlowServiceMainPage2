@@ -2627,8 +2627,6 @@ begin
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
-var
-  SelectionContext: TDeviceSelectionContext;
 begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
@@ -2658,12 +2656,6 @@ begin
     BuildTree;
     ApplyFilter;
     UpdateGridDevices;
-    SelectionContext := AppServices.DataManager.BuildDeviceSelectionContext(
-      ActiveRepo,
-      ''
-    );
-    if SelectionContext.DeviceFound then
-      AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
     ApplyInitialSelection;
   end;
 end;
