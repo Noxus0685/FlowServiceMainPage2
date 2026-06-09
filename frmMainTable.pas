@@ -621,8 +621,6 @@ type
     function ActiveWorkTableHasDeviceUUID(const AUUID: string): Boolean;
     function NewUniqueDeviceChannelUUID: string;
     procedure EnsureDeviceChannelUUIDs;
-    procedure EnsureEmptyDevicesForGridRows;
-    procedure ClearDeviceRowByMenu(ARow: Integer);
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
 
     procedure UpdateUIFromValues;
@@ -3711,6 +3709,11 @@ begin
     AChannel.FlowMeter.Device := nil;
     AChannel.FlowMeter.DeviceUUID := '';
   end;
+
+  if WorkTable = FActiveWorkTable then
+    AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
+  else
+    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
 
   if WorkTable = FActiveWorkTable then
     AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
