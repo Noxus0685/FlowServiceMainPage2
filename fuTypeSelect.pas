@@ -2060,6 +2060,13 @@ begin
   {----------------------------------}
   AppServices.DataManager.RemoveRepository(Repo.Name);
 
+  TreeViewTypes.BeginUpdate;
+  try
+    TreeViewTypes.Clear;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
+
   {----------------------------------}
   { Обновление UI }
   {----------------------------------}
