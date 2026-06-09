@@ -1132,7 +1132,7 @@ begin
     Exit;
 
   if Trim(Self.DeviceUUID) = '' then
-    Self.DeviceUUID := TGUID.NewGuid.ToString;
+    Exit;
 
   ADevice := TDeviceCreationService.CreateDevice(
     ActiveRepo,

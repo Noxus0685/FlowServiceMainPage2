@@ -3045,6 +3045,7 @@ begin
 
   if ADevice = nil then
   begin
+    DeviceSelectResult := mrCancel;
     SelectFrm := TFormDeviceSelect.Create(Self);
     try
       DeviceSelectResult := SelectFrm.ShowModal;
