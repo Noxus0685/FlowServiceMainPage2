@@ -724,6 +724,7 @@ type
     procedure UpdateUIConditions;
     function   GetMeasurementRun: TMeasurementRun;
     procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
+    procedure ClearDeviceRowByMenu(ARow: Integer);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -3590,10 +3591,6 @@ begin
   end;
 end;
 
-procedure TFrameMainTable.EnsureEmptyDevicesForGridRows;
-begin
-  EnsureDeviceChannelUUIDs;
-end;
 
 procedure TFrameMainTable.ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable);
 var
@@ -3624,17 +3621,17 @@ begin
     AChannel.FlowMeter.DeviceUUID := '';
   end;
 
-  if WorkTable = FActiveWorkTable then
+  if aWorkTable = FActiveWorkTable then
     AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
   else
     AChannel.DeviceUUID := TGUID.NewGuid.ToString;
 
-  if WorkTable = FActiveWorkTable then
+  if aWorkTable = FActiveWorkTable then
     AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
   else
     AChannel.DeviceUUID := TGUID.NewGuid.ToString;
 
-  if WorkTable = FActiveWorkTable then
+  if aWorkTable = FActiveWorkTable then
     AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
   else
     AChannel.DeviceUUID := TGUID.NewGuid.ToString;
@@ -3840,23 +3837,7 @@ begin
   ClearChannelData(Channel);
 end;
 
-procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
-var
-  Channel: TChannel;
-begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
-    Exit;
 
-  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
-    Exit;
-
-  Channel := FActiveWorkTable.DeviceChannels[ARow];
-  if Channel = nil then
-    Exit;
-
-  ClearChannelData(Channel);
-  Channel.DeviceUUID := NewUniqueDeviceChannelUUID;
-end;
 
 procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
 begin
