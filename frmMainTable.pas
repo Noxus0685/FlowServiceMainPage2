@@ -3676,10 +3676,14 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.EnsureEmptyDevicesForGridRows;
+begin
+  EnsureDeviceChannelUUIDs;
+end;
+
 procedure TFrameMainTable.ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable);
 var
   Device: TDevice;
-  WorkTable: TWorkTable;
 begin
   if AChannel = nil then
     Exit;
@@ -3690,10 +3694,6 @@ begin
 
   if FFrameProceed <> nil then
     FFrameProceed.RemoveProcessingDevice(Device);
-
-  WorkTable := AWorkTable;
-  if WorkTable = nil then
-    WorkTable := FActiveWorkTable;
 
   AChannel.TypeName := '';
   AChannel.Serial := '';
@@ -3715,13 +3715,15 @@ begin
   else
     AChannel.DeviceUUID := TGUID.NewGuid.ToString;
 
-  if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-    TDeviceCreationService.EnsureDeviceForChannel(
-      AChannel,
-      WorkTable,
-      DataManager.ActiveDeviceRepo,
-      dcmGridPlaceholder
-    );
+  if WorkTable = FActiveWorkTable then
+    AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
+  else
+    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
+
+  if WorkTable = FActiveWorkTable then
+    AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
+  else
+    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
 
   MarkChannelDeviceModified(AChannel);
 end;
@@ -3907,14 +3909,44 @@ begin
   end;
 end;
 
+procedure TFrameMainTable.ClearDeviceRowByMenu(ARow: Integer);
+var
+  Channel: TChannel;
+begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
+    Exit;
+
+  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+    Exit;
+
+  Channel := FActiveWorkTable.DeviceChannels[ARow];
+  if Channel = nil then
+    Exit;
+
+  ClearChannelData(Channel);
+end;
+
 procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
 var
-  Ch: TChannel;
+  Channel: TChannel;
 begin
-  if FActiveWorkTable = nil then
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) then
     Exit;
-  Ch := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
-  ClearChannelData(Ch);
+
+  if (ARow < 0) or (ARow >= FActiveWorkTable.DeviceChannels.Count) then
+    Exit;
+
+  Channel := FActiveWorkTable.DeviceChannels[ARow];
+  if Channel = nil then
+    Exit;
+
+  ClearChannelData(Channel);
+  Channel.DeviceUUID := NewUniqueDeviceChannelUUID;
+end;
+
+procedure TFrameMainTable.ActionDevicesClearRowExecute(Sender: TObject);
+begin
+  ClearDeviceRowByMenu(GridDevices.Row);
   UpdateGrids;
 end;
 
