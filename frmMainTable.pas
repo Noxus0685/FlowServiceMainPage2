@@ -2761,8 +2761,6 @@ begin
   end;
 
   EnsureDeviceChannelUUIDs;
-  EnsureEmptyDevicesForGridRows;
-  EnsureDeviceChannelUUIDs;
 
   if FActiveWorkTable <> nil then
   begin
@@ -3061,6 +3059,7 @@ begin
         Exit;
 
       RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
+      EnsureDeviceChannelUUIDs;
 
       SelDevice := SelectFrm.GetSelectedDevice;
       if SelDevice = nil then
@@ -3235,6 +3234,7 @@ begin
       Exit;
 
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
+    EnsureDeviceChannelUUIDs;
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
@@ -3679,52 +3679,13 @@ begin
 end;
 
 procedure TFrameMainTable.EnsureEmptyDevicesForGridRows;
-var
-  I: Integer;
-  Channel: TChannel;
-  Device: TDevice;
-  Repo: TDeviceRepository;
-  DeviceUUID: string;
 begin
-  if (FActiveWorkTable = nil) or (FActiveWorkTable.DeviceChannels = nil) or
-     (DataManager = nil) or (DataManager.ActiveDeviceRepo = nil) then
-    Exit;
-
-  for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
-  begin
-    Channel := FActiveWorkTable.DeviceChannels[I];
-    if Channel = nil then
-      Continue;
-
-    DeviceUUID := Trim(Channel.DeviceUUID);
-    Device := nil;
-    Repo := nil;
-    if DeviceUUID <> '' then
-      Device := DataManager.FindDevice(DeviceUUID, Repo);
-
-    if (DeviceUUID <> '') and (Device = nil) then
-    begin
-      Channel.DeviceUUID := '';
-      if Channel.FlowMeter <> nil then
-        Channel.FlowMeter.Device := nil;
-    end;
-
-    if Trim(Channel.DeviceUUID) = '' then
-      Channel.DeviceUUID := NewUniqueDeviceChannelUUID;
-
-    TDeviceCreationService.EnsureDeviceForChannel(
-      Channel,
-      FActiveWorkTable,
-      DataManager.ActiveDeviceRepo,
-      dcmGridPlaceholder
-    );
-  end;
+  EnsureDeviceChannelUUIDs;
 end;
 
 procedure TFrameMainTable.ClearChannelData(AChannel: TChannel; AWorkTable: TWorkTable);
 var
   Device: TDevice;
-  WorkTable: TWorkTable;
 begin
   if AChannel = nil then
     Exit;
@@ -3735,10 +3696,6 @@ begin
 
   if FFrameProceed <> nil then
     FFrameProceed.RemoveProcessingDevice(Device);
-
-  WorkTable := AWorkTable;
-  if WorkTable = nil then
-    WorkTable := FActiveWorkTable;
 
   AChannel.TypeName := '';
   AChannel.Serial := '';
@@ -3751,14 +3708,6 @@ begin
   AChannel.DeviceUUID := '';
   if AChannel.FlowMeter <> nil then
     AChannel.FlowMeter.Device := nil;
-
-  if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
-    TDeviceCreationService.EnsureDeviceForChannel(
-      AChannel,
-      WorkTable,
-      DataManager.ActiveDeviceRepo,
-      dcmGridPlaceholder
-    );
 
   MarkChannelDeviceModified(AChannel);
 end;
