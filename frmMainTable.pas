@@ -272,30 +272,38 @@ type
     StringColumnDeviceQuantityBefore1: TStringColumn;
     StringColumnDeviceQuantityAfter1: TStringColumn;
     StringColumnDevicePressureDelta1: TStringColumn;
-    PopupMenuEtalonsGridLayOut: TPopupMenu;
-    PopupMenuDevicesGridLayOut: TPopupMenu;
     PopupMenuDevicesGrid: TPopupMenu;
+    MenuItemDevicesAddGroup: TMenuItem;
+    MenuItemDevicesAddChannel: TMenuItem;
+    MenuItemDevicesSelectDevice: TMenuItem;
+    MenuItemDevicesFromArchive: TMenuItem;
+    MenuItemDevicesEditGroup: TMenuItem;
+    MenuItemDevicesProperties: TMenuItem;
     MenuItemDevicesClearRow: TMenuItem;
     MenuItemDevicesCopy: TMenuItem;
     MenuItemDevicesPaste: TMenuItem;
     MenuItemDevicesSep1: TMenuItem;
     MenuItemDevicesClearAll: TMenuItem;
     MenuItemDevicesFillAllBySelected: TMenuItem;
-    MenuItemDevicesSep2: TMenuItem;
-    MenuItemDevicesFromArchive: TMenuItem;
-    MenuItemDevicesSep3: TMenuItem;
+    MenuItemDevicesDeleteGroup: TMenuItem;
+    MenuItemDevicesDeleteChannel: TMenuItem;
+    MenuItemDevicesOtherGroup: TMenuItem;
     MenuItemDevicesSetFlowSource: TMenuItem;
     MenuItemDevicesAssignEtalon: TMenuItem;
     PopupMenuEtalonsGrid: TPopupMenu;
+    MenuItemEtalonsAddGroup: TMenuItem;
+    MenuItemEtalonsAddChannel: TMenuItem;
+    MenuItemEtalonsFromArchive: TMenuItem;
+    MenuItemEtalonsEditGroup: TMenuItem;
     MenuItemEtalonsClearRow: TMenuItem;
     MenuItemEtalonsCopy: TMenuItem;
     MenuItemEtalonsPaste: TMenuItem;
     MenuItemEtalonsSep1: TMenuItem;
     MenuItemEtalonsClearAll: TMenuItem;
     MenuItemEtalonsFillAllBySelected: TMenuItem;
-    MenuItemEtalonsSep2: TMenuItem;
-    MenuItemEtalonsFromArchive: TMenuItem;
-    MenuItemEtalonsSep3: TMenuItem;
+    MenuItemEtalonsDeleteGroup: TMenuItem;
+    MenuItemEtalonsDeleteChannel: TMenuItem;
+    MenuItemEtalonsOtherGroup: TMenuItem;
     MenuItemEtalonsSetFlowSource: TMenuItem;
     MenuItemEtalonsAssignEtalon: TMenuItem;
     StringColumnDeviceOptions1: TStringColumn;
@@ -423,8 +431,8 @@ type
     procedure PopupMenuInstrumentalLayOutPopup(Sender: TObject);
     procedure PopupMenuWorkTablesPopup(Sender: TObject);
     procedure MenuInstrumentalLayOutClick(Sender: TObject);
-    procedure PopupMenuDevicesGridLayOutPopup(Sender: TObject);
-    procedure PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
+    procedure PopupMenuDevicesGridPopup(Sender: TObject);
+    procedure PopupMenuEtalonsGridPopup(Sender: TObject);
     procedure MenuGridLayOutClick(Sender: TObject);
     procedure PopupMenuGridDataPointsPopup(Sender: TObject);
     procedure PopupMenuGridResultsPopup(Sender: TObject);
@@ -551,11 +559,7 @@ type
     procedure FillDNItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
     function ApplyChannelDNChange(AChannel: TChannel; const ANewDN: string): Boolean;
     procedure ApplyActiveWorkTableEditMode;
-    procedure FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
-    procedure FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
-    procedure FillGridDevicesActionsPopup(AMenu: TPopupMenu);
-    function IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
-    procedure GridDevicesActionsMenuClick(Sender: TObject);
+    procedure UpdateGridPopupActions;
     procedure CaptureGridColumnsLayout(AGrid: TGrid; out AColumns: TArray<TGridColumnLayout>);
     procedure ApplyGridColumnsLayout(AGrid: TGrid; const AColumns: TArray<TGridColumnLayout>);
     procedure EnforceDataPointsColumnsLayout;
@@ -2065,152 +2069,6 @@ end;
 
 
 
-procedure TFrameMainTable.FillGridLayOutPopup(AMenu: TPopupMenu; AGrid: TGrid);
-var
-  I: Integer;
-  MenuItem: TMenuItem;
-  GroupItem: TMenuItem;
-  Column: TColumn;
-  GroupItems: array[1..5] of TMenuItem;
-
-  function GetGroupNameByTag(const ATag: Integer): string;
-  begin
-    case ATag of
-      1: Result := 'Канал';
-      2: Result := 'Прибор';
-      3: Result := 'Измерение';
-      4: Result := 'Статистика';
-      5: Result := 'Прочее';
-    else
-      Result := '';
-    end;
-  end;
-
-  function EnsureGroupItem(const ATag: Integer): TMenuItem;
-  begin
-    Result := nil;
-    if (ATag < Low(GroupItems)) or (ATag > High(GroupItems)) then
-      Exit;
-
-    if GroupItems[ATag] = nil then
-    begin
-      GroupItems[ATag] := TMenuItem.Create(AMenu);
-      GroupItems[ATag].Parent := AMenu;
-      GroupItems[ATag].Text := GetGroupNameByTag(ATag);
-    end;
-
-    Result := GroupItems[ATag];
-  end;
-begin
-  if (AMenu = nil) or (AGrid = nil) then
-    Exit;
-
-  AMenu.Clear;
-  for I := Low(GroupItems) to High(GroupItems) do
-    GroupItems[I] := nil;
-
-  for I := 0 to AGrid.ColumnCount - 1 do
-  begin
-    Column := AGrid.Columns[I];
-
-    MenuItem := TMenuItem.Create(AMenu);
-    GroupItem := EnsureGroupItem(Column.Tag);
-    if GroupItem <> nil then
-      MenuItem.Parent := GroupItem
-    else
-      MenuItem.Parent := AMenu;
-    MenuItem.Text := Column.Header;
-    MenuItem.IsChecked := Column.Visible;
-    MenuItem.TagObject := Column;
-    MenuItem.OnClick := MenuGridLayOutClick;
-  end;
-end;
-
-procedure TFrameMainTable.FillGridColumnsSubMenu(AMenuItem: TMenuItem; AGrid: TGrid);
-var
-  I: Integer;
-  MenuItem: TMenuItem;
-  Column: TColumn;
-begin
-  if (AMenuItem = nil) or (AGrid = nil) then
-    Exit;
-
-  AMenuItem.Clear;
-
-  for I := 0 to AGrid.ColumnCount - 1 do
-  begin
-    Column := AGrid.Columns[I];
-
-    if (FFrameProceed <> nil) and (AGrid = FFrameProceed.GridDataPoints) and (Column = FFrameProceed.StringColumnSpillageNum) then
-      Continue;
-
-    MenuItem := TMenuItem.Create(AMenuItem);
-    MenuItem.Parent := AMenuItem;
-    MenuItem.Text := Column.Header;
-    MenuItem.IsChecked := Column.Visible;
-    MenuItem.TagObject := Column;
-    MenuItem.OnClick := MenuGridLayOutClick;
-  end;
-end;
-
-function TFrameMainTable.IsHeaderPopup(AMenu: TPopupMenu; AGrid: TGrid): Boolean;
-var
-  PopupPoint: TPointF;
-begin
-  Result := True;
-  if (AMenu = nil) or (AGrid = nil) then
-    Exit;
-
-  // Если меню вызвано не из грида (например, с тулбара), показываем меню колонок.
-  if AMenu.PopupComponent <> AGrid then
-    Exit;
-
-  PopupPoint := AMenu.PopupPoint;
-  Result := PopupPoint.Y <= 20;
-end;
-
-procedure TFrameMainTable.FillGridDevicesActionsPopup(AMenu: TPopupMenu);
-
-  procedure AddItem(const AText: string; const AEnabled: Boolean = True);
-  var
-    MenuItem: TMenuItem;
-  begin
-    MenuItem := TMenuItem.Create(AMenu);
-    MenuItem.Parent := AMenu;
-    MenuItem.Text := AText;
-    MenuItem.Enabled := AEnabled;
-    MenuItem.OnClick := GridDevicesActionsMenuClick;
-  end;
-
-  procedure AddSeparator;
-  begin
-    AddItem('-');
-  end;
-
-begin
-  if AMenu = nil then
-    Exit;
-
-  AMenu.Clear;
-
-  AddItem('Очистить строку');
-  AddItem('Копировать');
-  AddItem('Вставить');
-  AddSeparator;
-  AddItem('Очистить все приборы');
-  AddItem('Заполнить все по выбранному');
-  AddSeparator;
-  AddItem('Прибор из архива');
-  AddSeparator;
-  AddItem('Установить источник расхода');
-  AddItem('Назначить эталоном');
-end;
-
-procedure TFrameMainTable.GridDevicesActionsMenuClick(Sender: TObject);
-begin
-  // Здесь будут обработчики действий с приборами.
-end;
-
 procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
 var
   CanEdit: Boolean;
@@ -2234,32 +2092,77 @@ begin
     ActionSaveWorkTable.Enabled := CanEdit;
 end;
 
-procedure TFrameMainTable.PopupMenuDevicesGridLayOutPopup(Sender: TObject);
+procedure TFrameMainTable.UpdateGridPopupActions;
+var
+  CanEdit: Boolean;
+  HasDeviceRow: Boolean;
+  HasEtalonRow: Boolean;
 begin
-  if not CanEditActiveWorkTable then
-  begin
-    PopupMenuDevicesGridLayOut.Clear;
-    Exit;
-  end;
+  CanEdit := CanEditActiveWorkTable;
+  HasDeviceRow := CanEdit and (FActiveWorkTable <> nil) and (GridDevices <> nil) and
+    (GridDevices.Row >= 0) and (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count);
+  HasEtalonRow := CanEdit and (FActiveWorkTable <> nil) and (GridEtalons <> nil) and
+    (GridEtalons.Row >= 0) and (GridEtalons.Row < FActiveWorkTable.EtalonChannels.Count);
 
-  if IsHeaderPopup(PopupMenuDevicesGridLayOut, GridDevices) then
-    FillGridLayOutPopup(PopupMenuDevicesGridLayOut, GridDevices)
-  else
-    FillGridDevicesActionsPopup(PopupMenuDevicesGridLayOut);
+  if ActionAddDeviceChannel <> nil then
+    ActionAddDeviceChannel.Enabled := CanEdit;
+  if ActionAddEtalonChannel <> nil then
+    ActionAddEtalonChannel.Enabled := CanEdit;
+  if ActionOpenDeviceSelect <> nil then
+    ActionOpenDeviceSelect.Enabled := HasDeviceRow;
+  if ActionMeterValueProperties <> nil then
+    ActionMeterValueProperties.Enabled := HasDeviceRow;
+
+  if ActionDevicesClearRow <> nil then
+    ActionDevicesClearRow.Enabled := HasDeviceRow;
+  if ActionDevicesCopy <> nil then
+    ActionDevicesCopy.Enabled := HasDeviceRow;
+  if ActionDevicesPaste <> nil then
+    ActionDevicesPaste.Enabled := HasDeviceRow;
+  if ActionDevicesClearAll <> nil then
+    ActionDevicesClearAll.Enabled := CanEdit and (FActiveWorkTable <> nil) and
+      (FActiveWorkTable.DeviceChannels.Count > 0);
+  if ActionDevicesFillAllBySelected <> nil then
+    ActionDevicesFillAllBySelected.Enabled := HasDeviceRow;
+  if ActionDevicesFromArchive <> nil then
+    ActionDevicesFromArchive.Enabled := HasDeviceRow;
+  if ActionDevicesSetFlowSource <> nil then
+    ActionDevicesSetFlowSource.Enabled := HasDeviceRow;
+  if ActionDevicesAssignEtalon <> nil then
+    ActionDevicesAssignEtalon.Enabled := HasDeviceRow and (FActiveWorkTable <> nil) and
+      (FActiveWorkTable.EtalonChannels.Count > 0);
+  if ActionDeleteDevice <> nil then
+    ActionDeleteDevice.Enabled := HasDeviceRow;
+
+  if ActionEtalonsClearRow <> nil then
+    ActionEtalonsClearRow.Enabled := HasEtalonRow;
+  if ActionEtalonsCopy <> nil then
+    ActionEtalonsCopy.Enabled := HasEtalonRow;
+  if ActionEtalonsPaste <> nil then
+    ActionEtalonsPaste.Enabled := HasEtalonRow;
+  if ActionEtalonsClearAll <> nil then
+    ActionEtalonsClearAll.Enabled := CanEdit and (FActiveWorkTable <> nil) and
+      (FActiveWorkTable.EtalonChannels.Count > 0);
+  if ActionEtalonsFillAllBySelected <> nil then
+    ActionEtalonsFillAllBySelected.Enabled := HasEtalonRow;
+  if ActionEtalonsFromArchive <> nil then
+    ActionEtalonsFromArchive.Enabled := HasEtalonRow;
+  if ActionEtalonsSetFlowSource <> nil then
+    ActionEtalonsSetFlowSource.Enabled := HasEtalonRow;
+  if ActionEtalonsAssignEtalon <> nil then
+    ActionEtalonsAssignEtalon.Enabled := HasEtalonRow;
+  if ActionDeleteEtalons <> nil then
+    ActionDeleteEtalons.Enabled := HasEtalonRow;
 end;
 
-procedure TFrameMainTable.PopupMenuEtalonsGridLayOutPopup(Sender: TObject);
+procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
 begin
-  if not CanEditActiveWorkTable then
-  begin
-    PopupMenuEtalonsGridLayOut.Clear;
-    Exit;
-  end;
+  UpdateGridPopupActions;
+end;
 
-  if IsHeaderPopup(PopupMenuEtalonsGridLayOut, GridEtalons) then
-    FillGridLayOutPopup(PopupMenuEtalonsGridLayOut, GridEtalons)
-  else
-    FillGridDevicesActionsPopup(PopupMenuEtalonsGridLayOut);
+procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
+begin
+  UpdateGridPopupActions;
 end;
 
 procedure TFrameMainTable.MenuGridLayOutClick(Sender: TObject);
@@ -2616,16 +2519,10 @@ begin
       TabControlWorkTables.PopupMenu := nil;
 
   if Label23 <> nil then
-    if CanEdit then
-      Label23.PopupMenu := PopupMenuWorkTables
-    else
-      Label23.PopupMenu := nil;
+    Label23.PopupMenu := nil;
 
   if Label30 <> nil then
-    if CanEdit then
-      Label30.PopupMenu := PopupMenuWorkTables
-    else
-      Label30.PopupMenu := nil;
+    Label30.PopupMenu := nil;
 
   if GridDevices <> nil then
   begin
@@ -2662,16 +2559,10 @@ begin
   end;
 
   if ToolBar1 <> nil then
-    if CanEdit then
-      ToolBar1.PopupMenu := PopupMenuDevicesGridLayOut
-    else
-      ToolBar1.PopupMenu := nil;
+    ToolBar1.PopupMenu := nil;
 
   if ToolBarEtalons1 <> nil then
-    if CanEdit then
-      ToolBarEtalons1.PopupMenu := PopupMenuEtalonsGridLayOut
-    else
-      ToolBarEtalons1.PopupMenu := nil;
+    ToolBarEtalons1.PopupMenu := nil;
 end;
 
 procedure TFrameMainTable.NormalizeActiveWorkTable;

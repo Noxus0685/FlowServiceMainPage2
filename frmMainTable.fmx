@@ -4686,99 +4686,134 @@ object FrameMainTable: TFrameMainTable
         OnClick = MenuInstrumentalLayOutClick
       end
     end
-    object PopupMenuEtalonsGridLayOut: TPopupMenu
-      OnPopup = PopupMenuEtalonsGridLayOutPopup
-      Left = 1610
-      Top = 405
-    end
     object PopupMenuDevicesGrid: TPopupMenu
+      OnPopup = PopupMenuDevicesGridPopup
       Left = 1660
       Top = 405
-      object MenuItemDevicesClearRow: TMenuItem
-        Action = ActionDevicesClearRow
-        ImageIndex = -1
+      object MenuItemDevicesAddGroup: TMenuItem
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100
+        object MenuItemDevicesAddChannel: TMenuItem
+          Action = ActionAddDeviceChannel
+          ImageIndex = -1
+        end
+        object MenuItemDevicesSelectDevice: TMenuItem
+          Action = ActionOpenDeviceSelect
+          ImageIndex = -1
+        end
+        object MenuItemDevicesFromArchive: TMenuItem
+          Action = ActionDevicesFromArchive
+          ImageIndex = -1
+        end
       end
-      object MenuItemDevicesCopy: TMenuItem
-        Action = ActionDevicesCopy
-        ImageIndex = -1
+      object MenuItemDevicesEditGroup: TMenuItem
+        Text = #1048#1079#1084#1077#1085#1080#1090#1100
+        object MenuItemDevicesProperties: TMenuItem
+          Action = ActionMeterValueProperties
+          ImageIndex = -1
+        end
+        object MenuItemDevicesClearRow: TMenuItem
+          Action = ActionDevicesClearRow
+          ImageIndex = -1
+        end
+        object MenuItemDevicesSep1: TMenuItem
+          Text = '-'
+        end
+        object MenuItemDevicesCopy: TMenuItem
+          Action = ActionDevicesCopy
+          ImageIndex = -1
+        end
+        object MenuItemDevicesPaste: TMenuItem
+          Action = ActionDevicesPaste
+          ImageIndex = -1
+        end
+        object MenuItemDevicesFillAllBySelected: TMenuItem
+          Action = ActionDevicesFillAllBySelected
+          ImageIndex = -1
+        end
       end
-      object MenuItemDevicesPaste: TMenuItem
-        Action = ActionDevicesPaste
-        ImageIndex = -1
+      object MenuItemDevicesDeleteGroup: TMenuItem
+        Text = #1059#1076#1072#1083#1080#1090#1100
+        object MenuItemDevicesDeleteChannel: TMenuItem
+          Action = ActionDeleteDevice
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1087#1088#1080#1073#1086#1088' '#1080#1079' '#1089#1090#1088#1086#1082#1080
+          ImageIndex = -1
+        end
+        object MenuItemDevicesClearAll: TMenuItem
+          Action = ActionDevicesClearAll
+          ImageIndex = -1
+        end
       end
-      object MenuItemDevicesSep1: TMenuItem
-        Text = '-'
-      end
-      object MenuItemDevicesClearAll: TMenuItem
-        Action = ActionDevicesClearAll
-        ImageIndex = -1
-      end
-      object MenuItemDevicesFillAllBySelected: TMenuItem
-        Action = ActionDevicesFillAllBySelected
-        ImageIndex = -1
-      end
-      object MenuItemDevicesSep2: TMenuItem
-        Text = '-'
-      end
-      object MenuItemDevicesFromArchive: TMenuItem
-        Action = ActionDevicesFromArchive
-        ImageIndex = -1
-      end
-      object MenuItemDevicesSep3: TMenuItem
-        Text = '-'
-      end
-      object MenuItemDevicesSetFlowSource: TMenuItem
-        Action = ActionDevicesSetFlowSource
-        ImageIndex = -1
-      end
-      object MenuItemDevicesAssignEtalon: TMenuItem
-        Action = ActionDevicesAssignEtalon
-        ImageIndex = -1
+      object MenuItemDevicesOtherGroup: TMenuItem
+        Text = #1055#1088#1086#1095#1077#1077
+        object MenuItemDevicesSetFlowSource: TMenuItem
+          Action = ActionDevicesSetFlowSource
+          ImageIndex = -1
+        end
+        object MenuItemDevicesAssignEtalon: TMenuItem
+          Action = ActionDevicesAssignEtalon
+          ImageIndex = -1
+        end
       end
     end
     object PopupMenuEtalonsGrid: TPopupMenu
+      OnPopup = PopupMenuEtalonsGridPopup
       Left = 1710
       Top = 405
-      object MenuItemEtalonsClearRow: TMenuItem
-        Action = ActionEtalonsClearRow
-        ImageIndex = -1
+      object MenuItemEtalonsAddGroup: TMenuItem
+        Text = #1044#1086#1073#1072#1074#1080#1090#1100
+        object MenuItemEtalonsAddChannel: TMenuItem
+          Action = ActionAddEtalonChannel
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsFromArchive: TMenuItem
+          Action = ActionEtalonsFromArchive
+          ImageIndex = -1
+        end
       end
-      object MenuItemEtalonsCopy: TMenuItem
-        Action = ActionEtalonsCopy
-        ImageIndex = -1
+      object MenuItemEtalonsEditGroup: TMenuItem
+        Text = #1048#1079#1084#1077#1085#1080#1090#1100
+        object MenuItemEtalonsClearRow: TMenuItem
+          Action = ActionEtalonsClearRow
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsSep1: TMenuItem
+          Text = '-'
+        end
+        object MenuItemEtalonsCopy: TMenuItem
+          Action = ActionEtalonsCopy
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsPaste: TMenuItem
+          Action = ActionEtalonsPaste
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsFillAllBySelected: TMenuItem
+          Action = ActionEtalonsFillAllBySelected
+          ImageIndex = -1
+        end
       end
-      object MenuItemEtalonsPaste: TMenuItem
-        Action = ActionEtalonsPaste
-        ImageIndex = -1
+      object MenuItemEtalonsDeleteGroup: TMenuItem
+        Text = #1059#1076#1072#1083#1080#1090#1100
+        object MenuItemEtalonsDeleteChannel: TMenuItem
+          Action = ActionDeleteEtalons
+          Text = #1059#1076#1072#1083#1080#1090#1100' '#1101#1090#1072#1083#1086#1085' '#1080#1079' '#1089#1090#1088#1086#1082#1080
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsClearAll: TMenuItem
+          Action = ActionEtalonsClearAll
+          ImageIndex = -1
+        end
       end
-      object MenuItemEtalonsSep1: TMenuItem
-        Text = '-'
-      end
-      object MenuItemEtalonsClearAll: TMenuItem
-        Action = ActionEtalonsClearAll
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsFillAllBySelected: TMenuItem
-        Action = ActionEtalonsFillAllBySelected
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsSep2: TMenuItem
-        Text = '-'
-      end
-      object MenuItemEtalonsFromArchive: TMenuItem
-        Action = ActionEtalonsFromArchive
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsSep3: TMenuItem
-        Text = '-'
-      end
-      object MenuItemEtalonsSetFlowSource: TMenuItem
-        Action = ActionEtalonsSetFlowSource
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsAssignEtalon: TMenuItem
-        Action = ActionEtalonsAssignEtalon
-        ImageIndex = -1
+      object MenuItemEtalonsOtherGroup: TMenuItem
+        Text = #1055#1088#1086#1095#1077#1077
+        object MenuItemEtalonsSetFlowSource: TMenuItem
+          Action = ActionEtalonsSetFlowSource
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsAssignEtalon: TMenuItem
+          Action = ActionEtalonsAssignEtalon
+          ImageIndex = -1
+        end
       end
     end
     object LayoutCenter: TLayout
@@ -5093,7 +5128,6 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBar1: TToolBar
-            PopupMenu = PopupMenuDevicesGridLayOut
             Size.Width = 1057.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
@@ -5101,17 +5135,11 @@ object FrameMainTable: TFrameMainTable
             object Label23: TLabel
               Align = Left
               HitTest = True
-              PopupMenu = PopupMenuWorkTables
               Size.Width = 100.000000000000000000
               Size.Height = 32.000000000000000000
               Size.PlatformDefault = False
               Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
               TabOrder = 0
-            end
-            object PopupMenuDevicesGridLayOut: TPopupMenu
-              OnPopup = PopupMenuDevicesGridLayOutPopup
-              Left = 1610
-              Top = 461
             end
             object SpeedButton1: TSpeedButton
               Action = ActionDevicesFillAllBySelected
@@ -5311,14 +5339,12 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBarEtalons1: TToolBar
-            PopupMenu = PopupMenuEtalonsGridLayOut
             Size.Width = 1057.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Label30: TLabel
               HitTest = True
-              PopupMenu = PopupMenuWorkTables
               Position.X = 1.000000000000000000
               Position.Y = 8.000000000000000000
               Size.Width = 100.000000000000000000
