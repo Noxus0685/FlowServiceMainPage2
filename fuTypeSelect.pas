@@ -2013,6 +2013,12 @@ begin
     DBFileName
   );
 
+  TreeViewTypes.BeginUpdate;
+  try
+    TreeViewTypes.Clear;
+  finally
+    TreeViewTypes.EndUpdate;
+  end;
 
   {----------------------------------}
   { Обновление UI }
