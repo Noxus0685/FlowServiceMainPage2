@@ -1132,7 +1132,7 @@ begin
     Exit;
 
   if Trim(Self.DeviceUUID) = '' then
-    Self.DeviceUUID := TGUID.NewGuid.ToString;
+    Exit;
 
   ADevice := TDeviceCreationService.CreateDevice(
     ActiveRepo,
@@ -1169,7 +1169,7 @@ begin
 
     FoundDevice := AppServices.DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
 
-    if FoundDevice = nil then
+    if (FoundDevice = nil) and (Trim(Self.DeviceUUID) <> '') then
       CreateDevice;
     if FoundDevice <> nil then
       Self.Device := FoundDevice;

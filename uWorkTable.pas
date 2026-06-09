@@ -914,7 +914,11 @@ begin
   if (DeviceUUID = '') and (AChannel.FlowMeter <> nil) then
     DeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
   if DeviceUUID = '' then
+  begin
+    if AMode = dcmGridPlaceholder then
+      Exit;
     DeviceUUID := TGUID.NewGuid.ToString;
+  end;
 
   Result := FindDeviceByUUID(DeviceUUID, ARepo);
   WasCreated := Result = nil;

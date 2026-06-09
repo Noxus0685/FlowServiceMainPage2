@@ -2293,22 +2293,8 @@ begin
       Break;
     end;
 
-  if FoundRow then
-    TThread.ForceQueue(nil,
-      procedure
-      begin
-        if (GridDevices <> nil) and GridDevices.Visible then
-        begin
-          GridDevices.SetFocus;
-          if not GridDevices.IsFocused then
-            TThread.ForceQueue(nil,
-              procedure
-              begin
-                if (GridDevices <> nil) and GridDevices.Visible then
-                  GridDevices.SetFocus;
-              end);
-        end;
-      end);
+  if FoundRow and (GridDevices <> nil) and GridDevices.Visible then
+    GridDevices.SetFocus;
 
 end;
 
@@ -2641,8 +2627,6 @@ begin
 end;
 
 procedure TFormDeviceSelect.FormCreate(Sender: TObject);
-var
-  SelectionContext: TDeviceSelectionContext;
 begin
   OnKeyDown := FormKeyDown;
   GridDevices.OnKeyDown := GridDevicesKeyDown;
@@ -2672,12 +2656,6 @@ begin
     BuildTree;
     ApplyFilter;
     UpdateGridDevices;
-    SelectionContext := AppServices.DataManager.BuildDeviceSelectionContext(
-      ActiveRepo,
-      ''
-    );
-    if SelectionContext.DeviceFound then
-      AppServices.DataManager.PendingSelectedDeviceUUID := SelectionContext.DeviceUUID;
     ApplyInitialSelection;
   end;
 end;
