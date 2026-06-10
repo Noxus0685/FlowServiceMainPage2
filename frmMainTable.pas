@@ -4869,6 +4869,7 @@ procedure TFrameMainTable.TestButtonClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
   Channel: TChannel;
+  Device: TDevice;
   Run: TMeasurementRun;
   NeedSaveResults: Boolean;
 begin
@@ -4880,14 +4881,17 @@ begin
   begin
     NeedSaveResults := False;
     for Channel in WorkTable.DeviceChannels do
-      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) and
-         (Channel.FlowMeter.Device <> nil) and
-         ((Channel.FlowMeter.Device.Spillages = nil) or
-          (Channel.FlowMeter.Device.Spillages.Count = 0)) then
+    begin
+      if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+        Continue;
+
+      Device := Channel.FlowMeter.Device;
+      if (Device = nil) or (Device.Spillages = nil) or (Device.Spillages.Count = 0) then
       begin
         NeedSaveResults := True;
         Break;
       end;
+    end;
 
     if NeedSaveResults then
       WorkTable.SaveMeasurementResults;
