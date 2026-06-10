@@ -217,8 +217,6 @@ type
     Layout44: TLayout;
     Label45: TLabel;
     mmoComment: TMemo;
-    layTop: TLayout;
-    GroupBox1: TGroupBox;
     lytButtons: TLayout;
     btnOK: TCornerButton;
     btnCancel: TCornerButton;
