@@ -1787,8 +1787,6 @@ begin
   end;
 end;
 
-
-
 procedure TFrameMainTable.SpinBoxFlowRateChange(Sender: TObject);
 var
 AValue:double;
@@ -2132,8 +2130,6 @@ begin
 
   SaveLayoutSettingsToWorkTable;
 end;
-
-
 
 procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
 var

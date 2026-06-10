@@ -132,7 +132,7 @@ type
     procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
     procedure WorkTableCommandHandler(AWorkTable: TWorkTable; AAction: EActionWorkTable);
     procedure WorkTableActionHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
-    procedure WorkTableStateChangedHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
+    procedure WorkTableStateChangedHandler(Sender: TWorkTable; Data: TObject);
     procedure WorkTableEventHandler(Sender: TWorkTable; AEvent: ENotifyEvent; Data: TObject);
     procedure PumpActionHandler(Sender: TPump; AEvent: ENotifyEvent; Data: TObject);
     procedure PumpStateChangedHandler(Sender: TPump; AEvent: ENotifyEvent; Data: TObject);
@@ -724,7 +724,128 @@ begin
   end;
 end;
 
+procedure TTableMainForm.WorkTableStateChangedHandler(Sender: TWorkTable; Data: TObject);
+var WorkTable: TWorkTable;
+    State: EStateWorkTable;
+begin
+      WorkTable:=Sender;
+      State:= WorkTable.State;
 
+ case State of
+
+    // ------------------------------------------------------------
+    // Начальное состояние
+    // ------------------------------------------------------------
+    swtNONE:
+     begin
+      //WorkTable.State := swtSTANDBY;
+     end;
+
+    // ------------------------------------------------------------
+    // Ожидание →
+
+    // ожидаем состояние "система подключена" - swtCONNECTED
+    // ------------------------------------------------------------
+    swtSTANDBY:
+    begin
+
+    end;
+
+    // ------------------------------------------------------------
+    // Запуск мониторинга
+    // ------------------------------------------------------------
+    swtSTARTMONITOR:
+    begin
+      //WorkTable.State := swtSTARTMONITORWAIT;
+
+    end;
+
+    // ------------------------------------------------------------
+    // Ожидание запуска мониторинга → переход в мониторинг
+    // ------------------------------------------------------------
+    swtSTARTMONITORWAIT:
+    begin
+      //WorkTable.State:= swtMONITOR;
+
+    end;
+
+    // ------------------------------------------------------------
+    // Мониторинг (наблюдение без измерения)
+    // ------------------------------------------------------------
+    swtMONITOR:
+    begin
+
+     // UpdateRandomSignals(WorkTable); // обновление показаний
+    end;
+
+    // ------------------------------------------------------------
+    // Остановка мониторинга или конфигурация
+    // → возвращаемся в подключённое состояние
+    // ------------------------------------------------------------
+    swtSTOPMONITOR,
+    swtCONFIGED:
+    begin
+     // WorkTable.State := swtCONNECTED;
+    end;
+
+    // ------------------------------------------------------------
+    // Запуск теста
+    // ------------------------------------------------------------
+    swtSTARTTEST:
+    begin
+
+      //WorkTable.State := swtSTARTWAIT;
+    end;
+
+    // ------------------------------------------------------------
+    // Ожидание старта → переход к выполнению
+    // ------------------------------------------------------------
+    swtSTARTWAIT:
+    begin
+      //WorkTable.State := swtEXECUTE;
+    end;
+
+    // ============================================================
+    // 4. Основной процесс измерения
+    // ============================================================
+    swtEXECUTE:
+    begin
+
+    end;
+
+
+    // ------------------------------------------------------------
+    // Инициация остановки теста
+    // ------------------------------------------------------------
+    swtSTOPTEST:
+    begin
+
+    end;
+
+
+    // ------------------------------------------------------------
+    // Ожидание полной остановки
+    // ------------------------------------------------------------
+    swtSTOPWAIT:
+    begin
+
+    end;
+
+
+    // ------------------------------------------------------------
+    // Тест завершён → переход к финальному считыванию
+    // ------------------------------------------------------------
+    swtCOMPLETE:
+    begin
+
+    end;
+
+
+  end;
+
+
+
+end;
 
 
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
@@ -903,7 +1024,7 @@ begin
     awtStopTest:
     begin
 
-      { WorkTable.State := swtSTOPWAIT;   }
+       WorkTable.State := swtSTOPWAIT;
 
     end;
 
@@ -912,9 +1033,6 @@ begin
       // Возникает, когда пользователь запускает обновление стола (режим TEST)
 
        WorkTable.State := swtSTARTMONITOR;
-
-
-
 
     end;
 
@@ -956,20 +1074,16 @@ end;
 
 
 
-
+  {
 procedure TTableMainForm.WorkTableStateChangedHandler(Sender: TWorkTable;
   AEvent: ENotifyEvent; Data: TObject);
 begin
   if Sender = nil then
     Exit;
 
-  if (Data is TPump) or (Data is TFlowRate) or (Data is TFluidTemp) or
-     (Data is TFluidPress) then
-    Exit;
-
   HandleWorkTableNotify(Sender, AEvent, Data);
 end;
-
+     }
 procedure TTableMainForm.WorkTableEventHandler(Sender: TWorkTable;
   AEvent: ENotifyEvent; Data: TObject);
 begin
@@ -1104,7 +1218,7 @@ begin
   begin
     case LNotifyEvent of
       notifyStateChanged:
-        WorkTableStateChangedHandler(TWorkTable(Sender), LNotifyEvent, Data);
+        WorkTableStateChangedHandler(TWorkTable(Sender),Data);
       notifyAction:
         WorkTableActionHandler(TWorkTable(Sender), LNotifyEvent, Data);
       notifyEvent:
