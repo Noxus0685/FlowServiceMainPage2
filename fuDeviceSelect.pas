@@ -2579,10 +2579,9 @@ var
   Repo: TDeviceRepository;
   Res: TModalResult;
 begin
-  Repo := AppServices.DataManager.ActiveDeviceRepo;
-
-  if ModalResult <> mrOk then
-    Exit;
+  Repo := nil;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
 
   if (Repo <> nil) and (Repo.State = osModified) then
   begin
