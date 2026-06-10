@@ -3096,7 +3096,7 @@ begin
   finally
     Frm.Free;
   end;
-
+  WorkTableManager.ActiveWorkTable.InitChannels ;
   UpdateGrids;
 
 end;
