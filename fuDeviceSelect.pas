@@ -1083,6 +1083,9 @@ end;
 
 procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
 begin
+  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+    Exit;
+
   ModalResult := mrOk;
 end;
 
