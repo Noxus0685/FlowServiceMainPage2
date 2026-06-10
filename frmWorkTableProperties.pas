@@ -62,13 +62,6 @@ type
     procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
       out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
       AOnClick: TNotifyEvent);
-    procedure AddMeterValueTab(const ATabCaption, ACaption: string; const AKind: Integer;
-      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
-      AOnClick: TNotifyEvent);
-    procedure AddMeterValueTab(const ATabCaption, ACaption: string; const AKind: Integer;
-      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
-      AOnClick: TNotifyEvent);
-    procedure AddLimitRow(AParent: TFmxObject; const AKind: Integer; out AMinEdit: TEdit; out AMaxEdit: TEdit);
     function MeterValueToText(AMeterValue: TMeterValue): string;
     function WorkTableStateToCaption(AState: EStateWorkTable): string;
     function ParameterByKind(const AKind: Integer): TParameter;
@@ -292,12 +285,12 @@ begin
   RowGrid.Align := TAlignLayout.Client;
   RowGrid.RowCollection.Clear;
   RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 24;
-  RowGrid.ColumnCollection.Add.Value := 42;
-  RowGrid.ColumnCollection.Add.Value := 9;
   RowGrid.ColumnCollection.Add.Value := 8;
+  RowGrid.ColumnCollection.Add.Value := 73;
   RowGrid.ColumnCollection.Add.Value := 9;
-  RowGrid.ColumnCollection.Add.Value := 8;
+  RowGrid.ColumnCollection.Add.Value := 10;
+  RowGrid.ColumnCollection.Add.Value := 9;
+  RowGrid.ColumnCollection.Add.Value := 10;
   RowGrid.RowCollection.Add.Value := 100;
   RowGrid.Stored := False;
 
