@@ -208,6 +208,7 @@ private
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
+  FRepositoryChangesDiscarded: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -263,6 +264,7 @@ public
   function GetSelectedDevice: TDevice;
   destructor Destroy; override;
   property DeletedDeviceUUIDs: TStringList read FDeletedDeviceUUIDs;
+  property RepositoryChangesDiscarded: Boolean read FRepositoryChangesDiscarded;
 
   end;
 
@@ -280,6 +282,7 @@ begin
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
+  FRepositoryChangesDiscarded := False;
 end;
 
 destructor TFormDeviceSelect.Destroy;
@@ -1083,6 +1086,9 @@ end;
 
 procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
 begin
+  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+    Exit;
+
   ModalResult := mrOk;
 end;
 
@@ -2576,10 +2582,9 @@ var
   Repo: TDeviceRepository;
   Res: TModalResult;
 begin
-  Repo := AppServices.DataManager.ActiveDeviceRepo;
-
-  if ModalResult <> mrOk then
-    Exit;
+  Repo := nil;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
 
   if (Repo <> nil) and (Repo.State = osModified) then
   begin
@@ -2620,6 +2625,7 @@ begin
             Action := TCloseAction.caNone;
             Exit;
           end;
+          FRepositoryChangesDiscarded := True;
           LoadData;
           BuildTree;
           ApplyFilter;

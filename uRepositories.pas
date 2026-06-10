@@ -3507,6 +3507,88 @@ begin
 end;
 
 
+procedure MarkDeviceTreeClean(ADevice: TDevice);
+var
+  Point: TDevicePoint;
+  Session: TSessionSpillage;
+  Spillage: TPointSpillage;
+begin
+  if ADevice = nil then
+    Exit;
+
+  ADevice.State := osClean;
+
+  if ADevice.Points <> nil then
+    for Point in ADevice.Points do
+      if Point <> nil then
+        Point.State := osClean;
+
+  if ADevice.Spillages <> nil then
+    for Spillage in ADevice.Spillages do
+      if Spillage <> nil then
+        Spillage.State := osClean;
+
+  if ADevice.Sessions <> nil then
+    for Session in ADevice.Sessions do
+      if Session <> nil then
+      begin
+        Session.State := osClean;
+        if Session.Spillages <> nil then
+          for Spillage in Session.Spillages do
+            if Spillage <> nil then
+              Spillage.State := osClean;
+      end;
+end;
+
+function DeviceTreeHasPendingChanges(ADevice: TDevice): Boolean;
+var
+  Point: TDevicePoint;
+  Session: TSessionSpillage;
+  Spillage: TPointSpillage;
+begin
+  Result := False;
+  if ADevice = nil then
+    Exit;
+
+  if ADevice.State in [osNew, osModified, osDeleted] then
+    Exit(True);
+
+  if ADevice.Points <> nil then
+    for Point in ADevice.Points do
+      if (Point <> nil) and (Point.State in [osNew, osModified, osDeleted]) then
+        Exit(True);
+
+  if ADevice.Spillages <> nil then
+    for Spillage in ADevice.Spillages do
+      if (Spillage <> nil) and (Spillage.State in [osNew, osModified, osDeleted]) then
+        Exit(True);
+
+  if ADevice.Sessions <> nil then
+    for Session in ADevice.Sessions do
+      if Session <> nil then
+      begin
+        if Session.State in [osNew, osModified, osDeleted] then
+          Exit(True);
+        if Session.Spillages <> nil then
+          for Spillage in Session.Spillages do
+            if (Spillage <> nil) and (Spillage.State in [osNew, osModified, osDeleted]) then
+              Exit(True);
+      end;
+end;
+
+function DeviceRepositoryHasPendingChanges(ADevices: TObjectList<TDevice>): Boolean;
+var
+  Device: TDevice;
+begin
+  Result := False;
+  if ADevices = nil then
+    Exit;
+
+  for Device in ADevices do
+    if DeviceTreeHasPendingChanges(Device) then
+      Exit(True);
+end;
+
 function TDeviceRepository.Save: Boolean;
 var
   D: TDevice;
@@ -3566,7 +3648,9 @@ begin
         FDM.Commit;
 
         if WasDeleted then
-          FDevices.Delete(I);
+          FDevices.Delete(I)
+        else
+          MarkDeviceTreeClean(D);
       except
         on E: Exception do
         begin
@@ -3597,6 +3681,7 @@ function TDeviceRepository.SaveDevice(
 var
   SaveErrors: TStringList;
   ExistingDevice: TDevice;
+  WasDeleted: Boolean;
 begin
   Result := False;
 
@@ -3633,16 +3718,29 @@ begin
         Exit(True);
     end;
 
-    if not ShouldSaveDevice(ADevice) then
+    if (ADevice.State <> osDeleted) and (not ShouldSaveDevice(ADevice)) then
+    begin
+      MarkDeviceTreeClean(ADevice);
+      if not DeviceRepositoryHasPendingChanges(FDevices) then
+        FState := osSaved;
       Exit(True);
+    end;
 
     FDM.StartTransaction;
     try
+      WasDeleted := ADevice.State = osDeleted;
+
       if (ADevice.State <> osClean) and not UpdateDevice(ADevice) then
         raise Exception.Create('Ошибка сохранения прибора');
 
       FDM.Commit;
       Result := True;
+      if WasDeleted then
+        FDevices.Remove(ADevice)
+      else
+        MarkDeviceTreeClean(ADevice);
+      if not DeviceRepositoryHasPendingChanges(FDevices) then
+        FState := osSaved;
     except
       on E: Exception do
       begin
