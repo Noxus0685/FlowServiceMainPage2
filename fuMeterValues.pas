@@ -241,8 +241,8 @@ begin
   EditValueFull.Text := MeterValue.GetStrValue;
 
   EditValue.Text := FloatToStr(MeterValue.GetDoubleValueDim);
-  EditMax.Text := MeterValue.GetStringNum(MeterValue.MaxValue);
-  EditMin.Text := MeterValue.GetStringNum(MeterValue.MinValue);
+  EditMax.Text := MeterValue.GetStrNum(MeterValue.MaxValue);
+  EditMin.Text := MeterValue.GetStrNum(MeterValue.MinValue);
   EditValueDim.Text := MeterValue.GetDimName;
 end;
 
