@@ -11,12 +11,14 @@ uses
   FMX.ListBox,
   FMX.Objects,
   FMX.StdCtrls,
+  FMX.TabControl,
   FMX.Types,
   System.Classes,
   System.SysUtils,
   System.Types,
   System.UITypes,
   uMeterValue,
+  uParameter,
   uWorkTable;
 
 type
@@ -31,6 +33,16 @@ type
     LabelWorkTableUUID: TLabel;
     LabelWorkTableState: TLabel;
     ComboEditMode: TComboBox;
+    PanelMeterValues: TPanel;
+    TabMeterValues: TTabControl;
+    EditPressureMin: TEdit;
+    EditPressureMax: TEdit;
+    EditTempertureMin: TEdit;
+    EditTempertureMax: TEdit;
+    EditFlowRateMin: TEdit;
+    EditFlowRateMax: TEdit;
+    EditQuantityMin: TEdit;
+    EditQuantityMax: TEdit;
     EditPressure: TEdit;
     EditTemperture: TEdit;
     EditFlowRate: TEdit;
@@ -44,14 +56,21 @@ type
     procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
     procedure AddLabelRow(const ACaption: string; out ALabel: TLabel);
     procedure AddComboRow(const ACaption: string; out ACombo: TComboBox);
-    procedure AddMeterValueRow(const ACaption: string; out AEdit: TEdit; out AButton: TButton;
+    procedure AddMeterValueRow(AParent: TFmxObject; const ACaption: string; const AKind: Integer;
+      out AEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
+      AOnClick: TNotifyEvent);
+    procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
+      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
       AOnClick: TNotifyEvent);
     function MeterValueToText(AMeterValue: TMeterValue): string;
     function WorkTableStateToCaption(AState: EStateWorkTable): string;
+    function ParameterByKind(const AKind: Integer): TParameter;
+    function MeterValueByKind(const AKind: Integer): TMeterValue;
     procedure RefreshValues;
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
     procedure HandleEditModeChange(Sender: TObject);
+    procedure HandleLimitExit(Sender: TObject);
     procedure NotifyRefreshIfChanged(const AChanged: Boolean);
     procedure ApplyEditState;
     procedure SelectMeterValue(AKind: Integer);
@@ -101,10 +120,27 @@ begin
   ComboEditMode.ItemIndex := 0;
   ComboEditMode.OnChange := HandleEditModeChange;
 
-  AddMeterValueRow('Давление', EditPressure, ButtonSelectPressure, ButtonSelectPressureClick);
-  AddMeterValueRow('Температура', EditTemperture, ButtonSelectTemperture, ButtonSelectTempertureClick);
-  AddMeterValueRow('Расход', EditFlowRate, ButtonSelectFlowRate, ButtonSelectFlowRateClick);
-  AddMeterValueRow('Количество жидкости', EditQuantity, ButtonSelectQuantity, ButtonSelectQuantityClick);
+  PanelMeterValues := TPanel.Create(Self);
+  PanelMeterValues.Parent := LayoutRoot;
+  PanelMeterValues.Align := TAlignLayout.Top;
+  PanelMeterValues.Height := 80;
+  PanelMeterValues.Margins.Rect := TRectF.Create(0, 8, 0, 0);
+  PanelMeterValues.Stored := False;
+
+  TabMeterValues := TTabControl.Create(Self);
+  TabMeterValues.Parent := PanelMeterValues;
+  TabMeterValues.Align := TAlignLayout.Client;
+  TabMeterValues.Stored := False;
+
+  AddMeterValuePage('Давление', 'Давление', 0, EditPressure, ButtonSelectPressure,
+    EditPressureMin, EditPressureMax, ButtonSelectPressureClick);
+  AddMeterValuePage('Температура', 'Температура', 1, EditTemperture, ButtonSelectTemperture,
+    EditTempertureMin, EditTempertureMax, ButtonSelectTempertureClick);
+  AddMeterValuePage('Расход', 'Расход', 2, EditFlowRate, ButtonSelectFlowRate,
+    EditFlowRateMin, EditFlowRateMax, ButtonSelectFlowRateClick);
+  AddMeterValuePage('Жидкость', 'Количество жидкости', 3, EditQuantity, ButtonSelectQuantity,
+    EditQuantityMin, EditQuantityMax, ButtonSelectQuantityClick);
+  TabMeterValues.TabIndex := 0;
 end;
 
 procedure TFrameWorkTableProperties.AddEditRow(const ACaption: string; out AEdit: TEdit);
@@ -226,16 +262,19 @@ begin
   RowGrid.ControlCollection.AddControl(ACombo, 1, 0);
 end;
 
-procedure TFrameWorkTableProperties.AddMeterValueRow(const ACaption: string; out AEdit: TEdit;
-  out AButton: TButton; AOnClick: TNotifyEvent);
+procedure TFrameWorkTableProperties.AddMeterValueRow(AParent: TFmxObject; const ACaption: string; const AKind: Integer;
+  out AEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
+  AOnClick: TNotifyEvent);
 var
   Item: TLayout;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
   ValueLayout: TLayout;
+  MinLabel: TLabel;
+  MaxLabel: TLabel;
 begin
   Item := TLayout.Create(Self);
-  Item.Parent := LayoutRoot;
+  Item.Parent := AParent;
   Item.Align := TAlignLayout.Top;
   Item.Height := 36;
   Item.Margins.Bottom := 4;
@@ -246,8 +285,12 @@ begin
   RowGrid.Align := TAlignLayout.Client;
   RowGrid.RowCollection.Clear;
   RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 45;
-  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.ColumnCollection.Add.Value := 24;
+  RowGrid.ColumnCollection.Add.Value := 42;
+  RowGrid.ColumnCollection.Add.Value := 9;
+  RowGrid.ColumnCollection.Add.Value := 8;
+  RowGrid.ColumnCollection.Add.Value := 9;
+  RowGrid.ColumnCollection.Add.Value := 8;
   RowGrid.RowCollection.Add.Value := 100;
   RowGrid.Stored := False;
 
@@ -263,7 +306,7 @@ begin
   ValueLayout := TLayout.Create(Self);
   ValueLayout.Parent := RowGrid;
   ValueLayout.Align := TAlignLayout.Client;
-  ValueLayout.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  ValueLayout.Margins.Rect := TRectF.Create(6, 3, 8, 3);
   ValueLayout.Stored := False;
   RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
 
@@ -279,6 +322,64 @@ begin
   AEdit.Parent := ValueLayout;
   AEdit.Align := TAlignLayout.Client;
   AEdit.ReadOnly := True;
+
+  MinLabel := TLabel.Create(Self);
+  MinLabel.Parent := RowGrid;
+  MinLabel.Align := TAlignLayout.Client;
+  MinLabel.Text := 'Мин';
+  MinLabel.TextSettings.VertAlign := TTextAlign.Center;
+  MinLabel.HitTest := False;
+  MinLabel.Margins.Rect := TRectF.Create(0, 0, 4, 0);
+  RowGrid.ControlCollection.AddControl(MinLabel, 2, 0);
+
+  AMinEdit := TEdit.Create(Self);
+  AMinEdit.Parent := RowGrid;
+  AMinEdit.Align := TAlignLayout.Client;
+  AMinEdit.Margins.Rect := TRectF.Create(0, 3, 6, 3);
+  AMinEdit.KillFocusByReturn := True;
+  AMinEdit.Tag := AKind * 2;
+  AMinEdit.OnExit := HandleLimitExit;
+  RowGrid.ControlCollection.AddControl(AMinEdit, 3, 0);
+
+  MaxLabel := TLabel.Create(Self);
+  MaxLabel.Parent := RowGrid;
+  MaxLabel.Align := TAlignLayout.Client;
+  MaxLabel.Text := 'Макс';
+  MaxLabel.TextSettings.VertAlign := TTextAlign.Center;
+  MaxLabel.HitTest := False;
+  MaxLabel.Margins.Rect := TRectF.Create(0, 0, 4, 0);
+  RowGrid.ControlCollection.AddControl(MaxLabel, 4, 0);
+
+  AMaxEdit := TEdit.Create(Self);
+  AMaxEdit.Parent := RowGrid;
+  AMaxEdit.Align := TAlignLayout.Client;
+  AMaxEdit.Margins.Rect := TRectF.Create(0, 3, 10, 3);
+  AMaxEdit.KillFocusByReturn := True;
+  AMaxEdit.Tag := AKind * 2 + 1;
+  AMaxEdit.OnExit := HandleLimitExit;
+  RowGrid.ControlCollection.AddControl(AMaxEdit, 5, 0);
+end;
+
+
+procedure TFrameWorkTableProperties.AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
+  out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
+  AOnClick: TNotifyEvent);
+var
+  TabItem: TTabItem;
+  TabLayout: TLayout;
+begin
+  TabItem := TTabItem.Create(Self);
+  TabItem.Parent := TabMeterValues;
+  TabItem.Text := ATabCaption;
+  TabItem.Stored := False;
+
+  TabLayout := TLayout.Create(Self);
+  TabLayout.Parent := TabItem;
+  TabLayout.Align := TAlignLayout.Client;
+  TabLayout.Padding.Rect := TRectF.Create(6, 8, 6, 6);
+  TabLayout.Stored := False;
+
+  AddMeterValueRow(TabLayout, ACaption, AKind, AValueEdit, AButton, AMinEdit, AMaxEdit, AOnClick);
 end;
 
 function TFrameWorkTableProperties.MeterValueToText(AMeterValue: TMeterValue): string;
@@ -312,6 +413,34 @@ begin
   end;
 end;
 
+
+function TFrameWorkTableProperties.ParameterByKind(const AKind: Integer): TParameter;
+begin
+  Result := nil;
+  if FWorkTable = nil then
+    Exit;
+
+  case AKind of
+    0: Result := FWorkTable.FluidPress;
+    1: Result := FWorkTable.FluidTemp;
+    2: Result := FWorkTable.FlowRate;
+  end;
+end;
+
+function TFrameWorkTableProperties.MeterValueByKind(const AKind: Integer): TMeterValue;
+begin
+  Result := nil;
+  if FWorkTable = nil then
+    Exit;
+
+  case AKind of
+    0: Result := FWorkTable.ValuePressure;
+    1: Result := FWorkTable.ValueTemperture;
+    2: Result := FWorkTable.ValueFlowRate;
+    3: Result := FWorkTable.ValueQuantity;
+  end;
+end;
+
 function TFrameWorkTableProperties.CanEditWorkTable: Boolean;
 begin
   Result := (FWorkTable <> nil) and (ComboEditMode.ItemIndex = 0);
@@ -339,6 +468,14 @@ begin
       EditTemperture.Text := '';
       EditFlowRate.Text := '';
       EditQuantity.Text := '';
+      EditPressureMin.Text := '';
+      EditPressureMax.Text := '';
+      EditTempertureMin.Text := '';
+      EditTempertureMax.Text := '';
+      EditFlowRateMin.Text := '';
+      EditFlowRateMax.Text := '';
+      EditQuantityMin.Text := '';
+      EditQuantityMax.Text := '';
       Exit;
     end;
 
@@ -351,6 +488,27 @@ begin
     EditTemperture.Text := MeterValueToText(FWorkTable.ValueTemperture);
     EditFlowRate.Text := MeterValueToText(FWorkTable.ValueFlowRate);
     EditQuantity.Text := MeterValueToText(FWorkTable.ValueQuantity);
+
+    if FWorkTable.FluidPress <> nil then
+    begin
+      EditPressureMin.Text := FWorkTable.ValuePressure.GetStrNum(FWorkTable.FluidPress.Min);
+      EditPressureMax.Text := FWorkTable.ValuePressure.GetStrNum(FWorkTable.FluidPress.Max);
+    end;
+    if FWorkTable.FluidTemp <> nil then
+    begin
+      EditTempertureMin.Text := FWorkTable.ValueTemperture.GetStrNum(FWorkTable.FluidTemp.Min);
+      EditTempertureMax.Text := FWorkTable.ValueTemperture.GetStrNum(FWorkTable.FluidTemp.Max);
+    end;
+    if FWorkTable.FlowRate <> nil then
+    begin
+      EditFlowRateMin.Text := FWorkTable.ValueFlowRate.GetStrNum(FWorkTable.FlowRate.Min);
+      EditFlowRateMax.Text := FWorkTable.ValueFlowRate.GetStrNum(FWorkTable.FlowRate.Max);
+    end;
+    if FWorkTable.TableFlow <> nil then
+    begin
+      EditQuantityMin.Text := FWorkTable.ValueQuantity.GetStrNum(FWorkTable.TableFlow.QuantityMin);
+      EditQuantityMax.Text := FWorkTable.ValueQuantity.GetStrNum(FWorkTable.TableFlow.QuantityMax);
+    end;
   finally
     FLoading := False;
   end;
@@ -368,6 +526,14 @@ begin
   ButtonSelectTemperture.Enabled := CanEdit;
   ButtonSelectFlowRate.Enabled := CanEdit;
   ButtonSelectQuantity.Enabled := CanEdit;
+  EditPressureMin.Enabled := CanEdit;
+  EditPressureMax.Enabled := CanEdit;
+  EditTempertureMin.Enabled := CanEdit;
+  EditTempertureMax.Enabled := CanEdit;
+  EditFlowRateMin.Enabled := CanEdit;
+  EditFlowRateMax.Enabled := CanEdit;
+  EditQuantityMin.Enabled := CanEdit;
+  EditQuantityMax.Enabled := CanEdit;
 end;
 
 procedure TFrameWorkTableProperties.HandleEditModeChange(Sender: TObject);
@@ -375,6 +541,99 @@ begin
   ApplyEditState;
   if (not FLoading) and (FWorkTable <> nil) then
     FWorkTable.FireEvent(ewtRefresh);
+end;
+
+
+procedure TFrameWorkTableProperties.HandleLimitExit(Sender: TObject);
+var
+  Edit: TEdit;
+  Kind: Integer;
+  IsMax: Boolean;
+  TextValue: string;
+  NewValue: Double;
+  BaseValue: Double;
+  FormatSettings: TFormatSettings;
+  Parameter: TParameter;
+  MeterValue: TMeterValue;
+  Changed: Boolean;
+begin
+  if FLoading or (FWorkTable = nil) or not (Sender is TEdit) then
+    Exit;
+
+  Edit := TEdit(Sender);
+  Kind := Edit.Tag div 2;
+  IsMax := (Edit.Tag mod 2) = 1;
+  TextValue := StringReplace(Trim(Edit.Text), ',', '.', [rfReplaceAll]);
+  FormatSettings := TFormatSettings.Invariant;
+  if not TryStrToFloat(TextValue, NewValue, FormatSettings) then
+  begin
+    RefreshValues;
+    Exit;
+  end;
+
+  MeterValue := MeterValueByKind(Kind);
+  if MeterValue = nil then
+    Exit;
+
+  Changed := False;
+  if Kind = 3 then
+  begin
+    if FWorkTable.TableFlow = nil then
+      Exit;
+
+    BaseValue := MeterValue.GetDoubleBaseNum(NewValue, MeterValue.CurrentDimIndex);
+    if IsMax then
+    begin
+      if BaseValue < FWorkTable.TableFlow.QuantityMin then
+      begin
+        RefreshValues;
+        Exit;
+      end;
+      Changed := FWorkTable.TableFlow.QuantityMax <> BaseValue;
+      FWorkTable.TableFlow.QuantityMax := BaseValue;
+    end
+    else
+    begin
+      if BaseValue > FWorkTable.TableFlow.QuantityMax then
+      begin
+        RefreshValues;
+        Exit;
+      end;
+      Changed := FWorkTable.TableFlow.QuantityMin <> BaseValue;
+      FWorkTable.TableFlow.QuantityMin := BaseValue;
+    end;
+  end
+  else
+  begin
+    Parameter := ParameterByKind(Kind);
+    if Parameter = nil then
+      Exit;
+
+    BaseValue := MeterValue.GetDoubleBaseNum(NewValue, MeterValue.CurrentDimIndex);
+    if IsMax then
+    begin
+      if BaseValue < Parameter.Min then
+      begin
+        RefreshValues;
+        Exit;
+      end;
+      Changed := Parameter.Max <> BaseValue;
+      Parameter.Max := BaseValue;
+    end
+    else
+    begin
+      if BaseValue > Parameter.Max then
+      begin
+        RefreshValues;
+        Exit;
+      end;
+      Changed := Parameter.Min <> BaseValue;
+      Parameter.Min := BaseValue;
+    end;
+  end;
+
+  RefreshValues;
+  NotifyRefreshIfChanged(Changed);
 end;
 
 procedure TFrameWorkTableProperties.NotifyRefreshIfChanged(const AChanged: Boolean);
