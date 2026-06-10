@@ -61,7 +61,6 @@ type
     procedure AddLimitEditRow(AParent: TFmxObject; const ACaption: string; const ATag: Integer;
       out AEdit: TEdit);
     procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
-      out AValueEdit: TEdit; out AButton: TButton; out AMinLimitEdit: TEdit; out AMaxLimitEdit: TEdit;
       AOnClick: TNotifyEvent);
     function MeterValueToText(AMeterValue: TMeterValue): string;
     function WorkTableStateToCaption(AState: EStateWorkTable): string;
@@ -133,14 +132,10 @@ begin
   TabMeterValues.Align := TAlignLayout.Client;
   TabMeterValues.Stored := False;
 
-  AddMeterValuePage('Давление', 'Давление', 0, EditPressure, ButtonSelectPressure,
-    EditPressureMin, EditPressureMax, ButtonSelectPressureClick);
-  AddMeterValuePage('Температура', 'Температура', 1, EditTemperture, ButtonSelectTemperture,
-    EditTempertureMin, EditTempertureMax, ButtonSelectTempertureClick);
-  AddMeterValuePage('Расход', 'Расход', 2, EditFlowRate, ButtonSelectFlowRate,
-    EditFlowRateMin, EditFlowRateMax, ButtonSelectFlowRateClick);
-  AddMeterValuePage('Жидкость', 'Количество жидкости', 3, EditQuantity, ButtonSelectQuantity,
-    EditQuantityMin, EditQuantityMax, ButtonSelectQuantityClick);
+  AddMeterValuePage('Давление', 'Давление', 0, ButtonSelectPressureClick);
+  AddMeterValuePage('Температура', 'Температура', 1, ButtonSelectTempertureClick);
+  AddMeterValuePage('Расход', 'Расход', 2, ButtonSelectFlowRateClick);
+  AddMeterValuePage('Жидкость', 'Количество жидкости', 3, ButtonSelectQuantityClick);
   TabMeterValues.TabIndex := 0;
 end;
 
@@ -512,6 +507,94 @@ begin
   AddMeterValueRow(TabLayout, ACaption, AValueEdit, AButton, AOnClick);
   AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, AMinLimitEdit);
   AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, AMaxLimitEdit);
+end;
+
+procedure TFrameWorkTableProperties.AddLimitEditRow(AParent: TFmxObject; const ACaption: string;
+  const ATag: Integer; out AEdit: TEdit);
+var
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
+  CaptionLabel: TLabel;
+begin
+  Item := TLayout.Create(Self);
+  Item.Parent := AParent;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  AEdit := TEdit.Create(Self);
+  AEdit.Parent := RowGrid;
+  AEdit.Align := TAlignLayout.Client;
+  AEdit.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  AEdit.KillFocusByReturn := True;
+  AEdit.Tag := ATag;
+  AEdit.OnExit := HandleLimitExit;
+  RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
+end;
+
+procedure TFrameWorkTableProperties.AddMeterValuePage(const ATabCaption, ACaption: string;
+  const AKind: Integer; AOnClick: TNotifyEvent);
+var
+  TabItem: TTabItem;
+  TabLayout: TLayout;
+begin
+  TabItem := TTabItem.Create(Self);
+  TabItem.Parent := TabMeterValues;
+  TabItem.Text := ATabCaption;
+  TabItem.Stored := False;
+
+  TabLayout := TLayout.Create(Self);
+  TabLayout.Parent := TabItem;
+  TabLayout.Align := TAlignLayout.Client;
+  TabLayout.Padding.Rect := TRectF.Create(6, 8, 6, 6);
+  TabLayout.Stored := False;
+
+  case AKind of
+    0:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditPressure, ButtonSelectPressure, AOnClick);
+        AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, EditPressureMin);
+        AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, EditPressureMax);
+      end;
+    1:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditTemperture, ButtonSelectTemperture, AOnClick);
+        AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, EditTempertureMin);
+        AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, EditTempertureMax);
+      end;
+    2:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditFlowRate, ButtonSelectFlowRate, AOnClick);
+        AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, EditFlowRateMin);
+        AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, EditFlowRateMax);
+      end;
+    3:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditQuantity, ButtonSelectQuantity, AOnClick);
+        AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, EditQuantityMin);
+        AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, EditQuantityMax);
+      end;
+  end;
 end;
 
 function TFrameWorkTableProperties.MeterValueToText(AMeterValue: TMeterValue): string;
