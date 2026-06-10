@@ -723,15 +723,16 @@ begin
 end;
 
 procedure TFlowMeter.SetDeviceUUID(const ADevice: string);
+var
+  NewUUID: string;
 begin
+  NewUUID := Trim(ADevice);
 
-  FDeviceUUID := ADevice;
+  if Assigned(FDevice) and
+     (not SameText(Trim(FDevice.UUID), NewUUID)) then
+    FDevice := nil;
 
-   if Assigned(FDevice) then
-    Exit;
-
-
-
+  FDeviceUUID := NewUUID;
 end;
 
 function TFlowMeter.GetOutputTypeProxy: Integer;
