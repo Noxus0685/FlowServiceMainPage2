@@ -3595,17 +3595,7 @@ begin
     AChannel.FlowMeter.DeviceUUID := '';
   end;
 
-  if aWorkTable = FActiveWorkTable then
-    AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
-  else
-    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
-
-  if aWorkTable = FActiveWorkTable then
-    AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
-  else
-    AChannel.DeviceUUID := TGUID.NewGuid.ToString;
-
-  if aWorkTable = FActiveWorkTable then
+  if AWorkTable = FActiveWorkTable then
     AChannel.DeviceUUID := NewUniqueDeviceChannelUUID
   else
     AChannel.DeviceUUID := TGUID.NewGuid.ToString;
