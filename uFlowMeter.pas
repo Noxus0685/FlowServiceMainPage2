@@ -1161,7 +1161,8 @@ var
   FoundRepo: TDeviceRepository;
 begin
   FoundDevice := nil;
-  Self.Device := nil;
+  FDevice := nil;
+  FDeviceUUID := '';
   Self.DeviceUUID := UUID;
 
   if AppServices.DataManager <> nil then
