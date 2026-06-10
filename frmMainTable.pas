@@ -677,7 +677,6 @@ type
     function GetLayoutOrderKey(ALayout: TLayout): string;
     function GetLayoutByOrderKey(const AKey: string): TLayout;
     function GetInstrumentalVisibleOrderAsString: string;
-    procedure UpdatePanelInstrumentsHeight;
     procedure RestoreInstrumentalLayoutsByFlags(const AFlowRateVisible, APumpVisible,
       AMainVisible, AMesureVisible, AConditionsVisible, AProceduresVisible: Boolean;
       const AOrder: string = '');
@@ -1949,7 +1948,6 @@ begin
     HorzScrollBoxInstrumental.EndUpdate;
   end;
 
-  UpdatePanelInstrumentsHeight;
 end;
 
 procedure TFrameMainTable.SetInstrumentalLayoutVisible(ALayout: TLayout;
@@ -2034,13 +2032,7 @@ begin
   end;
 end;
 
-procedure TFrameMainTable.UpdatePanelInstrumentsHeight;
-begin
-  if (FInstrumentalVisibleOrder <> nil) and (FInstrumentalVisibleOrder.Count = 0) then
-    PanelInstruments.Height := 20
-  else
-    PanelInstruments.Height := 121;
-end;
+
 
 procedure TFrameMainTable.RestoreInstrumentalLayoutsByFlags(
   const AFlowRateVisible, APumpVisible, AMainVisible, AMesureVisible,
