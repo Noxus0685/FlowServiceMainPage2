@@ -61,10 +61,7 @@ type
     procedure AddLimitEditRow(AParent: TFmxObject; const ACaption: string; const ATag: Integer;
       out AEdit: TEdit);
     procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
-      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
-      AOnClick: TNotifyEvent);
-    procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
-      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
+      out AValueEdit: TEdit; out AButton: TButton; out AMinLimitEdit: TEdit; out AMaxLimitEdit: TEdit;
       AOnClick: TNotifyEvent);
     function MeterValueToText(AMeterValue: TMeterValue): string;
     function WorkTableStateToCaption(AState: EStateWorkTable): string;
@@ -449,6 +446,72 @@ begin
   AddMeterValueRow(TabLayout, ACaption, AValueEdit, AButton, AOnClick);
   AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, AMinEdit);
   AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, AMaxEdit);
+end;
+
+procedure TFrameWorkTableProperties.AddLimitEditRow(AParent: TFmxObject; const ACaption: string;
+  const ATag: Integer; out AEdit: TEdit);
+var
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
+  CaptionLabel: TLabel;
+begin
+  Item := TLayout.Create(Self);
+  Item.Parent := AParent;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  AEdit := TEdit.Create(Self);
+  AEdit.Parent := RowGrid;
+  AEdit.Align := TAlignLayout.Client;
+  AEdit.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  AEdit.KillFocusByReturn := True;
+  AEdit.Tag := ATag;
+  AEdit.OnExit := HandleLimitExit;
+  RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
+end;
+
+procedure TFrameWorkTableProperties.AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
+  out AValueEdit: TEdit; out AButton: TButton; out AMinLimitEdit: TEdit; out AMaxLimitEdit: TEdit;
+  AOnClick: TNotifyEvent);
+var
+  TabItem: TTabItem;
+  TabLayout: TLayout;
+begin
+  TabItem := TTabItem.Create(Self);
+  TabItem.Parent := TabMeterValues;
+  TabItem.Text := ATabCaption;
+  TabItem.Stored := False;
+
+  TabLayout := TLayout.Create(Self);
+  TabLayout.Parent := TabItem;
+  TabLayout.Align := TAlignLayout.Client;
+  TabLayout.Padding.Rect := TRectF.Create(6, 8, 6, 6);
+  TabLayout.Stored := False;
+
+  AddMeterValueRow(TabLayout, ACaption, AValueEdit, AButton, AOnClick);
+  AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, AMinLimitEdit);
+  AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, AMaxLimitEdit);
 end;
 
 function TFrameWorkTableProperties.MeterValueToText(AMeterValue: TMeterValue): string;
