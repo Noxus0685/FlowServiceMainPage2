@@ -846,9 +846,15 @@ begin
     Exit;
   end;
 
-  ADevice.Name := MergeStringIfNeeded(ADevice.Name, AChannel.DeviceName);
-  if Trim(ADevice.Name) = '' then
-    ADevice.Name := 'Прибор ' + Trim(AChannel.Text);
+  if (AMode = dcmMeasurementPromoted) and (Trim(ADevice.Name) = '') and
+     (Trim(AChannel.Text) <> '') then
+    ADevice.Name := Trim(AChannel.Text)
+  else
+  begin
+    ADevice.Name := MergeStringIfNeeded(ADevice.Name, AChannel.DeviceName);
+    if Trim(ADevice.Name) = '' then
+      ADevice.Name := 'Прибор ' + Trim(AChannel.Text);
+  end;
   ADevice.SerialNumber := MergeStringIfNeeded(ADevice.SerialNumber, AChannel.Serial);
   ADevice.DeviceTypeName := MergeStringIfNeeded(ADevice.DeviceTypeName, AChannel.TypeName);
   ADevice.DeviceTypeUUID := MergeStringIfNeeded(ADevice.DeviceTypeUUID, AChannel.TypeUUID);
