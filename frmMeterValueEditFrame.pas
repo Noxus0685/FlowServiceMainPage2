@@ -327,8 +327,8 @@ begin
     EditValueFull.Text := FMeterValue.GetStrFullName;
     EditValue.Text := FloatToStr(FMeterValue.GetDoubleValueDim);
     FillDimensionCombo;
-    EditMin.Text := FMeterValue.GetStringNum(FMeterValue.MinValue);
-    EditMax.Text := FMeterValue.GetStringNum(FMeterValue.MaxValue);
+    EditMin.Text := FMeterValue.GetStrNum(FMeterValue.MinValue);
+    EditMax.Text := FMeterValue.GetStrNum(FMeterValue.MaxValue);
     EditName.Text := FMeterValue.Name;
     EditType.Text := FMeterValue.&Type;
     EditShrtName.Text := FMeterValue.ShrtName;
