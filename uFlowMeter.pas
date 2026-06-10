@@ -1110,12 +1110,6 @@ begin
   end;
 end;
 
-procedure TFlowMeter.Init;
-begin
-  ResultValue := '-';
-  MeterFlowCategory := mftUnknownType;
-
-end;
 
 procedure TFlowMeter.CreateDevice;
 var
@@ -1169,6 +1163,31 @@ begin
   begin
 
     FoundDevice := AppServices.DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
+
+    if FoundDevice = nil then
+      CreateDevice;
+    if FoundDevice <> nil then
+      Self.Device := FoundDevice;
+  end;
+
+  ResultValue := '-';
+  MeterFlowCategory := ResolveStdCategoryFromDevice;
+
+ // if Assigned(Self.Device) then
+    InitAllValues;
+end;
+
+procedure TFlowMeter.Init();
+var
+  FoundDevice: TDevice;
+  FoundRepo: TDeviceRepository;
+  SrcDevice: TDevice;
+begin
+  FoundDevice := nil;
+  if AppServices.DataManager <> nil then
+  begin
+
+    FoundDevice := AppServices.DataManager.FindDevice(Self.FDeviceUUID, FoundRepo);
 
     if FoundDevice = nil then
       CreateDevice;

@@ -90,8 +90,6 @@ type
     Layout45: TLayout;
     Label41: TLabel;
     EditError: TEdit;
-    LayoutTemp: TLayout;
-    LabelTemp: TLabel;
     EditTemp: TEdit;
     grpTypeOfCheck: TGroupBox;
     LayoutOutPutType: TLayout;
@@ -706,6 +704,8 @@ begin
   StringColumnPointVolume.Header := 'V, л';
   Label47.Text := 'Макс расход, ' + FDevice.GetDimensionName;
   Label49.Text := 'Мин расход, ' + FDevice.GetDimensionName;
+  Label7.Text := 'Норм расход, ' + FDevice.GetDimensionName;
+  Label4.Text := 'Переход расход, ' + FDevice.GetDimensionName;
 
   // ===== Критерий остановки =====
   FillSpillageStopVolume;
