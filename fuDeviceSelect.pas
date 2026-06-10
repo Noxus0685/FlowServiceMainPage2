@@ -1083,6 +1083,9 @@ end;
 
 procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
 begin
+  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+    Exit;
+
   ModalResult := mrOk;
 end;
 
@@ -2576,10 +2579,9 @@ var
   Repo: TDeviceRepository;
   Res: TModalResult;
 begin
-  Repo := AppServices.DataManager.ActiveDeviceRepo;
-
-  if ModalResult <> mrOk then
-    Exit;
+  Repo := nil;
+  if AppServices.DataManager <> nil then
+    Repo := AppServices.DataManager.ActiveDeviceRepo;
 
   if (Repo <> nil) and (Repo.State = osModified) then
   begin
