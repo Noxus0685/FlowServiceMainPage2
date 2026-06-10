@@ -3196,7 +3196,7 @@ begin
 
     if DeviceSelectResult <> mrOk then
     begin
-      UpdateGrids;
+      //UpdateGrids;
       Exit;
     end;
 
