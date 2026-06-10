@@ -360,10 +360,11 @@ begin
   RowGrid.Align := TAlignLayout.Client;
   RowGrid.RowCollection.Clear;
   RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 42;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 16;
+  RowGrid.ColumnCollection.Add.Value := 12;
   RowGrid.ColumnCollection.Add.Value := 15;
-  RowGrid.ColumnCollection.Add.Value := 18;
-  RowGrid.ColumnCollection.Add.Value := 25;
+  RowGrid.ColumnCollection.Add.Value := 12;
   RowGrid.RowCollection.Add.Value := 100;
   RowGrid.Stored := False;
 
@@ -374,7 +375,7 @@ begin
   MinLabel.TextSettings.VertAlign := TTextAlign.Center;
   MinLabel.HitTest := False;
   MinLabel.Margins.Rect := TRectF.Create(10, 0, 8, 0);
-  RowGrid.ControlCollection.AddControl(MinLabel, 0, 0);
+  RowGrid.ControlCollection.AddControl(MinLabel, 1, 0);
 
   AMinEdit := TEdit.Create(Self);
   AMinEdit.Parent := RowGrid;
@@ -383,7 +384,7 @@ begin
   AMinEdit.KillFocusByReturn := True;
   AMinEdit.Tag := AKind * 2;
   AMinEdit.OnExit := HandleLimitExit;
-  RowGrid.ControlCollection.AddControl(AMinEdit, 1, 0);
+  RowGrid.ControlCollection.AddControl(AMinEdit, 2, 0);
 
   MaxLabel := TLabel.Create(Self);
   MaxLabel.Parent := RowGrid;
@@ -392,7 +393,7 @@ begin
   MaxLabel.TextSettings.VertAlign := TTextAlign.Center;
   MaxLabel.HitTest := False;
   MaxLabel.Margins.Rect := TRectF.Create(10, 0, 8, 0);
-  RowGrid.ControlCollection.AddControl(MaxLabel, 2, 0);
+  RowGrid.ControlCollection.AddControl(MaxLabel, 3, 0);
 
   AMaxEdit := TEdit.Create(Self);
   AMaxEdit.Parent := RowGrid;
@@ -401,7 +402,7 @@ begin
   AMaxEdit.KillFocusByReturn := True;
   AMaxEdit.Tag := AKind * 2 + 1;
   AMaxEdit.OnExit := HandleLimitExit;
-  RowGrid.ControlCollection.AddControl(AMaxEdit, 3, 0);
+  RowGrid.ControlCollection.AddControl(AMaxEdit, 4, 0);
 end;
 
 function TFrameWorkTableProperties.MeterValueToText(AMeterValue: TMeterValue): string;
