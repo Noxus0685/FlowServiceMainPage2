@@ -1017,14 +1017,14 @@ begin
       // (кнопка "Старт" в ручном режиме/команда запуска измерения при автомате).
 
 
-       WorkTable.State := swtSTARTWAIT;
+       WorkTable.State := swtSTARTTEST;
 
     end;
 
     awtStopTest:
     begin
 
-       WorkTable.State := swtSTOPWAIT;
+       WorkTable.State := swtSTOPTEST;
 
     end;
 
