@@ -556,7 +556,10 @@ end;
 
 function TFlowMeter.GetDevice: TDevice;
 begin
-  Result := FDevice;
+  if FDevice<>nil then
+     Result := FDevice
+     else
+     Result := nil;
 end;
 
 procedure TFlowMeter.SetDevice(const ADevice: TDevice);
