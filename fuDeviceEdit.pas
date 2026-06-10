@@ -682,7 +682,7 @@ begin
   for I := 0 to FDevice.Dimensions.Count - 1 do
     ComboBoxUnits.Items.Add(FDevice.Dimensions[I].Name);
 
-   if (FDevice.Units > 0) and (FDevice.Units < ComboBoxUnits.Items.Count) then
+  if (FDevice.Units >= 0) and (FDevice.Units < ComboBoxUnits.Items.Count) then
     ComboBoxUnits.ItemIndex := FDevice.Units
   else if (num>0) and  (num < ComboBoxUnits.Items.Count)  then
      ComboBoxUnits.ItemIndex :=num
