@@ -62,9 +62,6 @@ type
     procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
       out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
       AOnClick: TNotifyEvent);
-    procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
-      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
-      AOnClick: TNotifyEvent);
     procedure AddMeterValueTab(const ATabCaption, ACaption: string; const AKind: Integer;
       out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
       AOnClick: TNotifyEvent);
@@ -295,8 +292,12 @@ begin
   RowGrid.Align := TAlignLayout.Client;
   RowGrid.RowCollection.Clear;
   RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 18;
-  RowGrid.ColumnCollection.Add.Value := 82;
+  RowGrid.ColumnCollection.Add.Value := 24;
+  RowGrid.ColumnCollection.Add.Value := 42;
+  RowGrid.ColumnCollection.Add.Value := 9;
+  RowGrid.ColumnCollection.Add.Value := 8;
+  RowGrid.ColumnCollection.Add.Value := 9;
+  RowGrid.ColumnCollection.Add.Value := 8;
   RowGrid.RowCollection.Add.Value := 100;
   RowGrid.Stored := False;
 
@@ -306,56 +307,21 @@ begin
   CaptionLabel.Text := ACaption;
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.HitTest := False;
-  CaptionLabel.Margins.Rect := TRectF.Create(10, 0, 6, 0);
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
   RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
 
   ValueLayout := TLayout.Create(Self);
   ValueLayout.Parent := RowGrid;
   ValueLayout.Align := TAlignLayout.Client;
-  ValueLayout.Margins.Rect := TRectF.Create(2, 3, 10, 3);
+  ValueLayout.Margins.Rect := TRectF.Create(6, 3, 8, 3);
   ValueLayout.Stored := False;
   RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
-
-  AMaxEdit := TEdit.Create(Self);
-  AMaxEdit.Parent := ValueLayout;
-  AMaxEdit.Align := TAlignLayout.Right;
-  AMaxEdit.Width := 58;
-  AMaxEdit.Margins.Left := 4;
-  AMaxEdit.KillFocusByReturn := True;
-  AMaxEdit.Tag := AKind * 2 + 1;
-  AMaxEdit.OnExit := HandleLimitExit;
-
-  MaxLabel := TLabel.Create(Self);
-  MaxLabel.Parent := ValueLayout;
-  MaxLabel.Align := TAlignLayout.Right;
-  MaxLabel.Width := 34;
-  MaxLabel.Text := 'Макс';
-  MaxLabel.TextSettings.VertAlign := TTextAlign.Center;
-  MaxLabel.HitTest := False;
-
-  AMinEdit := TEdit.Create(Self);
-  AMinEdit.Parent := ValueLayout;
-  AMinEdit.Align := TAlignLayout.Right;
-  AMinEdit.Width := 58;
-  AMinEdit.Margins.Left := 4;
-  AMinEdit.KillFocusByReturn := True;
-  AMinEdit.Tag := AKind * 2;
-  AMinEdit.OnExit := HandleLimitExit;
-
-  MinLabel := TLabel.Create(Self);
-  MinLabel.Parent := ValueLayout;
-  MinLabel.Align := TAlignLayout.Right;
-  MinLabel.Width := 28;
-  MinLabel.Text := 'Мин';
-  MinLabel.TextSettings.VertAlign := TTextAlign.Center;
-  MinLabel.HitTest := False;
 
   AButton := TButton.Create(Self);
   AButton.Parent := ValueLayout;
   AButton.Align := TAlignLayout.Right;
   AButton.Width := 36;
-  AButton.Margins.Left := 6;
-  AButton.Margins.Right := 8;
+  AButton.Margins.Left := 8;
   AButton.Text := '...';
   AButton.OnClick := AOnClick;
 
@@ -401,27 +367,6 @@ begin
   RowGrid.ControlCollection.AddControl(AMaxEdit, 5, 0);
 end;
 
-
-procedure TFrameWorkTableProperties.AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
-  out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
-  AOnClick: TNotifyEvent);
-var
-  TabItem: TTabItem;
-  TabLayout: TLayout;
-begin
-  TabItem := TTabItem.Create(Self);
-  TabItem.Parent := TabMeterValues;
-  TabItem.Text := ATabCaption;
-  TabItem.Stored := False;
-
-  TabLayout := TLayout.Create(Self);
-  TabLayout.Parent := TabItem;
-  TabLayout.Align := TAlignLayout.Client;
-  TabLayout.Padding.Rect := TRectF.Create(6, 8, 6, 6);
-  TabLayout.Stored := False;
-
-  AddMeterValueRow(TabLayout, ACaption, AKind, AValueEdit, AButton, AMinEdit, AMaxEdit, AOnClick);
-end;
 
 procedure TFrameWorkTableProperties.AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
   out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
