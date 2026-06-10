@@ -268,8 +268,6 @@ type
 
 implementation
 
-
-
 function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
 var
   Normalized: string;
@@ -721,6 +719,18 @@ begin
     FPoints := TObjectList<TDevicePoint>.Create(True);
 
   FPoints.Clear;
+  if FWorkTable = nil then
+    Exit;
+
+  if FWorkTable.DeviceChannels.Count = 0 then
+    FWorkTable.AddDeviceChannel(
+      True,
+      -1,
+      TWorkTable.BuildChannelDefaultText(1),
+      '',
+      '-',
+      ''
+    );
 
   for Channel in FWorkTable.DeviceChannels do
   begin
@@ -728,6 +738,17 @@ begin
       Continue;
 
     Device := Channel.FlowMeter.Device;
+    if ((Device = nil) or (Device.Points = nil) or (Device.Points.Count = 0)) and
+       (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+      Device := TDeviceCreationService.EnsureDeviceForChannel(
+        Channel,
+        FWorkTable,
+        DataManager.ActiveDeviceRepo,
+        dcmMeasurementPromoted,
+        nil,
+        FWorkTable.CurrentPoint
+      );
+
     if (Device = nil) or (Device.Points = nil) then
       Continue;
 
