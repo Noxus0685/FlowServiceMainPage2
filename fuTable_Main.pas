@@ -154,6 +154,8 @@ type
     function _Release: Integer; stdcall;
 
 
+
+
   public
     destructor Destroy; override;
     property T_WorkBench_First:Double read FT_WorkBench_First write SetT_WorkBench_First;
@@ -722,6 +724,9 @@ begin
   end;
 end;
 
+
+
+
 procedure TTableMainForm.HandleWorkTableNotify(ASender: TObject;
   AEvent: ENotifyEvent; AData: TObject);
 var
@@ -766,6 +771,11 @@ EnabledEtalonChannels: TObjectList<TChannel>;
   case AEvent of
     notifyAction:
       begin
+
+
+
+
+
         if AData is TPump then
           begin
             if (WorkTable = nil) or (WorkTable.ActivePump = nil) then
@@ -871,23 +881,81 @@ end;
 
 procedure TTableMainForm.WorkTableActionHandler(Sender: TWorkTable;
   AEvent: ENotifyEvent; Data: TObject);
+
+var WorkTable: TWorkTable;
+    State: EStateWorkTable;
+    Error: TErrorInfo;
 begin
-  if Sender = nil then
-    Exit;
+      WorkTable:=Sender;
+      State:= Sender.State;
 
   case Sender.Action of
+    awtStartTest:
+    begin
+      // Возникает, когда необходимо запустить измерение
+      // (кнопка "Старт" в ручном режиме/команда запуска измерения при автомате).
+
+
+       WorkTable.State := swtSTARTWAIT;
+
+    end;
+
+    awtStopTest:
+    begin
+
+      { WorkTable.State := swtSTOPWAIT;   }
+
+    end;
+
+    awtStartMonitor:
+    begin
+      // Возникает, когда пользователь запускает обновление стола (режим TEST)
+
+       WorkTable.State := swtSTARTMONITOR;
+
+
+
+
+    end;
+
+
+    awtStopMonitor:
+       begin
+      // Возникает, когда пользователь останавливает обновление стола (режим TEST)
+
+
+       WorkTable.State := swtSTOPMONITOR;
+
+
+      end;
+
+
     awtAddPump:
+    begin
+      // При добавлении насоса к столу подписываем форму на события насоса
+      // и связанных объектов стола.
       SubscribeWorkTableObjects(Sender);
+    end;
+
     awtRemovePump:
-      SyncWorkTableObservers;
+    begin
+      // При добавлении насоса к столу подписываем форму на события насоса
+      // и связанных объектов стола.
+      SyncWorkTableObservers
+    end;
+
+  else
+    begin
+      // Резервная ветка: неизвестное действие.
+      // Здесь можно добавить диагностику/защиту от некорректных команд.
+    end;
   end;
 
-  if (Data is TPump) or (Data is TFlowRate) or (Data is TFluidTemp) or
-     (Data is TFluidPress) then
-    Exit;
 
-  HandleWorkTableNotify(Sender, AEvent, Data);
 end;
+
+
+
 
 procedure TTableMainForm.WorkTableStateChangedHandler(Sender: TWorkTable;
   AEvent: ENotifyEvent; Data: TObject);

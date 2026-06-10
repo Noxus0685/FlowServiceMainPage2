@@ -4694,173 +4694,206 @@ object FrameMainTable: TFrameMainTable
         Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
         object MenuItemDevicesWorkTablesAddTable: TMenuItem
           Action = ActionAddWorkTable
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesAddDeviceChannel: TMenuItem
           Action = ActionAddDeviceChannel
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesAddEtalonChannel: TMenuItem
           Action = ActionAddEtalonChannel
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesSaveWorkTable: TMenuItem
           Action = ActionSaveWorkTable
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesMeterValueProperties: TMenuItem
           Action = ActionMeterValueProperties
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesOpenDeviceSelect: TMenuItem
           Action = ActionOpenDeviceSelect
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesDeleteDevice: TMenuItem
           Action = ActionDeleteDevice
+          Locked = True
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1082#1072#1085#1072#1083
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesDeleteEtalons: TMenuItem
           Action = ActionDeleteEtalons
+          Locked = True
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1101#1090#1072#1083#1086#1085
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesAddPump: TMenuItem
           Action = ActionPumpAdd
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesDeletePump: TMenuItem
           Action = ActionPumpDelete
+          Locked = True
           ImageIndex = -1
         end
       end
       object MenuItemDevicesColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
         object MenuItemDevicesColumnsChannelGroup: TMenuItem
+          Locked = True
           Text = #1050#1072#1085#1072#1083
           object MenuItemDevicesColumn1: TMenuItem
             Tag = 1
+            Locked = True
             IsChecked = True
             Text = #1050#1072#1085#1072#1083
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn6: TMenuItem
             Tag = 6
+            Locked = True
             IsChecked = True
             Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemDevicesColumnsDeviceGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemDevicesColumn2: TMenuItem
             Tag = 2
+            Locked = True
             IsChecked = True
             Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn3: TMenuItem
             Tag = 3
+            Locked = True
             IsChecked = True
             Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn4: TMenuItem
             Tag = 4
+            Locked = True
             IsChecked = True
             Text = #1055#1088#1080#1073#1086#1088
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn5: TMenuItem
             Tag = 5
+            Locked = True
             IsChecked = True
             Text = #1057#1077#1088#1080#1081#1085#1099#1081
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn18: TMenuItem
             Tag = 18
+            Locked = True
             IsChecked = True
             Text = #1050#1086#1101#1092'-'#1085#1090
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemDevicesColumnsMeasureGroup: TMenuItem
+          Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
           object MenuItemDevicesColumn7: TMenuItem
             Tag = 7
+            Locked = True
             IsChecked = True
             Text = #1057#1080#1075#1085#1072#1083
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn8: TMenuItem
             Tag = 8
+            Locked = True
             IsChecked = True
             Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn9: TMenuItem
             Tag = 9
+            Locked = True
             IsChecked = True
             Text = #1054#1073#1098#1077#1084', '#1084'3'
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn12: TMenuItem
             Tag = 12
+            Locked = True
             IsChecked = True
             Text = #1054#1073#1098#1077#1084' '#1076#1086
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn13: TMenuItem
             Tag = 13
+            Locked = True
             IsChecked = True
             Text = #1054#1073#1098#1077#1084' '#1087#1086#1089#1083#1077
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn16: TMenuItem
             Tag = 16
+            Locked = True
             IsChecked = True
             Text = #1047#1085#1072#1095#1077#1085#1080#1077
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemDevicesColumnsStatGroup: TMenuItem
+          Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemDevicesColumn10: TMenuItem
             Tag = 10
+            Locked = True
             IsChecked = True
             Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn11: TMenuItem
             Tag = 11
+            Locked = True
             IsChecked = True
             Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemDevicesColumnsOtherGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1086#1095#1077#1077
           object MenuItemDevicesColumn0: TMenuItem
-            Tag = 0
+            Locked = True
             IsChecked = True
             Text = #1042#1082#1083
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn14: TMenuItem
             Tag = 14
+            Locked = True
             IsChecked = True
             Text = #1055#1088#1077#1087#1072#1076
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn15: TMenuItem
             Tag = 15
+            Locked = True
             IsChecked = True
             Text = #1057#1090#1072#1090#1091#1089
             OnClick = MenuGridLayOutClick
           end
           object MenuItemDevicesColumn17: TMenuItem
             Tag = 17
+            Locked = True
             IsChecked = True
             Text = 'UUID'
             OnClick = MenuGridLayOutClick
@@ -4871,14 +4904,17 @@ object FrameMainTable: TFrameMainTable
         Text = #1044#1086#1073#1072#1074#1080#1090#1100
         object MenuItemDevicesAddChannel: TMenuItem
           Action = ActionAddDeviceChannel
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesSelectDevice: TMenuItem
           Action = ActionOpenDeviceSelect
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesFromArchive: TMenuItem
           Action = ActionDevicesFromArchive
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -4886,25 +4922,31 @@ object FrameMainTable: TFrameMainTable
         Text = #1048#1079#1084#1077#1085#1080#1090#1100
         object MenuItemDevicesProperties: TMenuItem
           Action = ActionMeterValueProperties
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesClearRow: TMenuItem
           Action = ActionDevicesClearRow
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesSep1: TMenuItem
+          Locked = True
           Text = '-'
         end
         object MenuItemDevicesCopy: TMenuItem
           Action = ActionDevicesCopy
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesPaste: TMenuItem
           Action = ActionDevicesPaste
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesFillAllBySelected: TMenuItem
           Action = ActionDevicesFillAllBySelected
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -4912,11 +4954,13 @@ object FrameMainTable: TFrameMainTable
         Text = #1059#1076#1072#1083#1080#1090#1100
         object MenuItemDevicesDeleteChannel: TMenuItem
           Action = ActionDeleteDevice
+          Locked = True
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1087#1088#1080#1073#1086#1088' '#1080#1079' '#1089#1090#1088#1086#1082#1080
           ImageIndex = -1
         end
         object MenuItemDevicesClearAll: TMenuItem
           Action = ActionDevicesClearAll
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -4924,10 +4968,12 @@ object FrameMainTable: TFrameMainTable
         Text = #1055#1088#1086#1095#1077#1077
         object MenuItemDevicesSetFlowSource: TMenuItem
           Action = ActionDevicesSetFlowSource
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesAssignEtalon: TMenuItem
           Action = ActionDevicesAssignEtalon
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -4940,149 +4986,178 @@ object FrameMainTable: TFrameMainTable
         Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
         object MenuItemEtalonsWorkTablesAddTable: TMenuItem
           Action = ActionAddWorkTable
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesAddDeviceChannel: TMenuItem
           Action = ActionAddDeviceChannel
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesAddEtalonChannel: TMenuItem
           Action = ActionAddEtalonChannel
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesSaveWorkTable: TMenuItem
           Action = ActionSaveWorkTable
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesMeterValueProperties: TMenuItem
           Action = ActionMeterValueProperties
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesOpenDeviceSelect: TMenuItem
           Action = ActionOpenDeviceSelect
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesDeleteDevice: TMenuItem
           Action = ActionDeleteDevice
+          Locked = True
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1082#1072#1085#1072#1083
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesDeleteEtalons: TMenuItem
           Action = ActionDeleteEtalons
+          Locked = True
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1099#1076#1077#1083#1077#1085#1085#1099#1081' '#1101#1090#1072#1083#1086#1085
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesAddPump: TMenuItem
           Action = ActionPumpAdd
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesDeletePump: TMenuItem
           Action = ActionPumpDelete
+          Locked = True
           ImageIndex = -1
         end
       end
       object MenuItemEtalonsColumnsGroup: TMenuItem
         Text = #1050#1086#1083#1086#1085#1082#1080
         object MenuItemEtalonsColumnsChannelGroup: TMenuItem
+          Locked = True
           Text = #1050#1072#1085#1072#1083
           object MenuItemEtalonsColumn1: TMenuItem
             Tag = 1
+            Locked = True
             IsChecked = True
             Text = #1050#1072#1085#1072#1083
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn5: TMenuItem
             Tag = 5
+            Locked = True
             IsChecked = True
             Text = #1058#1080#1087' '#1089#1080#1075#1085#1072#1083#1072
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemEtalonsColumnsDeviceGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1080#1073#1086#1088
           object MenuItemEtalonsColumn2: TMenuItem
             Tag = 2
+            Locked = True
             IsChecked = True
             Text = #1058#1080#1087' '#1087#1088#1080#1073#1086#1088#1072
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn3: TMenuItem
             Tag = 3
+            Locked = True
             IsChecked = True
             Text = #1058#1080#1087#1086#1088#1072#1079#1084#1077#1088
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn4: TMenuItem
             Tag = 4
+            Locked = True
             IsChecked = True
             Text = #1055#1088#1080#1073#1086#1088
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn9: TMenuItem
             Tag = 9
+            Locked = True
             IsChecked = True
             Text = #1057#1077#1088#1080#1081#1085#1099#1081' '
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemEtalonsColumnsMeasureGroup: TMenuItem
+          Locked = True
           Text = #1048#1079#1084#1077#1088#1077#1085#1080#1077
           object MenuItemEtalonsColumn6: TMenuItem
             Tag = 6
+            Locked = True
             IsChecked = True
             Text = #1057#1080#1075#1085#1072#1083
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn7: TMenuItem
             Tag = 7
+            Locked = True
             IsChecked = True
             Text = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn8: TMenuItem
             Tag = 8
+            Locked = True
             IsChecked = True
             Text = #1054#1073#1098#1077#1084', '#1084'3'
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn14: TMenuItem
             Tag = 14
+            Locked = True
             IsChecked = True
             Text = #1047#1085#1072#1095#1077#1085#1080#1077
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemEtalonsColumnsStatGroup: TMenuItem
+          Locked = True
           Text = #1057#1090#1072#1090#1080#1089#1090#1080#1082#1072
           object MenuItemEtalonsColumn10: TMenuItem
             Tag = 10
+            Locked = True
             IsChecked = True
             Text = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn11: TMenuItem
             Tag = 11
+            Locked = True
             IsChecked = True
             Text = #1054#1090#1082#1083#1086#1085#1077#1085#1080#1077', %'
             OnClick = MenuGridLayOutClick
           end
         end
         object MenuItemEtalonsColumnsOtherGroup: TMenuItem
+          Locked = True
           Text = #1055#1088#1086#1095#1077#1077
           object MenuItemEtalonsColumn0: TMenuItem
-            Tag = 0
+            Locked = True
             IsChecked = True
             Text = #1042#1082#1083
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn12: TMenuItem
             Tag = 12
+            Locked = True
             IsChecked = True
             Text = #1055#1077#1088#1077#1087#1072#1076
             OnClick = MenuGridLayOutClick
           end
           object MenuItemEtalonsColumn13: TMenuItem
             Tag = 13
+            Locked = True
             IsChecked = True
             Text = #1057#1090#1072#1090#1091#1089
             OnClick = MenuGridLayOutClick
@@ -5093,10 +5168,12 @@ object FrameMainTable: TFrameMainTable
         Text = #1044#1086#1073#1072#1074#1080#1090#1100
         object MenuItemEtalonsAddChannel: TMenuItem
           Action = ActionAddEtalonChannel
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsFromArchive: TMenuItem
           Action = ActionEtalonsFromArchive
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -5104,21 +5181,26 @@ object FrameMainTable: TFrameMainTable
         Text = #1048#1079#1084#1077#1085#1080#1090#1100
         object MenuItemEtalonsClearRow: TMenuItem
           Action = ActionEtalonsClearRow
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsSep1: TMenuItem
+          Locked = True
           Text = '-'
         end
         object MenuItemEtalonsCopy: TMenuItem
           Action = ActionEtalonsCopy
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsPaste: TMenuItem
           Action = ActionEtalonsPaste
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsFillAllBySelected: TMenuItem
           Action = ActionEtalonsFillAllBySelected
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -5126,11 +5208,13 @@ object FrameMainTable: TFrameMainTable
         Text = #1059#1076#1072#1083#1080#1090#1100
         object MenuItemEtalonsDeleteChannel: TMenuItem
           Action = ActionDeleteEtalons
+          Locked = True
           Text = #1059#1076#1072#1083#1080#1090#1100' '#1101#1090#1072#1083#1086#1085' '#1080#1079' '#1089#1090#1088#1086#1082#1080
           ImageIndex = -1
         end
         object MenuItemEtalonsClearAll: TMenuItem
           Action = ActionEtalonsClearAll
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -5138,10 +5222,12 @@ object FrameMainTable: TFrameMainTable
         Text = #1055#1088#1086#1095#1077#1077
         object MenuItemEtalonsSetFlowSource: TMenuItem
           Action = ActionEtalonsSetFlowSource
+          Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsAssignEtalon: TMenuItem
           Action = ActionEtalonsAssignEtalon
+          Locked = True
           ImageIndex = -1
         end
       end
@@ -5190,25 +5276,25 @@ object FrameMainTable: TFrameMainTable
           TabPosition = PlatformDefault
           Sizes = (
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s)
+            448s)
           object TabItemMeasurmentRun: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 105.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5222,8 +5308,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 81.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5237,8 +5323,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 120.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5252,8 +5338,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 95.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5267,8 +5353,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 74.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5278,7 +5364,7 @@ object FrameMainTable: TFrameMainTable
             object LayoutProtocolHost: TLayout
               Align = Client
               Size.Width = 674.000000000000000000
-              Size.Height = 427.000000000000000000
+              Size.Height = 448.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
             end
@@ -5289,8 +5375,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 138.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
