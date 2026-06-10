@@ -3173,6 +3173,8 @@ begin
   Frm := TFormDeviceSelect.Create(Self);
   try
     DeviceSelectResult := Frm.ShowModal;
+
+    WorkTableManager.ActiveWorkTable.InitChannels ;
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     if DeviceSelectResult <> mrOk then
@@ -4828,7 +4830,7 @@ var
   Rows: Integer;
   WorkTable: TWorkTable;
 begin
-  if not CanEditActiveWorkTable then
+ if not CanEditActiveWorkTable then
   begin
     ApplyActiveWorkTableEditMode;
     Exit;
@@ -4853,7 +4855,7 @@ begin
   FLastClickCol := Column;
   FLastClickTick := Tick;
 
-  if (Column = CheckColumnDeviceEnable1) then
+ if (Column = CheckColumnDeviceEnable1) then
   begin
     if WorkTable <> nil then
     begin

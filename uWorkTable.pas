@@ -483,11 +483,12 @@ type
   class function WorkTableEventToString(AEvent: TWorkTableEvent): string; static;
   class function WorkTableEventToProtocolCategory(AEvent: TWorkTableEvent): EProtocolCategory; static;
 
-  public
 
+
+  public
+  procedure InitChannels;
   constructor Create;
   destructor Destroy; override;
-
     class function WorkTableStateToString(AState: EStateWorkTable): string; static;
     class function WorkTableStateFromString(const AValue: string): EStateWorkTable; static;
     class function BuildWorkTableServiceName(const ATableIndex: Integer): string; static;
@@ -1132,6 +1133,7 @@ begin
   FreeAndNil(FFlowMeter);
   inherited Destroy;
 end;
+
 
 { Initializes channel FlowMeter links using the configured device UUID. }
 procedure TChannel.Init;
@@ -2502,6 +2504,29 @@ begin
     Result := 0;
 end;
 
+procedure TWorkTable.InitChannels;
+var Count, I: Integer;
+begin
+  Count:=FDeviceChannels.count;
+  for I := 0 to Count - 1 do
+    begin
+     // FDeviceChannels[i].Init;
+      if not Assigned(FDeviceChannels[i].FFlowMeter) then
+    Exit;
+
+  FDeviceChannels[i].FFlowMeter.Init();
+  {if (FDeviceChannels[i].FFlowMeter.Device <> nil) then
+  begin
+    FDeviceChannels[i].FOutputSet.FromDefault(IntToOutputSet(FFlowMeter.Device.OutputSet));
+    FSyncMode.FromDefault(IntToSyncChannelMode(FFlowMeter.Device.SyncMode));
+    FNoiseFilter.FromDefault(FFlowMeter.Device.NoiseFilter);
+  end;    }
+
+
+
+    end;
+end;
+
 function TWorkTable.GetPressDelta: Double;
 begin
   if FFluidPress <> nil then
@@ -3200,6 +3225,8 @@ begin
     end;
   end;
 end;
+
+
 
 { Restores channel collection metadata from INI storage. }
 class procedure TWorkTable.LoadChannelList(AIni: TCustomIniFile;
@@ -3907,6 +3934,16 @@ begin
   DeviceRepo := nil;
   if DataManager <> nil then
     DeviceRepo := DataManager.ActiveDeviceRepo;
+
+  if DeviceChannels.Count = 0 then
+    AddDeviceChannel(
+      True,
+      -1,
+      TWorkTable.BuildChannelDefaultText(1),
+      '',
+      '-',
+      ''
+    );
 
   for DeviceChannel in DeviceChannels do
   begin
