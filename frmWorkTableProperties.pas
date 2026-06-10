@@ -58,8 +58,7 @@ type
     procedure AddComboRow(const ACaption: string; out ACombo: TComboBox);
     procedure AddMeterValueRow(AParent: TFmxObject; const ACaption: string; out AEdit: TEdit;
       out AButton: TButton; AOnClick: TNotifyEvent);
-    procedure AddLimitEditRow(AParent: TFmxObject; const ACaption: string; const ATag: Integer;
-      out AEdit: TEdit);
+    function AddLimitEditRow(AParent: TFmxObject; const ACaption: string; const ATag: Integer): TEdit;
     procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
       AOnClick: TNotifyEvent);
     function MeterValueToText(AMeterValue: TMeterValue): string;
@@ -593,6 +592,94 @@ begin
         AddMeterValueRow(TabLayout, ACaption, EditQuantity, ButtonSelectQuantity, AOnClick);
         AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2, EditQuantityMin);
         AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1, EditQuantityMax);
+      end;
+  end;
+end;
+
+function TFrameWorkTableProperties.AddLimitEditRow(AParent: TFmxObject; const ACaption: string;
+  const ATag: Integer): TEdit;
+var
+  Item: TLayout;
+  RowGrid: TGridPanelLayout;
+  CaptionLabel: TLabel;
+begin
+  Item := TLayout.Create(Self);
+  Item.Parent := AParent;
+  Item.Align := TAlignLayout.Top;
+  Item.Height := 36;
+  Item.Margins.Bottom := 4;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  Result := TEdit.Create(Self);
+  Result.Parent := RowGrid;
+  Result.Align := TAlignLayout.Client;
+  Result.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  Result.KillFocusByReturn := True;
+  Result.Tag := ATag;
+  Result.OnExit := HandleLimitExit;
+  RowGrid.ControlCollection.AddControl(Result, 1, 0);
+end;
+
+procedure TFrameWorkTableProperties.AddMeterValuePage(const ATabCaption, ACaption: string;
+  const AKind: Integer; AOnClick: TNotifyEvent);
+var
+  TabItem: TTabItem;
+  TabLayout: TLayout;
+begin
+  TabItem := TTabItem.Create(Self);
+  TabItem.Parent := TabMeterValues;
+  TabItem.Text := ATabCaption;
+  TabItem.Stored := False;
+
+  TabLayout := TLayout.Create(Self);
+  TabLayout.Parent := TabItem;
+  TabLayout.Align := TAlignLayout.Client;
+  TabLayout.Padding.Rect := TRectF.Create(6, 8, 6, 6);
+  TabLayout.Stored := False;
+
+  case AKind of
+    0:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditPressure, ButtonSelectPressure, AOnClick);
+        EditPressureMin := AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2);
+        EditPressureMax := AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1);
+      end;
+    1:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditTemperture, ButtonSelectTemperture, AOnClick);
+        EditTempertureMin := AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2);
+        EditTempertureMax := AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1);
+      end;
+    2:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditFlowRate, ButtonSelectFlowRate, AOnClick);
+        EditFlowRateMin := AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2);
+        EditFlowRateMax := AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1);
+      end;
+    3:
+      begin
+        AddMeterValueRow(TabLayout, ACaption, EditQuantity, ButtonSelectQuantity, AOnClick);
+        EditQuantityMin := AddLimitEditRow(TabLayout, 'Мин значение', AKind * 2);
+        EditQuantityMax := AddLimitEditRow(TabLayout, 'Макс значение', AKind * 2 + 1);
       end;
   end;
 end;
