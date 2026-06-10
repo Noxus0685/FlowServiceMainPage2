@@ -3033,7 +3033,7 @@ begin
       DeviceSelectResult := SelectFrm.ShowModal;
       RemoveDeviceChannelsByDeletedUUIDs(SelectFrm.DeletedDeviceUUIDs);
 
-      if DeviceSelectResult <> mrOk then
+      if (DeviceSelectResult <> mrOk) or (not SelectFrm.SelectionConfirmed) then
       begin
         ClearChannelsByMissingDevices;
         Exit;
@@ -3175,7 +3175,7 @@ begin
     DeviceSelectResult := Frm.ShowModal;
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
-    if DeviceSelectResult <> mrOk then
+    if (DeviceSelectResult <> mrOk) or (not Frm.SelectionConfirmed) then
       Exit;
 
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);

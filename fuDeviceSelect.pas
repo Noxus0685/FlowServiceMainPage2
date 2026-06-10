@@ -208,6 +208,7 @@ private
   FSkipDeviceDeleteConfirm: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
+  FSelectionConfirmed: Boolean;
 
   { ================= ОСНОВНЫЕ ПРОЦЕДУРЫ ================= }
 
@@ -253,6 +254,7 @@ private
   function GetCheckedDevices: TObjectList<TDevice>;
   procedure ClearGridSelection;
   function IsGridInputFocused: Boolean;
+  function HasSelectedDevice: Boolean;
   procedure SyncTreeAfterGridRowsRemoved;
   procedure WriteDeviceActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   procedure LogDuplicateDeviceUUIDs;
@@ -263,6 +265,7 @@ public
   function GetSelectedDevice: TDevice;
   destructor Destroy; override;
   property DeletedDeviceUUIDs: TStringList read FDeletedDeviceUUIDs;
+  property SelectionConfirmed: Boolean read FSelectionConfirmed;
 
   end;
 
@@ -277,6 +280,7 @@ implementation
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
   inherited;
+  FSelectionConfirmed := False;
   FDeletedDeviceUUIDs := TStringList.Create;
   FDeletedDeviceUUIDs.Duplicates := dupIgnore;
   FDeletedDeviceUUIDs.CaseSensitive := False;
@@ -1078,8 +1082,19 @@ begin
   ButtonDeviceAddClick(Sender);
 end;
 
+function TFormDeviceSelect.HasSelectedDevice: Boolean;
+begin
+  Result := (FDevFilteredDevices <> nil) and
+            (GridDevices.Row >= 0) and
+            (GridDevices.Row < FDevFilteredDevices.Count);
+end;
+
 procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
 begin
+  if not HasSelectedDevice then
+    Exit;
+
+  FSelectionConfirmed := True;
   ModalResult := mrOk;
 end;
 
@@ -1088,9 +1103,10 @@ begin
   if not IsGridInputFocused then
     Exit;
 
-  if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
+  if not HasSelectedDevice then
     Exit;
 
+  FSelectionConfirmed := True;
   ModalResult := mrOk;
 end;
 
@@ -2587,6 +2603,9 @@ var
   Repo: TDeviceRepository;
   Res: TModalResult;
 begin
+  if (ModalResult = mrOk) and (not FSelectionConfirmed) then
+    ModalResult := mrCancel;
+
   Repo := AppServices.DataManager.ActiveDeviceRepo;
 
   if (Repo <> nil) and (Repo.State = osModified) then
@@ -2704,8 +2723,9 @@ begin
     Exit;
   end;
 
-  if (Key = vkReturn) and (GridDevices.Row>=0) then
+  if (Key = vkReturn) and HasSelectedDevice then
   begin
+    FSelectionConfirmed := True;
     ModalResult := mrOk;
     Key := 0;
     KeyChar := #0;

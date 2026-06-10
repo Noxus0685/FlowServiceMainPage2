@@ -3908,6 +3908,16 @@ begin
   if DataManager <> nil then
     DeviceRepo := DataManager.ActiveDeviceRepo;
 
+  if DeviceChannels.Count = 0 then
+    AddDeviceChannel(
+      True,
+      -1,
+      TWorkTable.BuildChannelDefaultText(1),
+      '',
+      '-',
+      ''
+    );
+
   for DeviceChannel in DeviceChannels do
   begin
     if (DeviceChannel = nil) or (not DeviceChannel.Enabled) then
