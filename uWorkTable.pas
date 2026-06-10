@@ -273,6 +273,8 @@ type
     property SyncMode: ESyncChannelMode read GetSyncModeProxy write SetSyncModeProxy;
     property NoiseFilter: Integer read GetNoiseFilterProxy write SetNoiseFilterProxy;
     property Category: Integer read GetCategoryProxy write SetCategoryProxy;
+    // Group > 0: номер параллельной группы эталонов; Qmax группы суммируется.
+    // Group <= 0: канал считается одиночным, его Qmax не суммируется.
     property Group: Integer read FGroup write FGroup;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
     property TypeUUID: string read GetTypeUUIDProxy write SetTypeUUIDProxy;
@@ -607,6 +609,9 @@ type
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
+    function CalcEtalonFlowRateMax: Double;
+    function CalcEtalonFlowRateMin: Double;
+    procedure UpdateFlowRateLimitsByEtalons;
 
     procedure InitMeterValues;
     // Собирает Hash и удаляет из глобального списка сохранения MeterValues значения этого рабочего стола.
@@ -702,6 +707,7 @@ uses
 
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
+  DEVICE_FLOW_RATE_DIM_INDEX = 4;
 
 class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
   const AAction: string; ADevice: TDevice; AChannel: TChannel);
@@ -2392,6 +2398,7 @@ begin
   RebindAllFlowMeters;
   RecalculateAllMeterValues;
   UpdateAggregateMeterValues;
+  UpdateFlowRateLimitsByEtalons;
 end;
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
@@ -2452,6 +2459,148 @@ begin
     end;
   end;
 end;
+
+{ Calculates the greatest supported flow from single etalons and parallel groups. }
+function TWorkTable.CalcEtalonFlowRateMax: Double;
+var
+  I: Integer;
+  Channel: TChannel;
+  Device: TDevice;
+  QmaxBase: Double;
+  GroupSum: Double;
+  GroupSums: TDictionary<Integer, Double>;
+  Pair: TPair<Integer, Double>;
+begin
+  Result := 0;
+  if (FEtalonChannels = nil) or (ValueFlowRate = nil) then
+    Exit;
+
+  GroupSums := TDictionary<Integer, Double>.Create;
+  try
+    for I := 0 to FEtalonChannels.Count - 1 do
+    begin
+      Channel := FEtalonChannels[I];
+      if (Channel = nil) or (not Channel.Enabled) or
+         (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
+        Continue;
+
+      Device := Channel.FlowMeter.Device;
+      if Device.Qmax <= 0 then
+        Continue;
+
+      QmaxBase := ValueFlowRate.GetDoubleBaseNum(Device.Qmax,
+        DEVICE_FLOW_RATE_DIM_INDEX);
+      if QmaxBase <= 0 then
+        Continue;
+
+      if Channel.Group > 0 then
+      begin
+        if GroupSums.TryGetValue(Channel.Group, GroupSum) then
+          GroupSums[Channel.Group] := GroupSum + QmaxBase
+        else
+          GroupSums.Add(Channel.Group, QmaxBase);
+      end
+      else if QmaxBase > Result then
+        Result := QmaxBase;
+    end;
+
+    for Pair in GroupSums do
+      if Pair.Value > Result then
+        Result := Pair.Value;
+  finally
+    GroupSums.Free;
+  end;
+end;
+
+{ Calculates the lowest positive Qmin among enabled etalon devices. }
+function TWorkTable.CalcEtalonFlowRateMin: Double;
+var
+  I: Integer;
+  Channel: TChannel;
+  Device: TDevice;
+  QminBase: Double;
+  IsFound: Boolean;
+begin
+  Result := 0;
+  IsFound := False;
+  if (FEtalonChannels = nil) or (ValueFlowRate = nil) then
+    Exit;
+
+  for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
+      Continue;
+
+    Device := Channel.FlowMeter.Device;
+    if Device.Qmin <= 0 then
+      Continue;
+
+    QminBase := ValueFlowRate.GetDoubleBaseNum(Device.Qmin,
+      DEVICE_FLOW_RATE_DIM_INDEX);
+    if QminBase <= 0 then
+      Continue;
+
+    if (not IsFound) or (QminBase < Result) then
+    begin
+      Result := QminBase;
+      IsFound := True;
+    end;
+  end;
+end;
+
+{ Refreshes flow-rate limits from installed etalons and clamps the current task. }
+procedure TWorkTable.UpdateFlowRateLimitsByEtalons;
+var
+  NewMin: Double;
+  NewMax: Double;
+  OldMin: Double;
+  OldMax: Double;
+  OldValueSet: Double;
+begin
+  if (FlowRate = nil) or (ValueFlowRate = nil) then
+    Exit;
+
+  NewMin := CalcEtalonFlowRateMin;
+  NewMax := CalcEtalonFlowRateMax;
+  OldMin := FlowRate.Min;
+  OldMax := FlowRate.Max;
+  if FlowRate.ValueSet <> nil then
+    OldValueSet := FlowRate.ValueSet.Value
+  else
+    OldValueSet := 0;
+
+  // Change the opposite boundary first when the old range would reject a valid new one.
+  if (NewMin > 0) and (NewMax > 0) and (NewMin <= NewMax) then
+  begin
+    if NewMin > FlowRate.Max then
+      FlowRate.Max := NewMax
+    else if NewMax < FlowRate.Min then
+      FlowRate.Min := NewMin;
+  end;
+
+  if NewMin > 0 then
+    FlowRate.Min := NewMin;
+  if NewMax > 0 then
+    FlowRate.Max := NewMax;
+
+  if FlowRate.ValueSet <> nil then
+  begin
+    if (FlowRate.Max > 0) and (FlowRate.ValueSet.Value > FlowRate.Max) then
+      FlowRate.ValueSet.Value := FlowRate.Max;
+    if (FlowRate.Min > 0) and (FlowRate.ValueSet.Value > 0) and
+       (FlowRate.ValueSet.Value < FlowRate.Min) then
+      FlowRate.ValueSet.Value := FlowRate.Min;
+  end;
+
+  if (not SameValue(OldMin, FlowRate.Min)) or
+     (not SameValue(OldMax, FlowRate.Max)) or
+     ((FlowRate.ValueSet <> nil) and
+      (not SameValue(OldValueSet, FlowRate.ValueSet.Value))) then
+    Notify(notifyStateChanged, FlowRate);
+end;
+
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
@@ -2733,6 +2882,7 @@ begin
     FEtalonChannels[I].RebindFlowMeterValues(Self);
 
   UpdateAggregateMeterValues;
+  UpdateFlowRateLimitsByEtalons;
   AssignTableFlowAsEtalonToDevices;
 end;
 
@@ -2811,6 +2961,8 @@ begin
   Result.Init;
   Result.InitMeterValues;
   Result.RebindFlowMeterValues(Self);
+  UpdateAggregateMeterValues;
+  UpdateFlowRateLimitsByEtalons;
 end;
 
 { Saves work table list, channels, and meter values to INI files. }
@@ -3087,6 +3239,7 @@ begin
       WorkTable.RebindAllFlowMeters;
       WorkTable.RecalculateAllMeterValues;
       WorkTable.UpdateAggregateMeterValues;
+      WorkTable.UpdateFlowRateLimitsByEtalons;
 
       AWorkTables.Add(WorkTable);
     end;
@@ -3364,6 +3517,7 @@ begin
     FEtalonChannels.Delete(ChannelIndex);
     //ReindexChannels(FEtalonChannels, True);
     UpdateAggregateMeterValues;
+    UpdateFlowRateLimitsByEtalons;
     AssignTableFlowAsEtalonToDevices;
     Result := True;
     Exit;
