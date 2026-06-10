@@ -336,8 +336,8 @@ begin
   TabLayout.Padding.Rect := TRectF.Create(6, 8, 6, 6);
   TabLayout.Stored := False;
 
-  AddMeterValueRow(TabLayout, ACaption, AValueEdit, AButton, AOnClick);
   AddLimitRow(TabLayout, AKind, AMinEdit, AMaxEdit);
+  AddMeterValueRow(TabLayout, ACaption, AValueEdit, AButton, AOnClick);
 end;
 
 procedure TFrameWorkTableProperties.AddLimitRow(AParent: TFmxObject; const AKind: Integer;
@@ -360,9 +360,9 @@ begin
   RowGrid.Align := TAlignLayout.Client;
   RowGrid.RowCollection.Clear;
   RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 25;
-  RowGrid.ColumnCollection.Add.Value := 25;
-  RowGrid.ColumnCollection.Add.Value := 25;
+  RowGrid.ColumnCollection.Add.Value := 42;
+  RowGrid.ColumnCollection.Add.Value := 15;
+  RowGrid.ColumnCollection.Add.Value := 18;
   RowGrid.ColumnCollection.Add.Value := 25;
   RowGrid.RowCollection.Add.Value := 100;
   RowGrid.Stored := False;
@@ -373,7 +373,7 @@ begin
   MinLabel.Text := 'Мин значение';
   MinLabel.TextSettings.VertAlign := TTextAlign.Center;
   MinLabel.HitTest := False;
-  MinLabel.Margins.Rect := TRectF.Create(10, 0, 6, 0);
+  MinLabel.Margins.Rect := TRectF.Create(10, 0, 8, 0);
   RowGrid.ControlCollection.AddControl(MinLabel, 0, 0);
 
   AMinEdit := TEdit.Create(Self);
@@ -391,7 +391,7 @@ begin
   MaxLabel.Text := 'Макс значение';
   MaxLabel.TextSettings.VertAlign := TTextAlign.Center;
   MaxLabel.HitTest := False;
-  MaxLabel.Margins.Rect := TRectF.Create(10, 0, 6, 0);
+  MaxLabel.Margins.Rect := TRectF.Create(10, 0, 8, 0);
   RowGrid.ControlCollection.AddControl(MaxLabel, 2, 0);
 
   AMaxEdit := TEdit.Create(Self);
@@ -603,7 +603,7 @@ begin
     if FWorkTable.TableFlow = nil then
       Exit;
 
-    BaseValue := MeterValue.GetDoubleNum(NewValue);
+    BaseValue := MeterValue.GetDoubleBaseNum(NewValue, MeterValue.CurrentDimIndex);
     if IsMax then
     begin
       if BaseValue < FWorkTable.TableFlow.QuantityMin then
@@ -631,7 +631,7 @@ begin
     if Parameter = nil then
       Exit;
 
-    BaseValue := MeterValue.GetDoubleNum(NewValue);
+    BaseValue := MeterValue.GetDoubleBaseNum(NewValue, MeterValue.CurrentDimIndex);
     if IsMax then
     begin
       if BaseValue < Parameter.Min then
