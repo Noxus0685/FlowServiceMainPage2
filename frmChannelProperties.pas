@@ -35,6 +35,7 @@ type
     HeaderDivider: TLine;
     EditChannelText: TEdit;
     EditChannelName: TEdit;
+    EditChannelGroup: TEdit;
     ComboChannelType: TComboBox;
     ComboOutputSet: TComboBox;
     ComboSyncMode: TComboBox;
@@ -57,6 +58,7 @@ type
     procedure RefreshRegisterColors;
     procedure HandleChannelTextExit(Sender: TObject);
     procedure HandleChannelNameExit(Sender: TObject);
+    procedure HandleChannelGroupExit(Sender: TObject);
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
@@ -236,6 +238,22 @@ begin
   NotifyWorkTableRefreshIfChanged(Changed);
 end;
 
+
+procedure TFrameChannelProperties.HandleChannelGroupExit(Sender: TObject);
+var
+  NewValue: Integer;
+  Changed: Boolean;
+begin
+  if FLoading or (FChannel = nil) then
+    Exit;
+
+  NewValue := StrToIntDef(Trim(EditChannelGroup.Text), FChannel.Group);
+  Changed := FChannel.Group <> NewValue;
+  FChannel.Group := NewValue;
+  EditChannelGroup.Text := IntToStr(NewValue);
+  NotifyWorkTableRefreshIfChanged(Changed);
+end;
+
 procedure TFrameChannelProperties.HandleOutputSetChange(Sender: TObject);
 var
   NewValue: EOutPutSet;
@@ -313,6 +331,7 @@ begin
     begin
       EditChannelText.Text := '';
       EditChannelName.Text := '';
+      EditChannelGroup.Text := '';
       ComboChannelType.ItemIndex := -1;
       ComboOutputSet.ItemIndex := -1;
       ComboSyncMode.ItemIndex := -1;
@@ -323,6 +342,7 @@ begin
 
     EditChannelText.Text := AChannel.Text;
     EditChannelName.Text := AChannel.Name;
+    EditChannelGroup.Text := IntToStr(AChannel.Group);
 
     SignalName := GetOutputTypeName(TOutputType(AChannel.Signal));
     ComboChannelType.ItemIndex := ComboChannelType.Items.IndexOf(SignalName);
@@ -395,6 +415,11 @@ begin
   AddPropertyRow(CategoryGeneral, 'Имя канала', EditChannelName);
   EditChannelName.KillFocusByReturn:=True;
   EditChannelName.OnExit := HandleChannelNameExit;
+
+  EditChannelGroup := TEdit.Create(Self);
+  AddPropertyRow(CategoryGeneral, 'Группа каналов', EditChannelGroup);
+  EditChannelGroup.KillFocusByReturn:=True;
+  EditChannelGroup.OnExit := HandleChannelGroupExit;
 
   ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
   AddPropertyRow(CategoryGeneral, 'Тип канала', ComboChannelType);
