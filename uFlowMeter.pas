@@ -1159,18 +1159,15 @@ procedure TFlowMeter.Init(UUID: string);
 var
   FoundDevice: TDevice;
   FoundRepo: TDeviceRepository;
-  SrcDevice: TDevice;
 begin
   FoundDevice := nil;
+  FDevice := nil;
+  FDeviceUUID := '';
   Self.DeviceUUID := UUID;
 
   if AppServices.DataManager <> nil then
   begin
-
     FoundDevice := AppServices.DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
-
-    if (FoundDevice = nil) and (Trim(Self.DeviceUUID) <> '') then
-      CreateDevice;
     if FoundDevice <> nil then
       Self.Device := FoundDevice;
   end;
