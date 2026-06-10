@@ -2898,11 +2898,8 @@ begin
   TypeUUID := Trim(AChannel.TypeUUID);
   TypeName := Trim(AChannel.TypeName);
 
-  if (TypeUUID = '') and (AChannel.FlowMeter <> nil) then
-    TypeUUID := Trim(AChannel.FlowMeter.DeviceTypeUUID);
-
-  if (TypeName = '') and (AChannel.FlowMeter <> nil) then
-    TypeName := Trim(AChannel.FlowMeter.DeviceTypeName);
+  if (TypeUUID = '') and (TypeName = '') then
+    Exit;
 
   Result := DataManager.FindType(TypeUUID, TypeName, ARepo);
 end;
@@ -2945,10 +2942,10 @@ begin
   Result := False;
 
   NewDN := Trim(ANewDN);
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (NewDN = '') then
+  if (AChannel = nil) or (NewDN = '') then
     Exit;
 
-  Device := AChannel.FlowMeter.Device;
+  Device := ResolveChannelDevice(AChannel);
   if Device = nil then
     Exit;
 
@@ -3193,7 +3190,7 @@ begin
 
     if DeviceSelectResult <> mrOk then
     begin
-      //UpdateGrids;
+      UpdateGrids;
       Exit;
     end;
 
