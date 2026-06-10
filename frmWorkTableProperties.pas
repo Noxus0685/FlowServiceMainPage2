@@ -62,6 +62,13 @@ type
     procedure AddMeterValuePage(const ATabCaption, ACaption: string; const AKind: Integer;
       out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
       AOnClick: TNotifyEvent);
+    procedure AddMeterValueTab(const ATabCaption, ACaption: string; const AKind: Integer;
+      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
+      AOnClick: TNotifyEvent);
+    procedure AddMeterValueTab(const ATabCaption, ACaption: string; const AKind: Integer;
+      out AValueEdit: TEdit; out AButton: TButton; out AMinEdit: TEdit; out AMaxEdit: TEdit;
+      AOnClick: TNotifyEvent);
+    procedure AddLimitRow(AParent: TFmxObject; const AKind: Integer; out AMinEdit: TEdit; out AMaxEdit: TEdit);
     function MeterValueToText(AMeterValue: TMeterValue): string;
     function WorkTableStateToCaption(AState: EStateWorkTable): string;
     function ParameterByKind(const AKind: Integer): TParameter;
