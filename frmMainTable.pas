@@ -152,13 +152,11 @@ type
     LayoutScaleClient: TLayout;
     LayoutScaleDisplay: TLayout;
     LayoutScaleTotal: TLayout;
-    Label1: TLabel;
     RectangleScaleTotalWeight: TRectangle;
-    LabelScaleTotalWeight: TLabel;
-    LayoutScaleCurrent: TLayout;
-    Label3: TLabel;
-    RectangleScaleWeight: TRectangle;
     LabelScaleWeight: TLabel;
+    LayoutScaleCurrent: TLayout;
+    RectangleScaleWeight: TRectangle;
+    LabelScaleTotalWeight: TLabel;
     LayoutScaleSelect: TLayout;
     ComboBoxScales: TComboBox;
     ButtonScaleDrain: TButton;
@@ -484,7 +482,8 @@ type
     ActionPumpDelete: TAction;
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
-    Rectangle2: TRectangle;
+    Label3: TLabel;
+    SpeedButton7: TSpeedButton;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -1930,7 +1929,7 @@ end;
 
 procedure TFrameMainTable.SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
 begin
-  SetInstrumentalLayoutVisible(LayoutFlowRate, False);
+  SetInstrumentalLayoutVisible(LayoutScale, False);
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
   SaveLayoutSettingsToWorkTable;
 end;
@@ -2935,7 +2934,7 @@ begin
     RefreshPumpsCombo;
     RefreshScalesCombo;
     UpdateUIScale;
-  end
+  end ;
 
   if FFrameMeasurementRun <> nil then
     FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
@@ -6176,8 +6175,6 @@ begin
   WorkTable := FActiveWorkTable;
   UnitName := NormalizeScaleUnit(ComboEditUnits.Text);
 
-  Label1.Text := BuildScaleCaption('Общий', UnitName);
-  Label3.Text := BuildScaleCaption('Текущий', UnitName);
 
   if WorkTable = nil then
   begin
