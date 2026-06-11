@@ -147,6 +147,18 @@ type
     SpeedButton28: TSpeedButton;
     Rectangle14: TRectangle;
     LabelLayoutPump: TLabel;
+    LayoutScale: TLayout;
+    LineScale: TLine;
+    LayoutScaleClient: TLayout;
+    LayoutScaleDisplay: TLayout;
+    RectangleScaleWeight: TRectangle;
+    LabelScaleWeight: TLabel;
+    LabelScaleDevice: TLabel;
+    LayoutScaleSelect: TLayout;
+    ComboBoxScales: TComboBox;
+    ButtonScaleDrain: TButton;
+    ButtonScaleTare: TButton;
+    LabelLayoutScale: TLabel;
     LayoutConditions: TLayout;
     Layout9: TLayout;
     LayoutPressure: TLayout;
@@ -545,8 +557,12 @@ type
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
     procedure SpeedButtonStartPumpClick(Sender: TObject);
     procedure ComboBoxPumpsChange(Sender: TObject);
+    procedure ComboBoxScalesChange(Sender: TObject);
+    procedure ButtonScaleTareClick(Sender: TObject);
+    procedure ButtonScaleDrainClick(Sender: TObject);
     procedure Rectangle14Click(Sender: TObject);
     procedure UpdateUIPump;
+    procedure UpdateUIScale;
     procedure UpdateUIFlowRate;
     procedure ComboBoxPumpsClick(Sender: TObject);
     procedure SpinBoxFreqChange(Sender: TObject);
@@ -635,6 +651,7 @@ type
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure RefreshPumpsCombo;
+    procedure RefreshScalesCombo;
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
@@ -983,6 +1000,37 @@ begin
     ComboBoxPumps.Text := '';   }
 
 
+end;
+
+procedure TFrameMainTable.RefreshScalesCombo;
+var
+  Scale: TScale;
+  SelectedScaleName: string;
+  ItemIndex: Integer;
+begin
+  ComboBoxScales.Items.Clear;
+  ComboBoxScales.ItemIndex := -1;
+
+  if FActiveWorkTable = nil then
+    Exit;
+
+  SelectedScaleName := Trim(ComboBoxScales.Text);
+  if (SelectedScaleName = '') and (FActiveWorkTable.ActiveScale <> nil) then
+    SelectedScaleName := FActiveWorkTable.ActiveScale.Name;
+
+  for Scale in FActiveWorkTable.Scales do
+    if Scale <> nil then
+      ComboBoxScales.Items.Add(Scale.Name);
+
+  ItemIndex := -1;
+  if SelectedScaleName <> '' then
+    ItemIndex := ComboBoxScales.Items.IndexOf(SelectedScaleName);
+  if (ItemIndex < 0) and (ComboBoxScales.Items.Count > 0) then
+    ItemIndex := 0;
+
+  ComboBoxScales.ItemIndex := ItemIndex;
+  if ItemIndex >= 0 then
+    FActiveWorkTable.SetActiveScale(ComboBoxScales.Items[ItemIndex]);
 end;
 
 procedure TFrameMainTable.SetConfiguration;
@@ -1637,6 +1685,8 @@ begin
   ApplyActiveWorkTableEditMode;
 
   RefreshPumpsCombo;
+  RefreshScalesCombo;
+  UpdateUIScale;
 
   FLastClickRow := -1;
   FLastClickCol := nil;
@@ -1940,7 +1990,7 @@ begin
     Control := HorzScrollBoxInstrumental.Controls[I];
     if (Control is TLayout) and Control.Visible and
        ((Control = LayoutFlowRate) or (Control = LayoutPump) or
-        (Control = LayoutMain) or (Control = LayoutMesure) or
+        (Control = LayoutScale) or (Control = LayoutMain) or (Control = LayoutMesure) or
         (Control = LayoutConditions) or (Control = LayoutProcedures)) then
       FInstrumentalVisibleOrder.Add(TLayout(Control));
   end;
@@ -1981,7 +2031,7 @@ begin
   try
     // Не полагаемся на неочевидный порядок Align=Left/MostLeft:
     // задаем положение блоков вручную в порядке включения.
-    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutScale, LayoutMain,
       LayoutMesure, LayoutConditions, LayoutProcedures] do
       Layout.Align := TAlignLayout.None;
 
@@ -2037,6 +2087,8 @@ begin
     Result := 'FlowRate'
   else if ALayout = LayoutPump then
     Result := 'Pump'
+  else if ALayout = LayoutScale then
+    Result := 'Scale'
   else if ALayout = LayoutMain then
     Result := 'Main'
   else if ALayout = LayoutMesure then
@@ -2054,6 +2106,8 @@ begin
     Result := LayoutFlowRate
   else if SameText(AKey, 'Pump') then
     Result := LayoutPump
+  else if SameText(AKey, 'Scale') then
+    Result := LayoutScale
   else if SameText(AKey, 'Main') then
     Result := LayoutMain
   else if SameText(AKey, 'Mesure') then
@@ -2098,6 +2152,7 @@ var
   begin
     Result := ((ALayout = LayoutFlowRate) and AFlowRateVisible) or
       ((ALayout = LayoutPump) and APumpVisible) or
+      (ALayout = LayoutScale) or
       ((ALayout = LayoutMain) and AMainVisible) or
       ((ALayout = LayoutMesure) and AMesureVisible) or
       ((ALayout = LayoutConditions) and AConditionsVisible) or
@@ -2121,7 +2176,7 @@ begin
   HorzScrollBoxInstrumental.BeginUpdate;
   try
     FInstrumentalVisibleOrder.Clear;
-    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutScale, LayoutMain,
       LayoutMesure, LayoutConditions, LayoutProcedures] do
     begin
       Layout.Align := TAlignLayout.None;
@@ -2148,6 +2203,7 @@ begin
   // 2) Если в сохраненном порядке чего-то нет, добираем в порядке пунктов меню.
   ShowIfVisibleAndNotAdded(LayoutFlowRate);
   ShowIfVisibleAndNotAdded(LayoutPump);
+  ShowIfVisibleAndNotAdded(LayoutScale);
   ShowIfVisibleAndNotAdded(LayoutMain);
   ShowIfVisibleAndNotAdded(LayoutMesure);
   ShowIfVisibleAndNotAdded(LayoutConditions);
@@ -2796,9 +2852,15 @@ begin
     SetDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
     LoadLayoutSettingsFromWorkTable;
     RefreshPumpsCombo;
+    RefreshScalesCombo;
+    UpdateUIScale;
   end
   else
+  begin
     RefreshPumpsCombo;
+    RefreshScalesCombo;
+    UpdateUIScale;
+  end
 
   if FFrameMeasurementRun <> nil then
     FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
@@ -3178,7 +3240,9 @@ procedure TFrameMainTable.ActionPumpAddExecute(Sender: TObject);
 begin
         FActiveWorkTable.AddPump('1');
         RefreshPumpsCombo;
+        RefreshScalesCombo;
         UpdateUIPump;
+        UpdateUIScale;
 end;
 
 procedure TFrameMainTable.ActionPumpDeleteExecute(Sender: TObject);
@@ -3188,7 +3252,9 @@ begin
 
         FActiveWorkTable.RemovePump(FActiveWorkTable.ActivePump);
         RefreshPumpsCombo;
+        RefreshScalesCombo;
         UpdateUIPump;
+        UpdateUIScale;
 end;
 
 procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
@@ -3958,6 +4024,34 @@ begin
   ComboBoxPumps.Tag:=2;
 end;
 
+procedure TFrameMainTable.ComboBoxScalesChange(Sender: TObject);
+begin
+  if (FActiveWorkTable = nil) or not ((LayoutScale.Tag = 0) or (LayoutScale.Tag = 3)) then
+    Exit;
+
+  LayoutScale.Tag := 0;
+  FActiveWorkTable.SetActiveScale(ComboBoxScales.Text);
+  UpdateUIScale;
+end;
+
+procedure TFrameMainTable.ButtonScaleTareClick(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  FActiveWorkTable.DoScaleTare;
+  UpdateUIScale;
+end;
+
+procedure TFrameMainTable.ButtonScaleDrainClick(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  FActiveWorkTable.DoScaleDrain;
+  UpdateUIScale;
+end;
+
 procedure TFrameMainTable.ComboBoxUnitsChange(Sender: TObject);
 var
   UnitName: string;
@@ -3969,6 +4063,7 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
+  UpdateUIScale;
 
   GridDevices.SetFocus;
 end;
@@ -4211,6 +4306,7 @@ begin
   //Grid Headers + Instrumental Labels
     UpdateUIFromValues;
     UpdateUIPump;
+    UpdateUIScale;
     UpdateUIFlowRate;
     UpdateUIConditions;
   finally
@@ -5934,6 +6030,50 @@ begin
 
 
 
+end;
+
+procedure TFrameMainTable.UpdateUIScale;
+var
+  WorkTable: TWorkTable;
+  UnitName: string;
+  I: Integer;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+  begin
+    LabelScaleWeight.Text := '-';
+    LabelScaleDevice.Text := #1042#1077#1089#1099': -';
+    Exit;
+  end;
+
+  UnitName := Trim(ComboEditUnits.Text);
+  if UnitName = '' then
+    UnitName := Trim(WorkTable.QuantityUnitName);
+  if UnitName = '' then
+    UnitName := #1082#1075;
+
+  LabelScaleWeight.Text := FormatFloat('0.###', WorkTable.DisplayWeight) + ' ' + UnitName;
+
+  if WorkTable.ActiveScale <> nil then
+    LabelScaleDevice.Text := #1042#1077#1089#1099': ' + WorkTable.ActiveScale.Name
+  else
+    LabelScaleDevice.Text := #1042#1077#1089#1099': -';
+
+  if LayoutScale.Tag = 3 then
+    Exit;
+
+  LayoutScale.Tag := 2;
+  try
+    if (WorkTable.ActiveScale <> nil) and (ComboBoxScales.Count <> 0) then
+      for I := ComboBoxScales.Count - 1 downto 0 do
+        if ComboBoxScales.Items[I] = WorkTable.ActiveScale.Name then
+        begin
+          ComboBoxScales.ItemIndex := I;
+          Break;
+        end;
+  finally
+    LayoutScale.Tag := 0;
+  end;
 end;
 
 procedure TFrameMainTable.UpdateUIFlowRate;
