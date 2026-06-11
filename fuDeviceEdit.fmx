@@ -1,7 +1,7 @@
 object FormDeviceEditor: TFormDeviceEditor
   Left = 0
   Top = 0
-  Caption = 'Form2'
+  Caption = #1059#1089#1090#1088#1086#1081#1089#1090#1074#1086
   ClientHeight = 814
   ClientWidth = 1456
   FormFactor.Width = 320
@@ -14,9 +14,9 @@ object FormDeviceEditor: TFormDeviceEditor
     Align = Left
     Margins.Top = 10.000000000000000000
     Margins.Right = -5.000000000000000000
-    Position.Y = 35.000000000000000000
+    Position.Y = 10.000000000000000000
     Size.Width = 343.000000000000000000
-    Size.Height = 709.000000000000000000
+    Size.Height = 734.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 2
     object grpCommonInfo: TGroupBox
@@ -858,24 +858,24 @@ object FormDeviceEditor: TFormDeviceEditor
     object tcOutPutType: TTabControl
       Align = Client
       Size.Width = 343.000000000000000000
-      Size.Height = 151.000000000000000000
+      Size.Height = 176.000000000000000000
       Size.PlatformDefault = False
       TabIndex = 2
       TabOrder = 42
       TabPosition = None
       Sizes = (
         343s
-        151s
+        176s
         343s
-        151s
+        176s
         343s
-        151s
+        176s
         343s
-        151s
+        176s
         343s
-        151s
+        176s
         343s
-        151s)
+        176s)
       object tiVoltage: TTabItem
         CustomIcon = <
           item
@@ -900,7 +900,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 146.000000000000000000
+          Size.Height = 171.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1053#1072#1087#1088#1103#1078#1077#1085#1080#1077
@@ -1064,7 +1064,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 146.000000000000000000
+          Size.Height = 171.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1058#1086#1082
@@ -1228,7 +1228,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 146.000000000000000000
+          Size.Height = 171.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1048#1084#1087#1091#1083#1100#1089#1099
@@ -1377,7 +1377,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 146.000000000000000000
+          Size.Height = 171.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1062#1080#1092#1088#1086#1074#1086#1081' '#1080#1085#1090#1077#1088#1092#1077#1081#1089
@@ -1560,7 +1560,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 146.000000000000000000
+          Size.Height = 171.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1042#1080#1079#1091#1072#1083#1100#1085#1099#1081' '#1082#1086#1085#1090#1086#1083#1100
@@ -1744,7 +1744,7 @@ object FormDeviceEditor: TFormDeviceEditor
           Margins.Right = 5.000000000000000000
           Margins.Bottom = 5.000000000000000000
           Size.Width = 333.000000000000000000
-          Size.Height = 146.000000000000000000
+          Size.Height = 171.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'groupstyle'
           Text = #1063#1072#1089#1090#1086#1090#1072
@@ -1928,7 +1928,7 @@ object FormDeviceEditor: TFormDeviceEditor
     Align = Client
     Margins.Top = 10.000000000000000000
     Size.Width = 1107.000000000000000000
-    Size.Height = 709.000000000000000000
+    Size.Height = 734.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1
     object grpWorkShedule: TGroupBox
@@ -2207,7 +2207,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Margins.Right = 5.000000000000000000
       Margins.Bottom = 5.000000000000000000
       Size.Width = 1102.000000000000000000
-      Size.Height = 231.000000000000000000
+      Size.Height = 256.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = 'groupstyle'
       Text = #1063#1072#1089#1090#1085#1072#1103' '#1080#1085#1092#1086#1088#1084#1072#1094#1080#1103
@@ -2281,12 +2281,12 @@ object FormDeviceEditor: TFormDeviceEditor
         Margins.Right = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
         Size.Width = 1082.000000000000000000
-        Size.Height = 146.000000000000000000
+        Size.Height = 171.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
         OnExit = mmoCommentExit
         Viewport.Width = 1078.000000000000000000
-        Viewport.Height = 142.000000000000000000
+        Viewport.Height = 167.000000000000000000
       end
     end
     object GroupBox7: TGroupBox
@@ -2497,29 +2497,6 @@ object FormDeviceEditor: TFormDeviceEditor
       end
     end
   end
-  object layTop: TLayout
-    Align = Top
-    Size.Width = 1456.000000000000000000
-    Size.Height = 25.000000000000000000
-    Size.PlatformDefault = False
-    TabOrder = 3
-    object GroupBox1: TGroupBox
-      Align = Client
-      Padding.Left = 5.000000000000000000
-      Padding.Top = 5.000000000000000000
-      Padding.Right = 5.000000000000000000
-      Padding.Bottom = 5.000000000000000000
-      Margins.Left = 5.000000000000000000
-      Margins.Right = 5.000000000000000000
-      Margins.Bottom = -2.000000000000000000
-      Size.Width = 1446.000000000000000000
-      Size.Height = 27.000000000000000000
-      Size.PlatformDefault = False
-      StyleLookup = 'groupstyle'
-      Text = #1059#1089#1090#1088#1086#1081#1089#1090#1074#1086
-      TabOrder = 0
-    end
-  end
   object lytButtons: TLayout
     Align = MostBottom
     Margins.Left = 10.000000000000000000
@@ -2614,9 +2591,8 @@ object FormDeviceEditor: TFormDeviceEditor
     Cursor = crHSplit
     MinSize = 20.000000000000000000
     Position.X = 338.000000000000000000
-    Position.Y = 25.000000000000000000
     Size.Width = 11.000000000000000000
-    Size.Height = 719.000000000000000000
+    Size.Height = 744.000000000000000000
     Size.PlatformDefault = False
   end
   object NetHTTPClient1: TNetHTTPClient

@@ -3031,6 +3031,14 @@ begin
      // Ini.WriteFloat(Section, 'Press', WorkTable.Press);
       Ini.WriteFloat(Section, 'PressDelta', WorkTable.PressDelta);
       Ini.WriteFloat(Section, 'FlowRate', WorkTable.FlowRate.Value.Value);
+      Ini.WriteFloat(Section, 'PressureMin', WorkTable.FluidPress.Min);
+      Ini.WriteFloat(Section, 'PressureMax', WorkTable.FluidPress.Max);
+      Ini.WriteFloat(Section, 'TempMin', WorkTable.FluidTemp.Min);
+      Ini.WriteFloat(Section, 'TempMax', WorkTable.FluidTemp.Max);
+      Ini.WriteFloat(Section, 'FlowRateMin', WorkTable.FlowRate.Min);
+      Ini.WriteFloat(Section, 'FlowRateMax', WorkTable.FlowRate.Max);
+      Ini.WriteFloat(Section, 'QuantityMin', WorkTable.TableFlow.QuantityMin);
+      Ini.WriteFloat(Section, 'QuantityMax', WorkTable.TableFlow.QuantityMax);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
       if WorkTable.CurrentPoint <> nil then
@@ -3149,6 +3157,14 @@ begin
       //WorkTable.Press := Ini.ReadFloat(Section, 'Press', 0);
       WorkTable.PressDelta := S2F(Ini.ReadString(Section, 'PressDelta','0'));
      // WorkTable.FlowRate.Value.Value := S2F(Ini.ReadString(Section, 'FlowRate', '0'));
+      WorkTable.FluidPress.Min := S2F(Ini.ReadString(Section, 'PressureMin', FloatToStr(WorkTable.FluidPress.Min)));
+      WorkTable.FluidPress.Max := S2F(Ini.ReadString(Section, 'PressureMax', FloatToStr(WorkTable.FluidPress.Max)));
+      WorkTable.FluidTemp.Min := S2F(Ini.ReadString(Section, 'TempMin', FloatToStr(WorkTable.FluidTemp.Min)));
+      WorkTable.FluidTemp.Max := S2F(Ini.ReadString(Section, 'TempMax', FloatToStr(WorkTable.FluidTemp.Max)));
+      WorkTable.FlowRate.Min := S2F(Ini.ReadString(Section, 'FlowRateMin', FloatToStr(WorkTable.FlowRate.Min)));
+      WorkTable.FlowRate.Max := S2F(Ini.ReadString(Section, 'FlowRateMax', FloatToStr(WorkTable.FlowRate.Max)));
+      WorkTable.TableFlow.QuantityMin := S2F(Ini.ReadString(Section, 'QuantityMin', FloatToStr(WorkTable.TableFlow.QuantityMin)));
+      WorkTable.TableFlow.QuantityMax := S2F(Ini.ReadString(Section, 'QuantityMax', FloatToStr(WorkTable.TableFlow.QuantityMax)));
       WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
       WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
       if WorkTable.CurrentPoint <> nil then

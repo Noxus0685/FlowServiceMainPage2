@@ -5271,7 +5271,7 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 2
+          TabIndex = 3
           TabOrder = 1
           TabPosition = PlatformDefault
           Sizes = (
@@ -5322,7 +5322,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
+            IsSelected = False
             Size.Width = 120.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
@@ -5337,7 +5337,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
+            IsSelected = True
             Size.Width = 95.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
