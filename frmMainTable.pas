@@ -1064,7 +1064,7 @@ end;
 
 procedure TFrameMainTable.RefreshScalesCombo;
 var
-  Scale: TScale;
+  Scale: TWeight;
   SelectedScaleName: string;
   ItemIndex: Integer;
   OldTag: NativeInt;
@@ -1075,14 +1075,14 @@ begin
     ComboBoxScales.Items.Clear;
     ComboBoxScales.ItemIndex := -1;
 
-    if (FActiveWorkTable = nil) or (FActiveWorkTable.Scales = nil) then
+    if (FActiveWorkTable = nil) or (FActiveWorkTable.Weights = nil) then
       Exit;
 
     SelectedScaleName := Trim(ComboBoxScales.Text);
     if (SelectedScaleName = '') and (FActiveWorkTable.ActiveScale <> nil) then
       SelectedScaleName := FActiveWorkTable.ActiveScale.Name;
 
-    for Scale in FActiveWorkTable.Scales do
+    for Scale in FActiveWorkTable.Weights do
       if Scale <> nil then
         ComboBoxScales.Items.Add(Scale.Name);
 
@@ -4341,8 +4341,8 @@ begin
   if DeltaSeconds <= 0 then
     DeltaSeconds := 1;
 
-  AWorkTable.CurrentWeight := AWorkTable.CurrentWeight + FlowPerSecond * DeltaSeconds;
-  AWorkTable.ActiveScale.CurrentWeight := AWorkTable.CurrentWeight;
+  AWorkTable.Value := AWorkTable.Value + FlowPerSecond * DeltaSeconds;
+  AWorkTable.ActiveScale.CurentValue := AWorkTable.Value;
 end;
 
 procedure TFrameMainTable.SetValues;
@@ -6187,9 +6187,9 @@ begin
   end;
 
   LabelScaleWeight.Text := FormatFloat('0.###',
-    ConvertScaleWeight(WorkTable.DisplayWeight, UnitName));
+    ConvertScaleWeight(WorkTable.CurentValue, UnitName));
   LabelScaleTotalWeight.Text := FormatFloat('0.###',
-    ConvertScaleWeight(WorkTable.CurrentWeight, UnitName));
+    ConvertScaleWeight(WorkTable.Value, UnitName));
 
   if LayoutScale.Tag = 3 then
     Exit;
