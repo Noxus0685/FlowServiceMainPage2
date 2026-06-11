@@ -11,7 +11,7 @@ uses
   FMX.ListBox,
   FMX.Objects,
   FMX.StdCtrls,
-  FMX.TabControl,
+  FMX.TreeView,
   FMX.Types,
   System.Classes,
   System.SysUtils,
@@ -27,14 +27,13 @@ type
     FWorkTable: TWorkTable;
     FLoading: Boolean;
 
-    LayoutRoot: TVertScrollBox;
+    LayoutRoot: TLayout;
     EditWorkTableText: TEdit;
     EditWorkTableName: TEdit;
     LabelWorkTableUUID: TLabel;
     LabelWorkTableState: TLabel;
     ComboEditMode: TComboBox;
-    PanelMeterValues: TPanel;
-    TabMeterValues: TTabControl;
+    TreeProperties: TTreeView;
     EditPressureMin: TEdit;
     EditPressureMax: TEdit;
     EditTempertureMin: TEdit;
@@ -53,13 +52,13 @@ type
     ButtonSelectQuantity: TButton;
 
     procedure BuildUI;
-    procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
-    procedure AddLabelRow(const ACaption: string; out ALabel: TLabel);
-    procedure AddComboRow(const ACaption: string; out ACombo: TComboBox);
-    procedure AddMeterValueRow(AParent: TFmxObject; const ACaption: string; out AEdit: TEdit;
+    procedure AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
+    procedure AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
+    procedure AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
+    procedure AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
       out AButton: TButton; AOnClick: TNotifyEvent);
-    function CreateMeterPageLayout(const ATabCaption: string): TLayout;
-    function CreateLimitEdit(AParent: TFmxObject; const ACaption: string; const ATag: Integer): TEdit;
+    function AddCategory(const ACaption: string): TTreeViewItem;
+    function CreateLimitEdit(AParent: TTreeViewItem; const ACaption: string; const ATag: Integer): TEdit;
     function MeterValueToText(AMeterValue: TMeterValue): string;
     function WorkTableStateToCaption(AState: EStateWorkTable): string;
     function ParameterByKind(const AKind: Integer): TParameter;
@@ -97,81 +96,119 @@ end;
 
 procedure TFrameWorkTableProperties.BuildUI;
 var
-  PressureTab: TLayout;
-  TempertureTab: TLayout;
-  FlowRateTab: TLayout;
-  QuantityTab: TLayout;
+  GeneralCategory: TTreeViewItem;
+  PressureCategory: TTreeViewItem;
+  TempertureCategory: TTreeViewItem;
+  FlowRateCategory: TTreeViewItem;
+  QuantityCategory: TTreeViewItem;
+  HeaderGrid: TGridPanelLayout;
+  HeaderProperty: TLabel;
+  HeaderValue: TLabel;
+  HeaderDivider: TLine;
 begin
-  LayoutRoot := TVertScrollBox.Create(Self);
+  LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
   LayoutRoot.Align := TAlignLayout.Client;
   LayoutRoot.Padding.Rect := TRectF.Create(8, 8, 8, 8);
   LayoutRoot.Stored := False;
 
-  AddEditRow('Название рабочего стола', EditWorkTableText);
+  TreeProperties := TTreeView.Create(Self);
+  TreeProperties.Parent := LayoutRoot;
+  TreeProperties.Align := TAlignLayout.Client;
+  TreeProperties.ShowCheckboxes := False;
+  TreeProperties.ItemHeight := 32;
+  TreeProperties.Stored := False;
+
+  HeaderGrid := TGridPanelLayout.Create(Self);
+  HeaderGrid.Parent := LayoutRoot;
+  HeaderGrid.Align := TAlignLayout.Top;
+  HeaderGrid.Height := 30;
+  HeaderGrid.RowCollection.Clear;
+  HeaderGrid.ColumnCollection.Clear;
+  HeaderGrid.ColumnCollection.Add.Value := 45;
+  HeaderGrid.ColumnCollection.Add.Value := 55;
+  HeaderGrid.RowCollection.Add.Value := 100;
+  HeaderGrid.Stored := False;
+
+  HeaderProperty := TLabel.Create(Self);
+  HeaderProperty.Parent := HeaderGrid;
+  HeaderProperty.Align := TAlignLayout.Client;
+  HeaderProperty.Text := 'Свойство';
+  HeaderProperty.StyledSettings := [];
+  HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
+  HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
+  HeaderProperty.Margins.Rect := TRectF.Create(10, 0, 8, 0);
+  HeaderGrid.ControlCollection.AddControl(HeaderProperty, 0, 0);
+
+  HeaderValue := TLabel.Create(Self);
+  HeaderValue.Parent := HeaderGrid;
+  HeaderValue.Align := TAlignLayout.Client;
+  HeaderValue.Text := 'Значение';
+  HeaderValue.StyledSettings := [];
+  HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
+  HeaderValue.TextSettings.FontColor := $FF3D3D3D;
+  HeaderValue.Margins.Rect := TRectF.Create(8, 0, 10, 0);
+  HeaderGrid.ControlCollection.AddControl(HeaderValue, 1, 0);
+
+  HeaderDivider := TLine.Create(Self);
+  HeaderDivider.Parent := LayoutRoot;
+  HeaderDivider.Align := TAlignLayout.Top;
+  HeaderDivider.Height := 1;
+  HeaderDivider.LineType := TLineType.Bottom;
+  HeaderDivider.Stroke.Color := $FFCDCDCD;
+  HeaderDivider.Stored := False;
+
+  GeneralCategory := AddCategory('Рабочий стол');
+  AddEditRow(GeneralCategory, 'Название рабочего стола', EditWorkTableText);
   EditWorkTableText.OnExit := HandleWorkTableTextExit;
 
-  AddEditRow('Имя рабочего стола', EditWorkTableName);
+  AddEditRow(GeneralCategory, 'Имя рабочего стола', EditWorkTableName);
   EditWorkTableName.OnExit := HandleWorkTableNameExit;
 
-  AddLabelRow('UUID рабочего стола', LabelWorkTableUUID);
-  AddLabelRow('Текущее состояние', LabelWorkTableState);
+  AddLabelRow(GeneralCategory, 'UUID рабочего стола', LabelWorkTableUUID);
+  AddLabelRow(GeneralCategory, 'Текущее состояние', LabelWorkTableState);
 
-  AddComboRow('Редактирование', ComboEditMode);
+  AddComboRow(GeneralCategory, 'Редактирование', ComboEditMode);
   ComboEditMode.Items.Add('Можно редактировать');
   ComboEditMode.Items.Add('Нельзя редактировать');
   ComboEditMode.ItemIndex := 0;
   ComboEditMode.OnChange := HandleEditModeChange;
 
-  PanelMeterValues := TPanel.Create(Self);
-  PanelMeterValues.Parent := LayoutRoot;
-  PanelMeterValues.Align := TAlignLayout.Top;
-  PanelMeterValues.Height := 150;
-  PanelMeterValues.Margins.Rect := TRectF.Create(0, 8, 0, 0);
-  PanelMeterValues.Stored := False;
-
-  TabMeterValues := TTabControl.Create(Self);
-  TabMeterValues.Parent := PanelMeterValues;
-  TabMeterValues.Align := TAlignLayout.Client;
-  TabMeterValues.Stored := False;
-
-  PressureTab := CreateMeterPageLayout('Давление');
-  AddMeterValueRow(PressureTab, 'Давление', EditPressure, ButtonSelectPressure,
+  PressureCategory := AddCategory('Давление');
+  AddMeterValueRow(PressureCategory, 'Давление', EditPressure, ButtonSelectPressure,
     ButtonSelectPressureClick);
-  EditPressureMin := CreateLimitEdit(PressureTab, 'Мин значение', 0);
-  EditPressureMax := CreateLimitEdit(PressureTab, 'Макс значение', 1);
+  EditPressureMin := CreateLimitEdit(PressureCategory, 'Мин значение', 0);
+  EditPressureMax := CreateLimitEdit(PressureCategory, 'Макс значение', 1);
 
-  TempertureTab := CreateMeterPageLayout('Температура');
-  AddMeterValueRow(TempertureTab, 'Температура', EditTemperture, ButtonSelectTemperture,
+  TempertureCategory := AddCategory('Температура');
+  AddMeterValueRow(TempertureCategory, 'Температура', EditTemperture, ButtonSelectTemperture,
     ButtonSelectTempertureClick);
-  EditTempertureMin := CreateLimitEdit(TempertureTab, 'Мин значение', 2);
-  EditTempertureMax := CreateLimitEdit(TempertureTab, 'Макс значение', 3);
+  EditTempertureMin := CreateLimitEdit(TempertureCategory, 'Мин значение', 2);
+  EditTempertureMax := CreateLimitEdit(TempertureCategory, 'Макс значение', 3);
 
-  FlowRateTab := CreateMeterPageLayout('Расход');
-  AddMeterValueRow(FlowRateTab, 'Расход', EditFlowRate, ButtonSelectFlowRate,
+  FlowRateCategory := AddCategory('Расход');
+  AddMeterValueRow(FlowRateCategory, 'Расход', EditFlowRate, ButtonSelectFlowRate,
     ButtonSelectFlowRateClick);
-  EditFlowRateMin := CreateLimitEdit(FlowRateTab, 'Мин значение', 4);
-  EditFlowRateMax := CreateLimitEdit(FlowRateTab, 'Макс значение', 5);
+  EditFlowRateMin := CreateLimitEdit(FlowRateCategory, 'Мин значение', 4);
+  EditFlowRateMax := CreateLimitEdit(FlowRateCategory, 'Макс значение', 5);
 
-  QuantityTab := CreateMeterPageLayout('Жидкость');
-  AddMeterValueRow(QuantityTab, 'Количество жидкости', EditQuantity, ButtonSelectQuantity,
+  QuantityCategory := AddCategory('Жидкость');
+  AddMeterValueRow(QuantityCategory, 'Количество жидкости', EditQuantity, ButtonSelectQuantity,
     ButtonSelectQuantityClick);
-  EditQuantityMin := CreateLimitEdit(QuantityTab, 'Мин значение', 6);
-  EditQuantityMax := CreateLimitEdit(QuantityTab, 'Макс значение', 7);
-  TabMeterValues.TabIndex := 0;
+  EditQuantityMin := CreateLimitEdit(QuantityCategory, 'Мин значение', 6);
+  EditQuantityMax := CreateLimitEdit(QuantityCategory, 'Макс значение', 7);
 end;
 
-procedure TFrameWorkTableProperties.AddEditRow(const ACaption: string; out AEdit: TEdit);
+procedure TFrameWorkTableProperties.AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Item := TLayout.Create(Self);
-  Item.Parent := LayoutRoot;
-  Item.Align := TAlignLayout.Top;
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
   Item.Height := 36;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -201,17 +238,16 @@ begin
   RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
 end;
 
-procedure TFrameWorkTableProperties.AddLabelRow(const ACaption: string; out ALabel: TLabel);
+procedure TFrameWorkTableProperties.AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Item := TLayout.Create(Self);
-  Item.Parent := LayoutRoot;
-  Item.Align := TAlignLayout.Top;
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
   Item.Height := 32;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -241,17 +277,16 @@ begin
   RowGrid.ControlCollection.AddControl(ALabel, 1, 0);
 end;
 
-procedure TFrameWorkTableProperties.AddComboRow(const ACaption: string; out ACombo: TComboBox);
+procedure TFrameWorkTableProperties.AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Item := TLayout.Create(Self);
-  Item.Parent := LayoutRoot;
-  Item.Align := TAlignLayout.Top;
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
   Item.Height := 36;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -280,19 +315,18 @@ begin
   RowGrid.ControlCollection.AddControl(ACombo, 1, 0);
 end;
 
-procedure TFrameWorkTableProperties.AddMeterValueRow(AParent: TFmxObject; const ACaption: string; out AEdit: TEdit;
+procedure TFrameWorkTableProperties.AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
   out AButton: TButton; AOnClick: TNotifyEvent);
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
   ValueLayout: TLayout;
 begin
-  Item := TLayout.Create(Self);
+  Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
-  Item.Align := TAlignLayout.Top;
+  Item.Text := '';
   Item.Height := 36;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -335,34 +369,30 @@ begin
   AEdit.ReadOnly := True;
 end;
 
-function TFrameWorkTableProperties.CreateMeterPageLayout(const ATabCaption: string): TLayout;
-var
-  TabItem: TTabItem;
+function TFrameWorkTableProperties.AddCategory(const ACaption: string): TTreeViewItem;
 begin
-  TabItem := TTabItem.Create(Self);
-  TabItem.Parent := TabMeterValues;
-  TabItem.Text := ATabCaption;
-  TabItem.Stored := False;
-
-  Result := TLayout.Create(Self);
-  Result.Parent := TabItem;
-  Result.Align := TAlignLayout.Client;
-  Result.Padding.Rect := TRectF.Create(6, 8, 6, 6);
+  Result := TTreeViewItem.Create(Self);
+  Result.Parent := TreeProperties;
+  Result.Text := ACaption;
+  Result.StyledSettings := [];
+  Result.TextSettings.Font.Style := [TFontStyle.fsBold];
+  Result.TextSettings.FontColor := $FF2C2C2C;
+  Result.IsExpanded := True;
+  Result.Height := 30;
   Result.Stored := False;
 end;
 
-function TFrameWorkTableProperties.CreateLimitEdit(AParent: TFmxObject; const ACaption: string;
+function TFrameWorkTableProperties.CreateLimitEdit(AParent: TTreeViewItem; const ACaption: string;
   const ATag: Integer): TEdit;
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Item := TLayout.Create(Self);
+  Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
-  Item.Align := TAlignLayout.Top;
+  Item.Text := '';
   Item.Height := 36;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
