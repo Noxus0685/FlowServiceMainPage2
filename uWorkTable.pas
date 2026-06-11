@@ -4531,8 +4531,8 @@ end;
 procedure TWorkTable.DoScaleDrain;
 begin
   // TODO: добавить аппаратную команду слива воды после появления поддержки весов.
-  CurrentWeight := 0;
-  ScaleTareWeight := 0;
+  // Общий накопленный вес не сбрасываем; текущий отображаемый вес обнуляем тарой.
+  ScaleTareWeight := CurrentWeight;
   if ActiveScale <> nil then
   begin
     ActiveScale.CurrentWeight := CurrentWeight;

@@ -153,7 +153,7 @@ type
     LayoutScaleDisplay: TLayout;
     RectangleScaleWeight: TRectangle;
     LabelScaleWeight: TLabel;
-    LabelScaleDevice: TLabel;
+    LabelScaleTotalWeight: TLabel;
     LayoutScaleSelect: TLayout;
     ComboBoxScales: TComboBox;
     ButtonScaleDrain: TButton;
@@ -6163,7 +6163,7 @@ begin
   if WorkTable = nil then
   begin
     LabelScaleWeight.Text := '-';
-    LabelScaleDevice.Text := #1042#1077#1089#1099': -';
+    LabelScaleTotalWeight.Text := #1042#1089#1077#1075#1086': -';
     Exit;
   end;
 
@@ -6171,11 +6171,8 @@ begin
 
   LabelScaleWeight.Text := FormatFloat('0.###',
     ConvertScaleWeight(WorkTable.DisplayWeight, UnitName)) + ' ' + UnitName;
-
-  if WorkTable.ActiveScale <> nil then
-    LabelScaleDevice.Text := #1042#1077#1089#1099': ' + WorkTable.ActiveScale.Name
-  else
-    LabelScaleDevice.Text := #1042#1077#1089#1099': -';
+  LabelScaleTotalWeight.Text := #1042#1089#1077#1075#1086': ' + FormatFloat('0.###',
+    ConvertScaleWeight(WorkTable.CurrentWeight, UnitName)) + ' ' + UnitName;
 
   if LayoutScale.Tag = 3 then
     Exit;

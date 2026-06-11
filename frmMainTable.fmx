@@ -1204,7 +1204,7 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 40.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              object LabelScaleDevice: TLabel
+              object LabelScaleTotalWeight: TLabel
                 Align = Left
                 StyledSettings = [Family, FontColor]
                 Size.Width = 119.000000000000000000
@@ -1214,7 +1214,7 @@ object FrameMainTable: TFrameMainTable
                 TextSettings.Font.Size = 14.000000000000000000
                 TextSettings.Font.StyleExt = {00070000000000000004000000}
                 TextSettings.HorzAlign = Center
-                Text = #1042#1077#1089#1099': -'
+                Text = #1042#1089#1077#1075#1086': 0'
                 TabOrder = 0
               end
               object RectangleScaleWeight: TRectangle
