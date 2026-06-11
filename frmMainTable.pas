@@ -151,9 +151,14 @@ type
     LineScale: TLine;
     LayoutScaleClient: TLayout;
     LayoutScaleDisplay: TLayout;
+    LayoutScaleTotal: TLayout;
+    Label1: TLabel;
+    RectangleScaleTotalWeight: TRectangle;
+    LabelScaleTotalWeight: TLabel;
+    LayoutScaleCurrent: TLayout;
+    Label3: TLabel;
     RectangleScaleWeight: TRectangle;
     LabelScaleWeight: TLabel;
-    LabelScaleTotalWeight: TLabel;
     LayoutScaleSelect: TLayout;
     ComboBoxScales: TComboBox;
     ButtonScaleDrain: TButton;
@@ -843,6 +848,18 @@ begin
     Result := AWeightBase / 1000
   else
     Result := AWeightBase;
+end;
+
+function BuildScaleCaption(const ACaptionPrefix, AUnit: string): string;
+var
+  ValueName: string;
+begin
+  if SameText(AUnit, 'л') or SameText(AUnit, 'м3') then
+    ValueName := 'объем'
+  else
+    ValueName := 'вес';
+
+  Result := ACaptionPrefix + ' ' + ValueName + ', ' + AUnit;
 end;
 
 function ResolveQuantityUnitByFlowUnit(const AUnit: string): string;
@@ -6160,19 +6177,22 @@ var
   I: Integer;
 begin
   WorkTable := FActiveWorkTable;
+  UnitName := NormalizeScaleUnit(ComboEditUnits.Text);
+
+  Label1.Text := BuildScaleCaption('Общий', UnitName);
+  Label3.Text := BuildScaleCaption('Текущий', UnitName);
+
   if WorkTable = nil then
   begin
     LabelScaleWeight.Text := '-';
-    LabelScaleTotalWeight.Text := #1042#1089#1077#1075#1086': -';
+    LabelScaleTotalWeight.Text := '-';
     Exit;
   end;
 
-  UnitName := NormalizeScaleUnit(ComboEditUnits.Text);
-
   LabelScaleWeight.Text := FormatFloat('0.###',
-    ConvertScaleWeight(WorkTable.DisplayWeight, UnitName)) + ' ' + UnitName;
-  LabelScaleTotalWeight.Text := #1042#1089#1077#1075#1086': ' + FormatFloat('0.###',
-    ConvertScaleWeight(WorkTable.CurrentWeight, UnitName)) + ' ' + UnitName;
+    ConvertScaleWeight(WorkTable.DisplayWeight, UnitName));
+  LabelScaleTotalWeight.Text := FormatFloat('0.###',
+    ConvertScaleWeight(WorkTable.CurrentWeight, UnitName));
 
   if LayoutScale.Tag = 3 then
     Exit;
