@@ -625,8 +625,6 @@ type
     procedure SetValues;
     function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
     procedure FillDNItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
-    procedure AttachDeviceSignalPopupHandler;
-    procedure DeviceSignalPopupCellChange(Sender: TObject);
     function ApplyChannelDNChange(AChannel: TChannel; const ANewDN: string): Boolean;
     procedure ApplyActiveWorkTableEditMode;
     procedure UpdateGridPopupActions;
@@ -4861,33 +4859,6 @@ begin
     OnChangeState(swtSTANDBY);
 end;
 
-procedure TFrameMainTable.AttachDeviceSignalPopupHandler;
-var
-  Cell: TFmxObject;
-begin
-  for Cell in PopupColumnDeviceSignal1.Children do
-    if Cell is TPopupCell then
-      TPopupCell(Cell).OnChange := DeviceSignalPopupCellChange;
-end;
-
-procedure TFrameMainTable.DeviceSignalPopupCellChange(Sender: TObject);
-var
-  Row: Integer;
-begin
-  if IsUpdating or not (Sender is TPopupCell) then
-    Exit;
-
-  Row := GridDevices.Row;
-  if Row < 0 then
-    Exit;
-
-  GridDevicesSetValue(GridDevices, PopupColumnDeviceSignal1.Index, Row,
-    TPopupCell(Sender).Text);
-  GridDevices.EditorMode := False;
-  GridDevices.ReadOnly := True;
-  GridDevices.Repaint;
-end;
-
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -4948,11 +4919,6 @@ begin
     GridDevices.ReadOnly:=False;
     GridDevices.EditorMode := True;
     inherited;
-    TThread.Queue(nil,
-      procedure
-      begin
-        AttachDeviceSignalPopupHandler;
-      end);
     Exit;
   end;
 
@@ -5412,7 +5378,6 @@ begin
       DeviceFieldsChanged := Changed;
     end
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
-    begin
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
         Changed := WorkTable.DeviceChannels[ARow].Signal <> Signal;
@@ -5422,9 +5387,6 @@ begin
           WorkTable.DeviceChannels[ARow].FlowMeter.Device.OutputType := Signal;
         DeviceFieldsChanged := True;
       end;
-      GridDevices.EditorMode := False;
-      GridDevices.ReadOnly := True;
-    end;
 
     if Changed then
     begin
