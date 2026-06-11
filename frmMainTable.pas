@@ -155,6 +155,7 @@ type
     RectangleScaleTotalWeight: TRectangle;
     LabelScaleWeight: TLabel;
     LayoutScaleCurrent: TLayout;
+    LabelScaleTotalWeightCaption: TLabel;
     RectangleScaleWeight: TRectangle;
     LabelScaleTotalWeight: TLabel;
     LayoutScaleSelect: TLayout;
@@ -6181,6 +6182,8 @@ begin
   UnitName := NormalizeScaleUnit(ComboEditUnits.Text);
 
 
+  Label3.Text := 'Масса, ' + UnitName;
+
   if WorkTable = nil then
   begin
     LabelScaleWeight.Text := '-';
@@ -6190,8 +6193,7 @@ begin
 
   LabelScaleWeight.Text := FormatFloat('0.###',
     ConvertScaleWeight(WorkTable.CurentValue, UnitName));
-  LabelScaleTotalWeight.Text := FormatFloat('0.###',
-    ConvertScaleWeight(WorkTable.Value, UnitName));
+  LabelScaleTotalWeight.Text := FormatFloat('0.###', WorkTable.Value);
 
   if LayoutScale.Tag = 3 then
     Exit;

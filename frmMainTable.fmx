@@ -1238,6 +1238,17 @@ object FrameMainTable: TFrameMainTable
                 Size.Height = 38.000000000000000000
                 Size.PlatformDefault = False
                 TabOrder = 1
+                object LabelScaleTotalWeightCaption: TLabel
+                  Align = MostTop
+                  StyledSettings = [Family, FontColor]
+                  Size.Width = 110.000000000000000000
+                  Size.Height = 16.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'labelstyle'
+                  TextSettings.HorzAlign = Center
+                  Text = #1042#1077#1089#44#32#1082#1075
+                  TabOrder = 0
+                end
                 object RectangleScaleWeight: TRectangle
                   Align = MostBottom
                   Fill.Color = claWhite
@@ -1306,7 +1317,7 @@ object FrameMainTable: TFrameMainTable
                 Size.Height = 17.000000000000000000
                 Size.PlatformDefault = False
                 StyleLookup = 'labelstyle'
-                Text = #1042#1077#1089#1099
+                Text = #1052#1072#1089#1089#1072#44#32#1082#1075
                 TabOrder = 0
               end
             end
