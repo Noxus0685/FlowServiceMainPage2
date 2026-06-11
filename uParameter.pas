@@ -48,6 +48,13 @@ type
     epError
   );
 
+  EParameterType = (
+    ptUnknown,
+    ptFlow,
+    ptPump,
+    ptScale
+  );
+
   EEventFlowRate = (
     efrStart,
     efrStop,
@@ -162,6 +169,25 @@ end;
     procedure FireEvent(AEvent: EEventPump); overload;
 
   end;
+//---------------------------------
+  TWeight = class(TParameter)
+  private
+    FUUID: string;
+    FCurrentWeight: Double;
+    FTareWeight: Double;
+  public
+    class var Weights: TObjectList<TWeight>;
+
+    constructor Create(const AScaleName: string); overload;
+    constructor Create; overload;
+
+    property UUID: string read FUUID write FUUID;
+    property CurrentWeight: Double read FCurrentWeight write FCurrentWeight;
+    property TareWeight: Double read FTareWeight write FTareWeight;
+    property CurentValue: Double read FCurrentWeight write FCurrentWeight;
+  end;
+
+  TScale = TWeight;
 //---------------------------------
   TFlowRate = class(TParameter)
  private
@@ -546,6 +572,26 @@ begin
 end;
 
   {$ENDREGION 'TPump'}
+
+  {$REGION 'TWeight'}
+
+constructor TWeight.Create;
+begin
+  inherited Create('', '');
+  FUUID := TGUID.NewGuid.ToString;
+  FCurrentWeight := 0;
+  FTareWeight := 0;
+end;
+
+constructor TWeight.Create(const AScaleName: string);
+begin
+  Create;
+  Self.FName := AScaleName;
+  if Weights <> nil then
+    Weights.Add(Self);
+end;
+
+  {$ENDREGION 'TWeight'}
 
 { TParameter }
 

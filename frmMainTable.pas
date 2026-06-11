@@ -147,6 +147,22 @@ type
     SpeedButton28: TSpeedButton;
     Rectangle14: TRectangle;
     LabelLayoutPump: TLabel;
+    LayoutScale: TLayout;
+    LineScale: TLine;
+    LayoutScaleClient: TLayout;
+    LayoutScaleDisplay: TLayout;
+    LayoutScaleTotal: TLayout;
+    RectangleScaleTotalWeight: TRectangle;
+    LabelScaleWeight: TLabel;
+    LayoutScaleCurrent: TLayout;
+    LabelScaleTotalWeightCaption: TLabel;
+    RectangleScaleWeight: TRectangle;
+    LabelScaleTotalWeight: TLabel;
+    LayoutScaleSelect: TLayout;
+    ComboBoxScales: TComboBox;
+    ButtonScaleDrain: TButton;
+    ButtonScaleTare: TButton;
+    LabelLayoutScale: TLabel;
     LayoutConditions: TLayout;
     Layout9: TLayout;
     LayoutPressure: TLayout;
@@ -246,6 +262,7 @@ type
     PopupMenuInstrumentalLayOut: TPopupMenu;
     miFlowRate: TMenuItem;
     miPump: TMenuItem;
+    miScale: TMenuItem;
     miMain: TMenuItem;
     miMesurment: TMenuItem;
     miConditions: TMenuItem;
@@ -467,6 +484,8 @@ type
     ActionPumpDelete: TAction;
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
+    Label3: TLabel;
+    SpeedButton7: TSpeedButton;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
@@ -545,8 +564,12 @@ type
     procedure SetDim(FlowUnitName: string; QuantityUnitName: string);
     procedure SpeedButtonStartPumpClick(Sender: TObject);
     procedure ComboBoxPumpsChange(Sender: TObject);
+    procedure ComboBoxScalesChange(Sender: TObject);
+    procedure ButtonScaleTareClick(Sender: TObject);
+    procedure ButtonScaleDrainClick(Sender: TObject);
     procedure Rectangle14Click(Sender: TObject);
     procedure UpdateUIPump;
+    procedure UpdateUIScale;
     procedure UpdateUIFlowRate;
     procedure ComboBoxPumpsClick(Sender: TObject);
     procedure SpinBoxFreqChange(Sender: TObject);
@@ -635,6 +658,7 @@ type
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure RefreshPumpsCombo;
+    procedure RefreshScalesCombo;
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
       AFoundRepo: TTypeRepository; const AIsTypeChanged: Boolean);
@@ -721,6 +745,9 @@ type
     procedure UpdateUIConditions;
     function   GetMeasurementRun: TMeasurementRun;
     procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
+    procedure FlowMeterPropertiesChanged(Sender: TObject);
+    procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
+    procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -755,6 +782,14 @@ const
     'т/ч'
   );
 
+  CScaleUnits: array[0..4] of string = (
+    'г',
+    'кг',
+    'т',
+    'л',
+    'м3'
+  );
+
   CFlowMeterTypes: array[0..2] of string = (
     'Расходомер ПРЭМ',
     'Расходомер ЭЛЕМЕР',
@@ -781,6 +816,51 @@ begin
     if SameText(AUnit, CVolumeFlowUnits[I]) then
       Exit(True);
   Result := False;
+end;
+
+function IsScaleUnit(const AUnit: string): Boolean;
+var
+  I: Integer;
+begin
+  for I := Low(CScaleUnits) to High(CScaleUnits) do
+    if SameText(AUnit, CScaleUnits[I]) then
+      Exit(True);
+  Result := False;
+end;
+
+function ResolveQuantityUnitByFlowUnit(const AUnit: string): string; forward;
+
+function NormalizeScaleUnit(const AUnit: string): string;
+begin
+  Result := Trim(AUnit);
+  if IsScaleUnit(Result) then
+    Exit;
+
+  Result := ResolveQuantityUnitByFlowUnit(Result);
+  if not IsScaleUnit(Result) then
+    Result := 'кг';
+end;
+
+function ConvertScaleWeight(const AWeightBase: Double; const AUnit: string): Double;
+begin
+  if SameText(AUnit, 'г') then
+    Result := AWeightBase * 1000
+  else if SameText(AUnit, 'т') or SameText(AUnit, 'м3') then
+    Result := AWeightBase / 1000
+  else
+    Result := AWeightBase;
+end;
+
+function BuildScaleCaption(const ACaptionPrefix, AUnit: string): string;
+var
+  ValueName: string;
+begin
+  if SameText(AUnit, 'л') or SameText(AUnit, 'м3') then
+    ValueName := 'объем'
+  else
+    ValueName := 'вес';
+
+  Result := ACaptionPrefix + ' ' + ValueName + ', ' + AUnit;
 end;
 
 function ResolveQuantityUnitByFlowUnit(const AUnit: string): string;
@@ -871,6 +951,55 @@ begin
   FFrameFlowMeterProperties.FlowMeter := Meter;
 end;
 
+procedure TFrameMainTable.FlowMeterPropertiesChanged(Sender: TObject);
+var
+  Row: Integer;
+  Channel: TChannel;
+begin
+  Channel := nil;
+
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+  begin
+    Row := GridDevices.Selected;
+    if (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) then
+      Channel := FActiveWorkTable.DeviceChannels[Row];
+  end;
+
+  RefreshActiveWorkTableViews(Channel, True);
+end;
+
+procedure TFrameMainTable.RefreshActiveWorkTableViews(AChannel: TChannel;
+  ASyncFromFlowMeter: Boolean);
+begin
+  if IsUpdating then
+    Exit;
+
+  if ASyncFromFlowMeter and (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+  begin
+    AChannel.TypeName := AChannel.FlowMeter.DeviceTypeName;
+    AChannel.Serial := AChannel.FlowMeter.SerialNumber;
+    AChannel.Signal := AChannel.FlowMeter.OutputType;
+    MarkChannelDeviceModified(AChannel);
+    SyncChannelsWithSameDeviceUUID(AChannel, AChannel.DeviceUUID);
+  end;
+
+  IsUpdating := True;
+  try
+    UpdateUIFromValues;
+    UpdateGrids;
+    if FFrameWorkTableProperties <> nil then
+      FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+    if AChannel <> nil then
+    begin
+      UpdateFlowMeterPropertiesFrame;
+      if FFrameChannelProperties <> nil then
+        FFrameChannelProperties.LoadFromChannel(AChannel);
+    end;
+  finally
+    IsUpdating := False;
+  end;
+end;
+
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
 var
   P: TGradientPoint;
@@ -932,6 +1061,44 @@ begin
     ComboBoxPumps.Text := '';   }
 
 
+end;
+
+procedure TFrameMainTable.RefreshScalesCombo;
+var
+  Scale: TWeight;
+  SelectedScaleName: string;
+  ItemIndex: Integer;
+  OldTag: NativeInt;
+begin
+  OldTag := LayoutScale.Tag;
+  LayoutScale.Tag := 2;
+  try
+    ComboBoxScales.Items.Clear;
+    ComboBoxScales.ItemIndex := -1;
+
+    if (FActiveWorkTable = nil) or (FActiveWorkTable.Weights = nil) then
+      Exit;
+
+    SelectedScaleName := Trim(ComboBoxScales.Text);
+    if (SelectedScaleName = '') and (FActiveWorkTable.ActiveScale <> nil) then
+      SelectedScaleName := FActiveWorkTable.ActiveScale.Name;
+
+    for Scale in FActiveWorkTable.Weights do
+      if Scale <> nil then
+        ComboBoxScales.Items.Add(Scale.Name);
+
+    ItemIndex := -1;
+    if SelectedScaleName <> '' then
+      ItemIndex := ComboBoxScales.Items.IndexOf(SelectedScaleName);
+    if (ItemIndex < 0) and (ComboBoxScales.Items.Count > 0) then
+      ItemIndex := 0;
+
+    ComboBoxScales.ItemIndex := ItemIndex;
+    if ItemIndex >= 0 then
+      FActiveWorkTable.SetActiveScale(ComboBoxScales.Items[ItemIndex]);
+  finally
+    LayoutScale.Tag := OldTag;
+  end;
 end;
 
 procedure TFrameMainTable.SetConfiguration;
@@ -1034,6 +1201,8 @@ procedure TFrameMainTable.UpdateForm;
           NormalizeActiveWorkTable;
           if FActiveWorkTable = nil then
           begin
+            RefreshScalesCombo;
+            UpdateUIScale;
             UpdateGrids;
             if FFrameWorkTableProperties <> nil then
               FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
@@ -1044,6 +1213,8 @@ procedure TFrameMainTable.UpdateForm;
           IsUpdating := True;
             try
                UpdateUIFromValues;
+                RefreshScalesCombo;
+                UpdateUIScale;
                 UpdateGrids;
                 if FFrameWorkTableProperties <> nil then
                   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
@@ -1133,6 +1304,8 @@ begin
       FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
 
     SetValues;
+    RefreshScalesCombo;
+    UpdateUIScale;
     UpdateForm;
     Exit;
   end;
@@ -1520,6 +1693,8 @@ begin
     ComboEditUnits.Items.Add(UnitName);
   for UnitName in CMassFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
+  for UnitName in CScaleUnits do
+    ComboEditUnits.Items.Add(UnitName);
 
   if ComboEditUnits.Items.Count > 0 then
     ComboEditUnits.ItemIndex := 0;
@@ -1564,6 +1739,7 @@ begin
     FFrameFlowMeterProperties := TFrameFlowMeterProperties.Create(Self);
     FFrameFlowMeterProperties.Parent := TabItemDeviceProperties;
     FFrameFlowMeterProperties.Align := TAlignLayout.Client;
+    FFrameFlowMeterProperties.OnChange := FlowMeterPropertiesChanged;
   end;
   UpdateFlowMeterPropertiesFrame;
 
@@ -1585,6 +1761,8 @@ begin
   ApplyActiveWorkTableEditMode;
 
   RefreshPumpsCombo;
+  RefreshScalesCombo;
+  UpdateUIScale;
 
   FLastClickRow := -1;
   FLastClickCol := nil;
@@ -1753,7 +1931,7 @@ end;
 
 procedure TFrameMainTable.SpeedButtonMinimzeLayoutFlowRateClick(Sender: TObject);
 begin
-  SetInstrumentalLayoutVisible(LayoutFlowRate, False);
+  SetInstrumentalLayoutVisible(LayoutScale, False);
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
   SaveLayoutSettingsToWorkTable;
 end;
@@ -1841,6 +2019,7 @@ procedure TFrameMainTable.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
 begin
   miFlowRate.Text := LabelLayoutFlowRate.Text;
   miPump.Text := LabelLayoutPump.Text;
+  miScale.Text := LabelLayoutScale.Text;
   miMain.Text := LabelLayoutMain.Text;
   miMesurment.Text := LabelLayoutMesure.Text;
   miConditions.Text := LabelLayoutConditions.Text;
@@ -1848,6 +2027,7 @@ begin
 
   miFlowRate.IsChecked := LayoutFlowRate.Visible;
   miPump.IsChecked := LayoutPump.Visible;
+  miScale.IsChecked := LayoutScale.Visible;
   miMain.IsChecked := LayoutMain.Visible;
   miMesurment.IsChecked := LayoutMesure.Visible;
   miConditions.IsChecked := LayoutConditions.Visible;
@@ -1862,6 +2042,8 @@ begin
     Result := LayoutFlowRate
   else if AMenuItem = miPump then
     Result := LayoutPump
+  else if AMenuItem = miScale then
+    Result := LayoutScale
   else if AMenuItem = miMain then
     Result := LayoutMain
   else if AMenuItem = miMesurment then
@@ -1888,7 +2070,7 @@ begin
     Control := HorzScrollBoxInstrumental.Controls[I];
     if (Control is TLayout) and Control.Visible and
        ((Control = LayoutFlowRate) or (Control = LayoutPump) or
-        (Control = LayoutMain) or (Control = LayoutMesure) or
+        (Control = LayoutScale) or (Control = LayoutMain) or (Control = LayoutMesure) or
         (Control = LayoutConditions) or (Control = LayoutProcedures)) then
       FInstrumentalVisibleOrder.Add(TLayout(Control));
   end;
@@ -1929,7 +2111,7 @@ begin
   try
     // Не полагаемся на неочевидный порядок Align=Left/MostLeft:
     // задаем положение блоков вручную в порядке включения.
-    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutScale, LayoutMain,
       LayoutMesure, LayoutConditions, LayoutProcedures] do
       Layout.Align := TAlignLayout.None;
 
@@ -1985,6 +2167,8 @@ begin
     Result := 'FlowRate'
   else if ALayout = LayoutPump then
     Result := 'Pump'
+  else if ALayout = LayoutScale then
+    Result := 'Scale'
   else if ALayout = LayoutMain then
     Result := 'Main'
   else if ALayout = LayoutMesure then
@@ -2002,6 +2186,8 @@ begin
     Result := LayoutFlowRate
   else if SameText(AKey, 'Pump') then
     Result := LayoutPump
+  else if SameText(AKey, 'Scale') then
+    Result := LayoutScale
   else if SameText(AKey, 'Main') then
     Result := LayoutMain
   else if SameText(AKey, 'Mesure') then
@@ -2046,6 +2232,7 @@ var
   begin
     Result := ((ALayout = LayoutFlowRate) and AFlowRateVisible) or
       ((ALayout = LayoutPump) and APumpVisible) or
+      (ALayout = LayoutScale) or
       ((ALayout = LayoutMain) and AMainVisible) or
       ((ALayout = LayoutMesure) and AMesureVisible) or
       ((ALayout = LayoutConditions) and AConditionsVisible) or
@@ -2069,7 +2256,7 @@ begin
   HorzScrollBoxInstrumental.BeginUpdate;
   try
     FInstrumentalVisibleOrder.Clear;
-    for Layout in [LayoutFlowRate, LayoutPump, LayoutMain,
+    for Layout in [LayoutFlowRate, LayoutPump, LayoutScale, LayoutMain,
       LayoutMesure, LayoutConditions, LayoutProcedures] do
     begin
       Layout.Align := TAlignLayout.None;
@@ -2096,6 +2283,7 @@ begin
   // 2) Если в сохраненном порядке чего-то нет, добираем в порядке пунктов меню.
   ShowIfVisibleAndNotAdded(LayoutFlowRate);
   ShowIfVisibleAndNotAdded(LayoutPump);
+  ShowIfVisibleAndNotAdded(LayoutScale);
   ShowIfVisibleAndNotAdded(LayoutMain);
   ShowIfVisibleAndNotAdded(LayoutMesure);
   ShowIfVisibleAndNotAdded(LayoutConditions);
@@ -2744,9 +2932,15 @@ begin
     SetDim(FActiveWorkTable.FlowUnitName, FActiveWorkTable.QuantityUnitName);
     LoadLayoutSettingsFromWorkTable;
     RefreshPumpsCombo;
+    RefreshScalesCombo;
+    UpdateUIScale;
   end
   else
+  begin
     RefreshPumpsCombo;
+    RefreshScalesCombo;
+    UpdateUIScale;
+  end ;
 
   if FFrameMeasurementRun <> nil then
     FFrameMeasurementRun.ActiveWorkTable := FActiveWorkTable;
@@ -3126,7 +3320,9 @@ procedure TFrameMainTable.ActionPumpAddExecute(Sender: TObject);
 begin
         FActiveWorkTable.AddPump('1');
         RefreshPumpsCombo;
+        RefreshScalesCombo;
         UpdateUIPump;
+        UpdateUIScale;
 end;
 
 procedure TFrameMainTable.ActionPumpDeleteExecute(Sender: TObject);
@@ -3136,7 +3332,9 @@ begin
 
         FActiveWorkTable.RemovePump(FActiveWorkTable.ActivePump);
         RefreshPumpsCombo;
+        RefreshScalesCombo;
         UpdateUIPump;
+        UpdateUIScale;
 end;
 
 procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
@@ -3906,6 +4104,34 @@ begin
   ComboBoxPumps.Tag:=2;
 end;
 
+procedure TFrameMainTable.ComboBoxScalesChange(Sender: TObject);
+begin
+  if (FActiveWorkTable = nil) or not ((LayoutScale.Tag = 0) or (LayoutScale.Tag = 3)) then
+    Exit;
+
+  LayoutScale.Tag := 0;
+  FActiveWorkTable.SetActiveScale(ComboBoxScales.Text);
+  UpdateUIScale;
+end;
+
+procedure TFrameMainTable.ButtonScaleTareClick(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  FActiveWorkTable.DoScaleTare;
+  UpdateUIScale;
+end;
+
+procedure TFrameMainTable.ButtonScaleDrainClick(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  FActiveWorkTable.DoScaleDrain;
+  UpdateUIScale;
+end;
+
 procedure TFrameMainTable.ComboBoxUnitsChange(Sender: TObject);
 var
   UnitName: string;
@@ -3913,10 +4139,20 @@ var
 begin
   UnitName := Trim(ComboEditUnits.Text);
   if UnitName = '' then
+  begin
+    UpdateUIScale;
     Exit;
+  end;
+
+  if IsScaleUnit(UnitName) then
+  begin
+    UpdateUIScale;
+    Exit;
+  end;
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
+  UpdateUIScale;
 
   GridDevices.SetFocus;
 end;
@@ -4065,6 +4301,55 @@ begin
   UpdateGrids;
 end;
 
+procedure TFrameMainTable.UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+var
+  FlowPerSecond: Double;
+  DeltaSeconds: Double;
+  FlowUnit: string;
+
+  function FlowToBasePerSecond(const AFlow: Double; const AUnitName: string): Double;
+  begin
+    if SameText(AUnitName, 'л/мин') or SameText(AUnitName, 'кг/мин') then
+      Result := AFlow / 60
+    else if SameText(AUnitName, 'л/ч') or SameText(AUnitName, 'кг/ч') then
+      Result := AFlow / 3600
+    else if SameText(AUnitName, 'м3/мин') or SameText(AUnitName, 'т/мин') then
+      Result := AFlow * 1000 / 60
+    else if SameText(AUnitName, 'м3/ч') or SameText(AUnitName, 'т/ч') then
+      Result := AFlow * 1000 / 3600
+    else
+      Result := AFlow;
+  end;
+
+begin
+  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or
+     (AWorkTable.FlowRate.Value = nil) or (AWorkTable.ValueFlowRate = nil) or
+     (AWorkTable.ActiveScale = nil) then
+    Exit;
+
+  if not (AWorkTable.State in [swtMONITOR, swtEXECUTE]) then
+    Exit;
+
+  FlowUnit := Trim(AWorkTable.FlowUnitName);
+  if FlowUnit = '' then
+    FlowUnit := AWorkTable.ValueFlowRate.GetDimName;
+
+  if FlowUnit <> '' then
+    FlowPerSecond := FlowToBasePerSecond(
+      AWorkTable.ValueFlowRate.GetDoubleValue(FlowUnit), FlowUnit)
+  else
+    FlowPerSecond := AWorkTable.FlowRate.Value.Value;
+  if FlowPerSecond <= 0 then
+    Exit;
+
+  DeltaSeconds := TimerMain.Interval / 1000;
+  if DeltaSeconds <= 0 then
+    DeltaSeconds := 1;
+
+  AWorkTable.Value := AWorkTable.Value + FlowPerSecond * DeltaSeconds;
+  AWorkTable.ActiveScale.CurentValue := AWorkTable.Value;
+end;
+
 procedure TFrameMainTable.SetValues;
 var
   WorkTable: TWorkTable;
@@ -4154,11 +4439,14 @@ begin
   if WorkTable = nil then
     Exit;
 
+  UpdateScaleWeightFromFlow(WorkTable);
+
   IsUpdating := True;
   try
   //Grid Headers + Instrumental Labels
     UpdateUIFromValues;
     UpdateUIPump;
+    UpdateUIScale;
     UpdateUIFlowRate;
     UpdateUIConditions;
   finally
@@ -5344,6 +5632,7 @@ begin
       MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
       if DeviceFieldsChanged then
         SyncChannelsWithSameDeviceUUID(WorkTable.DeviceChannels[ARow], WorkTable.DeviceChannels[ARow].DeviceUUID);
+      RefreshActiveWorkTableViews(WorkTable.DeviceChannels[ARow]);
     end;
 
     Exit;
@@ -5690,9 +5979,12 @@ begin
   if Length(ARefreshColumns) = 0 then
     AGrid.Repaint
   else
+  begin
     for I := Low(ARefreshColumns) to High(ARefreshColumns) do
       if ARefreshColumns[I] <> nil then
         ARefreshColumns[I].Repaint;
+    AGrid.Repaint;
+  end;
 end;
 
 procedure TFrameMainTable.UpdateGrids;
@@ -5727,7 +6019,9 @@ begin
     SoftReloadGridByGrowingRowCount(
       GridEtalons,
       WT.EtalonChannels.Count,
-      [StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
+      [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
+       StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
+       StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
        StringColumnEtalonFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     )
@@ -5735,7 +6029,9 @@ begin
     SoftReloadGridByGrowingRowCount(
       GridEtalons,
       0,
-      [StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
+      [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
+       StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
+       StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
        StringColumnEtalonFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     );
@@ -5792,7 +6088,10 @@ begin
       end;
 
     if Changed then
+    begin
       MarkChannelDeviceModified(WorkTable.EtalonChannels[ARow]);
+      RefreshActiveWorkTableViews(WorkTable.EtalonChannels[ARow]);
+    end;
 
     Exit;
   end;
@@ -5874,6 +6173,46 @@ begin
 
 
 
+end;
+
+procedure TFrameMainTable.UpdateUIScale;
+var
+  WorkTable: TWorkTable;
+  UnitName: string;
+  I: Integer;
+begin
+  WorkTable := FActiveWorkTable;
+  UnitName := NormalizeScaleUnit(ComboEditUnits.Text);
+
+
+  Label3.Text := 'Масса, ' + UnitName;
+
+  if WorkTable = nil then
+  begin
+    LabelScaleWeight.Text := '-';
+    LabelScaleTotalWeight.Text := '-';
+    Exit;
+  end;
+
+  LabelScaleWeight.Text := FormatFloat('0.###',
+    ConvertScaleWeight(WorkTable.CurentValue, UnitName));
+  LabelScaleTotalWeight.Text := FormatFloat('0.###', WorkTable.Value);
+
+  if LayoutScale.Tag = 3 then
+    Exit;
+
+  LayoutScale.Tag := 2;
+  try
+    if (WorkTable.ActiveScale <> nil) and (ComboBoxScales.Count <> 0) then
+      for I := ComboBoxScales.Count - 1 downto 0 do
+        if ComboBoxScales.Items[I] = WorkTable.ActiveScale.Name then
+        begin
+          ComboBoxScales.ItemIndex := I;
+          Break;
+        end;
+  finally
+    LayoutScale.Tag := 0;
+  end;
 end;
 
 procedure TFrameMainTable.UpdateUIFlowRate;
