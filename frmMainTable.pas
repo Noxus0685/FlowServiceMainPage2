@@ -774,6 +774,12 @@ const
     'т/ч'
   );
 
+  CScaleUnits: array[0..2] of string = (
+    'г',
+    'кг',
+    'т'
+  );
+
   CFlowMeterTypes: array[0..2] of string = (
     'Расходомер ПРЭМ',
     'Расходомер ЭЛЕМЕР',
@@ -800,6 +806,33 @@ begin
     if SameText(AUnit, CVolumeFlowUnits[I]) then
       Exit(True);
   Result := False;
+end;
+
+function IsScaleUnit(const AUnit: string): Boolean;
+var
+  I: Integer;
+begin
+  for I := Low(CScaleUnits) to High(CScaleUnits) do
+    if SameText(AUnit, CScaleUnits[I]) then
+      Exit(True);
+  Result := False;
+end;
+
+function NormalizeScaleUnit(const AUnit: string): string;
+begin
+  Result := Trim(AUnit);
+  if not IsScaleUnit(Result) then
+    Result := 'кг';
+end;
+
+function ConvertScaleWeight(const AWeightKg: Double; const AUnit: string): Double;
+begin
+  if SameText(AUnit, 'г') then
+    Result := AWeightKg * 1000
+  else if SameText(AUnit, 'т') then
+    Result := AWeightKg / 1000
+  else
+    Result := AWeightKg;
 end;
 
 function ResolveQuantityUnitByFlowUnit(const AUnit: string): string;
@@ -1007,30 +1040,37 @@ var
   Scale: TScale;
   SelectedScaleName: string;
   ItemIndex: Integer;
+  OldTag: NativeInt;
 begin
-  ComboBoxScales.Items.Clear;
-  ComboBoxScales.ItemIndex := -1;
+  OldTag := LayoutScale.Tag;
+  LayoutScale.Tag := 2;
+  try
+    ComboBoxScales.Items.Clear;
+    ComboBoxScales.ItemIndex := -1;
 
-  if FActiveWorkTable = nil then
-    Exit;
+    if (FActiveWorkTable = nil) or (FActiveWorkTable.Scales = nil) then
+      Exit;
 
-  SelectedScaleName := Trim(ComboBoxScales.Text);
-  if (SelectedScaleName = '') and (FActiveWorkTable.ActiveScale <> nil) then
-    SelectedScaleName := FActiveWorkTable.ActiveScale.Name;
+    SelectedScaleName := Trim(ComboBoxScales.Text);
+    if (SelectedScaleName = '') and (FActiveWorkTable.ActiveScale <> nil) then
+      SelectedScaleName := FActiveWorkTable.ActiveScale.Name;
 
-  for Scale in FActiveWorkTable.Scales do
-    if Scale <> nil then
-      ComboBoxScales.Items.Add(Scale.Name);
+    for Scale in FActiveWorkTable.Scales do
+      if Scale <> nil then
+        ComboBoxScales.Items.Add(Scale.Name);
 
-  ItemIndex := -1;
-  if SelectedScaleName <> '' then
-    ItemIndex := ComboBoxScales.Items.IndexOf(SelectedScaleName);
-  if (ItemIndex < 0) and (ComboBoxScales.Items.Count > 0) then
-    ItemIndex := 0;
+    ItemIndex := -1;
+    if SelectedScaleName <> '' then
+      ItemIndex := ComboBoxScales.Items.IndexOf(SelectedScaleName);
+    if (ItemIndex < 0) and (ComboBoxScales.Items.Count > 0) then
+      ItemIndex := 0;
 
-  ComboBoxScales.ItemIndex := ItemIndex;
-  if ItemIndex >= 0 then
-    FActiveWorkTable.SetActiveScale(ComboBoxScales.Items[ItemIndex]);
+    ComboBoxScales.ItemIndex := ItemIndex;
+    if ItemIndex >= 0 then
+      FActiveWorkTable.SetActiveScale(ComboBoxScales.Items[ItemIndex]);
+  finally
+    LayoutScale.Tag := OldTag;
+  end;
 end;
 
 procedure TFrameMainTable.SetConfiguration;
@@ -1133,6 +1173,8 @@ procedure TFrameMainTable.UpdateForm;
           NormalizeActiveWorkTable;
           if FActiveWorkTable = nil then
           begin
+            RefreshScalesCombo;
+            UpdateUIScale;
             UpdateGrids;
             if FFrameWorkTableProperties <> nil then
               FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
@@ -1143,6 +1185,8 @@ procedure TFrameMainTable.UpdateForm;
           IsUpdating := True;
             try
                UpdateUIFromValues;
+                RefreshScalesCombo;
+                UpdateUIScale;
                 UpdateGrids;
                 if FFrameWorkTableProperties <> nil then
                   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
@@ -1232,6 +1276,8 @@ begin
       FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
 
     SetValues;
+    RefreshScalesCombo;
+    UpdateUIScale;
     UpdateForm;
     Exit;
   end;
@@ -1618,6 +1664,8 @@ begin
   for UnitName in CVolumeFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
   for UnitName in CMassFlowUnits do
+    ComboEditUnits.Items.Add(UnitName);
+  for UnitName in CScaleUnits do
     ComboEditUnits.Items.Add(UnitName);
 
   if ComboEditUnits.Items.Count > 0 then
@@ -4059,7 +4107,16 @@ var
 begin
   UnitName := Trim(ComboEditUnits.Text);
   if UnitName = '' then
+  begin
+    UpdateUIScale;
     Exit;
+  end;
+
+  if IsScaleUnit(UnitName) then
+  begin
+    UpdateUIScale;
+    Exit;
+  end;
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
@@ -6046,13 +6103,10 @@ begin
     Exit;
   end;
 
-  UnitName := Trim(ComboEditUnits.Text);
-  if UnitName = '' then
-    UnitName := Trim(WorkTable.QuantityUnitName);
-  if UnitName = '' then
-    UnitName := #1082#1075;
+  UnitName := NormalizeScaleUnit(ComboEditUnits.Text);
 
-  LabelScaleWeight.Text := FormatFloat('0.###', WorkTable.DisplayWeight) + ' ' + UnitName;
+  LabelScaleWeight.Text := FormatFloat('0.###',
+    ConvertScaleWeight(WorkTable.DisplayWeight, UnitName)) + ' ' + UnitName;
 
   if WorkTable.ActiveScale <> nil then
     LabelScaleDevice.Text := #1042#1077#1089#1099': ' + WorkTable.ActiveScale.Name
