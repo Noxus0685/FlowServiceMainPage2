@@ -3096,7 +3096,6 @@ begin
   finally
     Frm.Free;
   end;
-  WorkTableManager.ActiveWorkTable.InitChannels ;
   UpdateGrids;
 
 end;
@@ -3162,7 +3161,6 @@ begin
   try
     DeviceSelectResult := Frm.ShowModal;
 
-    WorkTableManager.ActiveWorkTable.InitChannels ;
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     if DeviceSelectResult <> mrOk then
