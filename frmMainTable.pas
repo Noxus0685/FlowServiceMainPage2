@@ -740,6 +740,7 @@ type
     procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
+    procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -4269,6 +4270,33 @@ begin
   UpdateGrids;
 end;
 
+procedure TFrameMainTable.UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+var
+  FlowPerSecond: Double;
+  DeltaSeconds: Double;
+begin
+  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or
+     (AWorkTable.ActiveScale = nil) then
+    Exit;
+
+  if not (AWorkTable.State in [swtEXECUTE]) then
+    Exit;
+
+  if not AWorkTable.FlowRate.IsRunning then
+    Exit;
+
+  FlowPerSecond := AWorkTable.FlowRate.Value.Value;
+  if FlowPerSecond <= 0 then
+    Exit;
+
+  DeltaSeconds := TimerMain.Interval / 1000;
+  if DeltaSeconds <= 0 then
+    DeltaSeconds := 1;
+
+  AWorkTable.CurrentWeight := AWorkTable.CurrentWeight + FlowPerSecond * DeltaSeconds;
+  AWorkTable.ActiveScale.CurrentWeight := AWorkTable.CurrentWeight;
+end;
+
 procedure TFrameMainTable.SetValues;
 var
   WorkTable: TWorkTable;
@@ -4357,6 +4385,8 @@ begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
+
+  UpdateScaleWeightFromFlow(WorkTable);
 
   IsUpdating := True;
   try
