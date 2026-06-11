@@ -5382,10 +5382,18 @@ begin
       begin
         Changed := WorkTable.DeviceChannels[ARow].Signal <> Signal;
         WorkTable.DeviceChannels[ARow].Signal := Signal;
-        if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-           (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
-          WorkTable.DeviceChannels[ARow].FlowMeter.Device.OutputType := Signal;
+        if WorkTable.DeviceChannels[ARow].FlowMeter <> nil then
+          WorkTable.DeviceChannels[ARow].FlowMeter.OutputType := Signal;
         DeviceFieldsChanged := True;
+
+        TThread.ForceQueue(nil,
+          procedure
+          begin
+            GridDevices.EditorMode := False;
+            PopupColumnDeviceSignal1.Repaint;
+            GridDevices.Repaint;
+          end
+        );
       end;
 
     if Changed then
