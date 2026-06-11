@@ -378,6 +378,9 @@ type
 
 implementation
 
+uses
+  uWorkTable;
+
 {$REGION 'Helpers'}
 function Col(const AName, ASqlType: string): TTableColumn;
 begin
@@ -3443,6 +3446,9 @@ begin
     AssertDevicePointSchema;
     AssertSpillageSchema;
     AssertCalibrCoefSchema;
+
+    if (WorkTableManager <> nil) and (WorkTableManager.ActiveWorkTable <> nil) then
+      WorkTableManager.ActiveWorkTable.InitChannels;
 
     {==================================================}
     { 2. ПРИБОРЫ }
