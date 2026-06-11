@@ -1204,38 +1204,83 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 40.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              object LabelScaleTotalWeight: TLabel
+              object LayoutScaleTotal: TLayout
                 Align = Left
-                StyledSettings = [Family, FontColor]
-                Size.Width = 119.000000000000000000
+                Size.Width = 110.000000000000000000
                 Size.Height = 40.000000000000000000
                 Size.PlatformDefault = False
-                StyleLookup = 'labelstyle'
-                TextSettings.Font.Size = 14.000000000000000000
-                TextSettings.Font.StyleExt = {00070000000000000004000000}
-                TextSettings.HorzAlign = Center
-                Text = #1042#1089#1077#1075#1086': 0'
                 TabOrder = 0
-              end
-              object RectangleScaleWeight: TRectangle
-                Align = Right
-                Fill.Color = claWhite
-                Position.X = 141.000000000000000000
-                Size.Width = 91.000000000000000000
-                Size.Height = 40.000000000000000000
-                Size.PlatformDefault = False
-                object LabelScaleWeight: TLabel
-                  Align = Client
+                object Label1: TLabel
+                  Align = Top
                   StyledSettings = [Family, FontColor]
-                  Size.Width = 91.000000000000000000
-                  Size.Height = 40.000000000000000000
+                  Size.Width = 110.000000000000000000
+                  Size.Height = 16.000000000000000000
                   Size.PlatformDefault = False
                   StyleLookup = 'labelstyle'
-                  TextSettings.Font.Size = 14.000000000000000000
-                  TextSettings.Font.StyleExt = {00070000000000000004000000}
+                  TextSettings.Font.Size = 10.000000000000000000
                   TextSettings.HorzAlign = Center
-                  Text = '0'
+                  Text = #1054#1073#1097#1080#1081' '#1074#1077#1089', '#1082#1075
                   TabOrder = 0
+                end
+                object RectangleScaleTotalWeight: TRectangle
+                  Align = Client
+                  Fill.Color = claWhite
+                  Size.Width = 110.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelScaleTotalWeight: TLabel
+                    Align = Client
+                    StyledSettings = [Family, FontColor]
+                    Size.Width = 110.000000000000000000
+                    Size.Height = 24.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'labelstyle'
+                    TextSettings.Font.Size = 14.000000000000000000
+                    TextSettings.Font.StyleExt = {00070000000000000004000000}
+                    TextSettings.HorzAlign = Center
+                    Text = '0'
+                    TabOrder = 0
+                  end
+                end
+              end
+              object LayoutScaleCurrent: TLayout
+                Align = Right
+                Position.X = 122.000000000000000000
+                Size.Width = 110.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+                object Label3: TLabel
+                  Align = Top
+                  StyledSettings = [Family, FontColor]
+                  Size.Width = 110.000000000000000000
+                  Size.Height = 16.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'labelstyle'
+                  TextSettings.Font.Size = 10.000000000000000000
+                  TextSettings.HorzAlign = Center
+                  Text = #1058#1077#1082#1091#1097#1080#1081' '#1074#1077#1089', '#1082#1075
+                  TabOrder = 0
+                end
+                object RectangleScaleWeight: TRectangle
+                  Align = Client
+                  Fill.Color = claWhite
+                  Size.Width = 110.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  object LabelScaleWeight: TLabel
+                    Align = Client
+                    StyledSettings = [Family, FontColor]
+                    Size.Width = 110.000000000000000000
+                    Size.Height = 24.000000000000000000
+                    Size.PlatformDefault = False
+                    StyleLookup = 'labelstyle'
+                    TextSettings.Font.Size = 14.000000000000000000
+                    TextSettings.Font.StyleExt = {00070000000000000004000000}
+                    TextSettings.HorzAlign = Center
+                    Text = '0'
+                    TabOrder = 0
+                  end
                 end
               end
             end
