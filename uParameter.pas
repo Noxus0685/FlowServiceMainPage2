@@ -170,13 +170,13 @@ end;
 
   end;
 //---------------------------------
-  TScale = class(TParameter)
+  TWeight = class(TParameter)
   private
     FUUID: string;
     FCurrentWeight: Double;
     FTareWeight: Double;
   public
-    class var Scales: TObjectList<TScale>;
+    class var Weights: TObjectList<TWeight>;
 
     constructor Create(const AScaleName: string); overload;
     constructor Create; overload;
@@ -184,7 +184,10 @@ end;
     property UUID: string read FUUID write FUUID;
     property CurrentWeight: Double read FCurrentWeight write FCurrentWeight;
     property TareWeight: Double read FTareWeight write FTareWeight;
+    property CurentValue: Double read FCurrentWeight write FCurrentWeight;
   end;
+
+  TScale = TWeight;
 //---------------------------------
   TFlowRate = class(TParameter)
  private
@@ -570,9 +573,9 @@ end;
 
   {$ENDREGION 'TPump'}
 
-  {$REGION 'TScale'}
+  {$REGION 'TWeight'}
 
-constructor TScale.Create;
+constructor TWeight.Create;
 begin
   inherited Create('', '');
   FUUID := TGUID.NewGuid.ToString;
@@ -580,15 +583,15 @@ begin
   FTareWeight := 0;
 end;
 
-constructor TScale.Create(const AScaleName: string);
+constructor TWeight.Create(const AScaleName: string);
 begin
   Create;
   Self.FName := AScaleName;
-  if Scales <> nil then
-    Scales.Add(Self);
+  if Weights <> nil then
+    Weights.Add(Self);
 end;
 
-  {$ENDREGION 'TScale'}
+  {$ENDREGION 'TWeight'}
 
 { TParameter }
 

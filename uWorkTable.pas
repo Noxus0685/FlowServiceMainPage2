@@ -321,7 +321,7 @@ type
     FName: string;
     FText: string;
     FActivePump : TPump;
-    FActiveScale: TScale;
+    FActiveScale: TWeight;
 
     FState: EStateWorkTable;
     FAction: EActionWorkTable;
@@ -337,7 +337,7 @@ type
     FEtalonChannels: TObjectList<TChannel>;
 
     FPumps: TObjectList<TPump>;
-    FScales: TObjectList<TScale>;
+    FScales: TObjectList<TWeight>;
     FFlowRate: TFlowRate;
 
     FMeasurementRun: TObject;
@@ -411,6 +411,8 @@ type
     function GetTime: Double;
     function GetTimeResult: Double;
     function GetFlowRate: Double;
+    function GetCurentValue: Double;
+    procedure SetCurentValue(const AValue: Double);
 
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
@@ -466,13 +468,13 @@ type
     class procedure SaveScaleList(
       AIni: TCustomIniFile;
       const ASectionPrefix: string;
-      AScales: TObjectList<TScale>
+      AScales: TObjectList<TWeight>
     ); static;
 
     class procedure LoadScaleList(
       AIni: TCustomIniFile;
       const ASectionPrefix: string;
-      AScales: TObjectList<TScale>
+      AScales: TObjectList<TWeight>
     ); static;
 
   private
@@ -483,7 +485,7 @@ type
   procedure SetState(const ANewState: EStateWorkTable);
   procedure SetIsActive(const AValue: Boolean);
   procedure SetActivePumpObject(const APump: TPump);
-  procedure SetActiveScaleObject(const AScale: TScale);
+  procedure SetActiveScaleObject(const AScale: TWeight);
   procedure BindParameterEvents(AParameter: TParameter);
   procedure UnbindParameterEvents(AParameter: TParameter);
   procedure HandleParameterNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -547,17 +549,18 @@ type
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
-  function AddScale(const AScaleName: string): TScale; overload;
-  function AddScale(AScale: TScale): Boolean; overload;
+  function AddScale(const AScaleName: string): TWeight; overload;
+  function AddScale(AScale: TWeight): Boolean; overload;
   procedure RemoveScale(const AScaleUUID: string); overload;
-  procedure RemoveScale(AScale: TScale); overload;
-  function FindScaleByUUID(const AScaleUUID: string): TScale;
-  function FindScaleByName(const AScaleName: string): TScale;
+  procedure RemoveScale(AScale: TWeight); overload;
+  function FindScaleByUUID(const AScaleUUID: string): TWeight;
+  function FindScaleByName(const AScaleName: string): TWeight;
   function DisplayWeight: Double;
   procedure DoScaleTare;
   procedure DoScaleDrain;
   property Pumps: TObjectList<TPump> read FPumps;
-  property Scales: TObjectList<TScale> read FScales;
+  property Scales: TObjectList<TWeight> read FScales;
+  property Weights: TObjectList<TWeight> read FScales;
 
   property MeasurementRun: TObject read FMeasurementRun;
   property MeasurementMode: EMeasurementRunMode read FMode write FMode;
@@ -566,7 +569,7 @@ type
   property FluidPress: TFluidPress read FFluidPress;
 
   property ActivePump: TPump read FActivePump write SetActivePumpObject;
-  property ActiveScale: TScale read FActiveScale write SetActiveScaleObject;
+  property ActiveScale: TWeight read FActiveScale write SetActiveScaleObject;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
 
     property ID: Integer read FID write FID;
@@ -592,6 +595,8 @@ type
 
     property TimeResult: Double read GetTimeResult write SetTimeResult;
     property CurrentWeight: Double read FCurrentWeight write FCurrentWeight;
+    property Value: Double read FCurrentWeight write FCurrentWeight;
+    property CurentValue: Double read GetCurentValue write SetCurentValue;
     property ScaleTareWeight: Double read FScaleTareWeight write FScaleTareWeight;
 
     //property State: TSpillState read FState write FState;
@@ -1693,7 +1698,7 @@ begin
         Text := 'Рабочий стол ' + IntToStr(ID);
 
   FPumps := TObjectList<TPump>.Create(false); // True — автоосвобождение объектов   False- хрантся копии
-  FScales := TObjectList<TScale>.Create(false);
+  FScales := TObjectList<TWeight>.Create(false);
   FlowRate := TFlowRate.Create('Расход');
   FFluidTemp := TFluidTemp.Create;
   FFluidPress := TFluidPress.Create;
@@ -2989,7 +2994,7 @@ begin
       ValuesIni.WriteFloat(Section, 'ValueQuantity', WorkTable.ValueQuantity.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueFlowRate', WorkTable.ValueFlowRate.GetDoubleValue);
 
-      SaveScaleList(Ini, Section + '.Scales', WorkTable.Scales);
+      SaveScaleList(Ini, Section + '.Scales', WorkTable.Weights);
       SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
       SaveGridColumns(Ini, Section + '.EtalonGrid', WorkTable.EtalonsGridColumns);
@@ -3023,8 +3028,8 @@ begin
     Exit;
 
   AWorkTables.Clear;
-  if TScale.Scales <> nil then
-    TScale.Scales.Clear;
+  if TWeight.Weights <> nil then
+    TWeight.Weights.Clear;
 
   Ini := TIniFile.Create(AIniFileName);
   WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
@@ -3141,7 +3146,7 @@ begin
 
       WorkTable.FluidTemp.Value.Value := 21;
 
-      LoadScaleList(Ini, Section + '.Scales', WorkTable.Scales);
+      LoadScaleList(Ini, Section + '.Scales', WorkTable.Weights);
       WorkTable.ActiveScale := WorkTable.FindScaleByUUID(Ini.ReadString(Section, 'ActiveScaleUUID', ''));
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels, WorkTable.ID);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels, WorkTable.ID);
@@ -3382,10 +3387,10 @@ begin
 end;
 
 class procedure TWorkTable.SaveScaleList(AIni: TCustomIniFile;
-  const ASectionPrefix: string; AScales: TObjectList<TScale>);
+  const ASectionPrefix: string; AScales: TObjectList<TWeight>);
 var
   I, OldCount: Integer;
-  Scale: TScale;
+  Scale: TWeight;
   Section: string;
 begin
   if (AIni = nil) or (AScales = nil) then
@@ -3415,10 +3420,10 @@ begin
 end;
 
 class procedure TWorkTable.LoadScaleList(AIni: TCustomIniFile;
-  const ASectionPrefix: string; AScales: TObjectList<TScale>);
+  const ASectionPrefix: string; AScales: TObjectList<TWeight>);
 var
   I, Count: Integer;
-  Scale: TScale;
+  Scale: TWeight;
   Section, ScaleName, ScaleUUID: string;
 begin
   if (AIni = nil) or (AScales = nil) then
@@ -3430,7 +3435,7 @@ begin
   begin
     Section := ASectionPrefix + '.' + IntToStr(I);
     ScaleName := AIni.ReadString(Section, 'Name', '');
-    Scale := TScale.Create(ScaleName);
+    Scale := TWeight.Create(ScaleName);
     ScaleUUID := AIni.ReadString(Section, 'UUID', '');
     if Trim(ScaleUUID) <> '' then
       Scale.UUID := ScaleUUID;
@@ -3812,7 +3817,7 @@ begin
   BindParameterEvents(FActivePump);
 end;
 
-procedure TWorkTable.SetActiveScaleObject(const AScale: TScale);
+procedure TWorkTable.SetActiveScaleObject(const AScale: TWeight);
 begin
   if FActiveScale = AScale then
     Exit;
@@ -4407,18 +4412,18 @@ begin
   ActivePump := Pump;
 end;
 
-function TWorkTable.AddScale(const AScaleName: string): TScale;
+function TWorkTable.AddScale(const AScaleName: string): TWeight;
 var
-  NewScale: TScale;
-  Scale: TScale;
+  NewScale: TWeight;
+  Scale: TWeight;
 begin
   Result := nil;
   if AScaleName = '' then
     Exit;
 
   NewScale := nil;
-  if TScale.Scales <> nil then
-    for Scale in TScale.Scales do
+  if TWeight.Weights <> nil then
+    for Scale in TWeight.Weights do
       if Scale.Name = AScaleName then
       begin
         NewScale := Scale;
@@ -4426,7 +4431,7 @@ begin
       end;
 
   if NewScale = nil then
-    NewScale := TScale.Create(AScaleName);
+    NewScale := TWeight.Create(AScaleName);
 
   if FScales.IndexOf(NewScale) < 0 then
   begin
@@ -4438,7 +4443,7 @@ begin
   Notify(notifyAction, Self);
 end;
 
-function TWorkTable.AddScale(AScale: TScale): Boolean;
+function TWorkTable.AddScale(AScale: TWeight): Boolean;
 begin
   if Assigned(AScale) and (FScales.IndexOf(AScale) < 0) then
   begin
@@ -4453,14 +4458,14 @@ end;
 
 procedure TWorkTable.RemoveScale(const AScaleUUID: string);
 var
-  Scale: TScale;
+  Scale: TWeight;
 begin
   Scale := FindScaleByUUID(AScaleUUID);
   if Assigned(Scale) then
     RemoveScale(Scale);
 end;
 
-procedure TWorkTable.RemoveScale(AScale: TScale);
+procedure TWorkTable.RemoveScale(AScale: TWeight);
 begin
   if Assigned(AScale) then
   begin
@@ -4474,7 +4479,7 @@ end;
 
 procedure TWorkTable.ClearScales;
 var
-  Scale: TScale;
+  Scale: TWeight;
 begin
   for Scale in FScales do
     UnbindParameterEvents(Scale);
@@ -4482,9 +4487,9 @@ begin
   FScales.Clear;
 end;
 
-function TWorkTable.FindScaleByName(const AScaleName: string): TScale;
+function TWorkTable.FindScaleByName(const AScaleName: string): TWeight;
 var
-  Scale: TScale;
+  Scale: TWeight;
 begin
   Result := nil;
   for Scale in FScales do
@@ -4492,9 +4497,9 @@ begin
       Exit(Scale);
 end;
 
-function TWorkTable.FindScaleByUUID(const AScaleUUID: string): TScale;
+function TWorkTable.FindScaleByUUID(const AScaleUUID: string): TWeight;
 var
-  Scale: TScale;
+  Scale: TWeight;
 begin
   Result := nil;
   if Trim(AScaleUUID) = '' then
@@ -4508,6 +4513,18 @@ end;
 procedure TWorkTable.SetActiveScale(AScaleName: string);
 begin
   ActiveScale := FindScaleByName(AScaleName);
+end;
+
+function TWorkTable.GetCurentValue: Double;
+begin
+  Result := DisplayWeight;
+end;
+
+procedure TWorkTable.SetCurentValue(const AValue: Double);
+begin
+  CurrentWeight := AValue + ScaleTareWeight;
+  if ActiveScale <> nil then
+    ActiveScale.CurentValue := CurrentWeight;
 end;
 
 function TWorkTable.DisplayWeight: Double;
@@ -4585,14 +4602,14 @@ begin
   FIniFileName := AIniFileName;
   FWorkTables := TObjectList<TWorkTable>.Create(True);
   TPump.Pumps := TObjectList<TPump>.Create(True);
-  TScale.Scales := TObjectList<TScale>.Create(True);
+  TWeight.Weights := TObjectList<TWeight>.Create(True);
 end;
 
 { Frees managed work table collection and manager resources. }
 destructor TWorkTableManager.Destroy;
 begin
   FWorkTables.Free;
-  FreeAndNil(TScale.Scales);
+  FreeAndNil(TWeight.Weights);
   inherited;
 end;
 

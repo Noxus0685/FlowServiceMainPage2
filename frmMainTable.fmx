@@ -1270,14 +1270,10 @@ object FrameMainTable: TFrameMainTable
                   Size.PlatformDefault = False
                   object LabelScaleWeight: TLabel
                     Align = Client
-                    StyledSettings = [Family, FontColor]
-                    Size.Width = 110.000000000000000000
+                    Margins.Left = 5.000000000000000000
+                    Size.Width = 105.000000000000000000
                     Size.Height = 24.000000000000000000
                     Size.PlatformDefault = False
-                    StyleLookup = 'labelstyle'
-                    TextSettings.Font.Size = 14.000000000000000000
-                    TextSettings.Font.StyleExt = {00070000000000000004000000}
-                    TextSettings.HorzAlign = Center
                     Text = '0'
                     TabOrder = 0
                   end
