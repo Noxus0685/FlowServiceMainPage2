@@ -263,6 +263,7 @@ type
     PopupMenuInstrumentalLayOut: TPopupMenu;
     miFlowRate: TMenuItem;
     miPump: TMenuItem;
+    miScale: TMenuItem;
     miMain: TMenuItem;
     miMesurment: TMenuItem;
     miConditions: TMenuItem;
@@ -2018,6 +2019,7 @@ procedure TFrameMainTable.PopupMenuInstrumentalLayOutPopup(Sender: TObject);
 begin
   miFlowRate.Text := LabelLayoutFlowRate.Text;
   miPump.Text := LabelLayoutPump.Text;
+  miScale.Text := LabelLayoutScale.Text;
   miMain.Text := LabelLayoutMain.Text;
   miMesurment.Text := LabelLayoutMesure.Text;
   miConditions.Text := LabelLayoutConditions.Text;
@@ -2025,6 +2027,7 @@ begin
 
   miFlowRate.IsChecked := LayoutFlowRate.Visible;
   miPump.IsChecked := LayoutPump.Visible;
+  miScale.IsChecked := LayoutScale.Visible;
   miMain.IsChecked := LayoutMain.Visible;
   miMesurment.IsChecked := LayoutMesure.Visible;
   miConditions.IsChecked := LayoutConditions.Visible;
@@ -2039,6 +2042,8 @@ begin
     Result := LayoutFlowRate
   else if AMenuItem = miPump then
     Result := LayoutPump
+  else if AMenuItem = miScale then
+    Result := LayoutScale
   else if AMenuItem = miMain then
     Result := LayoutMain
   else if AMenuItem = miMesurment then
