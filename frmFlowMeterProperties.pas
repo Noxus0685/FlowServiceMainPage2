@@ -27,6 +27,7 @@ type
   private
     FFlowMeter: TFlowMeter;
     FIsLoading: Boolean;
+    FOnChange: TNotifyEvent;
 
     LayoutRoot: TLayout;
     HeaderGrid: TGridPanelLayout;
@@ -75,10 +76,12 @@ type
     function GetOutputTypeByIndex(AIndex: Integer): Integer;
     function GetFlowDimName: string;
     function GetQuantityDimName: string;
+    procedure NotifyChanged;
   public
     constructor Create(AOwner: TComponent); override;
     procedure SetFlowMeter(AFlowMeter: TFlowMeter);
     property FlowMeter: TFlowMeter read FFlowMeter write SetFlowMeter;
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
 implementation
@@ -266,6 +269,12 @@ begin
   UpdateControls;
 end;
 
+procedure TFrameFlowMeterProperties.NotifyChanged;
+begin
+  if Assigned(FOnChange) then
+    FOnChange(Self);
+end;
+
 function TFrameFlowMeterProperties.GetFlowDimName: string;
 begin
   Result := '';
@@ -377,8 +386,11 @@ begin
   if FIsLoading or (FFlowMeter = nil) then
     Exit;
   S := Trim(EditDeviceName.Text);
+  if FFlowMeter.DeviceName = S then
+    Exit;
   FFlowMeter.DeviceName := S;
   EditDeviceName.Text := S;
+  NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditDeviceTypeNameExit(Sender: TObject);
@@ -388,8 +400,11 @@ begin
   if FIsLoading or (FFlowMeter = nil) then
     Exit;
   S := Trim(EditDeviceTypeName.Text);
+  if FFlowMeter.DeviceTypeName = S then
+    Exit;
   FFlowMeter.DeviceTypeName := S;
   EditDeviceTypeName.Text := S;
+  NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditSerialNumberExit(Sender: TObject);
@@ -399,8 +414,11 @@ begin
   if FIsLoading or (FFlowMeter = nil) then
     Exit;
   S := Trim(EditSerialNumber.Text);
+  if FFlowMeter.SerialNumber = S then
+    Exit;
   FFlowMeter.SerialNumber := S;
   EditSerialNumber.Text := S;
+  NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.ComboOutputTypeChange(Sender: TObject);
@@ -409,7 +427,12 @@ begin
     Exit;
 
   if ComboOutputType.ItemIndex >= 0 then
+  begin
+    if FFlowMeter.OutputType = GetOutputTypeByIndex(ComboOutputType.ItemIndex) then
+      Exit;
     FFlowMeter.OutputType := GetOutputTypeByIndex(ComboOutputType.ItemIndex);
+    NotifyChanged;
+  end;
 end;
 
 procedure TFrameFlowMeterProperties.EditFlowMaxExit(Sender: TObject);
@@ -417,8 +440,11 @@ begin
   if FIsLoading or (FFlowMeter = nil) then
     Exit;
 
+  if FFlowMeter.FlowMax = NormalizeFloatInput(EditFlowMax.Text) then
+    Exit;
   FFlowMeter.FlowMax := NormalizeFloatInput(EditFlowMax.Text);
   EditFlowMax.Text := FloatToStr(FFlowMeter.FlowMax);
+  NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditFlowMinExit(Sender: TObject);
@@ -426,8 +452,11 @@ begin
   if FIsLoading or (FFlowMeter = nil) then
     Exit;
 
+  if FFlowMeter.FlowMin = NormalizeFloatInput(EditFlowMin.Text) then
+    Exit;
   FFlowMeter.FlowMin := NormalizeFloatInput(EditFlowMin.Text);
   EditFlowMin.Text := FloatToStr(FFlowMeter.FlowMin);
+  NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditQuantityMaxExit(Sender: TObject);
@@ -435,8 +464,11 @@ begin
   if FIsLoading or (FFlowMeter = nil) then
     Exit;
 
+  if FFlowMeter.QuantityMax = NormalizeFloatInput(EditQuantityMax.Text) then
+    Exit;
   FFlowMeter.QuantityMax := NormalizeFloatInput(EditQuantityMax.Text);
   EditQuantityMax.Text := FloatToStr(FFlowMeter.QuantityMax);
+  NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditQuantityMinExit(Sender: TObject);
@@ -444,8 +476,11 @@ begin
   if FIsLoading or (FFlowMeter = nil) then
     Exit;
 
+  if FFlowMeter.QuantityMin = NormalizeFloatInput(EditQuantityMin.Text) then
+    Exit;
   FFlowMeter.QuantityMin := NormalizeFloatInput(EditQuantityMin.Text);
   EditQuantityMin.Text := FloatToStr(FFlowMeter.QuantityMin);
+  NotifyChanged;
 end;
 
 end.

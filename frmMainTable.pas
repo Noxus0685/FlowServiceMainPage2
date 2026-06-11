@@ -721,6 +721,8 @@ type
     procedure UpdateUIConditions;
     function   GetMeasurementRun: TMeasurementRun;
     procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
+    procedure FlowMeterPropertiesChanged(Sender: TObject);
+    procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -869,6 +871,55 @@ begin
   end;
 
   FFrameFlowMeterProperties.FlowMeter := Meter;
+end;
+
+procedure TFrameMainTable.FlowMeterPropertiesChanged(Sender: TObject);
+var
+  Row: Integer;
+  Channel: TChannel;
+begin
+  Channel := nil;
+
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+  begin
+    Row := GridDevices.Selected;
+    if (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) then
+      Channel := FActiveWorkTable.DeviceChannels[Row];
+  end;
+
+  RefreshActiveWorkTableViews(Channel, True);
+end;
+
+procedure TFrameMainTable.RefreshActiveWorkTableViews(AChannel: TChannel;
+  ASyncFromFlowMeter: Boolean);
+begin
+  if IsUpdating then
+    Exit;
+
+  if ASyncFromFlowMeter and (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+  begin
+    AChannel.TypeName := AChannel.FlowMeter.DeviceTypeName;
+    AChannel.Serial := AChannel.FlowMeter.SerialNumber;
+    AChannel.Signal := AChannel.FlowMeter.OutputType;
+    MarkChannelDeviceModified(AChannel);
+    SyncChannelsWithSameDeviceUUID(AChannel, AChannel.DeviceUUID);
+  end;
+
+  IsUpdating := True;
+  try
+    UpdateUIFromValues;
+    UpdateGrids;
+    if FFrameWorkTableProperties <> nil then
+      FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+    if AChannel <> nil then
+    begin
+      UpdateFlowMeterPropertiesFrame;
+      if FFrameChannelProperties <> nil then
+        FFrameChannelProperties.LoadFromChannel(AChannel);
+    end;
+  finally
+    IsUpdating := False;
+  end;
 end;
 
 procedure TFrameMainTable.ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
@@ -1564,6 +1615,7 @@ begin
     FFrameFlowMeterProperties := TFrameFlowMeterProperties.Create(Self);
     FFrameFlowMeterProperties.Parent := TabItemDeviceProperties;
     FFrameFlowMeterProperties.Align := TAlignLayout.Client;
+    FFrameFlowMeterProperties.OnChange := FlowMeterPropertiesChanged;
   end;
   UpdateFlowMeterPropertiesFrame;
 
@@ -5330,10 +5382,18 @@ begin
       begin
         Changed := WorkTable.DeviceChannels[ARow].Signal <> Signal;
         WorkTable.DeviceChannels[ARow].Signal := Signal;
-        if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-           (WorkTable.DeviceChannels[ARow].FlowMeter.Device <> nil) then
-          WorkTable.DeviceChannels[ARow].FlowMeter.Device.OutputType := Signal;
+        if WorkTable.DeviceChannels[ARow].FlowMeter <> nil then
+          WorkTable.DeviceChannels[ARow].FlowMeter.OutputType := Signal;
         DeviceFieldsChanged := True;
+
+        TThread.ForceQueue(nil,
+          procedure
+          begin
+            GridDevices.EditorMode := False;
+            PopupColumnDeviceSignal1.Repaint;
+            GridDevices.Repaint;
+          end
+        );
       end;
 
     if Changed then
@@ -5341,6 +5401,7 @@ begin
       MarkChannelDeviceModified(WorkTable.DeviceChannels[ARow]);
       if DeviceFieldsChanged then
         SyncChannelsWithSameDeviceUUID(WorkTable.DeviceChannels[ARow], WorkTable.DeviceChannels[ARow].DeviceUUID);
+      RefreshActiveWorkTableViews(WorkTable.DeviceChannels[ARow]);
     end;
 
     Exit;
@@ -5687,9 +5748,12 @@ begin
   if Length(ARefreshColumns) = 0 then
     AGrid.Repaint
   else
+  begin
     for I := Low(ARefreshColumns) to High(ARefreshColumns) do
       if ARefreshColumns[I] <> nil then
         ARefreshColumns[I].Repaint;
+    AGrid.Repaint;
+  end;
 end;
 
 procedure TFrameMainTable.UpdateGrids;
@@ -5724,7 +5788,9 @@ begin
     SoftReloadGridByGrowingRowCount(
       GridEtalons,
       WT.EtalonChannels.Count,
-      [StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
+      [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
+       StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
+       StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
        StringColumnEtalonFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     )
@@ -5732,7 +5798,9 @@ begin
     SoftReloadGridByGrowingRowCount(
       GridEtalons,
       0,
-      [StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
+      [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
+       StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
+       StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
        StringColumnEtalonFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     );
@@ -5789,7 +5857,10 @@ begin
       end;
 
     if Changed then
+    begin
       MarkChannelDeviceModified(WorkTable.EtalonChannels[ARow]);
+      RefreshActiveWorkTableViews(WorkTable.EtalonChannels[ARow]);
+    end;
 
     Exit;
   end;
