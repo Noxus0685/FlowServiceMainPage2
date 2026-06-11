@@ -479,6 +479,7 @@ type
     ActionPumpDelete: TAction;
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
+    Rectangle2: TRectangle;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;

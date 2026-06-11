@@ -453,6 +453,9 @@ begin
     FWorkTableManager.ActiveWorkTable.AddPump('2');
     FWorkTableManager.ActiveWorkTable.AddPump('2');
     FWorkTableManager.ActiveWorkTable.AddPump('3');
+    FWorkTableManager.ActiveWorkTable.AddScale('1');
+    FWorkTableManager.ActiveWorkTable.AddScale('2');
+    FWorkTableManager.ActiveWorkTable.AddScale('3');
   end;
 
   SyncWorkTableObservers;
