@@ -639,7 +639,8 @@ type
   procedure DoSpillageStop;
   procedure Notify(Event: Integer; Data: TObject = nil); reintroduce; overload;
   procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
-  procedure StartMeasurementRun(AMode: Integer = 1);
+  procedure StartMeasurementRun;    overload;
+  procedure StartMeasurementRun(AMode: Integer); overload;
   procedure ResetMeasurementValues;
   procedure StopMeasurementRun;
   procedure PauseMeasurementRun;
@@ -2488,8 +2489,7 @@ begin
       if Device.Qmax <= 0 then
         Continue;
 
-      QmaxBase := ValueFlowRate.GetDoubleBaseNum(Device.Qmax,
-        DEVICE_FLOW_RATE_DIM_INDEX);
+      QmaxBase := Device.Qmax;
       if QmaxBase <= 0 then
         Continue;
 
@@ -2537,8 +2537,8 @@ begin
     if Device.Qmin <= 0 then
       Continue;
 
-    QminBase := ValueFlowRate.GetDoubleBaseNum(Device.Qmin,
-      DEVICE_FLOW_RATE_DIM_INDEX);
+    QminBase := Device.Qmin;//ValueFlowRate.GetDoubleBaseNum(Device.Qmin,
+    //  DEVICE_FLOW_RATE_DIM_INDEX);
     if QminBase <= 0 then
       Continue;
 
@@ -2562,7 +2562,7 @@ begin
   if (FlowRate = nil) or (ValueFlowRate = nil) then
     Exit;
 
-  NewMin := CalcEtalonFlowRateMin;
+  NewMin := 0;
   NewMax := CalcEtalonFlowRateMax;
   OldMin := FlowRate.Min;
   OldMax := FlowRate.Max;
@@ -2598,7 +2598,7 @@ begin
      (not SameValue(OldMax, FlowRate.Max)) or
      ((FlowRate.ValueSet <> nil) and
       (not SameValue(OldValueSet, FlowRate.ValueSet.Value))) then
-    Notify(notifyStateChanged, FlowRate);
+    Notify(notifyEvent, FlowRate);
 end;
 
 { Frees channel collections owned by the work table. }
@@ -3890,7 +3890,7 @@ begin
 
   OldState := FState;
   FState := ANewState;
-  ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',
     'Изменено состояние рабочего стола',
     Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
       WorkTableStateToString(ANewState)]));
@@ -3947,33 +3947,134 @@ begin
     'Подготовка к остановке измеиения.', Name);
 end;
 
+/// <summary>
+/// Обрабатывает изменение состояния MeasurementRun и синхронизирует
+/// внутренний процесс измерения с внешним состоянием рабочего стола.
+/// </summary>
+/// <param name="ASender">
+/// Объект, инициировавший изменение состояния. Обычно экземпляр TMeasurementRun.
+/// </param>
+/// <param name="AState">
+/// Новое состояние процесса измерения.
+/// </param>
+/// <remarks>
+/// Метод не выполняет само измерение напрямую, а переводит TWorkTable
+/// в соответствующее состояние, запускает подготовку пролива или фиксирует
+/// завершение пролива.
+/// </remarks>
+
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
 begin
+  // This handler is called when TMeasurementRun changes its internal measurement stage.
+  //
+  // Important architectural rule:
+  // This method MUST NOT change the WorkTable state directly.
+  //
+  // TMeasurementRun describes the logical measurement workflow:
+  //   - point selection
+  //   - waiting for measurement
+  //   - active measurement
+  //   - completion
+  //
+  // TWorkTable.State describes the external state of the physical work table.
+  // The table state must be changed only by the code that actually processes
+  // work table actions, controller responses, hardware events, or command results.
+  //
+  // Therefore this method only converts measurement workflow stages into
+  // work table action requests.
+  //
+  // Example:
+  //   msMeasure -> request awtStartTest
+  //   msDone    -> request awtStopTest
+  //
+  // The action handler will later decide whether the action is allowed,
+  // execute the required command, and update the WorkTable state.
+
   case AState of
+
     msNone:
       begin
-        if FState in [swtSTOPTEST, swtSTOPWAIT, swtEXECUTE] then
-          SetState(swtCOMPLETE)
-        else if FState in [swtSTARTTEST, swtSTARTWAIT] then
-          SetState(swtSTANDBY);
+        // MeasurementRun is inactive or has been reset.
+        //
+        // Do not change the WorkTable state here.
+        // The current WorkTable state may already be STANDBY, COMPLETE,
+        // FAILURE, STOPWAIT, etc. Only the action-processing layer should
+        // decide how to finalize or normalize the table state.
+        //
+        // Clear the last requested action so that observers do not process
+        // a stale command again.
         FAction := awtNone;
       end;
+
 
     msSelectPoint:
       begin
+        // MeasurementRun selected a measurement point.
+        //
+        // This stage is only a logical preparation stage.
+        // It must not start the physical measurement directly and must not
+        // force the WorkTable into swtSTARTWAIT or any other state.
+        //
+        // If point selection requires UI refresh, parameter preparation,
+        // or controller setup, that should be done by the MeasurementRun
+        // workflow itself or by a separate explicit action.
+        //
+        // No WorkTable action is requested here.
         FAction := awtNone;
-        DoSpillageStart;
-        SetState(swtSTARTWAIT);
       end;
 
+
     msMeasure:
-      SetState(swtEXECUTE);
+      begin
+        // MeasurementRun entered the active measurement stage.
+        //
+        // At this moment we request the WorkTable to start the test.
+        // The request is sent as an action, not as a direct state change.
+        //
+        // Do NOT call SetState(swtEXECUTE) here.
+        // The WorkTable should enter swtEXECUTE only after the StartTest
+        // action is processed successfully.
+
+        StartTest;
+      end;
+
 
     msDone:
       begin
-        DoSpillageStop;
-        SetState(swtCOMPLETE);
+        // MeasurementRun has completed the current measurement cycle.
+        //
+        // At this moment we request the WorkTable to stop the test.
+        // The real stop procedure may include:
+        //   - sending a stop command to the controller;
+        //   - waiting for final values;
+        //   - reading results;
+        //   - saving data;
+        //   - switching the WorkTable to COMPLETE or FAILURE.
+        //
+        // All of that must be done by the action handler or by the
+        // corresponding stop workflow.
+        //
+        // Do NOT call DoSpillageStop here.
+        // Do NOT call SetState(swtCOMPLETE) here.
+
+        { TODO -oAndrey -cNeedToDo : Написать обработку окончания измерения. }
+
       end;
+
+  else
+    begin
+      // Other MeasurementRun stages are informational for TWorkTable.
+      //
+      // Examples:
+      //   msSelectEtalon
+      //   msSetupPoint
+      //   msWaitStable
+      //   msResultsRead
+      //   msSave
+      //
+      // They do not directly map to StartTest or StopTest.
+      // No WorkTable action is requested here.
+    end;
   end;
 end;
 
@@ -4217,7 +4318,7 @@ end;
 
 procedure TWorkTable.StartTest;
 begin
-  FireAction(awtStartTest, 'StartTest', 'Запрошен запуск теста');
+  FireAction(awtStartTest, 'StartTest', 'Запрошен запуск измерения');
 end;
 
 procedure TWorkTable.StartMonitor;
@@ -4235,6 +4336,12 @@ begin
   FireAction(awtStopMonitor, 'StopMonitor', 'Запрошена остановка мониторинга');
 end;
 
+procedure TWorkTable.StartMeasurementRun;
+begin
+    StartMeasurementRun(Integer(MeasurementMode));
+end;
+
+
 procedure TWorkTable.StartMeasurementRun(AMode: Integer);
 begin
   if FMeasurementRun = nil then
@@ -4247,8 +4354,9 @@ begin
     TMeasurementRun(FMeasurementRun).Mode := mrmAutomatic;
 
   TMeasurementRun(FMeasurementRun).Start;
-  if TMeasurementRun(FMeasurementRun).Stage = msNone then
-    SetState(swtSTANDBY);
+
+ { if TMeasurementRun(FMeasurementRun).Stage = msNone then
+    SetState(swtSTANDBY);  }
 
 end;
 

@@ -983,9 +983,10 @@ begin
   end;
 
   FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
-  RequestStartTest;
-  ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Пользователь запустил измерение', FActiveWorkTable.Name);
+   ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Запрос на запуск измерения', FActiveWorkTable.Name);
 
+  //FActiveWorkTable.StartTest;
+  FActiveWorkTable.StartMeasurementRun;
   end;
 
 procedure TFrameMainTable.StopTest;
@@ -1001,10 +1002,9 @@ begin
     Exit;
   end;
 
-   RequestStopTest;
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь останавливает измерение', FActiveWorkTable.Name);
- 
-end;
+   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Запрос на остановку измерения', FActiveWorkTable.Name);
+     FActiveWorkTable.StopMeasurementRun;
+ end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
 begin
@@ -4804,9 +4804,12 @@ end;
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
 begin
   if (FActiveWorkTable <> nil) then
-    FActiveWorkTable.State := swtSTANDBY
-  else
-    OnChangeState(swtSTANDBY);
+    FActiveWorkTable.State := swtCONNECTED;
+
+  //FActiveWorkTable.State:=swtCONNECTED;
+
+  //else
+   OnChangeState(swtSTANDBY);
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -5894,7 +5897,7 @@ begin
    //   LabelFlowRate.Text := '0';
   // if LayoutFlowRate.tag = 3 then
    // begin
-      WorkTable.UpdateFlowRateLimitsByEtalons;
+  //    WorkTable.UpdateFlowRateLimitsByEtalons;
       LayoutFlowRate.tag:=2;
       SpinBoxFlowRate.Min:= WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);
       SpinBoxFlowRate.Max:= WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Max,
