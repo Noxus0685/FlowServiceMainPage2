@@ -4322,10 +4322,7 @@ begin
      (AWorkTable.ActiveScale = nil) then
     Exit;
 
-  if not (AWorkTable.State in [swtEXECUTE]) then
-    Exit;
-
-  if not AWorkTable.FlowRate.IsRunning then
+  if not (AWorkTable.State in [swtMONITOR, swtEXECUTE]) then
     Exit;
 
   FlowUnit := Trim(AWorkTable.FlowUnitName);
