@@ -25,18 +25,18 @@ object FrameMainTable: TFrameMainTable
         Size.PlatformDefault = False
         TabOrder = 1
         Viewport.Width = 1737.000000000000000000
-        Viewport.Height = 137.000000000000000000
+        Viewport.Height = 121.000000000000000000
         object LayoutConditions: TLayout
           Align = Left
           Position.X = 625.000000000000000000
           Size.Width = 289.000000000000000000
-          Size.Height = 137.000000000000000000
+          Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           object Layout9: TLayout
             Align = Left
             Size.Width = 273.000000000000000000
-            Size.Height = 137.000000000000000000
+            Size.Height = 121.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
             object LayoutPressure: TLayout
@@ -176,7 +176,7 @@ object FrameMainTable: TFrameMainTable
             end
             object LabelLayoutConditions: TLabel
               Align = MostBottom
-              Position.Y = 120.000000000000000000
+              Position.Y = 104.000000000000000000
               Size.Width = 273.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
@@ -204,7 +204,7 @@ object FrameMainTable: TFrameMainTable
             Position.X = 273.000000000000000000
             Position.Y = 5.000000000000000000
             Size.Width = 10.000000000000000000
-            Size.Height = 127.000000000000000000
+            Size.Height = 111.000000000000000000
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
@@ -213,7 +213,7 @@ object FrameMainTable: TFrameMainTable
           Align = Left
           Position.X = 1170.000000000000000000
           Size.Width = 281.000000000000000000
-          Size.Height = 137.000000000000000000
+          Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 4
           object Line5: TLine
@@ -224,14 +224,14 @@ object FrameMainTable: TFrameMainTable
             Position.X = 271.000000000000000000
             Position.Y = 5.000000000000000000
             Size.Width = 10.000000000000000000
-            Size.Height = 127.000000000000000000
+            Size.Height = 111.000000000000000000
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
           object LayoutFLR: TLayout
             Align = Client
             Size.Width = 271.000000000000000000
-            Size.Height = 137.000000000000000000
+            Size.Height = 121.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object LayoutFLDisplay: TLayout
@@ -354,7 +354,7 @@ object FrameMainTable: TFrameMainTable
             end
             object LabelLayoutFlowRate: TLabel
               Align = MostBottom
-              Position.Y = 120.000000000000000000
+              Position.Y = 104.000000000000000000
               Size.Width = 271.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
@@ -376,7 +376,7 @@ object FrameMainTable: TFrameMainTable
         object LayoutMain: TLayout
           Align = Left
           Size.Width = 313.000000000000000000
-          Size.Height = 137.000000000000000000
+          Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 2
           object Line6: TLine
@@ -387,14 +387,14 @@ object FrameMainTable: TFrameMainTable
             Position.X = 303.000000000000000000
             Position.Y = 5.000000000000000000
             Size.Width = 10.000000000000000000
-            Size.Height = 127.000000000000000000
+            Size.Height = 111.000000000000000000
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
           object Layout16: TLayout
             Align = Left
             Size.Width = 305.000000000000000000
-            Size.Height = 137.000000000000000000
+            Size.Height = 121.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object LayoutTaskMain: TLayout
@@ -424,7 +424,7 @@ object FrameMainTable: TFrameMainTable
             end
             object LabelLayoutMain: TLabel
               Align = MostBottom
-              Position.Y = 120.000000000000000000
+              Position.Y = 104.000000000000000000
               Size.Width = 305.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
@@ -556,9 +556,9 @@ object FrameMainTable: TFrameMainTable
         end
         object LayoutMesure: TLayout
           Align = Left
-          Position.X = 1451.000000000000000000
+          Position.X = 1707.000000000000000000
           Size.Width = 255.000000000000000000
-          Size.Height = 137.000000000000000000
+          Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
           object Line13: TLine
@@ -569,14 +569,14 @@ object FrameMainTable: TFrameMainTable
             Position.X = 245.000000000000000000
             Position.Y = 5.000000000000000000
             Size.Width = 10.000000000000000000
-            Size.Height = 127.000000000000000000
+            Size.Height = 111.000000000000000000
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
           object Layout44: TLayout
             Align = Client
             Size.Width = 245.000000000000000000
-            Size.Height = 137.000000000000000000
+            Size.Height = 121.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Layout45: TLayout
@@ -729,7 +729,7 @@ object FrameMainTable: TFrameMainTable
             end
             object LabelLayoutMesure: TLabel
               Align = MostBottom
-              Position.Y = 120.000000000000000000
+              Position.Y = 104.000000000000000000
               Size.Width = 245.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
@@ -842,7 +842,7 @@ object FrameMainTable: TFrameMainTable
           Align = Left
           Position.X = 313.000000000000000000
           Size.Width = 312.000000000000000000
-          Size.Height = 137.000000000000000000
+          Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 1
           object Line2: TLine
@@ -853,14 +853,14 @@ object FrameMainTable: TFrameMainTable
             Position.X = 302.000000000000000000
             Position.Y = 5.000000000000000000
             Size.Width = 10.000000000000000000
-            Size.Height = 127.000000000000000000
+            Size.Height = 111.000000000000000000
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
           object Layout4: TLayout
             Align = Left
             Size.Width = 305.000000000000000000
-            Size.Height = 137.000000000000000000
+            Size.Height = 121.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object Layout8: TLayout
@@ -924,7 +924,7 @@ object FrameMainTable: TFrameMainTable
             end
             object LabelLayoutProcedures: TLabel
               Align = MostBottom
-              Position.Y = 120.000000000000000000
+              Position.Y = 104.000000000000000000
               Size.Width = 305.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
@@ -1012,7 +1012,7 @@ object FrameMainTable: TFrameMainTable
           Align = Left
           Position.X = 914.000000000000000000
           Size.Width = 256.000000000000000000
-          Size.Height = 137.000000000000000000
+          Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 5
           object Line1: TLine
@@ -1023,14 +1023,14 @@ object FrameMainTable: TFrameMainTable
             Position.X = 246.000000000000000000
             Position.Y = 5.000000000000000000
             Size.Width = 10.000000000000000000
-            Size.Height = 127.000000000000000000
+            Size.Height = 111.000000000000000000
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
           object Layout3: TLayout
             Align = Client
             Size.Width = 246.000000000000000000
-            Size.Height = 137.000000000000000000
+            Size.Height = 121.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object LayoutFrequancy: TLayout
@@ -1153,7 +1153,7 @@ object FrameMainTable: TFrameMainTable
               Margins.Right = 2.000000000000000000
               Margins.Bottom = 2.000000000000000000
               Position.X = 2.000000000000000000
-              Position.Y = 118.000000000000000000
+              Position.Y = 102.000000000000000000
               Size.Width = 242.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
@@ -1174,9 +1174,9 @@ object FrameMainTable: TFrameMainTable
         end
         object LayoutScale: TLayout
           Align = Left
-          Position.X = 1170.000000000000000000
+          Position.X = 1451.000000000000000000
           Size.Width = 256.000000000000000000
-          Size.Height = 137.000000000000000000
+          Size.Height = 121.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 6
           object LineScale: TLine
@@ -1187,14 +1187,14 @@ object FrameMainTable: TFrameMainTable
             Position.X = 246.000000000000000000
             Position.Y = 5.000000000000000000
             Size.Width = 10.000000000000000000
-            Size.Height = 127.000000000000000000
+            Size.Height = 111.000000000000000000
             Size.PlatformDefault = False
             Stroke.Color = claGray
           end
           object LayoutScaleClient: TLayout
             Align = Client
             Size.Width = 246.000000000000000000
-            Size.Height = 137.000000000000000000
+            Size.Height = 121.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
             object LayoutScaleDisplay: TLayout
@@ -1204,19 +1204,6 @@ object FrameMainTable: TFrameMainTable
               Size.Height = 40.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              object LabelScaleDevice: TLabel
-                Align = Left
-                StyledSettings = [Family, FontColor]
-                Size.Width = 119.000000000000000000
-                Size.Height = 40.000000000000000000
-                Size.PlatformDefault = False
-                StyleLookup = 'labelstyle'
-                TextSettings.Font.Size = 14.000000000000000000
-                TextSettings.Font.StyleExt = {00070000000000000004000000}
-                TextSettings.HorzAlign = Center
-                Text = #1042#1077#1089#1099': -'
-                TabOrder = 0
-              end
               object RectangleScaleWeight: TRectangle
                 Align = Right
                 Fill.Color = claWhite
@@ -1235,6 +1222,26 @@ object FrameMainTable: TFrameMainTable
                   TextSettings.Font.StyleExt = {00070000000000000004000000}
                   TextSettings.HorzAlign = Center
                   Text = '0'
+                  TabOrder = 0
+                end
+              end
+              object Rectangle2: TRectangle
+                Align = Left
+                Fill.Color = claWhite
+                Size.Width = 97.000000000000000000
+                Size.Height = 40.000000000000000000
+                Size.PlatformDefault = False
+                object LabelScaleDevice: TLabel
+                  Align = Left
+                  StyledSettings = [Family, FontColor]
+                  Size.Width = 97.000000000000000000
+                  Size.Height = 40.000000000000000000
+                  Size.PlatformDefault = False
+                  StyleLookup = 'labelstyle'
+                  TextSettings.Font.Size = 14.000000000000000000
+                  TextSettings.Font.StyleExt = {00070000000000000004000000}
+                  TextSettings.HorzAlign = Center
+                  Text = #1042#1077#1089#1099': -'
                   TabOrder = 0
                 end
               end
@@ -1263,6 +1270,7 @@ object FrameMainTable: TFrameMainTable
                 Size.PlatformDefault = False
                 TabOrder = 1
                 Text = #1057#1083#1080#1074
+                TextSettings.Trimming = None
                 OnClick = ButtonScaleDrainClick
               end
               object ButtonScaleTare: TButton
@@ -1274,6 +1282,7 @@ object FrameMainTable: TFrameMainTable
                 Size.PlatformDefault = False
                 TabOrder = 2
                 Text = #1058#1072#1088#1072
+                TextSettings.Trimming = None
                 OnClick = ButtonScaleTareClick
               end
             end
@@ -1284,7 +1293,7 @@ object FrameMainTable: TFrameMainTable
               Margins.Right = 2.000000000000000000
               Margins.Bottom = 2.000000000000000000
               Position.X = 2.000000000000000000
-              Position.Y = 118.000000000000000000
+              Position.Y = 102.000000000000000000
               Size.Width = 242.000000000000000000
               Size.Height = 17.000000000000000000
               Size.PlatformDefault = False
