@@ -3162,7 +3162,7 @@ begin
   try
     DeviceSelectResult := Frm.ShowModal;
 
-    WorkTableManager.ActiveWorkTable.InitChannels ;
+   // WorkTableManager.ActiveWorkTable.InitChannels ;
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     if DeviceSelectResult <> mrOk then
