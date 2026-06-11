@@ -1150,9 +1150,10 @@ begin
   end;
 
   FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
-  RequestStartTest;
-  ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Пользователь запустил измерение', FActiveWorkTable.Name);
+   ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Запрос на запуск измерения', FActiveWorkTable.Name);
 
+  //FActiveWorkTable.StartTest;
+  FActiveWorkTable.StartMeasurementRun;
   end;
 
 procedure TFrameMainTable.StopTest;
@@ -1168,10 +1169,9 @@ begin
     Exit;
   end;
 
-   RequestStopTest;
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Пользователь останавливает измерение', FActiveWorkTable.Name);
- 
-end;
+   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Запрос на остановку измерения', FActiveWorkTable.Name);
+     FActiveWorkTable.StopMeasurementRun;
+ end;
 
  procedure TFrameMainTable.SwitchAutoSwitch(Sender: TObject);
 begin
@@ -5090,9 +5090,12 @@ end;
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
 begin
   if (FActiveWorkTable <> nil) then
-    FActiveWorkTable.State := swtSTANDBY
-  else
-    OnChangeState(swtSTANDBY);
+    FActiveWorkTable.State := swtCONNECTED;
+
+  //FActiveWorkTable.State:=swtCONNECTED;
+
+  //else
+   OnChangeState(swtSTANDBY);
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -6215,13 +6218,9 @@ end;
 procedure TFrameMainTable.UpdateUIFlowRate;
 var
   WorkTable: TWorkTable;
-  i:integer;
-  AMax,tmpMax:Double;
   StableStatus: RStableInfo;
-  tmpDevice:TDevice;
 begin
     WorkTable := FActiveWorkTable;
-    tmpMax:=-1;
     if WorkTable = nil then
       Exit;
 
@@ -6235,19 +6234,11 @@ begin
    //   LabelFlowRate.Text := '0';
   // if LayoutFlowRate.tag = 3 then
    // begin
-      for I := 0 to FActiveWorkTable.EtalonChannels.Count-1 do
-        begin
-          tmpDevice:=FActiveWorkTable.EtalonChannels[i].FlowMeter.Device;
-          if Assigned(tmpDevice) then
-          begin
-               tmpMax:=FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(tmpDevice.Qmax,4);
-               if AMax<tmpMax then
-                  Amax:=tmpMax;
-          end;
-        end;
+  //    WorkTable.UpdateFlowRateLimitsByEtalons;
       LayoutFlowRate.tag:=2;
-      SpinBoxFlowRate.Min:=  FActiveWorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);
-      SpinBoxFlowRate.Max:= FActiveWorkTable.ValueFlowRate.GetDoubleNum(Amax,WorkTable.ValueFlowRate.CurrentDimIndex);
+      SpinBoxFlowRate.Min:= WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Min);
+      SpinBoxFlowRate.Max:= WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.Max,
+        WorkTable.ValueFlowRate.CurrentDimIndex);
       if WorkTable.FlowRate.ValueSet.Value<>0 then
         SpinBoxFlowRate.value:=WorkTable.ValueFlowRate.GetDoubleNum(WorkTable.FlowRate.ValueSet.Value);
 

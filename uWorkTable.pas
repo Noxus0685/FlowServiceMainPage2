@@ -273,6 +273,8 @@ type
     property SyncMode: ESyncChannelMode read GetSyncModeProxy write SetSyncModeProxy;
     property NoiseFilter: Integer read GetNoiseFilterProxy write SetNoiseFilterProxy;
     property Category: Integer read GetCategoryProxy write SetCategoryProxy;
+    // Group > 0: номер параллельной группы эталонов; Qmax группы суммируется.
+    // Group <= 0: канал считается одиночным, его Qmax не суммируется.
     property Group: Integer read FGroup write FGroup;
     property DeviceUUID: string read GetDeviceUUIDProxy write SetDeviceUUIDProxy;
     property TypeUUID: string read GetTypeUUIDProxy write SetTypeUUIDProxy;
@@ -644,6 +646,9 @@ type
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
+    function CalcEtalonFlowRateMax: Double;
+    function CalcEtalonFlowRateMin: Double;
+    procedure UpdateFlowRateLimitsByEtalons;
 
     procedure InitMeterValues;
     // Собирает Hash и удаляет из глобального списка сохранения MeterValues значения этого рабочего стола.
@@ -671,7 +676,8 @@ type
   procedure DoSpillageStop;
   procedure Notify(Event: Integer; Data: TObject = nil); reintroduce; overload;
   procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
-  procedure StartMeasurementRun(AMode: Integer = 1);
+  procedure StartMeasurementRun;    overload;
+  procedure StartMeasurementRun(AMode: Integer); overload;
   procedure ResetMeasurementValues;
   procedure StopMeasurementRun;
   procedure PauseMeasurementRun;
@@ -739,6 +745,7 @@ uses
 
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
+  DEVICE_FLOW_RATE_DIM_INDEX = 4;
 
 class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
   const AAction: string; ADevice: TDevice; AChannel: TChannel);
@@ -2430,6 +2437,7 @@ begin
   RebindAllFlowMeters;
   RecalculateAllMeterValues;
   UpdateAggregateMeterValues;
+  UpdateFlowRateLimitsByEtalons;
 end;
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
@@ -2490,6 +2498,147 @@ begin
     end;
   end;
 end;
+
+{ Calculates the greatest supported flow from single etalons and parallel groups. }
+function TWorkTable.CalcEtalonFlowRateMax: Double;
+var
+  I: Integer;
+  Channel: TChannel;
+  Device: TDevice;
+  QmaxBase: Double;
+  GroupSum: Double;
+  GroupSums: TDictionary<Integer, Double>;
+  Pair: TPair<Integer, Double>;
+begin
+  Result := 0;
+  if (FEtalonChannels = nil) or (ValueFlowRate = nil) then
+    Exit;
+
+  GroupSums := TDictionary<Integer, Double>.Create;
+  try
+    for I := 0 to FEtalonChannels.Count - 1 do
+    begin
+      Channel := FEtalonChannels[I];
+      if (Channel = nil) or (not Channel.Enabled) or
+         (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
+        Continue;
+
+      Device := Channel.FlowMeter.Device;
+      if Device.Qmax <= 0 then
+        Continue;
+
+      QmaxBase := Device.Qmax;
+      if QmaxBase <= 0 then
+        Continue;
+
+      if Channel.Group > 0 then
+      begin
+        if GroupSums.TryGetValue(Channel.Group, GroupSum) then
+          GroupSums[Channel.Group] := GroupSum + QmaxBase
+        else
+          GroupSums.Add(Channel.Group, QmaxBase);
+      end
+      else if QmaxBase > Result then
+        Result := QmaxBase;
+    end;
+
+    for Pair in GroupSums do
+      if Pair.Value > Result then
+        Result := Pair.Value;
+  finally
+    GroupSums.Free;
+  end;
+end;
+
+{ Calculates the lowest positive Qmin among enabled etalon devices. }
+function TWorkTable.CalcEtalonFlowRateMin: Double;
+var
+  I: Integer;
+  Channel: TChannel;
+  Device: TDevice;
+  QminBase: Double;
+  IsFound: Boolean;
+begin
+  Result := 0;
+  IsFound := False;
+  if (FEtalonChannels = nil) or (ValueFlowRate = nil) then
+    Exit;
+
+  for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+    if (Channel = nil) or (not Channel.Enabled) or
+       (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
+      Continue;
+
+    Device := Channel.FlowMeter.Device;
+    if Device.Qmin <= 0 then
+      Continue;
+
+    QminBase := Device.Qmin;//ValueFlowRate.GetDoubleBaseNum(Device.Qmin,
+    //  DEVICE_FLOW_RATE_DIM_INDEX);
+    if QminBase <= 0 then
+      Continue;
+
+    if (not IsFound) or (QminBase < Result) then
+    begin
+      Result := QminBase;
+      IsFound := True;
+    end;
+  end;
+end;
+
+{ Refreshes flow-rate limits from installed etalons and clamps the current task. }
+procedure TWorkTable.UpdateFlowRateLimitsByEtalons;
+var
+  NewMin: Double;
+  NewMax: Double;
+  OldMin: Double;
+  OldMax: Double;
+  OldValueSet: Double;
+begin
+  if (FlowRate = nil) or (ValueFlowRate = nil) then
+    Exit;
+
+  NewMin := 0;
+  NewMax := CalcEtalonFlowRateMax;
+  OldMin := FlowRate.Min;
+  OldMax := FlowRate.Max;
+  if FlowRate.ValueSet <> nil then
+    OldValueSet := FlowRate.ValueSet.Value
+  else
+    OldValueSet := 0;
+
+  // Change the opposite boundary first when the old range would reject a valid new one.
+  if (NewMin > 0) and (NewMax > 0) and (NewMin <= NewMax) then
+  begin
+    if NewMin > FlowRate.Max then
+      FlowRate.Max := NewMax
+    else if NewMax < FlowRate.Min then
+      FlowRate.Min := NewMin;
+  end;
+
+  if NewMin > 0 then
+    FlowRate.Min := NewMin;
+  if NewMax > 0 then
+    FlowRate.Max := NewMax;
+
+  if FlowRate.ValueSet <> nil then
+  begin
+    if (FlowRate.Max > 0) and (FlowRate.ValueSet.Value > FlowRate.Max) then
+      FlowRate.ValueSet.Value := FlowRate.Max;
+    if (FlowRate.Min > 0) and (FlowRate.ValueSet.Value > 0) and
+       (FlowRate.ValueSet.Value < FlowRate.Min) then
+      FlowRate.ValueSet.Value := FlowRate.Min;
+  end;
+
+  if (not SameValue(OldMin, FlowRate.Min)) or
+     (not SameValue(OldMax, FlowRate.Max)) or
+     ((FlowRate.ValueSet <> nil) and
+      (not SameValue(OldValueSet, FlowRate.ValueSet.Value))) then
+    Notify(notifyEvent, FlowRate);
+end;
+
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
@@ -2775,6 +2924,7 @@ begin
     FEtalonChannels[I].RebindFlowMeterValues(Self);
 
   UpdateAggregateMeterValues;
+  UpdateFlowRateLimitsByEtalons;
   AssignTableFlowAsEtalonToDevices;
 end;
 
@@ -2853,6 +3003,8 @@ begin
   Result.Init;
   Result.InitMeterValues;
   Result.RebindFlowMeterValues(Self);
+  UpdateAggregateMeterValues;
+  UpdateFlowRateLimitsByEtalons;
 end;
 
 { Saves work table list, channels, and meter values to INI files. }
@@ -3158,6 +3310,7 @@ begin
       WorkTable.RebindAllFlowMeters;
       WorkTable.RecalculateAllMeterValues;
       WorkTable.UpdateAggregateMeterValues;
+      WorkTable.UpdateFlowRateLimitsByEtalons;
 
       AWorkTables.Add(WorkTable);
     end;
@@ -3494,6 +3647,7 @@ begin
     FEtalonChannels.Delete(ChannelIndex);
     //ReindexChannels(FEtalonChannels, True);
     UpdateAggregateMeterValues;
+    UpdateFlowRateLimitsByEtalons;
     AssignTableFlowAsEtalonToDevices;
     Result := True;
     Exit;
@@ -3881,7 +4035,7 @@ begin
 
   OldState := FState;
   FState := ANewState;
-  ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableState',
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',
     'Изменено состояние рабочего стола',
     Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
       WorkTableStateToString(ANewState)]));
@@ -3938,33 +4092,134 @@ begin
     'Подготовка к остановке измеиения.', Name);
 end;
 
+/// <summary>
+/// Обрабатывает изменение состояния MeasurementRun и синхронизирует
+/// внутренний процесс измерения с внешним состоянием рабочего стола.
+/// </summary>
+/// <param name="ASender">
+/// Объект, инициировавший изменение состояния. Обычно экземпляр TMeasurementRun.
+/// </param>
+/// <param name="AState">
+/// Новое состояние процесса измерения.
+/// </param>
+/// <remarks>
+/// Метод не выполняет само измерение напрямую, а переводит TWorkTable
+/// в соответствующее состояние, запускает подготовку пролива или фиксирует
+/// завершение пролива.
+/// </remarks>
+
 procedure TWorkTable.MeasurementRunStateChanged(ASender: TObject; AState: EMeasurementState);
 begin
+  // This handler is called when TMeasurementRun changes its internal measurement stage.
+  //
+  // Important architectural rule:
+  // This method MUST NOT change the WorkTable state directly.
+  //
+  // TMeasurementRun describes the logical measurement workflow:
+  //   - point selection
+  //   - waiting for measurement
+  //   - active measurement
+  //   - completion
+  //
+  // TWorkTable.State describes the external state of the physical work table.
+  // The table state must be changed only by the code that actually processes
+  // work table actions, controller responses, hardware events, or command results.
+  //
+  // Therefore this method only converts measurement workflow stages into
+  // work table action requests.
+  //
+  // Example:
+  //   msMeasure -> request awtStartTest
+  //   msDone    -> request awtStopTest
+  //
+  // The action handler will later decide whether the action is allowed,
+  // execute the required command, and update the WorkTable state.
+
   case AState of
+
     msNone:
       begin
-        if FState in [swtSTOPTEST, swtSTOPWAIT, swtEXECUTE] then
-          SetState(swtCOMPLETE)
-        else if FState in [swtSTARTTEST, swtSTARTWAIT] then
-          SetState(swtSTANDBY);
+        // MeasurementRun is inactive or has been reset.
+        //
+        // Do not change the WorkTable state here.
+        // The current WorkTable state may already be STANDBY, COMPLETE,
+        // FAILURE, STOPWAIT, etc. Only the action-processing layer should
+        // decide how to finalize or normalize the table state.
+        //
+        // Clear the last requested action so that observers do not process
+        // a stale command again.
         FAction := awtNone;
       end;
+
 
     msSelectPoint:
       begin
+        // MeasurementRun selected a measurement point.
+        //
+        // This stage is only a logical preparation stage.
+        // It must not start the physical measurement directly and must not
+        // force the WorkTable into swtSTARTWAIT or any other state.
+        //
+        // If point selection requires UI refresh, parameter preparation,
+        // or controller setup, that should be done by the MeasurementRun
+        // workflow itself or by a separate explicit action.
+        //
+        // No WorkTable action is requested here.
         FAction := awtNone;
-        DoSpillageStart;
-        SetState(swtSTARTWAIT);
       end;
 
+
     msMeasure:
-      SetState(swtEXECUTE);
+      begin
+        // MeasurementRun entered the active measurement stage.
+        //
+        // At this moment we request the WorkTable to start the test.
+        // The request is sent as an action, not as a direct state change.
+        //
+        // Do NOT call SetState(swtEXECUTE) here.
+        // The WorkTable should enter swtEXECUTE only after the StartTest
+        // action is processed successfully.
+
+        StartTest;
+      end;
+
 
     msDone:
       begin
-        DoSpillageStop;
-        SetState(swtCOMPLETE);
+        // MeasurementRun has completed the current measurement cycle.
+        //
+        // At this moment we request the WorkTable to stop the test.
+        // The real stop procedure may include:
+        //   - sending a stop command to the controller;
+        //   - waiting for final values;
+        //   - reading results;
+        //   - saving data;
+        //   - switching the WorkTable to COMPLETE or FAILURE.
+        //
+        // All of that must be done by the action handler or by the
+        // corresponding stop workflow.
+        //
+        // Do NOT call DoSpillageStop here.
+        // Do NOT call SetState(swtCOMPLETE) here.
+
+        { TODO -oAndrey -cNeedToDo : Написать обработку окончания измерения. }
+
       end;
+
+  else
+    begin
+      // Other MeasurementRun stages are informational for TWorkTable.
+      //
+      // Examples:
+      //   msSelectEtalon
+      //   msSetupPoint
+      //   msWaitStable
+      //   msResultsRead
+      //   msSave
+      //
+      // They do not directly map to StartTest or StopTest.
+      // No WorkTable action is requested here.
+    end;
   end;
 end;
 
@@ -4208,7 +4463,7 @@ end;
 
 procedure TWorkTable.StartTest;
 begin
-  FireAction(awtStartTest, 'StartTest', 'Запрошен запуск теста');
+  FireAction(awtStartTest, 'StartTest', 'Запрошен запуск измерения');
 end;
 
 procedure TWorkTable.StartMonitor;
@@ -4226,6 +4481,12 @@ begin
   FireAction(awtStopMonitor, 'StopMonitor', 'Запрошена остановка мониторинга');
 end;
 
+procedure TWorkTable.StartMeasurementRun;
+begin
+    StartMeasurementRun(Integer(MeasurementMode));
+end;
+
+
 procedure TWorkTable.StartMeasurementRun(AMode: Integer);
 begin
   if FMeasurementRun = nil then
@@ -4238,8 +4499,9 @@ begin
     TMeasurementRun(FMeasurementRun).Mode := mrmAutomatic;
 
   TMeasurementRun(FMeasurementRun).Start;
-  if TMeasurementRun(FMeasurementRun).Stage = msNone then
-    SetState(swtSTANDBY);
+
+ { if TMeasurementRun(FMeasurementRun).Stage = msNone then
+    SetState(swtSTANDBY);  }
 
 end;
 
