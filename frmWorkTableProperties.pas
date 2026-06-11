@@ -27,13 +27,13 @@ type
     FWorkTable: TWorkTable;
     FLoading: Boolean;
 
-    LayoutRoot: TVertScrollBox;
+    LayoutRoot: TLayout;
     EditWorkTableText: TEdit;
     EditWorkTableName: TEdit;
     LabelWorkTableUUID: TLabel;
     LabelWorkTableState: TLabel;
     ComboEditMode: TComboBox;
-    TreeMeterValues: TTreeView;
+    TreeProperties: TTreeView;
     EditPressureMin: TEdit;
     EditPressureMax: TEdit;
     EditTempertureMin: TEdit;
@@ -52,12 +52,12 @@ type
     ButtonSelectQuantity: TButton;
 
     procedure BuildUI;
-    procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
-    procedure AddLabelRow(const ACaption: string; out ALabel: TLabel);
-    procedure AddComboRow(const ACaption: string; out ACombo: TComboBox);
+    procedure AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
+    procedure AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
+    procedure AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
     procedure AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
       out AButton: TButton; AOnClick: TNotifyEvent);
-    function AddMeterCategory(const ACaption: string): TTreeViewItem;
+    function AddCategory(const ACaption: string): TTreeViewItem;
     function CreateLimitEdit(AParent: TTreeViewItem; const ACaption: string; const ATag: Integer): TEdit;
     function MeterValueToText(AMeterValue: TMeterValue): string;
     function WorkTableStateToCaption(AState: EStateWorkTable): string;
@@ -96,77 +96,76 @@ end;
 
 procedure TFrameWorkTableProperties.BuildUI;
 var
+  GeneralCategory: TTreeViewItem;
   PressureCategory: TTreeViewItem;
   TempertureCategory: TTreeViewItem;
   FlowRateCategory: TTreeViewItem;
   QuantityCategory: TTreeViewItem;
 begin
-  LayoutRoot := TVertScrollBox.Create(Self);
+  LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
   LayoutRoot.Align := TAlignLayout.Client;
   LayoutRoot.Padding.Rect := TRectF.Create(8, 8, 8, 8);
   LayoutRoot.Stored := False;
 
-  AddEditRow('Название рабочего стола', EditWorkTableText);
+  TreeProperties := TTreeView.Create(Self);
+  TreeProperties.Parent := LayoutRoot;
+  TreeProperties.Align := TAlignLayout.Client;
+  TreeProperties.ShowCheckboxes := False;
+  TreeProperties.ItemHeight := 32;
+  TreeProperties.Stored := False;
+
+  GeneralCategory := AddCategory('Рабочий стол');
+  AddEditRow(GeneralCategory, 'Название рабочего стола', EditWorkTableText);
   EditWorkTableText.OnExit := HandleWorkTableTextExit;
 
-  AddEditRow('Имя рабочего стола', EditWorkTableName);
+  AddEditRow(GeneralCategory, 'Имя рабочего стола', EditWorkTableName);
   EditWorkTableName.OnExit := HandleWorkTableNameExit;
 
-  AddLabelRow('UUID рабочего стола', LabelWorkTableUUID);
-  AddLabelRow('Текущее состояние', LabelWorkTableState);
+  AddLabelRow(GeneralCategory, 'UUID рабочего стола', LabelWorkTableUUID);
+  AddLabelRow(GeneralCategory, 'Текущее состояние', LabelWorkTableState);
 
-  AddComboRow('Редактирование', ComboEditMode);
+  AddComboRow(GeneralCategory, 'Редактирование', ComboEditMode);
   ComboEditMode.Items.Add('Можно редактировать');
   ComboEditMode.Items.Add('Нельзя редактировать');
   ComboEditMode.ItemIndex := 0;
   ComboEditMode.OnChange := HandleEditModeChange;
 
-  TreeMeterValues := TTreeView.Create(Self);
-  TreeMeterValues.Parent := LayoutRoot;
-  TreeMeterValues.Align := TAlignLayout.Top;
-  TreeMeterValues.Height := 520;
-  TreeMeterValues.Margins.Rect := TRectF.Create(0, 8, 0, 0);
-  TreeMeterValues.ShowCheckboxes := False;
-  TreeMeterValues.ItemHeight := 32;
-  TreeMeterValues.Stored := False;
-
-  PressureCategory := AddMeterCategory('Давление');
+  PressureCategory := AddCategory('Давление');
   AddMeterValueRow(PressureCategory, 'Давление', EditPressure, ButtonSelectPressure,
     ButtonSelectPressureClick);
   EditPressureMin := CreateLimitEdit(PressureCategory, 'Мин значение', 0);
   EditPressureMax := CreateLimitEdit(PressureCategory, 'Макс значение', 1);
 
-  TempertureCategory := AddMeterCategory('Температура');
+  TempertureCategory := AddCategory('Температура');
   AddMeterValueRow(TempertureCategory, 'Температура', EditTemperture, ButtonSelectTemperture,
     ButtonSelectTempertureClick);
   EditTempertureMin := CreateLimitEdit(TempertureCategory, 'Мин значение', 2);
   EditTempertureMax := CreateLimitEdit(TempertureCategory, 'Макс значение', 3);
 
-  FlowRateCategory := AddMeterCategory('Расход');
+  FlowRateCategory := AddCategory('Расход');
   AddMeterValueRow(FlowRateCategory, 'Расход', EditFlowRate, ButtonSelectFlowRate,
     ButtonSelectFlowRateClick);
   EditFlowRateMin := CreateLimitEdit(FlowRateCategory, 'Мин значение', 4);
   EditFlowRateMax := CreateLimitEdit(FlowRateCategory, 'Макс значение', 5);
 
-  QuantityCategory := AddMeterCategory('Жидкость');
+  QuantityCategory := AddCategory('Жидкость');
   AddMeterValueRow(QuantityCategory, 'Количество жидкости', EditQuantity, ButtonSelectQuantity,
     ButtonSelectQuantityClick);
   EditQuantityMin := CreateLimitEdit(QuantityCategory, 'Мин значение', 6);
   EditQuantityMax := CreateLimitEdit(QuantityCategory, 'Макс значение', 7);
 end;
 
-procedure TFrameWorkTableProperties.AddEditRow(const ACaption: string; out AEdit: TEdit);
+procedure TFrameWorkTableProperties.AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Item := TLayout.Create(Self);
-  Item.Parent := LayoutRoot;
-  Item.Align := TAlignLayout.Top;
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
   Item.Height := 36;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -196,17 +195,16 @@ begin
   RowGrid.ControlCollection.AddControl(AEdit, 1, 0);
 end;
 
-procedure TFrameWorkTableProperties.AddLabelRow(const ACaption: string; out ALabel: TLabel);
+procedure TFrameWorkTableProperties.AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Item := TLayout.Create(Self);
-  Item.Parent := LayoutRoot;
-  Item.Align := TAlignLayout.Top;
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
   Item.Height := 32;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -236,17 +234,16 @@ begin
   RowGrid.ControlCollection.AddControl(ALabel, 1, 0);
 end;
 
-procedure TFrameWorkTableProperties.AddComboRow(const ACaption: string; out ACombo: TComboBox);
+procedure TFrameWorkTableProperties.AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
 var
-  Item: TLayout;
+  Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   CaptionLabel: TLabel;
 begin
-  Item := TLayout.Create(Self);
-  Item.Parent := LayoutRoot;
-  Item.Align := TAlignLayout.Top;
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
   Item.Height := 36;
-  Item.Margins.Bottom := 4;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -329,10 +326,10 @@ begin
   AEdit.ReadOnly := True;
 end;
 
-function TFrameWorkTableProperties.AddMeterCategory(const ACaption: string): TTreeViewItem;
+function TFrameWorkTableProperties.AddCategory(const ACaption: string): TTreeViewItem;
 begin
   Result := TTreeViewItem.Create(Self);
-  Result.Parent := TreeMeterValues;
+  Result.Parent := TreeProperties;
   Result.Text := ACaption;
   Result.StyledSettings := [];
   Result.TextSettings.Font.Style := [TFontStyle.fsBold];
