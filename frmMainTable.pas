@@ -3160,6 +3160,7 @@ begin
   Frm := TFormDeviceSelect.Create(Self);
   try
     DeviceSelectResult := Frm.ShowModal;
+
     RemoveDeviceChannelsByDeletedUUIDs(Frm.DeletedDeviceUUIDs);
 
     if DeviceSelectResult <> mrOk then
