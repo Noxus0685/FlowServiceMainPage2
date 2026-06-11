@@ -101,6 +101,10 @@ var
   TempertureCategory: TTreeViewItem;
   FlowRateCategory: TTreeViewItem;
   QuantityCategory: TTreeViewItem;
+  HeaderGrid: TGridPanelLayout;
+  HeaderProperty: TLabel;
+  HeaderValue: TLabel;
+  HeaderDivider: TLine;
 begin
   LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
@@ -114,6 +118,45 @@ begin
   TreeProperties.ShowCheckboxes := False;
   TreeProperties.ItemHeight := 32;
   TreeProperties.Stored := False;
+
+  HeaderGrid := TGridPanelLayout.Create(Self);
+  HeaderGrid.Parent := LayoutRoot;
+  HeaderGrid.Align := TAlignLayout.Top;
+  HeaderGrid.Height := 30;
+  HeaderGrid.RowCollection.Clear;
+  HeaderGrid.ColumnCollection.Clear;
+  HeaderGrid.ColumnCollection.Add.Value := 45;
+  HeaderGrid.ColumnCollection.Add.Value := 55;
+  HeaderGrid.RowCollection.Add.Value := 100;
+  HeaderGrid.Stored := False;
+
+  HeaderProperty := TLabel.Create(Self);
+  HeaderProperty.Parent := HeaderGrid;
+  HeaderProperty.Align := TAlignLayout.Client;
+  HeaderProperty.Text := 'Свойство';
+  HeaderProperty.StyledSettings := [];
+  HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
+  HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
+  HeaderProperty.Margins.Rect := TRectF.Create(10, 0, 8, 0);
+  HeaderGrid.ControlCollection.AddControl(HeaderProperty, 0, 0);
+
+  HeaderValue := TLabel.Create(Self);
+  HeaderValue.Parent := HeaderGrid;
+  HeaderValue.Align := TAlignLayout.Client;
+  HeaderValue.Text := 'Значение';
+  HeaderValue.StyledSettings := [];
+  HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
+  HeaderValue.TextSettings.FontColor := $FF3D3D3D;
+  HeaderValue.Margins.Rect := TRectF.Create(8, 0, 10, 0);
+  HeaderGrid.ControlCollection.AddControl(HeaderValue, 1, 0);
+
+  HeaderDivider := TLine.Create(Self);
+  HeaderDivider.Parent := LayoutRoot;
+  HeaderDivider.Align := TAlignLayout.Top;
+  HeaderDivider.Height := 1;
+  HeaderDivider.LineType := TLineType.Bottom;
+  HeaderDivider.Stroke.Color := $FFCDCDCD;
+  HeaderDivider.Stored := False;
 
   GeneralCategory := AddCategory('Рабочий стол');
   AddEditRow(GeneralCategory, 'Название рабочего стола', EditWorkTableText);
