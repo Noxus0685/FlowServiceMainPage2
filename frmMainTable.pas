@@ -776,10 +776,12 @@ const
     'т/ч'
   );
 
-  CScaleUnits: array[0..2] of string = (
+  CScaleUnits: array[0..4] of string = (
     'г',
     'кг',
-    'т'
+    'т',
+    'л',
+    'м3'
   );
 
   CFlowMeterTypes: array[0..2] of string = (
@@ -820,21 +822,27 @@ begin
   Result := False;
 end;
 
+function ResolveQuantityUnitByFlowUnit(const AUnit: string): string; forward;
+
 function NormalizeScaleUnit(const AUnit: string): string;
 begin
   Result := Trim(AUnit);
+  if IsScaleUnit(Result) then
+    Exit;
+
+  Result := ResolveQuantityUnitByFlowUnit(Result);
   if not IsScaleUnit(Result) then
     Result := 'кг';
 end;
 
-function ConvertScaleWeight(const AWeightKg: Double; const AUnit: string): Double;
+function ConvertScaleWeight(const AWeightBase: Double; const AUnit: string): Double;
 begin
   if SameText(AUnit, 'г') then
-    Result := AWeightKg * 1000
-  else if SameText(AUnit, 'т') then
-    Result := AWeightKg / 1000
+    Result := AWeightBase * 1000
+  else if SameText(AUnit, 'т') or SameText(AUnit, 'м3') then
+    Result := AWeightBase / 1000
   else
-    Result := AWeightKg;
+    Result := AWeightBase;
 end;
 
 function ResolveQuantityUnitByFlowUnit(const AUnit: string): string;
@@ -4275,8 +4283,25 @@ procedure TFrameMainTable.UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
 var
   FlowPerSecond: Double;
   DeltaSeconds: Double;
+  FlowUnit: string;
+
+  function FlowToBasePerSecond(const AFlow: Double; const AUnitName: string): Double;
+  begin
+    if SameText(AUnitName, 'л/мин') or SameText(AUnitName, 'кг/мин') then
+      Result := AFlow / 60
+    else if SameText(AUnitName, 'л/ч') or SameText(AUnitName, 'кг/ч') then
+      Result := AFlow / 3600
+    else if SameText(AUnitName, 'м3/мин') or SameText(AUnitName, 'т/мин') then
+      Result := AFlow * 1000 / 60
+    else if SameText(AUnitName, 'м3/ч') or SameText(AUnitName, 'т/ч') then
+      Result := AFlow * 1000 / 3600
+    else
+      Result := AFlow;
+  end;
+
 begin
   if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or
+     (AWorkTable.FlowRate.Value = nil) or (AWorkTable.ValueFlowRate = nil) or
      (AWorkTable.ActiveScale = nil) then
     Exit;
 
@@ -4286,7 +4311,15 @@ begin
   if not AWorkTable.FlowRate.IsRunning then
     Exit;
 
-  FlowPerSecond := AWorkTable.FlowRate.Value.Value;
+  FlowUnit := Trim(AWorkTable.FlowUnitName);
+  if FlowUnit = '' then
+    FlowUnit := AWorkTable.ValueFlowRate.GetDimName;
+
+  if FlowUnit <> '' then
+    FlowPerSecond := FlowToBasePerSecond(
+      AWorkTable.ValueFlowRate.GetDoubleValue(FlowUnit), FlowUnit)
+  else
+    FlowPerSecond := AWorkTable.FlowRate.Value.Value;
   if FlowPerSecond <= 0 then
     Exit;
 
