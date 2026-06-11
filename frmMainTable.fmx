@@ -4832,6 +4832,11 @@ object FrameMainTable: TFrameMainTable
         Text = 'miPump'
         OnClick = MenuInstrumentalLayOutClick
       end
+      object miScale: TMenuItem
+        IsChecked = True
+        Text = 'miScale'
+        OnClick = MenuInstrumentalLayOutClick
+      end
       object miMain: TMenuItem
         IsChecked = True
         Text = 'miMain'
