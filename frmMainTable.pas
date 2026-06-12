@@ -658,6 +658,7 @@ type
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure RefreshPumpsCombo;
+    procedure ResetUIPump;
     procedure RefreshScalesCombo;
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
@@ -1040,7 +1041,7 @@ begin
 
   if FActiveWorkTable = nil then
   begin
-    //ComboBoxPumps.Text := '';
+    ComboBoxPumps.Text := '';
     Exit;
   end;
 
@@ -1201,6 +1202,8 @@ procedure TFrameMainTable.UpdateForm;
           NormalizeActiveWorkTable;
           if FActiveWorkTable = nil then
           begin
+            RefreshPumpsCombo;
+            ResetUIPump;
             RefreshScalesCombo;
             UpdateUIScale;
             UpdateGrids;
@@ -1213,6 +1216,8 @@ procedure TFrameMainTable.UpdateForm;
           IsUpdating := True;
             try
                UpdateUIFromValues;
+                RefreshPumpsCombo;
+                UpdateUIPump;
                 RefreshScalesCombo;
                 UpdateUIScale;
                 UpdateGrids;
@@ -4455,7 +4460,11 @@ begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
+  begin
+    RefreshPumpsCombo;
+    ResetUIPump;
     Exit;
+  end;
 
   SetValues;
   WorkTable := FActiveWorkTable;
@@ -6145,18 +6154,42 @@ begin
     FFrameMeasurementRun.SpeedButtonCreatePointsClick(Sender);
 end;
 
+procedure TFrameMainTable.ResetUIPump;
+begin
+  LabelFreq.Text := '-';
+  Rectangle1.Fill.Color := TAlphaColorRec.White;
+
+  LayoutPump.Tag := 2;
+  try
+    SpinBoxFreq.Min := 0;
+    SpinBoxFreq.Max := 0;
+    SpinBoxFreq.Value := 0;
+    ComboBoxPumps.ItemIndex := -1;
+    ComboBoxPumps.Text := '';
+  finally
+    LayoutPump.Tag := 0;
+  end;
+end;
+
 procedure TFrameMainTable.UpdateUIPump;
 var
   WorkTable: TWorkTable;
   i:integer;
 begin
+    NormalizeActiveWorkTable;
     WorkTable := FActiveWorkTable;
 
     if WorkTable = nil then
+    begin
+      ResetUIPump;
       Exit;
+    end;
 
     if WorkTable.ActivePump = nil then
+    begin
+      ResetUIPump;
       exit;
+    end;
 
     if WorkTable.ActivePump <> nil then
       LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Value.Value)
