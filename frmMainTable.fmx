@@ -1242,30 +1242,25 @@ object FrameMainTable: TFrameMainTable
                   Align = MostTop
                   StyledSettings = [Family, FontColor]
                   Size.Width = 110.000000000000000000
-                  Size.Height = 16.000000000000000000
+                  Size.Height = 25.000000000000000000
                   Size.PlatformDefault = False
                   StyleLookup = 'labelstyle'
-                  TextSettings.HorzAlign = Center
                   Text = #1042#1077#1089', '#1082#1075
                   TabOrder = 0
                 end
                 object RectangleScaleWeight: TRectangle
                   Align = MostBottom
                   Fill.Color = claWhite
-                  Position.Y = 16.000000000000000000
+                  Position.Y = 21.000000000000000000
                   Size.Width = 110.000000000000000000
-                  Size.Height = 22.000000000000000000
+                  Size.Height = 17.000000000000000000
                   Size.PlatformDefault = False
                   object LabelScaleTotalWeight: TLabel
-                    Align = MostBottom
-                    StyledSettings = [Family, Style, FontColor]
-                    Size.Width = 110.000000000000000000
-                    Size.Height = 22.000000000000000000
+                    Align = Client
+                    Margins.Left = 5.000000000000000000
+                    Size.Width = 105.000000000000000000
+                    Size.Height = 17.000000000000000000
                     Size.PlatformDefault = False
-                    StyleLookup = 'labelstyle'
-                    TextSettings.Font.Size = 14.000000000000000000
-                    TextSettings.Font.StyleExt = {00070000000000000004000000}
-                    TextSettings.HorzAlign = Center
                     Text = '0'
                     TabOrder = 0
                   end
@@ -5451,7 +5446,7 @@ object FrameMainTable: TFrameMainTable
           Size.Width = 674.000000000000000000
           Size.Height = 453.000000000000000000
           Size.PlatformDefault = False
-          TabIndex = 3
+          TabIndex = 5
           TabOrder = 1
           TabPosition = PlatformDefault
           Sizes = (
@@ -5517,7 +5512,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = True
+            IsSelected = False
             Size.Width = 95.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
@@ -5554,7 +5549,7 @@ object FrameMainTable: TFrameMainTable
               item
               end>
             TextSettings.Trimming = None
-            IsSelected = False
+            IsSelected = True
             Size.Width = 138.000000000000000000
             Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
@@ -5595,8 +5590,8 @@ object FrameMainTable: TFrameMainTable
             OnEditingDone = GridDevicesEditingDone
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1057.000000000000000000
-            Viewport.Height = 253.000000000000000000
+            Viewport.Width = 1037.000000000000000000
+            Viewport.Height = 212.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -5830,8 +5825,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1057.000000000000000000
-              Viewport.Height = 120.000000000000000000
+              Viewport.Width = 1053.000000000000000000
+              Viewport.Height = 79.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
