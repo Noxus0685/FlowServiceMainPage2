@@ -2315,10 +2315,12 @@ end;
 procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
 var
   CanEdit: Boolean;
+  CanAddWorkTable: Boolean;
 begin
   CanEdit := CanEditActiveWorkTable;
+  CanAddWorkTable := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
   if miAddTable <> nil then
-    miAddTable.Enabled := CanEdit;
+    miAddTable.Enabled := CanAddWorkTable;
   if miAddDeviceChannel <> nil then
     miAddDeviceChannel.Enabled := CanEdit;
   if miAddEtalonChannel <> nil then
@@ -2326,7 +2328,7 @@ begin
   if miSaveWorkTable <> nil then
     miSaveWorkTable.Enabled := CanEdit;
   if ActionAddWorkTable <> nil then
-    ActionAddWorkTable.Enabled := CanEdit;
+    ActionAddWorkTable.Enabled := CanAddWorkTable;
   if ActionAddDeviceChannel <> nil then
     ActionAddDeviceChannel.Enabled := CanEdit;
   if ActionAddEtalonChannel <> nil then
@@ -2342,6 +2344,7 @@ end;
 procedure TFrameMainTable.UpdateGridPopupActions;
 var
   CanEdit: Boolean;
+  CanAddWorkTable: Boolean;
   HasDeviceRow: Boolean;
   HasEtalonRow: Boolean;
 
@@ -2367,13 +2370,14 @@ var
   end;
 begin
   CanEdit := CanEditActiveWorkTable;
+  CanAddWorkTable := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
   HasDeviceRow := CanEdit and (FActiveWorkTable <> nil) and (GridDevices <> nil) and
     (GridDevices.Row >= 0) and (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count);
   HasEtalonRow := CanEdit and (FActiveWorkTable <> nil) and (GridEtalons <> nil) and
     (GridEtalons.Row >= 0) and (GridEtalons.Row < FActiveWorkTable.EtalonChannels.Count);
 
   if ActionAddWorkTable <> nil then
-    ActionAddWorkTable.Enabled := CanEdit;
+    ActionAddWorkTable.Enabled := CanAddWorkTable;
   if ActionSaveWorkTable <> nil then
     ActionSaveWorkTable.Enabled := CanEdit;
   if ActionPumpAdd <> nil then
@@ -2787,11 +2791,13 @@ end;
 procedure TFrameMainTable.ApplyActiveWorkTableEditMode;
 var
   CanEdit: Boolean;
+  CanAddWorkTable: Boolean;
 begin
   CanEdit := CanEditActiveWorkTable;
+  CanAddWorkTable := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
 
   if ActionAddWorkTable <> nil then
-    ActionAddWorkTable.Enabled := CanEdit;
+    ActionAddWorkTable.Enabled := CanAddWorkTable;
   if ActionAddDeviceChannel <> nil then
     ActionAddDeviceChannel.Enabled := CanEdit;
   if ActionAddEtalonChannel <> nil then
@@ -2814,16 +2820,15 @@ begin
   if GridDevices <> nil then
   begin
     GridDevices.EditorMode := False;
+    GridDevices.PopupMenu := PopupMenuDevicesGrid;
     if CanEdit then
     begin
-      GridDevices.PopupMenu := PopupMenuDevicesGrid;
       if StringColumnDeviceSerial1 <> nil then
         StringColumnDeviceSerial1.PopupMenu := PopupMenu1;
       GridDevices.Options := GridDevices.Options + [TGridOption.Editing];
     end
     else
     begin
-      GridDevices.PopupMenu := nil;
       if StringColumnDeviceSerial1 <> nil then
         StringColumnDeviceSerial1.PopupMenu := nil;
       GridDevices.Options := GridDevices.Options - [TGridOption.Editing];
@@ -2833,16 +2838,11 @@ begin
   if GridEtalons <> nil then
   begin
     GridEtalons.EditorMode := False;
+    GridEtalons.PopupMenu := PopupMenuEtalonsGrid;
     if CanEdit then
-    begin
-      GridEtalons.PopupMenu := PopupMenuEtalonsGrid;
-      GridEtalons.Options := GridEtalons.Options + [TGridOption.Editing];
-    end
+      GridEtalons.Options := GridEtalons.Options + [TGridOption.Editing]
     else
-    begin
-      GridEtalons.PopupMenu := nil;
       GridEtalons.Options := GridEtalons.Options - [TGridOption.Editing];
-    end;
   end;
 
   if ToolBar1 <> nil then
