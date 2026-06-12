@@ -256,16 +256,14 @@ begin
   MeasurementStartCategory := AddCategory('Запуск измерения');
   AddComboRow(MeasurementStartCategory, 'Условия', ComboMeasurementStart);
   ComboMeasurementStart.Items.Add('По кнопке измерения');
-  ComboMeasurementStart.Items.Add('По сигналу синхр.');
-  ComboMeasurementStart.Items.Add('По команде, затем сигнал');
+  ComboMeasurementStart.Items.Add('По сигналу синхронизации');
   ComboMeasurementStart.ItemIndex := 0;
   ComboMeasurementStart.OnChange := HandleSyncComboChange;
 
   MeasurementStopCategory := AddCategory('Остановка измерения');
   AddComboRow(MeasurementStopCategory, 'Условия', ComboMeasurementStop);
   ComboMeasurementStop.Items.Add('По кнопке измерения');
-  ComboMeasurementStop.Items.Add('По сигналу синхр.');
-  ComboMeasurementStop.Items.Add('По сигналу синхр. после огранич.');
+  ComboMeasurementStop.Items.Add('По сигналу синхронизации после ограничения');
   ComboMeasurementStop.ItemIndex := 0;
   ComboMeasurementStop.OnChange := HandleSyncComboChange;
 
