@@ -1495,7 +1495,9 @@ var
   NextWorkTable: TWorkTable;
 begin
   NextWorkTable := nil;
-  if FWorkTableManager <> nil then
+  if (FWorkTableManager <> nil) and
+     (FWorkTableManager.WorkTables <> nil) and
+     (FWorkTableManager.WorkTables.IndexOf(FWorkTableManager.ActiveWorkTable) >= 0) then
     NextWorkTable := FWorkTableManager.ActiveWorkTable;
 
   FActiveWorkTable := NextWorkTable;
@@ -1524,6 +1526,7 @@ procedure TFrameProceed.ActionDeleteWorkTableExecute(Sender: TObject);
 var
   WorkTable: TWorkTable;
   WorkTableName: string;
+  ObserverHost: IWorkTableObserverHost;
 begin
   if not IsSelectedTreeWorkTable(WorkTable) then
     Exit;
@@ -1543,6 +1546,12 @@ begin
       TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
     Exit;
 
+  if TreeViewDevices <> nil then
+    TreeViewDevices.Selected := nil;
+
+  if Supports(Owner, IWorkTableObserverHost, ObserverHost) then
+    ObserverHost.DetachWorkTableObservers(WorkTable);
+
   if FWorkTableManager.DeleteWorkTableByName(WorkTableName) then
     RefreshAfterWorkTableDeletion;
 
@@ -1559,6 +1568,8 @@ procedure TFrameProceed.ActionDeleteSelectedWorkTablesExecute(Sender: TObject);
 var
   DeletedCount: Integer;
   WorkTableCount: Integer;
+  I: Integer;
+  ObserverHost: IWorkTableObserverHost;
 begin
   if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
     Exit;
@@ -1570,6 +1581,13 @@ begin
   if MessageDlg(Format('Удалить все рабочие столы: %d шт.?', [WorkTableCount]),
       TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
     Exit;
+
+  if TreeViewDevices <> nil then
+    TreeViewDevices.Selected := nil;
+
+  if Supports(Owner, IWorkTableObserverHost, ObserverHost) then
+    for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      ObserverHost.DetachWorkTableObservers(FWorkTableManager.WorkTables[I]);
 
   DeletedCount := FWorkTableManager.DeleteWorkTablesByNames;
 

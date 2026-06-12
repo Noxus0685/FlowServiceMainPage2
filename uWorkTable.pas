@@ -697,6 +697,11 @@ type
 
   end;
 
+  IWorkTableObserverHost = interface
+    ['{8E305AD6-49F7-4D3C-AD3E-1DBDF5692656}']
+    procedure DetachWorkTableObservers(AWorkTable: TWorkTable);
+  end;
+
   TWorkTableManager = class
   private
     FIniFileName: string;
@@ -2648,8 +2653,9 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
-  ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableDestroy',
-    'Удалён рабочий стол', Name);
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableDestroy',
+      'Удалён рабочий стол', Name);
   UnbindParameterEvents(FFluidTemp);
   UnbindParameterEvents(FFluidPress);
   UnbindParameterEvents(FlowRate);
@@ -5013,6 +5019,11 @@ begin
   if FWorkTables = nil then
     Exit;
 
+  // Активный стол мог быть уже удалён другим экраном: не разыменовываем
+  // висячую ссылку через SetActiveWorkTable, только проверяем наличие в списке.
+  if (FActiveWorkTable <> nil) and (FWorkTables.IndexOf(FActiveWorkTable) < 0) then
+    FActiveWorkTable := nil;
+
   DeletedMeterValueHashes := TStringList.Create;
   DeletedMeterValueOwners := TStringList.Create;
   try
@@ -5045,7 +5056,8 @@ begin
 
         if FWorkTables.Count = 0 then
           SetActiveWorkTable(nil)
-        else if FActiveWorkTable = nil then
+        else if (FActiveWorkTable = nil) or
+                (FWorkTables.IndexOf(FActiveWorkTable) < 0) then
         begin
           if I < FWorkTables.Count then
             SetActiveWorkTable(FWorkTables[I])
