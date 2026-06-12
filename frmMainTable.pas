@@ -1694,8 +1694,6 @@ begin
     ComboEditUnits.Items.Add(UnitName);
   for UnitName in CMassFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
-  for UnitName in CScaleUnits do
-    ComboEditUnits.Items.Add(UnitName);
 
   if ComboEditUnits.Items.Count > 0 then
     ComboEditUnits.ItemIndex := 0;
@@ -4473,7 +4471,7 @@ procedure TFrameMainTable.UpdateUIFromValues;
 var
   WorkTable: TWorkTable;
   I: Integer;
-  MinImpValue: TMeterValue;
+  MinImpTotalValue: TMeterValue;
   RawValueBaseMultiplier: TMeterValue;
   RawQuantityBaseMultiplier: TMeterValue;
 
@@ -4595,17 +4593,17 @@ begin
       LabelNameTemperture.Text := WorkTable.ValueTemperture.GetStrFullName;
 
 
-  MinImpValue := nil;
+  MinImpTotalValue := nil;
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-    if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].ValueImp <> nil) then
+    if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].ValueImpTotal <> nil) then
     begin
-      if (MinImpValue = nil) or
-         (WorkTable.DeviceChannels[I].ValueImp.GetDoubleValue < MinImpValue.GetDoubleValue) then
-        MinImpValue := WorkTable.DeviceChannels[I].ValueImp;
+      if (MinImpTotalValue = nil) or
+         (WorkTable.DeviceChannels[I].ValueImpTotal.GetDoubleValue < MinImpTotalValue.GetDoubleValue) then
+        MinImpTotalValue := WorkTable.DeviceChannels[I].ValueImpTotal;
     end;
 
-  if MinImpValue <> nil then
-    LabelImp.Text := MinImpValue.GetStrValue
+  if MinImpTotalValue <> nil then
+    LabelImp.Text := MinImpTotalValue.GetStrValue
   else
     LabelImp.Text := '0';
 
