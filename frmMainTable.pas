@@ -668,6 +668,10 @@ type
     procedure StopMonitor;
     procedure StartMeasurement;
     procedure StopMeasurement;
+    function IsTestButtonSaveMode: Boolean;
+    function IsMeasurementActive(AWorkTable: TWorkTable): Boolean;
+    function NeedSaveMeasurementResults(AWorkTable: TWorkTable): Boolean;
+    procedure AcceptMeasurementResults;
     procedure RequestStartTest;
     procedure RequestStopTest;
 
@@ -5038,46 +5042,110 @@ begin
   end;
 end;
 
-procedure TFrameMainTable.TestButtonClick(Sender: TObject);
+function TFrameMainTable.IsTestButtonSaveMode: Boolean;
+begin
+  Result :=
+    (TestButton <> nil) and
+    (TestButton.Tag = 6) and
+    SameText(Trim(TestButton.Text), 'Сохранить?');
+end;
+
+function TFrameMainTable.IsMeasurementActive(AWorkTable: TWorkTable): Boolean;
+var
+  Run: TMeasurementRun;
+begin
+  Result := False;
+
+  if AWorkTable = nil then
+    Exit;
+
+  Run := MeasurementRun;
+  if (Run <> nil) and not (Run.Stage in [msNone, msDone]) then
+    Exit(True);
+
+  Result := AWorkTable.State in [
+    swtSTARTTEST,
+    swtSTARTWAIT,
+    swtEXECUTE,
+    swtSTOPTEST,
+    swtSTOPWAIT
+  ];
+end;
+
+// Returns True when the current table appears to have measurement results
+// that were not materialized into device spillages yet.
+// TODO: Replace this indirect check with an explicit WorkTable.HasUnsavedMeasurementResults flag.
+function TFrameMainTable.NeedSaveMeasurementResults(
+  AWorkTable: TWorkTable): Boolean;
+var
+  Channel: TChannel;
+begin
+  Result := False;
+
+  if AWorkTable = nil then
+    Exit;
+
+  for Channel in AWorkTable.DeviceChannels do
+    if (Channel <> nil) and
+       Channel.Enabled and
+       (Channel.FlowMeter <> nil) and
+       (Channel.FlowMeter.Device <> nil) and
+       ((Channel.FlowMeter.Device.Spillages = nil) or
+        (Channel.FlowMeter.Device.Spillages.Count = 0)) then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+// Accepts pending measurement results after user confirmation.
+// This method persists measurement results and managers,
+// then returns the active work table to the connected state.
+procedure TFrameMainTable.AcceptMeasurementResults;
 var
   WorkTable: TWorkTable;
-  Channel: TChannel;
-  Run: TMeasurementRun;
-  NeedSaveResults: Boolean;
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
-  if (TestButton.Tag = 6) and SameText(Trim(TestButton.Text), 'Сохранить?') then
+  ProtocolManager.AddMessage(pcAction, psForm, 'AcceptResults',
+    'Пользователь подтвердил сохранение результатов измерения',
+    WorkTable.Name);
+
+  if NeedSaveMeasurementResults(WorkTable) then
+    WorkTable.SaveMeasurementResults;
+
+  if DataManager <> nil then
+    DataManager.Save;
+
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
+
+  WorkTable.State := swtCONNECTED;
+end;
+
+// Handles the main measurement button click.
+// The handler must only dispatch the user intent:
+// - accept pending measurement results;
+// - stop the active measurement;
+// - start a new measurement.
+// Business logic must be kept in dedicated helper methods.
+procedure TFrameMainTable.TestButtonClick(Sender: TObject);
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := FActiveWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  if IsTestButtonSaveMode then
   begin
-    NeedSaveResults := False;
-    for Channel in WorkTable.DeviceChannels do
-      if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) and
-         (Channel.FlowMeter.Device <> nil) and
-         ((Channel.FlowMeter.Device.Spillages = nil) or
-          (Channel.FlowMeter.Device.Spillages.Count = 0)) then
-      begin
-        NeedSaveResults := True;
-        Break;
-      end;
-
-    if NeedSaveResults then
-      WorkTable.SaveMeasurementResults;
-
-    if DataManager <> nil then
-      DataManager.Save;
-
-    if WorkTableManager <> nil then
-      WorkTableManager.Save;
-
-    WorkTable.State := swtCONNECTED ;
+    AcceptMeasurementResults;
     Exit;
   end;
 
-  Run := MeasurementRun;
-  if ((Run <> nil) and not (Run.Stage in [msNone, msDone])) or
-     (WorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
+  if IsMeasurementActive(WorkTable) then
     StopMeasurement
   else
     StartMeasurement;
