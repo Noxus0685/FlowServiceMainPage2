@@ -4907,8 +4907,11 @@ begin
   WorkTable.ID := NextID;
   WorkTable.Name := TWorkTable.BuildWorkTableServiceName(WorkTable.ID);
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
+  TMeterValue.SetInitDensity(0.9982);
   WorkTables.Add(WorkTable);
   WorkTable.Rebind;
+  if WorkTable.ValueDensity <> nil then
+    WorkTable.ValueDensity.SetValue(TMeterValue.GetInitDensity);
 end;
 
 procedure TWorkTableManager.AddWorkTable(const WorkTableName: string);
