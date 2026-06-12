@@ -19,6 +19,7 @@ uses
   System.UITypes,
   uMeterValue,
   uParameter,
+  uSyncSetup,
   uWorkTable;
 
 type
@@ -94,6 +95,9 @@ type
     constructor Create(AOwner: TComponent); override;
     function CanEditWorkTable: Boolean;
     procedure LoadFromWorkTable(AWorkTable: TWorkTable);
+    procedure LoadSyncSetupToUI(ASetup: TSyncSetup);
+    procedure SaveUISyncSetup(ASetup: TSyncSetup);
+    procedure UpdateSyncControlsState;
   end;
 
 implementation
@@ -200,17 +204,21 @@ begin
   ComboVerticalSync.Items.Add('Отключено');
   ComboVerticalSync.Items.Add('Внешняя синхронизация');
   ComboVerticalSync.Items.Add('По каналу');
+  ComboVerticalSync.Items.Add('Внутренняя синхронизация');
   ComboVerticalSync.ItemIndex := 0;
   ComboVerticalSync.OnChange := HandleSyncComboChange;
   AddComboRow(VerticalSyncCategory, 'Старт', ComboVerticalStart);
   ComboVerticalStart.Items.Add('Фронт');
   ComboVerticalStart.Items.Add('Спад');
   ComboVerticalStart.ItemIndex := 0;
+  ComboVerticalStart.OnChange := HandleSyncComboChange;
   AddComboRow(VerticalSyncCategory, 'Стоп', ComboVerticalStop);
   ComboVerticalStop.Items.Add('Фронт');
   ComboVerticalStop.Items.Add('Спад');
   ComboVerticalStop.ItemIndex := 0;
+  ComboVerticalStop.OnChange := HandleSyncComboChange;
   AddComboRow(VerticalSyncCategory, 'Канал', ComboVerticalChannel);
+  ComboVerticalChannel.OnChange := HandleSyncComboChange;
 
   OutputSyncCategory1 := AddCategory('Выход синхронизация 1');
   AddComboRow(OutputSyncCategory1, 'Выход синхронизация', ComboOutputSync1);
@@ -222,10 +230,12 @@ begin
   ComboOutputStart1.Items.Add('Фронт');
   ComboOutputStart1.Items.Add('Спад');
   ComboOutputStart1.ItemIndex := 0;
+  ComboOutputStart1.OnChange := HandleSyncComboChange;
   AddComboRow(OutputSyncCategory1, 'Стоп', ComboOutputStop1);
   ComboOutputStop1.Items.Add('Фронт');
   ComboOutputStop1.Items.Add('Спад');
   ComboOutputStop1.ItemIndex := 0;
+  ComboOutputStop1.OnChange := HandleSyncComboChange;
 
   OutputSyncCategory2 := AddCategory('Выход синхронизация 2');
   AddComboRow(OutputSyncCategory2, 'Выход синхронизация', ComboOutputSync2);
@@ -237,29 +247,36 @@ begin
   ComboOutputStart2.Items.Add('Фронт');
   ComboOutputStart2.Items.Add('Спад');
   ComboOutputStart2.ItemIndex := 0;
+  ComboOutputStart2.OnChange := HandleSyncComboChange;
   AddComboRow(OutputSyncCategory2, 'Стоп', ComboOutputStop2);
   ComboOutputStop2.Items.Add('Фронт');
   ComboOutputStop2.Items.Add('Спад');
   ComboOutputStop2.ItemIndex := 0;
+  ComboOutputStop2.OnChange := HandleSyncComboChange;
 
   InternalSyncCategory := AddCategory('Выход внутренней синхронизации');
   AddComboRow(InternalSyncCategory, 'Канал', ComboInternalSyncChannel);
   ComboInternalSyncChannel.Items.Add('Выкл');
   ComboInternalSyncChannel.Items.Add('Вкл');
   ComboInternalSyncChannel.ItemIndex := 0;
+  ComboInternalSyncChannel.OnChange := HandleSyncComboChange;
 
   MeasurementStartCategory := AddCategory('Запуск измерения');
   AddComboRow(MeasurementStartCategory, 'Условия', ComboMeasurementStart);
   ComboMeasurementStart.Items.Add('По кнопке измерения');
   ComboMeasurementStart.Items.Add('По сигналу синхр.');
+  ComboMeasurementStart.Items.Add('По команде, затем сигнал');
   ComboMeasurementStart.ItemIndex := 0;
+  ComboMeasurementStart.OnChange := HandleSyncComboChange;
 
   MeasurementStopCategory := AddCategory('Остановка измерения');
   AddComboRow(MeasurementStopCategory, 'Условия', ComboMeasurementStop);
   ComboMeasurementStop.Items.Add('По кнопке измерения');
   ComboMeasurementStop.Items.Add('По сигналу синхр.');
+  ComboMeasurementStop.Items.Add('По ограничению');
   ComboMeasurementStop.Items.Add('По сигналу синхр. после огранич.');
   ComboMeasurementStop.ItemIndex := 0;
+  ComboMeasurementStop.OnChange := HandleSyncComboChange;
 
   PressureCategory := AddCategory('Давление');
   AddMeterValueRow(PressureCategory, 'Давление', EditPressure, ButtonSelectPressure,
@@ -579,6 +596,10 @@ procedure TFrameWorkTableProperties.LoadFromWorkTable(AWorkTable: TWorkTable);
 begin
   FWorkTable := AWorkTable;
   RefreshValues;
+  if FWorkTable <> nil then
+    LoadSyncSetupToUI(FWorkTable.SyncSetup)
+  else
+    LoadSyncSetupToUI(nil);
   ApplyEditState;
 end;
 
@@ -677,6 +698,212 @@ begin
   end;
 end;
 
+
+procedure TFrameWorkTableProperties.LoadSyncSetupToUI(ASetup: TSyncSetup);
+
+  procedure SetComboIndex(ACombo: TComboBox; AIndex: Integer);
+  begin
+    if ACombo = nil then
+      Exit;
+    if (AIndex >= -1) and (AIndex < ACombo.Items.Count) then
+      ACombo.ItemIndex := AIndex;
+  end;
+
+  function EdgeToIndex(AEdge: ESyncEdge): Integer;
+  begin
+    case AEdge of
+      seFalling: Result := 1;
+    else
+      Result := 0;
+    end;
+  end;
+
+  function SourceToIndex(ASource: ESyncInSource): Integer;
+  begin
+    case ASource of
+      sisExternalCh0: Result := 1;
+      sisImpChannel: Result := 2;
+      sisInternal: Result := 3;
+    else
+      Result := 0;
+    end;
+  end;
+
+begin
+  FLoading := True;
+  try
+    if ASetup = nil then
+    begin
+      SetComboIndex(ComboVerticalSync, 0);
+      SetComboIndex(ComboVerticalStart, 0);
+      SetComboIndex(ComboVerticalStop, 1);
+      SetComboIndex(ComboVerticalChannel, -1);
+      SetComboIndex(ComboOutputSync1, 0);
+      SetComboIndex(ComboOutputStart1, 0);
+      SetComboIndex(ComboOutputStop1, 1);
+      SetComboIndex(ComboOutputSync2, 0);
+      SetComboIndex(ComboOutputStart2, 0);
+      SetComboIndex(ComboOutputStop2, 1);
+      SetComboIndex(ComboInternalSyncChannel, 0);
+      SetComboIndex(ComboMeasurementStart, 0);
+      SetComboIndex(ComboMeasurementStop, 2);
+      Exit;
+    end;
+
+    SetComboIndex(ComboVerticalSync, SourceToIndex(ASetup.Input.Source));
+    SetComboIndex(ComboVerticalStart, EdgeToIndex(ASetup.Input.StartEdge));
+    SetComboIndex(ComboVerticalStop, EdgeToIndex(ASetup.Input.StopEdge));
+    SetComboIndex(ComboVerticalChannel, ASetup.Input.StartChannel - 1);
+    case ASetup.Input.StartMode of
+      ssmStartOnSignal: SetComboIndex(ComboMeasurementStart, 1);
+      ssmStartCommandThenSignal: SetComboIndex(ComboMeasurementStart, 2);
+    else
+      SetComboIndex(ComboMeasurementStart, 0);
+    end;
+
+    case ASetup.Input.StopMode of
+      ssmStopOnSignal: SetComboIndex(ComboMeasurementStop, 1);
+      ssmStopOnLimit: SetComboIndex(ComboMeasurementStop, 2);
+      ssmStopLimitThenSignal: SetComboIndex(ComboMeasurementStop, 3);
+    else
+      SetComboIndex(ComboMeasurementStop, 0);
+    end;
+
+    SetComboIndex(ComboOutputSync1, Ord(ASetup.Output1.Enabled));
+    SetComboIndex(ComboOutputStart1, EdgeToIndex(ASetup.Output1.StartEdge));
+    SetComboIndex(ComboOutputStop1, EdgeToIndex(ASetup.Output1.StopEdge));
+
+    SetComboIndex(ComboOutputSync2, Ord(ASetup.Output2.Enabled));
+    SetComboIndex(ComboOutputStart2, EdgeToIndex(ASetup.Output2.StartEdge));
+    SetComboIndex(ComboOutputStop2, EdgeToIndex(ASetup.Output2.StopEdge));
+
+    SetComboIndex(ComboInternalSyncChannel, Ord(ASetup.InternalSyncEnabled));
+  finally
+    FLoading := False;
+  end;
+  UpdateSyncControlsState;
+end;
+
+procedure TFrameWorkTableProperties.SaveUISyncSetup(ASetup: TSyncSetup);
+
+  function ComboIndex(ACombo: TComboBox; ADefault: Integer): Integer;
+  begin
+    Result := ADefault;
+    if (ACombo <> nil) and (ACombo.ItemIndex >= 0) then
+      Result := ACombo.ItemIndex;
+  end;
+
+  function IndexToEdge(AIndex: Integer): ESyncEdge;
+  begin
+    if AIndex = 1 then
+      Result := seFalling
+    else
+      Result := seRising;
+  end;
+
+  function IndexToSource(AIndex: Integer): ESyncInSource;
+  begin
+    case AIndex of
+      1: Result := sisExternalCh0;
+      2: Result := sisImpChannel;
+      3: Result := sisInternal;
+    else
+      Result := sisNone;
+    end;
+  end;
+
+  procedure ApplyOutput(AOutput: TSyncOutputSetup; AEnabledCombo, AStartCombo,
+    AStopCombo: TComboBox);
+  begin
+    AOutput.Enabled := ComboIndex(AEnabledCombo, 0) = 1;
+    AOutput.StartEdge := IndexToEdge(ComboIndex(AStartCombo, 0));
+    AOutput.StopEdge := IndexToEdge(ComboIndex(AStopCombo, 1));
+
+    if not AOutput.Enabled then
+      AOutput.OutType := sotDisabled
+    else if (AOutput.StartEdge = seRising) and (AOutput.StopEdge = seFalling) then
+    begin
+      AOutput.OutType := sotRunHigh;
+      AOutput.OutMode := somUpDownInverse;
+    end
+    else if (AOutput.StartEdge = seFalling) and (AOutput.StopEdge = seRising) then
+    begin
+      AOutput.OutType := sotRunLow;
+      AOutput.OutMode := somUpDownInverse;
+    end;
+  end;
+
+var
+  ChannelIndex: Integer;
+begin
+  if ASetup = nil then
+    Exit;
+
+  ASetup.Input.Source := IndexToSource(ComboIndex(ComboVerticalSync, 0));
+  ASetup.Input.StartEdge := IndexToEdge(ComboIndex(ComboVerticalStart, 0));
+  ASetup.Input.StopEdge := IndexToEdge(ComboIndex(ComboVerticalStop, 1));
+  ChannelIndex := ComboIndex(ComboVerticalChannel, 0) + 1;
+  if ChannelIndex < 1 then
+    ChannelIndex := 1;
+  ASetup.Input.StartChannel := ChannelIndex;
+  ASetup.Input.StopChannel := ChannelIndex;
+  case ComboIndex(ComboMeasurementStart, 0) of
+    1: ASetup.Input.StartMode := ssmStartOnSignal;
+    2: ASetup.Input.StartMode := ssmStartCommandThenSignal;
+  else
+    ASetup.Input.StartMode := ssmStartOnCommand;
+  end;
+
+  case ComboIndex(ComboMeasurementStop, 2) of
+    1: ASetup.Input.StopMode := ssmStopOnSignal;
+    2: ASetup.Input.StopMode := ssmStopOnLimit;
+    3: ASetup.Input.StopMode := ssmStopLimitThenSignal;
+  else
+    ASetup.Input.StopMode := ssmStopOnCommand;
+  end;
+
+  ApplyOutput(ASetup.Output1, ComboOutputSync1, ComboOutputStart1, ComboOutputStop1);
+  ApplyOutput(ASetup.Output2, ComboOutputSync2, ComboOutputStart2, ComboOutputStop2);
+  ASetup.InternalSyncEnabled := ComboIndex(ComboInternalSyncChannel, 0) = 1;
+end;
+
+procedure TFrameWorkTableProperties.UpdateSyncControlsState;
+var
+  CanEdit: Boolean;
+  Source: ESyncInSource;
+
+  function ComboIndex(ACombo: TComboBox; ADefault: Integer): Integer;
+  begin
+    Result := ADefault;
+    if (ACombo <> nil) and (ACombo.ItemIndex >= 0) then
+      Result := ACombo.ItemIndex;
+  end;
+
+begin
+  CanEdit := CanEditWorkTable;
+  Source := sisNone;
+  case ComboIndex(ComboVerticalSync, 0) of
+    1: Source := sisExternalCh0;
+    2: Source := sisImpChannel;
+    3: Source := sisInternal;
+  end;
+
+  ComboVerticalSync.Enabled := CanEdit;
+  ComboVerticalStart.Enabled := CanEdit and (Source <> sisNone);
+  ComboVerticalStop.Enabled := CanEdit and (Source <> sisNone);
+  ComboVerticalChannel.Enabled := CanEdit and (Source = sisImpChannel);
+
+  ComboOutputSync1.Enabled := CanEdit;
+  ComboOutputStart1.Enabled := CanEdit and (ComboOutputSync1.ItemIndex = 1);
+  ComboOutputStop1.Enabled := CanEdit and (ComboOutputSync1.ItemIndex = 1);
+  ComboOutputSync2.Enabled := CanEdit;
+  ComboOutputStart2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
+  ComboOutputStop2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
+  ComboInternalSyncChannel.Enabled := CanEdit;
+  ComboMeasurementStart.Enabled := CanEdit;
+  ComboMeasurementStop.Enabled := CanEdit;
+end;
+
 procedure TFrameWorkTableProperties.ApplyEditState;
 var
   CanEdit: Boolean;
@@ -697,24 +924,17 @@ begin
   EditFlowRateMax.Enabled := CanEdit;
   EditQuantityMin.Enabled := CanEdit;
   EditQuantityMax.Enabled := CanEdit;
-  ComboVerticalSync.Enabled := CanEdit;
-  ComboVerticalStart.Enabled := CanEdit and (ComboVerticalSync.ItemIndex = 1);
-  ComboVerticalStop.Enabled := CanEdit and (ComboVerticalSync.ItemIndex = 1);
-  ComboVerticalChannel.Enabled := CanEdit and (ComboVerticalSync.ItemIndex = 2);
-  ComboOutputSync1.Enabled := CanEdit;
-  ComboOutputStart1.Enabled := CanEdit and (ComboOutputSync1.ItemIndex = 1);
-  ComboOutputStop1.Enabled := CanEdit and (ComboOutputSync1.ItemIndex = 1);
-  ComboOutputSync2.Enabled := CanEdit;
-  ComboOutputStart2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
-  ComboOutputStop2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
-  ComboInternalSyncChannel.Enabled := CanEdit;
-  ComboMeasurementStart.Enabled := CanEdit;
-  ComboMeasurementStop.Enabled := CanEdit;
+  UpdateSyncControlsState;
 end;
 
 procedure TFrameWorkTableProperties.HandleSyncComboChange(Sender: TObject);
 begin
-  ApplyEditState;
+  if (not FLoading) and (FWorkTable <> nil) then
+  begin
+    SaveUISyncSetup(FWorkTable.SyncSetup);
+    FWorkTable.FireEvent(ewtRefresh);
+  end;
+  UpdateSyncControlsState;
 end;
 
 procedure TFrameWorkTableProperties.HandleEditModeChange(Sender: TObject);
