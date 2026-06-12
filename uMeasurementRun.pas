@@ -207,13 +207,15 @@ type
     FAttempt: Integer;
     FMaxAttemptCount: Integer;
     FMeasureTimeout: Cardinal;
+    FStopRequested: Boolean;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
     function CanChangeStage(AOldStage, ANewStage: EMeasurementState): Boolean;
     procedure DoExitStage(AOldStage, ANewStage: EMeasurementState);
     procedure DoEnterStage(AOldStage, ANewStage: EMeasurementState);
-    procedure RequestStopInternal;
+    procedure RequestStop;
+    procedure StopWorkerThread;
     procedure ProcessSelectPoint;
     procedure ProcessSelectEtalon;
     procedure ProcessSetupPoint;
@@ -462,6 +464,7 @@ begin
   FMaxAttemptCount := 3;
   FAttempt := 0;
   FMeasureTimeout := 0;
+  FStopRequested := False;
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -533,7 +536,9 @@ end;
 
 destructor TMeasurementRun.Destroy;
 begin
-  RequestStopInternal;
+  StopWorkerThread;
+  if FCurrentStage <> msNone then
+    SetStage(msNone);
   FreeAndNil(FCriticalSection);
   FreeAndNil(FPoints);
   inherited Destroy;
@@ -593,6 +598,8 @@ begin
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
     'Переход этапа измерения', TransitionText);
+  if FWorkTable <> nil then
+    FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
   Notify(Integer(meStateChanged));
   DoEnterStage(OldStage, ANewStage);
 end;
@@ -882,6 +889,7 @@ begin
     if Assigned(FThread) then
       FreeAndNil(FThread);
 
+    FStopRequested := False;
     CreateSession;
     if FPoints.Count = 0 then
     begin
@@ -911,7 +919,6 @@ begin
           'Запуск процесса измерения в полуавтоматическом режиме', '');
     end;
 
-    FireEvent(meStarted);
     FThread := TThread.CreateAnonymousThread(
       procedure
       begin
@@ -920,42 +927,70 @@ begin
     FThread.FreeOnTerminate := False;
     FThread.Start;
     SetStage(msSelectPoint);
+    if not FStopRequested then
+      FireEvent(meStarted);
   finally
     FCriticalSection.Release;
   end;
 end;
 
-procedure TMeasurementRun.RequestStopInternal;
+procedure TMeasurementRun.StopWorkerThread;
 var
   LThread: TThread;
+  IsCurrentThread: Boolean;
 begin
   LThread := nil;
+  IsCurrentThread := False;
+
   FCriticalSection.Acquire;
   try
     LThread := FThread;
-    FThread := nil;
+    if LThread = nil then
+      Exit;
+
+    LThread.Terminate;
+    IsCurrentThread := TThread.CurrentThread.ThreadID = LThread.ThreadID;
+    if not IsCurrentThread then
+      FThread := nil;
   finally
     FCriticalSection.Release;
   end;
 
-  if LThread <> nil then
+  // Waiting for the current worker from inside itself would deadlock.
+  if not IsCurrentThread then
   begin
-    LThread.Terminate;
     LThread.WaitFor;
     LThread.Free;
   end;
+end;
 
-  FIsPaused := False;
+procedure TMeasurementRun.RequestStop;
+begin
+  FCriticalSection.Acquire;
+  try
+    if FStopRequested then
+      Exit;
+    FStopRequested := True;
+  finally
+    FCriticalSection.Release;
+  end;
+
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'RequestStop',
+    'Запрошена принудительная остановка измерения',
+    MeasurementStateToString(FCurrentStage));
+
+  StopWorkerThread;
+
   if FCurrentStage <> msNone then
     SetStage(msNone);
+
+  FIsPaused := False;
+  FireEvent(meStopped);
 end;
 
 procedure TMeasurementRun.Stop;
 begin
-  RequestStopInternal;
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'Stop',
-    'Остановка процесса измерения', '');
-  FireEvent(meStopped);
+  Execute(mcStop);
 end;
 
 procedure TMeasurementRun.Pause;
@@ -997,12 +1032,12 @@ procedure TMeasurementRun.HandleCommand(Cmd: EMeasurementCommand; const Param: V
 begin
   case Cmd of
     mcStart: Start;
-    mcStop, mcCancel: Stop;
+    mcStop, mcCancel: RequestStop;
     mcPause: Pause;
     mcResume: Resume;
     mcReset:
       begin
-        Stop;
+        RequestStop;
         FCurrentPointIndex := -1;
         Start;
       end;
@@ -1021,6 +1056,9 @@ procedure TMeasurementRun.RunThreadProc;
 begin
   while not TThread.CurrentThread.CheckTerminated do
   begin
+    if FStopRequested then
+      Break;
+
     if FIsPaused then
     begin
       TThread.Sleep(50);
@@ -1028,7 +1066,7 @@ begin
     end;
 
     if IsTerminated then
-    Exit;
+      Break;
 
     try
       ProcessStage;
@@ -1424,7 +1462,7 @@ begin
   if Int64(TThread.GetTickCount64 - FWaitStartedTick) > Int64(FMeasureTimeout * 1000) then
   begin
     FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
-    FWorkTable.StopTest;
+    // DoExitStage(msMeasure, msDone) requests the physical test stop.
     SetStage(msDone);
   end;
 end;
