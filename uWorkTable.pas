@@ -21,7 +21,8 @@ uses
   uObservable,
   uParameter,
   uProtocols,
-  uRepositories;
+  uRepositories,
+  uSyncSetup;
 
 
 type
@@ -390,6 +391,7 @@ type
     FDevicesGridColumns: TArray<TGridColumnLayout>;
     FDataPointsGridColumns: TArray<TGridColumnLayout>;
     FResultsGridColumns: TArray<TGridColumnLayout>;
+    FSyncSetup: TSyncSetup;
 
     function GetValueTempertureBefore: TMeterValue;
     function GetValueTempertureAfter: TMeterValue;
@@ -638,6 +640,7 @@ type
     property DevicesGridColumns: TArray<TGridColumnLayout> read FDevicesGridColumns write FDevicesGridColumns;
     property DataPointsGridColumns: TArray<TGridColumnLayout> read FDataPointsGridColumns write FDataPointsGridColumns;
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
+    property SyncSetup: TSyncSetup read FSyncSetup;
 
     property NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
     property NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
@@ -692,6 +695,11 @@ type
   procedure SaveMeasurementResults;
 
 
+  end;
+
+  IWorkTableObserverHost = interface
+    ['{8E305AD6-49F7-4D3C-AD3E-1DBDF5692656}']
+    procedure DetachWorkTableObservers(AWorkTable: TWorkTable);
   end;
 
   TWorkTableManager = class
@@ -1694,6 +1702,7 @@ begin
   inherited Create;
   FParameterObserver := TParameterObserverBridge.Create(Self);
   FUUID := TGUID.NewGuid.ToString;
+  FSyncSetup := TSyncSetup.Create;
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
@@ -2478,6 +2487,8 @@ begin
       if not IsQuantityTemplateSet then
       begin
         FTableFlow.ValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
+        if FQuantityUnitName <> '' then
+          FTableFlow.ValueQuantity.SetDim(FQuantityUnitName);
         FTableFlow.ValueQuantity.ValueType := AGGREGATE_TYPE;
         IsQuantityTemplateSet := True;
       end;
@@ -2489,6 +2500,8 @@ begin
       if not IsFlowTemplateSet then
       begin
         FTableFlow.ValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
+        if FFlowUnitName <> '' then
+          FTableFlow.ValueFlowRate.SetDim(FFlowUnitName);
         FTableFlow.ValueFlowRate.ValueType := AGGREGATE_TYPE;
         IsFlowTemplateSet := True;
       end;
@@ -2640,8 +2653,9 @@ end;
 { Frees channel collections owned by the work table. }
 destructor TWorkTable.Destroy;
 begin
-  ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableDestroy',
-    'Удалён рабочий стол', Name);
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'WorkTableDestroy',
+      'Удалён рабочий стол', Name);
   UnbindParameterEvents(FFluidTemp);
   UnbindParameterEvents(FFluidPress);
   UnbindParameterEvents(FlowRate);
@@ -2658,6 +2672,7 @@ begin
   FreeAndNil(FFluidPress);
   FreeAndNil(FlowRate);
   FreeAndNil(FTableFlow);
+  FreeAndNil(FSyncSetup);
   FDeviceChannels.Free;
   FEtalonChannels.Free;
   FreeAndNil(FPumps);
@@ -2914,12 +2929,56 @@ end;
 procedure TWorkTable.RebindAllFlowMeters;
 var
   I: Integer;
+
+  function IsVolumeFlowUnitName(const AUnitName: string): Boolean;
+  begin
+    Result := SameText(AUnitName, 'л/с') or
+              SameText(AUnitName, 'л/мин') or
+              SameText(AUnitName, 'л/ч') or
+              SameText(AUnitName, 'м3/мин') or
+              SameText(AUnitName, 'м3/ч');
+  end;
+
+  procedure ApplySelectedUnitsToChannel(AChannel: TChannel);
+  var
+    Meter: TFlowMeter;
+  begin
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) or (FFlowUnitName = '') then
+      Exit;
+
+    Meter := AChannel.FlowMeter;
+    if IsVolumeFlowUnitName(FFlowUnitName) then
+    begin
+      Meter.ValueQuantity := Meter.ValueVolume;
+      Meter.ValueFlow := Meter.ValueVolumeFlow;
+      if (Meter.ValueVolume <> nil) and (FQuantityUnitName <> '') then
+        Meter.ValueVolume.SetDim(FQuantityUnitName);
+      if Meter.ValueVolumeFlow <> nil then
+        Meter.ValueVolumeFlow.SetDim(FFlowUnitName);
+    end
+    else
+    begin
+      Meter.ValueQuantity := Meter.ValueMass;
+      Meter.ValueFlow := Meter.ValueMassFlow;
+      if (Meter.ValueMass <> nil) and (FQuantityUnitName <> '') then
+        Meter.ValueMass.SetDim(FQuantityUnitName);
+      if Meter.ValueMassFlow <> nil then
+        Meter.ValueMassFlow.SetDim(FFlowUnitName);
+    end;
+  end;
+
 begin
   for I := 0 to FDeviceChannels.Count - 1 do
+  begin
     FDeviceChannels[I].RebindFlowMeterValues(Self);
+    ApplySelectedUnitsToChannel(FDeviceChannels[I]);
+  end;
 
    for I := 0 to FEtalonChannels.Count - 1 do
+   begin
     FEtalonChannels[I].RebindFlowMeterValues(Self);
+    ApplySelectedUnitsToChannel(FEtalonChannels[I]);
+   end;
 
   UpdateAggregateMeterValues;
   UpdateFlowRateLimitsByEtalons;
@@ -3033,7 +3092,8 @@ var
       begin
         SectionName := Trim(Sections[J]);
 
-        if StartsText('WorkTable.', SectionName) then
+        if StartsText('WorkTable.', SectionName) or
+           (StartsText('WorkTable_', SectionName) and EndsText('_Sync', SectionName)) then
           AIni.EraseSection(SectionName);
       end;
     finally
@@ -3053,8 +3113,8 @@ begin
 
     Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
 
-    if AWorkTables.Count > 0 then
-      ValuesIni.WriteFloat('Common', 'InitDensity', AWorkTables[0].ValueDensity.GetDoubleValue);
+     if ValuesIni.ReadFloat('Common', 'InitDensity', 0) = 0 then
+          ValuesIni.WriteFloat('Common', 'InitDensity', 0.9982);
 
     for I := 0 to AWorkTables.Count - 1 do
     begin
@@ -3151,6 +3211,7 @@ begin
       SaveGridColumns(Ini, Section + '.DeviceGrid', WorkTable.DevicesGridColumns);
       SaveGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.DataPointsGridColumns);
       SaveGridColumns(Ini, Section + '.ResultsGrid', WorkTable.ResultsGridColumns);
+      WorkTable.SyncSetup.SaveToIni(Ini, 'WorkTable_' + WorkTable.UUID);
     end;
     Ini.UpdateFile;
     ValuesIni.UpdateFile;
@@ -3197,6 +3258,7 @@ begin
       WorkTable.UUID := Ini.ReadString(Section, 'UUID', WorkTable.UUID);
       if Trim(WorkTable.UUID) = '' then
         WorkTable.UUID := TGUID.NewGuid.ToString;
+      WorkTable.SyncSetup.LoadFromIni(Ini, 'WorkTable_' + WorkTable.UUID);
       WorkTable.Name := Ini.ReadString(Section, 'Name','0'); //BuildWorkTableServiceName(WorkTable.ID);
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
@@ -4837,6 +4899,11 @@ begin
   if FWorkTables = nil then
     Exit;
 
+  // Активный стол мог быть уже удалён другим экраном: не разыменовываем
+  // висячую ссылку через SetActiveWorkTable, только проверяем наличие в списке.
+  if (FActiveWorkTable <> nil) and (FWorkTables.IndexOf(FActiveWorkTable) < 0) then
+    FActiveWorkTable := nil;
+
   DeletedMeterValueHashes := TStringList.Create;
   DeletedMeterValueOwners := TStringList.Create;
   try
@@ -4869,7 +4936,8 @@ begin
 
         if FWorkTables.Count = 0 then
           SetActiveWorkTable(nil)
-        else if FActiveWorkTable = nil then
+        else if (FActiveWorkTable = nil) or
+                (FWorkTables.IndexOf(FActiveWorkTable) < 0) then
         begin
           if I < FWorkTables.Count then
             SetActiveWorkTable(FWorkTables[I])

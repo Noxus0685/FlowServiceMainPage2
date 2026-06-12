@@ -1141,6 +1141,7 @@ begin
     if SameText(Name, 'Плотность') then
     begin
       SetCalcValue;
+      exit;
     end
 
     else if ValueType = AGGREGATE_TYPE then

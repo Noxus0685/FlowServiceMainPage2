@@ -658,6 +658,7 @@ type
     procedure ApplyMonitorIndicatorColor(const AColor: TAlphaColor);
     procedure RefreshMonitorIndicator;
     procedure RefreshPumpsCombo;
+    procedure ResetUIPump;
     procedure RefreshScalesCombo;
     procedure UpdateConditionsCurrentValues(AWorkTable: TWorkTable);
     procedure AttachType(AChannel: TChannel; ANewType: TDeviceType;
@@ -1043,10 +1044,7 @@ begin
   ComboBoxPumps.ItemIndex := -1;
 
   if FActiveWorkTable = nil then
-  begin
-    //ComboBoxPumps.Text := '';
     Exit;
-  end;
 
   SelectedPumpName := Trim(ComboBoxPumps.Text);
   for Pump in FActiveWorkTable.Pumps do
@@ -1205,6 +1203,8 @@ procedure TFrameMainTable.UpdateForm;
           NormalizeActiveWorkTable;
           if FActiveWorkTable = nil then
           begin
+            RefreshPumpsCombo;
+            ResetUIPump;
             RefreshScalesCombo;
             UpdateUIScale;
             UpdateGrids;
@@ -1217,6 +1217,8 @@ procedure TFrameMainTable.UpdateForm;
           IsUpdating := True;
             try
                UpdateUIFromValues;
+                RefreshPumpsCombo;
+                UpdateUIPump;
                 RefreshScalesCombo;
                 UpdateUIScale;
                 UpdateGrids;
@@ -1698,8 +1700,6 @@ begin
     ComboEditUnits.Items.Add(UnitName);
   for UnitName in CMassFlowUnits do
     ComboEditUnits.Items.Add(UnitName);
-  for UnitName in CScaleUnits do
-    ComboEditUnits.Items.Add(UnitName);
 
   if ComboEditUnits.Items.Count > 0 then
     ComboEditUnits.ItemIndex := 0;
@@ -1945,6 +1945,9 @@ procedure TFrameMainTable.SpeedButtonSetFlowRateClick(Sender: TObject);
 var
 AValue:double;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
@@ -1954,6 +1957,9 @@ end;
 
 procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
 
     if FActiveWorkTable.ActivePump=nil then
     begin
@@ -1974,6 +1980,9 @@ var
 AValue:double;
 StableStatus: RStableInfo;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
 
   if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
        Exit;
@@ -1990,6 +1999,9 @@ end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.ActivePump = nil) then
+    Exit;
+
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
     begin
       FActiveWorkTable.ActivePump.DoFreqSet(NormalizeFloatInput(SpinBoxFreq.Text));
@@ -2083,6 +2095,9 @@ end;
 
 procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
     if FActiveWorkTable.ActivePump=nil then
     begin
          ProtocolManager.AddMessage(pcWarning, psForm, 'PumpStart', 'Пользователь попробовал остановить насос', 'Активного насоса нет!');
@@ -2099,6 +2114,9 @@ end;
 
 procedure TFrameMainTable.Rectangle15Click(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
  FActiveWorkTable.FlowRate.DoFlowRateStop;
  UpdateUIFlowRate;
 end;
@@ -2322,7 +2340,7 @@ var
 begin
   CanEdit := CanEditActiveWorkTable;
   if miAddTable <> nil then
-    miAddTable.Enabled := CanEdit;
+    miAddTable.Enabled := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
   if miAddDeviceChannel <> nil then
     miAddDeviceChannel.Enabled := CanEdit;
   if miAddEtalonChannel <> nil then
@@ -2330,7 +2348,7 @@ begin
   if miSaveWorkTable <> nil then
     miSaveWorkTable.Enabled := CanEdit;
   if ActionAddWorkTable <> nil then
-    ActionAddWorkTable.Enabled := CanEdit;
+    ActionAddWorkTable.Enabled := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
   if ActionAddDeviceChannel <> nil then
     ActionAddDeviceChannel.Enabled := CanEdit;
   if ActionAddEtalonChannel <> nil then
@@ -2377,7 +2395,7 @@ begin
     (GridEtalons.Row >= 0) and (GridEtalons.Row < FActiveWorkTable.EtalonChannels.Count);
 
   if ActionAddWorkTable <> nil then
-    ActionAddWorkTable.Enabled := CanEdit;
+    ActionAddWorkTable.Enabled := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
   if ActionSaveWorkTable <> nil then
     ActionSaveWorkTable.Enabled := CanEdit;
   if ActionPumpAdd <> nil then
@@ -2745,7 +2763,7 @@ begin
   WorkTable.UpdateAggregateMeterValues;
   WorkTable.RecalculateAllMeterValues;
   if FFrameProceed <> nil then
-    FFrameProceed.UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+    FFrameProceed.UpdateGridDataPointsHeaders(WorkTable.TableFlow.ValueVolume.GetDimName, WorkTable.TableFlow.ValueVolumeFlow.GetDimName);
 
   UpdateUIFromValues;
 
@@ -2795,7 +2813,7 @@ begin
   CanEdit := CanEditActiveWorkTable;
 
   if ActionAddWorkTable <> nil then
-    ActionAddWorkTable.Enabled := CanEdit;
+    ActionAddWorkTable.Enabled := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
   if ActionAddDeviceChannel <> nil then
     ActionAddDeviceChannel.Enabled := CanEdit;
   if ActionAddEtalonChannel <> nil then
@@ -2804,10 +2822,7 @@ begin
     ActionSaveWorkTable.Enabled := CanEdit;
 
   if TabControlWorkTables <> nil then
-    if CanEdit then
-      TabControlWorkTables.PopupMenu := PopupMenuWorkTables
-    else
-      TabControlWorkTables.PopupMenu := nil;
+    TabControlWorkTables.PopupMenu := PopupMenuWorkTables;
 
   if Label23 <> nil then
     Label23.PopupMenu := nil;
@@ -2818,16 +2833,15 @@ begin
   if GridDevices <> nil then
   begin
     GridDevices.EditorMode := False;
+    GridDevices.PopupMenu := PopupMenuDevicesGrid;
     if CanEdit then
     begin
-      GridDevices.PopupMenu := PopupMenuDevicesGrid;
       if StringColumnDeviceSerial1 <> nil then
         StringColumnDeviceSerial1.PopupMenu := PopupMenu1;
       GridDevices.Options := GridDevices.Options + [TGridOption.Editing];
     end
     else
     begin
-      GridDevices.PopupMenu := nil;
       if StringColumnDeviceSerial1 <> nil then
         StringColumnDeviceSerial1.PopupMenu := nil;
       GridDevices.Options := GridDevices.Options - [TGridOption.Editing];
@@ -2837,16 +2851,11 @@ begin
   if GridEtalons <> nil then
   begin
     GridEtalons.EditorMode := False;
+    GridEtalons.PopupMenu := PopupMenuEtalonsGrid;
     if CanEdit then
-    begin
-      GridEtalons.PopupMenu := PopupMenuEtalonsGrid;
-      GridEtalons.Options := GridEtalons.Options + [TGridOption.Editing];
-    end
+      GridEtalons.Options := GridEtalons.Options + [TGridOption.Editing]
     else
-    begin
-      GridEtalons.PopupMenu := nil;
       GridEtalons.Options := GridEtalons.Options - [TGridOption.Editing];
-    end;
   end;
 
   if ToolBar1 <> nil then
@@ -3323,6 +3332,9 @@ end;
 
 procedure TFrameMainTable.ActionPumpAddExecute(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
         FActiveWorkTable.AddPump('1');
         RefreshPumpsCombo;
         RefreshScalesCombo;
@@ -3332,6 +3344,9 @@ end;
 
 procedure TFrameMainTable.ActionPumpDeleteExecute(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
          if FActiveWorkTable.ActivePump=nil then
          Exit;
 
@@ -4096,6 +4111,9 @@ end;
 
 procedure TFrameMainTable.ComboBoxPumpsChange(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
       LayoutPump.tag:=0;
@@ -4166,6 +4184,9 @@ procedure TFrameMainTable.ActionDeleteDeviceExecute(Sender: TObject);
 var
  Src: TChannel;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
    Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
    FActiveWorkTable.DeleteChannel(Src);
    UpdateGrids;
@@ -4176,6 +4197,9 @@ procedure TFrameMainTable.ActionDeleteEtalonsExecute(Sender: TObject);
 var
   Src: TChannel;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
    Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
    FActiveWorkTable.DeleteChannel(Src);
    UpdateGrids;
@@ -4437,7 +4461,11 @@ begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
+  begin
+    RefreshPumpsCombo;
+    ResetUIPump;
     Exit;
+  end;
 
   SetValues;
   WorkTable := FActiveWorkTable;
@@ -4477,7 +4505,7 @@ procedure TFrameMainTable.UpdateUIFromValues;
 var
   WorkTable: TWorkTable;
   I: Integer;
-  MinImpValue: TMeterValue;
+  MinImpTotalValue: TMeterValue;
   RawValueBaseMultiplier: TMeterValue;
   RawQuantityBaseMultiplier: TMeterValue;
 
@@ -4599,17 +4627,17 @@ begin
       LabelNameTemperture.Text := WorkTable.ValueTemperture.GetStrFullName;
 
 
-  MinImpValue := nil;
+  MinImpTotalValue := nil;
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-    if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].ValueImp <> nil) then
+    if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].ValueImpTotal <> nil) then
     begin
-      if (MinImpValue = nil) or
-         (WorkTable.DeviceChannels[I].ValueImp.GetDoubleValue < MinImpValue.GetDoubleValue) then
-        MinImpValue := WorkTable.DeviceChannels[I].ValueImp;
+      if (MinImpTotalValue = nil) or
+         (WorkTable.DeviceChannels[I].ValueImpTotal.GetDoubleValue < MinImpTotalValue.GetDoubleValue) then
+        MinImpTotalValue := WorkTable.DeviceChannels[I].ValueImpTotal;
     end;
 
-  if MinImpValue <> nil then
-    LabelImp.Text := MinImpValue.GetStrValue
+  if MinImpTotalValue <> nil then
+    LabelImp.Text := MinImpTotalValue.GetStrValue
   else
     LabelImp.Text := '0';
 
@@ -4857,6 +4885,9 @@ end;
 
 procedure TFrameMainTable.EditRepeatsExit(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
     //Установка кол-ва повторов.
   FActiveWorkTable.Repeats:= StrToInt(EditRepeats.Text);
 
@@ -6226,18 +6257,41 @@ begin
     FFrameMeasurementRun.SpeedButtonCreatePointsClick(Sender);
 end;
 
+procedure TFrameMainTable.ResetUIPump;
+begin
+  LabelFreq.Text := '-';
+  Rectangle1.Fill.Color := TAlphaColorRec.White;
+
+  LayoutPump.Tag := 2;
+  try
+    SpinBoxFreq.Min := 0;
+    SpinBoxFreq.Max := 0;
+    SpinBoxFreq.Value := 0;
+    ComboBoxPumps.ItemIndex := -1;
+  finally
+    LayoutPump.Tag := 0;
+  end;
+end;
+
 procedure TFrameMainTable.UpdateUIPump;
 var
   WorkTable: TWorkTable;
   i:integer;
 begin
+    NormalizeActiveWorkTable;
     WorkTable := FActiveWorkTable;
 
     if WorkTable = nil then
+    begin
+      ResetUIPump;
       Exit;
+    end;
 
     if WorkTable.ActivePump = nil then
+    begin
+      ResetUIPump;
       exit;
+    end;
 
     if WorkTable.ActivePump <> nil then
       LabelFreq.Text :=FormatFloat('0.##', WorkTable.ActivePump.Value.Value)

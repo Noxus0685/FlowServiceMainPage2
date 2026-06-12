@@ -35,7 +35,8 @@ uses
   frmWorkTableProperties in 'frmWorkTableProperties.pas' {FrameWorkTableProperties: TFrame},
   frmMeterValueSelect in 'frmMeterValueSelect.pas' {FormMeterValueSelect},
   frmMeterValueEditFrame in 'frmMeterValueEditFrame.pas' {FrameMeterValueEdit: TFrame},
-  uControlRegister in 'uControlRegister.pas';
+  uControlRegister in 'uControlRegister.pas',
+  uSyncSetup in 'uSyncSetup.pas';
 
 {$R *.res}
 
