@@ -3053,8 +3053,8 @@ begin
 
     Ini.WriteInteger('WorkTables', 'Count', AWorkTables.Count);
 
-    if AWorkTables.Count > 0 then
-      ValuesIni.WriteFloat('Common', 'InitDensity', AWorkTables[0].ValueDensity.GetDoubleValue);
+     if ValuesIni.ReadFloat('Common', 'InitDensity', 0) = 0 then
+          ValuesIni.WriteFloat('Common', 'InitDensity', 0.9982);
 
     for I := 0 to AWorkTables.Count - 1 do
     begin
