@@ -4363,15 +4363,22 @@ end;
 
 
 procedure TWorkTable.StartMeasurementRun(AMode: Integer);
+var
+  RunMode: EMeasurementRunMode;
 begin
   if FMeasurementRun = nil then
     Exit;
 
-  if AMode = 0 then
-    TMeasurementRun(FMeasurementRun).Mode := mrmManual
+  if (AMode < Ord(Low(EMeasurementRunMode))) or
+     (AMode > Ord(High(EMeasurementRunMode))) then
+    RunMode := mrmManual
   else
-    TMeasurementRun(FMeasurementRun).Mode := mrmAutomatic;
+    RunMode := EMeasurementRunMode(AMode);
 
+  FMode := RunMode;
+  TMeasurementRun(FMeasurementRun).Mode := RunMode;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun',
+    'Запуск измерения', Format('Mode=%d', [Ord(RunMode)]));
   TMeasurementRun(FMeasurementRun).Execute(mcStart);
 end;
 
