@@ -237,6 +237,11 @@ type
     function CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
     function SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+    function ShouldUseAllPoints: Boolean;
+    function ShouldSetupConditions: Boolean;
+    function ShouldWaitStable: Boolean;
+    function ShouldSelectEtalon: Boolean;
+    function CreateSingleSessionPoint(AWithConditions: Boolean): TDevicePoint;
 
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
@@ -623,7 +628,7 @@ begin
     msSelectPoint:
       FAttempt := 0;
     msWaitStable:
-      if (FWorkTable <> nil) and
+      if ShouldWaitStable and (FWorkTable <> nil) and
          not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
         FWorkTable.StartMonitor;
     msMeasure:
@@ -737,46 +742,119 @@ end;
 
 procedure TMeasurementRun.CreateSession;
 var
-  ManualPoint: TDevicePoint;
+  Point: TDevicePoint;
 begin
   FPoints.Clear;
   if FWorkTable = nil then
     Exit;
 
-  if FMode = mrmManual then
-  begin
-    ManualPoint := TDevicePoint.Create(0);
-    ManualPoint.FlowRate := 1;
-
-    if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet.Value >= 0) then
-      ManualPoint.Q := FWorkTable.FlowRate.ValueSet.Value
-    else
-      ManualPoint.Q := -1;
-
-    if FWorkTable.FluidTemp <> nil then
-      ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet.Value
-    else
-      ManualPoint.Temp := -1;
-    if FWorkTable.FluidPress <> nil then
-      ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet.Value
-    else
-      ManualPoint.Pressure := -1;
-
-    if FWorkTable.CurrentPoint <> nil then
-    begin
-      ManualPoint.LimitTime := FWorkTable.CurrentPoint.LimitTime;
-      ManualPoint.LimitImp := FWorkTable.CurrentPoint.LimitImp;
-      ManualPoint.LimitVolume := FWorkTable.CurrentPoint.LimitVolume;
-      ManualPoint.StopCriteria := FWorkTable.CurrentPoint.StopCriteria;
-    end;
-    ManualPoint.Repeats := FWorkTable.Repeats;
-    ManualPoint.RepeatsProtocol := FWorkTable.Repeats;
-    ManualPoint.Num := 1;
-    FPoints.Add(ManualPoint);
-    Exit;
+  case FMode of
+    mrmAutomatic:
+      if ShouldUseAllPoints then
+        CreateSessionPoints;
+    mrmManual:
+      begin
+        Point := CreateSingleSessionPoint(False);
+        if Point <> nil then
+          FPoints.Add(Point);
+      end;
+    mrmHalfAutomatic:
+      begin
+        Point := CreateSingleSessionPoint(True);
+        if Point <> nil then
+          FPoints.Add(Point);
+      end;
   end;
 
-  CreateSessionPoints;
+  ProtocolManager.AddMessage(pcInfo, psMeasurement, 'CreateSession',
+    'Создание сессии измерения',
+    Format('Mode=%d; Points=%d', [Ord(FMode), FPoints.Count]));
+end;
+
+function TMeasurementRun.ShouldUseAllPoints: Boolean;
+begin
+  Result := FMode = mrmAutomatic;
+end;
+
+function TMeasurementRun.ShouldSetupConditions: Boolean;
+begin
+  Result := FMode in [mrmHalfAutomatic, mrmAutomatic];
+end;
+
+function TMeasurementRun.ShouldWaitStable: Boolean;
+begin
+  Result := FMode in [mrmHalfAutomatic, mrmAutomatic];
+end;
+
+function TMeasurementRun.ShouldSelectEtalon: Boolean;
+begin
+  Result := True;
+end;
+
+function TMeasurementRun.CreateSingleSessionPoint(AWithConditions: Boolean): TDevicePoint;
+begin
+  Result := nil;
+  if FWorkTable = nil then
+    Exit;
+
+  Result := TDevicePoint.Create(0);
+  Result.Num := 1;
+  Result.Status := 0;
+  Result.RepeatsCompleted := 0;
+
+  if FWorkTable.CurrentPoint <> nil then
+  begin
+    Result.LimitTime := FWorkTable.CurrentPoint.LimitTime;
+    Result.LimitImp := FWorkTable.CurrentPoint.LimitImp;
+    Result.LimitVolume := FWorkTable.CurrentPoint.LimitVolume;
+    Result.StopCriteria := FWorkTable.CurrentPoint.StopCriteria;
+    Result.Repeats := FWorkTable.CurrentPoint.Repeats;
+    Result.RepeatsProtocol := FWorkTable.CurrentPoint.RepeatsProtocol;
+  end
+  else
+  begin
+    Result.LimitTime := -1;
+    Result.LimitImp := -1;
+    Result.LimitVolume := -1;
+    Result.StopCriteria := [];
+    Result.Repeats := 1;
+    Result.RepeatsProtocol := 1;
+  end;
+
+  if Result.Repeats <= 0 then
+    Result.Repeats := Max(FWorkTable.Repeats, 1);
+  if Result.RepeatsProtocol <= 0 then
+    Result.RepeatsProtocol := Result.Repeats;
+
+  if AWithConditions then
+  begin
+    if (FWorkTable.CurrentPoint <> nil) and (FWorkTable.CurrentPoint.Q >= 0) then
+      Result.Q := FWorkTable.CurrentPoint.Q
+    else if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet.Value >= 0) then
+      Result.Q := FWorkTable.FlowRate.ValueSet.Value
+    else
+      Result.Q := -1;
+
+    if (FWorkTable.CurrentPoint <> nil) and (FWorkTable.CurrentPoint.Temp >= 0) then
+      Result.Temp := FWorkTable.CurrentPoint.Temp
+    else if FWorkTable.FluidTemp <> nil then
+      Result.Temp := FWorkTable.FluidTemp.ValueSet.Value
+    else
+      Result.Temp := -1;
+
+    if (FWorkTable.CurrentPoint <> nil) and (FWorkTable.CurrentPoint.Pressure >= 0) then
+      Result.Pressure := FWorkTable.CurrentPoint.Pressure
+    else if FWorkTable.FluidPress <> nil then
+      Result.Pressure := FWorkTable.FluidPress.ValueSet.Value
+    else
+      Result.Pressure := -1;
+  end
+  else
+  begin
+    Result.Q := -1;
+    Result.Temp := -1;
+    Result.Pressure := -1;
+  end;
 end;
 
 procedure TMeasurementRun.CreateSessionPoints;
@@ -1183,6 +1261,8 @@ begin
       Best := Channel;
   end;
 
+  { TODO: SelectEtalons finds the best etalon channel, but the selected
+    channel is not currently persisted or applied. }
   Result := Best <> nil;
   if not Result then
   begin
@@ -1345,7 +1425,10 @@ begin
     ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
       'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
     FireEvent(mePointSelected);
-    SetStage(msSelectEtalon);
+    if ShouldSelectEtalon then
+      SetStage(msSelectEtalon)
+    else
+      SetStage(msSetupPoint);
   end
   else
   begin
@@ -1376,12 +1459,24 @@ var
   Error: TErrorInfo;
 begin
   Point := GetCurrentPoint;
-  if not SetupPoint(Point, Error) then
+  if Point = nil then
   begin
-    FireEvent(mePointNotSet, Error);
+    FireEvent(mePointNotSet, BuildError(1200, 'Текущая точка измерения не назначена'));
     SetStage(msDone);
     Exit;
   end;
+
+  if ShouldSetupConditions then
+  begin
+    if not SetupPoint(Point, Error) then
+    begin
+      FireEvent(mePointNotSet, Error);
+      SetStage(msDone);
+      Exit;
+    end;
+  end
+  else
+    Point.Status := 3;
 
   if not SetupMeasurement(Point, Error) then
   begin
@@ -1391,7 +1486,10 @@ begin
   end;
 
   FireEvent(mePointSet);
-  SetStage(msWaitStable);
+  if ShouldWaitStable then
+    SetStage(msWaitStable)
+  else
+    SetStage(msMeasure);
 end;
 
 procedure TMeasurementRun.ProcessWaitStable;
