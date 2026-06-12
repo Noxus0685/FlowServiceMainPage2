@@ -43,6 +43,9 @@ type
     ComboOutputSync2: TComboBox;
     ComboOutputStart2: TComboBox;
     ComboOutputStop2: TComboBox;
+    ComboInternalSyncChannel: TComboBox;
+    ComboMeasurementStart: TComboBox;
+    ComboMeasurementStop: TComboBox;
     TreeProperties: TTreeView;
     EditPressureMin: TEdit;
     EditPressureMax: TEdit;
@@ -116,6 +119,9 @@ var
   VerticalSyncCategory: TTreeViewItem;
   OutputSyncCategory1: TTreeViewItem;
   OutputSyncCategory2: TTreeViewItem;
+  InternalSyncCategory: TTreeViewItem;
+  MeasurementStartCategory: TTreeViewItem;
+  MeasurementStopCategory: TTreeViewItem;
   HeaderGrid: TGridPanelLayout;
   HeaderProperty: TLabel;
   HeaderValue: TLabel;
@@ -235,6 +241,25 @@ begin
   ComboOutputStop2.Items.Add('Фронт');
   ComboOutputStop2.Items.Add('Спад');
   ComboOutputStop2.ItemIndex := 0;
+
+  InternalSyncCategory := AddCategory('Выход внутренней синхронизации');
+  AddComboRow(InternalSyncCategory, 'Канал', ComboInternalSyncChannel);
+  ComboInternalSyncChannel.Items.Add('Выкл');
+  ComboInternalSyncChannel.Items.Add('Вкл');
+  ComboInternalSyncChannel.ItemIndex := 0;
+
+  MeasurementStartCategory := AddCategory('Запуск измерения');
+  AddComboRow(MeasurementStartCategory, 'Условия', ComboMeasurementStart);
+  ComboMeasurementStart.Items.Add('По кнопке измерения');
+  ComboMeasurementStart.Items.Add('По сигналу синхр.');
+  ComboMeasurementStart.ItemIndex := 0;
+
+  MeasurementStopCategory := AddCategory('Остановка измерения');
+  AddComboRow(MeasurementStopCategory, 'Условия', ComboMeasurementStop);
+  ComboMeasurementStop.Items.Add('По кнопке измерения');
+  ComboMeasurementStop.Items.Add('По сигналу синхр.');
+  ComboMeasurementStop.Items.Add('По сигналу синхр. после огранич.');
+  ComboMeasurementStop.ItemIndex := 0;
 
   PressureCategory := AddCategory('Давление');
   AddMeterValueRow(PressureCategory, 'Давление', EditPressure, ButtonSelectPressure,
@@ -682,6 +707,9 @@ begin
   ComboOutputSync2.Enabled := CanEdit;
   ComboOutputStart2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
   ComboOutputStop2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
+  ComboInternalSyncChannel.Enabled := CanEdit;
+  ComboMeasurementStart.Enabled := CanEdit;
+  ComboMeasurementStop.Enabled := CanEdit;
 end;
 
 procedure TFrameWorkTableProperties.HandleSyncComboChange(Sender: TObject);
