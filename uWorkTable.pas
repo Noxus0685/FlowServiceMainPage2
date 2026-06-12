@@ -4909,6 +4909,8 @@ begin
   WorkTable.Text := 'Рабочий стол ' + IntToStr(WorkTable.ID);
   WorkTables.Add(WorkTable);
   WorkTable.Rebind;
+  if WorkTable.ValueDensity <> nil then
+    WorkTable.ValueDensity.SetValue(0.9982);
 end;
 
 procedure TWorkTableManager.AddWorkTable(const WorkTableName: string);
