@@ -626,6 +626,9 @@ begin
 //  end
 //  else
     Result := Value;
+
+  if SameText(Name, 'Плотность') and SameValue(Result, 0, EPS) then
+    Result := FInitDensity;
 end;
 
 { Returns current value in base units or converted to the requested dimension. }
