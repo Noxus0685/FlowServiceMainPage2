@@ -1078,20 +1078,21 @@ end;
 
 procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
 begin
-  case AWorkTable.Action of
+
+{  case AWorkTable.Action of
     awtStartTest:
       begin
-        AWorkTable.ExecuteAction;
-        if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
-          MeasurementRun.Execute(mcStart);
+       AWorkTable.ExecuteAction;
+      //  if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
+      //   MeasurementRun.Execute(mcStart);
         Exit;
       end;
 
     awtStopTest:
       begin
         AWorkTable.ExecuteAction;
-        if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
-          MeasurementRun.Execute(mcStop);
+      //  if (AWorkTable = FActiveWorkTable) and (MeasurementRun <> nil) then
+      //    MeasurementRun.Execute(mcStop);
         Exit;
       end;
   else
@@ -1100,7 +1101,7 @@ begin
 
   if AData is TDevicePoint then
     OnChangePoint(AWorkTable, TDevicePoint(AData), -1);
-
+             }
   UpdateForm;
 end;
 

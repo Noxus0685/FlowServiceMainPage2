@@ -663,9 +663,8 @@ type
     FWorkTables: TObjectList<TWorkTable>;
     FIsSimulationMode :Boolean;
     FActiveWorkTable  :TWorkTable;
+
   public
-
-
     constructor Create(const AIniFileName: string);
     destructor Destroy; override;
 
@@ -685,7 +684,7 @@ type
     function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate: Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil): Double;
     function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
-      const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+    const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
@@ -699,8 +698,6 @@ type
 
 implementation
 
-
-
 uses
   FmxHelper,
   frmMainTable,
@@ -709,6 +706,8 @@ uses
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
+
+  {$REGION 'HELPERS'}
 
 class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
   const AAction: string; ADevice: TDevice; AChannel: TChannel);
@@ -1012,7 +1011,9 @@ begin
     FOwner.HandleParameterNotify(Sender, Event, Data);
 end;
 
-{$REGION 'TChannel'}
+{$ENDREGION}
+
+  {$REGION 'TChannel'}
 
 procedure TChannel.InitMeterValues;
 var
@@ -1647,9 +1648,6 @@ end;
 
 
     {$ENDREGION}
-
-
-
 
   {$REGION 'TWorkTable'}
 
@@ -3704,7 +3702,7 @@ begin
   Category := WorkTableEventToProtocolCategory(AEvent);
   EventText := WorkTableEventToText(AEvent);
 
-  ProtocolManager.AddMessage(Category, psWorkTable, 'WorkTableEvent',
+  ProtocolManager.AddMessage(Category, psWorkTable, 'FireEvent',
     'Событие рабочего стола', EventText);
 
   if (AError.Code <> 0) or (Trim(AError.Msg) <> '') then
@@ -3717,7 +3715,7 @@ begin
       AError.Msg
     ]);
 
-    ProtocolManager.AddMessage(pcError, psWorkTable, 'WorkTableError',
+    ProtocolManager.AddMessage(pcError, psWorkTable, 'FireEvent-ERROR',
       'Ошибка события рабочего стола', ErrorDetails);
   end;
 
@@ -3904,7 +3902,7 @@ begin
   if FState = ANewState then
     Exit;
 
-  OldState := FState;
+   OldState := FState;
   FState := ANewState;
   ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',
     'Изменено состояние рабочего стола',
@@ -3923,12 +3921,7 @@ end;
 
 procedure TWorkTable.ExecuteAction;
 begin
-  case FAction of
-    awtStartMonitor: DoStartMonitor;
-    awtStopMonitor: DoStopMonitor;
-    awtStartTest: DoStartTest;
-    awtStopTest: DoStopTest;
-  end;
+
 end;
 
 procedure TWorkTable.DoStartMonitor;
@@ -3949,8 +3942,6 @@ end;
 procedure TWorkTable.DoStartTest;
 begin
   ResetMeasurementValues;
-  //SetState(swtSTARTTEST);
-  StartMeasurementRun(Ord(FMode));
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
     'Подготовка к запуску измерения. Очистка данных', Name);
 end;
@@ -3958,7 +3949,7 @@ end;
 procedure TWorkTable.DoStopTest;
 begin
   //SetState(swtSTOPTEST);
-  StopMeasurementRun;
+  //StopMeasurementRun;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStopTest',
     'Подготовка к остановке измеиения.', Name);
 end;
@@ -4334,21 +4325,25 @@ end;
 
 procedure TWorkTable.StartTest;
 begin
+  DoStartTest;
   FireAction(awtStartTest, 'StartTest', 'Запрошен запуск измерения');
 end;
 
 procedure TWorkTable.StartMonitor;
 begin
+  DoStartMonitor;
   FireAction(awtStartMonitor, 'StartMonitor', 'Действие: запуск монитора');
 end;
 
 procedure TWorkTable.StopTest;
 begin
+   DoStopTest;
   FireAction(awtStopTest, 'StopTest', 'Запрошена остановка теста');
 end;
 
 procedure TWorkTable.StopMonitor;
 begin
+  DoStopMonitor;
   FireAction(awtStopMonitor, 'StopMonitor', 'Запрошена остановка мониторинга');
 end;
 
@@ -5497,8 +5492,4 @@ begin
 
      {$ENDREGION 'TWorkTableManager'}
 
-
-
-
-
-end.
+ end.

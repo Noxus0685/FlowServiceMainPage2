@@ -586,7 +586,7 @@ procedure TMeasurementRun.FireEvent(AEvent: EMeasurementEvent; const AError: TEr
 var
   ErrorDetails: string;
 begin
-  ProtocolManager.AddMessage(pcEvent, psMeasurement, 'MeasurementEvent',
+  ProtocolManager.AddMessage(pcEvent, psMeasurement, 'FireEvent',
     'Событие измерения', MeasurementEventToString(AEvent));
 
   if (AError.Code <> 0) or (Trim(AError.Msg) <> '') then
@@ -944,7 +944,11 @@ begin
       Continue;
     end;
 
-    Process;
+    if IsTerminated then
+    Exit;
+
+    ProcessStage;
+
     TThread.Sleep(10);
   end;
 end;
@@ -1181,9 +1185,7 @@ end;
 
 procedure TMeasurementRun.Process;
 begin
-  if IsTerminated then
-    Exit;
-  ProcessStage;
+
 end;
 
 procedure TMeasurementRun.ProcessStage;
