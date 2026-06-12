@@ -195,8 +195,8 @@ begin
   ComboEditMode.ItemIndex := 0;
   ComboEditMode.OnChange := HandleEditModeChange;
 
-  VerticalSyncCategory := AddCategory('Вертикальная синхронизация');
-  AddComboRow(VerticalSyncCategory, 'Вертикальная синхронизация', ComboVerticalSync);
+  VerticalSyncCategory := AddCategory('Вход синхронизация');
+  AddComboRow(VerticalSyncCategory, 'Вход синхронизация', ComboVerticalSync);
   ComboVerticalSync.Items.Add('Отключено');
   ComboVerticalSync.Items.Add('Внешняя синхронизация');
   ComboVerticalSync.Items.Add('По каналу');
@@ -212,8 +212,8 @@ begin
   ComboVerticalStop.ItemIndex := 0;
   AddComboRow(VerticalSyncCategory, 'Канал', ComboVerticalChannel);
 
-  OutputSyncCategory1 := AddCategory('Выходная синхронизация 1');
-  AddComboRow(OutputSyncCategory1, 'Выходная синхронизация', ComboOutputSync1);
+  OutputSyncCategory1 := AddCategory('Выход синхронизация 1');
+  AddComboRow(OutputSyncCategory1, 'Выход синхронизация', ComboOutputSync1);
   ComboOutputSync1.Items.Add('Выкл');
   ComboOutputSync1.Items.Add('Вкл');
   ComboOutputSync1.ItemIndex := 0;
@@ -227,8 +227,8 @@ begin
   ComboOutputStop1.Items.Add('Спад');
   ComboOutputStop1.ItemIndex := 0;
 
-  OutputSyncCategory2 := AddCategory('Выходная синхронизация 2');
-  AddComboRow(OutputSyncCategory2, 'Выходная синхронизация', ComboOutputSync2);
+  OutputSyncCategory2 := AddCategory('Выход синхронизация 2');
+  AddComboRow(OutputSyncCategory2, 'Выход синхронизация', ComboOutputSync2);
   ComboOutputSync2.Items.Add('Выкл');
   ComboOutputSync2.Items.Add('Вкл');
   ComboOutputSync2.ItemIndex := 0;
