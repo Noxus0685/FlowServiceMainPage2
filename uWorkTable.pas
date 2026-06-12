@@ -697,6 +697,11 @@ type
 
   end;
 
+  IWorkTableObserverHost = interface
+    ['{8E305AD6-49F7-4D3C-AD3E-1DBDF5692656}']
+    procedure DetachWorkTableObservers(AWorkTable: TWorkTable);
+  end;
+
   TWorkTableManager = class
   private
     FIniFileName: string;
