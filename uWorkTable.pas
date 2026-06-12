@@ -90,7 +90,7 @@ type
     wtecSaveResultsFailed = 2005
   );
 
-  EMeasurementRunMode = (mrmManual =0, mrmAutomatic);
+  EMeasurementRunMode = (mrmManual =0, mrmHalfAutomatic, mrmAutomatic);
 
   // Алиас для обратной совместимости
   EWorkTableState = EStateWorkTable;

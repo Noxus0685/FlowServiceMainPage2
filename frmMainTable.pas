@@ -666,8 +666,8 @@ type
     procedure SetConfiguration;
     procedure StartMonitor;
     procedure StopMonitor;
-    procedure StartTest;
-    procedure StopTest;
+    procedure StartMeasurement;
+    procedure StopSpillage;
     procedure RequestStartTest;
     procedure RequestStopTest;
 
@@ -1137,26 +1137,26 @@ begin
     FOnWorkTableCommand(FActiveWorkTable, awtStopTest);
 end;
 
-procedure TFrameMainTable.StartTest;
+procedure TFrameMainTable.StartMeasurement;
 begin
   if FActiveWorkTable = nil then
     Exit;
 
   if MeasurementRun = nil then
   begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StartTest',
+    ProtocolManager.AddMessage(pcWarning, psForm, 'StartSpillage',
       'Невозможно запустить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
     Exit;
   end;
 
   FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
-   ProtocolManager.AddMessage(pcAction, psForm, 'StartTest', 'Запрос на запуск измерения', FActiveWorkTable.Name);
+   ProtocolManager.AddMessage(pcAction, psForm, 'StartSpillage', 'Запрос на запуск проливки', FActiveWorkTable.Name);
 
   //FActiveWorkTable.StartTest;
   FActiveWorkTable.StartMeasurementRun;
   end;
 
-procedure TFrameMainTable.StopTest;
+procedure TFrameMainTable.StopSpillage;
 begin
 
   if FActiveWorkTable = nil then
@@ -1164,12 +1164,12 @@ begin
 
   if MeasurementRun = nil then
   begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StopTest',
+    ProtocolManager.AddMessage(pcWarning, psForm, 'StopSpillage',
       'Невозможно остановить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
     Exit;
   end;
 
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopTest', 'Запрос на остановку измерения', FActiveWorkTable.Name);
+   ProtocolManager.AddMessage(pcAction, psForm, 'StopSpillage', 'Запрос на остановку проливки', FActiveWorkTable.Name);
      FActiveWorkTable.StopMeasurementRun;
  end;
 
@@ -5078,9 +5078,9 @@ begin
   Run := MeasurementRun;
   if ((Run <> nil) and not (Run.Stage in [msNone, msDone])) or
      (WorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
-    StopTest
+    StopSpillage
   else
-    StartTest;
+    StartMeasurement;
 end;
 
 procedure TFrameMainTable.Button1Click(Sender: TObject);

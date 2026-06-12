@@ -828,9 +828,30 @@ begin
     FCurrentRepeat := 0;
     FForceNextPoint := -1;
     FIsPaused := False;
-    SetStage(msSelectPoint);
-    ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
-      'Запуск процесса измерения', '');
+
+     case Mode of
+     mrmAutomatic:
+     begin
+     ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
+      'Запуск процесса измерения в автоматическом режиме', '');
+     SetStage(msSelectPoint);
+     end;
+     mrmManual:
+     begin
+         ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
+      'Запуск процесса измерения в ручном режиме', '');
+     SetStage(msMeasure);
+     end;
+     mrmHalfAutomatic:
+      begin
+              ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
+      'Запуск процесса измерения в полуавтоматическом режиме', '');
+     SetStage(msSelectPoint);
+      end;
+     end;
+
+
+
     FireEvent(meStarted);
 
 
