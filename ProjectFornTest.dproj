@@ -391,6 +391,7 @@
             <DesignClass>TFrame</DesignClass>
         </DCCReference>
         <DCCReference Include="uControlRegister.pas"/>
+        <DCCReference Include="uSyncSetup.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
