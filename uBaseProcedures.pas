@@ -84,6 +84,8 @@ type
     tnModification
   );
 
+    EMeasurementRunMode = (mrmManual =0, mrmHalfAutomatic, mrmAutomatic);
+
     EMeasurementState = (
       msNone,
 
@@ -95,7 +97,11 @@ type
 
       msWaitStable,// — Ожидание стабилизации параметров
 
+      msMeasureStarting,
+
       msMeasure,// — Проведение измерения
+
+      msMeasureStoping,
 
       msResultsRead,// — Подготовка и чтение результатов
 

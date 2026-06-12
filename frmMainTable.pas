@@ -667,7 +667,7 @@ type
     procedure StartMonitor;
     procedure StopMonitor;
     procedure StartMeasurement;
-    procedure StopSpillage;
+    procedure StopMeasurement;
     procedure RequestStartTest;
     procedure RequestStopTest;
 
@@ -1144,19 +1144,19 @@ begin
 
   if MeasurementRun = nil then
   begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StartSpillage',
+    ProtocolManager.AddMessage(pcWarning, psForm, 'StartMeasurement',
       'Невозможно запустить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
     Exit;
   end;
 
   FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
-   ProtocolManager.AddMessage(pcAction, psForm, 'StartSpillage', 'Запрос на запуск проливки', FActiveWorkTable.Name);
+   ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
 
   //FActiveWorkTable.StartTest;
   FActiveWorkTable.StartMeasurementRun;
   end;
 
-procedure TFrameMainTable.StopSpillage;
+procedure TFrameMainTable.StopMeasurement;
 begin
 
   if FActiveWorkTable = nil then
@@ -1164,12 +1164,12 @@ begin
 
   if MeasurementRun = nil then
   begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'StopSpillage',
+    ProtocolManager.AddMessage(pcWarning, psForm, 'StopMeasurement',
       'Невозможно остановить измерение: MeasurementRun не создан', FActiveWorkTable.Name);
     Exit;
   end;
 
-   ProtocolManager.AddMessage(pcAction, psForm, 'StopSpillage', 'Запрос на остановку проливки', FActiveWorkTable.Name);
+   ProtocolManager.AddMessage(pcAction, psForm, 'StopMeasurement', 'Запрос на остановку измерений', FActiveWorkTable.Name);
      FActiveWorkTable.StopMeasurementRun;
  end;
 
@@ -5078,7 +5078,7 @@ begin
   Run := MeasurementRun;
   if ((Run <> nil) and not (Run.Stage in [msNone, msDone])) or
      (WorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
-    StopSpillage
+    StopMeasurement
   else
     StartMeasurement;
 end;
