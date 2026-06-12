@@ -1484,10 +1484,25 @@ begin
   SetLength(FCurrentResultRows, 0);
   SetLength(FCurrentSpillages, 0);
 
+  if FSessionDevice <> nil then
+    FSessionDevice.Device := nil;
+  if FSessionEtalon <> nil then
+    FSessionEtalon.Device := nil;
+
+  if LabelSessionDate <> nil then
+    LabelSessionDate.Text := 'Сессия';
+  if LabelSessionActive <> nil then
+    LabelSessionActive.Text := '';
+
   if GridResults <> nil then
     GridResults.RowCount := 0;
   if GridDataPoints <> nil then
     GridDataPoints.RowCount := 0;
+  if GridCoefs <> nil then
+    GridCoefs.RowCount := 0;
+
+  if FFrameCalibrCoefs <> nil then
+    FFrameCalibrCoefs.Init(nil, cctMeterValueCoef, nil);
 end;
 
 procedure TFrameProceed.RefreshAfterWorkTableDeletion;
@@ -1495,12 +1510,21 @@ var
   NextWorkTable: TWorkTable;
 begin
   NextWorkTable := nil;
-  if (FWorkTableManager <> nil) and
-     (FWorkTableManager.WorkTables <> nil) and
-     (FWorkTableManager.WorkTables.IndexOf(FWorkTableManager.ActiveWorkTable) >= 0) then
-    NextWorkTable := FWorkTableManager.ActiveWorkTable;
+  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+  begin
+    if FWorkTableManager.WorkTables.IndexOf(FWorkTableManager.ActiveWorkTable) >= 0 then
+      NextWorkTable := FWorkTableManager.ActiveWorkTable
+    else if FWorkTableManager.WorkTables.Count > 0 then
+    begin
+      NextWorkTable := FWorkTableManager.WorkTables[0];
+      FWorkTableManager.ActiveWorkTable := NextWorkTable;
+      NextWorkTable.IsActive := True;
+    end;
+  end;
 
   FActiveWorkTable := NextWorkTable;
+
+  ClearCurrentResultsView;
 
   if FWorkTableManager <> nil then
     FWorkTableManager.Save;
@@ -2442,7 +2466,7 @@ begin
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
   begin
-      if (FSessionEtalon <> nil) then
+      if (FSessionEtalon <> nil) and (FActiveWorkTable <> nil) then
       begin
         if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
           Value := FSessionEtalon.ValueVolumeFlow.GetStrNum(P.EtalonVolumeFlow)
@@ -2460,7 +2484,7 @@ begin
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonVolume then
   begin
-      if (FSessionEtalon <> nil) then
+      if (FSessionEtalon <> nil) and (FActiveWorkTable <> nil) then
       begin
         if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
           Value := FSessionEtalon.ValueVolume.GetStrNum(P.EtalonVolume)
