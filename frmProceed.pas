@@ -1484,10 +1484,25 @@ begin
   SetLength(FCurrentResultRows, 0);
   SetLength(FCurrentSpillages, 0);
 
+  if FSessionDevice <> nil then
+    FSessionDevice.Device := nil;
+  if FSessionEtalon <> nil then
+    FSessionEtalon.Device := nil;
+
+  if LabelSessionDate <> nil then
+    LabelSessionDate.Text := 'Сессия';
+  if LabelSessionActive <> nil then
+    LabelSessionActive.Text := '';
+
   if GridResults <> nil then
     GridResults.RowCount := 0;
   if GridDataPoints <> nil then
     GridDataPoints.RowCount := 0;
+  if GridCoefs <> nil then
+    GridCoefs.RowCount := 0;
+
+  if FFrameCalibrCoefs <> nil then
+    FFrameCalibrCoefs.Init(nil, cctMeterValueCoef, nil);
 end;
 
 procedure TFrameProceed.RefreshAfterWorkTableDeletion;
@@ -1508,6 +1523,8 @@ begin
   end;
 
   FActiveWorkTable := NextWorkTable;
+
+  ClearCurrentResultsView;
 
   if FWorkTableManager <> nil then
     FWorkTableManager.Save;
