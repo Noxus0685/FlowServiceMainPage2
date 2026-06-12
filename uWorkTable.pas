@@ -323,6 +323,7 @@ type
     FName: string;
     FText: string;
     FActivePump : TPump;
+    FActiveScale: TWeight;
 
     FState: EStateWorkTable;
     FAction: EActionWorkTable;
@@ -338,6 +339,7 @@ type
     FEtalonChannels: TObjectList<TChannel>;
 
     FPumps: TObjectList<TPump>;
+    FScales: TObjectList<TWeight>;
     FFlowRate: TFlowRate;
 
     FMeasurementRun: TObject;
@@ -347,6 +349,8 @@ type
     FFluidPress: TFluidPress;
     FTime: Double;
     FTimeResult: Double;
+    FCurrentWeight: Double;
+    FScaleTareWeight: Double;
 
     FTableClamped: Boolean;
     FFlowUnitName: string;
@@ -409,6 +413,8 @@ type
     function GetTime: Double;
     function GetTimeResult: Double;
     function GetFlowRate: Double;
+    function GetCurentValue: Double;
+    procedure SetCurentValue(const AValue: Double);
 
     procedure SetValueTempertureBefore(const AValue: TMeterValue);
     procedure SetValueTempertureAfter(const AValue: TMeterValue);
@@ -461,6 +467,18 @@ type
       const AWorkTableID: Integer
     ); static;
 
+    class procedure SaveScaleList(
+      AIni: TCustomIniFile;
+      const ASectionPrefix: string;
+      AScales: TObjectList<TWeight>
+    ); static;
+
+    class procedure LoadScaleList(
+      AIni: TCustomIniFile;
+      const ASectionPrefix: string;
+      AScales: TObjectList<TWeight>
+    ); static;
+
   private
 
   FCurrentPoint:  TDevicePoint;
@@ -469,6 +487,7 @@ type
   procedure SetState(const ANewState: EStateWorkTable);
   procedure SetIsActive(const AValue: Boolean);
   procedure SetActivePumpObject(const APump: TPump);
+  procedure SetActiveScaleObject(const AScale: TWeight);
   procedure BindParameterEvents(AParameter: TParameter);
   procedure UnbindParameterEvents(AParameter: TParameter);
   procedure HandleParameterNotify(Sender: TObject; Event: Integer; Data: TObject);
@@ -520,7 +539,9 @@ type
   procedure RemovePump(const APumpUUID: string); overload;
   procedure RemovePump(APump: TPump); overload;
   procedure ClearPumps;
+  procedure ClearScales;
   procedure SetActivePump(APumpName: string);
+  procedure SetActiveScale(AScaleName: string);
   function DeleteChannel(AChannel: TChannel): Boolean;
   procedure ReindexChannels(AChannels: TObjectList<TChannel>;
       const AEtalonChannels: Boolean);
@@ -530,7 +551,18 @@ type
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
+  function AddScale(const AScaleName: string): TWeight; overload;
+  function AddScale(AScale: TWeight): Boolean; overload;
+  procedure RemoveScale(const AScaleUUID: string); overload;
+  procedure RemoveScale(AScale: TWeight); overload;
+  function FindScaleByUUID(const AScaleUUID: string): TWeight;
+  function FindScaleByName(const AScaleName: string): TWeight;
+  function DisplayWeight: Double;
+  procedure DoScaleTare;
+  procedure DoScaleDrain;
   property Pumps: TObjectList<TPump> read FPumps;
+  property Scales: TObjectList<TWeight> read FScales;
+  property Weights: TObjectList<TWeight> read FScales;
 
   property MeasurementRun: TObject read FMeasurementRun;
   property MeasurementMode: EMeasurementRunMode read FMode write FMode;
@@ -539,6 +571,7 @@ type
   property FluidPress: TFluidPress read FFluidPress;
 
   property ActivePump: TPump read FActivePump write SetActivePumpObject;
+  property ActiveScale: TWeight read FActiveScale write SetActiveScaleObject;
   property FlowRate: TFlowRate read FFlowRate write FFlowRate;
 
     property ID: Integer read FID write FID;
@@ -563,6 +596,10 @@ type
     property &Repeat: Integer read FRepeat write FRepeat;
 
     property TimeResult: Double read GetTimeResult write SetTimeResult;
+    property CurrentWeight: Double read FCurrentWeight write FCurrentWeight;
+    property Value: Double read FCurrentWeight write FCurrentWeight;
+    property CurentValue: Double read GetCurentValue write SetCurentValue;
+    property ScaleTareWeight: Double read FScaleTareWeight write FScaleTareWeight;
 
     //property State: TSpillState read FState write FState;
     property State: EStateWorkTable read FState write SetState;
@@ -1666,6 +1703,7 @@ begin
         Text := 'Рабочий стол ' + IntToStr(ID);
 
   FPumps := TObjectList<TPump>.Create(false); // True — автоосвобождение объектов   False- хрантся копии
+  FScales := TObjectList<TWeight>.Create(false);
   FlowRate := TFlowRate.Create('Расход');
   FFluidTemp := TFluidTemp.Create;
   FFluidPress := TFluidPress.Create;
@@ -2609,7 +2647,10 @@ begin
   UnbindParameterEvents(FlowRate);
   if FActivePump <> nil then
     UnbindParameterEvents(FActivePump);
+  if FActiveScale <> nil then
+    UnbindParameterEvents(FActiveScale);
   ClearPumps;
+  ClearScales;
   FParameterObserver := nil;
 
   FreeAndNil(FMeasurementRun);
@@ -2620,6 +2661,7 @@ begin
   FDeviceChannels.Free;
   FEtalonChannels.Free;
   FreeAndNil(FPumps);
+  FreeAndNil(FScales);
 
   if FCurrentPoint<>nil then
   FreeAndNil(FCurrentPoint);
@@ -3039,6 +3081,12 @@ begin
       Ini.WriteFloat(Section, 'QuantityMax', WorkTable.TableFlow.QuantityMax);
       Ini.WriteFloat(Section, 'Time', WorkTable.Time);
       Ini.WriteFloat(Section, 'TimeResult', WorkTable.TimeResult);
+      Ini.WriteFloat(Section, 'CurrentWeight', WorkTable.CurrentWeight);
+      Ini.WriteFloat(Section, 'ScaleTareWeight', WorkTable.ScaleTareWeight);
+      if WorkTable.ActiveScale <> nil then
+        Ini.WriteString(Section, 'ActiveScaleUUID', WorkTable.ActiveScale.UUID)
+      else
+        Ini.WriteString(Section, 'ActiveScaleUUID', '');
       if WorkTable.CurrentPoint <> nil then
       begin
         Ini.WriteInteger(Section, 'TimeSet', Round(WorkTable.CurrentPoint.LimitTime));
@@ -3096,6 +3144,7 @@ begin
       ValuesIni.WriteFloat(Section, 'ValueQuantity', WorkTable.ValueQuantity.GetDoubleValue);
       ValuesIni.WriteFloat(Section, 'ValueFlowRate', WorkTable.ValueFlowRate.GetDoubleValue);
 
+      SaveScaleList(Ini, Section + '.Scales', WorkTable.Weights);
       SaveChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels);
       SaveChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels);
       SaveGridColumns(Ini, Section + '.EtalonGrid', WorkTable.EtalonsGridColumns);
@@ -3129,6 +3178,8 @@ begin
     Exit;
 
   AWorkTables.Clear;
+  if TWeight.Weights <> nil then
+    TWeight.Weights.Clear;
 
   Ini := TIniFile.Create(AIniFileName);
   WorkTableValuesFileName := IncludeTrailingPathDelimiter(ExtractFilePath(AIniFileName)) + 'WorkTableValues.ini';
@@ -3165,6 +3216,8 @@ begin
       WorkTable.TableFlow.QuantityMax := S2F(Ini.ReadString(Section, 'QuantityMax', FloatToStr(WorkTable.TableFlow.QuantityMax)));
       WorkTable.Time := S2F(Ini.ReadString(Section, 'Time', '0'));
       WorkTable.TimeResult := S2F(Ini.ReadString(Section, 'TimeResult', '0'));
+      WorkTable.CurrentWeight := S2F(Ini.ReadString(Section, 'CurrentWeight', '0'));
+      WorkTable.ScaleTareWeight := S2F(Ini.ReadString(Section, 'ScaleTareWeight', '0'));
       if WorkTable.CurrentPoint <> nil then
       begin
         WorkTable.CurrentPoint.LimitTime := Ini.ReadInteger(Section, 'TimeSet', 0);
@@ -3243,6 +3296,8 @@ begin
 
       WorkTable.FluidTemp.Value.Value := 21;
 
+      LoadScaleList(Ini, Section + '.Scales', WorkTable.Weights);
+      WorkTable.ActiveScale := WorkTable.FindScaleByUUID(Ini.ReadString(Section, 'ActiveScaleUUID', ''));
       LoadChannelList(Ini, Section + '.Etalon', WorkTable.EtalonChannels, WorkTable.ID);
       LoadChannelList(Ini, Section + '.Device', WorkTable.DeviceChannels, WorkTable.ID);
       LoadGridColumns(Ini, Section + '.EtalonGrid', WorkTable.FEtalonsGridColumns);
@@ -3479,6 +3534,65 @@ begin
 
 
     AChannels.Add(Channel);
+  end;
+end;
+
+class procedure TWorkTable.SaveScaleList(AIni: TCustomIniFile;
+  const ASectionPrefix: string; AScales: TObjectList<TWeight>);
+var
+  I, OldCount: Integer;
+  Scale: TWeight;
+  Section: string;
+begin
+  if (AIni = nil) or (AScales = nil) then
+    Exit;
+
+  OldCount := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
+  AIni.WriteInteger(ASectionPrefix, 'Count', AScales.Count);
+
+  for I := AScales.Count to OldCount - 1 do
+  begin
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    AIni.EraseSection(Section);
+  end;
+
+  for I := 0 to AScales.Count - 1 do
+  begin
+    Scale := AScales[I];
+    if Scale = nil then
+      Continue;
+
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    AIni.WriteString(Section, 'Name', Scale.Name);
+    AIni.WriteString(Section, 'UUID', Scale.UUID);
+    AIni.WriteFloat(Section, 'CurrentWeight', Scale.CurrentWeight);
+    AIni.WriteFloat(Section, 'TareWeight', Scale.TareWeight);
+  end;
+end;
+
+class procedure TWorkTable.LoadScaleList(AIni: TCustomIniFile;
+  const ASectionPrefix: string; AScales: TObjectList<TWeight>);
+var
+  I, Count: Integer;
+  Scale: TWeight;
+  Section, ScaleName, ScaleUUID: string;
+begin
+  if (AIni = nil) or (AScales = nil) then
+    Exit;
+
+  AScales.Clear;
+  Count := AIni.ReadInteger(ASectionPrefix, 'Count', 0);
+  for I := 0 to Count - 1 do
+  begin
+    Section := ASectionPrefix + '.' + IntToStr(I);
+    ScaleName := AIni.ReadString(Section, 'Name', '');
+    Scale := TWeight.Create(ScaleName);
+    ScaleUUID := AIni.ReadString(Section, 'UUID', '');
+    if Trim(ScaleUUID) <> '' then
+      Scale.UUID := ScaleUUID;
+    Scale.CurrentWeight := S2F(AIni.ReadString(Section, 'CurrentWeight', '0'));
+    Scale.TareWeight := S2F(AIni.ReadString(Section, 'TareWeight', '0'));
+    AScales.Add(Scale);
   end;
 end;
 
@@ -3853,6 +3967,21 @@ begin
   UnbindParameterEvents(FActivePump);
   FActivePump := APump;
   BindParameterEvents(FActivePump);
+end;
+
+procedure TWorkTable.SetActiveScaleObject(const AScale: TWeight);
+begin
+  if FActiveScale = AScale then
+    Exit;
+
+  UnbindParameterEvents(FActiveScale);
+  FActiveScale := AScale;
+  BindParameterEvents(FActiveScale);
+  if FActiveScale <> nil then
+  begin
+    FCurrentWeight := FActiveScale.CurrentWeight;
+    FScaleTareWeight := FActiveScale.TareWeight;
+  end;
 end;
 
 procedure TWorkTable.DoProcStart(AProcName: string);
@@ -4540,6 +4669,154 @@ begin
   ActivePump := Pump;
 end;
 
+function TWorkTable.AddScale(const AScaleName: string): TWeight;
+var
+  NewScale: TWeight;
+  Scale: TWeight;
+begin
+  Result := nil;
+  if AScaleName = '' then
+    Exit;
+
+  NewScale := nil;
+  if TWeight.Weights <> nil then
+    for Scale in TWeight.Weights do
+      if Scale.Name = AScaleName then
+      begin
+        NewScale := Scale;
+        Break;
+      end;
+
+  if NewScale = nil then
+    NewScale := TWeight.Create(AScaleName);
+
+  if FScales.IndexOf(NewScale) < 0 then
+  begin
+    BindParameterEvents(NewScale);
+    FScales.Add(NewScale);
+  end;
+
+  Result := NewScale;
+  Notify(notifyAction, Self);
+end;
+
+function TWorkTable.AddScale(AScale: TWeight): Boolean;
+begin
+  if Assigned(AScale) and (FScales.IndexOf(AScale) < 0) then
+  begin
+    BindParameterEvents(AScale);
+    FScales.Add(AScale);
+    Result := True;
+    Notify(notifyAction, Self);
+  end
+  else
+    Result := False;
+end;
+
+procedure TWorkTable.RemoveScale(const AScaleUUID: string);
+var
+  Scale: TWeight;
+begin
+  Scale := FindScaleByUUID(AScaleUUID);
+  if Assigned(Scale) then
+    RemoveScale(Scale);
+end;
+
+procedure TWorkTable.RemoveScale(AScale: TWeight);
+begin
+  if Assigned(AScale) then
+  begin
+    if FActiveScale = AScale then
+      FActiveScale := nil;
+    UnbindParameterEvents(AScale);
+    FScales.Remove(AScale);
+    Notify(notifyAction, Self);
+  end;
+end;
+
+procedure TWorkTable.ClearScales;
+var
+  Scale: TWeight;
+begin
+  for Scale in FScales do
+    UnbindParameterEvents(Scale);
+  FActiveScale := nil;
+  FScales.Clear;
+end;
+
+function TWorkTable.FindScaleByName(const AScaleName: string): TWeight;
+var
+  Scale: TWeight;
+begin
+  Result := nil;
+  for Scale in FScales do
+    if (Scale <> nil) and SameText(Scale.Name, AScaleName) then
+      Exit(Scale);
+end;
+
+function TWorkTable.FindScaleByUUID(const AScaleUUID: string): TWeight;
+var
+  Scale: TWeight;
+begin
+  Result := nil;
+  if Trim(AScaleUUID) = '' then
+    Exit;
+
+  for Scale in FScales do
+    if (Scale <> nil) and SameText(Scale.UUID, AScaleUUID) then
+      Exit(Scale);
+end;
+
+procedure TWorkTable.SetActiveScale(AScaleName: string);
+begin
+  ActiveScale := FindScaleByName(AScaleName);
+end;
+
+function TWorkTable.GetCurentValue: Double;
+begin
+  Result := DisplayWeight;
+end;
+
+procedure TWorkTable.SetCurentValue(const AValue: Double);
+begin
+  CurrentWeight := AValue + ScaleTareWeight;
+  if ActiveScale <> nil then
+    ActiveScale.CurentValue := CurrentWeight;
+end;
+
+function TWorkTable.DisplayWeight: Double;
+begin
+  Result := CurrentWeight - ScaleTareWeight;
+end;
+
+procedure TWorkTable.DoScaleTare;
+begin
+  ScaleTareWeight := CurrentWeight;
+  if ActiveScale <> nil then
+  begin
+    ActiveScale.CurrentWeight := CurrentWeight;
+    ActiveScale.TareWeight := ScaleTareWeight;
+  end;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoScaleTare',
+    'Выполнена тара весов', Name);
+  Notify(notifyAction, Self);
+end;
+
+procedure TWorkTable.DoScaleDrain;
+begin
+  // TODO: добавить аппаратную команду слива воды после появления поддержки весов.
+  CurrentWeight := 0;
+  ScaleTareWeight := 0;
+  if ActiveScale <> nil then
+  begin
+    ActiveScale.CurrentWeight := CurrentWeight;
+    ActiveScale.TareWeight := ScaleTareWeight;
+  end;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoScaleDrain',
+    'Выполнен слив воды', Name);
+  Notify(notifyAction, Self);
+end;
+
 procedure TWorkTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
   const AImpSecValues: TArray<Double>; const AImpResult: Double);
 var
@@ -4582,12 +4859,14 @@ begin
   FIniFileName := AIniFileName;
   FWorkTables := TObjectList<TWorkTable>.Create(True);
   TPump.Pumps := TObjectList<TPump>.Create(True);
+  TWeight.Weights := TObjectList<TWeight>.Create(True);
 end;
 
 { Frees managed work table collection and manager resources. }
 destructor TWorkTableManager.Destroy;
 begin
   FWorkTables.Free;
+  FreeAndNil(TWeight.Weights);
   inherited;
 end;
 
