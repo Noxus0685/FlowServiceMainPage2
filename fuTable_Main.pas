@@ -538,11 +538,9 @@ begin
     WorkTable := FSubscribedWorkTables[I];
     if (WorkTable = nil) or (FWorkTableManager.WorkTables.IndexOf(WorkTable) < 0) then
     begin
-      if WorkTable <> nil then
-      begin
-        UnsubscribeWorkTableObjects(WorkTable);
-        WorkTable.Unsubscribe(Observer);
-      end;
+      // Если стол уже удалён из менеджера, указатель может вести на освобождённый
+      // объект. Не вызываем Unsubscribe у него и его параметров, только чистим
+      // локальный список подписок формы.
       FSubscribedWorkTables.Delete(I);
     end;
   end;
@@ -553,8 +551,8 @@ begin
       Pump := FSubscribedPumps[I];
       if (Pump = nil) or (FindWorkTableForObject(Pump) = nil) then
       begin
-        if Pump <> nil then
-          Pump.Unsubscribe(Observer);
+        // Объект уже не принадлежит ни одному столу менеджера и мог быть
+        // освобождён вместе с удалённым столом. Не разыменовываем старый указатель.
         FSubscribedPumps.Delete(I);
       end;
     end;
@@ -565,8 +563,8 @@ begin
       FlowRate := FSubscribedFlowRates[I];
       if (FlowRate = nil) or (FindWorkTableForObject(FlowRate) = nil) then
       begin
-        if FlowRate <> nil then
-          FlowRate.Unsubscribe(Observer);
+        // Объект уже не принадлежит ни одному столу менеджера и мог быть
+        // освобождён вместе с удалённым столом. Не разыменовываем старый указатель.
         FSubscribedFlowRates.Delete(I);
       end;
     end;
@@ -577,8 +575,8 @@ begin
       FluidTemp := FSubscribedFluidTemps[I];
       if (FluidTemp = nil) or (FindWorkTableForObject(FluidTemp) = nil) then
       begin
-        if FluidTemp <> nil then
-          FluidTemp.Unsubscribe(Observer);
+        // Объект уже не принадлежит ни одному столу менеджера и мог быть
+        // освобождён вместе с удалённым столом. Не разыменовываем старый указатель.
         FSubscribedFluidTemps.Delete(I);
       end;
     end;
@@ -589,8 +587,8 @@ begin
       FluidPress := FSubscribedFluidPresses[I];
       if (FluidPress = nil) or (FindWorkTableForObject(FluidPress) = nil) then
       begin
-        if FluidPress <> nil then
-          FluidPress.Unsubscribe(Observer);
+        // Объект уже не принадлежит ни одному столу менеджера и мог быть
+        // освобождён вместе с удалённым столом. Не разыменовываем старый указатель.
         FSubscribedFluidPresses.Delete(I);
       end;
     end;
@@ -687,7 +685,9 @@ begin
   if Assigned(FSubscribedWorkTables) then
     while FSubscribedWorkTables.Count > 0 do
     begin
-      if FSubscribedWorkTables[FSubscribedWorkTables.Count - 1] <> nil then
+      if (FSubscribedWorkTables[FSubscribedWorkTables.Count - 1] <> nil) and
+         (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) and
+         (FWorkTableManager.WorkTables.IndexOf(FSubscribedWorkTables[FSubscribedWorkTables.Count - 1]) >= 0) then
         FSubscribedWorkTables[FSubscribedWorkTables.Count - 1].Unsubscribe(Observer);
       FSubscribedWorkTables.Delete(FSubscribedWorkTables.Count - 1);
     end;
@@ -695,7 +695,8 @@ begin
   if Assigned(FSubscribedPumps) then
     while FSubscribedPumps.Count > 0 do
     begin
-      if FSubscribedPumps[FSubscribedPumps.Count - 1] <> nil then
+      if (FSubscribedPumps[FSubscribedPumps.Count - 1] <> nil) and
+         (FindWorkTableForObject(FSubscribedPumps[FSubscribedPumps.Count - 1]) <> nil) then
         FSubscribedPumps[FSubscribedPumps.Count - 1].Unsubscribe(Observer);
       FSubscribedPumps.Delete(FSubscribedPumps.Count - 1);
     end;
@@ -703,7 +704,8 @@ begin
   if Assigned(FSubscribedFlowRates) then
     while FSubscribedFlowRates.Count > 0 do
     begin
-      if FSubscribedFlowRates[FSubscribedFlowRates.Count - 1] <> nil then
+      if (FSubscribedFlowRates[FSubscribedFlowRates.Count - 1] <> nil) and
+         (FindWorkTableForObject(FSubscribedFlowRates[FSubscribedFlowRates.Count - 1]) <> nil) then
         FSubscribedFlowRates[FSubscribedFlowRates.Count - 1].Unsubscribe(Observer);
       FSubscribedFlowRates.Delete(FSubscribedFlowRates.Count - 1);
     end;
@@ -711,7 +713,8 @@ begin
   if Assigned(FSubscribedFluidTemps) then
     while FSubscribedFluidTemps.Count > 0 do
     begin
-      if FSubscribedFluidTemps[FSubscribedFluidTemps.Count - 1] <> nil then
+      if (FSubscribedFluidTemps[FSubscribedFluidTemps.Count - 1] <> nil) and
+         (FindWorkTableForObject(FSubscribedFluidTemps[FSubscribedFluidTemps.Count - 1]) <> nil) then
         FSubscribedFluidTemps[FSubscribedFluidTemps.Count - 1].Unsubscribe(Observer);
       FSubscribedFluidTemps.Delete(FSubscribedFluidTemps.Count - 1);
     end;
@@ -719,7 +722,8 @@ begin
   if Assigned(FSubscribedFluidPresses) then
     while FSubscribedFluidPresses.Count > 0 do
     begin
-      if FSubscribedFluidPresses[FSubscribedFluidPresses.Count - 1] <> nil then
+      if (FSubscribedFluidPresses[FSubscribedFluidPresses.Count - 1] <> nil) and
+         (FindWorkTableForObject(FSubscribedFluidPresses[FSubscribedFluidPresses.Count - 1]) <> nil) then
         FSubscribedFluidPresses[FSubscribedFluidPresses.Count - 1].Unsubscribe(Observer);
       FSubscribedFluidPresses.Delete(FSubscribedFluidPresses.Count - 1);
     end;
@@ -739,10 +743,11 @@ begin
     if WorkTable = nil then
       Continue;
 
+    // AObject может быть старым указателем из списка подписок после удаления стола.
+    // Поэтому нельзя использовать оператор "is": он разыменует VMT объекта.
     if (AObject = WorkTable) or (AObject = WorkTable.FlowRate) or
        (AObject = WorkTable.FluidTemp) or (AObject = WorkTable.FluidPress) or
-       ((AObject is TPump) and (WorkTable.Pumps <> nil) and
-        (WorkTable.Pumps.IndexOf(TPump(AObject)) >= 0)) then
+       ((WorkTable.Pumps <> nil) and (WorkTable.Pumps.IndexOf(TPump(AObject)) >= 0)) then
       Exit(WorkTable);
   end;
 end;

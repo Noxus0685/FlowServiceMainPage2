@@ -1549,9 +1549,6 @@ begin
   if TreeViewDevices <> nil then
     TreeViewDevices.Selected := nil;
 
-  if Supports(Owner, IWorkTableObserverHost, ObserverHost) then
-    ObserverHost.DetachWorkTableObservers(WorkTable);
-
   if FWorkTableManager.DeleteWorkTableByName(WorkTableName) then
     RefreshAfterWorkTableDeletion;
 
@@ -1584,10 +1581,6 @@ begin
 
   if TreeViewDevices <> nil then
     TreeViewDevices.Selected := nil;
-
-  if Supports(Owner, IWorkTableObserverHost, ObserverHost) then
-    for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
-      ObserverHost.DetachWorkTableObservers(FWorkTableManager.WorkTables[I]);
 
   DeletedCount := FWorkTableManager.DeleteWorkTablesByNames;
 
