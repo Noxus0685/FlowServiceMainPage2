@@ -4347,7 +4347,6 @@ end;
 
 procedure TWorkTable.StopTest;
 begin
-   DoStopTest;
   FireAction(awtStopTest, 'StopTest', 'Запрошена остановка теста');
 end;
 
