@@ -33,7 +33,6 @@ type
     EditWorkTableName: TEdit;
     LabelWorkTableUUID: TLabel;
     LabelWorkTableState: TLabel;
-    ComboEditMode: TComboBox;
     ComboVerticalSync: TComboBox;
     ComboVerticalStart: TComboBox;
     ComboVerticalStop: TComboBox;
@@ -81,7 +80,6 @@ type
     procedure FillChannelCombo;
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
-    procedure HandleEditModeChange(Sender: TObject);
     procedure HandleSyncComboChange(Sender: TObject);
     procedure HandleLimitExit(Sender: TObject);
     procedure NotifyRefreshIfChanged(const AChanged: Boolean);
@@ -192,12 +190,6 @@ begin
 
   AddLabelRow(GeneralCategory, 'UUID рабочего стола', LabelWorkTableUUID);
   AddLabelRow(GeneralCategory, 'Текущее состояние', LabelWorkTableState);
-
-  AddComboRow(GeneralCategory, 'Редактирование', ComboEditMode);
-  ComboEditMode.Items.Add('Можно редактировать');
-  ComboEditMode.Items.Add('Нельзя редактировать');
-  ComboEditMode.ItemIndex := 0;
-  ComboEditMode.OnChange := HandleEditModeChange;
 
   VerticalSyncCategory := AddCategory('Вход синхронизация');
   AddComboRow(VerticalSyncCategory, 'Вход синхронизация', ComboVerticalSync);
@@ -589,7 +581,7 @@ end;
 
 function TFrameWorkTableProperties.CanEditWorkTable: Boolean;
 begin
-  Result := (FWorkTable <> nil) and (ComboEditMode.ItemIndex = 0);
+  Result := FWorkTable <> nil;
 end;
 
 procedure TFrameWorkTableProperties.LoadFromWorkTable(AWorkTable: TWorkTable);
@@ -645,7 +637,6 @@ begin
       EditWorkTableName.Text := '';
       LabelWorkTableUUID.Text := '';
       LabelWorkTableState.Text := '';
-      ComboEditMode.Enabled := False;
       FillChannelCombo;
       EditPressure.Text := '';
       EditTemperture.Text := '';
@@ -666,7 +657,6 @@ begin
     EditWorkTableName.Text := FWorkTable.Name;
     LabelWorkTableUUID.Text := FWorkTable.UUID;
     LabelWorkTableState.Text := WorkTableStateToCaption(FWorkTable.State);
-    ComboEditMode.Enabled := True;
     FillChannelCombo;
     EditPressure.Text := MeterValueToText(FWorkTable.ValuePressure);
     EditTemperture.Text := MeterValueToText(FWorkTable.ValueTemperture);
@@ -937,14 +927,6 @@ begin
   UpdateSyncControlsState;
 end;
 
-procedure TFrameWorkTableProperties.HandleEditModeChange(Sender: TObject);
-begin
-  ApplyEditState;
-  if (not FLoading) and (FWorkTable <> nil) then
-    FWorkTable.FireEvent(ewtRefresh);
-end;
-
-
 procedure TFrameWorkTableProperties.HandleLimitExit(Sender: TObject);
 var
   Edit: TEdit;
@@ -1082,7 +1064,7 @@ var
   Form: TFormMeterValueSelect;
   SelectedMeterValue: TMeterValue;
 begin
-  if (FWorkTable = nil) or (ComboEditMode.ItemIndex <> 0) then
+  if FWorkTable = nil then
     Exit;
 
   Form := TFormMeterValueSelect.Create(Self);
