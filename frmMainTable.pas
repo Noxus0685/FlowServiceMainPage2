@@ -1040,10 +1040,7 @@ begin
   ComboBoxPumps.ItemIndex := -1;
 
   if FActiveWorkTable = nil then
-  begin
-    ComboBoxPumps.Text := '';
     Exit;
-  end;
 
   SelectedPumpName := Trim(ComboBoxPumps.Text);
   for Pump in FActiveWorkTable.Pumps do
@@ -6165,7 +6162,6 @@ begin
     SpinBoxFreq.Max := 0;
     SpinBoxFreq.Value := 0;
     ComboBoxPumps.ItemIndex := -1;
-    ComboBoxPumps.Text := '';
   finally
     LayoutPump.Tag := 0;
   end;
