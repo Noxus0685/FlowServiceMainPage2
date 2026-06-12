@@ -626,6 +626,9 @@ begin
 //  end
 //  else
     Result := Value;
+
+  if SameText(Name, 'Плотность') and SameValue(Result, 0, EPS) then
+    Result := FInitDensity;
 end;
 
 { Returns current value in base units or converted to the requested dimension. }
@@ -1263,7 +1266,10 @@ var
   InputValue: Double;
 begin
   //InputValue := EnsureRange(AValue, MinValue, MaxValue);
-  InputValue :=   AValue;
+  if SameText(Name, 'Плотность') and SameValue(AValue, 0, EPS) then
+    InputValue := FInitDensity
+  else
+    InputValue := AValue;
 
 
   if ARRAY_SIZE > 0 then
@@ -1676,7 +1682,10 @@ end;
 procedure TMeterValue.Reset(AValue: Double);
 begin
   Reset;
-  Value := AValue;
+  if SameText(Name, 'Плотность') and SameValue(AValue, 0, EPS) then
+    Value := FInitDensity
+  else
+    Value := AValue;
 end;
 
 { Configures this meter value as volume with predefined units and limits. }
