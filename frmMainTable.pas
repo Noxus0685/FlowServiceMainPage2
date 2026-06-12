@@ -157,7 +157,6 @@ type
     LayoutScaleCurrent: TLayout;
     LabelScaleTotalWeightCaption: TLabel;
     RectangleScaleWeight: TRectangle;
-    LabelScaleTotalWeight: TLabel;
     LayoutScaleSelect: TLayout;
     ComboBoxScales: TComboBox;
     ButtonScaleDrain: TButton;
@@ -486,6 +485,7 @@ type
     PanelControlWorkTables: TPanel;
     Label3: TLabel;
     SpeedButton7: TSpeedButton;
+    LabelScaleTotalWeight: TLabel;
 
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
