@@ -43,6 +43,7 @@ type
     ComboOutputSync2: TComboBox;
     ComboOutputStart2: TComboBox;
     ComboOutputStop2: TComboBox;
+    ComboInternalSyncChannel: TComboBox;
     TreeProperties: TTreeView;
     EditPressureMin: TEdit;
     EditPressureMax: TEdit;
@@ -116,6 +117,7 @@ var
   VerticalSyncCategory: TTreeViewItem;
   OutputSyncCategory1: TTreeViewItem;
   OutputSyncCategory2: TTreeViewItem;
+  InternalSyncCategory: TTreeViewItem;
   HeaderGrid: TGridPanelLayout;
   HeaderProperty: TLabel;
   HeaderValue: TLabel;
@@ -235,6 +237,12 @@ begin
   ComboOutputStop2.Items.Add('Фронт');
   ComboOutputStop2.Items.Add('Спад');
   ComboOutputStop2.ItemIndex := 0;
+
+  InternalSyncCategory := AddCategory('Выход внутренней синхронизации');
+  AddComboRow(InternalSyncCategory, 'Канал', ComboInternalSyncChannel);
+  ComboInternalSyncChannel.Items.Add('Выкл');
+  ComboInternalSyncChannel.Items.Add('Вкл');
+  ComboInternalSyncChannel.ItemIndex := 0;
 
   PressureCategory := AddCategory('Давление');
   AddMeterValueRow(PressureCategory, 'Давление', EditPressure, ButtonSelectPressure,
@@ -682,6 +690,7 @@ begin
   ComboOutputSync2.Enabled := CanEdit;
   ComboOutputStart2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
   ComboOutputStop2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
+  ComboInternalSyncChannel.Enabled := CanEdit;
 end;
 
 procedure TFrameWorkTableProperties.HandleSyncComboChange(Sender: TObject);
