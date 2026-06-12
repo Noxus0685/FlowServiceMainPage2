@@ -78,6 +78,7 @@ type
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
     procedure HandleEditModeChange(Sender: TObject);
+    procedure HandleSyncComboChange(Sender: TObject);
     procedure HandleLimitExit(Sender: TObject);
     procedure NotifyRefreshIfChanged(const AChanged: Boolean);
     procedure ApplyEditState;
@@ -194,6 +195,7 @@ begin
   ComboVerticalSync.Items.Add('Внешняя синхронизация');
   ComboVerticalSync.Items.Add('По каналу');
   ComboVerticalSync.ItemIndex := 0;
+  ComboVerticalSync.OnChange := HandleSyncComboChange;
   AddComboRow(VerticalSyncCategory, 'Старт', ComboVerticalStart);
   ComboVerticalStart.Items.Add('Фронт');
   ComboVerticalStart.Items.Add('Спад');
@@ -209,6 +211,7 @@ begin
   ComboOutputSync1.Items.Add('Выкл');
   ComboOutputSync1.Items.Add('Вкл');
   ComboOutputSync1.ItemIndex := 0;
+  ComboOutputSync1.OnChange := HandleSyncComboChange;
   AddComboRow(OutputSyncCategory1, 'Старт', ComboOutputStart1);
   ComboOutputStart1.Items.Add('Фронт');
   ComboOutputStart1.Items.Add('Спад');
@@ -223,6 +226,7 @@ begin
   ComboOutputSync2.Items.Add('Выкл');
   ComboOutputSync2.Items.Add('Вкл');
   ComboOutputSync2.ItemIndex := 0;
+  ComboOutputSync2.OnChange := HandleSyncComboChange;
   AddComboRow(OutputSyncCategory2, 'Старт', ComboOutputStart2);
   ComboOutputStart2.Items.Add('Фронт');
   ComboOutputStart2.Items.Add('Спад');
@@ -576,20 +580,7 @@ begin
       ChannelName := Trim(Channel.Text);
     if ChannelName = '' then
       ChannelName := TWorkTable.BuildDeviceChannelServiceName(I + 1);
-    ComboVerticalChannel.Items.Add('Прибор: ' + ChannelName);
-  end;
-
-  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
-  begin
-    Channel := FWorkTable.EtalonChannels[I];
-    if Channel = nil then
-      Continue;
-    ChannelName := Trim(Channel.Name);
-    if ChannelName = '' then
-      ChannelName := Trim(Channel.Text);
-    if ChannelName = '' then
-      ChannelName := TWorkTable.BuildEtalonChannelServiceName(I + 1);
-    ComboVerticalChannel.Items.Add('Эталон: ' + ChannelName);
+    ComboVerticalChannel.Items.Add(ChannelName);
   end;
 
   if ComboVerticalChannel.Items.Count > 0 then
@@ -682,15 +673,20 @@ begin
   EditQuantityMin.Enabled := CanEdit;
   EditQuantityMax.Enabled := CanEdit;
   ComboVerticalSync.Enabled := CanEdit;
-  ComboVerticalStart.Enabled := CanEdit;
-  ComboVerticalStop.Enabled := CanEdit;
-  ComboVerticalChannel.Enabled := CanEdit;
+  ComboVerticalStart.Enabled := CanEdit and (ComboVerticalSync.ItemIndex = 1);
+  ComboVerticalStop.Enabled := CanEdit and (ComboVerticalSync.ItemIndex = 1);
+  ComboVerticalChannel.Enabled := CanEdit and (ComboVerticalSync.ItemIndex = 2);
   ComboOutputSync1.Enabled := CanEdit;
-  ComboOutputStart1.Enabled := CanEdit;
-  ComboOutputStop1.Enabled := CanEdit;
+  ComboOutputStart1.Enabled := CanEdit and (ComboOutputSync1.ItemIndex = 1);
+  ComboOutputStop1.Enabled := CanEdit and (ComboOutputSync1.ItemIndex = 1);
   ComboOutputSync2.Enabled := CanEdit;
-  ComboOutputStart2.Enabled := CanEdit;
-  ComboOutputStop2.Enabled := CanEdit;
+  ComboOutputStart2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
+  ComboOutputStop2.Enabled := CanEdit and (ComboOutputSync2.ItemIndex = 1);
+end;
+
+procedure TFrameWorkTableProperties.HandleSyncComboChange(Sender: TObject);
+begin
+  ApplyEditState;
 end;
 
 procedure TFrameWorkTableProperties.HandleEditModeChange(Sender: TObject);
