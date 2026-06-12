@@ -46,12 +46,21 @@
 
   Design Rules
   ------------
-  1. All logic MUST be implemented inside ProcessStage().
-  2. Stage transitions MUST only happen via SetStage().
-  3. UI MUST NOT directly control TWorkTable.
-  4. TWorkTable MUST NOT contain measurement logic.
-  5. Events MUST NOT change system state (no feedback control).
-  6. Commands are the only external control mechanism.
+  1. External control MUST be performed only via Execute(Command).
+  2. Execute(Command) MUST delegate command handling to HandleCommand().
+  3. Stage transitions MUST happen only via SetStage().
+  4. SetStage() MUST be the single place where FCurrentStage changes.
+  5. SetStage() MUST NOT contain detailed business logic of measurement stages.
+  6. Actions required when entering a stage MUST be implemented in DoEnterStage().
+  7. Cleanup required when leaving a stage MUST be implemented in DoExitStage().
+  8. ProcessStage() MUST only dispatch processing to stage-specific methods.
+  9. Stage-specific methods MUST check completion conditions and request the next transition.
+  10. UI MUST NOT directly control TWorkTable.
+  11. TWorkTable MUST be treated as a low-level executor.
+  12. TWorkTable MUST NOT contain measurement scenario logic.
+  13. Events MUST only notify observers and MUST NOT perform feedback control.
+  14. Errors MUST be reported via FireEvent with TErrorInfo.
+  15. No unhandled exception should break the FSM execution flow.
 
   WorkTable Contract
   ------------------
@@ -199,9 +208,20 @@ type
     FMaxAttemptCount: Integer;
     FMeasureTimeout: Cardinal;
 
-    procedure SetState(const ANewState: EMeasurementState);
+    procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
-    procedure EnterStage(const ANewStage: EMeasurementState);
+    function CanChangeStage(AOldStage, ANewStage: EMeasurementState): Boolean;
+    procedure DoExitStage(AOldStage, ANewStage: EMeasurementState);
+    procedure DoEnterStage(AOldStage, ANewStage: EMeasurementState);
+    procedure RequestStopInternal;
+    procedure ProcessSelectPoint;
+    procedure ProcessSelectEtalon;
+    procedure ProcessSetupPoint;
+    procedure ProcessWaitStable;
+    procedure ProcessMeasure;
+    procedure ProcessResultsRead;
+    procedure ProcessSave;
+    procedure ProcessDone;
     procedure FireEvent(AEvent: EMeasurementEvent; const AError: TErrorInfo); overload;
     procedure FireEvent(AEvent: EMeasurementEvent); overload;
 
@@ -219,7 +239,7 @@ type
     procedure RunThreadProc;
     function IsThreadRunning: Boolean;
 
-    function IsStable(StableInfo: RStableInfo): Boolean;
+    function IsStable(out StableInfo: RStableInfo): Boolean;
     function IsTerminated: Boolean;
   public
     constructor Create(AWorkTable: TWorkTable);
@@ -478,7 +498,10 @@ begin
       if (Channel = nil) or (Channel.FlowMeter = nil) then
         Continue;
 
-      if (APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax) then
+      if (APoint.Q <= 0) and (not Channel.Enabled) then
+        Continue;
+      if (APoint.Q > 0) and
+         ((APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax)) then
         Continue;
 
       EtalonName := Trim(Channel.Name);
@@ -509,76 +532,108 @@ begin
 end;
 
 destructor TMeasurementRun.Destroy;
-var
-  LThread: TThread;
 begin
-  //  if Assigned(FWorkTable) then
-  //  FWorkTable.Unsubscribe(Self);
-
-  FCriticalSection.Acquire;
-  try
-    LThread := FThread;
-    FThread := nil;
-  finally
-    FCriticalSection.Release;
-  end;
-
-  if LThread <> nil then
-  begin
-    LThread.Terminate;
-    LThread.WaitFor;
-    LThread.Free;
-  end;
-
+  RequestStopInternal;
   FreeAndNil(FCriticalSection);
   FreeAndNil(FPoints);
   inherited Destroy;
 end;
 
-procedure TMeasurementRun.SetState(const ANewState: EMeasurementState);
+function TMeasurementRun.CanChangeStage(AOldStage, ANewStage: EMeasurementState): Boolean;
 begin
-  if FCurrentStage = ANewState then
-    Exit;
-  FCurrentStage := ANewState;
+  if AOldStage = ANewStage then
+    Exit(True);
 
-  if FWorkTable <> nil then
-    FWorkTable.MeasurementRunStateChanged(Self, ANewState);
-
-  Notify(Integer(meStateChanged));
+  Result := False;
+  case AOldStage of
+    msNone:
+      Result := ANewStage in [msSelectPoint];
+    msSelectPoint:
+      Result := ANewStage in [msSelectEtalon, msDone, msNone];
+    msSelectEtalon:
+      Result := ANewStage in [msSetupPoint, msDone, msNone];
+    msSetupPoint:
+      Result := ANewStage in [msWaitStable, msDone, msNone];
+    msWaitStable:
+      Result := ANewStage in [msMeasure, msSetupPoint, msDone, msNone];
+    msMeasure:
+      Result := ANewStage in [msResultsRead, msDone, msNone];
+    msResultsRead:
+      Result := ANewStage in [msSave, msDone, msNone];
+    msSave:
+      Result := ANewStage in [msSelectPoint, msSetupPoint, msDone, msNone];
+    msDone:
+      Result := ANewStage in [msNone, msSelectPoint];
+  end;
 end;
 
 procedure TMeasurementRun.SetStage(const ANewStage: EMeasurementState);
+var
+  OldStage: EMeasurementState;
+  TransitionText: string;
 begin
-  SetState(ANewStage);
+  if FCurrentStage = ANewStage then
+    Exit;
+
+  OldStage := FCurrentStage;
+  TransitionText := Format('%s -> %s', [MeasurementStateToString(OldStage),
+    MeasurementStateToString(ANewStage)]);
+
+  if not CanChangeStage(OldStage, ANewStage) then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psMeasurement, 'SetStage',
+      'Недопустимый переход этапа измерения', TransitionText);
+    FireEvent(meMeasureWarning, BuildError(9001,
+      'Invalid measurement stage transition: ' + TransitionText));
+    Exit;
+  end;
+
+  DoExitStage(OldStage, ANewStage);
+  FCurrentStage := ANewStage;
+
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения', MeasurementStateToString(ANewStage));
-  EnterStage(ANewStage);
+    'Переход этапа измерения', TransitionText);
+  Notify(Integer(meStateChanged));
+  DoEnterStage(OldStage, ANewStage);
 end;
 
-procedure TMeasurementRun.EnterStage(const ANewStage: EMeasurementState);
+procedure TMeasurementRun.DoExitStage(AOldStage, ANewStage: EMeasurementState);
+begin
+  case AOldStage of
+    msWaitStable:
+      if (ANewStage <> msMeasure) and (FWorkTable <> nil) then
+        FWorkTable.StopMonitor;
+    msMeasure:
+      if (ANewStage <> msResultsRead) and (FWorkTable <> nil) then
+        FWorkTable.StopTest;
+  end;
+end;
+
+procedure TMeasurementRun.DoEnterStage(AOldStage, ANewStage: EMeasurementState);
 begin
   FWaitStartedTick := TThread.GetTickCount64;
   case ANewStage of
     msSelectPoint:
-     begin
-        FAttempt := 0;  // Кол-во выходов на параетры. Сборс попыток.
-     end;
-
+      FAttempt := 0;
     msWaitStable:
-      begin
-        if (FWorkTable <> nil) and
-           not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
-          FWorkTable.StartMonitor;
-      end;
-
+      if (FWorkTable <> nil) and
+         not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
+        FWorkTable.StartMonitor;
     msMeasure:
       begin
         FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
+        if FWorkTable <> nil then
+          FWorkTable.StartTest;
         FireEvent(meMeasureStarted);
       end;
-
     msResultsRead:
       FireEvent(meResultReading);
+    msDone:
+      begin
+        FireEvent(meAllDone);
+        if FThread <> nil then
+          FThread.Terminate;
+      end;
   end;
 end;
 
@@ -631,23 +686,41 @@ begin
   Result := Assigned(FThread) and (not FThread.Finished);
 end;
 
-function TMeasurementRun.IsStable(StableInfo: RStableInfo): Boolean;
+function TMeasurementRun.IsStable(out StableInfo: RStableInfo): Boolean;
 var
-  ParamStatus: Boolean;
+  Point: TDevicePoint;
+  ParamInfo: RStableInfo;
 begin
-  Result := True;
+  Result := False;
+  StableInfo.Status := ssNONE;
+  StableInfo.StatusText := '';
+  StableInfo.CurrentValue := 0;
+  Point := GetCurrentPoint;
 
-  if (FWorkTable = nil) then
+  if (FWorkTable = nil) or (Point = nil) then
     Exit;
 
-  if (FWorkTable.FlowRate <> nil) and (GetCurrentPoint.Q>=0)  then
-  //  Result := Result and FWorkTable.FlowRate.IsStable(ParamStatus);
+  Result := True;
+  if (FWorkTable.FlowRate <> nil) and (Point.Q >= 0) then
+  begin
+    Result := FWorkTable.FlowRate.IsStable(ParamInfo) and Result;
+    if ParamInfo.Status <> ssOk then
+      StableInfo := ParamInfo;
+  end;
 
-  if (FWorkTable.FluidTemp <> nil) and  (GetCurrentPoint.Temp>0) then
-//    Result := Result and FWorkTable.FluidTemp.IsStable(ParamStatus);
+  if (FWorkTable.FluidTemp <> nil) and (Point.Temp > 0) then
+  begin
+    Result := FWorkTable.FluidTemp.IsStable(ParamInfo) and Result;
+    if ParamInfo.Status <> ssOk then
+      StableInfo := ParamInfo;
+  end;
 
-  if (FWorkTable.FluidPress <> nil) and  (GetCurrentPoint.Pressure>0) then
-//    Result := Result and FWorkTable.FluidPress.IsStable(ParamStatus);
+  if (FWorkTable.FluidPress <> nil) and (Point.Pressure > 0) then
+  begin
+    Result := FWorkTable.FluidPress.IsStable(ParamInfo) and Result;
+    if ParamInfo.Status <> ssOk then
+      StableInfo := ParamInfo;
+  end;
 end;
 
 function TMeasurementRun.IsTerminated: Boolean;
@@ -657,28 +730,31 @@ end;
 
 procedure TMeasurementRun.CreateSession;
 var
-  SourcePoint: TDevicePoint;
   ManualPoint: TDevicePoint;
 begin
   FPoints.Clear;
+  if FWorkTable = nil then
+    Exit;
 
   if FMode = mrmManual then
   begin
     ManualPoint := TDevicePoint.Create(0);
-    ManualPoint.FlowRate := 1; //FManualFlowRate;
+    ManualPoint.FlowRate := 1;
 
-    if (FWorkTable.FlowRate.ValueSet.Value>=0) then
-    begin
-       ManualPoint.Q := FWorkTable.FlowRate.ValueSet.Value;
-    end else
-    begin
-       ManualPoint.Q := -1;
-    end;
+    if (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet.Value >= 0) then
+      ManualPoint.Q := FWorkTable.FlowRate.ValueSet.Value
+    else
+      ManualPoint.Q := -1;
 
-       ManualPoint.Q := -1;
+    if FWorkTable.FluidTemp <> nil then
+      ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet.Value
+    else
+      ManualPoint.Temp := -1;
+    if FWorkTable.FluidPress <> nil then
+      ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet.Value
+    else
+      ManualPoint.Pressure := -1;
 
-    ManualPoint.Temp := FWorkTable.FluidTemp.ValueSet.Value;
-    ManualPoint.Pressure := FWorkTable.FluidPress.ValueSet.Value;
     if FWorkTable.CurrentPoint <> nil then
     begin
       ManualPoint.LimitTime := FWorkTable.CurrentPoint.LimitTime;
@@ -693,18 +769,7 @@ begin
     Exit;
   end;
 
-  if FWorkTable = nil then
-    Exit;
-
   CreateSessionPoints;
-   {
-  for SourcePoint in FWorkTable.Points do
-  begin
-    ManualPoint := TDevicePoint.Create(0);
-    ManualPoint.Assign(SourcePoint);
-    FPoints.Add(ManualPoint);
-  end;
-  }
 end;
 
 procedure TMeasurementRun.CreateSessionPoints;
@@ -820,7 +885,10 @@ begin
     CreateSession;
     if FPoints.Count = 0 then
     begin
-      SetState(msNone);
+      ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
+        'Измерение не запущено', 'Нет точек измерения');
+      if FCurrentStage <> msNone then
+        SetStage(msNone);
       Exit;
     end;
 
@@ -828,33 +896,22 @@ begin
     FCurrentRepeat := 0;
     FForceNextPoint := -1;
     FIsPaused := False;
+    FAttempt := 0;
+    FMeasureTimeout := 0;
 
-     case Mode of
-     mrmAutomatic:
-     begin
-     ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
-      'Запуск процесса измерения в автоматическом режиме', '');
-     SetStage(msSelectPoint);
-     end;
-     mrmManual:
-     begin
-         ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
-      'Запуск процесса измерения в ручном режиме', '');
-     SetStage(msMeasure);
-     end;
-     mrmHalfAutomatic:
-      begin
-              ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
-      'Запуск процесса измерения в полуавтоматическом режиме', '');
-     SetStage(msSelectPoint);
-      end;
-     end;
-
-
+    case Mode of
+      mrmAutomatic:
+        ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
+          'Запуск процесса измерения в автоматическом режиме', '');
+      mrmManual:
+        ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
+          'Запуск процесса измерения в ручном режиме', '');
+      mrmHalfAutomatic:
+        ProtocolManager.AddMessage(pcAction, psMeasurement, 'Start',
+          'Запуск процесса измерения в полуавтоматическом режиме', '');
+    end;
 
     FireEvent(meStarted);
-
-
     FThread := TThread.CreateAnonymousThread(
       procedure
       begin
@@ -862,15 +919,17 @@ begin
       end);
     FThread.FreeOnTerminate := False;
     FThread.Start;
+    SetStage(msSelectPoint);
   finally
     FCriticalSection.Release;
   end;
 end;
 
-procedure TMeasurementRun.Stop;
+procedure TMeasurementRun.RequestStopInternal;
 var
   LThread: TThread;
 begin
+  LThread := nil;
   FCriticalSection.Acquire;
   try
     LThread := FThread;
@@ -879,21 +938,21 @@ begin
     FCriticalSection.Release;
   end;
 
-  if LThread = nil then
+  if LThread <> nil then
   begin
-    if FWorkTable <> nil then
-      FWorkTable.MeasurementRunStateChanged(Self, msNone);
-    SetStage(msNone);
-    Exit;
+    LThread.Terminate;
+    LThread.WaitFor;
+    LThread.Free;
   end;
 
-  LThread.Terminate;
-  LThread.WaitFor;
-  LThread.Free;
-
   FIsPaused := False;
- // SetState(msStopping);
-  SetStage(msNone);
+  if FCurrentStage <> msNone then
+    SetStage(msNone);
+end;
+
+procedure TMeasurementRun.Stop;
+begin
+  RequestStopInternal;
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'Stop',
     'Остановка процесса измерения', '');
   FireEvent(meStopped);
@@ -906,7 +965,6 @@ begin
   FIsPaused := True;
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'Pause',
     'Пауза процесса измерения', '');
-  //SetState(msPause);
 end;
 
 procedure TMeasurementRun.Resume;
@@ -916,7 +974,6 @@ begin
   FIsPaused := False;
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'Resume',
     'Возобновление процесса измерения', '');
-  //SetState(msOnGoing);
 end;
 
 procedure TMeasurementRun.NextPoint;
@@ -932,6 +989,11 @@ begin
 end;
 
 procedure TMeasurementRun.Execute(Cmd: EMeasurementCommand; Param: Variant);
+begin
+  HandleCommand(Cmd, Param);
+end;
+
+procedure TMeasurementRun.HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
 begin
   case Cmd of
     mcStart: Start;
@@ -968,7 +1030,16 @@ begin
     if IsTerminated then
     Exit;
 
-    ProcessStage;
+    try
+      ProcessStage;
+    except
+      on E: Exception do
+      begin
+        FireEvent(meMeasureError, BuildError(1999, E.Message));
+        if FCurrentStage <> msDone then
+          SetStage(msDone);
+      end;
+    end;
 
     TThread.Sleep(10);
   end;
@@ -984,19 +1055,22 @@ begin
     Exit;
   end;
 
-  if (APoint.Q > 0) and ((APoint.Q < FWorkTable.FlowRate.Min) or (APoint.Q > FWorkTable.FlowRate.Max)) then
+  if (APoint.Q > 0) and ((FWorkTable.FlowRate = nil) or
+     (APoint.Q < FWorkTable.FlowRate.Min) or (APoint.Q > FWorkTable.FlowRate.Max)) then
   begin
     AError := BuildError(1001, 'Расход точки вне диапазона');
     Exit(False);
   end;
 
-  if (APoint.Temp > 0) and ((APoint.Temp < FWorkTable.FluidTemp.Min) or (APoint.Temp > FWorkTable.FluidTemp.Max)) then
+  if (APoint.Temp > 0) and ((FWorkTable.FluidTemp = nil) or
+     (APoint.Temp < FWorkTable.FluidTemp.Min) or (APoint.Temp > FWorkTable.FluidTemp.Max)) then
   begin
     AError := BuildError(1002, 'Температура точки вне диапазона');
     Exit(False);
   end;
 
-  if (APoint.Pressure > 0) and ((APoint.Pressure < FWorkTable.FluidPress.Min) or (APoint.Pressure > FWorkTable.FluidPress.Max)) then
+  if (APoint.Pressure > 0) and ((FWorkTable.FluidPress = nil) or
+     (APoint.Pressure < FWorkTable.FluidPress.Min) or (APoint.Pressure > FWorkTable.FluidPress.Max)) then
   begin
     AError := BuildError(1003, 'Давление точки вне диапазона');
     Exit(False);
@@ -1044,53 +1118,42 @@ begin
     AError := BuildError(1100, 'Нет точки или рабочего стола для выбора эталона');
     Exit;
   end;
-    //Расход не указан, берем текщие эталоны и текущий расход
-  if (APoint.Q < 0) then
-     begin
-    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
-  begin
-    Channel := FWorkTable.EtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) or (not Channel.Enabled) then
-      Continue;
-
-        Best := Channel;
-
-
-  end;
-
-     end
-   else
-
 
   for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
   begin
     Channel := FWorkTable.EtalonChannels[I];
     if (Channel = nil) or (Channel.FlowMeter = nil) then
       Continue;
-    if (APoint.Q >= Channel.FlowMeter.FlowMin) and (APoint.Q <= Channel.FlowMeter.FlowMax) then
+
+    if APoint.Q < 0 then
     begin
-      if (Best = nil) or (Channel.FlowMeter.FlowMax < Best.FlowMeter.FlowMax) then
+      if Channel.Enabled then
         Best := Channel;
+      Continue;
     end;
 
+    if SameValue(APoint.Q, 0) then
+    begin
+      if Channel.Enabled then
+        Best := Channel;
+      Continue;
+    end;
 
+    if (APoint.Q >= Channel.FlowMeter.FlowMin) and
+       (APoint.Q <= Channel.FlowMeter.FlowMax) and
+       ((Best = nil) or (Channel.FlowMeter.FlowMax < Best.FlowMeter.FlowMax)) then
+      Best := Channel;
   end;
-
-
-  if (APoint.Q = 0) then
-     Best :=  FWorkTable.EtalonChannels[FWorkTable.EtalonChannels.Count - 1];
-
-
-
 
   Result := Best <> nil;
   if not Result then
+  begin
     AError := BuildError(1101, 'Эталон по расходу не найден');
+    Exit;
+  end;
 
-
-   ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
-            'Выбраны эталоны для точки', BuildEtalonSelectionLog(APoint));
-
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
+    'Выбраны эталоны для точки', BuildEtalonSelectionLog(APoint));
 end;
 
 function TMeasurementRun.CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
@@ -1210,151 +1273,198 @@ begin
 end;
 
 procedure TMeasurementRun.ProcessStage;
+begin
+  case FCurrentStage of
+    msSelectPoint: ProcessSelectPoint;
+    msSelectEtalon: ProcessSelectEtalon;
+    msSetupPoint: ProcessSetupPoint;
+    msWaitStable: ProcessWaitStable;
+    msMeasure: ProcessMeasure;
+    msResultsRead: ProcessResultsRead;
+    msSave: ProcessSave;
+    msDone: ProcessDone;
+  end;
+end;
+
+procedure TMeasurementRun.ProcessSelectPoint;
+var
+  Error: TErrorInfo;
+begin
+  if FForceNextPoint >= 0 then
+    FCurrentPointIndex := FForceNextPoint
+  else
+    Inc(FCurrentPointIndex);
+  FForceNextPoint := -1;
+
+  if FCurrentPointIndex >= FPoints.Count then
+  begin
+    SetStage(msDone);
+    Exit;
+  end;
+
+  if SetPoint(FCurrentPointIndex, Error) then
+  begin
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
+      'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
+    FireEvent(mePointSelected);
+    SetStage(msSelectEtalon);
+  end
+  else
+  begin
+    FireEvent(mePointInvalid, Error);
+    SetStage(msDone);
+  end;
+end;
+
+procedure TMeasurementRun.ProcessSelectEtalon;
+var
+  Error: TErrorInfo;
+begin
+  if SelectEtalons(GetCurrentPoint, Error) then
+  begin
+    FireEvent(meEtalonSelected);
+    SetStage(msSetupPoint);
+  end
+  else
+  begin
+    FireEvent(meEtalonAbsent, Error);
+    SetStage(msDone);
+  end;
+end;
+
+procedure TMeasurementRun.ProcessSetupPoint;
 var
   Point: TDevicePoint;
   Error: TErrorInfo;
+begin
+  Point := GetCurrentPoint;
+  if not SetupPoint(Point, Error) then
+  begin
+    FireEvent(mePointNotSet, Error);
+    SetStage(msDone);
+    Exit;
+  end;
+
+  if not SetupMeasurement(Point, Error) then
+  begin
+    FireEvent(mePointNotSet, Error);
+    SetStage(msDone);
+    Exit;
+  end;
+
+  FireEvent(mePointSet);
+  SetStage(msWaitStable);
+end;
+
+procedure TMeasurementRun.ProcessWaitStable;
+const
+  DEFAULT_STABLE_TIMEOUT_MS = 30000;
+var
+  Point: TDevicePoint;
   StableInfo: RStableInfo;
+begin
+  Point := GetCurrentPoint;
+  if Point = nil then
+  begin
+    FireEvent(meMeasureError, BuildError(1300, 'Нет текущей точки для стабилизации'));
+    SetStage(msDone);
+    Exit;
+  end;
+
+  if IsStable(StableInfo) then
+  begin
+    Point.Status := 6;
+    FireEvent(meStableReached);
+    SetStage(msMeasure);
+    Exit;
+  end;
+
+  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STABLE_TIMEOUT_MS then
+  begin
+    Inc(FAttempt);
+    if FAttempt < FMaxAttemptCount then
+    begin
+      ProtocolManager.AddMessage(pcWarning, psMeasurement, 'StableTimeout',
+        'Таймаут установки параметров измерения',
+        Format('Попытка выхода на параметры: %d из %d', [FAttempt, FMaxAttemptCount]));
+      FireEvent(meStableRetry);
+      SetStage(msSetupPoint);
+      Exit;
+    end;
+
+    ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
+      'Не удалось установить параметры измерения', StableInfo.StatusText);
+    FireEvent(meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'));
+    SetStage(msDone);
+  end;
+end;
+
+procedure TMeasurementRun.ProcessMeasure;
+var
+  Point: TDevicePoint;
+begin
+  if FWorkTable = nil then
+  begin
+    FireEvent(meMeasureError, BuildError(1400, 'Рабочий стол не назначен'));
+    SetStage(msDone);
+    Exit;
+  end;
+
+  if FWorkTable.State = swtCOMPLETE then
+  begin
+    Point := GetCurrentPoint;
+    if Point <> nil then
+      Point.Status := 9;
+    FWorkTable.SaveMeasurementResults;
+    FireEvent(meMeasureCompleted);
+    SetStage(msResultsRead);
+    Exit;
+  end;
+
+  if Int64(TThread.GetTickCount64 - FWaitStartedTick) > Int64(FMeasureTimeout * 1000) then
+  begin
+    FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
+    FWorkTable.StopTest;
+    SetStage(msDone);
+  end;
+end;
+
+procedure TMeasurementRun.ProcessResultsRead;
+begin
+  FireEvent(meResultReady);
+  SetStage(msSave);
+end;
+
+procedure TMeasurementRun.ProcessSave;
+var
+  Point: TDevicePoint;
   RepeatsTarget: Integer;
 begin
   Point := GetCurrentPoint;
-  case FCurrentStage of
-    msSelectPoint:
-      begin
-        if FForceNextPoint >= 0 then
-          FCurrentPointIndex := FForceNextPoint
-        else
-          Inc(FCurrentPointIndex);
-        FForceNextPoint := -1;
+  SaveMeasurementResults;
+  FireEvent(meSaveDone);
 
-        if FCurrentPointIndex >= FPoints.Count then
-        begin
-          FireEvent(meAllDone);
-          SetStage(msDone);
-          Exit;
-        end;
+  RepeatsTarget := 1;
+  if Point <> nil then
+    RepeatsTarget := Max(Point.Repeats, 1);
+  Inc(FCurrentRepeat);
 
-        if SetPoint(FCurrentPointIndex, Error) then
-        begin
-          ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
-            'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
-          FireEvent(mePointSelected);
-          SetStage(msSelectEtalon);
-        end
-        else
-        begin
-          FireEvent(mePointInvalid, Error);
-          SetStage(msDone);
-        end;
-      end;
+  if FCurrentRepeat >= RepeatsTarget then
+  begin
+    if Point <> nil then
+      Point.Status := 9;
+    FCurrentRepeat := 0;
+    FireEvent(mePointDone);
+    SetStage(msSelectPoint);
+  end
+  else
+    SetStage(msSetupPoint);
+end;
 
-    msSelectEtalon:
-      begin
-        if SelectEtalons(Point, Error) then
-        begin
-          FireEvent(meEtalonSelected);
-          SetStage(msSetupPoint);
-        end
-        else
-        begin
-          FireEvent(meEtalonAbsent, Error);
-          SetStage(msDone);
-        end;
-      end;
-
-    msSetupPoint:
-      begin
-        if SetupPoint(Point, Error) and SetupMeasurement(Point, Error) then
-        begin
-          FireEvent(mePointSet);
-          SetStage(msWaitStable);
-        end
-        else
-        begin
-          FireEvent(mePointNotSet, Error);
-          SetStage(msDone);
-        end;
-      end;
-
-    msWaitStable:
-      begin
-        if IsStable(StableInfo) then
-        begin
-          GetCurrentPoint.Status:= 6;
-          FireEvent(meStableReached);
-          SetStage(msMeasure);
-          Exit;
-        end;
-
-        if (TThread.GetTickCount64 - FWaitStartedTick) > 30000 then  //Здесь должен быть тайм аут по выходу на расход
-        begin
-          Inc(FAttempt);
-          if FAttempt < FMaxAttemptCount then
-          begin
-             ProtocolManager.AddMessage(pcWarning, psUnknown, 'Таймаут установки параметров измерения',
-            'Попытка выход на параметры:', IntToStr(FAttempt) + ' из '+ IntToStr(FMaxAttemptCount));
-            FireEvent(meStableRetry);
-            SetStage(msSetupPoint);
-          end
-          else
-          begin
-             ProtocolManager.AddMessage(pcError, psUnknown, 'Неудача при установке параметров измерения',
-            'Неудалось установить:', StableInfo.StatusText);     {Здесь должна формироваться подробная запись по StableInfo: объект,  заданное значение, текущее значение, отклонение заданного от текущего з в%, требуемое отклонение текущего от заданного в%, отклонение от среднего в%, требуемое отклонение от среднего в %, Время стабилизации потраченное, время стабилизации допустимое (ТаймАут)  }
-
-            FireEvent(meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'));
-            SetStage(msDone);
-          end;
-        end;
-      end;
-
-    msMeasure:
-      begin
-        if (FWorkTable <> nil) and (FWorkTable.State = swtCOMPLETE) then
-        begin
-          GetCurrentPoint.Status:= 9;
-          FWorkTable.SaveMeasurementResults;
-          FireEvent(meMeasureCompleted);
-          SetStage(msResultsRead);
-          Exit;
-        end;
-
-        if  (Int64(TThread.GetTickCount64 - FWaitStartedTick)  > Int64(FMeasureTimeout*1000)) then
-        begin
-          FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
-          SetStage(msDone);
-        end;
-      end;
-
-    msResultsRead:
-      begin
-        FireEvent(meResultReady);
-        SetStage(msSave);
-      end;
-
-    msSave:
-      begin
-        SaveMeasurementResults;
-        FireEvent(meSaveDone);
-
-        RepeatsTarget := 1;
-        if Point <> nil then
-          RepeatsTarget := Max(Point.Repeats, 1);
-        Inc(FCurrentRepeat);
-        if FCurrentRepeat >= RepeatsTarget then
-        begin
-          if Point <> nil then
-          Point.Status := 9;   // 'измерение завершено корректно';
-          FCurrentRepeat := 0;
-          FireEvent(mePointDone);
-          SetStage(msSelectPoint);
-        end
-        else
-          SetStage(msSetupPoint);
-      end;
-
-    msDone:
-      if FThread <> nil then
-        FThread.Terminate;
-  end;
+procedure TMeasurementRun.ProcessDone;
+begin
+  if FThread <> nil then
+    FThread.Terminate;
 end;
 
 procedure TMeasurementRun.SaveMeasurementResults;
