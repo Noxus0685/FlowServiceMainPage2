@@ -250,15 +250,15 @@ begin
 
   MeasurementStartCategory := AddCategory('Запуск измерения');
   AddComboRow(MeasurementStartCategory, 'Условия', ComboMeasurementStart);
-  ComboMeasurementStart.Items.Add('По кнопке');
-  ComboMeasurementStart.Items.Add('По синхр.');
+  ComboMeasurementStart.Items.Add('По кнопке измерения');
+  ComboMeasurementStart.Items.Add('По сигналу синхр.');
   ComboMeasurementStart.ItemIndex := 0;
 
   MeasurementStopCategory := AddCategory('Остановка измерения');
   AddComboRow(MeasurementStopCategory, 'Условия', ComboMeasurementStop);
-  ComboMeasurementStop.Items.Add('По кнопке');
-  ComboMeasurementStop.Items.Add('По синхр.');
-  ComboMeasurementStop.Items.Add('Синхр. после огр.');
+  ComboMeasurementStop.Items.Add('По кнопке измерения');
+  ComboMeasurementStop.Items.Add('По сигналу синхр.');
+  ComboMeasurementStop.Items.Add('По сигналу синхр. после огранич.');
   ComboMeasurementStop.ItemIndex := 0;
 
   PressureCategory := AddCategory('Давление');
