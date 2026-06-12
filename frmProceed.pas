@@ -1495,10 +1495,17 @@ var
   NextWorkTable: TWorkTable;
 begin
   NextWorkTable := nil;
-  if (FWorkTableManager <> nil) and
-     (FWorkTableManager.WorkTables <> nil) and
-     (FWorkTableManager.WorkTables.IndexOf(FWorkTableManager.ActiveWorkTable) >= 0) then
-    NextWorkTable := FWorkTableManager.ActiveWorkTable;
+  if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+  begin
+    if FWorkTableManager.WorkTables.IndexOf(FWorkTableManager.ActiveWorkTable) >= 0 then
+      NextWorkTable := FWorkTableManager.ActiveWorkTable
+    else if FWorkTableManager.WorkTables.Count > 0 then
+    begin
+      NextWorkTable := FWorkTableManager.WorkTables[0];
+      FWorkTableManager.ActiveWorkTable := NextWorkTable;
+      NextWorkTable.IsActive := True;
+    end;
+  end;
 
   FActiveWorkTable := NextWorkTable;
 
@@ -2442,7 +2449,7 @@ begin
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageQavgEtalon then
   begin
-      if (FSessionEtalon <> nil) then
+      if (FSessionEtalon <> nil) and (FActiveWorkTable <> nil) then
       begin
         if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
           Value := FSessionEtalon.ValueVolumeFlow.GetStrNum(P.EtalonVolumeFlow)
@@ -2460,7 +2467,7 @@ begin
 
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageEtalonVolume then
   begin
-      if (FSessionEtalon <> nil) then
+      if (FSessionEtalon <> nil) and (FActiveWorkTable <> nil) then
       begin
         if IsVolumeFlowUnit(FActiveWorkTable.FlowUnitName) then
           Value := FSessionEtalon.ValueVolume.GetStrNum(P.EtalonVolume)
