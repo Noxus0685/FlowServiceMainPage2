@@ -889,8 +889,8 @@ begin
   end;
 
   ComboVerticalSync.Enabled := CanEdit;
-  ComboVerticalStart.Enabled := CanEdit and (Source <> sisNone);
-  ComboVerticalStop.Enabled := CanEdit and (Source <> sisNone);
+  ComboVerticalStart.Enabled := CanEdit and (Source in [sisExternalCh0, sisInternal]);
+  ComboVerticalStop.Enabled := CanEdit and (Source in [sisExternalCh0, sisInternal]);
   ComboVerticalChannel.Enabled := CanEdit and (Source = sisImpChannel);
 
   ComboOutputSync1.Enabled := CanEdit;
