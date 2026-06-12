@@ -1043,11 +1043,11 @@ begin
   ComboBoxPumps.Items.Clear;
   ComboBoxPumps.ItemIndex := -1;
 
-  if FActiveWorkTable = nil then
+  if (TPump.Pumps = nil) then
     Exit;
 
   SelectedPumpName := Trim(ComboBoxPumps.Text);
-  for Pump in FActiveWorkTable.Pumps do
+  for Pump in TPump.Pumps do
     ComboBoxPumps.Items.Add(Pump.Name);
 
   ItemIndex := -1;
