@@ -1526,6 +1526,7 @@ procedure TFrameProceed.ActionDeleteWorkTableExecute(Sender: TObject);
 var
   WorkTable: TWorkTable;
   WorkTableName: string;
+  ObserverHost: IWorkTableObserverHost;
 begin
   if not IsSelectedTreeWorkTable(WorkTable) then
     Exit;
@@ -1564,6 +1565,8 @@ procedure TFrameProceed.ActionDeleteSelectedWorkTablesExecute(Sender: TObject);
 var
   DeletedCount: Integer;
   WorkTableCount: Integer;
+  I: Integer;
+  ObserverHost: IWorkTableObserverHost;
 begin
   if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
     Exit;

@@ -37,7 +37,7 @@ uses
   uWorkTable;
 
 type
-  TTableMainForm = class(TForm, IEventObserver)
+  TTableMainForm = class(TForm, IEventObserver, IWorkTableObserverHost)
     tcMain: TTabControl;
     tiTable: TTabItem;
     tiResults: TTabItem;
@@ -157,6 +157,7 @@ type
 
 
   public
+    procedure DetachWorkTableObservers(AWorkTable: TWorkTable);
     destructor Destroy; override;
     property T_WorkBench_First:Double read FT_WorkBench_First write SetT_WorkBench_First;
     property T_WorkBench_Last:Double read FT_WorkBench_Last write SetT_WorkBench_Last;
@@ -178,6 +179,25 @@ begin
   FreeAndNil(FSubscribedFluidTemps);
   FreeAndNil(FSubscribedFluidPresses);
   inherited Destroy;
+end;
+
+
+procedure TTableMainForm.DetachWorkTableObservers(AWorkTable: TWorkTable);
+var
+  Observer: IEventObserver;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  Observer := Self;
+  UnsubscribeWorkTableObjects(AWorkTable);
+
+  if Assigned(FSubscribedWorkTables) and
+     FSubscribedWorkTables.Contains(AWorkTable) then
+  begin
+    AWorkTable.Unsubscribe(Observer);
+    FSubscribedWorkTables.Remove(AWorkTable);
+  end;
 end;
 
 procedure TTableMainForm.ActiveWorkTableChangeTracking(Sender: TObject);
