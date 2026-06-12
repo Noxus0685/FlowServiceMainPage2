@@ -1856,7 +1856,9 @@ begin
   if IsExisted = 0 then
   begin
     FTableFlow.ValueDensity.SetAsDensity;
-  end;
+  end
+  else if FTableFlow.ValueDensity.GetDoubleValue = 0 then
+    FTableFlow.ValueDensity.SetValue(TMeterValue.GetInitDensity);
   EnsureDescription(FTableFlow.ValueDensity, 'Плотность среды');
   FTableFlow.ValueDensity.ValueBaseMultiplier := FTableFlow.ValueTemperture;
   FTableFlow.ValueDensity.ValueBaseDevider := FTableFlow.ValuePressure;

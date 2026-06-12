@@ -1276,7 +1276,9 @@ begin
   begin
     ValueDensity.SetAsDensity;
     SetDescription(ValueDensity, 'Плотность среды');
-  end;
+  end
+  else if ValueDensity.GetDoubleValue = 0 then
+    ValueDensity.SetValue(TMeterValue.GetInitDensity);
   ValueDensity.ValueBaseMultiplier := ValueTemperture;
   ValueDensity.ValueBaseDevider := ValuePressure;
   ValueDensity.ValueRate := nil;
@@ -1805,6 +1807,9 @@ begin
   if (ValueVolumeCoef = nil) or (ValueMassCoef = nil) or (ValueDensity = nil) or
      (ValueVolume = nil) or (ValueMass = nil) then
     Exit;
+
+  if ValueDensity.GetDoubleValue = 0 then
+    ValueDensity.SetValue(TMeterValue.GetInitDensity);
 
   case MeterFlowCategory of
     mftWeightsType,
