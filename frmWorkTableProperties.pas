@@ -33,6 +33,16 @@ type
     LabelWorkTableUUID: TLabel;
     LabelWorkTableState: TLabel;
     ComboEditMode: TComboBox;
+    ComboVerticalSync: TComboBox;
+    ComboVerticalStart: TComboBox;
+    ComboVerticalStop: TComboBox;
+    ComboVerticalChannel: TComboBox;
+    ComboOutputSync1: TComboBox;
+    ComboOutputStart1: TComboBox;
+    ComboOutputStop1: TComboBox;
+    ComboOutputSync2: TComboBox;
+    ComboOutputStart2: TComboBox;
+    ComboOutputStop2: TComboBox;
     TreeProperties: TTreeView;
     EditPressureMin: TEdit;
     EditPressureMax: TEdit;
@@ -64,6 +74,7 @@ type
     function ParameterByKind(const AKind: Integer): TParameter;
     function MeterValueByKind(const AKind: Integer): TMeterValue;
     procedure RefreshValues;
+    procedure FillChannelCombo;
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
     procedure HandleEditModeChange(Sender: TObject);
@@ -101,6 +112,9 @@ var
   TempertureCategory: TTreeViewItem;
   FlowRateCategory: TTreeViewItem;
   QuantityCategory: TTreeViewItem;
+  VerticalSyncCategory: TTreeViewItem;
+  OutputSyncCategory1: TTreeViewItem;
+  OutputSyncCategory2: TTreeViewItem;
   HeaderGrid: TGridPanelLayout;
   HeaderProperty: TLabel;
   HeaderValue: TLabel;
@@ -173,6 +187,50 @@ begin
   ComboEditMode.Items.Add('Нельзя редактировать');
   ComboEditMode.ItemIndex := 0;
   ComboEditMode.OnChange := HandleEditModeChange;
+
+  VerticalSyncCategory := AddCategory('Вертикальная синхронизация');
+  AddComboRow(VerticalSyncCategory, 'Вертикальная синхронизация', ComboVerticalSync);
+  ComboVerticalSync.Items.Add('Отключено');
+  ComboVerticalSync.Items.Add('Внешняя синхронизация');
+  ComboVerticalSync.Items.Add('По каналу');
+  ComboVerticalSync.ItemIndex := 0;
+  AddComboRow(VerticalSyncCategory, 'Старт', ComboVerticalStart);
+  ComboVerticalStart.Items.Add('Фронт');
+  ComboVerticalStart.Items.Add('Спад');
+  ComboVerticalStart.ItemIndex := 0;
+  AddComboRow(VerticalSyncCategory, 'Стоп', ComboVerticalStop);
+  ComboVerticalStop.Items.Add('Фронт');
+  ComboVerticalStop.Items.Add('Спад');
+  ComboVerticalStop.ItemIndex := 0;
+  AddComboRow(VerticalSyncCategory, 'Канал', ComboVerticalChannel);
+
+  OutputSyncCategory1 := AddCategory('Выходная синхронизация 1');
+  AddComboRow(OutputSyncCategory1, 'Выходная синхронизация', ComboOutputSync1);
+  ComboOutputSync1.Items.Add('Выкл');
+  ComboOutputSync1.Items.Add('Вкл');
+  ComboOutputSync1.ItemIndex := 0;
+  AddComboRow(OutputSyncCategory1, 'Старт', ComboOutputStart1);
+  ComboOutputStart1.Items.Add('Фронт');
+  ComboOutputStart1.Items.Add('Спад');
+  ComboOutputStart1.ItemIndex := 0;
+  AddComboRow(OutputSyncCategory1, 'Стоп', ComboOutputStop1);
+  ComboOutputStop1.Items.Add('Фронт');
+  ComboOutputStop1.Items.Add('Спад');
+  ComboOutputStop1.ItemIndex := 0;
+
+  OutputSyncCategory2 := AddCategory('Выходная синхронизация 2');
+  AddComboRow(OutputSyncCategory2, 'Выходная синхронизация', ComboOutputSync2);
+  ComboOutputSync2.Items.Add('Выкл');
+  ComboOutputSync2.Items.Add('Вкл');
+  ComboOutputSync2.ItemIndex := 0;
+  AddComboRow(OutputSyncCategory2, 'Старт', ComboOutputStart2);
+  ComboOutputStart2.Items.Add('Фронт');
+  ComboOutputStart2.Items.Add('Спад');
+  ComboOutputStart2.ItemIndex := 0;
+  AddComboRow(OutputSyncCategory2, 'Стоп', ComboOutputStop2);
+  ComboOutputStop2.Items.Add('Фронт');
+  ComboOutputStop2.Items.Add('Спад');
+  ComboOutputStop2.ItemIndex := 0;
 
   PressureCategory := AddCategory('Давление');
   AddMeterValueRow(PressureCategory, 'Давление', EditPressure, ButtonSelectPressure,
@@ -495,6 +553,51 @@ begin
   ApplyEditState;
 end;
 
+procedure TFrameWorkTableProperties.FillChannelCombo;
+var
+  I: Integer;
+  Channel: TChannel;
+  ChannelName: string;
+begin
+  ComboVerticalChannel.Items.Clear;
+  if FWorkTable = nil then
+  begin
+    ComboVerticalChannel.ItemIndex := -1;
+    Exit;
+  end;
+
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+    ChannelName := Trim(Channel.Name);
+    if ChannelName = '' then
+      ChannelName := Trim(Channel.Text);
+    if ChannelName = '' then
+      ChannelName := TWorkTable.BuildDeviceChannelServiceName(I + 1);
+    ComboVerticalChannel.Items.Add('Прибор: ' + ChannelName);
+  end;
+
+  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+  begin
+    Channel := FWorkTable.EtalonChannels[I];
+    if Channel = nil then
+      Continue;
+    ChannelName := Trim(Channel.Name);
+    if ChannelName = '' then
+      ChannelName := Trim(Channel.Text);
+    if ChannelName = '' then
+      ChannelName := TWorkTable.BuildEtalonChannelServiceName(I + 1);
+    ComboVerticalChannel.Items.Add('Эталон: ' + ChannelName);
+  end;
+
+  if ComboVerticalChannel.Items.Count > 0 then
+    ComboVerticalChannel.ItemIndex := 0
+  else
+    ComboVerticalChannel.ItemIndex := -1;
+end;
+
 procedure TFrameWorkTableProperties.RefreshValues;
 begin
   FLoading := True;
@@ -506,6 +609,7 @@ begin
       LabelWorkTableUUID.Text := '';
       LabelWorkTableState.Text := '';
       ComboEditMode.Enabled := False;
+      FillChannelCombo;
       EditPressure.Text := '';
       EditTemperture.Text := '';
       EditFlowRate.Text := '';
@@ -526,6 +630,7 @@ begin
     LabelWorkTableUUID.Text := FWorkTable.UUID;
     LabelWorkTableState.Text := WorkTableStateToCaption(FWorkTable.State);
     ComboEditMode.Enabled := True;
+    FillChannelCombo;
     EditPressure.Text := MeterValueToText(FWorkTable.ValuePressure);
     EditTemperture.Text := MeterValueToText(FWorkTable.ValueTemperture);
     EditFlowRate.Text := MeterValueToText(FWorkTable.ValueFlowRate);
@@ -576,6 +681,16 @@ begin
   EditFlowRateMax.Enabled := CanEdit;
   EditQuantityMin.Enabled := CanEdit;
   EditQuantityMax.Enabled := CanEdit;
+  ComboVerticalSync.Enabled := CanEdit;
+  ComboVerticalStart.Enabled := CanEdit;
+  ComboVerticalStop.Enabled := CanEdit;
+  ComboVerticalChannel.Enabled := CanEdit;
+  ComboOutputSync1.Enabled := CanEdit;
+  ComboOutputStart1.Enabled := CanEdit;
+  ComboOutputStop1.Enabled := CanEdit;
+  ComboOutputSync2.Enabled := CanEdit;
+  ComboOutputStart2.Enabled := CanEdit;
+  ComboOutputStop2.Enabled := CanEdit;
 end;
 
 procedure TFrameWorkTableProperties.HandleEditModeChange(Sender: TObject);
