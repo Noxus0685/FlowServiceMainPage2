@@ -84,31 +84,22 @@ type
     tnModification
   );
 
-    EMeasurementRunMode = (mrmManual =0, mrmHalfAutomatic, mrmAutomatic);
-
     EMeasurementState = (
       msNone,
 
-      msSelectPoint,// — Выбор точки измерения
+      msSelectPoint,        // Выбор точки измерения
+      msSelectEtalon,       // Выбор эталонов для текущей точки
+      msSetupPoint,         // Задание параметров точки и ограничений измерения
+      msWaitStable,         // Ожидание стабилизации условий
 
-      msSelectEtalon,// — Выбор эталона
+      msWaitMeasureStart,   // Команда StartTest отдана, ожидаем фактический запуск
+      msMeasure,            // Измерение реально выполняется
+      msWaitMeasureStop,    // Команда StopTest отдана или остановка началась, ожидаем завершение
 
-      msSetupPoint,// — Установка заданной точки
-
-      msWaitStable,// — Ожидание стабилизации параметров
-
-      msMeasureStarting,
-
-      msMeasure,// — Проведение измерения
-
-      msMeasureStoping,
-
-      msResultsRead,// — Подготовка и чтение результатов
-
-      msSave,// — Сохранение результатов
-
-      msDone //— Окончание цикла измерения
-  );
+      msResultsRead,        // Чтение/подготовка результатов
+      msSave,               // Сохранение результатов
+      msDone                // Завершение цикла измерения
+    );
 
   EStableStatus = (
     ssNONE,
