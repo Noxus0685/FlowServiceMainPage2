@@ -265,7 +265,6 @@ begin
   AddComboRow(MeasurementStopCategory, 'Условия', ComboMeasurementStop);
   ComboMeasurementStop.Items.Add('По кнопке измерения');
   ComboMeasurementStop.Items.Add('По сигналу синхр.');
-  ComboMeasurementStop.Items.Add('По ограничению');
   ComboMeasurementStop.Items.Add('По сигналу синхр. после огранич.');
   ComboMeasurementStop.ItemIndex := 0;
   ComboMeasurementStop.OnChange := HandleSyncComboChange;
