@@ -79,7 +79,10 @@ end;
 
 procedure TObservableObject.Subscribe(const AObserver: IEventObserver);
 begin
-  if (AObserver = nil) or (FObservers = nil) then
+  if AObserver = nil then
+    Exit;
+
+  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
     Exit;
 
   TMonitor.Enter(FObserversLock);
@@ -93,11 +96,11 @@ end;
 
 procedure TObservableObject.Unsubscribe(const AObserver: IEventObserver);
 begin
-  if (AObserver = nil) or (FObservers = nil) then
+  if AObserver = nil then
     Exit;
 
-    if (FObserversLock= nil) then
-        Exit;
+  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
+    Exit;
 
   TMonitor.Enter(FObserversLock);
   try
@@ -109,7 +112,7 @@ end;
 
 function TObservableObject.ObserverCount: Integer;
 begin
-  if FObservers = nil then
+  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
     Exit(0);
 
   TMonitor.Enter(FObserversLock);
@@ -124,10 +127,7 @@ procedure TObservableObject.Notify(Event: Integer; Data: TObject);
 var
   LocalObservers: TArray<IEventObserver>;
 begin
-    if FIsDestroying then
-    Exit;
-
-  if FObservers = nil then
+  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
     Exit;
 
   TMonitor.Enter(FObserversLock);

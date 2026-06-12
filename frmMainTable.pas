@@ -1993,7 +1993,7 @@ end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
-  if FActiveWorkTable = nil then
+  if (FActiveWorkTable = nil) or (FActiveWorkTable.ActivePump = nil) then
     Exit;
 
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then

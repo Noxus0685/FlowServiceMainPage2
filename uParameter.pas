@@ -112,6 +112,7 @@ TParameter = class(TObservableObject)
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
     procedure SetParam(Avalue: Double);
+    procedure EnsureMeterValues;
     function GetSetValue: Double;
   public
     constructor Create(const AName, AHint: string); virtual;
@@ -482,10 +483,11 @@ end;
 
 constructor TPump.Create;
 begin
-  inherited Create('','');
+  inherited Create('', '');
   FMax:= 50;
   FMin:= 12;
 
+  EnsureMeterValues;
   //FValue:=10;
   //FValueSet := 12;
 end;
@@ -495,8 +497,7 @@ begin
   Create;
   Self.FName :=   APumpName;
   Pumps.Add(Self);
-  Value:=TMeterValue.Create;
-  ValueSet:=TMeterValue.Create;
+  EnsureMeterValues;
 end;
 
 destructor TPump.Destroy;
@@ -625,6 +626,8 @@ var
   ADelta: Double;
 begin
 
+  EnsureMeterValues;
+
   //код кодекса, надо переделывать
   IsTargetReached := (Value.Value<=ValueSet.Value*(1+AccuracyPlus/100))
       AND (Value.Value>=ValueSet.Value*(1-AccuracyMinus/100)) ;
@@ -687,6 +690,8 @@ end;
 
 procedure TParameter.Start;
 begin
+  EnsureMeterValues;
+
     if FValueSet.Value<FMin then
       FValueSet.Value:=FMin;
     if FValueSet.Value>FMax then
@@ -794,6 +799,8 @@ end;
 
 procedure TParameter.SetValue(AValue: Double);
 begin
+  EnsureMeterValues;
+
   if AValue < FMin then
     FValue.Value := FMin
   else if AValue > FMax then
@@ -804,14 +811,24 @@ end;
 
 function TParameter.GetSetValue: Double;
 begin
-result:= fValueSet.Value;
+  EnsureMeterValues;
+  Result := FValueSet.Value;
 end;
 
 
 
+procedure TParameter.EnsureMeterValues;
+begin
+  if FValue = nil then
+    FValue := TMeterValue.Create;
+  if FValueSet = nil then
+    FValueSet := TMeterValue.Create;
+end;
 
 procedure TParameter.SetParam(AValue: Double);
 begin
+      EnsureMeterValues;
+
        if  SameValue(FValueSet.Value ,AValue, MinDouble) then
        Exit;
 
