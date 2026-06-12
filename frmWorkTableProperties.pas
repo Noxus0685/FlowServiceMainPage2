@@ -8,7 +8,6 @@ uses
   FMX.Edit,
   FMX.Forms,
   FMX.Layouts,
-  FMX.ListBox,
   FMX.Objects,
   FMX.StdCtrls,
   FMX.TreeView,
@@ -32,7 +31,6 @@ type
     EditWorkTableName: TEdit;
     LabelWorkTableUUID: TLabel;
     LabelWorkTableState: TLabel;
-    ComboEditMode: TComboBox;
     TreeProperties: TTreeView;
     EditPressureMin: TEdit;
     EditPressureMax: TEdit;
@@ -54,7 +52,6 @@ type
     procedure BuildUI;
     procedure AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
     procedure AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
-    procedure AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
     procedure AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
       out AButton: TButton; AOnClick: TNotifyEvent);
     function AddCategory(const ACaption: string): TTreeViewItem;
@@ -66,10 +63,8 @@ type
     procedure RefreshValues;
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
-    procedure HandleEditModeChange(Sender: TObject);
     procedure HandleLimitExit(Sender: TObject);
     procedure NotifyRefreshIfChanged(const AChanged: Boolean);
-    procedure ApplyEditState;
     procedure SelectMeterValue(AKind: Integer);
     procedure ButtonSelectPressureClick(Sender: TObject);
     procedure ButtonSelectTempertureClick(Sender: TObject);
@@ -167,12 +162,6 @@ begin
 
   AddLabelRow(GeneralCategory, 'UUID рабочего стола', LabelWorkTableUUID);
   AddLabelRow(GeneralCategory, 'Текущее состояние', LabelWorkTableState);
-
-  AddComboRow(GeneralCategory, 'Редактирование', ComboEditMode);
-  ComboEditMode.Items.Add('Можно редактировать');
-  ComboEditMode.Items.Add('Нельзя редактировать');
-  ComboEditMode.ItemIndex := 0;
-  ComboEditMode.OnChange := HandleEditModeChange;
 
   PressureCategory := AddCategory('Давление');
   AddMeterValueRow(PressureCategory, 'Давление', EditPressure, ButtonSelectPressure,
@@ -275,44 +264,6 @@ begin
   ALabel.Margins.Rect := TRectF.Create(6, 0, 10, 0);
   ALabel.TextSettings.VertAlign := TTextAlign.Center;
   RowGrid.ControlCollection.AddControl(ALabel, 1, 0);
-end;
-
-procedure TFrameWorkTableProperties.AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
-var
-  Item: TTreeViewItem;
-  RowGrid: TGridPanelLayout;
-  CaptionLabel: TLabel;
-begin
-  Item := TTreeViewItem.Create(Self);
-  Item.Parent := AParent;
-  Item.Text := '';
-  Item.Height := 36;
-  Item.Stored := False;
-
-  RowGrid := TGridPanelLayout.Create(Self);
-  RowGrid.Parent := Item;
-  RowGrid.Align := TAlignLayout.Client;
-  RowGrid.RowCollection.Clear;
-  RowGrid.ColumnCollection.Clear;
-  RowGrid.ColumnCollection.Add.Value := 45;
-  RowGrid.ColumnCollection.Add.Value := 55;
-  RowGrid.RowCollection.Add.Value := 100;
-  RowGrid.Stored := False;
-
-  CaptionLabel := TLabel.Create(Self);
-  CaptionLabel.Parent := RowGrid;
-  CaptionLabel.Align := TAlignLayout.Client;
-  CaptionLabel.Text := ACaption;
-  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
-  CaptionLabel.HitTest := False;
-  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
-  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
-
-  ACombo := TComboBox.Create(Self);
-  ACombo.Parent := RowGrid;
-  ACombo.Align := TAlignLayout.Client;
-  ACombo.Margins.Rect := TRectF.Create(6, 3, 10, 3);
-  RowGrid.ControlCollection.AddControl(ACombo, 1, 0);
 end;
 
 procedure TFrameWorkTableProperties.AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
@@ -485,14 +436,13 @@ end;
 
 function TFrameWorkTableProperties.CanEditWorkTable: Boolean;
 begin
-  Result := (FWorkTable <> nil) and (ComboEditMode.ItemIndex = 0);
+  Result := FWorkTable <> nil;
 end;
 
 procedure TFrameWorkTableProperties.LoadFromWorkTable(AWorkTable: TWorkTable);
 begin
   FWorkTable := AWorkTable;
   RefreshValues;
-  ApplyEditState;
 end;
 
 procedure TFrameWorkTableProperties.RefreshValues;
@@ -505,7 +455,6 @@ begin
       EditWorkTableName.Text := '';
       LabelWorkTableUUID.Text := '';
       LabelWorkTableState.Text := '';
-      ComboEditMode.Enabled := False;
       EditPressure.Text := '';
       EditTemperture.Text := '';
       EditFlowRate.Text := '';
@@ -525,7 +474,6 @@ begin
     EditWorkTableName.Text := FWorkTable.Name;
     LabelWorkTableUUID.Text := FWorkTable.UUID;
     LabelWorkTableState.Text := WorkTableStateToCaption(FWorkTable.State);
-    ComboEditMode.Enabled := True;
     EditPressure.Text := MeterValueToText(FWorkTable.ValuePressure);
     EditTemperture.Text := MeterValueToText(FWorkTable.ValueTemperture);
     EditFlowRate.Text := MeterValueToText(FWorkTable.ValueFlowRate);
@@ -555,36 +503,6 @@ begin
     FLoading := False;
   end;
 end;
-
-procedure TFrameWorkTableProperties.ApplyEditState;
-var
-  CanEdit: Boolean;
-begin
-  CanEdit := CanEditWorkTable;
-
-  EditWorkTableText.Enabled := CanEdit;
-  EditWorkTableName.Enabled := CanEdit;
-  ButtonSelectPressure.Enabled := CanEdit;
-  ButtonSelectTemperture.Enabled := CanEdit;
-  ButtonSelectFlowRate.Enabled := CanEdit;
-  ButtonSelectQuantity.Enabled := CanEdit;
-  EditPressureMin.Enabled := CanEdit;
-  EditPressureMax.Enabled := CanEdit;
-  EditTempertureMin.Enabled := CanEdit;
-  EditTempertureMax.Enabled := CanEdit;
-  EditFlowRateMin.Enabled := CanEdit;
-  EditFlowRateMax.Enabled := CanEdit;
-  EditQuantityMin.Enabled := CanEdit;
-  EditQuantityMax.Enabled := CanEdit;
-end;
-
-procedure TFrameWorkTableProperties.HandleEditModeChange(Sender: TObject);
-begin
-  ApplyEditState;
-  if (not FLoading) and (FWorkTable <> nil) then
-    FWorkTable.FireEvent(ewtRefresh);
-end;
-
 
 procedure TFrameWorkTableProperties.HandleLimitExit(Sender: TObject);
 var
@@ -723,7 +641,7 @@ var
   Form: TFormMeterValueSelect;
   SelectedMeterValue: TMeterValue;
 begin
-  if (FWorkTable = nil) or (ComboEditMode.ItemIndex <> 0) then
+  if FWorkTable = nil then
     Exit;
 
   Form := TFormMeterValueSelect.Create(Self);
