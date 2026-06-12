@@ -4031,6 +4031,12 @@ begin
   if FState = ANewState then
     Exit;
 
+    if FState = swtCONNECTED then
+        ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',
+    'swtCONNECTED',
+    Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
+      WorkTableStateToString(ANewState)]));
+
    OldState := FState;
   FState := ANewState;
   ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',

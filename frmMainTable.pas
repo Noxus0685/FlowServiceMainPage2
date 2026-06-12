@@ -5071,7 +5071,7 @@ begin
     if WorkTableManager <> nil then
       WorkTableManager.Save;
 
-    WorkTable.State := swtSTANDBY;
+    WorkTable.State := swtCONNECTED ;
     Exit;
   end;
 
@@ -5090,13 +5090,51 @@ end;
 
 procedure TFrameMainTable.ButtonCancelClick(Sender: TObject);
 begin
-  if (FActiveWorkTable <> nil) then
-    FActiveWorkTable.State := swtCONNECTED;
+  if FActiveWorkTable = nil then
+  begin
+    OnChangeState(swtSTANDBY);
+    Exit;
+  end;
 
-  //FActiveWorkTable.State:=swtCONNECTED;
+  ProtocolManager.AddMessage(pcAction, psForm, 'Cancel',
+    'Пользователь запросил отмену текущего действия',
+    FActiveWorkTable.Name);
 
-  //else
-   OnChangeState(swtSTANDBY);
+  case FActiveWorkTable.State of
+    swtSTARTTEST,
+    swtSTARTWAIT,
+    swtEXECUTE:
+      StopMeasurement;
+
+    swtSTOPTEST,
+    swtSTOPWAIT:
+      begin
+        // Уже останавливаемся. Повторно ничего не делаем.
+      end;
+
+    swtCOMPLETE,
+    swtFINALREAD:
+      begin
+        // Это не остановка измерения, а отказ от сохранения/финального результата.
+        // Здесь лучше вызвать отдельную команду отмены результата,
+        // а не просто менять State.
+        FActiveWorkTable.State := swtCONNECTED;
+      end;
+
+    swtSTARTMONITOR,
+    swtSTARTMONITORWAIT,
+    swtMONITOR:
+      begin
+        FActiveWorkTable.StopMonitor;
+      end;
+
+  else
+    begin
+      // Для спокойных состояний Cancel просто возвращает UI в нормальный режим.
+      if FActiveWorkTable.State <> swtCONNECTED then
+        FActiveWorkTable.State := swtCONNECTED;
+    end;
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
