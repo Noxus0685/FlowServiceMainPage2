@@ -2478,6 +2478,8 @@ begin
       if not IsQuantityTemplateSet then
       begin
         FTableFlow.ValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
+        if FQuantityUnitName <> '' then
+          FTableFlow.ValueQuantity.SetDim(FQuantityUnitName);
         FTableFlow.ValueQuantity.ValueType := AGGREGATE_TYPE;
         IsQuantityTemplateSet := True;
       end;
@@ -2489,6 +2491,8 @@ begin
       if not IsFlowTemplateSet then
       begin
         FTableFlow.ValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
+        if FFlowUnitName <> '' then
+          FTableFlow.ValueFlowRate.SetDim(FFlowUnitName);
         FTableFlow.ValueFlowRate.ValueType := AGGREGATE_TYPE;
         IsFlowTemplateSet := True;
       end;
