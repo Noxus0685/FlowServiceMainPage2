@@ -21,7 +21,8 @@ uses
   uObservable,
   uParameter,
   uProtocols,
-  uRepositories;
+  uRepositories,
+  uSyncSetup;
 
 
 type
@@ -390,6 +391,7 @@ type
     FDevicesGridColumns: TArray<TGridColumnLayout>;
     FDataPointsGridColumns: TArray<TGridColumnLayout>;
     FResultsGridColumns: TArray<TGridColumnLayout>;
+    FSyncSetup: TSyncSetup;
 
     function GetValueTempertureBefore: TMeterValue;
     function GetValueTempertureAfter: TMeterValue;
@@ -638,6 +640,7 @@ type
     property DevicesGridColumns: TArray<TGridColumnLayout> read FDevicesGridColumns write FDevicesGridColumns;
     property DataPointsGridColumns: TArray<TGridColumnLayout> read FDataPointsGridColumns write FDataPointsGridColumns;
     property ResultsGridColumns: TArray<TGridColumnLayout> read FResultsGridColumns write FResultsGridColumns;
+    property SyncSetup: TSyncSetup read FSyncSetup;
 
     property NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
     property NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
@@ -1694,6 +1697,7 @@ begin
   inherited Create;
   FParameterObserver := TParameterObserverBridge.Create(Self);
   FUUID := TGUID.NewGuid.ToString;
+  FSyncSetup := TSyncSetup.Create;
 
   FDeviceChannels := TObjectList<TChannel>.Create(True);
   FEtalonChannels := TObjectList<TChannel>.Create(True);
@@ -2662,6 +2666,7 @@ begin
   FreeAndNil(FFluidPress);
   FreeAndNil(FlowRate);
   FreeAndNil(FTableFlow);
+  FreeAndNil(FSyncSetup);
   FDeviceChannels.Free;
   FEtalonChannels.Free;
   FreeAndNil(FPumps);
@@ -3081,7 +3086,8 @@ var
       begin
         SectionName := Trim(Sections[J]);
 
-        if StartsText('WorkTable.', SectionName) then
+        if StartsText('WorkTable.', SectionName) or
+           (StartsText('WorkTable_', SectionName) and EndsText('_Sync', SectionName)) then
           AIni.EraseSection(SectionName);
       end;
     finally
@@ -3199,6 +3205,7 @@ begin
       SaveGridColumns(Ini, Section + '.DeviceGrid', WorkTable.DevicesGridColumns);
       SaveGridColumns(Ini, Section + '.DataPointsGrid', WorkTable.DataPointsGridColumns);
       SaveGridColumns(Ini, Section + '.ResultsGrid', WorkTable.ResultsGridColumns);
+      WorkTable.SyncSetup.SaveToIni(Ini, 'WorkTable_' + WorkTable.UUID);
     end;
     Ini.UpdateFile;
     ValuesIni.UpdateFile;
@@ -3245,6 +3252,7 @@ begin
       WorkTable.UUID := Ini.ReadString(Section, 'UUID', WorkTable.UUID);
       if Trim(WorkTable.UUID) = '' then
         WorkTable.UUID := TGUID.NewGuid.ToString;
+      WorkTable.SyncSetup.LoadFromIni(Ini, 'WorkTable_' + WorkTable.UUID);
       WorkTable.Name := Ini.ReadString(Section, 'Name','0'); //BuildWorkTableServiceName(WorkTable.ID);
       WorkTable.Text := Ini.ReadString(Section, 'Text', 'Рабочий стол ' + IntToStr(WorkTable.ID));
       if Trim(WorkTable.Text) = '' then
