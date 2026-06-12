@@ -6226,8 +6226,8 @@ begin
 
     //if WorkTable.FlowRate.IsRunning the
 
-    if( WorkTable.FlowRate.Value.GetDoubleValue<=WorkTable.FlowRate.Max) and (WorkTable.FlowRate.Value.GetDoubleValue>=WorkTable.FlowRate.Min) then
-      LabelFlowRate.text:=WorkTable.FlowRate.Value.GetStrValue
+    if WorkTable.FlowRate.Value <> nil then
+      LabelFlowRate.Text := WorkTable.FlowRate.Value.GetStrValue
     else
       LabelFlowRate.Text := '-';
    // else
