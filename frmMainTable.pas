@@ -1939,6 +1939,9 @@ procedure TFrameMainTable.SpeedButtonSetFlowRateClick(Sender: TObject);
 var
 AValue:double;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
@@ -1948,6 +1951,9 @@ end;
 
 procedure TFrameMainTable.SpeedButtonStartPumpClick(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
 
     if FActiveWorkTable.ActivePump=nil then
     begin
@@ -1968,6 +1974,9 @@ var
 AValue:double;
 StableStatus: RStableInfo;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
 
   if  SameValue(FActiveWorkTable.FlowRate.ValueSet.Value ,SpinBoxFlowRate.Value, MinDouble) then
        Exit;
@@ -1984,6 +1993,9 @@ end;
 
 procedure TFrameMainTable.SpinBoxFreqChange(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3)  then
     begin
       FActiveWorkTable.ActivePump.DoFreqSet(NormalizeFloatInput(SpinBoxFreq.Text));
@@ -2077,6 +2089,9 @@ end;
 
 procedure TFrameMainTable.Rectangle14Click(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
     if FActiveWorkTable.ActivePump=nil then
     begin
          ProtocolManager.AddMessage(pcWarning, psForm, 'PumpStart', 'Пользователь попробовал остановить насос', 'Активного насоса нет!');
@@ -2093,6 +2108,9 @@ end;
 
 procedure TFrameMainTable.Rectangle15Click(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
  FActiveWorkTable.FlowRate.DoFlowRateStop;
  UpdateUIFlowRate;
 end;
@@ -2739,7 +2757,7 @@ begin
   WorkTable.UpdateAggregateMeterValues;
   WorkTable.RecalculateAllMeterValues;
   if FFrameProceed <> nil then
-    FFrameProceed.UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+    FFrameProceed.UpdateGridDataPointsHeaders(WorkTable.TableFlow.ValueVolume.GetDimName, WorkTable.TableFlow.ValueVolumeFlow.GetDimName);
 
   UpdateUIFromValues;
 
@@ -3308,6 +3326,9 @@ end;
 
 procedure TFrameMainTable.ActionPumpAddExecute(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
         FActiveWorkTable.AddPump('1');
         RefreshPumpsCombo;
         RefreshScalesCombo;
@@ -3317,6 +3338,9 @@ end;
 
 procedure TFrameMainTable.ActionPumpDeleteExecute(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
          if FActiveWorkTable.ActivePump=nil then
          Exit;
 
@@ -4081,6 +4105,9 @@ end;
 
 procedure TFrameMainTable.ComboBoxPumpsChange(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
   if  (LayoutPump.tag=0) or (LayoutPump.tag=3) then
     begin
       LayoutPump.tag:=0;
@@ -4151,6 +4178,9 @@ procedure TFrameMainTable.ActionDeleteDeviceExecute(Sender: TObject);
 var
  Src: TChannel;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
    Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
    FActiveWorkTable.DeleteChannel(Src);
    UpdateGrids;
@@ -4161,6 +4191,9 @@ procedure TFrameMainTable.ActionDeleteEtalonsExecute(Sender: TObject);
 var
   Src: TChannel;
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
    Src := GetSelectedChannel(FActiveWorkTable.EtalonChannels, GridEtalons);
    FActiveWorkTable.DeleteChannel(Src);
    UpdateGrids;
@@ -4842,6 +4875,9 @@ end;
 
 procedure TFrameMainTable.EditRepeatsExit(Sender: TObject);
 begin
+  if FActiveWorkTable = nil then
+    Exit;
+
     //Установка кол-ва повторов.
   FActiveWorkTable.Repeats:= StrToInt(EditRepeats.Text);
 
