@@ -2918,12 +2918,56 @@ end;
 procedure TWorkTable.RebindAllFlowMeters;
 var
   I: Integer;
+
+  function IsVolumeFlowUnitName(const AUnitName: string): Boolean;
+  begin
+    Result := SameText(AUnitName, 'л/с') or
+              SameText(AUnitName, 'л/мин') or
+              SameText(AUnitName, 'л/ч') or
+              SameText(AUnitName, 'м3/мин') or
+              SameText(AUnitName, 'м3/ч');
+  end;
+
+  procedure ApplySelectedUnitsToChannel(AChannel: TChannel);
+  var
+    Meter: TFlowMeter;
+  begin
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) or (FFlowUnitName = '') then
+      Exit;
+
+    Meter := AChannel.FlowMeter;
+    if IsVolumeFlowUnitName(FFlowUnitName) then
+    begin
+      Meter.ValueQuantity := Meter.ValueVolume;
+      Meter.ValueFlow := Meter.ValueVolumeFlow;
+      if (Meter.ValueVolume <> nil) and (FQuantityUnitName <> '') then
+        Meter.ValueVolume.SetDim(FQuantityUnitName);
+      if Meter.ValueVolumeFlow <> nil then
+        Meter.ValueVolumeFlow.SetDim(FFlowUnitName);
+    end
+    else
+    begin
+      Meter.ValueQuantity := Meter.ValueMass;
+      Meter.ValueFlow := Meter.ValueMassFlow;
+      if (Meter.ValueMass <> nil) and (FQuantityUnitName <> '') then
+        Meter.ValueMass.SetDim(FQuantityUnitName);
+      if Meter.ValueMassFlow <> nil then
+        Meter.ValueMassFlow.SetDim(FFlowUnitName);
+    end;
+  end;
+
 begin
   for I := 0 to FDeviceChannels.Count - 1 do
+  begin
     FDeviceChannels[I].RebindFlowMeterValues(Self);
+    ApplySelectedUnitsToChannel(FDeviceChannels[I]);
+  end;
 
    for I := 0 to FEtalonChannels.Count - 1 do
+   begin
     FEtalonChannels[I].RebindFlowMeterValues(Self);
+    ApplySelectedUnitsToChannel(FEtalonChannels[I]);
+   end;
 
   UpdateAggregateMeterValues;
   UpdateFlowRateLimitsByEtalons;
