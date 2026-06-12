@@ -1495,7 +1495,9 @@ var
   NextWorkTable: TWorkTable;
 begin
   NextWorkTable := nil;
-  if FWorkTableManager <> nil then
+  if (FWorkTableManager <> nil) and
+     (FWorkTableManager.WorkTables <> nil) and
+     (FWorkTableManager.WorkTables.IndexOf(FWorkTableManager.ActiveWorkTable) >= 0) then
     NextWorkTable := FWorkTableManager.ActiveWorkTable;
 
   FActiveWorkTable := NextWorkTable;
@@ -1542,6 +1544,9 @@ begin
       'Все связанные данные этого рабочего стола будут удалены.', [WorkTableName]),
       TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
     Exit;
+
+  if TreeViewDevices <> nil then
+    TreeViewDevices.Selected := nil;
 
   if FWorkTableManager.DeleteWorkTableByName(WorkTableName) then
     RefreshAfterWorkTableDeletion;
