@@ -6304,6 +6304,8 @@ var
   WorkTable: TWorkTable;
   Signal: Integer;
   Changed: Boolean;
+  Channel: TChannel;
+  NewValue: Double;
 begin
   if IsUpdating then
     Exit;
@@ -6315,41 +6317,66 @@ begin
   if (WorkTable <> nil) and (ARow >= 0) and (ARow < WorkTable.EtalonChannels.Count) then
   begin
     Changed := False;
+    Channel := WorkTable.EtalonChannels[ARow];
 
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
      begin
-      Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
-      WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
+      Changed := Channel.Enabled <> Value.AsBoolean;
+      Channel.Enabled := Value.AsBoolean;
       WorkTable.RebindAllFlowMeters;
      end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
     begin
-      Changed := WorkTable.EtalonChannels[ARow].Text <> Value.AsString;
-      WorkTable.EtalonChannels[ARow].Text := Value.AsString;
+      Changed := Channel.Text <> Value.AsString;
+      Channel.Text := Value.AsString;
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
     begin
-      Changed := WorkTable.EtalonChannels[ARow].TypeName <> Value.AsString;
-      WorkTable.EtalonChannels[ARow].TypeName := Value.AsString;
+      Changed := Channel.TypeName <> Value.AsString;
+      Channel.TypeName := Value.AsString;
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonSerial1 then
     begin
-      Changed := WorkTable.EtalonChannels[ARow].Serial <> Value.AsString;
-      WorkTable.EtalonChannels[ARow].Serial := Value.AsString;
+      Changed := Channel.Serial <> Value.AsString;
+      Channel.Serial := Value.AsString;
     end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
-      Changed := ApplyChannelDNChange(WorkTable.EtalonChannels[ARow], Value.AsString)
+      Changed := ApplyChannelDNChange(Channel, Value.AsString)
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
-        Changed := WorkTable.EtalonChannels[ARow].Signal <> Signal;
-        WorkTable.EtalonChannels[ARow].Signal := Signal;
-      end;
+        Changed := Channel.Signal <> Signal;
+        Channel.Signal := Signal;
+      end
+    else if (GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1) and
+            (Channel.Scale <> nil) then
+    begin
+      NewValue := NormalizeFloatInput(Value.AsString);
+      if WorkTable.ValueFlowRate <> nil then
+        NewValue := WorkTable.ValueFlowRate.GetDoubleBaseNum(NewValue, WorkTable.ValueFlowRate.CurrentDimIndex);
+      Changed := not SameValue(Channel.ValueSec, NewValue, MinDouble);
+      Channel.ValueSec := NewValue;
+      if Channel.ValueInterface <> nil then
+        Channel.ValueInterface.SetValue(Channel.ValueSec);
+      if Channel.Scale.ValueFlow <> nil then
+        Channel.Scale.ValueFlow.SetValue(Channel.ValueSec);
+    end
+    else if (GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1) and
+            (Channel.Scale <> nil) then
+    begin
+      NewValue := NormalizeFloatInput(Value.AsString);
+      if WorkTable.ValueQuantity <> nil then
+        NewValue := WorkTable.ValueQuantity.GetDoubleBaseNum(NewValue, WorkTable.ValueQuantity.CurrentDimIndex);
+      Changed := not SameValue(Channel.ValueResult, NewValue, MinDouble);
+      Channel.ValueResult := NewValue;
+      if Channel.Scale.ValueQuantity <> nil then
+        Channel.Scale.ValueQuantity.SetValue(Channel.ValueResult);
+    end;
 
     if Changed then
     begin
-      MarkChannelDeviceModified(WorkTable.EtalonChannels[ARow]);
-      RefreshActiveWorkTableViews(WorkTable.EtalonChannels[ARow]);
+      MarkChannelDeviceModified(Channel);
+      RefreshActiveWorkTableViews(Channel);
     end;
 
     Exit;
