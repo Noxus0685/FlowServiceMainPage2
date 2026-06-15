@@ -1056,26 +1056,23 @@ begin
   ComboBoxPumps.Items.Clear;
   ComboBoxPumps.ItemIndex := -1;
 
-  if (TPump.Pumps = nil) then
+  if TPump.Pumps = nil then
+  begin
     Exit;
+  end;
 
-  SelectedPumpName := Trim(ComboBoxPumps.Text);
+  SelectedPumpName := '';
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ActivePump <> nil) then
+    SelectedPumpName := FActiveWorkTable.ActivePump.Name;
+
   for Pump in TPump.Pumps do
-    ComboBoxPumps.Items.Add(Pump.Name);
+    if Pump <> nil then
+      ComboBoxPumps.Items.Add(Pump.Name);
 
   ItemIndex := -1;
   if SelectedPumpName <> '' then
     ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
-  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
-    ItemIndex := 0;
-
   ComboBoxPumps.ItemIndex := ItemIndex;
- { if ItemIndex >= 0 then
-    ComboBoxPumps.Text := ComboBoxPumps.Items[ItemIndex]
-  else
-    ComboBoxPumps.Text := '';   }
-
-
 end;
 
 procedure TFrameMainTable.RefreshScalesCombo;
@@ -1334,6 +1331,8 @@ begin
   begin
     if FActiveWorkTable = AWorkTable then
     begin
+      RefreshPumpsCombo;
+      RefreshScalesCombo;
       UpdateForm;
       if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
          (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
@@ -4171,6 +4170,8 @@ begin
     begin
       LayoutPump.tag:=0;
       FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
+      if FFrameWorkTableProperties <> nil then
+        FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
       UpdateUIPump;
     end;
 end;
@@ -4187,6 +4188,8 @@ begin
 
   LayoutScale.Tag := 0;
   FActiveWorkTable.SetActiveScale(ComboBoxScales.Text);
+  if FFrameWorkTableProperties <> nil then
+    FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
   UpdateUIScale;
 end;
 
