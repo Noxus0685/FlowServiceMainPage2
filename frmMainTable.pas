@@ -1056,26 +1056,26 @@ begin
   ComboBoxPumps.Items.Clear;
   ComboBoxPumps.ItemIndex := -1;
 
-  if (TPump.Pumps = nil) then
+  if TPump.Pumps = nil then
+  begin
+    ComboBoxPumps.Text := '';
     Exit;
+  end;
 
-  SelectedPumpName := Trim(ComboBoxPumps.Text);
+  SelectedPumpName := '';
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ActivePump <> nil) then
+    SelectedPumpName := FActiveWorkTable.ActivePump.Name;
+
   for Pump in TPump.Pumps do
-    ComboBoxPumps.Items.Add(Pump.Name);
+    if Pump <> nil then
+      ComboBoxPumps.Items.Add(Pump.Name);
 
   ItemIndex := -1;
   if SelectedPumpName <> '' then
     ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
-  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
-    ItemIndex := 0;
-
   ComboBoxPumps.ItemIndex := ItemIndex;
- { if ItemIndex >= 0 then
-    ComboBoxPumps.Text := ComboBoxPumps.Items[ItemIndex]
-  else
-    ComboBoxPumps.Text := '';   }
-
-
+  if ItemIndex < 0 then
+    ComboBoxPumps.Text := '';
 end;
 
 procedure TFrameMainTable.RefreshScalesCombo;
