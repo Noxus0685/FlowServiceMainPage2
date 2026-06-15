@@ -2698,7 +2698,10 @@ begin
 
   if NewMin > 0 then
     FlowRate.Min := NewMin;
-  if NewMax > 0 then
+  // Не занижаем вручную заданный максимум расхода при включении/выключении
+  // эталонов: эталонный Qmax используется только для расширения пустого/меньшего
+  // диапазона, иначе UI неожиданно сбрасывает максимум (например, до 36).
+  if (NewMax > 0) and ((FlowRate.Max <= 0) or (NewMax > FlowRate.Max)) then
     FlowRate.Max := NewMax;
 
   if FlowRate.ValueSet <> nil then
@@ -4846,7 +4849,9 @@ begin
     if Channel = nil then
       Continue;
 
-    if (Length(AImpSecValues) > I) then
+    if Channel.Scale <> nil then
+      ChannelImpSec := 0
+    else if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
