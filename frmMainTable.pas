@@ -3044,7 +3044,10 @@ begin
       begin
         FRows[TableCount].Enabled := WorkTable.EtalonChannels[TableCount].Enabled;
         FRows[TableCount].ChannelName := WorkTable.EtalonChannels[TableCount].Text;
-        FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].TypeName;
+        if WorkTable.EtalonChannels[TableCount].FlowMeter <> nil then
+          FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].FlowMeter.GetEtalonKindText
+        else
+          FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].TypeName;
         FRows[TableCount].Serial := WorkTable.EtalonChannels[TableCount].Serial;
         FRows[TableCount].SignalName := GetOutputTypeName(WorkTable.EtalonChannels[TableCount].Signal);
       end;
@@ -3230,9 +3233,14 @@ var
   Frm: TFormDeviceEditor;
   OldDeviceUUID: string;
   DeviceSelectResult: TModalResult;
+  IsEtalonChannel: Boolean;
 begin
   if AChannel = nil then
     Exit;
+
+  IsEtalonChannel := (FActiveWorkTable <> nil) and
+    (FActiveWorkTable.EtalonChannels <> nil) and
+    (FActiveWorkTable.EtalonChannels.IndexOf(AChannel) >= 0);
 
   OldDeviceUUID := Trim(AChannel.DeviceUUID);
   ADevice := nil;
@@ -3264,7 +3272,10 @@ begin
         Exit;
       end;
 
-      AChannel.FlowMeter.Init(SelDevice.UUID);
+      if IsEtalonChannel then
+        AChannel.RecreateEtalonByDevice(FActiveWorkTable, SelDevice)
+      else
+        AChannel.FlowMeter.Init(SelDevice.UUID);
 
       if AChannel.FlowMeter.Device <> nil then
       begin
@@ -3313,8 +3324,13 @@ begin
 
         if AChannel.FlowMeter <> nil then
         begin
-          AChannel.FlowMeter.Device := ADevice;
-          AChannel.FlowMeter.UpdateByDevice;
+          if IsEtalonChannel then
+            AChannel.RecreateEtalonByDevice(FActiveWorkTable, ADevice)
+          else
+          begin
+            AChannel.FlowMeter.Device := ADevice;
+            AChannel.FlowMeter.UpdateByDevice;
+          end;
         end;
       end;
 
@@ -6010,7 +6026,12 @@ begin
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
       Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
-      Value := WorkTable.EtalonChannels[ARow].TypeName
+    begin
+      if WorkTable.EtalonChannels[ARow].FlowMeter <> nil then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.GetEtalonKindText
+      else
+        Value := WorkTable.EtalonChannels[ARow].TypeName;
+    end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and

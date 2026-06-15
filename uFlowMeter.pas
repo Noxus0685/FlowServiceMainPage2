@@ -18,6 +18,7 @@ const
 
 type
   TFlowMeter = class;
+  TScale = class;
 
 {
   TFlowMeter – класс runtime-состояния прибора.
@@ -379,7 +380,10 @@ public
   procedure SetMeterCategory(const AMeterFlowType: string); overload;
   function GetMeterCategory: string;
   function ResolveStdCategoryFromDevice: EStdCategory;
-  procedure SetAsEtalon;
+  function IsScale: Boolean; virtual;
+  function IsFlowMeter: Boolean; virtual;
+  function GetEtalonKindText: string; virtual;
+  procedure SetAsEtalon; virtual;
 
   procedure SetImpCoef(AK: Double); overload;
   procedure SetImpCoef(AK: Single); overload;
@@ -408,6 +412,18 @@ public
   procedure ApplyCalibrCoefsToValues;
 
 end;
+
+TScale = class(TFlowMeter)
+public
+  function IsScale: Boolean; override;
+  function IsFlowMeter: Boolean; override;
+  function GetEtalonKindText: string; override;
+  procedure SetAsEtalon; override;
+end;
+
+function IsScaleDevice(ADevice: TDevice): Boolean;
+function CreateEtalonByDevice(ADevice: TDevice): TFlowMeter;
+
 implementation
 
 uses
@@ -417,6 +433,31 @@ uses
   uWorkTable;
 
 { TFlowMeter }
+
+function IsScaleDevice(ADevice: TDevice): Boolean;
+var
+  Cat: TDeviceCategory;
+begin
+  Result := False;
+
+  if (ADevice = nil) or (AppServices.DataManager = nil) then
+    Exit;
+
+  Cat := AppServices.DataManager.FindCategoryByID(ADevice.Category);
+  Result := (Cat <> nil) and (Cat.StdCategory = mftWeightsType);
+end;
+
+function CreateEtalonByDevice(ADevice: TDevice): TFlowMeter;
+begin
+  if IsScaleDevice(ADevice) then
+    Result := TScale.Create
+  else
+    Result := TFlowMeter.Create;
+
+  Result.Device := ADevice;
+  Result.SetAsEtalon;
+  Result.InitAllValues;
+end;
 
 
 
@@ -1937,12 +1978,49 @@ begin
   ApplyUpdateType(ValueVolumeError);
 end;
 
+function TFlowMeter.IsScale: Boolean;
+begin
+  Result := False;
+end;
+
+function TFlowMeter.IsFlowMeter: Boolean;
+begin
+  Result := True;
+end;
+
+function TFlowMeter.GetEtalonKindText: string;
+begin
+  Result := 'Расходомер';
+end;
+
 procedure TFlowMeter.SetAsEtalon;
 begin
   Name := 'Etalon';
   IsEtalon := True;
   SetMeterCategory(mftMassFlowmeterType);
   SetImpCoef(100);
+end;
+
+function TScale.IsScale: Boolean;
+begin
+  Result := True;
+end;
+
+function TScale.IsFlowMeter: Boolean;
+begin
+  Result := False;
+end;
+
+function TScale.GetEtalonKindText: string;
+begin
+  Result := 'Весы';
+end;
+
+procedure TScale.SetAsEtalon;
+begin
+  Name := 'Etalon';
+  IsEtalon := True;
+  SetMeterCategory(mftWeightsType);
 end;
 
 procedure TFlowMeter.SetCopy(AMeter: TFlowMeter);
