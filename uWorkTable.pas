@@ -1237,6 +1237,16 @@ begin
      (FValueCurrent = nil) or (FValueInterface = nil) then
     InitMeterValues;
 
+  if Scale <> nil then
+  begin
+    if AWorkTable <> nil then
+    begin
+      Scale.ValueFlow := AWorkTable.ValueFlowRate;
+      Scale.ValueQuantity := AWorkTable.ValueQuantity;
+    end;
+    Exit;
+  end;
+
   if FlowMeter = nil then
     Exit;
 

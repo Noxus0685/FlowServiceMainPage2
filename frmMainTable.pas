@@ -6060,34 +6060,46 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Serial
     else if GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
+      if (WorkTable.EtalonChannels[ARow].Scale <> nil) and
+         (WorkTable.EtalonChannels[ARow].Scale.ValueFlow <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Scale.ValueFlow.GetStrValue
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
+      if (WorkTable.EtalonChannels[ARow].Scale <> nil) and
+         (WorkTable.EtalonChannels[ARow].Scale.ValueQuantity <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Scale.ValueQuantity.GetStrValue
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
         Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+      if (WorkTable.EtalonChannels[ARow].Scale <> nil) and
+         (WorkTable.EtalonChannels[ARow].Scale.ValueFlow <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Scale.ValueFlow.GetStrValue
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
       else
         Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonRawSumValue1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
+      if (WorkTable.EtalonChannels[ARow].Scale <> nil) and
+         (WorkTable.EtalonChannels[ARow].Scale.ValueQuantity <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Scale.ValueQuantity.GetStrValue
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier.GetStrValue
       else
         Value := '0';

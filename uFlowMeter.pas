@@ -473,6 +473,15 @@ public
 end;
 
 TScale = class(TMeter)
+private
+  FValueFlow: TMeterValue;
+  FValueQuantity: TMeterValue;
+  HashValueFlow: string;
+  HashValueQuantity: string;
+  procedure SetValueFlow(const AValue: TMeterValue);
+  procedure SetValueQuantity(const AValue: TMeterValue);
+  function GetValueFlow: TMeterValue;
+  function GetValueQuantity: TMeterValue;
 public
   function GetMeterKind: EMeterKind; override;
   function IsScale: Boolean; override;
@@ -483,6 +492,8 @@ public
   procedure SetAsEtalon; override;
   procedure InitAllValues; override;
   procedure Reset; override;
+  property ValueFlow: TMeterValue read GetValueFlow write SetValueFlow;
+  property ValueQuantity: TMeterValue read GetValueQuantity write SetValueQuantity;
 end;
 
 function IsScaleDevice(ADevice: TDevice): Boolean;
@@ -2233,8 +2244,55 @@ begin
   IsEtalon := True;
 end;
 
-procedure TScale.InitAllValues;
+function TScale.GetValueFlow: TMeterValue;
 begin
+  Result := TMeterValue.GetMeterValue(HashValueFlow);
+  if Result = nil then
+    Result := FValueFlow;
+end;
+
+function TScale.GetValueQuantity: TMeterValue;
+begin
+  Result := TMeterValue.GetMeterValue(HashValueQuantity);
+  if Result = nil then
+    Result := FValueQuantity;
+end;
+
+procedure TScale.SetValueFlow(const AValue: TMeterValue);
+begin
+  FValueFlow := AValue;
+  if AValue <> nil then
+    HashValueFlow := AValue.Hash
+  else
+    HashValueFlow := '';
+end;
+
+procedure TScale.SetValueQuantity(const AValue: TMeterValue);
+begin
+  FValueQuantity := AValue;
+  if AValue <> nil then
+    HashValueQuantity := AValue.Hash
+  else
+    HashValueQuantity := '';
+end;
+
+procedure TScale.InitAllValues;
+var
+  IsExisted: Integer;
+begin
+  ValueFlow := TMeterValue.GetExistedMeterValueBool(HashValueFlow, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+  begin
+    ValueFlow.SetAsVolumeFlow;
+    ValueFlow.Description := 'Расход по весам';
+  end;
+
+  ValueQuantity := TMeterValue.GetExistedMeterValueBool(HashValueQuantity, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+  begin
+    ValueQuantity.SetAsVolume;
+    ValueQuantity.Description := 'Объем по весам';
+  end;
 end;
 
 procedure TScale.Reset;
