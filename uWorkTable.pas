@@ -160,7 +160,7 @@ type
     FValueSec: Double;
     FValueResult: Double;
 
-    FFlowMeter: TFlowMeter;
+    FMeter: TMeter;
     FValueImp: TMeterValue;
     FValueImpTotal: TMeterValue;
     FValueCurrent: TMeterValue;
@@ -256,7 +256,12 @@ type
 
     //property UUID: string read FUUID write FUUID;
 
-    property FlowMeter: TFlowMeter read FFlowMeter;
+    function GetFlowMeter: TFlowMeter;
+    function GetScale: TScale;
+
+    property Meter: TMeter read FMeter;
+    property FlowMeter: TFlowMeter read GetFlowMeter;
+    property Scale: TScale read GetScale;
 
     property Enabled: Boolean read FEnabled write FEnabled;
     property Name: string read FName write FName;
@@ -921,11 +926,12 @@ begin
     Exit;
 
   AChannel.DeviceUUID := ADevice.UUID;
-  if AChannel.FlowMeter <> nil then
+  if AChannel.Meter <> nil then
   begin
-    AChannel.FlowMeter.Device := ADevice;
-    AChannel.FlowMeter.DeviceUUID := ADevice.UUID;
-    AChannel.FlowMeter.UpdateByDevice;
+    AChannel.Meter.Device := ADevice;
+    AChannel.Meter.DeviceUUID := ADevice.UUID;
+    if AChannel.FlowMeter <> nil then
+      AChannel.FlowMeter.UpdateByDevice;
   end;
 
   if Trim(ADevice.DeviceTypeUUID) <> '' then
@@ -960,12 +966,12 @@ begin
   if (AChannel = nil) or (ARepo = nil) then
     Exit;
 
-  if AChannel.FlowMeter = nil then
+  if AChannel.Meter = nil then
     AChannel.RecreateFlowMeter(AWorkTable);
 
   DeviceUUID := Trim(AChannel.DeviceUUID);
-  if (DeviceUUID = '') and (AChannel.FlowMeter <> nil) then
-    DeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+  if (DeviceUUID = '') and (AChannel.Meter <> nil) then
+    DeviceUUID := Trim(AChannel.Meter.DeviceUUID);
   if DeviceUUID = '' then
     DeviceUUID := TGUID.NewGuid.ToString;
 
@@ -1151,13 +1157,29 @@ begin
   SetMeterValue(FValueInterface, FHashValueInterface, AValue);
 end;
 
-  { Creates a channel object, initializes defaults, and allocates linked meter values. }
+  function TChannel.GetFlowMeter: TFlowMeter;
+begin
+  if FMeter is TFlowMeter then
+    Result := TFlowMeter(FMeter)
+  else
+    Result := nil;
+end;
+
+function TChannel.GetScale: TScale;
+begin
+  if FMeter is TScale then
+    Result := TScale(FMeter)
+  else
+    Result := nil;
+end;
+
+{ Creates a channel object, initializes defaults, and allocates linked meter values. }
 constructor TChannel.Create;
 
 begin
   inherited Create;
 
-  FFlowMeter := TFlowMeter.Create;
+  FMeter := TFlowMeter.Create;
   FOutputSet := TControlRegister<EOutPutSet>.Create;
   FSyncMode := TControlRegister<ESyncChannelMode>.Create;
   FNoiseFilter := TControlRegister<Integer>.Create;
@@ -1175,7 +1197,7 @@ begin
   FCategory := mftUnknownType;
   FWorkTabeID := 0;
 
-  FFlowMeter.Name := 'Прибор ' + FName;
+  FMeter.Name := 'Прибор ' + FName;
 end;
 
 { Releases channel-owned resources and removes linked values from shared storage. }
@@ -1184,7 +1206,7 @@ begin
   FreeAndNil(FOutputSet);
   FreeAndNil(FSyncMode);
   FreeAndNil(FNoiseFilter);
-  FreeAndNil(FFlowMeter);
+  FreeAndNil(FMeter);
   inherited Destroy;
 end;
 
@@ -1192,44 +1214,54 @@ end;
 { Initializes channel FlowMeter links using the configured device UUID. }
 procedure TChannel.Init;
 begin
-  if not Assigned(FFlowMeter) then
+  if not Assigned(FMeter) then
     Exit;
 
-  FFlowMeter.Init(DeviceUUID);
-  if (FFlowMeter.Device <> nil) then
+  if FlowMeter <> nil then
+    FlowMeter.Init(DeviceUUID);
+  if (FMeter.Device <> nil) then
   begin
-    FOutputSet.FromDefault(IntToOutputSet(FFlowMeter.Device.OutputSet));
-    FSyncMode.FromDefault(IntToSyncChannelMode(FFlowMeter.Device.SyncMode));
-    FNoiseFilter.FromDefault(FFlowMeter.Device.NoiseFilter);
+    FOutputSet.FromDefault(IntToOutputSet(FMeter.Device.OutputSet));
+    FSyncMode.FromDefault(IntToSyncChannelMode(FMeter.Device.SyncMode));
+    FNoiseFilter.FromDefault(FMeter.Device.NoiseFilter);
   end;
 end;
                                          {TODO -oOwner -cGeneral : ActionItem}
 { Rebinds FlowMeter value references to channel and work table meter values. }
 procedure TChannel.RebindFlowMeterValues(const AWorkTable: TWorkTable);
 begin
-  if (FFlowMeter = nil) then
+  if (FMeter = nil) then
     Exit;
 
+  if (FValueImp = nil) or (FValueImpTotal = nil) or
+     (FValueCurrent = nil) or (FValueInterface = nil) then
+    InitMeterValues;
 
-  FFlowMeter.RebindCalculatedValues;
-  FFlowMeter.InitHashValues;
+  if Scale <> nil then
+    Exit;
+
+  if FlowMeter = nil then
+    Exit;
+
+  FlowMeter.RebindCalculatedValues;
+  FlowMeter.InitHashValues;
 
   // Pulse and current values are taken directly from the channel.
-  FFlowMeter.ValueImp := FValueImp;
-  FFlowMeter.ValueImpTotal := ValueImpResult;
-  FFlowMeter.ValueCurrent := FValueCurrent;
+  FlowMeter.ValueImp := FValueImp;
+  FlowMeter.ValueImpTotal := ValueImpResult;
+  FlowMeter.ValueCurrent := FValueCurrent;
   //Интерфейс тоже.
 
   if AWorkTable <> nil then
   begin
     // Temperature/pressure and atmospheric conditions are taken from the work table.
-    FFlowMeter.ValueTemperture := AWorkTable.ValueTemperture;
-    FFlowMeter.ValuePressure := AWorkTable.ValuePressure;
-    FFlowMeter.ValueDensity := AWorkTable.ValueDensity;
-    FFlowMeter.ValueAirPressure := AWorkTable.ValueAirPressure;
-    FFlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
-    FFlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
-    FFlowMeter.ValueTime := AWorkTable.ValueTime;
+    FlowMeter.ValueTemperture := AWorkTable.ValueTemperture;
+    FlowMeter.ValuePressure := AWorkTable.ValuePressure;
+    FlowMeter.ValueDensity := AWorkTable.ValueDensity;
+    FlowMeter.ValueAirPressure := AWorkTable.ValueAirPressure;
+    FlowMeter.ValueAirTemperture := AWorkTable.ValueAirTemperture;
+    FlowMeter.ValueHumidity := AWorkTable.ValueHumidity;
+    FlowMeter.ValueTime := AWorkTable.ValueTime;
   end;
 
 
@@ -1237,9 +1269,9 @@ end;
 
 procedure TChannel.RecreateFlowMeter(const AWorkTable: TWorkTable);
 begin
-  FreeAndNil(FFlowMeter);
-  FFlowMeter := TFlowMeter.Create;
-  FFlowMeter.Name := 'Прибор ' + FName;
+  FreeAndNil(FMeter);
+  FMeter := TFlowMeter.Create;
+  FMeter.Name := 'Прибор ' + FName;
 
   Init;
   RebindFlowMeterValues(AWorkTable);
@@ -1250,9 +1282,9 @@ begin
   if ADevice = nil then
     Exit;
 
-  FreeAndNil(FFlowMeter);
-  FFlowMeter := CreateEtalonByDevice(ADevice);
-  FFlowMeter.Name := 'Прибор ' + FName;
+  FreeAndNil(FMeter);
+  FMeter := CreateEtalonByDevice(ADevice);
+  FMeter.Name := 'Прибор ' + FName;
   DeviceUUID := ADevice.UUID;
   TypeUUID := ADevice.DeviceTypeUUID;
   TypeName := ADevice.DeviceTypeName;
@@ -1276,10 +1308,11 @@ begin
 
 
 
-  if FFlowMeter = nil then
+  if FMeter = nil then
   Exit;
 
-  FFlowMeter.CreateDevice;
+  if FlowMeter <> nil then
+    FlowMeter.CreateDevice;
 
   end;
 
@@ -1289,76 +1322,76 @@ var
   SrcDevice: TDevice;
   NewDevice: TDevice;
 begin
-  if (ASource = nil) or (ASource.FFlowMeter = nil) then
+  if (ASource = nil) or (ASource.FlowMeter = nil) then
     Exit;
 
   RecreateFlowMeter(AWorkTable);
 
-  FFlowMeter.UUID := ASource.FFlowMeter.UUID;
-  FFlowMeter.Name := ASource.FFlowMeter.Name;
-  FFlowMeter.DeviceUUID := ASource.FFlowMeter.DeviceUUID;
-  FFlowMeter.DeviceTypeName := ASource.FFlowMeter.DeviceTypeName;
-  FFlowMeter.DeviceTypeUUID := ASource.FFlowMeter.DeviceTypeUUID;
-  FFlowMeter.RepoTypeName := ASource.FFlowMeter.RepoTypeName;
-  FFlowMeter.RepoTypeUUID := ASource.FFlowMeter.RepoTypeUUID;
-  FFlowMeter.RepoDeviceName := ASource.FFlowMeter.RepoDeviceName;
-  FFlowMeter.RepoDeviceUUID := ASource.FFlowMeter.RepoDeviceUUID;
-  FFlowMeter.SerialNumber := ASource.FFlowMeter.SerialNumber;
-  FFlowMeter.OutputType := ASource.FFlowMeter.OutputType;
+  FlowMeter.UUID := ASource.FlowMeter.UUID;
+  FMeter.Name := ASource.FlowMeter.Name;
+  FlowMeter.DeviceUUID := ASource.FlowMeter.DeviceUUID;
+  FlowMeter.DeviceTypeName := ASource.FlowMeter.DeviceTypeName;
+  FlowMeter.DeviceTypeUUID := ASource.FlowMeter.DeviceTypeUUID;
+  FlowMeter.RepoTypeName := ASource.FlowMeter.RepoTypeName;
+  FlowMeter.RepoTypeUUID := ASource.FlowMeter.RepoTypeUUID;
+  FlowMeter.RepoDeviceName := ASource.FlowMeter.RepoDeviceName;
+  FlowMeter.RepoDeviceUUID := ASource.FlowMeter.RepoDeviceUUID;
+  FlowMeter.SerialNumber := ASource.FlowMeter.SerialNumber;
+  FlowMeter.OutputType := ASource.FlowMeter.OutputType;
 
-  FFlowMeter.Active := ASource.FFlowMeter.Active;
-  FFlowMeter.CheckType := ASource.FFlowMeter.CheckType;
-  FFlowMeter.Status := ASource.FFlowMeter.Status;
-  FFlowMeter.SendStatus := ASource.FFlowMeter.SendStatus;
-  FFlowMeter.FlowTypeName := ASource.FFlowMeter.FlowTypeName;
-  FFlowMeter.DocNumber := ASource.FFlowMeter.DocNumber;
-  FFlowMeter.Means := ASource.FFlowMeter.Means;
-  FFlowMeter.K1 := ASource.FFlowMeter.K1;
-  FFlowMeter.P1 := ASource.FFlowMeter.P1;
-  FFlowMeter.K2 := ASource.FFlowMeter.K2;
-  FFlowMeter.P2 := ASource.FFlowMeter.P2;
-  FFlowMeter.TempWater := ASource.FFlowMeter.TempWater;
-  FFlowMeter.Temperature := ASource.FFlowMeter.Temperature;
-  FFlowMeter.Pressure := ASource.FFlowMeter.Pressure;
-  FFlowMeter.Humidity := ASource.FFlowMeter.Humidity;
-  FFlowMeter.VrfDate := ASource.FFlowMeter.VrfDate;
-  FFlowMeter.Data1 := ASource.FFlowMeter.Data1;
-  FFlowMeter.Data2 := ASource.FFlowMeter.Data2;
-  FFlowMeter.Data3 := ASource.FFlowMeter.Data3;
-  FFlowMeter.Date1 := ASource.FFlowMeter.Date1;
-  FFlowMeter.Date2 := ASource.FFlowMeter.Date2;
-  FFlowMeter.ResultValue := ASource.FFlowMeter.ResultValue;
-  FFlowMeter.MeterDateTime := ASource.FFlowMeter.MeterDateTime;
-  FFlowMeter.ModifiedDateTime := ASource.FFlowMeter.ModifiedDateTime;
-  FFlowMeter.Kp := ASource.FFlowMeter.Kp;
-  FFlowMeter.FactoryKp := ASource.FFlowMeter.FactoryKp;
-  FFlowMeter.FreqMax := ASource.FFlowMeter.FreqMax;
-  FFlowMeter.FlowMax := ASource.FFlowMeter.FlowMax;
-  FFlowMeter.FlowMin := ASource.FFlowMeter.FlowMin;
-  FFlowMeter.QuantityMax := ASource.FFlowMeter.QuantityMax;
-  FFlowMeter.QuantityMin := ASource.FFlowMeter.QuantityMin;
-  FFlowMeter.Error := ASource.FFlowMeter.Error;
-  FFlowMeter.PointIndex := ASource.FFlowMeter.PointIndex;
-  FFlowMeter.Comment := ASource.FFlowMeter.Comment;
-  FFlowMeter.MeterFlowCategory := ASource.FFlowMeter.MeterFlowCategory;
+  FlowMeter.Active := ASource.FlowMeter.Active;
+  FlowMeter.CheckType := ASource.FlowMeter.CheckType;
+  FlowMeter.Status := ASource.FlowMeter.Status;
+  FlowMeter.SendStatus := ASource.FlowMeter.SendStatus;
+  FlowMeter.FlowTypeName := ASource.FlowMeter.FlowTypeName;
+  FlowMeter.DocNumber := ASource.FlowMeter.DocNumber;
+  FlowMeter.Means := ASource.FlowMeter.Means;
+  FlowMeter.K1 := ASource.FlowMeter.K1;
+  FlowMeter.P1 := ASource.FlowMeter.P1;
+  FlowMeter.K2 := ASource.FlowMeter.K2;
+  FlowMeter.P2 := ASource.FlowMeter.P2;
+  FlowMeter.TempWater := ASource.FlowMeter.TempWater;
+  FlowMeter.Temperature := ASource.FlowMeter.Temperature;
+  FlowMeter.Pressure := ASource.FlowMeter.Pressure;
+  FlowMeter.Humidity := ASource.FlowMeter.Humidity;
+  FlowMeter.VrfDate := ASource.FlowMeter.VrfDate;
+  FlowMeter.Data1 := ASource.FlowMeter.Data1;
+  FlowMeter.Data2 := ASource.FlowMeter.Data2;
+  FlowMeter.Data3 := ASource.FlowMeter.Data3;
+  FlowMeter.Date1 := ASource.FlowMeter.Date1;
+  FlowMeter.Date2 := ASource.FlowMeter.Date2;
+  FlowMeter.ResultValue := ASource.FlowMeter.ResultValue;
+  FlowMeter.MeterDateTime := ASource.FlowMeter.MeterDateTime;
+  FlowMeter.ModifiedDateTime := ASource.FlowMeter.ModifiedDateTime;
+  FlowMeter.Kp := ASource.FlowMeter.Kp;
+  FlowMeter.FactoryKp := ASource.FlowMeter.FactoryKp;
+  FlowMeter.FreqMax := ASource.FlowMeter.FreqMax;
+  FlowMeter.FlowMax := ASource.FlowMeter.FlowMax;
+  FlowMeter.FlowMin := ASource.FlowMeter.FlowMin;
+  FlowMeter.QuantityMax := ASource.FlowMeter.QuantityMax;
+  FlowMeter.QuantityMin := ASource.FlowMeter.QuantityMin;
+  FlowMeter.Error := ASource.FlowMeter.Error;
+  FlowMeter.PointIndex := ASource.FlowMeter.PointIndex;
+  FlowMeter.Comment := ASource.FlowMeter.Comment;
+  FlowMeter.MeterFlowCategory := ASource.FlowMeter.MeterFlowCategory;
   FCategory := ASource.FCategory;
   FGroup := ASource.FGroup;
   OutputSet := ASource.OutputSet;
   SyncMode := ASource.SyncMode;
   NoiseFilter := ASource.NoiseFilter;
 
-  SrcDevice := ASource.FFlowMeter.Device;
+  SrcDevice := ASource.FlowMeter.Device;
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
   begin
     NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
-    FFlowMeter.Device := NewDevice;
+    FlowMeter.Device := NewDevice;
   end
   else if SrcDevice <> nil then
   begin
-    FFlowMeter.DeviceTypeName := SrcDevice.DeviceTypeName;
-    FFlowMeter.DeviceTypeUUID := SrcDevice.DeviceTypeUUID;
-    FFlowMeter.SerialNumber := SrcDevice.SerialNumber;
-    FFlowMeter.OutputType := SrcDevice.OutputType;
+    FlowMeter.DeviceTypeName := SrcDevice.DeviceTypeName;
+    FlowMeter.DeviceTypeUUID := SrcDevice.DeviceTypeUUID;
+    FlowMeter.SerialNumber := SrcDevice.SerialNumber;
+    FlowMeter.OutputType := SrcDevice.OutputType;
   end;
 
   RebindFlowMeterValues(AWorkTable);
@@ -1371,38 +1404,38 @@ end;
 { Returns device type name from FlowMeter for proxy property access. }
 function TChannel.GetTypeNameProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.DeviceTypeName
+  if Assigned(FMeter) then
+    Result := FMeter.DeviceTypeName
   else
     Result := '';
 end;
 
 function TChannel.GetDeviceNameProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.DeviceName
+  if Assigned(FMeter) then
+    Result := FMeter.DeviceName
   else
     Result := '';
 end;
 
 procedure TChannel.SetDeviceNameProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.DeviceName := AValue;
+  if Assigned(FMeter) then
+    FMeter.DeviceName := AValue;
 end;
 
 { Updates FlowMeter device type name through proxy property. }
 procedure TChannel.SetTypeNameProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.DeviceTypeName := AValue;
+  if Assigned(FMeter) then
+    FMeter.DeviceTypeName := AValue;
 end;
 
 { Returns serial number from FlowMeter for proxy property access. }
 function TChannel.GetSerialProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.SerialNumber
+  if Assigned(FMeter) then
+    Result := FMeter.SerialNumber
   else
     Result := '';
 end;
@@ -1410,15 +1443,15 @@ end;
 { Updates FlowMeter serial number through proxy property. }
 procedure TChannel.SetSerialProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.SerialNumber := AValue;
+  if Assigned(FMeter) then
+    FMeter.SerialNumber := AValue;
 end;
 
 { Returns FlowMeter output signal type for proxy property access. }
 function TChannel.GetSignalProxy: Integer;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.OutputType
+  if Assigned(FMeter) then
+    Result := FMeter.OutputType
   else
     Result := -1;
 end;
@@ -1426,8 +1459,8 @@ end;
 { Updates FlowMeter output signal type through proxy property. }
 procedure TChannel.SetSignalProxy(const AValue: Integer);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.OutputType := AValue;
+  if Assigned(FMeter) then
+    FMeter.OutputType := AValue;
 end;
 
 function TChannel.GetOutputSetProxy: EOutPutSet;
@@ -1499,18 +1532,18 @@ end;
 
 function TChannel.GetCategoryProxy: Integer;
 begin
-  if Assigned(FFlowMeter) and Assigned(FFlowMeter.Device) then
-    Result := FFlowMeter.Device.Category
+  if Assigned(FMeter) and Assigned(FMeter.Device) then
+    Result := FMeter.Device.Category
   else
     Result := Ord(FCategory);
 end;
 
 procedure TChannel.SetCategoryProxy(const AValue: Integer);
 begin
-  if Assigned(FFlowMeter) and Assigned(FFlowMeter.Device) then
+  if Assigned(FMeter) and Assigned(FMeter.Device) then
   begin
-    FFlowMeter.Device.Category := AValue;
-    FFlowMeter.Device.State := osModified;
+    FMeter.Device.Category := AValue;
+    FMeter.Device.State := osModified;
   end
   else
     if (AValue >= Ord(Low(EStdCategory))) and (AValue <= Ord(High(EStdCategory))) then
@@ -1522,8 +1555,8 @@ end;
 { Returns bound FlowMeter device UUID for proxy property access. }
 function TChannel.GetDeviceUUIDProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.DeviceUUID
+  if Assigned(FMeter) then
+    Result := FMeter.DeviceUUID
   else
     Result := '';
 end;
@@ -1531,80 +1564,80 @@ end;
 { Updates FlowMeter device UUID through proxy property. }
 procedure TChannel.SetDeviceUUIDProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
+  if Assigned(FMeter) then
   begin
-    FFlowMeter.DeviceUUID := AValue;
+    FMeter.DeviceUUID := AValue;
   end;
 end;
 
 function TChannel.GetTypeUUIDProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.DeviceTypeUUID
+  if Assigned(FMeter) then
+    Result := FMeter.DeviceTypeUUID
   else
     Result := '';
 end;
 
 procedure TChannel.SetTypeUUIDProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.DeviceTypeUUID := AValue;
+  if Assigned(FMeter) then
+    FMeter.DeviceTypeUUID := AValue;
 end;
 
 function TChannel.GetRepoTypeNameProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.RepoTypeName
+  if Assigned(FMeter) then
+    Result := FMeter.RepoTypeName
   else
     Result := '';
 end;
 
 procedure TChannel.SetRepoTypeNameProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.RepoTypeName := AValue;
+  if Assigned(FMeter) then
+    FMeter.RepoTypeName := AValue;
 end;
 
 function TChannel.GetRepoTypeUUIDProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.RepoTypeUUID
+  if Assigned(FMeter) then
+    Result := FMeter.RepoTypeUUID
   else
     Result := '';
 end;
 
 procedure TChannel.SetRepoTypeUUIDProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.RepoTypeUUID := AValue;
+  if Assigned(FMeter) then
+    FMeter.RepoTypeUUID := AValue;
 end;
 
 function TChannel.GetRepoDeviceNameProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.RepoDeviceName
+  if Assigned(FMeter) then
+    Result := FMeter.RepoDeviceName
   else
     Result := '';
 end;
 
 procedure TChannel.SetRepoDeviceNameProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.RepoDeviceName := AValue;
+  if Assigned(FMeter) then
+    FMeter.RepoDeviceName := AValue;
 end;
 
 function TChannel.GetRepoDeviceUUIDProxy: string;
 begin
-  if Assigned(FFlowMeter) then
-    Result := FFlowMeter.RepoDeviceUUID
+  if Assigned(FMeter) then
+    Result := FMeter.RepoDeviceUUID
   else
     Result := '';
 end;
 
 procedure TChannel.SetRepoDeviceUUIDProxy(const AValue: string);
 begin
-  if Assigned(FFlowMeter) then
-    FFlowMeter.RepoDeviceUUID := AValue;
+  if Assigned(FMeter) then
+    FMeter.RepoDeviceUUID := AValue;
 end;
 
 // =====================================================
@@ -1709,8 +1742,9 @@ end;
 
 procedure TChannel.SetValues;
 begin
- if FFlowMeter<>nil then
-    FFlowMeter.SetValues;
+ if FMeter<>nil then
+    if FlowMeter <> nil then
+      FlowMeter.SetValues;
 end;
 
 
@@ -2474,6 +2508,8 @@ procedure TWorkTable.UpdateAggregateMeterValues;
 var
   I: Integer;
   Channel: TChannel;
+  ChannelValueQuantity: TMeterValue;
+  ChannelValueFlow: TMeterValue;
   AggregateGroup: Integer;
   IsAggregateGroupDefined: Boolean;
   IsQuantityTemplateSet: Boolean;
@@ -2492,7 +2528,23 @@ begin
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.Meter = nil) then
+      Continue;
+
+    ChannelValueQuantity := nil;
+    ChannelValueFlow := nil;
+    if Channel.Scale <> nil then
+    begin
+      ChannelValueQuantity := Channel.Scale.ValueQuantity;
+      ChannelValueFlow := Channel.Scale.ValueFlow;
+    end
+    else if Channel.FlowMeter <> nil then
+    begin
+      ChannelValueQuantity := Channel.FlowMeter.ValueQuantity;
+      ChannelValueFlow := Channel.FlowMeter.ValueFlow;
+    end;
+
+    if (ChannelValueQuantity = nil) and (ChannelValueFlow = nil) then
       Continue;
 
     if not IsAggregateGroupDefined then
@@ -2504,30 +2556,30 @@ begin
     if Channel.Group <> AggregateGroup then
       Continue;
 
-    if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
+    if (FTableFlow.ValueQuantity <> nil) and (ChannelValueQuantity <> nil) then
     begin
       if not IsQuantityTemplateSet then
       begin
-        FTableFlow.ValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
+        FTableFlow.ValueQuantity.SetAs(ChannelValueQuantity);
         if FQuantityUnitName <> '' then
           FTableFlow.ValueQuantity.SetDim(FQuantityUnitName);
         FTableFlow.ValueQuantity.ValueType := AGGREGATE_TYPE;
         IsQuantityTemplateSet := True;
       end;
-      FTableFlow.ValueQuantity.AddMeterValue(Channel.FlowMeter.ValueQuantity);
+      FTableFlow.ValueQuantity.AddMeterValue(ChannelValueQuantity);
     end;
 
-    if (FTableFlow.ValueFlowRate <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+    if (FTableFlow.ValueFlowRate <> nil) and (ChannelValueFlow <> nil) then
     begin
       if not IsFlowTemplateSet then
       begin
-        FTableFlow.ValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
+        FTableFlow.ValueFlowRate.SetAs(ChannelValueFlow);
         if FFlowUnitName <> '' then
           FTableFlow.ValueFlowRate.SetDim(FFlowUnitName);
         FTableFlow.ValueFlowRate.ValueType := AGGREGATE_TYPE;
         IsFlowTemplateSet := True;
       end;
-      FTableFlow.ValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
+      FTableFlow.ValueFlowRate.AddMeterValue(ChannelValueFlow);
     end;
   end;
 end;
@@ -2553,12 +2605,12 @@ begin
     begin
       Channel := FEtalonChannels[I];
       if (Channel = nil) or (not Channel.Enabled) or
-         (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
+         (Channel.FlowMeter = nil) or (Channel.Meter.Device = nil) then
         Continue;
-      if Channel.FlowMeter.IsScale then
+      if Channel.Meter.IsScale then
         Continue;
 
-      Device := Channel.FlowMeter.Device;
+      Device := Channel.Meter.Device;
       if Device.Qmax <= 0 then
         Continue;
 
@@ -2603,12 +2655,12 @@ begin
   begin
     Channel := FEtalonChannels[I];
     if (Channel = nil) or (not Channel.Enabled) or
-       (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
+       (Channel.FlowMeter = nil) or (Channel.Meter.Device = nil) then
       Continue;
-    if Channel.FlowMeter.IsScale then
+    if Channel.Meter.IsScale then
       Continue;
 
-    Device := Channel.FlowMeter.Device;
+    Device := Channel.Meter.Device;
     if Device.Qmin <= 0 then
       Continue;
 
@@ -2657,7 +2709,10 @@ begin
 
   if NewMin > 0 then
     FlowRate.Min := NewMin;
-  if NewMax > 0 then
+  // Не занижаем вручную заданный максимум расхода при включении/выключении
+  // эталонов: эталонный Qmax используется только для расширения пустого/меньшего
+  // диапазона, иначе UI неожиданно сбрасывает максимум (например, до 36).
+  if (NewMax > 0) and ((FlowRate.Max <= 0) or (NewMax > FlowRate.Max)) then
     FlowRate.Max := NewMax;
 
   if FlowRate.ValueSet <> nil then
@@ -2741,15 +2796,16 @@ begin
   for I := 0 to Count - 1 do
     begin
      // FDeviceChannels[i].Init;
-      if not Assigned(FDeviceChannels[i].FFlowMeter) then
+      if not Assigned(FDeviceChannels[i].FMeter) then
     Exit;
 
-  FDeviceChannels[i].FFlowMeter.Init();
-  {if (FDeviceChannels[i].FFlowMeter.Device <> nil) then
+  if FDeviceChannels[i].FlowMeter <> nil then
+    FDeviceChannels[i].FlowMeter.Init();
+  {if (FDeviceChannels[i].FMeter.Device <> nil) then
   begin
-    FDeviceChannels[i].FOutputSet.FromDefault(IntToOutputSet(FFlowMeter.Device.OutputSet));
-    FSyncMode.FromDefault(IntToSyncChannelMode(FFlowMeter.Device.SyncMode));
-    FNoiseFilter.FromDefault(FFlowMeter.Device.NoiseFilter);
+    FDeviceChannels[i].FOutputSet.FromDefault(IntToOutputSet(FMeter.Device.OutputSet));
+    FSyncMode.FromDefault(IntToSyncChannelMode(FMeter.Device.SyncMode));
+    FNoiseFilter.FromDefault(FMeter.Device.NoiseFilter);
   end;    }
 
 
@@ -2948,6 +3004,7 @@ begin
   Result.Text := BuildChannelDefaultText(ChannelIndex);
   Result.WorkTabeID := Self.ID;
   FEtalonChannels.Add(Result);
+  Result.InitMeterValues;
   Result.RebindFlowMeterValues(Self);
 end;
 
@@ -3620,8 +3677,8 @@ begin
     Channel.Init;
 
     if EndsText('.Etalon', ASectionPrefix) and (Channel.FlowMeter <> nil) and
-       (Channel.FlowMeter.Device <> nil) then
-      Channel.RecreateEtalonByDevice(nil, Channel.FlowMeter.Device);
+       (Channel.Meter.Device <> nil) then
+      Channel.RecreateEtalonByDevice(nil, Channel.Meter.Device);
 
     AChannels.Add(Channel);
   end;
@@ -4353,11 +4410,11 @@ begin
       for EtalonChannel in EtalonChannels do
         begin
       if (EtalonChannel.Enabled=True) and
-         (EtalonChannel.FlowMeter <> nil) and
-         (EtalonChannel.FlowMeter.Device <> nil) then
+         (EtalonChannel.Meter <> nil) and
+         (EtalonChannel.Meter.Device <> nil) then
       begin
-        Point.EtalonName := EtalonChannel.FlowMeter.Device.Name;
-        Point.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
+        Point.EtalonName := EtalonChannel.Meter.Device.Name;
+        Point.EtalonUUID := EtalonChannel.Meter.Device.UUID;
       end
       else
       begin
@@ -4386,11 +4443,11 @@ begin
       MeterValueCoef := DeviceChannel.FlowMeter.ValueCoef;
       if MeterValueCoef <> nil then
         CurrentCoef := MeterValueCoef.GetDoubleValue
-      else if DeviceChannel.FlowMeter.Device <> nil then
+      else if DeviceChannel.Meter.Device <> nil then
         CurrentCoef := DeviceChannel.FlowMeter.Device.Coef;
 
       if SameValue(CurrentCoef, 0.0, 1E-12) and
-         (DeviceChannel.FlowMeter.Device <> nil) then
+         (DeviceChannel.Meter.Device <> nil) then
       begin
         MeasuredDim := TMeasuredDimension(DeviceChannel.FlowMeter.Device.MeasuredDimension);
         case MeasuredDim of
@@ -4809,11 +4866,32 @@ begin
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec;
-    if AImpResult > 0 then
-      Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
+
+    if Channel.Scale <> nil then
+    begin
+      Channel.ImpSec := 0;
+      Channel.ImpResult := 0;
+      Channel.ValueSec := ChannelImpSec;
+      if AImpResult > 0 then
+        Channel.ValueResult := EnsureRange(AImpResult, 0.0, 1.0E12)
+      else
+        Channel.ValueResult := EnsureRange(Channel.ValueResult + Channel.ValueSec, 0.0, 1.0E12);
+
+      if Channel.ValueInterface <> nil then
+        Channel.ValueInterface.SetValue(Channel.ValueSec);
+      if Channel.Scale.ValueFlow <> nil then
+        Channel.Scale.ValueFlow.SetValue(Channel.ValueSec);
+      if Channel.Scale.ValueQuantity <> nil then
+        Channel.Scale.ValueQuantity.SetValue(Channel.ValueResult);
+    end
     else
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    begin
+      Channel.ImpSec := ChannelImpSec;
+      if AImpResult > 0 then
+        Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
+      else
+        Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    end;
   end;
 end;
 
@@ -5085,17 +5163,28 @@ end;
 function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
 begin
   Result := 0.0;
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+  if (AChannel = nil) or (AChannel.Meter = nil) then
     Exit;
 
-  if (AChannel.FlowMeter.ValueCoef <> nil) then
-    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+  if AChannel.FlowMeter <> nil then
+  begin
+    if AChannel.FlowMeter.ValueCoef <> nil then
+      Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
 
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
+    if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.Meter.Device) then
+      Result := AChannel.FlowMeter.Device.Coef;
 
-  if SameValue(Result, 0.0, 1E-12) then
-    Result := AChannel.FlowMeter.Kp;
+    if SameValue(Result, 0.0, 1E-12) then
+      Result := AChannel.FlowMeter.Kp;
+  end
+  else if AChannel.Scale <> nil then
+  begin
+    if Assigned(AChannel.Meter.Device) then
+      Result := AChannel.Meter.Device.Coef;
+
+    if SameValue(Result, 0.0, 1E-12) then
+      Result := 1;
+  end;
 end;
 
 function TWorkTableManager.UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable;
@@ -5146,7 +5235,7 @@ function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkT
   AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
   I: Integer;
-  Coef, SUM, MaxRatio: Double;
+  Coef, SUM, MaxRatio, ChannelQmax: Double;
 begin
   SetLength(Result, 0);
   if (AWorkTable = nil) or (AChannels = nil) then
@@ -5154,15 +5243,30 @@ begin
 
   SUM := 0;
   for I := 0 to AChannels.Count - 1 do
-    SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+    if (AChannels[I] <> nil) and (AChannels[I].Meter <> nil) and
+       (AChannels[I].Meter.Device <> nil) then
+    begin
+      ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].Meter.Device.Qmax, 4);
+      if SameValue(ChannelQmax, 0.0, 1e-12) then
+        ChannelQmax := 1;
+      SUM := SUM + ChannelQmax;
+    end;
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
     if SameValue(SUM, 0.0, 1e-12) then
-      MaxRatio := 0
+      MaxRatio := 1 / AChannels.Count
+    else if (AChannels[I] <> nil) and (AChannels[I].Meter <> nil) and
+            (AChannels[I].Meter.Device <> nil) then
+    begin
+      ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].Meter.Device.Qmax, 4);
+      if SameValue(ChannelQmax, 0.0, 1e-12) then
+        ChannelQmax := 1;
+      MaxRatio := ChannelQmax / SUM;
+    end
     else
-      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+      MaxRatio := 0;
 
     Coef := GetChannelFlowCoef(AChannels[I]);
     if Coef > 0 then
