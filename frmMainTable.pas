@@ -4465,9 +4465,6 @@ var
   I: Integer;
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
-  ScaleQuantity: Double;
-  ScaleFlow: Double;
-  DeltaSeconds: Double;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4498,18 +4495,6 @@ begin
 
     if EtalonChannel.Scale <> nil then
     begin
-      ScaleQuantity := WorkTable.DisplayWeight;
-      DeltaSeconds := TimerMain.Interval / 1000;
-      if DeltaSeconds <= 0 then
-        DeltaSeconds := 1;
-
-      ScaleFlow := 0;
-      if EtalonChannel.ValueResult > 0 then
-        ScaleFlow := Abs(ScaleQuantity - EtalonChannel.ValueResult) / DeltaSeconds * 3600;
-
-      EtalonChannel.ValueSec := ScaleFlow;
-      EtalonChannel.ValueResult := ScaleQuantity;
-
       if EtalonChannel.ValueInterface <> nil then
         EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
       if EtalonChannel.Scale.ValueFlow <> nil then
