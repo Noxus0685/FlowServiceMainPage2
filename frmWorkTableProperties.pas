@@ -1,4 +1,4 @@
-unit frmWorkTableProperties;
+﻿unit frmWorkTableProperties;
 
 interface
 
