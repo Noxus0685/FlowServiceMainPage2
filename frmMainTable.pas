@@ -1058,7 +1058,6 @@ begin
 
   if TPump.Pumps = nil then
   begin
-    ComboBoxPumps.Text := '';
     Exit;
   end;
 
@@ -1074,8 +1073,6 @@ begin
   if SelectedPumpName <> '' then
     ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
   ComboBoxPumps.ItemIndex := ItemIndex;
-  if ItemIndex < 0 then
-    ComboBoxPumps.Text := '';
 end;
 
 procedure TFrameMainTable.RefreshScalesCombo;
