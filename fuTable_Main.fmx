@@ -1585,15 +1585,14 @@ object TableMainForm: TTableMainForm
         Value = 0.100000000000000000
         OnChange = TrackStdChange
       end
-      object ActiveWorkTable: TEdit
+      object EditInstrumentName: TEdit
         Touch.InteractiveGestures = [LongTap, DoubleTap]
         TabOrder = 1
         Position.X = 200.000000000000000000
         Position.Y = 312.000000000000000000
         KillFocusByReturn = True
-        OnChangeTracking = ActiveWorkTableChangeTracking
-        OnKeyDown = ActiveWorkTableKeyDown
-        OnExit = ActiveWorkTableExit
+        Text = '1'
+        OnChangeTracking = EditInstrumentNameChangeTracking
       end
     end
   end

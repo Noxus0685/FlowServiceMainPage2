@@ -618,7 +618,8 @@ type
 
   private
 
-  FActiveWorkTable: TWorkTable;
+    FActiveWorkTable: TWorkTable;
+    FNewInstrumentName: string;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
@@ -648,6 +649,7 @@ type
     // Проверяет, что ссылка на рабочий стол ещё принадлежит менеджеру.
     function IsManagedWorkTable(AWorkTable: TWorkTable): Boolean;
     function CanEditActiveWorkTable: Boolean;
+    function GetNewInstrumentName: string;
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
     procedure UpdateGridDevices;
@@ -743,6 +745,7 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
     procedure ReleaseEmptyGridDevicesBeforeSave;
+    property NewInstrumentName: string read FNewInstrumentName write FNewInstrumentName;
     property OnWorkTableCommand: TWorkTableCommandEvent read FOnWorkTableCommand write FOnWorkTableCommand;
 
 
@@ -3348,12 +3351,20 @@ begin
   SelectDeviceForChannel(Ch);
 end;
 
+
+function TFrameMainTable.GetNewInstrumentName: string;
+begin
+  Result := Trim(FNewInstrumentName);
+  if Result = '' then
+    Result := '1';
+end;
+
 procedure TFrameMainTable.ActionPumpAddExecute(Sender: TObject);
 begin
   if FActiveWorkTable = nil then
     Exit;
 
-        FActiveWorkTable.AddPump('1');
+        FActiveWorkTable.AddPump(GetNewInstrumentName);
         RefreshPumpsCombo;
         RefreshScalesCombo;
         UpdateUIPump;
@@ -3381,7 +3392,7 @@ begin
   if FActiveWorkTable = nil then
     Exit;
 
-  FActiveWorkTable.AddScale('1');
+  FActiveWorkTable.AddScale(GetNewInstrumentName);
   RefreshScalesCombo;
   UpdateUIScale;
 end;
