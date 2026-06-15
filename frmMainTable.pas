@@ -4490,7 +4490,21 @@ begin
   for I := 0 to WorkTable.EtalonChannels.Count - 1 do
   begin
     EtalonChannel := WorkTable.EtalonChannels[I];
-    if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
+    if (EtalonChannel = nil) or (EtalonChannel.Meter = nil) then
+      Continue;
+
+    if EtalonChannel.Scale <> nil then
+    begin
+      if EtalonChannel.ValueInterface <> nil then
+        EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
+      if EtalonChannel.Scale.ValueFlow <> nil then
+        EtalonChannel.Scale.ValueFlow.SetValue(EtalonChannel.ValueSec);
+      if EtalonChannel.Scale.ValueQuantity <> nil then
+        EtalonChannel.Scale.ValueQuantity.SetValue(EtalonChannel.ValueResult);
+      Continue;
+    end;
+
+    if EtalonChannel.FlowMeter = nil then
       Continue;
 
     EtalonChannel.ValueCurrent.SetValue(EtalonChannel.CurSec);
