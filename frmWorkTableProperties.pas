@@ -63,11 +63,9 @@ type
     ButtonSelectTemperture: TButton;
     ButtonSelectFlowRate: TButton;
     ButtonSelectQuantity: TButton;
-    ComboPumps: TComboBox;
     EditPumpName: TEdit;
     ButtonPumpAdd: TButton;
     ButtonPumpDelete: TButton;
-    ComboScales: TComboBox;
     EditScaleName: TEdit;
     ButtonScaleAdd: TButton;
     ButtonScaleDelete: TButton;
@@ -76,8 +74,8 @@ type
     procedure AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
     procedure AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
     procedure AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
-    procedure AddInstrumentRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox;
-      out AEdit: TEdit; out AAddButton, ADeleteButton: TButton; AOnAddClick, AOnDeleteClick: TNotifyEvent);
+    procedure AddInstrumentRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
+      out AAddButton, ADeleteButton: TButton; AOnAddClick, AOnDeleteClick: TNotifyEvent);
     procedure AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
       out AButton: TButton; AOnClick: TNotifyEvent);
     function AddCategory(const ACaption: string): TTreeViewItem;
@@ -88,7 +86,7 @@ type
     function MeterValueByKind(const AKind: Integer): TMeterValue;
     procedure RefreshValues;
     procedure FillChannelCombo;
-    procedure RefreshInstrumentCombos;
+    procedure RefreshInstrumentEdits;
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
     procedure HandleSyncComboChange(Sender: TObject);
@@ -209,11 +207,11 @@ begin
   AddLabelRow(GeneralCategory, 'Текущее состояние', LabelWorkTableState);
 
   PumpsCategory := AddCategory('Насосы');
-  AddInstrumentRow(PumpsCategory, 'Насос', ComboPumps, EditPumpName, ButtonPumpAdd, ButtonPumpDelete,
+  AddInstrumentRow(PumpsCategory, 'Насос', EditPumpName, ButtonPumpAdd, ButtonPumpDelete,
     ButtonPumpAddClick, ButtonPumpDeleteClick);
 
   ScalesCategory := AddCategory('Весы');
-  AddInstrumentRow(ScalesCategory, 'Весы', ComboScales, EditScaleName, ButtonScaleAdd, ButtonScaleDelete,
+  AddInstrumentRow(ScalesCategory, 'Весы', EditScaleName, ButtonScaleAdd, ButtonScaleDelete,
     ButtonScaleAddClick, ButtonScaleDeleteClick);
 
   VerticalSyncCategory := AddCategory('Вход синхронизация');
@@ -434,8 +432,7 @@ begin
 end;
 
 procedure TFrameWorkTableProperties.AddInstrumentRow(AParent: TTreeViewItem; const ACaption: string;
-  out ACombo: TComboBox; out AEdit: TEdit; out AAddButton, ADeleteButton: TButton;
-  AOnAddClick, AOnDeleteClick: TNotifyEvent);
+  out AEdit: TEdit; out AAddButton, ADeleteButton: TButton; AOnAddClick, AOnDeleteClick: TNotifyEvent);
 var
   Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
@@ -445,7 +442,7 @@ begin
   Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
   Item.Text := '';
-  Item.Height := 72;
+  Item.Height := 36;
   Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
@@ -474,11 +471,6 @@ begin
   ValueLayout.Stored := False;
   RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
 
-  ACombo := TComboBox.Create(Self);
-  ACombo.Parent := ValueLayout;
-  ACombo.Align := TAlignLayout.Top;
-  ACombo.Height := 30;
-
   ADeleteButton := TButton.Create(Self);
   ADeleteButton.Parent := ValueLayout;
   ADeleteButton.Align := TAlignLayout.Right;
@@ -498,7 +490,6 @@ begin
   AEdit := TEdit.Create(Self);
   AEdit.Parent := ValueLayout;
   AEdit.Align := TAlignLayout.Client;
-  AEdit.Margins.Top := 4;
   AEdit.KillFocusByReturn := True;
 end;
 
@@ -741,7 +732,7 @@ begin
       EditFlowRateMax.Text := '';
       EditQuantityMin.Text := '';
       EditQuantityMax.Text := '';
-      RefreshInstrumentCombos;
+      RefreshInstrumentEdits;
       Exit;
     end;
 
@@ -750,7 +741,7 @@ begin
     LabelWorkTableUUID.Text := FWorkTable.UUID;
     LabelWorkTableState.Text := WorkTableStateToCaption(FWorkTable.State);
     FillChannelCombo;
-    RefreshInstrumentCombos;
+    RefreshInstrumentEdits;
     EditPressure.Text := MeterValueToText(FWorkTable.ValuePressure);
     EditTemperture.Text := MeterValueToText(FWorkTable.ValueTemperture);
     EditFlowRate.Text := MeterValueToText(FWorkTable.ValueFlowRate);
@@ -1007,14 +998,12 @@ begin
   EditFlowRateMax.Enabled := CanEdit;
   EditQuantityMin.Enabled := CanEdit;
   EditQuantityMax.Enabled := CanEdit;
-  ComboPumps.Enabled := CanEdit;
   EditPumpName.Enabled := CanEdit;
   ButtonPumpAdd.Enabled := CanEdit;
-  ButtonPumpDelete.Enabled := CanEdit and (ComboPumps.ItemIndex >= 0);
-  ComboScales.Enabled := CanEdit;
+  ButtonPumpDelete.Enabled := CanEdit;
   EditScaleName.Enabled := CanEdit;
   ButtonScaleAdd.Enabled := CanEdit;
-  ButtonScaleDelete.Enabled := CanEdit and (ComboScales.ItemIndex >= 0);
+  ButtonScaleDelete.Enabled := CanEdit;
   UpdateSyncControlsState;
 end;
 
@@ -1121,16 +1110,8 @@ begin
 end;
 
 
-procedure TFrameWorkTableProperties.RefreshInstrumentCombos;
-var
-  I: Integer;
-  SelectedName: string;
+procedure TFrameWorkTableProperties.RefreshInstrumentEdits;
 begin
-  ComboPumps.Items.Clear;
-  ComboPumps.ItemIndex := -1;
-  ComboScales.Items.Clear;
-  ComboScales.ItemIndex := -1;
-
   if FWorkTable = nil then
   begin
     EditPumpName.Text := '';
@@ -1138,31 +1119,15 @@ begin
     Exit;
   end;
 
-  if FWorkTable.Pumps <> nil then
-    for I := 0 to FWorkTable.Pumps.Count - 1 do
-      if FWorkTable.Pumps[I] <> nil then
-        ComboPumps.Items.Add(FWorkTable.Pumps[I].Name);
-
-  SelectedName := '';
   if FWorkTable.ActivePump <> nil then
-    SelectedName := FWorkTable.ActivePump.Name;
-  if SelectedName <> '' then
-    ComboPumps.ItemIndex := ComboPumps.Items.IndexOf(SelectedName);
-  if (ComboPumps.ItemIndex < 0) and (ComboPumps.Items.Count > 0) then
-    ComboPumps.ItemIndex := 0;
+    EditPumpName.Text := FWorkTable.ActivePump.Name
+  else
+    EditPumpName.Text := '';
 
-  if FWorkTable.Scales <> nil then
-    for I := 0 to FWorkTable.Scales.Count - 1 do
-      if FWorkTable.Scales[I] <> nil then
-        ComboScales.Items.Add(FWorkTable.Scales[I].Name);
-
-  SelectedName := '';
   if FWorkTable.ActiveScale <> nil then
-    SelectedName := FWorkTable.ActiveScale.Name;
-  if SelectedName <> '' then
-    ComboScales.ItemIndex := ComboScales.Items.IndexOf(SelectedName);
-  if (ComboScales.ItemIndex < 0) and (ComboScales.Items.Count > 0) then
-    ComboScales.ItemIndex := 0;
+    EditScaleName.Text := FWorkTable.ActiveScale.Name
+  else
+    EditScaleName.Text := '';
 end;
 
 procedure TFrameWorkTableProperties.NotifyRefreshIfChanged(const AChanged: Boolean);
@@ -1217,18 +1182,22 @@ begin
   if Name = '' then
     Name := '1';
   FWorkTable.AddPump(Name);
-  RefreshInstrumentCombos;
   ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
 
 procedure TFrameWorkTableProperties.ButtonPumpDeleteClick(Sender: TObject);
+var
+  Name: string;
 begin
-  if (FWorkTable = nil) or (ComboPumps.ItemIndex < 0) then
+  if FWorkTable = nil then
     Exit;
 
-  FWorkTable.RemovePump(FWorkTable.FindPumpByName(ComboPumps.Items[ComboPumps.ItemIndex]));
-  RefreshInstrumentCombos;
+  Name := Trim(EditPumpName.Text);
+  if Name = '' then
+    Exit;
+
+  FWorkTable.RemovePump(FWorkTable.FindPumpByName(Name));
   ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
@@ -1244,18 +1213,22 @@ begin
   if Name = '' then
     Name := '1';
   FWorkTable.AddScale(Name);
-  RefreshInstrumentCombos;
   ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
 
 procedure TFrameWorkTableProperties.ButtonScaleDeleteClick(Sender: TObject);
+var
+  Name: string;
 begin
-  if (FWorkTable = nil) or (ComboScales.ItemIndex < 0) then
+  if FWorkTable = nil then
     Exit;
 
-  FWorkTable.RemoveScale(FWorkTable.FindScaleByName(ComboScales.Items[ComboScales.ItemIndex]));
-  RefreshInstrumentCombos;
+  Name := Trim(EditScaleName.Text);
+  if Name = '' then
+    Exit;
+
+  FWorkTable.RemoveScale(FWorkTable.FindScaleByName(Name));
   ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
