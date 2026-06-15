@@ -926,11 +926,12 @@ begin
     Exit;
 
   AChannel.DeviceUUID := ADevice.UUID;
-  if AChannel.FlowMeter <> nil then
+  if AChannel.Meter <> nil then
   begin
-    AChannel.FlowMeter.Device := ADevice;
-    AChannel.FlowMeter.DeviceUUID := ADevice.UUID;
-    AChannel.FlowMeter.UpdateByDevice;
+    AChannel.Meter.Device := ADevice;
+    AChannel.Meter.DeviceUUID := ADevice.UUID;
+    if AChannel.FlowMeter <> nil then
+      AChannel.FlowMeter.UpdateByDevice;
   end;
 
   if Trim(ADevice.DeviceTypeUUID) <> '' then
@@ -965,12 +966,12 @@ begin
   if (AChannel = nil) or (ARepo = nil) then
     Exit;
 
-  if AChannel.FlowMeter = nil then
+  if AChannel.Meter = nil then
     AChannel.RecreateFlowMeter(AWorkTable);
 
   DeviceUUID := Trim(AChannel.DeviceUUID);
-  if (DeviceUUID = '') and (AChannel.FlowMeter <> nil) then
-    DeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+  if (DeviceUUID = '') and (AChannel.Meter <> nil) then
+    DeviceUUID := Trim(AChannel.Meter.DeviceUUID);
   if DeviceUUID = '' then
     DeviceUUID := TGUID.NewGuid.ToString;
 
@@ -4381,11 +4382,11 @@ begin
       for EtalonChannel in EtalonChannels do
         begin
       if (EtalonChannel.Enabled=True) and
-         (EtalonChannel.FlowMeter <> nil) and
+         (EtalonChannel.Meter <> nil) and
          (EtalonChannel.Meter.Device <> nil) then
       begin
-        Point.EtalonName := EtalonChannel.FlowMeter.Device.Name;
-        Point.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
+        Point.EtalonName := EtalonChannel.Meter.Device.Name;
+        Point.EtalonUUID := EtalonChannel.Meter.Device.UUID;
       end
       else
       begin
