@@ -1233,6 +1233,9 @@ begin
   if (FMeter = nil) then
     Exit;
 
+  if (FValueImp = nil) or (FValueImpTotal = nil) or
+     (FValueCurrent = nil) or (FValueInterface = nil) then
+    InitMeterValues;
 
   if FlowMeter = nil then
     Exit;
@@ -2977,6 +2980,7 @@ begin
   Result.Text := BuildChannelDefaultText(ChannelIndex);
   Result.WorkTabeID := Self.ID;
   FEtalonChannels.Add(Result);
+  Result.InitMeterValues;
   Result.RebindFlowMeterValues(Self);
 end;
 
