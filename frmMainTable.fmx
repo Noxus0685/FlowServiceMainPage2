@@ -4816,11 +4816,23 @@ object FrameMainTable: TFrameMainTable
         ImageIndex = -1
       end
       object MenuItemAddPump: TMenuItem
+        Visible = False
         Action = ActionPumpAdd
         ImageIndex = -1
       end
       object MenuItemDeletePump: TMenuItem
+        Visible = False
         Action = ActionPumpDelete
+        ImageIndex = -1
+      end
+      object MenuItemAddScale: TMenuItem
+        Visible = False
+        Action = ActionScaleAdd
+        ImageIndex = -1
+      end
+      object MenuItemDeleteScale: TMenuItem
+        Visible = False
+        Action = ActionScaleDelete
         ImageIndex = -1
       end
     end
@@ -4910,12 +4922,26 @@ object FrameMainTable: TFrameMainTable
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesAddPump: TMenuItem
+        Visible = False
           Action = ActionPumpAdd
           Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesDeletePump: TMenuItem
+        Visible = False
           Action = ActionPumpDelete
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesAddScale: TMenuItem
+        Visible = False
+          Action = ActionScaleAdd
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesDeleteScale: TMenuItem
+        Visible = False
+          Action = ActionScaleDelete
           Locked = True
           ImageIndex = -1
         end
@@ -5202,12 +5228,26 @@ object FrameMainTable: TFrameMainTable
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesAddPump: TMenuItem
+        Visible = False
           Action = ActionPumpAdd
           Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesDeletePump: TMenuItem
+        Visible = False
           Action = ActionPumpDelete
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesAddScale: TMenuItem
+        Visible = False
+          Action = ActionScaleAdd
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesDeleteScale: TMenuItem
+        Visible = False
+          Action = ActionScaleDelete
           Locked = True
           ImageIndex = -1
         end
@@ -5451,25 +5491,25 @@ object FrameMainTable: TFrameMainTable
           TabPosition = PlatformDefault
           Sizes = (
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s
+            448s
             674s
-            427s)
+            448s)
           object TabItemMeasurmentRun: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 105.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5483,8 +5523,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 81.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5498,8 +5538,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 120.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5513,8 +5553,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 95.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5528,8 +5568,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 74.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5539,7 +5579,7 @@ object FrameMainTable: TFrameMainTable
             object LayoutProtocolHost: TLayout
               Align = Client
               Size.Width = 674.000000000000000000
-              Size.Height = 427.000000000000000000
+              Size.Height = 448.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
             end
@@ -5550,8 +5590,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 138.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5590,8 +5630,8 @@ object FrameMainTable: TFrameMainTable
             OnEditingDone = GridDevicesEditingDone
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1037.000000000000000000
-            Viewport.Height = 212.000000000000000000
+            Viewport.Width = 1057.000000000000000000
+            Viewport.Height = 253.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -5825,8 +5865,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1053.000000000000000000
-              Viewport.Height = 79.000000000000000000
+              Viewport.Width = 1057.000000000000000000
+              Viewport.Height = 120.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -6116,6 +6156,18 @@ object FrameMainTable: TFrameMainTable
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1085#1072#1089#1086#1089' '
       Hint = #1059#1076#1072#1083#1080#1090#1100' '#1085#1072#1089#1086#1089' '
       OnExecute = ActionPumpDeleteExecute
+    end
+    object ActionScaleAdd: TAction
+      Category = 'WorkTable'
+      Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1074#1077#1089#1099
+      Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1074#1077#1089#1099
+      OnExecute = ActionScaleAddExecute
+    end
+    object ActionScaleDelete: TAction
+      Category = 'WorkTable'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1077#1089#1099
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1074#1077#1089#1099
+      OnExecute = ActionScaleDeleteExecute
     end
   end
 end

@@ -300,6 +300,8 @@ type
     MenuItemDevicesWorkTablesDeleteEtalons: TMenuItem;
     MenuItemDevicesWorkTablesAddPump: TMenuItem;
     MenuItemDevicesWorkTablesDeletePump: TMenuItem;
+    MenuItemDevicesWorkTablesAddScale: TMenuItem;
+    MenuItemDevicesWorkTablesDeleteScale: TMenuItem;
     MenuItemDevicesColumnsGroup: TMenuItem;
     MenuItemDevicesColumnsChannelGroup: TMenuItem;
     MenuItemDevicesColumnsDeviceGroup: TMenuItem;
@@ -336,6 +338,8 @@ type
     MenuItemEtalonsWorkTablesDeleteEtalons: TMenuItem;
     MenuItemEtalonsWorkTablesAddPump: TMenuItem;
     MenuItemEtalonsWorkTablesDeletePump: TMenuItem;
+    MenuItemEtalonsWorkTablesAddScale: TMenuItem;
+    MenuItemEtalonsWorkTablesDeleteScale: TMenuItem;
     MenuItemEtalonsColumnsGroup: TMenuItem;
     MenuItemEtalonsColumnsChannelGroup: TMenuItem;
     MenuItemEtalonsColumnsDeviceGroup: TMenuItem;
@@ -481,6 +485,10 @@ type
     MenuItemAddPump: TMenuItem;
     MenuItemDeletePump: TMenuItem;
     ActionPumpDelete: TAction;
+    ActionScaleAdd: TAction;
+    ActionScaleDelete: TAction;
+    MenuItemAddScale: TMenuItem;
+    MenuItemDeleteScale: TMenuItem;
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
     Label3: TLabel;
@@ -599,6 +607,8 @@ type
     procedure ActionDeleteEtalonsExecute(Sender: TObject);
     procedure ActionPumpAddExecute(Sender: TObject);
     procedure ActionPumpDeleteExecute(Sender: TObject);
+    procedure ActionScaleAddExecute(Sender: TObject);
+    procedure ActionScaleDeleteExecute(Sender: TObject);
     procedure SpinBoxFreqExit(Sender: TObject);
     procedure SpinBoxFreqEnter(Sender: TObject);
     procedure GridDevicesEditingDone(Sender: TObject; const ACol,
@@ -608,7 +618,8 @@ type
 
   private
 
-  FActiveWorkTable: TWorkTable;
+    FActiveWorkTable: TWorkTable;
+    FNewInstrumentName: string;
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
@@ -638,6 +649,7 @@ type
     // Проверяет, что ссылка на рабочий стол ещё принадлежит менеджеру.
     function IsManagedWorkTable(AWorkTable: TWorkTable): Boolean;
     function CanEditActiveWorkTable: Boolean;
+    function GetNewInstrumentName: string;
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
     procedure UpdateGridDevices;
@@ -733,6 +745,7 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure LoadLayoutSettingsFromWorkTable;
     procedure ReleaseEmptyGridDevicesBeforeSave;
+    property NewInstrumentName: string read FNewInstrumentName write FNewInstrumentName;
     property OnWorkTableCommand: TWorkTableCommandEvent read FOnWorkTableCommand write FOnWorkTableCommand;
 
 
@@ -1043,26 +1056,23 @@ begin
   ComboBoxPumps.Items.Clear;
   ComboBoxPumps.ItemIndex := -1;
 
-  if (TPump.Pumps = nil) then
+  if TPump.Pumps = nil then
+  begin
     Exit;
+  end;
 
-  SelectedPumpName := Trim(ComboBoxPumps.Text);
+  SelectedPumpName := '';
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.ActivePump <> nil) then
+    SelectedPumpName := FActiveWorkTable.ActivePump.Name;
+
   for Pump in TPump.Pumps do
-    ComboBoxPumps.Items.Add(Pump.Name);
+    if Pump <> nil then
+      ComboBoxPumps.Items.Add(Pump.Name);
 
   ItemIndex := -1;
   if SelectedPumpName <> '' then
     ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
-  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
-    ItemIndex := 0;
-
   ComboBoxPumps.ItemIndex := ItemIndex;
- { if ItemIndex >= 0 then
-    ComboBoxPumps.Text := ComboBoxPumps.Items[ItemIndex]
-  else
-    ComboBoxPumps.Text := '';   }
-
-
 end;
 
 procedure TFrameMainTable.RefreshScalesCombo;
@@ -1321,6 +1331,8 @@ begin
   begin
     if FActiveWorkTable = AWorkTable then
     begin
+      RefreshPumpsCombo;
+      RefreshScalesCombo;
       UpdateForm;
       if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
          (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
@@ -2359,6 +2371,10 @@ begin
     ActionPumpAdd.Enabled := CanEdit;
   if ActionPumpDelete <> nil then
     ActionPumpDelete.Enabled := CanEdit;
+  if ActionScaleAdd <> nil then
+    ActionScaleAdd.Enabled := CanEdit;
+  if ActionScaleDelete <> nil then
+    ActionScaleDelete.Enabled := CanEdit;
 end;
 
 procedure TFrameMainTable.UpdateGridPopupActions;
@@ -2402,6 +2418,10 @@ begin
     ActionPumpAdd.Enabled := CanEdit;
   if ActionPumpDelete <> nil then
     ActionPumpDelete.Enabled := CanEdit;
+  if ActionScaleAdd <> nil then
+    ActionScaleAdd.Enabled := CanEdit;
+  if ActionScaleDelete <> nil then
+    ActionScaleDelete.Enabled := CanEdit;
   if ActionAddDeviceChannel <> nil then
     ActionAddDeviceChannel.Enabled := CanEdit;
   if ActionAddEtalonChannel <> nil then
@@ -3330,12 +3350,20 @@ begin
   SelectDeviceForChannel(Ch);
 end;
 
+
+function TFrameMainTable.GetNewInstrumentName: string;
+begin
+  Result := Trim(FNewInstrumentName);
+  if Result = '' then
+    Result := '1';
+end;
+
 procedure TFrameMainTable.ActionPumpAddExecute(Sender: TObject);
 begin
   if FActiveWorkTable = nil then
     Exit;
 
-        FActiveWorkTable.AddPump('1');
+        FActiveWorkTable.AddPump(GetNewInstrumentName);
         RefreshPumpsCombo;
         RefreshScalesCombo;
         UpdateUIPump;
@@ -3355,6 +3383,30 @@ begin
         RefreshScalesCombo;
         UpdateUIPump;
         UpdateUIScale;
+end;
+
+
+procedure TFrameMainTable.ActionScaleAddExecute(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  FActiveWorkTable.AddScale(GetNewInstrumentName);
+  RefreshScalesCombo;
+  UpdateUIScale;
+end;
+
+procedure TFrameMainTable.ActionScaleDeleteExecute(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  if FActiveWorkTable.ActiveScale = nil then
+    Exit;
+
+  FActiveWorkTable.RemoveScale(FActiveWorkTable.ActiveScale);
+  RefreshScalesCombo;
+  UpdateUIScale;
 end;
 
 procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
@@ -4118,6 +4170,8 @@ begin
     begin
       LayoutPump.tag:=0;
       FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
+      if FFrameWorkTableProperties <> nil then
+        FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
       UpdateUIPump;
     end;
 end;
@@ -4134,6 +4188,8 @@ begin
 
   LayoutScale.Tag := 0;
   FActiveWorkTable.SetActiveScale(ComboBoxScales.Text);
+  if FFrameWorkTableProperties <> nil then
+    FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
   UpdateUIScale;
 end;
 
