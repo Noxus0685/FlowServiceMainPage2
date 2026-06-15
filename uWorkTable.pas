@@ -5590,6 +5590,7 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+  ScaleFlow: Double;
 begin
   if AWorkTable = nil then
     Exit;
@@ -5607,14 +5608,50 @@ begin
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+
+      if Channel.Scale <> nil then
+      begin
+        ScaleFlow := 0;
+        if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) then
+          ScaleFlow := AWorkTable.FlowRate.ValueSet.Value;
+        if SameValue(ScaleFlow, 0.0, 1E-12) and
+           (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.Value <> nil) then
+          ScaleFlow := AWorkTable.FlowRate.Value.Value;
+        if SameValue(ScaleFlow, 0.0, 1E-12) and (Channel.Meter <> nil) and
+           (Channel.Meter.Device <> nil) and (AWorkTable.ValueFlowRate <> nil) then
+          ScaleFlow := AWorkTable.ValueFlowRate.GetDoubleBaseNum(Channel.Meter.Device.Qmax, 4) / 3.6;
+        if SameValue(ScaleFlow, 0.0, 1E-12) then
+          ScaleFlow := EnsureRange(Channel.ValueSec + ImpDelta, 0.0, 1000000.0);
+
+        Channel.ImpSec := 0;
+        Channel.ImpResult := 0;
+        Channel.ValueSec := EnsureRange(ScaleFlow * (1 + ((Random * 0.2) - 0.1) / 100), 0.0, 1000000.0);
+        Channel.ValueResult := EnsureRange(Channel.ValueResult + Channel.ValueSec, 0.0, 1.0E12);
+        if Channel.Scale.ValueFlow <> nil then
+          Channel.Scale.ValueFlow.SetValue(Channel.ValueSec);
+        if Channel.Scale.ValueQuantity <> nil then
+          Channel.Scale.ValueQuantity.SetValue(Channel.ValueResult);
+      end
+      else
+      begin
+        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+        Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+      end;
     end
     else
     begin
       Channel.CurSec :=0;
       Channel.ImpSec := 0;
       Channel.ImpResult := 0;
+      if Channel.Scale <> nil then
+      begin
+        Channel.ValueSec := 0;
+        Channel.ValueResult := 0;
+        if Channel.Scale.ValueFlow <> nil then
+          Channel.Scale.ValueFlow.SetValue(0);
+        if Channel.Scale.ValueQuantity <> nil then
+          Channel.Scale.ValueQuantity.SetValue(0);
+      end;
     end;
 
   end;
