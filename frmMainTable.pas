@@ -4465,6 +4465,7 @@ var
   I: Integer;
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
+  ScaleFlowValue: Double;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4495,10 +4496,12 @@ begin
 
     if EtalonChannel.Scale <> nil then
     begin
+      ScaleFlowValue := EtalonChannel.ValueSec;
       if EtalonChannel.ValueInterface <> nil then
-        EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
+        ScaleFlowValue := EtalonChannel.ValueInterface.GetDoubleValue;
+
       if EtalonChannel.Scale.ValueFlow <> nil then
-        EtalonChannel.Scale.ValueFlow.SetValue(EtalonChannel.ValueSec);
+        EtalonChannel.Scale.ValueFlow.SetValue(ScaleFlowValue);
       if EtalonChannel.Scale.ValueQuantity <> nil then
         EtalonChannel.Scale.ValueQuantity.SetValue(EtalonChannel.ValueResult);
       Continue;
