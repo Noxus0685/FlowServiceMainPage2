@@ -2508,6 +2508,8 @@ procedure TWorkTable.UpdateAggregateMeterValues;
 var
   I: Integer;
   Channel: TChannel;
+  ChannelValueQuantity: TMeterValue;
+  ChannelValueFlow: TMeterValue;
   AggregateGroup: Integer;
   IsAggregateGroupDefined: Boolean;
   IsQuantityTemplateSet: Boolean;
@@ -2526,7 +2528,23 @@ begin
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.Meter = nil) then
+      Continue;
+
+    ChannelValueQuantity := nil;
+    ChannelValueFlow := nil;
+    if Channel.Scale <> nil then
+    begin
+      ChannelValueQuantity := Channel.Scale.ValueQuantity;
+      ChannelValueFlow := Channel.Scale.ValueFlow;
+    end
+    else if Channel.FlowMeter <> nil then
+    begin
+      ChannelValueQuantity := Channel.FlowMeter.ValueQuantity;
+      ChannelValueFlow := Channel.FlowMeter.ValueFlow;
+    end;
+
+    if (ChannelValueQuantity = nil) and (ChannelValueFlow = nil) then
       Continue;
 
     if not IsAggregateGroupDefined then
@@ -2538,30 +2556,30 @@ begin
     if Channel.Group <> AggregateGroup then
       Continue;
 
-    if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
+    if (FTableFlow.ValueQuantity <> nil) and (ChannelValueQuantity <> nil) then
     begin
       if not IsQuantityTemplateSet then
       begin
-        FTableFlow.ValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
+        FTableFlow.ValueQuantity.SetAs(ChannelValueQuantity);
         if FQuantityUnitName <> '' then
           FTableFlow.ValueQuantity.SetDim(FQuantityUnitName);
         FTableFlow.ValueQuantity.ValueType := AGGREGATE_TYPE;
         IsQuantityTemplateSet := True;
       end;
-      FTableFlow.ValueQuantity.AddMeterValue(Channel.FlowMeter.ValueQuantity);
+      FTableFlow.ValueQuantity.AddMeterValue(ChannelValueQuantity);
     end;
 
-    if (FTableFlow.ValueFlowRate <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+    if (FTableFlow.ValueFlowRate <> nil) and (ChannelValueFlow <> nil) then
     begin
       if not IsFlowTemplateSet then
       begin
-        FTableFlow.ValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
+        FTableFlow.ValueFlowRate.SetAs(ChannelValueFlow);
         if FFlowUnitName <> '' then
           FTableFlow.ValueFlowRate.SetDim(FFlowUnitName);
         FTableFlow.ValueFlowRate.ValueType := AGGREGATE_TYPE;
         IsFlowTemplateSet := True;
       end;
-      FTableFlow.ValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
+      FTableFlow.ValueFlowRate.AddMeterValue(ChannelValueFlow);
     end;
   end;
 end;
