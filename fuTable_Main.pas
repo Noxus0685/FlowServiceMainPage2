@@ -72,7 +72,7 @@ type
     Label1: TLabel;
     LabelStd: TLabel;
     TrackStd: TTrackBar;
-    EditInstrumentName: TEdit;
+    EditInstrumentName: Tedit;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
