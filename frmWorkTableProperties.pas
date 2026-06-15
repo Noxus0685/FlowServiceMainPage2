@@ -1,4 +1,4 @@
-﻿unit frmWorkTableProperties;
+unit frmWorkTableProperties;
 
 interface
 
@@ -63,11 +63,19 @@ type
     ButtonSelectTemperture: TButton;
     ButtonSelectFlowRate: TButton;
     ButtonSelectQuantity: TButton;
+    EditPumpName: TEdit;
+    ButtonPumpAdd: TButton;
+    ButtonPumpDelete: TButton;
+    EditScaleName: TEdit;
+    ButtonScaleAdd: TButton;
+    ButtonScaleDelete: TButton;
 
     procedure BuildUI;
     procedure AddEditRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit);
     procedure AddLabelRow(AParent: TTreeViewItem; const ACaption: string; out ALabel: TLabel);
     procedure AddComboRow(AParent: TTreeViewItem; const ACaption: string; out ACombo: TComboBox);
+    procedure AddInstrumentRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
+      out AAddButton, ADeleteButton: TButton; AOnAddClick, AOnDeleteClick: TNotifyEvent);
     procedure AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
       out AButton: TButton; AOnClick: TNotifyEvent);
     function AddCategory(const ACaption: string): TTreeViewItem;
@@ -78,6 +86,7 @@ type
     function MeterValueByKind(const AKind: Integer): TMeterValue;
     procedure RefreshValues;
     procedure FillChannelCombo;
+    procedure RefreshInstrumentEdits;
     procedure HandleWorkTableTextExit(Sender: TObject);
     procedure HandleWorkTableNameExit(Sender: TObject);
     procedure HandleSyncComboChange(Sender: TObject);
@@ -89,6 +98,10 @@ type
     procedure ButtonSelectTempertureClick(Sender: TObject);
     procedure ButtonSelectFlowRateClick(Sender: TObject);
     procedure ButtonSelectQuantityClick(Sender: TObject);
+    procedure ButtonPumpAddClick(Sender: TObject);
+    procedure ButtonPumpDeleteClick(Sender: TObject);
+    procedure ButtonScaleAddClick(Sender: TObject);
+    procedure ButtonScaleDeleteClick(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
     function CanEditWorkTable: Boolean;
@@ -124,6 +137,8 @@ var
   InternalSyncCategory: TTreeViewItem;
   MeasurementStartCategory: TTreeViewItem;
   MeasurementStopCategory: TTreeViewItem;
+  PumpsCategory: TTreeViewItem;
+  ScalesCategory: TTreeViewItem;
   HeaderGrid: TGridPanelLayout;
   HeaderProperty: TLabel;
   HeaderValue: TLabel;
@@ -190,6 +205,14 @@ begin
 
   AddLabelRow(GeneralCategory, 'UUID рабочего стола', LabelWorkTableUUID);
   AddLabelRow(GeneralCategory, 'Текущее состояние', LabelWorkTableState);
+
+  PumpsCategory := AddCategory('Насосы');
+  AddInstrumentRow(PumpsCategory, 'Насос', EditPumpName, ButtonPumpAdd, ButtonPumpDelete,
+    ButtonPumpAddClick, ButtonPumpDeleteClick);
+
+  ScalesCategory := AddCategory('Весы');
+  AddInstrumentRow(ScalesCategory, 'Весы', EditScaleName, ButtonScaleAdd, ButtonScaleDelete,
+    ButtonScaleAddClick, ButtonScaleDeleteClick);
 
   VerticalSyncCategory := AddCategory('Вход синхронизация');
   AddComboRow(VerticalSyncCategory, 'Вход синхронизация', ComboVerticalSync);
@@ -406,6 +429,68 @@ begin
   ACombo.Align := TAlignLayout.Client;
   ACombo.Margins.Rect := TRectF.Create(6, 3, 10, 3);
   RowGrid.ControlCollection.AddControl(ACombo, 1, 0);
+end;
+
+procedure TFrameWorkTableProperties.AddInstrumentRow(AParent: TTreeViewItem; const ACaption: string;
+  out AEdit: TEdit; out AAddButton, ADeleteButton: TButton; AOnAddClick, AOnDeleteClick: TNotifyEvent);
+var
+  Item: TTreeViewItem;
+  RowGrid: TGridPanelLayout;
+  CaptionLabel: TLabel;
+  ValueLayout: TLayout;
+begin
+  Item := TTreeViewItem.Create(Self);
+  Item.Parent := AParent;
+  Item.Text := '';
+  Item.Height := 36;
+  Item.Stored := False;
+
+  RowGrid := TGridPanelLayout.Create(Self);
+  RowGrid.Parent := Item;
+  RowGrid.Align := TAlignLayout.Client;
+  RowGrid.RowCollection.Clear;
+  RowGrid.ColumnCollection.Clear;
+  RowGrid.ColumnCollection.Add.Value := 45;
+  RowGrid.ColumnCollection.Add.Value := 55;
+  RowGrid.RowCollection.Add.Value := 100;
+  RowGrid.Stored := False;
+
+  CaptionLabel := TLabel.Create(Self);
+  CaptionLabel.Parent := RowGrid;
+  CaptionLabel.Align := TAlignLayout.Client;
+  CaptionLabel.Text := ACaption;
+  CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
+  CaptionLabel.HitTest := False;
+  CaptionLabel.Margins.Rect := TRectF.Create(26, 0, 8, 0);
+  RowGrid.ControlCollection.AddControl(CaptionLabel, 0, 0);
+
+  ValueLayout := TLayout.Create(Self);
+  ValueLayout.Parent := RowGrid;
+  ValueLayout.Align := TAlignLayout.Client;
+  ValueLayout.Margins.Rect := TRectF.Create(6, 3, 10, 3);
+  ValueLayout.Stored := False;
+  RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
+
+  AAddButton := TButton.Create(Self);
+  AAddButton.Parent := ValueLayout;
+  AAddButton.Align := TAlignLayout.Right;
+  AAddButton.Width := 36;
+  AAddButton.Margins.Left := 8;
+  AAddButton.Text := '+';
+  AAddButton.OnClick := AOnAddClick;
+
+  ADeleteButton := TButton.Create(Self);
+  ADeleteButton.Parent := ValueLayout;
+  ADeleteButton.Align := TAlignLayout.Right;
+  ADeleteButton.Width := 36;
+  ADeleteButton.Margins.Left := 8;
+  ADeleteButton.Text := '-';
+  ADeleteButton.OnClick := AOnDeleteClick;
+
+  AEdit := TEdit.Create(Self);
+  AEdit.Parent := ValueLayout;
+  AEdit.Align := TAlignLayout.Client;
+  AEdit.KillFocusByReturn := True;
 end;
 
 procedure TFrameWorkTableProperties.AddMeterValueRow(AParent: TTreeViewItem; const ACaption: string; out AEdit: TEdit;
@@ -647,6 +732,7 @@ begin
       EditFlowRateMax.Text := '';
       EditQuantityMin.Text := '';
       EditQuantityMax.Text := '';
+      RefreshInstrumentEdits;
       Exit;
     end;
 
@@ -655,6 +741,7 @@ begin
     LabelWorkTableUUID.Text := FWorkTable.UUID;
     LabelWorkTableState.Text := WorkTableStateToCaption(FWorkTable.State);
     FillChannelCombo;
+    RefreshInstrumentEdits;
     EditPressure.Text := MeterValueToText(FWorkTable.ValuePressure);
     EditTemperture.Text := MeterValueToText(FWorkTable.ValueTemperture);
     EditFlowRate.Text := MeterValueToText(FWorkTable.ValueFlowRate);
@@ -911,6 +998,12 @@ begin
   EditFlowRateMax.Enabled := CanEdit;
   EditQuantityMin.Enabled := CanEdit;
   EditQuantityMax.Enabled := CanEdit;
+  EditPumpName.Enabled := CanEdit;
+  ButtonPumpAdd.Enabled := CanEdit;
+  ButtonPumpDelete.Enabled := CanEdit;
+  EditScaleName.Enabled := CanEdit;
+  ButtonScaleAdd.Enabled := CanEdit;
+  ButtonScaleDelete.Enabled := CanEdit;
   UpdateSyncControlsState;
 end;
 
@@ -1016,6 +1109,27 @@ begin
   NotifyRefreshIfChanged(Changed);
 end;
 
+
+procedure TFrameWorkTableProperties.RefreshInstrumentEdits;
+begin
+  if FWorkTable = nil then
+  begin
+    EditPumpName.Text := '';
+    EditScaleName.Text := '';
+    Exit;
+  end;
+
+  if FWorkTable.ActivePump <> nil then
+    EditPumpName.Text := FWorkTable.ActivePump.Name
+  else
+    EditPumpName.Text := '';
+
+  if FWorkTable.ActiveScale <> nil then
+    EditScaleName.Text := FWorkTable.ActiveScale.Name
+  else
+    EditScaleName.Text := '';
+end;
+
 procedure TFrameWorkTableProperties.NotifyRefreshIfChanged(const AChanged: Boolean);
 begin
   if AChanged and (FWorkTable <> nil) then
@@ -1053,6 +1167,97 @@ begin
     Exit;
 
   FWorkTable.Name := NewValue;
+  NotifyRefreshIfChanged(True);
+end;
+
+
+procedure TFrameWorkTableProperties.ButtonPumpAddClick(Sender: TObject);
+var
+  Name: string;
+begin
+  if FWorkTable = nil then
+    Exit;
+
+  Name := Trim(EditPumpName.Text);
+  if Name = '' then
+    Name := '1';
+  FWorkTable.AddPump(Name);
+  ApplyEditState;
+  NotifyRefreshIfChanged(True);
+end;
+
+procedure TFrameWorkTableProperties.ButtonPumpDeleteClick(Sender: TObject);
+var
+  I: Integer;
+  Name: string;
+  Pump: TPump;
+begin
+  if (FWorkTable = nil) or (FWorkTable.Pumps = nil) then
+    Exit;
+
+  Name := Trim(EditPumpName.Text);
+  if Name = '' then
+    Exit;
+
+  Pump := nil;
+  for I := 0 to FWorkTable.Pumps.Count - 1 do
+    if (FWorkTable.Pumps[I] <> nil) and SameText(Trim(FWorkTable.Pumps[I].Name), Name) then
+    begin
+      Pump := FWorkTable.Pumps[I];
+      Break;
+    end;
+
+  if Pump = nil then
+    Exit;
+
+  FWorkTable.RemovePump(Pump);
+  RefreshInstrumentEdits;
+  ApplyEditState;
+  NotifyRefreshIfChanged(True);
+end;
+
+procedure TFrameWorkTableProperties.ButtonScaleAddClick(Sender: TObject);
+var
+  Name: string;
+begin
+  if FWorkTable = nil then
+    Exit;
+
+  Name := Trim(EditScaleName.Text);
+  if Name = '' then
+    Name := '1';
+  FWorkTable.AddScale(Name);
+  ApplyEditState;
+  NotifyRefreshIfChanged(True);
+end;
+
+procedure TFrameWorkTableProperties.ButtonScaleDeleteClick(Sender: TObject);
+var
+  I: Integer;
+  Name: string;
+  Scale: TWeight;
+begin
+  if (FWorkTable = nil) or (FWorkTable.Scales = nil) then
+    Exit;
+
+  Name := Trim(EditScaleName.Text);
+  if Name = '' then
+    Exit;
+
+  Scale := nil;
+  for I := 0 to FWorkTable.Scales.Count - 1 do
+    if (FWorkTable.Scales[I] <> nil) and SameText(Trim(FWorkTable.Scales[I].Name), Name) then
+    begin
+      Scale := FWorkTable.Scales[I];
+      Break;
+    end;
+
+  if Scale = nil then
+    Exit;
+
+  FWorkTable.RemoveScale(Scale);
+  RefreshInstrumentEdits;
+  ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
 

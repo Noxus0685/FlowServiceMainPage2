@@ -4171,6 +4171,8 @@ begin
     begin
       LayoutPump.tag:=0;
       FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
+      if FFrameWorkTableProperties <> nil then
+        FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
       UpdateUIPump;
     end;
 end;
@@ -4187,6 +4189,8 @@ begin
 
   LayoutScale.Tag := 0;
   FActiveWorkTable.SetActiveScale(ComboBoxScales.Text);
+  if FFrameWorkTableProperties <> nil then
+    FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
   UpdateUIScale;
 end;
 
