@@ -1451,26 +1451,28 @@ begin
   for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
   begin
     Channel := FWorkTable.EtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (Channel.Meter = nil) or (not Channel.Enabled) then
       Continue;
 
-    if APoint.Q < 0 then
+    if Channel.Meter.IsScale then
     begin
-      if Channel.Enabled then
-        Best := Channel;
+      Best := Channel;
       Continue;
     end;
 
-    if SameValue(APoint.Q, 0) then
+    if Channel.FlowMeter = nil then
+      Continue;
+
+    if APoint.Q <= 0 then
     begin
-      if Channel.Enabled then
-        Best := Channel;
+      Best := Channel;
       Continue;
     end;
 
     if (APoint.Q >= Channel.FlowMeter.FlowMin) and
        (APoint.Q <= Channel.FlowMeter.FlowMax) and
-       ((Best = nil) or (Channel.FlowMeter.FlowMax < Best.FlowMeter.FlowMax)) then
+       ((Best = nil) or (Best.FlowMeter = nil) or
+        (Channel.FlowMeter.FlowMax < Best.FlowMeter.FlowMax)) then
       Best := Channel;
   end;
 

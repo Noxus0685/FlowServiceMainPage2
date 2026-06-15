@@ -6034,17 +6034,17 @@ begin
     end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.Device <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.Device.DN
+      if (WorkTable.EtalonChannels[ARow].Meter <> nil) and
+         (WorkTable.EtalonChannels[ARow].Meter.Device <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Meter.Device.DN
       else
         Value := '';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonName1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.Device <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.Device.Name
+      if (WorkTable.EtalonChannels[ARow].Meter <> nil) and
+         (WorkTable.EtalonChannels[ARow].Meter.Device <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Meter.Device.Name
       else
         Value := '';
     end
