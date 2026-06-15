@@ -4842,7 +4842,9 @@ begin
     if Channel = nil then
       Continue;
 
-    if (Length(AImpSecValues) > I) then
+    if Channel.Scale <> nil then
+      ChannelImpSec := 0
+    else if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
