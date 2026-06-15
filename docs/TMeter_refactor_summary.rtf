@@ -1,0 +1,55 @@
+{\rtf1\ansi\ansicpg1251\deff0{\fonttbl{\f0 Arial;}}
+\fs28\b      \b0\par
+\fs22\par
+\b 1.  \b0\par
+-     TMeter   .\par
+-      Meter,      .\par
+-      TMeter: Device, UUID, , ,  , repo-, OutputType  IsEtalon.\par
+-     TFlowMeter.     TScale.\par
+\par
+\b 2. uFlowMeter.pas\b0\par
+-  EMeterKind: mkUnknown, mkFlowMeter, mkScale.\par
+-  TMeter   -    GetMeterKind, GetEtalonKindText, IsFlowMeter, IsScale, NeedFlowPoints, NeedImpCoef, SetAsEtalon, InitAllValues, Reset.\par
+- TFlowMeter   TMeter   , , , , Q,     .\par
+- TScale   TMeter,   ,       .\par
+-    UI  TScale  ValueFlow  ValueQuantity.\par
+-   CreateMeterByDevice:    TScale,    TFlowMeter.\par
+\par
+\b 3. uWorkTable.pas / TChannel\b0\par
+-  FFlowMeter   FMeter: TMeter.\par
+-   Meter, FlowMeter  Scale.\par
+- FlowMeter  Scale   typed-accessors:    ,  nil.\par
+- RecreateEtalonByDevice    ,     TScale.\par
+- RebindFlowMeterValues  :  Scale  ValueFlow/ValueQuantity    ,  FlowMeter    rebind.\par
+-  /  FlowRate.Max     Qmax ,   36.\par
+\par
+\b 4. UI / frmMainTable.pas\b0\par
+-        Meter.GetEtalonKindText.\par
+-      Meter/Meter.Device.\par
+-         Scale.ValueFlow  Scale.ValueQuantity.\par
+-     /   '-',      .\par
+-       FlowMeter.\par
+\par
+\b 5.  /  \b0\par
+-    Channel.Meter.\par
+-         FlowMin/FlowMax.\par
+-  -    .\par
+\par
+\b 6.   \b0\par
+-    UUID .\par
+-     .\par
+-       TDevice:  -> TScale,  -> TFlowMeter.\par
+\par
+\b 7. \b0\par
+-  ,   ,   Channel.FlowMeter.\par
+-      Channel.Meter.\par
+-      Channel.Scale.\par
+-    , Channel.FlowMeter  nil.\par
+\par
+\b 8.  \b0\par
+- uFlowMeter.pas: TMeter, TFlowMeter, TScale, .\par
+- uWorkTable.pas: Meter  , rebind,  ,  .\par
+- frmMainTable.pas:     Scale/FlowMeter.\par
+- uMeasurementRun.pas:     .\par
+- frmWorkTableProperties.pas: UTF-8 BOM   .\par
+}

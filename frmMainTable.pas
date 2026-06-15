@@ -992,11 +992,11 @@ begin
   if IsUpdating then
     Exit;
 
-  if ASyncFromFlowMeter and (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+  if ASyncFromFlowMeter and (AChannel <> nil) and (AChannel.Meter <> nil) then
   begin
-    AChannel.TypeName := AChannel.FlowMeter.DeviceTypeName;
-    AChannel.Serial := AChannel.FlowMeter.SerialNumber;
-    AChannel.Signal := AChannel.FlowMeter.OutputType;
+    AChannel.TypeName := AChannel.Meter.DeviceTypeName;
+    AChannel.Serial := AChannel.Meter.SerialNumber;
+    AChannel.Signal := AChannel.Meter.OutputType;
     MarkChannelDeviceModified(AChannel);
     SyncChannelsWithSameDeviceUUID(AChannel, AChannel.DeviceUUID);
   end;
@@ -2671,24 +2671,25 @@ var
   RepoDevice: TDevice;
   FoundRepo: TDeviceRepository;
 begin
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
+  if (AChannel = nil) or (AChannel.Meter = nil) or (AChannel.Meter.Device = nil) then
     Exit;
 
-  AChannel.FlowMeter.Device.State := osModified;
+  AChannel.Meter.Device.State := osModified;
 
   RepoDevice := nil;
   if DataManager <> nil then
-    RepoDevice := DataManager.FindDevice(AChannel.FlowMeter.Device.UUID, FoundRepo);
+    RepoDevice := DataManager.FindDevice(AChannel.Meter.Device.UUID, FoundRepo);
 
-  if (RepoDevice <> nil) and (RepoDevice <> AChannel.FlowMeter.Device) then
+  if (RepoDevice <> nil) and (RepoDevice <> AChannel.Meter.Device) then
   begin
-    RepoDevice.Assign(AChannel.FlowMeter.Device, True);
+    RepoDevice.Assign(AChannel.Meter.Device, True);
     RepoDevice.State := osModified;
-    AChannel.FlowMeter.Device := RepoDevice;
+    AChannel.Meter.Device := RepoDevice;
   end;
 
-  AChannel.FlowMeter.RebindCalculatedValues;
-  PersistDeviceAsync(AChannel.FlowMeter.Device);
+  if AChannel.FlowMeter <> nil then
+    AChannel.FlowMeter.RebindCalculatedValues;
+  PersistDeviceAsync(AChannel.Meter.Device);
 
 end;
 
@@ -3044,8 +3045,8 @@ begin
       begin
         FRows[TableCount].Enabled := WorkTable.EtalonChannels[TableCount].Enabled;
         FRows[TableCount].ChannelName := WorkTable.EtalonChannels[TableCount].Text;
-        if WorkTable.EtalonChannels[TableCount].FlowMeter <> nil then
-          FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].FlowMeter.GetEtalonKindText
+        if WorkTable.EtalonChannels[TableCount].Meter <> nil then
+          FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].Meter.GetEtalonKindText
         else
           FRows[TableCount].TypeName := WorkTable.EtalonChannels[TableCount].TypeName;
         FRows[TableCount].Serial := WorkTable.EtalonChannels[TableCount].Serial;
@@ -3099,11 +3100,11 @@ begin
   TypeUUID := Trim(AChannel.TypeUUID);
   TypeName := Trim(AChannel.TypeName);
 
-  if (TypeUUID = '') and (AChannel.FlowMeter <> nil) then
-    TypeUUID := Trim(AChannel.FlowMeter.DeviceTypeUUID);
+  if (TypeUUID = '') and (AChannel.Meter <> nil) then
+    TypeUUID := Trim(AChannel.Meter.DeviceTypeUUID);
 
-  if (TypeName = '') and (AChannel.FlowMeter <> nil) then
-    TypeName := Trim(AChannel.FlowMeter.DeviceTypeName);
+  if (TypeName = '') and (AChannel.Meter <> nil) then
+    TypeName := Trim(AChannel.Meter.DeviceTypeName);
 
   Result := DataManager.FindType(TypeUUID, TypeName, ARepo);
 end;
@@ -3146,10 +3147,10 @@ begin
   Result := False;
 
   NewDN := Trim(ANewDN);
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) or (NewDN = '') then
+  if (AChannel = nil) or (AChannel.Meter = nil) or (NewDN = '') then
     Exit;
 
-  Device := AChannel.FlowMeter.Device;
+  Device := AChannel.Meter.Device;
   if Device = nil then
     Exit;
 
@@ -3238,14 +3239,13 @@ begin
   if AChannel = nil then
     Exit;
 
+  OldDeviceUUID := Trim(AChannel.DeviceUUID);
   IsEtalonChannel := (FActiveWorkTable <> nil) and
     (FActiveWorkTable.EtalonChannels <> nil) and
     (FActiveWorkTable.EtalonChannels.IndexOf(AChannel) >= 0);
-
-  OldDeviceUUID := Trim(AChannel.DeviceUUID);
   ADevice := nil;
-  if AChannel.FlowMeter <> nil then
-    ADevice := AChannel.FlowMeter.Device;
+  if AChannel.Meter <> nil then
+    ADevice := AChannel.Meter.Device;
 
   if (ADevice = nil) and (DataManager <> nil) then
     ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
@@ -3277,20 +3277,21 @@ begin
       else
         AChannel.FlowMeter.Init(SelDevice.UUID);
 
-      if AChannel.FlowMeter.Device <> nil then
+      if AChannel.Meter.Device <> nil then
       begin
-        AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
-        AChannel.TypeUUID := AChannel.FlowMeter.Device.DeviceTypeUUID;
-        AChannel.TypeName := AChannel.FlowMeter.Device.DeviceTypeName;
-        AChannel.Serial := AChannel.FlowMeter.Device.SerialNumber;
-        AChannel.Signal := AChannel.FlowMeter.Device.OutputType;
+        AChannel.DeviceUUID := AChannel.Meter.Device.UUID;
+        AChannel.TypeUUID := AChannel.Meter.Device.DeviceTypeUUID;
+        AChannel.TypeName := AChannel.Meter.Device.DeviceTypeName;
+        AChannel.Serial := AChannel.Meter.Device.SerialNumber;
+        AChannel.Signal := AChannel.Meter.Device.OutputType;
 
-        AChannel.RepoTypeName := AChannel.FlowMeter.Device.RepoTypeName;
-        AChannel.RepoTypeUUID := AChannel.FlowMeter.Device.RepoTypeUUID;
-        AChannel.RepoDeviceName := AChannel.FlowMeter.Device.RepoDeviceName;
-        AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
+        AChannel.RepoTypeName := AChannel.Meter.Device.RepoTypeName;
+        AChannel.RepoTypeUUID := AChannel.Meter.Device.RepoTypeUUID;
+        AChannel.RepoDeviceName := AChannel.Meter.Device.RepoDeviceName;
+        AChannel.RepoDeviceUUID := AChannel.Meter.Device.RepoDeviceUUID;
 
-        AChannel.FlowMeter.UpdateByDevice;
+        if AChannel.FlowMeter <> nil then
+          AChannel.FlowMeter.UpdateByDevice;
       end;
 
       MarkChannelDeviceModified(AChannel);
@@ -3322,15 +3323,12 @@ begin
         AChannel.RepoDeviceName := ADevice.RepoDeviceName;
         AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
 
-        if AChannel.FlowMeter <> nil then
+        if IsEtalonChannel then
+          AChannel.RecreateEtalonByDevice(FActiveWorkTable, ADevice)
+        else if AChannel.FlowMeter <> nil then
         begin
-          if IsEtalonChannel then
-            AChannel.RecreateEtalonByDevice(FActiveWorkTable, ADevice)
-          else
-          begin
-            AChannel.FlowMeter.Device := ADevice;
-            AChannel.FlowMeter.UpdateByDevice;
-          end;
+          AChannel.FlowMeter.Device := ADevice;
+          AChannel.FlowMeter.UpdateByDevice;
         end;
       end;
 
@@ -3434,11 +3432,15 @@ var
   SelectedUUID: string;
   OldDeviceUUID : string;
   DeviceSelectResult: TModalResult;
+  IsEtalonChannel: Boolean;
 begin
   if AChannel = nil then
     Exit;
 
   OldDeviceUUID := Trim(AChannel.DeviceUUID);
+  IsEtalonChannel := (FActiveWorkTable <> nil) and
+    (FActiveWorkTable.EtalonChannels <> nil) and
+    (FActiveWorkTable.EtalonChannels.IndexOf(AChannel) >= 0);
 
   if DataManager <> nil then
     DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
@@ -3458,38 +3460,44 @@ begin
     if SelDevice = nil then
       Exit;
 
-    if AChannel.FlowMeter = nil then
-      Exit;
-
     SelectedUUID := Trim(SelDevice.UUID);
 
-    // Полностью переинициализируем расходомер выбранным прибором,
-    // чтобы в канал попали все данные нового прибора и его типа.
-    AChannel.FlowMeter.Init(SelDevice.UUID);
+    if IsEtalonChannel then
+      AChannel.RecreateEtalonByDevice(FActiveWorkTable, SelDevice)
+    else
+    begin
+      if AChannel.FlowMeter = nil then
+        Exit;
 
-    if (AChannel.FlowMeter.Device = nil) or
-       (not SameText(Trim(AChannel.FlowMeter.Device.UUID), Trim(SelDevice.UUID))) or
-       (not SameText(Trim(AChannel.FlowMeter.Device.DeviceTypeUUID), Trim(SelDevice.DeviceTypeUUID))) then
-      AChannel.FlowMeter.Device := SelDevice;
+      // Полностью переинициализируем расходомер выбранным прибором,
+      // чтобы в канал попали все данные нового прибора и его типа.
+      AChannel.FlowMeter.Init(SelDevice.UUID);
+
+      if (AChannel.Meter.Device = nil) or
+         (not SameText(Trim(AChannel.Meter.Device.UUID), Trim(SelDevice.UUID))) or
+         (not SameText(Trim(AChannel.Meter.Device.DeviceTypeUUID), Trim(SelDevice.DeviceTypeUUID))) then
+        AChannel.FlowMeter.Device := SelDevice;
+    end;
 
     // После Init берём данные уже из нового прибора внутри FlowMeter.
-    if AChannel.FlowMeter.Device <> nil then
+    if AChannel.Meter.Device <> nil then
     begin
-      AChannel.DeviceUUID := AChannel.FlowMeter.Device.UUID;
-      AChannel.TypeUUID := AChannel.FlowMeter.Device.DeviceTypeUUID;
-      AChannel.TypeName := AChannel.FlowMeter.Device.DeviceTypeName;
-      AChannel.Serial := AChannel.FlowMeter.Device.SerialNumber;
-      AChannel.Signal := AChannel.FlowMeter.Device.OutputType;
+      AChannel.DeviceUUID := AChannel.Meter.Device.UUID;
+      AChannel.TypeUUID := AChannel.Meter.Device.DeviceTypeUUID;
+      AChannel.TypeName := AChannel.Meter.Device.DeviceTypeName;
+      AChannel.Serial := AChannel.Meter.Device.SerialNumber;
+      AChannel.Signal := AChannel.Meter.Device.OutputType;
 
-      AChannel.RepoTypeName := AChannel.FlowMeter.Device.RepoTypeName;
-      AChannel.RepoTypeUUID := AChannel.FlowMeter.Device.RepoTypeUUID;
-      AChannel.RepoDeviceName := AChannel.FlowMeter.Device.RepoDeviceName;
-      AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
+      AChannel.RepoTypeName := AChannel.Meter.Device.RepoTypeName;
+      AChannel.RepoTypeUUID := AChannel.Meter.Device.RepoTypeUUID;
+      AChannel.RepoDeviceName := AChannel.Meter.Device.RepoDeviceName;
+      AChannel.RepoDeviceUUID := AChannel.Meter.Device.RepoDeviceUUID;
 
-      AChannel.FlowMeter.UpdateByDevice;
+      if AChannel.FlowMeter <> nil then
+        AChannel.FlowMeter.UpdateByDevice;
 
       if FFrameProceed <> nil then
-        FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
+        FFrameProceed.AddProcessingDevice(AChannel.Meter.Device);
 
       if (FActiveWorkTable <> nil) and (SelectedUUID <> '') then
         for I := 0 to FActiveWorkTable.DeviceChannels.Count - 1 do
@@ -3502,7 +3510,7 @@ begin
           if LinkedChannel.FlowMeter = nil then
             Continue;
 
-          LinkedChannel.FlowMeter.Device := AChannel.FlowMeter.Device;
+          LinkedChannel.FlowMeter.Device := AChannel.Meter.Device;
           LinkedChannel.FlowMeter.UpdateByDevice;
 
           LinkedChannel.DeviceUUID := AChannel.DeviceUUID;
@@ -3705,7 +3713,7 @@ begin
 
   AChannel.AssignFlowMeterFrom(AClipboard.Snapshot, FActiveWorkTable, True);
   if FFrameProceed <> nil then
-    FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
+    FFrameProceed.AddProcessingDevice(AChannel.Meter.Device);
   MarkChannelDeviceModified(AChannel);
 end;
 
@@ -3777,9 +3785,9 @@ begin
 
       Device := nil;
       Repo := nil;
-      if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) and
-         SameText(Trim(Channel.FlowMeter.Device.UUID), DeviceUUID) then
-        Device := Channel.FlowMeter.Device;
+      if (Channel.FlowMeter <> nil) and (Channel.Meter.Device <> nil) and
+         SameText(Trim(Channel.Meter.Device.UUID), DeviceUUID) then
+        Device := Channel.Meter.Device;
 
       if DataManager <> nil then
       begin
@@ -3851,8 +3859,8 @@ begin
     Exit;
 
   Device := nil;
-  if AChannel.FlowMeter <> nil then
-    Device := AChannel.FlowMeter.Device;
+  if AChannel.Meter <> nil then
+    Device := AChannel.Meter.Device;
 
   if FFrameProceed <> nil then
     FFrameProceed.RemoveProcessingDevice(Device);
@@ -3870,8 +3878,8 @@ begin
   AChannel.RepoDeviceName := '';
   AChannel.RepoDeviceUUID := '';
   AChannel.DeviceUUID := '';
-  if AChannel.FlowMeter <> nil then
-    AChannel.FlowMeter.Device := nil;
+  if AChannel.Meter <> nil then
+    AChannel.Meter.Device := nil;
 
   if (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
     TDeviceCreationService.EnsureDeviceForChannel(
@@ -3958,9 +3966,9 @@ begin
   if (DeviceUUID <> '') and (ADeletedUUIDs.IndexOf(DeviceUUID) >= 0) then
     Exit(True);
 
-  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+  if (AChannel.Meter <> nil) and (AChannel.Meter.Device <> nil) then
   begin
-    DeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
+    DeviceUUID := Trim(AChannel.Meter.Device.UUID);
     if (DeviceUUID <> '') and (ADeletedUUIDs.IndexOf(DeviceUUID) >= 0) then
       Exit(True);
   end;
@@ -4457,6 +4465,9 @@ var
   I: Integer;
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
+  ScaleQuantity: Double;
+  ScaleFlow: Double;
+  DeltaSeconds: Double;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4482,7 +4493,33 @@ begin
   for I := 0 to WorkTable.EtalonChannels.Count - 1 do
   begin
     EtalonChannel := WorkTable.EtalonChannels[I];
-    if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
+    if (EtalonChannel = nil) or (EtalonChannel.Meter = nil) then
+      Continue;
+
+    if EtalonChannel.Scale <> nil then
+    begin
+      ScaleQuantity := WorkTable.DisplayWeight;
+      DeltaSeconds := TimerMain.Interval / 1000;
+      if DeltaSeconds <= 0 then
+        DeltaSeconds := 1;
+
+      ScaleFlow := 0;
+      if EtalonChannel.ValueResult > 0 then
+        ScaleFlow := Abs(ScaleQuantity - EtalonChannel.ValueResult) / DeltaSeconds * 3600;
+
+      EtalonChannel.ValueSec := ScaleFlow;
+      EtalonChannel.ValueResult := ScaleQuantity;
+
+      if EtalonChannel.ValueInterface <> nil then
+        EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
+      if EtalonChannel.Scale.ValueFlow <> nil then
+        EtalonChannel.Scale.ValueFlow.SetValue(EtalonChannel.ValueSec);
+      if EtalonChannel.Scale.ValueQuantity <> nil then
+        EtalonChannel.Scale.ValueQuantity.SetValue(EtalonChannel.ValueResult);
+      Continue;
+    end;
+
+    if EtalonChannel.FlowMeter = nil then
       Continue;
 
     EtalonChannel.ValueCurrent.SetValue(EtalonChannel.CurSec);
@@ -5005,13 +5042,13 @@ begin
   AChannel.RepoTypeName := RepoName;
   AChannel.RepoTypeUUID := RepoUUID;
 
-  if not Assigned(AChannel.FlowMeter.Device) then
+  if not Assigned(AChannel.Meter.Device) then
     Exit;
 
-  AChannel.FlowMeter.Device.DeviceTypeUUID := ANewType.UUID;
-  AChannel.FlowMeter.Device.DeviceTypeName := ANewType.Name;
-  AChannel.FlowMeter.Device.RepoTypeName := RepoName;
-  AChannel.FlowMeter.Device.RepoTypeUUID := RepoUUID;
+  AChannel.Meter.Device.DeviceTypeUUID := ANewType.UUID;
+  AChannel.Meter.Device.DeviceTypeName := ANewType.Name;
+  AChannel.Meter.Device.RepoTypeName := RepoName;
+  AChannel.Meter.Device.RepoTypeUUID := RepoUUID;
 
   if not AIsTypeChanged then
     Exit;
@@ -5020,7 +5057,7 @@ begin
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
   AChannel.FlowMeter.Device.AttachType(ANewType, RepoName);
   MarkChannelDeviceModified(AChannel);
-  PersistDeviceAsync(AChannel.FlowMeter.Device); //Сохранение прибора
+  PersistDeviceAsync(AChannel.Meter.Device); //Сохранение прибора
 end;
 
 procedure TFrameMainTable.OpenTypeSelect(ARow: Integer; const AIsEtalon: Boolean);
@@ -5192,7 +5229,7 @@ begin
     if (Channel <> nil) and
        Channel.Enabled and
        (Channel.FlowMeter <> nil) and
-       (Channel.FlowMeter.Device <> nil) and
+       (Channel.Meter.Device <> nil) and
        ((Channel.FlowMeter.Device.Spillages = nil) or
         (Channel.FlowMeter.Device.Spillages.Count = 0)) then
     begin
@@ -6027,24 +6064,24 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
     begin
-      if WorkTable.EtalonChannels[ARow].FlowMeter <> nil then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.GetEtalonKindText
+      if WorkTable.EtalonChannels[ARow].Meter <> nil then
+        Value := WorkTable.EtalonChannels[ARow].Meter.GetEtalonKindText
       else
         Value := WorkTable.EtalonChannels[ARow].TypeName;
     end
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonDN1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.Device <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.Device.DN
+      if (WorkTable.EtalonChannels[ARow].Meter <> nil) and
+         (WorkTable.EtalonChannels[ARow].Meter.Device <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Meter.Device.DN
       else
         Value := '';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonName1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.Device <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.Device.Name
+      if (WorkTable.EtalonChannels[ARow].Meter <> nil) and
+         (WorkTable.EtalonChannels[ARow].Meter.Device <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Meter.Device.Name
       else
         Value := '';
     end
@@ -6052,34 +6089,44 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Serial
     else if GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
+      if (WorkTable.EtalonChannels[ARow].Scale <> nil) and
+         (WorkTable.EtalonChannels[ARow].Scale.ValueFlow <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Scale.ValueFlow.GetStrValue
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
+      if (WorkTable.EtalonChannels[ARow].Scale <> nil) and
+         (WorkTable.EtalonChannels[ARow].Scale.ValueQuantity <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].Scale.ValueQuantity.GetStrValue
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
         Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
+      if WorkTable.EtalonChannels[ARow].Scale <> nil then
+        Value := '-'
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
       else
         Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonRawSumValue1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
+      if WorkTable.EtalonChannels[ARow].Scale <> nil then
+        Value := '-'
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) and
+              (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier.GetStrValue
       else
         Value := '0';
