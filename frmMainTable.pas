@@ -4498,7 +4498,9 @@ begin
 
     if EtalonChannel.Scale <> nil then
     begin
-      ScaleQuantity := WorkTable.DisplayWeight;
+      ScaleQuantity := EtalonChannel.ValueResult;
+      if WorkTable.DisplayWeight <> 0 then
+        ScaleQuantity := WorkTable.DisplayWeight;
       ScaleTime := WorkTable.Time;
       ScaleFlowValue := EtalonChannel.ValueSec;
 

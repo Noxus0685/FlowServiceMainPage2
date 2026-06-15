@@ -4850,11 +4850,32 @@ begin
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
-    Channel.ImpSec := ChannelImpSec;
-    if AImpResult > 0 then
-      Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
+
+    if Channel.Scale <> nil then
+    begin
+      Channel.ImpSec := 0;
+      Channel.ImpResult := 0;
+      Channel.ValueSec := ChannelImpSec;
+      if AImpResult > 0 then
+        Channel.ValueResult := EnsureRange(AImpResult, 0.0, 1.0E12)
+      else
+        Channel.ValueResult := EnsureRange(Channel.ValueResult + Channel.ValueSec, 0.0, 1.0E12);
+
+      if Channel.ValueInterface <> nil then
+        Channel.ValueInterface.SetValue(Channel.ValueSec);
+      if Channel.Scale.ValueFlow <> nil then
+        Channel.Scale.ValueFlow.SetValue(Channel.ValueSec);
+      if Channel.Scale.ValueQuantity <> nil then
+        Channel.Scale.ValueQuantity.SetValue(Channel.ValueResult);
+    end
     else
-      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    begin
+      Channel.ImpSec := ChannelImpSec;
+      if AImpResult > 0 then
+        Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
+      else
+        Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    end;
   end;
 end;
 
@@ -5126,17 +5147,28 @@ end;
 function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
 begin
   Result := 0.0;
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+  if (AChannel = nil) or (AChannel.Meter = nil) then
     Exit;
 
-  if (AChannel.FlowMeter.ValueCoef <> nil) then
-    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+  if AChannel.FlowMeter <> nil then
+  begin
+    if AChannel.FlowMeter.ValueCoef <> nil then
+      Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
 
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.Meter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
+    if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.Meter.Device) then
+      Result := AChannel.FlowMeter.Device.Coef;
 
-  if SameValue(Result, 0.0, 1E-12) then
-    Result := AChannel.FlowMeter.Kp;
+    if SameValue(Result, 0.0, 1E-12) then
+      Result := AChannel.FlowMeter.Kp;
+  end
+  else if AChannel.Scale <> nil then
+  begin
+    if Assigned(AChannel.Meter.Device) then
+      Result := AChannel.Meter.Device.Coef;
+
+    if SameValue(Result, 0.0, 1E-12) then
+      Result := 1;
+  end;
 end;
 
 function TWorkTableManager.UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable;
@@ -5187,7 +5219,7 @@ function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkT
   AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
   I: Integer;
-  Coef, SUM, MaxRatio: Double;
+  Coef, SUM, MaxRatio, ChannelQmax: Double;
 begin
   SetLength(Result, 0);
   if (AWorkTable = nil) or (AChannels = nil) then
@@ -5195,15 +5227,30 @@ begin
 
   SUM := 0;
   for I := 0 to AChannels.Count - 1 do
-    SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+    if (AChannels[I] <> nil) and (AChannels[I].Meter <> nil) and
+       (AChannels[I].Meter.Device <> nil) then
+    begin
+      ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].Meter.Device.Qmax, 4);
+      if SameValue(ChannelQmax, 0.0, 1e-12) then
+        ChannelQmax := 1;
+      SUM := SUM + ChannelQmax;
+    end;
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
     if SameValue(SUM, 0.0, 1e-12) then
-      MaxRatio := 0
+      MaxRatio := 1 / AChannels.Count
+    else if (AChannels[I] <> nil) and (AChannels[I].Meter <> nil) and
+            (AChannels[I].Meter.Device <> nil) then
+    begin
+      ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].Meter.Device.Qmax, 4);
+      if SameValue(ChannelQmax, 0.0, 1e-12) then
+        ChannelQmax := 1;
+      MaxRatio := ChannelQmax / SUM;
+    end
     else
-      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+      MaxRatio := 0;
 
     Coef := GetChannelFlowCoef(AChannels[I]);
     if Coef > 0 then
