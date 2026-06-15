@@ -1334,6 +1334,8 @@ begin
   begin
     if FActiveWorkTable = AWorkTable then
     begin
+      RefreshPumpsCombo;
+      RefreshScalesCombo;
       UpdateForm;
       if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
          (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
