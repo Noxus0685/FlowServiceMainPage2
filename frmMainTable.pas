@@ -4467,7 +4467,6 @@ var
   EtalonChannel: TChannel;
   ScaleFlowValue: Double;
   ScaleQuantity: Double;
-  ScaleTime: Double;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4498,31 +4497,12 @@ begin
 
     if EtalonChannel.Scale <> nil then
     begin
-      ScaleQuantity := EtalonChannel.ValueResult;
-      if WorkTable.DisplayWeight <> 0 then
-        ScaleQuantity := WorkTable.DisplayWeight;
-      ScaleTime := WorkTable.Time;
       ScaleFlowValue := EtalonChannel.ValueSec;
+      ScaleQuantity := EtalonChannel.ValueResult;
 
       if (EtalonChannel.ValueInterface <> nil) and
          (EtalonChannel.ValueInterface.GetDoubleValue <> 0) then
         ScaleFlowValue := EtalonChannel.ValueInterface.GetDoubleValue;
-
-      if (ScaleFlowValue = 0) and (ScaleQuantity <> 0) and (ScaleTime > 0) then
-        ScaleFlowValue := ScaleQuantity / ScaleTime
-      else if (ScaleFlowValue = 0) and (WorkTable.ValueFlowRate <> nil) then
-        ScaleFlowValue := WorkTable.ValueFlowRate.GetDoubleValue;
-
-      if (ScaleFlowValue = 0) and (WorkTable.FlowRate <> nil) then
-      begin
-        if (WorkTable.FlowRate.Value <> nil) and (WorkTable.FlowRate.Value.Value <> 0) then
-          ScaleFlowValue := WorkTable.FlowRate.Value.Value
-        else if (WorkTable.FlowRate.ValueSet <> nil) then
-          ScaleFlowValue := WorkTable.FlowRate.ValueSet.Value;
-      end;
-
-      if (ScaleQuantity = 0) and (ScaleFlowValue <> 0) and (ScaleTime > 0) then
-        ScaleQuantity := ScaleFlowValue * ScaleTime;
 
       EtalonChannel.ValueSec := ScaleFlowValue;
       EtalonChannel.ValueResult := ScaleQuantity;
