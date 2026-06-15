@@ -4500,15 +4500,9 @@ begin
       ScaleFlowValue := EtalonChannel.ValueSec;
       ScaleQuantity := EtalonChannel.ValueResult;
 
-      if (EtalonChannel.ValueInterface <> nil) and
-         (EtalonChannel.ValueInterface.GetDoubleValue <> 0) then
-        ScaleFlowValue := EtalonChannel.ValueInterface.GetDoubleValue;
-
       EtalonChannel.ValueSec := ScaleFlowValue;
       EtalonChannel.ValueResult := ScaleQuantity;
 
-      if EtalonChannel.ValueInterface <> nil then
-        EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
       if EtalonChannel.Scale.ValueFlow <> nil then
         EtalonChannel.Scale.ValueFlow.SetValue(EtalonChannel.ValueSec);
       if EtalonChannel.Scale.ValueQuantity <> nil then
@@ -6356,8 +6350,6 @@ begin
         NewValue := WorkTable.ValueFlowRate.GetDoubleBaseNum(NewValue, WorkTable.ValueFlowRate.CurrentDimIndex);
       Changed := not SameValue(Channel.ValueSec, NewValue, MinDouble);
       Channel.ValueSec := NewValue;
-      if Channel.ValueInterface <> nil then
-        Channel.ValueInterface.SetValue(Channel.ValueSec);
       if Channel.Scale.ValueFlow <> nil then
         Channel.Scale.ValueFlow.SetValue(Channel.ValueSec);
     end

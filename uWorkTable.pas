@@ -1294,6 +1294,8 @@ begin
   RepoTypeUUID := ADevice.RepoTypeUUID;
   RepoDeviceName := ADevice.RepoDeviceName;
   RepoDeviceUUID := ADevice.RepoDeviceUUID;
+  ValueSec := 0;
+  ValueResult := 0;
 
   RebindFlowMeterValues(AWorkTable);
 end;
@@ -4879,8 +4881,6 @@ begin
       else
         Channel.ValueResult := EnsureRange(Channel.ValueResult + Channel.ValueSec, 0.0, 1.0E12);
 
-      if Channel.ValueInterface <> nil then
-        Channel.ValueInterface.SetValue(Channel.ValueSec);
       if Channel.Scale.ValueFlow <> nil then
         Channel.Scale.ValueFlow.SetValue(Channel.ValueSec);
       if Channel.Scale.ValueQuantity <> nil then
