@@ -449,13 +449,13 @@ public
   function SetImpCoef(const AK: string): Boolean; overload;
 
   procedure InitHashValues;
-  procedure InitAllValues;
+  procedure InitAllValues; override;
   procedure UpdateByDevice;
   procedure RebindCalculatedValues;
   procedure SetMonitorValues;
   procedure SetFinalValues;
   procedure SetUpdateType(AType: EUpdateType);
-  procedure Reset;
+  procedure Reset; override;
   procedure AddDataPoint(const APoint: TPointSpillage);
 
   procedure Init; overload;
