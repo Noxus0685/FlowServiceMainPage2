@@ -1188,29 +1188,29 @@ end;
 
 procedure TFrameWorkTableProperties.ButtonPumpDeleteClick(Sender: TObject);
 var
-  I: Integer;
   Name: string;
   Pump: TPump;
+  WorkTable: TWorkTable;
 begin
-  if (FWorkTable = nil) or (FWorkTable.Pumps = nil) then
-    Exit;
-
   Name := Trim(EditPumpName.Text);
-  if Name = '' then
+  if (Name = '') or (TPump.Pumps = nil) then
     Exit;
 
   Pump := nil;
-  for I := 0 to FWorkTable.Pumps.Count - 1 do
-    if (FWorkTable.Pumps[I] <> nil) and SameText(Trim(FWorkTable.Pumps[I].Name), Name) then
-    begin
-      Pump := FWorkTable.Pumps[I];
+  for Pump in TPump.Pumps do
+    if (Pump <> nil) and SameText(Trim(Pump.Name), Name) then
       Break;
-    end;
 
-  if Pump = nil then
+  if (Pump = nil) or not SameText(Trim(Pump.Name), Name) then
     Exit;
 
-  FWorkTable.RemovePump(Pump);
+  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
+    for WorkTable in WorkTableManager.WorkTables do
+      if (WorkTable <> nil) and (WorkTable.Pumps <> nil) and
+         (WorkTable.Pumps.IndexOf(Pump) >= 0) then
+        WorkTable.RemovePump(Pump);
+
+  TPump.Pumps.Remove(Pump);
   RefreshInstrumentEdits;
   ApplyEditState;
   NotifyRefreshIfChanged(True);
