@@ -17,6 +17,13 @@ const
   XMLVERFLOWMETERS = '5.0';
 
 type
+  EMeterKind = (
+    mkUnknown,
+    mkFlowMeter,
+    mkScale
+  );
+
+  TMeter = class;
   TFlowMeter = class;
   TScale = class;
 
@@ -52,13 +59,10 @@ type
   TFlowMeter → текущее состояние прибора (runtime)
  }
 
-TFlowMeter = class(TTypeEntity)
-private
-  // =====================================================
-  // == Связь с "базовым" устройством из БД
-  // =====================================================
+TMeter = class(TTypeEntity)
+protected
   FDevice: TDevice;
-
+  FIsEtalon: Boolean;
   FSerialNumber:  string;
   FDeviceTypeUUID:  string;
   FTypeName:  string;
@@ -67,7 +71,60 @@ private
   FRepoTypeUUID: string;
   FRepoDeviceName: string;
   FRepoDeviceUUID: string;
-  FOutputType: Integer; // тип должен совпадать с типом OutputType в TDevice
+  FOutputType: Integer;
+  function GetDevice: TDevice; virtual;
+  procedure SetDevice(const ADevice: TDevice); virtual;
+  function GetDeviceUUID: string; virtual;
+  procedure SetDeviceUUID(const ADevice: string); virtual;
+  function GetDeviceNameProxy: string; virtual;
+  procedure SetDeviceNameProxy(const AValue: string); virtual;
+  function GetDeviceTypeNameProxy: string; virtual;
+  procedure SetDeviceTypeNameProxy(const AValue: string); virtual;
+  function GetDeviceTypeUUIDProxy: string; virtual;
+  procedure SetDeviceTypeUUIDProxy(const AValue: string); virtual;
+  function GetRepoTypeNameProxy: string; virtual;
+  procedure SetRepoTypeNameProxy(const AValue: string); virtual;
+  function GetRepoTypeUUIDProxy: string; virtual;
+  procedure SetRepoTypeUUIDProxy(const AValue: string); virtual;
+  function GetRepoDeviceNameProxy: string; virtual;
+  procedure SetRepoDeviceNameProxy(const AValue: string); virtual;
+  function GetRepoDeviceUUIDProxy: string; virtual;
+  procedure SetRepoDeviceUUIDProxy(const AValue: string); virtual;
+  function GetSerialNumberProxy: string; virtual;
+  procedure SetSerialNumberProxy(const AValue: string); virtual;
+  function GetOutputTypeProxy: Integer; virtual;
+  procedure SetOutputTypeProxy(const AValue: Integer); virtual;
+public
+  constructor Create; override;
+  destructor Destroy; override;
+
+  property Device: TDevice read GetDevice write SetDevice;
+  property IsEtalon: Boolean read FIsEtalon write FIsEtalon;
+
+  property DeviceUUID: string read GetDeviceUUID write SetDeviceUUID;
+  property DeviceName: string read GetDeviceNameProxy write SetDeviceNameProxy;
+  property DeviceTypeName: string read GetDeviceTypeNameProxy write SetDeviceTypeNameProxy;
+  property DeviceTypeUUID: string read GetDeviceTypeUUIDProxy write SetDeviceTypeUUIDProxy;
+  property RepoTypeName: string read GetRepoTypeNameProxy write SetRepoTypeNameProxy;
+  property RepoTypeUUID: string read GetRepoTypeUUIDProxy write SetRepoTypeUUIDProxy;
+  property RepoDeviceName: string read GetRepoDeviceNameProxy write SetRepoDeviceNameProxy;
+  property RepoDeviceUUID: string read GetRepoDeviceUUIDProxy write SetRepoDeviceUUIDProxy;
+  property SerialNumber: string read GetSerialNumberProxy write SetSerialNumberProxy;
+  property OutputType: Integer read GetOutputTypeProxy write SetOutputTypeProxy;
+
+  function GetMeterKind: EMeterKind; virtual;
+  function GetEtalonKindText: string; virtual;
+  function IsFlowMeter: Boolean; virtual;
+  function IsScale: Boolean; virtual;
+  function NeedFlowPoints: Boolean; virtual;
+  function NeedImpCoef: Boolean; virtual;
+  procedure SetAsEtalon; virtual;
+  procedure InitAllValues; virtual;
+  procedure Reset; virtual;
+end;
+
+TFlowMeter = class(TMeter)
+private
 
   FImpulses: array[0..99] of Word;
   FWrImp: Byte;
@@ -139,38 +196,38 @@ private
   HashValueCurrent: string;
   HashValueTime: string;
 
-  function GetDevice: TDevice;
-  procedure SetDevice(const ADevice: TDevice);
+  function GetDevice: TDevice; override;
+  procedure SetDevice(const ADevice: TDevice); override;
 
-  function GetDeviceUUID: string;
-  procedure SetDeviceUUID(const ADevice: string);
+  function GetDeviceUUID: string; virtual;
+  procedure SetDeviceUUID(const ADevice: string); virtual;
 
-  function GetDeviceNameProxy: string;
-  procedure SetDeviceNameProxy(const AValue: string);
+  function GetDeviceNameProxy: string; virtual;
+  procedure SetDeviceNameProxy(const AValue: string); virtual;
 
-  function GetDeviceTypeNameProxy: string;
-  procedure SetDeviceTypeNameProxy(const AValue: string);
+  function GetDeviceTypeNameProxy: string; virtual;
+  procedure SetDeviceTypeNameProxy(const AValue: string); virtual;
 
-  function GetDeviceTypeUUIDProxy: string;
-  procedure SetDeviceTypeUUIDProxy(const AValue: string);
+  function GetDeviceTypeUUIDProxy: string; virtual;
+  procedure SetDeviceTypeUUIDProxy(const AValue: string); virtual;
 
-  function GetRepoTypeNameProxy: string;
-  procedure SetRepoTypeNameProxy(const AValue: string);
+  function GetRepoTypeNameProxy: string; virtual;
+  procedure SetRepoTypeNameProxy(const AValue: string); virtual;
 
-  function GetRepoTypeUUIDProxy: string;
-  procedure SetRepoTypeUUIDProxy(const AValue: string);
+  function GetRepoTypeUUIDProxy: string; virtual;
+  procedure SetRepoTypeUUIDProxy(const AValue: string); virtual;
 
-  function GetRepoDeviceNameProxy: string;
-  procedure SetRepoDeviceNameProxy(const AValue: string);
+  function GetRepoDeviceNameProxy: string; virtual;
+  procedure SetRepoDeviceNameProxy(const AValue: string); virtual;
 
-  function GetRepoDeviceUUIDProxy: string;
-  procedure SetRepoDeviceUUIDProxy(const AValue: string);
+  function GetRepoDeviceUUIDProxy: string; virtual;
+  procedure SetRepoDeviceUUIDProxy(const AValue: string); virtual;
 
-  function GetSerialNumberProxy: string;
-  procedure SetSerialNumberProxy(const AValue: string);
+  function GetSerialNumberProxy: string; virtual;
+  procedure SetSerialNumberProxy(const AValue: string); virtual;
 
-  function GetOutputTypeProxy: Integer;
-  procedure SetOutputTypeProxy(const AValue: Integer);
+  function GetOutputTypeProxy: Integer; virtual;
+  procedure SetOutputTypeProxy(const AValue: Integer); virtual;
 
   procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
 
@@ -285,7 +342,6 @@ public
   TypeHash: Integer;
   OrderHash: Integer;
 
-  IsEtalon: Boolean;
   Active: Integer;
   CheckType: Integer;
 
@@ -380,10 +436,13 @@ public
   procedure SetMeterCategory(const AMeterFlowType: string); overload;
   function GetMeterCategory: string;
   function ResolveStdCategoryFromDevice: EStdCategory;
-  function IsScale: Boolean; virtual;
-  function IsFlowMeter: Boolean; virtual;
-  function GetEtalonKindText: string; virtual;
-  procedure SetAsEtalon; virtual;
+  function GetMeterKind: EMeterKind; override;
+  function IsScale: Boolean; override;
+  function IsFlowMeter: Boolean; override;
+  function GetEtalonKindText: string; override;
+  function NeedFlowPoints: Boolean; override;
+  function NeedImpCoef: Boolean; override;
+  procedure SetAsEtalon; override;
 
   procedure SetImpCoef(AK: Double); overload;
   procedure SetImpCoef(AK: Single); overload;
@@ -413,16 +472,22 @@ public
 
 end;
 
-TScale = class(TFlowMeter)
+TScale = class(TMeter)
 public
+  function GetMeterKind: EMeterKind; override;
   function IsScale: Boolean; override;
   function IsFlowMeter: Boolean; override;
   function GetEtalonKindText: string; override;
+  function NeedFlowPoints: Boolean; override;
+  function NeedImpCoef: Boolean; override;
   procedure SetAsEtalon; override;
+  procedure InitAllValues; override;
+  procedure Reset; override;
 end;
 
 function IsScaleDevice(ADevice: TDevice): Boolean;
-function CreateEtalonByDevice(ADevice: TDevice): TFlowMeter;
+function CreateMeterByDevice(ADevice: TDevice): TMeter;
+function CreateEtalonByDevice(ADevice: TDevice): TMeter;
 
 implementation
 
@@ -447,7 +512,7 @@ begin
   Result := (Cat <> nil) and (Cat.StdCategory = mftWeightsType);
 end;
 
-function CreateEtalonByDevice(ADevice: TDevice): TFlowMeter;
+function CreateMeterByDevice(ADevice: TDevice): TMeter;
 begin
   if IsScaleDevice(ADevice) then
     Result := TScale.Create
@@ -459,7 +524,123 @@ begin
   Result.InitAllValues;
 end;
 
+function CreateEtalonByDevice(ADevice: TDevice): TMeter;
+begin
+  Result := CreateMeterByDevice(ADevice);
+end;
 
+{ TMeter }
+
+constructor TMeter.Create;
+begin
+  inherited Create;
+  FDevice := nil;
+  FIsEtalon := False;
+end;
+
+destructor TMeter.Destroy;
+begin
+  inherited Destroy;
+end;
+
+function TMeter.GetMeterKind: EMeterKind;
+begin
+  Result := mkUnknown;
+end;
+
+function TMeter.GetEtalonKindText: string;
+begin
+  Result := 'Эталон';
+end;
+
+function TMeter.IsFlowMeter: Boolean;
+begin
+  Result := False;
+end;
+
+function TMeter.IsScale: Boolean;
+begin
+  Result := False;
+end;
+
+function TMeter.NeedFlowPoints: Boolean;
+begin
+  Result := False;
+end;
+
+function TMeter.NeedImpCoef: Boolean;
+begin
+  Result := False;
+end;
+
+procedure TMeter.SetAsEtalon;
+begin
+  FIsEtalon := True;
+end;
+
+procedure TMeter.InitAllValues;
+begin
+end;
+
+procedure TMeter.Reset;
+begin
+end;
+
+
+function TMeter.GetDevice: TDevice;
+begin
+  Result := FDevice;
+end;
+
+procedure TMeter.SetDevice(const ADevice: TDevice);
+begin
+  FDevice := ADevice;
+  if FDevice = nil then
+  begin
+    FDeviceUUID := '';
+    FSerialNumber := '';
+    FDeviceTypeUUID := '';
+    FTypeName := '';
+    FRepoTypeName := '';
+    FRepoTypeUUID := '';
+    FRepoDeviceName := '';
+    FRepoDeviceUUID := '';
+    FOutputType := 0;
+    Exit;
+  end;
+  UUID := FDevice.UUID;
+  Name := FDevice.Name;
+  FDeviceUUID := FDevice.UUID;
+  FSerialNumber := FDevice.SerialNumber;
+  FDeviceTypeUUID := FDevice.DeviceTypeUUID;
+  FTypeName := FDevice.DeviceTypeName;
+  FRepoTypeName := FDevice.RepoTypeName;
+  FRepoTypeUUID := FDevice.RepoTypeUUID;
+  FRepoDeviceName := FDevice.RepoDeviceName;
+  FRepoDeviceUUID := FDevice.RepoDeviceUUID;
+  FOutputType := FDevice.OutputType;
+end;
+
+function TMeter.GetDeviceUUID: string; begin if Assigned(FDevice) then Result := FDevice.UUID else Result := FDeviceUUID; end;
+procedure TMeter.SetDeviceUUID(const ADevice: string); begin FDeviceUUID := Trim(ADevice); if Assigned(FDevice) and (not SameText(Trim(FDevice.UUID), FDeviceUUID)) then FDevice := nil; end;
+function TMeter.GetDeviceNameProxy: string; begin if Assigned(FDevice) then Result := FDevice.Name else Result := Name; end;
+procedure TMeter.SetDeviceNameProxy(const AValue: string); begin Name := AValue; if Assigned(FDevice) then begin FDevice.Name := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetDeviceTypeNameProxy: string; begin if Assigned(FDevice) then Result := FDevice.DeviceTypeName else Result := FTypeName; end;
+procedure TMeter.SetDeviceTypeNameProxy(const AValue: string); begin FTypeName := AValue; if Assigned(FDevice) then begin FDevice.DeviceTypeName := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetDeviceTypeUUIDProxy: string; begin if Assigned(FDevice) then Result := FDevice.DeviceTypeUUID else Result := FDeviceTypeUUID; end;
+procedure TMeter.SetDeviceTypeUUIDProxy(const AValue: string); begin FDeviceTypeUUID := AValue; if Assigned(FDevice) then begin FDevice.DeviceTypeUUID := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetRepoTypeNameProxy: string; begin if Assigned(FDevice) then Result := FDevice.RepoTypeName else Result := FRepoTypeName; end;
+procedure TMeter.SetRepoTypeNameProxy(const AValue: string); begin FRepoTypeName := AValue; if Assigned(FDevice) then begin FDevice.RepoTypeName := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetRepoTypeUUIDProxy: string; begin if Assigned(FDevice) then Result := FDevice.RepoTypeUUID else Result := FRepoTypeUUID; end;
+procedure TMeter.SetRepoTypeUUIDProxy(const AValue: string); begin FRepoTypeUUID := AValue; if Assigned(FDevice) then begin FDevice.RepoTypeUUID := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetRepoDeviceNameProxy: string; begin if Assigned(FDevice) then Result := FDevice.RepoDeviceName else Result := FRepoDeviceName; end;
+procedure TMeter.SetRepoDeviceNameProxy(const AValue: string); begin FRepoDeviceName := AValue; if Assigned(FDevice) then begin FDevice.RepoDeviceName := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetRepoDeviceUUIDProxy: string; begin if Assigned(FDevice) then Result := FDevice.RepoDeviceUUID else Result := FRepoDeviceUUID; end;
+procedure TMeter.SetRepoDeviceUUIDProxy(const AValue: string); begin FRepoDeviceUUID := AValue; if Assigned(FDevice) then begin FDevice.RepoDeviceUUID := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetSerialNumberProxy: string; begin if Assigned(FDevice) then Result := FDevice.SerialNumber else Result := FSerialNumber; end;
+procedure TMeter.SetSerialNumberProxy(const AValue: string); begin FSerialNumber := AValue; if Assigned(FDevice) then begin FDevice.SerialNumber := AValue; FDevice.State := osModified; end; end;
+function TMeter.GetOutputTypeProxy: Integer; begin if Assigned(FDevice) then Result := FDevice.OutputType else Result := FOutputType; end;
+procedure TMeter.SetOutputTypeProxy(const AValue: Integer); begin FOutputType := AValue; if Assigned(FDevice) then begin FDevice.OutputType := AValue; FDevice.State := osModified; end; end;
 
 constructor TFlowMeter.Create();
 begin
@@ -469,7 +650,7 @@ begin
   TypeHash := 0;
   OrderHash := 0;
 
-  IsEtalon := False;
+  FIsEtalon := False;
   Active := 0;
   CheckType := 0;
   Status := 0;
@@ -1978,6 +2159,11 @@ begin
   ApplyUpdateType(ValueVolumeError);
 end;
 
+function TFlowMeter.GetMeterKind: EMeterKind;
+begin
+  Result := mkFlowMeter;
+end;
+
 function TFlowMeter.IsScale: Boolean;
 begin
   Result := False;
@@ -1993,12 +2179,27 @@ begin
   Result := 'Расходомер';
 end;
 
+function TFlowMeter.NeedFlowPoints: Boolean;
+begin
+  Result := True;
+end;
+
+function TFlowMeter.NeedImpCoef: Boolean;
+begin
+  Result := True;
+end;
+
 procedure TFlowMeter.SetAsEtalon;
 begin
   Name := 'Etalon';
   IsEtalon := True;
   SetMeterCategory(mftMassFlowmeterType);
   SetImpCoef(100);
+end;
+
+function TScale.GetMeterKind: EMeterKind;
+begin
+  Result := mkScale;
 end;
 
 function TScale.IsScale: Boolean;
@@ -2016,11 +2217,28 @@ begin
   Result := 'Весы';
 end;
 
+function TScale.NeedFlowPoints: Boolean;
+begin
+  Result := False;
+end;
+
+function TScale.NeedImpCoef: Boolean;
+begin
+  Result := False;
+end;
+
 procedure TScale.SetAsEtalon;
 begin
   Name := 'Etalon';
   IsEtalon := True;
-  SetMeterCategory(mftWeightsType);
+end;
+
+procedure TScale.InitAllValues;
+begin
+end;
+
+procedure TScale.Reset;
+begin
 end;
 
 procedure TFlowMeter.SetCopy(AMeter: TFlowMeter);
