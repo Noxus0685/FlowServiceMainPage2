@@ -522,10 +522,10 @@ begin
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
     begin
       Channel := FWorkTable.EtalonChannels[I];
-      if (Channel = nil) or (Channel.FlowMeter = nil) then
+      if (Channel = nil) or (Channel.Meter = nil) then
         Continue;
 
-      if (not Channel.FlowMeter.IsScale) then
+      if (not Channel.Meter.IsScale) then
       begin
         if (APoint.Q <= 0) and (not Channel.Enabled) then
           Continue;
@@ -536,13 +536,13 @@ begin
 
       EtalonName := Trim(Channel.Name);
       if EtalonName = '' then
-        EtalonName := Trim(Channel.FlowMeter.DeviceName);
+        EtalonName := Trim(Channel.Meter.DeviceName);
       if EtalonName = '' then
         EtalonName := 'Без имени';
 
       Accuracy := '';
-      if Channel.FlowMeter.Device <> nil then
-        Accuracy := Trim(Channel.FlowMeter.Device.AccuracyClass);
+      if Channel.Meter.Device <> nil then
+        Accuracy := Trim(Channel.Meter.Device.AccuracyClass);
       if Accuracy = '' then
         Accuracy := 'не указана';
 
@@ -1083,7 +1083,7 @@ begin
     if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
       Continue;
 
-    Device := Channel.FlowMeter.Device;
+    Device := Channel.Meter.Device;
     if ((Device = nil) or (Device.Points = nil) or (Device.Points.Count = 0)) and
        (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
       Device := TDeviceCreationService.EnsureDeviceForChannel(
