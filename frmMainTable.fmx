@@ -4823,6 +4823,14 @@ object FrameMainTable: TFrameMainTable
         Action = ActionPumpDelete
         ImageIndex = -1
       end
+      object MenuItemAddScale: TMenuItem
+        Action = ActionScaleAdd
+        ImageIndex = -1
+      end
+      object MenuItemDeleteScale: TMenuItem
+        Action = ActionScaleDelete
+        ImageIndex = -1
+      end
     end
     object PopupMenuInstrumentalLayOut: TPopupMenu
       OnPopup = PopupMenuInstrumentalLayOutPopup
@@ -4916,6 +4924,16 @@ object FrameMainTable: TFrameMainTable
         end
         object MenuItemDevicesWorkTablesDeletePump: TMenuItem
           Action = ActionPumpDelete
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesAddScale: TMenuItem
+          Action = ActionScaleAdd
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemDevicesWorkTablesDeleteScale: TMenuItem
+          Action = ActionScaleDelete
           Locked = True
           ImageIndex = -1
         end
@@ -5208,6 +5226,16 @@ object FrameMainTable: TFrameMainTable
         end
         object MenuItemEtalonsWorkTablesDeletePump: TMenuItem
           Action = ActionPumpDelete
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesAddScale: TMenuItem
+          Action = ActionScaleAdd
+          Locked = True
+          ImageIndex = -1
+        end
+        object MenuItemEtalonsWorkTablesDeleteScale: TMenuItem
+          Action = ActionScaleDelete
           Locked = True
           ImageIndex = -1
         end
@@ -6116,6 +6144,18 @@ object FrameMainTable: TFrameMainTable
       Text = #1059#1076#1072#1083#1080#1090#1100' '#1085#1072#1089#1086#1089' '
       Hint = #1059#1076#1072#1083#1080#1090#1100' '#1085#1072#1089#1086#1089' '
       OnExecute = ActionPumpDeleteExecute
+    end
+    object ActionScaleAdd: TAction
+      Category = 'WorkTable'
+      Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1074#1077#1089#1099
+      Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1074#1077#1089#1099
+      OnExecute = ActionScaleAddExecute
+    end
+    object ActionScaleDelete: TAction
+      Category = 'WorkTable'
+      Text = #1059#1076#1072#1083#1080#1090#1100' '#1074#1077#1089#1099
+      Hint = #1059#1076#1072#1083#1080#1090#1100' '#1074#1077#1089#1099
+      OnExecute = ActionScaleDeleteExecute
     end
   end
 end

@@ -300,6 +300,8 @@ type
     MenuItemDevicesWorkTablesDeleteEtalons: TMenuItem;
     MenuItemDevicesWorkTablesAddPump: TMenuItem;
     MenuItemDevicesWorkTablesDeletePump: TMenuItem;
+    MenuItemDevicesWorkTablesAddScale: TMenuItem;
+    MenuItemDevicesWorkTablesDeleteScale: TMenuItem;
     MenuItemDevicesColumnsGroup: TMenuItem;
     MenuItemDevicesColumnsChannelGroup: TMenuItem;
     MenuItemDevicesColumnsDeviceGroup: TMenuItem;
@@ -336,6 +338,8 @@ type
     MenuItemEtalonsWorkTablesDeleteEtalons: TMenuItem;
     MenuItemEtalonsWorkTablesAddPump: TMenuItem;
     MenuItemEtalonsWorkTablesDeletePump: TMenuItem;
+    MenuItemEtalonsWorkTablesAddScale: TMenuItem;
+    MenuItemEtalonsWorkTablesDeleteScale: TMenuItem;
     MenuItemEtalonsColumnsGroup: TMenuItem;
     MenuItemEtalonsColumnsChannelGroup: TMenuItem;
     MenuItemEtalonsColumnsDeviceGroup: TMenuItem;
@@ -481,6 +485,10 @@ type
     MenuItemAddPump: TMenuItem;
     MenuItemDeletePump: TMenuItem;
     ActionPumpDelete: TAction;
+    ActionScaleAdd: TAction;
+    ActionScaleDelete: TAction;
+    MenuItemAddScale: TMenuItem;
+    MenuItemDeleteScale: TMenuItem;
     StyleBook1: TStyleBook;
     PanelControlWorkTables: TPanel;
     Label3: TLabel;
@@ -599,6 +607,8 @@ type
     procedure ActionDeleteEtalonsExecute(Sender: TObject);
     procedure ActionPumpAddExecute(Sender: TObject);
     procedure ActionPumpDeleteExecute(Sender: TObject);
+    procedure ActionScaleAddExecute(Sender: TObject);
+    procedure ActionScaleDeleteExecute(Sender: TObject);
     procedure SpinBoxFreqExit(Sender: TObject);
     procedure SpinBoxFreqEnter(Sender: TObject);
     procedure GridDevicesEditingDone(Sender: TObject; const ACol,
@@ -2359,6 +2369,10 @@ begin
     ActionPumpAdd.Enabled := CanEdit;
   if ActionPumpDelete <> nil then
     ActionPumpDelete.Enabled := CanEdit;
+  if ActionScaleAdd <> nil then
+    ActionScaleAdd.Enabled := CanEdit;
+  if ActionScaleDelete <> nil then
+    ActionScaleDelete.Enabled := CanEdit;
 end;
 
 procedure TFrameMainTable.UpdateGridPopupActions;
@@ -2402,6 +2416,10 @@ begin
     ActionPumpAdd.Enabled := CanEdit;
   if ActionPumpDelete <> nil then
     ActionPumpDelete.Enabled := CanEdit;
+  if ActionScaleAdd <> nil then
+    ActionScaleAdd.Enabled := CanEdit;
+  if ActionScaleDelete <> nil then
+    ActionScaleDelete.Enabled := CanEdit;
   if ActionAddDeviceChannel <> nil then
     ActionAddDeviceChannel.Enabled := CanEdit;
   if ActionAddEtalonChannel <> nil then
@@ -3355,6 +3373,30 @@ begin
         RefreshScalesCombo;
         UpdateUIPump;
         UpdateUIScale;
+end;
+
+
+procedure TFrameMainTable.ActionScaleAddExecute(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  FActiveWorkTable.AddScale('1');
+  RefreshScalesCombo;
+  UpdateUIScale;
+end;
+
+procedure TFrameMainTable.ActionScaleDeleteExecute(Sender: TObject);
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  if FActiveWorkTable.ActiveScale = nil then
+    Exit;
+
+  FActiveWorkTable.RemoveScale(FActiveWorkTable.ActiveScale);
+  RefreshScalesCombo;
+  UpdateUIScale;
 end;
 
 procedure TFrameMainTable.SelectDeviceForChannel(AChannel: TChannel);
