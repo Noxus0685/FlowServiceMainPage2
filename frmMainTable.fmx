@@ -4816,18 +4816,22 @@ object FrameMainTable: TFrameMainTable
         ImageIndex = -1
       end
       object MenuItemAddPump: TMenuItem
+        Visible = False
         Action = ActionPumpAdd
         ImageIndex = -1
       end
       object MenuItemDeletePump: TMenuItem
+        Visible = False
         Action = ActionPumpDelete
         ImageIndex = -1
       end
       object MenuItemAddScale: TMenuItem
+        Visible = False
         Action = ActionScaleAdd
         ImageIndex = -1
       end
       object MenuItemDeleteScale: TMenuItem
+        Visible = False
         Action = ActionScaleDelete
         ImageIndex = -1
       end
@@ -4918,21 +4922,25 @@ object FrameMainTable: TFrameMainTable
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesAddPump: TMenuItem
+        Visible = False
           Action = ActionPumpAdd
           Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesDeletePump: TMenuItem
+        Visible = False
           Action = ActionPumpDelete
           Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesAddScale: TMenuItem
+        Visible = False
           Action = ActionScaleAdd
           Locked = True
           ImageIndex = -1
         end
         object MenuItemDevicesWorkTablesDeleteScale: TMenuItem
+        Visible = False
           Action = ActionScaleDelete
           Locked = True
           ImageIndex = -1
@@ -5220,21 +5228,25 @@ object FrameMainTable: TFrameMainTable
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesAddPump: TMenuItem
+        Visible = False
           Action = ActionPumpAdd
           Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesDeletePump: TMenuItem
+        Visible = False
           Action = ActionPumpDelete
           Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesAddScale: TMenuItem
+        Visible = False
           Action = ActionScaleAdd
           Locked = True
           ImageIndex = -1
         end
         object MenuItemEtalonsWorkTablesDeleteScale: TMenuItem
+        Visible = False
           Action = ActionScaleDelete
           Locked = True
           ImageIndex = -1
