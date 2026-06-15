@@ -471,14 +471,6 @@ begin
   ValueLayout.Stored := False;
   RowGrid.ControlCollection.AddControl(ValueLayout, 1, 0);
 
-  ADeleteButton := TButton.Create(Self);
-  ADeleteButton.Parent := ValueLayout;
-  ADeleteButton.Align := TAlignLayout.Right;
-  ADeleteButton.Width := 36;
-  ADeleteButton.Margins.Left := 8;
-  ADeleteButton.Text := '-';
-  ADeleteButton.OnClick := AOnDeleteClick;
-
   AAddButton := TButton.Create(Self);
   AAddButton.Parent := ValueLayout;
   AAddButton.Align := TAlignLayout.Right;
@@ -486,6 +478,14 @@ begin
   AAddButton.Margins.Left := 8;
   AAddButton.Text := '+';
   AAddButton.OnClick := AOnAddClick;
+
+  ADeleteButton := TButton.Create(Self);
+  ADeleteButton.Parent := ValueLayout;
+  ADeleteButton.Align := TAlignLayout.Right;
+  ADeleteButton.Width := 36;
+  ADeleteButton.Margins.Left := 8;
+  ADeleteButton.Text := '-';
+  ADeleteButton.OnClick := AOnDeleteClick;
 
   AEdit := TEdit.Create(Self);
   AEdit.Parent := ValueLayout;
@@ -1188,16 +1188,30 @@ end;
 
 procedure TFrameWorkTableProperties.ButtonPumpDeleteClick(Sender: TObject);
 var
+  I: Integer;
   Name: string;
+  Pump: TPump;
 begin
-  if FWorkTable = nil then
+  if (FWorkTable = nil) or (FWorkTable.Pumps = nil) then
     Exit;
 
   Name := Trim(EditPumpName.Text);
   if Name = '' then
     Exit;
 
-  FWorkTable.RemovePump(FWorkTable.FindPumpByName(Name));
+  Pump := nil;
+  for I := 0 to FWorkTable.Pumps.Count - 1 do
+    if (FWorkTable.Pumps[I] <> nil) and SameText(Trim(FWorkTable.Pumps[I].Name), Name) then
+    begin
+      Pump := FWorkTable.Pumps[I];
+      Break;
+    end;
+
+  if Pump = nil then
+    Exit;
+
+  FWorkTable.RemovePump(Pump);
+  RefreshInstrumentEdits;
   ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
@@ -1219,16 +1233,30 @@ end;
 
 procedure TFrameWorkTableProperties.ButtonScaleDeleteClick(Sender: TObject);
 var
+  I: Integer;
   Name: string;
+  Scale: TWeight;
 begin
-  if FWorkTable = nil then
+  if (FWorkTable = nil) or (FWorkTable.Scales = nil) then
     Exit;
 
   Name := Trim(EditScaleName.Text);
   if Name = '' then
     Exit;
 
-  FWorkTable.RemoveScale(FWorkTable.FindScaleByName(Name));
+  Scale := nil;
+  for I := 0 to FWorkTable.Scales.Count - 1 do
+    if (FWorkTable.Scales[I] <> nil) and SameText(Trim(FWorkTable.Scales[I].Name), Name) then
+    begin
+      Scale := FWorkTable.Scales[I];
+      Break;
+    end;
+
+  if Scale = nil then
+    Exit;
+
+  FWorkTable.RemoveScale(Scale);
+  RefreshInstrumentEdits;
   ApplyEditState;
   NotifyRefreshIfChanged(True);
 end;
