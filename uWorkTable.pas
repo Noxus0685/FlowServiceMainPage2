@@ -303,6 +303,7 @@ type
 
     procedure RebindFlowMeterValues(const AWorkTable: TWorkTable);
     procedure RecreateFlowMeter(const AWorkTable: TWorkTable);
+    procedure RecreateEtalonByDevice(const AWorkTable: TWorkTable; ADevice: TDevice);
     procedure AssignFlowMeterFrom(const ASource: TChannel; const AWorkTable: TWorkTable;
       const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
@@ -1241,6 +1242,27 @@ begin
   FFlowMeter.Name := 'Прибор ' + FName;
 
   Init;
+  RebindFlowMeterValues(AWorkTable);
+end;
+
+procedure TChannel.RecreateEtalonByDevice(const AWorkTable: TWorkTable; ADevice: TDevice);
+begin
+  if ADevice = nil then
+    Exit;
+
+  FreeAndNil(FFlowMeter);
+  FFlowMeter := CreateEtalonByDevice(ADevice);
+  FFlowMeter.Name := 'Прибор ' + FName;
+  DeviceUUID := ADevice.UUID;
+  TypeUUID := ADevice.DeviceTypeUUID;
+  TypeName := ADevice.DeviceTypeName;
+  Serial := ADevice.SerialNumber;
+  Signal := ADevice.OutputType;
+  RepoTypeName := ADevice.RepoTypeName;
+  RepoTypeUUID := ADevice.RepoTypeUUID;
+  RepoDeviceName := ADevice.RepoDeviceName;
+  RepoDeviceUUID := ADevice.RepoDeviceUUID;
+
   RebindFlowMeterValues(AWorkTable);
 end;
 
@@ -2533,6 +2555,8 @@ begin
       if (Channel = nil) or (not Channel.Enabled) or
          (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
         Continue;
+      if Channel.FlowMeter.IsScale then
+        Continue;
 
       Device := Channel.FlowMeter.Device;
       if Device.Qmax <= 0 then
@@ -2580,6 +2604,8 @@ begin
     Channel := FEtalonChannels[I];
     if (Channel = nil) or (not Channel.Enabled) or
        (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
+      Continue;
+    if Channel.FlowMeter.IsScale then
       Continue;
 
     Device := Channel.FlowMeter.Device;
@@ -3593,7 +3619,9 @@ begin
 
     Channel.Init;
 
-
+    if EndsText('.Etalon', ASectionPrefix) and (Channel.FlowMeter <> nil) and
+       (Channel.FlowMeter.Device <> nil) then
+      Channel.RecreateEtalonByDevice(nil, Channel.FlowMeter.Device);
 
     AChannels.Add(Channel);
   end;

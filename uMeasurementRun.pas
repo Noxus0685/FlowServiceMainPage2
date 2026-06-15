@@ -525,11 +525,14 @@ begin
       if (Channel = nil) or (Channel.FlowMeter = nil) then
         Continue;
 
-      if (APoint.Q <= 0) and (not Channel.Enabled) then
-        Continue;
-      if (APoint.Q > 0) and
-         ((APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax)) then
-        Continue;
+      if (not Channel.FlowMeter.IsScale) then
+      begin
+        if (APoint.Q <= 0) and (not Channel.Enabled) then
+          Continue;
+        if (APoint.Q > 0) and
+           ((APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax)) then
+          Continue;
+      end;
 
       EtalonName := Trim(Channel.Name);
       if EtalonName = '' then
