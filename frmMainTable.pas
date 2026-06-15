@@ -1334,6 +1334,8 @@ begin
   begin
     if FActiveWorkTable = AWorkTable then
     begin
+      RefreshPumpsCombo;
+      RefreshScalesCombo;
       UpdateForm;
       if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
          (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
@@ -4171,6 +4173,8 @@ begin
     begin
       LayoutPump.tag:=0;
       FActiveWorkTable.SetActivePump(ComboBoxPumps.Text);
+      if FFrameWorkTableProperties <> nil then
+        FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
       UpdateUIPump;
     end;
 end;
@@ -4187,6 +4191,8 @@ begin
 
   LayoutScale.Tag := 0;
   FActiveWorkTable.SetActiveScale(ComboBoxScales.Text);
+  if FFrameWorkTableProperties <> nil then
+    FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
   UpdateUIScale;
 end;
 
