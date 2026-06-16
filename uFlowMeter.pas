@@ -122,6 +122,8 @@ public
   function NeedFlowPoints: Boolean; virtual;
   function NeedImpCoef: Boolean; virtual;
   procedure SetAsEtalon; virtual;
+  procedure Init; overload; virtual;
+  procedure Init(UUID: string); overload; virtual;
   procedure InitAllValues; virtual;
   procedure Reset; virtual;
 end;
@@ -388,8 +390,8 @@ public
   procedure Reset; override;
   procedure AddDataPoint(const APoint: TPointSpillage);
 
-  procedure Init; overload;
-  procedure Init(UUID: string); overload;
+  procedure Init; overload; override;
+  procedure Init(UUID: string); overload; override;
   procedure CreateDevice;
 
   procedure SetValues;
@@ -461,6 +463,29 @@ end;
 procedure TMeter.SetAsEtalon;
 begin
   IsEtalon := True;
+end;
+
+procedure TMeter.Init;
+var
+  FoundDevice: TDevice;
+  FoundRepo: TDeviceRepository;
+begin
+  if AppServices.DataManager <> nil then
+  begin
+    FoundDevice := AppServices.DataManager.FindDevice(FDeviceUUID, FoundRepo);
+    if FoundDevice <> nil then
+      Device := FoundDevice
+    else
+      FDevice := nil;
+  end;
+
+  InitAllValues;
+end;
+
+procedure TMeter.Init(UUID: string);
+begin
+  DeviceUUID := UUID;
+  Init;
 end;
 
 procedure TMeter.InitAllValues;
@@ -1237,7 +1262,10 @@ begin
     FoundDevice := AppServices.DataManager.FindDevice(Self.DeviceUUID, FoundRepo);
 
     if FoundDevice = nil then
+    begin
+      FDevice := nil;
       CreateDevice;
+    end;
     if FoundDevice <> nil then
       Self.Device := FoundDevice;
   end;
@@ -1262,7 +1290,10 @@ begin
     FoundDevice := AppServices.DataManager.FindDevice(Self.FDeviceUUID, FoundRepo);
 
     if FoundDevice = nil then
+    begin
+      FDevice := nil;
       CreateDevice;
+    end;
     if FoundDevice <> nil then
       Self.Device := FoundDevice;
   end;
@@ -1817,7 +1848,10 @@ end;
 
 procedure TFlowMeter.ApplyCalibrCoefsToValues;
 var
+  I: Integer;
   Table: TCalibrCoefTable;
+  Tables: TObjectList<TCalibrCoefTable>;
+  CurrentDevice: TDevice;
 begin
   if ValueCoef <> nil then
     ValueCoef.Coefs.Clear;
@@ -1828,12 +1862,20 @@ begin
   if ValueDensity <> nil then
     ValueDensity.Coefs.Clear;
 
-  if (Device = nil) or
-     (Device.CalibrCoefTables = nil) then
+  CurrentDevice := FDevice;
+  if CurrentDevice = nil then
     Exit;
 
-  for Table in Device.CalibrCoefTables do
-    ApplyCalibrCoefsToValue(Table);
+  Tables := CurrentDevice.CalibrCoefTables;
+  if Tables = nil then
+    Exit;
+
+  for I := 0 to Tables.Count - 1 do
+  begin
+    Table := Tables[I];
+    if Table <> nil then
+      ApplyCalibrCoefsToValue(Table);
+  end;
 end;
 
 procedure TFlowMeter.UpdateByDevice;
