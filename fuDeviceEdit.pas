@@ -1011,6 +1011,7 @@ begin
         OldUUID := FOriginalDevice.UUID;
         FOriginalDevice.Assign(FDevice,True);
         FOriginalDevice.UUID := OldUUID;
+        FOriginalDevice.State := osModified;
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
         if not FTypeChangedDuringEdit then
           WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
@@ -1593,6 +1594,8 @@ begin
       FOriginalDevice := ADevice;
       //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
+      FDevice.State := osModified;
+      ADevice.State := osModified;
       FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
       FTypeChangedDuringEdit := False;
     end
@@ -3854,7 +3857,7 @@ begin
       begin
         { редактирование существующего }
         FOriginalDevice.Assign(FDevice,True);
-
+        FOriginalDevice.State := osModified;
 
         AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
       end

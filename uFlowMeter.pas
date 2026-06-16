@@ -410,6 +410,7 @@ end;
 
 TScale = class(TMeter)
 public
+  procedure InitAllValues; override;
   function GetMeterKind: EMeterKind; override;
   function GetEtalonKindText: string; override;
   function IsScale: Boolean; override;
@@ -2197,6 +2198,20 @@ begin
 end;
 
 { TScale }
+
+
+procedure TScale.InitAllValues;
+var
+  IsExisted: Integer;
+begin
+  ValueQuantity := TMeterValue.GetExistedMeterValueBool(HashValueQuantity, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValueQuantity.SetAsMass;
+
+  ValueFlow := TMeterValue.GetExistedMeterValueBool(HashValueFlow, IsExisted, UUID, Name);
+  if IsExisted = 0 then
+    ValueFlow.SetAsMassFlow;
+end;
 
 function TScale.GetMeterKind: EMeterKind;
 begin
