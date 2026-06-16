@@ -771,10 +771,10 @@ begin
 
             for Ch in WT.DeviceChannels do
             begin
-              if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+              if (Ch = nil) or (Ch.Meter = nil) or (Ch.Meter.Device = nil) then
                 Continue;
 
-              Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
+              Device := FindProcessingDeviceByUUID(Ch.Meter.Device.UUID);
               if Device = nil then
                 Continue;
 
@@ -992,10 +992,10 @@ begin
     if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
       for Ch in AWorkTable.DeviceChannels do
       begin
-        if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+        if (Ch = nil) or (Ch.Meter = nil) or (Ch.Meter.Device = nil) then
           Continue;
 
-        Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
+        Device := FindProcessingDeviceByUUID(Ch.Meter.Device.UUID);
         if (Device = nil) or (DeviceUUIDs.IndexOf(Trim(Device.UUID)) >= 0) then
           Continue;
 
@@ -1032,8 +1032,8 @@ begin
           Continue;
 
         for Ch in WT.DeviceChannels do
-          if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
+          if (Ch <> nil) and (Ch.Meter <> nil) and (Ch.Meter.Device <> nil) then
+            DeviceUUIDsOnTables.Add(Trim(Ch.Meter.Device.UUID));
       end;
 
     if FProcessingDevices <> nil then
@@ -1356,8 +1356,8 @@ begin
       WT := TWorkTable(Item.TagObject);
       if (WT <> nil) and (WT.DeviceChannels <> nil) then
         for Ch in WT.DeviceChannels do
-          if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-            DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
+          if (Ch <> nil) and (Ch.Meter <> nil) and (Ch.Meter.Device <> nil) then
+            DeviceUUIDsOnTables.Add(Trim(Ch.Meter.Device.UUID));
 
       for Device in FProcessingDevices do
         if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) >= 0) then
@@ -1378,8 +1378,8 @@ begin
             Continue;
 
           for Ch in WT.DeviceChannels do
-            if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-              DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
+            if (Ch <> nil) and (Ch.Meter <> nil) and (Ch.Meter.Device <> nil) then
+              DeviceUUIDsOnTables.Add(Trim(Ch.Meter.Device.UUID));
         end;
 
       for Device in FProcessingDevices do
@@ -1410,8 +1410,8 @@ begin
 
   if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
     for Ch in AWorkTable.DeviceChannels do
-      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        AddProcessingDevice(Ch.FlowMeter.Device);
+      if (Ch <> nil) and (Ch.Meter <> nil) and (Ch.Meter.Device <> nil) then
+        AddProcessingDevice(Ch.Meter.Device);
 end;
 procedure TFrameProceed.SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
 var
@@ -2164,8 +2164,8 @@ begin
       Exit;
 
     for Ch in WT.DeviceChannels do
-      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        RemoveProcessingDevice(Ch.FlowMeter.Device);
+      if (Ch <> nil) and (Ch.Meter <> nil) and (Ch.Meter.Device <> nil) then
+        RemoveProcessingDevice(Ch.Meter.Device);
 
     RefreshResultsAfterDevicesAction;
     Exit;
