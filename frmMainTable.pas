@@ -3266,6 +3266,21 @@ var
   Frm: TFormDeviceEditor;
   OldDeviceUUID: string;
   DeviceSelectResult: TModalResult;
+  OriginalDevice: TDevice;
+  EditDeviceCopy: Boolean;
+  I: Integer;
+
+  function EtalonUsesDeviceUUID(const ADeviceUUID: string): Boolean;
+  begin
+    Result := False;
+    if (FActiveWorkTable = nil) or (FActiveWorkTable.EtalonChannels = nil) then
+      Exit;
+
+    for I := 0 to FActiveWorkTable.EtalonChannels.Count - 1 do
+      if (FActiveWorkTable.EtalonChannels[I] <> nil) and
+         SameText(Trim(FActiveWorkTable.EtalonChannels[I].DeviceUUID), ADeviceUUID) then
+        Exit(True);
+  end;
 begin
   if AChannel = nil then
     Exit;
@@ -3275,8 +3290,13 @@ begin
   if AChannel.FlowMeter <> nil then
     ADevice := AChannel.FlowMeter.Device;
 
-  if (ADevice = nil) and (DataManager <> nil) then
-    ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo);
+  if DataManager <> nil then
+  begin
+    if ADevice = nil then
+      ADevice := DataManager.FindDevice(AChannel.DeviceUUID, FoundRepo)
+    else if Trim(ADevice.UUID) <> '' then
+      DataManager.FindDevice(ADevice.UUID, FoundRepo);
+  end;
 
   if ADevice = nil then
   begin
@@ -3330,6 +3350,21 @@ begin
     Exit;
   end;
 
+  OriginalDevice := ADevice;
+  EditDeviceCopy := False;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) and
+     (FActiveWorkTable.DeviceChannels.IndexOf(AChannel) >= 0) and
+     EtalonUsesDeviceUUID(OldDeviceUUID) then
+  begin
+    if (FoundRepo = nil) and (DataManager <> nil) then
+      FoundRepo := DataManager.ActiveDeviceRepo;
+    if FoundRepo <> nil then
+    begin
+      ADevice := FoundRepo.CreateDevice(OriginalDevice);
+      EditDeviceCopy := ADevice <> nil;
+    end;
+  end;
+
   Frm := TFormDeviceEditor.Create(Self);
   try
     Frm.LoadDevice(ADevice);
@@ -3356,6 +3391,12 @@ begin
 
       MarkChannelDeviceModified(AChannel);
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
+    end
+    else if EditDeviceCopy and (FoundRepo <> nil) and (ADevice <> nil) then
+    begin
+      FoundRepo.DeleteDevice(ADevice);
+      if AChannel.FlowMeter <> nil then
+        AChannel.FlowMeter.Device := OriginalDevice;
     end;
   finally
     Frm.Free;
