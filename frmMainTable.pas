@@ -921,14 +921,6 @@ begin
     end;
 end;
 
-function FormatMeterValue4(AValue: TMeterValue): string;
-begin
-  if AValue <> nil then
-    Result := FormatFloat('0.####', AValue.GetDoubleValue)
-  else
-    Result := '-';
-end;
-
 function ChannelIsScale(AChannel: TChannel): Boolean;
 begin
   Result := (AChannel <> nil) and
@@ -5689,7 +5681,7 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := FormatMeterValue4(WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow)
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '-';
     end
@@ -5697,7 +5689,7 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity <> nil) then
-        Value := FormatMeterValue4(WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity)
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
         Value := '-';
     end
@@ -6086,7 +6078,7 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := FormatMeterValue4(WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow)
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '-';
     end
@@ -6094,7 +6086,7 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
-        Value := FormatMeterValue4(WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity)
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
       else
         Value := '-';
     end
