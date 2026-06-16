@@ -1231,11 +1231,7 @@ begin
 
   if Scale <> nil then
   begin
-    if AWorkTable <> nil then
-    begin
-      Scale.ValueFlow := AWorkTable.ValueFlowRate;
-      Scale.ValueQuantity := AWorkTable.ValueQuantity;
-    end;
+    Scale.InitAllValues;
     Exit;
   end;
 
@@ -1261,9 +1257,20 @@ begin
 end;
 
 procedure TChannel.RecreateFlowMeter(const AWorkTable: TWorkTable);
+var
+  OldDevice: TDevice;
 begin
+  OldDevice := nil;
+  if FMeter <> nil then
+    OldDevice := FMeter.Device;
+
   FreeAndNil(FMeter);
-  FMeter := TFlowMeter.Create;
+
+  if OldDevice <> nil then
+    FMeter := CreateMeterByDevice(OldDevice)
+  else
+    FMeter := TFlowMeter.Create;
+
   FMeter.Name := 'Прибор ' + FName;
 
   Init;
