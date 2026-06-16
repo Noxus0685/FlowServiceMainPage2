@@ -2183,7 +2183,9 @@ end;
 
 function IsScaleDevice(ADevice: TDevice): Boolean;
 begin
-  Result := Assigned(ADevice) and ((ADevice.Category = Ord(mftWeightsType)) or SameText(Trim(ADevice.CategoryName), 'Весы'));
+  Result := Assigned(ADevice) and
+    ((ADevice.Category = 11) or (ADevice.Category = Ord(mftWeightsType)) or
+     SameText(Trim(ADevice.CategoryName), 'Весы'));
 end;
 
 function CreateMeterByDevice(ADevice: TDevice): TMeter;
