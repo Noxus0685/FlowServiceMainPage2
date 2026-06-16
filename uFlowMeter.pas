@@ -122,6 +122,8 @@ public
   function NeedFlowPoints: Boolean; virtual;
   function NeedImpCoef: Boolean; virtual;
   procedure SetAsEtalon; virtual;
+  procedure Init; overload; virtual;
+  procedure Init(UUID: string); overload; virtual;
   procedure InitAllValues; virtual;
   procedure Reset; virtual;
 end;
@@ -388,8 +390,8 @@ public
   procedure Reset; override;
   procedure AddDataPoint(const APoint: TPointSpillage);
 
-  procedure Init; overload;
-  procedure Init(UUID: string); overload;
+  procedure Init; overload; override;
+  procedure Init(UUID: string); overload; override;
   procedure CreateDevice;
 
   procedure SetValues;
@@ -461,6 +463,27 @@ end;
 procedure TMeter.SetAsEtalon;
 begin
   IsEtalon := True;
+end;
+
+procedure TMeter.Init;
+var
+  FoundDevice: TDevice;
+  FoundRepo: TDeviceRepository;
+begin
+  if AppServices.DataManager <> nil then
+  begin
+    FoundDevice := AppServices.DataManager.FindDevice(FDeviceUUID, FoundRepo);
+    if FoundDevice <> nil then
+      Device := FoundDevice;
+  end;
+
+  InitAllValues;
+end;
+
+procedure TMeter.Init(UUID: string);
+begin
+  DeviceUUID := UUID;
+  Init;
 end;
 
 procedure TMeter.InitAllValues;

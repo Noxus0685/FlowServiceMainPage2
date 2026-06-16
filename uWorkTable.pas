@@ -1214,8 +1214,7 @@ begin
   if not Assigned(FMeter) then
     Exit;
 
-  if FlowMeter <> nil then
-    FlowMeter.Init(DeviceUUID);
+  FMeter.Init(DeviceUUID);
   if (FMeter.Device <> nil) then
   begin
     FOutputSet.FromDefault(IntToOutputSet(FMeter.Device.OutputSet));
@@ -2737,27 +2736,23 @@ begin
 end;
 
 procedure TWorkTable.InitChannels;
-var Count, I: Integer;
-begin
-  Count:=FDeviceChannels.count;
-  for I := 0 to Count - 1 do
-    begin
-     // FDeviceChannels[i].Init;
-      if not Assigned(FDeviceChannels[i].FMeter) then
-    Exit;
+var
+  I: Integer;
 
-  if FDeviceChannels[i].FlowMeter <> nil then
-    FDeviceChannels[i].FlowMeter.Init();
-  {if (FDeviceChannels[i].FMeter.Device <> nil) then
+  procedure InitChannelMeter(AChannel: TChannel);
   begin
-    FDeviceChannels[i].FOutputSet.FromDefault(IntToOutputSet(FMeter.Device.OutputSet));
-    FSyncMode.FromDefault(IntToSyncChannelMode(FMeter.Device.SyncMode));
-    FNoiseFilter.FromDefault(FMeter.Device.NoiseFilter);
-  end;    }
+    if (AChannel = nil) or (not Assigned(AChannel.FMeter)) then
+      Exit;
 
+    AChannel.FMeter.Init;
+  end;
 
+begin
+  for I := 0 to FDeviceChannels.Count - 1 do
+    InitChannelMeter(FDeviceChannels[I]);
 
-    end;
+  for I := 0 to FEtalonChannels.Count - 1 do
+    InitChannelMeter(FEtalonChannels[I]);
 end;
 
 function TWorkTable.GetPressDelta: Double;
