@@ -3268,17 +3268,18 @@ var
   DeviceSelectResult: TModalResult;
   OriginalDevice: TDevice;
   EditDeviceCopy: Boolean;
-  I: Integer;
 
   function EtalonUsesDeviceUUID(const ADeviceUUID: string): Boolean;
+  var
+    J: Integer;
   begin
     Result := False;
     if (FActiveWorkTable = nil) or (FActiveWorkTable.EtalonChannels = nil) then
       Exit;
 
-    for I := 0 to FActiveWorkTable.EtalonChannels.Count - 1 do
-      if (FActiveWorkTable.EtalonChannels[I] <> nil) and
-         SameText(Trim(FActiveWorkTable.EtalonChannels[I].DeviceUUID), ADeviceUUID) then
+    for J := 0 to FActiveWorkTable.EtalonChannels.Count - 1 do
+      if (FActiveWorkTable.EtalonChannels[J] <> nil) and
+         SameText(Trim(FActiveWorkTable.EtalonChannels[J].DeviceUUID), ADeviceUUID) then
         Exit(True);
   end;
 begin
