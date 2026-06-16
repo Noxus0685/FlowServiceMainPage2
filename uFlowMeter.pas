@@ -255,6 +255,7 @@ private
 
 
   procedure CopyValues(const AEtalonMeter: TFlowMeter);
+    procedure ApplyCalibrCoefsToValues;
 
 public
 public

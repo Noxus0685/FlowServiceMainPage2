@@ -5435,7 +5435,10 @@ begin
     begin
       GridDevices.EditorMode := False;
       if WorkTable <> nil then
+      begin
         OpenChannelDeviceEditor(WorkTable.DeviceChannels[Row]);
+
+      end;
     end
     else if Column = StringColumnDeviceSerial1 then
     begin
@@ -5934,7 +5937,6 @@ begin
   end;
 
   WorkTable := GetWorkTableByIndex(0);
-
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
     Exit;
 
@@ -5952,7 +5954,6 @@ begin
   FLastClickRow := Row;
   FLastClickCol := Column;
   FLastClickTick := Tick;
-
   if Column = CheckColumnEtalonEnable1 then
   begin
     if WorkTable <> nil then
@@ -5999,7 +6000,10 @@ begin
     begin
       GridEtalons.EditorMode := False;
       if WorkTable <> nil then
-        OpenChannelDeviceEditor(WorkTable.EtalonChannels[Row]);
+        begin
+          OpenChannelDeviceEditor(WorkTable.EtalonChannels[Row]);
+          WorkTable.RebindAllFlowMeters;
+        end;
     end
     else if Column = StringColumnEtalonSerial1 then
     begin
@@ -6018,6 +6022,7 @@ begin
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
      (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
     FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[Row]);
+
 end;
 
 procedure TFrameMainTable.GridEtalonsCellDblClick(const Column: TColumn;
@@ -6055,7 +6060,10 @@ begin
     begin
       GridEtalons.EditorMode := False;
       if WorkTable <> nil then
+      begin
         OpenChannelDeviceEditor(WorkTable.EtalonChannels[Row]);
+        WorkTable.RebindAllFlowMeters;
+      end;
     end
     else if Column = StringColumnEtalonSerial1 then
     begin

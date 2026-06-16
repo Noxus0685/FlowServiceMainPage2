@@ -188,7 +188,6 @@ end;
     property CurentValue: Double read FCurrentWeight write FCurrentWeight;
   end;
 
-  TScale = TWeight;
 //---------------------------------
   TFlowRate = class(TParameter)
  private

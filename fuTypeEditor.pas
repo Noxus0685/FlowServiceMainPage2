@@ -547,6 +547,7 @@ type
     function IsWeightsCategory: Boolean;
     procedure ApplyWeightsOutputRestriction;
     procedure PopulateOutputTypeCombo(const ASelectedOutputType: Integer);
+    function Round3(const AValue: Double): Double;
 
   public
 
@@ -7201,7 +7202,7 @@ begin
     cbCoefViewType.ItemIndex := 0;
 end;
 
-function Round3(const AValue: Double): Double;
+function TFormTypeEditor.Round3(const AValue: Double): Double;
 begin
   Result := Round(AValue * 1000) / 1000;
 end;
