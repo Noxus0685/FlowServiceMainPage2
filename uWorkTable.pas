@@ -1715,8 +1715,8 @@ end;
 
 procedure TChannel.SetValues;
 begin
- if FMeter<>nil then
-    FMeter.SetValues;
+ if FlowMeter <> nil then
+    FlowMeter.SetValues;
 end;
 
 
