@@ -2203,14 +2203,31 @@ end;
 procedure TScale.InitAllValues;
 var
   IsExisted: Integer;
+  SavedValue: Double;
 begin
   ValueQuantity := TMeterValue.GetExistedMeterValueBool(HashValueQuantity, IsExisted, UUID, Name);
   if IsExisted = 0 then
+    ValueQuantity.SetAsMass
+  else if (ValueQuantity <> nil) and (not SameText(ValueQuantity.&Type, 'Масса')) then
+  begin
+    SavedValue := ValueQuantity.Value;
+    HashValueQuantity := '';
+    ValueQuantity := TMeterValue.GetExistedMeterValueBool(HashValueQuantity, IsExisted, UUID, Name);
     ValueQuantity.SetAsMass;
+    ValueQuantity.Value := SavedValue;
+  end;
 
   ValueFlow := TMeterValue.GetExistedMeterValueBool(HashValueFlow, IsExisted, UUID, Name);
   if IsExisted = 0 then
+    ValueFlow.SetAsMassFlow
+  else if (ValueFlow <> nil) and (not SameText(ValueFlow.&Type, 'Массовый расход')) then
+  begin
+    SavedValue := ValueFlow.Value;
+    HashValueFlow := '';
+    ValueFlow := TMeterValue.GetExistedMeterValueBool(HashValueFlow, IsExisted, UUID, Name);
     ValueFlow.SetAsMassFlow;
+    ValueFlow.Value := SavedValue;
+  end;
 end;
 
 function TScale.GetMeterKind: EMeterKind;
