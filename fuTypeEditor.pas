@@ -544,6 +544,9 @@ type
     procedure ActionGridPointsCutExecute(Sender: TObject);
     procedure ActionGridPointsPasteExecute(Sender: TObject);
     procedure AutoHideEmptyDiameterColumns;
+    function IsWeightsCategory: Boolean;
+    procedure ApplyWeightsOutputRestriction;
+    procedure PopulateOutputTypeCombo(const ASelectedOutputType: Integer);
 
   public
 
@@ -1232,12 +1235,8 @@ begin
     // =====================================================
     // == Тип сигнала
     // =====================================================
-    if (FType.OutputType >= 0) and
-       (FType.OutputType < ComboBoxOutputType.Items.Count) then
-      ComboBoxOutputType.ItemIndex := FType.OutputType
-    else
-      ComboBoxOutputType.ItemIndex := 0;
-    ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
+    ApplyWeightsOutputRestriction;
+    PopulateOutputTypeCombo(FType.OutputType);
 
     ApplyOutputType;
 
@@ -4082,7 +4081,8 @@ begin
       if FType.OutputType <> Ord(C.DefaultOutputType) then
       begin
         FType.OutputType := Ord(C.DefaultOutputType);
-        cbOutputType.ItemIndex := FType.OutputType;
+        ApplyWeightsOutputRestriction;
+        PopulateOutputTypeCombo(FType.OutputType);
         ApplyOutputType;
       end;
     end;
@@ -4096,6 +4096,9 @@ begin
     FType.CategoryName := Trim(ceCategory.Text);
   end;
 
+  ApplyWeightsOutputRestriction;
+  PopulateOutputTypeCombo(FType.OutputType);
+
   ceCategory.Hint := ceCategory.Text;
   SetModified;
 end;
@@ -4106,11 +4109,16 @@ var
 begin
   if FLoading then Exit;
 
-  V := ComboBoxOutputType.ItemIndex;
-  if V < 0 then Exit;
+  if ComboBoxOutputType.ItemIndex < 0 then Exit;
+
+  V := Integer(NativeInt(ComboBoxOutputType.Items.Objects[ComboBoxOutputType.ItemIndex]));
 
   // сохраняем в модель
+  if IsWeightsCategory and not (V in [Ord(otInterface), Ord(otVisual)]) then
+    V := Ord(otInterface);
+
   FType.OutputType := V;
+  PopulateOutputTypeCombo(FType.OutputType);
 
   // применяем настройки UI под тип сигнала
   ApplyOutputType;
@@ -5874,8 +5882,8 @@ begin
     {---------------------------------}
     if ACol = StringColumnPointFlowRate.Index then
     begin
-      P.FlowRate := NormalizeFloatInput(S);
-      V := P.FlowRate * Qmax * P.LimitTime ;
+      P.FlowRate := Round3(NormalizeFloatInput(S));
+      V := Round3(P.FlowRate * Qmax * P.LimitTime);
       P.LimitVolume := V;
     end
 
@@ -5901,7 +5909,7 @@ begin
     {---------------------------------}
     else if ACol = StringColumnPointVolume.Index then
     begin
-      V := NormalizeFloatInput(S);
+      V := Round3(NormalizeFloatInput(S));
       P.LimitVolume := V;
 
       if (V > 0) and (Q > 0) then
@@ -6632,7 +6640,7 @@ begin
       if Q <= 0 then
         Value := '—'
       else
-        Value := FormatByBaseError(FType.FromBaseUnits(Q), P.Error);
+        Value := FormatFloat('0.###', Round3(FType.FromBaseUnits(Q)));
     end
 
     {---------------------------}
@@ -6641,10 +6649,10 @@ begin
     else if ACol = StringColumnPointVolume.Index then
     begin
       if P.LimitVolume > 0 then
-        Value := FormatByBaseError(P.LimitVolume, P.Error)
+        Value := FormatFloat('0.###', Round3(P.LimitVolume))
 
       else if (Q > 0) and (P.LimitTime > 0) then
-        Value := FormatByBaseError(Q * P.LimitTime / 3.6, P.Error)
+        Value := FormatFloat('0.###', Round3(Q * P.LimitTime / 3.6))
 
       else
         Value := '—';
@@ -7193,8 +7201,73 @@ begin
     cbCoefViewType.ItemIndex := 0;
 end;
 
+function Round3(const AValue: Double): Double;
+begin
+  Result := Round(AValue * 1000) / 1000;
+end;
+
+function TFormTypeEditor.IsWeightsCategory: Boolean;
+begin
+  Result := (FType <> nil) and
+    ((FType.Category = 11) or SameText(Trim(FType.CategoryName), 'Весы'));
+end;
+
+procedure TFormTypeEditor.ApplyWeightsOutputRestriction;
+begin
+  if (FType = nil) or (not IsWeightsCategory) then
+    Exit;
+
+  if not (FType.OutputType in [Ord(otInterface), Ord(otVisual)]) then
+    FType.OutputType := Ord(otInterface);
+end;
+
+procedure TFormTypeEditor.PopulateOutputTypeCombo(const ASelectedOutputType: Integer);
+const
+  COutputNames: array[0..5] of string = (
+    'Частота', 'Импульсы', 'Напряжение', 'Ток', 'Интерфейс', 'Визуальный');
+var
+  I, OutType: Integer;
+  OldLoading: Boolean;
+begin
+  OldLoading := FLoading;
+  FLoading := True;
+  try
+    ComboBoxOutputType.Items.BeginUpdate;
+    try
+      ComboBoxOutputType.Items.Clear;
+      for I := Low(COutputNames) to High(COutputNames) do
+      begin
+        if IsWeightsCategory and not (I in [Ord(otInterface), Ord(otVisual)]) then
+          Continue;
+        ComboBoxOutputType.Items.AddObject(COutputNames[I], TObject(NativeInt(I)));
+      end;
+    finally
+      ComboBoxOutputType.Items.EndUpdate;
+    end;
+
+    ComboBoxOutputType.ItemIndex := -1;
+    for I := 0 to ComboBoxOutputType.Items.Count - 1 do
+    begin
+      OutType := Integer(NativeInt(ComboBoxOutputType.Items.Objects[I]));
+      if OutType = ASelectedOutputType then
+      begin
+        ComboBoxOutputType.ItemIndex := I;
+        Break;
+      end;
+    end;
+
+    if (ComboBoxOutputType.ItemIndex < 0) and (ComboBoxOutputType.Items.Count > 0) then
+      ComboBoxOutputType.ItemIndex := 0;
+
+    ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
+  finally
+    FLoading := OldLoading;
+  end;
+end;
+
 procedure TFormTypeEditor.ApplyOutputType;
 begin
+  ApplyWeightsOutputRestriction;
   // --- выбор вкладки по имени ---
   case FType.OutputType of
     0:
