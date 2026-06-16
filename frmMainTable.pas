@@ -3294,9 +3294,6 @@ begin
       end;
 
       AChannel.Meter.Init(SelDevice.UUID);
-      if (AChannel.Meter.Device <> nil) and
-         (IsScaleDevice(AChannel.Meter.Device) <> (AChannel.Scale <> nil)) then
-        AChannel.RecreateFlowMeter(FActiveWorkTable);
 
       if AChannel.Meter.Device <> nil then
       begin
@@ -3347,9 +3344,6 @@ begin
         if AChannel.Meter <> nil then
         begin
           AChannel.Meter.Device := ADevice;
-          if (AChannel.Meter.Device <> nil) and
-             (IsScaleDevice(AChannel.Meter.Device) <> (AChannel.Scale <> nil)) then
-            AChannel.RecreateFlowMeter(FActiveWorkTable);
           if AChannel.FlowMeter <> nil then
             AChannel.FlowMeter.UpdateByDevice;
         end;
@@ -3487,9 +3481,6 @@ begin
     // Полностью переинициализируем расходомер выбранным прибором,
     // чтобы в канал попали все данные нового прибора и его типа.
     AChannel.Meter.Init(SelDevice.UUID);
-    if (AChannel.Meter.Device <> nil) and
-       (IsScaleDevice(AChannel.Meter.Device) <> (AChannel.Scale <> nil)) then
-      AChannel.RecreateFlowMeter(FActiveWorkTable);
 
     if (AChannel.Meter.Device = nil) or
        (not SameText(Trim(AChannel.Meter.Device.UUID), Trim(SelDevice.UUID))) or
@@ -5078,7 +5069,6 @@ begin
   // При смене типа поверочные точки должны полностью переходить из типа в прибор.
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
   AChannel.Meter.Device.AttachType(ANewType, RepoName);
-  AChannel.RecreateFlowMeter(FActiveWorkTable);
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(AChannel.Meter.Device); //Сохранение прибора
 end;
