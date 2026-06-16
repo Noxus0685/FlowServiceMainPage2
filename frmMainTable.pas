@@ -660,6 +660,7 @@ type
     procedure SetValues;
     function ResolveTypeForChannel(AChannel: TChannel; out ARepo: TTypeRepository): TDeviceType;
     procedure FillDNItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
+    procedure FillSignalItemsForChannel(AChannel: TChannel; APopupColumn: TPopupColumn);
     function ApplyChannelDNChange(AChannel: TChannel; const ANewDN: string): Boolean;
     procedure ApplyActiveWorkTableEditMode;
     procedure UpdateGridPopupActions;
@@ -1676,7 +1677,6 @@ end;
 
 procedure TFrameMainTable.Initialize;
 var
-  OT: TOutputType;
   UnitName: string;
   LayoutOrder: string;
 
@@ -1699,13 +1699,8 @@ begin
 
   GridDevices.RowCount := 2;
 
-  // Заполняем список через имя колонки
-  PopupColumnDeviceSignal1.Items.Clear;
-
-  for OT := otFrequency to High(TOutputType) do
-    PopupColumnDeviceSignal1.Items.Add(GetOutputTypeName(OT));
-
-  PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
+  FillSignalItemsForChannel(nil, PopupColumnDeviceSignal1);
+  FillSignalItemsForChannel(nil, PopupColumnEtalonSignal1);
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -3126,6 +3121,33 @@ begin
     for D in DeviceType.Diameters do
       if (D <> nil) and (Trim(D.Name) <> '') then
         APopupColumn.Items.Add(D.Name);
+  finally
+    APopupColumn.Items.EndUpdate;
+  end;
+end;
+
+
+procedure TFrameMainTable.FillSignalItemsForChannel(AChannel: TChannel;
+  APopupColumn: TPopupColumn);
+var
+  OT: TOutputType;
+  Weights: Boolean;
+begin
+  if APopupColumn = nil then
+    Exit;
+
+  Weights := (AChannel <> nil) and (AChannel.FlowMeter <> nil) and
+    IsScaleDevice(AChannel.FlowMeter.Device);
+
+  APopupColumn.Items.BeginUpdate;
+  try
+    APopupColumn.Items.Clear;
+    for OT := otFrequency to High(TOutputType) do
+    begin
+      if Weights and not (OT in [otInterface, otVisual]) then
+        Continue;
+      APopupColumn.Items.Add(GetOutputTypeName(OT));
+    end;
   finally
     APopupColumn.Items.EndUpdate;
   end;
@@ -5349,6 +5371,8 @@ begin
 
   if (Column = PopupColumnDeviceSignal1 ) then
   begin
+    if WorkTable <> nil then
+      FillSignalItemsForChannel(WorkTable.DeviceChannels[Row], PopupColumnDeviceSignal1);
     GridDevices.ReadOnly:=False;
     GridDevices.EditorMode := True;
     inherited;
@@ -5813,6 +5837,11 @@ begin
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
+        if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+           IsScaleDevice(WorkTable.DeviceChannels[ARow].FlowMeter.Device) and
+           not (Signal in [Ord(otInterface), Ord(otVisual)]) then
+          Exit;
+
         Changed := WorkTable.DeviceChannels[ARow].Signal <> Signal;
         WorkTable.DeviceChannels[ARow].Signal := Signal;
         if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
@@ -5903,6 +5932,8 @@ begin
 
   if Column = PopupColumnEtalonSignal1 then
   begin
+    if WorkTable <> nil then
+      FillSignalItemsForChannel(WorkTable.EtalonChannels[Row], PopupColumnEtalonSignal1);
     GridEtalons.ReadOnly := False;
     GridEtalons.EditorMode := True;
     inherited;
@@ -6277,6 +6308,11 @@ begin
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
+        if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+           IsScaleDevice(WorkTable.EtalonChannels[ARow].FlowMeter.Device) and
+           not (Signal in [Ord(otInterface), Ord(otVisual)]) then
+          Exit;
+
         Changed := WorkTable.EtalonChannels[ARow].Signal <> Signal;
         WorkTable.EtalonChannels[ARow].Signal := Signal;
       end;
