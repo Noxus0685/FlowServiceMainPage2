@@ -522,24 +522,24 @@ begin
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
     begin
       Channel := FWorkTable.EtalonChannels[I];
-      if (Channel = nil) or (Channel.FlowMeter = nil) then
+      if (Channel = nil) or (Channel.Meter = nil) then
         Continue;
 
       if (APoint.Q <= 0) and (not Channel.Enabled) then
         Continue;
-      if (APoint.Q > 0) and
+      if (APoint.Q > 0) and (Channel.FlowMeter <> nil) and
          ((APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax)) then
         Continue;
 
       EtalonName := Trim(Channel.Name);
       if EtalonName = '' then
-        EtalonName := Trim(Channel.FlowMeter.DeviceName);
+        EtalonName := Trim(Channel.Meter.DeviceName);
       if EtalonName = '' then
         EtalonName := 'Без имени';
 
       Accuracy := '';
-      if Channel.FlowMeter.Device <> nil then
-        Accuracy := Trim(Channel.FlowMeter.Device.AccuracyClass);
+      if Channel.Meter.Device <> nil then
+        Accuracy := Trim(Channel.Meter.Device.AccuracyClass);
       if Accuracy = '' then
         Accuracy := 'не указана';
 
@@ -1448,7 +1448,17 @@ begin
   for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
   begin
     Channel := FWorkTable.EtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (Channel.Meter = nil) then
+      Continue;
+
+    if Channel.Meter.IsScale then
+    begin
+      if (APoint.Q <= 0) and Channel.Enabled then
+        Best := Channel;
+      Continue;
+    end;
+
+    if Channel.FlowMeter = nil then
       Continue;
 
     if APoint.Q < 0 then
