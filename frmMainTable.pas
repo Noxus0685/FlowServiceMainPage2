@@ -921,6 +921,21 @@ begin
     end;
 end;
 
+function FormatMeterValue4(AValue: TMeterValue): string;
+begin
+  if AValue <> nil then
+    Result := FormatFloat('0.####', AValue.GetDoubleValue)
+  else
+    Result := '-';
+end;
+
+function ChannelIsScale(AChannel: TChannel): Boolean;
+begin
+  Result := (AChannel <> nil) and
+    ((AChannel.Scale <> nil) or
+     ((AChannel.FlowMeter <> nil) and IsScaleDevice(AChannel.FlowMeter.Device)));
+end;
+
 destructor TFrameMainTable.Destroy;
 begin
   FreeAndNil(FFrameMeasurementRun);
@@ -3136,8 +3151,7 @@ begin
   if APopupColumn = nil then
     Exit;
 
-  Weights := (AChannel <> nil) and (AChannel.FlowMeter <> nil) and
-    IsScaleDevice(AChannel.FlowMeter.Device);
+  Weights := ChannelIsScale(AChannel);
 
   APopupColumn.Items.BeginUpdate;
   try
@@ -4746,6 +4760,11 @@ begin
     StringColumnEtalonQuantity1.Header := WorkTable.ValueQuantity.GetStrFullName;
   end;
 
+  StringColumnDeviceRawValue1.Visible := True;
+  StringColumnDeviceRawSumValue1.Visible := True;
+  StringColumnEtalonRawValue1.Visible := True;
+  StringColumnEtalonRawSumValue1.Visible := True;
+
   RawValueBaseMultiplier := FindFirstValueBaseMultiplier(WorkTable.DeviceChannels);
 
    if RawValueBaseMultiplier <> nil then
@@ -5670,7 +5689,7 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrValue
+        Value := FormatMeterValue4(WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow)
       else
         Value := '-';
     end
@@ -5678,7 +5697,7 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
+        Value := FormatMeterValue4(WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity)
       else
         Value := '-';
     end
@@ -5692,7 +5711,9 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceRawValue1 then
     begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+      if ChannelIsScale(WorkTable.DeviceChannels[ARow]) then
+        Value := '-'
+      else if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
         Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
@@ -5701,7 +5722,9 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceRawSumValue1 then
     begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+      if ChannelIsScale(WorkTable.DeviceChannels[ARow]) then
+        Value := '-'
+      else if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
         Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier.GetStrValue
@@ -5837,8 +5860,7 @@ begin
     else if GridDevices.Columns[ACol] = PopupColumnDeviceSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
-        if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-           IsScaleDevice(WorkTable.DeviceChannels[ARow].FlowMeter.Device) and
+        if ChannelIsScale(WorkTable.DeviceChannels[ARow]) and
            not (Signal in [Ord(otInterface), Ord(otVisual)]) then
           Exit;
 
@@ -6064,7 +6086,7 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
+        Value := FormatMeterValue4(WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow)
       else
         Value := '-';
     end
@@ -6072,13 +6094,15 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.GetStrValue
+        Value := FormatMeterValue4(WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity)
       else
         Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+      if ChannelIsScale(WorkTable.EtalonChannels[ARow]) then
+        Value := '-'
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.ValueBaseMultiplier.GetStrValue
@@ -6087,12 +6111,14 @@ begin
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonRawSumValue1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+      if ChannelIsScale(WorkTable.EtalonChannels[ARow]) then
+        Value := '-'
+      else if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueQuantity.ValueBaseMultiplier.GetStrValue
       else
-        Value := '0';
+        Value := '-';
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonStd1 then
     begin
@@ -6308,8 +6334,7 @@ begin
     else if GridEtalons.Columns[ACol] = PopupColumnEtalonSignal1 then
       if TryGetOutputTypeFromValue(Value, Signal) then
       begin
-        if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-           IsScaleDevice(WorkTable.EtalonChannels[ARow].FlowMeter.Device) and
+        if ChannelIsScale(WorkTable.EtalonChannels[ARow]) and
            not (Signal in [Ord(otInterface), Ord(otVisual)]) then
           Exit;
 
