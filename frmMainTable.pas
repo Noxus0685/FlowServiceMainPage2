@@ -4508,7 +4508,21 @@ begin
   for I := 0 to WorkTable.EtalonChannels.Count - 1 do
   begin
     EtalonChannel := WorkTable.EtalonChannels[I];
-    if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
+    if (EtalonChannel = nil) or (EtalonChannel.Meter = nil) then
+      Continue;
+
+    if EtalonChannel.Meter.IsScale then
+    begin
+      if EtalonChannel.Meter.ValueFlow <> nil then
+        EtalonChannel.Meter.ValueFlow.SetValue(EtalonChannel.ValueSec);
+      if EtalonChannel.Meter.ValueQuantity <> nil then
+        EtalonChannel.Meter.ValueQuantity.SetValue(EtalonChannel.ValueResult);
+      if EtalonChannel.ValueInterface <> nil then
+        EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
+      Continue;
+    end;
+
+    if EtalonChannel.FlowMeter = nil then
       Continue;
 
     EtalonChannel.ValueCurrent.SetValue(EtalonChannel.CurSec);
@@ -4520,7 +4534,21 @@ begin
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
   begin
     DeviceChannel := WorkTable.DeviceChannels[I];
-    if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
+    if (DeviceChannel = nil) or (DeviceChannel.Meter = nil) then
+      Continue;
+
+    if DeviceChannel.Meter.IsScale then
+    begin
+      if DeviceChannel.Meter.ValueFlow <> nil then
+        DeviceChannel.Meter.ValueFlow.SetValue(DeviceChannel.ValueSec);
+      if DeviceChannel.Meter.ValueQuantity <> nil then
+        DeviceChannel.Meter.ValueQuantity.SetValue(DeviceChannel.ValueResult);
+      if DeviceChannel.ValueInterface <> nil then
+        DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
+      Continue;
+    end;
+
+    if DeviceChannel.FlowMeter = nil then
       Continue;
 
          if DeviceChannel.ValueCurrent<>nil then
