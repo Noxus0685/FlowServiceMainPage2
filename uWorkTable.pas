@@ -1235,6 +1235,16 @@ begin
     begin
       Scale.ValueFlow := AWorkTable.ValueFlowRate;
       Scale.ValueQuantity := AWorkTable.ValueQuantity;
+      if Scale.ValueFlow <> nil then
+      begin
+        Scale.ValueFlow.Accuracy := -1;
+        Scale.ValueFlow.Error := 0.1;
+      end;
+      if Scale.ValueQuantity <> nil then
+      begin
+        Scale.ValueQuantity.Accuracy := -1;
+        Scale.ValueQuantity.Error := 0.1;
+      end;
     end;
     Exit;
   end;
@@ -1261,9 +1271,20 @@ begin
 end;
 
 procedure TChannel.RecreateFlowMeter(const AWorkTable: TWorkTable);
+var
+  OldDevice: TDevice;
 begin
+  OldDevice := nil;
+  if FMeter <> nil then
+    OldDevice := FMeter.Device;
+
   FreeAndNil(FMeter);
-  FMeter := TFlowMeter.Create;
+
+  if OldDevice <> nil then
+    FMeter := CreateMeterByDevice(OldDevice)
+  else
+    FMeter := TFlowMeter.Create;
+
   FMeter.Name := 'Прибор ' + FName;
 
   Init;
