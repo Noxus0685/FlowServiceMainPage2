@@ -5041,6 +5041,7 @@ begin
   // При смене типа поверочные точки должны полностью переходить из типа в прибор.
   // Измерения (проливы/сессии) и калибровочные коэффициенты при этом не трогаем.
   AChannel.Meter.Device.AttachType(ANewType, RepoName);
+  AChannel.RecreateFlowMeter(FActiveWorkTable);
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(AChannel.Meter.Device); //Сохранение прибора
 end;

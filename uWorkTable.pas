@@ -1257,9 +1257,20 @@ begin
 end;
 
 procedure TChannel.RecreateFlowMeter(const AWorkTable: TWorkTable);
+var
+  OldDevice: TDevice;
 begin
+  OldDevice := nil;
+  if FMeter <> nil then
+    OldDevice := FMeter.Device;
+
   FreeAndNil(FMeter);
-  FMeter := TFlowMeter.Create;
+
+  if OldDevice <> nil then
+    FMeter := CreateMeterByDevice(OldDevice)
+  else
+    FMeter := TFlowMeter.Create;
+
   FMeter.Name := 'Прибор ' + FName;
 
   Init;
