@@ -472,6 +472,7 @@ end;
 function TFormDeviceEditor.ResolveDeviceType(out ARepo: TTypeRepository): TDeviceType;
 var
   RepoName: string;
+  RepoUUID: string;
   Repo: TTypeRepository;
 begin
   Result := nil;
@@ -479,6 +480,24 @@ begin
 
   if (AppServices.DataManager = nil) or (FDevice = nil) then
     Exit;
+
+  RepoUUID := Trim(FDevice.RepoTypeUUID);
+  if RepoUUID <> '' then
+    for Repo in AppServices.DataManager.TypeRepositories do
+      if (Repo <> nil) and SameText(Trim(Repo.UUID), RepoUUID) then
+      begin
+        if FDevice.DeviceTypeUUID <> '' then
+          Result := Repo.FindTypeByUUID(FDevice.DeviceTypeUUID);
+
+        if (Result = nil) and (FDevice.DeviceTypeName <> '') then
+          Result := Repo.FindTypeByName(FDevice.DeviceTypeName);
+
+        if Result <> nil then
+        begin
+          ARepo := Repo;
+          Exit;
+        end;
+      end;
 
   RepoName := Trim(FDevice.DeviceTypeRepo);
   if RepoName = '' then
