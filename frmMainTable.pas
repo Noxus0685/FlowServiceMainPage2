@@ -3294,6 +3294,9 @@ begin
       end;
 
       AChannel.Meter.Init(SelDevice.UUID);
+      if (AChannel.Meter.Device <> nil) and
+         (IsScaleDevice(AChannel.Meter.Device) <> (AChannel.Scale <> nil)) then
+        AChannel.RecreateFlowMeter(FActiveWorkTable);
 
       if AChannel.Meter.Device <> nil then
       begin
@@ -3344,6 +3347,9 @@ begin
         if AChannel.Meter <> nil then
         begin
           AChannel.Meter.Device := ADevice;
+          if (AChannel.Meter.Device <> nil) and
+             (IsScaleDevice(AChannel.Meter.Device) <> (AChannel.Scale <> nil)) then
+            AChannel.RecreateFlowMeter(FActiveWorkTable);
           if AChannel.FlowMeter <> nil then
             AChannel.FlowMeter.UpdateByDevice;
         end;
@@ -3481,6 +3487,9 @@ begin
     // Полностью переинициализируем расходомер выбранным прибором,
     // чтобы в канал попали все данные нового прибора и его типа.
     AChannel.Meter.Init(SelDevice.UUID);
+    if (AChannel.Meter.Device <> nil) and
+       (IsScaleDevice(AChannel.Meter.Device) <> (AChannel.Scale <> nil)) then
+      AChannel.RecreateFlowMeter(FActiveWorkTable);
 
     if (AChannel.Meter.Device = nil) or
        (not SameText(Trim(AChannel.Meter.Device.UUID), Trim(SelDevice.UUID))) or
