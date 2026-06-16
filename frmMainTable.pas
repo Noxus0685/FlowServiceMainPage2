@@ -4516,7 +4516,7 @@ begin
       if EtalonChannel.Meter.ValueFlow <> nil then
         EtalonChannel.Meter.ValueFlow.SetValue(EtalonChannel.ValueSec);
       if EtalonChannel.Meter.ValueQuantity <> nil then
-        EtalonChannel.Meter.ValueQuantity.SetValue(EtalonChannel.ValueResult);
+        EtalonChannel.Meter.ValueQuantity.SetValue(EtalonChannel.ValueSec);
       if EtalonChannel.ValueInterface <> nil then
         EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
       Continue;
@@ -4542,7 +4542,7 @@ begin
       if DeviceChannel.Meter.ValueFlow <> nil then
         DeviceChannel.Meter.ValueFlow.SetValue(DeviceChannel.ValueSec);
       if DeviceChannel.Meter.ValueQuantity <> nil then
-        DeviceChannel.Meter.ValueQuantity.SetValue(DeviceChannel.ValueResult);
+        DeviceChannel.Meter.ValueQuantity.SetValue(DeviceChannel.ValueSec);
       if DeviceChannel.ValueInterface <> nil then
         DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
       Continue;
