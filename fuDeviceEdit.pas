@@ -348,6 +348,9 @@ type
      procedure ApplyVolumeMode;
      procedure ApplyMeasuredDimension;
      procedure ApplyOutputType;
+     function IsWeightsCategory: Boolean;
+     procedure ApplyWeightsOutputRestriction;
+    procedure PopulateOutputTypeCombo(const ASelectedOutputType: Integer);
 
      procedure FillSpillageStopVolume;
      procedure FillSpillageStopMass;
@@ -1149,12 +1152,78 @@ begin
     cbCoefViewType.ItemIndex := 0;
 end;
 
+function Round3(const AValue: Double): Double;
+begin
+  Result := Round(AValue * 1000) / 1000;
+end;
+
+function TFormDeviceEditor.IsWeightsCategory: Boolean;
+begin
+  Result := (FDevice <> nil) and
+    ((FDevice.Category = 11) or SameText(Trim(FDevice.CategoryName), 'Весы'));
+end;
+
+procedure TFormDeviceEditor.ApplyWeightsOutputRestriction;
+begin
+  if (FDevice = nil) or (not IsWeightsCategory) then
+    Exit;
+
+  if not (FDevice.OutputType in [Ord(otInterface), Ord(otVisual)]) then
+    FDevice.OutputType := Ord(otInterface);
+end;
+
+procedure TFormDeviceEditor.PopulateOutputTypeCombo(const ASelectedOutputType: Integer);
+const
+  COutputNames: array[0..5] of string = (
+    'Частота', 'Импульсы', 'Напряжение', 'Ток', 'Интерфейс', 'Визуальный');
+var
+  I, OutType: Integer;
+  OldLoading: Boolean;
+begin
+  OldLoading := FLoading;
+  FLoading := True;
+  try
+    ComboBoxOutputType.Items.BeginUpdate;
+    try
+      ComboBoxOutputType.Items.Clear;
+      for I := Low(COutputNames) to High(COutputNames) do
+      begin
+        if IsWeightsCategory and not (I in [Ord(otInterface), Ord(otVisual)]) then
+          Continue;
+        ComboBoxOutputType.Items.AddObject(COutputNames[I], TObject(NativeInt(I)));
+      end;
+    finally
+      ComboBoxOutputType.Items.EndUpdate;
+    end;
+
+    ComboBoxOutputType.ItemIndex := -1;
+    for I := 0 to ComboBoxOutputType.Items.Count - 1 do
+    begin
+      OutType := Integer(NativeInt(ComboBoxOutputType.Items.Objects[I]));
+      if OutType = ASelectedOutputType then
+      begin
+        ComboBoxOutputType.ItemIndex := I;
+        Break;
+      end;
+    end;
+
+    if (ComboBoxOutputType.ItemIndex < 0) and (ComboBoxOutputType.Items.Count > 0) then
+      ComboBoxOutputType.ItemIndex := 0;
+
+    ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
+  finally
+    FLoading := OldLoading;
+  end;
+end;
+
 procedure TFormDeviceEditor.ApplyOutputType;
 var
  Idx : integer;
 begin
   if FDevice = nil then
     Exit;
+
+  ApplyWeightsOutputRestriction;
 
   // --- выбор вкладки по имени ---
   case FDevice.OutputType of
@@ -2106,12 +2175,8 @@ begin
     // =====================================================
     // == Тип сигнала
     // =====================================================
-    if (FDevice.OutputType >= 0) and
-       (FDevice.OutputType < ComboBoxOutputType.Items.Count) then
-      ComboBoxOutputType.ItemIndex := FDevice.OutputType
-    else
-      ComboBoxOutputType.ItemIndex := 0;
-    ComboBoxOutputType.Hint := ComboBoxOutputType.Text;
+    ApplyWeightsOutputRestriction;
+    PopulateOutputTypeCombo(FDevice.OutputType);
 
     // =====================================================
     // == Тип выхода (OutputSet)
@@ -2437,7 +2502,8 @@ begin
       if FDevice.OutputType <> Ord(C.DefaultOutputType) then
       begin
         FDevice.OutputType := Ord(C.DefaultOutputType);
-        cbOutputType.ItemIndex := FDevice.OutputType;
+        ApplyWeightsOutputRestriction;
+        PopulateOutputTypeCombo(FDevice.OutputType);
       end;
     end;
 
@@ -2449,6 +2515,9 @@ begin
     FDevice.Category := -1;
     FDevice.CategoryName := Trim(ceCategory.Text);
   end;
+
+  ApplyWeightsOutputRestriction;
+  PopulateOutputTypeCombo(FDevice.OutputType);
 
   ceCategory.Hint := ceCategory.Text;
   SetModified;
@@ -2465,12 +2534,17 @@ begin
   if FDevice = nil then
     Exit;
 
-  V := ComboBoxOutputType.ItemIndex;
-  if V < 0 then
+  if ComboBoxOutputType.ItemIndex < 0 then
     Exit;
 
+  V := Integer(NativeInt(ComboBoxOutputType.Items.Objects[ComboBoxOutputType.ItemIndex]));
+
   { сохраняем в модель }
+  if IsWeightsCategory and not (V in [Ord(otInterface), Ord(otVisual)]) then
+    V := Ord(otInterface);
+
   FDevice.OutputType := V;
+  PopulateOutputTypeCombo(FDevice.OutputType);
 
   { применяем настройки UI под тип сигнала }
   ApplyOutputType;
@@ -3265,7 +3339,7 @@ begin
       if (Q <= 0) then
         Value := '—'
       else
-        Value := FormatByBaseError(FDevice.FromBaseUnits(Q), P.Error);
+        Value := FormatFloat('0.###', Round3(FDevice.FromBaseUnits(Q)));
     end
 
     {---------------------------}
@@ -3276,11 +3350,11 @@ begin
       Qmax := FDevice.Qmax;
       Q := P.FlowRate * Qmax;
       if P.LimitVolume > 0 then
-        Value := FormatByBaseError(P.LimitVolume, P.Error)
+        Value := FormatFloat('0.###', Round3(P.LimitVolume))
 
       else if (Q > 0) and (P.LimitTime > 0) then
       begin
-        Value := FormatByBaseError(Q * P.LimitTime, P.Error);
+        Value := FormatFloat('0.###', Round3(Q * P.LimitTime));
       end
 
       else
@@ -3358,17 +3432,17 @@ begin
       if Q <= 0 then
         Value := '—'
       else
-        Value := FormatByBaseError(FDevice.FromBaseUnits(Q), P.Error);
+        Value := FormatFloat('0.###', Round3(FDevice.FromBaseUnits(Q)));
     end
 
 
     else
     begin
       if P.LimitVolume > 0 then
-        Value := FormatByBaseError(P.LimitVolume, P.Error)
+        Value := FormatFloat('0.###', Round3(P.LimitVolume))
 
       else if (Q > 0) and (P.LimitTime > 0) then
-        Value := FormatByBaseError(Q * P.LimitTime, P.Error)
+        Value := FormatFloat('0.###', Round3(Q * P.LimitTime))
 
       else
         Value := '—';
@@ -3571,7 +3645,7 @@ begin
     Q := P.FlowRate * Qmax;
 
     if ACol = StringColumnPointFlowRate.Index then
-      P.FlowRate := NormalizeFloatInput(S)
+      P.FlowRate := Round3(NormalizeFloatInput(S))
 
     else if ACol = StringColumnPointQ.Index then
     begin
@@ -3582,7 +3656,7 @@ begin
 
     else if ACol = StringColumnPointVolume.Index then
     begin
-      V := NormalizeFloatInput(S);
+      V := Round3(NormalizeFloatInput(S));
       P.LimitVolume := V;
 
       if (V > 0) and (Q > 0) then
