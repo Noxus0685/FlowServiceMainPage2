@@ -1231,11 +1231,7 @@ begin
 
   if Scale <> nil then
   begin
-    if AWorkTable <> nil then
-    begin
-      Scale.ValueFlow := AWorkTable.ValueFlowRate;
-      Scale.ValueQuantity := AWorkTable.ValueQuantity;
-    end;
+    Scale.InitAllValues;
     Exit;
   end;
 
