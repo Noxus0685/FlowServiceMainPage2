@@ -3320,7 +3320,7 @@ begin
 
       MarkChannelDeviceModified(AChannel);
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
-      UpdateGrids;
+      UpdateGridDevices;
       GridDevices.Repaint;
       ClearChannelsByMissingDevices;
 
@@ -3360,7 +3360,7 @@ begin
   finally
     Frm.Free;
   end;
-  UpdateGrids;
+  UpdateGridDevices;
 
 end;
 
@@ -3454,11 +3454,14 @@ var
   SelectedUUID: string;
   OldDeviceUUID : string;
   DeviceSelectResult: TModalResult;
+  IsEtalonChannel: Boolean;
 begin
   if AChannel = nil then
     Exit;
 
   OldDeviceUUID := Trim(AChannel.DeviceUUID);
+  IsEtalonChannel := (FActiveWorkTable <> nil) and (FActiveWorkTable.EtalonChannels <> nil) and
+    (FActiveWorkTable.EtalonChannels.IndexOf(AChannel) >= 0);
 
   if DataManager <> nil then
     DataManager.PendingSelectedDeviceUUID := AChannel.DeviceUUID;
@@ -3544,10 +3547,14 @@ begin
     if FActiveWorkTable <> nil then
     begin
       FActiveWorkTable.RecalculateAllMeterValues;
-      FActiveWorkTable.RebindAllFlowMeters;
+      if IsEtalonChannel then
+        FActiveWorkTable.RebindAllFlowMeters;
     end;
 
-    UpdateGrids;
+    if IsEtalonChannel then
+      UpdateGrids
+    else
+      UpdateGridDevices;
   finally
     ClearChannelsByMissingDevices;
     if DataManager <> nil then
