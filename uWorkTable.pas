@@ -1231,7 +1231,21 @@ begin
 
   if Scale <> nil then
   begin
-    Scale.InitAllValues;
+    if AWorkTable <> nil then
+    begin
+      Scale.ValueFlow := AWorkTable.ValueFlowRate;
+      Scale.ValueQuantity := AWorkTable.ValueQuantity;
+      if Scale.ValueFlow <> nil then
+      begin
+        Scale.ValueFlow.Accuracy := -1;
+        Scale.ValueFlow.Error := 0.1;
+      end;
+      if Scale.ValueQuantity <> nil then
+      begin
+        Scale.ValueQuantity.Accuracy := -1;
+        Scale.ValueQuantity.Error := 0.1;
+      end;
+    end;
     Exit;
   end;
 
