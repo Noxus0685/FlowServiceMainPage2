@@ -1415,9 +1415,6 @@ begin
   if FMeter = nil then
   Exit;
 
-  if FlowMeter <> nil then
-    FlowMeter.CreateDevice;
-
   if (FMeter.Device = nil) and (DataManager <> nil) and
      (DataManager.ActiveDeviceRepo <> nil) then
   begin
@@ -1441,22 +1438,39 @@ var
   SrcDevice: TDevice;
   NewDevice: TDevice;
 begin
-  if (ASource = nil) or (ASource.FlowMeter = nil) then
+  if (ASource = nil) or (ASource.Meter = nil) then
     Exit;
 
   RecreateFlowMeter(AWorkTable);
 
-  FMeter.UUID := ASource.FlowMeter.UUID;
-  FMeter.Name := ASource.FlowMeter.Name;
-  FMeter.DeviceUUID := ASource.FlowMeter.DeviceUUID;
-  FMeter.DeviceTypeName := ASource.FlowMeter.DeviceTypeName;
-  FMeter.DeviceTypeUUID := ASource.FlowMeter.DeviceTypeUUID;
-  FMeter.RepoTypeName := ASource.FlowMeter.RepoTypeName;
-  FMeter.RepoTypeUUID := ASource.FlowMeter.RepoTypeUUID;
-  FMeter.RepoDeviceName := ASource.FlowMeter.RepoDeviceName;
-  FMeter.RepoDeviceUUID := ASource.FlowMeter.RepoDeviceUUID;
-  FMeter.SerialNumber := ASource.FlowMeter.SerialNumber;
-  FMeter.OutputType := ASource.FlowMeter.OutputType;
+  FMeter.UUID := ASource.Meter.UUID;
+  FMeter.Name := ASource.Meter.Name;
+  FMeter.DeviceUUID := ASource.Meter.DeviceUUID;
+  FMeter.DeviceTypeName := ASource.Meter.DeviceTypeName;
+  FMeter.DeviceTypeUUID := ASource.Meter.DeviceTypeUUID;
+  FMeter.RepoTypeName := ASource.Meter.RepoTypeName;
+  FMeter.RepoTypeUUID := ASource.Meter.RepoTypeUUID;
+  FMeter.RepoDeviceName := ASource.Meter.RepoDeviceName;
+  FMeter.RepoDeviceUUID := ASource.Meter.RepoDeviceUUID;
+  FMeter.SerialNumber := ASource.Meter.SerialNumber;
+  FMeter.OutputType := ASource.Meter.OutputType;
+
+  if (FlowMeter = nil) or (ASource.FlowMeter = nil) then
+  begin
+    SrcDevice := ASource.Meter.Device;
+    if ACloneDeviceToRepo and (SrcDevice <> nil) and
+       (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+    begin
+      NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
+      if NewDevice <> nil then
+        FMeter.Device := NewDevice;
+    end
+    else
+      FMeter.Device := SrcDevice;
+
+    RebindFlowMeterValues(AWorkTable);
+    Exit;
+  end;
 
   FlowMeter.Active := ASource.FlowMeter.Active;
   FlowMeter.CheckType := ASource.FlowMeter.CheckType;
@@ -1866,9 +1880,9 @@ begin
   else if Scale <> nil then
   begin
     if Scale.ValueQuantity <> nil then
-      Scale.ValueQuantity.SetValue();
+      Scale.ValueQuantity.SetValue(FValueSec);
     if Scale.ValueFlow <> nil then
-      Scale.ValueFlow.SetValue();
+      Scale.ValueFlow.SetValue(FValueSec);
   end;
 end;
 
@@ -3123,7 +3137,32 @@ var
   var
     Meter: TFlowMeter;
   begin
-    if (AChannel = nil) or (AChannel.FlowMeter = nil) or (FFlowUnitName = '') then
+    if (AChannel = nil) or (AChannel.Meter = nil) or (FFlowUnitName = '') then
+      Exit;
+
+    if AChannel.Meter.IsScale then
+    begin
+      if (AChannel.Meter.ValueQuantity <> nil) and (ValueQuantity <> nil) then
+      begin
+        AChannel.Meter.ValueQuantity.SetAs(ValueQuantity);
+        AChannel.Meter.ValueQuantity.DependenceType := INDEPENDENT;
+        AChannel.Meter.ValueQuantity.ValueBaseMultiplier := nil;
+        AChannel.Meter.ValueQuantity.ValueBaseDevider := nil;
+        if FQuantityUnitName <> '' then
+          AChannel.Meter.ValueQuantity.SetDim(FQuantityUnitName);
+      end;
+      if (AChannel.Meter.ValueFlow <> nil) and (ValueFlowRate <> nil) then
+      begin
+        AChannel.Meter.ValueFlow.SetAs(ValueFlowRate);
+        AChannel.Meter.ValueFlow.DependenceType := INDEPENDENT;
+        AChannel.Meter.ValueFlow.ValueBaseMultiplier := nil;
+        AChannel.Meter.ValueFlow.ValueBaseDevider := nil;
+        AChannel.Meter.ValueFlow.SetDim(FFlowUnitName);
+      end;
+      Exit;
+    end;
+
+    if AChannel.FlowMeter = nil then
       Exit;
 
     Meter := AChannel.FlowMeter;
@@ -4955,17 +4994,17 @@ begin
     if Channel = nil then
       Continue;
 
-    if (Channel.Meter <> nil) and Channel.Meter.IsScale then
-    begin
-      Channel.ValueSec := DisplayWeight;
-      Channel.ValueResult := DisplayWeight;
-      Continue;
-    end;
-
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
+
+    if (Channel.Meter <> nil) and Channel.Meter.IsScale then
+    begin
+      Channel.ValueSec := ChannelImpSec;
+      Channel.ValueResult := ChannelImpSec;
+      Continue;
+    end;
 
     Channel.CurSec := ACurSec;
     Channel.ImpSec := ChannelImpSec;

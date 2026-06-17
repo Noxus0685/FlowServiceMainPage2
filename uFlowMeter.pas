@@ -2212,30 +2212,44 @@ var
       (Abs(AValue) < 1E100);
   end;
 
-  function IsMassValue(const AMeterValue: TMeterValue): Boolean;
+  procedure MakeScaleValueIndependent(const AMeterValue: TMeterValue);
   begin
-    Result := (AMeterValue <> nil) and
-      (SameText(AMeterValue.&Type, 'Масса') or SameText(AMeterValue.Name, 'Масса'));
-  end;
+    if AMeterValue = nil then
+      Exit;
 
-  function IsMassFlowValue(const AMeterValue: TMeterValue): Boolean;
-  begin
-    Result := (AMeterValue <> nil) and
-      (SameText(AMeterValue.&Type, 'Массовый расход') or SameText(AMeterValue.Name, 'Массовый расход'));
+    AMeterValue.DependenceType := INDEPENDENT;
+    AMeterValue.ValueBaseMultiplier := nil;
+    AMeterValue.ValueBaseDevider := nil;
   end;
 
 begin
   ValueQuantity := TMeterValue.GetExistedMeterValueBool(HashValueQuantity, IsExisted, UUID, Name);
-  if (IsExisted = 0) or (not IsMassValue(ValueQuantity)) then
+  if IsExisted = 0 then
+  begin
     ValueQuantity.SetAsMass;
-  if not IsValidScaleNumber(ValueQuantity.Value) then
+    MakeScaleValueIndependent(ValueQuantity);
     ValueQuantity.SetValue(0);
+  end
+  else
+  begin
+    MakeScaleValueIndependent(ValueQuantity);
+    if not IsValidScaleNumber(ValueQuantity.Value) then
+      ValueQuantity.SetValue(0);
+  end;
 
   ValueFlow := TMeterValue.GetExistedMeterValueBool(HashValueFlow, IsExisted, UUID, Name);
-  if (IsExisted = 0) or (not IsMassFlowValue(ValueFlow)) then
+  if IsExisted = 0 then
+  begin
     ValueFlow.SetAsMassFlow;
-  if not IsValidScaleNumber(ValueFlow.Value) then
+    MakeScaleValueIndependent(ValueFlow);
     ValueFlow.SetValue(0);
+  end
+  else
+  begin
+    MakeScaleValueIndependent(ValueFlow);
+    if not IsValidScaleNumber(ValueFlow.Value) then
+      ValueFlow.SetValue(0);
+  end;
 end;
 
 function TScale.GetMeterKind: EMeterKind;
