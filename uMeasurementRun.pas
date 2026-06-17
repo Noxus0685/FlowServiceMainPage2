@@ -1077,10 +1077,10 @@ begin
 
   for Channel in FWorkTable.DeviceChannels do
   begin
-    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.Meter = nil) then
       Continue;
 
-    Device := Channel.FlowMeter.Device;
+    Device := Channel.Meter.Device;
     if ((Device = nil) or (Device.Points = nil) or (Device.Points.Count = 0)) and
        (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
       Device := TDeviceCreationService.EnsureDeviceForChannel(
