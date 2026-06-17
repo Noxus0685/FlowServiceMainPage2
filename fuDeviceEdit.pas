@@ -3957,7 +3957,7 @@ begin
     NewPoint := FDevice.Points[I];
     Result :=
       (OldPoint.Name <> NewPoint.Name) or
-      (OldPoint.UUID <> NewPoint.UUID) or
+      //(OldPoint.UUID <> NewPoint.UUID) or
       (not SameValue(OldPoint.FlowRate, NewPoint.FlowRate)) or
       (not SameValue(OldPoint.Q, NewPoint.Q)) or
       (OldPoint.FlowAccuracy <> NewPoint.FlowAccuracy) or
