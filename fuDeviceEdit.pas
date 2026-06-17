@@ -932,6 +932,14 @@ end;
 procedure TFormDeviceEditor.GridPointsKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
+  if Key = vkEscape then
+  begin
+    btnCancelClick(Sender);
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
   if Key = vkDelete then
   begin
     ButtonPointDeleteClick(ButtonPointDelete);
@@ -1432,6 +1440,14 @@ end;
 procedure TFormDeviceEditor.GridCoefsKeyDown(Sender: TObject; var Key: Word;
   var KeyChar: Char; Shift: TShiftState);
 begin
+  if Key = vkEscape then
+  begin
+    btnCancelClick(Sender);
+    Key := 0;
+    KeyChar := #0;
+    Exit;
+  end;
+
   if Key = vkDelete then
   begin
     ButtonCoefDeleteClick(FButtonCoefDelete);
@@ -1594,8 +1610,9 @@ begin
       FOriginalDevice := ADevice;
       //Создаем новый прибор в новой области памяти идентичный данному.
       FDevice := ADevice.Clone;
-      FDevice.State := osModified;
-      ADevice.State := osModified;
+      { Клон только загружен в редактор: реальных изменений ещё нет.
+        Статус станет osModified только через SetModified после правки. }
+      FDevice.State := osClean;
       FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
       FTypeChangedDuringEdit := False;
     end
@@ -1640,7 +1657,7 @@ procedure TFormDeviceEditor.FormKeyDown(Sender: TObject; var Key: Word;
 begin
   if Key = vkEscape then
   begin
-    ModalResult := mrOk;
+    btnCancelClick(Sender);
     Key := 0;
     KeyChar := #0;
   end;
