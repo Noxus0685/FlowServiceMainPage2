@@ -2227,14 +2227,20 @@ var
 begin
   ValueQuantity := TMeterValue.GetExistedMeterValueBool(HashValueQuantity, IsExisted, UUID, Name);
   if (IsExisted = 0) or (not IsMassValue(ValueQuantity)) then
+  begin
     ValueQuantity.SetAsMass;
-  if not IsValidScaleNumber(ValueQuantity.Value) then
+    ValueQuantity.SetValue(0);
+  end
+  else if not IsValidScaleNumber(ValueQuantity.Value) then
     ValueQuantity.SetValue(0);
 
   ValueFlow := TMeterValue.GetExistedMeterValueBool(HashValueFlow, IsExisted, UUID, Name);
   if (IsExisted = 0) or (not IsMassFlowValue(ValueFlow)) then
+  begin
     ValueFlow.SetAsMassFlow;
-  if not IsValidScaleNumber(ValueFlow.Value) then
+    ValueFlow.SetValue(0);
+  end
+  else if not IsValidScaleNumber(ValueFlow.Value) then
     ValueFlow.SetValue(0);
 end;
 
