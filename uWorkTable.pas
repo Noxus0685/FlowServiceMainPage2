@@ -1861,8 +1861,15 @@ end;
 
 procedure TChannel.SetValues;
 begin
- if FlowMeter <> nil then
-    FlowMeter.SetValues;
+  if FlowMeter <> nil then
+    FlowMeter.SetValues
+  else if Scale <> nil then
+  begin
+    if Scale.ValueQuantity <> nil then
+      Scale.ValueQuantity.SetValue();
+    if Scale.ValueFlow <> nil then
+      Scale.ValueFlow.SetValue();
+  end;
 end;
 
 
@@ -2644,7 +2651,7 @@ begin
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.Meter = nil) then
       Continue;
 
     if not IsAggregateGroupDefined then
@@ -2656,30 +2663,30 @@ begin
     if Channel.Group <> AggregateGroup then
       Continue;
 
-    if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
+    if (FTableFlow.ValueQuantity <> nil) and (Channel.Meter.ValueQuantity <> nil) then
     begin
       if not IsQuantityTemplateSet then
       begin
-        FTableFlow.ValueQuantity.SetAs(Channel.FlowMeter.ValueQuantity);
+        FTableFlow.ValueQuantity.SetAs(Channel.Meter.ValueQuantity);
         if FQuantityUnitName <> '' then
           FTableFlow.ValueQuantity.SetDim(FQuantityUnitName);
         FTableFlow.ValueQuantity.ValueType := AGGREGATE_TYPE;
         IsQuantityTemplateSet := True;
       end;
-      FTableFlow.ValueQuantity.AddMeterValue(Channel.FlowMeter.ValueQuantity);
+      FTableFlow.ValueQuantity.AddMeterValue(Channel.Meter.ValueQuantity);
     end;
 
-    if (FTableFlow.ValueFlowRate <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+    if (FTableFlow.ValueFlowRate <> nil) and (Channel.Meter.ValueFlow <> nil) then
     begin
       if not IsFlowTemplateSet then
       begin
-        FTableFlow.ValueFlowRate.SetAs(Channel.FlowMeter.ValueFlow);
+        FTableFlow.ValueFlowRate.SetAs(Channel.Meter.ValueFlow);
         if FFlowUnitName <> '' then
           FTableFlow.ValueFlowRate.SetDim(FFlowUnitName);
         FTableFlow.ValueFlowRate.ValueType := AGGREGATE_TYPE;
         IsFlowTemplateSet := True;
       end;
-      FTableFlow.ValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
+      FTableFlow.ValueFlowRate.AddMeterValue(Channel.Meter.ValueFlow);
     end;
   end;
 end;
@@ -3189,7 +3196,7 @@ begin
    for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (Channel.Meter = nil) then
       Continue;
 
     Channel.SetValues;
@@ -3210,7 +3217,7 @@ begin
   for I := 0 to FDeviceChannels.Count - 1 do
   begin
     Channel := FDeviceChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (Channel.Meter = nil) then
       Continue;
 
     Channel.SetValues;
@@ -4948,6 +4955,13 @@ begin
     if Channel = nil then
       Continue;
 
+    if (Channel.Meter <> nil) and Channel.Meter.IsScale then
+    begin
+      Channel.ValueSec := DisplayWeight;
+      Channel.ValueResult := DisplayWeight;
+      Continue;
+    end;
+
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
@@ -5230,16 +5244,16 @@ end;
 function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
 begin
   Result := 0.0;
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+  if (AChannel = nil) or (AChannel.Meter = nil) then
     Exit;
 
-  if (AChannel.FlowMeter.ValueCoef <> nil) then
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.ValueCoef <> nil) then
     Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
 
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
+  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.Meter.Device) then
+    Result := AChannel.Meter.Device.Coef;
 
-  if SameValue(Result, 0.0, 1E-12) then
+  if SameValue(Result, 0.0, 1E-12) and (AChannel.FlowMeter <> nil) then
     Result := AChannel.FlowMeter.Kp;
 end;
 
@@ -5292,6 +5306,15 @@ function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkT
 var
   I: Integer;
   Coef, SUM, MaxRatio: Double;
+
+  function GetChannelQmax(AChannel: TChannel): Double;
+  begin
+    Result := 0;
+    if (AChannel <> nil) and (AChannel.Meter <> nil) and
+       (AChannel.Meter.Device <> nil) then
+      Result := AChannel.Meter.Device.Qmax;
+  end;
+
 begin
   SetLength(Result, 0);
   if (AWorkTable = nil) or (AChannels = nil) then
@@ -5299,7 +5322,7 @@ begin
 
   SUM := 0;
   for I := 0 to AChannels.Count - 1 do
-    SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+    SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(GetChannelQmax(AChannels[I]), 4);
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
@@ -5307,7 +5330,7 @@ begin
     if SameValue(SUM, 0.0, 1e-12) then
       MaxRatio := 0
     else
-      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(GetChannelQmax(AChannels[I]), 4)) / SUM;
 
     Coef := GetChannelFlowCoef(AChannels[I]);
     if Coef > 0 then
