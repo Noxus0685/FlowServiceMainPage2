@@ -3259,6 +3259,7 @@ var
   Frm: TFormDeviceEditor;
   OldDeviceUUID: string;
   DeviceSelectResult: TModalResult;
+  DeviceChanged: Boolean;
 begin
   if AChannel = nil then
     Exit;
@@ -3329,6 +3330,7 @@ begin
     Frm.LoadDevice(ADevice);
     if Frm.ShowModal = mrOk then
     begin
+      DeviceChanged := Frm.DeviceChanged;
       if ADevice <> nil then
       begin
         AChannel.DeviceUUID := ADevice.UUID;
@@ -3349,8 +3351,11 @@ begin
         end;
       end;
 
-      MarkChannelDeviceModified(AChannel);
-      SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
+      if DeviceChanged then
+      begin
+        MarkChannelDeviceModified(AChannel);
+        SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
+      end;
     end;
   finally
     Frm.Free;
