@@ -820,17 +820,40 @@ end;
 class function TDeviceCreationService.CreateDevice(ARepo: TDeviceRepository;
   AMode: TDeviceCreateMode; ASourceDevice: TDevice;
   const ADeviceUUID: string): TDevice;
+var
+  DeviceUUID: string;
+  DeviceID: Integer;
 begin
   Result := nil;
   if ARepo = nil then
     Exit;
 
+  DeviceUUID := Trim(ADeviceUUID);
+  if (DeviceUUID = '') and (ASourceDevice <> nil) then
+    DeviceUUID := Trim(ASourceDevice.UUID);
+
+  Result := FindDeviceByUUID(DeviceUUID, ARepo);
+  if Result <> nil then
+  begin
+    if (ASourceDevice <> nil) and (Result <> ASourceDevice) then
+    begin
+      DeviceID := Result.ID;
+      DeviceUUID := Result.UUID;
+      Result.Assign(ASourceDevice, True);
+      Result.ID := DeviceID;
+      Result.UUID := DeviceUUID;
+      Result.State := osModified;
+    end;
+    AddProtocol(AMode, 'Reuse', Result, nil);
+    Exit;
+  end;
+
   Result := ARepo.CreateDevice(ASourceDevice);
   if Result = nil then
     Exit;
 
-  if Trim(ADeviceUUID) <> '' then
-    Result.UUID := Trim(ADeviceUUID)
+  if DeviceUUID <> '' then
+    Result.UUID := DeviceUUID
   else if Trim(Result.UUID) = '' then
     Result.UUID := TGUID.NewGuid.ToString;
 
