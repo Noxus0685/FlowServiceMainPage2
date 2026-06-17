@@ -1161,10 +1161,6 @@ begin
     cbCoefViewType.ItemIndex := 0;
 end;
 
-function Round3(const AValue: Double): Double;
-begin
-  Result := Round(AValue * 1000) / 1000;
-end;
 
 function TFormDeviceEditor.IsWeightsCategory: Boolean;
 begin
@@ -3359,7 +3355,7 @@ begin
       if (Q <= 0) then
         Value := '—'
       else
-        Value := FormatFloat('0.###', Round3(FDevice.FromBaseUnits(Q)));
+        Value := FormatFloat('0.###', (FDevice.FromBaseUnits(Q)));
     end
 
     {---------------------------}
@@ -3370,11 +3366,11 @@ begin
       Qmax := FDevice.Qmax;
       Q := P.FlowRate * Qmax;
       if P.LimitVolume > 0 then
-        Value := FormatFloat('0.###', Round3(P.LimitVolume))
+        Value := FormatFloat('0.###', (P.LimitVolume))
 
       else if (Q > 0) and (P.LimitTime > 0) then
       begin
-        Value := FormatFloat('0.###', Round3(Q * P.LimitTime));
+        Value := FormatFloat('0.###', (Q * P.LimitTime));
       end
 
       else
@@ -3665,7 +3661,7 @@ begin
     Q := P.FlowRate * Qmax;
 
     if ACol = StringColumnPointFlowRate.Index then
-      P.FlowRate := Round3(NormalizeFloatInput(S))
+      P.FlowRate := (NormalizeFloatInput(S))
 
     else if ACol = StringColumnPointQ.Index then
     begin
@@ -3676,7 +3672,7 @@ begin
 
     else if ACol = StringColumnPointVolume.Index then
     begin
-      V := Round3(NormalizeFloatInput(S));
+      V := (NormalizeFloatInput(S));
       P.LimitVolume := V;
 
       if (V > 0) and (Q > 0) then
