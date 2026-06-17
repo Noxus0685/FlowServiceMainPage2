@@ -1267,6 +1267,8 @@ var
   OldQuantityCurrentDimIndex: Integer;
   OldQuantityError: Double;
   OldQuantityHasDisplaySettings: Boolean;
+  OldMeterKind: EMeterKind;
+  NewMeterKind: EMeterKind;
 
   procedure RestoreDisplaySettings(const AMeterValue: TMeterValue;
     const AAccuracy: Integer; const AError: Double; const ACurrentDimIndex: Integer);
@@ -1283,10 +1285,12 @@ begin
   OldDevice := nil;
   OldFlowHasDisplaySettings := False;
   OldQuantityHasDisplaySettings := False;
+  OldMeterKind := mkUnknown;
 
   if FMeter <> nil then
   begin
     OldDevice := FMeter.Device;
+    OldMeterKind := FMeter.GetMeterKind;
 
     if FMeter.ValueFlow <> nil then
     begin
@@ -1312,12 +1316,20 @@ begin
   else
     FMeter := TFlowMeter.Create;
 
+  NewMeterKind := FMeter.GetMeterKind;
+  if (OldMeterKind = mkFlowMeter) and (NewMeterKind = mkScale) then
+  begin
+    FMeter.ValueQuantity := nil;
+    FMeter.ValueFlow := nil;
+    FMeter.InitAllValues;
+  end;
+
   FMeter.Name := 'Прибор ' + FName;
 
-  if OldQuantityHasDisplaySettings then
+  if (NewMeterKind <> mkScale) and OldQuantityHasDisplaySettings then
     RestoreDisplaySettings(FMeter.ValueQuantity, OldQuantityAccuracy, OldQuantityError,
       OldQuantityCurrentDimIndex);
-  if OldFlowHasDisplaySettings then
+  if (NewMeterKind <> mkScale) and OldFlowHasDisplaySettings then
     RestoreDisplaySettings(FMeter.ValueFlow, OldFlowAccuracy, OldFlowError,
       OldFlowCurrentDimIndex);
 
