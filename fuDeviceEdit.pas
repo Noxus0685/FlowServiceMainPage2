@@ -3876,7 +3876,7 @@ var
   NewPoint: TDevicePoint;
   CompareDevice: TDevice;
 begin
-  if ModalResult <> mrNone then
+  if (ModalResult <> mrNone) and (FDevice = nil) then
     Exit(FDeviceChangedOnClose);
 
   Result := FOriginalDevice = nil;
@@ -3957,7 +3957,6 @@ begin
     NewPoint := FDevice.Points[I];
     Result :=
       (OldPoint.Name <> NewPoint.Name) or
-      //(OldPoint.UUID <> NewPoint.UUID) or
       (not SameValue(OldPoint.FlowRate, NewPoint.FlowRate)) or
       (not SameValue(OldPoint.Q, NewPoint.Q)) or
       (OldPoint.FlowAccuracy <> NewPoint.FlowAccuracy) or
