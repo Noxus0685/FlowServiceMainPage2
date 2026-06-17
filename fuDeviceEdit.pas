@@ -325,6 +325,7 @@ type
      FOriginalDevice: TDevice;
      FInitialTypeUUID: string;
      FTypeChangedDuringEdit: Boolean;
+     FDeviceChangedOnClose: Boolean;
 
 
      FDeviceType: TDeviceType; // ссылка на найденный тип
@@ -396,6 +397,7 @@ type
   public
     { Public declarations }
      procedure LoadDevice(ADevice: TDevice);
+     function DeviceChanged: Boolean;
      procedure WriteDeviceEditActionLog(const AAction: string; ADevice: TDevice; const ADetails: string = '');
   end;
 
@@ -731,18 +733,16 @@ end;
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
 begin
   // Отменяем все изменения
-  if FDevice.State = osModified then
+  if DeviceChanged then
   begin
-    // Если форма была изменена, запрашиваем подтверждение
+    // Если данные реально изменились, запрашиваем подтверждение.
     if MessageDlg('Вы уверены, что хотите отменить изменения?', TMsgDlgType.mtWarning,
        [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes then
     begin
-      // Возвращаем форму в исходное состояние
-      AppServices.DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
-
-      // Закрываем форму с результатом Cancel
+      // Не перезагружаем весь репозиторий: редактор работает с клоном прибора,
+      // поэтому для отмены достаточно закрыть форму без сохранения.
       WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
-    ModalResult := mrCancel;
+      ModalResult := mrCancel;
     end;
   end
   else
@@ -1005,6 +1005,7 @@ var
   OldUUID: string;
 begin
   CanClose := True;
+  FDeviceChangedOnClose := DeviceChanged;
 
   try
     if ModalResult = mrOk then
@@ -1013,23 +1014,26 @@ begin
       { Нажали OK }
       {----------------------------------}
 
-      if FOriginalDevice <> nil then
+      if FDeviceChangedOnClose then
       begin
-        { редактирование существующего }
-        OldUUID := FOriginalDevice.UUID;
-        FOriginalDevice.Assign(FDevice,True);
-        FOriginalDevice.UUID := OldUUID;
-        FOriginalDevice.State := osModified;
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
-        if not FTypeChangedDuringEdit then
-          WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
-      end
-      else
-      begin
-        { новый прибор }
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
-        if not FTypeChangedDuringEdit then
-          WriteDeviceEditActionLog('Сохранён прибор', FDevice);
+        if FOriginalDevice <> nil then
+        begin
+          { редактирование существующего }
+          OldUUID := FOriginalDevice.UUID;
+          FOriginalDevice.Assign(FDevice,True);
+          FOriginalDevice.UUID := OldUUID;
+          FOriginalDevice.State := osModified;
+          AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+          if not FTypeChangedDuringEdit then
+            WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
+        end
+        else
+        begin
+          { новый прибор }
+          AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
+          if not FTypeChangedDuringEdit then
+            WriteDeviceEditActionLog('Сохранён прибор', FDevice);
+        end;
       end;
 
       if not SameText(FInitialTypeUUID, string(FDevice.DeviceTypeUUID)) then
@@ -1615,6 +1619,7 @@ begin
       FDevice.State := osClean;
       FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
       FTypeChangedDuringEdit := False;
+      FDeviceChangedOnClose := False;
     end
     else
     begin
@@ -1629,6 +1634,7 @@ begin
 
       FInitialTypeUUID := string(FDevice.DeviceTypeUUID);
       FTypeChangedDuringEdit := False;
+      FDeviceChangedOnClose := False;
     end;
 
     {----------------------------------}
@@ -3859,6 +3865,115 @@ begin
     Exit;
 
   FDevice.State := osModified;
+end;
+
+function TFormDeviceEditor.DeviceChanged: Boolean;
+var
+  I: Integer;
+  OldPoint: TDevicePoint;
+  NewPoint: TDevicePoint;
+begin
+  if ModalResult <> mrNone then
+    Exit(FDeviceChangedOnClose);
+
+  Result := FOriginalDevice = nil;
+
+  if Result or (FOriginalDevice = nil) or (FDevice = nil) then
+    Exit;
+
+  Result :=
+    (FOriginalDevice.DeviceTypeUUID <> FDevice.DeviceTypeUUID) or
+    (FOriginalDevice.DeviceTypeName <> FDevice.DeviceTypeName) or
+    (FOriginalDevice.DeviceTypeRepo <> FDevice.DeviceTypeRepo) or
+    (FOriginalDevice.RepoTypeName <> FDevice.RepoTypeName) or
+    (FOriginalDevice.RepoTypeUUID <> FDevice.RepoTypeUUID) or
+    (FOriginalDevice.RepoDeviceName <> FDevice.RepoDeviceName) or
+    (FOriginalDevice.RepoDeviceUUID <> FDevice.RepoDeviceUUID) or
+    (FOriginalDevice.Name <> FDevice.Name) or
+    (FOriginalDevice.SerialNumber <> FDevice.SerialNumber) or
+    (FOriginalDevice.Modification <> FDevice.Modification) or
+    (FOriginalDevice.Manufacturer <> FDevice.Manufacturer) or
+    (FOriginalDevice.Owner <> FDevice.Owner) or
+    (FOriginalDevice.ReestrNumber <> FDevice.ReestrNumber) or
+    (FOriginalDevice.Category <> FDevice.Category) or
+    (FOriginalDevice.CategoryName <> FDevice.CategoryName) or
+    (FOriginalDevice.AccuracyClass <> FDevice.AccuracyClass) or
+    (FOriginalDevice.RegDate <> FDevice.RegDate) or
+    (FOriginalDevice.ValidityDate <> FDevice.ValidityDate) or
+    (FOriginalDevice.DateOfManufacture <> FDevice.DateOfManufacture) or
+    (FOriginalDevice.IVI <> FDevice.IVI) or
+    (FOriginalDevice.DN <> FDevice.DN) or
+    (not SameValue(FOriginalDevice.Qmax, FDevice.Qmax)) or
+    (not SameValue(FOriginalDevice.Qmin, FDevice.Qmin)) or
+    (not SameValue(FOriginalDevice.Qnom, FDevice.Qnom)) or
+    (not SameValue(FOriginalDevice.Qtr, FDevice.Qtr)) or
+    (not SameValue(FOriginalDevice.RangeDynamic, FDevice.RangeDynamic)) or
+    (FOriginalDevice.Temp <> FDevice.Temp) or
+    (not SameValue(FOriginalDevice.Error, FDevice.Error)) or
+    (FOriginalDevice.VerificationMethod <> FDevice.VerificationMethod) or
+    (FOriginalDevice.ProcedureName <> FDevice.ProcedureName) or
+    (FOriginalDevice.MeasuredDimension <> FDevice.MeasuredDimension) or
+    (FOriginalDevice.Units <> FDevice.Units) or
+    (FOriginalDevice.OutputType <> FDevice.OutputType) or
+    (FOriginalDevice.DimensionCoef <> FDevice.DimensionCoef) or
+    (FOriginalDevice.OutputSet <> FDevice.OutputSet) or
+    (FOriginalDevice.Freq <> FDevice.Freq) or
+    (not SameValue(FOriginalDevice.Coef, FDevice.Coef)) or
+    (not SameValue(FOriginalDevice.FreqFlowRate, FDevice.FreqFlowRate)) or
+    (FOriginalDevice.VoltageRange <> FDevice.VoltageRange) or
+    (not SameValue(FOriginalDevice.VoltageQminRate, FDevice.VoltageQminRate)) or
+    (not SameValue(FOriginalDevice.VoltageQmaxRate, FDevice.VoltageQmaxRate)) or
+    (FOriginalDevice.CurrentRange <> FDevice.CurrentRange) or
+    (not SameValue(FOriginalDevice.CurrentQminRate, FDevice.CurrentQminRate)) or
+    (not SameValue(FOriginalDevice.CurrentQmaxRate, FDevice.CurrentQmaxRate)) or
+    (FOriginalDevice.ProtocolName <> FDevice.ProtocolName) or
+    (FOriginalDevice.BaudRate <> FDevice.BaudRate) or
+    (FOriginalDevice.Parity <> FDevice.Parity) or
+    (FOriginalDevice.DeviceAddress <> FDevice.DeviceAddress) or
+    (FOriginalDevice.InputType <> FDevice.InputType) or
+    (FOriginalDevice.SpillageType <> FDevice.SpillageType) or
+    (FOriginalDevice.SpillageStop <> FDevice.SpillageStop) or
+    (FOriginalDevice.Repeats <> FDevice.Repeats) or
+    (FOriginalDevice.RepeatsProtocol <> FDevice.RepeatsProtocol) or
+    (FOriginalDevice.Comment <> FDevice.Comment) or
+    (FOriginalDevice.Description <> FDevice.Description) or
+    (FOriginalDevice.ReportingForm <> FDevice.ReportingForm);
+
+  if Result then
+    Exit;
+
+  Result := FOriginalDevice.Points.Count <> FDevice.Points.Count;
+  if Result then
+    Exit;
+
+  for I := 0 to FDevice.Points.Count - 1 do
+  begin
+    OldPoint := FOriginalDevice.Points[I];
+    NewPoint := FDevice.Points[I];
+    Result :=
+      (OldPoint.Name <> NewPoint.Name) or
+      (OldPoint.UUID <> NewPoint.UUID) or
+      (not SameValue(OldPoint.FlowRate, NewPoint.FlowRate)) or
+      (not SameValue(OldPoint.Q, NewPoint.Q)) or
+      (OldPoint.FlowAccuracy <> NewPoint.FlowAccuracy) or
+      (not SameValue(OldPoint.Pressure, NewPoint.Pressure)) or
+      (not SameValue(OldPoint.Temp, NewPoint.Temp)) or
+      (OldPoint.TempAccuracy <> NewPoint.TempAccuracy) or
+      (OldPoint.LimitImp <> NewPoint.LimitImp) or
+      (not SameValue(OldPoint.LimitVolume, NewPoint.LimitVolume)) or
+      (not SameValue(OldPoint.LimitTime, NewPoint.LimitTime)) or
+      (OldPoint.SpillageStop <> NewPoint.SpillageStop) or
+      (OldPoint.SpillageType <> NewPoint.SpillageType) or
+      (OldPoint.EtalonType <> NewPoint.EtalonType) or
+      (OldPoint.FlowSorceType <> NewPoint.FlowSorceType) or
+      (not SameValue(OldPoint.Error, NewPoint.Error)) or
+      (OldPoint.Pause <> NewPoint.Pause) or
+      (OldPoint.RepeatsProtocol <> NewPoint.RepeatsProtocol) or
+      (OldPoint.Repeats <> NewPoint.Repeats) or
+      (OldPoint.Num <> NewPoint.Num);
+    if Result then
+      Exit;
+  end;
 end;
 
 procedure TFormDeviceEditor.CloseEditor(ASave: Boolean);
