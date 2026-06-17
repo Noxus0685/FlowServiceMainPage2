@@ -1259,10 +1259,51 @@ end;
 procedure TChannel.RecreateFlowMeter(const AWorkTable: TWorkTable);
 var
   OldDevice: TDevice;
+  OldFlowAccuracy: Integer;
+  OldFlowCurrentDimIndex: Integer;
+  OldFlowError: Double;
+  OldFlowHasDisplaySettings: Boolean;
+  OldQuantityAccuracy: Integer;
+  OldQuantityCurrentDimIndex: Integer;
+  OldQuantityError: Double;
+  OldQuantityHasDisplaySettings: Boolean;
+
+  procedure RestoreDisplaySettings(const AMeterValue: TMeterValue;
+    const AAccuracy: Integer; const AError: Double; const ACurrentDimIndex: Integer);
+  begin
+    if AMeterValue = nil then
+      Exit;
+
+    AMeterValue.Accuracy := AAccuracy;
+    AMeterValue.Error := AError;
+    AMeterValue.SetDim(ACurrentDimIndex);
+  end;
+
 begin
   OldDevice := nil;
+  OldFlowHasDisplaySettings := False;
+  OldQuantityHasDisplaySettings := False;
+
   if FMeter <> nil then
+  begin
     OldDevice := FMeter.Device;
+
+    if FMeter.ValueFlow <> nil then
+    begin
+      OldFlowAccuracy := FMeter.ValueFlow.Accuracy;
+      OldFlowError := FMeter.ValueFlow.Error;
+      OldFlowCurrentDimIndex := FMeter.ValueFlow.CurrentDimIndex;
+      OldFlowHasDisplaySettings := True;
+    end;
+
+    if FMeter.ValueQuantity <> nil then
+    begin
+      OldQuantityAccuracy := FMeter.ValueQuantity.Accuracy;
+      OldQuantityError := FMeter.ValueQuantity.Error;
+      OldQuantityCurrentDimIndex := FMeter.ValueQuantity.CurrentDimIndex;
+      OldQuantityHasDisplaySettings := True;
+    end;
+  end;
 
   FreeAndNil(FMeter);
 
@@ -1272,6 +1313,13 @@ begin
     FMeter := TFlowMeter.Create;
 
   FMeter.Name := 'Прибор ' + FName;
+
+  if OldQuantityHasDisplaySettings then
+    RestoreDisplaySettings(FMeter.ValueQuantity, OldQuantityAccuracy, OldQuantityError,
+      OldQuantityCurrentDimIndex);
+  if OldFlowHasDisplaySettings then
+    RestoreDisplaySettings(FMeter.ValueFlow, OldFlowAccuracy, OldFlowError,
+      OldFlowCurrentDimIndex);
 
   Init;
   RebindFlowMeterValues(AWorkTable);
