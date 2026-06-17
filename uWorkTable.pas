@@ -1879,10 +1879,10 @@ begin
     FlowMeter.SetValues
   else if Scale <> nil then
   begin
-    if Scale.ValueQuantity <> nil then
-      Scale.ValueQuantity.SetValue(FValueSec);
     if Scale.ValueFlow <> nil then
       Scale.ValueFlow.SetValue(FValueSec);
+    if Scale.ValueQuantity <> nil then
+      Scale.ValueQuantity.SetValue(FValueResult);
   end;
 end;
 
@@ -5001,8 +5001,11 @@ begin
 
     if (Channel.Meter <> nil) and Channel.Meter.IsScale then
     begin
-      Channel.ValueSec := ChannelImpSec;
-      Channel.ValueResult := ChannelImpSec;
+      Channel.ValueSec := EnsureRange(ChannelImpSec, 0.0, 1.0E12);
+      if AImpResult > 0 then
+        Channel.ValueResult := EnsureRange(AImpResult, 0.0, 1.0E12)
+      else
+        Channel.ValueResult := EnsureRange(Channel.ValueResult + Channel.ValueSec, 0.0, 1.0E12);
       Continue;
     end;
 
@@ -5340,6 +5343,50 @@ begin
   Result := (FlowRate * Coef) / 3.6;
 end;
 
+function BuildScaleFlowValue(AWorkTable: TWorkTable; AChannel: TChannel;
+  const ABaseFlow: Double; const AIndex: Integer): Double;
+var
+  BaseFlow: Double;
+  RandomCoef: Double;
+  ScaleIndex: Integer;
+
+  function BuildScaleChannelSeed(const AValue: string): Integer;
+  var
+    I: Integer;
+  begin
+    Result := 0;
+    for I := 1 to Length(AValue) do
+      Result := Result + Ord(AValue[I]);
+  end;
+begin
+  Result := 0;
+
+  if AChannel = nil then
+    Exit;
+
+  BaseFlow := ABaseFlow;
+
+  if SameValue(BaseFlow, 0.0, 1e-12) and (AWorkTable <> nil) and
+     (AWorkTable.FlowRate <> nil) then
+    BaseFlow := AWorkTable.ValueFlowRate.GetDoubleNum(
+      AWorkTable.FlowRate.Value.Value, 4);
+
+  if SameValue(BaseFlow, 0.0, 1e-12) then
+    BaseFlow := 1;
+
+  ScaleIndex := AIndex + BuildScaleChannelSeed(AChannel.Name) +
+    BuildScaleChannelSeed(AChannel.Text) + BuildScaleChannelSeed(AChannel.Serial);
+
+  case ScaleIndex mod 3 of
+    0: RandomCoef := Random * 0.001 + 1.0000;
+    1: RandomCoef := Random * 0.001 + 1.0015;
+  else
+    RandomCoef := Random * 0.001 + 1.0080;
+  end;
+
+  Result := EnsureRange((BaseFlow * RandomCoef) / 3.6, 0.0, 1.0E12);
+end;
+
 function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkTable;
   AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
@@ -5366,6 +5413,13 @@ begin
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
+    if (AChannels[I] <> nil) and (AChannels[I].Meter <> nil) and
+       AChannels[I].Meter.IsScale then
+    begin
+      Result[I] := BuildScaleFlowValue(AWorkTable, AChannels[I], AFlowRate, I);
+      Continue;
+    end;
+
     if SameValue(SUM, 0.0, 1e-12) then
       MaxRatio := 0
     else
@@ -5659,7 +5713,9 @@ begin
 
           SetLength(ImpSecValues, EnabledDeviceChannels.Count);
            for I := 0 to EnabledDeviceChannels.Count - 1 do
-            if i in [1,3,6] then
+            if (EnabledDeviceChannels[I].Meter <> nil) and EnabledDeviceChannels[I].Meter.IsScale then
+              ImpSecValues[I] := BuildScaleFlowValue(AWorkTable, EnabledDeviceChannels[I], Flow, I)
+            else if i in [1,3,6] then
               ImpSecValues[i] := (Flow*(Random * ({trackStd.Value}0.1)/100 + 1)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6
             else if i in [2,4,5] then
               ImpSecValues[i] := (Flow*(Random * ({trackStd.Value}0.1)/100 + 1.0015)*GetChannelFlowCoef(EnabledDeviceChannels[I]))/3.6

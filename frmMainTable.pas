@@ -766,7 +766,6 @@ type
     procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
-    procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -4478,75 +4477,12 @@ begin
   UpdateGrids;
 end;
 
-procedure TFrameMainTable.UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
-var
-  FlowPerSecond: Double;
-  DeltaSeconds: Double;
-  FlowUnit: string;
-
-  function FlowToBasePerSecond(const AFlow: Double; const AUnitName: string): Double;
-  begin
-    if SameText(AUnitName, 'л/мин') or SameText(AUnitName, 'кг/мин') then
-      Result := AFlow / 60
-    else if SameText(AUnitName, 'л/ч') or SameText(AUnitName, 'кг/ч') then
-      Result := AFlow / 3600
-    else if SameText(AUnitName, 'м3/мин') or SameText(AUnitName, 'т/мин') then
-      Result := AFlow * 1000 / 60
-    else if SameText(AUnitName, 'м3/ч') or SameText(AUnitName, 'т/ч') then
-      Result := AFlow * 1000 / 3600
-    else
-      Result := AFlow;
-  end;
-
-begin
-  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or
-     (AWorkTable.FlowRate.Value = nil) or (AWorkTable.ValueFlowRate = nil) or
-     (AWorkTable.ActiveScale = nil) then
-    Exit;
-
-  if not (AWorkTable.State in [swtMONITOR, swtEXECUTE]) then
-    Exit;
-
-  FlowUnit := Trim(AWorkTable.FlowUnitName);
-  if FlowUnit = '' then
-    FlowUnit := AWorkTable.ValueFlowRate.GetDimName;
-
-  if FlowUnit <> '' then
-    FlowPerSecond := FlowToBasePerSecond(
-      AWorkTable.ValueFlowRate.GetDoubleValue(FlowUnit), FlowUnit)
-  else
-    FlowPerSecond := AWorkTable.FlowRate.Value.Value;
-  if FlowPerSecond <= 0 then
-    Exit;
-
-  DeltaSeconds := TimerMain.Interval / 1000;
-  if DeltaSeconds <= 0 then
-    DeltaSeconds := 1;
-
-  AWorkTable.Value := AWorkTable.Value + FlowPerSecond * DeltaSeconds;
-  AWorkTable.ActiveScale.CurentValue := AWorkTable.Value;
-end;
-
 procedure TFrameMainTable.SetValues;
 var
   WorkTable: TWorkTable;
   I: Integer;
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
-
-  procedure UpdateScaleImitationValue(AChannel: TChannel);
-  begin
-    if AChannel = nil then
-      Exit;
-
-    if AChannel.ValueSec <= 0 then
-      AChannel.ValueSec := 1
-    else
-      AChannel.ValueSec := AChannel.ValueSec + 0.05;
-
-    if AChannel.ValueSec < 0 then
-      AChannel.ValueSec := 0;
-  end;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4577,11 +4513,7 @@ begin
 
     if EtalonChannel.Meter.IsScale then
     begin
-      UpdateScaleImitationValue(EtalonChannel);
-      if EtalonChannel.Meter.ValueFlow <> nil then
-        EtalonChannel.Meter.ValueFlow.SetValue(EtalonChannel.ValueSec);
-      if EtalonChannel.Meter.ValueQuantity <> nil then
-        EtalonChannel.Meter.ValueQuantity.SetValue(EtalonChannel.ValueSec);
+      EtalonChannel.SetValues;
       if EtalonChannel.ValueInterface <> nil then
         EtalonChannel.ValueInterface.SetValue(EtalonChannel.ValueSec);
       Continue;
@@ -4604,11 +4536,7 @@ begin
 
     if DeviceChannel.Meter.IsScale then
     begin
-      UpdateScaleImitationValue(DeviceChannel);
-      if DeviceChannel.Meter.ValueFlow <> nil then
-        DeviceChannel.Meter.ValueFlow.SetValue(DeviceChannel.ValueSec);
-      if DeviceChannel.Meter.ValueQuantity <> nil then
-        DeviceChannel.Meter.ValueQuantity.SetValue(DeviceChannel.ValueSec);
+      DeviceChannel.SetValues;
       if DeviceChannel.ValueInterface <> nil then
         DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
       Continue;
@@ -4663,8 +4591,6 @@ begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
-
-  UpdateScaleWeightFromFlow(WorkTable);
 
   IsUpdating := True;
   try
