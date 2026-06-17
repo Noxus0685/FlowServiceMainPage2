@@ -3145,12 +3145,18 @@ var
       if (AChannel.Meter.ValueQuantity <> nil) and (ValueQuantity <> nil) then
       begin
         AChannel.Meter.ValueQuantity.SetAs(ValueQuantity);
+        AChannel.Meter.ValueQuantity.DependenceType := INDEPENDENT;
+        AChannel.Meter.ValueQuantity.ValueBaseMultiplier := nil;
+        AChannel.Meter.ValueQuantity.ValueBaseDevider := nil;
         if FQuantityUnitName <> '' then
           AChannel.Meter.ValueQuantity.SetDim(FQuantityUnitName);
       end;
       if (AChannel.Meter.ValueFlow <> nil) and (ValueFlowRate <> nil) then
       begin
         AChannel.Meter.ValueFlow.SetAs(ValueFlowRate);
+        AChannel.Meter.ValueFlow.DependenceType := INDEPENDENT;
+        AChannel.Meter.ValueFlow.ValueBaseMultiplier := nil;
+        AChannel.Meter.ValueFlow.ValueBaseDevider := nil;
         AChannel.Meter.ValueFlow.SetDim(FFlowUnitName);
       end;
       Exit;

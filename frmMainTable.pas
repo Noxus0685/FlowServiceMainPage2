@@ -2742,11 +2742,17 @@ begin
       if WorkTable.DeviceChannels[I].Meter.ValueQuantity <> nil then
       begin
         WorkTable.DeviceChannels[I].Meter.ValueQuantity.SetAs(WorkTable.ValueQuantity);
+        WorkTable.DeviceChannels[I].Meter.ValueQuantity.DependenceType := INDEPENDENT;
+        WorkTable.DeviceChannels[I].Meter.ValueQuantity.ValueBaseMultiplier := nil;
+        WorkTable.DeviceChannels[I].Meter.ValueQuantity.ValueBaseDevider := nil;
         WorkTable.DeviceChannels[I].Meter.ValueQuantity.SetDim(QuantityUnitName);
       end;
       if WorkTable.DeviceChannels[I].Meter.ValueFlow <> nil then
       begin
         WorkTable.DeviceChannels[I].Meter.ValueFlow.SetAs(WorkTable.ValueFlowRate);
+        WorkTable.DeviceChannels[I].Meter.ValueFlow.DependenceType := INDEPENDENT;
+        WorkTable.DeviceChannels[I].Meter.ValueFlow.ValueBaseMultiplier := nil;
+        WorkTable.DeviceChannels[I].Meter.ValueFlow.ValueBaseDevider := nil;
         WorkTable.DeviceChannels[I].Meter.ValueFlow.SetDim(FlowUnitName);
       end;
       Continue;
@@ -2786,11 +2792,17 @@ begin
       if WorkTable.EtalonChannels[I].Meter.ValueQuantity <> nil then
       begin
         WorkTable.EtalonChannels[I].Meter.ValueQuantity.SetAs(WorkTable.ValueQuantity);
+        WorkTable.EtalonChannels[I].Meter.ValueQuantity.DependenceType := INDEPENDENT;
+        WorkTable.EtalonChannels[I].Meter.ValueQuantity.ValueBaseMultiplier := nil;
+        WorkTable.EtalonChannels[I].Meter.ValueQuantity.ValueBaseDevider := nil;
         WorkTable.EtalonChannels[I].Meter.ValueQuantity.SetDim(QuantityUnitName);
       end;
       if WorkTable.EtalonChannels[I].Meter.ValueFlow <> nil then
       begin
         WorkTable.EtalonChannels[I].Meter.ValueFlow.SetAs(WorkTable.ValueFlowRate);
+        WorkTable.EtalonChannels[I].Meter.ValueFlow.DependenceType := INDEPENDENT;
+        WorkTable.EtalonChannels[I].Meter.ValueFlow.ValueBaseMultiplier := nil;
+        WorkTable.EtalonChannels[I].Meter.ValueFlow.ValueBaseDevider := nil;
         WorkTable.EtalonChannels[I].Meter.ValueFlow.SetDim(FlowUnitName);
       end;
       Continue;
