@@ -3137,7 +3137,26 @@ var
   var
     Meter: TFlowMeter;
   begin
-    if (AChannel = nil) or (AChannel.FlowMeter = nil) or (FFlowUnitName = '') then
+    if (AChannel = nil) or (AChannel.Meter = nil) or (FFlowUnitName = '') then
+      Exit;
+
+    if AChannel.Meter.IsScale then
+    begin
+      if (AChannel.Meter.ValueQuantity <> nil) and (ValueQuantity <> nil) then
+      begin
+        AChannel.Meter.ValueQuantity.SetAs(ValueQuantity);
+        if FQuantityUnitName <> '' then
+          AChannel.Meter.ValueQuantity.SetDim(FQuantityUnitName);
+      end;
+      if (AChannel.Meter.ValueFlow <> nil) and (ValueFlowRate <> nil) then
+      begin
+        AChannel.Meter.ValueFlow.SetAs(ValueFlowRate);
+        AChannel.Meter.ValueFlow.SetDim(FFlowUnitName);
+      end;
+      Exit;
+    end;
+
+    if AChannel.FlowMeter = nil then
       Exit;
 
     Meter := AChannel.FlowMeter;
@@ -4969,17 +4988,17 @@ begin
     if Channel = nil then
       Continue;
 
-    if (Channel.Meter <> nil) and Channel.Meter.IsScale then
-    begin
-      Channel.ValueSec := DisplayWeight;
-      Channel.ValueResult := DisplayWeight;
-      Continue;
-    end;
-
     if (Length(AImpSecValues) > I) then
       ChannelImpSec := AImpSecValues[I]
     else
       ChannelImpSec := 0;
+
+    if (Channel.Meter <> nil) and Channel.Meter.IsScale then
+    begin
+      Channel.ValueSec := ChannelImpSec;
+      Channel.ValueResult := ChannelImpSec;
+      Continue;
+    end;
 
     Channel.CurSec := ACurSec;
     Channel.ImpSec := ChannelImpSec;

@@ -2734,7 +2734,25 @@ begin
 
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
   begin
-    if (WorkTable.DeviceChannels[I] = nil) or (WorkTable.DeviceChannels[I].FlowMeter = nil) then
+    if (WorkTable.DeviceChannels[I] = nil) or (WorkTable.DeviceChannels[I].Meter = nil) then
+      Continue;
+
+    if WorkTable.DeviceChannels[I].Meter.IsScale then
+    begin
+      if WorkTable.DeviceChannels[I].Meter.ValueQuantity <> nil then
+      begin
+        WorkTable.DeviceChannels[I].Meter.ValueQuantity.SetAs(WorkTable.ValueQuantity);
+        WorkTable.DeviceChannels[I].Meter.ValueQuantity.SetDim(QuantityUnitName);
+      end;
+      if WorkTable.DeviceChannels[I].Meter.ValueFlow <> nil then
+      begin
+        WorkTable.DeviceChannels[I].Meter.ValueFlow.SetAs(WorkTable.ValueFlowRate);
+        WorkTable.DeviceChannels[I].Meter.ValueFlow.SetDim(FlowUnitName);
+      end;
+      Continue;
+    end;
+
+    if WorkTable.DeviceChannels[I].FlowMeter = nil then
       Continue;
 
     Meter := WorkTable.DeviceChannels[I].FlowMeter;
@@ -2760,7 +2778,25 @@ begin
 
   for I := 0 to WorkTable.EtalonChannels.Count - 1 do
   begin
-    if (WorkTable.EtalonChannels[I] = nil) or (WorkTable.EtalonChannels[I].FlowMeter = nil) then
+    if (WorkTable.EtalonChannels[I] = nil) or (WorkTable.EtalonChannels[I].Meter = nil) then
+      Continue;
+
+    if WorkTable.EtalonChannels[I].Meter.IsScale then
+    begin
+      if WorkTable.EtalonChannels[I].Meter.ValueQuantity <> nil then
+      begin
+        WorkTable.EtalonChannels[I].Meter.ValueQuantity.SetAs(WorkTable.ValueQuantity);
+        WorkTable.EtalonChannels[I].Meter.ValueQuantity.SetDim(QuantityUnitName);
+      end;
+      if WorkTable.EtalonChannels[I].Meter.ValueFlow <> nil then
+      begin
+        WorkTable.EtalonChannels[I].Meter.ValueFlow.SetAs(WorkTable.ValueFlowRate);
+        WorkTable.EtalonChannels[I].Meter.ValueFlow.SetDim(FlowUnitName);
+      end;
+      Continue;
+    end;
+
+    if WorkTable.EtalonChannels[I].FlowMeter = nil then
       Continue;
 
     Meter := WorkTable.EtalonChannels[I].FlowMeter;
