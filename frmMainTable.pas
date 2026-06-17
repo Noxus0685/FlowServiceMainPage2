@@ -958,7 +958,7 @@ end;
 
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
 var
-  Meter: TFlowMeter;
+  Meter: TMeter;
 begin
   if FFrameFlowMeterProperties = nil then
     Exit;
@@ -971,10 +971,10 @@ begin
 
     if (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) and
        (FActiveWorkTable.DeviceChannels[ARow] <> nil) then
-      Meter := FActiveWorkTable.DeviceChannels[ARow].FlowMeter;
+      Meter := FActiveWorkTable.DeviceChannels[ARow].Meter;
   end;
 
-  FFrameFlowMeterProperties.FlowMeter := Meter;
+  FFrameFlowMeterProperties.Meter := Meter;
 end;
 
 procedure TFrameMainTable.FlowMeterPropertiesChanged(Sender: TObject);
@@ -2734,7 +2734,25 @@ begin
 
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
   begin
-    if (WorkTable.DeviceChannels[I] = nil) or (WorkTable.DeviceChannels[I].FlowMeter = nil) then
+    if (WorkTable.DeviceChannels[I] = nil) or (WorkTable.DeviceChannels[I].Meter = nil) then
+      Continue;
+
+    if WorkTable.DeviceChannels[I].Meter.IsScale then
+    begin
+      if WorkTable.DeviceChannels[I].Meter.ValueQuantity <> nil then
+      begin
+        WorkTable.DeviceChannels[I].Meter.ValueQuantity.SetAs(WorkTable.ValueQuantity);
+        WorkTable.DeviceChannels[I].Meter.ValueQuantity.SetDim(QuantityUnitName);
+      end;
+      if WorkTable.DeviceChannels[I].Meter.ValueFlow <> nil then
+      begin
+        WorkTable.DeviceChannels[I].Meter.ValueFlow.SetAs(WorkTable.ValueFlowRate);
+        WorkTable.DeviceChannels[I].Meter.ValueFlow.SetDim(FlowUnitName);
+      end;
+      Continue;
+    end;
+
+    if WorkTable.DeviceChannels[I].FlowMeter = nil then
       Continue;
 
     Meter := WorkTable.DeviceChannels[I].FlowMeter;
@@ -2760,7 +2778,25 @@ begin
 
   for I := 0 to WorkTable.EtalonChannels.Count - 1 do
   begin
-    if (WorkTable.EtalonChannels[I] = nil) or (WorkTable.EtalonChannels[I].FlowMeter = nil) then
+    if (WorkTable.EtalonChannels[I] = nil) or (WorkTable.EtalonChannels[I].Meter = nil) then
+      Continue;
+
+    if WorkTable.EtalonChannels[I].Meter.IsScale then
+    begin
+      if WorkTable.EtalonChannels[I].Meter.ValueQuantity <> nil then
+      begin
+        WorkTable.EtalonChannels[I].Meter.ValueQuantity.SetAs(WorkTable.ValueQuantity);
+        WorkTable.EtalonChannels[I].Meter.ValueQuantity.SetDim(QuantityUnitName);
+      end;
+      if WorkTable.EtalonChannels[I].Meter.ValueFlow <> nil then
+      begin
+        WorkTable.EtalonChannels[I].Meter.ValueFlow.SetAs(WorkTable.ValueFlowRate);
+        WorkTable.EtalonChannels[I].Meter.ValueFlow.SetDim(FlowUnitName);
+      end;
+      Continue;
+    end;
+
+    if WorkTable.EtalonChannels[I].FlowMeter = nil then
       Continue;
 
     Meter := WorkTable.EtalonChannels[I].FlowMeter;
@@ -4485,6 +4521,20 @@ var
   I: Integer;
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
+
+  procedure UpdateScaleImitationValue(AChannel: TChannel);
+  begin
+    if AChannel = nil then
+      Exit;
+
+    if AChannel.ValueSec <= 0 then
+      AChannel.ValueSec := 1
+    else
+      AChannel.ValueSec := AChannel.ValueSec + 0.05;
+
+    if AChannel.ValueSec < 0 then
+      AChannel.ValueSec := 0;
+  end;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4515,6 +4565,7 @@ begin
 
     if EtalonChannel.Meter.IsScale then
     begin
+      UpdateScaleImitationValue(EtalonChannel);
       if EtalonChannel.Meter.ValueFlow <> nil then
         EtalonChannel.Meter.ValueFlow.SetValue(EtalonChannel.ValueSec);
       if EtalonChannel.Meter.ValueQuantity <> nil then
@@ -4541,6 +4592,7 @@ begin
 
     if DeviceChannel.Meter.IsScale then
     begin
+      UpdateScaleImitationValue(DeviceChannel);
       if DeviceChannel.Meter.ValueFlow <> nil then
         DeviceChannel.Meter.ValueFlow.SetValue(DeviceChannel.ValueSec);
       if DeviceChannel.Meter.ValueQuantity <> nil then
