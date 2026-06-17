@@ -3870,11 +3870,6 @@ begin
 end;
 
 function TFormDeviceEditor.DeviceChanged: Boolean;
-var
-  I: Integer;
-  OldPoint: TDevicePoint;
-  NewPoint: TDevicePoint;
-  CompareDevice: TDevice;
 begin
   if (ModalResult <> mrNone) and (FDevice = nil) then
     Exit(FDeviceChangedOnClose);
@@ -3884,100 +3879,7 @@ begin
   if Result or (FLoadedDeviceSnapshot = nil) or (FDevice = nil) then
     Exit;
 
-  CompareDevice := FLoadedDeviceSnapshot;
-
-  Result :=
-    (CompareDevice.DeviceTypeUUID <> FDevice.DeviceTypeUUID) or
-    (CompareDevice.DeviceTypeName <> FDevice.DeviceTypeName) or
-    (CompareDevice.DeviceTypeRepo <> FDevice.DeviceTypeRepo) or
-    (CompareDevice.RepoTypeName <> FDevice.RepoTypeName) or
-    (CompareDevice.RepoTypeUUID <> FDevice.RepoTypeUUID) or
-    (CompareDevice.RepoDeviceName <> FDevice.RepoDeviceName) or
-    (CompareDevice.RepoDeviceUUID <> FDevice.RepoDeviceUUID) or
-    (CompareDevice.Name <> FDevice.Name) or
-    (CompareDevice.SerialNumber <> FDevice.SerialNumber) or
-    (CompareDevice.Modification <> FDevice.Modification) or
-    (CompareDevice.Manufacturer <> FDevice.Manufacturer) or
-    (CompareDevice.Owner <> FDevice.Owner) or
-    (CompareDevice.ReestrNumber <> FDevice.ReestrNumber) or
-    (CompareDevice.Category <> FDevice.Category) or
-    (CompareDevice.CategoryName <> FDevice.CategoryName) or
-    (CompareDevice.AccuracyClass <> FDevice.AccuracyClass) or
-    (CompareDevice.RegDate <> FDevice.RegDate) or
-    (CompareDevice.ValidityDate <> FDevice.ValidityDate) or
-    (CompareDevice.DateOfManufacture <> FDevice.DateOfManufacture) or
-    (CompareDevice.IVI <> FDevice.IVI) or
-    (CompareDevice.DN <> FDevice.DN) or
-    (not SameValue(CompareDevice.Qmax, FDevice.Qmax)) or
-    (not SameValue(CompareDevice.Qmin, FDevice.Qmin)) or
-    (not SameValue(CompareDevice.Qnom, FDevice.Qnom)) or
-    (not SameValue(CompareDevice.Qtr, FDevice.Qtr)) or
-    (not SameValue(CompareDevice.RangeDynamic, FDevice.RangeDynamic)) or
-    (CompareDevice.Temp <> FDevice.Temp) or
-    (not SameValue(CompareDevice.Error, FDevice.Error)) or
-    (CompareDevice.VerificationMethod <> FDevice.VerificationMethod) or
-    (CompareDevice.ProcedureName <> FDevice.ProcedureName) or
-    (CompareDevice.MeasuredDimension <> FDevice.MeasuredDimension) or
-    (CompareDevice.Units <> FDevice.Units) or
-    (CompareDevice.OutputType <> FDevice.OutputType) or
-    (CompareDevice.DimensionCoef <> FDevice.DimensionCoef) or
-    (CompareDevice.OutputSet <> FDevice.OutputSet) or
-    (CompareDevice.Freq <> FDevice.Freq) or
-    (not SameValue(CompareDevice.Coef, FDevice.Coef)) or
-    (not SameValue(CompareDevice.FreqFlowRate, FDevice.FreqFlowRate)) or
-    (CompareDevice.VoltageRange <> FDevice.VoltageRange) or
-    (not SameValue(CompareDevice.VoltageQminRate, FDevice.VoltageQminRate)) or
-    (not SameValue(CompareDevice.VoltageQmaxRate, FDevice.VoltageQmaxRate)) or
-    (CompareDevice.CurrentRange <> FDevice.CurrentRange) or
-    (not SameValue(CompareDevice.CurrentQminRate, FDevice.CurrentQminRate)) or
-    (not SameValue(CompareDevice.CurrentQmaxRate, FDevice.CurrentQmaxRate)) or
-    (CompareDevice.ProtocolName <> FDevice.ProtocolName) or
-    (CompareDevice.BaudRate <> FDevice.BaudRate) or
-    (CompareDevice.Parity <> FDevice.Parity) or
-    (CompareDevice.DeviceAddress <> FDevice.DeviceAddress) or
-    (CompareDevice.InputType <> FDevice.InputType) or
-    (CompareDevice.SpillageType <> FDevice.SpillageType) or
-    (CompareDevice.SpillageStop <> FDevice.SpillageStop) or
-    (CompareDevice.Repeats <> FDevice.Repeats) or
-    (CompareDevice.RepeatsProtocol <> FDevice.RepeatsProtocol) or
-    (CompareDevice.Comment <> FDevice.Comment) or
-    (CompareDevice.Description <> FDevice.Description) or
-    (CompareDevice.ReportingForm <> FDevice.ReportingForm);
-
-  if Result then
-    Exit;
-
-  Result := CompareDevice.Points.Count <> FDevice.Points.Count;
-  if Result then
-    Exit;
-
-  for I := 0 to FDevice.Points.Count - 1 do
-  begin
-    OldPoint := CompareDevice.Points[I];
-    NewPoint := FDevice.Points[I];
-    Result :=
-      (OldPoint.Name <> NewPoint.Name) or
-      (not SameValue(OldPoint.FlowRate, NewPoint.FlowRate)) or
-      (not SameValue(OldPoint.Q, NewPoint.Q)) or
-      (OldPoint.FlowAccuracy <> NewPoint.FlowAccuracy) or
-      (not SameValue(OldPoint.Pressure, NewPoint.Pressure)) or
-      (not SameValue(OldPoint.Temp, NewPoint.Temp)) or
-      (OldPoint.TempAccuracy <> NewPoint.TempAccuracy) or
-      (OldPoint.LimitImp <> NewPoint.LimitImp) or
-      (not SameValue(OldPoint.LimitVolume, NewPoint.LimitVolume)) or
-      (not SameValue(OldPoint.LimitTime, NewPoint.LimitTime)) or
-      (OldPoint.SpillageStop <> NewPoint.SpillageStop) or
-      (OldPoint.SpillageType <> NewPoint.SpillageType) or
-      (OldPoint.EtalonType <> NewPoint.EtalonType) or
-      (OldPoint.FlowSorceType <> NewPoint.FlowSorceType) or
-      (not SameValue(OldPoint.Error, NewPoint.Error)) or
-      (OldPoint.Pause <> NewPoint.Pause) or
-      (OldPoint.RepeatsProtocol <> NewPoint.RepeatsProtocol) or
-      (OldPoint.Repeats <> NewPoint.Repeats) or
-      (OldPoint.Num <> NewPoint.Num);
-    if Result then
-      Exit;
-  end;
+  Result := not FLoadedDeviceSnapshot.IsEqual(FDevice);
 end;
 
 procedure TFormDeviceEditor.CloseEditor(ASave: Boolean);

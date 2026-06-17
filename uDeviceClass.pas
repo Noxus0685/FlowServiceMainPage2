@@ -530,6 +530,7 @@ type
     destructor Destroy;
 
     procedure Assign(ASource: TDevice; FullAssign: Boolean);
+    function IsEqual(ADevice: TDevice): Boolean;
     function Clone: TDevice;
     function GetSearchText: string; override;
 
@@ -1442,6 +1443,110 @@ begin
     Exit(X);
 
   Result := X * Item.K + Item.b;
+end;
+
+function TDevice.IsEqual(ADevice: TDevice): Boolean;
+var
+  I: Integer;
+  OldPoint: TDevicePoint;
+  NewPoint: TDevicePoint;
+begin
+  Result := ADevice <> nil;
+  if not Result then
+    Exit;
+
+  Result :=
+    (DeviceTypeUUID = ADevice.DeviceTypeUUID) and
+    (DeviceTypeName = ADevice.DeviceTypeName) and
+    (DeviceTypeRepo = ADevice.DeviceTypeRepo) and
+    (RepoTypeName = ADevice.RepoTypeName) and
+    (RepoTypeUUID = ADevice.RepoTypeUUID) and
+    (RepoDeviceName = ADevice.RepoDeviceName) and
+    (RepoDeviceUUID = ADevice.RepoDeviceUUID) and
+    (Name = ADevice.Name) and
+    (SerialNumber = ADevice.SerialNumber) and
+    (Modification = ADevice.Modification) and
+    (Manufacturer = ADevice.Manufacturer) and
+    (Owner = ADevice.Owner) and
+    (ReestrNumber = ADevice.ReestrNumber) and
+    (Category = ADevice.Category) and
+    (CategoryName = ADevice.CategoryName) and
+    (AccuracyClass = ADevice.AccuracyClass) and
+    (RegDate = ADevice.RegDate) and
+    (ValidityDate = ADevice.ValidityDate) and
+    (DateOfManufacture = ADevice.DateOfManufacture) and
+    (IVI = ADevice.IVI) and
+    (DN = ADevice.DN) and
+    SameValue(Qmax, ADevice.Qmax) and
+    SameValue(Qmin, ADevice.Qmin) and
+    SameValue(Qnom, ADevice.Qnom) and
+    SameValue(Qtr, ADevice.Qtr) and
+    SameValue(RangeDynamic, ADevice.RangeDynamic) and
+    (Temp = ADevice.Temp) and
+    SameValue(Error, ADevice.Error) and
+    (VerificationMethod = ADevice.VerificationMethod) and
+    (ProcedureName = ADevice.ProcedureName) and
+    (MeasuredDimension = ADevice.MeasuredDimension) and
+    (Units = ADevice.Units) and
+    (OutputType = ADevice.OutputType) and
+    (DimensionCoef = ADevice.DimensionCoef) and
+    (OutputSet = ADevice.OutputSet) and
+    (Freq = ADevice.Freq) and
+    SameValue(Coef, ADevice.Coef) and
+    SameValue(FreqFlowRate, ADevice.FreqFlowRate) and
+    (VoltageRange = ADevice.VoltageRange) and
+    SameValue(VoltageQminRate, ADevice.VoltageQminRate) and
+    SameValue(VoltageQmaxRate, ADevice.VoltageQmaxRate) and
+    (CurrentRange = ADevice.CurrentRange) and
+    SameValue(CurrentQminRate, ADevice.CurrentQminRate) and
+    SameValue(CurrentQmaxRate, ADevice.CurrentQmaxRate) and
+    (ProtocolName = ADevice.ProtocolName) and
+    (BaudRate = ADevice.BaudRate) and
+    (Parity = ADevice.Parity) and
+    (DeviceAddress = ADevice.DeviceAddress) and
+    (InputType = ADevice.InputType) and
+    (SpillageType = ADevice.SpillageType) and
+    (SpillageStop = ADevice.SpillageStop) and
+    (Repeats = ADevice.Repeats) and
+    (RepeatsProtocol = ADevice.RepeatsProtocol) and
+    (Comment = ADevice.Comment) and
+    (Description = ADevice.Description) and
+    (ReportingForm = ADevice.ReportingForm);
+
+  if not Result then
+    Exit;
+
+  Result := Points.Count = ADevice.Points.Count;
+  if not Result then
+    Exit;
+
+  for I := 0 to Points.Count - 1 do
+  begin
+    OldPoint := Points[I];
+    NewPoint := ADevice.Points[I];
+    Result :=
+      (OldPoint.Name = NewPoint.Name) and
+      SameValue(OldPoint.FlowRate, NewPoint.FlowRate) and
+      SameValue(OldPoint.Q, NewPoint.Q) and
+      (OldPoint.FlowAccuracy = NewPoint.FlowAccuracy) and
+      SameValue(OldPoint.Pressure, NewPoint.Pressure) and
+      SameValue(OldPoint.Temp, NewPoint.Temp) and
+      (OldPoint.TempAccuracy = NewPoint.TempAccuracy) and
+      (OldPoint.LimitImp = NewPoint.LimitImp) and
+      SameValue(OldPoint.LimitVolume, NewPoint.LimitVolume) and
+      SameValue(OldPoint.LimitTime, NewPoint.LimitTime) and
+      (OldPoint.SpillageStop = NewPoint.SpillageStop) and
+      (OldPoint.SpillageType = NewPoint.SpillageType) and
+      (OldPoint.EtalonType = NewPoint.EtalonType) and
+      (OldPoint.FlowSorceType = NewPoint.FlowSorceType) and
+      SameValue(OldPoint.Error, NewPoint.Error) and
+      (OldPoint.Pause = NewPoint.Pause) and
+      (OldPoint.RepeatsProtocol = NewPoint.RepeatsProtocol) and
+      (OldPoint.Repeats = NewPoint.Repeats) and
+      (OldPoint.Num = NewPoint.Num);
+    if not Result then
+      Exit;
+  end;
 end;
 
 function TDevice.Clone: TDevice;
