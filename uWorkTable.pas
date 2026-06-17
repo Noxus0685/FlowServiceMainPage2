@@ -1415,9 +1415,6 @@ begin
   if FMeter = nil then
   Exit;
 
-  if FlowMeter <> nil then
-    FlowMeter.CreateDevice;
-
   if (FMeter.Device = nil) and (DataManager <> nil) and
      (DataManager.ActiveDeviceRepo <> nil) then
   begin
@@ -1441,22 +1438,39 @@ var
   SrcDevice: TDevice;
   NewDevice: TDevice;
 begin
-  if (ASource = nil) or (ASource.FlowMeter = nil) then
+  if (ASource = nil) or (ASource.Meter = nil) then
     Exit;
 
   RecreateFlowMeter(AWorkTable);
 
-  FMeter.UUID := ASource.FlowMeter.UUID;
-  FMeter.Name := ASource.FlowMeter.Name;
-  FMeter.DeviceUUID := ASource.FlowMeter.DeviceUUID;
-  FMeter.DeviceTypeName := ASource.FlowMeter.DeviceTypeName;
-  FMeter.DeviceTypeUUID := ASource.FlowMeter.DeviceTypeUUID;
-  FMeter.RepoTypeName := ASource.FlowMeter.RepoTypeName;
-  FMeter.RepoTypeUUID := ASource.FlowMeter.RepoTypeUUID;
-  FMeter.RepoDeviceName := ASource.FlowMeter.RepoDeviceName;
-  FMeter.RepoDeviceUUID := ASource.FlowMeter.RepoDeviceUUID;
-  FMeter.SerialNumber := ASource.FlowMeter.SerialNumber;
-  FMeter.OutputType := ASource.FlowMeter.OutputType;
+  FMeter.UUID := ASource.Meter.UUID;
+  FMeter.Name := ASource.Meter.Name;
+  FMeter.DeviceUUID := ASource.Meter.DeviceUUID;
+  FMeter.DeviceTypeName := ASource.Meter.DeviceTypeName;
+  FMeter.DeviceTypeUUID := ASource.Meter.DeviceTypeUUID;
+  FMeter.RepoTypeName := ASource.Meter.RepoTypeName;
+  FMeter.RepoTypeUUID := ASource.Meter.RepoTypeUUID;
+  FMeter.RepoDeviceName := ASource.Meter.RepoDeviceName;
+  FMeter.RepoDeviceUUID := ASource.Meter.RepoDeviceUUID;
+  FMeter.SerialNumber := ASource.Meter.SerialNumber;
+  FMeter.OutputType := ASource.Meter.OutputType;
+
+  if (FlowMeter = nil) or (ASource.FlowMeter = nil) then
+  begin
+    SrcDevice := ASource.Meter.Device;
+    if ACloneDeviceToRepo and (SrcDevice <> nil) and
+       (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
+    begin
+      NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
+      if NewDevice <> nil then
+        FMeter.Device := NewDevice;
+    end
+    else
+      FMeter.Device := SrcDevice;
+
+    RebindFlowMeterValues(AWorkTable);
+    Exit;
+  end;
 
   FlowMeter.Active := ASource.FlowMeter.Active;
   FlowMeter.CheckType := ASource.FlowMeter.CheckType;
