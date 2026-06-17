@@ -6,6 +6,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.JSON,
+  System.Math,
   System.SysUtils,
   uBaseProcedures,
   uClasses,
@@ -2204,14 +2205,37 @@ end;
 procedure TScale.InitAllValues;
 var
   IsExisted: Integer;
+
+  function IsValidScaleNumber(const AValue: Double): Boolean;
+  begin
+    Result := (not IsNan(AValue)) and (not IsInfinite(AValue)) and
+      (Abs(AValue) < 1E100);
+  end;
+
+  function IsMassValue(const AMeterValue: TMeterValue): Boolean;
+  begin
+    Result := (AMeterValue <> nil) and
+      (SameText(AMeterValue.&Type, 'Масса') or SameText(AMeterValue.Name, 'Масса'));
+  end;
+
+  function IsMassFlowValue(const AMeterValue: TMeterValue): Boolean;
+  begin
+    Result := (AMeterValue <> nil) and
+      (SameText(AMeterValue.&Type, 'Массовый расход') or SameText(AMeterValue.Name, 'Массовый расход'));
+  end;
+
 begin
   ValueQuantity := TMeterValue.GetExistedMeterValueBool(HashValueQuantity, IsExisted, UUID, Name);
-  if IsExisted = 0 then
+  if (IsExisted = 0) or (not IsMassValue(ValueQuantity)) then
     ValueQuantity.SetAsMass;
+  if not IsValidScaleNumber(ValueQuantity.Value) then
+    ValueQuantity.SetValue(0);
 
   ValueFlow := TMeterValue.GetExistedMeterValueBool(HashValueFlow, IsExisted, UUID, Name);
-  if IsExisted = 0 then
+  if (IsExisted = 0) or (not IsMassFlowValue(ValueFlow)) then
     ValueFlow.SetAsMassFlow;
+  if not IsValidScaleNumber(ValueFlow.Value) then
+    ValueFlow.SetValue(0);
 end;
 
 function TScale.GetMeterKind: EMeterKind;
