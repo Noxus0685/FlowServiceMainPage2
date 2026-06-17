@@ -4436,6 +4436,33 @@ var
   DeltaSeconds: Double;
   FlowUnit: string;
 
+  procedure UpdateScaleChannels(AChannels: TObjectList<TChannel>);
+  var
+    I: Integer;
+    Channel: TChannel;
+    WeightValue: Double;
+  begin
+    if AChannels = nil then
+      Exit;
+
+    WeightValue := AWorkTable.DisplayWeight;
+    for I := 0 to AChannels.Count - 1 do
+    begin
+      Channel := AChannels[I];
+      if (Channel = nil) or (Channel.Meter = nil) or (not Channel.Meter.IsScale) then
+        Continue;
+
+      Channel.ValueSec := WeightValue;
+      Channel.ValueResult := WeightValue;
+      if Channel.Meter.ValueQuantity <> nil then
+        Channel.Meter.ValueQuantity.SetValue(WeightValue);
+      if Channel.Meter.ValueFlow <> nil then
+        Channel.Meter.ValueFlow.SetValue(FlowPerSecond);
+      if Channel.ValueInterface <> nil then
+        Channel.ValueInterface.SetValue(WeightValue);
+    end;
+  end;
+
   function FlowToBasePerSecond(const AFlow: Double; const AUnitName: string): Double;
   begin
     if SameText(AUnitName, 'л/мин') or SameText(AUnitName, 'кг/мин') then
@@ -4477,6 +4504,8 @@ begin
 
   AWorkTable.Value := AWorkTable.Value + FlowPerSecond * DeltaSeconds;
   AWorkTable.ActiveScale.CurentValue := AWorkTable.Value;
+  UpdateScaleChannels(AWorkTable.EtalonChannels);
+  UpdateScaleChannels(AWorkTable.DeviceChannels);
 end;
 
 procedure TFrameMainTable.SetValues;
