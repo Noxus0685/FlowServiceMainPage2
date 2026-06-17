@@ -242,6 +242,7 @@ type
 
     procedure InitMeterValues;
     procedure SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string;const AValue: TMeterValue);
+    procedure EnsureMeterMatchesDevice(const AWorkTable: TWorkTable);
 
     procedure SetValueImp(const AValue: TMeterValue);
     procedure SetValueImpTotal(const AValue: TMeterValue);
@@ -947,10 +948,15 @@ begin
     Exit;
 
   AChannel.DeviceUUID := ADevice.UUID;
+  if AChannel.Meter <> nil then
+  begin
+    AChannel.Meter.Device := ADevice;
+    AChannel.Meter.DeviceUUID := ADevice.UUID;
+  end;
+  AChannel.EnsureMeterMatchesDevice(nil);
+
   if AChannel.FlowMeter <> nil then
   begin
-    AChannel.FlowMeter.Device := ADevice;
-    AChannel.FlowMeter.DeviceUUID := ADevice.UUID;
     AChannel.FlowMeter.UpdateByDevice;
   end;
 
@@ -986,12 +992,12 @@ begin
   if (AChannel = nil) or (ARepo = nil) then
     Exit;
 
-  if AChannel.FlowMeter = nil then
+  if AChannel.Meter = nil then
     AChannel.RecreateFlowMeter(AWorkTable);
 
   DeviceUUID := Trim(AChannel.DeviceUUID);
-  if (DeviceUUID = '') and (AChannel.FlowMeter <> nil) then
-    DeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+  if (DeviceUUID = '') and (AChannel.Meter <> nil) then
+    DeviceUUID := Trim(AChannel.Meter.DeviceUUID);
   if DeviceUUID = '' then
     DeviceUUID := TGUID.NewGuid.ToString;
 
@@ -1036,6 +1042,8 @@ begin
   if (AMode <> dcmGridPlaceholder) or WasCreated or WasPlaceholder then
     FillDeviceFromChannel(Result, AChannel, AMode);
   SyncChannelAndFlowMeter(Result, AChannel);
+  AChannel.EnsureMeterMatchesDevice(AWorkTable);
+  AChannel.RebindFlowMeterValues(AWorkTable);
 
   if AMode = dcmMeasurementPromoted then
   begin
@@ -1238,6 +1246,7 @@ begin
     Exit;
 
   FMeter.Init(DeviceUUID);
+  EnsureMeterMatchesDevice(nil);
   if (FMeter.Device <> nil) then
   begin
     FOutputSet.FromDefault(IntToOutputSet(FMeter.Device.OutputSet));
@@ -1246,11 +1255,44 @@ begin
   end;
 end;
                                          {TODO -oOwner -cGeneral : ActionItem}
+procedure TChannel.EnsureMeterMatchesDevice(const AWorkTable: TWorkTable);
+var
+  Device: TDevice;
+  NeedScale: Boolean;
+  NeedRecreate: Boolean;
+begin
+  Device := nil;
+  if FMeter <> nil then
+    Device := FMeter.Device;
+
+  if Device = nil then
+  begin
+    if FMeter = nil then
+      FMeter := TFlowMeter.Create;
+    Exit;
+  end;
+
+  NeedScale := IsScaleDevice(Device);
+  NeedRecreate := (FMeter = nil) or
+    (NeedScale and not (FMeter is TScale)) or
+    ((not NeedScale) and not (FMeter is TFlowMeter));
+
+  if not NeedRecreate then
+    Exit;
+
+  FreeAndNil(FMeter);
+  FMeter := CreateMeterByDevice(Device);
+  FMeter.Name := 'Прибор ' + FName;
+  RebindFlowMeterValues(AWorkTable);
+end;
+
 { Rebinds FlowMeter value references to channel and work table meter values. }
 procedure TChannel.RebindFlowMeterValues(const AWorkTable: TWorkTable);
 begin
   if (FMeter = nil) then
     Exit;
+
+  EnsureMeterMatchesDevice(AWorkTable);
 
   if Scale <> nil then
   begin
@@ -1375,6 +1417,21 @@ begin
 
   if FlowMeter <> nil then
     FlowMeter.CreateDevice;
+
+  if (FMeter.Device = nil) and (DataManager <> nil) and
+     (DataManager.ActiveDeviceRepo <> nil) then
+  begin
+    ADevice := TDeviceCreationService.CreateDevice(
+      DataManager.ActiveDeviceRepo,
+      dcmGridPlaceholder,
+      nil,
+      FMeter.DeviceUUID
+    );
+    if ADevice <> nil then
+      FMeter.Device := ADevice;
+  end;
+
+  EnsureMeterMatchesDevice(nil);
 
   end;
 
@@ -2835,6 +2892,8 @@ var
       Exit;
 
     AChannel.FMeter.Init;
+    AChannel.EnsureMeterMatchesDevice(Self);
+    AChannel.RebindFlowMeterValues(Self);
   end;
 
 begin

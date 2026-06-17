@@ -3312,6 +3312,7 @@ begin
         if AChannel.FlowMeter <> nil then
           AChannel.FlowMeter.UpdateByDevice;
       end;
+      AChannel.RebindFlowMeterValues(FActiveWorkTable);
 
       MarkChannelDeviceModified(AChannel);
       SyncChannelsWithSameDeviceUUID(AChannel, OldDeviceUUID);
@@ -3346,6 +3347,7 @@ begin
         if AChannel.Meter <> nil then
         begin
           AChannel.Meter.Device := ADevice;
+          AChannel.RebindFlowMeterValues(FActiveWorkTable);
           if AChannel.FlowMeter <> nil then
             AChannel.FlowMeter.UpdateByDevice;
         end;
@@ -4067,8 +4069,11 @@ begin
     if not SameText(Trim(Ch.DeviceUUID), OldUUID) then
       Continue;
 
-    if Ch.FlowMeter <> nil then
-      Ch.FlowMeter.Init(AChangedChannel.DeviceUUID);
+    if (Ch.Meter <> nil) and (AChangedChannel.Meter <> nil) then
+    begin
+      Ch.Meter.Init(AChangedChannel.DeviceUUID);
+      Ch.Meter.Device := AChangedChannel.Meter.Device;
+    end;
 
     Ch.DeviceUUID := AChangedChannel.DeviceUUID;
     Ch.TypeUUID := AChangedChannel.TypeUUID;
@@ -4082,6 +4087,7 @@ begin
 
     if Ch.FlowMeter <> nil then
       Ch.FlowMeter.UpdateByDevice;
+    Ch.RebindFlowMeterValues(FActiveWorkTable);
 
     MarkChannelDeviceModified(Ch);
   end;
