@@ -1880,9 +1880,9 @@ begin
   else if Scale <> nil then
   begin
     if Scale.ValueQuantity <> nil then
-      Scale.ValueQuantity.SetValue(FValueResult);
+      Scale.ValueQuantity.SetValue();
     if Scale.ValueFlow <> nil then
-      Scale.ValueFlow.SetValue(FValueSec);
+      Scale.ValueFlow.SetValue();
   end;
 end;
 
