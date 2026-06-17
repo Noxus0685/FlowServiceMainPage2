@@ -547,7 +547,6 @@ type
     function IsWeightsCategory: Boolean;
     procedure ApplyWeightsOutputRestriction;
     procedure PopulateOutputTypeCombo(const ASelectedOutputType: Integer);
-    function Round3(const AValue: Double): Double;
 
   public
 
@@ -5883,8 +5882,8 @@ begin
     {---------------------------------}
     if ACol = StringColumnPointFlowRate.Index then
     begin
-      P.FlowRate := Round3(NormalizeFloatInput(S));
-      V := Round3(P.FlowRate * Qmax * P.LimitTime);
+      P.FlowRate := (NormalizeFloatInput(S));
+      V := (P.FlowRate * Qmax * P.LimitTime);
       P.LimitVolume := V;
     end
 
@@ -5910,7 +5909,7 @@ begin
     {---------------------------------}
     else if ACol = StringColumnPointVolume.Index then
     begin
-      V := Round3(NormalizeFloatInput(S));
+      V := (NormalizeFloatInput(S));
       P.LimitVolume := V;
 
       if (V > 0) and (Q > 0) then
@@ -6641,7 +6640,7 @@ begin
       if Q <= 0 then
         Value := '—'
       else
-        Value := FormatFloat('0.###', Round3(FType.FromBaseUnits(Q)));
+        Value := FormatFloat('0.###', (FType.FromBaseUnits(Q)));
     end
 
     {---------------------------}
@@ -6650,10 +6649,10 @@ begin
     else if ACol = StringColumnPointVolume.Index then
     begin
       if P.LimitVolume > 0 then
-        Value := FormatFloat('0.###', Round3(P.LimitVolume))
+        Value := FormatFloat('0.###', (P.LimitVolume))
 
       else if (Q > 0) and (P.LimitTime > 0) then
-        Value := FormatFloat('0.###', Round3(Q * P.LimitTime / 3.6))
+        Value := FormatFloat('0.###', (Q * P.LimitTime / 3.6))
 
       else
         Value := '—';
@@ -7202,10 +7201,7 @@ begin
     cbCoefViewType.ItemIndex := 0;
 end;
 
-function TFormTypeEditor.Round3(const AValue: Double): Double;
-begin
-  Result := Round(AValue * 1000) / 1000;
-end;
+
 
 function TFormTypeEditor.IsWeightsCategory: Boolean;
 begin
