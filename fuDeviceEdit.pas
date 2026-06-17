@@ -323,6 +323,7 @@ type
     { Private declarations }
      FDevice: TDevice;
      FOriginalDevice: TDevice;
+     FLoadedDeviceSnapshot: TDevice;
      FInitialTypeUUID: string;
      FTypeChangedDuringEdit: Boolean;
      FDeviceChangedOnClose: Boolean;
@@ -996,6 +997,7 @@ procedure TFormDeviceEditor.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
       FreeAndNil(FDevice);      // уничтожаем клон
+      FreeAndNil(FLoadedDeviceSnapshot);
       FOriginalDevice := nil;
 end;
 
@@ -1600,6 +1602,7 @@ begin
     FPointSortAscending := True;
 
     FreeAndNil(FDevice);
+    FreeAndNil(FLoadedDeviceSnapshot);
     FDeviceType := nil;
 
     if ADevice <> nil then
@@ -1648,6 +1651,9 @@ begin
 
     UpdateUIFromDevice;
     UpdateCoefsGrid;
+
+    if FOriginalDevice <> nil then
+      FLoadedDeviceSnapshot := FDevice.Clone;
 
   finally
     FLoading := False;
@@ -3868,83 +3874,86 @@ var
   I: Integer;
   OldPoint: TDevicePoint;
   NewPoint: TDevicePoint;
+  CompareDevice: TDevice;
 begin
   if ModalResult <> mrNone then
     Exit(FDeviceChangedOnClose);
 
   Result := FOriginalDevice = nil;
 
-  if Result or (FOriginalDevice = nil) or (FDevice = nil) then
+  if Result or (FLoadedDeviceSnapshot = nil) or (FDevice = nil) then
     Exit;
 
+  CompareDevice := FLoadedDeviceSnapshot;
+
   Result :=
-    (FOriginalDevice.DeviceTypeUUID <> FDevice.DeviceTypeUUID) or
-    (FOriginalDevice.DeviceTypeName <> FDevice.DeviceTypeName) or
-    (FOriginalDevice.DeviceTypeRepo <> FDevice.DeviceTypeRepo) or
-    (FOriginalDevice.RepoTypeName <> FDevice.RepoTypeName) or
-    (FOriginalDevice.RepoTypeUUID <> FDevice.RepoTypeUUID) or
-    (FOriginalDevice.RepoDeviceName <> FDevice.RepoDeviceName) or
-    (FOriginalDevice.RepoDeviceUUID <> FDevice.RepoDeviceUUID) or
-    (FOriginalDevice.Name <> FDevice.Name) or
-    (FOriginalDevice.SerialNumber <> FDevice.SerialNumber) or
-    (FOriginalDevice.Modification <> FDevice.Modification) or
-    (FOriginalDevice.Manufacturer <> FDevice.Manufacturer) or
-    (FOriginalDevice.Owner <> FDevice.Owner) or
-    (FOriginalDevice.ReestrNumber <> FDevice.ReestrNumber) or
-    (FOriginalDevice.Category <> FDevice.Category) or
-    (FOriginalDevice.CategoryName <> FDevice.CategoryName) or
-    (FOriginalDevice.AccuracyClass <> FDevice.AccuracyClass) or
-    (FOriginalDevice.RegDate <> FDevice.RegDate) or
-    (FOriginalDevice.ValidityDate <> FDevice.ValidityDate) or
-    (FOriginalDevice.DateOfManufacture <> FDevice.DateOfManufacture) or
-    (FOriginalDevice.IVI <> FDevice.IVI) or
-    (FOriginalDevice.DN <> FDevice.DN) or
-    (not SameValue(FOriginalDevice.Qmax, FDevice.Qmax)) or
-    (not SameValue(FOriginalDevice.Qmin, FDevice.Qmin)) or
-    (not SameValue(FOriginalDevice.Qnom, FDevice.Qnom)) or
-    (not SameValue(FOriginalDevice.Qtr, FDevice.Qtr)) or
-    (not SameValue(FOriginalDevice.RangeDynamic, FDevice.RangeDynamic)) or
-    (FOriginalDevice.Temp <> FDevice.Temp) or
-    (not SameValue(FOriginalDevice.Error, FDevice.Error)) or
-    (FOriginalDevice.VerificationMethod <> FDevice.VerificationMethod) or
-    (FOriginalDevice.ProcedureName <> FDevice.ProcedureName) or
-    (FOriginalDevice.MeasuredDimension <> FDevice.MeasuredDimension) or
-    (FOriginalDevice.Units <> FDevice.Units) or
-    (FOriginalDevice.OutputType <> FDevice.OutputType) or
-    (FOriginalDevice.DimensionCoef <> FDevice.DimensionCoef) or
-    (FOriginalDevice.OutputSet <> FDevice.OutputSet) or
-    (FOriginalDevice.Freq <> FDevice.Freq) or
-    (not SameValue(FOriginalDevice.Coef, FDevice.Coef)) or
-    (not SameValue(FOriginalDevice.FreqFlowRate, FDevice.FreqFlowRate)) or
-    (FOriginalDevice.VoltageRange <> FDevice.VoltageRange) or
-    (not SameValue(FOriginalDevice.VoltageQminRate, FDevice.VoltageQminRate)) or
-    (not SameValue(FOriginalDevice.VoltageQmaxRate, FDevice.VoltageQmaxRate)) or
-    (FOriginalDevice.CurrentRange <> FDevice.CurrentRange) or
-    (not SameValue(FOriginalDevice.CurrentQminRate, FDevice.CurrentQminRate)) or
-    (not SameValue(FOriginalDevice.CurrentQmaxRate, FDevice.CurrentQmaxRate)) or
-    (FOriginalDevice.ProtocolName <> FDevice.ProtocolName) or
-    (FOriginalDevice.BaudRate <> FDevice.BaudRate) or
-    (FOriginalDevice.Parity <> FDevice.Parity) or
-    (FOriginalDevice.DeviceAddress <> FDevice.DeviceAddress) or
-    (FOriginalDevice.InputType <> FDevice.InputType) or
-    (FOriginalDevice.SpillageType <> FDevice.SpillageType) or
-    (FOriginalDevice.SpillageStop <> FDevice.SpillageStop) or
-    (FOriginalDevice.Repeats <> FDevice.Repeats) or
-    (FOriginalDevice.RepeatsProtocol <> FDevice.RepeatsProtocol) or
-    (FOriginalDevice.Comment <> FDevice.Comment) or
-    (FOriginalDevice.Description <> FDevice.Description) or
-    (FOriginalDevice.ReportingForm <> FDevice.ReportingForm);
+    (CompareDevice.DeviceTypeUUID <> FDevice.DeviceTypeUUID) or
+    (CompareDevice.DeviceTypeName <> FDevice.DeviceTypeName) or
+    (CompareDevice.DeviceTypeRepo <> FDevice.DeviceTypeRepo) or
+    (CompareDevice.RepoTypeName <> FDevice.RepoTypeName) or
+    (CompareDevice.RepoTypeUUID <> FDevice.RepoTypeUUID) or
+    (CompareDevice.RepoDeviceName <> FDevice.RepoDeviceName) or
+    (CompareDevice.RepoDeviceUUID <> FDevice.RepoDeviceUUID) or
+    (CompareDevice.Name <> FDevice.Name) or
+    (CompareDevice.SerialNumber <> FDevice.SerialNumber) or
+    (CompareDevice.Modification <> FDevice.Modification) or
+    (CompareDevice.Manufacturer <> FDevice.Manufacturer) or
+    (CompareDevice.Owner <> FDevice.Owner) or
+    (CompareDevice.ReestrNumber <> FDevice.ReestrNumber) or
+    (CompareDevice.Category <> FDevice.Category) or
+    (CompareDevice.CategoryName <> FDevice.CategoryName) or
+    (CompareDevice.AccuracyClass <> FDevice.AccuracyClass) or
+    (CompareDevice.RegDate <> FDevice.RegDate) or
+    (CompareDevice.ValidityDate <> FDevice.ValidityDate) or
+    (CompareDevice.DateOfManufacture <> FDevice.DateOfManufacture) or
+    (CompareDevice.IVI <> FDevice.IVI) or
+    (CompareDevice.DN <> FDevice.DN) or
+    (not SameValue(CompareDevice.Qmax, FDevice.Qmax)) or
+    (not SameValue(CompareDevice.Qmin, FDevice.Qmin)) or
+    (not SameValue(CompareDevice.Qnom, FDevice.Qnom)) or
+    (not SameValue(CompareDevice.Qtr, FDevice.Qtr)) or
+    (not SameValue(CompareDevice.RangeDynamic, FDevice.RangeDynamic)) or
+    (CompareDevice.Temp <> FDevice.Temp) or
+    (not SameValue(CompareDevice.Error, FDevice.Error)) or
+    (CompareDevice.VerificationMethod <> FDevice.VerificationMethod) or
+    (CompareDevice.ProcedureName <> FDevice.ProcedureName) or
+    (CompareDevice.MeasuredDimension <> FDevice.MeasuredDimension) or
+    (CompareDevice.Units <> FDevice.Units) or
+    (CompareDevice.OutputType <> FDevice.OutputType) or
+    (CompareDevice.DimensionCoef <> FDevice.DimensionCoef) or
+    (CompareDevice.OutputSet <> FDevice.OutputSet) or
+    (CompareDevice.Freq <> FDevice.Freq) or
+    (not SameValue(CompareDevice.Coef, FDevice.Coef)) or
+    (not SameValue(CompareDevice.FreqFlowRate, FDevice.FreqFlowRate)) or
+    (CompareDevice.VoltageRange <> FDevice.VoltageRange) or
+    (not SameValue(CompareDevice.VoltageQminRate, FDevice.VoltageQminRate)) or
+    (not SameValue(CompareDevice.VoltageQmaxRate, FDevice.VoltageQmaxRate)) or
+    (CompareDevice.CurrentRange <> FDevice.CurrentRange) or
+    (not SameValue(CompareDevice.CurrentQminRate, FDevice.CurrentQminRate)) or
+    (not SameValue(CompareDevice.CurrentQmaxRate, FDevice.CurrentQmaxRate)) or
+    (CompareDevice.ProtocolName <> FDevice.ProtocolName) or
+    (CompareDevice.BaudRate <> FDevice.BaudRate) or
+    (CompareDevice.Parity <> FDevice.Parity) or
+    (CompareDevice.DeviceAddress <> FDevice.DeviceAddress) or
+    (CompareDevice.InputType <> FDevice.InputType) or
+    (CompareDevice.SpillageType <> FDevice.SpillageType) or
+    (CompareDevice.SpillageStop <> FDevice.SpillageStop) or
+    (CompareDevice.Repeats <> FDevice.Repeats) or
+    (CompareDevice.RepeatsProtocol <> FDevice.RepeatsProtocol) or
+    (CompareDevice.Comment <> FDevice.Comment) or
+    (CompareDevice.Description <> FDevice.Description) or
+    (CompareDevice.ReportingForm <> FDevice.ReportingForm);
 
   if Result then
     Exit;
 
-  Result := FOriginalDevice.Points.Count <> FDevice.Points.Count;
+  Result := CompareDevice.Points.Count <> FDevice.Points.Count;
   if Result then
     Exit;
 
   for I := 0 to FDevice.Points.Count - 1 do
   begin
-    OldPoint := FOriginalDevice.Points[I];
+    OldPoint := CompareDevice.Points[I];
     NewPoint := FDevice.Points[I];
     Result :=
       (OldPoint.Name <> NewPoint.Name) or
