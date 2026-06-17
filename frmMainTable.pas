@@ -958,7 +958,7 @@ end;
 
 procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
 var
-  Meter: TFlowMeter;
+  Meter: TMeter;
 begin
   if FFrameFlowMeterProperties = nil then
     Exit;
@@ -971,10 +971,10 @@ begin
 
     if (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) and
        (FActiveWorkTable.DeviceChannels[ARow] <> nil) then
-      Meter := FActiveWorkTable.DeviceChannels[ARow].FlowMeter;
+      Meter := FActiveWorkTable.DeviceChannels[ARow].Meter;
   end;
 
-  FFrameFlowMeterProperties.FlowMeter := Meter;
+  FFrameFlowMeterProperties.Meter := Meter;
 end;
 
 procedure TFrameMainTable.FlowMeterPropertiesChanged(Sender: TObject);

@@ -25,7 +25,7 @@ uses
 type
   TFrameFlowMeterProperties = class(TFrame)
   private
-    FFlowMeter: TFlowMeter;
+    FMeter: TMeter;
     FIsLoading: Boolean;
     FOnChange: TNotifyEvent;
 
@@ -79,8 +79,8 @@ type
     procedure NotifyChanged;
   public
     constructor Create(AOwner: TComponent); override;
-    procedure SetFlowMeter(AFlowMeter: TFlowMeter);
-    property FlowMeter: TFlowMeter read FFlowMeter write SetFlowMeter;
+    procedure SetMeter(AMeter: TMeter);
+    property Meter: TMeter read FMeter write SetMeter;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
@@ -263,9 +263,9 @@ begin
   Divider.Stored := False;
 end;
 
-procedure TFrameFlowMeterProperties.SetFlowMeter(AFlowMeter: TFlowMeter);
+procedure TFrameFlowMeterProperties.SetMeter(AMeter: TMeter);
 begin
-  FFlowMeter := AFlowMeter;
+  FMeter := AMeter;
   UpdateControls;
 end;
 
@@ -278,8 +278,8 @@ end;
 function TFrameFlowMeterProperties.GetFlowDimName: string;
 begin
   Result := '';
-  if (FFlowMeter <> nil) and (FFlowMeter.ValueFlow <> nil) then
-    Result := Trim(FFlowMeter.ValueFlow.GetDimName);
+  if (FMeter <> nil) and (FMeter.ValueFlow <> nil) then
+    Result := Trim(FMeter.ValueFlow.GetDimName);
   if Result = '' then
     Result := 'ед.';
 end;
@@ -287,8 +287,8 @@ end;
 function TFrameFlowMeterProperties.GetQuantityDimName: string;
 begin
   Result := '';
-  if (FFlowMeter <> nil) and (FFlowMeter.ValueQuantity <> nil) then
-    Result := Trim(FFlowMeter.ValueQuantity.GetDimName);
+  if (FMeter <> nil) and (FMeter.ValueQuantity <> nil) then
+    Result := Trim(FMeter.ValueQuantity.GetDimName);
   if Result = '' then
     Result := 'ед.';
 end;
@@ -337,20 +337,27 @@ end;
 procedure TFrameFlowMeterProperties.UpdateControls;
 var
   Enabled: Boolean;
+  FlowMeter: TFlowMeter;
 begin
   FIsLoading := True;
   try
     UpdateHeaders;
 
-    Enabled := FFlowMeter <> nil;
+    Enabled := FMeter <> nil;
+    if FMeter is TFlowMeter then
+      FlowMeter := TFlowMeter(FMeter)
+    else
+      FlowMeter := nil;
+
     EditDeviceName.Enabled := Enabled;
     EditDeviceTypeName.Enabled := Enabled;
     EditSerialNumber.Enabled := Enabled;
     ComboOutputType.Enabled := Enabled;
-    EditFlowMax.Enabled := Enabled;
-    EditFlowMin.Enabled := Enabled;
-    EditQuantityMax.Enabled := Enabled;
-    EditQuantityMin.Enabled := Enabled;
+    CategoryRanges.Visible := FlowMeter <> nil;
+    EditFlowMax.Enabled := FlowMeter <> nil;
+    EditFlowMin.Enabled := FlowMeter <> nil;
+    EditQuantityMax.Enabled := FlowMeter <> nil;
+    EditQuantityMin.Enabled := FlowMeter <> nil;
 
     if not Enabled then
     begin
@@ -365,15 +372,25 @@ begin
       Exit;
     end;
 
-    EditDeviceName.Text := Trim(FFlowMeter.DeviceName);
-    EditDeviceTypeName.Text := Trim(FFlowMeter.DeviceTypeName);
-    EditSerialNumber.Text := Trim(FFlowMeter.SerialNumber);
-    ComboOutputType.ItemIndex := GetOutputTypeIndex(FFlowMeter.OutputType);
+    EditDeviceName.Text := Trim(FMeter.DeviceName);
+    EditDeviceTypeName.Text := Trim(FMeter.DeviceTypeName);
+    EditSerialNumber.Text := Trim(FMeter.SerialNumber);
+    ComboOutputType.ItemIndex := GetOutputTypeIndex(FMeter.OutputType);
 
-    EditFlowMax.Text := FloatToStr(FFlowMeter.FlowMax);
-    EditFlowMin.Text := FloatToStr(FFlowMeter.FlowMin);
-    EditQuantityMax.Text := FloatToStr(FFlowMeter.QuantityMax);
-    EditQuantityMin.Text := FloatToStr(FFlowMeter.QuantityMin);
+    if FlowMeter <> nil then
+    begin
+      EditFlowMax.Text := FloatToStr(FlowMeter.FlowMax);
+      EditFlowMin.Text := FloatToStr(FlowMeter.FlowMin);
+      EditQuantityMax.Text := FloatToStr(FlowMeter.QuantityMax);
+      EditQuantityMin.Text := FloatToStr(FlowMeter.QuantityMin);
+    end
+    else
+    begin
+      EditFlowMax.Text := '';
+      EditFlowMin.Text := '';
+      EditQuantityMax.Text := '';
+      EditQuantityMin.Text := '';
+    end;
   finally
     FIsLoading := False;
   end;
@@ -383,12 +400,12 @@ procedure TFrameFlowMeterProperties.EditDeviceNameExit(Sender: TObject);
 var
   S: string;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or (FMeter = nil) then
     Exit;
   S := Trim(EditDeviceName.Text);
-  if FFlowMeter.DeviceName = S then
+  if FMeter.DeviceName = S then
     Exit;
-  FFlowMeter.DeviceName := S;
+  FMeter.DeviceName := S;
   EditDeviceName.Text := S;
   NotifyChanged;
 end;
@@ -397,12 +414,12 @@ procedure TFrameFlowMeterProperties.EditDeviceTypeNameExit(Sender: TObject);
 var
   S: string;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or (FMeter = nil) then
     Exit;
   S := Trim(EditDeviceTypeName.Text);
-  if FFlowMeter.DeviceTypeName = S then
+  if FMeter.DeviceTypeName = S then
     Exit;
-  FFlowMeter.DeviceTypeName := S;
+  FMeter.DeviceTypeName := S;
   EditDeviceTypeName.Text := S;
   NotifyChanged;
 end;
@@ -411,75 +428,87 @@ procedure TFrameFlowMeterProperties.EditSerialNumberExit(Sender: TObject);
 var
   S: string;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or (FMeter = nil) then
     Exit;
   S := Trim(EditSerialNumber.Text);
-  if FFlowMeter.SerialNumber = S then
+  if FMeter.SerialNumber = S then
     Exit;
-  FFlowMeter.SerialNumber := S;
+  FMeter.SerialNumber := S;
   EditSerialNumber.Text := S;
   NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.ComboOutputTypeChange(Sender: TObject);
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or (FMeter = nil) then
     Exit;
 
   if ComboOutputType.ItemIndex >= 0 then
   begin
-    if FFlowMeter.OutputType = GetOutputTypeByIndex(ComboOutputType.ItemIndex) then
+    if FMeter.OutputType = GetOutputTypeByIndex(ComboOutputType.ItemIndex) then
       Exit;
-    FFlowMeter.OutputType := GetOutputTypeByIndex(ComboOutputType.ItemIndex);
+    FMeter.OutputType := GetOutputTypeByIndex(ComboOutputType.ItemIndex);
     NotifyChanged;
   end;
 end;
 
 procedure TFrameFlowMeterProperties.EditFlowMaxExit(Sender: TObject);
+var
+  FlowMeter: TFlowMeter;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or not (FMeter is TFlowMeter) then
     Exit;
 
-  if FFlowMeter.FlowMax = NormalizeFloatInput(EditFlowMax.Text) then
+  FlowMeter := TFlowMeter(FMeter);
+  if FlowMeter.FlowMax = NormalizeFloatInput(EditFlowMax.Text) then
     Exit;
-  FFlowMeter.FlowMax := NormalizeFloatInput(EditFlowMax.Text);
-  EditFlowMax.Text := FloatToStr(FFlowMeter.FlowMax);
+  FlowMeter.FlowMax := NormalizeFloatInput(EditFlowMax.Text);
+  EditFlowMax.Text := FloatToStr(FlowMeter.FlowMax);
   NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditFlowMinExit(Sender: TObject);
+var
+  FlowMeter: TFlowMeter;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or not (FMeter is TFlowMeter) then
     Exit;
 
-  if FFlowMeter.FlowMin = NormalizeFloatInput(EditFlowMin.Text) then
+  FlowMeter := TFlowMeter(FMeter);
+  if FlowMeter.FlowMin = NormalizeFloatInput(EditFlowMin.Text) then
     Exit;
-  FFlowMeter.FlowMin := NormalizeFloatInput(EditFlowMin.Text);
-  EditFlowMin.Text := FloatToStr(FFlowMeter.FlowMin);
+  FlowMeter.FlowMin := NormalizeFloatInput(EditFlowMin.Text);
+  EditFlowMin.Text := FloatToStr(FlowMeter.FlowMin);
   NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditQuantityMaxExit(Sender: TObject);
+var
+  FlowMeter: TFlowMeter;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or not (FMeter is TFlowMeter) then
     Exit;
 
-  if FFlowMeter.QuantityMax = NormalizeFloatInput(EditQuantityMax.Text) then
+  FlowMeter := TFlowMeter(FMeter);
+  if FlowMeter.QuantityMax = NormalizeFloatInput(EditQuantityMax.Text) then
     Exit;
-  FFlowMeter.QuantityMax := NormalizeFloatInput(EditQuantityMax.Text);
-  EditQuantityMax.Text := FloatToStr(FFlowMeter.QuantityMax);
+  FlowMeter.QuantityMax := NormalizeFloatInput(EditQuantityMax.Text);
+  EditQuantityMax.Text := FloatToStr(FlowMeter.QuantityMax);
   NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditQuantityMinExit(Sender: TObject);
+var
+  FlowMeter: TFlowMeter;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or not (FMeter is TFlowMeter) then
     Exit;
 
-  if FFlowMeter.QuantityMin = NormalizeFloatInput(EditQuantityMin.Text) then
+  FlowMeter := TFlowMeter(FMeter);
+  if FlowMeter.QuantityMin = NormalizeFloatInput(EditQuantityMin.Text) then
     Exit;
-  FFlowMeter.QuantityMin := NormalizeFloatInput(EditQuantityMin.Text);
-  EditQuantityMin.Text := FloatToStr(FFlowMeter.QuantityMin);
+  FlowMeter.QuantityMin := NormalizeFloatInput(EditQuantityMin.Text);
+  EditQuantityMin.Text := FloatToStr(FlowMeter.QuantityMin);
   NotifyChanged;
 end;
 
