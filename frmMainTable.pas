@@ -4521,6 +4521,20 @@ var
   I: Integer;
   DeviceChannel: TChannel;
   EtalonChannel: TChannel;
+
+  procedure UpdateScaleImitationValue(AChannel: TChannel);
+  begin
+    if AChannel = nil then
+      Exit;
+
+    if AChannel.ValueSec <= 0 then
+      AChannel.ValueSec := 1
+    else
+      AChannel.ValueSec := AChannel.ValueSec + 0.05;
+
+    if AChannel.ValueSec < 0 then
+      AChannel.ValueSec := 0;
+  end;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4551,6 +4565,7 @@ begin
 
     if EtalonChannel.Meter.IsScale then
     begin
+      UpdateScaleImitationValue(EtalonChannel);
       if EtalonChannel.Meter.ValueFlow <> nil then
         EtalonChannel.Meter.ValueFlow.SetValue(EtalonChannel.ValueSec);
       if EtalonChannel.Meter.ValueQuantity <> nil then
@@ -4577,6 +4592,7 @@ begin
 
     if DeviceChannel.Meter.IsScale then
     begin
+      UpdateScaleImitationValue(DeviceChannel);
       if DeviceChannel.Meter.ValueFlow <> nil then
         DeviceChannel.Meter.ValueFlow.SetValue(DeviceChannel.ValueSec);
       if DeviceChannel.Meter.ValueQuantity <> nil then
