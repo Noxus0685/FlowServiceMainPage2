@@ -446,7 +446,7 @@ begin
   HeaderDivider.Stored := False;
 
   CategoryFreqPulse := AddCategory('Частотно-импульсный сигнал');
-  ComboOutputSet := CreateComboBox(['Авто', 'Пассивный', 'Активный', 'Универсальный', 'Емкостной']);
+  ComboOutputSet := CreateComboBox(['Авто', 'Пассивный', 'Активный', 'Активный высокоомный', 'Емкостной']);
   AddPropertyRow(CategoryFreqPulse, 'Тип выхода прибора', CreateComboWithIndicator(ComboOutputSet, IndicatorOutputSet));
   ComboOutputSet.OnChange := HandleOutputSetChange;
   ComboSyncMode := CreateComboBox(['Выкл', 'По фронту', 'По фронту + время']);

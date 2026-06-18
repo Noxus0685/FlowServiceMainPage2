@@ -1526,7 +1526,7 @@ begin
   end;
 
   if HasRestrictions and (TimeByLimit > 0) then
-    Result := Ceil(TimeByLimit);
+    Result := Ceil(TimeByLimit)+5; // Аварийная добавка к измерению?!
 end;
 
 function TMeasurementRun.SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
