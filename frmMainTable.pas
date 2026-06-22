@@ -631,6 +631,7 @@ type
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
   FLastClickTick: Cardinal;
+  FLastPopupGrid: TGrid;
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
@@ -2427,7 +2428,7 @@ begin
   if ActionAddEtalonChannel <> nil then
     ActionAddEtalonChannel.Enabled := CanEdit;
   if ActionOpenDeviceSelect <> nil then
-    ActionOpenDeviceSelect.Enabled := HasDeviceRow;
+    ActionOpenDeviceSelect.Enabled := HasDeviceRow or HasEtalonRow;
   if ActionMeterValueProperties <> nil then
     ActionMeterValueProperties.Enabled := HasDeviceRow;
 
@@ -2478,11 +2479,13 @@ end;
 
 procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
 begin
+  FLastPopupGrid := GridDevices;
   UpdateGridPopupActions;
 end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
 begin
+  FLastPopupGrid := GridEtalons;
   UpdateGridPopupActions;
 end;
 
@@ -3339,14 +3342,27 @@ begin
   if WorkTable = nil then
     Exit;
 
-  Row := GridDevices.Row;
-  if (Row < 0) or (Row >= WorkTable.DeviceChannels.Count) then
-    Exit;
+  if FLastPopupGrid = GridEtalons then
+  begin
+    Row := GridEtalons.Row;
+    if (Row < 0) or (Row >= WorkTable.EtalonChannels.Count) then
+      Exit;
 
-  Ch := WorkTable.DeviceChannels[Row];
+    Ch := WorkTable.EtalonChannels[Row];
+  end
+  else
+  begin
+    Row := GridDevices.Row;
+    if (Row < 0) or (Row >= WorkTable.DeviceChannels.Count) then
+      Exit;
+
+    Ch := WorkTable.DeviceChannels[Row];
+  end;
+
   if Ch = nil then
     Exit;
 
+  FLastPopupGrid := nil;
   SelectDeviceForChannel(Ch);
 end;
 
