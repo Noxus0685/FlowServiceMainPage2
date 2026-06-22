@@ -1024,7 +1024,8 @@ begin
         FOriginalDevice.Assign(FDevice, True);
         FOriginalDevice.UUID := OldUUID;
         FOriginalDevice.State := osModified;
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+        if not AppServices.DataManager.ActiveDeviceRepo.UpdateDevice(FOriginalDevice) then
+          raise Exception.Create('Ошибка сохранения прибора');
         if not FTypeChangedDuringEdit then
           WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
       end
