@@ -252,6 +252,7 @@ type
     { Public declarations }
     SelectedType:   TDeviceType;
     procedure SelectType (AType: TDeviceType);
+    procedure SelectTypeByUUID(const AUUID: string);
     destructor Destroy; override;
   end;
 
@@ -2735,14 +2736,57 @@ begin
 
   {---------------- Выбираем строку в отфильтрованном гриде ----------------}
   for I := 0 to FDevFilteredTypes.Count - 1 do
-    if FDevFilteredTypes[I] = AType then
+    if (FDevFilteredTypes[I] = AType) or
+       ((AType.UUID <> '') and SameText(FDevFilteredTypes[I].UUID, AType.UUID)) then
     begin
       GridTypes.Row := I;
       GridTypes.Selected := I;
       SelectedType := FDevFilteredTypes[I];
-      GridTypes.SetFocus;
+
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          if (GridTypes <> nil) and GridTypes.Visible and IsValidGridRow(GridTypes.Row) then
+          begin
+            GridTypes.Selected := GridTypes.Row;
+            GridTypes.SetFocus;
+          end;
+        end);
       Break;
     end;
+end;
+
+
+procedure TFormTypeSelect.SelectTypeByUUID(const AUUID: string);
+var
+  Repo: TTypeRepository;
+  AType: TDeviceType;
+begin
+  if Trim(AUUID) = '' then
+    Exit;
+
+  if (AppServices.DataManager <> nil) and
+     (AppServices.DataManager.ActiveTypeRepo <> nil) then
+  begin
+    AType := AppServices.DataManager.ActiveTypeRepo.FindTypeByUUID(AUUID);
+    if AType <> nil then
+    begin
+      SelectType(AType);
+      Exit;
+    end;
+  end;
+
+  if AppServices.DataManager <> nil then
+    for Repo in AppServices.DataManager.TypeRepositories do
+      if (Repo <> nil) and (Repo.Types <> nil) then
+      begin
+        AType := Repo.FindTypeByUUID(AUUID);
+        if AType <> nil then
+        begin
+          SelectType(AType);
+          Exit;
+        end;
+      end;
 end;
 
 procedure TFormTypeSelect.sbClearDateClick(Sender: TObject);
