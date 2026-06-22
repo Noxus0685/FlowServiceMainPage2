@@ -323,6 +323,7 @@ type
     { Private declarations }
      FDevice: TDevice;
      FOriginalDevice: TDevice;
+     FLoadedDeviceSnapshot: TDevice;
      FInitialTypeUUID: string;
      FTypeChangedDuringEdit: Boolean;
 
@@ -734,9 +735,6 @@ begin
     if MessageDlg('Вы уверены, что хотите отменить изменения?', TMsgDlgType.mtWarning,
        [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes then
     begin
-      // Возвращаем форму в исходное состояние
-      AppServices.DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
-
       // Закрываем форму с результатом Cancel
       WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
     ModalResult := mrCancel;
@@ -985,6 +983,7 @@ procedure TFormDeviceEditor.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
       FreeAndNil(FDevice);      // уничтожаем клон
+      FreeAndNil(FLoadedDeviceSnapshot);
       FOriginalDevice := nil;
 end;
 
@@ -1032,8 +1031,10 @@ begin
       {----------------------------------}
       { Нажали Отмена }
       {----------------------------------}
-      { Ничего не сохраняем }
-      { Просто закрываем форму }
+      { Ничего не сохраняем. Если оригинал был случайно изменён
+        через общие вложенные объекты, восстанавливаем снимок. }
+      if (FOriginalDevice <> nil) and (FLoadedDeviceSnapshot <> nil) then
+        FOriginalDevice.Assign(FLoadedDeviceSnapshot, True);
     end;
 
   except
@@ -1514,6 +1515,7 @@ begin
     FPointSortAscending := True;
 
     FreeAndNil(FDevice);
+    FreeAndNil(FLoadedDeviceSnapshot);
     FDeviceType := nil;
 
     if ADevice <> nil then
@@ -1522,7 +1524,8 @@ begin
       { Редактирование существующего прибора }
       {----------------------------------}
       FOriginalDevice := ADevice;
-      //Создаем новый прибор в новой области памяти идентичный данному.
+      // Создаем независимые снимки прибора в новой области памяти.
+      FLoadedDeviceSnapshot := ADevice.Clone;
       FDevice := ADevice.Clone;
       FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
       FTypeChangedDuringEdit := False;
@@ -1533,6 +1536,7 @@ begin
       { Новый прибор }
       {----------------------------------}
       FOriginalDevice := nil;
+      FLoadedDeviceSnapshot := nil;
       if (AppServices.DataManager <> nil) and (AppServices.DataManager.ActiveDeviceRepo <> nil) then
         FDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
@@ -3771,48 +3775,14 @@ end;
 
 procedure TFormDeviceEditor.CloseEditor(ASave: Boolean);
 begin
-  try
-    if ASave then
-    begin
-      {----------------------------------}
-      { Сохранение }
-      {----------------------------------}
-
-      if FOriginalDevice <> nil then
-      begin
-        { редактирование существующего }
-        FOriginalDevice.Assign(FDevice,True);
-
-
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
-      end
-      else
-      begin
-        { новый прибор }
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
-      end;
-
-      ModalResult := mrOk;
-    end
-    else
-    begin
-      {----------------------------------}
-      { Отмена }
-      {----------------------------------}
-      ModalResult := mrCancel;
-    end;
-
-  except
-    on E: Exception do
-    begin
-      ShowMessage('Ошибка сохранения: ' + E.Message);
-      Exit;  // НЕ закрываем форму
-    end;
-  end;
-
-  Close;
+  { Сохранение выполняется только в FormCloseQuery при ModalResult = mrOk.
+    Метод оставлен как совместимый переходник, чтобы не обойти общий сценарий
+    закрытия и восстановления при Cancel. }
+  if ASave then
+    ModalResult := mrOk
+  else
+    ModalResult := mrCancel;
 end;
-
 
 
 end.

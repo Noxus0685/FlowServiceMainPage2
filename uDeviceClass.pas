@@ -355,6 +355,8 @@ type
     b: Double;
     Enable: Boolean;            // Используется ли точка в расчётах K и P
 
+    procedure Assign(ASource: TCalibrCoefItem);
+    function Clone: TCalibrCoefItem;
     function InRange(Q: Double): Boolean;
   end;
 
@@ -374,6 +376,8 @@ type
     constructor Create;
     destructor Destroy; override;
 
+    procedure Assign(ASource: TCalibrCoefTable);
+    function Clone: TCalibrCoefTable;
     function FindItemByQ(Q: Double): TCalibrCoefItem;
     function ApplyByQ(Q, X: Double): Double;
   end;
@@ -1037,18 +1041,7 @@ begin
     begin
       if SrcItem = nil then
         Continue;
-      NewItem := TCalibrCoefItem.Create;
-      NewItem.Name := SrcItem.Name;
-      NewItem.UUID := SrcItem.UUID;
-      NewItem.TableID := SrcItem.TableID;
-      NewItem.OrderNo := SrcItem.OrderNo;
-      NewItem.Value := SrcItem.Value;
-      NewItem.Arg := SrcItem.Arg;
-      NewItem.QFrom := SrcItem.QFrom;
-      NewItem.QTo := SrcItem.QTo;
-      NewItem.K := SrcItem.K;
-      NewItem.b := SrcItem.b;
-      NewItem.Enable := SrcItem.Enable;
+      NewItem := SrcItem.Clone;
       NewTable.Items.Add(NewItem);
     end;
 
@@ -1084,6 +1077,9 @@ begin
 end;
 
 procedure TSessionSpillage.Assign(ASource: TSessionSpillage);
+var
+  Sp: TPointSpillage;
+  NewSp: TPointSpillage;
 begin
   if ASource = nil then
     Exit;
@@ -1107,6 +1103,16 @@ begin
     FSpillages := TObjectList<TPointSpillage>.Create(True)
   else
     FSpillages.Clear;
+
+  if ASource.FSpillages <> nil then
+    for Sp in ASource.FSpillages do
+    begin
+      if Sp = nil then
+        Continue;
+      NewSp := TPointSpillage.Create(Sp.SessionID);
+      NewSp.Assign(Sp);
+      FSpillages.Add(NewSp);
+    end;
 end;
 
 constructor TDevicePoint.Create(ADeviceID : Integer);
@@ -1264,6 +1270,11 @@ procedure TDevice.Assign(ASource: TDevice; FullAssign: Boolean);
 var
   P: TDevicePoint;
   NewP: TDevicePoint;
+  S: TSessionSpillage;
+  NewS: TSessionSpillage;
+  Sp: TPointSpillage;
+  NewSp: TPointSpillage;
+  Table: TCalibrCoefTable;
 begin
   if ASource = nil then
     Exit;
@@ -1363,14 +1374,37 @@ begin
   ReportingForm := ASource.ReportingForm;
 
   { ============================= }
-  { 2. При копировании НЕ переносим }
-  {    сессии, проливы и таблицу КК }
+  { 2. Глубокое копирование вложенных списков }
+  {    сессии, проливы и таблицы КК }
   { ============================= }
 
   FSessions.Clear;
+  if ASource.FSessions <> nil then
+    for S in ASource.FSessions do
+    begin
+      if S = nil then
+        Continue;
+      NewS := TSessionSpillage.Create(S.DeviceUUID);
+      NewS.Assign(S);
+      FSessions.Add(NewS);
+    end;
+
   FSpillages.Clear;
+  if ASource.FSpillages <> nil then
+    for Sp in ASource.FSpillages do
+    begin
+      if Sp = nil then
+        Continue;
+      NewSp := TPointSpillage.Create(Sp.SessionID);
+      NewSp.Assign(Sp);
+      FSpillages.Add(NewSp);
+    end;
 
   FCalibrCoefTable.Clear;
+  if ASource.FCalibrCoefTable <> nil then
+    for Table in ASource.FCalibrCoefTable do
+      if Table <> nil then
+        FCalibrCoefTable.Add(Table.Clone);
 
   { ============================= }
   { 3. Глубокое копирование точек }
@@ -1378,11 +1412,41 @@ begin
 
   FPoints.Clear;
 
-  for P in ASource.FPoints do
-  begin
-    NewP := AddPoint;
-    NewP.Assign(P, False);
-  end;
+  if ASource.FPoints <> nil then
+    for P in ASource.FPoints do
+    begin
+      if P = nil then
+        Continue;
+      NewP := TDevicePoint.Create(ID);
+      NewP.Assign(P, True);
+      NewP.State := P.State;
+      FPoints.Add(NewP);
+    end;
+end;
+
+procedure TCalibrCoefItem.Assign(ASource: TCalibrCoefItem);
+begin
+  if ASource = nil then
+    Exit;
+
+  Name := ASource.Name;
+  UUID := ASource.UUID;
+  TableID := ASource.TableID;
+  OrderNo := ASource.OrderNo;
+  Value := ASource.Value;
+  Arg := ASource.Arg;
+  QFrom := ASource.QFrom;
+  QTo := ASource.QTo;
+  RangeArg := ASource.RangeArg;
+  K := ASource.K;
+  b := ASource.b;
+  Enable := ASource.Enable;
+end;
+
+function TCalibrCoefItem.Clone: TCalibrCoefItem;
+begin
+  Result := TCalibrCoefItem.Create;
+  Result.Assign(Self);
 end;
 
 function TCalibrCoefItem.InRange(Q: Double): Boolean;
@@ -1402,6 +1466,40 @@ destructor TCalibrCoefTable.Destroy;
 begin
   Items.Free;
   inherited;
+end;
+
+procedure TCalibrCoefTable.Assign(ASource: TCalibrCoefTable);
+var
+  SrcItem: TCalibrCoefItem;
+begin
+  if ASource = nil then
+    Exit;
+
+  ID := ASource.ID;
+  UUID := ASource.UUID;
+  DeviceID := ASource.DeviceID;
+  DeviceUUID := ASource.DeviceUUID;
+  &Type := ASource.&Type;
+  Active := ASource.Active;
+  AppliedAt := ASource.AppliedAt;
+  Name := ASource.Name;
+  Comment := ASource.Comment;
+
+  if Items = nil then
+    Items := TObjectList<TCalibrCoefItem>.Create(True)
+  else
+    Items.Clear;
+
+  if ASource.Items <> nil then
+    for SrcItem in ASource.Items do
+      if SrcItem <> nil then
+        Items.Add(SrcItem.Clone);
+end;
+
+function TCalibrCoefTable.Clone: TCalibrCoefTable;
+begin
+  Result := TCalibrCoefTable.Create;
+  Result.Assign(Self);
 end;
 
 function TCalibrCoefTable.FindItemByQ(Q: Double): TCalibrCoefItem;
