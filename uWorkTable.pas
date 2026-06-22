@@ -2740,26 +2740,24 @@ begin
 end;
 
 procedure TWorkTable.InitChannels;
-var Count, I: Integer;
-begin
-  Count:=FDeviceChannels.count;
-  for I := 0 to Count - 1 do
-    begin
-     // FDeviceChannels[i].Init;
-      if not Assigned(FDeviceChannels[i].FFlowMeter) then
-    Exit;
 
-  FDeviceChannels[i].FFlowMeter.Init();
-  {if (FDeviceChannels[i].FFlowMeter.Device <> nil) then
+  procedure InitChannelList(AChannels: TObjectList<TChannel>);
+  var
+    I: Integer;
   begin
-    FDeviceChannels[i].FOutputSet.FromDefault(IntToOutputSet(FFlowMeter.Device.OutputSet));
-    FSyncMode.FromDefault(IntToSyncChannelMode(FFlowMeter.Device.SyncMode));
-    FNoiseFilter.FromDefault(FFlowMeter.Device.NoiseFilter);
-  end;    }
+    if AChannels = nil then
+      Exit;
 
-
-
+    for I := 0 to AChannels.Count - 1 do
+    begin
+      if (AChannels[I] <> nil) and Assigned(AChannels[I].FFlowMeter) then
+        AChannels[I].FFlowMeter.Init();
     end;
+  end;
+
+begin
+  InitChannelList(FDeviceChannels);
+  InitChannelList(FEtalonChannels);
 end;
 
 function TWorkTable.GetPressDelta: Double;
