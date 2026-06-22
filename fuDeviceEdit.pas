@@ -1656,7 +1656,9 @@ begin
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    if (CurrentType <> nil) and (FoundRepo <> nil) then
+    if FDevice.DeviceTypeUUID <> '' then
+      Frm.SelectTypeByUUID(FDevice.DeviceTypeUUID)
+    else if (CurrentType <> nil) and (FoundRepo <> nil) then
       Frm.SelectType(CurrentType);
 
     {----------------------------------------------------}

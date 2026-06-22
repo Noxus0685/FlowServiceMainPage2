@@ -252,6 +252,7 @@ type
     { Public declarations }
     SelectedType:   TDeviceType;
     procedure SelectType (AType: TDeviceType);
+    procedure SelectTypeByUUID(const AUUID: string);
     destructor Destroy; override;
   end;
 
@@ -2753,6 +2754,39 @@ begin
         end);
       Break;
     end;
+end;
+
+
+procedure TFormTypeSelect.SelectTypeByUUID(const AUUID: string);
+var
+  Repo: TTypeRepository;
+  AType: TDeviceType;
+begin
+  if Trim(AUUID) = '' then
+    Exit;
+
+  if (AppServices.DataManager <> nil) and
+     (AppServices.DataManager.ActiveTypeRepo <> nil) then
+  begin
+    AType := AppServices.DataManager.ActiveTypeRepo.FindTypeByUUID(AUUID);
+    if AType <> nil then
+    begin
+      SelectType(AType);
+      Exit;
+    end;
+  end;
+
+  if AppServices.DataManager <> nil then
+    for Repo in AppServices.DataManager.TypeRepositories do
+      if (Repo <> nil) and (Repo.Types <> nil) then
+      begin
+        AType := Repo.FindTypeByUUID(AUUID);
+        if AType <> nil then
+        begin
+          SelectType(AType);
+          Exit;
+        end;
+      end;
 end;
 
 procedure TFormTypeSelect.sbClearDateClick(Sender: TObject);
