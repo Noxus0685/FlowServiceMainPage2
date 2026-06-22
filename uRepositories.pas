@@ -263,7 +263,6 @@ type
 
     function LoadDevices: Boolean;              // Загрузка всех приборов
 
-    function UpdateDevice(ADevice: TDevice): Boolean;
     function RebuildDevices: Boolean;
 
     { ================= DEVICE POINTS ================= }
@@ -355,6 +354,7 @@ type
     function LoadDevice(ADevice: TDevice): TDevice; overload;
     function LoadDevice(ADeviceId: Integer): TDevice; overload;
     function SaveDevice(ADevice: TDevice): Boolean;
+    function UpdateDevice(ADevice: TDevice): Boolean;
     {$ENDREGION}
 
     { ================= DEVICES ================= }
