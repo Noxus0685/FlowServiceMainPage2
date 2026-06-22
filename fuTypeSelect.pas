@@ -2735,12 +2735,22 @@ begin
 
   {---------------- Выбираем строку в отфильтрованном гриде ----------------}
   for I := 0 to FDevFilteredTypes.Count - 1 do
-    if FDevFilteredTypes[I] = AType then
+    if (FDevFilteredTypes[I] = AType) or
+       ((AType.UUID <> '') and SameText(FDevFilteredTypes[I].UUID, AType.UUID)) then
     begin
       GridTypes.Row := I;
       GridTypes.Selected := I;
       SelectedType := FDevFilteredTypes[I];
-      GridTypes.SetFocus;
+
+      TThread.ForceQueue(nil,
+        procedure
+        begin
+          if (GridTypes <> nil) and GridTypes.Visible and IsValidGridRow(GridTypes.Row) then
+          begin
+            GridTypes.Selected := GridTypes.Row;
+            GridTypes.SetFocus;
+          end;
+        end);
       Break;
     end;
 end;
