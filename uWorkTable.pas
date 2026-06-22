@@ -816,41 +816,72 @@ end;
 class function TDeviceCreationService.CreateDevice(ARepo: TDeviceRepository;
   AMode: TDeviceCreateMode; ASourceDevice: TDevice;
   const ADeviceUUID: string): TDevice;
+var
+  WasCreated: Boolean;
 begin
   Result := nil;
+  WasCreated := False;
   if ARepo = nil then
     Exit;
 
-  Result := ARepo.CreateDevice(ASourceDevice);
-  if Result = nil then
-    Exit;
-
   if Trim(ADeviceUUID) <> '' then
-    Result.UUID := Trim(ADeviceUUID)
-  else if Trim(Result.UUID) = '' then
-    Result.UUID := TGUID.NewGuid.ToString;
+  begin
+    Result := FindDeviceByUUID(ADeviceUUID, ARepo);
+    if Result <> nil then
+    begin
+      if ASourceDevice <> nil then
+      begin
+        Result.Assign(ASourceDevice, False);
+        Result.SerialNumber := ASourceDevice.SerialNumber;
+      end;
+    end;
+  end;
 
-  Result.State := osNew;
+  if Result = nil then
+  begin
+    Result := ARepo.CreateDevice(ASourceDevice);
+    if Result = nil then
+      Exit;
+
+    if Trim(ADeviceUUID) <> '' then
+      Result.UUID := Trim(ADeviceUUID)
+    else if Trim(Result.UUID) = '' then
+      Result.UUID := TGUID.NewGuid.ToString;
+
+    Result.State := osNew;
+    WasCreated := True;
+  end;
 
   case AMode of
     dcmUserCreated:
       begin
         Result.Comment := '';
-        AddProtocol(AMode, 'Create', Result, nil);
+        if WasCreated then
+          AddProtocol(AMode, 'Create', Result, nil)
+        else
+          AddProtocol(AMode, 'Reuse', Result, nil);
       end;
     dcmGridPlaceholder:
       begin
-        Result.Comment := '';
-        Result.Name := '';
-        Result.SerialNumber := '';
-        Result.OutputType := -1;
-        AddProtocol(AMode, 'Create', Result, nil);
+        if WasCreated then
+        begin
+          Result.Comment := '';
+          Result.Name := '';
+          Result.SerialNumber := '';
+          Result.OutputType := -1;
+          AddProtocol(AMode, 'Create', Result, nil);
+        end
+        else
+          AddProtocol(AMode, 'Reuse', Result, nil);
       end;
     dcmMeasurementPromoted:
       begin
         if SameText(Trim(Result.Comment), CEmptyGridDeviceComment) then
           Result.Comment := '';
-        AddProtocol(AMode, 'Create', Result, nil);
+        if WasCreated then
+          AddProtocol(AMode, 'Create', Result, nil)
+        else
+          AddProtocol(AMode, 'Reuse', Result, nil);
       end;
   end;
 end;
