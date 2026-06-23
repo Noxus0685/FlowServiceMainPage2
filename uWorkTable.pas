@@ -4297,6 +4297,7 @@ var
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
+  EtalonFlow: Double;
   Device: TDevice;
 begin
 
@@ -4345,7 +4346,11 @@ begin
       Point.SessionID := Session.ID;
       Point.DateTime := Now;
       Point.SpillTime := ValueTime.GetDoubleValue;
-      Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
+      EtalonFlow := ValueFlowRate.GetDoubleValue;
+      if SameValue(EtalonFlow, 0.0, 1E-12) and
+         (CurrentPoint <> nil) and (CurrentPoint.Q > 0) then
+        EtalonFlow := CurrentPoint.Q;
+      Point.QavgEtalon := EtalonFlow;
 
       Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
 
