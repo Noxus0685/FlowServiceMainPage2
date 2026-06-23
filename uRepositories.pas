@@ -263,7 +263,6 @@ type
 
     function LoadDevices: Boolean;              // Загрузка всех приборов
 
-    function UpdateDevice(ADevice: TDevice): Boolean;
     function RebuildDevices: Boolean;
 
     { ================= DEVICE POINTS ================= }
@@ -355,6 +354,7 @@ type
     function LoadDevice(ADevice: TDevice): TDevice; overload;
     function LoadDevice(ADeviceId: Integer): TDevice; overload;
     function SaveDevice(ADevice: TDevice): Boolean;
+    function UpdateDevice(ADevice: TDevice): Boolean;
     {$ENDREGION}
 
     { ================= DEVICES ================= }
@@ -3623,16 +3623,11 @@ begin
     ExistingDevice := FindDeviceByUUID(ADevice.UUID);
     if (ExistingDevice <> nil) and (ExistingDevice <> ADevice) then
     begin
-      if ADevice.State = osNew then
-      begin
-        SaveErrors.Add(Format('Нельзя сохранить прибор "%s": UUID %s уже принадлежит другому объекту.',
-          [ADevice.Name, ADevice.UUID]));
-        Exit(False);
-      end;
-
       if ADevice.State <> osClean then
       begin
-        ExistingDevice.Assign(ADevice, True);
+        ExistingDevice.Assign(ADevice, False);
+        ExistingDevice.SerialNumber := ADevice.SerialNumber;
+        ExistingDevice.State := osModified;
         ADevice := ExistingDevice;
       end
       else

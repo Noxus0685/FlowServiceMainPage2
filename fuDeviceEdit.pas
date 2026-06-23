@@ -323,6 +323,7 @@ type
     { Private declarations }
      FDevice: TDevice;
      FOriginalDevice: TDevice;
+     FLoadedDeviceSnapshot: TDevice;
      FInitialTypeUUID: string;
      FTypeChangedDuringEdit: Boolean;
 
@@ -369,6 +370,8 @@ type
      procedure InitCategoryComboEdit;
      procedure UpdatePointsGrid;
      procedure SetModified;
+     procedure FlushPendingChanges;
+     function DeviceChanged: Boolean;
 
      procedure CloseEditor(ASave: Boolean);
      function   GetSelectedPoint: TDevicePoint;
@@ -726,27 +729,37 @@ begin
 end;
 
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
+var
+  Res: TModalResult;
 begin
-  // Отменяем все изменения
-  if FDevice.State = osModified then
-  begin
-    // Если форма была изменена, запрашиваем подтверждение
-    if MessageDlg('Вы уверены, что хотите отменить изменения?', TMsgDlgType.mtWarning,
-       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes then
-    begin
-      // Возвращаем форму в исходное состояние
-      AppServices.DataManager.ActiveDeviceRepo.Load;    // предполагается, что у FDevice есть метод для отката изменений
+  btnCancel.ModalResult := mrNone;
+  FlushPendingChanges;
 
-      // Закрываем форму с результатом Cancel
-      WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
-    ModalResult := mrCancel;
+  if DeviceChanged then
+  begin
+    Res := MessageDlg(
+      'Есть несохранённые изменения. Сохранить перед выходом?',
+      TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo, TMsgDlgBtn.mbCancel],
+      0
+    );
+
+    case Res of
+      mrYes:
+        ModalResult := mrOk;
+
+      mrNo:
+        begin
+          WriteDeviceEditActionLog('Редактирование прибора отменено', FDevice);
+          ModalResult := mrCancel;
+        end;
+
+      mrCancel:
+        ModalResult := mrNone;
     end;
   end
   else
-  begin
-    // Если изменений не было, просто закрываем форму
     ModalResult := mrCancel;
-  end;
 end;
 
 procedure TFormDeviceEditor.btnOKClick(Sender: TObject);
@@ -985,6 +998,7 @@ procedure TFormDeviceEditor.FormClose(Sender: TObject;
   var Action: TCloseAction);
 begin
       FreeAndNil(FDevice);      // уничтожаем клон
+      FreeAndNil(FLoadedDeviceSnapshot);
       FOriginalDevice := nil;
 end;
 
@@ -994,6 +1008,7 @@ var
   OldUUID: string;
 begin
   CanClose := True;
+  FlushPendingChanges;
 
   try
     if ModalResult = mrOk then
@@ -1006,9 +1021,12 @@ begin
       begin
         { редактирование существующего }
         OldUUID := FOriginalDevice.UUID;
-        FOriginalDevice.Assign(FDevice,True);
+        FDevice.State:=osModified;
+        FOriginalDevice.Assign(FDevice, True);
         FOriginalDevice.UUID := OldUUID;
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
+        //FOriginalDevice.State := osModified;
+        if not AppServices.DataManager.ActiveDeviceRepo.UpdateDevice(FOriginalDevice) then
+          raise Exception.Create('Ошибка сохранения прибора');
         if not FTypeChangedDuringEdit then
           WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
       end
@@ -1032,8 +1050,10 @@ begin
       {----------------------------------}
       { Нажали Отмена }
       {----------------------------------}
-      { Ничего не сохраняем }
-      { Просто закрываем форму }
+      { Ничего не сохраняем. Если оригинал был случайно изменён
+        через общие вложенные объекты, восстанавливаем снимок. }
+      if (FOriginalDevice <> nil) and (FLoadedDeviceSnapshot <> nil) then
+        FOriginalDevice.Assign(FLoadedDeviceSnapshot, True);
     end;
 
   except
@@ -1514,6 +1534,7 @@ begin
     FPointSortAscending := True;
 
     FreeAndNil(FDevice);
+    FreeAndNil(FLoadedDeviceSnapshot);
     FDeviceType := nil;
 
     if ADevice <> nil then
@@ -1522,7 +1543,8 @@ begin
       { Редактирование существующего прибора }
       {----------------------------------}
       FOriginalDevice := ADevice;
-      //Создаем новый прибор в новой области памяти идентичный данному.
+      // Создаем независимые снимки прибора в новой области памяти.
+      FLoadedDeviceSnapshot := ADevice.Clone;
       FDevice := ADevice.Clone;
       FInitialTypeUUID := string(ADevice.DeviceTypeUUID);
       FTypeChangedDuringEdit := False;
@@ -1533,11 +1555,13 @@ begin
       { Новый прибор }
       {----------------------------------}
       FOriginalDevice := nil;
+      FLoadedDeviceSnapshot := nil;
       if (AppServices.DataManager <> nil) and (AppServices.DataManager.ActiveDeviceRepo <> nil) then
         FDevice := AppServices.DataManager.ActiveDeviceRepo.CreateDevice(0)
       else
         FDevice := TDevice.Create;
 
+      FLoadedDeviceSnapshot := FDevice.Clone;
       FInitialTypeUUID := string(FDevice.DeviceTypeUUID);
       FTypeChangedDuringEdit := False;
     end;
@@ -1597,7 +1621,14 @@ end;
 
 procedure TFormDeviceEditor.mmoCommentExit(Sender: TObject);
 begin
-   FDevice.Description :=   mmoComment.Text;
+  if (FDevice = nil) or FLoading then
+    Exit;
+
+  if FDevice.Description = mmoComment.Text then
+    Exit;
+
+  FDevice.Description := mmoComment.Text;
+  SetModified;
 end;
 
 procedure TFormDeviceEditor.RefreshDeviceTypeReference;
@@ -1656,7 +1687,9 @@ begin
     {----------------------------------------------------}
     { 1. Предвыбор текущего типа }
     {----------------------------------------------------}
-    if (CurrentType <> nil) and (FoundRepo <> nil) then
+    if FDevice.DeviceTypeUUID <> '' then
+      Frm.SelectTypeByUUID(FDevice.DeviceTypeUUID)
+    else if (CurrentType <> nil) and (FoundRepo <> nil) then
       Frm.SelectType(CurrentType);
 
     {----------------------------------------------------}
@@ -3767,50 +3800,165 @@ begin
   FDevice.State := osModified;
 end;
 
-procedure TFormDeviceEditor.CloseEditor(ASave: Boolean);
+procedure TFormDeviceEditor.FlushPendingChanges;
 begin
-  try
-    if ASave then
-    begin
-      {----------------------------------}
-      { Сохранение }
-      {----------------------------------}
+  if (FDevice = nil) or FLoading then
+    Exit;
 
-      if FOriginalDevice <> nil then
-      begin
-        { редактирование существующего }
-        FOriginalDevice.Assign(FDevice,True);
-
-
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FOriginalDevice);
-      end
-      else
-      begin
-        { новый прибор }
-        AppServices.DataManager.ActiveDeviceRepo.SaveDevice(FDevice);
-      end;
-
-      ModalResult := mrOk;
-    end
-    else
-    begin
-      {----------------------------------}
-      { Отмена }
-      {----------------------------------}
-      ModalResult := mrCancel;
-    end;
-
-  except
-    on E: Exception do
-    begin
-      ShowMessage('Ошибка сохранения: ' + E.Message);
-      Exit;  // НЕ закрываем форму
-    end;
-  end;
-
-  Close;
+  if EditName.IsFocused then
+    EditNameExit(EditName)
+  else if EditTypeName.IsFocused then
+    EditTypeNameExit(EditTypeName)
+  else if edtManufacturer.IsFocused then
+    edtManufacturerExit(edtManufacturer)
+  else if EditModification.IsFocused then
+    EditModificationExit(EditModification)
+  else if edtReestrNumber.IsFocused then
+    edtReestrNumberExit(edtReestrNumber)
+  else if edtDocumentation.IsFocused then
+    edtDocumentationExit(edtDocumentation)
+  else if EditAccuracyClass.IsFocused then
+    EditAccuracyClassExit(EditAccuracyClass)
+  else if EditTemp.IsFocused or EditError.IsFocused then
+    EditTempExit(EditTemp)
+  else if EditReportingForm.IsFocused then
+    EditReportingFormExit(EditReportingForm)
+  else if EditQmax.IsFocused then
+    EditQmaxExit(EditQmax)
+  else if EditQnom.IsFocused then
+    EditQnomExit(EditQnom)
+  else if EditQmin.IsFocused then
+    EditQminExit(EditQmin)
+  else if EditQtr.IsFocused then
+    EditQtrExit(EditQtr)
+  else if EditVoltageQmax.IsFocused then
+    EditVoltageQmaxExit(EditVoltageQmax)
+  else if EditVoltageQmin.IsFocused then
+    EditVoltageQminExit(EditVoltageQmin)
+  else if EditCoef.IsFocused then
+    EditCoefExit(EditCoef)
+  else if EditFreq.IsFocused then
+    EditFreqExit(EditFreq)
+  else if EditFreqFlowRate.IsFocused then
+    EditFreqFlowRateExit(EditFreqFlowRate)
+  else if edtOwner.IsFocused then
+    edtOwnerExit(edtOwner)
+  else if edtSerialNumber.IsFocused then
+    edtSerialNumberExit(edtSerialNumber)
+  else if mmoComment.IsFocused then
+    mmoCommentExit(mmoComment);
 end;
 
+
+function TFormDeviceEditor.DeviceChanged: Boolean;
+var
+  I: Integer;
+  L, R: TDevicePoint;
+begin
+  Result := False;
+
+  if FDevice = nil then
+    Exit;
+
+  if FLoadedDeviceSnapshot = nil then
+    Exit(True);
+
+  Result :=
+    (FDevice.DeviceTypeUUID <> FLoadedDeviceSnapshot.DeviceTypeUUID) or
+    (FDevice.DeviceTypeName <> FLoadedDeviceSnapshot.DeviceTypeName) or
+    (FDevice.DeviceTypeRepo <> FLoadedDeviceSnapshot.DeviceTypeRepo) or
+    (FDevice.RepoTypeName <> FLoadedDeviceSnapshot.RepoTypeName) or
+    (FDevice.SerialNumber <> FLoadedDeviceSnapshot.SerialNumber) or
+    (FDevice.Name <> FLoadedDeviceSnapshot.Name) or
+    (FDevice.Modification <> FLoadedDeviceSnapshot.Modification) or
+    (FDevice.Manufacturer <> FLoadedDeviceSnapshot.Manufacturer) or
+    (FDevice.Owner <> FLoadedDeviceSnapshot.Owner) or
+    (FDevice.ReestrNumber <> FLoadedDeviceSnapshot.ReestrNumber) or
+    (FDevice.Category <> FLoadedDeviceSnapshot.Category) or
+    (FDevice.CategoryName <> FLoadedDeviceSnapshot.CategoryName) or
+    (FDevice.AccuracyClass <> FLoadedDeviceSnapshot.AccuracyClass) or
+    (FDevice.RegDate <> FLoadedDeviceSnapshot.RegDate) or
+    (FDevice.ValidityDate <> FLoadedDeviceSnapshot.ValidityDate) or
+    (FDevice.DateOfManufacture <> FLoadedDeviceSnapshot.DateOfManufacture) or
+    (FDevice.IVI <> FLoadedDeviceSnapshot.IVI) or
+    (FDevice.Documentation <> FLoadedDeviceSnapshot.Documentation) or
+    (FDevice.DN <> FLoadedDeviceSnapshot.DN) or
+    (not SameValue(FDevice.Qmax, FLoadedDeviceSnapshot.Qmax)) or
+    (not SameValue(FDevice.Qmin, FLoadedDeviceSnapshot.Qmin)) or
+    (not SameValue(FDevice.Qnom, FLoadedDeviceSnapshot.Qnom)) or
+    (not SameValue(FDevice.Qtr, FLoadedDeviceSnapshot.Qtr)) or
+    (FDevice.Temp <> FLoadedDeviceSnapshot.Temp) or
+    (not SameValue(FDevice.Error, FLoadedDeviceSnapshot.Error)) or
+    (FDevice.VerificationMethod <> FLoadedDeviceSnapshot.VerificationMethod) or
+    (FDevice.ProcedureName <> FLoadedDeviceSnapshot.ProcedureName) or
+    (FDevice.MeasuredDimension <> FLoadedDeviceSnapshot.MeasuredDimension) or
+    (FDevice.Units <> FLoadedDeviceSnapshot.Units) or
+    (FDevice.OutputType <> FLoadedDeviceSnapshot.OutputType) or
+    (FDevice.DimensionCoef <> FLoadedDeviceSnapshot.DimensionCoef) or
+    (FDevice.OutputSet <> FLoadedDeviceSnapshot.OutputSet) or
+    (FDevice.Freq <> FLoadedDeviceSnapshot.Freq) or
+    (not SameValue(FDevice.Coef, FLoadedDeviceSnapshot.Coef)) or
+    (not SameValue(FDevice.FreqFlowRate, FLoadedDeviceSnapshot.FreqFlowRate)) or
+    (FDevice.VoltageRange <> FLoadedDeviceSnapshot.VoltageRange) or
+    (not SameValue(FDevice.VoltageQminRate, FLoadedDeviceSnapshot.VoltageQminRate)) or
+    (not SameValue(FDevice.VoltageQmaxRate, FLoadedDeviceSnapshot.VoltageQmaxRate)) or
+    (FDevice.CurrentRange <> FLoadedDeviceSnapshot.CurrentRange) or
+    (not SameValue(FDevice.CurrentQminRate, FLoadedDeviceSnapshot.CurrentQminRate)) or
+    (not SameValue(FDevice.CurrentQmaxRate, FLoadedDeviceSnapshot.CurrentQmaxRate)) or
+    (FDevice.ProtocolName <> FLoadedDeviceSnapshot.ProtocolName) or
+    (FDevice.BaudRate <> FLoadedDeviceSnapshot.BaudRate) or
+    (FDevice.Parity <> FLoadedDeviceSnapshot.Parity) or
+    (FDevice.DeviceAddress <> FLoadedDeviceSnapshot.DeviceAddress) or
+    (FDevice.InputType <> FLoadedDeviceSnapshot.InputType) or
+    (FDevice.SpillageType <> FLoadedDeviceSnapshot.SpillageType) or
+    (FDevice.SpillageStop <> FLoadedDeviceSnapshot.SpillageStop) or
+    (FDevice.Repeats <> FLoadedDeviceSnapshot.Repeats) or
+    (FDevice.RepeatsProtocol <> FLoadedDeviceSnapshot.RepeatsProtocol) or
+    (FDevice.Description <> FLoadedDeviceSnapshot.Description) or
+    (FDevice.ReportingForm <> FLoadedDeviceSnapshot.ReportingForm);
+
+  if Result then
+    Exit;
+
+  if FDevice.Points.Count <> FLoadedDeviceSnapshot.Points.Count then
+    Exit(True);
+
+  for I := 0 to FDevice.Points.Count - 1 do
+  begin
+    L := FDevice.Points[I];
+    R := FLoadedDeviceSnapshot.Points[I];
+
+    if (L.State <> R.State) or (L.Name <> R.Name) or
+       (not SameValue(L.FlowRate, R.FlowRate)) or
+       (L.FlowAccuracy <> R.FlowAccuracy) or
+       (not SameValue(L.Pressure, R.Pressure)) or
+       (not SameValue(L.Temp, R.Temp)) or
+       (L.TempAccuracy <> R.TempAccuracy) or
+       (L.LimitImp <> R.LimitImp) or
+       (not SameValue(L.LimitVolume, R.LimitVolume)) or
+       (not SameValue(L.LimitTime, R.LimitTime)) or
+       (L.SpillageStop <> R.SpillageStop) or
+       (L.SpillageType <> R.SpillageType) or
+       (L.EtalonType <> R.EtalonType) or
+       (L.FlowSorceType <> R.FlowSorceType) or
+       (not SameValue(L.Error, R.Error)) or
+       (L.Pause <> R.Pause) or
+       (L.RepeatsProtocol <> R.RepeatsProtocol) or
+       (L.Repeats <> R.Repeats) then
+      Exit(True);
+  end;
+end;
+
+procedure TFormDeviceEditor.CloseEditor(ASave: Boolean);
+begin
+  { Сохранение выполняется только в FormCloseQuery при ModalResult = mrOk.
+    Метод оставлен как совместимый переходник, чтобы не обойти общий сценарий
+    закрытия и восстановления при Cancel. }
+  if ASave then
+    ModalResult := mrOk
+  else
+    ModalResult := mrCancel;
+end;
 
 
 end.
