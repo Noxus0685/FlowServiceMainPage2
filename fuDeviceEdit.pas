@@ -1021,9 +1021,10 @@ begin
       begin
         { редактирование существующего }
         OldUUID := FOriginalDevice.UUID;
+        FDevice.State:=osModified;
         FOriginalDevice.Assign(FDevice, True);
         FOriginalDevice.UUID := OldUUID;
-        FOriginalDevice.State := osModified;
+        //FOriginalDevice.State := osModified;
         if not AppServices.DataManager.ActiveDeviceRepo.UpdateDevice(FOriginalDevice) then
           raise Exception.Create('Ошибка сохранения прибора');
         if not FTypeChangedDuringEdit then

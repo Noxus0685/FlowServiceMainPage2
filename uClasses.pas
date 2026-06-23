@@ -584,7 +584,7 @@ end;
 procedure TTypeEntity.SetState(const Value: TObjectState);
 begin
   if (FState=osNew) and (Value=osModified) then
-  FState := osNew
+    FState := osNew
 
   else if (FState=osDeleted) then
   FState := osDeleted
