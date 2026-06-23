@@ -1073,6 +1073,14 @@ begin
   ItemIndex := -1;
   if SelectedPumpName <> '' then
     ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
+
+  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
+  begin
+    ItemIndex := 0;
+    if FActiveWorkTable <> nil then
+      FActiveWorkTable.SetActivePump(ComboBoxPumps.Items[ItemIndex]);
+  end;
+
   ComboBoxPumps.ItemIndex := ItemIndex;
 end;
 
