@@ -3045,7 +3045,7 @@ begin
    for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
       Continue;
 
     Channel.SetValues;
@@ -3057,7 +3057,7 @@ begin
      for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
       Continue;
     if Channel.FlowMeter.ValueError <> nil then Channel.FlowMeter.ValueError.SetValue();
   end;
@@ -5130,7 +5130,13 @@ begin
     for I := 0 to AEtalonChannels.Count - 1 do
       Coef := Coef + GetChannelFlowCoef(AEtalonChannels[I])
   else
-    Coef := GetChannelFlowCoef(AWorkTable.EtalonChannels[0]);
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if (AWorkTable.EtalonChannels[I] <> nil) and
+         (AWorkTable.EtalonChannels[I].Enabled) then
+      begin
+        Coef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+        Break;
+      end;
 
   if Coef <= 0 then
     Exit;
@@ -5155,11 +5161,20 @@ begin
 
   SUM := 0;
   for I := 0 to AChannels.Count - 1 do
-    SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+    if (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
+       (AChannels[I].FlowMeter.Device <> nil) then
+      SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
+    if (AChannels[I] = nil) or (AChannels[I].FlowMeter = nil) or
+       (AChannels[I].FlowMeter.Device = nil) then
+    begin
+      Result[I] := AFallbackImpSec;
+      Continue;
+    end;
+
     if SameValue(SUM, 0.0, 1e-12) then
       MaxRatio := 0
     else
