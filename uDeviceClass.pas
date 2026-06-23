@@ -1284,7 +1284,7 @@ begin
      SerialNumber := ASource.SerialNumber;
      UUID:=  ASource. UUID;
      ID:=  ASource.  ID;
-     State  := ASource.State;
+     fState  := ASource.State;
    end else
    begin
 
