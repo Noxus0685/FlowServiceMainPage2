@@ -292,7 +292,8 @@ begin
       WorkTable,
       EnabledEtalonChannels,
       FlowRate,
-      NormalizeFloatInput(EditEtalonImpSec.Text)
+      NormalizeFloatInput(EditEtalonImpSec.Text),
+      False
     );
 
     WorkTable.ApplyChannelValues(
