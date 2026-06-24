@@ -729,7 +729,7 @@ type
     function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate: Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil): Double;
     function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
-    const AFlowRate, AFallbackImpSec: Double; ASplitByQmax: Boolean = True): TArray<Double>;
+    const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
@@ -5150,8 +5150,7 @@ begin
 end;
 
 function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkTable;
-  AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double;
-  ASplitByQmax: Boolean): TArray<Double>;
+  AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
   I: Integer;
   Coef, SUM, MaxRatio: Double;
@@ -5161,11 +5160,10 @@ begin
     Exit;
 
   SUM := 0;
-  if ASplitByQmax then
-    for I := 0 to AChannels.Count - 1 do
-      if (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
-         (AChannels[I].FlowMeter.Device <> nil) then
-        SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+  for I := 0 to AChannels.Count - 1 do
+    if (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
+       (AChannels[I].FlowMeter.Device <> nil) then
+      SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
@@ -5177,9 +5175,7 @@ begin
       Continue;
     end;
 
-    if not ASplitByQmax then
-      MaxRatio := 1
-    else if SameValue(SUM, 0.0, 1e-12) then
+    if SameValue(SUM, 0.0, 1e-12) then
       MaxRatio := 0
     else
       MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
