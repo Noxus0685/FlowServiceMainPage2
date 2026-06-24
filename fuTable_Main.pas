@@ -223,41 +223,28 @@ var
   WorkTable: TWorkTable;
   FlowRate: Double;
   ImpSecValues: TArray<Double>;
-  EnabledDeviceChannels: TObjectList<TChannel>;
-  I: Integer;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
-  EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
-  try
-    for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-      if (WorkTable.DeviceChannels[I] <> nil) and
-         (WorkTable.DeviceChannels[I].Enabled) then
-        EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
+  EditDeviceImpSec.Text := FloatToStr(
+    FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
+  );
+  ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
+    WorkTable,
+    WorkTable.DeviceChannels,
+    FlowRate,
+    NormalizeFloatInput(EditDeviceImpSec.Text)
+  );
 
-    EditDeviceImpSec.Text := FloatToStr(
-      FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
-    );
-    ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
-      WorkTable,
-      EnabledDeviceChannels,
-      FlowRate,
-      NormalizeFloatInput(EditDeviceImpSec.Text),
-      False
-    );
-
-    WorkTable.ApplyChannelValues(
-      EnabledDeviceChannels,
-      NormalizeFloatInput(EditDeviceCurSec.Text),
-      ImpSecValues,
-      NormalizeFloatInput(EditDeviceImpResult.Text)
-    );
-  finally
-    EnabledDeviceChannels.Free;
-  end;
+  WorkTable.ApplyChannelValues(
+    WorkTable.DeviceChannels,
+    NormalizeFloatInput(EditDeviceCurSec.Text),
+    ImpSecValues,
+    NormalizeFloatInput(EditDeviceImpResult.Text)
+  );
 
 end;
 
@@ -292,8 +279,7 @@ begin
       WorkTable,
       EnabledEtalonChannels,
       FlowRate,
-      NormalizeFloatInput(EditEtalonImpSec.Text),
-      False
+      NormalizeFloatInput(EditEtalonImpSec.Text)
     );
 
     WorkTable.ApplyChannelValues(
