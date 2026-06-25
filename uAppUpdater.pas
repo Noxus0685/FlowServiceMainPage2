@@ -34,6 +34,8 @@ const
   GITHUB_USER_AGENT = 'FlowServiceMainPage2-Updater';
   UPDATE_TEMP_FOLDER = 'FlowServiceMainPage2_Update';
   UPDATER_EXE_NAME = 'Updater.exe';
+  HTTP_CONNECTION_TIMEOUT_MS = 10000;
+  HTTP_RESPONSE_TIMEOUT_MS = 30000;
 
 type
   TReleaseAsset = record
@@ -140,6 +142,8 @@ begin
   Client := TNetHTTPClient.Create(nil);
   try
     Client.HandleRedirects := True;
+    Client.ConnectionTimeout := HTTP_CONNECTION_TIMEOUT_MS;
+    Client.ResponseTimeout := HTTP_RESPONSE_TIMEOUT_MS;
     Client.CustomHeaders['User-Agent'] := GITHUB_USER_AGENT;
     Client.CustomHeaders['Accept'] := 'application/vnd.github+json';
     Response := Client.Get(AUrl);
@@ -160,6 +164,8 @@ begin
   Client := TNetHTTPClient.Create(nil);
   try
     Client.HandleRedirects := True;
+    Client.ConnectionTimeout := HTTP_CONNECTION_TIMEOUT_MS;
+    Client.ResponseTimeout := HTTP_RESPONSE_TIMEOUT_MS;
     Client.CustomHeaders['User-Agent'] := GITHUB_USER_AGENT;
     Client.CustomHeaders['Accept'] := 'application/octet-stream';
     Stream := TFileStream.Create(AFileName, fmCreate);
@@ -265,6 +271,38 @@ begin
   Application.Terminate;
 end;
 
+
+procedure StartDownloadAndRunUpdate(const AAsset: TReleaseAsset; const AZipFile: string);
+begin
+  TThread.CreateAnonymousThread(
+    procedure
+    var
+      ErrorText: string;
+    begin
+      ErrorText := '';
+      try
+        DownloadFile(AAsset.Url, AZipFile);
+
+        if (not TFile.Exists(AZipFile)) or (TFile.GetSize(AZipFile) <= 0) or (not IsZipFile(AZipFile)) then
+          ErrorText := 'Не удалось скачать обновление. Загруженный файл не является ZIP-архивом.'
+        else if not VerifySha256IfAvailable(AZipFile, AAsset.Digest) then
+          ErrorText := 'Не удалось скачать обновление. Контрольная сумма ZIP не совпадает.';
+      except
+        on E: Exception do
+          ErrorText := 'Не удалось скачать обновление.' + sLineBreak + E.Message;
+      end;
+
+      TThread.Synchronize(nil,
+        procedure
+        begin
+          if ErrorText <> '' then
+            ShowMessage(ErrorText)
+          else
+            RunUpdaterAndClose(AZipFile);
+        end);
+    end).Start;
+end;
+
 procedure TAppUpdater.CheckAndRunUpdate;
 var
   JsonText: string;
@@ -311,29 +349,7 @@ begin
       if TFile.Exists(ZipFile) then
         TFile.Delete(ZipFile);
 
-      try
-        DownloadFile(Asset.Url, ZipFile);
-      except
-        on E: Exception do
-        begin
-          ShowMessage('Не удалось скачать обновление.' + sLineBreak + E.Message);
-          Exit;
-        end;
-      end;
-
-      if (not TFile.Exists(ZipFile)) or (TFile.GetSize(ZipFile) <= 0) or (not IsZipFile(ZipFile)) then
-      begin
-        ShowMessage('Не удалось скачать обновление. Загруженный файл не является ZIP-архивом.');
-        Exit;
-      end;
-
-      if not VerifySha256IfAvailable(ZipFile, Asset.Digest) then
-      begin
-        ShowMessage('Не удалось скачать обновление. Контрольная сумма ZIP не совпадает.');
-        Exit;
-      end;
-
-      RunUpdaterAndClose(ZipFile);
+      StartDownloadAndRunUpdate(Asset, ZipFile);
     finally
       JsonValue.Free;
     end;
