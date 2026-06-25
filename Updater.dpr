@@ -22,8 +22,8 @@ const
   GITHUB_LATEST_RELEASE_URL = 'https://api.github.com/repos/makspyankov150796-design/FlowServiceMainPage2-Updates/releases/latest';
   GITHUB_USER_AGENT = 'FlowServiceMainPage2-Updater';
   UPDATE_TEMP_FOLDER = 'FlowServiceMainPage2_Update';
-  HTTP_CONNECTION_TIMEOUT_MS = 10000;
-  HTTP_RESPONSE_TIMEOUT_MS = 30000;
+  HTTP_CONNECTION_TIMEOUT_MS = 15000;
+  HTTP_RESPONSE_TIMEOUT_MS = 120000;
 
 type
   TReleaseAsset = record
@@ -150,12 +150,35 @@ begin
   end;
 end;
 
-procedure DownloadFile(const AUrl, AFileName: string);
+type
+  TUpdateDownloader = class
+  private
+    procedure OnReceiveData(const Sender: TObject; AContentLength: Int64;
+      AReadCount: Int64; var Abort: Boolean);
+  public
+    procedure DownloadFile(const AUrl, ALocalFile: string);
+  end;
+
+procedure TUpdateDownloader.OnReceiveData(const Sender: TObject;
+  AContentLength: Int64; AReadCount: Int64; var Abort: Boolean);
+begin
+  if AContentLength > 0 then
+    Write(#13 + Format('Downloaded: %.1f%%  %d / %d bytes',
+      [AReadCount / AContentLength * 100, AReadCount, AContentLength]))
+  else
+    Write(#13 + Format('Downloaded: %d bytes', [AReadCount]));
+end;
+
+procedure TUpdateDownloader.DownloadFile(const AUrl, ALocalFile: string);
 var
   Client: TNetHTTPClient;
   Response: IHTTPResponse;
   Stream: TFileStream;
 begin
+  Writeln('URL: ' + AUrl);
+  Writeln('Local file: ' + ALocalFile);
+  Writeln('Start download...');
+
   Client := TNetHTTPClient.Create(nil);
   try
     Client.HandleRedirects := True;
@@ -163,16 +186,47 @@ begin
     Client.ResponseTimeout := HTTP_RESPONSE_TIMEOUT_MS;
     Client.CustomHeaders['User-Agent'] := GITHUB_USER_AGENT;
     Client.CustomHeaders['Accept'] := 'application/octet-stream';
-    Stream := TFileStream.Create(AFileName, fmCreate);
+    Client.OnReceiveData := OnReceiveData;
+
+    Stream := TFileStream.Create(ALocalFile, fmCreate);
     try
-      Response := Client.Get(AUrl, Stream);
-      if Response.StatusCode <> 200 then
-        raise Exception.CreateFmt('HTTP %d: %s', [Response.StatusCode, Response.StatusText]);
+      try
+        Response := Client.Get(AUrl, Stream);
+        Writeln;
+        Writeln(Format('HTTP status: %d %s', [Response.StatusCode, Response.StatusText]));
+        Writeln(Format('Saved size: %d bytes', [Stream.Size]));
+
+        if Response.StatusCode <> 200 then
+          raise Exception.CreateFmt('HTTP error: %d %s', [Response.StatusCode, Response.StatusText]);
+        if Stream.Size <= 0 then
+          raise Exception.Create('Downloaded file is empty');
+
+        Writeln('Download completed.');
+      except
+        on E: Exception do
+        begin
+          Writeln;
+          Writeln('ERROR: ' + E.ClassName + ': ' + E.Message);
+          raise;
+        end;
+      end;
     finally
       Stream.Free;
     end;
   finally
     Client.Free;
+  end;
+end;
+
+procedure DownloadFile(const AUrl, AFileName: string);
+var
+  Downloader: TUpdateDownloader;
+begin
+  Downloader := TUpdateDownloader.Create;
+  try
+    Downloader.DownloadFile(AUrl, AFileName);
+  finally
+    Downloader.Free;
   end;
 end;
 
@@ -434,7 +488,9 @@ var
   ProgramDir: string;
   MainExeName: string;
   MainProcessId: Cardinal;
+  ManualMode: Boolean;
 begin
+  ManualMode := ParamCount = 0;
   try
     if ParamCount >= 2 then
     begin
@@ -458,9 +514,16 @@ begin
   except
     on E: Exception do
     begin
+      Writeln('ERROR: ' + E.ClassName + ': ' + E.Message);
       ErrorMsg(E.Message);
       if (ProgramDir <> '') and (MainExeName <> '') then
         StartMainExe(ProgramDir, MainExeName);
     end;
+  end;
+
+  if ManualMode then
+  begin
+    Writeln('Press Enter...');
+    Readln;
   end;
 end.
