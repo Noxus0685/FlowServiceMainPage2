@@ -11,6 +11,26 @@ uses
   Winapi.ShellAPI,
   Winapi.Windows;
 
+
+function IsZipFile(const AFileName: string): Boolean;
+var
+  Stream: TFileStream;
+  Header: array[0..1] of Byte;
+begin
+  Result := False;
+  if (not TFile.Exists(AFileName)) or (TFile.GetSize(AFileName) < 4) then
+    Exit;
+
+  Stream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    if Stream.Read(Header, SizeOf(Header)) <> SizeOf(Header) then
+      Exit;
+    Result := (Header[0] = Ord('P')) and (Header[1] = Ord('K'));
+  finally
+    Stream.Free;
+  end;
+end;
+
 function IsExcludedFromUpdate(const ARelativeName: string): Boolean;
 var
   Ext: string;
@@ -149,6 +169,8 @@ begin
 
     if not TFile.Exists(ZipFile) then
       raise Exception.Create('ZIP-файл обновления не найден.');
+    if not IsZipFile(ZipFile) then
+      raise Exception.Create('Файл обновления не является ZIP-архивом. Скачайте обновление повторно.');
     if not TDirectory.Exists(ProgramDir) then
       raise Exception.Create('Папка программы не найдена.');
     if MainExeName = '' then
