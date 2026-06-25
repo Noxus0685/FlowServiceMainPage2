@@ -421,14 +421,15 @@ begin
     LatestVersion := NormalizeVersion(TagName);
     if LatestVersion = '' then
       raise Exception.Create('В релизе не указан tag_name.');
-    if TryReadLocalVersion(AProgramDir, LocalVersion) and
-      (CompareVersions(LatestVersion, LocalVersion) <= 0) then
+    if TryReadLocalVersion(AProgramDir, LocalVersion) and SameText(LatestVersion, LocalVersion) then
     begin
-      Info('Установлена актуальная версия.');
-      StartMainExe(AProgramDir, AMainExeName);
-      Exit;
-    end;
-    if not Confirm('Доступна новая версия ' + LatestVersion + '. Установить обновление?') then
+      if not Confirm('Установлена актуальная версия ' + LatestVersion + '. Переустановить эту версию?') then
+      begin
+        StartMainExe(AProgramDir, AMainExeName);
+        Exit;
+      end;
+    end
+    else if not Confirm('Доступна новая версия ' + LatestVersion + '. Установить обновление?') then
     begin
       StartMainExe(AProgramDir, AMainExeName);
       Exit;
