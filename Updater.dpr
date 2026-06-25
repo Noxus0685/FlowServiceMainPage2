@@ -12,6 +12,7 @@ uses
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
   System.SysUtils,
+  System.Types,
   System.Zip,
   uAppVersion in 'uAppVersion.pas',
   Winapi.ShellAPI,
@@ -317,6 +318,66 @@ begin
   end;
 end;
 
+
+function FindDefaultMainExe(var AProgramDir: string): string;
+var
+  Files: TStringDynArray;
+  FileName: string;
+  RootDir: string;
+  FoundExeName: string;
+
+  function TryUseFile(const AFileName: string): Boolean;
+  begin
+    Result := TFile.Exists(AFileName);
+    if Result then
+    begin
+      AProgramDir := IncludeTrailingPathDelimiter(ExtractFilePath(AFileName));
+      FoundExeName := ExtractFileName(AFileName);
+    end;
+  end;
+
+begin
+  Result := '';
+  FoundExeName := '';
+  RootDir := AProgramDir;
+
+  if TryUseFile(TPath.Combine(RootDir, 'FlowServiceMainPage2.exe')) then
+  begin
+    Result := FoundExeName;
+    Exit;
+  end;
+  if TryUseFile(TPath.Combine(RootDir, 'ProjectFornTest.exe')) then
+  begin
+    Result := FoundExeName;
+    Exit;
+  end;
+
+  Files := TDirectory.GetFiles(RootDir, 'FlowServiceMainPage2.exe', TSearchOption.soAllDirectories);
+  if Length(Files) > 0 then
+  begin
+    TryUseFile(Files[0]);
+    Result := FoundExeName;
+    Exit;
+  end;
+
+  Files := TDirectory.GetFiles(RootDir, 'ProjectFornTest.exe', TSearchOption.soAllDirectories);
+  if Length(Files) > 0 then
+  begin
+    TryUseFile(Files[0]);
+    Result := FoundExeName;
+    Exit;
+  end;
+
+  Files := TDirectory.GetFiles(RootDir, '*.exe', TSearchOption.soAllDirectories);
+  for FileName in Files do
+    if not SameText(ExtractFileName(FileName), ExtractFileName(ParamStr(0))) then
+    begin
+      TryUseFile(FileName);
+      Result := FoundExeName;
+      Exit;
+    end;
+end;
+
 procedure CheckDownloadAndApply(const AProgramDir, AMainExeName: string; const AMainProcessId: Cardinal);
 var
   JsonText: string;
@@ -375,17 +436,24 @@ var
   MainProcessId: Cardinal;
 begin
   try
-    if ParamCount < 2 then
-      raise Exception.Create('Usage: Updater.exe <program_dir> <main_exe> [main_pid]');
-    ProgramDir := IncludeTrailingPathDelimiter(ParamStr(1));
-    MainExeName := ParamStr(2);
+    if ParamCount >= 2 then
+    begin
+      ProgramDir := IncludeTrailingPathDelimiter(ParamStr(1));
+      MainExeName := ParamStr(2);
+    end
+    else
+    begin
+      ProgramDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0)));
+      MainExeName := FindDefaultMainExe(ProgramDir);
+    end;
+
     MainProcessId := 0;
     if ParamCount >= 3 then
       MainProcessId := StrToIntDef(ParamStr(3), 0);
     if not TDirectory.Exists(ProgramDir) then
       raise Exception.Create('Папка программы не найдена.');
     if MainExeName = '' then
-      raise Exception.Create('Не указано имя основной программы.');
+      raise Exception.Create('Не найден основной EXE. Запустите Updater.exe из папки программы или передайте параметры.');
     CheckDownloadAndApply(ProgramDir, MainExeName, MainProcessId);
   except
     on E: Exception do
