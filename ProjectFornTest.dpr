@@ -29,6 +29,8 @@ uses
   uProtocols in 'uProtocols.pas',
   uRepositories in 'uRepositories.pas',
   uAppServices in 'uAppServices.pas',
+  uAppUpdater in 'uAppUpdater.pas',
+  uAppVersion in 'uAppVersion.pas',
   uTable_Data in 'uTable_Data.pas' {TableDM: TDataModule},
   uWorkTable in 'uWorkTable.pas',
   frmChannelProperties in 'frmChannelProperties.pas' {FrameChannelProperties: TFrame},
