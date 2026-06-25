@@ -84,33 +84,32 @@ begin
   end;
 end;
 
-procedure WaitForMainExe(const AProgramDir, AMainExeName: string);
+procedure WaitForMainExe(const AProgramDir, AMainExeName: string; const AMainProcessId: Cardinal);
 var
   MainExePath: string;
   Deadline: TDateTime;
+  ProcessHandle: THandle;
 begin
+  if AMainProcessId <> 0 then
+  begin
+    ProcessHandle := OpenProcess(SYNCHRONIZE, False, AMainProcessId);
+    if ProcessHandle <> 0 then
+    try
+      WaitForSingleObject(ProcessHandle, INFINITE);
+      Exit;
+    finally
+      CloseHandle(ProcessHandle);
+    end;
+  end;
+
   MainExePath := TPath.Combine(AProgramDir, AMainExeName);
-  Deadline := IncSecond(Now, 120);
+  Deadline := IncSecond(Now, 5);
 
   while (Now < Deadline) and (not CanOpenExclusive(MainExePath)) do
-    Sleep(1000);
+    Sleep(50);
 
   if not CanOpenExclusive(MainExePath) then
     raise Exception.Create('Основная программа не закрылась за отведенное время.');
-end;
-
-procedure BackupExistingFile(const AProgramDir, ABackupDir, ATargetPath: string);
-var
-  RelativeName: string;
-  BackupPath: string;
-begin
-  if not TFile.Exists(ATargetPath) then
-    Exit;
-
-  RelativeName := ATargetPath.Substring(Length(IncludeTrailingPathDelimiter(TPath.GetFullPath(AProgramDir))));
-  BackupPath := TPath.Combine(ABackupDir, RelativeName);
-  TDirectory.CreateDirectory(ExtractFilePath(BackupPath));
-  TFile.Copy(ATargetPath, BackupPath, True);
 end;
 
 procedure ApplyUpdate(const AZipFile, AProgramDir: string);
@@ -119,11 +118,7 @@ var
   I: Integer;
   ZipName: string;
   TargetPath: string;
-  BackupDir: string;
 begin
-  BackupDir := TPath.Combine(AProgramDir, 'backup_before_update_' + FormatDateTime('yyyymmdd_hhnnss', Now));
-  TDirectory.CreateDirectory(BackupDir);
-
   Zip := TZipFile.Create;
   try
     Zip.Open(AZipFile, zmRead);
@@ -136,7 +131,6 @@ begin
         Continue;
 
       TDirectory.CreateDirectory(ExtractFilePath(TargetPath));
-      BackupExistingFile(AProgramDir, BackupDir, TargetPath);
       if TFile.Exists(TargetPath) then
         TFile.Delete(TargetPath);
       Zip.Extract(ZipName, AProgramDir, True);
@@ -158,6 +152,7 @@ var
   ZipFile: string;
   ProgramDir: string;
   MainExeName: string;
+  MainProcessId: Cardinal;
 begin
   try
     if ParamCount < 3 then
@@ -166,6 +161,9 @@ begin
     ZipFile := ParamStr(1);
     ProgramDir := IncludeTrailingPathDelimiter(ParamStr(2));
     MainExeName := ParamStr(3);
+    MainProcessId := 0;
+    if ParamCount >= 4 then
+      MainProcessId := StrToIntDef(ParamStr(4), 0);
 
     if not TFile.Exists(ZipFile) then
       raise Exception.Create('ZIP-файл обновления не найден.');
@@ -176,7 +174,7 @@ begin
     if MainExeName = '' then
       raise Exception.Create('Не указано имя основной программы.');
 
-    WaitForMainExe(ProgramDir, MainExeName);
+    WaitForMainExe(ProgramDir, MainExeName, MainProcessId);
     ApplyUpdate(ZipFile, ProgramDir);
     StartMainExe(ProgramDir, MainExeName);
   except

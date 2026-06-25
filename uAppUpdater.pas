@@ -257,7 +257,8 @@ begin
   if UpdaterPath = '' then
     raise Exception.Create('Updater.exe не найден в папке программы или папке проекта.');
 
-  Params := QuoteParam(AZipFile) + ' ' + QuoteParam(ProgramFolder) + ' ' + QuoteParam(MainExeName);
+  Params := QuoteParam(AZipFile) + ' ' + QuoteParam(ProgramFolder) + ' ' +
+    QuoteParam(MainExeName) + ' ' + IntToStr(GetCurrentProcessId);
   if ShellExecute(0, 'open', PChar(UpdaterPath), PChar(Params), PChar(ProgramFolder), SW_SHOWNORMAL) <= 32 then
     raise Exception.Create('Не удалось запустить Updater.exe.');
 
