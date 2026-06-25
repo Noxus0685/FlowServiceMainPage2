@@ -1,4 +1,4 @@
-unit uAppUpdater;
+﻿unit uAppUpdater;
 
 interface
 

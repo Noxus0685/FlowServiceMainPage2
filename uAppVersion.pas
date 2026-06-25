@@ -1,4 +1,4 @@
-unit uAppVersion;
+﻿unit uAppVersion;
 
 interface
 
