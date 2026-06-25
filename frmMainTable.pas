@@ -6037,6 +6037,14 @@ begin
   begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
       Value := WorkTable.EtalonChannels[ARow].Enabled
+    else if (not WorkTable.EtalonChannels[ARow].Enabled) and
+            ((GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonRawSumValue1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonStd1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonError1)) then
+      Value := '0'
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
       Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
