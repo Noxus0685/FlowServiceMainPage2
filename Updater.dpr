@@ -1,4 +1,4 @@
-program Updater;
+﻿program Updater;
 
 {$APPTYPE CONSOLE}
 

@@ -16,7 +16,7 @@ object TableMainForm: TTableMainForm
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 3
+    TabIndex = 0
     TabOrder = 0
     TabPosition = PlatformDefault
     OnChange = tcMainChange
@@ -34,7 +34,7 @@ object TableMainForm: TTableMainForm
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Padding.Left = 5.000000000000000000
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
@@ -1336,7 +1336,7 @@ object TableMainForm: TTableMainForm
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Size.Width = 44.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1598,7 +1598,7 @@ object TableMainForm: TTableMainForm
         Position.X = 160.000000000000000000
         Position.Y = 526.000000000000000000
         TabOrder = 10
-        Text = 'Обновить'
+        Text = #1056#1115#1056#177#1056#1029#1056#1109#1056#1030#1056#1105#1057#8218#1057#1034
         TextSettings.Trimming = None
         OnClick = Button1Click
       end
