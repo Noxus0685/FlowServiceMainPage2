@@ -12,9 +12,7 @@ uses
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
   System.SysUtils,
-  System.Types,
   System.Zip,
-  uAppVersion in 'uAppVersion.pas',
   Winapi.ShellAPI,
   Winapi.Windows;
 
@@ -24,6 +22,7 @@ const
   UPDATE_TEMP_FOLDER = 'FlowServiceMainPage2_Update';
   HTTP_CONNECTION_TIMEOUT_MS = 15000;
   HTTP_RESPONSE_TIMEOUT_MS = 120000;
+  VERSION_FILE_NAME = 'version.txt';
 
 type
   TReleaseAsset = record
@@ -373,63 +372,31 @@ begin
 end;
 
 
-function FindDefaultMainExe(var AProgramDir: string): string;
-var
-  Files: TStringDynArray;
-  FileName: string;
-  RootDir: string;
-  FoundExeName: string;
-
-  function TryUseFile(const AFileName: string): Boolean;
-  begin
-    Result := TFile.Exists(AFileName);
-    if Result then
-    begin
-      AProgramDir := IncludeTrailingPathDelimiter(ExtractFilePath(AFileName));
-      FoundExeName := ExtractFileName(AFileName);
-    end;
-  end;
-
+function GetDefaultMainExeName: string;
 begin
-  Result := '';
-  FoundExeName := '';
-  RootDir := AProgramDir;
+  Result := 'ProjectFornTest.exe';
+end;
 
-  if TryUseFile(TPath.Combine(RootDir, 'FlowServiceMainPage2.exe')) then
-  begin
-    Result := FoundExeName;
-    Exit;
-  end;
-  if TryUseFile(TPath.Combine(RootDir, 'ProjectFornTest.exe')) then
-  begin
-    Result := FoundExeName;
-    Exit;
-  end;
+function GetVersionFileName(const AProgramDir: string): string;
+begin
+  Result := TPath.Combine(AProgramDir, VERSION_FILE_NAME);
+end;
 
-  Files := TDirectory.GetFiles(RootDir, 'FlowServiceMainPage2.exe', TSearchOption.soAllDirectories);
-  if Length(Files) > 0 then
-  begin
-    TryUseFile(Files[0]);
-    Result := FoundExeName;
-    Exit;
-  end;
+function TryReadLocalVersion(const AProgramDir: string; out AVersion: string): Boolean;
+var
+  VersionFile: string;
+begin
+  VersionFile := GetVersionFileName(AProgramDir);
+  Result := TFile.Exists(VersionFile);
+  if Result then
+    AVersion := NormalizeVersion(TFile.ReadAllText(VersionFile, TEncoding.UTF8))
+  else
+    AVersion := '';
+end;
 
-  Files := TDirectory.GetFiles(RootDir, 'ProjectFornTest.exe', TSearchOption.soAllDirectories);
-  if Length(Files) > 0 then
-  begin
-    TryUseFile(Files[0]);
-    Result := FoundExeName;
-    Exit;
-  end;
-
-  Files := TDirectory.GetFiles(RootDir, '*.exe', TSearchOption.soAllDirectories);
-  for FileName in Files do
-    if not SameText(ExtractFileName(FileName), ExtractFileName(ParamStr(0))) then
-    begin
-      TryUseFile(FileName);
-      Result := FoundExeName;
-      Exit;
-    end;
+procedure WriteLocalVersion(const AProgramDir, AVersion: string);
+begin
+  TFile.WriteAllText(GetVersionFileName(AProgramDir), NormalizeVersion(AVersion), TEncoding.UTF8);
 end;
 
 procedure CheckDownloadAndApply(const AProgramDir, AMainExeName: string; const AMainProcessId: Cardinal);
@@ -439,6 +406,7 @@ var
   Release: TJSONObject;
   TagName: string;
   LatestVersion: string;
+  LocalVersion: string;
   Asset: TReleaseAsset;
   TempFolder: string;
   ZipFile: string;
@@ -453,7 +421,8 @@ begin
     LatestVersion := NormalizeVersion(TagName);
     if LatestVersion = '' then
       raise Exception.Create('В релизе не указан tag_name.');
-    if CompareVersions(LatestVersion, APP_VERSION) <= 0 then
+    if TryReadLocalVersion(AProgramDir, LocalVersion) and
+      (CompareVersions(LatestVersion, LocalVersion) <= 0) then
     begin
       Info('Установлена актуальная версия.');
       StartMainExe(AProgramDir, AMainExeName);
@@ -478,6 +447,7 @@ begin
       raise Exception.Create('Не удалось скачать обновление. Контрольная сумма ZIP не совпадает.');
     WaitForMainExe(AProgramDir, AMainExeName, AMainProcessId);
     ApplyUpdate(ZipFile, AProgramDir);
+    WriteLocalVersion(AProgramDir, LatestVersion);
     StartMainExe(AProgramDir, AMainExeName);
   finally
     JsonValue.Free;
@@ -500,7 +470,7 @@ begin
     else
     begin
       ProgramDir := IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0)));
-      MainExeName := FindDefaultMainExe(ProgramDir);
+      MainExeName := GetDefaultMainExeName;
     end;
 
     MainProcessId := 0;
