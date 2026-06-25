@@ -29,6 +29,7 @@ uses
   System.SysUtils,
   System.UITypes,
   uAppServices,
+  uAppUpdater,
   uBaseProcedures,
   uClasses,
   uDataManager,
@@ -83,6 +84,7 @@ type
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
     procedure EditInstrumentNameChangeTracking(Sender: TObject);
+    procedure Button1Click(Sender: TObject);
 
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure TrackStdChange(Sender: TObject);
@@ -217,6 +219,12 @@ begin
 
   if FFrameMainTable <> nil then
     FFrameMainTable.NewInstrumentName := NewName;
+end;
+
+
+procedure TTableMainForm.Button1Click(Sender: TObject);
+begin
+  AppUpdater.CheckAndRunUpdate;
 end;
 
 procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
