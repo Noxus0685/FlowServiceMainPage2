@@ -22,6 +22,7 @@ uses
   System.JSON,
   System.Math,
   System.Net.HttpClient,
+  System.Net.HttpClientComponent,
   System.SysUtils,
   System.UITypes,
   uAppVersion,
