@@ -246,7 +246,8 @@ begin
       EnabledDeviceChannels,
       FlowRate,
       NormalizeFloatInput(EditDeviceImpSec.Text),
-      False
+      False,
+      True
     );
 
     WorkTable.ApplyChannelValues(
