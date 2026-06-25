@@ -332,7 +332,7 @@ public
 
   property ValueImp: TMeterValue read FValueImp write SetValueImp;
   property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
-  property ValueCoef: TMeterValue read GetValueCoef write SetValueCoef;
+   property ValueCoef: TMeterValue read GetValueCoef write SetValueCoef;
   property ValueMassCoef: TMeterValue read FValueMassCoef write SetValueMassCoef;
   property ValueVolumeCoef: TMeterValue read FValueVolumeCoef write SetValueVolumeCoef;
   property ValueQuantity: TMeterValue read GetValueQuantity write SetValueQuantity;
