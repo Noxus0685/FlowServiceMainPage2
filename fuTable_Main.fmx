@@ -1598,8 +1598,9 @@ object TableMainForm: TTableMainForm
         Position.X = 160.000000000000000000
         Position.Y = 526.000000000000000000
         TabOrder = 10
-        Text = 'Button1'
+        Text = 'Обновить'
         TextSettings.Trimming = None
+        OnClick = Button1Click
       end
     end
   end
