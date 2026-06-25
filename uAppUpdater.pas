@@ -139,6 +139,7 @@ var
 begin
   Client := TNetHTTPClient.Create(nil);
   try
+    Client.HandleRedirects := True;
     Client.CustomHeaders['User-Agent'] := GITHUB_USER_AGENT;
     Client.CustomHeaders['Accept'] := 'application/vnd.github+json';
     Response := Client.Get(AUrl);
@@ -158,7 +159,9 @@ var
 begin
   Client := TNetHTTPClient.Create(nil);
   try
+    Client.HandleRedirects := True;
     Client.CustomHeaders['User-Agent'] := GITHUB_USER_AGENT;
+    Client.CustomHeaders['Accept'] := 'application/octet-stream';
     Stream := TFileStream.Create(AFileName, fmCreate);
     try
       Response := Client.Get(AUrl, Stream);
@@ -169,6 +172,26 @@ begin
     end;
   finally
     Client.Free;
+  end;
+end;
+
+
+function IsZipFile(const AFileName: string): Boolean;
+var
+  Stream: TFileStream;
+  Header: array[0..1] of Byte;
+begin
+  Result := False;
+  if (not TFile.Exists(AFileName)) or (TFile.GetSize(AFileName) < 4) then
+    Exit;
+
+  Stream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyWrite);
+  try
+    if Stream.Read(Header, SizeOf(Header)) <> SizeOf(Header) then
+      Exit;
+    Result := (Header[0] = Ord('P')) and (Header[1] = Ord('K'));
+  finally
+    Stream.Free;
   end;
 end;
 
@@ -297,9 +320,9 @@ begin
         end;
       end;
 
-      if (not TFile.Exists(ZipFile)) or (TFile.GetSize(ZipFile) <= 0) then
+      if (not TFile.Exists(ZipFile)) or (TFile.GetSize(ZipFile) <= 0) or (not IsZipFile(ZipFile)) then
       begin
-        ShowMessage('Не удалось скачать обновление.');
+        ShowMessage('Не удалось скачать обновление. Загруженный файл не является ZIP-архивом.');
         Exit;
       end;
 
