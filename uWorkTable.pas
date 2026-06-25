@@ -729,7 +729,7 @@ type
     function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate: Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil): Double;
     function BuildImpSecValuesForChannels(const AWorkTable: TWorkTable; AChannels: TObjectList<TChannel>;
-    const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+    const AFlowRate, AFallbackImpSec: Double; const ASplitByQmax: Boolean = True): TArray<Double>;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
@@ -5150,7 +5150,8 @@ begin
 end;
 
 function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkTable;
-  AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
+  AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double;
+  const ASplitByQmax: Boolean): TArray<Double>;
 var
   I: Integer;
   Coef, SUM, MaxRatio: Double;
@@ -5160,10 +5161,11 @@ begin
     Exit;
 
   SUM := 0;
-  for I := 0 to AChannels.Count - 1 do
-    if (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
-       (AChannels[I].FlowMeter.Device <> nil) then
-      SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+  if ASplitByQmax then
+    for I := 0 to AChannels.Count - 1 do
+      if (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
+         (AChannels[I].FlowMeter.Device <> nil) then
+        SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
@@ -5175,10 +5177,15 @@ begin
       Continue;
     end;
 
-    if SameValue(SUM, 0.0, 1e-12) then
-      MaxRatio := 0
+    if ASplitByQmax then
+    begin
+      if SameValue(SUM, 0.0, 1e-12) then
+        MaxRatio := 0
+      else
+        MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+    end
     else
-      MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+      MaxRatio := 1;
 
     Coef := GetChannelFlowCoef(AChannels[I]);
     if Coef > 0 then
