@@ -2487,6 +2487,7 @@ var
   Channel: TChannel;
   AggregateGroup: Integer;
   ChannelGroup: Integer;
+  ChannelFlow: Double;
   GroupFlow: Double;
   MaxGroupFlow: Double;
   GroupFlows: TDictionary<Integer, Double>;
@@ -2522,11 +2523,11 @@ begin
         Continue;
 
       ChannelGroup := GetAggregateGroupKey(I, Channel);
-      GroupFlow := Abs(Channel.FlowMeter.ValueFlow.GetDoubleValue);
+      ChannelFlow := Abs(Channel.FlowMeter.ValueFlow.GetDoubleValue);
       if GroupFlows.TryGetValue(ChannelGroup, GroupFlow) then
-        GroupFlows[ChannelGroup] := GroupFlow + Abs(Channel.FlowMeter.ValueFlow.GetDoubleValue)
+        GroupFlows[ChannelGroup] := GroupFlow + ChannelFlow
       else
-        GroupFlows.Add(ChannelGroup, GroupFlow);
+        GroupFlows.Add(ChannelGroup, ChannelFlow);
     end;
 
     for Pair in GroupFlows do
