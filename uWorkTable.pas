@@ -3090,6 +3090,8 @@ begin
 
   end;
 
+  UpdateAggregateMeterValues;
+
       Self.SetValues;
 
      for I := 0 to FEtalonChannels.Count - 1 do
