@@ -2278,12 +2278,21 @@ begin
     ASpillage.State := osModified;
 
   MatchedPoint := nil;
-  for P in FPoints do
-    if IsFlowInPoint(ASpillage.QavgEtalon, P) then
-    begin
-      MatchedPoint := P;
-      Break;
-    end;
+  if ASpillage.DevicePointID <> 0 then
+    for P in FPoints do
+      if (P <> nil) and (P.ID = ASpillage.DevicePointID) then
+      begin
+        MatchedPoint := P;
+        Break;
+      end;
+
+  if MatchedPoint = nil then
+    for P in FPoints do
+      if IsFlowInPoint(ASpillage.QavgEtalon, P) then
+      begin
+        MatchedPoint := P;
+        Break;
+      end;
 
   if MatchedPoint = nil then
   begin
@@ -2404,7 +2413,9 @@ begin
   CandidateList := TList<TPointSpillage>.Create;
   try
     for S in Spillages do
-      if (S.SessionID = ActiveSession.ID) and IsFlowInPoint(S.QavgEtalon, APoint) then
+      if (S.SessionID = ActiveSession.ID) and
+         (((S.DevicePointID <> 0) and (S.DevicePointID = APoint.ID)) or
+          IsFlowInPoint(S.QavgEtalon, APoint)) then
       begin
         APoint.DataPoints.Add(S);
         CandidateList.Add(S);
