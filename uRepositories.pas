@@ -565,7 +565,7 @@ begin
   FUUID := TGUID.NewGuid.ToString;
   FComment := '';
   FWriteAccess := True;
-  FState := osClean;
+  FState := osEmpty;
 end;
 
  procedure TBaseRepository.Init(
