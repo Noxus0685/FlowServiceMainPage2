@@ -2734,7 +2734,7 @@ var
   P: TDevicePoint;
   LQ, V, Tm: Double;
 begin
-  if (Points = nil) or (Coef <= 0) then
+  if Points = nil then
     Exit;
 
   for I := 0 to Points.Count - 1 do
@@ -2748,7 +2748,8 @@ begin
       Tm := P.LimitTime;
       V := LQ * Tm / 3.6;
       P.LimitVolume := V;
-      P.LimitImp := Round(V * Coef);
+      if Coef > 0 then
+        P.LimitImp := Round(V * Coef);
     end;
   end;
 end;
