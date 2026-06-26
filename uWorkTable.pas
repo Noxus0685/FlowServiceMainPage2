@@ -2486,9 +2486,21 @@ var
   I: Integer;
   Channel: TChannel;
   AggregateGroup: Integer;
-  IsAggregateGroupDefined: Boolean;
+  ChannelGroup: Integer;
+  GroupFlow: Double;
+  MaxGroupFlow: Double;
+  GroupFlows: TDictionary<Integer, Double>;
+  Pair: TPair<Integer, Double>;
   IsQuantityTemplateSet: Boolean;
   IsFlowTemplateSet: Boolean;
+
+  function GetAggregateGroupKey(const AIndex: Integer; const AChannel: TChannel): Integer;
+  begin
+    if (AChannel <> nil) and (AChannel.Group > 0) then
+      Result := AChannel.Group
+    else
+      Result := -AIndex - 1;
+  end;
 begin
   if FTableFlow.ValueQuantity <> nil then
     FTableFlow.ValueQuantity.ClearMeterValues;
@@ -2497,8 +2509,38 @@ begin
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
-  IsAggregateGroupDefined := False;
   AggregateGroup := 0;
+  MaxGroupFlow := -1;
+
+  GroupFlows := TDictionary<Integer, Double>.Create;
+  try
+    for I := 0 to FEtalonChannels.Count - 1 do
+    begin
+      Channel := FEtalonChannels[I];
+      if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) or
+         (Channel.FlowMeter.ValueFlow = nil) then
+        Continue;
+
+      ChannelGroup := GetAggregateGroupKey(I, Channel);
+      GroupFlow := Abs(Channel.FlowMeter.ValueFlow.GetDoubleValue);
+      if GroupFlows.TryGetValue(ChannelGroup, GroupFlow) then
+        GroupFlows[ChannelGroup] := GroupFlow + Abs(Channel.FlowMeter.ValueFlow.GetDoubleValue)
+      else
+        GroupFlows.Add(ChannelGroup, GroupFlow);
+    end;
+
+    for Pair in GroupFlows do
+      if Pair.Value > MaxGroupFlow then
+      begin
+        MaxGroupFlow := Pair.Value;
+        AggregateGroup := Pair.Key;
+      end;
+  finally
+    GroupFlows.Free;
+  end;
+
+  if MaxGroupFlow < 0 then
+    Exit;
 
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
@@ -2506,13 +2548,7 @@ begin
     if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
       Continue;
 
-    if not IsAggregateGroupDefined then
-    begin
-      AggregateGroup := Channel.Group;
-      IsAggregateGroupDefined := True;
-    end;
-
-    if Channel.Group <> AggregateGroup then
+    if GetAggregateGroupKey(I, Channel) <> AggregateGroup then
       Continue;
 
     if (FTableFlow.ValueQuantity <> nil) and (Channel.FlowMeter.ValueQuantity <> nil) then
