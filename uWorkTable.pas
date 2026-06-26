@@ -4388,6 +4388,11 @@ begin
       Point.DateTime := Now;
       Point.SpillTime := ValueTime.GetDoubleValue;
       Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
+      if CurrentPoint <> nil then
+      begin
+        Point.DevicePointID := CurrentPoint.ID;
+        Point.Name := CurrentPoint.Name;
+      end;
 
       Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
 
