@@ -565,7 +565,7 @@ begin
   FUUID := TGUID.NewGuid.ToString;
   FComment := '';
   FWriteAccess := True;
-  FState := osClean;
+  FState := osEmpty;
 end;
 
  procedure TBaseRepository.Init(
@@ -673,7 +673,7 @@ begin
     if not LoadTypes then
       raise Exception.Create('Не удалось загрузить типы');
 
-    FState := osLoaded;
+    FState := osClean;
     Result := True;
 
   except
@@ -3144,7 +3144,7 @@ begin
   InitDevices;
   InitDevicePoints;
 
-  FState := osLoaded;
+  FState := osClean;
 end;
 
 function TDeviceRepository.InitDevices: TObjectList<TDevice>;
@@ -3160,7 +3160,7 @@ begin
   D.ID := FNextDeviceID;
   Inc(FNextDeviceID);
 
-  D.State := osLoaded;
+  D.State := osClean;
 
   D.Name := 'Расходомер ВЗЛЕТ ТЭР';
   D.SerialNumber := 'A123456';
@@ -3195,7 +3195,7 @@ begin
   D.ID := FNextDeviceID;
   Inc(FNextDeviceID);
 
-  D.State := osLoaded;
+  D.State := osClean;
 
   D.Name := 'Счётчик воды СВК-15';
   D.SerialNumber := 'W987654';
@@ -3236,7 +3236,7 @@ begin
 //  P.ID := FNextPointID;
 //  Inc(FNextPointID);
 //
-//  P.State := osLoaded;
+//  P.State := osClean;
 //
 //  P.DeviceID := 1;
 //  P.Num := 1;
@@ -3263,7 +3263,7 @@ begin
 //  P.ID := FNextPointID;
 //  Inc(FNextPointID);
 //
-//  P.State := osLoaded;
+//  P.State := osClean;
 //
 //  P.DeviceID := 1;
 //  P.Num := 2;
@@ -3386,7 +3386,7 @@ begin
       for k := 1 to 3 do
       begin
         P := D.AddPoint;
-        P.State    := osLoaded;
+        P.State    := osClean;
         P.DeviceID := D.ID;
         P.Num      := k;
 
@@ -3420,7 +3420,7 @@ begin
     end;
   end;
 
-  FState := osLoaded;
+  FState := osClean;
 end;
 
 function TDeviceRepository.Load: Boolean;
@@ -3471,7 +3471,7 @@ begin
     { 4. ИТОГ }
     {==================================================}
 
-    FState := osLoaded;
+    FState := osClean;
     Result := True;
 
   except
@@ -3584,7 +3584,7 @@ begin
 
     if SaveErrors.Count > 0 then
     begin
-      FState := osLoaded;
+      FState := osClean;
       ShowMessage('Сохранение выполнено с предупреждениями:' + sLineBreak + SaveErrors.Text);
     end
     else
@@ -4118,7 +4118,7 @@ begin
 
       if LoadErrors.Count > 0 then
       begin
-        FState := osLoaded;
+        FState := osClean;
         ShowMessage('Часть данных приборов не загружена:' + sLineBreak + LoadErrors.Text);
       end
       else

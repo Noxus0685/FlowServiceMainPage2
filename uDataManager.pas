@@ -596,7 +596,7 @@ begin
       if not Repo.WriteAccess then
         Continue;
 
-      if (Repo.State <> osLoaded) and (Repo.State <> osClean)    then
+      if Repo.State <> osClean then
         Repo.Save;
     end;
 
@@ -606,7 +606,7 @@ begin
       if not Repo.WriteAccess then
         Continue;
 
-      if (Repo.State <> osLoaded) and (Repo.State <> osClean) then
+      if Repo.State <> osClean then
         Repo.Save;
     end;
 
@@ -850,7 +850,7 @@ begin
           if Repo = nil then
             Continue;
 
-          if Repo.State <> osLoaded then
+          if Repo.State <> osClean then
             Repo.Load;
         end;
 
@@ -878,7 +878,7 @@ begin
           if Repo = nil then
             Continue;
 
-          if Repo.State <> osLoaded then
+          if Repo.State <> osClean then
             Repo.Load;
         end;
       end;
@@ -1026,7 +1026,7 @@ begin
     {--------------------------------------------------}
     { 4. Загружаем/инициализируем схему и данные }
     {--------------------------------------------------}
-    if Repo.State <> osLoaded then
+    if Repo.State <> osClean then
       Repo.Load;
 
   except

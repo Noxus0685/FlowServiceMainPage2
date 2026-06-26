@@ -4375,6 +4375,7 @@ begin
     if Session = nil then
       Session := Device.AddSessionSpillage;
     Session.State := osModified;
+    Device.State := osModified;
 
     if Session.DateTimeOpen = 0 then
       Session.DateTimeOpen := Now;
