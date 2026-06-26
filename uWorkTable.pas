@@ -2503,7 +2503,7 @@ begin
   for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
+    if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
       Continue;
 
     if not IsAggregateGroupDefined then
@@ -2563,7 +2563,7 @@ begin
     for I := 0 to FEtalonChannels.Count - 1 do
     begin
       Channel := FEtalonChannels[I];
-      if (Channel = nil) or
+      if (Channel = nil) or (not Channel.Enabled) or
          (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
         Continue;
 
