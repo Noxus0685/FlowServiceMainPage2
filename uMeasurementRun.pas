@@ -802,9 +802,6 @@ begin
   if Point <> nil then
     Point.Status := 9;
 
-  if FWorkTable <> nil then
-    FWorkTable.SaveMeasurementResults;
-
   FireEvent(meMeasureCompleted);
   FireEvent(meResultReady);
 end;
