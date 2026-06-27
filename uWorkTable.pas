@@ -4503,6 +4503,13 @@ end;
 procedure TWorkTable.StartMeasurementRun;
 begin
     StartMeasurementRun(Integer(MeasurementMode));
+
+  FMode := MeasurementMode;
+  TMeasurementRun(FMeasurementRun).Mode := MeasurementMode;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'StartMeasurementRun',
+    'Запуск измерения', Format('Mode=%d', [Ord(MeasurementMode)]));
+  TMeasurementRun(FMeasurementRun).Execute(mcStart);
+
 end;
 
 
