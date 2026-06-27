@@ -1,4 +1,4 @@
-﻿object TableMainForm: TTableMainForm
+object TableMainForm: TTableMainForm
   Left = 0
   Top = 0
   Caption = #1058#1072#1073#1083#1080#1095#1085#1086#1077' '#1087#1088#1077#1076#1089#1090#1072#1074#1083#1077#1085#1080#1077
@@ -1598,7 +1598,7 @@
         Position.X = 160.000000000000000000
         Position.Y = 526.000000000000000000
         TabOrder = 10
-        Text = 'Обновить'
+        Text = #1054#1073#1085#1086#1074#1080#1090#1100
         TextSettings.Trimming = None
         OnClick = Button1Click
       end
