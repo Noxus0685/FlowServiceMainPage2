@@ -3639,7 +3639,10 @@ begin
 
     FDM.StartTransaction;
     try
-      if (ADevice.State <> osClean) and not UpdateDevice(ADevice) then
+      if ADevice.State = osClean then
+        ADevice.State := osModified;
+
+      if not UpdateDevice(ADevice) then
         raise Exception.Create('Ошибка сохранения прибора');
 
       FDM.Commit;
