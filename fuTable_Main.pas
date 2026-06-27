@@ -29,7 +29,6 @@ uses
   System.SysUtils,
   System.UITypes,
   uAppServices,
-  uAppUpdater,
   uBaseProcedures,
   uClasses,
   uDataManager,
@@ -74,7 +73,6 @@ type
     LabelStd: TLabel;
     TrackStd: TTrackBar;
     EditInstrumentName: Tedit;
-    Button1: TButton;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -84,7 +82,6 @@ type
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
     procedure EditInstrumentNameChangeTracking(Sender: TObject);
-    procedure Button1Click(Sender: TObject);
 
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure TrackStdChange(Sender: TObject);
@@ -221,11 +218,6 @@ begin
     FFrameMainTable.NewInstrumentName := NewName;
 end;
 
-
-procedure TTableMainForm.Button1Click(Sender: TObject);
-begin
-  AppUpdater.CheckAndRunUpdate;
-end;
 
 procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
