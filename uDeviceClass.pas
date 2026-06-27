@@ -1284,7 +1284,7 @@ begin
      SerialNumber := ASource.SerialNumber;
      UUID:=  ASource. UUID;
      ID:=  ASource.  ID;
-     State  := ASource.State;
+     fState  := ASource.State;
    end else
    begin
 
@@ -2278,12 +2278,21 @@ begin
     ASpillage.State := osModified;
 
   MatchedPoint := nil;
-  for P in FPoints do
-    if IsFlowInPoint(ASpillage.QavgEtalon, P) then
-    begin
-      MatchedPoint := P;
-      Break;
-    end;
+  if ASpillage.DevicePointID <> 0 then
+    for P in FPoints do
+      if (P <> nil) and (P.ID = ASpillage.DevicePointID) then
+      begin
+        MatchedPoint := P;
+        Break;
+      end;
+
+  if MatchedPoint = nil then
+    for P in FPoints do
+      if IsFlowInPoint(ASpillage.QavgEtalon, P) then
+      begin
+        MatchedPoint := P;
+        Break;
+      end;
 
   if MatchedPoint = nil then
   begin
@@ -2404,7 +2413,10 @@ begin
   CandidateList := TList<TPointSpillage>.Create;
   try
     for S in Spillages do
-      if (S.SessionID = ActiveSession.ID) and IsFlowInPoint(S.QavgEtalon, APoint) then
+      if (S <> nil) and (S.State <> osDeleted) and
+         (S.SessionID = ActiveSession.ID) and
+         (((S.DevicePointID <> 0) and (S.DevicePointID = APoint.ID)) or
+          IsFlowInPoint(S.QavgEtalon, APoint)) then
       begin
         APoint.DataPoints.Add(S);
         CandidateList.Add(S);
@@ -2554,6 +2566,7 @@ var
   AllStatus0: Boolean;
   AllStatus01: Boolean;
   AllStatus012: Boolean;
+  HasMissingData: Boolean;
 begin
   AnalyseDevicePointsResults;
 
@@ -2569,6 +2582,7 @@ begin
   AllStatus0 := True;
   AllStatus01 := True;
   AllStatus012 := True;
+  HasMissingData := False;
 
   for DP in Points do
   begin
@@ -2577,6 +2591,9 @@ begin
 
     if DP.Status <> 5 then
       AllStatus5 := False;
+
+    if DP.Status in [0, 1] then
+      HasMissingData := True;
 
     if DP.Status <> 0 then
       AllStatus0 := False;
@@ -2635,6 +2652,16 @@ begin
     StatusStr := 'Измерения не производились/не анализировались.';
     Exit;
   end;
+
+  if HasMissingData then
+  begin
+    Status := 2;
+    StatusStr := 'Есть поверочные точки без достаточных данных для результата.';
+    Exit;
+  end;
+
+  Status := 3;
+  StatusStr := 'По всем поверочным точкам есть данные, но не все точки годны.';
 end;
 
 function TDevice.FindDiameter(AType: TDeviceType): TDiameter;
@@ -2723,7 +2750,7 @@ var
   P: TDevicePoint;
   LQ, V, Tm: Double;
 begin
-  if (Points = nil) or (Coef <= 0) then
+  if Points = nil then
     Exit;
 
   for I := 0 to Points.Count - 1 do
@@ -2737,7 +2764,8 @@ begin
       Tm := P.LimitTime;
       V := LQ * Tm / 3.6;
       P.LimitVolume := V;
-      P.LimitImp := Round(V * Coef);
+      if Coef > 0 then
+        P.LimitImp := Round(V * Coef);
     end;
   end;
 end;
@@ -2855,6 +2883,8 @@ begin
 end;
 
 end.
+
+
 
 
 

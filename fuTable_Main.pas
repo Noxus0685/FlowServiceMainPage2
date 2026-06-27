@@ -218,33 +218,48 @@ begin
     FFrameMainTable.NewInstrumentName := NewName;
 end;
 
+
 procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
   FlowRate: Double;
   ImpSecValues: TArray<Double>;
+  EnabledDeviceChannels: TObjectList<TChannel>;
+  I: Integer;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
-  EditDeviceImpSec.Text := FloatToStr(
-    FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
-  );
-  ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
-    WorkTable,
-    WorkTable.DeviceChannels,
-    FlowRate,
-    NormalizeFloatInput(EditDeviceImpSec.Text)
-  );
+  EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to WorkTable.DeviceChannels.Count - 1 do
+      if (WorkTable.DeviceChannels[I] <> nil) and
+         (WorkTable.DeviceChannels[I].Enabled) then
+        EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
 
-  WorkTable.ApplyChannelValues(
-    WorkTable.DeviceChannels,
-    NormalizeFloatInput(EditDeviceCurSec.Text),
-    ImpSecValues,
-    NormalizeFloatInput(EditDeviceImpResult.Text)
-  );
+    EditDeviceImpSec.Text := FloatToStr(
+      FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
+    );
+    ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
+      WorkTable,
+      EnabledDeviceChannels,
+      FlowRate,
+      NormalizeFloatInput(EditDeviceImpSec.Text),
+      False,
+      True
+    );
+
+    WorkTable.ApplyChannelValues(
+      EnabledDeviceChannels,
+      NormalizeFloatInput(EditDeviceCurSec.Text),
+      ImpSecValues,
+      NormalizeFloatInput(EditDeviceImpResult.Text)
+    );
+  finally
+    EnabledDeviceChannels.Free;
+  end;
 
 end;
 
@@ -253,28 +268,44 @@ var
   WorkTable: TWorkTable;
   FlowRate: Double;
   ImpSecValues: TArray<Double>;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  I: Integer;
 begin
   WorkTable := FWorkTableManager.WorkTables[0];
   if WorkTable = nil then
     Exit;
 
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
-  EditEtalonImpSec.Text := FloatToStr(
-    FWorkTableManager.UpdateEtalonImpSecFromFlowRate(WorkTable, FlowRate)
-  );
-  ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
-    WorkTable,
-    WorkTable.EtalonChannels,
-    FlowRate,
-    NormalizeFloatInput(EditEtalonImpSec.Text)
-  );
+  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+      if (WorkTable.EtalonChannels[I] <> nil) and
+         (WorkTable.EtalonChannels[I].Enabled) then
+        EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
-  WorkTable.ApplyChannelValues(
-    WorkTable.EtalonChannels,
-    NormalizeFloatInput(EditEtalonCurSec.Text),
-    ImpSecValues,
-    NormalizeFloatInput(EditEtalonImpResult.Text)
-  );
+    EditEtalonImpSec.Text := FloatToStr(
+      FWorkTableManager.UpdateEtalonImpSecFromFlowRate(
+        WorkTable,
+        FlowRate,
+        EnabledEtalonChannels
+      )
+    );
+    ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
+      WorkTable,
+      EnabledEtalonChannels,
+      FlowRate,
+      NormalizeFloatInput(EditEtalonImpSec.Text)
+    );
+
+    WorkTable.ApplyChannelValues(
+      EnabledEtalonChannels,
+      NormalizeFloatInput(EditEtalonCurSec.Text),
+      ImpSecValues,
+      NormalizeFloatInput(EditEtalonImpResult.Text)
+    );
+  finally
+    EnabledEtalonChannels.Free;
+  end;
 
 end;
 
@@ -316,16 +347,30 @@ end;
 procedure TTableMainForm.EditEtalonFlowRateExit(Sender: TObject);
 var
   WorkTable: TWorkTable;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  I: Integer;
 begin
   WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
-  EditEtalonImpSec.Text := FloatToStr(
-    FWorkTableManager.UpdateEtalonImpSecFromFlowRate(
-      WorkTable,
-      NormalizeFloatInput(EditEtalonFlowRate.Text)
-    )
-  );
+
+  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to WorkTable.EtalonChannels.Count - 1 do
+      if (WorkTable.EtalonChannels[I] <> nil) and
+         (WorkTable.EtalonChannels[I].Enabled) then
+        EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
+
+    EditEtalonImpSec.Text := FloatToStr(
+      FWorkTableManager.UpdateEtalonImpSecFromFlowRate(
+        WorkTable,
+        NormalizeFloatInput(EditEtalonFlowRate.Text),
+        EnabledEtalonChannels
+      )
+    );
+  finally
+    EnabledEtalonChannels.Free;
+  end;
 end;
 
 

@@ -917,7 +917,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 38
+            TabOrder = 39
             object Label21: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -953,7 +953,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
             Visible = False
-            TabOrder = 39
+            TabOrder = 40
             object Label22: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -973,7 +973,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 41
+            TabOrder = 42
             object Label5: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1010,7 +1010,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 37
+            TabOrder = 38
             object Label6: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1081,7 +1081,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 38
+            TabOrder = 39
             object Label16: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1118,7 +1118,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 40
+            TabOrder = 41
             object labCurrentMin: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1155,7 +1155,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
             Visible = False
-            TabOrder = 39
+            TabOrder = 40
             object Label17: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1175,7 +1175,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 37
+            TabOrder = 38
             object Label20: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1394,7 +1394,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 40
+            TabOrder = 41
             object Label25: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1438,7 +1438,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 39
+            TabOrder = 40
             object edtAddr: TEdit
               Touch.InteractiveGestures = [LongTap, DoubleTap]
               Align = Client
@@ -1475,7 +1475,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 37
+            TabOrder = 38
             object Label27: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1510,7 +1510,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 38
+            TabOrder = 39
             object Label26: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1577,7 +1577,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 37
+            TabOrder = 38
             object Label8: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1613,7 +1613,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Height = 38.000000000000000000
             Size.PlatformDefault = False
             Visible = False
-            TabOrder = 40
+            TabOrder = 41
             object Label10: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1653,7 +1653,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Height = 38.000000000000000000
             Size.PlatformDefault = False
             Visible = False
-            TabOrder = 38
+            TabOrder = 39
             object Label12: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1690,7 +1690,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Height = 38.000000000000000000
             Size.PlatformDefault = False
             Visible = False
-            TabOrder = 39
+            TabOrder = 40
             object Label13: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1761,7 +1761,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 37
+            TabOrder = 38
             object Label35: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1801,7 +1801,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 38.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 40
+            TabOrder = 41
             object Label36: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1843,7 +1843,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Height = 38.000000000000000000
             Size.PlatformDefault = False
             Visible = False
-            TabOrder = 38
+            TabOrder = 39
             object Label37: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -1879,7 +1879,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 323.000000000000000000
             Size.Height = 38.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 39
+            TabOrder = 40
             object Label38: TLabel
               Align = Left
               Position.X = 5.000000000000000000
@@ -2017,14 +2017,12 @@ object FormDeviceEditor: TFormDeviceEditor
             HeaderSettings.TextSettings.WordWrap = False
           end
           object IntegerColumnPointRepeatsForm: TIntegerColumn
-            Enabled = False
             Header = #1055#1086#1074#1090#1086#1088#1086#1074
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
             Size.Width = 74.000000000000000000
           end
           object IntegerColumnPointRepeats: TIntegerColumn
-            Enabled = False
             Header = #1057#1077#1088#1080#1103' '#1080#1079#1084'-'#1080#1081
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
@@ -2569,8 +2567,8 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.PlatformDefault = False
       TabOrder = 2
       Visible = False
-      Viewport.Width = 909.000000000000000000
-      Viewport.Height = 50.000000000000000000
+      Viewport.Width = 905.000000000000000000
+      Viewport.Height = 46.000000000000000000
     end
     object DeepSeek: TSpeedButton
       Position.X = 872.000000000000000000

@@ -605,8 +605,11 @@ var
   OldStage: EMeasurementState;
   TransitionText: string;
 begin
+
   if FCurrentStage = ANewStage then
     Exit;
+
+  FWaitStartedTick := TThread.GetTickCount64;
 
   OldStage := FCurrentStage;
   TransitionText := Format('%s -> %s', [MeasurementStateToString(OldStage),
@@ -625,7 +628,7 @@ begin
   FCurrentStage := ANewStage;
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
-    'Переход этапа измерения', TransitionText);
+    'Переход этапа измерения, тайм аут: ' +inttostr(TThread.GetTickCount64 - FWaitStartedTick)+'; ', TransitionText);
   if FWorkTable <> nil then
     FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
   Notify(Integer(meStateChanged));
@@ -643,7 +646,7 @@ end;
 
 procedure TMeasurementRun.DoEnterStage(AOldStage, ANewStage: EMeasurementState);
 begin
-  FWaitStartedTick := TThread.GetTickCount64;
+
   case ANewStage of
     msSelectPoint: EnterSelectPoint;
     msSelectEtalon: EnterSelectEtalon;
@@ -798,9 +801,6 @@ begin
   Point := GetCurrentPoint;
   if Point <> nil then
     Point.Status := 9;
-
-  if FWorkTable <> nil then
-    FWorkTable.SaveMeasurementResults;
 
   FireEvent(meMeasureCompleted);
   FireEvent(meResultReady);

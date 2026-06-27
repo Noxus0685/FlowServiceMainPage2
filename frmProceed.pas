@@ -360,6 +360,7 @@ end;
 
 procedure TFrameProceed.RefreshResultsTab;
 begin
+  SyncProcessingDevicesFromAllTables(False);
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
@@ -828,7 +829,7 @@ begin
     1: Result := '-';
     2: Result := 'Нет данных';
     3: Result := 'Не Годен';
-    4: Result := 'Нет данных';
+    4: Result := 'Не Годен';
     5: Result := 'Годен';
   else
     Result := '-';
@@ -840,6 +841,11 @@ var
   AllSameType: Boolean;
   FirstTypeName: string;
   HeaderFromPoints: TArray<string>;
+
+  function FormatPointHeader(const APointName: string): string;
+  begin
+    Result := #948 + '(' + APointName + '), %';
+  end;
 begin
   MaxPoints := 0;
   for I := 0 to High(FCurrentResultRows) do
@@ -874,17 +880,17 @@ begin
 
   if AllSameType and (Length(HeaderFromPoints) > 0) then
   begin
-    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := HeaderFromPoints[0];
-    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := HeaderFromPoints[1];
-    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := HeaderFromPoints[2];
-    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := HeaderFromPoints[3];
+    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := FormatPointHeader(HeaderFromPoints[0]);
+    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := FormatPointHeader(HeaderFromPoints[1]);
+    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := FormatPointHeader(HeaderFromPoints[2]);
+    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := FormatPointHeader(HeaderFromPoints[3]);
   end
   else
   begin
-    StringColumnPointNum1.Header := 'Q1';
-    StringColumnPointNum2.Header := 'Q2';
-    StringColumnPointNum3.Header := 'Q3';
-    StringColumnPointNum4.Header := 'Q4';
+    StringColumnPointNum1.Header := FormatPointHeader('Q1');
+    StringColumnPointNum2.Header := FormatPointHeader('Q2');
+    StringColumnPointNum3.Header := FormatPointHeader('Q3');
+    StringColumnPointNum4.Header := FormatPointHeader('Q4');
   end;
 end;
 procedure TFrameProceed.ShowAllDevicesResults;
@@ -1811,6 +1817,15 @@ begin
     Exit;
 
   Point.State := osDeleted;
+  if (Device.Spillages <> nil) and (Point.ID > 0) then
+    for Point in Device.Spillages do
+      if (Point <> nil) and (Point.ID = FCurrentSpillages[GridDataPoints.Row].ID) then
+      begin
+        Point.State := osDeleted;
+        Break;
+      end;
+  if Device.State = osClean then
+    Device.State := osModified;
   Session.State := osModified;
 
   Repo := nil;
@@ -1832,8 +1847,8 @@ begin
     Exit;
 
   Point.State := osDeleted;
-  //if Session.State = osClean then
-  //  Session.State := osModified;
+  if Device.State = osClean then
+    Device.State := osModified;
 
   Repo := nil;
   if AppServices.DataManager <> nil then
@@ -2098,6 +2113,15 @@ begin
     NextPoint := FCurrentSpillages[GridDataPoints.Row + 1];
 
   Point.State := osDeleted;
+  if (Session <> nil) and (Device.Spillages <> nil) and (Point.ID > 0) then
+    for I := 0 to Device.Spillages.Count - 1 do
+      if (Device.Spillages[I] <> nil) and (Device.Spillages[I].ID = Point.ID) then
+      begin
+        Device.Spillages[I].State := osDeleted;
+        Break;
+      end;
+  if Device.State = osClean then
+    Device.State := osModified;
   if (Session <> nil) then
     Session.State := osModified;
 
@@ -2139,6 +2163,7 @@ var
   Ch: TChannel;
   WT: TWorkTable;
   Repo: TDeviceRepository;
+  DeviceUUIDs: TStringList;
   I, NextIdx: Integer;
 begin
   ResetPointDeleteConfirm;
@@ -2163,9 +2188,49 @@ begin
     if (WT = nil) or (WT.DeviceChannels = nil) then
       Exit;
 
-    for Ch in WT.DeviceChannels do
-      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        RemoveProcessingDevice(Ch.FlowMeter.Device);
+    if MessageDlg('Очистить все результаты приборов данного рабочего стола?',
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit;
+
+    Repo := nil;
+    if AppServices.DataManager <> nil then
+      Repo := AppServices.DataManager.ActiveDeviceRepo;
+
+    DeviceUUIDs := TStringList.Create;
+    try
+      DeviceUUIDs.Sorted := False;
+      DeviceUUIDs.Duplicates := TDuplicates.dupIgnore;
+
+      for Ch in WT.DeviceChannels do
+        if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+        begin
+          Device := Ch.FlowMeter.Device;
+          if Trim(Device.UUID) <> '' then
+          begin
+            if DeviceUUIDs.IndexOf(Device.UUID) >= 0 then
+              Continue;
+            DeviceUUIDs.Add(Device.UUID);
+          end;
+
+          if Device.Sessions <> nil then
+            for Session in Device.Sessions do
+              if Session <> nil then
+              begin
+                Session.Active := False;
+                Session.State := osDeleted;
+              end;
+
+          if Device.Spillages <> nil then
+            for P in Device.Spillages do
+              if P <> nil then
+                P.State := osDeleted;
+
+          if Repo <> nil then
+            Repo.SaveDevice(Device);
+        end;
+    finally
+      DeviceUUIDs.Free;
+    end;
 
     RefreshResultsAfterDevicesAction;
     Exit;

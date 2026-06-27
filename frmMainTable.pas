@@ -1073,6 +1073,14 @@ begin
   ItemIndex := -1;
   if SelectedPumpName <> '' then
     ItemIndex := ComboBoxPumps.Items.IndexOf(SelectedPumpName);
+
+  if (ItemIndex < 0) and (ComboBoxPumps.Items.Count > 0) then
+  begin
+    ItemIndex := 0;
+    if FActiveWorkTable <> nil then
+      FActiveWorkTable.SetActivePump(ComboBoxPumps.Items[ItemIndex]);
+  end;
+
   ComboBoxPumps.ItemIndex := ItemIndex;
 end;
 
@@ -1163,6 +1171,9 @@ begin
   end;
 
   FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
+  FActiveWorkTable.ResetMeasurementValues;
+  UpdateForm;
+
    ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
 
   //FActiveWorkTable.StartTest;
@@ -5216,8 +5227,7 @@ begin
     'Пользователь подтвердил сохранение результатов измерения',
     WorkTable.Name);
 
-  if NeedSaveMeasurementResults(WorkTable) then
-    WorkTable.SaveMeasurementResults;
+  WorkTable.SaveMeasurementResults;
 
   if DataManager <> nil then
     DataManager.Save;
@@ -5347,6 +5357,8 @@ begin
     if WorkTable <> nil then
     begin
       WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled;
+      if not WorkTable.DeviceChannels[Row].Enabled then
+        WorkTable.DeviceChannels[Row].ImpSec := 0;
       MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
     end
     else
@@ -5797,6 +5809,8 @@ begin
     begin
       Changed := WorkTable.DeviceChannels[ARow].Enabled <> Value.AsBoolean;
       WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
+      if not WorkTable.DeviceChannels[ARow].Enabled then
+        WorkTable.DeviceChannels[ARow].ImpSec := 0;
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
     begin
@@ -5898,6 +5912,8 @@ begin
     if WorkTable <> nil then
     begin
       WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
+      if not WorkTable.EtalonChannels[Row].Enabled then
+        WorkTable.EtalonChannels[Row].ImpSec := 0;
       MarkChannelDeviceModified(WorkTable.EtalonChannels[Row]);
     end
     else
@@ -6023,6 +6039,14 @@ begin
   begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
       Value := WorkTable.EtalonChannels[ARow].Enabled
+    else if (not WorkTable.EtalonChannels[ARow].Enabled) and
+            ((GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonRawSumValue1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonStd1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonError1)) then
+      Value := '0'
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
       Value := WorkTable.EtalonChannels[ARow].Text
     else if GridEtalons.Columns[ACol] = StringColumnEtalonType1 then
@@ -6271,6 +6295,8 @@ begin
      begin
       Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
       WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
+      if not WorkTable.EtalonChannels[ARow].Enabled then
+        WorkTable.EtalonChannels[ARow].ImpSec := 0;
       WorkTable.RebindAllFlowMeters;
      end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then

@@ -565,7 +565,7 @@ begin
   FUUID := TGUID.NewGuid.ToString;
   FComment := '';
   FWriteAccess := True;
-  FState := osClean;
+  FState := osEmpty;
 end;
 
  procedure TBaseRepository.Init(
@@ -673,7 +673,7 @@ begin
     if not LoadTypes then
       raise Exception.Create('Не удалось загрузить типы');
 
-    FState := osLoaded;
+    FState := osClean;
     Result := True;
 
   except
@@ -3144,7 +3144,7 @@ begin
   InitDevices;
   InitDevicePoints;
 
-  FState := osLoaded;
+  FState := osClean;
 end;
 
 function TDeviceRepository.InitDevices: TObjectList<TDevice>;
@@ -3160,7 +3160,7 @@ begin
   D.ID := FNextDeviceID;
   Inc(FNextDeviceID);
 
-  D.State := osLoaded;
+  D.State := osClean;
 
   D.Name := 'Расходомер ВЗЛЕТ ТЭР';
   D.SerialNumber := 'A123456';
@@ -3195,7 +3195,7 @@ begin
   D.ID := FNextDeviceID;
   Inc(FNextDeviceID);
 
-  D.State := osLoaded;
+  D.State := osClean;
 
   D.Name := 'Счётчик воды СВК-15';
   D.SerialNumber := 'W987654';
@@ -3236,7 +3236,7 @@ begin
 //  P.ID := FNextPointID;
 //  Inc(FNextPointID);
 //
-//  P.State := osLoaded;
+//  P.State := osClean;
 //
 //  P.DeviceID := 1;
 //  P.Num := 1;
@@ -3263,7 +3263,7 @@ begin
 //  P.ID := FNextPointID;
 //  Inc(FNextPointID);
 //
-//  P.State := osLoaded;
+//  P.State := osClean;
 //
 //  P.DeviceID := 1;
 //  P.Num := 2;
@@ -3386,7 +3386,7 @@ begin
       for k := 1 to 3 do
       begin
         P := D.AddPoint;
-        P.State    := osLoaded;
+        P.State    := osClean;
         P.DeviceID := D.ID;
         P.Num      := k;
 
@@ -3420,7 +3420,7 @@ begin
     end;
   end;
 
-  FState := osLoaded;
+  FState := osClean;
 end;
 
 function TDeviceRepository.Load: Boolean;
@@ -3471,7 +3471,7 @@ begin
     { 4. ИТОГ }
     {==================================================}
 
-    FState := osLoaded;
+    FState := osClean;
     Result := True;
 
   except
@@ -3584,7 +3584,7 @@ begin
 
     if SaveErrors.Count > 0 then
     begin
-      FState := osLoaded;
+      FState := osClean;
       ShowMessage('Сохранение выполнено с предупреждениями:' + sLineBreak + SaveErrors.Text);
     end
     else
@@ -3639,7 +3639,10 @@ begin
 
     FDM.StartTransaction;
     try
-      if (ADevice.State <> osClean) and not UpdateDevice(ADevice) then
+      if ADevice.State = osClean then
+        ADevice.State := osModified;
+
+      if not UpdateDevice(ADevice) then
         raise Exception.Create('Ошибка сохранения прибора');
 
       FDM.Commit;
@@ -4118,7 +4121,7 @@ begin
 
       if LoadErrors.Count > 0 then
       begin
-        FState := osLoaded;
+        FState := osClean;
         ShowMessage('Часть данных приборов не загружена:' + sLineBreak + LoadErrors.Text);
       end
       else
@@ -4613,19 +4616,28 @@ var
   P: TDevicePoint;
   Q: TFDQuery;
   KeepIDs: string;
+  I: Integer;
 begin
   Result := False;
 
   if (ADevice = nil) or (ADevice.Points = nil) then
     Exit;
 
-  for P in ADevice.Points do
+  I := 0;
+  while I < ADevice.Points.Count do
   begin
+    P := ADevice.Points[I];
+
     if P <> nil then
       P.DeviceUUID := ADevice.UUID;
 
     if not UpdateDevicePoint(P) then
       Exit(False);
+
+    if (P <> nil) and (P.State = osDeleted) then
+      ADevice.Points.Delete(I)
+    else
+      Inc(I);
   end;
 
   {--------------------------------------------------}
@@ -4664,6 +4676,7 @@ function TDeviceRepository.UpdateDevicePoint(
 ): Boolean;
 var
   Q: TFDQuery;
+  ADevice: TDevice;
 begin
   Result := False;
 
@@ -4678,6 +4691,10 @@ begin
   { защита: точка обязана принадлежать прибору }
   if Trim(APoint.DeviceUUID) = '' then
     raise Exception.Create('DevicePoint must have valid DeviceUUID');
+
+  ADevice := FindDeviceByUUID(APoint.DeviceUUID);
+  if (ADevice <> nil) and (ADevice.Qmax > 0) then
+    APoint.Q := APoint.FlowRate * ADevice.Qmax;
 
   Q := FDM.CreateQuery;
   try
@@ -4696,12 +4713,8 @@ begin
           SetStrParam(Q, 'DeviceUUID', APoint.DeviceUUID);
           Q.ExecSQL;
 
-          if Q.RowsAffected = 0 then
-            raise Exception.CreateFmt(
-              'DevicePoint not deleted (ID=%d, DeviceUUID=%s)',
-              [APoint.ID, APoint.UUID]
-            );
-
+          { Удаление должно быть идемпотентным: точка могла уже отсутствовать
+            в БД после синхронизации состава точек или предыдущего сохранения. }
           Exit(True);
         end;
 
@@ -5638,7 +5651,8 @@ begin
   SpillageIDsToDelete := TList<Integer>.Create;
   try
     for S in ADevice.Spillages do
-      if (S <> nil) and (S.ID > 0) and not KeepIDs.ContainsKey(S.ID) then
+      if (S <> nil) and (S.State <> osDeleted) and (S.ID > 0) and
+         not KeepIDs.ContainsKey(S.ID) then
         KeepIDs.Add(S.ID, 0);
 
     Q := FDM.CreateQuery;

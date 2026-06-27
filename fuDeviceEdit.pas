@@ -2699,9 +2699,10 @@ begin
   begin
     P := FDevice.Points[I];
 
-    // Абсолютный расход точки
-    // FlowRate у DevicePoint — абсолютный (м³/ч или т/ч)
-    Q := P.FlowRate;
+    // Абсолютный расход точки — как в колонке Q таблицы точек:
+    // относительный FlowRate умножается на Qmax прибора.
+    Q := P.FlowRate * FDevice.Qmax;
+    P.Q := Q;
 
     // Если задано время
     if (Q > 0) and (P.LimitTime > 0) then
@@ -3604,11 +3605,16 @@ begin
     Q := P.FlowRate * Qmax;
 
     if ACol = StringColumnPointFlowRate.Index then
-      P.FlowRate := NormalizeFloatInput(S)
+    begin
+      P.FlowRate := NormalizeFloatInput(S);
+      Q := P.FlowRate * Qmax;
+      P.Q := Q;
+    end
 
     else if ACol = StringColumnPointQ.Index then
     begin
       Q := FDevice.ToBaseUnits(NormalizeFloatInput(S));
+      P.Q := Q;
       if Qmax > 0 then
         P.FlowRate := Q / Qmax;
     end
