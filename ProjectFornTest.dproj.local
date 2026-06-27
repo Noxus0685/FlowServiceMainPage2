@@ -352,7 +352,6 @@
     <File Path="frmWorkTableProperties.pas"/>
     <File Path="frmWorkTableProperties.fmx"/>
     <File Path="uSyncSetup.pas"/>
-    <File Path="uAppUpdater.pas"/>
     <File Path="uAppVersion.pas"/>
   </ProjectSortOrder>
 </BorlandProject>

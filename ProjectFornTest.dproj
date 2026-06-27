@@ -283,7 +283,6 @@
         <DCCReference Include="uProtocols.pas"/>
         <DCCReference Include="uRepositories.pas"/>
         <DCCReference Include="uAppServices.pas"/>
-        <DCCReference Include="uAppUpdater.pas"/>
         <DCCReference Include="uAppVersion.pas"/>
         <DCCReference Include="uTable_Data.pas">
             <Form>TableDM</Form>

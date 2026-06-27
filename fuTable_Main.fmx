@@ -1594,14 +1594,6 @@ object TableMainForm: TTableMainForm
         KillFocusByReturn = True
         OnChangeTracking = EditInstrumentNameChangeTracking
       end
-      object Button1: TButton
-        Position.X = 160.000000000000000000
-        Position.Y = 526.000000000000000000
-        TabOrder = 10
-        Text = #1054#1073#1085#1086#1074#1080#1090#1100
-        TextSettings.Trimming = None
-        OnClick = Button1Click
-      end
     end
   end
   object TimerSetValues: TTimer
