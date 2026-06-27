@@ -16,7 +16,7 @@ object TableMainForm: TTableMainForm
     Size.Height = 778.000000000000000000
     Size.PlatformDefault = False
     StyleLookup = 'tabcontrolstyle'
-    TabIndex = 0
+    TabIndex = 3
     TabOrder = 0
     TabPosition = PlatformDefault
     OnChange = tcMainChange
@@ -34,7 +34,7 @@ object TableMainForm: TTableMainForm
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = True
+      IsSelected = False
       Padding.Left = 5.000000000000000000
       Size.Width = 64.000000000000000000
       Size.Height = 26.000000000000000000
@@ -1336,7 +1336,7 @@ object TableMainForm: TTableMainForm
         item
         end>
       TextSettings.Trimming = None
-      IsSelected = False
+      IsSelected = True
       Size.Width = 44.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
@@ -1593,6 +1593,13 @@ object TableMainForm: TTableMainForm
         Position.Y = 312.000000000000000000
         KillFocusByReturn = True
         OnChangeTracking = EditInstrumentNameChangeTracking
+      end
+      object Button1: TButton
+        Position.X = 168.000000000000000000
+        Position.Y = 542.000000000000000000
+        TabOrder = 10
+        Text = 'Button1'
+        TextSettings.Trimming = None
       end
     end
   end
