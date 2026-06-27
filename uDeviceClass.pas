@@ -2413,7 +2413,8 @@ begin
   CandidateList := TList<TPointSpillage>.Create;
   try
     for S in Spillages do
-      if (S.SessionID = ActiveSession.ID) and
+      if (S <> nil) and (S.State <> osDeleted) and
+         (S.SessionID = ActiveSession.ID) and
          (((S.DevicePointID <> 0) and (S.DevicePointID = APoint.ID)) or
           IsFlowInPoint(S.QavgEtalon, APoint)) then
       begin
