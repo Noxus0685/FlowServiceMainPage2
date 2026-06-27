@@ -4664,6 +4664,7 @@ function TDeviceRepository.UpdateDevicePoint(
 ): Boolean;
 var
   Q: TFDQuery;
+  ADevice: TDevice;
 begin
   Result := False;
 
@@ -4678,6 +4679,10 @@ begin
   { защита: точка обязана принадлежать прибору }
   if Trim(APoint.DeviceUUID) = '' then
     raise Exception.Create('DevicePoint must have valid DeviceUUID');
+
+  ADevice := FindDeviceByUUID(APoint.DeviceUUID);
+  if (ADevice <> nil) and (ADevice.Qmax > 0) then
+    APoint.Q := APoint.FlowRate * ADevice.Qmax;
 
   Q := FDM.CreateQuery;
   try
