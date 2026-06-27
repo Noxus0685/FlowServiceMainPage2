@@ -2566,6 +2566,7 @@ var
   AllStatus0: Boolean;
   AllStatus01: Boolean;
   AllStatus012: Boolean;
+  HasMissingData: Boolean;
 begin
   AnalyseDevicePointsResults;
 
@@ -2581,6 +2582,7 @@ begin
   AllStatus0 := True;
   AllStatus01 := True;
   AllStatus012 := True;
+  HasMissingData := False;
 
   for DP in Points do
   begin
@@ -2589,6 +2591,9 @@ begin
 
     if DP.Status <> 5 then
       AllStatus5 := False;
+
+    if DP.Status in [0, 1] then
+      HasMissingData := True;
 
     if DP.Status <> 0 then
       AllStatus0 := False;
@@ -2647,6 +2652,16 @@ begin
     StatusStr := 'Измерения не производились/не анализировались.';
     Exit;
   end;
+
+  if HasMissingData then
+  begin
+    Status := 2;
+    StatusStr := 'Есть поверочные точки без достаточных данных для результата.';
+    Exit;
+  end;
+
+  Status := 3;
+  StatusStr := 'По всем поверочным точкам есть данные, но не все точки годны.';
 end;
 
 function TDevice.FindDiameter(AType: TDeviceType): TDiameter;

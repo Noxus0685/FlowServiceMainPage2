@@ -829,7 +829,7 @@ begin
     1: Result := '-';
     2: Result := 'Нет данных';
     3: Result := 'Не Годен';
-    4: Result := 'Нет данных';
+    4: Result := 'Не Годен';
     5: Result := 'Годен';
   else
     Result := '-';
