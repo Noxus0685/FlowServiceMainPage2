@@ -1812,6 +1812,15 @@ begin
     Exit;
 
   Point.State := osDeleted;
+  if (Device.Spillages <> nil) and (Point.ID > 0) then
+    for Point in Device.Spillages do
+      if (Point <> nil) and (Point.ID = FCurrentSpillages[GridDataPoints.Row].ID) then
+      begin
+        Point.State := osDeleted;
+        Break;
+      end;
+  if Device.State = osClean then
+    Device.State := osModified;
   Session.State := osModified;
 
   Repo := nil;
@@ -1833,8 +1842,8 @@ begin
     Exit;
 
   Point.State := osDeleted;
-  //if Session.State = osClean then
-  //  Session.State := osModified;
+  if Device.State = osClean then
+    Device.State := osModified;
 
   Repo := nil;
   if AppServices.DataManager <> nil then
@@ -2099,6 +2108,15 @@ begin
     NextPoint := FCurrentSpillages[GridDataPoints.Row + 1];
 
   Point.State := osDeleted;
+  if (Session <> nil) and (Device.Spillages <> nil) and (Point.ID > 0) then
+    for I := 0 to Device.Spillages.Count - 1 do
+      if (Device.Spillages[I] <> nil) and (Device.Spillages[I].ID = Point.ID) then
+      begin
+        Device.Spillages[I].State := osDeleted;
+        Break;
+      end;
+  if Device.State = osClean then
+    Device.State := osModified;
   if (Session <> nil) then
     Session.State := osModified;
 
