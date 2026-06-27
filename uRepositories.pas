@@ -4704,12 +4704,8 @@ begin
           SetStrParam(Q, 'DeviceUUID', APoint.DeviceUUID);
           Q.ExecSQL;
 
-          if Q.RowsAffected = 0 then
-            raise Exception.CreateFmt(
-              'DevicePoint not deleted (ID=%d, DeviceUUID=%s)',
-              [APoint.ID, APoint.UUID]
-            );
-
+          { Удаление должно быть идемпотентным: точка могла уже отсутствовать
+            в БД после синхронизации состава точек или предыдущего сохранения. }
           Exit(True);
         end;
 
