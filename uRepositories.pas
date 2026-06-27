@@ -5646,7 +5646,8 @@ begin
   SpillageIDsToDelete := TList<Integer>.Create;
   try
     for S in ADevice.Spillages do
-      if (S <> nil) and (S.ID > 0) and not KeepIDs.ContainsKey(S.ID) then
+      if (S <> nil) and (S.State <> osDeleted) and (S.ID > 0) and
+         not KeepIDs.ContainsKey(S.ID) then
         KeepIDs.Add(S.ID, 0);
 
     Q := FDM.CreateQuery;
