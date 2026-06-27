@@ -3604,11 +3604,16 @@ begin
     Q := P.FlowRate * Qmax;
 
     if ACol = StringColumnPointFlowRate.Index then
-      P.FlowRate := NormalizeFloatInput(S)
+    begin
+      P.FlowRate := NormalizeFloatInput(S);
+      Q := P.FlowRate * Qmax;
+      P.Q := Q;
+    end
 
     else if ACol = StringColumnPointQ.Index then
     begin
       Q := FDevice.ToBaseUnits(NormalizeFloatInput(S));
+      P.Q := Q;
       if Qmax > 0 then
         P.FlowRate := Q / Qmax;
     end
