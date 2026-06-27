@@ -5224,8 +5224,7 @@ begin
     'Пользователь подтвердил сохранение результатов измерения',
     WorkTable.Name);
 
-  if NeedSaveMeasurementResults(WorkTable) then
-    WorkTable.SaveMeasurementResults;
+  WorkTable.SaveMeasurementResults;
 
   if DataManager <> nil then
     DataManager.Save;
