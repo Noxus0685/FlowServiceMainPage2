@@ -844,7 +844,7 @@ var
 
   function FormatPointHeader(const APointName: string): string;
   begin
-    Result := #916 + '(' + APointName + '), %';
+    Result := #948 + '(' + APointName + '), %';
   end;
 begin
   MaxPoints := 0;
