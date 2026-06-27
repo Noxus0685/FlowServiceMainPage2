@@ -4616,19 +4616,28 @@ var
   P: TDevicePoint;
   Q: TFDQuery;
   KeepIDs: string;
+  I: Integer;
 begin
   Result := False;
 
   if (ADevice = nil) or (ADevice.Points = nil) then
     Exit;
 
-  for P in ADevice.Points do
+  I := 0;
+  while I < ADevice.Points.Count do
   begin
+    P := ADevice.Points[I];
+
     if P <> nil then
       P.DeviceUUID := ADevice.UUID;
 
     if not UpdateDevicePoint(P) then
       Exit(False);
+
+    if (P <> nil) and (P.State = osDeleted) then
+      ADevice.Points.Delete(I)
+    else
+      Inc(I);
   end;
 
   {--------------------------------------------------}
