@@ -829,7 +829,7 @@ begin
     1: Result := '-';
     2: Result := 'Нет данных';
     3: Result := 'Не Годен';
-    4: Result := 'Нет данных';
+    4: Result := 'Не Годен';
     5: Result := 'Годен';
   else
     Result := '-';
@@ -2163,6 +2163,7 @@ var
   Ch: TChannel;
   WT: TWorkTable;
   Repo: TDeviceRepository;
+  DeviceUUIDs: TStringList;
   I, NextIdx: Integer;
 begin
   ResetPointDeleteConfirm;
@@ -2187,9 +2188,49 @@ begin
     if (WT = nil) or (WT.DeviceChannels = nil) then
       Exit;
 
-    for Ch in WT.DeviceChannels do
-      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        RemoveProcessingDevice(Ch.FlowMeter.Device);
+    if MessageDlg('Очистить все результаты приборов данного рабочего стола?',
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
+      Exit;
+
+    Repo := nil;
+    if AppServices.DataManager <> nil then
+      Repo := AppServices.DataManager.ActiveDeviceRepo;
+
+    DeviceUUIDs := TStringList.Create;
+    try
+      DeviceUUIDs.Sorted := False;
+      DeviceUUIDs.Duplicates := TDuplicates.dupIgnore;
+
+      for Ch in WT.DeviceChannels do
+        if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+        begin
+          Device := Ch.FlowMeter.Device;
+          if Trim(Device.UUID) <> '' then
+          begin
+            if DeviceUUIDs.IndexOf(Device.UUID) >= 0 then
+              Continue;
+            DeviceUUIDs.Add(Device.UUID);
+          end;
+
+          if Device.Sessions <> nil then
+            for Session in Device.Sessions do
+              if Session <> nil then
+              begin
+                Session.Active := False;
+                Session.State := osDeleted;
+              end;
+
+          if Device.Spillages <> nil then
+            for P in Device.Spillages do
+              if P <> nil then
+                P.State := osDeleted;
+
+          if Repo <> nil then
+            Repo.SaveDevice(Device);
+        end;
+    finally
+      DeviceUUIDs.Free;
+    end;
 
     RefreshResultsAfterDevicesAction;
     Exit;
