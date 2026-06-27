@@ -243,28 +243,28 @@ object FrameProceed: TFrameProceed
             Size.Width = 125.000000000000000000
           end
           object StringColumnPointNum1: TStringColumn
-            Header = '1  '#1090#1086#1095#1082#1072
+            Header = #916'(1 '#1090#1086#1095#1082#1072'), %'
             HeaderSettings.TextSettings.Trimming = Character
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
             Size.Width = 125.000000000000000000
           end
           object StringColumnPointNum2: TStringColumn
-            Header = '2 '#1090#1086#1095#1082#1072
+            Header = #916'(2 '#1090#1086#1095#1082#1072'), %'
             HeaderSettings.TextSettings.Trimming = Character
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
             Size.Width = 125.000000000000000000
           end
           object StringColumnPointNum3: TStringColumn
-            Header = '3 '#1090#1086#1095#1082#1072
+            Header = #916'(3 '#1090#1086#1095#1082#1072'), %'
             HeaderSettings.TextSettings.Trimming = Character
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center
             Size.Width = 125.000000000000000000
           end
           object StringColumnPointNum4: TStringColumn
-            Header = '4 '#1090#1086#1095#1082#1072
+            Header = #916'(4 '#1090#1086#1095#1082#1072'), %'
             HeaderSettings.TextSettings.Trimming = Character
             HeaderSettings.TextSettings.WordWrap = False
             HeaderSettings.TextSettings.HorzAlign = Center

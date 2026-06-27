@@ -841,6 +841,11 @@ var
   AllSameType: Boolean;
   FirstTypeName: string;
   HeaderFromPoints: TArray<string>;
+
+  function FormatPointHeader(const APointName: string): string;
+  begin
+    Result := #916 + '(' + APointName + '), %';
+  end;
 begin
   MaxPoints := 0;
   for I := 0 to High(FCurrentResultRows) do
@@ -875,17 +880,17 @@ begin
 
   if AllSameType and (Length(HeaderFromPoints) > 0) then
   begin
-    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := HeaderFromPoints[0];
-    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := HeaderFromPoints[1];
-    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := HeaderFromPoints[2];
-    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := HeaderFromPoints[3];
+    if Length(HeaderFromPoints) > 0 then StringColumnPointNum1.Header := FormatPointHeader(HeaderFromPoints[0]);
+    if Length(HeaderFromPoints) > 1 then StringColumnPointNum2.Header := FormatPointHeader(HeaderFromPoints[1]);
+    if Length(HeaderFromPoints) > 2 then StringColumnPointNum3.Header := FormatPointHeader(HeaderFromPoints[2]);
+    if Length(HeaderFromPoints) > 3 then StringColumnPointNum4.Header := FormatPointHeader(HeaderFromPoints[3]);
   end
   else
   begin
-    StringColumnPointNum1.Header := 'Q1';
-    StringColumnPointNum2.Header := 'Q2';
-    StringColumnPointNum3.Header := 'Q3';
-    StringColumnPointNum4.Header := 'Q4';
+    StringColumnPointNum1.Header := FormatPointHeader('Q1');
+    StringColumnPointNum2.Header := FormatPointHeader('Q2');
+    StringColumnPointNum3.Header := FormatPointHeader('Q3');
+    StringColumnPointNum4.Header := FormatPointHeader('Q4');
   end;
 end;
 procedure TFrameProceed.ShowAllDevicesResults;
