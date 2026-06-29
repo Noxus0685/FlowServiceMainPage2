@@ -372,6 +372,7 @@ type
      procedure SetModified;
      procedure FlushPendingChanges;
      function DeviceChanged: Boolean;
+     procedure UpdateSnapshotMeasurementsFromOriginal;
 
      procedure CloseEditor(ASave: Boolean);
      function   GetSelectedPoint: TDevicePoint;
@@ -726,6 +727,39 @@ begin
      string(ADevice.DeviceTypeUUID), ADevice.DeviceTypeName, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then Details := Details + '; ' + ADetails;
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
+end;
+
+procedure TFormDeviceEditor.UpdateSnapshotMeasurementsFromOriginal;
+var
+  Session: TSessionSpillage;
+  NewSession: TSessionSpillage;
+  Spillage: TPointSpillage;
+  NewSpillage: TPointSpillage;
+begin
+  if (FOriginalDevice = nil) or (FLoadedDeviceSnapshot = nil) then
+    Exit;
+
+  FLoadedDeviceSnapshot.Sessions.Clear;
+  if FOriginalDevice.Sessions <> nil then
+    for Session in FOriginalDevice.Sessions do
+    begin
+      if Session = nil then
+        Continue;
+      NewSession := TSessionSpillage.Create(Session.DeviceUUID);
+      NewSession.Assign(Session);
+      FLoadedDeviceSnapshot.Sessions.Add(NewSession);
+    end;
+
+  FLoadedDeviceSnapshot.Spillages.Clear;
+  if FOriginalDevice.Spillages <> nil then
+    for Spillage in FOriginalDevice.Spillages do
+    begin
+      if Spillage = nil then
+        Continue;
+      NewSpillage := TPointSpillage.Create(Spillage.SessionID);
+      NewSpillage.Assign(Spillage);
+      FLoadedDeviceSnapshot.Spillages.Add(NewSpillage);
+    end;
 end;
 
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
