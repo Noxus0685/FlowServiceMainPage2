@@ -5200,19 +5200,47 @@ function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkT
   AChannels: TObjectList<TChannel>; const AFlowRate, AFallbackImpSec: Double;
   const ASplitByQmax: Boolean; const ASplitByEnabledGroup: Boolean): TArray<Double>;
 var
-  I, J, EnabledGroupCount: Integer;
-  Coef, SUM, MaxRatio: Double;
+  I, J, GroupKey: Integer;
+  Coef, SUM, MaxRatio, GroupQmax, MaxGroupQmax, ChannelQmax: Double;
 begin
   SetLength(Result, 0);
   if (AWorkTable = nil) or (AChannels = nil) then
     Exit;
 
   SUM := 0;
-  if ASplitByQmax then
+  MaxGroupQmax := -1;
+  if ASplitByQmax or ASplitByEnabledGroup then
     for I := 0 to AChannels.Count - 1 do
       if (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
          (AChannels[I].FlowMeter.Device <> nil) then
-        SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+      begin
+        ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+        SUM := SUM + ChannelQmax;
+        if AChannels[I].Group >= 0 then
+          GroupKey := AChannels[I].Group
+        else
+          GroupKey := -I - 1;
+
+        GroupQmax := 0;
+        for J := 0 to AChannels.Count - 1 do
+          if AChannels[J] <> nil then
+          begin
+            if AChannels[J].Group >= 0 then
+            begin
+              if AChannels[J].Group <> GroupKey then
+                Continue;
+            end
+            else if GroupKey <> -J - 1 then
+              Continue;
+
+            if (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
+              GroupQmax := GroupQmax +
+                AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
+          end;
+
+        if GroupQmax > MaxGroupQmax then
+          MaxGroupQmax := GroupQmax;
+      end;
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
@@ -5224,24 +5252,15 @@ begin
       Continue;
     end;
 
-    if ASplitByEnabledGroup and (AChannels[I].Group > 0) then
-    begin
-      EnabledGroupCount := 0;
-      for J := 0 to AChannels.Count - 1 do
-        if (AChannels[J] <> nil) and (AChannels[J].Group = AChannels[I].Group) then
-          Inc(EnabledGroupCount);
-
-      if EnabledGroupCount > 0 then
-        MaxRatio := 1 / EnabledGroupCount
-      else
-        MaxRatio := 0;
-    end
+    ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+    if (ASplitByQmax or ASplitByEnabledGroup) and (MaxGroupQmax > 0) then
+      MaxRatio := ChannelQmax / MaxGroupQmax
     else if ASplitByQmax then
     begin
       if SameValue(SUM, 0.0, 1e-12) then
         MaxRatio := 0
       else
-        MaxRatio := (AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4)) / SUM;
+        MaxRatio := ChannelQmax / SUM;
     end
     else
       MaxRatio := 1;
