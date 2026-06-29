@@ -313,7 +313,6 @@ type
     function RequiredSpillageSessionColumns: TTableColumns;
     procedure EnsureSpillageSessionSchema;
     function MapSpillageSessionFromQuery(Q: TFDQuery): TSessionSpillage;
-    function LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
     function UpdateSpillageSessions(ADevice: TDevice): Boolean;
     function UpdateSpillageSession(ASession: TSessionSpillage): Boolean;
     function DeleteSessionCascade(ASessionID: Integer): Boolean;
@@ -329,7 +328,6 @@ type
 
     function MapSpillageFromQuery(Q: TFDQuery; ADevice: TDevice): TPointSpillage;
 
-    function LoadSpillagesByDevice(const ADeviceUUID: string): Boolean;
 
     //function SaveSpillages: Boolean;
 
@@ -353,6 +351,8 @@ type
 
     function LoadDevice(ADevice: TDevice): TDevice; overload;
     function LoadDevice(ADeviceId: Integer): TDevice; overload;
+    function LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
+    function LoadSpillagesByDevice(const ADeviceUUID: string): Boolean;
     function SaveDevice(ADevice: TDevice): Boolean;
     function UpdateDevice(ADevice: TDevice): Boolean;
     {$ENDREGION}
