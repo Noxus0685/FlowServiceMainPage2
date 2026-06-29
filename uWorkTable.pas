@@ -5201,18 +5201,36 @@ function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkT
   const ASplitByQmax: Boolean; const ASplitByEnabledGroup: Boolean): TArray<Double>;
 var
   I, J, EnabledGroupCount: Integer;
-  Coef, SUM, MaxRatio: Double;
+  Coef, SUM, MaxRatio, GroupQmax, MaxGroupQmax: Double;
 begin
   SetLength(Result, 0);
   if (AWorkTable = nil) or (AChannels = nil) then
     Exit;
 
   SUM := 0;
+  MaxGroupQmax := -1;
   if ASplitByQmax then
     for I := 0 to AChannels.Count - 1 do
       if (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
          (AChannels[I].FlowMeter.Device <> nil) then
         SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+
+  if ASplitByEnabledGroup then
+    for I := 0 to AChannels.Count - 1 do
+      if (AChannels[I] <> nil) and (AChannels[I].Group > 0) then
+      begin
+        GroupQmax := 0;
+        for J := 0 to AChannels.Count - 1 do
+          if (AChannels[J] <> nil) and (AChannels[J].Group = AChannels[I].Group) and
+             (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
+            GroupQmax := GroupQmax +
+              AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
+
+        if GroupQmax > MaxGroupQmax then
+        begin
+          MaxGroupQmax := GroupQmax;
+        end;
+      end;
 
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
@@ -5227,12 +5245,18 @@ begin
     if ASplitByEnabledGroup and (AChannels[I].Group > 0) then
     begin
       EnabledGroupCount := 0;
+      GroupQmax := 0;
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and (AChannels[J].Group = AChannels[I].Group) then
+        begin
           Inc(EnabledGroupCount);
+          if (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
+            GroupQmax := GroupQmax +
+              AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
+        end;
 
-      if EnabledGroupCount > 0 then
-        MaxRatio := 1 / EnabledGroupCount
+      if (EnabledGroupCount > 0) and (MaxGroupQmax > 0) then
+        MaxRatio := (GroupQmax / MaxGroupQmax) / EnabledGroupCount
       else
         MaxRatio := 0;
     end
