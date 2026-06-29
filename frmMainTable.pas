@@ -5345,6 +5345,7 @@ var
   Channel: TChannel;
   CellColor: TAlphaColor;
   IsChannelColumn: Boolean;
+  SavedState: TCanvasSaveState;
 begin
   IsChannelColumn := Column = StringColumnDeviceChanel1;
   if Odd(Row) then
@@ -5360,15 +5361,21 @@ begin
       CellColor := GetDeviceGroupColor(Channel.Group);
   end;
 
-  if (not (Column is TCheckColumn)) and
-     (IsChannelColumn or (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
-  begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.Fill.Color := CellColor;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
-  end;
+  SavedState := Canvas.SaveState;
+  try
+    if (not (Column is TCheckColumn)) and
+       not (TGridDrawState.Selected in State) and
+       (IsChannelColumn or (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := CellColor;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
 
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  finally
+    Canvas.RestoreState(SavedState);
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -6097,6 +6104,7 @@ var
   Channel: TChannel;
   CellColor: TAlphaColor;
   IsChannelColumn: Boolean;
+  SavedState: TCanvasSaveState;
 begin
   IsChannelColumn := Column = StringColumnEtalonChanel1;
   if Odd(Row) then
@@ -6112,15 +6120,21 @@ begin
       CellColor := GetEtalonGroupColor(Channel.Group);
   end;
 
-  if (not (Column is TCheckColumn)) and
-     (IsChannelColumn or (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
-  begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.Fill.Color := CellColor;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
-  end;
+  SavedState := Canvas.SaveState;
+  try
+    if (not (Column is TCheckColumn)) and
+       not (TGridDrawState.Selected in State) and
+       (IsChannelColumn or (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := CellColor;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
 
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  finally
+    Canvas.RestoreState(SavedState);
+  end;
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;

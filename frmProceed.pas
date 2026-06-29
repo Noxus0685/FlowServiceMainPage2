@@ -2753,24 +2753,36 @@ procedure TFrameProceed.GridDataPointsDrawColumnCell(Sender: TObject;
 var
   P: TPointSpillage;
   Color: TAlphaColor;
+  SavedState: TCanvasSaveState;
 begin
   if (Column <> StringColumnSpillageValid) or (Row < 0) or
      (Row >= Length(FCurrentSpillages)) then
+  begin
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
     Exit;
+  end;
 
   P := FCurrentSpillages[Row];
   if P = nil then
+  begin
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
     Exit;
+  end;
 
-  Color := GetStatusColor(P.Status);
-  if Color = TAlphaColors.Null then
-    Exit;
+  SavedState := Canvas.SaveState;
+  try
+    Color := GetStatusColor(P.Status);
+    if (Color <> TAlphaColors.Null) and not (TGridDrawState.Selected in State) then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := Color;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
 
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := Color;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
-
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  finally
+    Canvas.RestoreState(SavedState);
+  end;
 end;
 procedure TFrameProceed.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
