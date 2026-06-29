@@ -1722,6 +1722,7 @@ begin
     PopupColumnDeviceSignal1.Items.Add(GetOutputTypeName(OT));
 
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
+  GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -6034,10 +6035,11 @@ end;
 
 function TFrameMainTable.GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
 const
-  // Тусклые светло-фиолетовые оттенки: текст остаётся читаемым.
+  // Полупрозрачные тусклые фиолетовые оттенки накладываются поверх
+  // стандартной ячейки, поэтому текст и штатная отрисовка остаются видимыми.
   PurpleGroupColors: array[0..5] of TAlphaColor = (
-    $FFF1E9FA, $FFE9E1F7, $FFF6E9F8,
-    $FFEDE8FF, $FFF3E6FF, $FFE8E5F2);
+    $4D8E68B4, $4D7B5EA7, $4D9B6FB8,
+    $4D6F63B6, $4D9660A8, $4D806EA5);
 begin
   if AGroup <= 0 then
     Exit(TAlphaColors.Null);
@@ -6065,14 +6067,14 @@ begin
         CellColor := GetEtalonGroupColor(Channel.Group);
     end;
 
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+
     if CellColor <> TAlphaColors.Null then
     begin
       Canvas.Fill.Kind := TBrushKind.Solid;
       Canvas.Fill.Color := CellColor;
       Canvas.FillRect(Bounds, 0, 0, [], 1);
     end;
-
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
   finally
     Canvas.RestoreState(SavedState);
   end;
