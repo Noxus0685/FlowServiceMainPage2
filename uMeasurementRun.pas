@@ -1811,14 +1811,21 @@ begin
     Exit;
 
   RepeatsTarget := Max(Point.Repeats, 1);
-  Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
-  Point.DateTime := Now;
-   Point.Status := 11;   // 'измерение завершено корректно';
-  //Point.Status := 1;
-  //Point.StatusStr := 'Measured';
 
   if FWorkTable <> nil then
-    FWorkTable.TimeResult := Point.LimitTime;
+  begin
+    FWorkTable.RecalculateAllMeterValues;
+    if FWorkTable.ValueTime <> nil then
+      FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
+    else
+      FWorkTable.TimeResult := Point.LimitTime;
+  end;
+
+  Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
+  Point.DateTime := Now;
+  Point.Status := 11;   // 'измерение завершено корректно';
+  //Point.Status := 1;
+  //Point.StatusStr := 'Measured';
 end;
 
 { Converts persisted string to spill state enum value. }

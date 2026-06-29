@@ -1270,6 +1270,9 @@ procedure TFrameMainTable.HandleWorkTableStateChanged(const AWorkTable: TWorkTab
 var
   Point: TDevicePoint;
 begin
+  if AWorkTable.State in [swtCOMPLETE, swtFINALREAD] then
+    AWorkTable.RecalculateAllMeterValues;
+
   OnChangeState(AWorkTable.State);
 
   if AData is TDevicePoint then
@@ -4726,6 +4729,11 @@ var
     Result := COLOR_NONE;
 
     if (WorkTable = nil) or (WorkTable.CurrentPoint = nil) then
+      Exit;
+
+    // В режиме монитора критерии остановки не относятся к активному измерению,
+    // поэтому цветовые индикаторы критериев скрываем.
+    if WorkTable.State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
       Exit;
 
     if not (ACriterion in WorkTable.CurrentPoint.StopCriteria) then
