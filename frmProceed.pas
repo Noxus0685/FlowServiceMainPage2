@@ -339,6 +339,11 @@ begin
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
 
+  if GridResults <> nil then
+    GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+  if GridDataPoints <> nil then
+    GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
+
   FCurrentSession := nil;
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
@@ -2418,6 +2423,8 @@ begin
     Canvas.Fill.Color := Color;
     Canvas.FillRect(Bounds, 0, 0, [], 1);
   end;
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
@@ -2784,6 +2791,8 @@ begin
   Canvas.Fill.Kind := TBrushKind.Solid;
   Canvas.Fill.Color := Color;
   Canvas.FillRect(Bounds, 0, 0, [], 1);
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
