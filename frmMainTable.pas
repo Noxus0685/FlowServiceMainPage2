@@ -498,6 +498,9 @@ type
     procedure FormCreate(Sender: TObject);
     procedure GridEtalonsGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridEtalonsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+      const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+      const Value: TValue; const State: TGridDrawStates);
     procedure GridEtalonsSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridEtalonsCellClick(const Column: TColumn; const Row: Integer);
@@ -656,6 +659,7 @@ type
     procedure UpdateGridDevices;
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
+    function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -1718,6 +1722,7 @@ begin
     PopupColumnDeviceSignal1.Items.Add(GetOutputTypeName(OT));
 
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
+  GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -6025,6 +6030,49 @@ begin
     GridEtalons.EndUpdate;
   end;
 
+end;
+
+
+function TFrameMainTable.GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
+const
+  // Один фиолетовый оттенок с разной светлотой: от светлого к более тёмному.
+  PurpleGroupColors: array[0..2] of TAlphaColor = (
+    $338A2BE2, $4D8A2BE2, $668A2BE2);
+begin
+  Result := PurpleGroupColors[Abs(AGroup) mod Length(PurpleGroupColors)];
+end;
+
+procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+  const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+  const Value: TValue; const State: TGridDrawStates);
+var
+  Channel: TChannel;
+  CellColor: TAlphaColor;
+  SavedState: TCanvasSaveState;
+begin
+  SavedState := Canvas.SaveState;
+  try
+    CellColor := TAlphaColors.Null;
+
+    if (FActiveWorkTable <> nil) and (Row >= 0) and
+       (Row < FActiveWorkTable.EtalonChannels.Count) then
+    begin
+      Channel := FActiveWorkTable.EtalonChannels[Row];
+      if Channel <> nil then
+        CellColor := GetEtalonGroupColor(Channel.Group);
+    end;
+
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+
+    if Column = StringColumnEtalonChanel1 then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := CellColor;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
+  finally
+    Canvas.RestoreState(SavedState);
+  end;
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;

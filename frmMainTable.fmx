@@ -5862,6 +5862,7 @@ object FrameMainTable: TFrameMainTable
               TabOrder = 0
               RowCount = 2
               OnGetValue = GridEtalonsGetValue
+              OnDrawColumnCell = GridEtalonsDrawColumnCell
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
