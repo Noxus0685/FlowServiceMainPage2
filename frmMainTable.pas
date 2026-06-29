@@ -2673,8 +2673,10 @@ begin
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
   if FFrameProceed <> nil then
     ApplyGridColumnsLayout(FFrameProceed.GridDataPoints, WorkTable.DataPointsGridColumns);
-  if FFrameProceed <> nil then
-    ApplyGridColumnsLayout(FFrameProceed.GridResults, WorkTable.ResultsGridColumns);
+
+  // GridResults показывает сводку по выбранным приборам. При выборе рабочего
+  // стола в дереве не применяем к нему настройки рабочего стола, чтобы
+  // оформление/ширины колонок оставались такими же, как после выбора прибора.
   EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
 end;
