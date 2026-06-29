@@ -2392,38 +2392,7 @@ end;
 procedure TFrameProceed.GridResultsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
-var
-  GridRow: TResultGridRow;
-  Color: TAlphaColor;
-  PointIdx: Integer;
 begin
-  if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
-    Exit;
-
-  GridRow := FCurrentResultRows[Row];
-  Color := TAlphaColors.Null;
-
-  if Column = StringColumnResult then
-    Color := GetStatusColor(GridRow.ResultStatus)
-  else
-  begin
-    PointIdx := -1;
-    if Column = StringColumnPointNum1 then PointIdx := 0;
-    if Column = StringColumnPointNum2 then PointIdx := 1;
-    if Column = StringColumnPointNum3 then PointIdx := 2;
-    if Column = StringColumnPointNum4 then PointIdx := 3;
-
-    if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointStatuses)) then
-      Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
-  end;
-
-  if Color <> TAlphaColors.Null then
-  begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.Fill.Color := Color;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
-  end;
-
   Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
@@ -2775,24 +2744,36 @@ procedure TFrameProceed.GridDataPointsDrawColumnCell(Sender: TObject;
 var
   P: TPointSpillage;
   Color: TAlphaColor;
+  SavedState: TCanvasSaveState;
 begin
   if (Column <> StringColumnSpillageValid) or (Row < 0) or
      (Row >= Length(FCurrentSpillages)) then
+  begin
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
     Exit;
+  end;
 
   P := FCurrentSpillages[Row];
   if P = nil then
+  begin
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
     Exit;
+  end;
 
-  Color := GetStatusColor(P.Status);
-  if Color = TAlphaColors.Null then
-    Exit;
+  SavedState := Canvas.SaveState;
+  try
+    Color := GetStatusColor(P.Status);
+    if (Color <> TAlphaColors.Null) and not (TGridDrawState.Selected in State) then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := Color;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
 
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := Color;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
-
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  finally
+    Canvas.RestoreState(SavedState);
+  end;
 end;
 procedure TFrameProceed.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
