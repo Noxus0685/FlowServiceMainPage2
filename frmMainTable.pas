@@ -6035,14 +6035,11 @@ end;
 
 function TFrameMainTable.GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
 const
-  // Три различимых фиолетовых оттенка; группа 0 остаётся стандартной белой.
+  // Один фиолетовый оттенок с разной светлотой: от светлого к более тёмному.
   PurpleGroupColors: array[0..2] of TAlphaColor = (
-    $668A5CF6, $66D150B8, $66585AD6);
+    $338A2BE2, $4D8A2BE2, $668A2BE2);
 begin
-  if AGroup <= 0 then
-    Exit(TAlphaColors.Null);
-
-  Result := PurpleGroupColors[Abs(AGroup - 1) mod Length(PurpleGroupColors)];
+  Result := PurpleGroupColors[Abs(AGroup) mod Length(PurpleGroupColors)];
 end;
 
 procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -6067,7 +6064,7 @@ begin
 
     Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 
-    if (Column = StringColumnEtalonChanel1) and (CellColor <> TAlphaColors.Null) then
+    if Column = StringColumnEtalonChanel1 then
     begin
       Canvas.Fill.Kind := TBrushKind.Solid;
       Canvas.Fill.Color := CellColor;
