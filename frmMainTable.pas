@@ -6035,11 +6035,9 @@ end;
 
 function TFrameMainTable.GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
 const
-  // Полупрозрачные тусклые фиолетовые оттенки накладываются поверх
-  // стандартной ячейки, поэтому текст и штатная отрисовка остаются видимыми.
-  PurpleGroupColors: array[0..5] of TAlphaColor = (
-    $4D8E68B4, $4D7B5EA7, $4D9B6FB8,
-    $4D6F63B6, $4D9660A8, $4D806EA5);
+  // Три различимых фиолетовых оттенка; группа 0 остаётся стандартной белой.
+  PurpleGroupColors: array[0..2] of TAlphaColor = (
+    $668A5CF6, $66D150B8, $66585AD6);
 begin
   if AGroup <= 0 then
     Exit(TAlphaColors.Null);
@@ -6069,7 +6067,7 @@ begin
 
     Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 
-    if CellColor <> TAlphaColors.Null then
+    if (Column = StringColumnEtalonChanel1) and (CellColor <> TAlphaColors.Null) then
     begin
       Canvas.Fill.Kind := TBrushKind.Solid;
       Canvas.Fill.Color := CellColor;
