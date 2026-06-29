@@ -2434,7 +2434,9 @@ begin
       Canvas.Fill.Color := Color;
       Canvas.FillRect(Bounds, 0, 0, [], 1);
       Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-    end;
+    end
+    else
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
   finally
     Canvas.RestoreState(SavedState);
   end;
