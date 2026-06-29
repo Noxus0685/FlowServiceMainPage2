@@ -5625,6 +5625,7 @@ object FrameMainTable: TFrameMainTable
             Options = [AlternatingRowBackground, Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
             OnHeaderClick = GridDevicesHeaderClick
             OnSelectCell = GridDevicesSelectCell
+            OnDrawColumnCell = GridDevicesDrawColumnCell
             OnGetValue = GridDevicesGetValue
             OnSetValue = GridDevicesSetValue
             OnEditingDone = GridDevicesEditingDone
@@ -5861,6 +5862,7 @@ object FrameMainTable: TFrameMainTable
               Size.PlatformDefault = False
               TabOrder = 0
               RowCount = 2
+              OnDrawColumnCell = GridEtalonsDrawColumnCell
               OnGetValue = GridEtalonsGetValue
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick

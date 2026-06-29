@@ -339,6 +339,11 @@ begin
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
 
+  if GridResults <> nil then
+    GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+  if GridDataPoints <> nil then
+    GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
+
   FCurrentSession := nil;
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
@@ -360,7 +365,6 @@ end;
 
 procedure TFrameProceed.RefreshResultsTab;
 begin
-  SyncProcessingDevicesFromAllTables(False);
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
@@ -483,17 +487,31 @@ procedure TFrameProceed.AddProcessingDeviceFromSelection;
 var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
+  Res: TModalResult;
 begin
   Frm := TFormDeviceSelect.Create(Self);
   try
-    if Frm.ShowModal <> mrOk then
+    Frm.Tag := 0;
+    Res := Frm.ShowModal;
+    if (Res <> mrOk) or (Frm.Tag <> 1) then
+    begin
+      PopulateTreeViewDevices;
+      ShowAllDevicesResults;
       Exit;
+    end;
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
+    begin
+      PopulateTreeViewDevices;
+      ShowAllDevicesResults;
       Exit;
+    end;
 
     AddProcessingDevice(SelDevice);
+    PopulateTreeViewDevices;
+    SelectTreeItemByTagObject(SelDevice);
+    ShowDeviceSpillages(SelDevice);
   finally
     Frm.Free;
   end;
@@ -507,6 +525,25 @@ function TFrameProceed.FindTreeItemByTagObject(ATagObject: TObject): TTreeViewIt
 var
   I: Integer;
   Item: TTreeViewItem;
+
+  function FindInItem(AItem: TTreeViewItem): TTreeViewItem;
+  var
+    J: Integer;
+  begin
+    Result := nil;
+    if AItem = nil then
+      Exit;
+
+    if AItem.TagObject = ATagObject then
+      Exit(AItem);
+
+    for J := 0 to AItem.Count - 1 do
+    begin
+      Result := FindInItem(AItem.ItemByIndex(J));
+      if Result <> nil then
+        Exit;
+    end;
+  end;
 begin
   Result := nil;
   if (TreeViewDevices = nil) or (ATagObject = nil) then
@@ -515,17 +552,27 @@ begin
   for I := 0 to TreeViewDevices.Count - 1 do
   begin
     Item := TreeViewDevices.ItemByIndex(I);
-    if (Item <> nil) and (Item.TagObject = ATagObject) then
-      Exit(Item);
+    Result := FindInItem(Item);
+    if Result <> nil then
+      Exit;
   end;
 end;
 procedure TFrameProceed.SelectTreeItemByTagObject(ATagObject: TObject);
 var
   Item: TTreeViewItem;
+  Parent: TTreeViewItem;
 begin
   Item := FindTreeItemByTagObject(ATagObject);
   if Item <> nil then
+  begin
+    Parent := Item.ParentItem;
+    while Parent <> nil do
+    begin
+      Parent.IsExpanded := True;
+      Parent := Parent.ParentItem;
+    end;
     TreeViewDevices.Selected := Item;
+  end;
 end;
 procedure TFrameProceed.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
@@ -815,10 +862,10 @@ end;
 function TFrameProceed.GetStatusColor(const AStatus: Integer): TAlphaColor;
 begin
   case AStatus of
-    2: Result := TAlphaColors.Lightgray;
-    3: Result := TAlphaColors.Lightcoral;
+    2: Result := $FFF0F0F0;
+    3: Result := $FFFFE6E6;
     4: Result := TAlphaColors.Lightyellow;
-    5: Result := TAlphaColors.Lightgreen;
+    5: Result := $FFE6F4E6;
   else
     Result := TAlphaColors.Null;
   end;
@@ -1057,8 +1104,16 @@ end;
 procedure TFrameProceed.UpdateGridResults;
 begin
   GridResults.BeginUpdate;
-
-  GridResults.EndUpdate;
+  try
+    if GridDataPoints <> nil then
+    begin
+      GridResults.Options := GridDataPoints.Options;
+      GridResults.RowHeight := GridDataPoints.RowHeight;
+      GridResults.StyleLookup := GridDataPoints.StyleLookup;
+    end;
+  finally
+    GridResults.EndUpdate;
+  end;
 
   GridResults.RowCount := Length(FCurrentResultRows);
   if Length(FCurrentResultRows) = 0 then
@@ -1463,7 +1518,6 @@ end;
 procedure TFrameProceed.MenuTreeViewDevicesAddClick(Sender: TObject);
 begin
   AddProcessingDeviceFromSelection;
-  RefreshResultsAfterDevicesAction;
 end;
 function TFrameProceed.IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
 var
@@ -1738,7 +1792,6 @@ end;
 procedure TFrameProceed.ActionSessionDeviceAddExecute(Sender: TObject);
 begin
   AddProcessingDeviceFromSelection;
-  RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionDeviceRemoveExecute(Sender: TObject);
 var
@@ -2391,6 +2444,7 @@ var
   GridRow: TResultGridRow;
   Color: TAlphaColor;
   PointIdx: Integer;
+  SavedState: TCanvasSaveState;
 begin
   if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
     Exit;
@@ -2412,11 +2466,17 @@ begin
       Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
   end;
 
-  if Color <> TAlphaColors.Null then
-  begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.Fill.Color := Color;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
+  SavedState := Canvas.SaveState;
+  try
+    if Color <> TAlphaColors.Null then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := Color;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    end;
+  finally
+    Canvas.RestoreState(SavedState);
   end;
 end;
 procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
@@ -2784,6 +2844,8 @@ begin
   Canvas.Fill.Kind := TBrushKind.Solid;
   Canvas.Fill.Color := Color;
   Canvas.FillRect(Bounds, 0, 0, [], 1);
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);

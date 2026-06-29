@@ -372,6 +372,7 @@ type
      procedure SetModified;
      procedure FlushPendingChanges;
      function DeviceChanged: Boolean;
+     procedure CopyDeviceMeasurements(ASource, ADest: TDevice);
 
      procedure CloseEditor(ASave: Boolean);
      function   GetSelectedPoint: TDevicePoint;
@@ -728,6 +729,39 @@ begin
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
 end;
 
+procedure TFormDeviceEditor.CopyDeviceMeasurements(ASource, ADest: TDevice);
+var
+  Session: TSessionSpillage;
+  NewSession: TSessionSpillage;
+  Spillage: TPointSpillage;
+  NewSpillage: TPointSpillage;
+begin
+  if (ASource = nil) or (ADest = nil) then
+    Exit;
+
+  ADest.Sessions.Clear;
+  if ASource.Sessions <> nil then
+    for Session in ASource.Sessions do
+    begin
+      if Session = nil then
+        Continue;
+      NewSession := TSessionSpillage.Create(Session.DeviceUUID);
+      NewSession.Assign(Session);
+      ADest.Sessions.Add(NewSession);
+    end;
+
+  ADest.Spillages.Clear;
+  if ASource.Spillages <> nil then
+    for Spillage in ASource.Spillages do
+    begin
+      if Spillage = nil then
+        Continue;
+      NewSpillage := TPointSpillage.Create(Spillage.SessionID);
+      NewSpillage.Assign(Spillage);
+      ADest.Spillages.Add(NewSpillage);
+    end;
+end;
+
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
 var
   Res: TModalResult;
@@ -1006,6 +1040,8 @@ procedure TFormDeviceEditor.FormCloseQuery(Sender: TObject;
   var CanClose: Boolean);
 var
   OldUUID: string;
+  MeasurementsSnapshot: TDevice;
+  Repo: TDeviceRepository;
 begin
   CanClose := True;
   FlushPendingChanges;
@@ -1021,12 +1057,27 @@ begin
       begin
         { редактирование существующего }
         OldUUID := FOriginalDevice.UUID;
-        FDevice.State:=osModified;
-        FOriginalDevice.Assign(FDevice, True);
-        FOriginalDevice.UUID := OldUUID;
-        //FOriginalDevice.State := osModified;
-        if not AppServices.DataManager.ActiveDeviceRepo.UpdateDevice(FOriginalDevice) then
-          raise Exception.Create('Ошибка сохранения прибора');
+        MeasurementsSnapshot := nil;
+        Repo := AppServices.DataManager.ActiveDeviceRepo;
+        try
+          if ((FOriginalDevice.Sessions = nil) or (FOriginalDevice.Sessions.Count = 0)) and
+             ((FOriginalDevice.Spillages = nil) or (FOriginalDevice.Spillages.Count = 0)) then
+          begin
+            Repo.LoadSpillageSessionsByDevice(OldUUID);
+            Repo.LoadSpillagesByDevice(OldUUID);
+          end;
+
+          MeasurementsSnapshot := FOriginalDevice.Clone;
+          FDevice.State:=osModified;
+          FOriginalDevice.Assign(FDevice, True);
+          FOriginalDevice.UUID := OldUUID;
+          CopyDeviceMeasurements(MeasurementsSnapshot, FOriginalDevice);
+          //FOriginalDevice.State := osModified;
+          if not Repo.UpdateDevice(FOriginalDevice) then
+            raise Exception.Create('Ошибка сохранения прибора');
+        finally
+          MeasurementsSnapshot.Free;
+        end;
         if not FTypeChangedDuringEdit then
           WriteDeviceEditActionLog('Сохранён прибор', FOriginalDevice);
       end
@@ -1050,10 +1101,9 @@ begin
       {----------------------------------}
       { Нажали Отмена }
       {----------------------------------}
-      { Ничего не сохраняем. Если оригинал был случайно изменён
-        через общие вложенные объекты, восстанавливаем снимок. }
-      if (FOriginalDevice <> nil) and (FLoadedDeviceSnapshot <> nil) then
-        FOriginalDevice.Assign(FLoadedDeviceSnapshot, True);
+      { Ничего не сохраняем. Редактор работает с клоном FDevice, поэтому
+        оригинальный прибор не трогаем: Assign из снимка пересоздаёт точки
+        и разрывает уже загруженные связи сессий/измерений. }
     end;
 
   except
