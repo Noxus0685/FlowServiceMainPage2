@@ -1080,6 +1080,7 @@ end;
 
 procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
 begin
+  Tag := 1;
   ModalResult := mrOk;
 end;
 
@@ -1091,6 +1092,7 @@ begin
   if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
     Exit;
 
+  Tag := 1;
   ModalResult := mrOk;
 end;
 
@@ -2707,6 +2709,7 @@ begin
 
   if (Key = vkReturn) and (GridDevices.Row>=0) then
   begin
+    Tag := 1;
     ModalResult := mrOk;
     Key := 0;
     KeyChar := #0;

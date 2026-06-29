@@ -491,7 +491,8 @@ var
 begin
   Frm := TFormDeviceSelect.Create(Self);
   try
-    if Frm.ShowModal <> mrOk then
+    Frm.Tag := 0;
+    if (Frm.ShowModal <> mrOk) or (Frm.Tag <> 1) then
       Exit;
 
     SelDevice := Frm.GetSelectedDevice;
