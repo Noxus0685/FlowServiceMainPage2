@@ -1062,8 +1062,16 @@ end;
 procedure TFrameProceed.UpdateGridResults;
 begin
   GridResults.BeginUpdate;
-
-  GridResults.EndUpdate;
+  try
+    if GridDataPoints <> nil then
+    begin
+      GridResults.Options := GridDataPoints.Options;
+      GridResults.RowHeight := GridDataPoints.RowHeight;
+      GridResults.StyleLookup := GridDataPoints.StyleLookup;
+    end;
+  finally
+    GridResults.EndUpdate;
+  end;
 
   GridResults.RowCount := Length(FCurrentResultRows);
   if Length(FCurrentResultRows) = 0 then
