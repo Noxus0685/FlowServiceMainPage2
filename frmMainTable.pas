@@ -2673,10 +2673,9 @@ begin
   ApplyGridColumnsLayout(GridDevices, WorkTable.DevicesGridColumns);
   if FFrameProceed <> nil then
     ApplyGridColumnsLayout(FFrameProceed.GridDataPoints, WorkTable.DataPointsGridColumns);
+  if FFrameProceed <> nil then
+    ApplyGridColumnsLayout(FFrameProceed.GridResults, WorkTable.ResultsGridColumns);
 
-  // GridResults показывает сводку по выбранным приборам. При выборе рабочего
-  // стола в дереве не применяем к нему настройки рабочего стола, чтобы
-  // оформление/ширины колонок оставались такими же, как после выбора прибора.
   EnforceDataPointsColumnsLayout;
   PopupMenuInstrumentalLayOutPopup(PopupMenuInstrumentalLayOut);
 end;
@@ -5369,9 +5368,7 @@ begin
     Canvas.Fill.Color := CellColor;
     Canvas.FillRect(Bounds, 0, 0, [], 1);
     Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-  end
-  else
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -6116,9 +6113,7 @@ begin
     Canvas.Fill.Color := CellColor;
     Canvas.FillRect(Bounds, 0, 0, [], 1);
     Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-  end
-  else
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  end;
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
