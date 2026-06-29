@@ -4640,6 +4640,102 @@ var
         Exit;
       end;
   end;
+
+
+  function GetMinPositiveDeviceImpTotal: Double;
+  var
+    J: Integer;
+    V: Double;
+    HasValue: Boolean;
+  begin
+    Result := 0;
+    HasValue := False;
+
+    if (WorkTable = nil) or (WorkTable.DeviceChannels = nil) then
+      Exit;
+
+    for J := 0 to WorkTable.DeviceChannels.Count - 1 do
+      if (WorkTable.DeviceChannels[J] <> nil) and
+         WorkTable.DeviceChannels[J].Enabled and
+         (WorkTable.DeviceChannels[J].ValueImpTotal <> nil) then
+      begin
+        V := WorkTable.DeviceChannels[J].ValueImpTotal.GetDoubleValue;
+
+        if V <= 0 then
+          Continue;
+
+        if (not HasValue) or (V < Result) then
+        begin
+          Result := V;
+          HasValue := True;
+        end;
+      end;
+  end;
+
+  function IsLimitReached(ACriterion: TSpillageStopCriterion): Boolean;
+  var
+    CurrentValue: Double;
+    LimitValue: Double;
+  begin
+    Result := False;
+
+    if (WorkTable = nil) or (WorkTable.CurrentPoint = nil) then
+      Exit;
+
+    if not (ACriterion in WorkTable.CurrentPoint.StopCriteria) then
+      Exit;
+
+    CurrentValue := 0;
+    LimitValue := 0;
+
+    case ACriterion of
+      scTime:
+        begin
+          LimitValue := WorkTable.CurrentPoint.LimitTime;
+
+          if WorkTable.ValueTime = nil then
+            Exit;
+
+          CurrentValue := WorkTable.ValueTime.GetDoubleValue;
+          Result := (LimitValue > 0) and (CurrentValue >= LimitValue);
+        end;
+
+      scVolume:
+        begin
+          LimitValue := WorkTable.CurrentPoint.LimitVolume;
+
+          if WorkTable.ValueQuantity = nil then
+            Exit;
+
+          CurrentValue := WorkTable.ValueQuantity.GetDoubleValue;
+          Result := (LimitValue > 0) and (CurrentValue >= LimitValue);
+        end;
+
+      scImpulse:
+        begin
+          LimitValue := WorkTable.CurrentPoint.LimitImp;
+          CurrentValue := GetMinPositiveDeviceImpTotal;
+
+          Result := (LimitValue > 0) and (CurrentValue >= LimitValue);
+        end;
+    end;
+  end;
+
+  function GetLimitIndicatorColor(ACriterion: TSpillageStopCriterion): TAlphaColor;
+  begin
+    Result := COLOR_NONE;
+
+    if (WorkTable = nil) or (WorkTable.CurrentPoint = nil) then
+      Exit;
+
+    if not (ACriterion in WorkTable.CurrentPoint.StopCriteria) then
+      Exit;
+
+    if IsLimitReached(ACriterion) then
+      Result := COLOR_COMPLETED
+    else
+      Result := COLOR_WARNING;
+  end;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
@@ -4722,7 +4818,10 @@ begin
 
   MinImpTotalValue := nil;
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-    if (WorkTable.DeviceChannels[I] <> nil) and (WorkTable.DeviceChannels[I].ValueImpTotal <> nil) then
+    if (WorkTable.DeviceChannels[I] <> nil) and
+       WorkTable.DeviceChannels[I].Enabled and
+       (WorkTable.DeviceChannels[I].ValueImpTotal <> nil) and
+       (WorkTable.DeviceChannels[I].ValueImpTotal.GetDoubleValue > 0) then
     begin
       if (MinImpTotalValue = nil) or
          (WorkTable.DeviceChannels[I].ValueImpTotal.GetDoubleValue < MinImpTotalValue.GetDoubleValue) then
@@ -4734,20 +4833,9 @@ begin
   else
     LabelImp.Text := '0';
 
-  if (WorkTable.CurrentPoint <> nil) and (scTime in WorkTable.CurrentPoint.StopCriteria) then
-    Rectangle3.Fill.Color := $FFFEF9C3
-  else
-    Rectangle3.Fill.Color := TAlphaColorRec.White;
-
-  if (WorkTable.CurrentPoint <> nil) and (scVolume in WorkTable.CurrentPoint.StopCriteria) then
-    Rectangle9.Fill.Color := $FFFEF9C3
-  else
-    Rectangle9.Fill.Color := TAlphaColorRec.White;
-
-  if (WorkTable.CurrentPoint <> nil) and (scImpulse in WorkTable.CurrentPoint.StopCriteria) then
-    Rectangle10.Fill.Color := $FFFEF9C3
-  else
-    Rectangle10.Fill.Color := TAlphaColorRec.White;
+  Rectangle3.Fill.Color := GetLimitIndicatorColor(scTime);
+  Rectangle9.Fill.Color := GetLimitIndicatorColor(scVolume);
+  Rectangle10.Fill.Color := GetLimitIndicatorColor(scImpulse);
 
   if WorkTable.ValueFlowRate <> nil then
   begin
