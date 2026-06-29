@@ -365,7 +365,6 @@ end;
 
 procedure TFrameProceed.RefreshResultsTab;
 begin
-  SyncProcessingDevicesFromAllTables(False);
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
