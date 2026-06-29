@@ -1670,8 +1670,8 @@ begin
         GlowMesYellow.Enabled := False;
         GlowMesGreen.Enabled := False;
         TestButton.Text := 'Ошибка';
-        TestButton.Enabled := False;
-        ButtonMonitor.Enabled := False;
+        TestButton.Enabled := True;
+        ButtonMonitor.Enabled := True;
         ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
       end;
   else

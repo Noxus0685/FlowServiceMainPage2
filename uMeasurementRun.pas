@@ -646,7 +646,7 @@ end;
 
 procedure TMeasurementRun.DoEnterStage(AOldStage, ANewStage: EMeasurementState);
 begin
-
+  FWaitStartedTick := TThread.GetTickCount64;
   case ANewStage of
     msSelectPoint: EnterSelectPoint;
     msSelectEtalon: EnterSelectEtalon;
@@ -1675,8 +1675,10 @@ begin
 end;
 
 procedure TMeasurementRun.ProcessWaitMeasureStart;
+var timeout: extended;
 const
-  DEFAULT_START_TIMEOUT_MS = 30000;
+  DEFAULT_START_TIMEOUT_S = 30;
+
 begin
   if FWorkTable = nil then
   begin
@@ -1706,11 +1708,12 @@ begin
         Exit;
       end;
   end;
-
-  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_START_TIMEOUT_MS then
+   timeout := (TThread.GetTickCount64 - FWaitStartedTick)/1000;
+  if timeout > DEFAULT_START_TIMEOUT_S then
   begin
     FireEvent(meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
-    SetStage(msWaitMeasureStop);
+  { TODO -oAndrey -cОтладка : Надо потом отладить и вернуть обратно }
+  //  SetStage(msWaitMeasureStop);
   end;
 end;
 
