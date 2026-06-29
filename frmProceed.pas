@@ -2420,16 +2420,15 @@ begin
 
   SavedState := Canvas.SaveState;
   try
-    Canvas.Fill.Kind := TBrushKind.Solid;
     if Color <> TAlphaColors.Null then
-      Canvas.Fill.Color := Color
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := Color;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    end
     else
-      Canvas.Fill.Color := TAlphaColors.White;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
-
-    Canvas.Fill.Color := TAlphaColors.Black;
-    Canvas.FillText(RectF(Bounds.Left + 3, Bounds.Top, Bounds.Right - 3, Bounds.Bottom),
-      Value.ToString, False, 1, [], TTextAlign.Leading, TTextAlign.Center);
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
   finally
     Canvas.RestoreState(SavedState);
   end;

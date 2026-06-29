@@ -5368,9 +5368,10 @@ begin
     Canvas.Fill.Kind := TBrushKind.Solid;
     Canvas.Fill.Color := CellColor;
     Canvas.FillRect(Bounds, 0, 0, [], 1);
-  end;
-
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  end
+  else
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -6120,9 +6121,10 @@ begin
     Canvas.Fill.Kind := TBrushKind.Solid;
     Canvas.Fill.Color := CellColor;
     Canvas.FillRect(Bounds, 0, 0, [], 1);
-  end;
-
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  end
+  else
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
