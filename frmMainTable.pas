@@ -5358,14 +5358,14 @@ begin
         CellColor := GetDeviceGroupColor(Channel.Group);
     end;
 
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-
-    if Column = StringColumnDeviceChanel1 then
+    if (Column = StringColumnDeviceChanel1) and (CellColor <> TAlphaColors.Null) then
     begin
       Canvas.Fill.Kind := TBrushKind.Solid;
       Canvas.Fill.Color := CellColor;
       Canvas.FillRect(Bounds, 0, 0, [], 1);
     end;
+
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
   finally
     Canvas.RestoreState(SavedState);
   end;
@@ -6110,14 +6110,14 @@ begin
         CellColor := GetEtalonGroupColor(Channel.Group);
     end;
 
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-
-    if Column = StringColumnEtalonChanel1 then
+    if (Column = StringColumnEtalonChanel1) and (CellColor <> TAlphaColors.Null) then
     begin
       Canvas.Fill.Kind := TBrushKind.Solid;
       Canvas.Fill.Color := CellColor;
       Canvas.FillRect(Bounds, 0, 0, [], 1);
     end;
+
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
   finally
     Canvas.RestoreState(SavedState);
   end;
