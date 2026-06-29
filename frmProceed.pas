@@ -820,10 +820,10 @@ end;
 function TFrameProceed.GetStatusColor(const AStatus: Integer): TAlphaColor;
 begin
   case AStatus of
-    2: Result := TAlphaColors.Lightgray;
-    3: Result := TAlphaColors.Lightcoral;
+    2: Result := $FFF0F0F0;
+    3: Result := $FFFFE6E6;
     4: Result := TAlphaColors.Lightyellow;
-    5: Result := TAlphaColors.Lightgreen;
+    5: Result := $FFE6F4E6;
   else
     Result := TAlphaColors.Null;
   end;
