@@ -5344,31 +5344,25 @@ procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
-  SavedState: TCanvasSaveState;
 begin
-  SavedState := Canvas.SaveState;
-  try
-    CellColor := TAlphaColors.Null;
+  CellColor := TAlphaColors.Null;
 
-    if (FActiveWorkTable <> nil) and (Row >= 0) and
-       (Row < FActiveWorkTable.DeviceChannels.Count) then
-    begin
-      Channel := FActiveWorkTable.DeviceChannels[Row];
-      if Channel <> nil then
-        CellColor := GetDeviceGroupColor(Channel.Group);
-    end;
-
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-
-    if Column = StringColumnDeviceChanel1 then
-    begin
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := CellColor;
-      Canvas.FillRect(Bounds, 0, 0, [], 1);
-    end;
-  finally
-    Canvas.RestoreState(SavedState);
+  if (FActiveWorkTable <> nil) and (Row >= 0) and
+     (Row < FActiveWorkTable.DeviceChannels.Count) then
+  begin
+    Channel := FActiveWorkTable.DeviceChannels[Row];
+    if Channel <> nil then
+      CellColor := GetDeviceGroupColor(Channel.Group);
   end;
+
+  if (Column = StringColumnDeviceChanel1) and (CellColor <> TAlphaColors.Null) then
+  begin
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := CellColor;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
+  end;
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -6096,31 +6090,25 @@ procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
-  SavedState: TCanvasSaveState;
 begin
-  SavedState := Canvas.SaveState;
-  try
-    CellColor := TAlphaColors.Null;
+  CellColor := TAlphaColors.Null;
 
-    if (FActiveWorkTable <> nil) and (Row >= 0) and
-       (Row < FActiveWorkTable.EtalonChannels.Count) then
-    begin
-      Channel := FActiveWorkTable.EtalonChannels[Row];
-      if Channel <> nil then
-        CellColor := GetEtalonGroupColor(Channel.Group);
-    end;
-
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-
-    if Column = StringColumnEtalonChanel1 then
-    begin
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := CellColor;
-      Canvas.FillRect(Bounds, 0, 0, [], 1);
-    end;
-  finally
-    Canvas.RestoreState(SavedState);
+  if (FActiveWorkTable <> nil) and (Row >= 0) and
+     (Row < FActiveWorkTable.EtalonChannels.Count) then
+  begin
+    Channel := FActiveWorkTable.EtalonChannels[Row];
+    if Channel <> nil then
+      CellColor := GetEtalonGroupColor(Channel.Group);
   end;
+
+  if (Column = StringColumnEtalonChanel1) and (CellColor <> TAlphaColors.Null) then
+  begin
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := CellColor;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
+  end;
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
