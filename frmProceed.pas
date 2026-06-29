@@ -339,6 +339,11 @@ begin
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
 
+  if GridResults <> nil then
+    GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
+  if GridDataPoints <> nil then
+    GridDataPoints.OnDrawColumnCell := GridDataPointsDrawColumnCell;
+
   FCurrentSession := nil;
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
@@ -815,10 +820,10 @@ end;
 function TFrameProceed.GetStatusColor(const AStatus: Integer): TAlphaColor;
 begin
   case AStatus of
-    2: Result := TAlphaColors.Lightgray;
-    3: Result := TAlphaColors.Lightcoral;
+    2: Result := $FFF0F0F0;
+    3: Result := $FFFFE6E6;
     4: Result := TAlphaColors.Lightyellow;
-    5: Result := TAlphaColors.Lightgreen;
+    5: Result := $FFE6F4E6;
   else
     Result := TAlphaColors.Null;
   end;
@@ -2418,6 +2423,8 @@ begin
     Canvas.Fill.Color := Color;
     Canvas.FillRect(Bounds, 0, 0, [], 1);
   end;
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
@@ -2784,6 +2791,8 @@ begin
   Canvas.Fill.Kind := TBrushKind.Solid;
   Canvas.Fill.Color := Color;
   Canvas.FillRect(Bounds, 0, 0, [], 1);
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
