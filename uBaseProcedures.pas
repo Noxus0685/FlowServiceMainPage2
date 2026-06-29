@@ -46,6 +46,7 @@ uses
   System.Variants;
 
   const
+  COLOR_NONE      = $FFFFFFFF; // Белый: нет состояния / нет активного ограничения
   COLOR_INVALID = $FFFFECEC;   // Светло-красный: точка некорректна
   COLOR_RUNNING = $FFF2E9FF;   // Светло-фиолетовый: точка выполняется
   COLOR_COMPLETED = $FFEAF9EA; // Светло-зелёный: точка выполнена
