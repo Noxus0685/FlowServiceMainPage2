@@ -5355,9 +5355,13 @@ begin
       CellColor := GetDeviceGroupColor(Channel.Group);
   end;
 
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := CellColor;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
+  if (not (Column is TCheckColumn)) and
+     ((not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
+  begin
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := CellColor;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
+  end;
 
   Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
@@ -6098,9 +6102,13 @@ begin
       CellColor := GetEtalonGroupColor(Channel.Group);
   end;
 
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := CellColor;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
+  if (not (Column is TCheckColumn)) and
+     ((not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
+  begin
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := CellColor;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
+  end;
 
   Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
