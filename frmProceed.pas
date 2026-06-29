@@ -2396,6 +2396,7 @@ var
   GridRow: TResultGridRow;
   Color: TAlphaColor;
   PointIdx: Integer;
+  SavedState: TCanvasSaveState;
 begin
   if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
     Exit;
@@ -2417,14 +2418,20 @@ begin
       Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
   end;
 
-  if Color <> TAlphaColors.Null then
-  begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.Fill.Color := Color;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
+  SavedState := Canvas.SaveState;
+  try
+    if Color <> TAlphaColors.Null then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := Color;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    end
+    else
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  finally
+    Canvas.RestoreState(SavedState);
   end;
-
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
