@@ -487,16 +487,26 @@ procedure TFrameProceed.AddProcessingDeviceFromSelection;
 var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
+  Res: TModalResult;
 begin
   Frm := TFormDeviceSelect.Create(Self);
   try
     Frm.Tag := 0;
-    if (Frm.ShowModal <> mrOk) or (Frm.Tag <> 1) then
+    Res := Frm.ShowModal;
+    if (Res <> mrOk) or (Frm.Tag <> 1) then
+    begin
+      PopulateTreeViewDevices;
+      ShowAllDevicesResults;
       Exit;
+    end;
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
+    begin
+      PopulateTreeViewDevices;
+      ShowAllDevicesResults;
       Exit;
+    end;
 
     AddProcessingDevice(SelDevice);
     PopulateTreeViewDevices;
