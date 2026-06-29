@@ -267,6 +267,8 @@ type
     FSessionEtalon: TFlowMeter;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
+    function IsChannelColumn(const AColumn: TColumn): Boolean;
+    function GetChannelColor(const ARow: Integer): TAlphaColor;
   public
     { Public declarations }
     procedure Initialize;
@@ -283,6 +285,13 @@ implementation
 const
   CProcessingDevicesSection = 'ProcessingDevices';
   CProcessingDevicesCountKey = 'Count';
+  CChannelColors: array[0..4] of TAlphaColor = (
+    $FFFFE0E0,
+    $FFE0FFE0,
+    $FFE0F0FF,
+    $FFFFFFD0,
+    $FFF0E0FF
+  );
   CProcessingDevicesItemKeyPrefix = 'Item';
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
@@ -2392,10 +2401,6 @@ end;
 procedure TFrameProceed.GridResultsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
-var
-  GridRow: TResultGridRow;
-  Color: TAlphaColor;
-  PointIdx: Integer;
 begin
   if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
     Exit;
@@ -2776,24 +2781,36 @@ procedure TFrameProceed.GridDataPointsDrawColumnCell(Sender: TObject;
 var
   P: TPointSpillage;
   Color: TAlphaColor;
+  SavedState: TCanvasSaveState;
 begin
   if (Column <> StringColumnSpillageValid) or (Row < 0) or
      (Row >= Length(FCurrentSpillages)) then
+  begin
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
     Exit;
+  end;
 
   P := FCurrentSpillages[Row];
   if P = nil then
+  begin
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
     Exit;
+  end;
 
-  Color := GetStatusColor(P.Status);
-  if Color = TAlphaColors.Null then
-    Exit;
+  SavedState := Canvas.SaveState;
+  try
+    Color := GetStatusColor(P.Status);
+    if (Color <> TAlphaColors.Null) and not (TGridDrawState.Selected in State) then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := Color;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
 
-  Canvas.Fill.Kind := TBrushKind.Solid;
-  Canvas.Fill.Color := Color;
-  Canvas.FillRect(Bounds, 0, 0, [], 1);
-
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  finally
+    Canvas.RestoreState(SavedState);
+  end;
 end;
 procedure TFrameProceed.GridDataPointsMouseDown(Sender: TObject;
   Button: TMouseButton; Shift: TShiftState; X, Y: Single);
