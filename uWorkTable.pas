@@ -3222,12 +3222,14 @@ begin
         Ini.WriteInteger(Section, 'TimeSet', Round(WorkTable.CurrentPoint.LimitTime));
         Ini.WriteInteger(Section, 'LimitImpSet', WorkTable.CurrentPoint.LimitImp);
         Ini.WriteFloat(Section, 'LimitVolumeSet', WorkTable.CurrentPoint.LimitVolume);
+        Ini.WriteInteger(Section, 'StopCriteria', CriteriaToInt(WorkTable.CurrentPoint.StopCriteria));
       end
       else
       begin
         Ini.WriteInteger(Section, 'TimeSet', -1);
         Ini.WriteInteger(Section, 'LimitImpSet', -1);
         Ini.WriteFloat(Section, 'LimitVolumeSet', -1);
+        Ini.WriteInteger(Section, 'StopCriteria', 0);
       end;
       Ini.WriteString(Section, 'Status', WorkTableStateToString(WorkTable.State));
       Ini.WriteString(Section, 'MeasurementState', WorkTableStateToString(WorkTable.State));
@@ -3352,10 +3354,29 @@ begin
       WorkTable.ScaleTareWeight := S2F(Ini.ReadString(Section, 'ScaleTareWeight', '0'));
       if WorkTable.CurrentPoint <> nil then
       begin
-        WorkTable.CurrentPoint.LimitTime := Ini.ReadInteger(Section, 'TimeSet', 0);
-        WorkTable.CurrentPoint.LimitImp := Ini.ReadInteger(Section, 'LimitImpSet', 0);
-        WorkTable.CurrentPoint.LimitVolume := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '0'));
-        WorkTable.CurrentPoint.StopCriteria := [];
+        WorkTable.CurrentPoint.LimitTime := Ini.ReadInteger(Section, 'TimeSet', -1);
+        WorkTable.CurrentPoint.LimitImp := Ini.ReadInteger(Section, 'LimitImpSet', -1);
+        WorkTable.CurrentPoint.LimitVolume := S2F(Ini.ReadString(Section, 'LimitVolumeSet', '-1'));
+
+        if Ini.ValueExists(Section, 'StopCriteria') then
+          WorkTable.CurrentPoint.StopCriteria :=
+            IntToCriteria(Ini.ReadInteger(Section, 'StopCriteria', 0))
+        else
+        begin
+          WorkTable.CurrentPoint.StopCriteria := [];
+
+          if WorkTable.CurrentPoint.LimitTime > 0 then
+            WorkTable.CurrentPoint.StopCriteria :=
+              WorkTable.CurrentPoint.StopCriteria + [scTime];
+
+          if WorkTable.CurrentPoint.LimitImp > 0 then
+            WorkTable.CurrentPoint.StopCriteria :=
+              WorkTable.CurrentPoint.StopCriteria + [scImpulse];
+
+          if WorkTable.CurrentPoint.LimitVolume > 0 then
+            WorkTable.CurrentPoint.StopCriteria :=
+              WorkTable.CurrentPoint.StopCriteria + [scVolume];
+        end;
       end;
        //Нет смысла восстанавливать состояние
      { WorkTable.State := WorkTableStateFromString(
