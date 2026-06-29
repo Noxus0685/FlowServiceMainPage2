@@ -2417,6 +2417,7 @@ begin
       Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
   end;
 
+  // Фон статуса рисуется до стандартной отрисовки текста.
   if Color <> TAlphaColors.Null then
   begin
     Canvas.Fill.Kind := TBrushKind.Solid;
