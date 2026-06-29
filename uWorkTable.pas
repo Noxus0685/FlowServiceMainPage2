@@ -2497,7 +2497,7 @@ var
 
   function GetAggregateGroupKey(const AIndex: Integer; const AChannel: TChannel): Integer;
   begin
-    if (AChannel <> nil) and (AChannel.Group > 0) then
+    if (AChannel <> nil) and (AChannel.Group >= 0) then
       Result := AChannel.Group
     else
       Result := -AIndex - 1;
