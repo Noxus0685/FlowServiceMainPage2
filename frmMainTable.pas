@@ -5369,9 +5369,7 @@ begin
     Canvas.Fill.Color := CellColor;
     Canvas.FillRect(Bounds, 0, 0, [], 1);
     Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-  end
-  else
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
