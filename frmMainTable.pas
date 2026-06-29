@@ -506,6 +506,9 @@ type
     procedure GridEtalonsCellClick(const Column: TColumn; const Row: Integer);
     procedure GridDevicesGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
+    procedure GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+      const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+      const Value: TValue; const State: TGridDrawStates);
     procedure GridDevicesSetValue(Sender: TObject; const ACol, ARow: Integer;
       const Value: TValue);
     procedure GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -660,6 +663,7 @@ type
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
+    function GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -1723,6 +1727,7 @@ begin
 
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
+  GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -5320,6 +5325,49 @@ begin
       if FActiveWorkTable.State <> swtCONNECTED then
         FActiveWorkTable.State := swtCONNECTED;
     end;
+  end;
+end;
+
+
+function TFrameMainTable.GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
+const
+  // Один синий оттенок с разной светлотой: от светлого к более тёмному.
+  BlueGroupColors: array[0..2] of TAlphaColor = (
+    $331E90FF, $4D1E90FF, $661E90FF);
+begin
+  Result := BlueGroupColors[Abs(AGroup) mod Length(BlueGroupColors)];
+end;
+
+procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
+  const Column: TColumn; const Bounds: TRectF; const Row: Integer;
+  const Value: TValue; const State: TGridDrawStates);
+var
+  Channel: TChannel;
+  CellColor: TAlphaColor;
+  SavedState: TCanvasSaveState;
+begin
+  SavedState := Canvas.SaveState;
+  try
+    CellColor := TAlphaColors.Null;
+
+    if (FActiveWorkTable <> nil) and (Row >= 0) and
+       (Row < FActiveWorkTable.DeviceChannels.Count) then
+    begin
+      Channel := FActiveWorkTable.DeviceChannels[Row];
+      if Channel <> nil then
+        CellColor := GetDeviceGroupColor(Channel.Group);
+    end;
+
+    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+
+    if Column = StringColumnDeviceChanel1 then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := CellColor;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+    end;
+  finally
+    Canvas.RestoreState(SavedState);
   end;
 end;
 
