@@ -491,7 +491,8 @@ var
 begin
   Frm := TFormDeviceSelect.Create(Self);
   try
-    if Frm.ShowModal <> mrOk then
+    Frm.Tag := 0;
+    if (Frm.ShowModal <> mrOk) or (Frm.Tag <> 1) then
       Exit;
 
     SelDevice := Frm.GetSelectedDevice;
@@ -499,6 +500,9 @@ begin
       Exit;
 
     AddProcessingDevice(SelDevice);
+    PopulateTreeViewDevices;
+    SelectTreeItemByTagObject(SelDevice);
+    ShowDeviceSpillages(SelDevice);
   finally
     Frm.Free;
   end;
@@ -512,6 +516,25 @@ function TFrameProceed.FindTreeItemByTagObject(ATagObject: TObject): TTreeViewIt
 var
   I: Integer;
   Item: TTreeViewItem;
+
+  function FindInItem(AItem: TTreeViewItem): TTreeViewItem;
+  var
+    J: Integer;
+  begin
+    Result := nil;
+    if AItem = nil then
+      Exit;
+
+    if AItem.TagObject = ATagObject then
+      Exit(AItem);
+
+    for J := 0 to AItem.Count - 1 do
+    begin
+      Result := FindInItem(AItem.ItemByIndex(J));
+      if Result <> nil then
+        Exit;
+    end;
+  end;
 begin
   Result := nil;
   if (TreeViewDevices = nil) or (ATagObject = nil) then
@@ -520,17 +543,27 @@ begin
   for I := 0 to TreeViewDevices.Count - 1 do
   begin
     Item := TreeViewDevices.ItemByIndex(I);
-    if (Item <> nil) and (Item.TagObject = ATagObject) then
-      Exit(Item);
+    Result := FindInItem(Item);
+    if Result <> nil then
+      Exit;
   end;
 end;
 procedure TFrameProceed.SelectTreeItemByTagObject(ATagObject: TObject);
 var
   Item: TTreeViewItem;
+  Parent: TTreeViewItem;
 begin
   Item := FindTreeItemByTagObject(ATagObject);
   if Item <> nil then
+  begin
+    Parent := Item.ParentItem;
+    while Parent <> nil do
+    begin
+      Parent.IsExpanded := True;
+      Parent := Parent.ParentItem;
+    end;
     TreeViewDevices.Selected := Item;
+  end;
 end;
 procedure TFrameProceed.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
@@ -1476,7 +1509,6 @@ end;
 procedure TFrameProceed.MenuTreeViewDevicesAddClick(Sender: TObject);
 begin
   AddProcessingDeviceFromSelection;
-  RefreshResultsAfterDevicesAction;
 end;
 function TFrameProceed.IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
 var
@@ -1751,7 +1783,6 @@ end;
 procedure TFrameProceed.ActionSessionDeviceAddExecute(Sender: TObject);
 begin
   AddProcessingDeviceFromSelection;
-  RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionDeviceRemoveExecute(Sender: TObject);
 var
