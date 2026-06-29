@@ -2433,9 +2433,10 @@ begin
       Canvas.Fill.Kind := TBrushKind.Solid;
       Canvas.Fill.Color := Color;
       Canvas.FillRect(Bounds, 0, 0, [], 1);
-    end;
-
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+    end
+    else
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
   finally
     Canvas.RestoreState(SavedState);
   end;
