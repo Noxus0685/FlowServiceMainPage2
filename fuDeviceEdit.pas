@@ -372,6 +372,7 @@ type
      procedure SetModified;
      procedure FlushPendingChanges;
      function DeviceChanged: Boolean;
+     procedure UpdateSnapshotMeasurementsFromOriginal;
 
      procedure CloseEditor(ASave: Boolean);
      function   GetSelectedPoint: TDevicePoint;
@@ -728,6 +729,39 @@ begin
   ProtocolManager.AddMessage(pcInfo, psForm, 'DeviceAction', 'Действие с прибором', Details);
 end;
 
+procedure TFormDeviceEditor.UpdateSnapshotMeasurementsFromOriginal;
+var
+  Session: TSessionSpillage;
+  NewSession: TSessionSpillage;
+  Spillage: TPointSpillage;
+  NewSpillage: TPointSpillage;
+begin
+  if (FOriginalDevice = nil) or (FLoadedDeviceSnapshot = nil) then
+    Exit;
+
+  FLoadedDeviceSnapshot.Sessions.Clear;
+  if FOriginalDevice.Sessions <> nil then
+    for Session in FOriginalDevice.Sessions do
+    begin
+      if Session = nil then
+        Continue;
+      NewSession := TSessionSpillage.Create(Session.DeviceUUID);
+      NewSession.Assign(Session);
+      FLoadedDeviceSnapshot.Sessions.Add(NewSession);
+    end;
+
+  FLoadedDeviceSnapshot.Spillages.Clear;
+  if FOriginalDevice.Spillages <> nil then
+    for Spillage in FOriginalDevice.Spillages do
+    begin
+      if Spillage = nil then
+        Continue;
+      NewSpillage := TPointSpillage.Create(Spillage.SessionID);
+      NewSpillage.Assign(Spillage);
+      FLoadedDeviceSnapshot.Spillages.Add(NewSpillage);
+    end;
+end;
+
 procedure TFormDeviceEditor.btnCancelClick(Sender: TObject);
 var
   Res: TModalResult;
@@ -1050,8 +1084,10 @@ begin
       {----------------------------------}
       { Нажали Отмена }
       {----------------------------------}
-      { Ничего не сохраняем. Если оригинал был случайно изменён
-        через общие вложенные объекты, восстанавливаем снимок. }
+      { Ничего не сохраняем. Перед восстановлением обновляем в снимке
+        актуальные сессии/измерения оригинального прибора, чтобы откатить
+        только изменения редактора и не стереть результаты измерений. }
+      UpdateSnapshotMeasurementsFromOriginal;
       if (FOriginalDevice <> nil) and (FLoadedDeviceSnapshot <> nil) then
         FOriginalDevice.Assign(FLoadedDeviceSnapshot, True);
     end;
