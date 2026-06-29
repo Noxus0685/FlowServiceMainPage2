@@ -897,7 +897,7 @@ var
   ParamInfo: RStableInfo;
 begin
   Result := False;
-  StableInfo.Status := ssNONE;
+  StableInfo.Status := sNONE;
   StableInfo.StatusText := '';
   StableInfo.CurrentValue := 0;
   Point := GetCurrentPoint;
@@ -909,21 +909,21 @@ begin
   if (FWorkTable.FlowRate <> nil) and (Point.Q >= 0) then
   begin
     Result := FWorkTable.FlowRate.IsStable(ParamInfo) and Result;
-    if ParamInfo.Status <> ssOk then
+    if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
   end;
 
   if (FWorkTable.FluidTemp <> nil) and (Point.Temp > 0) then
   begin
     Result := FWorkTable.FluidTemp.IsStable(ParamInfo) and Result;
-    if ParamInfo.Status <> ssOk then
+    if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
   end;
 
   if (FWorkTable.FluidPress <> nil) and (Point.Pressure > 0) then
   begin
     Result := FWorkTable.FluidPress.IsStable(ParamInfo) and Result;
-    if ParamInfo.Status <> ssOk then
+    if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
   end;
 end;

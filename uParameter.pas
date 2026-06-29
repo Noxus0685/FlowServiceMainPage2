@@ -640,47 +640,47 @@ begin
   IsChangingNow := (FValueSet.Value<>FValue.Value) and (not IsTargetReached);
 
   if not HadTask then
-    AStableInfo.Status := ssNONE
+    AStableInfo.Status := sNONE
   else if not IsTargetReached then
   begin
     if IsChangingNow then
     begin
       if HasStabilization then
-        AStableInfo.Status := ssRun_SN
+        AStableInfo.Status := sRun_SN
       else
-        AStableInfo.Status := ssRun_NN;
+        AStableInfo.Status := sRun_NN;
     end
     else if HasStabilization then
-      AStableInfo.Status := ssFail_SN
+      AStableInfo.Status := sFail_SN
     else
-      AStableInfo.Status := ssFail_NN;
+      AStableInfo.Status := sFail_NN;
   end
   else
   begin
     if IsChangingNow then
-      AStableInfo.Status := ssRun_NS
+      AStableInfo.Status := sRun_NS
     else if HasStabilization then
-      AStableInfo.Status := ssOk
+      AStableInfo.Status := sOk
     else
-      AStableInfo.Status := ssFail_NS;
+      AStableInfo.Status := sFail_NS;
   end;
 
   case AStableInfo.Status of
-    ssNONE:
+    sNONE:
       AStableInfo.StatusText := 'Не было заданий, поэтому стабилен.';
-    ssRun_NN:
+    sRun_NN:
       AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизации нет.';
-    ssRun_SN:
+    sRun_SN:
       AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизация есть.';
-    ssRun_NS:
+    sRun_NS:
       AStableInfo.StatusText := 'Есть задание, происходит изменение, задание достигнуто, стабилизации нет.';
-    ssOk:
+    sOk:
       AStableInfo.StatusText := 'Было задание, оно выполнено, стабилизация достигнута.';
-    ssFail_SN:
+    sFail_SN:
       AStableInfo.StatusText := 'Было задание, оно не достигнуто, стабилизация есть.';
-    ssFail_NS:
+    sFail_NS:
       AStableInfo.StatusText := 'Было задание, оно достигнуто, стабилизации нет.';
-    ssFail_NN:
+    sFail_NN:
       AStableInfo.StatusText := 'Было задание, оно не достигнуто и нет стабилизации.';
   end;
 

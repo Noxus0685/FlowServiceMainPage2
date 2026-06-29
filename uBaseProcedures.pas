@@ -101,14 +101,14 @@ type
     );
 
   EStableStatus = (
-    ssNONE,
-    ssRun_NN,   // no target, no stable
-    ssRun_SN,   // stable, no target
-    ssRun_NS,   // no stable, target
-    ssOk,       // done + stable
-    ssFail_SN,  // stable, no target
-    ssFail_NS,  // no stable, target
-    ssFail_NN   // no stable, no target
+    sNONE,
+    sRun_NN,   // no target, no stable
+    sRun_SN,   // stable, no target
+    sRun_NS,   // no stable, target
+    sOk,       // done + stable
+    sFail_SN,  // stable, no target
+    sFail_NS,  // no stable, target
+    sFail_NN   // no stable, no target
   );
 
   RStableInfo = record

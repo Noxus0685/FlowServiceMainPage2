@@ -1640,7 +1640,7 @@ begin
         // Ожидание завершения остановки.
       end;
 
-    swtCOMPLETE:
+     swtFINALREAD:
       begin
         TestButton.Text := 'Сохранение';
         TestButton.Tag := 5;
@@ -1650,7 +1650,7 @@ begin
         GlowMesGreen.Enabled := False;
       end;
 
-    swtFINALREAD:
+     swtCOMPLETE:
       begin
         GlowMesYellow.Enabled := False;
         GlowMesRed.Enabled := False;
@@ -1658,7 +1658,6 @@ begin
         TestButton.Text := 'Сохранить?';
         TestButton.Tag := 6;
         TestButton.Enabled := True;
-        ButtonMonitor.Enabled := True;
         ButtonCancel.Visible := True;
         GlowEffectCancelRed.Enabled := True;
         UpdateForm;
