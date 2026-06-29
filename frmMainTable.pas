@@ -5344,10 +5344,15 @@ procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
+  IsChannelColumn: Boolean;
 begin
-  CellColor := TAlphaColors.White;
+  IsChannelColumn := Column = StringColumnDeviceChanel1;
+  if Odd(Row) then
+    CellColor := $FFF2F2F2
+  else
+    CellColor := TAlphaColors.White;
 
-  if (Column = StringColumnDeviceChanel1) and (FActiveWorkTable <> nil) and
+  if IsChannelColumn and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) then
   begin
     Channel := FActiveWorkTable.DeviceChannels[Row];
@@ -5356,7 +5361,7 @@ begin
   end;
 
   if (not (Column is TCheckColumn)) and
-     ((not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
+     (IsChannelColumn or (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
   begin
     Canvas.Fill.Kind := TBrushKind.Solid;
     Canvas.Fill.Color := CellColor;
@@ -6091,10 +6096,15 @@ procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
+  IsChannelColumn: Boolean;
 begin
-  CellColor := TAlphaColors.White;
+  IsChannelColumn := Column = StringColumnEtalonChanel1;
+  if Odd(Row) then
+    CellColor := $FFF2F2F2
+  else
+    CellColor := TAlphaColors.White;
 
-  if (Column = StringColumnEtalonChanel1) and (FActiveWorkTable <> nil) and
+  if IsChannelColumn and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) then
   begin
     Channel := FActiveWorkTable.EtalonChannels[Row];
@@ -6103,7 +6113,7 @@ begin
   end;
 
   if (not (Column is TCheckColumn)) and
-     ((not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
+     (IsChannelColumn or (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
   begin
     Canvas.Fill.Kind := TBrushKind.Solid;
     Canvas.Fill.Color := CellColor;
