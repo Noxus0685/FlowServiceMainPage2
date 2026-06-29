@@ -2406,7 +2406,7 @@ end;
 function TFrameProceed.GetChannelColor(const ARow: Integer): TAlphaColor;
 var
   ChannelName: string;
-  Hash: Cardinal;
+  PaletteIndex: Integer;
   I: Integer;
 begin
   Result := TAlphaColors.Null;
@@ -2418,11 +2418,11 @@ begin
   if ChannelName = '' then
     Exit;
 
-  Hash := 0;
+  PaletteIndex := 0;
   for I := 1 to Length(ChannelName) do
-    Hash := Hash * 31 + Ord(ChannelName[I]);
+    PaletteIndex := (PaletteIndex + Ord(ChannelName[I]) + I) mod Length(CChannelColors);
 
-  Result := CChannelColors[Hash mod Length(CChannelColors)];
+  Result := CChannelColors[PaletteIndex];
 end;
 
 procedure TFrameProceed.GridResultsDrawColumnCell(Sender: TObject;
