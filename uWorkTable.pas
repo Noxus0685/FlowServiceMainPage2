@@ -5242,6 +5242,23 @@ begin
           MaxGroupQmax := GroupQmax;
       end;
 
+  if ASplitByEnabledGroup then
+    for I := 0 to AChannels.Count - 1 do
+      if (AChannels[I] <> nil) and (AChannels[I].Group > 0) then
+      begin
+        GroupQmax := 0;
+        for J := 0 to AChannels.Count - 1 do
+          if (AChannels[J] <> nil) and (AChannels[J].Group = AChannels[I].Group) and
+             (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
+            GroupQmax := GroupQmax +
+              AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
+
+        if GroupQmax > MaxGroupQmax then
+        begin
+          MaxGroupQmax := GroupQmax;
+        end;
+      end;
+
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
