@@ -2533,8 +2533,16 @@ begin
 
     if ValidCount = 0 then
     begin
-      DP.Status := 2;
-      DP.StatusStr := 'Есть измерения по расходу, но корректных измерений недостаточно или нет.';
+      if ErrorExceededInValid then
+      begin
+        DP.Status := 3;
+        DP.StatusStr := 'Есть измерения по расходу, но погрешность превышает допуск (красный).';
+      end
+      else
+      begin
+        DP.Status := 2;
+        DP.StatusStr := 'Есть измерения по расходу, но корректных измерений недостаточно или нет.';
+      end;
     end
     else if ValidCount < RequiredCount then
     begin
