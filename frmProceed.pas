@@ -2398,60 +2398,11 @@ begin
 end;
 
 
-function TFrameProceed.IsChannelColumn(const AColumn: TColumn): Boolean;
-begin
-  Result := (AColumn = StringColumnResultName) or SameText(AColumn.Header, 'Канал');
-end;
-
-function TFrameProceed.GetChannelColor(const ARow: Integer): TAlphaColor;
-var
-  ChannelName: string;
-  PaletteIndex: Integer;
-  I: Integer;
-begin
-  Result := TAlphaColors.Null;
-
-  if (ARow < 0) or (ARow >= Length(FCurrentResultRows)) then
-    Exit;
-
-  ChannelName := Trim(FCurrentResultRows[ARow].Name);
-  if ChannelName = '' then
-    Exit;
-
-  PaletteIndex := 0;
-  for I := 1 to Length(ChannelName) do
-    PaletteIndex := (PaletteIndex + Ord(ChannelName[I]) + I) mod Length(CChannelColors);
-
-  Result := CChannelColors[PaletteIndex];
-end;
-
 procedure TFrameProceed.GridResultsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
-var
-  Color: TAlphaColor;
-  SavedState: TCanvasSaveState;
 begin
-  if not IsChannelColumn(Column) then
-  begin
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-    Exit;
-  end;
-
-  SavedState := Canvas.SaveState;
-  try
-    Color := GetChannelColor(Row);
-    if (Color <> TAlphaColors.Null) and not (TGridDrawState.Selected in State) then
-    begin
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := Color;
-      Canvas.FillRect(Bounds, 0, 0, [], 1);
-    end;
-
-    Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-  finally
-    Canvas.RestoreState(SavedState);
-  end;
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 procedure TFrameProceed.GridResultsMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Single);
