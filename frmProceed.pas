@@ -267,6 +267,8 @@ type
     FSessionEtalon: TFlowMeter;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
+    function IsChannelColumn(const AColumn: TColumn): Boolean;
+    function GetChannelColor(const ARow: Integer): TAlphaColor;
   public
     { Public declarations }
     procedure Initialize;
@@ -283,6 +285,13 @@ implementation
 const
   CProcessingDevicesSection = 'ProcessingDevices';
   CProcessingDevicesCountKey = 'Count';
+  CChannelColors: array[0..4] of TAlphaColor = (
+    $FFFFE0E0,
+    $FFE0FFE0,
+    $FFE0F0FF,
+    $FFFFFFD0,
+    $FFF0E0FF
+  );
   CProcessingDevicesItemKeyPrefix = 'Item';
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
