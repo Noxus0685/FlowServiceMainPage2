@@ -5344,7 +5344,6 @@ procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
-  SavedState: TCanvasSaveState;
 begin
   CellColor := TAlphaColors.Null;
 
@@ -5356,20 +5355,14 @@ begin
       CellColor := GetDeviceGroupColor(Channel.Group);
   end;
 
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-
   if (Column = StringColumnDeviceChanel1) and (CellColor <> TAlphaColors.Null) then
   begin
-    SavedState := Canvas.SaveState;
-    try
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := CellColor;
-      Canvas.FillRect(TRectF.Create(Bounds.Right - 6, Bounds.Top, Bounds.Right, Bounds.Bottom),
-        0, 0, [], 1);
-    finally
-      Canvas.RestoreState(SavedState);
-    end;
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := CellColor;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
   end;
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
@@ -6097,7 +6090,6 @@ procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
-  SavedState: TCanvasSaveState;
 begin
   CellColor := TAlphaColors.Null;
 
@@ -6109,20 +6101,14 @@ begin
       CellColor := GetEtalonGroupColor(Channel.Group);
   end;
 
-  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-
   if (Column = StringColumnEtalonChanel1) and (CellColor <> TAlphaColors.Null) then
   begin
-    SavedState := Canvas.SaveState;
-    try
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := CellColor;
-      Canvas.FillRect(TRectF.Create(Bounds.Right - 6, Bounds.Top, Bounds.Right, Bounds.Bottom),
-        0, 0, [], 1);
-    finally
-      Canvas.RestoreState(SavedState);
-    end;
+    Canvas.Fill.Kind := TBrushKind.Solid;
+    Canvas.Fill.Color := CellColor;
+    Canvas.FillRect(Bounds, 0, 0, [], 1);
   end;
+
+  Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
 
 procedure TFrameMainTable.GridEtalonsGetValue(Sender: TObject;
