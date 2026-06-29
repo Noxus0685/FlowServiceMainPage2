@@ -5345,22 +5345,19 @@ var
   Channel: TChannel;
   CellColor: TAlphaColor;
 begin
-  CellColor := TAlphaColors.Null;
+  CellColor := TAlphaColors.White;
 
-  if (FActiveWorkTable <> nil) and (Row >= 0) and
-     (Row < FActiveWorkTable.DeviceChannels.Count) then
+  if (Column = StringColumnDeviceChanel1) and (FActiveWorkTable <> nil) and
+     (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) then
   begin
     Channel := FActiveWorkTable.DeviceChannels[Row];
     if Channel <> nil then
       CellColor := GetDeviceGroupColor(Channel.Group);
   end;
 
-  if (Column = StringColumnDeviceChanel1) and (CellColor <> TAlphaColors.Null) then
-  begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.Fill.Color := CellColor;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
-  end;
+  Canvas.Fill.Kind := TBrushKind.Solid;
+  Canvas.Fill.Color := CellColor;
+  Canvas.FillRect(Bounds, 0, 0, [], 1);
 
   Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
@@ -6091,22 +6088,19 @@ var
   Channel: TChannel;
   CellColor: TAlphaColor;
 begin
-  CellColor := TAlphaColors.Null;
+  CellColor := TAlphaColors.White;
 
-  if (FActiveWorkTable <> nil) and (Row >= 0) and
-     (Row < FActiveWorkTable.EtalonChannels.Count) then
+  if (Column = StringColumnEtalonChanel1) and (FActiveWorkTable <> nil) and
+     (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) then
   begin
     Channel := FActiveWorkTable.EtalonChannels[Row];
     if Channel <> nil then
       CellColor := GetEtalonGroupColor(Channel.Group);
   end;
 
-  if (Column = StringColumnEtalonChanel1) and (CellColor <> TAlphaColors.Null) then
-  begin
-    Canvas.Fill.Kind := TBrushKind.Solid;
-    Canvas.Fill.Color := CellColor;
-    Canvas.FillRect(Bounds, 0, 0, [], 1);
-  end;
+  Canvas.Fill.Kind := TBrushKind.Solid;
+  Canvas.Fill.Color := CellColor;
+  Canvas.FillRect(Bounds, 0, 0, [], 1);
 
   Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
 end;
