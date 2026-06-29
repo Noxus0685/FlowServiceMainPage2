@@ -5220,6 +5220,7 @@ end;
 function TDeviceRepository.UpdateSpillageSession(ASession: TSessionSpillage): Boolean;
 var
   Q: TFDQuery;
+  ClearActiveQ: TFDQuery;
 begin
   Result := False;
   if (ASession = nil) or (FDM = nil) then Exit;
@@ -5257,6 +5258,21 @@ begin
     Q.ExecSQL;
     if ASession.State = osNew then
       ASession.ID := Q.Connection.ExecSQLScalar('select last_insert_rowid()');
+
+    if ASession.Active and (Trim(ASession.DeviceUUID) <> '') and (ASession.ID > 0) then
+    begin
+      ClearActiveQ := FDM.CreateQuery;
+      try
+        ClearActiveQ.SQL.Text :=
+          'update SessionSpillage set Active = 0 where DeviceUUID = :DeviceUUID and ID <> :ID';
+        SetStrParam(ClearActiveQ, 'DeviceUUID', ASession.DeviceUUID);
+        SetIntParam(ClearActiveQ, 'ID', ASession.ID);
+        ClearActiveQ.ExecSQL;
+      finally
+        ClearActiveQ.Free;
+      end;
+    end;
+
     ASession.State := osClean;
     Result := True;
   finally
