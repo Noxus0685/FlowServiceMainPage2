@@ -5216,7 +5216,8 @@ begin
       begin
         ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
         SUM := SUM + ChannelQmax;
-        if AChannels[I].Group >= 0 then
+        if (AChannels[I].Group > 0) or ((AChannels[I].Group = 0) and
+           (not ASplitByEnabledGroup)) then
           GroupKey := AChannels[I].Group
         else
           GroupKey := -I - 1;
@@ -5225,7 +5226,8 @@ begin
         for J := 0 to AChannels.Count - 1 do
           if AChannels[J] <> nil then
           begin
-            if AChannels[J].Group >= 0 then
+            if (AChannels[J].Group > 0) or ((AChannels[J].Group = 0) and
+               (not ASplitByEnabledGroup)) then
             begin
               if AChannels[J].Group <> GroupKey then
                 Continue;
