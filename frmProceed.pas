@@ -2393,18 +2393,16 @@ procedure TFrameProceed.GridResultsDrawColumnCell(Sender: TObject;
   const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
   const Row: Integer; const Value: TValue; const State: TGridDrawStates);
 var
-  GridRow: TResultGridRow;
   Color: TAlphaColor;
   PointIdx: Integer;
 begin
   if (Row < 0) or (Row >= Length(FCurrentResultRows)) then
     Exit;
 
-  GridRow := FCurrentResultRows[Row];
   Color := TAlphaColors.Null;
 
   if Column = StringColumnResult then
-    Color := GetStatusColor(GridRow.ResultStatus)
+    Color := GetStatusColor(FCurrentResultRows[Row].ResultStatus)
   else
   begin
     PointIdx := -1;
@@ -2413,10 +2411,11 @@ begin
     if Column = StringColumnPointNum3 then PointIdx := 2;
     if Column = StringColumnPointNum4 then PointIdx := 3;
 
-    if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointStatuses)) then
-      Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
+    if (PointIdx >= 0) and (PointIdx < Length(FCurrentResultRows[Row].PointStatuses)) then
+      Color := GetStatusColor(FCurrentResultRows[Row].PointStatuses[PointIdx]);
   end;
 
+  // Фон статуса рисуется до стандартной отрисовки текста.
   if Color <> TAlphaColors.Null then
   begin
     Canvas.Fill.Kind := TBrushKind.Solid;
