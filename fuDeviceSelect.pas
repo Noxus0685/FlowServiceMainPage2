@@ -384,14 +384,10 @@ begin
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
-  { Загружаем данные из БД (в репозиторий!) }
+  { Не перезагружаем репозиторий здесь: ActiveRepo.Load/InitChannels
+    меняют состояние рабочего стола при простом открытии DeviceSelect. }
   {--------------------------------------------------}
-  DbgDeviceSelect('DBG 2002'#13#10'Before ActiveRepo.Load');
-  ActiveRepo.Load;
-  DbgDeviceSelect('DBG 2003'#13#10'After ActiveRepo.Load');
-  DbgDeviceSelect('DBG 2004'#13#10'Before WorkTableManager.ActiveWorkTable.InitChannels');
-  WorkTableManager.ActiveWorkTable.InitChannels ;
-  DbgDeviceSelect('DBG 2005'#13#10'After WorkTableManager.ActiveWorkTable.InitChannels');
+  DbgDeviceSelect('DBG 2002'#13#10'DeviceSelect.LoadData uses existing ActiveRepo.Devices');
   {--------------------------------------------------}
   { Берём ссылку на данные репозитория }
   {--------------------------------------------------}
