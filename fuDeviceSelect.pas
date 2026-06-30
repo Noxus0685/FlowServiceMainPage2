@@ -363,6 +363,7 @@ begin
   DbgDeviceSelect('DBG 2001'#13#10'DeviceSelect.LoadData ENTER');
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория приборов }
+  { Временная диагностика DbgDeviceSelect удалена. }
   {--------------------------------------------------}
   if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveDeviceRepo = nil) then
   begin
