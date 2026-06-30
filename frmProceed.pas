@@ -518,8 +518,6 @@ begin
     Frm.Tag := 0;
     DbgProceedTree(1104, 'Before DeviceSelect.ShowModal'#13#10 + GetSelectedTreeDebugText);
     Res := Frm.ShowModal;
-    { DeviceSelect may reload the device repository, so refresh non-owning
-      FProcessingDevices references before any later tree/results work. }
     LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
