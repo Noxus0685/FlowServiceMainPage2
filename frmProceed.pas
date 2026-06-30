@@ -559,8 +559,6 @@ begin
     begin
       DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
         [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
-      PopulateTreeViewDevices;
-      ShowAllDevicesResults;
       Exit;
     end;
 
@@ -569,8 +567,6 @@ begin
     if SelDevice = nil then
     begin
       DbgProceedTree(1108, 'SelDevice=nil branch'#13#10 + GetSelectedTreeDebugText);
-      PopulateTreeViewDevices;
-      ShowAllDevicesResults;
       Exit;
     end;
 
