@@ -4339,6 +4339,7 @@ var
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
   Device: TDevice;
+  DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
 begin
 
@@ -4392,14 +4393,15 @@ begin
 
       MatchedPoint := nil;
       if (CurrentPoint <> nil) and (Device.Points <> nil) then
-        for MatchedPoint in Device.Points do
-          if (MatchedPoint <> nil) and
-             (((CurrentPoint.ID <> 0) and (MatchedPoint.ID = CurrentPoint.ID)) or
+        for DevicePoint in Device.Points do
+          if (DevicePoint <> nil) and
+             (((CurrentPoint.ID <> 0) and (DevicePoint.ID = CurrentPoint.ID)) or
               ((CurrentPoint.ID = 0) and (Trim(CurrentPoint.Name) <> '') and
-               SameText(MatchedPoint.Name, CurrentPoint.Name))) then
-            Break
-          else
-            MatchedPoint := nil;
+               SameText(DevicePoint.Name, CurrentPoint.Name))) then
+          begin
+            MatchedPoint := DevicePoint;
+            Break;
+          end;
 
       if MatchedPoint <> nil then
       begin
