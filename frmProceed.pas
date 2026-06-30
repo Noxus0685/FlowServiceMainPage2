@@ -31,6 +31,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.IniFiles,
+  System.IOUtils,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -375,8 +376,14 @@ end;
 
 
 procedure TFrameProceed.DbgProceedTree(const ACode: Integer; const AText: string);
+var
+  LogFileName: string;
 begin
-  ShowMessage(Format('DBG %d'#13#10'%s', [ACode, AText]));
+  LogFileName := TPath.Combine(ExtractFilePath(ParamStr(0)), 'ProceedTreeDebug.log');
+  TFile.AppendAllText(LogFileName,
+    FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' +
+    Format('DBG %d', [ACode]) + sLineBreak + AText + sLineBreak + sLineBreak,
+    TEncoding.UTF8);
 end;
 
 function TFrameProceed.GetSelectedTreeDebugText: string;
