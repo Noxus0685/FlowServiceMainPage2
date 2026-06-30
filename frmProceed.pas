@@ -31,6 +31,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.IniFiles,
+  System.IOUtils,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -189,6 +190,8 @@ type
     procedure SaveProcessingDevices;
     procedure LoadProcessingDevices;
     procedure AddProcessingDeviceFromSelection;
+    procedure DbgProceedTree(const ACode: Integer; const AText: string);
+    function GetSelectedTreeDebugText: string;
     procedure RefreshResultsAfterDevicesAction;
     function FindTreeItemByTagObject(ATagObject: TObject): TTreeViewItem;
     procedure SelectTreeItemByTagObject(ATagObject: TObject);
@@ -366,6 +369,7 @@ end;
 
 procedure TFrameProceed.RefreshResultsTab;
 begin
+  DbgProceedTree(1501, 'RefreshResultsTab ENTER'#13#10 + GetSelectedTreeDebugText);
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
@@ -391,13 +395,21 @@ begin
 end;
 procedure TFrameProceed.AddProcessingDevice(ADevice: TDevice);
 begin
+  if ADevice = nil then
+    DbgProceedTree(1301, 'AddProcessingDevice ENTER: ADevice=nil')
+  else
+    DbgProceedTree(1302, 'AddProcessingDevice ENTER: ' + ADevice.Name + #13#10 + ADevice.UUID);
+
   if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FProcessingDevices = nil) then
     Exit;
 
   if HasDeviceInProcessing(ADevice) then
     Exit;
 
+  DbgProceedTree(1303, 'Before FProcessingDevices.Add: ' + ADevice.Name + #13#10 + ADevice.UUID);
   FProcessingDevices.Add(ADevice);
+  DbgProceedTree(1304, 'After FProcessingDevices.Add: Count=' + FProcessingDevices.Count.ToString);
+  DbgProceedTree(1305, 'Before SaveProcessingDevices from AddProcessingDevice');
   SaveProcessingDevices;
 end;
 procedure TFrameProceed.RemoveProcessingDevice(ADevice: TDevice);
@@ -420,6 +432,11 @@ var
   I, SaveIndex: Integer;
   Device: TDevice;
 begin
+  if FWorkTableManager <> nil then
+    DbgProceedTree(1411, 'SaveProcessingDevices ENTER; Ini=' + FWorkTableManager.IniFileName)
+  else
+    DbgProceedTree(1411, 'SaveProcessingDevices ENTER; Ini=<nil>');
+
   if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
      (FProcessingDevices = nil) then
     Exit;
@@ -435,12 +452,14 @@ begin
       if (Device = nil) or (Trim(Device.UUID) = '') then
         Continue;
 
+      DbgProceedTree(1412, 'SaveProcessingDevices item: ' + Device.Name + #13#10 + Device.UUID);
       Ini.WriteString(CProcessingDevicesSection,
         CProcessingDevicesItemKeyPrefix + IntToStr(SaveIndex), Trim(Device.UUID));
       Inc(SaveIndex);
     end;
 
     Ini.WriteInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, SaveIndex);
+    DbgProceedTree(1413, 'SaveProcessingDevices EXIT');
   finally
     Ini.Free;
   end;
@@ -491,9 +510,13 @@ var
   SelDevice: TDevice;
   Res: TModalResult;
 begin
+  DbgProceedTree(1101, 'AddProcessingDeviceFromSelection ENTER'#13#10 + GetSelectedTreeDebugText);
+  DbgProceedTree(1102, 'Before TFormDeviceSelect.Create'#13#10 + GetSelectedTreeDebugText);
   Frm := TFormDeviceSelect.Create(Self);
   try
+    DbgProceedTree(1103, 'After TFormDeviceSelect.Create'#13#10 + GetSelectedTreeDebugText);
     Frm.Tag := 0;
+    DbgProceedTree(1104, 'Before DeviceSelect.ShowModal'#13#10 + GetSelectedTreeDebugText);
     Res := Frm.ShowModal;
     LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
@@ -501,22 +524,30 @@ begin
       Exit;
     end;
 
+    DbgProceedTree(1107, 'Before Frm.GetSelectedDevice'#13#10 + GetSelectedTreeDebugText);
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
     begin
       Exit;
     end;
 
+    DbgProceedTree(1109, 'Before AddProcessingDevice: ' + SelDevice.Name + #13#10 + SelDevice.UUID);
     AddProcessingDevice(SelDevice);
+    DbgProceedTree(1110, 'After AddProcessingDevice'#13#10 + GetSelectedTreeDebugText);
+    DbgProceedTree(1111, 'Before PopulateTreeViewDevices from AddProcessingDeviceFromSelection');
     PopulateTreeViewDevices;
+    DbgProceedTree(1112, 'After PopulateTreeViewDevices from AddProcessingDeviceFromSelection'#13#10 + GetSelectedTreeDebugText);
     SelectTreeItemByTagObject(SelDevice);
     ShowDeviceSpillages(SelDevice);
   finally
+    DbgProceedTree(1113, 'Before Frm.Free'#13#10 + GetSelectedTreeDebugText);
     Frm.Free;
   end;
+  DbgProceedTree(1114, 'AddProcessingDeviceFromSelection EXIT'#13#10 + GetSelectedTreeDebugText);
 end;
 procedure TFrameProceed.RefreshResultsAfterDevicesAction;
 begin
+  DbgProceedTree(1502, 'RefreshResultsAfterDevicesAction ENTER'#13#10 + GetSelectedTreeDebugText);
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
@@ -605,6 +636,11 @@ var
   Device: TDevice;
   Repo: TDeviceRepository;
 begin
+  if FWorkTableManager <> nil then
+    DbgProceedTree(1401, 'LoadProcessingDevices ENTER; Ini=' + FWorkTableManager.IniFileName)
+  else
+    DbgProceedTree(1401, 'LoadProcessingDevices ENTER; Ini=<nil>');
+
   if FProcessingDevices = nil then
     Exit;
 
@@ -617,6 +653,7 @@ begin
   Ini := TIniFile.Create(FWorkTableManager.IniFileName);
   try
     Count := Ini.ReadInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, 0);
+    DbgProceedTree(1402, 'LoadProcessingDevices Count=' + Count.ToString);
     for I := 0 to Count - 1 do
     begin
       DeviceUUID := Trim(Ini.ReadString(CProcessingDevicesSection,
@@ -638,6 +675,7 @@ begin
   finally
     Ini.Free;
   end;
+  DbgProceedTree(1406, 'LoadProcessingDevices EXIT; FProcessingDevices.Count=' + FProcessingDevices.Count.ToString);
 end;
 
 function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;
@@ -789,6 +827,7 @@ var
       end;
   end;
 begin
+  DbgProceedTree(1201, 'PopulateTreeViewDevices ENTER'#13#10 + GetSelectedTreeDebugText);
   ProcessedOnTables := TStringList.Create;
   try
     ProcessedOnTables.Sorted := False;
@@ -796,7 +835,9 @@ begin
 
     TreeViewDevices.BeginUpdate;
     try
+      DbgProceedTree(1202, 'Before TreeViewDevices.Clear'#13#10 + GetSelectedTreeDebugText);
       TreeViewDevices.Clear;
+      DbgProceedTree(1203, 'After TreeViewDevices.Clear'#13#10 + GetSelectedTreeDebugText);
 
       RootAll := TTreeViewItem.Create(TreeViewDevices);
       RootAll.Text := '...';
@@ -836,6 +877,7 @@ begin
               if ProcessedOnTables.IndexOf(Device.UUID) < 0 then
                 ProcessedOnTables.Add(Device.UUID);
 
+              DbgProceedTree(1206, 'Add device to WORKTABLE: ' + Device.Name + #13#10 + Device.UUID);
               AddDeviceNode(RootTable, Device);
             end;
           finally
@@ -846,6 +888,7 @@ begin
       RootOther := TTreeViewItem.Create(TreeViewDevices);
       RootOther.Text := 'прочее';
       TreeViewDevices.AddObject(RootOther);
+      DbgProceedTree(1204, 'RootOther created; Count=' + RootOther.Count.ToString);
 
       if FProcessingDevices <> nil then
         for Device in FProcessingDevices do
@@ -856,6 +899,7 @@ begin
 
       if TreeViewDevices.Count > 0 then
         TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0);
+      DbgProceedTree(1207, 'PopulateTreeViewDevices EXIT'#13#10 + GetSelectedTreeDebugText);
     finally
       TreeViewDevices.EndUpdate;
     end;
@@ -1317,6 +1361,7 @@ var
     PopupMenuTreeViewDevices.AddObject(MenuItem);
   end;
 begin
+  DbgProceedTree(1701, 'PopupMenuTreeViewDevicesPopup ENTER'#13#10 + GetSelectedTreeDebugText);
   if PopupMenuTreeViewDevices = nil then
     Exit;
 
@@ -1331,7 +1376,9 @@ begin
   begin
     AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
+    DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
     AddActionMenuItem(ActionSessionSynchTable);
+    DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
     Exit;
   end;
 
@@ -1341,6 +1388,7 @@ begin
     AddActionMenuItem(ActionDeleteWorkTable);
     AddActionMenuItem(ActionDeleteSelectedWorkTables);
     AddActionMenuItem(ActionSessionSynchTable);
+    DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
     Exit;
   end;
 
@@ -1348,6 +1396,8 @@ begin
   begin
     AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
+    DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
+    DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
     Exit;
   end;
 
@@ -1355,6 +1405,8 @@ begin
   begin
     AddSimpleMenuItem('Удалить', MenuTreeViewDevicesDeleteClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
+    DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
+    DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
     Exit;
   end;
 
@@ -1366,6 +1418,7 @@ begin
     AddActionMenuItem(ActionSessionActive);
     AddActionMenuItem(ActionSessionNew);
   end;
+  DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
 end;
 procedure TFrameProceed.MenuTreeViewDevicesClearClick(Sender: TObject);
 var
@@ -1390,6 +1443,7 @@ var
     SaveProcessingDevices;
   end;
 begin
+  DbgProceedTree(1504, 'MenuTreeViewDevicesClearClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
 
@@ -1505,6 +1559,7 @@ procedure TFrameProceed.ActionSessionSynchTableExecute(Sender: TObject);
 var
   Item: TTreeViewItem;
 begin
+  DbgProceedTree(1506, 'ActionSessionSynchTableExecute ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
 
@@ -1521,7 +1576,9 @@ begin
 end;
 procedure TFrameProceed.MenuTreeViewDevicesAddClick(Sender: TObject);
 begin
+  DbgProceedTree(1001, 'MenuTreeViewDevicesAddClick ENTER'#13#10 + GetSelectedTreeDebugText);
   AddProcessingDeviceFromSelection;
+  DbgProceedTree(1002, 'MenuTreeViewDevicesAddClick EXIT'#13#10 + GetSelectedTreeDebugText);
 end;
 function TFrameProceed.IsSelectedTreeWorkTable(out AWorkTable: TWorkTable): Boolean;
 var
@@ -1573,6 +1630,7 @@ procedure TFrameProceed.RefreshAfterWorkTableDeletion;
 var
   NextWorkTable: TWorkTable;
 begin
+  DbgProceedTree(1503, 'RefreshAfterWorkTableDeletion ENTER'#13#10 + GetSelectedTreeDebugText);
   NextWorkTable := nil;
   if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
   begin
@@ -1688,6 +1746,7 @@ procedure TFrameProceed.MenuTreeViewDevicesDeleteClick(Sender: TObject);
 var
   Item: TTreeViewItem;
 begin
+  DbgProceedTree(1505, 'MenuTreeViewDevicesDeleteClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
 
@@ -1795,6 +1854,7 @@ begin
 end;
 procedure TFrameProceed.ActionSessionDeviceAddExecute(Sender: TObject);
 begin
+  DbgProceedTree(1507, 'ActionSessionDeviceAddExecute ENTER'#13#10 + GetSelectedTreeDebugText);
   AddProcessingDeviceFromSelection;
 end;
 procedure TFrameProceed.ActionSessionDeviceRemoveExecute(Sender: TObject);
@@ -2068,6 +2128,7 @@ end;
 
 procedure TFrameProceed.TreeViewDevicesChange(Sender: TObject);
 begin
+  DbgProceedTree(1601, 'TreeViewDevicesChange ENTER'#13#10 + GetSelectedTreeDebugText);
   UpdateSessionItems;
   UpdateCalibrCoefsFrame;
 end;
@@ -2088,6 +2149,9 @@ var
     if AItem = nil then
       Exit;
 
+    DbgProceedTree(1605, 'FindItemByPoint checks children of: ' + AItem.Text +
+      '; Expanded=' + BoolToStr(AItem.IsExpanded, True) +
+      '; Count=' + AItem.Count.ToString);
     for ChildIndex := 0 to AItem.Count - 1 do
     begin
       ChildItem := FindItemByPoint(TTreeViewItem(AItem.Items[ChildIndex]));
@@ -2102,6 +2166,8 @@ var
   end;
 
 begin
+  DbgProceedTree(1602, Format('TreeViewDevicesMouseDown ENTER; Button=%d; X=%.0f; Y=%.0f'#13#10'%s',
+    [Ord(Button), X, Y, GetSelectedTreeDebugText]));
   if (Button <> TMouseButton.mbRight) or (TreeViewDevices = nil) then
     Exit;
 
@@ -2111,6 +2177,9 @@ begin
     Item := FindItemByPoint(TreeViewDevices.ItemByIndex(I));
     if Item <> nil then
     begin
+      DbgProceedTree(1603, 'TreeViewDevicesMouseDown selects item: ' + Item.Text +
+        '; Count=' + Item.Count.ToString +
+        '; Expanded=' + BoolToStr(Item.IsExpanded, True));
       TreeViewDevices.Selected := Item;
       Exit;
     end;
