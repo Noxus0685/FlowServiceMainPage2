@@ -4339,6 +4339,7 @@ var
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
   Device: TDevice;
+  MatchedPoint: TDevicePoint;
 begin
 
   DeviceRepo := nil;
@@ -4388,10 +4389,22 @@ begin
       Point.DateTime := Now;
       Point.SpillTime := ValueTime.GetDoubleValue;
       Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
-      if CurrentPoint <> nil then
+
+      MatchedPoint := nil;
+      if (CurrentPoint <> nil) and (Device.Points <> nil) then
+        for MatchedPoint in Device.Points do
+          if (MatchedPoint <> nil) and
+             (((CurrentPoint.ID <> 0) and (MatchedPoint.ID = CurrentPoint.ID)) or
+              ((CurrentPoint.ID = 0) and (Trim(CurrentPoint.Name) <> '') and
+               SameText(MatchedPoint.Name, CurrentPoint.Name))) then
+            Break
+          else
+            MatchedPoint := nil;
+
+      if MatchedPoint <> nil then
       begin
-        Point.DevicePointID := CurrentPoint.ID;
-        Point.Name := CurrentPoint.Name;
+        Point.DevicePointID := MatchedPoint.ID;
+        Point.Name := MatchedPoint.Name;
       end;
 
       Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
