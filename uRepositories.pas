@@ -4373,7 +4373,7 @@ begin
         if not UpdateSpillages(ADevice) then
           raise Exception.Create('Ошибка сохранения результатов пролива');
 
-      if (ADevice.CalibrCoefTable <> nil) and (ADevice.CalibrCoefTable.Count > 0) then
+      if (ADevice.CalibrCoefTables <> nil) and (ADevice.CalibrCoefTables.Count > 0) then
         if not UpdateCalibrCoef(ADevice) then
           raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
