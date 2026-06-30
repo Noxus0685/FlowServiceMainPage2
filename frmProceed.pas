@@ -142,6 +142,7 @@ type
     ButtonSessionNew: TButton;
     ButtonSessionClearPoints: TButton;
     ButtonSessionClose: TButton;
+    ButtonSessionDeviceAdd: TButton;
     Layout19: TLayout;
     Layout20: TLayout;
     ComboBoxUnitsResult: TComboBox;
