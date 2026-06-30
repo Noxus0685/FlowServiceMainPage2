@@ -142,6 +142,7 @@ type
     ButtonSessionNew: TButton;
     ButtonSessionClearPoints: TButton;
     ButtonSessionClose: TButton;
+    ButtonSessionDeviceAdd: TButton;
     Layout19: TLayout;
     Layout20: TLayout;
     ComboBoxUnitsResult: TComboBox;
@@ -369,6 +370,7 @@ begin
   ShowAllDevicesResults;
 end;
 
+
 function TFrameProceed.FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
 var
   Device: TDevice;
@@ -493,18 +495,15 @@ begin
   try
     Frm.Tag := 0;
     Res := Frm.ShowModal;
+    LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
-      PopulateTreeViewDevices;
-      ShowAllDevicesResults;
       Exit;
     end;
 
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
     begin
-      PopulateTreeViewDevices;
-      ShowAllDevicesResults;
       Exit;
     end;
 
@@ -625,13 +624,16 @@ begin
       if DeviceUUID = '' then
         Continue;
 
+
       Device := nil;
       Repo := nil;
       if AppServices.DataManager <> nil then
         Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
 
       if (Device <> nil) and (FindProcessingDeviceByUUID(Device.UUID) = nil) then
+      begin
         FProcessingDevices.Add(Device);
+      end;
     end;
   finally
     Ini.Free;
@@ -848,7 +850,9 @@ begin
       if FProcessingDevices <> nil then
         for Device in FProcessingDevices do
           if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
+          begin
             AddDeviceNode(RootOther, Device);
+          end;
 
       if TreeViewDevices.Count > 0 then
         TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0);
@@ -2092,7 +2096,9 @@ var
     end;
 
     if AItem.AbsoluteRect.Contains(AbsPoint) then
+    begin
       Result := AItem;
+    end;
   end;
 
 begin

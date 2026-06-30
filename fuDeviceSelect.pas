@@ -274,6 +274,7 @@ implementation
    uAppServices,
    uWorkTable;
 {$R *.fmx}
+
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
   inherited;
@@ -374,7 +375,7 @@ begin
   { Загружаем данные из БД (в репозиторий!) }
   {--------------------------------------------------}
   ActiveRepo.Load;
-  WorkTableManager.ActiveWorkTable.InitChannels ;
+  WorkTableManager.ActiveWorkTable.InitChannels;
   {--------------------------------------------------}
   { Берём ссылку на данные репозитория }
   {--------------------------------------------------}
