@@ -274,6 +274,7 @@ implementation
    uAppServices,
    uWorkTable;
 {$R *.fmx}
+
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
   inherited;
@@ -360,6 +361,7 @@ procedure TFormDeviceSelect.LoadData;
 begin
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория приборов }
+  { Временная диагностика DbgDeviceSelect удалена. }
   {--------------------------------------------------}
   if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveDeviceRepo = nil) then
   begin
