@@ -384,7 +384,8 @@ begin
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
-  { Загружаем данные из БД (в репозиторий!) }
+  { Не перезагружаем репозиторий здесь: ActiveRepo.Load/InitChannels
+    меняют состояние рабочего стола при простом открытии DeviceSelect. }
   {--------------------------------------------------}
   DbgDeviceSelect('DBG 2002'#13#10'Before ActiveRepo.Load');
   ActiveRepo.Load;
