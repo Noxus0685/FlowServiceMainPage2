@@ -35,6 +35,7 @@ uses
   System.Generics.Collections,
   System.Generics.Defaults,
   System.JSON,
+  System.IOUtils,
   System.Net.HttpClient,
   System.Net.HttpClientComponent,
   System.Net.URLClient,
@@ -359,8 +360,10 @@ end;
 
 procedure TFormDeviceSelect.LoadData;
 begin
+  DbgDeviceSelect('DBG 2001'#13#10'DeviceSelect.LoadData ENTER');
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория приборов }
+  { Временная диагностика DbgDeviceSelect удалена. }
   {--------------------------------------------------}
   if (AppServices.DataManager = nil) or (AppServices.DataManager.ActiveDeviceRepo = nil) then
   begin
@@ -372,10 +375,15 @@ begin
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
-  { Загружаем данные из БД (в репозиторий!) }
+  { Не перезагружаем репозиторий здесь: ActiveRepo.Load/InitChannels
+    меняют состояние рабочего стола при простом открытии DeviceSelect. }
   {--------------------------------------------------}
+  DbgDeviceSelect('DBG 2002'#13#10'Before ActiveRepo.Load');
   ActiveRepo.Load;
+  DbgDeviceSelect('DBG 2003'#13#10'After ActiveRepo.Load');
+  DbgDeviceSelect('DBG 2004'#13#10'Before WorkTableManager.ActiveWorkTable.InitChannels');
   WorkTableManager.ActiveWorkTable.InitChannels ;
+  DbgDeviceSelect('DBG 2005'#13#10'After WorkTableManager.ActiveWorkTable.InitChannels');
   {--------------------------------------------------}
   { Берём ссылку на данные репозитория }
   {--------------------------------------------------}
@@ -743,10 +751,13 @@ var
       end;
   end;
 begin
+  DbgDeviceSelect('DBG 2011'#13#10'DeviceSelect.BuildTree ENTER');
   if ActiveRepo = nil then
   begin
+    DbgDeviceSelect('DBG 2012'#13#10'DeviceSelect.BuildTree before TreeViewDevices.Clear');
     TreeViewDevices.Clear;
     GridDevices.RowCount := 0;
+    DbgDeviceSelect('DBG 2013'#13#10'DeviceSelect.BuildTree EXIT');
     Exit;
   end;
 
@@ -967,6 +978,7 @@ begin
 
     for I := 0 to TreeViewDevices.Count - 1 do
       RestoreExpandedNodes(TreeViewDevices.ItemByIndex(I));
+    DbgDeviceSelect('DBG 2013'#13#10'DeviceSelect.BuildTree EXIT');
   finally
     PrevExpandedPaths.Free;
     TreeViewDevices.EndUpdate;
@@ -1081,6 +1093,7 @@ end;
 
 procedure TFormDeviceSelect.CornerButton1Click(Sender: TObject);
 begin
+  DbgDeviceSelect('DBG 2031'#13#10'DeviceSelect OK/select clicked; ModalResult will be mrOk');
   Tag := 1;
   ModalResult := mrOk;
 end;
@@ -1093,6 +1106,7 @@ begin
   if (FDevFilteredDevices = nil) or (GridDevices.Row < 0) or (GridDevices.Row >= FDevFilteredDevices.Count) then
     Exit;
 
+  DbgDeviceSelect('DBG 2031'#13#10'DeviceSelect OK/select clicked; ModalResult will be mrOk');
   Tag := 1;
   ModalResult := mrOk;
 end;
@@ -2590,6 +2604,7 @@ var
   Repo: TDeviceRepository;
   Res: TModalResult;
 begin
+  DbgDeviceSelect('DBG 2021'#13#10'DeviceSelect.FormClose ENTER; ModalResult=' + IntToStr(Ord(ModalResult)));
   Repo := AppServices.DataManager.ActiveDeviceRepo;
 
   if (Repo <> nil) and (Repo.State = osModified) then
@@ -2625,13 +2640,17 @@ begin
           { Откатываем изменения в памяти, чтобы вызывающая форма не считала
             несохранённо удалённые приборы реально удалёнными. }
           FDeletedDeviceUUIDs.Clear;
+          DbgDeviceSelect('DBG 2022'#13#10'DeviceSelect.FormClose before Repo.Load rollback');
           if not Repo.Load then
           begin
             ShowMessage('Не удалось отменить несохранённые изменения приборов');
             Action := TCloseAction.caNone;
             Exit;
           end;
+          DbgDeviceSelect('DBG 2023'#13#10'DeviceSelect.FormClose after Repo.Load rollback');
+          DbgDeviceSelect('DBG 2024'#13#10'DeviceSelect.FormClose before LoadData');
           LoadData;
+          DbgDeviceSelect('DBG 2025'#13#10'DeviceSelect.FormClose after LoadData');
           BuildTree;
           ApplyFilter;
           UpdateGridDevices;
@@ -2691,6 +2710,7 @@ procedure TFormDeviceSelect.FormKeyDown(Sender: TObject; var Key: Word;
 begin
   if (Key = vkEscape) and IsGridInputFocused then
   begin
+    DbgDeviceSelect('DBG 2032'#13#10'DeviceSelect cancel/close clicked');
     ModalResult := mrCancel;
     Key := 0;
     KeyChar := #0;
@@ -2702,6 +2722,7 @@ procedure TFormDeviceSelect.GridDevicesKeyDown(Sender: TObject; var Key: Word;
 begin
   if (Key = vkEscape) and IsGridInputFocused then
   begin
+    DbgDeviceSelect('DBG 2032'#13#10'DeviceSelect cancel/close clicked');
     ModalResult := mrCancel;
     Key := 0;
     KeyChar := #0;
@@ -2710,6 +2731,7 @@ begin
 
   if (Key = vkReturn) and (GridDevices.Row>=0) then
   begin
+    DbgDeviceSelect('DBG 2031'#13#10'DeviceSelect OK/select clicked; ModalResult will be mrOk');
     Tag := 1;
     ModalResult := mrOk;
     Key := 0;
