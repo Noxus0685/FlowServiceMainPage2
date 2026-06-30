@@ -692,6 +692,12 @@ var
       (ADevice.Sessions.Count > 0);
   end;
 
+  function HasSpillages(ADevice: TDevice): Boolean;
+  begin
+    Result := (ADevice <> nil) and (ADevice.Spillages <> nil) and
+      (ADevice.Spillages.Count > 0);
+  end;
+
 begin
   if FWorkTableManager <> nil then
     DbgProceedTree(1401, 'LoadProcessingDevices ENTER; Ini=' + FWorkTableManager.IniFileName)
@@ -733,9 +739,10 @@ begin
         if Device <> nil then
         begin
           OldDevice := FindOldProcessingDeviceByUUID(Device.UUID);
-          if (not HasSessions(Device)) and HasSessions(OldDevice) then
+          if ((not HasSessions(Device)) and HasSessions(OldDevice)) or
+             ((not HasSpillages(Device)) and HasSpillages(OldDevice)) then
           begin
-            DbgProceedTree(1407, 'Keep processing device with in-memory sessions: ' + Device.Name + #13#10 + Device.UUID);
+            DbgProceedTree(1407, 'Keep processing device with in-memory measurements: ' + Device.Name + #13#10 + Device.UUID);
             Device := OldDevice;
           end;
 
@@ -1331,8 +1338,9 @@ begin
       for Point in Device.Spillages do
         if (Point <> nil) and (Point.SessionID = ASession.ID) and (Point.State <> osDeleted) then
           List.Add(Point);
-    end
-    else if ASession.Spillages <> nil then
+    end;
+
+    if (List.Count = 0) and (ASession.Spillages <> nil) then
     begin
       for I := 0 to ASession.Spillages.Count - 1 do
       begin
