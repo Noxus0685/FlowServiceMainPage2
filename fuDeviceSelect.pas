@@ -276,6 +276,7 @@ implementation
    uWorkTable;
 {$R *.fmx}
 
+
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
   inherited;
