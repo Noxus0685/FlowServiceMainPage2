@@ -375,41 +375,6 @@ begin
 end;
 
 
-procedure TFrameProceed.DbgProceedTree(const ACode: Integer; const AText: string);
-var
-  LogFileName: string;
-begin
-  LogFileName := TPath.Combine(ExtractFilePath(ParamStr(0)), 'ProceedTreeDebug.log');
-  TFile.AppendAllText(LogFileName,
-    FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' +
-    Format('DBG %d', [ACode]) + sLineBreak + AText + sLineBreak + sLineBreak,
-    TEncoding.UTF8);
-end;
-
-function TFrameProceed.GetSelectedTreeDebugText: string;
-var
-  Item: TTreeViewItem;
-begin
-  Result := 'Tree=nil';
-
-  if TreeViewDevices = nil then
-    Exit;
-
-  Result := Format('Tree.Count=%d', [TreeViewDevices.Count]);
-
-  Item := TreeViewDevices.Selected;
-  if Item = nil then
-  begin
-    Result := Result + '; Selected=nil';
-    Exit;
-  end;
-
-  Result := Result + Format(
-    '; Selected.Text=%s; Selected.Count=%d; Expanded=%s',
-    [Item.Text, Item.Count, BoolToStr(Item.IsExpanded, True)]
-  );
-end;
-
 function TFrameProceed.FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
 var
   Device: TDevice;
@@ -556,12 +521,8 @@ begin
     { DeviceSelect may reload the device repository, so refresh non-owning
       FProcessingDevices references before any later tree/results work. }
     LoadProcessingDevices;
-    DbgProceedTree(1105, Format('After DeviceSelect.ShowModal; Res=%d; Frm.Tag=%d'#13#10'%s',
-      [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
-      DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
-        [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
       Exit;
     end;
 
@@ -569,7 +530,6 @@ begin
     SelDevice := Frm.GetSelectedDevice;
     if SelDevice = nil then
     begin
-      DbgProceedTree(1108, 'SelDevice=nil branch'#13#10 + GetSelectedTreeDebugText);
       Exit;
     end;
 
@@ -703,7 +663,6 @@ begin
       if DeviceUUID = '' then
         Continue;
 
-      DbgProceedTree(1403, 'LoadProcessingDevices item: ' + DeviceUUID);
 
       Device := nil;
       Repo := nil;
@@ -712,11 +671,8 @@ begin
 
       if (Device <> nil) and (FindProcessingDeviceByUUID(Device.UUID) = nil) then
       begin
-        DbgProceedTree(1404, 'Loaded processing device: ' + Device.Name + #13#10 + Device.UUID);
         FProcessingDevices.Add(Device);
-      end
-      else if Device = nil then
-        DbgProceedTree(1405, 'Processing device UUID not found in repo: ' + DeviceUUID);
+      end;
     end;
   finally
     Ini.Free;
@@ -940,7 +896,6 @@ begin
         for Device in FProcessingDevices do
           if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
           begin
-            DbgProceedTree(1205, 'Add device to OTHER: ' + Device.Name + #13#10 + Device.UUID);
             AddDeviceNode(RootOther, Device);
           end;
 
@@ -2208,7 +2163,6 @@ var
 
     if AItem.AbsoluteRect.Contains(AbsPoint) then
     begin
-      DbgProceedTree(1604, 'FindItemByPoint HIT self: ' + AItem.Text);
       Result := AItem;
     end;
   end;

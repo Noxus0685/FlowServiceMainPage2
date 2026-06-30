@@ -276,16 +276,6 @@ implementation
    uWorkTable;
 {$R *.fmx}
 
-procedure DbgDeviceSelect(const AText: string);
-var
-  LogFileName: string;
-begin
-  LogFileName := TPath.Combine(ExtractFilePath(ParamStr(0)), 'ProceedTreeDebug.log');
-  TFile.AppendAllText(LogFileName,
-    FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' ' + AText + sLineBreak + sLineBreak,
-    TEncoding.UTF8);
-end;
-
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
   inherited;
