@@ -4365,14 +4365,17 @@ begin
       if not UpdateDevicePoints(ADevice) then
         raise Exception.Create('Ошибка сохранения точек прибора');
 
-      if not UpdateSpillageSessions(ADevice) then
-        raise Exception.Create('Ошибка сохранения сессий пролива');
+      if (ADevice.Sessions <> nil) and (ADevice.Sessions.Count > 0) then
+        if not UpdateSpillageSessions(ADevice) then
+          raise Exception.Create('Ошибка сохранения сессий пролива');
 
-      if not UpdateSpillages(ADevice) then
-        raise Exception.Create('Ошибка сохранения результатов пролива');
+      if (ADevice.Spillages <> nil) and (ADevice.Spillages.Count > 0) then
+        if not UpdateSpillages(ADevice) then
+          raise Exception.Create('Ошибка сохранения результатов пролива');
 
-      if not UpdateCalibrCoef(ADevice) then
-        raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
+      if (ADevice.CalibrCoefTables <> nil) and (ADevice.CalibrCoefTables.Count > 0) then
+        if not UpdateCalibrCoef(ADevice) then
+          raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
     ADevice.State := osClean;
     if OwnsTransaction then
