@@ -20,6 +20,7 @@ uses
   uBaseProcedures in 'uBaseProcedures.pas',
   uClasses in 'uClasses.pas',
   uDataManager in 'uDataManager.pas',
+  uDebugLog in 'uDebugLog.pas',
   uDeviceClass in 'uDeviceClass.pas',
   uFlowMeter in 'uFlowMeter.pas',
   uMeasurementRun in 'uMeasurementRun.pas',
@@ -44,6 +45,7 @@ uses
 
 begin
   Application.Initialize;
+  InitDebugLog;
   AppServices := TAppServices.Create;
   AppServices.Initialize;
 

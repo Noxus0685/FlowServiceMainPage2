@@ -281,6 +281,7 @@ type
 implementation
    uses
     uAppServices,
+    uDebugLog,
     uMeterValue;
 {$R *.fmx}
 
@@ -369,7 +370,7 @@ end;
 
 procedure TFrameProceed.DbgProceedTree(const ACode: Integer; const AText: string);
 begin
-  ShowMessage(Format('DBG %d'#13#10'%s', [ACode, AText]));
+  DebugLog(Format('DBG %d'#13#10'%s', [ACode, AText]));
 end;
 
 function TFrameProceed.GetSelectedTreeDebugText: string;
