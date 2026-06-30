@@ -535,7 +535,7 @@ object FrameProceed: TFrameProceed
         Align = Left
         Padding.Left = 5.000000000000000000
         Padding.Right = 5.000000000000000000
-        Size.Width = 224.000000000000000000
+        Size.Width = 271.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 38
@@ -589,6 +589,19 @@ object FrameProceed: TFrameProceed
           Size.PlatformDefault = False
           StyleLookup = 'organizetoolbutton'
           TabOrder = 1
+          TextSettings.Trimming = None
+        end
+        object ButtonSessionDeviceAdd: TButton
+          Action = ActionSessionDeviceAdd
+          Align = Left
+          Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1088#1080#1073#1086#1088
+          ImageIndex = -1
+          Position.X = 175.000000000000000000
+          Size.Width = 47.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'additembutton'
+          TabOrder = 4
           TextSettings.Trimming = None
         end
       end
