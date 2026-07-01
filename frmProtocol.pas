@@ -47,6 +47,7 @@ type
   private
     FMessages: TObjectList<TProtocolMessage>;
     FListener: TProtocolListener;
+    FLoadingSettings: Boolean;
     procedure HandleProtocolMessage(Msg: TProtocolMessage);
 
     procedure AddProtocolItem(const Msg: TProtocolMessage);
@@ -56,6 +57,8 @@ type
     procedure CopyProtocolToClipboard;
     procedure LoadProtocolSettings;
     procedure SaveProtocolSettings;
+    procedure LoadCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
+    procedure SaveCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
     procedure LoadComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
     procedure SaveComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
   public
@@ -74,6 +77,7 @@ var
 begin
   inherited;
   FMessages := TObjectList<TProtocolMessage>.Create(True);
+  FLoadingSettings := False;
 
   CheckBoxEvent.IsChecked := True;
   CheckBoxState.IsChecked := True;
@@ -108,6 +112,23 @@ begin
   ProtocolManager.Subscribe(FListener);
 end;
 
+
+
+procedure TFrameProtocol.LoadCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
+begin
+  if (AIni = nil) or (ACheckBox = nil) or (ACheckBox.Name = '') then
+    Exit;
+
+  ACheckBox.IsChecked := AIni.ReadBool('Protocol', ACheckBox.Name, True);
+end;
+
+procedure TFrameProtocol.SaveCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
+begin
+  if (AIni = nil) or (ACheckBox = nil) or (ACheckBox.Name = '') then
+    Exit;
+
+  AIni.WriteBool('Protocol', ACheckBox.Name, ACheckBox.IsChecked);
+end;
 
 procedure TFrameProtocol.LoadComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
 var
@@ -145,17 +166,22 @@ begin
   if (WorkTableManager = nil) or (Trim(WorkTableManager.IniFileName) = '') then
     Exit;
 
+  FLoadingSettings := True;
   Ini := TIniFile.Create(WorkTableManager.IniFileName);
   try
-    CheckBoxMKS.IsChecked := Ini.ReadBool('Protocol', 'CheckBoxMKS', True);
     for I := 0 to ComponentCount - 1 do
-      if Components[I] is TComboBox then
+    begin
+      if Components[I] is TCheckBox then
+        LoadCheckBoxSetting(Ini, TCheckBox(Components[I]))
+      else if Components[I] is TComboBox then
       begin
         LoadComboBoxSetting(Ini, TComboBox(Components[I]));
         TComboBox(Components[I]).OnChange := FilterChanged;
       end;
+    end;
   finally
     Ini.Free;
+    FLoadingSettings := False;
   end;
 end;
 
@@ -169,9 +195,10 @@ begin
 
   Ini := TIniFile.Create(WorkTableManager.IniFileName);
   try
-    Ini.WriteBool('Protocol', 'CheckBoxMKS', CheckBoxMKS.IsChecked);
     for I := 0 to ComponentCount - 1 do
-      if Components[I] is TComboBox then
+      if Components[I] is TCheckBox then
+        SaveCheckBoxSetting(Ini, TCheckBox(Components[I]))
+      else if Components[I] is TComboBox then
         SaveComboBoxSetting(Ini, TComboBox(Components[I]));
   finally
     Ini.Free;
@@ -268,6 +295,7 @@ begin
   Item.StyledSettings := Item.StyledSettings - [TStyledSetting.FontColor];
   Item.TextSettings.Font.Family := 'Consolas';
   Item.TextSettings.Font.Size := 12;
+  Item.TextSettings.WordWrap := False;
 
   case Msg.Category of
     pcInfo: Item.TextSettings.FontColor := TAlphaColorRec.Dodgerblue;
@@ -290,7 +318,7 @@ begin
     pcMKS: Result := CheckBoxMKS.IsChecked;
   end;
 
-  if not Result then
+  if (not Result) or (Msg.Category = pcMKS) then
     Exit;
 
   case Msg.Source of
@@ -318,7 +346,8 @@ end;
 
 procedure TFrameProtocol.FilterChanged(Sender: TObject);
 begin
-  SaveProtocolSettings;
+  if not FLoadingSettings then
+    SaveProtocolSettings;
   RebuildMemo;
 end;
 
