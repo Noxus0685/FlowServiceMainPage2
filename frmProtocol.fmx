@@ -92,6 +92,16 @@ object FrameProtocol: TFrameProtocol
       Text = 'MR'
       OnChange = FilterChanged
     end
+    object CheckBoxMKS: TCheckBox
+      Align = Left
+      Position.X = 405.000000000000000000
+      Size.Width = 55.000000000000000000
+      Size.Height = 24.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 7
+      Text = 'MKS'
+      OnChange = FilterChanged
+    end
   end
   object ToolBarProtocol: TToolBar
     Size.Width = 600.000000000000000000
