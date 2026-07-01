@@ -620,9 +620,18 @@ begin
 
   NewPoint.Assign(APoint);
 
-  // Сохраняем служебные поля, присвоенные при добавлении в устройство.
+  // Сохраняем служебные поля, присвоенные при добавлении в устройство,
+  // но не даём Assign сбросить связи и состояние новой сохраняемой точки.
   NewPoint.ID := NewPointID;
-  NewPoint.SessionID := NewPointSessionID;
+  NewPoint.SessionID := APoint.SessionID;
+  if NewPoint.SessionID = 0 then
+    NewPoint.SessionID := NewPointSessionID;
+  NewPoint.DevicePointID := APoint.DevicePointID;
+  NewPoint.Name := APoint.Name;
+  NewPoint.Valid := APoint.Valid;
+  NewPoint.Status := APoint.Status;
+  NewPoint.Error := APoint.Error;
+  NewPoint.State := osNew;
   NewPoint.Num := NewPointNum;
 
   // Синхронизируем копию точки в списке выбранной сессии.
@@ -640,6 +649,12 @@ begin
   if (Sess <> nil) and (Sess.Spillages <> nil) and (Sess.Spillages.Count > 0) then
   begin
     Sess.Spillages.Last.Assign(NewPoint);
+    Sess.Spillages.Last.SessionID := NewPoint.SessionID;
+    Sess.Spillages.Last.DevicePointID := NewPoint.DevicePointID;
+    Sess.Spillages.Last.Name := NewPoint.Name;
+    Sess.Spillages.Last.Valid := NewPoint.Valid;
+    Sess.Spillages.Last.Status := NewPoint.Status;
+    Sess.Spillages.Last.Error := NewPoint.Error;
     Sess.Spillages.Last.State := NewPoint.State;
   end;
 end;

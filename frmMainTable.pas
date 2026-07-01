@@ -5331,9 +5331,7 @@ begin
     if (Channel <> nil) and
        Channel.Enabled and
        (Channel.FlowMeter <> nil) and
-       (Channel.FlowMeter.Device <> nil) and
-       ((Channel.FlowMeter.Device.Spillages = nil) or
-        (Channel.FlowMeter.Device.Spillages.Count = 0)) then
+       (Channel.FlowMeter.Device <> nil) then
     begin
       Result := True;
       Exit;
@@ -5349,6 +5347,9 @@ var
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
+    Exit;
+
+  if not (WorkTable.State in [swtCOMPLETE, swtFINALREAD]) then
     Exit;
 
   ProtocolManager.AddMessage(pcAction, psForm, 'AcceptResults',
