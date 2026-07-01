@@ -722,33 +722,6 @@ var
   DeviceUUID: string;
   Device: TDevice;
   Repo: TDeviceRepository;
-  OldDevice: TDevice;
-  OldProcessingDevices: TObjectList<TDevice>;
-
-  function FindOldProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
-  var
-    OldDevice: TDevice;
-  begin
-    Result := nil;
-    if OldProcessingDevices = nil then
-      Exit;
-
-    for OldDevice in OldProcessingDevices do
-      if (OldDevice <> nil) and SameText(Trim(OldDevice.UUID), ADeviceUUID) then
-        Exit(OldDevice);
-  end;
-
-  function HasSessions(ADevice: TDevice): Boolean;
-  begin
-    Result := (ADevice <> nil) and (ADevice.Sessions <> nil) and
-      (ADevice.Sessions.Count > 0);
-  end;
-
-  function HasSpillages(ADevice: TDevice): Boolean;
-  begin
-    Result := (ADevice <> nil) and (ADevice.Spillages <> nil) and
-      (ADevice.Spillages.Count > 0);
-  end;
 
 begin
   if FWorkTableManager <> nil then
@@ -759,63 +732,43 @@ begin
   if FProcessingDevices = nil then
     Exit;
 
-  OldProcessingDevices := TObjectList<TDevice>.Create(False);
+  FProcessingDevices.Clear;
+
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (not FileExists(FWorkTableManager.IniFileName)) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
   try
-    for Device in FProcessingDevices do
-      OldProcessingDevices.Add(Device);
-
-    FProcessingDevices.Clear;
-
-    if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
-       (not FileExists(FWorkTableManager.IniFileName)) then
+    Count := Ini.ReadInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, 0);
+    DbgProceedTree(1402, 'LoadProcessingDevices Count=' + Count.ToString);
+    for I := 0 to Count - 1 do
     begin
-      UpdateTreeViewDeviceTagObjects;
-      Exit;
-    end;
+      DeviceUUID := Trim(Ini.ReadString(CProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(I), ''));
+      if DeviceUUID = '' then
+        Continue;
 
-    Ini := TIniFile.Create(FWorkTableManager.IniFileName);
-    try
-      Count := Ini.ReadInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, 0);
-      DbgProceedTree(1402, 'LoadProcessingDevices Count=' + Count.ToString);
-      for I := 0 to Count - 1 do
+      DbgProceedTree(1403, 'LoadProcessingDevices item: ' + DeviceUUID);
+
+      Device := nil;
+      Repo := nil;
+      if AppServices.DataManager <> nil then
+        Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
+
+      if Device <> nil then
       begin
-        DeviceUUID := Trim(Ini.ReadString(CProcessingDevicesSection,
-          CProcessingDevicesItemKeyPrefix + IntToStr(I), ''));
-        if DeviceUUID = '' then
-          Continue;
-
-        DbgProceedTree(1403, 'LoadProcessingDevices item: ' + DeviceUUID);
-
-        Device := nil;
-        Repo := nil;
-        if AppServices.DataManager <> nil then
-          Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
-
-        if Device <> nil then
-        begin
-          OldDevice := FindOldProcessingDeviceByUUID(Device.UUID);
-          if ((not HasSessions(Device)) and HasSessions(OldDevice)) or
-             ((not HasSpillages(Device)) and HasSpillages(OldDevice)) then
-          begin
-            DbgProceedTree(1407, 'Keep processing device with in-memory measurements: ' + Device.Name + #13#10 + Device.UUID);
-            Device := OldDevice;
-          end;
-
-          DbgProceedTree(1404, 'Loaded processing device: ' + Device.Name + #13#10 + Device.UUID);
-          if FindProcessingDeviceByUUID(Device.UUID) = nil then
-            FProcessingDevices.Add(Device);
-        end
-        else
-          DbgProceedTree(1405, 'Processing device UUID not found in repo: ' + DeviceUUID);
-      end;
-    finally
-      Ini.Free;
+        DbgProceedTree(1404, 'Loaded processing device: ' + Device.Name + #13#10 + Device.UUID);
+        if FindProcessingDeviceByUUID(Device.UUID) = nil then
+          FProcessingDevices.Add(Device);
+      end
+      else
+        DbgProceedTree(1405, 'Processing device UUID not found in repo: ' + DeviceUUID);
     end;
-    UpdateTreeViewDeviceTagObjects;
-    DbgProceedTree(1406, 'LoadProcessingDevices EXIT; FProcessingDevices.Count=' + FProcessingDevices.Count.ToString);
   finally
-    OldProcessingDevices.Free;
+    Ini.Free;
   end;
+  DbgProceedTree(1406, 'LoadProcessingDevices EXIT; FProcessingDevices.Count=' + FProcessingDevices.Count.ToString);
 end;
 
 function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;
