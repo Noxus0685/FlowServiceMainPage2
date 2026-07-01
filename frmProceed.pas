@@ -190,6 +190,7 @@ type
     procedure RemoveProcessingDevice(ADevice: TDevice);
     procedure SaveProcessingDevices;
     procedure LoadProcessingDevices;
+    procedure UpdateTreeViewDeviceTagObjects;
     procedure AddProcessingDeviceFromSelection;
     procedure DbgProceedTree(const ACode: Integer; const AText: string);
     function GetSelectedTreeDebugText: string;
@@ -554,6 +555,7 @@ begin
     LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
+      UpdateTreeViewDeviceTagObjects;
       DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
         [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
       Exit;
@@ -580,6 +582,55 @@ begin
     Frm.Free;
   end;
   DbgProceedTree(1114, 'AddProcessingDeviceFromSelection EXIT'#13#10 + GetSelectedTreeDebugText);
+end;
+
+procedure TFrameProceed.UpdateTreeViewDeviceTagObjects;
+var
+  I: Integer;
+
+  function FindSessionByID(ADevice: TDevice; const ASessionID: Integer): TSessionSpillage;
+  var
+    Sess: TSessionSpillage;
+  begin
+    Result := nil;
+    if (ADevice = nil) or (ADevice.Sessions = nil) then
+      Exit;
+
+    for Sess in ADevice.Sessions do
+      if (Sess <> nil) and (Sess.ID = ASessionID) then
+        Exit(Sess);
+  end;
+
+  procedure UpdateItem(AItem: TTreeViewItem);
+  var
+    J: Integer;
+    Parts: TArray<string>;
+    Device: TDevice;
+  begin
+    if AItem = nil then
+      Exit;
+
+    Parts := AItem.TagString.Split(['|']);
+    if Length(Parts) > 0 then
+    begin
+      if SameText(Parts[0], 'D') and (Length(Parts) >= 2) then
+        AItem.TagObject := FindProcessingDeviceByUUID(Parts[1])
+      else if SameText(Parts[0], 'S') and (Length(Parts) >= 3) then
+      begin
+        Device := FindProcessingDeviceByUUID(Parts[1]);
+        AItem.TagObject := FindSessionByID(Device, StrToIntDef(Parts[2], -1));
+      end;
+    end;
+
+    for J := 0 to AItem.Count - 1 do
+      UpdateItem(AItem.ItemByIndex(J));
+  end;
+begin
+  if TreeViewDevices = nil then
+    Exit;
+
+  for I := 0 to TreeViewDevices.Count - 1 do
+    UpdateItem(TreeViewDevices.ItemByIndex(I));
 end;
 procedure TFrameProceed.RefreshResultsAfterDevicesAction;
 begin
@@ -853,6 +904,7 @@ var
     DeviceItem := TTreeViewItem.Create(TreeViewDevices);
     DeviceItem.Text := ADevice.Name;
     DeviceItem.TagObject := ADevice;
+    DeviceItem.TagString := 'D|' + ADevice.UUID;
     AParent.AddObject(DeviceItem);
 
     if ADevice.Sessions <> nil then
@@ -865,6 +917,7 @@ var
         SessionItem.Text :=
           Format('Сессия #%d (%s)', [Sess.ID, DateToStr(Sess.DateTimeOpen)]);
         SessionItem.TagObject := Sess;
+        SessionItem.TagString := Format('S|%s|%d', [ADevice.UUID, Sess.ID]);
         DeviceItem.AddObject(SessionItem);
       end;
   end;
