@@ -826,6 +826,9 @@ begin
       Device := TDevice(Item.ParentItem.TagObject);
   end;
 
+  if (Session = nil) and (Device <> nil) then
+    Session := Device.GetActiveSessionSpillage;
+
   FCurrentSession := Session;
 
   if LabelSessionDate <> nil then
@@ -879,7 +882,7 @@ begin
     if FCurrentSession <> nil then
       ShowSessionSpillages(FCurrentSession)
     else
-      ShowDeviceSpillages(Device);
+      ShowSessionSpillages(nil);
   end
   else if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
   begin
