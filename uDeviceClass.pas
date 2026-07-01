@@ -2418,14 +2418,15 @@ begin
          (((S.DevicePointID <> 0) and (S.DevicePointID = APoint.ID)) or
           IsFlowInPoint(S.QavgEtalon, APoint)) then
       begin
-        if S.DevicePointID = 0 then
+        if (S.DevicePointID = 0) or (Trim(S.Name) = '') then
         begin
           S.DevicePointID := APoint.ID;
           S.Name := APoint.Name;
           S.State := osModified;
         end;
         APoint.DataPoints.Add(S);
-        CandidateList.Add(S);
+        if S.Enabled then
+          CandidateList.Add(S);
       end;
 
     CandidateList.Sort(
@@ -2495,7 +2496,7 @@ begin
     HasInvalidSpillage := False;
 
     for S in DP.DataPoints do
-      if (S <> nil) and (not S.Valid) then
+      if (S <> nil) and S.Enabled and (not S.Valid) then
       begin
         HasInvalidSpillage := True;
         Break;
@@ -2913,7 +2914,6 @@ begin
 end;
 
 end.
-
 
 
 
