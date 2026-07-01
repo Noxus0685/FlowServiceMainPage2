@@ -1128,6 +1128,7 @@ var
   P: TDevicePoint;
   Device: TDevice;
   Row: TResultGridRow;
+  Repo: TDeviceRepository;
   I: Integer;
 begin
   Rows := TList<TResultGridRow>.Create;
@@ -1139,6 +1140,14 @@ begin
           Continue;
 
         Device.AnalyseResults;
+        if Device.State = osModified then
+        begin
+          Repo := nil;
+          if AppServices.DataManager <> nil then
+            Repo := AppServices.DataManager.ActiveDeviceRepo;
+          if Repo <> nil then
+            Repo.SaveDevice(Device);
+        end;
 
         Row.Device := Device;
         Row.Name := Device.Name;
