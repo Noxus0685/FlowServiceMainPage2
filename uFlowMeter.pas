@@ -628,17 +628,12 @@ begin
   LogMKS('DBG SP 2003', 'TFlowMeter.AddDataPoint AFTER NewPoint.Assign',
     Format('APoint=%s | NewPoint=%s', [DumpSpillage(APoint), DumpSpillage(NewPoint)]));
 
-  // Сохраняем служебные поля, присвоенные при добавлении в устройство,
-  // но не даём Assign сбросить связи и состояние новой сохраняемой точки.
+  // Сохраняем только служебные поля новой записи, которые не должны
+  // затираться данными временной точки при Assign.
   NewPoint.ID := NewPointID;
   NewPoint.SessionID := APoint.SessionID;
   if NewPoint.SessionID = 0 then
     NewPoint.SessionID := NewPointSessionID;
-  NewPoint.DevicePointID := APoint.DevicePointID;
-  NewPoint.Name := APoint.Name;
-  NewPoint.Valid := APoint.Valid;
-  NewPoint.Status := APoint.Status;
-  NewPoint.Error := APoint.Error;
   NewPoint.State := osNew;
   NewPoint.Num := NewPointNum;
   LogMKS('DBG SP 2004', 'TFlowMeter.AddDataPoint AFTER restore service fields',
