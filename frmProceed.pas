@@ -1540,6 +1540,7 @@ begin
     AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
     DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
+    AddActionMenuItem(ActionSessionSynchTable);
     DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
     Exit;
   end;
@@ -1712,6 +1713,8 @@ begin
     SyncProcessingDevicesFromTable(TWorkTable(Item.TagObject), False)
   else if SameText(Item.Text, '...') then
     SyncProcessingDevicesFromAllTables(True)
+  else if SameText(Item.Text, 'прочее') then
+    SyncProcessingDevicesFromAllTables(False)
   else
     Exit;
 
