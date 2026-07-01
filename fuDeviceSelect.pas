@@ -366,6 +366,7 @@ end;
 
 procedure TFormDeviceSelect.LoadData;
 begin
+  DebugLog('DBG 2001'#13#10'DeviceSelect.LoadData ENTER');
   {--------------------------------------------------}
   { Проверяем наличие активного репозитория приборов }
   {--------------------------------------------------}
@@ -379,10 +380,15 @@ begin
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
-  { Перезагружаем репозиторий приборов. Форма выбора не должна
-    переинициализировать каналы активного рабочего стола. }
+  { Перезагружаем репозиторий и каналы: DeviceSelect должен видеть
+    актуальные приборы после изменений рабочего стола. }
   {--------------------------------------------------}
+  DebugLog('DBG 2002'#13#10'Before ActiveRepo.Load');
   ActiveRepo.Load;
+  DebugLog('DBG 2003'#13#10'After ActiveRepo.Load');
+  DebugLog('DBG 2004'#13#10'Before WorkTableManager.ActiveWorkTable.InitChannels');
+  WorkTableManager.ActiveWorkTable.InitChannels;
+  DebugLog('DBG 2005'#13#10'After WorkTableManager.ActiveWorkTable.InitChannels');
   {--------------------------------------------------}
   { Берём ссылку на данные репозитория }
   {--------------------------------------------------}
@@ -469,12 +475,7 @@ begin
   {----------------------------------}
   LoadData;              // берёт данные из ActiveDeviceRepo
 
-  ComboBoxRepository.OnChange := nil;
-  try
-    FillComboBoxRepository;
-  finally
-    ComboBoxRepository.OnChange := ComboBoxRepositoryChange;
-  end;
+  FillComboBoxRepository;
   TreeViewDevices.Clear;
   TreeViewDevices.Clear;
   BuildTree;
@@ -2608,6 +2609,7 @@ var
   Repo: TDeviceRepository;
   Res: TModalResult;
 begin
+  DebugLog('DBG 2021'#13#10'DeviceSelect.FormClose ENTER; ModalResult=' + IntToStr(Ord(ModalResult)));
   Repo := AppServices.DataManager.ActiveDeviceRepo;
 
   if (Repo <> nil) and (Repo.State = osModified) then
@@ -2643,13 +2645,17 @@ begin
           { Откатываем изменения в памяти, чтобы вызывающая форма не считала
             несохранённо удалённые приборы реально удалёнными. }
           FDeletedDeviceUUIDs.Clear;
+          DebugLog('DBG 2022'#13#10'DeviceSelect.FormClose before Repo.Load rollback');
           if not Repo.Load then
           begin
             ShowMessage('Не удалось отменить несохранённые изменения приборов');
             Action := TCloseAction.caNone;
             Exit;
           end;
+          DebugLog('DBG 2023'#13#10'DeviceSelect.FormClose after Repo.Load rollback');
+          DebugLog('DBG 2024'#13#10'DeviceSelect.FormClose before LoadData');
           LoadData;
+          DebugLog('DBG 2025'#13#10'DeviceSelect.FormClose after LoadData');
           BuildTree;
           ApplyFilter;
           UpdateGridDevices;
@@ -2684,12 +2690,7 @@ begin
   {----------------------------------}
   LoadData;
 
-  ComboBoxRepository.OnChange := nil;
-  try
-    FillComboBoxRepository;
-  finally
-    ComboBoxRepository.OnChange := ComboBoxRepositoryChange;
-  end;
+  FillComboBoxRepository;
 
   {----------------------------------}
   { Подключение и первичная отрисовка UI }

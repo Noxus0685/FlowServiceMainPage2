@@ -273,7 +273,6 @@ type
     FSessionEtalon: TFlowMeter;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
-    FUpdatingTree: Boolean;
   public
     { Public declarations }
     procedure Initialize;
@@ -372,7 +371,8 @@ end;
 
 procedure TFrameProceed.DbgProceedTree(const ACode: Integer; const AText: string);
 begin
-  // Temporary tree diagnostics disabled.
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcMKS, psMeasurement, 'DBG ' + ACode.ToString, 'MKS', AText);
 end;
 
 function TFrameProceed.GetSelectedTreeDebugText: string;
@@ -552,8 +552,14 @@ begin
     Res := Frm.ShowModal;
     DbgProceedTree(1105, Format('After DeviceSelect.ShowModal; Res=%d; Frm.Tag=%d'#13#10'%s',
       [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
-    if Res <> mrOk then
+    LoadProcessingDevices;
+    if (Res <> mrOk) or (Frm.Tag <> 1) then
+    begin
+      UpdateTreeViewDeviceTagObjects;
+      DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
+        [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
       Exit;
+    end;
 
     DbgProceedTree(1107, 'Before Frm.GetSelectedDevice'#13#10 + GetSelectedTreeDebugText);
     SelDevice := Frm.GetSelectedDevice;
@@ -887,8 +893,6 @@ var
   Device: TDevice;
   ProcessedOnTables: TStringList;
   TableDeviceUUIDs: TStringList;
-  PrevSelectedObject: TObject;
-  RestoreItem: TTreeViewItem;
 
   procedure AddDeviceNode(const AParent: TTreeViewItem; ADevice: TDevice);
   var
@@ -919,94 +923,81 @@ var
   end;
 begin
   DbgProceedTree(1201, 'PopulateTreeViewDevices ENTER'#13#10 + GetSelectedTreeDebugText);
-  PrevSelectedObject := nil;
-  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
-    PrevSelectedObject := TreeViewDevices.Selected.TagObject;
-
   ProcessedOnTables := TStringList.Create;
   try
     ProcessedOnTables.Sorted := False;
     ProcessedOnTables.Duplicates := TDuplicates.dupIgnore;
 
-    FUpdatingTree := True;
+    TreeViewDevices.BeginUpdate;
     try
-      TreeViewDevices.BeginUpdate;
-      try
-        DbgProceedTree(1202, 'Before TreeViewDevices.Clear'#13#10 + GetSelectedTreeDebugText);
-        TreeViewDevices.Clear;
-        DbgProceedTree(1203, 'After TreeViewDevices.Clear'#13#10 + GetSelectedTreeDebugText);
+      DbgProceedTree(1202, 'Before TreeViewDevices.Clear'#13#10 + GetSelectedTreeDebugText);
+      TreeViewDevices.Clear;
+      DbgProceedTree(1203, 'After TreeViewDevices.Clear'#13#10 + GetSelectedTreeDebugText);
 
-        RootAll := TTreeViewItem.Create(TreeViewDevices);
-        RootAll.Text := '...';
-        TreeViewDevices.AddObject(RootAll);
+      RootAll := TTreeViewItem.Create(TreeViewDevices);
+      RootAll.Text := '...';
+      TreeViewDevices.AddObject(RootAll);
 
-        if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-          for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
-          begin
-            WT := FWorkTableManager.WorkTables[I];
-            if WT = nil then
-              Continue;
+      if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+        for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+        begin
+          WT := FWorkTableManager.WorkTables[I];
+          if WT = nil then
+            Continue;
 
-            RootTable := TTreeViewItem.Create(TreeViewDevices);
-            RootTable.Text := WT.Name;
-            RootTable.TagObject := WT;
-            TreeViewDevices.AddObject(RootTable);
+          RootTable := TTreeViewItem.Create(TreeViewDevices);
+          RootTable.Text := WT.Name;
+          RootTable.TagObject := WT;
+          TreeViewDevices.AddObject(RootTable);
 
-            TableDeviceUUIDs := TStringList.Create;
-            try
-              TableDeviceUUIDs.Sorted := False;
-              TableDeviceUUIDs.Duplicates := TDuplicates.dupIgnore;
+          TableDeviceUUIDs := TStringList.Create;
+          try
+            TableDeviceUUIDs.Sorted := False;
+            TableDeviceUUIDs.Duplicates := TDuplicates.dupIgnore;
 
-              for Ch in WT.DeviceChannels do
-              begin
-                if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
-                  Continue;
+            for Ch in WT.DeviceChannels do
+            begin
+              if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+                Continue;
 
-                Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
-                if Device = nil then
-                  Continue;
+              Device := FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID);
+              if Device = nil then
+                Continue;
 
-                if TableDeviceUUIDs.IndexOf(Device.UUID) >= 0 then
-                  Continue;
+              if TableDeviceUUIDs.IndexOf(Device.UUID) >= 0 then
+                Continue;
 
-                TableDeviceUUIDs.Add(Device.UUID);
+              TableDeviceUUIDs.Add(Device.UUID);
 
-                if ProcessedOnTables.IndexOf(Device.UUID) < 0 then
-                  ProcessedOnTables.Add(Device.UUID);
+              if ProcessedOnTables.IndexOf(Device.UUID) < 0 then
+                ProcessedOnTables.Add(Device.UUID);
 
-                DbgProceedTree(1206, 'Add device to WORKTABLE: ' + Device.Name + #13#10 + Device.UUID);
-                AddDeviceNode(RootTable, Device);
-              end;
-            finally
-              TableDeviceUUIDs.Free;
+              DbgProceedTree(1206, 'Add device to WORKTABLE: ' + Device.Name + #13#10 + Device.UUID);
+              AddDeviceNode(RootTable, Device);
             end;
+          finally
+            TableDeviceUUIDs.Free;
+          end;
+        end;
+
+      RootOther := TTreeViewItem.Create(TreeViewDevices);
+      RootOther.Text := 'прочее';
+      TreeViewDevices.AddObject(RootOther);
+      DbgProceedTree(1204, 'RootOther created; Count=' + RootOther.Count.ToString);
+
+      if FProcessingDevices <> nil then
+        for Device in FProcessingDevices do
+          if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
+          begin
+            DbgProceedTree(1205, 'Add device to OTHER: ' + Device.Name + #13#10 + Device.UUID);
+            AddDeviceNode(RootOther, Device);
           end;
 
-        RootOther := TTreeViewItem.Create(TreeViewDevices);
-        RootOther.Text := 'прочее';
-        TreeViewDevices.AddObject(RootOther);
-        DbgProceedTree(1204, 'RootOther created; Count=' + RootOther.Count.ToString);
-
-        if FProcessingDevices <> nil then
-          for Device in FProcessingDevices do
-            if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
-            begin
-              DbgProceedTree(1205, 'Add device to OTHER: ' + Device.Name + #13#10 + Device.UUID);
-              AddDeviceNode(RootOther, Device);
-            end;
-
-        DbgProceedTree(1207, 'PopulateTreeViewDevices EXIT'#13#10 + GetSelectedTreeDebugText);
-      finally
-        TreeViewDevices.EndUpdate;
-      end;
-
-      RestoreItem := FindTreeItemByTagObject(PrevSelectedObject);
-      if RestoreItem <> nil then
-        SelectTreeItemByTagObject(PrevSelectedObject)
-      else if TreeViewDevices.Count > 0 then
+      if TreeViewDevices.Count > 0 then
         TreeViewDevices.Selected := TreeViewDevices.ItemByIndex(0);
+      DbgProceedTree(1207, 'PopulateTreeViewDevices EXIT'#13#10 + GetSelectedTreeDebugText);
     finally
-      FUpdatingTree := False;
+      TreeViewDevices.EndUpdate;
     end;
   finally
     ProcessedOnTables.Free;
@@ -2234,9 +2225,6 @@ end;
 
 procedure TFrameProceed.TreeViewDevicesChange(Sender: TObject);
 begin
-  if FUpdatingTree then
-    Exit;
-
   DbgProceedTree(1601, 'TreeViewDevicesChange ENTER'#13#10 + GetSelectedTreeDebugText);
   UpdateSessionItems;
   UpdateCalibrCoefsFrame;
@@ -2258,17 +2246,20 @@ var
     if AItem = nil then
       Exit;
 
-    if AItem.AbsoluteRect.Contains(AbsPoint) then
-      Exit(AItem);
-
-    if not AItem.IsExpanded then
-      Exit;
-
+    DbgProceedTree(1605, 'FindItemByPoint checks children of: ' + AItem.Text +
+      '; Expanded=' + BoolToStr(AItem.IsExpanded, True) +
+      '; Count=' + AItem.Count.ToString);
     for ChildIndex := 0 to AItem.Count - 1 do
     begin
       ChildItem := FindItemByPoint(TTreeViewItem(AItem.Items[ChildIndex]));
       if ChildItem <> nil then
         Exit(ChildItem);
+    end;
+
+    if AItem.AbsoluteRect.Contains(AbsPoint) then
+    begin
+      DbgProceedTree(1604, 'FindItemByPoint HIT self: ' + AItem.Text);
+      Result := AItem;
     end;
   end;
 
