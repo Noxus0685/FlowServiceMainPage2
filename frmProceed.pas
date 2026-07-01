@@ -1,4 +1,4 @@
-﻿unit frmProceed;
+unit frmProceed;
 
 interface
 
@@ -45,7 +45,8 @@ uses
   uFlowMeter,
   uRepositories,
   uProtocols,
-  uWorkTable;
+  uWorkTable,
+  uMKSDebug;
 
 type
   TResultGridRow = record
@@ -591,6 +592,7 @@ var
   function FindSessionByID(ADevice: TDevice; const ASessionID: Integer): TSessionSpillage;
   var
     Sess: TSessionSpillage;
+    Point: TPointSpillage;
   begin
     Result := nil;
     if (ADevice = nil) or (ADevice.Sessions = nil) then
@@ -722,6 +724,7 @@ var
   DeviceUUID: string;
   Device: TDevice;
   Repo: TDeviceRepository;
+  Point: TPointSpillage;
 
 begin
   if FWorkTableManager <> nil then
@@ -759,6 +762,12 @@ begin
       if Device <> nil then
       begin
         DbgProceedTree(1404, 'Loaded processing device: ' + Device.Name + #13#10 + Device.UUID);
+        LogMKS('DBG SP 8003', 'LoadProcessingDevices LOADED DEVICE DETAILS',
+          Format('Device=%s UUID=%s; Sessions=%d; Spillages=%d',
+            [Device.Name, Device.UUID, Device.Sessions.Count, Device.Spillages.Count]));
+        if Device.Spillages <> nil then
+          for Point in Device.Spillages do
+            LogMKS('DBG SP 8004', 'LoadProcessingDevices LOADED SPILLAGE', DumpSpillage(Point));
         if FindProcessingDeviceByUUID(Device.UUID) = nil then
           FProcessingDevices.Add(Device);
       end
@@ -897,6 +906,7 @@ var
   procedure AddDeviceNode(const AParent: TTreeViewItem; ADevice: TDevice);
   var
     Sess: TSessionSpillage;
+    Point: TPointSpillage;
   begin
     if (AParent = nil) or (ADevice = nil) then
       Exit;
@@ -906,6 +916,12 @@ var
     DeviceItem.TagObject := ADevice;
     DeviceItem.TagString := 'D|' + ADevice.UUID;
     AParent.AddObject(DeviceItem);
+    LogMKS('DBG SP 9001', 'PopulateTreeViewDevices ADD DEVICE',
+      Format('Device=%s UUID=%s; Sessions=%d; Spillages=%d',
+        [ADevice.Name, ADevice.UUID, ADevice.Sessions.Count, ADevice.Spillages.Count]));
+    if ADevice.Spillages <> nil then
+      for Point in ADevice.Spillages do
+        LogMKS('DBG SP 9003', 'PopulateTreeViewDevices ADD SPILLAGE', DumpSpillage(Point));
 
     if ADevice.Sessions <> nil then
       for Sess in ADevice.Sessions do
@@ -919,6 +935,9 @@ var
         SessionItem.TagObject := Sess;
         SessionItem.TagString := Format('S|%s|%d', [ADevice.UUID, Sess.ID]);
         DeviceItem.AddObject(SessionItem);
+        LogMKS('DBG SP 9002', 'PopulateTreeViewDevices ADD SESSION',
+          Format('Device=%s UUID=%s; Session.ID=%d; Session.Spillages.Count=%d',
+            [ADevice.Name, ADevice.UUID, Sess.ID, Sess.Spillages.Count]));
       end;
   end;
 begin
@@ -1313,7 +1332,7 @@ begin
     end;
   end;
 
-    UpdateGridDataPoints;
+  UpdateGridDataPoints;
 end;
 procedure TFrameProceed.ShowSessionSpillages(ASession: TSessionSpillage);
 var
@@ -1342,13 +1361,20 @@ begin
     Exit;
   end;
 
+  LogMKS('DBG SP 6001', 'ShowSessionSpillages ENTER',
+    Format('Device=%s UUID=%s; Session.ID=%d; Session.Spillages.Count=%d; Device.Spillages.Count=%d',
+      [Device.Name, Device.UUID, ASession.ID, ASession.Spillages.Count, Device.Spillages.Count]));
+
   List := TList<TPointSpillage>.Create;
   try
     if Device.Spillages <> nil then
     begin
       for Point in Device.Spillages do
         if (Point <> nil) and (Point.SessionID = ASession.ID) and (Point.State <> osDeleted) then
+        begin
           List.Add(Point);
+          LogMKS('DBG SP 6002', 'ShowSessionSpillages ADD FROM Device.Spillages', DumpSpillage(Point));
+        end;
     end;
 
     if (List.Count = 0) and (ASession.Spillages <> nil) then
@@ -1357,11 +1383,19 @@ begin
       begin
         Point := ASession.Spillages[I];
         if Point <> nil then
+        begin
           List.Add(Point);
+          LogMKS('DBG SP 6003', 'ShowSessionSpillages ADD FROM Session.Spillages', DumpSpillage(Point));
+        end;
       end;
     end;
 
     FCurrentSpillages := List.ToArray;
+    LogMKS('DBG SP 6004', 'ShowSessionSpillages EXIT',
+      Format('FCurrentSpillages.Count=%d', [Length(FCurrentSpillages)]));
+    for I := 0 to High(FCurrentSpillages) do
+      LogMKS('DBG SP 6005', 'ShowSessionSpillages CURRENT',
+        Format('Index=%d | %s', [I, DumpSpillage(FCurrentSpillages[I])]));
   finally
     List.Free;
   end;
@@ -2727,7 +2761,12 @@ begin
   P.DeltaPressure :=  P.InputPressure - P.OutputPressure;
 
   if GridDataPoints.Columns[ACol] = StringColumnName then
-    Value := P.Name
+  begin
+    if (P <> nil) and ((P.Name = '-') or (P.DevicePointID = 0)) then
+      LogMKS('DBG SP 7001', 'GridDataPointsGetValue NAME',
+        Format('Row=%d | %s', [ARow, DumpSpillage(P)]));
+    Value := P.Name;
+  end
   else if GridDataPoints.Columns[ACol] = CheckColumnSpillageEnable then
     Value := P.Enabled
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageNum then

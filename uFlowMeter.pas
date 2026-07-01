@@ -1,4 +1,4 @@
-﻿unit uFlowMeter;
+unit uFlowMeter;
 
 interface
 
@@ -414,7 +414,8 @@ uses
   uAppServices,
   uDataManager,
   uRepositories,
-  uWorkTable;
+  uWorkTable,
+  uMKSDebug;
 
 { TFlowMeter }
 
@@ -610,7 +611,12 @@ begin
   if (FDevice = nil) or (APoint = nil) then
     Exit;
 
+  LogMKS('DBG SP 2001', 'TFlowMeter.AddDataPoint ENTER',
+    Format('Device=%s UUID=%s | APoint=%s', [FDevice.Name, FDevice.UUID, DumpSpillage(APoint)]));
+
   NewPoint := FDevice.AddSpillage;
+  LogMKS('DBG SP 2002', 'TFlowMeter.AddDataPoint AFTER AddSpillage',
+    Format('NewPoint=%s', [DumpSpillage(NewPoint)]));
   if NewPoint = nil then
     Exit;
 
@@ -619,6 +625,8 @@ begin
   NewPointNum := NewPoint.Num;
 
   NewPoint.Assign(APoint);
+  LogMKS('DBG SP 2003', 'TFlowMeter.AddDataPoint AFTER NewPoint.Assign',
+    Format('APoint=%s | NewPoint=%s', [DumpSpillage(APoint), DumpSpillage(NewPoint)]));
 
   // Сохраняем служебные поля, присвоенные при добавлении в устройство,
   // но не даём Assign сбросить связи и состояние новой сохраняемой точки.
@@ -633,6 +641,8 @@ begin
   NewPoint.Error := APoint.Error;
   NewPoint.State := osNew;
   NewPoint.Num := NewPointNum;
+  LogMKS('DBG SP 2004', 'TFlowMeter.AddDataPoint AFTER restore service fields',
+    Format('APoint=%s | NewPoint=%s', [DumpSpillage(APoint), DumpSpillage(NewPoint)]));
 
   // Синхронизируем копию точки в списке выбранной сессии.
   Sess := FDevice.GetActiveSessionSpillage;
@@ -648,7 +658,12 @@ begin
 
   if (Sess <> nil) and (Sess.Spillages <> nil) and (Sess.Spillages.Count > 0) then
   begin
+    LogMKS('DBG SP 2005', 'TFlowMeter.AddDataPoint BEFORE session sync',
+      Format('Sess.ID=%d; Sess.Spillages.Count=%d; NewPoint=%s',
+        [Sess.ID, Sess.Spillages.Count, DumpSpillage(NewPoint)]));
     Sess.Spillages.Last.Assign(NewPoint);
+    LogMKS('DBG SP 2006', 'TFlowMeter.AddDataPoint AFTER session sync',
+      Format('NewPoint=%s | Last=%s', [DumpSpillage(NewPoint), DumpSpillage(Sess.Spillages.Last)]));
     Sess.Spillages.Last.SessionID := NewPoint.SessionID;
     Sess.Spillages.Last.DevicePointID := NewPoint.DevicePointID;
     Sess.Spillages.Last.Name := NewPoint.Name;

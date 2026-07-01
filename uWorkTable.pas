@@ -1,4 +1,4 @@
-﻿unit uWorkTable;
+unit uWorkTable;
 
 interface
 
@@ -748,7 +748,8 @@ implementation
 uses
   FmxHelper,
   frmMainTable,
-  uMeasurementRun;
+  uMeasurementRun,
+  uMKSDebug;
 
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
@@ -4505,7 +4506,13 @@ begin
       Point.RelativeHumidity := ValueHumidity.GetDoubleValue;
 
       if Device <> nil then
+      begin
+        LogMKS('DBG SP 1001', 'SaveMeasurementResults BEFORE AnalyseDataPoint',
+          Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
         Point.Valid := Device.AnalyseDataPoint(Point);
+        LogMKS('DBG SP 1002', 'SaveMeasurementResults AFTER AnalyseDataPoint',
+          Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
+      end;
 
       Point.State := osNew;
       if Session <> nil then
@@ -4516,7 +4523,12 @@ begin
       end;
       Device.State := osModified;
 
+      LogMKS('DBG SP 1003', 'SaveMeasurementResults BEFORE AddDataPoint',
+        Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
       DeviceChannel.FlowMeter.AddDataPoint(Point);
+      LogMKS('DBG SP 1004', 'SaveMeasurementResults AFTER AddDataPoint',
+        Format('Device=%s UUID=%s; Device.Spillages.Count=%d; Sessions.Count=%d',
+          [Device.Name, Device.UUID, Device.Spillages.Count, Device.Sessions.Count]));
 
       if Assigned(DeviceRepo) then
         DeviceRepo.SaveDevice(Device);

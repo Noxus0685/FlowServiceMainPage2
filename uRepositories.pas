@@ -1,4 +1,4 @@
-﻿unit uRepositories;
+unit uRepositories;
 
 
 interface
@@ -379,7 +379,8 @@ type
 implementation
 
 uses
-  uWorkTable;
+  uWorkTable,
+  uMKSDebug;
 
 {$REGION 'Helpers'}
 function Col(const AName, ASqlType: string): TTableColumn;
@@ -3603,11 +3604,19 @@ function TDeviceRepository.SaveDevice(
 var
   SaveErrors: TStringList;
   ExistingDevice: TDevice;
+  Point: TPointSpillage;
 begin
   Result := False;
 
   if (ADevice = nil) or (FDM = nil) then
     Exit;
+
+  LogMKS('DBG SP 8001', 'DeviceRepo.SaveDevice BEFORE',
+    Format('Device=%s UUID=%s; Sessions=%d; Spillages=%d',
+      [ADevice.Name, ADevice.UUID, ADevice.Sessions.Count, ADevice.Spillages.Count]));
+  if ADevice.Spillages <> nil then
+    for Point in ADevice.Spillages do
+      LogMKS('DBG SP 8002', 'DeviceRepo.SaveDevice POINT', DumpSpillage(Point));
 
   SaveErrors := TStringList.Create;
   try
@@ -5563,6 +5572,8 @@ begin
   Result.Coef := Q.FieldByName('Coef').AsFloat;
   Result.FCDCoefficient := Q.FieldByName('FCDCoefficient').AsString;
   Result.State := osClean;
+
+  LogMKS('DBG SP 8004', 'LoadProcessingDevices LOADED SPILLAGE', DumpSpillage(Result));
 
   if (MatchedSession <> nil) and (MatchedSession.Spillages <> nil) then
   begin
