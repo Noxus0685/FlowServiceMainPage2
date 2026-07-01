@@ -550,7 +550,6 @@ begin
     Res := Frm.ShowModal;
     DbgProceedTree(1105, Format('After DeviceSelect.ShowModal; Res=%d; Frm.Tag=%d'#13#10'%s',
       [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
-    LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
       DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
