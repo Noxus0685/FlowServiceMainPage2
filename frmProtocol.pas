@@ -78,7 +78,7 @@ var
 begin
   inherited;
   FMessages := TObjectList<TProtocolMessage>.Create(True);
-  FLoadingSettings := False;
+  FLoadingSettings := True;
 
   CheckBoxEvent.IsChecked := True;
   CheckBoxState.IsChecked := True;
@@ -88,6 +88,7 @@ begin
   CheckBoxWorkTable.IsChecked := True;
   CheckBoxMeasurement.IsChecked := True;
   CheckBoxMKS.IsChecked := True;
+  FLoadingSettings := False;
   LoadProtocolSettings;
 
   BtnCopy := TSpeedButton.Create(ToolBarProtocol);
@@ -185,16 +186,21 @@ begin
   FLoadingSettings := True;
   Ini := TIniFile.Create(FileName);
   try
+    LoadCheckBoxSetting(Ini, CheckBoxEvent);
+    LoadCheckBoxSetting(Ini, CheckBoxState);
+    LoadCheckBoxSetting(Ini, CheckBoxAction);
+    LoadCheckBoxSetting(Ini, CheckBoxForm);
+    LoadCheckBoxSetting(Ini, CheckBoxParameters);
+    LoadCheckBoxSetting(Ini, CheckBoxWorkTable);
+    LoadCheckBoxSetting(Ini, CheckBoxMeasurement);
+    LoadCheckBoxSetting(Ini, CheckBoxMKS);
+
     for I := 0 to ComponentCount - 1 do
-    begin
-      if Components[I] is TCheckBox then
-        LoadCheckBoxSetting(Ini, TCheckBox(Components[I]))
-      else if Components[I] is TComboBox then
+      if Components[I] is TComboBox then
       begin
         LoadComboBoxSetting(Ini, TComboBox(Components[I]));
         TComboBox(Components[I]).OnChange := FilterChanged;
       end;
-    end;
   finally
     Ini.Free;
     FLoadingSettings := False;
@@ -214,10 +220,17 @@ begin
   ForceDirectories(ExtractFilePath(FileName));
   Ini := TIniFile.Create(FileName);
   try
+    SaveCheckBoxSetting(Ini, CheckBoxEvent);
+    SaveCheckBoxSetting(Ini, CheckBoxState);
+    SaveCheckBoxSetting(Ini, CheckBoxAction);
+    SaveCheckBoxSetting(Ini, CheckBoxForm);
+    SaveCheckBoxSetting(Ini, CheckBoxParameters);
+    SaveCheckBoxSetting(Ini, CheckBoxWorkTable);
+    SaveCheckBoxSetting(Ini, CheckBoxMeasurement);
+    SaveCheckBoxSetting(Ini, CheckBoxMKS);
+
     for I := 0 to ComponentCount - 1 do
-      if Components[I] is TCheckBox then
-        SaveCheckBoxSetting(Ini, TCheckBox(Components[I]))
-      else if Components[I] is TComboBox then
+      if Components[I] is TComboBox then
         SaveComboBoxSetting(Ini, TComboBox(Components[I]));
   finally
     Ini.Free;
