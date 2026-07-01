@@ -22,6 +22,7 @@ type
     pcEvent,
     pcState,
     pcAction,
+    pcMKS,
     pcInfo,
     pcWarning,
     pcError
@@ -311,6 +312,7 @@ begin
     pcEvent: Result := 'EVENT';
     pcState: Result := 'STATE';
     pcAction: Result := 'ACTION';
+    pcMKS: Result := 'MKS';
     pcInfo: Result := 'INFO';
     pcWarning: Result := 'Warning!';
     pcError: Result := 'Error!';
