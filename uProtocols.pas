@@ -22,6 +22,7 @@ type
     pcEvent,
     pcState,
     pcAction,
+    pcMKS,
     pcInfo,
     pcWarning,
     pcError
@@ -311,6 +312,7 @@ begin
     pcEvent: Result := 'EVENT';
     pcState: Result := 'STATE';
     pcAction: Result := 'ACTION';
+    pcMKS: Result := 'MKS';
     pcInfo: Result := 'INFO';
     pcWarning: Result := 'Warning!';
     pcError: Result := 'Error!';
@@ -334,6 +336,14 @@ end;
 class function TProtocolManager.FormatMessage(const Msg: TProtocolMessage): string;
 var
   Cat, Src: string;
+
+  function SingleLine(const AText: string): string;
+  begin
+    Result := StringReplace(AText, sLineBreak, ' | ', [rfReplaceAll]);
+    Result := StringReplace(Result, #13, ' | ', [rfReplaceAll]);
+    Result := StringReplace(Result, #10, ' | ', [rfReplaceAll]);
+    Result := StringReplace(Result, #9, ' ', [rfReplaceAll]);
+  end;
 begin
   if Msg = nil then
     Exit('');
@@ -344,9 +354,9 @@ begin
     FormatDateTime('hh:nn:ss', Msg.TimeStamp),
     Cat,
     Src,
-    Msg.Name,
-    Msg.Description,
-    Msg.Params
+    SingleLine(Msg.Name),
+    SingleLine(Msg.Description),
+    SingleLine(Msg.Params)
   ]);
 end;
 

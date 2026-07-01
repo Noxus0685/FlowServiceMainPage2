@@ -44,6 +44,7 @@ uses
   uDeviceClass,
   uFlowMeter,
   uRepositories,
+  uProtocols,
   uWorkTable;
 
 type
@@ -281,7 +282,6 @@ type
 implementation
    uses
     uAppServices,
-    uDebugLog,
     uMeterValue;
 {$R *.fmx}
 
@@ -370,7 +370,8 @@ end;
 
 procedure TFrameProceed.DbgProceedTree(const ACode: Integer; const AText: string);
 begin
-  DebugLog(Format('DBG %d'#13#10'%s', [ACode, AText]));
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcMKS, psMeasurement, 'DBG ' + ACode.ToString, 'MKS', AText);
 end;
 
 function TFrameProceed.GetSelectedTreeDebugText: string;
