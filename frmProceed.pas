@@ -278,6 +278,9 @@ type
     FOtherDeviceSnapshot: TArray<string>;
     function FindRootOtherItem: TTreeViewItem;
     function GetOtherDeviceUUIDSnapshot: TArray<string>;
+    function GetProcessingDeviceUUIDSnapshot: TArray<string>;
+    procedure RestoreProcessingDevicesFromSnapshot(const ADeviceUUIDs: TArray<string>);
+    function IsDeviceUUIDOnAnyWorkTable(const ADeviceUUID: string): Boolean;
     procedure RestoreOtherDevicesFromSnapshot(const ADeviceUUIDs: TArray<string>);
     function FindDeviceByUUID(const ADeviceUUID: string): TDevice;
     function JoinUUIDs(const ADeviceUUIDs: TArray<string>): string;
@@ -471,6 +474,7 @@ var
   Ini: TIniFile;
   I, SaveIndex: Integer;
   Device: TDevice;
+  DeviceUUIDs: TStringList;
 begin
   if FWorkTableManager <> nil then
     DbgProceedTree(1411, 'SaveProcessingDevices ENTER; Ini=' + FWorkTableManager.IniFileName)
@@ -480,6 +484,36 @@ begin
   if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
      (FProcessingDevices = nil) then
     Exit;
+
+  DeviceUUIDs := TStringList.Create;
+  try
+    DeviceUUIDs.Sorted := False;
+    DeviceUUIDs.Duplicates := dupIgnore;
+    for I := 0 to FProcessingDevices.Count - 1 do
+    begin
+      Device := FProcessingDevices[I];
+      if (Device = nil) or (Trim(Device.UUID) = '') then
+        Continue;
+
+      if DeviceUUIDs.IndexOf(Trim(Device.UUID)) >= 0 then
+      begin
+        DbgProceedTree(1006, Format('DBG PROC 1006 SaveProcessingDevices BLOCKED: duplicate UUID; UUID=%s',
+          [Trim(Device.UUID)]));
+        Exit;
+      end;
+      DeviceUUIDs.Add(Trim(Device.UUID));
+
+      if (not IsDeviceUUIDOnAnyWorkTable(Device.UUID)) and
+        (Device.Sessions.Count = 0) and (Device.Spillages.Count = 0) then
+      begin
+        DbgProceedTree(1005, Format('DBG PROC 1005 SaveProcessingDevices BLOCKED: foreign/other device in FProcessingDevices; UUID=%s; Name=%s',
+          [Device.UUID, Device.Name]));
+        Exit;
+      end;
+    end;
+  finally
+    DeviceUUIDs.Free;
+  end;
 
   Ini := TIniFile.Create(FWorkTableManager.IniFileName);
   try
@@ -608,13 +642,96 @@ function TFrameProceed.FindDeviceByUUID(const ADeviceUUID: string): TDevice;
 var
   Repo: TDeviceRepository;
 begin
-  Result := FindProcessingDeviceByUUID(ADeviceUUID);
-  if Result <> nil then
-    Exit;
-
+  Result := nil;
   Repo := nil;
   if AppServices.DataManager <> nil then
     Result := AppServices.DataManager.FindDevice(ADeviceUUID, Repo);
+
+  if Result = nil then
+    Result := FindProcessingDeviceByUUID(ADeviceUUID);
+end;
+
+
+function TFrameProceed.GetProcessingDeviceUUIDSnapshot: TArray<string>;
+var
+  Device: TDevice;
+  List: TList<string>;
+begin
+  List := TList<string>.Create;
+  try
+    if FProcessingDevices <> nil then
+      for Device in FProcessingDevices do
+        if (Device <> nil) and (Trim(Device.UUID) <> '') then
+          List.Add(Device.UUID);
+
+    Result := List.ToArray;
+  finally
+    List.Free;
+  end;
+end;
+
+function TFrameProceed.IsDeviceUUIDOnAnyWorkTable(const ADeviceUUID: string): Boolean;
+var
+  I: Integer;
+  WT: TWorkTable;
+  Ch: TChannel;
+  DeviceUUID: string;
+begin
+  Result := False;
+  DeviceUUID := Trim(ADeviceUUID);
+  if (DeviceUUID = '') or (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
+    Exit;
+
+  for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+  begin
+    WT := FWorkTableManager.WorkTables[I];
+    if (WT = nil) or (WT.DeviceChannels = nil) then
+      Continue;
+
+    for Ch in WT.DeviceChannels do
+      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
+        SameText(Trim(Ch.FlowMeter.Device.UUID), DeviceUUID) then
+        Exit(True);
+  end;
+end;
+
+procedure TFrameProceed.RestoreProcessingDevicesFromSnapshot(
+  const ADeviceUUIDs: TArray<string>);
+var
+  I: Integer;
+  DeviceUUID: string;
+  Device: TDevice;
+begin
+  DbgProceedTree(1002, Format('DBG PROC 1002 Cancel restore processing; Count=%d',
+    [Length(ADeviceUUIDs)]));
+
+  if FProcessingDevices = nil then
+    Exit;
+
+  FProcessingDevices.Clear;
+  for I := 0 to Length(ADeviceUUIDs) - 1 do
+  begin
+    DeviceUUID := Trim(ADeviceUUIDs[I]);
+    if DeviceUUID = '' then
+      Continue;
+
+    Device := FindDeviceByUUID(DeviceUUID);
+    if Device = nil then
+    begin
+      DbgProceedTree(1005, Format('DBG PROC 1005 SaveProcessingDevices BLOCKED: foreign/other device in FProcessingDevices; Missing restore UUID=%s',
+        [DeviceUUID]));
+      Continue;
+    end;
+
+    if FindProcessingDeviceByUUID(Device.UUID) <> nil then
+      Continue;
+
+    FProcessingDevices.Add(Device);
+    DbgProceedTree(1003, Format('DBG PROC 1003 Restore processing item; UUID=%s; Name=%s; Sessions=%d; Spillages=%d',
+      [Device.UUID, Device.Name, Device.Sessions.Count, Device.Spillages.Count]));
+  end;
+  DbgProceedTree(1004, Format('DBG PROC 1004 After restore processing; Count=%d',
+    [FProcessingDevices.Count]));
 end;
 
 procedure TFrameProceed.RestoreOtherDevicesFromSnapshot(
@@ -649,9 +766,13 @@ var
   SelDevice: TDevice;
   Res: TModalResult;
   OtherSnapshot: TArray<string>;
+  ProcessingSnapshot: TArray<string>;
 begin
   DbgProceedTree(1101, 'AddProcessingDeviceFromSelection ENTER'#13#10 + GetSelectedTreeDebugText);
+  ProcessingSnapshot := GetProcessingDeviceUUIDSnapshot;
   OtherSnapshot := GetOtherDeviceUUIDSnapshot;
+  DbgProceedTree(1001, Format('DBG PROC 1001 Before DeviceSelect; Processing.Count=%d; UUIDs=%s',
+    [Length(ProcessingSnapshot), JoinUUIDs(ProcessingSnapshot)]));
   DbgProceedTree(1001, Format('DBG OTHER 1001 Before DeviceSelect; Other.Count=%d; UUIDs=%s',
     [Length(OtherSnapshot), JoinUUIDs(OtherSnapshot)]));
   DbgProceedTree(1102, 'Before TFormDeviceSelect.Create'#13#10 + GetSelectedTreeDebugText);
@@ -668,6 +789,7 @@ begin
 
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
+      RestoreProcessingDevicesFromSnapshot(ProcessingSnapshot);
       RestoreOtherDevicesFromSnapshot(OtherSnapshot);
       PopulateTreeViewDevices;
       DbgProceedTree(1006, Format('DBG OTHER 1006 After restore; Other.Count=%d',
@@ -680,6 +802,7 @@ begin
     if SelDevice = nil then
     begin
       DbgProceedTree(1108, 'SelDevice=nil branch'#13#10 + GetSelectedTreeDebugText);
+      RestoreProcessingDevicesFromSnapshot(ProcessingSnapshot);
       RestoreOtherDevicesFromSnapshot(OtherSnapshot);
       PopulateTreeViewDevices;
       DbgProceedTree(1006, Format('DBG OTHER 1006 After restore; Other.Count=%d',
@@ -1796,42 +1919,120 @@ procedure TFrameProceed.SyncProcessingDevicesFromTable(AWorkTable: TWorkTable;
   const AClearBeforeSync: Boolean);
 var
   Ch: TChannel;
+  Device: TDevice;
+  DeviceUUIDs: TStringList;
+  I: Integer;
+  Changed: Boolean;
 begin
   if FProcessingDevices = nil then
     Exit;
 
-  if AClearBeforeSync then
-  begin
-    FProcessingDevices.Clear;
-    SaveProcessingDevices;
-  end;
+  DeviceUUIDs := TStringList.Create;
+  try
+    DeviceUUIDs.Sorted := False;
+    DeviceUUIDs.Duplicates := dupIgnore;
 
-  if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
-    for Ch in AWorkTable.DeviceChannels do
-      if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        AddProcessingDevice(Ch.FlowMeter.Device);
+    if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
+      for Ch in AWorkTable.DeviceChannels do
+        if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
+          (Trim(Ch.FlowMeter.Device.UUID) <> '') then
+          DeviceUUIDs.Add(Trim(Ch.FlowMeter.Device.UUID));
+
+    Changed := AClearBeforeSync;
+    if AClearBeforeSync then
+      FProcessingDevices.Clear
+    else
+      for I := FProcessingDevices.Count - 1 downto 0 do
+      begin
+        Device := FProcessingDevices[I];
+        if (Device = nil) or (DeviceUUIDs.IndexOf(Trim(Device.UUID)) < 0) then
+        begin
+          FProcessingDevices.Delete(I);
+          Changed := True;
+        end;
+      end;
+
+    if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
+      for Ch in AWorkTable.DeviceChannels do
+        if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
+          (Trim(Ch.FlowMeter.Device.UUID) <> '') and
+          (FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID) = nil) then
+        begin
+          FProcessingDevices.Add(Ch.FlowMeter.Device);
+          Changed := True;
+        end;
+
+    if Changed then
+      SaveProcessingDevices;
+  finally
+    DeviceUUIDs.Free;
+  end;
 end;
 procedure TFrameProceed.SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
 var
   I: Integer;
   WT: TWorkTable;
+  Ch: TChannel;
+  Device: TDevice;
+  DeviceUUIDs: TStringList;
+  Changed: Boolean;
 begin
   if FProcessingDevices = nil then
     Exit;
 
-  if AClearBeforeSync then
-  begin
-    FProcessingDevices.Clear;
-    SaveProcessingDevices;
-  end;
+  DeviceUUIDs := TStringList.Create;
+  try
+    DeviceUUIDs.Sorted := False;
+    DeviceUUIDs.Duplicates := dupIgnore;
 
-  if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
-    Exit;
+    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if (WT = nil) or (WT.DeviceChannels = nil) then
+          Continue;
 
-  for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
-  begin
-    WT := FWorkTableManager.WorkTables[I];
-    SyncProcessingDevicesFromTable(WT, False);
+        for Ch in WT.DeviceChannels do
+          if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
+            (Trim(Ch.FlowMeter.Device.UUID) <> '') then
+            DeviceUUIDs.Add(Trim(Ch.FlowMeter.Device.UUID));
+      end;
+
+    Changed := AClearBeforeSync;
+    if AClearBeforeSync then
+      FProcessingDevices.Clear
+    else
+      for I := FProcessingDevices.Count - 1 downto 0 do
+      begin
+        Device := FProcessingDevices[I];
+        if (Device = nil) or (DeviceUUIDs.IndexOf(Trim(Device.UUID)) < 0) then
+        begin
+          FProcessingDevices.Delete(I);
+          Changed := True;
+        end;
+      end;
+
+    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if (WT = nil) or (WT.DeviceChannels = nil) then
+          Continue;
+
+        for Ch in WT.DeviceChannels do
+          if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) and
+            (Trim(Ch.FlowMeter.Device.UUID) <> '') and
+            (FindProcessingDeviceByUUID(Ch.FlowMeter.Device.UUID) = nil) then
+          begin
+            FProcessingDevices.Add(Ch.FlowMeter.Device);
+            Changed := True;
+          end;
+      end;
+
+    if Changed then
+      SaveProcessingDevices;
+  finally
+    DeviceUUIDs.Free;
   end;
 end;
 procedure TFrameProceed.ActionSessionSynchTableExecute(Sender: TObject);
@@ -1849,7 +2050,7 @@ begin
   else if SameText(Item.Text, '...') then
     SyncProcessingDevicesFromAllTables(True)
   else if SameText(Item.Text, 'прочее') then
-    SyncProcessingDevicesFromAllTables(False)
+    SyncProcessingDevicesFromAllTables(True)
   else
     Exit;
 
