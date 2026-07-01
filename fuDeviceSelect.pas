@@ -208,6 +208,7 @@ private
   FSortColumn: Integer;
   FSortAscending: Boolean;
   FSkipDeviceDeleteConfirm: Boolean;
+  FUpdatingRepositoryCombo: Boolean;
   FCheckedDevices: TList<TDevice>;
   FDeletedDeviceUUIDs: TStringList;
 
@@ -375,8 +376,8 @@ begin
   ActiveRepo := AppServices.DataManager.ActiveDeviceRepo;
 
   {--------------------------------------------------}
-  { Не перезагружаем репозиторий здесь: ActiveRepo.Load/InitChannels
-    меняют состояние рабочего стола при простом открытии DeviceSelect. }
+  { Перезагружаем репозиторий и каналы: DeviceSelect должен видеть
+    актуальные приборы после изменений рабочего стола. }
   {--------------------------------------------------}
   DebugLog('DBG 2002'#13#10'Before ActiveRepo.Load');
   ActiveRepo.Load;
@@ -2480,6 +2481,9 @@ var
   Idx: Integer;
   RepoName: string;
 begin
+  if FUpdatingRepositoryCombo then
+    Exit;
+
   {----------------------------------}
   { Проверки }
   {----------------------------------}
@@ -2564,6 +2568,7 @@ var
   Repo: TDeviceRepository;
   ItemIndex: Integer;
 begin
+  FUpdatingRepositoryCombo := True;
   ComboBoxRepository.BeginUpdate;
   try
     ComboBoxRepository.Clear;
@@ -2594,6 +2599,7 @@ begin
 
   finally
     ComboBoxRepository.EndUpdate;
+    FUpdatingRepositoryCombo := False;
   end;
 end;
 

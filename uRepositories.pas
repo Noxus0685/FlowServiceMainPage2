@@ -4365,14 +4365,17 @@ begin
       if not UpdateDevicePoints(ADevice) then
         raise Exception.Create('Ошибка сохранения точек прибора');
 
-      if not UpdateSpillageSessions(ADevice) then
-        raise Exception.Create('Ошибка сохранения сессий пролива');
+      if (ADevice.Sessions <> nil) and (ADevice.Sessions.Count > 0) then
+        if not UpdateSpillageSessions(ADevice) then
+          raise Exception.Create('Ошибка сохранения сессий пролива');
 
-      if not UpdateSpillages(ADevice) then
-        raise Exception.Create('Ошибка сохранения результатов пролива');
+      if (ADevice.Spillages <> nil) and (ADevice.Spillages.Count > 0) then
+        if not UpdateSpillages(ADevice) then
+          raise Exception.Create('Ошибка сохранения результатов пролива');
 
-      if not UpdateCalibrCoef(ADevice) then
-        raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
+      if (ADevice.CalibrCoefTables <> nil) and (ADevice.CalibrCoefTables.Count > 0) then
+        if not UpdateCalibrCoef(ADevice) then
+          raise Exception.Create('Ошибка сохранения таблицы калибровочных коэффициентов');
 
     ADevice.State := osClean;
     if OwnsTransaction then
@@ -5356,71 +5359,36 @@ var
   OldSessionID: Integer;
   P: TPointSpillage;
   SP: TPointSpillage;
-  KeepIDs: TDictionary<Integer, Byte>;
-  Q: TFDQuery;
-  SessionIDsToDelete: TList<Integer>;
 begin
   Result := False;
   if (ADevice = nil) or (ADevice.Sessions = nil) then Exit;
 
-  KeepIDs := TDictionary<Integer, Byte>.Create;
-  SessionIDsToDelete := TList<Integer>.Create;
-  try
-    for Sess in ADevice.Sessions do
-      if (Sess <> nil) and (Sess.ID > 0) and not KeepIDs.ContainsKey(Sess.ID) then
-        KeepIDs.Add(Sess.ID, 0);
+  for Sess in ADevice.Sessions do
+  begin
+    if Sess = nil then
+      Continue;
+    if not SameText(Sess.DeviceUUID, ADevice.UUID) then
+      Sess.DeviceUUID := ADevice.UUID;
 
-    Q := FDM.CreateQuery;
-    try
-      Q.SQL.Text :=
-        'select ID from SessionSpillage where DeviceUUID = :DeviceUUID';
-      SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
-      Q.Open;
-      while not Q.Eof do
-      begin
-        OldSessionID := Q.FieldByName('ID').AsInteger;
-        if not KeepIDs.ContainsKey(OldSessionID) then
-          SessionIDsToDelete.Add(OldSessionID);
-        Q.Next;
-      end;
-    finally
-      Q.Free;
-    end;
+    OldSessionID := Sess.ID;
+    if not UpdateSpillageSession(Sess) then
+      Exit(False);
 
-    for OldSessionID in SessionIDsToDelete do
-      if not DeleteSessionCascade(OldSessionID) then
-        Exit(False);
-
-    for Sess in ADevice.Sessions do
+    if (OldSessionID > 0) and (Sess.ID > 0) and (OldSessionID <> Sess.ID) then
     begin
-      if Sess = nil then
-        Continue;
-      if not SameText(Sess.DeviceUUID, ADevice.UUID) then
-        Sess.DeviceUUID := ADevice.UUID;
+      if ADevice.Spillages <> nil then
+        for P in ADevice.Spillages do
+          if (P <> nil) and (P.SessionID = OldSessionID) then
+            P.SessionID := Sess.ID;
 
-      OldSessionID := Sess.ID;
-      if not UpdateSpillageSession(Sess) then
-        Exit(False);
-
-      if (OldSessionID > 0) and (Sess.ID > 0) and (OldSessionID <> Sess.ID) then
-      begin
-        if ADevice.Spillages <> nil then
-          for P in ADevice.Spillages do
-            if (P <> nil) and (P.SessionID = OldSessionID) then
-              P.SessionID := Sess.ID;
-
-        if Sess.Spillages <> nil then
-          for SP in Sess.Spillages do
-            if SP <> nil then
-              SP.SessionID := Sess.ID;
-      end;
+      if Sess.Spillages <> nil then
+        for SP in Sess.Spillages do
+          if SP <> nil then
+            SP.SessionID := Sess.ID;
     end;
-
-    Result := True;
-  finally
-    SessionIDsToDelete.Free;
-    KeepIDs.Free;
   end;
+
+  Result := True;
 end;
 
 {$ENDREGION}
@@ -5653,64 +5621,18 @@ function TDeviceRepository.UpdateSpillages(
 ): Boolean;
 var
   S: TPointSpillage;
-  KeepIDs: TDictionary<Integer, Byte>;
-  Q: TFDQuery;
-  ExistingID: Integer;
-  SpillageIDsToDelete: TList<Integer>;
 begin
   Result := False;
 
   if (ADevice = nil) or (ADevice.Spillages = nil) then
     Exit;
 
-  KeepIDs := TDictionary<Integer, Byte>.Create;
-  SpillageIDsToDelete := TList<Integer>.Create;
-  try
-    for S in ADevice.Spillages do
-      if (S <> nil) and (S.State <> osDeleted) and (S.ID > 0) and
-         not KeepIDs.ContainsKey(S.ID) then
-        KeepIDs.Add(S.ID, 0);
+  for S in ADevice.Spillages do
+    if (S <> nil) and (S.SessionID > 0) and
+       not UpdateSpillage(S) then
+      Exit(False);
 
-    Q := FDM.CreateQuery;
-    try
-      Q.SQL.Text :=
-        'select PS.ID from PointSpillage PS ' +
-        'where PS.SessionID in (select ID from SessionSpillage where DeviceUUID = :DeviceUUID)';
-      SetStrParam(Q, 'DeviceUUID', ADevice.UUID);
-      Q.Open;
-      while not Q.Eof do
-      begin
-        ExistingID := Q.FieldByName('ID').AsInteger;
-        if not KeepIDs.ContainsKey(ExistingID) then
-          SpillageIDsToDelete.Add(ExistingID);
-        Q.Next;
-      end;
-    finally
-      Q.Free;
-    end;
-
-    Q := FDM.CreateQuery;
-    try
-      Q.SQL.Text := 'delete from PointSpillage where ID = :ID';
-      for ExistingID in SpillageIDsToDelete do
-      begin
-        SetIntParam(Q, 'ID', ExistingID);
-        Q.ExecSQL;
-      end;
-    finally
-      Q.Free;
-    end;
-
-    for S in ADevice.Spillages do
-      if (S.SessionID > 0) and
-         not UpdateSpillage(S) then
-        Exit(False);
-
-    Result := True;
-  finally
-    SpillageIDsToDelete.Free;
-    KeepIDs.Free;
-  end;
+  Result := True;
 end;
 
 function TDeviceRepository.UpdateSpillage(

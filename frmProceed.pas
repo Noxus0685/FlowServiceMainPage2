@@ -550,7 +550,6 @@ begin
     Res := Frm.ShowModal;
     DbgProceedTree(1105, Format('After DeviceSelect.ShowModal; Res=%d; Frm.Tag=%d'#13#10'%s',
       [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
-    LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
       DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
@@ -700,8 +699,12 @@ begin
 
       Device := nil;
       Repo := nil;
-      if AppServices.DataManager <> nil then
-        Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
+      if (AppServices.DataManager <> nil) and
+         (AppServices.DataManager.ActiveDeviceRepo <> nil) then
+      begin
+        Repo := AppServices.DataManager.ActiveDeviceRepo;
+        Device := Repo.FindDeviceByUUID(DeviceUUID);
+      end;
 
       if Device <> nil then
       begin
@@ -1294,8 +1297,9 @@ begin
       for Point in Device.Spillages do
         if (Point <> nil) and (Point.SessionID = ASession.ID) and (Point.State <> osDeleted) then
           List.Add(Point);
-    end
-    else if ASession.Spillages <> nil then
+    end;
+
+    if (List.Count = 0) and (ASession.Spillages <> nil) then
     begin
       for I := 0 to ASession.Spillages.Count - 1 do
       begin
