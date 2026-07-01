@@ -1,4 +1,4 @@
-﻿unit uDeviceClass;
+unit uDeviceClass;
 
 interface
 
@@ -583,7 +583,8 @@ implementation
 uses
   uDataManager,
   uAppServices,
-  uRepositories;
+  uRepositories,
+  uMKSDebug;
 
 class function TDevicePoint.GetPointSpillageTypeText(const AType: EPointSpillageType): string;
 begin
@@ -1975,6 +1976,12 @@ begin
   if ASource = nil then
     Exit;
 
+  if (ASource.DevicePointID <> Self.DevicePointID) or
+     (ASource.Name <> Self.Name) or
+     (ASource.SessionID <> Self.SessionID) then
+    LogMKS('DBG SP 3001', 'TPointSpillage.Assign BEFORE',
+      Format('Self=%s | Source=%s', [DumpSpillage(Self), DumpSpillage(ASource)]));
+
   {====================================================================}
   { СОСТОЯНИЕ }
   {====================================================================}
@@ -2075,6 +2082,13 @@ begin
   {====================================================================}
   Coef := ASource.Coef;
   FCDCoefficient := ASource.FCDCoefficient;
+
+  if (ASource.DevicePointID <> Self.DevicePointID) or
+     (ASource.Name <> Self.Name) or
+     (ASource.SessionID <> Self.SessionID) or
+     (Self.DevicePointID = 0) or (Self.Name = '-') then
+    LogMKS('DBG SP 3002', 'TPointSpillage.Assign AFTER',
+      Format('Self=%s | Source=%s', [DumpSpillage(Self), DumpSpillage(ASource)]));
 end;
 
 function TDevice.AddPoint: TDevicePoint;
@@ -2267,6 +2281,9 @@ var
   AllowedError, ActualError: Double;
 begin
 
+  LogMKS('DBG SP 4001', 'TDevice.AnalyseDataPoint ENTER',
+    Format('Device=%s UUID=%s | Point=%s', [Self.Name, Self.UUID, DumpSpillage(ASpillage)]));
+
   result:=False;
   if ASpillage = nil then
     Exit;
@@ -2280,19 +2297,29 @@ begin
   MatchedPoint := nil;
   if ASpillage.DevicePointID <> 0 then
     for P in FPoints do
+    begin
+      if P <> nil then
+        LogMKS('DBG SP 4002', 'TDevice.AnalyseDataPoint CHECK DEVICE POINT',
+          Format('DevicePoint ID=%d Name=%s Q=%f | Spillage=%s', [P.ID, P.Name, P.Q, DumpSpillage(ASpillage)]));
       if (P <> nil) and (P.ID = ASpillage.DevicePointID) then
       begin
         MatchedPoint := P;
         Break;
       end;
+    end;
 
   if MatchedPoint = nil then
     for P in FPoints do
+    begin
+      if P <> nil then
+        LogMKS('DBG SP 4002', 'TDevice.AnalyseDataPoint CHECK DEVICE POINT',
+          Format('DevicePoint ID=%d Name=%s Q=%f | Spillage=%s', [P.ID, P.Name, P.Q, DumpSpillage(ASpillage)]));
       if IsFlowInPoint(ASpillage.QavgEtalon, P) then
       begin
         MatchedPoint := P;
         Break;
       end;
+    end;
 
   if MatchedPoint = nil then
   begin
@@ -2302,11 +2329,16 @@ begin
     ASpillage.StatusStr :=
       'Анализ выполнен: расход не соответствует ни одной поверочной точке прибора. ' +
       'Измерение некорректно (цвет: серый).';
+    LogMKS('DBG SP 4005', 'TDevice.AnalyseDataPoint NO MATCH', DumpSpillage(ASpillage));
     Exit;
   end;
 
+  LogMKS('DBG SP 4003', 'TDevice.AnalyseDataPoint MATCH',
+    Format('Matched DevicePoint ID=%d Name=%s | Before assign=%s',
+      [MatchedPoint.ID, MatchedPoint.Name, DumpSpillage(ASpillage)]));
   ASpillage.DevicePointID := MatchedPoint.ID;
   ASpillage.Name := MatchedPoint.Name;
+  LogMKS('DBG SP 4004', 'TDevice.AnalyseDataPoint AFTER MATCH ASSIGN', DumpSpillage(ASpillage));
 
   StopCriteria := MatchedPoint.StopCriteria;
   if StopCriteria = [] then
@@ -2454,6 +2486,7 @@ end;
 procedure TDevice.AnalyseDevicePointsResults;
 var
   DP: TDevicePoint;
+  Spillage: TPointSpillage;
   S: TPointSpillage;
   ValidCount: Integer;
   ErrorsSum: Double;
@@ -2591,6 +2624,10 @@ end;
 procedure TDevice.AnalyseResults;
 var
   DP: TDevicePoint;
+  Spillage: TPointSpillage;
+  PointsCount: Integer;
+  SessionsCount: Integer;
+  SpillagesCount: Integer;
   HasStatus3: Boolean;
   HasStatus4: Boolean;
   AllStatus5: Boolean;
@@ -2599,7 +2636,28 @@ var
   AllStatus012: Boolean;
   HasMissingData: Boolean;
 begin
+  PointsCount := 0;
+  SessionsCount := 0;
+  SpillagesCount := 0;
+  if Self.Points <> nil then
+    PointsCount := Self.Points.Count;
+  if Self.Sessions <> nil then
+    SessionsCount := Self.Sessions.Count;
+  if Self.Spillages <> nil then
+    SpillagesCount := Self.Spillages.Count;
+
+  LogMKS('DBG SP 5001', 'TDevice.AnalyseResults ENTER',
+    Format('Device=%s UUID=%s; Points.Count=%d; Sessions.Count=%d; Spillages.Count=%d',
+      [Self.Name, Self.UUID, PointsCount, SessionsCount, SpillagesCount]));
+  if Self.Spillages <> nil then
+    for Spillage in Self.Spillages do
+      LogMKS('DBG SP 5002', 'TDevice.AnalyseResults SPILLAGE BEFORE', DumpSpillage(Spillage));
+
   AnalyseDevicePointsResults;
+
+  if Self.Spillages <> nil then
+    for Spillage in Self.Spillages do
+      LogMKS('DBG SP 5003', 'TDevice.AnalyseResults SPILLAGE AFTER', DumpSpillage(Spillage));
 
   Status := 0;
   StatusStr := 'Измерения не производились/не анализировались.';
@@ -2693,6 +2751,8 @@ begin
 
   Status := 3;
   StatusStr := 'По всем поверочным точкам есть данные, но не все точки годны.';
+  LogMKS('DBG SP 5004', 'TDevice.AnalyseResults EXIT',
+    Format('Device=%s UUID=%s Status=%d', [Self.Name, Self.UUID, Self.Status]));
 end;
 
 function TDevice.FindDiameter(AType: TDeviceType): TDiameter;
