@@ -51,8 +51,7 @@ uses
   uDataManager,
   uDeviceClass,
   uRepositories,
-  uProtocols,
-  uDebugLog;
+  uProtocols;
 
 type
   TFormDeviceSelect = class(TForm)
@@ -276,6 +275,12 @@ implementation
    uAppServices,
    uWorkTable;
 {$R *.fmx}
+
+procedure DebugLog(const AText: string);
+begin
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcMKS, psForm, 'DeviceSelect', 'MKS', AText);
+end;
 
 constructor TFormDeviceSelect.Create(AOwner: TComponent);
 begin
