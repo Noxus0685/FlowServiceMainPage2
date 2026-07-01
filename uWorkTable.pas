@@ -4396,8 +4396,13 @@ begin
 
     Session := Device.GetActiveSessionSpillage;
     if Session = nil then
+    begin
       Session := Device.AddSessionSpillage;
-    Session.State := osModified;
+      if Session <> nil then
+        Session.State := osNew;
+    end
+    else if Session.State <> osNew then
+      Session.State := osModified;
     Device.State := osModified;
 
     if Session.DateTimeOpen = 0 then
@@ -4501,6 +4506,15 @@ begin
 
       if Device <> nil then
         Point.Valid := Device.AnalyseDataPoint(Point);
+
+      Point.State := osNew;
+      if Session <> nil then
+      begin
+        if Session.State <> osNew then
+          Session.State := osModified;
+        Point.SessionID := Session.ID;
+      end;
+      Device.State := osModified;
 
       DeviceChannel.FlowMeter.AddDataPoint(Point);
 
