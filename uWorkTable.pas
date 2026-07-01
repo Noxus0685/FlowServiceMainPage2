@@ -5885,14 +5885,14 @@ begin
     // Ожидание полной остановки
     // ------------------------------------------------------------
     swtSTOPWAIT:
-      WorkTable.State := swtCOMPLETE;
+      WorkTable.State := swtFINALREAD ;
 
 
     // ------------------------------------------------------------
     // Тест завершён → переход к финальному считыванию
     // ------------------------------------------------------------
-    swtCOMPLETE:
-      WorkTable.State := swtFINALREAD;
+    swtFINALREAD:
+      WorkTable.State := swtCOMPLETE;
 
   end;
 
