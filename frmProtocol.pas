@@ -57,6 +57,7 @@ type
     procedure CopyProtocolToClipboard;
     procedure LoadProtocolSettings;
     procedure SaveProtocolSettings;
+    function ProtocolSettingsFileName: string;
     procedure LoadCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
     procedure SaveCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
     procedure LoadComboBoxSetting(AIni: TIniFile; AComboBox: TComboBox);
@@ -114,6 +115,18 @@ end;
 
 
 
+
+function TFrameProtocol.ProtocolSettingsFileName: string;
+begin
+  if (WorkTableManager <> nil) and (Trim(WorkTableManager.IniFileName) <> '') then
+    Exit(WorkTableManager.IniFileName);
+
+  Result := TPath.Combine(
+    TPath.Combine(IncludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0))), 'Settings'),
+    'TableSettings.ini'
+  );
+end;
+
 procedure TFrameProtocol.LoadCheckBoxSetting(AIni: TIniFile; ACheckBox: TCheckBox);
 begin
   if (AIni = nil) or (ACheckBox = nil) or (ACheckBox.Name = '') then
@@ -162,12 +175,15 @@ procedure TFrameProtocol.LoadProtocolSettings;
 var
   Ini: TIniFile;
   I: Integer;
+  FileName: string;
 begin
-  if (WorkTableManager = nil) or (Trim(WorkTableManager.IniFileName) = '') then
+  FileName := ProtocolSettingsFileName;
+  if Trim(FileName) = '' then
     Exit;
 
+  ForceDirectories(ExtractFilePath(FileName));
   FLoadingSettings := True;
-  Ini := TIniFile.Create(WorkTableManager.IniFileName);
+  Ini := TIniFile.Create(FileName);
   try
     for I := 0 to ComponentCount - 1 do
     begin
@@ -189,11 +205,14 @@ procedure TFrameProtocol.SaveProtocolSettings;
 var
   Ini: TIniFile;
   I: Integer;
+  FileName: string;
 begin
-  if (WorkTableManager = nil) or (Trim(WorkTableManager.IniFileName) = '') then
+  FileName := ProtocolSettingsFileName;
+  if Trim(FileName) = '' then
     Exit;
 
-  Ini := TIniFile.Create(WorkTableManager.IniFileName);
+  ForceDirectories(ExtractFilePath(FileName));
+  Ini := TIniFile.Create(FileName);
   try
     for I := 0 to ComponentCount - 1 do
       if Components[I] is TCheckBox then
@@ -232,6 +251,7 @@ end;
 
 destructor TFrameProtocol.Destroy;
 begin
+  SaveProtocolSettings;
  if ProtocolManager<>nil then
    begin
    ProtocolManager.Unsubscribe(FListener);
