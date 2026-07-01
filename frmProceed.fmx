@@ -221,8 +221,8 @@ object FrameProceed: TFrameProceed
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
-          Viewport.Width = 941.000000000000000000
-          Viewport.Height = 570.000000000000000000
+          Viewport.Width = 961.000000000000000000
+          Viewport.Height = 611.000000000000000000
           object StringColumnResultName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.Trimming = Character
@@ -374,21 +374,21 @@ object FrameProceed: TFrameProceed
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            585s
+            606s
             348s
-            585s
+            606s
             348s
-            585s
+            606s
             348s
-            585s)
+            606s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 71.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -398,7 +398,7 @@ object FrameProceed: TFrameProceed
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 585.000000000000000000
+              Size.Height = 606.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -447,8 +447,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 65.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -464,8 +464,8 @@ object FrameProceed: TFrameProceed
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 277.000000000000000000
-              Viewport.Height = 194.000000000000000000
+              Viewport.Width = 297.000000000000000000
+              Viewport.Height = 219.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -480,8 +480,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 73.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -495,8 +495,8 @@ object FrameProceed: TFrameProceed
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 61.000000000000000000
-            Size.Height = 26.000000000000000000
+            Size.Width = 1.000000000000000000
+            Size.Height = 5.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -524,7 +524,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 458.000000000000000000
+        Position.X = 505.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 12.000000000000000000
         Size.Height = 22.000000000000000000
@@ -607,7 +607,7 @@ object FrameProceed: TFrameProceed
       end
       object Layout19: TLayout
         Align = Left
-        Position.X = 470.000000000000000000
+        Position.X = 517.000000000000000000
         Size.Width = 240.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -615,7 +615,7 @@ object FrameProceed: TFrameProceed
       end
       object Layout20: TLayout
         Align = Left
-        Position.X = 234.000000000000000000
+        Position.X = 281.000000000000000000
         Size.Width = 224.000000000000000000
         Size.Height = 32.000000000000000000
         Size.PlatformDefault = False
@@ -644,7 +644,7 @@ object FrameProceed: TFrameProceed
         LineType = Right
         Margins.Top = 5.000000000000000000
         Margins.Bottom = 5.000000000000000000
-        Position.X = 224.000000000000000000
+        Position.X = 271.000000000000000000
         Position.Y = 5.000000000000000000
         Size.Width = 10.000000000000000000
         Size.Height = 22.000000000000000000

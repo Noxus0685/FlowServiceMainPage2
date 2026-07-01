@@ -1,4 +1,4 @@
-unit frmProceed;
+﻿unit frmProceed;
 
 interface
 
@@ -556,9 +556,9 @@ begin
     LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
-      UpdateTreeViewDeviceTagObjects;
-      DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
-        [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
+      //UpdateTreeViewDeviceTagObjects;
+     // DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
+      //  [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
       Exit;
     end;
 
