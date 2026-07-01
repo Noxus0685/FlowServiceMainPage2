@@ -552,6 +552,7 @@ type
     function GetActiveSessionSpillage: TSessionSpillage;
     function AddSpillage: TPointSpillage;
     function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
+    function FindMatchedDevicePointForSpillage(const ASpillage: TPointSpillage): TDevicePoint;
 
     function  AnalyseDataPoint(const ASpillage: TPointSpillage): Boolean;
     procedure FillDataPointsList(APoint: TDevicePoint);
@@ -2272,6 +2273,26 @@ begin
   Result := InRange(AFlow, Q1, Q2);
 end;
 
+function TDevice.FindMatchedDevicePointForSpillage(
+  const ASpillage: TPointSpillage
+): TDevicePoint;
+var
+  P: TDevicePoint;
+begin
+  Result := nil;
+  if (ASpillage = nil) or (FPoints = nil) then
+    Exit;
+
+  if ASpillage.DevicePointID <> 0 then
+    for P in FPoints do
+      if (P <> nil) and (P.ID = ASpillage.DevicePointID) then
+        Exit(P);
+
+  for P in FPoints do
+    if (P <> nil) and IsFlowInPoint(ASpillage.QavgEtalon, P) then
+      Exit(P);
+end;
+
 function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
 var
   P, MatchedPoint: TDevicePoint;
@@ -2294,32 +2315,12 @@ begin
 
     ASpillage.State := osModified;
 
-  MatchedPoint := nil;
-  if ASpillage.DevicePointID <> 0 then
+  MatchedPoint := FindMatchedDevicePointForSpillage(ASpillage);
+  if FPoints <> nil then
     for P in FPoints do
-    begin
       if P <> nil then
         LogMKS('DBG SP 4002', 'TDevice.AnalyseDataPoint CHECK DEVICE POINT',
           Format('DevicePoint ID=%d Name=%s Q=%f | Spillage=%s', [P.ID, P.Name, P.Q, DumpSpillage(ASpillage)]));
-      if (P <> nil) and (P.ID = ASpillage.DevicePointID) then
-      begin
-        MatchedPoint := P;
-        Break;
-      end;
-    end;
-
-  if MatchedPoint = nil then
-    for P in FPoints do
-    begin
-      if P <> nil then
-        LogMKS('DBG SP 4002', 'TDevice.AnalyseDataPoint CHECK DEVICE POINT',
-          Format('DevicePoint ID=%d Name=%s Q=%f | Spillage=%s', [P.ID, P.Name, P.Q, DumpSpillage(ASpillage)]));
-      if IsFlowInPoint(ASpillage.QavgEtalon, P) then
-      begin
-        MatchedPoint := P;
-        Break;
-      end;
-    end;
 
   if MatchedPoint = nil then
   begin
@@ -2337,6 +2338,7 @@ begin
     Format('Matched DevicePoint ID=%d Name=%s | Before assign=%s',
       [MatchedPoint.ID, MatchedPoint.Name, DumpSpillage(ASpillage)]));
   ASpillage.DevicePointID := MatchedPoint.ID;
+  ASpillage.DeviceTypePointID := MatchedPoint.DeviceTypePointID;
   ASpillage.Name := MatchedPoint.Name;
   LogMKS('DBG SP 4004', 'TDevice.AnalyseDataPoint AFTER MATCH ASSIGN', DumpSpillage(ASpillage));
 
@@ -2418,6 +2420,8 @@ procedure TDevice.FillDataPointsList(APoint: TDevicePoint);
 var
   S: TPointSpillage;
   CandidateList: TList<TPointSpillage>;
+  MatchedPoint: TDevicePoint;
+  Changed: Boolean;
   KeepCount: Integer;
   I: Integer;
   ActiveSession: TSessionSpillage;
@@ -2442,24 +2446,35 @@ begin
   if ActiveSession = nil then
     Exit;
 
+  Changed := False;
   CandidateList := TList<TPointSpillage>.Create;
   try
     for S in Spillages do
       if (S <> nil) and S.Enabled and (S.State <> osDeleted) and
-         (S.SessionID = ActiveSession.ID) and
-         (((S.DevicePointID <> 0) and (S.DevicePointID = APoint.ID)) or
-          IsFlowInPoint(S.QavgEtalon, APoint)) then
+         (S.SessionID = ActiveSession.ID) then
       begin
-        if (S.DevicePointID = 0) or (Trim(S.Name) = '') then
+        MatchedPoint := FindMatchedDevicePointForSpillage(S);
+        if MatchedPoint <> APoint then
+          Continue;
+
+        if (S.DevicePointID <> APoint.ID) or
+           (S.DeviceTypePointID <> APoint.DeviceTypePointID) or
+           (not SameText(S.Name, APoint.Name)) then
         begin
           S.DevicePointID := APoint.ID;
+          S.DeviceTypePointID := APoint.DeviceTypePointID;
           S.Name := APoint.Name;
           S.State := osModified;
+          Changed := True;
         end;
+
         APoint.DataPoints.Add(S);
         if S.Enabled then
           CandidateList.Add(S);
       end;
+
+    if Changed then
+      Self.State := osModified;
 
     CandidateList.Sort(
       TComparer<TPointSpillage>.Construct(
