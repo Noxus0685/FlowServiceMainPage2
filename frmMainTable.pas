@@ -4795,7 +4795,7 @@ begin
         EditVolume.Text := FormatFloat('0.###', WorkTable.CurrentPoint.LimitVolume);
 
     if not EditImp.IsFocused then
-      if WorkTable.CurrentPoint.LimitImp = -1 then
+      if WorkTable.CurrentPoint.LimitImp <= 0 then
         EditImp.Text := '-'
       else
         EditImp.Text := IntToStr(WorkTable.CurrentPoint.LimitImp);
@@ -5052,11 +5052,12 @@ begin
   SC := FActiveWorkTable.CurrentPoint.StopCriteria;
 
   if (Trim(EditImp.Text) = '-') or
-     (TryStrToInt(EditImp.Text, Value) and (Value = -1)) then
+     (TryStrToInt(EditImp.Text, Value) and (Value <= 0)) then
   begin
     FActiveWorkTable.CurrentPoint.LimitImp := -1;
     Exclude(SC, scImpulse);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    EditImp.Text := '-';
     Exit;
   end;
 
@@ -5447,12 +5448,8 @@ end;
 
 
 function TFrameMainTable.GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
-const
-  // Один синий оттенок с разной светлотой: от светлого к более тёмному.
-  BlueGroupColors: array[0..2] of TAlphaColor = (
-    $331E90FF, $4D1E90FF, $661E90FF);
 begin
-  Result := BlueGroupColors[Abs(AGroup) mod Length(BlueGroupColors)];
+  Result := GRID_DEVICE_GROUP_COLORS[Abs(AGroup) mod Length(GRID_DEVICE_GROUP_COLORS)];
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -5465,7 +5462,7 @@ var
 begin
   IsChannelColumn := Column = StringColumnDeviceChanel1;
   if Odd(Row) then
-    CellColor := $FFF2F2F2
+    CellColor := GRID_ALTERNATE_ROW_COLOR
   else
     CellColor := TAlphaColors.White;
 
@@ -6203,12 +6200,8 @@ end;
 
 
 function TFrameMainTable.GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
-const
-  // Один фиолетовый оттенок с разной светлотой: от светлого к более тёмному.
-  PurpleGroupColors: array[0..2] of TAlphaColor = (
-    $338A2BE2, $4D8A2BE2, $668A2BE2);
 begin
-  Result := PurpleGroupColors[Abs(AGroup) mod Length(PurpleGroupColors)];
+  Result := GRID_ETALON_GROUP_COLORS[Abs(AGroup) mod Length(GRID_ETALON_GROUP_COLORS)];
 end;
 
 procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
