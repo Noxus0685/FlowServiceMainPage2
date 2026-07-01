@@ -274,6 +274,13 @@ type
     FSessionEtalon: TFlowMeter;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
+    FUseOtherDeviceSnapshot: Boolean;
+    FOtherDeviceSnapshot: TArray<string>;
+    function FindRootOtherItem: TTreeViewItem;
+    function GetOtherDeviceUUIDSnapshot: TArray<string>;
+    procedure RestoreOtherDevicesFromSnapshot(const ADeviceUUIDs: TArray<string>);
+    function FindDeviceByUUID(const ADeviceUUID: string): TDevice;
+    function JoinUUIDs(const ADeviceUUIDs: TArray<string>): string;
   public
     { Public declarations }
     procedure Initialize;
@@ -537,13 +544,116 @@ end;
 
 
 
+
+function TFrameProceed.FindRootOtherItem: TTreeViewItem;
+var
+  I: Integer;
+  Item: TTreeViewItem;
+begin
+  Result := nil;
+  if TreeViewDevices = nil then
+    Exit;
+
+  for I := 0 to TreeViewDevices.Count - 1 do
+  begin
+    Item := TreeViewDevices.ItemByIndex(I);
+    if (Item <> nil) and SameText(Item.Text, 'прочее') then
+      Exit(Item);
+  end;
+end;
+
+function TFrameProceed.JoinUUIDs(const ADeviceUUIDs: TArray<string>): string;
+var
+  DeviceUUID: string;
+begin
+  Result := '';
+  for DeviceUUID in ADeviceUUIDs do
+  begin
+    if Result <> '' then
+      Result := Result + ',';
+    Result := Result + DeviceUUID;
+  end;
+end;
+
+function TFrameProceed.GetOtherDeviceUUIDSnapshot: TArray<string>;
+var
+  RootOther: TTreeViewItem;
+  Item: TTreeViewItem;
+  Device: TDevice;
+  List: TList<string>;
+  I: Integer;
+begin
+  List := TList<string>.Create;
+  try
+    RootOther := FindRootOtherItem;
+    if RootOther <> nil then
+      for I := 0 to RootOther.Count - 1 do
+      begin
+        Item := RootOther.ItemByIndex(I);
+        if (Item <> nil) and (Item.TagObject is TDevice) then
+        begin
+          Device := TDevice(Item.TagObject);
+          if (Device <> nil) and (Trim(Device.UUID) <> '') then
+            List.Add(Device.UUID);
+        end;
+      end;
+
+    Result := List.ToArray;
+  finally
+    List.Free;
+  end;
+end;
+
+function TFrameProceed.FindDeviceByUUID(const ADeviceUUID: string): TDevice;
+var
+  Repo: TDeviceRepository;
+begin
+  Result := FindProcessingDeviceByUUID(ADeviceUUID);
+  if Result <> nil then
+    Exit;
+
+  Repo := nil;
+  if AppServices.DataManager <> nil then
+    Result := AppServices.DataManager.FindDevice(ADeviceUUID, Repo);
+end;
+
+procedure TFrameProceed.RestoreOtherDevicesFromSnapshot(
+  const ADeviceUUIDs: TArray<string>);
+var
+  I: Integer;
+  DeviceUUID: string;
+  Device: TDevice;
+begin
+  SetLength(FOtherDeviceSnapshot, Length(ADeviceUUIDs));
+  for I := 0 to Length(ADeviceUUIDs) - 1 do
+    FOtherDeviceSnapshot[I] := ADeviceUUIDs[I];
+  FUseOtherDeviceSnapshot := True;
+  DbgProceedTree(1003, Format('DBG OTHER 1003 Cancel restore other; Count=%d', [Length(ADeviceUUIDs)]));
+
+  for I := 0 to Length(ADeviceUUIDs) - 1 do
+  begin
+    DeviceUUID := ADeviceUUIDs[I];
+    Device := FindDeviceByUUID(DeviceUUID);
+    if Device <> nil then
+      DbgProceedTree(1004, Format('DBG OTHER 1004 Restore other item; UUID=%s; Name=%s',
+        [DeviceUUID, Device.Name]))
+    else
+      DbgProceedTree(1005, Format('DBG OTHER 1005 Restore other missing device; UUID=%s',
+        [DeviceUUID]));
+  end;
+end;
+
 procedure TFrameProceed.AddProcessingDeviceFromSelection;
 var
   Frm: TFormDeviceSelect;
   SelDevice: TDevice;
   Res: TModalResult;
+  OtherSnapshot: TArray<string>;
 begin
   DbgProceedTree(1101, 'AddProcessingDeviceFromSelection ENTER'#13#10 + GetSelectedTreeDebugText);
+  OtherSnapshot := GetOtherDeviceUUIDSnapshot;
+  DbgProceedTree(1001, Format('DBG OTHER 1001 Before DeviceSelect; Other.Count=%d; UUIDs=%s',
+    [Length(OtherSnapshot), JoinUUIDs(OtherSnapshot)]));
   DbgProceedTree(1102, 'Before TFormDeviceSelect.Create'#13#10 + GetSelectedTreeDebugText);
   Frm := TFormDeviceSelect.Create(Self);
   try
@@ -551,14 +661,17 @@ begin
     Frm.Tag := 0;
     DbgProceedTree(1104, 'Before DeviceSelect.ShowModal'#13#10 + GetSelectedTreeDebugText);
     Res := Frm.ShowModal;
+    DbgProceedTree(1002, Format('DBG OTHER 1002 DeviceSelect result; Res=%d; Tag=%d',
+      [Ord(Res), Frm.Tag]));
     DbgProceedTree(1105, Format('After DeviceSelect.ShowModal; Res=%d; Frm.Tag=%d'#13#10'%s',
       [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
-    //LoadProcessingDevices;
+
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
-      //UpdateTreeViewDeviceTagObjects;
-     // DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
-      //  [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
+      RestoreOtherDevicesFromSnapshot(OtherSnapshot);
+      PopulateTreeViewDevices;
+      DbgProceedTree(1006, Format('DBG OTHER 1006 After restore; Other.Count=%d',
+        [Length(GetOtherDeviceUUIDSnapshot)]));
       Exit;
     end;
 
@@ -567,6 +680,10 @@ begin
     if SelDevice = nil then
     begin
       DbgProceedTree(1108, 'SelDevice=nil branch'#13#10 + GetSelectedTreeDebugText);
+      RestoreOtherDevicesFromSnapshot(OtherSnapshot);
+      PopulateTreeViewDevices;
+      DbgProceedTree(1006, Format('DBG OTHER 1006 After restore; Other.Count=%d',
+        [Length(GetOtherDeviceUUIDSnapshot)]));
       Exit;
     end;
 
@@ -1007,7 +1124,25 @@ begin
       TreeViewDevices.AddObject(RootOther);
       DbgProceedTree(1204, 'RootOther created; Count=' + RootOther.Count.ToString);
 
-      if FProcessingDevices <> nil then
+      if FUseOtherDeviceSnapshot then
+      begin
+        for I := 0 to Length(FOtherDeviceSnapshot) - 1 do
+        begin
+          Device := FindDeviceByUUID(FOtherDeviceSnapshot[I]);
+          if Device = nil then
+          begin
+            DbgProceedTree(1005, Format('DBG OTHER 1005 Restore other missing device; UUID=%s',
+              [FOtherDeviceSnapshot[I]]));
+            Continue;
+          end;
+
+          DbgProceedTree(1205, 'Add device to OTHER from snapshot: ' + Device.Name + #13#10 + Device.UUID);
+          AddDeviceNode(RootOther, Device);
+        end;
+        FUseOtherDeviceSnapshot := False;
+        SetLength(FOtherDeviceSnapshot, 0);
+      end
+      else if FProcessingDevices <> nil then
         for Device in FProcessingDevices do
           if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
           begin
