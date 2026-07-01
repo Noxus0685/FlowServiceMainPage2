@@ -631,6 +631,7 @@ type
   FFrameProtocol: TFrameProtocol;
   FProtocolHostScroll: TVertScrollBox;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
+  FFlowMeterPropertiesChannel: TChannel;
   FFrameChannelProperties: TFrameChannelProperties;
   FFrameWorkTableProperties: TFrameWorkTableProperties;
     { Private declarations }
@@ -771,7 +772,7 @@ type
     procedure PersistDeviceAsync(ADevice: TDevice);
     procedure UpdateUIConditions;
     function   GetMeasurementRun: TMeasurementRun;
-    procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
+    procedure UpdateFlowMeterPropertiesFrame(ARow: Integer = -1; AEtalon: Boolean = False);
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
@@ -957,25 +958,42 @@ begin
   Result := TMeasurementRun(FActiveWorkTable.MeasurementRun);
 end;
 
-procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1);
+procedure TFrameMainTable.UpdateFlowMeterPropertiesFrame(ARow: Integer = -1;
+  AEtalon: Boolean = False);
 var
-  Meter: TFlowMeter;
+  Channel: TChannel;
 begin
   if FFrameFlowMeterProperties = nil then
     Exit;
 
-  Meter := nil;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+  Channel := nil;
+  if FActiveWorkTable <> nil then
   begin
-    if ARow < 0 then
-      ARow := GridDevices.Selected;
+    if AEtalon then
+    begin
+      if ARow < 0 then
+        ARow := GridEtalons.Selected;
 
-    if (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) and
-       (FActiveWorkTable.DeviceChannels[ARow] <> nil) then
-      Meter := FActiveWorkTable.DeviceChannels[ARow].FlowMeter;
+      if (FActiveWorkTable.EtalonChannels <> nil) and
+         (ARow >= 0) and (ARow < FActiveWorkTable.EtalonChannels.Count) then
+        Channel := FActiveWorkTable.EtalonChannels[ARow];
+    end
+    else
+    begin
+      if ARow < 0 then
+        ARow := GridDevices.Selected;
+
+      if (FActiveWorkTable.DeviceChannels <> nil) and
+         (ARow >= 0) and (ARow < FActiveWorkTable.DeviceChannels.Count) then
+        Channel := FActiveWorkTable.DeviceChannels[ARow];
+    end;
   end;
 
-  FFrameFlowMeterProperties.FlowMeter := Meter;
+  FFlowMeterPropertiesChannel := Channel;
+  if Channel <> nil then
+    FFrameFlowMeterProperties.FlowMeter := Channel.FlowMeter
+  else
+    FFrameFlowMeterProperties.FlowMeter := nil;
 end;
 
 procedure TFrameMainTable.FlowMeterPropertiesChanged(Sender: TObject);
@@ -983,9 +1001,10 @@ var
   Row: Integer;
   Channel: TChannel;
 begin
-  Channel := nil;
+  Channel := FFlowMeterPropertiesChannel;
 
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.DeviceChannels <> nil) then
+  if (Channel = nil) and (FActiveWorkTable <> nil) and
+     (FActiveWorkTable.DeviceChannels <> nil) then
   begin
     Row := GridDevices.Selected;
     if (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) then
@@ -1018,7 +1037,9 @@ begin
       FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
     if AChannel <> nil then
     begin
-      UpdateFlowMeterPropertiesFrame;
+      FFlowMeterPropertiesChannel := AChannel;
+      if FFrameFlowMeterProperties <> nil then
+        FFrameFlowMeterProperties.FlowMeter := AChannel.FlowMeter;
       if FFrameChannelProperties <> nil then
         FFrameChannelProperties.LoadFromChannel(AChannel);
     end;
@@ -6117,6 +6138,7 @@ begin
     GridEtalons.EndUpdate;
   end;
 
+  UpdateFlowMeterPropertiesFrame(Row, True);
   if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
      (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
     FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[Row]);
@@ -6173,6 +6195,10 @@ begin
     GridEtalons.EndUpdate;
   end;
 
+  UpdateFlowMeterPropertiesFrame(Row, True);
+  if (FFrameChannelProperties <> nil) and (WorkTable <> nil) and
+     (Row >= 0) and (Row < WorkTable.EtalonChannels.Count) then
+    FFrameChannelProperties.LoadFromChannel(WorkTable.EtalonChannels[Row]);
 end;
 
 
