@@ -714,9 +714,14 @@ begin
 
     FProcessingDevices.Clear;
 
-    if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
-       (not FileExists(FWorkTableManager.IniFileName)) then
-      Exit;
+      Device := nil;
+      Repo := nil;
+      if (AppServices.DataManager <> nil) and
+         (AppServices.DataManager.ActiveDeviceRepo <> nil) then
+      begin
+        Repo := AppServices.DataManager.ActiveDeviceRepo;
+        Device := Repo.FindDeviceByUUID(DeviceUUID);
+      end;
 
     Ini := TIniFile.Create(FWorkTableManager.IniFileName);
     try
