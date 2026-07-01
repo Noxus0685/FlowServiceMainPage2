@@ -1,4 +1,4 @@
-unit uWorkTable;
+﻿unit uWorkTable;
 
 interface
 
@@ -5897,7 +5897,7 @@ begin
     // Ожидание полной остановки
     // ------------------------------------------------------------
     swtSTOPWAIT:
-      WorkTable.State := swtFINALREAD ;
+      WorkTable.State := swtFINALREAD   ;
 
 
     // ------------------------------------------------------------
