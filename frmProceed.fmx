@@ -784,28 +784,6 @@
     Size.Height = 44.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
-    object btnOK: TCornerButton
-      Align = Right
-      StyledSettings = [Family, Size, Style]
-      ModalResult = 1
-      Margins.Left = 10.000000000000000000
-      Margins.Top = 10.000000000000000000
-      Margins.Right = 10.000000000000000000
-      Margins.Bottom = 10.000000000000000000
-      Position.X = 1427.000000000000000000
-      Position.Y = 10.000000000000000000
-      Sides = [Top, Left, Bottom, Right]
-      Size.Width = 127.000000000000000000
-      Size.Height = 24.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 0
-      Text = #1054#1090#1084#1077#1085#1072
-      TextSettings.FontColor = claDarkgreen
-      TextSettings.Trimming = None
-      XRadius = 3.000000000000000000
-      YRadius = 3.000000000000000000
-      OnClick = btnOKClick
-    end
   end
   object PopupMenuGridDataPoints: TPopupMenu
     Left = 578

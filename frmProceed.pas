@@ -162,7 +162,6 @@ type
     Button6: TButton;
     Line9: TLine;
     lyt1: TLayout;
-    btnOK: TCornerButton;
     ActionListWorkTables: TActionList;
     ActionSessionDelete: TAction;
     ActionSessionClose: TAction;
@@ -508,22 +507,68 @@ var
 begin
   SaveProcessingDevices;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-
-  if (Repo = nil) or (Repo.Devices = nil) then
+  if (AppServices.DataManager = nil) or
+     (AppServices.DataManager.DeviceRepositories = nil) then
     Exit;
 
-  for Device in Repo.Devices do
-    if (Device <> nil) and (Device.State <> osClean) then
-      Repo.SaveDevice(Device);
+  for Repo in AppServices.DataManager.DeviceRepositories do
+  begin
+    if (Repo = nil) or (Repo.Devices = nil) then
+      Continue;
+
+    for Device in Repo.Devices do
+      if (Device <> nil) and (Device.State <> osClean) then
+        Repo.SaveDevice(Device);
+  end;
 end;
 
 procedure TFrameProceed.CancelProcessingChanges;
 var
   Repo: TDeviceRepository;
+  SelectedTag: string;
+  SelectedItem: TTreeViewItem;
+
+  function FindTreeItemByTagString(AParent: TTreeViewItem;
+    const ATagString: string): TTreeViewItem;
+  var
+    I: Integer;
+  begin
+    Result := nil;
+    if (AParent = nil) or (ATagString = '') then
+      Exit;
+
+    if SameText(AParent.TagString, ATagString) then
+      Exit(AParent);
+
+    for I := 0 to AParent.Count - 1 do
+    begin
+      Result := FindTreeItemByTagString(TTreeViewItem(AParent.Items[I]), ATagString);
+      if Result <> nil then
+        Exit;
+    end;
+  end;
+
+  function FindTreeItemBySavedTag(const ATagString: string): TTreeViewItem;
+  var
+    I: Integer;
+  begin
+    Result := nil;
+    if (TreeViewDevices = nil) or (ATagString = '') then
+      Exit;
+
+    for I := 0 to TreeViewDevices.Count - 1 do
+    begin
+      Result := FindTreeItemByTagString(TreeViewDevices.ItemByIndex(I), ATagString);
+      if Result <> nil then
+        Exit;
+    end;
+  end;
+
 begin
+  SelectedTag := '';
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+    SelectedTag := TreeViewDevices.Selected.TagString;
+
   if FProcessingDevices <> nil then
     FProcessingDevices.Clear;
   SetLength(FCurrentResultRows, 0);
@@ -532,14 +577,26 @@ begin
   FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
   ResetPointDeleteConfirm;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.Load;
+  if (AppServices.DataManager <> nil) and
+     (AppServices.DataManager.DeviceRepositories <> nil) then
+    for Repo in AppServices.DataManager.DeviceRepositories do
+      if Repo <> nil then
+        Repo.Load;
 
   LoadProcessingDevices;
-  RefreshResultsTab;
+  PopulateTreeViewDevices;
+
+  SelectedItem := FindTreeItemBySavedTag(SelectedTag);
+  if SelectedItem <> nil then
+    TreeViewDevices.Selected := SelectedItem;
+
+  UpdateSessionItems;
+  if (SelectedItem <> nil) and (SelectedItem.TagObject is TSessionSpillage) then
+    ShowSessionSpillages(TSessionSpillage(SelectedItem.TagObject))
+  else if (SelectedItem <> nil) and (SelectedItem.TagObject is TDevice) then
+    ShowDeviceSpillages(TDevice(SelectedItem.TagObject))
+  else
+    ShowAllDevicesResults;
 end;
 
 procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
