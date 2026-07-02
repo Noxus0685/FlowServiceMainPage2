@@ -696,6 +696,8 @@ end;
 procedure TFrameProceed.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
 begin
+  PopulateTreeViewDevices;
+
   if ASession <> nil then
   begin
     SelectTreeItemByTagObject(ASession);
@@ -929,7 +931,7 @@ var
     if ADevice.Sessions <> nil then
       for Sess in ADevice.Sessions do
       begin
-        if Sess = nil then
+        if (Sess = nil) or (Sess.State = osDeleted) then
           Continue;
 
         SessionItem := TTreeViewItem.Create(TreeViewDevices);
@@ -1420,7 +1422,7 @@ begin
       for I := 0 to ASession.Spillages.Count - 1 do
       begin
         Point := ASession.Spillages[I];
-        if Point <> nil then
+        if (Point <> nil) and (Point.State <> osDeleted) then
         begin
           List.Add(Point);
           LogMKS('DBG SP 6003', 'ShowSessionSpillages ADD FROM Session.Spillages', DumpSpillage(Point));
