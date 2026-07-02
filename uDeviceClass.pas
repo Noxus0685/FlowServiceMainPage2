@@ -2472,7 +2472,9 @@ begin
         end;
 
         APoint.DataPoints.Add(S);
-        if S.Enabled then
+        if S.Enabled and not ((not S.Valid) and
+          (S.Status in [TPointSpillage.SPS_FLOW_NOT_MATCHED,
+                        TPointSpillage.SPS_STOP_CRITERIA_FAILED])) then
           CandidateList.Add(S);
       end;
 
