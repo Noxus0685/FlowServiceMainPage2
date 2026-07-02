@@ -1,4 +1,4 @@
-unit uDeviceClass;
+﻿unit uDeviceClass;
 
 interface
 
