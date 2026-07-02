@@ -30,6 +30,12 @@ type
   // Используем общий тип уведомлений из uObservable
   EWorkTableNotifyEvent = ENotifyEvent;
 
+    TMeasurementStopControlMode = (
+    scmNone,
+    scmControllerTime,
+    scmControllerImpulse,
+    scmCommand
+  );
 
     EStateWorkTable = (
     swtNONE = 0,
