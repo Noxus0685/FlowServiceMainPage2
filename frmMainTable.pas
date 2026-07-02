@@ -5485,6 +5485,9 @@ begin
   end;
 end;
 
+procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>); forward;
+procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>); forward;
+
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -5493,6 +5496,7 @@ var
   IsSecondClick: Boolean;
   Rows: Integer;
   WorkTable: TWorkTable;
+  ColumnWidths: TArray<Single>;
 begin
  if not CanEditActiveWorkTable then
   begin
@@ -5508,6 +5512,7 @@ begin
     Exit;
 
   Rows := GridDevices.RowCount;
+  SaveGridColumnWidths(GridDevices, ColumnWidths);
   Tick := TThread.GetTickCount;
   GridDevices.ReadOnly := True;
 
@@ -5581,6 +5586,7 @@ begin
   GridDevices.BeginUpdate;
   try
     GridDevices.RowCount := Rows;
+    RestoreGridColumnWidths(GridDevices, ColumnWidths);
   finally
     GridDevices.EndUpdate;
   end;
@@ -5649,6 +5655,7 @@ procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
 var
   Rows: Integer;
   WorkTable: TWorkTable;
+  ColumnWidths: TArray<Single>;
 begin
   if not CanEditActiveWorkTable then
   begin
@@ -5664,6 +5671,7 @@ begin
     Exit;
 
   Rows := GridDevices.RowCount;
+  SaveGridColumnWidths(GridDevices, ColumnWidths);
   GridDevices.ReadOnly := True;
 
 
@@ -5696,6 +5704,7 @@ begin
   GridDevices.BeginUpdate;
   try
     GridDevices.RowCount := Rows;
+    RestoreGridColumnWidths(GridDevices, ColumnWidths);
   finally
     GridDevices.EndUpdate;
   end;
@@ -6343,10 +6352,38 @@ begin
     Value := FRows[ARow].SignalName;
 end;
 
+procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  SetLength(AWidths, 0);
+  if AGrid = nil then
+    Exit;
+
+  SetLength(AWidths, AGrid.ColumnCount);
+  for I := 0 to AGrid.ColumnCount - 1 do
+    AWidths[I] := AGrid.Columns[I].Width;
+end;
+
+procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  if AGrid = nil then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+    if (I <= High(AWidths)) and (AWidths[I] > 0) then
+      AGrid.Columns[I].Width := AWidths[I];
+end;
+
  procedure TFrameMainTable.UpdateGridDevices;
-  var  Rows: Integer;
+  var
+    Rows: Integer;
+    ColumnWidths: TArray<Single>;
  begin
    Rows:= GridDevices.RowCount;
+   SaveGridColumnWidths(GridDevices, ColumnWidths);
 
     GridDevices.BeginUpdate;
 
@@ -6354,6 +6391,7 @@ end;
 
   try
     GridDevices.RowCount := Rows;
+    RestoreGridColumnWidths(GridDevices, ColumnWidths);
   finally
     GridDevices.EndUpdate;
   end;
