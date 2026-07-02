@@ -13,6 +13,8 @@ uses
   uWorkTable;
 
 type
+  TAppShutdownEvent = procedure(Sender: TObject) of object;
+
   TAppServices = class
   private
     FBasePath: string;
@@ -22,6 +24,8 @@ type
     FOwnsWorkTableManager: Boolean;
 
     FInitialized: Boolean;
+    FOnBeforeShutdown: TAppShutdownEvent;
+    FShuttingDown: Boolean;
 
     FDataManager: TManagerTTableDM;
     FProtocolManager: TProtocolManager;
@@ -48,6 +52,7 @@ type
     property DataManager: TManagerTTableDM read GetDataManager;
     property ProtocolManagerRef: TProtocolManager read GetProtocolManager;
     property Initialized: Boolean read FInitialized;
+    property OnBeforeShutdown: TAppShutdownEvent read FOnBeforeShutdown write FOnBeforeShutdown;
   end;
 
 var
@@ -75,6 +80,8 @@ begin
   FWorkTableManager := nil;
 
   FInitialized := False;
+  FOnBeforeShutdown := nil;
+  FShuttingDown := False;
 end;
 
 destructor TAppServices.Destroy;
@@ -181,42 +188,53 @@ begin
   if not FInitialized then
     Exit;
 
-  SaveAll;
+  if FShuttingDown then
+    Exit;
 
-  // --- WorkTableManager ---
-  if FOwnsWorkTableManager and (FWorkTableManager <> nil) then
-  begin
-    if uWorkTable.WorkTableManager = FWorkTableManager then
-      uWorkTable.WorkTableManager := nil;
+  FShuttingDown := True;
+  try
+    if Assigned(FOnBeforeShutdown) then
+      FOnBeforeShutdown(Self);
 
-    FreeAndNil(FWorkTableManager);
+    SaveAll;
+
+    // --- WorkTableManager ---
+    if FOwnsWorkTableManager and (FWorkTableManager <> nil) then
+    begin
+      if uWorkTable.WorkTableManager = FWorkTableManager then
+        uWorkTable.WorkTableManager := nil;
+
+      FreeAndNil(FWorkTableManager);
+    end;
+
+    // --- DataManager ---
+    if FOwnsDataManager and (FDataManager <> nil) then
+    begin
+      if uDataManager.DataManager = FDataManager then
+        uDataManager.DataManager := nil;
+
+      FreeAndNil(FDataManager);
+    end;
+
+    // --- ProtocolManager ---
+    if FOwnsProtocolManager and (FProtocolManager <> nil) then
+    begin
+      if uProtocols.ProtocolManager = FProtocolManager then
+        uProtocols.ProtocolManager := nil;
+
+      FreeAndNil(FProtocolManager);
+    end;
+
+    ResetGlobalStatics;
+
+    FOwnsDataManager := False;
+    FOwnsProtocolManager := False;
+    FOwnsWorkTableManager := False;
+
+    FInitialized := False;
+  finally
+    FShuttingDown := False;
   end;
-
-  // --- DataManager ---
-  if FOwnsDataManager and (FDataManager <> nil) then
-  begin
-    if uDataManager.DataManager = FDataManager then
-      uDataManager.DataManager := nil;
-
-    FreeAndNil(FDataManager);
-  end;
-
-  // --- ProtocolManager ---
-  if FOwnsProtocolManager and (FProtocolManager <> nil) then
-  begin
-    if uProtocols.ProtocolManager = FProtocolManager then
-      uProtocols.ProtocolManager := nil;
-
-    FreeAndNil(FProtocolManager);
-  end;
-
-  ResetGlobalStatics;
-
-  FOwnsDataManager := False;
-  FOwnsProtocolManager := False;
-  FOwnsWorkTableManager := False;
-
-  FInitialized := False;
 end;
 
 initialization

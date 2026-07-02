@@ -508,6 +508,8 @@ begin
   FFrameProceed.Parent := tiResults;
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize;
+  if Assigned(AppServices) then
+    AppServices.OnBeforeShutdown := FFrameProceed.SavePendingProcessingChanges;
 
 
 end;
