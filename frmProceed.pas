@@ -1781,10 +1781,8 @@ var
   WT: TWorkTable;
   Ch: TChannel;
   Device: TDevice;
-  I: Integer;
+  I, J: Integer;
   DeviceUUIDsOnTables: TStringList;
-  DevicesToRemove: TList<TDevice>;
-  D: TDevice;
 begin
   DbgProceedTree(1504, 'MenuTreeViewDevicesClearClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
@@ -1798,7 +1796,6 @@ begin
     Exit;
 
   DeviceUUIDsOnTables := TStringList.Create;
-  DevicesToDelete := TList<TDevice>.Create;
   try
     DeviceUUIDsOnTables.Sorted := False;
     DeviceUUIDsOnTables.Duplicates := dupIgnore;
@@ -1815,17 +1812,16 @@ begin
             DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
       end;
 
-    for Device in FProcessingDevices do
+    for J := FProcessingDevices.Count - 1 downto 0 do
+    begin
+      Device := FProcessingDevices[J];
       if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
-        DevicesToRemove.Add(Device);
-
-    for D in DevicesToRemove do
-      FProcessingDevices.Remove(D);
+        FProcessingDevices.Delete(J);
+    end;
 
     SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
   finally
-    DevicesToDelete.Free;
     DeviceUUIDsOnTables.Free;
   end;
 end;
