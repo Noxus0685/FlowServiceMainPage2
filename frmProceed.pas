@@ -44,7 +44,9 @@ uses
   uDeviceClass,
   uFlowMeter,
   uRepositories,
-  uWorkTable;
+  uProtocols,
+  uWorkTable,
+  uMKSDebug;
 
 type
   TResultGridRow = record
@@ -159,9 +161,6 @@ type
     Button6: TButton;
     Line9: TLine;
     lyt1: TLayout;
-    btnOK: TCornerButton;
-    CornerButton1: TCornerButton;
-    CornerButtonEditDevice: TCornerButton;
     ActionListWorkTables: TActionList;
     ActionSessionDelete: TAction;
     ActionSessionClose: TAction;
@@ -183,12 +182,17 @@ type
     ActionSessionDeviceAdd: TAction;
     ActionDeleteWorkTable: TAction;
     ActionDeleteSelectedWorkTables: TAction;
+    btnCancel: TCornerButton;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
+    function GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
     procedure SaveProcessingDevices;
+    procedure SavePendingProcessingChanges;
+    procedure CancelProcessingChanges;
     procedure LoadProcessingDevices;
+    procedure UpdateTreeViewDeviceTagObjects;
     procedure AddProcessingDeviceFromSelection;
     procedure DbgProceedTree(const ACode: Integer; const AText: string);
     function GetSelectedTreeDebugText: string;
@@ -240,6 +244,7 @@ type
     function GetSelectedResultDevice: TDevice;
     function DeleteSelectedDataPointWithRules(const AOwner: TObject): Boolean;
     procedure ButtonSessionClearPointsClick(Sender: TObject);
+    procedure ButtonSessionCancelClick(Sender: TObject);
     procedure ButtonSessionDeleteDataPointClick(Sender: TObject);
     procedure GridResultsGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridResultsDrawColumnCell(Sender: TObject; const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF; const Row: Integer; const Value: TValue; const State: TGridDrawStates);
@@ -259,6 +264,8 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure GridDataPointsColumnMoved(Column: TColumn; FromIndex,
       ToIndex: Integer);
+    procedure btnOKClick(Sender: TObject);
+    procedure btnCancelClick(Sender: TObject);
   private
     FFrameCalibrCoefs: TFrameCalibrCoefs;
     FWorkTableManager: TWorkTableManager;
@@ -281,7 +288,6 @@ type
 implementation
    uses
     uAppServices,
-    uDebugLog,
     uMeterValue;
 {$R *.fmx}
 
@@ -327,6 +333,7 @@ end;
 
 destructor TFrameProceed.Destroy;
 begin
+  SavePendingProcessingChanges;
   FreeAndNil(FFrameCalibrCoefs);
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
@@ -370,7 +377,8 @@ end;
 
 procedure TFrameProceed.DbgProceedTree(const ACode: Integer; const AText: string);
 begin
-  DebugLog(Format('DBG %d'#13#10'%s', [ACode, AText]));
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcMKS, psMeasurement, 'DBG ' + ACode.ToString, 'MKS', AText);
 end;
 
 function TFrameProceed.GetSelectedTreeDebugText: string;
@@ -439,8 +447,6 @@ begin
   DbgProceedTree(1303, 'Before FProcessingDevices.Add: ' + ADevice.Name + #13#10 + ADevice.UUID);
   FProcessingDevices.Add(ADevice);
   DbgProceedTree(1304, 'After FProcessingDevices.Add: Count=' + FProcessingDevices.Count.ToString);
-  DbgProceedTree(1305, 'Before SaveProcessingDevices from AddProcessingDevice');
-  SaveProcessingDevices;
 end;
 procedure TFrameProceed.RemoveProcessingDevice(ADevice: TDevice);
 var
@@ -454,7 +460,6 @@ begin
     Exit;
 
   FProcessingDevices.Remove(Existing);
-  SaveProcessingDevices;
 end;
 procedure TFrameProceed.SaveProcessingDevices;
 var
@@ -493,6 +498,106 @@ begin
   finally
     Ini.Free;
   end;
+end;
+
+
+procedure TFrameProceed.SavePendingProcessingChanges;
+var
+  Repo: TDeviceRepository;
+  Device: TDevice;
+begin
+  SaveProcessingDevices;
+
+  if (AppServices.DataManager = nil) or
+     (AppServices.DataManager.DeviceRepositories = nil) then
+    Exit;
+
+  for Repo in AppServices.DataManager.DeviceRepositories do
+  begin
+    if (Repo = nil) or (Repo.Devices = nil) then
+      Continue;
+
+    for Device in Repo.Devices do
+      if (Device <> nil) and (Device.State <> osClean) then
+        Repo.SaveDevice(Device);
+  end;
+end;
+
+procedure TFrameProceed.CancelProcessingChanges;
+var
+  Repo: TDeviceRepository;
+  SelectedTag: string;
+  SelectedItem: TTreeViewItem;
+
+  function FindTreeItemByTagString(AParent: TTreeViewItem;
+    const ATagString: string): TTreeViewItem;
+  var
+    I: Integer;
+  begin
+    Result := nil;
+    if (AParent = nil) or (ATagString = '') then
+      Exit;
+
+    if SameText(AParent.TagString, ATagString) then
+      Exit(AParent);
+
+    for I := 0 to AParent.Count - 1 do
+    begin
+      Result := FindTreeItemByTagString(TTreeViewItem(AParent.Items[I]), ATagString);
+      if Result <> nil then
+        Exit;
+    end;
+  end;
+
+  function FindTreeItemBySavedTag(const ATagString: string): TTreeViewItem;
+  var
+    I: Integer;
+  begin
+    Result := nil;
+    if (TreeViewDevices = nil) or (ATagString = '') then
+      Exit;
+
+    for I := 0 to TreeViewDevices.Count - 1 do
+    begin
+      Result := FindTreeItemByTagString(TreeViewDevices.ItemByIndex(I), ATagString);
+      if Result <> nil then
+        Exit;
+    end;
+  end;
+
+begin
+  SelectedTag := '';
+  if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
+    SelectedTag := TreeViewDevices.Selected.TagString;
+
+  if FProcessingDevices <> nil then
+    FProcessingDevices.Clear;
+  SetLength(FCurrentResultRows, 0);
+  SetLength(FCurrentSpillages, 0);
+  FCurrentSession := nil;
+  FActiveWorkTable := ResolveManagerWorkTable(FWorkTableManager);
+  ResetPointDeleteConfirm;
+
+  if (AppServices.DataManager <> nil) and
+     (AppServices.DataManager.DeviceRepositories <> nil) then
+    for Repo in AppServices.DataManager.DeviceRepositories do
+      if Repo <> nil then
+        Repo.Load;
+
+  LoadProcessingDevices;
+  PopulateTreeViewDevices;
+
+  SelectedItem := FindTreeItemBySavedTag(SelectedTag);
+  if SelectedItem <> nil then
+    TreeViewDevices.Selected := SelectedItem;
+
+  UpdateSessionItems;
+  if (SelectedItem <> nil) and (SelectedItem.TagObject is TSessionSpillage) then
+    ShowSessionSpillages(TSessionSpillage(SelectedItem.TagObject))
+  else if (SelectedItem <> nil) and (SelectedItem.TagObject is TDevice) then
+    ShowDeviceSpillages(TDevice(SelectedItem.TagObject))
+  else
+    ShowAllDevicesResults;
 end;
 
 procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
@@ -550,11 +655,12 @@ begin
     Res := Frm.ShowModal;
     DbgProceedTree(1105, Format('After DeviceSelect.ShowModal; Res=%d; Frm.Tag=%d'#13#10'%s',
       [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
-    LoadProcessingDevices;
+    //LoadProcessingDevices;
     if (Res <> mrOk) or (Frm.Tag <> 1) then
     begin
-      DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
-        [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
+      //UpdateTreeViewDeviceTagObjects;
+     // DbgProceedTree(1106, Format('DeviceSelect canceled/closed branch; Res=%d; Frm.Tag=%d'#13#10'%s',
+      //  [Ord(Res), Frm.Tag, GetSelectedTreeDebugText]));
       Exit;
     end;
 
@@ -579,6 +685,66 @@ begin
     Frm.Free;
   end;
   DbgProceedTree(1114, 'AddProcessingDeviceFromSelection EXIT'#13#10 + GetSelectedTreeDebugText);
+end;
+
+procedure TFrameProceed.btnCancelClick(Sender: TObject);
+begin
+  CancelProcessingChanges;
+end;
+
+procedure TFrameProceed.btnOKClick(Sender: TObject);
+begin
+  CancelProcessingChanges;
+end;
+
+procedure TFrameProceed.UpdateTreeViewDeviceTagObjects;
+var
+  I: Integer;
+
+  function FindSessionByID(ADevice: TDevice; const ASessionID: Integer): TSessionSpillage;
+  var
+    Sess: TSessionSpillage;
+    Point: TPointSpillage;
+  begin
+    Result := nil;
+    if (ADevice = nil) or (ADevice.Sessions = nil) then
+      Exit;
+
+    for Sess in ADevice.Sessions do
+      if (Sess <> nil) and (Sess.ID = ASessionID) then
+        Exit(Sess);
+  end;
+
+  procedure UpdateItem(AItem: TTreeViewItem);
+  var
+    J: Integer;
+    Parts: TArray<string>;
+    Device: TDevice;
+  begin
+    if AItem = nil then
+      Exit;
+
+    Parts := AItem.TagString.Split(['|']);
+    if Length(Parts) > 0 then
+    begin
+      if SameText(Parts[0], 'D') and (Length(Parts) >= 2) then
+        AItem.TagObject := FindProcessingDeviceByUUID(Parts[1])
+      else if SameText(Parts[0], 'S') and (Length(Parts) >= 3) then
+      begin
+        Device := FindProcessingDeviceByUUID(Parts[1]);
+        AItem.TagObject := FindSessionByID(Device, StrToIntDef(Parts[2], -1));
+      end;
+    end;
+
+    for J := 0 to AItem.Count - 1 do
+      UpdateItem(AItem.ItemByIndex(J));
+  end;
+begin
+  if TreeViewDevices = nil then
+    Exit;
+
+  for I := 0 to TreeViewDevices.Count - 1 do
+    UpdateItem(TreeViewDevices.ItemByIndex(I));
 end;
 procedure TFrameProceed.RefreshResultsAfterDevicesAction;
 begin
@@ -639,9 +805,26 @@ begin
     TreeViewDevices.Selected := Item;
   end;
 end;
+function TFrameProceed.GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
+var
+  Sess: TSessionSpillage;
+begin
+  Result := nil;
+  if (ADevice = nil) or (ADevice.Sessions = nil) then
+    Exit;
+
+  for Sess in ADevice.Sessions do
+    if (Sess <> nil) and Sess.Active and (Sess.State <> osDeleted) then
+      Exit(Sess);
+end;
+
 procedure TFrameProceed.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
+var
+  ActiveSession: TSessionSpillage;
 begin
+  PopulateTreeViewDevices;
+
   if ASession <> nil then
   begin
     SelectTreeItemByTagObject(ASession);
@@ -649,8 +832,17 @@ begin
   end
   else if ADevice <> nil then
   begin
-    SelectTreeItemByTagObject(ADevice);
-    ShowDeviceSpillages(ADevice)
+    ActiveSession := GetActiveVisibleSession(ADevice);
+    if ActiveSession <> nil then
+    begin
+      SelectTreeItemByTagObject(ActiveSession);
+      ShowSessionSpillages(ActiveSession)
+    end
+    else
+    begin
+      SelectTreeItemByTagObject(ADevice);
+      ShowSessionSpillages(nil);
+    end;
   end;
 
   if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
@@ -670,33 +862,7 @@ var
   DeviceUUID: string;
   Device: TDevice;
   Repo: TDeviceRepository;
-  OldDevice: TDevice;
-  OldProcessingDevices: TObjectList<TDevice>;
-
-  function FindOldProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
-  var
-    OldDevice: TDevice;
-  begin
-    Result := nil;
-    if OldProcessingDevices = nil then
-      Exit;
-
-    for OldDevice in OldProcessingDevices do
-      if (OldDevice <> nil) and SameText(Trim(OldDevice.UUID), ADeviceUUID) then
-        Exit(OldDevice);
-  end;
-
-  function HasSessions(ADevice: TDevice): Boolean;
-  begin
-    Result := (ADevice <> nil) and (ADevice.Sessions <> nil) and
-      (ADevice.Sessions.Count > 0);
-  end;
-
-  function HasSpillages(ADevice: TDevice): Boolean;
-  begin
-    Result := (ADevice <> nil) and (ADevice.Spillages <> nil) and
-      (ADevice.Spillages.Count > 0);
-  end;
+  Point: TPointSpillage;
 
 begin
   if FWorkTableManager <> nil then
@@ -707,59 +873,49 @@ begin
   if FProcessingDevices = nil then
     Exit;
 
-  OldProcessingDevices := TObjectList<TDevice>.Create(False);
+  FProcessingDevices.Clear;
+
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (not FileExists(FWorkTableManager.IniFileName)) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
   try
-    for Device in FProcessingDevices do
-      OldProcessingDevices.Add(Device);
+    Count := Ini.ReadInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, 0);
+    DbgProceedTree(1402, 'LoadProcessingDevices Count=' + Count.ToString);
+    for I := 0 to Count - 1 do
+    begin
+      DeviceUUID := Trim(Ini.ReadString(CProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(I), ''));
+      if DeviceUUID = '' then
+        Continue;
 
-    FProcessingDevices.Clear;
+      DbgProceedTree(1403, 'LoadProcessingDevices item: ' + DeviceUUID);
 
-    if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
-       (not FileExists(FWorkTableManager.IniFileName)) then
-      Exit;
+      Device := nil;
+      Repo := nil;
+      if AppServices.DataManager <> nil then
+        Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
 
-    Ini := TIniFile.Create(FWorkTableManager.IniFileName);
-    try
-      Count := Ini.ReadInteger(CProcessingDevicesSection, CProcessingDevicesCountKey, 0);
-      DbgProceedTree(1402, 'LoadProcessingDevices Count=' + Count.ToString);
-      for I := 0 to Count - 1 do
+      if Device <> nil then
       begin
-        DeviceUUID := Trim(Ini.ReadString(CProcessingDevicesSection,
-          CProcessingDevicesItemKeyPrefix + IntToStr(I), ''));
-        if DeviceUUID = '' then
-          Continue;
-
-        DbgProceedTree(1403, 'LoadProcessingDevices item: ' + DeviceUUID);
-
-        Device := nil;
-        Repo := nil;
-        if AppServices.DataManager <> nil then
-          Device := AppServices.DataManager.FindDevice(DeviceUUID, Repo);
-
-        if Device <> nil then
-        begin
-          OldDevice := FindOldProcessingDeviceByUUID(Device.UUID);
-          if ((not HasSessions(Device)) and HasSessions(OldDevice)) or
-             ((not HasSpillages(Device)) and HasSpillages(OldDevice)) then
-          begin
-            DbgProceedTree(1407, 'Keep processing device with in-memory measurements: ' + Device.Name + #13#10 + Device.UUID);
-            Device := OldDevice;
-          end;
-
-          DbgProceedTree(1404, 'Loaded processing device: ' + Device.Name + #13#10 + Device.UUID);
-          if FindProcessingDeviceByUUID(Device.UUID) = nil then
-            FProcessingDevices.Add(Device);
-        end
-        else
-          DbgProceedTree(1405, 'Processing device UUID not found in repo: ' + DeviceUUID);
-      end;
-    finally
-      Ini.Free;
+        DbgProceedTree(1404, 'Loaded processing device: ' + Device.Name + #13#10 + Device.UUID);
+        LogMKS('DBG SP 8003', 'LoadProcessingDevices LOADED DEVICE DETAILS',
+          Format('Device=%s UUID=%s; Sessions=%d; Spillages=%d',
+            [Device.Name, Device.UUID, Device.Sessions.Count, Device.Spillages.Count]));
+        if Device.Spillages <> nil then
+          for Point in Device.Spillages do
+            LogMKS('DBG SP 8004', 'LoadProcessingDevices LOADED SPILLAGE', DumpSpillage(Point));
+        if FindProcessingDeviceByUUID(Device.UUID) = nil then
+          FProcessingDevices.Add(Device);
+      end
+      else
+        DbgProceedTree(1405, 'Processing device UUID not found in repo: ' + DeviceUUID);
     end;
-    DbgProceedTree(1406, 'LoadProcessingDevices EXIT; FProcessingDevices.Count=' + FProcessingDevices.Count.ToString);
   finally
-    OldProcessingDevices.Free;
+    Ini.Free;
   end;
+  DbgProceedTree(1406, 'LoadProcessingDevices EXIT; FProcessingDevices.Count=' + FProcessingDevices.Count.ToString);
 end;
 
 function FormatSessionPeriodLabel(ASession: TSessionSpillage): string;
@@ -807,6 +963,9 @@ begin
     else if (Item.ParentItem <> nil) and (Item.ParentItem.TagObject is TDevice) then
       Device := TDevice(Item.ParentItem.TagObject);
   end;
+
+  if (Session = nil) and (Device <> nil) then
+    Session := GetActiveVisibleSession(Device);
 
   FCurrentSession := Session;
 
@@ -861,7 +1020,7 @@ begin
     if FCurrentSession <> nil then
       ShowSessionSpillages(FCurrentSession)
     else
-      ShowDeviceSpillages(Device);
+      ShowSessionSpillages(nil);
   end
   else if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
   begin
@@ -888,6 +1047,7 @@ var
   procedure AddDeviceNode(const AParent: TTreeViewItem; ADevice: TDevice);
   var
     Sess: TSessionSpillage;
+    Point: TPointSpillage;
   begin
     if (AParent = nil) or (ADevice = nil) then
       Exit;
@@ -895,19 +1055,30 @@ var
     DeviceItem := TTreeViewItem.Create(TreeViewDevices);
     DeviceItem.Text := ADevice.Name;
     DeviceItem.TagObject := ADevice;
+    DeviceItem.TagString := 'D|' + ADevice.UUID;
     AParent.AddObject(DeviceItem);
+    LogMKS('DBG SP 9001', 'PopulateTreeViewDevices ADD DEVICE',
+      Format('Device=%s UUID=%s; Sessions=%d; Spillages=%d',
+        [ADevice.Name, ADevice.UUID, ADevice.Sessions.Count, ADevice.Spillages.Count]));
+    if ADevice.Spillages <> nil then
+      for Point in ADevice.Spillages do
+        LogMKS('DBG SP 9003', 'PopulateTreeViewDevices ADD SPILLAGE', DumpSpillage(Point));
 
     if ADevice.Sessions <> nil then
       for Sess in ADevice.Sessions do
       begin
-        if Sess = nil then
+        if (Sess = nil) or (Sess.State = osDeleted) then
           Continue;
 
         SessionItem := TTreeViewItem.Create(TreeViewDevices);
         SessionItem.Text :=
           Format('Сессия #%d (%s)', [Sess.ID, DateToStr(Sess.DateTimeOpen)]);
         SessionItem.TagObject := Sess;
+        SessionItem.TagString := Format('S|%s|%d', [ADevice.UUID, Sess.ID]);
         DeviceItem.AddObject(SessionItem);
+        LogMKS('DBG SP 9002', 'PopulateTreeViewDevices ADD SESSION',
+          Format('Device=%s UUID=%s; Session.ID=%d; Session.Spillages.Count=%d',
+            [ADevice.Name, ADevice.UUID, Sess.ID, Sess.Spillages.Count]));
       end;
   end;
 begin
@@ -1261,14 +1432,56 @@ begin
   GridDataPoints.Visible := False;
 
 end;
+procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  SetLength(AWidths, 0);
+  if AGrid = nil then
+    Exit;
+
+  SetLength(AWidths, AGrid.ColumnCount);
+  for I := 0 to AGrid.ColumnCount - 1 do
+    AWidths[I] := AGrid.Columns[I].Width;
+end;
+
+procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  if AGrid = nil then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+    if (I <= High(AWidths)) and (AWidths[I] > 0) then
+      AGrid.Columns[I].Width := AWidths[I];
+end;
+
 procedure TFrameProceed.UpdateGridDataPoints;
+var
+  ColumnWidths: TArray<Single>;
+  I, Count: Integer;
 begin
 //  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+  Count := 0;
+  for I := 0 to High(FCurrentSpillages) do
+    if (FCurrentSpillages[I] <> nil) and (FCurrentSpillages[I].State <> osDeleted) then
+    begin
+      FCurrentSpillages[Count] := FCurrentSpillages[I];
+      Inc(Count);
+    end;
+  SetLength(FCurrentSpillages, Count);
+
+  SaveGridColumnWidths(GridDataPoints, ColumnWidths);
   GridDataPoints.BeginUpdate;
-  GridDataPoints.RowCount := 0;
-  GridDataPoints.RowCount := Length(FCurrentSpillages);
-  GridDataPoints.Repaint;
-  GridDataPoints.EndUpdate;
+  try
+    GridDataPoints.RowCount := 0;
+    GridDataPoints.RowCount := Length(FCurrentSpillages);
+    RestoreGridColumnWidths(GridDataPoints, ColumnWidths);
+    GridDataPoints.Repaint;
+  finally
+    GridDataPoints.EndUpdate;
+  end;
   GridResults.Visible := False;
   GridDataPoints.Visible := True;
 end;
@@ -1278,7 +1491,7 @@ var
 begin
   Result := TObjectList<TPointSpillage>.Create(False);
   for Point in FCurrentSpillages do
-    if Point <> nil then
+    if (Point <> nil) and (Point.State <> osDeleted) then
       Result.Add(Point);
 end;
 procedure TFrameProceed.ShowDeviceSpillages(ADevice: TDevice);
@@ -1302,7 +1515,7 @@ begin
     end;
   end;
 
-    UpdateGridDataPoints;
+  UpdateGridDataPoints;
 end;
 procedure TFrameProceed.ShowSessionSpillages(ASession: TSessionSpillage);
 var
@@ -1314,22 +1527,20 @@ begin
   SetLength(FCurrentSpillages, 0);
   if ASession = nil then
   begin
-    GridResults.Visible := False;
-    GridDataPoints.Visible := True;
-    GridDataPoints.RowCount := 0;
-    GridDataPoints.Repaint;
+    UpdateGridDataPoints;
     Exit;
   end;
 
   Device := ResolveSelectedDevice;
   if (Device = nil) then
   begin
-    GridResults.Visible := False;
-    GridDataPoints.Visible := True;
-    GridDataPoints.RowCount := 0;
-    GridDataPoints.Repaint;
+    UpdateGridDataPoints;
     Exit;
   end;
+
+  LogMKS('DBG SP 6001', 'ShowSessionSpillages ENTER',
+    Format('Device=%s UUID=%s; Session.ID=%d; Session.Spillages.Count=%d; Device.Spillages.Count=%d',
+      [Device.Name, Device.UUID, ASession.ID, ASession.Spillages.Count, Device.Spillages.Count]));
 
   List := TList<TPointSpillage>.Create;
   try
@@ -1337,7 +1548,10 @@ begin
     begin
       for Point in Device.Spillages do
         if (Point <> nil) and (Point.SessionID = ASession.ID) and (Point.State <> osDeleted) then
+        begin
           List.Add(Point);
+          LogMKS('DBG SP 6002', 'ShowSessionSpillages ADD FROM Device.Spillages', DumpSpillage(Point));
+        end;
     end;
 
     if (List.Count = 0) and (ASession.Spillages <> nil) then
@@ -1345,12 +1559,20 @@ begin
       for I := 0 to ASession.Spillages.Count - 1 do
       begin
         Point := ASession.Spillages[I];
-        if Point <> nil then
+        if (Point <> nil) and (Point.State <> osDeleted) then
+        begin
           List.Add(Point);
+          LogMKS('DBG SP 6003', 'ShowSessionSpillages ADD FROM Session.Spillages', DumpSpillage(Point));
+        end;
       end;
     end;
 
     FCurrentSpillages := List.ToArray;
+    LogMKS('DBG SP 6004', 'ShowSessionSpillages EXIT',
+      Format('FCurrentSpillages.Count=%d', [Length(FCurrentSpillages)]));
+    for I := 0 to High(FCurrentSpillages) do
+      LogMKS('DBG SP 6005', 'ShowSessionSpillages CURRENT',
+        Format('Index=%d | %s', [I, DumpSpillage(FCurrentSpillages[I])]));
   finally
     List.Free;
   end;
@@ -1483,6 +1705,7 @@ begin
     AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
     DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
+    AddActionMenuItem(ActionSessionSynchTable);
     DbgProceedTree(1703, 'PopupMenuTreeViewDevicesPopup EXIT'#13#10 + GetSelectedTreeDebugText);
     Exit;
   end;
@@ -1525,8 +1748,6 @@ var
 
     for D in DevicesToRemove do
       FProcessingDevices.Remove(D);
-
-    SaveProcessingDevices;
   end;
 begin
   DbgProceedTree(1504, 'MenuTreeViewDevicesClearClick ENTER'#13#10 + GetSelectedTreeDebugText);
@@ -1540,7 +1761,6 @@ begin
     if FProcessingDevices <> nil then
     begin
       FProcessingDevices.Clear;
-      SaveProcessingDevices;
     end;
 
     RefreshResultsAfterDevicesAction;
@@ -1610,7 +1830,6 @@ begin
   if AClearBeforeSync then
   begin
     FProcessingDevices.Clear;
-    SaveProcessingDevices;
   end;
 
   if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
@@ -1629,7 +1848,6 @@ begin
   if AClearBeforeSync then
   begin
     FProcessingDevices.Clear;
-    SaveProcessingDevices;
   end;
 
   if (FWorkTableManager = nil) or (FWorkTableManager.WorkTables = nil) then
@@ -1655,6 +1873,8 @@ begin
     SyncProcessingDevicesFromTable(TWorkTable(Item.TagObject), False)
   else if SameText(Item.Text, '...') then
     SyncProcessingDevicesFromAllTables(True)
+  else if SameText(Item.Text, 'прочее') then
+    SyncProcessingDevicesFromAllTables(False)
   else
     Exit;
 
@@ -1850,7 +2070,6 @@ var
   Session, NextSession: TSessionSpillage;
   I, NextIdx: Integer;
   P: TPointSpillage;
-  Repo: TDeviceRepository;
 begin
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
@@ -1930,12 +2149,6 @@ begin
     NextSession.State := osModified;
   end;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
-
   RefreshMeasurementsAfterSessionAction(Device, NextSession);
 end;
 procedure TFrameProceed.ActionSessionDeviceAddExecute(Sender: TObject);
@@ -1962,7 +2175,6 @@ var
   Item: TTreeViewItem;
   Session: TSessionSpillage;
   Device: TDevice;
-  Repo: TDeviceRepository;
 begin
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
@@ -1978,7 +2190,7 @@ begin
   else if Item.TagObject is TDevice then
   begin
     Device := TDevice(Item.TagObject);
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
   end;
 
   if (Session = nil) or (Device = nil) then
@@ -1989,12 +2201,6 @@ begin
   Session.DateTimeClose := Now;
   Session.State := osModified;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
-
   RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 procedure TFrameProceed.ActionSessionPointDeleteExecute(Sender: TObject);
@@ -2003,7 +2209,6 @@ var
   Session: TSessionSpillage;
   Device: TDevice;
   Point: TPointSpillage;
-  Repo: TDeviceRepository;
 begin
   if (not GridDataPoints.Visible) or (GridDataPoints.Row < 0) or
      (GridDataPoints.Row >= Length(FCurrentSpillages)) then
@@ -2031,12 +2236,6 @@ begin
     Device.State := osModified;
   Session.State := osModified;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
-
   RefreshMeasurementsAfterSessionAction(nil, Session);
 
    end;
@@ -2053,12 +2252,6 @@ begin
   if Device.State = osClean then
     Device.State := osModified;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
-
   RefreshMeasurementsAfterSessionAction(Device, nil);
 
    end;
@@ -2074,7 +2267,6 @@ var
   Session: TSessionSpillage;
   Device: TDevice;
   P: TPointSpillage;
-  Repo: TDeviceRepository;
 begin
   if not GridDataPoints.Visible then
     Exit;
@@ -2117,12 +2309,6 @@ begin
   else
     Exit;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
-
   RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 procedure TFrameProceed.ActionSessionActiveExecute(Sender: TObject);
@@ -2130,7 +2316,6 @@ var
   Item: TTreeViewItem;
   Session, S: TSessionSpillage;
   Device: TDevice;
-  Repo: TDeviceRepository;
 begin
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
@@ -2146,7 +2331,7 @@ begin
   else if Item.TagObject is TDevice then
   begin
     Device := TDevice(Item.TagObject);
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
   end;
 
   if (Session = nil) or (Device = nil) or (Device.Sessions = nil) then
@@ -2167,12 +2352,6 @@ begin
       S.State := osModified;
     end;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
-
   RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
 procedure TFrameProceed.ActionSessionNewExecute(Sender: TObject);
@@ -2180,7 +2359,6 @@ var
   Item: TTreeViewItem;
   Device: TDevice;
   Session: TSessionSpillage;
-  Repo: TDeviceRepository;
 begin
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
@@ -2202,12 +2380,6 @@ begin
     Session.DateTimeClose := 0;
     Session.Status := 0;
   end;
-
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
 
   RefreshMeasurementsAfterSessionAction(Device, Session);
 end;
@@ -2291,7 +2463,6 @@ var
   Device: TDevice;
   Point, NextPoint: TPointSpillage;
   NextRow, I: Integer;
-  Repo: TDeviceRepository;
 begin
   Result := False;
   if (not GridDataPoints.Visible) or (GridDataPoints.Row < 0) or
@@ -2340,12 +2511,6 @@ begin
   if (Session <> nil) then
     Session.State := osModified;
 
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
-
   if Session <> nil then
     RefreshMeasurementsAfterSessionAction(nil, Session)
   else
@@ -2369,6 +2534,10 @@ begin
   FPointDeleteOwner := AOwner;
   Result := True;
 end;
+procedure TFrameProceed.ButtonSessionCancelClick(Sender: TObject);
+begin
+  CancelProcessingChanges;
+end;
 procedure TFrameProceed.ButtonSessionClearPointsClick(Sender: TObject);
 var
   Item: TTreeViewItem;
@@ -2377,7 +2546,6 @@ var
   P: TPointSpillage;
   Ch: TChannel;
   WT: TWorkTable;
-  Repo: TDeviceRepository;
   DeviceUUIDs: TStringList;
   I, NextIdx: Integer;
 begin
@@ -2392,7 +2560,6 @@ begin
   begin
     if FProcessingDevices <> nil then
       FProcessingDevices.Clear;
-    SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
   end;
@@ -2406,10 +2573,6 @@ begin
     if MessageDlg('Очистить все результаты приборов данного рабочего стола?',
       TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
       Exit;
-
-    Repo := nil;
-    if AppServices.DataManager <> nil then
-      Repo := AppServices.DataManager.ActiveDeviceRepo;
 
     DeviceUUIDs := TStringList.Create;
     try
@@ -2440,8 +2603,6 @@ begin
               if P <> nil then
                 P.State := osDeleted;
 
-          if Repo <> nil then
-            Repo.SaveDevice(Device);
         end;
     finally
       DeviceUUIDs.Free;
@@ -2507,12 +2668,6 @@ begin
       NextSession.Status := 1;
     NextSession.State := osModified;
   end;
-
-  Repo := nil;
-  if AppServices.DataManager <> nil then
-    Repo := AppServices.DataManager.ActiveDeviceRepo;
-  if Repo <> nil then
-    Repo.SaveDevice(Device);
 
   RefreshMeasurementsAfterSessionAction(Device, NextSession);
 end;
@@ -2700,7 +2855,7 @@ begin
   if (ARow < 0) or (ARow >= Length(FCurrentSpillages)) then
     Exit;
   P := FCurrentSpillages[ARow];
-  if P = nil then
+  if (P = nil) or (P.State = osDeleted) then
     Exit;
 
   CurrentDevice := nil;
@@ -2716,7 +2871,12 @@ begin
   P.DeltaPressure :=  P.InputPressure - P.OutputPressure;
 
   if GridDataPoints.Columns[ACol] = StringColumnName then
-    Value := P.Name
+  begin
+    if (P <> nil) and ((P.Name = '-') or (P.DevicePointID = 0)) then
+      LogMKS('DBG SP 7001', 'GridDataPointsGetValue NAME',
+        Format('Row=%d | %s', [ARow, DumpSpillage(P)]));
+    Value := P.Name;
+  end
   else if GridDataPoints.Columns[ACol] = CheckColumnSpillageEnable then
     Value := P.Enabled
   else if GridDataPoints.Columns[ACol] = StringColumnSpillageNum then
@@ -2953,7 +3113,6 @@ procedure TFrameProceed.GridDataPointsCellClick(const Column: TColumn;
 var
   Point: TPointSpillage;
   Device: TDevice;
-  Repo: TDeviceRepository;
 begin
   if (Column <> CheckColumnSpillageEnable) or (Row < 0) or
      (Row >= Length(FCurrentSpillages)) then
@@ -2967,14 +3126,8 @@ begin
   Point.State := osModified;
 
   Device := ResolveSelectedDevice;
-  if Device <> nil then
-  begin
-    Repo := nil;
-    if AppServices.DataManager <> nil then
-      Repo := AppServices.DataManager.ActiveDeviceRepo;
-    if Repo <> nil then
-      Repo.SaveDevice(Device);
-  end;
+  if (Device <> nil) and (Device.State = osClean) then
+    Device.State := osModified;
 
   UpdateGridDataPoints;
 end;

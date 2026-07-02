@@ -568,6 +568,11 @@ end;
 
 procedure TManagerTTableDM.Load;
 begin
+
+  { TODO -oAndrey -cВажно, не срочно :
+Надо здесь загружать только приборы, которые есть на столе и их типы.
+черег LoadDevice(UUID) и LoadType(UUID) }
+
   BuildRepositories(rkType);
   BuildRepositories(rkDevice);
 

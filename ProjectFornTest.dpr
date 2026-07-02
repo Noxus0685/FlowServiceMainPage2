@@ -22,6 +22,7 @@ uses
   uDataManager in 'uDataManager.pas',
   uDebugLog in 'uDebugLog.pas',
   uDeviceClass in 'uDeviceClass.pas',
+  uMKSDebug in 'uMKSDebug.pas',
   uFlowMeter in 'uFlowMeter.pas',
   uMeasurementRun in 'uMeasurementRun.pas',
   uMeterValue in 'uMeterValue.pas',

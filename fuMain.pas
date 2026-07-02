@@ -230,6 +230,9 @@ begin
   if FFrameMainTable <> nil then
     FFrameMainTable.SaveLayoutSettingsToWorkTable;
 
+  if FFrameProceed <> nil then
+    FFrameProceed.SavePendingProcessingChanges;
+
   DataManager.Save;
 
   if FWorkTableManager <> nil then

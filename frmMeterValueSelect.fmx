@@ -1,4 +1,4 @@
-object FormMeterValueSelect: TFormMeterValueSelect
+﻿object FormMeterValueSelect: TFormMeterValueSelect
   Left = 0
   Top = 0
   Caption = 'Выбор MeterValue'

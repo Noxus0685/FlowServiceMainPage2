@@ -73,13 +73,13 @@ type
   pDWORD=^DWORD;
 {$ENDIF}
 
-  // Âñïîìîãàòåëüíûé òèï - òî÷êà â êàëèáðîâî÷íîé òàáëèöå ðàñõîäîìåðà.
+  // Вспомогательный тип - точка в калибровочной таблице расходомера.
   TCalibrationPoint = record
 
-    // Ðàñõîä â ì3/÷, âûäàâàåìûé ðàñõîäîìåðîì ñ ó÷åòîì âåñà èìïóëüñà.
+    // Расход в м3/ч, выдаваемый расходомером с учетом веса импульса.
     WaterDischarge: Double;
 
-    // Ïîïðàâî÷íûé êîýôôèöèåíò äëÿ äàííîé ÷àñòîòû.
+    // Поправочный коэффициент для данной частоты.
     Coefficient: Double;
 
   end;
@@ -199,14 +199,14 @@ var
 
 const
 PICCHAR: array[$C0..$FF] of Char = (
-  Char('À'), Char('Á'), Char('Â'), Char('Ã'), Char('Ä'), Char('Å'), Char('Æ'), Char('Ç'), Char('È'),
-  Char('É'), Char('Ê'), Char('Ë'), Char('Ì'), Char('Í'), Char('Î'), Char('Ï'), Char('Ð'), Char('Ñ'),
-  Char('Ò'), Char('Ó'), Char('Ô'), Char('Õ'), Char('Ö'), Char('×'), Char('Ø'), Char('Ù'), Char('Ú'),
-  Char('Û'), Char('Ü'), Char('Ý'), Char('Þ'), Char('ß'),
-  Char('à'), Char('á'), Char('â'), Char('ã'), Char('ä'), Char('å'), Char('æ'), Char('ç'), Char('è'),
-  Char('é'), Char('ê'), Char('ë'), Char('ì'), Char('í'), Char('î'), Char('ï'), Char('ð'), Char('ñ'),
-  Char('ò'), Char('ó'), Char('ô'), Char('õ'), Char('ö'), Char('÷'), Char('ø'), Char('ù'),
-  Char('ú'), Char('û'), Char('ü'), Char('ý'), Char('þ'), Char('ÿ')
+  Char('А'), Char('Б'), Char('В'), Char('Г'), Char('Д'), Char('Е'), Char('Ж'), Char('З'), Char('И'),
+  Char('Й'), Char('К'), Char('Л'), Char('М'), Char('Н'), Char('О'), Char('П'), Char('Р'), Char('С'),
+  Char('Т'), Char('У'), Char('Ф'), Char('Х'), Char('Ц'), Char('Ч'), Char('Ш'), Char('Щ'), Char('Ъ'),
+  Char('Ы'), Char('Ь'), Char('Э'), Char('Ю'), Char('Я'),
+  Char('а'), Char('б'), Char('в'), Char('г'), Char('д'), Char('е'), Char('ж'), Char('з'), Char('и'),
+  Char('й'), Char('к'), Char('л'), Char('м'), Char('н'), Char('о'), Char('п'), Char('р'), Char('с'),
+  Char('т'), Char('у'), Char('ф'), Char('х'), Char('ц'), Char('ч'), Char('ш'), Char('щ'),
+  Char('ъ'), Char('ы'), Char('ь'), Char('э'), Char('ю'), Char('я')
 );
 
 CRCtable:  ARRAY[0..255] OF LongWord =
@@ -312,7 +312,7 @@ crctab: array[0..255] OF word = (
 {$IFDEF LINUX}
 procedure  OutputDebugString(Msg:PChar);
 begin
-  //Ïîêà èãíîðèðóåì
+  //Пока игнорируем
 end;
 {$ENDIF}
 
@@ -433,21 +433,21 @@ const tables: array[0..255] of WORD=(
             $4400, $84C1, $8581, $4540, $8701, $47C0, $4680, $8641,
             $8201, $42C0, $4380, $8341, $4100, $81C1, $8081, $4040);
 
-  WinR: Array[0..66] of Char = ('à', 'á', 'â', 'ã', 'ä', 'å', '¸', 'æ', 'ç', 'è',
-    'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð', 'ñ', 'ò',
-    'ó', 'ô', 'õ', 'ö', '÷', 'ø', 'ù', 'ú', 'û', 'ü',
-    'ý', 'þ', 'ÿ', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', '¨',                                                                /// ñ ýòîé ïðîáëåìîé íå çíàë êàê
-    'Æ', 'Ç', 'È', 'É', 'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï',                                                               //êàê ðàçîáðàòüñÿ ñ êîäèðîâêîé áûëè
-    'Ð', 'Ñ', 'Ò', 'Ó', 'Ô', 'Õ', 'Ö', '×', 'Ø', 'Ù',                                                           // ïðîáëåìû è ñ ïîìîùüþ ýòîãî ðåøèë
-    'Ú', 'Û', 'Ü', 'Ý', 'Þ', 'ß', '¹');
-  KoiR: Array[0..66] of Char = ('Á', 'Â', '×', 'Ç', 'Ä', 'Å', '£', 'Ö', 'Ú', 'É',
-    'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï', 'Ð', 'Ò', 'Ó', 'Ô',
-    'Õ', 'Æ', 'È', 'Ã' ,'Þ', 'Û', 'Ý', 'ß', 'Ù', 'Ø',
-    'Ü', 'À', 'Ñ', 'á', 'â', '÷', 'ç', 'ä', 'å', '³',
-    'ö', 'ú', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï', 'ð',
-    'ò', 'ó', 'ô', 'õ', 'æ', 'è', 'ã', 'þ', 'û', 'ý',
-    'ÿ', 'ù', 'ø', 'ü', 'à', 'ñ', '?');
-//Èç Cyrillic Windows-1251 â Cyrillic (KOI8-R)
+  WinR: Array[0..66] of Char = ('а', 'б', 'в', 'г', 'д', 'е', 'ё', 'ж', 'з', 'и',
+    'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т',
+    'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ы', 'ь',
+    'э', 'ю', 'я', 'А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ё',                                                                /// с этой проблемой не знал как
+    'Ж', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П',                                                               //как разобраться с кодировкой были
+    'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ',                                                           // проблемы и с помощью этого решил
+    'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я', '№');
+  KoiR: Array[0..66] of Char = ('Б', 'В', 'Ч', 'З', 'Д', 'Е', 'Ј', 'Ц', 'Ъ', 'Й',
+    'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'Т', 'У', 'Ф',
+    'Х', 'Ж', 'И', 'Г' ,'Ю', 'Ы', 'Э', 'Я', 'Щ', 'Ш',
+    'Ь', 'А', 'С', 'б', 'в', 'ч', 'з', 'д', 'е', 'і',
+    'ц', 'ъ', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р',
+    'т', 'у', 'ф', 'х', 'ж', 'и', 'г', 'ю', 'ы', 'э',
+    'я', 'щ', 'ш', 'ь', 'а', 'с', '?');
+//Из Cyrillic Windows-1251 в Cyrillic (KOI8-R)
 function WinRToKoiR (aStr: String): String;
 var
   i, j, Index: Integer;
@@ -508,7 +508,7 @@ begin
   i:=0;j:=0;
   while (i<len) do
   begin
-    inc(i);//ïåðâûé ñòàðøèé ïîëóáàéò
+    inc(i);//первый старший полубайт
     b:=0;
     if aStr[i] in ['0'..'9','A'..'F'] then
     begin
@@ -518,7 +518,7 @@ begin
         b:=((ord(aStr[i])-ord('A'))+10) shl 4;
     end;
     if i<len then begin
-      inc(i);//âòîðîé ìëàäøèé ïîëóáàéò
+      inc(i);//второй младший полубайт
       if aStr[i] in ['0'..'9','A'..'F'] then
       begin
         if (aStr[i] in ['0'..'9']) then
@@ -723,7 +723,7 @@ begin
 end;
 
 
-//Âûáèðàåò èç ñòòðîêè öèôðû, ðàçðåøàåòñÿ ââîä Hex
+//Выбирает из сттроки цифры, разрешается ввод Hex
 function S2IDef(const val:String;default_value:integer):integer;
 var i:integer;
     s,res:string;
@@ -731,7 +731,7 @@ var i:integer;
 begin
      hex:=False;
      s:=UpperCase(Val);res:='';
-     //âûáèðàåì òîëüêî öèôðû
+     //выбираем только цифры
      for i:=1 to Length(s) do
      begin
        if s[i] in ['X','$'] then hex:=True;
@@ -745,13 +745,13 @@ begin
             res:=res+s[i];
      end;
      if hex then res:='$'+res;
-     //Ñîõðàíÿåì çíà÷åíèå â Tag
+     //Сохраняем значение в Tag
      if res<>'' then
        result:=StrToIntDef(res,default_value);
 end;
 
 
-//ïóçûðüêîâàÿ ñîðòèðîâêà
+//пузырьковая сортировка
 procedure SortCalibrationPointArray(var _array:array of TCalibrationPoint);
 var i,j:Integer;
     tmp:TCalibrationPoint;
@@ -762,7 +762,7 @@ begin
       begin
          if _array[j].WaterDischarge>_array[j+1].WaterDischarge then
          begin
-          //îáìåí ýëåìåíòîâ
+          //обмен элементов
           tmp:=_array[j];
           _array[j]:=_array[j+1];
           _array[j+1]:=tmp;
@@ -926,7 +926,7 @@ function FontToStr(font: TFont): string;
   end;
 begin
 
-  {êîäèðóåì âñå àòðèáóòû TFont â ñòðîêó}
+  {кодируем все атрибуты TFont в строку}
   Result := '';
   Result := Result + font.Family + '|';
   Result := Result + FloatToStr(font.Size) + '|';
@@ -972,7 +972,7 @@ begin
       font.Style := font.Style + [TFontStyle.fsStrikeout];
   end
   else begin
-    //äëÿ ñòàðîãî âàðèàíòà
+    //для старого варианта
     font.Size := Size;
   end;
 end;
@@ -1016,13 +1016,13 @@ end;
 
 function CalculateAngle(CurrentValue, MinValue, MaxValue: Double; MaxAngle:Double=270): Double;
 begin
-  // Ïðîâåðÿåì, ÷òî òåêóùåå çíà÷åíèå íàõîäèòñÿ â ïðåäåëàõ îò ìèíèìàëüíîãî äî ìàêñèìàëüíîãî çíà÷åíèÿ
+  // Проверяем, что текущее значение находится в пределах от минимального до максимального значения
   if CurrentValue < MinValue then
     CurrentValue := MinValue
   else if CurrentValue > MaxValue then
     CurrentValue := MaxValue;
 
-  // Ðàññ÷èòûâàåì óãîë ïîâîðîòà
+  // Рассчитываем угол поворота
   Result := (CurrentValue - MinValue) / (MaxValue - MinValue) * MaxAngle;
 end;
 
@@ -1032,13 +1032,13 @@ begin
 end;
 
 (*
-âû ìîæåòå èñïîëüçîâàòü $ 00BBGGRR
+вы можете использовать $ 00BBGGRR
 
-BB = Ñèíèé
-GG = Çåëåíûé
-RR = Êðàñíûé
+BB = Синий
+GG = Зеленый
+RR = Красный
 
-Âñå ýòè çíà÷åíèÿ ìîãóò áûòü îò 0 äî 255 ($ 00 è $ FF)
+Все эти значения могут быть от 0 до 255 ($ 00 и $ FF)
 *)
 function ColorToAlphaColor(aColor:TColor):TAlphaColor;
 var rgbcolor:LongWord;
@@ -1132,7 +1132,7 @@ end;
 procedure OutputDebugMessage(const Msg: string);
 begin
 {$IFDEF LINUX}
-  WriteLn(Msg); // Èëè èñïîëüçóéòå äðóãîé ìåòîä ïî âàøåìó âûáîðó
+  WriteLn(Msg); // Или используйте другой метод по вашему выбору
 {$ELSE}
   OutputDebugString(PChar(Msg));
 {$ENDIF}
@@ -1223,13 +1223,13 @@ var
   AdminSID: PSID;
   IsAdmin: BOOL;
 begin
-  // Îòêðûòü òåêóùèé òîêåí ïðîöåññà
+  // Открыть текущий токен процесса
   if OpenProcessToken(GetCurrentProcess, TOKEN_QUERY, hToken) then
   try
-    // Ñîçäàòü SID äëÿ ãðóïïû àäìèíèñòðàòîðîâ
+    // Создать SID для группы администраторов
     if AllocateAndInitializeSid(SECURITY_NT_AUTHORITY, 2, SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, AdminSID) then
     try
-      // Ïðîâåðèòü, ÿâëÿåòñÿ ëè òåêóùèé ïîëüçîâàòåëü ÷ëåíîì ãðóïïû àäìèíèñòðàòîðîâ
+      // Проверить, является ли текущий пользователь членом группы администраторов
 {$IFDEF MSWINDOWS}
       if CheckTokenMembership(hToken, AdminSID, @IsAdmin) then
         Result := IsAdmin;
@@ -1392,7 +1392,7 @@ end;
 
 (*
 Screen.ActiveForm.Handle,
-        'Ïðîèçîøëà îøèáêà ïðè ðàáîòå ñ óñòðîéñòâîì.', cTestModeCOM,
+        'Произошла ошибка при работе с устройством.', cTestModeCOM,
         MB_OK or MB_ICONERROR
 *)
 procedure _MessageBox(AHandle:longint;AMessage:string;ADopMessage:string;AICON:Integer);
@@ -1445,7 +1445,7 @@ begin
       if (AMask and mask)=mask then
          result:=result+IntToStr(i)+',';
     end;
-    //çàòèðàåì çàïÿòóþ
+    //затираем запятую
     if result<>'' then result[length(result)]:=' ';
 
 
@@ -1464,24 +1464,24 @@ end;
 //begin
 //  Result := False;
 //
-//  // Ðàçáèâàåì ñòðîêó íà ÷àñòè, ðàçäåë¸ííûå çàïÿòûìè
+//  // Разбиваем строку на части, разделённые запятыми
 //  Ranges := SplitString(RangeStr, ',');
 //
 //  for i := 0 to High(Ranges) do
 //  begin
 //    Range := Trim(Ranges[i]);
 //
-//    // Ïðîâåðÿåì, ñîäåðæèò ëè ÷àñòü äèàïàçîí
+//    // Проверяем, содержит ли часть диапазон
 //    if Pos('..', Range) > 0 then
 //    begin
-//      // Ðàçáèâàåì äèàïàçîí íà íà÷àëüíîå è êîíå÷íîå çíà÷åíèÿ
+//      // Разбиваем диапазон на начальное и конечное значения
 //      Parts := SplitString(Range, '..');
 //      if Length(Parts) = 2 then
 //      begin
 //        StartRange := StrToIntDef(Trim(Parts[0]), 0);
 //        EndRange := StrToIntDef(Trim(Parts[1]), 0);
 //
-//        // Ïðîâåðÿåì, âõîäèò ëè çíà÷åíèå â äèàïàçîí
+//        // Проверяем, входит ли значение в диапазон
 //        if (Value >= StartRange) and (Value <= EndRange) then
 //        begin
 //          Result := True;
@@ -1491,7 +1491,7 @@ end;
 //    end
 //    else
 //    begin
-//      // Ïðîâåðÿåì îòäåëüíîå çíà÷åíèå
+//      // Проверяем отдельное значение
 //      if Value = StrToIntDef(Range, -1) then
 //      begin
 //        Result := True;
@@ -1512,24 +1512,24 @@ var
 begin
   Result := False;
 
-  // Ðàçáèâàåì ñòðîêó íà ÷àñòè, ðàçäåë¸ííûå çàïÿòûìè
+  // Разбиваем строку на части, разделённые запятыми
   Ranges := SplitString(RangeStr, ',');
 
   for i := 0 to High(Ranges) do
   begin
     Range := Trim(Ranges[i]);
 
-    // Ïðîâåðÿåì, ñîäåðæèò ëè ÷àñòü äèàïàçîí
+    // Проверяем, содержит ли часть диапазон
     if Pos('..', Range) > 0 then
     begin
-      // Ðàçáèâàåì äèàïàçîí íà íà÷àëüíîå è êîíå÷íîå çíà÷åíèÿ
+      // Разбиваем диапазон на начальное и конечное значения
       Parts := SplitString(Range, '..');
       if Length(Parts) = 3 then
       begin
         StartRange := StrToIntDef(Trim(Parts[0]), 0);
         EndRange := StrToIntDef(Trim(Parts[2]), 0);
 
-        // Ïðîâåðÿåì, âõîäèò ëè çíà÷åíèå â äèàïàçîí
+        // Проверяем, входит ли значение в диапазон
         if (Value >= StartRange) and (Value <= EndRange) then
         begin
           Result := True;
@@ -1539,7 +1539,7 @@ begin
     end
     else
     begin
-      // Ïðîâåðÿåì îòäåëüíîå çíà÷åíèå
+      // Проверяем отдельное значение
       if Value = StrToIntDef(Range, -1) then
       begin
         Result := True;
@@ -1562,24 +1562,24 @@ begin
   Elements := TList<Integer>.Create;
 
   try
-    // Ðàçáèâàåì ñòðîêó íà ÷àñòè, ðàçäåë¸ííûå çàïÿòûìè
+    // Разбиваем строку на части, разделённые запятыми
     Ranges := SplitString(RangeStr, ',');
 
     for i := 0 to High(Ranges) do
     begin
       Range := Trim(Ranges[i]);
 
-      // Ïðîâåðÿåì, ñîäåðæèò ëè ÷àñòü äèàïàçîí
+      // Проверяем, содержит ли часть диапазон
       if Pos('..', Range) > 0 then
       begin
-        // Ðàçáèâàåì äèàïàçîí íà íà÷àëüíîå è êîíå÷íîå çíà÷åíèÿ
+        // Разбиваем диапазон на начальное и конечное значения
         Parts := SplitString(Range, '..');
         if Length(Parts) = 3 then
         begin
           StartRange := StrToIntDef(Trim(Parts[0]), 0);
           EndRange := StrToIntDef(Trim(Parts[2]), 0);
 
-          // Äîáàâëÿåì âñå ýëåìåíòû äèàïàçîíà â ñïèñîê
+          // Добавляем все элементы диапазона в список
           for j := StartRange to EndRange do
           begin
             Elements.Add(j);
@@ -1588,12 +1588,12 @@ begin
       end
       else
       begin
-        // Äîáàâëÿåì îòäåëüíîå çíà÷åíèå â ñïèñîê
+        // Добавляем отдельное значение в список
         Elements.Add(StrToIntDef(Range, 0));
       end;
     end;
 
-    // Ïðîâåðÿåì, ñóùåñòâóåò ëè ýëåìåíò ñ çàäàííûì èíäåêñîì
+    // Проверяем, существует ли элемент с заданным индексом
     if (Index >= 0) and (Index < Elements.Count) then
     begin
       Result := Elements[Index];
@@ -1605,15 +1605,15 @@ end;
 
 function TwosComplementToDecimal(hexValue: Word): Integer;
 begin
-  // Ïðîâåðêà çíàêîâîãî áèòà
+  // Проверка знакового бита
   if (hexValue and $8000) <> 0 then
   begin
-    // Åñëè ÷èñëî îòðèöàòåëüíîå, èíâåðòèðóåì âñå áèòû è ïðèáàâëÿåì 1
+    // Если число отрицательное, инвертируем все биты и прибавляем 1
     Result := -((not hexValue) + 1);
   end
   else
   begin
-    // Åñëè ÷èñëî ïîëîæèòåëüíîå, ïðîñòî âîçâðàùàåì åãî
+    // Если число положительное, просто возвращаем его
     Result := hexValue;
   end;
 end;
@@ -1671,28 +1671,28 @@ begin
   end;
 end;
 
-// Âñïîìîãàòåëüíàÿ ôóíêöèÿ äëÿ ïðåîáðàçîâàíèÿ Word â äâà áàéòà
+// Вспомогательная функция для преобразования Word в два байта
 function WordToBytes(Value: Word): ShortString;
 begin
 //  Result := AnsiChar(DecToHex(Value div 100))+AnsiChar(DecToHex(Value mod 100));
   Result := AnsiChar(Hi(Value)) + AnsiChar(Lo(Value));
 end;
 
-(* Ïðèìåð èñïîëüçîâàíèÿ
+(* Пример использования
 var
   ResponseStr, Param: string;
 begin
   ResponseStr := '>-0000+015.81+015.87'#$D;
 
-  // Ïîëó÷èòü ïåðâûé ïàðàìåòð
+  // Получить первый параметр
   Param := ExtractParameter(ResponseStr, 1);
   // Param = '-0000'
 
-  // Ïîëó÷èòü âòîðîé ïàðàìåòð
+  // Получить второй параметр
   Param := ExtractParameter(ResponseStr, 2);
   // Param = '+015.81'
 
-  // Ïîëó÷èòü òðåòèé ïàðàìåòð
+  // Получить третий параметр
   Param := ExtractParameter(ResponseStr, 3);
   // Param = '+015.87'
 end;
@@ -1706,22 +1706,22 @@ begin
   CurrentPos := 1;
   ParamCount := 0;
 
-  // Ïðîâåðêà âàëèäíîñòè íîìåðà ïàðàìåòðà
+  // Проверка валидности номера параметра
   if (ParamNumber < 1) then
     Exit;
 
   for I := 1 to Length(ResponseString) do
   begin
-    // Èùåì ëèáî '+', ëèáî '-'
+    // Ищем либо '+', либо '-'
     if (ResponseString[I] = '+') or (ResponseString[I] = '-') then
     begin
       Inc(ParamCount);
       CurrentSign := ResponseString[I];
 
-      // Åñëè íàøëè íóæíûé ïàðàìåòð
+      // Если нашли нужный параметр
       if ParamCount = ParamNumber then
       begin
-        // Èùåì êîíåö ïàðàìåòðà (ñëåäóþùèé çíàê èëè êîíåö ñòðîêè)
+        // Ищем конец параметра (следующий знак или конец строки)
         CurrentPos := I + 1;
         while (CurrentPos <= Length(ResponseString)) and
               ((ResponseString[CurrentPos]  in ['0'..'9','.',','])) and
@@ -1731,7 +1731,7 @@ begin
           Inc(CurrentPos);
         end;
 
-        // Èçâëåêàåì ïàðàìåòð ÑÎ ÇÍÀÊÎÌ
+        // Извлекаем параметр СО ЗНАКОМ
         Result := Copy(ResponseString, I, CurrentPos - I);
         Exit;
       end;
@@ -1750,12 +1750,12 @@ begin
 
   StringList := TStringList.Create;
   try
-    // Óñòàíàâëèâàåì ðàçäåëèòåëü
+    // Устанавливаем разделитель
     StringList.Delimiter := StrDivider;
-    StringList.StrictDelimiter := True; // Èãíîðèðîâàòü êàâû÷êè
+    StringList.StrictDelimiter := True; // Игнорировать кавычки
     StringList.DelimitedText := S;
 
-    // Ïðîâåðÿåì, ñóùåñòâóåò ëè ïàðàìåòð ñ òàêèì íîìåðîì
+    // Проверяем, существует ли параметр с таким номером
     if ParamNum <= StringList.Count then
       Result := StringList[ParamNum - 1];
   finally
@@ -1784,7 +1784,7 @@ end;
 //var
 //  LogPath, LogDir, LogText, AppName: string;
 //begin
-//  // Ïîëó÷àåì èìÿ ïðèëîæåíèÿ
+//  // Получаем имя приложения
 //  {$IFDEF FMX}
 //  AppName := Application.Title;
 //  {$ELSE}
@@ -1796,7 +1796,7 @@ end;
 //
 //  AppName := StringReplace(AppName, ' ', '_', [rfReplaceAll]);
 //
-//  // Ôîðìèðóåì ïóòü
+//  // Формируем путь
 //  {$IFDEF LINUX}
 //  LogDir := GetEnvironmentVariable('XDG_DATA_HOME');
 //  if LogDir = '' then
@@ -1817,11 +1817,11 @@ end;
 //
 //    TFile.AppendAllText(LogPath, LogText, TEncoding.UTF8);
 //  except
-//    // Fallback â òåêóùóþ äèðåêòîðèþ
+//    // Fallback в текущую директорию
 //    try
 //      TFile.AppendAllText('app_log.txt', LogText, TEncoding.UTF8);
 //    except
-//      // Èãíîðèðóåì
+//      // Игнорируем
 //    end;
 //  end;
 //end;
@@ -1833,11 +1833,11 @@ procedure WriteLog(const Msg: string);
 var
   LogPath, LogDir, LogText, AppName: string;
 begin
-  if RecursionGuard > 0 then Exit; // Èãíîðèðóåì ïîâòîðíûé âûçîâ
+  if RecursionGuard > 0 then Exit; // Игнорируем повторный вызов
   Inc(RecursionGuard);
   LogCriticalSection.Enter;
   try
-    // Ïîëó÷àåì èìÿ ïðèëîæåíèÿ
+    // Получаем имя приложения
     {$IFDEF FMX}
     AppName := Application.Title;
     {$ELSE}
@@ -1851,13 +1851,13 @@ begin
 
 
     {$IFDEF MSWINDOWS}
-    LogDir := GetEnvironmentVariable('LOCALAPPDATA'); // èëè äðóãîé ïîäõîäÿùèé ïóòü
+    LogDir := GetEnvironmentVariable('LOCALAPPDATA'); // или другой подходящий путь
     if LogDir = '' then
       LogDir := 'C:\Temp';
     LogPath := LogDir + '\' + AppName + '_log.txt';
     {$ENDIF}
 
-    // Ôîðìèðóåì ïóòü
+    // Формируем путь
     {$IFDEF LINUX}
     LogDir := GetEnvironmentVariable('XDG_DATA_HOME');
     if LogDir = '' then
@@ -1873,11 +1873,11 @@ begin
 
       TFile.AppendAllText(LogPath, LogText, TEncoding.UTF8);
     except
-      // Fallback â òåêóùóþ äèðåêòîðèþ
+      // Fallback в текущую директорию
       try
         TFile.AppendAllText('app_log.txt', LogText, TEncoding.UTF8);
       except
-        // Èãíîðèðóåì
+        // Игнорируем
       end;
     end;
   finally
