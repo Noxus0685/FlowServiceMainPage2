@@ -1,4 +1,4 @@
-unit uRepositories;
+﻿unit uRepositories;
 
 
 interface
@@ -3928,7 +3928,7 @@ end;
 
 function TDeviceRepository.MapDeviceFromQuery(Q: TFDQuery): TDevice;
 begin
-  Result := CreateNewDevice;
+  Result :=  TDevice.Create;
 
   Result.ID := Q.FieldByName('ID').AsInteger;
   Result.UUID := Q.FieldByName('UUID').AsString;
@@ -4088,9 +4088,7 @@ begin
   FState := osLoading;
 
   if FDevices = nil then
-    FDevices := TObjectList<TDevice>.Create(True)
-  else
-    FDevices.Clear;
+    FDevices := TObjectList<TDevice>.Create(True);
   LoadErrors := TStringList.Create;
 
   Q := FDM.CreateQuery;
@@ -4102,6 +4100,8 @@ begin
       while not Q.Eof do
       begin
         NewD := MapDeviceFromQuery(Q);
+
+
 
         if Trim(NewD.UUID) = '' then
         begin
@@ -4124,6 +4124,11 @@ begin
           LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [NewD.Name]));
 
            end;
+
+        {1. Найти NewD в FDevices.
+        1.1. Если нашли, то делаем Assign(NewD,True)
+        1.2. Если не нашли, то добавляем его в FDevices}
+
 
         Q.Next;
       end;
