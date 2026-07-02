@@ -446,17 +446,37 @@ begin
 end;
 
 function GetDigitsFromError(Value, Error: Double): Integer;
+var
+  AbsError: Double;
+  ValuePart: Double;
 begin
   Result := 0;
 
   if Error <= 0 then
     Exit;
 
-  if Error < 1 then
-    Result := Ceil(-Log10(Error));
+  // Абсолютная погрешность при относительной погрешности Error (%)
+  AbsError := Abs(Value) * Error / 100;
+
+  // Если само значение = 0, то относительная погрешность не даёт масштаба.
+  // В таком случае просто оставляем 0 знаков.
+  if AbsError <= 0 then
+    Exit;
+
+  // Требуемая дискретность отображения = 1/10 абсолютной погрешности
+  ValuePart := AbsError / 2;
+
+  if ValuePart >= 1 then
+    Exit(0);
+
+  Result := Ceil(-Log10(ValuePart));
+
+  if Result < 0 then
+    Result := 0;
 
   Result := EnsureRange(Result, 0, 12);
 end;
+
 
 function FormatValue(Value: Double; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean): string;
 var

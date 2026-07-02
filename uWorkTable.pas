@@ -1981,6 +1981,7 @@ begin
   begin
     FTableFlow.ValueImp := TMeterValue.Create('', Name);
     FTableFlow.ValueImp.SetAsImp;
+    FTableFlow.ValueImp.ValueType := AGGREGATEMIN_TYPE;
     EnsureDescription(FTableFlow.ValueImp, 'Импульсы стола');
   end;
 
@@ -1988,6 +1989,7 @@ begin
   begin
     FTableFlow.ValueImpTotal := TMeterValue.Create('', Name);
     FTableFlow.ValueImpTotal.SetAsImp;
+    FTableFlow.ValueImp.ValueType := AGGREGATEMIN_TYPE;
     EnsureDescription(FTableFlow.ValueImpTotal, 'Суммарные импульсы стола');
   end;
 
@@ -2501,6 +2503,8 @@ var
   Pair: TPair<Integer, Double>;
   IsQuantityTemplateSet: Boolean;
   IsFlowTemplateSet: Boolean;
+  IsImpTemplateSet: Boolean;
+  IsImpTotalTemplateSet: Boolean;
 
   function GetAggregateGroupKey(const AIndex: Integer; const AChannel: TChannel): Integer;
   begin
@@ -2585,6 +2589,43 @@ begin
       FTableFlow.ValueFlowRate.AddMeterValue(Channel.FlowMeter.ValueFlow);
     end;
   end;
+
+
+ // Агрегация импульсов поверяемых приборов.
+// Для стола ValueImp и ValueImpTotal берут минимальное значение
+// среди включенных каналов поверяемых приборов.
+for I := 0 to FDeviceChannels.Count - 1 do
+begin
+  Channel := FDeviceChannels[I];
+
+  if (Channel = nil) or (not Channel.Enabled) or (Channel.FlowMeter = nil) then
+    Continue;
+
+  if (FTableFlow.ValueImp <> nil) and (Channel.FlowMeter.ValueImp <> nil) then
+  begin
+    if not IsImpTemplateSet then
+    begin
+      FTableFlow.ValueImp.SetAs(Channel.FlowMeter.ValueImp);
+      FTableFlow.ValueImp.ValueType := AGGREGATEMIN_TYPE;
+      IsImpTemplateSet := True;
+    end;
+
+    FTableFlow.ValueImp.AddMeterValue(Channel.FlowMeter.ValueImp);
+  end;
+
+  if (FTableFlow.ValueImpTotal <> nil) and (Channel.FlowMeter.ValueImpTotal <> nil) then
+  begin
+    if not IsImpTotalTemplateSet then
+    begin
+      FTableFlow.ValueImpTotal.SetAs(Channel.FlowMeter.ValueImpTotal);
+      FTableFlow.ValueImpTotal.ValueType := AGGREGATEMIN_TYPE;
+      IsImpTotalTemplateSet := True;
+    end;
+
+    FTableFlow.ValueImpTotal.AddMeterValue(Channel.FlowMeter.ValueImpTotal);
+  end;
+end;
+
 end;
 
 { Calculates the greatest supported flow from single etalons and parallel groups. }
@@ -3085,9 +3126,6 @@ var
   I: Integer;
   Channel: TChannel;
 begin
-
-
-
    for I := 0 to FEtalonChannels.Count - 1 do
   begin
     Channel := FEtalonChannels[I];

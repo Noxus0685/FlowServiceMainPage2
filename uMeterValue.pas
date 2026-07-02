@@ -16,7 +16,7 @@ uses
 type
   EUpdateType = (OFFLINE_TYPE, ONLINE_TYPE, HAND_TYPE);
   EValueType = (FLOW_TYPE, SUM_TYPE, CONST_TYPE, PARAM_TYPE,
-                  ERROR_TYPE, MEAN_TYPE, AGGREGATE_TYPE);
+                  ERROR_TYPE, MEAN_TYPE, AGGREGATE_TYPE, AGGREGATEMIN_TYPE);
   EDependenceType = (INDEPENDENT, DEPENDENT);
 
   TDimension = record
@@ -618,7 +618,7 @@ function TMeterValue.GetDoubleValue: Double;
 var
   AbsError: Double;
 begin
-  if ValueType = AGGREGATE_TYPE then     //Спорный момент. SetValue должен делаться
+  if (ValueType = AGGREGATE_TYPE) or (ValueType = AGGREGATEMIN_TYPE) then     //Спорный момент. SetValue должен делаться
     SetValue;                           // Перед использованием.
 
 //  if (Error <> 0) and (MinNomValue<>0) then
@@ -1142,6 +1142,8 @@ var
   Q: Single;
   MeterValue: TMeterValue;
   I: Integer;
+  HasValue: Boolean;
+  MeterValueDouble: Double;
 begin
 
   ValueLocal := Value;
@@ -1169,6 +1171,32 @@ begin
         end;
 
         ValueLocal := ValueLocal + MeterValue.GetDoubleValue;
+      end;
+    end
+
+    else if ValueType = AGGREGATEMIN_TYPE then
+    begin
+     ValueLocal := 0;
+     HasValue := False;
+
+     for MeterValue in FAggregateMeterValues do
+      begin
+       if (MeterValue = nil) or (MeterValue = Self) then
+        Continue;
+
+       MeterValueDouble := MeterValue.GetDoubleValue;
+
+         // Не учитываем нулевые и практически нулевые значения.
+       if SameValue(MeterValueDouble, 0, MinDouble) then
+         Continue;
+
+        if not HasValue then
+          begin
+             ValueLocal := MeterValueDouble;
+             HasValue := True;
+           end
+            else
+           ValueLocal := Min(ValueLocal, MeterValueDouble);
       end;
     end
 
