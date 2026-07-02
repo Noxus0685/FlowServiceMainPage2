@@ -696,6 +696,8 @@ end;
 procedure TFrameProceed.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
 begin
+  PopulateTreeViewDevices;
+
   if ASession <> nil then
   begin
     SelectTreeItemByTagObject(ASession);
@@ -929,7 +931,7 @@ var
     if ADevice.Sessions <> nil then
       for Sess in ADevice.Sessions do
       begin
-        if Sess = nil then
+        if (Sess = nil) or (Sess.State = osDeleted) then
           Continue;
 
         SessionItem := TTreeViewItem.Create(TreeViewDevices);
@@ -1331,8 +1333,18 @@ end;
 procedure TFrameProceed.UpdateGridDataPoints;
 var
   ColumnWidths: TArray<Single>;
+  I, Count: Integer;
 begin
 //  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+  Count := 0;
+  for I := 0 to High(FCurrentSpillages) do
+    if (FCurrentSpillages[I] <> nil) and (FCurrentSpillages[I].State <> osDeleted) then
+    begin
+      FCurrentSpillages[Count] := FCurrentSpillages[I];
+      Inc(Count);
+    end;
+  SetLength(FCurrentSpillages, Count);
+
   SaveGridColumnWidths(GridDataPoints, ColumnWidths);
   GridDataPoints.BeginUpdate;
   try
@@ -1352,7 +1364,7 @@ var
 begin
   Result := TObjectList<TPointSpillage>.Create(False);
   for Point in FCurrentSpillages do
-    if Point <> nil then
+    if (Point <> nil) and (Point.State <> osDeleted) then
       Result.Add(Point);
 end;
 procedure TFrameProceed.ShowDeviceSpillages(ADevice: TDevice);
@@ -1420,7 +1432,7 @@ begin
       for I := 0 to ASession.Spillages.Count - 1 do
       begin
         Point := ASession.Spillages[I];
-        if Point <> nil then
+        if (Point <> nil) and (Point.State <> osDeleted) then
         begin
           List.Add(Point);
           LogMKS('DBG SP 6003', 'ShowSessionSpillages ADD FROM Session.Spillages', DumpSpillage(Point));
@@ -2786,7 +2798,7 @@ begin
   if (ARow < 0) or (ARow >= Length(FCurrentSpillages)) then
     Exit;
   P := FCurrentSpillages[ARow];
-  if P = nil then
+  if (P = nil) or (P.State = osDeleted) then
     Exit;
 
   CurrentDevice := nil;
