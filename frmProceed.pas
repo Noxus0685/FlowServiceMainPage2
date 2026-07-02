@@ -188,8 +188,9 @@ type
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
+    procedure MarkProcessingDeviceDeleted(ADevice: TDevice);
     procedure SaveProcessingDevices;
-    procedure SavePendingProcessingChanges;
+    procedure SavePendingProcessingChanges(Sender: TObject);
     procedure CancelProcessingChanges;
     procedure LoadProcessingDevices;
     procedure UpdateTreeViewDeviceTagObjects;
@@ -278,6 +279,7 @@ type
     FSessionEtalon: TFlowMeter;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
+    FProcessingChangesSaved: Boolean;
   public
     { Public declarations }
     procedure Initialize;
@@ -333,7 +335,9 @@ end;
 
 destructor TFrameProceed.Destroy;
 begin
-  SavePendingProcessingChanges;
+  if Assigned(AppServices) then
+    AppServices.OnBeforeShutdown := nil;
+
   FreeAndNil(FFrameCalibrCoefs);
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
@@ -438,7 +442,8 @@ begin
   else
     DbgProceedTree(1302, 'AddProcessingDevice ENTER: ' + ADevice.Name + #13#10 + ADevice.UUID);
 
-  if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FProcessingDevices = nil) then
+  if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FProcessingDevices = nil) or
+     (ADevice.State = osDeleted) then
     Exit;
 
   if HasDeviceInProcessing(ADevice) then
@@ -460,6 +465,29 @@ begin
     Exit;
 
   FProcessingDevices.Remove(Existing);
+end;
+procedure TFrameProceed.MarkProcessingDeviceDeleted(ADevice: TDevice);
+var
+  Session: TSessionSpillage;
+  Point: TPointSpillage;
+begin
+  if ADevice = nil then
+    Exit;
+
+  ADevice.State := osDeleted;
+
+  if ADevice.Sessions <> nil then
+    for Session in ADevice.Sessions do
+      if Session <> nil then
+      begin
+        Session.Active := False;
+        Session.State := osDeleted;
+      end;
+
+  if ADevice.Spillages <> nil then
+    for Point in ADevice.Spillages do
+      if Point <> nil then
+        Point.State := osDeleted;
 end;
 procedure TFrameProceed.SaveProcessingDevices;
 var
@@ -501,18 +529,38 @@ begin
 end;
 
 
-procedure TFrameProceed.SavePendingProcessingChanges;
+procedure TFrameProceed.SavePendingProcessingChanges(Sender: TObject);
 var
+  Services: TAppServices;
+  DM: TManagerTTableDM;
   Repo: TDeviceRepository;
   Device: TDevice;
 begin
-  SaveProcessingDevices;
-
-  if (AppServices.DataManager = nil) or
-     (AppServices.DataManager.DeviceRepositories = nil) then
+  if FProcessingChangesSaved then
     Exit;
 
-  for Repo in AppServices.DataManager.DeviceRepositories do
+  FProcessingChangesSaved := True;
+
+  Services := nil;
+  DM := nil;
+
+  if Sender is TAppServices then
+    Services := TAppServices(Sender)
+  else if Assigned(AppServices) then
+    Services := AppServices;
+
+  if Assigned(Services) then
+    DM := Services.DataManager;
+
+  if DM = nil then
+    DM := uDataManager.DataManager;
+
+  if (DM = nil) or (DM.DeviceRepositories = nil) then
+    Exit;
+
+  SaveProcessingDevices;
+
+  for Repo in DM.DeviceRepositories do
   begin
     if (Repo = nil) or (Repo.Devices = nil) then
       Continue;
@@ -906,7 +954,7 @@ begin
         if Device.Spillages <> nil then
           for Point in Device.Spillages do
             LogMKS('DBG SP 8004', 'LoadProcessingDevices LOADED SPILLAGE', DumpSpillage(Point));
-        if FindProcessingDeviceByUUID(Device.UUID) = nil then
+        if (Device.State <> osDeleted) and (FindProcessingDeviceByUUID(Device.UUID) = nil) then
           FProcessingDevices.Add(Device);
       end
       else
@@ -1049,7 +1097,7 @@ var
     Sess: TSessionSpillage;
     Point: TPointSpillage;
   begin
-    if (AParent = nil) or (ADevice = nil) then
+    if (AParent = nil) or (ADevice = nil) or (ADevice.State = osDeleted) then
       Exit;
 
     DeviceItem := TTreeViewItem.Create(TreeViewDevices);
@@ -1737,17 +1785,17 @@ var
   Device: TDevice;
   I: Integer;
   DeviceUUIDsOnTables: TStringList;
-  DevicesToRemove: TList<TDevice>;
+  DevicesToDelete: TList<TDevice>;
 
-  procedure RemoveCollectedDevices;
+  procedure MarkCollectedDevicesDeleted;
   var
     D: TDevice;
   begin
-    if (FProcessingDevices = nil) or (DevicesToRemove.Count = 0) then
+    if DevicesToDelete.Count = 0 then
       Exit;
 
-    for D in DevicesToRemove do
-      FProcessingDevices.Remove(D);
+    for D in DevicesToDelete do
+      MarkProcessingDeviceDeleted(D);
   end;
 begin
   DbgProceedTree(1504, 'MenuTreeViewDevicesClearClick ENTER'#13#10 + GetSelectedTreeDebugText);
@@ -1759,10 +1807,10 @@ begin
   if SameText(Item.Text, '...') then
   begin
     if FProcessingDevices <> nil then
-    begin
-      FProcessingDevices.Clear;
-    end;
+      for Device in FProcessingDevices do
+        MarkProcessingDeviceDeleted(Device);
 
+    SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
   end;
@@ -1771,7 +1819,7 @@ begin
     Exit;
 
   DeviceUUIDsOnTables := TStringList.Create;
-  DevicesToRemove := TList<TDevice>.Create;
+  DevicesToDelete := TList<TDevice>.Create;
   try
     DeviceUUIDsOnTables.Sorted := False;
     DeviceUUIDsOnTables.Duplicates := dupIgnore;
@@ -1786,9 +1834,10 @@ begin
 
       for Device in FProcessingDevices do
         if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) >= 0) then
-          DevicesToRemove.Add(Device);
+          DevicesToDelete.Add(Device);
 
-      RemoveCollectedDevices;
+      MarkCollectedDevicesDeleted;
+      SaveProcessingDevices;
       RefreshResultsAfterDevicesAction;
       Exit;
     end;
@@ -1809,13 +1858,14 @@ begin
 
       for Device in FProcessingDevices do
         if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
-          DevicesToRemove.Add(Device);
+          DevicesToDelete.Add(Device);
 
-      RemoveCollectedDevices;
+      MarkCollectedDevicesDeleted;
+      SaveProcessingDevices;
       RefreshResultsAfterDevicesAction;
     end;
   finally
-    DevicesToRemove.Free;
+    DevicesToDelete.Free;
     DeviceUUIDsOnTables.Free;
   end;
 end;
@@ -1823,6 +1873,40 @@ procedure TFrameProceed.SyncProcessingDevicesFromTable(AWorkTable: TWorkTable;
   const AClearBeforeSync: Boolean);
 var
   Ch: TChannel;
+  Device: TDevice;
+
+  function HasDeviceData(AChannel: TChannel; ADevice: TDevice): Boolean;
+  begin
+    Result := False;
+
+    if AChannel <> nil then
+    begin
+      Result := (Trim(AChannel.TypeName) <> '') or
+        (Trim(AChannel.Serial) <> '') or
+        (AChannel.Signal >= 0) or
+        (Trim(AChannel.TypeUUID) <> '') or
+        (Trim(AChannel.RepoTypeName) <> '') or
+        (Trim(AChannel.RepoTypeUUID) <> '') or
+        (Trim(AChannel.RepoDeviceName) <> '') or
+        (Trim(AChannel.RepoDeviceUUID) <> '');
+
+      if Result then
+        Exit;
+    end;
+
+    if ADevice = nil then
+      Exit;
+
+    Result := (Trim(ADevice.Name) <> '') or
+      (Trim(ADevice.SerialNumber) <> '') or
+      (ADevice.OutputType >= 0) or
+      (Trim(ADevice.DeviceTypeName) <> '') or
+      (Trim(ADevice.DeviceTypeUUID) <> '') or
+      (Trim(ADevice.RepoTypeName) <> '') or
+      (Trim(ADevice.RepoTypeUUID) <> '') or
+      (Trim(ADevice.RepoDeviceName) <> '') or
+      (Trim(ADevice.RepoDeviceUUID) <> '');
+  end;
 begin
   if FProcessingDevices = nil then
     Exit;
@@ -1835,7 +1919,11 @@ begin
   if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
     for Ch in AWorkTable.DeviceChannels do
       if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        AddProcessingDevice(Ch.FlowMeter.Device);
+      begin
+        Device := Ch.FlowMeter.Device;
+        if (Device.State <> osDeleted) and HasDeviceData(Ch, Device) then
+          AddProcessingDevice(Device);
+      end;
 end;
 procedure TFrameProceed.SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
 var
@@ -1878,6 +1966,7 @@ begin
   else
     Exit;
 
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.MenuTreeViewDevicesAddClick(Sender: TObject);
@@ -2051,6 +2140,7 @@ end;
 procedure TFrameProceed.MenuTreeViewDevicesDeleteClick(Sender: TObject);
 var
   Item: TTreeViewItem;
+  Device: TDevice;
 begin
   DbgProceedTree(1505, 'MenuTreeViewDevicesDeleteClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
@@ -2060,7 +2150,9 @@ begin
   if not (Item.TagObject is TDevice) then
     Exit;
 
-  RemoveProcessingDevice(TDevice(Item.TagObject));
+  Device := TDevice(Item.TagObject);
+  MarkProcessingDeviceDeleted(Device);
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionDeleteExecute(Sender: TObject);
@@ -2159,6 +2251,7 @@ end;
 procedure TFrameProceed.ActionSessionDeviceRemoveExecute(Sender: TObject);
 var
   Item: TTreeViewItem;
+  Device: TDevice;
 begin
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
@@ -2167,7 +2260,9 @@ begin
   if not (Item.TagObject is TDevice) then
     Exit;
 
-  RemoveProcessingDevice(TDevice(Item.TagObject));
+  Device := TDevice(Item.TagObject);
+  MarkProcessingDeviceDeleted(Device);
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionCloseExecute(Sender: TObject);

@@ -231,7 +231,7 @@ begin
     FFrameMainTable.SaveLayoutSettingsToWorkTable;
 
   if FFrameProceed <> nil then
-    FFrameProceed.SavePendingProcessingChanges;
+    FFrameProceed.SavePendingProcessingChanges(Self);
 
   DataManager.Save;
 

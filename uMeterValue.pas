@@ -68,6 +68,7 @@ type
     FDevider: Double;
     FAggregateMeterValues: TObjectList<TMeterValue>;
     function FindDimIndex(const AName: string): Integer;
+    function FormatDisplayValue(const AValue: Double): string;
     class constructor CreateClass;
     class destructor DestroyClass;
 
@@ -120,6 +121,7 @@ type
     RawValueDim: string;
 
     Accuracy: Integer;
+    ShowTrailingZeros: Boolean;
 
     Error: Double;
     ShowTrailingZeros: Boolean;
@@ -316,6 +318,7 @@ begin
   TempDelta := 3;
   Short_Mean_index := 3;
   Accuracy := 5;
+  ShowTrailingZeros := True;
   Error := 5;
   ShowTrailingZeros := True;
   ARRAY_SIZE := 1000;
@@ -393,6 +396,7 @@ begin
   DependenceType := AMeterValue.DependenceType;
   UpdateType := AMeterValue.UpdateType;
   Accuracy := AMeterValue.Accuracy;
+  ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   Error := AMeterValue.Error;
   ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   MaxValue := AMeterValue.MaxValue;
@@ -767,7 +771,14 @@ if Abs(Value) < EPS then
   if (Value >= MaxValue) and (MaxValue<>0) then
     Exit('+NAN');
 
-  Result := FormatValue(Dbl, Accuracy, Error, ShowTrailingZeros);
+  Result := FormatDisplayValue(Dbl);
+end;
+
+function TMeterValue.FormatDisplayValue(const AValue: Double): string;
+begin
+  Result := FormatValue(AValue, Accuracy, Error);
+  if not ShowTrailingZeros then
+    Result := RemoveTrailingZeros(Result);
 end;
 
 { Formats current numeric value to string in default or requested dimension. }
@@ -789,7 +800,7 @@ begin
   if Value > MaxValue then
     Exit('+NAN');
 
-  Result := FormatValue(Dbl, Accuracy, Error, ShowTrailingZeros);
+  Result := FormatDisplayValue(Dbl);
 end;
 
 { Returns formatted mean value in the default display dimension. }
@@ -873,7 +884,7 @@ begin
    ValueType:= CONST_TYPE;
   try
     DisplayValue := GetDoubleValue(CurrentDimIndex);
-    Result := FormatValue(DisplayValue, Accuracy, Error, ShowTrailingZeros);
+    Result := FormatDisplayValue(DisplayValue);
   finally
 
     Value := TempValue;
@@ -1346,6 +1357,7 @@ begin
   FilterShortDelta := AMeterValue.FilterShortDelta;
 
   Accuracy := AMeterValue.Accuracy;
+  ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   Error := AMeterValue.Error;
   ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   MaxValue := AMeterValue.MaxValue;
@@ -2211,6 +2223,7 @@ begin
 
       Ini.WriteInteger(Section, 'filter_order', MV.FFilterOrder);
       Ini.WriteInteger(Section, 'Accuracy', MV.Accuracy);
+      Ini.WriteBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       Ini.WriteFloat(Section, 'Error', MV.Error);
       Ini.WriteBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       Ini.WriteFloat(Section, 'MaxValue', MV.MaxValue);
@@ -2447,6 +2460,7 @@ begin
 
       MV.FFilterOrder := Ini.ReadInteger(Section, 'filter_order', MV.FFilterOrder);
       MV.Accuracy := Ini.ReadInteger(Section, 'Accuracy', MV.Accuracy);
+      MV.ShowTrailingZeros := Ini.ReadBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       MV.Error := S2F(Ini.ReadString(Section, 'Error', F2S(MV.Error)));
       MV.ShowTrailingZeros := Ini.ReadBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       MV.MaxValue := S2F(Ini.ReadString(Section, 'MaxValue', F2S(MV.MaxValue)));
