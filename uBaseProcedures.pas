@@ -158,8 +158,8 @@ function FormatError(Value: Double): string;
  function FormatPhys(Value: Double): string;
 function FormatTime(Value: Double): string;
 function FormatByBaseError(Value, BaseError: Double): string;
-function FormatValue(Value: Double; Accuracy: Integer; Error: Double): string; overload;
-function FormatValue(const Str: string; Accuracy: Integer; Error: Double): string; overload;
+function FormatValue(Value: Double; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean = True): string; overload;
+function FormatValue(const Str: string; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean = True): string; overload;
 function RemoveTrailingZeros(const Str: string): string;
 function RandomGenerate(Value, Error: Double): Double;
 function FormatFloatN(Value: Double; Digits: Integer): string;
@@ -446,38 +446,19 @@ begin
 end;
 
 function GetDigitsFromError(Value, Error: Double): Integer;
-var
-  AbsError: Double;
-  ValuePart: Double;
 begin
   Result := 0;
 
   if Error <= 0 then
     Exit;
 
-  // Абсолютная погрешность при относительной погрешности Error (%)
-  AbsError := Abs(Value) * Error / 100;
-
-  // Если само значение = 0, то относительная погрешность не даёт масштаба.
-  // В таком случае просто оставляем 0 знаков.
-  if AbsError <= 0 then
-    Exit;
-
-  // Требуемая дискретность отображения = 1/10 абсолютной погрешности
-  ValuePart := AbsError / 2;
-
-  if ValuePart >= 1 then
-    Exit(0);
-
-  Result := Ceil(-Log10(ValuePart));
-
-  if Result < 0 then
-    Result := 0;
+  if Error < 1 then
+    Result := Ceil(-Log10(Error));
 
   Result := EnsureRange(Result, 0, 12);
 end;
 
-function FormatValue(Value: Double; Accuracy: Integer; Error: Double): string;
+function FormatValue(Value: Double; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean): string;
 var
   FS: TFormatSettings;
   FractPartCnt: Integer;
@@ -499,11 +480,15 @@ begin
   else
     FractPartCnt := 0;
 
+  FractPartCnt := EnsureRange(FractPartCnt, 0, 12);
   RoundedValue := RoundTo(Value, -FractPartCnt);
   Result := FloatToStrF(RoundedValue, ffFixed, 18, FractPartCnt, FS);
+
+  if not ShowTrailingZeros then
+    Result := RemoveTrailingZeros(Result);
 end;
 
-function FormatValue(const Str: string; Accuracy: Integer; Error: Double): string;
+function FormatValue(const Str: string; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean): string;
 var
   FS: TFormatSettings;
   S: string;
@@ -516,7 +501,7 @@ begin
   S := StringReplace(S, ',', FS.DecimalSeparator, [rfReplaceAll]);
 
   V := StrToFloatDef(S, 0, FS);
-  Result := FormatValue(V, Accuracy, Error);
+  Result := FormatValue(V, Accuracy, Error, ShowTrailingZeros);
 end;
 
 function RemoveTrailingZeros(const Str: string): string;
