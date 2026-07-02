@@ -270,6 +270,7 @@ begin
    ProtocolManager.Unsubscribe(FListener);
   FreeAndNil(FMessages);
    end;
+
   inherited;
 end;
 
@@ -281,10 +282,16 @@ begin
     Exit;
 
   CopyMsg := Msg.Clone;
-  FMessages.Add(CopyMsg);
 
-  if IsAllowedByFilters(CopyMsg) then
-    AddProtocolItem(CopyMsg);
+  TThread.Synchronize(nil,
+    procedure
+    begin
+      FMessages.Add(CopyMsg);
+
+      if IsAllowedByFilters(CopyMsg) then
+        AddProtocolItem(CopyMsg);
+    end
+  );
 end;
 
 procedure TFrameProtocol.CopyProtocolToClipboard;
