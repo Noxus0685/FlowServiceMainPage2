@@ -4294,6 +4294,8 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
+  UpdateUI;
+  UpdateGrids;
   UpdateUIScale;
 
   GridDevices.SetFocus;
