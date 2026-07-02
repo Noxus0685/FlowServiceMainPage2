@@ -122,6 +122,7 @@ type
     Accuracy: Integer;
 
     Error: Double;
+    ShowTrailingZeros: Boolean;
 
     ARRAY_SIZE: Integer;
 
@@ -316,6 +317,7 @@ begin
   Short_Mean_index := 3;
   Accuracy := 5;
   Error := 5;
+  ShowTrailingZeros := True;
   ARRAY_SIZE := 1000;
   CoefK := 1;
   CoefP := 0;
@@ -392,6 +394,7 @@ begin
   UpdateType := AMeterValue.UpdateType;
   Accuracy := AMeterValue.Accuracy;
   Error := AMeterValue.Error;
+  ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   MaxValue := AMeterValue.MaxValue;
   MinValue := AMeterValue.MinValue;
   CurrentDimIndex := AMeterValue.CurrentDimIndex;
@@ -766,7 +769,7 @@ if Abs(Value) < EPS then
   if (Value >= MaxValue) and (MaxValue<>0) then
     Exit('+NAN');
 
-  Result := FormatValue(Dbl, Accuracy, Error);
+  Result := FormatValue(Dbl, Accuracy, Error, ShowTrailingZeros);
 end;
 
 { Formats current numeric value to string in default or requested dimension. }
@@ -788,7 +791,7 @@ begin
   if Value > MaxValue then
     Exit('+NAN');
 
-  Result := FormatValue(Dbl, Accuracy, Error);
+  Result := FormatValue(Dbl, Accuracy, Error, ShowTrailingZeros);
 end;
 
 { Returns formatted mean value in the default display dimension. }
@@ -872,7 +875,7 @@ begin
    ValueType:= CONST_TYPE;
   try
     DisplayValue := GetDoubleValue(CurrentDimIndex);
-    Result := FormatValue(DisplayValue, Accuracy, Error);
+    Result := FormatValue(DisplayValue, Accuracy, Error, ShowTrailingZeros);
   finally
 
     Value := TempValue;
@@ -1346,6 +1349,7 @@ begin
 
   Accuracy := AMeterValue.Accuracy;
   Error := AMeterValue.Error;
+  ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   MaxValue := AMeterValue.MaxValue;
   MinValue := AMeterValue.MinValue;
   MaxNomValue := AMeterValue.MaxNomValue;
@@ -1371,6 +1375,7 @@ begin
   SetFilter(-1);
   Accuracy := -1;
   Error := 0.001;
+  ShowTrailingZeros := False;
   Name := 'Время';
   ShrtName := 'T';
   Dimensions.Clear;
@@ -2209,6 +2214,7 @@ begin
       Ini.WriteInteger(Section, 'filter_order', MV.FFilterOrder);
       Ini.WriteInteger(Section, 'Accuracy', MV.Accuracy);
       Ini.WriteFloat(Section, 'Error', MV.Error);
+      Ini.WriteBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       Ini.WriteFloat(Section, 'MaxValue', MV.MaxValue);
       Ini.WriteFloat(Section, 'MinValue', MV.MinValue);
       Ini.WriteFloat(Section, 'MaxNomValue', MV.MaxNomValue);
@@ -2444,6 +2450,7 @@ begin
       MV.FFilterOrder := Ini.ReadInteger(Section, 'filter_order', MV.FFilterOrder);
       MV.Accuracy := Ini.ReadInteger(Section, 'Accuracy', MV.Accuracy);
       MV.Error := S2F(Ini.ReadString(Section, 'Error', F2S(MV.Error)));
+      MV.ShowTrailingZeros := Ini.ReadBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       MV.MaxValue := S2F(Ini.ReadString(Section, 'MaxValue', F2S(MV.MaxValue)));
       MV.MinValue := S2F(Ini.ReadString(Section, 'MinValue', F2S(MV.MinValue)));
       MV.MaxNomValue := S2F(Ini.ReadString(Section, 'MaxNomValue', F2S(MV.MaxNomValue)));

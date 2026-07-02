@@ -4779,7 +4779,6 @@ begin
   begin
     LabelTime.Text := WorkTable.ValueTime.GetStrValue;
   end
-    //LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
   else
     LabelTime.Text := '-';
 
