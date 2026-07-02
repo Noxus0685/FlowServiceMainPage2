@@ -1791,8 +1791,8 @@ begin
     DependenceType:=  INDEPENDENT;
   Value := 0;
   SetFilter(-1);
-  Accuracy := 0;
-  Error := 0.001;
+  Accuracy := -1;
+  Error := 0.1;
   MaxValue := MaxDouble;
   MinValue := 0;
 
