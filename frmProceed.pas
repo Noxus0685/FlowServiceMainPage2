@@ -1303,14 +1303,46 @@ begin
   GridDataPoints.Visible := False;
 
 end;
+procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  SetLength(AWidths, 0);
+  if AGrid = nil then
+    Exit;
+
+  SetLength(AWidths, AGrid.ColumnCount);
+  for I := 0 to AGrid.ColumnCount - 1 do
+    AWidths[I] := AGrid.Columns[I].Width;
+end;
+
+procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  if AGrid = nil then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+    if (I <= High(AWidths)) and (AWidths[I] > 0) then
+      AGrid.Columns[I].Width := AWidths[I];
+end;
+
 procedure TFrameProceed.UpdateGridDataPoints;
+var
+  ColumnWidths: TArray<Single>;
 begin
 //  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+  SaveGridColumnWidths(GridDataPoints, ColumnWidths);
   GridDataPoints.BeginUpdate;
-  GridDataPoints.RowCount := 0;
-  GridDataPoints.RowCount := Length(FCurrentSpillages);
-  GridDataPoints.Repaint;
-  GridDataPoints.EndUpdate;
+  try
+    GridDataPoints.RowCount := 0;
+    GridDataPoints.RowCount := Length(FCurrentSpillages);
+    RestoreGridColumnWidths(GridDataPoints, ColumnWidths);
+    GridDataPoints.Repaint;
+  finally
+    GridDataPoints.EndUpdate;
+  end;
   GridResults.Visible := False;
   GridDataPoints.Visible := True;
 end;
@@ -1356,20 +1388,14 @@ begin
   SetLength(FCurrentSpillages, 0);
   if ASession = nil then
   begin
-    GridResults.Visible := False;
-    GridDataPoints.Visible := True;
-    GridDataPoints.RowCount := 0;
-    GridDataPoints.Repaint;
+    UpdateGridDataPoints;
     Exit;
   end;
 
   Device := ResolveSelectedDevice;
   if (Device = nil) then
   begin
-    GridResults.Visible := False;
-    GridDataPoints.Visible := True;
-    GridDataPoints.RowCount := 0;
-    GridDataPoints.Repaint;
+    UpdateGridDataPoints;
     Exit;
   end;
 
