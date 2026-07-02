@@ -186,6 +186,7 @@ type
     ActionDeleteWorkTable: TAction;
     ActionDeleteSelectedWorkTables: TAction;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
+    function GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
@@ -693,8 +694,23 @@ begin
     TreeViewDevices.Selected := Item;
   end;
 end;
+function TFrameProceed.GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
+var
+  Sess: TSessionSpillage;
+begin
+  Result := nil;
+  if (ADevice = nil) or (ADevice.Sessions = nil) then
+    Exit;
+
+  for Sess in ADevice.Sessions do
+    if (Sess <> nil) and Sess.Active and (Sess.State <> osDeleted) then
+      Exit(Sess);
+end;
+
 procedure TFrameProceed.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
+var
+  ActiveSession: TSessionSpillage;
 begin
   PopulateTreeViewDevices;
 
@@ -705,8 +721,17 @@ begin
   end
   else if ADevice <> nil then
   begin
-    SelectTreeItemByTagObject(ADevice);
-    ShowDeviceSpillages(ADevice)
+    ActiveSession := GetActiveVisibleSession(ADevice);
+    if ActiveSession <> nil then
+    begin
+      SelectTreeItemByTagObject(ActiveSession);
+      ShowSessionSpillages(ActiveSession)
+    end
+    else
+    begin
+      SelectTreeItemByTagObject(ADevice);
+      ShowSessionSpillages(nil);
+    end;
   end;
 
   if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
@@ -829,7 +854,7 @@ begin
   end;
 
   if (Session = nil) and (Device <> nil) then
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
 
   FCurrentSession := Session;
 
@@ -2076,7 +2101,7 @@ begin
   else if Item.TagObject is TDevice then
   begin
     Device := TDevice(Item.TagObject);
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
   end;
 
   if (Session = nil) or (Device = nil) then
@@ -2244,7 +2269,7 @@ begin
   else if Item.TagObject is TDevice then
   begin
     Device := TDevice(Item.TagObject);
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
   end;
 
   if (Session = nil) or (Device = nil) or (Device.Sessions = nil) then
