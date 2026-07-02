@@ -1,4 +1,4 @@
-object FrameProceed: TFrameProceed
+﻿object FrameProceed: TFrameProceed
   Size.Width = 1564.000000000000000000
   Size.Height = 688.000000000000000000
   Size.PlatformDefault = False
@@ -604,6 +604,19 @@ object FrameProceed: TFrameProceed
           TabOrder = 4
           TextSettings.Trimming = None
         end
+        object ButtonSessionCancel: TButton
+          Align = Left
+          Hint = #1054#1090#1084#1077#1085#1072
+          Position.X = 222.000000000000000000
+          Size.Width = 44.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'canceltoolbutton'
+          TabOrder = 5
+          Text = #1054#1090#1084#1077#1085#1072
+          TextSettings.Trimming = None
+          OnClick = ButtonSessionCancelClick
+        end
       end
       object Layout19: TLayout
         Align = Left
@@ -771,69 +784,6 @@ object FrameProceed: TFrameProceed
     Size.Height = 44.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
-    object btnOK: TCornerButton
-      Align = Right
-      StyledSettings = [Family, Size, Style]
-      ModalResult = 1
-      Margins.Left = 10.000000000000000000
-      Margins.Top = 10.000000000000000000
-      Margins.Right = 10.000000000000000000
-      Margins.Bottom = 10.000000000000000000
-      Position.X = 1427.000000000000000000
-      Position.Y = 10.000000000000000000
-      Sides = [Top, Left, Bottom, Right]
-      Size.Width = 127.000000000000000000
-      Size.Height = 24.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 2
-      Text = #1047#1072#1082#1088#1099#1090#1100
-      TextSettings.FontColor = claDarkgreen
-      TextSettings.Trimming = None
-      XRadius = 3.000000000000000000
-      YRadius = 3.000000000000000000
-    end
-    object CornerButton1: TCornerButton
-      Align = Right
-      StyledSettings = [Family, Size, Style]
-      ModalResult = 1
-      Margins.Left = 10.000000000000000000
-      Margins.Top = 10.000000000000000000
-      Margins.Right = 10.000000000000000000
-      Margins.Bottom = 10.000000000000000000
-      Position.X = 1133.000000000000000000
-      Position.Y = 10.000000000000000000
-      Sides = [Top, Left, Bottom, Right]
-      Size.Width = 127.000000000000000000
-      Size.Height = 24.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 1
-      Text = #1042#1099#1073#1088#1072#1090#1100
-      TextSettings.FontColor = claDarkgreen
-      TextSettings.Trimming = None
-      XRadius = 3.000000000000000000
-      YRadius = 3.000000000000000000
-    end
-    object CornerButtonEditDevice: TCornerButton
-      Align = Right
-      StyledSettings = [Family, Size, Style]
-      ModalResult = 1
-      Margins.Left = 10.000000000000000000
-      Margins.Top = 10.000000000000000000
-      Margins.Right = 10.000000000000000000
-      Margins.Bottom = 10.000000000000000000
-      Position.X = 1280.000000000000000000
-      Position.Y = 10.000000000000000000
-      Sides = [Top, Left, Bottom, Right]
-      Size.Width = 127.000000000000000000
-      Size.Height = 24.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 0
-      Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100
-      TextSettings.FontColor = claDarkgreen
-      TextSettings.Trimming = None
-      XRadius = 3.000000000000000000
-      YRadius = 3.000000000000000000
-    end
   end
   object PopupMenuGridDataPoints: TPopupMenu
     Left = 578
