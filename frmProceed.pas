@@ -146,7 +146,6 @@ type
     ButtonSessionClearPoints: TButton;
     ButtonSessionClose: TButton;
     ButtonSessionDeviceAdd: TButton;
-    ButtonSessionCancel: TButton;
     Layout19: TLayout;
     Layout20: TLayout;
     ComboBoxUnitsResult: TComboBox;
@@ -183,6 +182,7 @@ type
     ActionSessionDeviceAdd: TAction;
     ActionDeleteWorkTable: TAction;
     ActionDeleteSelectedWorkTables: TAction;
+    btnCancel: TCornerButton;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
     function GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
@@ -265,6 +265,7 @@ type
     procedure GridDataPointsColumnMoved(Column: TColumn; FromIndex,
       ToIndex: Integer);
     procedure btnOKClick(Sender: TObject);
+    procedure btnCancelClick(Sender: TObject);
   private
     FFrameCalibrCoefs: TFrameCalibrCoefs;
     FWorkTableManager: TWorkTableManager;
@@ -686,9 +687,14 @@ begin
   DbgProceedTree(1114, 'AddProcessingDeviceFromSelection EXIT'#13#10 + GetSelectedTreeDebugText);
 end;
 
+procedure TFrameProceed.btnCancelClick(Sender: TObject);
+begin
+  CancelProcessingChanges;
+end;
+
 procedure TFrameProceed.btnOKClick(Sender: TObject);
 begin
-  RefreshResultsTab;
+  CancelProcessingChanges;
 end;
 
 procedure TFrameProceed.UpdateTreeViewDeviceTagObjects;

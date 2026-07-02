@@ -1,23 +1,23 @@
-﻿object FrameProceed: TFrameProceed
+object FrameProceed: TFrameProceed
   Size.Width = 1564.000000000000000000
   Size.Height = 688.000000000000000000
   Size.PlatformDefault = False
   object LayoutMiddle: TLayout
     Align = Client
     Size.Width = 1564.000000000000000000
-    Size.Height = 611.000000000000000000
+    Size.Height = 609.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 2
     object LayoutCenter: TLayout
       Align = Client
       Size.Width = 963.000000000000000000
-      Size.Height = 611.000000000000000000
+      Size.Height = 609.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 7
       object Layout18: TLayout
         Align = Client
         Size.Width = 963.000000000000000000
-        Size.Height = 611.000000000000000000
+        Size.Height = 609.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object GridDataPoints: TGrid
@@ -215,14 +215,14 @@
           Margins.Left = 2.000000000000000000
           PopupMenu = PopupMenuGridResults
           Size.Width = 961.000000000000000000
-          Size.Height = 611.000000000000000000
+          Size.Height = 609.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           Options = [ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
           OnSelChanged = GridResultsSelChanged
           OnGetValue = GridResultsGetValue
           Viewport.Width = 941.000000000000000000
-          Viewport.Height = 570.000000000000000000
+          Viewport.Height = 568.000000000000000000
           object StringColumnResultName: TStringColumn
             Header = #1048#1084#1103
             HeaderSettings.TextSettings.Trimming = Character
@@ -296,20 +296,20 @@
     object LayoutLeft: TLayout
       Align = Left
       Size.Width = 233.000000000000000000
-      Size.Height = 611.000000000000000000
+      Size.Height = 609.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 6
       object TreeViewDevices: TTreeView
         Align = Client
         PopupMenu = PopupMenuTreeViewDevices
         Size.Width = 233.000000000000000000
-        Size.Height = 611.000000000000000000
+        Size.Height = 609.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         OnMouseDown = TreeViewDevicesMouseDown
         OnChange = TreeViewDevicesChange
         Viewport.Width = 229.000000000000000000
-        Viewport.Height = 607.000000000000000000
+        Viewport.Height = 605.000000000000000000
         object TreeViewItem1: TTreeViewItem
           IsChecked = False
           IsExpanded = False
@@ -339,7 +339,7 @@
       MinSize = 20.000000000000000000
       Position.X = 233.000000000000000000
       Size.Width = 10.000000000000000000
-      Size.Height = 611.000000000000000000
+      Size.Height = 609.000000000000000000
       Size.PlatformDefault = False
     end
     object Splitter3: TSplitter
@@ -348,39 +348,39 @@
       MinSize = 20.000000000000000000
       Position.X = 1206.000000000000000000
       Size.Width = 10.000000000000000000
-      Size.Height = 611.000000000000000000
+      Size.Height = 609.000000000000000000
       Size.PlatformDefault = False
     end
     object LayoutRight: TLayout
       Align = MostRight
       Position.X = 1216.000000000000000000
       Size.Width = 348.000000000000000000
-      Size.Height = 611.000000000000000000
+      Size.Height = 609.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 9
       object Panel1: TPanel
         Align = Client
         Size.Width = 348.000000000000000000
-        Size.Height = 611.000000000000000000
+        Size.Height = 609.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object TabControlSessionProperties: TTabControl
           Align = Client
           Size.Width = 348.000000000000000000
-          Size.Height = 611.000000000000000000
+          Size.Height = 609.000000000000000000
           Size.PlatformDefault = False
           TabIndex = 1
           TabOrder = 0
           TabPosition = PlatformDefault
           Sizes = (
             348s
-            585s
+            583s
             348s
-            585s
+            583s
             348s
-            585s
+            583s
             348s
-            585s)
+            583s)
           object TabItemSessionProperties: TTabItem
             CustomIcon = <
               item
@@ -398,7 +398,7 @@
             object LayoutSessionProperties: TLayout
               Align = Client
               Size.Width = 348.000000000000000000
-              Size.Height = 585.000000000000000000
+              Size.Height = 583.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
               object LabelCoefs: TLabel
@@ -604,19 +604,6 @@
           TabOrder = 4
           TextSettings.Trimming = None
         end
-        object ButtonSessionCancel: TButton
-          Align = Left
-          Hint = #1054#1090#1084#1077#1085#1072
-          Position.X = 222.000000000000000000
-          Size.Width = 44.000000000000000000
-          Size.Height = 32.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = 'canceltoolbutton'
-          TabOrder = 5
-          Text = #1054#1090#1084#1077#1085#1072
-          TextSettings.Trimming = None
-          OnClick = ButtonSessionCancelClick
-        end
       end
       object Layout19: TLayout
         Align = Left
@@ -779,11 +766,33 @@
   end
   object lyt1: TLayout
     Align = MostBottom
-    Position.Y = 644.000000000000000000
+    Position.Y = 642.000000000000000000
     Size.Width = 1564.000000000000000000
-    Size.Height = 44.000000000000000000
+    Size.Height = 46.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
+    object btnCancel: TCornerButton
+      Align = Right
+      StyledSettings = [Family, Size, Style]
+      ModalResult = 2
+      Margins.Left = 10.000000000000000000
+      Margins.Top = 10.000000000000000000
+      Margins.Right = 10.000000000000000000
+      Margins.Bottom = 10.000000000000000000
+      Position.X = 1427.000000000000000000
+      Position.Y = 10.000000000000000000
+      Sides = [Top, Left, Bottom, Right]
+      Size.Width = 127.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      Text = #1054#1090#1084#1077#1085#1072
+      TextSettings.FontColor = claDarkgreen
+      TextSettings.Trimming = None
+      XRadius = 3.000000000000000000
+      YRadius = 3.000000000000000000
+      OnClick = btnOKClick
+    end
   end
   object PopupMenuGridDataPoints: TPopupMenu
     Left = 578
