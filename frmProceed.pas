@@ -189,7 +189,7 @@ type
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
     procedure SaveProcessingDevices;
-    procedure SavePendingProcessingChanges;
+    procedure SavePendingProcessingChanges(Sender: TObject);
     procedure CancelProcessingChanges;
     procedure LoadProcessingDevices;
     procedure UpdateTreeViewDeviceTagObjects;
@@ -278,6 +278,7 @@ type
     FSessionEtalon: TFlowMeter;
     FSkipPointDeleteConfirm: Boolean;
     FPointDeleteOwner: TObject;
+    FProcessingChangesSaved: Boolean;
   public
     { Public declarations }
     procedure Initialize;
@@ -333,7 +334,9 @@ end;
 
 destructor TFrameProceed.Destroy;
 begin
-  SavePendingProcessingChanges;
+  if Assigned(AppServices) then
+    AppServices.OnBeforeShutdown := nil;
+
   FreeAndNil(FFrameCalibrCoefs);
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
@@ -501,18 +504,38 @@ begin
 end;
 
 
-procedure TFrameProceed.SavePendingProcessingChanges;
+procedure TFrameProceed.SavePendingProcessingChanges(Sender: TObject);
 var
+  Services: TAppServices;
+  DM: TManagerTTableDM;
   Repo: TDeviceRepository;
   Device: TDevice;
 begin
-  SaveProcessingDevices;
-
-  if (AppServices.DataManager = nil) or
-     (AppServices.DataManager.DeviceRepositories = nil) then
+  if FProcessingChangesSaved then
     Exit;
 
-  for Repo in AppServices.DataManager.DeviceRepositories do
+  FProcessingChangesSaved := True;
+
+  Services := nil;
+  DM := nil;
+
+  if Sender is TAppServices then
+    Services := TAppServices(Sender)
+  else if Assigned(AppServices) then
+    Services := AppServices;
+
+  if Assigned(Services) then
+    DM := Services.DataManager;
+
+  if DM = nil then
+    DM := uDataManager.DataManager;
+
+  if (DM = nil) or (DM.DeviceRepositories = nil) then
+    Exit;
+
+  SaveProcessingDevices;
+
+  for Repo in DM.DeviceRepositories do
   begin
     if (Repo = nil) or (Repo.Devices = nil) then
       Continue;
