@@ -1687,6 +1687,9 @@ begin
 
      swtCOMPLETE:
       begin
+        SetValues;
+        UpdateForm;
+
         GlowMesYellow.Enabled := False;
         GlowMesRed.Enabled := False;
         GlowMesGreen.Enabled := True;
@@ -1695,7 +1698,7 @@ begin
         TestButton.Enabled := True;
         ButtonCancel.Visible := True;
         GlowEffectCancelRed.Enabled := True;
-        UpdateForm;
+
       end;
 
     swtFAILURE:
@@ -4852,7 +4855,7 @@ begin
       LabelNameTemperture.Text := WorkTable.ValueTemperture.GetStrFullName;
 
 
-  MinImpTotalValue := nil;
+ { MinImpTotalValue := nil;
   for I := 0 to WorkTable.DeviceChannels.Count - 1 do
     if (WorkTable.DeviceChannels[I] <> nil) and
        WorkTable.DeviceChannels[I].Enabled and
@@ -4866,6 +4869,11 @@ begin
 
   if MinImpTotalValue <> nil then
     LabelImp.Text := MinImpTotalValue.GetStrValue
+  else
+    LabelImp.Text := '0';  }
+
+    if WorkTable.TableFlow.ValueImpTotal <> nil then
+    LabelImp.Text := WorkTable.TableFlow.ValueImpTotal.GetStrValue
   else
     LabelImp.Text := '0';
 
