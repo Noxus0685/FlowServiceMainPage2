@@ -1369,7 +1369,7 @@ begin
   ValueType := PARAM_TYPE;
   Value := 0;
   SetFilter(-1);
-  Accuracy := 0;
+  Accuracy := -1;
   Error := 0.001;
   Name := 'Время';
   ShrtName := 'T';

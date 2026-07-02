@@ -1876,6 +1876,16 @@ var
   CurrentTime: Double;
   CurrentImpulse: Int64;
   CurrentVolume: Double;
+
+  NeedTime: Boolean;
+  NeedImpulse: Boolean;
+  NeedVolume: Boolean;
+
+  TimeReached: Boolean;
+  ImpulseReached: Boolean;
+  VolumeReached: Boolean;
+
+  HasAnyLimit: Boolean;
 begin
   Result := False;
   AReason := '';
@@ -1888,37 +1898,62 @@ begin
   if not Assigned(Point) then
     Exit;
 
+  NeedTime :=
+    (scTime in Point.StopCriteria) and
+    (Point.LimitTime > 0);
+
+  NeedImpulse :=
+    (scImpulse in Point.StopCriteria) and
+    (Point.LimitImp > 0);
+
+  NeedVolume :=
+    (scVolume in Point.StopCriteria) and
+    (Point.LimitVolume > 0);
+
+  HasAnyLimit := NeedTime or NeedImpulse or NeedVolume;
+
+  if not HasAnyLimit then
+    Exit;
+
   CurrentTime := GetCurrentStopTimeValue;
   CurrentImpulse := GetCurrentStopImpulseValue;
   CurrentVolume := GetCurrentStopVolumeValue;
 
-  if (scTime in Point.StopCriteria) and
-     (Point.LimitTime > 0) and
-     (CurrentTime >= Point.LimitTime) then
-  begin
-    AReason := Format('Достигнут лимит времени: текущее %.3f с, лимит %.3f с',
-      [CurrentTime, Point.LimitTime]);
-    Exit(True);
-  end;
+  TimeReached :=
+    (not NeedTime) or
+    (CurrentTime >= Point.LimitTime);
 
-  if (scImpulse in Point.StopCriteria) and
-     (Point.LimitImp > 0) and
-     (CurrentImpulse >= Point.LimitImp) then
-  begin
-    AReason := Format('Достигнут лимит импульсов: текущее %d, лимит %d',
-      [CurrentImpulse, Point.LimitImp]);
-    Exit(True);
-  end;
+  ImpulseReached :=
+    (not NeedImpulse) or
+    (CurrentImpulse >= Point.LimitImp);
 
-  if (scVolume in Point.StopCriteria) and
-     (Point.LimitVolume > 0) and
-     (CurrentVolume >= Point.LimitVolume) then
+  VolumeReached :=
+    (not NeedVolume) or
+    (CurrentVolume >= Point.LimitVolume);
+
+  Result := TimeReached and ImpulseReached and VolumeReached;
+
+  if Result then
   begin
-    AReason := Format('Достигнут лимит объёма: текущее %.6f, лимит %.6f',
-      [CurrentVolume, Point.LimitVolume]);
-    Exit(True);
+    AReason := 'Достигнуты все заданные лимиты остановки';
+
+    if NeedTime then
+      AReason := AReason + Format(
+        '. Время: текущее %.3f с, лимит %.3f с',
+        [CurrentTime, Point.LimitTime]);
+
+    if NeedImpulse then
+      AReason := AReason + Format(
+        '. Импульсы: текущее %d, лимит %d',
+        [CurrentImpulse, Point.LimitImp]);
+
+    if NeedVolume then
+      AReason := AReason + Format(
+        '. Объём: текущее %.6f, лимит %.6f',
+        [CurrentVolume, Point.LimitVolume]);
   end;
 end;
+
 
 function TMeasurementRun.BuildCommandStopLimitDetails(APoint: TDevicePoint; const AReason: string): string;
 begin
