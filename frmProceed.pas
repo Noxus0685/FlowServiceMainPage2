@@ -186,6 +186,7 @@ type
     ActionDeleteWorkTable: TAction;
     ActionDeleteSelectedWorkTables: TAction;
     function FindProcessingDeviceByUUID(const ADeviceUUID: string): TDevice;
+    function GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
@@ -693,9 +694,26 @@ begin
     TreeViewDevices.Selected := Item;
   end;
 end;
+function TFrameProceed.GetActiveVisibleSession(ADevice: TDevice): TSessionSpillage;
+var
+  Sess: TSessionSpillage;
+begin
+  Result := nil;
+  if (ADevice = nil) or (ADevice.Sessions = nil) then
+    Exit;
+
+  for Sess in ADevice.Sessions do
+    if (Sess <> nil) and Sess.Active and (Sess.State <> osDeleted) then
+      Exit(Sess);
+end;
+
 procedure TFrameProceed.RefreshMeasurementsAfterSessionAction(ADevice: TDevice;
   ASession: TSessionSpillage);
+var
+  ActiveSession: TSessionSpillage;
 begin
+  PopulateTreeViewDevices;
+
   if ASession <> nil then
   begin
     SelectTreeItemByTagObject(ASession);
@@ -703,8 +721,17 @@ begin
   end
   else if ADevice <> nil then
   begin
-    SelectTreeItemByTagObject(ADevice);
-    ShowDeviceSpillages(ADevice)
+    ActiveSession := GetActiveVisibleSession(ADevice);
+    if ActiveSession <> nil then
+    begin
+      SelectTreeItemByTagObject(ActiveSession);
+      ShowSessionSpillages(ActiveSession)
+    end
+    else
+    begin
+      SelectTreeItemByTagObject(ADevice);
+      ShowSessionSpillages(nil);
+    end;
   end;
 
   if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
@@ -827,7 +854,7 @@ begin
   end;
 
   if (Session = nil) and (Device <> nil) then
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
 
   FCurrentSession := Session;
 
@@ -929,7 +956,7 @@ var
     if ADevice.Sessions <> nil then
       for Sess in ADevice.Sessions do
       begin
-        if Sess = nil then
+        if (Sess = nil) or (Sess.State = osDeleted) then
           Continue;
 
         SessionItem := TTreeViewItem.Create(TreeViewDevices);
@@ -1331,8 +1358,18 @@ end;
 procedure TFrameProceed.UpdateGridDataPoints;
 var
   ColumnWidths: TArray<Single>;
+  I, Count: Integer;
 begin
 //  UpdateGridDataPointsHeaders(FActiveWorkTable.TableFlow.ValueVolume.GetDimName, FActiveWorkTable.TableFlow.ValueVolumeFlow.GetDimName);
+  Count := 0;
+  for I := 0 to High(FCurrentSpillages) do
+    if (FCurrentSpillages[I] <> nil) and (FCurrentSpillages[I].State <> osDeleted) then
+    begin
+      FCurrentSpillages[Count] := FCurrentSpillages[I];
+      Inc(Count);
+    end;
+  SetLength(FCurrentSpillages, Count);
+
   SaveGridColumnWidths(GridDataPoints, ColumnWidths);
   GridDataPoints.BeginUpdate;
   try
@@ -1352,7 +1389,7 @@ var
 begin
   Result := TObjectList<TPointSpillage>.Create(False);
   for Point in FCurrentSpillages do
-    if Point <> nil then
+    if (Point <> nil) and (Point.State <> osDeleted) then
       Result.Add(Point);
 end;
 procedure TFrameProceed.ShowDeviceSpillages(ADevice: TDevice);
@@ -1420,7 +1457,7 @@ begin
       for I := 0 to ASession.Spillages.Count - 1 do
       begin
         Point := ASession.Spillages[I];
-        if Point <> nil then
+        if (Point <> nil) and (Point.State <> osDeleted) then
         begin
           List.Add(Point);
           LogMKS('DBG SP 6003', 'ShowSessionSpillages ADD FROM Session.Spillages', DumpSpillage(Point));
@@ -2064,7 +2101,7 @@ begin
   else if Item.TagObject is TDevice then
   begin
     Device := TDevice(Item.TagObject);
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
   end;
 
   if (Session = nil) or (Device = nil) then
@@ -2232,7 +2269,7 @@ begin
   else if Item.TagObject is TDevice then
   begin
     Device := TDevice(Item.TagObject);
-    Session := Device.GetActiveSessionSpillage;
+    Session := GetActiveVisibleSession(Device);
   end;
 
   if (Session = nil) or (Device = nil) or (Device.Sessions = nil) then
@@ -2786,7 +2823,7 @@ begin
   if (ARow < 0) or (ARow >= Length(FCurrentSpillages)) then
     Exit;
   P := FCurrentSpillages[ARow];
-  if P = nil then
+  if (P = nil) or (P.State = osDeleted) then
     Exit;
 
   CurrentDevice := nil;
