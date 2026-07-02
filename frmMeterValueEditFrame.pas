@@ -36,8 +36,6 @@ type
     EditMax: TEdit;
     EditAccuracy: TEdit;
     EditError: TEdit;
-    EditMinNomValue: TEdit;
-    EditMaxNomValue: TEdit;
     EditNameValueRate: TEdit;
     EditValueRate: TEdit;
     EditNameValueMultiplier: TEdit;
@@ -98,8 +96,6 @@ begin
   AddSectionRow('Точность');
   AddEditRow('Знаков после запятой', EditAccuracy);
   AddEditRow('Погрешность форматирования', EditError);
-  AddEditRow('Мин. номинальное значение', EditMinNomValue);
-  AddEditRow('Макс. номинальное значение', EditMaxNomValue);
   AddSectionRow('Коэффициенты');
   AddEditRow('Наименование Rate', EditNameValueRate);
   AddEditRow('Значение Rate', EditValueRate);
@@ -323,8 +319,6 @@ begin
       EditMax.Text := '';
       EditAccuracy.Text := '';
       EditError.Text := '';
-      EditMinNomValue.Text := '';
-      EditMaxNomValue.Text := '';
       EditNameValueRate.Text := '';
       EditValueRate.Text := '';
       EditNameValueMultiplier.Text := '';
@@ -344,8 +338,6 @@ begin
     EditMax.Text := FMeterValue.GetStrNum(FMeterValue.MaxValue);
     EditAccuracy.Text := IntToStr(FMeterValue.Accuracy);
     EditError.Text := FloatToStr(FMeterValue.Error);
-    EditMinNomValue.Text := FMeterValue.GetStrNum(FMeterValue.MinNomValue);
-    EditMaxNomValue.Text := FMeterValue.GetStrNum(FMeterValue.MaxNomValue);
     EditName.Text := FMeterValue.Name;
     EditType.Text := FMeterValue.&Type;
     EditShrtName.Text := FMeterValue.ShrtName;
@@ -411,8 +403,6 @@ begin
   FMeterValue.MaxValue := FMeterValue.GetDoubleNum(EditMax.Text);
   FMeterValue.Accuracy := StrToIntDef(Trim(EditAccuracy.Text), FMeterValue.Accuracy);
   FMeterValue.Error := SafeFloat(EditError.Text);
-  FMeterValue.MinNomValue := FMeterValue.GetDoubleNum(EditMinNomValue.Text);
-  FMeterValue.MaxNomValue := FMeterValue.GetDoubleNum(EditMaxNomValue.Text);
   FMeterValue.CoefK := SafeFloat(EditCoefK.Text);
   FMeterValue.CoefP := SafeFloat(EditCoefP.Text);
   FMeterValue.SetToSave(CheckBoxIsToSave.IsChecked);
