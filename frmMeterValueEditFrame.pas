@@ -34,6 +34,9 @@ type
     ComboValueDim: TComboBox;
     EditMin: TEdit;
     EditMax: TEdit;
+    EditAccuracy: TEdit;
+    EditError: TEdit;
+    CheckBoxShowTrailingZeros: TCheckBox;
     EditNameValueRate: TEdit;
     EditValueRate: TEdit;
     EditNameValueMultiplier: TEdit;
@@ -91,6 +94,10 @@ begin
   AddComboRow('Размерность', ComboValueDim);
   AddEditRow('Минимальное значение', EditMin);
   AddEditRow('Максимальное значение', EditMax);
+  AddSectionRow('Точность');
+  AddEditRow('Знаков после запятой', EditAccuracy);
+  AddEditRow('Погрешность форматирования', EditError);
+  AddCheckRow('ShowTrailingZeros', CheckBoxShowTrailingZeros);
   AddSectionRow('Коэффициенты');
   AddEditRow('Наименование Rate', EditNameValueRate);
   AddEditRow('Значение Rate', EditValueRate);
@@ -312,6 +319,9 @@ begin
       ComboValueDim.ItemIndex := -1;
       EditMin.Text := '';
       EditMax.Text := '';
+      EditAccuracy.Text := '';
+      EditError.Text := '';
+      CheckBoxShowTrailingZeros.IsChecked := False;
       EditNameValueRate.Text := '';
       EditValueRate.Text := '';
       EditNameValueMultiplier.Text := '';
@@ -329,6 +339,9 @@ begin
     FillDimensionCombo;
     EditMin.Text := FMeterValue.GetStrNum(FMeterValue.MinValue);
     EditMax.Text := FMeterValue.GetStrNum(FMeterValue.MaxValue);
+    EditAccuracy.Text := IntToStr(FMeterValue.Accuracy);
+    EditError.Text := FloatToStr(FMeterValue.Error);
+    CheckBoxShowTrailingZeros.IsChecked := FMeterValue.ShowTrailingZeros;
     EditName.Text := FMeterValue.Name;
     EditType.Text := FMeterValue.&Type;
     EditShrtName.Text := FMeterValue.ShrtName;
@@ -392,6 +405,9 @@ begin
   FMeterValue.SetValue(EditValue.Text);
   FMeterValue.MinValue := FMeterValue.GetDoubleNum(EditMin.Text);
   FMeterValue.MaxValue := FMeterValue.GetDoubleNum(EditMax.Text);
+  FMeterValue.Accuracy := StrToIntDef(Trim(EditAccuracy.Text), FMeterValue.Accuracy);
+  FMeterValue.Error := SafeFloat(EditError.Text);
+  FMeterValue.ShowTrailingZeros := CheckBoxShowTrailingZeros.IsChecked;
   FMeterValue.CoefK := SafeFloat(EditCoefK.Text);
   FMeterValue.CoefP := SafeFloat(EditCoefP.Text);
   FMeterValue.SetToSave(CheckBoxIsToSave.IsChecked);
