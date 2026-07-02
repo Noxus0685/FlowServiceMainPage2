@@ -4294,7 +4294,7 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
-  UpdateUI;
+  UpdateUIFromValues;
   UpdateGrids;
   UpdateUIScale;
 

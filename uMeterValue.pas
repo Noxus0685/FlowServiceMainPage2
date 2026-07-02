@@ -124,7 +124,6 @@ type
     ShowTrailingZeros: Boolean;
 
     Error: Double;
-    ShowTrailingZeros: Boolean;
 
     ARRAY_SIZE: Integer;
 
