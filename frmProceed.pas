@@ -1705,7 +1705,6 @@ begin
 
   if SameText(Item.Text, '...') then
   begin
-    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
     DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
     AddActionMenuItem(ActionSessionSynchTable);
@@ -1715,7 +1714,6 @@ begin
 
   if Item.TagObject is TWorkTable then
   begin
-    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddActionMenuItem(ActionDeleteWorkTable);
     AddActionMenuItem(ActionDeleteSelectedWorkTables);
     AddActionMenuItem(ActionSessionSynchTable);
@@ -1761,36 +1759,17 @@ var
   I: Integer;
   DeviceUUIDsOnTables: TStringList;
   DevicesToRemove: TList<TDevice>;
-
-  procedure RemoveCollectedDevices;
-  var
-    D: TDevice;
-  begin
-    if (FProcessingDevices = nil) or (DevicesToRemove.Count = 0) then
-      Exit;
-
-    for D in DevicesToRemove do
-      FProcessingDevices.Remove(D);
-  end;
+  D: TDevice;
 begin
   DbgProceedTree(1504, 'MenuTreeViewDevicesClearClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
 
   Item := TreeViewDevices.Selected;
-
-  if SameText(Item.Text, '...') then
-  begin
-    if FProcessingDevices <> nil then
-    begin
-      FProcessingDevices.Clear;
-    end;
-
-    RefreshResultsAfterDevicesAction;
+  if not SameText(Item.Text, 'прочее') then
     Exit;
-  end;
 
-  if (FProcessingDevices = nil) then
+  if FProcessingDevices = nil then
     Exit;
 
   DeviceUUIDsOnTables := TStringList.Create;
@@ -1799,44 +1778,27 @@ begin
     DeviceUUIDsOnTables.Sorted := False;
     DeviceUUIDsOnTables.Duplicates := dupIgnore;
 
-    if Item.TagObject is TWorkTable then
-    begin
-      WT := TWorkTable(Item.TagObject);
-      if (WT <> nil) and (WT.DeviceChannels <> nil) then
+    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if (WT = nil) or (WT.DeviceChannels = nil) then
+          Continue;
+
         for Ch in WT.DeviceChannels do
           if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
             DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
+      end;
 
-      for Device in FProcessingDevices do
-        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) >= 0) then
-          DevicesToRemove.Add(Device);
+    for Device in FProcessingDevices do
+      if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
+        DevicesToRemove.Add(Device);
 
-      RemoveCollectedDevices;
-      RefreshResultsAfterDevicesAction;
-      Exit;
-    end;
+    for D in DevicesToRemove do
+      FProcessingDevices.Remove(D);
 
-    if SameText(Item.Text, 'прочее') then
-    begin
-      if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-        for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
-        begin
-          WT := FWorkTableManager.WorkTables[I];
-          if (WT = nil) or (WT.DeviceChannels = nil) then
-            Continue;
-
-          for Ch in WT.DeviceChannels do
-            if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-              DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
-        end;
-
-      for Device in FProcessingDevices do
-        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
-          DevicesToRemove.Add(Device);
-
-      RemoveCollectedDevices;
-      RefreshResultsAfterDevicesAction;
-    end;
+    SaveProcessingDevices;
+    RefreshResultsAfterDevicesAction;
   finally
     DevicesToRemove.Free;
     DeviceUUIDsOnTables.Free;
@@ -1846,6 +1808,40 @@ procedure TFrameProceed.SyncProcessingDevicesFromTable(AWorkTable: TWorkTable;
   const AClearBeforeSync: Boolean);
 var
   Ch: TChannel;
+  Device: TDevice;
+
+  function HasDeviceData(AChannel: TChannel; ADevice: TDevice): Boolean;
+  begin
+    Result := False;
+
+    if AChannel <> nil then
+    begin
+      Result := (Trim(AChannel.TypeName) <> '') or
+        (Trim(AChannel.Serial) <> '') or
+        (AChannel.Signal >= 0) or
+        (Trim(AChannel.TypeUUID) <> '') or
+        (Trim(AChannel.RepoTypeName) <> '') or
+        (Trim(AChannel.RepoTypeUUID) <> '') or
+        (Trim(AChannel.RepoDeviceName) <> '') or
+        (Trim(AChannel.RepoDeviceUUID) <> '');
+
+      if Result then
+        Exit;
+    end;
+
+    if ADevice = nil then
+      Exit;
+
+    Result := (Trim(ADevice.Name) <> '') or
+      (Trim(ADevice.SerialNumber) <> '') or
+      (ADevice.OutputType >= 0) or
+      (Trim(ADevice.DeviceTypeName) <> '') or
+      (Trim(ADevice.DeviceTypeUUID) <> '') or
+      (Trim(ADevice.RepoTypeName) <> '') or
+      (Trim(ADevice.RepoTypeUUID) <> '') or
+      (Trim(ADevice.RepoDeviceName) <> '') or
+      (Trim(ADevice.RepoDeviceUUID) <> '');
+  end;
 begin
   if FProcessingDevices = nil then
     Exit;
@@ -1858,7 +1854,11 @@ begin
   if (AWorkTable <> nil) and (AWorkTable.DeviceChannels <> nil) then
     for Ch in AWorkTable.DeviceChannels do
       if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-        AddProcessingDevice(Ch.FlowMeter.Device);
+      begin
+        Device := Ch.FlowMeter.Device;
+        if HasDeviceData(Ch, Device) then
+          AddProcessingDevice(Device);
+      end;
 end;
 procedure TFrameProceed.SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
 var
@@ -1901,6 +1901,7 @@ begin
   else
     Exit;
 
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.MenuTreeViewDevicesAddClick(Sender: TObject);
@@ -2084,6 +2085,7 @@ begin
     Exit;
 
   RemoveProcessingDevice(TDevice(Item.TagObject));
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionDeleteExecute(Sender: TObject);
