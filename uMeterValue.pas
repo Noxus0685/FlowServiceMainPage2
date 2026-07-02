@@ -124,6 +124,7 @@ type
     ShowTrailingZeros: Boolean;
 
     Error: Double;
+    ShowTrailingZeros: Boolean;
 
     ARRAY_SIZE: Integer;
 
@@ -319,6 +320,7 @@ begin
   Accuracy := 5;
   ShowTrailingZeros := True;
   Error := 5;
+  ShowTrailingZeros := True;
   ARRAY_SIZE := 1000;
   CoefK := 1;
   CoefP := 0;
@@ -396,6 +398,7 @@ begin
   Accuracy := AMeterValue.Accuracy;
   ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   Error := AMeterValue.Error;
+  ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   MaxValue := AMeterValue.MaxValue;
   MinValue := AMeterValue.MinValue;
   CurrentDimIndex := AMeterValue.CurrentDimIndex;
@@ -1358,6 +1361,7 @@ begin
   Accuracy := AMeterValue.Accuracy;
   ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   Error := AMeterValue.Error;
+  ShowTrailingZeros := AMeterValue.ShowTrailingZeros;
   MaxValue := AMeterValue.MaxValue;
   MinValue := AMeterValue.MinValue;
   MaxNomValue := AMeterValue.MaxNomValue;
@@ -1381,8 +1385,9 @@ begin
   ValueType := PARAM_TYPE;
   Value := 0;
   SetFilter(-1);
-  Accuracy := 0;
+  Accuracy := -1;
   Error := 0.001;
+  ShowTrailingZeros := False;
   Name := 'Время';
   ShrtName := 'T';
   Dimensions.Clear;
@@ -2222,6 +2227,7 @@ begin
       Ini.WriteInteger(Section, 'Accuracy', MV.Accuracy);
       Ini.WriteBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       Ini.WriteFloat(Section, 'Error', MV.Error);
+      Ini.WriteBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       Ini.WriteFloat(Section, 'MaxValue', MV.MaxValue);
       Ini.WriteFloat(Section, 'MinValue', MV.MinValue);
       Ini.WriteFloat(Section, 'MaxNomValue', MV.MaxNomValue);
@@ -2458,6 +2464,7 @@ begin
       MV.Accuracy := Ini.ReadInteger(Section, 'Accuracy', MV.Accuracy);
       MV.ShowTrailingZeros := Ini.ReadBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       MV.Error := S2F(Ini.ReadString(Section, 'Error', F2S(MV.Error)));
+      MV.ShowTrailingZeros := Ini.ReadBool(Section, 'ShowTrailingZeros', MV.ShowTrailingZeros);
       MV.MaxValue := S2F(Ini.ReadString(Section, 'MaxValue', F2S(MV.MaxValue)));
       MV.MinValue := S2F(Ini.ReadString(Section, 'MinValue', F2S(MV.MinValue)));
       MV.MaxNomValue := S2F(Ini.ReadString(Section, 'MaxNomValue', F2S(MV.MaxNomValue)));

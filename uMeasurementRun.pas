@@ -185,6 +185,12 @@ type
 
   TMeasurementRunEvent = procedure(ASender: TObject; AEvent: EMeasurementEvent; const AError: TErrorInfo) of object;
 
+  TMeasurementStopControlMode = (
+    scmNone,
+    scmControllerTime,
+    scmControllerImpulse,
+    scmCommand
+  );
 
 
   TMeasurementRun = class(TObservableObject)
@@ -255,6 +261,11 @@ type
     function CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
     function SetupPoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+    function GetCurrentStopTimeValue: Double;
+    function GetCurrentStopImpulseValue: Int64;
+    function GetCurrentStopVolumeValue: Double;
+    function IsCommandStopLimitReached(out AReason: string): Boolean;
+    function BuildCommandStopLimitDetails(APoint: TDevicePoint; const AReason: string): string;
     function ShouldUseAllPoints: Boolean;
     function ShouldSetupConditions: Boolean;
     function ShouldWaitStable: Boolean;
@@ -311,6 +322,8 @@ type
 
   end;
 
+function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
+
 implementation
 
 function AccuracyToRange(const AAccuracy: string; out AMin, AMax: Double): Boolean;
@@ -355,6 +368,78 @@ begin
   if not AccuracyToRange(AAccuracy, MinVal, MaxVal) then
     Exit(MaxDouble);
   Result := MaxVal - MinVal;
+end;
+
+
+function GetMeasurementStopControlMode(APoint: TDevicePoint): TMeasurementStopControlMode;
+var
+  ActiveCriteria: TSpillageStopCriteria;
+begin
+  Result := scmNone;
+
+  if not Assigned(APoint) then
+    Exit;
+
+  ActiveCriteria := [];
+
+  if (scTime in APoint.StopCriteria) and (APoint.LimitTime > 0) then
+    Include(ActiveCriteria, scTime);
+
+  if (scImpulse in APoint.StopCriteria) and (APoint.LimitImp > 0) then
+    Include(ActiveCriteria, scImpulse);
+
+  if (scVolume in APoint.StopCriteria) and (APoint.LimitVolume > 0) then
+    Include(ActiveCriteria, scVolume);
+
+  if ActiveCriteria = [scTime] then
+    Exit(scmControllerTime);
+
+  if ActiveCriteria = [scImpulse] then
+    Exit(scmControllerImpulse);
+
+  Result := scmCommand;
+end;
+
+function MeasurementStopControlModeToString(AMode: TMeasurementStopControlMode): string;
+begin
+  case AMode of
+    scmNone: Result := 'scmNone';
+    scmControllerTime: Result := 'scmControllerTime';
+    scmControllerImpulse: Result := 'scmControllerImpulse';
+    scmCommand: Result := 'scmCommand';
+  else
+    Result := 'Unknown';
+  end;
+end;
+
+function StopCriteriaToLogString(ACriteria: TSpillageStopCriteria): string;
+var
+  Parts: TStringBuilder;
+begin
+  Parts := TStringBuilder.Create;
+  try
+    if scTime in ACriteria then
+      Parts.Append('scTime');
+    if scImpulse in ACriteria then
+    begin
+      if Parts.Length > 0 then
+        Parts.Append(', ');
+      Parts.Append('scImpulse');
+    end;
+    if scVolume in ACriteria then
+    begin
+      if Parts.Length > 0 then
+        Parts.Append(', ');
+      Parts.Append('scVolume');
+    end;
+
+    if Parts.Length = 0 then
+      Result := '[]'
+    else
+      Result := '[' + Parts.ToString + ']';
+  finally
+    Parts.Free;
+  end;
 end;
 
 function IsFlowFit(AQ1: Double; AAccuracy: string; AQ2: Double): Boolean;
@@ -1717,7 +1802,184 @@ begin
   end;
 end;
 
+
+function TMeasurementRun.GetCurrentStopTimeValue: Double;
+begin
+  Result := 0;
+
+  if not Assigned(FWorkTable) then
+    Exit;
+
+  if Assigned(FWorkTable.ValueTime) then
+    Result := FWorkTable.ValueTime.GetDoubleValue
+  else
+    Result := FWorkTable.Time;
+end;
+
+function TMeasurementRun.GetCurrentStopImpulseValue: Int64;
+var
+  I: Integer;
+  Value: Double;
+  MinValue: Double;
+  HasValue: Boolean;
+begin
+  Result := 0;
+  MinValue := 0;
+  HasValue := False;
+
+  if not Assigned(FWorkTable) then
+    Exit;
+
+  if not Assigned(FWorkTable.DeviceChannels) then
+    Exit;
+
+  for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+  begin
+    if not Assigned(FWorkTable.DeviceChannels[I]) then
+      Continue;
+
+    if not FWorkTable.DeviceChannels[I].Enabled then
+      Continue;
+
+    Value := FWorkTable.DeviceChannels[I].ImpResult;
+
+    if Value <= 0 then
+      Continue;
+
+    if (not HasValue) or (Value < MinValue) then
+    begin
+      MinValue := Value;
+      HasValue := True;
+    end;
+  end;
+
+  if HasValue then
+    Result := Trunc(MinValue)
+  else
+    Result := 0;
+end;
+
+function TMeasurementRun.GetCurrentStopVolumeValue: Double;
+begin
+  Result := 0;
+
+  if not Assigned(FWorkTable) then
+    Exit;
+
+  if Assigned(FWorkTable.ValueQuantity) then
+    Result := FWorkTable.ValueQuantity.GetDoubleValue;
+end;
+
+function TMeasurementRun.IsCommandStopLimitReached(out AReason: string): Boolean;
+var
+  Point: TDevicePoint;
+  CurrentTime: Double;
+  CurrentImpulse: Int64;
+  CurrentVolume: Double;
+
+  NeedTime: Boolean;
+  NeedImpulse: Boolean;
+  NeedVolume: Boolean;
+
+  TimeReached: Boolean;
+  ImpulseReached: Boolean;
+  VolumeReached: Boolean;
+
+  HasAnyLimit: Boolean;
+begin
+  Result := False;
+  AReason := '';
+
+  if not Assigned(FWorkTable) then
+    Exit;
+
+  Point := FWorkTable.CurrentPoint;
+
+  if not Assigned(Point) then
+    Exit;
+
+  NeedTime :=
+    (scTime in Point.StopCriteria) and
+    (Point.LimitTime > 0);
+
+  NeedImpulse :=
+    (scImpulse in Point.StopCriteria) and
+    (Point.LimitImp > 0);
+
+  NeedVolume :=
+    (scVolume in Point.StopCriteria) and
+    (Point.LimitVolume > 0);
+
+  HasAnyLimit := NeedTime or NeedImpulse or NeedVolume;
+
+  if not HasAnyLimit then
+    Exit;
+
+  CurrentTime := GetCurrentStopTimeValue;
+  CurrentImpulse := GetCurrentStopImpulseValue;
+  CurrentVolume := GetCurrentStopVolumeValue;
+
+  TimeReached :=
+    (not NeedTime) or
+    (CurrentTime >= Point.LimitTime);
+
+  ImpulseReached :=
+    (not NeedImpulse) or
+    (CurrentImpulse >= Point.LimitImp);
+
+  VolumeReached :=
+    (not NeedVolume) or
+    (CurrentVolume >= Point.LimitVolume);
+
+  Result := TimeReached and ImpulseReached and VolumeReached;
+
+  if Result then
+  begin
+    AReason := 'Достигнуты все заданные лимиты остановки';
+
+    if NeedTime then
+      AReason := AReason + Format(
+        '. Время: текущее %.3f с, лимит %.3f с',
+        [CurrentTime, Point.LimitTime]);
+
+    if NeedImpulse then
+      AReason := AReason + Format(
+        '. Импульсы: текущее %d, лимит %d',
+        [CurrentImpulse, Point.LimitImp]);
+
+    if NeedVolume then
+      AReason := AReason + Format(
+        '. Объём: текущее %.6f, лимит %.6f',
+        [CurrentVolume, Point.LimitVolume]);
+  end;
+end;
+
+
+function TMeasurementRun.BuildCommandStopLimitDetails(APoint: TDevicePoint; const AReason: string): string;
+begin
+  Result := AReason;
+
+  if not Assigned(APoint) then
+    Exit;
+
+  Result := Format('%s; StopCriteria=%s; CurrentTime=%.3f; CurrentImpulse=%d; CurrentVolume=%.6f; '
+    + 'LimitTime=%.3f; LimitImp=%d; LimitVolume=%.6f; StopControlMode=%s; NextStage=%s',
+    [AReason,
+     StopCriteriaToLogString(APoint.StopCriteria),
+     GetCurrentStopTimeValue,
+     GetCurrentStopImpulseValue,
+     GetCurrentStopVolumeValue,
+     APoint.LimitTime,
+     APoint.LimitImp,
+     APoint.LimitVolume,
+     MeasurementStopControlModeToString(scmCommand),
+     MeasurementStateToString(msWaitMeasureStop)]);
+end;
+
 procedure TMeasurementRun.ProcessMeasure;
+var
+  StopControlMode: TMeasurementStopControlMode;
+  StopReason: string;
 begin
   if FWorkTable = nil then
   begin
@@ -1743,6 +2005,20 @@ begin
         SetStage(msWaitMeasureStop);
         Exit;
       end;
+  end;
+
+  StopControlMode := GetMeasurementStopControlMode(FWorkTable.CurrentPoint);
+
+  if StopControlMode = scmCommand then
+  begin
+    if IsCommandStopLimitReached(StopReason) then
+    begin
+      ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessMeasure',
+        'Достигнут программный лимит измерения',
+        BuildCommandStopLimitDetails(FWorkTable.CurrentPoint, StopReason));
+      SetStage(msWaitMeasureStop);
+      Exit;
+    end;
   end;
 
   if Int64(TThread.GetTickCount64 - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then

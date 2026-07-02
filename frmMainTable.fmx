@@ -1,11 +1,11 @@
 object FrameMainTable: TFrameMainTable
-  Size.Width = 1742.000000000000000000
+  Size.Width = 1940.000000000000000000
   Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
   object Layout: TLayout
     Align = Client
     Padding.Left = 5.000000000000000000
-    Size.Width = 1742.000000000000000000
+    Size.Width = 1940.000000000000000000
     Size.Height = 686.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
@@ -13,18 +13,18 @@ object FrameMainTable: TFrameMainTable
       Align = MostTop
       PopupMenu = PopupMenuInstrumentalLayOut
       Position.X = 5.000000000000000000
-      Size.Width = 1737.000000000000000000
+      Size.Width = 1935.000000000000000000
       Size.Height = 137.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
       object HorzScrollBoxInstrumental: THorzScrollBox
         Align = Client
         PopupMenu = PopupMenuInstrumentalLayOut
-        Size.Width = 1737.000000000000000000
+        Size.Width = 1935.000000000000000000
         Size.Height = 137.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 1
-        Viewport.Width = 1737.000000000000000000
+        Viewport.Width = 1935.000000000000000000
         Viewport.Height = 121.000000000000000000
         object LayoutConditions: TLayout
           Align = Left
@@ -1348,7 +1348,7 @@ object FrameMainTable: TFrameMainTable
       Align = MostBottom
       Position.X = 5.000000000000000000
       Position.Y = 590.000000000000000000
-      Size.Width = 1737.000000000000000000
+      Size.Width = 1935.000000000000000000
       Size.Height = 96.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 2
@@ -5449,7 +5449,7 @@ object FrameMainTable: TFrameMainTable
     end
     object LayoutCenter: TLayout
       Align = Client
-      Size.Width = 1737.000000000000000000
+      Size.Width = 1935.000000000000000000
       Size.Height = 453.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 4
@@ -5469,14 +5469,14 @@ object FrameMainTable: TFrameMainTable
         Align = Right
         Cursor = crHSplit
         MinSize = 20.000000000000000000
-        Position.X = 1057.000000000000000000
+        Position.X = 1255.000000000000000000
         Size.Width = 6.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
       end
       object PanelProperties: TPanel
         Align = Right
-        Position.X = 1063.000000000000000000
+        Position.X = 1261.000000000000000000
         Size.Width = 674.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
@@ -5491,25 +5491,25 @@ object FrameMainTable: TFrameMainTable
           TabPosition = PlatformDefault
           Sizes = (
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s
+            427s
             674s
-            448s)
+            427s)
           object TabItemMeasurmentRun: TTabItem
             CustomIcon = <
               item
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 105.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5523,8 +5523,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 81.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5538,8 +5538,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 120.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5553,8 +5553,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 95.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5568,8 +5568,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 74.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5579,7 +5579,7 @@ object FrameMainTable: TFrameMainTable
             object LayoutProtocolHost: TLayout
               Align = Client
               Size.Width = 674.000000000000000000
-              Size.Height = 448.000000000000000000
+              Size.Height = 427.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
             end
@@ -5590,8 +5590,8 @@ object FrameMainTable: TFrameMainTable
               end>
             TextSettings.Trimming = None
             IsSelected = True
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
+            Size.Width = 138.000000000000000000
+            Size.Height = 26.000000000000000000
             Size.PlatformDefault = False
             StyleLookup = ''
             TabOrder = 0
@@ -5603,13 +5603,13 @@ object FrameMainTable: TFrameMainTable
       end
       object PanelControlWorkTables: TPanel
         Align = Client
-        Size.Width = 1057.000000000000000000
+        Size.Width = 1255.000000000000000000
         Size.Height = 453.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 4
         object PanelDevices1: TPanel
           Align = Client
-          Size.Width = 1057.000000000000000000
+          Size.Width = 1255.000000000000000000
           Size.Height = 285.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 3
@@ -5618,7 +5618,7 @@ object FrameMainTable: TFrameMainTable
             CanFocus = True
             ClipChildren = True
             PopupMenu = PopupMenuDevicesGrid
-            Size.Width = 1057.000000000000000000
+            Size.Width = 1255.000000000000000000
             Size.Height = 253.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
@@ -5631,8 +5631,8 @@ object FrameMainTable: TFrameMainTable
             OnEditingDone = GridDevicesEditingDone
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1057.000000000000000000
-            Viewport.Height = 253.000000000000000000
+            Viewport.Width = 1235.000000000000000000
+            Viewport.Height = 212.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -5760,7 +5760,7 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBar1: TToolBar
-            Size.Width = 1057.000000000000000000
+            Size.Width = 1255.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
@@ -5842,13 +5842,13 @@ object FrameMainTable: TFrameMainTable
         end
         object PanelEtalons1: TPanel
           Align = Top
-          Size.Width = 1057.000000000000000000
+          Size.Width = 1255.000000000000000000
           Size.Height = 152.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 2
           object LayoutEtalons1: TLayout
             Align = Client
-            Size.Width = 1057.000000000000000000
+            Size.Width = 1255.000000000000000000
             Size.Height = 120.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
@@ -5857,7 +5857,7 @@ object FrameMainTable: TFrameMainTable
               CanFocus = True
               ClipChildren = True
               PopupMenu = PopupMenuEtalonsGrid
-              Size.Width = 1057.000000000000000000
+              Size.Width = 1255.000000000000000000
               Size.Height = 120.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
@@ -5867,8 +5867,8 @@ object FrameMainTable: TFrameMainTable
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1057.000000000000000000
-              Viewport.Height = 120.000000000000000000
+              Viewport.Width = 1251.000000000000000000
+              Viewport.Height = 79.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
@@ -5972,7 +5972,7 @@ object FrameMainTable: TFrameMainTable
             end
           end
           object ToolBarEtalons1: TToolBar
-            Size.Width = 1057.000000000000000000
+            Size.Width = 1255.000000000000000000
             Size.Height = 32.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 1
@@ -5994,7 +5994,7 @@ object FrameMainTable: TFrameMainTable
           MinSize = 20.000000000000000000
           Position.Y = 152.000000000000000000
           ShowGrip = False
-          Size.Width = 1057.000000000000000000
+          Size.Width = 1255.000000000000000000
           Size.Height = 16.000000000000000000
           Size.PlatformDefault = False
         end

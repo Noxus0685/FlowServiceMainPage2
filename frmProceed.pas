@@ -188,6 +188,7 @@ type
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
+    procedure MarkProcessingDeviceDeleted(ADevice: TDevice);
     procedure SaveProcessingDevices;
     procedure SavePendingProcessingChanges(Sender: TObject);
     procedure CancelProcessingChanges;
@@ -441,7 +442,8 @@ begin
   else
     DbgProceedTree(1302, 'AddProcessingDevice ENTER: ' + ADevice.Name + #13#10 + ADevice.UUID);
 
-  if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FProcessingDevices = nil) then
+  if (ADevice = nil) or (Trim(ADevice.UUID) = '') or (FProcessingDevices = nil) or
+     (ADevice.State = osDeleted) then
     Exit;
 
   if HasDeviceInProcessing(ADevice) then
@@ -463,6 +465,29 @@ begin
     Exit;
 
   FProcessingDevices.Remove(Existing);
+end;
+procedure TFrameProceed.MarkProcessingDeviceDeleted(ADevice: TDevice);
+var
+  Session: TSessionSpillage;
+  Point: TPointSpillage;
+begin
+  if ADevice = nil then
+    Exit;
+
+  ADevice.State := osDeleted;
+
+  if ADevice.Sessions <> nil then
+    for Session in ADevice.Sessions do
+      if Session <> nil then
+      begin
+        Session.Active := False;
+        Session.State := osDeleted;
+      end;
+
+  if ADevice.Spillages <> nil then
+    for Point in ADevice.Spillages do
+      if Point <> nil then
+        Point.State := osDeleted;
 end;
 procedure TFrameProceed.SaveProcessingDevices;
 var
@@ -929,7 +954,7 @@ begin
         if Device.Spillages <> nil then
           for Point in Device.Spillages do
             LogMKS('DBG SP 8004', 'LoadProcessingDevices LOADED SPILLAGE', DumpSpillage(Point));
-        if FindProcessingDeviceByUUID(Device.UUID) = nil then
+        if (Device.State <> osDeleted) and (FindProcessingDeviceByUUID(Device.UUID) = nil) then
           FProcessingDevices.Add(Device);
       end
       else
@@ -1072,7 +1097,7 @@ var
     Sess: TSessionSpillage;
     Point: TPointSpillage;
   begin
-    if (AParent = nil) or (ADevice = nil) then
+    if (AParent = nil) or (ADevice = nil) or (ADevice.State = osDeleted) then
       Exit;
 
     DeviceItem := TTreeViewItem.Create(TreeViewDevices);
@@ -2071,6 +2096,7 @@ end;
 procedure TFrameProceed.MenuTreeViewDevicesDeleteClick(Sender: TObject);
 var
   Item: TTreeViewItem;
+  Device: TDevice;
 begin
   DbgProceedTree(1505, 'MenuTreeViewDevicesDeleteClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
@@ -2180,6 +2206,7 @@ end;
 procedure TFrameProceed.ActionSessionDeviceRemoveExecute(Sender: TObject);
 var
   Item: TTreeViewItem;
+  Device: TDevice;
 begin
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
@@ -2188,7 +2215,9 @@ begin
   if not (Item.TagObject is TDevice) then
     Exit;
 
-  RemoveProcessingDevice(TDevice(Item.TagObject));
+  Device := TDevice(Item.TagObject);
+  MarkProcessingDeviceDeleted(Device);
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionCloseExecute(Sender: TObject);

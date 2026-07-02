@@ -1599,6 +1599,8 @@ begin
         GlowMesYellow.Enabled := False;
         ApplyMonitorIndicatorColor(TAlphaColorRec.Gray);
         ButtonCancel.Visible := False;
+
+        FActiveWorkTable.ValueTime.Accuracy:=-1;
       end;
 
     swtCONFIGED:
@@ -4292,6 +4294,8 @@ begin
 
   QuantityUnitName := ResolveQuantityUnitByFlowUnit(UnitName);
   SetDim(UnitName, QuantityUnitName);
+  UpdateUI;
+  UpdateGrids;
   UpdateUIScale;
 
   GridDevices.SetFocus;
@@ -4774,7 +4778,9 @@ begin
   UpdateConditionsCurrentValues(WorkTable);
 
   if WorkTable.ValueTime <> nil then
-    LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue)
+  begin
+    LabelTime.Text := WorkTable.ValueTime.GetStrValue;
+  end
   else
     LabelTime.Text := '-';
 
@@ -5024,8 +5030,10 @@ begin
 
   SC := FActiveWorkTable.CurrentPoint.StopCriteria;
 
+  Value:= NormalizeFloatInput(EditVolume.Text);
+
   if (Trim(EditVolume.Text) = '-') or
-     (TryStrToFloat(EditVolume.Text, Value) and SameValue(Value, -1, MinDouble)) then
+     (Value<=0) then
   begin
     FActiveWorkTable.CurrentPoint.LimitVolume := -1;
     Exclude(SC, scVolume);
@@ -5033,12 +5041,11 @@ begin
     Exit;
   end;
 
-  if TryStrToFloat(EditVolume.Text, Value) then
-  begin
+
     FActiveWorkTable.CurrentPoint.LimitVolume := Value;
     Include(SC, scVolume);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
-  end;
+
 end;
 
 procedure TFrameMainTable.EditImpExit(Sender: TObject);
