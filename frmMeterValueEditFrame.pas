@@ -97,7 +97,7 @@ begin
   AddSectionRow('Точность');
   AddEditRow('Знаков после запятой', EditAccuracy);
   AddEditRow('Погрешность форматирования', EditError);
-  AddCheckRow('ShowTrailingZeros', CheckBoxShowTrailingZeros);
+  AddCheckRow('Отображение нулей', CheckBoxShowTrailingZeros);
   AddSectionRow('Коэффициенты');
   AddEditRow('Наименование Rate', EditNameValueRate);
   AddEditRow('Значение Rate', EditValueRate);
