@@ -4719,11 +4719,20 @@ var
   Q: TFDQuery;
   KeepIDs: string;
   I: Integer;
+  RepoDevice: TDevice;
 begin
   Result := False;
 
   if (ADevice = nil) or (ADevice.Points = nil) then
     Exit;
+
+  { UpdateDevicePoint пересчитывает Q точки через прибор из репозитория.
+    Поэтому перед сохранением точек синхронизируем Qmax найденного
+    объекта с реально сохраняемым прибором: иначе при устаревшем объекте
+    в списке точки получали Q от старого/базового Qmax. }
+  RepoDevice := FindDeviceByUUID(ADevice.UUID);
+  if (RepoDevice <> nil) and (RepoDevice <> ADevice) and (ADevice.Qmax > 0) then
+    RepoDevice.Qmax := ADevice.Qmax;
 
   I := 0;
   while I < ADevice.Points.Count do

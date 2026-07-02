@@ -127,6 +127,7 @@ type
     class procedure FillDeviceFromChannel(ADevice: TDevice; AChannel: TChannel;
       AMode: TDeviceCreateMode); static;
     class procedure SyncChannelAndFlowMeter(ADevice: TDevice; AChannel: TChannel); static;
+    class procedure RecalcDevicePointQ(ADevice: TDevice); static;
     class procedure AddProtocol(AMode: TDeviceCreateMode; const AAction: string;
       ADevice: TDevice; AChannel: TChannel); static;
     class function FindDeviceByUUID(const ADeviceUUID: string; ARepo: TDeviceRepository): TDevice; static;
@@ -986,6 +987,19 @@ begin
     AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
 end;
 
+
+class procedure TDeviceCreationService.RecalcDevicePointQ(ADevice: TDevice);
+var
+  DevicePoint: TDevicePoint;
+begin
+  if (ADevice = nil) or (ADevice.Points = nil) or (ADevice.Qmax <= 0) then
+    Exit;
+
+  for DevicePoint in ADevice.Points do
+    if (DevicePoint <> nil) and (DevicePoint.FlowRate > 0) then
+      DevicePoint.Q := DevicePoint.FlowRate * ADevice.Qmax;
+end;
+
 class function TDeviceCreationService.EnsureDeviceForChannel(AChannel: TChannel;
   AWorkTable: TWorkTable; ARepo: TDeviceRepository; AMode: TDeviceCreateMode;
   ASourceDevice: TDevice; ACurrentPoint: TDevicePoint): TDevice;
@@ -1048,6 +1062,14 @@ begin
 
   if (AMode <> dcmGridPlaceholder) or WasCreated or WasPlaceholder then
     FillDeviceFromChannel(Result, AChannel, AMode);
+
+  if (AMode = dcmMeasurementPromoted) and (ASourceDevice <> nil) and
+     (ASourceDevice <> Result) and (ASourceDevice.Qmax > 0) then
+  begin
+    Result.Qmax := ASourceDevice.Qmax;
+    RecalcDevicePointQ(Result);
+  end;
+
   SyncChannelAndFlowMeter(Result, AChannel);
 
   if AMode = dcmMeasurementPromoted then
@@ -4404,7 +4426,9 @@ var
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
+  CurrentPointQmax: Double;
   Device: TDevice;
+  SourceDevice: TDevice;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
 begin
@@ -4428,16 +4452,31 @@ begin
     if (DeviceChannel = nil) or (not DeviceChannel.Enabled) then
       Continue;
 
+    SourceDevice := nil;
+    if DeviceChannel.FlowMeter <> nil then
+      SourceDevice := DeviceChannel.FlowMeter.Device;
+
     Device := TDeviceCreationService.EnsureDeviceForChannel(
       DeviceChannel,
       Self,
       DeviceRepo,
       dcmMeasurementPromoted,
-      nil,
+      SourceDevice,
       CurrentPoint
     );
     if Device = nil then
       Continue;
+
+    if (CurrentPoint <> nil) and (CurrentPoint.FlowRate > 0) and
+       (CurrentPoint.Q > 0) then
+    begin
+      CurrentPointQmax := CurrentPoint.Q / CurrentPoint.FlowRate;
+      if CurrentPointQmax > 0 then
+      begin
+        Device.Qmax := CurrentPointQmax;
+        TDeviceCreationService.RecalcDevicePointQ(Device);
+      end;
+    end;
 
     Session := Device.GetActiveSessionSpillage;
     if Session = nil then
@@ -4551,6 +4590,7 @@ begin
 
       if Device <> nil then
       begin
+        TDeviceCreationService.RecalcDevicePointQ(Device);
         LogMKS('DBG SP 1001', 'SaveMeasurementResults BEFORE AnalyseDataPoint',
           Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
         Point.Valid := Device.AnalyseDataPoint(Point);
