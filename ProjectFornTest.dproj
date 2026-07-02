@@ -276,6 +276,7 @@
         <DCCReference Include="uDataManager.pas"/>
         <DCCReference Include="uDebugLog.pas"/>
         <DCCReference Include="uDeviceClass.pas"/>
+        <DCCReference Include="uMKSDebug.pas"/>
         <DCCReference Include="uFlowMeter.pas"/>
         <DCCReference Include="uMeasurementRun.pas"/>
         <DCCReference Include="uMeterValue.pas"/>

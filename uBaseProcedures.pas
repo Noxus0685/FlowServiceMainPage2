@@ -52,6 +52,12 @@ uses
   COLOR_COMPLETED = $FFEAF9EA; // Светло-зелёный: точка выполнена
   COLOR_WARNING   = $FFFFF8E6; // Светло-жёлтый
 
+  GRID_ALTERNATE_ROW_COLOR = $FFF2F2F2;
+  GRID_DEVICE_GROUP_COLORS: array[0..2] of TAlphaColor = (
+    $331E90FF, $4D1E90FF, $661E90FF);
+  GRID_ETALON_GROUP_COLORS: array[0..2] of TAlphaColor = (
+    $338A2BE2, $4D8A2BE2, $668A2BE2);
+
 type
 
 

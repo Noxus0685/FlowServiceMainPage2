@@ -4795,7 +4795,7 @@ begin
         EditVolume.Text := FormatFloat('0.###', WorkTable.CurrentPoint.LimitVolume);
 
     if not EditImp.IsFocused then
-      if WorkTable.CurrentPoint.LimitImp = -1 then
+      if WorkTable.CurrentPoint.LimitImp <= 0 then
         EditImp.Text := '-'
       else
         EditImp.Text := IntToStr(WorkTable.CurrentPoint.LimitImp);
@@ -5052,11 +5052,12 @@ begin
   SC := FActiveWorkTable.CurrentPoint.StopCriteria;
 
   if (Trim(EditImp.Text) = '-') or
-     (TryStrToInt(EditImp.Text, Value) and (Value = -1)) then
+     (TryStrToInt(EditImp.Text, Value) and (Value <= 0)) then
   begin
     FActiveWorkTable.CurrentPoint.LimitImp := -1;
     Exclude(SC, scImpulse);
     FActiveWorkTable.CurrentPoint.StopCriteria := SC;
+    EditImp.Text := '-';
     Exit;
   end;
 
@@ -5330,9 +5331,7 @@ begin
     if (Channel <> nil) and
        Channel.Enabled and
        (Channel.FlowMeter <> nil) and
-       (Channel.FlowMeter.Device <> nil) and
-       ((Channel.FlowMeter.Device.Spillages = nil) or
-        (Channel.FlowMeter.Device.Spillages.Count = 0)) then
+       (Channel.FlowMeter.Device <> nil) then
     begin
       Result := True;
       Exit;
@@ -5348,6 +5347,9 @@ var
 begin
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
+    Exit;
+
+  if not (WorkTable.State in [swtCOMPLETE, swtFINALREAD]) then
     Exit;
 
   ProtocolManager.AddMessage(pcAction, psForm, 'AcceptResults',
@@ -5447,12 +5449,8 @@ end;
 
 
 function TFrameMainTable.GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
-const
-  // Один синий оттенок с разной светлотой: от светлого к более тёмному.
-  BlueGroupColors: array[0..2] of TAlphaColor = (
-    $331E90FF, $4D1E90FF, $661E90FF);
 begin
-  Result := BlueGroupColors[Abs(AGroup) mod Length(BlueGroupColors)];
+  Result := GRID_DEVICE_GROUP_COLORS[Abs(AGroup) mod Length(GRID_DEVICE_GROUP_COLORS)];
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -5465,7 +5463,7 @@ var
 begin
   IsChannelColumn := Column = StringColumnDeviceChanel1;
   if Odd(Row) then
-    CellColor := $FFF2F2F2
+    CellColor := GRID_ALTERNATE_ROW_COLOR
   else
     CellColor := TAlphaColors.White;
 
@@ -5487,6 +5485,9 @@ begin
   end;
 end;
 
+procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>); forward;
+procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>); forward;
+
 procedure TFrameMainTable.GridDevicesCellClick(const Column: TColumn; const Row: Integer);
 const
   SECOND_CLICK_MS = 1000; // окно "второго клика" (подбери по ощущениям)
@@ -5495,6 +5496,7 @@ var
   IsSecondClick: Boolean;
   Rows: Integer;
   WorkTable: TWorkTable;
+  ColumnWidths: TArray<Single>;
 begin
  if not CanEditActiveWorkTable then
   begin
@@ -5510,6 +5512,7 @@ begin
     Exit;
 
   Rows := GridDevices.RowCount;
+  SaveGridColumnWidths(GridDevices, ColumnWidths);
   Tick := TThread.GetTickCount;
   GridDevices.ReadOnly := True;
 
@@ -5583,6 +5586,7 @@ begin
   GridDevices.BeginUpdate;
   try
     GridDevices.RowCount := Rows;
+    RestoreGridColumnWidths(GridDevices, ColumnWidths);
   finally
     GridDevices.EndUpdate;
   end;
@@ -5651,6 +5655,7 @@ procedure TFrameMainTable.GridDevicesCellDblClick(const Column: TColumn;
 var
   Rows: Integer;
   WorkTable: TWorkTable;
+  ColumnWidths: TArray<Single>;
 begin
   if not CanEditActiveWorkTable then
   begin
@@ -5666,6 +5671,7 @@ begin
     Exit;
 
   Rows := GridDevices.RowCount;
+  SaveGridColumnWidths(GridDevices, ColumnWidths);
   GridDevices.ReadOnly := True;
 
 
@@ -5698,6 +5704,7 @@ begin
   GridDevices.BeginUpdate;
   try
     GridDevices.RowCount := Rows;
+    RestoreGridColumnWidths(GridDevices, ColumnWidths);
   finally
     GridDevices.EndUpdate;
   end;
@@ -6203,12 +6210,8 @@ end;
 
 
 function TFrameMainTable.GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
-const
-  // Один фиолетовый оттенок с разной светлотой: от светлого к более тёмному.
-  PurpleGroupColors: array[0..2] of TAlphaColor = (
-    $338A2BE2, $4D8A2BE2, $668A2BE2);
 begin
-  Result := PurpleGroupColors[Abs(AGroup) mod Length(PurpleGroupColors)];
+  Result := GRID_ETALON_GROUP_COLORS[Abs(AGroup) mod Length(GRID_ETALON_GROUP_COLORS)];
 end;
 
 procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -6349,10 +6352,38 @@ begin
     Value := FRows[ARow].SignalName;
 end;
 
+procedure SaveGridColumnWidths(AGrid: TGrid; out AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  SetLength(AWidths, 0);
+  if AGrid = nil then
+    Exit;
+
+  SetLength(AWidths, AGrid.ColumnCount);
+  for I := 0 to AGrid.ColumnCount - 1 do
+    AWidths[I] := AGrid.Columns[I].Width;
+end;
+
+procedure RestoreGridColumnWidths(AGrid: TGrid; const AWidths: TArray<Single>);
+var
+  I: Integer;
+begin
+  if AGrid = nil then
+    Exit;
+
+  for I := 0 to AGrid.ColumnCount - 1 do
+    if (I <= High(AWidths)) and (AWidths[I] > 0) then
+      AGrid.Columns[I].Width := AWidths[I];
+end;
+
  procedure TFrameMainTable.UpdateGridDevices;
-  var  Rows: Integer;
+  var
+    Rows: Integer;
+    ColumnWidths: TArray<Single>;
  begin
    Rows:= GridDevices.RowCount;
+   SaveGridColumnWidths(GridDevices, ColumnWidths);
 
     GridDevices.BeginUpdate;
 
@@ -6360,6 +6391,7 @@ end;
 
   try
     GridDevices.RowCount := Rows;
+    RestoreGridColumnWidths(GridDevices, ColumnWidths);
   finally
     GridDevices.EndUpdate;
   end;

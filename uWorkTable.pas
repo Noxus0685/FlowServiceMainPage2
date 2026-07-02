@@ -754,7 +754,8 @@ implementation
 uses
   FmxHelper,
   frmMainTable,
-  uMeasurementRun;
+  uMeasurementRun,
+  uMKSDebug;
 
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
@@ -4402,8 +4403,13 @@ begin
 
     Session := Device.GetActiveSessionSpillage;
     if Session = nil then
+    begin
       Session := Device.AddSessionSpillage;
-    Session.State := osModified;
+      if Session <> nil then
+        Session.State := osNew;
+    end
+    else if Session.State <> osNew then
+      Session.State := osModified;
     Device.State := osModified;
 
     if Session.DateTimeOpen = 0 then
@@ -4506,9 +4512,29 @@ begin
       Point.RelativeHumidity := ValueHumidity.GetDoubleValue;
 
       if Device <> nil then
+      begin
+        LogMKS('DBG SP 1001', 'SaveMeasurementResults BEFORE AnalyseDataPoint',
+          Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
         Point.Valid := Device.AnalyseDataPoint(Point);
+        LogMKS('DBG SP 1002', 'SaveMeasurementResults AFTER AnalyseDataPoint',
+          Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
+      end;
 
+      Point.State := osNew;
+      if Session <> nil then
+      begin
+        if Session.State <> osNew then
+          Session.State := osModified;
+        Point.SessionID := Session.ID;
+      end;
+      Device.State := osModified;
+
+      LogMKS('DBG SP 1003', 'SaveMeasurementResults BEFORE AddDataPoint',
+        Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
       DeviceChannel.FlowMeter.AddDataPoint(Point);
+      LogMKS('DBG SP 1004', 'SaveMeasurementResults AFTER AddDataPoint',
+        Format('Device=%s UUID=%s; Device.Spillages.Count=%d; Sessions.Count=%d',
+          [Device.Name, Device.UUID, Device.Spillages.Count, Device.Sessions.Count]));
 
       if Assigned(DeviceRepo) then
         DeviceRepo.SaveDevice(Device);
@@ -5877,14 +5903,14 @@ begin
     // Ожидание полной остановки
     // ------------------------------------------------------------
     swtSTOPWAIT:
-      WorkTable.State := swtCOMPLETE;
+      WorkTable.State := swtFINALREAD   ;
 
 
     // ------------------------------------------------------------
     // Тест завершён → переход к финальному считыванию
     // ------------------------------------------------------------
-    swtCOMPLETE:
-      WorkTable.State := swtFINALREAD;
+    swtFINALREAD:
+      WorkTable.State := swtCOMPLETE;
 
   end;
 

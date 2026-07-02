@@ -350,7 +350,7 @@ type
     function Save: Boolean;override;      // Сохранить все изменения в БД
 
     function LoadDevice(ADevice: TDevice): TDevice; overload;
-    function LoadDevice(ADeviceId: Integer): TDevice; overload;
+    function LoadDevice(ADeviceUUID: String): TDevice; overload;
     function LoadSpillageSessionsByDevice(const ADeviceUUID: string): Boolean;
     function LoadSpillagesByDevice(const ADeviceUUID: string): Boolean;
     function SaveDevice(ADevice: TDevice): Boolean;
@@ -379,7 +379,9 @@ type
 implementation
 
 uses
-  uWorkTable;
+  uWorkTable,
+  uMKSDebug,
+  uProtocols;
 
 {$REGION 'Helpers'}
 function Col(const AName, ASqlType: string): TTableColumn;
@@ -3603,11 +3605,19 @@ function TDeviceRepository.SaveDevice(
 var
   SaveErrors: TStringList;
   ExistingDevice: TDevice;
+  Point: TPointSpillage;
 begin
   Result := False;
 
   if (ADevice = nil) or (FDM = nil) then
     Exit;
+
+  LogMKS('DBG SP 8001', 'DeviceRepo.SaveDevice BEFORE',
+    Format('Device=%s UUID=%s; Sessions=%d; Spillages=%d',
+      [ADevice.Name, ADevice.UUID, ADevice.Sessions.Count, ADevice.Spillages.Count]));
+  if ADevice.Spillages <> nil then
+    for Point in ADevice.Spillages do
+      LogMKS('DBG SP 8002', 'DeviceRepo.SaveDevice POINT', DumpSpillage(Point));
 
   SaveErrors := TStringList.Create;
   try
@@ -3919,7 +3929,7 @@ end;
 
 function TDeviceRepository.MapDeviceFromQuery(Q: TFDQuery): TDevice;
 begin
-  Result := CreateNewDevice;
+  Result :=  TDevice.Create;
 
   Result.ID := Q.FieldByName('ID').AsInteger;
   Result.UUID := Q.FieldByName('UUID').AsString;
@@ -4049,27 +4059,105 @@ begin
   end;
 end;
 
-function TDeviceRepository.LoadDevice(ADeviceId: Integer): TDevice;
+function TDeviceRepository.LoadDevice(ADeviceUUID: String): TDevice;
 var
-  Existing: TDevice;
+  Q: TFDQuery;
+  NewD: TDevice;
+  Device: TDevice;
+  LoadErrors: TStringList;
+
 begin
   Result := nil;
 
-  if ADeviceId <= 0 then
+  if FDM = nil then
     Exit;
 
-  Existing := FindDeviceByID(ADeviceId);
-  if (Existing = nil) or (Trim(Existing.UUID) = '') then
-    Exit;
+  FState := osLoading;
 
-  Result := LoadDevice(Existing);
+  if FDevices = nil then
+    FDevices := TObjectList<TDevice>.Create(True);
+  LoadErrors := TStringList.Create;
+
+  Q := FDM.CreateQuery;
+  try
+    try
+      Q.SQL.Text := 'select * from Devices Where UUID = :UUID order by Name';
+       SetStrParam(Q, 'UUID', Trim(ADeviceUUID));
+      Q.Open;
+
+      if Q.Eof then
+        exit;
+     // while not Q.Eof do
+     // begin
+        NewD := MapDeviceFromQuery(Q);
+
+        Device := FindDeviceByUUID(NewD.UUID);
+        if Device <> nil then
+        begin
+          Device.Assign(NewD, True);
+
+            NewD.Free;
+        end
+        else
+        begin
+          FDevices.Add(NewD);
+          Device := NewD;
+        end;
+
+
+        if Trim(Device.UUID) = '' then
+        begin
+          Device.UUID := TGUID.NewGuid.ToString;
+          Device.State := osModified;
+          LoadErrors.Add(Format('У прибора "%s" в БД отсутствовал UUID. Присвоен новый UUID.', [Device.Name]));
+        end
+        else
+        begin
+          if not LoadDevicePointsByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [Device.Name]));
+
+          if not LoadSpillageSessionsByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить проливы прибора "%s".', [Device.Name]));
+
+          if not LoadSpillagesByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить результаты проливов прибора "%s".', [Device.Name]));
+
+          if not LoadCalibrCoefByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [Device.Name]));
+        end;
+
+
+    //    Q.Next;
+     // end;
+
+      if LoadErrors.Count > 0 then
+      begin
+
+        ShowMessage('Часть данных приборов не загружена:' + sLineBreak + LoadErrors.Text);
+      end;
+
+      FState := osClean;
+
+      Result := Device;
+
+    except
+      FState := osError;
+      raise;
+    end;
+
+  finally
+    Q.Free;
+    LoadErrors.Free;
+  end;
 end;
 
 function TDeviceRepository.LoadDevices: Boolean;
 var
   Q: TFDQuery;
   NewD: TDevice;
+  Device: TDevice;
   LoadErrors: TStringList;
+
 begin
   Result := False;
 
@@ -4079,9 +4167,7 @@ begin
   FState := osLoading;
 
   if FDevices = nil then
-    FDevices := TObjectList<TDevice>.Create(True)
-  else
-    FDevices.Clear;
+    FDevices := TObjectList<TDevice>.Create(True);
   LoadErrors := TStringList.Create;
 
   Q := FDM.CreateQuery;
@@ -4094,27 +4180,40 @@ begin
       begin
         NewD := MapDeviceFromQuery(Q);
 
-        if Trim(NewD.UUID) = '' then
+        Device := FindDeviceByUUID(NewD.UUID);
+        if Device <> nil then
         begin
-          NewD.UUID := TGUID.NewGuid.ToString;
-          NewD.State := osModified;
-          LoadErrors.Add(Format('У прибора "%s" в БД отсутствовал UUID. Присвоен новый UUID.', [NewD.Name]));
+          Device.Assign(NewD, True);
+
+            NewD.Free;
         end
-           else
-           begin
-        if not LoadDevicePointsByDevice(NewD.UUID) then
-          LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [NewD.Name]));
+        else
+        begin
+          FDevices.Add(NewD);
+          Device := NewD;
+        end;
 
-        if not LoadSpillageSessionsByDevice(NewD.UUID) then
-          LoadErrors.Add(Format('Не удалось загрузить проливы прибора "%s".', [NewD.Name]));
+        if Trim(Device.UUID) = '' then
+        begin
+          Device.UUID := TGUID.NewGuid.ToString;
+          Device.State := osModified;
+          LoadErrors.Add(Format('У прибора "%s" в БД отсутствовал UUID. Присвоен новый UUID.', [Device.Name]));
+        end
+        else
+        begin
+          if not LoadDevicePointsByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить точки прибора "%s".', [Device.Name]));
 
-        if not LoadSpillagesByDevice(NewD.UUID) then
-          LoadErrors.Add(Format('Не удалось загрузить результаты проливов прибора "%s".', [NewD.Name]));
+          if not LoadSpillageSessionsByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить проливы прибора "%s".', [Device.Name]));
 
-        if not LoadCalibrCoefByDevice(NewD.UUID) then
-          LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [NewD.Name]));
+          if not LoadSpillagesByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить результаты проливов прибора "%s".', [Device.Name]));
 
-           end;
+          if not LoadCalibrCoefByDevice(Device.UUID) then
+            LoadErrors.Add(Format('Не удалось загрузить таблицу калибровочных коэффициентов прибора "%s".', [Device.Name]));
+        end;
+
 
         Q.Next;
       end;
@@ -5563,6 +5662,8 @@ begin
   Result.Coef := Q.FieldByName('Coef').AsFloat;
   Result.FCDCoefficient := Q.FieldByName('FCDCoefficient').AsString;
   Result.State := osClean;
+
+  LogMKS('DBG SP 8004', 'LoadProcessingDevices LOADED SPILLAGE', DumpSpillage(Result));
 
   if (MatchedSession <> nil) and (MatchedSession.Spillages <> nil) then
   begin
