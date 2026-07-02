@@ -764,8 +764,6 @@ if Abs(Value) < EPS then
   if Value <= MinValue then
     Exit('-');
 
-
-
   if (Value >= MaxValue) and (MaxValue<>0) then
     Exit('+NAN');
 

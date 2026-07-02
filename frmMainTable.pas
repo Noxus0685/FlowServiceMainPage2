@@ -1601,6 +1601,7 @@ begin
         ButtonCancel.Visible := False;
 
         FActiveWorkTable.ValueTime.Accuracy:=-1;
+        FActiveWorkTable.ValueTime.ShowTrailingZeros:=False;
       end;
 
     swtCONFIGED:
