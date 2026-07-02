@@ -2158,6 +2158,9 @@ begin
     if Sess = nil then
       Continue;
 
+    if Sess.State = osDeleted then
+      Continue;
+
     if Sess.Active and not ActiveFound then
     begin
       Result := Sess;
@@ -2173,14 +2176,14 @@ begin
   end;
 
   if Result = nil then
-  begin
-    Result := Sessions[0];
-    if Result <> nil then
-    begin
-      Result.Active := True;
-        Result.State := osModified;
-    end;
-  end;
+    for Sess in Sessions do
+      if (Sess <> nil) and (Sess.State <> osDeleted) then
+      begin
+        Result := Sess;
+        Result.Active := True;
+          Result.State := osModified;
+        Break;
+      end;
 end;
 
 function TDevice.AddSpillage: TPointSpillage;
