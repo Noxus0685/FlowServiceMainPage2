@@ -1730,7 +1730,6 @@ begin
 
   if SameText(Item.Text, '...') then
   begin
-    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
     DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
     AddActionMenuItem(ActionSessionSynchTable);
@@ -1740,7 +1739,6 @@ begin
 
   if Item.TagObject is TWorkTable then
   begin
-    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddActionMenuItem(ActionDeleteWorkTable);
     AddActionMenuItem(ActionDeleteSelectedWorkTables);
     AddActionMenuItem(ActionSessionSynchTable);
@@ -1783,89 +1781,47 @@ var
   WT: TWorkTable;
   Ch: TChannel;
   Device: TDevice;
-  I: Integer;
+  I, J: Integer;
   DeviceUUIDsOnTables: TStringList;
-  DevicesToDelete: TList<TDevice>;
-
-  procedure MarkCollectedDevicesDeleted;
-  var
-    D: TDevice;
-  begin
-    if DevicesToDelete.Count = 0 then
-      Exit;
-
-    for D in DevicesToDelete do
-      MarkProcessingDeviceDeleted(D);
-  end;
 begin
   DbgProceedTree(1504, 'MenuTreeViewDevicesClearClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
     Exit;
 
   Item := TreeViewDevices.Selected;
-
-  if SameText(Item.Text, '...') then
-  begin
-    if FProcessingDevices <> nil then
-      for Device in FProcessingDevices do
-        MarkProcessingDeviceDeleted(Device);
-
-    SaveProcessingDevices;
-    RefreshResultsAfterDevicesAction;
+  if not SameText(Item.Text, 'прочее') then
     Exit;
-  end;
 
-  if (FProcessingDevices = nil) then
+  if FProcessingDevices = nil then
     Exit;
 
   DeviceUUIDsOnTables := TStringList.Create;
-  DevicesToDelete := TList<TDevice>.Create;
   try
     DeviceUUIDsOnTables.Sorted := False;
     DeviceUUIDsOnTables.Duplicates := dupIgnore;
 
-    if Item.TagObject is TWorkTable then
-    begin
-      WT := TWorkTable(Item.TagObject);
-      if (WT <> nil) and (WT.DeviceChannels <> nil) then
+    if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if (WT = nil) or (WT.DeviceChannels = nil) then
+          Continue;
+
         for Ch in WT.DeviceChannels do
           if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
             DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
+      end;
 
-      for Device in FProcessingDevices do
-        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) >= 0) then
-          DevicesToDelete.Add(Device);
-
-      MarkCollectedDevicesDeleted;
-      SaveProcessingDevices;
-      RefreshResultsAfterDevicesAction;
-      Exit;
-    end;
-
-    if SameText(Item.Text, 'прочее') then
+    for J := FProcessingDevices.Count - 1 downto 0 do
     begin
-      if (FWorkTableManager <> nil) and (FWorkTableManager.WorkTables <> nil) then
-        for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
-        begin
-          WT := FWorkTableManager.WorkTables[I];
-          if (WT = nil) or (WT.DeviceChannels = nil) then
-            Continue;
-
-          for Ch in WT.DeviceChannels do
-            if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
-              DeviceUUIDsOnTables.Add(Trim(Ch.FlowMeter.Device.UUID));
-        end;
-
-      for Device in FProcessingDevices do
-        if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
-          DevicesToDelete.Add(Device);
-
-      MarkCollectedDevicesDeleted;
-      SaveProcessingDevices;
-      RefreshResultsAfterDevicesAction;
+      Device := FProcessingDevices[J];
+      if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
+        FProcessingDevices.Delete(J);
     end;
+
+    SaveProcessingDevices;
+    RefreshResultsAfterDevicesAction;
   finally
-    DevicesToDelete.Free;
     DeviceUUIDsOnTables.Free;
   end;
 end;
@@ -1921,7 +1877,7 @@ begin
       if (Ch <> nil) and (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
       begin
         Device := Ch.FlowMeter.Device;
-        if (Device.State <> osDeleted) and HasDeviceData(Ch, Device) then
+        if HasDeviceData(Ch, Device) then
           AddProcessingDevice(Device);
       end;
 end;
@@ -2150,8 +2106,7 @@ begin
   if not (Item.TagObject is TDevice) then
     Exit;
 
-  Device := TDevice(Item.TagObject);
-  MarkProcessingDeviceDeleted(Device);
+  RemoveProcessingDevice(TDevice(Item.TagObject));
   SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;

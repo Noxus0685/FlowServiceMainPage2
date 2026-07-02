@@ -68,6 +68,7 @@ begin
   {--------------------------------------------------}
   if AppServices <> nil then
     AppServices.Shutdown;
+  FreeAndNil(AppServices);
   // AppServices освобождается в finalization секции uAppServices.
   // Нельзя уничтожать его здесь: во время завершения FMX/финализации другие
   // объекты ещё могут обращаться к AppServices.DataManager и получать AV
