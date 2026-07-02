@@ -1,4 +1,4 @@
-object FrameProceed: TFrameProceed
+﻿object FrameProceed: TFrameProceed
   Size.Width = 1564.000000000000000000
   Size.Height = 688.000000000000000000
   Size.PlatformDefault = False
@@ -603,6 +603,19 @@ object FrameProceed: TFrameProceed
           StyleLookup = 'additembutton'
           TabOrder = 4
           TextSettings.Trimming = None
+        end
+        object ButtonSessionCancel: TButton
+          Align = Left
+          Hint = #1054#1090#1084#1077#1085#1072
+          Position.X = 222.000000000000000000
+          Size.Width = 44.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = 'canceltoolbutton'
+          TabOrder = 5
+          Text = #1054#1090#1084#1077#1085#1072
+          TextSettings.Trimming = None
+          OnClick = ButtonSessionCancelClick
         end
       end
       object Layout19: TLayout
