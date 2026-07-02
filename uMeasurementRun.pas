@@ -1978,7 +1978,7 @@ begin
   begin
     if IsCommandStopLimitReached(StopReason) then
     begin
-      ProtocolManager.AddMessage(pcAction, psMeasurement, 'LimitReached',
+      ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessMeasure',
         'Достигнут программный лимит измерения',
         BuildCommandStopLimitDetails(FWorkTable.CurrentPoint, StopReason));
       SetStage(msWaitMeasureStop);
