@@ -264,6 +264,7 @@ type
     procedure SaveLayoutSettingsToWorkTable;
     procedure GridDataPointsColumnMoved(Column: TColumn; FromIndex,
       ToIndex: Integer);
+    procedure btnOKClick(Sender: TObject);
   private
     FFrameCalibrCoefs: TFrameCalibrCoefs;
     FWorkTableManager: TWorkTableManager;
@@ -683,6 +684,11 @@ begin
     Frm.Free;
   end;
   DbgProceedTree(1114, 'AddProcessingDeviceFromSelection EXIT'#13#10 + GetSelectedTreeDebugText);
+end;
+
+procedure TFrameProceed.btnOKClick(Sender: TObject);
+begin
+  RefreshResultsTab;
 end;
 
 procedure TFrameProceed.UpdateTreeViewDeviceTagObjects;
