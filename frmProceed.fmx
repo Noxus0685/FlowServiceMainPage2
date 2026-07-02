@@ -464,8 +464,8 @@ object FrameProceed: TFrameProceed
               Size.Height = 219.000000000000000000
               Size.PlatformDefault = False
               TabOrder = 0
-              Viewport.Width = 297.000000000000000000
-              Viewport.Height = 219.000000000000000000
+              Viewport.Width = 277.000000000000000000
+              Viewport.Height = 194.000000000000000000
               object StringColumnCoefTableName: TStringColumn
                 HeaderSettings.TextSettings.WordWrap = False
               end
@@ -785,54 +785,13 @@ object FrameProceed: TFrameProceed
       Size.Width = 127.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 2
-      Text = #1047#1072#1082#1088#1099#1090#1100
-      TextSettings.FontColor = claDarkgreen
-      TextSettings.Trimming = None
-      XRadius = 3.000000000000000000
-      YRadius = 3.000000000000000000
-    end
-    object CornerButton1: TCornerButton
-      Align = Right
-      StyledSettings = [Family, Size, Style]
-      ModalResult = 1
-      Margins.Left = 10.000000000000000000
-      Margins.Top = 10.000000000000000000
-      Margins.Right = 10.000000000000000000
-      Margins.Bottom = 10.000000000000000000
-      Position.X = 1133.000000000000000000
-      Position.Y = 10.000000000000000000
-      Sides = [Top, Left, Bottom, Right]
-      Size.Width = 127.000000000000000000
-      Size.Height = 24.000000000000000000
-      Size.PlatformDefault = False
-      TabOrder = 1
-      Text = #1042#1099#1073#1088#1072#1090#1100
-      TextSettings.FontColor = claDarkgreen
-      TextSettings.Trimming = None
-      XRadius = 3.000000000000000000
-      YRadius = 3.000000000000000000
-    end
-    object CornerButtonEditDevice: TCornerButton
-      Align = Right
-      StyledSettings = [Family, Size, Style]
-      ModalResult = 1
-      Margins.Left = 10.000000000000000000
-      Margins.Top = 10.000000000000000000
-      Margins.Right = 10.000000000000000000
-      Margins.Bottom = 10.000000000000000000
-      Position.X = 1280.000000000000000000
-      Position.Y = 10.000000000000000000
-      Sides = [Top, Left, Bottom, Right]
-      Size.Width = 127.000000000000000000
-      Size.Height = 24.000000000000000000
-      Size.PlatformDefault = False
       TabOrder = 0
-      Text = #1056#1077#1076#1072#1082#1090#1080#1088#1086#1074#1072#1090#1100
+      Text = #1054#1090#1084#1077#1085#1072
       TextSettings.FontColor = claDarkgreen
       TextSettings.Trimming = None
       XRadius = 3.000000000000000000
       YRadius = 3.000000000000000000
+      OnClick = btnOKClick
     end
   end
   object PopupMenuGridDataPoints: TPopupMenu

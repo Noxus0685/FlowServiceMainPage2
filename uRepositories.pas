@@ -4066,43 +4066,6 @@ var
   Device: TDevice;
   LoadErrors: TStringList;
 
-  function DeviceLogText(ADevice: TDevice): string;
-  begin
-    if ADevice = nil then
-      Exit('<nil>');
-
-    Result := Format('Ptr=%p; ID=%d; UUID="%s"; Name="%s"; State=%d; Points=%d; Sessions=%d; Spillages=%d; CalibrTables=%d',
-      [
-        Pointer(ADevice),
-        ADevice.ID,
-        ADevice.UUID,
-        ADevice.Name,
-        Ord(ADevice.State),
-        ADevice.Points.Count,
-        ADevice.Sessions.Count,
-        ADevice.Spillages.Count,
-        ADevice.CalibrCoefTables.Count
-      ]);
-  end;
-
-  procedure LogDeviceLoadDebug(ACode: Integer; const AText: string);
-  begin
-    if ProtocolManager <> nil then
-      ProtocolManager.AddMessage(pcMKS, psMeasurement, 'DBG ' + ACode.ToString, 'MKS', AText);
-  end;
-
-  procedure LogDevicesList(const APlace: string; ANewD, AExistingD: TDevice);
-  var
-    I: Integer;
-  begin
-    LogDeviceLoadDebug(8100, Format('%s | NewD=%s | ExistingD=%s | FDevices.Count=%d',
-      [APlace, DeviceLogText(ANewD), DeviceLogText(AExistingD), FDevices.Count]));
-
-    for I := 0 to FDevices.Count - 1 do
-      LogDeviceLoadDebug(8101, Format('%s | FDevices[%d]=%s',
-        [APlace, I, DeviceLogText(FDevices[I])]));
-  end;
-
 begin
   Result := nil;
 
@@ -4133,17 +4096,14 @@ begin
         begin
           Device.Assign(NewD, True);
 
-          LogDeviceLoadDebug(8102, 'LoadDevices: найден прибор в FDevices, выполнен Assign(NewD, True).');
             NewD.Free;
         end
         else
         begin
           FDevices.Add(NewD);
           Device := NewD;
-          LogDeviceLoadDebug(8103, 'LoadDevices: прибор не найден в FDevices, добавлен новый экземпляр.');
         end;
 
-        LogDevicesList('LoadDevices before Q.Next', NewD, Device);
 
         if Trim(Device.UUID) = '' then
         begin
@@ -4198,43 +4158,6 @@ var
   Device: TDevice;
   LoadErrors: TStringList;
 
-  function DeviceLogText(ADevice: TDevice): string;
-  begin
-    if ADevice = nil then
-      Exit('<nil>');
-
-    Result := Format('Ptr=%p; ID=%d; UUID="%s"; Name="%s"; State=%d; Points=%d; Sessions=%d; Spillages=%d; CalibrTables=%d',
-      [
-        Pointer(ADevice),
-        ADevice.ID,
-        ADevice.UUID,
-        ADevice.Name,
-        Ord(ADevice.State),
-        ADevice.Points.Count,
-        ADevice.Sessions.Count,
-        ADevice.Spillages.Count,
-        ADevice.CalibrCoefTables.Count
-      ]);
-  end;
-
-  procedure LogDeviceLoadDebug(ACode: Integer; const AText: string);
-  begin
-    if ProtocolManager <> nil then
-      ProtocolManager.AddMessage(pcMKS, psMeasurement, 'DBG ' + ACode.ToString, 'MKS', AText);
-  end;
-
-  procedure LogDevicesList(const APlace: string; ANewD, AExistingD: TDevice);
-  var
-    I: Integer;
-  begin
-    LogDeviceLoadDebug(8100, Format('%s | NewD=%s | ExistingD=%s | FDevices.Count=%d',
-      [APlace, DeviceLogText(ANewD), DeviceLogText(AExistingD), FDevices.Count]));
-
-    for I := 0 to FDevices.Count - 1 do
-      LogDeviceLoadDebug(8101, Format('%s | FDevices[%d]=%s',
-        [APlace, I, DeviceLogText(FDevices[I])]));
-  end;
-
 begin
   Result := False;
 
@@ -4262,17 +4185,13 @@ begin
         begin
           Device.Assign(NewD, True);
 
-          LogDeviceLoadDebug(8102, 'LoadDevices: найден прибор в FDevices, выполнен Assign(NewD, True).');
             NewD.Free;
         end
         else
         begin
           FDevices.Add(NewD);
           Device := NewD;
-          LogDeviceLoadDebug(8103, 'LoadDevices: прибор не найден в FDevices, добавлен новый экземпляр.');
         end;
-
-        LogDevicesList('LoadDevices before Q.Next', NewD, Device);
 
         if Trim(Device.UUID) = '' then
         begin
