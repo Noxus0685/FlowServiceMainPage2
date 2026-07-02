@@ -1783,18 +1783,8 @@ var
   Device: TDevice;
   I: Integer;
   DeviceUUIDsOnTables: TStringList;
-  DevicesToDelete: TList<TDevice>;
-
-  procedure MarkCollectedDevicesDeleted;
-  var
-    D: TDevice;
-  begin
-    if DevicesToDelete.Count = 0 then
-      Exit;
-
-    for D in DevicesToDelete do
-      MarkProcessingDeviceDeleted(D);
-  end;
+  DevicesToRemove: TList<TDevice>;
+  D: TDevice;
 begin
   DbgProceedTree(1504, 'MenuTreeViewDevicesClearClick ENTER'#13#10 + GetSelectedTreeDebugText);
   if (TreeViewDevices = nil) or (TreeViewDevices.Selected = nil) then
@@ -1829,7 +1819,9 @@ begin
       if (Device <> nil) and (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
         DevicesToRemove.Add(Device);
 
-    RemoveCollectedDevices;
+    for D in DevicesToRemove do
+      FProcessingDevices.Remove(D);
+
     SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
   finally
