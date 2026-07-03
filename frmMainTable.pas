@@ -1929,6 +1929,7 @@ begin
   LoadLayoutSettingsFromWorkTable;
   RefreshPumpsCombo;
   RefreshScalesCombo;
+  UpdateGrids;
   UpdateForm;
 end;
 
@@ -3203,7 +3204,7 @@ begin
       GridDevicesN.Repaint;
     end;
 
-    if I = 1 then
+    if WorkTable = FActiveWorkTable then
     begin
       SetLength(FRows, WorkTable.EtalonChannels.Count);
       for TableCount := 0 to WorkTable.EtalonChannels.Count - 1 do
@@ -3225,6 +3226,8 @@ begin
       end;
     end;
   end;
+
+  UpdateGrids;
 end;
 
 function TFrameMainTable.FindTypeIndex(const ATypeName: string): Integer;
