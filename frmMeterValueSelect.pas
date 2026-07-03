@@ -17,6 +17,7 @@ uses
   System.SysUtils,
   System.Types,
   System.UITypes,
+  uClasses,
   uMeterValue;
 
 type
@@ -24,6 +25,7 @@ type
   private
     FSelectedMeterValue: TMeterValue;
     FFilteredValues: TObjectList<TMeterValue>;
+    FDeviceCategory: EStdCategory;
     ButtonSelect: TButton;
     ButtonCancel: TButton;
     ButtonEdit: TButton;
@@ -52,19 +54,22 @@ type
     destructor Destroy; override;
     procedure SetFilterText(const AFilterText: string);
     procedure SelectMeterValue(AMeterValue: TMeterValue);
+    procedure SetDeviceCategory(ACategory: EStdCategory);
     property SelectedMeterValue: TMeterValue read FSelectedMeterValue;
   end;
 
 implementation
 
 uses
-  frmMeterValueEditFrame;
+  frmMeterValueEditFrame,
+  uMeterValueFilter;
 
 {$R *.fmx}
 
 constructor TFormMeterValueSelect.Create(AOwner: TComponent);
 begin
   inherited;
+  FDeviceCategory := mftUnknownType;
   BuildUI;
   FillValuesList;
   SelectCurrentRow;
@@ -187,6 +192,9 @@ begin
   SearchText := Trim(AnsiLowerCase(EditFindDevice.Text));
   for Item in Source do
   begin
+    if not CanShowMeterValueForCategory(Item, FDeviceCategory) then
+      Continue;
+
     if SearchText = '' then
     begin
       FFilteredValues.Add(Item);
@@ -294,6 +302,13 @@ end;
 procedure TFormMeterValueSelect.SelectMeterValue(AMeterValue: TMeterValue);
 begin
   FocusMeterValue(AMeterValue);
+end;
+
+procedure TFormMeterValueSelect.SetDeviceCategory(ACategory: EStdCategory);
+begin
+  FDeviceCategory := ACategory;
+  FillValuesList;
+  SelectCurrentRow;
 end;
 
 procedure TFormMeterValueSelect.SelectCurrentRow;

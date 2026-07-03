@@ -26,6 +26,7 @@ uses
   uFlowMeter in 'uFlowMeter.pas',
   uMeasurementRun in 'uMeasurementRun.pas',
   uMeterValue in 'uMeterValue.pas',
+  uMeterValueFilter in 'uMeterValueFilter.pas',
   uObservable in 'uObservable.pas',
   uParameter in 'uParameter.pas',
   uProtocols in 'uProtocols.pas',
