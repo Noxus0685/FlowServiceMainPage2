@@ -3090,8 +3090,21 @@ begin
   if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
     TableCount := WorkTableManager.WorkTables.Count;
 
-  //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
-  FActiveWorkTable := GetWorkTableByIndex(0);
+  if (WorkTableManager <> nil) and IsManagedWorkTable(WorkTableManager.ActiveWorkTable) then
+    FActiveWorkTable := WorkTableManager.ActiveWorkTable
+  else
+    FActiveWorkTable := GetWorkTableByIndex(0);
+
+  if (WorkTableManager <> nil) and (FActiveWorkTable <> nil) then
+    WorkTableManager.ActiveWorkTable := FActiveWorkTable;
+
+  if (TabControlWorkTables <> nil) and (WorkTableManager <> nil) and
+     (WorkTableManager.WorkTables <> nil) and (FActiveWorkTable <> nil) then
+    TabControlWorkTables.TabIndex := EnsureRange(
+      WorkTableManager.WorkTables.IndexOf(FActiveWorkTable),
+      0,
+      Max(0, TabControlWorkTables.TabCount - 1)
+    );
   for WorkTableIndex := 0 to TableCount - 1 do
   begin
     WorkTable := GetWorkTableByIndex(WorkTableIndex);
@@ -3691,7 +3704,8 @@ var
   WorkTable: TWorkTable;
   ChannelIndex: Integer;
 begin
-  WorkTable := GetWorkTableByIndex(TabControlWorkTables.TabIndex);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -3713,7 +3727,8 @@ var
   WorkTable: TWorkTable;
   ChannelIndex: Integer;
 begin
-  WorkTable := GetWorkTableByIndex(TabControlWorkTables.TabIndex);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
