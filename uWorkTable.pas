@@ -741,7 +741,7 @@ type
     const ASplitByEnabledGroup: Boolean = False): TArray<Double>;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
-    property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
+    property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
     procedure UpdateSimulation;
@@ -5043,18 +5043,85 @@ end;
 
 { Loads managed work tables from configured INI file. }
 procedure TWorkTableManager.Load;
+var
+  Ini: TIniFile;
+  ActiveUUID: string;
+  ActiveName: string;
+  ActiveIndex: Integer;
+  I: Integer;
+  WorkTable: TWorkTable;
 begin
   TWorkTable.Load(FIniFileName, FWorkTables);
 
-  if (FWorkTables<>nil) and (FWorkTables.Count>0) and (FWorkTables[0]<>nil) then
+  WorkTable := nil;
+  ActiveUUID := '';
+  ActiveName := '';
+  ActiveIndex := -1;
 
-  SetActiveWorkTable(FWorkTables[0]);
+  if (FIniFileName <> '') and FileExists(FIniFileName) then
+  begin
+    Ini := TIniFile.Create(FIniFileName);
+    try
+      ActiveUUID := Trim(Ini.ReadString('WorkTables', 'ActiveUUID', ''));
+      ActiveName := Trim(Ini.ReadString('WorkTables', 'ActiveName', ''));
+      ActiveIndex := Ini.ReadInteger('WorkTables', 'ActiveIndex', -1);
+    finally
+      Ini.Free;
+    end;
+  end;
+
+  if (ActiveUUID <> '') and (FWorkTables <> nil) then
+    for I := 0 to FWorkTables.Count - 1 do
+      if (FWorkTables[I] <> nil) and SameText(FWorkTables[I].UUID, ActiveUUID) then
+      begin
+        WorkTable := FWorkTables[I];
+        Break;
+      end;
+
+  if (WorkTable = nil) and (ActiveName <> '') then
+    WorkTable := FindWorkTableName(ActiveName);
+
+  if (WorkTable = nil) and (ActiveIndex >= 0) and
+     (FWorkTables <> nil) and (ActiveIndex < FWorkTables.Count) then
+    WorkTable := FWorkTables[ActiveIndex];
+
+  if (WorkTable = nil) and (FWorkTables <> nil) and
+     (FWorkTables.Count > 0) and (FWorkTables[0] <> nil) then
+    WorkTable := FWorkTables[0];
+
+  SetActiveWorkTable(WorkTable);
 end;
 
 { Saves managed work tables to configured INI file. }
 procedure TWorkTableManager.Save;
+var
+  Ini: TMemIniFile;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
+
+  if FIniFileName = '' then
+    Exit;
+
+  Ini := TMemIniFile.Create(FIniFileName);
+  try
+    if (FActiveWorkTable <> nil) and (FWorkTables <> nil) and
+       (FWorkTables.IndexOf(FActiveWorkTable) >= 0) then
+    begin
+      Ini.WriteString('WorkTables', 'ActiveUUID', FActiveWorkTable.UUID);
+      Ini.WriteString('WorkTables', 'ActiveName', FActiveWorkTable.Name);
+      Ini.WriteInteger('WorkTables', 'ActiveIndex', FWorkTables.IndexOf(FActiveWorkTable));
+    end
+    else
+    begin
+      Ini.DeleteKey('WorkTables', 'ActiveUUID');
+      Ini.DeleteKey('WorkTables', 'ActiveName');
+      Ini.DeleteKey('WorkTables', 'ActiveIndex');
+    end;
+
+    Ini.UpdateFile;
+  finally
+    Ini.Free;
+  end;
 end;
 
 procedure TWorkTableManager.AddWorkTable;
@@ -5091,12 +5158,14 @@ begin
   if FActiveWorkTable = AWorkTable then
     Exit;
 
-  if FActiveWorkTable <> nil then
+  if (FActiveWorkTable <> nil) and
+     ((FWorkTables = nil) or (FWorkTables.IndexOf(FActiveWorkTable) >= 0)) then
     FActiveWorkTable.IsActive := False;
 
   FActiveWorkTable := AWorkTable;
 
-  if FActiveWorkTable <> nil then
+  if (FActiveWorkTable <> nil) and
+     ((FWorkTables = nil) or (FWorkTables.IndexOf(FActiveWorkTable) >= 0)) then
     FActiveWorkTable.IsActive := True;
 end;
 
