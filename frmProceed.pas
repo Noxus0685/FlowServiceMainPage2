@@ -146,6 +146,7 @@ type
     ButtonSessionClearPoints: TButton;
     ButtonSessionClose: TButton;
     ButtonSessionDeviceAdd: TButton;
+    ButtonSessionSynchTable: TButton;
     Layout19: TLayout;
     Layout20: TLayout;
     ComboBoxUnitsResult: TComboBox;
@@ -189,6 +190,8 @@ type
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
     procedure MarkProcessingDeviceDeleted(ADevice: TDevice);
+    function GetDeviceSpillageCount(ADevice: TDevice): Integer;
+    procedure SaveProcessingPointCounts;
     procedure SaveProcessingDevices;
     procedure SavePendingProcessingChanges(Sender: TObject);
     procedure CancelProcessingChanges;
@@ -219,6 +222,7 @@ type
     procedure PopupMenuTreeViewDevicesPopup(Sender: TObject);
     procedure MenuTreeViewDevicesClearClick(Sender: TObject);
     procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable; const AClearBeforeSync: Boolean);
+    procedure SyncProcessingDevicesWithNewPoints;
     procedure SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
     procedure ActionSessionSynchTableExecute(Sender: TObject);
     procedure MenuTreeViewDevicesAddClick(Sender: TObject);
@@ -297,6 +301,7 @@ const
   CProcessingDevicesSection = 'ProcessingDevices';
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
+  CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -375,6 +380,7 @@ begin
     ComboBoxUnitsResult.ItemIndex := 0;
 
   LoadProcessingDevices;
+  SyncProcessingDevicesWithNewPoints;
   InitCalibrCoefsFrame;
   RefreshResultsTab;
 end;
@@ -412,6 +418,7 @@ end;
 procedure TFrameProceed.RefreshResultsTab;
 begin
   DbgProceedTree(1501, 'RefreshResultsTab ENTER'#13#10 + GetSelectedTreeDebugText);
+  SyncProcessingDevicesWithNewPoints;
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
@@ -489,6 +496,65 @@ begin
       if Point <> nil then
         Point.State := osDeleted;
 end;
+
+function TFrameProceed.GetDeviceSpillageCount(ADevice: TDevice): Integer;
+var
+  Point: TPointSpillage;
+begin
+  Result := 0;
+  if (ADevice = nil) or (ADevice.Spillages = nil) then
+    Exit;
+
+  for Point in ADevice.Spillages do
+    if (Point <> nil) and (Point.State <> osDeleted) then
+      Inc(Result);
+end;
+
+procedure TFrameProceed.SaveProcessingPointCounts;
+var
+  Ini: TIniFile;
+  I: Integer;
+  WT: TWorkTable;
+  Ch: TChannel;
+  Device: TDevice;
+  SavedUUIDs: TStringList;
+begin
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  SavedUUIDs := TStringList.Create;
+  try
+    SavedUUIDs.Sorted := False;
+    SavedUUIDs.Duplicates := dupIgnore;
+
+    if (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if (WT = nil) or (WT.DeviceChannels = nil) then
+          Continue;
+
+        for Ch in WT.DeviceChannels do
+        begin
+          if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+            Continue;
+
+          Device := Ch.FlowMeter.Device;
+          if (Trim(Device.UUID) = '') or (SavedUUIDs.IndexOf(Trim(Device.UUID)) >= 0) then
+            Continue;
+
+          SavedUUIDs.Add(Trim(Device.UUID));
+          Ini.WriteInteger(CProcessingDevicePointCountsSection, Trim(Device.UUID),
+            GetDeviceSpillageCount(Device));
+        end;
+      end;
+  finally
+    SavedUUIDs.Free;
+    Ini.Free;
+  end;
+end;
+
 procedure TFrameProceed.SaveProcessingDevices;
 var
   Ini: TIniFile;
@@ -526,6 +592,8 @@ begin
   finally
     Ini.Free;
   end;
+
+  SaveProcessingPointCounts;
 end;
 
 
@@ -726,6 +794,7 @@ begin
     DbgProceedTree(1111, 'Before PopulateTreeViewDevices from AddProcessingDeviceFromSelection');
     PopulateTreeViewDevices;
     DbgProceedTree(1112, 'After PopulateTreeViewDevices from AddProcessingDeviceFromSelection'#13#10 + GetSelectedTreeDebugText);
+    SaveProcessingDevices;
     SelectTreeItemByTagObject(SelDevice);
     ShowDeviceSpillages(SelDevice);
   finally
@@ -1730,6 +1799,7 @@ begin
 
   if SameText(Item.Text, '...') then
   begin
+    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
     DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
     AddActionMenuItem(ActionSessionSynchTable);
@@ -1789,11 +1859,19 @@ begin
     Exit;
 
   Item := TreeViewDevices.Selected;
-  if not SameText(Item.Text, 'прочее') then
+  if (not SameText(Item.Text, 'прочее')) and (not SameText(Item.Text, '...')) then
     Exit;
 
   if FProcessingDevices = nil then
     Exit;
+
+  if SameText(Item.Text, '...') then
+  begin
+    FProcessingDevices.Clear;
+    SaveProcessingDevices;
+    RefreshResultsAfterDevicesAction;
+    Exit;
+  end;
 
   DeviceUUIDsOnTables := TStringList.Create;
   try
@@ -1881,6 +1959,54 @@ begin
           AddProcessingDevice(Device);
       end;
 end;
+
+procedure TFrameProceed.SyncProcessingDevicesWithNewPoints;
+var
+  Ini: TIniFile;
+  I, OldCount, PointCount, SavedPointCount: Integer;
+  WT: TWorkTable;
+  Ch: TChannel;
+  Device: TDevice;
+begin
+  if (FProcessingDevices = nil) or (FWorkTableManager = nil) or
+     (FWorkTableManager.WorkTables = nil) or (Trim(FWorkTableManager.IniFileName) = '') then
+    Exit;
+
+  OldCount := FProcessingDevices.Count;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+    begin
+      WT := FWorkTableManager.WorkTables[I];
+      if (WT = nil) or (WT.DeviceChannels = nil) then
+        Continue;
+
+      for Ch in WT.DeviceChannels do
+      begin
+        if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+          Continue;
+
+        Device := Ch.FlowMeter.Device;
+        if Trim(Device.UUID) = '' then
+          Continue;
+
+        PointCount := GetDeviceSpillageCount(Device);
+        SavedPointCount := Ini.ReadInteger(CProcessingDevicePointCountsSection,
+          Trim(Device.UUID), 0);
+        if PointCount > SavedPointCount then
+          AddProcessingDevice(Device);
+      end;
+    end;
+  finally
+    Ini.Free;
+  end;
+
+  if FProcessingDevices.Count <> OldCount then
+    SaveProcessingDevices
+  else
+    SaveProcessingPointCounts;
+end;
+
 procedure TFrameProceed.SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
 var
   I: Integer;
@@ -2130,6 +2256,7 @@ begin
       Exit;
 
     RemoveProcessingDevice(Device);
+    SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
   end;
@@ -2216,7 +2343,7 @@ begin
     Exit;
 
   Device := TDevice(Item.TagObject);
-  MarkProcessingDeviceDeleted(Device);
+  RemoveProcessingDevice(Device);
   SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
