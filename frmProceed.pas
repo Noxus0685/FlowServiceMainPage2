@@ -330,7 +330,7 @@ begin
      (AWorkTableManager.WorkTables.Count = 0) then
     Exit;
 
-  Result := AWorkTableManager.WorkTables[0];
+  Result := AWorkTableManager.ActiveWorkTable;
 end;
 
 destructor TFrameProceed.Destroy;
