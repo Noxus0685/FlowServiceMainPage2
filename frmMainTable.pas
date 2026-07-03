@@ -1669,6 +1669,9 @@ begin
         GlowMesGreen.Enabled := True;
         GlowMesRed.Enabled := False;
         GlowMesYellow.Enabled := False;
+        TestButton.Text := 'Стоп';
+        TestButton.Tag := 3;
+        TestButton.Enabled := True;
       end;
 
     swtSTOPTEST:
