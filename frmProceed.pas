@@ -1288,7 +1288,7 @@ begin
   case AStatus of
     2: Result := $FFF0F0F0;
     3: Result := $FFFFE6E6;
-    4: Result := TAlphaColors.Lightyellow;
+    4: Result := $FFFFE6E6;
     5: Result := $FFE6F4E6;
   else
     Result := TAlphaColors.Null;
