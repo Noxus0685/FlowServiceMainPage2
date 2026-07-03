@@ -635,6 +635,8 @@ type
   FFrameChannelProperties: TFrameChannelProperties;
   FFrameWorkTableProperties: TFrameWorkTableProperties;
   FMenuItemSetActiveWorkTable: TMenuItem;
+  FMenuItemDevicesSetActiveWorkTable: TMenuItem;
+  FMenuItemEtalonsSetActiveWorkTable: TMenuItem;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -1872,13 +1874,19 @@ begin
 end;
 
 procedure TFrameMainTable.EnsureActiveWorkTableMenu;
-begin
-  if FMenuItemSetActiveWorkTable <> nil then
-    Exit;
+  procedure EnsureMenuItem(var AMenuItem: TMenuItem; AParent: TFmxObject);
+  begin
+    if (AMenuItem <> nil) or (AParent = nil) then
+      Exit;
 
-  FMenuItemSetActiveWorkTable := TMenuItem.Create(PopupMenuWorkTables);
-  FMenuItemSetActiveWorkTable.Text := 'Сменить активный рабочий стол';
-  PopupMenuWorkTables.AddObject(FMenuItemSetActiveWorkTable);
+    AMenuItem := TMenuItem.Create(AParent);
+    AMenuItem.Text := 'Сменить активный рабочий стол';
+    AParent.AddObject(AMenuItem);
+  end;
+begin
+  EnsureMenuItem(FMenuItemSetActiveWorkTable, PopupMenuWorkTables);
+  EnsureMenuItem(FMenuItemDevicesSetActiveWorkTable, MenuItemDevicesWorkTablesGroup);
+  EnsureMenuItem(FMenuItemEtalonsSetActiveWorkTable, MenuItemEtalonsWorkTablesGroup);
 end;
 
 procedure TFrameMainTable.MenuSetActiveWorkTableClick(Sender: TObject);
@@ -2454,9 +2462,36 @@ end;
 procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
 var
   CanEdit: Boolean;
-  I: Integer;
-  MenuItem: TMenuItem;
-  WorkTable: TWorkTable;
+  procedure PopulateActiveWorkTableMenu(AMenuItem: TMenuItem);
+  var
+    I: Integer;
+    MenuItem: TMenuItem;
+    WorkTable: TWorkTable;
+  begin
+    if AMenuItem = nil then
+      Exit;
+
+    AMenuItem.Enabled := (WorkTableManager <> nil) and
+      (WorkTableManager.WorkTables <> nil) and (WorkTableManager.WorkTables.Count > 0);
+
+    while AMenuItem.ItemsCount > 0 do
+      AMenuItem.Items[0].Free;
+
+    if AMenuItem.Enabled then
+      for I := 0 to WorkTableManager.WorkTables.Count - 1 do
+      begin
+        WorkTable := WorkTableManager.WorkTables[I];
+        if WorkTable = nil then
+          Continue;
+
+        MenuItem := TMenuItem.Create(AMenuItem);
+        MenuItem.Text := WorkTable.Text;
+        MenuItem.TagObject := WorkTable;
+        MenuItem.IsChecked := WorkTable = FActiveWorkTable;
+        MenuItem.OnClick := MenuSetActiveWorkTableClick;
+        AMenuItem.AddObject(MenuItem);
+      end;
+  end;
 begin
   EnsureActiveWorkTableMenu;
   CanEdit := CanEditActiveWorkTable;
@@ -2485,29 +2520,9 @@ begin
   if ActionScaleDelete <> nil then
     ActionScaleDelete.Enabled := CanEdit;
 
-  if FMenuItemSetActiveWorkTable <> nil then
-  begin
-    FMenuItemSetActiveWorkTable.Enabled := (WorkTableManager <> nil) and
-      (WorkTableManager.WorkTables <> nil) and (WorkTableManager.WorkTables.Count > 0);
-
-    while FMenuItemSetActiveWorkTable.ItemsCount > 0 do
-      FMenuItemSetActiveWorkTable.Items[0].Free;
-
-    if FMenuItemSetActiveWorkTable.Enabled then
-      for I := 0 to WorkTableManager.WorkTables.Count - 1 do
-      begin
-        WorkTable := WorkTableManager.WorkTables[I];
-        if WorkTable = nil then
-          Continue;
-
-        MenuItem := TMenuItem.Create(FMenuItemSetActiveWorkTable);
-        MenuItem.Text := WorkTable.Text;
-        MenuItem.TagObject := WorkTable;
-        MenuItem.IsChecked := WorkTable = FActiveWorkTable;
-        MenuItem.OnClick := MenuSetActiveWorkTableClick;
-        FMenuItemSetActiveWorkTable.AddObject(MenuItem);
-      end;
-  end;
+  PopulateActiveWorkTableMenu(FMenuItemSetActiveWorkTable);
+  PopulateActiveWorkTableMenu(FMenuItemDevicesSetActiveWorkTable);
+  PopulateActiveWorkTableMenu(FMenuItemEtalonsSetActiveWorkTable);
 end;
 
 procedure TFrameMainTable.UpdateGridPopupActions;
@@ -2612,12 +2627,14 @@ end;
 procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
 begin
   FLastPopupGrid := GridDevices;
+  PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
 end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
 begin
   FLastPopupGrid := GridEtalons;
+  PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
 end;
 
