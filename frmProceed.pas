@@ -54,6 +54,7 @@ type
     Name: string;
     DeviceType: string;
     Serial: string;
+    DeviceUUID: string;
     PointNames: TArray<string>;
     PointValues: TArray<string>;
     PointStatuses: TArray<Integer>;
@@ -209,6 +210,8 @@ type
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
     procedure UpdateResultsPointColumns;
+    function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
+    procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
     procedure ShowWorkTableResults(AWorkTable: TWorkTable);
@@ -1361,6 +1364,67 @@ begin
     StringColumnPointNum4.Header := FormatPointHeader('Q4');
   end;
 end;
+
+function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
+  APoint: TDevicePoint): TPointSpillage;
+var
+  Spillage: TPointSpillage;
+  DeviceUUID: string;
+  TypeUUID: string;
+begin
+  Result := nil;
+  if (ADevice = nil) or (APoint = nil) or (ADevice.Spillages = nil) then
+    Exit;
+
+  DeviceUUID := Trim(ADevice.UUID);
+  TypeUUID := Trim(APoint.DeviceTypeUUID);
+
+  for Spillage in ADevice.Spillages do
+  begin
+    if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) then
+      Continue;
+
+    if not SameText(Trim(Spillage.DeviceUUID), DeviceUUID) then
+      Continue;
+
+    if (TypeUUID <> '') and (Trim(Spillage.DeviceTypeUUID) <> '') then
+    begin
+      if not SameText(Trim(Spillage.DeviceTypeUUID), TypeUUID) then
+        Continue;
+    end
+    else if (not SameText(Trim(Spillage.Name), Trim(APoint.Name))) and
+            (not ADevice.IsFlowInPoint(Spillage.QavgEtalon, APoint)) then
+      Continue;
+
+    Result := Spillage;
+    if Spillage.Valid then
+      Exit;
+  end;
+end;
+
+procedure TFrameProceed.LogResultCellDebug(const ARow: TResultGridRow;
+  APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
+var
+  FoundID: Integer;
+  FoundDeviceUUID: string;
+  FoundError: string;
+begin
+  FoundID := 0;
+  FoundDeviceUUID := '';
+  FoundError := '';
+  if ASpillage <> nil then
+  begin
+    FoundID := ASpillage.ID;
+    FoundDeviceUUID := ASpillage.DeviceUUID;
+    FoundError := FormatFloat('0.###', ASpillage.Error);
+  end;
+
+  LogMKS('DBG SP 9101', 'SummaryResults CELL',
+    Format('RowDeviceUUID=%s; RowSerial=%s; ColumnPointName=%s; ColumnPointDeviceTypeUUID=%s; FoundSpillageID=%d; FoundSpillageDeviceUUID=%s; FoundError=%s; CellValue=%s',
+      [ARow.DeviceUUID, ARow.Serial, APoint.Name, APoint.DeviceTypeUUID,
+       FoundID, FoundDeviceUUID, FoundError, ACellValue]));
+end;
+
 procedure TFrameProceed.ShowAllDevicesResults;
 var
   Devices: TList<TDevice>;
@@ -1387,6 +1451,7 @@ var
   Device: TDevice;
   Row: TResultGridRow;
   I: Integer;
+  Spillage: TPointSpillage;
 begin
   Rows := TList<TResultGridRow>.Create;
   try
@@ -1402,6 +1467,7 @@ begin
         Row.Name := Device.Name;
         Row.DeviceType := Device.DeviceTypeName;
         Row.Serial := Device.SerialNumber;
+        Row.DeviceUUID := Device.UUID;
 
         if Device.Points <> nil then
         begin
@@ -1414,11 +1480,18 @@ begin
             if P <> nil then
             begin
               Row.PointNames[I] := P.Name;
-              Row.PointStatuses[I] := P.Status;
-              if P.Status = 1 then
-                Row.PointValues[I] := '-'
+              Spillage := FindResultSpillageForPoint(Device, P);
+              if Spillage <> nil then
+              begin
+                Row.PointStatuses[I] := Spillage.Status;
+                Row.PointValues[I] := FormatFloat('0.###', Spillage.Error);
+              end
               else
-                Row.PointValues[I] := FormatFloat('0.###', P.ResultError);
+              begin
+                Row.PointStatuses[I] := 1;
+                Row.PointValues[I] := '-';
+              end;
+              LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
             end
             else
             begin
