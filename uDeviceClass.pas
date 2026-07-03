@@ -125,7 +125,7 @@ type
 
     DeviceID: Integer;           // Идентификатор прибора (FK → TDevice.ID)
     DeviceUUID: String;
-    DeviceTypePointID: Integer;  // Идентификатор шаблонной точки типа (опционально)
+    DeviceTypeUUID: string;   // UUID шаблонной точки типа (опционально)
 
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
@@ -222,7 +222,7 @@ type
 
     SessionID: Integer;          // Сессия, к которой относится измерение (FK → TSessionSpillage.ID)
     DeviceUUID: string;          // Прибор, к которому относится измерение (стабильная связь по UUID)
-    DeviceTypePointID: Integer;  // Шаблонная точка типа (опционально)
+    DeviceTypeUUID: string;   // UUID шаблонной точки типа (опционально)
     EtalonName: string;
     EtalonUUID: string;
 
@@ -1129,7 +1129,7 @@ begin
 
   { Идентификация }
   DeviceID := ADeviceID;
-  DeviceTypePointID := 0;
+  DeviceTypeUUID := '';
 
   { Общая информация }
   Name := 'Точка измерения';
@@ -1203,7 +1203,7 @@ begin
   { Идентификация }
   SessionID := ASessionID;
   DeviceUUID := '';
-  DeviceTypePointID := 0;
+  DeviceTypeUUID := '';
   EtalonName := '';
   EtalonUUID := '';
   Enabled := True;
@@ -1643,7 +1643,7 @@ begin
     begin
       Add(IntToStr(P.ID));
       Add(IntToStr(P.DeviceID));
-      Add(IntToStr(P.DeviceTypePointID));
+      Add(P.DeviceTypeUUID);
       Add(IntToStr(P.Num));
       Add(P.Name);
       Add(P.Description);
@@ -1684,7 +1684,7 @@ begin
       Add(IntToStr(S.ID));
       Add(IntToStr(S.SessionID));
       Add(S.DeviceUUID);
-      Add(IntToStr(S.DeviceTypePointID));
+      Add(S.DeviceTypeUUID);
       Add(IntToStr(S.Num));
       Add(S.Description);
       Add(FloatToStr(S.SpillTime));
@@ -1816,7 +1816,7 @@ begin
   DeviceUUID := ASource.DeviceUUID;
   end;
 
-  DeviceTypePointID := ASource.DeviceTypePointID;
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   {====================================================================}
   { СОСТОЯНИЕ }
   {====================================================================}
@@ -1895,7 +1895,7 @@ begin
   if ASource = nil then
     Exit;
 
-  DeviceTypePointID := ASource.ID;
+  DeviceTypeUUID := ASource.UUID;
   Name := ASource.Name;
   Description := ASource.Description;
 
@@ -1994,7 +1994,7 @@ begin
 
   SessionID := ASource.SessionID;
   DeviceUUID := ASource.DeviceUUID;
-  DeviceTypePointID := ASource.DeviceTypePointID;
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   EtalonName := ASource.EtalonName;
   EtalonUUID := ASource.EtalonUUID;
   Enabled := ASource.Enabled;
@@ -2340,7 +2340,7 @@ begin
   LogMKS('DBG SP 4003', 'TDevice.AnalyseDataPoint MATCH',
     Format('Matched DevicePoint ID=%d Name=%s | Before assign=%s',
       [MatchedPoint.ID, MatchedPoint.Name, DumpSpillage(ASpillage)]));
-  ASpillage.DeviceTypePointID := MatchedPoint.DeviceTypePointID;
+  ASpillage.DeviceTypeUUID := MatchedPoint.DeviceTypeUUID;
   ASpillage.Name := MatchedPoint.Name;
   LogMKS('DBG SP 4004', 'TDevice.AnalyseDataPoint AFTER MATCH ASSIGN', DumpSpillage(ASpillage));
 
@@ -2466,10 +2466,10 @@ begin
           Changed := True;
         end;
 
-        if (S.DeviceTypePointID <> APoint.DeviceTypePointID) or
+        if (S.DeviceTypeUUID <> APoint.DeviceTypeUUID) or
            (not SameText(S.Name, APoint.Name)) then
         begin
-          S.DeviceTypePointID := APoint.DeviceTypePointID;
+          S.DeviceTypeUUID := APoint.DeviceTypeUUID;
           S.Name := APoint.Name;
           S.State := osModified;
           Changed := True;
