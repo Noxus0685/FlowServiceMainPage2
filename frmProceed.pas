@@ -1452,6 +1452,10 @@ var
   Row: TResultGridRow;
   I: Integer;
   Spillage: TPointSpillage;
+  FoundPointsCount: Integer;
+  RequiredPointsCount: Integer;
+  InvalidCount: Integer;
+  HasAnyData: Boolean;
 begin
   Rows := TList<TResultGridRow>.Create;
   try
@@ -1469,8 +1473,14 @@ begin
         Row.Serial := Device.SerialNumber;
         Row.DeviceUUID := Device.UUID;
 
+        FoundPointsCount := 0;
+        RequiredPointsCount := 0;
+        InvalidCount := 0;
+        HasAnyData := False;
+
         if Device.Points <> nil then
         begin
+          RequiredPointsCount := Device.Points.Count;
           SetLength(Row.PointNames, Device.Points.Count);
           SetLength(Row.PointValues, Device.Points.Count);
           SetLength(Row.PointStatuses, Device.Points.Count);
@@ -1483,6 +1493,11 @@ begin
               Spillage := FindResultSpillageForPoint(Device, P);
               if Spillage <> nil then
               begin
+                Inc(FoundPointsCount);
+                HasAnyData := True;
+                if (not Spillage.Valid) or
+                   (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+                  Inc(InvalidCount);
                 Row.PointStatuses[I] := Spillage.Status;
                 Row.PointValues[I] := FormatFloat('0.###', Spillage.Error);
               end
@@ -1508,8 +1523,21 @@ begin
           SetLength(Row.PointStatuses, 0);
         end;
 
-        Row.ResultStatus := Device.Status;
-        Row.ResultText := BuildResultTextByStatus(Device.Status);
+        if FoundPointsCount = 0 then
+          Row.ResultStatus := 2
+        else if InvalidCount > 0 then
+          Row.ResultStatus := 3
+        else if FoundPointsCount < RequiredPointsCount then
+          Row.ResultStatus := 2
+        else
+          Row.ResultStatus := 5;
+
+        Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
+
+        LogMKS('DBG SP 9102', 'SummaryResults RESULT',
+          Format('RowDeviceUUID=%s; RowSerial=%s; RequiredPointsCount=%d; FoundPointsCount=%d; InvalidCount=%d; HasAnyData=%s; ResultText=%s',
+            [Row.DeviceUUID, Row.Serial, RequiredPointsCount, FoundPointsCount,
+             InvalidCount, BoolToStr(HasAnyData, True), Row.ResultText]));
 
         Rows.Add(Row);
       end;
