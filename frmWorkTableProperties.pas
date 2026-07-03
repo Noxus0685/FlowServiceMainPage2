@@ -20,7 +20,6 @@ uses
   uMeterValue,
   uParameter,
   uSyncSetup,
-  uClasses,
   uWorkTable;
 
 type
@@ -1266,18 +1265,12 @@ procedure TFrameWorkTableProperties.SelectMeterValue(AKind: Integer);
 var
   Form: TFormMeterValueSelect;
   SelectedMeterValue: TMeterValue;
-  Category: EStdCategory;
 begin
   if FWorkTable = nil then
     Exit;
 
-  Category := mftUnknownType;
-  if (FWorkTable.TableFlow <> nil) then
-    Category := FWorkTable.TableFlow.MeterFlowCategory;
-
   Form := TFormMeterValueSelect.Create(Self);
   try
-    Form.SetDeviceCategory(Category);
     case AKind of
       0: Form.SetFilterText('давление');
       1: Form.SetFilterText('температура');
