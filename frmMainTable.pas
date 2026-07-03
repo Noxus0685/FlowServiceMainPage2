@@ -5741,7 +5741,8 @@ begin
   if Column = CheckColumnDeviceEnable1 then
   begin
 
-  WorkTable := GetWorkTableByIndex(0);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
   if WorkTable <> nil then
   begin
     AllEnabled := WorkTable.DeviceChannels.Count > 0;
@@ -6191,7 +6192,8 @@ begin
     Exit;
   end;
 
-  WorkTable := GetWorkTableByIndex(0);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
 
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
     Exit;
@@ -6293,7 +6295,8 @@ begin
     Exit;
   end;
 
-  WorkTable := GetWorkTableByIndex(0);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
 
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
     Exit;
