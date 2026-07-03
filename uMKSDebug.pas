@@ -1,4 +1,4 @@
-unit uMKSDebug;
+﻿unit uMKSDebug;
 
 interface
 
@@ -20,14 +20,14 @@ begin
     Exit('<nil>');
 
   Result := Format(
-    'Ptr=%p; ID=%d; Num=%d; Name="%s"; SessionID=%d; DevicePointID=%d; DeviceTypePointID=%d; Valid=%s; Status=%d; State=%d; Error=%f; QavgEtalon=%f; Enabled=%s',
+    'Ptr=%p; ID=%d; Num=%d; Name="%s"; SessionID=%d; DeviceUUID=%s; DeviceTypePointID=%d; Valid=%s; Status=%d; State=%d; Error=%f; QavgEtalon=%f; Enabled=%s',
     [
       Pointer(APoint),
       APoint.ID,
       APoint.Num,
       APoint.Name,
       APoint.SessionID,
-      APoint.DevicePointID,
+      APoint.DeviceUUID,
       APoint.DeviceTypePointID,
       BoolToStr(APoint.Valid, True),
       APoint.Status,

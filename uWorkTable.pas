@@ -4497,6 +4497,7 @@ begin
       Point.Num := Device.Spillages.Count + 1;
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.SessionID := Session.ID;
+      Point.DeviceUUID := Device.UUID;
       Point.DateTime := Now;
       Point.SpillTime := ValueTime.GetDoubleValue;
       Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
@@ -4515,7 +4516,6 @@ begin
 
       if MatchedPoint <> nil then
       begin
-        Point.DevicePointID := MatchedPoint.ID;
         Point.Name := MatchedPoint.Name;
       end;
 

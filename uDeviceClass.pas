@@ -221,7 +221,7 @@ type
     {====================================================================}
 
     SessionID: Integer;          // Сессия, к которой относится измерение (FK → TSessionSpillage.ID)
-    DevicePointID: Integer;      // Поверочная точка прибора (FK → TDevicePoint.ID)
+    DeviceUUID: string;          // Прибор, к которому относится измерение (стабильная связь по UUID)
     DeviceTypePointID: Integer;  // Шаблонная точка типа (опционально)
     EtalonName: string;
     EtalonUUID: string;
@@ -1202,7 +1202,7 @@ begin
 
   { Идентификация }
   SessionID := ASessionID;
-  DevicePointID := 0;
+  DeviceUUID := '';
   DeviceTypePointID := 0;
   EtalonName := '';
   EtalonUUID := '';
@@ -1683,7 +1683,7 @@ begin
     begin
       Add(IntToStr(S.ID));
       Add(IntToStr(S.SessionID));
-      Add(IntToStr(S.DevicePointID));
+      Add(S.DeviceUUID);
       Add(IntToStr(S.DeviceTypePointID));
       Add(IntToStr(S.Num));
       Add(S.Description);
@@ -1977,7 +1977,7 @@ begin
   if ASource = nil then
     Exit;
 
-  if (ASource.DevicePointID <> Self.DevicePointID) or
+  if (ASource.DeviceUUID <> Self.DeviceUUID) or
      (ASource.Name <> Self.Name) or
      (ASource.SessionID <> Self.SessionID) then
     LogMKS('DBG SP 3001', 'TPointSpillage.Assign BEFORE',
@@ -1993,7 +1993,7 @@ begin
   {====================================================================}
 
   SessionID := ASource.SessionID;
-  DevicePointID := ASource.DevicePointID;
+  DeviceUUID := ASource.DeviceUUID;
   DeviceTypePointID := ASource.DeviceTypePointID;
   EtalonName := ASource.EtalonName;
   EtalonUUID := ASource.EtalonUUID;
@@ -2084,10 +2084,10 @@ begin
   Coef := ASource.Coef;
   FCDCoefficient := ASource.FCDCoefficient;
 
-  if (ASource.DevicePointID <> Self.DevicePointID) or
+  if (ASource.DeviceUUID <> Self.DeviceUUID) or
      (ASource.Name <> Self.Name) or
      (ASource.SessionID <> Self.SessionID) or
-     (Self.DevicePointID = 0) or (Self.Name = '-') then
+     (Self.Name = '-') then
     LogMKS('DBG SP 3002', 'TPointSpillage.Assign AFTER',
       Format('Self=%s | Source=%s', [DumpSpillage(Self), DumpSpillage(ASource)]));
 end;
@@ -2286,14 +2286,14 @@ begin
   if (ASpillage = nil) or (FPoints = nil) then
     Exit;
 
-  if ASpillage.DevicePointID <> 0 then
-    for P in FPoints do
-      if (P <> nil) and (P.ID = ASpillage.DevicePointID) then
-        Exit(P);
+  if (Trim(ASpillage.DeviceUUID) <> '') and
+     (not SameText(Trim(ASpillage.DeviceUUID), Trim(Self.UUID))) then
+    Exit;
 
   for P in FPoints do
     if (P <> nil) and IsFlowInPoint(ASpillage.QavgEtalon, P) then
       Exit(P);
+
 end;
 
 function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
@@ -2312,6 +2312,7 @@ begin
   if ASpillage = nil then
     Exit;
 
+  ASpillage.DeviceUUID := Self.UUID;
   ASpillage.Status := TPointSpillage.SPS_DATA_ASSIGNED;
   ASpillage.StatusStr := 'Данные присвоены, анализ выполняется.';
   ASpillage.Valid := False;
@@ -2327,7 +2328,6 @@ begin
 
   if MatchedPoint = nil then
   begin
-    ASpillage.DevicePointID := 0;
     ASpillage.Name := '-';
     ASpillage.Status := TPointSpillage.SPS_FLOW_NOT_MATCHED;
     ASpillage.StatusStr :=
@@ -2340,7 +2340,6 @@ begin
   LogMKS('DBG SP 4003', 'TDevice.AnalyseDataPoint MATCH',
     Format('Matched DevicePoint ID=%d Name=%s | Before assign=%s',
       [MatchedPoint.ID, MatchedPoint.Name, DumpSpillage(ASpillage)]));
-  ASpillage.DevicePointID := MatchedPoint.ID;
   ASpillage.DeviceTypePointID := MatchedPoint.DeviceTypePointID;
   ASpillage.Name := MatchedPoint.Name;
   LogMKS('DBG SP 4004', 'TDevice.AnalyseDataPoint AFTER MATCH ASSIGN', DumpSpillage(ASpillage));
@@ -2460,11 +2459,16 @@ begin
         if MatchedPoint <> APoint then
           Continue;
 
-        if (S.DevicePointID <> APoint.ID) or
-           (S.DeviceTypePointID <> APoint.DeviceTypePointID) or
+        if Trim(S.DeviceUUID) = '' then
+        begin
+          S.DeviceUUID := Self.UUID;
+          S.State := osModified;
+          Changed := True;
+        end;
+
+        if (S.DeviceTypePointID <> APoint.DeviceTypePointID) or
            (not SameText(S.Name, APoint.Name)) then
         begin
-          S.DevicePointID := APoint.ID;
           S.DeviceTypePointID := APoint.DeviceTypePointID;
           S.Name := APoint.Name;
           S.State := osModified;
