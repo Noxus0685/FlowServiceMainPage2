@@ -1299,6 +1299,9 @@ begin
   if AWorkTable.State in [swtCOMPLETE, swtFINALREAD] then
     AWorkTable.RecalculateAllMeterValues;
 
+  if AWorkTable <> FActiveWorkTable then
+    Exit;
+
   OnChangeState(AWorkTable.State);
 
   if AData is TDevicePoint then
@@ -1372,6 +1375,7 @@ begin
     SetValues;
     RefreshScalesCombo;
     UpdateUIScale;
+    OnChangeState(FActiveWorkTable.State);
     UpdateForm;
     Exit;
   end;
@@ -1930,6 +1934,7 @@ begin
   RefreshPumpsCombo;
   RefreshScalesCombo;
   UpdateGrids;
+  OnChangeState(FActiveWorkTable.State);
   UpdateForm;
 end;
 
