@@ -127,6 +127,7 @@ type
     class procedure FillDeviceFromChannel(ADevice: TDevice; AChannel: TChannel;
       AMode: TDeviceCreateMode); static;
     class procedure SyncChannelAndFlowMeter(ADevice: TDevice; AChannel: TChannel); static;
+    class procedure RecalcDevicePointQ(ADevice: TDevice); static;
     class procedure AddProtocol(AMode: TDeviceCreateMode; const AAction: string;
       ADevice: TDevice; AChannel: TChannel); static;
     class function FindDeviceByUUID(const ADeviceUUID: string; ARepo: TDeviceRepository): TDevice; static;
@@ -740,7 +741,7 @@ type
     const ASplitByEnabledGroup: Boolean = False): TArray<Double>;
 
     property WorkTables: TObjectList<TWorkTable> read FWorkTables;
-    property ActiveWorkTable: TWorkTable read FActiveWorkTable write FActiveWorkTable;
+    property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
     procedure UpdateSimulation;
@@ -986,6 +987,19 @@ begin
     AChannel.RepoDeviceUUID := ADevice.RepoDeviceUUID;
 end;
 
+
+class procedure TDeviceCreationService.RecalcDevicePointQ(ADevice: TDevice);
+var
+  DevicePoint: TDevicePoint;
+begin
+  if (ADevice = nil) or (ADevice.Points = nil) or (ADevice.Qmax <= 0) then
+    Exit;
+
+  for DevicePoint in ADevice.Points do
+    if (DevicePoint <> nil) and (DevicePoint.FlowRate > 0) then
+      DevicePoint.Q := DevicePoint.FlowRate * ADevice.Qmax;
+end;
+
 class function TDeviceCreationService.EnsureDeviceForChannel(AChannel: TChannel;
   AWorkTable: TWorkTable; ARepo: TDeviceRepository; AMode: TDeviceCreateMode;
   ASourceDevice: TDevice; ACurrentPoint: TDevicePoint): TDevice;
@@ -1048,6 +1062,14 @@ begin
 
   if (AMode <> dcmGridPlaceholder) or WasCreated or WasPlaceholder then
     FillDeviceFromChannel(Result, AChannel, AMode);
+
+  if (AMode = dcmMeasurementPromoted) and (ASourceDevice <> nil) and
+     (ASourceDevice <> Result) and (ASourceDevice.Qmax > 0) then
+  begin
+    Result.Qmax := ASourceDevice.Qmax;
+    RecalcDevicePointQ(Result);
+  end;
+
   SyncChannelAndFlowMeter(Result, AChannel);
 
   if AMode = dcmMeasurementPromoted then
@@ -2521,6 +2543,8 @@ begin
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
+  IsImpTemplateSet := False;
+  IsImpTotalTemplateSet := False;
   AggregateGroup := 0;
   MaxGroupFlow := -1;
 
@@ -4404,7 +4428,9 @@ var
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
+  CurrentPointQmax: Double;
   Device: TDevice;
+  SourceDevice: TDevice;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
 begin
@@ -4428,16 +4454,31 @@ begin
     if (DeviceChannel = nil) or (not DeviceChannel.Enabled) then
       Continue;
 
+    SourceDevice := nil;
+    if DeviceChannel.FlowMeter <> nil then
+      SourceDevice := DeviceChannel.FlowMeter.Device;
+
     Device := TDeviceCreationService.EnsureDeviceForChannel(
       DeviceChannel,
       Self,
       DeviceRepo,
       dcmMeasurementPromoted,
-      nil,
+      SourceDevice,
       CurrentPoint
     );
     if Device = nil then
       Continue;
+
+    if (CurrentPoint <> nil) and (CurrentPoint.FlowRate > 0) and
+       (CurrentPoint.Q > 0) then
+    begin
+      CurrentPointQmax := CurrentPoint.Q / CurrentPoint.FlowRate;
+      if CurrentPointQmax > 0 then
+      begin
+        Device.Qmax := CurrentPointQmax;
+        TDeviceCreationService.RecalcDevicePointQ(Device);
+      end;
+    end;
 
     Session := Device.GetActiveSessionSpillage;
     if Session = nil then
@@ -4458,6 +4499,7 @@ begin
       Point.Num := Device.Spillages.Count + 1;
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.SessionID := Session.ID;
+      Point.DeviceUUID := Device.UUID;
       Point.DateTime := Now;
       Point.SpillTime := ValueTime.GetDoubleValue;
       Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
@@ -4476,7 +4518,6 @@ begin
 
       if MatchedPoint <> nil then
       begin
-        Point.DevicePointID := MatchedPoint.ID;
         Point.Name := MatchedPoint.Name;
       end;
 
@@ -4551,6 +4592,7 @@ begin
 
       if Device <> nil then
       begin
+        TDeviceCreationService.RecalcDevicePointQ(Device);
         LogMKS('DBG SP 1001', 'SaveMeasurementResults BEFORE AnalyseDataPoint',
           Format('Device=%s UUID=%s | %s', [Device.Name, Device.UUID, DumpSpillage(Point)]));
         Point.Valid := Device.AnalyseDataPoint(Point);
@@ -5003,18 +5045,85 @@ end;
 
 { Loads managed work tables from configured INI file. }
 procedure TWorkTableManager.Load;
+var
+  Ini: TIniFile;
+  ActiveUUID: string;
+  ActiveName: string;
+  ActiveIndex: Integer;
+  I: Integer;
+  WorkTable: TWorkTable;
 begin
   TWorkTable.Load(FIniFileName, FWorkTables);
 
-  if (FWorkTables<>nil) and (FWorkTables.Count>0) and (FWorkTables[0]<>nil) then
+  WorkTable := nil;
+  ActiveUUID := '';
+  ActiveName := '';
+  ActiveIndex := -1;
 
-  SetActiveWorkTable(FWorkTables[0]);
+  if (FIniFileName <> '') and FileExists(FIniFileName) then
+  begin
+    Ini := TIniFile.Create(FIniFileName);
+    try
+      ActiveUUID := Trim(Ini.ReadString('WorkTables', 'ActiveUUID', ''));
+      ActiveName := Trim(Ini.ReadString('WorkTables', 'ActiveName', ''));
+      ActiveIndex := Ini.ReadInteger('WorkTables', 'ActiveIndex', -1);
+    finally
+      Ini.Free;
+    end;
+  end;
+
+  if (ActiveUUID <> '') and (FWorkTables <> nil) then
+    for I := 0 to FWorkTables.Count - 1 do
+      if (FWorkTables[I] <> nil) and SameText(FWorkTables[I].UUID, ActiveUUID) then
+      begin
+        WorkTable := FWorkTables[I];
+        Break;
+      end;
+
+  if (WorkTable = nil) and (ActiveName <> '') then
+    WorkTable := FindWorkTableName(ActiveName);
+
+  if (WorkTable = nil) and (ActiveIndex >= 0) and
+     (FWorkTables <> nil) and (ActiveIndex < FWorkTables.Count) then
+    WorkTable := FWorkTables[ActiveIndex];
+
+  if (WorkTable = nil) and (FWorkTables <> nil) and
+     (FWorkTables.Count > 0) and (FWorkTables[0] <> nil) then
+    WorkTable := FWorkTables[0];
+
+  SetActiveWorkTable(WorkTable);
 end;
 
 { Saves managed work tables to configured INI file. }
 procedure TWorkTableManager.Save;
+var
+  Ini: TMemIniFile;
 begin
   TWorkTable.Save(FIniFileName, FWorkTables);
+
+  if FIniFileName = '' then
+    Exit;
+
+  Ini := TMemIniFile.Create(FIniFileName);
+  try
+    if (FActiveWorkTable <> nil) and (FWorkTables <> nil) and
+       (FWorkTables.IndexOf(FActiveWorkTable) >= 0) then
+    begin
+      Ini.WriteString('WorkTables', 'ActiveUUID', FActiveWorkTable.UUID);
+      Ini.WriteString('WorkTables', 'ActiveName', FActiveWorkTable.Name);
+      Ini.WriteInteger('WorkTables', 'ActiveIndex', FWorkTables.IndexOf(FActiveWorkTable));
+    end
+    else
+    begin
+      Ini.DeleteKey('WorkTables', 'ActiveUUID');
+      Ini.DeleteKey('WorkTables', 'ActiveName');
+      Ini.DeleteKey('WorkTables', 'ActiveIndex');
+    end;
+
+    Ini.UpdateFile;
+  finally
+    Ini.Free;
+  end;
 end;
 
 procedure TWorkTableManager.AddWorkTable;
@@ -5051,12 +5160,14 @@ begin
   if FActiveWorkTable = AWorkTable then
     Exit;
 
-  if FActiveWorkTable <> nil then
+  if (FActiveWorkTable <> nil) and
+     ((FWorkTables = nil) or (FWorkTables.IndexOf(FActiveWorkTable) >= 0)) then
     FActiveWorkTable.IsActive := False;
 
   FActiveWorkTable := AWorkTable;
 
-  if FActiveWorkTable <> nil then
+  if (FActiveWorkTable <> nil) and
+     ((FWorkTables = nil) or (FWorkTables.IndexOf(FActiveWorkTable) >= 0)) then
     FActiveWorkTable.IsActive := True;
 end;
 

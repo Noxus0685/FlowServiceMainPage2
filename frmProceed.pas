@@ -54,6 +54,7 @@ type
     Name: string;
     DeviceType: string;
     Serial: string;
+    DeviceUUID: string;
     PointNames: TArray<string>;
     PointValues: TArray<string>;
     PointStatuses: TArray<Integer>;
@@ -146,6 +147,7 @@ type
     ButtonSessionClearPoints: TButton;
     ButtonSessionClose: TButton;
     ButtonSessionDeviceAdd: TButton;
+    ButtonSessionSynchTable: TButton;
     Layout19: TLayout;
     Layout20: TLayout;
     ComboBoxUnitsResult: TComboBox;
@@ -189,6 +191,8 @@ type
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
     procedure MarkProcessingDeviceDeleted(ADevice: TDevice);
+    function GetDeviceSpillageCount(ADevice: TDevice): Integer;
+    procedure SaveProcessingPointCounts;
     procedure SaveProcessingDevices;
     procedure SavePendingProcessingChanges(Sender: TObject);
     procedure CancelProcessingChanges;
@@ -206,6 +210,8 @@ type
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
     procedure UpdateResultsPointColumns;
+    function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
+    procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
     procedure ShowWorkTableResults(AWorkTable: TWorkTable);
@@ -219,6 +225,7 @@ type
     procedure PopupMenuTreeViewDevicesPopup(Sender: TObject);
     procedure MenuTreeViewDevicesClearClick(Sender: TObject);
     procedure SyncProcessingDevicesFromTable(AWorkTable: TWorkTable; const AClearBeforeSync: Boolean);
+    procedure SyncProcessingDevicesWithNewPoints;
     procedure SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
     procedure ActionSessionSynchTableExecute(Sender: TObject);
     procedure MenuTreeViewDevicesAddClick(Sender: TObject);
@@ -297,6 +304,7 @@ const
   CProcessingDevicesSection = 'ProcessingDevices';
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
+  CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -330,7 +338,7 @@ begin
      (AWorkTableManager.WorkTables.Count = 0) then
     Exit;
 
-  Result := AWorkTableManager.WorkTables[0];
+  Result := AWorkTableManager.ActiveWorkTable;
 end;
 
 destructor TFrameProceed.Destroy;
@@ -375,6 +383,7 @@ begin
     ComboBoxUnitsResult.ItemIndex := 0;
 
   LoadProcessingDevices;
+  SyncProcessingDevicesWithNewPoints;
   InitCalibrCoefsFrame;
   RefreshResultsTab;
 end;
@@ -412,6 +421,7 @@ end;
 procedure TFrameProceed.RefreshResultsTab;
 begin
   DbgProceedTree(1501, 'RefreshResultsTab ENTER'#13#10 + GetSelectedTreeDebugText);
+  SyncProcessingDevicesWithNewPoints;
   PopulateTreeViewDevices;
   ShowAllDevicesResults;
 end;
@@ -489,6 +499,65 @@ begin
       if Point <> nil then
         Point.State := osDeleted;
 end;
+
+function TFrameProceed.GetDeviceSpillageCount(ADevice: TDevice): Integer;
+var
+  Point: TPointSpillage;
+begin
+  Result := 0;
+  if (ADevice = nil) or (ADevice.Spillages = nil) then
+    Exit;
+
+  for Point in ADevice.Spillages do
+    if (Point <> nil) and (Point.State <> osDeleted) then
+      Inc(Result);
+end;
+
+procedure TFrameProceed.SaveProcessingPointCounts;
+var
+  Ini: TIniFile;
+  I: Integer;
+  WT: TWorkTable;
+  Ch: TChannel;
+  Device: TDevice;
+  SavedUUIDs: TStringList;
+begin
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  SavedUUIDs := TStringList.Create;
+  try
+    SavedUUIDs.Sorted := False;
+    SavedUUIDs.Duplicates := dupIgnore;
+
+    if (FWorkTableManager.WorkTables <> nil) then
+      for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+      begin
+        WT := FWorkTableManager.WorkTables[I];
+        if (WT = nil) or (WT.DeviceChannels = nil) then
+          Continue;
+
+        for Ch in WT.DeviceChannels do
+        begin
+          if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+            Continue;
+
+          Device := Ch.FlowMeter.Device;
+          if (Trim(Device.UUID) = '') or (SavedUUIDs.IndexOf(Trim(Device.UUID)) >= 0) then
+            Continue;
+
+          SavedUUIDs.Add(Trim(Device.UUID));
+          Ini.WriteInteger(CProcessingDevicePointCountsSection, Trim(Device.UUID),
+            GetDeviceSpillageCount(Device));
+        end;
+      end;
+  finally
+    SavedUUIDs.Free;
+    Ini.Free;
+  end;
+end;
+
 procedure TFrameProceed.SaveProcessingDevices;
 var
   Ini: TIniFile;
@@ -526,6 +595,8 @@ begin
   finally
     Ini.Free;
   end;
+
+  SaveProcessingPointCounts;
 end;
 
 
@@ -726,6 +797,7 @@ begin
     DbgProceedTree(1111, 'Before PopulateTreeViewDevices from AddProcessingDeviceFromSelection');
     PopulateTreeViewDevices;
     DbgProceedTree(1112, 'After PopulateTreeViewDevices from AddProcessingDeviceFromSelection'#13#10 + GetSelectedTreeDebugText);
+    SaveProcessingDevices;
     SelectTreeItemByTagObject(SelDevice);
     ShowDeviceSpillages(SelDevice);
   finally
@@ -1216,7 +1288,7 @@ begin
   case AStatus of
     2: Result := $FFF0F0F0;
     3: Result := $FFFFE6E6;
-    4: Result := TAlphaColors.Lightyellow;
+    4: Result := $FFFFE6E6;
     5: Result := $FFE6F4E6;
   else
     Result := TAlphaColors.Null;
@@ -1292,6 +1364,67 @@ begin
     StringColumnPointNum4.Header := FormatPointHeader('Q4');
   end;
 end;
+
+function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
+  APoint: TDevicePoint): TPointSpillage;
+var
+  Spillage: TPointSpillage;
+  DeviceUUID: string;
+  TypeUUID: string;
+begin
+  Result := nil;
+  if (ADevice = nil) or (APoint = nil) or (ADevice.Spillages = nil) then
+    Exit;
+
+  DeviceUUID := Trim(ADevice.UUID);
+  TypeUUID := Trim(APoint.DeviceTypeUUID);
+
+  for Spillage in ADevice.Spillages do
+  begin
+    if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) then
+      Continue;
+
+    if not SameText(Trim(Spillage.DeviceUUID), DeviceUUID) then
+      Continue;
+
+    if (TypeUUID <> '') and (Trim(Spillage.DeviceTypeUUID) <> '') then
+    begin
+      if not SameText(Trim(Spillage.DeviceTypeUUID), TypeUUID) then
+        Continue;
+    end
+    else if (not SameText(Trim(Spillage.Name), Trim(APoint.Name))) and
+            (not ADevice.IsFlowInPoint(Spillage.QavgEtalon, APoint)) then
+      Continue;
+
+    Result := Spillage;
+    if Spillage.Valid then
+      Exit;
+  end;
+end;
+
+procedure TFrameProceed.LogResultCellDebug(const ARow: TResultGridRow;
+  APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
+var
+  FoundID: Integer;
+  FoundDeviceUUID: string;
+  FoundError: string;
+begin
+  FoundID := 0;
+  FoundDeviceUUID := '';
+  FoundError := '';
+  if ASpillage <> nil then
+  begin
+    FoundID := ASpillage.ID;
+    FoundDeviceUUID := ASpillage.DeviceUUID;
+    FoundError := FormatFloat('0.###', ASpillage.Error);
+  end;
+
+  LogMKS('DBG SP 9101', 'SummaryResults CELL',
+    Format('RowDeviceUUID=%s; RowSerial=%s; ColumnPointName=%s; ColumnPointDeviceTypeUUID=%s; FoundSpillageID=%d; FoundSpillageDeviceUUID=%s; FoundError=%s; CellValue=%s',
+      [ARow.DeviceUUID, ARow.Serial, APoint.Name, APoint.DeviceTypeUUID,
+       FoundID, FoundDeviceUUID, FoundError, ACellValue]));
+end;
+
 procedure TFrameProceed.ShowAllDevicesResults;
 var
   Devices: TList<TDevice>;
@@ -1318,6 +1451,11 @@ var
   Device: TDevice;
   Row: TResultGridRow;
   I: Integer;
+  Spillage: TPointSpillage;
+  FoundPointsCount: Integer;
+  RequiredPointsCount: Integer;
+  InvalidCount: Integer;
+  HasAnyData: Boolean;
 begin
   Rows := TList<TResultGridRow>.Create;
   try
@@ -1333,9 +1471,16 @@ begin
         Row.Name := Device.Name;
         Row.DeviceType := Device.DeviceTypeName;
         Row.Serial := Device.SerialNumber;
+        Row.DeviceUUID := Device.UUID;
+
+        FoundPointsCount := 0;
+        RequiredPointsCount := 0;
+        InvalidCount := 0;
+        HasAnyData := False;
 
         if Device.Points <> nil then
         begin
+          RequiredPointsCount := Device.Points.Count;
           SetLength(Row.PointNames, Device.Points.Count);
           SetLength(Row.PointValues, Device.Points.Count);
           SetLength(Row.PointStatuses, Device.Points.Count);
@@ -1345,11 +1490,23 @@ begin
             if P <> nil then
             begin
               Row.PointNames[I] := P.Name;
-              Row.PointStatuses[I] := P.Status;
-              if P.Status = 1 then
-                Row.PointValues[I] := '-'
+              Spillage := FindResultSpillageForPoint(Device, P);
+              if Spillage <> nil then
+              begin
+                Inc(FoundPointsCount);
+                HasAnyData := True;
+                if (not Spillage.Valid) or
+                   (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+                  Inc(InvalidCount);
+                Row.PointStatuses[I] := Spillage.Status;
+                Row.PointValues[I] := FormatFloat('0.###', Spillage.Error);
+              end
               else
-                Row.PointValues[I] := FormatFloat('0.###', P.ResultError);
+              begin
+                Row.PointStatuses[I] := 1;
+                Row.PointValues[I] := '-';
+              end;
+              LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
             end
             else
             begin
@@ -1366,8 +1523,21 @@ begin
           SetLength(Row.PointStatuses, 0);
         end;
 
-        Row.ResultStatus := Device.Status;
-        Row.ResultText := BuildResultTextByStatus(Device.Status);
+        if FoundPointsCount = 0 then
+          Row.ResultStatus := 2
+        else if InvalidCount > 0 then
+          Row.ResultStatus := 3
+        else if FoundPointsCount < RequiredPointsCount then
+          Row.ResultStatus := 2
+        else
+          Row.ResultStatus := 5;
+
+        Row.ResultText := BuildResultTextByStatus(Row.ResultStatus);
+
+        LogMKS('DBG SP 9102', 'SummaryResults RESULT',
+          Format('RowDeviceUUID=%s; RowSerial=%s; RequiredPointsCount=%d; FoundPointsCount=%d; InvalidCount=%d; HasAnyData=%s; ResultText=%s',
+            [Row.DeviceUUID, Row.Serial, RequiredPointsCount, FoundPointsCount,
+             InvalidCount, BoolToStr(HasAnyData, True), Row.ResultText]));
 
         Rows.Add(Row);
       end;
@@ -1730,6 +1900,7 @@ begin
 
   if SameText(Item.Text, '...') then
   begin
+    AddSimpleMenuItem('Очистить', MenuTreeViewDevicesClearClick);
     AddSimpleMenuItem('Добавить', MenuTreeViewDevicesAddClick);
     DbgProceedTree(1702, 'Popup adds menu item: Добавить; selected=' + TreeViewDevices.Selected.Text);
     AddActionMenuItem(ActionSessionSynchTable);
@@ -1789,11 +1960,19 @@ begin
     Exit;
 
   Item := TreeViewDevices.Selected;
-  if not SameText(Item.Text, 'прочее') then
+  if (not SameText(Item.Text, 'прочее')) and (not SameText(Item.Text, '...')) then
     Exit;
 
   if FProcessingDevices = nil then
     Exit;
+
+  if SameText(Item.Text, '...') then
+  begin
+    FProcessingDevices.Clear;
+    SaveProcessingDevices;
+    RefreshResultsAfterDevicesAction;
+    Exit;
+  end;
 
   DeviceUUIDsOnTables := TStringList.Create;
   try
@@ -1881,6 +2060,54 @@ begin
           AddProcessingDevice(Device);
       end;
 end;
+
+procedure TFrameProceed.SyncProcessingDevicesWithNewPoints;
+var
+  Ini: TIniFile;
+  I, OldCount, PointCount, SavedPointCount: Integer;
+  WT: TWorkTable;
+  Ch: TChannel;
+  Device: TDevice;
+begin
+  if (FProcessingDevices = nil) or (FWorkTableManager = nil) or
+     (FWorkTableManager.WorkTables = nil) or (Trim(FWorkTableManager.IniFileName) = '') then
+    Exit;
+
+  OldCount := FProcessingDevices.Count;
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    for I := 0 to FWorkTableManager.WorkTables.Count - 1 do
+    begin
+      WT := FWorkTableManager.WorkTables[I];
+      if (WT = nil) or (WT.DeviceChannels = nil) then
+        Continue;
+
+      for Ch in WT.DeviceChannels do
+      begin
+        if (Ch = nil) or (Ch.FlowMeter = nil) or (Ch.FlowMeter.Device = nil) then
+          Continue;
+
+        Device := Ch.FlowMeter.Device;
+        if Trim(Device.UUID) = '' then
+          Continue;
+
+        PointCount := GetDeviceSpillageCount(Device);
+        SavedPointCount := Ini.ReadInteger(CProcessingDevicePointCountsSection,
+          Trim(Device.UUID), 0);
+        if PointCount > SavedPointCount then
+          AddProcessingDevice(Device);
+      end;
+    end;
+  finally
+    Ini.Free;
+  end;
+
+  if FProcessingDevices.Count <> OldCount then
+    SaveProcessingDevices
+  else
+    SaveProcessingPointCounts;
+end;
+
 procedure TFrameProceed.SyncProcessingDevicesFromAllTables(const AClearBeforeSync: Boolean);
 var
   I: Integer;
@@ -2130,6 +2357,7 @@ begin
       Exit;
 
     RemoveProcessingDevice(Device);
+    SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
   end;
@@ -2216,7 +2444,7 @@ begin
     Exit;
 
   Device := TDevice(Item.TagObject);
-  MarkProcessingDeviceDeleted(Device);
+  RemoveProcessingDevice(Device);
   SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
@@ -2922,7 +3150,7 @@ begin
 
   if GridDataPoints.Columns[ACol] = StringColumnName then
   begin
-    if (P <> nil) and ((P.Name = '-') or (P.DevicePointID = 0)) then
+    if (P <> nil) and (P.Name = '-') then
       LogMKS('DBG SP 7001', 'GridDataPointsGetValue NAME',
         Format('Row=%d | %s', [ARow, DumpSpillage(P)]));
     Value := P.Name;

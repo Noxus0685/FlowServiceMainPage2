@@ -105,6 +105,7 @@ private
   FValueHumidity: TMeterValue;
   FValueCurrent: TMeterValue;
   FValueTime: TMeterValue;
+  FEtalonMeter: TFlowMeter;
 
   HashValueImp: string;
   HashValueImpTotal: string;
@@ -213,6 +214,7 @@ private
 
 
   procedure CopyValues(const AEtalonMeter: TFlowMeter);
+  procedure UpdateErrorEtalon;
 
 public
   // =====================================================
@@ -277,7 +279,6 @@ public
 
   class var ActiveFlowMeter: TFlowMeter;
   class var ActiveEtalon: TFlowMeter;
-  class var EtalonMeter: TFlowMeter;
 
   UUID: string;
   DeviceHash: Integer;
@@ -660,7 +661,6 @@ begin
     LogMKS('DBG SP 2006', 'TFlowMeter.AddDataPoint AFTER session sync',
       Format('NewPoint=%s | Last=%s', [DumpSpillage(NewPoint), DumpSpillage(Sess.Spillages.Last)]));
     Sess.Spillages.Last.SessionID := NewPoint.SessionID;
-    Sess.Spillages.Last.DevicePointID := NewPoint.DevicePointID;
     Sess.Spillages.Last.Name := NewPoint.Name;
     Sess.Spillages.Last.Valid := NewPoint.Valid;
     Sess.Spillages.Last.Status := NewPoint.Status;
@@ -1425,8 +1425,8 @@ begin
     ValueVolumeError.SetAsError;
     SetDescription(ValueVolumeError, 'Погрешность объема');
   end;
-  if EtalonMeter <> nil then
-    ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
+  if FEtalonMeter <> nil then
+    ValueVolumeError.ValueEtalon := FEtalonMeter.ValueVolume;
   ValueVolumeError.ValueBaseMultiplier := ValueVolume;
 
   ValueMassError := TMeterValue.GetExistedMeterValueBool(HashValueMassError, IsExisted, UUID, Name);
@@ -1435,8 +1435,8 @@ begin
     ValueMassError.SetAsError;
     SetDescription(ValueMassError, 'Погрешность массы');
   end;
-  if EtalonMeter <> nil then
-    ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
+  if FEtalonMeter <> nil then
+    ValueMassError.ValueEtalon := FEtalonMeter.ValueMass;
   ValueMassError.ValueBaseMultiplier := ValueMass;
 
   ValueError := TMeterValue.GetExistedMeterValueBool(HashValueError, IsExisted, UUID, Name);
@@ -1445,9 +1445,8 @@ begin
     ValueError.SetAsError;
     SetDescription(ValueError, 'Итоговая погрешность');
   end;
-  if EtalonMeter <> nil then
-    ValueError.ValueEtalon := EtalonMeter.ValueQuantity;
   ValueError.ValueBaseMultiplier := ValueQuantity;
+  UpdateErrorEtalon;
 
   ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, UUID, Name);
   if IsExisted = 0 then
@@ -1474,18 +1473,36 @@ begin
   if AEtalon = nil then
     Exit;
 
-  EtalonMeter := AEtalon;
+  FEtalonMeter := AEtalon;
 
   if ValueVolumeError <> nil then
-    ValueVolumeError.ValueEtalon := EtalonMeter.ValueVolume;
+    ValueVolumeError.ValueEtalon := FEtalonMeter.ValueVolume;
   if ValueMassError <> nil then
-    ValueMassError.ValueEtalon := EtalonMeter.ValueMass;
-  if ValueError <> nil then
-    ValueError.ValueEtalon := EtalonMeter.ValueQuantity;
+    ValueMassError.ValueEtalon := FEtalonMeter.ValueMass;
+  UpdateErrorEtalon;
   if ValueCoef <> nil then
-    ValueCoef.ValueCorrection := EtalonMeter.ValueFlow;
+    ValueCoef.ValueCorrection := FEtalonMeter.ValueFlow;
 
   //ApplyMeasurementModel;
+end;
+
+procedure TFlowMeter.UpdateErrorEtalon;
+begin
+  if ValueError = nil then
+    Exit;
+
+  if FEtalonMeter = nil then
+  begin
+    ValueError.ValueEtalon := nil;
+    Exit;
+  end;
+
+  if ValueQuantity = ValueMass then
+    ValueError.ValueEtalon := FEtalonMeter.ValueMass
+  else if ValueQuantity = ValueVolume then
+    ValueError.ValueEtalon := FEtalonMeter.ValueVolume
+  else
+    ValueError.ValueEtalon := FEtalonMeter.ValueQuantity;
 end;
 
 procedure TFlowMeter.ApplyMeasurementModel;
@@ -1645,8 +1662,8 @@ begin
           ValueCoef.Constant:= K;
           ValueCoef.CoefCorrection:=1;
 
-          if (EtalonMeter <> nil) and (EtalonMeter.ValueFlowRate<> nil)  then
-             ValueCoef.ValueCorrection:= EtalonMeter.ValueFlowRate;
+          if (FEtalonMeter <> nil) and (FEtalonMeter.ValueFlowRate<> nil)  then
+             ValueCoef.ValueCorrection:= FEtalonMeter.ValueFlowRate;
 
           SetUpdateType(ONLINE_TYPE);
         end;
@@ -1688,10 +1705,7 @@ begin
   if ValueError <> nil then
   begin
     ValueError.ValueBaseMultiplier := ValueQuantity;
-    if EtalonMeter <> nil then
-      ValueError.ValueEtalon := EtalonMeter.ValueQuantity
-    else
-      ValueError.ValueEtalon := nil;
+    UpdateErrorEtalon;
   end;
 
   ApplyCalibrCoefsToValues;
@@ -1893,10 +1907,7 @@ begin
   if ValueError <> nil then
   begin
     ValueError.ValueBaseMultiplier := ValueQuantity;
-    if EtalonMeter <> nil then
-      ValueError.ValueEtalon := EtalonMeter.ValueQuantity
-    else
-      ValueError.ValueEtalon := nil;
+    UpdateErrorEtalon;
   end;
 
     SetUpdateType(ONLINE_TYPE);

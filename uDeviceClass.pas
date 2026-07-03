@@ -125,7 +125,7 @@ type
 
     DeviceID: Integer;           // Идентификатор прибора (FK → TDevice.ID)
     DeviceUUID: String;
-    DeviceTypePointID: Integer;  // Идентификатор шаблонной точки типа (опционально)
+    DeviceTypeUUID: string;   // UUID шаблонной точки типа (опционально)
 
     {====================================================================}
     { ОБЩАЯ ИНФОРМАЦИЯ }
@@ -221,8 +221,8 @@ type
     {====================================================================}
 
     SessionID: Integer;          // Сессия, к которой относится измерение (FK → TSessionSpillage.ID)
-    DevicePointID: Integer;      // Поверочная точка прибора (FK → TDevicePoint.ID)
-    DeviceTypePointID: Integer;  // Шаблонная точка типа (опционально)
+    DeviceUUID: string;          // Прибор, к которому относится измерение (стабильная связь по UUID)
+    DeviceTypeUUID: string;   // UUID шаблонной точки типа (опционально)
     EtalonName: string;
     EtalonUUID: string;
 
@@ -1129,7 +1129,7 @@ begin
 
   { Идентификация }
   DeviceID := ADeviceID;
-  DeviceTypePointID := 0;
+  DeviceTypeUUID := '';
 
   { Общая информация }
   Name := 'Точка измерения';
@@ -1202,8 +1202,8 @@ begin
 
   { Идентификация }
   SessionID := ASessionID;
-  DevicePointID := 0;
-  DeviceTypePointID := 0;
+  DeviceUUID := '';
+  DeviceTypeUUID := '';
   EtalonName := '';
   EtalonUUID := '';
   Enabled := True;
@@ -1643,7 +1643,7 @@ begin
     begin
       Add(IntToStr(P.ID));
       Add(IntToStr(P.DeviceID));
-      Add(IntToStr(P.DeviceTypePointID));
+      Add(P.DeviceTypeUUID);
       Add(IntToStr(P.Num));
       Add(P.Name);
       Add(P.Description);
@@ -1683,8 +1683,8 @@ begin
     begin
       Add(IntToStr(S.ID));
       Add(IntToStr(S.SessionID));
-      Add(IntToStr(S.DevicePointID));
-      Add(IntToStr(S.DeviceTypePointID));
+      Add(S.DeviceUUID);
+      Add(S.DeviceTypeUUID);
       Add(IntToStr(S.Num));
       Add(S.Description);
       Add(FloatToStr(S.SpillTime));
@@ -1816,7 +1816,7 @@ begin
   DeviceUUID := ASource.DeviceUUID;
   end;
 
-  DeviceTypePointID := ASource.DeviceTypePointID;
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   {====================================================================}
   { СОСТОЯНИЕ }
   {====================================================================}
@@ -1895,7 +1895,7 @@ begin
   if ASource = nil then
     Exit;
 
-  DeviceTypePointID := ASource.ID;
+  DeviceTypeUUID := ASource.UUID;
   Name := ASource.Name;
   Description := ASource.Description;
 
@@ -1977,7 +1977,7 @@ begin
   if ASource = nil then
     Exit;
 
-  if (ASource.DevicePointID <> Self.DevicePointID) or
+  if (ASource.DeviceUUID <> Self.DeviceUUID) or
      (ASource.Name <> Self.Name) or
      (ASource.SessionID <> Self.SessionID) then
     LogMKS('DBG SP 3001', 'TPointSpillage.Assign BEFORE',
@@ -1993,8 +1993,8 @@ begin
   {====================================================================}
 
   SessionID := ASource.SessionID;
-  DevicePointID := ASource.DevicePointID;
-  DeviceTypePointID := ASource.DeviceTypePointID;
+  DeviceUUID := ASource.DeviceUUID;
+  DeviceTypeUUID := ASource.DeviceTypeUUID;
   EtalonName := ASource.EtalonName;
   EtalonUUID := ASource.EtalonUUID;
   Enabled := ASource.Enabled;
@@ -2084,10 +2084,10 @@ begin
   Coef := ASource.Coef;
   FCDCoefficient := ASource.FCDCoefficient;
 
-  if (ASource.DevicePointID <> Self.DevicePointID) or
+  if (ASource.DeviceUUID <> Self.DeviceUUID) or
      (ASource.Name <> Self.Name) or
      (ASource.SessionID <> Self.SessionID) or
-     (Self.DevicePointID = 0) or (Self.Name = '-') then
+     (Self.Name = '-') then
     LogMKS('DBG SP 3002', 'TPointSpillage.Assign AFTER',
       Format('Self=%s | Source=%s', [DumpSpillage(Self), DumpSpillage(ASource)]));
 end;
@@ -2286,14 +2286,14 @@ begin
   if (ASpillage = nil) or (FPoints = nil) then
     Exit;
 
-  if ASpillage.DevicePointID <> 0 then
-    for P in FPoints do
-      if (P <> nil) and (P.ID = ASpillage.DevicePointID) then
-        Exit(P);
+  if (Trim(ASpillage.DeviceUUID) <> '') and
+     (not SameText(Trim(ASpillage.DeviceUUID), Trim(Self.UUID))) then
+    Exit;
 
   for P in FPoints do
     if (P <> nil) and IsFlowInPoint(ASpillage.QavgEtalon, P) then
       Exit(P);
+
 end;
 
 function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
@@ -2312,6 +2312,7 @@ begin
   if ASpillage = nil then
     Exit;
 
+  ASpillage.DeviceUUID := Self.UUID;
   ASpillage.Status := TPointSpillage.SPS_DATA_ASSIGNED;
   ASpillage.StatusStr := 'Данные присвоены, анализ выполняется.';
   ASpillage.Valid := False;
@@ -2327,7 +2328,6 @@ begin
 
   if MatchedPoint = nil then
   begin
-    ASpillage.DevicePointID := 0;
     ASpillage.Name := '-';
     ASpillage.Status := TPointSpillage.SPS_FLOW_NOT_MATCHED;
     ASpillage.StatusStr :=
@@ -2340,8 +2340,7 @@ begin
   LogMKS('DBG SP 4003', 'TDevice.AnalyseDataPoint MATCH',
     Format('Matched DevicePoint ID=%d Name=%s | Before assign=%s',
       [MatchedPoint.ID, MatchedPoint.Name, DumpSpillage(ASpillage)]));
-  ASpillage.DevicePointID := MatchedPoint.ID;
-  ASpillage.DeviceTypePointID := MatchedPoint.DeviceTypePointID;
+  ASpillage.DeviceTypeUUID := MatchedPoint.DeviceTypeUUID;
   ASpillage.Name := MatchedPoint.Name;
   LogMKS('DBG SP 4004', 'TDevice.AnalyseDataPoint AFTER MATCH ASSIGN', DumpSpillage(ASpillage));
 
@@ -2460,19 +2459,26 @@ begin
         if MatchedPoint <> APoint then
           Continue;
 
-        if (S.DevicePointID <> APoint.ID) or
-           (S.DeviceTypePointID <> APoint.DeviceTypePointID) or
+        if Trim(S.DeviceUUID) = '' then
+        begin
+          S.DeviceUUID := Self.UUID;
+          S.State := osModified;
+          Changed := True;
+        end;
+
+        if (S.DeviceTypeUUID <> APoint.DeviceTypeUUID) or
            (not SameText(S.Name, APoint.Name)) then
         begin
-          S.DevicePointID := APoint.ID;
-          S.DeviceTypePointID := APoint.DeviceTypePointID;
+          S.DeviceTypeUUID := APoint.DeviceTypeUUID;
           S.Name := APoint.Name;
           S.State := osModified;
           Changed := True;
         end;
 
         APoint.DataPoints.Add(S);
-        if S.Enabled then
+        if S.Enabled and not ((not S.Valid) and
+          (S.Status in [TPointSpillage.SPS_FLOW_NOT_MATCHED,
+                        TPointSpillage.SPS_STOP_CRITERIA_FAILED])) then
           CandidateList.Add(S);
       end;
 

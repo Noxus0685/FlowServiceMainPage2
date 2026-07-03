@@ -634,6 +634,9 @@ type
   FFlowMeterPropertiesChannel: TChannel;
   FFrameChannelProperties: TFrameChannelProperties;
   FFrameWorkTableProperties: TFrameWorkTableProperties;
+  FMenuItemSetActiveWorkTable: TMenuItem;
+  FMenuItemDevicesSetActiveWorkTable: TMenuItem;
+  FMenuItemEtalonsSetActiveWorkTable: TMenuItem;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -660,6 +663,8 @@ type
     function GetNewInstrumentName: string;
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
+    procedure EnsureActiveWorkTableMenu;
+    procedure MenuSetActiveWorkTableClick(Sender: TObject);
     procedure UpdateGridDevices;
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
@@ -1294,6 +1299,9 @@ begin
   if AWorkTable.State in [swtCOMPLETE, swtFINALREAD] then
     AWorkTable.RecalculateAllMeterValues;
 
+  if AWorkTable <> FActiveWorkTable then
+    Exit;
+
   OnChangeState(AWorkTable.State);
 
   if AData is TDevicePoint then
@@ -1367,6 +1375,7 @@ begin
     SetValues;
     RefreshScalesCombo;
     UpdateUIScale;
+    OnChangeState(FActiveWorkTable.State);
     UpdateForm;
     Exit;
   end;
@@ -1660,6 +1669,9 @@ begin
         GlowMesGreen.Enabled := True;
         GlowMesRed.Enabled := False;
         GlowMesYellow.Enabled := False;
+        TestButton.Text := 'Стоп';
+        TestButton.Tag := 3;
+        TestButton.Enabled := True;
       end;
 
     swtSTOPTEST:
@@ -1825,6 +1837,7 @@ begin
     FFrameWorkTableProperties.Align := TAlignLayout.Client;
   end;
   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+  EnsureActiveWorkTableMenu;
   PopupMenuWorkTables.OnPopup := PopupMenuWorkTablesPopup;
   ApplyActiveWorkTableEditMode;
 
@@ -1868,6 +1881,67 @@ begin
   end
   else
     OnChangeState(swtNONE);
+end;
+
+procedure TFrameMainTable.EnsureActiveWorkTableMenu;
+  procedure EnsureMenuItem(var AMenuItem: TMenuItem; AParent: TFmxObject);
+  begin
+    if (AMenuItem <> nil) or (AParent = nil) then
+      Exit;
+
+    AMenuItem := TMenuItem.Create(AParent);
+    AMenuItem.Text := 'Сменить активный рабочий стол';
+    AParent.AddObject(AMenuItem);
+  end;
+begin
+  EnsureMenuItem(FMenuItemSetActiveWorkTable, PopupMenuWorkTables);
+  EnsureMenuItem(FMenuItemDevicesSetActiveWorkTable, MenuItemDevicesWorkTablesGroup);
+  EnsureMenuItem(FMenuItemEtalonsSetActiveWorkTable, MenuItemEtalonsWorkTablesGroup);
+end;
+
+procedure TFrameMainTable.MenuSetActiveWorkTableClick(Sender: TObject);
+var
+  I: Integer;
+  WorkTable: TWorkTable;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  if not (TMenuItem(Sender).TagObject is TWorkTable) then
+    Exit;
+
+  WorkTable := TWorkTable(TMenuItem(Sender).TagObject);
+  if not IsManagedWorkTable(WorkTable) then
+    Exit;
+
+  SaveLayoutSettingsToWorkTable;
+
+  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
+  begin
+    for I := 0 to WorkTableManager.WorkTables.Count - 1 do
+      if WorkTableManager.WorkTables[I] <> nil then
+        WorkTableManager.WorkTables[I].IsActive := False;
+
+    WorkTableManager.ActiveWorkTable := WorkTable;
+  end;
+
+  WorkTable.IsActive := True;
+  FActiveWorkTable := WorkTable;
+
+  if TabControlWorkTables <> nil then
+    TabControlWorkTables.TabIndex := EnsureRange(
+      WorkTableManager.WorkTables.IndexOf(WorkTable),
+      0,
+      Max(0, TabControlWorkTables.TabCount - 1)
+    );
+
+  SetValues;
+  LoadLayoutSettingsFromWorkTable;
+  RefreshPumpsCombo;
+  RefreshScalesCombo;
+  UpdateGrids;
+  OnChangeState(FActiveWorkTable.State);
+  UpdateForm;
 end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
@@ -2400,7 +2474,38 @@ end;
 procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
 var
   CanEdit: Boolean;
+  procedure PopulateActiveWorkTableMenu(AMenuItem: TMenuItem);
+  var
+    I: Integer;
+    MenuItem: TMenuItem;
+    WorkTable: TWorkTable;
+  begin
+    if AMenuItem = nil then
+      Exit;
+
+    AMenuItem.Enabled := (WorkTableManager <> nil) and
+      (WorkTableManager.WorkTables <> nil) and (WorkTableManager.WorkTables.Count > 0);
+
+    while AMenuItem.ItemsCount > 0 do
+      AMenuItem.Items[0].Free;
+
+    if AMenuItem.Enabled then
+      for I := 0 to WorkTableManager.WorkTables.Count - 1 do
+      begin
+        WorkTable := WorkTableManager.WorkTables[I];
+        if WorkTable = nil then
+          Continue;
+
+        MenuItem := TMenuItem.Create(AMenuItem);
+        MenuItem.Text := WorkTable.Text;
+        MenuItem.TagObject := WorkTable;
+        MenuItem.IsChecked := WorkTable = FActiveWorkTable;
+        MenuItem.OnClick := MenuSetActiveWorkTableClick;
+        AMenuItem.AddObject(MenuItem);
+      end;
+  end;
 begin
+  EnsureActiveWorkTableMenu;
   CanEdit := CanEditActiveWorkTable;
   if miAddTable <> nil then
     miAddTable.Enabled := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
@@ -2426,6 +2531,10 @@ begin
     ActionScaleAdd.Enabled := CanEdit;
   if ActionScaleDelete <> nil then
     ActionScaleDelete.Enabled := CanEdit;
+
+  PopulateActiveWorkTableMenu(FMenuItemSetActiveWorkTable);
+  PopulateActiveWorkTableMenu(FMenuItemDevicesSetActiveWorkTable);
+  PopulateActiveWorkTableMenu(FMenuItemEtalonsSetActiveWorkTable);
 end;
 
 procedure TFrameMainTable.UpdateGridPopupActions;
@@ -2530,12 +2639,14 @@ end;
 procedure TFrameMainTable.PopupMenuDevicesGridPopup(Sender: TObject);
 begin
   FLastPopupGrid := GridDevices;
+  PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
 end;
 
 procedure TFrameMainTable.PopupMenuEtalonsGridPopup(Sender: TObject);
 begin
   FLastPopupGrid := GridEtalons;
+  PopupMenuWorkTablesPopup(Sender);
   UpdateGridPopupActions;
 end;
 
@@ -2991,8 +3102,21 @@ begin
   if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
     TableCount := WorkTableManager.WorkTables.Count;
 
-  //FActiveWorkTable:=FWorkTableManager.ActiveWorkTable;
-  FActiveWorkTable := GetWorkTableByIndex(0);
+  if (WorkTableManager <> nil) and IsManagedWorkTable(WorkTableManager.ActiveWorkTable) then
+    FActiveWorkTable := WorkTableManager.ActiveWorkTable
+  else
+    FActiveWorkTable := GetWorkTableByIndex(0);
+
+  if (WorkTableManager <> nil) and (FActiveWorkTable <> nil) then
+    WorkTableManager.ActiveWorkTable := FActiveWorkTable;
+
+  if (TabControlWorkTables <> nil) and (WorkTableManager <> nil) and
+     (WorkTableManager.WorkTables <> nil) and (FActiveWorkTable <> nil) then
+    TabControlWorkTables.TabIndex := EnsureRange(
+      WorkTableManager.WorkTables.IndexOf(FActiveWorkTable),
+      0,
+      Max(0, TabControlWorkTables.TabCount - 1)
+    );
   for WorkTableIndex := 0 to TableCount - 1 do
   begin
     WorkTable := GetWorkTableByIndex(WorkTableIndex);
@@ -3091,7 +3215,7 @@ begin
       GridDevicesN.Repaint;
     end;
 
-    if I = 1 then
+    if WorkTable = FActiveWorkTable then
     begin
       SetLength(FRows, WorkTable.EtalonChannels.Count);
       for TableCount := 0 to WorkTable.EtalonChannels.Count - 1 do
@@ -3113,6 +3237,8 @@ begin
       end;
     end;
   end;
+
+  UpdateGrids;
 end;
 
 function TFrameMainTable.FindTypeIndex(const ATypeName: string): Integer;
@@ -3592,7 +3718,8 @@ var
   WorkTable: TWorkTable;
   ChannelIndex: Integer;
 begin
-  WorkTable := GetWorkTableByIndex(TabControlWorkTables.TabIndex);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -3614,7 +3741,8 @@ var
   WorkTable: TWorkTable;
   ChannelIndex: Integer;
 begin
-  WorkTable := GetWorkTableByIndex(TabControlWorkTables.TabIndex);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -5629,7 +5757,8 @@ begin
   if Column = CheckColumnDeviceEnable1 then
   begin
 
-  WorkTable := GetWorkTableByIndex(0);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
   if WorkTable <> nil then
   begin
     AllEnabled := WorkTable.DeviceChannels.Count > 0;
@@ -6079,7 +6208,8 @@ begin
     Exit;
   end;
 
-  WorkTable := GetWorkTableByIndex(0);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
 
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
     Exit;
@@ -6181,7 +6311,8 @@ begin
     Exit;
   end;
 
-  WorkTable := GetWorkTableByIndex(0);
+  NormalizeActiveWorkTable;
+  WorkTable := FActiveWorkTable;
 
   if (WorkTable <> nil) and ((Row < 0) or (Row >= WorkTable.EtalonChannels.Count)) then
     Exit;

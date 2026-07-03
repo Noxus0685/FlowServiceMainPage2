@@ -358,6 +358,10 @@ type
      function  SpillageStopItemIndexToValue(const AIndex: Integer): Integer;
      procedure FillConversionCoefVolume;
      procedure FillConversionCoefMass;
+     function IsFlowMeterOrScales: Boolean;
+     function MeasuredDimensionByItemIndex(const AIndex: Integer): TMeasuredDimension;
+     function ItemIndexByMeasuredDimension(const ADim: TMeasuredDimension): Integer;
+     procedure UpdateMeasuredDimensionCombo;
 
      function GetDisplayedCoef: Double;
      procedure RecalcDevicePointsCoef;
@@ -594,13 +598,19 @@ begin
     {----------------------------------}
     { Синхронизация ComboBox }
     {----------------------------------}
-    if (FDevice.MeasuredDimension >= 0) and
-       (FDevice.MeasuredDimension < cbMeasuredDimension.Items.Count) then
-      cbMeasuredDimension.ItemIndex := FDevice.MeasuredDimension
-    else
+    UpdateMeasuredDimensionCombo;
+    cbMeasuredDimension.ItemIndex := ItemIndexByMeasuredDimension(
+      TMeasuredDimension(FDevice.MeasuredDimension)
+    );
+    if cbMeasuredDimension.ItemIndex < 0 then
     begin
-      cbMeasuredDimension.ItemIndex := -1;
-      Exit;
+      if cbMeasuredDimension.Items.Count > 0 then
+      begin
+        cbMeasuredDimension.ItemIndex := 0;
+        FDevice.MeasuredDimension := Ord(MeasuredDimensionByItemIndex(0));
+      end
+      else
+        Exit;
     end;
 
     Dim := TMeasuredDimension(FDevice.MeasuredDimension);
@@ -666,6 +676,91 @@ begin
   finally
     FLoading := ALoading;
   end;
+end;
+
+function TFormDeviceEditor.IsFlowMeterOrScales: Boolean;
+var
+  C: TDeviceCategory;
+begin
+  Result := False;
+
+  if (FDevice = nil) or (AppServices.DataManager = nil) then
+    Exit;
+
+  C := AppServices.DataManager.FindCategoryByID(FDevice.Category);
+  if C = nil then
+    Exit;
+
+  Result := C.StdCategory in [
+    mftMassFlowmeterType,
+    mftVolumeFlowmeterType,
+    mftWeightsType
+  ];
+end;
+
+function TFormDeviceEditor.MeasuredDimensionByItemIndex(
+  const AIndex: Integer): TMeasuredDimension;
+var
+  S: string;
+begin
+  Result := mdUnknown;
+
+  if (AIndex < 0) or (AIndex >= cbMeasuredDimension.Items.Count) then
+    Exit;
+
+  S := cbMeasuredDimension.Items[AIndex];
+
+  if SameText(S, 'Объемный расход') then
+    Result := mdVolumeFlow
+  else if SameText(S, 'Массовый расход') then
+    Result := mdMassFlow
+  else if SameText(S, 'Объем') then
+    Result := mdVolume
+  else if SameText(S, 'Масса') then
+    Result := mdMass
+  else if SameText(S, 'Скорость') then
+    Result := mdSpeed
+  else if SameText(S, 'Теплота') then
+    Result := mdHeat;
+end;
+
+function TFormDeviceEditor.ItemIndexByMeasuredDimension(
+  const ADim: TMeasuredDimension): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+
+  for I := 0 to cbMeasuredDimension.Items.Count - 1 do
+    if MeasuredDimensionByItemIndex(I) = ADim then
+      Exit(I);
+end;
+
+procedure TFormDeviceEditor.UpdateMeasuredDimensionCombo;
+var
+  OldDim: TMeasuredDimension;
+begin
+  OldDim := MeasuredDimensionByItemIndex(cbMeasuredDimension.ItemIndex);
+
+  cbMeasuredDimension.Items.BeginUpdate;
+  try
+    cbMeasuredDimension.Items.Clear;
+    cbMeasuredDimension.Items.Add('Объемный расход');
+    cbMeasuredDimension.Items.Add('Массовый расход');
+
+    if IsFlowMeterOrScales then
+    begin
+      cbMeasuredDimension.Items.Add('Объем');
+      cbMeasuredDimension.Items.Add('Масса');
+      cbMeasuredDimension.Items.Add('Скорость');
+    end;
+
+    cbMeasuredDimension.Items.Add('Теплота');
+  finally
+    cbMeasuredDimension.Items.EndUpdate;
+  end;
+
+  cbMeasuredDimension.ItemIndex := ItemIndexByMeasuredDimension(OldDim);
 end;
 
 procedure TFormDeviceEditor.UpdateUnitsCombo;
@@ -2180,10 +2275,11 @@ begin
     // =====================================================
     // == Измеряемая величина
     // =====================================================
-    if (FDevice.MeasuredDimension >= 0) and
-       (FDevice.MeasuredDimension < cbMeasuredDimension.Items.Count) then
-      cbMeasuredDimension.ItemIndex := FDevice.MeasuredDimension
-    else
+    UpdateMeasuredDimensionCombo;
+    cbMeasuredDimension.ItemIndex := ItemIndexByMeasuredDimension(
+      TMeasuredDimension(FDevice.MeasuredDimension)
+    );
+    if cbMeasuredDimension.ItemIndex < 0 then
       cbMeasuredDimension.ItemIndex := 0;
 
     // =====================================================
@@ -2400,7 +2496,7 @@ begin
     Exit;
 
   { сохраняем в модель }
-  FDevice.MeasuredDimension := V;
+  FDevice.MeasuredDimension := Ord(MeasuredDimensionByItemIndex(V));
   FDevice.Units := 0;
   FDevice.SetDimensions;
 
@@ -2534,6 +2630,7 @@ begin
   end;
 
   ceCategory.Hint := ceCategory.Text;
+  ApplyMeasuredDimension;
   SetModified;
 
 end;
