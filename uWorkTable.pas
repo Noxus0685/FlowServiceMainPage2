@@ -2543,6 +2543,8 @@ begin
 
   IsQuantityTemplateSet := False;
   IsFlowTemplateSet := False;
+  IsImpTemplateSet := False;
+  IsImpTotalTemplateSet := False;
   AggregateGroup := 0;
   MaxGroupFlow := -1;
 
