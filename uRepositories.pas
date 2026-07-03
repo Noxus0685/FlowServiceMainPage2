@@ -272,7 +272,7 @@ type
     function DeviceExistsInDB(const AUUID: string): Boolean;
     function ShouldSaveDevice(ADevice: TDevice): Boolean;
 
-    function GenerateDevicePointID: Integer;
+    function GeneratePointID: Integer;
 
     { ================= SCHEMA : DEVICE POINTS ================= }
 
@@ -4498,7 +4498,7 @@ end;
 
   {$REGION 'Device Points'}
 
-function TDeviceRepository.GenerateDevicePointID: Integer;
+function TDeviceRepository.GeneratePointID: Integer;
 begin
   Result := FNextPointID;
   Inc(FNextPointID);
@@ -4512,7 +4512,7 @@ begin
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('DeviceUUID', 'TEXT'),
     Col('SessionID', 'INTEGER'),
-    Col('DeviceTypePointID', 'INTEGER'),
+    Col('DeviceTypeUUID', 'TEXT'),
 
     Col('Num', 'INTEGER'),
 
@@ -4598,7 +4598,7 @@ begin
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
-  Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
+  Result.DeviceTypeUUID := Q.FieldByName('DeviceTypeUUID').AsString;
   Result.DeviceUUID :=  DeviceUUID;
   Result.Num := Q.FieldByName('Num').AsInteger;
 
@@ -4719,11 +4719,20 @@ var
   Q: TFDQuery;
   KeepIDs: string;
   I: Integer;
+  RepoDevice: TDevice;
 begin
   Result := False;
 
   if (ADevice = nil) or (ADevice.Points = nil) then
     Exit;
+
+  { UpdateDevicePoint пересчитывает Q точки через прибор из репозитория.
+    Поэтому перед сохранением точек синхронизируем Qmax найденного
+    объекта с реально сохраняемым прибором: иначе при устаревшем объекте
+    в списке точки получали Q от старого/базового Qmax. }
+  RepoDevice := FindDeviceByUUID(ADevice.UUID);
+  if (RepoDevice <> nil) and (RepoDevice <> ADevice) and (ADevice.Qmax > 0) then
+    RepoDevice.Qmax := ADevice.Qmax;
 
   I := 0;
   while I < ADevice.Points.Count do
@@ -4825,13 +4834,13 @@ begin
         begin
           Q.SQL.Text :=
             'insert into DevicePoint (' +
-            'DeviceUUID, DeviceTypePointID, Num, Name, Description, ' +
+            'DeviceUUID, DeviceTypeUUID, Num, Name, Description, ' +
             'FlowRate, Q, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, SpillageStop, SpillageType, EtalonType, FlowSorceType, ' +
             'Error, Pause, RepeatsProtocol, Repeats' +
             ') values (' +
-            ':DeviceUUID, :DeviceTypePointID, :Num, :Name, :Description, ' +
+            ':DeviceUUID, :DeviceTypeUUID, :Num, :Name, :Description, ' +
             ':FlowRate, :Q, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, :SpillageStop, :SpillageType, :EtalonType, :FlowSorceType, ' +
@@ -4848,7 +4857,7 @@ begin
           Q.SQL.Text :=
             'update DevicePoint set ' +
             'DeviceUUID=:DeviceUUID, ' +
-            'DeviceTypePointID=:DeviceTypePointID, ' +
+            'DeviceTypeUUID=:DeviceTypeUUID, ' +
             'Num=:Num, Name=:Name, Description=:Description, ' +
             'FlowRate=:FlowRate, Q=:Q, FlowAccuracy=:FlowAccuracy, ' +
             'Pressure=:Pressure, Temp=:Temp, TempAccuracy=:TempAccuracy, ' +
@@ -4869,7 +4878,7 @@ begin
       SetIntParam(Q, 'ID', APoint.ID);
 
     SetStrParam(Q, 'DeviceUUID', APoint.DeviceUUID);
-    SetIntParam(Q, 'DeviceTypePointID', APoint.DeviceTypePointID);
+    SetStrParam(Q, 'DeviceTypeUUID', APoint.DeviceTypeUUID);
     SetIntParam(Q, 'Num', APoint.Num);
 
     SetStrParam(Q, 'Name', APoint.Name);
@@ -5501,8 +5510,8 @@ begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('SessionID', 'INTEGER'),
-    Col('DevicePointID', 'INTEGER'),
-    Col('DeviceTypePointID', 'INTEGER'),
+    Col('DeviceUUID', 'TEXT'),
+    Col('DeviceTypeUUID', 'TEXT'),
     Col('EtalonName', 'TEXT'),
     Col('EtalonUUID', 'TEXT'),
     Col('Enabled', 'INTEGER'),
@@ -5617,8 +5626,11 @@ begin
   ADevice.Spillages.Add(Result);
   Result.ID := Q.FieldByName('ID').AsInteger;
   Result.SessionID := SessionID;
-  Result.DevicePointID := Q.FieldByName('DevicePointID').AsInteger;
-  Result.DeviceTypePointID := Q.FieldByName('DeviceTypePointID').AsInteger;
+  if Q.FindField('DeviceUUID') <> nil then
+    Result.DeviceUUID := Q.FieldByName('DeviceUUID').AsString;
+  if Trim(Result.DeviceUUID) = '' then
+    Result.DeviceUUID := ADevice.UUID;
+  Result.DeviceTypeUUID := Q.FieldByName('DeviceTypeUUID').AsString;
   Result.EtalonName := Q.FieldByName('EtalonName').AsString;
   Result.EtalonUUID := Q.FieldByName('EtalonUUID').AsString;
   Result.Enabled := Q.FieldByName('Enabled').AsInteger <> 0;
@@ -5690,6 +5702,8 @@ begin
   if Device = nil then
     Exit;
 
+  EnsureSpillageSchema;
+
   if Device.Spillages = nil then
     Device.Spillages := TObjectList<TPointSpillage>.Create(True)
   else
@@ -5729,9 +5743,14 @@ begin
     Exit;
 
   for S in ADevice.Spillages do
+  begin
+    if S <> nil then
+      S.DeviceUUID := ADevice.UUID;
+
     if (S <> nil) and (S.SessionID > 0) and
        not UpdateSpillage(S) then
       Exit(False);
+  end;
 
   Result := True;
 end;
@@ -5759,7 +5778,7 @@ begin
       osNew:
         Q.SQL.Text :=
           'insert into PointSpillage (' +
-          'SessionID, DevicePointID, DeviceTypePointID, EtalonName, EtalonUUID, Enabled, Num, Name, Description, DateTime, ' +
+          'SessionID, DeviceUUID, DeviceTypeUUID, EtalonName, EtalonUUID, Enabled, Num, Name, Description, DateTime, ' +
           'SpillTime, QavgEtalon, EtalonVolume, EtalonMass, QEtalonStd, QEtalonCV, ' +
           'DeviceVolume, DeviceMass, Velocity, Status, StatusStr, Error, Valid, QStd, QCV, ' +
           'VolumeBefore, VolumeAfter, PulseCount, MeanFrequency, AvgCurrent, AvgVoltage, ' +
@@ -5767,7 +5786,7 @@ begin
           'InputPressure, OutputPressure, Density, AmbientTemperature, AtmosphericPressure, RelativeHumidity, ' +
           'Coef, FCDCoefficient' +
           ') values (' +
-          ':SessionID, :DevicePointID, :DeviceTypePointID, :EtalonName, :EtalonUUID, :Enabled, :Num, :Name, :Description, :DateTime, ' +
+          ':SessionID, :DeviceUUID, :DeviceTypeUUID, :EtalonName, :EtalonUUID, :Enabled, :Num, :Name, :Description, :DateTime, ' +
           ':SpillTime, :QavgEtalon, :EtalonVolume, :EtalonMass, :QEtalonStd, :QEtalonCV, ' +
           ':DeviceVolume, :DeviceMass, :Velocity, :Status, :StatusStr, :Error, :Valid, :QStd, :QCV, ' +
           ':VolumeBefore, :VolumeAfter, :PulseCount, :MeanFrequency, :AvgCurrent, :AvgVoltage, ' +
@@ -5779,7 +5798,7 @@ begin
         begin
           Q.SQL.Text :=
             'update PointSpillage set ' +
-            'SessionID=:SessionID, DevicePointID=:DevicePointID, DeviceTypePointID=:DeviceTypePointID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Enabled=:Enabled, Num=:Num, ' +
+            'SessionID=:SessionID, DeviceUUID=:DeviceUUID, DeviceTypeUUID=:DeviceTypeUUID, EtalonName=:EtalonName, EtalonUUID=:EtalonUUID, Enabled=:Enabled, Num=:Num, ' +
             'Name=:Name, Description=:Description, DateTime=:DateTime, SpillTime=:SpillTime, QavgEtalon=:QavgEtalon, EtalonVolume=:EtalonVolume, EtalonMass=:EtalonMass, ' +
             'QEtalonStd=:QEtalonStd, QEtalonCV=:QEtalonCV, DeviceVolume=:DeviceVolume, DeviceMass=:DeviceMass, Velocity=:Velocity, ' +
             'Status=:Status, StatusStr=:StatusStr, Error=:Error, Valid=:Valid, QStd=:QStd, QCV=:QCV, VolumeBefore=:VolumeBefore, VolumeAfter=:VolumeAfter, ' +
@@ -5792,8 +5811,8 @@ begin
     end;
 
     SetIntParam(Q, 'SessionID', ASpillage.SessionID);
-    SetIntParam(Q, 'DevicePointID', ASpillage.DevicePointID);
-    SetIntParam(Q, 'DeviceTypePointID', ASpillage.DeviceTypePointID);
+    SetStrParam(Q, 'DeviceUUID', ASpillage.DeviceUUID);
+    SetStrParam(Q, 'DeviceTypeUUID', ASpillage.DeviceTypeUUID);
     SetStrParam(Q, 'EtalonName', ASpillage.EtalonName);
     SetStrParam(Q, 'EtalonUUID', ASpillage.EtalonUUID);
     SetIntParam(Q, 'Enabled', Ord(ASpillage.Enabled));

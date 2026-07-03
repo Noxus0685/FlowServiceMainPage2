@@ -2922,7 +2922,7 @@ begin
 
   if GridDataPoints.Columns[ACol] = StringColumnName then
   begin
-    if (P <> nil) and ((P.Name = '-') or (P.DevicePointID = 0)) then
+    if (P <> nil) and (P.Name = '-') then
       LogMKS('DBG SP 7001', 'GridDataPointsGetValue NAME',
         Format('Row=%d | %s', [ARow, DumpSpillage(P)]));
     Value := P.Name;

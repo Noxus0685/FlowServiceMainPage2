@@ -660,7 +660,6 @@ begin
     LogMKS('DBG SP 2006', 'TFlowMeter.AddDataPoint AFTER session sync',
       Format('NewPoint=%s | Last=%s', [DumpSpillage(NewPoint), DumpSpillage(Sess.Spillages.Last)]));
     Sess.Spillages.Last.SessionID := NewPoint.SessionID;
-    Sess.Spillages.Last.DevicePointID := NewPoint.DevicePointID;
     Sess.Spillages.Last.Name := NewPoint.Name;
     Sess.Spillages.Last.Valid := NewPoint.Valid;
     Sess.Spillages.Last.Status := NewPoint.Status;
