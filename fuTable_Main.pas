@@ -228,7 +228,7 @@ var
   EnabledDeviceChannels: TObjectList<TChannel>;
   I: Integer;
 begin
-  WorkTable := FWorkTableManager.WorkTables[0];
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -272,7 +272,7 @@ var
   EnabledEtalonChannels: TObjectList<TChannel>;
   I: Integer;
 begin
-  WorkTable := FWorkTableManager.WorkTables[0];
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
 

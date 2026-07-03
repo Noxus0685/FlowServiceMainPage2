@@ -111,7 +111,7 @@ var
   FlowRate: Double;
   ImpSecValues: TArray<Double>;
 begin
-  WorkTable := FWorkTableManager.WorkTables[0];
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -138,7 +138,7 @@ var
   FlowRate: Double;
   ImpSecValues: TArray<Double>;
 begin
-  WorkTable := FWorkTableManager.WorkTables[0];
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -161,7 +161,7 @@ end;
 
 procedure TFormMain.EditTestNumExit(Sender: TObject);
 begin
- LabelTestNum.Text := FWorkTableManager.WorkTables[0].DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
+ LabelTestNum.Text := FWorkTableManager.ActiveWorkTable.DeviceChannels[0].FlowMeter.ValueError.GetStrNum(EditTestNum.Text)
 end;
 
 
@@ -574,7 +574,7 @@ var
   WorkTable: TWorkTable;
   FlowRate, Coef, ImpSec: Double;
 begin
-  WorkTable := FWorkTableManager.WorkTables[0];
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   if (WorkTable = nil) or (WorkTable.DeviceChannels.Count = 0) then
     Exit;
 
@@ -594,7 +594,7 @@ var
   FlowRate, Coef, ImpSec: Double;
   i:integer;
 begin
-  WorkTable := FWorkTableManager.WorkTables[0];
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   if (WorkTable = nil) or (WorkTable.EtalonChannels.Count = 0) then
     Exit;
 
@@ -792,9 +792,8 @@ begin
   if FWorkTableManager.WorkTables.Count = 0 then
     Exit;
 
-  // Берём первую таблицу (по факту — активную)
-  // В будущем лучше заменить на FActiveWorkTable
-  WorkTable := FWorkTableManager.WorkTables[0];
+  // Берём активную таблицу
+  WorkTable := FWorkTableManager.ActiveWorkTable;
 
   // Дополнительная защита от nil
   if WorkTable = nil then
