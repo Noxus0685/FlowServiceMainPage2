@@ -634,6 +634,7 @@ type
   FFlowMeterPropertiesChannel: TChannel;
   FFrameChannelProperties: TFrameChannelProperties;
   FFrameWorkTableProperties: TFrameWorkTableProperties;
+  FMenuItemSetActiveWorkTable: TMenuItem;
     { Private declarations }
   FLastClickRow: Integer;
   FLastClickCol: TColumn;
@@ -660,6 +661,8 @@ type
     function GetNewInstrumentName: string;
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
+    procedure EnsureActiveWorkTableMenu;
+    procedure MenuSetActiveWorkTableClick(Sender: TObject);
     procedure UpdateGridDevices;
     procedure EnsureEmptyDevicesForGridRows;
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
@@ -1822,6 +1825,7 @@ begin
     FFrameWorkTableProperties.Align := TAlignLayout.Client;
   end;
   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
+  EnsureActiveWorkTableMenu;
   PopupMenuWorkTables.OnPopup := PopupMenuWorkTablesPopup;
   ApplyActiveWorkTableEditMode;
 
@@ -1865,6 +1869,59 @@ begin
   end
   else
     OnChangeState(swtNONE);
+end;
+
+procedure TFrameMainTable.EnsureActiveWorkTableMenu;
+begin
+  if FMenuItemSetActiveWorkTable <> nil then
+    Exit;
+
+  FMenuItemSetActiveWorkTable := TMenuItem.Create(PopupMenuWorkTables);
+  FMenuItemSetActiveWorkTable.Text := 'Сменить активный рабочий стол';
+  PopupMenuWorkTables.AddObject(FMenuItemSetActiveWorkTable);
+end;
+
+procedure TFrameMainTable.MenuSetActiveWorkTableClick(Sender: TObject);
+var
+  I: Integer;
+  WorkTable: TWorkTable;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  if not (TMenuItem(Sender).TagObject is TWorkTable) then
+    Exit;
+
+  WorkTable := TWorkTable(TMenuItem(Sender).TagObject);
+  if not IsManagedWorkTable(WorkTable) then
+    Exit;
+
+  SaveLayoutSettingsToWorkTable;
+
+  if (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil) then
+  begin
+    for I := 0 to WorkTableManager.WorkTables.Count - 1 do
+      if WorkTableManager.WorkTables[I] <> nil then
+        WorkTableManager.WorkTables[I].IsActive := False;
+
+    WorkTableManager.ActiveWorkTable := WorkTable;
+  end;
+
+  WorkTable.IsActive := True;
+  FActiveWorkTable := WorkTable;
+
+  if TabControlWorkTables <> nil then
+    TabControlWorkTables.TabIndex := EnsureRange(
+      WorkTableManager.WorkTables.IndexOf(WorkTable),
+      0,
+      Max(0, TabControlWorkTables.TabCount - 1)
+    );
+
+  SetValues;
+  LoadLayoutSettingsFromWorkTable;
+  RefreshPumpsCombo;
+  RefreshScalesCombo;
+  UpdateForm;
 end;
 
 procedure TFrameMainTable.TabControl1Change(Sender: TObject);
@@ -2397,7 +2454,11 @@ end;
 procedure TFrameMainTable.PopupMenuWorkTablesPopup(Sender: TObject);
 var
   CanEdit: Boolean;
+  I: Integer;
+  MenuItem: TMenuItem;
+  WorkTable: TWorkTable;
 begin
+  EnsureActiveWorkTableMenu;
   CanEdit := CanEditActiveWorkTable;
   if miAddTable <> nil then
     miAddTable.Enabled := (WorkTableManager <> nil) and (WorkTableManager.WorkTables <> nil);
@@ -2423,6 +2484,30 @@ begin
     ActionScaleAdd.Enabled := CanEdit;
   if ActionScaleDelete <> nil then
     ActionScaleDelete.Enabled := CanEdit;
+
+  if FMenuItemSetActiveWorkTable <> nil then
+  begin
+    FMenuItemSetActiveWorkTable.Enabled := (WorkTableManager <> nil) and
+      (WorkTableManager.WorkTables <> nil) and (WorkTableManager.WorkTables.Count > 0);
+
+    while FMenuItemSetActiveWorkTable.ItemsCount > 0 do
+      FMenuItemSetActiveWorkTable.Items[0].Free;
+
+    if FMenuItemSetActiveWorkTable.Enabled then
+      for I := 0 to WorkTableManager.WorkTables.Count - 1 do
+      begin
+        WorkTable := WorkTableManager.WorkTables[I];
+        if WorkTable = nil then
+          Continue;
+
+        MenuItem := TMenuItem.Create(FMenuItemSetActiveWorkTable);
+        MenuItem.Text := WorkTable.Text;
+        MenuItem.TagObject := WorkTable;
+        MenuItem.IsChecked := WorkTable = FActiveWorkTable;
+        MenuItem.OnClick := MenuSetActiveWorkTableClick;
+        FMenuItemSetActiveWorkTable.AddObject(MenuItem);
+      end;
+  end;
 end;
 
 procedure TFrameMainTable.UpdateGridPopupActions;
