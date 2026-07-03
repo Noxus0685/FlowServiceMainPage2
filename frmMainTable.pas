@@ -2490,8 +2490,8 @@ begin
     FMenuItemSetActiveWorkTable.Enabled := (WorkTableManager <> nil) and
       (WorkTableManager.WorkTables <> nil) and (WorkTableManager.WorkTables.Count > 0);
 
-    for I := FMenuItemSetActiveWorkTable.Count - 1 downto 0 do
-      FMenuItemSetActiveWorkTable.Items[I].Free;
+    while FMenuItemSetActiveWorkTable.ItemsCount > 0 do
+      FMenuItemSetActiveWorkTable.Items[0].Free;
 
     if FMenuItemSetActiveWorkTable.Enabled then
       for I := 0 to WorkTableManager.WorkTables.Count - 1 do
