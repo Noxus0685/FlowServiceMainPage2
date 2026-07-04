@@ -439,19 +439,26 @@ var
 
   function StateText(AState: TObjectState): string;
   begin
-    case AState of
-      osEmpty: Result := 'osEmpty';
-      osLoading: Result := 'osLoading';
-      osClean: Result := 'osClean';
-      osNew: Result := 'osNew';
-      osModified: Result := 'osModified';
-      osDeleted: Result := 'osDeleted';
-      osSaving: Result := 'osSaving';
-      osSaved: Result := 'osSaved';
-      osError: Result := 'osError';
+    if AState = osEmpty then
+      Result := 'osEmpty'
+    else if AState = osLoading then
+      Result := 'osLoading'
+    else if AState = osClean then
+      Result := 'osClean'
+    else if AState = osNew then
+      Result := 'osNew'
+    else if AState = osModified then
+      Result := 'osModified'
+    else if AState = osDeleted then
+      Result := 'osDeleted'
+    else if AState = osSaving then
+      Result := 'osSaving'
+    else if AState = osSaved then
+      Result := 'osSaved'
+    else if AState = osError then
+      Result := 'osError'
     else
-      Result := IntToStr(Ord(AState));
-    end;
+      Result := 'unknown';
   end;
 
 begin
