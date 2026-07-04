@@ -541,7 +541,9 @@ begin
   if Existing = nil then
     Exit;
 
-  MarkProcessingDeviceDeleted(Existing);
+  // FProcessingDevices stores references to desktop/worktable devices.
+  // Removing from processing must only drop the processing reference;
+  // do not change Existing.State or sessions/points here.
   FProcessingDevices.Remove(Existing);
 
   if FManualProcessingDeviceUUIDs <> nil then
@@ -2518,13 +2520,8 @@ begin
     Exit;
 
   Device := TDevice(Item.TagObject);
-  if (Item.ParentItem <> nil) and SameText(Item.ParentItem.Text, 'прочее') then
-    MarkProcessingDeviceDeleted(Device)
-  else
-  begin
-    RemoveProcessingDevice(Device);
-    SaveProcessingDevices;
-  end;
+  RemoveProcessingDevice(Device);
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionDeleteExecute(Sender: TObject);
@@ -2546,13 +2543,8 @@ begin
         TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
       Exit;
 
-    if (Item.ParentItem <> nil) and SameText(Item.ParentItem.Text, 'прочее') then
-      MarkProcessingDeviceDeleted(Device)
-    else
-    begin
-      RemoveProcessingDevice(Device);
-      SaveProcessingDevices;
-    end;
+    RemoveProcessingDevice(Device);
+    SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
   end;
@@ -2639,13 +2631,8 @@ begin
     Exit;
 
   Device := TDevice(Item.TagObject);
-  if (Item.ParentItem <> nil) and SameText(Item.ParentItem.Text, 'прочее') then
-    MarkProcessingDeviceDeleted(Device)
-  else
-  begin
-    RemoveProcessingDevice(Device);
-    SaveProcessingDevices;
-  end;
+  RemoveProcessingDevice(Device);
+  SaveProcessingDevices;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionCloseExecute(Sender: TObject);
@@ -3168,10 +3155,8 @@ begin
     Device := GetSelectedResultDevice;
     if Device <> nil then
     begin
-      if SameText(Item.Text, 'прочее') then
-        MarkProcessingDeviceDeleted(Device)
-      else
-        RemoveProcessingDevice(Device);
+      RemoveProcessingDevice(Device);
+      SaveProcessingDevices;
       RefreshResultsAfterDevicesAction;
     end;
     Exit;
@@ -3184,6 +3169,7 @@ begin
 
     ResetPointDeleteConfirm;
     RemoveProcessingDevice(TDevice(Item.TagObject));
+    SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
   end;
