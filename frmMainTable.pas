@@ -5617,7 +5617,6 @@ var
   S: string;
   ActualError: Double;
   AllowedError: Double;
-  DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
 begin
   Result := False;
@@ -5635,25 +5634,11 @@ begin
   if not TryStrToFloat(Trim(S), ActualError) then
     Exit;
 
-  MatchedPoint := nil;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
-     (AChannel.FlowMeter.Device.Points <> nil) then
-    for DevicePoint in AChannel.FlowMeter.Device.Points do
-      if (DevicePoint <> nil) and
-         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
-           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
-          ((FActiveWorkTable.CurrentPoint.ID = 0) and
-           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
-           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
-      begin
-        MatchedPoint := DevicePoint;
-        Break;
-      end;
+  MatchedPoint := FindMatchedDevicePoint(FActiveWorkTable, AChannel);
+  if MatchedPoint = nil then
+    Exit;
 
-  if MatchedPoint <> nil then
-    AllowedError := Abs(MatchedPoint.Error)
-  else
-    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
+  AllowedError := Abs(MatchedPoint.Error);
 
   if AllowedError <= 0 then
     Exit;
