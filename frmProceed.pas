@@ -607,7 +607,6 @@ begin
       RemoveProcessingDevice(Device);
   end;
 
-  FPendingRemovedProcessingUUIDs.Clear;
 end;
 
 function TFrameProceed.IsManualProcessingDevice(ADevice: TDevice): Boolean;
@@ -1077,8 +1076,11 @@ end;
 
 procedure TFrameProceed.btnOKClick(Sender: TObject);
 begin
-  ApplyProcessingDeviceRemovals;
-  SaveProcessingDevices;
+   FPendingRemovedProcessingUUIDs.Clear;
+  //ApplyProcessingDeviceRemovals;
+  //SaveProcessingDevices;
+  PopulateTreeViewDevices;
+   RefreshResultsTab;
 end;
 
 procedure TFrameProceed.UpdateTreeViewDeviceTagObjects;
