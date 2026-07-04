@@ -20,20 +20,22 @@ begin
     Exit('<nil>');
 
   Result := Format(
-    'Ptr=%p; ID=%d; Num=%d; Name="%s"; SessionID=%d; DeviceUUID=%s; DeviceTypeUUID=%s; Valid=%s; Status=%d; State=%d; Error=%f; QavgEtalon=%f; Enabled=%s',
+    'Ptr=%p; ID=%d; Name="%s"; DeviceUUID=%s; DeviceTypeUUID=%s; QavgEtalon=%f; EtalonName="%s"; EtalonUUID=%s; Num=%d; SessionID=%d; Valid=%s; Status=%d; State=%d; Error=%f; Enabled=%s',
     [
       Pointer(APoint),
       APoint.ID,
-      APoint.Num,
       APoint.Name,
-      APoint.SessionID,
       APoint.DeviceUUID,
       APoint.DeviceTypeUUID,
+      APoint.QavgEtalon,
+      APoint.EtalonName,
+      APoint.EtalonUUID,
+      APoint.Num,
+      APoint.SessionID,
       BoolToStr(APoint.Valid, True),
       APoint.Status,
       Ord(APoint.State),
       APoint.Error,
-      APoint.QavgEtalon,
       BoolToStr(APoint.Enabled, True)
     ]
   );

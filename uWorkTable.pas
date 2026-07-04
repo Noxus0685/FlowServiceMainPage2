@@ -4523,23 +4523,26 @@ begin
 
       Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
 
-      {Это надо поправить! Не первый включенный эталон является эталоном, а тот
-      с которого берут данные кол-ва для расчёта погрешности через   TableFlow.Quantity}
+      Point.EtalonName := '';
+      Point.EtalonUUID := '';
       for EtalonChannel in EtalonChannels do
-        begin
-      if (EtalonChannel.Enabled=True) and
-         (EtalonChannel.FlowMeter <> nil) and
-         (EtalonChannel.FlowMeter.Device <> nil) then
       begin
-        Point.EtalonName := EtalonChannel.FlowMeter.Device.Name;
+        if (EtalonChannel = nil) or (not EtalonChannel.Enabled) or
+           (EtalonChannel.FlowMeter = nil) or
+           (EtalonChannel.FlowMeter.Device = nil) then
+          Continue;
+
+        if SameText(Trim(EtalonChannel.FlowMeter.Device.Name), 'Новое устройство') then
+          Continue;
+
+        Point.EtalonName := Trim(EtalonChannel.FlowMeter.Device.Name);
         Point.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
-      end
-      else
-      begin
-        Point.EtalonName := TableFlow.Name;
-        Point.EtalonUUID := '';
+        Break;
       end;
-        end;
+
+      if (Point.EtalonName = '') and (TableFlow <> nil) and
+         (not SameText(Trim(TableFlow.Name), 'Новое устройство')) then
+        Point.EtalonName := Trim(TableFlow.Name);
 
       Point.EtalonMass := TableFlow.ValueMass.GetDoubleValue;
 
