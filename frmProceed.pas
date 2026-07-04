@@ -205,6 +205,7 @@ type
     procedure AddProcessingDeviceFromSelection;
     procedure DbgProceedTree(const ACode: Integer; const AText: string);
     function GetSelectedTreeDebugText: string;
+    function GetProcessingDevicesDebugText: string;
     procedure RefreshResultsAfterDevicesAction;
     function FindTreeItemByTagObject(ATagObject: TObject): TTreeViewItem;
     procedure SelectTreeItemByTagObject(ATagObject: TObject);
@@ -430,6 +431,49 @@ begin
     '; Selected.Text=%s; Selected.Count=%d; Expanded=%s',
     [Item.Text, Item.Count, BoolToStr(Item.IsExpanded, True)]
   );
+end;
+
+function TFrameProceed.GetProcessingDevicesDebugText: string;
+var
+  Device: TDevice;
+
+  function StateText(AState: TObjectState): string;
+  begin
+    case AState of
+      osEmpty: Result := 'osEmpty';
+      osLoading: Result := 'osLoading';
+      osClean: Result := 'osClean';
+      osNew: Result := 'osNew';
+      osModified: Result := 'osModified';
+      osDeleted: Result := 'osDeleted';
+      osSaving: Result := 'osSaving';
+      osSaved: Result := 'osSaved';
+      osError: Result := 'osError';
+    else
+      Result := IntToStr(Ord(AState));
+    end;
+  end;
+
+begin
+  Result := 'ProcessingDevices=nil';
+  if FProcessingDevices = nil then
+    Exit;
+
+  Result := 'ProcessingDevices.Count=' + FProcessingDevices.Count.ToString;
+  for Device in FProcessingDevices do
+  begin
+    if Device = nil then
+    begin
+      Result := Result + sLineBreak + '  <nil>';
+      Continue;
+    end;
+
+    Result := Result + sLineBreak + Format(
+      '  Name=%s; UUID=%s; State=%s; Manual=%s; Sessions=%d; Spillages=%d',
+      [Device.Name, Device.UUID, StateText(Device.State),
+       BoolToStr(IsManualProcessingDevice(Device), True),
+       Device.Sessions.Count, Device.Spillages.Count]);
+  end;
 end;
 
 
@@ -795,6 +839,9 @@ var
   end;
 
 begin
+  DbgProceedTree(1801, 'CancelProcessingChanges ENTER'#13#10 +
+    GetSelectedTreeDebugText + #13#10 + GetProcessingDevicesDebugText);
+
   SelectedTag := '';
   if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
     SelectedTag := TreeViewDevices.Selected.TagString;
@@ -803,6 +850,9 @@ begin
     for Device in FProcessingDevices do
       if (Device <> nil) and (Device.State = osDeleted) then
         Device.State := osClean;
+
+  DbgProceedTree(1802, 'CancelProcessingChanges AFTER osClean restore'#13#10 +
+    GetProcessingDevicesDebugText);
 
   if FProcessingDevices <> nil then
     FProcessingDevices.Clear;
@@ -820,6 +870,8 @@ begin
 
   LoadProcessingDevices;
   LoadManualProcessingDevices;
+  DbgProceedTree(1803, 'CancelProcessingChanges AFTER reload'#13#10 +
+    GetProcessingDevicesDebugText);
   PopulateTreeViewDevices;
 
   SelectedItem := FindTreeItemBySavedTag(SelectedTag);
@@ -833,6 +885,9 @@ begin
     ShowDeviceSpillages(TDevice(SelectedItem.TagObject))
   else
     ShowAllDevicesResults;
+
+  DbgProceedTree(1804, 'CancelProcessingChanges EXIT'#13#10 +
+    GetSelectedTreeDebugText + #13#10 + GetProcessingDevicesDebugText);
 end;
 
 procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
@@ -926,6 +981,7 @@ end;
 
 procedure TFrameProceed.btnCancelClick(Sender: TObject);
 begin
+  DbgProceedTree(1811, 'btnCancelClick'#13#10 + GetProcessingDevicesDebugText);
   CancelProcessingChanges;
 end;
 
@@ -2801,7 +2857,8 @@ end;
 
 procedure TFrameProceed.TreeViewDevicesChange(Sender: TObject);
 begin
-  DbgProceedTree(1601, 'TreeViewDevicesChange ENTER'#13#10 + GetSelectedTreeDebugText);
+  DbgProceedTree(1601, 'TreeViewDevicesChange ENTER'#13#10 +
+    GetSelectedTreeDebugText + #13#10 + GetProcessingDevicesDebugText);
   UpdateSessionItems;
   UpdateCalibrCoefsFrame;
 end;
@@ -2840,8 +2897,8 @@ var
   end;
 
 begin
-  DbgProceedTree(1602, Format('TreeViewDevicesMouseDown ENTER; Button=%d; X=%.0f; Y=%.0f'#13#10'%s',
-    [Ord(Button), X, Y, GetSelectedTreeDebugText]));
+  DbgProceedTree(1602, Format('TreeViewDevicesMouseDown ENTER; Button=%d; X=%.0f; Y=%.0f'#13#10'%s'#13#10'%s',
+    [Ord(Button), X, Y, GetSelectedTreeDebugText, GetProcessingDevicesDebugText]));
   if (Button <> TMouseButton.mbRight) or (TreeViewDevices = nil) then
     Exit;
 
@@ -2853,7 +2910,8 @@ begin
     begin
       DbgProceedTree(1603, 'TreeViewDevicesMouseDown selects item: ' + Item.Text +
         '; Count=' + Item.Count.ToString +
-        '; Expanded=' + BoolToStr(Item.IsExpanded, True));
+        '; Expanded=' + BoolToStr(Item.IsExpanded, True) + #13#10 +
+        GetProcessingDevicesDebugText);
       TreeViewDevices.Selected := Item;
       Exit;
     end;
@@ -2951,6 +3009,7 @@ begin
 end;
 procedure TFrameProceed.ButtonSessionCancelClick(Sender: TObject);
 begin
+  DbgProceedTree(1812, 'ButtonSessionCancelClick'#13#10 + GetProcessingDevicesDebugText);
   CancelProcessingChanges;
 end;
 procedure TFrameProceed.ButtonSessionClearPointsClick(Sender: TObject);
