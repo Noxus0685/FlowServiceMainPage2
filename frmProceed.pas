@@ -482,7 +482,6 @@ procedure TFrameProceed.RemoveProcessingDevice(ADevice: TDevice);
 var
   Existing: TDevice;
   ManualIndex: Integer;
-  Repo: TDeviceRepository;
 begin
   if (ADevice = nil) or (FProcessingDevices = nil) then
     Exit;
@@ -492,11 +491,6 @@ begin
     Exit;
 
   MarkProcessingDeviceDeleted(Existing);
-  Repo := nil;
-  if DataManager <> nil then
-    DataManager.FindDevice(Existing.UUID, Repo);
-  if Repo <> nil then
-    Repo.SaveDevice(Existing);
   FProcessingDevices.Remove(Existing);
 
   if FManualProcessingDeviceUUIDs <> nil then
@@ -760,6 +754,7 @@ end;
 procedure TFrameProceed.CancelProcessingChanges;
 var
   Repo: TDeviceRepository;
+  Device: TDevice;
   SelectedTag: string;
   SelectedItem: TTreeViewItem;
 
@@ -803,6 +798,11 @@ begin
   SelectedTag := '';
   if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
     SelectedTag := TreeViewDevices.Selected.TagString;
+
+  if FProcessingDevices <> nil then
+    for Device in FProcessingDevices do
+      if (Device <> nil) and (Device.State = osDeleted) then
+        Device.State := osClean;
 
   if FProcessingDevices <> nil then
     FProcessingDevices.Clear;
@@ -931,7 +931,7 @@ end;
 
 procedure TFrameProceed.btnOKClick(Sender: TObject);
 begin
-  CancelProcessingChanges;
+  SaveProcessingDevices;
 end;
 
 procedure TFrameProceed.UpdateTreeViewDeviceTagObjects;
@@ -1731,7 +1731,7 @@ begin
 
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
-        if (Device <> nil) and
+        if (Device <> nil) and (Device.State <> osDeleted) and
            IsManualProcessingDevice(Device) and
            (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
           Devices.Add(Device);
@@ -2454,8 +2454,14 @@ begin
   if not (Item.TagObject is TDevice) then
     Exit;
 
-  RemoveProcessingDevice(TDevice(Item.TagObject));
-  SaveProcessingDevices;
+  Device := TDevice(Item.TagObject);
+  if (Item.ParentItem <> nil) and SameText(Item.ParentItem.Text, 'прочее') then
+    MarkProcessingDeviceDeleted(Device)
+  else
+  begin
+    RemoveProcessingDevice(Device);
+    SaveProcessingDevices;
+  end;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionDeleteExecute(Sender: TObject);
@@ -2477,8 +2483,13 @@ begin
         TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
       Exit;
 
-    RemoveProcessingDevice(Device);
-    SaveProcessingDevices;
+    if (Item.ParentItem <> nil) and SameText(Item.ParentItem.Text, 'прочее') then
+      MarkProcessingDeviceDeleted(Device)
+    else
+    begin
+      RemoveProcessingDevice(Device);
+      SaveProcessingDevices;
+    end;
     RefreshResultsAfterDevicesAction;
     Exit;
   end;
@@ -2565,8 +2576,13 @@ begin
     Exit;
 
   Device := TDevice(Item.TagObject);
-  RemoveProcessingDevice(Device);
-  SaveProcessingDevices;
+  if (Item.ParentItem <> nil) and SameText(Item.ParentItem.Text, 'прочее') then
+    MarkProcessingDeviceDeleted(Device)
+  else
+  begin
+    RemoveProcessingDevice(Device);
+    SaveProcessingDevices;
+  end;
   RefreshResultsAfterDevicesAction;
 end;
 procedure TFrameProceed.ActionSessionCloseExecute(Sender: TObject);
@@ -3086,7 +3102,10 @@ begin
     Device := GetSelectedResultDevice;
     if Device <> nil then
     begin
-      RemoveProcessingDevice(Device);
+      if SameText(Item.Text, 'прочее') then
+        MarkProcessingDeviceDeleted(Device)
+      else
+        RemoveProcessingDevice(Device);
       RefreshResultsAfterDevicesAction;
     end;
     Exit;
