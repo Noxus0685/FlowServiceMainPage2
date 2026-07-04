@@ -117,6 +117,7 @@ type
     StringColumnEtalonType1: TStringColumn;
     StringColumnEtalonSerial1: TStringColumn;
     StringColumnEtalonFlowRate1: TStringColumn;
+    StringColumnEtalonAvgFlowRate1: TStringColumn;
     StringColumnEtalonQuantity1: TStringColumn;
     StringColumnEtalonError1: TStringColumn;
     ToolBarEtalons1: TToolBar;
@@ -128,6 +129,7 @@ type
     ColumnDeviceType1: TColumn;
     StringColumnDeviceSerial1: TStringColumn;
     StringColumnDeviceFlowRate1: TStringColumn;
+    StringColumnDeviceAvgFlowRate1: TStringColumn;
     StringColumnDeviceQuantity1: TStringColumn;
     StringColumnDeviceError1: TStringColumn;
     ToolBar1: TToolBar;
@@ -781,6 +783,7 @@ type
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+    function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -4438,6 +4441,8 @@ begin
     Exit;
 
    Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+   if (FFrameProceed <> nil) and (Src <> nil) and (Src.FlowMeter <> nil) then
+     FFrameProceed.RemoveProcessingDevice(Src.FlowMeter.Device);
    FActiveWorkTable.DeleteChannel(Src);
    UpdateGrids;
 end;
@@ -5004,7 +5009,9 @@ begin
   if WorkTable.ValueFlowRate <> nil then
   begin
     StringColumnDeviceFlowRate1.Header := 'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
-    StringColumnEtalonFlowRate1.Header := 'Расход, ' +WorkTable.ValueFlowRate.GetDimName;
+    StringColumnDeviceAvgFlowRate1.Header := 'Ср. расход, ' + WorkTable.ValueFlowRate.GetDimName;
+    StringColumnEtalonFlowRate1.Header := 'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
+    StringColumnEtalonAvgFlowRate1.Header := 'Ср. расход, ' + WorkTable.ValueFlowRate.GetDimName;
   end;
 
   if WorkTable.ValueQuantity <> nil then
@@ -5950,6 +5957,26 @@ begin
   );
 end;
 
+function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
+  AWorkTable: TWorkTable): string;
+var
+  MeasureTime: Double;
+  AvgFlow: Double;
+begin
+  Result := '-';
+  if (AFlowMeter = nil) or (AFlowMeter.ValueFlow = nil) or
+     (AFlowMeter.ValueQuantity = nil) or (AWorkTable = nil) or
+     (AWorkTable.ValueTime = nil) then
+    Exit;
+
+  MeasureTime := AWorkTable.ValueTime.GetDoubleValue;
+  if MeasureTime <= 0 then
+    Exit;
+
+  AvgFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
+  Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
+end;
+
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -5990,6 +6017,10 @@ begin
         Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '-';
+    end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceAvgFlowRate1 then
+    begin
+      Value := GetAverageFlowText(WorkTable.DeviceChannels[ARow].FlowMeter, WorkTable);
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceQuantity1 then
     begin
@@ -6393,6 +6424,7 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Enabled
     else if (not WorkTable.EtalonChannels[ARow].Enabled) and
             ((GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonAvgFlowRate1) or
              (GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1) or
              (GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1) or
              (GridEtalons.Columns[ACol] = StringColumnEtalonRawSumValue1) or
@@ -6428,6 +6460,10 @@ begin
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
       else
         Value := '-';
+    end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonAvgFlowRate1 then
+    begin
+      Value := GetAverageFlowText(WorkTable.EtalonChannels[ARow].FlowMeter, WorkTable);
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1 then
     begin
@@ -6616,8 +6652,8 @@ begin
       [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
        StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
        StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
-       StringColumnDeviceCoef1, StringColumnDeviceError1]
+       StringColumnDeviceFlowRate1, StringColumnDeviceAvgFlowRate1,
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
@@ -6626,8 +6662,8 @@ begin
       [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
        StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
        StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
-       StringColumnDeviceCoef1, StringColumnDeviceError1]
+       StringColumnDeviceFlowRate1, StringColumnDeviceAvgFlowRate1,
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     );
 
   if WT <> nil then
@@ -6637,7 +6673,7 @@ begin
       [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
        StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
        StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
-       StringColumnEtalonFlowRate1,
+       StringColumnEtalonFlowRate1, StringColumnEtalonAvgFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     )
   else
@@ -6647,7 +6683,7 @@ begin
       [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
        StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
        StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
-       StringColumnEtalonFlowRate1,
+       StringColumnEtalonFlowRate1, StringColumnEtalonAvgFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     );
 
