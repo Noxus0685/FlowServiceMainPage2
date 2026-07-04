@@ -117,6 +117,7 @@ type
     StringColumnEtalonType1: TStringColumn;
     StringColumnEtalonSerial1: TStringColumn;
     StringColumnEtalonFlowRate1: TStringColumn;
+    StringColumnEtalonAvgFlowRate1: TStringColumn;
     StringColumnEtalonQuantity1: TStringColumn;
     StringColumnEtalonError1: TStringColumn;
     ToolBarEtalons1: TToolBar;
@@ -128,6 +129,7 @@ type
     ColumnDeviceType1: TColumn;
     StringColumnDeviceSerial1: TStringColumn;
     StringColumnDeviceFlowRate1: TStringColumn;
+    StringColumnDeviceAvgFlowRate1: TStringColumn;
     StringColumnDeviceQuantity1: TStringColumn;
     StringColumnDeviceError1: TStringColumn;
     ToolBar1: TToolBar;
@@ -4438,6 +4440,8 @@ begin
     Exit;
 
    Src := GetSelectedChannel(FActiveWorkTable.DeviceChannels, GridDevices);
+   if (FFrameProceed <> nil) and (Src <> nil) and (Src.FlowMeter <> nil) then
+     FFrameProceed.RemoveProcessingDevice(Src.FlowMeter.Device);
    FActiveWorkTable.DeleteChannel(Src);
    UpdateGrids;
 end;
@@ -5004,7 +5008,9 @@ begin
   if WorkTable.ValueFlowRate <> nil then
   begin
     StringColumnDeviceFlowRate1.Header := 'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
-    StringColumnEtalonFlowRate1.Header := 'Расход, ' +WorkTable.ValueFlowRate.GetDimName;
+    StringColumnDeviceAvgFlowRate1.Header := 'Ср. расход, ' + WorkTable.ValueFlowRate.GetDimName;
+    StringColumnEtalonFlowRate1.Header := 'Расход, ' + WorkTable.ValueFlowRate.GetDimName;
+    StringColumnEtalonAvgFlowRate1.Header := 'Ср. расход, ' + WorkTable.ValueFlowRate.GetDimName;
   end;
 
   if WorkTable.ValueQuantity <> nil then
@@ -5991,6 +5997,15 @@ begin
       else
         Value := '-';
     end
+    else if GridDevices.Columns[ACol] = StringColumnDeviceAvgFlowRate1 then
+    begin
+      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
+        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStringMeanValue(
+          WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.CurrentDimIndex)
+      else
+        Value := '-';
+    end
     else if GridDevices.Columns[ACol] = StringColumnDeviceQuantity1 then
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
@@ -6393,6 +6408,7 @@ begin
       Value := WorkTable.EtalonChannels[ARow].Enabled
     else if (not WorkTable.EtalonChannels[ARow].Enabled) and
             ((GridEtalons.Columns[ACol] = StringColumnEtalonFlowRate1) or
+             (GridEtalons.Columns[ACol] = StringColumnEtalonAvgFlowRate1) or
              (GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1) or
              (GridEtalons.Columns[ACol] = StringColumnEtalonRawValue1) or
              (GridEtalons.Columns[ACol] = StringColumnEtalonRawSumValue1) or
@@ -6426,6 +6442,15 @@ begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
         Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
+      else
+        Value := '-';
+    end
+    else if GridEtalons.Columns[ACol] = StringColumnEtalonAvgFlowRate1 then
+    begin
+      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
+         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
+        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStringMeanValue(
+          WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.CurrentDimIndex)
       else
         Value := '-';
     end
@@ -6616,8 +6641,8 @@ begin
       [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
        StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
        StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
-       StringColumnDeviceCoef1, StringColumnDeviceError1]
+       StringColumnDeviceFlowRate1, StringColumnDeviceAvgFlowRate1,
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     )
   else
     SoftReloadGridByGrowingRowCount(
@@ -6626,8 +6651,8 @@ begin
       [ColumnDeviceType1, PopupColumnDeviceDN1, StringColumnDeviceName1,
        StringColumnDeviceSerial1, PopupColumnDeviceSignal1, StringColumnUUID1,
        StringColumnDeviceRawValue1, StringColumnDeviceRawSumValue1,
-       StringColumnDeviceFlowRate1, StringColumnDeviceQuantity1,
-       StringColumnDeviceCoef1, StringColumnDeviceError1]
+       StringColumnDeviceFlowRate1, StringColumnDeviceAvgFlowRate1,
+       StringColumnDeviceQuantity1, StringColumnDeviceCoef1, StringColumnDeviceError1]
     );
 
   if WT <> nil then
@@ -6637,7 +6662,7 @@ begin
       [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
        StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
        StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
-       StringColumnEtalonFlowRate1,
+       StringColumnEtalonFlowRate1, StringColumnEtalonAvgFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     )
   else
@@ -6647,7 +6672,7 @@ begin
       [StringColumnEtalonChanel1, StringColumnEtalonType1, PopupColumnEtalonDN1,
        StringColumnEtalonName1, StringColumnEtalonSerial1, PopupColumnEtalonSignal1,
        StringColumnEtalonRawValue1, StringColumnEtalonRawSumValue1,
-       StringColumnEtalonFlowRate1,
+       StringColumnEtalonFlowRate1, StringColumnEtalonAvgFlowRate1,
        StringColumnEtalonQuantity1, StringColumnEtalonError1]
     );
 
