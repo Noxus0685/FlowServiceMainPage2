@@ -784,7 +784,7 @@ type
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
-    function GetErrorCellColor(AFlowMeter: TFlowMeter; const AText: string; out AColor: TAlphaColor): Boolean;
+    function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -5611,23 +5611,58 @@ begin
   Result := GRID_DEVICE_GROUP_COLORS[Abs(AGroup) mod Length(GRID_DEVICE_GROUP_COLORS)];
 end;
 
-function TFrameMainTable.GetErrorCellColor(AFlowMeter: TFlowMeter;
+function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
   const AText: string; out AColor: TAlphaColor): Boolean;
 var
   S: string;
+  ActualError: Double;
+  AllowedError: Double;
+  DevicePoint: TDevicePoint;
+  MatchedPoint: TDevicePoint;
 begin
   Result := False;
   AColor := TAlphaColors.Null;
 
   S := Trim(AText);
-  if (AFlowMeter = nil) or (S = '') or (S = '-') then
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.Device = nil) or (S = '') or (S = '-') then
+    Exit;
+
+  S := StringReplace(S, '%', '', [rfReplaceAll]);
+  S := StringReplace(S, '±', '', [rfReplaceAll]);
+  S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+  S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+  if not TryStrToFloat(Trim(S), ActualError) then
+    Exit;
+
+  MatchedPoint := nil;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
+     (AChannel.FlowMeter.Device.Points <> nil) then
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
+           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
+          ((FActiveWorkTable.CurrentPoint.ID = 0) and
+           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
+           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
+      begin
+        MatchedPoint := DevicePoint;
+        Break;
+      end;
+
+  if MatchedPoint <> nil then
+    AllowedError := Abs(MatchedPoint.Error)
+  else
+    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
+
+  if AllowedError <= 0 then
     Exit;
 
   Result := True;
-  if AFlowMeter.Status = 1 then
-    AColor := $FFFFD6D6
+  if Abs(ActualError) > AllowedError then
+    AColor := $FFFFE6E6
   else
-    AColor := $FFDFF5DF;
+    AColor := $FFE6F4E6;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -5656,7 +5691,7 @@ begin
   if (Column = StringColumnDeviceError1) and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) and
      (FActiveWorkTable.DeviceChannels[Row] <> nil) then
-    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row].FlowMeter,
+    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row],
       Value.ToString, CellColor);
 
   NeedCustomDraw := (Column = StringColumnDeviceError1) or IsChannelColumn or
@@ -6448,7 +6483,7 @@ begin
   if (Column = StringColumnEtalonError1) and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) and
      (FActiveWorkTable.EtalonChannels[Row] <> nil) then
-    GetErrorCellColor(FActiveWorkTable.EtalonChannels[Row].FlowMeter,
+    GetErrorCellColor(FActiveWorkTable.EtalonChannels[Row],
       Value.ToString, CellColor);
 
   if CellColor <> TAlphaColors.Null then

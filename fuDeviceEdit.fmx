@@ -1,4 +1,4 @@
-object FormDeviceEditor: TFormDeviceEditor
+﻿object FormDeviceEditor: TFormDeviceEditor
   Left = 0
   Top = 0
   Caption = #1059#1089#1090#1088#1086#1081#1089#1090#1074#1086
@@ -1904,6 +1904,7 @@ object FormDeviceEditor: TFormDeviceEditor
               ParentShowHint = False
               ShowHint = True
               OnExit = EditFreqFlowRateExit
+              OnKeyDown = EditFreqFlowRateKeyDown
               Left = 276
               Top = 15
             end

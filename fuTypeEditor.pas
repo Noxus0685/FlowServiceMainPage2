@@ -353,6 +353,8 @@ type
     procedure EditCoefKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
     procedure EditFreqFlowRateExit(Sender: TObject);
+    procedure EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure EditFreqExit(Sender: TObject);
     procedure cbVoltageRangeChange(Sender: TObject);
     procedure EditVoltageQminExit(Sender: TObject);
@@ -578,7 +580,7 @@ type
   procedure ApplyOutputType;
 
   procedure UpdateCoefEdit;
-  procedure UpdateCoefUnitLabel;
+  procedure UpdateFreqFlowRateUnitLabel;
   function GetDisplayedCoef: Double;
 
   procedure LoadCategories;
@@ -4771,6 +4773,21 @@ begin
     RecalcPointsBySelectedDiameter;
 end;
 
+procedure TFormTypeEditor.EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key <> vkReturn then
+    Exit;
+
+  EditFreqFlowRateExit(EditFreqFlowRate);
+  Key := 0;
+  KeyChar := #0;
+  if GridDiameters <> nil then
+    GridDiameters.SetFocus
+  else
+    Self.SetFocus;
+end;
+
 procedure TFormTypeEditor.EditFreqFlowRateExit(Sender: TObject);
 var
   NewRate: Double;
@@ -6916,6 +6933,7 @@ begin
    Dim := TMeasuredDimension(FType.MeasuredDimension);
    FType.SetDimensions;
    UpdateUnitsCombo;
+   UpdateFreqFlowRateUnitLabel;
 
    cbMeasuredDimension.Hint := cbMeasuredDimension.Text;
 
@@ -7290,16 +7308,12 @@ begin
   end;
 end;
 
-procedure TFormTypeEditor.UpdateCoefUnitLabel;
+procedure TFormTypeEditor.UpdateFreqFlowRateUnitLabel;
 begin
-  if LabelEditCoefUnit = nil then
+  if (Label38 = nil) or (FType = nil) then
     Exit;
 
-  if (cbCoefViewType <> nil) and (cbCoefViewType.ItemIndex >= 0) and
-     (cbCoefViewType.ItemIndex < cbCoefViewType.Items.Count) then
-    LabelEditCoefUnit.Text := cbCoefViewType.Items[cbCoefViewType.ItemIndex]
-  else
-    LabelEditCoefUnit.Text := '';
+  Label38.Text := 'Расход, QF/Qmax, ' + FType.GetDimensionName;
 end;
 
 function TFormTypeEditor.GetDisplayedCoef: Double;
@@ -7382,6 +7396,7 @@ begin
   // =====================================================
   // == Отношение расхода к частоте
   // =====================================================
+  UpdateFreqFlowRateUnitLabel;
   EditFreqFlowRate.Text := '';
   EditFreqFlowRate.TextPrompt := '';
   if FType.FreqFlowRate > 0 then
