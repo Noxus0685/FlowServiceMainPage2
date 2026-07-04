@@ -194,6 +194,10 @@ type
     function GetDeviceSpillageCount(ADevice: TDevice): Integer;
     procedure SaveProcessingPointCounts;
     procedure SaveProcessingDevices;
+    procedure LoadManualProcessingDevices;
+    procedure SaveManualProcessingDevices;
+    procedure MarkProcessingDeviceManual(ADevice: TDevice);
+    function IsManualProcessingDevice(ADevice: TDevice): Boolean;
     procedure SavePendingProcessingChanges(Sender: TObject);
     procedure CancelProcessingChanges;
     procedure LoadProcessingDevices;
@@ -278,6 +282,7 @@ type
     FFrameCalibrCoefs: TFrameCalibrCoefs;
     FWorkTableManager: TWorkTableManager;
     FProcessingDevices: TObjectList<TDevice>;
+    FManualProcessingDeviceUUIDs: TStringList;
     FCurrentSession: TSessionSpillage;
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
@@ -305,6 +310,7 @@ const
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
   CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
+  CManualProcessingDevicesSection = 'ManualProcessingDevices';
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -350,6 +356,7 @@ begin
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
   FreeAndNil(FProcessingDevices);
+  FreeAndNil(FManualProcessingDeviceUUIDs);
   inherited;
 end;
 
@@ -362,6 +369,12 @@ begin
 
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
+  if FManualProcessingDeviceUUIDs = nil then
+  begin
+    FManualProcessingDeviceUUIDs := TStringList.Create;
+    FManualProcessingDeviceUUIDs.Sorted := False;
+    FManualProcessingDeviceUUIDs.Duplicates := dupIgnore;
+  end;
 
   if GridResults <> nil then
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
@@ -383,6 +396,7 @@ begin
     ComboBoxUnitsResult.ItemIndex := 0;
 
   LoadProcessingDevices;
+  LoadManualProcessingDevices;
   SyncProcessingDevicesWithNewPoints;
   InitCalibrCoefsFrame;
   RefreshResultsTab;
@@ -417,6 +431,7 @@ begin
     [Item.Text, Item.Count, BoolToStr(Item.IsExpanded, True)]
   );
 end;
+
 
 procedure TFrameProceed.RefreshResultsTab;
 begin
@@ -466,6 +481,8 @@ end;
 procedure TFrameProceed.RemoveProcessingDevice(ADevice: TDevice);
 var
   Existing: TDevice;
+  ManualIndex: Integer;
+  Repo: TDeviceRepository;
 begin
   if (ADevice = nil) or (FProcessingDevices = nil) then
     Exit;
@@ -474,8 +491,104 @@ begin
   if Existing = nil then
     Exit;
 
+  MarkProcessingDeviceDeleted(Existing);
+  Repo := nil;
+  if DataManager <> nil then
+    DataManager.FindDevice(Existing.UUID, Repo);
+  if Repo <> nil then
+    Repo.SaveDevice(Existing);
   FProcessingDevices.Remove(Existing);
+
+  if FManualProcessingDeviceUUIDs <> nil then
+  begin
+    ManualIndex := FManualProcessingDeviceUUIDs.IndexOf(Trim(ADevice.UUID));
+    if ManualIndex >= 0 then
+      FManualProcessingDeviceUUIDs.Delete(ManualIndex);
+  end;
 end;
+
+function TFrameProceed.IsManualProcessingDevice(ADevice: TDevice): Boolean;
+begin
+  Result := (ADevice <> nil) and (FManualProcessingDeviceUUIDs <> nil) and
+    (FManualProcessingDeviceUUIDs.IndexOf(Trim(ADevice.UUID)) >= 0);
+end;
+
+procedure TFrameProceed.MarkProcessingDeviceManual(ADevice: TDevice);
+var
+  DeviceUUID: string;
+begin
+  if (ADevice = nil) or (FManualProcessingDeviceUUIDs = nil) then
+    Exit;
+
+  DeviceUUID := Trim(ADevice.UUID);
+  if DeviceUUID = '' then
+    Exit;
+
+  if FManualProcessingDeviceUUIDs.IndexOf(DeviceUUID) < 0 then
+    FManualProcessingDeviceUUIDs.Add(DeviceUUID);
+end;
+
+procedure TFrameProceed.LoadManualProcessingDevices;
+var
+  Ini: TIniFile;
+  I, Count: Integer;
+  DeviceUUID: string;
+begin
+  if FManualProcessingDeviceUUIDs = nil then
+    Exit;
+
+  FManualProcessingDeviceUUIDs.Clear;
+
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (not FileExists(FWorkTableManager.IniFileName)) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    Count := Ini.ReadInteger(CManualProcessingDevicesSection, CProcessingDevicesCountKey, 0);
+    for I := 0 to Count - 1 do
+    begin
+      DeviceUUID := Trim(Ini.ReadString(CManualProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(I), ''));
+      if (DeviceUUID <> '') and
+         (FManualProcessingDeviceUUIDs.IndexOf(DeviceUUID) < 0) then
+        FManualProcessingDeviceUUIDs.Add(DeviceUUID);
+    end;
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TFrameProceed.SaveManualProcessingDevices;
+var
+  Ini: TIniFile;
+  I, SaveIndex: Integer;
+  DeviceUUID: string;
+begin
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (FManualProcessingDeviceUUIDs = nil) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    Ini.EraseSection(CManualProcessingDevicesSection);
+    SaveIndex := 0;
+    for I := 0 to FManualProcessingDeviceUUIDs.Count - 1 do
+    begin
+      DeviceUUID := Trim(FManualProcessingDeviceUUIDs[I]);
+      if (DeviceUUID = '') or (FindProcessingDeviceByUUID(DeviceUUID) = nil) then
+        Continue;
+
+      Ini.WriteString(CManualProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(SaveIndex), DeviceUUID);
+      Inc(SaveIndex);
+    end;
+    Ini.WriteInteger(CManualProcessingDevicesSection, CProcessingDevicesCountKey, SaveIndex);
+  finally
+    Ini.Free;
+  end;
+end;
+
 procedure TFrameProceed.MarkProcessingDeviceDeleted(ADevice: TDevice);
 var
   Session: TSessionSpillage;
@@ -581,7 +694,8 @@ begin
     for I := 0 to FProcessingDevices.Count - 1 do
     begin
       Device := FProcessingDevices[I];
-      if (Device = nil) or (Trim(Device.UUID) = '') then
+      if (Device = nil) or (Trim(Device.UUID) = '') or
+         (Device.State = osDeleted) then
         Continue;
 
       DbgProceedTree(1412, 'SaveProcessingDevices item: ' + Device.Name + #13#10 + Device.UUID);
@@ -597,6 +711,7 @@ begin
   end;
 
   SaveProcessingPointCounts;
+  SaveManualProcessingDevices;
 end;
 
 
@@ -704,6 +819,7 @@ begin
         Repo.Load;
 
   LoadProcessingDevices;
+  LoadManualProcessingDevices;
   PopulateTreeViewDevices;
 
   SelectedItem := FindTreeItemBySavedTag(SelectedTag);
@@ -793,6 +909,7 @@ begin
 
     DbgProceedTree(1109, 'Before AddProcessingDevice: ' + SelDevice.Name + #13#10 + SelDevice.UUID);
     AddProcessingDevice(SelDevice);
+    MarkProcessingDeviceManual(SelDevice);
     DbgProceedTree(1110, 'After AddProcessingDevice'#13#10 + GetSelectedTreeDebugText);
     DbgProceedTree(1111, 'Before PopulateTreeViewDevices from AddProcessingDeviceFromSelection');
     PopulateTreeViewDevices;
@@ -1267,7 +1384,8 @@ begin
 
       if FProcessingDevices <> nil then
         for Device in FProcessingDevices do
-          if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
+          if (Device <> nil) and IsManualProcessingDevice(Device) and
+             (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
           begin
             DbgProceedTree(1205, 'Add device to OTHER: ' + Device.Name + #13#10 + Device.UUID);
             AddDeviceNode(RootOther, Device);
@@ -1614,6 +1732,7 @@ begin
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
         if (Device <> nil) and
+           IsManualProcessingDevice(Device) and
            (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
           Devices.Add(Device);
 
@@ -1969,6 +2088,8 @@ begin
   if SameText(Item.Text, '...') then
   begin
     FProcessingDevices.Clear;
+    if FManualProcessingDeviceUUIDs <> nil then
+      FManualProcessingDeviceUUIDs.Clear;
     SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
