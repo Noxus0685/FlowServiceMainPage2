@@ -1552,7 +1552,7 @@ begin
   try
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
-        if Device <> nil then
+        if (Device <> nil) and (Device.State <> osDeleted) then
           Devices.Add(Device);
 
     ShowDevicesResults(Devices);
@@ -1580,7 +1580,7 @@ begin
     if ADevices <> nil then
       for Device in ADevices do
       begin
-        if Device = nil then
+        if (Device = nil) or (Device.State = osDeleted) then
           Continue;
 
         Device.AnalyseResults;
