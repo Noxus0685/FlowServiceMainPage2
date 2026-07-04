@@ -1,4 +1,4 @@
-object FrameMainTable: TFrameMainTable
+﻿object FrameMainTable: TFrameMainTable
   Size.Width = 1940.000000000000000000
   Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
@@ -5701,6 +5701,13 @@ object FrameMainTable: TFrameMainTable
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
             end
+            object StringColumnDeviceAvgFlowRate1: TStringColumn
+              Tag = 3
+              Header = #1057#1088'. '#1088#1072#1089#1093#1086#1076', '#1084'3/'#1095
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              ReadOnly = True
+            end
             object StringColumnDeviceQuantity1: TStringColumn
               Tag = 3
               Header = #1054#1073#1098#1077#1084', '#1084'3'
@@ -5927,6 +5934,13 @@ object FrameMainTable: TFrameMainTable
                 Header = #1056#1072#1089#1093#1086#1076', '#1084'3/'#1095
                 HeaderSettings.TextSettings.WordWrap = False
                 HeaderSettings.TextSettings.HorzAlign = Center
+              end
+              object StringColumnEtalonAvgFlowRate1: TStringColumn
+                Tag = 3
+                Header = #1057#1088'. '#1088#1072#1089#1093#1086#1076', '#1084'3/'#1095
+                HeaderSettings.TextSettings.WordWrap = False
+                HeaderSettings.TextSettings.HorzAlign = Center
+                ReadOnly = True
               end
               object StringColumnEtalonQuantity1: TStringColumn
                 Tag = 3
