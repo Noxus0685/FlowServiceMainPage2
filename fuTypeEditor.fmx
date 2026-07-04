@@ -788,8 +788,20 @@ object FormTypeEditor: TFormTypeEditor
               ParentShowHint = False
               ShowHint = True
               OnExit = EditCoefExit
+              OnKeyDown = EditCoefKeyDown
               Left = 276
               Top = 15
+            end
+            object LabelEditCoefUnit: TLabel
+              Align = Right
+              Margins.Left = 5.000000000000000000
+              Size.Width = 52.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              Text = ''
+              TextSettings.HorzAlign = Center
+              TextSettings.VertAlign = Center
+              TabOrder = 2
             end
           end
           object Layout9: TLayout
