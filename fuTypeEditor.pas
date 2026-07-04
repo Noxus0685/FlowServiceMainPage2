@@ -580,6 +580,7 @@ type
   procedure ApplyOutputType;
 
   procedure UpdateCoefEdit;
+  procedure UpdateCoefUnitLabel;
   procedure UpdateFreqFlowRateUnitLabel;
   function GetDisplayedCoef: Double;
 
@@ -7306,6 +7307,11 @@ begin
         EditCoef.Text := FloatToStr(1 / V);
       end;
   end;
+end;
+
+procedure TFormTypeEditor.UpdateCoefUnitLabel;
+begin
+  UpdateFreqFlowRateUnitLabel;
 end;
 
 procedure TFormTypeEditor.UpdateFreqFlowRateUnitLabel;
