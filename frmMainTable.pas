@@ -783,6 +783,7 @@ type
     procedure FlowMeterPropertiesChanged(Sender: TObject);
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
+    function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -5956,6 +5957,26 @@ begin
   );
 end;
 
+function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
+  AWorkTable: TWorkTable): string;
+var
+  MeasureTime: Double;
+  AvgFlow: Double;
+begin
+  Result := '-';
+  if (AFlowMeter = nil) or (AFlowMeter.ValueFlow = nil) or
+     (AFlowMeter.ValueQuantity = nil) or (AWorkTable = nil) or
+     (AWorkTable.ValueTime = nil) then
+    Exit;
+
+  MeasureTime := AWorkTable.ValueTime.GetDoubleValue;
+  if MeasureTime <= 0 then
+    Exit;
+
+  AvgFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
+  Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
+end;
+
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
 var
@@ -5999,12 +6020,7 @@ begin
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceAvgFlowRate1 then
     begin
-      if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStringMeanValue(
-          WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.CurrentDimIndex)
-      else
-        Value := '-';
+      Value := GetAverageFlowText(WorkTable.DeviceChannels[ARow].FlowMeter, WorkTable);
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceQuantity1 then
     begin
@@ -6447,12 +6463,7 @@ begin
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonAvgFlowRate1 then
     begin
-      if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
-         (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStringMeanValue(
-          WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.CurrentDimIndex)
-      else
-        Value := '-';
+      Value := GetAverageFlowText(WorkTable.EtalonChannels[ARow].FlowMeter, WorkTable);
     end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonQuantity1 then
     begin

@@ -482,6 +482,7 @@ procedure TFrameProceed.RemoveProcessingDevice(ADevice: TDevice);
 var
   Existing: TDevice;
   ManualIndex: Integer;
+  Repo: TDeviceRepository;
 begin
   if (ADevice = nil) or (FProcessingDevices = nil) then
     Exit;
@@ -491,6 +492,11 @@ begin
     Exit;
 
   MarkProcessingDeviceDeleted(Existing);
+  Repo := nil;
+  if DataManager <> nil then
+    DataManager.FindDevice(Existing.UUID, Repo);
+  if Repo <> nil then
+    Repo.SaveDevice(Existing);
   FProcessingDevices.Remove(Existing);
 
   if FManualProcessingDeviceUUIDs <> nil then
