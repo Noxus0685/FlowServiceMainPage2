@@ -4645,7 +4645,7 @@ begin
   if GridDiameters <> nil then
     GridDiameters.SetFocus
   else
-    Self.SetFocus;
+    EditCoef.ResetFocus;
 end;
 
 procedure TFormTypeEditor.RecalcDiametersKpByFreq;
@@ -4786,7 +4786,7 @@ begin
   if GridDiameters <> nil then
     GridDiameters.SetFocus
   else
-    Self.SetFocus;
+    EditFreqFlowRate.ResetFocus;
 end;
 
 procedure TFormTypeEditor.EditFreqFlowRateExit(Sender: TObject);

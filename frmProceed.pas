@@ -146,7 +146,6 @@ type
     ButtonSessionNew: TButton;
     ButtonSessionClearPoints: TButton;
     ButtonSessionClose: TButton;
-    ButtonSessionDeviceAdd: TButton;
     ButtonSessionSynchTable: TButton;
     Layout19: TLayout;
     Layout20: TLayout;

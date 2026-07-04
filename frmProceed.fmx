@@ -591,30 +591,17 @@ object FrameProceed: TFrameProceed
           TabOrder = 1
           TextSettings.Trimming = None
         end
-        object ButtonSessionDeviceAdd: TButton
-          Action = ActionSessionDeviceAdd
-          Align = Left
-          Hint = #1044#1086#1073#1072#1074#1080#1090#1100' '#1087#1088#1080#1073#1086#1088
-          ImageIndex = -1
-          Position.X = 175.000000000000000000
-          Size.Width = 47.000000000000000000
-          Size.Height = 32.000000000000000000
-          Size.PlatformDefault = False
-          StyleLookup = 'additembutton'
-          TabOrder = 4
-          TextSettings.Trimming = None
-        end
         object ButtonSessionSynchTable: TButton
           Action = ActionSessionSynchTable
           Align = Left
           Hint = #1057#1080#1085#1093#1088#1086#1085#1080#1079#1080#1088#1086#1074#1072#1090#1100' '#1089#1086' '#1089#1090#1086#1083#1086#1084
           ImageIndex = -1
-          Position.X = 222.000000000000000000
+          Position.X = 175.000000000000000000
           Size.Width = 47.000000000000000000
           Size.Height = 32.000000000000000000
           Size.PlatformDefault = False
           StyleLookup = 'refreshtoolbutton'
-          TabOrder = 5
+          TabOrder = 4
           TextSettings.Trimming = None
         end
       end

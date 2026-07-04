@@ -2970,13 +2970,14 @@ begin
   if GridPoints <> nil then
     GridPoints.SetFocus
   else
-    Self.SetFocus;
+    EditFreqFlowRate.SetFocus;
 end;
 
 procedure TFormDeviceEditor.EditFreqFlowRateExit(Sender: TObject);
 var
   NewRate: Double;
 begin
+
   if FLoading then
     Exit;
 
