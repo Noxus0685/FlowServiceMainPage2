@@ -689,6 +689,7 @@ type
   procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
   procedure StartMeasurementRun;    overload;
   procedure StartMeasurementRun(AMode: Integer); overload;
+  procedure ResetSpillageRuntimeValues;
   procedure ResetMeasurementValues;
   procedure StopMeasurementRun;
   procedure PauseMeasurementRun;
@@ -4238,6 +4239,9 @@ end;
 
 procedure TWorkTable.DoSpillageStart;
 begin
+  ResetSpillageRuntimeValues;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoSpillageStart',
+    'Начало проливки. Сброшены текущие накопители времени, объёма и среднего расхода', Name);
   Notify(notifyAction, Self);
 end;
 
@@ -4279,6 +4283,52 @@ end;
 procedure TWorkTable.ExecuteAction;
 begin
 
+end;
+
+procedure TWorkTable.ResetSpillageRuntimeValues;
+var
+  Ch: TChannel;
+
+  procedure ResetMeter(const AMeter: TMeterValue); overload;
+  begin
+    if AMeter <> nil then
+      AMeter.Reset;
+  end;
+
+  procedure ResetMeter(const AMeter: TMeterValue; const AValue: Double); overload;
+  begin
+    if AMeter <> nil then
+      AMeter.Reset(AValue);
+  end;
+begin
+  Time := 0;
+  TimeResult := 0;
+  ResetMeter(ValueTime, 0);
+  ResetMeter(ValueQuantity, 0);
+
+  if DeviceChannels <> nil then
+    for Ch in DeviceChannels do
+      if Ch <> nil then
+      begin
+        Ch.CurSec := 0;
+        Ch.ImpResult := 0;
+        ResetMeter(Ch.ValueImp);
+        ResetMeter(Ch.ValueImpTotal, 0);
+        if (Ch.FlowMeter <> nil) and (Ch.FlowMeter.ValueQuantity <> nil) then
+          Ch.FlowMeter.ValueQuantity.Reset(0);
+      end;
+
+  if EtalonChannels <> nil then
+    for Ch in EtalonChannels do
+      if Ch <> nil then
+      begin
+        Ch.CurSec := 0;
+        Ch.ImpResult := 0;
+        ResetMeter(Ch.ValueImp);
+        ResetMeter(Ch.ValueImpTotal, 0);
+        if (Ch.FlowMeter <> nil) and (Ch.FlowMeter.ValueQuantity <> nil) then
+          Ch.FlowMeter.ValueQuantity.Reset(0);
+      end;
 end;
 
 procedure TWorkTable.DoStartMonitor;
@@ -4523,23 +4573,26 @@ begin
 
       Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
 
-      {Это надо поправить! Не первый включенный эталон является эталоном, а тот
-      с которого берут данные кол-ва для расчёта погрешности через   TableFlow.Quantity}
+      Point.EtalonName := '';
+      Point.EtalonUUID := '';
       for EtalonChannel in EtalonChannels do
-        begin
-      if (EtalonChannel.Enabled=True) and
-         (EtalonChannel.FlowMeter <> nil) and
-         (EtalonChannel.FlowMeter.Device <> nil) then
       begin
-        Point.EtalonName := EtalonChannel.FlowMeter.Device.Name;
+        if (EtalonChannel = nil) or (not EtalonChannel.Enabled) or
+           (EtalonChannel.FlowMeter = nil) or
+           (EtalonChannel.FlowMeter.Device = nil) then
+          Continue;
+
+        if SameText(Trim(EtalonChannel.FlowMeter.Device.Name), 'Новое устройство') then
+          Continue;
+
+        Point.EtalonName := Trim(EtalonChannel.FlowMeter.Device.Name);
         Point.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
-      end
-      else
-      begin
-        Point.EtalonName := TableFlow.Name;
-        Point.EtalonUUID := '';
+        Break;
       end;
-        end;
+
+      if (Point.EtalonName = '') and (TableFlow <> nil) and
+         (not SameText(Trim(TableFlow.Name), 'Новое устройство')) then
+        Point.EtalonName := Trim(TableFlow.Name);
 
       Point.EtalonMass := TableFlow.ValueMass.GetDoubleValue;
 

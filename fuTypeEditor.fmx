@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 57
+    TabOrder = 58
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -780,16 +780,28 @@ object FormTypeEditor: TFormTypeEditor
               Hint = #1050#1086#1101#1092#1080#1094#1080#1077#1085#1090' '#1087#1088#1077#1086#1073#1088#1072#1079#1086#1074#1072#1085#1080#1103
               Margins.Top = 5.000000000000000000
               Margins.Bottom = 5.000000000000000000
-              Size.Width = 141.000000000000000000
+              Size.Width = 84.000000000000000000
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
               TextPrompt = '100'
               KillFocusByReturn = True
               ParentShowHint = False
               ShowHint = True
+              OnKeyDown = EditCoefKeyDown
               OnExit = EditCoefExit
               Left = 276
               Top = 15
+            end
+            object LabelEditCoefUnit: TLabel
+              Align = Right
+              Margins.Left = 5.000000000000000000
+              Position.X = 266.000000000000000000
+              Position.Y = 3.000000000000000000
+              Size.Width = 52.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TextSettings.HorzAlign = Center
+              TabOrder = 2
             end
           end
           object Layout9: TLayout
@@ -1384,8 +1396,10 @@ object FormTypeEditor: TFormTypeEditor
               Size.Height = 22.000000000000000000
               Size.PlatformDefault = False
               TextPrompt = '1'
+              KillFocusByReturn = True
               ParentShowHint = False
               ShowHint = True
+              OnKeyDown = EditFreqFlowRateKeyDown
               OnExit = EditFreqFlowRateExit
               Left = 276
               Top = 15

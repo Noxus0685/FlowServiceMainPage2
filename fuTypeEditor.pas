@@ -135,6 +135,7 @@ type
     Layout2: TLayout;
     Label14: TLabel;
     EditCoef: TEdit;
+    LabelEditCoefUnit: TLabel;
     Layout9: TLayout;
     Label15: TLabel;
     cbCoefViewType: TComboBox;
@@ -349,7 +350,11 @@ type
     procedure cbOutPutType2Change(Sender: TObject);
     procedure cbCoefViewTypeChange(Sender: TObject);
     procedure EditCoefExit(Sender: TObject);
+    procedure EditCoefKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure EditFreqFlowRateExit(Sender: TObject);
+    procedure EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure EditFreqExit(Sender: TObject);
     procedure cbVoltageRangeChange(Sender: TObject);
     procedure EditVoltageQminExit(Sender: TObject);
@@ -575,6 +580,8 @@ type
   procedure ApplyOutputType;
 
   procedure UpdateCoefEdit;
+  procedure UpdateCoefUnitLabel;
+  procedure UpdateFreqFlowRateUnitLabel;
   function GetDisplayedCoef: Double;
 
   procedure LoadCategories;
@@ -3801,6 +3808,7 @@ begin
 
   // сохраняем тип представления
   FType.DimensionCoef := ViewType;
+  UpdateCoefUnitLabel;
 
   // базовый коэффициент всегда хранится как имп/л (имп/кг)
   if FType.Coef <= 0 then
@@ -4522,8 +4530,11 @@ begin
   end;
 
   // 4. Если базовый коэффициент не изменился — выходим
- // if SameValue(FType.Coef, NewBaseCoef, 1e-12) then
- //   Exit;
+  if SameValue(FType.Coef, NewBaseCoef, 1e-12) then
+  begin
+    EditCoef.Text := FormatFloat('0.########', GetDisplayedCoef);
+    Exit;
+  end;
 
   // 5. Сохраняем базовый коэффициент
   FType.Coef := NewBaseCoef;
@@ -4620,6 +4631,21 @@ begin
 
 
 
+end;
+
+procedure TFormTypeEditor.EditCoefKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key <> vkReturn then
+    Exit;
+
+  EditCoefExit(EditCoef);
+  Key := 0;
+  KeyChar := #0;
+  if GridDiameters <> nil then
+    GridDiameters.SetFocus
+  else
+    EditCoef.ResetFocus;
 end;
 
 procedure TFormTypeEditor.RecalcDiametersKpByFreq;
@@ -4746,6 +4772,21 @@ begin
   // ----------------------------------------
   if FSelectedDiameterID >= 0 then
     RecalcPointsBySelectedDiameter;
+end;
+
+procedure TFormTypeEditor.EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key <> vkReturn then
+    Exit;
+
+  EditFreqFlowRateExit(EditFreqFlowRate);
+  Key := 0;
+  KeyChar := #0;
+  if GridDiameters <> nil then
+    GridDiameters.SetFocus
+  else
+    EditFreqFlowRate.ResetFocus;
 end;
 
 procedure TFormTypeEditor.EditFreqFlowRateExit(Sender: TObject);
@@ -6893,6 +6934,7 @@ begin
    Dim := TMeasuredDimension(FType.MeasuredDimension);
    FType.SetDimensions;
    UpdateUnitsCombo;
+   UpdateFreqFlowRateUnitLabel;
 
    cbMeasuredDimension.Hint := cbMeasuredDimension.Text;
 
@@ -7243,6 +7285,7 @@ procedure TFormTypeEditor.UpdateCoefEdit;
 var
   V: Double;
 begin
+  UpdateCoefUnitLabel;
   V := FType.Coef;
 
   if V <= 0 then
@@ -7264,6 +7307,19 @@ begin
         EditCoef.Text := FloatToStr(1 / V);
       end;
   end;
+end;
+
+procedure TFormTypeEditor.UpdateCoefUnitLabel;
+begin
+  UpdateFreqFlowRateUnitLabel;
+end;
+
+procedure TFormTypeEditor.UpdateFreqFlowRateUnitLabel;
+begin
+  if (Label38 = nil) or (FType = nil) then
+    Exit;
+
+  Label38.Text := 'Расход, QF/Qmax, ' + FType.GetDimensionName;
 end;
 
 function TFormTypeEditor.GetDisplayedCoef: Double;
@@ -7322,6 +7378,7 @@ begin
   else
     cbCoefViewType.ItemIndex := -1;
   cbCoefViewType.Hint := cbCoefViewType.Text;
+  UpdateCoefUnitLabel;
   // =====================================================
   // == Коэффициент преобразования
   // =====================================================
@@ -7345,6 +7402,7 @@ begin
   // =====================================================
   // == Отношение расхода к частоте
   // =====================================================
+  UpdateFreqFlowRateUnitLabel;
   EditFreqFlowRate.Text := '';
   EditFreqFlowRate.TextPrompt := '';
   if FType.FreqFlowRate > 0 then

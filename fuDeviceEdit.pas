@@ -296,6 +296,8 @@ type
     procedure cbOutPutTypeChange(Sender: TObject);
     procedure EditFreqExit(Sender: TObject);
     procedure EditFreqFlowRateExit(Sender: TObject);
+    procedure EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure edtOwnerExit(Sender: TObject);
     procedure edtSerialNumberExit(Sender: TObject);
     procedure edtSerialNumberTyping(Sender: TObject);
@@ -803,6 +805,7 @@ begin
   Label49.Text := 'Мин расход, ' + FDevice.GetDimensionName;
   Label7.Text := 'Норм расход, ' + FDevice.GetDimensionName;
   Label4.Text := 'Переход расход, ' + FDevice.GetDimensionName;
+  Label38.Text := 'Расход, QF, ' + FDevice.GetDimensionName;
 
   // ===== Критерий остановки =====
   FillSpillageStopVolume;
@@ -1109,6 +1112,7 @@ begin
   StringColumnPointVolume.Header := 'M, кг';
   Label47.Text := 'Макс расход, ' + FDevice.GetDimensionName;
   Label49.Text := 'Мин расход, ' + FDevice.GetDimensionName;
+  Label38.Text := 'Расход, QF, ' + FDevice.GetDimensionName;
 
   // ===== Критерий остановки =====
   FillSpillageStopMass;
@@ -2096,6 +2100,8 @@ end;
 
 procedure TFormDeviceEditor.UpdateUIFreq;
 begin
+    if (Label38 <> nil) and (FDevice <> nil) then
+      Label38.Text := 'Расход, QF, ' + FDevice.GetDimensionName;
 
     // =====================================================
     // == Частота
@@ -2952,10 +2958,26 @@ begin
   SetModified;
 end;
 
+procedure TFormDeviceEditor.EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key <> vkReturn then
+    Exit;
+
+  EditFreqFlowRateExit(EditFreqFlowRate);
+  Key := 0;
+  KeyChar := #0;
+  if GridPoints <> nil then
+    GridPoints.SetFocus
+  else
+    EditFreqFlowRate.SetFocus;
+end;
+
 procedure TFormDeviceEditor.EditFreqFlowRateExit(Sender: TObject);
 var
   NewRate: Double;
 begin
+
   if FLoading then
     Exit;
 
