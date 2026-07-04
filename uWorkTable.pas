@@ -779,9 +779,10 @@ begin
      (AChannel.FlowMeter.Device.Points = nil) then
     Exit;
 
-  if AWorkTable.CurrentPoint.ID <> 0 then
+  if Trim(AWorkTable.CurrentPoint.UUID) <> '' then
     for DevicePoint in AChannel.FlowMeter.Device.Points do
-      if (DevicePoint <> nil) and (DevicePoint.ID = AWorkTable.CurrentPoint.ID) then
+      if (DevicePoint <> nil) and
+         SameText(Trim(DevicePoint.UUID), Trim(AWorkTable.CurrentPoint.UUID)) then
         Exit(DevicePoint);
 
   if Trim(AWorkTable.CurrentPoint.Name) <> '' then

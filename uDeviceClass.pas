@@ -1820,6 +1820,7 @@ begin
   if FullAssign then
   begin
   ID := ASource.ID;
+  UUID := ASource.UUID;
   DeviceID := ASource.DeviceID;
   DeviceUUID := ASource.DeviceUUID;
   end;
