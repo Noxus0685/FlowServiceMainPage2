@@ -720,6 +720,33 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+
+  function CalcImpDelta(AChannel: TChannel): Double;
+  var
+    BaseImpDelta: Double;
+    CurrentError: Double;
+    AllowedError: Double;
+    MatchedPoint: TDevicePoint;
+  begin
+    Result := Random(11) - 5;
+    MatchedPoint := FindMatchedDevicePoint(AWorkTable, AChannel);
+    if (MatchedPoint = nil) or (AChannel = nil) or (AChannel.FlowMeter = nil) or
+       (AChannel.FlowMeter.ValueError = nil) then
+      Exit;
+
+    BaseImpDelta := Result;
+    if SameValue(BaseImpDelta, 0) then
+      BaseImpDelta := 1;
+
+    BaseImpDelta := Abs(BaseImpDelta);
+    CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
+    AllowedError := MatchedPoint.Error;
+
+    if CurrentError > AllowedError then
+      Result := -BaseImpDelta
+    else
+      Result := BaseImpDelta;
+  end;
 begin
   if AWorkTable = nil then
     Exit;
@@ -733,7 +760,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDelta(Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
@@ -756,7 +783,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDelta(Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);

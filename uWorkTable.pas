@@ -749,6 +749,8 @@ type
 
   end;
 
+function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel): TDevicePoint;
+
   var WorkTableManager:   TWorkTableManager;
 
 implementation
@@ -764,6 +766,28 @@ const
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
 
   {$REGION 'HELPERS'}
+
+function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel): TDevicePoint;
+var
+  DevicePoint: TDevicePoint;
+begin
+  Result := nil;
+
+  if (AWorkTable = nil) or (AWorkTable.CurrentPoint = nil) or
+     (AChannel = nil) or (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.Device = nil) or
+     (AChannel.FlowMeter.Device.Points = nil) then
+    Exit;
+
+  for DevicePoint in AChannel.FlowMeter.Device.Points do
+    if (DevicePoint <> nil) and
+       (((AWorkTable.CurrentPoint.ID <> 0) and
+         (DevicePoint.ID = AWorkTable.CurrentPoint.ID)) or
+        ((AWorkTable.CurrentPoint.ID = 0) and
+         (Trim(AWorkTable.CurrentPoint.Name) <> '') and
+         SameText(DevicePoint.Name, AWorkTable.CurrentPoint.Name))) then
+      Exit(DevicePoint);
+end;
 
 class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
   const AAction: string; ADevice: TDevice; AChannel: TChannel);
@@ -5863,6 +5887,33 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+
+  function CalcImpDelta(AChannel: TChannel): Double;
+  var
+    BaseImpDelta: Double;
+    CurrentError: Double;
+    AllowedError: Double;
+    MatchedPoint: TDevicePoint;
+  begin
+    Result := Random(11) - 5;
+    MatchedPoint := FindMatchedDevicePoint(AWorkTable, AChannel);
+    if (MatchedPoint = nil) or (AChannel = nil) or (AChannel.FlowMeter = nil) or
+       (AChannel.FlowMeter.ValueError = nil) then
+      Exit;
+
+    BaseImpDelta := Result;
+    if SameValue(BaseImpDelta, 0) then
+      BaseImpDelta := 1;
+
+    BaseImpDelta := Abs(BaseImpDelta);
+    CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
+    AllowedError := MatchedPoint.Error;
+
+    if CurrentError > AllowedError then
+      Result := -BaseImpDelta
+    else
+      Result := BaseImpDelta;
+  end;
 begin
   if AWorkTable = nil then
     Exit;
@@ -5876,7 +5927,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDelta(Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
@@ -5899,7 +5950,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDelta(Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
