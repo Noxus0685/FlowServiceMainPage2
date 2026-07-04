@@ -784,6 +784,7 @@ type
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
+    function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -2088,10 +2089,16 @@ begin
   if FActiveWorkTable = nil then
     Exit;
 
+  if (FActiveWorkTable.ValueFlowRate = nil) or (FActiveWorkTable.FlowRate = nil) then
+    Exit;
+
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
+  FActiveWorkTable.ResetSpillageRuntimeValues;
   ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход', Format('Q=%.3f', [AValue]));
+  ProtocolManager.AddMessage(pcAction, psForm, 'ResetSpillageTimer',
+    'Сброшен таймер текущей проливки после задания расхода', FActiveWorkTable.Name);
   UpdateUIFlowRate;
 end;
 
@@ -5604,6 +5611,60 @@ begin
   Result := GRID_DEVICE_GROUP_COLORS[Abs(AGroup) mod Length(GRID_DEVICE_GROUP_COLORS)];
 end;
 
+function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
+  const AText: string; out AColor: TAlphaColor): Boolean;
+var
+  S: string;
+  ActualError: Double;
+  AllowedError: Double;
+  DevicePoint: TDevicePoint;
+  MatchedPoint: TDevicePoint;
+begin
+  Result := False;
+  AColor := TAlphaColors.Null;
+
+  S := Trim(AText);
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.Device = nil) or (S = '') or (S = '-') then
+    Exit;
+
+  S := StringReplace(S, '%', '', [rfReplaceAll]);
+  S := StringReplace(S, '±', '', [rfReplaceAll]);
+  S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+  S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+  if not TryStrToFloat(Trim(S), ActualError) then
+    Exit;
+
+  MatchedPoint := nil;
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
+     (AChannel.FlowMeter.Device.Points <> nil) then
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
+           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
+          ((FActiveWorkTable.CurrentPoint.ID = 0) and
+           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
+           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
+      begin
+        MatchedPoint := DevicePoint;
+        Break;
+      end;
+
+  if MatchedPoint <> nil then
+    AllowedError := Abs(MatchedPoint.Error)
+  else
+    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
+
+  if AllowedError <= 0 then
+    Exit;
+
+  Result := True;
+  if Abs(ActualError) > AllowedError then
+    AColor := TAlphaColorRec.Lightyellow
+  else
+    AColor := $FFE6F4E6;
+end;
+
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
   const Column: TColumn; const Bounds: TRectF; const Row: Integer;
   const Value: TValue; const State: TGridDrawStates);
@@ -5611,6 +5672,7 @@ var
   Channel: TChannel;
   CellColor: TAlphaColor;
   IsChannelColumn: Boolean;
+  NeedCustomDraw: Boolean;
 begin
   IsChannelColumn := Column = StringColumnDeviceChanel1;
   if Odd(Row) then
@@ -5626,8 +5688,17 @@ begin
       CellColor := GetDeviceGroupColor(Channel.Group);
   end;
 
+  if (Column = StringColumnDeviceError1) and (FActiveWorkTable <> nil) and
+     (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) and
+     (FActiveWorkTable.DeviceChannels[Row] <> nil) then
+    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row],
+      Value.ToString, CellColor);
+
+  NeedCustomDraw := (Column = StringColumnDeviceError1) or IsChannelColumn or
+    (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row);
+
   if (not (Column is TCheckColumn)) and
-     (IsChannelColumn or (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row)) then
+     NeedCustomDraw then
   begin
     Canvas.Fill.Kind := TBrushKind.Solid;
     Canvas.Fill.Color := CellColor;
@@ -6408,6 +6479,7 @@ begin
     if Channel <> nil then
       CellColor := GetEtalonGroupColor(Channel.Group);
   end;
+
 
   if CellColor <> TAlphaColors.Null then
   begin

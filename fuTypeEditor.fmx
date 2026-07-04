@@ -1,4 +1,4 @@
-object FormTypeEditor: TFormTypeEditor
+﻿object FormTypeEditor: TFormTypeEditor
   Left = 0
   Top = 0
   Caption = 'fuTypeEditor'
@@ -1387,6 +1387,7 @@ object FormTypeEditor: TFormTypeEditor
               ParentShowHint = False
               ShowHint = True
               OnExit = EditFreqFlowRateExit
+              OnKeyDown = EditFreqFlowRateKeyDown
               Left = 276
               Top = 15
             end
