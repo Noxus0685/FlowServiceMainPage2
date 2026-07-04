@@ -190,10 +190,17 @@ type
     function HasDeviceInProcessing(ADevice: TDevice): Boolean;
     procedure AddProcessingDevice(ADevice: TDevice);
     procedure RemoveProcessingDevice(ADevice: TDevice);
+    procedure MarkProcessingDeviceRemoved(ADevice: TDevice);
+    procedure ApplyProcessingDeviceRemovals;
+    function IsProcessingDevicePendingRemoved(ADevice: TDevice): Boolean;
     procedure MarkProcessingDeviceDeleted(ADevice: TDevice);
     function GetDeviceSpillageCount(ADevice: TDevice): Integer;
     procedure SaveProcessingPointCounts;
     procedure SaveProcessingDevices;
+    procedure LoadManualProcessingDevices;
+    procedure SaveManualProcessingDevices;
+    procedure MarkProcessingDeviceManual(ADevice: TDevice);
+    function IsManualProcessingDevice(ADevice: TDevice): Boolean;
     procedure SavePendingProcessingChanges(Sender: TObject);
     procedure CancelProcessingChanges;
     procedure LoadProcessingDevices;
@@ -201,6 +208,7 @@ type
     procedure AddProcessingDeviceFromSelection;
     procedure DbgProceedTree(const ACode: Integer; const AText: string);
     function GetSelectedTreeDebugText: string;
+    function GetProcessingDevicesDebugText: string;
     procedure RefreshResultsAfterDevicesAction;
     function FindTreeItemByTagObject(ATagObject: TObject): TTreeViewItem;
     procedure SelectTreeItemByTagObject(ATagObject: TObject);
@@ -278,6 +286,8 @@ type
     FFrameCalibrCoefs: TFrameCalibrCoefs;
     FWorkTableManager: TWorkTableManager;
     FProcessingDevices: TObjectList<TDevice>;
+    FManualProcessingDeviceUUIDs: TStringList;
+    FPendingRemovedProcessingUUIDs: TStringList;
     FCurrentSession: TSessionSpillage;
     FCurrentResultRows: TArray<TResultGridRow>;
     FCurrentSpillages: TArray<TPointSpillage>;
@@ -305,6 +315,7 @@ const
   CProcessingDevicesCountKey = 'Count';
   CProcessingDevicesItemKeyPrefix = 'Item';
   CProcessingDevicePointCountsSection = 'ProcessingDevicePointCounts';
+  CManualProcessingDevicesSection = 'ManualProcessingDevices';
   CVolumeFlowUnits: array[0..4] of string = ('л/с','л/мин','л/ч','м3/мин','м3/ч');
   CMassFlowUnits: array[0..4] of string = ('кг/с','кг/мин','кг/ч','т/мин','т/ч');
 
@@ -350,6 +361,8 @@ begin
   FreeAndNil(FSessionDevice);
   FreeAndNil(FSessionEtalon);
   FreeAndNil(FProcessingDevices);
+  FreeAndNil(FManualProcessingDeviceUUIDs);
+  FreeAndNil(FPendingRemovedProcessingUUIDs);
   inherited;
 end;
 
@@ -362,6 +375,18 @@ begin
 
   if FProcessingDevices = nil then
     FProcessingDevices := TObjectList<TDevice>.Create(False);
+  if FManualProcessingDeviceUUIDs = nil then
+  begin
+    FManualProcessingDeviceUUIDs := TStringList.Create;
+    FManualProcessingDeviceUUIDs.Sorted := False;
+    FManualProcessingDeviceUUIDs.Duplicates := dupIgnore;
+  end;
+  if FPendingRemovedProcessingUUIDs = nil then
+  begin
+    FPendingRemovedProcessingUUIDs := TStringList.Create;
+    FPendingRemovedProcessingUUIDs.Sorted := False;
+    FPendingRemovedProcessingUUIDs.Duplicates := dupIgnore;
+  end;
 
   if GridResults <> nil then
     GridResults.OnDrawColumnCell := GridResultsDrawColumnCell;
@@ -383,6 +408,7 @@ begin
     ComboBoxUnitsResult.ItemIndex := 0;
 
   LoadProcessingDevices;
+  LoadManualProcessingDevices;
   SyncProcessingDevicesWithNewPoints;
   InitCalibrCoefsFrame;
   RefreshResultsTab;
@@ -417,6 +443,57 @@ begin
     [Item.Text, Item.Count, BoolToStr(Item.IsExpanded, True)]
   );
 end;
+
+function TFrameProceed.GetProcessingDevicesDebugText: string;
+var
+  Device: TDevice;
+
+  function StateText(AState: uBaseProcedures.TObjectState): string;
+  begin
+    if AState = osEmpty then
+      Result := 'osEmpty'
+    else if AState = osLoading then
+      Result := 'osLoading'
+    else if AState = osClean then
+      Result := 'osClean'
+    else if AState = osNew then
+      Result := 'osNew'
+    else if AState = osModified then
+      Result := 'osModified'
+    else if AState = osDeleted then
+      Result := 'osDeleted'
+    else if AState = osSaving then
+      Result := 'osSaving'
+    else if AState = osSaved then
+      Result := 'osSaved'
+    else if AState = osError then
+      Result := 'osError'
+    else
+      Result := 'unknown';
+  end;
+
+begin
+  Result := 'ProcessingDevices=nil';
+  if FProcessingDevices = nil then
+    Exit;
+
+  Result := 'ProcessingDevices.Count=' + FProcessingDevices.Count.ToString;
+  for Device in FProcessingDevices do
+  begin
+    if Device = nil then
+    begin
+      Result := Result + sLineBreak + '  <nil>';
+      Continue;
+    end;
+
+    Result := Result + sLineBreak + Format(
+      '  Name=%s; UUID=%s; State=%s; Manual=%s; Sessions=%d; Spillages=%d',
+      [Device.Name, Device.UUID, StateText(Device.State),
+       BoolToStr(IsManualProcessingDevice(Device), True),
+       Device.Sessions.Count, Device.Spillages.Count]);
+  end;
+end;
+
 
 procedure TFrameProceed.RefreshResultsTab;
 begin
@@ -456,6 +533,10 @@ begin
      (ADevice.State = osDeleted) then
     Exit;
 
+  if (FPendingRemovedProcessingUUIDs <> nil) and
+     (FPendingRemovedProcessingUUIDs.IndexOf(Trim(ADevice.UUID)) >= 0) then
+    FPendingRemovedProcessingUUIDs.Delete(FPendingRemovedProcessingUUIDs.IndexOf(Trim(ADevice.UUID)));
+
   if HasDeviceInProcessing(ADevice) then
     Exit;
 
@@ -466,6 +547,7 @@ end;
 procedure TFrameProceed.RemoveProcessingDevice(ADevice: TDevice);
 var
   Existing: TDevice;
+  ManualIndex: Integer;
 begin
   if (ADevice = nil) or (FProcessingDevices = nil) then
     Exit;
@@ -474,8 +556,141 @@ begin
   if Existing = nil then
     Exit;
 
+  // FProcessingDevices stores references to desktop/worktable devices.
+  // Removing from processing must only drop the processing reference;
+  // do not change Existing.State or sessions/points here.
   FProcessingDevices.Remove(Existing);
+
+  if FManualProcessingDeviceUUIDs <> nil then
+  begin
+    ManualIndex := FManualProcessingDeviceUUIDs.IndexOf(Trim(ADevice.UUID));
+    if ManualIndex >= 0 then
+      FManualProcessingDeviceUUIDs.Delete(ManualIndex);
+  end;
 end;
+
+function TFrameProceed.IsProcessingDevicePendingRemoved(ADevice: TDevice): Boolean;
+begin
+  Result := (ADevice <> nil) and (FPendingRemovedProcessingUUIDs <> nil) and
+    (FPendingRemovedProcessingUUIDs.IndexOf(Trim(ADevice.UUID)) >= 0);
+end;
+
+procedure TFrameProceed.MarkProcessingDeviceRemoved(ADevice: TDevice);
+var
+  DeviceUUID: string;
+begin
+  if (ADevice = nil) or (FPendingRemovedProcessingUUIDs = nil) then
+    Exit;
+
+  DeviceUUID := Trim(ADevice.UUID);
+  if DeviceUUID = '' then
+    Exit;
+
+  if FPendingRemovedProcessingUUIDs.IndexOf(DeviceUUID) < 0 then
+    FPendingRemovedProcessingUUIDs.Add(DeviceUUID);
+
+  RefreshResultsAfterDevicesAction;
+end;
+
+procedure TFrameProceed.ApplyProcessingDeviceRemovals;
+var
+  I: Integer;
+  Device: TDevice;
+begin
+  if FPendingRemovedProcessingUUIDs = nil then
+    Exit;
+
+  for I := FPendingRemovedProcessingUUIDs.Count - 1 downto 0 do
+  begin
+    Device := FindProcessingDeviceByUUID(FPendingRemovedProcessingUUIDs[I]);
+    if Device <> nil then
+      RemoveProcessingDevice(Device);
+  end;
+
+end;
+
+function TFrameProceed.IsManualProcessingDevice(ADevice: TDevice): Boolean;
+begin
+  Result := (ADevice <> nil) and (FManualProcessingDeviceUUIDs <> nil) and
+    (FManualProcessingDeviceUUIDs.IndexOf(Trim(ADevice.UUID)) >= 0);
+end;
+
+procedure TFrameProceed.MarkProcessingDeviceManual(ADevice: TDevice);
+var
+  DeviceUUID: string;
+begin
+  if (ADevice = nil) or (FManualProcessingDeviceUUIDs = nil) then
+    Exit;
+
+  DeviceUUID := Trim(ADevice.UUID);
+  if DeviceUUID = '' then
+    Exit;
+
+  if FManualProcessingDeviceUUIDs.IndexOf(DeviceUUID) < 0 then
+    FManualProcessingDeviceUUIDs.Add(DeviceUUID);
+end;
+
+procedure TFrameProceed.LoadManualProcessingDevices;
+var
+  Ini: TIniFile;
+  I, Count: Integer;
+  DeviceUUID: string;
+begin
+  if FManualProcessingDeviceUUIDs = nil then
+    Exit;
+
+  FManualProcessingDeviceUUIDs.Clear;
+
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (not FileExists(FWorkTableManager.IniFileName)) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    Count := Ini.ReadInteger(CManualProcessingDevicesSection, CProcessingDevicesCountKey, 0);
+    for I := 0 to Count - 1 do
+    begin
+      DeviceUUID := Trim(Ini.ReadString(CManualProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(I), ''));
+      if (DeviceUUID <> '') and
+         (FManualProcessingDeviceUUIDs.IndexOf(DeviceUUID) < 0) then
+        FManualProcessingDeviceUUIDs.Add(DeviceUUID);
+    end;
+  finally
+    Ini.Free;
+  end;
+end;
+
+procedure TFrameProceed.SaveManualProcessingDevices;
+var
+  Ini: TIniFile;
+  I, SaveIndex: Integer;
+  DeviceUUID: string;
+begin
+  if (FWorkTableManager = nil) or (Trim(FWorkTableManager.IniFileName) = '') or
+     (FManualProcessingDeviceUUIDs = nil) then
+    Exit;
+
+  Ini := TIniFile.Create(FWorkTableManager.IniFileName);
+  try
+    Ini.EraseSection(CManualProcessingDevicesSection);
+    SaveIndex := 0;
+    for I := 0 to FManualProcessingDeviceUUIDs.Count - 1 do
+    begin
+      DeviceUUID := Trim(FManualProcessingDeviceUUIDs[I]);
+      if (DeviceUUID = '') or (FindProcessingDeviceByUUID(DeviceUUID) = nil) then
+        Continue;
+
+      Ini.WriteString(CManualProcessingDevicesSection,
+        CProcessingDevicesItemKeyPrefix + IntToStr(SaveIndex), DeviceUUID);
+      Inc(SaveIndex);
+    end;
+    Ini.WriteInteger(CManualProcessingDevicesSection, CProcessingDevicesCountKey, SaveIndex);
+  finally
+    Ini.Free;
+  end;
+end;
+
 procedure TFrameProceed.MarkProcessingDeviceDeleted(ADevice: TDevice);
 var
   Session: TSessionSpillage;
@@ -581,7 +796,8 @@ begin
     for I := 0 to FProcessingDevices.Count - 1 do
     begin
       Device := FProcessingDevices[I];
-      if (Device = nil) or (Trim(Device.UUID) = '') then
+      if (Device = nil) or (Trim(Device.UUID) = '') or
+         (Device.State = osDeleted) then
         Continue;
 
       DbgProceedTree(1412, 'SaveProcessingDevices item: ' + Device.Name + #13#10 + Device.UUID);
@@ -597,6 +813,7 @@ begin
   end;
 
   SaveProcessingPointCounts;
+  SaveManualProcessingDevices;
 end;
 
 
@@ -629,6 +846,7 @@ begin
   if (DM = nil) or (DM.DeviceRepositories = nil) then
     Exit;
 
+  ApplyProcessingDeviceRemovals;
   SaveProcessingDevices;
 
   for Repo in DM.DeviceRepositories do
@@ -645,8 +863,11 @@ end;
 procedure TFrameProceed.CancelProcessingChanges;
 var
   Repo: TDeviceRepository;
+  Device: TDevice;
   SelectedTag: string;
   SelectedItem: TTreeViewItem;
+  HadPendingRemovals: Boolean;
+  HasDeletedDevices: Boolean;
 
   function FindTreeItemByTagString(AParent: TTreeViewItem;
     const ATagString: string): TTreeViewItem;
@@ -685,9 +906,42 @@ var
   end;
 
 begin
+  DbgProceedTree(1801, 'CancelProcessingChanges ENTER'#13#10 +
+    GetSelectedTreeDebugText + #13#10 + GetProcessingDevicesDebugText);
+
+  HadPendingRemovals := (FPendingRemovedProcessingUUIDs <> nil) and
+    (FPendingRemovedProcessingUUIDs.Count > 0);
+  HasDeletedDevices := False;
+  if FProcessingDevices <> nil then
+    for Device in FProcessingDevices do
+      if (Device <> nil) and (Device.State = osDeleted) then
+      begin
+        HasDeletedDevices := True;
+        Break;
+      end;
+
+  if FPendingRemovedProcessingUUIDs <> nil then
+    FPendingRemovedProcessingUUIDs.Clear;
+
+  if HadPendingRemovals and (not HasDeletedDevices) then
+  begin
+    RefreshResultsAfterDevicesAction;
+    DbgProceedTree(1804, 'CancelProcessingChanges EXIT pending removals only'#13#10 +
+      GetSelectedTreeDebugText + #13#10 + GetProcessingDevicesDebugText);
+    Exit;
+  end;
+
   SelectedTag := '';
   if (TreeViewDevices <> nil) and (TreeViewDevices.Selected <> nil) then
     SelectedTag := TreeViewDevices.Selected.TagString;
+
+  if FProcessingDevices <> nil then
+    for Device in FProcessingDevices do
+      if (Device <> nil) and (Device.State = osDeleted) then
+        Device.State := osClean;
+
+  DbgProceedTree(1802, 'CancelProcessingChanges AFTER osClean restore'#13#10 +
+    GetProcessingDevicesDebugText);
 
   if FProcessingDevices <> nil then
     FProcessingDevices.Clear;
@@ -704,6 +958,9 @@ begin
         Repo.Load;
 
   LoadProcessingDevices;
+  LoadManualProcessingDevices;
+  DbgProceedTree(1803, 'CancelProcessingChanges AFTER reload'#13#10 +
+    GetProcessingDevicesDebugText);
   PopulateTreeViewDevices;
 
   SelectedItem := FindTreeItemBySavedTag(SelectedTag);
@@ -717,6 +974,9 @@ begin
     ShowDeviceSpillages(TDevice(SelectedItem.TagObject))
   else
     ShowAllDevicesResults;
+
+  DbgProceedTree(1804, 'CancelProcessingChanges EXIT'#13#10 +
+    GetSelectedTreeDebugText + #13#10 + GetProcessingDevicesDebugText);
 end;
 
 procedure TFrameProceed.CaptureGridColumnsLayout(AGrid: TGrid;
@@ -793,6 +1053,7 @@ begin
 
     DbgProceedTree(1109, 'Before AddProcessingDevice: ' + SelDevice.Name + #13#10 + SelDevice.UUID);
     AddProcessingDevice(SelDevice);
+    MarkProcessingDeviceManual(SelDevice);
     DbgProceedTree(1110, 'After AddProcessingDevice'#13#10 + GetSelectedTreeDebugText);
     DbgProceedTree(1111, 'Before PopulateTreeViewDevices from AddProcessingDeviceFromSelection');
     PopulateTreeViewDevices;
@@ -809,12 +1070,17 @@ end;
 
 procedure TFrameProceed.btnCancelClick(Sender: TObject);
 begin
+  DbgProceedTree(1811, 'btnCancelClick'#13#10 + GetProcessingDevicesDebugText);
   CancelProcessingChanges;
 end;
 
 procedure TFrameProceed.btnOKClick(Sender: TObject);
 begin
-  CancelProcessingChanges;
+   FPendingRemovedProcessingUUIDs.Clear;
+  //ApplyProcessingDeviceRemovals;
+  //SaveProcessingDevices;
+  PopulateTreeViewDevices;
+   RefreshResultsTab;
 end;
 
 procedure TFrameProceed.UpdateTreeViewDeviceTagObjects;
@@ -1169,7 +1435,8 @@ var
     Sess: TSessionSpillage;
     Point: TPointSpillage;
   begin
-    if (AParent = nil) or (ADevice = nil) or (ADevice.State = osDeleted) then
+    if (AParent = nil) or (ADevice = nil) or (ADevice.State = osDeleted) or
+       IsProcessingDevicePendingRemoved(ADevice) then
       Exit;
 
     DeviceItem := TTreeViewItem.Create(TreeViewDevices);
@@ -1267,7 +1534,8 @@ begin
 
       if FProcessingDevices <> nil then
         for Device in FProcessingDevices do
-          if (Device <> nil) and (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
+          if (Device <> nil) and IsManualProcessingDevice(Device) and
+             (ProcessedOnTables.IndexOf(Device.UUID) < 0) then
           begin
             DbgProceedTree(1205, 'Add device to OTHER: ' + Device.Name + #13#10 + Device.UUID);
             AddDeviceNode(RootOther, Device);
@@ -1434,7 +1702,8 @@ begin
   try
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
-        if Device <> nil then
+        if (Device <> nil) and (Device.State <> osDeleted) and
+           (not IsProcessingDevicePendingRemoved(Device)) then
           Devices.Add(Device);
 
     ShowDevicesResults(Devices);
@@ -1462,7 +1731,8 @@ begin
     if ADevices <> nil then
       for Device in ADevices do
       begin
-        if Device = nil then
+        if (Device = nil) or (Device.State = osDeleted) or
+           IsProcessingDevicePendingRemoved(Device) then
           Continue;
 
         Device.AnalyseResults;
@@ -1613,7 +1883,8 @@ begin
 
     if FProcessingDevices <> nil then
       for Device in FProcessingDevices do
-        if (Device <> nil) and
+        if (Device <> nil) and (Device.State <> osDeleted) and
+           IsManualProcessingDevice(Device) and
            (DeviceUUIDsOnTables.IndexOf(Trim(Device.UUID)) < 0) then
           Devices.Add(Device);
 
@@ -1969,6 +2240,8 @@ begin
   if SameText(Item.Text, '...') then
   begin
     FProcessingDevices.Clear;
+    if FManualProcessingDeviceUUIDs <> nil then
+      FManualProcessingDeviceUUIDs.Clear;
     SaveProcessingDevices;
     RefreshResultsAfterDevicesAction;
     Exit;
@@ -2333,9 +2606,8 @@ begin
   if not (Item.TagObject is TDevice) then
     Exit;
 
-  RemoveProcessingDevice(TDevice(Item.TagObject));
-  SaveProcessingDevices;
-  RefreshResultsAfterDevicesAction;
+  Device := TDevice(Item.TagObject);
+  MarkProcessingDeviceRemoved(Device);
 end;
 procedure TFrameProceed.ActionSessionDeleteExecute(Sender: TObject);
 var
@@ -2356,9 +2628,7 @@ begin
         TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes then
       Exit;
 
-    RemoveProcessingDevice(Device);
-    SaveProcessingDevices;
-    RefreshResultsAfterDevicesAction;
+    MarkProcessingDeviceRemoved(Device);
     Exit;
   end;
 
@@ -2444,9 +2714,7 @@ begin
     Exit;
 
   Device := TDevice(Item.TagObject);
-  RemoveProcessingDevice(Device);
-  SaveProcessingDevices;
-  RefreshResultsAfterDevicesAction;
+  MarkProcessingDeviceRemoved(Device);
 end;
 procedure TFrameProceed.ActionSessionCloseExecute(Sender: TObject);
 var
@@ -2664,7 +2932,8 @@ end;
 
 procedure TFrameProceed.TreeViewDevicesChange(Sender: TObject);
 begin
-  DbgProceedTree(1601, 'TreeViewDevicesChange ENTER'#13#10 + GetSelectedTreeDebugText);
+  DbgProceedTree(1601, 'TreeViewDevicesChange ENTER'#13#10 +
+    GetSelectedTreeDebugText + #13#10 + GetProcessingDevicesDebugText);
   UpdateSessionItems;
   UpdateCalibrCoefsFrame;
 end;
@@ -2703,8 +2972,8 @@ var
   end;
 
 begin
-  DbgProceedTree(1602, Format('TreeViewDevicesMouseDown ENTER; Button=%d; X=%.0f; Y=%.0f'#13#10'%s',
-    [Ord(Button), X, Y, GetSelectedTreeDebugText]));
+  DbgProceedTree(1602, Format('TreeViewDevicesMouseDown ENTER; Button=%d; X=%.0f; Y=%.0f'#13#10'%s'#13#10'%s',
+    [Ord(Button), X, Y, GetSelectedTreeDebugText, GetProcessingDevicesDebugText]));
   if (Button <> TMouseButton.mbRight) or (TreeViewDevices = nil) then
     Exit;
 
@@ -2716,7 +2985,8 @@ begin
     begin
       DbgProceedTree(1603, 'TreeViewDevicesMouseDown selects item: ' + Item.Text +
         '; Count=' + Item.Count.ToString +
-        '; Expanded=' + BoolToStr(Item.IsExpanded, True));
+        '; Expanded=' + BoolToStr(Item.IsExpanded, True) + #13#10 +
+        GetProcessingDevicesDebugText);
       TreeViewDevices.Selected := Item;
       Exit;
     end;
@@ -2814,6 +3084,7 @@ begin
 end;
 procedure TFrameProceed.ButtonSessionCancelClick(Sender: TObject);
 begin
+  DbgProceedTree(1812, 'ButtonSessionCancelClick'#13#10 + GetProcessingDevicesDebugText);
   CancelProcessingChanges;
 end;
 procedure TFrameProceed.ButtonSessionClearPointsClick(Sender: TObject);
@@ -2965,8 +3236,7 @@ begin
     Device := GetSelectedResultDevice;
     if Device <> nil then
     begin
-      RemoveProcessingDevice(Device);
-      RefreshResultsAfterDevicesAction;
+      MarkProcessingDeviceRemoved(Device);
     end;
     Exit;
   end;
@@ -2977,8 +3247,7 @@ begin
       Exit;
 
     ResetPointDeleteConfirm;
-    RemoveProcessingDevice(TDevice(Item.TagObject));
-    RefreshResultsAfterDevicesAction;
+    MarkProcessingDeviceRemoved(TDevice(Item.TagObject));
     Exit;
   end;
 
