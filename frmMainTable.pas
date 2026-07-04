@@ -5660,7 +5660,7 @@ begin
 
   Result := True;
   if Abs(ActualError) > AllowedError then
-    AColor := $FFFFE6E6
+    AColor := TAlphaColorRec.Lightyellow
   else
     AColor := $FFE6F4E6;
 end;
@@ -6480,11 +6480,6 @@ begin
       CellColor := GetEtalonGroupColor(Channel.Group);
   end;
 
-  if (Column = StringColumnEtalonError1) and (FActiveWorkTable <> nil) and
-     (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) and
-     (FActiveWorkTable.EtalonChannels[Row] <> nil) then
-    GetErrorCellColor(FActiveWorkTable.EtalonChannels[Row],
-      Value.ToString, CellColor);
 
   if CellColor <> TAlphaColors.Null then
   begin
