@@ -135,6 +135,7 @@ type
     Layout2: TLayout;
     Label14: TLabel;
     EditCoef: TEdit;
+    LabelEditCoefUnit: TLabel;
     Layout9: TLayout;
     Label15: TLabel;
     cbCoefViewType: TComboBox;
@@ -349,6 +350,8 @@ type
     procedure cbOutPutType2Change(Sender: TObject);
     procedure cbCoefViewTypeChange(Sender: TObject);
     procedure EditCoefExit(Sender: TObject);
+    procedure EditCoefKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
+      Shift: TShiftState);
     procedure EditFreqFlowRateExit(Sender: TObject);
     procedure EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
@@ -3804,6 +3807,7 @@ begin
 
   // сохраняем тип представления
   FType.DimensionCoef := ViewType;
+  UpdateCoefUnitLabel;
 
   // базовый коэффициент всегда хранится как имп/л (имп/кг)
   if FType.Coef <= 0 then
@@ -4626,6 +4630,21 @@ begin
 
 
 
+end;
+
+procedure TFormTypeEditor.EditCoefKeyDown(Sender: TObject; var Key: Word;
+  var KeyChar: Char; Shift: TShiftState);
+begin
+  if Key <> vkReturn then
+    Exit;
+
+  EditCoefExit(EditCoef);
+  Key := 0;
+  KeyChar := #0;
+  if GridDiameters <> nil then
+    GridDiameters.SetFocus
+  else
+    Self.SetFocus;
 end;
 
 procedure TFormTypeEditor.RecalcDiametersKpByFreq;
@@ -7265,6 +7284,7 @@ procedure TFormTypeEditor.UpdateCoefEdit;
 var
   V: Double;
 begin
+  UpdateCoefUnitLabel;
   V := FType.Coef;
 
   if V <= 0 then
@@ -7352,6 +7372,7 @@ begin
   else
     cbCoefViewType.ItemIndex := -1;
   cbCoefViewType.Hint := cbCoefViewType.Text;
+  UpdateCoefUnitLabel;
   // =====================================================
   // == Коэффициент преобразования
   // =====================================================
