@@ -1420,8 +1420,16 @@ begin
       if P = nil then
         Continue;
       NewP := TDevicePoint.Create(ID);
-      NewP.Assign(P, True);
-      NewP.State := P.State;
+      NewP.Assign(P, FullAssign);
+      if FullAssign then
+        NewP.State := P.State
+      else
+      begin
+        NewP.ID := TEntityHelpers<TDevicePoint>.NextID(FPoints);
+        NewP.DeviceID := ID;
+        NewP.DeviceUUID := UUID;
+        NewP.State := osNew;
+      end;
       FPoints.Add(NewP);
     end;
 end;
