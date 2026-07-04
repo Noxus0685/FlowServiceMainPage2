@@ -437,7 +437,7 @@ function TFrameProceed.GetProcessingDevicesDebugText: string;
 var
   Device: TDevice;
 
-  function StateText(AState: TObjectState): string;
+  function StateText(AState: uBaseProcedures.TObjectState): string;
   begin
     if AState = osEmpty then
       Result := 'osEmpty'
