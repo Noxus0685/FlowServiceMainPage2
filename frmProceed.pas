@@ -58,6 +58,7 @@ type
     PointNames: TArray<string>;
     PointValues: TArray<string>;
     PointStatuses: TArray<Integer>;
+    PointColors: TArray<TAlphaColor>;
     ResultText: string;
     ResultStatus: Integer;
   end;
@@ -218,7 +219,9 @@ type
     function BuildResultTextByStatus(const AStatus: Integer): string;
     procedure UpdateResultsPointColumns;
     function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
+    function GetSummaryResultCellColor(const ARow: TResultGridRow; APoint: TDevicePoint; const ACellValue: string; out AColor: TAlphaColor): Boolean;
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
+    procedure LogSummaryResultColor(const ARow: TResultGridRow; APoint: TDevicePoint; const ACellValue: string; const AActualErrorParsed, AMatchedPointFound: Boolean; const AAllowedError, AGrayLimitPercent: Double; const AColorName, AReason: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
     procedure ShowWorkTableResults(AWorkTable: TWorkTable);
@@ -1669,6 +1672,125 @@ begin
   end;
 end;
 
+
+procedure TFrameProceed.LogSummaryResultColor(const ARow: TResultGridRow;
+  APoint: TDevicePoint; const ACellValue: string; const AActualErrorParsed,
+  AMatchedPointFound: Boolean; const AAllowedError, AGrayLimitPercent: Double;
+  const AColorName, AReason: string);
+var
+  PointName: string;
+  PointDeviceTypeUUID: string;
+begin
+  PointName := '';
+  PointDeviceTypeUUID := '';
+  if APoint <> nil then
+  begin
+    PointName := APoint.Name;
+    PointDeviceTypeUUID := APoint.DeviceTypeUUID;
+  end;
+
+  LogMKS('DBG SP 9103', 'SummaryResults COLOR',
+    Format('RowDeviceUUID=%s; RowSerial=%s; ColumnPointName=%s; ColumnPointDeviceTypeUUID=%s; CellValue=%s; ActualErrorParsed=%s; MatchedPointFound=%s; AllowedError=%g; GrayLimitPercent=%g; Color=%s; Reason=%s',
+      [ARow.DeviceUUID, ARow.Serial, PointName, PointDeviceTypeUUID, ACellValue,
+       BoolToStr(AActualErrorParsed, True), BoolToStr(AMatchedPointFound, True),
+       AAllowedError, AGrayLimitPercent, AColorName, AReason]));
+end;
+
+function TFrameProceed.GetSummaryResultCellColor(const ARow: TResultGridRow;
+  APoint: TDevicePoint; const ACellValue: string; out AColor: TAlphaColor): Boolean;
+var
+  S: string;
+  ActualError: Double;
+  AllowedError: Double;
+  GrayLimitPercent: Double;
+  AbsActualError: Double;
+  MatchedPoint: TDevicePoint;
+  I: Integer;
+
+  function ParseNumber(const AText: string; out AValue: Double): Boolean;
+  var
+    N: string;
+  begin
+    N := Trim(AText);
+    N := StringReplace(N, '%', '', [rfReplaceAll]);
+    N := StringReplace(N, '±', '', [rfReplaceAll]);
+    N := StringReplace(N, '+', '', [rfReplaceAll]);
+    N := StringReplace(N, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+    N := StringReplace(N, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+    Result := TryStrToFloat(N, AValue);
+  end;
+
+  function ColorName(const AColor: TAlphaColor): string;
+  begin
+    if AColor = TAlphaColorRec.Lightyellow then
+      Result := 'YELLOW'
+    else if AColor = $FFE6F4E6 then
+      Result := 'GREEN'
+    else if AColor = TAlphaColorRec.Lightgray then
+      Result := 'GRAY'
+    else
+      Result := 'NONE';
+  end;
+
+begin
+  Result := False;
+  AColor := TAlphaColors.Null;
+  AllowedError := 0;
+  GrayLimitPercent := 0;
+  MatchedPoint := nil;
+
+  S := Trim(ACellValue);
+  if (S = '') or (S = '-') then
+  begin
+    LogSummaryResultColor(ARow, APoint, ACellValue, False, False, 0, 0, 'NONE', 'EmptyCellValue');
+    Exit;
+  end;
+
+  if not ParseNumber(S, ActualError) then
+  begin
+    LogSummaryResultColor(ARow, APoint, ACellValue, False, False, 0, 0, 'NONE', 'ParseError');
+    Exit;
+  end;
+
+  if (ARow.Device <> nil) and (ARow.Device.Points <> nil) and (APoint <> nil) then
+    for I := 0 to ARow.Device.Points.Count - 1 do
+      if (ARow.Device.Points[I] <> nil) and
+         (((Trim(APoint.DeviceTypeUUID) <> '') and SameText(Trim(ARow.Device.Points[I].DeviceTypeUUID), Trim(APoint.DeviceTypeUUID))) or
+          SameText(Trim(ARow.Device.Points[I].Name), Trim(APoint.Name))) then
+      begin
+        MatchedPoint := ARow.Device.Points[I];
+        Break;
+      end;
+
+  if MatchedPoint = nil then
+  begin
+    LogSummaryResultColor(ARow, APoint, ACellValue, True, False, 0, 0, 'NONE', 'MatchedPointNotFound');
+    Exit;
+  end;
+
+  AllowedError := Abs(MatchedPoint.Error);
+  ParseNumber(MatchedPoint.FlowAccuracy, GrayLimitPercent);
+  GrayLimitPercent := Abs(GrayLimitPercent);
+  AbsActualError := Abs(ActualError);
+
+  Result := True;
+  if (GrayLimitPercent > 0) and (AbsActualError > GrayLimitPercent) then
+  begin
+    AColor := TAlphaColorRec.Lightgray;
+    LogSummaryResultColor(ARow, APoint, ACellValue, True, True, AllowedError, GrayLimitPercent, ColorName(AColor), 'ErrorOverGrayLimit');
+  end
+  else if AbsActualError > AllowedError then
+  begin
+    AColor := TAlphaColorRec.Lightyellow;
+    LogSummaryResultColor(ARow, APoint, ACellValue, True, True, AllowedError, GrayLimitPercent, ColorName(AColor), 'ErrorOverPointTolerance');
+  end
+  else
+  begin
+    AColor := $FFE6F4E6;
+    LogSummaryResultColor(ARow, APoint, ACellValue, True, True, AllowedError, GrayLimitPercent, ColorName(AColor), 'ErrorInsideTolerance');
+  end;
+end;
+
 procedure TFrameProceed.LogResultCellDebug(const ARow: TResultGridRow;
   APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
 var
@@ -1753,6 +1875,7 @@ begin
           SetLength(Row.PointNames, Device.Points.Count);
           SetLength(Row.PointValues, Device.Points.Count);
           SetLength(Row.PointStatuses, Device.Points.Count);
+          SetLength(Row.PointColors, Device.Points.Count);
           for I := 0 to Device.Points.Count - 1 do
           begin
             P := Device.Points[I];
@@ -1776,12 +1899,14 @@ begin
                 Row.PointValues[I] := '-';
               end;
               LogResultCellDebug(Row, P, Spillage, Row.PointValues[I]);
+              GetSummaryResultCellColor(Row, P, Row.PointValues[I], Row.PointColors[I]);
             end
             else
             begin
               Row.PointNames[I] := '';
               Row.PointStatuses[I] := 1;
               Row.PointValues[I] := '-';
+              Row.PointColors[I] := TAlphaColors.Null;
             end;
           end;
         end
@@ -1790,6 +1915,7 @@ begin
           SetLength(Row.PointNames, 0);
           SetLength(Row.PointValues, 0);
           SetLength(Row.PointStatuses, 0);
+          SetLength(Row.PointColors, 0);
         end;
 
         if FoundPointsCount = 0 then
@@ -3325,7 +3451,10 @@ begin
     if Column = StringColumnPointNum3 then PointIdx := 2;
     if Column = StringColumnPointNum4 then PointIdx := 3;
 
-    if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointStatuses)) then
+    if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointColors)) and
+       (GridRow.PointColors[PointIdx] <> TAlphaColors.Null) then
+      Color := GridRow.PointColors[PointIdx]
+    else if (PointIdx >= 0) and (PointIdx < Length(GridRow.PointStatuses)) then
       Color := GetStatusColor(GridRow.PointStatuses[PointIdx]);
   end;
 
