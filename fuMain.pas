@@ -733,7 +733,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
@@ -756,7 +756,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);

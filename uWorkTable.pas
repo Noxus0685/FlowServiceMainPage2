@@ -751,6 +751,16 @@ type
 
   var WorkTableManager:   TWorkTableManager;
 
+const
+  CPointMatchFlowBaseUnit = 'base';
+
+function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel;
+  AStrictDeviceUUID: Boolean): TDevicePoint;
+function GetChannelFlowForPointMatchBase(AChannel: TChannel): Double;
+function GetDevicePointFlowBase(ADevice: TDevice; APoint: TDevicePoint): Double;
+function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: Double): TDevicePoint;
+function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
+
 implementation
 
 uses
@@ -758,6 +768,395 @@ uses
   frmMainTable,
   uMeasurementRun,
   uMKSDebug;
+
+function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel;
+  AStrictDeviceUUID: Boolean): TDevicePoint;
+var
+  DevicePoint: TDevicePoint;
+  CurPoint: TDevicePoint;
+  CurPointUUID: string;
+  CurPointName: string;
+  CurDeviceUUID: string;
+  ChannelDeviceUUID: string;
+
+  procedure DebugLog(const AAction, AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'FindMatchedDevicePoint ' + AAction,
+        'DEBUG', AParams);
+  end;
+
+
+  function FindByProcessingLogic: TDevicePoint;
+  var
+    Point: TDevicePoint;
+    Spillage: TPointSpillage;
+    DeviceUUID: string;
+    TypeUUID: string;
+    BestPoint: TDevicePoint;
+    BestSpillage: TPointSpillage;
+  begin
+    Result := nil;
+    BestPoint := nil;
+    BestSpillage := nil;
+    if (AChannel.FlowMeter.Device.Spillages = nil) or
+       (AChannel.FlowMeter.Device.Points = nil) then
+    begin
+      DebugLog('PROCESSING_LOGIC_SKIP', 'Reason=NoSpillagesOrPoints');
+      Exit;
+    end;
+
+    DeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
+    DebugLog('PROCESSING_LOGIC_ENTER', 'DeviceUUID=' + DeviceUUID);
+
+    for Point in AChannel.FlowMeter.Device.Points do
+    begin
+      if Point = nil then
+        Continue;
+
+      TypeUUID := Trim(Point.DeviceTypeUUID);
+      for Spillage in AChannel.FlowMeter.Device.Spillages do
+      begin
+        if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) then
+          Continue;
+
+        if not SameText(Trim(Spillage.DeviceUUID), DeviceUUID) then
+          Continue;
+
+        if (TypeUUID <> '') and (Trim(Spillage.DeviceTypeUUID) <> '') then
+        begin
+          if not SameText(Trim(Spillage.DeviceTypeUUID), TypeUUID) then
+            Continue;
+        end
+        else if (not SameText(Trim(Spillage.Name), Trim(Point.Name))) and
+                (not AChannel.FlowMeter.Device.IsFlowInPoint(Spillage.QavgEtalon, Point)) then
+          Continue;
+
+        if (BestPoint = nil) or ((BestSpillage <> nil) and (not BestSpillage.Valid) and Spillage.Valid) then
+        begin
+          BestPoint := Point;
+          BestSpillage := Spillage;
+        end;
+
+
+        if Spillage.Valid then
+        begin
+          DebugLog('FOUND_BY_PROCESSING_LOGIC', Format('PointName=%s; PointUUID=%s; DeviceTypeUUID=%s; Error=%g; FoundSpillageDeviceUUID=%s; FoundError=%g; Match=ValidSpillage',
+            [Trim(Point.Name), Trim(Point.UUID), Trim(Point.DeviceTypeUUID), Point.Error,
+             Trim(Spillage.DeviceUUID), Spillage.Error]));
+          Exit(Point);
+        end;
+      end;
+    end;
+
+    if BestPoint <> nil then
+    begin
+      DebugLog('FOUND_BY_PROCESSING_LOGIC', Format('PointName=%s; PointUUID=%s; DeviceTypeUUID=%s; Error=%g; FoundSpillageDeviceUUID=%s; FoundError=%g; Match=FirstSpillage',
+        [Trim(BestPoint.Name), Trim(BestPoint.UUID), Trim(BestPoint.DeviceTypeUUID), BestPoint.Error,
+         Trim(BestSpillage.DeviceUUID), BestSpillage.Error]));
+      Exit(BestPoint);
+    end;
+
+    DebugLog('PROCESSING_LOGIC_NOT_FOUND', 'Reason=NoMatchingSpillage');
+  end;
+begin
+  Result := nil;
+
+  if AWorkTable = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoActiveWorkTable');
+    Exit;
+  end;
+
+  if AWorkTable.CurrentPoint = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoCurrentPoint');
+    Exit;
+  end;
+
+  if AChannel = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoChannel');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoFlowMeter');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter.Device = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoDevice');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter.Device.Points = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoPoints');
+    Exit;
+  end;
+
+  CurPoint := AWorkTable.CurrentPoint;
+
+  CurDeviceUUID := Trim(CurPoint.DeviceUUID);
+  ChannelDeviceUUID := Trim(AChannel.DeviceUUID);
+
+  if (ChannelDeviceUUID = '') and (AChannel.FlowMeter <> nil) then
+    ChannelDeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+
+  if (ChannelDeviceUUID = '') and (AChannel.FlowMeter.Device <> nil) then
+    ChannelDeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
+
+  DebugLog('ENTER', Format('Strict=%s; CurUUID=%s; CurDeviceUUID=%s; CurName=%s; ChannelDeviceUUID=%s; PointsCount=%d',
+    [System.SysUtils.BoolToStr(AStrictDeviceUUID, True), Trim(CurPoint.UUID), CurDeviceUUID, Trim(CurPoint.Name),
+     ChannelDeviceUUID, AChannel.FlowMeter.Device.Points.Count]));
+
+  if AStrictDeviceUUID then
+    if (CurDeviceUUID <> '') and
+       (ChannelDeviceUUID <> '') and
+       (not SameText(CurDeviceUUID, ChannelDeviceUUID)) then
+    begin
+      DebugLog('EXIT_NIL', Format('Reason=DeviceUUIDMismatch; CurDeviceUUID=%s; ChannelDeviceUUID=%s',
+        [CurDeviceUUID, ChannelDeviceUUID]));
+      Exit;
+    end;
+
+  CurPointUUID := Trim(CurPoint.UUID);
+  CurPointName := Trim(CurPoint.Name);
+
+  if CurPointUUID <> '' then
+  begin
+    DebugLog('SEARCH_UUID', 'CurUUID=' + CurPointUUID);
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         SameText(Trim(DevicePoint.UUID), CurPointUUID) then
+      begin
+        DebugLog('FOUND_BY_UUID', Format('PointUUID=%s; PointName=%s; Error=%g',
+          [Trim(DevicePoint.UUID), Trim(DevicePoint.Name), DevicePoint.Error]));
+        Exit(DevicePoint);
+      end;
+    DebugLog('UUID_NOT_FOUND', 'CurUUID=' + CurPointUUID);
+  end;
+
+  if CurPointName <> '' then
+  begin
+    DebugLog('SEARCH_NAME', 'CurName=' + CurPointName);
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         SameText(Trim(DevicePoint.Name), CurPointName) then
+      begin
+        DebugLog('FOUND_BY_NAME', Format('PointUUID=%s; PointName=%s; Error=%g',
+          [Trim(DevicePoint.UUID), Trim(DevicePoint.Name), DevicePoint.Error]));
+        Exit(DevicePoint);
+      end;
+    DebugLog('NAME_NOT_FOUND', 'CurName=' + CurPointName);
+  end;
+
+  Result := FindByProcessingLogic;
+  if Result <> nil then
+    Exit;
+
+  DebugLog('EXIT_NIL', 'Reason=NoPointMatched');
+end;
+
+function GetPointMatchBaseUnitName(AChannel: TChannel): string;
+begin
+  Result := CPointMatchFlowBaseUnit;
+  if (AChannel <> nil) and
+     (AChannel.FlowMeter <> nil) and
+     (AChannel.FlowMeter.ValueFlow <> nil) then
+    Result := AChannel.FlowMeter.ValueFlow.GetDimName(0);
+end;
+
+function GetChannelFlowForPointMatchBase(AChannel: TChannel): Double;
+begin
+  Result := 0;
+  if (AChannel = nil) or
+     (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.ValueFlow = nil) then
+    Exit;
+
+  Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+end;
+
+function GetDevicePointFlowBase(ADevice: TDevice; APoint: TDevicePoint): Double;
+var
+  QmaxBase: Double;
+begin
+  Result := 0;
+  if (ADevice = nil) or (APoint = nil) then
+    Exit;
+
+  if APoint.Q > 0 then
+    Exit(ADevice.ToBaseUnits(APoint.Q));
+
+  QmaxBase := ADevice.ToBaseUnits(ADevice.Qmax);
+  Result := APoint.FlowRate * QmaxBase;
+end;
+
+function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: Double): TDevicePoint;
+var
+  DevicePoint: TDevicePoint;
+  DeviceQmaxRaw: Double;
+  DeviceQmaxBase: Double;
+  PointFlowBase: Double;
+  DeltaBase: Double;
+  BestDeltaBase: Double;
+  BaseUnit: string;
+
+  procedure DebugLog(const AAction, AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'FindMatchedDevicePointByFlowBase ' + AAction,
+        'DEBUG', AParams);
+  end;
+
+begin
+  Result := nil;
+  BaseUnit := GetPointMatchBaseUnitName(AChannel);
+
+  if (AChannel = nil) or
+     (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.Device = nil) or
+     (AChannel.FlowMeter.Device.Points = nil) then
+  begin
+    DebugLog('EXIT_NIL', Format('Reason=InvalidContext; CurrentFlowBase=%g; BaseUnit=%s',
+      [ACurrentFlowBase, BaseUnit]));
+    Exit;
+  end;
+
+  DeviceQmaxRaw := AChannel.FlowMeter.Device.Qmax;
+  DeviceQmaxBase := AChannel.FlowMeter.Device.ToBaseUnits(DeviceQmaxRaw);
+  BestDeltaBase := MaxDouble;
+
+  DebugLog('ENTER', Format('CurrentFlowBase=%g; BaseUnit=%s; Device=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; DeviceQmaxBase=%g; PointsCount=%d',
+    [ACurrentFlowBase, BaseUnit, Trim(AChannel.FlowMeter.Device.Name), DeviceQmaxRaw,
+     AChannel.FlowMeter.Device.GetDimensionName, DeviceQmaxBase,
+     AChannel.FlowMeter.Device.Points.Count]));
+
+  for DevicePoint in AChannel.FlowMeter.Device.Points do
+  begin
+    if DevicePoint = nil then
+      Continue;
+
+    PointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, DevicePoint);
+    DeltaBase := Abs(ACurrentFlowBase - PointFlowBase);
+    DebugLog('CHECK_POINT', Format('PointName=%s; PointUUID=%s; PointQRaw=%g; PointQRawUnit=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; PointFlowBase=%g; BaseUnit=%s; DeltaBase=%g; Error=%g',
+      [Trim(DevicePoint.Name), Trim(DevicePoint.UUID), DevicePoint.Q,
+       AChannel.FlowMeter.Device.GetDimensionName, DeviceQmaxRaw,
+       AChannel.FlowMeter.Device.GetDimensionName, PointFlowBase, BaseUnit,
+       DeltaBase, DevicePoint.Error]));
+
+    if (Result = nil) or (DeltaBase < BestDeltaBase) then
+    begin
+      Result := DevicePoint;
+      BestDeltaBase := DeltaBase;
+    end;
+  end;
+
+  if Result <> nil then
+    DebugLog('FOUND_BY_FLOW', Format('CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; DeltaBase=%g; AllowedError=%g; BaseUnit=%s',
+      [ACurrentFlowBase, Trim(Result.Name), GetDevicePointFlowBase(AChannel.FlowMeter.Device, Result),
+       BestDeltaBase, Result.Error, BaseUnit]))
+  else
+    DebugLog('EXIT_NIL', Format('Reason=NoPoints; CurrentFlowBase=%g; BaseUnit=%s',
+      [ACurrentFlowBase, BaseUnit]));
+end;
+
+function RandomRangeDouble(const AMin, AMax: Double): Double;
+begin
+  Result := AMin + Random * (AMax - AMin);
+end;
+
+function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
+var
+  MatchedPoint: TDevicePoint;
+  BaseImpDelta: Double;
+  CurrentError: Double;
+  AllowedError: Double;
+  TargetError: Double;
+  AllowOutOfRange: Boolean;
+  ChannelName: string;
+  DeviceName: string;
+  CurrentFlowBase: Double;
+
+  procedure DebugLog(const AAction, AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'CalcImpDeltaByError ' + AAction,
+        'DEBUG', AParams);
+  end;
+
+begin
+  Result := Random(11) - 5;
+  ChannelName := '';
+  DeviceName := '';
+  CurrentFlowBase := 0;
+
+  if AChannel <> nil then
+  begin
+    ChannelName := Trim(AChannel.Name);
+    if ChannelName = '' then
+      ChannelName := Trim(AChannel.Text);
+    if AChannel.FlowMeter <> nil then
+    begin
+      if AChannel.FlowMeter.ValueFlow <> nil then
+        CurrentFlowBase := GetChannelFlowForPointMatchBase(AChannel);
+      if AChannel.FlowMeter.Device <> nil then
+        DeviceName := Trim(AChannel.FlowMeter.Device.Name);
+    end;
+  end;
+
+  if (AWorkTable = nil) or
+     (AChannel = nil) or
+     (AChannel.FlowMeter = nil) then
+  begin
+    DebugLog('SKIP', Format('Reason=InvalidContext; Channel=%s; Device=%s; ImpDelta=%g',
+      [ChannelName, DeviceName, Result]));
+    Exit;
+  end;
+
+  MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
+  if MatchedPoint = nil then
+  begin
+    DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; CurrentFlowBase=%g; ImpDelta=%g',
+      [ChannelName, DeviceName, CurrentFlowBase, Result]));
+    Exit;
+  end;
+
+  AllowedError := Abs(MatchedPoint.Error);
+  if AllowedError <= 0 then
+  begin
+    DebugLog('SKIP', Format('Reason=AllowedErrorZero; Channel=%s; Device=%s; PointName=%s; AllowedError=%g; ImpDelta=%g',
+      [ChannelName, DeviceName, Trim(MatchedPoint.Name), AllowedError, Result]));
+    Exit;
+  end;
+
+  CurrentError := 0;
+  if AChannel.FlowMeter.ValueError <> nil then
+    CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
+
+  AllowOutOfRange := Random(100) < 5;
+  if AllowOutOfRange then
+    TargetError := RandomRangeDouble(-AllowedError * 1.3, AllowedError * 1.3)
+  else
+    TargetError := RandomRangeDouble(-AllowedError, AllowedError);
+
+  BaseImpDelta := Abs(Random(5) + 1);
+
+  if CurrentError > TargetError then
+    Result := -BaseImpDelta
+  else if CurrentError < TargetError then
+    Result := BaseImpDelta
+  else
+    Result := 0;
+
+  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
+    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, CurrentError, AllowedError,
+     TargetError, Result, System.SysUtils.BoolToStr(AllowOutOfRange, True)]));
+end;
 
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
@@ -5876,7 +6275,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
@@ -5899,7 +6298,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
