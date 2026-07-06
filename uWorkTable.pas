@@ -1138,14 +1138,6 @@ var
   AllowOutOfRange: Boolean;
   ChannelName: string;
   DeviceName: string;
-  CurrentFlowBase: Double;
-  UserTargetFlow: Double;
-  BaseUnit: string;
-  PointFlowBase: Double;
-  FlowTolerancePercent: Double;
-  MinFlowBase: Double;
-  MaxFlowBase: Double;
-  IsFlowInPointRange: Boolean;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -1158,22 +1150,14 @@ begin
   Result := Random(11) - 5;
   ChannelName := '';
   DeviceName := '';
-  CurrentFlowBase := 0;
-  UserTargetFlow := 0;
-  BaseUnit := GetPointMatchBaseUnitName(AChannel);
 
   if AChannel <> nil then
   begin
     ChannelName := Trim(AChannel.Name);
     if ChannelName = '' then
       ChannelName := Trim(AChannel.Text);
-    if AChannel.FlowMeter <> nil then
-    begin
-      if AChannel.FlowMeter.ValueFlow <> nil then
-        CurrentFlowBase := GetChannelFlowForPointMatchBase(AChannel);
-      if AChannel.FlowMeter.Device <> nil then
-        DeviceName := Trim(AChannel.FlowMeter.Device.Name);
-    end;
+    if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+      DeviceName := Trim(AChannel.FlowMeter.Device.Name);
   end;
 
   if (AWorkTable = nil) or
@@ -1185,32 +1169,11 @@ begin
     Exit;
   end;
 
-  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) then
-    UserTargetFlow := AWorkTable.FlowRate.ValueSet.Value;
-
-  MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
+  MatchedPoint := FindMatchedDevicePoint(AWorkTable, AChannel, False);
   if MatchedPoint = nil then
   begin
-    Result := 0;
-    DebugLog('IMP_DELTA_SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; CurrentFlowBase=%g; ImpDelta=%g; FlowWasAlreadyApplied=True',
-      [ChannelName, DeviceName, CurrentFlowBase, Result]));
-    Exit;
-  end;
-
-  IsFlowInPointRange := IsDevicePointFlowInRange(AChannel, MatchedPoint, CurrentFlowBase,
-    PointFlowBase, FlowTolerancePercent, MinFlowBase, MaxFlowBase);
-  DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; UserTargetFlow=%g; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=%s; Action=%s; Color=%s',
-    [ChannelName, UserTargetFlow, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
-     FlowTolerancePercent, MinFlowBase, MaxFlowBase,
-     System.SysUtils.BoolToStr(IsFlowInPointRange, True),
-     IfThen(IsFlowInPointRange, 'UsePoint', 'IgnorePoint'),
-     IfThen(IsFlowInPointRange, 'BY_ERROR', 'GRAY')]));
-  if not IsFlowInPointRange then
-  begin
-    Result := 0;
-    DebugLog('IMP_DELTA_SKIP', Format('Reason=FlowOutOfPointRange; Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; PointFlowBase=%g; FlowTolerancePercent=%g; ImpDelta=%g; FlowWasAlreadyApplied=True',
-      [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, PointFlowBase,
-       FlowTolerancePercent, Result]));
+    DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; ImpDelta=%g',
+      [ChannelName, DeviceName, Result]));
     Exit;
   end;
 
@@ -1241,8 +1204,8 @@ begin
   else
     Result := 0;
 
-  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; BaseUnit=%s; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
-    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, BaseUnit, CurrentError, AllowedError,
+  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
+    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentError, AllowedError,
      TargetError, Result, System.SysUtils.BoolToStr(AllowOutOfRange, True)]));
 end;
 
@@ -6447,6 +6410,17 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+  CurrentImpSec: Double;
+  ChannelName: string;
+  DeviceName: string;
+
+  procedure DebugLog(const AAction, AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'UpdateRandomSignals ' + AAction,
+        'DEBUG', AParams);
+  end;
+
 begin
   if AWorkTable = nil then
     Exit;
@@ -6460,7 +6434,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
+    ImpDelta := Random(11) - 5;
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
@@ -6483,12 +6457,24 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
+    CurrentImpSec := Channel.ImpSec;
     if Channel.Enabled then
     begin
+      ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
+
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
       Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+
+      ChannelName := Trim(Channel.Name);
+      if ChannelName = '' then
+        ChannelName := Trim(Channel.Text);
+      DeviceName := '';
+      if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
+        DeviceName := Trim(Channel.FlowMeter.Device.Name);
+
+      DebugLog('DEVICE', Format('Channel=%s; Device=%s; CurrentImpSec=%g; ImpDelta=%g; NewImpSec=%g; NewImpResult=%g',
+        [ChannelName, DeviceName, CurrentImpSec, ImpDelta, Channel.ImpSec, Channel.ImpResult]));
     end
     else
     begin
