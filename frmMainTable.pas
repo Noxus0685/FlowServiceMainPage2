@@ -5819,6 +5819,82 @@ var
        MatchedPoint.Error, MatchSource, AllowedError, AColorName, AReason]));
   end;
 
+  function GetCurrentFlowBaseForMatch: Double;
+  begin
+    Result := GetChannelFlowForPointMatchBase(AChannel);
+    if (Result = 0) and (AChannel <> nil) then
+      Result := AChannel.ValueSec;
+    if (Result = 0) and (FActiveWorkTable <> nil) and
+       (FActiveWorkTable.ValueFlowRate <> nil) then
+      Result := FActiveWorkTable.ValueFlowRate.GetDoubleValue;
+  end;
+
+  function FindPointByCurrentPoint: TDevicePoint;
+  var
+    DevicePoint: TDevicePoint;
+  begin
+    Result := nil;
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) or
+       (AChannel.FlowMeter.Device = nil) or
+       (AChannel.FlowMeter.Device.Points = nil) then
+      Exit;
+
+    if CurPointUUID <> '' then
+      for DevicePoint in AChannel.FlowMeter.Device.Points do
+        if (DevicePoint <> nil) and SameText(Trim(DevicePoint.UUID), CurPointUUID) then
+          Exit(DevicePoint);
+
+    if CurPointName <> '' then
+      for DevicePoint in AChannel.FlowMeter.Device.Points do
+        if (DevicePoint <> nil) and SameText(Trim(DevicePoint.Name), CurPointName) then
+          Exit(DevicePoint);
+  end;
+
+  function FindLiveGridMatchedPoint: TDevicePoint;
+  var
+    CurrentPointMatch: TDevicePoint;
+    PointFlowBase: Double;
+    TolerancePercent: Double;
+    MinFlowBase: Double;
+    MaxFlowBase: Double;
+  begin
+    CurrentPointMatch := FindPointByCurrentPoint;
+    if CurrentPointMatch <> nil then
+    begin
+      if (CurrentFlowBase <= 0) or
+         IsDevicePointFlowInRange(AChannel, CurrentPointMatch, CurrentFlowBase,
+           PointFlowBase, TolerancePercent, MinFlowBase, MaxFlowBase) then
+      begin
+        MatchSource := 'ByCurrentPoint';
+        Exit(CurrentPointMatch);
+      end;
+
+      DebugLog('CURRENT_POINT_FLOW_MISMATCH',
+        Format('CurrentPointName=%s; CurrentFlow=%g; PointFlow=%g; TolerancePercent=%g; MinFlow=%g; MaxFlow=%g',
+          [Trim(CurrentPointMatch.Name), CurrentFlowBase, PointFlowBase,
+           TolerancePercent, MinFlowBase, MaxFlowBase]));
+    end;
+
+    if CurrentFlowBase > 0 then
+    begin
+      Result := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
+      if Result <> nil then
+      begin
+        MatchSource := 'ByFlow';
+        Exit;
+      end;
+    end;
+
+    Result := nil;
+  end;
+
+  procedure LogMatch(const AColorName, AReason: string);
+  begin
+    DebugLog('MATCH', Format('ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; MatchedPointQ=%g; MatchedPointError=%g; MatchSource=%s; AllowedError=%g; Color=%s; Reason=%s',
+      [ActualError, CurrentFlowBase, Trim(MatchedPoint.Name), MatchedPointFlowBase,
+       MatchedPoint.Error, MatchSource, AllowedError, AColorName, AReason]));
+  end;
+
 begin
   Result := False;
   AColor := TAlphaColors.Null;
