@@ -1189,7 +1189,8 @@ begin
   MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
   if MatchedPoint = nil then
   begin
-    DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; CurrentFlowBase=%g; ImpDelta=%g',
+    Result := 0;
+    DebugLog('IMP_DELTA_SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; CurrentFlowBase=%g; ImpDelta=%g; FlowWasAlreadyApplied=True',
       [ChannelName, DeviceName, CurrentFlowBase, Result]));
     Exit;
   end;
@@ -1205,7 +1206,7 @@ begin
   if not IsFlowInPointRange then
   begin
     Result := 0;
-    DebugLog('SKIP', Format('Reason=FlowOutOfPointRange; Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; PointFlowBase=%g; FlowTolerancePercent=%g; ImpDelta=%g',
+    DebugLog('IMP_DELTA_SKIP', Format('Reason=FlowOutOfPointRange; Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; PointFlowBase=%g; FlowTolerancePercent=%g; ImpDelta=%g; FlowWasAlreadyApplied=True',
       [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, PointFlowBase,
        FlowTolerancePercent, Result]));
     Exit;
@@ -6352,7 +6353,7 @@ var
     if Result < 0 then
       Result := 0;
 
-    DebugLog('SIM_FLOW_CALC', Format('SimulationReady=%s; CurrentFlowBefore=%g; UserTargetFlow=%g; NearestPointFlow=%g; NewFlowCalculated=%g; Mode=%s',
+    DebugLog('SIM_FLOW_CALC', Format('Channel=ALL; SimulationReady=%s; CurrentFlowBefore=%g; UserTargetFlow=%g; NearestPointFlow=%g; NewFlowCalculated=%g; Mode=%s',
       [BoolText((WorkTableManager = nil) or WorkTableManager.SimulationReady), CurrentFlow,
        UserTargetFlow, NearestPointFlow, Result, Mode]));
   end;
