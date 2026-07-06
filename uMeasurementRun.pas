@@ -766,6 +766,9 @@ begin
 
   if SetPoint(FCurrentPointIndex, Error) then
   begin
+
+    GetCurrentPoint.Status := 1; //точка выбрана
+
     ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
       'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
     FireEvent(mePointSelected);
@@ -776,6 +779,9 @@ begin
   end
   else
   begin
+
+    GetCurrentPoint.Status := 2; //некорректно
+
     FireEvent(mePointInvalid, Error);
     SetStage(msDone);
   end;
@@ -820,7 +826,7 @@ begin
     end;
   end
   else
-    Point.Status := 3;
+    Point.Status := 3;   //Установка точки
 
   if not SetupMeasurement(Point, Error) then
   begin
@@ -861,6 +867,7 @@ end;
 
 procedure TMeasurementRun.EnterMeasure;
 begin
+  GetCurrentPoint.Status:= 6; //Измерение
   FireEvent(meMeasureStarted);
 end;
 
@@ -878,15 +885,10 @@ begin
 end;
 
 procedure TMeasurementRun.EnterResultsRead;
-var
-  Point: TDevicePoint;
 begin
+
+  GetCurrentPoint.Status:= 9;
   FireEvent(meResultReading);
-
-  Point := GetCurrentPoint;
-  if Point <> nil then
-    Point.Status := 9;
-
   FireEvent(meMeasureCompleted);
   FireEvent(meResultReady);
 end;
@@ -910,7 +912,7 @@ begin
   if FCurrentRepeat >= RepeatsTarget then
   begin
     if Point <> nil then
-      Point.Status := 9;
+      Point.Status := 9;   //Закончено
     FCurrentRepeat := 0;
     FireEvent(mePointDone);
     FNextStageAfterSave := msSelectPoint;
@@ -1499,18 +1501,17 @@ begin
     AError := BuildError(1004, 'Индекс точки вне диапазона');
     Exit;
   end;
-
   FCurrentPointIndex := Index;
   Point := GetCurrentPoint;
   Result := ValidatePoint(Point, AError);
   if Result then
   begin
-    Point.Status := 1; //точка выбрана
+
     FCurrentRepeat := Point.RepeatsCompleted;
 
   end else
   begin
-    Point.Status := 2; //некорректно
+
   end;
 end;
 
@@ -1637,8 +1638,6 @@ begin
   if (APoint.Pressure >= 0) and (FWorkTable.FluidPress <> nil) then
     FWorkTable.FluidPress.DoFluidPressStart(APoint.Pressure);
 
-  GetCurrentPoint.Status:= 3;
-
   Result := True;
 end;
 
@@ -1733,7 +1732,6 @@ begin
 
   if IsStable(StableInfo) then
   begin
-    Point.Status := 6;
     FireEvent(meStableReached);
     SetStage(msWaitMeasureStart);
     Exit;

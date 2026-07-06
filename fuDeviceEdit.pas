@@ -3464,7 +3464,7 @@ begin
    else if ACol = StringColumnPointQ.Index then
     begin
       Qmax := FDevice.Qmax;
-      Q := P.FlowRate * Qmax;
+      Q := P.Q; //P.FlowRate * Qmax;
       if (Q <= 0) then
         Value := '—'
       else
@@ -3477,7 +3477,7 @@ begin
     else if (ACol = StringColumnPointVolume.Index) then
     begin
       Qmax := FDevice.Qmax;
-      Q := P.FlowRate * Qmax;
+      Q := P.Q;//P.FlowRate * Qmax;
       if P.LimitVolume > 0 then
         Value := FormatByBaseError(P.LimitVolume, P.Error)
 
@@ -3771,7 +3771,9 @@ begin
   begin
     Qmax := FDevice.Qmax;
     Coef := FDevice.Coef;
-    Q := P.FlowRate * Qmax;
+    Q := P.Q;
+
+    //P.FlowRate * Qmax;
 
     if ACol = StringColumnPointFlowRate.Index then
     begin
@@ -3785,7 +3787,7 @@ begin
       Q := FDevice.ToBaseUnits(NormalizeFloatInput(S));
       P.Q := Q;
       if Qmax > 0 then
-        P.FlowRate := Q / Qmax;
+        P.FlowRate := P.Q / Qmax;
     end
 
     else if ACol = StringColumnPointVolume.Index then
@@ -3793,7 +3795,7 @@ begin
       V := NormalizeFloatInput(S);
       P.LimitVolume := V;
 
-      if (V > 0) and (Q > 0) then
+      if (V > 0) and (P.Q > 0) then
         P.LimitTime := V / Q;
 
       if (V > 0) and (Coef > 0) then
@@ -3809,8 +3811,8 @@ begin
         V := P.LimitImp / Coef;
         P.LimitVolume := V;
 
-        if Q > 0 then
-          P.LimitTime := V / Q;
+        if P.Q > 0 then
+          P.LimitTime := V / P.Q;
       end;
     end
 
@@ -3819,9 +3821,9 @@ begin
       Tm := NormalizeFloatInput(S);
       P.LimitTime := Tm;
 
-      if (Tm > 0) and (Q > 0) then
+      if (Tm > 0) and (P.Q > 0) then
       begin
-        V := Q * Tm;
+        V := P.Q * Tm;
         P.LimitVolume := V;
 
         if Coef > 0 then

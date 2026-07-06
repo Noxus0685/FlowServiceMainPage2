@@ -4703,7 +4703,7 @@ end;
 
 procedure TWorkTable.StartMeasurementRun;
 begin
-    StartMeasurementRun(Integer(MeasurementMode));
+   // StartMeasurementRun(Integer(MeasurementMode));
 
   FMode := MeasurementMode;
   TMeasurementRun(FMeasurementRun).Mode := MeasurementMode;
