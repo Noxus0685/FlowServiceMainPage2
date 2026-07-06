@@ -5619,7 +5619,8 @@ var
   CurrentFlowBase: Double;
   ValueFlowRaw: Double;
   GridFlowText: string;
-  ValueFlowUnit: string;
+  GridFlowUnit: string;
+  DeviceQmaxBase: Double;
   BaseUnit: string;
   AllowedError: Double;
   DeviceName: string;
@@ -5695,7 +5696,8 @@ begin
   CurrentFlowBase := 0;
   ValueFlowRaw := 0;
   GridFlowText := '';
-  ValueFlowUnit := '';
+  GridFlowUnit := '';
+  DeviceQmaxBase := 0;
   BaseUnit := CPointMatchFlowBaseUnit;
   LoadDebugContext;
 
@@ -5753,14 +5755,16 @@ begin
   begin
     ValueFlowRaw := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
     GridFlowText := AChannel.FlowMeter.ValueFlow.GetStrValue;
-    ValueFlowUnit := AChannel.FlowMeter.ValueFlow.GetDimName;
+    GridFlowUnit := AChannel.FlowMeter.ValueFlow.GetDimName;
     BaseUnit := AChannel.FlowMeter.ValueFlow.GetDimName(0);
     CurrentFlowBase := GetChannelFlowForPointMatchBase(AChannel);
+    DeviceQmaxBase := AChannel.FlowMeter.Device.ToBaseUnits(AChannel.FlowMeter.Device.Qmax);
   end;
 
-  DebugLog('FLOW_SOURCE', Format('Channel=%s; GridFlowText=%s; ValueFlowRaw=%g; ValueFlowUnit=%s; CurrentFlowBase=%g; BaseUnit=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s',
-    [ChannelName, GridFlowText, ValueFlowRaw, ValueFlowUnit, CurrentFlowBase, BaseUnit,
-     AChannel.FlowMeter.Device.Qmax, AChannel.FlowMeter.Device.GetDimensionName]));
+  DebugLog('FLOW_SOURCE', Format('Channel=%s; GridFlowText=%s; GridFlowUnit=%s; ValueFlowRaw=%g; ValueFlowRawUnit=base; CurrentFlowBase=%g; BaseUnit=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; DeviceQmaxBase=%g; DeviceQmaxBaseUnit=%s',
+    [ChannelName, GridFlowText, GridFlowUnit, ValueFlowRaw, CurrentFlowBase, BaseUnit,
+     AChannel.FlowMeter.Device.Qmax, AChannel.FlowMeter.Device.GetDimensionName,
+     DeviceQmaxBase, BaseUnit]));
 
   MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
   if MatchedPoint = nil then
@@ -5772,10 +5776,6 @@ begin
   end;
 
   AllowedError := Abs(MatchedPoint.Error);
-  DebugLog('MATCH', Format('Channel=%s; Matched=True; PointUUID=%s; PointDeviceUUID=%s; MatchedPointName=%s; PointError=%g; ActualError=%g; CurrentFlowBase=%g; AllowedError=%g',
-    [ChannelName, Trim(MatchedPoint.UUID), Trim(MatchedPoint.DeviceUUID), Trim(MatchedPoint.Name),
-     MatchedPoint.Error, ActualError, CurrentFlowBase, AllowedError]));
-
   if AllowedError <= 0 then
   begin
     LogSkip('AllowedErrorZero');
@@ -5786,14 +5786,16 @@ begin
   if Abs(ActualError) > AllowedError then
   begin
     AColor := TAlphaColorRec.Lightyellow;
-    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorGreaterAllowed; ActualError=%g; CurrentFlowBase=%g; MatchedPointName=%s; AllowedError=%g',
-      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlowBase, Trim(MatchedPoint.Name), AllowedError]));
+    DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
+      [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
+       AllowedError, ColorToDebugName(AColor)]));
   end
   else
   begin
     AColor := $FFE6F4E6;
-    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorWithinAllowed; ActualError=%g; CurrentFlowBase=%g; MatchedPointName=%s; AllowedError=%g',
-      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlowBase, Trim(MatchedPoint.Name), AllowedError]));
+    DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
+      [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
+       AllowedError, ColorToDebugName(AColor)]));
   end;
 end;
 

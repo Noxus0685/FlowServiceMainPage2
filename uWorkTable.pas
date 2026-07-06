@@ -1043,9 +1043,9 @@ begin
 
     PointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, DevicePoint);
     DeltaBase := Abs(ACurrentFlowBase - PointFlowBase);
-    DebugLog('CHECK_POINT', Format('PointName=%s; PointUUID=%s; PointQRaw=%g; PointQRawUnit=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; PointFlowBase=%g; BaseUnit=%s; DeltaBase=%g; Error=%g',
+    DebugLog('CHECK_POINT', Format('PointName=%s; PointUUID=%s; PointQRaw=%g; PointQRawUnit=%s; PointFlowRate=%g; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; PointFlowBase=%g; BaseUnit=%s; DeltaBase=%g; PointError=%g',
       [Trim(DevicePoint.Name), Trim(DevicePoint.UUID), DevicePoint.Q,
-       AChannel.FlowMeter.Device.GetDimensionName, DeviceQmaxRaw,
+       AChannel.FlowMeter.Device.GetDimensionName, DevicePoint.FlowRate, DeviceQmaxRaw,
        AChannel.FlowMeter.Device.GetDimensionName, PointFlowBase, BaseUnit,
        DeltaBase, DevicePoint.Error]));
 
@@ -1059,7 +1059,7 @@ begin
   if Result <> nil then
     DebugLog('FOUND_BY_FLOW', Format('CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; DeltaBase=%g; AllowedError=%g; BaseUnit=%s',
       [ACurrentFlowBase, Trim(Result.Name), GetDevicePointFlowBase(AChannel.FlowMeter.Device, Result),
-       BestDeltaBase, Result.Error, BaseUnit]))
+       BestDeltaBase, Abs(Result.Error), BaseUnit]))
   else
     DebugLog('EXIT_NIL', Format('Reason=NoPoints; CurrentFlowBase=%g; BaseUnit=%s',
       [ACurrentFlowBase, BaseUnit]));
@@ -1081,6 +1081,7 @@ var
   ChannelName: string;
   DeviceName: string;
   CurrentFlowBase: Double;
+  BaseUnit: string;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -1094,6 +1095,7 @@ begin
   ChannelName := '';
   DeviceName := '';
   CurrentFlowBase := 0;
+  BaseUnit := GetPointMatchBaseUnitName(AChannel);
 
   if AChannel <> nil then
   begin
@@ -1153,8 +1155,8 @@ begin
   else
     Result := 0;
 
-  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
-    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, CurrentError, AllowedError,
+  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; BaseUnit=%s; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
+    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, BaseUnit, CurrentError, AllowedError,
      TargetError, Result, System.SysUtils.BoolToStr(AllowOutOfRange, True)]));
 end;
 
