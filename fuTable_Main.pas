@@ -74,6 +74,7 @@ type
     TrackStd: TTrackBar;
     EditInstrumentName: Tedit;
     Button1: TButton;
+    ComboBoxReadiness: TComboBox;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -83,6 +84,7 @@ type
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
     procedure EditInstrumentNameChangeTracking(Sender: TObject);
+    procedure ComboBoxReadinessChange(Sender: TObject);
 
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure TrackStdChange(Sender: TObject);
@@ -345,6 +347,12 @@ begin
   );
 end;
 
+procedure TTableMainForm.ComboBoxReadinessChange(Sender: TObject);
+begin
+  if FWorkTableManager <> nil then
+    FWorkTableManager.SimulationReady := ComboBoxReadiness.ItemIndex = 0;
+end;
+
 procedure TTableMainForm.EditEtalonFlowRateExit(Sender: TObject);
 var
   WorkTable: TWorkTable;
@@ -511,6 +519,11 @@ begin
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := FFrameProceed.SavePendingProcessingChanges;
 
+  if ComboBoxReadiness <> nil then
+  begin
+    ComboBoxReadiness.ItemIndex := 0;
+    ComboBoxReadinessChange(ComboBoxReadiness);
+  end;
 
 end;
 

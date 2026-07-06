@@ -5634,7 +5634,28 @@ var
   FlowTolerancePercent: Double;
   MinFlowBase: Double;
   MaxFlowBase: Double;
-  IsFlowInPointRange: Boolean;
+
+  function ParseFlowTolerancePercent(const AText: string): Double;
+  var
+    I: Integer;
+    Num: string;
+    Ch: Char;
+  begin
+    Result := 0;
+    Num := '';
+    for I := 1 to Length(AText) do
+    begin
+      Ch := AText[I];
+      if CharInSet(Ch, ['0'..'9', ',', '.', '-', '+']) then
+        Num := Num + Ch;
+    end;
+    Num := StringReplace(Num, '+', '', [rfReplaceAll]);
+    Num := StringReplace(Num, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+    Num := StringReplace(Num, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+    if not TryStrToFloat(Num, Result) then
+      Result := 0;
+    Result := Abs(Result);
+  end;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -5782,16 +5803,17 @@ begin
     Exit;
   end;
 
-  IsFlowInPointRange := IsDevicePointFlowInRange(AChannel, MatchedPoint, CurrentFlowBase,
-    PointFlowBase, FlowTolerancePercent, MinFlowBase, MaxFlowBase);
-  if not IsFlowInPointRange then
+  PointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, MatchedPoint);
+  FlowTolerancePercent := ParseFlowTolerancePercent(MatchedPoint.FlowAccuracy);
+  MinFlowBase := PointFlowBase * (1 - FlowTolerancePercent / 100);
+  MaxFlowBase := PointFlowBase * (1 + FlowTolerancePercent / 100);
+  if (CurrentFlowBase < MinFlowBase) or (CurrentFlowBase > MaxFlowBase) then
   begin
     AColor := TAlphaColorRec.Lightgray;
     Result := True;
-    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; UserTargetFlow=%g; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=%s; Action=IgnorePoint; Color=%s',
-      [ChannelName, CurrentFlowBase, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
-       FlowTolerancePercent, MinFlowBase, MaxFlowBase,
-       System.SysUtils.BoolToStr(IsFlowInPointRange, True), ColorToDebugName(AColor)]));
+    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=False; Color=%s',
+      [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
+       FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
     Exit;
   end;
 
@@ -6669,30 +6691,9 @@ procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
-  ErrorColorApplied: Boolean;
-
-  function ColorToDebugName(const ACellColor: TAlphaColor): string;
-  begin
-    if ACellColor = TAlphaColorRec.Lightyellow then
-      Result := 'YELLOW'
-    else if ACellColor = $FFE6F4E6 then
-      Result := 'GREEN'
-    else if ACellColor = TAlphaColors.Null then
-      Result := 'NONE'
-    else
-      Result := Format('$%.8x', [ACellColor]);
-  end;
-
-  procedure DebugLog(const AParams: string);
-  begin
-    if ProtocolManager <> nil then
-      ProtocolManager.AddMessage(pcInfo, psForm, 'GridEtalonsDrawColumnCell ERROR_COLUMN',
-        'DEBUG', AParams);
-  end;
 
 begin
   CellColor := TAlphaColors.Null;
-  ErrorColorApplied := False;
 
   if (Column = StringColumnEtalonChanel1) and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) then
@@ -6700,28 +6701,6 @@ begin
     Channel := FActiveWorkTable.EtalonChannels[Row];
     if Channel <> nil then
       CellColor := GetEtalonGroupColor(Channel.Group);
-  end;
-
-  if (Column = StringColumnEtalonError1) then
-  begin
-    if (FActiveWorkTable <> nil) and
-       (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) and
-       (FActiveWorkTable.EtalonChannels[Row] <> nil) then
-      ErrorColorApplied := GetErrorCellColor(FActiveWorkTable.EtalonChannels[Row],
-        Value.ToString, CellColor);
-
-    DebugLog(Format('Row=%d; Column=%s; Value=%s; GetErrorCellColor=%s; Color=%s',
-      [Row, Column.Header, Value.ToString, BoolToStr(ErrorColorApplied, True),
-       ColorToDebugName(CellColor)]));
-
-    if ErrorColorApplied then
-    begin
-      Canvas.Fill.Kind := TBrushKind.Solid;
-      Canvas.Fill.Color := CellColor;
-      Canvas.FillRect(Bounds, 0, 0, [], 1);
-      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
-      Exit;
-    end;
   end;
 
   if CellColor <> TAlphaColors.Null then

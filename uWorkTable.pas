@@ -716,6 +716,7 @@ type
     FIniFileName: string;
     FWorkTables: TObjectList<TWorkTable>;
     FIsSimulationMode :Boolean;
+    FSimulationReady: Boolean;
     FActiveWorkTable  :TWorkTable;
 
   public
@@ -745,6 +746,7 @@ type
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
+    property SimulationReady: Boolean read FSimulationReady write FSimulationReady;
     procedure UpdateSimulation;
 
   end;
@@ -5565,6 +5567,7 @@ constructor TWorkTableManager.Create(const AIniFileName: string);
 begin
   inherited Create;
   FIniFileName := AIniFileName;
+  FSimulationReady := True;
   FWorkTables := TObjectList<TWorkTable>.Create(True);
   TPump.Pumps := TObjectList<TPump>.Create(True);
   TWeight.Weights := TObjectList<TWeight>.Create(True);
@@ -6248,25 +6251,54 @@ var
   ChannelCoef: Double;
   ChannelRatio: Double;
 
-  procedure LogSimFlowTarget(AChannel: TChannel; const AIsEtalon: Boolean;
-    const AUserTargetFlow, ACurrentFlowBefore, ACurrentFlowAfter: Double);
+  function GetNearestPointFlow(const ACurrentFlow: Double): Double;
   var
-    ChannelName: string;
+    Channel: TChannel;
+    Point: TDevicePoint;
+    PointFlow: Double;
+    Delta: Double;
+    BestDelta: Double;
   begin
-    if ProtocolManager = nil then
+    Result := ACurrentFlow;
+    BestDelta := MaxDouble;
+    if AWorkTable.DeviceChannels = nil then
       Exit;
-    ChannelName := '';
-    if AChannel <> nil then
-    begin
-      ChannelName := Trim(AChannel.Name);
-      if ChannelName = '' then
-        ChannelName := Trim(AChannel.Text);
-    end;
-    ProtocolManager.AddMessage(pcInfo, psWorkTable, 'SIM_FLOW_TARGET',
-      'DEBUG',
-      Format('Channel=%s; IsEtalon=%s; UserTargetFlow=%g; CurrentFlowBefore=%g; CurrentFlowAfter=%g; TargetSource=UserInput; ForcedToEtalon=False; ForcedToPoint=False',
-        [ChannelName, System.SysUtils.BoolToStr(AIsEtalon, True), AUserTargetFlow,
-         ACurrentFlowBefore, ACurrentFlowAfter]));
+
+    for Channel in AWorkTable.DeviceChannels do
+      if (Channel <> nil) and Channel.Enabled and
+         (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) and
+         (Channel.FlowMeter.Device.Points <> nil) then
+        for Point in Channel.FlowMeter.Device.Points do
+        begin
+          if Point = nil then
+            Continue;
+          PointFlow := GetDevicePointFlowBase(Channel.FlowMeter.Device, Point);
+          Delta := Abs(ACurrentFlow - PointFlow);
+          if Delta < BestDelta then
+          begin
+            BestDelta := Delta;
+            Result := PointFlow;
+          end;
+        end;
+  end;
+
+  function CalcSimulationFlow: Double;
+  var
+    TargetFlow: Double;
+    CurrentFlow: Double;
+  begin
+    CurrentFlow := FlowRate.Value.Value;
+    if (WorkTableManager = nil) or WorkTableManager.SimulationReady then
+      TargetFlow := CurrentFlow + (Random * 0.2) - 0.1
+    else
+      TargetFlow := GetNearestPointFlow(CurrentFlow);
+
+    if Abs(CurrentFlow - TargetFlow) < 1 then
+      Result := AWorkTable.ValueFlowRate.GetDoubleNum(TargetFlow, 4)
+    else if CurrentFlow < TargetFlow then
+      Result := AWorkTable.ValueFlowRate.GetDoubleNum(CurrentFlow + 1, 4)
+    else
+      Result := AWorkTable.ValueFlowRate.GetDoubleNum(CurrentFlow - 1, 4);
   end;
 begin
 
@@ -6292,17 +6324,7 @@ begin
             if (AWorkTable.EtalonChannels[I] <> nil) and (AWorkTable.EtalonChannels[I].Enabled) then
               EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
 
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
-
-            for I := 0 to EnabledEtalonChannels.Count - 1 do
-              LogSimFlowTarget(EnabledEtalonChannels[I], True, FlowRate.ValueSet.Value,
-                FlowRate.Value.Value, Flow);
-
+              Flow := CalcSimulationFlow;
 
              ImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
               EnabledEtalonChannels,
@@ -6329,12 +6351,7 @@ begin
               EnabledDeviceChannels.Add(AWorkTable.DeviceChannels[I]);
             end;
 
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+              Flow := CalcSimulationFlow;
 
           for I := 0 to EnabledDeviceChannels.Count - 1 do
             LogSimFlowTarget(EnabledDeviceChannels[I], False, FlowRate.ValueSet.Value,
