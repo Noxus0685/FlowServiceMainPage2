@@ -843,7 +843,7 @@ begin
   if BaseImpDelta = 0 then
     BaseImpDelta := 1;
 
-  if CurrentError > AllowedError then
+  if Abs(CurrentError) > AllowedError then
     Result := -BaseImpDelta
   else
     Result := BaseImpDelta;
