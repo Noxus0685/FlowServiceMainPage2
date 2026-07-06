@@ -1529,18 +1529,16 @@ object TableMainForm: TTableMainForm
             TextSettings.Trimming = None
             OnClick = ButtonApplyDeviceValuesClick
           end
-          object ComboBoxReadiness: TComboBox
-            Items.Strings = (
-              #1075#1086#1090#1086#1074#1085#1086#1089#1090#1100': '#1076#1072
-              #1075#1086#1090#1086#1074#1085#1086#1089#1090#1100': '#1085#1077#1090)
-            ItemIndex = 0
+          object CheckBoxReadiness: TCheckBox
+            IsChecked = True
             Position.X = 24.000000000000000000
-            Position.Y = 226.000000000000000000
+            Position.Y = 231.000000000000000000
             Size.Width = 128.000000000000000000
-            Size.Height = 30.000000000000000000
+            Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 9
-            OnChange = ComboBoxReadinessChange
+            Text = #1075#1086#1090#1086#1074#1085#1086#1089#1090#1100
+            OnChange = CheckBoxReadinessChange
           end
         end
       end

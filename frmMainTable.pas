@@ -5811,7 +5811,7 @@ begin
   begin
     AColor := TAlphaColorRec.Lightgray;
     Result := True;
-    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=False; Color=%s',
+    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=False; Color=%s',
       [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
        FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
     Exit;

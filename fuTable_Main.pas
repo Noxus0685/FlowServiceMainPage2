@@ -74,7 +74,7 @@ type
     TrackStd: TTrackBar;
     EditInstrumentName: Tedit;
     Button1: TButton;
-    ComboBoxReadiness: TComboBox;
+    CheckBoxReadiness: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure tcMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -84,7 +84,7 @@ type
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
     procedure EditInstrumentNameChangeTracking(Sender: TObject);
-    procedure ComboBoxReadinessChange(Sender: TObject);
+    procedure CheckBoxReadinessChange(Sender: TObject);
 
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure TrackStdChange(Sender: TObject);
@@ -347,10 +347,10 @@ begin
   );
 end;
 
-procedure TTableMainForm.ComboBoxReadinessChange(Sender: TObject);
+procedure TTableMainForm.CheckBoxReadinessChange(Sender: TObject);
 begin
   if FWorkTableManager <> nil then
-    FWorkTableManager.SimulationReady := ComboBoxReadiness.ItemIndex = 0;
+    FWorkTableManager.SimulationReady := CheckBoxReadiness.IsChecked;
 end;
 
 procedure TTableMainForm.EditEtalonFlowRateExit(Sender: TObject);
@@ -519,10 +519,10 @@ begin
   if Assigned(AppServices) then
     AppServices.OnBeforeShutdown := FFrameProceed.SavePendingProcessingChanges;
 
-  if ComboBoxReadiness <> nil then
+  if CheckBoxReadiness <> nil then
   begin
-    ComboBoxReadiness.ItemIndex := 0;
-    ComboBoxReadinessChange(ComboBoxReadiness);
+    CheckBoxReadiness.IsChecked := True;
+    CheckBoxReadinessChange(CheckBoxReadiness);
   end;
 
 end;

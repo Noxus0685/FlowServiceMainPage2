@@ -6353,10 +6353,6 @@ begin
 
               Flow := CalcSimulationFlow;
 
-          for I := 0 to EnabledDeviceChannels.Count - 1 do
-            LogSimFlowTarget(EnabledDeviceChannels[I], False, FlowRate.ValueSet.Value,
-              FlowRate.Value.Value, Flow);
-
           ImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
             EnabledDeviceChannels,
             Flow,
