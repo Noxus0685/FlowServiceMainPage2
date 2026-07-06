@@ -168,6 +168,7 @@ type
     FValueResult: Double;
     FSimulationTargetFlowBase: Double;
     FSimulationStartImpSec: Double;
+    FSimulationTargetImpSec: Double;
     FSimulationStartAssigned: Boolean;
 
     FFlowMeter: TFlowMeter;
@@ -306,6 +307,7 @@ type
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
     property SimulationTargetFlowBase: Double read FSimulationTargetFlowBase write FSimulationTargetFlowBase;
     property SimulationStartImpSec: Double read FSimulationStartImpSec write FSimulationStartImpSec;
+    property SimulationTargetImpSec: Double read FSimulationTargetImpSec write FSimulationTargetImpSec;
     property SimulationStartAssigned: Boolean read FSimulationStartAssigned write FSimulationStartAssigned;
 
     property ValueImp: TMeterValue read FValueImp write SetValueImp;
@@ -319,6 +321,7 @@ type
     procedure RecreateFlowMeter(const AWorkTable: TWorkTable);
     procedure AssignFlowMeterFrom(const ASource: TChannel; const AWorkTable: TWorkTable;
       const ACloneDeviceToRepo: Boolean = True);
+    procedure SetSimulationTargetImpSec(const AImpSec: Double);
     procedure SetValues;
     procedure CreateDevice;
 
@@ -974,11 +977,7 @@ end;
 
 function GetPointMatchBaseUnitName(AChannel: TChannel): string;
 begin
-  Result := CPointMatchFlowBaseUnit;
-  if (AChannel <> nil) and
-     (AChannel.FlowMeter <> nil) and
-     (AChannel.FlowMeter.ValueFlow <> nil) then
-    Result := AChannel.FlowMeter.ValueFlow.GetDimName(0);
+  Result := 'л/с';
 end;
 
 function GetChannelFlowForPointMatchBase(AChannel: TChannel): Double;
@@ -1000,11 +999,14 @@ begin
   if (ADevice = nil) or (APoint = nil) then
     Exit;
 
-  if APoint.Q > 0 then
-    Exit(ADevice.ToBaseUnits(APoint.Q));
-
   QmaxBase := ADevice.ToBaseUnits(ADevice.Qmax);
-  Result := APoint.FlowRate * QmaxBase;
+  if (APoint.FlowRate > 0) and (QmaxBase > 0) then
+    Exit(APoint.FlowRate * QmaxBase);
+
+  // TDevicePoint has no separate unit field for Q. Use Q only as a
+  // fallback when the relative point flow cannot be calculated from Qmax.
+  if APoint.Q > 0 then
+    Result := ADevice.ToBaseUnits(APoint.Q);
 end;
 
 function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: Double): TDevicePoint;
@@ -1012,10 +1014,13 @@ var
   DevicePoint: TDevicePoint;
   DeviceQmaxRaw: Double;
   DeviceQmaxBase: Double;
+  DeviceQmaxUnit: string;
+  PointQBase: Double;
   PointFlowBase: Double;
   DeltaBase: Double;
   BestDeltaBase: Double;
   BaseUnit: string;
+  MatchBasis: string;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -1039,12 +1044,13 @@ begin
   end;
 
   DeviceQmaxRaw := AChannel.FlowMeter.Device.Qmax;
+  DeviceQmaxUnit := AChannel.FlowMeter.Device.GetDimensionName;
   DeviceQmaxBase := AChannel.FlowMeter.Device.ToBaseUnits(DeviceQmaxRaw);
   BestDeltaBase := MaxDouble;
 
-  DebugLog('ENTER', Format('CurrentFlowBase=%g; BaseUnit=%s; Device=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; DeviceQmaxBase=%g; PointsCount=%d',
+  DebugLog('ENTER', Format('CurrentFlowBase=%g; BaseUnit=%s; Device=%s; DeviceQmax=%g; DeviceQmaxUnit=%s; DeviceQmaxBase=%g; PointsCount=%d',
     [ACurrentFlowBase, BaseUnit, Trim(AChannel.FlowMeter.Device.Name), DeviceQmaxRaw,
-     AChannel.FlowMeter.Device.GetDimensionName, DeviceQmaxBase,
+     DeviceQmaxUnit, DeviceQmaxBase,
      AChannel.FlowMeter.Device.Points.Count]));
 
   for DevicePoint in AChannel.FlowMeter.Device.Points do
@@ -1053,12 +1059,21 @@ begin
       Continue;
 
     PointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, DevicePoint);
+    PointQBase := 0;
+    if DevicePoint.Q > 0 then
+      PointQBase := AChannel.FlowMeter.Device.ToBaseUnits(DevicePoint.Q);
+    if (DevicePoint.FlowRate > 0) and (DeviceQmaxBase > 0) then
+      MatchBasis := 'FlowRate*DeviceQmaxBase'
+    else if DevicePoint.Q > 0 then
+      MatchBasis := 'PointQFallback'
+    else
+      MatchBasis := 'None';
     DeltaBase := Abs(ACurrentFlowBase - PointFlowBase);
-    DebugLog('CHECK_POINT', Format('PointName=%s; PointUUID=%s; PointQRaw=%g; PointQRawUnit=%s; PointFlowRate=%g; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; PointFlowBase=%g; BaseUnit=%s; DeltaBase=%g; PointError=%g',
+    DebugLog('CANDIDATE', Format('PointName=%s; PointUUID=%s; Point.Q=%g; Point.FlowRate=%g; Point.Qavg=%s; Point.QBase=%g; DeviceQmax=%g; DeviceQmaxUnit=%s; DeviceQmaxBase=%g; PointFlowBase=%g; Units=%s; Delta=%g; Error=%g; MatchBasis=%s',
       [Trim(DevicePoint.Name), Trim(DevicePoint.UUID), DevicePoint.Q,
-       AChannel.FlowMeter.Device.GetDimensionName, DevicePoint.FlowRate, DeviceQmaxRaw,
-       AChannel.FlowMeter.Device.GetDimensionName, PointFlowBase, BaseUnit,
-       DeltaBase, DevicePoint.Error]));
+       DevicePoint.FlowRate, 'N/A', PointQBase, DeviceQmaxRaw,
+       DeviceQmaxUnit, DeviceQmaxBase, PointFlowBase, BaseUnit, DeltaBase,
+       DevicePoint.Error, MatchBasis]));
 
     if (Result = nil) or (DeltaBase < BestDeltaBase) then
     begin
@@ -1689,6 +1704,7 @@ begin
   FValueResult := 0;
   FSimulationTargetFlowBase := 0;
   FSimulationStartImpSec := 0;
+  FSimulationTargetImpSec := 0;
   FSimulationStartAssigned := False;
   FGroup := 0;
   FCategory := mftUnknownType;
@@ -1780,6 +1796,13 @@ begin
   FFlowMeter.CreateDevice;
 
   end;
+
+procedure TChannel.SetSimulationTargetImpSec(const AImpSec: Double);
+begin
+  FSimulationStartImpSec := AImpSec;
+  FSimulationTargetImpSec := AImpSec;
+  FSimulationStartAssigned := True;
+end;
 
 procedure TChannel.AssignFlowMeterFrom(const ASource: TChannel;
   const AWorkTable: TWorkTable; const ACloneDeviceToRepo: Boolean);
@@ -5506,6 +5529,17 @@ var
   I: Integer;
   Channel: TChannel;
   ChannelImpSec: Double;
+  OldImpSec: Double;
+  OldStartImpSec: Double;
+  OldTargetImpSec: Double;
+  ChannelName: string;
+  DeviceName: string;
+
+  function BoolText(const AValue: Boolean): string;
+  begin
+    Result := System.SysUtils.BoolToStr(AValue, True);
+  end;
+
 begin
   if AChannels = nil then
     Exit;
@@ -5521,12 +5555,33 @@ begin
     else
       ChannelImpSec := 0;
 
+    OldImpSec := Channel.ImpSec;
+    OldStartImpSec := Channel.SimulationStartImpSec;
+    OldTargetImpSec := Channel.SimulationTargetImpSec;
+
     Channel.CurSec := ACurSec;
     Channel.ImpSec := ChannelImpSec;
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+
+    Channel.SetSimulationTargetImpSec(ChannelImpSec);
+
+    ChannelName := Trim(Channel.Name);
+    if ChannelName = '' then
+      ChannelName := Trim(Channel.Text);
+    DeviceName := '';
+    if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
+      DeviceName := Trim(Channel.FlowMeter.Device.Name);
+
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'SIM_TARGET_SET',
+        'DEBUG',
+        Format('Channel=%s; Device=%s; OldImpSec=%g; NewImpSec=%g; OldStartImpSec=%g; NewStartImpSec=%g; OldTargetImpSec=%g; NewTargetImpSec=%g; ReadinessChecked=%s; AppliedOnlyToSelectedChannel=True',
+          [ChannelName, DeviceName, OldImpSec, ChannelImpSec, OldStartImpSec,
+           Channel.SimulationStartImpSec, OldTargetImpSec, Channel.SimulationTargetImpSec,
+           BoolText((WorkTableManager = nil) or WorkTableManager.SimulationReady)]));
   end;
 end;
 
@@ -6546,11 +6601,12 @@ begin
         if not Channel.SimulationStartAssigned then
         begin
           Channel.SimulationStartImpSec := Channel.ImpSec;
+          Channel.SimulationTargetImpSec := Channel.ImpSec;
           Channel.SimulationStartAssigned := True;
         end;
 
         StartImpSec := Channel.SimulationStartImpSec;
-        TargetImpSec := StartImpSec;
+        TargetImpSec := Channel.SimulationTargetImpSec;
         EtalonFlow := GetActiveEtalonFlowBase;
         NoiseAmplitude := Max(Abs(TargetImpSec) * 0.005, 5.0);
         ImpDelta := RandomRangeDouble(-NoiseAmplitude, NoiseAmplitude);
@@ -6563,6 +6619,7 @@ begin
         StartImpSec := Channel.SimulationStartImpSec;
         EtalonFlow := GetActiveEtalonFlowBase;
         TargetImpSec := CalcDeviceImpSecByFlow(Channel, EtalonFlow);
+        Channel.SimulationTargetImpSec := TargetImpSec;
         Diff := TargetImpSec - Channel.ImpSec;
 
         if SameValue(Diff, 0.0, 1E-12) then
@@ -6603,6 +6660,7 @@ begin
       Channel.ImpSec := 0;
       Channel.ImpResult := 0;
       Channel.SimulationStartAssigned := False;
+      Channel.SimulationTargetImpSec := 0;
     end;
   end;
 end;
