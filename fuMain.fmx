@@ -1529,6 +1529,17 @@ object FormMain: TFormMain
             TextSettings.Trimming = None
             OnClick = ButtonApplyDeviceValuesClick
           end
+          object CheckBoxReadiness: TCheckBox
+            IsChecked = True
+            Position.X = 24.000000000000000000
+            Position.Y = 231.000000000000000000
+            Size.Width = 128.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 9
+            Text = #1075#1086#1090#1086#1074#1085#1086#1089#1090#1100
+            OnChange = CheckBoxReadinessChange
+          end
         end
       end
       object EditTestNum: TEdit
