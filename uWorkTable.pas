@@ -751,6 +751,10 @@ type
 
   var WorkTableManager:   TWorkTableManager;
 
+function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel;
+  AStrictDeviceUUID: Boolean): TDevicePoint;
+function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
+
 implementation
 
 uses
@@ -758,6 +762,157 @@ uses
   frmMainTable,
   uMeasurementRun,
   uMKSDebug;
+
+function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel;
+  AStrictDeviceUUID: Boolean): TDevicePoint;
+var
+  DevicePoint: TDevicePoint;
+  CurPoint: TDevicePoint;
+  CurPointUUID: string;
+  CurPointName: string;
+  CurDeviceUUID: string;
+  ChannelDeviceUUID: string;
+
+  procedure DebugLog(const AAction, AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'FindMatchedDevicePoint ' + AAction,
+        'DEBUG', AParams);
+  end;
+
+begin
+  Result := nil;
+
+  if AWorkTable = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoActiveWorkTable');
+    Exit;
+  end;
+
+  if AWorkTable.CurrentPoint = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoCurrentPoint');
+    Exit;
+  end;
+
+  if AChannel = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoChannel');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoFlowMeter');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter.Device = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoDevice');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter.Device.Points = nil then
+  begin
+    DebugLog('EXIT_NIL', 'Reason=NoPoints');
+    Exit;
+  end;
+
+  CurPoint := AWorkTable.CurrentPoint;
+
+  CurDeviceUUID := Trim(CurPoint.DeviceUUID);
+  ChannelDeviceUUID := Trim(AChannel.DeviceUUID);
+
+  if (ChannelDeviceUUID = '') and (AChannel.FlowMeter <> nil) then
+    ChannelDeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+
+  if (ChannelDeviceUUID = '') and (AChannel.FlowMeter.Device <> nil) then
+    ChannelDeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
+
+  DebugLog('ENTER', Format('Strict=%s; CurUUID=%s; CurDeviceUUID=%s; CurName=%s; ChannelDeviceUUID=%s; PointsCount=%d',
+    [BoolToStr(AStrictDeviceUUID, True), Trim(CurPoint.UUID), CurDeviceUUID, Trim(CurPoint.Name),
+     ChannelDeviceUUID, AChannel.FlowMeter.Device.Points.Count]));
+
+  if AStrictDeviceUUID then
+    if (CurDeviceUUID <> '') and
+       (ChannelDeviceUUID <> '') and
+       (not SameText(CurDeviceUUID, ChannelDeviceUUID)) then
+    begin
+      DebugLog('EXIT_NIL', Format('Reason=DeviceUUIDMismatch; CurDeviceUUID=%s; ChannelDeviceUUID=%s',
+        [CurDeviceUUID, ChannelDeviceUUID]));
+      Exit;
+    end;
+
+  CurPointUUID := Trim(CurPoint.UUID);
+  CurPointName := Trim(CurPoint.Name);
+
+  if CurPointUUID <> '' then
+  begin
+    DebugLog('SEARCH_UUID', 'CurUUID=' + CurPointUUID);
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         SameText(Trim(DevicePoint.UUID), CurPointUUID) then
+      begin
+        DebugLog('FOUND_BY_UUID', Format('PointUUID=%s; PointName=%s; Error=%g',
+          [Trim(DevicePoint.UUID), Trim(DevicePoint.Name), DevicePoint.Error]));
+        Exit(DevicePoint);
+      end;
+    DebugLog('UUID_NOT_FOUND', 'CurUUID=' + CurPointUUID);
+  end;
+
+  if CurPointName <> '' then
+  begin
+    DebugLog('SEARCH_NAME', 'CurName=' + CurPointName);
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         SameText(Trim(DevicePoint.Name), CurPointName) then
+      begin
+        DebugLog('FOUND_BY_NAME', Format('PointUUID=%s; PointName=%s; Error=%g',
+          [Trim(DevicePoint.UUID), Trim(DevicePoint.Name), DevicePoint.Error]));
+        Exit(DevicePoint);
+      end;
+    DebugLog('NAME_NOT_FOUND', 'CurName=' + CurPointName);
+  end;
+
+  DebugLog('EXIT_NIL', 'Reason=NoPointMatched');
+end;
+
+function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
+var
+  MatchedPoint: TDevicePoint;
+  BaseImpDelta: Double;
+  CurrentError: Double;
+  AllowedError: Double;
+begin
+  Result := Random(11) - 5;
+
+  if (AWorkTable = nil) or
+     (AChannel = nil) or
+     (AChannel.FlowMeter = nil) then
+    Exit;
+
+  MatchedPoint := FindMatchedDevicePoint(AWorkTable, AChannel, False);
+  if MatchedPoint = nil then
+    Exit;
+
+  AllowedError := Abs(MatchedPoint.Error);
+  if AllowedError <= 0 then
+    Exit;
+
+  CurrentError := 0;
+  if AChannel.FlowMeter.ValueError <> nil then
+    CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
+
+  BaseImpDelta := Abs(Random(11) - 5);
+  if BaseImpDelta = 0 then
+    BaseImpDelta := 1;
+
+  if Abs(CurrentError) > AllowedError then
+    Result := -BaseImpDelta
+  else
+    Result := BaseImpDelta;
+end;
 
 const
   CEmptyGridDeviceComment = '[GridDevices.EmptyPlaceholder]';
@@ -5876,7 +6031,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
@@ -5899,7 +6054,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcImpDeltaByError(AWorkTable, Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
