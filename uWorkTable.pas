@@ -773,6 +773,8 @@ function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: 
 function GetDevicePointFlowTolerancePercent(APoint: TDevicePoint): Double;
 function IsDevicePointFlowInRange(AChannel: TChannel; APoint: TDevicePoint; ACurrentFlowBase: Double;
   out APointFlowBase, ATolerancePercent, AMinFlowBase, AMaxFlowBase: Double): Boolean;
+function FindPointByCurrentMeasurementPoint(AWorkTable: TWorkTable; AChannel: TChannel;
+  out AMatchSource: string): TDevicePoint;
 function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
 
 implementation
@@ -1147,6 +1149,56 @@ begin
   Result := AMin + Random * (AMax - AMin);
 end;
 
+function FindPointByCurrentMeasurementPoint(AWorkTable: TWorkTable; AChannel: TChannel;
+  out AMatchSource: string): TDevicePoint;
+var
+  DevicePoint: TDevicePoint;
+  CurPoint: TDevicePoint;
+  CurDeviceTypePointUUID: string;
+  CurDevicePointUUID: string;
+  CurPointName: string;
+begin
+  Result := nil;
+  AMatchSource := 'None';
+
+  if (AWorkTable = nil) or (AWorkTable.CurrentPoint = nil) or
+     (AChannel = nil) or (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.Device = nil) or
+     (AChannel.FlowMeter.Device.Points = nil) then
+    Exit;
+
+  CurPoint := AWorkTable.CurrentPoint;
+  CurDeviceTypePointUUID := Trim(CurPoint.DeviceTypeUUID);
+  CurDevicePointUUID := Trim(CurPoint.UUID);
+  CurPointName := Trim(CurPoint.Name);
+
+  if CurDeviceTypePointUUID <> '' then
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         SameText(Trim(DevicePoint.DeviceTypeUUID), CurDeviceTypePointUUID) then
+      begin
+        AMatchSource := 'CurrentPointUUID';
+        Exit(DevicePoint);
+      end;
+
+  if CurDevicePointUUID <> '' then
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and
+         SameText(Trim(DevicePoint.UUID), CurDevicePointUUID) then
+      begin
+        AMatchSource := 'CurrentPointUUID';
+        Exit(DevicePoint);
+      end;
+
+  if CurPointName <> '' then
+    for DevicePoint in AChannel.FlowMeter.Device.Points do
+      if (DevicePoint <> nil) and SameText(Trim(DevicePoint.Name), CurPointName) then
+      begin
+        AMatchSource := 'CurrentPointName';
+        Exit(DevicePoint);
+      end;
+end;
+
 function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
 var
   MatchedPoint: TDevicePoint;
@@ -1157,6 +1209,8 @@ var
   AllowOutOfRange: Boolean;
   ChannelName: string;
   DeviceName: string;
+  MatchSource: string;
+  CurrentFlowBase: Double;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -1165,10 +1219,49 @@ var
         'DEBUG', AParams);
   end;
 
+  procedure LogSimPointMatch(const AAllowedError: Double);
+  var
+    CurrentPointName: string;
+    CurrentDeviceTypePointUUID: string;
+    CurrentDevicePointUUID: string;
+    MatchedPointName: string;
+    MatchedPointUUID: string;
+    MatchedPointError: Double;
+  begin
+    CurrentPointName := '';
+    CurrentDeviceTypePointUUID := '';
+    CurrentDevicePointUUID := '';
+    if (AWorkTable <> nil) and (AWorkTable.CurrentPoint <> nil) then
+    begin
+      CurrentPointName := Trim(AWorkTable.CurrentPoint.Name);
+      CurrentDeviceTypePointUUID := Trim(AWorkTable.CurrentPoint.DeviceTypeUUID);
+      CurrentDevicePointUUID := Trim(AWorkTable.CurrentPoint.UUID);
+    end;
+
+    MatchedPointName := '';
+    MatchedPointUUID := '';
+    MatchedPointError := 0;
+    if MatchedPoint <> nil then
+    begin
+      MatchedPointName := Trim(MatchedPoint.Name);
+      MatchedPointUUID := Trim(MatchedPoint.UUID);
+      MatchedPointError := MatchedPoint.Error;
+    end;
+
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'SIM_POINT_MATCH',
+        'DEBUG',
+        Format('Channel=%s; Device=%s; CurrentPointName=%s; CurrentDeviceTypePointUUID=%s; CurrentDevicePointUUID=%s; MatchedPointName=%s; MatchedPointUUID=%s; MatchedPointError=%g; MatchSource=%s; AllowedError=%g',
+          [ChannelName, DeviceName, CurrentPointName, CurrentDeviceTypePointUUID,
+           CurrentDevicePointUUID, MatchedPointName, MatchedPointUUID,
+           MatchedPointError, MatchSource, AAllowedError]));
+  end;
+
 begin
   Result := Random(11) - 5;
   ChannelName := '';
   DeviceName := '';
+  MatchSource := 'None';
 
   if AChannel <> nil then
   begin
@@ -1188,15 +1281,29 @@ begin
     Exit;
   end;
 
-  MatchedPoint := FindMatchedDevicePoint(AWorkTable, AChannel, False);
+  MatchedPoint := FindPointByCurrentMeasurementPoint(AWorkTable, AChannel, MatchSource);
   if MatchedPoint = nil then
   begin
+    CurrentFlowBase := GetChannelFlowForPointMatchBase(AChannel);
+    if (CurrentFlowBase = 0) and (AWorkTable.ValueFlowRate <> nil) then
+      CurrentFlowBase := AWorkTable.ValueFlowRate.GetDoubleValue;
+    MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
+    if MatchedPoint <> nil then
+      MatchSource := 'ByFlowFallback'
+    else
+      MatchSource := 'None';
+  end;
+
+  if MatchedPoint = nil then
+  begin
+    LogSimPointMatch(0);
     DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; ImpDelta=%g',
       [ChannelName, DeviceName, Result]));
     Exit;
   end;
 
   AllowedError := Abs(MatchedPoint.Error);
+  LogSimPointMatch(AllowedError);
   if AllowedError <= 0 then
   begin
     DebugLog('SKIP', Format('Reason=AllowedErrorZero; Channel=%s; Device=%s; PointName=%s; AllowedError=%g; ImpDelta=%g',
