@@ -999,17 +999,14 @@ begin
   if (ADevice = nil) or (APoint = nil) then
     Exit;
 
-  if APoint.Q > 0 then
-  begin
-    // Device points used by the live grid already store Q in the same
-    // base flow unit as the live value (л/с). Do not convert it through
-    // the device display unit again, otherwise 4.944 л/с becomes
-    // 1.373 л/с when the device unit is м3/ч.
-    Exit(APoint.Q);
-  end;
+  QmaxBase := ADevice.ToBaseUnits(ADevice.Qmax);
+  if (APoint.FlowRate > 0) and (QmaxBase > 0) then
+    Exit(APoint.FlowRate * QmaxBase);
 
-  QmaxValue := ADevice.Qmax;
-  Result := APoint.FlowRate * QmaxValue;
+  // TDevicePoint has no separate unit field for Q. Use Q only as a
+  // fallback when the relative point flow cannot be calculated from Qmax.
+  if APoint.Q > 0 then
+    Result := ADevice.ToBaseUnits(APoint.Q);
 end;
 
 function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: Double): TDevicePoint;
@@ -1017,10 +1014,13 @@ var
   DevicePoint: TDevicePoint;
   DeviceQmaxRaw: Double;
   DeviceQmaxBase: Double;
+  DeviceQmaxUnit: string;
+  PointQBase: Double;
   PointFlowBase: Double;
   DeltaBase: Double;
   BestDeltaBase: Double;
   BaseUnit: string;
+  MatchBasis: string;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -1044,12 +1044,13 @@ begin
   end;
 
   DeviceQmaxRaw := AChannel.FlowMeter.Device.Qmax;
-  DeviceQmaxBase := DeviceQmaxRaw;
+  DeviceQmaxUnit := AChannel.FlowMeter.Device.GetDimensionName;
+  DeviceQmaxBase := AChannel.FlowMeter.Device.ToBaseUnits(DeviceQmaxRaw);
   BestDeltaBase := MaxDouble;
 
   DebugLog('ENTER', Format('CurrentFlowBase=%g; BaseUnit=%s; Device=%s; DeviceQmax=%g; DeviceQmaxUnit=%s; DeviceQmaxBase=%g; PointsCount=%d',
     [ACurrentFlowBase, BaseUnit, Trim(AChannel.FlowMeter.Device.Name), DeviceQmaxRaw,
-     BaseUnit, DeviceQmaxBase,
+     DeviceQmaxUnit, DeviceQmaxBase,
      AChannel.FlowMeter.Device.Points.Count]));
 
   for DevicePoint in AChannel.FlowMeter.Device.Points do
@@ -1058,11 +1059,21 @@ begin
       Continue;
 
     PointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, DevicePoint);
+    PointQBase := 0;
+    if DevicePoint.Q > 0 then
+      PointQBase := AChannel.FlowMeter.Device.ToBaseUnits(DevicePoint.Q);
+    if (DevicePoint.FlowRate > 0) and (DeviceQmaxBase > 0) then
+      MatchBasis := 'FlowRate*DeviceQmaxBase'
+    else if DevicePoint.Q > 0 then
+      MatchBasis := 'PointQFallback'
+    else
+      MatchBasis := 'None';
     DeltaBase := Abs(ACurrentFlowBase - PointFlowBase);
-    DebugLog('CANDIDATE', Format('PointName=%s; PointUUID=%s; Point.Q=%g; Point.FlowRate=%g; Point.Qavg=%s; Point.QBase=%g; DeviceQmax=%g; DeviceQmaxUnit=%s; PointFlowBase=%g; Units=%s; Delta=%g; Error=%g',
+    DebugLog('CANDIDATE', Format('PointName=%s; PointUUID=%s; Point.Q=%g; Point.FlowRate=%g; Point.Qavg=%s; Point.QBase=%g; DeviceQmax=%g; DeviceQmaxUnit=%s; DeviceQmaxBase=%g; PointFlowBase=%g; Units=%s; Delta=%g; Error=%g; MatchBasis=%s',
       [Trim(DevicePoint.Name), Trim(DevicePoint.UUID), DevicePoint.Q,
-       DevicePoint.FlowRate, 'N/A', PointFlowBase, DeviceQmaxRaw,
-       BaseUnit, PointFlowBase, BaseUnit, DeltaBase, DevicePoint.Error]));
+       DevicePoint.FlowRate, 'N/A', PointQBase, DeviceQmaxRaw,
+       DeviceQmaxUnit, DeviceQmaxBase, PointFlowBase, BaseUnit, DeltaBase,
+       DevicePoint.Error, MatchBasis]));
 
     if (Result = nil) or (DeltaBase < BestDeltaBase) then
     begin
