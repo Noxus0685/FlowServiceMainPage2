@@ -993,7 +993,7 @@ end;
 
 function GetDevicePointFlowBase(ADevice: TDevice; APoint: TDevicePoint): Double;
 var
-  QmaxBase: Double;
+  QmaxValue: Double;
 begin
   Result := 0;
   if (ADevice = nil) or (APoint = nil) then
