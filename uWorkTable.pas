@@ -909,7 +909,7 @@ begin
     ChannelDeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
 
   DebugLog('ENTER', Format('Strict=%s; CurUUID=%s; CurDeviceUUID=%s; CurName=%s; ChannelDeviceUUID=%s; PointsCount=%d',
-    [BoolToStr(AStrictDeviceUUID, True), Trim(CurPoint.UUID), CurDeviceUUID, Trim(CurPoint.Name),
+    [System.SysUtils.BoolToStr(AStrictDeviceUUID, True), Trim(CurPoint.UUID), CurDeviceUUID, Trim(CurPoint.Name),
      ChannelDeviceUUID, AChannel.FlowMeter.Device.Points.Count]));
 
   if AStrictDeviceUUID then
@@ -1123,7 +1123,7 @@ begin
 
   DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentFlow=%g; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
     [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlow, CurrentError, AllowedError,
-     TargetError, Result, BoolToStr(AllowOutOfRange, True)]));
+     TargetError, Result, System.SysUtils.BoolToStr(AllowOutOfRange, True)]));
 end;
 
 const
