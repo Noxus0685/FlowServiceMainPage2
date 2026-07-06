@@ -48,6 +48,7 @@ type
     LabelTestNum: TLabel;
     Label5: TLabel;
     mPump: TMemo;
+    ComboBoxReadiness: TComboBox;
     procedure FormCreate(Sender: TObject);
     procedure TabControlMainChange(Sender: TObject);
     procedure TimerSetValuesTimer(Sender: TObject);
@@ -57,6 +58,7 @@ type
     procedure  PumpStateHandler(AParameters: TParameter; AAction:EActionParameter);
     procedure EditEtalonFlowRateExit(Sender: TObject);
     procedure EditDeviceFlowRateExit(Sender: TObject);
+    procedure ComboBoxReadinessChange(Sender: TObject);
 
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
 
@@ -177,6 +179,12 @@ begin
   UpdateDeviceImpSecFromFlowRate;
 end;
 
+procedure TFormMain.ComboBoxReadinessChange(Sender: TObject);
+begin
+  if FWorkTableManager <> nil then
+    FWorkTableManager.SimulationReady := ComboBoxReadiness.ItemIndex = 0;
+end;
+
 procedure TFormMain.EditEtalonFlowRateExit(Sender: TObject);
 begin
   UpdateEtalonImpSecFromFlowRate;
@@ -282,6 +290,12 @@ begin
   FFrameProceed.Parent := TabItemResults;
   FFrameProceed.Align := TAlignLayout.Client;
   FFrameProceed.Initialize(FWorkTableManager);
+
+  if ComboBoxReadiness <> nil then
+  begin
+    ComboBoxReadiness.ItemIndex := 0;
+    ComboBoxReadinessChange(ComboBoxReadiness);
+  end;
 
 
 end;

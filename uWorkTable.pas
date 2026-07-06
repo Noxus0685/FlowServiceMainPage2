@@ -716,6 +716,7 @@ type
     FIniFileName: string;
     FWorkTables: TObjectList<TWorkTable>;
     FIsSimulationMode :Boolean;
+    FSimulationReady: Boolean;
     FActiveWorkTable  :TWorkTable;
 
   public
@@ -745,6 +746,7 @@ type
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
+    property SimulationReady: Boolean read FSimulationReady write FSimulationReady;
     procedure UpdateSimulation;
 
   end;
@@ -5484,6 +5486,7 @@ constructor TWorkTableManager.Create(const AIniFileName: string);
 begin
   inherited Create;
   FIniFileName := AIniFileName;
+  FSimulationReady := True;
   FWorkTables := TObjectList<TWorkTable>.Create(True);
   TPump.Pumps := TObjectList<TPump>.Create(True);
   TWeight.Weights := TObjectList<TWeight>.Create(True);
@@ -6166,6 +6169,56 @@ var
   ChannelFlowRate: Double;
   ChannelCoef: Double;
   ChannelRatio: Double;
+
+  function GetNearestPointFlow(const ACurrentFlow: Double): Double;
+  var
+    Channel: TChannel;
+    Point: TDevicePoint;
+    PointFlow: Double;
+    Delta: Double;
+    BestDelta: Double;
+  begin
+    Result := ACurrentFlow;
+    BestDelta := MaxDouble;
+    if AWorkTable.DeviceChannels = nil then
+      Exit;
+
+    for Channel in AWorkTable.DeviceChannels do
+      if (Channel <> nil) and Channel.Enabled and
+         (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) and
+         (Channel.FlowMeter.Device.Points <> nil) then
+        for Point in Channel.FlowMeter.Device.Points do
+        begin
+          if Point = nil then
+            Continue;
+          PointFlow := GetDevicePointFlowBase(Channel.FlowMeter.Device, Point);
+          Delta := Abs(ACurrentFlow - PointFlow);
+          if Delta < BestDelta then
+          begin
+            BestDelta := Delta;
+            Result := PointFlow;
+          end;
+        end;
+  end;
+
+  function CalcSimulationFlow: Double;
+  var
+    TargetFlow: Double;
+    CurrentFlow: Double;
+  begin
+    CurrentFlow := FlowRate.Value.Value;
+    if (WorkTableManager = nil) or WorkTableManager.SimulationReady then
+      TargetFlow := CurrentFlow + (Random * 0.2) - 0.1
+    else
+      TargetFlow := GetNearestPointFlow(CurrentFlow);
+
+    if Abs(CurrentFlow - TargetFlow) < 1 then
+      Result := AWorkTable.ValueFlowRate.GetDoubleNum(TargetFlow, 4)
+    else if CurrentFlow < TargetFlow then
+      Result := AWorkTable.ValueFlowRate.GetDoubleNum(CurrentFlow + 1, 4)
+    else
+      Result := AWorkTable.ValueFlowRate.GetDoubleNum(CurrentFlow - 1, 4);
+  end;
 begin
 
   FlowRate := AWorkTable.FlowRate; // Контроллер расхода
@@ -6190,14 +6243,7 @@ begin
             if (AWorkTable.EtalonChannels[I] <> nil) and (AWorkTable.EtalonChannels[I].Enabled) then
               EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
 
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
-
-
+              Flow := CalcSimulationFlow;
 
              ImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
               EnabledEtalonChannels,
@@ -6224,12 +6270,7 @@ begin
               EnabledDeviceChannels.Add(AWorkTable.DeviceChannels[I]);
             end;
 
-              IF ABS(FlowRate.Value.Value-FlowRate.ValueSet.Value)<1 then
-               Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Valueset.Value,4)
-              else IF FlowRate.Value.Value<FlowRate.ValueSet.Value then
-                Flow  :=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value+1,4)
-              else if FlowRate.Value.Value>FlowRate.ValueSet.Value then
-                Flow:=AWorkTable.ValueFlowRate.GetDoubleNum(FlowRate.Value.Value-1,4);
+              Flow := CalcSimulationFlow;
 
           ImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
             EnabledDeviceChannels,
