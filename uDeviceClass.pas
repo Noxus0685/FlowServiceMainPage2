@@ -1821,9 +1821,10 @@ begin
   begin
   ID := ASource.ID;
   DeviceID := ASource.DeviceID;
-  DeviceUUID := ASource.DeviceUUID;
   end;
 
+  UUID := ASource.UUID;
+  DeviceUUID := ASource.DeviceUUID;
   DeviceTypeUUID := ASource.DeviceTypeUUID;
   {====================================================================}
   { СОСТОЯНИЕ }
