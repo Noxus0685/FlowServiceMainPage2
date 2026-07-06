@@ -785,6 +785,7 @@ type
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
     function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
+    procedure LogGridDevicesDrawBinding(const AContext: string);
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -1773,6 +1774,7 @@ begin
   PopupColumnEtalonSignal1.Items.Assign(PopupColumnDeviceSignal1.Items);
   GridEtalons.OnDrawColumnCell := GridEtalonsDrawColumnCell;
   GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
+  LogGridDevicesDrawBinding('Initialize');
 
   ComboEditUnits.Items.Clear;
   for UnitName in CVolumeFlowUnits do
@@ -5611,6 +5613,22 @@ begin
   Result := GRID_DEVICE_GROUP_COLORS[Abs(AGroup) mod Length(GRID_DEVICE_GROUP_COLORS)];
 end;
 
+
+procedure TFrameMainTable.LogGridDevicesDrawBinding(const AContext: string);
+var
+  ErrorColumnHeader: string;
+begin
+  ErrorColumnHeader := '';
+  if StringColumnDeviceError1 <> nil then
+    ErrorColumnHeader := StringColumnDeviceError1.Header;
+
+  if (ProtocolManager <> nil) and (GridDevices <> nil) then
+    ProtocolManager.AddMessage(pcInfo, psForm, 'GridDevicesDrawBinding', 'DEBUG',
+      Format('Context=%s; OnDrawColumnCellAssigned=%s; ErrorColumnFound=%s; ErrorColumnHeader=%s',
+        [AContext, BoolToStr(Assigned(GridDevices.OnDrawColumnCell), True),
+         BoolToStr(StringColumnDeviceError1 <> nil, True), ErrorColumnHeader]));
+end;
+
 function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
   const AText: string; out AColor: TAlphaColor): Boolean;
 var
@@ -5793,7 +5811,7 @@ begin
   if (GrayLimitPercent > 0) and (AbsActualError > GrayLimitPercent) then
   begin
     AColor := TAlphaColorRec.Lightgray;
-    DebugLog('ERROR_COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverGrayLimit',
+    DebugLog('COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverGrayLimit',
       [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
        AbsActualError, ColorToDebugName(AColor)]));
     Exit;
@@ -5802,14 +5820,14 @@ begin
   if AbsActualError > AllowedError then
   begin
     AColor := TAlphaColorRec.Lightyellow;
-    DebugLog('ERROR_COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverPointTolerance',
+    DebugLog('COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverPointTolerance',
       [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
        AbsActualError, ColorToDebugName(AColor)]));
   end
   else
   begin
     AColor := $FFE6F4E6;
-    DebugLog('ERROR_COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorInsideTolerance',
+    DebugLog('COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorInsideTolerance',
       [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
        AbsActualError, ColorToDebugName(AColor)]));
   end;
@@ -6827,6 +6845,9 @@ end;
     Rows: Integer;
     ColumnWidths: TArray<Single>;
  begin
+   if GridDevices <> nil then
+     GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
+   LogGridDevicesDrawBinding('UpdateGridDevices.BeforeReload');
    Rows:= GridDevices.RowCount;
    SaveGridColumnWidths(GridDevices, ColumnWidths);
 
@@ -6841,6 +6862,9 @@ end;
     GridDevices.EndUpdate;
   end;
 
+   if GridDevices <> nil then
+     GridDevices.OnDrawColumnCell := GridDevicesDrawColumnCell;
+   LogGridDevicesDrawBinding('UpdateGridDevices.AfterReload');
 
  end;
 
