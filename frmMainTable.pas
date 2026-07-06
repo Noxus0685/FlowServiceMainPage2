@@ -5616,6 +5616,7 @@ function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
 var
   S: string;
   ActualError: Double;
+  CurrentFlow: Double;
   AllowedError: Double;
   DeviceName: string;
   ChannelDeviceUUID: string;
@@ -5687,6 +5688,7 @@ var
 begin
   Result := False;
   AColor := TAlphaColors.Null;
+  CurrentFlow := 0;
   LoadDebugContext;
 
   DebugLog('ENTER', Format('Channel=%s; Device=%s; ChannelDeviceUUID=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s',
@@ -5739,19 +5741,22 @@ begin
     Exit;
   end;
 
-  MatchedPoint := FindMatchedDevicePoint(FActiveWorkTable, AChannel, False);
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.ValueFlow <> nil) then
+    CurrentFlow := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+
+  MatchedPoint := FindMatchedDevicePointByFlow(AChannel, CurrentFlow);
   if MatchedPoint = nil then
   begin
-    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g',
-      [ChannelName, ActualError]));
+    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g; CurrentFlow=%g',
+      [ChannelName, ActualError, CurrentFlow]));
     LogSkip('MatchedPointNil');
     Exit;
   end;
 
   AllowedError := Abs(MatchedPoint.Error);
-  DebugLog('MATCH', Format('Channel=%s; Matched=True; PointUUID=%s; PointDeviceUUID=%s; PointName=%s; PointError=%g; ActualError=%g; AllowedError=%g',
+  DebugLog('MATCH', Format('Channel=%s; Matched=True; PointUUID=%s; PointDeviceUUID=%s; MatchedPointName=%s; PointError=%g; ActualError=%g; CurrentFlow=%g; AllowedError=%g',
     [ChannelName, Trim(MatchedPoint.UUID), Trim(MatchedPoint.DeviceUUID), Trim(MatchedPoint.Name),
-     MatchedPoint.Error, ActualError, AllowedError]));
+     MatchedPoint.Error, ActualError, CurrentFlow, AllowedError]));
 
   if AllowedError <= 0 then
   begin
@@ -5763,14 +5768,14 @@ begin
   if Abs(ActualError) > AllowedError then
   begin
     AColor := TAlphaColorRec.Lightyellow;
-    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorGreaterAllowed; ActualError=%g; AllowedError=%g',
-      [ChannelName, ColorToDebugName(AColor), ActualError, AllowedError]));
+    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorGreaterAllowed; ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; AllowedError=%g',
+      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlow, Trim(MatchedPoint.Name), AllowedError]));
   end
   else
   begin
     AColor := $FFE6F4E6;
-    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorWithinAllowed; ActualError=%g; AllowedError=%g',
-      [ChannelName, ColorToDebugName(AColor), ActualError, AllowedError]));
+    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorWithinAllowed; ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; AllowedError=%g',
+      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlow, Trim(MatchedPoint.Name), AllowedError]));
   end;
 end;
 
