@@ -5811,7 +5811,7 @@ begin
   begin
     AColor := TAlphaColorRec.Lightgray;
     Result := True;
-    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=False; Color=%s',
+    DebugLog('FLOW_RANGE_COLOR', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=False; Color=%s; AffectsFlow=False',
       [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
        FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
     Exit;
@@ -5831,10 +5831,9 @@ begin
     DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
       [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
        AllowedError, ColorToDebugName(AColor)]));
-    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; UserTargetFlow=%g; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=%s; Action=UsePoint; Color=%s',
-      [ChannelName, CurrentFlowBase, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
-       FlowTolerancePercent, MinFlowBase, MaxFlowBase,
-       System.SysUtils.BoolToStr(IsFlowInPointRange, True), ColorToDebugName(AColor)]));
+    DebugLog('FLOW_RANGE_COLOR', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=True; Color=%s; AffectsFlow=False',
+      [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
+       FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
   end
   else
   begin
@@ -5842,10 +5841,9 @@ begin
     DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
       [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
        AllowedError, ColorToDebugName(AColor)]));
-    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; UserTargetFlow=%g; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=%s; Action=UsePoint; Color=%s',
-      [ChannelName, CurrentFlowBase, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
-       FlowTolerancePercent, MinFlowBase, MaxFlowBase,
-       System.SysUtils.BoolToStr(IsFlowInPointRange, True), ColorToDebugName(AColor)]));
+    DebugLog('FLOW_RANGE_COLOR', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=True; Color=%s; AffectsFlow=False',
+      [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
+       FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
   end;
 end;
 
@@ -5865,6 +5863,8 @@ var
       Result := 'YELLOW'
     else if ACellColor = $FFE6F4E6 then
       Result := 'GREEN'
+    else if ACellColor = TAlphaColorRec.Lightgray then
+      Result := 'GRAY'
     else if ACellColor = TAlphaColors.Null then
       Result := 'NONE'
     else
