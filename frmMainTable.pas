@@ -5617,6 +5617,9 @@ var
   S: string;
   ActualError: Double;
   CurrentFlow: Double;
+  ValueFlowRaw: Double;
+  GridFlowText: string;
+  ValueFlowUnit: string;
   AllowedError: Double;
   DeviceName: string;
   ChannelDeviceUUID: string;
@@ -5689,6 +5692,9 @@ begin
   Result := False;
   AColor := TAlphaColors.Null;
   CurrentFlow := 0;
+  ValueFlowRaw := 0;
+  GridFlowText := '';
+  ValueFlowUnit := '';
   LoadDebugContext;
 
   DebugLog('ENTER', Format('Channel=%s; Device=%s; ChannelDeviceUUID=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s',
@@ -5742,7 +5748,16 @@ begin
   end;
 
   if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.ValueFlow <> nil) then
-    CurrentFlow := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+  begin
+    ValueFlowRaw := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+    GridFlowText := AChannel.FlowMeter.ValueFlow.GetStrValue;
+    ValueFlowUnit := AChannel.FlowMeter.ValueFlow.GetDimName;
+    CurrentFlow := GetChannelFlowForPointMatch(AChannel);
+  end;
+
+  DebugLog('FLOW_SOURCE', Format('Channel=%s; GridFlowText=%s; ValueFlowRaw=%g; ValueFlowUnit=%s; CurrentFlowForMatch=%g; MatchUnit=%s; DeviceQmax=%g; DeviceQmaxUnit=%s',
+    [ChannelName, GridFlowText, ValueFlowRaw, ValueFlowUnit, CurrentFlow, CPointMatchFlowUnit,
+     AChannel.FlowMeter.Device.Qmax, CPointMatchFlowUnit]));
 
   MatchedPoint := FindMatchedDevicePointByFlow(AChannel, CurrentFlow);
   if MatchedPoint = nil then

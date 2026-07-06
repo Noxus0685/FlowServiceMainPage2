@@ -751,8 +751,12 @@ type
 
   var WorkTableManager:   TWorkTableManager;
 
+const
+  CPointMatchFlowUnit = 'м3/ч';
+
 function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel;
   AStrictDeviceUUID: Boolean): TDevicePoint;
+function GetChannelFlowForPointMatch(AChannel: TChannel): Double;
 function FindMatchedDevicePointByFlow(AChannel: TChannel; ACurrentFlow: Double): TDevicePoint;
 function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
 
@@ -956,6 +960,17 @@ begin
   DebugLog('EXIT_NIL', 'Reason=NoPointMatched');
 end;
 
+function GetChannelFlowForPointMatch(AChannel: TChannel): Double;
+begin
+  Result := 0;
+  if (AChannel = nil) or
+     (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.ValueFlow = nil) then
+    Exit;
+
+  Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue(CPointMatchFlowUnit);
+end;
+
 function FindMatchedDevicePointByFlow(AChannel: TChannel; ACurrentFlow: Double): TDevicePoint;
 var
   DevicePoint: TDevicePoint;
@@ -986,9 +1001,9 @@ begin
   DeviceQmax := AChannel.FlowMeter.Device.Qmax;
   BestDelta := MaxDouble;
 
-  DebugLog('ENTER', Format('CurrentFlow=%g; Device=%s; DeviceQmax=%g; PointsCount=%d',
-    [ACurrentFlow, Trim(AChannel.FlowMeter.Device.Name), DeviceQmax,
-     AChannel.FlowMeter.Device.Points.Count]));
+  DebugLog('ENTER', Format('CurrentFlow=%g; CurrentFlowUnit=%s; Device=%s; DeviceQmax=%g; DeviceQmaxUnit=%s; PointFlowUnit=%s; PointsCount=%d',
+    [ACurrentFlow, CPointMatchFlowUnit, Trim(AChannel.FlowMeter.Device.Name), DeviceQmax,
+     CPointMatchFlowUnit, CPointMatchFlowUnit, AChannel.FlowMeter.Device.Points.Count]));
 
   for DevicePoint in AChannel.FlowMeter.Device.Points do
   begin
@@ -1056,7 +1071,7 @@ begin
     if AChannel.FlowMeter <> nil then
     begin
       if AChannel.FlowMeter.ValueFlow <> nil then
-        CurrentFlow := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+        CurrentFlow := GetChannelFlowForPointMatch(AChannel);
       if AChannel.FlowMeter.Device <> nil then
         DeviceName := Trim(AChannel.FlowMeter.Device.Name);
     end;
