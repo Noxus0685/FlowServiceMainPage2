@@ -830,9 +830,16 @@ begin
   if (ChannelDeviceUUID = '') and (AChannel.FlowMeter.Device <> nil) then
     ChannelDeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
 
-  DebugLog('ENTER', Format('Strict=%s; CurUUID=%s; CurDeviceUUID=%s; CurName=%s; ChannelDeviceUUID=%s; PointsCount=%d',
-    [BoolToStr(AStrictDeviceUUID, True), Trim(CurPoint.UUID), CurDeviceUUID, Trim(CurPoint.Name),
-     ChannelDeviceUUID, AChannel.FlowMeter.Device.Points.Count]));
+    DebugLog('ENTER', Format(
+      'Strict=%s; CurUUID=%s; CurDeviceUUID=%s; CurName=%s; ChannelDeviceUUID=%s; PointsCount=%d',
+      [
+        IfThen(AStrictDeviceUUID, 'True', 'False'),
+        Trim(CurPoint.UUID),
+        CurDeviceUUID,
+        Trim(CurPoint.Name),
+        ChannelDeviceUUID,
+        AChannel.FlowMeter.Device.Points.Count
+      ]));
 
   if AStrictDeviceUUID then
     if (CurDeviceUUID <> '') and
