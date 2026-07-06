@@ -5616,12 +5616,6 @@ function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
 var
   S: string;
   ActualError: Double;
-  CurrentFlowBase: Double;
-  ValueFlowRaw: Double;
-  GridFlowText: string;
-  GridFlowUnit: string;
-  DeviceQmaxBase: Double;
-  BaseUnit: string;
   AllowedError: Double;
   DeviceName: string;
   ChannelDeviceUUID: string;
@@ -5630,12 +5624,10 @@ var
   CurPointDeviceUUID: string;
   CurPointName: string;
   MatchedPoint: TDevicePoint;
-  PointFlowBase: Double;
-  FlowTolerancePercent: Double;
-  MinFlowBase: Double;
-  MaxFlowBase: Double;
+  GrayLimitPercent: Double;
+  AbsActualError: Double;
 
-  function ParseFlowTolerancePercent(const AText: string): Double;
+  function ParseGrayLimitPercent(const AText: string): Double;
   var
     I: Integer;
     Num: string;
@@ -5721,12 +5713,8 @@ var
 begin
   Result := False;
   AColor := TAlphaColors.Null;
-  CurrentFlowBase := 0;
-  ValueFlowRaw := 0;
-  GridFlowText := '';
-  GridFlowUnit := '';
-  DeviceQmaxBase := 0;
-  BaseUnit := CPointMatchFlowBaseUnit;
+  GrayLimitPercent := 0;
+  AbsActualError := 0;
   LoadDebugContext;
 
   DebugLog('ENTER', Format('Channel=%s; Device=%s; ChannelDeviceUUID=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s',
@@ -5763,59 +5751,36 @@ begin
     Exit;
   end;
 
-  if (S = '') or (S = '-') then
+  if (S <> '') and (S <> '-') then
   begin
-    LogSkip('ParseError');
-    Exit;
+    S := StringReplace(S, '%', '', [rfReplaceAll]);
+    S := StringReplace(S, '±', '', [rfReplaceAll]);
+    S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+    S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
   end;
 
-  S := StringReplace(S, '%', '', [rfReplaceAll]);
-  S := StringReplace(S, '±', '', [rfReplaceAll]);
-  S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  if not TryStrToFloat(Trim(S), ActualError) then
+  if ((S = '') or (S = '-')) or (not TryStrToFloat(Trim(S), ActualError)) then
   begin
-    LogSkip('ParseError');
-    Exit;
+    if AChannel.FlowMeter.ValueError <> nil then
+      ActualError := AChannel.FlowMeter.ValueError.GetDoubleValue
+    else
+    begin
+      LogSkip('ParseError');
+      Exit;
+    end;
   end;
 
-  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.ValueFlow <> nil) then
-  begin
-    ValueFlowRaw := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
-    GridFlowText := AChannel.FlowMeter.ValueFlow.GetStrValue;
-    GridFlowUnit := AChannel.FlowMeter.ValueFlow.GetDimName;
-    BaseUnit := AChannel.FlowMeter.ValueFlow.GetDimName(0);
-    CurrentFlowBase := GetChannelFlowForPointMatchBase(AChannel);
-    DeviceQmaxBase := AChannel.FlowMeter.Device.ToBaseUnits(AChannel.FlowMeter.Device.Qmax);
-  end;
-
-  DebugLog('FLOW_SOURCE', Format('Channel=%s; GridFlowText=%s; GridFlowUnit=%s; ValueFlowRaw=%g; ValueFlowRawUnit=base; CurrentFlowBase=%g; BaseUnit=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; DeviceQmaxBase=%g; DeviceQmaxBaseUnit=%s',
-    [ChannelName, GridFlowText, GridFlowUnit, ValueFlowRaw, CurrentFlowBase, BaseUnit,
-     AChannel.FlowMeter.Device.Qmax, AChannel.FlowMeter.Device.GetDimensionName,
-     DeviceQmaxBase, BaseUnit]));
-
-  MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
+  MatchedPoint := FindMatchedDevicePoint(FActiveWorkTable, AChannel, False);
   if MatchedPoint = nil then
   begin
-    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g; CurrentFlowBase=%g',
-      [ChannelName, ActualError, CurrentFlowBase]));
+    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g',
+      [ChannelName, ActualError]));
     LogSkip('MatchedPointNil');
     Exit;
   end;
 
-  PointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, MatchedPoint);
-  FlowTolerancePercent := ParseFlowTolerancePercent(MatchedPoint.FlowAccuracy);
-  MinFlowBase := PointFlowBase * (1 - FlowTolerancePercent / 100);
-  MaxFlowBase := PointFlowBase * (1 + FlowTolerancePercent / 100);
-  if (CurrentFlowBase < MinFlowBase) or (CurrentFlowBase > MaxFlowBase) then
-  begin
-    AColor := TAlphaColorRec.Lightgray;
-    Result := True;
-    DebugLog('FLOW_RANGE_COLOR', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=False; Color=%s; AffectsFlow=False',
-      [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
-       FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
-    Exit;
-  end;
+  GrayLimitPercent := ParseGrayLimitPercent(MatchedPoint.FlowAccuracy);
+  AbsActualError := Abs(ActualError);
 
   AllowedError := Abs(MatchedPoint.Error);
   if AllowedError <= 0 then
@@ -5825,25 +5790,28 @@ begin
   end;
 
   Result := True;
-  if Abs(ActualError) > AllowedError then
+  if (GrayLimitPercent > 0) and (AbsActualError > GrayLimitPercent) then
+  begin
+    AColor := TAlphaColorRec.Lightgray;
+    DebugLog('ERROR_COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverGrayLimit',
+      [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
+       AbsActualError, ColorToDebugName(AColor)]));
+    Exit;
+  end;
+
+  if AbsActualError > AllowedError then
   begin
     AColor := TAlphaColorRec.Lightyellow;
-    DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
-      [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
-       AllowedError, ColorToDebugName(AColor)]));
-    DebugLog('FLOW_RANGE_COLOR', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=True; Color=%s; AffectsFlow=False',
-      [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
-       FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
+    DebugLog('ERROR_COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverPointTolerance',
+      [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
+       AbsActualError, ColorToDebugName(AColor)]));
   end
   else
   begin
     AColor := $FFE6F4E6;
-    DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
-      [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
-       AllowedError, ColorToDebugName(AColor)]));
-    DebugLog('FLOW_RANGE_COLOR', Format('Channel=%s; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; FlowInPointRange=True; Color=%s; AffectsFlow=False',
-      [ChannelName, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
-       FlowTolerancePercent, MinFlowBase, MaxFlowBase, ColorToDebugName(AColor)]));
+    DebugLog('ERROR_COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorInsideTolerance',
+      [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
+       AbsActualError, ColorToDebugName(AColor)]));
   end;
 end;
 
