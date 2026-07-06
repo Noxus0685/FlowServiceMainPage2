@@ -752,12 +752,13 @@ type
   var WorkTableManager:   TWorkTableManager;
 
 const
-  CPointMatchFlowUnit = 'м3/ч';
+  CPointMatchFlowBaseUnit = 'base';
 
 function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel;
   AStrictDeviceUUID: Boolean): TDevicePoint;
-function GetChannelFlowForPointMatch(AChannel: TChannel): Double;
-function FindMatchedDevicePointByFlow(AChannel: TChannel; ACurrentFlow: Double): TDevicePoint;
+function GetChannelFlowForPointMatchBase(AChannel: TChannel): Double;
+function GetDevicePointFlowBase(ADevice: TDevice; APoint: TDevicePoint): Double;
+function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: Double): TDevicePoint;
 function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
 
 implementation
@@ -960,7 +961,16 @@ begin
   DebugLog('EXIT_NIL', 'Reason=NoPointMatched');
 end;
 
-function GetChannelFlowForPointMatch(AChannel: TChannel): Double;
+function GetPointMatchBaseUnitName(AChannel: TChannel): string;
+begin
+  Result := CPointMatchFlowBaseUnit;
+  if (AChannel <> nil) and
+     (AChannel.FlowMeter <> nil) and
+     (AChannel.FlowMeter.ValueFlow <> nil) then
+    Result := AChannel.FlowMeter.ValueFlow.GetDimName(0);
+end;
+
+function GetChannelFlowForPointMatchBase(AChannel: TChannel): Double;
 begin
   Result := 0;
   if (AChannel = nil) or
@@ -968,69 +978,91 @@ begin
      (AChannel.FlowMeter.ValueFlow = nil) then
     Exit;
 
-  Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue(CPointMatchFlowUnit);
+  Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
 end;
 
-function FindMatchedDevicePointByFlow(AChannel: TChannel; ACurrentFlow: Double): TDevicePoint;
+function GetDevicePointFlowBase(ADevice: TDevice; APoint: TDevicePoint): Double;
+var
+  QmaxBase: Double;
+begin
+  Result := 0;
+  if (ADevice = nil) or (APoint = nil) then
+    Exit;
+
+  if APoint.Q > 0 then
+    Exit(ADevice.ToBaseUnits(APoint.Q));
+
+  QmaxBase := ADevice.ToBaseUnits(ADevice.Qmax);
+  Result := APoint.FlowRate * QmaxBase;
+end;
+
+function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: Double): TDevicePoint;
 var
   DevicePoint: TDevicePoint;
-  DeviceQmax: Double;
-  PointFlow: Double;
-  Delta: Double;
-  BestDelta: Double;
+  DeviceQmaxRaw: Double;
+  DeviceQmaxBase: Double;
+  PointFlowBase: Double;
+  DeltaBase: Double;
+  BestDeltaBase: Double;
+  BaseUnit: string;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
     if ProtocolManager <> nil then
-      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'FindMatchedDevicePointByFlow ' + AAction,
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'FindMatchedDevicePointByFlowBase ' + AAction,
         'DEBUG', AParams);
   end;
 
 begin
   Result := nil;
+  BaseUnit := GetPointMatchBaseUnitName(AChannel);
 
   if (AChannel = nil) or
      (AChannel.FlowMeter = nil) or
      (AChannel.FlowMeter.Device = nil) or
      (AChannel.FlowMeter.Device.Points = nil) then
   begin
-    DebugLog('EXIT_NIL', Format('Reason=InvalidContext; CurrentFlow=%g', [ACurrentFlow]));
+    DebugLog('EXIT_NIL', Format('Reason=InvalidContext; CurrentFlowBase=%g; BaseUnit=%s',
+      [ACurrentFlowBase, BaseUnit]));
     Exit;
   end;
 
-  DeviceQmax := AChannel.FlowMeter.Device.Qmax;
-  BestDelta := MaxDouble;
+  DeviceQmaxRaw := AChannel.FlowMeter.Device.Qmax;
+  DeviceQmaxBase := AChannel.FlowMeter.Device.ToBaseUnits(DeviceQmaxRaw);
+  BestDeltaBase := MaxDouble;
 
-  DebugLog('ENTER', Format('CurrentFlow=%g; CurrentFlowUnit=%s; Device=%s; DeviceQmax=%g; DeviceQmaxUnit=%s; PointFlowUnit=%s; PointsCount=%d',
-    [ACurrentFlow, CPointMatchFlowUnit, Trim(AChannel.FlowMeter.Device.Name), DeviceQmax,
-     CPointMatchFlowUnit, CPointMatchFlowUnit, AChannel.FlowMeter.Device.Points.Count]));
+  DebugLog('ENTER', Format('CurrentFlowBase=%g; BaseUnit=%s; Device=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; DeviceQmaxBase=%g; PointsCount=%d',
+    [ACurrentFlowBase, BaseUnit, Trim(AChannel.FlowMeter.Device.Name), DeviceQmaxRaw,
+     AChannel.FlowMeter.Device.GetDimensionName, DeviceQmaxBase,
+     AChannel.FlowMeter.Device.Points.Count]));
 
   for DevicePoint in AChannel.FlowMeter.Device.Points do
   begin
     if DevicePoint = nil then
       Continue;
 
-    if DevicePoint.Q > 0 then
-      PointFlow := DevicePoint.Q
-    else
-      PointFlow := DevicePoint.FlowRate * DeviceQmax;
+    PointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, DevicePoint);
+    DeltaBase := Abs(ACurrentFlowBase - PointFlowBase);
+    DebugLog('CHECK_POINT', Format('PointName=%s; PointUUID=%s; PointQRaw=%g; PointQRawUnit=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s; PointFlowBase=%g; BaseUnit=%s; DeltaBase=%g; Error=%g',
+      [Trim(DevicePoint.Name), Trim(DevicePoint.UUID), DevicePoint.Q,
+       AChannel.FlowMeter.Device.GetDimensionName, DeviceQmaxRaw,
+       AChannel.FlowMeter.Device.GetDimensionName, PointFlowBase, BaseUnit,
+       DeltaBase, DevicePoint.Error]));
 
-    Delta := Abs(ACurrentFlow - PointFlow);
-    DebugLog('CHECK_POINT', Format('PointName=%s; PointUUID=%s; PointFlow=%g; CurrentFlow=%g; Delta=%g; Error=%g',
-      [Trim(DevicePoint.Name), Trim(DevicePoint.UUID), PointFlow, ACurrentFlow, Delta, DevicePoint.Error]));
-
-    if (Result = nil) or (Delta < BestDelta) then
+    if (Result = nil) or (DeltaBase < BestDeltaBase) then
     begin
       Result := DevicePoint;
-      BestDelta := Delta;
+      BestDeltaBase := DeltaBase;
     end;
   end;
 
   if Result <> nil then
-    DebugLog('FOUND_BY_FLOW', Format('PointName=%s; PointUUID=%s; PointFlowDelta=%g; Error=%g',
-      [Trim(Result.Name), Trim(Result.UUID), BestDelta, Result.Error]))
+    DebugLog('FOUND_BY_FLOW', Format('CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; DeltaBase=%g; AllowedError=%g; BaseUnit=%s',
+      [ACurrentFlowBase, Trim(Result.Name), GetDevicePointFlowBase(AChannel.FlowMeter.Device, Result),
+       BestDeltaBase, Result.Error, BaseUnit]))
   else
-    DebugLog('EXIT_NIL', Format('Reason=NoPoints; CurrentFlow=%g', [ACurrentFlow]));
+    DebugLog('EXIT_NIL', Format('Reason=NoPoints; CurrentFlowBase=%g; BaseUnit=%s',
+      [ACurrentFlowBase, BaseUnit]));
 end;
 
 function RandomRangeDouble(const AMin, AMax: Double): Double;
@@ -1048,7 +1080,7 @@ var
   AllowOutOfRange: Boolean;
   ChannelName: string;
   DeviceName: string;
-  CurrentFlow: Double;
+  CurrentFlowBase: Double;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -1061,7 +1093,7 @@ begin
   Result := Random(11) - 5;
   ChannelName := '';
   DeviceName := '';
-  CurrentFlow := 0;
+  CurrentFlowBase := 0;
 
   if AChannel <> nil then
   begin
@@ -1071,7 +1103,7 @@ begin
     if AChannel.FlowMeter <> nil then
     begin
       if AChannel.FlowMeter.ValueFlow <> nil then
-        CurrentFlow := GetChannelFlowForPointMatch(AChannel);
+        CurrentFlowBase := GetChannelFlowForPointMatchBase(AChannel);
       if AChannel.FlowMeter.Device <> nil then
         DeviceName := Trim(AChannel.FlowMeter.Device.Name);
     end;
@@ -1086,11 +1118,11 @@ begin
     Exit;
   end;
 
-  MatchedPoint := FindMatchedDevicePointByFlow(AChannel, CurrentFlow);
+  MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
   if MatchedPoint = nil then
   begin
-    DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; CurrentFlow=%g; ImpDelta=%g',
-      [ChannelName, DeviceName, CurrentFlow, Result]));
+    DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; CurrentFlowBase=%g; ImpDelta=%g',
+      [ChannelName, DeviceName, CurrentFlowBase, Result]));
     Exit;
   end;
 
@@ -1121,8 +1153,8 @@ begin
   else
     Result := 0;
 
-  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentFlow=%g; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
-    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlow, CurrentError, AllowedError,
+  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
+    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, CurrentError, AllowedError,
      TargetError, Result, System.SysUtils.BoolToStr(AllowOutOfRange, True)]));
 end;
 

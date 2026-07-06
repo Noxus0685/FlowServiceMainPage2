@@ -5616,10 +5616,11 @@ function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
 var
   S: string;
   ActualError: Double;
-  CurrentFlow: Double;
+  CurrentFlowBase: Double;
   ValueFlowRaw: Double;
   GridFlowText: string;
   ValueFlowUnit: string;
+  BaseUnit: string;
   AllowedError: Double;
   DeviceName: string;
   ChannelDeviceUUID: string;
@@ -5691,10 +5692,11 @@ var
 begin
   Result := False;
   AColor := TAlphaColors.Null;
-  CurrentFlow := 0;
+  CurrentFlowBase := 0;
   ValueFlowRaw := 0;
   GridFlowText := '';
   ValueFlowUnit := '';
+  BaseUnit := CPointMatchFlowBaseUnit;
   LoadDebugContext;
 
   DebugLog('ENTER', Format('Channel=%s; Device=%s; ChannelDeviceUUID=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s',
@@ -5752,26 +5754,27 @@ begin
     ValueFlowRaw := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
     GridFlowText := AChannel.FlowMeter.ValueFlow.GetStrValue;
     ValueFlowUnit := AChannel.FlowMeter.ValueFlow.GetDimName;
-    CurrentFlow := GetChannelFlowForPointMatch(AChannel);
+    BaseUnit := AChannel.FlowMeter.ValueFlow.GetDimName(0);
+    CurrentFlowBase := GetChannelFlowForPointMatchBase(AChannel);
   end;
 
-  DebugLog('FLOW_SOURCE', Format('Channel=%s; GridFlowText=%s; ValueFlowRaw=%g; ValueFlowUnit=%s; CurrentFlowForMatch=%g; MatchUnit=%s; DeviceQmax=%g; DeviceQmaxUnit=%s',
-    [ChannelName, GridFlowText, ValueFlowRaw, ValueFlowUnit, CurrentFlow, CPointMatchFlowUnit,
-     AChannel.FlowMeter.Device.Qmax, CPointMatchFlowUnit]));
+  DebugLog('FLOW_SOURCE', Format('Channel=%s; GridFlowText=%s; ValueFlowRaw=%g; ValueFlowUnit=%s; CurrentFlowBase=%g; BaseUnit=%s; DeviceQmaxRaw=%g; DeviceQmaxRawUnit=%s',
+    [ChannelName, GridFlowText, ValueFlowRaw, ValueFlowUnit, CurrentFlowBase, BaseUnit,
+     AChannel.FlowMeter.Device.Qmax, AChannel.FlowMeter.Device.GetDimensionName]));
 
-  MatchedPoint := FindMatchedDevicePointByFlow(AChannel, CurrentFlow);
+  MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
   if MatchedPoint = nil then
   begin
-    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g; CurrentFlow=%g',
-      [ChannelName, ActualError, CurrentFlow]));
+    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g; CurrentFlowBase=%g',
+      [ChannelName, ActualError, CurrentFlowBase]));
     LogSkip('MatchedPointNil');
     Exit;
   end;
 
   AllowedError := Abs(MatchedPoint.Error);
-  DebugLog('MATCH', Format('Channel=%s; Matched=True; PointUUID=%s; PointDeviceUUID=%s; MatchedPointName=%s; PointError=%g; ActualError=%g; CurrentFlow=%g; AllowedError=%g',
+  DebugLog('MATCH', Format('Channel=%s; Matched=True; PointUUID=%s; PointDeviceUUID=%s; MatchedPointName=%s; PointError=%g; ActualError=%g; CurrentFlowBase=%g; AllowedError=%g',
     [ChannelName, Trim(MatchedPoint.UUID), Trim(MatchedPoint.DeviceUUID), Trim(MatchedPoint.Name),
-     MatchedPoint.Error, ActualError, CurrentFlow, AllowedError]));
+     MatchedPoint.Error, ActualError, CurrentFlowBase, AllowedError]));
 
   if AllowedError <= 0 then
   begin
@@ -5783,14 +5786,14 @@ begin
   if Abs(ActualError) > AllowedError then
   begin
     AColor := TAlphaColorRec.Lightyellow;
-    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorGreaterAllowed; ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; AllowedError=%g',
-      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlow, Trim(MatchedPoint.Name), AllowedError]));
+    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorGreaterAllowed; ActualError=%g; CurrentFlowBase=%g; MatchedPointName=%s; AllowedError=%g',
+      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlowBase, Trim(MatchedPoint.Name), AllowedError]));
   end
   else
   begin
     AColor := $FFE6F4E6;
-    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorWithinAllowed; ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; AllowedError=%g',
-      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlow, Trim(MatchedPoint.Name), AllowedError]));
+    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorWithinAllowed; ActualError=%g; CurrentFlowBase=%g; MatchedPointName=%s; AllowedError=%g',
+      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlowBase, Trim(MatchedPoint.Name), AllowedError]));
   end;
 end;
 
