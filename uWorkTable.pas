@@ -780,6 +780,94 @@ var
         'DEBUG', AParams);
   end;
 
+
+  function FindByProcessingLogic: TDevicePoint;
+  var
+    Point: TDevicePoint;
+    Spillage: TPointSpillage;
+    DeviceUUID: string;
+    TypeUUID: string;
+    CurrentError: Double;
+    HasCurrentError: Boolean;
+    BestPoint: TDevicePoint;
+    BestSpillage: TPointSpillage;
+  begin
+    Result := nil;
+    BestPoint := nil;
+    BestSpillage := nil;
+    HasCurrentError := (AChannel.FlowMeter.ValueError <> nil);
+    CurrentError := 0;
+    if HasCurrentError then
+      CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
+
+    if (AChannel.FlowMeter.Device.Spillages = nil) or
+       (AChannel.FlowMeter.Device.Points = nil) then
+    begin
+      DebugLog('PROCESSING_LOGIC_SKIP', 'Reason=NoSpillagesOrPoints');
+      Exit;
+    end;
+
+    DeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
+    DebugLog('PROCESSING_LOGIC_ENTER', Format('DeviceUUID=%s; CurrentError=%g; HasCurrentError=%s',
+      [DeviceUUID, CurrentError, BoolToStr(HasCurrentError, True)]));
+
+    for Point in AChannel.FlowMeter.Device.Points do
+    begin
+      if Point = nil then
+        Continue;
+
+      TypeUUID := Trim(Point.DeviceTypeUUID);
+      for Spillage in AChannel.FlowMeter.Device.Spillages do
+      begin
+        if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) then
+          Continue;
+
+        if not SameText(Trim(Spillage.DeviceUUID), DeviceUUID) then
+          Continue;
+
+        if (TypeUUID <> '') and (Trim(Spillage.DeviceTypeUUID) <> '') then
+        begin
+          if not SameText(Trim(Spillage.DeviceTypeUUID), TypeUUID) then
+            Continue;
+        end
+        else if (not SameText(Trim(Spillage.Name), Trim(Point.Name))) and
+                (not AChannel.FlowMeter.Device.IsFlowInPoint(Spillage.QavgEtalon, Point)) then
+          Continue;
+
+        if (BestPoint = nil) or ((BestSpillage <> nil) and (not BestSpillage.Valid) and Spillage.Valid) then
+        begin
+          BestPoint := Point;
+          BestSpillage := Spillage;
+        end;
+
+        if HasCurrentError and SameValue(Spillage.Error, CurrentError, 0.001) then
+        begin
+          DebugLog('FOUND_BY_PROCESSING_LOGIC', Format('PointName=%s; PointUUID=%s; DeviceTypeUUID=%s; Error=%g; FoundSpillageDeviceUUID=%s; FoundError=%g; Match=CurrentError',
+            [Trim(Point.Name), Trim(Point.UUID), Trim(Point.DeviceTypeUUID), Point.Error,
+             Trim(Spillage.DeviceUUID), Spillage.Error]));
+          Exit(Point);
+        end;
+
+        if Spillage.Valid then
+        begin
+          DebugLog('FOUND_BY_PROCESSING_LOGIC', Format('PointName=%s; PointUUID=%s; DeviceTypeUUID=%s; Error=%g; FoundSpillageDeviceUUID=%s; FoundError=%g; Match=ValidSpillage',
+            [Trim(Point.Name), Trim(Point.UUID), Trim(Point.DeviceTypeUUID), Point.Error,
+             Trim(Spillage.DeviceUUID), Spillage.Error]));
+          Exit(Point);
+        end;
+      end;
+    end;
+
+    if BestPoint <> nil then
+    begin
+      DebugLog('FOUND_BY_PROCESSING_LOGIC', Format('PointName=%s; PointUUID=%s; DeviceTypeUUID=%s; Error=%g; FoundSpillageDeviceUUID=%s; FoundError=%g; Match=FirstSpillage',
+        [Trim(BestPoint.Name), Trim(BestPoint.UUID), Trim(BestPoint.DeviceTypeUUID), BestPoint.Error,
+         Trim(BestSpillage.DeviceUUID), BestSpillage.Error]));
+      Exit(BestPoint);
+    end;
+
+    DebugLog('PROCESSING_LOGIC_NOT_FOUND', 'Reason=NoMatchingSpillage');
+  end;
 begin
   Result := nil;
 
@@ -875,7 +963,16 @@ begin
     DebugLog('NAME_NOT_FOUND', 'CurName=' + CurPointName);
   end;
 
+  Result := FindByProcessingLogic;
+  if Result <> nil then
+    Exit;
+
   DebugLog('EXIT_NIL', 'Reason=NoPointMatched');
+end;
+
+function RandomRangeDouble(const AMin, AMax: Double): Double;
+begin
+  Result := AMin + Random * (AMax - AMin);
 end;
 
 function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
@@ -884,34 +981,79 @@ var
   BaseImpDelta: Double;
   CurrentError: Double;
   AllowedError: Double;
+  TargetError: Double;
+  AllowOutOfRange: Boolean;
+  ChannelName: string;
+  DeviceName: string;
+
+  procedure DebugLog(const AAction, AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psWorkTable, 'CalcImpDeltaByError ' + AAction,
+        'DEBUG', AParams);
+  end;
+
 begin
   Result := Random(11) - 5;
+  ChannelName := '';
+  DeviceName := '';
+
+  if AChannel <> nil then
+  begin
+    ChannelName := Trim(AChannel.Name);
+    if ChannelName = '' then
+      ChannelName := Trim(AChannel.Text);
+    if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) then
+      DeviceName := Trim(AChannel.FlowMeter.Device.Name);
+  end;
 
   if (AWorkTable = nil) or
      (AChannel = nil) or
      (AChannel.FlowMeter = nil) then
+  begin
+    DebugLog('SKIP', Format('Reason=InvalidContext; Channel=%s; Device=%s; ImpDelta=%g',
+      [ChannelName, DeviceName, Result]));
     Exit;
+  end;
 
   MatchedPoint := FindMatchedDevicePoint(AWorkTable, AChannel, False);
   if MatchedPoint = nil then
+  begin
+    DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; ImpDelta=%g',
+      [ChannelName, DeviceName, Result]));
     Exit;
+  end;
 
   AllowedError := Abs(MatchedPoint.Error);
   if AllowedError <= 0 then
+  begin
+    DebugLog('SKIP', Format('Reason=AllowedErrorZero; Channel=%s; Device=%s; PointName=%s; AllowedError=%g; ImpDelta=%g',
+      [ChannelName, DeviceName, Trim(MatchedPoint.Name), AllowedError, Result]));
     Exit;
+  end;
 
   CurrentError := 0;
   if AChannel.FlowMeter.ValueError <> nil then
     CurrentError := AChannel.FlowMeter.ValueError.GetDoubleValue;
 
-  BaseImpDelta := Abs(Random(11) - 5);
-  if BaseImpDelta = 0 then
-    BaseImpDelta := 1;
-
-  if Abs(CurrentError) > AllowedError then
-    Result := -BaseImpDelta
+  AllowOutOfRange := Random(100) < 5;
+  if AllowOutOfRange then
+    TargetError := RandomRangeDouble(-AllowedError * 1.3, AllowedError * 1.3)
   else
-    Result := BaseImpDelta;
+    TargetError := RandomRangeDouble(-AllowedError, AllowedError);
+
+  BaseImpDelta := Abs(Random(5) + 1);
+
+  if CurrentError > TargetError then
+    Result := -BaseImpDelta
+  else if CurrentError < TargetError then
+    Result := BaseImpDelta
+  else
+    Result := 0;
+
+  DebugLog('RESULT', Format('Channel=%s; Device=%s; PointName=%s; CurrentError=%g; AllowedError=%g; TargetError=%g; ImpDelta=%g; AllowOutOfRange=%s',
+    [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentError, AllowedError,
+     TargetError, Result, BoolToStr(AllowOutOfRange, True)]));
 end;
 
 const
