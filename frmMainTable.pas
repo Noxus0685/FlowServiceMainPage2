@@ -5831,6 +5831,10 @@ begin
     DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
       [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
        AllowedError, ColorToDebugName(AColor)]));
+    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; UserTargetFlow=%g; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=%s; Action=UsePoint; Color=%s',
+      [ChannelName, CurrentFlowBase, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
+       FlowTolerancePercent, MinFlowBase, MaxFlowBase,
+       System.SysUtils.BoolToStr(IsFlowInPointRange, True), ColorToDebugName(AColor)]));
   end
   else
   begin
@@ -5838,6 +5842,10 @@ begin
     DebugLog('MATCH', Format('Channel=%s; GridFlowText=%s; CurrentFlowBase=%g; BaseUnit=%s; ActualError=%g; MatchedPointName=%s; AllowedError=%g; Color=%s',
       [ChannelName, GridFlowText, CurrentFlowBase, BaseUnit, ActualError, Trim(MatchedPoint.Name),
        AllowedError, ColorToDebugName(AColor)]));
+    DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; UserTargetFlow=%g; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=%s; Action=UsePoint; Color=%s',
+      [ChannelName, CurrentFlowBase, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
+       FlowTolerancePercent, MinFlowBase, MaxFlowBase,
+       System.SysUtils.BoolToStr(IsFlowInPointRange, True), ColorToDebugName(AColor)]));
   end;
 end;
 

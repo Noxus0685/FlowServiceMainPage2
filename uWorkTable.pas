@@ -1,4 +1,4 @@
-﻿unit uWorkTable;
+unit uWorkTable;
 
 interface
 
@@ -761,6 +761,9 @@ function FindMatchedDevicePoint(AWorkTable: TWorkTable; AChannel: TChannel;
 function GetChannelFlowForPointMatchBase(AChannel: TChannel): Double;
 function GetDevicePointFlowBase(ADevice: TDevice; APoint: TDevicePoint): Double;
 function FindMatchedDevicePointByFlowBase(AChannel: TChannel; ACurrentFlowBase: Double): TDevicePoint;
+function GetDevicePointFlowTolerancePercent(APoint: TDevicePoint): Double;
+function IsDevicePointFlowInRange(AChannel: TChannel; APoint: TDevicePoint; ACurrentFlowBase: Double;
+  out APointFlowBase, ATolerancePercent, AMinFlowBase, AMaxFlowBase: Double): Boolean;
 function CalcImpDeltaByError(AWorkTable: TWorkTable; AChannel: TChannel): Double;
 
 implementation
@@ -1067,6 +1070,57 @@ begin
       [ACurrentFlowBase, BaseUnit]));
 end;
 
+function GetDevicePointFlowTolerancePercent(APoint: TDevicePoint): Double;
+var
+  S: string;
+  I: Integer;
+  Ch: Char;
+  Num: string;
+begin
+  Result := 0;
+  if APoint = nil then
+    Exit;
+
+  S := Trim(APoint.FlowAccuracy);
+  if S = '' then
+    Exit;
+
+  Num := '';
+  for I := 1 to Length(S) do
+  begin
+    Ch := S[I];
+    if CharInSet(Ch, ['0'..'9', ',', '.', '-', '+']) then
+      Num := Num + Ch;
+  end;
+
+  Num := StringReplace(Num, '+', '', [rfReplaceAll]);
+  Num := StringReplace(Num, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+  Num := StringReplace(Num, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
+  if not TryStrToFloat(Num, Result) then
+    Result := 0;
+  Result := Abs(Result);
+end;
+
+function IsDevicePointFlowInRange(AChannel: TChannel; APoint: TDevicePoint; ACurrentFlowBase: Double;
+  out APointFlowBase, ATolerancePercent, AMinFlowBase, AMaxFlowBase: Double): Boolean;
+begin
+  Result := False;
+  APointFlowBase := 0;
+  ATolerancePercent := 0;
+  AMinFlowBase := 0;
+  AMaxFlowBase := 0;
+
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or
+     (AChannel.FlowMeter.Device = nil) or (APoint = nil) then
+    Exit;
+
+  APointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, APoint);
+  ATolerancePercent := GetDevicePointFlowTolerancePercent(APoint);
+  AMinFlowBase := APointFlowBase * (1 - ATolerancePercent / 100);
+  AMaxFlowBase := APointFlowBase * (1 + ATolerancePercent / 100);
+  Result := (ACurrentFlowBase >= AMinFlowBase) and (ACurrentFlowBase <= AMaxFlowBase);
+end;
+
 function RandomRangeDouble(const AMin, AMax: Double): Double;
 begin
   Result := AMin + Random * (AMax - AMin);
@@ -1083,7 +1137,13 @@ var
   ChannelName: string;
   DeviceName: string;
   CurrentFlowBase: Double;
+  UserTargetFlow: Double;
   BaseUnit: string;
+  PointFlowBase: Double;
+  FlowTolerancePercent: Double;
+  MinFlowBase: Double;
+  MaxFlowBase: Double;
+  IsFlowInPointRange: Boolean;
 
   procedure DebugLog(const AAction, AParams: string);
   begin
@@ -1097,6 +1157,7 @@ begin
   ChannelName := '';
   DeviceName := '';
   CurrentFlowBase := 0;
+  UserTargetFlow := 0;
   BaseUnit := GetPointMatchBaseUnitName(AChannel);
 
   if AChannel <> nil then
@@ -1122,11 +1183,31 @@ begin
     Exit;
   end;
 
+  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) then
+    UserTargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+
   MatchedPoint := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
   if MatchedPoint = nil then
   begin
     DebugLog('SKIP', Format('Reason=MatchedPointNil; Channel=%s; Device=%s; CurrentFlowBase=%g; ImpDelta=%g',
       [ChannelName, DeviceName, CurrentFlowBase, Result]));
+    Exit;
+  end;
+
+  IsFlowInPointRange := IsDevicePointFlowInRange(AChannel, MatchedPoint, CurrentFlowBase,
+    PointFlowBase, FlowTolerancePercent, MinFlowBase, MaxFlowBase);
+  DebugLog('FLOW_RANGE_CHECK', Format('Channel=%s; UserTargetFlow=%g; CurrentFlowBase=%g; PointName=%s; PointFlowBase=%g; FlowTolerancePercent=%g; MinFlowBase=%g; MaxFlowBase=%g; IsFlowInPointRange=%s; Action=%s; Color=%s',
+    [ChannelName, UserTargetFlow, CurrentFlowBase, Trim(MatchedPoint.Name), PointFlowBase,
+     FlowTolerancePercent, MinFlowBase, MaxFlowBase,
+     System.SysUtils.BoolToStr(IsFlowInPointRange, True),
+     IfThen(IsFlowInPointRange, 'UsePoint', 'IgnorePoint'),
+     IfThen(IsFlowInPointRange, 'BY_ERROR', 'GRAY')]));
+  if not IsFlowInPointRange then
+  begin
+    Result := 0;
+    DebugLog('SKIP', Format('Reason=FlowOutOfPointRange; Channel=%s; Device=%s; PointName=%s; CurrentFlowBase=%g; PointFlowBase=%g; FlowTolerancePercent=%g; ImpDelta=%g',
+      [ChannelName, DeviceName, Trim(MatchedPoint.Name), CurrentFlowBase, PointFlowBase,
+       FlowTolerancePercent, Result]));
     Exit;
   end;
 
@@ -6271,6 +6352,10 @@ begin
             end;
 
               Flow := CalcSimulationFlow;
+
+          for I := 0 to EnabledDeviceChannels.Count - 1 do
+            LogSimFlowTarget(EnabledDeviceChannels[I], False, FlowRate.ValueSet.Value,
+              FlowRate.Value.Value, Flow);
 
           ImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
             EnabledDeviceChannels,
