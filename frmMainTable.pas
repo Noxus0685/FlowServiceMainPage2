@@ -5616,53 +5616,182 @@ function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
 var
   S: string;
   ActualError: Double;
+  CurrentFlow: Double;
+  ValueFlowRaw: Double;
+  GridFlowText: string;
+  ValueFlowUnit: string;
   AllowedError: Double;
-  DevicePoint: TDevicePoint;
+  DeviceName: string;
+  ChannelDeviceUUID: string;
+  ChannelName: string;
+  CurPointUUID: string;
+  CurPointDeviceUUID: string;
+  CurPointName: string;
   MatchedPoint: TDevicePoint;
+
+  procedure DebugLog(const AAction, AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psForm, 'GetErrorCellColor ' + AAction,
+        'DEBUG', AParams);
+  end;
+
+  function ColorToDebugName(const ACellColor: TAlphaColor): string;
+  begin
+    if ACellColor = TAlphaColorRec.Lightyellow then
+      Result := 'YELLOW'
+    else if ACellColor = $FFE6F4E6 then
+      Result := 'GREEN'
+    else
+      Result := 'NONE';
+  end;
+
+  procedure LoadDebugContext;
+  begin
+    ChannelName := '';
+    DeviceName := '';
+    ChannelDeviceUUID := '';
+    CurPointUUID := '';
+    CurPointDeviceUUID := '';
+    CurPointName := '';
+
+    if AChannel <> nil then
+    begin
+      ChannelName := Trim(AChannel.Name);
+      if ChannelName = '' then
+        ChannelName := Trim(AChannel.Text);
+      ChannelDeviceUUID := Trim(AChannel.DeviceUUID);
+      if AChannel.FlowMeter <> nil then
+      begin
+        if ChannelDeviceUUID = '' then
+          ChannelDeviceUUID := Trim(AChannel.FlowMeter.DeviceUUID);
+        if AChannel.FlowMeter.Device <> nil then
+        begin
+          DeviceName := Trim(AChannel.FlowMeter.Device.Name);
+          if ChannelDeviceUUID = '' then
+            ChannelDeviceUUID := Trim(AChannel.FlowMeter.Device.UUID);
+        end;
+      end;
+    end;
+
+    if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) then
+    begin
+      CurPointUUID := Trim(FActiveWorkTable.CurrentPoint.UUID);
+      CurPointDeviceUUID := Trim(FActiveWorkTable.CurrentPoint.DeviceUUID);
+      CurPointName := Trim(FActiveWorkTable.CurrentPoint.Name);
+    end;
+  end;
+
+  procedure LogSkip(const AReason: string);
+  begin
+    DebugLog('SKIP', Format('Channel=%s; Device=%s; Reason=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s; ChannelDeviceUUID=%s',
+      [ChannelName, DeviceName, AReason, CurPointUUID, CurPointDeviceUUID, CurPointName, AText, ChannelDeviceUUID]));
+  end;
+
 begin
   Result := False;
   AColor := TAlphaColors.Null;
+  CurrentFlow := 0;
+  ValueFlowRaw := 0;
+  GridFlowText := '';
+  ValueFlowUnit := '';
+  LoadDebugContext;
+
+  DebugLog('ENTER', Format('Channel=%s; Device=%s; ChannelDeviceUUID=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s',
+    [ChannelName, DeviceName, ChannelDeviceUUID, CurPointUUID, CurPointDeviceUUID, CurPointName, AText]));
 
   S := Trim(AText);
-  if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) or (S = '') or (S = '-') then
+  if FActiveWorkTable = nil then
+  begin
+    LogSkip('NoActiveWorkTable');
     Exit;
+  end;
+
+  if FActiveWorkTable.CurrentPoint = nil then
+  begin
+    LogSkip('NoCurrentPoint');
+    Exit;
+  end;
+
+  if AChannel = nil then
+  begin
+    LogSkip('NoChannel');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter = nil then
+  begin
+    LogSkip('NoFlowMeter');
+    Exit;
+  end;
+
+  if AChannel.FlowMeter.Device = nil then
+  begin
+    LogSkip('NoDevice');
+    Exit;
+  end;
+
+  if (S = '') or (S = '-') then
+  begin
+    LogSkip('ParseError');
+    Exit;
+  end;
 
   S := StringReplace(S, '%', '', [rfReplaceAll]);
   S := StringReplace(S, '±', '', [rfReplaceAll]);
   S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
   S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
   if not TryStrToFloat(Trim(S), ActualError) then
+  begin
+    LogSkip('ParseError');
     Exit;
+  end;
 
-  MatchedPoint := nil;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
-     (AChannel.FlowMeter.Device.Points <> nil) then
-    for DevicePoint in AChannel.FlowMeter.Device.Points do
-      if (DevicePoint <> nil) and
-         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
-           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
-          ((FActiveWorkTable.CurrentPoint.ID = 0) and
-           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
-           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
-      begin
-        MatchedPoint := DevicePoint;
-        Break;
-      end;
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.ValueFlow <> nil) then
+  begin
+    ValueFlowRaw := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+    GridFlowText := AChannel.FlowMeter.ValueFlow.GetStrValue;
+    ValueFlowUnit := AChannel.FlowMeter.ValueFlow.GetDimName;
+    CurrentFlow := GetChannelFlowForPointMatch(AChannel);
+  end;
 
-  if MatchedPoint <> nil then
-    AllowedError := Abs(MatchedPoint.Error)
-  else
-    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
+  DebugLog('FLOW_SOURCE', Format('Channel=%s; GridFlowText=%s; ValueFlowRaw=%g; ValueFlowUnit=%s; CurrentFlowForMatch=%g; MatchUnit=%s; DeviceQmax=%g; DeviceQmaxUnit=%s',
+    [ChannelName, GridFlowText, ValueFlowRaw, ValueFlowUnit, CurrentFlow, CPointMatchFlowUnit,
+     AChannel.FlowMeter.Device.Qmax, CPointMatchFlowUnit]));
+
+  MatchedPoint := FindMatchedDevicePointByFlow(AChannel, CurrentFlow);
+  if MatchedPoint = nil then
+  begin
+    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g; CurrentFlow=%g',
+      [ChannelName, ActualError, CurrentFlow]));
+    LogSkip('MatchedPointNil');
+    Exit;
+  end;
+
+  AllowedError := Abs(MatchedPoint.Error);
+  DebugLog('MATCH', Format('Channel=%s; Matched=True; PointUUID=%s; PointDeviceUUID=%s; MatchedPointName=%s; PointError=%g; ActualError=%g; CurrentFlow=%g; AllowedError=%g',
+    [ChannelName, Trim(MatchedPoint.UUID), Trim(MatchedPoint.DeviceUUID), Trim(MatchedPoint.Name),
+     MatchedPoint.Error, ActualError, CurrentFlow, AllowedError]));
 
   if AllowedError <= 0 then
+  begin
+    LogSkip('AllowedErrorZero');
     Exit;
+  end;
 
   Result := True;
   if Abs(ActualError) > AllowedError then
-    AColor := TAlphaColorRec.Lightyellow
+  begin
+    AColor := TAlphaColorRec.Lightyellow;
+    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorGreaterAllowed; ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; AllowedError=%g',
+      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlow, Trim(MatchedPoint.Name), AllowedError]));
+  end
   else
+  begin
     AColor := $FFE6F4E6;
+    DebugLog('COLOR', Format('Channel=%s; Color=%s; Reason=AbsActualErrorWithinAllowed; ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; AllowedError=%g',
+      [ChannelName, ColorToDebugName(AColor), ActualError, CurrentFlow, Trim(MatchedPoint.Name), AllowedError]));
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -5673,8 +5802,30 @@ var
   CellColor: TAlphaColor;
   IsChannelColumn: Boolean;
   NeedCustomDraw: Boolean;
+  ErrorColorApplied: Boolean;
+
+  function ColorToDebugName(const ACellColor: TAlphaColor): string;
+  begin
+    if ACellColor = TAlphaColorRec.Lightyellow then
+      Result := 'YELLOW'
+    else if ACellColor = $FFE6F4E6 then
+      Result := 'GREEN'
+    else if ACellColor = TAlphaColors.Null then
+      Result := 'NONE'
+    else
+      Result := Format('$%.8x', [ACellColor]);
+  end;
+
+  procedure DebugLog(const AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psForm, 'GridDevicesDrawColumnCell ERROR_COLUMN',
+        'DEBUG', AParams);
+  end;
+
 begin
   IsChannelColumn := Column = StringColumnDeviceChanel1;
+  ErrorColorApplied := False;
   if Odd(Row) then
     CellColor := GRID_ALTERNATE_ROW_COLOR
   else
@@ -5688,11 +5839,27 @@ begin
       CellColor := GetDeviceGroupColor(Channel.Group);
   end;
 
-  if (Column = StringColumnDeviceError1) and (FActiveWorkTable <> nil) and
-     (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) and
-     (FActiveWorkTable.DeviceChannels[Row] <> nil) then
-    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row],
-      Value.ToString, CellColor);
+  if (Column = StringColumnDeviceError1) then
+  begin
+    if (FActiveWorkTable <> nil) and
+       (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) and
+       (FActiveWorkTable.DeviceChannels[Row] <> nil) then
+      ErrorColorApplied := GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row],
+        Value.ToString, CellColor);
+
+    DebugLog(Format('Row=%d; Column=%s; Value=%s; GetErrorCellColor=%s; Color=%s',
+      [Row, Column.Header, Value.ToString, BoolToStr(ErrorColorApplied, True),
+       ColorToDebugName(CellColor)]));
+
+    if ErrorColorApplied then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := CellColor;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+      Exit;
+    end;
+  end;
 
   NeedCustomDraw := (Column = StringColumnDeviceError1) or IsChannelColumn or
     (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row);
@@ -6469,8 +6636,30 @@ procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canva
 var
   Channel: TChannel;
   CellColor: TAlphaColor;
+  ErrorColorApplied: Boolean;
+
+  function ColorToDebugName(const ACellColor: TAlphaColor): string;
+  begin
+    if ACellColor = TAlphaColorRec.Lightyellow then
+      Result := 'YELLOW'
+    else if ACellColor = $FFE6F4E6 then
+      Result := 'GREEN'
+    else if ACellColor = TAlphaColors.Null then
+      Result := 'NONE'
+    else
+      Result := Format('$%.8x', [ACellColor]);
+  end;
+
+  procedure DebugLog(const AParams: string);
+  begin
+    if ProtocolManager <> nil then
+      ProtocolManager.AddMessage(pcInfo, psForm, 'GridEtalonsDrawColumnCell ERROR_COLUMN',
+        'DEBUG', AParams);
+  end;
+
 begin
   CellColor := TAlphaColors.Null;
+  ErrorColorApplied := False;
 
   if (Column = StringColumnEtalonChanel1) and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) then
@@ -6480,6 +6669,27 @@ begin
       CellColor := GetEtalonGroupColor(Channel.Group);
   end;
 
+  if (Column = StringColumnEtalonError1) then
+  begin
+    if (FActiveWorkTable <> nil) and
+       (Row >= 0) and (Row < FActiveWorkTable.EtalonChannels.Count) and
+       (FActiveWorkTable.EtalonChannels[Row] <> nil) then
+      ErrorColorApplied := GetErrorCellColor(FActiveWorkTable.EtalonChannels[Row],
+        Value.ToString, CellColor);
+
+    DebugLog(Format('Row=%d; Column=%s; Value=%s; GetErrorCellColor=%s; Color=%s',
+      [Row, Column.Header, Value.ToString, BoolToStr(ErrorColorApplied, True),
+       ColorToDebugName(CellColor)]));
+
+    if ErrorColorApplied then
+    begin
+      Canvas.Fill.Kind := TBrushKind.Solid;
+      Canvas.Fill.Color := CellColor;
+      Canvas.FillRect(Bounds, 0, 0, [], 1);
+      Column.DefaultDrawCell(Canvas, Bounds, Row, Value, State);
+      Exit;
+    end;
+  end;
 
   if CellColor <> TAlphaColors.Null then
   begin
