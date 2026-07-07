@@ -5891,7 +5891,7 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
-  EtalonFlow: Double;
+  EtalonFlowBaseLps: Double;
   TargetImpSec: Double;
   Diff: Double;
   Step: Double;
@@ -5899,7 +5899,7 @@ var
   NewImpSec: Double;
   ModeText: string;
 
-  function GetActiveEtalonFlow: Double;
+  function GetActiveEtalonFlowBaseLps: Double;
   var
     J: Integer;
     EtalonChannel: TChannel;
@@ -5925,7 +5925,7 @@ var
       Result := AWorkTable.FlowRate.Value.Value;
   end;
 
-  function CalcDeviceImpSecByFlow(const AChannel: TChannel; const AFlow: Double): Double;
+  function CalcDeviceImpSecByBaseFlow(const AChannel: TChannel; const AFlowBaseLps: Double): Double;
   var
     Coef: Double;
   begin
@@ -5936,7 +5936,7 @@ var
     Result := AChannel.ImpSec;
     Coef := WorkTableManager.GetChannelFlowCoef(AChannel);
     if Coef > 0 then
-      Result := (AFlow * Coef) / 3.6;
+      Result := AFlowBaseLps * Coef;
   end;
 begin
   if AWorkTable = nil then
@@ -5968,7 +5968,7 @@ begin
 
   end;
 
-  EtalonFlow := GetActiveEtalonFlow;
+  EtalonFlowBaseLps := GetActiveEtalonFlowBaseLps;
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
@@ -6012,7 +6012,7 @@ begin
           Channel.SimulationStartAssigned := True;
         end;
 
-        if SameValue(EtalonFlow, 0.0, 1E-12) then
+        if SameValue(EtalonFlowBaseLps, 0.0, 1E-12) then
         begin
           ModeText := 'OscillateWithoutEtalon';
           TargetImpSec := Channel.ImpSec;
@@ -6022,7 +6022,7 @@ begin
         end
         else
         begin
-          TargetImpSec := CalcDeviceImpSecByFlow(Channel, EtalonFlow);
+          TargetImpSec := CalcDeviceImpSecByBaseFlow(Channel, EtalonFlowBaseLps);
           Channel.SimulationTargetImpSec := TargetImpSec;
           Diff := TargetImpSec - Channel.ImpSec;
           Step := EnsureRange(Abs(Diff) * 0.08, 20.0, 2000.0);
@@ -6042,11 +6042,11 @@ begin
       if Channel.ValueImpTotal <> nil then
         Channel.ValueImpTotal.SetValue(Channel.ImpResult);
       LogMKS('UPDATE_RANDOM_SIGNALS_DEVICE', 'UpdateRandomSignals',
-        Format('Channel=%s; Device=%s; ReadinessChecked=%s; Mode=%s; CurrentImpSec=%f; StartImpSec=%f; TargetImpSec=%f; EtalonFlow=%f; Diff=%f; Step=%f; NoiseAmplitude=%f; NewImpSec=%f',
+        Format('Channel=%s; Device=%s; ReadinessChecked=%s; Mode=%s; CurrentImpSec=%f; StartImpSec=%f; TargetImpSec=%f; EtalonFlowBaseLps=%f; UserFlow=%f; UserUnits=m3/h; FlowBaseLps=%f; BaseValueAlreadyConverted=True; AdditionalConversionApplied=False; Diff=%f; Step=%f; NoiseAmplitude=%f; NewImpSec=%f',
           [Channel.Text, Channel.DeviceName, IfThen(Channel.ReadinessChecked, 'True', 'False'),
            ModeText, Channel.ImpSec, Channel.SimulationStartImpSec,
-           Channel.SimulationTargetImpSec, EtalonFlow, Diff, Step, NoiseAmplitude,
-           Channel.ImpSec]));
+           Channel.SimulationTargetImpSec, EtalonFlowBaseLps, EtalonFlowBaseLps * 3.6,
+           EtalonFlowBaseLps, Diff, Step, NoiseAmplitude, Channel.ImpSec]));
     end
     else
     begin
