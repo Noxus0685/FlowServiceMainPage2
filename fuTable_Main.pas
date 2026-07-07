@@ -236,6 +236,8 @@ begin
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
+    WorkTable.SimulationReadinessChecked := CheckBoxReadiness.IsChecked;
+
     for I := 0 to WorkTable.DeviceChannels.Count - 1 do
       if WorkTable.DeviceChannels[I] <> nil then
         EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);

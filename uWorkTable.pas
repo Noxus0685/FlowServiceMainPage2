@@ -376,6 +376,7 @@ type
     FNextClimateChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
+    FSimulationReadinessChecked: Boolean;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -625,6 +626,7 @@ type
     property TableClamped: Boolean read FTableClamped write FTableClamped;
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
     property QuantityUnitName: string read FQuantityUnitName write FQuantityUnitName;
+    property SimulationReadinessChecked: Boolean read FSimulationReadinessChecked write FSimulationReadinessChecked;
 
     property ValueTempertureBefore: TMeterValue read GetValueTempertureBefore write SetValueTempertureBefore;
     property ValueTempertureAfter: TMeterValue read GetValueTempertureAfter write SetValueTempertureAfter;
@@ -1811,6 +1813,7 @@ begin
   FTimeSet := 0;
   FLimitImpSet := 0;
   FLimitVolumeSet := 0;
+  FSimulationReadinessChecked := False;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
