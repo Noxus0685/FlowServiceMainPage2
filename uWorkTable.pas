@@ -764,6 +764,7 @@ implementation
 uses
   FmxHelper,
   frmMainTable,
+  fuTable_Main,
   uMeasurementRun,
   uMKSDebug;
 
@@ -772,6 +773,12 @@ const
   DEVICE_FLOW_RATE_DIM_INDEX = 4;
 
   {$REGION 'HELPERS'}
+
+function IsTestReadinessChecked: Boolean;
+begin
+  Result := (TableMainForm <> nil) and (TableMainForm.CheckBoxReadiness <> nil) and
+    TableMainForm.CheckBoxReadiness.IsChecked;
+end;
 
 class procedure TDeviceCreationService.AddProtocol(AMode: TDeviceCreateMode;
   const AAction: string; ADevice: TDevice; AChannel: TChannel);
@@ -5088,10 +5095,10 @@ begin
     Channel.SimulationTargetImpSec := ChannelImpSec;
     Channel.SimulationStartAssigned := True;
     LogMKS('SIM_TARGET_SET', 'TWorkTable.ApplyChannelValues',
-      Format('Channel=%s; Device=%s; OldImpSec=%f; NewImpSec=%f; OldStartImpSec=%f; NewStartImpSec=%f; OldTargetImpSec=%f; NewTargetImpSec=%f; ReadinessChecked=%s; AppliedOnlyToSelectedChannel=False',
+      Format('Channel=%s; Device=%s; OldImpSec=%f; NewImpSec=%f; OldStartImpSec=%f; NewStartImpSec=%f; OldTargetImpSec=%f; NewTargetImpSec=%f; CheckBoxReadiness=%s; AppliedOnlyToSelectedChannel=False',
         [Channel.Text, Channel.DeviceName, OldImpSec, ChannelImpSec,
          OldStartImpSec, ChannelImpSec, OldTargetImpSec,
-         ChannelImpSec, IfThen(Self.SimulationReadinessChecked, 'True', 'False')]));
+         ChannelImpSec, IfThen(IsTestReadinessChecked, 'True', 'False')]));
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
@@ -5988,7 +5995,7 @@ begin
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
 
-      if AWorkTable.SimulationReadinessChecked then
+      if IsTestReadinessChecked then
       begin
         ModeText := 'OscillateAroundStart';
         if not Channel.SimulationStartAssigned then
@@ -6042,8 +6049,8 @@ begin
       if Channel.ValueImpTotal <> nil then
         Channel.ValueImpTotal.SetValue(Channel.ImpResult);
       LogMKS('UPDATE_RANDOM_SIGNALS_DEVICE', 'UpdateRandomSignals',
-        Format('Channel=%s; Device=%s; ReadinessChecked=%s; Mode=%s; CurrentImpSec=%f; StartImpSec=%f; TargetImpSec=%f; EtalonFlowBaseLps=%f; UserFlow=%f; UserUnits=m3/h; FlowBaseLps=%f; BaseValueAlreadyConverted=True; AdditionalConversionApplied=False; Diff=%f; Step=%f; NoiseAmplitude=%f; NewImpSec=%f',
-          [Channel.Text, Channel.DeviceName, IfThen(AWorkTable.SimulationReadinessChecked, 'True', 'False'),
+        Format('Channel=%s; Device=%s; CheckBoxReadiness=%s; Mode=%s; CurrentImpSec=%f; StartImpSec=%f; TargetImpSec=%f; EtalonFlowBaseLps=%f; UserFlow=%f; UserUnits=m3/h; FlowBaseLps=%f; BaseValueAlreadyConverted=True; AdditionalConversionApplied=False; Diff=%f; Step=%f; NoiseAmplitude=%f; NewImpSec=%f',
+          [Channel.Text, Channel.DeviceName, IfThen(IsTestReadinessChecked, 'True', 'False'),
            ModeText, Channel.ImpSec, Channel.SimulationStartImpSec,
            Channel.SimulationTargetImpSec, EtalonFlowBaseLps, EtalonFlowBaseLps * 3.6,
            EtalonFlowBaseLps, Diff, Step, NoiseAmplitude, Channel.ImpSec]));
