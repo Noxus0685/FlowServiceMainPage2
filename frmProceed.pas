@@ -1634,39 +1634,11 @@ end;
 
 function TFrameProceed.FindResultSpillageForPoint(ADevice: TDevice;
   APoint: TDevicePoint): TPointSpillage;
-var
-  Spillage: TPointSpillage;
-  DeviceUUID: string;
-  TypeUUID: string;
 begin
   Result := nil;
-  if (ADevice = nil) or (APoint = nil) or (ADevice.Spillages = nil) then
+  if ADevice = nil then
     Exit;
-
-  DeviceUUID := Trim(ADevice.UUID);
-  TypeUUID := Trim(APoint.DeviceTypeUUID);
-
-  for Spillage in ADevice.Spillages do
-  begin
-    if (Spillage = nil) or (Spillage.State = osDeleted) or (not Spillage.Enabled) then
-      Continue;
-
-    if not SameText(Trim(Spillage.DeviceUUID), DeviceUUID) then
-      Continue;
-
-    if (TypeUUID <> '') and (Trim(Spillage.DeviceTypeUUID) <> '') then
-    begin
-      if not SameText(Trim(Spillage.DeviceTypeUUID), TypeUUID) then
-        Continue;
-    end
-    else if (not SameText(Trim(Spillage.Name), Trim(APoint.Name))) and
-            (not ADevice.IsFlowInPoint(Spillage.QavgEtalon, APoint)) then
-      Continue;
-
-    Result := Spillage;
-    if Spillage.Valid then
-      Exit;
-  end;
+  Result := ADevice.FindResultSpillageForPoint(APoint);
 end;
 
 procedure TFrameProceed.LogResultCellDebug(const ARow: TResultGridRow;
