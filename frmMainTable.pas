@@ -5614,6 +5614,9 @@ end;
 function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
   out AColor: TAlphaColor): Boolean;
 var
+  Device: TDevice;
+  DevicePoint: TDevicePoint;
+  ResultSpillage: TPointSpillage;
   Spillage: TPointSpillage;
   Session: TSessionSpillage;
 begin
@@ -5621,26 +5624,30 @@ begin
   AColor := TAlphaColors.Null;
 
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) or (FActiveWorkTable = nil) or
-     (FActiveWorkTable.CurrentPoint = nil) then
+     (AChannel.FlowMeter.Device = nil) then
     Exit;
 
-  Session := AChannel.FlowMeter.Device.GetActiveSessionSpillage;
+  Device := AChannel.FlowMeter.Device;
+  Session := Device.GetActiveSessionSpillage;
   if (Session = nil) or (Session.Spillages = nil) or
      (Session.Spillages.Count = 0) then
     Exit;
 
   Spillage := Session.Spillages.Last;
-  if AChannel.FlowMeter.Device.FindResultSpillageForPoint(
-     FActiveWorkTable.CurrentPoint, Spillage) = nil then
+  if (Spillage = nil) or (Device.Points = nil) then
     Exit;
 
-  if Spillage = nil then
+  DevicePoint := Device.FindMatchedDevicePointForSpillage(Spillage);
+  if DevicePoint = nil then
+    Exit;
+
+  ResultSpillage := Device.FindResultSpillageForPoint(DevicePoint, Spillage);
+  if ResultSpillage = nil then
     Exit;
 
   Result := True;
-  if (not Spillage.Valid) or
-     (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
+  if (not ResultSpillage.Valid) or
+     (ResultSpillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
     AColor := TAlphaColorRec.Lightyellow
   else
     AColor := $FFE6F4E6;

@@ -2292,6 +2292,8 @@ function TDevice.FindMatchedDevicePointForSpillage(
 ): TDevicePoint;
 var
   P: TDevicePoint;
+  SpillageDeviceTypeUUID: string;
+  SpillageName: string;
 begin
   Result := nil;
   if (ASpillage = nil) or (FPoints = nil) then
@@ -2300,6 +2302,18 @@ begin
   if (Trim(ASpillage.DeviceUUID) <> '') and
      (not SameText(Trim(ASpillage.DeviceUUID), Trim(Self.UUID))) then
     Exit;
+
+  SpillageDeviceTypeUUID := Trim(ASpillage.DeviceTypeUUID);
+  if SpillageDeviceTypeUUID <> '' then
+    for P in FPoints do
+      if (P <> nil) and SameText(Trim(P.DeviceTypeUUID), SpillageDeviceTypeUUID) then
+        Exit(P);
+
+  SpillageName := Trim(ASpillage.Name);
+  if SpillageName <> '' then
+    for P in FPoints do
+      if (P <> nil) and SameText(Trim(P.Name), SpillageName) then
+        Exit(P);
 
   for P in FPoints do
     if (P <> nil) and IsFlowInPoint(ASpillage.QavgEtalon, P) then
@@ -2311,6 +2325,7 @@ function TDevice.FindResultSpillageForPoint(
   const APoint: TDevicePoint
 ): TPointSpillage;
 var
+  Candidate: TPointSpillage;
   Spillage: TPointSpillage;
 begin
   Result := nil;
@@ -2319,11 +2334,12 @@ begin
 
   for Spillage in FSpillages do
   begin
-    Result := FindResultSpillageForPoint(APoint, Spillage);
-    if Result = nil then
+    Candidate := FindResultSpillageForPoint(APoint, Spillage);
+    if Candidate = nil then
       Continue;
 
-    if Result.Valid then
+    Result := Candidate;
+    if Candidate.Valid then
       Exit;
   end;
 end;
@@ -2332,6 +2348,8 @@ function TDevice.FindResultSpillageForPoint(const APoint: TDevicePoint;
   const ASpillage: TPointSpillage): TPointSpillage;
 var
   DeviceUUID: string;
+  SpillageDeviceTypeUUID: string;
+  SpillageName: string;
   TypeUUID: string;
 begin
   Result := nil;
@@ -2340,21 +2358,23 @@ begin
     Exit;
 
   DeviceUUID := Trim(Self.UUID);
+  SpillageDeviceTypeUUID := Trim(ASpillage.DeviceTypeUUID);
+  SpillageName := Trim(ASpillage.Name);
   TypeUUID := Trim(APoint.DeviceTypeUUID);
 
   if not SameText(Trim(ASpillage.DeviceUUID), DeviceUUID) then
     Exit;
 
-  if (TypeUUID <> '') and (Trim(ASpillage.DeviceTypeUUID) <> '') then
-  begin
-    if not SameText(Trim(ASpillage.DeviceTypeUUID), TypeUUID) then
-      Exit;
-  end
-  else if (not SameText(Trim(ASpillage.Name), Trim(APoint.Name))) and
-          (not IsFlowInPoint(ASpillage.QavgEtalon, APoint)) then
-    Exit;
+  if (TypeUUID <> '') and (SpillageDeviceTypeUUID <> '') and
+     SameText(SpillageDeviceTypeUUID, TypeUUID) then
+    Exit(ASpillage);
 
-  Result := ASpillage;
+  if (SpillageName <> '') and SameText(SpillageName, Trim(APoint.Name)) then
+    Exit(ASpillage);
+
+  if IsFlowInPoint(ASpillage.QavgEtalon, APoint) then
+    Exit(ASpillage);
+
 end;
 
 function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
@@ -3059,9 +3079,6 @@ begin
 end;
 
 end.
-
-
-
 
 
 
