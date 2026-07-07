@@ -182,6 +182,10 @@ type
     FOutputSet: TControlRegister<EOutPutSet>;
     FSyncMode: TControlRegister<ESyncChannelMode>;
     FNoiseFilter: TControlRegister<Integer>;
+    FReadinessChecked: Boolean;
+    FSimulationStartImpSec: Double;
+    FSimulationTargetImpSec: Double;
+    FSimulationStartAssigned: Boolean;
 
 
 
@@ -301,6 +305,10 @@ type
     property VolResult: Double read GetVolResultProxy write SetVolResultProxy;
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
+    property ReadinessChecked: Boolean read FReadinessChecked write FReadinessChecked;
+    property SimulationStartImpSec: Double read FSimulationStartImpSec write FSimulationStartImpSec;
+    property SimulationTargetImpSec: Double read FSimulationTargetImpSec write FSimulationTargetImpSec;
+    property SimulationStartAssigned: Boolean read FSimulationStartAssigned write FSimulationStartAssigned;
 
     property ValueImp: TMeterValue read FValueImp write SetValueImp;
     property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
@@ -1236,6 +1244,10 @@ begin
   FGroup := 0;
   FCategory := mftUnknownType;
   FWorkTabeID := 0;
+  FReadinessChecked := False;
+  FSimulationStartImpSec := 0;
+  FSimulationTargetImpSec := 0;
+  FSimulationStartAssigned := False;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -5049,6 +5061,7 @@ var
   I: Integer;
   Channel: TChannel;
   ChannelImpSec: Double;
+  OldImpSec, OldStartImpSec, OldTargetImpSec: Double;
 begin
   if AChannels = nil then
     Exit;
@@ -5065,11 +5078,26 @@ begin
       ChannelImpSec := 0;
 
     Channel.CurSec := ACurSec;
+    OldImpSec := Channel.ImpSec;
+    OldStartImpSec := Channel.SimulationStartImpSec;
+    OldTargetImpSec := Channel.SimulationTargetImpSec;
     Channel.ImpSec := ChannelImpSec;
+    if Channel.ValueImp <> nil then
+      Channel.ValueImp.SetValue(Channel.ImpSec);
+    Channel.SimulationStartImpSec := ChannelImpSec;
+    Channel.SimulationTargetImpSec := ChannelImpSec;
+    Channel.SimulationStartAssigned := True;
+    LogMKS('SIM_TARGET_SET', 'TWorkTable.ApplyChannelValues',
+      Format('Channel=%s; Device=%s; OldImpSec=%f; NewImpSec=%f; OldStartImpSec=%f; NewStartImpSec=%f; OldTargetImpSec=%f; NewTargetImpSec=%f; ReadinessChecked=%s; AppliedOnlyToSelectedChannel=True',
+        [Channel.Text, Channel.DeviceName, OldImpSec, ChannelImpSec,
+         OldStartImpSec, ChannelImpSec, OldTargetImpSec,
+         ChannelImpSec, IfThen(Channel.ReadinessChecked, 'True', 'False')]));
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+    if Channel.ValueImpTotal <> nil then
+      Channel.ValueImpTotal.SetValue(Channel.ImpResult);
   end;
 end;
 
@@ -5863,11 +5891,58 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+  EtalonFlow: Double;
+  TargetImpSec: Double;
+  Diff: Double;
+  Step: Double;
+  NoiseAmplitude: Double;
+  NewImpSec: Double;
+  ModeText: string;
+
+  function GetActiveEtalonFlow: Double;
+  var
+    J: Integer;
+    EtalonChannel: TChannel;
+  begin
+    Result := 0;
+    if AWorkTable = nil then
+      Exit;
+
+    for J := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    begin
+      EtalonChannel := AWorkTable.EtalonChannels[J];
+      if (EtalonChannel <> nil) and EtalonChannel.Enabled and
+         (EtalonChannel.FlowMeter <> nil) and
+         (EtalonChannel.FlowMeter.ValueFlow <> nil) then
+      begin
+        Result := EtalonChannel.FlowMeter.ValueFlow.GetDoubleValue;
+        if not SameValue(Result, 0.0, 1E-12) then
+          Exit;
+      end;
+    end;
+
+    if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.Value <> nil) then
+      Result := AWorkTable.FlowRate.Value.Value;
+  end;
+
+  function CalcDeviceImpSecByFlow(const AChannel: TChannel; const AFlow: Double): Double;
+  var
+    Coef: Double;
+  begin
+    Result := 0;
+    if AChannel = nil then
+      Exit;
+
+    Result := AChannel.ImpSec;
+    Coef := WorkTableManager.GetChannelFlowCoef(AChannel);
+    if Coef > 0 then
+      Result := (AFlow * Coef) / 3.6;
+  end;
 begin
   if AWorkTable = nil then
     Exit;
 
-    AWorkTable.Time := AWorkTable.Time + 1;
+  AWorkTable.Time := AWorkTable.Time + 1;
 
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
   begin
@@ -5888,9 +5963,12 @@ begin
       Channel.CurSec :=0;
       Channel.ImpSec := 0;
       Channel.ImpResult := 0;
+      Channel.SimulationStartAssigned := False;
     end;
 
   end;
+
+  EtalonFlow := GetActiveEtalonFlow;
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
@@ -5899,18 +5977,83 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    TargetImpSec := Channel.SimulationTargetImpSec;
+    Diff := 0;
+    Step := 0;
+    NoiseAmplitude := 0;
+    NewImpSec := Channel.ImpSec;
+    ModeText := 'Disabled';
+
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+
+      if Channel.ReadinessChecked then
+      begin
+        ModeText := 'OscillateAroundStart';
+        if not Channel.SimulationStartAssigned then
+        begin
+          Channel.SimulationStartImpSec := Channel.ImpSec;
+          Channel.SimulationTargetImpSec := Channel.ImpSec;
+          Channel.SimulationStartAssigned := True;
+        end;
+
+        TargetImpSec := Channel.SimulationTargetImpSec;
+        NoiseAmplitude := Max(Abs(Channel.SimulationStartImpSec) * 0.005, 5.0);
+        NewImpSec := Channel.SimulationStartImpSec + ((Random * 2.0) - 1.0) * NoiseAmplitude;
+      end
+      else
+      begin
+        ModeText := 'MoveToEtalon';
+        if not Channel.SimulationStartAssigned then
+        begin
+          Channel.SimulationStartImpSec := Channel.ImpSec;
+          Channel.SimulationTargetImpSec := Channel.ImpSec;
+          Channel.SimulationStartAssigned := True;
+        end;
+
+        if SameValue(EtalonFlow, 0.0, 1E-12) then
+        begin
+          ModeText := 'OscillateWithoutEtalon';
+          TargetImpSec := Channel.ImpSec;
+          Channel.SimulationTargetImpSec := TargetImpSec;
+          NoiseAmplitude := Max(Abs(Channel.ImpSec) * 0.002, 2.0);
+          NewImpSec := Channel.ImpSec + ((Random * 2.0) - 1.0) * NoiseAmplitude;
+        end
+        else
+        begin
+          TargetImpSec := CalcDeviceImpSecByFlow(Channel, EtalonFlow);
+          Channel.SimulationTargetImpSec := TargetImpSec;
+          Diff := TargetImpSec - Channel.ImpSec;
+          Step := EnsureRange(Abs(Diff) * 0.08, 20.0, 2000.0);
+          if Abs(Diff) <= Step then
+            NewImpSec := TargetImpSec
+          else if Diff > 0 then
+            NewImpSec := Channel.ImpSec + Step
+          else
+            NewImpSec := Channel.ImpSec - Step;
+        end;
+      end;
+
+      Channel.ImpSec := EnsureRange(NewImpSec, 0.0, 1000000.0);
+      if Channel.ValueImp <> nil then
+        Channel.ValueImp.SetValue(Channel.ImpSec);
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
+      if Channel.ValueImpTotal <> nil then
+        Channel.ValueImpTotal.SetValue(Channel.ImpResult);
+      LogMKS('UPDATE_RANDOM_SIGNALS_DEVICE', 'UpdateRandomSignals',
+        Format('Channel=%s; Device=%s; ReadinessChecked=%s; Mode=%s; CurrentImpSec=%f; StartImpSec=%f; TargetImpSec=%f; EtalonFlow=%f; Diff=%f; Step=%f; NoiseAmplitude=%f; NewImpSec=%f',
+          [Channel.Text, Channel.DeviceName, IfThen(Channel.ReadinessChecked, 'True', 'False'),
+           ModeText, Channel.ImpSec, Channel.SimulationStartImpSec,
+           Channel.SimulationTargetImpSec, EtalonFlow, Diff, Step, NoiseAmplitude,
+           Channel.ImpSec]));
     end
     else
     begin
       Channel.CurSec :=0;
       Channel.ImpSec := 0;
       Channel.ImpResult := 0;
+      Channel.SimulationStartAssigned := False;
     end;
   end;
 end;
