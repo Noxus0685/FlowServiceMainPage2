@@ -125,7 +125,6 @@ type
     PanelDevices1: TPanel;
     GridDevices: TGrid;
     CheckColumnDeviceEnable1: TCheckColumn;
-    CheckColumnDeviceReadiness1: TCheckColumn;
     StringColumnDeviceChanel1: TStringColumn;
     ColumnDeviceType1: TColumn;
     StringColumnDeviceSerial1: TStringColumn;
@@ -6068,8 +6067,6 @@ begin
   begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
       Value := WorkTable.DeviceChannels[ARow].Enabled
-    else if GridDevices.Columns[ACol] = CheckColumnDeviceReadiness1 then
-      Value := WorkTable.DeviceChannels[ARow].ReadinessChecked
     else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
       Value := WorkTable.DeviceChannels[ARow].Text
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
@@ -6237,17 +6234,6 @@ begin
       WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
       if not WorkTable.DeviceChannels[ARow].Enabled then
         WorkTable.DeviceChannels[ARow].ImpSec := 0;
-    end
-    else if GridDevices.Columns[ACol] = CheckColumnDeviceReadiness1 then
-    begin
-      Changed := WorkTable.DeviceChannels[ARow].ReadinessChecked <> Value.AsBoolean;
-      WorkTable.DeviceChannels[ARow].ReadinessChecked := Value.AsBoolean;
-      if Changed then
-      begin
-        WorkTable.DeviceChannels[ARow].SimulationStartImpSec := WorkTable.DeviceChannels[ARow].ImpSec;
-        WorkTable.DeviceChannels[ARow].SimulationTargetImpSec := WorkTable.DeviceChannels[ARow].ImpSec;
-        WorkTable.DeviceChannels[ARow].SimulationStartAssigned := True;
-      end;
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
     begin
