@@ -5091,7 +5091,7 @@ begin
       Format('Channel=%s; Device=%s; OldImpSec=%f; NewImpSec=%f; OldStartImpSec=%f; NewStartImpSec=%f; OldTargetImpSec=%f; NewTargetImpSec=%f; ReadinessChecked=%s; AppliedOnlyToSelectedChannel=True',
         [Channel.Text, Channel.DeviceName, OldImpSec, ChannelImpSec,
          OldStartImpSec, ChannelImpSec, OldTargetImpSec,
-         ChannelImpSec, BoolToStr(Channel.ReadinessChecked, True)]));
+         ChannelImpSec, IfThen(Channel.ReadinessChecked, 'True', 'False')]));
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
@@ -6043,7 +6043,7 @@ begin
         Channel.ValueImpTotal.SetValue(Channel.ImpResult);
       LogMKS('UPDATE_RANDOM_SIGNALS_DEVICE', 'UpdateRandomSignals',
         Format('Channel=%s; Device=%s; ReadinessChecked=%s; Mode=%s; CurrentImpSec=%f; StartImpSec=%f; TargetImpSec=%f; EtalonFlow=%f; Diff=%f; Step=%f; NoiseAmplitude=%f; NewImpSec=%f',
-          [Channel.Text, Channel.DeviceName, BoolToStr(Channel.ReadinessChecked, True),
+          [Channel.Text, Channel.DeviceName, IfThen(Channel.ReadinessChecked, 'True', 'False'),
            ModeText, Channel.ImpSec, Channel.SimulationStartImpSec,
            Channel.SimulationTargetImpSec, EtalonFlow, Diff, Step, NoiseAmplitude,
            Channel.ImpSec]));
