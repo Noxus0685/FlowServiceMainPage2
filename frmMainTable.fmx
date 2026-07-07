@@ -5640,6 +5640,13 @@ object FrameMainTable: TFrameMainTable
               HeaderSettings.TextSettings.HorzAlign = Center
               ReadOnly = True
             end
+            object CheckColumnDeviceReadiness1: TCheckColumn
+              Header = #1043#1086#1090#1086#1074#1085#1086#1089#1090#1100
+              HeaderSettings.TextSettings.Trimming = Character
+              HeaderSettings.TextSettings.WordWrap = False
+              HeaderSettings.TextSettings.HorzAlign = Center
+              Size.Width = 86.000000000000000000
+            end
             object StringColumnDeviceChanel1: TStringColumn
               Tag = 1
               Header = #1050#1072#1085#1072#1083
