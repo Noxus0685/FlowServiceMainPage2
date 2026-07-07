@@ -799,7 +799,8 @@ implementation
 {$R *.fmx}
 
 uses
-  fuTable_Main;
+  fuTable_Main,
+  uMKSDebug;
 
 
 const
@@ -5631,28 +5632,57 @@ begin
   CurrentSpillage := TPointSpillage.Create(0);
   try
     FActiveWorkTable.FillCurrentSpillage(AChannel, CurrentSpillage);
+    LogMKS('DBG SP 9201', 'GetErrorCellColor CURRENT SPILLAGE',
+      Format('Channel=%s; Device=%s UUID=%s | %s',
+        [AChannel.Name, Device.Name, Device.UUID, DumpSpillage(CurrentSpillage)]));
 
     if Device.Points = nil then
+    begin
+      LogMKS('DBG SP 9202', 'GetErrorCellColor NO DEVICE POINTS',
+        Format('Device=%s UUID=%s | %s',
+          [Device.Name, Device.UUID, DumpSpillage(CurrentSpillage)]));
       Exit;
+    end;
 
     DevicePoint := Device.FindMatchedDevicePointForSpillage(CurrentSpillage);
     if DevicePoint = nil then
+    begin
+      LogMKS('DBG SP 9203', 'GetErrorCellColor POINT NOT MATCHED',
+        Format('Device=%s UUID=%s | %s',
+          [Device.Name, Device.UUID, DumpSpillage(CurrentSpillage)]));
       Exit;
+    end;
 
     ResultSpillage := Device.FindResultSpillageForPoint(
       DevicePoint, CurrentSpillage);
     if ResultSpillage = nil then
+    begin
+      LogMKS('DBG SP 9204', 'GetErrorCellColor RESULT NOT MATCHED',
+        Format('DevicePoint ID=%d Name=%s DeviceTypeUUID=%s | %s',
+          [DevicePoint.ID, DevicePoint.Name, DevicePoint.DeviceTypeUUID,
+           DumpSpillage(CurrentSpillage)]));
       Exit;
+    end;
 
     AllowedError := Abs(DevicePoint.Error);
     if AllowedError <= 0 then
+    begin
+      LogMKS('DBG SP 9205', 'GetErrorCellColor INVALID ALLOWED ERROR',
+        Format('DevicePoint ID=%d Name=%s AllowedError=%f | %s',
+          [DevicePoint.ID, DevicePoint.Name, AllowedError,
+           DumpSpillage(ResultSpillage)]));
       Exit;
+    end;
 
     Result := True;
     if Abs(ResultSpillage.Error) <= AllowedError then
       AColor := $FFE6F4E6
     else
       AColor := TAlphaColorRec.Lightyellow;
+    LogMKS('DBG SP 9206', 'GetErrorCellColor COLOR',
+      Format('DevicePoint ID=%d Name=%s AllowedError=%f Color=%x | %s',
+        [DevicePoint.ID, DevicePoint.Name, AllowedError, AColor,
+         DumpSpillage(ResultSpillage)]));
   finally
     CurrentSpillage.Free;
   end;
