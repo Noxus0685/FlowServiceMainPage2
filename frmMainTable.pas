@@ -5614,43 +5614,48 @@ end;
 function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
   out AColor: TAlphaColor): Boolean;
 var
+  AllowedError: Double;
+  CurrentSpillage: TPointSpillage;
   Device: TDevice;
   DevicePoint: TDevicePoint;
   ResultSpillage: TPointSpillage;
-  Spillage: TPointSpillage;
-  Session: TSessionSpillage;
 begin
   Result := False;
   AColor := TAlphaColors.Null;
 
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) then
+     (AChannel.FlowMeter.Device = nil) or (FActiveWorkTable = nil) then
     Exit;
 
   Device := AChannel.FlowMeter.Device;
-  Session := Device.GetActiveSessionSpillage;
-  if (Session = nil) or (Session.Spillages = nil) or
-     (Session.Spillages.Count = 0) then
-    Exit;
+  CurrentSpillage := TPointSpillage.Create(0);
+  try
+    FActiveWorkTable.FillCurrentSpillage(AChannel, CurrentSpillage);
 
-  Spillage := Session.Spillages.Last;
-  if (Spillage = nil) or (Device.Points = nil) then
-    Exit;
+    if Device.Points = nil then
+      Exit;
 
-  DevicePoint := Device.FindMatchedDevicePointForSpillage(Spillage);
-  if DevicePoint = nil then
-    Exit;
+    DevicePoint := Device.FindMatchedDevicePointForSpillage(CurrentSpillage);
+    if DevicePoint = nil then
+      Exit;
 
-  ResultSpillage := Device.FindResultSpillageForPoint(DevicePoint, Spillage);
-  if ResultSpillage = nil then
-    Exit;
+    ResultSpillage := Device.FindResultSpillageForPoint(
+      DevicePoint, CurrentSpillage);
+    if ResultSpillage = nil then
+      Exit;
 
-  Result := True;
-  if (not ResultSpillage.Valid) or
-     (ResultSpillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
-    AColor := TAlphaColorRec.Lightyellow
-  else
-    AColor := $FFE6F4E6;
+    AllowedError := Abs(DevicePoint.Error);
+    if AllowedError <= 0 then
+      Exit;
+
+    Result := True;
+    if Abs(ResultSpillage.Error) <= AllowedError then
+      AColor := $FFE6F4E6
+    else
+      AColor := TAlphaColorRec.Lightyellow;
+  finally
+    CurrentSpillage.Free;
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;

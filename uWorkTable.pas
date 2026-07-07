@@ -701,6 +701,7 @@ type
   procedure StopTest;
   procedure StartMonitor;
   procedure StopMonitor;
+  procedure FillCurrentSpillage(AChannel: TChannel; ASpillage: TPointSpillage);
   procedure SaveMeasurementResults;
 
 
@@ -4468,23 +4469,133 @@ begin
   end;
 end;
 
-procedure TWorkTable.SaveMeasurementResults;
+procedure TWorkTable.FillCurrentSpillage(AChannel: TChannel;
+  ASpillage: TPointSpillage);
 var
-  DeviceChannel: TChannel;
   EtalonChannel: TChannel;
-  Point: TPointSpillage;
-  Session: TSessionSpillage;
-  DeviceRepo: TDeviceRepository;
   MeterValueCoef: TMeterValue;
   MeasuredDim: TMeasuredDimension;
   CurrentCoef: Double;
-  CurrentPointQmax: Double;
   Device: TDevice;
-  SourceDevice: TDevice;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
 begin
+  if (AChannel = nil) or (AChannel.FlowMeter = nil) or
+     (ASpillage = nil) then
+    Exit;
 
+  Device := AChannel.FlowMeter.Device;
+  if Device <> nil then
+    ASpillage.DeviceUUID := Device.UUID;
+  ASpillage.DateTime := Now;
+  ASpillage.SpillTime := ValueTime.GetDoubleValue;
+  ASpillage.QavgEtalon := ValueFlowRate.GetDoubleValue;
+
+  MatchedPoint := nil;
+  if (CurrentPoint <> nil) and (Device <> nil) and (Device.Points <> nil) then
+    for DevicePoint in Device.Points do
+      if (DevicePoint <> nil) and
+         (((CurrentPoint.ID <> 0) and (DevicePoint.ID = CurrentPoint.ID)) or
+          ((CurrentPoint.ID = 0) and (Trim(CurrentPoint.Name) <> '') and
+           SameText(DevicePoint.Name, CurrentPoint.Name))) then
+      begin
+        MatchedPoint := DevicePoint;
+        Break;
+      end;
+
+  if MatchedPoint <> nil then
+    ASpillage.Name := MatchedPoint.Name;
+
+  if TableFlow <> nil then
+    ASpillage.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
+
+  ASpillage.EtalonName := '';
+  ASpillage.EtalonUUID := '';
+  for EtalonChannel in EtalonChannels do
+  begin
+    if (EtalonChannel = nil) or (not EtalonChannel.Enabled) or
+       (EtalonChannel.FlowMeter = nil) or
+       (EtalonChannel.FlowMeter.Device = nil) then
+      Continue;
+
+    if SameText(Trim(EtalonChannel.FlowMeter.Device.Name), 'Новое устройство') then
+      Continue;
+
+    ASpillage.EtalonName := Trim(EtalonChannel.FlowMeter.Device.Name);
+    ASpillage.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
+    Break;
+  end;
+
+  if (ASpillage.EtalonName = '') and (TableFlow <> nil) and
+     (not SameText(Trim(TableFlow.Name), 'Новое устройство')) then
+    ASpillage.EtalonName := Trim(TableFlow.Name);
+
+  if TableFlow <> nil then
+    ASpillage.EtalonMass := TableFlow.ValueMass.GetDoubleValue;
+
+  if not SameValue(ASpillage.SpillTime, 0.0, 1E-12) then
+  begin
+    ASpillage.EtalonVolumeFlow := ASpillage.EtalonVolume / ASpillage.SpillTime;
+    ASpillage.EtalonMassFlow := ASpillage.EtalonMass / ASpillage.SpillTime;
+  end;
+
+  ASpillage.DeviceVolume := AChannel.FlowMeter.ValueVolume.GetDoubleValue;
+  ASpillage.DeviceMass := AChannel.FlowMeter.ValueMass.GetDoubleValue;
+
+  ASpillage.Density := AChannel.FlowMeter.ValueDensity.GetDoubleValue;
+  ASpillage.Error := AChannel.FlowMeter.ValueError.GetDoubleValue;
+  ASpillage.PulseCount := AChannel.ValueImpResult.GetDoubleValue;
+
+  if not SameValue(ASpillage.SpillTime, 0.0, 1E-12) then
+  begin
+    ASpillage.DeviceMassFlow := ASpillage.DeviceMass / ASpillage.SpillTime;
+    ASpillage.DeviceVolumeFlow := ASpillage.DeviceVolume / ASpillage.SpillTime;
+    ASpillage.MeanFrequency := ASpillage.PulseCount / ASpillage.SpillTime;
+  end;
+
+  CurrentCoef := 0.0;
+  MeterValueCoef := AChannel.FlowMeter.ValueCoef;
+  if MeterValueCoef <> nil then
+    CurrentCoef := MeterValueCoef.GetDoubleValue
+  else if Device <> nil then
+    CurrentCoef := Device.Coef;
+
+  if SameValue(CurrentCoef, 0.0, 1E-12) and (Device <> nil) then
+  begin
+    MeasuredDim := TMeasuredDimension(Device.MeasuredDimension);
+    case MeasuredDim of
+      mdVolumeFlow, mdVolume:
+        if not SameValue(ASpillage.EtalonVolume, 0.0, 1E-12) then
+          CurrentCoef := ASpillage.PulseCount / ASpillage.EtalonVolume;
+      mdMassFlow, mdMass:
+        if not SameValue(ASpillage.EtalonMass, 0.0, 1E-12) then
+          CurrentCoef := ASpillage.PulseCount / ASpillage.EtalonMass;
+    end;
+  end;
+  ASpillage.Coef := CurrentCoef;
+
+  ASpillage.AvgCurrent := AChannel.ValueCurrent.GetDoubleValue;
+  ASpillage.StartTemperature := ValueTempertureBefore.GetDoubleValue;
+  ASpillage.EndTemperature := ValueTempertureAfter.GetDoubleValue;
+  ASpillage.AvgTemperature := ValueTemperture.GetDoubleValue;
+  ASpillage.InputPressure := ValuePressureBefore.GetDoubleValue;
+  ASpillage.OutputPressure := ValuePressureAfter.GetDoubleValue;
+  ASpillage.DeltaPressure := ASpillage.InputPressure - ASpillage.OutputPressure;
+  ASpillage.AtmosphericPressure := ValueAirPressure.GetDoubleValue;
+  ASpillage.AmbientTemperature := ValueAirTemperture.GetDoubleValue;
+  ASpillage.RelativeHumidity := ValueHumidity.GetDoubleValue;
+end;
+
+procedure TWorkTable.SaveMeasurementResults;
+var
+  DeviceChannel: TChannel;
+  Point: TPointSpillage;
+  Session: TSessionSpillage;
+  DeviceRepo: TDeviceRepository;
+  CurrentPointQmax: Double;
+  Device: TDevice;
+  SourceDevice: TDevice;
+begin
   DeviceRepo := nil;
   if DataManager <> nil then
     DeviceRepo := DataManager.ActiveDeviceRepo;
@@ -4549,99 +4660,7 @@ begin
       Point.Num := Device.Spillages.Count + 1;
       Point.Name := 'Измерение #' + IntToStr(Point.Num);
       Point.SessionID := Session.ID;
-      Point.DeviceUUID := Device.UUID;
-      Point.DateTime := Now;
-      Point.SpillTime := ValueTime.GetDoubleValue;
-      Point.QavgEtalon := ValueFlowRate.GetDoubleValue;
-
-      MatchedPoint := nil;
-      if (CurrentPoint <> nil) and (Device.Points <> nil) then
-        for DevicePoint in Device.Points do
-          if (DevicePoint <> nil) and
-             (((CurrentPoint.ID <> 0) and (DevicePoint.ID = CurrentPoint.ID)) or
-              ((CurrentPoint.ID = 0) and (Trim(CurrentPoint.Name) <> '') and
-               SameText(DevicePoint.Name, CurrentPoint.Name))) then
-          begin
-            MatchedPoint := DevicePoint;
-            Break;
-          end;
-
-      if MatchedPoint <> nil then
-      begin
-        Point.Name := MatchedPoint.Name;
-      end;
-
-      Point.EtalonVolume := TableFlow.ValueVolume.GetDoubleValue;
-
-      Point.EtalonName := '';
-      Point.EtalonUUID := '';
-      for EtalonChannel in EtalonChannels do
-      begin
-        if (EtalonChannel = nil) or (not EtalonChannel.Enabled) or
-           (EtalonChannel.FlowMeter = nil) or
-           (EtalonChannel.FlowMeter.Device = nil) then
-          Continue;
-
-        if SameText(Trim(EtalonChannel.FlowMeter.Device.Name), 'Новое устройство') then
-          Continue;
-
-        Point.EtalonName := Trim(EtalonChannel.FlowMeter.Device.Name);
-        Point.EtalonUUID := EtalonChannel.FlowMeter.Device.UUID;
-        Break;
-      end;
-
-      if (Point.EtalonName = '') and (TableFlow <> nil) and
-         (not SameText(Trim(TableFlow.Name), 'Новое устройство')) then
-        Point.EtalonName := Trim(TableFlow.Name);
-
-      Point.EtalonMass := TableFlow.ValueMass.GetDoubleValue;
-
-      Point.EtalonVolumeFlow := Point.EtalonVolume/Point.SpillTime;
-      Point.EtalonMassFlow := Point.EtalonMass/Point.SpillTime;
-
-      Point.DeviceVolume := DeviceChannel.FlowMeter.ValueVolume.GetDoubleValue;
-      Point.DeviceMass := DeviceChannel.FlowMeter.ValueMass.GetDoubleValue;
-
-      Point.Density := DeviceChannel.FlowMeter.ValueDensity.GetDoubleValue;
-      Point.Error := DeviceChannel.FlowMeter.ValueError.GetDoubleValue;
-      Point.PulseCount := DeviceChannel.ValueImpResult.GetDoubleValue;
-
-      Point.DeviceMassFlow := Point.DeviceMass/Point.SpillTime;
-      Point.DeviceVolumeFlow := Point.DeviceVolume/Point.SpillTime;
-      Point.MeanFrequency := Point.PulseCount/Point.SpillTime;
-
-      CurrentCoef := 0.0;
-      MeterValueCoef := DeviceChannel.FlowMeter.ValueCoef;
-      if MeterValueCoef <> nil then
-        CurrentCoef := MeterValueCoef.GetDoubleValue
-      else if DeviceChannel.FlowMeter.Device <> nil then
-        CurrentCoef := DeviceChannel.FlowMeter.Device.Coef;
-
-      if SameValue(CurrentCoef, 0.0, 1E-12) and
-         (DeviceChannel.FlowMeter.Device <> nil) then
-      begin
-        MeasuredDim := TMeasuredDimension(DeviceChannel.FlowMeter.Device.MeasuredDimension);
-        case MeasuredDim of
-          mdVolumeFlow, mdVolume:
-            if not SameValue(Point.EtalonVolume, 0.0, 1E-12) then
-              CurrentCoef := Point.PulseCount / Point.EtalonVolume;
-          mdMassFlow, mdMass:
-            if not SameValue(Point.EtalonMass, 0.0, 1E-12) then
-              CurrentCoef := Point.PulseCount / Point.EtalonMass;
-        end;
-      end;
-      Point.Coef := CurrentCoef;
-
-      Point.AvgCurrent := DeviceChannel.ValueCurrent.GetDoubleValue;
-      Point.StartTemperature := ValueTempertureBefore.GetDoubleValue;
-      Point.EndTemperature := ValueTempertureAfter.GetDoubleValue;
-      Point.AvgTemperature := ValueTemperture.GetDoubleValue;
-      Point.InputPressure := ValuePressureBefore.GetDoubleValue;
-      Point.OutputPressure := ValuePressureAfter.GetDoubleValue;
-      Point.DeltaPressure :=  Point.InputPressure - Point.OutputPressure;
-      Point.AtmosphericPressure := ValueAirPressure.GetDoubleValue;
-      Point.AmbientTemperature := ValueAirTemperture.GetDoubleValue;
-      Point.RelativeHumidity := ValueHumidity.GetDoubleValue;
+      FillCurrentSpillage(DeviceChannel, Point);
 
       if Device <> nil then
       begin
