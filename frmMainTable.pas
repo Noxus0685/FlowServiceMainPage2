@@ -125,8 +125,6 @@ type
     PanelDevices1: TPanel;
     GridDevices: TGrid;
     CheckColumnDeviceEnable1: TCheckColumn;
-    CheckColumnDeviceReadiness1: TCheckColumn;
-    StringColumnDeviceChanel1: TStringColumn;
     ColumnDeviceType1: TColumn;
     StringColumnDeviceSerial1: TStringColumn;
     StringColumnDeviceFlowRate1: TStringColumn;
@@ -673,6 +671,7 @@ type
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
     function GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
+    function IsDeviceChannelTextColumn(AColumn: TColumn): Boolean;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -5612,6 +5611,11 @@ begin
   Result := GRID_DEVICE_GROUP_COLORS[Abs(AGroup) mod Length(GRID_DEVICE_GROUP_COLORS)];
 end;
 
+function TFrameMainTable.IsDeviceChannelTextColumn(AColumn: TColumn): Boolean;
+begin
+  Result := (AColumn <> nil) and (AColumn.Tag = 1);
+end;
+
 function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
   const AText: string; out AColor: TAlphaColor): Boolean;
 var
@@ -5675,7 +5679,7 @@ var
   IsChannelColumn: Boolean;
   NeedCustomDraw: Boolean;
 begin
-  IsChannelColumn := Column = StringColumnDeviceChanel1;
+  IsChannelColumn := IsDeviceChannelTextColumn(Column);
   if Odd(Row) then
     CellColor := GRID_ALTERNATE_ROW_COLOR
   else
@@ -6068,9 +6072,7 @@ begin
   begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
       Value := WorkTable.DeviceChannels[ARow].Enabled
-    else if GridDevices.Columns[ACol] = CheckColumnDeviceReadiness1 then
-      Value := WorkTable.DeviceChannels[ARow].ReadinessChecked
-    else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
+    else if IsDeviceChannelTextColumn(GridDevices.Columns[ACol]) then
       Value := WorkTable.DeviceChannels[ARow].Text
     else if GridDevices.Columns[ACol] = ColumnDeviceType1 then
       Value := WorkTable.DeviceChannels[ARow].TypeName
@@ -6238,18 +6240,7 @@ begin
       if not WorkTable.DeviceChannels[ARow].Enabled then
         WorkTable.DeviceChannels[ARow].ImpSec := 0;
     end
-    else if GridDevices.Columns[ACol] = CheckColumnDeviceReadiness1 then
-    begin
-      Changed := WorkTable.DeviceChannels[ARow].ReadinessChecked <> Value.AsBoolean;
-      WorkTable.DeviceChannels[ARow].ReadinessChecked := Value.AsBoolean;
-      if Changed then
-      begin
-        WorkTable.DeviceChannels[ARow].SimulationStartImpSec := WorkTable.DeviceChannels[ARow].ImpSec;
-        WorkTable.DeviceChannels[ARow].SimulationTargetImpSec := WorkTable.DeviceChannels[ARow].ImpSec;
-        WorkTable.DeviceChannels[ARow].SimulationStartAssigned := True;
-      end;
-    end
-    else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
+    else if IsDeviceChannelTextColumn(GridDevices.Columns[ACol]) then
     begin
       Changed := WorkTable.DeviceChannels[ARow].Text <> Value.AsString;
       WorkTable.DeviceChannels[ARow].Text := Value.AsString;
