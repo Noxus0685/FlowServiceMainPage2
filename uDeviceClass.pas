@@ -553,6 +553,9 @@ type
     function AddSpillage: TPointSpillage;
     function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
     function FindMatchedDevicePointForSpillage(const ASpillage: TPointSpillage): TDevicePoint;
+    function FindResultSpillageForPoint(const APoint: TDevicePoint): TPointSpillage; overload;
+    function FindResultSpillageForPoint(const APoint: TDevicePoint;
+      const ASpillage: TPointSpillage): TPointSpillage; overload;
 
     function  AnalyseDataPoint(const ASpillage: TPointSpillage): Boolean;
     procedure FillDataPointsList(APoint: TDevicePoint);
@@ -2289,6 +2292,8 @@ function TDevice.FindMatchedDevicePointForSpillage(
 ): TDevicePoint;
 var
   P: TDevicePoint;
+  SpillageDeviceTypeUUID: string;
+  SpillageName: string;
 begin
   Result := nil;
   if (ASpillage = nil) or (FPoints = nil) then
@@ -2298,9 +2303,77 @@ begin
      (not SameText(Trim(ASpillage.DeviceUUID), Trim(Self.UUID))) then
     Exit;
 
+  SpillageDeviceTypeUUID := Trim(ASpillage.DeviceTypeUUID);
+  if SpillageDeviceTypeUUID <> '' then
+    for P in FPoints do
+      if (P <> nil) and SameText(Trim(P.DeviceTypeUUID), SpillageDeviceTypeUUID) then
+        Exit(P);
+
+  SpillageName := Trim(ASpillage.Name);
+  if SpillageName <> '' then
+    for P in FPoints do
+      if (P <> nil) and SameText(Trim(P.Name), SpillageName) then
+        Exit(P);
+
   for P in FPoints do
     if (P <> nil) and IsFlowInPoint(ASpillage.QavgEtalon, P) then
       Exit(P);
+
+end;
+
+function TDevice.FindResultSpillageForPoint(
+  const APoint: TDevicePoint
+): TPointSpillage;
+var
+  Candidate: TPointSpillage;
+  Spillage: TPointSpillage;
+begin
+  Result := nil;
+  if FSpillages = nil then
+    Exit;
+
+  for Spillage in FSpillages do
+  begin
+    Candidate := FindResultSpillageForPoint(APoint, Spillage);
+    if Candidate = nil then
+      Continue;
+
+    Result := Candidate;
+    if Candidate.Valid then
+      Exit;
+  end;
+end;
+
+function TDevice.FindResultSpillageForPoint(const APoint: TDevicePoint;
+  const ASpillage: TPointSpillage): TPointSpillage;
+var
+  DeviceUUID: string;
+  SpillageDeviceTypeUUID: string;
+  SpillageName: string;
+  TypeUUID: string;
+begin
+  Result := nil;
+  if (APoint = nil) or (ASpillage = nil) or (ASpillage.State = osDeleted) or
+     (not ASpillage.Enabled) then
+    Exit;
+
+  DeviceUUID := Trim(Self.UUID);
+  SpillageDeviceTypeUUID := Trim(ASpillage.DeviceTypeUUID);
+  SpillageName := Trim(ASpillage.Name);
+  TypeUUID := Trim(APoint.DeviceTypeUUID);
+
+  if not SameText(Trim(ASpillage.DeviceUUID), DeviceUUID) then
+    Exit;
+
+  if (TypeUUID <> '') and (SpillageDeviceTypeUUID <> '') and
+     SameText(SpillageDeviceTypeUUID, TypeUUID) then
+    Exit(ASpillage);
+
+  if (SpillageName <> '') and SameText(SpillageName, Trim(APoint.Name)) then
+    Exit(ASpillage);
+
+  if IsFlowInPoint(ASpillage.QavgEtalon, APoint) then
+    Exit(ASpillage);
 
 end;
 
@@ -3006,13 +3079,6 @@ begin
 end;
 
 end.
-
-
-
-
-
-
-
 
 
 

@@ -784,7 +784,7 @@ type
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
-    function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
+    function GetErrorCellColor(AChannel: TChannel; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -799,7 +799,8 @@ implementation
 {$R *.fmx}
 
 uses
-  fuTable_Main;
+  fuTable_Main,
+  uMKSDebug;
 
 
 const
@@ -5612,57 +5613,79 @@ begin
 end;
 
 function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
-  const AText: string; out AColor: TAlphaColor): Boolean;
+  out AColor: TAlphaColor): Boolean;
 var
-  S: string;
-  ActualError: Double;
   AllowedError: Double;
+  CurrentSpillage: TPointSpillage;
+  Device: TDevice;
   DevicePoint: TDevicePoint;
-  MatchedPoint: TDevicePoint;
+  ResultSpillage: TPointSpillage;
 begin
   Result := False;
   AColor := TAlphaColors.Null;
 
-  S := Trim(AText);
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) or (S = '') or (S = '-') then
+     (AChannel.FlowMeter.Device = nil) or (FActiveWorkTable = nil) then
     Exit;
 
-  S := StringReplace(S, '%', '', [rfReplaceAll]);
-  S := StringReplace(S, '±', '', [rfReplaceAll]);
-  S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  if not TryStrToFloat(Trim(S), ActualError) then
-    Exit;
+  Device := AChannel.FlowMeter.Device;
+  CurrentSpillage := TPointSpillage.Create(0);
+  try
+    FActiveWorkTable.FillCurrentSpillage(AChannel, CurrentSpillage);
+    LogMKS('DBG SP 9201', 'GetErrorCellColor CURRENT SPILLAGE',
+      Format('Channel=%s; Device=%s UUID=%s | %s',
+        [AChannel.Name, Device.Name, Device.UUID, DumpSpillage(CurrentSpillage)]));
 
-  MatchedPoint := nil;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
-     (AChannel.FlowMeter.Device.Points <> nil) then
-    for DevicePoint in AChannel.FlowMeter.Device.Points do
-      if (DevicePoint <> nil) and
-         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
-           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
-          ((FActiveWorkTable.CurrentPoint.ID = 0) and
-           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
-           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
-      begin
-        MatchedPoint := DevicePoint;
-        Break;
-      end;
+    if Device.Points = nil then
+    begin
+      LogMKS('DBG SP 9202', 'GetErrorCellColor NO DEVICE POINTS',
+        Format('Device=%s UUID=%s | %s',
+          [Device.Name, Device.UUID, DumpSpillage(CurrentSpillage)]));
+      Exit;
+    end;
 
-  if MatchedPoint <> nil then
-    AllowedError := Abs(MatchedPoint.Error)
-  else
-    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
+    DevicePoint := Device.FindMatchedDevicePointForSpillage(CurrentSpillage);
+    if DevicePoint = nil then
+    begin
+      LogMKS('DBG SP 9203', 'GetErrorCellColor POINT NOT MATCHED',
+        Format('Device=%s UUID=%s | %s',
+          [Device.Name, Device.UUID, DumpSpillage(CurrentSpillage)]));
+      Exit;
+    end;
 
-  if AllowedError <= 0 then
-    Exit;
+    ResultSpillage := Device.FindResultSpillageForPoint(
+      DevicePoint, CurrentSpillage);
+    if ResultSpillage = nil then
+    begin
+      LogMKS('DBG SP 9204', 'GetErrorCellColor RESULT NOT MATCHED',
+        Format('DevicePoint ID=%d Name=%s DeviceTypeUUID=%s | %s',
+          [DevicePoint.ID, DevicePoint.Name, DevicePoint.DeviceTypeUUID,
+           DumpSpillage(CurrentSpillage)]));
+      Exit;
+    end;
 
-  Result := True;
-  if Abs(ActualError) > AllowedError then
-    AColor := TAlphaColorRec.Lightyellow
-  else
-    AColor := $FFE6F4E6;
+    AllowedError := Abs(DevicePoint.Error);
+    if AllowedError <= 0 then
+    begin
+      LogMKS('DBG SP 9205', 'GetErrorCellColor INVALID ALLOWED ERROR',
+        Format('DevicePoint ID=%d Name=%s AllowedError=%f | %s',
+          [DevicePoint.ID, DevicePoint.Name, AllowedError,
+           DumpSpillage(ResultSpillage)]));
+      Exit;
+    end;
+
+    Result := True;
+    if Abs(ResultSpillage.Error) <= AllowedError then
+      AColor := $FFE6F4E6
+    else
+      AColor := TAlphaColorRec.Lightyellow;
+    LogMKS('DBG SP 9206', 'GetErrorCellColor COLOR',
+      Format('DevicePoint ID=%d Name=%s AllowedError=%f Color=%x | %s',
+        [DevicePoint.ID, DevicePoint.Name, AllowedError, AColor,
+         DumpSpillage(ResultSpillage)]));
+  finally
+    CurrentSpillage.Free;
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -5691,8 +5714,7 @@ begin
   if (Column = StringColumnDeviceError1) and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) and
      (FActiveWorkTable.DeviceChannels[Row] <> nil) then
-    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row],
-      Value.ToString, CellColor);
+    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row], CellColor);
 
   NeedCustomDraw := (Column = StringColumnDeviceError1) or IsChannelColumn or
     (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row);
