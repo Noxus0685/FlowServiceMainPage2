@@ -5615,6 +5615,7 @@ function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
   out AColor: TAlphaColor): Boolean;
 var
   Spillage: TPointSpillage;
+  Session: TSessionSpillage;
 begin
   Result := False;
   AColor := TAlphaColors.Null;
@@ -5624,8 +5625,16 @@ begin
      (FActiveWorkTable.CurrentPoint = nil) then
     Exit;
 
-  Spillage := AChannel.FlowMeter.Device.FindResultSpillageForPoint(
-    FActiveWorkTable.CurrentPoint);
+  Session := AChannel.FlowMeter.Device.GetActiveSessionSpillage;
+  if (Session = nil) or (Session.Spillages = nil) or
+     (Session.Spillages.Count = 0) then
+    Exit;
+
+  Spillage := Session.Spillages.Last;
+  if AChannel.FlowMeter.Device.FindResultSpillageForPoint(
+     FActiveWorkTable.CurrentPoint, Spillage) = nil then
+    Exit;
+
   if Spillage = nil then
     Exit;
 
