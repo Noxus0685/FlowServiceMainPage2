@@ -553,6 +553,9 @@ type
     function AddSpillage: TPointSpillage;
     function IsFlowInPoint(const AFlow: Double; const APoint: TDevicePoint): Boolean;
     function FindMatchedDevicePointForSpillage(const ASpillage: TPointSpillage): TDevicePoint;
+    function FindResultSpillageForPoint(const APoint: TDevicePoint): TPointSpillage; overload;
+    function FindResultSpillageForPoint(const APoint: TDevicePoint;
+      const ASpillage: TPointSpillage): TPointSpillage; overload;
 
     function  AnalyseDataPoint(const ASpillage: TPointSpillage): Boolean;
     procedure FillDataPointsList(APoint: TDevicePoint);
@@ -2304,6 +2307,56 @@ begin
 
 end;
 
+function TDevice.FindResultSpillageForPoint(
+  const APoint: TDevicePoint
+): TPointSpillage;
+var
+  Spillage: TPointSpillage;
+begin
+  Result := nil;
+  if FSpillages = nil then
+    Exit;
+
+  for Spillage in FSpillages do
+  begin
+    Result := FindResultSpillageForPoint(APoint, Spillage);
+    if Result = nil then
+      Continue;
+
+    if Result.Valid then
+      Exit;
+  end;
+end;
+
+function TDevice.FindResultSpillageForPoint(const APoint: TDevicePoint;
+  const ASpillage: TPointSpillage): TPointSpillage;
+var
+  DeviceUUID: string;
+  TypeUUID: string;
+begin
+  Result := nil;
+  if (APoint = nil) or (ASpillage = nil) or (ASpillage.State = osDeleted) or
+     (not ASpillage.Enabled) then
+    Exit;
+
+  DeviceUUID := Trim(Self.UUID);
+  TypeUUID := Trim(APoint.DeviceTypeUUID);
+
+  if not SameText(Trim(ASpillage.DeviceUUID), DeviceUUID) then
+    Exit;
+
+  if (TypeUUID <> '') and (Trim(ASpillage.DeviceTypeUUID) <> '') then
+  begin
+    if not SameText(Trim(ASpillage.DeviceTypeUUID), TypeUUID) then
+      Exit;
+  end
+  else if (not SameText(Trim(ASpillage.Name), Trim(APoint.Name))) and
+          (not IsFlowInPoint(ASpillage.QavgEtalon, APoint)) then
+    Exit;
+
+  Result := ASpillage;
+end;
+
 function TDevice.AnalyseDataPoint(const ASpillage: TPointSpillage):Boolean;
 var
   P, MatchedPoint: TDevicePoint;
@@ -3006,10 +3059,6 @@ begin
 end;
 
 end.
-
-
-
-
 
 
 

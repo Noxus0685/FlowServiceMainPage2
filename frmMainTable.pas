@@ -784,7 +784,7 @@ type
     procedure RefreshActiveWorkTableViews(AChannel: TChannel = nil; ASyncFromFlowMeter: Boolean = False);
     procedure UpdateScaleWeightFromFlow(AWorkTable: TWorkTable);
     function GetAverageFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
-    function GetErrorCellColor(AChannel: TChannel; const AText: string; out AColor: TAlphaColor): Boolean;
+    function GetErrorCellColor(AChannel: TChannel; out AColor: TAlphaColor): Boolean;
 
     property  MeasurementRun:TMeasurementRun read GetMeasurementRun;
 
@@ -5612,54 +5612,35 @@ begin
 end;
 
 function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
-  const AText: string; out AColor: TAlphaColor): Boolean;
+  out AColor: TAlphaColor): Boolean;
 var
-  S: string;
-  ActualError: Double;
-  AllowedError: Double;
-  DevicePoint: TDevicePoint;
-  MatchedPoint: TDevicePoint;
+  Spillage: TPointSpillage;
+  Session: TSessionSpillage;
 begin
   Result := False;
   AColor := TAlphaColors.Null;
 
-  S := Trim(AText);
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) or (S = '') or (S = '-') then
+     (AChannel.FlowMeter.Device = nil) or (FActiveWorkTable = nil) or
+     (FActiveWorkTable.CurrentPoint = nil) then
     Exit;
 
-  S := StringReplace(S, '%', '', [rfReplaceAll]);
-  S := StringReplace(S, '±', '', [rfReplaceAll]);
-  S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  if not TryStrToFloat(Trim(S), ActualError) then
+  Session := AChannel.FlowMeter.Device.GetActiveSessionSpillage;
+  if (Session = nil) or (Session.Spillages = nil) or
+     (Session.Spillages.Count = 0) then
     Exit;
 
-  MatchedPoint := nil;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
-     (AChannel.FlowMeter.Device.Points <> nil) then
-    for DevicePoint in AChannel.FlowMeter.Device.Points do
-      if (DevicePoint <> nil) and
-         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
-           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
-          ((FActiveWorkTable.CurrentPoint.ID = 0) and
-           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
-           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
-      begin
-        MatchedPoint := DevicePoint;
-        Break;
-      end;
+  Spillage := Session.Spillages.Last;
+  if AChannel.FlowMeter.Device.FindResultSpillageForPoint(
+     FActiveWorkTable.CurrentPoint, Spillage) = nil then
+    Exit;
 
-  if MatchedPoint <> nil then
-    AllowedError := Abs(MatchedPoint.Error)
-  else
-    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
-
-  if AllowedError <= 0 then
+  if Spillage = nil then
     Exit;
 
   Result := True;
-  if Abs(ActualError) > AllowedError then
+  if (not Spillage.Valid) or
+     (Spillage.Status = TPointSpillage.SPS_ERROR_EXCEEDED) then
     AColor := TAlphaColorRec.Lightyellow
   else
     AColor := $FFE6F4E6;
@@ -5691,8 +5672,7 @@ begin
   if (Column = StringColumnDeviceError1) and (FActiveWorkTable <> nil) and
      (Row >= 0) and (Row < FActiveWorkTable.DeviceChannels.Count) and
      (FActiveWorkTable.DeviceChannels[Row] <> nil) then
-    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row],
-      Value.ToString, CellColor);
+    GetErrorCellColor(FActiveWorkTable.DeviceChannels[Row], CellColor);
 
   NeedCustomDraw := (Column = StringColumnDeviceError1) or IsChannelColumn or
     (not (Sender is TGrid)) or (Row <> TGrid(Sender).Row);
