@@ -182,7 +182,6 @@ type
     FOutputSet: TControlRegister<EOutPutSet>;
     FSyncMode: TControlRegister<ESyncChannelMode>;
     FNoiseFilter: TControlRegister<Integer>;
-    FReadinessChecked: Boolean;
     FSimulationStartImpSec: Double;
     FSimulationTargetImpSec: Double;
     FSimulationStartAssigned: Boolean;
@@ -305,7 +304,6 @@ type
     property VolResult: Double read GetVolResultProxy write SetVolResultProxy;
     property ValueSec: Double read GetValueSecProxy write SetValueSecProxy;
     property ValueResult: Double read GetValueResultProxy write SetValueResultProxy;
-    property ReadinessChecked: Boolean read FReadinessChecked write FReadinessChecked;
     property SimulationStartImpSec: Double read FSimulationStartImpSec write FSimulationStartImpSec;
     property SimulationTargetImpSec: Double read FSimulationTargetImpSec write FSimulationTargetImpSec;
     property SimulationStartAssigned: Boolean read FSimulationStartAssigned write FSimulationStartAssigned;
@@ -378,6 +376,7 @@ type
     FNextClimateChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
+    FSimulationReadinessChecked: Boolean;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -627,6 +626,7 @@ type
     property TableClamped: Boolean read FTableClamped write FTableClamped;
     property FlowUnitName: string read FFlowUnitName write FFlowUnitName;
     property QuantityUnitName: string read FQuantityUnitName write FQuantityUnitName;
+    property SimulationReadinessChecked: Boolean read FSimulationReadinessChecked write FSimulationReadinessChecked;
 
     property ValueTempertureBefore: TMeterValue read GetValueTempertureBefore write SetValueTempertureBefore;
     property ValueTempertureAfter: TMeterValue read GetValueTempertureAfter write SetValueTempertureAfter;
@@ -1244,7 +1244,6 @@ begin
   FGroup := 0;
   FCategory := mftUnknownType;
   FWorkTabeID := 0;
-  FReadinessChecked := False;
   FSimulationStartImpSec := 0;
   FSimulationTargetImpSec := 0;
   FSimulationStartAssigned := False;
@@ -1807,6 +1806,7 @@ begin
   FTimeSet := 0;
   FLimitImpSet := 0;
   FLimitVolumeSet := 0;
+  FSimulationReadinessChecked := False;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
@@ -5088,10 +5088,10 @@ begin
     Channel.SimulationTargetImpSec := ChannelImpSec;
     Channel.SimulationStartAssigned := True;
     LogMKS('SIM_TARGET_SET', 'TWorkTable.ApplyChannelValues',
-      Format('Channel=%s; Device=%s; OldImpSec=%f; NewImpSec=%f; OldStartImpSec=%f; NewStartImpSec=%f; OldTargetImpSec=%f; NewTargetImpSec=%f; ReadinessChecked=%s; AppliedOnlyToSelectedChannel=True',
+      Format('Channel=%s; Device=%s; OldImpSec=%f; NewImpSec=%f; OldStartImpSec=%f; NewStartImpSec=%f; OldTargetImpSec=%f; NewTargetImpSec=%f; ReadinessChecked=%s; AppliedOnlyToSelectedChannel=False',
         [Channel.Text, Channel.DeviceName, OldImpSec, ChannelImpSec,
          OldStartImpSec, ChannelImpSec, OldTargetImpSec,
-         ChannelImpSec, IfThen(Channel.ReadinessChecked, 'True', 'False')]));
+         ChannelImpSec, IfThen(Self.SimulationReadinessChecked, 'True', 'False')]));
     if AImpResult > 0 then
       Channel.ImpResult := EnsureRange(AImpResult, 0.0, 1.0E12)
     else
@@ -5988,7 +5988,7 @@ begin
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
 
-      if Channel.ReadinessChecked then
+      if AWorkTable.SimulationReadinessChecked then
       begin
         ModeText := 'OscillateAroundStart';
         if not Channel.SimulationStartAssigned then
@@ -6043,7 +6043,7 @@ begin
         Channel.ValueImpTotal.SetValue(Channel.ImpResult);
       LogMKS('UPDATE_RANDOM_SIGNALS_DEVICE', 'UpdateRandomSignals',
         Format('Channel=%s; Device=%s; ReadinessChecked=%s; Mode=%s; CurrentImpSec=%f; StartImpSec=%f; TargetImpSec=%f; EtalonFlowBaseLps=%f; UserFlow=%f; UserUnits=m3/h; FlowBaseLps=%f; BaseValueAlreadyConverted=True; AdditionalConversionApplied=False; Diff=%f; Step=%f; NoiseAmplitude=%f; NewImpSec=%f',
-          [Channel.Text, Channel.DeviceName, IfThen(Channel.ReadinessChecked, 'True', 'False'),
+          [Channel.Text, Channel.DeviceName, IfThen(AWorkTable.SimulationReadinessChecked, 'True', 'False'),
            ModeText, Channel.ImpSec, Channel.SimulationStartImpSec,
            Channel.SimulationTargetImpSec, EtalonFlowBaseLps, EtalonFlowBaseLps * 3.6,
            EtalonFlowBaseLps, Diff, Step, NoiseAmplitude, Channel.ImpSec]));
