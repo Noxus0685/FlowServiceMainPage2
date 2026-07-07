@@ -5639,9 +5639,13 @@ var
   ChannelDeviceUUID: string;
   ChannelName: string;
   CurPointUUID: string;
+  CurDeviceTypePointUUID: string;
   CurPointDeviceUUID: string;
   CurPointName: string;
   MatchedPoint: TDevicePoint;
+  MatchSource: string;
+  CurrentFlowBase: Double;
+  MatchedPointFlowBase: Double;
   GrayLimitPercent: Double;
   AbsActualError: Double;
 
@@ -5692,6 +5696,7 @@ var
     DeviceName := '';
     ChannelDeviceUUID := '';
     CurPointUUID := '';
+    CurDeviceTypePointUUID := '';
     CurPointDeviceUUID := '';
     CurPointName := '';
 
@@ -5717,6 +5722,7 @@ var
     if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) then
     begin
       CurPointUUID := Trim(FActiveWorkTable.CurrentPoint.UUID);
+      CurDeviceTypePointUUID := Trim(FActiveWorkTable.CurrentPoint.DeviceTypeUUID);
       CurPointDeviceUUID := Trim(FActiveWorkTable.CurrentPoint.DeviceUUID);
       CurPointName := Trim(FActiveWorkTable.CurrentPoint.Name);
     end;
@@ -5724,8 +5730,85 @@ var
 
   procedure LogSkip(const AReason: string);
   begin
-    DebugLog('SKIP', Format('Channel=%s; Device=%s; Reason=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s; ChannelDeviceUUID=%s',
-      [ChannelName, DeviceName, AReason, CurPointUUID, CurPointDeviceUUID, CurPointName, AText, ChannelDeviceUUID]));
+    DebugLog('SKIP', Format('Channel=%s; Device=%s; Reason=%s; CurPointUUID=%s; CurDeviceTypePointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s; ChannelDeviceUUID=%s',
+      [ChannelName, DeviceName, AReason, CurPointUUID, CurDeviceTypePointUUID,
+       CurPointDeviceUUID, CurPointName, AText, ChannelDeviceUUID]));
+  end;
+
+  function CalcErrorCellCurrentFlowBase: Double;
+  begin
+    Result := GetChannelFlowForPointMatchBase(AChannel);
+    if (Result = 0) and (AChannel <> nil) then
+      Result := AChannel.ValueSec;
+    if (Result = 0) and (FActiveWorkTable <> nil) and
+       (FActiveWorkTable.ValueFlowRate <> nil) then
+      Result := FActiveWorkTable.ValueFlowRate.GetDoubleValue;
+  end;
+
+  function FindErrorCellPointByCurrentPoint: TDevicePoint;
+  var
+    DevicePoint: TDevicePoint;
+  begin
+    Result := nil;
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) or
+       (AChannel.FlowMeter.Device = nil) or
+       (AChannel.FlowMeter.Device.Points = nil) then
+      Exit;
+
+    if CurPointUUID <> '' then
+      for DevicePoint in AChannel.FlowMeter.Device.Points do
+        if (DevicePoint <> nil) and SameText(Trim(DevicePoint.UUID), CurPointUUID) then
+          Exit(DevicePoint);
+
+    if CurPointName <> '' then
+      for DevicePoint in AChannel.FlowMeter.Device.Points do
+        if (DevicePoint <> nil) and SameText(Trim(DevicePoint.Name), CurPointName) then
+          Exit(DevicePoint);
+  end;
+
+  function FindErrorCellLiveMatchedPoint: TDevicePoint;
+  var
+    CurrentPointMatch: TDevicePoint;
+    PointFlowBase: Double;
+    TolerancePercent: Double;
+    MinFlowBase: Double;
+    MaxFlowBase: Double;
+  begin
+    CurrentPointMatch := FindErrorCellPointByCurrentPoint;
+    if CurrentPointMatch <> nil then
+    begin
+      if (CurrentFlowBase <= 0) or
+        IsDevicePointFlowInRange(AChannel, CurrentPointMatch, CurrentFlowBase,
+           PointFlowBase, TolerancePercent, MinFlowBase, MaxFlowBase) then
+      begin
+        MatchSource := 'CurrentPointUUID';
+        Exit(CurrentPointMatch);
+      end;
+
+      DebugLog('CURRENT_POINT_FLOW_MISMATCH',
+        Format('CurrentPointName=%s; CurrentFlow=%g; PointFlow=%g; TolerancePercent=%g; MinFlow=%g; MaxFlow=%g',
+          [Trim(CurrentPointMatch.Name), CurrentFlowBase, PointFlowBase,
+           TolerancePercent, MinFlowBase, MaxFlowBase]));
+    end;
+
+    if CurrentFlowBase > 0 then
+    begin
+      Result := FindMatchedDevicePointByFlowBase(AChannel, CurrentFlowBase);
+      if Result <> nil then
+      begin
+        MatchSource := 'ByFlowFallback';
+        Exit;
+      end;
+    end;
+
+    Result := nil;
+  end;
+
+  procedure LogErrorCellMatch(const AColorName, AReason: string);
+  begin
+    DebugLog('MATCH', Format('ActualError=%g; CurrentFlow=%g; MatchedPointName=%s; MatchedPointQ=%g; MatchedPointError=%g; MatchSource=%s; AllowedError=%g; Color=%s; Reason=%s',
+      [ActualError, CurrentFlowBase, Trim(MatchedPoint.Name), MatchedPointFlowBase,
+       MatchedPoint.Error, MatchSource, AllowedError, AColorName, AReason]));
   end;
 
 begin
@@ -5735,8 +5818,9 @@ begin
   AbsActualError := 0;
   LoadDebugContext;
 
-  DebugLog('ENTER', Format('Channel=%s; Device=%s; ChannelDeviceUUID=%s; CurPointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s',
-    [ChannelName, DeviceName, ChannelDeviceUUID, CurPointUUID, CurPointDeviceUUID, CurPointName, AText]));
+  DebugLog('ENTER', Format('Channel=%s; Device=%s; ChannelDeviceUUID=%s; CurPointUUID=%s; CurDeviceTypePointUUID=%s; CurPointDeviceUUID=%s; CurPointName=%s; Text=%s',
+    [ChannelName, DeviceName, ChannelDeviceUUID, CurPointUUID, CurDeviceTypePointUUID,
+     CurPointDeviceUUID, CurPointName, AText]));
 
   S := Trim(AText);
   if FActiveWorkTable = nil then
@@ -5777,7 +5861,13 @@ begin
     S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
   end;
 
-  if ((S = '') or (S = '-')) or (not TryStrToFloat(Trim(S), ActualError)) then
+  if (S = '') or (S = '-') then
+  begin
+    LogSkip('EmptyErrorValue');
+    Exit;
+  end;
+
+  if not TryStrToFloat(Trim(S), ActualError) then
   begin
     if AChannel.FlowMeter.ValueError <> nil then
       ActualError := AChannel.FlowMeter.ValueError.GetDoubleValue
@@ -5788,15 +5878,20 @@ begin
     end;
   end;
 
-  MatchedPoint := FindMatchedDevicePoint(FActiveWorkTable, AChannel, False);
+  MatchSource := '';
+  CurrentFlowBase := CalcErrorCellCurrentFlowBase;
+  MatchedPoint := FindPointByCurrentMeasurementPoint(FActiveWorkTable, AChannel, MatchSource);
+  if MatchedPoint = nil then
+    MatchedPoint := FindErrorCellLiveMatchedPoint;
   if MatchedPoint = nil then
   begin
-    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g',
-      [ChannelName, ActualError]));
+    DebugLog('MATCH', Format('Channel=%s; Matched=False; ActualError=%g; CurrentFlow=%g; MatchSource=None',
+      [ChannelName, ActualError, CurrentFlowBase]));
     LogSkip('MatchedPointNil');
     Exit;
   end;
 
+  MatchedPointFlowBase := GetDevicePointFlowBase(AChannel.FlowMeter.Device, MatchedPoint);
   GrayLimitPercent := ParseGrayLimitPercent(MatchedPoint.FlowAccuracy);
   AbsActualError := Abs(ActualError);
 
@@ -5811,6 +5906,7 @@ begin
   if (GrayLimitPercent > 0) and (AbsActualError > GrayLimitPercent) then
   begin
     AColor := TAlphaColorRec.Lightgray;
+    LogErrorCellMatch(ColorToDebugName(AColor), 'ErrorOverGrayLimit');
     DebugLog('COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverGrayLimit',
       [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
        AbsActualError, ColorToDebugName(AColor)]));
@@ -5820,6 +5916,7 @@ begin
   if AbsActualError > AllowedError then
   begin
     AColor := TAlphaColorRec.Lightyellow;
+    LogErrorCellMatch(ColorToDebugName(AColor), 'ErrorOverPointTolerance');
     DebugLog('COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorOverPointTolerance',
       [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
        AbsActualError, ColorToDebugName(AColor)]));
@@ -5827,6 +5924,7 @@ begin
   else
   begin
     AColor := $FFE6F4E6;
+    LogErrorCellMatch(ColorToDebugName(AColor), 'ErrorInsideTolerance');
     DebugLog('COLOR', Format('Channel=%s; PointName=%s; ActualError=%g; AllowedError=%g; GrayLimitPercent=%g; AbsActualError=%g; Color=%s; Reason=ErrorInsideTolerance',
       [ChannelName, Trim(MatchedPoint.Name), ActualError, AllowedError, GrayLimitPercent,
        AbsActualError, ColorToDebugName(AColor)]));
