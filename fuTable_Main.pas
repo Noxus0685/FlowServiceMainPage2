@@ -235,7 +235,6 @@ begin
 
   WorkTable.DeviceReady := CheckBoxDeviceReady.IsChecked;
   WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
-  WorkTable.DeviceFlowSet := NormalizeFloatInput(EditDeviceFlowRate.Text) / 3.6;
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
