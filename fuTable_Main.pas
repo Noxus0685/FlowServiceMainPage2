@@ -64,6 +64,7 @@ type
     EditDeviceImpSec: TEdit;
     EditDeviceFlowRate: TEdit;
     EditDeviceImpResult: TEdit;
+    CheckBoxDeviceReady: TCheckBox;
     ButtonApplyDeviceValues: TButton;
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
@@ -232,6 +233,9 @@ begin
   if WorkTable = nil then
     Exit;
 
+  WorkTable.DeviceReady := CheckBoxDeviceReady.IsChecked;
+  WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
+  WorkTable.DeviceFlowSet := NormalizeFloatInput(EditDeviceFlowRate.Text) / 3.6;
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
@@ -276,6 +280,7 @@ begin
   if WorkTable = nil then
     Exit;
 
+  WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
   EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
   try
