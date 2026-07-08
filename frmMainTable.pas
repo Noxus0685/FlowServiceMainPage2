@@ -5655,6 +5655,9 @@ var
   S: string;
   ActualError: Double;
   AllowedError: Double;
+  DeviceFlow: Double;
+  Distance: Double;
+  MinDistance: Double;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
 begin
@@ -5663,7 +5666,10 @@ begin
 
   S := Trim(AText);
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) or (S = '') or (S = '-') then
+     (AChannel.FlowMeter.Device = nil) or
+     (AChannel.FlowMeter.ValueFlow = nil) or
+     (AChannel.FlowMeter.Device.Points = nil) or
+     (S = '') or (S = '-') then
     Exit;
 
   S := StringReplace(S, '%', '', [rfReplaceAll]);
@@ -5673,34 +5679,34 @@ begin
   if not TryStrToFloat(Trim(S), ActualError) then
     Exit;
 
+  DeviceFlow := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
   MatchedPoint := nil;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
-     (AChannel.FlowMeter.Device.Points <> nil) then
-    for DevicePoint in AChannel.FlowMeter.Device.Points do
-      if (DevicePoint <> nil) and
-         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
-           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
-          ((FActiveWorkTable.CurrentPoint.ID = 0) and
-           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
-           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
-      begin
-        MatchedPoint := DevicePoint;
-        Break;
-      end;
+  MinDistance := MaxDouble;
 
-  if MatchedPoint <> nil then
-    AllowedError := Abs(MatchedPoint.Error)
-  else
-    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
+  for DevicePoint in AChannel.FlowMeter.Device.Points do
+  begin
+    if (DevicePoint = nil) or (DevicePoint.State = osDeleted) then
+      Continue;
 
-  if AllowedError <= 0 then
+    Distance := Abs(DeviceFlow - DevicePoint.Q);
+    if Distance < MinDistance then
+    begin
+      MinDistance := Distance;
+      MatchedPoint := DevicePoint;
+    end;
+  end;
+
+  if MatchedPoint = nil then
     Exit;
 
+  AllowedError := Abs(MatchedPoint.Error);
+
   Result := True;
-  if Abs(ActualError) > AllowedError then
+  if Abs(ActualError) <= AllowedError then
+    AColor := $FFE6F4E6
+  else if  Abs(ActualError) <= NormalizeFloatInput(MatchedPoint.FlowAccuracy )  then
     AColor := TAlphaColorRec.Lightyellow
-  else
-    AColor := $FFE6F4E6;
+  else AColor:= TAlphaColors.Null;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;

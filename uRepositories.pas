@@ -4611,6 +4611,7 @@ begin
   Result.Q := Q.FieldByName('Q').AsFloat;
   Result.FlowAccuracy := Q.FieldByName('FlowAccuracy').AsString;
 
+
   {================ Условия ======================}
   Result.Pressure := Q.FieldByName('Pressure').AsFloat;
   Result.Temp := Q.FieldByName('Temp').AsFloat;

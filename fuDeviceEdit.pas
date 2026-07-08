@@ -1968,7 +1968,9 @@ begin
   if SameValue(NewValue, FDevice.Qmax) then
     Exit;
   FDevice.Qmax := NewValue;
+
   SetModified;
+  FDevice.RecalcPoints;
   UpdateQmaxQmin;
   UpdatePointsGrid;
 end;
@@ -3795,7 +3797,7 @@ begin
       V := NormalizeFloatInput(S);
       P.LimitVolume := V;
 
-      if (V > 0) and (P.Q > 0) then
+      if (V > 0) and (Q > 0) then
         P.LimitTime := V / Q;
 
       if (V > 0) and (Coef > 0) then
