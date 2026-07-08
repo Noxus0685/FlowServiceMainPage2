@@ -1968,8 +1968,9 @@ begin
   if SameValue(NewValue, FDevice.Qmax) then
     Exit;
   FDevice.Qmax := NewValue;
-  FDevice.RecalcPoints;
+
   SetModified;
+  FDevice.RecalcPoints;
   UpdateQmaxQmin;
   UpdatePointsGrid;
 end;

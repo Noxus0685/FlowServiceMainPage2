@@ -5666,8 +5666,9 @@ begin
   Result := True;
   if Abs(ActualError) <= AllowedError then
     AColor := $FFE6F4E6
-  else
-    AColor := TAlphaColorRec.Lightyellow;
+  else if  Abs(ActualError) <= NormalizeFloatInput(MatchedPoint.FlowAccuracy )  then
+    AColor := TAlphaColorRec.Lightyellow
+  else AColor:= TAlphaColors.Null;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;

@@ -2891,8 +2891,9 @@ begin
       if Coef > 0 then
         P.LimitImp := Round(V * Coef);
     end;
+    P.State := osModified;
   end;
-  P.State := osModified;
+
 end;
 
 procedure TDevice.CreatePointsFromType(AType: TDeviceType);
