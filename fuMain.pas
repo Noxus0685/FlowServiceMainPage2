@@ -43,6 +43,7 @@ type
     EditDeviceImpSec: TEdit;
     EditDeviceFlowRate: TEdit;
     EditDeviceImpResult: TEdit;
+    CheckBoxDeviceReady: TCheckBox;
     ButtonApplyDeviceValues: TButton;
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
@@ -116,6 +117,9 @@ begin
     Exit;
 
   UpdateDeviceImpSecFromFlowRate;
+  WorkTable.DeviceReady := CheckBoxDeviceReady.IsChecked;
+  WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
+  WorkTable.DeviceFlowSet := NormalizeFloatInput(EditDeviceFlowRate.Text) / 3.6;
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
   ImpSecValues := BuildImpSecValuesForChannels(
     WorkTable.DeviceChannels,
@@ -143,6 +147,7 @@ begin
     Exit;
 
   UpdateEtalonImpSecFromFlowRate;
+  WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
   ImpSecValues := BuildImpSecValuesForChannels(
     WorkTable.EtalonChannels,
@@ -723,9 +728,32 @@ var
   MaxImpDelta: Double;
   MinImpSec: Double;
   MaxImpSec: Double;
+  EtalonFlowSet: Double;
+  DeviceFlowSet: Double;
+  ChannelCoef: Double;
+  TargetImpSec: Double;
+  CurrentFlow: Double;
+  DeviceReady: Boolean;
 begin
   if AWorkTable = nil then
     Exit;
+
+  DeviceReady := CheckBoxDeviceReady.IsChecked;
+  AWorkTable.DeviceReady := DeviceReady;
+  EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
+  DeviceFlowSet := NormalizeFloatInput(EditDeviceFlowRate.Text) / 3.6;
+  AWorkTable.EtalonFlowSet := EtalonFlowSet;
+  AWorkTable.DeviceFlowSet := DeviceFlowSet;
+  if EtalonFlowSet <= 0 then
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if (AWorkTable.EtalonChannels[I] <> nil) and
+         AWorkTable.EtalonChannels[I].Enabled then
+      begin
+        ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+        if ChannelCoef > 0 then
+          EtalonFlowSet := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+        Break;
+      end;
 
     AWorkTable.Time := AWorkTable.Time + 1;
 
@@ -740,6 +768,13 @@ begin
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
+      ChannelCoef := GetChannelFlowCoef(Channel);
+      if (EtalonFlowSet > 0) and (ChannelCoef > 0) then
+      begin
+        CurrentFlow := Channel.ImpSec / ChannelCoef;
+        if Abs(CurrentFlow - EtalonFlowSet) > EtalonFlowSet * 0.1 then
+          Channel.ImpSec := EtalonFlowSet * ChannelCoef;
+      end;
       Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
     end
@@ -763,12 +798,27 @@ begin
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
 
-      if Channel.ImpSec > 0 then
+      ChannelCoef := GetChannelFlowCoef(Channel);
+      if DeviceFlowSet > 0 then
+        TargetImpSec := DeviceFlowSet * ChannelCoef
+      else
+        TargetImpSec := EtalonFlowSet * ChannelCoef;
+      if (Channel.ImpSec > 0) or ((not DeviceReady) and (TargetImpSec > 0)) then
       begin
-        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
-        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
-        MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
-        MaxImpSec := Channel.ImpSec * 1.01;
+        if DeviceReady or (TargetImpSec <= 0) then
+        begin
+          MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
+          ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
+          MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
+          MaxImpSec := Channel.ImpSec * 1.01;
+        end
+        else
+        begin
+          MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.003, 0.1, 10.0);
+          ImpDelta := EnsureRange(TargetImpSec - Channel.ImpSec, -MaxImpDelta, MaxImpDelta);
+          MinImpSec := 0.0;
+          MaxImpSec := Max(Channel.ImpSec, TargetImpSec);
+        end;
         Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
       end;
 
