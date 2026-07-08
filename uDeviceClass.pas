@@ -114,6 +114,7 @@ type
 
     Status: Integer;             // Статус точки по результатам анализа измерений
     StatusStr: string;           // Текстовое описание статуса
+    Enabled: Boolean;            // Точка доступна для измерения и подсветки
 
     ResultError: Double;         // Итоговая (худшая из лучших) погрешность
     AverageError: Double;        // Средняя погрешность лучших измерений
@@ -136,7 +137,9 @@ type
     {====================================================================}
     FlowRate: Double;            // Отношение Q / Qmax (0..1)
     Q: Double;                   // Абсолютный расход, м3/ч (т/ч)
+    PointQ: Double;              // Готовый абсолютный расход точки в базовых единицах
     FlowAccuracy: string;        // Допустимое отклонение расхода ("±5%", "-5%", "+5%")
+    PointFlowError: Double;      // Готовое абсолютное отклонение расхода точки
 
     {====================================================================}
     { УСЛОВИЯ ИЗМЕРЕНИЯ }
@@ -161,6 +164,7 @@ type
     { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
     {====================================================================}
     Error: Double;               // Допустимая относительная погрешность, %
+    PointError: Double;          // Готовое абсолютное отклонение для зелёной зоны
 
     {====================================================================}
     { ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ }
@@ -1140,7 +1144,9 @@ begin
   { Параметры расхода }
   FlowRate := 0.0;
   Q := 0.0;
+  PointQ := 0.0;
   FlowAccuracy := '';
+  PointFlowError := 0.0;
 
   { Условия измерения }
   Pressure := 0.0;
@@ -1158,6 +1164,7 @@ begin
 
   { Метрология }
   Error := 0.0;
+  PointError := 0.0;
 
   { Дополнительно }
   Pause := 0;
@@ -1836,6 +1843,7 @@ begin
   {====================================================================}
   Name := ASource.Name;
   Description := ASource.Description;
+  Enabled := ASource.Enabled;
   Num := ASource.Num;
   DateTime := ASource.DateTime;
 
@@ -1844,7 +1852,9 @@ begin
   {====================================================================}
   FlowRate := ASource.FlowRate;
   Q := ASource.Q;
+  PointQ := ASource.PointQ;
   FlowAccuracy := ASource.FlowAccuracy;
+  PointFlowError := ASource.PointFlowError;
 
   {====================================================================}
   { УСЛОВИЯ ИЗМЕРЕНИЯ }
@@ -1868,6 +1878,8 @@ begin
   { МЕТРОЛОГИЧЕСКИЕ ПАРАМЕТРЫ }
   {====================================================================}
   Error := ASource.Error;
+
+  PointError := ASource.PointError;
 
   {====================================================================}
   { ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ }
@@ -1909,7 +1921,9 @@ begin
 
   FlowRate := ASource.FlowRate;
   Q := 0;
+  PointQ := 0;
   FlowAccuracy := ASource.FlowAccuracy;
+  PointFlowError := 0;
 
   Pressure := ASource.Pressure;
   Temp := ASource.Temp;
@@ -1923,6 +1937,7 @@ begin
   FlowSorceType := Integer(fstNone);
 
   Error := ASource.Error;
+  PointError := 0;
   Pause := ASource.Pause;
 
   RepeatsProtocol := ASource.RepeatsProtocol;
@@ -2872,6 +2887,8 @@ var
   I: Integer;
   P: TDevicePoint;
   LQ, V, Tm: Double;
+  FlowErrorPercent: Double;
+  AccNorm: string;
 begin
   if Points = nil then
     Exit;
@@ -2881,6 +2898,17 @@ begin
     P := Points[I];
     LQ := P.FlowRate * Qmax;
     P.Q := LQ;
+    P.PointQ := LQ;
+    P.PointError := Abs(LQ * P.Error / 100.0);
+
+    AccNorm := NormalizeFlowAccuracyInput(P.FlowAccuracy);
+    if AccNorm = '' then
+      FlowErrorPercent := 0
+    else if (AccNorm[1] = '+') or (AccNorm[1] = '-') then
+      FlowErrorPercent := NormalizeFloatInput(Copy(AccNorm, 2, MaxInt))
+    else
+      FlowErrorPercent := NormalizeFloatInput(AccNorm);
+    P.PointFlowError := Abs(LQ * FlowErrorPercent / 100.0);
 
     if (LQ > 0) and (P.LimitTime > 0) then
     begin

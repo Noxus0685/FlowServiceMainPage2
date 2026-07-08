@@ -5623,23 +5623,18 @@ var
   MinDistance: Double;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
+  AccNorm: string;
 begin
   Result := False;
   AColor := TAlphaColors.Null;
 
-  S := Trim(AText);
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or
      (AChannel.FlowMeter.Device = nil) or
      (AChannel.FlowMeter.ValueFlow = nil) or
      (S = '') or (S = '-') then
     Exit;
 
-  S := StringReplace(S, '%', '', [rfReplaceAll]);
-  S := StringReplace(S, '±', '', [rfReplaceAll]);
-  S := StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  S := StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]);
-  if not TryStrToFloat(Trim(S), ActualError) then
-    Exit;
+  DeviceFlow := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
 
   MatchedPoint := nil;
   if AChannel.FlowMeter.Device.Points <> nil then
@@ -5661,19 +5656,28 @@ begin
     end;
   end;
 
-  if MatchedPoint <> nil then
-    AllowedError := Abs(MatchedPoint.Error)
-  else
-    AllowedError := Abs(AChannel.FlowMeter.Device.Error);
+    Distance := Abs(DeviceFlow - DevicePoint.PointQ);
+    if (MatchedPoint = nil) or (Distance < MinDistance) then
+    begin
+      MatchedPoint := DevicePoint;
+      MinDistance := Distance;
+    end;
+  end;
 
-  if AllowedError <= 0 then
+  if MatchedPoint = nil then
     Exit;
 
-  Result := True;
-  if Abs(ActualError) > AllowedError then
-    AColor := TAlphaColorRec.Lightyellow
-  else
+  Delta := Abs(DeviceFlow - MatchedPoint.PointQ);
+  if Delta <= Abs(MatchedPoint.PointError) then
+  begin
     AColor := $FFE6F4E6;
+    Result := True;
+  end
+  else if Delta <= Abs(MatchedPoint.PointFlowError) then
+  begin
+    AColor := TAlphaColorRec.Lightyellow;
+    Result := True;
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
