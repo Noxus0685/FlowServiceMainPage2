@@ -65,6 +65,7 @@ type
     EditDeviceFlowRate: TEdit;
     EditDeviceImpResult: TEdit;
     ButtonApplyDeviceValues: TButton;
+    CheckBoxDeviceReadiness: TCheckBox;
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
     Label5: TLabel;
@@ -251,6 +252,16 @@ begin
       False,
       True
     );
+
+    for I := 0 to EnabledDeviceChannels.Count - 1 do
+    begin
+      EnabledDeviceChannels[I].SimulationAssignedFlow := FlowRate;
+      if not EnabledDeviceChannels[I].SimulationInitialized then
+      begin
+        EnabledDeviceChannels[I].SimulationDirection := 1;
+        EnabledDeviceChannels[I].SimulationInitialized := True;
+      end;
+    end;
 
     WorkTable.ApplyChannelValues(
       EnabledDeviceChannels,
@@ -1406,6 +1417,8 @@ begin
 
   SyncWorkTableObservers;
   UpdateInstrumentNameEdit;
+  FWorkTableManager.SimulationDeviceReadiness :=
+    (CheckBoxDeviceReadiness <> nil) and CheckBoxDeviceReadiness.IsChecked;
 
   FWorkTableManager.UpdateSimulation;
 end;

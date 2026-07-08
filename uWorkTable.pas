@@ -182,6 +182,10 @@ type
     FOutputSet: TControlRegister<EOutPutSet>;
     FSyncMode: TControlRegister<ESyncChannelMode>;
     FNoiseFilter: TControlRegister<Integer>;
+    FSimulationAssignedFlow: Double;
+    FSimulationTargetImpSec: Double;
+    FSimulationDirection: Integer;
+    FSimulationInitialized: Boolean;
 
 
 
@@ -308,6 +312,10 @@ type
     property ValueImpResult: TMeterValue read FValueImpTotal;
     property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
     property ValueInterface: TMeterValue read FValueInterface write SetValueInterface;
+    property SimulationAssignedFlow: Double read FSimulationAssignedFlow write FSimulationAssignedFlow;
+    property SimulationTargetImpSec: Double read FSimulationTargetImpSec write FSimulationTargetImpSec;
+    property SimulationDirection: Integer read FSimulationDirection write FSimulationDirection;
+    property SimulationInitialized: Boolean read FSimulationInitialized write FSimulationInitialized;
 
     procedure RebindFlowMeterValues(const AWorkTable: TWorkTable);
     procedure RecreateFlowMeter(const AWorkTable: TWorkTable);
@@ -716,6 +724,7 @@ type
     FIniFileName: string;
     FWorkTables: TObjectList<TWorkTable>;
     FIsSimulationMode :Boolean;
+    FSimulationDeviceReadiness: Boolean;
     FActiveWorkTable  :TWorkTable;
 
   public
@@ -734,6 +743,7 @@ type
     procedure SetActiveWorkTable(AWorkTable: TWorkTable);
     function FindPumpByName(const APumpName: string): TPump;
     function GetChannelFlowCoef(const AChannel: TChannel): Double;
+    function FlowRateToImpSec(const AWorkTable: TWorkTable; const AChannel: TChannel; const AFlowRate: Double): Double;
     function UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable; const AFlowRate: Double): Double;
     function UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable; AFlowRate: Double = 0;
       AEtalonChannels: TObjectList<TChannel> = nil): Double;
@@ -745,6 +755,7 @@ type
     property ActiveWorkTable: TWorkTable read FActiveWorkTable write SetActiveWorkTable;
     property IniFileName: string read FIniFileName write FIniFileName;
     property IsSimulationMode:Boolean read FIsSimulationMode  write FIsSimulationMode;
+    property SimulationDeviceReadiness: Boolean read FSimulationDeviceReadiness write FSimulationDeviceReadiness;
     procedure UpdateSimulation;
 
   end;
@@ -1236,6 +1247,10 @@ begin
   FGroup := 0;
   FCategory := mftUnknownType;
   FWorkTabeID := 0;
+  FSimulationAssignedFlow := 0;
+  FSimulationTargetImpSec := 0;
+  FSimulationDirection := 0;
+  FSimulationInitialized := False;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -4407,6 +4422,10 @@ var
     AChannel.CurSec := 0;
    // AChannel.ImpSec := 0;
     AChannel.ImpResult := 0;
+    AChannel.SimulationAssignedFlow := 0;
+    AChannel.SimulationTargetImpSec := 0;
+    AChannel.SimulationDirection := 0;
+    AChannel.SimulationInitialized := False;
   end;
 begin
 
@@ -5423,6 +5442,19 @@ begin
     Result := AChannel.FlowMeter.Kp;
 end;
 
+function TWorkTableManager.FlowRateToImpSec(const AWorkTable: TWorkTable;
+  const AChannel: TChannel; const AFlowRate: Double): Double;
+var
+  Coef: Double;
+begin
+  Result := 0;
+  Coef := GetChannelFlowCoef(AChannel);
+  if Coef <= 0 then
+    Exit;
+
+  Result := (AFlowRate * Coef) / 3.6;
+end;
+
 function TWorkTableManager.UpdateDeviceImpSecFromFlowRate(const AWorkTable: TWorkTable;
   const AFlowRate: Double): Double;
 var
@@ -5436,7 +5468,7 @@ begin
   if Coef <= 0 then
     Exit;
 
-  Result := (AFlowRate * Coef) / 3.6;
+  Result := FlowRateToImpSec(AWorkTable, AWorkTable.DeviceChannels[0], AFlowRate);
 end;
 
 function TWorkTableManager.UpdateEtalonImpSecFromFlowRate(const AWorkTable: TWorkTable;
@@ -5863,6 +5895,141 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+
+  function FlowToBaseUnits(const AFlowRate: Double): Double;
+  begin
+    Result := AFlowRate / 3.6;
+  end;
+
+  function FlowFromBaseUnits(const AFlowRate: Double): Double;
+  begin
+    Result := AFlowRate * 3.6;
+  end;
+
+  function ParseFlowAccuracy(const S: string; out APercent: Double): Boolean;
+  var
+    Text, NumText: string;
+    Ch: Char;
+  begin
+    NumText := '';
+    Text := StringReplace(S, ',', '.', [rfReplaceAll]);
+    for Ch in Text do
+      if CharInSet(Ch, ['0'..'9', '.', '-', '+']) then
+        NumText := NumText + Ch;
+
+    Result := TryStrToFloat(NumText, APercent, TFormatSettings.Invariant);
+    if Result then
+      APercent := Abs(APercent);
+  end;
+
+  function FindNearestDevicePoint(const AChannel: TChannel; const ABaseFlow: Double): TDevicePoint;
+  var
+    J: Integer;
+    Point: TDevicePoint;
+    Distance, BestDistance: Double;
+  begin
+    Result := nil;
+    BestDistance := 0;
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) or
+       (AChannel.FlowMeter.Device = nil) or
+       (AChannel.FlowMeter.Device.Points = nil) then
+      Exit;
+
+    for J := 0 to AChannel.FlowMeter.Device.Points.Count - 1 do
+    begin
+      Point := AChannel.FlowMeter.Device.Points[J];
+      if (Point = nil) or (Point.State = osDeleted) then
+        Continue;
+
+      Distance := Abs(ABaseFlow - Point.Q);
+      if (Result = nil) or (Distance < BestDistance) then
+      begin
+        Result := Point;
+        BestDistance := Distance;
+      end;
+    end;
+  end;
+
+  function GetCurrentEtalonFlow(const AWorkTable: TWorkTable): Double;
+  var
+    J: Integer;
+    EtalonChannel: TChannel;
+  begin
+    Result := 0;
+    if (AWorkTable <> nil) and (AWorkTable.ValueFlowRate <> nil) then
+      Result := FlowToBaseUnits(AWorkTable.ValueFlowRate.GetDoubleValue);
+
+    if not SameValue(Result, 0.0, 1E-12) then
+      Exit;
+
+    if AWorkTable = nil then
+      Exit;
+
+    for J := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    begin
+      EtalonChannel := AWorkTable.EtalonChannels[J];
+      if (EtalonChannel <> nil) and (EtalonChannel.Enabled) and
+         (EtalonChannel.FlowMeter <> nil) and
+         (EtalonChannel.FlowMeter.ValueFlow <> nil) then
+      begin
+        Result := FlowToBaseUnits(EtalonChannel.FlowMeter.ValueFlow.GetDoubleValue);
+        if not SameValue(Result, 0.0, 1E-12) then
+          Exit;
+      end;
+    end;
+  end;
+
+  function CalcDeviceSimulationImpDelta(const AWorkTable: TWorkTable;
+    const AChannel: TChannel): Double;
+  var
+    BaseFlow, TargetFlow, TargetImpSec: Double;
+    FlowAccuracyPercent, FlowTolerance, MinFlow, MaxFlow: Double;
+    TargetErrorPercent, OscillationFlow: Double;
+    MatchedPoint: TDevicePoint;
+    HasFlowAccuracy: Boolean;
+  begin
+    if (AChannel = nil) then
+      Exit(0);
+
+    if (AChannel.SimulationDirection <> -1) and
+       (AChannel.SimulationDirection <> 1) then
+      AChannel.SimulationDirection := 1;
+
+    if SimulationDeviceReadiness and AChannel.SimulationInitialized then
+      BaseFlow := FlowToBaseUnits(AChannel.SimulationAssignedFlow)
+    else
+      BaseFlow := GetCurrentEtalonFlow(AWorkTable);
+
+    TargetFlow := BaseFlow;
+    MatchedPoint := FindNearestDevicePoint(AChannel, BaseFlow);
+    if MatchedPoint <> nil then
+    begin
+      HasFlowAccuracy := ParseFlowAccuracy(MatchedPoint.FlowAccuracy, FlowAccuracyPercent);
+      if HasFlowAccuracy then
+      begin
+        FlowTolerance := Abs(BaseFlow) * FlowAccuracyPercent / 100;
+        MinFlow := BaseFlow - FlowTolerance;
+        MaxFlow := BaseFlow + FlowTolerance;
+
+        TargetErrorPercent := AChannel.SimulationDirection * Abs(MatchedPoint.Error);
+        if Abs(TargetErrorPercent) > FlowAccuracyPercent then
+          TargetErrorPercent := AChannel.SimulationDirection * FlowAccuracyPercent;
+
+        TargetFlow := BaseFlow * (1 + TargetErrorPercent / 100);
+        if SimulationDeviceReadiness then
+          OscillationFlow := FlowTolerance * 0.35
+        else
+          OscillationFlow := FlowTolerance * 0.15;
+        if Abs(FlowRateToImpSec(AWorkTable, AChannel, FlowFromBaseUnits(TargetFlow)) - AChannel.ImpSec) < 1 then
+          AChannel.SimulationDirection := -AChannel.SimulationDirection;
+        TargetFlow := EnsureRange(TargetFlow + (AChannel.SimulationDirection * OscillationFlow), MinFlow, MaxFlow);
+      end;
+    end;
+
+    TargetImpSec := FlowRateToImpSec(AWorkTable, AChannel, FlowFromBaseUnits(TargetFlow));
+    AChannel.SimulationTargetImpSec := TargetImpSec;
+    Result := (AChannel.SimulationTargetImpSec - AChannel.ImpSec) * 0.15 + ((Random - 0.5) * 0.2);
+  end;
 begin
   if AWorkTable = nil then
     Exit;
@@ -5899,7 +6066,7 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
+    ImpDelta := CalcDeviceSimulationImpDelta(AWorkTable, Channel);
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);

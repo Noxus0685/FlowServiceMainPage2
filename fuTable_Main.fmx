@@ -1,4 +1,4 @@
-object TableMainForm: TTableMainForm
+﻿object TableMainForm: TTableMainForm
   Left = 0
   Top = 0
   Caption = #1058#1072#1073#1083#1080#1095#1085#1086#1077' '#1087#1088#1077#1076#1089#1090#1072#1074#1083#1077#1085#1080#1077
@@ -1518,13 +1518,23 @@ object TableMainForm: TTableMainForm
             Size.Height = 22.000000000000000000
             Size.PlatformDefault = False
           end
+          object CheckBoxDeviceReadiness: TCheckBox
+            IsChecked = False
+            Position.X = 24.000000000000000000
+            Position.Y = 232.000000000000000000
+            Size.Width = 120.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 8
+            Text = #1043#1086#1090#1086#1074#1085#1086#1089#1090#1100
+          end
           object ButtonApplyDeviceValues: TButton
             Position.X = 160.000000000000000000
             Position.Y = 226.000000000000000000
             Size.Width = 180.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            TabOrder = 8
+            TabOrder = 9
             Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
             TextSettings.Trimming = None
             OnClick = ButtonApplyDeviceValuesClick
