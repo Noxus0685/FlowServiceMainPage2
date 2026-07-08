@@ -5617,6 +5617,10 @@ var
   S: string;
   ActualError: Double;
   AllowedError: Double;
+  DeviceFlow: Double;
+  PointFlow: Double;
+  Distance: Double;
+  MinDistance: Double;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
 begin
@@ -5625,7 +5629,9 @@ begin
 
   S := Trim(AText);
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or
-     (AChannel.FlowMeter.Device = nil) or (S = '') or (S = '-') then
+     (AChannel.FlowMeter.Device = nil) or
+     (AChannel.FlowMeter.ValueFlow = nil) or
+     (S = '') or (S = '-') then
     Exit;
 
   S := StringReplace(S, '%', '', [rfReplaceAll]);
@@ -5636,19 +5642,24 @@ begin
     Exit;
 
   MatchedPoint := nil;
-  if (FActiveWorkTable <> nil) and (FActiveWorkTable.CurrentPoint <> nil) and
-     (AChannel.FlowMeter.Device.Points <> nil) then
+  if AChannel.FlowMeter.Device.Points <> nil then
+  begin
+    DeviceFlow := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+    MinDistance := MaxDouble;
     for DevicePoint in AChannel.FlowMeter.Device.Points do
-      if (DevicePoint <> nil) and
-         (((FActiveWorkTable.CurrentPoint.ID <> 0) and
-           (DevicePoint.ID = FActiveWorkTable.CurrentPoint.ID)) or
-          ((FActiveWorkTable.CurrentPoint.ID = 0) and
-           (Trim(FActiveWorkTable.CurrentPoint.Name) <> '') and
-           SameText(DevicePoint.Name, FActiveWorkTable.CurrentPoint.Name))) then
+    begin
+      if (DevicePoint = nil) or (DevicePoint.State = osDeleted) then
+        Continue;
+
+      PointFlow := AChannel.FlowMeter.Device.ToBaseUnits(DevicePoint.Q);
+      Distance := Abs(DeviceFlow - PointFlow);
+      if (MatchedPoint = nil) or (Distance < MinDistance) then
       begin
         MatchedPoint := DevicePoint;
-        Break;
+        MinDistance := Distance;
       end;
+    end;
+  end;
 
   if MatchedPoint <> nil then
     AllowedError := Abs(MatchedPoint.Error)
