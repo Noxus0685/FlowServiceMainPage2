@@ -4059,6 +4059,10 @@ begin
   AChannel.RepoDeviceName := '';
   AChannel.RepoDeviceUUID := '';
   AChannel.DeviceUUID := '';
+  AChannel.SimulationAssignedFlow := 0;
+  AChannel.SimulationTargetImpSec := 0;
+  AChannel.SimulationDirection := 0;
+  AChannel.SimulationInitialized := False;
   if AChannel.FlowMeter <> nil then
     AChannel.FlowMeter.Device := nil;
 

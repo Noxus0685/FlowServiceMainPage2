@@ -65,6 +65,7 @@ type
     EditDeviceFlowRate: TEdit;
     EditDeviceImpResult: TEdit;
     ButtonApplyDeviceValues: TButton;
+    CheckBoxDeviceReadiness: TCheckBox;
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
     Label5: TLabel;
@@ -104,6 +105,7 @@ type
     FT_WorkBench_First: Double;
     FPrevFlowRateValue: Double;
     FHasPrevFlowRateValue: Boolean;
+    FLastSimulationLogAt: TDateTime;
 
 
     procedure UpdateTemp(const AWorkTable: TWorkTable);
@@ -127,6 +129,8 @@ type
     procedure SubscribeWorkTableObjects(AWorkTable: TWorkTable);
     procedure UnsubscribeWorkTableObjects(AWorkTable: TWorkTable);
     procedure ClearWorkTableObservers;
+    procedure AddSimulationLog(const AText: string);
+    procedure LogDeviceSimulationValues(const AWorkTable: TWorkTable; const AForce: Boolean = False);
     function FindWorkTableForObject(AObject: TObject): TWorkTable;
     procedure HandleWorkTableNotify(ASender: TObject; AEvent: EWorkTableNotifyEvent; AData: TObject);
     procedure WorkTableCommandHandler(AWorkTable: TWorkTable; AAction: EActionWorkTable);
@@ -224,6 +228,7 @@ procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
   FlowRate: Double;
+  FlowRateForImpSec: Double;
   ImpSecValues: TArray<Double>;
   EnabledDeviceChannels: TObjectList<TChannel>;
   I: Integer;
@@ -233,6 +238,7 @@ begin
     Exit;
 
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
+  FlowRateForImpSec := FlowRate * 3.6;
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
     for I := 0 to WorkTable.DeviceChannels.Count - 1 do
@@ -241,16 +247,32 @@ begin
         EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
 
     EditDeviceImpSec.Text := FloatToStr(
-      FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
+      FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRateForImpSec)
     );
     ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
       WorkTable,
       EnabledDeviceChannels,
-      FlowRate,
+      FlowRateForImpSec,
       NormalizeFloatInput(EditDeviceImpSec.Text),
       False,
       True
     );
+
+    AddSimulationLog(Format('Готовность: EditDeviceFlowRate=%s; расход=%.6f л/с; активных приборов=%d',
+      [EditDeviceFlowRate.Text, FlowRate, EnabledDeviceChannels.Count]));
+
+    for I := 0 to EnabledDeviceChannels.Count - 1 do
+    begin
+      EnabledDeviceChannels[I].SimulationAssignedFlow := FlowRate;
+      if not EnabledDeviceChannels[I].SimulationInitialized then
+      begin
+        EnabledDeviceChannels[I].SimulationDirection := 1;
+        EnabledDeviceChannels[I].SimulationInitialized := True;
+      end;
+      AddSimulationLog(Format('Прибор %d: заданный расход=%.6f л/с; текущий ImpSec=%.6f; целевой ImpSec=%.6f',
+        [I + 1, EnabledDeviceChannels[I].SimulationAssignedFlow,
+         EnabledDeviceChannels[I].ImpSec, EnabledDeviceChannels[I].SimulationTargetImpSec]));
+    end;
 
     WorkTable.ApplyChannelValues(
       EnabledDeviceChannels,
@@ -457,6 +479,7 @@ i:integer;
 begin
   FPrevFlowRateValue := 0;
   FHasPrevFlowRateValue := False;
+  FLastSimulationLogAt := 0;
   //Значения по умолчанию
   FT_WorkBench_First:=20;
   FT_WorkBench_Last:=20;
@@ -1399,6 +1422,51 @@ end;
 
 
 
+procedure TTableMainForm.AddSimulationLog(const AText: string);
+begin
+  if mPump = nil then
+    Exit;
+
+  mPump.Lines.Add(FormatDateTime('hh:nn:ss', Now) + ' ' + AText);
+  while mPump.Lines.Count > 200 do
+    mPump.Lines.Delete(0);
+end;
+
+procedure TTableMainForm.LogDeviceSimulationValues(const AWorkTable: TWorkTable;
+  const AForce: Boolean);
+var
+  I: Integer;
+  Channel: TChannel;
+  DeviceFlow: Double;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  if (not AForce) and (FLastSimulationLogAt <> 0) and
+     ((Now - FLastSimulationLogAt) < (2 / 86400)) then
+    Exit;
+
+  FLastSimulationLogAt := Now;
+  AddSimulationLog(Format('Имитация приборов: готовность=%s; EditDeviceFlowRate=%s',
+    [BoolToStr((CheckBoxDeviceReadiness <> nil) and CheckBoxDeviceReadiness.IsChecked, True),
+     EditDeviceFlowRate.Text]));
+
+  for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if Channel = nil then
+      Continue;
+
+    DeviceFlow := 0;
+    if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+      DeviceFlow := Channel.FlowMeter.ValueFlow.GetDoubleValue;
+
+    AddSimulationLog(Format('Прибор %d: Enabled=%s; Flow=%.6f; ImpSec=%.6f; TargetImpSec=%.6f; AssignedFlow=%.6f л/с',
+      [I + 1, BoolToStr(Channel.Enabled, True), DeviceFlow, Channel.ImpSec,
+       Channel.SimulationTargetImpSec, Channel.SimulationAssignedFlow]));
+  end;
+end;
+
 procedure TTableMainForm.TimerSetValuesTimer(Sender: TObject);
 begin
   if FWorkTableManager = nil then
@@ -1406,8 +1474,11 @@ begin
 
   SyncWorkTableObservers;
   UpdateInstrumentNameEdit;
+  FWorkTableManager.SimulationDeviceReadiness :=
+    (CheckBoxDeviceReadiness <> nil) and CheckBoxDeviceReadiness.IsChecked;
 
   FWorkTableManager.UpdateSimulation;
+  LogDeviceSimulationValues(FWorkTableManager.ActiveWorkTable);
 end;
 
 
