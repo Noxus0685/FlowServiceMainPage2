@@ -43,6 +43,7 @@ type
     EditDeviceImpSec: TEdit;
     EditDeviceFlowRate: TEdit;
     EditDeviceImpResult: TEdit;
+    CheckBoxDeviceReady: TCheckBox;
     ButtonApplyDeviceValues: TButton;
     EditTestNum: TEdit;
     LabelTestNum: TLabel;
@@ -116,6 +117,8 @@ begin
     Exit;
 
   UpdateDeviceImpSecFromFlowRate;
+  WorkTable.DeviceReady := CheckBoxDeviceReady.IsChecked;
+  WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
   ImpSecValues := BuildImpSecValuesForChannels(
     WorkTable.DeviceChannels,
@@ -143,6 +146,7 @@ begin
     Exit;
 
   UpdateEtalonImpSecFromFlowRate;
+  WorkTable.EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
   FlowRate := NormalizeFloatInput(EditEtalonFlowRate.Text);
   ImpSecValues := BuildImpSecValuesForChannels(
     WorkTable.EtalonChannels,
@@ -720,9 +724,36 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+  MaxImpDelta: Double;
+  MinImpSec: Double;
+  MaxImpSec: Double;
+  EtalonFlowSet: Double;
+  EtalonFlowActual: Double;
+  ChannelCoef: Double;
+  TargetImpSec: Double;
+  CurrentFlow: Double;
+  DeviceReady: Boolean;
 begin
   if AWorkTable = nil then
     Exit;
+
+  DeviceReady := CheckBoxDeviceReady.IsChecked;
+  AWorkTable.DeviceReady := DeviceReady;
+  EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
+  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) and
+     (AWorkTable.FlowRate.ValueSet.Value > 0) then
+    EtalonFlowSet := AWorkTable.FlowRate.ValueSet.Value;
+  AWorkTable.EtalonFlowSet := EtalonFlowSet;
+  if EtalonFlowSet <= 0 then
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if (AWorkTable.EtalonChannels[I] <> nil) and
+         AWorkTable.EtalonChannels[I].Enabled then
+      begin
+        ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+        if ChannelCoef > 0 then
+          EtalonFlowSet := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+        Break;
+      end;
 
     AWorkTable.Time := AWorkTable.Time + 1;
 
@@ -733,11 +764,24 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+      ChannelCoef := GetChannelFlowCoef(Channel);
+      if (EtalonFlowSet > 0) and (ChannelCoef > 0) then
+      begin
+        CurrentFlow := Channel.ImpSec / ChannelCoef;
+        if Abs(CurrentFlow - EtalonFlowSet) > EtalonFlowSet * 0.1 then
+          Channel.ImpSec := EtalonFlowSet * ChannelCoef;
+      end;
+      if Channel.ImpSec > 0 then
+      begin
+        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
+        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
+        MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
+        MaxImpSec := Channel.ImpSec * 1.01;
+        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
+      end;
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
     end
     else
@@ -749,6 +793,19 @@ begin
 
   end;
 
+  EtalonFlowActual := 0;
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and
+       AWorkTable.EtalonChannels[I].Enabled then
+    begin
+      ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+      if ChannelCoef > 0 then
+        EtalonFlowActual := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+      Break;
+    end;
+  if EtalonFlowActual <= 0 then
+    EtalonFlowActual := EtalonFlowSet;
+
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
     Channel := AWorkTable.DeviceChannels[I];
@@ -756,11 +813,41 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+
+      if DeviceReady and (Channel.ImpSec > 0) then
+      begin
+        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
+        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
+        MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
+        MaxImpSec := Channel.ImpSec * 1.01;
+        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
+      end
+      else if not DeviceReady then
+      begin
+        ChannelCoef := GetChannelFlowCoef(Channel);
+        TargetImpSec := EtalonFlowActual * ChannelCoef;
+        if TargetImpSec > 0 then
+        begin
+          MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.003, 0.1, 10.0);
+          if Abs(Channel.ImpSec - TargetImpSec) > MaxImpDelta then
+          begin
+            ImpDelta := EnsureRange(TargetImpSec - Channel.ImpSec, -MaxImpDelta, MaxImpDelta);
+            MinImpSec := 0.0;
+            MaxImpSec := Max(Channel.ImpSec, TargetImpSec);
+          end
+          else
+          begin
+            ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
+            MinImpSec := Max(0.0, TargetImpSec * 0.99);
+            MaxImpSec := TargetImpSec * 1.01;
+          end;
+          Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
+        end;
+      end;
+
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
     end
     else
