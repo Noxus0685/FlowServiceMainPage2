@@ -5896,6 +5896,16 @@ var
   CurDelta: Double;
   ImpDelta: Double;
 
+  function FlowToBaseUnits(const AFlowRate: Double): Double;
+  begin
+    Result := AFlowRate / 3.6;
+  end;
+
+  function FlowFromBaseUnits(const AFlowRate: Double): Double;
+  begin
+    Result := AFlowRate * 3.6;
+  end;
+
   function ParseFlowAccuracy(const S: string; out APercent: Double): Boolean;
   var
     Text, NumText: string;
@@ -5947,7 +5957,7 @@ var
   begin
     Result := 0;
     if (AWorkTable <> nil) and (AWorkTable.ValueFlowRate <> nil) then
-      Result := AWorkTable.ValueFlowRate.GetDoubleValue;
+      Result := FlowToBaseUnits(AWorkTable.ValueFlowRate.GetDoubleValue);
 
     if not SameValue(Result, 0.0, 1E-12) then
       Exit;
@@ -5962,7 +5972,7 @@ var
          (EtalonChannel.FlowMeter <> nil) and
          (EtalonChannel.FlowMeter.ValueFlow <> nil) then
       begin
-        Result := EtalonChannel.FlowMeter.ValueFlow.GetDoubleValue;
+        Result := FlowToBaseUnits(EtalonChannel.FlowMeter.ValueFlow.GetDoubleValue);
         if not SameValue(Result, 0.0, 1E-12) then
           Exit;
       end;
@@ -5986,7 +5996,7 @@ var
       AChannel.SimulationDirection := 1;
 
     if SimulationDeviceReadiness and AChannel.SimulationInitialized then
-      BaseFlow := AChannel.SimulationAssignedFlow
+      BaseFlow := FlowToBaseUnits(AChannel.SimulationAssignedFlow)
     else
       BaseFlow := GetCurrentEtalonFlow(AWorkTable);
 
@@ -6006,14 +6016,17 @@ var
           TargetErrorPercent := AChannel.SimulationDirection * FlowAccuracyPercent;
 
         TargetFlow := BaseFlow * (1 + TargetErrorPercent / 100);
-        OscillationFlow := FlowTolerance * 0.10;
-        if Abs(FlowRateToImpSec(AWorkTable, AChannel, TargetFlow) - AChannel.ImpSec) < 1 then
+        if SimulationDeviceReadiness then
+          OscillationFlow := FlowTolerance * 0.35
+        else
+          OscillationFlow := FlowTolerance * 0.15;
+        if Abs(FlowRateToImpSec(AWorkTable, AChannel, FlowFromBaseUnits(TargetFlow)) - AChannel.ImpSec) < 1 then
           AChannel.SimulationDirection := -AChannel.SimulationDirection;
         TargetFlow := EnsureRange(TargetFlow + (AChannel.SimulationDirection * OscillationFlow), MinFlow, MaxFlow);
       end;
     end;
 
-    TargetImpSec := FlowRateToImpSec(AWorkTable, AChannel, TargetFlow);
+    TargetImpSec := FlowRateToImpSec(AWorkTable, AChannel, FlowFromBaseUnits(TargetFlow));
     AChannel.SimulationTargetImpSec := TargetImpSec;
     Result := (AChannel.SimulationTargetImpSec - AChannel.ImpSec) * 0.15 + ((Random - 0.5) * 0.2);
   end;
