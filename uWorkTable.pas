@@ -662,6 +662,8 @@ type
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
     function SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean;
+    function SetEtalonsByNames(const AEtalonNames: TArray<string>;
+      out AError: TErrorInfo): Boolean;
     function CalcEtalonFlowRateMax: Double;
     function CalcEtalonFlowRateMin: Double;
     procedure UpdateFlowRateLimitsByEtalons;
@@ -2826,6 +2828,97 @@ begin
   UpdateAggregateMeterValues;
   AError := BuildWorkTableError(1103, Format(
     'Эталон или группа эталонов для расхода %.6f не найдены', [AFlowRate]));
+end;
+
+function TWorkTable.SetEtalonsByNames(const AEtalonNames: TArray<string>;
+  out AError: TErrorInfo): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  ChannelName: string;
+  NeedEnabled: Boolean;
+  Changed: Boolean;
+  MatchedCount: Integer;
+
+  function BuildWorkTableError(ACode: Integer; const AMsg: string): TErrorInfo;
+  begin
+    Result.Code := ACode;
+    Result.Msg := AMsg;
+    Result.Time := Now;
+    Result.Stage := 0;
+  end;
+
+  function NameInList(const AName: string): Boolean;
+  var
+    J: Integer;
+    Name: string;
+  begin
+    Result := False;
+    Name := Trim(AName);
+
+    if Name = '' then
+      Exit;
+
+    for J := Low(AEtalonNames) to High(AEtalonNames) do
+      if SameText(Name, Trim(AEtalonNames[J])) then
+        Exit(True);
+  end;
+
+begin
+  Result := False;
+  Changed := False;
+  MatchedCount := 0;
+  AError := TErrorInfo.Empty(0);
+
+  if (FEtalonChannels = nil) or (FEtalonChannels.Count = 0) then
+  begin
+    AError := BuildWorkTableError(1101, 'Список эталонных каналов не создан или пуст');
+    Exit;
+  end;
+
+  if Length(AEtalonNames) = 0 then
+  begin
+    AError := BuildWorkTableError(1102, 'Список имён эталонов для выбора пуст');
+    Exit;
+  end;
+
+  for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+
+    if Channel = nil then
+      Continue;
+
+    ChannelName := '';
+
+    if Channel.FlowMeter <> nil then
+      ChannelName := Channel.FlowMeter.Name;
+
+    NeedEnabled := NameInList(ChannelName);
+
+    if NeedEnabled then
+      Inc(MatchedCount);
+
+    if Channel.Enabled <> NeedEnabled then
+    begin
+      Channel.Enabled := NeedEnabled;
+      Changed := True;
+    end;
+  end;
+
+  UpdateAggregateMeterValues;
+
+  if MatchedCount = 0 then
+  begin
+    AError := BuildWorkTableError(1103,
+      'В рабочем столе не найдены эталонные каналы по именам из гидросхемы');
+    Exit(False);
+  end;
+
+  if Changed then
+    FireEvent(ewtEtalonsChanged, 'Изменен набор выбранных эталонных каналов');
+
+  Result := True;
 end;
 
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
