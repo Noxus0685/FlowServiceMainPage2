@@ -5933,7 +5933,7 @@ begin
       end;
       if Channel.ImpSec > 0 then
       begin
-        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
+        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.01, 0.1, 1000.0);
         ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
         MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
         MaxImpSec := Channel.ImpSec * 1.01;
@@ -5976,7 +5976,7 @@ begin
 
       if DeviceReady and (Channel.ImpSec > 0) then
       begin
-        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
+        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.01, 0.1, 1000.0);
         ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
         MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
         MaxImpSec := Channel.ImpSec * 1.01;
@@ -5988,7 +5988,7 @@ begin
         TargetImpSec := EtalonFlowActual * ChannelCoef;
         if TargetImpSec > 0 then
         begin
-          MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.003, 0.1, 10.0);
+          MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.01, 0.1, 10.0);
           if Abs(Channel.ImpSec - TargetImpSec) > MaxImpDelta then
           begin
             ImpDelta := EnsureRange(TargetImpSec - Channel.ImpSec, -MaxImpDelta, MaxImpDelta);
