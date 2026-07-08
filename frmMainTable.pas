@@ -5615,7 +5615,6 @@ function TFrameMainTable.GetErrorCellColor(AChannel: TChannel;
   const AText: string; out AColor: TAlphaColor): Boolean;
 var
   DeviceFlow: Double;
-  FlowError: Double;
   Delta: Double;
   Distance: Double;
   MinDistance: Double;
@@ -5638,11 +5637,10 @@ begin
   MinDistance := MaxDouble;
   for DevicePoint in AChannel.FlowMeter.Device.Points do
   begin
-    if (DevicePoint = nil) or (DevicePoint.State = osDeleted) or
-       (not DevicePoint.Enabled) then
+    if (DevicePoint = nil) or (DevicePoint.State = osDeleted) then
       Continue;
 
-    Distance := Abs(DeviceFlow - DevicePoint.Q);
+    Distance := Abs(DeviceFlow - DevicePoint.PointQ);
     if (MatchedPoint = nil) or (Distance < MinDistance) then
     begin
       MatchedPoint := DevicePoint;
@@ -5653,25 +5651,17 @@ begin
   if MatchedPoint = nil then
     Exit;
 
-  AccNorm := NormalizeFlowAccuracyInput(MatchedPoint.FlowAccuracy);
-  if AccNorm = '' then
-    Exit;
-
-  if (AccNorm[1] = '+') or (AccNorm[1] = '-') then
-    FlowError := NormalizeFloatInput(Copy(AccNorm, 2, MaxInt))
-  else
-    FlowError := NormalizeFloatInput(AccNorm);
-
-  FlowError := Abs(MatchedPoint.Q * FlowError / 100.0);
-  Delta := Abs(DeviceFlow - MatchedPoint.Q);
-
-  Result := True;
-  if Delta <= Abs(MatchedPoint.Error) then
-    AColor := $FFE6F4E6
-  else if Delta <= FlowError then
-    AColor := TAlphaColorRec.Lightyellow
-  else
-    Result := False;
+  Delta := Abs(DeviceFlow - MatchedPoint.PointQ);
+  if Delta <= Abs(MatchedPoint.PointError) then
+  begin
+    AColor := $FFE6F4E6;
+    Result := True;
+  end
+  else if Delta <= Abs(MatchedPoint.PointFlowError) then
+  begin
+    AColor := TAlphaColorRec.Lightyellow;
+    Result := True;
+  end;
 end;
 
 procedure TFrameMainTable.GridDevicesDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
