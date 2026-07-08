@@ -728,6 +728,7 @@ var
   MinImpSec: Double;
   MaxImpSec: Double;
   EtalonFlowSet: Double;
+  EtalonFlowActual: Double;
   ChannelCoef: Double;
   TargetImpSec: Double;
   CurrentFlow: Double;
@@ -783,6 +784,19 @@ begin
 
   end;
 
+  EtalonFlowActual := 0;
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and
+       AWorkTable.EtalonChannels[I].Enabled then
+    begin
+      ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+      if ChannelCoef > 0 then
+        EtalonFlowActual := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+      Break;
+    end;
+  if EtalonFlowActual <= 0 then
+    EtalonFlowActual := EtalonFlowSet;
+
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
     Channel := AWorkTable.DeviceChannels[I];
@@ -805,7 +819,7 @@ begin
       else if not DeviceReady then
       begin
         ChannelCoef := GetChannelFlowCoef(Channel);
-        TargetImpSec := EtalonFlowSet * ChannelCoef;
+        TargetImpSec := EtalonFlowActual * ChannelCoef;
         if TargetImpSec > 0 then
         begin
           MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.003, 0.1, 10.0);
