@@ -1327,8 +1327,8 @@ begin
   case AWorkTable.Action of
     awtSelectEtalons:
       begin
-        // Эталоны уже выбраны внутри TWorkTable.SelectEtalons.
-        // Здесь не нужно повторно выбирать эталоны, менять Enabled или запускать измерение.
+        // Доменное действие уже выполнено в TWorkTable.SelectEtalons.
+        // Обработчик только пишет протокол: он не меняет Enabled и не запускает измерение.
         if Assigned(ProtocolManager) then
           ProtocolManager.AddMessage(
             pcAction,
@@ -1404,6 +1404,7 @@ begin
 
   if WorkTableEvent = ewtEtalonsChanged then
   begin
+    // UI обновляется по уведомлению рабочего стола, без прямых вызовов из TWorkTable.
     if FActiveWorkTable = AWorkTable then
     begin
       UpdateGrids;
