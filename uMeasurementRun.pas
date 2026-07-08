@@ -595,25 +595,20 @@ var
   I: Integer;
   Channel: TChannel;
   Details: TStringList;
-  DetailsText: string;
   EtalonName: string;
-  Accuracy: string;
 begin
-  if (APoint = nil) or (FWorkTable = nil) then
-    Exit('Эталоны не выбраны');
+  if (APoint = nil) or (FWorkTable = nil) or (FWorkTable.EtalonChannels = nil) then
+    Exit('Выбранные эталоны отсутствуют');
 
   Details := TStringList.Create;
   try
+    Details.Add(Format('Расход точки: %.6f', [APoint.Q]));
+    Details.Add('Выбранные эталоны:');
+
     for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
     begin
       Channel := FWorkTable.EtalonChannels[I];
-      if (Channel = nil) or (Channel.FlowMeter = nil) then
-        Continue;
-
-      if (APoint.Q <= 0) and (not Channel.Enabled) then
-        Continue;
-      if (APoint.Q > 0) and
-         ((APoint.Q < Channel.FlowMeter.FlowMin) or (APoint.Q > Channel.FlowMeter.FlowMax)) then
+      if (Channel = nil) or (Channel.FlowMeter = nil) or (not Channel.Enabled) then
         Continue;
 
       EtalonName := Trim(Channel.Name);
@@ -622,22 +617,18 @@ begin
       if EtalonName = '' then
         EtalonName := 'Без имени';
 
-      Accuracy := '';
-      if Channel.FlowMeter.Device <> nil then
-        Accuracy := Trim(Channel.FlowMeter.Device.AccuracyClass);
-      if Accuracy = '' then
-        Accuracy := 'не указана';
-
-      Details.Add(Format('%s (точность %s)', [EtalonName, Accuracy]));
+      Details.Add(Format('- %s, диапазон %.6f..%.6f, Group=%d', [
+        EtalonName,
+        Channel.FlowMeter.FlowMin,
+        Channel.FlowMeter.FlowMax,
+        Channel.Group
+      ]));
     end;
 
-    if Details.Count = 0 then
-      Exit('Эталоны по расходу'  +FWorkTable.TableFlow.ValueFlowRate.GetStrNum(APoint.Q) + ' '+FWorkTable.TableFlow.ValueFlowRate.GetDimName+   ' не найдены');
+    if Details.Count = 2 then
+      Details.Add('Выбранные эталоны отсутствуют');
 
-    DetailsText := Trim(StringReplace(Details.Text, sLineBreak, '; ', [rfReplaceAll]));
-    if EndsText(';', DetailsText) then
-      Delete(DetailsText, Length(DetailsText), 1);
-    Result := 'Установлены эталоны: ' + DetailsText;
+    Result := Trim(Details.Text);
   finally
     Details.Free;
   end;
@@ -1516,14 +1507,9 @@ begin
 end;
 
 function TMeasurementRun.SelectEtalons(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
-var
-  I: Integer;
-  Channel: TChannel;
-  Best: TChannel;
 begin
   AError := TErrorInfo.Empty(Integer(msSelectEtalon));
   Result := False;
-  Best := nil;
 
   if (APoint = nil) or (FWorkTable = nil) then
   begin
@@ -1531,43 +1517,13 @@ begin
     Exit;
   end;
 
-  for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
-  begin
-    Channel := FWorkTable.EtalonChannels[I];
-    if (Channel = nil) or (Channel.FlowMeter = nil) then
-      Continue;
-
-    if APoint.Q < 0 then
-    begin
-      if Channel.Enabled then
-        Best := Channel;
-      Continue;
-    end;
-
-    if SameValue(APoint.Q, 0) then
-    begin
-      if Channel.Enabled then
-        Best := Channel;
-      Continue;
-    end;
-
-    if (APoint.Q >= Channel.FlowMeter.FlowMin) and
-       (APoint.Q <= Channel.FlowMeter.FlowMax) and
-       ((Best = nil) or (Channel.FlowMeter.FlowMax < Best.FlowMeter.FlowMax)) then
-      Best := Channel;
-  end;
-
-  { TODO: SelectEtalons finds the best etalon channel, but the selected
-    channel is not currently persisted or applied. }
-  Result := Best <> nil;
+  Result := FWorkTable.SelectEtalons(APoint.Q, AError);
   if not Result then
-  begin
-    AError := BuildError(1101, 'Эталон по расходу не найден');
     Exit;
-  end;
 
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
-    'Выбраны эталоны для точки', BuildEtalonSelectionLog(APoint));
+  if Assigned(ProtocolManager) then
+    ProtocolManager.AddMessage(pcAction, psMeasurement, 'EtalonSelected',
+      'Выбраны эталоны для точки', BuildEtalonSelectionLog(APoint));
 end;
 
 function TMeasurementRun.CalcMeasureTimeout(APoint: TDevicePoint): Cardinal;
