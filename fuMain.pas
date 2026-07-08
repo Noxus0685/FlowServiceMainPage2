@@ -740,6 +740,9 @@ begin
   DeviceReady := CheckBoxDeviceReady.IsChecked;
   AWorkTable.DeviceReady := DeviceReady;
   EtalonFlowSet := NormalizeFloatInput(EditEtalonFlowRate.Text) / 3.6;
+  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) and
+     (AWorkTable.FlowRate.ValueSet.Value > 0) then
+    EtalonFlowSet := AWorkTable.FlowRate.ValueSet.Value;
   AWorkTable.EtalonFlowSet := EtalonFlowSet;
   if EtalonFlowSet <= 0 then
     for I := 0 to AWorkTable.EtalonChannels.Count - 1 do

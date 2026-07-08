@@ -5898,6 +5898,9 @@ begin
 
   DeviceReady := AWorkTable.DeviceReady;
   EtalonFlowSet := AWorkTable.EtalonFlowSet;
+  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) and
+     (AWorkTable.FlowRate.ValueSet.Value > 0) then
+    EtalonFlowSet := AWorkTable.FlowRate.ValueSet.Value;
   if EtalonFlowSet <= 0 then
     for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
       if (AWorkTable.EtalonChannels[I] <> nil) and
