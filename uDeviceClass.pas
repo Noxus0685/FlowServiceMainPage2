@@ -2114,6 +2114,7 @@ begin
   Result.SpillageStop := SpillageStop;
   StdIdx := GetNextPointStdIndex(Points.Count);
   Result.FlowRate := StdPointRates[StdIdx];
+  Result.Q := Result.FlowRate * Qmax;
 
   Points.Add(Result);
 end;
@@ -2910,6 +2911,7 @@ begin
   begin
     DP := AddPoint;
     DP.Apply(TP);
+    DP.Q := DP.FlowRate * Qmax;
     DP.SpillageStop := SpillageStop;
   end;
 
