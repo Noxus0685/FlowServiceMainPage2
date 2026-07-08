@@ -840,6 +840,7 @@ begin
           end
           else
           begin
+            MaxImpDelta := EnsureRange(Abs(TargetImpSec) * 0.01, 0.1, 30.0);
             ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
             MinImpSec := Max(0.0, TargetImpSec * 0.99);
             MaxImpSec := TargetImpSec * 1.01;
