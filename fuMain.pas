@@ -116,6 +116,7 @@ begin
     Exit;
 
   UpdateDeviceImpSecFromFlowRate;
+  WorkTable.DeltaSignal := NormalizeFloatInput(EditDeviceImpSec.Text);
   FlowRate := NormalizeFloatInput(EditDeviceFlowRate.Text);
   ImpSecValues := BuildImpSecValuesForChannels(
     WorkTable.DeviceChannels,
@@ -720,9 +721,15 @@ var
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+  DeltaSignal: Double;
+  MaxImpDelta: Double;
+  MinImpSec: Double;
+  MaxImpSec: Double;
 begin
   if AWorkTable = nil then
     Exit;
+
+  DeltaSignal := AWorkTable.DeltaSignal;
 
     AWorkTable.Time := AWorkTable.Time + 1;
 
@@ -756,11 +763,19 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+
+      if DeltaSignal > 0 then
+      begin
+        MaxImpDelta := EnsureRange(Abs(DeltaSignal) * 0.003, 0.1, 10.0);
+        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
+        MinImpSec := Max(0.0, DeltaSignal * 0.99);
+        MaxImpSec := DeltaSignal * 1.01;
+        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
+      end;
+
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
     end
     else
