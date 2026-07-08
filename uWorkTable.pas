@@ -5921,7 +5921,6 @@ begin
       Continue;
 
     CurDelta := (Random * 0.06) - 0.03;
-    ImpDelta := Random(11) - 5;
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
@@ -5932,7 +5931,14 @@ begin
         if Abs(CurrentFlow - EtalonFlowSet) > EtalonFlowSet * 0.1 then
           Channel.ImpSec := EtalonFlowSet * ChannelCoef;
       end;
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+      if Channel.ImpSec > 0 then
+      begin
+        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
+        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
+        MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
+        MaxImpSec := Channel.ImpSec * 1.01;
+        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
+      end;
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
     end
     else
