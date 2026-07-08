@@ -360,6 +360,7 @@ type
     FTimeResult: Double;
     FDeviceReady: Boolean;
     FEtalonFlowSet: Double;
+    FDeviceFlowSet: Double;
     FCurrentWeight: Double;
     FScaleTareWeight: Double;
 
@@ -610,6 +611,7 @@ type
     property TimeResult: Double read GetTimeResult write SetTimeResult;
     property DeviceReady: Boolean read FDeviceReady write FDeviceReady;
     property EtalonFlowSet: Double read FEtalonFlowSet write FEtalonFlowSet;
+    property DeviceFlowSet: Double read FDeviceFlowSet write FDeviceFlowSet;
     property CurrentWeight: Double read FCurrentWeight write FCurrentWeight;
     property Value: Double read FCurrentWeight write FCurrentWeight;
     property CurentValue: Double read GetCurentValue write SetCurentValue;
@@ -5871,7 +5873,9 @@ var
   MinImpSec: Double;
   MaxImpSec: Double;
   EtalonFlowSet: Double;
+  DeviceFlowSet: Double;
   ChannelCoef: Double;
+  TargetImpSec: Double;
   CurrentFlow: Double;
   DeviceReady: Boolean;
 
@@ -5896,6 +5900,7 @@ begin
 
   DeviceReady := AWorkTable.DeviceReady;
   EtalonFlowSet := AWorkTable.EtalonFlowSet;
+  DeviceFlowSet := AWorkTable.DeviceFlowSet;
   if EtalonFlowSet <= 0 then
     for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
       if (AWorkTable.EtalonChannels[I] <> nil) and
@@ -5950,12 +5955,27 @@ begin
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
 
-      if DeviceReady and (Channel.ImpSec > 0) then
+      ChannelCoef := GetSignalChannelFlowCoef(Channel);
+      if DeviceFlowSet > 0 then
+        TargetImpSec := DeviceFlowSet * ChannelCoef
+      else
+        TargetImpSec := EtalonFlowSet * ChannelCoef;
+      if (Channel.ImpSec > 0) or ((not DeviceReady) and (TargetImpSec > 0)) then
       begin
-        MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
-        ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
-        MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
-        MaxImpSec := Channel.ImpSec * 1.01;
+        if DeviceReady or (TargetImpSec <= 0) then
+        begin
+          MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
+          ImpDelta := (Random * 2.0 - 1.0) * MaxImpDelta;
+          MinImpSec := Max(0.0, Channel.ImpSec * 0.99);
+          MaxImpSec := Channel.ImpSec * 1.01;
+        end
+        else
+        begin
+          MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.003, 0.1, 10.0);
+          ImpDelta := EnsureRange(TargetImpSec - Channel.ImpSec, -MaxImpDelta, MaxImpDelta);
+          MinImpSec := 0.0;
+          MaxImpSec := Max(Channel.ImpSec, TargetImpSec);
+        end;
         Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
       end;
 
