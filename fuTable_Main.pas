@@ -243,6 +243,7 @@ begin
     EditDeviceImpSec.Text := FloatToStr(
       FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, FlowRate)
     );
+    uWorkTable.DeltaSignal := NormalizeFloatInput(EditDeviceImpSec.Text);
     ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
       WorkTable,
       EnabledDeviceChannels,

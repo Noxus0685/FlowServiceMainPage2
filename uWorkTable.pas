@@ -749,7 +749,9 @@ type
 
   end;
 
-  var WorkTableManager:   TWorkTableManager;
+  var
+    WorkTableManager: TWorkTableManager;
+    DeltaSignal: Double = 0;
 
 implementation
 
@@ -5857,12 +5859,48 @@ begin
    end;
 end;
 
+
+function TryParseFlowAccuracy(const AValue: string; out APercent: Double): Boolean;
+var
+  I: Integer;
+  CleanValue: string;
+  DecSep: Char;
+begin
+  CleanValue := '';
+  DecSep := FormatSettings.DecimalSeparator;
+
+  for I := 1 to Length(AValue) do
+    if CharInSet(AValue[I], ['0'..'9', '.', ',']) then
+      CleanValue := CleanValue + AValue[I];
+
+  CleanValue := StringReplace(CleanValue, '.', DecSep, [rfReplaceAll]);
+  CleanValue := StringReplace(CleanValue, ',', DecSep, [rfReplaceAll]);
+
+  Result := TryStrToFloat(CleanValue, APercent);
+  if Result then
+    APercent := Abs(APercent)
+  else
+    APercent := 0;
+end;
+
 procedure UpdateRandomSignals(const AWorkTable: TWorkTable);
 var
   I: Integer;
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
+  NoiseDelta: Double;
+  CurrentFlow: Double;
+  CurrentError: Double;
+  TargetError: Double;
+  ErrorDelta: Double;
+  FlowAccuracyPercent: Double;
+  MinImpSec: Double;
+  MaxImpSec: Double;
+  Distance: Double;
+  MinDistance: Double;
+  DevicePoint: TDevicePoint;
+  MatchedPoint: TDevicePoint;
 begin
   if AWorkTable = nil then
     Exit;
@@ -5899,11 +5937,63 @@ begin
       Continue;
 
     CurDelta := (Random * 0.6) - 0.3;
-    ImpDelta := Random(11) - 5;
     if Channel.Enabled then
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
-      Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+
+      MatchedPoint := nil;
+      MinDistance := MaxDouble;
+
+      if (Channel.FlowMeter <> nil) and
+         (Channel.FlowMeter.Device <> nil) and
+         (Channel.FlowMeter.Device.Points <> nil) and
+         (Channel.FlowMeter.ValueFlow <> nil) then
+      begin
+        CurrentFlow := Channel.FlowMeter.ValueFlow.GetDoubleValue;
+
+        for DevicePoint in Channel.FlowMeter.Device.Points do
+        begin
+          if (DevicePoint = nil) or (DevicePoint.State = osDeleted) then
+            Continue;
+
+          Distance := Abs(CurrentFlow - DevicePoint.Q);
+          if Distance < MinDistance then
+          begin
+            MinDistance := Distance;
+            MatchedPoint := DevicePoint;
+          end;
+        end;
+      end;
+
+      if (MatchedPoint <> nil) and
+         (Channel.FlowMeter.ValueError <> nil) and
+         TryParseFlowAccuracy(MatchedPoint.FlowAccuracy, FlowAccuracyPercent) then
+      begin
+        CurrentError := Channel.FlowMeter.ValueError.GetDoubleValue;
+
+        if CurrentError > -MaxDouble then
+        begin
+          TargetError := Abs(MatchedPoint.Error);
+          MinImpSec := DeltaSignal * (1 - Abs(FlowAccuracyPercent) / 100);
+          MaxImpSec := DeltaSignal * (1 + Abs(FlowAccuracyPercent) / 100);
+          MinImpSec := Max(0.0, MinImpSec);
+          ErrorDelta := TargetError - Abs(CurrentError);
+          NoiseDelta := (Random - 0.5) * DeltaSignal * 0.0005;
+          ImpDelta := DeltaSignal * ErrorDelta / 100 * 0.15 + NoiseDelta;
+          Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, MinImpSec, MaxImpSec);
+        end
+        else
+        begin
+          ImpDelta := (DeltaSignal - Channel.ImpSec) * 0.15;
+          Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+        end;
+      end
+      else
+      begin
+        ImpDelta := (DeltaSignal - Channel.ImpSec) * 0.15;
+        Channel.ImpSec := EnsureRange(Channel.ImpSec + ImpDelta, 0.0, 1000000.0);
+      end;
+
       Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec, 0.0, 1.0E12);
     end
     else
