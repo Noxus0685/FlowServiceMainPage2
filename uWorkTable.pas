@@ -70,7 +70,9 @@ type
     awtAddChannel,
     awtRemoveChannel,
     awtWriteRegister,
-    awtReadRegister
+    awtReadRegister,
+    // Автоматический выбор эталонных каналов для текущего расхода.
+    awtSelectEtalons
 
   );
 
@@ -83,7 +85,9 @@ type
     ewtWarning,
     ewtError,
     ewtActivated,
-    ewtRefresh
+    ewtRefresh,
+    // Изменился набор выбранных эталонных каналов рабочего стола.
+    ewtEtalonsChanged
   );
   TWorkTableEvent = EEventWorkTable;
 
@@ -657,6 +661,7 @@ type
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
     procedure UpdateAggregateMeterValues;
+    function SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean;
     function CalcEtalonFlowRateMax: Double;
     function CalcEtalonFlowRateMin: Double;
     procedure UpdateFlowRateLimitsByEtalons;
@@ -2512,6 +2517,317 @@ begin
   UpdateFlowRateLimitsByEtalons;
 end;
 
+
+{ TODO HYDRAULIC-SCHEME / NOTIFICATIONS:
+  Сейчас выбор эталонов выполняется временным способом:
+    - по паспортным диапазонам FlowMeter.FlowMin / FlowMeter.FlowMax;
+    - по полю Channel.Group;
+    - результат выбора записывается в Channel.Enabled.
+
+  Это промежуточная логика без учета полной гидравлической схемы установки.
+
+  В будущем выбор эталонов должен выполняться не только по диапазонам
+  расходомеров, а по таблице гидравлической схемы.
+
+  Гидравлическая схема должна быть основным источником допустимых
+  технологических маршрутов, потому что она знает:
+    - какие эталоны физически могут работать вместе;
+    - какие комбинации эталонов разрешены гидравлически;
+    - какие клапаны, задвижки, насосы и весы нужны для данного диапазона;
+    - какие batch-команды должны быть выполнены;
+    - какой маршрут предпочтительнее при пересечении диапазонов.
+
+  Предполагаемый будущий алгоритм:
+
+    1. TMeasurementRun на стадии msSelectEtalon передает текущую точку
+       измерения APoint в сервис выбора гидравлического маршрута.
+
+    2. Сервис выбора анализирует:
+         - APoint.Q;
+         - APoint.EtalonType;
+         - APoint.FlowSourceType;
+         - APoint.SpillageType;
+         - настройки проекта;
+         - таблицу гидравлической схемы.
+
+    3. В таблице гидравлической схемы выбирается строка, где:
+         - Qmin <= APoint.Q <= Qmax;
+         - строка разрешена для текущего режима;
+         - маршрут технологически допустим.
+
+    4. Из выбранной строки берется FlowmeterMask.
+
+    5. FlowmeterMask преобразуется в набор эталонных каналов TWorkTable.
+
+    6. Только выбранным эталонным каналам выставляется Channel.Enabled := True.
+       Остальные эталонные каналы получают Channel.Enabled := False.
+
+    7. После выбора вызывается UpdateAggregateMeterValues, чтобы агрегированные
+       значения рабочего стола считались только по выбранным эталонам.
+
+    8. На следующем этапе та же выбранная строка гидравлической схемы должна
+       использоваться для настройки установки:
+         - насосов;
+         - клапанов;
+         - байпаса;
+         - весов;
+         - batch-команд;
+         - старт/стоп режима.
+
+  Важное архитектурное замечание:
+
+    Не следует превращать TWorkTable в объект, который напрямую знает всю
+    структуру Project.Settings.sHydraulicCharts.
+
+    Желательно разделить ответственность:
+
+      TMeasurementRun
+        управляет сценарием измерения;
+
+      HydraulicRouteSelector / сервис выбора гидравлического маршрута
+        выбирает строку гидравлической схемы;
+
+      TWorkTable
+        применяет результат выбора к своим каналам:
+          FlowmeterMask -> Channel.Enabled.
+
+  Текущая логика по диапазонам и Group должна остаться fallback-режимом
+  на случай, если гидравлическая схема не задана или отключена.
+
+  Важно:
+    На текущем этапе Channel.Enabled используется как результат выбора
+    эталона для текущего измерения. В будущем желательно разделить:
+      - признак доступности/разрешения канала в конфигурации;
+      - признак выбора канала для текущей точки измерения.
+
+
+  Контракт уведомлений для будущей гидравлической схемы:
+    результат выбора строки гидравлической схемы должен завершаться тем же
+    механизмом, что и текущий fallback-выбор по диапазонам:
+
+    1. FlowmeterMask выбранной строки гидросхемы преобразуется в Channel.Enabled.
+    2. Вызывается UpdateAggregateMeterValues.
+    3. Вызывается FireAction(awtSelectEtalons, ...).
+    4. Вызывается FireEvent(ewtEtalonsChanged, ...).
+
+  UI не должен зависеть от способа выбора эталонов:
+    - по диапазонам и Group;
+    - или по гидравлической схеме.
+
+  Для интерфейса единственным сигналом обновления выбранных эталонов остается
+  ewtEtalonsChanged.
+
+  Риск сохранения:
+    Channel.Enabled сохраняется в файле рабочего стола. Если рабочий стол будет
+    сохранен после автоматического выбора, временный выбор эталонов может стать
+    постоянной настройкой. В будущем желательно разделить Channel.Enabled
+    (доступен/разрешен в конфигурации) и Channel.Selected (выбран для текущей
+    точки измерения).
+}
+function TWorkTable.SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  BestSingle: TChannel;
+  GroupSumsMin: TDictionary<Integer, Double>;
+  GroupSumsMax: TDictionary<Integer, Double>;
+  GroupCounts: TDictionary<Integer, Integer>;
+  Pair: TPair<Integer, Double>;
+  GroupID: Integer;
+  FlowMin: Double;
+  FlowMax: Double;
+  SumMin: Double;
+  SumMax: Double;
+  BestGroupID: Integer;
+  BestGroupMax: Double;
+  BestGroupCount: Integer;
+  GroupCount: Integer;
+
+  function BuildWorkTableError(ACode: Integer; const AMsg: string): TErrorInfo;
+  begin
+    Result.Code := ACode;
+    Result.Msg := AMsg;
+    Result.Time := Now;
+    Result.Stage := 0;
+  end;
+
+  procedure DisableAllEtalons;
+  var
+    J: Integer;
+  begin
+    if FEtalonChannels = nil then
+      Exit;
+
+    for J := 0 to FEtalonChannels.Count - 1 do
+      if FEtalonChannels[J] <> nil then
+        FEtalonChannels[J].Enabled := False;
+  end;
+
+  function GetChannelFlowMin(AChannel: TChannel): Double;
+  begin
+    Result := 0;
+    if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+      Result := AChannel.FlowMeter.FlowMin;
+  end;
+
+  function GetChannelFlowMax(AChannel: TChannel): Double;
+  begin
+    Result := 0;
+    if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
+      Result := AChannel.FlowMeter.FlowMax;
+  end;
+
+begin
+  AError := TErrorInfo.Empty(0);
+  Result := False;
+  BestSingle := nil;
+
+  if (FEtalonChannels = nil) or (FEtalonChannels.Count = 0) then
+  begin
+    AError := BuildWorkTableError(1101, 'Список эталонных каналов не создан или пуст');
+    UpdateAggregateMeterValues;
+    Exit;
+  end;
+
+  DisableAllEtalons;
+
+  if AFlowRate <= 0 then
+  begin
+    AError := BuildWorkTableError(1102, Format(
+      'Некорректный расход для выбора эталона: %.6f', [AFlowRate]));
+    UpdateAggregateMeterValues;
+    Exit;
+  end;
+
+  for I := 0 to FEtalonChannels.Count - 1 do
+  begin
+    Channel := FEtalonChannels[I];
+
+    if (Channel = nil) or (Channel.FlowMeter = nil) or (Channel.Group > 0) then
+      Continue;
+
+    FlowMin := GetChannelFlowMin(Channel);
+    FlowMax := GetChannelFlowMax(Channel);
+
+    if FlowMax <= 0 then
+      Continue;
+
+    if (AFlowRate >= FlowMin) and (AFlowRate <= FlowMax) then
+      if (BestSingle = nil) or (FlowMax < GetChannelFlowMax(BestSingle)) then
+        BestSingle := Channel;
+  end;
+
+  if BestSingle <> nil then
+  begin
+    BestSingle.Enabled := True;
+    UpdateAggregateMeterValues;
+    FireAction(
+      awtSelectEtalons,
+      'SelectEtalons',
+      Format('Выбран одиночный эталон для расхода %.6f', [AFlowRate])
+    );
+    FireEvent(
+      ewtEtalonsChanged,
+      Format('Изменен набор эталонов. Расход: %.6f', [AFlowRate])
+    );
+    Exit(True);
+  end;
+
+  GroupSumsMin := TDictionary<Integer, Double>.Create;
+  GroupSumsMax := TDictionary<Integer, Double>.Create;
+  GroupCounts := TDictionary<Integer, Integer>.Create;
+  try
+    for I := 0 to FEtalonChannels.Count - 1 do
+    begin
+      Channel := FEtalonChannels[I];
+
+      if (Channel = nil) or (Channel.FlowMeter = nil) or (Channel.Group <= 0) then
+        Continue;
+
+      FlowMin := GetChannelFlowMin(Channel);
+      FlowMax := GetChannelFlowMax(Channel);
+
+      if FlowMax <= 0 then
+        Continue;
+
+      if GroupSumsMin.ContainsKey(Channel.Group) then
+        GroupSumsMin[Channel.Group] := GroupSumsMin[Channel.Group] + FlowMin
+      else
+        GroupSumsMin.Add(Channel.Group, FlowMin);
+
+      if GroupSumsMax.ContainsKey(Channel.Group) then
+        GroupSumsMax[Channel.Group] := GroupSumsMax[Channel.Group] + FlowMax
+      else
+        GroupSumsMax.Add(Channel.Group, FlowMax);
+
+      if GroupCounts.ContainsKey(Channel.Group) then
+        GroupCounts[Channel.Group] := GroupCounts[Channel.Group] + 1
+      else
+        GroupCounts.Add(Channel.Group, 1);
+    end;
+
+    BestGroupID := 0;
+    BestGroupMax := 0;
+    BestGroupCount := 0;
+
+    for Pair in GroupSumsMax do
+    begin
+      GroupID := Pair.Key;
+      SumMax := Pair.Value;
+
+      if not GroupSumsMin.TryGetValue(GroupID, SumMin) then
+        Continue;
+
+      if not GroupCounts.TryGetValue(GroupID, GroupCount) then
+        GroupCount := 0;
+
+      if (AFlowRate < SumMin) or (AFlowRate > SumMax) then
+        Continue;
+
+      if (BestGroupID = 0) or
+         (SumMax < BestGroupMax) or
+         (SameValue(SumMax, BestGroupMax) and (GroupCount < BestGroupCount)) or
+         (SameValue(SumMax, BestGroupMax) and (GroupCount = BestGroupCount) and (GroupID < BestGroupID)) then
+      begin
+        BestGroupID := GroupID;
+        BestGroupMax := SumMax;
+        BestGroupCount := GroupCount;
+      end;
+    end;
+
+    if BestGroupID > 0 then
+    begin
+      for I := 0 to FEtalonChannels.Count - 1 do
+      begin
+        Channel := FEtalonChannels[I];
+        if (Channel <> nil) and (Channel.Group = BestGroupID) then
+          Channel.Enabled := True;
+      end;
+
+      UpdateAggregateMeterValues;
+      FireAction(
+        awtSelectEtalons,
+        'SelectEtalons',
+        Format('Выбрана группа эталонов %d для расхода %.6f', [BestGroupID, AFlowRate])
+      );
+      FireEvent(
+        ewtEtalonsChanged,
+        Format('Изменен набор эталонов. Выбрана группа %d. Расход: %.6f',
+          [BestGroupID, AFlowRate])
+      );
+      Exit(True);
+    end;
+  finally
+    GroupCounts.Free;
+    GroupSumsMax.Free;
+    GroupSumsMin.Free;
+  end;
+
+  UpdateAggregateMeterValues;
+  AError := BuildWorkTableError(1103, Format(
+    'Эталон или группа эталонов для расхода %.6f не найдены', [AFlowRate]));
+end;
+
 { Rebuilds aggregate lists for table values from enabled etalon channels. }
 procedure TWorkTable.UpdateAggregateMeterValues;
 var
@@ -3964,7 +4280,12 @@ end;
 
 class function TWorkTable.WorkTableEventToText(AEvent: TWorkTableEvent): string;
 begin
-  Result := GetEnumName(TypeInfo(TWorkTableEvent), Ord(AEvent));
+  case AEvent of
+    ewtEtalonsChanged:
+      Result := 'EtalonsChanged';
+  else
+    Result := GetEnumName(TypeInfo(TWorkTableEvent), Ord(AEvent));
+  end;
 end;
 
 class function TWorkTable.WorkTableEventToString(AEvent: TWorkTableEvent): string;
@@ -3990,7 +4311,8 @@ begin
     ewtActivated:
       Result := pcAction;
 
-    ewtInfo:
+    ewtInfo,
+    ewtEtalonsChanged:
       Result := pcInfo;
 
     ewtWarning:

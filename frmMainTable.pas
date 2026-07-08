@@ -1321,6 +1321,24 @@ end;
 
 procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
 begin
+  if AWorkTable = nil then
+    Exit;
+
+  case AWorkTable.Action of
+    awtSelectEtalons:
+      begin
+        // Доменное действие уже выполнено в TWorkTable.SelectEtalons.
+        // Обработчик только пишет протокол: он не меняет Enabled и не запускает измерение.
+        if Assigned(ProtocolManager) then
+          ProtocolManager.AddMessage(
+            pcAction,
+            psWorkTable,
+            'SelectEtalons',
+            'Выполнен выбор эталонов рабочего стола',
+            AWorkTable.Name
+          );
+      end;
+  end;
 
 {  case AWorkTable.Action of
     awtStartTest:
@@ -1381,6 +1399,26 @@ begin
     UpdateUIScale;
     OnChangeState(FActiveWorkTable.State);
     UpdateForm;
+    Exit;
+  end;
+
+  if WorkTableEvent = ewtEtalonsChanged then
+  begin
+    // UI обновляется по уведомлению рабочего стола, без прямых вызовов из TWorkTable.
+    if FActiveWorkTable = AWorkTable then
+    begin
+      UpdateGrids;
+      UpdateForm;
+    end;
+
+    if Assigned(ProtocolManager) then
+      ProtocolManager.AddMessage(
+        pcInfo,
+        psWorkTable,
+        'EtalonsChanged',
+        'Обновление интерфейса после изменения выбранных эталонов',
+        AWorkTable.Name
+      );
     Exit;
   end;
 
