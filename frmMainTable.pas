@@ -5620,6 +5620,7 @@ var
   MinDistance: Double;
   DevicePoint: TDevicePoint;
   MatchedPoint: TDevicePoint;
+  AccNorm: string;
 begin
   Result := False;
   AColor := TAlphaColors.Null;

@@ -114,6 +114,7 @@ type
 
     Status: Integer;             // Статус точки по результатам анализа измерений
     StatusStr: string;           // Текстовое описание статуса
+    Enabled: Boolean;            // Точка доступна для измерения и подсветки
 
     ResultError: Double;         // Итоговая (худшая из лучших) погрешность
     AverageError: Double;        // Средняя погрешность лучших измерений
@@ -1842,6 +1843,7 @@ begin
   {====================================================================}
   Name := ASource.Name;
   Description := ASource.Description;
+  Enabled := ASource.Enabled;
   Num := ASource.Num;
   DateTime := ASource.DateTime;
 
