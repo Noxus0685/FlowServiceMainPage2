@@ -135,7 +135,7 @@ type
     { ОСНОВНЫЕ ПАРАМЕТРЫ РАСХОДА }
     {====================================================================}
     FlowRate: Double;            // Отношение Q / Qmax (0..1)
-    Q: Double;                   // Абсолютный расход, м3/ч (т/ч)
+    Q: Double;                   // Абсолютный расход, л/с
     FlowAccuracy: string;        // Допустимое отклонение расхода ("±5%", "-5%", "+5%")
 
     {====================================================================}
@@ -398,7 +398,7 @@ type
       function FindDiameter(AType: TDeviceType): TDiameter;
       procedure ApplyType(AType: TDeviceType);
       procedure ApplyDiameter(ADiameter: TDiameter; AType: TDeviceType);
-      procedure RecalcPoints;
+
       procedure CreatePointsFromType(AType: TDeviceType);
   protected
       procedure SetState(const Value: TObjectState); override;
@@ -536,7 +536,7 @@ type
     procedure Assign(ASource: TDevice; FullAssign: Boolean);
     function Clone: TDevice;
     function GetSearchText: string; override;
-
+    procedure RecalcPoints;
     function CompareTo(
       const B: TTypeEntity;
       ASortField: Integer
@@ -2892,6 +2892,7 @@ begin
         P.LimitImp := Round(V * Coef);
     end;
   end;
+  P.State := osModified;
 end;
 
 procedure TDevice.CreatePointsFromType(AType: TDeviceType);
