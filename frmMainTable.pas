@@ -6023,7 +6023,10 @@ begin
           ApplyEnabledChannelSimulationValues(WorkTable, False);
         end
       else
-        ClearChannelSimulationValues(WorkTable.DeviceChannels[Row]);
+        begin
+          ClearChannelSimulationValues(WorkTable.DeviceChannels[Row]);
+          ApplyEnabledChannelSimulationValues(WorkTable, False);
+        end;
       MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
     end
     else
@@ -6513,7 +6516,10 @@ begin
             ApplyEnabledChannelSimulationValues(WorkTable, False);
           end
         else
-          ClearChannelSimulationValues(WorkTable.DeviceChannels[ARow]);
+          begin
+            ClearChannelSimulationValues(WorkTable.DeviceChannels[ARow]);
+            ApplyEnabledChannelSimulationValues(WorkTable, False);
+          end;
       finally
         FUpdatingChannelEnabled := False;
       end;
@@ -6625,7 +6631,10 @@ begin
           ApplyEnabledChannelSimulationValues(WorkTable, True);
         end
       else
-        ClearChannelSimulationValues(WorkTable.EtalonChannels[Row]);
+        begin
+          ClearChannelSimulationValues(WorkTable.EtalonChannels[Row]);
+          ApplyEnabledChannelSimulationValues(WorkTable, True);
+        end;
       MarkChannelDeviceModified(WorkTable.EtalonChannels[Row]);
     end
     else
@@ -7151,7 +7160,10 @@ begin
             ApplyEnabledChannelSimulationValues(WorkTable, True);
           end
         else
-          ClearChannelSimulationValues(WorkTable.EtalonChannels[ARow]);
+          begin
+            ClearChannelSimulationValues(WorkTable.EtalonChannels[ARow]);
+            ApplyEnabledChannelSimulationValues(WorkTable, True);
+          end;
       finally
         FUpdatingChannelEnabled := False;
       end;
