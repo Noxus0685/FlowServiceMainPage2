@@ -120,6 +120,8 @@ type
     procedure cbInputTypeChange(Sender: TObject);
 
     function GetFlowDimName: string;
+    function IsValidFloat(const AValue: Double): Boolean;
+    function SafeFloatText(const AValue: Double): string;
     procedure NotifyChanged;
     procedure ApplyOutputType;
     function GetActiveOutputType: Integer;
@@ -152,6 +154,8 @@ begin
 end;
 
 procedure TFrameFlowMeterProperties.BuildUI;
+var
+  OutputItem: TTreeViewItem;
 begin
   LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
@@ -221,10 +225,15 @@ begin
   AddPropertyRow(CategoryMain, 'Тип выхода', ComboOutputType);
 
   CategoryOutput := AddCategory('Настройки выхода');
-  CategoryOutput.Height := 220;
+
+  OutputItem := TTreeViewItem.Create(Self);
+  OutputItem.Parent := CategoryOutput;
+  OutputItem.Text := '';
+  OutputItem.Height := 190;
+  OutputItem.Stored := False;
 
   TabControlOutputType := TTabControl.Create(Self);
-  TabControlOutputType.Parent := CategoryOutput;
+  TabControlOutputType.Parent := OutputItem;
   TabControlOutputType.Align := TAlignLayout.Client;
   TabControlOutputType.TabPosition := TTabPosition(0);
   TabControlOutputType.Stored := False;
@@ -528,6 +537,19 @@ begin
     Result := FDevice.GetDimensionName;
 end;
 
+function TFrameFlowMeterProperties.IsValidFloat(const AValue: Double): Boolean;
+begin
+  Result := (AValue = AValue) and (Abs(AValue) < 1.0E308);
+end;
+
+function TFrameFlowMeterProperties.SafeFloatText(const AValue: Double): string;
+begin
+  if IsValidFloat(AValue) then
+    Result := FloatToStr(AValue)
+  else
+    Result := '0';
+end;
+
 procedure TFrameFlowMeterProperties.ApplyDeviceOutputType;
 begin
   if FDevice = nil then
@@ -579,7 +601,7 @@ begin
     EditFreq.Text := '';
   ComboBox6.ItemIndex := FDevice.DimensionCoef;
   if FDevice.FreqFlowRate > 0 then
-    EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate)
+    EditFreqFlowRate.Text := SafeFloatText(FDevice.FreqFlowRate)
   else
     EditFreqFlowRate.Text := '';
 end;
@@ -592,7 +614,7 @@ begin
     cbOutPutType2.ItemIndex := -1;
   cbCoefViewType.ItemIndex := FDevice.DimensionCoef;
   if FDevice.Coef > 0 then
-    EditCoef.Text := FloatToStr(FDevice.Coef)
+    EditCoef.Text := SafeFloatText(FDevice.Coef)
   else
     EditCoef.Text := '';
 end;
@@ -606,8 +628,8 @@ begin
   else
     cbVoltageRange.ItemIndex := -1;
   end;
-  EditVoltageQminRate.Text := FloatToStr(FDevice.VoltageQminRate);
-  EditVoltageQmaxRate.Text := FloatToStr(FDevice.VoltageQmaxRate);
+  EditVoltageQminRate.Text := SafeFloatText(FDevice.VoltageQminRate);
+  EditVoltageQmaxRate.Text := SafeFloatText(FDevice.VoltageQmaxRate);
 end;
 
 procedure TFrameFlowMeterProperties.UpdateUICurrent;
@@ -618,8 +640,8 @@ begin
   else
     cbCurrentRange.ItemIndex := -1;
   end;
-  EditCurrentQminRate.Text := FloatToStr(FDevice.CurrentQminRate);
-  EditCurrentQmaxRate.Text := FloatToStr(FDevice.CurrentQmaxRate);
+  EditCurrentQminRate.Text := SafeFloatText(FDevice.CurrentQminRate);
+  EditCurrentQmaxRate.Text := SafeFloatText(FDevice.CurrentQmaxRate);
 end;
 
 procedure TFrameFlowMeterProperties.UpdateUIInterface;
@@ -722,7 +744,8 @@ begin
     Exit;
   end;
   FDevice.Freq := NewFreq;
-  if FDevice.FreqFlowRate > 0 then
+  if (FDevice.Freq > 0) and (FDevice.FreqFlowRate > 0) and
+     IsValidFloat(FDevice.FreqFlowRate) then
     FDevice.Coef := 3.6 * FDevice.Freq / FDevice.FreqFlowRate;
   NotifyChanged;
 end;
@@ -734,12 +757,18 @@ begin
   NewRate := NormalizeFloatInput(EditFreqFlowRate.Text);
   if NewRate <= 0 then
   begin
-    EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate);
+    EditFreqFlowRate.Text := SafeFloatText(FDevice.FreqFlowRate);
+    Exit;
+  end;
+  if not IsValidFloat(NewRate) then
+  begin
+    EditFreqFlowRate.Text := SafeFloatText(FDevice.FreqFlowRate);
     Exit;
   end;
   if Abs(FDevice.FreqFlowRate - NewRate) < 1E-12 then Exit;
   FDevice.FreqFlowRate := NewRate;
-  if FDevice.FreqFlowRate > 0 then
+  if (FDevice.Freq > 0) and (FDevice.FreqFlowRate > 0) and
+     IsValidFloat(FDevice.FreqFlowRate) then
     FDevice.Coef := 3.6 * FDevice.Freq / FDevice.FreqFlowRate;
   NotifyChanged;
 end;
@@ -749,9 +778,9 @@ var NewCoef: Double;
 begin
   if FIsLoading or (FDevice = nil) then Exit;
   NewCoef := NormalizeFloatInput(EditCoef.Text);
-  if NewCoef <= 0 then
+  if (NewCoef <= 0) or not IsValidFloat(NewCoef) then
   begin
-    EditCoef.Text := FloatToStr(FDevice.Coef);
+    EditCoef.Text := SafeFloatText(FDevice.Coef);
     Exit;
   end;
   if Abs(FDevice.Coef - NewCoef) < 1E-12 then Exit;
