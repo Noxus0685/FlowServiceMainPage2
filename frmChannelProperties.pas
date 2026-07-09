@@ -444,7 +444,8 @@ begin
   LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
   LayoutRoot.Align := TAlignLayout.Client;
-  LayoutRoot.Padding.Rect := TRectF.Create(6, 6, 6, 6);
+  LayoutRoot.Padding.Rect := TRectF.Create(8, 8, 8, 8);
+  LayoutRoot.Stored := False;
 
 
   TreeInspector := TTreeView.Create(Self);
@@ -464,6 +465,7 @@ begin
   HeaderGrid.ColumnCollection.Add.Value := 45;
   HeaderGrid.ColumnCollection.Add.Value := 55;
   HeaderGrid.RowCollection.Add.Value := 100;
+  HeaderGrid.Stored := False;
 
   HeaderProperty := TLabel.Create(Self);
   HeaderProperty.Parent := HeaderGrid;
