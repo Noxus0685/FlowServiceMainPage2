@@ -4767,13 +4767,7 @@ end;
 
 procedure TWorkTable.DoStartTest;
 begin
-  if State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
-    ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
-      'Переход из режима монитора к измерению без промежуточной остановки', Name);
 
-  ResetMeasurementValues;
-  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
-    'Подготовка к запуску измерения. Очистка данных', Name);
 end;
 
 procedure TWorkTable.DoStopTest;
@@ -4841,9 +4835,6 @@ begin
 
   Time  := 0;
   TimeResult  := 0;
-
- // FActiveWorkTable.FlowRate   := 0;
-
 
   if TableFlow <> nil then
     TableFlow.Reset;
@@ -5103,7 +5094,15 @@ end;
 
 procedure TWorkTable.StartTest;
 begin
-  DoStartTest;
+  if State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
+      'Переход из режима монитора к измерению без промежуточной остановки', Name);
+
+  ResetMeasurementValues;
+
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
+    'Подготовка к запуску измерения. Данные очищены', Name);
+
   FireAction(awtStartTest, 'StartTest', 'Запрошен запуск измерения');
 end;
 
@@ -5126,7 +5125,10 @@ end;
 
 procedure TWorkTable.StartMeasurementRun;
 begin
-   // StartMeasurementRun(Integer(MeasurementMode));
+
+  ResetMeasurementValues;
+
+  RecalculateAllMeterValues;
 
   FMode := MeasurementMode;
   TMeasurementRun(FMeasurementRun).Mode := MeasurementMode;

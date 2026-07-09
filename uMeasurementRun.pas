@@ -680,7 +680,7 @@ begin
     msSave:
       Result := ANewStage in [msSelectPoint, msSetupPoint, msDone, msNone];
     msDone:
-      Result := ANewStage in [msNone, msSelectPoint];
+      Result := ANewStage in [msNone, msSelectPoint, msSetupPoint];
   end;
 end;
 

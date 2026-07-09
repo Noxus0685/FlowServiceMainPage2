@@ -1333,20 +1333,25 @@ begin
   case AWorkTable.Action of
     awtStartTest:
       begin
-        // Измерение должно запускаться из любого спокойного состояния, включая монитор.
-        // Монитор не является отдельной блокирующей операцией: команда старта измерения
-        // сразу переводит стол в штатную цепочку swtSTARTTEST -> swtSTARTWAIT -> swtEXECUTE.
-        AWorkTable.State := swtSTARTTEST;
+          //После очистки стола, обновляем форму.
+          UpdateForm;
       end;
 
     awtStopTest:
-      AWorkTable.State := swtSTOPTEST;
+         begin
+
+         end;
 
     awtStartMonitor:
-      AWorkTable.State := swtSTARTMONITOR;
+         begin
+           //После очистки стола, обновляем форму.
+          UpdateForm;
+         end;
 
     awtStopMonitor:
-      AWorkTable.State := swtSTOPMONITOR;
+          begin
+
+         end;
 
     awtSelectEtalons:
       begin

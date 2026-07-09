@@ -870,8 +870,6 @@ begin
 
 end;
 
-
-
 procedure TFlowMeter.SetMeterValue(var ATarget: TMeterValue; var ATargetHash: string; const AValue: TMeterValue);
 begin
   if ATarget = AValue then
@@ -2040,6 +2038,12 @@ begin
   ApplyReset(ValueMassFlow);
   ApplyReset(ValueTime, 0);
   ApplyReset(ValueImpTotal, 0);
+  ApplyReset(ValueCurrent, 0);
+  ApplyReset(ValueImp, 0);
+  ApplyReset(ValueQuantity, 0);
+  ApplyReset(ValueFlow, 0);
+
+
 end;
 
 procedure TFlowMeter.SetSendStatus(const AText: string);
