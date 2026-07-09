@@ -5135,16 +5135,6 @@ object FrameMainTable: TFrameMainTable
           Locked = True
           Text = '-'
         end
-        object MenuItemDevicesCopy: TMenuItem
-          Action = ActionDevicesCopy
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemDevicesPaste: TMenuItem
-          Action = ActionDevicesPaste
-          Locked = True
-          ImageIndex = -1
-        end
         object MenuItemDevicesFillAllBySelected: TMenuItem
           Action = ActionDevicesFillAllBySelected
           Locked = True
@@ -5177,6 +5167,16 @@ object FrameMainTable: TFrameMainTable
           Locked = True
           ImageIndex = -1
         end
+      end
+      object MenuItemDevicesCopy: TMenuItem
+        Action = ActionDevicesCopy
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemDevicesPaste: TMenuItem
+        Action = ActionDevicesPaste
+        Locked = True
+        ImageIndex = -1
       end
     end
     object PopupMenuEtalonsGrid: TPopupMenu
@@ -5403,16 +5403,6 @@ object FrameMainTable: TFrameMainTable
           Locked = True
           Text = '-'
         end
-        object MenuItemEtalonsCopy: TMenuItem
-          Action = ActionEtalonsCopy
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemEtalonsPaste: TMenuItem
-          Action = ActionEtalonsPaste
-          Locked = True
-          ImageIndex = -1
-        end
         object MenuItemEtalonsFillAllBySelected: TMenuItem
           Action = ActionEtalonsFillAllBySelected
           Locked = True
@@ -5445,6 +5435,16 @@ object FrameMainTable: TFrameMainTable
           Locked = True
           ImageIndex = -1
         end
+      end
+      object MenuItemEtalonsCopy: TMenuItem
+        Action = ActionEtalonsCopy
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsPaste: TMenuItem
+        Action = ActionEtalonsPaste
+        Locked = True
+        ImageIndex = -1
       end
     end
     object LayoutCenter: TLayout
