@@ -6790,9 +6790,12 @@ begin
   if (AWorkTable = nil) or (WorkTableManager = nil) then
     Exit;
 
-  Flow := AWorkTable.EtalonFlowSet;
-  if (Flow <= 0) and (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) then
-    Flow := AWorkTable.FlowRate.ValueSet.Value;
+  Flow := 0;
+  if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) and
+     (AWorkTable.FlowRate.ValueSet.Value > 0) then
+    Flow := AWorkTable.FlowRate.ValueSet.Value
+  else if AWorkTable.EtalonFlowSet > 0 then
+    Flow := AWorkTable.EtalonFlowSet * 3.6;
   if Flow <= 0 then
     Exit;
 
