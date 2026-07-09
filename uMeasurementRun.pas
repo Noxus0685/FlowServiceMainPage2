@@ -652,7 +652,15 @@ begin
   Result := False;
   case AOldStage of
     msNone:
-      Result := ANewStage in [msSelectPoint];
+      case FMode of
+        mrmManual:
+          Result := ANewStage = msSetupPoint;
+        mrmHalfAutomatic,
+        mrmAutomatic:
+          Result := ANewStage = msSelectPoint;
+      else
+        Result := False;
+      end;
     msSelectPoint:
       Result := ANewStage in [msSelectEtalon, msDone, msNone];
     msSelectEtalon:
@@ -800,6 +808,28 @@ var
   Error: TErrorInfo;
 begin
   Point := GetCurrentPoint;
+
+  if FMode = mrmManual then
+  begin
+    if Point = nil then
+    begin
+      FireEvent(mePointNotSet, BuildError(1200, 'В ручном режиме не задана текущая точка измерения'));
+      SetStage(msDone);
+      Exit;
+    end;
+
+    if not SetupMeasurement(Point, Error) then
+    begin
+      FireEvent(mePointNotSet, Error);
+      SetStage(msDone);
+      Exit;
+    end;
+
+    FireEvent(mePointSet);
+    SetStage(msWaitMeasureStart);
+    Exit;
+  end;
+
   if Point = nil then
   begin
     FireEvent(mePointNotSet, BuildError(1200, 'Текущая точка измерения не назначена'));
@@ -835,6 +865,12 @@ end;
 
 procedure TMeasurementRun.EnterWaitStable;
 begin
+  if FMode = mrmManual then
+  begin
+    SetStage(msWaitMeasureStart);
+    Exit;
+  end;
+
   if ShouldWaitStable and (FWorkTable <> nil) and
      not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
     FWorkTable.StartMonitor;
@@ -896,7 +932,7 @@ begin
   FireEvent(meSaveDone);
 
   RepeatsTarget := 1;
-  if Point <> nil then
+  if (FMode <> mrmManual) and (Point <> nil) then
     RepeatsTarget := Max(Point.Repeats, 1);
   Inc(FCurrentRepeat);
 
@@ -906,7 +942,10 @@ begin
       Point.Status := 9;   //Закончено
     FCurrentRepeat := 0;
     FireEvent(mePointDone);
-    FNextStageAfterSave := msSelectPoint;
+    if FMode = mrmManual then
+      FNextStageAfterSave := msDone
+    else
+      FNextStageAfterSave := msSelectPoint;
   end
   else
     FNextStageAfterSave := msSetupPoint;
@@ -960,6 +999,13 @@ end;
 function TMeasurementRun.GetCurrentPoint: TDevicePoint;
 begin
   Result := nil;
+  if FMode = mrmManual then
+  begin
+    if FWorkTable <> nil then
+      Result := FWorkTable.CurrentPoint;
+    Exit;
+  end;
+
   if (FCurrentPointIndex >= 0) and (FCurrentPointIndex < FPoints.Count) then
     Result := FPoints[FCurrentPointIndex];
 end;
@@ -1025,9 +1071,8 @@ begin
         CreateSessionPoints;
     mrmManual:
       begin
-        Point := CreateSingleSessionPoint(False);
-        if Point <> nil then
-          FPoints.Add(Point);
+        // Manual mode measures the current worktable point as-is.
+        // Do not create or select a session point here.
       end;
     mrmHalfAutomatic:
       begin
@@ -1059,7 +1104,7 @@ end;
 
 function TMeasurementRun.ShouldSelectEtalon: Boolean;
 begin
-  Result := True;
+  Result := FMode in [mrmHalfAutomatic, mrmAutomatic];
 end;
 
 function TMeasurementRun.CreateSingleSessionPoint(AWithConditions: Boolean): TDevicePoint;
@@ -1240,7 +1285,27 @@ begin
 
     FStopRequested := False;
     CreateSession;
-    if FPoints.Count = 0 then
+    if FWorkTable = nil then
+    begin
+      ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
+        'Измерение не запущено', 'Не задан рабочий стол');
+      FireEvent(meMeasureError, BuildError(1001, 'Не задан рабочий стол'));
+      if FCurrentStage <> msNone then
+        SetStage(msNone);
+      Exit;
+    end;
+
+    if (FMode = mrmManual) and (FWorkTable.CurrentPoint = nil) then
+    begin
+      ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
+        'Измерение не запущено', 'В ручном режиме не задана текущая точка измерения');
+      FireEvent(mePointNotSet, BuildError(1002, 'В ручном режиме не задана текущая точка измерения'));
+      if FCurrentStage <> msNone then
+        SetStage(msNone);
+      Exit;
+    end;
+
+    if (FMode <> mrmManual) and (FPoints.Count = 0) then
     begin
       ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
         'Измерение не запущено', 'Нет точек измерения');
@@ -1276,7 +1341,13 @@ begin
       end);
     FThread.FreeOnTerminate := False;
     FThread.Start;
-    SetStage(msSelectPoint);
+    case FMode of
+      mrmManual:
+        SetStage(msSetupPoint);
+      mrmHalfAutomatic,
+      mrmAutomatic:
+        SetStage(msSelectPoint);
+    end;
     if not FStopRequested then
       FireEvent(meStarted);
   finally
@@ -1598,6 +1669,11 @@ begin
 end;
 
 function TMeasurementRun.SetupMeasurement(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+var
+  LimitTime: Double;
+  LimitImp: Int64;
+  LimitVolume: Double;
+  StopCriteria: TSpillageStopCriteria;
 begin
   Result := False;
   AError := TErrorInfo.Empty(Integer(FCurrentStage));
@@ -1608,29 +1684,29 @@ begin
     Exit;
   end;
 
+  LimitTime := APoint.LimitTime;
+  LimitImp := APoint.LimitImp;
+  LimitVolume := APoint.LimitVolume;
+  StopCriteria := APoint.StopCriteria;
+
   if FWorkTable.CurrentPoint <> nil then
   begin
     FWorkTable.CurrentPoint.LimitTime := -1;
     FWorkTable.CurrentPoint.LimitImp := -1;
     FWorkTable.CurrentPoint.LimitVolume := -1;
     FWorkTable.CurrentPoint.StopCriteria := [];
+
+    if (scTime in StopCriteria) and (LimitTime > 0) then
+      FWorkTable.CurrentPoint.LimitTime := Round(LimitTime);
+
+    if (scVolume in StopCriteria) and (LimitVolume > 0) then
+      FWorkTable.CurrentPoint.LimitVolume := LimitVolume;
+
+    if (scImpulse in StopCriteria) and (LimitImp > 0) then
+      FWorkTable.CurrentPoint.LimitImp := LimitImp;
+
+    FWorkTable.CurrentPoint.StopCriteria := StopCriteria;
   end;
-
-      if (scTime in APoint.StopCriteria) and (FWorkTable.CurrentPoint <> nil) then
-       if APoint.LimitTime > 0 then
-    FWorkTable.CurrentPoint.LimitTime := Round(APoint.LimitTime);
-
-      if (scVolume in APoint.StopCriteria) and (FWorkTable.CurrentPoint <> nil) then
-        if APoint.LimitVolume > 0 then
-    FWorkTable.CurrentPoint.LimitVolume := APoint.LimitVolume;
-
-    if (scImpulse in APoint.StopCriteria) and (FWorkTable.CurrentPoint <> nil) then
-      if APoint.LimitImp > 0 then
-    FWorkTable.CurrentPoint.LimitImp := APoint.LimitImp;
-
-    if FWorkTable.CurrentPoint <> nil then
-      FWorkTable.CurrentPoint.StopCriteria := APoint.StopCriteria;
-
 
   Result := True;
 end;
@@ -1678,6 +1754,12 @@ var
   Point: TDevicePoint;
   StableInfo: RStableInfo;
 begin
+  if FMode = mrmManual then
+  begin
+    SetStage(msWaitMeasureStart);
+    Exit;
+  end;
+
   Point := GetCurrentPoint;
   if Point = nil then
   begin
