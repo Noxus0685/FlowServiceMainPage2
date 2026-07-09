@@ -6268,7 +6268,7 @@ var
   EtalonFlowActual: Double;
   ChannelCoef: Double;
   TargetImpSec: Double;
-  CurrentFlow: Double;
+  CurrentFlow,GroupKey: Double;
   DeviceReady: Boolean;
   GroupChannelCount: Integer;
   DeviceFlow: Double;
