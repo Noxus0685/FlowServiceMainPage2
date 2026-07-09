@@ -78,9 +78,6 @@ type
     LabelBaudRate: TLabel;
     LabelParity: TLabel;
     LabelVisualInputType: TLabel;
-    LabelVisualValue1: TLabel;
-    LabelVisualView: TLabel;
-    LabelVisualValue2: TLabel;
 
     ComboBoxFrequencyOutputSet: TComboBox;
     EditFrequency: TEdit;
@@ -100,9 +97,6 @@ type
     ComboBoxBaudRate: TComboBox;
     ComboBoxParity: TComboBox;
     ComboBoxVisualInputType: TComboBox;
-    EditVisualValue1: TEdit;
-    ComboBoxVisualView: TComboBox;
-    EditVisualValue2: TEdit;
 
     procedure BuildUI;
     procedure UpdateHeaders;
@@ -321,11 +315,7 @@ begin
   LabelParity := AddPropertyRow(CategoryOutputSettings, 'Чётность', ComboBoxParity);
 
   ComboBoxVisualInputType := TComboBox.Create(Self); ComboBoxVisualInputType.Items.Add('Ручной'); ComboBoxVisualInputType.Items.Add('Фотофиксация'); ComboBoxVisualInputType.OnChange := ComboBoxVisualInputTypeChange;
-  LabelVisualInputType := AddPropertyRow(CategoryOutputSettings, 'Тип ввода', ComboBoxVisualInputType);
-  EditVisualValue1 := TEdit.Create(Self); LabelVisualValue1 := AddPropertyRow(CategoryOutputSettings, 'Параметр 1', EditVisualValue1);
-  ComboBoxVisualView := TComboBox.Create(Self); ComboBoxVisualView.Items.Assign(ComboBoxFrequencyView.Items); ComboBoxVisualView.OnChange := DimensionCoefChange;
-  LabelVisualView := AddPropertyRow(CategoryOutputSettings, 'Представление', ComboBoxVisualView);
-  EditVisualValue2 := TEdit.Create(Self); LabelVisualValue2 := AddPropertyRow(CategoryOutputSettings, 'Параметр 2', EditVisualValue2);
+  LabelVisualInputType := AddPropertyRow(CategoryOutputSettings, 'Режим ввода', ComboBoxVisualInputType);
 end;
 
 function TFrameFlowMeterProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -692,7 +682,6 @@ begin
   if FDevice.Freq > 0 then EditFrequency.Text := IntToStr(FDevice.Freq) else EditFrequency.Text := '';
   ComboBoxFrequencyView.ItemIndex := FDevice.DimensionCoef;
   ComboBoxImpulseCoefView.ItemIndex := FDevice.DimensionCoef;
-  ComboBoxVisualView.ItemIndex := FDevice.DimensionCoef;
   if FDevice.FreqFlowRate > 0 then EditFrequencyFlowRate.Text := FloatToStr(FDevice.FreqFlowRate) else EditFrequencyFlowRate.Text := '';
   if DisplayedCoef > 0 then EditImpulseCoef.Text := FormatFloat('0.########', DisplayedCoef) else EditImpulseCoef.Text := '';
   if (FDevice.VoltageRange >= 0) and (FDevice.VoltageRange < ComboBoxVoltageRange.Items.Count) then
@@ -720,8 +709,6 @@ begin
     ComboBoxVisualInputType.ItemIndex := FDevice.InputType
   else
     ComboBoxVisualInputType.ItemIndex := -1;
-  EditVisualValue1.Text := '';
-  EditVisualValue2.Text := '';
 end;
 
 procedure TFrameFlowMeterProperties.UpdateOutputSettingsVisibility;
@@ -747,9 +734,6 @@ begin
   SetPropertyRowVisible(LabelBaudRate, OutputType = Ord(otInterface));
   SetPropertyRowVisible(LabelParity, OutputType = Ord(otInterface));
   SetPropertyRowVisible(LabelVisualInputType, OutputType = Ord(otVisual));
-  SetPropertyRowVisible(LabelVisualValue1, OutputType = Ord(otVisual));
-  SetPropertyRowVisible(LabelVisualView, OutputType = Ord(otVisual));
-  SetPropertyRowVisible(LabelVisualValue2, OutputType = Ord(otVisual));
   Realign;
 end;
 
