@@ -630,6 +630,7 @@ begin
   if AChannels = nil then
     Exit;
 
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
@@ -825,7 +826,15 @@ begin
       EtalonFlowActual := Max(EtalonFlowActual, CurrentFlow);
     end;
   if EtalonFlowActual <= 0 then
-    EtalonFlowActual := EtalonFlowSet;
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if (AWorkTable.EtalonChannels[I] <> nil) and
+         AWorkTable.EtalonChannels[I].Enabled then
+      begin
+        ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+        if ChannelCoef > 0 then
+          EtalonFlowActual := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+        Break;
+      end;
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin

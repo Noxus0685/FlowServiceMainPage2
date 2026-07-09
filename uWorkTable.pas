@@ -6366,7 +6366,27 @@ begin
       EtalonFlowActual := Max(EtalonFlowActual, CurrentFlow);
     end;
   if EtalonFlowActual <= 0 then
-    EtalonFlowActual := EtalonFlowSet;
+  begin
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if (AWorkTable.EtalonChannels[I] <> nil) and
+         AWorkTable.EtalonChannels[I].Enabled then
+      begin
+        CurrentFlow := 0;
+        for J := 0 to AWorkTable.EtalonChannels.Count - 1 do
+          if (AWorkTable.EtalonChannels[J] <> nil) and
+             AWorkTable.EtalonChannels[J].Enabled and
+             (((AWorkTable.EtalonChannels[I].Group > 0) and
+               (AWorkTable.EtalonChannels[J].Group = AWorkTable.EtalonChannels[I].Group)) or
+              ((AWorkTable.EtalonChannels[I].Group <= 0) and (J = I))) then
+          begin
+            ChannelCoef := GetSignalChannelFlowCoef(AWorkTable.EtalonChannels[J]);
+            if ChannelCoef > 0 then
+              CurrentFlow := CurrentFlow + AWorkTable.EtalonChannels[J].ImpSec / ChannelCoef;
+          end;
+
+        EtalonFlowActual := Max(EtalonFlowActual, CurrentFlow);
+      end;
+  end;
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
