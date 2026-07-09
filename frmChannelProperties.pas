@@ -36,6 +36,10 @@ type
     EditChannelText: TEdit;
     EditChannelName: TEdit;
     EditChannelGroup: TEdit;
+    EditQMaxWork: TEdit;
+    EditQMinWork: TEdit;
+    EditVMaxWork: TEdit;
+    EditVMinWork: TEdit;
     ComboChannelType: TComboBox;
     ComboOutputSet: TComboBox;
     ComboSyncMode: TComboBox;
@@ -59,6 +63,10 @@ type
     procedure HandleChannelTextExit(Sender: TObject);
     procedure HandleChannelNameExit(Sender: TObject);
     procedure HandleChannelGroupExit(Sender: TObject);
+    procedure HandleQMaxWorkExit(Sender: TObject);
+    procedure HandleQMinWorkExit(Sender: TObject);
+    procedure HandleVMaxWorkExit(Sender: TObject);
+    procedure HandleVMinWorkExit(Sender: TObject);
     procedure HandleOutputSetChange(Sender: TObject);
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
@@ -254,6 +262,63 @@ begin
   NotifyWorkTableRefreshIfChanged(Changed);
 end;
 
+
+procedure TFrameChannelProperties.HandleQMaxWorkExit(Sender: TObject);
+var
+  NewValue: Double;
+  Changed: Boolean;
+begin
+  if FLoading or (FChannel = nil) then
+    Exit;
+  NewValue := NormalizeFloatInput(EditQMaxWork.Text);
+  Changed := FChannel.QMaxWork <> NewValue;
+  FChannel.QMaxWork := NewValue;
+  EditQMaxWork.Text := FloatToStr(NewValue);
+  NotifyWorkTableRefreshIfChanged(Changed);
+end;
+
+procedure TFrameChannelProperties.HandleQMinWorkExit(Sender: TObject);
+var
+  NewValue: Double;
+  Changed: Boolean;
+begin
+  if FLoading or (FChannel = nil) then
+    Exit;
+  NewValue := NormalizeFloatInput(EditQMinWork.Text);
+  Changed := FChannel.QMinWork <> NewValue;
+  FChannel.QMinWork := NewValue;
+  EditQMinWork.Text := FloatToStr(NewValue);
+  NotifyWorkTableRefreshIfChanged(Changed);
+end;
+
+procedure TFrameChannelProperties.HandleVMaxWorkExit(Sender: TObject);
+var
+  NewValue: Double;
+  Changed: Boolean;
+begin
+  if FLoading or (FChannel = nil) then
+    Exit;
+  NewValue := NormalizeFloatInput(EditVMaxWork.Text);
+  Changed := FChannel.VMaxWork <> NewValue;
+  FChannel.VMaxWork := NewValue;
+  EditVMaxWork.Text := FloatToStr(NewValue);
+  NotifyWorkTableRefreshIfChanged(Changed);
+end;
+
+procedure TFrameChannelProperties.HandleVMinWorkExit(Sender: TObject);
+var
+  NewValue: Double;
+  Changed: Boolean;
+begin
+  if FLoading or (FChannel = nil) then
+    Exit;
+  NewValue := NormalizeFloatInput(EditVMinWork.Text);
+  Changed := FChannel.VMinWork <> NewValue;
+  FChannel.VMinWork := NewValue;
+  EditVMinWork.Text := FloatToStr(NewValue);
+  NotifyWorkTableRefreshIfChanged(Changed);
+end;
+
 procedure TFrameChannelProperties.HandleOutputSetChange(Sender: TObject);
 var
   NewValue: EOutPutSet;
@@ -337,6 +402,10 @@ begin
       ComboSyncMode.ItemIndex := -1;
       ComboNoiseFilter.ItemIndex := -1;
       LabelChannelHash.Text := '';
+      EditQMaxWork.Text := '';
+      EditQMinWork.Text := '';
+      EditVMaxWork.Text := '';
+      EditVMinWork.Text := '';
       Exit;
     end;
 
@@ -354,6 +423,10 @@ begin
     ComboNoiseFilter.ItemIndex := ComboNoiseFilter.Items.IndexOf(NoiseFilterToStr(AChannel.NoiseFilter));
 
     LabelChannelHash.Text := AChannel.UUID;
+    EditQMaxWork.Text := FloatToStr(AChannel.QMaxWork);
+    EditQMinWork.Text := FloatToStr(AChannel.QMinWork);
+    EditVMaxWork.Text := FloatToStr(AChannel.VMaxWork);
+    EditVMinWork.Text := FloatToStr(AChannel.VMinWork);
   finally
     FLoading := False;
     RefreshRegisterColors;
@@ -366,6 +439,7 @@ var
   CategoryFreqPulse: TTreeViewItem;
   CategoryAnalogCurrent: TTreeViewItem;
   CategoryAnalogVoltage: TTreeViewItem;
+  CategoryRanges: TTreeViewItem;
 begin
   LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
@@ -423,6 +497,27 @@ begin
 
   ComboChannelType := CreateComboBox(['Не задан', 'Частотный', 'Импульсный', 'Токовый', 'Напряжение']);
   AddPropertyRow(CategoryGeneral, 'Тип канала', ComboChannelType);
+
+  CategoryRanges := AddCategory('Рабочие диапазоны');
+  EditQMaxWork := TEdit.Create(Self);
+  AddPropertyRow(CategoryRanges, 'Q макс раб, м³/ч', EditQMaxWork);
+  EditQMaxWork.KillFocusByReturn := True;
+  EditQMaxWork.OnExit := HandleQMaxWorkExit;
+
+  EditQMinWork := TEdit.Create(Self);
+  AddPropertyRow(CategoryRanges, 'Q мин раб, м³/ч', EditQMinWork);
+  EditQMinWork.KillFocusByReturn := True;
+  EditQMinWork.OnExit := HandleQMinWorkExit;
+
+  EditVMaxWork := TEdit.Create(Self);
+  AddPropertyRow(CategoryRanges, 'V макс раб, м³', EditVMaxWork);
+  EditVMaxWork.KillFocusByReturn := True;
+  EditVMaxWork.OnExit := HandleVMaxWorkExit;
+
+  EditVMinWork := TEdit.Create(Self);
+  AddPropertyRow(CategoryRanges, 'V мин раб, м³', EditVMinWork);
+  EditVMinWork.KillFocusByReturn := True;
+  EditVMinWork.OnExit := HandleVMinWorkExit;
 
   LabelChannelHash := TLabel.Create(Self);
   LabelChannelHash.StyledSettings := [];
