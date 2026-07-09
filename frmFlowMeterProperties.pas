@@ -387,7 +387,8 @@ end;
 procedure TFrameFlowMeterProperties.ApplyOutputType;
 begin
   if CategoryFrequency <> nil then
-    CategoryFrequency.Visible := True;
+    CategoryFrequency.Visible := (FFlowMeter = nil) or
+      (GetActiveOutputType = Ord(otFrequency));
 
   if (LabelFreqFlowRate <> nil) and (FFlowMeter <> nil) then
     LabelFreqFlowRate.Text := 'Расход, QF, ' + GetFlowDimName;
