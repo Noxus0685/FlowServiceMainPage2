@@ -5913,15 +5913,13 @@ begin
       Continue;
     end;
 
-    if ASplitByQmax or ASplitByEnabledGroup then
+    if ASplitByEnabledGroup then
     begin
       GroupKey := AChannels[I].Group;
       SUM := 0;
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
-           (((ASplitByEnabledGroup) and (AChannels[J].Group = GroupKey)) or
-            ((not ASplitByEnabledGroup) and (GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
-            ((not ASplitByEnabledGroup) and (GroupKey <= 0) and (J = I))) then
+           (AChannels[J].Group = GroupKey) then
           SUM := SUM + 1;
 
       if SUM > 0 then
@@ -6280,21 +6278,6 @@ var
         Inc(Result);
   end;
 
-  function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup: Integer): Integer;
-  var
-    K: Integer;
-  begin
-    Result := 0;
-    if AChannels = nil then
-      Exit;
-
-    for K := 0 to AChannels.Count - 1 do
-      if (AChannels[K] <> nil) and AChannels[K].Enabled and
-         (((AGroup > 0) and (AChannels[K].Group = AGroup)) or
-          ((AGroup <= 0) and (AChannels[K].Group <= 0))) then
-        Inc(Result);
-  end;
-
   function GetSignalChannelFlowCoef(const AChannel: TChannel): Double;
   begin
     Result := 0.0;
@@ -6362,7 +6345,26 @@ begin
 
   end;
 
-  EtalonFlowActual := EtalonFlowSet;
+  EtalonFlowActual := 0;
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if AWorkTable.EtalonChannels[I] <> nil then
+    begin
+      CurrentFlow := 0;
+      for J := 0 to AWorkTable.EtalonChannels.Count - 1 do
+        if (AWorkTable.EtalonChannels[J] <> nil) and
+           (((AWorkTable.EtalonChannels[I].Group > 0) and
+             (AWorkTable.EtalonChannels[J].Group = AWorkTable.EtalonChannels[I].Group)) or
+            ((AWorkTable.EtalonChannels[I].Group <= 0) and (J = I))) then
+        begin
+          ChannelCoef := GetSignalChannelFlowCoef(AWorkTable.EtalonChannels[J]);
+          if AWorkTable.EtalonChannels[J].Enabled and (ChannelCoef > 0) then
+            CurrentFlow := CurrentFlow + AWorkTable.EtalonChannels[J].ImpSec / ChannelCoef
+          else if not AWorkTable.EtalonChannels[J].Enabled then
+            CurrentFlow := CurrentFlow + EtalonFlowSet;
+        end;
+
+      EtalonFlowActual := Max(EtalonFlowActual, CurrentFlow);
+    end;
   if EtalonFlowActual <= 0 then
   begin
     for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
