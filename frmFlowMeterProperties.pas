@@ -479,42 +479,46 @@ end;
 
 function TFrameFlowMeterProperties.GetActiveOutputType: Integer;
 begin
-  if (FChannel <> nil) and (FChannel.Signal = Ord(otFrequency)) then
-    Exit(Ord(otFrequency));
+  if (FChannel <> nil) and (FChannel.Signal <> Ord(otUnknown)) then
+    Exit(FChannel.Signal);
 
-  if (FFlowMeter <> nil) and (FFlowMeter.Device <> nil) and
-     (FFlowMeter.Device.OutputType = Ord(otFrequency)) then
-    Exit(Ord(otFrequency));
+  if (FFlowMeter <> nil) and (FFlowMeter.OutputType <> Ord(otUnknown)) then
+    Exit(FFlowMeter.OutputType);
 
-  if FChannel <> nil then
-    Result := FChannel.Signal
-  else if FFlowMeter <> nil then
-    Result := FFlowMeter.OutputType
+  if (FFlowMeter <> nil) and (FFlowMeter.Device <> nil) then
+    Result := FFlowMeter.Device.OutputType
   else
     Result := Ord(otUnknown);
-
-  if (Result = Ord(otUnknown)) and (FFlowMeter <> nil) and
-     (FFlowMeter.Device <> nil) then
-    Result := FFlowMeter.Device.OutputType;
 end;
 
 procedure TFrameFlowMeterProperties.ApplyOutputType;
+var
+  OutputType: Integer;
 begin
+  if (ComboOutputType <> nil) and (ComboOutputType.ItemIndex >= 0) then
+    OutputType := GetOutputTypeByIndex(ComboOutputType.ItemIndex)
+  else
+    OutputType := GetActiveOutputType;
+
   if CategoryFrequency <> nil then
-    CategoryFrequency.Visible := GetActiveOutputType = Ord(otFrequency);
+    CategoryFrequency.Visible := OutputType = Ord(otFrequency);
   if CategoryImpulse <> nil then
-    CategoryImpulse.Visible := GetActiveOutputType = Ord(otImpulse);
+    CategoryImpulse.Visible := OutputType = Ord(otImpulse);
   if CategoryVoltage <> nil then
-    CategoryVoltage.Visible := GetActiveOutputType = Ord(otVoltage);
+    CategoryVoltage.Visible := OutputType = Ord(otVoltage);
   if CategoryCurrent <> nil then
-    CategoryCurrent.Visible := GetActiveOutputType = Ord(otCurrent);
+    CategoryCurrent.Visible := OutputType = Ord(otCurrent);
   if CategoryInterface <> nil then
-    CategoryInterface.Visible := GetActiveOutputType = Ord(otInterface);
+    CategoryInterface.Visible := OutputType = Ord(otInterface);
   if CategoryVisual <> nil then
-    CategoryVisual.Visible := GetActiveOutputType = Ord(otVisual);
+    CategoryVisual.Visible := OutputType = Ord(otVisual);
 
   if (LabelFreqFlowRate <> nil) and (FFlowMeter <> nil) then
     LabelFreqFlowRate.Text := 'Расход, QF, ' + GetFlowDimName;
+
+  if TreeInspector <> nil then
+    TreeInspector.Repaint;
+  Repaint;
 end;
 
 procedure TFrameFlowMeterProperties.UpdateControls;
