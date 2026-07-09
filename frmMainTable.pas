@@ -666,6 +666,7 @@ type
     function GetNewInstrumentName: string;
     procedure ClearChannelSimulationValues(AChannel: TChannel);
     procedure DisableOtherChannelGroups(AChannels: TObjectList<TChannel>; const AActiveIndex: Integer);
+    procedure ApplyEnabledChannelSimulationValues(AWorkTable: TWorkTable; const AEtalonChannels: Boolean);
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
     procedure EnsureActiveWorkTableMenu;
@@ -6017,7 +6018,10 @@ begin
     begin
       WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled;
       if WorkTable.DeviceChannels[Row].Enabled then
-        DisableOtherChannelGroups(WorkTable.DeviceChannels, Row)
+        begin
+          DisableOtherChannelGroups(WorkTable.DeviceChannels, Row);
+          ApplyEnabledChannelSimulationValues(WorkTable, False);
+        end
       else
         ClearChannelSimulationValues(WorkTable.DeviceChannels[Row]);
       MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
@@ -6504,7 +6508,10 @@ begin
       try
         WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
         if WorkTable.DeviceChannels[ARow].Enabled then
-          DisableOtherChannelGroups(WorkTable.DeviceChannels, ARow)
+          begin
+            DisableOtherChannelGroups(WorkTable.DeviceChannels, ARow);
+            ApplyEnabledChannelSimulationValues(WorkTable, False);
+          end
         else
           ClearChannelSimulationValues(WorkTable.DeviceChannels[ARow]);
       finally
@@ -6613,7 +6620,10 @@ begin
     begin
       WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
       if WorkTable.EtalonChannels[Row].Enabled then
-        DisableOtherChannelGroups(WorkTable.EtalonChannels, Row)
+        begin
+          DisableOtherChannelGroups(WorkTable.EtalonChannels, Row);
+          ApplyEnabledChannelSimulationValues(WorkTable, True);
+        end
       else
         ClearChannelSimulationValues(WorkTable.EtalonChannels[Row]);
       MarkChannelDeviceModified(WorkTable.EtalonChannels[Row]);
@@ -6771,6 +6781,34 @@ begin
     end;
 end;
 
+
+procedure TFrameMainTable.ApplyEnabledChannelSimulationValues(AWorkTable: TWorkTable; const AEtalonChannels: Boolean);
+var
+  Flow: Double;
+  ImpSecValues: TArray<Double>;
+begin
+  if (AWorkTable = nil) or (WorkTableManager = nil) then
+    Exit;
+
+  Flow := AWorkTable.EtalonFlowSet;
+  if (Flow <= 0) and (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) then
+    Flow := AWorkTable.FlowRate.ValueSet.Value;
+  if Flow <= 0 then
+    Exit;
+
+  if AEtalonChannels then
+  begin
+    ImpSecValues := WorkTableManager.BuildImpSecValuesForChannels(AWorkTable,
+      AWorkTable.EtalonChannels, Flow, 0, True, False);
+    AWorkTable.ApplyChannelValues(AWorkTable.EtalonChannels, 0, ImpSecValues, 0);
+  end
+  else
+  begin
+    ImpSecValues := WorkTableManager.BuildImpSecValuesForChannels(AWorkTable,
+      AWorkTable.DeviceChannels, Flow, 0, False, True);
+    AWorkTable.ApplyChannelValues(AWorkTable.DeviceChannels, 0, ImpSecValues, 0);
+  end;
+end;
 procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
   const Column: TColumn; const Bounds: TRectF; const Row: Integer;
   const Value: TValue; const State: TGridDrawStates);
@@ -7105,7 +7143,10 @@ begin
       try
         WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
         if WorkTable.EtalonChannels[ARow].Enabled then
-          DisableOtherChannelGroups(WorkTable.EtalonChannels, ARow)
+          begin
+            DisableOtherChannelGroups(WorkTable.EtalonChannels, ARow);
+            ApplyEnabledChannelSimulationValues(WorkTable, True);
+          end
         else
           ClearChannelSimulationValues(WorkTable.EtalonChannels[ARow]);
       finally
