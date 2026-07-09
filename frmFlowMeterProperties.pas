@@ -20,7 +20,8 @@ uses
   System.UITypes,
   System.Variants,
   uClasses,
-  uFlowMeter;
+  uFlowMeter,
+  uWorkTable;
 
 type
   TFrameFlowMeterProperties = class(TFrame)
