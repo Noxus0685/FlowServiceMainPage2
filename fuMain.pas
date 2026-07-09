@@ -14,7 +14,7 @@ uses
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
-  FMX.EditBox, FMX.SpinBox,UnitParameter;
+  FMX.EditBox, FMX.SpinBox, UnitParameter, uProtocols;
 
 type
   TFormMain = class(TForm)
@@ -762,6 +762,8 @@ var
   TargetImpSec: Double;
   CurrentFlow: Double;
   DeviceReady: Boolean;
+  GroupChannelCount: Integer;
+  DeviceFlow: Double;
 
   function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup: Integer): Integer;
   var
@@ -773,8 +775,7 @@ var
 
     for K := 0 to AChannels.Count - 1 do
       if (AChannels[K] <> nil) and AChannels[K].Enabled and
-         (((AGroup > 0) and (AChannels[K].Group = AGroup)) or
-          ((AGroup <= 0) and (AChannels[K].Group <= 0))) then
+         (AChannels[K].Group = AGroup) then
         Inc(Result);
   end;
 begin
@@ -865,9 +866,17 @@ begin
       else if not DeviceReady then
       begin
         ChannelCoef := GetChannelFlowCoef(Channel);
-        TargetImpSec := EtalonFlowActual * ChannelCoef;
-        if Channel.Group > 0 then
-          TargetImpSec := TargetImpSec / Max(GetEnabledGroupCount(AWorkTable.DeviceChannels, Channel.Group), 1);
+        GroupChannelCount := GetEnabledGroupCount(AWorkTable.DeviceChannels, Channel.Group);
+        if GroupChannelCount > 0 then
+          DeviceFlow := EtalonFlowActual / GroupChannelCount
+        else
+          DeviceFlow := 0;
+        if ProtocolManager <> nil then
+          ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceFlowSimulation',
+            'Device flow distribution',
+            Format('Device=%d Group=%d EnabledCount=%d LineFlow=%.3f DeviceFlow=%.3f',
+              [I, Channel.Group, GroupChannelCount, EtalonFlowSet, DeviceFlow]));
+        TargetImpSec := DeviceFlow * ChannelCoef;
         if TargetImpSec > 0 then
         begin
           MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.003, 0.1, 10.0);

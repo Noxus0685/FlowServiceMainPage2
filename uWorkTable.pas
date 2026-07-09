@@ -5919,8 +5919,9 @@ begin
       SUM := 0;
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
-           (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
-            ((GroupKey <= 0) and (J = I))) then
+           (((ASplitByEnabledGroup) and (AChannels[J].Group = GroupKey)) or
+            ((not ASplitByEnabledGroup) and (GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
+            ((not ASplitByEnabledGroup) and (GroupKey <= 0) and (J = I))) then
           SUM := SUM + 1;
 
       if SUM > 0 then
@@ -6262,6 +6263,22 @@ var
   TargetImpSec: Double;
   CurrentFlow: Double;
   DeviceReady: Boolean;
+  GroupChannelCount: Integer;
+  DeviceFlow: Double;
+
+  function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup: Integer): Integer;
+  var
+    K: Integer;
+  begin
+    Result := 0;
+    if AChannels = nil then
+      Exit;
+
+    for K := 0 to AChannels.Count - 1 do
+      if (AChannels[K] <> nil) and AChannels[K].Enabled and
+         (AChannels[K].Group = AGroup) then
+        Inc(Result);
+  end;
 
   function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup: Integer): Integer;
   var
@@ -6391,9 +6408,17 @@ begin
       else if not DeviceReady then
       begin
         ChannelCoef := GetSignalChannelFlowCoef(Channel);
-        TargetImpSec := EtalonFlowActual * ChannelCoef;
-        if Channel.Group > 0 then
-          TargetImpSec := TargetImpSec / Max(GetEnabledGroupCount(AWorkTable.DeviceChannels, Channel.Group), 1);
+        GroupChannelCount := GetEnabledGroupCount(AWorkTable.DeviceChannels, Channel.Group);
+        if GroupChannelCount > 0 then
+          DeviceFlow := EtalonFlowActual / GroupChannelCount
+        else
+          DeviceFlow := 0;
+        if ProtocolManager <> nil then
+          ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceFlowSimulation',
+            'Device flow distribution',
+            Format('Device=%d Group=%d EnabledCount=%d LineFlow=%.3f DeviceFlow=%.3f',
+              [I, Channel.Group, GroupChannelCount, EtalonFlowSet, DeviceFlow]));
+        TargetImpSec := DeviceFlow * ChannelCoef;
         if TargetImpSec > 0 then
         begin
           MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.01, 0.1, 10.0);
