@@ -1007,9 +1007,9 @@ begin
 
   FFlowMeterPropertiesChannel := Channel;
   if Channel <> nil then
-    FFrameFlowMeterProperties.FlowMeter := Channel.FlowMeter
+    FFrameFlowMeterProperties.Channel := Channel
   else
-    FFrameFlowMeterProperties.FlowMeter := nil;
+    FFrameFlowMeterProperties.Channel := nil;
 end;
 
 procedure TFrameMainTable.FlowMeterPropertiesChanged(Sender: TObject);
@@ -1040,7 +1040,6 @@ begin
   begin
     AChannel.TypeName := AChannel.FlowMeter.DeviceTypeName;
     AChannel.Serial := AChannel.FlowMeter.SerialNumber;
-    AChannel.Signal := AChannel.FlowMeter.OutputType;
     MarkChannelDeviceModified(AChannel);
     SyncChannelsWithSameDeviceUUID(AChannel, AChannel.DeviceUUID);
   end;
@@ -1055,7 +1054,7 @@ begin
     begin
       FFlowMeterPropertiesChannel := AChannel;
       if FFrameFlowMeterProperties <> nil then
-        FFrameFlowMeterProperties.FlowMeter := AChannel.FlowMeter;
+        FFrameFlowMeterProperties.Channel := AChannel;
       if FFrameChannelProperties <> nil then
         FFrameChannelProperties.LoadFromChannel(AChannel);
     end;
