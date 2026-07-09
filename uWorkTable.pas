@@ -1369,7 +1369,7 @@ begin
 
   RecreateFlowMeter(AWorkTable);
 
-  FFlowMeter.UUID := ASource.FFlowMeter.UUID;
+  FFlowMeter.UUID := TGUID.NewGuid.ToString;
   FFlowMeter.Name := ASource.FFlowMeter.Name;
   FFlowMeter.DeviceUUID := ASource.FFlowMeter.DeviceUUID;
   FFlowMeter.DeviceTypeName := ASource.FFlowMeter.DeviceTypeName;
@@ -1430,6 +1430,8 @@ begin
   if ACloneDeviceToRepo and (SrcDevice <> nil) and (DataManager <> nil) and (DataManager.ActiveDeviceRepo <> nil) then
   begin
     NewDevice := DataManager.ActiveDeviceRepo.CreateDevice(SrcDevice);
+    NewDevice.UUID := TGUID.NewGuid.ToString;
+    NewDevice.SerialNumber := SrcDevice.SerialNumber;
     FFlowMeter.Device := NewDevice;
   end
   else if SrcDevice <> nil then
