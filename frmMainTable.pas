@@ -1331,6 +1331,23 @@ begin
     Exit;
 
   case AWorkTable.Action of
+    awtStartTest:
+      begin
+        // Измерение должно запускаться из любого спокойного состояния, включая монитор.
+        // Монитор не является отдельной блокирующей операцией: команда старта измерения
+        // сразу переводит стол в штатную цепочку swtSTARTTEST -> swtSTARTWAIT -> swtEXECUTE.
+        AWorkTable.State := swtSTARTTEST;
+      end;
+
+    awtStopTest:
+      AWorkTable.State := swtSTOPTEST;
+
+    awtStartMonitor:
+      AWorkTable.State := swtSTARTMONITOR;
+
+    awtStopMonitor:
+      AWorkTable.State := swtSTOPMONITOR;
+
     awtSelectEtalons:
       begin
         // Доменное действие уже выполнено в TWorkTable.SelectEtalons.
@@ -5661,7 +5678,13 @@ begin
   Run := MeasurementRun;
   CanStart :=
     (FActiveWorkTable <> nil) and
-    (FActiveWorkTable.State in [swtCONNECTED, swtCOMPLETE]);
+    (FActiveWorkTable.State in [
+      swtCONNECTED,
+      swtCOMPLETE,
+      swtSTARTMONITOR,
+      swtSTARTMONITORWAIT,
+      swtMONITOR
+    ]);
 
   if (FActiveWorkTable <> nil) and (FActiveWorkTable.State = swtFAILURE) then
   begin
