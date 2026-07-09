@@ -698,7 +698,8 @@ begin
   EditCurrentQMax.Text := FloatToStr(FDevice.CurrentQmaxRate);
   Idx := ComboBoxProtocol.Items.IndexOf(FDevice.ProtocolName);
   ComboBoxProtocol.ItemIndex := Idx;
-  ComboBoxProtocol.Text := FDevice.ProtocolName;
+  ComboBoxProtocol.ItemIndex :=
+  ComboBoxProtocol.Items.IndexOf(FDevice.ProtocolName);
   EditDeviceAddress.Text := IntToStr(FDevice.DeviceAddress);
   ComboBoxBaudRate.ItemIndex := ComboBoxBaudRate.Items.IndexOf(IntToStr(FDevice.BaudRate));
   if (FDevice.Parity >= 0) and (FDevice.Parity < ComboBoxParity.Items.Count) then
