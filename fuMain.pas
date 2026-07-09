@@ -14,7 +14,7 @@ uses
   FMX.Filter.Effects, FMX.StdCtrls, FMX.Colors, FMX.Effects,System.Math,
   FMX.ListBox, FMX.Controls.Presentation, FMX.Objects, FMX.Layouts, FMX.Edit,
   FMX.Memo.Types, FMX.ScrollBox, FMX.Memo,
-  FMX.EditBox, FMX.SpinBox,UnitParameter;
+  FMX.EditBox, FMX.SpinBox, UnitParameter, uProtocols;
 
 type
   TFormMain = class(TForm)
@@ -112,7 +112,6 @@ var
   FlowRate: Double;
   ImpSecValues: TArray<Double>;
 begin
-  WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -141,7 +140,6 @@ var
   FlowRate: Double;
   ImpSecValues: TArray<Double>;
 begin
-  WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
@@ -578,7 +576,6 @@ var
   WorkTable: TWorkTable;
   FlowRate, Coef, ImpSec: Double;
 begin
-  WorkTable := FWorkTableManager.ActiveWorkTable;
   if (WorkTable = nil) or (WorkTable.DeviceChannels.Count = 0) then
     Exit;
 
@@ -626,23 +623,49 @@ end;
 function TFormMain.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
   const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
-  I: Integer;
-  Coef: Double;
+  I, J, GroupKey: Integer;
+  Coef, SUM, MaxRatio, ChannelQmax: Double;
+  WorkTable: TWorkTable;
 begin
   SetLength(Result, 0);
   if AChannels = nil then
     Exit;
 
+  WorkTable := FWorkTableManager.ActiveWorkTable;
   SetLength(Result, AChannels.Count);
   for I := 0 to AChannels.Count - 1 do
   begin
+    MaxRatio := 1;
+    if (WorkTable <> nil) and (AChannels = WorkTable.EtalonChannels) and
+       (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
+       (AChannels[I].FlowMeter.Device <> nil) then
+    begin
+      GroupKey := AChannels[I].Group;
+      SUM := 0;
+      for J := 0 to AChannels.Count - 1 do
+        if (AChannels[J] <> nil) and AChannels[J].Enabled and
+           (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
+            ((GroupKey <= 0) and (J = I))) and
+           (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
+          SUM := SUM + WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
+
+      ChannelQmax := WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+      if SUM > 0 then
+        MaxRatio := ChannelQmax / SUM
+      else
+        MaxRatio := 0;
+    end;
+
     Coef := GetChannelFlowCoef(AChannels[I]);
-    if Coef > 0 then
-      Result[I] := (AFlowRate * Coef) / 3.6
+    if (AChannels[I] <> nil) and (not AChannels[I].Enabled) then
+      Result[I] := 0
+    else if Coef > 0 then
+      Result[I] := (AFlowRate * MaxRatio * Coef) / 3.6
     else
       Result[I] := AFallbackImpSec;
   end;
 end;
+
 
 procedure TFormMain.UpdateRandomFlowRate(const AFlowRate: TFlowRate);
 var
@@ -681,7 +704,7 @@ begin
         EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
         try
           for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-            if (WorkTable.EtalonChannels[I] <> nil) and (WorkTable.EtalonChannels[I].Enabled) then
+            if WorkTable.EtalonChannels[I] <> nil then
               EnabledEtalonChannels.Add(WorkTable.EtalonChannels[I]);
 
               IF ABS(AFlowRate.Value.Value-AFlowRate.ValueSet.Value)<1 then
@@ -720,7 +743,7 @@ end;
 
 procedure TFormMain.UpdateRandomSignals(const AWorkTable: TWorkTable);
 var
-  I: Integer;
+  I, J: Integer;
   Channel: TChannel;
   CurDelta: Double;
   ImpDelta: Double;
@@ -733,6 +756,27 @@ var
   TargetImpSec: Double;
   CurrentFlow: Double;
   DeviceReady: Boolean;
+  GroupChannelCount: Integer;
+  DeviceFlow: Double;
+  ActiveEtalonIndex: Integer;
+  GroupFlowMax: Double;
+  ChannelFlowMax: Double;
+
+  function GetEnabledGroupFlowMax(AChannels: TObjectList<TChannel>; const AGroup, AChannelIndex: Integer): Double;
+  var
+    K: Integer;
+  begin
+    Result := 0;
+    if AChannels = nil then
+      Exit;
+
+    for K := 0 to AChannels.Count - 1 do
+      if (AChannels[K] <> nil) and AChannels[K].Enabled and
+         (((AGroup > 0) and (AChannels[K].Group = AGroup)) or
+          ((AGroup <= 0) and (K = AChannelIndex))) and
+         (AChannels[K].FlowMeter <> nil) and (AChannels[K].FlowMeter.Device <> nil) then
+        Result := Result + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[K].FlowMeter.Device.Qmax, 4);
+  end;
 begin
   if AWorkTable = nil then
     Exit;
@@ -768,12 +812,6 @@ begin
     begin
       Channel.CurSec := EnsureRange(Channel.CurSec + CurDelta, 0.0, 1000.0);
       ChannelCoef := GetChannelFlowCoef(Channel);
-      if (EtalonFlowSet > 0) and (ChannelCoef > 0) then
-      begin
-        CurrentFlow := Channel.ImpSec / ChannelCoef;
-        if Abs(CurrentFlow - EtalonFlowSet) > EtalonFlowSet * 0.1 then
-          Channel.ImpSec := EtalonFlowSet * ChannelCoef;
-      end;
       if Channel.ImpSec > 0 then
       begin
         MaxImpDelta := EnsureRange(Abs(Channel.ImpSec) * 0.003, 0.1, 10.0);
@@ -794,17 +832,27 @@ begin
   end;
 
   EtalonFlowActual := 0;
+  GroupKey := 0;
+  ActiveEtalonIndex := -1;
   for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-    if (AWorkTable.EtalonChannels[I] <> nil) and
-       AWorkTable.EtalonChannels[I].Enabled then
+    if (AWorkTable.EtalonChannels[I] <> nil) and AWorkTable.EtalonChannels[I].Enabled then
+    begin
+      GroupKey := AWorkTable.EtalonChannels[I].Group;
+      ActiveEtalonIndex := I;
+      Break;
+    end;
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and AWorkTable.EtalonChannels[I].Enabled and
+       (((GroupKey > 0) and (AWorkTable.EtalonChannels[I].Group = GroupKey)) or
+        ((GroupKey <= 0) and (I = ActiveEtalonIndex))) then
     begin
       ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
       if ChannelCoef > 0 then
-        EtalonFlowActual := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
-      Break;
+        EtalonFlowActual := EtalonFlowActual + AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
     end;
   if EtalonFlowActual <= 0 then
     EtalonFlowActual := EtalonFlowSet;
+
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
@@ -828,7 +876,27 @@ begin
       else if not DeviceReady then
       begin
         ChannelCoef := GetChannelFlowCoef(Channel);
-        TargetImpSec := EtalonFlowActual * ChannelCoef;
+        GroupChannelCount := 0;
+        for J := 0 to AWorkTable.DeviceChannels.Count - 1 do
+          if (AWorkTable.DeviceChannels[J] <> nil) and AWorkTable.DeviceChannels[J].Enabled and
+             (((Channel.Group > 0) and (AWorkTable.DeviceChannels[J].Group = Channel.Group)) or
+              ((Channel.Group <= 0) and (J = I))) then
+            Inc(GroupChannelCount);
+        GroupFlowMax := GetEnabledGroupFlowMax(AWorkTable.DeviceChannels, Channel.Group, I);
+        if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
+          ChannelFlowMax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(Channel.FlowMeter.Device.Qmax, 4)
+        else
+          ChannelFlowMax := 0;
+        if (GroupFlowMax > 0) and (ChannelFlowMax > 0) then
+          DeviceFlow := EtalonFlowActual * ChannelFlowMax / GroupFlowMax
+        else
+          DeviceFlow := 0;
+        if ProtocolManager <> nil then
+          ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceFlowSimulation',
+            'Device flow distribution',
+            Format('Device=%d Group=%d EnabledCount=%d LineFlow=%.3f DeviceFlow=%.3f',
+              [I, Channel.Group, GroupChannelCount, EtalonFlowSet, DeviceFlow]));
+        TargetImpSec := DeviceFlow * ChannelCoef;
         if TargetImpSec > 0 then
         begin
           MaxImpDelta := EnsureRange(Abs(Max(Channel.ImpSec, TargetImpSec)) * 0.003, 0.1, 10.0);

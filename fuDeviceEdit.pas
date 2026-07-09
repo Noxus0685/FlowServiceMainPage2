@@ -1968,10 +1968,15 @@ begin
   if SameValue(NewValue, FDevice.Qmax) then
     Exit;
   FDevice.Qmax := NewValue;
+  FDevice.FreqFlowRate := FDevice.FromBaseUnits(FDevice.Qmax);
+  EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate);
+  if (FDevice.Freq > 0) and (FDevice.FreqFlowRate > 0) then
+    FDevice.Coef := 3.6 * FDevice.Freq / FDevice.FreqFlowRate;
 
   SetModified;
   FDevice.RecalcPoints;
   UpdateQmaxQmin;
+  UpdateUIFreq;
   UpdatePointsGrid;
 end;
 
