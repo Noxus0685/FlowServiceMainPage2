@@ -121,6 +121,8 @@ type
 
     function GetFlowDimName: string;
     procedure NotifyChanged;
+    procedure ApplyOutputType;
+    function GetActiveOutputType: Integer;
   public
     constructor Create(AOwner: TComponent); override;
     procedure SetFlowMeter(AFlowMeter: TFlowMeter);
@@ -133,6 +135,7 @@ type
 implementation
 
 uses
+  System.Math,
   uBaseProcedures;
 
 {$R *.fmx}
@@ -813,6 +816,161 @@ procedure TFrameFlowMeterProperties.cbInputTypeChange(Sender: TObject);
 begin
   if FIsLoading or (FDevice = nil) then Exit;
   FDevice.InputType := cbInputType.ItemIndex;
+  NotifyChanged;
+end;
+
+
+procedure TFrameFlowMeterProperties.ComboFreqOutputSetChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  if ComboFreqOutputSet.ItemIndex < 0 then
+    Exit;
+  if FFlowMeter.Device.OutputSet = ComboFreqOutputSet.ItemIndex then
+    Exit;
+  FFlowMeter.Device.OutputSet := ComboFreqOutputSet.ItemIndex;
+  NotifyChanged;
+end;
+
+
+procedure TFrameFlowMeterProperties.ComboFreqViewChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  if ComboFreqView.ItemIndex < 0 then
+    Exit;
+  if FFlowMeter.Device.DimensionCoef = ComboFreqView.ItemIndex then
+    Exit;
+  FFlowMeter.Device.DimensionCoef := ComboFreqView.ItemIndex;
+  NotifyChanged;
+end;
+
+
+procedure TFrameFlowMeterProperties.ComboImpulseOutputSetChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  if ComboImpulseOutputSet.ItemIndex < 0 then
+    Exit;
+  if FFlowMeter.Device.OutputSet = ComboImpulseOutputSet.ItemIndex then
+    Exit;
+  FFlowMeter.Device.OutputSet := ComboImpulseOutputSet.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.ComboImpulseViewChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  if ComboImpulseView.ItemIndex < 0 then
+    Exit;
+  if FFlowMeter.Device.DimensionCoef = ComboImpulseView.ItemIndex then
+    Exit;
+  FFlowMeter.Device.DimensionCoef := ComboImpulseView.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.EditCoefExit(Sender: TObject);
+var
+  NewCoef: Double;
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  NewCoef := NormalizeFloatInput(EditCoef.Text);
+  if NewCoef <= 0 then
+  begin
+    EditCoef.Text := FloatToStr(FFlowMeter.Device.Coef);
+    Exit;
+  end;
+  if SameValue(FFlowMeter.Device.Coef, NewCoef) then
+    Exit;
+  FFlowMeter.Device.Coef := NewCoef;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.EditFreqExit(Sender: TObject);
+var
+  NewFreq: Integer;
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  NewFreq := Trunc(NormalizeFloatInput(EditFreq.Text));
+  if NewFreq <= 0 then
+  begin
+    EditFreq.Text := IntToStr(FFlowMeter.Device.Freq);
+    Exit;
+  end;
+  FFlowMeter.Device.Freq := NewFreq;
+  if FFlowMeter.Device.FreqFlowRate > 0 then
+    FFlowMeter.Device.Coef := 3.6 * FFlowMeter.Device.Freq / FFlowMeter.Device.FreqFlowRate;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.EditFreqFlowRateExit(Sender: TObject);
+var
+  NewRate: Double;
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  NewRate := NormalizeFloatInput(EditFreqFlowRate.Text);
+  if NewRate <= 0 then
+  begin
+    EditFreqFlowRate.Text := FloatToStr(FFlowMeter.Device.FreqFlowRate);
+    Exit;
+  end;
+  if SameValue(FFlowMeter.Device.FreqFlowRate, NewRate) then
+    Exit;
+  FFlowMeter.Device.FreqFlowRate := NewRate;
+  if FFlowMeter.Device.FreqFlowRate > 0 then
+    FFlowMeter.Device.Coef := 3.6 * FFlowMeter.Device.Freq / FFlowMeter.Device.FreqFlowRate;
+  NotifyChanged;
+end;
+
+
+procedure TFrameFlowMeterProperties.OutputComboChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) or
+     not (Sender is TComboBox) then
+    Exit;
+
+  case TComboBox(Sender).Tag of
+    1:
+      case TComboBox(Sender).ItemIndex of
+        0: FFlowMeter.Device.VoltageRange := 10;
+        1: FFlowMeter.Device.VoltageRange := 5;
+        2: FFlowMeter.Device.VoltageRange := 24;
+      end;
+    2:
+      case TComboBox(Sender).ItemIndex of
+        0: FFlowMeter.Device.CurrentRange := 20;
+        1: FFlowMeter.Device.CurrentRange := 0;
+      end;
+    3:
+      FFlowMeter.Device.BaudRate := StrToIntDef(TComboBox(Sender).Text,
+        FFlowMeter.Device.BaudRate);
+    4:
+      FFlowMeter.Device.Parity := TComboBox(Sender).ItemIndex;
+    5:
+      FFlowMeter.Device.InputType := TComboBox(Sender).ItemIndex;
+  end;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.OutputEditExit(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) or
+     not (Sender is TEdit) then
+    Exit;
+
+  case TEdit(Sender).Tag of
+    1: FFlowMeter.Device.VoltageQminRate := NormalizeFloatInput(TEdit(Sender).Text);
+    2: FFlowMeter.Device.VoltageQmaxRate := NormalizeFloatInput(TEdit(Sender).Text);
+    3: FFlowMeter.Device.CurrentQminRate := NormalizeFloatInput(TEdit(Sender).Text);
+    4: FFlowMeter.Device.CurrentQmaxRate := NormalizeFloatInput(TEdit(Sender).Text);
+    5: FFlowMeter.Device.ProtocolName := Trim(TEdit(Sender).Text);
+    6: FFlowMeter.Device.DeviceAddress := StrToIntDef(TEdit(Sender).Text,
+         FFlowMeter.Device.DeviceAddress);
+  end;
   NotifyChanged;
 end;
 
