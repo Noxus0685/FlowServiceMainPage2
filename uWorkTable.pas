@@ -6280,6 +6280,21 @@ var
         Inc(Result);
   end;
 
+  function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup: Integer): Integer;
+  var
+    K: Integer;
+  begin
+    Result := 0;
+    if AChannels = nil then
+      Exit;
+
+    for K := 0 to AChannels.Count - 1 do
+      if (AChannels[K] <> nil) and AChannels[K].Enabled and
+         (((AGroup > 0) and (AChannels[K].Group = AGroup)) or
+          ((AGroup <= 0) and (AChannels[K].Group <= 0))) then
+        Inc(Result);
+  end;
+
   function GetSignalChannelFlowCoef(const AChannel: TChannel): Double;
   begin
     Result := 0.0;
