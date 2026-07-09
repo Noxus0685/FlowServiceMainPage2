@@ -37,6 +37,7 @@ type
     CategoryMain: TTreeViewItem;
     CategoryRanges: TTreeViewItem;
     CategoryFrequency: TTreeViewItem;
+    CategoryImpulse: TTreeViewItem;
 
     LabelDeviceName: TLabel;
     LabelDeviceTypeName: TLabel;
@@ -63,6 +64,12 @@ type
     EditFreq: TEdit;
     ComboFreqView: TComboBox;
     EditFreqFlowRate: TEdit;
+    LabelImpulseOutputSet: TLabel;
+    LabelImpulseView: TLabel;
+    LabelImpulseCoef: TLabel;
+    ComboImpulseOutputSet: TComboBox;
+    ComboImpulseView: TComboBox;
+    EditCoef: TEdit;
     HeaderProperty: TLabel;
     HeaderValue: TLabel;
     HeaderDivider: TLine;
@@ -86,6 +93,9 @@ type
     procedure ComboFreqViewChange(Sender: TObject);
     procedure EditFreqExit(Sender: TObject);
     procedure EditFreqFlowRateExit(Sender: TObject);
+    procedure ComboImpulseOutputSetChange(Sender: TObject);
+    procedure ComboImpulseViewChange(Sender: TObject);
+    procedure EditCoefExit(Sender: TObject);
 
     function GetOutputTypeIndex(AOutputType: Integer): Integer;
     function GetOutputTypeByIndex(AIndex: Integer): Integer;
@@ -228,6 +238,26 @@ begin
   EditFreqFlowRate.KillFocusByReturn := True;
   EditFreqFlowRate.OnExit := EditFreqFlowRateExit;
   LabelFreqFlowRate := AddPropertyRow(CategoryFrequency, 'Расход, QF', EditFreqFlowRate);
+
+  CategoryImpulse := AddCategory('Импульсы');
+
+  ComboImpulseOutputSet := TComboBox.Create(Self);
+  ComboImpulseOutputSet.Items.Assign(ComboFreqOutputSet.Items);
+  ComboImpulseOutputSet.OnChange := ComboImpulseOutputSetChange;
+  LabelImpulseOutputSet := AddPropertyRow(CategoryImpulse, 'Тип выхода', ComboImpulseOutputSet);
+
+  ComboImpulseView := TComboBox.Create(Self);
+  ComboImpulseView.Items.Add('имп/л');
+  ComboImpulseView.Items.Add('л/имп');
+  ComboImpulseView.ItemIndex := 0;
+  ComboImpulseView.OnChange := ComboImpulseViewChange;
+  LabelImpulseView := AddPropertyRow(CategoryImpulse, 'Представление', ComboImpulseView);
+
+  EditCoef := TEdit.Create(Self);
+  EditCoef.TextPrompt := '100';
+  EditCoef.KillFocusByReturn := True;
+  EditCoef.OnExit := EditCoefExit;
+  LabelImpulseCoef := AddPropertyRow(CategoryImpulse, 'Коэффициент Kp', EditCoef);
 end;
 
 function TFrameFlowMeterProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -387,7 +417,9 @@ end;
 procedure TFrameFlowMeterProperties.ApplyOutputType;
 begin
   if CategoryFrequency <> nil then
-    CategoryFrequency.Visible := True;
+    CategoryFrequency.Visible := GetActiveOutputType = Ord(otFrequency);
+  if CategoryImpulse <> nil then
+    CategoryImpulse.Visible := GetActiveOutputType = Ord(otImpulse);
 
   if (LabelFreqFlowRate <> nil) and (FFlowMeter <> nil) then
     LabelFreqFlowRate.Text := 'Расход, QF, ' + GetFlowDimName;
@@ -410,6 +442,9 @@ begin
     EditFreq.Enabled := Enabled;
     ComboFreqView.Enabled := Enabled;
     EditFreqFlowRate.Enabled := Enabled;
+    ComboImpulseOutputSet.Enabled := Enabled;
+    ComboImpulseView.Enabled := Enabled;
+    EditCoef.Enabled := Enabled;
 
     if not Enabled then
     begin
@@ -421,6 +456,9 @@ begin
       EditFreq.Text := '';
       ComboFreqView.ItemIndex := -1;
       EditFreqFlowRate.Text := '';
+      ComboImpulseOutputSet.ItemIndex := -1;
+      ComboImpulseView.ItemIndex := -1;
+      EditCoef.Text := '';
       ApplyOutputType;
       Exit;
     end;
@@ -450,6 +488,13 @@ begin
         EditFreqFlowRate.Text := FloatToStr(FFlowMeter.Device.FreqFlowRate)
       else
         EditFreqFlowRate.Text := '';
+
+      ComboImpulseOutputSet.ItemIndex := ComboFreqOutputSet.ItemIndex;
+      ComboImpulseView.ItemIndex := ComboFreqView.ItemIndex;
+      if FFlowMeter.Device.Coef > 0 then
+        EditCoef.Text := FloatToStr(FFlowMeter.Device.Coef)
+      else
+        EditCoef.Text := '';
     end;
     ApplyOutputType;
 
@@ -590,6 +635,49 @@ begin
   if FFlowMeter.Device.DimensionCoef = ComboFreqView.ItemIndex then
     Exit;
   FFlowMeter.Device.DimensionCoef := ComboFreqView.ItemIndex;
+  NotifyChanged;
+end;
+
+
+procedure TFrameFlowMeterProperties.ComboImpulseOutputSetChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  if ComboImpulseOutputSet.ItemIndex < 0 then
+    Exit;
+  if FFlowMeter.Device.OutputSet = ComboImpulseOutputSet.ItemIndex then
+    Exit;
+  FFlowMeter.Device.OutputSet := ComboImpulseOutputSet.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.ComboImpulseViewChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  if ComboImpulseView.ItemIndex < 0 then
+    Exit;
+  if FFlowMeter.Device.DimensionCoef = ComboImpulseView.ItemIndex then
+    Exit;
+  FFlowMeter.Device.DimensionCoef := ComboImpulseView.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.EditCoefExit(Sender: TObject);
+var
+  NewCoef: Double;
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) then
+    Exit;
+  NewCoef := NormalizeFloatInput(EditCoef.Text);
+  if NewCoef <= 0 then
+  begin
+    EditCoef.Text := FloatToStr(FFlowMeter.Device.Coef);
+    Exit;
+  end;
+  if SameValue(FFlowMeter.Device.Coef, NewCoef) then
+    Exit;
+  FFlowMeter.Device.Coef := NewCoef;
   NotifyChanged;
 end;
 
