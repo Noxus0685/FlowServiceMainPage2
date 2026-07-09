@@ -38,6 +38,10 @@ type
     CategoryRanges: TTreeViewItem;
     CategoryFrequency: TTreeViewItem;
     CategoryImpulse: TTreeViewItem;
+    CategoryVoltage: TTreeViewItem;
+    CategoryCurrent: TTreeViewItem;
+    CategoryInterface: TTreeViewItem;
+    CategoryVisual: TTreeViewItem;
 
     LabelDeviceName: TLabel;
     LabelDeviceTypeName: TLabel;
@@ -70,6 +74,17 @@ type
     ComboImpulseOutputSet: TComboBox;
     ComboImpulseView: TComboBox;
     EditCoef: TEdit;
+    ComboVoltageRange: TComboBox;
+    EditVoltageQminRate: TEdit;
+    EditVoltageQmaxRate: TEdit;
+    ComboCurrentRange: TComboBox;
+    EditCurrentQminRate: TEdit;
+    EditCurrentQmaxRate: TEdit;
+    EditProtocolName: TEdit;
+    ComboBaudRate: TComboBox;
+    ComboParity: TComboBox;
+    EditDeviceAddress: TEdit;
+    ComboInputType: TComboBox;
     HeaderProperty: TLabel;
     HeaderValue: TLabel;
     HeaderDivider: TLine;
@@ -96,6 +111,8 @@ type
     procedure ComboImpulseOutputSetChange(Sender: TObject);
     procedure ComboImpulseViewChange(Sender: TObject);
     procedure EditCoefExit(Sender: TObject);
+    procedure OutputComboChange(Sender: TObject);
+    procedure OutputEditExit(Sender: TObject);
 
     function GetOutputTypeIndex(AOutputType: Integer): Integer;
     function GetOutputTypeByIndex(AIndex: Integer): Integer;
@@ -258,6 +275,73 @@ begin
   EditCoef.KillFocusByReturn := True;
   EditCoef.OnExit := EditCoefExit;
   LabelImpulseCoef := AddPropertyRow(CategoryImpulse, 'Коэффициент Kp', EditCoef);
+
+  CategoryVoltage := AddCategory('Напряжение');
+  ComboVoltageRange := TComboBox.Create(Self);
+  ComboVoltageRange.Items.Add('0-10 В');
+  ComboVoltageRange.Items.Add('0-5 В');
+  ComboVoltageRange.Items.Add('0-24 В');
+  ComboVoltageRange.Tag := 1;
+  ComboVoltageRange.OnChange := OutputComboChange;
+  AddPropertyRow(CategoryVoltage, 'Диапазон', ComboVoltageRange);
+  EditVoltageQminRate := TEdit.Create(Self);
+  EditVoltageQminRate.Tag := 1;
+  EditVoltageQminRate.OnExit := OutputEditExit;
+  AddPropertyRow(CategoryVoltage, 'Qmin', EditVoltageQminRate);
+  EditVoltageQmaxRate := TEdit.Create(Self);
+  EditVoltageQmaxRate.Tag := 2;
+  EditVoltageQmaxRate.OnExit := OutputEditExit;
+  AddPropertyRow(CategoryVoltage, 'Qmax', EditVoltageQmaxRate);
+
+  CategoryCurrent := AddCategory('Ток');
+  ComboCurrentRange := TComboBox.Create(Self);
+  ComboCurrentRange.Items.Add('4-20 мА');
+  ComboCurrentRange.Items.Add('0-20 мА');
+  ComboCurrentRange.Tag := 2;
+  ComboCurrentRange.OnChange := OutputComboChange;
+  AddPropertyRow(CategoryCurrent, 'Диапазон', ComboCurrentRange);
+  EditCurrentQminRate := TEdit.Create(Self);
+  EditCurrentQminRate.Tag := 3;
+  EditCurrentQminRate.OnExit := OutputEditExit;
+  AddPropertyRow(CategoryCurrent, 'Qmin', EditCurrentQminRate);
+  EditCurrentQmaxRate := TEdit.Create(Self);
+  EditCurrentQmaxRate.Tag := 4;
+  EditCurrentQmaxRate.OnExit := OutputEditExit;
+  AddPropertyRow(CategoryCurrent, 'Qmax', EditCurrentQmaxRate);
+
+  CategoryInterface := AddCategory('Интерфейс');
+  EditProtocolName := TEdit.Create(Self);
+  EditProtocolName.Tag := 5;
+  EditProtocolName.OnExit := OutputEditExit;
+  AddPropertyRow(CategoryInterface, 'Библиотека', EditProtocolName);
+  ComboBaudRate := TComboBox.Create(Self);
+  ComboBaudRate.Items.Add('2400');
+  ComboBaudRate.Items.Add('4800');
+  ComboBaudRate.Items.Add('9600');
+  ComboBaudRate.Items.Add('19200');
+  ComboBaudRate.Items.Add('115200');
+  ComboBaudRate.Tag := 3;
+  ComboBaudRate.OnChange := OutputComboChange;
+  AddPropertyRow(CategoryInterface, 'Скорость', ComboBaudRate);
+  ComboParity := TComboBox.Create(Self);
+  ComboParity.Items.Add('Нет');
+  ComboParity.Items.Add('Четность');
+  ComboParity.Items.Add('Нечетность');
+  ComboParity.Tag := 4;
+  ComboParity.OnChange := OutputComboChange;
+  AddPropertyRow(CategoryInterface, 'Четность', ComboParity);
+  EditDeviceAddress := TEdit.Create(Self);
+  EditDeviceAddress.Tag := 6;
+  EditDeviceAddress.OnExit := OutputEditExit;
+  AddPropertyRow(CategoryInterface, 'Адрес', EditDeviceAddress);
+
+  CategoryVisual := AddCategory('Визуальный');
+  ComboInputType := TComboBox.Create(Self);
+  ComboInputType.Items.Add('Ручной ввод');
+  ComboInputType.Items.Add('Клавиатура');
+  ComboInputType.Tag := 5;
+  ComboInputType.OnChange := OutputComboChange;
+  AddPropertyRow(CategoryVisual, 'Тип ввода', ComboInputType);
 end;
 
 function TFrameFlowMeterProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -420,6 +504,14 @@ begin
     CategoryFrequency.Visible := GetActiveOutputType = Ord(otFrequency);
   if CategoryImpulse <> nil then
     CategoryImpulse.Visible := GetActiveOutputType = Ord(otImpulse);
+  if CategoryVoltage <> nil then
+    CategoryVoltage.Visible := GetActiveOutputType = Ord(otVoltage);
+  if CategoryCurrent <> nil then
+    CategoryCurrent.Visible := GetActiveOutputType = Ord(otCurrent);
+  if CategoryInterface <> nil then
+    CategoryInterface.Visible := GetActiveOutputType = Ord(otInterface);
+  if CategoryVisual <> nil then
+    CategoryVisual.Visible := GetActiveOutputType = Ord(otVisual);
 
   if (LabelFreqFlowRate <> nil) and (FFlowMeter <> nil) then
     LabelFreqFlowRate.Text := 'Расход, QF, ' + GetFlowDimName;
@@ -445,6 +537,17 @@ begin
     ComboImpulseOutputSet.Enabled := Enabled;
     ComboImpulseView.Enabled := Enabled;
     EditCoef.Enabled := Enabled;
+    ComboVoltageRange.Enabled := Enabled;
+    EditVoltageQminRate.Enabled := Enabled;
+    EditVoltageQmaxRate.Enabled := Enabled;
+    ComboCurrentRange.Enabled := Enabled;
+    EditCurrentQminRate.Enabled := Enabled;
+    EditCurrentQmaxRate.Enabled := Enabled;
+    EditProtocolName.Enabled := Enabled;
+    ComboBaudRate.Enabled := Enabled;
+    ComboParity.Enabled := Enabled;
+    EditDeviceAddress.Enabled := Enabled;
+    ComboInputType.Enabled := Enabled;
 
     if not Enabled then
     begin
@@ -459,6 +562,17 @@ begin
       ComboImpulseOutputSet.ItemIndex := -1;
       ComboImpulseView.ItemIndex := -1;
       EditCoef.Text := '';
+      ComboVoltageRange.ItemIndex := -1;
+      EditVoltageQminRate.Text := '';
+      EditVoltageQmaxRate.Text := '';
+      ComboCurrentRange.ItemIndex := -1;
+      EditCurrentQminRate.Text := '';
+      EditCurrentQmaxRate.Text := '';
+      EditProtocolName.Text := '';
+      ComboBaudRate.ItemIndex := -1;
+      ComboParity.ItemIndex := -1;
+      EditDeviceAddress.Text := '';
+      ComboInputType.ItemIndex := -1;
       ApplyOutputType;
       Exit;
     end;
@@ -495,6 +609,31 @@ begin
         EditCoef.Text := FloatToStr(FFlowMeter.Device.Coef)
       else
         EditCoef.Text := '';
+
+      case FFlowMeter.Device.VoltageRange of
+        10: ComboVoltageRange.ItemIndex := 0;
+        5: ComboVoltageRange.ItemIndex := 1;
+        24: ComboVoltageRange.ItemIndex := 2;
+      else
+        ComboVoltageRange.ItemIndex := -1;
+      end;
+      EditVoltageQminRate.Text := FloatToStr(FFlowMeter.Device.VoltageQminRate);
+      EditVoltageQmaxRate.Text := FloatToStr(FFlowMeter.Device.VoltageQmaxRate);
+
+      case FFlowMeter.Device.CurrentRange of
+        20: ComboCurrentRange.ItemIndex := 0;
+        0: ComboCurrentRange.ItemIndex := 1;
+      else
+        ComboCurrentRange.ItemIndex := -1;
+      end;
+      EditCurrentQminRate.Text := FloatToStr(FFlowMeter.Device.CurrentQminRate);
+      EditCurrentQmaxRate.Text := FloatToStr(FFlowMeter.Device.CurrentQmaxRate);
+
+      EditProtocolName.Text := FFlowMeter.Device.ProtocolName;
+      ComboBaudRate.ItemIndex := ComboBaudRate.Items.IndexOf(IntToStr(FFlowMeter.Device.BaudRate));
+      ComboParity.ItemIndex := FFlowMeter.Device.Parity;
+      EditDeviceAddress.Text := IntToStr(FFlowMeter.Device.DeviceAddress);
+      ComboInputType.ItemIndex := FFlowMeter.Device.InputType;
     end;
     ApplyOutputType;
 
@@ -716,6 +855,54 @@ begin
   FFlowMeter.Device.FreqFlowRate := NewRate;
   if FFlowMeter.Device.FreqFlowRate > 0 then
     FFlowMeter.Device.Coef := 3.6 * FFlowMeter.Device.Freq / FFlowMeter.Device.FreqFlowRate;
+  NotifyChanged;
+end;
+
+
+procedure TFrameFlowMeterProperties.OutputComboChange(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) or
+     not (Sender is TComboBox) then
+    Exit;
+
+  case TComboBox(Sender).Tag of
+    1:
+      case TComboBox(Sender).ItemIndex of
+        0: FFlowMeter.Device.VoltageRange := 10;
+        1: FFlowMeter.Device.VoltageRange := 5;
+        2: FFlowMeter.Device.VoltageRange := 24;
+      end;
+    2:
+      case TComboBox(Sender).ItemIndex of
+        0: FFlowMeter.Device.CurrentRange := 20;
+        1: FFlowMeter.Device.CurrentRange := 0;
+      end;
+    3:
+      FFlowMeter.Device.BaudRate := StrToIntDef(TComboBox(Sender).Text,
+        FFlowMeter.Device.BaudRate);
+    4:
+      FFlowMeter.Device.Parity := TComboBox(Sender).ItemIndex;
+    5:
+      FFlowMeter.Device.InputType := TComboBox(Sender).ItemIndex;
+  end;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.OutputEditExit(Sender: TObject);
+begin
+  if FIsLoading or (FFlowMeter = nil) or (FFlowMeter.Device = nil) or
+     not (Sender is TEdit) then
+    Exit;
+
+  case TEdit(Sender).Tag of
+    1: FFlowMeter.Device.VoltageQminRate := NormalizeFloatInput(TEdit(Sender).Text);
+    2: FFlowMeter.Device.VoltageQmaxRate := NormalizeFloatInput(TEdit(Sender).Text);
+    3: FFlowMeter.Device.CurrentQminRate := NormalizeFloatInput(TEdit(Sender).Text);
+    4: FFlowMeter.Device.CurrentQmaxRate := NormalizeFloatInput(TEdit(Sender).Text);
+    5: FFlowMeter.Device.ProtocolName := Trim(TEdit(Sender).Text);
+    6: FFlowMeter.Device.DeviceAddress := StrToIntDef(TEdit(Sender).Text,
+         FFlowMeter.Device.DeviceAddress);
+  end;
   NotifyChanged;
 end;
 
