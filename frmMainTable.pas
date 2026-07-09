@@ -5654,6 +5654,12 @@ begin
           ButtonCancel.Visible := True;
         end;
       end;
+    SwtMonitor:
+      begin
+        TestButton.Text := 'Измерение';
+        TestButton.Tag := 0;
+        TestButton.Enabled := True;
+      end
   else
     begin
       TestButton.Text := 'Измерение';
