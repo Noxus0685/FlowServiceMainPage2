@@ -186,8 +186,10 @@ type
     FOutputSet: TControlRegister<EOutPutSet>;
     FSyncMode: TControlRegister<ESyncChannelMode>;
     FNoiseFilter: TControlRegister<Integer>;
-
-
+    FQMaxWork: Double;
+    FQMinWork: Double;
+    FVMaxWork: Double;
+    FVMinWork: Double;
 
     // --- proxies for FlowMeter fields ---
     function GetDeviceNameProxy: string;
@@ -295,6 +297,10 @@ type
     property RepoTypeUUID: string read GetRepoTypeUUIDProxy write SetRepoTypeUUIDProxy;
     property RepoDeviceName: string read GetRepoDeviceNameProxy write SetRepoDeviceNameProxy;
     property RepoDeviceUUID: string read GetRepoDeviceUUIDProxy write SetRepoDeviceUUIDProxy;
+    property QMaxWork: Double read FQMaxWork write FQMaxWork;
+    property QMinWork: Double read FQMinWork write FQMinWork;
+    property VMaxWork: Double read FVMaxWork write FVMaxWork;
+    property VMinWork: Double read FVMinWork write FVMinWork;
 
     // Channel fields (internal variables)
     property ImpSec: Double read GetImpSecProxy write SetImpSecProxy;
@@ -319,6 +325,7 @@ type
       const ACloneDeviceToRepo: Boolean = True);
     procedure SetValues;
     procedure CreateDevice;
+    procedure InitWorkRangesFromFlowMeter;
 
     function GetOutputSetStateColor: TAlphaColor;
     function GetSyncModeStateColor: TAlphaColor;
@@ -978,6 +985,7 @@ begin
     AChannel.FlowMeter.Device := ADevice;
     AChannel.FlowMeter.DeviceUUID := ADevice.UUID;
     AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
   end;
 
   if Trim(ADevice.DeviceTypeUUID) <> '' then
@@ -1247,6 +1255,10 @@ begin
   FGroup := 0;
   FCategory := mftUnknownType;
   FWorkTabeID := 0;
+  FQMaxWork := 0;
+  FQMinWork := 0;
+  FVMaxWork := 0;
+  FVMinWork := 0;
 
   FFlowMeter.Name := 'Прибор ' + FName;
 end;
@@ -1275,6 +1287,17 @@ begin
     FSyncMode.FromDefault(IntToSyncChannelMode(FFlowMeter.Device.SyncMode));
     FNoiseFilter.FromDefault(FFlowMeter.Device.NoiseFilter);
   end;
+end;
+
+procedure TChannel.InitWorkRangesFromFlowMeter;
+begin
+  if FFlowMeter = nil then
+    Exit;
+
+  FQMaxWork := FFlowMeter.FlowMax;
+  FQMinWork := FFlowMeter.FlowMin;
+  FVMaxWork := FFlowMeter.QuantityMax;
+  FVMinWork := FFlowMeter.QuantityMin;
 end;
                                          {TODO -oOwner -cGeneral : ActionItem}
 { Rebinds FlowMeter value references to channel and work table meter values. }
@@ -1389,6 +1412,10 @@ begin
   FFlowMeter.FlowMin := ASource.FFlowMeter.FlowMin;
   FFlowMeter.QuantityMax := ASource.FFlowMeter.QuantityMax;
   FFlowMeter.QuantityMin := ASource.FFlowMeter.QuantityMin;
+  FQMaxWork := ASource.FQMaxWork;
+  FQMinWork := ASource.FQMinWork;
+  FVMaxWork := ASource.FVMaxWork;
+  FVMinWork := ASource.FVMinWork;
   FFlowMeter.Error := ASource.FFlowMeter.Error;
   FFlowMeter.PointIndex := ASource.FFlowMeter.PointIndex;
   FFlowMeter.Comment := ASource.FFlowMeter.Comment;
@@ -2673,14 +2700,14 @@ var
   begin
     Result := 0;
     if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
-      Result := AChannel.FlowMeter.FlowMin;
+      Result := AChannel.QMinWork;
   end;
 
   function GetChannelFlowMax(AChannel: TChannel): Double;
   begin
     Result := 0;
     if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
-      Result := AChannel.FlowMeter.FlowMax;
+      Result := AChannel.QMaxWork;
   end;
 
 begin
@@ -4062,6 +4089,10 @@ begin
     AIni.WriteString(Section, 'RepoTypeUUID', Channel.RepoTypeUUID);
     AIni.WriteString(Section, 'RepoDeviceName', Channel.RepoDeviceName);
     AIni.WriteString(Section, 'RepoDeviceUUID', Channel.RepoDeviceUUID);
+    AIni.WriteFloat(Section, 'QMaxWork', Channel.QMaxWork);
+    AIni.WriteFloat(Section, 'QMinWork', Channel.QMinWork);
+    AIni.WriteFloat(Section, 'VMaxWork', Channel.VMaxWork);
+    AIni.WriteFloat(Section, 'VMinWork', Channel.VMinWork);
 
     AIni.WriteFloat(Section, 'ImpSec', Channel.ImpSec);
     AIni.WriteFloat(Section, 'ImpResult', Channel.ImpResult);
@@ -4143,6 +4174,13 @@ begin
     Channel.RepoTypeUUID := AIni.ReadString(Section, 'RepoTypeUUID', '');
     Channel.RepoDeviceName := AIni.ReadString(Section, 'RepoDeviceName', '');
     Channel.RepoDeviceUUID := AIni.ReadString(Section, 'RepoDeviceUUID', '');
+    if AIni.ValueExists(Section, 'QMaxWork') then
+    begin
+      Channel.QMaxWork := S2F(AIni.ReadString(Section, 'QMaxWork', '0'));
+      Channel.QMinWork := S2F(AIni.ReadString(Section, 'QMinWork', '0'));
+      Channel.VMaxWork := S2F(AIni.ReadString(Section, 'VMaxWork', '0'));
+      Channel.VMinWork := S2F(AIni.ReadString(Section, 'VMinWork', '0'));
+    end;
 
     Channel.ImpSec := S2F(AIni.ReadString(Section, 'ImpSec', '0'));
     Channel.ImpResult :=0; //AIni.ReadFloat(Section, 'ImpResult', 0);
@@ -4166,8 +4204,8 @@ begin
     Channel.FlowMeter.Name := 'прибор '+ Channel.Name;
 
     Channel.Init;
-
-
+    if not AIni.ValueExists(Section, 'QMaxWork') then
+      Channel.InitWorkRangesFromFlowMeter;
 
     AChannels.Add(Channel);
   end;
@@ -6412,7 +6450,7 @@ begin
             Inc(GroupChannelCount);
         GroupFlowMax := GetEnabledGroupFlowMax(AWorkTable.DeviceChannels, Channel.Group, I);
         if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
-          ChannelFlowMax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(Channel.FlowMeter.Device.Qmax, 4)
+          ChannelFlowMax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(Channel.QMaxWork, 4)
         else
           ChannelFlowMax := 0;
         if (GroupFlowMax > 0) and (ChannelFlowMax > 0) then

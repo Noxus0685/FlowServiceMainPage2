@@ -631,7 +631,6 @@ type
   FFrameMeasurementRun: TFrameMeasurementRun;
   FFrameMRResults: TFrameMRResults;
   FFrameProtocol: TFrameProtocol;
-  FProtocolHostScroll: TVertScrollBox;
   FFrameFlowMeterProperties: TFrameFlowMeterProperties;
   FFlowMeterPropertiesChannel: TChannel;
   FFrameChannelProperties: TFrameChannelProperties;
@@ -953,7 +952,6 @@ begin
   FreeAndNil(FFrameMeasurementRun);
   FreeAndNil(FFrameMRResults);
   FreeAndNil(FFrameProtocol);
-  FreeAndNil(FProtocolHostScroll);
   FreeAndNil(FFrameFlowMeterProperties);
   FreeAndNil(FFrameChannelProperties);
   FreeAndNil(FFrameWorkTableProperties);
@@ -1879,16 +1877,8 @@ begin
 
   if FFrameProtocol = nil then
   begin
-    if FProtocolHostScroll = nil then
-    begin
-      FProtocolHostScroll := TVertScrollBox.Create(Self);
-      FProtocolHostScroll.Parent := LayoutProtocolHost;
-      FProtocolHostScroll.Align := TAlignLayout.Client;
-      FProtocolHostScroll.Stored := False;
-      FProtocolHostScroll.ShowScrollBars := True;
-    end;
     FFrameProtocol := TFrameProtocol.Create(Self);
-    FFrameProtocol.Parent := FProtocolHostScroll;
+    FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
 
@@ -3246,16 +3236,8 @@ begin
 
   if FFrameProtocol = nil then
   begin
-    if FProtocolHostScroll = nil then
-    begin
-      FProtocolHostScroll := TVertScrollBox.Create(Self);
-      FProtocolHostScroll.Parent := LayoutProtocolHost;
-      FProtocolHostScroll.Align := TAlignLayout.Client;
-      FProtocolHostScroll.Stored := False;
-      FProtocolHostScroll.ShowScrollBars := True;
-    end;
     FFrameProtocol := TFrameProtocol.Create(Self);
-    FFrameProtocol.Parent := FProtocolHostScroll;
+    FFrameProtocol.Parent := LayoutProtocolHost;
     FFrameProtocol.Align := TAlignLayout.Client;
   end;
 
@@ -3438,6 +3420,7 @@ begin
 
   if AChannel.FlowMeter <> nil then
     AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
 
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(Device);
@@ -3544,6 +3527,7 @@ begin
         AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
 
         AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
       end;
 
       MarkChannelDeviceModified(AChannel);
@@ -3579,6 +3563,7 @@ begin
         begin
           AChannel.FlowMeter.Device := ADevice;
           AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
         end;
       end;
 
@@ -3748,6 +3733,7 @@ begin
       AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
 
       AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
 
       if FFrameProceed <> nil then
         FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
@@ -3765,6 +3751,7 @@ begin
 
           LinkedChannel.FlowMeter.Device := AChannel.FlowMeter.Device;
           LinkedChannel.FlowMeter.UpdateByDevice;
+          LinkedChannel.InitWorkRangesFromFlowMeter;
 
           LinkedChannel.DeviceUUID := AChannel.DeviceUUID;
           LinkedChannel.TypeUUID := AChannel.TypeUUID;
