@@ -1756,6 +1756,8 @@ begin
         TestButton.Text := 'Сохранить?';
         TestButton.Tag := 6;
         TestButton.Enabled := True;
+        ButtonCancel.Text := 'Отмена';
+        ButtonCancel.Enabled := True;
         ButtonCancel.Visible := True;
         GlowEffectCancelRed.Enabled := True;
 
@@ -5510,6 +5512,12 @@ begin
     TestButton.Text := 'Измерение';
     TestButton.Tag := 0;
     TestButton.Enabled := False;
+    if ButtonCancel <> nil then
+    begin
+      ButtonCancel.Text := 'Отмена';
+      ButtonCancel.Enabled := False;
+      ButtonCancel.Visible := False;
+    end;
     Exit;
   end;
 
@@ -5520,6 +5528,12 @@ begin
         TestButton.Text := 'Измерение';
         TestButton.Tag := 0;
         TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
       end;
 
     swtCONNECTED:
@@ -5527,6 +5541,12 @@ begin
         TestButton.Text := 'Измерение';
         TestButton.Tag := 1;
         TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
       end;
 
     swtSTARTTEST:
@@ -5534,6 +5554,12 @@ begin
         TestButton.Text := 'Запуск';
         TestButton.Tag := 2;
         TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
       end;
 
     swtSTARTWAIT,
@@ -5542,6 +5568,12 @@ begin
         TestButton.Text := 'Стоп';
         TestButton.Tag := 3;
         TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
       end;
 
     swtSTOPTEST,
@@ -5550,6 +5582,12 @@ begin
         TestButton.Text := 'Завершение';
         TestButton.Tag := 4;
         TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
       end;
 
     swtFINALREAD:
@@ -5557,6 +5595,12 @@ begin
         TestButton.Text := 'Сохранение';
         TestButton.Tag := 5;
         TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
       end;
 
     swtCOMPLETE:
@@ -5564,6 +5608,12 @@ begin
         TestButton.Text := 'Сохранить?';
         TestButton.Tag := 6;
         TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := True;
+          ButtonCancel.Visible := True;
+        end;
       end;
 
     swtFAILURE:
@@ -5571,12 +5621,24 @@ begin
         TestButton.Text := 'Ошибка';
         TestButton.Tag := 0;
         TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := True;
+          ButtonCancel.Visible := True;
+        end;
       end;
   else
     begin
       TestButton.Text := 'Измерение';
       TestButton.Tag := 0;
       TestButton.Enabled := False;
+      if ButtonCancel <> nil then
+      begin
+        ButtonCancel.Text := 'Отмена';
+        ButtonCancel.Enabled := False;
+        ButtonCancel.Visible := False;
+      end;
     end;
   end;
 end;
@@ -5588,6 +5650,13 @@ var
 begin
   if TestButton = nil then
     Exit;
+
+  if ButtonCancel <> nil then
+  begin
+    ButtonCancel.Text := 'Отмена';
+    ButtonCancel.Enabled := False;
+    ButtonCancel.Visible := False;
+  end;
 
   Run := MeasurementRun;
   CanStart :=
