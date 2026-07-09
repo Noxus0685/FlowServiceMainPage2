@@ -724,6 +724,7 @@ type
       AWorkTable: TWorkTable; ADeletedUUIDs: TStrings);
     function ChannelMatchesDeletedDevice(AChannel: TChannel; ADeletedUUIDs: TStrings): Boolean;
     procedure CopyChannelData(ASource, ADest: TChannel);
+    procedure CloneSelectedChannelDevice(ASource, ADest: TChannel);
     procedure SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
     function GetSelectedChannel(AChannels: TObjectList<TChannel>; AGrid: TGrid): TChannel;
 
@@ -3945,6 +3946,13 @@ begin
 
   AClipboard.Snapshot := TChannel.Create;
   AClipboard.Snapshot.AssignFlowMeterFrom(AChannel, nil, False);
+  if (AChannel.FlowMeter <> nil) and (AChannel.FlowMeter.Device <> nil) and
+     (AClipboard.Snapshot.FlowMeter <> nil) then
+  begin
+    AClipboard.Snapshot.FlowMeter.Device := TDevice.Create;
+    AClipboard.Snapshot.FlowMeter.Device.Assign(AChannel.FlowMeter.Device, False);
+    AClipboard.Snapshot.FlowMeter.Device.SerialNumber := AChannel.FlowMeter.Device.SerialNumber;
+  end;
 end;
 
 procedure TFrameMainTable.LoadChannelFromClipboard(AChannel: TChannel;
@@ -3953,7 +3961,7 @@ begin
   if (AChannel = nil) or not AClipboard.HasData or (AClipboard.Snapshot = nil) then
     Exit;
 
-  AChannel.AssignFlowMeterFrom(AClipboard.Snapshot, FActiveWorkTable, True);
+  CloneSelectedChannelDevice(AClipboard.Snapshot, AChannel);
   if FFrameProceed <> nil then
     FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
   MarkChannelDeviceModified(AChannel);
@@ -4270,6 +4278,15 @@ begin
   MarkChannelDeviceModified(ADest);
 end;
 
+procedure TFrameMainTable.CloneSelectedChannelDevice(ASource, ADest: TChannel);
+begin
+  if (ASource = nil) or (ADest = nil) then
+    Exit;
+
+  ADest.AssignFlowMeterFrom(ASource, FActiveWorkTable, True);
+  MarkChannelDeviceModified(ADest);
+end;
+
 procedure TFrameMainTable.SyncChannelsWithSameDeviceUUID(AChangedChannel: TChannel; const AOldUUID: string);
 var
   I: Integer;
@@ -4384,13 +4401,11 @@ begin
 
 
 
-       If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
-      begin
-      Ch.FlowMeter.Device.Assign(Src.FlowMeter.Device, False);//  (Src.FlowMeter.Device.DN, SourceType);
-      PersistDeviceAsync(Ch.FlowMeter.Device); //Сохранение прибора
-      end
-       else
-      AttachType(Ch, SourceType, FoundRepo, True);
+      CloneSelectedChannelDevice(Src, Ch);
+      if (Ch.FlowMeter <> nil) and (Ch.FlowMeter.Device <> nil) then
+        PersistDeviceAsync(Ch.FlowMeter.Device) //Сохранение прибора
+      else
+        AttachType(Ch, SourceType, FoundRepo, True);
 
   //  If (Ch.FlowMeter.Device<>nil) and (Src.FlowMeter.Device<>nil) then
   //    Ch.FlowMeter.Device.AttachDN(Src.FlowMeter.Device.DN, SourceType);
@@ -4605,7 +4620,7 @@ begin
     Exit;
   for Ch in FActiveWorkTable.EtalonChannels do
     if Ch <> Src then
-      CopyChannelData(Src, Ch);
+      CloneSelectedChannelDevice(Src, Ch);
   UpdateGrids;
 end;
 
