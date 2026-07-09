@@ -698,6 +698,11 @@ type
     procedure StopMonitor;
     procedure StartMeasurement;
     procedure StopMeasurement;
+    procedure UpdateTestButton;
+    procedure UpdateTestButtonByWorkTableState;
+    procedure UpdateTestButtonByMeasurementRun;
+    procedure TestButtonClickManualMode;
+    procedure TestButtonClickAutoMode;
     function IsTestButtonSaveMode: Boolean;
     function IsMeasurementActive(AWorkTable: TWorkTable): Boolean;
     function NeedSaveMeasurementResults(AWorkTable: TWorkTable): Boolean;
@@ -1256,6 +1261,7 @@ begin
                FActiveWorkTable.MeasurementMode := EMeasurementRunMode.mrmManual;
            end;
 
+  UpdateTestButton;
 end;
 
 procedure TFrameMainTable.UpdateForm;
@@ -1750,6 +1756,8 @@ begin
         TestButton.Text := 'Сохранить?';
         TestButton.Tag := 6;
         TestButton.Enabled := True;
+        ButtonCancel.Text := 'Отмена';
+        ButtonCancel.Enabled := True;
         ButtonCancel.Visible := True;
         GlowEffectCancelRed.Enabled := True;
 
@@ -1770,6 +1778,8 @@ begin
       // swtNONE
     end;
   end;
+
+  UpdateTestButton;
 end;
 
 procedure TFrameMainTable.FormCreate(Sender: TObject);
@@ -5480,6 +5490,292 @@ begin
   end;
 end;
 
+
+procedure TFrameMainTable.UpdateTestButton;
+begin
+  if TestButton = nil then
+    Exit;
+
+  if (SwitchAuto <> nil) and SwitchAuto.IsChecked then
+    UpdateTestButtonByMeasurementRun
+  else
+    UpdateTestButtonByWorkTableState;
+end;
+
+procedure TFrameMainTable.UpdateTestButtonByWorkTableState;
+begin
+  if TestButton = nil then
+    Exit;
+
+  if FActiveWorkTable = nil then
+  begin
+    TestButton.Text := 'Измерение';
+    TestButton.Tag := 0;
+    TestButton.Enabled := False;
+    if ButtonCancel <> nil then
+    begin
+      ButtonCancel.Text := 'Отмена';
+      ButtonCancel.Enabled := False;
+      ButtonCancel.Visible := False;
+    end;
+    Exit;
+  end;
+
+  case FActiveWorkTable.State of
+    swtSTANDBY,
+    swtNONE:
+      begin
+        TestButton.Text := 'Измерение';
+        TestButton.Tag := 0;
+        TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
+      end;
+
+    swtCONNECTED:
+      begin
+        TestButton.Text := 'Измерение';
+        TestButton.Tag := 1;
+        TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
+      end;
+
+    swtSTARTTEST:
+      begin
+        TestButton.Text := 'Запуск';
+        TestButton.Tag := 2;
+        TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
+      end;
+
+    swtSTARTWAIT,
+    swtEXECUTE:
+      begin
+        TestButton.Text := 'Стоп';
+        TestButton.Tag := 3;
+        TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
+      end;
+
+    swtSTOPTEST,
+    swtSTOPWAIT:
+      begin
+        TestButton.Text := 'Завершение';
+        TestButton.Tag := 4;
+        TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
+      end;
+
+    swtFINALREAD:
+      begin
+        TestButton.Text := 'Сохранение';
+        TestButton.Tag := 5;
+        TestButton.Enabled := False;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := False;
+          ButtonCancel.Visible := False;
+        end;
+      end;
+
+    swtCOMPLETE:
+      begin
+        TestButton.Text := 'Сохранить?';
+        TestButton.Tag := 6;
+        TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := True;
+          ButtonCancel.Visible := True;
+        end;
+      end;
+
+    swtFAILURE:
+      begin
+        TestButton.Text := 'Ошибка';
+        TestButton.Tag := 0;
+        TestButton.Enabled := True;
+        if ButtonCancel <> nil then
+        begin
+          ButtonCancel.Text := 'Отмена';
+          ButtonCancel.Enabled := True;
+          ButtonCancel.Visible := True;
+        end;
+      end;
+  else
+    begin
+      TestButton.Text := 'Измерение';
+      TestButton.Tag := 0;
+      TestButton.Enabled := False;
+      if ButtonCancel <> nil then
+      begin
+        ButtonCancel.Text := 'Отмена';
+        ButtonCancel.Enabled := False;
+        ButtonCancel.Visible := False;
+      end;
+    end;
+  end;
+end;
+
+procedure TFrameMainTable.UpdateTestButtonByMeasurementRun;
+var
+  Run: TMeasurementRun;
+  CanStart: Boolean;
+begin
+  if TestButton = nil then
+    Exit;
+
+  if ButtonCancel <> nil then
+  begin
+    ButtonCancel.Text := 'Отмена';
+    ButtonCancel.Enabled := False;
+    ButtonCancel.Visible := False;
+  end;
+
+  Run := MeasurementRun;
+  CanStart :=
+    (FActiveWorkTable <> nil) and
+    (FActiveWorkTable.State in [swtCONNECTED, swtCOMPLETE]);
+
+  if (FActiveWorkTable <> nil) and (FActiveWorkTable.State = swtFAILURE) then
+  begin
+    TestButton.Text := 'Ошибка';
+    TestButton.Tag := 0;
+    TestButton.Enabled := True;
+    Exit;
+  end;
+
+  if Run = nil then
+  begin
+    TestButton.Text := 'Старт';
+    TestButton.Tag := 0;
+    TestButton.Enabled := False;
+    Exit;
+  end;
+
+  case Run.Stage of
+    msNone,
+    msDone:
+      begin
+        TestButton.Text := 'Старт';
+        TestButton.Tag := 1;
+        TestButton.Enabled := CanStart;
+      end;
+
+    msSelectPoint,
+    msSelectEtalon,
+    msSetupPoint,
+    msWaitStable,
+    msWaitMeasureStart,
+    msMeasure:
+      begin
+        TestButton.Text := 'Стоп';
+        TestButton.Tag := 3;
+        TestButton.Enabled := True;
+      end;
+
+    msWaitMeasureStop:
+      begin
+        TestButton.Text := 'Остановка';
+        TestButton.Tag := 4;
+        TestButton.Enabled := False;
+      end;
+
+    msResultsRead:
+      begin
+        TestButton.Text := 'Чтение';
+        TestButton.Tag := 5;
+        TestButton.Enabled := False;
+      end;
+
+    msSave:
+      begin
+        TestButton.Text := 'Сохранение';
+        TestButton.Tag := 5;
+        TestButton.Enabled := False;
+      end;
+  else
+    begin
+      TestButton.Text := 'Старт';
+      TestButton.Tag := 0;
+      TestButton.Enabled := False;
+    end;
+  end;
+end;
+
+procedure TFrameMainTable.TestButtonClickManualMode;
+begin
+  if FActiveWorkTable = nil then
+    Exit;
+
+  if IsTestButtonSaveMode then
+  begin
+    AcceptMeasurementResults;
+    Exit;
+  end;
+
+  if IsMeasurementActive(FActiveWorkTable) then
+    StopMeasurement
+  else
+    StartMeasurement;
+end;
+
+procedure TFrameMainTable.TestButtonClickAutoMode;
+var
+  Run: TMeasurementRun;
+begin
+  Run := MeasurementRun;
+  if Run = nil then
+    Exit;
+
+  case Run.Stage of
+    msNone,
+    msDone:
+      StartMeasurement;
+
+    msSelectPoint,
+    msSelectEtalon,
+    msSetupPoint,
+    msWaitStable,
+    msWaitMeasureStart,
+    msMeasure:
+      StopMeasurement;
+
+    msWaitMeasureStop,
+    msResultsRead,
+    msSave:
+      Exit;
+  else
+    Exit;
+  end;
+end;
+
 function TFrameMainTable.IsTestButtonSaveMode: Boolean;
 begin
   Result :=
@@ -5570,23 +5866,14 @@ end;
 // - start a new measurement.
 // Business logic must be kept in dedicated helper methods.
 procedure TFrameMainTable.TestButtonClick(Sender: TObject);
-var
-  WorkTable: TWorkTable;
 begin
-  WorkTable := FActiveWorkTable;
-  if WorkTable = nil then
+  if FActiveWorkTable = nil then
     Exit;
 
-  if IsTestButtonSaveMode then
-  begin
-    AcceptMeasurementResults;
-    Exit;
-  end;
-
-  if IsMeasurementActive(WorkTable) then
-    StopMeasurement
+  if (SwitchAuto <> nil) and SwitchAuto.IsChecked then
+    TestButtonClickAutoMode
   else
-    StartMeasurement;
+    TestButtonClickManualMode;
 end;
 
 procedure TFrameMainTable.Button1Click(Sender: TObject);
