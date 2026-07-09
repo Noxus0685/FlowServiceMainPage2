@@ -16,6 +16,7 @@ uses
   FMX.TreeView,
   FMX.Types,
   System.Classes,
+  System.Math,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -120,6 +121,8 @@ type
 
     function GetFlowDimName: string;
     procedure NotifyChanged;
+    procedure ApplyOutputType;
+    function GetActiveOutputType: Integer;
   public
     constructor Create(AOwner: TComponent); override;
     procedure SetFlowMeter(AFlowMeter: TFlowMeter);
@@ -132,6 +135,7 @@ type
 implementation
 
 uses
+  System.Math,
   uBaseProcedures;
 
 {$R *.fmx}
