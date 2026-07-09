@@ -154,7 +154,6 @@ begin
   TreeInspector.Stored := False;
 
   CategoryMain := AddCategory('Основные');
-  CategoryRanges := AddCategory('Диапазоны');
 
   EditDeviceName := TEdit.Create(Self);
   EditDeviceName.OnExit := EditDeviceNameExit;
@@ -177,22 +176,6 @@ begin
   ComboOutputType.Items.Add('Визуальный');
   ComboOutputType.OnChange := ComboOutputTypeChange;
   LabelOutputType := AddPropertyRow(CategoryMain, 'Тип выхода', ComboOutputType);
-
-  EditFlowMax := TEdit.Create(Self);
-  EditFlowMax.OnExit := EditFlowMaxExit;
-  LabelFlowMax := AddPropertyRow(CategoryRanges, 'Q макс', EditFlowMax);
-
-  EditFlowMin := TEdit.Create(Self);
-  EditFlowMin.OnExit := EditFlowMinExit;
-  LabelFlowMin := AddPropertyRow(CategoryRanges, 'Q мин', EditFlowMin);
-
-  EditQuantityMax := TEdit.Create(Self);
-  EditQuantityMax.OnExit := EditQuantityMaxExit;
-  LabelQuantityMax := AddPropertyRow(CategoryRanges, 'V макс', EditQuantityMax);
-
-  EditQuantityMin := TEdit.Create(Self);
-  EditQuantityMin.OnExit := EditQuantityMinExit;
-  LabelQuantityMin := AddPropertyRow(CategoryRanges, 'V мин', EditQuantityMin);
 end;
 
 function TFrameFlowMeterProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -295,15 +278,6 @@ end;
 
 procedure TFrameFlowMeterProperties.UpdateHeaders;
 begin
-  LabelFlowMax.Text := 'Q макс, ' + GetFlowDimName;
-  LabelFlowMin.Text := 'Q мин, ' + GetFlowDimName;
-  LabelQuantityMax.Text := 'V макс, ' + GetQuantityDimName;
-  LabelQuantityMin.Text := 'V мин, ' + GetQuantityDimName;
-
-  EditFlowMax.Hint := 'Диапазон Q макс — максимум диапазона расхода';
-  EditFlowMin.Hint := 'Диапазон Q мин — минимум диапазона расхода';
-  EditQuantityMax.Hint := 'Диапазон V макс — максимум диапазона количества';
-  EditQuantityMin.Hint := 'Диапазон V мин — минимум диапазона количества';
 end;
 
 function TFrameFlowMeterProperties.GetOutputTypeIndex(AOutputType: Integer): Integer;
@@ -347,10 +321,6 @@ begin
     EditDeviceTypeName.Enabled := Enabled;
     EditSerialNumber.Enabled := Enabled;
     ComboOutputType.Enabled := Enabled;
-    EditFlowMax.Enabled := Enabled;
-    EditFlowMin.Enabled := Enabled;
-    EditQuantityMax.Enabled := Enabled;
-    EditQuantityMin.Enabled := Enabled;
 
     if not Enabled then
     begin
@@ -358,10 +328,6 @@ begin
       EditDeviceTypeName.Text := '';
       EditSerialNumber.Text := '';
       ComboOutputType.ItemIndex := -1;
-      EditFlowMax.Text := '';
-      EditFlowMin.Text := '';
-      EditQuantityMax.Text := '';
-      EditQuantityMin.Text := '';
       Exit;
     end;
 
@@ -370,10 +336,6 @@ begin
     EditSerialNumber.Text := Trim(FFlowMeter.SerialNumber);
     ComboOutputType.ItemIndex := GetOutputTypeIndex(FFlowMeter.OutputType);
 
-    EditFlowMax.Text := FloatToStr(FFlowMeter.FlowMax);
-    EditFlowMin.Text := FloatToStr(FFlowMeter.FlowMin);
-    EditQuantityMax.Text := FloatToStr(FFlowMeter.QuantityMax);
-    EditQuantityMin.Text := FloatToStr(FFlowMeter.QuantityMin);
   finally
     FIsLoading := False;
   end;

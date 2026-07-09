@@ -3438,6 +3438,7 @@ begin
 
   if AChannel.FlowMeter <> nil then
     AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
 
   MarkChannelDeviceModified(AChannel);
   PersistDeviceAsync(Device);
@@ -3544,6 +3545,7 @@ begin
         AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
 
         AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
       end;
 
       MarkChannelDeviceModified(AChannel);
@@ -3579,6 +3581,7 @@ begin
         begin
           AChannel.FlowMeter.Device := ADevice;
           AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
         end;
       end;
 
@@ -3748,6 +3751,7 @@ begin
       AChannel.RepoDeviceUUID := AChannel.FlowMeter.Device.RepoDeviceUUID;
 
       AChannel.FlowMeter.UpdateByDevice;
+      AChannel.InitWorkRangesFromFlowMeter;
 
       if FFrameProceed <> nil then
         FFrameProceed.AddProcessingDevice(AChannel.FlowMeter.Device);
@@ -3765,6 +3769,7 @@ begin
 
           LinkedChannel.FlowMeter.Device := AChannel.FlowMeter.Device;
           LinkedChannel.FlowMeter.UpdateByDevice;
+          LinkedChannel.InitWorkRangesFromFlowMeter;
 
           LinkedChannel.DeviceUUID := AChannel.DeviceUUID;
           LinkedChannel.TypeUUID := AChannel.TypeUUID;
