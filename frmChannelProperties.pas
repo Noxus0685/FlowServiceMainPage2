@@ -28,6 +28,7 @@ type
   TFrameChannelProperties = class(TFrame)
   private
     LayoutRoot: TLayout;
+    RectangleBackground: TRectangle;
     HeaderGrid: TGridPanelLayout;
     TreeInspector: TTreeView;
     HeaderProperty: TLabel;
@@ -71,6 +72,10 @@ type
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
     procedure NotifyWorkTableRefreshIfChanged(const AChanged: Boolean);
+    procedure RefreshInspector;
+    procedure TreeInspectorViewportPositionChange(Sender: TObject;
+      const OldViewportPosition, NewViewportPosition: TPointF;
+      const ContentSizeChanged: Boolean);
   public
     constructor Create(AOwner: TComponent); override;
     procedure LoadFromChannel(AChannel: TChannel);
@@ -80,6 +85,10 @@ implementation
 
 {$R *.fmx}
 
+const
+  ChannelPropertiesBackColor = $FFF0F0F0;
+  ChannelPropertiesRowColor = $FFFFFFFF;
+
 constructor TFrameChannelProperties.Create(AOwner: TComponent);
 begin
   inherited;
@@ -87,6 +96,8 @@ begin
 end;
 
 function TFrameChannelProperties.AddCategory(const ACaption: string): TTreeViewItem;
+var
+  CategoryBackground: TRectangle;
 begin
   Result := TTreeViewItem.Create(Self);
   Result.Parent := TreeInspector;
@@ -96,6 +107,15 @@ begin
   Result.TextSettings.FontColor := $FF2C2C2C;
   Result.IsExpanded := True;
   Result.Height := 30;
+
+  CategoryBackground := TRectangle.Create(Self);
+  CategoryBackground.Parent := Result;
+  CategoryBackground.Align := TAlignLayout.Client;
+  CategoryBackground.Fill.Color := ChannelPropertiesBackColor;
+  CategoryBackground.Stroke.Kind := TBrushKind.None;
+  CategoryBackground.HitTest := False;
+  CategoryBackground.Stored := False;
+  CategoryBackground.SendToBack;
 end;
 
 function TFrameChannelProperties.AddPropertyRow(AParent: TTreeViewItem;
@@ -104,12 +124,22 @@ var
   Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
   Divider: TLine;
+  RowBackground: TRectangle;
 begin
   Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
   Item.Text := '';
   Item.Stored := False;
   Item.Height := 32;
+
+  RowBackground := TRectangle.Create(Self);
+  RowBackground.Parent := Item;
+  RowBackground.Align := TAlignLayout.Client;
+  RowBackground.Fill.Color := ChannelPropertiesRowColor;
+  RowBackground.Stroke.Kind := TBrushKind.None;
+  RowBackground.HitTest := False;
+  RowBackground.Stored := False;
+  RowBackground.SendToBack;
 
   RowGrid := TGridPanelLayout.Create(Self);
   RowGrid.Parent := Item;
@@ -374,6 +404,7 @@ procedure TFrameChannelProperties.NotifyWorkTableRefreshIfChanged(const AChanged
 var
   WorkTable: TWorkTable;
 begin
+  RefreshInspector;
   if not AChanged then
     Exit;
   if (FChannel = nil) or (WorkTableManager = nil) then
@@ -384,6 +415,20 @@ begin
     WorkTable.FireEvent(ewtRefresh);
 end;
 
+procedure TFrameChannelProperties.RefreshInspector;
+begin
+  if TreeInspector = nil then
+    Exit;
+  TreeInspector.Realign;
+  TreeInspector.Repaint;
+end;
+
+procedure TFrameChannelProperties.TreeInspectorViewportPositionChange(Sender: TObject;
+  const OldViewportPosition, NewViewportPosition: TPointF;
+  const ContentSizeChanged: Boolean);
+begin
+  RefreshInspector;
+end;
 
 procedure TFrameChannelProperties.LoadFromChannel(AChannel: TChannel);
 var
@@ -430,6 +475,7 @@ begin
   finally
     FLoading := False;
     RefreshRegisterColors;
+    RefreshInspector;
   end;
 end;
 
@@ -441,11 +487,20 @@ var
   CategoryAnalogVoltage: TTreeViewItem;
   CategoryRanges: TTreeViewItem;
 begin
+  TreeInspector := nil;
   LayoutRoot := TLayout.Create(Self);
   LayoutRoot.Parent := Self;
   LayoutRoot.Align := TAlignLayout.Client;
   LayoutRoot.Padding.Rect := TRectF.Create(6, 6, 6, 6);
 
+  RectangleBackground := TRectangle.Create(Self);
+  RectangleBackground.Parent := LayoutRoot;
+  RectangleBackground.Align := TAlignLayout.Client;
+  RectangleBackground.Fill.Color := ChannelPropertiesBackColor;
+  RectangleBackground.Stroke.Kind := TBrushKind.None;
+  RectangleBackground.HitTest := False;
+  RectangleBackground.Stored := False;
+  RectangleBackground.SendToBack;
 
   TreeInspector := TTreeView.Create(Self);
   TreeInspector.Parent := LayoutRoot;
@@ -454,6 +509,7 @@ begin
   TreeInspector.ItemHeight := 32;
   TreeInspector.HitTest := True;
   TreeInspector.Stored := False;
+  TreeInspector.OnViewportPositionChange := TreeInspectorViewportPositionChange;
 
   HeaderGrid := TGridPanelLayout.Create(Self);
   HeaderGrid.Parent := LayoutRoot;
@@ -479,7 +535,9 @@ begin
   HeaderValue.Parent := HeaderGrid;
   HeaderValue.Align := TAlignLayout.Client;
 
-  CategoryGeneral := AddCategory('Общий');
+  TreeInspector.BeginUpdate;
+  try
+    CategoryGeneral := AddCategory('Общий');
   EditChannelText := TEdit.Create(Self);
   AddPropertyRow(CategoryGeneral, 'Название канала', EditChannelText);
   EditChannelText.KillFocusByReturn:=True;
@@ -568,7 +626,12 @@ begin
   AddPropertyRow(CategoryAnalogVoltage, 'Усреднение', CreateComboBox(['Выкл', '2 сек', '4 сек']));
   AddPropertyRow(CategoryAnalogVoltage, 'Текущий ток', TLabel.Create(Self));
   AddPropertyRow(CategoryAnalogVoltage, 'Квадратичное отклонение, %', TLabel.Create(Self));
-  AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
+    AddPropertyRow(CategoryAnalogVoltage, 'Девиация, В', TLabel.Create(Self));
+  finally
+    TreeInspector.EndUpdate;
+  end;
+
+  RefreshInspector;
 end;
 
 end.
