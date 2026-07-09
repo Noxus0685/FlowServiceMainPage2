@@ -103,7 +103,6 @@ function TFrameChannelProperties.AddPropertyRow(AParent: TTreeViewItem;
 var
   Item: TTreeViewItem;
   RowGrid: TGridPanelLayout;
-  Divider: TLine;
 begin
   Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
@@ -141,13 +140,6 @@ begin
     TStyledControl(AControl).TabStop := True;
   RowGrid.ControlCollection.AddControl(AControl, 1, 0);
 
-  Divider := TLine.Create(Self);
-  Divider.Parent := Item;
-  Divider.Align := TAlignLayout.Bottom;
-  Divider.Height := 1;
-  Divider.LineType := TLineType.Bottom;
-  Divider.Stroke.Color := $FFEBEBEB;
-  Divider.Stored := False;
 end;
 
 function TFrameChannelProperties.CreateEditCombo(
