@@ -623,8 +623,9 @@ end;
 function TFormMain.BuildImpSecValuesForChannels(AChannels: TObjectList<TChannel>;
   const AFlowRate, AFallbackImpSec: Double): TArray<Double>;
 var
-  I: Integer;
-  Coef, MaxRatio: Double;
+  I, J, GroupKey: Integer;
+  Coef, SUM, MaxRatio, ChannelQmax: Double;
+  WorkTable: TWorkTable;
 begin
   SetLength(Result, 0);
   if AChannels = nil then
@@ -635,6 +636,30 @@ begin
   for I := 0 to AChannels.Count - 1 do
   begin
     MaxRatio := 1;
+    if (WorkTable <> nil) and (AChannels = WorkTable.EtalonChannels) and
+       (AChannels[I] <> nil) and (AChannels[I].FlowMeter <> nil) and
+       (AChannels[I].FlowMeter.Device <> nil) then
+    begin
+      GroupKey := AChannels[I].Group;
+      SUM := 0;
+      for J := 0 to AChannels.Count - 1 do
+        if (AChannels[J] <> nil) and AChannels[J].Enabled and
+           (AChannels[J].Group = GroupKey) and
+           (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
+          SUM := SUM + WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
+
+      ChannelQmax := WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
+      if SUM > 0 then
+      begin
+        if AFlowRate > SUM then
+          MaxRatio := ChannelQmax / AFlowRate
+        else
+          MaxRatio := ChannelQmax / SUM;
+      end
+      else
+        MaxRatio := 0;
+    end;
+
     Coef := GetChannelFlowCoef(AChannels[I]);
     if (AChannels[I] <> nil) and (not AChannels[I].Enabled) then
       Result[I] := 0
@@ -805,36 +830,8 @@ begin
 
   end;
 
-  EtalonFlowActual := 0;
-  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-    if AWorkTable.EtalonChannels[I] <> nil then
-    begin
-      CurrentFlow := 0;
-      for J := 0 to AWorkTable.EtalonChannels.Count - 1 do
-        if (AWorkTable.EtalonChannels[J] <> nil) and
-           (((AWorkTable.EtalonChannels[I].Group > 0) and
-             (AWorkTable.EtalonChannels[J].Group = AWorkTable.EtalonChannels[I].Group)) or
-            ((AWorkTable.EtalonChannels[I].Group <= 0) and (J = I))) then
-        begin
-          ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[J]);
-          if AWorkTable.EtalonChannels[J].Enabled and (ChannelCoef > 0) then
-            CurrentFlow := CurrentFlow + AWorkTable.EtalonChannels[J].ImpSec / ChannelCoef
-          else if not AWorkTable.EtalonChannels[J].Enabled then
-            CurrentFlow := CurrentFlow + EtalonFlowSet;
-        end;
+  EtalonFlowActual := EtalonFlowSet;
 
-      EtalonFlowActual := Max(EtalonFlowActual, CurrentFlow);
-    end;
-  if EtalonFlowActual <= 0 then
-    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
-      if (AWorkTable.EtalonChannels[I] <> nil) and
-         AWorkTable.EtalonChannels[I].Enabled then
-      begin
-        ChannelCoef := GetChannelFlowCoef(AWorkTable.EtalonChannels[I]);
-        if ChannelCoef > 0 then
-          EtalonFlowActual := AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
-        Break;
-      end;
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
   begin
