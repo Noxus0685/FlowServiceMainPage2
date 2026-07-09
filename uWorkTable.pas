@@ -4767,6 +4767,10 @@ end;
 
 procedure TWorkTable.DoStartTest;
 begin
+  if State in [swtSTARTMONITOR, swtSTARTMONITORWAIT, swtMONITOR] then
+    ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
+      'Переход из режима монитора к измерению без промежуточной остановки', Name);
+
   ResetMeasurementValues;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartTest',
     'Подготовка к запуску измерения. Очистка данных', Name);
