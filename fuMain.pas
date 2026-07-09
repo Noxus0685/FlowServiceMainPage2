@@ -644,7 +644,8 @@ begin
       SUM := 0;
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
-           (AChannels[J].Group = GroupKey) and
+           (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
+            ((GroupKey <= 0) and (J = I))) and
            (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
           SUM := SUM + WorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
 
@@ -763,7 +764,7 @@ var
   GroupChannelCount: Integer;
   DeviceFlow: Double;
 
-  function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup: Integer): Integer;
+  function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup, AChannelIndex: Integer): Integer;
   var
     K: Integer;
   begin
@@ -773,7 +774,8 @@ var
 
     for K := 0 to AChannels.Count - 1 do
       if (AChannels[K] <> nil) and AChannels[K].Enabled and
-         (AChannels[K].Group = AGroup) then
+         (((AGroup > 0) and (AChannels[K].Group = AGroup)) or
+          ((AGroup <= 0) and (K = AChannelIndex))) then
         Inc(Result);
   end;
 begin
@@ -855,7 +857,7 @@ begin
       else if not DeviceReady then
       begin
         ChannelCoef := GetChannelFlowCoef(Channel);
-        GroupChannelCount := GetEnabledGroupCount(AWorkTable.DeviceChannels, Channel.Group);
+        GroupChannelCount := GetEnabledGroupCount(AWorkTable.DeviceChannels, Channel.Group, I);
         if GroupChannelCount > 0 then
           DeviceFlow := EtalonFlowActual / GroupChannelCount
         else
