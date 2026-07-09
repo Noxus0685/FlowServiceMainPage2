@@ -12,14 +12,17 @@ uses
   FMX.ListBox,
   FMX.Objects,
   FMX.StdCtrls,
+  FMX.TabControl,
   FMX.TreeView,
   FMX.Types,
   System.Classes,
+  System.Math,
   System.SysUtils,
   System.Types,
   System.UITypes,
   System.Variants,
   uClasses,
+  uDeviceClass,
   uFlowMeter,
   uWorkTable;
 
@@ -28,6 +31,7 @@ type
   private
     FFlowMeter: TFlowMeter;
     FChannel: TChannel;
+    FDevice: TDevice;
     FIsLoading: Boolean;
     FOnChange: TNotifyEvent;
 
@@ -35,89 +39,87 @@ type
     HeaderGrid: TGridPanelLayout;
     TreeInspector: TTreeView;
     CategoryMain: TTreeViewItem;
-    CategoryRanges: TTreeViewItem;
-    CategoryFrequency: TTreeViewItem;
-    CategoryImpulse: TTreeViewItem;
-    CategoryVoltage: TTreeViewItem;
-    CategoryCurrent: TTreeViewItem;
-    CategoryInterface: TTreeViewItem;
-    CategoryVisual: TTreeViewItem;
-
-    LabelDeviceName: TLabel;
-    LabelDeviceTypeName: TLabel;
-    LabelSerialNumber: TLabel;
-    LabelOutputType: TLabel;
-    LabelFlowMax: TLabel;
-    LabelFlowMin: TLabel;
-    LabelQuantityMax: TLabel;
-    LabelQuantityMin: TLabel;
+    CategoryOutput: TTreeViewItem;
 
     EditDeviceName: TEdit;
     EditDeviceTypeName: TEdit;
     EditSerialNumber: TEdit;
     ComboOutputType: TComboBox;
-    EditFlowMax: TEdit;
-    EditFlowMin: TEdit;
-    EditQuantityMax: TEdit;
-    EditQuantityMin: TEdit;
-    LabelFreqOutputSet: TLabel;
-    LabelFreq: TLabel;
-    LabelFreqView: TLabel;
-    LabelFreqFlowRate: TLabel;
-    ComboFreqOutputSet: TComboBox;
-    EditFreq: TEdit;
-    ComboFreqView: TComboBox;
-    EditFreqFlowRate: TEdit;
-    LabelImpulseOutputSet: TLabel;
-    LabelImpulseView: TLabel;
-    LabelImpulseCoef: TLabel;
-    ComboImpulseOutputSet: TComboBox;
-    ComboImpulseView: TComboBox;
-    EditCoef: TEdit;
-    ComboVoltageRange: TComboBox;
-    EditVoltageQminRate: TEdit;
-    EditVoltageQmaxRate: TEdit;
-    ComboCurrentRange: TComboBox;
-    EditCurrentQminRate: TEdit;
-    EditCurrentQmaxRate: TEdit;
-    EditProtocolName: TEdit;
-    ComboBaudRate: TComboBox;
-    ComboParity: TComboBox;
-    EditDeviceAddress: TEdit;
-    ComboInputType: TComboBox;
     HeaderProperty: TLabel;
     HeaderValue: TLabel;
     HeaderDivider: TLine;
 
+    TabControlOutputType: TTabControl;
+    TabFrequency: TTabItem;
+    TabImpulse: TTabItem;
+    TabVoltage: TTabItem;
+    TabCurrent: TTabItem;
+    TabInterface: TTabItem;
+    TabVisual: TTabItem;
+
+    cbOutPutType: TComboBox;
+    EditFreq: TEdit;
+    ComboBox6: TComboBox;
+    EditFreqFlowRate: TEdit;
+
+    cbOutPutType2: TComboBox;
+    cbCoefViewType: TComboBox;
+    EditCoef: TEdit;
+
+    cbVoltageRange: TComboBox;
+    EditVoltageQminRate: TEdit;
+    EditVoltageQmaxRate: TEdit;
+
+    cbCurrentRange: TComboBox;
+    EditCurrentQminRate: TEdit;
+    EditCurrentQmaxRate: TEdit;
+
+    EditProtocolName: TEdit;
+    cbBaudRate: TComboBox;
+    cbParity: TComboBox;
+    EditDeviceAddress: TEdit;
+
+    cbInputType: TComboBox;
+
     procedure BuildUI;
     procedure UpdateHeaders;
     procedure UpdateControls;
+    procedure ClearUI;
     function AddCategory(const ACaption: string): TTreeViewItem;
     function AddPropertyRow(AParent: TTreeViewItem; const ACaption: string;
       AControl: TControl; const AHint: string = ''): TLabel;
+    procedure AddTabRow(ATab: TTabItem; const ACaption: string; AControl: TControl);
+    procedure FillOutputSetCombo(ACombo: TComboBox);
+    procedure FillCoefViewCombo(ACombo: TComboBox);
+    procedure PopulateOutputTypeCombo(const ASelectedOutputType: Integer);
+    procedure ApplyOutputType;
+    procedure UpdateUIFreq;
+    procedure UpdateUICoef;
+    procedure UpdateUIVoltage;
+    procedure UpdateUICurrent;
+    procedure UpdateUIInterface;
+    procedure UpdateUIVisual;
 
     procedure EditDeviceNameExit(Sender: TObject);
     procedure EditDeviceTypeNameExit(Sender: TObject);
     procedure EditSerialNumberExit(Sender: TObject);
     procedure ComboOutputTypeChange(Sender: TObject);
-    procedure EditFlowMaxExit(Sender: TObject);
-    procedure EditFlowMinExit(Sender: TObject);
-    procedure EditQuantityMaxExit(Sender: TObject);
-    procedure EditQuantityMinExit(Sender: TObject);
-    procedure ComboFreqOutputSetChange(Sender: TObject);
-    procedure ComboFreqViewChange(Sender: TObject);
+    procedure cbOutPutTypeChange(Sender: TObject);
+    procedure cbOutPutType2Change(Sender: TObject);
+    procedure cbCoefViewTypeChange(Sender: TObject);
+    procedure ComboBox6Change(Sender: TObject);
     procedure EditFreqExit(Sender: TObject);
     procedure EditFreqFlowRateExit(Sender: TObject);
-    procedure ComboImpulseOutputSetChange(Sender: TObject);
-    procedure ComboImpulseViewChange(Sender: TObject);
     procedure EditCoefExit(Sender: TObject);
-    procedure OutputComboChange(Sender: TObject);
-    procedure OutputEditExit(Sender: TObject);
+    procedure cbVoltageRangeChange(Sender: TObject);
+    procedure EditVoltageExit(Sender: TObject);
+    procedure cbCurrentRangeChange(Sender: TObject);
+    procedure EditCurrentExit(Sender: TObject);
+    procedure InterfaceControlChange(Sender: TObject);
+    procedure InterfaceEditExit(Sender: TObject);
+    procedure cbInputTypeChange(Sender: TObject);
 
-    function GetOutputTypeIndex(AOutputType: Integer): Integer;
-    function GetOutputTypeByIndex(AIndex: Integer): Integer;
     function GetFlowDimName: string;
-    function GetQuantityDimName: string;
     procedure NotifyChanged;
     procedure ApplyOutputType;
     function GetActiveOutputType: Integer;
@@ -138,13 +140,15 @@ uses
 
 {$R *.fmx}
 
-{ TFrameFlowMeterProperties }
+const
+  COutputNames: array[0..5] of string = (
+    'Частота', 'Импульсы', 'Напряжение', 'Ток', 'Интерфейс', 'Визуальный');
 
 constructor TFrameFlowMeterProperties.Create(AOwner: TComponent);
 begin
   inherited;
   BuildUI;
-  UpdateControls;
+  ClearUI;
 end;
 
 procedure TFrameFlowMeterProperties.BuildUI;
@@ -159,8 +163,8 @@ begin
   HeaderGrid.Parent := LayoutRoot;
   HeaderGrid.Align := TAlignLayout.Top;
   HeaderGrid.Height := 30;
-  HeaderGrid.RowCollection.Clear;
   HeaderGrid.ColumnCollection.Clear;
+  HeaderGrid.RowCollection.Clear;
   HeaderGrid.ColumnCollection.Add.Value := 45;
   HeaderGrid.ColumnCollection.Add.Value := 55;
   HeaderGrid.RowCollection.Add.Value := 100;
@@ -172,7 +176,6 @@ begin
   HeaderProperty.Text := 'Свойство';
   HeaderProperty.StyledSettings := [];
   HeaderProperty.TextSettings.Font.Style := [TFontStyle.fsBold];
-  HeaderProperty.TextSettings.FontColor := $FF3D3D3D;
   HeaderProperty.Margins.Rect := TRectF.Create(10, 0, 8, 0);
   HeaderGrid.ControlCollection.AddControl(HeaderProperty, 0, 0);
 
@@ -182,7 +185,6 @@ begin
   HeaderValue.Text := 'Значение';
   HeaderValue.StyledSettings := [];
   HeaderValue.TextSettings.Font.Style := [TFontStyle.fsBold];
-  HeaderValue.TextSettings.FontColor := $FF3D3D3D;
   HeaderValue.Margins.Rect := TRectF.Create(8, 0, 10, 0);
   HeaderGrid.ControlCollection.AddControl(HeaderValue, 1, 0);
 
@@ -191,7 +193,6 @@ begin
   HeaderDivider.Align := TAlignLayout.Top;
   HeaderDivider.Height := 1;
   HeaderDivider.LineType := TLineType.Bottom;
-  HeaderDivider.Stroke.Color := $FFCDCDCD;
   HeaderDivider.Stored := False;
 
   TreeInspector := TTreeView.Create(Self);
@@ -199,149 +200,137 @@ begin
   TreeInspector.Align := TAlignLayout.Client;
   TreeInspector.ShowCheckboxes := False;
   TreeInspector.ItemHeight := 32;
-  TreeInspector.HitTest := True;
   TreeInspector.Stored := False;
 
   CategoryMain := AddCategory('Основные');
 
   EditDeviceName := TEdit.Create(Self);
   EditDeviceName.OnExit := EditDeviceNameExit;
-  LabelDeviceName := AddPropertyRow(CategoryMain, 'Имя', EditDeviceName);
+  AddPropertyRow(CategoryMain, 'Имя', EditDeviceName);
 
   EditDeviceTypeName := TEdit.Create(Self);
   EditDeviceTypeName.OnExit := EditDeviceTypeNameExit;
-  LabelDeviceTypeName := AddPropertyRow(CategoryMain, 'Тип', EditDeviceTypeName);
+  AddPropertyRow(CategoryMain, 'Тип', EditDeviceTypeName);
 
   EditSerialNumber := TEdit.Create(Self);
   EditSerialNumber.OnExit := EditSerialNumberExit;
-  LabelSerialNumber := AddPropertyRow(CategoryMain, 'Серийный номер', EditSerialNumber);
+  AddPropertyRow(CategoryMain, 'Серийный номер', EditSerialNumber);
 
   ComboOutputType := TComboBox.Create(Self);
-  ComboOutputType.Items.Add('Частота');
-  ComboOutputType.Items.Add('Импульсы');
-  ComboOutputType.Items.Add('Напряжение');
-  ComboOutputType.Items.Add('Ток');
-  ComboOutputType.Items.Add('Интерфейс');
-  ComboOutputType.Items.Add('Визуальный');
   ComboOutputType.OnChange := ComboOutputTypeChange;
-  LabelOutputType := AddPropertyRow(CategoryMain, 'Тип выхода', ComboOutputType);
+  AddPropertyRow(CategoryMain, 'Тип выхода', ComboOutputType);
 
-  CategoryFrequency := AddCategory('Частота');
+  CategoryOutput := AddCategory('Настройки выхода');
+  CategoryOutput.Height := 220;
 
-  ComboFreqOutputSet := TComboBox.Create(Self);
-  ComboFreqOutputSet.Items.Add('Авто');
-  ComboFreqOutputSet.Items.Add('Пассивный');
-  ComboFreqOutputSet.Items.Add('Активный');
-  ComboFreqOutputSet.Items.Add('Активный высокоомный');
-  ComboFreqOutputSet.Items.Add('Емкостной');
-  ComboFreqOutputSet.OnChange := ComboFreqOutputSetChange;
-  LabelFreqOutputSet := AddPropertyRow(CategoryFrequency, 'Тип выхода', ComboFreqOutputSet);
+  TabControlOutputType := TTabControl.Create(Self);
+  TabControlOutputType.Parent := CategoryOutput;
+  TabControlOutputType.Align := TAlignLayout.Client;
+  TabControlOutputType.TabPosition := TTabPosition.None;
+  TabControlOutputType.Stored := False;
 
+  TabFrequency := TTabItem.Create(Self);
+  TabFrequency.Parent := TabControlOutputType;
+  TabFrequency.Text := 'Частота';
+  cbOutPutType := TComboBox.Create(Self);
+  FillOutputSetCombo(cbOutPutType);
+  cbOutPutType.OnChange := cbOutPutTypeChange;
+  AddTabRow(TabFrequency, 'Тип выхода', cbOutPutType);
   EditFreq := TEdit.Create(Self);
   EditFreq.TextPrompt := 'F: 0..10кГц';
   EditFreq.KillFocusByReturn := True;
   EditFreq.OnExit := EditFreqExit;
-  LabelFreq := AddPropertyRow(CategoryFrequency, 'Частота, Гц', EditFreq);
-
-  ComboFreqView := TComboBox.Create(Self);
-  ComboFreqView.Items.Add('имп/л');
-  ComboFreqView.Items.Add('л/имп');
-  ComboFreqView.ItemIndex := 0;
-  ComboFreqView.OnChange := ComboFreqViewChange;
-  LabelFreqView := AddPropertyRow(CategoryFrequency, 'Представление', ComboFreqView);
-
+  AddTabRow(TabFrequency, 'Частота, Гц', EditFreq);
+  ComboBox6 := TComboBox.Create(Self);
+  FillCoefViewCombo(ComboBox6);
+  ComboBox6.OnChange := ComboBox6Change;
+  AddTabRow(TabFrequency, 'Представление', ComboBox6);
   EditFreqFlowRate := TEdit.Create(Self);
   EditFreqFlowRate.TextPrompt := '1';
   EditFreqFlowRate.KillFocusByReturn := True;
   EditFreqFlowRate.OnExit := EditFreqFlowRateExit;
-  LabelFreqFlowRate := AddPropertyRow(CategoryFrequency, 'Расход, QF', EditFreqFlowRate);
+  AddTabRow(TabFrequency, 'Расход, QF', EditFreqFlowRate);
 
-  CategoryImpulse := AddCategory('Импульсы');
-
-  ComboImpulseOutputSet := TComboBox.Create(Self);
-  ComboImpulseOutputSet.Items.Assign(ComboFreqOutputSet.Items);
-  ComboImpulseOutputSet.OnChange := ComboImpulseOutputSetChange;
-  LabelImpulseOutputSet := AddPropertyRow(CategoryImpulse, 'Тип выхода', ComboImpulseOutputSet);
-
-  ComboImpulseView := TComboBox.Create(Self);
-  ComboImpulseView.Items.Add('имп/л');
-  ComboImpulseView.Items.Add('л/имп');
-  ComboImpulseView.ItemIndex := 0;
-  ComboImpulseView.OnChange := ComboImpulseViewChange;
-  LabelImpulseView := AddPropertyRow(CategoryImpulse, 'Представление', ComboImpulseView);
-
+  TabImpulse := TTabItem.Create(Self);
+  TabImpulse.Parent := TabControlOutputType;
+  TabImpulse.Text := 'Импульсы';
+  cbOutPutType2 := TComboBox.Create(Self);
+  FillOutputSetCombo(cbOutPutType2);
+  cbOutPutType2.OnChange := cbOutPutType2Change;
+  AddTabRow(TabImpulse, 'Тип выхода', cbOutPutType2);
+  cbCoefViewType := TComboBox.Create(Self);
+  FillCoefViewCombo(cbCoefViewType);
+  cbCoefViewType.OnChange := cbCoefViewTypeChange;
+  AddTabRow(TabImpulse, 'Представление', cbCoefViewType);
   EditCoef := TEdit.Create(Self);
   EditCoef.TextPrompt := '100';
   EditCoef.KillFocusByReturn := True;
   EditCoef.OnExit := EditCoefExit;
-  LabelImpulseCoef := AddPropertyRow(CategoryImpulse, 'Коэффициент Kp', EditCoef);
+  AddTabRow(TabImpulse, 'Коэффициент Kp', EditCoef);
 
-  CategoryVoltage := AddCategory('Напряжение');
-  ComboVoltageRange := TComboBox.Create(Self);
-  ComboVoltageRange.Items.Add('0-10 В');
-  ComboVoltageRange.Items.Add('0-5 В');
-  ComboVoltageRange.Items.Add('0-24 В');
-  ComboVoltageRange.Tag := 1;
-  ComboVoltageRange.OnChange := OutputComboChange;
-  AddPropertyRow(CategoryVoltage, 'Диапазон', ComboVoltageRange);
+  TabVoltage := TTabItem.Create(Self);
+  TabVoltage.Parent := TabControlOutputType;
+  TabVoltage.Text := 'Напряжение';
+  cbVoltageRange := TComboBox.Create(Self);
+  cbVoltageRange.Items.Add('0-10 В');
+  cbVoltageRange.Items.Add('0-5 В');
+  cbVoltageRange.Items.Add('0-24 В');
+  cbVoltageRange.OnChange := cbVoltageRangeChange;
+  AddTabRow(TabVoltage, 'Диапазон', cbVoltageRange);
   EditVoltageQminRate := TEdit.Create(Self);
-  EditVoltageQminRate.Tag := 1;
-  EditVoltageQminRate.OnExit := OutputEditExit;
-  AddPropertyRow(CategoryVoltage, 'Qmin', EditVoltageQminRate);
+  EditVoltageQminRate.OnExit := EditVoltageExit;
+  AddTabRow(TabVoltage, 'Qmin', EditVoltageQminRate);
   EditVoltageQmaxRate := TEdit.Create(Self);
-  EditVoltageQmaxRate.Tag := 2;
-  EditVoltageQmaxRate.OnExit := OutputEditExit;
-  AddPropertyRow(CategoryVoltage, 'Qmax', EditVoltageQmaxRate);
+  EditVoltageQmaxRate.OnExit := EditVoltageExit;
+  AddTabRow(TabVoltage, 'Qmax', EditVoltageQmaxRate);
 
-  CategoryCurrent := AddCategory('Ток');
-  ComboCurrentRange := TComboBox.Create(Self);
-  ComboCurrentRange.Items.Add('4-20 мА');
-  ComboCurrentRange.Items.Add('0-20 мА');
-  ComboCurrentRange.Tag := 2;
-  ComboCurrentRange.OnChange := OutputComboChange;
-  AddPropertyRow(CategoryCurrent, 'Диапазон', ComboCurrentRange);
+  TabCurrent := TTabItem.Create(Self);
+  TabCurrent.Parent := TabControlOutputType;
+  TabCurrent.Text := 'Ток';
+  cbCurrentRange := TComboBox.Create(Self);
+  cbCurrentRange.Items.Add('4-20 мА');
+  cbCurrentRange.Items.Add('0-20 мА');
+  cbCurrentRange.OnChange := cbCurrentRangeChange;
+  AddTabRow(TabCurrent, 'Диапазон', cbCurrentRange);
   EditCurrentQminRate := TEdit.Create(Self);
-  EditCurrentQminRate.Tag := 3;
-  EditCurrentQminRate.OnExit := OutputEditExit;
-  AddPropertyRow(CategoryCurrent, 'Qmin', EditCurrentQminRate);
+  EditCurrentQminRate.OnExit := EditCurrentExit;
+  AddTabRow(TabCurrent, 'Qmin', EditCurrentQminRate);
   EditCurrentQmaxRate := TEdit.Create(Self);
-  EditCurrentQmaxRate.Tag := 4;
-  EditCurrentQmaxRate.OnExit := OutputEditExit;
-  AddPropertyRow(CategoryCurrent, 'Qmax', EditCurrentQmaxRate);
+  EditCurrentQmaxRate.OnExit := EditCurrentExit;
+  AddTabRow(TabCurrent, 'Qmax', EditCurrentQmaxRate);
 
-  CategoryInterface := AddCategory('Интерфейс');
+  TabInterface := TTabItem.Create(Self);
+  TabInterface.Parent := TabControlOutputType;
+  TabInterface.Text := 'Интерфейс';
   EditProtocolName := TEdit.Create(Self);
-  EditProtocolName.Tag := 5;
-  EditProtocolName.OnExit := OutputEditExit;
-  AddPropertyRow(CategoryInterface, 'Библиотека', EditProtocolName);
-  ComboBaudRate := TComboBox.Create(Self);
-  ComboBaudRate.Items.Add('2400');
-  ComboBaudRate.Items.Add('4800');
-  ComboBaudRate.Items.Add('9600');
-  ComboBaudRate.Items.Add('19200');
-  ComboBaudRate.Items.Add('115200');
-  ComboBaudRate.Tag := 3;
-  ComboBaudRate.OnChange := OutputComboChange;
-  AddPropertyRow(CategoryInterface, 'Скорость', ComboBaudRate);
-  ComboParity := TComboBox.Create(Self);
-  ComboParity.Items.Add('Нет');
-  ComboParity.Items.Add('Четность');
-  ComboParity.Items.Add('Нечетность');
-  ComboParity.Tag := 4;
-  ComboParity.OnChange := OutputComboChange;
-  AddPropertyRow(CategoryInterface, 'Четность', ComboParity);
+  EditProtocolName.OnExit := InterfaceEditExit;
+  AddTabRow(TabInterface, 'Библиотека', EditProtocolName);
+  cbBaudRate := TComboBox.Create(Self);
+  cbBaudRate.Items.Add('2400');
+  cbBaudRate.Items.Add('4800');
+  cbBaudRate.Items.Add('9600');
+  cbBaudRate.Items.Add('19200');
+  cbBaudRate.Items.Add('115200');
+  cbBaudRate.OnChange := InterfaceControlChange;
+  AddTabRow(TabInterface, 'Скорость', cbBaudRate);
+  cbParity := TComboBox.Create(Self);
+  cbParity.Items.Add('Нет');
+  cbParity.Items.Add('Четность');
+  cbParity.Items.Add('Нечетность');
+  cbParity.OnChange := InterfaceControlChange;
+  AddTabRow(TabInterface, 'Четность', cbParity);
   EditDeviceAddress := TEdit.Create(Self);
-  EditDeviceAddress.Tag := 6;
-  EditDeviceAddress.OnExit := OutputEditExit;
-  AddPropertyRow(CategoryInterface, 'Адрес', EditDeviceAddress);
+  EditDeviceAddress.OnExit := InterfaceEditExit;
+  AddTabRow(TabInterface, 'Адрес', EditDeviceAddress);
 
-  CategoryVisual := AddCategory('Визуальный');
-  ComboInputType := TComboBox.Create(Self);
-  ComboInputType.Items.Add('Ручной ввод');
-  ComboInputType.Items.Add('Клавиатура');
-  ComboInputType.Tag := 5;
-  ComboInputType.OnChange := OutputComboChange;
-  AddPropertyRow(CategoryVisual, 'Тип ввода', ComboInputType);
+  TabVisual := TTabItem.Create(Self);
+  TabVisual.Parent := TabControlOutputType;
+  TabVisual.Text := 'Визуальный';
+  cbInputType := TComboBox.Create(Self);
+  cbInputType.Items.Add('Ручной ввод');
+  cbInputType.Items.Add('Клавиатура');
+  cbInputType.OnChange := cbInputTypeChange;
+  AddTabRow(TabVisual, 'Тип ввода', cbInputType);
 end;
 
 function TFrameFlowMeterProperties.AddCategory(const ACaption: string): TTreeViewItem;
@@ -351,7 +340,6 @@ begin
   Result.Text := ACaption;
   Result.StyledSettings := [];
   Result.TextSettings.Font.Style := [TFontStyle.fsBold];
-  Result.TextSettings.FontColor := $FF2C2C2C;
   Result.IsExpanded := True;
   Result.Height := 30;
 end;
@@ -365,8 +353,8 @@ begin
   Item := TTreeViewItem.Create(Self);
   Item.Parent := AParent;
   Item.Text := '';
-  Item.Stored := False;
   Item.Height := 32;
+  Item.Stored := False;
 
   RowGrid := TGridPanelLayout.Create(Self);
   RowGrid.Parent := Item;
@@ -382,43 +370,149 @@ begin
   Result.Parent := RowGrid;
   Result.Align := TAlignLayout.Client;
   Result.Text := ACaption;
-  Result.StyledSettings := [];
-  Result.TextSettings.FontColor := $FF1F1F1F;
-  Result.TextSettings.HorzAlign := TTextAlign.Leading;
-  Result.TextSettings.VertAlign := TTextAlign.Center;
   Result.Margins.Rect := TRectF.Create(26, 0, 8, 0);
-  Result.HitTest := False;
-  if AHint <> '' then
-    Result.Hint := AHint;
   RowGrid.ControlCollection.AddControl(Result, 0, 0);
 
   AControl.Parent := RowGrid;
   AControl.Align := TAlignLayout.Client;
   AControl.Margins.Rect := TRectF.Create(6, 3, 10, 3);
-  AControl.HitTest := True;
-  if AControl is TStyledControl then
-    TStyledControl(AControl).TabStop := True;
-  if AHint <> '' then
-    AControl.Hint := AHint;
   RowGrid.ControlCollection.AddControl(AControl, 1, 0);
+end;
 
+procedure TFrameFlowMeterProperties.AddTabRow(ATab: TTabItem;
+  const ACaption: string; AControl: TControl);
+var
+  Row: TLayout;
+  LabelCaption: TLabel;
+begin
+  Row := TLayout.Create(Self);
+  Row.Parent := ATab;
+  Row.Align := TAlignLayout.Top;
+  Row.Height := 32;
+  Row.Padding.Rect := TRectF.Create(40, 3, 10, 3);
+  Row.Stored := False;
+
+  LabelCaption := TLabel.Create(Self);
+  LabelCaption.Parent := Row;
+  LabelCaption.Align := TAlignLayout.Left;
+  LabelCaption.Width := 260;
+  LabelCaption.Text := ACaption;
+
+  AControl.Parent := Row;
+  AControl.Align := TAlignLayout.Client;
+end;
+
+procedure TFrameFlowMeterProperties.FillOutputSetCombo(ACombo: TComboBox);
+begin
+  ACombo.Items.Clear;
+  ACombo.Items.Add('Авто');
+  ACombo.Items.Add('Пассивный');
+  ACombo.Items.Add('Активный');
+  ACombo.Items.Add('Активный высокоомный');
+  ACombo.Items.Add('Емкостной');
+end;
+
+procedure TFrameFlowMeterProperties.FillCoefViewCombo(ACombo: TComboBox);
+begin
+  ACombo.Items.Clear;
+  ACombo.Items.Add('имп/л');
+  ACombo.Items.Add('л/имп');
+  ACombo.ItemIndex := 0;
+end;
+
+procedure TFrameFlowMeterProperties.PopulateOutputTypeCombo(
+  const ASelectedOutputType: Integer);
+var
+  I: Integer;
+begin
+  ComboOutputType.Items.BeginUpdate;
+  try
+    ComboOutputType.Items.Clear;
+    for I := 0 to High(COutputNames) do
+      ComboOutputType.Items.AddObject(COutputNames[I], TObject(NativeInt(I)));
+    ComboOutputType.ItemIndex := -1;
+    for I := 0 to ComboOutputType.Items.Count - 1 do
+      if Integer(NativeInt(ComboOutputType.Items.Objects[I])) = ASelectedOutputType then
+      begin
+        ComboOutputType.ItemIndex := I;
+        Break;
+      end;
+  finally
+    ComboOutputType.Items.EndUpdate;
+  end;
 end;
 
 procedure TFrameFlowMeterProperties.SetFlowMeter(AFlowMeter: TFlowMeter);
 begin
   FChannel := nil;
   FFlowMeter := AFlowMeter;
+  if FFlowMeter <> nil then
+    FDevice := FFlowMeter.Device
+  else
+    FDevice := nil;
   UpdateControls;
 end;
 
 procedure TFrameFlowMeterProperties.SetChannel(AChannel: TChannel);
 begin
-  FChannel := AChannel;
-  if AChannel <> nil then
-    FFlowMeter := AChannel.FlowMeter
-  else
-    FFlowMeter := nil;
-  UpdateControls;
+  FIsLoading := True;
+  try
+    FChannel := AChannel;
+    FDevice := nil;
+    if FChannel <> nil then
+      FFlowMeter := FChannel.FlowMeter
+    else
+      FFlowMeter := nil;
+    if FFlowMeter <> nil then
+      FDevice := FFlowMeter.Device;
+
+    if FDevice = nil then
+      ClearUI
+    else
+    begin
+      UpdateControls;
+      PopulateOutputTypeCombo(FDevice.OutputType);
+      ApplyOutputType;
+    end;
+  finally
+    FIsLoading := False;
+  end;
+end;
+
+procedure TFrameFlowMeterProperties.ClearUI;
+begin
+  EditDeviceName.Text := '';
+  EditDeviceTypeName.Text := '';
+  EditSerialNumber.Text := '';
+  ComboOutputType.ItemIndex := -1;
+  TabControlOutputType.ActiveTab := TabFrequency;
+  TabControlOutputType.Enabled := False;
+end;
+
+procedure TFrameFlowMeterProperties.UpdateHeaders;
+begin
+end;
+
+procedure TFrameFlowMeterProperties.UpdateControls;
+begin
+  FIsLoading := True;
+  try
+    UpdateHeaders;
+    if FDevice = nil then
+    begin
+      ClearUI;
+      Exit;
+    end;
+
+    TabControlOutputType.Enabled := True;
+    EditDeviceName.Text := Trim(FDevice.Name);
+    EditDeviceTypeName.Text := Trim(FDevice.DeviceTypeName);
+    EditSerialNumber.Text := Trim(FDevice.SerialNumber);
+    PopulateOutputTypeCombo(FDevice.OutputType);
+    ApplyOutputType;
+  finally
+    FIsLoading := False;
+  end;
 end;
 
 procedure TFrameFlowMeterProperties.NotifyChanged;
@@ -429,329 +523,299 @@ end;
 
 function TFrameFlowMeterProperties.GetFlowDimName: string;
 begin
-  Result := '';
-  if (FFlowMeter <> nil) and (FFlowMeter.ValueFlow <> nil) then
-    Result := Trim(FFlowMeter.ValueFlow.GetDimName);
-  if Result = '' then
-    Result := 'ед.';
-end;
-
-function TFrameFlowMeterProperties.GetQuantityDimName: string;
-begin
-  Result := '';
-  if (FFlowMeter <> nil) and (FFlowMeter.ValueQuantity <> nil) then
-    Result := Trim(FFlowMeter.ValueQuantity.GetDimName);
-  if Result = '' then
-    Result := 'ед.';
-end;
-
-procedure TFrameFlowMeterProperties.UpdateHeaders;
-begin
-end;
-
-function TFrameFlowMeterProperties.GetOutputTypeIndex(AOutputType: Integer): Integer;
-begin
-  case AOutputType of
-    Ord(otFrequency): Result := 0;
-    Ord(otImpulse): Result := 1;
-    Ord(otVoltage): Result := 2;
-    Ord(otCurrent): Result := 3;
-    Ord(otInterface): Result := 4;
-    Ord(otVisual): Result := 5;
-  else
-    Result := -1;
-  end;
-end;
-
-function TFrameFlowMeterProperties.GetOutputTypeByIndex(AIndex: Integer): Integer;
-begin
-  case AIndex of
-    0: Result := Ord(otFrequency);
-    1: Result := Ord(otImpulse);
-    2: Result := Ord(otVoltage);
-    3: Result := Ord(otCurrent);
-    4: Result := Ord(otInterface);
-    5: Result := Ord(otVisual);
-  else
-    Result := Ord(otUnknown);
-  end;
-end;
-
-function TFrameFlowMeterProperties.GetActiveOutputType: Integer;
-begin
-  if (FChannel <> nil) and (FChannel.Signal <> Ord(otUnknown)) then
-    Exit(FChannel.Signal);
-
-  if (FFlowMeter <> nil) and (FFlowMeter.OutputType <> Ord(otUnknown)) then
-    Exit(FFlowMeter.OutputType);
-
-  if (FFlowMeter <> nil) and (FFlowMeter.Device <> nil) then
-    Result := FFlowMeter.Device.OutputType
-  else
-    Result := Ord(otUnknown);
+  Result := 'ед.';
+  if FDevice <> nil then
+    Result := FDevice.GetDimensionName;
 end;
 
 procedure TFrameFlowMeterProperties.ApplyOutputType;
-var
-  OutputType: Integer;
 begin
-  if (ComboOutputType <> nil) and (ComboOutputType.ItemIndex >= 0) then
-    OutputType := GetOutputTypeByIndex(ComboOutputType.ItemIndex)
-  else
-    OutputType := GetActiveOutputType;
+  if FDevice = nil then
+    Exit;
 
-  if CategoryFrequency <> nil then
-    CategoryFrequency.Visible := OutputType = Ord(otFrequency);
-  if CategoryImpulse <> nil then
-    CategoryImpulse.Visible := OutputType = Ord(otImpulse);
-  if CategoryVoltage <> nil then
-    CategoryVoltage.Visible := OutputType = Ord(otVoltage);
-  if CategoryCurrent <> nil then
-    CategoryCurrent.Visible := OutputType = Ord(otCurrent);
-  if CategoryInterface <> nil then
-    CategoryInterface.Visible := OutputType = Ord(otInterface);
-  if CategoryVisual <> nil then
-    CategoryVisual.Visible := OutputType = Ord(otVisual);
-
-  if (LabelFreqFlowRate <> nil) and (FFlowMeter <> nil) then
-    LabelFreqFlowRate.Text := 'Расход, QF, ' + GetFlowDimName;
-
-  if TreeInspector <> nil then
-    TreeInspector.Repaint;
-  Repaint;
-end;
-
-procedure TFrameFlowMeterProperties.UpdateControls;
-var
-  Enabled: Boolean;
-begin
-  FIsLoading := True;
-  try
-    UpdateHeaders;
-
-    Enabled := FFlowMeter <> nil;
-    EditDeviceName.Enabled := Enabled;
-    EditDeviceTypeName.Enabled := Enabled;
-    EditSerialNumber.Enabled := Enabled;
-    ComboOutputType.Enabled := Enabled;
-    ComboFreqOutputSet.Enabled := Enabled;
-    EditFreq.Enabled := Enabled;
-    ComboFreqView.Enabled := Enabled;
-    EditFreqFlowRate.Enabled := Enabled;
-    ComboImpulseOutputSet.Enabled := Enabled;
-    ComboImpulseView.Enabled := Enabled;
-    EditCoef.Enabled := Enabled;
-    ComboVoltageRange.Enabled := Enabled;
-    EditVoltageQminRate.Enabled := Enabled;
-    EditVoltageQmaxRate.Enabled := Enabled;
-    ComboCurrentRange.Enabled := Enabled;
-    EditCurrentQminRate.Enabled := Enabled;
-    EditCurrentQmaxRate.Enabled := Enabled;
-    EditProtocolName.Enabled := Enabled;
-    ComboBaudRate.Enabled := Enabled;
-    ComboParity.Enabled := Enabled;
-    EditDeviceAddress.Enabled := Enabled;
-    ComboInputType.Enabled := Enabled;
-
-    if not Enabled then
-    begin
-      EditDeviceName.Text := '';
-      EditDeviceTypeName.Text := '';
-      EditSerialNumber.Text := '';
-      ComboOutputType.ItemIndex := -1;
-      ComboFreqOutputSet.ItemIndex := -1;
-      EditFreq.Text := '';
-      ComboFreqView.ItemIndex := -1;
-      EditFreqFlowRate.Text := '';
-      ComboImpulseOutputSet.ItemIndex := -1;
-      ComboImpulseView.ItemIndex := -1;
-      EditCoef.Text := '';
-      ComboVoltageRange.ItemIndex := -1;
-      EditVoltageQminRate.Text := '';
-      EditVoltageQmaxRate.Text := '';
-      ComboCurrentRange.ItemIndex := -1;
-      EditCurrentQminRate.Text := '';
-      EditCurrentQmaxRate.Text := '';
-      EditProtocolName.Text := '';
-      ComboBaudRate.ItemIndex := -1;
-      ComboParity.ItemIndex := -1;
-      EditDeviceAddress.Text := '';
-      ComboInputType.ItemIndex := -1;
-      ApplyOutputType;
-      Exit;
-    end;
-
-    EditDeviceName.Text := Trim(FFlowMeter.DeviceName);
-    EditDeviceTypeName.Text := Trim(FFlowMeter.DeviceTypeName);
-    EditSerialNumber.Text := Trim(FFlowMeter.SerialNumber);
-    ComboOutputType.ItemIndex := GetOutputTypeIndex(GetActiveOutputType);
-    if FFlowMeter.Device <> nil then
-    begin
-      if (FFlowMeter.Device.OutputSet >= 0) and
-         (FFlowMeter.Device.OutputSet < ComboFreqOutputSet.Items.Count) then
-        ComboFreqOutputSet.ItemIndex := FFlowMeter.Device.OutputSet
-      else
-        ComboFreqOutputSet.ItemIndex := -1;
-
-      if FFlowMeter.Device.Freq > 0 then
-        EditFreq.Text := IntToStr(FFlowMeter.Device.Freq)
-      else
-        EditFreq.Text := '';
-
-      if FFlowMeter.Device.DimensionCoef >= 0 then
-        ComboFreqView.ItemIndex := FFlowMeter.Device.DimensionCoef
-      else
-        ComboFreqView.ItemIndex := 0;
-      if FFlowMeter.Device.FreqFlowRate > 0 then
-        EditFreqFlowRate.Text := FloatToStr(FFlowMeter.Device.FreqFlowRate)
-      else
-        EditFreqFlowRate.Text := '';
-
-      ComboImpulseOutputSet.ItemIndex := ComboFreqOutputSet.ItemIndex;
-      ComboImpulseView.ItemIndex := ComboFreqView.ItemIndex;
-      if FFlowMeter.Device.Coef > 0 then
-        EditCoef.Text := FloatToStr(FFlowMeter.Device.Coef)
-      else
-        EditCoef.Text := '';
-
-      case FFlowMeter.Device.VoltageRange of
-        10: ComboVoltageRange.ItemIndex := 0;
-        5: ComboVoltageRange.ItemIndex := 1;
-        24: ComboVoltageRange.ItemIndex := 2;
-      else
-        ComboVoltageRange.ItemIndex := -1;
+  case FDevice.OutputType of
+    Ord(otFrequency):
+      begin
+        UpdateUIFreq;
+        TabControlOutputType.ActiveTab := TabFrequency;
       end;
-      EditVoltageQminRate.Text := FloatToStr(FFlowMeter.Device.VoltageQminRate);
-      EditVoltageQmaxRate.Text := FloatToStr(FFlowMeter.Device.VoltageQmaxRate);
-
-      case FFlowMeter.Device.CurrentRange of
-        20: ComboCurrentRange.ItemIndex := 0;
-        0: ComboCurrentRange.ItemIndex := 1;
-      else
-        ComboCurrentRange.ItemIndex := -1;
+    Ord(otImpulse):
+      begin
+        UpdateUICoef;
+        TabControlOutputType.ActiveTab := TabImpulse;
       end;
-      EditCurrentQminRate.Text := FloatToStr(FFlowMeter.Device.CurrentQminRate);
-      EditCurrentQmaxRate.Text := FloatToStr(FFlowMeter.Device.CurrentQmaxRate);
-
-      EditProtocolName.Text := FFlowMeter.Device.ProtocolName;
-      ComboBaudRate.ItemIndex := ComboBaudRate.Items.IndexOf(IntToStr(FFlowMeter.Device.BaudRate));
-      ComboParity.ItemIndex := FFlowMeter.Device.Parity;
-      EditDeviceAddress.Text := IntToStr(FFlowMeter.Device.DeviceAddress);
-      ComboInputType.ItemIndex := FFlowMeter.Device.InputType;
-    end;
-    ApplyOutputType;
-
-  finally
-    FIsLoading := False;
+    Ord(otVoltage):
+      begin
+        UpdateUIVoltage;
+        TabControlOutputType.ActiveTab := TabVoltage;
+      end;
+    Ord(otCurrent):
+      begin
+        UpdateUICurrent;
+        TabControlOutputType.ActiveTab := TabCurrent;
+      end;
+    Ord(otInterface):
+      begin
+        UpdateUIInterface;
+        TabControlOutputType.ActiveTab := TabInterface;
+      end;
+    Ord(otVisual):
+      begin
+        UpdateUIVisual;
+        TabControlOutputType.ActiveTab := TabVisual;
+      end;
   end;
 end;
 
-procedure TFrameFlowMeterProperties.EditDeviceNameExit(Sender: TObject);
-var
-  S: string;
+procedure TFrameFlowMeterProperties.UpdateUIFreq;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
-    Exit;
+  if FDevice.OutputSet >= 0 then
+    cbOutPutType.ItemIndex := FDevice.OutputSet
+  else
+    cbOutPutType.ItemIndex := -1;
+  if FDevice.Freq > 0 then
+    EditFreq.Text := IntToStr(FDevice.Freq)
+  else
+    EditFreq.Text := '';
+  ComboBox6.ItemIndex := FDevice.DimensionCoef;
+  if FDevice.FreqFlowRate > 0 then
+    EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate)
+  else
+    EditFreqFlowRate.Text := '';
+end;
+
+procedure TFrameFlowMeterProperties.UpdateUICoef;
+begin
+  if FDevice.OutputSet >= 0 then
+    cbOutPutType2.ItemIndex := FDevice.OutputSet
+  else
+    cbOutPutType2.ItemIndex := -1;
+  cbCoefViewType.ItemIndex := FDevice.DimensionCoef;
+  if FDevice.Coef > 0 then
+    EditCoef.Text := FloatToStr(FDevice.Coef)
+  else
+    EditCoef.Text := '';
+end;
+
+procedure TFrameFlowMeterProperties.UpdateUIVoltage;
+begin
+  case FDevice.VoltageRange of
+    10: cbVoltageRange.ItemIndex := 0;
+    5: cbVoltageRange.ItemIndex := 1;
+    24: cbVoltageRange.ItemIndex := 2;
+  else
+    cbVoltageRange.ItemIndex := -1;
+  end;
+  EditVoltageQminRate.Text := FloatToStr(FDevice.VoltageQminRate);
+  EditVoltageQmaxRate.Text := FloatToStr(FDevice.VoltageQmaxRate);
+end;
+
+procedure TFrameFlowMeterProperties.UpdateUICurrent;
+begin
+  case FDevice.CurrentRange of
+    20: cbCurrentRange.ItemIndex := 0;
+    0: cbCurrentRange.ItemIndex := 1;
+  else
+    cbCurrentRange.ItemIndex := -1;
+  end;
+  EditCurrentQminRate.Text := FloatToStr(FDevice.CurrentQminRate);
+  EditCurrentQmaxRate.Text := FloatToStr(FDevice.CurrentQmaxRate);
+end;
+
+procedure TFrameFlowMeterProperties.UpdateUIInterface;
+begin
+  EditProtocolName.Text := FDevice.ProtocolName;
+  cbBaudRate.ItemIndex := cbBaudRate.Items.IndexOf(IntToStr(FDevice.BaudRate));
+  cbParity.ItemIndex := FDevice.Parity;
+  EditDeviceAddress.Text := IntToStr(FDevice.DeviceAddress);
+end;
+
+procedure TFrameFlowMeterProperties.UpdateUIVisual;
+begin
+  cbInputType.ItemIndex := FDevice.InputType;
+end;
+
+procedure TFrameFlowMeterProperties.EditDeviceNameExit(Sender: TObject);
+var S: string;
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
   S := Trim(EditDeviceName.Text);
-  if FFlowMeter.DeviceName = S then
-    Exit;
-  FFlowMeter.DeviceName := S;
-  EditDeviceName.Text := S;
+  if FDevice.Name = S then Exit;
+  FDevice.Name := S;
   NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditDeviceTypeNameExit(Sender: TObject);
-var
-  S: string;
+var S: string;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
-    Exit;
+  if FIsLoading or (FDevice = nil) then Exit;
   S := Trim(EditDeviceTypeName.Text);
-  if FFlowMeter.DeviceTypeName = S then
-    Exit;
-  FFlowMeter.DeviceTypeName := S;
-  EditDeviceTypeName.Text := S;
+  if FDevice.DeviceTypeName = S then Exit;
+  FDevice.DeviceTypeName := S;
   NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.EditSerialNumberExit(Sender: TObject);
-var
-  S: string;
+var S: string;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
-    Exit;
+  if FIsLoading or (FDevice = nil) then Exit;
   S := Trim(EditSerialNumber.Text);
-  if FFlowMeter.SerialNumber = S then
-    Exit;
-  FFlowMeter.SerialNumber := S;
-  EditSerialNumber.Text := S;
+  if FDevice.SerialNumber = S then Exit;
+  FDevice.SerialNumber := S;
   NotifyChanged;
 end;
 
 procedure TFrameFlowMeterProperties.ComboOutputTypeChange(Sender: TObject);
+var V: Integer;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or (FDevice = nil) or (ComboOutputType.ItemIndex < 0) then
     Exit;
+  V := Integer(NativeInt(ComboOutputType.Items.Objects[ComboOutputType.ItemIndex]));
+  if FDevice.OutputType = V then
+    Exit;
+  FDevice.OutputType := V;
+  if FFlowMeter <> nil then
+    FFlowMeter.OutputType := V;
+  if FChannel <> nil then
+    FChannel.Signal := V;
+  PopulateOutputTypeCombo(FDevice.OutputType);
+  ApplyOutputType;
+  NotifyChanged;
+end;
 
-  if ComboOutputType.ItemIndex >= 0 then
+procedure TFrameFlowMeterProperties.cbOutPutTypeChange(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) or (cbOutPutType.ItemIndex < 0) then Exit;
+  FDevice.OutputSet := cbOutPutType.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.cbOutPutType2Change(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) or (cbOutPutType2.ItemIndex < 0) then Exit;
+  FDevice.OutputSet := cbOutPutType2.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.cbCoefViewTypeChange(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) or (cbCoefViewType.ItemIndex < 0) then Exit;
+  FDevice.DimensionCoef := cbCoefViewType.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.ComboBox6Change(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) or (ComboBox6.ItemIndex < 0) then Exit;
+  FDevice.DimensionCoef := ComboBox6.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.EditFreqExit(Sender: TObject);
+var NewFreq: Integer;
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
+  NewFreq := Trunc(NormalizeFloatInput(EditFreq.Text));
+  if NewFreq <= 0 then
   begin
-    if GetActiveOutputType = GetOutputTypeByIndex(ComboOutputType.ItemIndex) then
-      Exit;
-    FFlowMeter.OutputType := GetOutputTypeByIndex(ComboOutputType.ItemIndex);
-    if FChannel <> nil then
-      FChannel.Signal := FFlowMeter.OutputType;
-    if FFlowMeter.Device <> nil then
-      FFlowMeter.Device.OutputType := FFlowMeter.OutputType;
-    ApplyOutputType;
-    NotifyChanged;
+    EditFreq.Text := IntToStr(FDevice.Freq);
+    Exit;
   end;
-end;
-
-procedure TFrameFlowMeterProperties.EditFlowMaxExit(Sender: TObject);
-begin
-  if FIsLoading or (FFlowMeter = nil) then
-    Exit;
-
-  if FFlowMeter.FlowMax = NormalizeFloatInput(EditFlowMax.Text) then
-    Exit;
-  FFlowMeter.FlowMax := NormalizeFloatInput(EditFlowMax.Text);
-  EditFlowMax.Text := FloatToStr(FFlowMeter.FlowMax);
+  FDevice.Freq := NewFreq;
+  if FDevice.FreqFlowRate > 0 then
+    FDevice.Coef := 3.6 * FDevice.Freq / FDevice.FreqFlowRate;
   NotifyChanged;
 end;
 
-procedure TFrameFlowMeterProperties.EditFlowMinExit(Sender: TObject);
+procedure TFrameFlowMeterProperties.EditFreqFlowRateExit(Sender: TObject);
+var NewRate: Double;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or (FDevice = nil) then Exit;
+  NewRate := NormalizeFloatInput(EditFreqFlowRate.Text);
+  if NewRate <= 0 then
+  begin
+    EditFreqFlowRate.Text := FloatToStr(FDevice.FreqFlowRate);
     Exit;
-
-  if FFlowMeter.FlowMin = NormalizeFloatInput(EditFlowMin.Text) then
-    Exit;
-  FFlowMeter.FlowMin := NormalizeFloatInput(EditFlowMin.Text);
-  EditFlowMin.Text := FloatToStr(FFlowMeter.FlowMin);
+  end;
+  if SameValue(FDevice.FreqFlowRate, NewRate) then Exit;
+  FDevice.FreqFlowRate := NewRate;
+  if FDevice.FreqFlowRate > 0 then
+    FDevice.Coef := 3.6 * FDevice.Freq / FDevice.FreqFlowRate;
   NotifyChanged;
 end;
 
-procedure TFrameFlowMeterProperties.EditQuantityMaxExit(Sender: TObject);
+procedure TFrameFlowMeterProperties.EditCoefExit(Sender: TObject);
+var NewCoef: Double;
 begin
-  if FIsLoading or (FFlowMeter = nil) then
+  if FIsLoading or (FDevice = nil) then Exit;
+  NewCoef := NormalizeFloatInput(EditCoef.Text);
+  if NewCoef <= 0 then
+  begin
+    EditCoef.Text := FloatToStr(FDevice.Coef);
     Exit;
-
-  if FFlowMeter.QuantityMax = NormalizeFloatInput(EditQuantityMax.Text) then
-    Exit;
-  FFlowMeter.QuantityMax := NormalizeFloatInput(EditQuantityMax.Text);
-  EditQuantityMax.Text := FloatToStr(FFlowMeter.QuantityMax);
+  end;
+  if SameValue(FDevice.Coef, NewCoef) then Exit;
+  FDevice.Coef := NewCoef;
   NotifyChanged;
 end;
 
-procedure TFrameFlowMeterProperties.EditQuantityMinExit(Sender: TObject);
+procedure TFrameFlowMeterProperties.cbVoltageRangeChange(Sender: TObject);
 begin
-  if FIsLoading or (FFlowMeter = nil) then
-    Exit;
+  if FIsLoading or (FDevice = nil) then Exit;
+  case cbVoltageRange.ItemIndex of
+    0: FDevice.VoltageRange := 10;
+    1: FDevice.VoltageRange := 5;
+    2: FDevice.VoltageRange := 24;
+  end;
+  NotifyChanged;
+end;
 
-  if FFlowMeter.QuantityMin = NormalizeFloatInput(EditQuantityMin.Text) then
-    Exit;
-  FFlowMeter.QuantityMin := NormalizeFloatInput(EditQuantityMin.Text);
-  EditQuantityMin.Text := FloatToStr(FFlowMeter.QuantityMin);
+procedure TFrameFlowMeterProperties.EditVoltageExit(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
+  FDevice.VoltageQminRate := NormalizeFloatInput(EditVoltageQminRate.Text);
+  FDevice.VoltageQmaxRate := NormalizeFloatInput(EditVoltageQmaxRate.Text);
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.cbCurrentRangeChange(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
+  case cbCurrentRange.ItemIndex of
+    0: FDevice.CurrentRange := 20;
+    1: FDevice.CurrentRange := 0;
+  end;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.EditCurrentExit(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
+  FDevice.CurrentQminRate := NormalizeFloatInput(EditCurrentQminRate.Text);
+  FDevice.CurrentQmaxRate := NormalizeFloatInput(EditCurrentQmaxRate.Text);
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.InterfaceControlChange(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
+  FDevice.BaudRate := StrToIntDef(cbBaudRate.Text, FDevice.BaudRate);
+  FDevice.Parity := cbParity.ItemIndex;
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.InterfaceEditExit(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
+  FDevice.ProtocolName := Trim(EditProtocolName.Text);
+  FDevice.DeviceAddress := StrToIntDef(EditDeviceAddress.Text, FDevice.DeviceAddress);
+  NotifyChanged;
+end;
+
+procedure TFrameFlowMeterProperties.cbInputTypeChange(Sender: TObject);
+begin
+  if FIsLoading or (FDevice = nil) then Exit;
+  FDevice.InputType := cbInputType.ItemIndex;
   NotifyChanged;
 end;
 
