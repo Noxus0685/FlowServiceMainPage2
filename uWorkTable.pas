@@ -5897,7 +5897,7 @@ function TWorkTableManager.BuildImpSecValuesForChannels(const AWorkTable: TWorkT
   const ASplitByQmax: Boolean; const ASplitByEnabledGroup: Boolean): TArray<Double>;
 var
   I, J, GroupKey: Integer;
-  Coef, SUM, MaxRatio, ChannelQmax: Double;
+  Coef, SUM, MaxRatio: Double;
 begin
   SetLength(Result, 0);
   if (AWorkTable = nil) or (AChannels = nil) then
@@ -5933,18 +5933,11 @@ begin
       for J := 0 to AChannels.Count - 1 do
         if (AChannels[J] <> nil) and AChannels[J].Enabled and
            (((GroupKey > 0) and (AChannels[J].Group = GroupKey)) or
-            ((GroupKey <= 0) and (J = I))) and
-           (AChannels[J].FlowMeter <> nil) and (AChannels[J].FlowMeter.Device <> nil) then
-          SUM := SUM + AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[J].FlowMeter.Device.Qmax, 4);
+            ((GroupKey <= 0) and (J = I))) then
+          SUM := SUM + 1;
 
-      ChannelQmax := AWorkTable.ValueFlowRate.GetDoubleBaseNum(AChannels[I].FlowMeter.Device.Qmax, 4);
       if SUM > 0 then
-      begin
-        if AFlowRate > SUM then
-          MaxRatio := ChannelQmax / AFlowRate
-        else
-          MaxRatio := ChannelQmax / SUM;
-      end
+        MaxRatio := 1 / SUM
       else
         MaxRatio := 0;
     end
@@ -6284,6 +6277,7 @@ var
   DeviceReady: Boolean;
   GroupChannelCount: Integer;
   DeviceFlow: Double;
+  ActiveEtalonIndex: Integer;
 
   function GetEnabledGroupCount(AChannels: TObjectList<TChannel>; const AGroup, AChannelIndex: Integer): Integer;
   var
@@ -6367,7 +6361,27 @@ begin
 
   end;
 
-  EtalonFlowActual := EtalonFlowSet;
+  EtalonFlowActual := 0;
+  GroupKey := 0;
+  ActiveEtalonIndex := -1;
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and AWorkTable.EtalonChannels[I].Enabled then
+    begin
+      GroupKey := AWorkTable.EtalonChannels[I].Group;
+      ActiveEtalonIndex := I;
+      Break;
+    end;
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and AWorkTable.EtalonChannels[I].Enabled and
+       (((GroupKey > 0) and (AWorkTable.EtalonChannels[I].Group = GroupKey)) or
+        ((GroupKey <= 0) and (I = ActiveEtalonIndex))) then
+    begin
+      ChannelCoef := GetSignalChannelFlowCoef(AWorkTable.EtalonChannels[I]);
+      if ChannelCoef > 0 then
+        EtalonFlowActual := EtalonFlowActual + AWorkTable.EtalonChannels[I].ImpSec / ChannelCoef;
+    end;
+  if EtalonFlowActual <= 0 then
+    EtalonFlowActual := EtalonFlowSet;
 
 
   for I := 0 to AWorkTable.DeviceChannels.Count - 1 do

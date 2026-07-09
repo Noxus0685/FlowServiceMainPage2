@@ -647,6 +647,7 @@ type
 
   FRows: array of TRowData;
   IsUpdating: Boolean;
+  FUpdatingChannelEnabled: Boolean;
 
     FFlowMeters: TObjectList<TFlowMeter>;
     FFlowMeterRows: TArray<TFlowMeterRowData>;
@@ -663,6 +664,8 @@ type
     function IsManagedWorkTable(AWorkTable: TWorkTable): Boolean;
     function CanEditActiveWorkTable: Boolean;
     function GetNewInstrumentName: string;
+    procedure ClearChannelSimulationValues(AChannel: TChannel);
+    procedure DisableOtherChannelGroups(AChannels: TObjectList<TChannel>; const AActiveIndex: Integer);
     // Сбрасывает устаревшую ссылку FActiveWorkTable после удаления рабочего стола.
     procedure NormalizeActiveWorkTable;
     procedure EnsureActiveWorkTableMenu;
@@ -6013,8 +6016,10 @@ begin
     if WorkTable <> nil then
     begin
       WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled;
-      if not WorkTable.DeviceChannels[Row].Enabled then
-        WorkTable.DeviceChannels[Row].ImpSec := 0;
+      if WorkTable.DeviceChannels[Row].Enabled then
+        DisableOtherChannelGroups(WorkTable.DeviceChannels, Row)
+      else
+        ClearChannelSimulationValues(WorkTable.DeviceChannels[Row]);
       MarkChannelDeviceModified(WorkTable.DeviceChannels[Row]);
     end
     else
@@ -6493,9 +6498,18 @@ begin
     if GridDevices.Columns[ACol] = CheckColumnDeviceEnable1 then
     begin
       Changed := WorkTable.DeviceChannels[ARow].Enabled <> Value.AsBoolean;
-      WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
-      if not WorkTable.DeviceChannels[ARow].Enabled then
-        WorkTable.DeviceChannels[ARow].ImpSec := 0;
+      if FUpdatingChannelEnabled then
+        Exit;
+      FUpdatingChannelEnabled := True;
+      try
+        WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
+        if WorkTable.DeviceChannels[ARow].Enabled then
+          DisableOtherChannelGroups(WorkTable.DeviceChannels, ARow)
+        else
+          ClearChannelSimulationValues(WorkTable.DeviceChannels[ARow]);
+      finally
+        FUpdatingChannelEnabled := False;
+      end;
     end
     else if GridDevices.Columns[ACol] = StringColumnDeviceChanel1 then
     begin
@@ -6598,8 +6612,10 @@ begin
     if WorkTable <> nil then
     begin
       WorkTable.EtalonChannels[Row].Enabled := not WorkTable.EtalonChannels[Row].Enabled;
-      if not WorkTable.EtalonChannels[Row].Enabled then
-        WorkTable.EtalonChannels[Row].ImpSec := 0;
+      if WorkTable.EtalonChannels[Row].Enabled then
+        DisableOtherChannelGroups(WorkTable.EtalonChannels, Row)
+      else
+        ClearChannelSimulationValues(WorkTable.EtalonChannels[Row]);
       MarkChannelDeviceModified(WorkTable.EtalonChannels[Row]);
     end
     else
@@ -6723,6 +6739,36 @@ end;
 function TFrameMainTable.GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
 begin
   Result := GRID_ETALON_GROUP_COLORS[Abs(AGroup) mod Length(GRID_ETALON_GROUP_COLORS)];
+end;
+
+procedure TFrameMainTable.ClearChannelSimulationValues(AChannel: TChannel);
+begin
+  if AChannel = nil then
+    Exit;
+
+  AChannel.ImpSec := 0;
+  AChannel.CurSec := 0;
+  AChannel.ValueSec := 0;
+  AChannel.ImpResult := 0;
+end;
+
+procedure TFrameMainTable.DisableOtherChannelGroups(AChannels: TObjectList<TChannel>; const AActiveIndex: Integer);
+var
+  J: Integer;
+  ActiveGroup: Integer;
+begin
+  if (AChannels = nil) or (AActiveIndex < 0) or (AActiveIndex >= AChannels.Count) or
+     (AChannels[AActiveIndex] = nil) then
+    Exit;
+
+  ActiveGroup := AChannels[AActiveIndex].Group;
+  for J := 0 to AChannels.Count - 1 do
+    if (J <> AActiveIndex) and (AChannels[J] <> nil) and
+       ((ActiveGroup <= 0) or (AChannels[J].Group <> ActiveGroup)) then
+    begin
+      AChannels[J].Enabled := False;
+      ClearChannelSimulationValues(AChannels[J]);
+    end;
 end;
 
 procedure TFrameMainTable.GridEtalonsDrawColumnCell(Sender: TObject; const Canvas: TCanvas;
@@ -7053,9 +7099,18 @@ begin
     if GridEtalons.Columns[ACol] = CheckColumnEtalonEnable1 then
      begin
       Changed := WorkTable.EtalonChannels[ARow].Enabled <> Value.AsBoolean;
-      WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
-      if not WorkTable.EtalonChannels[ARow].Enabled then
-        WorkTable.EtalonChannels[ARow].ImpSec := 0;
+      if FUpdatingChannelEnabled then
+        Exit;
+      FUpdatingChannelEnabled := True;
+      try
+        WorkTable.EtalonChannels[ARow].Enabled := Value.AsBoolean;
+        if WorkTable.EtalonChannels[ARow].Enabled then
+          DisableOtherChannelGroups(WorkTable.EtalonChannels, ARow)
+        else
+          ClearChannelSimulationValues(WorkTable.EtalonChannels[ARow]);
+      finally
+        FUpdatingChannelEnabled := False;
+      end;
       WorkTable.RebindAllFlowMeters;
      end
     else if GridEtalons.Columns[ACol] = StringColumnEtalonChanel1 then
