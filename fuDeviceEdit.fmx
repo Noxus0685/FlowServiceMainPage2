@@ -2354,7 +2354,7 @@ object FormDeviceEditor: TFormDeviceEditor
         object Layout12: TLayout
           Align = Left
           Position.X = 253.000000000000000000
-          Size.Width = 268.000000000000000000
+          Size.Width = 260.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 2
@@ -2367,7 +2367,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Hint = #1040#1076#1088#1077#1089' '#1087#1088#1080#1073#1086#1088#1072
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 100.000000000000000000
+            Size.Width = 93.000000000000000000
             Size.Height = 20.000000000000000000
             Size.PlatformDefault = False
             TextPrompt = 'Qmax'
@@ -2383,7 +2383,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 148.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            Text = #1052#1072#1082#1089' '#1088#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            Text = 'Qmax ('#1052#1072#1082#1089' '#1088#1072#1089#1093#1086#1076'), '#1084'3/'#1095
             TabOrder = 3
           end
         end
@@ -2398,12 +2398,12 @@ object FormDeviceEditor: TFormDeviceEditor
             Touch.InteractiveGestures = [LongTap, DoubleTap]
             Align = Left
             TabOrder = 0
-            Position.X = 129.000000000000000000
+            Position.X = 145.000000000000000000
             Position.Y = 5.000000000000000000
             Hint = #1040#1076#1088#1077#1089' '#1087#1088#1080#1073#1086#1088#1072
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 100.000000000000000000
+            Size.Width = 80.000000000000000000
             Size.Height = 20.000000000000000000
             Size.PlatformDefault = False
             TextPrompt = 'Qmin'
@@ -2416,16 +2416,16 @@ object FormDeviceEditor: TFormDeviceEditor
           end
           object Label49: TLabel
             Align = Left
-            Size.Width = 129.000000000000000000
+            Size.Width = 145.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            Text = #1052#1080#1085' '#1088#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            Text = 'Qmin ('#1052#1080#1085' '#1088#1072#1089#1093#1086#1076'), '#1084'3/'#1095
             TabOrder = 2
           end
         end
         object Layout20: TLayout
           Align = Left
-          Position.X = 761.000000000000000000
+          Position.X = 769.000000000000000000
           Size.Width = 281.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
@@ -2439,7 +2439,7 @@ object FormDeviceEditor: TFormDeviceEditor
             Hint = #1040#1076#1088#1077#1089' '#1087#1088#1080#1073#1086#1088#1072
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 100.000000000000000000
+            Size.Width = 93.000000000000000000
             Size.Height = 20.000000000000000000
             Size.PlatformDefault = False
             TextPrompt = 'Qtr'
@@ -2455,14 +2455,14 @@ object FormDeviceEditor: TFormDeviceEditor
             Size.Width = 148.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            Text = #1055#1077#1088#1077#1093' '#1088#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            Text = 'Qtr ('#1055#1077#1088#1077#1093' '#1088#1072#1089#1093#1086#1076'), '#1084'3/'#1095
             TabOrder = 3
           end
         end
         object Layout21: TLayout
           Align = Left
-          Position.X = 521.000000000000000000
-          Size.Width = 240.000000000000000000
+          Position.X = 513.000000000000000000
+          Size.Width = 256.000000000000000000
           Size.Height = 30.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
@@ -2470,12 +2470,12 @@ object FormDeviceEditor: TFormDeviceEditor
             Touch.InteractiveGestures = [LongTap, DoubleTap]
             Align = Left
             TabOrder = 1
-            Position.X = 121.000000000000000000
+            Position.X = 153.000000000000000000
             Position.Y = 5.000000000000000000
             Hint = #1040#1076#1088#1077#1089' '#1087#1088#1080#1073#1086#1088#1072
             Margins.Top = 5.000000000000000000
             Margins.Bottom = 5.000000000000000000
-            Size.Width = 100.000000000000000000
+            Size.Width = 91.000000000000000000
             Size.Height = 20.000000000000000000
             Size.PlatformDefault = False
             TextPrompt = 'Qnom'
@@ -2488,10 +2488,10 @@ object FormDeviceEditor: TFormDeviceEditor
           end
           object Label7: TLabel
             Align = MostLeft
-            Size.Width = 121.000000000000000000
+            Size.Width = 153.000000000000000000
             Size.Height = 30.000000000000000000
             Size.PlatformDefault = False
-            Text = #1053#1086#1084' '#1088#1072#1089#1093#1086#1076', '#1084'3/'#1095
+            Text = 'Qnom ('#1053#1086#1084' '#1088#1072#1089#1093#1086#1076',) '#1084'3/'#1095
             TabOrder = 3
           end
         end
