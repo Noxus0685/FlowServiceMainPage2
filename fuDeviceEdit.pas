@@ -743,17 +743,22 @@ var
   OldDim, NewDim: TMeasuredDimension;
   C: TDeviceCategory;
   StdCategory: EStdCategory;
+  CategoryDim: TMeasuredDimension;
 begin
   if FDevice = nil then
     Exit;
 
   OldDim := TMeasuredDimension(FDevice.MeasuredDimension);
   StdCategory := mftUnknownType;
-  if (FDevice <> nil) and (AppServices.DataManager <> nil) then
+  CategoryDim := mdUnknown;
+  if AppServices.DataManager <> nil then
   begin
     C := AppServices.DataManager.FindCategoryByID(FDevice.Category);
     if C <> nil then
+    begin
       StdCategory := C.StdCategory;
+      CategoryDim := C.MeasuredDimension;
+    end;
   end;
 
   cbMeasuredDimension.Items.BeginUpdate;
@@ -764,10 +769,29 @@ begin
         cbMeasuredDimension.Items.Add('Масса');
       mftTankType:
         cbMeasuredDimension.Items.Add('Объем');
+      mftUnknownType, mftUserType:
+        begin
+          cbMeasuredDimension.Items.Add('Объемный расход');
+          cbMeasuredDimension.Items.Add('Массовый расход');
+          cbMeasuredDimension.Items.Add('Объем');
+          cbMeasuredDimension.Items.Add('Масса');
+          cbMeasuredDimension.Items.Add('Скорость');
+          cbMeasuredDimension.Items.Add('Теплота');
+        end;
     else
-      begin
-        cbMeasuredDimension.Items.Add('Объемный расход');
-        cbMeasuredDimension.Items.Add('Массовый расход');
+      case CategoryDim of
+        mdSpeed:
+          cbMeasuredDimension.Items.Add('Скорость');
+        mdHeat:
+          begin
+            cbMeasuredDimension.Items.Add('Объемный расход');
+            cbMeasuredDimension.Items.Add('Теплота');
+          end;
+      else
+        begin
+          cbMeasuredDimension.Items.Add('Объемный расход');
+          cbMeasuredDimension.Items.Add('Массовый расход');
+        end;
       end;
     end;
   finally
@@ -779,7 +803,7 @@ begin
   begin
     cbMeasuredDimension.ItemIndex := 0;
     NewDim := MeasuredDimensionByItemIndex(0);
-    if (FDevice <> nil) and (TMeasuredDimension(FDevice.MeasuredDimension) <> NewDim) then
+    if TMeasuredDimension(FDevice.MeasuredDimension) <> NewDim then
     begin
       FDevice.MeasuredDimension := Ord(NewDim);
       FDevice.Units := 0;
