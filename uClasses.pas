@@ -9,6 +9,7 @@ uses
   System.Generics.Defaults,
   System.StrUtils,
   System.SysUtils,
+  System.Math,
   uBaseProcedures,
   uMeterValue;
 const
@@ -283,6 +284,10 @@ type
       FDiameters  : TObjectList<TDiameter>;
       FPoints     : TObjectList<TTypePoint>;
       FDimensions : TList<TDimension>;
+      FCoef: Double;
+      function GetCoef: Double;
+      procedure SetCoef(const AValue: Double);
+      procedure SetBaseCoef(const AValue: Double);
       function GetStopCriteria: TSpillageStopCriteria;
       procedure SetStopCriteria(const Value: TSpillageStopCriteria);
   protected
@@ -354,7 +359,6 @@ type
     {====================================================================}
     OutputSet: Integer;          // Тип выхода (Auto / Passive / Active / Namur)
     Freq: Integer;               // Максимальная частота, Гц
-    Coef: Double;                // Коэффициент преобразования
     FreqFlowRate: Double;        // Отношение расхода к частоте
 
     {====================================================================}
@@ -417,6 +421,9 @@ type
     procedure AddDiameterData(const ADN: string; AQmax, AQmin, AKp: Double  );
     function  CopyDiameter(SrcIndex: Integer): TDiameter;
     procedure GetNextStdDN(const ADN: string; out NextDNStr: string; out NextDNmm: Integer);
+
+    property Coef: Double read GetCoef write SetCoef;
+    property BaseCoef: Double read FCoef write SetBaseCoef;
 
     class function CalcQmaxByDiameter(
       const OldQmax: Double;
@@ -661,6 +668,52 @@ begin
   Result := Name;
 end;
 
+
+function TDeviceType.GetCoef: Double;
+begin
+  case DimensionCoef of
+    1:
+      begin
+        if FCoef <> 0 then
+        begin
+          Result := 1 / FCoef;
+          if IsNan(Result) or IsInfinite(Result) then
+            Result := 0;
+        end
+        else
+          Result := 0;
+      end;
+  else
+    Result := FCoef;
+  end;
+end;
+
+procedure TDeviceType.SetCoef(const AValue: Double);
+begin
+  if IsNan(AValue) or IsInfinite(AValue) then
+    Exit;
+
+  case DimensionCoef of
+    1:
+      begin
+        if AValue <> 0 then
+          SetBaseCoef(1 / AValue)
+        else
+          SetBaseCoef(0);
+      end;
+  else
+    SetBaseCoef(AValue);
+  end;
+end;
+
+procedure TDeviceType.SetBaseCoef(const AValue: Double);
+begin
+  if IsNan(AValue) or IsInfinite(AValue) then
+    Exit;
+
+  FCoef := AValue;
+end;
+
 function TDeviceType.GetStopCriteria: TSpillageStopCriteria;
 begin
   Result := IntToCriteria(SpillageStop);
@@ -832,7 +885,7 @@ begin
     Add(IntToStr(DimensionCoef));
     Add(IntToStr(OutputSet));
     Add(IntToStr(Freq));
-    Add(FloatToStr(Coef));
+    Add(FloatToStr(BaseCoef));
     Add(FloatToStr(FreqFlowRate));
     Add(IntToStr(VoltageRange));
     Add(FloatToStr(VoltageQminRate));
@@ -1233,7 +1286,7 @@ begin
   {====================================================================}
   OutputSet := 0;
   Freq := 0;
-  Coef := 0.0;
+  BaseCoef := 0.0;
   FreqFlowRate := 0.0;
 
   {====================================================================}
@@ -1866,7 +1919,7 @@ begin
   {====================================================================}
   OutputSet := ASource.OutputSet;
   Freq := ASource.Freq;
-  Coef := ASource.Coef;
+  BaseCoef := ASource.BaseCoef;
   FreqFlowRate := ASource.FreqFlowRate;
 
   {====================================================================}
