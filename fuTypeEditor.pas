@@ -20,7 +20,6 @@ uses
   FMX.Memo,
   FMX.Memo.Types,
   FMX.Menus,
-  FMX.Objects,
   FMX.ScrollBox,
   FMX.SpinBox,
   FMX.StdCtrls,
@@ -383,8 +382,6 @@ type
     procedure GridDiametersCellClick(const Column: TColumn; const Row: Integer);
     procedure GridPointsCellClick(const Column: TColumn; const Row: Integer);
     procedure EditRangeDynamicCanFocus(Sender: TObject; var ACanFocus: Boolean);
-    procedure RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Single);
     procedure GridDiametersMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
@@ -394,8 +391,6 @@ type
     procedure GridDiametersMenuCopyClick(Sender: TObject);
     procedure GridDiametersMenuCutClick(Sender: TObject);
     procedure GridDiametersMenuPasteClick(Sender: TObject);
-    procedure GridDiametersResize(Sender: TObject);
-    procedure UpdateGridDiametersHeaderRect;
     procedure SyncGridDiametersHeaderPopupMenu;
     procedure GridDiametersHeaderClick(Column: TColumn);
     // Сортировка локального списка диаметров по выбранной колонке грида.
@@ -453,10 +448,6 @@ type
   FDiameterQ2: TDictionary<Integer, Double>;
   FDiameterQ4: TDictionary<Integer, Double>;
 
-  // Индекс колонки заголовка GridDiameters, по которой нажали ПКМ.
-  FGridDiametersHeaderColumnIndex: Integer;
-  // Невидимая кликабельная область поверх заголовка GridDiameters.
-  FRectGridDiametersHeader: TRectangle;
   // Контекстное меню заголовка GridDiameters для управления видимостью колонок.
   FPopupMenuGridDiametersHeader: TPopupMenu;
   FMenuItemGridDiametersDisplay: TMenuItem;
@@ -792,25 +783,11 @@ end;
    FActionGridPointsPaste.OnExecute := ActionGridPointsPasteExecute;
    FActionGridPointsPaste.ActionList := FActionListGridPoints;
 
-   FGridDiametersHeaderColumnIndex := -1;
    // Инициализация состояния сортировки GridDiameters.
    FGridDiametersSortColumnIndex := -1;
    FGridDiametersSortAscending := True;
    FPointsSortColumn := -1;
    FPointsSortAscending := True;
-
-   // Создаем невидимую кликабельную область над заголовком грида для отдельного header-popup.
-   FRectGridDiametersHeader := TRectangle.Create(Self);
-   FRectGridDiametersHeader.Parent := GridDiameters.Parent;
-   FRectGridDiametersHeader.Stored := False;
-   FRectGridDiametersHeader.Fill.Kind := TBrushKind.None;
-   FRectGridDiametersHeader.Stroke.Kind := TBrushKind.None;
-   // Rectangle размещается над визуальным header грида и принимает ПКМ для контекстного меню.
-   FRectGridDiametersHeader.HitTest := True;
-   FRectGridDiametersHeader.OnMouseDown := RectGridDiametersHeaderMouseDown;
-   // Важно: не назначаем обработчик на весь Grid, чтобы сортировка срабатывала
-   // только по клику в header-область, а не по клику в строки данных.
-   FRectGridDiametersHeader.BringToFront;
 
    // Создаем popup-меню заголовка; пункты 1..9 управляют Visible соответствующих колонок.
    FPopupMenuGridDiametersHeader := TPopupMenu.Create(Self);
@@ -820,7 +797,6 @@ end;
    ButtonDiameterDelete.Action := FActionGridDiametersDelete;
    ButtonPointDelete.Action := FActionGridPointsDelete;
 
-   GridDiameters.OnResize := GridDiametersResize;
 
    LoadType(AType);
    // Настройка кнопок работы с файлами по именам компонентов из .fmx.
@@ -832,7 +808,6 @@ end;
      TSpeedButton(FindComponent('SpeedButton4')).OnClick := SpeedButton4Click;
    if FindComponent('SpeedButton5') is TSpeedButton then
      TSpeedButton(FindComponent('SpeedButton5')).OnClick := SpeedButton5Click;
-   UpdateGridDiametersHeaderRect;
  end;
 
 
@@ -892,6 +867,8 @@ begin
     MenuItem.AutoCheck := False;
     MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
     MenuItem.Parent := FMenuItemGridDiametersDisplay;
+
+    GridDiameters.Columns[I].OnMouseDown := GridDiametersMouseDown;
   end;
 end;
 
@@ -1556,7 +1533,6 @@ begin
   StringColumnDNQmin.Visible := HasQmin;
   StringColumnDNQmax.Visible := HasQmax;
   SyncGridDiametersHeaderPopupMenu;
-  UpdateGridDiametersHeaderRect;
 end;
 
 
@@ -1742,34 +1718,6 @@ begin
 end;
 
 
-procedure TFormTypeEditor.UpdateGridDiametersHeaderRect;
-begin
-  if (FRectGridDiametersHeader = nil) or (GridDiameters = nil) then
-    Exit;
-
-  // Прозрачный rectangle ставим в координатах родителя грида точно над областью header.
-  var GridTopLeft: TPointF;
-  var ParentCtrl: TControl;
-  if FRectGridDiametersHeader.Parent is TControl then
-  begin
-    ParentCtrl := TControl(FRectGridDiametersHeader.Parent);
-    GridTopLeft := ParentCtrl.AbsoluteToLocal(GridDiameters.LocalToAbsolute(PointF(0, 0)));
-  end
-  else
-    GridTopLeft := PointF(GridDiameters.Position.X, GridDiameters.Position.Y);
-
-  FRectGridDiametersHeader.Position.X := GridTopLeft.X;
-  FRectGridDiametersHeader.Position.Y := GridTopLeft.Y;
-  FRectGridDiametersHeader.Width := GridDiameters.Width;
-  FRectGridDiametersHeader.Height := GridDiameters.RowHeight;
-  FRectGridDiametersHeader.Visible := GridDiameters.Visible and (GridDiameters.RowHeight > 0);
-  FRectGridDiametersHeader.BringToFront;
-end;
-
-procedure TFormTypeEditor.GridDiametersResize(Sender: TObject);
-begin
-  UpdateGridDiametersHeaderRect;
-end;
 
 procedure TFormTypeEditor.SyncGridDiametersHeaderPopupMenu;
 var
@@ -1880,8 +1828,14 @@ begin
   if Button <> TMouseButton.mbRight then
     Exit;
 
+  if (Sender = GridDiameters) and (Y > GridDiameters.RowHeight) then
+    Exit;
+
   SyncGridDiametersHeaderPopupMenu;
-  P := GridDiameters.LocalToScreen(PointF(X, Y));
+  if Sender is TControl then
+    P := TControl(Sender).LocalToScreen(PointF(X, Y))
+  else
+    P := GridDiameters.LocalToScreen(PointF(X, Y));
   FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
 end;
@@ -1979,41 +1933,6 @@ begin
   SetModified;
 end;
 
-procedure TFormTypeEditor.RectGridDiametersHeaderMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Single);
-var
-  I: Integer;
-  ColLeft: Single;
-  ColRight: Single;
-begin
-  // Для ЛКМ выполняем сортировку по колонке заголовка под курсором.
-  if Button = TMouseButton.mbLeft then
-  begin
-    FGridDiametersHeaderColumnIndex := -1;
-    ColLeft := 0;
-    for I := 0 to GridDiameters.ColumnCount - 1 do
-    begin
-      if not GridDiameters.Columns[I].Visible then
-        Continue;
-
-      ColRight := ColLeft + GridDiameters.Columns[I].Width;
-      if (X >= ColLeft) and (X <= ColRight) then
-      begin
-        FGridDiametersHeaderColumnIndex := I;
-        Break;
-      end;
-      ColLeft := ColRight;
-    end;
-
-    if FGridDiametersHeaderColumnIndex >= 0 then
-      SortGridDiametersByColumn(FGridDiametersHeaderColumnIndex);
-    Exit;
-  end;
-
-  // На header больше не открываем контекстное меню.
-  // Контекстное меню доступно только по ПКМ на самом GridDiameters.
-end;
-
 function TFormTypeEditor.TryParseNumericTextForSort(const S: string; out AValue: Double): Boolean;
 var
   N: Double;
@@ -2090,9 +2009,6 @@ end;
 
 procedure TFormTypeEditor.GridDiametersHeaderClick(Column: TColumn);
 begin
-  if FRectGridDiametersHeader <> nil then
-    FRectGridDiametersHeader.HitTest := True;
-
   if Column = nil then
     Exit;
 
@@ -2288,7 +2204,6 @@ begin
   MenuItem.IsChecked := GridDiameters.Columns[Index].Visible;
 
   GridDiameters.Repaint;
-  UpdateGridDiametersHeaderRect;
 end;
 
 
