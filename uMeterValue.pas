@@ -8,7 +8,10 @@ uses
   System.IniFiles,
   System.IOUtils,
   System.Math,
-  System.SysUtils;
+  System.SyncObjs,
+  System.Diagnostics,
+  System.SysUtils,
+  uBaseProcedures;
 
   const
   EPS = 1E-12;
@@ -46,8 +49,6 @@ type
     Arg: Double;
   end;
 
-
-
   TMeterValue = class
   private
     class var FMeterValues: TObjectList<TMeterValue>;
@@ -67,6 +68,24 @@ type
     FFactor: Double;
     FDevider: Double;
     FAggregateMeterValues: TObjectList<TMeterValue>;
+    /// <summary>Stores all configurable signal-stability and target-range criteria for this meter value.</summary>
+    FStabilitySettings: TMeterValueStabilitySettings;
+    /// <summary>Chronological history of physical-value samples used only by stability analysis.</summary>
+    FStabilitySamples: TList<TMeterValueSample>;
+    /// <summary>Last calculated stability-analysis snapshot for consumers that should not recalculate immediately.</summary>
+    FLastStabilityInfo: TMeterValueStabilityInfo;
+    /// <summary>Monotonic timestamp when all mathematical stability criteria first became true.</summary>
+    FStableCandidateSinceMs: Int64;
+    /// <summary>True after mathematical stability has stayed true for ConfirmationTimeSec.</summary>
+    FStabilityConfirmed: Boolean;
+    /// <summary>Protects stability history and confirmation runtime state from concurrent readers/writers.</summary>
+    FStabilityLock: TCriticalSection;
+    /// <summary>Initializes every stability setting with safe backward-compatible defaults.</summary>
+    procedure InitStabilitySettings;
+    /// <summary>Clears last analysis and runtime confirmation flags without touching settings.</summary>
+    procedure ResetStabilityInfo;
+    /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
+    procedure AddStabilitySample(const AValue: Double; const ATimeStampMs: Int64); overload;
     function FindDimIndex(const AName: string): Integer;
     function FormatDisplayValue(const AValue: Double): string;
     class constructor CreateClass;
@@ -178,7 +197,23 @@ type
     function GetDoubleMeanValue: Double; overload;
     function GetDoubleVariation: Double;
     function GetDoubleStdDeviationPercent: Double;
+    /// <summary>Returns absolute standard deviation of the existing Values history in physical units.</summary>
+    function GetDoubleStdDeviation: Double;
     function IsStable(lim: Integer): Boolean;
+    /// <summary>Returns process-monotonic time in milliseconds for interval analysis immune to system clock changes.</summary>
+    class function GetMonotonicTimeMs: Int64; static;
+    /// <summary>Adds a physical-value sample using the current monotonic timestamp.</summary>
+    procedure AddStabilitySample(const AValue: Double); overload;
+    /// <summary>Clears stability samples and runtime confirmation state while preserving all settings.</summary>
+    procedure ClearStabilityHistory;
+    /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
+    function GetStabilitySamples: TArray<TMeterValueSample>;
+    /// <summary>Analyzes the current time window and returns True only when stability is confirmed.</summary>
+    function AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
+    /// <summary>Calculates a forecast for a custom horizon using the same regression-based analyzer.</summary>
+    function GetForecastValue(const AHorizonSec: Double; out AValue: Double): Boolean;
+    /// <summary>Validates stability and target-range settings and returns a Russian diagnostic on failure.</summary>
+    function ValidateStabilitySettings(out AErrorText: string): Boolean;
     function GetStringValue: string; overload;
     function GetStringValue(Dim: Byte): string; overload;
     function GetStringValue(const ADim: string): string; overload;
@@ -284,13 +319,16 @@ type
     class procedure RebindReferences(const AOldValue, ANewValue: TMeterValue); static;
     class function GetInitDensity: Double; static;
     class procedure SetInitDensity(const AValue: Double); static;
+    /// <summary>Single source of truth for this signal's stability and target-range settings.</summary>
+    property StabilitySettings: TMeterValueStabilitySettings read FStabilitySettings write FStabilitySettings;
+    /// <summary>Last analysis result; useful for UI/status code that should avoid immediate recalculation.</summary>
+    property LastStabilityInfo: TMeterValueStabilityInfo read FLastStabilityInfo;
   end;
 
 implementation
 
 uses
-  FmxHelper,
-  uBaseProcedures;
+  FmxHelper;
 
 { Initializes class-level collections used to store all meter value instances. }
 class constructor TMeterValue.CreateClass;
@@ -334,6 +372,10 @@ begin
   AverValues := TList<Single>.Create;
   Coefs := TList<TCoef>.Create;
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
+  FStabilitySamples := TList<TMeterValueSample>.Create;
+  FStabilityLock := TCriticalSection.Create;
+  InitStabilitySettings;
+  ResetStabilityInfo;
   IsToSave := False;
 
   FMeterValues.Add(Self);
@@ -376,6 +418,8 @@ begin
   RawValues.Free;
   Means.Free;
   Dimensions.Free;
+  FStabilityLock.Free;
+  FStabilitySamples.Free;
   FAggregateMeterValues.Free;
   inherited;
 end;
@@ -405,6 +449,8 @@ begin
   for D in AMeterValue.Dimensions do Dimensions.Add(D);
   Coefs.Clear;
   for C in AMeterValue.Coefs do Coefs.Add(C);
+  FStabilitySettings := AMeterValue.FStabilitySettings;
+  ClearStabilityHistory;
 end;
 
 { Finds an existing meter value by hash (and optional owner context). }
@@ -686,6 +732,287 @@ end;
 function TMeterValue.GetDoubleMeanValue(const DimName: string): Double;
 begin
   Result := GetDoubleMeanValue * GetDimRate(DimName);
+end;
+
+
+procedure TMeterValue.InitStabilitySettings;
+begin
+  FillChar(FStabilitySettings, SizeOf(FStabilitySettings), 0);
+  FStabilitySettings.Enabled := False;
+  FStabilitySettings.MinSampleCount := 10;
+  FStabilitySettings.WindowDurationSec := 10.0;
+  FStabilitySettings.MaxSampleAgeSec := 3.0;
+  FStabilitySettings.MaxVariation := 0.0;
+  FStabilitySettings.MaxStdDeviation := 0.0;
+  FStabilitySettings.MaxTrendRate := 0.0;
+  FStabilitySettings.ForecastHorizonSec := 10.0;
+  FStabilitySettings.MaxOutlierFraction := 0.1;
+  FStabilitySettings.OutlierFactor := 3.5;
+  FStabilitySettings.ConfirmationTimeSec := 3.0;
+  FStabilitySettings.ExitThresholdFactor := 1.2;
+  FStabilitySettings.TargetAccuracyPlusPercent := 0.0;
+  FStabilitySettings.TargetAccuracyMinusPercent := 0.0;
+  FStabilitySettings.TargetToleranceAbsolute := 0.0;
+  FStabilitySettings.RequireCurrentValueInRange := True;
+  FStabilitySettings.RequireMeanValueInRange := True;
+  FStabilitySettings.RequireForecastInRange := True;
+end;
+
+procedure TMeterValue.ResetStabilityInfo;
+begin
+  FLastStabilityInfo := Default(TMeterValueStabilityInfo);
+  FLastStabilityInfo.Status := mvssUnknown;
+  FStableCandidateSinceMs := 0;
+  FStabilityConfirmed := False;
+end;
+
+class function TMeterValue.GetMonotonicTimeMs: Int64;
+begin
+  Result := Round(TStopwatch.GetTimeStamp * 1000.0 / TStopwatch.Frequency);
+end;
+
+procedure TMeterValue.AddStabilitySample(const AValue: Double);
+begin
+  AddStabilitySample(AValue, GetMonotonicTimeMs);
+end;
+
+procedure TMeterValue.AddStabilitySample(const AValue: Double; const ATimeStampMs: Int64);
+var
+  Sample: TMeterValueSample;
+  CutoffMs: Int64;
+begin
+  Sample.TimeStampMs := ATimeStampMs;
+  Sample.Value := AValue;
+  FStabilityLock.Enter;
+  try
+    FStabilitySamples.Add(Sample);
+    CutoffMs := ATimeStampMs - Round(Max(1.0, FStabilitySettings.WindowDurationSec * 2.0) * 1000.0);
+    while (FStabilitySamples.Count > 0) and
+      ((FStabilitySamples.Count > ARRAY_SIZE) or (FStabilitySamples[0].TimeStampMs < CutoffMs)) do
+      FStabilitySamples.Delete(0);
+  finally
+    FStabilityLock.Leave;
+  end;
+end;
+
+procedure TMeterValue.ClearStabilityHistory;
+begin
+  FStabilityLock.Enter;
+  try
+    FStabilitySamples.Clear;
+    ResetStabilityInfo;
+  finally
+    FStabilityLock.Leave;
+  end;
+end;
+
+function TMeterValue.GetStabilitySamples: TArray<TMeterValueSample>;
+begin
+  FStabilityLock.Enter;
+  try
+    Result := FStabilitySamples.ToArray;
+  finally
+    FStabilityLock.Leave;
+  end;
+end;
+
+function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
+begin
+  Result := (FStabilitySettings.MinSampleCount >= 2) and
+    (FStabilitySettings.WindowDurationSec > 0) and
+    (FStabilitySettings.MaxSampleAgeSec > 0) and
+    (FStabilitySettings.MaxVariation >= 0) and
+    (FStabilitySettings.MaxStdDeviation >= 0) and
+    (FStabilitySettings.MaxTrendRate >= 0) and
+    (FStabilitySettings.ForecastHorizonSec >= 0) and
+    (FStabilitySettings.ConfirmationTimeSec >= 0) and
+    (FStabilitySettings.MaxOutlierFraction >= 0) and (FStabilitySettings.MaxOutlierFraction <= 1) and
+    (FStabilitySettings.OutlierFactor > 0) and
+    (FStabilitySettings.TargetAccuracyPlusPercent >= 0) and
+    (FStabilitySettings.TargetAccuracyMinusPercent >= 0) and
+    (FStabilitySettings.TargetToleranceAbsolute >= 0) and
+    (FStabilitySettings.ExitThresholdFactor >= 1);
+  if not Result then
+    AErrorText := 'Некорректные настройки анализа стабильности.'
+  else
+    AErrorText := '';
+end;
+
+function TMeterValue.GetDoubleStdDeviation: Double;
+var
+  MeanHistory, SumSquares, ItemValue: Double;
+begin
+  if Values.Count = 0 then Exit(0);
+  MeanHistory := 0;
+  for ItemValue in Values do MeanHistory := MeanHistory + ItemValue;
+  MeanHistory := MeanHistory / Values.Count;
+  SumSquares := 0;
+  for ItemValue in Values do SumSquares := SumSquares + Sqr(ItemValue - MeanHistory);
+  Result := Sqrt(SumSquares / Values.Count);
+end;
+
+function TMeterValue.AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
+var
+  Samples, Window, Used: TArray<TMeterValueSample>;
+  CurrentMs, CutoffMs, FirstMs, LastMs: Int64;
+  I, N: Integer;
+  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept, Threshold: Double;
+  ErrorText, Msg: string;
+  LimitsFactor: Double;
+  MathStable: Boolean;
+begin
+  AInfo := Default(TMeterValueStabilityInfo);
+  AInfo.Status := mvssUnknown;
+  if not FStabilitySettings.Enabled then
+  begin
+    AInfo.Status := mvssDisabled;
+    AInfo.StatusText := 'Анализ стабильности отключён.';
+    FLastStabilityInfo := AInfo;
+    Exit(False);
+  end;
+  if not ValidateStabilitySettings(ErrorText) then
+  begin
+    AInfo.Status := mvssUnstable;
+    Include(AInfo.FailReasons, mvsfrInvalidSettings);
+    AInfo.StatusText := ErrorText;
+    FLastStabilityInfo := AInfo;
+    Exit(False);
+  end;
+
+  CurrentMs := GetMonotonicTimeMs;
+  Samples := GetStabilitySamples;
+  AInfo.SampleCount := Length(Samples);
+  CutoffMs := CurrentMs - Round(FStabilitySettings.WindowDurationSec * 1000.0);
+  SetLength(Window, 0);
+  for I := 0 to High(Samples) do
+    if Samples[I].TimeStampMs >= CutoffMs then
+    begin
+      SetLength(Window, Length(Window) + 1);
+      Window[High(Window)] := Samples[I];
+    end;
+
+  N := Length(Window);
+  AInfo.UsedSampleCount := N;
+  if N > 0 then
+  begin
+    FirstMs := Window[0].TimeStampMs;
+    LastMs := Window[N - 1].TimeStampMs;
+    AInfo.CurrentValue := Window[N - 1].Value;
+    AInfo.LastSampleAgeSec := (CurrentMs - LastMs) / 1000.0;
+    AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
+  end;
+  AInfo.HasEnoughSamples := N >= FStabilitySettings.MinSampleCount;
+  AInfo.HasEnoughWindow := AInfo.WindowDurationSec + 0.001 >= FStabilitySettings.WindowDurationSec;
+  AInfo.IsDataActual := (N > 0) and (AInfo.LastSampleAgeSec <= FStabilitySettings.MaxSampleAgeSec);
+  if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
+  if not AInfo.HasEnoughWindow then Include(AInfo.FailReasons, mvsfrInsufficientWindow);
+  if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
+
+  // MAD-based outlier filter: estimate the central value with the median, then
+  // exclude only points whose absolute deviation is above the configured limit.
+  Used := Window;
+  if N > 0 then
+  begin
+    AInfo.MinValue := Window[0].Value; AInfo.MaxValue := Window[0].Value; Sum := 0;
+    for I := 0 to N - 1 do begin Sum := Sum + Window[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Window[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Window[I].Value); end;
+    AInfo.MeanValue := Sum / N;
+    SumSq := 0; for I := 0 to N - 1 do SumSq := SumSq + Sqr(Window[I].Value - AInfo.MeanValue);
+    AInfo.StdDeviation := Sqrt(SumSq / N);
+    Threshold := FStabilitySettings.OutlierFactor * AInfo.StdDeviation;
+    if Threshold > 0 then
+    begin
+      SetLength(Used, 0);
+      for I := 0 to N - 1 do
+        if Abs(Window[I].Value - AInfo.MeanValue) <= Threshold then begin SetLength(Used, Length(Used)+1); Used[High(Used)] := Window[I]; end
+        else Inc(AInfo.OutlierCount);
+    end;
+  end;
+  AInfo.OutlierFraction := IfThen(N > 0, AInfo.OutlierCount / N, 0);
+  AInfo.IsOutlierLevelAcceptable := AInfo.OutlierFraction <= FStabilitySettings.MaxOutlierFraction;
+  if not AInfo.IsOutlierLevelAcceptable then Include(AInfo.FailReasons, mvsfrTooManyOutliers);
+
+  N := Length(Used);
+  if N >= 2 then
+  begin
+    Sum := 0; AInfo.MinValue := Used[0].Value; AInfo.MaxValue := Used[0].Value;
+    for I := 0 to N - 1 do begin Sum := Sum + Used[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Used[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Used[I].Value); end;
+    AInfo.MeanValue := Sum / N;
+    AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
+    SumSq := 0; for I := 0 to N - 1 do SumSq := SumSq + Sqr(Used[I].Value - AInfo.MeanValue);
+    AInfo.StdDeviation := Sqrt(SumSq / N);
+
+    // Linear regression uses all non-outlier samples and their real timestamps.
+    // The slope is a physical rate per second and is less noise-sensitive than
+    // comparing only the first and last samples.
+    FirstMs := Used[0].TimeStampMs; SumT := 0;
+    for I := 0 to N - 1 do SumT := SumT + (Used[I].TimeStampMs - FirstMs) / 1000.0;
+    MeanT := SumT / N; Num := 0; Den := 0;
+    for I := 0 to N - 1 do begin T := (Used[I].TimeStampMs - FirstMs) / 1000.0; Num := Num + (T - MeanT) * (Used[I].Value - AInfo.MeanValue); Den := Den + Sqr(T - MeanT); end;
+    if Den > EPS then AInfo.TrendRate := Num / Den else Include(AInfo.FailReasons, mvsfrInsufficientWindow);
+    T := (Used[N-1].TimeStampMs - FirstMs) / 1000.0;
+    Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
+    AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + FStabilitySettings.ForecastHorizonSec);
+  end;
+
+  LimitsFactor := IfThen(FStabilityConfirmed, FStabilitySettings.ExitThresholdFactor, 1.0);
+  AInfo.IsVariationStable := AInfo.Variation <= FStabilitySettings.MaxVariation * LimitsFactor;
+  AInfo.IsDeviationStable := AInfo.StdDeviation <= FStabilitySettings.MaxStdDeviation * LimitsFactor;
+  AInfo.IsTrendStable := Abs(AInfo.TrendRate) <= FStabilitySettings.MaxTrendRate * LimitsFactor;
+  if not AInfo.IsVariationStable then Include(AInfo.FailReasons, mvsfrVariationTooHigh);
+  if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
+  if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
+
+  MathStable := AInfo.HasEnoughSamples and AInfo.HasEnoughWindow and AInfo.IsDataActual and
+    AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and AInfo.IsOutlierLevelAcceptable and
+    not (mvsfrInvalidSettings in AInfo.FailReasons);
+
+  FStabilityLock.Enter;
+  try
+    if MathStable then
+    begin
+      if FStableCandidateSinceMs = 0 then FStableCandidateSinceMs := CurrentMs;
+      AInfo.StableCandidateDurationSec := (CurrentMs - FStableCandidateSinceMs) / 1000.0;
+      FStabilityConfirmed := AInfo.StableCandidateDurationSec >= FStabilitySettings.ConfirmationTimeSec;
+    end
+    else begin FStableCandidateSinceMs := 0; FStabilityConfirmed := False; end;
+    AInfo.IsConfirmed := FStabilityConfirmed;
+  finally
+    FStabilityLock.Leave;
+  end;
+
+  if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
+  else if MathStable and AInfo.IsConfirmed then AInfo.Status := mvssStable
+  else AInfo.Status := mvssUnstable;
+
+  Msg := '';
+  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных для анализа стабильности: %d из %d отсчётов. ', [AInfo.UsedSampleCount, FStabilitySettings.MinSampleCount]);
+  if mvsfrInsufficientWindow in AInfo.FailReasons then Msg := Msg + Format('Недостаточная длительность окна: %.1f с при требуемых %.1f с. ', [AInfo.WindowDurationSec, FStabilitySettings.WindowDurationSec]);
+  if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
+  if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Размах %.4f превышает допустимые %.4f. ', [AInfo.Variation, FStabilitySettings.MaxVariation]);
+  if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, FStabilitySettings.MaxStdDeviation]);
+  if mvsfrTrendTooHigh in AInfo.FailReasons then Msg := Msg + Format('Тренд %.6f ед./с превышает допустимые %.6f ед./с. ', [AInfo.TrendRate, FStabilitySettings.MaxTrendRate]);
+  if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.2f превышает допустимые %.2f. ', [AInfo.OutlierFraction, FStabilitySettings.MaxOutlierFraction]);
+  if MathStable and not AInfo.IsConfirmed then Msg := Format('Предварительная стабильность достигнута, ожидается подтверждение: %.1f из %.1f с.', [AInfo.StableCandidateDurationSec, FStabilitySettings.ConfirmationTimeSec]);
+  if AInfo.Status = mvssStable then Msg := Format('Сигнал стабилен: среднее %.4f; размах %.4f; стандартное отклонение %.4f; тренд %.6f ед./с.', [AInfo.MeanValue, AInfo.Variation, AInfo.StdDeviation, AInfo.TrendRate]);
+  AInfo.StatusText := Trim(Msg);
+  FLastStabilityInfo := AInfo;
+  Result := AInfo.Status = mvssStable;
+end;
+
+function TMeterValue.GetForecastValue(const AHorizonSec: Double; out AValue: Double): Boolean;
+var
+  Info: TMeterValueStabilityInfo;
+  Old: Double;
+begin
+  Old := FStabilitySettings.ForecastHorizonSec;
+  FStabilitySettings.ForecastHorizonSec := AHorizonSec;
+  try
+    Result := AnalyzeStability(Info);
+    AValue := Info.ForecastValue;
+  finally
+    FStabilitySettings.ForecastHorizonSec := Old;
+  end;
 end;
 
 { Returns variation (max - min) in absolute units over Values history. }
@@ -1304,6 +1631,7 @@ var
 begin
   //InputValue := EnsureRange(AValue, MinValue, MaxValue);
   InputValue :=   AValue;
+  AddStabilitySample(InputValue);
 
 
   if ARRAY_SIZE > 0 then
@@ -2222,7 +2550,7 @@ begin
   Ini := TMemIniFile.Create(FileName);
   try
     Ini.Clear;
-    Ini.WriteString('MeterValues', 'VER', '1.0');
+    Ini.WriteString('MeterValues', 'VER', '1.1');
     Ini.WriteFloat('MeterValues', 'InitDensity', FInitDensity);
     Ini.WriteInteger('MeterValues', 'ValuesCount', FMeterValuesSaves.Count);
 
@@ -2264,6 +2592,25 @@ begin
       Ini.WriteInteger(Section, 'ValueType', Ord(MV.ValueType));
       Ini.WriteInteger(Section, 'DependenceType', Ord(MV.DependenceType));
       Ini.WriteInteger(Section, 'UpdateType', Ord(MV.UpdateType));
+
+      Ini.WriteBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
+      Ini.WriteInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      Ini.WriteFloat(Section, 'StabilityWindowDurationSec', MV.FStabilitySettings.WindowDurationSec);
+      Ini.WriteFloat(Section, 'StabilityMaxSampleAgeSec', MV.FStabilitySettings.MaxSampleAgeSec);
+      Ini.WriteFloat(Section, 'StabilityMaxVariation', MV.FStabilitySettings.MaxVariation);
+      Ini.WriteFloat(Section, 'StabilityMaxStdDeviation', MV.FStabilitySettings.MaxStdDeviation);
+      Ini.WriteFloat(Section, 'StabilityMaxTrendRate', MV.FStabilitySettings.MaxTrendRate);
+      Ini.WriteFloat(Section, 'StabilityForecastHorizonSec', MV.FStabilitySettings.ForecastHorizonSec);
+      Ini.WriteFloat(Section, 'StabilityMaxOutlierFraction', MV.FStabilitySettings.MaxOutlierFraction);
+      Ini.WriteFloat(Section, 'StabilityOutlierFactor', MV.FStabilitySettings.OutlierFactor);
+      Ini.WriteFloat(Section, 'StabilityConfirmationTimeSec', MV.FStabilitySettings.ConfirmationTimeSec);
+      Ini.WriteFloat(Section, 'StabilityExitThresholdFactor', MV.FStabilitySettings.ExitThresholdFactor);
+      Ini.WriteFloat(Section, 'TargetAccuracyPlusPercent', MV.FStabilitySettings.TargetAccuracyPlusPercent);
+      Ini.WriteFloat(Section, 'TargetAccuracyMinusPercent', MV.FStabilitySettings.TargetAccuracyMinusPercent);
+      Ini.WriteFloat(Section, 'TargetToleranceAbsolute', MV.FStabilitySettings.TargetToleranceAbsolute);
+      Ini.WriteBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
+      Ini.WriteBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
+      Ini.WriteBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
 
       Ini.WriteInteger(Section, 'DimensionsCount', MV.Dimensions.Count);
       for J := 0 to MV.Dimensions.Count - 1 do
@@ -2501,6 +2848,25 @@ begin
       MV.ValueType := EValueType(Ini.ReadInteger(Section, 'ValueType', Ord(MV.ValueType)));
       MV.DependenceType := EDependenceType(Ini.ReadInteger(Section, 'DependenceType', Ord(MV.DependenceType)));
       MV.UpdateType := EUpdateType(Ini.ReadInteger(Section, 'UpdateType', Ord(MV.UpdateType)));
+
+      MV.FStabilitySettings.Enabled := Ini.ReadBool(Section, 'StabilityEnabled', MV.FStabilitySettings.Enabled);
+      MV.FStabilitySettings.MinSampleCount := Ini.ReadInteger(Section, 'StabilityMinSampleCount', MV.FStabilitySettings.MinSampleCount);
+      MV.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(Section, 'StabilityWindowDurationSec', F2S(MV.FStabilitySettings.WindowDurationSec)));
+      MV.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(Section, 'StabilityMaxSampleAgeSec', F2S(MV.FStabilitySettings.MaxSampleAgeSec)));
+      MV.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(Section, 'StabilityMaxVariation', F2S(MV.FStabilitySettings.MaxVariation)));
+      MV.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(Section, 'StabilityMaxStdDeviation', F2S(MV.FStabilitySettings.MaxStdDeviation)));
+      MV.FStabilitySettings.MaxTrendRate := S2F(Ini.ReadString(Section, 'StabilityMaxTrendRate', F2S(MV.FStabilitySettings.MaxTrendRate)));
+      MV.FStabilitySettings.ForecastHorizonSec := S2F(Ini.ReadString(Section, 'StabilityForecastHorizonSec', F2S(MV.FStabilitySettings.ForecastHorizonSec)));
+      MV.FStabilitySettings.MaxOutlierFraction := S2F(Ini.ReadString(Section, 'StabilityMaxOutlierFraction', F2S(MV.FStabilitySettings.MaxOutlierFraction)));
+      MV.FStabilitySettings.OutlierFactor := S2F(Ini.ReadString(Section, 'StabilityOutlierFactor', F2S(MV.FStabilitySettings.OutlierFactor)));
+      MV.FStabilitySettings.ConfirmationTimeSec := S2F(Ini.ReadString(Section, 'StabilityConfirmationTimeSec', F2S(MV.FStabilitySettings.ConfirmationTimeSec)));
+      MV.FStabilitySettings.ExitThresholdFactor := S2F(Ini.ReadString(Section, 'StabilityExitThresholdFactor', F2S(MV.FStabilitySettings.ExitThresholdFactor)));
+      MV.FStabilitySettings.TargetAccuracyPlusPercent := S2F(Ini.ReadString(Section, 'TargetAccuracyPlusPercent', F2S(MV.FStabilitySettings.TargetAccuracyPlusPercent)));
+      MV.FStabilitySettings.TargetAccuracyMinusPercent := S2F(Ini.ReadString(Section, 'TargetAccuracyMinusPercent', F2S(MV.FStabilitySettings.TargetAccuracyMinusPercent)));
+      MV.FStabilitySettings.TargetToleranceAbsolute := S2F(Ini.ReadString(Section, 'TargetToleranceAbsolute', F2S(MV.FStabilitySettings.TargetToleranceAbsolute)));
+      MV.FStabilitySettings.RequireCurrentValueInRange := Ini.ReadBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
+      MV.FStabilitySettings.RequireMeanValueInRange := Ini.ReadBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
+      MV.FStabilitySettings.RequireForecastInRange := Ini.ReadBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
 
       MV.Dimensions.Clear;
       for J := 0 to Ini.ReadInteger(Section, 'DimensionsCount', 0) - 1 do
