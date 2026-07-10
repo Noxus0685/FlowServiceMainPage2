@@ -1562,7 +1562,7 @@ begin
 
   Result.OutputSet := Q.FieldByName('OutputSet').AsInteger;
   Result.Freq := Q.FieldByName('Freq').AsInteger;
-  Result.Coef := Q.FieldByName('Coef').AsFloat;
+  Result.BaseCoef := Q.FieldByName('Coef').AsFloat;
   Result.FreqFlowRate := Q.FieldByName('FreqFlowRate').AsFloat;
 
   Result.VoltageRange := Q.FieldByName('VoltageRange').AsInteger;
@@ -1901,7 +1901,7 @@ begin
 
     SetIntParam(Q, 'OutputSet', AType.OutputSet);
     SetFloatParam(Q, 'Freq', AType.Freq);
-    SetFloatParam(Q, 'Coef', AType.Coef);
+    SetFloatParam(Q, 'Coef', AType.BaseCoef);
     SetFloatParam(Q, 'FreqFlowRate', AType.FreqFlowRate);
 
     SetIntParam(Q, 'VoltageRange', AType.VoltageRange);
