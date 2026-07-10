@@ -97,6 +97,7 @@ begin
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
+  GridMeasurmentRun.ShowHint := True;
 end;
 
 destructor TFrameMeasurementRun.Destroy;
@@ -220,10 +221,6 @@ end;
 function TFrameMeasurementRun.GetRowColor(const ARow: Integer): TAlphaColor;
 var
   LPoint: TDevicePoint;
-  LIsInvalid: Boolean;
-  LIsRunning: Boolean;
-  LIsCompleted: Boolean;
-
 begin
   Result := TAlphaColors.Null;
 
@@ -232,20 +229,10 @@ begin
     Exit;
 
   LPoint := MeasurementRun.Points[ARow];
+  if LPoint = nil then
+    Exit;
 
-  LIsInvalid := (FInvalidPointIndexes.IndexOf(ARow) >= 0) or IsPointInvalid(LPoint);
-  if LIsInvalid then
-    Exit(COLOR_INVALID);
-
-  LIsRunning := (MeasurementRun.CurrentPointIndex = ARow) and
-                (MeasurementRun.Stage <> msNone) and
-                (MeasurementRun.Stage <> msDone);
-  if LIsRunning then
-    Exit(COLOR_RUNNING);
-
-  LIsCompleted := (LPoint <> nil) and (LPoint.RepeatsCompleted >= Max(LPoint.Repeats, 1));
-  if LIsCompleted then
-    Exit(COLOR_COMPLETED);
+  Result := LPoint.GetStatusColor;
 end;
 
 procedure TFrameMeasurementRun.GridMeasurmentRunDrawColumnCell(
@@ -262,7 +249,9 @@ begin
   Exit;
 
   try
-    C := GetRowColor(Row);
+    C := TAlphaColors.Null;
+    if Column = StringColumnMRStatus then
+      C := GetRowColor(Row);
 
     if C <> TAlphaColors.Null then
     begin

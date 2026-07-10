@@ -9,6 +9,7 @@ uses
   System.Math,
   System.StrUtils,
   System.SysUtils,
+  System.UITypes,
   uBaseProcedures,
   uClasses,
   uMeterValue;
@@ -104,7 +105,9 @@ type
     procedure SetStopCriteria(const Value: TSpillageStopCriteria);
     function GettargetEtalonType: integer;
     procedure SettargetEtalonType(etalonType:integer);
-
+    function GetMeasurementPointStatus: EMeasurementPointStatus;
+    procedure SetMeasurementPointStatus(const Value: EMeasurementPointStatus);
+    FStatus: EMeasurementPointStatus;
 
   protected
     procedure SetState(const Value: TObjectState); override;
@@ -112,7 +115,11 @@ type
     DataPoints: TObjectList<TPointSpillage>;          // Все измерения, относящиеся к точке по расходу
     ProtocolDataPoints: TObjectList<TPointSpillage>;  // Лучшие измерения по погрешности (не более RepeatsProtocol)
 
-    Status: Integer;             // Статус точки по результатам анализа измерений
+    /// <summary>
+    /// Current execution/result status of this measurement point. StatusStr is
+    /// kept for persisted metrological analysis details and is not used to
+    /// render the measurement run status text.
+    /// </summary>
     StatusStr: string;           // Текстовое описание статуса
 
     ResultError: Double;         // Итоговая (худшая из лучших) погрешность
@@ -188,6 +195,7 @@ type
     procedure Apply(ASource: TTypePoint);
     function GetStatus: string;
     function GetStatusHint: string;
+    function GetStatusColor: TAlphaColor;
     class function GetPointSpillageTypeText(const AType: EPointSpillageType): string; overload; static;
     class function GetPointSpillageTypeText(const AType: Integer): string; overload; static;
     class function GetPointEtalonTypeText(const AType: EPointEtalonType): string; overload; static;
@@ -196,7 +204,11 @@ type
     class function GetPointFlowSourceTypeText(const AType: Integer): string; overload; static;
 
     property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
-
+    /// <summary>
+    /// Gets or sets the typed execution/result status of the point. The setter
+    /// intentionally contains no measurement state transition logic.
+    /// </summary>
+    property Status: EMeasurementPointStatus read GetMeasurementPointStatus write SetMeasurementPointStatus;
 
     property target_EtalonType: integer read GettargetEtalonType  write SettargetEtalonType;
 
@@ -647,6 +659,17 @@ begin
   else
     Result := 'Неизвестно';
   end;
+end;
+
+
+function TDevicePoint.GetMeasurementPointStatus: EMeasurementPointStatus;
+begin
+  Result := FStatus;
+end;
+
+procedure TDevicePoint.SetMeasurementPointStatus(const Value: EMeasurementPointStatus);
+begin
+  FStatus := Value;
 end;
 
 function TDevicePoint.GettargetEtalonType : integer;
@@ -1167,7 +1190,7 @@ begin
   Repeats := 0;
   RepeatsCompleted := 0;
 
-  Status := 0;
+  Status := mptsNone;
   StatusStr := '-';
   ResultError := 0.0;
   AverageError := 0.0;
@@ -1933,18 +1956,23 @@ end;
 function TDevicePoint.GetStatus: string;
 begin
   case Status of
-    0: Result := '-'; // hint :'измерения не проводились';
-    1: Result := 'выбрана'; // hint :'измерения не проводились, точка выбрана';
-    2: Result := 'некорректно'; // hint :'измерения не проводились, точка выбрана';
-    3: Result := 'установка'; // hint :'измерения не проводились, устанавливаем расход';
-    4: Result := 'установка темп-ры'; // hint :'измерения не проводились, устанавливаем температуру';
-    5: Result := 'ошибка установки'; // hint :'измерения не проводились, устанавливаем температуру';
-    6: Result := 'измерение';// hint :'измерение начато, но не завершено';  \
-    7: Result := 'ошибка измерения'; // hint :'измерения не проводились, устанавливаем температуру';
-    8: Result := 'прервано';// hint :'измерение начато, но завершено досрочно, не окончено';
-    9: Result := 'закончено';// hint :'измерение завершено корректно';
-    10: Result := 'отменено';// hint :'измерение завершено корректно и результаты отменены';
-    11: Result := 'сохранено';// hint :'измерение завершено корректно и результаты сохранены';
+    mptsNone: Result := '-';
+    mptsSelectPoint: Result := 'выбрана';
+    mptsInvalidPoint: Result := 'некорректна';
+    mptsSelectEtalon: Result := 'выбор эталона';
+    mptsSetupPoint: Result := 'установка';
+    mptsWaitStable: Result := 'стабилизация';
+    mptsWaitMeasureStart: Result := 'запуск';
+    mptsMeasure: Result := 'измерение';
+    mptsWaitMeasureStop: Result := 'остановка';
+    mptsResultsRead: Result := 'чтение результатов';
+    mptsSave: Result := 'сохранение';
+    mptsDone: Result := 'завершено';
+    mptsSetupError: Result := 'ошибка установки';
+    mptsMeasureError: Result := 'ошибка измерения';
+    mptsInterrupted: Result := 'прервано';
+    mptsCancelled: Result := 'отменено';
+    mptsSaved: Result := 'сохранено';
   else
     Result := 'неизвестный статус';
   end;
@@ -1953,20 +1981,45 @@ end;
 function TDevicePoint.GetStatusHint: string;
 begin
   case Status of
-    0: Result := 'измерения не проводились';
-    1: Result := 'измерения не проводились, точка выбрана';
-    2: Result := 'точка не корректна';
-    3: Result := 'измерения не проводились, устанавливаем расход';
-    4: Result := 'измерения не проводились, устанавливаем температуру';
-    5: Result := 'ошибка установки';
-    6: Result := 'измерение начато, но не завершено';
-    7: Result := 'измерения не проводились, устанавливаем температуру';
-    8: Result := 'измерение начато, но завершено досрочно, не окончено';
-    9: Result := 'измерение завершено корректно';
-    10: Result := 'измерение завершено корректно и результаты отменены';
-    11: Result := 'измерение завершено корректно и результаты сохранены';
+    mptsNone: Result := 'Измерение в точке ещё не выполнялось';
+    mptsSelectPoint: Result := 'Точка выбрана для выполнения измерения';
+    mptsInvalidPoint: Result := 'Точка некорректна или не может быть использована для измерения';
+    mptsSelectEtalon: Result := 'Выполняется выбор эталонных средств измерения';
+    mptsSetupPoint: Result := 'Выполняется установка параметров измерительной точки';
+    mptsWaitStable: Result := 'Выполняется ожидание стабилизации параметров';
+    mptsWaitMeasureStart: Result := 'Команда запуска передана, ожидается фактическое начало измерения';
+    mptsMeasure: Result := 'Выполняется измерение';
+    mptsWaitMeasureStop: Result := 'Команда остановки передана, ожидается завершение измерения';
+    mptsResultsRead: Result := 'Выполняется чтение итоговых результатов измерения';
+    mptsSave: Result := 'Выполняется сохранение результатов';
+    mptsDone: Result := 'Измерение завершено, результаты ожидают сохранения или отмены';
+    mptsSetupError: Result := 'Не удалось установить параметры измерительной точки';
+    mptsMeasureError: Result := 'Во время выполнения измерения произошла ошибка';
+    mptsInterrupted: Result := 'Измерение было принудительно прервано';
+    mptsCancelled: Result := 'Полученные результаты были отменены пользователем';
+    mptsSaved: Result := 'Измерение завершено, результаты успешно сохранены';
   else
-    Result := 'неизвестный статус';
+    Result := 'Неизвестный статус точки';
+  end;
+end;
+
+function TDevicePoint.GetStatusColor: TAlphaColor;
+begin
+  case Status of
+    mptsNone, mptsSelectPoint:
+      Result := COLOR_NONE;
+    mptsSelectEtalon, mptsSetupPoint, mptsWaitStable,
+    mptsWaitMeasureStart, mptsMeasure, mptsWaitMeasureStop,
+    mptsResultsRead, mptsSave:
+      Result := COLOR_RUNNING;
+    mptsDone, mptsInterrupted, mptsCancelled:
+      Result := COLOR_WARNING;
+    mptsSaved:
+      Result := COLOR_COMPLETED;
+    mptsInvalidPoint, mptsSetupError, mptsMeasureError:
+      Result := COLOR_INVALID;
+  else
+    Result := COLOR_NONE;
   end;
 end;
 
@@ -2539,7 +2592,7 @@ begin
   begin
     FillDataPointsList(DP);
 
-    DP.Status := 0;
+    DP.Status := mptsNone;
     DP.StatusStr := 'Измерения не производились/не анализировались.';
     DP.ResultError := 0.0;
     DP.AverageError := 0.0;
@@ -2547,7 +2600,7 @@ begin
 
     if (DP.DataPoints = nil) or (DP.DataPoints.Count = 0) then
     begin
-      DP.Status := 1;
+      DP.Status := EMeasurementPointStatus(1);
       DP.StatusStr := 'Измерения производились, но измерений, связанных с данной точкой, нет.';
       Continue;
     end;
@@ -2615,7 +2668,7 @@ begin
 
     if HasInvalidSpillage then
     begin
-      DP.Status := 3;
+      DP.Status := EMeasurementPointStatus(3);
       DP.StatusStr := 'Есть включённые измерения по точке с признаком "Годность = Нет"; результат точки не годен.';
       Continue;
     end;
@@ -2624,12 +2677,12 @@ begin
     begin
       if ErrorExceededInValid then
       begin
-        DP.Status := 3;
+        DP.Status := EMeasurementPointStatus(3);
         DP.StatusStr := 'Есть измерения по расходу, но погрешность превышает допуск (красный).';
       end
       else
       begin
-        DP.Status := 2;
+        DP.Status := EMeasurementPointStatus(2);
         DP.StatusStr := 'Есть измерения по расходу, но корректных измерений недостаточно или нет.';
       end;
     end
@@ -2637,18 +2690,18 @@ begin
     begin
       if ErrorExceededInValid then
       begin
-        DP.Status := 3;
+        DP.Status := EMeasurementPointStatus(3);
         DP.StatusStr := 'Есть корректные измерения, но их меньше RepeatsProtocol и часть измерений превышает допуск по погрешности (красный).';
       end
       else
       begin
-        DP.Status := 4;
+        DP.Status := EMeasurementPointStatus(4);
         DP.StatusStr := 'Корректные измерения есть, их меньше RepeatsProtocol, но погрешности в пределах допуска (желтый).';
       end;
     end
     else
     begin
-      DP.Status := 5;
+      DP.Status := EMeasurementPointStatus(5);
       DP.StatusStr := 'Корректных измерений не меньше RepeatsProtocol, требование по погрешности выполнено (зеленый).';
     end;
   end;
@@ -2711,25 +2764,25 @@ begin
     if DP = nil then
       Continue;
 
-    if DP.Status <> 5 then
+    if Ord(DP.Status) <> 5 then
       AllStatus5 := False;
 
-    if DP.Status in [0, 1] then
+    if Ord(DP.Status) in [0, 1] then
       HasMissingData := True;
 
-    if DP.Status <> 0 then
+    if Ord(DP.Status) <> 0 then
       AllStatus0 := False;
 
-    if not (DP.Status in [0, 1]) then
+    if not (Ord(DP.Status) in [0, 1]) then
       AllStatus01 := False;
 
-    if not (DP.Status in [0, 1, 2]) then
+    if not (Ord(DP.Status) in [0, 1, 2]) then
       AllStatus012 := False;
 
-    if DP.Status = 3 then
+    if Ord(DP.Status) = 3 then
       HasStatus3 := True;
 
-    if DP.Status = 4 then
+    if Ord(DP.Status) = 4 then
       HasStatus4 := True;
   end;
 

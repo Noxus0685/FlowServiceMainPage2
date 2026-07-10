@@ -236,6 +236,11 @@ type
     procedure EnterResultsRead;
     procedure EnterSave;
     procedure EnterDone;
+    /// <summary>
+    /// Updates the status of the current measurement point and notifies
+    /// observers only when the value has actually changed.
+    /// </summary>
+    procedure SetCurrentPointStatus(const AStatus: EMeasurementPointStatus);
     procedure RequestStop;
     procedure StopWorkerThread;
     procedure ProcessSelectPoint;
@@ -745,6 +750,21 @@ begin
   end;
 end;
 
+procedure TMeasurementRun.SetCurrentPointStatus(const AStatus: EMeasurementPointStatus);
+var
+  Point: TDevicePoint;
+begin
+  Point := GetCurrentPoint;
+  if Point = nil then
+    Exit;
+  if Point.Status = AStatus then
+    Exit;
+  Point.Status := AStatus;
+  if FWorkTable <> nil then
+    FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
+  Notify(Integer(mePointChanged), Point);
+end;
+
 procedure TMeasurementRun.EnterSelectPoint;
 var
   Error: TErrorInfo;
@@ -766,7 +786,7 @@ begin
   if SetPoint(FCurrentPointIndex, Error) then
   begin
 
-    GetCurrentPoint.Status := 1; //точка выбрана
+    SetCurrentPointStatus(mptsSelectPoint);
 
     ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
       'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
@@ -779,7 +799,7 @@ begin
   else
   begin
 
-    GetCurrentPoint.Status := 2; //некорректно
+    SetCurrentPointStatus(mptsInvalidPoint);
 
     FireEvent(mePointInvalid, Error);
     SetStage(msDone);
@@ -790,6 +810,7 @@ procedure TMeasurementRun.EnterSelectEtalon;
 var
   Error: TErrorInfo;
 begin
+  SetCurrentPointStatus(mptsSelectEtalon);
   if SelectEtalons(GetCurrentPoint, Error) then
   begin
     FireEvent(meEtalonSelected);
@@ -797,6 +818,7 @@ begin
   end
   else
   begin
+    SetCurrentPointStatus(mptsSetupError);
     FireEvent(meEtalonAbsent, Error);
     SetStage(msDone);
   end;
@@ -818,8 +840,11 @@ begin
       Exit;
     end;
 
+    SetCurrentPointStatus(mptsSetupPoint);
+
     if not SetupMeasurement(Point, Error) then
     begin
+      SetCurrentPointStatus(mptsSetupError);
       FireEvent(mePointNotSet, Error);
       SetStage(msDone);
       Exit;
@@ -837,20 +862,24 @@ begin
     Exit;
   end;
 
+  SetCurrentPointStatus(mptsSetupPoint);
+
   if ShouldSetupConditions then
   begin
     if not SetupPoint(Point, Error) then
     begin
+      SetCurrentPointStatus(mptsSetupError);
       FireEvent(mePointNotSet, Error);
       SetStage(msDone);
       Exit;
     end;
   end
   else
-    Point.Status := 3;   //Установка точки
+    SetCurrentPointStatus(mptsSetupPoint);
 
   if not SetupMeasurement(Point, Error) then
   begin
+    SetCurrentPointStatus(mptsSetupError);
     FireEvent(mePointNotSet, Error);
     SetStage(msDone);
     Exit;
@@ -865,6 +894,7 @@ end;
 
 procedure TMeasurementRun.EnterWaitStable;
 begin
+  SetCurrentPointStatus(mptsWaitStable);
   if FMode = mrmManual then
   begin
     SetStage(msWaitMeasureStart);
@@ -878,10 +908,12 @@ end;
 
 procedure TMeasurementRun.EnterWaitMeasureStart;
 begin
+  SetCurrentPointStatus(mptsWaitMeasureStart);
   FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
 
   if FWorkTable = nil then
   begin
+    SetCurrentPointStatus(mptsMeasureError);
     FireEvent(meMeasureError, BuildError(1400, 'Рабочий стол не назначен'));
     SetStage(msDone);
     Exit;
@@ -894,14 +926,19 @@ end;
 
 procedure TMeasurementRun.EnterMeasure;
 begin
-  GetCurrentPoint.Status:= 6; //Измерение
+  SetCurrentPointStatus(mptsMeasure);
   FireEvent(meMeasureStarted);
 end;
 
 procedure TMeasurementRun.EnterWaitMeasureStop;
 begin
+  SetCurrentPointStatus(mptsWaitMeasureStop);
   if FWorkTable = nil then
+  begin
+    SetCurrentPointStatus(mptsMeasureError);
+    SetStage(msDone);
     Exit;
+  end;
 
   if FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE] then
   begin
@@ -913,7 +950,7 @@ end;
 
 procedure TMeasurementRun.EnterResultsRead;
 begin
-  GetCurrentPoint.Status:= 9; //
+  SetCurrentPointStatus(mptsResultsRead);
   FireEvent(meResultReading);
 end;
 
@@ -923,7 +960,7 @@ var
   RepeatsTarget: Integer;
 begin
   FNextStageAfterSave := msDone;
-
+  SetCurrentPointStatus(mptsSave);
 
   FireEvent(meMeasureCompleted);
 
@@ -940,7 +977,7 @@ begin
   if FCurrentRepeat >= RepeatsTarget then
   begin
     if Point <> nil then
-      Point.Status := 9;   //Закончено
+      SetCurrentPointStatus(mptsSaved);
     FCurrentRepeat := 0;
     FireEvent(mePointDone);
     if FMode = mrmManual then
@@ -956,6 +993,8 @@ end;
 
 procedure TMeasurementRun.EnterDone;
 begin
+  if (GetCurrentPoint <> nil) and (GetCurrentPoint.Status = mptsResultsRead) then
+    SetCurrentPointStatus(mptsDone);
   FireEvent(meAllDone);
   if FThread <> nil then
     FThread.Terminate;
@@ -1118,7 +1157,7 @@ begin
 
   Result := TDevicePoint.Create(0);
   Result.Num := 1;
-  Result.Status := 0;
+  Result.Status := mptsNone;
   Result.RepeatsCompleted := 0;
 
   if FWorkTable.CurrentPoint <> nil then
@@ -1235,7 +1274,7 @@ begin
       begin
         SessionPoint := TDevicePoint.Create(0);
         SessionPoint.Assign(SourcePoint, False);
-        SessionPoint.Status := 0;
+        SessionPoint.Status := mptsNone;
         SessionPoint.RepeatsCompleted := 0;
         FPoints.Add(SessionPoint);
       end
@@ -1828,6 +1867,7 @@ const
 begin
   if FWorkTable = nil then
   begin
+    SetCurrentPointStatus(mptsMeasureError);
     FireEvent(meMeasureError, BuildError(1400, 'Рабочий стол не назначен'));
     SetStage(msDone);
     Exit;
@@ -2044,6 +2084,7 @@ var
 begin
   if FWorkTable = nil then
   begin
+    SetCurrentPointStatus(mptsMeasureError);
     FireEvent(meMeasureError, BuildError(1400, 'Рабочий стол не назначен'));
     SetStage(msDone);
     Exit;
@@ -2208,9 +2249,6 @@ begin
 
   Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
   Point.DateTime := Now;
-  Point.Status := 11;   // 'измерение завершено корректно';
-  //Point.Status := 1;
-  //Point.StatusStr := 'Measured';
 end;
 
 { Converts persisted string to spill state enum value. }

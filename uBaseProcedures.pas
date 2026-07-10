@@ -107,6 +107,38 @@ type
       msDone                // Завершение цикла измерения
     );
 
+  /// <summary>
+  /// Defines the current execution and result status of a measurement point.
+  /// Unlike EMeasurementState, this value is stored in the point and may
+  /// preserve a final result such as Saved, Cancelled, or MeasurementError.
+  /// Explicit ordinal values keep database compatibility with the existing
+  /// integer Status field.
+  /// </summary>
+  EMeasurementPointStatus = (
+    mptsNone = 0,
+
+    mptsSelectPoint = 1,
+    mptsInvalidPoint = 2,
+
+    mptsSelectEtalon = 3,
+    mptsSetupPoint = 4,
+    mptsWaitStable = 5,
+
+    mptsWaitMeasureStart = 6,
+    mptsMeasure = 7,
+    mptsWaitMeasureStop = 8,
+
+    mptsResultsRead = 9,
+    mptsSave = 10,
+    mptsDone = 11,
+
+    mptsSetupError = 12,
+    mptsMeasureError = 13,
+    mptsInterrupted = 14,
+    mptsCancelled = 15,
+    mptsSaved = 16
+  );
+
   EStableStatus = (
     sNONE,
     sRun_NN,   // no target, no stable
@@ -178,6 +210,7 @@ function FindChildInTree(ATree: TTreeView; ATag: Integer; const AKey: string): T
 function NewGuidString: string;
 function ContainsTextAny(const AText, AFind: string): Boolean;
 function IsDateInRange(const ADate, AFrom, ATo: TDate): Boolean;
+function TryMeasurementPointStatusFromInteger(const AValue: Integer; out AStatus: EMeasurementPointStatus): Boolean;
 function NormalizeFlowAccuracyInput(const S: string): string;
 function BoolToRussianYesNo(const AValue: Boolean): string;
 function ObjClassNameOrNil(const AObject: TObject): string;
@@ -962,5 +995,15 @@ begin
   Result := (ADate >= AFrom) and (ADate <= ATo);
 end;
 
+
+function TryMeasurementPointStatusFromInteger(const AValue: Integer; out AStatus: EMeasurementPointStatus): Boolean;
+begin
+  Result := (AValue >= Ord(Low(EMeasurementPointStatus))) and
+            (AValue <= Ord(High(EMeasurementPointStatus)));
+  if Result then
+    AStatus := EMeasurementPointStatus(AValue)
+  else
+    AStatus := mptsNone;
+end;
 
 end.

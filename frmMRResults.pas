@@ -484,7 +484,7 @@ begin
   if ASpillage = nil then
     Exit(csPending);
 
-  case ADevicePoint.Status of
+  case Ord(ADevicePoint.Status) of
     3: Result := csDoneInvalid;
     4: Result := csDoneWarning;
     5: Result := csDoneValid;
@@ -590,7 +590,7 @@ begin
   AllDone := (Device.Points <> nil) and (Device.Points.Count > 0);
   if AllDone then
     for DP in Device.Points do
-      if (DP = nil) or (DP.Status = 0) or (DP.Status = 1) then
+      if (DP = nil) or (DP.Status in [mptsNone, mptsSelectPoint]) then
       begin
         AllDone := False;
         Break;
@@ -628,7 +628,7 @@ begin
   AllDone := (Device.Points <> nil) and (Device.Points.Count > 0);
   if AllDone then
     for DP in Device.Points do
-      if (DP = nil) or (DP.Status = 0) or (DP.Status = 1) then
+      if (DP = nil) or (DP.Status in [mptsNone, mptsSelectPoint]) then
       begin
         AllDone := False;
         Break;
