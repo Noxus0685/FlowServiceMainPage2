@@ -33,7 +33,7 @@ begin
       APoint.Num,
       APoint.SessionID,
       BoolToStr(APoint.Valid, True),
-      APoint.Status,
+      Ord(APoint.Status),
       Ord(APoint.State),
       APoint.Error,
       BoolToStr(APoint.Enabled, True)

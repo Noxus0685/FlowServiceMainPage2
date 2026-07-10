@@ -2486,7 +2486,8 @@ begin
     Col('Pause', 'INTEGER'),
 
     Col('RepeatsProtocol', 'INTEGER'),
-    Col('Repeats', 'INTEGER')
+    Col('Repeats', 'INTEGER'),
+    Col('Status', 'INTEGER')
   ];
 end;
 
@@ -2570,6 +2571,7 @@ var
   {================ Повторы ======================}
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
+  Result.Status := Q.FieldByName('Status').AsInteger;
 
   Result.State := osClean;
 end;
@@ -2746,13 +2748,13 @@ begin
             'FlowRate, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, ' +
-            'Error, Pause, RepeatsProtocol, Repeats' +
+            'Error, Pause, RepeatsProtocol, Repeats, Status' +
             ') values (' +
             ':DeviceTypeID,:DeviceTypeUUID, :UUID, :Name, :Description, ' +
             ':FlowRate, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, ' +
-            ':Error, :Pause, :RepeatsProtocol, :Repeats' +
+            ':Error, :Pause, :RepeatsProtocol, :Repeats, :Status' +
             ')';
         end;
 
@@ -2771,7 +2773,7 @@ begin
             'Pressure=:Pressure, Temp=:Temp, TempAccuracy=:TempAccuracy, ' +
             'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, ' +
             'Error=:Error, Pause=:Pause, ' +
-            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats ' +
+            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats, Status=:Status ' +
             'where ID=:ID';
         end;
 
@@ -2805,6 +2807,7 @@ begin
     SetIntParam(Q, 'Pause', APoint.Pause);
     SetIntParam(Q, 'RepeatsProtocol', APoint.RepeatsProtocol);
     SetIntParam(Q, 'Repeats', APoint.Repeats);
+    SetIntParam(Q, 'Status', APoint.Status);
 
     {======================= EXEC =======================}
 
@@ -4540,7 +4543,8 @@ begin
     Col('Pause', 'INTEGER'),
 
     Col('RepeatsProtocol', 'INTEGER'),
-    Col('Repeats', 'INTEGER')
+    Col('Repeats', 'INTEGER'),
+    Col('Status', 'INTEGER')
   ];
 end;
 
@@ -4584,6 +4588,7 @@ var
 
 DeviceUUID: string;
 ADevice : TDevice;
+PointStatus: EMeasurementPointStatus;
 
 
 begin
@@ -4635,6 +4640,10 @@ begin
   {================ Повторы ======================}
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
+  if TryMeasurementPointStatusFromInteger(Q.FieldByName('Status').AsInteger, PointStatus) then
+    Result.Status := PointStatus
+  else
+    Result.Status := mptsNone;
 
   Result.State := osClean;
 end;
@@ -4834,13 +4843,13 @@ begin
             'FlowRate, Q, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, SpillageStop, SpillageType, EtalonType, FlowSorceType, ' +
-            'Error, Pause, RepeatsProtocol, Repeats' +
+            'Error, Pause, RepeatsProtocol, Repeats, Status' +
             ') values (' +
             ':DeviceUUID, :DeviceTypeUUID, :Num, :Name, :Description, ' +
             ':FlowRate, :Q, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, :SpillageStop, :SpillageType, :EtalonType, :FlowSorceType, ' +
-            ':Error, :Pause, :RepeatsProtocol, :Repeats' +
+            ':Error, :Pause, :RepeatsProtocol, :Repeats, :Status' +
             ')';
         end;
 
@@ -4860,7 +4869,7 @@ begin
             'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, SpillageStop=:SpillageStop, ' +
             'SpillageType=:SpillageType, EtalonType=:EtalonType, FlowSorceType=:FlowSorceType, ' +
             'Error=:Error, Pause=:Pause, ' +
-            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats ' +
+            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats, Status=:Status ' +
             'where ID=:ID';
         end;
 
@@ -4900,6 +4909,7 @@ begin
     SetIntParam(Q, 'Pause', APoint.Pause);
     SetIntParam(Q, 'RepeatsProtocol', APoint.RepeatsProtocol);
     SetIntParam(Q, 'Repeats', APoint.Repeats);
+    SetIntParam(Q, 'Status', Ord(APoint.Status));
 
     {======================= EXEC =======================}
 
