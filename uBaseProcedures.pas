@@ -139,6 +139,135 @@ type
     mptsSaved = 16
   );
 
+  /// <summary>One physical-value sample stored by TMeterValue for stability analysis.</summary>
+  TMeterValueSample = record
+    /// <summary>Monotonic timestamp in milliseconds; used for intervals and never based on wall-clock time.</summary>
+    TimeStampMs: Int64;
+    /// <summary>Physical value at TimeStampMs, before excessive display/filter smoothing.</summary>
+    Value: Double;
+  end;
+
+  /// <summary>Overall state returned by TMeterValue.AnalyzeStability.</summary>
+  TMeterValueStabilityStatus = (
+    mvssUnknown,       // Analysis has not run yet.
+    mvssDisabled,      // Stability analysis is intentionally disabled for this value.
+    mvssNotEnoughData, // The window lacks required sample count or duration.
+    mvssStaleData,     // Last sample is older than MaxSampleAgeSec.
+    mvssUnstable,      // Data is available but at least one criterion failed or confirmation is pending.
+    mvssStable         // All criteria passed continuously for ConfirmationTimeSec.
+  );
+
+  /// <summary>Individual reasons why a stability analysis did not become stable.</summary>
+  TMeterValueStabilityFailReason = (
+    mvsfrNotEnoughSamples,  // Fewer samples than MinSampleCount are available in the active window.
+    mvsfrInsufficientWindow,// Active window duration is shorter than WindowDurationSec.
+    mvsfrStaleData,         // Last sample age exceeds MaxSampleAgeSec.
+    mvsfrVariationTooHigh,  // Max-min variation exceeds MaxVariation.
+    mvsfrDeviationTooHigh,  // Absolute standard deviation exceeds MaxStdDeviation.
+    mvsfrTrendTooHigh,      // Absolute regression slope exceeds MaxTrendRate.
+    mvsfrTooManyOutliers,   // Outlier fraction exceeds MaxOutlierFraction.
+    mvsfrInvalidSettings    // Settings failed validation and analysis result is not reliable.
+  );
+
+  /// <summary>Set of failure reasons; multiple simultaneous problems can be reported.</summary>
+  TMeterValueStabilityFailReasons = set of TMeterValueStabilityFailReason;
+
+  /// <summary>Configurable criteria used by TMeterValue and target-range checks used by TParameter.</summary>
+  TMeterValueStabilitySettings = record
+    /// <summary>Enables mathematical stability analysis; disabled values never auto-confirm readiness.</summary>
+    Enabled: Boolean;
+    /// <summary>Minimum number of samples required inside the active time window.</summary>
+    MinSampleCount: Integer;
+    /// <summary>Required active-window duration in seconds.</summary>
+    WindowDurationSec: Double;
+    /// <summary>Maximum allowed age in seconds for the latest sample.</summary>
+    MaxSampleAgeSec: Double;
+    /// <summary>Maximum allowed max-min spread in physical units.</summary>
+    MaxVariation: Double;
+    /// <summary>Maximum allowed absolute standard deviation in physical units.</summary>
+    MaxStdDeviation: Double;
+    /// <summary>Maximum allowed absolute linear-regression slope in physical units per second.</summary>
+    MaxTrendRate: Double;
+    /// <summary>Forecast horizon in seconds used by AnalyzeStability.</summary>
+    ForecastHorizonSec: Double;
+    /// <summary>Maximum allowed fraction of detected outliers in the active window.</summary>
+    MaxOutlierFraction: Double;
+    /// <summary>Multiplier used by the outlier detector threshold.</summary>
+    OutlierFactor: Double;
+    /// <summary>Seconds that all mathematical criteria must remain true before final stability.</summary>
+    ConfirmationTimeSec: Double;
+    /// <summary>Multiplier for exit thresholds after stability was already confirmed.</summary>
+    ExitThresholdFactor: Double;
+    /// <summary>Upper target tolerance as percent of Abs(TargetValue).</summary>
+    TargetAccuracyPlusPercent: Double;
+    /// <summary>Lower target tolerance as percent of Abs(TargetValue).</summary>
+    TargetAccuracyMinusPercent: Double;
+    /// <summary>Absolute target tolerance used near zero and as a minimum tolerance.</summary>
+    TargetToleranceAbsolute: Double;
+    /// <summary>Requires current value to be inside the target range.</summary>
+    RequireCurrentValueInRange: Boolean;
+    /// <summary>Requires analyzed mean value to be inside the target range.</summary>
+    RequireMeanValueInRange: Boolean;
+    /// <summary>Requires forecast value to remain inside the target range.</summary>
+    RequireForecastInRange: Boolean;
+  end;
+
+  /// <summary>Full diagnostic result of TMeterValue.AnalyzeStability for UI and process logic.</summary>
+  TMeterValueStabilityInfo = record
+    /// <summary>Overall analysis status after all checks and confirmation-time logic.</summary>
+    Status: TMeterValueStabilityStatus;
+    /// <summary>All failure reasons detected during the analysis.</summary>
+    FailReasons: TMeterValueStabilityFailReasons;
+    /// <summary>Total sample count currently stored in stability history.</summary>
+    SampleCount: Integer;
+    /// <summary>Number of samples selected into the active analysis window before outlier removal.</summary>
+    UsedSampleCount: Integer;
+    /// <summary>Number of samples excluded by the outlier detector.</summary>
+    OutlierCount: Integer;
+    /// <summary>Latest physical value in the active window.</summary>
+    CurrentValue: Double;
+    /// <summary>Mean value of non-outlier samples in the active window.</summary>
+    MeanValue: Double;
+    /// <summary>Minimum value of non-outlier samples in the active window.</summary>
+    MinValue: Double;
+    /// <summary>Maximum value of non-outlier samples in the active window.</summary>
+    MaxValue: Double;
+    /// <summary>MaxValue - MinValue in physical units.</summary>
+    Variation: Double;
+    /// <summary>Absolute standard deviation in physical units.</summary>
+    StdDeviation: Double;
+    /// <summary>Linear-regression slope in physical units per second.</summary>
+    TrendRate: Double;
+    /// <summary>Regression-based forecast at ForecastHorizonSec.</summary>
+    ForecastValue: Double;
+    /// <summary>Actual duration in seconds between first and last samples in the active window.</summary>
+    WindowDurationSec: Double;
+    /// <summary>Age in seconds of the latest sample.</summary>
+    LastSampleAgeSec: Double;
+    /// <summary>OutlierCount divided by active-window sample count.</summary>
+    OutlierFraction: Double;
+    /// <summary>Seconds elapsed since the signal first met all mathematical criteria.</summary>
+    StableCandidateDurationSec: Double;
+    /// <summary>True when StableCandidateDurationSec reached ConfirmationTimeSec.</summary>
+    IsConfirmed: Boolean;
+    /// <summary>True when active-window sample count meets MinSampleCount.</summary>
+    HasEnoughSamples: Boolean;
+    /// <summary>True when active-window duration meets WindowDurationSec.</summary>
+    HasEnoughWindow: Boolean;
+    /// <summary>True when latest sample age does not exceed MaxSampleAgeSec.</summary>
+    IsDataActual: Boolean;
+    /// <summary>True when Variation is within MaxVariation.</summary>
+    IsVariationStable: Boolean;
+    /// <summary>True when StdDeviation is within MaxStdDeviation.</summary>
+    IsDeviationStable: Boolean;
+    /// <summary>True when Abs(TrendRate) is within MaxTrendRate.</summary>
+    IsTrendStable: Boolean;
+    /// <summary>True when OutlierFraction is within MaxOutlierFraction.</summary>
+    IsOutlierLevelAcceptable: Boolean;
+    /// <summary>Human-readable Russian diagnostic text containing the main analysis reasons.</summary>
+    StatusText: string;
+  end;
+
   EStableStatus = (
     sNONE,
     sRun_NN,   // no target, no stable
@@ -150,10 +279,38 @@ type
     sFail_NN   // no stable, no target
   );
 
+  /// <summary>Final parameter-level readiness result assembled by TParameter from signal and target checks.</summary>
   RStableInfo = record
+    /// <summary>Backward-compatible parameter status used by existing UI and process logic.</summary>
     Status: EStableStatus;
+    /// <summary>Human-readable Russian diagnostic combining signal stability and target-range checks.</summary>
     StatusText: string;
+    /// <summary>Current measured value copied from SignalInfo for backward compatibility.</summary>
     CurrentValue: Double;
+    /// <summary>Full TMeterValue mathematical stability analysis result.</summary>
+    SignalInfo: TMeterValueStabilityInfo;
+    /// <summary>Current target/setpoint value from TParameter.ValueSet.</summary>
+    TargetValue: Double;
+    /// <summary>Lower allowed target boundary after percent and absolute tolerance calculation.</summary>
+    LowerLimit: Double;
+    /// <summary>Upper allowed target boundary after percent and absolute tolerance calculation.</summary>
+    UpperLimit: Double;
+    /// <summary>Mean value copied from SignalInfo for UI convenience.</summary>
+    MeanValue: Double;
+    /// <summary>Forecast value copied from SignalInfo for UI convenience.</summary>
+    ForecastValue: Double;
+    /// <summary>True when TMeterValue returned confirmed mathematical stability.</summary>
+    IsSignalStable: Boolean;
+    /// <summary>True when current value is inside LowerLimit..UpperLimit.</summary>
+    IsCurrentInRange: Boolean;
+    /// <summary>True when mean value is inside LowerLimit..UpperLimit.</summary>
+    IsMeanInRange: Boolean;
+    /// <summary>True when forecast value is inside LowerLimit..UpperLimit.</summary>
+    IsForecastInRange: Boolean;
+    /// <summary>True when all enabled target-range checks are satisfied.</summary>
+    IsTargetConditionPassed: Boolean;
+    /// <summary>True only when signal stability and all enabled target checks are satisfied.</summary>
+    IsReadyForMeasurement: Boolean;
   end;
 
   EOutPutSet = (

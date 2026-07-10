@@ -93,13 +93,16 @@ TParameter = class(TObservableObject)
 
     FMax: Double;
     FMin: Double;
-    FAccuracyPlus: Double;
-    FAccuracyMinus: Double;
+
+    /// <summary>Current measured value; owns stability settings and signal history used by IsStable.</summary>
     FValue: TMeterValue;  // òåêóùàÿ
+    /// <summary>Target/setpoint value; does not own stability settings.</summary>
     FValueSet: TMeterValue;   //óñòàíîâëåííàÿ
+    /// <summary>Legacy lower/previous setup value kept for existing callers; not used for stability decisions.</summary>
     FBefore: Double;
+    /// <summary>Legacy upper/next setup value kept for existing callers; not used for stability decisions.</summary>
     FAfter: Double;
-    FDelta: Double;
+
     FHasTaskHistory: Boolean;
     FDim: integer;
     procedure SetMin(const Value: Double );
@@ -107,8 +110,22 @@ TParameter = class(TObservableObject)
 
     procedure SetState(AStatus: EStateParameter);
     procedure SetAction(AAction: EActionParameter);
+    /// <summary>Stores legacy BeforeValue within Min..Max bounds without affecting stability analysis.</summary>
     procedure SetBefore(ABefore: Double);
+    /// <summary>Stores legacy AfterValue within Min..Max bounds without affecting stability analysis.</summary>
     procedure SetAfter(AAfter: Double);
+    /// <summary>Returns upper target tolerance percent from FValue.StabilitySettings.</summary>
+    function GetAccuracyPlus: Double;
+    /// <summary>Writes upper target tolerance percent to FValue.StabilitySettings.</summary>
+    procedure SetAccuracyPlus(const AValue: Double);
+    /// <summary>Returns lower target tolerance percent from FValue.StabilitySettings.</summary>
+    function GetAccuracyMinus: Double;
+    /// <summary>Writes lower target tolerance percent to FValue.StabilitySettings.</summary>
+    procedure SetAccuracyMinus(const AValue: Double);
+    /// <summary>Returns the legacy DeltaValue as the MaxVariation stability setting.</summary>
+    function GetDeltaValue: Double;
+    /// <summary>Writes legacy DeltaValue into the MaxVariation stability setting.</summary>
+    procedure SetDeltaValue(const AValue: Double);
     function GetIsRunning: Boolean;
     function GetIsChanging: Boolean;
     procedure SetParam(Avalue: Double);
@@ -116,6 +133,7 @@ TParameter = class(TObservableObject)
     function GetSetValue: Double;
   public
     constructor Create(const AName, AHint: string); virtual;
+    /// <summary>Combines TMeterValue signal analysis with target-range checks and returns measurement readiness.</summary>
     function IsStable(out AStableInfo: rStableInfo): Boolean;
     function GetStateAsString: string;
     procedure Stop;
@@ -129,13 +147,18 @@ TParameter = class(TObservableObject)
     property Value: TMeterValue read FValue write FValue;
     property IsRunning: Boolean read GetIsRunning;
     property IsChanging: Boolean read GetIsChanging;
-    property AccuracyPlus: Double read FAccuracyPlus write FAccuracyPlus;
-    property AccuracyMinus: Double read FAccuracyMinus write FAccuracyMinus;
+    /// <summary>Backward-compatible proxy to FValue.StabilitySettings.TargetAccuracyPlusPercent.</summary>
+    property AccuracyPlus: Double read GetAccuracyPlus write SetAccuracyPlus;
+    /// <summary>Backward-compatible proxy to FValue.StabilitySettings.TargetAccuracyMinusPercent.</summary>
+    property AccuracyMinus: Double read GetAccuracyMinus write SetAccuracyMinus;
     property Min: Double read FMin write SetMin;
     property Max: Double read FMax write SetMax;
+    /// <summary>Legacy setup value kept for UI/process compatibility; not used in stability calculation.</summary>
     property BeforeValue: Double read FBefore write SetBefore;
+    /// <summary>Legacy setup value kept for UI/process compatibility; not used in stability calculation.</summary>
     property AfterValue: Double read FAfter write SetAfter;
-    property DeltaValue: Double read FDelta write FDelta;
+    /// <summary>Backward-compatible proxy to FValue.StabilitySettings.MaxVariation.</summary>
+    property DeltaValue: Double read GetDeltaValue write SetDeltaValue;
     property TargetValue: Double read GetSetValue write SetParam;
 
 
@@ -245,9 +268,9 @@ begin
   //FValueSet := 24;
   FBefore := 23;
   FAfter := 25;
-  FDelta := 0.1;
-  FAccuracyPlus := 5;
-  FAccuracyMinus := 5;
+  DeltaValue := 0.1;
+  AccuracyPlus := 5;
+  AccuracyMinus := 5;
 end;
 
 
@@ -302,9 +325,9 @@ begin
   //FValueSet := 10;
   FBefore := 9;
   FAfter := 11;
-  FDelta := 0.1;
-  FAccuracyPlus := 5;
-  FAccuracyMinus := 5;
+  DeltaValue := 0.1;
+  AccuracyPlus := 5;
+  AccuracyMinus := 5;
 end;
 
  function TFluidPress.GetActionAsString: string;
@@ -618,74 +641,89 @@ end;
 
 function TParameter.IsStable(out AStableInfo: RStableInfo): Boolean;
 var
-  IsTargetReached: Boolean;
-  HasStabilization: Boolean;
+  SignalInfo: TMeterValueStabilityInfo;
+  Settings: TMeterValueStabilitySettings;
+  PlusTolerance: Double;
+  MinusTolerance: Double;
   HasActiveTask: Boolean;
   HadTask: Boolean;
-  IsChangingNow: Boolean;
-  ADelta: Double;
+  CurrentCheckPassed: Boolean;
+  MeanCheckPassed: Boolean;
+  ForecastCheckPassed: Boolean;
 begin
-
   EnsureMeterValues;
+  AStableInfo := Default(RStableInfo);
 
-  //код кодекса, надо переделывать
-  IsTargetReached := (Value.Value<=ValueSet.Value*(1+AccuracyPlus/100))
-      AND (Value.Value>=ValueSet.Value*(1-AccuracyMinus/100)) ;
-  ADelta := Abs(FDelta);
-  if ADelta <= MinDouble then
-    ADelta := 0.001;
-  HasStabilization := Abs(FAfter - FBefore) <= ADelta;
+  Settings := FValue.StabilitySettings;
+  AStableInfo.IsSignalStable := FValue.AnalyzeStability(SignalInfo);
+  AStableInfo.SignalInfo := SignalInfo;
+  AStableInfo.CurrentValue := SignalInfo.CurrentValue;
+  AStableInfo.MeanValue := SignalInfo.MeanValue;
+  AStableInfo.ForecastValue := SignalInfo.ForecastValue;
+  AStableInfo.TargetValue := FValueSet.Value;
+
+  PlusTolerance := Max(Settings.TargetToleranceAbsolute,
+    Abs(AStableInfo.TargetValue) * Settings.TargetAccuracyPlusPercent / 100.0);
+  MinusTolerance := Max(Settings.TargetToleranceAbsolute,
+    Abs(AStableInfo.TargetValue) * Settings.TargetAccuracyMinusPercent / 100.0);
+  AStableInfo.LowerLimit := AStableInfo.TargetValue - MinusTolerance;
+  AStableInfo.UpperLimit := AStableInfo.TargetValue + PlusTolerance;
+
+  AStableInfo.IsCurrentInRange := (SignalInfo.CurrentValue >= AStableInfo.LowerLimit) and
+    (SignalInfo.CurrentValue <= AStableInfo.UpperLimit);
+  AStableInfo.IsMeanInRange := (SignalInfo.MeanValue >= AStableInfo.LowerLimit) and
+    (SignalInfo.MeanValue <= AStableInfo.UpperLimit);
+  AStableInfo.IsForecastInRange := (SignalInfo.ForecastValue >= AStableInfo.LowerLimit) and
+    (SignalInfo.ForecastValue <= AStableInfo.UpperLimit);
+
+  CurrentCheckPassed := (not Settings.RequireCurrentValueInRange) or AStableInfo.IsCurrentInRange;
+  MeanCheckPassed := (not Settings.RequireMeanValueInRange) or AStableInfo.IsMeanInRange;
+  ForecastCheckPassed := (not Settings.RequireForecastInRange) or AStableInfo.IsForecastInRange;
+  AStableInfo.IsTargetConditionPassed := CurrentCheckPassed and MeanCheckPassed and ForecastCheckPassed;
+  AStableInfo.IsReadyForMeasurement := AStableInfo.IsSignalStable and AStableInfo.IsTargetConditionPassed;
+
   HasActiveTask := (FState in [spStarted, spChanging]) or (FAction in [apSet, apStart]);
   HadTask := HasActiveTask or FHasTaskHistory;
-  IsChangingNow := (FValueSet.Value<>FValue.Value) and (not IsTargetReached);
-
   if not HadTask then
     AStableInfo.Status := sNONE
-  else if not IsTargetReached then
+  else if AStableInfo.IsReadyForMeasurement then
+    AStableInfo.Status := sOk
+  else if HasActiveTask then
   begin
-    if IsChangingNow then
-    begin
-      if HasStabilization then
-        AStableInfo.Status := sRun_SN
-      else
-        AStableInfo.Status := sRun_NN;
-    end
-    else if HasStabilization then
-      AStableInfo.Status := sFail_SN
+    if AStableInfo.IsSignalStable and not AStableInfo.IsTargetConditionPassed then
+      AStableInfo.Status := sRun_SN
+    else if (not AStableInfo.IsSignalStable) and AStableInfo.IsTargetConditionPassed then
+      AStableInfo.Status := sRun_NS
     else
-      AStableInfo.Status := sFail_NN;
+      AStableInfo.Status := sRun_NN;
   end
   else
   begin
-    if IsChangingNow then
-      AStableInfo.Status := sRun_NS
-    else if HasStabilization then
-      AStableInfo.Status := sOk
+    if AStableInfo.IsSignalStable and not AStableInfo.IsTargetConditionPassed then
+      AStableInfo.Status := sFail_SN
+    else if (not AStableInfo.IsSignalStable) and AStableInfo.IsTargetConditionPassed then
+      AStableInfo.Status := sFail_NS
     else
-      AStableInfo.Status := sFail_NS;
+      AStableInfo.Status := sFail_NN;
   end;
 
-  case AStableInfo.Status of
-    sNONE:
-      AStableInfo.StatusText := 'Не было заданий, поэтому стабилен.';
-    sRun_NN:
-      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизации нет.';
-    sRun_SN:
-      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание не достигнуто, стабилизация есть.';
-    sRun_NS:
-      AStableInfo.StatusText := 'Есть задание, происходит изменение, задание достигнуто, стабилизации нет.';
-    sOk:
-      AStableInfo.StatusText := 'Было задание, оно выполнено, стабилизация достигнута.';
-    sFail_SN:
-      AStableInfo.StatusText := 'Было задание, оно не достигнуто, стабилизация есть.';
-    sFail_NS:
-      AStableInfo.StatusText := 'Было задание, оно достигнуто, стабилизации нет.';
-    sFail_NN:
-      AStableInfo.StatusText := 'Было задание, оно не достигнуто и нет стабилизации.';
-  end;
+  if AStableInfo.IsReadyForMeasurement then
+    AStableInfo.StatusText := 'Параметр готов: текущее значение, среднее и прогноз находятся в допустимом диапазоне; стабильность подтверждена.'
+  else if not AStableInfo.IsTargetConditionPassed then
+  begin
+    if Settings.RequireCurrentValueInRange and not AStableInfo.IsCurrentInRange then
+      AStableInfo.StatusText := Format('%s ещё не готов: текущее значение %.4f вне допустимого диапазона %.4f–%.4f. ', [FName, SignalInfo.CurrentValue, AStableInfo.LowerLimit, AStableInfo.UpperLimit]);
+    if Settings.RequireMeanValueInRange and not AStableInfo.IsMeanInRange then
+      AStableInfo.StatusText := AStableInfo.StatusText + Format('Среднее значение %.4f вне диапазона. ', [SignalInfo.MeanValue]);
+    if Settings.RequireForecastInRange and not AStableInfo.IsForecastInRange then
+      AStableInfo.StatusText := AStableInfo.StatusText + Format('Прогноз %.4f выходит за диапазон %.4f–%.4f. ', [SignalInfo.ForecastValue, AStableInfo.LowerLimit, AStableInfo.UpperLimit]);
+    if not AStableInfo.IsSignalStable then
+      AStableInfo.StatusText := AStableInfo.StatusText + SignalInfo.StatusText;
+  end
+  else
+    AStableInfo.StatusText := Format('%s находится в допустимом диапазоне, но стабильность не подтверждена. %s', [FName, SignalInfo.StatusText]);
 
-  AStableInfo.CurrentValue := Value.Value;
-  Result := IsTargetReached;
+  Result := AStableInfo.IsReadyForMeasurement;
 end;
 
 procedure TParameter.Start;
@@ -697,6 +735,7 @@ begin
     if FValueSet.Value>FMax then
       FValueSet.Value:=FMax;
 
+  FValue.ClearStabilityHistory;
   Action := apStart;
   FHasTaskHistory := True;
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStart', 'Parameter started', FName);
@@ -785,7 +824,8 @@ begin
     FBefore := FMin
   else if ABefore > FMax then
     FBefore := FMax
-  else FBefore:=ABefore;
+  else
+    FBefore := ABefore;
 end;
 
 procedure TParameter.SetAfter(AAfter: Double);
@@ -794,7 +834,57 @@ begin
     FAfter := FMin
   else if AAfter > FMax then
     FAfter := FMax
-  else FAfter:=AAfter;
+  else
+    FAfter := AAfter;
+end;
+
+function TParameter.GetAccuracyPlus: Double;
+begin
+  EnsureMeterValues;
+  Result := FValue.StabilitySettings.TargetAccuracyPlusPercent;
+end;
+
+procedure TParameter.SetAccuracyPlus(const AValue: Double);
+var
+  Settings: TMeterValueStabilitySettings;
+begin
+  EnsureMeterValues;
+  Settings := FValue.StabilitySettings;
+  Settings.TargetAccuracyPlusPercent := Max(0.0, AValue);
+  FValue.StabilitySettings := Settings;
+end;
+
+function TParameter.GetAccuracyMinus: Double;
+begin
+  EnsureMeterValues;
+  Result := FValue.StabilitySettings.TargetAccuracyMinusPercent;
+end;
+
+procedure TParameter.SetAccuracyMinus(const AValue: Double);
+var
+  Settings: TMeterValueStabilitySettings;
+begin
+  EnsureMeterValues;
+  Settings := FValue.StabilitySettings;
+  Settings.TargetAccuracyMinusPercent := Max(0.0, AValue);
+  FValue.StabilitySettings := Settings;
+end;
+
+function TParameter.GetDeltaValue: Double;
+begin
+  EnsureMeterValues;
+  Result := FValue.StabilitySettings.MaxVariation;
+end;
+
+procedure TParameter.SetDeltaValue(const AValue: Double);
+var
+  Settings: TMeterValueStabilitySettings;
+begin
+  EnsureMeterValues;
+  // DeltaValue is a deprecated compatibility name for the stability variation limit.
+  Settings := FValue.StabilitySettings;
+  Settings.MaxVariation := Max(0.0, AValue);
+  FValue.StabilitySettings := Settings;
 end;
 
 procedure TParameter.SetValue(AValue: Double);
@@ -838,6 +928,7 @@ begin
         FValueSet.Value:=FMax
       else
         FValueSet.Value:=AValue;
+      FValue.ClearStabilityHistory;
       ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
       Action := apSet;
@@ -869,7 +960,10 @@ function TParameter.GetIsChanging: Boolean;
 var
   AStableInfo: rStableInfo;
 begin
-  Result :=  (FValueSet.Value<>FValue.Value) and not(IsStable(AStableInfo));
+  IsStable(AStableInfo);
+  Result := (FState = spChanging) or
+    ((not AStableInfo.IsTargetConditionPassed) and (not AStableInfo.SignalInfo.IsTrendStable)) or
+    ((FAction in [apSet, apStart]) and (not AStableInfo.IsSignalStable));
 end;
 
   {$ENDREGION 'TPump'}
