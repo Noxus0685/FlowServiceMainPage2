@@ -867,6 +867,8 @@ begin
     MenuItem.AutoCheck := False;
     MenuItem.OnClick := GridDiametersHeaderMenuItemClick;
     MenuItem.Parent := FMenuItemGridDiametersDisplay;
+
+    GridDiameters.Columns[I].OnMouseDown := GridDiametersMouseDown;
   end;
 end;
 
@@ -1826,8 +1828,14 @@ begin
   if (Button <> TMouseButton.mbRight) or (Y > GridDiameters.RowHeight) then
     Exit;
 
+  if (Sender = GridDiameters) and (Y > GridDiameters.RowHeight) then
+    Exit;
+
   SyncGridDiametersHeaderPopupMenu;
-  P := GridDiameters.LocalToScreen(PointF(X, Y));
+  if Sender is TControl then
+    P := TControl(Sender).LocalToScreen(PointF(X, Y))
+  else
+    P := GridDiameters.LocalToScreen(PointF(X, Y));
   FPopupMenuGridDiametersHeader.PopupComponent := GridDiameters;
   FPopupMenuGridDiametersHeader.Popup(P.X, P.Y);
 end;
