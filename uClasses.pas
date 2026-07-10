@@ -287,7 +287,6 @@ type
       FCoef: Double;
       function GetCoef: Double;
       procedure SetCoef(const AValue: Double);
-      procedure SetBaseCoef(const AValue: Double);
       function GetStopCriteria: TSpillageStopCriteria;
       procedure SetStopCriteria(const Value: TSpillageStopCriteria);
   protected
@@ -423,7 +422,6 @@ type
     procedure GetNextStdDN(const ADN: string; out NextDNStr: string; out NextDNmm: Integer);
 
     property Coef: Double read GetCoef write SetCoef;
-    property BaseCoef: Double read FCoef write SetBaseCoef;
 
     class function CalcQmaxByDiameter(
       const OldQmax: Double;
@@ -697,21 +695,17 @@ begin
     1:
       begin
         if AValue <> 0 then
-          SetBaseCoef(1 / AValue)
+        begin
+          FCoef := 1 / AValue;
+          if IsNan(FCoef) or IsInfinite(FCoef) then
+            FCoef := 0;
+        end
         else
-          SetBaseCoef(0);
+          FCoef := 0;
       end;
   else
-    SetBaseCoef(AValue);
+    FCoef := AValue;
   end;
-end;
-
-procedure TDeviceType.SetBaseCoef(const AValue: Double);
-begin
-  if IsNan(AValue) or IsInfinite(AValue) then
-    Exit;
-
-  FCoef := AValue;
 end;
 
 function TDeviceType.GetStopCriteria: TSpillageStopCriteria;
@@ -885,7 +879,7 @@ begin
     Add(IntToStr(DimensionCoef));
     Add(IntToStr(OutputSet));
     Add(IntToStr(Freq));
-    Add(FloatToStr(BaseCoef));
+    Add(FloatToStr(FCoef));
     Add(FloatToStr(FreqFlowRate));
     Add(IntToStr(VoltageRange));
     Add(FloatToStr(VoltageQminRate));
@@ -1286,7 +1280,7 @@ begin
   {====================================================================}
   OutputSet := 0;
   Freq := 0;
-  BaseCoef := 0.0;
+  FCoef := 0.0;
   FreqFlowRate := 0.0;
 
   {====================================================================}
@@ -1919,7 +1913,7 @@ begin
   {====================================================================}
   OutputSet := ASource.OutputSet;
   Freq := ASource.Freq;
-  BaseCoef := ASource.BaseCoef;
+  FCoef := ASource.FCoef;
   FreqFlowRate := ASource.FreqFlowRate;
 
   {====================================================================}

@@ -7327,24 +7327,6 @@ begin
 end;
 
 
-function TFormTypeEditor.DisplayCoefFromBase(const ABaseCoef: Double): Double;
-begin
-  if FType = nil then
-    Exit(ABaseCoef);
-
-  case FType.DimensionCoef of
-    1:
-      begin
-        if ABaseCoef <> 0 then
-          Result := 1 / ABaseCoef
-        else
-          Result := 0;
-      end;
-  else
-    Result := ABaseCoef;
-  end;
-end;
-
 procedure TFormTypeEditor.UpdateUICoef;
 begin
   // =====================================================

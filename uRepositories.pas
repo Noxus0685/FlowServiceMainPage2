@@ -1558,11 +1558,12 @@ begin
   Result.Units := Q.FieldByName('Units').AsInteger;
   Result.SetDimensions;
   Result.OutputType := Q.FieldByName('OutputType').AsInteger;
-  Result.DimensionCoef := Q.FieldByName('DimensionCoef').AsInteger;
+  Result.DimensionCoef := 0;
 
   Result.OutputSet := Q.FieldByName('OutputSet').AsInteger;
   Result.Freq := Q.FieldByName('Freq').AsInteger;
-  Result.BaseCoef := Q.FieldByName('Coef').AsFloat;
+  Result.Coef := Q.FieldByName('Coef').AsFloat;
+  Result.DimensionCoef := Q.FieldByName('DimensionCoef').AsInteger;
   Result.FreqFlowRate := Q.FieldByName('FreqFlowRate').AsFloat;
 
   Result.VoltageRange := Q.FieldByName('VoltageRange').AsInteger;
@@ -1758,6 +1759,8 @@ function TTypeRepository.UpdateType(AType: TDeviceType): Boolean;
 var
   Q: TFDQuery;
   OwnsTransaction: Boolean;
+  SavedDimensionCoef: Integer;
+  StoredCoef: Double;
 begin
   Result := False;
 
@@ -1901,7 +1904,14 @@ begin
 
     SetIntParam(Q, 'OutputSet', AType.OutputSet);
     SetFloatParam(Q, 'Freq', AType.Freq);
-    SetFloatParam(Q, 'Coef', AType.BaseCoef);
+    SavedDimensionCoef := AType.DimensionCoef;
+    AType.DimensionCoef := 0;
+    try
+      StoredCoef := AType.Coef;
+    finally
+      AType.DimensionCoef := SavedDimensionCoef;
+    end;
+    SetFloatParam(Q, 'Coef', StoredCoef);
     SetFloatParam(Q, 'FreqFlowRate', AType.FreqFlowRate);
 
     SetIntParam(Q, 'VoltageRange', AType.VoltageRange);
