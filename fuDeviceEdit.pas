@@ -3646,21 +3646,12 @@ procedure TFormDeviceEditor.GridPointsSetValue(
     Result := False;
     AValue := 0;
     NameNorm := UpperCase(Trim(AName));
-  {  if (NameNorm = 'QMAX') then
-      AValue := FDevice.Qmax
-    else if (NameNorm = 'QMIN') then
-      AValue := FDevice.Qmin
-    else if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
-      AValue := FDevice.FreqFlowRate
-    else if (NameNorm = 'KP') then
-      AValue := FDevice.Coef     }
-
-    if (NameNorm = 'QMIN') or (NameNorm = 'Q1') then
+    if NameNorm = 'QMIN' then
     begin
       AValue := FDevice.Qmin;
       Exit(True);
     end;
-    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
+    if NameNorm = 'QTR' then
     begin
       AValue := FDevice.Qtr;
       Exit(True);
@@ -3670,29 +3661,14 @@ procedure TFormDeviceEditor.GridPointsSetValue(
       AValue := FDevice.Q2tr;
       Exit(True);
     end;
-    if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
+    if NameNorm = 'QNOM' then
     begin
       AValue := FDevice.Qnom;
       Exit(True);
     end;
-    if (NameNorm = 'QMAX') or (NameNorm = 'Q4') then
+    if NameNorm = 'QMAX' then
     begin
       AValue := FDevice.Qmax;
-      Exit(True);
-    end;
-    if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
-    begin
-      AValue := FDevice.QFmax;
-      Exit(True);
-    end;
-    if NameNorm = 'KP' then
-    begin
-      AValue := FDevice.Kp;
-      Exit(True);
-    end
-    else if NameNorm = 'COEF' then
-    begin
-      AValue := FDevice.Coef;
       Exit(True);
     end;
   end;
