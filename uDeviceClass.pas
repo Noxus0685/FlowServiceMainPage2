@@ -101,13 +101,16 @@ type
 
   TDevicePoint = class (TTypeEntity)
   private
+
+    FStatus: EMeasurementPointStatus;
+
     function GetStopCriteria: TSpillageStopCriteria;
     procedure SetStopCriteria(const Value: TSpillageStopCriteria);
     function GettargetEtalonType: integer;
     procedure SettargetEtalonType(etalonType:integer);
     function GetMeasurementPointStatus: EMeasurementPointStatus;
     procedure SetMeasurementPointStatus(const Value: EMeasurementPointStatus);
-    FStatus: EMeasurementPointStatus;
+
 
   protected
     procedure SetState(const Value: TObjectState); override;

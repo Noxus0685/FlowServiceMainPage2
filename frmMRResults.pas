@@ -484,11 +484,18 @@ begin
   if ASpillage = nil then
     Exit(csPending);
 
-  case Ord(ADevicePoint.Status) of
-    3: Result := csDoneInvalid;
-    4: Result := csDoneWarning;
-    5: Result := csDoneValid;
-  else
+case ADevicePoint.Status of
+  mptsInvalidPoint:
+    Result := csDoneInvalid;
+
+  mptsInterrupted,
+  mptsCancelled,
+  mptsDone:
+    Result := csDoneWarning;
+
+  mptsSaved:
+    Result := csDoneValid;
+else
     case ASpillage.Status of
       TPointSpillage.SPS_OK: Result := csDoneValid;
       TPointSpillage.SPS_ERROR_EXCEEDED: Result := csDoneInvalid;

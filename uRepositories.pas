@@ -2571,7 +2571,7 @@ var
   {================ Повторы ======================}
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
-  Result.Status := Q.FieldByName('Status').AsInteger;
+  //Result.Status := Q.FieldByName('Status').AsInteger;
 
   Result.State := osClean;
 end;
@@ -2754,7 +2754,7 @@ begin
             ':FlowRate, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, ' +
-            ':Error, :Pause, :RepeatsProtocol, :Repeats, :Status' +
+            ':Error, :Pause, :RepeatsProtocol, :Repeats, ' +
             ')';
         end;
 
@@ -2773,7 +2773,7 @@ begin
             'Pressure=:Pressure, Temp=:Temp, TempAccuracy=:TempAccuracy, ' +
             'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, ' +
             'Error=:Error, Pause=:Pause, ' +
-            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats, Status=:Status ' +
+            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats ' +
             'where ID=:ID';
         end;
 
@@ -2807,7 +2807,7 @@ begin
     SetIntParam(Q, 'Pause', APoint.Pause);
     SetIntParam(Q, 'RepeatsProtocol', APoint.RepeatsProtocol);
     SetIntParam(Q, 'Repeats', APoint.Repeats);
-    SetIntParam(Q, 'Status', APoint.Status);
+    //SetIntParam(Q, 'Status', APoint.Status);
 
     {======================= EXEC =======================}
 

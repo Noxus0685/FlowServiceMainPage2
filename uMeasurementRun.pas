@@ -761,8 +761,8 @@ begin
     Exit;
   Point.Status := AStatus;
   if FWorkTable <> nil then
-    FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
-  Notify(Integer(mePointChanged), Point);
+ //   FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
+ // Notify(Integer(mePointChanged), Point);
 end;
 
 procedure TMeasurementRun.EnterSelectPoint;
@@ -1899,7 +1899,7 @@ begin
   begin
     FireEvent(meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
   { TODO -oAndrey -cОтладка : Надо потом отладить и вернуть обратно }
-  //  SetStage(msWaitMeasureStop);
+    SetStage(msDone);
   end;
 end;
 
