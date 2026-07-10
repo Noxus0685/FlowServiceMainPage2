@@ -533,7 +533,6 @@ type
   procedure UpdateUnitsCombo;
     procedure UpdateUIFreq;
     procedure UpdateUICoef;
-    function DisplayCoefFromBase(const ABaseCoef: Double): Double;
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
@@ -4518,7 +4517,7 @@ begin
 
   FType.Coef := InputValue;
 
-  FType.Freq := Round(FType.BaseCoef/3.6);
+  FType.Freq := Round(FType.Coef/3.6);
 
   // 6. Пересчёт Kp для всех диаметров
   RecalcDiametersKpByCoef;
@@ -4594,7 +4593,7 @@ begin
   for I := 0 to FDiametersLocal.Count - 1 do
   begin
     if FDiametersLocal[I].QFmax > 0 then
-      Kp := FType.BaseCoef / FDiametersLocal[I].QFmax
+      Kp := FType.Coef / FDiametersLocal[I].QFmax
     else
       Kp := 0;
 
@@ -4734,7 +4733,7 @@ begin
   // Сохраняем в тип
   // ----------------------------------------
   FType.Freq := NewFreq;
-  FType.BaseCoef := 3.6 *  FType.Freq;
+  FType.Coef := 3.6 *  FType.Freq;
   // ----------------------------------------
   // Пересчёт Kp по частоте
   // Kp = 3.6 * Freq / QFmax
@@ -5449,15 +5448,15 @@ begin
   // ----------------------------------------
   // Coef не задан — считаем и показываем подсказку
   // ----------------------------------------
-  if FType.BaseCoef = 0 then
+  if FType.Coef = 0 then
   begin
     if D.Qmax > 0 then
-      NewCoef := D.Kp / D.Qmax
+      FType.Coef := D.Kp * D.Qmax
     else
-      NewCoef := 0;
+      FType.Coef := 0;
 
-    if NewCoef > 0 then
-      EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
+    if FType.Coef > 0 then
+      EditCoef.TextPrompt := FormatFloat('0.####################', FType.Coef)
     else
       EditCoef.TextPrompt := '-';
   end;
@@ -5616,20 +5615,18 @@ begin
     D.Kp := NormalizeFloatInput(S);
 
     if D.Qmax > 0 then
-      NewCoef := D.Kp / D.Qmax
+      FType.Coef := D.Kp * D.Qmax
     else
-      NewCoef := 0;
+      FType.Coef := 0;
 
-    if not SameValue(NewCoef, FType.BaseCoef) then
-    begin
-      FType.BaseCoef := 0;
+      //FType.Coef := 0;
       EditCoef.Text := '';
 
-      if NewCoef > 0 then
-        EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
+      if FType.Coef > 0 then
+        EditCoef.TextPrompt := FormatFloat('0.####################', FType.Coef)
       else
         EditCoef.TextPrompt := '-';
-    end;
+
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
