@@ -6143,7 +6143,6 @@ begin
       WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled;
       if WorkTable.DeviceChannels[Row].Enabled then
         begin
-          DisableOtherChannelGroups(WorkTable.DeviceChannels, Row);
           ApplyEnabledChannelSimulationValues(WorkTable, False);
         end
       else
@@ -6636,7 +6635,6 @@ begin
         WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
         if WorkTable.DeviceChannels[ARow].Enabled then
           begin
-            DisableOtherChannelGroups(WorkTable.DeviceChannels, ARow);
             ApplyEnabledChannelSimulationValues(WorkTable, False);
           end
         else
