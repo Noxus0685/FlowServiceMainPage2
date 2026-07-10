@@ -533,6 +533,7 @@ type
   procedure UpdateUnitsCombo;
     procedure UpdateUIFreq;
     procedure UpdateUICoef;
+    function DisplayCoefFromBase(const ABaseCoef: Double): Double;
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
@@ -5448,7 +5449,7 @@ begin
   // ----------------------------------------
   // Coef не задан — считаем и показываем подсказку
   // ----------------------------------------
-  if FType.Coef = 0 then
+  if FType.BaseCoef = 0 then
   begin
     if D.Qmax > 0 then
       NewCoef := D.Kp / D.Qmax
@@ -5456,7 +5457,7 @@ begin
       NewCoef := 0;
 
     if NewCoef > 0 then
-      EditCoef.TextPrompt := FloatToStr(NewCoef)
+      EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
     else
       EditCoef.TextPrompt := '-';
   end;
@@ -5619,13 +5620,13 @@ begin
     else
       NewCoef := 0;
 
-    if not SameValue(NewCoef, FType.Coef) then
+    if not SameValue(NewCoef, FType.BaseCoef) then
     begin
-      FType.Coef := 0;
+      FType.BaseCoef := 0;
       EditCoef.Text := '';
 
       if NewCoef > 0 then
-        EditCoef.TextPrompt := FloatToStr(NewCoef)
+        EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
       else
         EditCoef.TextPrompt := '-';
     end;
@@ -7323,6 +7324,25 @@ begin
     InitCategoryComboEdit;
 
 
+end;
+
+
+function TFormTypeEditor.DisplayCoefFromBase(const ABaseCoef: Double): Double;
+begin
+  if FType = nil then
+    Exit(ABaseCoef);
+
+  case FType.DimensionCoef of
+    1:
+      begin
+        if ABaseCoef <> 0 then
+          Result := 1 / ABaseCoef
+        else
+          Result := 0;
+      end;
+  else
+    Result := ABaseCoef;
+  end;
 end;
 
 procedure TFormTypeEditor.UpdateUICoef;
