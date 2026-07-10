@@ -2148,7 +2148,7 @@ begin
     // == Коэффициент
     // =====================================================
     if FDevice.Coef > 0 then
-      EditCoef.Text := FloatToStr(FDevice.Coef)
+      EditCoef.Text := FormatByBaseError(FDevice.Coef, FDevice.Error)
     else
       EditCoef.Text := '';
 end;
@@ -2434,8 +2434,7 @@ begin
   end;
 
   { отображаем }
-  EditCoef.Text := FormatFloat('0.########', DisplayCoef);
-
+  EditCoef.Text := FormatByBaseError(DisplayCoef, FDevice.Error);
   SetModified;
 end;
 
@@ -2853,7 +2852,7 @@ begin
   // 2. Защита от мусора и нуля
   if InputValue <= 0 then
   begin
-    EditCoef.Text := FormatFloat('0.########', GetDisplayedCoef);
+    EditCoef.Text := FormatByBaseError(GetDisplayedCoef, FDevice.Error);
     Exit;
   end;
 

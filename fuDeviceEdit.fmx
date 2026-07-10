@@ -860,7 +860,7 @@ object FormDeviceEditor: TFormDeviceEditor
       Size.Width = 343.000000000000000000
       Size.Height = 176.000000000000000000
       Size.PlatformDefault = False
-      TabIndex = 5
+      TabIndex = 2
       TabOrder = 42
       TabPosition = None
       Sizes = (
@@ -1209,7 +1209,7 @@ object FormDeviceEditor: TFormDeviceEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = False
+        IsSelected = True
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
@@ -1725,7 +1725,7 @@ object FormDeviceEditor: TFormDeviceEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = True
+        IsSelected = False
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
