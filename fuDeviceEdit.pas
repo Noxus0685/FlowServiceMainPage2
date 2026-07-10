@@ -1740,6 +1740,7 @@ begin
   FMenuItemGridPointsDisplay := TMenuItem.Create(FPopupMenuGridPointsHeader);
   FMenuItemGridPointsDisplay.Text := 'Отображение';
   FMenuItemGridPointsDisplay.Parent := FPopupMenuGridPointsHeader;
+  GridPoints.OnMouseDown := GridPointsMouseDown;
 
   for I := 0 to GridPoints.ColumnCount - 1 do
   begin
