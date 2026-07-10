@@ -582,6 +582,7 @@ type
   procedure UpdateCoefEdit;
   procedure UpdateCoefUnitLabel;
   procedure UpdateFreqFlowRateUnitLabel;
+  procedure UpdateKpColumnHeader;
   function GetDisplayedCoef: Double;
 
   procedure LoadCategories;
@@ -3809,6 +3810,8 @@ begin
   // сохраняем тип представления
   FType.DimensionCoef := ViewType;
   UpdateCoefUnitLabel;
+  UpdateKpColumnHeader;
+  UpdateDiametersGrid;
 
   DisplayCoef := FType.Coef;
   if DisplayCoef <= 0 then
@@ -5399,7 +5402,10 @@ begin
     else
       // для Kp используем ту же логику точности,
       // т.к. он участвует в расчёте объёма/массы
-      Value := FormatByBaseError(D.Kp, FType.Error);
+      if FType.DimensionCoef = 1 then
+        Value := FormatFloat('0.####################', 1 / D.Kp)
+      else
+        Value := FormatFloat('0.####################', D.Kp);
   end;
 end;
 
@@ -5612,7 +5618,17 @@ begin
   {=====================================================}
   else if ACol = StringColumnDNKp.Index then
   begin
-    D.Kp := NormalizeFloatInput(S);
+    NewCoef := NormalizeFloatInput(S);
+
+    if FType.DimensionCoef = 1 then
+    begin
+      if NewCoef <> 0 then
+        D.Kp := 1 / NewCoef
+      else
+        D.Kp := 0;
+    end
+    else
+      D.Kp := NewCoef;
 
     if D.Qmax > 0 then
       FType.Coef := D.Kp * D.Qmax
@@ -7055,7 +7071,7 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
-  StringColumnDNKp.Header   := 'Kp, имп/л';
+  UpdateKpColumnHeader;
 
   FloatColumnVmax.Header   := 'Vmax, л';
   StringColumnVmin.Header  := 'Vmin, л';
@@ -7081,7 +7097,7 @@ begin
   StringColumnDNQnom.Header := 'Qnom '+ FType.GetDimensionName;
   StringColumnDNQmax.Header := 'Qmax '+ FType.GetDimensionName;
   StringColumnDNQF.Header   := 'QF '+ FType.GetDimensionName;
-  StringColumnDNKp.Header   := 'Kp, имп/кг';
+  UpdateKpColumnHeader;
 
   FloatColumnVmax.Header   := 'Mmax, кг';
   StringColumnVmin.Header  := 'Mmin, кг';
@@ -7237,6 +7253,7 @@ begin
     1: // Импульсы
       begin
         StringColumnDNKp.Visible       := True;
+        UpdateKpColumnHeader;
         StringColumnPointImp.Visible   := True;
         StringColumnDNQnom.Visible   := True;
         StringColumnDNQF.Visible     := True;
@@ -7257,6 +7274,17 @@ begin
 end;
 
 
+procedure TFormTypeEditor.UpdateKpColumnHeader;
+begin
+  if (FType = nil) or (StringColumnDNKp = nil) then
+    Exit;
+
+  if (FType.DimensionCoef >= 0) and (FType.DimensionCoef < cbCoefViewType.Items.Count) then
+    StringColumnDNKp.Header := 'Kp, ' + LowerCase(cbCoefViewType.Items[FType.DimensionCoef])
+  else
+    StringColumnDNKp.Header := 'Kp, имп/л';
+end;
+
 procedure TFormTypeEditor.UpdateCoefEdit;
 var
   V: Double;
@@ -7270,7 +7298,7 @@ begin
     Exit;
   end;
 
-  EditCoef.Text := FloatToStr(V);
+  EditCoef.Text := FormatFloat('0.####################', V);
 end;
 
 procedure TFormTypeEditor.UpdateCoefUnitLabel;
@@ -7341,7 +7369,7 @@ begin
   EditCoef.Text := '';
   EditCoef.TextPrompt := '';
   if FType.Coef > 0 then
-    EditCoef.Text := FloatToStr(FType.Coef)
+    EditCoef.Text := FormatFloat('0.####################', FType.Coef)
   else
     EditCoef.TextPrompt := '-';
 end;
