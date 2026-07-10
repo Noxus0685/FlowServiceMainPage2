@@ -777,14 +777,14 @@ begin
 end;
 
 procedure TFrameFlowMeterProperties.EditImpulseCoefExit(Sender: TObject);
-var InputValue, NewBaseCoef: Double;
+var InputValue, NewStoredCoef: Double;
 begin
   if FIsLoading or (FDevice = nil) then Exit;
   InputValue := NormalizeFloatInput(EditImpulseCoef.Text);
   if not ValidPositive(InputValue) then begin EditImpulseCoef.Text := FormatFloat('0.########', DisplayedCoef); Exit; end;
-  if FDevice.DimensionCoef = 1 then NewBaseCoef := 1 / InputValue else NewBaseCoef := InputValue;
-  if not ValidPositive(NewBaseCoef) then begin EditImpulseCoef.Text := FormatFloat('0.########', DisplayedCoef); Exit; end;
-  FDevice.Coef := NewBaseCoef;
+  if FDevice.DimensionCoef = 1 then NewStoredCoef := 1 / InputValue else NewStoredCoef := InputValue;
+  if not ValidPositive(NewStoredCoef) then begin EditImpulseCoef.Text := FormatFloat('0.########', DisplayedCoef); Exit; end;
+  FDevice.Coef := NewStoredCoef;
   if ValidPositive(FDevice.FreqFlowRate) then FDevice.Freq := Round(FDevice.Coef * FDevice.FreqFlowRate / 3.6);
   NotifyChanged;
 end;

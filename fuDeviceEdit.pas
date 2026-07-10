@@ -2839,7 +2839,7 @@ end;
 procedure TFormDeviceEditor.EditCoefExit(Sender: TObject);
 var
   InputValue: Double;
-  NewBaseCoef: Double;
+  NewStoredCoef: Double;
 begin
   if FLoading then
     Exit;
@@ -2859,18 +2859,18 @@ begin
 
   // 3. Приводим введённое значение к базовому виду (имп/л или имп/кг)
   case FDevice.DimensionCoef of
-    0: NewBaseCoef := InputValue;        // имп/л (имп/кг)
-    1: NewBaseCoef := 1 / InputValue;    // л/имп (кг/имп) → имп/л
+    0: NewStoredCoef := InputValue;        // имп/л (имп/кг)
+    1: NewStoredCoef := 1 / InputValue;    // л/имп (кг/имп) → имп/л
   else
-    NewBaseCoef := InputValue;
+    NewStoredCoef := InputValue;
   end;
 
   // 4. Если базовый коэффициент не изменился — выходим
-  if SameValue(FDevice.Coef, NewBaseCoef, 1e-12) then
+  if SameValue(FDevice.Coef, NewStoredCoef, 1e-12) then
     Exit;
 
   // 5. Сохраняем базовый коэффициент
-  FDevice.Coef := NewBaseCoef;
+  FDevice.Coef := NewStoredCoef;
 
   FDevice.Freq := Round(FDevice.Coef * FDevice.FreqFlowRate  / 3.6);
 
