@@ -1,4 +1,4 @@
-﻿unit uMeasurementRun;
+unit uMeasurementRun;
 
 {
   TMeasurementRun – Measurement Process Orchestrator (FSM)
@@ -163,7 +163,8 @@ type
     meSaveWarning,
     meSaveError,
     mePointDone,
-    meAllDone
+    meAllDone,
+    meStopRequested
   );
 
   EMeasurementEvent = TMeasurementEvent;
@@ -190,6 +191,17 @@ type
     scmControllerTime,
     scmControllerImpulse,
     scmCommand
+  );
+
+  TMeasurementStopReason = (
+    msrNone,
+    msrNormalComplete,
+    msrUserStop,
+    msrLimitReached,
+    msrError,
+    msrCancelledBeforeStart,
+    msrEmergency,
+    msrExternalCommand
   );
 
 
@@ -219,6 +231,10 @@ type
     FMaxAttemptCount: Integer;
     FMeasureTimeout: Cardinal;
     FStopRequested: Boolean;
+    FStopReason: TMeasurementStopReason;
+    FPhysicalMeasureStarted: Boolean;
+    FPhysicalStopRequested: Boolean;
+    FActualStopEventFired: Boolean;
     FNextStageAfterSave: EMeasurementState;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
@@ -243,6 +259,15 @@ type
     procedure SetCurrentPointStatus(const AStatus: EMeasurementPointStatus);
     procedure RequestStop;
     procedure StopWorkerThread;
+    function IsStopRequested: Boolean;
+    function GetStopReason: TMeasurementStopReason;
+    procedure SetStopReason(AReason: TMeasurementStopReason);
+    function HasPhysicalMeasurementStarted: Boolean;
+    function WorkTableNeedsPhysicalStop: Boolean;
+    procedure FireActualStopOnce;
+    procedure RouteStopInWorker;
+    procedure MarkInterruptedPointIfNeeded;
+    class function MeasurementStopReasonToString(AReason: TMeasurementStopReason): string; static;
     procedure ProcessSelectPoint;
     procedure ProcessSelectEtalon;
     procedure ProcessSetupPoint;
@@ -578,6 +603,10 @@ begin
   FAttempt := 0;
   FMeasureTimeout := 0;
   FStopRequested := False;
+  FStopReason := msrNone;
+  FPhysicalMeasureStarted := False;
+  FPhysicalStopRequested := False;
+  FActualStopEventFired := False;
   FNextStageAfterSave := msNone;
 end;
 
@@ -787,6 +816,8 @@ begin
   begin
 
     SetCurrentPointStatus(mptsSelectPoint);
+    if IsStopRequested then
+      Exit;
 
     ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
       'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
@@ -811,6 +842,8 @@ var
   Error: TErrorInfo;
 begin
   SetCurrentPointStatus(mptsSelectEtalon);
+  if IsStopRequested then
+    Exit;
   if SelectEtalons(GetCurrentPoint, Error) then
   begin
     FireEvent(meEtalonSelected);
@@ -863,6 +896,8 @@ begin
   end;
 
   SetCurrentPointStatus(mptsSetupPoint);
+  if IsStopRequested then
+    Exit;
 
   if ShouldSetupConditions then
   begin
@@ -895,6 +930,8 @@ end;
 procedure TMeasurementRun.EnterWaitStable;
 begin
   SetCurrentPointStatus(mptsWaitStable);
+  if IsStopRequested then
+    Exit;
   if FMode = mrmManual then
   begin
     SetStage(msWaitMeasureStart);
@@ -908,6 +945,17 @@ end;
 
 procedure TMeasurementRun.EnterWaitMeasureStart;
 begin
+  if IsStopRequested then
+  begin
+    SetStopReason(msrCancelledBeforeStart);
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EnterWaitMeasureStart',
+      'Запуск измерения отменён до отправки StartTest',
+      Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
+        MeasurementStopReasonToString(GetStopReason)]));
+    SetStage(msDone);
+    Exit;
+  end;
+
   SetCurrentPointStatus(mptsWaitMeasureStart);
   FMeasureTimeout := CalcMeasureTimeout(GetCurrentPoint);
 
@@ -921,6 +969,7 @@ begin
 
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'StartTest',
     'Отдана команда запуска измерения', MeasurementStateToString(FCurrentStage));
+  FPhysicalMeasureStarted := True;
   FWorkTable.StartTest;
 end;
 
@@ -940,11 +989,27 @@ begin
     Exit;
   end;
 
-  if FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE] then
+  if WorkTableNeedsPhysicalStop then
   begin
-    ProtocolManager.AddMessage(pcAction, psMeasurement, 'StopTest',
-      'Отдана команда остановки измерения', MeasurementStateToString(FCurrentStage));
-    FWorkTable.StopTest;
+    if not FPhysicalStopRequested then
+    begin
+      FPhysicalStopRequested := True;
+      ProtocolManager.AddMessage(pcAction, psMeasurement, 'StopTest',
+        'Отдана команда остановки измерения',
+        Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
+          MeasurementStopReasonToString(GetStopReason)]));
+      FWorkTable.StopTest;
+    end
+    else
+      ProtocolManager.AddMessage(pcInfo, psMeasurement, 'StopTest',
+        'Повторная команда StopTest не отправлена',
+        MeasurementStateToString(FCurrentStage));
+  end
+  else
+  begin
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'StopTest',
+      'Физическая остановка не требуется или уже выполняется',
+      MeasurementStateToString(FCurrentStage));
   end;
 end;
 
@@ -968,6 +1033,17 @@ begin
 
   SaveMeasurementResults;
   FireEvent(meSaveDone);
+
+  if IsStopRequested then
+  begin
+    MarkInterruptedPointIfNeeded;
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'EnterSave',
+      'После Stop продолжение серии запрещено',
+      Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
+        MeasurementStopReasonToString(GetStopReason)]));
+    FNextStageAfterSave := msDone;
+    Exit;
+  end;
 
   RepeatsTarget := 1;
   if (FMode <> mrmManual) and (Point <> nil) then
@@ -1326,6 +1402,10 @@ begin
       FreeAndNil(FThread);
 
     FStopRequested := False;
+    FStopReason := msrNone;
+    FPhysicalMeasureStarted := False;
+    FPhysicalStopRequested := False;
+    FActualStopEventFired := False;
     CreateSession;
     if FWorkTable = nil then
     begin
@@ -1405,13 +1485,6 @@ begin
   FThread.Start;
 
 
-    case FMode of
-      mrmManual:
-        SetStage(msSetupPoint);
-      mrmHalfAutomatic,
-      mrmAutomatic:
-        SetStage(msSelectPoint);
-    end;
     if not FStopRequested then
       FireEvent(meStarted);
   finally
@@ -1449,36 +1522,147 @@ begin
   end;
 end;
 
-procedure TMeasurementRun.RequestStop;
+function TMeasurementRun.IsStopRequested: Boolean;
 begin
   FCriticalSection.Acquire;
   try
-    if FStopRequested then
+    Result := FStopRequested;
+  finally
+    FCriticalSection.Release;
+  end;
+end;
+
+function TMeasurementRun.GetStopReason: TMeasurementStopReason;
+begin
+  FCriticalSection.Acquire;
+  try
+    Result := FStopReason;
+  finally
+    FCriticalSection.Release;
+  end;
+end;
+
+procedure TMeasurementRun.SetStopReason(AReason: TMeasurementStopReason);
+begin
+  FCriticalSection.Acquire;
+  try
+    if (FStopReason in [msrNone, msrNormalComplete, msrUserStop, msrLimitReached]) or
+       (AReason in [msrError, msrEmergency]) then
+      FStopReason := AReason;
+  finally
+    FCriticalSection.Release;
+  end;
+end;
+
+function TMeasurementRun.HasPhysicalMeasurementStarted: Boolean;
+begin
+  Result := FPhysicalMeasureStarted;
+  if not Result and (FWorkTable <> nil) then
+    Result := FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE,
+      swtSTOPTEST, swtSTOPWAIT, swtFINALREAD, swtCOMPLETE];
+end;
+
+function TMeasurementRun.WorkTableNeedsPhysicalStop: Boolean;
+begin
+  Result := (FWorkTable <> nil) and
+    (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]);
+end;
+
+procedure TMeasurementRun.FireActualStopOnce;
+begin
+  if FActualStopEventFired then
+    Exit;
+  FActualStopEventFired := True;
+  ProtocolManager.AddMessage(pcEvent, psMeasurement, 'ActualStop',
+    'Фактическая остановка измерения подтверждена',
+    Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
+      MeasurementStopReasonToString(GetStopReason)]));
+  FireEvent(meStopped);
+end;
+
+procedure TMeasurementRun.MarkInterruptedPointIfNeeded;
+begin
+  if IsStopRequested and (GetCurrentPoint <> nil) and
+     not (GetCurrentPoint.Status in [mptsMeasureError, mptsSetupError, mptsCancelled, mptsSaved]) then
+    SetCurrentPointStatus(mptsInterrupted);
+end;
+
+procedure TMeasurementRun.RouteStopInWorker;
+begin
+  if not IsStopRequested then
+    Exit;
+
+  case FCurrentStage of
+    msNone, msDone:
       Exit;
-    FStopRequested := True;
-    FIsPaused := False;
+    msWaitMeasureStop, msResultsRead, msSave:
+      Exit;
+    msWaitMeasureStart, msMeasure:
+      begin
+        SetStage(msWaitMeasureStop);
+        Exit;
+      end;
+  else
+    if HasPhysicalMeasurementStarted or WorkTableNeedsPhysicalStop then
+      SetStage(msWaitMeasureStop)
+    else
+    begin
+      SetStopReason(msrCancelledBeforeStart);
+      ProtocolManager.AddMessage(pcInfo, psMeasurement, 'RouteStopInWorker',
+        'Stop обработан до физического запуска измерения',
+        Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
+          MeasurementStopReasonToString(GetStopReason)]));
+      if FWorkTable <> nil then
+        FWorkTable.StopMonitor;
+      SetCurrentPointStatus(mptsCancelled);
+      FireActualStopOnce;
+      SetStage(msDone);
+    end;
+  end;
+end;
+
+procedure TMeasurementRun.RequestStop;
+var
+  StageSnapshot: EMeasurementState;
+  ReasonSnapshot: TMeasurementStopReason;
+  Duplicate: Boolean;
+begin
+  FCriticalSection.Acquire;
+  try
+    StageSnapshot := FCurrentStage;
+    ReasonSnapshot := FStopReason;
+    if FStopRequested then
+    begin
+      Duplicate := True;
+    end
+    else
+    begin
+      Duplicate := False;
+      FStopRequested := True;
+      FIsPaused := False;
+      if FStopReason in [msrNone, msrNormalComplete] then
+        FStopReason := msrUserStop;
+      ReasonSnapshot := FStopReason;
+    end;
   finally
     FCriticalSection.Release;
   end;
 
-  ProtocolManager.AddMessage(pcAction, psMeasurement, 'RequestStop',
-    'Запрошена принудительная остановка измерения',
-    MeasurementStateToString(FCurrentStage));
-
-  case FCurrentStage of
-    msWaitMeasureStart,
-    msMeasure:
-      SetStage(msWaitMeasureStop);
-    msWaitMeasureStop:
-      ; // The physical stop has already been requested.
-    msNone,
-    msDone:
-      ;
-  else
-    SetStage(msDone);
+  if Duplicate then
+  begin
+    ProtocolManager.AddMessage(pcInfo, psMeasurement, 'RequestStop',
+      'Повторный запрос Stop проигнорирован',
+      Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
+        MeasurementStopReasonToString(ReasonSnapshot)]));
+      Exit;
   end;
 
-  FireEvent(meStopped);
+  ProtocolManager.AddMessage(pcAction, psMeasurement, 'RequestStop',
+    'Запрошена принудительная остановка измерения',
+    Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
+      MeasurementStopReasonToString(ReasonSnapshot)]));
+
+  FireEvent(meStopRequested);
 end;
 
 procedure TMeasurementRun.Stop;
@@ -1550,13 +1734,18 @@ begin
   while not TThread.CurrentThread.CheckTerminated do
   begin
     try
-      if FStopRequested and not (FCurrentStage in [msWaitMeasureStop, msDone]) then
+      if FCurrentStage = msNone then
       begin
-        if FCurrentStage in [msWaitMeasureStart, msMeasure] then
-          SetStage(msWaitMeasureStop)
-        else
-          SetStage(msDone);
+        case FMode of
+          mrmManual:
+            SetStage(msSetupPoint);
+          mrmHalfAutomatic,
+          mrmAutomatic:
+            SetStage(msSelectPoint);
+        end;
       end;
+
+      RouteStopInWorker;
 
       if FIsPaused then
       begin
@@ -1876,6 +2065,7 @@ begin
   case FWorkTable.State of
     swtEXECUTE:
       begin
+        FPhysicalMeasureStarted := True;
         SetStage(msMeasure);
         Exit;
       end;
@@ -1889,6 +2079,7 @@ begin
       end;
     swtFAILURE:
       begin
+        SetStopReason(msrError);
         FireEvent(meMeasureError, BuildError(1402, 'Ошибка запуска измерения'));
         SetStage(msDone);
         Exit;
@@ -2103,6 +2294,7 @@ begin
       end;
     swtFAILURE:
       begin
+        SetStopReason(msrError);
         FireEvent(meMeasureError, BuildError(1404, 'Ошибка во время измерения'));
         SetStage(msWaitMeasureStop);
         Exit;
@@ -2118,6 +2310,7 @@ begin
       ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessMeasure',
         'Достигнут программный лимит измерения',
         BuildCommandStopLimitDetails(FWorkTable.CurrentPoint, StopReason));
+      SetStopReason(msrLimitReached);
       SetStage(msWaitMeasureStop);
       Exit;
     end;
@@ -2125,6 +2318,7 @@ begin
 
   if Int64(TThread.GetTickCount64 - FWaitStartedTick) > Int64(FMeasureTimeout) * 1000 then
   begin
+    SetStopReason(msrError);
     FireEvent(meMeasureTimeout, BuildError(1401, 'Таймаут измерения'));
     SetStage(msWaitMeasureStop);
   end;
@@ -2143,18 +2337,31 @@ begin
   case FWorkTable.State of
     swtCOMPLETE:
       begin
+        FireActualStopOnce;
+        if IsStopRequested and HasPhysicalMeasurementStarted then
+        begin
+          ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessWaitMeasureStop',
+            'Остановка подтверждена, результат будет сохранён как прерванный',
+            MeasurementStopReasonToString(GetStopReason));
+          MarkInterruptedPointIfNeeded;
+        end;
         SetStage(msSave);
         Exit;
       end;
 
     swtFINALREAD:
       begin
+        FireActualStopOnce;
+        if IsStopRequested then
+          ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessWaitMeasureStop',
+            'Начато чтение результата после Stop', MeasurementStopReasonToString(GetStopReason));
         SetStage(msResultsRead);
         Exit;
       end;
 
     swtFAILURE:
       begin
+        SetStopReason(msrError);
         FireEvent(meMeasureError, BuildError(1405, 'Ошибка остановки измерения'));
         SetStage(msDone);
         Exit;
@@ -2163,6 +2370,7 @@ begin
 
   if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
+    SetStopReason(msrError);
     FireEvent(meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
     SetStage(msDone);
   end;
@@ -2183,6 +2391,13 @@ begin
     swtCOMPLETE:
       begin
         FireEvent(meResultReady);
+        if IsStopRequested then
+        begin
+          ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessResultsRead',
+            'Результат прерванного измерения прочитан',
+            MeasurementStopReasonToString(GetStopReason));
+          MarkInterruptedPointIfNeeded;
+        end;
         SetStage(msSave);
         Exit;
       end;
@@ -2194,6 +2409,7 @@ begin
 
     swtFAILURE:
       begin
+        SetStopReason(msrError);
         FireEvent(meMeasureError, BuildError(1410, 'Ошибка чтения результатов'));
         SetStage(msDone);
         Exit;
@@ -2202,6 +2418,7 @@ begin
 
   if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
+    SetStopReason(msrError);
     FireEvent(meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
     SetStage(msDone);
   end;
@@ -2320,6 +2537,7 @@ class function TMeasurementRun.MeasurementEventToString(AEvent: EMeasurementEven
 begin
   case AEvent of
     meStarted:          Result := 'Запущено';
+    meStopRequested:    Result := 'Запрошена остановка';
     meStopped:          Result := 'Остановлено';
     mePointSelected:    Result := 'Точка выбрана';
     mePointInvalid:     Result := 'Точка невалидна';
@@ -2346,6 +2564,22 @@ begin
     meAllDone:          Result := 'Все точки завершены';
   else
     Result := '-';
+  end;
+end;
+
+class function TMeasurementRun.MeasurementStopReasonToString(AReason: TMeasurementStopReason): string;
+begin
+  case AReason of
+    msrNone: Result := 'остановка не запрошена';
+    msrNormalComplete: Result := 'штатное завершение';
+    msrUserStop: Result := 'остановка пользователем';
+    msrLimitReached: Result := 'достигнут лимит';
+    msrError: Result := 'ошибка';
+    msrCancelledBeforeStart: Result := 'отмена до начала измерения';
+    msrEmergency: Result := 'аварийное завершение';
+    msrExternalCommand: Result := 'внешняя команда';
+  else
+    Result := 'неизвестная причина';
   end;
 end;
 
