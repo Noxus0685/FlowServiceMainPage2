@@ -319,6 +319,10 @@ type
     procedure sbRepeatsChange(Sender: TObject);
     procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
+    procedure GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure GridPointsHeaderMenuItemClick(Sender: TObject);
+    procedure SyncGridPointsHeaderPopupMenu;
 
 
   private
@@ -343,6 +347,8 @@ type
      FButtonCoefClear: TButton;
      FCoefsTabInitialized: Boolean;
      FSkipPointDeleteConfirm: Boolean;
+     FPopupMenuGridPointsHeader: TPopupMenu;
+     FMenuItemGridPointsDisplay: TMenuItem;
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
 
@@ -385,6 +391,7 @@ type
      function GetPointByVisibleRow(ARow: Integer): TDevicePoint;
      procedure UpdateQmaxQmin;
      procedure SortPoints;
+     procedure CreateGridPointsHeaderMenu;
 
      procedure InitCoefsTab;
      procedure EnsureCalibrCoefTable;
@@ -1715,6 +1722,105 @@ begin
   SetModified;
 end;
 
+
+procedure TFormDeviceEditor.CreateGridPointsHeaderMenu;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+begin
+  if FPopupMenuGridPointsHeader = nil then
+  begin
+    FPopupMenuGridPointsHeader := TPopupMenu.Create(Self);
+    FPopupMenuGridPointsHeader.Stored := False;
+  end;
+
+  while FPopupMenuGridPointsHeader.ItemsCount > 0 do
+    FPopupMenuGridPointsHeader.Items[0].Free;
+
+  FMenuItemGridPointsDisplay := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  FMenuItemGridPointsDisplay.Text := 'Отображение';
+  FMenuItemGridPointsDisplay.Parent := FPopupMenuGridPointsHeader;
+
+  for I := 0 to GridPoints.ColumnCount - 1 do
+  begin
+    MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+    if GridPoints.Columns[I].Header <> '' then
+      MenuItem.Text := GridPoints.Columns[I].Header
+    else
+      MenuItem.Text := GridPoints.Columns[I].Name;
+    MenuItem.Tag := I;
+    MenuItem.AutoCheck := False;
+    MenuItem.OnClick := GridPointsHeaderMenuItemClick;
+    MenuItem.Parent := FMenuItemGridPointsDisplay;
+
+    GridPoints.Columns[I].OnMouseDown := GridPointsMouseDown;
+  end;
+end;
+
+procedure TFormDeviceEditor.SyncGridPointsHeaderPopupMenu;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  ColIndex: Integer;
+begin
+  if (FPopupMenuGridPointsHeader = nil) or (FMenuItemGridPointsDisplay = nil) then
+    Exit;
+
+  for I := 0 to FMenuItemGridPointsDisplay.ItemsCount - 1 do
+  begin
+    if not (FMenuItemGridPointsDisplay.Items[I] is TMenuItem) then
+      Continue;
+
+    MenuItem := TMenuItem(FMenuItemGridPointsDisplay.Items[I]);
+    ColIndex := MenuItem.Tag;
+
+    if (ColIndex >= 0) and (ColIndex < GridPoints.ColumnCount) then
+    begin
+      MenuItem.Enabled := True;
+      MenuItem.IsChecked := GridPoints.Columns[ColIndex].Visible;
+    end
+    else
+    begin
+      MenuItem.Enabled := False;
+      MenuItem.IsChecked := False;
+    end;
+  end;
+end;
+
+procedure TFormDeviceEditor.GridPointsHeaderMenuItemClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  ColIndex: Integer;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  ColIndex := MenuItem.Tag;
+  if (ColIndex < 0) or (ColIndex >= GridPoints.ColumnCount) then
+    Exit;
+
+  GridPoints.Columns[ColIndex].Visible := not GridPoints.Columns[ColIndex].Visible;
+  SyncGridPointsHeaderPopupMenu;
+end;
+
+procedure TFormDeviceEditor.GridPointsMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  P: TPointF;
+begin
+  if Button <> TMouseButton.mbRight then
+    Exit;
+
+  SyncGridPointsHeaderPopupMenu;
+  if Sender is TControl then
+    P := TControl(Sender).LocalToScreen(PointF(X, Y))
+  else
+    P := GridPoints.LocalToScreen(PointF(X, Y));
+  FPopupMenuGridPointsHeader.PopupComponent := GridPoints;
+  FPopupMenuGridPointsHeader.Popup(P.X, P.Y);
+end;
+
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
@@ -1723,6 +1829,7 @@ begin
   InitCoefsTab;
   OnKeyDown := FormKeyDown;
   GridPoints.OnKeyDown := GridPointsKeyDown;
+  CreateGridPointsHeaderMenu;
 
   FLoading := True;
   try
