@@ -5659,7 +5659,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
 );
   function TryGetDiameterColumnValueByName(const AD: TDiameter; const AColumnName: string; out AValue: Double): Boolean;
   var
-    NameNorm, HeaderNorm: string;
+    NameNorm: string;
   begin
     Result := False;
     AValue := 0;
@@ -5673,7 +5673,7 @@ procedure TFormTypeEditor.GridPointsSetValue(
       AValue := AD.Qmin;
       Exit(True);
     end;
-    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
+    if NameNorm = 'QTR' then
     begin
       AValue := AD.Qtr;
       Exit(True);
@@ -5683,81 +5683,17 @@ procedure TFormTypeEditor.GridPointsSetValue(
       AValue := AD.Q2Tr;
       Exit(True);
     end;
-    if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
+    if NameNorm = 'QNOM' then
     begin
       AValue := AD.Qnom;
       Exit(True);
     end;
-    if (NameNorm = 'QMAX') or (NameNorm = 'Q4') then
-    begin
-      AValue := AD.Qmax;
-      Exit(True);
-    end;
-    if NameNorm = 'QF' then
-    begin
-      AValue := AD.QFmax;
-      Exit(True);
-    end;
-    if NameNorm = 'KP' then
-    begin
-      AValue := AD.Kp;
-      Exit(True);
-    end;
-
-    HeaderNorm := UpperCase(StringColumnDNQmin.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
-    begin
-      AValue := AD.Qmin;
-      Exit(True);
-    end;
-
-    HeaderNorm := UpperCase(StringColumnDNQTr.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
-    begin
-      AValue := AD.Qtr;
-      Exit(True);
-    end;
-
-    HeaderNorm := UpperCase(StringColumnDNQ2Tr.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
-    begin
-      AValue := AD.Q2tr;
-      Exit(True);
-    end;
-    HeaderNorm := UpperCase(StringColumnDNQ2Tr.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
-    begin
-      AValue := AD.Q2Tr;
-      Exit(True);
-    end;
-
-    HeaderNorm := UpperCase(StringColumnDNQnom.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
-    begin
-      AValue := AD.Qnom;
-      Exit(True);
-    end;
-
-    HeaderNorm := UpperCase(StringColumnDNQmax.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
+    if NameNorm = 'QMAX' then
     begin
       AValue := AD.Qmax;
       Exit(True);
     end;
 
-    HeaderNorm := UpperCase(StringColumnDNQF.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
-    begin
-      AValue := AD.QFmax;
-      Exit(True);
-    end;
-
-    HeaderNorm := UpperCase(StringColumnDNKp.Header);
-    if (HeaderNorm <> '') and (Pos(NameNorm, HeaderNorm) > 0) then
-    begin
-      AValue := AD.Kp;
-      Exit(True);
-    end;
   end;
 
   function TryApplyPointNameFormula(const AText: string; AP: TTypePoint): Boolean;
