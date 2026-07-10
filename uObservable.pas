@@ -27,6 +27,7 @@ type
     FIsDestroying: Boolean;
     FEvent: Integer;
     FLastError: TErrorInfo;
+    FName: string;
   protected
     procedure Notify(Event: Integer; Data: TObject = nil); overload;
     procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
@@ -41,6 +42,8 @@ type
     procedure FireEvent(AEvent: Integer); overload; virtual;
     property Event: Integer read FEvent write   FEvent;
     property LastError: TErrorInfo read FLastError;
+    property Name: string read FName write FName;
+
   protected
     procedure DoFireEvent(AEvent: Integer; const AError: TErrorInfo); virtual;
   end;

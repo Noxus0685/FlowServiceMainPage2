@@ -913,11 +913,8 @@ end;
 
 procedure TMeasurementRun.EnterResultsRead;
 begin
-
-  GetCurrentPoint.Status:= 9;
+  GetCurrentPoint.Status:= 9; //
   FireEvent(meResultReading);
-  FireEvent(meMeasureCompleted);
-  FireEvent(meResultReady);
 end;
 
 procedure TMeasurementRun.EnterSave;
@@ -926,6 +923,10 @@ var
   RepeatsTarget: Integer;
 begin
   FNextStageAfterSave := msDone;
+
+
+  FireEvent(meMeasureCompleted);
+
   Point := GetCurrentPoint;
 
   SaveMeasurementResults;
@@ -945,7 +946,9 @@ begin
     if FMode = mrmManual then
       FNextStageAfterSave := msDone
     else
+    begin
       FNextStageAfterSave := msSelectPoint;
+    end;
   end
   else
     FNextStageAfterSave := msSetupPoint;
@@ -1334,13 +1337,35 @@ begin
           'Запуск процесса измерения в полуавтоматическом режиме', '');
     end;
 
-    FThread := TThread.CreateAnonymousThread(
-      procedure
-      begin
-        RunThreadProc;
-      end);
-    FThread.FreeOnTerminate := False;
-    FThread.Start;
+  // Создаём отдельный рабочий поток для выполнения процесса измерения.
+  //
+  // Поток создаётся в приостановленном состоянии. Фактическое выполнение
+  // анонимной процедуры начнётся только после вызова FThread.Start.
+
+
+  FThread := TThread.CreateAnonymousThread(
+  procedure
+  var
+    ThreadName: string;
+  begin
+    ThreadName := Format(
+      'MeasurementRun_%s_%d',
+      [
+        Name,
+        Ord(Mode)
+      ]
+    );
+
+    TThread.NameThreadForDebugging(ThreadName);
+
+    RunThreadProc;
+  end
+);
+
+  FThread.FreeOnTerminate := False;
+  FThread.Start;
+
+
     case FMode of
       mrmManual:
         SetStage(msSetupPoint);
@@ -2075,12 +2100,18 @@ begin
   end;
 
   case FWorkTable.State of
-    swtCOMPLETE,
+    swtCOMPLETE:
+      begin
+        SetStage(msSave);
+        Exit;
+      end;
+
     swtFINALREAD:
       begin
         SetStage(msResultsRead);
         Exit;
       end;
+
     swtFAILURE:
       begin
         FireEvent(meMeasureError, BuildError(1405, 'Ошибка остановки измерения'));
@@ -2097,8 +2128,42 @@ begin
 end;
 
 procedure TMeasurementRun.ProcessResultsRead;
+const
+  DEFAULT_STOP_TIMEOUT_MS = 3000;
 begin
-  SetStage(msSave);
+
+  if FWorkTable = nil then
+  begin
+    SetStage(msDone);
+    Exit;
+  end;
+
+  case FWorkTable.State of
+    swtCOMPLETE:
+      begin
+        FireEvent(meResultReady);
+        SetStage(msSave);
+        Exit;
+      end;
+
+    swtFINALREAD:
+      begin
+
+      end;
+
+    swtFAILURE:
+      begin
+        FireEvent(meMeasureError, BuildError(1410, 'Ошибка чтения результатов'));
+        SetStage(msDone);
+        Exit;
+      end;
+  end;
+
+  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
+  begin
+    FireEvent(meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
+    SetStage(msDone);
+  end;
 end;
 
 procedure TMeasurementRun.ProcessSave;
@@ -2132,6 +2197,14 @@ begin
     else
       FWorkTable.TimeResult := Point.LimitTime;
   end;
+
+  WorkTable.SaveMeasurementResults;
+
+  if DataManager <> nil then
+    DataManager.Save;
+
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
 
   Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
   Point.DateTime := Now;
