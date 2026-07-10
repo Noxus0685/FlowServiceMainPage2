@@ -825,10 +825,10 @@ begin
   // ===== Поверочные точки =====
   StringColumnPointQ.Header      := 'Q, ' + FDevice.GetDimensionName;
   StringColumnPointVolume.Header := 'V, л';
-  Label47.Text := 'Макс расход, ' + FDevice.GetDimensionName;
-  Label49.Text := 'Мин расход, ' + FDevice.GetDimensionName;
-  Label7.Text := 'Норм расход, ' + FDevice.GetDimensionName;
-  Label4.Text := 'Переход расход, ' + FDevice.GetDimensionName;
+  Label47.Text := 'Qmax (Макс расход), ' + FDevice.GetDimensionName;
+  Label49.Text := 'Qmin (Мин расход), ' + FDevice.GetDimensionName;
+  Label7.Text := 'Qnom (Норм расход), ' + FDevice.GetDimensionName;
+  Label4.Text := 'Qtr (Переход расход), ' + FDevice.GetDimensionName;
   Label38.Text := 'Расход, QF, ' + FDevice.GetDimensionName;
 
   // ===== Критерий остановки =====
@@ -3762,6 +3762,8 @@ begin
     TryApplyPointNameFormula(S, P);
     V := P.FlowRate * FDevice.Qmax * P.LimitTime;
     P.LimitVolume := V;
+    Q := P.FlowRate * FDevice.Qmax;
+    P.Q := Q;
   end
 
   else if ACol = StringColumnPointStab.Index then
