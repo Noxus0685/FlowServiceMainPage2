@@ -5403,9 +5403,9 @@ begin
       // для Kp используем ту же логику точности,
       // т.к. он участвует в расчёте объёма/массы
       if FType.DimensionCoef = 1 then
-        Value := FormatFloat('0.####################', 1 / D.Kp)
+        Value := FormatFloat('0.########', 1 / D.Kp)
       else
-        Value := FormatFloat('0.####################', D.Kp);
+        Value := FormatFloat('0.########', D.Kp);
   end;
 end;
 
