@@ -77,6 +77,8 @@ type
     function GetFlowUnitName: string;
     function FlowFromBase(const AValueLSec: Double): Double;
     function FlowToBase(const AValue: Double): Double;
+    function GetFlowFormatError: Double;
+    function FormatFlowWorkValue(const AValue: Double): string;
   public
     constructor Create(AOwner: TComponent); override;
     procedure LoadFromChannel(AChannel: TChannel);
@@ -272,7 +274,7 @@ begin
   NewValue := FlowToBase(NormalizeFloatInput(EditQMaxWork.Text));
   Changed := FChannel.QMaxWork <> NewValue;
   FChannel.QMaxWork := NewValue;
-  EditQMaxWork.Text := FloatToStr(FlowFromBase(NewValue));
+  EditQMaxWork.Text := FormatFlowWorkValue(FlowFromBase(NewValue));
   NotifyWorkTableRefreshIfChanged(Changed);
 end;
 
@@ -286,7 +288,7 @@ begin
   NewValue := FlowToBase(NormalizeFloatInput(EditQMinWork.Text));
   Changed := FChannel.QMinWork <> NewValue;
   FChannel.QMinWork := NewValue;
-  EditQMinWork.Text := FloatToStr(FlowFromBase(NewValue));
+  EditQMinWork.Text := FormatFlowWorkValue(FlowFromBase(NewValue));
   NotifyWorkTableRefreshIfChanged(Changed);
 end;
 
@@ -419,6 +421,26 @@ begin
     Result := WorkTable.ValueFlowRate.GetDoubleBaseNum(AValue, DimIndex);
 end;
 
+function TFrameChannelProperties.GetFlowFormatError: Double;
+begin
+  Result := 0;
+  if (FChannel <> nil) and (FChannel.FlowMeter <> nil) then
+  begin
+    if FChannel.FlowMeter.ValueFlow <> nil then
+      Result := FChannel.FlowMeter.ValueFlow.Error;
+    if (Result <= 0) and (FChannel.FlowMeter.Device <> nil) then
+      Result := FChannel.FlowMeter.Device.Error;
+  end;
+end;
+
+function TFrameChannelProperties.FormatFlowWorkValue(const AValue: Double): string;
+begin
+  if AValue > 0 then
+    Result := FormatByBaseError(AValue, GetFlowFormatError)
+  else
+    Result := FloatToStr(AValue);
+end;
+
 procedure TFrameChannelProperties.UpdateFlowUnitPresentation;
 var
   FlowUnitName: string;
@@ -432,8 +454,8 @@ begin
   if FChannel = nil then
     Exit;
 
-  EditQMaxWork.Text := FloatToStr(FlowFromBase(FChannel.QMaxWork));
-  EditQMinWork.Text := FloatToStr(FlowFromBase(FChannel.QMinWork));
+  EditQMaxWork.Text := FormatFlowWorkValue(FlowFromBase(FChannel.QMaxWork));
+  EditQMinWork.Text := FormatFlowWorkValue(FlowFromBase(FChannel.QMinWork));
 end;
 
 procedure TFrameChannelProperties.NotifyWorkTableRefreshIfChanged(const AChanged: Boolean);
