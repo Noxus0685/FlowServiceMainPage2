@@ -108,7 +108,7 @@ type
     mftMassFlowmeterType = 1,
     mftVolumeFlowmeterType = 2,
     mftWeightsType = 3,
-    mftTankType = 4
+    mftTankType = 4         //емкость
 
   );
 

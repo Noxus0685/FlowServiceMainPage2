@@ -717,7 +717,7 @@ var
   OutputType: Integer;
 begin
   if FDevice <> nil then OutputType := FDevice.OutputType else OutputType := Ord(otUnknown);
-  SetPropertyRowVisible(LabelFrequencyOutputSet, False);
+  SetPropertyRowVisible(LabelFrequencyOutputSet, OutputType = Ord(otFrequency));
   SetPropertyRowVisible(LabelFrequency, OutputType = Ord(otFrequency));
   SetPropertyRowVisible(LabelFrequencyView, False);
   SetPropertyRowVisible(LabelFrequencyFlowRate, OutputType = Ord(otFrequency));

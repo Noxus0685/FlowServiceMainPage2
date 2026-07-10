@@ -1405,6 +1405,8 @@ end;
 procedure TFrameMainTable.HandleWorkTableEvent(const AWorkTable: TWorkTable; AData: TObject);
 var
   WorkTableEvent: TWorkTableEvent;
+
+  SelectedChannel: TChannel;
 begin
   if AWorkTable = nil then
     Exit;
@@ -1465,9 +1467,20 @@ begin
       RefreshPumpsCombo;
       RefreshScalesCombo;
       UpdateForm;
-      if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
+
+
+      {if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
          (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
-        FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[GridDevices.Row]);
+        FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[GridDevices.Row]);     }
+
+      if (FFrameChannelProperties <> nil) and (FFlowMeterPropertiesChannel <> nil) and
+         (((FActiveWorkTable.DeviceChannels <> nil) and
+           (FActiveWorkTable.DeviceChannels.IndexOf(FFlowMeterPropertiesChannel) >= 0)) or
+          ((FActiveWorkTable.EtalonChannels <> nil) and
+           (FActiveWorkTable.EtalonChannels.IndexOf(FFlowMeterPropertiesChannel) >= 0))) then
+        FFrameChannelProperties.LoadFromChannel(FFlowMeterPropertiesChannel);
+
+
       if FFrameWorkTableProperties <> nil then
         FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
     end;
