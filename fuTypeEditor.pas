@@ -7233,10 +7233,21 @@ begin
 
   // --- столбцы коэффициентов / импульсов ---
   case FType.OutputType of
-    0, // Частота
+    0: // Частота
+      begin
+        StringColumnDNKp.Visible       := True;
+        StringColumnDNKp.Header        := 'Kf, Гц';
+        StringColumnPointImp.Visible   := True;
+        StringColumnDNQnom.Visible   := True;
+        StringColumnDNQF.Visible     := True;
+      end;
     1: // Импульсы
       begin
         StringColumnDNKp.Visible       := True;
+        if FType.MeasuredDimension in [Ord(mdMassFlow), Ord(mdMass)] then
+          StringColumnDNKp.Header      := 'Kp, имп/кг'
+        else
+          StringColumnDNKp.Header      := 'Kp, имп/л';
         StringColumnPointImp.Visible   := True;
         StringColumnDNQnom.Visible   := True;
         StringColumnDNQF.Visible     := True;
@@ -7270,7 +7281,7 @@ begin
     Exit;
   end;
 
-  EditCoef.Text := FloatToStr(V);
+  EditCoef.Text := FormatFloat('0.####################', V);
 end;
 
 procedure TFormTypeEditor.UpdateCoefUnitLabel;
@@ -7341,7 +7352,7 @@ begin
   EditCoef.Text := '';
   EditCoef.TextPrompt := '';
   if FType.Coef > 0 then
-    EditCoef.Text := FloatToStr(FType.Coef)
+    EditCoef.Text := FormatFloat('0.####################', FType.Coef)
   else
     EditCoef.TextPrompt := '-';
 end;
