@@ -1029,6 +1029,11 @@ begin
   end;
 
   RefreshActiveWorkTableViews(Channel, True);
+
+  if DataManager <> nil then
+    DataManager.Save;
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
 end;
 
 procedure TFrameMainTable.RefreshActiveWorkTableViews(AChannel: TChannel;
@@ -2914,6 +2919,7 @@ begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
     Exit;
 
+  AChannel.State := osModified;
   AChannel.FlowMeter.Device.State := osModified;
 
   RepoDevice := nil;

@@ -740,29 +740,77 @@ end;
 
 procedure TFormDeviceEditor.UpdateMeasuredDimensionCombo;
 var
-  OldDim: TMeasuredDimension;
+  OldDim, NewDim: TMeasuredDimension;
+  C: TDeviceCategory;
+  StdCategory: EStdCategory;
+  CategoryDim: TMeasuredDimension;
 begin
-  OldDim := MeasuredDimensionByItemIndex(cbMeasuredDimension.ItemIndex);
+  if FDevice = nil then
+    Exit;
+
+  OldDim := TMeasuredDimension(FDevice.MeasuredDimension);
+  StdCategory := mftUnknownType;
+  CategoryDim := mdUnknown;
+  if AppServices.DataManager <> nil then
+  begin
+    C := AppServices.DataManager.FindCategoryByID(FDevice.Category);
+    if C <> nil then
+    begin
+      StdCategory := C.StdCategory;
+      CategoryDim := C.MeasuredDimension;
+    end;
+  end;
 
   cbMeasuredDimension.Items.BeginUpdate;
   try
     cbMeasuredDimension.Items.Clear;
-    cbMeasuredDimension.Items.Add('Объемный расход');
-    cbMeasuredDimension.Items.Add('Массовый расход');
-
-    if IsFlowMeterOrScales then
-    begin
-      cbMeasuredDimension.Items.Add('Объем');
-      cbMeasuredDimension.Items.Add('Масса');
-      cbMeasuredDimension.Items.Add('Скорость');
+    case StdCategory of
+      mftWeightsType:
+        cbMeasuredDimension.Items.Add('Масса');
+      mftTankType:
+        cbMeasuredDimension.Items.Add('Объем');
+      mftUnknownType, mftUserType:
+        begin
+          cbMeasuredDimension.Items.Add('Объемный расход');
+          cbMeasuredDimension.Items.Add('Массовый расход');
+          cbMeasuredDimension.Items.Add('Объем');
+          cbMeasuredDimension.Items.Add('Масса');
+          cbMeasuredDimension.Items.Add('Скорость');
+          cbMeasuredDimension.Items.Add('Теплота');
+        end;
+    else
+      case CategoryDim of
+        mdSpeed:
+          cbMeasuredDimension.Items.Add('Скорость');
+        mdHeat:
+          begin
+            cbMeasuredDimension.Items.Add('Объемный расход');
+            cbMeasuredDimension.Items.Add('Теплота');
+          end;
+      else
+        begin
+          cbMeasuredDimension.Items.Add('Объемный расход');
+          cbMeasuredDimension.Items.Add('Массовый расход');
+        end;
+      end;
     end;
-
-    cbMeasuredDimension.Items.Add('Теплота');
   finally
     cbMeasuredDimension.Items.EndUpdate;
   end;
 
   cbMeasuredDimension.ItemIndex := ItemIndexByMeasuredDimension(OldDim);
+  if (cbMeasuredDimension.ItemIndex < 0) and (cbMeasuredDimension.Items.Count > 0) then
+  begin
+    cbMeasuredDimension.ItemIndex := 0;
+    NewDim := MeasuredDimensionByItemIndex(0);
+    if TMeasuredDimension(FDevice.MeasuredDimension) <> NewDim then
+    begin
+      FDevice.MeasuredDimension := Ord(NewDim);
+      FDevice.Units := 0;
+      FDevice.SetDimensions;
+      FDevice.State := osModified;
+    end;
+  end;
 end;
 
 procedure TFormDeviceEditor.UpdateUnitsCombo;
