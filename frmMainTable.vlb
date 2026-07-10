@@ -160,9 +160,6 @@ Coordinates=1041,370,109,58
 [Label36]
 Coordinates=605,166,60,58
 
-[MenuItemDevicesClearAll]
-Coordinates=1022,828,163,36
-
 [LayoutProcedures]
 Coordinates=893,828,119,36
 
@@ -273,9 +270,6 @@ Coordinates=1393,974,75,36
 
 [ActionFillAllTypes]
 Coordinates=1829,496,117,36
-
-[MenuItemDevicesFromArchive]
-Coordinates=1302,736,190,36
 
 [ActionAddEtalonChannel]
 Coordinates=1829,606,158,36
@@ -547,9 +541,6 @@ Coordinates=306,1120,166,36
 [Layout6]
 Coordinates=979,552,60,36
 
-[MenuItemEtalonsClearAll]
-Coordinates=809,552,160,36
-
 [LabelLayoutPump]
 Coordinates=487,234,118,58
 
@@ -706,14 +697,11 @@ Coordinates=894,438,192,36
 [PopupMenu1]
 Coordinates=715,1194,90,36
 
-[MenuItemEtalonsFromArchive]
-Coordinates=697,438,187,36
-
 [ComboBoxPumps]
 Coordinates=10,10,117,146
 
 []
-Coordinates=986,234,162,58
+Coordinates=697,438,187,36
 Visible=True
 
 [PanelEtalons1]

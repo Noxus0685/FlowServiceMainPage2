@@ -1825,10 +1825,10 @@ procedure TFormTypeEditor.GridDiametersMouseDown(Sender: TObject; Button: TMouse
 var
   P: TPointF;
 begin
-  if (Button <> TMouseButton.mbRight) or (Y > GridDiameters.RowHeight) then
+  if (Button <> TMouseButton.mbRight)  then
     Exit;
 
-  if (Sender = GridDiameters) and (Y > GridDiameters.RowHeight) then
+  if (Sender <> GridDiameters) then
     Exit;
 
   SyncGridDiametersHeaderPopupMenu;
