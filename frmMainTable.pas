@@ -1029,6 +1029,11 @@ begin
   end;
 
   RefreshActiveWorkTableViews(Channel, True);
+
+  if DataManager <> nil then
+    DataManager.Save;
+  if WorkTableManager <> nil then
+    WorkTableManager.Save;
 end;
 
 procedure TFrameMainTable.RefreshActiveWorkTableViews(AChannel: TChannel;
@@ -1400,6 +1405,8 @@ end;
 procedure TFrameMainTable.HandleWorkTableEvent(const AWorkTable: TWorkTable; AData: TObject);
 var
   WorkTableEvent: TWorkTableEvent;
+
+  SelectedChannel: TChannel;
 begin
   if AWorkTable = nil then
     Exit;
@@ -1460,9 +1467,20 @@ begin
       RefreshPumpsCombo;
       RefreshScalesCombo;
       UpdateForm;
-      if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
+
+
+      {if (FFrameChannelProperties <> nil) and (GridDevices.Row >= 0) and
          (GridDevices.Row < FActiveWorkTable.DeviceChannels.Count) then
-        FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[GridDevices.Row]);
+        FFrameChannelProperties.LoadFromChannel(FActiveWorkTable.DeviceChannels[GridDevices.Row]);     }
+
+      if (FFrameChannelProperties <> nil) and (FFlowMeterPropertiesChannel <> nil) and
+         (((FActiveWorkTable.DeviceChannels <> nil) and
+           (FActiveWorkTable.DeviceChannels.IndexOf(FFlowMeterPropertiesChannel) >= 0)) or
+          ((FActiveWorkTable.EtalonChannels <> nil) and
+           (FActiveWorkTable.EtalonChannels.IndexOf(FFlowMeterPropertiesChannel) >= 0))) then
+        FFrameChannelProperties.LoadFromChannel(FFlowMeterPropertiesChannel);
+
+
       if FFrameWorkTableProperties <> nil then
         FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
     end;
@@ -2914,6 +2932,7 @@ begin
   if (AChannel = nil) or (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) then
     Exit;
 
+  AChannel.State := osModified;
   AChannel.FlowMeter.Device.State := osModified;
 
   RepoDevice := nil;

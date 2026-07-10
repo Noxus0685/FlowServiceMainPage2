@@ -1110,7 +1110,7 @@ begin
   AddCategory(
     8,
     'Теплосчетчик',
-    mdMass,
+    mdHeat,
     otInterface,
     'теплосчетчик;теплосчётчик;теплов',
     mftMassFlowmeterType

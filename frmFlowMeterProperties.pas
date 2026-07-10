@@ -719,7 +719,7 @@ begin
   if FDevice <> nil then OutputType := FDevice.OutputType else OutputType := Ord(otUnknown);
   SetPropertyRowVisible(LabelFrequencyOutputSet, OutputType = Ord(otFrequency));
   SetPropertyRowVisible(LabelFrequency, OutputType = Ord(otFrequency));
-  SetPropertyRowVisible(LabelFrequencyView, OutputType = Ord(otFrequency));
+  SetPropertyRowVisible(LabelFrequencyView, False);
   SetPropertyRowVisible(LabelFrequencyFlowRate, OutputType = Ord(otFrequency));
   SetPropertyRowVisible(LabelImpulseOutputSet, OutputType = Ord(otImpulse));
   SetPropertyRowVisible(LabelImpulseCoef, OutputType = Ord(otImpulse));
