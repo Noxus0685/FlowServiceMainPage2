@@ -533,6 +533,7 @@ type
   procedure UpdateUnitsCombo;
     procedure UpdateUIFreq;
     procedure UpdateUICoef;
+    function DisplayCoefFromBase(const ABaseCoef: Double): Double;
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
@@ -3810,24 +3811,13 @@ begin
   FType.DimensionCoef := ViewType;
   UpdateCoefUnitLabel;
 
-  // базовый коэффициент всегда хранится как имп/л (имп/кг)
-  if FType.Coef <= 0 then
+  DisplayCoef := FType.Coef;
+  if DisplayCoef <= 0 then
   begin
     EditCoef.Text := '';
     Exit;
   end;
 
-  case ViewType of
-    0: // имп/л (имп/кг)
-      DisplayCoef := FType.Coef;
-
-    1: // л/имп (кг/имп)
-      DisplayCoef := 1 / FType.Coef;
-  else
-    DisplayCoef := FType.Coef;
-  end;
-
-  // отображаем
   EditCoef.Text := FormatFloat('0.########', DisplayCoef);
 
   SetModified;
@@ -4509,7 +4499,6 @@ end;
 procedure TFormTypeEditor.EditCoefExit(Sender: TObject);
 var
   InputValue: Double;
-  NewBaseCoef: Double;
 begin
   // 1. Безопасный ввод
   InputValue := NormalizeFloatInput(EditCoef.Text);
@@ -4521,25 +4510,15 @@ begin
     Exit;
   end;
 
-  // 3. Приводим введённое значение к базовому виду (имп/л)
-  case FType.DimensionCoef of
-    0: NewBaseCoef := InputValue;        // имп/л
-    1: NewBaseCoef := 1 / InputValue;    // л/имп → имп/л
-  else
-    NewBaseCoef := InputValue;
-  end;
-
-  // 4. Если базовый коэффициент не изменился — выходим
-  if SameValue(FType.Coef, NewBaseCoef, 1e-12) then
+  if SameValue(FType.Coef, InputValue, 1e-12) then
   begin
     EditCoef.Text := FormatFloat('0.########', GetDisplayedCoef);
     Exit;
   end;
 
-  // 5. Сохраняем базовый коэффициент
-  FType.Coef := NewBaseCoef;
+  FType.Coef := InputValue;
 
-  FType.Freq := Round(FType.Coef/3.6);
+  FType.Freq := Round(FType.BaseCoef/3.6);
 
   // 6. Пересчёт Kp для всех диаметров
   RecalcDiametersKpByCoef;
@@ -4615,7 +4594,7 @@ begin
   for I := 0 to FDiametersLocal.Count - 1 do
   begin
     if FDiametersLocal[I].QFmax > 0 then
-      Kp := FType.Coef / FDiametersLocal[I].QFmax
+      Kp := FType.BaseCoef / FDiametersLocal[I].QFmax
     else
       Kp := 0;
 
@@ -4755,7 +4734,7 @@ begin
   // Сохраняем в тип
   // ----------------------------------------
   FType.Freq := NewFreq;
-  FType.Coef := 3.6 *  FType.Freq;
+  FType.BaseCoef := 3.6 *  FType.Freq;
   // ----------------------------------------
   // Пересчёт Kp по частоте
   // Kp = 3.6 * Freq / QFmax
@@ -5470,7 +5449,7 @@ begin
   // ----------------------------------------
   // Coef не задан — считаем и показываем подсказку
   // ----------------------------------------
-  if FType.Coef = 0 then
+  if FType.BaseCoef = 0 then
   begin
     if D.Qmax > 0 then
       NewCoef := D.Kp / D.Qmax
@@ -5478,7 +5457,7 @@ begin
       NewCoef := 0;
 
     if NewCoef > 0 then
-      EditCoef.TextPrompt := FloatToStr(NewCoef)
+      EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
     else
       EditCoef.TextPrompt := '-';
   end;
@@ -5641,13 +5620,13 @@ begin
     else
       NewCoef := 0;
 
-    if not SameValue(NewCoef, FType.Coef) then
+    if not SameValue(NewCoef, FType.BaseCoef) then
     begin
-      FType.Coef := 0;
+      FType.BaseCoef := 0;
       EditCoef.Text := '';
 
       if NewCoef > 0 then
-        EditCoef.TextPrompt := FloatToStr(NewCoef)
+        EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
       else
         EditCoef.TextPrompt := '-';
     end;
@@ -7294,19 +7273,7 @@ begin
     Exit;
   end;
 
-  case FType.DimensionCoef of
-    0:
-      begin
-        // имп/л или имп/кг — базовое хранение
-        EditCoef.Text := FloatToStr(V);
-      end;
-
-    1:
-      begin
-        // л/имп или кг/имп — обратное представление
-        EditCoef.Text := FloatToStr(1 / V);
-      end;
-  end;
+  EditCoef.Text := FloatToStr(V);
 end;
 
 procedure TFormTypeEditor.UpdateCoefUnitLabel;
@@ -7326,19 +7293,10 @@ function TFormTypeEditor.GetDisplayedCoef: Double;
 begin
   Result := 0;
 
-  // базовый коэффициент всегда хранится как имп/л (имп/кг)
   if FType.Coef <= 0 then
     Exit;
 
-  case FType.DimensionCoef of
-    0: // имп/л (имп/кг)
-      Result := FType.Coef;
-
-    1: // л/имп (кг/имп)
-      Result := 1 / FType.Coef;
-  else
-    Result := FType.Coef;
-  end;
+  Result := FType.Coef;
 end;
 
 
@@ -7366,6 +7324,25 @@ begin
     InitCategoryComboEdit;
 
 
+end;
+
+
+function TFormTypeEditor.DisplayCoefFromBase(const ABaseCoef: Double): Double;
+begin
+  if FType = nil then
+    Exit(ABaseCoef);
+
+  case FType.DimensionCoef of
+    1:
+      begin
+        if ABaseCoef <> 0 then
+          Result := 1 / ABaseCoef
+        else
+          Result := 0;
+      end;
+  else
+    Result := ABaseCoef;
+  end;
 end;
 
 procedure TFormTypeEditor.UpdateUICoef;
