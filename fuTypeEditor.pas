@@ -533,6 +533,7 @@ type
   procedure UpdateUnitsCombo;
     procedure UpdateUIFreq;
     procedure UpdateUICoef;
+    function DisplayCoefFromBase(const ABaseCoef: Double): Double;
     procedure TestGridGetValue(Sender: TObject; const ACol, ARow: Integer;
       var Value: TValue);
     procedure CreateMenu;
@@ -4517,7 +4518,7 @@ begin
 
   FType.Coef := InputValue;
 
-  FType.Freq := Round(FType.Coef/3.6);
+  FType.Freq := Round(FType.BaseCoef/3.6);
 
   // 6. Пересчёт Kp для всех диаметров
   RecalcDiametersKpByCoef;
@@ -4593,7 +4594,7 @@ begin
   for I := 0 to FDiametersLocal.Count - 1 do
   begin
     if FDiametersLocal[I].QFmax > 0 then
-      Kp := FType.Coef / FDiametersLocal[I].QFmax
+      Kp := FType.BaseCoef / FDiametersLocal[I].QFmax
     else
       Kp := 0;
 
@@ -4733,7 +4734,7 @@ begin
   // Сохраняем в тип
   // ----------------------------------------
   FType.Freq := NewFreq;
-  FType.Coef := 3.6 *  FType.Freq;
+  FType.BaseCoef := 3.6 *  FType.Freq;
   // ----------------------------------------
   // Пересчёт Kp по частоте
   // Kp = 3.6 * Freq / QFmax
@@ -5448,7 +5449,7 @@ begin
   // ----------------------------------------
   // Coef не задан — считаем и показываем подсказку
   // ----------------------------------------
-  if FType.Coef = 0 then
+  if FType.BaseCoef = 0 then
   begin
     if D.Qmax > 0 then
       NewCoef := D.Kp / D.Qmax
@@ -5456,7 +5457,7 @@ begin
       NewCoef := 0;
 
     if NewCoef > 0 then
-      EditCoef.TextPrompt := FloatToStr(NewCoef)
+      EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
     else
       EditCoef.TextPrompt := '-';
   end;
@@ -5619,13 +5620,13 @@ begin
     else
       NewCoef := 0;
 
-    if not SameValue(NewCoef, FType.Coef) then
+    if not SameValue(NewCoef, FType.BaseCoef) then
     begin
-      FType.Coef := 0;
+      FType.BaseCoef := 0;
       EditCoef.Text := '';
 
       if NewCoef > 0 then
-        EditCoef.TextPrompt := FloatToStr(NewCoef)
+        EditCoef.TextPrompt := FloatToStr(DisplayCoefFromBase(NewCoef))
       else
         EditCoef.TextPrompt := '-';
     end;
