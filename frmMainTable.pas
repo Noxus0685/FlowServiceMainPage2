@@ -3045,6 +3045,8 @@ begin
     FFrameProceed.UpdateGridDataPointsHeaders(WorkTable.TableFlow.ValueVolume.GetDimName, WorkTable.TableFlow.ValueVolumeFlow.GetDimName);
 
   UpdateUIFromValues;
+  if FFrameChannelProperties <> nil then
+    FFrameChannelProperties.UpdateFlowUnitPresentation;
 
   LayoutFlowRate.Tag:=3;
   UpdateUIFlowRate;

@@ -48,6 +48,8 @@ type
     IndicatorSyncMode: TCircle;
     IndicatorNoiseFilter: TCircle;
     LabelChannelHash: TLabel;
+    LabelQMaxWork: TLabel;
+    LabelQMinWork: TLabel;
     FChannel: TChannel;
     FLoading: Boolean;
 
@@ -71,9 +73,14 @@ type
     procedure HandleSyncModeChange(Sender: TObject);
     procedure HandleNoiseFilterChange(Sender: TObject);
     procedure NotifyWorkTableRefreshIfChanged(const AChanged: Boolean);
+    function GetChannelWorkTable: TWorkTable;
+    function GetFlowUnitName: string;
+    function FlowFromBase(const AValueLSec: Double): Double;
+    function FlowToBase(const AValue: Double): Double;
   public
     constructor Create(AOwner: TComponent); override;
     procedure LoadFromChannel(AChannel: TChannel);
+    procedure UpdateFlowUnitPresentation;
   end;
 
 implementation
@@ -262,10 +269,10 @@ var
 begin
   if FLoading or (FChannel = nil) then
     Exit;
-  NewValue := NormalizeFloatInput(EditQMaxWork.Text);
+  NewValue := FlowToBase(NormalizeFloatInput(EditQMaxWork.Text));
   Changed := FChannel.QMaxWork <> NewValue;
   FChannel.QMaxWork := NewValue;
-  EditQMaxWork.Text := FloatToStr(NewValue);
+  EditQMaxWork.Text := FloatToStr(FlowFromBase(NewValue));
   NotifyWorkTableRefreshIfChanged(Changed);
 end;
 
@@ -276,10 +283,10 @@ var
 begin
   if FLoading or (FChannel = nil) then
     Exit;
-  NewValue := NormalizeFloatInput(EditQMinWork.Text);
+  NewValue := FlowToBase(NormalizeFloatInput(EditQMinWork.Text));
   Changed := FChannel.QMinWork <> NewValue;
   FChannel.QMinWork := NewValue;
-  EditQMinWork.Text := FloatToStr(NewValue);
+  EditQMinWork.Text := FloatToStr(FlowFromBase(NewValue));
   NotifyWorkTableRefreshIfChanged(Changed);
 end;
 
@@ -362,6 +369,73 @@ begin
   RefreshRegisterColors;
 end;
 
+function TFrameChannelProperties.GetChannelWorkTable: TWorkTable;
+begin
+  Result := nil;
+  if (FChannel = nil) or (WorkTableManager = nil) then
+    Exit;
+  Result := WorkTableManager.FindWorkTableByID(FChannel.WorkTabeID);
+end;
+
+function TFrameChannelProperties.GetFlowUnitName: string;
+var
+  WorkTable: TWorkTable;
+begin
+  Result := 'л/с';
+  WorkTable := GetChannelWorkTable;
+  if WorkTable = nil then
+    Exit;
+
+  Result := Trim(WorkTable.FlowUnitName);
+  if (Result = '') and (WorkTable.ValueFlowRate <> nil) then
+    Result := WorkTable.ValueFlowRate.GetDimName;
+  if Result = '' then
+    Result := 'л/с';
+end;
+
+function TFrameChannelProperties.FlowFromBase(const AValueLSec: Double): Double;
+var
+  WorkTable: TWorkTable;
+begin
+  WorkTable := GetChannelWorkTable;
+  if (WorkTable <> nil) and (WorkTable.ValueFlowRate <> nil) then
+    Result := WorkTable.ValueFlowRate.GetDoubleNum(AValueLSec, GetFlowUnitName)
+  else
+    Result := AValueLSec;
+end;
+
+function TFrameChannelProperties.FlowToBase(const AValue: Double): Double;
+var
+  WorkTable: TWorkTable;
+  DimIndex: Integer;
+begin
+  Result := AValue;
+  WorkTable := GetChannelWorkTable;
+  if (WorkTable = nil) or (WorkTable.ValueFlowRate = nil) then
+    Exit;
+
+  DimIndex := WorkTable.ValueFlowRate.GetDim(GetFlowUnitName);
+  if DimIndex >= 0 then
+    Result := WorkTable.ValueFlowRate.GetDoubleBaseNum(AValue, DimIndex);
+end;
+
+procedure TFrameChannelProperties.UpdateFlowUnitPresentation;
+var
+  FlowUnitName: string;
+begin
+  FlowUnitName := GetFlowUnitName;
+  if LabelQMaxWork <> nil then
+    LabelQMaxWork.Text := 'Q макс раб, ' + FlowUnitName;
+  if LabelQMinWork <> nil then
+    LabelQMinWork.Text := 'Q мин раб, ' + FlowUnitName;
+
+  if FChannel = nil then
+    Exit;
+
+  EditQMaxWork.Text := FloatToStr(FlowFromBase(FChannel.QMaxWork));
+  EditQMinWork.Text := FloatToStr(FlowFromBase(FChannel.QMinWork));
+end;
+
 procedure TFrameChannelProperties.NotifyWorkTableRefreshIfChanged(const AChanged: Boolean);
 var
   WorkTable: TWorkTable;
@@ -396,6 +470,7 @@ begin
       LabelChannelHash.Text := '';
       EditQMaxWork.Text := '';
       EditQMinWork.Text := '';
+      UpdateFlowUnitPresentation;
       EditVMaxWork.Text := '';
       EditVMinWork.Text := '';
       Exit;
@@ -415,8 +490,7 @@ begin
     ComboNoiseFilter.ItemIndex := ComboNoiseFilter.Items.IndexOf(NoiseFilterToStr(AChannel.NoiseFilter));
 
     LabelChannelHash.Text := AChannel.UUID;
-    EditQMaxWork.Text := FloatToStr(AChannel.QMaxWork);
-    EditQMinWork.Text := FloatToStr(AChannel.QMinWork);
+    UpdateFlowUnitPresentation;
     EditVMaxWork.Text := FloatToStr(AChannel.VMaxWork);
     EditVMinWork.Text := FloatToStr(AChannel.VMinWork);
   finally
@@ -494,12 +568,12 @@ begin
 
   CategoryRanges := AddCategory('Рабочие диапазоны');
   EditQMaxWork := TEdit.Create(Self);
-  AddPropertyRow(CategoryRanges, 'Q макс раб, м³/ч', EditQMaxWork);
+  LabelQMaxWork := AddPropertyRow(CategoryRanges, 'Q макс раб, л/с', EditQMaxWork);
   EditQMaxWork.KillFocusByReturn := True;
   EditQMaxWork.OnExit := HandleQMaxWorkExit;
 
   EditQMinWork := TEdit.Create(Self);
-  AddPropertyRow(CategoryRanges, 'Q мин раб, м³/ч', EditQMinWork);
+  LabelQMinWork := AddPropertyRow(CategoryRanges, 'Q мин раб, л/с', EditQMinWork);
   EditQMinWork.KillFocusByReturn := True;
   EditQMinWork.OnExit := HandleQMinWorkExit;
 
