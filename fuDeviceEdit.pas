@@ -3778,7 +3778,12 @@ begin
   end
 
   else if ACol = StringColumnPointStab.Index then
-    Value := P.Pause
+  begin
+    if P.Pause = -1 then
+      Value := 'Авто'
+    else
+      Value := P.Pause.ToString;
+  end
 
   {=====================================================}
   { ВСЕГДА отображаются }
@@ -3865,6 +3870,11 @@ procedure TFormDeviceEditor.GridPointsSetValue(
     end;
   end;
 
+  function IsValidStabilization(const AValue: Integer): Boolean;
+  begin
+    Result := AValue >= 0;
+  end;
+
   function TryApplyPointNameFormula(const AText: string; AP: TDevicePoint): Boolean;
   var
     SepPos, I, StartColPos: Integer;
@@ -3937,6 +3947,7 @@ procedure TFormDeviceEditor.GridPointsSetValue(
 var
   P: TDevicePoint;
   Qmax, Q, V, Tm, Coef: Double;
+  Stabilization: Integer;
   S: string;
 begin
   if (FDevice = nil) then
@@ -3959,7 +3970,14 @@ begin
   end
 
   else if ACol = StringColumnPointStab.Index then
-    P.Pause := Round(NormalizeFloatInput(S))
+  begin
+    if SameText(S, 'Авто') or
+       (not TryStrToInt(S, Stabilization)) or
+       (not IsValidStabilization(Stabilization)) then
+      Stabilization := -1;
+
+    P.Pause := Stabilization;
+  end
 
   else if ACol = StringColumnPointPres.Index then
     P.Pressure := NormalizeFloatInput(S)
