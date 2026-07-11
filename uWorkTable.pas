@@ -602,6 +602,8 @@ type
   function ResolveParameterActionEvent(AParameters: TParameter; AParameterAction: EActionParameter): ENotifyEvent;
 
   procedure MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint; APointIndex: Integer);
+  function CreateActionNotification(AAction: EActionWorkTable; const ASourceName: string;
+    const ADescription: string): TActionNotification;
   procedure FireAction(AAction: EActionWorkTable; const ASourceName: string; const ADescription: string);
   procedure DoStartMonitor;
   procedure DoStopMonitor;
@@ -797,7 +799,8 @@ type
   procedure PauseMeasurementRun;
   procedure ResumeMeasurementRun;
   procedure NextMeasurementPoint;
-  procedure ExecuteAction;
+  procedure ExecuteAction(AAction: EActionWorkTable; const ASourceName: string = '';
+    const ADescription: string = '');
 
   procedure StartTest;
   procedure StopTest;
@@ -5135,17 +5138,24 @@ begin
   NotifyOwned(notifyStateChanged, TStateNotification.Create(Ord(OldState), Ord(ANewState)));
 end;
 
-procedure TWorkTable.FireAction(AAction: EActionWorkTable; const ASourceName: string;
-  const ADescription: string);
+function TWorkTable.CreateActionNotification(AAction: EActionWorkTable; const ASourceName: string;
+  const ADescription: string): TActionNotification;
 begin
   FAction := AAction;
   ProtocolManager.AddMessage(pcAction, psWorkTable, ASourceName, ADescription, Name);
-  NotifyOwned(notifyAction, TActionNotification.Create(Ord(AAction)));
+  Result := TActionNotification.Create(Ord(AAction));
 end;
 
-procedure TWorkTable.ExecuteAction;
+procedure TWorkTable.FireAction(AAction: EActionWorkTable; const ASourceName: string;
+  const ADescription: string);
 begin
+  NotifyOwned(notifyAction, CreateActionNotification(AAction, ASourceName, ADescription));
+end;
 
+procedure TWorkTable.ExecuteAction(AAction: EActionWorkTable; const ASourceName: string;
+  const ADescription: string);
+begin
+  NotifySyncOwned(notifyAction, CreateActionNotification(AAction, ASourceName, ADescription));
 end;
 
 procedure TWorkTable.ResetSpillageRuntimeValues;
