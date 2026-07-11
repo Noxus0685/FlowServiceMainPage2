@@ -1051,14 +1051,34 @@ end;
 procedure TTableMainForm.WorkTableActionHandler(Sender: TWorkTable;
   AEvent: ENotifyEvent; Data: TObject);
 
-var WorkTable: TWorkTable;
-    State: EStateWorkTable;
-    Error: TErrorInfo;
+var
+  WorkTable: TWorkTable;
+  Notification: TActionNotification;
+  Action: EActionWorkTable;
+  Error: TErrorInfo;
 begin
-      WorkTable:=Sender;
-      State:= Sender.State;
+  WorkTable := Sender;
+  if not Assigned(WorkTable) then
+    Exit;
 
-  case Sender.Action of
+  if not (Data is TActionNotification) then
+  begin
+    ToLog := Format('[WorkTable.Action] Некорректный тип Data: Sender=%s; Data=%s',
+      [Sender.ClassName, ObjClassNameOrNil(Data)]);
+    Exit;
+  end;
+
+  Notification := TActionNotification(Data);
+  if (Notification.Action < Ord(Low(EActionWorkTable))) or
+     (Notification.Action > Ord(High(EActionWorkTable))) then
+  begin
+    ToLog := Format('[WorkTable.Action] Некорректный код Action: %d', [Notification.Action]);
+    Exit;
+  end;
+
+  Action := EActionWorkTable(Notification.Action);
+
+  case Action of
     awtStartTest:
     begin
       // Возникает, когда необходимо запустить измерение
