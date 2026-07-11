@@ -4877,6 +4877,35 @@ object FrameMainTable: TFrameMainTable
       OnPopup = PopupMenuDevicesGridPopup
       Left = 1660
       Top = 405
+      object MenuItemDevicesCopy: TMenuItem
+        Action = ActionDevicesCopy
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemDevicesPaste: TMenuItem
+        Action = ActionDevicesPaste
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemDevicesClearRow: TMenuItem
+        Action = ActionDevicesClearRow
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemDevicesFillAllBySelected: TMenuItem
+        Action = ActionDevicesFillAllBySelected
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemDevicesWorkTablesOpenDeviceSelect: TMenuItem
+        Action = ActionOpenDeviceSelect
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemDevicesSep1: TMenuItem
+        Locked = True
+        Text = '-'
+      end
       object MenuItemDevicesWorkTablesGroup: TMenuItem
         Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
         object MenuItemDevicesWorkTablesAddTable: TMenuItem
@@ -4901,11 +4930,6 @@ object FrameMainTable: TFrameMainTable
         end
         object MenuItemDevicesWorkTablesMeterValueProperties: TMenuItem
           Action = ActionMeterValueProperties
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemDevicesWorkTablesOpenDeviceSelect: TMenuItem
-          Action = ActionOpenDeviceSelect
           Locked = True
           ImageIndex = -1
         end
@@ -5101,62 +5125,8 @@ object FrameMainTable: TFrameMainTable
           end
         end
       end
-      object MenuItemDevicesAddGroup: TMenuItem
-        Text = #1044#1086#1073#1072#1074#1080#1090#1100
-        object MenuItemDevicesAddChannel: TMenuItem
-          Action = ActionAddDeviceChannel
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemDevicesSelectDevice: TMenuItem
-          Action = ActionOpenDeviceSelect
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemDevicesFromArchive: TMenuItem
-          Action = ActionDevicesFromArchive
-          Locked = True
-          ImageIndex = -1
-        end
-      end
-      object MenuItemDevicesEditGroup: TMenuItem
-        Text = #1048#1079#1084#1077#1085#1080#1090#1100
-        object MenuItemDevicesProperties: TMenuItem
-          Action = ActionMeterValueProperties
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemDevicesClearRow: TMenuItem
-          Action = ActionDevicesClearRow
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemDevicesSep1: TMenuItem
-          Locked = True
-          Text = '-'
-        end
-        object MenuItemDevicesFillAllBySelected: TMenuItem
-          Action = ActionDevicesFillAllBySelected
-          Locked = True
-          ImageIndex = -1
-        end
-      end
-      object MenuItemDevicesDeleteGroup: TMenuItem
-        Text = #1059#1076#1072#1083#1080#1090#1100
-        object MenuItemDevicesDeleteChannel: TMenuItem
-          Action = ActionDeleteDevice
-          Locked = True
-          Text = #1059#1076#1072#1083#1080#1090#1100' '#1087#1088#1080#1073#1086#1088' '#1080#1079' '#1089#1090#1088#1086#1082#1080
-          ImageIndex = -1
-        end
-        object MenuItemDevicesClearAll: TMenuItem
-          Action = ActionDevicesClearAll
-          Locked = True
-          ImageIndex = -1
-        end
-      end
       object MenuItemDevicesOtherGroup: TMenuItem
-        Text = #1055#1088#1086#1095#1077#1077
+        Text = #1069#1090#1072#1083#1086#1085
         object MenuItemDevicesSetFlowSource: TMenuItem
           Action = ActionDevicesSetFlowSource
           Locked = True
@@ -5168,21 +5138,40 @@ object FrameMainTable: TFrameMainTable
           ImageIndex = -1
         end
       end
-      object MenuItemDevicesCopy: TMenuItem
-        Action = ActionDevicesCopy
-        Locked = True
-        ImageIndex = -1
-      end
-      object MenuItemDevicesPaste: TMenuItem
-        Action = ActionDevicesPaste
-        Locked = True
-        ImageIndex = -1
-      end
     end
     object PopupMenuEtalonsGrid: TPopupMenu
       OnPopup = PopupMenuEtalonsGridPopup
       Left = 1710
       Top = 405
+      object MenuItemEtalonsCopy: TMenuItem
+        Action = ActionEtalonsCopy
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsPaste: TMenuItem
+        Action = ActionEtalonsPaste
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsClearRow: TMenuItem
+        Action = ActionEtalonsClearRow
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsFillAllBySelected: TMenuItem
+        Action = ActionEtalonsFillAllBySelected
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsWorkTablesOpenDeviceSelect: TMenuItem
+        Action = ActionOpenDeviceSelect
+        Locked = True
+        ImageIndex = -1
+      end
+      object MenuItemEtalonsSep1: TMenuItem
+        Locked = True
+        Text = '-'
+      end
       object MenuItemEtalonsWorkTablesGroup: TMenuItem
         Text = #1056#1072#1073#1086#1095#1080#1081' '#1089#1090#1086#1083
         object MenuItemEtalonsWorkTablesAddTable: TMenuItem
@@ -5207,11 +5196,6 @@ object FrameMainTable: TFrameMainTable
         end
         object MenuItemEtalonsWorkTablesMeterValueProperties: TMenuItem
           Action = ActionMeterValueProperties
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemEtalonsWorkTablesOpenDeviceSelect: TMenuItem
-          Action = ActionOpenDeviceSelect
           Locked = True
           ImageIndex = -1
         end
@@ -5379,52 +5363,8 @@ object FrameMainTable: TFrameMainTable
           end
         end
       end
-      object MenuItemEtalonsAddGroup: TMenuItem
-        Text = #1044#1086#1073#1072#1074#1080#1090#1100
-        object MenuItemEtalonsAddChannel: TMenuItem
-          Action = ActionAddEtalonChannel
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemEtalonsFromArchive: TMenuItem
-          Action = ActionEtalonsFromArchive
-          Locked = True
-          ImageIndex = -1
-        end
-      end
-      object MenuItemEtalonsEditGroup: TMenuItem
-        Text = #1048#1079#1084#1077#1085#1080#1090#1100
-        object MenuItemEtalonsClearRow: TMenuItem
-          Action = ActionEtalonsClearRow
-          Locked = True
-          ImageIndex = -1
-        end
-        object MenuItemEtalonsSep1: TMenuItem
-          Locked = True
-          Text = '-'
-        end
-        object MenuItemEtalonsFillAllBySelected: TMenuItem
-          Action = ActionEtalonsFillAllBySelected
-          Locked = True
-          ImageIndex = -1
-        end
-      end
-      object MenuItemEtalonsDeleteGroup: TMenuItem
-        Text = #1059#1076#1072#1083#1080#1090#1100
-        object MenuItemEtalonsDeleteChannel: TMenuItem
-          Action = ActionDeleteEtalons
-          Locked = True
-          Text = #1059#1076#1072#1083#1080#1090#1100' '#1101#1090#1072#1083#1086#1085' '#1080#1079' '#1089#1090#1088#1086#1082#1080
-          ImageIndex = -1
-        end
-        object MenuItemEtalonsClearAll: TMenuItem
-          Action = ActionEtalonsClearAll
-          Locked = True
-          ImageIndex = -1
-        end
-      end
       object MenuItemEtalonsOtherGroup: TMenuItem
-        Text = #1055#1088#1086#1095#1077#1077
+        Text = #1069#1090#1072#1083#1086#1085
         object MenuItemEtalonsSetFlowSource: TMenuItem
           Action = ActionEtalonsSetFlowSource
           Locked = True
@@ -5435,16 +5375,6 @@ object FrameMainTable: TFrameMainTable
           Locked = True
           ImageIndex = -1
         end
-      end
-      object MenuItemEtalonsCopy: TMenuItem
-        Action = ActionEtalonsCopy
-        Locked = True
-        ImageIndex = -1
-      end
-      object MenuItemEtalonsPaste: TMenuItem
-        Action = ActionEtalonsPaste
-        Locked = True
-        ImageIndex = -1
       end
     end
     object LayoutCenter: TLayout

@@ -9,6 +9,7 @@ uses
   System.Generics.Defaults,
   System.StrUtils,
   System.SysUtils,
+  System.Math,
   uBaseProcedures,
   uMeterValue;
 const
@@ -151,6 +152,8 @@ type
   TDiameter = class (TTypeEntity)
   protected
     procedure SetState(const Value: TObjectState); override;
+  private
+    FKp: Double;
   public
     {====================================================================}
     { ИДЕНТИФИКАЦИЯ И СВЯЗИ }
@@ -176,7 +179,7 @@ type
     {====================================================================}
     { ИМПУЛЬСНЫЕ / ЧАСТОТНЫЕ ПАРАМЕТРЫ }
     {====================================================================}
-    Kp: Double;                  // Базовый коэффициент преобразования (имп/л или имп/кг)
+    //Kp: Double;                  // Базовый коэффициент преобразования (имп/л или имп/кг)
     QFmax: Double;               // Расход, соответствующий максимальной частоте выхода
     {====================================================================}
     { ОБЪЕМ / МАССА (для емкостей и весов) }
@@ -186,6 +189,10 @@ type
     Enable : Boolean;
     constructor Create(ADeviceTypeUUID : string);
     procedure Assign(ASource: TDiameter);
+
+
+
+    property Kp: Double read FKp write FKp;
 
   end;
 
@@ -283,8 +290,12 @@ type
       FDiameters  : TObjectList<TDiameter>;
       FPoints     : TObjectList<TTypePoint>;
       FDimensions : TList<TDimension>;
+      FCoef: Double;
+      function GetCoefDim: Double;
+      procedure SetCoefDim(const AValue: Double);
       function GetStopCriteria: TSpillageStopCriteria;
       procedure SetStopCriteria(const Value: TSpillageStopCriteria);
+    function GetCoefString: String;
   protected
       procedure SetState(const Value: TObjectState); override;
   public
@@ -354,7 +365,6 @@ type
     {====================================================================}
     OutputSet: Integer;          // Тип выхода (Auto / Passive / Active / Namur)
     Freq: Integer;               // Максимальная частота, Гц
-    Coef: Double;                // Коэффициент преобразования
     FreqFlowRate: Double;        // Отношение расхода к частоте
 
     {====================================================================}
@@ -417,6 +427,10 @@ type
     procedure AddDiameterData(const ADN: string; AQmax, AQmin, AKp: Double  );
     function  CopyDiameter(SrcIndex: Integer): TDiameter;
     procedure GetNextStdDN(const ADN: string; out NextDNStr: string; out NextDNmm: Integer);
+
+    property Coef: Double read FCoef write FCoef;
+    property CoefDim: Double read GetCoefDim write SetCoefDim;
+    property CoefString: string read GetCoefString;
 
     class function CalcQmaxByDiameter(
       const OldQmax: Double;
@@ -661,6 +675,61 @@ begin
   Result := Name;
 end;
 
+
+function TDeviceType.GetCoefString: String;
+var value: Double;
+begin
+
+     Result := '-';
+     value:=GetCoefDim;
+
+      if value> 0 then
+        Result:=FormatByBaseError(value, Error);
+
+end;
+
+
+
+function TDeviceType.GetCoefDim: Double;
+begin
+  case DimensionCoef of
+    1:
+      begin
+        if FCoef <> 0 then
+        begin
+          Result := 1 / FCoef;
+          if IsNan(Result) or IsInfinite(Result) then
+            Result := 0;
+        end
+        else
+          Result := 0;
+      end;
+  else
+    Result := FCoef;
+  end;
+end;
+
+procedure TDeviceType.SetCoefDim(const AValue: Double);
+begin
+  if IsNan(AValue) or IsInfinite(AValue) then
+    Exit;
+
+  case DimensionCoef of
+    1:
+      begin
+        if AValue <> 0 then
+          FCoef := 1 / AValue
+        else
+          FCoef := 0;
+      end;
+  else
+    FCoef := AValue;
+  end;
+
+  if IsNan(FCoef) or IsInfinite(FCoef) then
+    FCoef := 0;
+end;
+
 function TDeviceType.GetStopCriteria: TSpillageStopCriteria;
 begin
   Result := IntToCriteria(SpillageStop);
@@ -832,7 +901,7 @@ begin
     Add(IntToStr(DimensionCoef));
     Add(IntToStr(OutputSet));
     Add(IntToStr(Freq));
-    Add(FloatToStr(Coef));
+    Add(FloatToStr(FCoef));
     Add(FloatToStr(FreqFlowRate));
     Add(IntToStr(VoltageRange));
     Add(FloatToStr(VoltageQminRate));
@@ -1233,7 +1302,7 @@ begin
   {====================================================================}
   OutputSet := 0;
   Freq := 0;
-  Coef := 0.0;
+  FCoef := 0.0;
   FreqFlowRate := 0.0;
 
   {====================================================================}
@@ -1866,7 +1935,7 @@ begin
   {====================================================================}
   OutputSet := ASource.OutputSet;
   Freq := ASource.Freq;
-  Coef := ASource.Coef;
+  FCoef := ASource.FCoef;
   FreqFlowRate := ASource.FreqFlowRate;
 
   {====================================================================}
