@@ -2525,14 +2525,13 @@ begin
   if FType = nil then
     Exit;
 
-  OldState := FType.State;
 
   if not (FType.State in [osNew, osDeleted]) then
     FType.State := osModified;
 
   AppendTypeEditorDebugLog(Format(
     'SetModified: ID=%d UUID=%s State=%s->%s Diameters.Count=%d Points.Count=%d',
-    [FType.ID, FType.UUID, TypeStateToLogText(OldState), TypeStateToLogText(FType.State),
+    [FType.ID, FType.UUID, TypeStateToLogText(FType.State), TypeStateToLogText(FType.State),
      FType.Diameters.Count, FType.Points.Count]
   ));
 
@@ -3788,14 +3787,7 @@ begin
   UpdateKpColumnHeader;
   UpdateDiametersGrid;
 
-  DisplayCoef := FType.Coef;
-  if DisplayCoef <= 0 then
-  begin
-    EditCoef.Text := '';
-    Exit;
-  end;
-
-  EditCoef.Text := FormatFloat('0.########', DisplayCoef);
+  EditCoef.Text := FType.CoefString;
 
   SetModified;
 end;
@@ -4493,7 +4485,7 @@ begin
     Exit;
   end;
 
-  FType.Coef := InputValue;
+  FType.CoefDim := InputValue;
 
   FType.Freq := Round(FType.Coef/3.6);
 
@@ -5626,8 +5618,9 @@ begin
       FType.Coef := D.Kp * D.Qmax
     else
       FType.Coef := 0;
-
-        EditCoef.TextPrompt :=FType.CoefString;
+    EditCoef.TextPrompt:='';
+    EditCoef.Text:='';
+    EditCoef.TextPrompt :=FType.CoefString;
 
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
@@ -7301,10 +7294,7 @@ begin
   // =====================================================
   EditCoef.Text := '';
   EditCoef.TextPrompt := '';
-  if FType.Coef > 0 then
-    EditCoef.Text := FormatFloat('0.####################', FType.Coef)
-  else
-    EditCoef.TextPrompt := '-';
+  EditCoef.Text :=FType.CoefString;
 end;
 
 procedure TFormTypeEditor.UpdateUIFreq;
