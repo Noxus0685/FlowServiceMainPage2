@@ -1308,6 +1308,7 @@ begin
   if (Notification.NewState < Ord(Low(EStateWorkTable))) or
      (Notification.NewState > Ord(High(EStateWorkTable))) then
     Exit;
+
   NewState := EStateWorkTable(Notification.NewState);
 
   if NewState in [swtCOMPLETE, swtFINALREAD] then
@@ -1424,16 +1425,20 @@ begin
 
   if not (AData is TEventNotification) then
   begin
-    ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableEvent',
-      Format('[WorkTable.Event] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');
-    Exit;
-  end;
-
+    {ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableEvent',
+      Format('[WorkTable.Event] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');   }
+    WorkTableEvent:=  TWorkTableEvent(AWorkTable.Event);
+  end
+  else
+  begin
   if (TEventNotification(AData).Event >= Ord(Low(TWorkTableEvent))) and
      (TEventNotification(AData).Event <= Ord(High(TWorkTableEvent))) then
     WorkTableEvent := TWorkTableEvent(TEventNotification(AData).Event)
   else
     WorkTableEvent := ewtNone;
+  end;
+
+
 
   if WorkTableEvent = ewtActivated then
   begin

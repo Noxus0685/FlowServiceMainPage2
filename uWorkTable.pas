@@ -1200,26 +1200,117 @@ begin
     AddProtocol(AMode, 'Promote', Result, AChannel);
 end;
 
-
 type
+  {
+    TParameterObserverBridge — промежуточный наблюдатель параметров
+    рабочего стола.
+
+    Класс реализует интерфейс IEventObserver, поэтому на него можно
+    подписывать объекты TParameter через метод Subscribe.
+
+    Сам класс не обрабатывает уведомления по существу.
+    Его задача — передать полученное уведомление владельцу TWorkTable.
+  }
   TParameterObserverBridge = class(TInterfacedObject, IEventObserver)
   private
+    {
+      Рабочий стол, которому принадлежат наблюдаемые параметры.
+
+      Ссылка не является интерфейсной и не управляет временем жизни
+      рабочего стола. TWorkTable должен существовать всё время,
+      пока этот мост подписан на параметры.
+    }
     FOwner: TWorkTable;
+
   public
+    {
+      Создаёт мост и связывает его с конкретным рабочим столом.
+
+      AOwner — рабочий стол, который должен получать уведомления
+      от своих параметров.
+    }
     constructor Create(AOwner: TWorkTable);
+
+    {
+      Реализация метода интерфейса IEventObserver.
+
+      Метод вызывается объектом TParameter, когда в параметре произошло
+      изменение состояния, действие или доменное событие.
+
+      Sender — объект, сформировавший уведомление. Обычно TParameter.
+
+      Event — код типа уведомления, например:
+        Ord(notifyStateChanged);
+        Ord(notifyAction);
+        Ord(notifyEvent).
+
+      Data — дополнительные данные уведомления.
+      В некоторых случаях здесь также может передаваться сам TParameter.
+
+      Мост не изменяет Sender, Event и Data, а передаёт их в TWorkTable.
+    }
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
   end;
 
+
 constructor TParameterObserverBridge.Create(AOwner: TWorkTable);
 begin
+  {
+    Инициализируем базовый класс TInterfacedObject.
+
+    Это необходимо, поскольку TParameterObserverBridge реализует
+    интерфейс IEventObserver и хранится через интерфейсную ссылку.
+  }
   inherited Create;
+
+  {
+    Запоминаем рабочий стол, которому необходимо передавать
+    уведомления от параметров.
+
+    Например, мост создаётся в конструкторе TWorkTable:
+
+      FParameterObserver := TParameterObserverBridge.Create(Self);
+
+    После этого один экземпляр моста может использоваться для подписки
+    сразу на несколько параметров данного рабочего стола.
+  }
   FOwner := AOwner;
 end;
 
-procedure TParameterObserverBridge.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
+
+procedure TParameterObserverBridge.OnNotify(
+  Sender: TObject;
+  Event: Integer;
+  Data: TObject
+);
 begin
+  {
+    Проверяем, что рабочий стол ещё доступен.
+
+    Такая проверка защищает от обращения по nil, хотя сама по себе
+    не защищает от висячей ссылки, если TWorkTable уже уничтожен,
+    а мост всё ещё остался подписан на какой-либо параметр.
+
+    Поэтому перед уничтожением TWorkTable все подписки должны быть сняты.
+  }
   if FOwner <> nil then
+  begin
+    {
+      Передаём уведомление рабочему столу без изменения данных.
+
+      Дальнейшая обработка выполняется в TWorkTable.HandleParameterNotify:
+
+      1. определяется параметр-источник;
+      2. анализируется общий тип уведомления;
+      3. событие параметра преобразуется в событие рабочего стола;
+      4. TWorkTable уведомляет уже своих подписчиков.
+
+      Таким образом, TParameter ничего не должен знать о TWorkTable,
+      а TWorkTable получает все события своих параметров через одну
+      централизованную точку.
+    }
     FOwner.HandleParameterNotify(Sender, Event, Data);
+  end;
 end;
 
 {$ENDREGION}
@@ -4876,8 +4967,8 @@ begin
         if not (Data is TStateNotification) then
           Exit;
         StateNotification := TStateNotification(Data);
-        AEvent := ResolveParameterStateEvent(AParameter);
-        NotifyOwned(AEvent, TStateNotification.Create(StateNotification.OldState, StateNotification.NewState));
+      //  AEvent := ResolveParameterStateEvent(AParameter);
+      { NotifyOwned(AEvent, TStateNotification.Create(StateNotification.OldState, StateNotification.NewState));  }
       end;
     Ord(notifyAction):
       begin
@@ -4887,33 +4978,24 @@ begin
         if (ActionNotification.Action < Ord(Low(EActionParameter))) or
            (ActionNotification.Action > Ord(High(EActionParameter))) then
           Exit;
-        AEvent := ResolveParameterActionEvent(AParameter, EActionParameter(ActionNotification.Action));
-        NotifyOwned(AEvent, TActionNotification.Create(ActionNotification.Action));
+       // AEvent := ResolveParameterActionEvent(AParameter, EActionParameter(ActionNotification.Action));
+      {  NotifyOwned(AEvent, TActionNotification.Create(ActionNotification.Action));   }
       end;
     Ord(notifyEvent):
       begin
         if not (Data is TEventNotification) then
           Exit;
         EventNotification := TEventNotification(Data);
-        NotifyOwned(notifyEvent, TEventNotification.Create(EventNotification.Event));
+       { NotifyOwned(notifyEvent, TEventNotification.Create(EventNotification.Event));   }
       end;
   end;
 end;
-
+//Не понятно зачем
 function TWorkTable.ResolveParameterStateEvent(AParameters: TParameter): ENotifyEvent;
 begin
-  if AParameters is TPump then
-    Exit(notifyStateChanged);
-  if AParameters is TFlowRate then
-    Exit(notifyStateChanged);
-  if AParameters is TFluidTemp then
-    Exit(notifyStateChanged);
-  if AParameters is TFluidPress then
-    Exit(notifyStateChanged);
 
-  Result := notifyStateChanged;
 end;
-
+//Не понятно зачем
 function TWorkTable.ResolveParameterActionEvent(AParameters: TParameter;
   AParameterAction: EActionParameter): ENotifyEvent;
 begin
@@ -5010,7 +5092,6 @@ end;
 procedure TWorkTable.DoProcNextStep(AProcName: string);
 begin
   NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
-
 end;
 
 procedure TWorkTable.DoProcRepeat(AProcName: string);
@@ -5149,7 +5230,7 @@ begin
   ProtocolManager.AddMessage(pcState, psWorkTable, 'MeasurementRunStateChanged',
     'Изменение этапа процесса измерения',
     TMeasurementRun.MeasurementStateToString(AState));
-  Notify(notifyStateChanged, ASender);
+ // Notify(notifyStateChanged, ASender);
 end;
 
 procedure TWorkTable.MeasurementRunPointChanged(ASender: TObject; APoint: TDevicePoint;
@@ -5158,7 +5239,7 @@ begin
   if (FCurrentPoint <> nil) and (APoint <> nil) then
     FCurrentPoint.Assign(APoint, True);
 
-  Notify(notifyStateChanged, APoint);
+ // Notify(notifyStateChanged, APoint);
   DoProcNextStep(Format('Point %d', [APointIndex + 1]));
 end;
 
