@@ -4664,7 +4664,8 @@ begin
 
     Col('RepeatsProtocol', 'INTEGER'),
     Col('Repeats', 'INTEGER'),
-    Col('Status', 'INTEGER')
+    Col('Status', 'INTEGER'),
+    Col('Enabled', 'INTEGER NOT NULL DEFAULT 1')
   ];
 end;
 
@@ -4760,6 +4761,10 @@ begin
   {================ Повторы ======================}
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
+  if Q.FieldByName('Enabled').IsNull then
+    Result.Enabled := True
+  else
+    Result.Enabled := Q.FieldByName('Enabled').AsInteger <> 0;
   if TryMeasurementPointStatusFromInteger(Q.FieldByName('Status').AsInteger, PointStatus) then
     Result.Status := PointStatus
   else
@@ -4963,13 +4968,13 @@ begin
             'FlowRate, Q, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, SpillageStop, SpillageType, EtalonType, FlowSorceType, ' +
-            'Error, Pause, RepeatsProtocol, Repeats, Status' +
+            'Error, Pause, RepeatsProtocol, Repeats, Status, Enabled' +
             ') values (' +
             ':DeviceUUID, :DeviceTypeUUID, :Num, :Name, :Description, ' +
             ':FlowRate, :Q, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, :SpillageStop, :SpillageType, :EtalonType, :FlowSorceType, ' +
-            ':Error, :Pause, :RepeatsProtocol, :Repeats, :Status' +
+            ':Error, :Pause, :RepeatsProtocol, :Repeats, :Status, :Enabled' +
             ')';
         end;
 
@@ -4989,7 +4994,7 @@ begin
             'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, SpillageStop=:SpillageStop, ' +
             'SpillageType=:SpillageType, EtalonType=:EtalonType, FlowSorceType=:FlowSorceType, ' +
             'Error=:Error, Pause=:Pause, ' +
-            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats, Status=:Status ' +
+            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats, Status=:Status, Enabled=:Enabled ' +
             'where ID=:ID';
         end;
 
@@ -5030,6 +5035,7 @@ begin
     SetIntParam(Q, 'RepeatsProtocol', APoint.RepeatsProtocol);
     SetIntParam(Q, 'Repeats', APoint.Repeats);
     SetIntParam(Q, 'Status', Ord(APoint.Status));
+    SetIntParam(Q, 'Enabled', Ord(APoint.Enabled));
 
     {======================= EXEC =======================}
 
