@@ -322,6 +322,9 @@ type
     procedure GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Single);
     procedure GridPointsHeaderMenuItemClick(Sender: TObject);
+    procedure GridPointsMenuDeleteClick(Sender: TObject);
+    procedure GridPointsMenuCopyClick(Sender: TObject);
+    procedure GridPointsMenuPasteClick(Sender: TObject);
     procedure SyncGridPointsHeaderPopupMenu;
 
 
@@ -349,6 +352,7 @@ type
      FSkipPointDeleteConfirm: Boolean;
      FPopupMenuGridPointsHeader: TPopupMenu;
      FMenuItemGridPointsDisplay: TMenuItem;
+     FClipboardPoint: TDevicePoint;
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
 
@@ -1187,6 +1191,7 @@ procedure TFormDeviceEditor.FormClose(Sender: TObject;
 begin
       FreeAndNil(FDevice);      // уничтожаем клон
       FreeAndNil(FLoadedDeviceSnapshot);
+      FreeAndNil(FClipboardPoint);
       FOriginalDevice := nil;
 end;
 
@@ -1737,6 +1742,21 @@ begin
   while FPopupMenuGridPointsHeader.ItemsCount > 0 do
     FPopupMenuGridPointsHeader.Items[0].Free;
 
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Удалить';
+  MenuItem.OnClick := GridPointsMenuDeleteClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Копировать';
+  MenuItem.OnClick := GridPointsMenuCopyClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Вставить';
+  MenuItem.OnClick := GridPointsMenuPasteClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
   FMenuItemGridPointsDisplay := TMenuItem.Create(FPopupMenuGridPointsHeader);
   FMenuItemGridPointsDisplay.Text := 'Отображение';
   FMenuItemGridPointsDisplay.Parent := FPopupMenuGridPointsHeader;
@@ -1786,6 +1806,47 @@ begin
       MenuItem.IsChecked := False;
     end;
   end;
+end;
+
+
+procedure TFormDeviceEditor.GridPointsMenuDeleteClick(Sender: TObject);
+begin
+  ButtonPointDeleteClick(ButtonPointDelete);
+end;
+
+procedure TFormDeviceEditor.GridPointsMenuCopyClick(Sender: TObject);
+var
+  Point: TDevicePoint;
+begin
+  Point := GetSelectedPoint;
+  if Point = nil then
+    Exit;
+
+  FreeAndNil(FClipboardPoint);
+  FClipboardPoint := TDevicePoint.Create(Point.DeviceID);
+  FClipboardPoint.Assign(Point, True);
+end;
+
+procedure TFormDeviceEditor.GridPointsMenuPasteClick(Sender: TObject);
+var
+  NewPoint: TDevicePoint;
+begin
+  if (FDevice = nil) or (FClipboardPoint = nil) then
+    Exit;
+
+  NewPoint := FDevice.AddPoint;
+  if NewPoint = nil then
+    Exit;
+
+  NewPoint.Assign(FClipboardPoint, False);
+  NewPoint.DeviceID := FDevice.ID;
+  NewPoint.DeviceUUID := FDevice.UUID;
+  NewPoint.State := osNew;
+
+  UpdatePointsGrid;
+  if GridPoints.RowCount > 0 then
+    GridPoints.Selected := GridPoints.RowCount - 1;
+  SetModified;
 end;
 
 procedure TFormDeviceEditor.GridPointsHeaderMenuItemClick(Sender: TObject);
