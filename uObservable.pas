@@ -59,6 +59,10 @@ type
     procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
     procedure NotifyOwned(Event: Integer; Data: TObject); overload;
     procedure NotifyOwned(AEvent: ENotifyEvent; Data: TObject); overload;
+    procedure NotifySync(Event: Integer; Data: TObject = nil); overload;
+    procedure NotifySync(AEvent: ENotifyEvent; Data: TObject = nil); overload;
+    procedure NotifySyncOwned(Event: Integer; Data: TObject); overload;
+    procedure NotifySyncOwned(AEvent: ENotifyEvent; Data: TObject); overload;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -249,6 +253,49 @@ end;
 procedure TObservableObject.NotifyOwned(AEvent: ENotifyEvent; Data: TObject);
 begin
   NotifyOwned(Ord(AEvent), Data);
+end;
+
+procedure TObservableObject.NotifySync(Event: Integer; Data: TObject);
+var
+  LocalObservers: TArray<IEventObserver>;
+  I: Integer;
+  Observer: IEventObserver;
+begin
+  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
+    Exit;
+
+  TMonitor.Enter(FObserversLock);
+  try
+    LocalObservers := FObservers.ToArray;
+  finally
+    TMonitor.Exit(FObserversLock);
+  end;
+
+  for I := 0 to Length(LocalObservers) - 1 do
+  begin
+    Observer := LocalObservers[I];
+    if Observer <> nil then
+      Observer.OnNotify(Self, Event, Data);
+  end;
+end;
+
+procedure TObservableObject.NotifySync(AEvent: ENotifyEvent; Data: TObject);
+begin
+  NotifySync(Ord(AEvent), Data);
+end;
+
+procedure TObservableObject.NotifySyncOwned(Event: Integer; Data: TObject);
+begin
+  try
+    NotifySync(Event, Data);
+  finally
+    Data.Free;
+  end;
+end;
+
+procedure TObservableObject.NotifySyncOwned(AEvent: ENotifyEvent; Data: TObject);
+begin
+  NotifySyncOwned(Ord(AEvent), Data);
 end;
 
 procedure TObservableObject.FireEvent(AEvent: Integer; const AError: TErrorInfo);
