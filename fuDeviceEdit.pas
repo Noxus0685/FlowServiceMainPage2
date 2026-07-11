@@ -325,6 +325,7 @@ type
     procedure GridPointsMenuDeleteClick(Sender: TObject);
     procedure GridPointsMenuCopyClick(Sender: TObject);
     procedure GridPointsMenuPasteClick(Sender: TObject);
+    procedure GridPointsMenuCutClick(Sender: TObject);
     procedure SyncGridPointsHeaderPopupMenu;
 
 
@@ -1743,11 +1744,6 @@ begin
     FPopupMenuGridPointsHeader.Items[0].Free;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
-  MenuItem.Text := 'Удалить';
-  MenuItem.OnClick := GridPointsMenuDeleteClick;
-  MenuItem.Parent := FPopupMenuGridPointsHeader;
-
-  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
   MenuItem.Text := 'Копировать';
   MenuItem.OnClick := GridPointsMenuCopyClick;
   MenuItem.Parent := FPopupMenuGridPointsHeader;
@@ -1755,6 +1751,16 @@ begin
   MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
   MenuItem.Text := 'Вставить';
   MenuItem.OnClick := GridPointsMenuPasteClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Вырезать';
+  MenuItem.OnClick := GridPointsMenuCutClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Удалить';
+  MenuItem.OnClick := GridPointsMenuDeleteClick;
   MenuItem.Parent := FPopupMenuGridPointsHeader;
 
   FMenuItemGridPointsDisplay := TMenuItem.Create(FPopupMenuGridPointsHeader);
@@ -1825,6 +1831,24 @@ begin
   FreeAndNil(FClipboardPoint);
   FClipboardPoint := TDevicePoint.Create(Point.DeviceID);
   FClipboardPoint.Assign(Point, True);
+end;
+
+
+procedure TFormDeviceEditor.GridPointsMenuCutClick(Sender: TObject);
+var
+  PrevSkipConfirm: Boolean;
+begin
+  GridPointsMenuCopyClick(Sender);
+  if FClipboardPoint = nil then
+    Exit;
+
+  PrevSkipConfirm := FSkipPointDeleteConfirm;
+  FSkipPointDeleteConfirm := True;
+  try
+    GridPointsMenuDeleteClick(Sender);
+  finally
+    FSkipPointDeleteConfirm := PrevSkipConfirm;
+  end;
 end;
 
 procedure TFormDeviceEditor.GridPointsMenuPasteClick(Sender: TObject);
