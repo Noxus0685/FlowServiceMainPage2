@@ -691,11 +691,20 @@ begin
   if IsNan(AValue) or IsInfinite(AValue) then
     Exit;
 
-
-   if IsNan(FCoef) or IsInfinite(FCoef) then
-    FCoef := 0;
-
+  case DimensionCoef of
+    1:
+      begin
+        if AValue <> 0 then
+          FCoef := 1 / AValue
+        else
+          FCoef := 0;
+      end;
+  else
     FCoef := AValue;
+  end;
+
+  if IsNan(FCoef) or IsInfinite(FCoef) then
+    FCoef := 0;
 end;
 
 function TDeviceType.GetStopCriteria: TSpillageStopCriteria;
