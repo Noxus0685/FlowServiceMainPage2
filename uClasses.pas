@@ -285,10 +285,11 @@ type
       FPoints     : TObjectList<TTypePoint>;
       FDimensions : TList<TDimension>;
       FCoef: Double;
-      function GetCoef: Double;
-      procedure SetCoef(const AValue: Double);
+      function GetCoefDim: Double;
+      procedure SetCoefDim(const AValue: Double);
       function GetStopCriteria: TSpillageStopCriteria;
       procedure SetStopCriteria(const Value: TSpillageStopCriteria);
+    function GetCoefString: String;
   protected
       procedure SetState(const Value: TObjectState); override;
   public
@@ -421,7 +422,9 @@ type
     function  CopyDiameter(SrcIndex: Integer): TDiameter;
     procedure GetNextStdDN(const ADN: string; out NextDNStr: string; out NextDNmm: Integer);
 
-    property Coef: Double read GetCoef write SetCoef;
+    property Coef: Double read FCoef write FCoef;
+    property CoefDim: Double read GetCoefDim write SetCoefDim;
+    property CoefString: string read GetCoefString;
 
     class function CalcQmaxByDiameter(
       const OldQmax: Double;
@@ -667,7 +670,21 @@ begin
 end;
 
 
-function TDeviceType.GetCoef: Double;
+function TDeviceType.GetCoefString: String;
+var value: Double;
+begin
+
+     Result := '-';
+     value:=GetCoefDim;
+
+      if value> 0 then
+        Result:=FormatByBaseError(value, Error);
+
+end;
+
+
+
+function TDeviceType.GetCoefDim: Double;
 begin
   case DimensionCoef of
     1:
@@ -686,7 +703,7 @@ begin
   end;
 end;
 
-procedure TDeviceType.SetCoef(const AValue: Double);
+procedure TDeviceType.SetCoefDim(const AValue: Double);
 begin
   if IsNan(AValue) or IsInfinite(AValue) then
     Exit;

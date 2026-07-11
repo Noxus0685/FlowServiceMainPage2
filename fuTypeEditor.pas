@@ -5318,9 +5318,13 @@ begin
       // для Kp используем ту же логику точности,
       // т.к. он участвует в расчёте объёма/массы
       if FType.DimensionCoef = 1 then
-        Value :=FormatByBaseError( 1 / D.Kp, FType.Error)
+        Value :=FormatByBaseError(1 / D.Kp, FType.Error)
       else
-        Value :=FormatByBaseError( D.Kp, FType.Error);
+        Value :=FormatByBaseError(D.Kp, FType.Error);
+
+
+    // Value :=FormatByBaseError( FType.Coef, FType.Error)
+
   end;
 end;
 
@@ -5550,13 +5554,7 @@ begin
     else
       FType.Coef := 0;
 
-      //FType.Coef := 0;
-      EditCoef.Text := '';
-
-      if FType.Coef > 0 then
-        EditCoef.TextPrompt := FormatFloat('0.####################', FType.Coef)
-      else
-        EditCoef.TextPrompt := '-';
+        EditCoef.TextPrompt :=FType.CoefString;
 
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
