@@ -103,6 +103,7 @@ type
   private
 
     FStatus: EMeasurementPointStatus;
+    FEnabled: Boolean;
 
     function GetStopCriteria: TSpillageStopCriteria;
     procedure SetStopCriteria(const Value: TSpillageStopCriteria);
@@ -206,6 +207,7 @@ type
     class function GetPointFlowSourceTypeText(const AType: EPointFlowSourceType): string; overload; static;
     class function GetPointFlowSourceTypeText(const AType: Integer): string; overload; static;
 
+    property Enabled: Boolean read FEnabled write FEnabled;
     property StopCriteria: TSpillageStopCriteria read GetStopCriteria write SetStopCriteria;
     /// <summary>
     /// Gets or sets the typed execution/result status of the point. The setter
@@ -1152,6 +1154,7 @@ begin
 
   FID := 0;
   FState := osNew;
+  FEnabled := True;
 
   { Идентификация }
   DeviceID := ADeviceID;
@@ -1856,6 +1859,7 @@ begin
   {====================================================================}
 
   State  := osModified;     //????????????????
+  Enabled := ASource.Enabled;
 
   {====================================================================}
   { ОБЩАЯ ИНФОРМАЦИЯ }
@@ -1930,6 +1934,7 @@ begin
     Exit;
 
   DeviceTypeUUID := ASource.UUID;
+  Enabled := True;
   Name := ASource.Name;
   Description := ASource.Description;
 
