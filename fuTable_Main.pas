@@ -1063,8 +1063,8 @@ begin
 
   if not (Data is TActionNotification) then
   begin
-    ToLog := Format('[WorkTable.Action] Некорректный тип Data: Sender=%s; Data=%s',
-      [Sender.ClassName, ObjClassNameOrNil(Data)]);
+   { ToLog := Format('[WorkTable.Action] Некорректный тип Data: Sender=%s; Data=%s',
+      [Sender.ClassName, ObjClassNameOrNil(Data)]);     }
     Exit;
   end;
 
@@ -1072,7 +1072,7 @@ begin
   if (Notification.Action < Ord(Low(EActionWorkTable))) or
      (Notification.Action > Ord(High(EActionWorkTable))) then
   begin
-    ToLog := Format('[WorkTable.Action] Некорректный код Action: %d', [Notification.Action]);
+   { ToLog := Format('[WorkTable.Action] Некорректный код Action: %d', [Notification.Action]); }
     Exit;
   end;
 
