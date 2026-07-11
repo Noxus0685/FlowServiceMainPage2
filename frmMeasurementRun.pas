@@ -23,13 +23,16 @@ uses
   uBaseProcedures,
   uClasses,
   uDeviceClass,
+  uDataManager,
   uMeasurementRun,
   uObservable,
+  uRepositories,
   uWorkTable;
 
 type
   TFrameMeasurementRun = class(TFrame, IEventObserver)
     GridMeasurmentRun: TGrid;
+    CheckColumnMREnable: TCheckColumn;
     StringColumnPointer: TStringColumn;
     StringColumnMRPointName: TStringColumn;
     StringColumnMRFlowRate: TStringColumn;
@@ -50,6 +53,8 @@ type
     procedure GridMeasurmentRunDrawColumnCell(Sender: TObject;
       const Canvas: TCanvas; const Column: TColumn; const Bounds: TRectF;
       const Row: Integer; const Value: TValue; const State: TGridDrawStates);
+    procedure GridMeasurmentRunSetValue(Sender: TObject; const ACol,
+      ARow: Integer; const Value: TValue);
     procedure SpeedButtonCreatePointsClick(Sender: TObject);
     procedure SpeedButtonPauseClick(Sender: TObject);
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
@@ -98,6 +103,7 @@ begin
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
   GridMeasurmentRun.ShowHint := True;
+  GridMeasurmentRun.OnSetValue := GridMeasurmentRunSetValue;
 end;
 
 destructor TFrameMeasurementRun.Destroy;
@@ -306,6 +312,12 @@ begin
   if Point = nil then
     Exit;
 
+  if GridMeasurmentRun.Columns[ACol] = CheckColumnMREnable then
+  begin
+    Value := Point.Enabled;
+    Exit;
+  end;
+
   if GridMeasurmentRun.Columns[ACol] = StringColumnPointer then
   begin
     if MeasurementRun.CurrentPointIndex = ARow then
@@ -353,6 +365,66 @@ begin
   end
   else if GridMeasurmentRun.Columns[ACol] = StringColumnMRStatus then
     Value := Point.GetStatus;
+end;
+
+
+procedure TFrameMeasurementRun.GridMeasurmentRunSetValue(Sender: TObject;
+  const ACol, ARow: Integer; const Value: TValue);
+var
+  Point: TDevicePoint;
+  Repo: TDeviceRepository;
+  Device: TDevice;
+  NewEnabled: Boolean;
+  DevicePoint: TDevicePoint;
+  SourcePoint: TDevicePoint;
+begin
+  Repo := nil;
+  Device := nil;
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
+    Exit;
+
+  if (ARow < 0) or (ARow >= MeasurementRun.Points.Count) then
+    Exit;
+
+  if GridMeasurmentRun.Columns[ACol] <> CheckColumnMREnable then
+    Exit;
+
+  Point := MeasurementRun.Points[ARow];
+  if Point = nil then
+    Exit;
+
+  NewEnabled := Value.AsBoolean;
+  if Point.Enabled = NewEnabled then
+    Exit;
+
+  SourcePoint := nil;
+  if (DataManager <> nil) and (Trim(Point.DeviceUUID) <> '') and (Trim(Point.UUID) <> '') then
+  begin
+    Device := DataManager.FindDevice(Point.DeviceUUID, Repo);
+    if (Device <> nil) and (Device.Points <> nil) then
+      for DevicePoint in Device.Points do
+        if (DevicePoint <> nil) and SameText(DevicePoint.UUID, Point.UUID) then
+        begin
+          SourcePoint := DevicePoint;
+          Break;
+        end;
+
+    if SourcePoint <> nil then
+    begin
+      SourcePoint.Enabled := NewEnabled;
+      SourcePoint.State := osModified;
+      Device.State := osModified;
+      if Repo <> nil then
+        Repo.State := osModified;
+
+      DataManager.Save;
+      Point.Enabled := SourcePoint.Enabled;
+      if Point.State = osClean then
+        Point.State := osModified;
+    end;
+  end;
+
+  UpdateGridMesurmentRun;
 end;
 
 procedure TFrameMeasurementRun.UpdateUI;

@@ -282,6 +282,7 @@ type
     procedure FireEvent(AEvent: EMeasurementEvent); overload;
 
     function GetCurrentPoint: TDevicePoint;
+    function FindNextEnabledPointIndex(AStartIndex: Integer): Integer;
     function BuildError(ACode: Integer; const AMsg: string): TErrorInfo;
     function ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
     function SetPoint(Index: Integer; out AError: TErrorInfo): Boolean;
@@ -822,6 +823,20 @@ end;
 /// назначается статус <c>mptsInvalidPoint</c>, формируется событие
 /// <c>mePointInvalid</c>, после чего измерительный цикл завершается.
 /// </remarks>
+
+function TMeasurementRun.FindNextEnabledPointIndex(AStartIndex: Integer): Integer;
+var
+  I: Integer;
+begin
+  Result := -1;
+  if FPoints = nil then
+    Exit;
+
+  for I := Max(AStartIndex, 0) to FPoints.Count - 1 do
+    if (FPoints[I] <> nil) and FPoints[I].Enabled then
+      Exit(I);
+end;
+
 procedure TMeasurementRun.EnterSelectPoint;
 var
   // Содержит подробную информацию об ошибке, если SetPoint не сможет
@@ -851,6 +866,10 @@ begin
     // индекс первой точки равным 0.
     Inc(FCurrentPointIndex);
 
+  if (FMode = mrmAutomatic) and ((FCurrentPointIndex < 0) or
+     (FCurrentPointIndex >= FPoints.Count) or (not FPoints[FCurrentPointIndex].Enabled)) then
+    FCurrentPointIndex := FindNextEnabledPointIndex(FCurrentPointIndex);
+
   // Принудительный индекс является одноразовой командой.
   //
   // После его использования обязательно сбрасываем значение, чтобы при
@@ -862,7 +881,7 @@ begin
   //
   // Если индекс равен количеству точек или превышает его, значит все точки
   // списка уже обработаны и продолжать измерительный цикл больше не нужно.
-  if FCurrentPointIndex >= FPoints.Count then
+  if (FCurrentPointIndex < 0) or (FCurrentPointIndex >= FPoints.Count) then
   begin
     // Переводим машину состояний в конечное состояние.
     //
@@ -1469,7 +1488,7 @@ begin
       if ExistingPoint = nil then
       begin
         SessionPoint := TDevicePoint.Create(0);
-        SessionPoint.Assign(SourcePoint, False);
+        SessionPoint.Assign(SourcePoint, True);
         SessionPoint.Status := mptsNone;
         SessionPoint.RepeatsCompleted := 0;
         FPoints.Add(SessionPoint);
@@ -1547,10 +1566,11 @@ begin
       Exit;
     end;
 
-    if (FMode <> mrmManual) and (FPoints.Count = 0) then
+    if (FMode <> mrmManual) and ((FPoints.Count = 0) or
+       ((FMode = mrmAutomatic) and (FindNextEnabledPointIndex(0) < 0))) then
     begin
       ProtocolManager.AddMessage(pcWarning, psMeasurement, 'Start',
-        'Измерение не запущено', 'Нет точек измерения');
+        'Измерение не запущено', 'Нет включенных точек измерения');
       if FCurrentStage <> msNone then
         SetStage(msNone);
       Exit;

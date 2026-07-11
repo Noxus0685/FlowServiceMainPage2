@@ -1,4 +1,4 @@
-object FrameMeasurementRun: TFrameMeasurementRun
+﻿object FrameMeasurementRun: TFrameMeasurementRun
   Size.Width = 1228.000000000000000000
   Size.Height = 888.000000000000000000
   Size.PlatformDefault = False
@@ -13,8 +13,15 @@ object FrameMeasurementRun: TFrameMeasurementRun
     RowCount = 1
     OnDrawColumnCell = GridMeasurmentRunDrawColumnCell
     OnGetValue = GridMeasurmentRunGetValue
+    OnSetValue = GridMeasurmentRunSetValue
     Viewport.Width = 1228.000000000000000000
     Viewport.Height = 856.000000000000000000
+    object CheckColumnMREnable: TCheckColumn
+      HeaderSettings.TextSettings.Trimming = Character
+      HeaderSettings.TextSettings.WordWrap = False
+      HeaderSettings.TextSettings.HorzAlign = Center
+      ReadOnly = True
+    end
     object StringColumnPointer: TStringColumn
       HeaderSettings.TextSettings.WordWrap = False
       Size.Width = 50.000000000000000000
