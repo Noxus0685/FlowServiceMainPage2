@@ -606,6 +606,35 @@ uAppServices
   ;
 {$R *.fmx}
 
+
+function TypeStateToLogText(AState: TObjectState): string;
+begin
+  case AState of
+    osEmpty: Result := 'osEmpty';
+    osLoading: Result := 'osLoading';
+    osClean: Result := 'osClean';
+    osNew: Result := 'osNew';
+    osModified: Result := 'osModified';
+    osDeleted: Result := 'osDeleted';
+  else
+    Result := IntToStr(Ord(AState));
+  end;
+end;
+
+procedure AppendTypeEditorDebugLog(const AMessage: string);
+var
+  LogFile: string;
+  Line: string;
+begin
+  try
+    LogFile := TPath.Combine(TPath.GetTempPath, 'FlowService_TypeEditor_Debug.log');
+    Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' | ' + AMessage + sLineBreak;
+    TFile.AppendAllText(LogFile, Line, TEncoding.UTF8);
+  except
+    { debug logging must never break editor flow }
+  end;
+end;
+
 function IsArshinReachable: Boolean;
 {$IFDEF MSWINDOWS}
 const
@@ -2487,6 +2516,8 @@ begin
 end;
 
  procedure TFormTypeEditor.SetModified;
+var
+  OldState: TObjectState;
 begin
   if FLoading then
     Exit;
@@ -2494,8 +2525,16 @@ begin
   if FType = nil then
     Exit;
 
+  OldState := FType.State;
+
   if not (FType.State in [osNew, osDeleted]) then
     FType.State := osModified;
+
+  AppendTypeEditorDebugLog(Format(
+    'SetModified: ID=%d UUID=%s State=%s->%s Diameters.Count=%d Points.Count=%d',
+    [FType.ID, FType.UUID, TypeStateToLogText(OldState), TypeStateToLogText(FType.State),
+     FType.Diameters.Count, FType.Points.Count]
+  ));
 
   FModified := True;
 end;
@@ -3259,13 +3298,28 @@ begin
 
     if FOriginalType <> nil then
     begin
+      AppendTypeEditorDebugLog(Format(
+        'Before Assign/Save original: EditID=%d EditUUID=%s EditState=%s OriginalID=%d OriginalUUID=%s OriginalState=%s',
+        [FType.ID, FType.UUID, TypeStateToLogText(FType.State),
+         FOriginalType.ID, FOriginalType.UUID, TypeStateToLogText(FOriginalType.State)]
+      ));
       FOriginalType.Assign(FType, True);
+      AppendTypeEditorDebugLog(Format(
+        'Before Save original after Assign: ID=%d UUID=%s State=%s Diameters.Count=%d Points.Count=%d',
+        [FOriginalType.ID, FOriginalType.UUID, TypeStateToLogText(FOriginalType.State),
+         FOriginalType.Diameters.Count, FOriginalType.Points.Count]
+      ));
       if not Repo.SaveType(FOriginalType) then
         raise Exception.Create('Ошибка сохранения типа');
       FOriginalType.SelectedDiameterID := FSelectedDiameterID;
     end
     else
     begin
+      AppendTypeEditorDebugLog(Format(
+        'Before Save current: ID=%d UUID=%s State=%s Diameters.Count=%d Points.Count=%d',
+        [FType.ID, FType.UUID, TypeStateToLogText(FType.State),
+         FType.Diameters.Count, FType.Points.Count]
+      ));
       if not Repo.SaveType(FType) then
         raise Exception.Create('Ошибка сохранения типа');
             FType.SelectedDiameterID := FSelectedDiameterID;
