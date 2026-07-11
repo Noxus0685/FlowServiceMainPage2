@@ -504,7 +504,7 @@ type
   function GetPointByVisibleRow(ARow: Integer): TTypePoint;
 
 
-  procedure RecalcPointsBySelectedDiameter;
+  procedure RecalcPointsBySelectedDiameter(AMarkModified: Boolean = False);
   procedure UpdatePointsErrorFromType;
 
   procedure InitLocalData;
@@ -2488,11 +2488,17 @@ end;
 
  procedure TFormTypeEditor.SetModified;
 begin
-  if FLoading then Exit;
-  FModified := True;
-  FType.State :=  osModified;
+  if FLoading then
+    Exit;
 
-    end;
+  if FType = nil then
+    Exit;
+
+  if not (FType.State in [osNew, osDeleted]) then
+    FType.State := osModified;
+
+  FModified := True;
+end;
 
 function TFormTypeEditor.Modified: Boolean;
 begin
@@ -4445,7 +4451,7 @@ begin
 
   // 8. Пересчёт точек для выбранного диаметра
   if GridDiameters.Selected > 0 then
-    RecalcPointsBySelectedDiameter;
+    RecalcPointsBySelectedDiameter(True);
 
   SetModified;
 end;
@@ -4667,7 +4673,9 @@ begin
   // Если выбран диаметр — обновляем точки
   // ----------------------------------------
   if FSelectedDiameterID >= 0 then
-    RecalcPointsBySelectedDiameter;
+    RecalcPointsBySelectedDiameter(True);
+
+  SetModified;
 end;
 
 procedure TFormTypeEditor.EditFreqFlowRateKeyDown(Sender: TObject; var Key: Word;
@@ -4720,8 +4728,12 @@ begin
   // QF = Qmax * FreqFlowRate
   // ----------------------------------------
   for I := 0 to FDiametersLocal.Count-1 do
+  begin
     FDiametersLocal[I].QFmax :=
       FDiametersLocal[I].Qmax * FType.FreqFlowRate;
+    if FDiametersLocal[I].State <> osNew then
+      FDiametersLocal[I].State := osModified;
+  end;
 
   // ----------------------------------------
   // Обновление таблицы диаметров
@@ -4732,7 +4744,9 @@ begin
   // Если выбран диаметр — обновляем точки
   // ----------------------------------------
   if FSelectedDiameterID >= 0 then
-    RecalcPointsBySelectedDiameter;
+    RecalcPointsBySelectedDiameter(True);
+
+  SetModified;
 end;
 
 
@@ -5208,8 +5222,13 @@ procedure TFormTypeEditor.GridDiametersCellClick(const Column: TColumn;
 
 
   D := GetDiameterByVisibleRow(Row);
-  d.Enable:=not  d.Enable;
+  if D = nil then
+    Exit;
+  D.Enable:=not  D.Enable;
+  if D.State <> osNew then
+    D.State := osModified;
   UpdateDiametersGrid;
+  SetModified;
 
 end;
 
@@ -5502,7 +5521,7 @@ begin
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
-      RecalcPointsBySelectedDiameter;
+      RecalcPointsBySelectedDiameter(True);
   end
 
   {=====================================================}
@@ -5559,7 +5578,7 @@ begin
 
     SelD := GetDiameterByVisibleRow(GridDiameters.Row);
     if SelD = D then
-      RecalcPointsBySelectedDiameter;
+      RecalcPointsBySelectedDiameter(True);
   end;
   SetModified;
   UpdateDiametersGrid;
@@ -5834,7 +5853,7 @@ begin
   UpdatePointsGrid;
 end;
 
-procedure TFormTypeEditor.RecalcPointsBySelectedDiameter;
+procedure TFormTypeEditor.RecalcPointsBySelectedDiameter(AMarkModified: Boolean = False);
 var
   I: Integer;
   Qmax, Q, V, Tm, Coef: Double;
@@ -5865,8 +5884,14 @@ begin
       Tm := FPointsLocal[I].LimitTime;
       V  := Q * Tm ;
 
-      FPointsLocal[I].LimitVolume := V;
-      FPointsLocal[I].LimitImp    := Round(V * Coef);
+      if (not SameValue(FPointsLocal[I].LimitVolume, V)) or
+         (FPointsLocal[I].LimitImp <> Round(V * Coef)) then
+      begin
+        FPointsLocal[I].LimitVolume := V;
+        FPointsLocal[I].LimitImp    := Round(V * Coef);
+        if AMarkModified and (FPointsLocal[I].State <> osNew) then
+          FPointsLocal[I].State := osModified;
+      end;
     end;
   end;
 
@@ -6395,8 +6420,13 @@ var
 
 
   P := GetPointByVisibleRow(Row);
+  if P = nil then
+    Exit;
   P.Enable:=not  P.Enable;
+  if P.State <> osNew then
+    P.State := osModified;
   UpdatePointsGrid;
+  SetModified;
 
 end;
 

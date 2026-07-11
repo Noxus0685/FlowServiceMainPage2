@@ -1766,11 +1766,26 @@ var
   OwnsTransaction: Boolean;
   SavedDimensionCoef: Integer;
   StoredCoef: Double;
+  DiametersCount: Integer;
+  PointsCount: Integer;
 begin
   Result := False;
 
   if (AType = nil) or (FDM = nil) then
     Exit;
+
+  DiametersCount := 0;
+  if AType.Diameters <> nil then
+    DiametersCount := AType.Diameters.Count;
+
+  PointsCount := 0;
+  if AType.Points <> nil then
+    PointsCount := AType.Points.Count;
+
+  AppendRepoDebugLog(Format(
+    'Type save: ID=%d UUID=%s State=%d Diameters.Count=%d Points.Count=%d',
+    [AType.ID, AType.UUID, Ord(AType.State), DiametersCount, PointsCount]
+  ));
 
   if AType.State = osClean then
     Exit(True);
@@ -1942,6 +1957,18 @@ begin
     SetFloatParam(Q, 'Error', AType.Error);
 
     Q.ExecSQL;
+
+    if (AType.State = osModified) and (Q.RowsAffected = 0) then
+    begin
+      AppendRepoDebugLog(Format(
+        'ERROR Type save: UPDATE affected 0 rows for modified type. INSERT blocked. ID=%d UUID=%s',
+        [AType.ID, AType.UUID]
+      ));
+      raise Exception.CreateFmt(
+        'Не найдена существующая запись типа для обновления (ID=%d, UUID=%s). INSERT для osModified запрещён.',
+        [AType.ID, AType.UUID]
+      );
+    end;
 
     {================ ДОЧЕРНИЕ СУЩНОСТИ =================}
     if AType.Diameters <> nil then
