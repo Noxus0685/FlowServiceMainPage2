@@ -405,6 +405,20 @@ begin
   end;
 end;
 
+function ObjectStateToLogText(AState: TObjectState): string;
+begin
+  case AState of
+    osEmpty: Result := 'osEmpty';
+    osLoading: Result := 'osLoading';
+    osClean: Result := 'osClean';
+    osNew: Result := 'osNew';
+    osModified: Result := 'osModified';
+    osDeleted: Result := 'osDeleted';
+  else
+    Result := IntToStr(Ord(AState));
+  end;
+end;
+
  procedure SetIntParam(Q: TFDQuery; const AName: string; const AValue: Integer);
 begin
   with Q.ParamByName(AName) do
@@ -1766,11 +1780,26 @@ var
   OwnsTransaction: Boolean;
   SavedDimensionCoef: Integer;
   StoredCoef: Double;
+  DiametersCount: Integer;
+  PointsCount: Integer;
 begin
   Result := False;
 
   if (AType = nil) or (FDM = nil) then
     Exit;
+
+  DiametersCount := 0;
+  if AType.Diameters <> nil then
+    DiametersCount := AType.Diameters.Count;
+
+  PointsCount := 0;
+  if AType.Points <> nil then
+    PointsCount := AType.Points.Count;
+
+  AppendRepoDebugLog(Format(
+    'Type save: ID=%d UUID=%s State=%s(%d) Diameters.Count=%d Points.Count=%d',
+    [AType.ID, AType.UUID, ObjectStateToLogText(AType.State), Ord(AType.State), DiametersCount, PointsCount]
+  ));
 
   if AType.State = osClean then
     Exit(True);
@@ -1788,6 +1817,22 @@ begin
     try
       if AType.State = osNew then
       begin
+        Q.SQL.Text := 'select ID from DeviceType where UUID = :UUID';
+        SetStrParam(Q, 'UUID', AType.UUID);
+        Q.Open;
+        if not Q.Eof then
+        begin
+          AppendRepoDebugLog(Format(
+            'ERROR Type save: INSERT blocked because UUID already exists. ID=%d UUID=%s State=%s(%d) ExistingID=%d',
+            [AType.ID, AType.UUID, ObjectStateToLogText(AType.State), Ord(AType.State), Q.FieldByName('ID').AsInteger]
+          ));
+          raise Exception.CreateFmt(
+            'Тип с UUID %s уже существует (ID=%d). INSERT для такого UUID запрещён.',
+            [AType.UUID, Q.FieldByName('ID').AsInteger]
+          );
+        end;
+        Q.Close;
+
         Q.SQL.Text := 'select 1 from DeviceType where ID = :ID';
         SetIntParam(Q, 'ID', AType.ID);
         Q.Open;
@@ -1942,6 +1987,18 @@ begin
     SetFloatParam(Q, 'Error', AType.Error);
 
     Q.ExecSQL;
+
+    if (AType.State = osModified) and (Q.RowsAffected = 0) then
+    begin
+      AppendRepoDebugLog(Format(
+        'ERROR Type save: UPDATE affected 0 rows for modified type. INSERT blocked. ID=%d UUID=%s State=%s(%d)',
+        [AType.ID, AType.UUID, ObjectStateToLogText(AType.State), Ord(AType.State)]
+      ));
+      raise Exception.CreateFmt(
+        'Не найдена существующая запись типа для обновления (ID=%d, UUID=%s). INSERT для osModified запрещён.',
+        [AType.ID, AType.UUID]
+      );
+    end;
 
     {================ ДОЧЕРНИЕ СУЩНОСТИ =================}
     if AType.Diameters <> nil then
