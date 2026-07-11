@@ -324,6 +324,7 @@ type
     procedure Pause;
     procedure Resume;
     procedure NextPoint;
+    procedure SyncCurrentPointIndex(APoint: TDevicePoint);
     procedure Execute(Cmd: EMeasurementCommand); overload;
     procedure Execute(Cmd: EMeasurementCommand; Param: Variant); overload;
 
@@ -1806,6 +1807,15 @@ begin
   FIsPaused := False;
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'Resume',
     'Возобновление процесса измерения', '');
+end;
+
+
+procedure TMeasurementRun.SyncCurrentPointIndex(APoint: TDevicePoint);
+begin
+  if (APoint = nil) or (FPoints = nil) then
+    Exit;
+
+  FCurrentPointIndex := FPoints.IndexOf(APoint);
 end;
 
 procedure TMeasurementRun.NextPoint;

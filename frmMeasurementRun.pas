@@ -14,6 +14,7 @@ uses
   FMX.Types,
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -55,9 +56,11 @@ type
     procedure SpeedButtonPointDeleteClick(Sender: TObject);
     procedure SpeedButtonPointNextClick(Sender: TObject);
     procedure SpeedButtonPointPrevClick(Sender: TObject);
+    procedure GridMeasurmentRunHeaderClick(Column: TColumn);
   private
     FActiveWorkTable: TWorkTable;
     FInvalidPointIndexes: TList<Integer>;
+    FFlowRateSortAscending: Boolean;
     function GetMeasurementRun: TMeasurementRun;
     function GetStopCriteriaText(APoint: TDevicePoint): string;
 
@@ -72,7 +75,9 @@ type
     procedure UpdateStopCriteriaColumns;
     function IsPointInvalid(APoint: TDevicePoint): Boolean;
     function GetRowColor(const ARow: Integer): TAlphaColor;
-     procedure UpdateGridMesurmentRun;
+    procedure MoveSelectedPoint(ANewIndex: Integer);
+    procedure SyncCurrentPointIndex(ACurrentPoint: TDevicePoint);
+    procedure UpdateGridMesurmentRun;
 
   public
     constructor Create(AOwner: TComponent); override;
@@ -92,12 +97,14 @@ constructor TFrameMeasurementRun.Create(AOwner: TComponent);
 begin
   inherited;
   FInvalidPointIndexes := TList<Integer>.Create;
+  FFlowRateSortAscending := True;
   SpeedButtonPointPrev.OnClick := SpeedButtonPointPrevClick;
   SpeedButtonPointNext.OnClick := SpeedButtonPointNextClick;
   SpeedButtonPause.OnClick := SpeedButtonPauseClick;
   SpeedButtonPointDelete.OnClick := SpeedButtonPointDeleteClick;
   SpeedButtonCreatePoints.OnClick := SpeedButtonCreatePointsClick;
   GridMeasurmentRun.ShowHint := True;
+  GridMeasurmentRun.OnHeaderClick := GridMeasurmentRunHeaderClick;
 end;
 
 destructor TFrameMeasurementRun.Destroy;
@@ -420,16 +427,90 @@ end;
 
 
 
+procedure TFrameMeasurementRun.SyncCurrentPointIndex(ACurrentPoint: TDevicePoint);
+var
+  LIndex: Integer;
+begin
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) or
+     (ACurrentPoint = nil) then
+    Exit;
+
+  LIndex := MeasurementRun.Points.IndexOf(ACurrentPoint);
+  if LIndex >= 0 then
+    MeasurementRun.SyncCurrentPointIndex(ACurrentPoint);
+end;
+
+procedure TFrameMeasurementRun.MoveSelectedPoint(ANewIndex: Integer);
+var
+  Row: Integer;
+  CurrentPoint: TDevicePoint;
+begin
+  if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
+    Exit;
+
+  Row := GridMeasurmentRun.Selected;
+  if (Row < 0) or (Row >= MeasurementRun.Points.Count) or
+     (ANewIndex < 0) or (ANewIndex >= MeasurementRun.Points.Count) then
+    Exit;
+
+  CurrentPoint := MeasurementRun.CurrentPoint;
+  MeasurementRun.Points.Move(Row, ANewIndex);
+  SyncCurrentPointIndex(CurrentPoint);
+
+  UpdateGridMesurmentRun;
+  GridMeasurmentRun.Selected := ANewIndex;
+  GridMeasurmentRun.Repaint;
+end;
+
 procedure TFrameMeasurementRun.SpeedButtonPointPrevClick(Sender: TObject);
 begin
-  if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcPreviousPoint, Unassigned);
+  MoveSelectedPoint(GridMeasurmentRun.Selected - 1);
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPointNextClick(Sender: TObject);
 begin
-  if MeasurementRun <> nil then
-    MeasurementRun.Execute(mcNextPoint, Null);
+  MoveSelectedPoint(GridMeasurmentRun.Selected + 1);
+end;
+
+procedure TFrameMeasurementRun.GridMeasurmentRunHeaderClick(Column: TColumn);
+var
+  SelectedPoint: TDevicePoint;
+  CurrentPoint: TDevicePoint;
+begin
+  if (Column <> StringColumnMRFlowRate) or
+     (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
+    Exit;
+
+  SelectedPoint := nil;
+  if (GridMeasurmentRun.Selected >= 0) and
+     (GridMeasurmentRun.Selected < MeasurementRun.Points.Count) then
+    SelectedPoint := MeasurementRun.Points[GridMeasurmentRun.Selected];
+
+  CurrentPoint := MeasurementRun.CurrentPoint;
+
+  MeasurementRun.Points.Sort(TComparer<TDevicePoint>.Construct(
+    function(const Left, Right: TDevicePoint): Integer
+    begin
+      if Left = Right then
+        Exit(0);
+      if Left = nil then
+        Exit(-1);
+      if Right = nil then
+        Exit(1);
+
+      Result := CompareValue(Left.Q, Right.Q);
+      if not FFlowRateSortAscending then
+        Result := -Result;
+    end));
+
+  SyncCurrentPointIndex(CurrentPoint);
+  UpdateGridMesurmentRun;
+
+  if SelectedPoint <> nil then
+    GridMeasurmentRun.Selected := MeasurementRun.Points.IndexOf(SelectedPoint);
+
+  GridMeasurmentRun.Repaint;
+  FFlowRateSortAscending := not FFlowRateSortAscending;
 end;
 
 procedure TFrameMeasurementRun.SpeedButtonPauseClick(Sender: TObject);
