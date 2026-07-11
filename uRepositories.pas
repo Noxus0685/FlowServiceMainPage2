@@ -115,7 +115,7 @@ type
         //Сохранение одного тиипа. ACheckExists - нужно ли проверять его наличие в БД или сразу добавлять новый.
 //    function SaveType(AType: TDeviceType; ACheckExists: Boolean): Boolean;
     function UpdateType(AType: TDeviceType): Boolean; //редактировать один тип
-    function DeleteTypeCascade(const ATypeUUID: string): Boolean;
+    function DeleteTypeCascade(AType: TDeviceType): Boolean;
     function SaveTypes: Boolean; //Сохранение с заменой всех типов
     function RebuildTypes: Boolean;
 
@@ -158,7 +158,8 @@ type
     function MapTypePointFromQuery(Q: TFDQuery): TTypePoint;
 
 
-     function LoadTypePointsByType(ATypeUUID: string): TObjectList<TTypePoint>;
+     function LoadTypePointsByType(ATypeUUID: string): TObjectList<TTypePoint>; overload;
+     function LoadTypePointsByType(ATypeID: Integer): TObjectList<TTypePoint>; overload;
 
      function UpdateTypePoint(APoint: TTypePoint): Boolean;
     function UpdateTypePoints(AType: TDeviceType): Boolean;   //Редактирование точек определенного типа //Требует реализации SQL
@@ -1257,22 +1258,24 @@ begin
   TypeUUID := AType.UUID;
 
   {----------------------------------}
-  { Точки — помечаем на удаление }
+  { Точки выбранного типа — помечаем на удаление }
   {----------------------------------}
   if AType.Points <> nil then
   begin
     for I := 0 to AType.Points.Count - 1 do
-      if AType.Points[I].DeviceTypeUUID = TypeUUID then
+      if (AType.Points[I].DeviceTypeID = AType.ID) or
+         ((AType.Points[I].DeviceTypeID <= 0) and SameText(AType.Points[I].DeviceTypeUUID, TypeUUID)) then
         AType.Points[I].State := osDeleted;
   end;
 
   {----------------------------------}
-  { Диаметры — помечаем на удаление }
+  { Диаметры выбранного типа — помечаем на удаление }
   {----------------------------------}
   if AType.Diameters <> nil then
   begin
     for I := 0 to AType.Diameters.Count - 1 do
-      if AType.Diameters[I].DeviceTypeUUID = TypeUUID then
+      if (AType.Diameters[I].DeviceTypeID = AType.ID) or
+         ((AType.Diameters[I].DeviceTypeID <= 0) and SameText(AType.Diameters[I].DeviceTypeUUID, TypeUUID)) then
         AType.Diameters[I].State := osDeleted;
   end;
 
@@ -1652,17 +1655,19 @@ begin
   Q := FDM.CreateQuery;
   try
     try
-      { получаем ТОЛЬКО UUID }
+      { Загружаем строки по ID, чтобы дубли UUID оставались отдельными типами }
       Q.SQL.Text :=
-        'select UUID from DeviceType order by Name';
+        'select * from DeviceType order by Name, ID';
       Q.Open;
 
       while not Q.Eof do
       begin
-        TypeUUID := Q.FieldByName('UUID').AsString;
-
-        { загрузка агрегата }
-        NewT := LoadType(TypeUUID);
+        NewT := MapTypeFromQuery(Q);
+        if NewT <> nil then
+        begin
+          LoadDiametersByType(NewT.ID);
+          LoadTypePointsByType(NewT.ID);
+        end;
         Q.Next;
       end;
 
@@ -1798,7 +1803,7 @@ begin
       {==================================================}
       osDeleted:
         begin
-          if not DeleteTypeCascade(AType.UUID) then
+          if not DeleteTypeCascade(AType) then
             Exit(False);
           AType.State := osClean;
           if OwnsTransaction then
@@ -1963,28 +1968,33 @@ begin
 
 end;
 
-function TTypeRepository.DeleteTypeCascade(const ATypeUUID: string): Boolean;
+function TTypeRepository.DeleteTypeCascade(AType: TDeviceType): Boolean;
 var
   Q: TFDQuery;
 begin
   Result := False;
 
-  if (Trim(ATypeUUID) = '') or (FDM = nil) then
+  if (AType = nil) or (AType.ID <= 0) or (FDM = nil) then
     Exit;
 
   Q := FDM.CreateQuery;
   try
-    Q.SQL.Text := 'delete from DeviceTypePoint where DeviceTypeUUID = :UUID';
-    SetStrParam(Q, 'UUID', ATypeUUID);
+    Q.SQL.Text := 'delete from DeviceTypePoint where DeviceTypeID = :ID';
+    SetIntParam(Q, 'ID', AType.ID);
     Q.ExecSQL;
 
-    Q.SQL.Text := 'delete from DeviceDiameter where DeviceTypeUUID = :UUID';
-    SetStrParam(Q, 'UUID', ATypeUUID);
+    Q.SQL.Text := 'delete from DeviceDiameter where DeviceTypeID = :ID';
+    SetIntParam(Q, 'ID', AType.ID);
     Q.ExecSQL;
 
-    Q.SQL.Text := 'delete from DeviceType where UUID = :UUID';
-    SetStrParam(Q, 'UUID', ATypeUUID);
+    Q.SQL.Text := 'delete from DeviceType where ID = :ID';
+    SetIntParam(Q, 'ID', AType.ID);
     Q.ExecSQL;
+
+    AppendRepoDebugLog(Format(
+      'DELETE DeviceType: ID=%d UUID=%s Name=%s | QueryDB=%s',
+      [AType.ID, AType.UUID, AType.Name, Q.Connection.Params.Database]
+    ));
 
     Result := True;
   finally
@@ -2143,7 +2153,12 @@ end;
 
   ADeviceTypeUUID := Q.FieldByName('DeviceTypeUUID').AsString;
 
-  AType:= FindTypeByUUID(ADeviceTypeUUID);
+  if Q.FindField('DeviceTypeID') <> nil then
+    AType := GetType(Q.FieldByName('DeviceTypeID').AsInteger)
+  else
+    AType := nil;
+  if AType = nil then
+    AType:= FindTypeByUUID(ADeviceTypeUUID);
 
   Result := AType.AddDiameter;
 
@@ -2542,7 +2557,12 @@ var
  begin
 
   DeviceTypeUUID:=  Q.FieldByName('DeviceTypeUUID').AsString;
-  AType:= FindTypeByUUID(DeviceTypeUUID);
+  if Q.FindField('DeviceTypeID') <> nil then
+    AType := GetType(Q.FieldByName('DeviceTypeID').AsInteger)
+  else
+    AType := nil;
+  if AType = nil then
+    AType:= FindTypeByUUID(DeviceTypeUUID);
   Result := AType.AddTypePoint;
 
   {================ Идентификация ================}
@@ -2618,6 +2638,39 @@ begin
   end;
 end;
 
+
+
+function TTypeRepository.LoadTypePointsByType(ATypeID: Integer): TObjectList<TTypePoint>;
+var
+  Q: TFDQuery;
+begin
+  Result := TObjectList<TTypePoint>.Create(True);
+
+  if (ATypeID <= 0) or (FDM = nil) then
+    Exit;
+
+  EnsurePointSchema;
+
+  Q := FDM.CreateQuery;
+  try
+    Q.SQL.Text :=
+      'select * from DeviceTypePoint ' +
+      'where DeviceTypeID = :DeviceTypeID ' +
+      'order by ID';
+
+    SetIntParam(Q, 'DeviceTypeID', ATypeID);
+    Q.Open;
+
+    while not Q.Eof do
+    begin
+      Result.Add(MapTypePointFromQuery(Q));
+      Q.Next;
+    end;
+
+  finally
+    Q.Free;
+  end;
+end;
 
 function TTypeRepository.UpdateTypePoints(
   AType: TDeviceType
