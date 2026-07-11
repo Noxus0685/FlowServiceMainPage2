@@ -25,7 +25,7 @@ object FrameProtocol: TFrameProtocol
     TabOrder = 1
     object CheckBoxEvent: TCheckBox
       Align = Left
-      Size.Width = 68.000000000000000000
+      Size.Width = 72.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
       TabOrder = 0
@@ -34,7 +34,7 @@ object FrameProtocol: TFrameProtocol
     end
     object CheckBoxState: TCheckBox
       Align = Left
-      Position.X = 68.000000000000000000
+      Position.X = 72.000000000000000000
       Size.Width = 66.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
@@ -44,62 +44,72 @@ object FrameProtocol: TFrameProtocol
     end
     object CheckBoxAction: TCheckBox
       Align = Left
-      Position.X = 134.000000000000000000
+      Position.X = 138.000000000000000000
       Size.Width = 71.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 2
+      TabOrder = 3
       Text = 'ACTION'
       OnChange = FilterChanged
     end
     object CheckBoxForm: TCheckBox
       Align = Left
-      Position.X = 205.000000000000000000
+      Position.X = 209.000000000000000000
       Size.Width = 56.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 3
+      TabOrder = 4
       Text = 'FRM'
       OnChange = FilterChanged
     end
     object CheckBoxParameters: TCheckBox
       Align = Left
-      Position.X = 261.000000000000000000
+      Position.X = 265.000000000000000000
       Size.Width = 48.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 4
+      TabOrder = 5
       Text = 'PAR'
       OnChange = FilterChanged
     end
     object CheckBoxWorkTable: TCheckBox
       Align = Left
-      Position.X = 309.000000000000000000
+      Position.X = 313.000000000000000000
       Size.Width = 48.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 5
+      TabOrder = 6
       Text = 'WT'
       OnChange = FilterChanged
     end
     object CheckBoxMeasurement: TCheckBox
       Align = Left
-      Position.X = 357.000000000000000000
+      Position.X = 361.000000000000000000
       Size.Width = 48.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 6
+      TabOrder = 7
       Text = 'MR'
       OnChange = FilterChanged
     end
     object CheckBoxMKS: TCheckBox
       Align = Left
-      Position.X = 405.000000000000000000
+      Position.X = 409.000000000000000000
       Size.Width = 55.000000000000000000
       Size.Height = 24.000000000000000000
       Size.PlatformDefault = False
-      TabOrder = 7
+      TabOrder = 8
       Text = 'MKS'
+      OnChange = FilterChanged
+    end
+    object CheckBoxWorkLog: TCheckBox
+      Align = Left
+      Position.X = 464.000000000000000000
+      Size.Width = 71.000000000000000000
+      Size.Height = 24.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 2
+      Text = 'WORKLOG'
       OnChange = FilterChanged
     end
   end

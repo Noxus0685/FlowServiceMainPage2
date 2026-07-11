@@ -927,7 +927,11 @@ begin
         else Inc(AInfo.OutlierCount);
     end;
   end;
-  AInfo.OutlierFraction := IfThen(N > 0, AInfo.OutlierCount / N, 0);
+if N > 0 then
+  AInfo.OutlierFraction := AInfo.OutlierCount / Double(N)
+else
+  AInfo.OutlierFraction := 0.0;
+
   AInfo.IsOutlierLevelAcceptable := AInfo.OutlierFraction <= FStabilitySettings.MaxOutlierFraction;
   if not AInfo.IsOutlierLevelAcceptable then Include(AInfo.FailReasons, mvsfrTooManyOutliers);
 
@@ -954,7 +958,11 @@ begin
     AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + FStabilitySettings.ForecastHorizonSec);
   end;
 
-  LimitsFactor := IfThen(FStabilityConfirmed, FStabilitySettings.ExitThresholdFactor, 1.0);
+if FStabilityConfirmed then
+  LimitsFactor := FStabilitySettings.ExitThresholdFactor
+else
+  LimitsFactor := 1.0;
+
   AInfo.IsVariationStable := AInfo.Variation <= FStabilitySettings.MaxVariation * LimitsFactor;
   AInfo.IsDeviationStable := AInfo.StdDeviation <= FStabilitySettings.MaxStdDeviation * LimitsFactor;
   AInfo.IsTrendStable := Abs(AInfo.TrendRate) <= FStabilitySettings.MaxTrendRate * LimitsFactor;

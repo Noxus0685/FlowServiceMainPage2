@@ -1222,12 +1222,9 @@ begin
   end;
 
   FActiveWorkTable.MeasurementMode := MeasurementRun.Mode;
-  FActiveWorkTable.ResetMeasurementValues;
-  UpdateForm;
 
-   ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
+  ProtocolManager.AddMessage(pcAction, psForm, 'StartMeasurement', 'Запрос на запуск измерений', FActiveWorkTable.Name);
 
-  //FActiveWorkTable.StartTest;
   FActiveWorkTable.StartMeasurementRun;
   end;
 

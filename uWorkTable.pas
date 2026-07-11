@@ -2637,154 +2637,164 @@ begin
 end;
 
 
-{ TODO HYDRAULIC-SCHEME / NOTIFICATIONS:
-  Сейчас выбор эталонов выполняется временным способом:
-    - по паспортным диапазонам FlowMeter.FlowMin / FlowMeter.FlowMax;
-    - по полю Channel.Group;
-    - результат выбора записывается в Channel.Enabled.
+{
+  TODO HYDRAULIC-SCHEME / METROLOGY / CHANNEL STATE:
 
-  Это промежуточная логика без учета полной гидравлической схемы установки.
+  Текущая реализация выполняет предварительный fallback-выбор эталонов
+  без использования полной гидравлической схемы установки.
 
-  В будущем выбор эталонов должен выполняться не только по диапазонам
-  расходомеров, а по таблице гидравлической схемы.
-
-  Гидравлическая схема должна быть основным источником допустимых
-  технологических маршрутов, потому что она знает:
-    - какие эталоны физически могут работать вместе;
-    - какие комбинации эталонов разрешены гидравлически;
-    - какие клапаны, задвижки, насосы и весы нужны для данного диапазона;
-    - какие batch-команды должны быть выполнены;
-    - какой маршрут предпочтительнее при пересечении диапазонов.
-
-  Предполагаемый будущий алгоритм:
-
-    1. TMeasurementRun на стадии msSelectEtalon передает текущую точку
-       измерения APoint в сервис выбора гидравлического маршрута.
-
-    2. Сервис выбора анализирует:
-         - APoint.Q;
-         - APoint.EtalonType;
-         - APoint.FlowSourceType;
-         - APoint.SpillageType;
-         - настройки проекта;
-         - таблицу гидравлической схемы.
-
-    3. В таблице гидравлической схемы выбирается строка, где:
-         - Qmin <= APoint.Q <= Qmax;
-         - строка разрешена для текущего режима;
-         - маршрут технологически допустим.
-
-    4. Из выбранной строки берется FlowmeterMask.
-
-    5. FlowmeterMask преобразуется в набор эталонных каналов TWorkTable.
-
-    6. Только выбранным эталонным каналам выставляется Channel.Enabled := True.
-       Остальные эталонные каналы получают Channel.Enabled := False.
-
-    7. После выбора вызывается UpdateAggregateMeterValues, чтобы агрегированные
-       значения рабочего стола считались только по выбранным эталонам.
-
-    8. На следующем этапе та же выбранная строка гидравлической схемы должна
-       использоваться для настройки установки:
-         - насосов;
-         - клапанов;
-         - байпаса;
-         - весов;
-         - batch-команд;
-         - старт/стоп режима.
-
-  Важное архитектурное замечание:
-
-    Не следует превращать TWorkTable в объект, который напрямую знает всю
-    структуру Project.Settings.sHydraulicCharts.
-
-    Желательно разделить ответственность:
-
-      TMeasurementRun
-        управляет сценарием измерения;
-
-      HydraulicRouteSelector / сервис выбора гидравлического маршрута
-        выбирает строку гидравлической схемы;
-
-      TWorkTable
-        применяет результат выбора к своим каналам:
-          FlowmeterMask -> Channel.Enabled.
-
-  Текущая логика по диапазонам и Group должна остаться fallback-режимом
-  на случай, если гидравлическая схема не задана или отключена.
+  В качестве исходных данных используются:
+    - рабочие диапазоны Channel.QMinWork / Channel.QMaxWork;
+    - поле Channel.Group;
+    - требуемый расход AFlowRate.
 
   Важно:
-    На текущем этапе Channel.Enabled используется как результат выбора
-    эталона для текущего измерения. В будущем желательно разделить:
-      - признак доступности/разрешения канала в конфигурации;
-      - признак выбора канала для текущей точки измерения.
+    QMinWork, QMaxWork и AFlowRate должны быть выражены в одинаковых
+    единицах расхода.
 
+  Алгоритм предварительного выбора:
 
-  Контракт уведомлений для будущей гидравлической схемы:
-    результат выбора строки гидравлической схемы должен завершаться тем же
-    механизмом, что и текущий fallback-выбор по диапазонам:
+    1. Сначала каждый корректный эталонный канал рассматривается отдельно,
+       независимо от значения Channel.Group.
 
-    1. FlowmeterMask выбранной строки гидросхемы преобразуется в Channel.Enabled.
-    2. Вызывается UpdateAggregateMeterValues.
-    3. Вызывается FireAction(awtSelectEtalons, ...).
-    4. Вызывается FireEvent(ewtEtalonsChanged, ...).
+    2. Если найдено несколько одиночных эталонов, покрывающих требуемый
+       расход, выбирается эталон с минимальным QMaxWork.
 
-  UI не должен зависеть от способа выбора эталонов:
-    - по диапазонам и Group;
-    - или по гидравлической схеме.
+       Это временная эвристика.
 
-  Для интерфейса единственным сигналом обновления выбранных эталонов остается
-  ewtEtalonsChanged.
+       В будущем выбор одиночного эталона должен быть вынесен в отдельную
+       функцию и учитывать метрологические характеристики:
+         - погрешность;
+         - рабочую точку внутри диапазона;
+         - поверочный диапазон;
+         - приоритет эталона;
+         - техническое состояние;
+         - другие метрологические и эксплуатационные параметры.
 
-  Риск сохранения:
-    Channel.Enabled сохраняется в файле рабочего стола. Если рабочий стол будет
-    сохранен после автоматического выбора, временный выбор эталонов может стать
-    постоянной настройкой. В будущем желательно разделить Channel.Enabled
-    (доступен/разрешен в конфигурации) и Channel.Selected (выбран для текущей
-    точки измерения).
+    3. Если подходящий одиночный эталон не найден, анализируются группы.
+
+    4. Для каждой группы перебираются все непустые комбинации корректных
+       каналов группы.
+
+       Для каждой комбинации рассчитывается:
+         SumMin = сумма QMinWork выбранных каналов;
+         SumMax = сумма QMaxWork выбранных каналов.
+
+       Комбинация считается подходящей, если:
+         SumMin <= AFlowRate <= SumMax.
+
+    5. Из подходящих комбинаций выбирается вариант:
+         - с минимальным SumMax;
+         - при равном SumMax — с меньшим количеством каналов;
+         - при остальных равных условиях — с меньшим номером группы.
+
+       Это также временная эвристика до внедрения гидравлической схемы.
+
+    6. Поиск выполняется без изменения Channel.Enabled.
+
+       Текущий набор эталонов изменяется только после того, как подходящий
+       одиночный эталон или конкретная комбинация каналов успешно найдены.
+
+    7. При ошибке текущий набор Channel.Enabled остается без изменений.
+
+    8. После успешного поиска:
+         - отключаются ранее выбранные эталонные каналы;
+         - включаются только каналы найденного варианта;
+         - пересчитываются агрегированные значения;
+         - в одной общей точке вызывается FireAction(awtSelectEtalons, ...).
+
+  Архитектура уведомлений:
+
+    SelectEtalons выполняет только предварительный выбор.
+
+    После этого обработчик awtSelectEtalons может скорректировать выбранный
+    набор на основании гидравлической схемы.
+
+    Вызов FireAction должен быть единой точкой продолжения алгоритма
+    независимо от того, был выбран:
+      - одиночный эталон;
+      - набор эталонов одной группы.
+
+    Отдельный вызов FireEvent(ewtEtalonsChanged, ...) в этой процедуре
+    не выполняется.
+
+    Предполагается, что скорректированный TWorkTable.FireAction для действия
+    awtSelectEtalons сам формирует окончательное событие ewtEtalonsChanged
+    после обработки или подтверждения выбранного набора.
+
+  Ограничение текущей модели:
+
+    Channel.Enabled одновременно используется:
+      - как конфигурационный признак доступности канала;
+      - как признак выбора эталона для текущего измерения.
+
+    Поскольку Enabled сохраняется вместе с рабочим столом, автоматический
+    выбор может случайно стать постоянной настройкой.
+
+    В будущем необходимо разделить:
+      Channel.Enabled                — канал разрешен конфигурацией;
+      Channel.SelectedForMeasurement — канал выбран для текущей точки.
 }
-function TWorkTable.SelectEtalons(const AFlowRate: Double; out AError: TErrorInfo): Boolean;
+function TWorkTable.SelectEtalons(
+  const AFlowRate: Double;
+  out AError: TErrorInfo
+): Boolean;
+const
+  // Явная точность сравнения вычисленных суммарных диапазонов.
+  //
+  // Значение применяется только при сравнении вариантов между собой,
+  // а не для искусственного расширения рабочего диапазона эталонов.
+  FLOW_COMPARE_EPSILON = 1E-9;
+
+type
+  // Список каналов, составляющих один вариант выбора.
+  TChannelList = TList<TChannel>;
+
 var
   I: Integer;
   Channel: TChannel;
+
+  // Лучший одиночный эталон, покрывающий требуемый расход.
   BestSingle: TChannel;
-  GroupSumsMin: TDictionary<Integer, Double>;
-  GroupSumsMax: TDictionary<Integer, Double>;
-  GroupCounts: TDictionary<Integer, Integer>;
-  Pair: TPair<Integer, Double>;
-  GroupID: Integer;
+
+  // Конкретный окончательный набор каналов, который будет применен
+  // только после успешного завершения поиска.
+  SelectedChannels: TChannelList;
+
+  // Словарь групп:
+  //   ключ      — Channel.Group;
+  //   значение — список корректных каналов данной группы.
+  Groups: TObjectDictionary<Integer, TChannelList>;
+
+  GroupChannels: TChannelList;
+  GroupPair: TPair<Integer, TChannelList>;
+
   FlowMin: Double;
   FlowMax: Double;
-  SumMin: Double;
-  SumMax: Double;
+
+  // Характеристики лучшей найденной групповой комбинации.
   BestGroupID: Integer;
   BestGroupMax: Double;
   BestGroupCount: Integer;
-  GroupCount: Integer;
 
-  function BuildWorkTableError(ACode: Integer; const AMsg: string): TErrorInfo;
+  SelectionDescription: string;
+
+  procedure SetSelectionError(ACode: Integer; const AMsg: string);
   begin
-    Result.Code := ACode;
-    Result.Msg := AMsg;
-    Result.Time := Now;
-    Result.Stage := 0;
-  end;
-
-  procedure DisableAllEtalons;
-  var
-    J: Integer;
-  begin
-    if FEtalonChannels = nil then
-      Exit;
-
-    for J := 0 to FEtalonChannels.Count - 1 do
-      if FEtalonChannels[J] <> nil then
-        FEtalonChannels[J].Enabled := False;
+    // Формируем ошибку на основании текущего состояния рабочего стола.
+    //
+    // В отличие от локальной фабрики с Stage := 0, здесь в ошибке
+    // сохраняется фактическое состояние TWorkTable.
+    AError := TErrorInfo.Empty(Integer(FState));
+    AError.Code := ACode;
+    AError.Msg := AMsg;
+    AError.Time := Now;
   end;
 
   function GetChannelFlowMin(AChannel: TChannel): Double;
   begin
     Result := 0;
+
     if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
       Result := AChannel.QMinWork;
   end;
@@ -2792,160 +2802,373 @@ var
   function GetChannelFlowMax(AChannel: TChannel): Double;
   begin
     Result := 0;
+
     if (AChannel <> nil) and (AChannel.FlowMeter <> nil) then
       Result := AChannel.QMaxWork;
   end;
 
+  function IsChannelValidForSelection(AChannel: TChannel): Boolean;
+  var
+    ChannelFlowMin: Double;
+    ChannelFlowMax: Double;
+  begin
+    Result := False;
+
+    // Канал без назначенного расходомера не может участвовать
+    // в выборе эталонного набора.
+    if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+      Exit;
+
+    ChannelFlowMin := GetChannelFlowMin(AChannel);
+    ChannelFlowMax := GetChannelFlowMax(AChannel);
+
+    // На текущем этапе оставляем минимальную проверку диапазона:
+    // верхняя рабочая граница должна быть положительной.
+    //
+    // Расширенную проверку NaN, Infinity и согласованности QMin/QMax
+    // можно добавить отдельно при ужесточении валидации данных проекта.
+    if ChannelFlowMax <= 0 then
+      Exit;
+
+    Result := True;
+  end;
+
+  procedure CopyChannels(
+    const ASource: TChannelList;
+    const ADestination: TChannelList
+  );
+  var
+    SourceChannel: TChannel;
+  begin
+    ADestination.Clear;
+
+    for SourceChannel in ASource do
+      ADestination.Add(SourceChannel);
+  end;
+
+  procedure ApplySelectedChannels(const AChannels: TChannelList);
+  var
+    J: Integer;
+    SelectedChannel: TChannel;
+  begin
+    // Этот метод вызывается только после успешного поиска.
+    //
+    // До этой точки существующий набор Enabled не изменялся,
+    // поэтому при любой ошибке старый выбор остается сохранен.
+
+    for J := 0 to FEtalonChannels.Count - 1 do
+    begin
+      Channel := FEtalonChannels[J];
+
+      if Channel <> nil then
+        Channel.Enabled := False;
+    end;
+
+    // Включаем только конкретные каналы найденного варианта.
+    //
+    // Для группового выбора здесь не используется повторная проверка
+    // Channel.Group, поэтому случайно не будут включены:
+    //   - каналы без FlowMeter;
+    //   - каналы с некорректным диапазоном;
+    //   - каналы группы, которые не входили в выбранную комбинацию.
+    for SelectedChannel in AChannels do
+      if SelectedChannel <> nil then
+        SelectedChannel.Enabled := True;
+  end;
+
+  procedure EvaluateGroupCombination(
+    const AGroupID: Integer;
+    const ACombination: TChannelList
+  );
+  var
+    CombinationChannel: TChannel;
+    SumMin: Double;
+    SumMax: Double;
+    CombinationCount: Integer;
+    IsBetter: Boolean;
+  begin
+    if ACombination.Count = 0 then
+      Exit;
+
+    SumMin := 0;
+    SumMax := 0;
+
+    // Рассчитываем общий рабочий диапазон конкретной комбинации
+    // параллельно работающих эталонов.
+    for CombinationChannel in ACombination do
+    begin
+      SumMin := SumMin + GetChannelFlowMin(CombinationChannel);
+      SumMax := SumMax + GetChannelFlowMax(CombinationChannel);
+    end;
+
+    // Требуемый расход должен входить в суммарный диапазон комбинации.
+    if (AFlowRate < SumMin) or (AFlowRate > SumMax) then
+      Exit;
+
+    CombinationCount := ACombination.Count;
+
+    // Временные правила выбора лучшей комбинации:
+    //
+    // 1. Первый найденный подходящий вариант.
+    // 2. Минимальный суммарный QMax.
+    // 3. При равном QMax — меньшее количество каналов.
+    // 4. При остальных равных условиях — меньший GroupID.
+    IsBetter :=
+      (BestGroupID = 0) or
+
+      (SumMax < BestGroupMax - FLOW_COMPARE_EPSILON) or
+
+      (SameValue(SumMax, BestGroupMax, FLOW_COMPARE_EPSILON) and
+       (CombinationCount < BestGroupCount)) or
+
+      (SameValue(SumMax, BestGroupMax, FLOW_COMPARE_EPSILON) and
+       (CombinationCount = BestGroupCount) and
+       (AGroupID < BestGroupID));
+
+    if not IsBetter then
+      Exit;
+
+    BestGroupID := AGroupID;
+    BestGroupMax := SumMax;
+    BestGroupCount := CombinationCount;
+
+    // Сохраняем именно конкретную комбинацию каналов.
+    //
+    // Это принципиально важно: позднее нельзя просто включить все каналы
+    // с тем же Group, поскольку часть из них могла не участвовать
+    // в найденном подходящем варианте.
+    CopyChannels(ACombination, SelectedChannels);
+  end;
+
+  procedure EnumerateGroupCombinations(
+    const AGroupID: Integer;
+    const AChannels: TChannelList
+  );
+  var
+    CurrentCombination: TChannelList;
+
+    procedure EnumerateFrom(AStartIndex: Integer);
+    var
+      J: Integer;
+    begin
+      // Каждая непустая текущая комбинация является отдельным кандидатом.
+      if CurrentCombination.Count > 0 then
+        EvaluateGroupCombination(AGroupID, CurrentCombination);
+
+      // Рекурсивно формируем все сочетания без повторений.
+      //
+      // Для каналов A, B, C будут проверены:
+      //   A;
+      //   A+B;
+      //   A+B+C;
+      //   A+C;
+      //   B;
+      //   B+C;
+      //   C.
+      for J := AStartIndex to AChannels.Count - 1 do
+      begin
+        CurrentCombination.Add(AChannels[J]);
+        try
+          EnumerateFrom(J + 1);
+        finally
+          CurrentCombination.Delete(CurrentCombination.Count - 1);
+        end;
+      end;
+    end;
+
+  begin
+    if (AChannels = nil) or (AChannels.Count = 0) then
+      Exit;
+
+    CurrentCombination := TChannelList.Create;
+    try
+      EnumerateFrom(0);
+    finally
+      CurrentCombination.Free;
+    end;
+  end;
+
 begin
-  AError := TErrorInfo.Empty(0);
+  // По умолчанию операция считается неуспешной.
   Result := False;
+
+  // Начальное значение ошибки соответствует отсутствию ошибки
+  // и содержит текущее состояние рабочего стола.
+  AError := TErrorInfo.Empty(Integer(FState));
+
   BestSingle := nil;
+  BestGroupID := 0;
+  BestGroupMax := 0;
+  BestGroupCount := 0;
+  SelectionDescription := '';
 
-  if (FEtalonChannels = nil) or (FEtalonChannels.Count = 0) then
-  begin
-    AError := BuildWorkTableError(1101, 'Список эталонных каналов не создан или пуст');
-    UpdateAggregateMeterValues;
-    Exit;
-  end;
+  SelectedChannels := TChannelList.Create;
 
-  DisableAllEtalons;
-
-  if AFlowRate <= 0 then
-  begin
-    AError := BuildWorkTableError(1102, Format(
-      'Некорректный расход для выбора эталона: %.6f', [AFlowRate]));
-    UpdateAggregateMeterValues;
-    Exit;
-  end;
-
-  for I := 0 to FEtalonChannels.Count - 1 do
-  begin
-    Channel := FEtalonChannels[I];
-
-    if (Channel = nil) or (Channel.FlowMeter = nil) or (Channel.Group > 0) then
-      Continue;
-
-    FlowMin := GetChannelFlowMin(Channel);
-    FlowMax := GetChannelFlowMax(Channel);
-
-    if FlowMax <= 0 then
-      Continue;
-
-    if (AFlowRate >= FlowMin) and (AFlowRate <= FlowMax) then
-      if (BestSingle = nil) or (FlowMax < GetChannelFlowMax(BestSingle)) then
-        BestSingle := Channel;
-  end;
-
-  if BestSingle <> nil then
-  begin
-    BestSingle.Enabled := True;
-    UpdateAggregateMeterValues;
-    FireAction(
-      awtSelectEtalons,
-      'SelectEtalons',
-      Format('Выбран одиночный эталон для расхода %.6f', [AFlowRate])
-    );
-    FireEvent(
-      ewtEtalonsChanged,
-      Format('Изменен набор эталонов. Расход: %.6f', [AFlowRate])
-    );
-    Exit(True);
-  end;
-
-  GroupSumsMin := TDictionary<Integer, Double>.Create;
-  GroupSumsMax := TDictionary<Integer, Double>.Create;
-  GroupCounts := TDictionary<Integer, Integer>.Create;
+  // TObjectDictionary владеет созданными списками каналов и автоматически
+  // освобождает их благодаря doOwnsValues.
+  Groups := TObjectDictionary<Integer, TChannelList>.Create([doOwnsValues]);
   try
+    // Проверяем наличие коллекции эталонных каналов.
+    //
+    // При ошибке существующие значения Channel.Enabled не изменяются.
+    if (FEtalonChannels = nil) or (FEtalonChannels.Count = 0) then
+    begin
+      SetSelectionError(
+        1101,
+        'Список эталонных каналов не создан или пуст'
+      );
+      Exit;
+    end;
+
+    // Неположительный расход не может использоваться для выбора эталона.
+    //
+    // При ошибке текущий выбранный набор также остается без изменений.
+    if AFlowRate <= 0 then
+    begin
+      SetSelectionError(
+        1102,
+        Format(
+          'Некорректный расход для выбора эталона: %.6f',
+          [AFlowRate]
+        )
+      );
+      Exit;
+    end;
+
+    // ------------------------------------------------------------
+    // ЭТАП 1. ПОИСК ЛУЧШЕГО ОДИНОЧНОГО ЭТАЛОНА
+    // ------------------------------------------------------------
+
     for I := 0 to FEtalonChannels.Count - 1 do
     begin
       Channel := FEtalonChannels[I];
 
-      if (Channel = nil) or (Channel.FlowMeter = nil) or (Channel.Group <= 0) then
+      if not IsChannelValidForSelection(Channel) then
         Continue;
 
       FlowMin := GetChannelFlowMin(Channel);
       FlowMax := GetChannelFlowMax(Channel);
 
-      if FlowMax <= 0 then
-        Continue;
-
-      if GroupSumsMin.ContainsKey(Channel.Group) then
-        GroupSumsMin[Channel.Group] := GroupSumsMin[Channel.Group] + FlowMin
-      else
-        GroupSumsMin.Add(Channel.Group, FlowMin);
-
-      if GroupSumsMax.ContainsKey(Channel.Group) then
-        GroupSumsMax[Channel.Group] := GroupSumsMax[Channel.Group] + FlowMax
-      else
-        GroupSumsMax.Add(Channel.Group, FlowMax);
-
-      if GroupCounts.ContainsKey(Channel.Group) then
-        GroupCounts[Channel.Group] := GroupCounts[Channel.Group] + 1
-      else
-        GroupCounts.Add(Channel.Group, 1);
-    end;
-
-    BestGroupID := 0;
-    BestGroupMax := 0;
-    BestGroupCount := 0;
-
-    for Pair in GroupSumsMax do
-    begin
-      GroupID := Pair.Key;
-      SumMax := Pair.Value;
-
-      if not GroupSumsMin.TryGetValue(GroupID, SumMin) then
-        Continue;
-
-      if not GroupCounts.TryGetValue(GroupID, GroupCount) then
-        GroupCount := 0;
-
-      if (AFlowRate < SumMin) or (AFlowRate > SumMax) then
-        Continue;
-
-      if (BestGroupID = 0) or
-         (SumMax < BestGroupMax) or
-         (SameValue(SumMax, BestGroupMax) and (GroupCount < BestGroupCount)) or
-         (SameValue(SumMax, BestGroupMax) and (GroupCount = BestGroupCount) and (GroupID < BestGroupID)) then
+      // Каждый канал рассматривается как одиночный эталон
+      // независимо от значения Channel.Group.
+      //
+      // Group означает возможность совместной параллельной работы,
+      // но не запрещает использовать канал отдельно.
+      if (AFlowRate >= FlowMin) and (AFlowRate <= FlowMax) then
       begin
-        BestGroupID := GroupID;
-        BestGroupMax := SumMax;
-        BestGroupCount := GroupCount;
+        // Пока используется простая эвристика:
+        // выбирается подходящий эталон с минимальным QMaxWork.
+        //
+        // В будущем это сравнение необходимо заменить вызовом отдельной
+        // функции оценки метрологической пригодности эталона.
+        if (BestSingle = nil) or
+           (FlowMax < GetChannelFlowMax(BestSingle)) then
+          BestSingle := Channel;
+      end;
+
+      // Одновременно собираем корректные каналы групп.
+      //
+      // В групповой поиск включаются только те каналы, которые прошли
+      // IsChannelValidForSelection.
+      if Channel.Group > 0 then
+      begin
+        if not Groups.TryGetValue(Channel.Group, GroupChannels) then
+        begin
+          GroupChannels := TChannelList.Create;
+          Groups.Add(Channel.Group, GroupChannels);
+        end;
+
+        GroupChannels.Add(Channel);
       end;
     end;
 
-    if BestGroupID > 0 then
+    if BestSingle <> nil then
     begin
-      for I := 0 to FEtalonChannels.Count - 1 do
-      begin
-        Channel := FEtalonChannels[I];
-        if (Channel <> nil) and (Channel.Group = BestGroupID) then
-          Channel.Enabled := True;
-      end;
+      // Для одиночного выбора итоговый набор состоит из одного канала.
+      SelectedChannels.Add(BestSingle);
 
-      UpdateAggregateMeterValues;
-      FireAction(
-        awtSelectEtalons,
-        'SelectEtalons',
-        Format('Выбрана группа эталонов %d для расхода %.6f', [BestGroupID, AFlowRate])
+      SelectionDescription := Format(
+        'Выполнен предварительный выбор одиночного эталона для расхода %.6f',
+        [AFlowRate]
       );
-      FireEvent(
-        ewtEtalonsChanged,
-        Format('Изменен набор эталонов. Выбрана группа %d. Расход: %.6f',
-          [BestGroupID, AFlowRate])
-      );
-      Exit(True);
+    end
+    else
+    begin
+      // ----------------------------------------------------------
+      // ЭТАП 2. ПОИСК ЛУЧШЕЙ КОМБИНАЦИИ КАНАЛОВ ВНУТРИ ГРУПП
+      // ----------------------------------------------------------
+
+      for GroupPair in Groups do
+        EnumerateGroupCombinations(
+          GroupPair.Key,
+          GroupPair.Value
+        );
+
+      if SelectedChannels.Count > 0 then
+      begin
+        SelectionDescription := Format(
+          'Выполнен предварительный выбор группы %d: каналов %d, ' +
+          'суммарный QMax %.6f, требуемый расход %.6f',
+          [
+            BestGroupID,
+            BestGroupCount,
+            BestGroupMax,
+            AFlowRate
+          ]
+        );
+      end;
     end;
+
+    // Если ни одиночный эталон, ни групповая комбинация не найдены,
+    // возвращаем ошибку и не меняем текущий набор Enabled.
+    if SelectedChannels.Count = 0 then
+    begin
+      SetSelectionError(
+        1103,
+        Format(
+          'Эталон или комбинация эталонов для расхода %.6f не найдены',
+          [AFlowRate]
+        )
+      );
+      Exit;
+    end;
+
+    // ------------------------------------------------------------
+    // ЭТАП 3. АТОМАРНОЕ ПРИМЕНЕНИЕ НАЙДЕННОГО РЕЗУЛЬТАТА
+    // ------------------------------------------------------------
+
+    // Только теперь, после успешного завершения поиска, изменяем
+    // Channel.Enabled.
+    ApplySelectedChannels(SelectedChannels);
+
+    // Агрегированные параметры рабочего стола должны быть рассчитаны
+    // уже по новому предварительно выбранному набору эталонов.
+    UpdateAggregateMeterValues;
+
+    // Единая точка продолжения алгоритма для любого способа выбора:
+    //   - одиночного эталона;
+    //   - комбинации каналов группы.
+    //
+    // Обработчик awtSelectEtalons может скорректировать предварительный
+    // выбор на основании гидравлической схемы.
+    //
+    // Отдельный FireEvent здесь не вызывается. Предполагается, что
+    // FireAction для awtSelectEtalons после обработки формирует
+    // ewtEtalonsChanged.
+    FireAction(
+      awtSelectEtalons,
+      'SelectEtalons',
+      SelectionDescription
+    );
+
+    Result := True;
   finally
-    GroupCounts.Free;
-    GroupSumsMax.Free;
-    GroupSumsMin.Free;
+    Groups.Free;
+    SelectedChannels.Free;
   end;
-
-  UpdateAggregateMeterValues;
-  AError := BuildWorkTableError(1103, Format(
-    'Эталон или группа эталонов для расхода %.6f не найдены', [AFlowRate]));
 end;
+
+
 
 function TWorkTable.SetEtalonsByNames(const AEtalonNames: TArray<string>;
   out AError: TErrorInfo): Boolean;
@@ -4876,10 +5099,9 @@ end;
 
 procedure TWorkTable.DoStartMonitor;
 begin
-  ResetMeasurementValues;
+
  // SetState(swtSTARTMONITOR);
-  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
-    'Подготовка к запуску монитра. Очищены данные', Name);
+
 end;
 
 procedure TWorkTable.DoStopMonitor;
@@ -5232,7 +5454,9 @@ end;
 
 procedure TWorkTable.StartMonitor;
 begin
-  DoStartMonitor;
+  ResetMeasurementValues;
+  ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoStartMonitor',
+    'Подготовка к запуску монитра. Очищены данные', Name);
   FireAction(awtStartMonitor, 'StartMonitor', 'Действие: запуск монитора');
 end;
 

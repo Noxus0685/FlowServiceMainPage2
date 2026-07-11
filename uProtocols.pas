@@ -25,7 +25,8 @@ type
     pcMKS,
     pcInfo,
     pcWarning,
-    pcError
+    pcError,
+    pcWorkLog
   );
 
   TProtocolSource = (
@@ -33,7 +34,8 @@ type
     psForm,
     psParameters,
     psWorkTable,
-    psMeasurement
+    psMeasurement,
+    psEngine
   );
 
   TProtocolMessage = class

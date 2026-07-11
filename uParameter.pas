@@ -95,9 +95,9 @@ TParameter = class(TObservableObject)
     FMin: Double;
 
     /// <summary>Current measured value; owns stability settings and signal history used by IsStable.</summary>
-    FValue: TMeterValue;  // òåêóùàÿ
+    FValue: TMeterValue;
     /// <summary>Target/setpoint value; does not own stability settings.</summary>
-    FValueSet: TMeterValue;   //óñòàíîâëåííàÿ
+    FValueSet: TMeterValue;
     /// <summary>Legacy lower/previous setup value kept for existing callers; not used for stability decisions.</summary>
     FBefore: Double;
     /// <summary>Legacy upper/next setup value kept for existing callers; not used for stability decisions.</summary>
@@ -662,9 +662,9 @@ begin
   AStableInfo.ForecastValue := SignalInfo.ForecastValue;
   AStableInfo.TargetValue := FValueSet.Value;
 
-  PlusTolerance := Max(Settings.TargetToleranceAbsolute,
+  PlusTolerance := System.Math.Max(Settings.TargetToleranceAbsolute,
     Abs(AStableInfo.TargetValue) * Settings.TargetAccuracyPlusPercent / 100.0);
-  MinusTolerance := Max(Settings.TargetToleranceAbsolute,
+  MinusTolerance := System.Math.Max(Settings.TargetToleranceAbsolute,
     Abs(AStableInfo.TargetValue) * Settings.TargetAccuracyMinusPercent / 100.0);
   AStableInfo.LowerLimit := AStableInfo.TargetValue - MinusTolerance;
   AStableInfo.UpperLimit := AStableInfo.TargetValue + PlusTolerance;
@@ -850,7 +850,7 @@ var
 begin
   EnsureMeterValues;
   Settings := FValue.StabilitySettings;
-  Settings.TargetAccuracyPlusPercent := Max(0.0, AValue);
+  Settings.TargetAccuracyPlusPercent := System.Math.Max(0.0, AValue);
   FValue.StabilitySettings := Settings;
 end;
 
@@ -866,7 +866,7 @@ var
 begin
   EnsureMeterValues;
   Settings := FValue.StabilitySettings;
-  Settings.TargetAccuracyMinusPercent := Max(0.0, AValue);
+  Settings.TargetAccuracyMinusPercent := System.Math.Max(0.0, AValue);
   FValue.StabilitySettings := Settings;
 end;
 
@@ -883,7 +883,7 @@ begin
   EnsureMeterValues;
   // DeltaValue is a deprecated compatibility name for the stability variation limit.
   Settings := FValue.StabilitySettings;
-  Settings.MaxVariation := Max(0.0, AValue);
+  Settings.MaxVariation := System.Math.Max(0.0, AValue);
   FValue.StabilitySettings := Settings;
 end;
 

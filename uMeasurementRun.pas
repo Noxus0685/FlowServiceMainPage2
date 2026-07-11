@@ -794,48 +794,168 @@ begin
  // Notify(Integer(mePointChanged), Point);
 end;
 
+
+/// <summary>
+/// Выполняет действия при входе в состояние выбора очередной точки измерения
+/// <c>msSelectPoint</c>.
+/// </summary>
+/// <remarks>
+/// Процедура определяет индекс точки, которая должна стать текущей, пытается
+/// загрузить её в <c>FWorkTable.CurrentPoint</c> через <c>SetPoint</c>,
+/// обновляет статус точки.
+///
+/// Возможны два варианта выбора точки:
+///
+/// 1. Обычный последовательный переход — выбирается следующая точка списка.
+/// 2. Принудительный переход — используется индекс из <c>FForceNextPoint</c>.
+///
+/// После успешного выбора точки машина состояний переходит:
+///
+/// - в <c>msSelectEtalon</c>, если для точки требуется автоматический выбор
+///   эталонных средств измерения;
+/// - в <c>msSetupPoint</c>, если выбор эталона не требуется.
+///
+/// Если все точки уже обработаны, измерительный цикл завершается переходом
+/// в <c>msDone</c>.
+///
+/// Если выбранная точка некорректна или её невозможно применить, точке
+/// назначается статус <c>mptsInvalidPoint</c>, формируется событие
+/// <c>mePointInvalid</c>, после чего измерительный цикл завершается.
+/// </remarks>
 procedure TMeasurementRun.EnterSelectPoint;
 var
+  // Содержит подробную информацию об ошибке, если SetPoint не сможет
+  // выбрать, проверить или применить указанную точку измерения.
   Error: TErrorInfo;
 begin
+  // Начинаем обработку новой точки с нулевого номера попытки.
+  //
+  // FAttempt обычно используется стадиями ожидания или выполнения команд
+  // для подсчёта повторных попыток. При переходе к новой точке значение,
+  // оставшееся от предыдущей точки, использовать нельзя.
   FAttempt := 0;
 
+  // Определяем индекс точки, которую необходимо выбрать.
+  //
+  // Если FForceNextPoint содержит неотрицательное значение, ранее был
+  // запрошен принудительный переход к конкретной точке. Например, такой
+  // механизм может использоваться командами перехода к предыдущей или
+  // следующей точке, повторного измерения либо ручного выбора точки.
   if FForceNextPoint >= 0 then
     FCurrentPointIndex := FForceNextPoint
   else
+    // При обычном автоматическом проходе переходим к следующей точке списка.
+    //
+    // Важно: предполагается, что до первого входа в EnterSelectPoint
+    // FCurrentPointIndex имеет значение -1. Тогда первый вызов Inc установит
+    // индекс первой точки равным 0.
     Inc(FCurrentPointIndex);
+
+  // Принудительный индекс является одноразовой командой.
+  //
+  // После его использования обязательно сбрасываем значение, чтобы при
+  // следующем входе в msSelectPoint продолжился обычный последовательный
+  // обход точек.
   FForceNextPoint := -1;
 
+  // Проверяем, существует ли точка с рассчитанным индексом.
+  //
+  // Если индекс равен количеству точек или превышает его, значит все точки
+  // списка уже обработаны и продолжать измерительный цикл больше не нужно.
   if FCurrentPointIndex >= FPoints.Count then
   begin
+    // Переводим машину состояний в конечное состояние.
+    //
+    // Все завершающие действия должны выполняться обработчиком входа
+    // в msDone, а не непосредственно в EnterSelectPoint.
     SetStage(msDone);
     Exit;
   end;
 
+  // Пытаемся выбрать точку с рассчитанным индексом и применить её как
+  // текущую точку измерения.
+  //
+  // SetPoint должен:
+  // - получить точку из FPoints;
+  // - проверить корректность индекса и самой точки;
+  // - назначить текущую точку рабочему столу;
+  // - подготовить необходимые данные текущего измерения;
+  // - заполнить Error при невозможности выбора точки.
   if SetPoint(FCurrentPointIndex, Error) then
   begin
-
+    // Точка успешно выбрана.
+    //
+    // Устанавливаем ей статус, соответствующий стадии выбора точки.
+    // Статус используется для отображения текущего положения точки
+    // в таблице и для последующего анализа результата измерения.
     SetCurrentPointStatus(mptsSelectPoint);
+
+    // После вызова SetPoint могла поступить команда принудительной остановки.
+    //
+    // Проверка выполняется до протоколирования выбора точки и до перехода
+    // на следующую стадию, чтобы не запускать новые действия после Stop.
+    //
+    // Предполагается, что сама обработка запроса остановки уже определила
+    // необходимую следующую стадию машины состояний.
     if IsStopRequested then
       Exit;
 
-    ProtocolManager.AddMessage(pcAction, psMeasurement, 'PointSelected',
-      'Выбрана точка измерения', BuildPointSelectionLog(GetCurrentPoint));
+    // Записываем в протокол факт успешного выбора точки.
+    //
+    // BuildPointSelectionLog формирует подробные данные о точке:
+    // индекс, расход, ограничения, параметры среды и другие значения,
+    // необходимые для диагностики процесса измерения.
+    ProtocolManager.AddMessage(
+      pcAction,
+      psMeasurement,
+      'PointSelected',
+      'Выбрана точка измерения',
+      BuildPointSelectionLog(GetCurrentPoint)
+    );
+
+    // Уведомляем подписчиков о том, что очередная точка успешно выбрана.
+    //
+    // Событие может использоваться для:
+    // - обновления пользовательского интерфейса;
+    // - отображения текущей точки;
+    // - обновления таблицы результатов;
+    // - дополнительного протоколирования.
     FireEvent(mePointSelected);
+
+    // Определяем следующий этап подготовки измерения.
+    //
+    // Если текущий режим и параметры точки требуют автоматического выбора
+    // эталонных расходомеров, сначала переходим в msSelectEtalon.
     if ShouldSelectEtalon then
       SetStage(msSelectEtalon)
     else
+      // Если эталон уже выбран, выбор эталона запрещён текущим режимом
+      // либо не требуется для данной точки, сразу переходим к настройке
+      // параметров точки.
       SetStage(msSetupPoint);
   end
   else
   begin
-
+    // Выбрать или применить точку не удалось.
+    //
+    // Назначаем точке статус некорректной. Этот статус должен быть отражён
+    // в интерфейсе, например соответствующим цветом строки или ячейки.
     SetCurrentPointStatus(mptsInvalidPoint);
 
+    // Передаём подписчикам событие о некорректной точке вместе с подробной
+    // информацией об ошибке, сформированной внутри SetPoint.
     FireEvent(mePointInvalid, Error);
+
+    // Текущая реализация считает ошибку выбора точки критической
+    // для всего измерительного запуска.
+    //
+    // Поэтому после первой некорректной точки дальнейшие точки не
+    // обрабатываются, а машина состояний переходит в msDone.
     SetStage(msDone);
   end;
 end;
+
+
 
 procedure TMeasurementRun.EnterSelectEtalon;
 var
@@ -1485,8 +1605,8 @@ begin
   FThread.Start;
 
 
-    if not FStopRequested then
-      FireEvent(meStarted);
+   // if not FStopRequested then
+   //   FireEvent(meStarted);
   finally
     FCriticalSection.Release;
   end;
@@ -1730,21 +1850,38 @@ begin
 end;
 
 procedure TMeasurementRun.RunThreadProc;
+
+procedure InitializeRunStage;
+var
+  InitialStage: EMeasurementState;
 begin
+  case FMode of
+    mrmAutomatic:
+      InitialStage := msSelectPoint;
+
+    mrmManual,
+    mrmHalfAutomatic:
+      InitialStage := msSetupPoint;
+  else
+    raise Exception.CreateFmt(
+      'Unsupported measurement mode: %d',
+      [Ord(FMode)]
+    );
+  end;
+
+  FireEvent(meStarted);
+  SetStage(InitialStage);
+
+end;
+
+
+begin
+
+  InitializeRunStage;
+
   while not TThread.CurrentThread.CheckTerminated do
   begin
     try
-      if FCurrentStage = msNone then
-      begin
-        case FMode of
-          mrmManual:
-            SetStage(msSetupPoint);
-          mrmHalfAutomatic,
-          mrmAutomatic:
-            SetStage(msSelectPoint);
-        end;
-      end;
-
       RouteStopInWorker;
 
       if FIsPaused then
@@ -2002,7 +2139,7 @@ end;
 
 procedure TMeasurementRun.ProcessWaitStable;
 const
-  DEFAULT_STABLE_TIMEOUT_MS = 30000;
+  DEFAULT_STABLE_TIMEOUT_S = 30000;
 var
   Point: TDevicePoint;
   StableInfo: RStableInfo;
@@ -2028,7 +2165,7 @@ begin
     Exit;
   end;
 
-  if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STABLE_TIMEOUT_MS then
+  if ((TThread.GetTickCount64 - FWaitStartedTick)/1000) > DEFAULT_STABLE_TIMEOUT_S then
   begin
     Inc(FAttempt);
     if FAttempt < FMaxAttemptCount then
