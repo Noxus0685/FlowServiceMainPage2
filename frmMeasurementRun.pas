@@ -376,7 +376,10 @@ var
   Device: TDevice;
   NewEnabled: Boolean;
   DevicePoint: TDevicePoint;
+  SourcePoint: TDevicePoint;
 begin
+  Repo := nil;
+  Device := nil;
   if (MeasurementRun = nil) or (MeasurementRun.Points = nil) then
     Exit;
 
@@ -394,32 +397,34 @@ begin
   if Point.Enabled = NewEnabled then
     Exit;
 
-  Point.Enabled := NewEnabled;
-  if Point.State = osClean then
-    Point.State := osModified;
-
-  if (DataManager <> nil) and (Trim(Point.DeviceUUID) <> '') then
+  SourcePoint := nil;
+  if (DataManager <> nil) and (Trim(Point.DeviceUUID) <> '') and (Trim(Point.UUID) <> '') then
   begin
     Device := DataManager.FindDevice(Point.DeviceUUID, Repo);
-    if Device <> nil then
+    if (Device <> nil) and (Device.Points <> nil) then
+      for DevicePoint in Device.Points do
+        if (DevicePoint <> nil) and SameText(DevicePoint.UUID, Point.UUID) then
+        begin
+          SourcePoint := DevicePoint;
+          Break;
+        end;
+
+    if SourcePoint <> nil then
     begin
+      SourcePoint.Enabled := NewEnabled;
+      SourcePoint.State := osModified;
       Device.State := osModified;
-      if Device.Points <> nil then
-        for DevicePoint in Device.Points do
-          if (DevicePoint <> nil) and (DevicePoint.ID = Point.ID) then
-          begin
-            DevicePoint.Enabled := NewEnabled;
-            if DevicePoint.State = osClean then
-              DevicePoint.State := osModified;
-            Break;
-          end;
+      if Repo <> nil then
+        Repo.State := osModified;
+
+      DataManager.Save;
+      Point.Enabled := SourcePoint.Enabled;
+      if Point.State = osClean then
+        Point.State := osModified;
     end;
-    if Repo <> nil then
-      Repo.State := osModified;
-    DataManager.Save;
   end;
 
-  GridMeasurmentRun.Repaint;
+  UpdateGridMesurmentRun;
 end;
 
 procedure TFrameMeasurementRun.UpdateUI;
