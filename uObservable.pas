@@ -151,7 +151,7 @@ begin
         Observer := LocalObservers[I];
         if Observer <> nil then
           Observer.OnNotify(Self, Event, Data);
-      end;
+       end;
     end);
 end;
 
