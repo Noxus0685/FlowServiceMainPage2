@@ -821,11 +821,11 @@ begin
     FPopupMenuGridDiametersHeader.Items[0].Free;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-  MenuItem.Action := FActionGridDiametersDelete;
+  MenuItem.Action := FActionGridDiametersCopy;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-  MenuItem.Action := FActionGridDiametersCopy;
+  MenuItem.Action := FActionGridDiametersPaste;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
@@ -833,7 +833,7 @@ begin
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridDiametersHeader);
-  MenuItem.Action := FActionGridDiametersPaste;
+  MenuItem.Action := FActionGridDiametersDelete;
   MenuItem.Parent := FPopupMenuGridDiametersHeader;
 
   FMenuItemGridDiametersConvertUnits := TMenuItem.Create(FPopupMenuGridDiametersHeader);
@@ -887,16 +887,16 @@ begin
     FPopupMenuGridPoints.Items[0].Free;
 
   MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
-  MenuItem.Action := FActionGridPointsDelete;
+  MenuItem.Action := FActionGridPointsCopy;
   MenuItem.Parent := FPopupMenuGridPoints;
   MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
-  MenuItem.Action := FActionGridPointsCopy;
+  MenuItem.Action := FActionGridPointsPaste;
   MenuItem.Parent := FPopupMenuGridPoints;
   MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
   MenuItem.Action := FActionGridPointsCut;
   MenuItem.Parent := FPopupMenuGridPoints;
   MenuItem := TMenuItem.Create(FPopupMenuGridPoints);
-  MenuItem.Action := FActionGridPointsPaste;
+  MenuItem.Action := FActionGridPointsDelete;
   MenuItem.Parent := FPopupMenuGridPoints;
 
   FMenuItemGridPointsDisplay := TMenuItem.Create(FPopupMenuGridPoints);
