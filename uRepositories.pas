@@ -28,6 +28,7 @@ uses
   System.Classes,
   System.DateUtils,
   System.Generics.Collections,
+  System.IOUtils,
   System.StrUtils,
   System.SysUtils,
   uBaseProcedures,
@@ -380,6 +381,7 @@ implementation
 
 uses
   uWorkTable,
+  uMKSDebug,
   uProtocols;
 
 {$REGION 'Helpers'}
@@ -387,6 +389,34 @@ function Col(const AName, ASqlType: string): TTableColumn;
 begin
   Result.Name := AName;
   Result.SqlType := ASqlType;
+end;
+
+procedure AppendRepoDebugLog(const AMessage: string);
+var
+  LogFile: string;
+  Line: string;
+begin
+  try
+    LogFile := TPath.Combine(TPath.GetTempPath, 'FlowService_DevicePoint_Debug.log');
+    Line := FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now) + ' | ' + AMessage + sLineBreak;
+    TFile.AppendAllText(LogFile, Line, TEncoding.UTF8);
+  except
+    { no-op: debug logging must never break save flow }
+  end;
+end;
+
+function ObjectStateToLogText(AState: TObjectState): string;
+begin
+  case AState of
+    osEmpty: Result := 'osEmpty';
+    osLoading: Result := 'osLoading';
+    osClean: Result := 'osClean';
+    osNew: Result := 'osNew';
+    osModified: Result := 'osModified';
+    osDeleted: Result := 'osDeleted';
+  else
+    Result := IntToStr(Ord(AState));
+  end;
 end;
 
  procedure SetIntParam(Q: TFDQuery; const AName: string; const AValue: Integer);
@@ -1750,11 +1780,26 @@ var
   OwnsTransaction: Boolean;
   SavedDimensionCoef: Integer;
   StoredCoef: Double;
+  DiametersCount: Integer;
+  PointsCount: Integer;
 begin
   Result := False;
 
   if (AType = nil) or (FDM = nil) then
     Exit;
+
+  DiametersCount := 0;
+  if AType.Diameters <> nil then
+    DiametersCount := AType.Diameters.Count;
+
+  PointsCount := 0;
+  if AType.Points <> nil then
+    PointsCount := AType.Points.Count;
+
+  AppendRepoDebugLog(Format(
+    'Type save: ID=%d UUID=%s State=%s(%d) Diameters.Count=%d Points.Count=%d',
+    [AType.ID, AType.UUID, ObjectStateToLogText(AType.State), Ord(AType.State), DiametersCount, PointsCount]
+  ));
 
   if AType.State = osClean then
     Exit(True);
@@ -1777,6 +1822,10 @@ begin
         Q.Open;
         if not Q.Eof then
         begin
+          AppendRepoDebugLog(Format(
+            'ERROR Type save: INSERT blocked because UUID already exists. ID=%d UUID=%s State=%s(%d) ExistingID=%d',
+            [AType.ID, AType.UUID, ObjectStateToLogText(AType.State), Ord(AType.State), Q.FieldByName('ID').AsInteger]
+          ));
           raise Exception.CreateFmt(
             'Тип с UUID %s уже существует (ID=%d). INSERT для такого UUID запрещён.',
             [AType.UUID, Q.FieldByName('ID').AsInteger]
@@ -1941,6 +1990,10 @@ begin
 
     if (AType.State = osModified) and (Q.RowsAffected = 0) then
     begin
+      AppendRepoDebugLog(Format(
+        'ERROR Type save: UPDATE affected 0 rows for modified type. INSERT blocked. ID=%d UUID=%s State=%s(%d)',
+        [AType.ID, AType.UUID, ObjectStateToLogText(AType.State), Ord(AType.State)]
+      ));
       raise Exception.CreateFmt(
         'Не найдена существующая запись типа для обновления (ID=%d, UUID=%s). INSERT для osModified запрещён.',
         [AType.ID, AType.UUID]
@@ -1995,6 +2048,10 @@ begin
     SetIntParam(Q, 'ID', AType.ID);
     Q.ExecSQL;
 
+    AppendRepoDebugLog(Format(
+      'DELETE DeviceType: ID=%d UUID=%s Name=%s | QueryDB=%s',
+      [AType.ID, AType.UUID, AType.Name, Q.Connection.Params.Database]
+    ));
 
     Result := True;
   finally
@@ -2303,9 +2360,17 @@ begin
           SetIntParam(Q, 'ID', ADiameter.ID);
           SetStrParam(Q, 'DeviceTypeUUID', ADiameter.DeviceTypeUUID);
 
+          AppendRepoDebugLog(Format(
+            'DELETE TRY #1 DeviceDiameter: ID=%d DeviceTypeUUID=%s | DMFile=%s | QueryDB=%s',
+            [ADiameter.ID, ADiameter.DeviceTypeUUID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
+          ));
 
           Q.ExecSQL;
 
+          AppendRepoDebugLog(Format(
+            'DELETE RES #1 DeviceDiameter: ID=%d DeviceTypeUUID=%s RowsAffected=%d',
+            [ADiameter.ID, ADiameter.DeviceTypeUUID, Q.RowsAffected]
+          ));
 
           if Q.RowsAffected = 0 then
           begin
@@ -2313,9 +2378,17 @@ begin
               'delete from DeviceDiameter where UUID = :UUID';
             SetStrParam(Q, 'UUID', ADiameter.UUID);
 
+            AppendRepoDebugLog(Format(
+              'DELETE TRY #2 DeviceDiameter (fallback by UUID): UUID=%s',
+              [ADiameter.UUID]
+            ));
 
             Q.ExecSQL;
 
+            AppendRepoDebugLog(Format(
+              'DELETE RES #2 DeviceDiameter (fallback by ID): UUID=%s RowsAffected=%d',
+              [ADiameter.UUID, Q.RowsAffected]
+            ));
           end;
 
           Exit(True);
@@ -2448,6 +2521,10 @@ begin
 
     SetStrParam(Q, 'DeviceTypeUUID', AType.UUID);
 
+    AppendRepoDebugLog(Format(
+      'SYNC DeviceDiameter: DeviceTypeUUID=%s KeepIDs=%s | QueryDB=%s',
+      [AType.UUID, KeepIDs, Q.Connection.Params.Database]
+    ));
 
     Q.ExecSQL;
   finally
@@ -2697,6 +2774,10 @@ begin
 
     SetIntParam(Q, 'DeviceTypeID', AType.ID);
 
+    AppendRepoDebugLog(Format(
+      'SYNC DeviceTypePoint: DeviceTypeID=%d KeepIDs=%s | QueryDB=%s',
+      [AType.ID, KeepIDs, Q.Connection.Params.Database]
+    ));
 
     Q.ExecSQL;
   finally
@@ -2742,9 +2823,17 @@ begin
           SetIntParam(Q, 'ID', APoint.ID);
           SetStrParam(Q, 'DeviceTypeUUID', APoint.DeviceTypeUUID);
 
+          AppendRepoDebugLog(Format(
+            'DELETE TRY #1 DeviceTypePoint: ID=%d DeviceTypeUUID=%s | DMFile=%s | QueryDB=%s',
+            [APoint.ID, APoint.DeviceTypeUUID, FDM.GetDatabaseFileName, Q.Connection.Params.Database]
+          ));
 
           Q.ExecSQL;
 
+          AppendRepoDebugLog(Format(
+            'DELETE RES #1 DeviceTypePoint: ID=%d DeviceTypeUUID=%s RowsAffected=%d',
+            [APoint.ID, APoint.DeviceTypeUUID, Q.RowsAffected]
+          ));
 
           if Q.RowsAffected = 0 then
           begin
@@ -2752,9 +2841,17 @@ begin
               'delete from DeviceTypePoint where ID = :ID';
             SetIntParam(Q, 'ID', APoint.ID);
 
+            AppendRepoDebugLog(Format(
+              'DELETE TRY #2 DeviceTypePoint (fallback by ID): ID=%d',
+              [APoint.ID]
+            ));
 
             Q.ExecSQL;
 
+            AppendRepoDebugLog(Format(
+              'DELETE RES #2 DeviceTypePoint (fallback by ID): ID=%d RowsAffected=%d',
+              [APoint.ID, Q.RowsAffected]
+            ));
           end;
 
           Exit(True);
