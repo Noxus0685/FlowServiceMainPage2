@@ -4734,10 +4734,6 @@ begin
   if WorkTable = nil then
     Exit;
 
-  if (WorkTableManager <> nil) and
-     (WorkTable.State in [swtMONITOR, swtEXECUTE]) then
-    WorkTableManager.UpdateSignalSimulation(WorkTable);
-
   // Основные MeterValues рабочего стола.
    WorkTable.SetTemperature(WorkTable.FluidTemp.BeforeValue, WorkTable.FluidTemp.AfterValue);
   WorkTable.ValueTempertureBefore.SetValue(WorkTable.FluidTemp.BeforeValue);
