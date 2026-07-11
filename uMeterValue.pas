@@ -927,7 +927,7 @@ begin
         else Inc(AInfo.OutlierCount);
     end;
   end;
-if N > 0 then
+if N > 0 then   //!!!
   AInfo.OutlierFraction := AInfo.OutlierCount / Double(N)
 else
   AInfo.OutlierFraction := 0.0;
