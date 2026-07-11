@@ -319,6 +319,14 @@ type
     procedure sbRepeatsChange(Sender: TObject);
     procedure GridPointsKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char;
       Shift: TShiftState);
+    procedure GridPointsMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Single);
+    procedure GridPointsHeaderMenuItemClick(Sender: TObject);
+    procedure GridPointsMenuDeleteClick(Sender: TObject);
+    procedure GridPointsMenuCopyClick(Sender: TObject);
+    procedure GridPointsMenuPasteClick(Sender: TObject);
+    procedure GridPointsMenuCutClick(Sender: TObject);
+    procedure SyncGridPointsHeaderPopupMenu;
 
 
   private
@@ -343,6 +351,9 @@ type
      FButtonCoefClear: TButton;
      FCoefsTabInitialized: Boolean;
      FSkipPointDeleteConfirm: Boolean;
+     FPopupMenuGridPointsHeader: TPopupMenu;
+     FMenuItemGridPointsDisplay: TMenuItem;
+     FClipboardPoint: TDevicePoint;
      FPointSortColumn: Integer;
      FPointSortAscending: Boolean;
 
@@ -385,6 +396,7 @@ type
      function GetPointByVisibleRow(ARow: Integer): TDevicePoint;
      procedure UpdateQmaxQmin;
      procedure SortPoints;
+     procedure CreateGridPointsHeaderMenu;
 
      procedure InitCoefsTab;
      procedure EnsureCalibrCoefTable;
@@ -1180,6 +1192,7 @@ procedure TFormDeviceEditor.FormClose(Sender: TObject;
 begin
       FreeAndNil(FDevice);      // уничтожаем клон
       FreeAndNil(FLoadedDeviceSnapshot);
+      FreeAndNil(FClipboardPoint);
       FOriginalDevice := nil;
 end;
 
@@ -1715,6 +1728,185 @@ begin
   SetModified;
 end;
 
+
+procedure TFormDeviceEditor.CreateGridPointsHeaderMenu;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+begin
+  if FPopupMenuGridPointsHeader = nil then
+  begin
+    FPopupMenuGridPointsHeader := TPopupMenu.Create(Self);
+    FPopupMenuGridPointsHeader.Stored := False;
+  end;
+
+  while FPopupMenuGridPointsHeader.ItemsCount > 0 do
+    FPopupMenuGridPointsHeader.Items[0].Free;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Копировать';
+  MenuItem.OnClick := GridPointsMenuCopyClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Вставить';
+  MenuItem.OnClick := GridPointsMenuPasteClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Вырезать';
+  MenuItem.OnClick := GridPointsMenuCutClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  MenuItem.Text := 'Удалить';
+  MenuItem.OnClick := GridPointsMenuDeleteClick;
+  MenuItem.Parent := FPopupMenuGridPointsHeader;
+
+  FMenuItemGridPointsDisplay := TMenuItem.Create(FPopupMenuGridPointsHeader);
+  FMenuItemGridPointsDisplay.Text := 'Отображение';
+  FMenuItemGridPointsDisplay.Parent := FPopupMenuGridPointsHeader;
+  GridPoints.OnMouseDown := GridPointsMouseDown;
+
+  for I := 0 to GridPoints.ColumnCount - 1 do
+  begin
+    MenuItem := TMenuItem.Create(FPopupMenuGridPointsHeader);
+    if GridPoints.Columns[I].Header <> '' then
+      MenuItem.Text := GridPoints.Columns[I].Header
+    else
+      MenuItem.Text := GridPoints.Columns[I].Name;
+    MenuItem.Tag := I;
+    MenuItem.AutoCheck := False;
+    MenuItem.OnClick := GridPointsHeaderMenuItemClick;
+    MenuItem.Parent := FMenuItemGridPointsDisplay;
+
+    GridPoints.Columns[I].OnMouseDown := GridPointsMouseDown;
+  end;
+end;
+
+procedure TFormDeviceEditor.SyncGridPointsHeaderPopupMenu;
+var
+  I: Integer;
+  MenuItem: TMenuItem;
+  ColIndex: Integer;
+begin
+  if (FPopupMenuGridPointsHeader = nil) or (FMenuItemGridPointsDisplay = nil) then
+    Exit;
+
+  for I := 0 to FMenuItemGridPointsDisplay.ItemsCount - 1 do
+  begin
+    if not (FMenuItemGridPointsDisplay.Items[I] is TMenuItem) then
+      Continue;
+
+    MenuItem := TMenuItem(FMenuItemGridPointsDisplay.Items[I]);
+    ColIndex := MenuItem.Tag;
+
+    if (ColIndex >= 0) and (ColIndex < GridPoints.ColumnCount) then
+    begin
+      MenuItem.Enabled := True;
+      MenuItem.IsChecked := GridPoints.Columns[ColIndex].Visible;
+    end
+    else
+    begin
+      MenuItem.Enabled := False;
+      MenuItem.IsChecked := False;
+    end;
+  end;
+end;
+
+
+procedure TFormDeviceEditor.GridPointsMenuDeleteClick(Sender: TObject);
+begin
+  ButtonPointDeleteClick(ButtonPointDelete);
+end;
+
+procedure TFormDeviceEditor.GridPointsMenuCopyClick(Sender: TObject);
+var
+  Point: TDevicePoint;
+begin
+  Point := GetSelectedPoint;
+  if Point = nil then
+    Exit;
+
+  FreeAndNil(FClipboardPoint);
+  FClipboardPoint := TDevicePoint.Create(Point.DeviceID);
+  FClipboardPoint.Assign(Point, True);
+end;
+
+
+procedure TFormDeviceEditor.GridPointsMenuCutClick(Sender: TObject);
+var
+  PrevSkipConfirm: Boolean;
+begin
+  GridPointsMenuCopyClick(Sender);
+  if FClipboardPoint = nil then
+    Exit;
+
+  PrevSkipConfirm := FSkipPointDeleteConfirm;
+  FSkipPointDeleteConfirm := True;
+  try
+    GridPointsMenuDeleteClick(Sender);
+  finally
+    FSkipPointDeleteConfirm := PrevSkipConfirm;
+  end;
+end;
+
+procedure TFormDeviceEditor.GridPointsMenuPasteClick(Sender: TObject);
+var
+  NewPoint: TDevicePoint;
+begin
+  if (FDevice = nil) or (FClipboardPoint = nil) then
+    Exit;
+
+  NewPoint := FDevice.AddPoint;
+  if NewPoint = nil then
+    Exit;
+
+  NewPoint.Assign(FClipboardPoint, False);
+  NewPoint.DeviceID := FDevice.ID;
+  NewPoint.DeviceUUID := FDevice.UUID;
+  NewPoint.State := osNew;
+
+  UpdatePointsGrid;
+  if GridPoints.RowCount > 0 then
+    GridPoints.Selected := GridPoints.RowCount - 1;
+  SetModified;
+end;
+
+procedure TFormDeviceEditor.GridPointsHeaderMenuItemClick(Sender: TObject);
+var
+  MenuItem: TMenuItem;
+  ColIndex: Integer;
+begin
+  if not (Sender is TMenuItem) then
+    Exit;
+
+  MenuItem := TMenuItem(Sender);
+  ColIndex := MenuItem.Tag;
+  if (ColIndex < 0) or (ColIndex >= GridPoints.ColumnCount) then
+    Exit;
+
+  GridPoints.Columns[ColIndex].Visible := not GridPoints.Columns[ColIndex].Visible;
+  SyncGridPointsHeaderPopupMenu;
+end;
+
+procedure TFormDeviceEditor.GridPointsMouseDown(Sender: TObject;
+  Button: TMouseButton; Shift: TShiftState; X, Y: Single);
+var
+  P: TPointF;
+begin
+  if Button <> TMouseButton.mbRight then
+    Exit;
+
+  SyncGridPointsHeaderPopupMenu;
+  if Sender is TControl then
+    P := TControl(Sender).LocalToScreen(PointF(X, Y))
+  else
+    P := GridPoints.LocalToScreen(PointF(X, Y));
+  FPopupMenuGridPointsHeader.PopupComponent := GridPoints;
+  FPopupMenuGridPointsHeader.Popup(P.X, P.Y);
+end;
+
 procedure TFormDeviceEditor.LoadDevice(ADevice: TDevice);
 var
   FoundType: TDeviceType;
@@ -1723,6 +1915,7 @@ begin
   InitCoefsTab;
   OnKeyDown := FormKeyDown;
   GridPoints.OnKeyDown := GridPointsKeyDown;
+  CreateGridPointsHeaderMenu;
 
   FLoading := True;
   try
@@ -2148,7 +2341,7 @@ begin
     // == Коэффициент
     // =====================================================
     if FDevice.Coef > 0 then
-      EditCoef.Text := FloatToStr(FDevice.Coef)
+      EditCoef.Text := FormatByBaseError(FDevice.Coef, FDevice.Error)
     else
       EditCoef.Text := '';
 end;
@@ -2434,8 +2627,7 @@ begin
   end;
 
   { отображаем }
-  EditCoef.Text := FormatFloat('0.########', DisplayCoef);
-
+  EditCoef.Text := FormatByBaseError(DisplayCoef, FDevice.Error);
   SetModified;
 end;
 
@@ -2839,7 +3031,7 @@ end;
 procedure TFormDeviceEditor.EditCoefExit(Sender: TObject);
 var
   InputValue: Double;
-  NewBaseCoef: Double;
+  NewStoredCoef: Double;
 begin
   if FLoading then
     Exit;
@@ -2853,24 +3045,24 @@ begin
   // 2. Защита от мусора и нуля
   if InputValue <= 0 then
   begin
-    EditCoef.Text := FormatFloat('0.########', GetDisplayedCoef);
+    EditCoef.Text := FormatByBaseError(GetDisplayedCoef, FDevice.Error);
     Exit;
   end;
 
   // 3. Приводим введённое значение к базовому виду (имп/л или имп/кг)
   case FDevice.DimensionCoef of
-    0: NewBaseCoef := InputValue;        // имп/л (имп/кг)
-    1: NewBaseCoef := 1 / InputValue;    // л/имп (кг/имп) → имп/л
+    0: NewStoredCoef := InputValue;        // имп/л (имп/кг)
+    1: NewStoredCoef := 1 / InputValue;    // л/имп (кг/имп) → имп/л
   else
-    NewBaseCoef := InputValue;
+    NewStoredCoef := InputValue;
   end;
 
   // 4. Если базовый коэффициент не изменился — выходим
-  if SameValue(FDevice.Coef, NewBaseCoef, 1e-12) then
+  if SameValue(FDevice.Coef, NewStoredCoef, 1e-12) then
     Exit;
 
   // 5. Сохраняем базовый коэффициент
-  FDevice.Coef := NewBaseCoef;
+  FDevice.Coef := NewStoredCoef;
 
   FDevice.Freq := Round(FDevice.Coef * FDevice.FreqFlowRate  / 3.6);
 
@@ -3646,21 +3838,12 @@ procedure TFormDeviceEditor.GridPointsSetValue(
     Result := False;
     AValue := 0;
     NameNorm := UpperCase(Trim(AName));
-  {  if (NameNorm = 'QMAX') then
-      AValue := FDevice.Qmax
-    else if (NameNorm = 'QMIN') then
-      AValue := FDevice.Qmin
-    else if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
-      AValue := FDevice.FreqFlowRate
-    else if (NameNorm = 'KP') then
-      AValue := FDevice.Coef     }
-
-    if (NameNorm = 'QMIN') or (NameNorm = 'Q1') then
+    if NameNorm = 'QMIN' then
     begin
       AValue := FDevice.Qmin;
       Exit(True);
     end;
-    if (NameNorm = 'QTR') or (NameNorm = 'Q2') then
+    if NameNorm = 'QTR' then
     begin
       AValue := FDevice.Qtr;
       Exit(True);
@@ -3670,29 +3853,14 @@ procedure TFormDeviceEditor.GridPointsSetValue(
       AValue := FDevice.Q2tr;
       Exit(True);
     end;
-    if (NameNorm = 'QNOM') or (NameNorm = 'Q3') then
+    if NameNorm = 'QNOM' then
     begin
       AValue := FDevice.Qnom;
       Exit(True);
     end;
-    if (NameNorm = 'QMAX') or (NameNorm = 'Q4') then
+    if NameNorm = 'QMAX' then
     begin
       AValue := FDevice.Qmax;
-      Exit(True);
-    end;
-    if (NameNorm = 'QF') or (NameNorm = 'QFMAX') then
-    begin
-      AValue := FDevice.QFmax;
-      Exit(True);
-    end;
-    if NameNorm = 'KP' then
-    begin
-      AValue := FDevice.Kp;
-      Exit(True);
-    end
-    else if NameNorm = 'COEF' then
-    begin
-      AValue := FDevice.Coef;
       Exit(True);
     end;
   end;

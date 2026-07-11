@@ -363,36 +363,20 @@ type
     MenuItemEtalonsColumn12: TMenuItem;
     MenuItemEtalonsColumn13: TMenuItem;
     MenuItemEtalonsColumn14: TMenuItem;
-    MenuItemDevicesAddGroup: TMenuItem;
-    MenuItemDevicesAddChannel: TMenuItem;
-    MenuItemDevicesSelectDevice: TMenuItem;
-    MenuItemDevicesFromArchive: TMenuItem;
-    MenuItemDevicesEditGroup: TMenuItem;
-    MenuItemDevicesProperties: TMenuItem;
     MenuItemDevicesClearRow: TMenuItem;
     MenuItemDevicesCopy: TMenuItem;
     MenuItemDevicesPaste: TMenuItem;
     MenuItemDevicesSep1: TMenuItem;
-    MenuItemDevicesClearAll: TMenuItem;
     MenuItemDevicesFillAllBySelected: TMenuItem;
-    MenuItemDevicesDeleteGroup: TMenuItem;
-    MenuItemDevicesDeleteChannel: TMenuItem;
     MenuItemDevicesOtherGroup: TMenuItem;
     MenuItemDevicesSetFlowSource: TMenuItem;
     MenuItemDevicesAssignEtalon: TMenuItem;
     PopupMenuEtalonsGrid: TPopupMenu;
-    MenuItemEtalonsAddGroup: TMenuItem;
-    MenuItemEtalonsAddChannel: TMenuItem;
-    MenuItemEtalonsFromArchive: TMenuItem;
-    MenuItemEtalonsEditGroup: TMenuItem;
     MenuItemEtalonsClearRow: TMenuItem;
     MenuItemEtalonsCopy: TMenuItem;
     MenuItemEtalonsPaste: TMenuItem;
     MenuItemEtalonsSep1: TMenuItem;
-    MenuItemEtalonsClearAll: TMenuItem;
     MenuItemEtalonsFillAllBySelected: TMenuItem;
-    MenuItemEtalonsDeleteGroup: TMenuItem;
-    MenuItemEtalonsDeleteChannel: TMenuItem;
     MenuItemEtalonsOtherGroup: TMenuItem;
     MenuItemEtalonsSetFlowSource: TMenuItem;
     MenuItemEtalonsAssignEtalon: TMenuItem;
@@ -3045,6 +3029,8 @@ begin
     FFrameProceed.UpdateGridDataPointsHeaders(WorkTable.TableFlow.ValueVolume.GetDimName, WorkTable.TableFlow.ValueVolumeFlow.GetDimName);
 
   UpdateUIFromValues;
+  if FFrameChannelProperties <> nil then
+    FFrameChannelProperties.UpdateFlowUnitPresentation;
 
   LayoutFlowRate.Tag:=3;
   UpdateUIFlowRate;
@@ -6143,7 +6129,6 @@ begin
       WorkTable.DeviceChannels[Row].Enabled := not WorkTable.DeviceChannels[Row].Enabled;
       if WorkTable.DeviceChannels[Row].Enabled then
         begin
-          DisableOtherChannelGroups(WorkTable.DeviceChannels, Row);
           ApplyEnabledChannelSimulationValues(WorkTable, False);
         end
       else
@@ -6636,7 +6621,6 @@ begin
         WorkTable.DeviceChannels[ARow].Enabled := Value.AsBoolean;
         if WorkTable.DeviceChannels[ARow].Enabled then
           begin
-            DisableOtherChannelGroups(WorkTable.DeviceChannels, ARow);
             ApplyEnabledChannelSimulationValues(WorkTable, False);
           end
         else

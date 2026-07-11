@@ -272,8 +272,8 @@ var
 begin
   if (AType = nil) or (ProtocolManager = nil) then
     Exit;
-  Details := Format('Action=%s; Form=%s; Object=%s; UUID=%s; Name=%s; Manufacturer=%s; Category=%s; Modification=%s; Time=%s',
-    [AAction, 'fuTypeSelect', 'DeviceType', string(AType.UUID), AType.Name, AType.Manufacturer,
+  Details := Format('Action=%s; Form=%s; Object=%s; ID=%d; UUID=%s; Name=%s; Manufacturer=%s; Category=%s; Modification=%s; Time=%s',
+    [AAction, 'fuTypeSelect', 'DeviceType', AType.ID, string(AType.UUID), AType.Name, AType.Manufacturer,
      IntToStr(AType.Category), AType.Modification, FormatDateTime('dd.mm.yyyy hh:nn:ss', Now)]);
   if Trim(ADetails) <> '' then
     Details := Details + '; ' + ADetails;
@@ -1082,7 +1082,7 @@ begin
     WriteTypeActionLog('Удалён тип прибора', TargetTypes[0], Format('Count=%d', [TargetTypes.Count]));
     AppServices.DataManager.DeleteTypes(TargetTypes);
 
-    SyncTreeAfterGridRowsRemoved;
+    BuildTree;
 
     FreeAndNil(FDevFilteredByTree);
     FDevFilteredByTree := BuildFilteredByTree(FDeviceTypes);
