@@ -2159,6 +2159,8 @@ begin
   AValue:= FActiveWorkTable.ValueFlowRate.GetDoubleBaseNum(SpinBoxFlowRate.Value,FActiveWorkTable.ValueFlowRate.CurrentDimIndex);
   //if not( SameValue(FActiveWorkTable.FlowRate.ValueSet ,AValue, MinDouble)) then
   FActiveWorkTable.FlowRate.DoFlowRateStart(AValue);
+  if WorkTableManager <> nil then
+    WorkTableManager.UpdateSimulation;
   FActiveWorkTable.ResetSpillageRuntimeValues;
   ProtocolManager.AddMessage(pcAction, psForm, 'SetFlowRate', 'Пользователь задал расход', Format('Q=%.3f', [AValue]));
   ProtocolManager.AddMessage(pcAction, psForm, 'ResetSpillageTimer',
