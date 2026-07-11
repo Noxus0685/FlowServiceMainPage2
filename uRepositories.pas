@@ -2868,13 +2868,13 @@ begin
             'FlowRate, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, ' +
-            'Error, Pause, RepeatsProtocol, Repeats, Status' +
+            'Error, Pause, RepeatsProtocol, Repeats' +
             ') values (' +
             ':DeviceTypeID,:DeviceTypeUUID, :UUID, :Name, :Description, ' +
             ':FlowRate, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, ' +
-            ':Error, :Pause, :RepeatsProtocol, :Repeats, ' +
+            ':Error, :Pause, :RepeatsProtocol, :Repeats ' +
             ')';
         end;
 
