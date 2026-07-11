@@ -1294,14 +1294,29 @@ end;
 procedure TFrameMainTable.HandleWorkTableStateChanged(const AWorkTable: TWorkTable; AData: TObject);
 var
   Point: TDevicePoint;
+  Notification: TStateNotification;
+  NewState: EStateWorkTable;
 begin
-  if AWorkTable.State in [swtCOMPLETE, swtFINALREAD] then
+  if not (AData is TStateNotification) then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableStateChanged',
+      Format('[WorkTable.State] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');
+    Exit;
+  end;
+
+  Notification := TStateNotification(AData);
+  if (Notification.NewState < Ord(Low(EStateWorkTable))) or
+     (Notification.NewState > Ord(High(EStateWorkTable))) then
+    Exit;
+  NewState := EStateWorkTable(Notification.NewState);
+
+  if NewState in [swtCOMPLETE, swtFINALREAD] then
     AWorkTable.RecalculateAllMeterValues;
 
   if AWorkTable <> FActiveWorkTable then
     Exit;
 
-  OnChangeState(AWorkTable.State);
+  OnChangeState(NewState);
 
   if AData is TDevicePoint then
     Point := TDevicePoint(AData)
@@ -1319,7 +1334,22 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  case AWorkTable.Action of
+  if not (AData is TActionNotification) then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableAction',
+      Format('[WorkTable.Action] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');
+    Exit;
+  end;
+
+  if (TActionNotification(AData).Action < Ord(Low(EActionWorkTable))) or
+     (TActionNotification(AData).Action > Ord(High(EActionWorkTable))) then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableAction',
+      Format('[WorkTable.Action] Некорректный код Action: %d', [TActionNotification(AData).Action]), '');
+    Exit;
+  end;
+
+  case EActionWorkTable(TActionNotification(AData).Action) of
     awtStartTest:
       begin
           //После очистки стола, обновляем форму.
@@ -1392,9 +1422,16 @@ begin
   if AWorkTable = nil then
     Exit;
 
-  if (AWorkTable.Event >= Ord(Low(TWorkTableEvent))) and
-     (AWorkTable.Event <= Ord(High(TWorkTableEvent))) then
-    WorkTableEvent := TWorkTableEvent(AWorkTable.Event)
+  if not (AData is TEventNotification) then
+  begin
+    ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableEvent',
+      Format('[WorkTable.Event] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');
+    Exit;
+  end;
+
+  if (TEventNotification(AData).Event >= Ord(Low(TWorkTableEvent))) and
+     (TEventNotification(AData).Event <= Ord(High(TWorkTableEvent))) then
+    WorkTableEvent := TWorkTableEvent(TEventNotification(AData).Event)
   else
     WorkTableEvent := ewtNone;
 
@@ -1521,10 +1558,6 @@ begin
 end;
 
 procedure TFrameMainTable.OnNotify(Sender: TObject; Event: Integer; Data: TObject);
-const
-  notifyStateChanged = 1;
-  notifyAction = 2;
-  notifyEvent = 3;
 type
   TNotifySenderKind = (
     nskUnknown,
@@ -1560,16 +1593,17 @@ begin
   if (SenderKind = nskWorkTable) and (FActiveWorkTable <> nil) and
      (TWorkTable(Sender) <> FActiveWorkTable) then
   begin
-    if (Event <> notifyEvent) or (TWorkTable(Sender).Event <> Ord(ewtActivated)) then
+    if (Event <> Ord(notifyEvent)) or not (Data is TEventNotification) or
+       (TEventNotification(Data).Event <> Ord(ewtActivated)) then
       Exit;
   end;
 
   case SenderKind of
     nskWorkTable:
       case Event of
-        notifyStateChanged: HandleWorkTableStateChanged(TWorkTable(Sender), Data);
-        notifyAction: HandleWorkTableAction(TWorkTable(Sender), Data);
-        notifyEvent: HandleWorkTableEvent(TWorkTable(Sender), Data);
+        Ord(notifyStateChanged): HandleWorkTableStateChanged(TWorkTable(Sender), Data);
+        Ord(notifyAction): HandleWorkTableAction(TWorkTable(Sender), Data);
+        Ord(notifyEvent): HandleWorkTableEvent(TWorkTable(Sender), Data);
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[WorkTable.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1578,9 +1612,9 @@ begin
 
     nskPump:
       case Event of
-        notifyStateChanged: HandlePumpStateChanged(TPump(Sender));
-        notifyAction: HandlePumpAction(TPump(Sender));
-        notifyEvent: HandlePumpAction(TPump(Sender));
+        Ord(notifyStateChanged): HandlePumpStateChanged(TPump(Sender));
+        Ord(notifyAction): HandlePumpAction(TPump(Sender));
+        Ord(notifyEvent): HandlePumpAction(TPump(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[Pump.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1589,9 +1623,9 @@ begin
 
     nskFlowRate:
       case Event of
-        notifyStateChanged: HandleFlowRateStateChanged(TFlowRate(Sender));
-        notifyAction: HandleFlowRateAction(TFlowRate(Sender));
-        notifyEvent: HandleFlowRateAction(TFlowRate(Sender));
+        Ord(notifyStateChanged): HandleFlowRateStateChanged(TFlowRate(Sender));
+        Ord(notifyAction): HandleFlowRateAction(TFlowRate(Sender));
+        Ord(notifyEvent): HandleFlowRateAction(TFlowRate(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[FlowRate.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1600,9 +1634,9 @@ begin
 
     nskFluidTemp:
       case Event of
-        notifyStateChanged: HandleFluidTempStateChanged(TFluidTemp(Sender));
-        notifyAction: HandleFluidTempAction(TFluidTemp(Sender));
-        notifyEvent: HandleFluidTempAction(TFluidTemp(Sender));
+        Ord(notifyStateChanged): HandleFluidTempStateChanged(TFluidTemp(Sender));
+        Ord(notifyAction): HandleFluidTempAction(TFluidTemp(Sender));
+        Ord(notifyEvent): HandleFluidTempAction(TFluidTemp(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[FluidTemp.Notify] Unknown Event=%d Sender=%s Data=%s',
@@ -1611,9 +1645,9 @@ begin
 
     nskFluidPress:
       case Event of
-        notifyStateChanged: HandleFluidPressStateChanged(TFluidPress(Sender));
-        notifyAction: HandleFluidPressAction(TFluidPress(Sender));
-        notifyEvent: HandleFluidPressAction(TFluidPress(Sender));
+        Ord(notifyStateChanged): HandleFluidPressStateChanged(TFluidPress(Sender));
+        Ord(notifyAction): HandleFluidPressAction(TFluidPress(Sender));
+        Ord(notifyEvent): HandleFluidPressAction(TFluidPress(Sender));
       else
         ProtocolManager.AddMessage(pcWarning, psForm, 'OnNotify',
           Format('[FluidPress.Notify] Unknown Event=%d Sender=%s Data=%s',

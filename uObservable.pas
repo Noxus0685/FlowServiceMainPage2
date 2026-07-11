@@ -20,6 +20,32 @@ type
     procedure OnNotify(Sender: TObject; Event: Integer; Data: TObject);
   end;
 
+  TActionNotification = class
+  private
+    FAction: Integer;
+  public
+    constructor Create(AAction: Integer);
+    property Action: Integer read FAction;
+  end;
+
+  TEventNotification = class
+  private
+    FEvent: Integer;
+  public
+    constructor Create(AEvent: Integer);
+    property Event: Integer read FEvent;
+  end;
+
+  TStateNotification = class
+  private
+    FOldState: Integer;
+    FNewState: Integer;
+  public
+    constructor Create(AOldState: Integer; ANewState: Integer);
+    property OldState: Integer read FOldState;
+    property NewState: Integer read FNewState;
+  end;
+
   TObservableObject = class
   private
     FObservers: TList<IEventObserver>;
@@ -31,6 +57,8 @@ type
   protected
     procedure Notify(Event: Integer; Data: TObject = nil); overload;
     procedure Notify(AEvent: ENotifyEvent; Data: TObject = nil); overload;
+    procedure NotifyOwned(Event: Integer; Data: TObject); overload;
+    procedure NotifyOwned(AEvent: ENotifyEvent; Data: TObject); overload;
   public
     constructor Create; virtual;
     destructor Destroy; override;
@@ -49,6 +77,25 @@ type
   end;
 
 implementation
+
+constructor TActionNotification.Create(AAction: Integer);
+begin
+  inherited Create;
+  FAction := AAction;
+end;
+
+constructor TEventNotification.Create(AEvent: Integer);
+begin
+  inherited Create;
+  FEvent := AEvent;
+end;
+
+constructor TStateNotification.Create(AOldState: Integer; ANewState: Integer);
+begin
+  inherited Create;
+  FOldState := AOldState;
+  FNewState := ANewState;
+end;
 
 constructor TObservableObject.Create;
 begin
@@ -160,6 +207,50 @@ begin
   Notify(Ord(AEvent), Data);
 end;
 
+procedure TObservableObject.NotifyOwned(Event: Integer; Data: TObject);
+var
+  LocalObservers: TArray<IEventObserver>;
+begin
+  if Data = nil then
+    Exit;
+
+  if FIsDestroying or (FObserversLock = nil) or (FObservers = nil) then
+  begin
+    Data.Free;
+    Exit;
+  end;
+
+  TMonitor.Enter(FObserversLock);
+  try
+    LocalObservers := FObservers.ToArray;
+  finally
+    TMonitor.Exit(FObserversLock);
+  end;
+
+  TThread.Queue(nil,
+    procedure
+    var
+      I: Integer;
+      Observer: IEventObserver;
+    begin
+      try
+        for I := 0 to Length(LocalObservers) - 1 do
+        begin
+          Observer := LocalObservers[I];
+          if Observer <> nil then
+            Observer.OnNotify(Self, Event, Data);
+        end;
+      finally
+        Data.Free;
+      end;
+    end);
+end;
+
+procedure TObservableObject.NotifyOwned(AEvent: ENotifyEvent; Data: TObject);
+begin
+  NotifyOwned(Ord(AEvent), Data);
+end;
+
 procedure TObservableObject.FireEvent(AEvent: Integer; const AError: TErrorInfo);
 begin
   FEvent := AEvent;
@@ -174,7 +265,7 @@ end;
 
 procedure TObservableObject.DoFireEvent(AEvent: Integer; const AError: TErrorInfo);
 begin
-  Notify(notifyEvent, Self);
+  NotifyOwned(notifyEvent, TEventNotification.Create(AEvent));
 end;
 
 end.

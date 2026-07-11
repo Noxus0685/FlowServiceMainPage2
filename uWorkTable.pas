@@ -4793,7 +4793,7 @@ begin
     'Событие рабочего стола', AMsg);
 
   Event := Integer(AEvent);
-  Notify(notifyEvent, Self);
+  NotifyOwned(notifyEvent, TEventNotification.Create(Ord(AEvent)));
 end;
 
 procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent; const AError: TErrorInfo);
@@ -4823,7 +4823,7 @@ begin
   end;
 
   Event := Integer(AEvent);
-  Notify(notifyEvent, Self);
+  NotifyOwned(notifyEvent, TEventNotification.Create(Ord(AEvent)));
 end;
 
 procedure TWorkTable.FireEvent(AEvent: TWorkTableEvent);
@@ -4861,27 +4861,43 @@ procedure TWorkTable.HandleParameterNotify(Sender: TObject; Event: Integer; Data
 var
   AParameter: TParameter;
   AEvent: ENotifyEvent;
+  ActionNotification: TActionNotification;
+  EventNotification: TEventNotification;
+  StateNotification: TStateNotification;
 begin
   if Sender is TParameter then
     AParameter := TParameter(Sender)
-  else if Data is TParameter then
-    AParameter := TParameter(Data)
   else
     Exit;
 
   case Event of
     Ord(notifyStateChanged):
-      AEvent := ResolveParameterStateEvent(AParameter);
+      begin
+        if not (Data is TStateNotification) then
+          Exit;
+        StateNotification := TStateNotification(Data);
+        AEvent := ResolveParameterStateEvent(AParameter);
+        NotifyOwned(AEvent, TStateNotification.Create(StateNotification.OldState, StateNotification.NewState));
+      end;
     Ord(notifyAction):
-      AEvent := ResolveParameterActionEvent(AParameter, AParameter.Action);
+      begin
+        if not (Data is TActionNotification) then
+          Exit;
+        ActionNotification := TActionNotification(Data);
+        if (ActionNotification.Action < Ord(Low(EActionParameter))) or
+           (ActionNotification.Action > Ord(High(EActionParameter))) then
+          Exit;
+        AEvent := ResolveParameterActionEvent(AParameter, EActionParameter(ActionNotification.Action));
+        NotifyOwned(AEvent, TActionNotification.Create(ActionNotification.Action));
+      end;
     Ord(notifyEvent):
-      AEvent := notifyEvent;
-  else
-    Exit;
+      begin
+        if not (Data is TEventNotification) then
+          Exit;
+        EventNotification := TEventNotification(Data);
+        NotifyOwned(notifyEvent, TEventNotification.Create(EventNotification.Event));
+      end;
   end;
-
-  Notify(AEvent, AParameter);
-
 end;
 
 function TWorkTable.ResolveParameterStateEvent(AParameters: TParameter): ENotifyEvent;
@@ -4975,31 +4991,31 @@ end;
 
 procedure TWorkTable.DoProcStart(AProcName: string);
 begin
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
 procedure TWorkTable.DoProcStop(AProcName: string);
 begin
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
 procedure TWorkTable.DoProcPause(AProcName: string);
 begin
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
 procedure TWorkTable.DoProcNextStep(AProcName: string);
 begin
-  Notify(notifyAction, FCurrentPoint);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
 procedure TWorkTable.DoProcRepeat(AProcName: string);
 begin
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
 end;
 
@@ -5008,12 +5024,12 @@ begin
   ResetSpillageRuntimeValues;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoSpillageStart',
     'Начало проливки. Сброшены текущие накопители времени, объёма и среднего расхода', Name);
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 end;
 
 procedure TWorkTable.DoSpillageStop;
 begin
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 end;
 
 procedure TWorkTable.SetState(const ANewState: EStateWorkTable);
@@ -5023,19 +5039,19 @@ begin
   if FState = ANewState then
     Exit;
 
-    if FState = swtCONNECTED then
-        ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',
-    'swtCONNECTED',
-    Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
-      WorkTableStateToString(ANewState)]));
+  OldState := FState;
+  if FState = swtCONNECTED then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',
+      'swtCONNECTED',
+      Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
+        WorkTableStateToString(ANewState)]));
 
-   OldState := FState;
   FState := ANewState;
   ProtocolManager.AddMessage(pcState, psWorkTable, 'SetState',
     'Изменено состояние рабочего стола',
     Format('%s: %s -> %s', [Text, WorkTableStateToString(OldState),
       WorkTableStateToString(ANewState)]));
-  Notify(notifyStateChanged, Self);
+  NotifyOwned(notifyStateChanged, TStateNotification.Create(Ord(OldState), Ord(ANewState)));
 end;
 
 procedure TWorkTable.FireAction(AAction: EActionWorkTable; const ASourceName: string;
@@ -5043,7 +5059,7 @@ procedure TWorkTable.FireAction(AAction: EActionWorkTable; const ASourceName: st
 begin
   FAction := AAction;
   ProtocolManager.AddMessage(pcAction, psWorkTable, ASourceName, ADescription, Name);
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(AAction)));
 end;
 
 procedure TWorkTable.ExecuteAction;
@@ -5560,7 +5576,7 @@ begin
   Result := NewPump;
 
       FAction:=awtAddPump;
-    Notify(notifyAction, Self);
+    NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 end;
 
 function TWorkTable.AddPump(APump: TPump): Boolean;
@@ -5571,7 +5587,7 @@ begin
     FPumps.Add(APump);
     Result := True;
     FAction:=awtAddPump;
-    Notify(notifyAction, Self);
+    NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 
   end
   else
@@ -5593,7 +5609,7 @@ begin
     FPumps.Remove(Pump);
 
     FAction:=awtRemovePump;
-    Notify(notifyAction, Self);
+    NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
   end;
 end;
 
@@ -5607,7 +5623,7 @@ begin
     FPumps.Remove(APump);
 
     FAction := awtRemovePump;
-    Notify(notifyAction, Self);
+    NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
   end;
 end;
 
@@ -5696,7 +5712,7 @@ begin
   end;
 
   Result := NewScale;
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 end;
 
 function TWorkTable.AddScale(AScale: TWeight): Boolean;
@@ -5706,7 +5722,7 @@ begin
     BindParameterEvents(AScale);
     FScales.Add(AScale);
     Result := True;
-    Notify(notifyAction, Self);
+    NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
   end
   else
     Result := False;
@@ -5729,7 +5745,7 @@ begin
       FActiveScale := nil;
     UnbindParameterEvents(AScale);
     FScales.Remove(AScale);
-    Notify(notifyAction, Self);
+    NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
   end;
 end;
 
@@ -5798,7 +5814,7 @@ begin
   end;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoScaleTare',
     'Выполнена тара весов', Name);
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 end;
 
 procedure TWorkTable.DoScaleDrain;
@@ -5813,7 +5829,7 @@ begin
   end;
   ProtocolManager.AddMessage(pcAction, psWorkTable, 'DoScaleDrain',
     'Выполнен слив воды', Name);
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(FAction)));
 end;
 
 procedure TWorkTable.ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;

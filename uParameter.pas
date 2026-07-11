@@ -758,13 +758,16 @@ begin
 end;
 
 procedure TParameter.SetState(AStatus: EStateParameter);
+var
+  OldState: EStateParameter;
 begin
   if FState = AStatus  then
     Exit;
 
+  OldState := FState;
   FState := AStatus;
   FireEvent(Ord(eparStateChanged));
-  Notify(notifyStateChanged, Self);
+  NotifyOwned(notifyStateChanged, TStateNotification.Create(Ord(OldState), Ord(AStatus)));
 end;
 
 procedure TParameter.SetAction(AAction: EActionParameter);
@@ -815,7 +818,7 @@ begin
     end;
   end;
 
-  Notify(notifyAction, Self);
+  NotifyOwned(notifyAction, TActionNotification.Create(Ord(AAction)));
 end;
 
 procedure TParameter.SetBefore(ABefore: Double);
