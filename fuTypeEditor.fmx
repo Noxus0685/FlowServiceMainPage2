@@ -137,7 +137,7 @@ object FormTypeEditor: TFormTypeEditor
     Size.Height = 703.000000000000000000
     Size.PlatformDefault = False
     TabIndex = 0
-    TabOrder = 59
+    TabOrder = 62
     TabPosition = PlatformDefault
     Visible = False
     Sizes = (
@@ -336,7 +336,7 @@ object FormTypeEditor: TFormTypeEditor
       Size.Width = 343.000000000000000000
       Size.Height = 157.000000000000000000
       Size.PlatformDefault = False
-      TabIndex = 5
+      TabIndex = 2
       TabOrder = 40
       TabPosition = None
       Sizes = (
@@ -687,7 +687,7 @@ object FormTypeEditor: TFormTypeEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = False
+        IsSelected = True
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
@@ -1220,7 +1220,7 @@ object FormTypeEditor: TFormTypeEditor
           item
           end>
         TextSettings.Trimming = None
-        IsSelected = True
+        IsSelected = False
         Size.Width = 8.000000000000000000
         Size.Height = 8.000000000000000000
         Size.PlatformDefault = False
@@ -2586,6 +2586,7 @@ object FormTypeEditor: TFormTypeEditor
           TabOrder = 0
           RowHeight = 18.000000000000000000
           RowCount = 3
+          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, RowSelect, Tabs, Header, HeaderClick, AutoDisplacement]
           OnHeaderClick = GridPointsHeaderClick
           OnGetValue = GridPointsGetValue
           OnSetValue = GridPointsSetValue
