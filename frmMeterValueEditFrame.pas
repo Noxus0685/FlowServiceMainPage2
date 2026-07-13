@@ -79,6 +79,9 @@ type
     FTestDataModified: Boolean;
     FTestTargetValue: Double;
     FTestSettings: TMeterValueStabilitySettings;
+    FLastTestAnalysis: TMeterValueStabilityInfo;
+    FTestStableCandidateSinceMs: Int64;
+    FTestStabilityConfirmed: Boolean;
     FSettingsModified: Boolean;
     FModified: Boolean;
     LayoutRoot: TVertScrollBox;
@@ -145,6 +148,12 @@ type
     function TryReadInteger(const AText: string; out AValue: Integer): Boolean;
     procedure UpdateTargetLimits;
     procedure HandleTargetRangeChange(Sender: TObject);
+    procedure Analyze;
+    procedure ClearTestAnalysis;
+    function FindSampleAnalysis(const ARow: Integer; out AResult: TMeterValueSampleAnalysis): Boolean;
+    function BoolText(const AValue: Boolean): string;
+    procedure AnalyzeIfNeeded;
+    procedure HandleAutoAnalyzeChange(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -167,6 +176,9 @@ begin
   FSettingsModified := False;
   FModified := False;
   FillChar(FTestSettings, SizeOf(FTestSettings), 0);
+  FLastTestAnalysis := Default(TMeterValueStabilityInfo);
+  FTestStableCandidateSinceMs := 0;
+  FTestStabilityConfirmed := False;
   BuildUI;
   ClearAnalysisDisplay;
 end;
@@ -191,6 +203,7 @@ begin
   ButtonSamplesClear.OnClick := ButtonSamplesClearClick;
   ButtonAnalyze.OnClick := ButtonAnalyzeClick;
   ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
+  CheckBoxAutoAnalyze.OnChange := HandleAutoAnalyzeChange;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
   GridSamples.OnGetValue := GridSamplesGetValue;
   GridSamples.OnSetValue := GridSamplesSetValue;
@@ -479,6 +492,7 @@ begin
     end;
   LoadSampleToEditor(GridSamples.Row);
   FTestDataModified := True;
+  AnalyzeIfNeeded;
   EditSampleValue.SetFocus;
 end;
 
@@ -509,6 +523,7 @@ begin
 
   LoadSampleToEditor(GridSamples.Row);
   FTestDataModified := True;
+  AnalyzeIfNeeded;
 end;
 
 procedure TFrameMeterValueEdit.DeleteSelectedSample;
@@ -529,6 +544,7 @@ begin
     EditSampleValue.Text := '';
   end;
   FTestDataModified := True;
+  AnalyzeIfNeeded;
 end;
 
 procedure TFrameMeterValueEdit.ClearAnalysisDisplay;
@@ -546,6 +562,7 @@ begin
   EditSampleValue.Text := '';
   ClearAnalysisDisplay;
   FTestDataModified := True;
+  AnalyzeIfNeeded;
 end;
 
 procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
@@ -570,8 +587,7 @@ end;
 
 procedure TFrameMeterValueEdit.ButtonAnalyzeClick(Sender: TObject);
 begin
-  FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
-  ClearAnalysisDisplay;
+  Analyze;
 end;
 
 procedure TFrameMeterValueEdit.GridSamplesCellDblClick(const Column: TColumn;
@@ -588,6 +604,8 @@ end;
 
 procedure TFrameMeterValueEdit.GridSamplesGetValue(Sender: TObject; const ACol,
   ARow: Integer; var Value: TValue);
+var
+  AResult: TMeterValueSampleAnalysis;
 begin
   if (ARow < 0) or (ARow >= FTestSamples.Count) then
     Exit;
@@ -597,7 +615,9 @@ begin
     1: Value := FloatToStr(FTestSamples[ARow].TimeStampMs / 1000);
     2: Value := IntToStr(FTestSamples[ARow].TimeStampMs);
     3: Value := FloatToStr(FTestSamples[ARow].Value);
-    4..6: Value := '';
+    4: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.InWindow) else Value := '';
+    5: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.IsOutlier) else Value := '';
+    6: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.IsInRange) else Value := '';
   end;
 end;
 
@@ -632,6 +652,7 @@ begin
     end;
   LoadSampleToEditor(GridSamples.Row);
   FTestDataModified := True;
+  AnalyzeIfNeeded;
 end;
 
 procedure TFrameMeterValueEdit.GridSamplesSelectCell(Sender: TObject; const ACol,
@@ -644,6 +665,7 @@ end;
 procedure TFrameMeterValueEdit.EditAnalysisTimeExit(Sender: TObject);
 begin
   FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
+  AnalyzeIfNeeded;
 end;
 
 
@@ -689,6 +711,114 @@ begin
     FSettingsModified := True;
   FTestDataModified := True;
   FModified := True;
+  AnalyzeIfNeeded;
+end;
+
+procedure TFrameMeterValueEdit.ClearTestAnalysis;
+begin
+  FLastTestAnalysis := Default(TMeterValueStabilityInfo);
+  FTestStableCandidateSinceMs := 0;
+  FTestStabilityConfirmed := False;
+  ClearAnalysisDisplay;
+  RefreshSamplesGrid;
+end;
+
+function TFrameMeterValueEdit.BoolText(const AValue: Boolean): string;
+begin
+  if AValue then
+    Result := 'Да'
+  else
+    Result := 'Нет';
+end;
+
+function TFrameMeterValueEdit.FindSampleAnalysis(const ARow: Integer;
+  out AResult: TMeterValueSampleAnalysis): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  AResult := Default(TMeterValueSampleAnalysis);
+  if (ARow < 0) or (ARow >= FTestSamples.Count) then
+    Exit;
+
+  for I := 0 to High(FLastTestAnalysis.SampleResults) do
+    if (FLastTestAnalysis.SampleResults[I].SourceIndex = ARow) and
+       (FLastTestAnalysis.SampleResults[I].TimeStampMs = FTestSamples[ARow].TimeStampMs) then
+    begin
+      AResult := FLastTestAnalysis.SampleResults[I];
+      Exit(True);
+    end;
+
+  for I := 0 to High(FLastTestAnalysis.SampleResults) do
+    if FLastTestAnalysis.SampleResults[I].TimeStampMs = FTestSamples[ARow].TimeStampMs then
+    begin
+      AResult := FLastTestAnalysis.SampleResults[I];
+      Exit(True);
+    end;
+end;
+
+procedure TFrameMeterValueEdit.AnalyzeIfNeeded;
+begin
+  if FLoading then
+    Exit;
+
+  if CheckBoxAutoAnalyze.IsChecked then
+    Analyze
+  else
+    ClearTestAnalysis;
+end;
+
+procedure TFrameMeterValueEdit.HandleAutoAnalyzeChange(Sender: TObject);
+begin
+  if (not FLoading) and CheckBoxAutoAnalyze.IsChecked then
+    Analyze;
+end;
+
+procedure TFrameMeterValueEdit.Analyze;
+var
+  ErrorText: string;
+  Settings: TMeterValueStabilitySettings;
+  Samples: TArray<TMeterValueSample>;
+  LowerLimit: Double;
+  UpperLimit: Double;
+  I: Integer;
+begin
+  if FMeterValue = nil then
+    Exit;
+
+  if FTestSamples.Count = 0 then
+  begin
+    ClearTestAnalysis;
+    Exit;
+  end;
+
+  if not ValidateControls(ErrorText) then
+  begin
+    ClearTestAnalysis;
+    ShowMessage('Анализ не выполнен.' + sLineBreak + ErrorText);
+    Exit;
+  end;
+
+  ReadSettingsFromControls(Settings);
+  UpdateTargetLimits;
+  if (not TryReadFloat(EditTargetLowerLimit.Text, LowerLimit)) or
+     (not TryReadFloat(EditTargetUpperLimit.Text, UpperLimit)) then
+  begin
+    ClearTestAnalysis;
+    ShowMessage('Анализ не выполнен: некорректные границы целевого диапазона.');
+    Exit;
+  end;
+
+  FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
+  SetLength(Samples, FTestSamples.Count);
+  for I := 0 to FTestSamples.Count - 1 do
+    Samples[I] := FTestSamples[I];
+
+  TMeterValue.AnalyzeStabilitySamples(Samples, Settings, FTestCurrentTimeMs,
+    FTestTargetValue, LowerLimit, UpperLimit, FTestStableCandidateSinceMs,
+    FTestStabilityConfirmed, FLastTestAnalysis);
+  MemoConclusion.Lines.Text := FLastTestAnalysis.StatusText;
+  RefreshSamplesGrid;
 end;
 
 procedure TFrameMeterValueEdit.ApplySettingsToWorkMeterValue;
@@ -850,6 +980,7 @@ begin
   FModified := True;
   if ValidateControls(ErrorText) then
     ReadSettingsFromControls(FTestSettings);
+  AnalyzeIfNeeded;
 end;
 
 function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
@@ -935,6 +1066,7 @@ begin
       FTestTargetValue := 0;
       CopySettingsFromWorkMeterValue;
       LoadSettingsToControls;
+      ClearTestAnalysis;
       Exit;
     end;
 
@@ -992,6 +1124,7 @@ begin
     FTestTargetValue := FMeterValue.GetDoubleValueDim;
     CopySettingsFromWorkMeterValue;
     LoadSettingsToControls;
+    ClearTestAnalysis;
   finally
     FLoading := False;
   end;

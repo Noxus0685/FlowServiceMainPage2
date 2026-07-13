@@ -147,6 +147,16 @@ type
     Value: Double;
   end;
 
+
+  /// <summary>Per-source-sample diagnostic flags calculated by stability analysis.</summary>
+  TMeterValueSampleAnalysis = record
+    SourceIndex: Integer;
+    TimeStampMs: Int64;
+    InWindow: Boolean;
+    IsOutlier: Boolean;
+    IsInRange: Boolean;
+  end;
+
   /// <summary>Overall state returned by TMeterValue.AnalyzeStability.</summary>
   TMeterValueStabilityStatus = (
     mvssUnknown,       // Analysis has not run yet.
@@ -264,6 +274,8 @@ type
     IsTrendStable: Boolean;
     /// <summary>True when OutlierFraction is within MaxOutlierFraction.</summary>
     IsOutlierLevelAcceptable: Boolean;
+    /// <summary>Per-source-sample flags for UI grids and diagnostics.</summary>
+    SampleResults: TArray<TMeterValueSampleAnalysis>;
     /// <summary>Human-readable Russian diagnostic text containing the main analysis reasons.</summary>
     StatusText: string;
   end;
