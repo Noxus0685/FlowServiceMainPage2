@@ -643,8 +643,6 @@ function TParameter.IsStable(out AStableInfo: RStableInfo): Boolean;
 var
   SignalInfo: TMeterValueStabilityInfo;
   Settings: TMeterValueStabilitySettings;
-  PlusTolerance: Double;
-  MinusTolerance: Double;
   HasActiveTask: Boolean;
   HadTask: Boolean;
   CurrentCheckPassed: Boolean;
@@ -662,12 +660,9 @@ begin
   AStableInfo.ForecastValue := SignalInfo.ForecastValue;
   AStableInfo.TargetValue := FValueSet.Value;
 
-  PlusTolerance := System.Math.Max(Settings.TargetToleranceAbsolute,
-    Abs(AStableInfo.TargetValue) * Settings.TargetAccuracyPlusPercent / 100.0);
-  MinusTolerance := System.Math.Max(Settings.TargetToleranceAbsolute,
-    Abs(AStableInfo.TargetValue) * Settings.TargetAccuracyMinusPercent / 100.0);
-  AStableInfo.LowerLimit := AStableInfo.TargetValue - MinusTolerance;
-  AStableInfo.UpperLimit := AStableInfo.TargetValue + PlusTolerance;
+  CalculateTargetLimits(AStableInfo.TargetValue, Settings.TargetAccuracyPlusPercent,
+    Settings.TargetAccuracyMinusPercent, Settings.TargetToleranceAbsolute,
+    AStableInfo.LowerLimit, AStableInfo.UpperLimit);
 
   AStableInfo.IsCurrentInRange := (SignalInfo.CurrentValue >= AStableInfo.LowerLimit) and
     (SignalInfo.CurrentValue <= AStableInfo.UpperLimit);
