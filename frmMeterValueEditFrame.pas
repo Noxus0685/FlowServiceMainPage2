@@ -12,6 +12,7 @@ uses
   FMX.ListBox,
   FMX.Memo,
   FMX.Memo.Types,
+  FMX.Objects,
   FMX.StdCtrls,
   FMX.TabControl,
   FMX.Types,
@@ -37,6 +38,18 @@ type
     TabItemStabilityResult: TTabItem;
     LayoutConclusion: TLayout;
     LabelConclusionTitle: TLabel;
+    RectangleSignalStable: TRectangle;
+    LabelSignalStableValue: TLabel;
+    RectangleStabilityConfirmed: TRectangle;
+    LabelStabilityConfirmedValue: TLabel;
+    RectangleCurrentInRange: TRectangle;
+    LabelCurrentInRangeValue: TLabel;
+    RectangleMeanInRange: TRectangle;
+    LabelMeanInRangeValue: TLabel;
+    RectangleForecastInRange: TRectangle;
+    LabelForecastInRangeValue: TLabel;
+    RectangleSuitable: TRectangle;
+    LabelSuitableValue: TLabel;
     MemoConclusion: TMemo;
     GridSamples: TGrid;
     EditSampleTime: TEdit;
@@ -174,6 +187,10 @@ type
     procedure AnalyzeIfNeeded;
     procedure HandleAutoAnalyzeChange(Sender: TObject);
     procedure DisplayAnalysis(const AInfo: TMeterValueStabilityInfo);
+    procedure SetConclusionIndicator(const ARectangle: TRectangle; const ALabel: TLabel;
+      const AText: string; const AColor: TAlphaColor);
+    procedure ResetConclusionIndicators;
+    procedure UpdateConclusionIndicators(const AInfo: TMeterValueStabilityInfo);
     function FormatInfoFloat(const AValue: Double; const AHasValue: Boolean; const ADigits: Integer = 4): string;
     function TrendDirectionText(const ADirection: TMeterValueTrendDirection; const AHasTrend: Boolean): string;
     procedure UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
@@ -588,11 +605,123 @@ begin
   AnalyzeIfNeeded;
 end;
 
+procedure TFrameMeterValueEdit.SetConclusionIndicator(const ARectangle: TRectangle;
+  const ALabel: TLabel; const AText: string; const AColor: TAlphaColor);
+begin
+  if ARectangle <> nil then
+    ARectangle.Fill.Color := AColor;
+  if ALabel <> nil then
+    ALabel.Text := AText;
+end;
+
+procedure TFrameMeterValueEdit.ResetConclusionIndicators;
+begin
+  SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, '—', COLOR_NONE);
+  SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, '—', COLOR_NONE);
+  SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, '—', COLOR_NONE);
+  SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, '—', COLOR_NONE);
+  SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, '—', COLOR_NONE);
+  SetConclusionIndicator(RectangleSuitable, LabelSuitableValue, '—', COLOR_NONE);
+end;
+
+procedure TFrameMeterValueEdit.UpdateConclusionIndicators(const AInfo: TMeterValueStabilityInfo);
+var
+  SuitableColor: TAlphaColor;
+  RangeFailure: Boolean;
+begin
+  if AInfo.Status = mvssDisabled then
+  begin
+    ResetConclusionIndicators;
+    Exit;
+  end;
+
+  if mvsfrNoData in AInfo.FailReasons then
+  begin
+    SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, '—', COLOR_NONE);
+    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, '—', COLOR_NONE);
+    SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, '—', COLOR_NONE);
+    SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, '—', COLOR_NONE);
+    SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, '—', COLOR_NONE);
+    SetConclusionIndicator(RectangleSuitable, LabelSuitableValue, 'НЕТ', COLOR_INVALID);
+    Exit;
+  end;
+
+  if AInfo.IsSignalStable then
+    SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'ДА', COLOR_COMPLETED)
+  else if mvsfrNotEnoughSamples in AInfo.FailReasons then
+    SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING)
+  else
+    SetConclusionIndicator(RectangleSignalStable, LabelSignalStableValue, 'НЕТ', COLOR_WARNING);
+
+  if AInfo.IsStabilityConfirmed then
+    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'ДА', COLOR_COMPLETED)
+  else if AInfo.IsSignalStable and (mvsfrWaitingForConfirmation in AInfo.FailReasons) then
+    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'НЕТ', COLOR_RUNNING)
+  else
+    SetConclusionIndicator(RectangleStabilityConfirmed, LabelStabilityConfirmedValue, 'НЕТ', COLOR_WARNING);
+
+  if AInfo.HasCurrentValue then
+  begin
+    if AInfo.IsCurrentValueInRange then
+      SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, 'ДА', COLOR_COMPLETED)
+    else
+      SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, 'НЕТ', COLOR_INVALID);
+  end
+  else
+    SetConclusionIndicator(RectangleCurrentInRange, LabelCurrentInRangeValue, '—', COLOR_NONE);
+
+  if AInfo.HasStatistics then
+  begin
+    if AInfo.IsMeanValueInRange then
+      SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, 'ДА', COLOR_COMPLETED)
+    else
+      SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, 'НЕТ', COLOR_INVALID);
+  end
+  else
+    SetConclusionIndicator(RectangleMeanInRange, LabelMeanInRangeValue, '—', COLOR_NONE);
+
+  if AInfo.HasForecast then
+  begin
+    if AInfo.IsForecastInRange then
+      SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, 'ДА', COLOR_COMPLETED)
+    else
+      SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, 'НЕТ', COLOR_INVALID);
+  end
+  else
+    SetConclusionIndicator(RectangleForecastInRange, LabelForecastInRangeValue, '—', COLOR_NONE);
+
+  if AInfo.IsSuitableForMeasurement then
+    SuitableColor := COLOR_COMPLETED
+  else if mvsfrInvalidSettings in AInfo.FailReasons then
+    SuitableColor := COLOR_INVALID
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or
+          (mvsfrInsufficientWindow in AInfo.FailReasons) then
+    SuitableColor := COLOR_WARNING
+  else if mvsfrStaleData in AInfo.FailReasons then
+    SuitableColor := COLOR_INVALID
+  else if not AInfo.IsSignalStable then
+    SuitableColor := COLOR_WARNING
+  else
+  begin
+    RangeFailure := (mvsfrCurrentValueOutOfRange in AInfo.FailReasons) or
+      (mvsfrMeanValueOutOfRange in AInfo.FailReasons) or
+      (mvsfrForecastOutOfRange in AInfo.FailReasons);
+    if RangeFailure then
+      SuitableColor := COLOR_INVALID
+    else if mvsfrWaitingForConfirmation in AInfo.FailReasons then
+      SuitableColor := COLOR_RUNNING
+    else
+      SuitableColor := COLOR_INVALID;
+  end;
+  SetConclusionIndicator(RectangleSuitable, LabelSuitableValue, BoolText(AInfo.IsSuitableForMeasurement), SuitableColor);
+end;
+
 procedure TFrameMeterValueEdit.ClearAnalysisDisplay;
 const
   EmptyText = '—';
 begin
   MemoConclusion.Lines.Clear;
+  ResetConclusionIndicators;
   if EditResultSampleCount = nil then
     Exit;
 
@@ -954,6 +1083,7 @@ begin
     ListBoxStabilityReasons.Items.Add('Причины отсутствуют.');
 
   UpdateDetailedConclusion(AInfo);
+  UpdateConclusionIndicators(AInfo);
 end;
 
 

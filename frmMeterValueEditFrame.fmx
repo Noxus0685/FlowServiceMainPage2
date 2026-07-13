@@ -36,7 +36,7 @@
         Margins.Right = 8.000000000000000000
         Margins.Bottom = 8.000000000000000000
         Size.Width = 704.000000000000000000
-        Size.Height = 96.000000000000000000
+        Size.Height = 148.000000000000000000
         Size.PlatformDefault = False
         TabOrder = 0
         object LabelConclusionTitle: TLabel
@@ -47,11 +47,173 @@
           Text = 'Заключение'
           TextSettings.VertAlign = Center
         end
+        object LayoutConclusionIndicators: TLayout
+          Align = Top
+          Size.Width = 704.000000000000000000
+          Size.Height = 68.000000000000000000
+          Size.PlatformDefault = False
+          object RectangleSignalStable: TRectangle
+            Position.X = 0.000000000000000000
+            Position.Y = 2.000000000000000000
+            Size.Width = 228.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Stroke.Color = claNull
+            object LabelSignalStableCaption: TLabel
+              Align = Left
+              Margins.Left = 8.000000000000000000
+              Size.Width = 168.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Сигнал стабилен'
+              TextSettings.VertAlign = Center
+            end
+            object LabelSignalStableValue: TLabel
+              Align = Client
+              Size.Width = 52.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = '—'
+              TextSettings.HorzAlign = Center
+              TextSettings.VertAlign = Center
+            end
+          end
+          object RectangleStabilityConfirmed: TRectangle
+            Position.X = 238.000000000000000000
+            Position.Y = 2.000000000000000000
+            Size.Width = 228.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Stroke.Color = claNull
+            object LabelStabilityConfirmedCaption: TLabel
+              Align = Left
+              Margins.Left = 8.000000000000000000
+              Size.Width = 168.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Стабильность подтверждена'
+              TextSettings.VertAlign = Center
+            end
+            object LabelStabilityConfirmedValue: TLabel
+              Align = Client
+              Size.Width = 52.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = '—'
+              TextSettings.HorzAlign = Center
+              TextSettings.VertAlign = Center
+            end
+          end
+          object RectangleCurrentInRange: TRectangle
+            Position.X = 476.000000000000000000
+            Position.Y = 2.000000000000000000
+            Size.Width = 228.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Stroke.Color = claNull
+            object LabelCurrentInRangeCaption: TLabel
+              Align = Left
+              Margins.Left = 8.000000000000000000
+              Size.Width = 168.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Текущее значение в диапазоне'
+              TextSettings.VertAlign = Center
+            end
+            object LabelCurrentInRangeValue: TLabel
+              Align = Client
+              Size.Width = 52.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = '—'
+              TextSettings.HorzAlign = Center
+              TextSettings.VertAlign = Center
+            end
+          end
+          object RectangleMeanInRange: TRectangle
+            Position.X = 0.000000000000000000
+            Position.Y = 36.000000000000000000
+            Size.Width = 228.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Stroke.Color = claNull
+            object LabelMeanInRangeCaption: TLabel
+              Align = Left
+              Margins.Left = 8.000000000000000000
+              Size.Width = 168.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Среднее значение в диапазоне'
+              TextSettings.VertAlign = Center
+            end
+            object LabelMeanInRangeValue: TLabel
+              Align = Client
+              Size.Width = 52.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = '—'
+              TextSettings.HorzAlign = Center
+              TextSettings.VertAlign = Center
+            end
+          end
+          object RectangleForecastInRange: TRectangle
+            Position.X = 238.000000000000000000
+            Position.Y = 36.000000000000000000
+            Size.Width = 228.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Stroke.Color = claNull
+            object LabelForecastInRangeCaption: TLabel
+              Align = Left
+              Margins.Left = 8.000000000000000000
+              Size.Width = 168.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Прогноз в диапазоне'
+              TextSettings.VertAlign = Center
+            end
+            object LabelForecastInRangeValue: TLabel
+              Align = Client
+              Size.Width = 52.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = '—'
+              TextSettings.HorzAlign = Center
+              TextSettings.VertAlign = Center
+            end
+          end
+          object RectangleSuitable: TRectangle
+            Position.X = 476.000000000000000000
+            Position.Y = 36.000000000000000000
+            Size.Width = 228.000000000000000000
+            Size.Height = 30.000000000000000000
+            Size.PlatformDefault = False
+            Stroke.Color = claNull
+            object LabelSuitableCaption: TLabel
+              Align = Left
+              Margins.Left = 8.000000000000000000
+              Size.Width = 168.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Пригодно для измерения'
+              TextSettings.VertAlign = Center
+            end
+            object LabelSuitableValue: TLabel
+              Align = Client
+              Size.Width = 52.000000000000000000
+              Size.Height = 30.000000000000000000
+              Size.PlatformDefault = False
+              Text = '—'
+              TextSettings.HorzAlign = Center
+              TextSettings.VertAlign = Center
+            end
+          end
+        end
         object MemoConclusion: TMemo
           Align = Client
           ReadOnly = True
           Size.Width = 704.000000000000000000
-          Size.Height = 72.000000000000000000
+          Size.Height = 56.000000000000000000
           Size.PlatformDefault = False
           TabOrder = 0
           Text = ''
@@ -64,7 +226,7 @@
         Margins.Right = 8.000000000000000000
         Margins.Bottom = 4.000000000000000000
         Size.Width = 704.000000000000000000
-        Size.Height = 386.000000000000000000
+        Size.Height = 334.000000000000000000
         Size.PlatformDefault = False
         TabIndex = 0
         TabPosition = PlatformDefault
