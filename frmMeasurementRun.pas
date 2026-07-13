@@ -372,46 +372,16 @@ end;
 
 procedure TFrameMeasurementRun.SetPointEnabledFromGrid(APoint: TDevicePoint;
   const AEnabled: Boolean);
-var
-  Repo: TDeviceRepository;
-  Device: TDevice;
-  DevicePoint: TDevicePoint;
-  SourcePoint: TDevicePoint;
 begin
-  Repo := nil;
-  Device := nil;
   if APoint = nil then
     Exit;
 
   if APoint.Enabled = AEnabled then
     Exit;
 
-  SourcePoint := nil;
-  if (DataManager <> nil) and (Trim(APoint.DeviceUUID) <> '') and (Trim(APoint.UUID) <> '') then
-  begin
-    Device := DataManager.FindDevice(APoint.DeviceUUID, Repo);
-    if (Device <> nil) and (Device.Points <> nil) then
-      for DevicePoint in Device.Points do
-        if (DevicePoint <> nil) and SameText(DevicePoint.UUID, APoint.UUID) then
-        begin
-          SourcePoint := DevicePoint;
-          Break;
-        end;
-
-    if SourcePoint <> nil then
-    begin
-      SourcePoint.Enabled := AEnabled;
-      SourcePoint.State := osModified;
-      Device.State := osModified;
-      if Repo <> nil then
-        Repo.State := osModified;
-
-      DataManager.Save;
-      APoint.Enabled := SourcePoint.Enabled;
-      if APoint.State = osClean then
-        APoint.State := osModified;
-    end;
-  end;
+  APoint.Enabled := AEnabled;
+  if APoint.State = osClean then
+    APoint.State := osModified;
 
   UpdateGridMesurmentRun;
 end;
