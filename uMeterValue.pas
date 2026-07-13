@@ -911,6 +911,8 @@ begin
     AInfo.CurrentValue := Window[N - 1].Value;
     AInfo.LastSampleAgeSec := (CurrentMs - LastMs) / 1000.0;
     AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
+    AInfo.HasCurrentValue := True;
+    AInfo.HasLastSampleAge := True;
   end;
   AInfo.HasEnoughSamples := N >= FStabilitySettings.MinSampleCount;
   AInfo.HasEnoughWindow := AInfo.WindowDurationSec + 0.001 >= FStabilitySettings.WindowDurationSec;
@@ -929,6 +931,8 @@ begin
     AInfo.MeanValue := Sum / N;
     SumSq := 0; for I := 0 to N - 1 do SumSq := SumSq + Sqr(Window[I].Value - AInfo.MeanValue);
     AInfo.StdDeviation := Sqrt(SumSq / N);
+    AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
+    AInfo.HasStatistics := True;
     Threshold := FStabilitySettings.OutlierFactor * AInfo.StdDeviation;
     if Threshold > 0 then
     begin
@@ -963,10 +967,22 @@ else
     for I := 0 to N - 1 do SumT := SumT + (Used[I].TimeStampMs - FirstMs) / 1000.0;
     MeanT := SumT / N; Num := 0; Den := 0;
     for I := 0 to N - 1 do begin T := (Used[I].TimeStampMs - FirstMs) / 1000.0; Num := Num + (T - MeanT) * (Used[I].Value - AInfo.MeanValue); Den := Den + Sqr(T - MeanT); end;
-    if Den > EPS then AInfo.TrendRate := Num / Den else Include(AInfo.FailReasons, mvsfrInsufficientWindow);
+    if Den > EPS then
+    begin
+      AInfo.TrendRate := Num / Den;
+      AInfo.HasTrend := True;
+      if AInfo.TrendRate > EPS then
+        AInfo.TrendDirection := tdIncreasing
+      else if AInfo.TrendRate < -EPS then
+        AInfo.TrendDirection := tdDecreasing
+      else
+        AInfo.TrendDirection := tdNone;
+    end
+    else Include(AInfo.FailReasons, mvsfrInsufficientWindow);
     T := (Used[N-1].TimeStampMs - FirstMs) / 1000.0;
     Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
     AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + FStabilitySettings.ForecastHorizonSec);
+    AInfo.HasForecast := AInfo.HasTrend;
   end;
 
 if FStabilityConfirmed then
@@ -1112,6 +1128,8 @@ begin
     AInfo.CurrentValue := Window[N - 1].Sample.Value;
     AInfo.LastSampleAgeSec := (ACurrentMs - LastMs) / 1000.0;
     AInfo.WindowDurationSec := (LastMs - FirstMs) / 1000.0;
+    AInfo.HasCurrentValue := True;
+    AInfo.HasLastSampleAge := True;
   end;
 
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
@@ -1138,6 +1156,8 @@ begin
     for I := 0 to N - 1 do
       SumSq := SumSq + Sqr(Window[I].Sample.Value - AInfo.MeanValue);
     AInfo.StdDeviation := Sqrt(SumSq / N);
+    AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
+    AInfo.HasStatistics := True;
     Threshold := ASettings.OutlierFactor * AInfo.StdDeviation;
     if Threshold > 0 then
     begin
@@ -1194,12 +1214,24 @@ begin
       Den := Den + Sqr(T - MeanT);
     end;
     if Den > EPS then
-      AInfo.TrendRate := Num / Den
+    begin
+      AInfo.TrendRate := Num / Den;
+      AInfo.HasTrend := True;
+      if AInfo.TrendRate > EPS then
+        AInfo.TrendDirection := tdIncreasing
+      else if AInfo.TrendRate < -EPS then
+        AInfo.TrendDirection := tdDecreasing
+      else
+        AInfo.TrendDirection := tdNone;
+    end
     else
       Include(AInfo.FailReasons, mvsfrInsufficientWindow);
     T := (Used[N - 1].Sample.TimeStampMs - FirstMs) / 1000.0;
     Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
     AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + ASettings.ForecastHorizonSec);
+    AInfo.HasForecast := AInfo.HasTrend;
+    AInfo.IsForecastInRange := AInfo.HasForecast and (AInfo.ForecastValue >= ALowerLimit) and
+      (AInfo.ForecastValue <= AUpperLimit);
   end;
 
   if AStabilityConfirmed then

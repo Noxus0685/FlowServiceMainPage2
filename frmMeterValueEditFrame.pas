@@ -71,6 +71,23 @@ type
     CheckBoxRequireForecastInRange: TCheckBox;
     EditTargetLowerLimit: TEdit;
     EditTargetUpperLimit: TEdit;
+    EditResultSampleCount: TEdit;
+    EditResultUsedSampleCount: TEdit;
+    EditResultOutlierCount: TEdit;
+    EditResultOutlierFraction: TEdit;
+    EditResultWindowDuration: TEdit;
+    EditResultLastSampleAge: TEdit;
+    EditResultCurrentValue: TEdit;
+    EditResultMeanValue: TEdit;
+    EditResultMinValue: TEdit;
+    EditResultMaxValue: TEdit;
+    EditResultVariation: TEdit;
+    EditResultStdDeviation: TEdit;
+    EditResultTrendRate: TEdit;
+    EditResultTrendDirection: TEdit;
+    EditResultForecastHorizon: TEdit;
+    EditResultForecastValue: TEdit;
+    EditResultForecastInRange: TEdit;
   private
     FMeterValue: TMeterValue;
     FLoading: Boolean;
@@ -154,6 +171,9 @@ type
     function BoolText(const AValue: Boolean): string;
     procedure AnalyzeIfNeeded;
     procedure HandleAutoAnalyzeChange(Sender: TObject);
+    procedure DisplayAnalysis(const AInfo: TMeterValueStabilityInfo);
+    function FormatInfoFloat(const AValue: Double; const AHasValue: Boolean; const ADigits: Integer = 4): string;
+    function TrendDirectionText(const ADirection: TMeterValueTrendDirection; const AHasTrend: Boolean): string;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -230,6 +250,23 @@ begin
   CheckBoxRequireForecastInRange.OnChange := HandleTargetRangeChange;
   EditTargetLowerLimit.ReadOnly := True;
   EditTargetUpperLimit.ReadOnly := True;
+  EditResultSampleCount.ReadOnly := True;
+  EditResultUsedSampleCount.ReadOnly := True;
+  EditResultOutlierCount.ReadOnly := True;
+  EditResultOutlierFraction.ReadOnly := True;
+  EditResultWindowDuration.ReadOnly := True;
+  EditResultLastSampleAge.ReadOnly := True;
+  EditResultCurrentValue.ReadOnly := True;
+  EditResultMeanValue.ReadOnly := True;
+  EditResultMinValue.ReadOnly := True;
+  EditResultMaxValue.ReadOnly := True;
+  EditResultVariation.ReadOnly := True;
+  EditResultStdDeviation.ReadOnly := True;
+  EditResultTrendRate.ReadOnly := True;
+  EditResultTrendDirection.ReadOnly := True;
+  EditResultForecastHorizon.ReadOnly := True;
+  EditResultForecastValue.ReadOnly := True;
+  EditResultForecastInRange.ReadOnly := True;
   EditSampleTimeStep.Text := '1,0';
   EditAnalysisTime.Text := '0';
   RefreshSamplesGrid;
@@ -548,8 +585,30 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.ClearAnalysisDisplay;
+const
+  EmptyText = '—';
 begin
   MemoConclusion.Lines.Clear;
+  if EditResultSampleCount = nil then
+    Exit;
+
+  EditResultSampleCount.Text := EmptyText;
+  EditResultUsedSampleCount.Text := EmptyText;
+  EditResultOutlierCount.Text := EmptyText;
+  EditResultOutlierFraction.Text := EmptyText;
+  EditResultWindowDuration.Text := EmptyText;
+  EditResultLastSampleAge.Text := EmptyText;
+  EditResultCurrentValue.Text := EmptyText;
+  EditResultMeanValue.Text := EmptyText;
+  EditResultMinValue.Text := EmptyText;
+  EditResultMaxValue.Text := EmptyText;
+  EditResultVariation.Text := EmptyText;
+  EditResultStdDeviation.Text := EmptyText;
+  EditResultTrendRate.Text := EmptyText;
+  EditResultTrendDirection.Text := EmptyText;
+  EditResultForecastHorizon.Text := EmptyText;
+  EditResultForecastValue.Text := EmptyText;
+  EditResultForecastInRange.Text := EmptyText;
 end;
 
 procedure TFrameMeterValueEdit.ClearSamples;
@@ -817,8 +876,67 @@ begin
   TMeterValue.AnalyzeStabilitySamples(Samples, Settings, FTestCurrentTimeMs,
     FTestTargetValue, LowerLimit, UpperLimit, FTestStableCandidateSinceMs,
     FTestStabilityConfirmed, FLastTestAnalysis);
-  MemoConclusion.Lines.Text := FLastTestAnalysis.StatusText;
+  DisplayAnalysis(FLastTestAnalysis);
   RefreshSamplesGrid;
+end;
+
+
+function TFrameMeterValueEdit.FormatInfoFloat(const AValue: Double;
+  const AHasValue: Boolean; const ADigits: Integer): string;
+begin
+  if not AHasValue then
+    Exit('—');
+  Result := FormatFloatN(AValue, ADigits);
+end;
+
+function TFrameMeterValueEdit.TrendDirectionText(
+  const ADirection: TMeterValueTrendDirection; const AHasTrend: Boolean): string;
+begin
+  if not AHasTrend then
+    Exit('—');
+
+  case ADirection of
+    tdIncreasing: Result := 'Рост';
+    tdDecreasing: Result := 'Снижение';
+  else
+    Result := 'Тренд отсутствует';
+  end;
+end;
+
+procedure TFrameMeterValueEdit.DisplayAnalysis(const AInfo: TMeterValueStabilityInfo);
+begin
+  MemoConclusion.Lines.Text := AInfo.StatusText;
+
+  if not (AInfo.Status in [mvssNotEnoughData, mvssStaleData, mvssUnstable, mvssStable]) then
+  begin
+    ClearAnalysisDisplay;
+    MemoConclusion.Lines.Text := AInfo.StatusText;
+    Exit;
+  end;
+
+  EditResultSampleCount.Text := IntToStr(AInfo.SampleCount);
+  EditResultUsedSampleCount.Text := IntToStr(AInfo.UsedSampleCount);
+  EditResultOutlierCount.Text := IntToStr(AInfo.OutlierCount);
+  EditResultOutlierFraction.Text := FormatInfoFloat(AInfo.OutlierFraction * 100, AInfo.UsedSampleCount > 0, 2);
+  EditResultWindowDuration.Text := FormatInfoFloat(AInfo.WindowDurationSec, AInfo.UsedSampleCount > 0, 2);
+  EditResultLastSampleAge.Text := FormatInfoFloat(AInfo.LastSampleAgeSec, AInfo.HasLastSampleAge, 2);
+  EditResultCurrentValue.Text := FormatInfoFloat(AInfo.CurrentValue, AInfo.HasCurrentValue, 4);
+  EditResultMeanValue.Text := FormatInfoFloat(AInfo.MeanValue, AInfo.HasStatistics, 4);
+  EditResultMinValue.Text := FormatInfoFloat(AInfo.MinValue, AInfo.HasStatistics, 4);
+  EditResultMaxValue.Text := FormatInfoFloat(AInfo.MaxValue, AInfo.HasStatistics, 4);
+  EditResultVariation.Text := FormatInfoFloat(AInfo.Variation, AInfo.HasStatistics, 4);
+  EditResultStdDeviation.Text := FormatInfoFloat(AInfo.StdDeviation, AInfo.HasStatistics, 4);
+  if AInfo.HasTrend then
+    EditResultTrendRate.Text := FormatFloat('+0.0000;-0.0000;0.0000', AInfo.TrendRate)
+  else
+    EditResultTrendRate.Text := '—';
+  EditResultTrendDirection.Text := TrendDirectionText(AInfo.TrendDirection, AInfo.HasTrend);
+  EditResultForecastHorizon.Text := FormatInfoFloat(FTestSettings.ForecastHorizonSec, AInfo.HasForecast, 2);
+  EditResultForecastValue.Text := FormatInfoFloat(AInfo.ForecastValue, AInfo.HasForecast, 4);
+  if AInfo.HasForecast then
+    EditResultForecastInRange.Text := BoolText(AInfo.IsForecastInRange)
+  else
+    EditResultForecastInRange.Text := '—';
 end;
 
 procedure TFrameMeterValueEdit.ApplySettingsToWorkMeterValue;

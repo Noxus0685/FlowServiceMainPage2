@@ -222,12 +222,29 @@ type
     RequireForecastInRange: Boolean;
   end;
 
+  /// <summary>Direction of the calculated linear trend.</summary>
+  TMeterValueTrendDirection = (
+    tdNone,
+    tdIncreasing,
+    tdDecreasing
+  );
+
   /// <summary>Full diagnostic result of TMeterValue.AnalyzeStability for UI and process logic.</summary>
   TMeterValueStabilityInfo = record
     /// <summary>Overall analysis status after all checks and confirmation-time logic.</summary>
     Status: TMeterValueStabilityStatus;
     /// <summary>All failure reasons detected during the analysis.</summary>
     FailReasons: TMeterValueStabilityFailReasons;
+    /// <summary>True when CurrentValue and LastSampleAgeSec are valid.</summary>
+    HasCurrentValue: Boolean;
+    /// <summary>True when MeanValue/MinValue/MaxValue/Variation/StdDeviation are valid.</summary>
+    HasStatistics: Boolean;
+    /// <summary>True when TrendRate and TrendDirection are valid.</summary>
+    HasTrend: Boolean;
+    /// <summary>True when ForecastValue and IsForecastInRange are valid.</summary>
+    HasForecast: Boolean;
+    /// <summary>True when LastSampleAgeSec is valid.</summary>
+    HasLastSampleAge: Boolean;
     /// <summary>Total sample count currently stored in stability history.</summary>
     SampleCount: Integer;
     /// <summary>Number of samples selected into the active analysis window before outlier removal.</summary>
@@ -248,8 +265,12 @@ type
     StdDeviation: Double;
     /// <summary>Linear-regression slope in physical units per second.</summary>
     TrendRate: Double;
+    /// <summary>Regression trend direction calculated by the domain analysis.</summary>
+    TrendDirection: TMeterValueTrendDirection;
     /// <summary>Regression-based forecast at ForecastHorizonSec.</summary>
     ForecastValue: Double;
+    /// <summary>True when forecast value is inside the target range.</summary>
+    IsForecastInRange: Boolean;
     /// <summary>Actual duration in seconds between first and last samples in the active window.</summary>
     WindowDurationSec: Double;
     /// <summary>Age in seconds of the latest sample.</summary>
