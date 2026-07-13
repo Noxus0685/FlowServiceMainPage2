@@ -5,6 +5,7 @@ interface
 uses
   FMX.Controls,
   FMX.Controls.Presentation,
+  FMX.Dialogs,
   FMX.Edit,
   FMX.Forms,
   FMX.Layouts,
@@ -48,6 +49,7 @@ type
     ButtonSamplesClear: TButton;
     ButtonAnalyze: TButton;
     CheckBoxAutoAnalyze: TCheckBox;
+    ButtonApplyStabilitySettings: TButton;
     CheckBoxStabilityEnabled: TCheckBox;
     EditMinSampleCount: TEdit;
     EditWindowDurationSec: TEdit;
@@ -118,6 +120,7 @@ type
     procedure ButtonSampleDeleteClick(Sender: TObject);
     procedure ButtonSamplesClearClick(Sender: TObject);
     procedure ButtonAnalyzeClick(Sender: TObject);
+    procedure ButtonApplyStabilitySettingsClick(Sender: TObject);
     procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
     procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridSamplesSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
@@ -135,6 +138,7 @@ type
     destructor Destroy; override;
     procedure LoadFromMeterValue(AMeterValue: TMeterValue);
     procedure SaveChanges;
+    procedure ApplySettingsToWorkMeterValue;
   end;
 
 implementation
@@ -173,6 +177,7 @@ begin
   ButtonSampleDelete.OnClick := ButtonSampleDeleteClick;
   ButtonSamplesClear.OnClick := ButtonSamplesClearClick;
   ButtonAnalyze.OnClick := ButtonAnalyzeClick;
+  ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
   GridSamples.OnGetValue := GridSamplesGetValue;
   GridSamples.OnSetValue := GridSamplesSetValue;
@@ -619,6 +624,34 @@ begin
   FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
 end;
 
+
+
+procedure TFrameMeterValueEdit.ApplySettingsToWorkMeterValue;
+var
+  ErrorText: string;
+  Settings: TMeterValueStabilitySettings;
+begin
+  if FMeterValue = nil then
+    Exit;
+
+  if not ValidateControls(ErrorText) then
+  begin
+    ShowMessage('Настройки стабильности не применены.' + sLineBreak + ErrorText);
+    Exit;
+  end;
+
+  ReadSettingsFromControls(Settings);
+  FMeterValue.StabilitySettings := Settings;
+  TMeterValue.SaveToFile(0);
+  CopySettingsFromWorkMeterValue;
+  LoadSettingsToControls;
+  FModified := FTestDataModified;
+end;
+
+procedure TFrameMeterValueEdit.ButtonApplyStabilitySettingsClick(Sender: TObject);
+begin
+  ApplySettingsToWorkMeterValue;
+end;
 
 procedure TFrameMeterValueEdit.CopySettingsFromWorkMeterValue;
 begin

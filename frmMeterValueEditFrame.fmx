@@ -296,6 +296,15 @@
             Size.Height = 360.000000000000000000
             Size.PlatformDefault = False
             TabOrder = 0
+            object ButtonApplyStabilitySettings: TButton
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 32.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              Text = 'Применить'
+            end
             object GroupSettingsCommon: TGroupBox
               Align = Top
               Margins.Bottom = 8.000000000000000000
