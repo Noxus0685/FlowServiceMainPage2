@@ -1318,7 +1318,7 @@ begin
     Exit;
 
   OnChangeState(NewState);
-
+  {
   if AData is TDevicePoint then
     Point := TDevicePoint(AData)
   else
@@ -1326,21 +1326,25 @@ begin
 
   if Point <> nil then
     OnChangePoint(AWorkTable, Point, -1);
-
+        }
   UpdateForm;
 end;
 
 procedure TFrameMainTable.HandleWorkTableAction(const AWorkTable: TWorkTable; AData: TObject);
-begin
-  if AWorkTable = nil then
-    Exit;
+var Action:  EActionWorkTable;
 
-  if not (AData is TActionNotification) then
+
+function TryToGetAction:  EActionWorkTable;
+begin
+    Result:=EActionWorkTable.awtNone;
+
+   if not (AData is TActionNotification) then
   begin
     ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableAction',
-      Format('[WorkTable.Action] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');
-    Exit;
-  end;
+    Format('[WorkTable.Action] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');
+    Result:= AWorkTable.Action;
+  end else
+  begin
 
   if (TActionNotification(AData).Action < Ord(Low(EActionWorkTable))) or
      (TActionNotification(AData).Action > Ord(High(EActionWorkTable))) then
@@ -1349,8 +1353,18 @@ begin
       Format('[WorkTable.Action] Некорректный код Action: %d', [TActionNotification(AData).Action]), '');
     Exit;
   end;
+      Result:= EActionWorkTable(TActionNotification(AData).Action);
+  end;
 
-  case EActionWorkTable(TActionNotification(AData).Action) of
+end;
+
+begin
+  if AWorkTable = nil then
+    Exit;
+
+   Action:= TryToGetAction;
+
+  case Action of
     awtStartTest:
       begin
           //После очистки стола, обновляем форму.
@@ -1416,29 +1430,40 @@ end;
 
 procedure TFrameMainTable.HandleWorkTableEvent(const AWorkTable: TWorkTable; AData: TObject);
 var
-  WorkTableEvent: TWorkTableEvent;
+  Notification: TEventNotification;
+  WorkTableEvent: EEventWorkTable;
 
   SelectedChannel: TChannel;
+
+function TryToGetEvent:  EEventWorkTable;
+begin
+    Result:=EEventWorkTable.ewtEvent;
+
+   if Assigned(AData)  and (AData is TEventNotification) then
+  begin
+
+    WorkTableEvent := EEventWorkTable(Notification.Event);
+
+  if (Notification.Event < Ord(Low(EEventWorkTable))) or
+     (Notification.Event > Ord(High(EEventWorkTable))) then
+    Exit;
+
+   Result:=WorkTableEvent;
+  end else
+  begin
+
+     Result:=EEventWorkTable(AWorkTable.Event);
+
+  end;
+
+end;
+
+
 begin
   if AWorkTable = nil then
     Exit;
 
-  if not (AData is TEventNotification) then
-  begin
-    {ProtocolManager.AddMessage(pcWarning, psForm, 'HandleWorkTableEvent',
-      Format('[WorkTable.Event] Некорректный тип Data: %s', [ObjClassNameOrNil(AData)]), '');   }
-    WorkTableEvent:=  TWorkTableEvent(AWorkTable.Event);
-  end
-  else
-  begin
-  if (TEventNotification(AData).Event >= Ord(Low(TWorkTableEvent))) and
-     (TEventNotification(AData).Event <= Ord(High(TWorkTableEvent))) then
-    WorkTableEvent := TWorkTableEvent(TEventNotification(AData).Event)
-  else
-    WorkTableEvent := ewtNone;
-  end;
-
-
+    WorkTableEvent:=TryToGetEvent;
 
   if WorkTableEvent = ewtActivated then
   begin
@@ -1510,7 +1535,7 @@ begin
     Exit;
   end;
 
-  HandleWorkTableAction(AWorkTable, AData);
+ // HandleWorkTableAction(AWorkTable, AData);
 end;
 
 procedure TFrameMainTable.HandlePumpStateChanged(const APump: TPump);

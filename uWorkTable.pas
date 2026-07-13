@@ -3633,7 +3633,8 @@ begin
      (not SameValue(OldMax, FlowRate.Max)) or
      ((FlowRate.ValueSet <> nil) and
       (not SameValue(OldValueSet, FlowRate.ValueSet.Value))) then
-    Notify(notifyEvent, FlowRate);
+
+  //  Notify(notifyEvent, FlowRate);
 end;
 
 { Frees channel collections owned by the work table. }

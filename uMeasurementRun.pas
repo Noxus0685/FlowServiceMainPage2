@@ -224,6 +224,9 @@ type
     FCurrentStage: EMeasurementState;
 
     FWaitStartedTick: UInt64;
+    FLastStableProtocolTick: UInt64;
+
+
     FCurrentRepeat: Integer;
     FIsPaused: Boolean;
     FForceNextPoint: Integer;
@@ -1050,15 +1053,22 @@ end;
 procedure TMeasurementRun.EnterWaitStable;
 begin
   SetCurrentPointStatus(mptsWaitStable);
+
+  // Начать новый период публикации состояния стабилизации.
+  // Первое промежуточное сообщение появится через 2 секунды.
+  FLastStableProtocolTick := TThread.GetTickCount64;
+
   if IsStopRequested then
     Exit;
+
   if FMode = mrmManual then
   begin
     SetStage(msWaitMeasureStart);
     Exit;
   end;
 
-  if ShouldWaitStable and (FWorkTable <> nil) and
+  if ShouldWaitStable and
+     (FWorkTable <> nil) and
      not (FWorkTable.State in [swtSTARTTEST, swtSTARTWAIT, swtEXECUTE]) then
     FWorkTable.StartMonitor;
 end;
@@ -2137,12 +2147,16 @@ begin
   // Point and measurement setup are performed once in EnterSetupPoint.
 end;
 
+
+
 procedure TMeasurementRun.ProcessWaitStable;
 const
   DEFAULT_STABLE_TIMEOUT_S = 30000;
+  STABLE_PROTOCOL_INTERVAL_MS = 2000;
 var
   Point: TDevicePoint;
   StableInfo: RStableInfo;
+  CurrentTick: UInt64;
 begin
   if FMode = mrmManual then
   begin
@@ -2153,7 +2167,10 @@ begin
   Point := GetCurrentPoint;
   if Point = nil then
   begin
-    FireEvent(meMeasureError, BuildError(1300, 'Нет текущей точки для стабилизации'));
+    FireEvent(
+      meMeasureError,
+      BuildError(1300, 'Нет текущей точки для стабилизации')
+    );
     SetStage(msDone);
     Exit;
   end;
@@ -2165,25 +2182,75 @@ begin
     Exit;
   end;
 
-  if ((TThread.GetTickCount64 - FWaitStartedTick)/1000) > DEFAULT_STABLE_TIMEOUT_S then
+  // Параметры ещё не стабилизированы.
+  // Публиковать диагностическую информацию не чаще одного раза в 2 секунды.
+  CurrentTick := TThread.GetTickCount64;
+
+  if CurrentTick - FLastStableProtocolTick >=
+     STABLE_PROTOCOL_INTERVAL_MS then
+  begin
+    FLastStableProtocolTick := CurrentTick;
+
+    ProtocolManager.AddMessage(
+      pcInfo,
+      psMeasurement,
+      'WaitStable',
+      'Ожидание стабилизации параметров',
+      StableInfo.StatusText
+    );
+  end;
+
+  if ((CurrentTick - FWaitStartedTick) / 1000) >
+     DEFAULT_STABLE_TIMEOUT_S then
   begin
     Inc(FAttempt);
+
     if FAttempt < FMaxAttemptCount then
     begin
-      ProtocolManager.AddMessage(pcWarning, psMeasurement, 'StableTimeout',
+      ProtocolManager.AddMessage(
+        pcWarning,
+        psMeasurement,
+        'StableTimeout',
         'Таймаут установки параметров измерения',
-        Format('Попытка выхода на параметры: %d из %d', [FAttempt, FMaxAttemptCount]));
+        Format(
+          'Попытка выхода на параметры: %d из %d',
+          [FAttempt, FMaxAttemptCount]
+        )
+      );
+
       FireEvent(meStableRetry);
       SetStage(msSetupPoint);
       Exit;
     end;
 
-    ProtocolManager.AddMessage(pcError, psMeasurement, 'StableFailed',
-      'Не удалось установить параметры измерения', StableInfo.StatusText);
-    FireEvent(meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'));
+    ProtocolManager.AddMessage(
+      pcError,
+      psMeasurement,
+      'StableFailed',
+      'Не удалось установить параметры измерения',
+      StableInfo.StatusText
+    );
+
+    FireEvent(
+      meStableTimeout,
+      BuildError(1301, 'Стабилизация не достигнута')
+    );
+
     SetStage(msDone);
   end;
 end;
+
+
+
+
+
+
+
+
+
+
+
+
 
 procedure TMeasurementRun.ProcessWaitMeasureStart;
 var timeout: extended;
