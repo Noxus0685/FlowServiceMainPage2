@@ -25,7 +25,7 @@ uses
   System.Types,
   System.UITypes,
   uBaseProcedures,
-  uMeterValue;
+  uMeterValue, FMX.Grid.Style, FMX.ScrollBox;
 
 type
   TMeterValueTestScenario = (
