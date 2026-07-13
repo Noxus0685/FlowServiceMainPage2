@@ -339,6 +339,9 @@ type
 implementation
 
 
+uses
+  FmxHelper;
+
 function MedianValue(const AValues: TArray<Double>): Double;
 var
   Values: TArray<Double>;
@@ -389,9 +392,6 @@ begin
       Inc(AOutlierCount);
     end;
 end;
-
-uses
-  FmxHelper;
 
 { Initializes class-level collections used to store all meter value instances. }
 class constructor TMeterValue.CreateClass;
