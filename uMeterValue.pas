@@ -208,6 +208,14 @@ type
     procedure ClearSamplesHistory;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
     function GetSamples: TArray<TMeterValueSample>;
+    /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
+    function GetStabilitySamples: TArray<TMeterValueSample>;
+    function BaseToDisplayValue(const AValue: Double): Double;
+    function DisplayToBaseValue(const AValue: Double): Double;
+    function BaseDeltaToDisplayValue(const AValue: Double): Double;
+    function DisplayDeltaToBaseValue(const AValue: Double): Double;
+    function FormatBaseValue(const AValue: Double): string;
+    function FormatBaseDeltaValue(const AValue: Double): string;
     /// <summary>Analyzes the current time window and returns True only when stability is confirmed.</summary>
     function AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
     /// <summary>Calculates a forecast for a custom horizon using the same regression-based analyzer.</summary>
@@ -842,12 +850,33 @@ end;
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
 var
   Sample: TMeterValueSample;
+  LastSample: TMeterValueSample;
+  LastIndex: Integer;
   CutoffMs: Int64;
 begin
   Sample.TimeStampMs := ATimeStampMs;
   Sample.Value := AValue;
   FSampleLock.Enter;
   try
+    if FSamples.Count > 0 then
+    begin
+      LastIndex := FSamples.Count - 1;
+      LastSample := FSamples[LastIndex];
+
+      if ATimeStampMs < LastSample.TimeStampMs then
+        Exit;
+
+      if LastSample.TimeStampMs = ATimeStampMs then
+      begin
+        if not SameValue(LastSample.Value, AValue, EPS) then
+        begin
+          LastSample.Value := AValue;
+          FSamples[LastIndex] := LastSample;
+        end;
+        Exit;
+      end;
+    end;
+
     FSamples.Add(Sample);
     CutoffMs := ATimeStampMs - Round(Max(1.0, FStabilitySettings.WindowDurationSec * 2.0) * 1000.0);
     while (FSamples.Count > 0) and
@@ -878,6 +907,69 @@ begin
     FSampleLock.Leave;
   end;
 end;
+
+function TMeterValue.GetStabilitySamples: TArray<TMeterValueSample>;
+begin
+  Result := GetSamples;
+end;
+
+
+function TMeterValue.BaseToDisplayValue(const AValue: Double): Double;
+var
+  TempValue: Double;
+  TempType: EValueType;
+begin
+  TempValue := Value;
+  TempType := ValueType;
+  Value := AValue;
+  ValueType := CONST_TYPE;
+  try
+    Result := GetDoubleValue(CurrentDimIndex);
+  finally
+    Value := TempValue;
+    ValueType := TempType;
+  end;
+end;
+
+function TMeterValue.DisplayToBaseValue(const AValue: Double): Double;
+var
+  TempValue: Double;
+begin
+  TempValue := Value;
+  try
+    SetDimValue(AValue);
+    Result := Value;
+  finally
+    Value := TempValue;
+  end;
+end;
+
+function TMeterValue.BaseDeltaToDisplayValue(const AValue: Double): Double;
+begin
+  Result := AValue * GetDimRate(CurrentDimIndex);
+end;
+
+function TMeterValue.DisplayDeltaToBaseValue(const AValue: Double): Double;
+var
+  DimRate: Double;
+begin
+  DimRate := GetDimRate(CurrentDimIndex);
+  if Abs(DimRate) <= EPS then
+    Result := AValue
+  else
+    Result := AValue / DimRate;
+end;
+
+function TMeterValue.FormatBaseValue(const AValue: Double): string;
+begin
+  Result := GetStrNum(AValue);
+end;
+
+function TMeterValue.FormatBaseDeltaValue(const AValue: Double): string;
+begin
+  Result := FormatDisplayValue(BaseDeltaToDisplayValue(AValue));
+end;
+
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
