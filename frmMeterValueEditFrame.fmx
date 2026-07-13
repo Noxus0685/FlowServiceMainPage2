@@ -301,7 +301,7 @@
                 end
               end
             end
-            object LayoutSampleSide: TLayout
+            object LayoutSampleSide: TVertScrollBox
               Align = Right
               Size.Width = 270.000000000000000000
               Size.Height = 360.000000000000000000
@@ -379,7 +379,7 @@
                 end
               end
               object GroupSamplesActions: TGroupBox
-                Align = Client
+                Align = Top
                 Margins.Top = 8.000000000000000000
                 Size.Width = 270.000000000000000000
                 Size.Height = 182.000000000000000000
@@ -438,6 +438,144 @@
                   Size.PlatformDefault = False
                   TabOrder = 5
                   Text = 'Автоматический пересчёт'
+                end
+              end
+              object GroupSamplesGenerator: TGroupBox
+                Align = Top
+                Margins.Top = 8.000000000000000000
+                Size.Width = 270.000000000000000000
+                Size.Height = 300.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Генератор'
+                object LabelGeneratorStartValue: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 30.000000000000000000
+                  Size.Width = 134.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Начальное значение'
+                end
+                object EditGeneratorStartValue: TEdit
+                  Position.X = 152.000000000000000000
+                  Position.Y = 28.000000000000000000
+                  Size.Width = 106.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 0
+                end
+                object LabelGeneratorCount: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 60.000000000000000000
+                  Size.Width = 134.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Количество точек'
+                end
+                object EditGeneratorCount: TEdit
+                  Position.X = 152.000000000000000000
+                  Position.Y = 58.000000000000000000
+                  Size.Width = 106.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                end
+                object LabelGeneratorTimeStep: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 90.000000000000000000
+                  Size.Width = 134.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Шаг времени, с'
+                end
+                object EditGeneratorTimeStep: TEdit
+                  Position.X = 152.000000000000000000
+                  Position.Y = 88.000000000000000000
+                  Size.Width = 106.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 2
+                end
+                object LabelGeneratorTrend: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 120.000000000000000000
+                  Size.Width = 134.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Тренд, ед./с'
+                end
+                object EditGeneratorTrend: TEdit
+                  Position.X = 152.000000000000000000
+                  Position.Y = 118.000000000000000000
+                  Size.Width = 106.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 3
+                end
+                object LabelGeneratorNoise: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 150.000000000000000000
+                  Size.Width = 134.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Случайный шум ±'
+                end
+                object EditGeneratorNoise: TEdit
+                  Position.X = 152.000000000000000000
+                  Position.Y = 148.000000000000000000
+                  Size.Width = 106.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 4
+                end
+                object LabelGeneratorOutlierProbability: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 180.000000000000000000
+                  Size.Width = 134.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Вероятность выброса, %'
+                end
+                object EditGeneratorOutlierProbability: TEdit
+                  Position.X = 152.000000000000000000
+                  Position.Y = 178.000000000000000000
+                  Size.Width = 106.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 5
+                end
+                object LabelGeneratorOutlierAmplitude: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 210.000000000000000000
+                  Size.Width = 134.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Амплитуда выброса'
+                end
+                object EditGeneratorOutlierAmplitude: TEdit
+                  Position.X = 152.000000000000000000
+                  Position.Y = 208.000000000000000000
+                  Size.Width = 106.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 6
+                end
+                object ButtonGenerateNew: TButton
+                  Position.X = 12.000000000000000000
+                  Position.Y = 248.000000000000000000
+                  Size.Width = 116.000000000000000000
+                  Size.Height = 28.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 7
+                  Text = 'Создать новый массив'
+                end
+                object ButtonGenerateAppend: TButton
+                  Position.X = 142.000000000000000000
+                  Position.Y = 248.000000000000000000
+                  Size.Width = 116.000000000000000000
+                  Size.Height = 28.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 8
+                  Text = 'Добавить к массиву'
                 end
               end
             end

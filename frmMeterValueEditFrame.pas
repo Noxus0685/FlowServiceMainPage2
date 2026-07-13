@@ -62,6 +62,15 @@ type
     ButtonSamplesClear: TButton;
     ButtonAnalyze: TButton;
     CheckBoxAutoAnalyze: TCheckBox;
+    EditGeneratorStartValue: TEdit;
+    EditGeneratorCount: TEdit;
+    EditGeneratorTimeStep: TEdit;
+    EditGeneratorTrend: TEdit;
+    EditGeneratorNoise: TEdit;
+    EditGeneratorOutlierProbability: TEdit;
+    EditGeneratorOutlierAmplitude: TEdit;
+    ButtonGenerateNew: TButton;
+    ButtonGenerateAppend: TButton;
     ButtonApplyStabilitySettings: TButton;
     CheckBoxStabilityEnabled: TCheckBox;
     EditMinSampleCount: TEdit;
@@ -158,6 +167,10 @@ type
     procedure EditSelectedSample;
     procedure DeleteSelectedSample;
     procedure ClearSamples;
+    procedure GenerateNewSamples;
+    procedure AppendGeneratedSamples;
+    procedure GenerateSamples(const AClearExisting: Boolean);
+    function ValidateGeneratorControls(out AErrorText: string): Boolean;
     procedure SortSamples;
     procedure ClearAnalysisDisplay;
     procedure ButtonSampleAddClick(Sender: TObject);
@@ -165,6 +178,8 @@ type
     procedure ButtonSampleDeleteClick(Sender: TObject);
     procedure ButtonSamplesClearClick(Sender: TObject);
     procedure ButtonAnalyzeClick(Sender: TObject);
+    procedure ButtonGenerateNewClick(Sender: TObject);
+    procedure ButtonGenerateAppendClick(Sender: TObject);
     procedure ButtonApplyStabilitySettingsClick(Sender: TObject);
     procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
     procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
@@ -242,6 +257,8 @@ begin
   ButtonSampleDelete.OnClick := ButtonSampleDeleteClick;
   ButtonSamplesClear.OnClick := ButtonSamplesClearClick;
   ButtonAnalyze.OnClick := ButtonAnalyzeClick;
+  ButtonGenerateNew.OnClick := ButtonGenerateNewClick;
+  ButtonGenerateAppend.OnClick := ButtonGenerateAppendClick;
   ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
   CheckBoxAutoAnalyze.OnChange := HandleAutoAnalyzeChange;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
@@ -290,6 +307,13 @@ begin
   MemoStabilityConclusion.ReadOnly := True;
   EditSampleTimeStep.Text := '1,0';
   EditAnalysisTime.Text := '0';
+  EditGeneratorStartValue.Text := '0';
+  EditGeneratorCount.Text := '10';
+  EditGeneratorTimeStep.Text := '1,0';
+  EditGeneratorTrend.Text := '0';
+  EditGeneratorNoise.Text := '0';
+  EditGeneratorOutlierProbability.Text := '0';
+  EditGeneratorOutlierAmplitude.Text := '0';
   RefreshSamplesGrid;
 
   AddEditRow('Полное название', EditValueFull);
@@ -759,6 +783,118 @@ begin
   AnalyzeIfNeeded;
 end;
 
+function TFrameMeterValueEdit.ValidateGeneratorControls(out AErrorText: string): Boolean;
+var
+  CountValue: Integer;
+  DoubleValue: Double;
+begin
+  Result := False;
+  AErrorText := '';
+
+  if not TryReadFloat(EditGeneratorStartValue.Text, DoubleValue) then
+    AErrorText := 'Начальное значение должно быть корректным числом.'
+  else if (not TryReadInteger(EditGeneratorCount.Text, CountValue)) or (CountValue <= 0) then
+    AErrorText := 'Количество точек должно быть положительным целым числом.'
+  else if CountValue > 100000 then
+    AErrorText := 'Количество точек не должно превышать 100000.'
+  else if (not TryReadFloat(EditGeneratorTimeStep.Text, DoubleValue)) or (DoubleValue <= 0) or
+          (SampleSecondsToMs(DoubleValue) <= 0) then
+    AErrorText := 'Шаг времени должен быть больше 0.'
+  else if not TryReadFloat(EditGeneratorTrend.Text, DoubleValue) then
+    AErrorText := 'Тренд должен быть корректным числом.'
+  else if (not TryReadFloat(EditGeneratorNoise.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Случайный шум не может быть отрицательным.'
+  else if (not TryReadFloat(EditGeneratorOutlierProbability.Text, DoubleValue)) or
+          (DoubleValue < 0) or (DoubleValue > 100) then
+    AErrorText := 'Вероятность выброса должна быть от 0 до 100 процентов.'
+  else if (not TryReadFloat(EditGeneratorOutlierAmplitude.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Амплитуда выброса не может быть отрицательной.'
+  else
+    Result := True;
+end;
+
+procedure TFrameMeterValueEdit.GenerateSamples(const AClearExisting: Boolean);
+var
+  ErrorText: string;
+  StartValue: Double;
+  TrendRate: Double;
+  NoiseAmplitude: Double;
+  OutlierProbability: Double;
+  OutlierAmplitude: Double;
+  ElapsedTimeSec: Double;
+  Value: Double;
+  CountValue: Integer;
+  TimeStepMs: Int64;
+  BaseTimeMs: Int64;
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  if not ValidateGeneratorControls(ErrorText) then
+  begin
+    ShowMessage('Тестовый массив не создан.' + sLineBreak + ErrorText);
+    Exit;
+  end;
+
+  TryReadFloat(EditGeneratorStartValue.Text, StartValue);
+  TryReadInteger(EditGeneratorCount.Text, CountValue);
+  TimeStepMs := SampleSecondsToMs(SafeFloat(EditGeneratorTimeStep.Text));
+  TryReadFloat(EditGeneratorTrend.Text, TrendRate);
+  TryReadFloat(EditGeneratorNoise.Text, NoiseAmplitude);
+  TryReadFloat(EditGeneratorOutlierProbability.Text, OutlierProbability);
+  TryReadFloat(EditGeneratorOutlierAmplitude.Text, OutlierAmplitude);
+  OutlierProbability := OutlierProbability / 100.0;
+
+  if AClearExisting then
+  begin
+    FTestSamples.Clear;
+    BaseTimeMs := 0;
+  end
+  else if FTestSamples.Count = 0 then
+    BaseTimeMs := 0
+  else
+    BaseTimeMs := FTestSamples[FTestSamples.Count - 1].TimeStampMs + TimeStepMs;
+
+  ClearTestAnalysis;
+  for I := 0 to CountValue - 1 do
+  begin
+    ElapsedTimeSec := (I * TimeStepMs) / 1000.0;
+    Value := StartValue + TrendRate * ElapsedTimeSec;
+    if NoiseAmplitude > 0 then
+      Value := Value + (Random * 2.0 - 1.0) * NoiseAmplitude;
+    if (OutlierAmplitude > 0) and (Random < OutlierProbability) then
+      if Random < 0.5 then
+        Value := Value - OutlierAmplitude
+      else
+        Value := Value + OutlierAmplitude;
+
+    Sample.TimeStampMs := BaseTimeMs + I * TimeStepMs;
+    Sample.Value := Value;
+    FTestSamples.Add(Sample);
+  end;
+
+  SortSamples;
+  RefreshSamplesGrid;
+  if FTestSamples.Count > 0 then
+  begin
+    GridSamples.Row := FTestSamples.Count - 1;
+    GridSamples.Selected := GridSamples.Row;
+    LoadSampleToEditor(GridSamples.Row);
+  end;
+  FTestDataModified := True;
+  FModified := True;
+  AnalyzeIfNeeded;
+end;
+
+procedure TFrameMeterValueEdit.GenerateNewSamples;
+begin
+  GenerateSamples(True);
+end;
+
+procedure TFrameMeterValueEdit.AppendGeneratedSamples;
+begin
+  GenerateSamples(False);
+end;
+
 procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
 begin
   AddSample;
@@ -782,6 +918,16 @@ end;
 procedure TFrameMeterValueEdit.ButtonAnalyzeClick(Sender: TObject);
 begin
   Analyze;
+end;
+
+procedure TFrameMeterValueEdit.ButtonGenerateNewClick(Sender: TObject);
+begin
+  GenerateNewSamples;
+end;
+
+procedure TFrameMeterValueEdit.ButtonGenerateAppendClick(Sender: TObject);
+begin
+  AppendGeneratedSamples;
 end;
 
 procedure TFrameMeterValueEdit.GridSamplesCellDblClick(const Column: TColumn;
@@ -1372,6 +1518,7 @@ begin
       EditDescription.Text := '';
       EditHash.Text := '';
       EditValueFull.Text := '';
+      EditGeneratorStartValue.Text := '0';
       EditValue.Text := '';
       ComboValueDim.Items.Clear;
       ComboValueDim.ItemIndex := -1;
@@ -1397,6 +1544,7 @@ begin
     end;
 
     EditValueFull.Text := FMeterValue.GetStrFullName;
+    EditGeneratorStartValue.Text := FloatToStr(FMeterValue.Value);
     EditValue.Text := FloatToStr(FMeterValue.GetDoubleValueDim);
     FillDimensionCombo;
     EditMin.Text := FMeterValue.GetStrNum(FMeterValue.MinValue);
