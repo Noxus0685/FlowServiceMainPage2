@@ -208,6 +208,8 @@ type
     procedure ClearSamplesHistory;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
     function GetSamples: TArray<TMeterValueSample>;
+    /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
+    function GetStabilitySamples: TArray<TMeterValueSample>;
     /// <summary>Analyzes the current time window and returns True only when stability is confirmed.</summary>
     function AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
     /// <summary>Calculates a forecast for a custom horizon using the same regression-based analyzer.</summary>
@@ -877,6 +879,11 @@ begin
   finally
     FSampleLock.Leave;
   end;
+end;
+
+function TMeterValue.GetStabilitySamples: TArray<TMeterValueSample>;
+begin
+  Result := GetSamples;
 end;
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
