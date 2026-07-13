@@ -300,25 +300,194 @@
               Align = Top
               Margins.Bottom = 8.000000000000000000
               Size.Width = 704.000000000000000000
-              Size.Height = 70.000000000000000000
+              Size.Height = 220.000000000000000000
               Size.PlatformDefault = False
               Text = 'Общие параметры'
+              object CheckBoxStabilityEnabled: TCheckBox
+                Position.X = 12.000000000000000000
+                Position.Y = 30.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                Text = 'Анализ стабильности включён'
+              end
+              object LabelMinSampleCount: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 62.000000000000000000
+                Size.Width = 240.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Минимальное количество отсчётов'
+              end
+              object EditMinSampleCount: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 60.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+              end
+              object LabelWindowDurationSec: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 92.000000000000000000
+                Size.Width = 240.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Длительность окна, с'
+              end
+              object EditWindowDurationSec: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 90.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+              end
+              object LabelMaxSampleAgeSec: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 122.000000000000000000
+                Size.Width = 240.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Максимальный возраст данных, с'
+              end
+              object EditMaxSampleAgeSec: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 120.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 3
+              end
+              object LabelConfirmationTimeSec: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 152.000000000000000000
+                Size.Width = 240.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Время подтверждения, с'
+              end
+              object EditConfirmationTimeSec: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 150.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 4
+              end
+              object LabelExitThresholdFactor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 182.000000000000000000
+                Size.Width = 240.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Коэффициент порога выхода'
+              end
+              object EditExitThresholdFactor: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 180.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 5
+              end
             end
             object GroupSettingsScatter: TGroupBox
               Align = Top
               Margins.Bottom = 8.000000000000000000
               Size.Width = 704.000000000000000000
-              Size.Height = 70.000000000000000000
+              Size.Height = 130.000000000000000000
               Size.PlatformDefault = False
               Text = 'Разброс'
+              object LabelMaxVariation: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 32.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Максимальный размах'
+              end
+              object EditMaxVariation: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 30.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+              end
+              object LabelMaxStdDeviation: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 62.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Максимальное стандартное отклонение'
+              end
+              object EditMaxStdDeviation: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 60.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+              end
+              object LabelMaxTrendRate: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 92.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Максимальная скорость тренда, ед./с'
+              end
+              object EditMaxTrendRate: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 90.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+              end
             end
             object GroupSettingsOutliers: TGroupBox
               Align = Top
               Margins.Bottom = 8.000000000000000000
               Size.Width = 704.000000000000000000
-              Size.Height = 70.000000000000000000
+              Size.Height = 100.000000000000000000
               Size.PlatformDefault = False
               Text = 'Выбросы'
+              object LabelMaxOutlierFractionPercent: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 32.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Максимальная доля выбросов, %'
+              end
+              object EditMaxOutlierFractionPercent: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 30.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+              end
+              object LabelOutlierFactor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 62.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Коэффициент определения выброса'
+              end
+              object EditOutlierFactor: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 60.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+              end
             end
             object GroupSettingsForecast: TGroupBox
               Align = Top
@@ -327,6 +496,22 @@
               Size.Height = 70.000000000000000000
               Size.PlatformDefault = False
               Text = 'Прогноз'
+              object LabelForecastHorizonSec: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 32.000000000000000000
+                Size.Width = 260.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Горизонт прогноза, с'
+              end
+              object EditForecastHorizonSec: TEdit
+                Position.X = 280.000000000000000000
+                Position.Y = 30.000000000000000000
+                Size.Width = 120.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+              end
             end
             object GroupSettingsTargetRange: TGroupBox
               Align = Top

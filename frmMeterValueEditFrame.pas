@@ -48,12 +48,27 @@ type
     ButtonSamplesClear: TButton;
     ButtonAnalyze: TButton;
     CheckBoxAutoAnalyze: TCheckBox;
+    CheckBoxStabilityEnabled: TCheckBox;
+    EditMinSampleCount: TEdit;
+    EditWindowDurationSec: TEdit;
+    EditMaxSampleAgeSec: TEdit;
+    EditConfirmationTimeSec: TEdit;
+    EditExitThresholdFactor: TEdit;
+    EditMaxVariation: TEdit;
+    EditMaxStdDeviation: TEdit;
+    EditMaxTrendRate: TEdit;
+    EditMaxOutlierFractionPercent: TEdit;
+    EditOutlierFactor: TEdit;
+    EditForecastHorizonSec: TEdit;
   private
     FMeterValue: TMeterValue;
     FLoading: Boolean;
     FTestSamples: TList<TMeterValueSample>;
     FTestCurrentTimeMs: Int64;
     FTestDataModified: Boolean;
+    FTestSettings: TMeterValueStabilitySettings;
+    FSettingsModified: Boolean;
+    FModified: Boolean;
     LayoutRoot: TVertScrollBox;
     EditName: TEdit;
     EditType: TEdit;
@@ -108,6 +123,13 @@ type
     procedure GridSamplesSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
     procedure GridSamplesSelectCell(Sender: TObject; const ACol, ARow: Integer; var CanSelect: Boolean);
     procedure EditAnalysisTimeExit(Sender: TObject);
+    procedure CopySettingsFromWorkMeterValue;
+    procedure LoadSettingsToControls;
+    procedure ReadSettingsFromControls(out ASettings: TMeterValueStabilitySettings);
+    function ValidateControls(out AErrorText: string): Boolean;
+    procedure HandleSettingsChange(Sender: TObject);
+    function TryReadFloat(const AText: string; out AValue: Double): Boolean;
+    function TryReadInteger(const AText: string; out AValue: Integer): Boolean;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -125,6 +147,9 @@ begin
   FTestSamples := TList<TMeterValueSample>.Create;
   FTestCurrentTimeMs := 0;
   FTestDataModified := False;
+  FSettingsModified := False;
+  FModified := False;
+  FillChar(FTestSettings, SizeOf(FTestSettings), 0);
   BuildUI;
   ClearAnalysisDisplay;
 end;
@@ -153,6 +178,18 @@ begin
   GridSamples.OnSetValue := GridSamplesSetValue;
   GridSamples.OnSelectCell := GridSamplesSelectCell;
   EditAnalysisTime.OnExit := EditAnalysisTimeExit;
+  CheckBoxStabilityEnabled.OnChange := HandleSettingsChange;
+  EditMinSampleCount.OnChange := HandleSettingsChange;
+  EditWindowDurationSec.OnChange := HandleSettingsChange;
+  EditMaxSampleAgeSec.OnChange := HandleSettingsChange;
+  EditConfirmationTimeSec.OnChange := HandleSettingsChange;
+  EditExitThresholdFactor.OnChange := HandleSettingsChange;
+  EditMaxVariation.OnChange := HandleSettingsChange;
+  EditMaxStdDeviation.OnChange := HandleSettingsChange;
+  EditMaxTrendRate.OnChange := HandleSettingsChange;
+  EditMaxOutlierFractionPercent.OnChange := HandleSettingsChange;
+  EditOutlierFactor.OnChange := HandleSettingsChange;
+  EditForecastHorizonSec.OnChange := HandleSettingsChange;
   EditSampleTimeStep.Text := '1,0';
   EditAnalysisTime.Text := '0';
   RefreshSamplesGrid;
@@ -582,6 +619,120 @@ begin
   FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
 end;
 
+
+procedure TFrameMeterValueEdit.CopySettingsFromWorkMeterValue;
+begin
+  FillChar(FTestSettings, SizeOf(FTestSettings), 0);
+  if FMeterValue <> nil then
+    FTestSettings := FMeterValue.StabilitySettings;
+  FSettingsModified := False;
+end;
+
+procedure TFrameMeterValueEdit.LoadSettingsToControls;
+begin
+  FLoading := True;
+  try
+    CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
+    EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
+    EditWindowDurationSec.Text := FloatToStr(FTestSettings.WindowDurationSec);
+    EditMaxSampleAgeSec.Text := FloatToStr(FTestSettings.MaxSampleAgeSec);
+    EditConfirmationTimeSec.Text := FloatToStr(FTestSettings.ConfirmationTimeSec);
+    EditExitThresholdFactor.Text := FloatToStr(FTestSettings.ExitThresholdFactor);
+    EditMaxVariation.Text := FloatToStr(FTestSettings.MaxVariation);
+    EditMaxStdDeviation.Text := FloatToStr(FTestSettings.MaxStdDeviation);
+    EditMaxTrendRate.Text := FloatToStr(FTestSettings.MaxTrendRate);
+    EditMaxOutlierFractionPercent.Text := FloatToStr(FTestSettings.MaxOutlierFraction * 100);
+    EditOutlierFactor.Text := FloatToStr(FTestSettings.OutlierFactor);
+    EditForecastHorizonSec.Text := FloatToStr(FTestSettings.ForecastHorizonSec);
+  finally
+    FLoading := False;
+  end;
+end;
+
+function TFrameMeterValueEdit.TryReadFloat(const AText: string;
+  out AValue: Double): Boolean;
+begin
+  Result := TryStrToFloat(StringReplace(Trim(AText), ',', FormatSettings.DecimalSeparator,
+    [rfReplaceAll]), AValue) and (not IsNan(AValue)) and (not IsInfinite(AValue));
+end;
+
+function TFrameMeterValueEdit.TryReadInteger(const AText: string;
+  out AValue: Integer): Boolean;
+begin
+  Result := TryStrToInt(Trim(AText), AValue);
+end;
+
+procedure TFrameMeterValueEdit.ReadSettingsFromControls(
+  out ASettings: TMeterValueStabilitySettings);
+var
+  OutlierPercent: Double;
+begin
+  ASettings := FTestSettings;
+  ASettings.Enabled := CheckBoxStabilityEnabled.IsChecked;
+  TryReadInteger(EditMinSampleCount.Text, ASettings.MinSampleCount);
+  TryReadFloat(EditWindowDurationSec.Text, ASettings.WindowDurationSec);
+  TryReadFloat(EditMaxSampleAgeSec.Text, ASettings.MaxSampleAgeSec);
+  TryReadFloat(EditConfirmationTimeSec.Text, ASettings.ConfirmationTimeSec);
+  TryReadFloat(EditExitThresholdFactor.Text, ASettings.ExitThresholdFactor);
+  TryReadFloat(EditMaxVariation.Text, ASettings.MaxVariation);
+  TryReadFloat(EditMaxStdDeviation.Text, ASettings.MaxStdDeviation);
+  TryReadFloat(EditMaxTrendRate.Text, ASettings.MaxTrendRate);
+  if TryReadFloat(EditMaxOutlierFractionPercent.Text, OutlierPercent) then
+    ASettings.MaxOutlierFraction := OutlierPercent / 100;
+  TryReadFloat(EditOutlierFactor.Text, ASettings.OutlierFactor);
+  TryReadFloat(EditForecastHorizonSec.Text, ASettings.ForecastHorizonSec);
+end;
+
+function TFrameMeterValueEdit.ValidateControls(out AErrorText: string): Boolean;
+var
+  DoubleValue: Double;
+  IntValue: Integer;
+begin
+  Result := False;
+  AErrorText := '';
+
+  if not TryReadInteger(EditMinSampleCount.Text, IntValue) then
+    AErrorText := 'Некорректное минимальное количество отсчётов.'
+  else if IntValue < 2 then
+    AErrorText := 'Минимальное количество отсчётов должно быть не меньше 2.'
+  else if (not TryReadFloat(EditWindowDurationSec.Text, DoubleValue)) or (DoubleValue <= 0) then
+    AErrorText := 'Длительность окна должна быть положительным числом.'
+  else if (not TryReadFloat(EditMaxSampleAgeSec.Text, DoubleValue)) or (DoubleValue <= 0) then
+    AErrorText := 'Максимальный возраст данных должен быть положительным числом.'
+  else if (not TryReadFloat(EditConfirmationTimeSec.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Время подтверждения не может быть отрицательным.'
+  else if (not TryReadFloat(EditExitThresholdFactor.Text, DoubleValue)) or (DoubleValue < 1) then
+    AErrorText := 'Коэффициент порога выхода должен быть не меньше 1.'
+  else if (not TryReadFloat(EditMaxVariation.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Максимальный размах не может быть отрицательным.'
+  else if (not TryReadFloat(EditMaxStdDeviation.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Максимальное стандартное отклонение не может быть отрицательным.'
+  else if (not TryReadFloat(EditMaxTrendRate.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Максимальная скорость тренда не может быть отрицательной.'
+  else if (not TryReadFloat(EditMaxOutlierFractionPercent.Text, DoubleValue)) or
+          (DoubleValue < 0) or (DoubleValue > 100) then
+    AErrorText := 'Максимальная доля выбросов должна быть от 0 до 100 процентов.'
+  else if (not TryReadFloat(EditOutlierFactor.Text, DoubleValue)) or (DoubleValue <= 0) then
+    AErrorText := 'Коэффициент определения выброса должен быть положительным числом.'
+  else if (not TryReadFloat(EditForecastHorizonSec.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Горизонт прогноза не может быть отрицательным.'
+  else
+    Result := True;
+end;
+
+procedure TFrameMeterValueEdit.HandleSettingsChange(Sender: TObject);
+var
+  ErrorText: string;
+begin
+  if FLoading then
+    Exit;
+
+  FSettingsModified := True;
+  FModified := True;
+  if ValidateControls(ErrorText) then
+    ReadSettingsFromControls(FTestSettings);
+end;
+
 function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
 begin
   Result := StrToFloatDef(StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]), 0);
@@ -662,6 +813,8 @@ begin
       EditCoefK.Text := '';
       EditCoefP.Text := '';
       CheckBoxIsToSave.IsChecked := False;
+      CopySettingsFromWorkMeterValue;
+      LoadSettingsToControls;
       Exit;
     end;
 
@@ -716,6 +869,8 @@ begin
 
     EditCoefK.Text := FloatToStr(FMeterValue.CoefK);
     EditCoefP.Text := FloatToStr(FMeterValue.CoefP);
+    CopySettingsFromWorkMeterValue;
+    LoadSettingsToControls;
   finally
     FLoading := False;
   end;
