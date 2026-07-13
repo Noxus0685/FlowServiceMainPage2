@@ -10,6 +10,7 @@ uses
   FMX.Layouts,
   FMX.ListBox,
   FMX.Memo,
+  FMX.Memo.Types,
   FMX.StdCtrls,
   FMX.TabControl,
   FMX.Types,
