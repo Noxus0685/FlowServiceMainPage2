@@ -850,12 +850,33 @@ end;
 procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
 var
   Sample: TMeterValueSample;
+  LastSample: TMeterValueSample;
+  LastIndex: Integer;
   CutoffMs: Int64;
 begin
   Sample.TimeStampMs := ATimeStampMs;
   Sample.Value := AValue;
   FSampleLock.Enter;
   try
+    if FSamples.Count > 0 then
+    begin
+      LastIndex := FSamples.Count - 1;
+      LastSample := FSamples[LastIndex];
+
+      if ATimeStampMs < LastSample.TimeStampMs then
+        Exit;
+
+      if LastSample.TimeStampMs = ATimeStampMs then
+      begin
+        if not SameValue(LastSample.Value, AValue, EPS) then
+        begin
+          LastSample.Value := AValue;
+          FSamples[LastIndex] := LastSample;
+        end;
+        Exit;
+      end;
+    end;
+
     FSamples.Add(Sample);
     CutoffMs := ATimeStampMs - Round(Max(1.0, FStabilitySettings.WindowDurationSec * 2.0) * 1000.0);
     while (FSamples.Count > 0) and
