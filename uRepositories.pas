@@ -4634,6 +4634,7 @@ begin
   Result := [
     Col('ID', 'INTEGER PRIMARY KEY AUTOINCREMENT'),
     Col('DeviceUUID', 'TEXT'),
+    Col('UUID', 'TEXT'),
     Col('SessionID', 'INTEGER'),
     Col('DeviceTypeUUID', 'TEXT'),
 
@@ -4664,13 +4665,20 @@ begin
 
     Col('RepeatsProtocol', 'INTEGER'),
     Col('Repeats', 'INTEGER'),
-    Col('Status', 'INTEGER')
+    Col('Status', 'INTEGER'),
+    Col('Enabled', 'INTEGER NOT NULL DEFAULT 1')
   ];
 end;
 
 procedure TDeviceRepository.EnsureDevicePointSchema;
 begin
   FDM.EnsureTable('DevicePoint', RequiredDevicePointColumns);
+  FDM.ExecSQL(
+    'update DevicePoint set UUID = lower(hex(randomblob(4))) || ''-'' || ' +
+    'lower(hex(randomblob(2))) || ''-'' || lower(hex(randomblob(2))) || ''-'' || ' +
+    'lower(hex(randomblob(2))) || ''-'' || lower(hex(randomblob(6))) ' +
+    'where UUID is null or length(trim(UUID)) = 0'
+  );
 end;
 
 procedure TDeviceRepository.AssertDevicePointSchema;
@@ -4723,6 +4731,8 @@ begin
 
   {================ Идентификация ================}
   Result.ID := Q.FieldByName('ID').AsInteger;
+  if not Q.FieldByName('UUID').IsNull and (Trim(Q.FieldByName('UUID').AsString) <> '') then
+    Result.UUID := Q.FieldByName('UUID').AsString;
   Result.DeviceTypeUUID := Q.FieldByName('DeviceTypeUUID').AsString;
   Result.DeviceUUID :=  DeviceUUID;
   Result.Num := Q.FieldByName('Num').AsInteger;
@@ -4760,6 +4770,10 @@ begin
   {================ Повторы ======================}
   Result.RepeatsProtocol := Q.FieldByName('RepeatsProtocol').AsInteger;
   Result.Repeats := Q.FieldByName('Repeats').AsInteger;
+  if Q.FieldByName('Enabled').IsNull then
+    Result.Enabled := True
+  else
+    Result.Enabled := Q.FieldByName('Enabled').AsInteger <> 0;
   if TryMeasurementPointStatusFromInteger(Q.FieldByName('Status').AsInteger, PointStatus) then
     Result.Status := PointStatus
   else
@@ -4959,29 +4973,30 @@ begin
         begin
           Q.SQL.Text :=
             'insert into DevicePoint (' +
-            'DeviceUUID, DeviceTypeUUID, Num, Name, Description, ' +
+            'DeviceUUID, UUID, DeviceTypeUUID, Num, Name, Description, ' +
             'FlowRate, Q, FlowAccuracy, ' +
             'Pressure, Temp, TempAccuracy, ' +
             'LimitImp, LimitVolume, LimitTime, SpillageStop, SpillageType, EtalonType, FlowSorceType, ' +
-            'Error, Pause, RepeatsProtocol, Repeats, Status' +
+            'Error, Pause, RepeatsProtocol, Repeats, Status, Enabled' +
             ') values (' +
-            ':DeviceUUID, :DeviceTypeUUID, :Num, :Name, :Description, ' +
+            ':DeviceUUID, :UUID, :DeviceTypeUUID, :Num, :Name, :Description, ' +
             ':FlowRate, :Q, :FlowAccuracy, ' +
             ':Pressure, :Temp, :TempAccuracy, ' +
             ':LimitImp, :LimitVolume, :LimitTime, :SpillageStop, :SpillageType, :EtalonType, :FlowSorceType, ' +
-            ':Error, :Pause, :RepeatsProtocol, :Repeats, :Status' +
+            ':Error, :Pause, :RepeatsProtocol, :Repeats, :Status, :Enabled' +
             ')';
         end;
 
       {======================= UPDATE =======================}
       osModified:
         begin
-          if APoint.ID <= 0 then
-            raise Exception.Create('Cannot update DevicePoint without ID');
+          if Trim(APoint.UUID) = '' then
+            raise Exception.Create('Cannot update DevicePoint without UUID');
 
           Q.SQL.Text :=
             'update DevicePoint set ' +
             'DeviceUUID=:DeviceUUID, ' +
+            'UUID=:UUID, ' +
             'DeviceTypeUUID=:DeviceTypeUUID, ' +
             'Num=:Num, Name=:Name, Description=:Description, ' +
             'FlowRate=:FlowRate, Q=:Q, FlowAccuracy=:FlowAccuracy, ' +
@@ -4989,8 +5004,8 @@ begin
             'LimitImp=:LimitImp, LimitVolume=:LimitVolume, LimitTime=:LimitTime, SpillageStop=:SpillageStop, ' +
             'SpillageType=:SpillageType, EtalonType=:EtalonType, FlowSorceType=:FlowSorceType, ' +
             'Error=:Error, Pause=:Pause, ' +
-            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats, Status=:Status ' +
-            'where ID=:ID';
+            'RepeatsProtocol=:RepeatsProtocol, Repeats=:Repeats, Status=:Status, Enabled = :Enabled ' +
+            'where UUID = :UUID';
         end;
 
     else
@@ -4999,10 +5014,11 @@ begin
 
     {======================= ПАРАМЕТРЫ =======================}
 
-    if APoint.State <> osNew then
+    if Q.Params.FindParam('ID') <> nil then
       SetIntParam(Q, 'ID', APoint.ID);
 
     SetStrParam(Q, 'DeviceUUID', APoint.DeviceUUID);
+    SetStrParam(Q, 'UUID', APoint.UUID);
     SetStrParam(Q, 'DeviceTypeUUID', APoint.DeviceTypeUUID);
     SetIntParam(Q, 'Num', APoint.Num);
 
@@ -5030,6 +5046,7 @@ begin
     SetIntParam(Q, 'RepeatsProtocol', APoint.RepeatsProtocol);
     SetIntParam(Q, 'Repeats', APoint.Repeats);
     SetIntParam(Q, 'Status', Ord(APoint.Status));
+    SetIntParam(Q, 'Enabled', Ord(APoint.Enabled));
 
     {======================= EXEC =======================}
 
