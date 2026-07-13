@@ -338,6 +338,58 @@ type
 
 implementation
 
+
+function MedianValue(const AValues: TArray<Double>): Double;
+var
+  Values: TArray<Double>;
+  Count: Integer;
+begin
+  Count := Length(AValues);
+  if Count = 0 then
+    Exit(0.0);
+
+  Values := Copy(AValues);
+  TArray.Sort<Double>(Values);
+  if Odd(Count) then
+    Result := Values[Count div 2]
+  else
+    Result := (Values[Count div 2 - 1] + Values[Count div 2]) / 2.0;
+end;
+
+procedure DetectStabilityOutliers(const AValues: TArray<Double>;
+  const AOutlierFactor: Double; out AOutliers: TArray<Boolean>;
+  out AOutlierCount: Integer);
+var
+  Deviations: TArray<Double>;
+  Median: Double;
+  Mad: Double;
+  Threshold: Double;
+  I: Integer;
+begin
+  SetLength(AOutliers, Length(AValues));
+  AOutlierCount := 0;
+  if Length(AValues) = 0 then
+    Exit;
+
+  Median := MedianValue(AValues);
+  SetLength(Deviations, Length(AValues));
+  for I := 0 to High(AValues) do
+    Deviations[I] := Abs(AValues[I] - Median);
+
+  Mad := MedianValue(Deviations);
+  if Mad > EPS then
+    Threshold := AOutlierFactor * 1.4826 * Mad
+  else
+    Threshold := EPS;
+
+  for I := 0 to High(AValues) do
+    if Deviations[I] > Threshold then
+    begin
+      AOutliers[I] := True;
+      Inc(AOutlierCount);
+    end;
+end;
+
 uses
   FmxHelper;
 
@@ -867,8 +919,10 @@ var
   Samples, Window, Used: TArray<TMeterValueSample>;
   CurrentMs, CutoffMs, FirstMs, LastMs: Int64;
   I, N: Integer;
-  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept, Threshold: Double;
+  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
   ErrorText, Msg: string;
+  OutlierValues: TArray<Double>;
+  Outliers: TArray<Boolean>;
   LimitsFactor: Double;
   MathStable: Boolean;
 begin
@@ -924,26 +978,31 @@ begin
   if not AInfo.HasEnoughWindow then Include(AInfo.FailReasons, mvsfrInsufficientWindow);
   if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
-  // MAD-based outlier filter: estimate the central value with the median, then
-  // exclude only points whose absolute deviation is above the configured limit.
   Used := Window;
   if N > 0 then
   begin
-    AInfo.MinValue := Window[0].Value; AInfo.MaxValue := Window[0].Value; Sum := 0;
-    for I := 0 to N - 1 do begin Sum := Sum + Window[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Window[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Window[I].Value); end;
-    AInfo.MeanValue := Sum / N;
-    SumSq := 0; for I := 0 to N - 1 do SumSq := SumSq + Sqr(Window[I].Value - AInfo.MeanValue);
-    AInfo.StdDeviation := Sqrt(SumSq / N);
+    SetLength(OutlierValues, N);
+    for I := 0 to N - 1 do
+      OutlierValues[I] := Window[I].Value;
+    DetectStabilityOutliers(OutlierValues, FStabilitySettings.OutlierFactor,
+      Outliers, AInfo.OutlierCount);
+    SetLength(Used, 0);
+    for I := 0 to N - 1 do
+      if not Outliers[I] then
+      begin
+        SetLength(Used, Length(Used) + 1);
+        Used[High(Used)] := Window[I];
+      end;
+    if Length(Used) = 0 then
+      Used := Window;
+
+    AInfo.MinValue := Used[0].Value; AInfo.MaxValue := Used[0].Value; Sum := 0;
+    for I := 0 to High(Used) do begin Sum := Sum + Used[I].Value; AInfo.MinValue := Min(AInfo.MinValue, Used[I].Value); AInfo.MaxValue := Max(AInfo.MaxValue, Used[I].Value); end;
+    AInfo.MeanValue := Sum / Length(Used);
+    SumSq := 0; for I := 0 to High(Used) do SumSq := SumSq + Sqr(Used[I].Value - AInfo.MeanValue);
+    AInfo.StdDeviation := Sqrt(SumSq / Length(Used));
     AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
     AInfo.HasStatistics := True;
-    Threshold := FStabilitySettings.OutlierFactor * AInfo.StdDeviation;
-    if Threshold > 0 then
-    begin
-      SetLength(Used, 0);
-      for I := 0 to N - 1 do
-        if Abs(Window[I].Value - AInfo.MeanValue) <= Threshold then begin SetLength(Used, Length(Used)+1); Used[High(Used)] := Window[I]; end
-        else Inc(AInfo.OutlierCount);
-    end;
   end;
 if N > 0 then   //!!!
   AInfo.OutlierFraction := AInfo.OutlierCount / Double(N)
@@ -1070,8 +1129,10 @@ var
   Used: TArray<TIndexedSample>;
   CutoffMs, FirstMs, LastMs: Int64;
   I, N: Integer;
-  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept, Threshold: Double;
+  Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
   Msg: string;
+  OutlierValues: TArray<Double>;
+  Outliers: TArray<Boolean>;
   LimitsFactor: Double;
   MathStable: Boolean;
 
@@ -1159,35 +1220,36 @@ begin
   Used := Window;
   if N > 0 then
   begin
-    AInfo.MinValue := Window[0].Sample.Value;
-    AInfo.MaxValue := Window[0].Sample.Value;
+    SetLength(OutlierValues, N);
+    for I := 0 to N - 1 do
+      OutlierValues[I] := Window[I].Sample.Value;
+    DetectStabilityOutliers(OutlierValues, ASettings.OutlierFactor,
+      Outliers, AInfo.OutlierCount);
+    SetLength(Used, 0);
+    for I := 0 to N - 1 do
+      if Outliers[I] then
+        AInfo.SampleResults[Window[I].SourceIndex].IsOutlier := True
+      else
+        AddUsedSample(Window[I]);
+    if Length(Used) = 0 then
+      Used := Window;
+
+    AInfo.MinValue := Used[0].Sample.Value;
+    AInfo.MaxValue := Used[0].Sample.Value;
     Sum := 0;
-    for I := 0 to N - 1 do
+    for I := 0 to High(Used) do
     begin
-      Sum := Sum + Window[I].Sample.Value;
-      AInfo.MinValue := Min(AInfo.MinValue, Window[I].Sample.Value);
-      AInfo.MaxValue := Max(AInfo.MaxValue, Window[I].Sample.Value);
+      Sum := Sum + Used[I].Sample.Value;
+      AInfo.MinValue := Min(AInfo.MinValue, Used[I].Sample.Value);
+      AInfo.MaxValue := Max(AInfo.MaxValue, Used[I].Sample.Value);
     end;
-    AInfo.MeanValue := Sum / N;
+    AInfo.MeanValue := Sum / Length(Used);
     SumSq := 0;
-    for I := 0 to N - 1 do
-      SumSq := SumSq + Sqr(Window[I].Sample.Value - AInfo.MeanValue);
-    AInfo.StdDeviation := Sqrt(SumSq / N);
+    for I := 0 to High(Used) do
+      SumSq := SumSq + Sqr(Used[I].Sample.Value - AInfo.MeanValue);
+    AInfo.StdDeviation := Sqrt(SumSq / Length(Used));
     AInfo.Variation := AInfo.MaxValue - AInfo.MinValue;
     AInfo.HasStatistics := True;
-    Threshold := ASettings.OutlierFactor * AInfo.StdDeviation;
-    if Threshold > 0 then
-    begin
-      SetLength(Used, 0);
-      for I := 0 to N - 1 do
-        if Abs(Window[I].Sample.Value - AInfo.MeanValue) <= Threshold then
-          AddUsedSample(Window[I])
-        else
-        begin
-          Inc(AInfo.OutlierCount);
-          AInfo.SampleResults[Window[I].SourceIndex].IsOutlier := True;
-        end;
-    end;
   end;
 
   if AInfo.UsedSampleCount > 0 then
