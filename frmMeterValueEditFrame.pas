@@ -18,6 +18,7 @@ uses
   System.Classes,
   System.Generics.Collections,
   System.Math,
+  System.Rtti,
   System.SysUtils,
   System.Types,
   System.UITypes,
@@ -103,6 +104,8 @@ type
     procedure ButtonSamplesClearClick(Sender: TObject);
     procedure ButtonAnalyzeClick(Sender: TObject);
     procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
+    procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+    procedure GridSamplesSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
     procedure GridSamplesSelectCell(Sender: TObject; const ACol, ARow: Integer; var CanSelect: Boolean);
     procedure EditAnalysisTimeExit(Sender: TObject);
   public
@@ -146,6 +149,8 @@ begin
   ButtonSamplesClear.OnClick := ButtonSamplesClearClick;
   ButtonAnalyze.OnClick := ButtonAnalyzeClick;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
+  GridSamples.OnGetValue := GridSamplesGetValue;
+  GridSamples.OnSetValue := GridSamplesSetValue;
   GridSamples.OnSelectCell := GridSamplesSelectCell;
   EditAnalysisTime.OnExit := EditAnalysisTimeExit;
   EditSampleTimeStep.Text := '1,0';
@@ -347,22 +352,10 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.RefreshSamplesGrid;
-var
-  I: Integer;
 begin
   GridSamples.BeginUpdate;
   try
     GridSamples.RowCount := FTestSamples.Count;
-    for I := 0 to FTestSamples.Count - 1 do
-    begin
-      GridSamples.Cells[0, I] := IntToStr(I + 1);
-      GridSamples.Cells[1, I] := FloatToStr(FTestSamples[I].TimeStampMs / 1000);
-      GridSamples.Cells[2, I] := IntToStr(FTestSamples[I].TimeStampMs);
-      GridSamples.Cells[3, I] := FloatToStr(FTestSamples[I].Value);
-      GridSamples.Cells[4, I] := '';
-      GridSamples.Cells[5, I] := '';
-      GridSamples.Cells[6, I] := '';
-    end;
   finally
     GridSamples.EndUpdate;
   end;
@@ -370,6 +363,7 @@ begin
   if GridSamples.Row >= FTestSamples.Count then
     GridSamples.Row := FTestSamples.Count - 1;
   GridSamples.Selected := GridSamples.Row;
+  GridSamples.Repaint;
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -525,6 +519,55 @@ begin
     GridSamples.Selected := Row;
     LoadSampleToEditor(Row);
   end;
+end;
+
+
+procedure TFrameMeterValueEdit.GridSamplesGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+begin
+  if (ARow < 0) or (ARow >= FTestSamples.Count) then
+    Exit;
+
+  case ACol of
+    0: Value := IntToStr(ARow + 1);
+    1: Value := FloatToStr(FTestSamples[ARow].TimeStampMs / 1000);
+    2: Value := IntToStr(FTestSamples[ARow].TimeStampMs);
+    3: Value := FloatToStr(FTestSamples[ARow].Value);
+    4..6: Value := '';
+  end;
+end;
+
+procedure TFrameMeterValueEdit.GridSamplesSetValue(Sender: TObject; const ACol,
+  ARow: Integer; const Value: TValue);
+var
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  if (ARow < 0) or (ARow >= FTestSamples.Count) then
+    Exit;
+
+  if not (ACol in [1, 3]) then
+    Exit;
+
+  Sample := FTestSamples[ARow];
+  case ACol of
+    1: Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
+    3: Sample.Value := SafeFloat(Value.ToString);
+  end;
+
+  FTestSamples[ARow] := Sample;
+  SortSamples;
+  RefreshSamplesGrid;
+  for I := 0 to FTestSamples.Count - 1 do
+    if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
+       SameValue(FTestSamples[I].Value, Sample.Value) then
+    begin
+      GridSamples.Row := I;
+      GridSamples.Selected := I;
+      Break;
+    end;
+  LoadSampleToEditor(GridSamples.Row);
+  FTestDataModified := True;
 end;
 
 procedure TFrameMeterValueEdit.GridSamplesSelectCell(Sender: TObject; const ACol,
