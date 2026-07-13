@@ -9,8 +9,11 @@ uses
   FMX.Forms,
   FMX.Layouts,
   FMX.ListBox,
+  FMX.Memo,
   FMX.StdCtrls,
+  FMX.TabControl,
   FMX.Types,
+  FMX.Grid,
   System.Classes,
   System.SysUtils,
   System.Types,
@@ -19,6 +22,27 @@ uses
 
 type
   TFrameMeterValueEdit = class(TFrame)
+    TabControlMain: TTabControl;
+    TabItemMainParameters: TTabItem;
+    TabItemStabilityForecast: TTabItem;
+    TabControlStability: TTabControl;
+    TabItemStabilityData: TTabItem;
+    TabItemStabilitySettings: TTabItem;
+    TabItemStabilityResult: TTabItem;
+    LayoutConclusion: TLayout;
+    LabelConclusionTitle: TLabel;
+    MemoConclusion: TMemo;
+    GridSamples: TGrid;
+    EditSampleTime: TEdit;
+    EditSampleValue: TEdit;
+    EditSampleTimeStep: TEdit;
+    EditAnalysisTime: TEdit;
+    ButtonSampleAdd: TButton;
+    ButtonSampleEdit: TButton;
+    ButtonSampleDelete: TButton;
+    ButtonSamplesClear: TButton;
+    ButtonAnalyze: TButton;
+    CheckBoxAutoAnalyze: TCheckBox;
   private
     FMeterValue: TMeterValue;
     FLoading: Boolean;
@@ -75,7 +99,7 @@ end;
 procedure TFrameMeterValueEdit.BuildUI;
 begin
   LayoutRoot := TVertScrollBox.Create(Self);
-  LayoutRoot.Parent := Self;
+  LayoutRoot.Parent := TabItemMainParameters;
   LayoutRoot.Align := TAlignLayout.Client;
   LayoutRoot.Padding.Rect := TRectF.Create(8, 8, 8, 8);
   LayoutRoot.Stored := False;
