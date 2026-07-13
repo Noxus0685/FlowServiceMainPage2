@@ -9,19 +9,51 @@ uses
   FMX.Forms,
   FMX.Layouts,
   FMX.ListBox,
+  FMX.Memo,
+  FMX.Memo.Types,
   FMX.StdCtrls,
+  FMX.TabControl,
   FMX.Types,
+  FMX.Grid,
   System.Classes,
+  System.Generics.Collections,
+  System.Math,
+  System.Rtti,
   System.SysUtils,
   System.Types,
   System.UITypes,
+  uBaseProcedures,
   uMeterValue;
 
 type
   TFrameMeterValueEdit = class(TFrame)
+    TabControlMain: TTabControl;
+    TabItemMainParameters: TTabItem;
+    TabItemStabilityForecast: TTabItem;
+    TabControlStability: TTabControl;
+    TabItemStabilityData: TTabItem;
+    TabItemStabilitySettings: TTabItem;
+    TabItemStabilityResult: TTabItem;
+    LayoutConclusion: TLayout;
+    LabelConclusionTitle: TLabel;
+    MemoConclusion: TMemo;
+    GridSamples: TGrid;
+    EditSampleTime: TEdit;
+    EditSampleValue: TEdit;
+    EditSampleTimeStep: TEdit;
+    EditAnalysisTime: TEdit;
+    ButtonSampleAdd: TButton;
+    ButtonSampleEdit: TButton;
+    ButtonSampleDelete: TButton;
+    ButtonSamplesClear: TButton;
+    ButtonAnalyze: TButton;
+    CheckBoxAutoAnalyze: TCheckBox;
   private
     FMeterValue: TMeterValue;
     FLoading: Boolean;
+    FTestSamples: TList<TMeterValueSample>;
+    FTestCurrentTimeMs: Int64;
+    FTestDataModified: Boolean;
     LayoutRoot: TVertScrollBox;
     EditName: TEdit;
     EditType: TEdit;
@@ -56,8 +88,29 @@ type
     procedure HandleComboChange(Sender: TObject);
     procedure FillDimensionCombo;
     function SafeFloat(const S: string): Double;
+    function SampleSecondsToMs(const ASeconds: Double): Int64;
+    function SelectedSampleIndex: Integer;
+    procedure LoadSampleToEditor(const AIndex: Integer);
+    procedure RefreshSamplesGrid;
+    procedure AddSample;
+    procedure EditSelectedSample;
+    procedure DeleteSelectedSample;
+    procedure ClearSamples;
+    procedure SortSamples;
+    procedure ClearAnalysisDisplay;
+    procedure ButtonSampleAddClick(Sender: TObject);
+    procedure ButtonSampleEditClick(Sender: TObject);
+    procedure ButtonSampleDeleteClick(Sender: TObject);
+    procedure ButtonSamplesClearClick(Sender: TObject);
+    procedure ButtonAnalyzeClick(Sender: TObject);
+    procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
+    procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
+    procedure GridSamplesSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
+    procedure GridSamplesSelectCell(Sender: TObject; const ACol, ARow: Integer; var CanSelect: Boolean);
+    procedure EditAnalysisTimeExit(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
     procedure LoadFromMeterValue(AMeterValue: TMeterValue);
     procedure SaveChanges;
   end;
@@ -69,16 +122,40 @@ implementation
 constructor TFrameMeterValueEdit.Create(AOwner: TComponent);
 begin
   inherited;
+  FTestSamples := TList<TMeterValueSample>.Create;
+  FTestCurrentTimeMs := 0;
+  FTestDataModified := False;
   BuildUI;
+  ClearAnalysisDisplay;
+end;
+
+destructor TFrameMeterValueEdit.Destroy;
+begin
+  FTestSamples.Free;
+  inherited;
 end;
 
 procedure TFrameMeterValueEdit.BuildUI;
 begin
   LayoutRoot := TVertScrollBox.Create(Self);
-  LayoutRoot.Parent := Self;
+  LayoutRoot.Parent := TabItemMainParameters;
   LayoutRoot.Align := TAlignLayout.Client;
   LayoutRoot.Padding.Rect := TRectF.Create(8, 8, 8, 8);
   LayoutRoot.Stored := False;
+
+  ButtonSampleAdd.OnClick := ButtonSampleAddClick;
+  ButtonSampleEdit.OnClick := ButtonSampleEditClick;
+  ButtonSampleDelete.OnClick := ButtonSampleDeleteClick;
+  ButtonSamplesClear.OnClick := ButtonSamplesClearClick;
+  ButtonAnalyze.OnClick := ButtonAnalyzeClick;
+  GridSamples.OnCellDblClick := GridSamplesCellDblClick;
+  GridSamples.OnGetValue := GridSamplesGetValue;
+  GridSamples.OnSetValue := GridSamplesSetValue;
+  GridSamples.OnSelectCell := GridSamplesSelectCell;
+  EditAnalysisTime.OnExit := EditAnalysisTimeExit;
+  EditSampleTimeStep.Text := '1,0';
+  EditAnalysisTime.Text := '0';
+  RefreshSamplesGrid;
 
   AddEditRow('Полное название', EditValueFull);
   AddEditRow('Текущее значение', EditValue);
@@ -249,6 +326,260 @@ begin
   CaptionLabel.TextSettings.VertAlign := TTextAlign.Center;
   CaptionLabel.Margins.Rect := TRectF.Create(10, 0, 8, 0);
   CaptionLabel.HitTest := False;
+end;
+
+
+function TFrameMeterValueEdit.SampleSecondsToMs(const ASeconds: Double): Int64;
+begin
+  Result := Round(ASeconds * 1000);
+end;
+
+function TFrameMeterValueEdit.SelectedSampleIndex: Integer;
+begin
+  Result := -1;
+  if (GridSamples <> nil) and (GridSamples.Row >= 0) and
+     (GridSamples.Row < FTestSamples.Count) then
+    Result := GridSamples.Row;
+end;
+
+procedure TFrameMeterValueEdit.LoadSampleToEditor(const AIndex: Integer);
+begin
+  if (AIndex < 0) or (AIndex >= FTestSamples.Count) then
+    Exit;
+
+  EditSampleTime.Text := FloatToStr(FTestSamples[AIndex].TimeStampMs / 1000);
+  EditSampleValue.Text := FloatToStr(FTestSamples[AIndex].Value);
+end;
+
+procedure TFrameMeterValueEdit.RefreshSamplesGrid;
+begin
+  GridSamples.BeginUpdate;
+  try
+    GridSamples.RowCount := FTestSamples.Count;
+  finally
+    GridSamples.EndUpdate;
+  end;
+
+  if GridSamples.Row >= FTestSamples.Count then
+    GridSamples.Row := FTestSamples.Count - 1;
+  GridSamples.Selected := GridSamples.Row;
+  GridSamples.Repaint;
+end;
+
+procedure TFrameMeterValueEdit.SortSamples;
+var
+  I: Integer;
+  J: Integer;
+  Tmp: TMeterValueSample;
+begin
+  for I := 0 to FTestSamples.Count - 2 do
+    for J := I + 1 to FTestSamples.Count - 1 do
+      if FTestSamples[J].TimeStampMs < FTestSamples[I].TimeStampMs then
+      begin
+        Tmp := FTestSamples[I];
+        FTestSamples[I] := FTestSamples[J];
+        FTestSamples[J] := Tmp;
+      end;
+end;
+
+procedure TFrameMeterValueEdit.AddSample;
+var
+  I: Integer;
+  Sample: TMeterValueSample;
+  StepSec: Double;
+begin
+  Sample.Value := SafeFloat(EditSampleValue.Text);
+  StepSec := SafeFloat(EditSampleTimeStep.Text);
+  if StepSec <= 0 then
+  begin
+    StepSec := 1.0;
+    EditSampleTimeStep.Text := FloatToStr(StepSec);
+  end;
+
+  if FTestSamples.Count = 0 then
+    Sample.TimeStampMs := 0
+  else
+    Sample.TimeStampMs := FTestSamples[FTestSamples.Count - 1].TimeStampMs +
+      SampleSecondsToMs(StepSec);
+
+  FTestSamples.Add(Sample);
+  SortSamples;
+  RefreshSamplesGrid;
+  for I := 0 to FTestSamples.Count - 1 do
+    if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
+       SameValue(FTestSamples[I].Value, Sample.Value) then
+    begin
+      GridSamples.Row := I;
+      GridSamples.Selected := I;
+      Break;
+    end;
+  LoadSampleToEditor(GridSamples.Row);
+  FTestDataModified := True;
+  EditSampleValue.SetFocus;
+end;
+
+procedure TFrameMeterValueEdit.EditSelectedSample;
+var
+  Index: Integer;
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  Index := SelectedSampleIndex;
+  if Index < 0 then
+    Exit;
+
+  Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
+  Sample.Value := SafeFloat(EditSampleValue.Text);
+  FTestSamples[Index] := Sample;
+  SortSamples;
+  RefreshSamplesGrid;
+
+  for I := 0 to FTestSamples.Count - 1 do
+    if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
+       SameValue(FTestSamples[I].Value, Sample.Value) then
+    begin
+      GridSamples.Row := I;
+      GridSamples.Selected := I;
+      Break;
+    end;
+
+  LoadSampleToEditor(GridSamples.Row);
+  FTestDataModified := True;
+end;
+
+procedure TFrameMeterValueEdit.DeleteSelectedSample;
+var
+  Index: Integer;
+begin
+  Index := SelectedSampleIndex;
+  if Index < 0 then
+    Exit;
+
+  FTestSamples.Delete(Index);
+  RefreshSamplesGrid;
+  if GridSamples.Row >= 0 then
+    LoadSampleToEditor(GridSamples.Row)
+  else
+  begin
+    EditSampleTime.Text := '';
+    EditSampleValue.Text := '';
+  end;
+  FTestDataModified := True;
+end;
+
+procedure TFrameMeterValueEdit.ClearAnalysisDisplay;
+begin
+  MemoConclusion.Lines.Clear;
+end;
+
+procedure TFrameMeterValueEdit.ClearSamples;
+begin
+  FTestSamples.Clear;
+  GridSamples.Row := -1;
+  GridSamples.Selected := -1;
+  RefreshSamplesGrid;
+  EditSampleTime.Text := '';
+  EditSampleValue.Text := '';
+  ClearAnalysisDisplay;
+  FTestDataModified := True;
+end;
+
+procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
+begin
+  AddSample;
+end;
+
+procedure TFrameMeterValueEdit.ButtonSampleEditClick(Sender: TObject);
+begin
+  EditSelectedSample;
+end;
+
+procedure TFrameMeterValueEdit.ButtonSampleDeleteClick(Sender: TObject);
+begin
+  DeleteSelectedSample;
+end;
+
+procedure TFrameMeterValueEdit.ButtonSamplesClearClick(Sender: TObject);
+begin
+  ClearSamples;
+end;
+
+procedure TFrameMeterValueEdit.ButtonAnalyzeClick(Sender: TObject);
+begin
+  FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
+  ClearAnalysisDisplay;
+end;
+
+procedure TFrameMeterValueEdit.GridSamplesCellDblClick(const Column: TColumn;
+  const Row: Integer);
+begin
+  if (Row >= 0) and (Row < FTestSamples.Count) then
+  begin
+    GridSamples.Row := Row;
+    GridSamples.Selected := Row;
+    LoadSampleToEditor(Row);
+  end;
+end;
+
+
+procedure TFrameMeterValueEdit.GridSamplesGetValue(Sender: TObject; const ACol,
+  ARow: Integer; var Value: TValue);
+begin
+  if (ARow < 0) or (ARow >= FTestSamples.Count) then
+    Exit;
+
+  case ACol of
+    0: Value := IntToStr(ARow + 1);
+    1: Value := FloatToStr(FTestSamples[ARow].TimeStampMs / 1000);
+    2: Value := IntToStr(FTestSamples[ARow].TimeStampMs);
+    3: Value := FloatToStr(FTestSamples[ARow].Value);
+    4..6: Value := '';
+  end;
+end;
+
+procedure TFrameMeterValueEdit.GridSamplesSetValue(Sender: TObject; const ACol,
+  ARow: Integer; const Value: TValue);
+var
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  if (ARow < 0) or (ARow >= FTestSamples.Count) then
+    Exit;
+
+  if not (ACol in [1, 3]) then
+    Exit;
+
+  Sample := FTestSamples[ARow];
+  case ACol of
+    1: Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
+    3: Sample.Value := SafeFloat(Value.ToString);
+  end;
+
+  FTestSamples[ARow] := Sample;
+  SortSamples;
+  RefreshSamplesGrid;
+  for I := 0 to FTestSamples.Count - 1 do
+    if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
+       SameValue(FTestSamples[I].Value, Sample.Value) then
+    begin
+      GridSamples.Row := I;
+      GridSamples.Selected := I;
+      Break;
+    end;
+  LoadSampleToEditor(GridSamples.Row);
+  FTestDataModified := True;
+end;
+
+procedure TFrameMeterValueEdit.GridSamplesSelectCell(Sender: TObject; const ACol,
+  ARow: Integer; var CanSelect: Boolean);
+begin
+  CanSelect := True;
+  LoadSampleToEditor(ARow);
+end;
+
+procedure TFrameMeterValueEdit.EditAnalysisTimeExit(Sender: TObject);
+begin
+  FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
 end;
 
 function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
