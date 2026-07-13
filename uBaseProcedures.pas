@@ -147,6 +147,16 @@ type
     Value: Double;
   end;
 
+
+  /// <summary>Per-source-sample diagnostic flags calculated by stability analysis.</summary>
+  TMeterValueSampleAnalysis = record
+    SourceIndex: Integer;
+    TimeStampMs: Int64;
+    InWindow: Boolean;
+    IsOutlier: Boolean;
+    IsInRange: Boolean;
+  end;
+
   /// <summary>Overall state returned by TMeterValue.AnalyzeStability.</summary>
   TMeterValueStabilityStatus = (
     mvssUnknown,       // Analysis has not run yet.
@@ -264,6 +274,8 @@ type
     IsTrendStable: Boolean;
     /// <summary>True when OutlierFraction is within MaxOutlierFraction.</summary>
     IsOutlierLevelAcceptable: Boolean;
+    /// <summary>Per-source-sample flags for UI grids and diagnostics.</summary>
+    SampleResults: TArray<TMeterValueSampleAnalysis>;
     /// <summary>Human-readable Russian diagnostic text containing the main analysis reasons.</summary>
     StatusText: string;
   end;
@@ -351,6 +363,14 @@ function FormatValue(Value: Double; Accuracy: Integer; Error: Double; ShowTraili
 function FormatValue(const Str: string; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean = True): string; overload;
 function RemoveTrailingZeros(const Str: string): string;
 function RandomGenerate(Value, Error: Double): Double;
+procedure CalculateTargetLimits(
+  const ATargetValue: Double;
+  const APlusPercent: Double;
+  const AMinusPercent: Double;
+  const AAbsoluteTolerance: Double;
+  out ALowerLimit: Double;
+  out AUpperLimit: Double
+);
 function FormatFloatN(Value: Double; Digits: Integer): string;
 function NormalizeAccuracyInput(const S: string): string;
 function FormatAccuracy(const S: string): string;
@@ -1134,6 +1154,27 @@ begin
 end;
 
 
+
+
+procedure CalculateTargetLimits(
+  const ATargetValue: Double;
+  const APlusPercent: Double;
+  const AMinusPercent: Double;
+  const AAbsoluteTolerance: Double;
+  out ALowerLimit: Double;
+  out AUpperLimit: Double
+);
+var
+  PlusTolerance: Double;
+  MinusTolerance: Double;
+begin
+  PlusTolerance := System.Math.Max(AAbsoluteTolerance,
+    Abs(ATargetValue) * APlusPercent / 100.0);
+  MinusTolerance := System.Math.Max(AAbsoluteTolerance,
+    Abs(ATargetValue) * AMinusPercent / 100.0);
+  ALowerLimit := ATargetValue - MinusTolerance;
+  AUpperLimit := ATargetValue + PlusTolerance;
+end;
 
 function NewGuidString: string;
 begin
