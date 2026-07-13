@@ -360,6 +360,7 @@ begin
     begin
       Frame.ApplySettingsToWorkMeterValue;
       Frame.SaveChanges;
+      Frame.ApplySettingsToWorkMeterValue;
       FillValuesList;
       FocusMeterValue(EditedMeterValue);
     end;
