@@ -147,6 +147,16 @@ type
     Value: Double;
   end;
 
+
+  /// <summary>Per-source-sample diagnostic flags calculated by stability analysis.</summary>
+  TMeterValueSampleAnalysis = record
+    SourceIndex: Integer;
+    TimeStampMs: Int64;
+    InWindow: Boolean;
+    IsOutlier: Boolean;
+    IsInRange: Boolean;
+  end;
+
   /// <summary>Overall state returned by TMeterValue.AnalyzeStability.</summary>
   TMeterValueStabilityStatus = (
     mvssUnknown,       // Analysis has not run yet.
@@ -159,6 +169,8 @@ type
 
   /// <summary>Individual reasons why a stability analysis did not become stable.</summary>
   TMeterValueStabilityFailReason = (
+    mvsfrAnalysisDisabled,
+    mvsfrNoData,
     mvsfrNotEnoughSamples,  // Fewer samples than MinSampleCount are available in the active window.
     mvsfrInsufficientWindow,// Active window duration is shorter than WindowDurationSec.
     mvsfrStaleData,         // Last sample age exceeds MaxSampleAgeSec.
@@ -166,6 +178,10 @@ type
     mvsfrDeviationTooHigh,  // Absolute standard deviation exceeds MaxStdDeviation.
     mvsfrTrendTooHigh,      // Absolute regression slope exceeds MaxTrendRate.
     mvsfrTooManyOutliers,   // Outlier fraction exceeds MaxOutlierFraction.
+    mvsfrCurrentValueOutOfRange,
+    mvsfrMeanValueOutOfRange,
+    mvsfrForecastOutOfRange,
+    mvsfrWaitingForConfirmation,
     mvsfrInvalidSettings    // Settings failed validation and analysis result is not reliable.
   );
 
@@ -212,12 +228,39 @@ type
     RequireForecastInRange: Boolean;
   end;
 
+  /// <summary>Direction of the calculated linear trend.</summary>
+  TMeterValueTrendDirection = (
+    tdNone,
+    tdIncreasing,
+    tdDecreasing
+  );
+
   /// <summary>Full diagnostic result of TMeterValue.AnalyzeStability for UI and process logic.</summary>
   TMeterValueStabilityInfo = record
     /// <summary>Overall analysis status after all checks and confirmation-time logic.</summary>
     Status: TMeterValueStabilityStatus;
     /// <summary>All failure reasons detected during the analysis.</summary>
     FailReasons: TMeterValueStabilityFailReasons;
+    /// <summary>True when CurrentValue and LastSampleAgeSec are valid.</summary>
+    HasCurrentValue: Boolean;
+    /// <summary>True when MeanValue/MinValue/MaxValue/Variation/StdDeviation are valid.</summary>
+    HasStatistics: Boolean;
+    /// <summary>True when TrendRate and TrendDirection are valid.</summary>
+    HasTrend: Boolean;
+    /// <summary>True when ForecastValue and IsForecastInRange are valid.</summary>
+    HasForecast: Boolean;
+    /// <summary>True when LastSampleAgeSec is valid.</summary>
+    HasLastSampleAge: Boolean;
+    /// <summary>True when signal stability criteria pass independently of target range.</summary>
+    IsSignalStable: Boolean;
+    /// <summary>True when confirmation time has elapsed after signal stability.</summary>
+    IsStabilityConfirmed: Boolean;
+    /// <summary>True when current value is inside the target range.</summary>
+    IsCurrentValueInRange: Boolean;
+    /// <summary>True when mean value is inside the target range.</summary>
+    IsMeanValueInRange: Boolean;
+    /// <summary>True when all mandatory stability and range checks passed.</summary>
+    IsSuitableForMeasurement: Boolean;
     /// <summary>Total sample count currently stored in stability history.</summary>
     SampleCount: Integer;
     /// <summary>Number of samples selected into the active analysis window before outlier removal.</summary>
@@ -238,8 +281,12 @@ type
     StdDeviation: Double;
     /// <summary>Linear-regression slope in physical units per second.</summary>
     TrendRate: Double;
+    /// <summary>Regression trend direction calculated by the domain analysis.</summary>
+    TrendDirection: TMeterValueTrendDirection;
     /// <summary>Regression-based forecast at ForecastHorizonSec.</summary>
     ForecastValue: Double;
+    /// <summary>True when forecast value is inside the target range.</summary>
+    IsForecastInRange: Boolean;
     /// <summary>Actual duration in seconds between first and last samples in the active window.</summary>
     WindowDurationSec: Double;
     /// <summary>Age in seconds of the latest sample.</summary>
@@ -264,6 +311,8 @@ type
     IsTrendStable: Boolean;
     /// <summary>True when OutlierFraction is within MaxOutlierFraction.</summary>
     IsOutlierLevelAcceptable: Boolean;
+    /// <summary>Per-source-sample flags for UI grids and diagnostics.</summary>
+    SampleResults: TArray<TMeterValueSampleAnalysis>;
     /// <summary>Human-readable Russian diagnostic text containing the main analysis reasons.</summary>
     StatusText: string;
   end;
@@ -351,6 +400,14 @@ function FormatValue(Value: Double; Accuracy: Integer; Error: Double; ShowTraili
 function FormatValue(const Str: string; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean = True): string; overload;
 function RemoveTrailingZeros(const Str: string): string;
 function RandomGenerate(Value, Error: Double): Double;
+procedure CalculateTargetLimits(
+  const ATargetValue: Double;
+  const APlusPercent: Double;
+  const AMinusPercent: Double;
+  const AAbsoluteTolerance: Double;
+  out ALowerLimit: Double;
+  out AUpperLimit: Double
+);
 function FormatFloatN(Value: Double; Digits: Integer): string;
 function NormalizeAccuracyInput(const S: string): string;
 function FormatAccuracy(const S: string): string;
@@ -368,6 +425,7 @@ function NewGuidString: string;
 function ContainsTextAny(const AText, AFind: string): Boolean;
 function IsDateInRange(const ADate, AFrom, ATo: TDate): Boolean;
 function TryMeasurementPointStatusFromInteger(const AValue: Integer; out AStatus: EMeasurementPointStatus): Boolean;
+function StabilityFailReasonToText(const AReason: TMeterValueStabilityFailReason): string;
 function NormalizeFlowAccuracyInput(const S: string): string;
 function BoolToRussianYesNo(const AValue: Boolean): string;
 function ObjClassNameOrNil(const AObject: TObject): string;
@@ -1135,6 +1193,27 @@ end;
 
 
 
+
+procedure CalculateTargetLimits(
+  const ATargetValue: Double;
+  const APlusPercent: Double;
+  const AMinusPercent: Double;
+  const AAbsoluteTolerance: Double;
+  out ALowerLimit: Double;
+  out AUpperLimit: Double
+);
+var
+  PlusTolerance: Double;
+  MinusTolerance: Double;
+begin
+  PlusTolerance := System.Math.Max(AAbsoluteTolerance,
+    Abs(ATargetValue) * APlusPercent / 100.0);
+  MinusTolerance := System.Math.Max(AAbsoluteTolerance,
+    Abs(ATargetValue) * AMinusPercent / 100.0);
+  ALowerLimit := ATargetValue - MinusTolerance;
+  AUpperLimit := ATargetValue + PlusTolerance;
+end;
+
 function NewGuidString: string;
 begin
   Result := TGUID.NewGuid.ToString;
@@ -1152,6 +1231,29 @@ begin
   Result := (ADate >= AFrom) and (ADate <= ATo);
 end;
 
+
+
+function StabilityFailReasonToText(const AReason: TMeterValueStabilityFailReason): string;
+begin
+  case AReason of
+    mvsfrAnalysisDisabled: Result := 'анализ стабильности отключён';
+    mvsfrNoData: Result := 'нет доступных данных';
+    mvsfrNotEnoughSamples: Result := 'недостаточно отсчётов';
+    mvsfrInsufficientWindow: Result := 'недостаточная длительность фактического окна';
+    mvsfrStaleData: Result := 'последнее значение устарело';
+    mvsfrVariationTooHigh: Result := 'размах превышает допустимое значение';
+    mvsfrDeviationTooHigh: Result := 'стандартное отклонение превышает допустимое значение';
+    mvsfrTrendTooHigh: Result := 'скорость тренда превышает допустимое значение';
+    mvsfrTooManyOutliers: Result := 'доля выбросов превышает допустимое значение';
+    mvsfrCurrentValueOutOfRange: Result := 'текущее значение вне диапазона';
+    mvsfrMeanValueOutOfRange: Result := 'среднее значение вне диапазона';
+    mvsfrForecastOutOfRange: Result := 'прогноз вне диапазона';
+    mvsfrWaitingForConfirmation: Result := 'ожидается подтверждение стабильности';
+    mvsfrInvalidSettings: Result := 'некорректные настройки';
+  else
+    Result := 'неизвестная причина';
+  end;
+end;
 
 function TryMeasurementPointStatusFromInteger(const AValue: Integer; out AStatus: EMeasurementPointStatus): Boolean;
 begin
