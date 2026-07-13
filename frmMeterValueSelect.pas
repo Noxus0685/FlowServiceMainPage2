@@ -358,6 +358,7 @@ begin
 
     if Form.ShowModal = mrOk then
     begin
+      Frame.ApplySettingsToWorkMeterValue;
       Frame.SaveChanges;
       FillValuesList;
       FocusMeterValue(EditedMeterValue);
