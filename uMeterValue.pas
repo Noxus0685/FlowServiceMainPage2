@@ -71,7 +71,7 @@ type
     /// <summary>Stores all configurable signal-stability and target-range criteria for this meter value.</summary>
     FStabilitySettings: TMeterValueStabilitySettings;
     /// <summary>Chronological history of physical-value samples used only by stability analysis.</summary>
-    FStabilitySamples: TList<TMeterValueSample>;
+    FSamples: TList<TMeterValueSample>;
     /// <summary>Last calculated stability-analysis snapshot for consumers that should not recalculate immediately.</summary>
     FLastStabilityInfo: TMeterValueStabilityInfo;
     /// <summary>Monotonic timestamp when all mathematical stability criteria first became true.</summary>
@@ -79,13 +79,13 @@ type
     /// <summary>True after mathematical stability has stayed true for ConfirmationTimeSec.</summary>
     FStabilityConfirmed: Boolean;
     /// <summary>Protects stability history and confirmation runtime state from concurrent readers/writers.</summary>
-    FStabilityLock: TCriticalSection;
+    FSampleLock: TCriticalSection;
     /// <summary>Initializes every stability setting with safe backward-compatible defaults.</summary>
     procedure InitStabilitySettings;
     /// <summary>Clears last analysis and runtime confirmation flags without touching settings.</summary>
     procedure ResetStabilityInfo;
     /// <summary>Adds a physical-value sample with an externally provided monotonic timestamp.</summary>
-    procedure AddStabilitySample(const AValue: Double; const ATimeStampMs: Int64); overload;
+    procedure AddSample(const AValue: Double; const ATimeStampMs: Int64); overload;
     function FindDimIndex(const AName: string): Integer;
     function FormatDisplayValue(const AValue: Double): string;
     class constructor CreateClass;
@@ -203,11 +203,11 @@ type
     /// <summary>Returns process-monotonic time in milliseconds for interval analysis immune to system clock changes.</summary>
     class function GetMonotonicTimeMs: Int64; static;
     /// <summary>Adds a physical-value sample using the current monotonic timestamp.</summary>
-    procedure AddStabilitySample(const AValue: Double); overload;
+    procedure AddSample(const AValue: Double); overload;
     /// <summary>Clears stability samples and runtime confirmation state while preserving all settings.</summary>
-    procedure ClearStabilityHistory;
+    procedure ClearSamplesHistory;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples.</summary>
-    function GetStabilitySamples: TArray<TMeterValueSample>;
+    function GetSamples: TArray<TMeterValueSample>;
     /// <summary>Analyzes the current time window and returns True only when stability is confirmed.</summary>
     function AnalyzeStability(out AInfo: TMeterValueStabilityInfo): Boolean;
     /// <summary>Calculates a forecast for a custom horizon using the same regression-based analyzer.</summary>
@@ -372,8 +372,8 @@ begin
   AverValues := TList<Single>.Create;
   Coefs := TList<TCoef>.Create;
   FAggregateMeterValues := TObjectList<TMeterValue>.Create(False);
-  FStabilitySamples := TList<TMeterValueSample>.Create;
-  FStabilityLock := TCriticalSection.Create;
+  FSamples := TList<TMeterValueSample>.Create;
+  FSampleLock := TCriticalSection.Create;
   InitStabilitySettings;
   ResetStabilityInfo;
   IsToSave := False;
@@ -418,8 +418,8 @@ begin
   RawValues.Free;
   Means.Free;
   Dimensions.Free;
-  FStabilityLock.Free;
-  FStabilitySamples.Free;
+  FSampleLock.Free;
+  FSamples.Free;
   FAggregateMeterValues.Free;
   inherited;
 end;
@@ -450,7 +450,7 @@ begin
   Coefs.Clear;
   for C in AMeterValue.Coefs do Coefs.Add(C);
   FStabilitySettings := AMeterValue.FStabilitySettings;
-  ClearStabilityHistory;
+  ClearSamplesHistory;
 end;
 
 { Finds an existing meter value by hash (and optional owner context). }
@@ -771,48 +771,48 @@ begin
   Result := Round(TStopwatch.GetTimeStamp * 1000.0 / TStopwatch.Frequency);
 end;
 
-procedure TMeterValue.AddStabilitySample(const AValue: Double);
+procedure TMeterValue.AddSample(const AValue: Double);
 begin
-  AddStabilitySample(AValue, GetMonotonicTimeMs);
+  AddSample(AValue, GetMonotonicTimeMs);
 end;
 
-procedure TMeterValue.AddStabilitySample(const AValue: Double; const ATimeStampMs: Int64);
+procedure TMeterValue.AddSample(const AValue: Double; const ATimeStampMs: Int64);
 var
   Sample: TMeterValueSample;
   CutoffMs: Int64;
 begin
   Sample.TimeStampMs := ATimeStampMs;
   Sample.Value := AValue;
-  FStabilityLock.Enter;
+  FSampleLock.Enter;
   try
-    FStabilitySamples.Add(Sample);
+    FSamples.Add(Sample);
     CutoffMs := ATimeStampMs - Round(Max(1.0, FStabilitySettings.WindowDurationSec * 2.0) * 1000.0);
-    while (FStabilitySamples.Count > 0) and
-      ((FStabilitySamples.Count > ARRAY_SIZE) or (FStabilitySamples[0].TimeStampMs < CutoffMs)) do
-      FStabilitySamples.Delete(0);
+    while (FSamples.Count > 0) and
+      ((FSamples.Count > ARRAY_SIZE) or (FSamples[0].TimeStampMs < CutoffMs)) do
+      FSamples.Delete(0);
   finally
-    FStabilityLock.Leave;
+    FSampleLock.Leave;
   end;
 end;
 
-procedure TMeterValue.ClearStabilityHistory;
+procedure TMeterValue.ClearSamplesHistory;
 begin
-  FStabilityLock.Enter;
+  FSampleLock.Enter;
   try
-    FStabilitySamples.Clear;
+    FSamples.Clear;
     ResetStabilityInfo;
   finally
-    FStabilityLock.Leave;
+    FSampleLock.Leave;
   end;
 end;
 
-function TMeterValue.GetStabilitySamples: TArray<TMeterValueSample>;
+function TMeterValue.GetSamples: TArray<TMeterValueSample>;
 begin
-  FStabilityLock.Enter;
+  FSampleLock.Enter;
   try
-    Result := FStabilitySamples.ToArray;
+    Result := FSamples.ToArray;
   finally
-    FStabilityLock.Leave;
+    FSampleLock.Leave;
   end;
 end;
 
@@ -880,7 +880,7 @@ begin
   end;
 
   CurrentMs := GetMonotonicTimeMs;
-  Samples := GetStabilitySamples;
+  Samples := GetSamples;
   AInfo.SampleCount := Length(Samples);
   CutoffMs := CurrentMs - Round(FStabilitySettings.WindowDurationSec * 1000.0);
   SetLength(Window, 0);
@@ -974,7 +974,7 @@ else
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and AInfo.IsOutlierLevelAcceptable and
     not (mvsfrInvalidSettings in AInfo.FailReasons);
 
-  FStabilityLock.Enter;
+  FSampleLock.Enter;
   try
     if MathStable then
     begin
@@ -985,7 +985,7 @@ else
     else begin FStableCandidateSinceMs := 0; FStabilityConfirmed := False; end;
     AInfo.IsConfirmed := FStabilityConfirmed;
   finally
-    FStabilityLock.Leave;
+    FSampleLock.Leave;
   end;
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
@@ -1639,7 +1639,7 @@ var
 begin
   //InputValue := EnsureRange(AValue, MinValue, MaxValue);
   InputValue :=   AValue;
-  AddStabilitySample(InputValue);
+  AddSample(InputValue);
 
 
   if ARRAY_SIZE > 0 then

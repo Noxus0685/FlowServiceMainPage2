@@ -735,7 +735,7 @@ begin
     if FValueSet.Value>FMax then
       FValueSet.Value:=FMax;
 
-  FValue.ClearStabilityHistory;
+  FValue.ClearSamplesHistory;
   Action := apStart;
   FHasTaskHistory := True;
   ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterStart', 'Parameter started', FName);
@@ -931,7 +931,7 @@ begin
         FValueSet.Value:=FMax
       else
         FValueSet.Value:=AValue;
-      FValue.ClearStabilityHistory;
+      FValue.ClearSamplesHistory;
       ProtocolManager.AddMessage(pcAction, psParameters, 'ParameterSet', 'Parameter set changed', Format('%s=%.4f', [FName, FValueSet.Value]));
 
       Action := apSet;
