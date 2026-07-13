@@ -25,9 +25,25 @@ uses
   System.Types,
   System.UITypes,
   uBaseProcedures,
-  uMeterValue;
+  uMeterValue, FMX.Grid.Style, FMX.ScrollBox;
 
 type
+  TMeterValueTestScenario = (
+    mtsConstantValue,
+    mtsStableNoise,
+    mtsSlowIncrease,
+    mtsSlowDecrease,
+    mtsSettlingAfterChange,
+    mtsSingleOutlier,
+    mtsManyOutliers,
+    mtsNotEnoughData,
+    mtsStaleData,
+    mtsForecastAboveRange,
+    mtsForecastBelowRange,
+    mtsStableOutOfRange,
+    mtsAllConditionsPassed
+  );
+
   TFrameMeterValueEdit = class(TFrame)
     TabControlMain: TTabControl;
     TabItemMainParameters: TTabItem;
@@ -62,6 +78,8 @@ type
     ButtonSamplesClear: TButton;
     ButtonAnalyze: TButton;
     CheckBoxAutoAnalyze: TCheckBox;
+    ComboBoxStabilityScenario: TComboBox;
+    ButtonApplyScenario: TButton;
     EditGeneratorStartValue: TEdit;
     EditGeneratorCount: TEdit;
     EditGeneratorTimeStep: TEdit;
@@ -171,6 +189,10 @@ type
     procedure AppendGeneratedSamples;
     procedure GenerateSamples(const AClearExisting: Boolean);
     function ValidateGeneratorControls(out AErrorText: string): Boolean;
+    procedure InitializeScenarioList;
+    procedure ApplySelectedScenario;
+    procedure ApplyScenario(const AScenario: TMeterValueTestScenario);
+    procedure RefreshAllTestControls;
     procedure SortSamples;
     procedure ClearAnalysisDisplay;
     procedure ButtonSampleAddClick(Sender: TObject);
@@ -180,6 +202,7 @@ type
     procedure ButtonAnalyzeClick(Sender: TObject);
     procedure ButtonGenerateNewClick(Sender: TObject);
     procedure ButtonGenerateAppendClick(Sender: TObject);
+    procedure ButtonApplyScenarioClick(Sender: TObject);
     procedure ButtonApplyStabilitySettingsClick(Sender: TObject);
     procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
     procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
@@ -259,6 +282,7 @@ begin
   ButtonAnalyze.OnClick := ButtonAnalyzeClick;
   ButtonGenerateNew.OnClick := ButtonGenerateNewClick;
   ButtonGenerateAppend.OnClick := ButtonGenerateAppendClick;
+  ButtonApplyScenario.OnClick := ButtonApplyScenarioClick;
   ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
   CheckBoxAutoAnalyze.OnChange := HandleAutoAnalyzeChange;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
@@ -314,6 +338,7 @@ begin
   EditGeneratorNoise.Text := '0';
   EditGeneratorOutlierProbability.Text := '0';
   EditGeneratorOutlierAmplitude.Text := '0';
+  InitializeScenarioList;
   RefreshSamplesGrid;
 
   AddEditRow('Полное название', EditValueFull);
@@ -895,6 +920,216 @@ begin
   GenerateSamples(False);
 end;
 
+procedure TFrameMeterValueEdit.InitializeScenarioList;
+begin
+  ComboBoxStabilityScenario.Items.Clear;
+  ComboBoxStabilityScenario.Items.Add('Постоянное значение');
+  ComboBoxStabilityScenario.Items.Add('Стабильный шум');
+  ComboBoxStabilityScenario.Items.Add('Медленный рост');
+  ComboBoxStabilityScenario.Items.Add('Медленное снижение');
+  ComboBoxStabilityScenario.Items.Add('Стабилизация после изменения');
+  ComboBoxStabilityScenario.Items.Add('Единичный выброс');
+  ComboBoxStabilityScenario.Items.Add('Много выбросов');
+  ComboBoxStabilityScenario.Items.Add('Недостаточно данных');
+  ComboBoxStabilityScenario.Items.Add('Устаревшие данные');
+  ComboBoxStabilityScenario.Items.Add('Прогноз выше верхней границы');
+  ComboBoxStabilityScenario.Items.Add('Прогноз ниже нижней границы');
+  ComboBoxStabilityScenario.Items.Add('Стабильный сигнал вне диапазона');
+  ComboBoxStabilityScenario.Items.Add('Все условия выполнены');
+  ComboBoxStabilityScenario.ItemIndex := Ord(mtsConstantValue);
+end;
+
+procedure TFrameMeterValueEdit.RefreshAllTestControls;
+begin
+  EditAnalysisTime.Text := FloatToStr(FTestCurrentTimeMs / 1000.0);
+  LoadSettingsToControls;
+  RefreshSamplesGrid;
+  if FTestSamples.Count > 0 then
+  begin
+    GridSamples.Row := FTestSamples.Count - 1;
+    GridSamples.Selected := GridSamples.Row;
+    LoadSampleToEditor(GridSamples.Row);
+  end
+  else
+  begin
+    GridSamples.Row := -1;
+    GridSamples.Selected := -1;
+    EditSampleTime.Text := '';
+    EditSampleValue.Text := '';
+  end;
+end;
+
+procedure TFrameMeterValueEdit.ApplySelectedScenario;
+begin
+  if (ComboBoxStabilityScenario.ItemIndex < Ord(Low(TMeterValueTestScenario))) or
+     (ComboBoxStabilityScenario.ItemIndex > Ord(High(TMeterValueTestScenario))) then
+  begin
+    ShowMessage('Сценарий не выбран.');
+    Exit;
+  end;
+  ApplyScenario(TMeterValueTestScenario(ComboBoxStabilityScenario.ItemIndex));
+end;
+
+procedure TFrameMeterValueEdit.ApplyScenario(const AScenario: TMeterValueTestScenario);
+
+  procedure AddSamplePoint(const ATimeSec: Integer; const AValue: Double);
+  var
+    Sample: TMeterValueSample;
+  begin
+    Sample.TimeStampMs := ATimeSec * 1000;
+    Sample.Value := AValue;
+    FTestSamples.Add(Sample);
+  end;
+
+  procedure AddValues(const AValues: array of Double; const AStartSec: Integer);
+  var
+    I: Integer;
+  begin
+    for I := Low(AValues) to High(AValues) do
+      AddSamplePoint(AStartSec + I, AValues[I]);
+  end;
+
+  procedure SetBaseSettings;
+  begin
+    FillChar(FTestSettings, SizeOf(FTestSettings), 0);
+    FTestSettings.Enabled := True;
+    FTestSettings.MinSampleCount := 10;
+    FTestSettings.WindowDurationSec := 10;
+    FTestSettings.MaxSampleAgeSec := 3;
+    FTestSettings.ConfirmationTimeSec := 3;
+    FTestSettings.ExitThresholdFactor := 1.2;
+    FTestSettings.MaxVariation := 0.5;
+    FTestSettings.MaxStdDeviation := 0.1;
+    FTestSettings.MaxTrendRate := 0.05;
+    FTestSettings.MaxOutlierFraction := 0.10;
+    FTestSettings.OutlierFactor := 3.5;
+    FTestSettings.ForecastHorizonSec := 10;
+    FTestSettings.TargetAccuracyPlusPercent := 1;
+    FTestSettings.TargetAccuracyMinusPercent := 1;
+    FTestSettings.TargetToleranceAbsolute := 0;
+    FTestSettings.RequireCurrentValueInRange := True;
+    FTestSettings.RequireMeanValueInRange := True;
+    FTestSettings.RequireForecastInRange := True;
+    FTestTargetValue := 10;
+    FTestCurrentTimeMs := 10000;
+  end;
+
+  procedure AddConstantSamples(const ACount: Integer; const AValue: Double);
+  var
+    I: Integer;
+  begin
+    for I := 0 to ACount - 1 do
+      AddSamplePoint(I, AValue);
+  end;
+
+begin
+  FLoading := True;
+  try
+    ClearTestAnalysis;
+    FTestSamples.Clear;
+    FTestStableCandidateSinceMs := 0;
+    FTestStabilityConfirmed := False;
+    SetBaseSettings;
+
+    case AScenario of
+      mtsConstantValue:
+        AddConstantSamples(11, 10);
+      mtsStableNoise:
+        begin
+          FTestSettings.MaxVariation := 0.10;
+          FTestSettings.MaxStdDeviation := 0.05;
+          AddValues([10.00, 10.02, 9.99, 10.01, 9.98, 10.00, 10.01, 9.99, 10.02, 10.00, 10.01], 0);
+        end;
+      mtsSlowIncrease:
+        begin
+          FTestSettings.MaxTrendRate := 0.01;
+          AddValues([10.00, 10.02, 10.04, 10.06, 10.08, 10.10, 10.12, 10.14, 10.16, 10.18, 10.20], 0);
+        end;
+      mtsSlowDecrease:
+        begin
+          FTestSettings.MaxTrendRate := 0.01;
+          AddValues([10.20, 10.18, 10.16, 10.14, 10.12, 10.10, 10.08, 10.06, 10.04, 10.02, 10.00], 0);
+        end;
+      mtsSettlingAfterChange:
+        begin
+          FTestCurrentTimeMs := 20000;
+          FTestSettings.MaxSampleAgeSec := 10;
+          AddValues([5, 5, 5, 5, 5, 7, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], 0);
+        end;
+      mtsSingleOutlier:
+        begin
+          FTestTargetValue := 29;
+          FTestSettings.TargetAccuracyPlusPercent := 1;
+          FTestSettings.TargetAccuracyMinusPercent := 1;
+          FTestSettings.MaxOutlierFraction := 0.11;
+          AddValues([29.00, 29.02, 28.98, 29.01, 29.00, 39.00, 28.99, 29.03, 29.00, 28.97, 29.01], 0);
+        end;
+      mtsManyOutliers:
+        begin
+          FTestTargetValue := 29;
+          FTestSettings.TargetAccuracyPlusPercent := 1;
+          FTestSettings.TargetAccuracyMinusPercent := 1;
+          FTestSettings.MaxOutlierFraction := 0.10;
+          AddValues([29, 29, 29, 29, 39, 29, 29, 19, 29, 29, 29, 39, 29, 29, 29], 0);
+          FTestCurrentTimeMs := 14000;
+        end;
+      mtsNotEnoughData:
+        begin
+          FTestCurrentTimeMs := 4000;
+          AddValues([10.00, 10.01, 9.99, 10.00, 10.01], 0);
+        end;
+      mtsStaleData:
+        begin
+          FTestCurrentTimeMs := 30000;
+          FTestSettings.WindowDurationSec := 30;
+          FTestSettings.MaxSampleAgeSec := 5;
+          AddConstantSamples(11, 10);
+        end;
+      mtsForecastAboveRange:
+        begin
+          FTestSettings.ForecastHorizonSec := 20;
+          FTestSettings.MaxTrendRate := 0.05;
+          FTestSettings.TargetAccuracyPlusPercent := 2;
+          FTestSettings.TargetAccuracyMinusPercent := 2;
+          AddValues([9.80, 9.82, 9.84, 9.86, 9.88, 9.90, 9.92, 9.94, 9.96, 9.98, 10.00], 0);
+        end;
+      mtsForecastBelowRange:
+        begin
+          FTestSettings.ForecastHorizonSec := 20;
+          FTestSettings.MaxTrendRate := 0.05;
+          FTestSettings.TargetAccuracyPlusPercent := 2;
+          FTestSettings.TargetAccuracyMinusPercent := 2;
+          AddValues([10.20, 10.18, 10.16, 10.14, 10.12, 10.10, 10.08, 10.06, 10.04, 10.02, 10.00], 0);
+        end;
+      mtsStableOutOfRange:
+        AddConstantSamples(11, 0);
+      mtsAllConditionsPassed:
+        begin
+          FTestSettings.MaxSampleAgeSec := 3;
+          FTestSettings.ConfirmationTimeSec := 3;
+          AddConstantSamples(14, 10);
+          FTestCurrentTimeMs := 10000;
+        end;
+    end;
+
+    SortSamples;
+    RefreshAllTestControls;
+  finally
+    FLoading := False;
+  end;
+
+  FTestDataModified := True;
+  FSettingsModified := True;
+  FModified := True;
+  if AScenario = mtsAllConditionsPassed then
+  begin
+    Analyze;
+    FTestCurrentTimeMs := 13000;
+    EditAnalysisTime.Text := FloatToStr(FTestCurrentTimeMs / 1000.0);
+  end;
+  Analyze;
+end;
+
 procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
 begin
   AddSample;
@@ -928,6 +1163,11 @@ end;
 procedure TFrameMeterValueEdit.ButtonGenerateAppendClick(Sender: TObject);
 begin
   AppendGeneratedSamples;
+end;
+
+procedure TFrameMeterValueEdit.ButtonApplyScenarioClick(Sender: TObject);
+begin
+  ApplySelectedScenario;
 end;
 
 procedure TFrameMeterValueEdit.GridSamplesCellDblClick(const Column: TColumn;
