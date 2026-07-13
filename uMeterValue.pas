@@ -897,7 +897,8 @@ begin
   CutoffMs := CurrentMs - Round(FStabilitySettings.WindowDurationSec * 1000.0);
   SetLength(Window, 0);
   for I := 0 to High(Samples) do
-    if Samples[I].TimeStampMs >= CutoffMs then
+    if (Samples[I].TimeStampMs >= CutoffMs) and
+       (Samples[I].TimeStampMs <= CurrentMs) then
     begin
       SetLength(Window, Length(Window) + 1);
       Window[High(Window)] := Samples[I];
@@ -1127,7 +1128,8 @@ begin
   CutoffMs := ACurrentMs - Round(ASettings.WindowDurationSec * 1000.0);
   SetLength(Window, 0);
   for I := 0 to High(ASamples) do
-    if ASamples[I].TimeStampMs >= CutoffMs then
+    if (ASamples[I].TimeStampMs >= CutoffMs) and
+       (ASamples[I].TimeStampMs <= ACurrentMs) then
     begin
       AddWindowSample(I, ASamples[I]);
       AInfo.SampleResults[I].InWindow := True;
