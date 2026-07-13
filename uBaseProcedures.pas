@@ -351,6 +351,14 @@ function FormatValue(Value: Double; Accuracy: Integer; Error: Double; ShowTraili
 function FormatValue(const Str: string; Accuracy: Integer; Error: Double; ShowTrailingZeros: Boolean = True): string; overload;
 function RemoveTrailingZeros(const Str: string): string;
 function RandomGenerate(Value, Error: Double): Double;
+procedure CalculateTargetLimits(
+  const ATargetValue: Double;
+  const APlusPercent: Double;
+  const AMinusPercent: Double;
+  const AAbsoluteTolerance: Double;
+  out ALowerLimit: Double;
+  out AUpperLimit: Double
+);
 function FormatFloatN(Value: Double; Digits: Integer): string;
 function NormalizeAccuracyInput(const S: string): string;
 function FormatAccuracy(const S: string): string;
@@ -1134,6 +1142,27 @@ begin
 end;
 
 
+
+
+procedure CalculateTargetLimits(
+  const ATargetValue: Double;
+  const APlusPercent: Double;
+  const AMinusPercent: Double;
+  const AAbsoluteTolerance: Double;
+  out ALowerLimit: Double;
+  out AUpperLimit: Double
+);
+var
+  PlusTolerance: Double;
+  MinusTolerance: Double;
+begin
+  PlusTolerance := System.Math.Max(AAbsoluteTolerance,
+    Abs(ATargetValue) * APlusPercent / 100.0);
+  MinusTolerance := System.Math.Max(AAbsoluteTolerance,
+    Abs(ATargetValue) * AMinusPercent / 100.0);
+  ALowerLimit := ATargetValue - MinusTolerance;
+  AUpperLimit := ATargetValue + PlusTolerance;
+end;
 
 function NewGuidString: string;
 begin

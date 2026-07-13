@@ -62,12 +62,22 @@ type
     EditMaxOutlierFractionPercent: TEdit;
     EditOutlierFactor: TEdit;
     EditForecastHorizonSec: TEdit;
+    EditTestTargetValue: TEdit;
+    EditTargetAccuracyPlusPercent: TEdit;
+    EditTargetAccuracyMinusPercent: TEdit;
+    EditTargetToleranceAbsolute: TEdit;
+    CheckBoxRequireCurrentValueInRange: TCheckBox;
+    CheckBoxRequireMeanValueInRange: TCheckBox;
+    CheckBoxRequireForecastInRange: TCheckBox;
+    EditTargetLowerLimit: TEdit;
+    EditTargetUpperLimit: TEdit;
   private
     FMeterValue: TMeterValue;
     FLoading: Boolean;
     FTestSamples: TList<TMeterValueSample>;
     FTestCurrentTimeMs: Int64;
     FTestDataModified: Boolean;
+    FTestTargetValue: Double;
     FTestSettings: TMeterValueStabilitySettings;
     FSettingsModified: Boolean;
     FModified: Boolean;
@@ -133,6 +143,8 @@ type
     procedure HandleSettingsChange(Sender: TObject);
     function TryReadFloat(const AText: string; out AValue: Double): Boolean;
     function TryReadInteger(const AText: string; out AValue: Integer): Boolean;
+    procedure UpdateTargetLimits;
+    procedure HandleTargetRangeChange(Sender: TObject);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -151,6 +163,7 @@ begin
   FTestSamples := TList<TMeterValueSample>.Create;
   FTestCurrentTimeMs := 0;
   FTestDataModified := False;
+  FTestTargetValue := 0;
   FSettingsModified := False;
   FModified := False;
   FillChar(FTestSettings, SizeOf(FTestSettings), 0);
@@ -195,6 +208,15 @@ begin
   EditMaxOutlierFractionPercent.OnChange := HandleSettingsChange;
   EditOutlierFactor.OnChange := HandleSettingsChange;
   EditForecastHorizonSec.OnChange := HandleSettingsChange;
+  EditTestTargetValue.OnChange := HandleTargetRangeChange;
+  EditTargetAccuracyPlusPercent.OnChange := HandleTargetRangeChange;
+  EditTargetAccuracyMinusPercent.OnChange := HandleTargetRangeChange;
+  EditTargetToleranceAbsolute.OnChange := HandleTargetRangeChange;
+  CheckBoxRequireCurrentValueInRange.OnChange := HandleTargetRangeChange;
+  CheckBoxRequireMeanValueInRange.OnChange := HandleTargetRangeChange;
+  CheckBoxRequireForecastInRange.OnChange := HandleTargetRangeChange;
+  EditTargetLowerLimit.ReadOnly := True;
+  EditTargetUpperLimit.ReadOnly := True;
   EditSampleTimeStep.Text := '1,0';
   EditAnalysisTime.Text := '0';
   RefreshSamplesGrid;
@@ -626,6 +648,49 @@ end;
 
 
 
+
+procedure TFrameMeterValueEdit.UpdateTargetLimits;
+var
+  TargetValue: Double;
+  PlusPercent: Double;
+  MinusPercent: Double;
+  AbsoluteTolerance: Double;
+  LowerLimit: Double;
+  UpperLimit: Double;
+begin
+  if (not TryReadFloat(EditTestTargetValue.Text, TargetValue)) or
+     (not TryReadFloat(EditTargetAccuracyPlusPercent.Text, PlusPercent)) or
+     (not TryReadFloat(EditTargetAccuracyMinusPercent.Text, MinusPercent)) or
+     (not TryReadFloat(EditTargetToleranceAbsolute.Text, AbsoluteTolerance)) or
+     (PlusPercent < 0) or (MinusPercent < 0) or (AbsoluteTolerance < 0) then
+    Exit;
+
+  FTestTargetValue := TargetValue;
+  FTestSettings.TargetAccuracyPlusPercent := PlusPercent;
+  FTestSettings.TargetAccuracyMinusPercent := MinusPercent;
+  FTestSettings.TargetToleranceAbsolute := AbsoluteTolerance;
+  FTestSettings.RequireCurrentValueInRange := CheckBoxRequireCurrentValueInRange.IsChecked;
+  FTestSettings.RequireMeanValueInRange := CheckBoxRequireMeanValueInRange.IsChecked;
+  FTestSettings.RequireForecastInRange := CheckBoxRequireForecastInRange.IsChecked;
+
+  CalculateTargetLimits(TargetValue, PlusPercent, MinusPercent, AbsoluteTolerance,
+    LowerLimit, UpperLimit);
+  EditTargetLowerLimit.Text := FloatToStr(LowerLimit);
+  EditTargetUpperLimit.Text := FloatToStr(UpperLimit);
+end;
+
+procedure TFrameMeterValueEdit.HandleTargetRangeChange(Sender: TObject);
+begin
+  if FLoading then
+    Exit;
+
+  UpdateTargetLimits;
+  if Sender <> EditTestTargetValue then
+    FSettingsModified := True;
+  FTestDataModified := True;
+  FModified := True;
+end;
+
 procedure TFrameMeterValueEdit.ApplySettingsToWorkMeterValue;
 var
   ErrorText: string;
@@ -676,6 +741,14 @@ begin
     EditMaxOutlierFractionPercent.Text := FloatToStr(FTestSettings.MaxOutlierFraction * 100);
     EditOutlierFactor.Text := FloatToStr(FTestSettings.OutlierFactor);
     EditForecastHorizonSec.Text := FloatToStr(FTestSettings.ForecastHorizonSec);
+    EditTestTargetValue.Text := FloatToStr(FTestTargetValue);
+    EditTargetAccuracyPlusPercent.Text := FloatToStr(FTestSettings.TargetAccuracyPlusPercent);
+    EditTargetAccuracyMinusPercent.Text := FloatToStr(FTestSettings.TargetAccuracyMinusPercent);
+    EditTargetToleranceAbsolute.Text := FloatToStr(FTestSettings.TargetToleranceAbsolute);
+    CheckBoxRequireCurrentValueInRange.IsChecked := FTestSettings.RequireCurrentValueInRange;
+    CheckBoxRequireMeanValueInRange.IsChecked := FTestSettings.RequireMeanValueInRange;
+    CheckBoxRequireForecastInRange.IsChecked := FTestSettings.RequireForecastInRange;
+    UpdateTargetLimits;
   finally
     FLoading := False;
   end;
@@ -713,6 +786,12 @@ begin
     ASettings.MaxOutlierFraction := OutlierPercent / 100;
   TryReadFloat(EditOutlierFactor.Text, ASettings.OutlierFactor);
   TryReadFloat(EditForecastHorizonSec.Text, ASettings.ForecastHorizonSec);
+  TryReadFloat(EditTargetAccuracyPlusPercent.Text, ASettings.TargetAccuracyPlusPercent);
+  TryReadFloat(EditTargetAccuracyMinusPercent.Text, ASettings.TargetAccuracyMinusPercent);
+  TryReadFloat(EditTargetToleranceAbsolute.Text, ASettings.TargetToleranceAbsolute);
+  ASettings.RequireCurrentValueInRange := CheckBoxRequireCurrentValueInRange.IsChecked;
+  ASettings.RequireMeanValueInRange := CheckBoxRequireMeanValueInRange.IsChecked;
+  ASettings.RequireForecastInRange := CheckBoxRequireForecastInRange.IsChecked;
 end;
 
 function TFrameMeterValueEdit.ValidateControls(out AErrorText: string): Boolean;
@@ -748,6 +827,14 @@ begin
     AErrorText := 'Коэффициент определения выброса должен быть положительным числом.'
   else if (not TryReadFloat(EditForecastHorizonSec.Text, DoubleValue)) or (DoubleValue < 0) then
     AErrorText := 'Горизонт прогноза не может быть отрицательным.'
+  else if not TryReadFloat(EditTestTargetValue.Text, DoubleValue) then
+    AErrorText := 'Целевое значение должно быть корректным числом.'
+  else if (not TryReadFloat(EditTargetAccuracyPlusPercent.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Допуск вверх не может быть отрицательным.'
+  else if (not TryReadFloat(EditTargetAccuracyMinusPercent.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Допуск вниз не может быть отрицательным.'
+  else if (not TryReadFloat(EditTargetToleranceAbsolute.Text, DoubleValue)) or (DoubleValue < 0) then
+    AErrorText := 'Минимальный абсолютный допуск не может быть отрицательным.'
   else
     Result := True;
 end;
@@ -845,6 +932,7 @@ begin
       EditCoefK.Text := '';
       EditCoefP.Text := '';
       CheckBoxIsToSave.IsChecked := False;
+      FTestTargetValue := 0;
       CopySettingsFromWorkMeterValue;
       LoadSettingsToControls;
       Exit;
@@ -901,6 +989,7 @@ begin
 
     EditCoefK.Text := FloatToStr(FMeterValue.CoefK);
     EditCoefP.Text := FloatToStr(FMeterValue.CoefP);
+    FTestTargetValue := FMeterValue.GetDoubleValueDim;
     CopySettingsFromWorkMeterValue;
     LoadSettingsToControls;
   finally
