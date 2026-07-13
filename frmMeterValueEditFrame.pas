@@ -25,7 +25,7 @@ uses
   System.Types,
   System.UITypes,
   uBaseProcedures,
-  uMeterValue, FMX.Grid.Style, FMX.ScrollBox;
+  uMeterValue, FMX.Grid.Style, FMX.ScrollBox, uDebugLog;
 
 type
   TMeterValueSampleSource = (
@@ -208,7 +208,7 @@ type
     function DisplayDeltaToBase(const AText: string): Double;
     procedure UpdateDimensionCaptions;
     procedure LoadSampleToEditor(const AIndex: Integer);
-    procedure RefreshSamplesGrid;
+    procedure RefreshSamplesGrid(const AReload: Boolean = True);
     procedure AddSample;
     procedure EditSelectedSample;
     procedure DeleteSelectedSample;
@@ -757,10 +757,38 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.ButtonRefreshHistoryClick(Sender: TObject);
+var
+  BeforeSamples: TArray<TMeterValueSample>;
+  AfterSamples: TArray<TMeterValueSample>;
+
+  function BoundaryText(const ASamples: TArray<TMeterValueSample>): string;
+  begin
+    if Length(ASamples) = 0 then
+      Result := 'empty'
+    else
+      Result := Format('first=%d last=%d', [ASamples[0].TimeStampMs,
+        ASamples[High(ASamples)].TimeStampMs]);
+  end;
+
 begin
   if FSampleSource <> mssWorkHistory then
     Exit;
+
+  if FMeterValue <> nil then
+    BeforeSamples := FMeterValue.GetStabilitySamples
+  else
+    SetLength(BeforeSamples, 0);
+
   Analyze;
+
+  if FMeterValue <> nil then
+    AfterSamples := FMeterValue.GetStabilitySamples
+  else
+    SetLength(AfterSamples, 0);
+
+  DebugLog(Format('ButtonRefreshHistory: before count=%d %s; after count=%d %s',
+    [Length(BeforeSamples), BoundaryText(BeforeSamples), Length(AfterSamples),
+     BoundaryText(AfterSamples)]));
 end;
 
 procedure TFrameMeterValueEdit.ButtonUseLastSampleTimeClick(Sender: TObject);
@@ -792,11 +820,12 @@ begin
   EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[AIndex].Value);
 end;
 
-procedure TFrameMeterValueEdit.RefreshSamplesGrid;
+procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
 begin
   GridSamples.BeginUpdate;
   try
-    RefreshDisplayedSamples;
+    if AReload then
+      RefreshDisplayedSamples;
     GridSamples.RowCount := Length(FDisplayedSamples);
   finally
     GridSamples.EndUpdate;
@@ -1678,7 +1707,7 @@ begin
     FTestTargetValue, LowerLimit, UpperLimit, FTestStableCandidateSinceMs,
     FTestStabilityConfirmed, FLastTestAnalysis);
   DisplayAnalysis(FLastTestAnalysis);
-  RefreshSamplesGrid;
+  RefreshSamplesGrid(False);
 end;
 
 
