@@ -877,6 +877,7 @@ begin
   if not FStabilitySettings.Enabled then
   begin
     AInfo.Status := mvssDisabled;
+    Include(AInfo.FailReasons, mvsfrAnalysisDisabled);
     AInfo.StatusText := 'Анализ стабильности отключён.';
     FLastStabilityInfo := AInfo;
     Exit(False);
@@ -904,6 +905,7 @@ begin
 
   N := Length(Window);
   AInfo.UsedSampleCount := N;
+  if N = 0 then Include(AInfo.FailReasons, mvsfrNoData);
   if N > 0 then
   begin
     FirstMs := Window[0].TimeStampMs;
@@ -1000,6 +1002,7 @@ else
   MathStable := AInfo.HasEnoughSamples and AInfo.HasEnoughWindow and AInfo.IsDataActual and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and AInfo.IsOutlierLevelAcceptable and
     not (mvsfrInvalidSettings in AInfo.FailReasons);
+  AInfo.IsSignalStable := MathStable;
 
   FStabilityLock.Enter;
   try
@@ -1011,9 +1014,13 @@ else
     end
     else begin FStableCandidateSinceMs := 0; FStabilityConfirmed := False; end;
     AInfo.IsConfirmed := FStabilityConfirmed;
+    AInfo.IsStabilityConfirmed := FStabilityConfirmed;
   finally
     FStabilityLock.Leave;
   end;
+
+  if MathStable and not AInfo.IsConfirmed then Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
+  AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed;
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
   else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
@@ -1030,7 +1037,13 @@ else
   if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.2f превышает допустимые %.2f. ', [AInfo.OutlierFraction, FStabilitySettings.MaxOutlierFraction]);
   if MathStable and not AInfo.IsConfirmed then Msg := Format('Предварительная стабильность достигнута, ожидается подтверждение: %.1f из %.1f с.', [AInfo.StableCandidateDurationSec, FStabilitySettings.ConfirmationTimeSec]);
   if AInfo.Status = mvssStable then Msg := Format('Сигнал стабилен: среднее %.4f; размах %.4f; стандартное отклонение %.4f; тренд %.6f ед./с.', [AInfo.MeanValue, AInfo.Variation, AInfo.StdDeviation, AInfo.TrendRate]);
-  AInfo.StatusText := Trim(Msg);
+  if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
+  else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
+  else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет доступных данных.'
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
+  else if AInfo.IsSignalStable and not AInfo.IsConfirmed then AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
+  else if AInfo.IsSignalStable and AInfo.IsConfirmed then AInfo.StatusText := 'Стабильность подтверждена, но значение вне диапазона.'
+  else AInfo.StatusText := 'Сигнал нестабилен.';
   FLastStabilityInfo := AInfo;
   Result := AInfo.Status = mvssStable;
 end;
@@ -1090,6 +1103,7 @@ begin
   if not ASettings.Enabled then
   begin
     AInfo.Status := mvssDisabled;
+    Include(AInfo.FailReasons, mvsfrAnalysisDisabled);
     AInfo.StatusText := 'Анализ стабильности отключён.';
     Exit(False);
   end;
@@ -1121,6 +1135,7 @@ begin
 
   N := Length(Window);
   AInfo.UsedSampleCount := N;
+  if N = 0 then Include(AInfo.FailReasons, mvsfrNoData);
   if N > 0 then
   begin
     FirstMs := Window[0].Sample.TimeStampMs;
@@ -1249,6 +1264,18 @@ begin
   MathStable := AInfo.HasEnoughSamples and AInfo.HasEnoughWindow and AInfo.IsDataActual and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and
     AInfo.IsOutlierLevelAcceptable and not (mvsfrInvalidSettings in AInfo.FailReasons);
+  AInfo.IsSignalStable := MathStable;
+
+  AInfo.IsCurrentValueInRange := AInfo.HasCurrentValue and (AInfo.CurrentValue >= ALowerLimit) and
+    (AInfo.CurrentValue <= AUpperLimit);
+  AInfo.IsMeanValueInRange := AInfo.HasStatistics and (AInfo.MeanValue >= ALowerLimit) and
+    (AInfo.MeanValue <= AUpperLimit);
+  if ASettings.RequireCurrentValueInRange and AInfo.HasCurrentValue and not AInfo.IsCurrentValueInRange then
+    Include(AInfo.FailReasons, mvsfrCurrentValueOutOfRange);
+  if ASettings.RequireMeanValueInRange and AInfo.HasStatistics and not AInfo.IsMeanValueInRange then
+    Include(AInfo.FailReasons, mvsfrMeanValueOutOfRange);
+  if ASettings.RequireForecastInRange and AInfo.HasForecast and not AInfo.IsForecastInRange then
+    Include(AInfo.FailReasons, mvsfrForecastOutOfRange);
 
   if MathStable then
   begin
@@ -1263,6 +1290,13 @@ begin
     AStabilityConfirmed := False;
   end;
   AInfo.IsConfirmed := AStabilityConfirmed;
+  AInfo.IsStabilityConfirmed := AStabilityConfirmed;
+  if MathStable and not AInfo.IsConfirmed then Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
+
+  AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed and
+    ((not ASettings.RequireCurrentValueInRange) or AInfo.IsCurrentValueInRange) and
+    ((not ASettings.RequireMeanValueInRange) or AInfo.IsMeanValueInRange) and
+    ((not ASettings.RequireForecastInRange) or AInfo.IsForecastInRange);
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
   else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
@@ -1279,7 +1313,13 @@ begin
   if mvsfrTooManyOutliers in AInfo.FailReasons then Msg := Msg + Format('Доля выбросов %.2f превышает допустимые %.2f. ', [AInfo.OutlierFraction, ASettings.MaxOutlierFraction]);
   if MathStable and not AInfo.IsConfirmed then Msg := Format('Предварительная стабильность достигнута, ожидается подтверждение: %.1f из %.1f с.', [AInfo.StableCandidateDurationSec, ASettings.ConfirmationTimeSec]);
   if AInfo.Status = mvssStable then Msg := Format('Сигнал стабилен: среднее %.4f; размах %.4f; стандартное отклонение %.4f; тренд %.6f ед./с.', [AInfo.MeanValue, AInfo.Variation, AInfo.StdDeviation, AInfo.TrendRate]);
-  AInfo.StatusText := Trim(Msg);
+  if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
+  else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
+  else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет доступных данных.'
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
+  else if AInfo.IsSignalStable and not AInfo.IsConfirmed then AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
+  else if AInfo.IsSignalStable and AInfo.IsConfirmed then AInfo.StatusText := 'Стабильность подтверждена, но значение вне диапазона.'
+  else AInfo.StatusText := 'Сигнал нестабилен.';
 
   Result := AInfo.Status = mvssStable;
 end;

@@ -169,6 +169,8 @@ type
 
   /// <summary>Individual reasons why a stability analysis did not become stable.</summary>
   TMeterValueStabilityFailReason = (
+    mvsfrAnalysisDisabled,
+    mvsfrNoData,
     mvsfrNotEnoughSamples,  // Fewer samples than MinSampleCount are available in the active window.
     mvsfrInsufficientWindow,// Active window duration is shorter than WindowDurationSec.
     mvsfrStaleData,         // Last sample age exceeds MaxSampleAgeSec.
@@ -176,6 +178,10 @@ type
     mvsfrDeviationTooHigh,  // Absolute standard deviation exceeds MaxStdDeviation.
     mvsfrTrendTooHigh,      // Absolute regression slope exceeds MaxTrendRate.
     mvsfrTooManyOutliers,   // Outlier fraction exceeds MaxOutlierFraction.
+    mvsfrCurrentValueOutOfRange,
+    mvsfrMeanValueOutOfRange,
+    mvsfrForecastOutOfRange,
+    mvsfrWaitingForConfirmation,
     mvsfrInvalidSettings    // Settings failed validation and analysis result is not reliable.
   );
 
@@ -245,6 +251,16 @@ type
     HasForecast: Boolean;
     /// <summary>True when LastSampleAgeSec is valid.</summary>
     HasLastSampleAge: Boolean;
+    /// <summary>True when signal stability criteria pass independently of target range.</summary>
+    IsSignalStable: Boolean;
+    /// <summary>True when confirmation time has elapsed after signal stability.</summary>
+    IsStabilityConfirmed: Boolean;
+    /// <summary>True when current value is inside the target range.</summary>
+    IsCurrentValueInRange: Boolean;
+    /// <summary>True when mean value is inside the target range.</summary>
+    IsMeanValueInRange: Boolean;
+    /// <summary>True when all mandatory stability and range checks passed.</summary>
+    IsSuitableForMeasurement: Boolean;
     /// <summary>Total sample count currently stored in stability history.</summary>
     SampleCount: Integer;
     /// <summary>Number of samples selected into the active analysis window before outlier removal.</summary>
@@ -409,6 +425,7 @@ function NewGuidString: string;
 function ContainsTextAny(const AText, AFind: string): Boolean;
 function IsDateInRange(const ADate, AFrom, ATo: TDate): Boolean;
 function TryMeasurementPointStatusFromInteger(const AValue: Integer; out AStatus: EMeasurementPointStatus): Boolean;
+function StabilityFailReasonToText(const AReason: TMeterValueStabilityFailReason): string;
 function NormalizeFlowAccuracyInput(const S: string): string;
 function BoolToRussianYesNo(const AValue: Boolean): string;
 function ObjClassNameOrNil(const AObject: TObject): string;
@@ -1214,6 +1231,29 @@ begin
   Result := (ADate >= AFrom) and (ADate <= ATo);
 end;
 
+
+
+function StabilityFailReasonToText(const AReason: TMeterValueStabilityFailReason): string;
+begin
+  case AReason of
+    mvsfrAnalysisDisabled: Result := 'анализ стабильности отключён';
+    mvsfrNoData: Result := 'нет доступных данных';
+    mvsfrNotEnoughSamples: Result := 'недостаточно отсчётов';
+    mvsfrInsufficientWindow: Result := 'недостаточная длительность фактического окна';
+    mvsfrStaleData: Result := 'последнее значение устарело';
+    mvsfrVariationTooHigh: Result := 'размах превышает допустимое значение';
+    mvsfrDeviationTooHigh: Result := 'стандартное отклонение превышает допустимое значение';
+    mvsfrTrendTooHigh: Result := 'скорость тренда превышает допустимое значение';
+    mvsfrTooManyOutliers: Result := 'доля выбросов превышает допустимое значение';
+    mvsfrCurrentValueOutOfRange: Result := 'текущее значение вне диапазона';
+    mvsfrMeanValueOutOfRange: Result := 'среднее значение вне диапазона';
+    mvsfrForecastOutOfRange: Result := 'прогноз вне диапазона';
+    mvsfrWaitingForConfirmation: Result := 'ожидается подтверждение стабильности';
+    mvsfrInvalidSettings: Result := 'некорректные настройки';
+  else
+    Result := 'неизвестная причина';
+  end;
+end;
 
 function TryMeasurementPointStatusFromInteger(const AValue: Integer; out AStatus: EMeasurementPointStatus): Boolean;
 begin

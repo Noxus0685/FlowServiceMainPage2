@@ -980,16 +980,40 @@
               Align = Top
               Margins.Bottom = 8.000000000000000000
               Size.Width = 704.000000000000000000
-              Size.Height = 80.000000000000000000
+              Size.Height = 160.000000000000000000
               Size.PlatformDefault = False
               Text = 'Причины'
+              object ListBoxStabilityReasons: TListBox
+                Align = Client
+                Margins.Left = 4.000000000000000000
+                Margins.Top = 4.000000000000000000
+                Margins.Right = 4.000000000000000000
+                Margins.Bottom = 4.000000000000000000
+                Size.Width = 696.000000000000000000
+                Size.Height = 134.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+              end
             end
             object GroupResultDetailedConclusion: TGroupBox
               Align = Top
               Size.Width = 704.000000000000000000
-              Size.Height = 120.000000000000000000
+              Size.Height = 260.000000000000000000
               Size.PlatformDefault = False
               Text = 'Подробное заключение'
+              object MemoStabilityConclusion: TMemo
+                Align = Client
+                Margins.Left = 4.000000000000000000
+                Margins.Top = 4.000000000000000000
+                Margins.Right = 4.000000000000000000
+                Margins.Bottom = 4.000000000000000000
+                ReadOnly = True
+                Size.Width = 696.000000000000000000
+                Size.Height = 234.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                Text = ''
+              end
             end
           end
         end

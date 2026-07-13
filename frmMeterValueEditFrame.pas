@@ -88,6 +88,8 @@ type
     EditResultForecastHorizon: TEdit;
     EditResultForecastValue: TEdit;
     EditResultForecastInRange: TEdit;
+    ListBoxStabilityReasons: TListBox;
+    MemoStabilityConclusion: TMemo;
   private
     FMeterValue: TMeterValue;
     FLoading: Boolean;
@@ -174,6 +176,7 @@ type
     procedure DisplayAnalysis(const AInfo: TMeterValueStabilityInfo);
     function FormatInfoFloat(const AValue: Double; const AHasValue: Boolean; const ADigits: Integer = 4): string;
     function TrendDirectionText(const ADirection: TMeterValueTrendDirection; const AHasTrend: Boolean): string;
+    procedure UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -267,6 +270,7 @@ begin
   EditResultForecastHorizon.ReadOnly := True;
   EditResultForecastValue.ReadOnly := True;
   EditResultForecastInRange.ReadOnly := True;
+  MemoStabilityConclusion.ReadOnly := True;
   EditSampleTimeStep.Text := '1,0';
   EditAnalysisTime.Text := '0';
   RefreshSamplesGrid;
@@ -609,6 +613,8 @@ begin
   EditResultForecastHorizon.Text := EmptyText;
   EditResultForecastValue.Text := EmptyText;
   EditResultForecastInRange.Text := EmptyText;
+  ListBoxStabilityReasons.Items.Clear;
+  MemoStabilityConclusion.Lines.Clear;
 end;
 
 procedure TFrameMeterValueEdit.ClearSamples;
@@ -904,6 +910,8 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.DisplayAnalysis(const AInfo: TMeterValueStabilityInfo);
+var
+  Reason: TMeterValueStabilityFailReason;
 begin
   MemoConclusion.Lines.Text := AInfo.StatusText;
 
@@ -937,6 +945,76 @@ begin
     EditResultForecastInRange.Text := BoolText(AInfo.IsForecastInRange)
   else
     EditResultForecastInRange.Text := '—';
+
+  ListBoxStabilityReasons.Items.Clear;
+  for Reason := Low(TMeterValueStabilityFailReason) to High(TMeterValueStabilityFailReason) do
+    if Reason in AInfo.FailReasons then
+      ListBoxStabilityReasons.Items.Add(StabilityFailReasonToText(Reason));
+  if ListBoxStabilityReasons.Items.Count = 0 then
+    ListBoxStabilityReasons.Items.Add('Причины отсутствуют.');
+
+  UpdateDetailedConclusion(AInfo);
+end;
+
+
+procedure TFrameMeterValueEdit.UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
+var
+  Lines: TStringList;
+  Reason: TMeterValueStabilityFailReason;
+begin
+  Lines := TStringList.Create;
+  try
+    if AInfo.IsSuitableForMeasurement then
+      Lines.Add('Значение пригодно для измерения.')
+    else if mvsfrAnalysisDisabled in AInfo.FailReasons then
+      Lines.Add('Анализ стабильности отключён.')
+    else if mvsfrNoData in AInfo.FailReasons then
+      Lines.Add('Нет доступных данных.')
+    else
+      Lines.Add('Значение пока нельзя использовать.');
+
+    Lines.Add('');
+    Lines.Add('Всего отсчётов: ' + IntToStr(AInfo.SampleCount) + '.');
+    Lines.Add('Использовано отсчётов: ' + IntToStr(AInfo.UsedSampleCount) + '.');
+    Lines.Add('Текущее значение: ' + FormatInfoFloat(AInfo.CurrentValue, AInfo.HasCurrentValue, 4) + '.');
+    Lines.Add('Среднее значение: ' + FormatInfoFloat(AInfo.MeanValue, AInfo.HasStatistics, 4) + '.');
+    Lines.Add('Допустимый диапазон: ' + EditTargetLowerLimit.Text + '–' + EditTargetUpperLimit.Text + '.');
+
+    Lines.Add('');
+    Lines.Add('Размах: ' + FormatInfoFloat(AInfo.Variation, AInfo.HasStatistics, 4) + '.');
+    Lines.Add('Стандартное отклонение: ' + FormatInfoFloat(AInfo.StdDeviation, AInfo.HasStatistics, 4) + '.');
+    Lines.Add('Скорость тренда: ' + EditResultTrendRate.Text + ' ед./с.');
+    Lines.Add('Направление тренда: ' + TrendDirectionText(AInfo.TrendDirection, AInfo.HasTrend) + '.');
+    Lines.Add('Предварительная стабильность: ' + BoolText(AInfo.IsSignalStable) + '.');
+    Lines.Add('Подтверждение стабильности: ' + BoolText(AInfo.IsStabilityConfirmed) + '.');
+    if AInfo.IsSignalStable and not AInfo.IsStabilityConfirmed then
+      Lines.Add('Время подтверждения: ' + FormatInfoFloat(AInfo.StableCandidateDurationSec, True, 2) +
+        ' из ' + FormatInfoFloat(FTestSettings.ConfirmationTimeSec, True, 2) + ' с.');
+
+    Lines.Add('');
+    Lines.Add('Прогноз через ' + FormatInfoFloat(FTestSettings.ForecastHorizonSec, AInfo.HasForecast, 2) + ' с: ' +
+      FormatInfoFloat(AInfo.ForecastValue, AInfo.HasForecast, 4) + '.');
+    Lines.Add('Прогноз в диапазоне: ' + EditResultForecastInRange.Text + '.');
+
+    Lines.Add('');
+    Lines.Add('Причины:');
+    if AInfo.FailReasons = [] then
+      Lines.Add('— причины отсутствуют;')
+    else
+      for Reason := Low(TMeterValueStabilityFailReason) to High(TMeterValueStabilityFailReason) do
+        if Reason in AInfo.FailReasons then
+          Lines.Add('— ' + StabilityFailReasonToText(Reason) + ';');
+
+    Lines.Add('');
+    if AInfo.IsSuitableForMeasurement then
+      Lines.Add('Итог: значение пригодно для измерения.')
+    else
+      Lines.Add('Итог: значение непригодно для измерения.');
+
+    MemoStabilityConclusion.Lines.Assign(Lines);
+  finally
+    Lines.Free;
+  end;
 end;
 
 procedure TFrameMeterValueEdit.ApplySettingsToWorkMeterValue;
