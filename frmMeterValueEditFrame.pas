@@ -642,7 +642,6 @@ begin
 
   ReadSettingsFromControls(Settings);
   FMeterValue.StabilitySettings := Settings;
-  TMeterValue.SaveToFile(0);
   CopySettingsFromWorkMeterValue;
   LoadSettingsToControls;
   FModified := FTestDataModified;
