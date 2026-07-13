@@ -1,5 +1,391 @@
-object FrameMeterValueEdit: TFrameMeterValueEdit
-  Size.Width = 520.000000000000000000
-  Size.Height = 300.000000000000000000
+﻿object FrameMeterValueEdit: TFrameMeterValueEdit
+  Size.Width = 720.000000000000000000
+  Size.Height = 520.000000000000000000
   Size.PlatformDefault = False
+  object TabControlMain: TTabControl
+    Align = Client
+    Size.Width = 720.000000000000000000
+    Size.Height = 520.000000000000000000
+    Size.PlatformDefault = False
+    TabIndex = 0
+    TabPosition = PlatformDefault
+    object TabItemMainParameters: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = True
+      Size.Width = 140.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = 'Основные параметры'
+    end
+    object TabItemStabilityForecast: TTabItem
+      CustomIcon = <
+        item
+        end>
+      Size.Width = 160.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      Text = 'Стабильность и прогноз'
+      object LayoutConclusion: TLayout
+        Align = Bottom
+        Margins.Left = 8.000000000000000000
+        Margins.Top = 4.000000000000000000
+        Margins.Right = 8.000000000000000000
+        Margins.Bottom = 8.000000000000000000
+        Size.Width = 704.000000000000000000
+        Size.Height = 96.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        object LabelConclusionTitle: TLabel
+          Align = Top
+          Size.Width = 704.000000000000000000
+          Size.Height = 24.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Заключение'
+          TextSettings.VertAlign = Center
+        end
+        object MemoConclusion: TMemo
+          Align = Client
+          ReadOnly = True
+          Size.Width = 704.000000000000000000
+          Size.Height = 72.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          Text = ''
+        end
+      end
+      object TabControlStability: TTabControl
+        Align = Client
+        Margins.Left = 8.000000000000000000
+        Margins.Top = 8.000000000000000000
+        Margins.Right = 8.000000000000000000
+        Margins.Bottom = 4.000000000000000000
+        Size.Width = 704.000000000000000000
+        Size.Height = 386.000000000000000000
+        Size.PlatformDefault = False
+        TabIndex = 0
+        TabPosition = PlatformDefault
+        object TabItemStabilityData: TTabItem
+          CustomIcon = <
+            item
+            end>
+          IsSelected = True
+          Size.Width = 64.000000000000000000
+          Size.Height = 26.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          Text = 'Данные'
+          object LayoutDataRoot: TLayout
+            Align = Client
+            Size.Width = 704.000000000000000000
+            Size.Height = 360.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            object GroupSamplesGrid: TGroupBox
+              Align = Client
+              Margins.Right = 8.000000000000000000
+              Size.Width = 426.000000000000000000
+              Size.Height = 360.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Таблица тестовых значений'
+              object GridSamples: TGrid
+                Align = Client
+                CanFocus = True
+                ClipChildren = True
+                Margins.Left = 4.000000000000000000
+                Margins.Top = 4.000000000000000000
+                Margins.Right = 4.000000000000000000
+                Margins.Bottom = 4.000000000000000000
+                Size.Width = 418.000000000000000000
+                Size.Height = 334.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+                Options = [ColumnResize, ColLines, RowLines, AlwaysShowSelection, Tabs, Header, AutoDisplacement]
+                object StringColumnSampleNumber: TStringColumn
+                  Header = '№'
+                  ReadOnly = True
+                  Size.Width = 42.000000000000000000
+                end
+                object StringColumnSampleTime: TStringColumn
+                  Header = 'Время, с'
+                  Size.Width = 82.000000000000000000
+                end
+                object StringColumnSampleMark: TStringColumn
+                  Header = 'Метка, мс'
+                  ReadOnly = True
+                  Size.Width = 82.000000000000000000
+                end
+                object StringColumnSampleValue: TStringColumn
+                  Header = 'Значение'
+                  Size.Width = 82.000000000000000000
+                end
+                object StringColumnSampleInWindow: TStringColumn
+                  Header = 'В окне'
+                  ReadOnly = True
+                  Size.Width = 72.000000000000000000
+                end
+                object StringColumnSampleOutlier: TStringColumn
+                  Header = 'Выброс'
+                  ReadOnly = True
+                  Size.Width = 72.000000000000000000
+                end
+                object StringColumnSampleInRange: TStringColumn
+                  Header = 'В диапазоне'
+                  ReadOnly = True
+                  Size.Width = 92.000000000000000000
+                end
+              end
+            end
+            object LayoutSampleSide: TLayout
+              Align = Right
+              Size.Width = 270.000000000000000000
+              Size.Height = 360.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 1
+              object GroupSampleEditor: TGroupBox
+                Align = Top
+                Size.Width = 270.000000000000000000
+                Size.Height = 170.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Редактор выбранной точки'
+                object LabelSampleTime: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 32.000000000000000000
+                  Size.Width = 120.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Время, с'
+                end
+                object EditSampleTime: TEdit
+                  Position.X = 140.000000000000000000
+                  Position.Y = 30.000000000000000000
+                  Size.Width = 118.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 0
+                end
+                object LabelSampleValue: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 62.000000000000000000
+                  Size.Width = 120.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Значение'
+                end
+                object EditSampleValue: TEdit
+                  Position.X = 140.000000000000000000
+                  Position.Y = 60.000000000000000000
+                  Size.Width = 118.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                end
+                object LabelSampleTimeStep: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 92.000000000000000000
+                  Size.Width = 120.000000000000000000
+                  Size.Height = 22.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Шаг времени, с'
+                end
+                object EditSampleTimeStep: TEdit
+                  Position.X = 140.000000000000000000
+                  Position.Y = 90.000000000000000000
+                  Size.Width = 118.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 2
+                end
+                object LabelAnalysisTime: TLabel
+                  Position.X = 12.000000000000000000
+                  Position.Y = 122.000000000000000000
+                  Size.Width = 120.000000000000000000
+                  Size.Height = 38.000000000000000000
+                  Size.PlatformDefault = False
+                  Text = 'Текущее время анализа, с'
+                end
+                object EditAnalysisTime: TEdit
+                  Position.X = 140.000000000000000000
+                  Position.Y = 126.000000000000000000
+                  Size.Width = 118.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 3
+                end
+              end
+              object GroupSamplesActions: TGroupBox
+                Align = Client
+                Margins.Top = 8.000000000000000000
+                Size.Width = 270.000000000000000000
+                Size.Height = 182.000000000000000000
+                Size.PlatformDefault = False
+                Text = 'Управление массивом'
+                object ButtonSampleAdd: TButton
+                  Position.X = 12.000000000000000000
+                  Position.Y = 32.000000000000000000
+                  Size.Width = 116.000000000000000000
+                  Size.Height = 28.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 0
+                  Text = 'Добавить'
+                end
+                object ButtonSampleEdit: TButton
+                  Position.X = 142.000000000000000000
+                  Position.Y = 32.000000000000000000
+                  Size.Width = 116.000000000000000000
+                  Size.Height = 28.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 1
+                  Text = 'Изменить'
+                end
+                object ButtonSampleDelete: TButton
+                  Position.X = 12.000000000000000000
+                  Position.Y = 68.000000000000000000
+                  Size.Width = 116.000000000000000000
+                  Size.Height = 28.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 2
+                  Text = 'Удалить'
+                end
+                object ButtonSamplesClear: TButton
+                  Position.X = 142.000000000000000000
+                  Position.Y = 68.000000000000000000
+                  Size.Width = 116.000000000000000000
+                  Size.Height = 28.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 3
+                  Text = 'Очистить'
+                end
+                object ButtonAnalyze: TButton
+                  Position.X = 12.000000000000000000
+                  Position.Y = 104.000000000000000000
+                  Size.Width = 246.000000000000000000
+                  Size.Height = 28.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 4
+                  Text = 'Пересчитать'
+                end
+                object CheckBoxAutoAnalyze: TCheckBox
+                  Position.X = 12.000000000000000000
+                  Position.Y = 140.000000000000000000
+                  Size.Width = 246.000000000000000000
+                  Size.Height = 24.000000000000000000
+                  Size.PlatformDefault = False
+                  TabOrder = 5
+                  Text = 'Автоматический пересчёт'
+                end
+              end
+            end
+          end
+        end
+        object TabItemStabilitySettings: TTabItem
+          CustomIcon = <
+            item
+            end>
+          Size.Width = 80.000000000000000000
+          Size.Height = 26.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          Text = 'Настройки'
+          object SettingsScrollBox: TVertScrollBox
+            Align = Client
+            Size.Width = 704.000000000000000000
+            Size.Height = 360.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            object GroupSettingsCommon: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 70.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Общие параметры'
+            end
+            object GroupSettingsScatter: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 70.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Разброс'
+            end
+            object GroupSettingsOutliers: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 70.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Выбросы'
+            end
+            object GroupSettingsForecast: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 70.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Прогноз'
+            end
+            object GroupSettingsTargetRange: TGroupBox
+              Align = Top
+              Size.Width = 704.000000000000000000
+              Size.Height = 70.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Целевой диапазон'
+            end
+          end
+        end
+        object TabItemStabilityResult: TTabItem
+          CustomIcon = <
+            item
+            end>
+          Size.Width = 78.000000000000000000
+          Size.Height = 26.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          Text = 'Результат'
+          object ResultScrollBox: TVertScrollBox
+            Align = Client
+            Size.Width = 704.000000000000000000
+            Size.Height = 360.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            object GroupResultStatistics: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 80.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Статистика'
+            end
+            object GroupResultTrendForecast: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 80.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Тренд и прогноз'
+            end
+            object GroupResultReasons: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 80.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Причины'
+            end
+            object GroupResultDetailedConclusion: TGroupBox
+              Align = Top
+              Size.Width = 704.000000000000000000
+              Size.Height = 120.000000000000000000
+              Size.PlatformDefault = False
+              Text = 'Подробное заключение'
+            end
+          end
+        end
+      end
+    end
+  end
 end
