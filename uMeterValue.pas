@@ -211,8 +211,7 @@ type
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
     function GetStabilitySamples: TArray<TMeterValueSample>;
     function AddStabilitySampleManual(const ATimeStampMs: Int64; const AValue: Double): Boolean;
-    function UpdateStabilitySample(const AIndex: Integer; const ATimeStampMs: Int64; const AValue: Double): Boolean; overload;
-    function UpdateStabilitySample(const AIndex: Integer; const ASample: TMeterValueSample): Boolean; overload;
+    function UpdateStabilitySample(const AIndex: Integer; const ATimeStampMs: Int64; const AValue: Double): Boolean;
     function DeleteStabilitySample(const AIndex: Integer): Boolean;
     procedure ClearStabilitySamples;
     function BaseToDisplayValue(const AValue: Double): Double;
@@ -1019,6 +1018,107 @@ function TMeterValue.UpdateStabilitySample(const AIndex: Integer;
   const ASample: TMeterValueSample): Boolean;
 begin
   Result := UpdateStabilitySample(AIndex, ASample.TimeStampMs, ASample.Value);
+end;
+
+function TMeterValue.DeleteStabilitySample(const AIndex: Integer): Boolean;
+begin
+  Result := False;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+
+    FSamples.Delete(AIndex);
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+procedure TMeterValue.ClearStabilitySamples;
+begin
+  ClearSamplesHistory;
+end;
+
+
+function TMeterValue.AddStabilitySampleManual(const ATimeStampMs: Int64;
+  const AValue: Double): Boolean;
+var
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  Result := False;
+  Sample.TimeStampMs := ATimeStampMs;
+  Sample.Value := AValue;
+  FSampleLock.Enter;
+  try
+    for I := 0 to FSamples.Count - 1 do
+    begin
+      if FSamples[I].TimeStampMs = ATimeStampMs then
+      begin
+        FSamples[I] := Sample;
+        ResetStabilityInfo;
+        Exit(True);
+      end;
+      if FSamples[I].TimeStampMs > ATimeStampMs then
+      begin
+        FSamples.Insert(I, Sample);
+        ResetStabilityInfo;
+        Exit(True);
+      end;
+    end;
+    FSamples.Add(Sample);
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+function TMeterValue.UpdateStabilitySample(const AIndex: Integer;
+  const ATimeStampMs: Int64; const AValue: Double): Boolean;
+var
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  Result := False;
+  Sample.TimeStampMs := ATimeStampMs;
+  Sample.Value := AValue;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+
+    for I := 0 to FSamples.Count - 1 do
+      if (I <> AIndex) and (FSamples[I].TimeStampMs = ATimeStampMs) then
+      begin
+        FSamples[I] := Sample;
+        FSamples.Delete(AIndex);
+        ResetStabilityInfo;
+        Exit(True);
+      end;
+
+    FSamples[AIndex] := Sample;
+    for I := 0 to FSamples.Count - 2 do
+      if FSamples[I + 1].TimeStampMs < FSamples[I].TimeStampMs then
+      begin
+        Sample := FSamples[I];
+        FSamples[I] := FSamples[I + 1];
+        FSamples[I + 1] := Sample;
+      end;
+    for I := FSamples.Count - 1 downto 1 do
+      if FSamples[I].TimeStampMs < FSamples[I - 1].TimeStampMs then
+      begin
+        Sample := FSamples[I - 1];
+        FSamples[I - 1] := FSamples[I];
+        FSamples[I] := Sample;
+      end;
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
 end;
 
 function TMeterValue.DeleteStabilitySample(const AIndex: Integer): Boolean;
