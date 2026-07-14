@@ -210,6 +210,7 @@ type
     function GetSamples: TArray<TMeterValueSample>;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
     function GetStabilitySamples: TArray<TMeterValueSample>;
+    function UpdateStabilitySample(const AIndex: Integer; const ASample: TMeterValueSample): Boolean;
     function BaseToDisplayValue(const AValue: Double): Double;
     function DisplayToBaseValue(const AValue: Double): Double;
     function BaseDeltaToDisplayValue(const AValue: Double): Double;
@@ -911,6 +912,23 @@ end;
 function TMeterValue.GetStabilitySamples: TArray<TMeterValueSample>;
 begin
   Result := GetSamples;
+end;
+
+function TMeterValue.UpdateStabilitySample(const AIndex: Integer;
+  const ASample: TMeterValueSample): Boolean;
+begin
+  Result := False;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+
+    FSamples[AIndex] := ASample;
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
 end;
 
 
