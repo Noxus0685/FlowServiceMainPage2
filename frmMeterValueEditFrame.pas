@@ -13,7 +13,6 @@ uses
   FMX.Memo,
   FMX.Memo.Types,
   FMX.Objects,
-  FMX.Platform,
   FMX.StdCtrls,
   FMX.TabControl,
   FMX.Types,
@@ -86,11 +85,8 @@ type
     GroupAnalysis: TGroupBox;
     ButtonAnalyze: TButton;
     CheckBoxAutoAnalyze: TCheckBox;
-    GroupStabilityScenario: TGroupBox;
     ComboBoxStabilityScenario: TComboBox;
     ButtonApplyScenario: TButton;
-    ButtonRunAllScenarios: TButton;
-    ButtonCopyScenarioResults: TButton;
     EditGeneratorStartValue: TEdit;
     EditGeneratorCount: TEdit;
     EditGeneratorTimeStep: TEdit;
@@ -157,8 +153,6 @@ type
     FLastTestAnalysis: TMeterValueStabilityInfo;
     FTestStableCandidateSinceMs: Int64;
     FTestStabilityConfirmed: Boolean;
-    FScenarioBatchReport: string;
-    FScenarioBatchRunning: Boolean;
     FSettingsModified: Boolean;
     FModified: Boolean;
     LayoutRoot: TVertScrollBox;
@@ -226,16 +220,6 @@ type
     procedure InitializeScenarioList;
     procedure ApplySelectedScenario;
     procedure ApplyScenario(const AScenario: TMeterValueTestScenario);
-    procedure RunAllScenarios;
-    function BuildScenarioReportBlock(const AScenario: TMeterValueTestScenario;
-      const AResult: TMeterValueStabilityInfo; const AExpectedPassed: Boolean;
-      const AFailureDescription: string): string;
-    function BuildScenarioSamplesReport(const AResult: TMeterValueStabilityInfo): string;
-    function ValidateScenarioExpectedResult(const AScenario: TMeterValueTestScenario;
-      const AResult: TMeterValueStabilityInfo; out AFailureDescription: string): Boolean;
-    procedure CopyScenarioBatchReportToClipboard;
-    function ScenarioName(const AScenario: TMeterValueTestScenario): string;
-    function ScenarioEnumName(const AScenario: TMeterValueTestScenario): string;
     procedure RefreshAllTestControls;
     procedure SortSamples;
     procedure ClearAnalysisDisplay;
@@ -247,8 +231,6 @@ type
     procedure ButtonGenerateNewClick(Sender: TObject);
     procedure ButtonGenerateAppendClick(Sender: TObject);
     procedure ButtonApplyScenarioClick(Sender: TObject);
-    procedure ButtonRunAllScenariosClick(Sender: TObject);
-    procedure ButtonCopyScenarioResultsClick(Sender: TObject);
     procedure ButtonApplyStabilitySettingsClick(Sender: TObject);
     procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
     procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
@@ -305,8 +287,6 @@ begin
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
-  FScenarioBatchReport := '';
-  FScenarioBatchRunning := False;
   BuildUI;
   ClearAnalysisDisplay;
 end;
@@ -373,25 +353,6 @@ begin
   ButtonGenerateNew.OnClick := ButtonGenerateNewClick;
   ButtonGenerateAppend.OnClick := ButtonGenerateAppendClick;
   ButtonApplyScenario.OnClick := ButtonApplyScenarioClick;
-
-  GroupStabilityScenario.Height := 148;
-  ButtonRunAllScenarios := TButton.Create(Self);
-  ButtonRunAllScenarios.Parent := GroupStabilityScenario;
-  ButtonRunAllScenarios.Position.X := 12;
-  ButtonRunAllScenarios.Position.Y := 82;
-  ButtonRunAllScenarios.Size.Width := 336;
-  ButtonRunAllScenarios.Size.Height := 28;
-  ButtonRunAllScenarios.Text := 'Прогнать все сценарии';
-  ButtonRunAllScenarios.OnClick := ButtonRunAllScenariosClick;
-
-  ButtonCopyScenarioResults := TButton.Create(Self);
-  ButtonCopyScenarioResults.Parent := GroupStabilityScenario;
-  ButtonCopyScenarioResults.Position.X := 12;
-  ButtonCopyScenarioResults.Position.Y := 114;
-  ButtonCopyScenarioResults.Size.Width := 336;
-  ButtonCopyScenarioResults.Size.Height := 28;
-  ButtonCopyScenarioResults.Text := 'Скопировать результаты';
-  ButtonCopyScenarioResults.OnClick := ButtonCopyScenarioResultsClick;
   ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
   CheckBoxAutoAnalyze.OnChange := HandleAutoAnalyzeChange;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
@@ -772,10 +733,6 @@ begin
   EditGeneratorOutlierAmplitude.Enabled := IsTestMode;
   ButtonGenerateNew.Enabled := IsTestMode;
   ButtonGenerateAppend.Enabled := IsTestMode;
-  if ButtonRunAllScenarios <> nil then
-    ButtonRunAllScenarios.Enabled := IsTestMode and (not FScenarioBatchRunning);
-  if ButtonCopyScenarioResults <> nil then
-    ButtonCopyScenarioResults.Enabled := IsTestMode and (not FScenarioBatchRunning);
   EditAnalysisTime.Enabled := IsTestMode;
   if ButtonRefreshHistory <> nil then
     ButtonRefreshHistory.Enabled := not IsTestMode;
@@ -1409,8 +1366,6 @@ begin
     FTestSamples.Clear;
     FTestStableCandidateSinceMs := 0;
     FTestStabilityConfirmed := False;
-  FScenarioBatchReport := '';
-  FScenarioBatchRunning := False;
     SetBaseSettings;
 
     case AScenario of
@@ -1522,438 +1477,6 @@ begin
   end
   else
     Analyze;
-end;
-
-
-function TFrameMeterValueEdit.ScenarioName(const AScenario: TMeterValueTestScenario): string;
-begin
-  case AScenario of
-    mtsConstantValue: Result := 'Постоянное значение';
-    mtsStableNoise: Result := 'Стабильный шум';
-    mtsSlowIncrease: Result := 'Медленный рост';
-    mtsSlowDecrease: Result := 'Медленное снижение';
-    mtsSettlingAfterChange: Result := 'Стабилизация после изменения';
-    mtsSingleOutlier: Result := 'Единичный выброс';
-    mtsManyOutliers: Result := 'Много выбросов';
-    mtsNotEnoughData: Result := 'Недостаточно данных';
-    mtsStaleData: Result := 'Устаревшие данные';
-    mtsForecastAboveRange: Result := 'Прогноз выше верхней границы';
-    mtsForecastBelowRange: Result := 'Прогноз ниже нижней границы';
-    mtsStableOutOfRange: Result := 'Стабильный сигнал вне диапазона';
-    mtsAllConditionsPassed: Result := 'Все условия выполнены';
-  else
-    Result := '';
-  end;
-end;
-
-function TFrameMeterValueEdit.ScenarioEnumName(const AScenario: TMeterValueTestScenario): string;
-begin
-  case AScenario of
-    mtsConstantValue: Result := 'mtsConstantValue';
-    mtsStableNoise: Result := 'mtsStableNoise';
-    mtsSlowIncrease: Result := 'mtsSlowIncrease';
-    mtsSlowDecrease: Result := 'mtsSlowDecrease';
-    mtsSettlingAfterChange: Result := 'mtsSettlingAfterChange';
-    mtsSingleOutlier: Result := 'mtsSingleOutlier';
-    mtsManyOutliers: Result := 'mtsManyOutliers';
-    mtsNotEnoughData: Result := 'mtsNotEnoughData';
-    mtsStaleData: Result := 'mtsStaleData';
-    mtsForecastAboveRange: Result := 'mtsForecastAboveRange';
-    mtsForecastBelowRange: Result := 'mtsForecastBelowRange';
-    mtsStableOutOfRange: Result := 'mtsStableOutOfRange';
-    mtsAllConditionsPassed: Result := 'mtsAllConditionsPassed';
-  else
-    Result := '';
-  end;
-end;
-
-function TFrameMeterValueEdit.ValidateScenarioExpectedResult(
-  const AScenario: TMeterValueTestScenario; const AResult: TMeterValueStabilityInfo;
-  out AFailureDescription: string): Boolean;
-
-  function HasReason(const AReason: TMeterValueStabilityFailReason): Boolean;
-  begin
-    Result := AReason in AResult.FailReasons;
-  end;
-
-begin
-  Result := True;
-  AFailureDescription := '';
-  case AScenario of
-    mtsConstantValue:
-      Result := AResult.IsSignalStable and (AResult.OutlierCount = 0);
-    mtsStableNoise:
-      Result := AResult.IsSignalStable and (AResult.OutlierCount = 0);
-    mtsSlowIncrease:
-      Result := (AResult.TrendDirection = tdIncreasing) and (not AResult.IsSignalStable);
-    mtsSlowDecrease:
-      Result := (AResult.TrendDirection = tdDecreasing) and (not AResult.IsSignalStable);
-    mtsSettlingAfterChange:
-      Result := AResult.IsSignalStable;
-    mtsSingleOutlier:
-      Result := AResult.OutlierCount = 1;
-    mtsManyOutliers:
-      Result := (not AResult.IsSignalStable) and HasReason(mvsfrTooManyOutliers);
-    mtsNotEnoughData:
-      Result := HasReason(mvsfrNotEnoughSamples) and (not AResult.IsSuitableForMeasurement);
-    mtsStaleData:
-      Result := HasReason(mvsfrStaleData) and (not AResult.IsSuitableForMeasurement);
-    mtsForecastAboveRange, mtsForecastBelowRange:
-      Result := not AResult.IsForecastInRange;
-    mtsStableOutOfRange:
-      Result := AResult.IsSignalStable and (not AResult.IsSuitableForMeasurement);
-    mtsAllConditionsPassed:
-      Result := AResult.IsSuitableForMeasurement;
-  end;
-  if not Result then
-    AFailureDescription := 'Фактический результат не соответствует ожидаемому контракту сценария.';
-end;
-
-function TFrameMeterValueEdit.BuildScenarioSamplesReport(
-  const AResult: TMeterValueStabilityInfo): string;
-var
-  B: TStringBuilder;
-  FS: TFormatSettings;
-  I: Integer;
-  Sample: TMeterValueSample;
-  SampleResult: TMeterValueSampleAnalysis;
-begin
-  FS := TFormatSettings.Invariant;
-  FS.DecimalSeparator := '.';
-  B := TStringBuilder.Create;
-  try
-    B.AppendLine('Samples:');
-    B.AppendLine('Index; TimeStampMs; TimeSec; ValueBase; ValueDisplay; InWindow; IsOutlier; IsInRange');
-    for I := 0 to FTestSamples.Count - 1 do
-    begin
-      Sample := FTestSamples[I];
-      if not FindSampleAnalysis(I, SampleResult) then
-        SampleResult := Default(TMeterValueSampleAnalysis);
-      B.AppendLine(Format('%d; %d; %s; %s; %s; %s; %s; %s',
-        [I + 1, Sample.TimeStampMs, FormatFloat('0.000', Sample.TimeStampMs / 1000.0, FS),
-         FormatFloat('0.###############', Sample.Value, FS), BaseToDisplayText(Sample.Value),
-         BoolToStr(SampleResult.InWindow, True), BoolToStr(SampleResult.IsOutlier, True),
-         BoolToStr(SampleResult.IsInRange, True)]));
-    end;
-    Result := B.ToString;
-  finally
-    B.Free;
-  end;
-end;
-
-function TFrameMeterValueEdit.BuildScenarioReportBlock(
-  const AScenario: TMeterValueTestScenario; const AResult: TMeterValueStabilityInfo;
-  const AExpectedPassed: Boolean; const AFailureDescription: string): string;
-var
-  B: TStringBuilder;
-  FS: TFormatSettings;
-  LowerLimit: Double;
-  UpperLimit: Double;
-  Reason: TMeterValueStabilityFailReason;
-  HasReasons: Boolean;
-
-  function F(const AValue: Double): string;
-  begin
-    Result := FormatFloat('0.###############', AValue, FS);
-  end;
-
-  procedure AddValuePair(const AName: string; const ABase: Double; const AIsDelta: Boolean = False);
-  begin
-    B.AppendLine(AName + 'Base: ' + F(ABase));
-    if AIsDelta then
-      B.AppendLine(AName + 'Display: ' + BaseDeltaToDisplayText(ABase) + ' ' + DisplayUnitName)
-    else
-      B.AppendLine(AName + 'Display: ' + BaseToDisplayText(ABase) + ' ' + DisplayUnitName);
-  end;
-
-begin
-  FS := TFormatSettings.Invariant;
-  FS.DecimalSeparator := '.';
-  CalculateTargetLimits(FTestTargetValue, FTestSettings.TargetAccuracyPlusPercent,
-    FTestSettings.TargetAccuracyMinusPercent, FTestSettings.TargetToleranceAbsolute,
-    LowerLimit, UpperLimit);
-  B := TStringBuilder.Create;
-  try
-    B.AppendLine('============================================================');
-    B.AppendLine('СЦЕНАРИЙ: ' + ScenarioName(AScenario));
-    B.AppendLine('ENUM: ' + ScenarioEnumName(AScenario));
-    B.AppendLine('============================================================');
-    B.AppendLine('');
-    B.AppendLine('Настройки:');
-    B.AppendLine('Enabled: ' + BoolToStr(FTestSettings.Enabled, True));
-    B.AppendLine('MinSampleCount: ' + IntToStr(FTestSettings.MinSampleCount));
-    B.AppendLine('WindowDurationSec: ' + F(FTestSettings.WindowDurationSec));
-    B.AppendLine('MaxSampleAgeSec: ' + F(FTestSettings.MaxSampleAgeSec));
-    B.AppendLine('ConfirmationTimeSec: ' + F(FTestSettings.ConfirmationTimeSec));
-    B.AppendLine('ExitThresholdFactor: ' + F(FTestSettings.ExitThresholdFactor));
-    B.AppendLine('MaxVariation: ' + F(FTestSettings.MaxVariation));
-    B.AppendLine('MaxStdDeviation: ' + F(FTestSettings.MaxStdDeviation));
-    B.AppendLine('MaxTrendRate: ' + F(FTestSettings.MaxTrendRate));
-    B.AppendLine('MaxOutlierFraction: ' + F(FTestSettings.MaxOutlierFraction));
-    B.AppendLine('OutlierFactor: ' + F(FTestSettings.OutlierFactor));
-    B.AppendLine('ForecastHorizonSec: ' + F(FTestSettings.ForecastHorizonSec));
-    B.AppendLine('');
-    B.AppendLine('Диапазон:');
-    AddValuePair('TargetValue', FTestTargetValue);
-    AddValuePair('LowerLimit', LowerLimit);
-    AddValuePair('UpperLimit', UpperLimit);
-    B.AppendLine('RequireCurrentValueInRange: ' + BoolToStr(FTestSettings.RequireCurrentValueInRange, True));
-    B.AppendLine('RequireMeanValueInRange: ' + BoolToStr(FTestSettings.RequireMeanValueInRange, True));
-    B.AppendLine('RequireForecastInRange: ' + BoolToStr(FTestSettings.RequireForecastInRange, True));
-    B.AppendLine('');
-    B.AppendLine('Время анализа:');
-    B.AppendLine('CurrentTimeMs: ' + IntToStr(FTestCurrentTimeMs));
-    B.AppendLine('CurrentTimeSec: ' + F(FTestCurrentTimeMs / 1000.0));
-    B.AppendLine('');
-    B.AppendLine('Точки:');
-    B.AppendLine('SampleCount: ' + IntToStr(AResult.SampleCount));
-    B.AppendLine('UsedSampleCount: ' + IntToStr(AResult.UsedSampleCount));
-    B.AppendLine('OutlierCount: ' + IntToStr(AResult.OutlierCount));
-    B.AppendLine('OutlierFraction: ' + F(AResult.OutlierFraction));
-    B.AppendLine('');
-    B.AppendLine('Статистика:');
-    AddValuePair('CurrentValue', AResult.CurrentValue);
-    AddValuePair('MeanValue', AResult.MeanValue);
-    AddValuePair('MinValue', AResult.MinValue);
-    AddValuePair('MaxValue', AResult.MaxValue);
-    AddValuePair('Variation', AResult.Variation, True);
-    AddValuePair('StdDeviation', AResult.StdDeviation, True);
-    B.AppendLine('');
-    B.AppendLine('Тренд и прогноз:');
-    B.AppendLine('TrendRateBasePerSec: ' + F(AResult.TrendRate));
-    B.AppendLine('TrendRateDisplayPerSec: ' + BaseDeltaToDisplayText(AResult.TrendRate) + ' ' + DisplayUnitName + '/с');
-    B.AppendLine('TrendDirection: ' + TrendDirectionText(AResult.TrendDirection, AResult.HasTrend));
-    AddValuePair('ForecastValue', AResult.ForecastValue);
-    B.AppendLine('LastSampleAgeSec: ' + F(AResult.LastSampleAgeSec));
-    B.AppendLine('');
-    B.AppendLine('Состояние:');
-    B.AppendLine('IsSignalStable: ' + BoolToStr(AResult.IsSignalStable, True));
-    B.AppendLine('IsStabilityConfirmed: ' + BoolToStr(AResult.IsStabilityConfirmed, True));
-    B.AppendLine('IsCurrentValueInRange: ' + BoolToStr(AResult.IsCurrentValueInRange, True));
-    B.AppendLine('IsMeanValueInRange: ' + BoolToStr(AResult.IsMeanValueInRange, True));
-    B.AppendLine('IsForecastInRange: ' + BoolToStr(AResult.IsForecastInRange, True));
-    B.AppendLine('IsSuitableForMeasurement: ' + BoolToStr(AResult.IsSuitableForMeasurement, True));
-    B.AppendLine('');
-    B.AppendLine('Причины:');
-    HasReasons := False;
-    for Reason := Low(TMeterValueStabilityFailReason) to High(TMeterValueStabilityFailReason) do
-      if Reason in AResult.FailReasons then
-      begin
-        HasReasons := True;
-        B.AppendLine(StabilityFailReasonToText(Reason));
-      end;
-    if not HasReasons then
-      B.AppendLine('Нет');
-    B.AppendLine('');
-    B.AppendLine('Заключение:');
-    B.AppendLine(AResult.StatusText);
-    B.AppendLine('');
-    B.AppendLine(BuildScenarioSamplesReport(AResult));
-    B.AppendLine('Ожидаемый результат:');
-    if AExpectedPassed then
-      B.AppendLine('Контракт сценария выполнен.')
-    else
-      B.AppendLine(AFailureDescription);
-    B.AppendLine('');
-    B.AppendLine('Проверка ожидания:');
-    if AExpectedPassed then
-      B.AppendLine('PASS')
-    else
-      B.AppendLine('FAIL');
-    B.AppendLine('');
-    Result := B.ToString;
-  finally
-    B.Free;
-  end;
-end;
-
-procedure TFrameMeterValueEdit.RunAllScenarios;
-var
-  SavedSource: TMeterValueSampleSource;
-  SavedScenarioIndex: Integer;
-  SavedAutoAnalyze: Boolean;
-  SavedSamples: TArray<TMeterValueSample>;
-  SavedSettings: TMeterValueStabilitySettings;
-  SavedCurrentTimeMs: Int64;
-  SavedTargetValue: Double;
-  SavedStableCandidateSinceMs: Int64;
-  SavedStabilityConfirmed: Boolean;
-  Scenario: TMeterValueTestScenario;
-  B: TStringBuilder;
-  Summary: TStringBuilder;
-  FailedNames: TStringBuilder;
-  ExpectedPassed: Boolean;
-  FailureDescription: string;
-  PassCount: Integer;
-  FailCount: Integer;
-  AllConditionsPassed: Boolean;
-  I: Integer;
-
-  function ScenarioCheckText(const AValue: Boolean): string;
-  begin
-    if AValue then
-      Result := 'PASS'
-    else
-      Result := 'FAIL';
-  end;
-
-begin
-  if FScenarioBatchRunning then
-    Exit;
-
-  SavedSource := FSampleSource;
-  SavedScenarioIndex := ComboBoxStabilityScenario.ItemIndex;
-  SavedAutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
-  SavedSamples := FTestSamples.ToArray;
-  SavedSettings := FTestSettings;
-  SavedCurrentTimeMs := FTestCurrentTimeMs;
-  SavedTargetValue := FTestTargetValue;
-  SavedStableCandidateSinceMs := FTestStableCandidateSinceMs;
-  SavedStabilityConfirmed := FTestStabilityConfirmed;
-  PassCount := 0;
-  FailCount := 0;
-  AllConditionsPassed := False;
-  FScenarioBatchReport := '';
-  FScenarioBatchRunning := True;
-  ButtonRunAllScenarios.Enabled := False;
-  ButtonApplyScenario.Enabled := False;
-  ButtonCopyScenarioResults.Enabled := False;
-
-  B := TStringBuilder.Create;
-  Summary := TStringBuilder.Create;
-  FailedNames := TStringBuilder.Create;
-  try
-    B.AppendLine('STABILITY SCENARIO REPORT');
-    B.AppendLine('Дата и время формирования:');
-    B.AppendLine(DateTimeToStr(Now));
-    B.AppendLine('Количество сценариев:');
-    B.AppendLine(IntToStr(Ord(High(TMeterValueTestScenario)) - Ord(Low(TMeterValueTestScenario)) + 1));
-    B.AppendLine('Источник:');
-    B.AppendLine('Тестовый массив');
-    B.AppendLine('Размерность:');
-    B.AppendLine(DisplayUnitName);
-    B.AppendLine('');
-
-    CheckBoxAutoAnalyze.IsChecked := False;
-    SetSampleSource(mssTestSamples);
-
-    for Scenario := Low(TMeterValueTestScenario) to High(TMeterValueTestScenario) do
-    begin
-      try
-        ApplyScenario(Scenario);
-        ExpectedPassed := ValidateScenarioExpectedResult(Scenario, FLastTestAnalysis, FailureDescription);
-        if ExpectedPassed then
-          Inc(PassCount)
-        else
-        begin
-          Inc(FailCount);
-          FailedNames.AppendLine('- ' + ScenarioName(Scenario));
-        end;
-        if Scenario = mtsAllConditionsPassed then
-          AllConditionsPassed := ExpectedPassed;
-        B.Append(BuildScenarioReportBlock(Scenario, FLastTestAnalysis, ExpectedPassed, FailureDescription));
-        Summary.AppendLine(Format('%s | %s | %s | %s | %s | %s | %s | %s',
-          [ScenarioName(Scenario), BoolText(FLastTestAnalysis.IsSignalStable),
-           BoolText(FLastTestAnalysis.IsStabilityConfirmed), BoolText(FLastTestAnalysis.IsCurrentValueInRange),
-           BoolText(FLastTestAnalysis.IsMeanValueInRange), BoolText(FLastTestAnalysis.IsForecastInRange),
-           BoolText(FLastTestAnalysis.IsSuitableForMeasurement),
-           ScenarioCheckText(ExpectedPassed)]));
-      except
-        on E: Exception do
-        begin
-          Inc(FailCount);
-          FailedNames.AppendLine('- ' + ScenarioName(Scenario));
-          B.AppendLine('============================================================');
-          B.AppendLine('СЦЕНАРИЙ: ' + ScenarioName(Scenario));
-          B.AppendLine('ENUM: ' + ScenarioEnumName(Scenario));
-          B.AppendLine('============================================================');
-          B.AppendLine('ERROR:');
-          B.AppendLine(E.ClassName + ': ' + E.Message);
-          B.AppendLine('Проверка ожидания:');
-          B.AppendLine('FAIL');
-          B.AppendLine('');
-          Summary.AppendLine(ScenarioName(Scenario) + ' | Нет | Нет | Нет | Нет | Нет | Нет | FAIL');
-        end;
-      end;
-    end;
-
-    B.AppendLine('============================================================');
-    B.AppendLine('ИТОГ');
-    B.AppendLine('============================================================');
-    B.AppendLine('Всего сценариев: ' + IntToStr(Ord(High(TMeterValueTestScenario)) - Ord(Low(TMeterValueTestScenario)) + 1));
-    B.AppendLine('PASS: ' + IntToStr(PassCount));
-    B.AppendLine('FAIL: ' + IntToStr(FailCount));
-    B.AppendLine('');
-    B.AppendLine('Сценарии с FAIL:');
-    if FailedNames.Length = 0 then
-      B.AppendLine('Нет')
-    else
-      B.Append(FailedNames.ToString);
-    B.AppendLine('');
-    B.AppendLine('Полностью положительный сценарий:');
-    B.AppendLine('Все условия выполнены = ' + ScenarioCheckText(AllConditionsPassed));
-    B.AppendLine('');
-    B.AppendLine('Сценарий | Stable | Confirmed | CurrentRange | MeanRange | ForecastRange | Suitable | Result');
-    B.Append(Summary.ToString);
-    B.AppendLine('END OF STABILITY SCENARIO REPORT');
-    FScenarioBatchReport := B.ToString;
-  finally
-    FTestSamples.Clear;
-    for I := 0 to High(SavedSamples) do
-      FTestSamples.Add(SavedSamples[I]);
-    FTestSettings := SavedSettings;
-    FTestCurrentTimeMs := SavedCurrentTimeMs;
-    FTestTargetValue := SavedTargetValue;
-    FTestStableCandidateSinceMs := SavedStableCandidateSinceMs;
-    FTestStabilityConfirmed := SavedStabilityConfirmed;
-    CheckBoxAutoAnalyze.IsChecked := SavedAutoAnalyze;
-    if ComboBoxStabilityScenario <> nil then
-      ComboBoxStabilityScenario.ItemIndex := SavedScenarioIndex;
-    FSampleSource := SavedSource;
-    if ComboBoxSampleSource <> nil then
-      ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
-    FScenarioBatchRunning := False;
-    UpdateSampleSourceControls;
-    LoadSettingsToControls;
-    RefreshSamplesGrid;
-    ButtonApplyScenario.Enabled := FSampleSource = mssTestSamples;
-    ButtonRunAllScenarios.Enabled := FSampleSource = mssTestSamples;
-    ButtonCopyScenarioResults.Enabled := FSampleSource = mssTestSamples;
-    B.Free;
-    Summary.Free;
-    FailedNames.Free;
-  end;
-
-  ShowMessage(Format('Проверка завершена. PASS: %d, FAIL: %d.', [PassCount, FailCount]));
-end;
-
-procedure TFrameMeterValueEdit.CopyScenarioBatchReportToClipboard;
-var
-  ClipboardService: IFMXClipboardService;
-begin
-  if FScenarioBatchReport = '' then
-  begin
-    ShowMessage('Сначала выполните все сценарии.');
-    Exit;
-  end;
-
-  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, IInterface(ClipboardService)) then
-  begin
-    ClipboardService.SetClipboard(FScenarioBatchReport);
-    ShowMessage('Результаты скопированы в буфер обмена.');
-  end
-  else
-    ShowMessage('Буфер обмена недоступен на этой платформе.');
-end;
-
-procedure TFrameMeterValueEdit.ButtonRunAllScenariosClick(Sender: TObject);
-begin
-  RunAllScenarios;
-end;
-
-procedure TFrameMeterValueEdit.ButtonCopyScenarioResultsClick(Sender: TObject);
-begin
-  CopyScenarioBatchReportToClipboard;
 end;
 
 procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
@@ -2129,8 +1652,6 @@ begin
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
-  FScenarioBatchReport := '';
-  FScenarioBatchRunning := False;
   ClearAnalysisDisplay;
   RefreshSamplesGrid;
 end;
