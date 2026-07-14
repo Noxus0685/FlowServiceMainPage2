@@ -1,4 +1,4 @@
-object FormMeterValues: TFormMeterValues
+﻿object FormMeterValues: TFormMeterValues
   Left = 0
   Top = 0
   Caption = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1084#1077#1090#1088#1086#1083#1086#1075#1080#1095#1077#1089#1082#1080#1093' '#1074#1077#1083#1080#1095#1080#1085
@@ -3205,12 +3205,12 @@ object FormMeterValues: TFormMeterValues
         end>
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 77.000000000000000000
+      Size.Width = 142.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
-      Text = #1054#1089#1085#1086#1074#1085#1099#1077
+      Text = #1054#1089#1085#1086#1074#1085#1099#1077' '#1087#1072#1088#1072#1084#1077#1090#1088#1099
       ExplicitSize.cx = 77.000000000000000000
       ExplicitSize.cy = 23.000000000000000000
       object Layout8: TLayout
