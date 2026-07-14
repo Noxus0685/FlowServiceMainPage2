@@ -2369,7 +2369,6 @@ function TFrameMeterValueEdit.ApplySettingsFromControls(
 var
   ErrorText: string;
   Settings: TMeterValueStabilitySettings;
-  Changed: Boolean;
   OldLoading: Boolean;
 begin
   Result := False;
@@ -2387,34 +2386,30 @@ begin
 {$IFDEF DEBUG}
   DebugLogStabilityPersistence('before-save', Settings);
 {$ENDIF}
-  Changed := not StabilitySettingsEqual(FMeterValue.StabilitySettings, Settings);
-  if Changed then
-    FMeterValue.StabilitySettings := Settings;
-
-  if Changed or (not FMeterValue.IsToSave) then
-  begin
-    if Trim(FMeterValue.Hash) = '' then
-      FMeterValue.Hash := FMeterValue.GetNewUUID;
-    if not FMeterValue.IsToSave then
-      FMeterValue.SetToSave(True);
-    if CheckBoxIsToSave <> nil then
-    begin
-      OldLoading := FLoading;
-      FLoading := True;
-      try
-        CheckBoxIsToSave.IsChecked := True;
-      finally
-        FLoading := OldLoading;
-      end;
-    end;
-    TMeterValue.SaveToFile(0);
-{$IFDEF DEBUG}
-    DebugLogStabilityPersistence('after-save', Settings);
-{$ENDIF}
-  end;
+  FMeterValue.StabilitySettings := Settings;
   FTestSettings := Settings;
   FTestTargetValue := Settings.TargetValue;
+
+  if Trim(FMeterValue.Hash) = '' then
+    FMeterValue.Hash := TGUID.NewGuid.ToString;
+  FMeterValue.SetToSave(True);
+  if CheckBoxIsToSave <> nil then
+  begin
+    OldLoading := FLoading;
+    FLoading := True;
+    try
+      CheckBoxIsToSave.IsChecked := True;
+    finally
+      FLoading := OldLoading;
+    end;
+  end;
+  TMeterValue.SaveToFile(0);
+{$IFDEF DEBUG}
+  DebugLogStabilityPersistence('after-save', Settings);
+{$ENDIF}
+
   FSettingsModified := False;
+  LoadSettingsToControls;
   FModified := FTestDataModified;
   if CheckBoxAutoAnalyze.IsChecked then
     Analyze;
@@ -2770,7 +2765,8 @@ begin
   FMeterValue.ShowTrailingZeros := CheckBoxShowTrailingZeros.IsChecked;
   FMeterValue.CoefK := SafeFloat(EditCoefK.Text);
   FMeterValue.CoefP := SafeFloat(EditCoefP.Text);
-  FMeterValue.SetToSave(CheckBoxIsToSave.IsChecked);
+  if (CheckBoxIsToSave <> nil) and CheckBoxIsToSave.Visible and CheckBoxIsToSave.Enabled then
+    FMeterValue.SetToSave(CheckBoxIsToSave.IsChecked);
   if FSettingsModified then
     ApplySettingsFromControls(False)
   else
