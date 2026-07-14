@@ -180,16 +180,17 @@ implementation
 {$R *.fmx}
 
 procedure TFormMeterValues.EnsureMeterValueEditFrame;
+var
+  OldMainParameters: TControl;
 begin
   if FFrameMeterValueEdit = nil then
-  begin
     FFrameMeterValueEdit := TFrameMeterValueEdit.Create(Self);
-    FFrameMeterValueEdit.Parent := LayoutStabilityForecast;
-    FFrameMeterValueEdit.Align := TAlignLayout.Client;
-    FFrameMeterValueEdit.SetStabilityOnlyMode;
-  end;
 
-  FFrameMeterValueEdit.BringToFront;
+  OldMainParameters := FindComponent('Layout8') as TControl;
+  if OldMainParameters <> nil then
+    OldMainParameters.Visible := False;
+
+  FFrameMeterValueEdit.SetIntegratedMode(TabItem1, LayoutStabilityForecast);
   FFrameMeterValueEdit.LoadFromMeterValue(MeterValue);
 end;
 
@@ -496,6 +497,7 @@ begin
         UpdateStringGridCoefs;
       end;
     2: UpdateStringGridDimensions;
+    4: EnsureMeterValueEditFrame;
   end;
 end;
 
