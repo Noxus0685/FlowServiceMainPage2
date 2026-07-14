@@ -173,7 +173,8 @@ type
     mvsfrAnalysisDisabled,
     mvsfrNoData,
     mvsfrNotEnoughSamples,  // Fewer samples than MinSampleCount are available in the active window.
-    mvsfrInsufficientWindow,// Active window duration is shorter than WindowDurationSec.
+    mvsfrInsufficientWindow,// Trend cannot be calculated because timestamps have insufficient spread.
+    mvsfrInsufficientTimeSpread, // Timestamps are too close or identical to calculate a trend.
     mvsfrStaleData,         // Last sample age exceeds MaxSampleAgeSec.
     mvsfrVariationTooHigh,  // Max-min variation exceeds MaxVariation.
     mvsfrDeviationTooHigh,  // Absolute standard deviation exceeds MaxStdDeviation.
@@ -1240,7 +1241,8 @@ begin
     mvsfrAnalysisDisabled: Result := 'анализ стабильности отключён';
     mvsfrNoData: Result := 'нет доступных данных';
     mvsfrNotEnoughSamples: Result := 'недостаточно отсчётов';
-    mvsfrInsufficientWindow: Result := 'недостаточная длительность фактического окна';
+    mvsfrInsufficientWindow: Result := 'недостаточный временной интервал между точками для расчёта тренда';
+    mvsfrInsufficientTimeSpread: Result := 'недостаточный временной интервал между точками для расчёта тренда';
     mvsfrStaleData: Result := 'последнее значение устарело';
     mvsfrVariationTooHigh: Result := 'размах превышает допустимое значение';
     mvsfrDeviationTooHigh: Result := 'стандартное отклонение превышает допустимое значение';

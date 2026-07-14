@@ -1145,10 +1145,9 @@ begin
     AInfo.HasLastSampleAge := True;
   end;
   AInfo.HasEnoughSamples := N >= FStabilitySettings.MinSampleCount;
-  AInfo.HasEnoughWindow := AInfo.WindowDurationSec + 0.001 >= FStabilitySettings.WindowDurationSec;
+  AInfo.HasEnoughWindow := N > 0;
   AInfo.IsDataActual := (N > 0) and (AInfo.LastSampleAgeSec <= FStabilitySettings.MaxSampleAgeSec);
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
-  if not AInfo.HasEnoughWindow then Include(AInfo.FailReasons, mvsfrInsufficientWindow);
   if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
   Used := Window;
@@ -1213,7 +1212,7 @@ else
       else
         AInfo.TrendDirection := tdNone;
     end
-    else Include(AInfo.FailReasons, mvsfrInsufficientWindow);
+    else Include(AInfo.FailReasons, mvsfrInsufficientTimeSpread);
     T := (Used[N-1].TimeStampMs - FirstMs) / 1000.0;
     Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
     AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + FStabilitySettings.ForecastHorizonSec);
@@ -1232,7 +1231,7 @@ else
   if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
   if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
 
-  MathStable := AInfo.HasEnoughSamples and AInfo.HasEnoughWindow and AInfo.IsDataActual and
+  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and AInfo.HasStatistics and AInfo.HasTrend and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and AInfo.IsOutlierLevelAcceptable and
     not (mvsfrInvalidSettings in AInfo.FailReasons);
   AInfo.IsSignalStable := MathStable;
@@ -1256,13 +1255,13 @@ else
   AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed;
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
   else if MathStable and AInfo.IsConfirmed then AInfo.Status := mvssStable
   else AInfo.Status := mvssUnstable;
 
   Msg := '';
-  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных для анализа стабильности: %d из %d отсчётов. ', [AInfo.UsedSampleCount, FStabilitySettings.MinSampleCount]);
-  if mvsfrInsufficientWindow in AInfo.FailReasons then Msg := Msg + Format('Недостаточная длительность окна: %.1f с при требуемых %.1f с. ', [AInfo.WindowDurationSec, FStabilitySettings.WindowDurationSec]);
+  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных: в окне %d точек, требуется минимум %d. ', [AInfo.UsedSampleCount, FStabilitySettings.MinSampleCount]);
+  if (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
   if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
   if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Размах %.4f превышает допустимые %.4f. ', [AInfo.Variation, FStabilitySettings.MaxVariation]);
   if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, FStabilitySettings.MaxStdDeviation]);
@@ -1273,7 +1272,7 @@ else
   if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
   else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
   else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет доступных данных.'
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
   else if AInfo.IsSignalStable and not AInfo.IsConfirmed then AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
   else if AInfo.IsSignalStable and AInfo.IsConfirmed then AInfo.StatusText := 'Стабильность подтверждена, но значение вне диапазона.'
   else AInfo.StatusText := 'Сигнал нестабилен.';
@@ -1384,10 +1383,9 @@ begin
   end;
 
   AInfo.HasEnoughSamples := N >= ASettings.MinSampleCount;
-  AInfo.HasEnoughWindow := AInfo.WindowDurationSec + 0.001 >= ASettings.WindowDurationSec;
+  AInfo.HasEnoughWindow := N > 0;
   AInfo.IsDataActual := (N > 0) and (AInfo.LastSampleAgeSec <= ASettings.MaxSampleAgeSec);
   if not AInfo.HasEnoughSamples then Include(AInfo.FailReasons, mvsfrNotEnoughSamples);
-  if not AInfo.HasEnoughWindow then Include(AInfo.FailReasons, mvsfrInsufficientWindow);
   if not AInfo.IsDataActual then Include(AInfo.FailReasons, mvsfrStaleData);
 
   Used := Window;
@@ -1477,7 +1475,7 @@ begin
         AInfo.TrendDirection := tdNone;
     end
     else
-      Include(AInfo.FailReasons, mvsfrInsufficientWindow);
+      Include(AInfo.FailReasons, mvsfrInsufficientTimeSpread);
     T := (Used[N - 1].Sample.TimeStampMs - FirstMs) / 1000.0;
     Intercept := AInfo.MeanValue - AInfo.TrendRate * MeanT;
     AInfo.ForecastValue := Intercept + AInfo.TrendRate * (T + ASettings.ForecastHorizonSec);
@@ -1498,7 +1496,7 @@ begin
   if not AInfo.IsDeviationStable then Include(AInfo.FailReasons, mvsfrDeviationTooHigh);
   if not AInfo.IsTrendStable then Include(AInfo.FailReasons, mvsfrTrendTooHigh);
 
-  MathStable := AInfo.HasEnoughSamples and AInfo.HasEnoughWindow and AInfo.IsDataActual and
+  MathStable := AInfo.HasEnoughSamples and AInfo.IsDataActual and AInfo.HasStatistics and AInfo.HasTrend and
     AInfo.IsVariationStable and AInfo.IsDeviationStable and AInfo.IsTrendStable and
     AInfo.IsOutlierLevelAcceptable and not (mvsfrInvalidSettings in AInfo.FailReasons);
   AInfo.IsSignalStable := MathStable;
@@ -1547,13 +1545,13 @@ begin
     ((not ASettings.RequireForecastInRange) or AInfo.IsForecastInRange);
 
   if mvsfrStaleData in AInfo.FailReasons then AInfo.Status := mvssStaleData
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.Status := mvssNotEnoughData
   else if MathStable and AInfo.IsConfirmed then AInfo.Status := mvssStable
   else AInfo.Status := mvssUnstable;
 
   Msg := '';
-  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных для анализа стабильности: %d из %d отсчётов. ', [AInfo.UsedSampleCount, ASettings.MinSampleCount]);
-  if mvsfrInsufficientWindow in AInfo.FailReasons then Msg := Msg + Format('Недостаточная длительность окна: %.1f с при требуемых %.1f с. ', [AInfo.WindowDurationSec, ASettings.WindowDurationSec]);
+  if mvsfrNotEnoughSamples in AInfo.FailReasons then Msg := Msg + Format('Недостаточно данных: в окне %d точек, требуется минимум %d. ', [AInfo.UsedSampleCount, ASettings.MinSampleCount]);
+  if (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then Msg := Msg + 'Недостаточный временной интервал между точками для расчёта тренда. ';
   if mvsfrStaleData in AInfo.FailReasons then Msg := Msg + Format('Данные устарели: последнее значение получено %.1f с назад. ', [AInfo.LastSampleAgeSec]);
   if mvsfrVariationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Размах %.4f превышает допустимые %.4f. ', [AInfo.Variation, ASettings.MaxVariation]);
   if mvsfrDeviationTooHigh in AInfo.FailReasons then Msg := Msg + Format('Стандартное отклонение %.4f превышает допустимые %.4f. ', [AInfo.StdDeviation, ASettings.MaxStdDeviation]);
@@ -1564,7 +1562,7 @@ begin
   if AInfo.IsSuitableForMeasurement then AInfo.StatusText := 'Значение пригодно для измерения.'
   else if mvsfrAnalysisDisabled in AInfo.FailReasons then AInfo.StatusText := 'Анализ стабильности отключён.'
   else if mvsfrNoData in AInfo.FailReasons then AInfo.StatusText := 'Нет доступных данных.'
-  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
+  else if (mvsfrNotEnoughSamples in AInfo.FailReasons) or (mvsfrInsufficientWindow in AInfo.FailReasons) or (mvsfrInsufficientTimeSpread in AInfo.FailReasons) then AInfo.StatusText := 'Недостаточно данных.'
   else if AInfo.IsSignalStable and not AInfo.IsConfirmed then AInfo.StatusText := 'Предварительная стабильность достигнута, ожидается подтверждение.'
   else if AInfo.IsSignalStable and AInfo.IsConfirmed then AInfo.StatusText := 'Стабильность подтверждена, но значение вне диапазона.'
   else AInfo.StatusText := 'Сигнал нестабилен.';
