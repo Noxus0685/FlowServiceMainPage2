@@ -579,7 +579,6 @@ var
     AEdit.HitTest := True;
     AEdit.ShowHint := True;
     AEdit.Hint := AHint;
-    AEdit.TextSettings.Font.Family := 'Consolas';
     AEdit.Stored := False;
 
     if AWithCopyButton then
