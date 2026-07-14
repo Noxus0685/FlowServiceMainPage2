@@ -210,6 +210,10 @@ type
     function GetSamples: TArray<TMeterValueSample>;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
     function GetStabilitySamples: TArray<TMeterValueSample>;
+    function AddStabilitySampleManual(const ATimeStampMs: Int64; const AValue: Double): Boolean;
+    function UpdateStabilitySampleValue(const AIndex: Integer; const AValue: Double): Boolean;
+    function DeleteStabilitySample(const AIndex: Integer): Boolean;
+    procedure ClearStabilitySamples;
     function BaseToDisplayValue(const AValue: Double): Double;
     function DisplayToBaseValue(const AValue: Double): Double;
     function BaseDeltaToDisplayValue(const AValue: Double): Double;
@@ -913,6 +917,83 @@ begin
   Result := GetSamples;
 end;
 
+
+
+function TMeterValue.AddStabilitySampleManual(const ATimeStampMs: Int64;
+  const AValue: Double): Boolean;
+var
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  Result := False;
+  Sample.TimeStampMs := ATimeStampMs;
+  Sample.Value := AValue;
+  FSampleLock.Enter;
+  try
+    for I := 0 to FSamples.Count - 1 do
+      if FSamples[I].TimeStampMs = ATimeStampMs then
+      begin
+        FSamples[I] := Sample;
+        ResetStabilityInfo;
+        Exit(True);
+      end;
+
+    I := 0;
+    while (I < FSamples.Count) and (FSamples[I].TimeStampMs < ATimeStampMs) do
+      Inc(I);
+    FSamples.Insert(I, Sample);
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+function TMeterValue.UpdateStabilitySampleValue(const AIndex: Integer;
+  const AValue: Double): Boolean;
+var
+  Sample: TMeterValueSample;
+begin
+  Result := False;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+    Sample := FSamples[AIndex];
+    Sample.Value := AValue;
+    FSamples[AIndex] := Sample;
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+function TMeterValue.DeleteStabilitySample(const AIndex: Integer): Boolean;
+begin
+  Result := False;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+    FSamples.Delete(AIndex);
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+procedure TMeterValue.ClearStabilitySamples;
+begin
+  FSampleLock.Enter;
+  try
+    FSamples.Clear;
+    ResetStabilityInfo;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
 
 function TMeterValue.BaseToDisplayValue(const AValue: Double): Double;
 var
