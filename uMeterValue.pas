@@ -1300,7 +1300,7 @@ type
 var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
-  CutoffMs, FirstMs, LastMs: Int64;
+  CutoffMs, FirstMs, LastMs, EffectiveConfirmationStartMs: Int64;
   I, N: Integer;
   Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
   Msg: string;
@@ -1528,6 +1528,17 @@ begin
   end;
   AInfo.IsConfirmed := AStabilityConfirmed;
   AInfo.IsStabilityConfirmed := AStabilityConfirmed;
+  if MathStable and (AStableCandidateSinceMs > 0) then
+  begin
+    EffectiveConfirmationStartMs := ACurrentMs - Round(ASettings.ConfirmationTimeSec * 1000.0);
+    if EffectiveConfirmationStartMs < AStableCandidateSinceMs then
+      EffectiveConfirmationStartMs := AStableCandidateSinceMs;
+    for I := 0 to High(AInfo.SampleResults) do
+      AInfo.SampleResults[I].IsInConfirmationPeriod :=
+        AInfo.SampleResults[I].InWindow and
+        (AInfo.SampleResults[I].TimeStampMs >= EffectiveConfirmationStartMs) and
+        (AInfo.SampleResults[I].TimeStampMs <= ACurrentMs);
+  end;
   if MathStable and not AInfo.IsConfirmed then Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
 
   AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed and
