@@ -311,6 +311,7 @@ type
     procedure SetCalcValue;
 
     function GetNewUUID: string;
+    class function GetMeterValuesFileName(IsBackUp: Integer): string; static;
     class procedure SaveToFile(IsBackUp: Integer); static;
     class procedure LoadFromFile; static;
     // Удаляет указанные значения/владельцев из памяти и физически перезаписывает MeterValues.ini.
@@ -352,7 +353,8 @@ implementation
 
 
 uses
-  FmxHelper;
+  FmxHelper,
+  uDebugLog;
 
 function MedianValue(const AValues: TArray<Double>): Double;
 var
@@ -825,12 +827,14 @@ begin
   FStabilitySettings.OutlierFactor := 3.5;
   FStabilitySettings.ConfirmationTimeSec := 3.0;
   FStabilitySettings.ExitThresholdFactor := 1.2;
+  FStabilitySettings.TargetValue := 0.0;
   FStabilitySettings.TargetAccuracyPlusPercent := 0.0;
   FStabilitySettings.TargetAccuracyMinusPercent := 0.0;
   FStabilitySettings.TargetToleranceAbsolute := 0.0;
   FStabilitySettings.RequireCurrentValueInRange := True;
   FStabilitySettings.RequireMeanValueInRange := True;
   FStabilitySettings.RequireForecastInRange := True;
+  FStabilitySettings.AutoAnalyze := True;
 end;
 
 procedure TMeterValue.ResetStabilityInfo;
@@ -1054,9 +1058,9 @@ end;
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
-  Result := (FStabilitySettings.MinSampleCount >= 2) and
+  Result := (FStabilitySettings.MinSampleCount >= 1) and
     (FStabilitySettings.WindowDurationSec > 0) and
-    (FStabilitySettings.MaxSampleAgeSec > 0) and
+    (FStabilitySettings.MaxSampleAgeSec >= 0) and
     (FStabilitySettings.MaxVariation >= 0) and
     (FStabilitySettings.MaxStdDeviation >= 0) and
     (FStabilitySettings.MaxTrendRate >= 0) and
@@ -3094,6 +3098,14 @@ begin
 end;
 
 { Serializes all meter values to persistent INI storage (optionally backup). }
+class function TMeterValue.GetMeterValuesFileName(IsBackUp: Integer): string;
+begin
+  if IsBackUp = 0 then
+    Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini')
+  else
+    Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
+end;
+
 class procedure TMeterValue.SaveToFile(IsBackUp: Integer);
 var
   Ini: TMemIniFile;
@@ -3110,10 +3122,7 @@ begin
     if MV.IsToSave then
       FMeterValuesSaves.Add(MV);
 
-  if IsBackUp = 0 then
-    FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini')
-  else
-    FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
+  FileName := GetMeterValuesFileName(IsBackUp);
 
   ForceDirectories(ExtractFilePath(FileName));
 
@@ -3175,12 +3184,14 @@ begin
       Ini.WriteFloat(Section, 'StabilityOutlierFactor', MV.FStabilitySettings.OutlierFactor);
       Ini.WriteFloat(Section, 'StabilityConfirmationTimeSec', MV.FStabilitySettings.ConfirmationTimeSec);
       Ini.WriteFloat(Section, 'StabilityExitThresholdFactor', MV.FStabilitySettings.ExitThresholdFactor);
+      Ini.WriteFloat(Section, 'TargetValue', MV.FStabilitySettings.TargetValue);
       Ini.WriteFloat(Section, 'TargetAccuracyPlusPercent', MV.FStabilitySettings.TargetAccuracyPlusPercent);
       Ini.WriteFloat(Section, 'TargetAccuracyMinusPercent', MV.FStabilitySettings.TargetAccuracyMinusPercent);
       Ini.WriteFloat(Section, 'TargetToleranceAbsolute', MV.FStabilitySettings.TargetToleranceAbsolute);
       Ini.WriteBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
       Ini.WriteBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       Ini.WriteBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
+      Ini.WriteBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
 
       Ini.WriteInteger(Section, 'DimensionsCount', MV.Dimensions.Count);
       for J := 0 to MV.Dimensions.Count - 1 do
@@ -3363,7 +3374,7 @@ var
   CoefItem: TCoef;
   Hash: string;
 begin
-  FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini');
+  FileName := GetMeterValuesFileName(0);
   if not FileExists(FileName) then
   begin
     SaveToFile(0);
@@ -3431,12 +3442,19 @@ begin
       MV.FStabilitySettings.OutlierFactor := S2F(Ini.ReadString(Section, 'StabilityOutlierFactor', F2S(MV.FStabilitySettings.OutlierFactor)));
       MV.FStabilitySettings.ConfirmationTimeSec := S2F(Ini.ReadString(Section, 'StabilityConfirmationTimeSec', F2S(MV.FStabilitySettings.ConfirmationTimeSec)));
       MV.FStabilitySettings.ExitThresholdFactor := S2F(Ini.ReadString(Section, 'StabilityExitThresholdFactor', F2S(MV.FStabilitySettings.ExitThresholdFactor)));
+      MV.FStabilitySettings.TargetValue := S2F(Ini.ReadString(Section, 'TargetValue', F2S(MV.FStabilitySettings.TargetValue)));
       MV.FStabilitySettings.TargetAccuracyPlusPercent := S2F(Ini.ReadString(Section, 'TargetAccuracyPlusPercent', F2S(MV.FStabilitySettings.TargetAccuracyPlusPercent)));
       MV.FStabilitySettings.TargetAccuracyMinusPercent := S2F(Ini.ReadString(Section, 'TargetAccuracyMinusPercent', F2S(MV.FStabilitySettings.TargetAccuracyMinusPercent)));
       MV.FStabilitySettings.TargetToleranceAbsolute := S2F(Ini.ReadString(Section, 'TargetToleranceAbsolute', F2S(MV.FStabilitySettings.TargetToleranceAbsolute)));
       MV.FStabilitySettings.RequireCurrentValueInRange := Ini.ReadBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
       MV.FStabilitySettings.RequireMeanValueInRange := Ini.ReadBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       MV.FStabilitySettings.RequireForecastInRange := Ini.ReadBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
+      MV.FStabilitySettings.AutoAnalyze := Ini.ReadBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
+{$IFDEF DEBUG}
+      DebugLog(Format('Stability LoadFromFile: Section=%s Hash=%s Name=%s MinSampleCount=%d WindowDurationSec=%.12g TargetValue=%.12g',
+        [Section, MV.Hash, MV.Name, MV.FStabilitySettings.MinSampleCount,
+         MV.FStabilitySettings.WindowDurationSec, MV.FStabilitySettings.TargetValue]));
+{$ENDIF}
 
       MV.Dimensions.Clear;
       for J := 0 to Ini.ReadInteger(Section, 'DimensionsCount', 0) - 1 do
