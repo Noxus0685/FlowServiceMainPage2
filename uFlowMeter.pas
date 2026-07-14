@@ -1274,6 +1274,19 @@ var
       AMeterValue.Description := ADescription;
   end;
 
+{$IFDEF DEBUG}
+  procedure LogInitValue(const AStage: string; AMeterValue: TMeterValue);
+  begin
+    if AMeterValue = nil then
+      DebugLog(Format('FlowMeter InitValues %s: FlowMeterPtr=%p ValuePtr=nil', [AStage, Pointer(Self)]))
+    else
+      DebugLog(Format('FlowMeter InitValues %s: FlowMeterPtr=%p ValuePtr=%p Hash=%s MinSampleCount=%d WindowDurationSec=%.12g',
+        [AStage, Pointer(Self), Pointer(AMeterValue), AMeterValue.Hash,
+         AMeterValue.StabilitySettings.MinSampleCount,
+         AMeterValue.StabilitySettings.WindowDurationSec]));
+  end;
+{$ENDIF}
+
   procedure BindSavedMeterValue(var AMeterValue: TMeterValue; var AHash: string;
     const AExpectedName: string; var AIsExisted: Integer);
   var
@@ -1401,10 +1414,22 @@ begin
   ValueMassFlow.ValueEtalon := nil;
 
   ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, UUID, Name);
+{$IFDEF DEBUG}
+  LogInitValue('ValueVolumeFlow after GetExistedMeterValueBool', ValueVolumeFlow);
+{$ENDIF}
   BindSavedMeterValue(FValueVolumeFlow, HashValueVolumeFlow, 'Объемный расход', IsExisted);
+{$IFDEF DEBUG}
+  LogInitValue('ValueVolumeFlow after BindSavedMeterValue', ValueVolumeFlow);
+{$ENDIF}
   if IsExisted = 0 then
   begin
+{$IFDEF DEBUG}
+    LogInitValue('ValueVolumeFlow before SetAsVolumeFlow', ValueVolumeFlow);
+{$ENDIF}
     ValueVolumeFlow.SetAsVolumeFlow;
+{$IFDEF DEBUG}
+    LogInitValue('ValueVolumeFlow after SetAsVolumeFlow', ValueVolumeFlow);
+{$ENDIF}
     SetDescription(ValueVolumeFlow, 'Объемный расход');
   end;
   ValueVolumeFlow.ValueCorrection := nil;
@@ -1502,6 +1527,9 @@ begin
   else if ValueFlow <> nil then
     ValueFlow.Accuracy := -1;
         ValueImp.Accuracy := 0;
+{$IFDEF DEBUG}
+  LogInitValue('ValueVolumeFlow after InitValues', ValueVolumeFlow);
+{$ENDIF}
 end;
 
 procedure TFlowMeter.SetEtalon(AEtalon: TFlowMeter);

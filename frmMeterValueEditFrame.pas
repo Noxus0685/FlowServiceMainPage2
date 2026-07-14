@@ -263,6 +263,7 @@ type
     function ApplySettingsFromControls(const AShowError: Boolean): Boolean;
 {$IFDEF DEBUG}
     procedure DebugLogStabilityPersistence(const AStage: string; const ASettings: TMeterValueStabilitySettings);
+    procedure DebugLogStabilityUI(const AStage: string);
 {$ENDIF}
     function ValidateControls(out AErrorText: string): Boolean;
     procedure HandleSettingsChange(Sender: TObject);
@@ -315,7 +316,13 @@ begin
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
+{$IFDEF DEBUG}
+  DebugLogStabilityUI('before BuildUI');
+{$ENDIF}
   BuildUI;
+{$IFDEF DEBUG}
+  DebugLogStabilityUI('after BuildUI');
+{$ENDIF}
   ClearAnalysisDisplay;
 end;
 
@@ -2423,6 +2430,9 @@ end;
 
 procedure TFrameMeterValueEdit.LoadSettingsToControls;
 begin
+{$IFDEF DEBUG}
+  DebugLogStabilityUI('before LoadSettingsToControls');
+{$ENDIF}
   FLoading := True;
   try
     CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
@@ -2450,6 +2460,9 @@ begin
   finally
     FLoading := False;
   end;
+{$IFDEF DEBUG}
+  DebugLogStabilityUI('after LoadSettingsToControls');
+{$ENDIF}
 end;
 
 function TFrameMeterValueEdit.TryReadFloat(const AText: string;
@@ -2520,6 +2533,30 @@ begin
 end;
 
 {$IFDEF DEBUG}
+
+procedure TFrameMeterValueEdit.DebugLogStabilityUI(const AStage: string);
+var
+  HashText: string;
+  MinText: string;
+  WindowText: string;
+begin
+  HashText := '';
+  if FMeterValue <> nil then
+    HashText := FMeterValue.Hash;
+  if EditMinSampleCount <> nil then
+    MinText := EditMinSampleCount.Text
+  else
+    MinText := '<nil>';
+  if EditWindowDurationSec <> nil then
+    WindowText := EditWindowDurationSec.Text
+  else
+    WindowText := '<nil>';
+
+  DebugLog(Format('Stability UI %s: Hash=%s FTestMinSampleCount=%d FTestWindowDurationSec=%.12g EditMinSampleCount=%s EditWindowDurationSec=%s',
+    [AStage, HashText, FTestSettings.MinSampleCount, FTestSettings.WindowDurationSec,
+     MinText, WindowText]));
+end;
+
 procedure TFrameMeterValueEdit.DebugLogStabilityPersistence(const AStage: string;
   const ASettings: TMeterValueStabilitySettings);
 var
