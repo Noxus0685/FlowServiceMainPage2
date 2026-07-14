@@ -253,7 +253,8 @@ type
     procedure UpdateTargetLimits;
     procedure HandleTargetRangeChange(Sender: TObject);
     procedure Analyze;
-    procedure AnalyzeDisplayedSamples(const AUseLastWorkSampleTime: Boolean; const AShowValidationError: Boolean);
+    procedure AnalyzeDisplayedSamples(const AUseLastWorkSampleTime: Boolean; const AShowValidationError: Boolean;
+      const ARefreshSource: Boolean = False);
     procedure ClearTestAnalysis;
     function FindSampleAnalysis(const ARow: Integer; out AResult: TMeterValueSampleAnalysis): Boolean;
     function BoolText(const AValue: Boolean): string;
@@ -1750,7 +1751,7 @@ end;
 
 procedure TFrameMeterValueEdit.ButtonAnalyzeClick(Sender: TObject);
 begin
-  Analyze;
+  AnalyzeDisplayedSamples(False, True, False);
 end;
 
 procedure TFrameMeterValueEdit.ButtonGenerateNewClick(Sender: TObject);
@@ -1906,7 +1907,7 @@ begin
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
   ClearAnalysisDisplay;
-  RefreshSamplesGrid;
+  RefreshSamplesGrid(False);
 end;
 
 function TFrameMeterValueEdit.BoolText(const AValue: Boolean): string;
@@ -1961,7 +1962,7 @@ begin
     Exit;
 
   if CheckBoxAutoAnalyze.IsChecked then
-    Analyze
+    AnalyzeDisplayedSamples(False, True, False)
   else
     ClearTestAnalysis;
 end;
@@ -1975,18 +1976,18 @@ begin
   FModified := True;
   FTestSettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
   if CheckBoxAutoAnalyze.IsChecked then
-    Analyze
+    AnalyzeDisplayedSamples(False, True, False)
   else
     ClearTestAnalysis;
 end;
 
 procedure TFrameMeterValueEdit.Analyze;
 begin
-  AnalyzeDisplayedSamples(True, True);
+  AnalyzeDisplayedSamples(False, True, False);
 end;
 
 procedure TFrameMeterValueEdit.AnalyzeDisplayedSamples(const AUseLastWorkSampleTime: Boolean;
-  const AShowValidationError: Boolean);
+  const AShowValidationError: Boolean; const ARefreshSource: Boolean);
 var
   ErrorText: string;
   Settings: TMeterValueStabilitySettings;
@@ -1994,11 +1995,35 @@ var
   LowerLimit: Double;
   UpperLimit: Double;
   I: Integer;
+  OldSampleCount: Integer;
+  OldRowCount: Integer;
+  SelectedRow: Integer;
+  SelectedTimeStampMs: Int64;
+  SelectedSampleValue: Double;
+
 begin
   if FMeterValue = nil then
     Exit;
 
-  RefreshDisplayedSamples;
+  OldSampleCount := Length(FDisplayedSamples);
+  OldRowCount := GridSamples.RowCount;
+  SelectedRow := GridSamples.Row;
+  SelectedTimeStampMs := 0;
+  SelectedSampleValue := 0;
+  if (SelectedRow >= 0) and (SelectedRow < Length(FDisplayedSamples)) and
+     (GetSampleIndexForGridRow(SelectedRow) >= 0) then
+  begin
+    SelectedTimeStampMs := FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].TimeStampMs;
+    SelectedSampleValue := FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].Value;
+  end;
+
+  if ARefreshSource then
+  begin
+    RefreshDisplayedSamples;
+    OldSampleCount := Length(FDisplayedSamples);
+    OldRowCount := Length(FDisplayedSamples);
+  end;
+
   if Length(FDisplayedSamples) = 0 then
   begin
     ClearTestAnalysis;
@@ -2021,9 +2046,7 @@ begin
   UpperLimit := DisplayToBase(EditTargetUpperLimit.Text);
 
   if (FSampleSource = mssWorkHistory) and AUseLastWorkSampleTime then
-    SetAnalysisTimeByLastDisplayedSample
-  else if FSampleSource = mssTestSamples then
-    FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
+    SetAnalysisTimeByLastDisplayedSample;
 
   SetLength(Samples, Length(FDisplayedSamples));
   for I := 0 to High(FDisplayedSamples) do
@@ -2034,6 +2057,19 @@ begin
     FTestStabilityConfirmed, FLastTestAnalysis);
   DisplayAnalysis(FLastTestAnalysis);
   RefreshSamplesGrid(False);
+
+  if (SelectedRow >= 0) and (SelectedRow < GridSamples.RowCount) then
+  begin
+    GridSamples.Row := SelectedRow;
+    GridSamples.Selected := SelectedRow;
+    if (GetSampleIndexForGridRow(SelectedRow) >= 0) and
+       (FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].TimeStampMs = SelectedTimeStampMs) and
+       SameValue(FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].Value, SelectedSampleValue) then
+      LoadSampleToEditor(SelectedRow);
+  end;
+
+  Assert(Length(FDisplayedSamples) = OldSampleCount);
+  Assert(GridSamples.RowCount = OldRowCount);
 end;
 
 function TFrameMeterValueEdit.FormatInfoFloat(const AValue: Double;
