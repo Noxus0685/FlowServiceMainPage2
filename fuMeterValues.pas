@@ -510,8 +510,7 @@ end;
 
 procedure TFormMeterValues.CheckBoxIsToSaveChange(Sender: TObject);
 begin
-  if (CheckBoxIsToSave = nil) or (not CheckBoxIsToSave.Visible) or
-     (not CheckBoxIsToSave.Enabled) then
+  if CheckBoxIsToSave = nil then
     Exit;
 
   if CheckBoxIsToSave.Tag = 0 then
