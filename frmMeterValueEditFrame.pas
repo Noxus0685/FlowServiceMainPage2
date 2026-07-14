@@ -199,6 +199,8 @@ type
     procedure ButtonRefreshHistoryClick(Sender: TObject);
     procedure ButtonUseLastSampleTimeClick(Sender: TObject);
     procedure SetAnalysisTimeByLastDisplayedSample;
+    procedure InstallStabilitySettingsHints;
+    procedure SetControlHint(const AName, AHint: string);
     function DisplayUnitName: string;
     function BaseToDisplayText(const AValue: Double): string;
     function BaseDeltaToDisplayText(const AValue: Double): string;
@@ -209,6 +211,7 @@ type
     procedure UpdateDimensionCaptions;
     procedure LoadSampleToEditor(const AIndex: Integer);
     procedure RefreshSamplesGrid(const AReload: Boolean = True);
+    procedure UpdateSampleCommandButtons;
     procedure AddSample;
     procedure EditSelectedSample;
     procedure DeleteSelectedSample;
@@ -308,7 +311,7 @@ begin
   ComboBoxSampleSource := TComboBox.Create(Self);
   ComboBoxSampleSource.Parent := GroupAnalysis;
   ComboBoxSampleSource.Position.X := 214;
-  ComboBoxSampleSource.Position.Y := 4;
+  ComboBoxSampleSource.Position.Y := 32;
   ComboBoxSampleSource.Size.Width := 134;
   ComboBoxSampleSource.Size.Height := 24;
   ComboBoxSampleSource.Items.Add('История TMeterValue');
@@ -320,17 +323,17 @@ begin
   begin
     Parent := GroupAnalysis;
     Position.X := 12;
-    Position.Y := 6;
+    Position.Y := 8;
     Size.Width := 190;
     Size.Height := 22;
     Text := 'Источник данных';
   end;
 
-  GroupAnalysis.Height := 188;
+  GroupAnalysis.Height := 220;
   ButtonRefreshHistory := TButton.Create(Self);
   ButtonRefreshHistory.Parent := GroupAnalysis;
   ButtonRefreshHistory.Position.X := 12;
-  ButtonRefreshHistory.Position.Y := 122;
+  ButtonRefreshHistory.Position.Y := 180;
   ButtonRefreshHistory.Size.Width := 160;
   ButtonRefreshHistory.Size.Height := 28;
   ButtonRefreshHistory.Text := 'Обновить историю';
@@ -339,7 +342,7 @@ begin
   ButtonUseLastSampleTime := TButton.Create(Self);
   ButtonUseLastSampleTime.Parent := GroupAnalysis;
   ButtonUseLastSampleTime.Position.X := 188;
-  ButtonUseLastSampleTime.Position.Y := 122;
+  ButtonUseLastSampleTime.Position.Y := 180;
   ButtonUseLastSampleTime.Size.Width := 160;
   ButtonUseLastSampleTime.Size.Height := 28;
   ButtonUseLastSampleTime.Text := 'По последней точке';
@@ -411,6 +414,7 @@ begin
   InitializeScenarioList;
   UpdateDimensionCaptions;
   UpdateSampleSourceControls;
+  InstallStabilitySettingsHints;
   RefreshSamplesGrid;
 
   AddEditRow('Полное название', EditValueFull);
@@ -683,8 +687,6 @@ end;
 procedure TFrameMeterValueEdit.RefreshDisplayedSamples;
 begin
   FDisplayedSamples := GetDisplayedSamples;
-  if (FSampleSource = mssWorkHistory) and (Length(FDisplayedSamples) > 0) then
-    SetAnalysisTimeByLastDisplayedSample;
 end;
 
 procedure TFrameMeterValueEdit.SetAnalysisTimeByLastDisplayedSample;
@@ -715,13 +717,9 @@ var
   GeneratorGroup: TControl;
 begin
   IsTestMode := FSampleSource = mssTestSamples;
-  EditSampleTime.Enabled := IsTestMode;
-  EditSampleValue.Enabled := IsTestMode;
-  EditSampleTimeStep.Enabled := IsTestMode;
-  ButtonSampleAdd.Enabled := IsTestMode;
-  ButtonSampleEdit.Enabled := IsTestMode;
-  ButtonSampleDelete.Enabled := IsTestMode;
-  ButtonSamplesClear.Enabled := IsTestMode;
+  EditSampleTime.Enabled := True;
+  EditSampleValue.Enabled := True;
+  EditSampleTimeStep.Enabled := True;
   ComboBoxStabilityScenario.Enabled := IsTestMode;
   ButtonApplyScenario.Enabled := IsTestMode;
   EditGeneratorStartValue.Enabled := IsTestMode;
@@ -733,11 +731,12 @@ begin
   EditGeneratorOutlierAmplitude.Enabled := IsTestMode;
   ButtonGenerateNew.Enabled := IsTestMode;
   ButtonGenerateAppend.Enabled := IsTestMode;
-  EditAnalysisTime.Enabled := IsTestMode;
+  EditAnalysisTime.Enabled := True;
   if ButtonRefreshHistory <> nil then
     ButtonRefreshHistory.Enabled := not IsTestMode;
   if ButtonUseLastSampleTime <> nil then
-    ButtonUseLastSampleTime.Enabled := not IsTestMode;
+    ButtonUseLastSampleTime.Enabled := True;
+  UpdateSampleCommandButtons;
   ScenarioGroup := FindComponent('GroupStabilityScenario') as TControl;
   if ScenarioGroup <> nil then
     ScenarioGroup.Visible := IsTestMode;
@@ -793,9 +792,58 @@ end;
 
 procedure TFrameMeterValueEdit.ButtonUseLastSampleTimeClick(Sender: TObject);
 begin
-  RefreshDisplayedSamples;
   SetAnalysisTimeByLastDisplayedSample;
-  AnalyzeIfNeeded;
+  Analyze;
+end;
+
+procedure TFrameMeterValueEdit.SetControlHint(const AName, AHint: string);
+var
+  Obj: TFmxObject;
+begin
+  Obj := FindComponent(AName) as TFmxObject;
+  if Obj is TControl then
+  begin
+    TControl(Obj).Hint := AHint;
+    TControl(Obj).ShowHint := True;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.InstallStabilitySettingsHints;
+begin
+  SetControlHint('CheckBoxStabilityEnabled', 'Включает расчёт стабильности и прогноза для этой метрологической величины. Если выключено, анализ не участвует в заключении.');
+  SetControlHint('LabelMinSampleCount', 'Минимальное число точек в окне анализа, необходимое для расчёта стабильности. Если точек меньше, результат считается недостаточным для анализа.');
+  SetControlHint('EditMinSampleCount', (FindComponent('LabelMinSampleCount') as TControl).Hint);
+  SetControlHint('LabelWindowDurationSec', 'Длительность окна анализа в секундах. Большее значение сглаживает случайный шум, но медленнее реагирует на изменения сигнала.');
+  SetControlHint('EditWindowDurationSec', (FindComponent('LabelWindowDurationSec') as TControl).Hint);
+  SetControlHint('LabelMaxSampleAgeSec', 'Максимально допустимое время в секундах с момента последней точки до текущего времени анализа. Если последняя точка старше, данные считаются устаревшими.');
+  SetControlHint('EditMaxSampleAgeSec', (FindComponent('LabelMaxSampleAgeSec') as TControl).Hint);
+  SetControlHint('LabelConfirmationTimeSec', 'Время подтверждения в секундах: сколько сигнал должен непрерывно удовлетворять условиям стабильности. Малое значение подтверждает быстрее, большое снижает риск ложного подтверждения.');
+  SetControlHint('EditConfirmationTimeSec', (FindComponent('LabelConfirmationTimeSec') as TControl).Hint);
+  SetControlHint('LabelExitThresholdFactor', 'Коэффициент расширения порогов после подтверждения. Большее значение добавляет гистерезис и реже сбрасывает подтверждённую стабильность.');
+  SetControlHint('EditExitThresholdFactor', (FindComponent('LabelExitThresholdFactor') as TControl).Hint);
+  SetControlHint('LabelMaxVariation', 'Предельный размах значений в окне в единицах величины. Малое значение требует почти неизменного сигнала, большое допускает больший разброс.');
+  SetControlHint('EditMaxVariation', (FindComponent('LabelMaxVariation') as TControl).Hint);
+  SetControlHint('LabelMaxStdDeviation', 'Предельное стандартное отклонение в единицах величины. Малое значение жёстко ограничивает шум, большое допускает более шумный сигнал.');
+  SetControlHint('EditMaxStdDeviation', (FindComponent('LabelMaxStdDeviation') as TControl).Hint);
+  SetControlHint('LabelMaxTrendRate', 'Предельная допустимая скорость изменения сигнала в единицах величины в секунду. Если модуль тренда выше этого порога, сигнал считается нестабильным.');
+  SetControlHint('EditMaxTrendRate', (FindComponent('LabelMaxTrendRate') as TControl).Hint);
+  SetControlHint('LabelMaxOutlierFractionPercent', 'Максимальная доля выбросов в процентах от числа точек окна. Малое значение допускает мало выбросов, большое менее строго к одиночным ошибкам.');
+  SetControlHint('EditMaxOutlierFractionPercent', (FindComponent('LabelMaxOutlierFractionPercent') as TControl).Hint);
+  SetControlHint('LabelOutlierFactor', 'Порог чувствительности обнаружения выбросов. Используется в алгоритме MAD. Чем меньше значение, тем больше точек будет считаться выбросами.');
+  SetControlHint('EditOutlierFactor', (FindComponent('LabelOutlierFactor') as TControl).Hint);
+  SetControlHint('LabelForecastHorizonSec', 'Горизонт прогноза в секундах от текущего времени анализа. Большое значение проверяет более дальний прогноз и сильнее зависит от тренда.');
+  SetControlHint('EditForecastHorizonSec', (FindComponent('LabelForecastHorizonSec') as TControl).Hint);
+  SetControlHint('LabelTestTargetValue', 'Целевое значение в текущих единицах отображения. От него рассчитываются верхняя и нижняя границы допустимого диапазона.');
+  SetControlHint('EditTestTargetValue', (FindComponent('LabelTestTargetValue') as TControl).Hint);
+  SetControlHint('LabelTargetAccuracyPlusPercent', 'Допуск вверх в процентах от целевого значения. Большее значение расширяет верхнюю допустимую границу.');
+  SetControlHint('EditTargetAccuracyPlusPercent', (FindComponent('LabelTargetAccuracyPlusPercent') as TControl).Hint);
+  SetControlHint('LabelTargetAccuracyMinusPercent', 'Допуск вниз в процентах от целевого значения. Большее значение расширяет нижнюю допустимую границу.');
+  SetControlHint('EditTargetAccuracyMinusPercent', (FindComponent('LabelTargetAccuracyMinusPercent') as TControl).Hint);
+  SetControlHint('LabelTargetToleranceAbsolute', 'Минимальный абсолютный допуск в единицах величины. Используется как нижняя граница допуска, когда процентный допуск слишком мал.');
+  SetControlHint('EditTargetToleranceAbsolute', (FindComponent('LabelTargetToleranceAbsolute') as TControl).Hint);
+  SetControlHint('CheckBoxRequireCurrentValueInRange', 'Требовать, чтобы текущее значение было в целевом диапазоне. Если выключено, этот признак не блокирует итоговую пригодность.');
+  SetControlHint('CheckBoxRequireMeanValueInRange', 'Требовать, чтобы среднее значение в окне было в целевом диапазоне. Полезно для устойчивости к одиночным выбросам.');
+  SetControlHint('CheckBoxRequireForecastInRange', 'Требовать, чтобы прогноз на заданный горизонт был в целевом диапазоне. Учитывает тренд и предупреждает о будущем выходе за границы.');
 end;
 
 function TFrameMeterValueEdit.SampleSecondsToMs(const ASeconds: Double): Int64;
@@ -807,16 +855,23 @@ function TFrameMeterValueEdit.SelectedSampleIndex: Integer;
 begin
   Result := -1;
   if (GridSamples <> nil) and (GridSamples.Row >= 0) and
-     (GridSamples.Row < Length(FDisplayedSamples)) and (FSampleSource = mssTestSamples) then
+     (GridSamples.Row < Length(FDisplayedSamples)) then
     Result := GridSamples.Row;
 end;
 
 procedure TFrameMeterValueEdit.LoadSampleToEditor(const AIndex: Integer);
 begin
   if (AIndex < 0) or (AIndex >= Length(FDisplayedSamples)) then
+  begin
+    EditSampleTime.Text := '';
+    EditSampleValue.Text := '';
     Exit;
+  end;
 
-  EditSampleTime.Text := FloatToStr(FDisplayedSamples[AIndex].TimeStampMs / 1000);
+  if Length(FDisplayedSamples) > 0 then
+    EditSampleTime.Text := FloatToStr((FDisplayedSamples[AIndex].TimeStampMs - FDisplayedSamples[0].TimeStampMs) / 1000.0)
+  else
+    EditSampleTime.Text := '0';
   EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[AIndex].Value);
 end;
 
@@ -834,7 +889,26 @@ begin
   if GridSamples.Row >= Length(FDisplayedSamples) then
     GridSamples.Row := Length(FDisplayedSamples) - 1;
   GridSamples.Selected := GridSamples.Row;
+  if GridSamples.Row >= 0 then
+    LoadSampleToEditor(GridSamples.Row)
+  else
+    LoadSampleToEditor(-1);
+  UpdateSampleCommandButtons;
   GridSamples.Repaint;
+end;
+
+procedure TFrameMeterValueEdit.UpdateSampleCommandButtons;
+var
+  HasSelection: Boolean;
+  HasSamples: Boolean;
+begin
+  HasSamples := Length(FDisplayedSamples) > 0;
+  HasSelection := (GridSamples <> nil) and (GridSamples.Row >= 0) and
+    (GridSamples.Row < Length(FDisplayedSamples));
+  ButtonSampleAdd.Enabled := FMeterValue <> nil;
+  ButtonSampleEdit.Enabled := HasSelection;
+  ButtonSampleDelete.Enabled := HasSelection;
+  ButtonSamplesClear.Enabled := HasSamples;
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -859,10 +933,23 @@ var
   Sample: TMeterValueSample;
   StepSec: Double;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Sample.Value := DisplayToBase(EditSampleValue.Text);
+  if FSampleSource = mssWorkHistory then
+  begin
+    if FMeterValue = nil then
+      Exit;
+    if Length(FDisplayedSamples) > 0 then
+      Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+    else
+      Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
+    if FMeterValue.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value) then
+    begin
+      RefreshSamplesGrid;
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
+
   StepSec := SafeFloat(EditSampleTimeStep.Text);
   if StepSec <= 0 then
   begin
@@ -899,14 +986,32 @@ var
   I: Integer;
   Sample: TMeterValueSample;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Index := SelectedSampleIndex;
   if Index < 0 then
     Exit;
 
-  Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
+  if FSampleSource = mssWorkHistory then
+  begin
+    if FMeterValue = nil then
+      Exit;
+    Sample := FDisplayedSamples[Index];
+    Sample.Value := DisplayToBase(EditSampleValue.Text);
+    if FMeterValue.UpdateStabilitySample(Index, Sample.TimeStampMs, Sample.Value) then
+    begin
+      RefreshSamplesGrid;
+      GridSamples.Row := Index;
+      GridSamples.Selected := Index;
+      LoadSampleToEditor(Index);
+      FModified := True;
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
+
+  if Length(FDisplayedSamples) > 0 then
+    Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+  else
+    Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
   Sample.Value := DisplayToBase(EditSampleValue.Text);
   FTestSamples[Index] := Sample;
   SortSamples;
@@ -930,12 +1035,23 @@ procedure TFrameMeterValueEdit.DeleteSelectedSample;
 var
   Index: Integer;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Index := SelectedSampleIndex;
   if Index < 0 then
     Exit;
+
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (FMeterValue <> nil) and FMeterValue.DeleteStabilitySample(Index) then
+    begin
+      RefreshSamplesGrid;
+      if GridSamples.Row >= 0 then
+        LoadSampleToEditor(GridSamples.Row)
+      else
+        LoadSampleToEditor(-1);
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
 
   FTestSamples.Delete(Index);
   RefreshSamplesGrid;
@@ -1093,8 +1209,21 @@ end;
 
 procedure TFrameMeterValueEdit.ClearSamples;
 begin
-  if FSampleSource <> mssTestSamples then
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (FMeterValue = nil) or (MessageDlg('Очистить рабочую историю значений?', TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes) then
+      Exit;
+    FMeterValue.ClearStabilitySamples;
+    GridSamples.Row := -1;
+    GridSamples.Selected := -1;
+    RefreshSamplesGrid;
+    LoadSampleToEditor(-1);
+    ClearTestAnalysis;
+    AnalyzeIfNeeded;
     Exit;
+  end;
+
   FTestSamples.Clear;
   GridSamples.Row := -1;
   GridSamples.Selected := -1;
@@ -1541,7 +1670,10 @@ begin
 
   case ACol of
     0: Value := IntToStr(ARow + 1);
-    1: Value := FloatToStr(FDisplayedSamples[ARow].TimeStampMs / 1000);
+    1: if Length(FDisplayedSamples) > 0 then
+         Value := FloatToStr((FDisplayedSamples[ARow].TimeStampMs - FDisplayedSamples[0].TimeStampMs) / 1000.0)
+       else
+         Value := '0';
     2: Value := IntToStr(FDisplayedSamples[ARow].TimeStampMs);
     3: Value := BaseToDisplayText(FDisplayedSamples[ARow].Value);
     4: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.InWindow) else Value := '';
@@ -1556,8 +1688,26 @@ var
   I: Integer;
   Sample: TMeterValueSample;
 begin
-  if FSampleSource <> mssTestSamples then
+  if (ARow < 0) or (ARow >= Length(FDisplayedSamples)) then
     Exit;
+
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (ACol <> 3) or (FMeterValue = nil) then
+      Exit;
+    Sample := FDisplayedSamples[ARow];
+    Sample.Value := DisplayToBase(Value.ToString);
+    if FMeterValue.UpdateStabilitySample(ARow, Sample.TimeStampMs, Sample.Value) then
+    begin
+      RefreshSamplesGrid;
+      GridSamples.Row := ARow;
+      GridSamples.Selected := ARow;
+      LoadSampleToEditor(ARow);
+      FModified := True;
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
 
   if (ARow < 0) or (ARow >= FTestSamples.Count) then
     Exit;
@@ -1567,7 +1717,10 @@ begin
 
   Sample := FTestSamples[ARow];
   case ACol of
-    1: Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
+    1: if Length(FDisplayedSamples) > 0 then
+         Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(Value.ToString))
+       else
+         Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
     3: Sample.Value := DisplayToBase(Value.ToString);
   end;
 
@@ -1592,6 +1745,7 @@ procedure TFrameMeterValueEdit.GridSamplesSelectCell(Sender: TObject; const ACol
 begin
   CanSelect := True;
   LoadSampleToEditor(ARow);
+  UpdateSampleCommandButtons;
 end;
 
 procedure TFrameMeterValueEdit.EditAnalysisTimeExit(Sender: TObject);
@@ -1740,10 +1894,7 @@ begin
   LowerLimit := DisplayToBase(EditTargetLowerLimit.Text);
   UpperLimit := DisplayToBase(EditTargetUpperLimit.Text);
 
-  if FSampleSource = mssWorkHistory then
-    SetAnalysisTimeByLastDisplayedSample
-  else
-    FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
+  FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
   SetLength(Samples, Length(FDisplayedSamples));
   for I := 0 to High(FDisplayedSamples) do
     Samples[I] := FDisplayedSamples[I];
@@ -2118,7 +2269,10 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
+var
+  IsNewMeterValue: Boolean;
 begin
+  IsNewMeterValue := FMeterValue <> AMeterValue;
   FMeterValue := AMeterValue;
   FLoading := True;
   try
@@ -2151,7 +2305,8 @@ begin
       FTestTargetValue := 0;
       CopySettingsFromWorkMeterValue;
       LoadSettingsToControls;
-      FSampleSource := mssWorkHistory;
+      if IsNewMeterValue then
+        FSampleSource := mssWorkHistory;
       if ComboBoxSampleSource <> nil then
         ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
       UpdateSampleSourceControls;
@@ -2216,10 +2371,14 @@ begin
     FTestTargetValue := FMeterValue.Value;
     CopySettingsFromWorkMeterValue;
     LoadSettingsToControls;
-    FSampleSource := mssWorkHistory;
+    if IsNewMeterValue then
+      FSampleSource := mssWorkHistory;
     if ComboBoxSampleSource <> nil then
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
     UpdateSampleSourceControls;
+    RefreshDisplayedSamples;
+    if IsNewMeterValue and (Length(FDisplayedSamples) > 0) then
+      SetAnalysisTimeByLastDisplayedSample;
     Analyze;
   finally
     FLoading := False;
