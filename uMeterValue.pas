@@ -552,7 +552,9 @@ end;
 class function TMeterValue.MakeValueKind(const AValueType: EValueType;
   const AShrtName: string): string;
 begin
-  Result := IntToStr(Ord(AValueType)) + ':' + Trim(AShrtName);
+  Result := Trim(AShrtName);
+  if Result = '' then
+    Result := IntToStr(Ord(AValueType));
 end;
 
 function TMeterValue.GetValueKind: string;
@@ -597,7 +599,11 @@ var
   begin
     KindText := Ini.ReadString(ASection, 'ValueKind', '');
     if Trim(KindText) <> '' then
+    begin
+      if Pos(':', KindText) > 0 then
+        Exit(Copy(KindText, Pos(':', KindText) + 1, MaxInt));
       Exit(KindText);
+    end;
     Result := MakeValueKind(EValueType(Ini.ReadInteger(ASection, 'ValueType', Ord(PARAM_TYPE))),
       Ini.ReadString(ASection, 'ShrtName', ''));
   end;
@@ -699,7 +705,11 @@ var
   begin
     KindText := Ini.ReadString(ASection, 'ValueKind', '');
     if Trim(KindText) <> '' then
+    begin
+      if Pos(':', KindText) > 0 then
+        Exit(Copy(KindText, Pos(':', KindText) + 1, MaxInt));
       Exit(KindText);
+    end;
 
     ValueTypeOrdinal := Ini.ReadInteger(ASection, 'ValueType', Ord(PARAM_TYPE));
     Result := MakeValueKind(EValueType(ValueTypeOrdinal), Ini.ReadString(ASection, 'ShrtName', ''));

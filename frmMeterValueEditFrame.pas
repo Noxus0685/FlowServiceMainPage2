@@ -760,6 +760,45 @@ var
   MatchedHash: string;
   MatchedHashOwner: string;
   MatchedValueKind: string;
+  DuplicateMatchCount: Integer;
+
+
+  function CountSectionsForCurrentKey: Integer;
+  var
+    Ini: TMemIniFile;
+    I: Integer;
+    Count: Integer;
+    Section: string;
+    CurrentKind: string;
+    KindText: string;
+  begin
+    Result := 0;
+    if FMeterValue = nil then
+      Exit;
+    CurrentKind := FMeterValue.GetValueKind;
+    if (Trim(FMeterValue.HashOwner) = '') or (Trim(CurrentKind) = '') then
+      Exit;
+
+    Ini := TMemIniFile.Create(TMeterValue.GetMeterValuesFileName(0));
+    try
+      Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        KindText := Ini.ReadString(Section, 'ValueKind', '');
+        if Pos(':', KindText) > 0 then
+          KindText := Copy(KindText, Pos(':', KindText) + 1, MaxInt);
+        if KindText = '' then
+          KindText := TMeterValue.MakeValueKind(EValueType(Ini.ReadInteger(Section, 'ValueType', Ord(PARAM_TYPE))),
+            Ini.ReadString(Section, 'ShrtName', ''));
+        if SameText(Ini.ReadString(Section, 'HashOwner', ''), FMeterValue.HashOwner) and
+           SameText(KindText, CurrentKind) then
+          Inc(Result);
+      end;
+    finally
+      Ini.Free;
+    end;
+  end;
 
   function PtrHex(APointer: Pointer): string;
   begin
@@ -866,12 +905,18 @@ begin
         Lines.Add('ValueKind=' + FMeterValue.GetValueKind);
         Lines.Add('UnitName=' + DisplayUnitName);
         Lines.Add('DimensionName=' + DisplayUnitName);
+        DuplicateMatchCount := CountSectionsForCurrentKey;
+        Lines.Add('StorageMode=HashOwner+ValueKind');
+        Lines.Add('StorageKey=' + FMeterValue.HashOwner + '|' + FMeterValue.GetValueKind);
+        Lines.Add('DuplicateMatchCount=' + IntToStr(DuplicateMatchCount));
         if TMeterValue.FindStabilitySectionByPersistentKey(FMeterValue, LookupMode, LookupKey,
           MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
         begin
           Lines.Add('LookupMode=' + LookupMode);
           Lines.Add('LookupKey=' + LookupKey);
           Lines.Add('MatchedSection=' + MatchedSection);
+          Lines.Add('UpdatedSection=' + MatchedSection);
+          Lines.Add('CreatedNewSection=' + BoolDump(False));
           Lines.Add('MatchedHash=' + MatchedHash);
           Lines.Add('MatchedHashOwner=' + MatchedHashOwner);
           Lines.Add('MatchedValueKind=' + MatchedValueKind);
@@ -881,6 +926,8 @@ begin
           Lines.Add('LookupMode=None');
           Lines.Add('LookupKey=');
           Lines.Add('MatchedSection=');
+          Lines.Add('UpdatedSection=');
+          Lines.Add('CreatedNewSection=' + BoolDump(FMeterValue.IsToSave));
           Lines.Add('MatchedHash=');
           Lines.Add('MatchedHashOwner=');
           Lines.Add('MatchedValueKind=');
@@ -2656,20 +2703,20 @@ begin
     CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
     CheckBoxAutoAnalyze.IsChecked := FTestSettings.AutoAnalyze;
     EditMinSampleCount.Text := IntToStr(FTestSettings.MinSampleCount);
-    EditWindowDurationSec.Text := FloatToStr(FTestSettings.WindowDurationSec);
-    EditMaxSampleAgeSec.Text := FloatToStr(FTestSettings.MaxSampleAgeSec);
-    EditConfirmationTimeSec.Text := FloatToStr(FTestSettings.ConfirmationTimeSec);
-    EditExitThresholdFactor.Text := FloatToStr(FTestSettings.ExitThresholdFactor);
+    EditWindowDurationSec.Text := FormatFloat('0.########', FTestSettings.WindowDurationSec);
+    EditMaxSampleAgeSec.Text := FormatFloat('0.########', FTestSettings.MaxSampleAgeSec);
+    EditConfirmationTimeSec.Text := FormatFloat('0.########', FTestSettings.ConfirmationTimeSec);
+    EditExitThresholdFactor.Text := FormatFloat('0.########', FTestSettings.ExitThresholdFactor);
     EditMaxVariation.Text := BaseDeltaToDisplayText(FTestSettings.MaxVariation);
     EditMaxStdDeviation.Text := BaseDeltaToDisplayText(FTestSettings.MaxStdDeviation);
     EditMaxTrendRate.Text := BaseDeltaToDisplayText(FTestSettings.MaxTrendRate);
-    EditMaxOutlierFractionPercent.Text := FloatToStr(FTestSettings.MaxOutlierFraction * 100);
-    EditOutlierFactor.Text := FloatToStr(FTestSettings.OutlierFactor);
-    EditForecastHorizonSec.Text := FloatToStr(FTestSettings.ForecastHorizonSec);
+    EditMaxOutlierFractionPercent.Text := FormatFloat('0.########', FTestSettings.MaxOutlierFraction * 100);
+    EditOutlierFactor.Text := FormatFloat('0.########', FTestSettings.OutlierFactor);
+    EditForecastHorizonSec.Text := FormatFloat('0.########', FTestSettings.ForecastHorizonSec);
     FTestTargetValue := FTestSettings.TargetValue;
     EditTestTargetValue.Text := BaseToDisplayText(FTestTargetValue);
-    EditTargetAccuracyPlusPercent.Text := FloatToStr(FTestSettings.TargetAccuracyPlusPercent);
-    EditTargetAccuracyMinusPercent.Text := FloatToStr(FTestSettings.TargetAccuracyMinusPercent);
+    EditTargetAccuracyPlusPercent.Text := FormatFloat('0.########', FTestSettings.TargetAccuracyPlusPercent);
+    EditTargetAccuracyMinusPercent.Text := FormatFloat('0.########', FTestSettings.TargetAccuracyMinusPercent);
     EditTargetToleranceAbsolute.Text := BaseDeltaToDisplayText(FTestSettings.TargetToleranceAbsolute);
     CheckBoxRequireCurrentValueInRange.IsChecked := FTestSettings.RequireCurrentValueInRange;
     CheckBoxRequireMeanValueInRange.IsChecked := FTestSettings.RequireMeanValueInRange;
