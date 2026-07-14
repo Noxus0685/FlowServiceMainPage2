@@ -317,6 +317,8 @@ procedure TFrameMeterValueEdit.BuildUI;
     begin
       TControl(Component).Hint := AHint;
       TControl(Component).ShowHint := True;
+      if Component is TLabel then
+        TLabel(Component).HitTest := True;
     end;
   end;
 
@@ -383,6 +385,7 @@ begin
       Size.Height := 22;
       Text := 'Единица измерения: ' + DisplayUnitName;
       ShowHint := True;
+      HitTest := True;
     end;
 
   ButtonSampleAdd.OnClick := ButtonSampleAddClick;
@@ -763,6 +766,8 @@ var
     begin
       TControl(Component).Hint := AHint;
       TControl(Component).ShowHint := True;
+      if Component is TLabel then
+        TLabel(Component).HitTest := True;
     end;
   end;
 
