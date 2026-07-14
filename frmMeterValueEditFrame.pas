@@ -20,6 +20,7 @@ uses
   FMX.Grid,
   System.Classes,
   System.Generics.Collections,
+  System.IniFiles,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -247,6 +248,9 @@ type
     procedure ReadSettingsFromControls(out ASettings: TMeterValueStabilitySettings);
     function StabilitySettingsEqual(const ALeft, ARight: TMeterValueStabilitySettings): Boolean;
     function ApplySettingsFromControls(const AShowError: Boolean): Boolean;
+{$IFDEF DEBUG}
+    procedure DebugLogStabilityPersistence(const AStage: string; const ASettings: TMeterValueStabilitySettings);
+{$ENDIF}
     function ValidateControls(out AErrorText: string): Boolean;
     procedure HandleSettingsChange(Sender: TObject);
     function TryReadFloat(const AText: string; out AValue: Double): Boolean;
@@ -1702,6 +1706,7 @@ begin
         end;
     end;
 
+    FTestSettings.TargetValue := FTestTargetValue;
     SortSamples;
     RefreshAllTestControls;
   finally
@@ -1874,6 +1879,7 @@ begin
 
   FTestTargetValue := DisplayToBase(EditTestTargetValue.Text);
   AbsoluteTolerance := DisplayDeltaToBase(EditTargetToleranceAbsolute.Text);
+  FTestSettings.TargetValue := FTestTargetValue;
   FTestSettings.TargetAccuracyPlusPercent := PlusPercent;
   FTestSettings.TargetAccuracyMinusPercent := MinusPercent;
   FTestSettings.TargetToleranceAbsolute := AbsoluteTolerance;
@@ -2228,6 +2234,7 @@ begin
     EditMaxOutlierFractionPercent.Text := FloatToStr(FTestSettings.MaxOutlierFraction * 100);
     EditOutlierFactor.Text := FloatToStr(FTestSettings.OutlierFactor);
     EditForecastHorizonSec.Text := FloatToStr(FTestSettings.ForecastHorizonSec);
+    FTestTargetValue := FTestSettings.TargetValue;
     EditTestTargetValue.Text := BaseToDisplayText(FTestTargetValue);
     EditTargetAccuracyPlusPercent.Text := FloatToStr(FTestSettings.TargetAccuracyPlusPercent);
     EditTargetAccuracyMinusPercent.Text := FloatToStr(FTestSettings.TargetAccuracyMinusPercent);
@@ -2274,6 +2281,7 @@ begin
     ASettings.MaxOutlierFraction := OutlierPercent / 100;
   TryReadFloat(EditOutlierFactor.Text, ASettings.OutlierFactor);
   TryReadFloat(EditForecastHorizonSec.Text, ASettings.ForecastHorizonSec);
+  ASettings.TargetValue := DisplayToBase(EditTestTargetValue.Text);
   TryReadFloat(EditTargetAccuracyPlusPercent.Text, ASettings.TargetAccuracyPlusPercent);
   TryReadFloat(EditTargetAccuracyMinusPercent.Text, ASettings.TargetAccuracyMinusPercent);
   ASettings.TargetToleranceAbsolute := DisplayDeltaToBase(EditTargetToleranceAbsolute.Text);
@@ -2297,6 +2305,7 @@ begin
     SameValue(ALeft.OutlierFactor, ARight.OutlierFactor, 1E-9) and
     SameValue(ALeft.ConfirmationTimeSec, ARight.ConfirmationTimeSec, 1E-9) and
     SameValue(ALeft.ExitThresholdFactor, ARight.ExitThresholdFactor, 1E-9) and
+    SameValue(ALeft.TargetValue, ARight.TargetValue, 1E-9) and
     SameValue(ALeft.TargetAccuracyPlusPercent, ARight.TargetAccuracyPlusPercent, 1E-9) and
     SameValue(ALeft.TargetAccuracyMinusPercent, ARight.TargetAccuracyMinusPercent, 1E-9) and
     SameValue(ALeft.TargetToleranceAbsolute, ARight.TargetToleranceAbsolute, 1E-9) and
@@ -2306,12 +2315,62 @@ begin
     (ALeft.AutoAnalyze = ARight.AutoAnalyze);
 end;
 
+{$IFDEF DEBUG}
+procedure TFrameMeterValueEdit.DebugLogStabilityPersistence(const AStage: string;
+  const ASettings: TMeterValueStabilitySettings);
+var
+  FileName: string;
+  Ini: TMemIniFile;
+  Count: Integer;
+  I: Integer;
+  Section: string;
+  SavedHash: string;
+begin
+  if FMeterValue = nil then
+    Exit;
+
+  FileName := TMeterValue.GetMeterValuesFileName(0);
+  DebugLog(Format('Stability %s: Hash=%s Name=%s IsToSave=%s MinSampleCount=%d WindowDurationSec=%.12g MaxSampleAgeSec=%.12g ConfirmationTimeSec=%.12g ExitThresholdFactor=%.12g Ini=%s',
+    [AStage, FMeterValue.Hash, FMeterValue.Name, BoolToStr(FMeterValue.IsToSave, True),
+     ASettings.MinSampleCount, ASettings.WindowDurationSec, ASettings.MaxSampleAgeSec,
+     ASettings.ConfirmationTimeSec, ASettings.ExitThresholdFactor, FileName]));
+
+  if (AStage <> 'after-save') or (FMeterValue.Hash = '') then
+    Exit;
+
+  Ini := TMemIniFile.Create(FileName);
+  try
+    Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
+    for I := 0 to Count - 1 do
+    begin
+      Section := 'MeterValue.' + IntToStr(I);
+      SavedHash := Ini.ReadString(Section, 'Hash', '');
+      if SavedHash = FMeterValue.Hash then
+      begin
+        DebugLog(Format('Stability after-save ini: Section=%s Hash=%s MinSampleCount=%d WindowDurationSec=%s MaxSampleAgeSec=%s ConfirmationTimeSec=%s ExitThresholdFactor=%s AutoAnalyze=%s',
+          [Section, SavedHash, Ini.ReadInteger(Section, 'StabilityMinSampleCount', -1),
+           Ini.ReadString(Section, 'StabilityWindowDurationSec', ''),
+           Ini.ReadString(Section, 'StabilityMaxSampleAgeSec', ''),
+           Ini.ReadString(Section, 'StabilityConfirmationTimeSec', ''),
+           Ini.ReadString(Section, 'StabilityExitThresholdFactor', ''),
+           BoolToStr(Ini.ReadBool(Section, 'StabilityAutoAnalyze', True), True)]));
+        Exit;
+      end;
+    end;
+    DebugLog(Format('Stability after-save ini: Hash=%s not found in %s', [FMeterValue.Hash, FileName]));
+  finally
+    Ini.Free;
+  end;
+end;
+{$ENDIF}
+
 function TFrameMeterValueEdit.ApplySettingsFromControls(
   const AShowError: Boolean): Boolean;
 var
   ErrorText: string;
   Settings: TMeterValueStabilitySettings;
   Changed: Boolean;
+  OldLoading: Boolean;
 begin
   Result := False;
   if FMeterValue = nil then
@@ -2325,13 +2384,36 @@ begin
   end;
 
   ReadSettingsFromControls(Settings);
+{$IFDEF DEBUG}
+  DebugLogStabilityPersistence('before-save', Settings);
+{$ENDIF}
   Changed := not StabilitySettingsEqual(FMeterValue.StabilitySettings, Settings);
   if Changed then
-  begin
     FMeterValue.StabilitySettings := Settings;
+
+  if Changed or (not FMeterValue.IsToSave) then
+  begin
+    if Trim(FMeterValue.Hash) = '' then
+      FMeterValue.Hash := FMeterValue.GetNewUUID;
+    if not FMeterValue.IsToSave then
+      FMeterValue.SetToSave(True);
+    if CheckBoxIsToSave <> nil then
+    begin
+      OldLoading := FLoading;
+      FLoading := True;
+      try
+        CheckBoxIsToSave.IsChecked := True;
+      finally
+        FLoading := OldLoading;
+      end;
+    end;
     TMeterValue.SaveToFile(0);
+{$IFDEF DEBUG}
+    DebugLogStabilityPersistence('after-save', Settings);
+{$ENDIF}
   end;
   FTestSettings := Settings;
+  FTestTargetValue := Settings.TargetValue;
   FSettingsModified := False;
   FModified := FTestDataModified;
   if CheckBoxAutoAnalyze.IsChecked then
@@ -2574,6 +2656,9 @@ begin
       FTestTargetValue := FMeterValue.Value;
       CopySettingsFromWorkMeterValue;
       LoadSettingsToControls;
+{$IFDEF DEBUG}
+      DebugLogStabilityPersistence('load-from-meter-value', FTestSettings);
+{$ENDIF}
       FSampleSource := mssWorkHistory;
       ClearTestAnalysis;
     end

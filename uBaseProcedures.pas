@@ -216,6 +216,8 @@ type
     ConfirmationTimeSec: Double;
     /// <summary>Multiplier for exit thresholds after stability was already confirmed.</summary>
     ExitThresholdFactor: Double;
+    /// <summary>Target value in base units used by current, mean and forecast range checks.</summary>
+    TargetValue: Double;
     /// <summary>Upper target tolerance as percent of Abs(TargetValue).</summary>
     TargetAccuracyPlusPercent: Double;
     /// <summary>Lower target tolerance as percent of Abs(TargetValue).</summary>
