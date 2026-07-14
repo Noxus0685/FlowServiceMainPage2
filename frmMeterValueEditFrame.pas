@@ -5,6 +5,7 @@ interface
 uses
   FMX.Controls,
   FMX.Controls.Presentation,
+  FMX.Consts,
   FMX.Dialogs,
   FMX.Edit,
   FMX.Forms,
@@ -1218,7 +1219,7 @@ procedure TFrameMeterValueEdit.ClearSamples;
 begin
   if FSampleSource = mssWorkHistory then
   begin
-    if (FMeterValue <> nil) and (MessageDlgSync('Очистить историю TMeterValue?',
+    if (FMeterValue <> nil) and (MessageDlg('Очистить историю TMeterValue?',
       TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes) then
     begin
       FMeterValue.ClearStabilitySamples;
