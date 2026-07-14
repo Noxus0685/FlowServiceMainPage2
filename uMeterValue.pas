@@ -210,6 +210,10 @@ type
     function GetSamples: TArray<TMeterValueSample>;
     /// <summary>Returns a thread-safe immutable copy of chronological stability samples for editor preview.</summary>
     function GetStabilitySamples: TArray<TMeterValueSample>;
+    function AddStabilitySampleManual(const ATimeStampMs: Int64; const AValue: Double): Boolean;
+    function UpdateStabilitySampleValue(const AIndex: Integer; const AValue: Double): Boolean;
+    function DeleteStabilitySample(const AIndex: Integer): Boolean;
+    procedure ClearStabilitySamples;
     function BaseToDisplayValue(const AValue: Double): Double;
     function DisplayToBaseValue(const AValue: Double): Double;
     function BaseDeltaToDisplayValue(const AValue: Double): Double;
@@ -914,6 +918,83 @@ begin
 end;
 
 
+
+function TMeterValue.AddStabilitySampleManual(const ATimeStampMs: Int64;
+  const AValue: Double): Boolean;
+var
+  I: Integer;
+  Sample: TMeterValueSample;
+begin
+  Result := False;
+  Sample.TimeStampMs := ATimeStampMs;
+  Sample.Value := AValue;
+  FSampleLock.Enter;
+  try
+    for I := 0 to FSamples.Count - 1 do
+      if FSamples[I].TimeStampMs = ATimeStampMs then
+      begin
+        FSamples[I] := Sample;
+        ResetStabilityInfo;
+        Exit(True);
+      end;
+
+    I := 0;
+    while (I < FSamples.Count) and (FSamples[I].TimeStampMs < ATimeStampMs) do
+      Inc(I);
+    FSamples.Insert(I, Sample);
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+function TMeterValue.UpdateStabilitySampleValue(const AIndex: Integer;
+  const AValue: Double): Boolean;
+var
+  Sample: TMeterValueSample;
+begin
+  Result := False;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+    Sample := FSamples[AIndex];
+    Sample.Value := AValue;
+    FSamples[AIndex] := Sample;
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+function TMeterValue.DeleteStabilitySample(const AIndex: Integer): Boolean;
+begin
+  Result := False;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+    FSamples.Delete(AIndex);
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
+procedure TMeterValue.ClearStabilitySamples;
+begin
+  FSampleLock.Enter;
+  try
+    FSamples.Clear;
+    ResetStabilityInfo;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
 function TMeterValue.BaseToDisplayValue(const AValue: Double): Double;
 var
   TempValue: Double;
@@ -1219,7 +1300,7 @@ type
 var
   Window: TArray<TIndexedSample>;
   Used: TArray<TIndexedSample>;
-  CutoffMs, FirstMs, LastMs: Int64;
+  CutoffMs, FirstMs, LastMs, EffectiveConfirmationStartMs: Int64;
   I, N: Integer;
   Sum, SumSq, MeanT, SumT, Num, Den, T, Intercept: Double;
   Msg: string;
@@ -1447,6 +1528,17 @@ begin
   end;
   AInfo.IsConfirmed := AStabilityConfirmed;
   AInfo.IsStabilityConfirmed := AStabilityConfirmed;
+  if MathStable and (AStableCandidateSinceMs > 0) then
+  begin
+    EffectiveConfirmationStartMs := ACurrentMs - Round(ASettings.ConfirmationTimeSec * 1000.0);
+    if EffectiveConfirmationStartMs < AStableCandidateSinceMs then
+      EffectiveConfirmationStartMs := AStableCandidateSinceMs;
+    for I := 0 to High(AInfo.SampleResults) do
+      AInfo.SampleResults[I].IsInConfirmationPeriod :=
+        AInfo.SampleResults[I].InWindow and
+        (AInfo.SampleResults[I].TimeStampMs >= EffectiveConfirmationStartMs) and
+        (AInfo.SampleResults[I].TimeStampMs <= ACurrentMs);
+  end;
   if MathStable and not AInfo.IsConfirmed then Include(AInfo.FailReasons, mvsfrWaitingForConfirmation);
 
   AInfo.IsSuitableForMeasurement := MathStable and AInfo.IsConfirmed and

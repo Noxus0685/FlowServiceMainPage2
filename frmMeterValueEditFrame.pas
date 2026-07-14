@@ -5,6 +5,7 @@ interface
 uses
   FMX.Controls,
   FMX.Controls.Presentation,
+  FMX.Consts,
   FMX.Dialogs,
   FMX.Edit,
   FMX.Forms,
@@ -190,6 +191,8 @@ type
     procedure FillDimensionCombo;
     function SafeFloat(const S: string): Double;
     function SampleSecondsToMs(const ASeconds: Double): Int64;
+    function GetSampleIndexForGridRow(const ARow: Integer): Integer;
+    function GetGridRowForSampleIndex(const AIndex: Integer): Integer;
     function SelectedSampleIndex: Integer;
     function GetDisplayedSamples: TArray<TMeterValueSample>;
     procedure RefreshDisplayedSamples;
@@ -247,9 +250,11 @@ type
     procedure UpdateTargetLimits;
     procedure HandleTargetRangeChange(Sender: TObject);
     procedure Analyze;
+    procedure AnalyzeDisplayedSamples(const AUseLastWorkSampleTime: Boolean; const AShowValidationError: Boolean);
     procedure ClearTestAnalysis;
     function FindSampleAnalysis(const ARow: Integer; out AResult: TMeterValueSampleAnalysis): Boolean;
     function BoolText(const AValue: Boolean): string;
+    function InWindowText(const AResult: TMeterValueSampleAnalysis): string;
     procedure AnalyzeIfNeeded;
     procedure HandleAutoAnalyzeChange(Sender: TObject);
     procedure DisplayAnalysis(const AInfo: TMeterValueStabilityInfo);
@@ -266,6 +271,8 @@ type
     procedure LoadFromMeterValue(AMeterValue: TMeterValue);
     procedure SaveChanges;
     procedure ApplySettingsToWorkMeterValue;
+    procedure SetStabilityOnlyMode;
+    procedure SetIntegratedMode(const AMainParametersParent, AStabilityParent: TControl);
   end;
 
 implementation
@@ -298,6 +305,19 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.BuildUI;
+
+  procedure SetHintFor(const AName, AHint: string);
+  var
+    Component: TComponent;
+  begin
+    Component := FindComponent(AName);
+    if Component is TControl then
+    begin
+      TControl(Component).Hint := AHint;
+      TControl(Component).ShowHint := True;
+    end;
+  end;
+
 begin
   LayoutRoot := TVertScrollBox.Create(Self);
   LayoutRoot.Parent := TabItemMainParameters;
@@ -308,7 +328,7 @@ begin
   ComboBoxSampleSource := TComboBox.Create(Self);
   ComboBoxSampleSource.Parent := GroupAnalysis;
   ComboBoxSampleSource.Position.X := 214;
-  ComboBoxSampleSource.Position.Y := 4;
+  ComboBoxSampleSource.Position.Y := 28;
   ComboBoxSampleSource.Size.Width := 134;
   ComboBoxSampleSource.Size.Height := 24;
   ComboBoxSampleSource.Items.Add('История TMeterValue');
@@ -320,17 +340,22 @@ begin
   begin
     Parent := GroupAnalysis;
     Position.X := 12;
-    Position.Y := 6;
+    Position.Y := 30;
     Size.Width := 190;
     Size.Height := 22;
     Text := 'Источник данных';
   end;
 
-  GroupAnalysis.Height := 188;
+  GroupAnalysis.Height := 196;
+  if FindComponent('LabelAnalysisTime') is TControl then
+    TControl(FindComponent('LabelAnalysisTime')).Position.Y := 62;
+  EditAnalysisTime.Position.Y := 60;
+  ButtonAnalyze.Position.Y := 94;
+  CheckBoxAutoAnalyze.Position.Y := 126;
   ButtonRefreshHistory := TButton.Create(Self);
   ButtonRefreshHistory.Parent := GroupAnalysis;
   ButtonRefreshHistory.Position.X := 12;
-  ButtonRefreshHistory.Position.Y := 122;
+  ButtonRefreshHistory.Position.Y := 158;
   ButtonRefreshHistory.Size.Width := 160;
   ButtonRefreshHistory.Size.Height := 28;
   ButtonRefreshHistory.Text := 'Обновить историю';
@@ -339,7 +364,7 @@ begin
   ButtonUseLastSampleTime := TButton.Create(Self);
   ButtonUseLastSampleTime.Parent := GroupAnalysis;
   ButtonUseLastSampleTime.Position.X := 188;
-  ButtonUseLastSampleTime.Position.Y := 122;
+  ButtonUseLastSampleTime.Position.Y := 158;
   ButtonUseLastSampleTime.Size.Width := 160;
   ButtonUseLastSampleTime.Size.Height := 28;
   ButtonUseLastSampleTime.Text := 'По последней точке';
@@ -409,6 +434,40 @@ begin
   EditGeneratorOutlierProbability.Text := '0';
   EditGeneratorOutlierAmplitude.Text := '0';
   InitializeScenarioList;
+  SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
+  SetHintFor('LabelMinSampleCount', 'Минимальное количество отсчётов в окне анализа для достоверного результата.');
+  SetHintFor('EditMinSampleCount', 'Минимальное количество отсчётов в окне анализа для достоверного результата.');
+  SetHintFor('LabelWindowDurationSec', 'Длительность временного окна, по которому рассчитываются размах, отклонение и тренд.');
+  SetHintFor('EditWindowDurationSec', 'Длительность временного окна, по которому рассчитываются размах, отклонение и тренд.');
+  SetHintFor('LabelMaxSampleAgeSec', 'Максимально допустимый возраст последнего отсчёта относительно текущего времени анализа.');
+  SetHintFor('EditMaxSampleAgeSec', 'Максимально допустимый возраст последнего отсчёта относительно текущего времени анализа.');
+  SetHintFor('LabelConfirmationTimeSec', 'Время, в течение которого условия стабильности должны оставаться выполненными для подтверждения.');
+  SetHintFor('EditConfirmationTimeSec', 'Время, в течение которого условия стабильности должны оставаться выполненными для подтверждения.');
+  SetHintFor('LabelExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
+  SetHintFor('EditExitThresholdFactor', 'Множитель порогов после подтверждения стабильности, задающий гистерезис выхода.');
+  SetHintFor('LabelMaxVariation', 'Максимально допустимый размах значений в окне анализа.');
+  SetHintFor('EditMaxVariation', 'Максимально допустимый размах значений в окне анализа.');
+  SetHintFor('LabelMaxStdDeviation', 'Максимально допустимое стандартное отклонение значений в окне анализа.');
+  SetHintFor('EditMaxStdDeviation', 'Максимально допустимое стандартное отклонение значений в окне анализа.');
+  SetHintFor('LabelMaxTrendRate', 'Максимально допустимая абсолютная скорость линейного тренда в единицах в секунду.');
+  SetHintFor('EditMaxTrendRate', 'Максимально допустимая абсолютная скорость линейного тренда в единицах в секунду.');
+  SetHintFor('LabelMaxOutlierFractionPercent', 'Максимальная допустимая доля выбросов в процентах от использованных отсчётов.');
+  SetHintFor('EditMaxOutlierFractionPercent', 'Максимальная допустимая доля выбросов в процентах от использованных отсчётов.');
+  SetHintFor('LabelOutlierFactor', 'Коэффициент MAD-критерия для определения выбросов.');
+  SetHintFor('EditOutlierFactor', 'Коэффициент MAD-критерия для определения выбросов.');
+  SetHintFor('LabelForecastHorizonSec', 'Горизонт прогноза от текущего времени анализа, с.');
+  SetHintFor('EditForecastHorizonSec', 'Горизонт прогноза от текущего времени анализа, с.');
+  SetHintFor('LabelTestTargetValue', 'Целевое значение для проверки текущего, среднего и прогнозного значения.');
+  SetHintFor('EditTestTargetValue', 'Целевое значение для проверки текущего, среднего и прогнозного значения.');
+  SetHintFor('LabelTargetAccuracyPlusPercent', 'Допуск вверх от целевого значения, %.');
+  SetHintFor('EditTargetAccuracyPlusPercent', 'Допуск вверх от целевого значения, %.');
+  SetHintFor('LabelTargetAccuracyMinusPercent', 'Допуск вниз от целевого значения, %.');
+  SetHintFor('EditTargetAccuracyMinusPercent', 'Допуск вниз от целевого значения, %.');
+  SetHintFor('LabelTargetToleranceAbsolute', 'Минимальный абсолютный допуск, применяемый вместе с процентными допусками.');
+  SetHintFor('EditTargetToleranceAbsolute', 'Минимальный абсолютный допуск, применяемый вместе с процентными допусками.');
+  SetHintFor('CheckBoxRequireCurrentValueInRange', 'Проверять попадание текущего значения в целевой диапазон.');
+  SetHintFor('CheckBoxRequireMeanValueInRange', 'Проверять попадание среднего значения в целевой диапазон.');
+  SetHintFor('CheckBoxRequireForecastInRange', 'Проверять попадание прогнозного значения в целевой диапазон.');
   UpdateDimensionCaptions;
   UpdateSampleSourceControls;
   RefreshSamplesGrid;
@@ -683,8 +742,6 @@ end;
 procedure TFrameMeterValueEdit.RefreshDisplayedSamples;
 begin
   FDisplayedSamples := GetDisplayedSamples;
-  if (FSampleSource = mssWorkHistory) and (Length(FDisplayedSamples) > 0) then
-    SetAnalysisTimeByLastDisplayedSample;
 end;
 
 procedure TFrameMeterValueEdit.SetAnalysisTimeByLastDisplayedSample;
@@ -715,13 +772,16 @@ var
   GeneratorGroup: TControl;
 begin
   IsTestMode := FSampleSource = mssTestSamples;
-  EditSampleTime.Enabled := IsTestMode;
-  EditSampleValue.Enabled := IsTestMode;
-  EditSampleTimeStep.Enabled := IsTestMode;
-  ButtonSampleAdd.Enabled := IsTestMode;
-  ButtonSampleEdit.Enabled := IsTestMode;
-  ButtonSampleDelete.Enabled := IsTestMode;
-  ButtonSamplesClear.Enabled := IsTestMode;
+  EditSampleTime.Enabled := True;
+  EditSampleTime.ReadOnly := (FSampleSource = mssWorkHistory) and (GridSamples.Row >= 0);
+  EditSampleValue.Enabled := True;
+  EditSampleValue.ReadOnly := False;
+  EditSampleTimeStep.Enabled := True;
+  EditSampleTimeStep.ReadOnly := False;
+  ButtonSampleAdd.Enabled := True;
+  ButtonSampleEdit.Enabled := GridSamples.Row >= 0;
+  ButtonSampleDelete.Enabled := GridSamples.Row >= 0;
+  ButtonSamplesClear.Enabled := Length(FDisplayedSamples) > 0;
   ComboBoxStabilityScenario.Enabled := IsTestMode;
   ButtonApplyScenario.Enabled := IsTestMode;
   EditGeneratorStartValue.Enabled := IsTestMode;
@@ -760,6 +820,9 @@ procedure TFrameMeterValueEdit.ButtonRefreshHistoryClick(Sender: TObject);
 var
   BeforeSamples: TArray<TMeterValueSample>;
   AfterSamples: TArray<TMeterValueSample>;
+  SelectedTimeStampMs: Int64;
+  BestIndex: Integer;
+  I: Integer;
 
   function BoundaryText(const ASamples: TArray<TMeterValueSample>): string;
   begin
@@ -774,12 +837,48 @@ begin
   if FSampleSource <> mssWorkHistory then
     Exit;
 
+  SelectedTimeStampMs := -1;
+  if (GridSamples.Row >= 0) and (GridSamples.Row < Length(FDisplayedSamples)) then
+    SelectedTimeStampMs := FDisplayedSamples[GetSampleIndexForGridRow(GridSamples.Row)].TimeStampMs;
+
   if FMeterValue <> nil then
     BeforeSamples := FMeterValue.GetStabilitySamples
   else
     SetLength(BeforeSamples, 0);
 
-  Analyze;
+  RefreshSamplesGrid(True);
+  if (SelectedTimeStampMs >= 0) and (Length(FDisplayedSamples) > 0) then
+  begin
+    BestIndex := 0;
+    for I := 0 to High(FDisplayedSamples) do
+    begin
+      if Abs(FDisplayedSamples[I].TimeStampMs - SelectedTimeStampMs) <
+        Abs(FDisplayedSamples[BestIndex].TimeStampMs - SelectedTimeStampMs) then
+        BestIndex := I;
+      if FDisplayedSamples[I].TimeStampMs = SelectedTimeStampMs then
+      begin
+        BestIndex := I;
+        Break;
+      end;
+    end;
+    GridSamples.Row := GetGridRowForSampleIndex(BestIndex);
+    GridSamples.Selected := GridSamples.Row;
+    LoadSampleToEditor(GridSamples.Row);
+  end;
+
+  if Length(FDisplayedSamples) = 0 then
+  begin
+    ClearTestAnalysis;
+    MemoConclusion.Lines.Text := 'В рабочей истории нет данных';
+  end
+  else if CheckBoxAutoAnalyze.IsChecked then
+    AnalyzeDisplayedSamples(False, True)
+  else
+  begin
+    ClearTestAnalysis;
+    MemoConclusion.Lines.Text := 'История обновлена. Выполните пересчёт.';
+    RefreshSamplesGrid(False);
+  end;
 
   if FMeterValue <> nil then
     AfterSamples := FMeterValue.GetStabilitySamples
@@ -793,7 +892,8 @@ end;
 
 procedure TFrameMeterValueEdit.ButtonUseLastSampleTimeClick(Sender: TObject);
 begin
-  RefreshDisplayedSamples;
+  if Length(FDisplayedSamples) = 0 then
+    Exit;
   SetAnalysisTimeByLastDisplayedSample;
   AnalyzeIfNeeded;
 end;
@@ -803,21 +903,38 @@ begin
   Result := Round(ASeconds * 1000);
 end;
 
+function TFrameMeterValueEdit.GetSampleIndexForGridRow(const ARow: Integer): Integer;
+begin
+  Result := -1;
+  if (ARow >= 0) and (ARow < Length(FDisplayedSamples)) then
+    Result := Length(FDisplayedSamples) - 1 - ARow;
+end;
+
+function TFrameMeterValueEdit.GetGridRowForSampleIndex(const AIndex: Integer): Integer;
+begin
+  Result := -1;
+  if (AIndex >= 0) and (AIndex < Length(FDisplayedSamples)) then
+    Result := Length(FDisplayedSamples) - 1 - AIndex;
+end;
+
 function TFrameMeterValueEdit.SelectedSampleIndex: Integer;
 begin
   Result := -1;
-  if (GridSamples <> nil) and (GridSamples.Row >= 0) and
-     (GridSamples.Row < Length(FDisplayedSamples)) and (FSampleSource = mssTestSamples) then
-    Result := GridSamples.Row;
+  if GridSamples <> nil then
+    Result := GetSampleIndexForGridRow(GridSamples.Row);
 end;
 
 procedure TFrameMeterValueEdit.LoadSampleToEditor(const AIndex: Integer);
+var
+  SampleIndex: Integer;
 begin
-  if (AIndex < 0) or (AIndex >= Length(FDisplayedSamples)) then
+  SampleIndex := GetSampleIndexForGridRow(AIndex);
+  if SampleIndex < 0 then
     Exit;
 
-  EditSampleTime.Text := FloatToStr(FDisplayedSamples[AIndex].TimeStampMs / 1000);
-  EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[AIndex].Value);
+  EditSampleTime.Text := FloatToStr((FDisplayedSamples[SampleIndex].TimeStampMs -
+    FDisplayedSamples[0].TimeStampMs) / 1000);
+  EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[SampleIndex].Value);
 end;
 
 procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
@@ -834,7 +951,13 @@ begin
   if GridSamples.Row >= Length(FDisplayedSamples) then
     GridSamples.Row := Length(FDisplayedSamples) - 1;
   GridSamples.Selected := GridSamples.Row;
+  if Length(FDisplayedSamples) = 0 then
+  begin
+    EditSampleTime.Text := '';
+    EditSampleValue.Text := '';
+  end;
   GridSamples.Repaint;
+  UpdateSampleSourceControls;
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -859,15 +982,29 @@ var
   Sample: TMeterValueSample;
   StepSec: Double;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Sample.Value := DisplayToBase(EditSampleValue.Text);
   StepSec := SafeFloat(EditSampleTimeStep.Text);
   if StepSec <= 0 then
   begin
     StepSec := 1.0;
     EditSampleTimeStep.Text := FloatToStr(StepSec);
+  end;
+
+  if FSampleSource = mssWorkHistory then
+  begin
+    if Length(FDisplayedSamples) > 0 then
+      Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+    else
+      Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
+    if (FMeterValue <> nil) and FMeterValue.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value) then
+    begin
+      RefreshSamplesGrid(True);
+      GridSamples.Row := 0;
+      GridSamples.Selected := GridSamples.Row;
+      LoadSampleToEditor(GridSamples.Row);
+      AnalyzeIfNeeded;
+    end;
+    Exit;
   end;
 
   if FTestSamples.Count = 0 then
@@ -883,8 +1020,8 @@ begin
     if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
        SameValue(FTestSamples[I].Value, Sample.Value) then
     begin
-      GridSamples.Row := I;
-      GridSamples.Selected := I;
+      GridSamples.Row := GetGridRowForSampleIndex(I);
+      GridSamples.Selected := GridSamples.Row;
       Break;
     end;
   LoadSampleToEditor(GridSamples.Row);
@@ -899,15 +1036,30 @@ var
   I: Integer;
   Sample: TMeterValueSample;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Index := SelectedSampleIndex;
   if Index < 0 then
     Exit;
 
-  Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
+  Sample := FDisplayedSamples[Index];
   Sample.Value := DisplayToBase(EditSampleValue.Text);
+
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (FMeterValue <> nil) and FMeterValue.UpdateStabilitySampleValue(Index, Sample.Value) then
+    begin
+      RefreshSamplesGrid(True);
+      GridSamples.Row := GetGridRowForSampleIndex(Index);
+      GridSamples.Selected := GridSamples.Row;
+      LoadSampleToEditor(GridSamples.Row);
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
+
+  if Length(FDisplayedSamples) > 0 then
+    Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+  else
+    Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
   FTestSamples[Index] := Sample;
   SortSamples;
   RefreshSamplesGrid;
@@ -916,8 +1068,8 @@ begin
     if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
        SameValue(FTestSamples[I].Value, Sample.Value) then
     begin
-      GridSamples.Row := I;
-      GridSamples.Selected := I;
+      GridSamples.Row := GetGridRowForSampleIndex(I);
+      GridSamples.Selected := GridSamples.Row;
       Break;
     end;
 
@@ -930,12 +1082,19 @@ procedure TFrameMeterValueEdit.DeleteSelectedSample;
 var
   Index: Integer;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Index := SelectedSampleIndex;
   if Index < 0 then
     Exit;
+
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (FMeterValue <> nil) and FMeterValue.DeleteStabilitySample(Index) then
+    begin
+      RefreshSamplesGrid(True);
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
 
   FTestSamples.Delete(Index);
   RefreshSamplesGrid;
@@ -1093,8 +1252,18 @@ end;
 
 procedure TFrameMeterValueEdit.ClearSamples;
 begin
-  if FSampleSource <> mssTestSamples then
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (FMeterValue <> nil) and (MessageDlg('Очистить историю TMeterValue?',
+      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes) then
+    begin
+      FMeterValue.ClearStabilitySamples;
+      RefreshSamplesGrid(True);
+      ClearAnalysisDisplay;
+    end;
     Exit;
+  end;
+
   FTestSamples.Clear;
   GridSamples.Row := -1;
   GridSamples.Selected := -1;
@@ -1202,7 +1371,7 @@ begin
   RefreshSamplesGrid;
   if FTestSamples.Count > 0 then
   begin
-    GridSamples.Row := FTestSamples.Count - 1;
+    GridSamples.Row := 0;
     GridSamples.Selected := GridSamples.Row;
     LoadSampleToEditor(GridSamples.Row);
   end;
@@ -1247,7 +1416,7 @@ begin
   RefreshSamplesGrid;
   if FTestSamples.Count > 0 then
   begin
-    GridSamples.Row := FTestSamples.Count - 1;
+    GridSamples.Row := 0;
     GridSamples.Selected := GridSamples.Row;
     LoadSampleToEditor(GridSamples.Row);
   end
@@ -1541,10 +1710,10 @@ begin
 
   case ACol of
     0: Value := IntToStr(ARow + 1);
-    1: Value := FloatToStr(FDisplayedSamples[ARow].TimeStampMs / 1000);
-    2: Value := IntToStr(FDisplayedSamples[ARow].TimeStampMs);
-    3: Value := BaseToDisplayText(FDisplayedSamples[ARow].Value);
-    4: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.InWindow) else Value := '';
+    1: Value := FloatToStr((FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs - FDisplayedSamples[0].TimeStampMs) / 1000);
+    2: Value := IntToStr(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs);
+    3: Value := BaseToDisplayText(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].Value);
+    4: if FindSampleAnalysis(ARow, AResult) then Value := InWindowText(AResult) else Value := '';
     5: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.IsOutlier) else Value := '';
     6: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.IsInRange) else Value := '';
   end;
@@ -1559,27 +1728,30 @@ begin
   if FSampleSource <> mssTestSamples then
     Exit;
 
-  if (ARow < 0) or (ARow >= FTestSamples.Count) then
+  if GetSampleIndexForGridRow(ARow) < 0 then
     Exit;
 
   if not (ACol in [1, 3]) then
     Exit;
 
-  Sample := FTestSamples[ARow];
+  Sample := FTestSamples[GetSampleIndexForGridRow(ARow)];
   case ACol of
-    1: Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
+    1: if Length(FDisplayedSamples) > 0 then
+         Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(Value.ToString))
+       else
+         Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(Value.ToString));
     3: Sample.Value := DisplayToBase(Value.ToString);
   end;
 
-  FTestSamples[ARow] := Sample;
+  FTestSamples[GetSampleIndexForGridRow(ARow)] := Sample;
   SortSamples;
   RefreshSamplesGrid;
   for I := 0 to FTestSamples.Count - 1 do
     if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
        SameValue(FTestSamples[I].Value, Sample.Value) then
     begin
-      GridSamples.Row := I;
-      GridSamples.Selected := I;
+      GridSamples.Row := GetGridRowForSampleIndex(I);
+      GridSamples.Selected := GridSamples.Row;
       Break;
     end;
   LoadSampleToEditor(GridSamples.Row);
@@ -1664,26 +1836,38 @@ begin
     Result := 'Нет';
 end;
 
+function TFrameMeterValueEdit.InWindowText(const AResult: TMeterValueSampleAnalysis): string;
+begin
+  if not AResult.InWindow then
+    Result := 'Нет'
+  else if AResult.IsInConfirmationPeriod then
+    Result := 'Стаб'
+  else
+    Result := 'Да';
+end;
+
 function TFrameMeterValueEdit.FindSampleAnalysis(const ARow: Integer;
   out AResult: TMeterValueSampleAnalysis): Boolean;
 var
   I: Integer;
+  SampleIndex: Integer;
 begin
   Result := False;
   AResult := Default(TMeterValueSampleAnalysis);
-  if (ARow < 0) or (ARow >= Length(FDisplayedSamples)) then
+  SampleIndex := GetSampleIndexForGridRow(ARow);
+  if SampleIndex < 0 then
     Exit;
 
   for I := 0 to High(FLastTestAnalysis.SampleResults) do
-    if (FLastTestAnalysis.SampleResults[I].SourceIndex = ARow) and
-       (FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[ARow].TimeStampMs) then
+    if (FLastTestAnalysis.SampleResults[I].SourceIndex = SampleIndex) and
+       (FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[SampleIndex].TimeStampMs) then
     begin
       AResult := FLastTestAnalysis.SampleResults[I];
       Exit(True);
     end;
 
   for I := 0 to High(FLastTestAnalysis.SampleResults) do
-    if FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[ARow].TimeStampMs then
+    if FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[SampleIndex].TimeStampMs then
     begin
       AResult := FLastTestAnalysis.SampleResults[I];
       Exit(True);
@@ -1708,6 +1892,12 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.Analyze;
+begin
+  AnalyzeDisplayedSamples(True, True);
+end;
+
+procedure TFrameMeterValueEdit.AnalyzeDisplayedSamples(const AUseLastWorkSampleTime: Boolean;
+  const AShowValidationError: Boolean);
 var
   ErrorText: string;
   Settings: TMeterValueStabilitySettings;
@@ -1731,7 +1921,8 @@ begin
   if not ValidateControls(ErrorText) then
   begin
     ClearTestAnalysis;
-    ShowMessage('Анализ не выполнен.' + sLineBreak + ErrorText);
+    if AShowValidationError then
+      ShowMessage('Анализ не выполнен.' + sLineBreak + ErrorText);
     Exit;
   end;
 
@@ -1740,10 +1931,11 @@ begin
   LowerLimit := DisplayToBase(EditTargetLowerLimit.Text);
   UpperLimit := DisplayToBase(EditTargetUpperLimit.Text);
 
-  if FSampleSource = mssWorkHistory then
+  if (FSampleSource = mssWorkHistory) and AUseLastWorkSampleTime then
     SetAnalysisTimeByLastDisplayedSample
-  else
+  else if FSampleSource = mssTestSamples then
     FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
+
   SetLength(Samples, Length(FDisplayedSamples));
   for I := 0 to High(FDisplayedSamples) do
     Samples[I] := FDisplayedSamples[I];
@@ -1754,7 +1946,6 @@ begin
   DisplayAnalysis(FLastTestAnalysis);
   RefreshSamplesGrid(False);
 end;
-
 
 function TFrameMeterValueEdit.FormatInfoFloat(const AValue: Double;
   const AHasValue: Boolean; const ADigits: Integer): string;
@@ -2118,7 +2309,10 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
+var
+  MeterValueChanged: Boolean;
 begin
+  MeterValueChanged := FMeterValue <> AMeterValue;
   FMeterValue := AMeterValue;
   FLoading := True;
   try
@@ -2151,7 +2345,8 @@ begin
       FTestTargetValue := 0;
       CopySettingsFromWorkMeterValue;
       LoadSettingsToControls;
-      FSampleSource := mssWorkHistory;
+      if MeterValueChanged then
+        FSampleSource := mssWorkHistory;
       if ComboBoxSampleSource <> nil then
         ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
       UpdateSampleSourceControls;
@@ -2216,7 +2411,8 @@ begin
     FTestTargetValue := FMeterValue.Value;
     CopySettingsFromWorkMeterValue;
     LoadSettingsToControls;
-    FSampleSource := mssWorkHistory;
+    if MeterValueChanged then
+      FSampleSource := mssWorkHistory;
     if ComboBoxSampleSource <> nil then
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
     UpdateSampleSourceControls;
@@ -2225,6 +2421,76 @@ begin
     FLoading := False;
   end;
 end;
+
+
+procedure TFrameMeterValueEdit.SetStabilityOnlyMode;
+begin
+  if TabControlStability.Parent <> Self then
+    TabControlStability.Parent := Self;
+  TabControlStability.Align := TAlignLayout.Client;
+  TabControlStability.Visible := True;
+  TabControlStability.TabPosition := TTabPosition.Top;
+
+  if LayoutConclusion.Parent <> Self then
+    LayoutConclusion.Parent := Self;
+  LayoutConclusion.Align := TAlignLayout.Bottom;
+  LayoutConclusion.Height := 148;
+  LayoutConclusion.Visible := True;
+  LayoutConclusion.Enabled := True;
+  LayoutConclusion.Opacity := 1;
+  LayoutConclusion.BringToFront;
+
+  TabControlMain.Visible := False;
+  TabItemMainParameters.Visible := False;
+  TabItemStabilityForecast.Visible := False;
+  TabItemStabilityData.Visible := True;
+  TabItemStabilitySettings.Visible := True;
+  TabItemStabilityResult.Visible := True;
+end;
+
+procedure TFrameMeterValueEdit.SetIntegratedMode(const AMainParametersParent,
+  AStabilityParent: TControl);
+begin
+  TabControlMain.Visible := False;
+  TabItemMainParameters.Visible := False;
+  TabItemStabilityForecast.Visible := False;
+
+  if AMainParametersParent <> nil then
+  begin
+    if LayoutRoot.Parent <> AMainParametersParent then
+      LayoutRoot.Parent := AMainParametersParent;
+    LayoutRoot.Align := TAlignLayout.Client;
+    LayoutRoot.Visible := True;
+    LayoutRoot.Enabled := True;
+    LayoutRoot.Opacity := 1;
+    LayoutRoot.BringToFront;
+  end;
+
+  if AStabilityParent <> nil then
+  begin
+    if TabControlStability.Parent <> AStabilityParent then
+      TabControlStability.Parent := AStabilityParent;
+    TabControlStability.Align := TAlignLayout.Client;
+    TabControlStability.Visible := True;
+    TabControlStability.Enabled := True;
+    TabControlStability.Opacity := 1;
+    TabControlStability.TabPosition := TTabPosition.Top;
+
+    if LayoutConclusion.Parent <> AStabilityParent then
+      LayoutConclusion.Parent := AStabilityParent;
+    LayoutConclusion.Align := TAlignLayout.Bottom;
+    LayoutConclusion.Height := 148;
+    LayoutConclusion.Visible := True;
+    LayoutConclusion.Enabled := True;
+    LayoutConclusion.Opacity := 1;
+    LayoutConclusion.BringToFront;
+  end;
+
+  TabItemStabilityData.Visible := True;
+  TabItemStabilitySettings.Visible := True;
+  TabItemStabilityResult.Visible := True;
+end;
+
 
 procedure TFrameMeterValueEdit.SaveChanges;
 begin
