@@ -28,7 +28,8 @@ uses
   System.UITypes,
   System.Variants,
   frmMeterValueEditFrame,
-  uMeterValue;
+  uMeterValue,
+  uDebugLog;
 
 type
   TFormMeterValues = class(TForm)
@@ -191,6 +192,12 @@ begin
     OldMainParameters.Visible := False;
 
   FFrameMeterValueEdit.SetIntegratedMode(TabItem1, LayoutStabilityForecast);
+{$IFDEF DEBUG}
+  if MeterValue <> nil then
+    DebugLog(Format('Stability before LoadFromMeterValue: Ptr=%p Hash=%s Name=%s MinSampleCount=%d WindowDurationSec=%.12g',
+      [Pointer(MeterValue), MeterValue.Hash, MeterValue.Name,
+       MeterValue.StabilitySettings.MinSampleCount, MeterValue.StabilitySettings.WindowDurationSec]));
+{$ENDIF}
   FFrameMeterValueEdit.LoadFromMeterValue(MeterValue);
 end;
 
@@ -503,6 +510,10 @@ end;
 
 procedure TFormMeterValues.CheckBoxIsToSaveChange(Sender: TObject);
 begin
+  if (CheckBoxIsToSave = nil) or (not CheckBoxIsToSave.Visible) or
+     (not CheckBoxIsToSave.Enabled) then
+    Exit;
+
   if CheckBoxIsToSave.Tag = 0 then
     MeterValue.SetToSave(CheckBoxIsToSave.IsChecked)
   else
