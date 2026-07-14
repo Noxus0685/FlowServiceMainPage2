@@ -150,7 +150,7 @@ type
     FCoefHash: string;
     FFilteredValues: TObjectList<TMeterValue>;
     FFrameMeterValueEdit: TFrameMeterValueEdit;
-    procedure EnsureMeterValueEditFrame;
+    procedure EnsureStabilityForecastTab;
     function SafeFloat(const S: string): Double;
     function SafeInt(const S: string): Integer;
     function HasActiveFilters: Boolean;
@@ -177,22 +177,16 @@ implementation
 
 {$R *.fmx}
 
-procedure TFormMeterValues.EnsureMeterValueEditFrame;
-var
-  OldLayout: TComponent;
+procedure TFormMeterValues.EnsureStabilityForecastTab;
 begin
   if FFrameMeterValueEdit = nil then
   begin
     FFrameMeterValueEdit := TFrameMeterValueEdit.Create(Self);
-    FFrameMeterValueEdit.Parent := TabItem1;
-    FFrameMeterValueEdit.Align := TAlignLayout.Client;
+    FFrameMeterValueEdit.Visible := False;
+    FFrameMeterValueEdit.TabItemStabilityForecast.Parent := TabControlMeterValueSettings;
+    FFrameMeterValueEdit.TabItemStabilityForecast.Index := TabItemListValues.Index;
   end;
 
-  OldLayout := FindComponent('Layout8');
-  if OldLayout is TControl then
-    TControl(OldLayout).Visible := False;
-
-  FFrameMeterValueEdit.BringToFront;
   FFrameMeterValueEdit.LoadFromMeterValue(MeterValue);
 end;
 
@@ -223,7 +217,6 @@ end;
 
 procedure TFormMeterValues.UpdateLayoutCommonSettings;
 begin
-  EnsureMeterValueEditFrame;
   EditName.Text := MeterValue.Name;
   EditValueType.Text := MeterValue.&Type;
   EditShrtName.Text := MeterValue.ShrtName;
@@ -264,7 +257,7 @@ end;
 procedure TFormMeterValues.FormShow(Sender: TObject);
 begin
   StringGridCoefsData.OnKeyDown := StringGridCoefsDataKeyDown;
-  EnsureMeterValueEditFrame;
+  EnsureStabilityForecastTab;
   if MeterValue <> nil then
   begin
     UpdateLayoutCommonSettings;
@@ -499,6 +492,9 @@ begin
         UpdateStringGridCoefs;
       end;
     2: UpdateStringGridDimensions;
+    3: UpdateLayoutTest;
+    4: EnsureStabilityForecastTab;
+    5: UpdateLayoutValuesList;
   end;
 end;
 

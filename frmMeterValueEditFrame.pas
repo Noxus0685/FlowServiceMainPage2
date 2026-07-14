@@ -211,6 +211,7 @@ type
     procedure UpdateDimensionCaptions;
     procedure LoadSampleToEditor(const AIndex: Integer);
     procedure RefreshSamplesGrid(const AReload: Boolean = True);
+    procedure UpdateSampleCommandButtons;
     procedure AddSample;
     procedure EditSelectedSample;
     procedure DeleteSelectedSample;
@@ -686,8 +687,6 @@ end;
 procedure TFrameMeterValueEdit.RefreshDisplayedSamples;
 begin
   FDisplayedSamples := GetDisplayedSamples;
-  if (FSampleSource = mssWorkHistory) and (Length(FDisplayedSamples) > 0) then
-    SetAnalysisTimeByLastDisplayedSample;
 end;
 
 procedure TFrameMeterValueEdit.SetAnalysisTimeByLastDisplayedSample;
@@ -718,13 +717,9 @@ var
   GeneratorGroup: TControl;
 begin
   IsTestMode := FSampleSource = mssTestSamples;
-  EditSampleTime.Enabled := IsTestMode;
+  EditSampleTime.Enabled := True;
   EditSampleValue.Enabled := True;
-  EditSampleTimeStep.Enabled := IsTestMode;
-  ButtonSampleAdd.Enabled := IsTestMode;
-  ButtonSampleEdit.Enabled := True;
-  ButtonSampleDelete.Enabled := IsTestMode;
-  ButtonSamplesClear.Enabled := IsTestMode;
+  EditSampleTimeStep.Enabled := True;
   ComboBoxStabilityScenario.Enabled := IsTestMode;
   ButtonApplyScenario.Enabled := IsTestMode;
   EditGeneratorStartValue.Enabled := IsTestMode;
@@ -736,11 +731,12 @@ begin
   EditGeneratorOutlierAmplitude.Enabled := IsTestMode;
   ButtonGenerateNew.Enabled := IsTestMode;
   ButtonGenerateAppend.Enabled := IsTestMode;
-  EditAnalysisTime.Enabled := IsTestMode;
+  EditAnalysisTime.Enabled := True;
   if ButtonRefreshHistory <> nil then
     ButtonRefreshHistory.Enabled := not IsTestMode;
   if ButtonUseLastSampleTime <> nil then
     ButtonUseLastSampleTime.Enabled := True;
+  UpdateSampleCommandButtons;
   ScenarioGroup := FindComponent('GroupStabilityScenario') as TControl;
   if ScenarioGroup <> nil then
     ScenarioGroup.Visible := IsTestMode;
@@ -796,7 +792,6 @@ end;
 
 procedure TFrameMeterValueEdit.ButtonUseLastSampleTimeClick(Sender: TObject);
 begin
-  RefreshDisplayedSamples;
   SetAnalysisTimeByLastDisplayedSample;
   Analyze;
 end;
@@ -898,7 +893,22 @@ begin
     LoadSampleToEditor(GridSamples.Row)
   else
     LoadSampleToEditor(-1);
+  UpdateSampleCommandButtons;
   GridSamples.Repaint;
+end;
+
+procedure TFrameMeterValueEdit.UpdateSampleCommandButtons;
+var
+  HasSelection: Boolean;
+  HasSamples: Boolean;
+begin
+  HasSamples := Length(FDisplayedSamples) > 0;
+  HasSelection := (GridSamples <> nil) and (GridSamples.Row >= 0) and
+    (GridSamples.Row < Length(FDisplayedSamples));
+  ButtonSampleAdd.Enabled := FMeterValue <> nil;
+  ButtonSampleEdit.Enabled := HasSelection;
+  ButtonSampleDelete.Enabled := HasSelection;
+  ButtonSamplesClear.Enabled := HasSamples;
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -923,10 +933,23 @@ var
   Sample: TMeterValueSample;
   StepSec: Double;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Sample.Value := DisplayToBase(EditSampleValue.Text);
+  if FSampleSource = mssWorkHistory then
+  begin
+    if FMeterValue = nil then
+      Exit;
+    if Length(FDisplayedSamples) > 0 then
+      Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
+    else
+      Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
+    if FMeterValue.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value) then
+    begin
+      RefreshSamplesGrid;
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
+
   StepSec := SafeFloat(EditSampleTimeStep.Text);
   if StepSec <= 0 then
   begin
@@ -1012,12 +1035,23 @@ procedure TFrameMeterValueEdit.DeleteSelectedSample;
 var
   Index: Integer;
 begin
-  if FSampleSource <> mssTestSamples then
-    Exit;
-
   Index := SelectedSampleIndex;
   if Index < 0 then
     Exit;
+
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (FMeterValue <> nil) and FMeterValue.DeleteStabilitySample(Index) then
+    begin
+      RefreshSamplesGrid;
+      if GridSamples.Row >= 0 then
+        LoadSampleToEditor(GridSamples.Row)
+      else
+        LoadSampleToEditor(-1);
+      AnalyzeIfNeeded;
+    end;
+    Exit;
+  end;
 
   FTestSamples.Delete(Index);
   RefreshSamplesGrid;
@@ -1175,8 +1209,21 @@ end;
 
 procedure TFrameMeterValueEdit.ClearSamples;
 begin
-  if FSampleSource <> mssTestSamples then
+  if FSampleSource = mssWorkHistory then
+  begin
+    if (FMeterValue = nil) or (MessageDlg('Очистить рабочую историю значений?', TMsgDlgType.mtConfirmation,
+      [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes) then
+      Exit;
+    FMeterValue.ClearStabilitySamples;
+    GridSamples.Row := -1;
+    GridSamples.Selected := -1;
+    RefreshSamplesGrid;
+    LoadSampleToEditor(-1);
+    ClearTestAnalysis;
+    AnalyzeIfNeeded;
     Exit;
+  end;
+
   FTestSamples.Clear;
   GridSamples.Row := -1;
   GridSamples.Selected := -1;
@@ -1698,6 +1745,7 @@ procedure TFrameMeterValueEdit.GridSamplesSelectCell(Sender: TObject; const ACol
 begin
   CanSelect := True;
   LoadSampleToEditor(ARow);
+  UpdateSampleCommandButtons;
 end;
 
 procedure TFrameMeterValueEdit.EditAnalysisTimeExit(Sender: TObject);
@@ -1846,10 +1894,7 @@ begin
   LowerLimit := DisplayToBase(EditTargetLowerLimit.Text);
   UpperLimit := DisplayToBase(EditTargetUpperLimit.Text);
 
-  if FSampleSource = mssWorkHistory then
-    SetAnalysisTimeByLastDisplayedSample
-  else
-    FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
+  FTestCurrentTimeMs := SampleSecondsToMs(SafeFloat(EditAnalysisTime.Text));
   SetLength(Samples, Length(FDisplayedSamples));
   for I := 0 to High(FDisplayedSamples) do
     Samples[I] := FDisplayedSamples[I];
@@ -2224,7 +2269,10 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
+var
+  IsNewMeterValue: Boolean;
 begin
+  IsNewMeterValue := FMeterValue <> AMeterValue;
   FMeterValue := AMeterValue;
   FLoading := True;
   try
@@ -2257,7 +2305,8 @@ begin
       FTestTargetValue := 0;
       CopySettingsFromWorkMeterValue;
       LoadSettingsToControls;
-      FSampleSource := mssWorkHistory;
+      if IsNewMeterValue then
+        FSampleSource := mssWorkHistory;
       if ComboBoxSampleSource <> nil then
         ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
       UpdateSampleSourceControls;
@@ -2322,10 +2371,14 @@ begin
     FTestTargetValue := FMeterValue.Value;
     CopySettingsFromWorkMeterValue;
     LoadSettingsToControls;
-    FSampleSource := mssWorkHistory;
+    if IsNewMeterValue then
+      FSampleSource := mssWorkHistory;
     if ComboBoxSampleSource <> nil then
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
     UpdateSampleSourceControls;
+    RefreshDisplayedSamples;
+    if IsNewMeterValue and (Length(FDisplayedSamples) > 0) then
+      SetAnalysisTimeByLastDisplayedSample;
     Analyze;
   finally
     FLoading := False;
