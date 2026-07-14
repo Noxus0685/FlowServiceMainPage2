@@ -203,6 +203,8 @@ type
     procedure ButtonUseLastSampleTimeClick(Sender: TObject);
     procedure SetAnalysisTimeByLastDisplayedSample;
     function DisplayUnitName: string;
+    function AppendUnit(const AText, AUnit: string): string;
+    procedure UpdateStabilityHints;
     function BaseToDisplayText(const AValue: Double): string;
     function BaseDeltaToDisplayText(const AValue: Double): string;
     function FormatBaseInfo(const AValue: Double; const AHasValue: Boolean): string;
@@ -370,6 +372,20 @@ begin
   ButtonUseLastSampleTime.Text := 'По последней точке';
   ButtonUseLastSampleTime.OnClick := ButtonUseLastSampleTimeClick;
 
+  if FindComponent('GroupSettingsCommon') is TControl then
+    with TLabel.Create(Self) do
+    begin
+      Name := 'LabelStabilityDisplayUnit';
+      Parent := TControl(FindComponent('GroupSettingsCommon'));
+      Position.X := 280;
+      Position.Y := 6;
+      Size.Width := 260;
+      Size.Height := 22;
+      Text := 'Единица измерения: ' + DisplayUnitName;
+      ShowHint := True;
+      ParentShowHint := False;
+    end;
+
   ButtonSampleAdd.OnClick := ButtonSampleAddClick;
   ButtonSampleEdit.OnClick := ButtonSampleEditClick;
   ButtonSampleDelete.OnClick := ButtonSampleDeleteClick;
@@ -434,6 +450,7 @@ begin
   EditGeneratorOutlierProbability.Text := '0';
   EditGeneratorOutlierAmplitude.Text := '0';
   InitializeScenarioList;
+  SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
   SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения по заданным критериям.');
   SetHintFor('LabelMinSampleCount', 'Минимальное количество отсчётов в окне анализа для достоверного результата.');
   SetHintFor('EditMinSampleCount', 'Минимальное количество отсчётов в окне анализа для достоверного результата.');
@@ -653,6 +670,13 @@ begin
     Result := FMeterValue.GetDimName;
 end;
 
+function TFrameMeterValueEdit.AppendUnit(const AText, AUnit: string): string;
+begin
+  Result := AText;
+  if (Result <> '—') and (Trim(AUnit) <> '') then
+    Result := Result + ' ' + AUnit;
+end;
+
 function TFrameMeterValueEdit.BaseToDisplayText(const AValue: Double): string;
 begin
   if FMeterValue <> nil then
@@ -675,7 +699,7 @@ function TFrameMeterValueEdit.FormatBaseInfo(const AValue: Double;
 begin
   if not AHasValue then
     Exit('—');
-  Result := BaseToDisplayText(AValue);
+  Result := AppendUnit(BaseToDisplayText(AValue), DisplayUnitName);
 end;
 
 function TFrameMeterValueEdit.FormatBaseDeltaInfo(const AValue: Double;
@@ -683,7 +707,7 @@ function TFrameMeterValueEdit.FormatBaseDeltaInfo(const AValue: Double;
 begin
   if not AHasValue then
     Exit('—');
-  Result := BaseDeltaToDisplayText(AValue);
+  Result := AppendUnit(BaseDeltaToDisplayText(AValue), DisplayUnitName);
 end;
 
 function TFrameMeterValueEdit.DisplayToBase(const AText: string): Double;
@@ -719,11 +743,77 @@ begin
   UnitName := DisplayUnitName;
   if StringColumnSampleValue <> nil then
     StringColumnSampleValue.Header := 'Значение, ' + UnitName;
+  SetLabelText('LabelStabilityDisplayUnit', 'Единица измерения: ' + UnitName);
   SetLabelText('LabelSampleValue', 'Значение, ' + UnitName);
   SetLabelText('LabelGeneratorStartValue', 'Начальное значение, ' + UnitName);
   SetLabelText('LabelGeneratorTrend', 'Тренд, ' + UnitName + '/с');
   SetLabelText('LabelGeneratorNoise', 'Шум ±, ' + UnitName);
   SetLabelText('LabelGeneratorOutlierAmplitude', 'Амплитуда выброса, ' + UnitName);
+  SetLabelText('LabelMinSampleCount', 'Минимальное количество отсчётов, шт.');
+  SetLabelText('LabelWindowDurationSec', 'Длительность окна, с');
+  SetLabelText('LabelMaxSampleAgeSec', 'Максимальный возраст данных, с');
+  SetLabelText('LabelConfirmationTimeSec', 'Время подтверждения, с');
+  SetLabelText('LabelMaxVariation', 'Максимальный размах, ' + UnitName);
+  SetLabelText('LabelMaxStdDeviation', 'Максимальное стандартное отклонение, ' + UnitName);
+  SetLabelText('LabelMaxTrendRate', 'Максимальная скорость тренда, ' + UnitName + ' за с');
+  SetLabelText('LabelMaxOutlierFractionPercent', 'Максимальная доля выбросов, %');
+  SetLabelText('LabelForecastHorizonSec', 'Горизонт прогноза, с');
+  SetLabelText('LabelTestTargetValue', 'Целевое значение, ' + UnitName);
+  SetLabelText('LabelTargetToleranceAbsolute', 'Минимальный абсолютный допуск, ' + UnitName);
+  SetLabelText('LabelTargetLowerLimit', 'Нижняя граница, ' + UnitName);
+  SetLabelText('LabelTargetUpperLimit', 'Верхняя граница, ' + UnitName);
+  UpdateStabilityHints;
+end;
+
+
+procedure TFrameMeterValueEdit.UpdateStabilityHints;
+var
+  UnitName: string;
+
+  procedure SetHintFor(const AName, AHint: string);
+  var
+    Component: TComponent;
+  begin
+    Component := FindComponent(AName);
+    if Component is TControl then
+    begin
+      TControl(Component).Hint := AHint;
+      TControl(Component).ShowHint := True;
+      TControl(Component).ParentShowHint := False;
+    end;
+  end;
+
+  procedure SetPairHint(const ALabelName, AEditName, AHint: string);
+  begin
+    SetHintFor(ALabelName, AHint);
+    SetHintFor(AEditName, AHint);
+  end;
+
+begin
+  UnitName := DisplayUnitName;
+  SetHintFor('LabelStabilityDisplayUnit', 'Единица, выбранная для отображения текущего TMeterValue. Все размерные значения результатов и соответствующие настройки показываются в этой единице. Внутреннее хранение может выполняться в базовой единице.');
+  SetHintFor('CheckBoxStabilityEnabled', 'Включает расчет стабильности и пригодности значения. При отключении анализ не подтверждает готовность измерения.');
+  SetHintFor('ComboBoxSampleSource', 'Выбирает массив для preview-анализа. История TMeterValue использует рабочую историю текущего значения. Тестовый массив не изменяет рабочую историю.');
+  SetPairHint('LabelMinSampleCount', 'EditMinSampleCount', 'Минимальное число допустимых точек в текущем окне, необходимое для расчёта статистики. Если после исключения выбросов их меньше указанного числа, анализ возвращает недостаточно данных. Единица: шт.');
+  SetPairHint('LabelWindowDurationSec', 'EditWindowDurationSec', 'Длительность интервала истории, используемого для анализа стабильности. Учитываются точки от текущего времени анализа минус указанное число секунд до текущего времени. Более длинное окно сглаживает кратковременные изменения, но медленнее реагирует на смену режима. Единица: с.');
+  SetPairHint('LabelMaxSampleAgeSec', 'EditMaxSampleAgeSec', 'Максимально допустимое время с момента последней точки до текущего времени анализа. Если последняя точка старше указанного значения, данные считаются устаревшими. Единица: с.');
+  SetPairHint('LabelConfirmationTimeSec', 'EditConfirmationTimeSec', 'Минимальное время, в течение которого сигнал должен непрерывно удовлетворять условиям стабильности, прежде чем стабильность будет подтверждена. Точки этого периода отмечаются в таблице как “Стаб”. Единица: с.');
+  SetPairHint('LabelExitThresholdFactor', 'EditExitThresholdFactor', 'Множитель порогов после подтверждения стабильности. Большее значение создаёт гистерезис и снижает частые переключения, меньшее быстрее снимает подтверждение. Безразмерная величина.');
+  SetPairHint('LabelMaxVariation', 'EditMaxVariation', 'Максимально допустимый размах между минимумом и максимумом в использованных точках. Единица: ' + UnitName + '. Чем меньше порог, тем строже проверка стабильности.');
+  SetPairHint('LabelMaxStdDeviation', 'EditMaxStdDeviation', 'Стандартное отклонение характеризует абсолютный разброс значений и имеет ту же физическую единицу, что и измеряемая величина. Это не процент, если отдельно не указано относительное стандартное отклонение. Единица: ' + UnitName + '.');
+  SetPairHint('LabelMaxTrendRate', 'EditMaxTrendRate', 'Максимально допустимая абсолютная скорость изменения по линейному тренду. Единица: ' + UnitName + ' за с. Меньшее значение строже ограничивает дрейф сигнала.');
+  SetPairHint('LabelMaxOutlierFractionPercent', 'EditMaxOutlierFractionPercent', 'Максимальная допустимая доля выбросов среди точек текущего окна. При превышении порога результат может быть признан непригодным или недостаточным. Единица: %.');
+  SetPairHint('LabelOutlierFactor', 'EditOutlierFactor', 'Коэффициент чувствительности обнаружения выбросов на основе медианного абсолютного отклонения. Меньшее значение выявляет больше выбросов, большее значение делает фильтр менее чувствительным. Безразмерная величина.');
+  SetPairHint('LabelForecastHorizonSec', 'EditForecastHorizonSec', 'Интервал времени вперёд, на который рассчитывается прогноз по текущему тренду. Чем больше горизонт, тем сильнее влияние небольшого наклона тренда на прогноз. Единица: с.');
+  SetPairHint('LabelTestTargetValue', 'EditTestTargetValue', 'Целевое значение для проверки текущего, среднего и прогнозируемого значения. Значение задаётся в выбранной единице TMeterValue: ' + UnitName + '.');
+  SetPairHint('LabelTargetToleranceAbsolute', 'EditTargetToleranceAbsolute', 'Минимальный абсолютный допуск целевого диапазона. Единица: ' + UnitName + '. Используется вместе с процентными допусками и влияет на итоговую пригодность.');
+  SetHintFor('CheckBoxRequireCurrentValueInRange', 'Проверяет попадание текущего значения в целевой диапазон. Если условие включено и не выполнено, значение непригодно.');
+  SetHintFor('CheckBoxRequireMeanValueInRange', 'Проверяет попадание среднего значения в целевой диапазон. Если условие включено и не выполнено, значение непригодно.');
+  SetHintFor('CheckBoxRequireForecastInRange', 'Проверяет попадание прогнозного значения в целевой диапазон. Если условие включено и не выполнено, значение непригодно.');
+  SetPairHint('LabelTargetLowerLimit', 'EditTargetLowerLimit', 'Расчётная нижняя граница допустимого диапазона. Показывается в выбранной единице TMeterValue: ' + UnitName + '.');
+  SetPairHint('LabelTargetUpperLimit', 'EditTargetUpperLimit', 'Расчётная верхняя граница допустимого диапазона. Показывается в выбранной единице TMeterValue: ' + UnitName + '.');
+  SetHintFor('EditAnalysisTime', 'Момент, относительно которого формируется временное окно, проверяется возраст последней точки и рассчитывается прогноз. Единица: с либо Unix-время — согласно выбранному режиму отображения.');
+  SetHintFor('CheckBoxAutoAnalyze', 'Автоматически повторяет preview-анализ после изменения данных, настроек или текущего времени. При отключении изменения не очищают историю, но результат требует ручного пересчёта.');
 end;
 
 function TFrameMeterValueEdit.GetDisplayedSamples: TArray<TMeterValueSample>;
@@ -2035,6 +2125,7 @@ begin
       Lines.Add('Значение пока нельзя использовать.');
 
     Lines.Add('');
+    Lines.Add('Значения:');
     Lines.Add('Всего отсчётов: ' + IntToStr(AInfo.SampleCount) + '.');
     Lines.Add('Использовано отсчётов: ' + IntToStr(AInfo.UsedSampleCount) + '.');
     Lines.Add('Текущее значение: ' + FormatBaseInfo(AInfo.CurrentValue, AInfo.HasCurrentValue) + '.');
@@ -2044,7 +2135,7 @@ begin
     Lines.Add('');
     Lines.Add('Размах: ' + FormatBaseDeltaInfo(AInfo.Variation, AInfo.HasStatistics) + '.');
     Lines.Add('Стандартное отклонение: ' + FormatBaseDeltaInfo(AInfo.StdDeviation, AInfo.HasStatistics) + '.');
-    Lines.Add('Скорость тренда: ' + EditResultTrendRate.Text + ' ' + DisplayUnitName + '/с.');
+    Lines.Add('Скорость тренда: ' + EditResultTrendRate.Text + ' за с.');
     Lines.Add('Направление тренда: ' + TrendDirectionText(AInfo.TrendDirection, AInfo.HasTrend) + '.');
     Lines.Add('Предварительная стабильность: ' + BoolText(AInfo.IsSignalStable) + '.');
     Lines.Add('Подтверждение стабильности: ' + BoolText(AInfo.IsStabilityConfirmed) + '.');
@@ -2056,6 +2147,31 @@ begin
     Lines.Add('Прогноз через ' + FormatInfoFloat(FTestSettings.ForecastHorizonSec, AInfo.HasForecast, 2) + ' с: ' +
       FormatBaseInfo(AInfo.ForecastValue, AInfo.HasForecast) + '.');
     Lines.Add('Прогноз в диапазоне: ' + EditResultForecastInRange.Text + '.');
+
+    Lines.Add('');
+    Lines.Add('Анализ выбросов:');
+    if AInfo.OutlierCount = 0 then
+      Lines.Add('Выбросы не обнаружены.')
+    else
+      Lines.Add('Обнаружено выбросов: ' + IntToStr(AInfo.OutlierCount) + ' из ' +
+        IntToStr(AInfo.UsedSampleCount) + ' точек (' +
+        FormatInfoFloat(AInfo.OutlierFraction * 100, AInfo.UsedSampleCount > 0, 2) + ' %).');
+    Lines.Add('В окне анализа: ' + IntToStr(AInfo.UsedSampleCount) + ' точек.');
+    if (AInfo.OutlierCount > 0) and (AInfo.OutlierCount < AInfo.UsedSampleCount) then
+    begin
+      Lines.Add('Использовано для статистики: ' + IntToStr(AInfo.UsedSampleCount - AInfo.OutlierCount) + ' точек.');
+      Lines.Add('Выбросы исключены из расчёта статистики и прогноза.');
+    end
+    else
+      Lines.Add('Использовано для статистики: ' + IntToStr(AInfo.UsedSampleCount) + ' точек.');
+    if mvsfrTooManyOutliers in AInfo.FailReasons then
+    begin
+      Lines.Add('Допустимая доля выбросов превышена.');
+      Lines.Add('Результат не может быть признан пригодным для измерения.');
+    end
+    else
+      Lines.Add('Допустимая доля выбросов не превышена.');
+    Lines.Add('Метод: медиана и MAD.');
 
     Lines.Add('');
     Lines.Add('Причины:');
@@ -2408,15 +2524,27 @@ begin
 
     EditCoefK.Text := FloatToStr(FMeterValue.CoefK);
     EditCoefP.Text := FloatToStr(FMeterValue.CoefP);
-    FTestTargetValue := FMeterValue.Value;
-    CopySettingsFromWorkMeterValue;
-    LoadSettingsToControls;
     if MeterValueChanged then
+    begin
+      FTestTargetValue := FMeterValue.Value;
+      CopySettingsFromWorkMeterValue;
+      LoadSettingsToControls;
       FSampleSource := mssWorkHistory;
+      ClearTestAnalysis;
+    end
+    else
+    begin
+      EditGeneratorStartValue.Text := BaseToDisplayText(DisplayToBase(EditGeneratorStartValue.Text));
+      LoadSettingsToControls;
+    end;
     if ComboBoxSampleSource <> nil then
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
     UpdateSampleSourceControls;
-    Analyze;
+    RefreshSamplesGrid;
+    if MeterValueChanged then
+      Analyze
+    else if FLastTestAnalysis.Status <> mvssUnknown then
+      DisplayAnalysis(FLastTestAnalysis);
   finally
     FLoading := False;
   end;
