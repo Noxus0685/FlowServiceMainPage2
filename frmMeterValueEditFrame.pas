@@ -157,6 +157,7 @@ type
     EditDiagWindowDurationSec: TEdit;
     ButtonCopyHash: TButton;
     ButtonShowIniData: TButton;
+    ButtonCopyDiagnostics: TButton;
     FTestCurrentTimeMs: Int64;
     FTestDataModified: Boolean;
     FTestTargetValue: Double;
@@ -195,6 +196,9 @@ type
     procedure UpdateStabilityDiagnostics;
     procedure ButtonCopyHashClick(Sender: TObject);
     procedure ButtonShowIniDataClick(Sender: TObject);
+    procedure ButtonCopyDiagnosticsClick(Sender: TObject);
+    function BuildStabilitySettingsDump(const AStage: string): string;
+    procedure CopyTextToClipboardSafe(const AText: string);
     procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
     procedure AddCheckRow(const ACaption: string; out ACheckBox: TCheckBox);
     procedure AddComboRow(const ACaption: string; out AComboBox: TComboBox);
@@ -607,7 +611,7 @@ begin
   Group.Parent := ParentControl;
   Group.Align := TAlignLayout.Top;
   Group.Margins.Bottom := 8;
-  Group.Size.Height := 216;
+  Group.Size.Height := 252;
   Group.Text := 'Диагностика текущего TMeterValue';
   Group.Stored := False;
 
@@ -632,6 +636,16 @@ begin
   ButtonShowIniData.Text := 'Показать данные из INI';
   ButtonShowIniData.OnClick := ButtonShowIniDataClick;
   ButtonShowIniData.Stored := False;
+
+  ButtonCopyDiagnostics := TButton.Create(Self);
+  ButtonCopyDiagnostics.Parent := Group;
+  ButtonCopyDiagnostics.Position.X := 364;
+  ButtonCopyDiagnostics.Position.Y := TopPos + 2;
+  ButtonCopyDiagnostics.Size.Width := 180;
+  ButtonCopyDiagnostics.Size.Height := 28;
+  ButtonCopyDiagnostics.Text := 'Копировать диагностику';
+  ButtonCopyDiagnostics.OnClick := ButtonCopyDiagnosticsClick;
+  ButtonCopyDiagnostics.Stored := False;
 end;
 
 procedure TFrameMeterValueEdit.UpdateStabilityDiagnostics;
@@ -721,6 +735,176 @@ begin
     Lines.Free;
     Ini.Free;
   end;
+end;
+
+
+procedure TFrameMeterValueEdit.CopyTextToClipboardSafe(const AText: string);
+var
+  Clipboard: IFMXClipboardService;
+begin
+  try
+    if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Clipboard) then
+      Clipboard.SetClipboard(TValue.From<string>(AText));
+  except
+    // Временная диагностика не должна ломать редактор.
+  end;
+end;
+
+function TFrameMeterValueEdit.BuildStabilitySettingsDump(const AStage: string): string;
+var
+  Lines: TStringList;
+  FS: TFormatSettings;
+
+  function PtrHex(APointer: Pointer): string;
+  begin
+    Result := IntToHex(NativeUInt(APointer), SizeOf(Pointer) * 2);
+  end;
+
+  function BoolDump(const AValue: Boolean): string;
+  begin
+    if AValue then
+      Result := 'True'
+    else
+      Result := 'False';
+  end;
+
+  function FloatDump(const AValue: Double): string;
+  begin
+    Result := FloatToStr(AValue, FS);
+  end;
+
+  function OwnerClassName: string;
+  begin
+    if Owner = nil then
+      Result := 'nil'
+    else
+      Result := Owner.ClassName;
+  end;
+
+  function ParentClassName: string;
+  begin
+    if Parent = nil then
+      Result := 'nil'
+    else
+      Result := Parent.ClassName;
+  end;
+
+  procedure AddSettings(const ACaption: string; const ASettings: TMeterValueStabilitySettings);
+  begin
+    Lines.Add('');
+    Lines.Add(ACaption);
+    Lines.Add('Enabled=' + BoolDump(ASettings.Enabled));
+    Lines.Add('AutoAnalyze=' + BoolDump(ASettings.AutoAnalyze));
+    Lines.Add('MinSampleCount=' + IntToStr(ASettings.MinSampleCount));
+    Lines.Add('WindowDurationSec=' + FloatDump(ASettings.WindowDurationSec));
+    Lines.Add('MaxSampleAgeSec=' + FloatDump(ASettings.MaxSampleAgeSec));
+    Lines.Add('ConfirmationTimeSec=' + FloatDump(ASettings.ConfirmationTimeSec));
+    Lines.Add('ExitThresholdFactor=' + FloatDump(ASettings.ExitThresholdFactor));
+    Lines.Add('MaxVariation=' + FloatDump(ASettings.MaxVariation));
+    Lines.Add('MaxStdDeviation=' + FloatDump(ASettings.MaxStdDeviation));
+    Lines.Add('MaxTrendRate=' + FloatDump(ASettings.MaxTrendRate));
+    Lines.Add('MaxOutlierFraction=' + FloatDump(ASettings.MaxOutlierFraction));
+    Lines.Add('OutlierFactor=' + FloatDump(ASettings.OutlierFactor));
+    Lines.Add('ForecastHorizonSec=' + FloatDump(ASettings.ForecastHorizonSec));
+    Lines.Add('TargetValue=' + FloatDump(ASettings.TargetValue));
+    Lines.Add('TargetAccuracyPlusPercent=' + FloatDump(ASettings.TargetAccuracyPlusPercent));
+    Lines.Add('TargetAccuracyMinusPercent=' + FloatDump(ASettings.TargetAccuracyMinusPercent));
+    Lines.Add('TargetToleranceAbsolute=' + FloatDump(ASettings.TargetToleranceAbsolute));
+    Lines.Add('RequireCurrentValueInRange=' + BoolDump(ASettings.RequireCurrentValueInRange));
+    Lines.Add('RequireMeanValueInRange=' + BoolDump(ASettings.RequireMeanValueInRange));
+    Lines.Add('RequireForecastInRange=' + BoolDump(ASettings.RequireForecastInRange));
+  end;
+
+  function EditText(AEdit: TEdit): string;
+  begin
+    if AEdit = nil then
+      Result := '<nil>'
+    else
+      Result := AEdit.Text;
+  end;
+
+  function CheckText(ACheckBox: TCheckBox): string;
+  begin
+    if ACheckBox = nil then
+      Result := '<nil>'
+    else
+      Result := BoolDump(ACheckBox.IsChecked);
+  end;
+
+begin
+  try
+    FS := TFormatSettings.Invariant;
+    Lines := TStringList.Create;
+    try
+      Lines.Add('Stage=' + AStage);
+      Lines.Add('DateTime=' + FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now));
+      Lines.Add('FramePointer=' + PtrHex(Pointer(Self)));
+      Lines.Add('MeterValuePointer=' + PtrHex(Pointer(FMeterValue)));
+      Lines.Add('OwnerClass=' + OwnerClassName);
+      Lines.Add('ParentClass=' + ParentClassName);
+      Lines.Add('Visible=' + BoolDump(Visible));
+
+      Lines.Add('');
+      Lines.Add('[MeterValue]');
+      if FMeterValue = nil then
+        Lines.Add('MeterValue=nil')
+      else
+      begin
+        Lines.Add('Hash=' + FMeterValue.Hash);
+        Lines.Add('HashOwner=' + FMeterValue.HashOwner);
+        Lines.Add('NameOwner=' + FMeterValue.NameOwner);
+        Lines.Add('Name=' + FMeterValue.Name);
+        Lines.Add('IsToSave=' + BoolDump(FMeterValue.IsToSave));
+        Lines.Add('Enabled=' + BoolDump(FMeterValue.StabilitySettings.Enabled));
+        Lines.Add('ValueType=' + IntToStr(Ord(FMeterValue.ValueType)));
+        Lines.Add('UnitName=' + DisplayUnitName);
+        Lines.Add('DimensionName=' + DisplayUnitName);
+        AddSettings('[MeterValue.StabilitySettings]', FMeterValue.StabilitySettings);
+      end;
+
+      AddSettings('[Frame.FTestSettings]', FTestSettings);
+
+      Lines.Add('');
+      Lines.Add('[Controls]');
+      Lines.Add('CheckBoxStabilityEnabled.IsChecked=' + CheckText(CheckBoxStabilityEnabled));
+      Lines.Add('CheckBoxAutoAnalyze.IsChecked=' + CheckText(CheckBoxAutoAnalyze));
+      Lines.Add('EditMinSampleCount.Text=' + EditText(EditMinSampleCount));
+      Lines.Add('EditWindowDurationSec.Text=' + EditText(EditWindowDurationSec));
+      Lines.Add('EditMaxSampleAgeSec.Text=' + EditText(EditMaxSampleAgeSec));
+      Lines.Add('EditConfirmationTimeSec.Text=' + EditText(EditConfirmationTimeSec));
+      Lines.Add('EditExitThresholdFactor.Text=' + EditText(EditExitThresholdFactor));
+      Lines.Add('EditMaxVariation.Text=' + EditText(EditMaxVariation));
+      Lines.Add('EditMaxStdDeviation.Text=' + EditText(EditMaxStdDeviation));
+      Lines.Add('EditMaxTrendRate.Text=' + EditText(EditMaxTrendRate));
+      Lines.Add('EditMaxOutlierFractionPercent.Text=' + EditText(EditMaxOutlierFractionPercent));
+      Lines.Add('EditOutlierFactor.Text=' + EditText(EditOutlierFactor));
+      Lines.Add('EditForecastHorizonSec.Text=' + EditText(EditForecastHorizonSec));
+      Lines.Add('EditTestTargetValue.Text=' + EditText(EditTestTargetValue));
+      Lines.Add('EditTargetAccuracyPlusPercent.Text=' + EditText(EditTargetAccuracyPlusPercent));
+      Lines.Add('EditTargetAccuracyMinusPercent.Text=' + EditText(EditTargetAccuracyMinusPercent));
+      Lines.Add('EditTargetToleranceAbsolute.Text=' + EditText(EditTargetToleranceAbsolute));
+      Lines.Add('CheckBoxRequireCurrentValueInRange.IsChecked=' + CheckText(CheckBoxRequireCurrentValueInRange));
+      Lines.Add('CheckBoxRequireMeanValueInRange.IsChecked=' + CheckText(CheckBoxRequireMeanValueInRange));
+      Lines.Add('CheckBoxRequireForecastInRange.IsChecked=' + CheckText(CheckBoxRequireForecastInRange));
+
+      Lines.Add('');
+      Lines.Add('[FrameState]');
+      Lines.Add('FLoading=' + BoolDump(FLoading));
+      Lines.Add('FSettingsModified=' + BoolDump(FSettingsModified));
+      Result := Lines.Text;
+    finally
+      Lines.Free;
+    end;
+  except
+    on E: Exception do
+      Result := 'Stage=' + AStage + sLineBreak + 'DiagnosticsError=' + E.ClassName + ': ' + E.Message;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.ButtonCopyDiagnosticsClick(Sender: TObject);
+begin
+  CopyTextToClipboardSafe(BuildStabilitySettingsDump('MANUAL'));
+  MemoConclusion.Lines.Text := 'Диагностика настроек скопирована в буфер обмена';
 end;
 
 procedure TFrameMeterValueEdit.AddEditRow(const ACaption: string; out AEdit: TEdit);
@@ -2415,8 +2599,17 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.ButtonApplyStabilitySettingsClick(Sender: TObject);
+var
+  BeforeDump: string;
+  AfterDump: string;
 begin
+  BeforeDump := BuildStabilitySettingsDump('BEFORE_APPLY');
   ApplySettingsToWorkMeterValue;
+  AfterDump := BuildStabilitySettingsDump('AFTER_APPLY');
+  CopyTextToClipboardSafe(BeforeDump + sLineBreak +
+    '================ APPLY RESULT ================' + sLineBreak + sLineBreak +
+    AfterDump);
+  MemoConclusion.Lines.Text := 'Диагностика настроек скопирована в буфер обмена';
 end;
 
 procedure TFrameMeterValueEdit.CopySettingsFromWorkMeterValue;
@@ -2947,6 +3140,8 @@ begin
   finally
     FLoading := False;
   end;
+  if MeterValueChanged and (FMeterValue <> nil) then
+    CopyTextToClipboardSafe(BuildStabilitySettingsDump('OPEN'));
 end;
 
 
