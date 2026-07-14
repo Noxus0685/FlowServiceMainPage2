@@ -228,6 +228,8 @@ type
     RequireMeanValueInRange: Boolean;
     /// <summary>Requires forecast value to remain inside the target range.</summary>
     RequireForecastInRange: Boolean;
+    /// <summary>Runs preview-analysis automatically after UI changes; persisted per TMeterValue.</summary>
+    AutoAnalyze: Boolean;
   end;
 
   /// <summary>Direction of the calculated linear trend.</summary>
