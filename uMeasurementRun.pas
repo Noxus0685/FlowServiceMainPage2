@@ -2167,8 +2167,6 @@ begin
   // Point and measurement setup are performed once in EnterSetupPoint.
 end;
 
-
-
 procedure TMeasurementRun.ProcessWaitStable;
 const
   DEFAULT_STABLE_TIMEOUT_S = 30000;
@@ -2259,18 +2257,6 @@ begin
     SetStage(msDone);
   end;
 end;
-
-
-
-
-
-
-
-
-
-
-
-
 
 procedure TMeasurementRun.ProcessWaitMeasureStart;
 var timeout: extended;
