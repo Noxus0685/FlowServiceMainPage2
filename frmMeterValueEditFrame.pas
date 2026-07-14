@@ -942,7 +942,7 @@ begin
       Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(EditSampleTime.Text))
     else
       Sample.TimeStampMs := SampleSecondsToMs(SafeFloat(EditSampleTime.Text));
-    if FMeterValue.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value) then
+    if FMeterValue.ManualAddStabilitySample(Sample.TimeStampMs, Sample.Value) then
     begin
       RefreshSamplesGrid;
       AnalyzeIfNeeded;
@@ -996,7 +996,7 @@ begin
       Exit;
     Sample := FDisplayedSamples[Index];
     Sample.Value := DisplayToBase(EditSampleValue.Text);
-    if FMeterValue.SetStabilitySample(Index, Sample.TimeStampMs, Sample.Value) then
+    if FMeterValue.ManualSetStabilitySample(Index, Sample.TimeStampMs, Sample.Value) then
     begin
       RefreshSamplesGrid;
       GridSamples.Row := Index;
@@ -1041,7 +1041,7 @@ begin
 
   if FSampleSource = mssWorkHistory then
   begin
-    if (FMeterValue <> nil) and FMeterValue.DeleteStabilitySample(Index) then
+    if (FMeterValue <> nil) and FMeterValue.ManualDeleteStabilitySample(Index) then
     begin
       RefreshSamplesGrid;
       if GridSamples.Row >= 0 then
@@ -1214,7 +1214,7 @@ begin
     if (FMeterValue = nil) or (MessageDlg('Очистить рабочую историю значений?', TMsgDlgType.mtConfirmation,
       [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) <> mrYes) then
       Exit;
-    FMeterValue.ClearStabilitySamples;
+    FMeterValue.ManualClearStabilitySamples;
     GridSamples.Row := -1;
     GridSamples.Selected := -1;
     RefreshSamplesGrid;
@@ -1697,7 +1697,7 @@ begin
       Exit;
     Sample := FDisplayedSamples[ARow];
     Sample.Value := DisplayToBase(Value.ToString);
-    if FMeterValue.SetStabilitySample(ARow, Sample.TimeStampMs, Sample.Value) then
+    if FMeterValue.ManualSetStabilitySample(ARow, Sample.TimeStampMs, Sample.Value) then
     begin
       RefreshSamplesGrid;
       GridSamples.Row := ARow;
