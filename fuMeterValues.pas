@@ -1726,7 +1726,7 @@ begin
       Exit;
     Sample := FDisplayedSamples[Index];
     Sample.Value := DisplayToBase(EditSampleValue.Text);
-    if MeterValue.UpdateStabilitySample(Index, Sample.TimeStampMs, Sample.Value) then
+    if MeterValue.SetStabilitySample(Index, Sample.TimeStampMs, Sample.Value) then
     begin
       RefreshSamplesGrid;
       GridSamples.Row := Index;
@@ -2427,7 +2427,7 @@ begin
       Exit;
     Sample := FDisplayedSamples[ARow];
     Sample.Value := DisplayToBase(Value.ToString);
-    if MeterValue.UpdateStabilitySample(ARow, Sample.TimeStampMs, Sample.Value) then
+    if MeterValue.SetStabilitySample(ARow, Sample.TimeStampMs, Sample.Value) then
     begin
       RefreshSamplesGrid;
       GridSamples.Row := ARow;
