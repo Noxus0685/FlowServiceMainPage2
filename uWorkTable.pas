@@ -265,6 +265,7 @@ type
     FHashValueImpTotal: string;
     FHashValueCurrent: string;
     FHashValueInterface: string;
+    FHashValueFlow: string;
     FName: string;
     FWorkTabeID: Integer;
     FOutputSet: TControlRegister<EOutPutSet>;
@@ -4515,6 +4516,8 @@ begin
     AIni.WriteString(Section, 'HashValueCurrent', Channel.ValueCurrent.Hash);
     if (Channel.ValueInterface<>nil) then
     AIni.WriteString(Section, 'HashValueInterface', Channel.ValueInterface.Hash);
+    if (Channel.FlowMeter<>nil) and (Channel.FlowMeter.ValueVolumeFlow<>nil) then
+    AIni.WriteString(Section, 'HashValueFlow', Channel.FlowMeter.ValueVolumeFlow.Hash);
     end;
   end;
 end;
@@ -4597,6 +4600,11 @@ begin
     Channel.FHashValueImpTotal := AIni.ReadString(Section, 'HashValueImpTotal', Channel.FHashValueImpTotal);
     Channel.FHashValueCurrent := AIni.ReadString(Section, 'HashValueCurrent', Channel.FHashValueCurrent);
     Channel.FHashValueInterface := AIni.ReadString(Section, 'HashValueInterface', Channel.FHashValueInterface);
+    Channel.FHashValueFlow := AIni.ReadString(Section, 'HashValueFlow', Channel.FHashValueFlow);
+    if (Channel.FlowMeter <> nil) and (Trim(Channel.FHashValueFlow) <> '') then
+    begin
+      Channel.FlowMeter.HashValueVolumeFlow := Channel.FHashValueFlow;
+    end;
 
     if Channel.FValueImp <> nil then Channel.FValueImp.DeleteFromVector;
     if Channel.FValueImpTotal <> nil then Channel.FValueImpTotal.DeleteFromVector;
