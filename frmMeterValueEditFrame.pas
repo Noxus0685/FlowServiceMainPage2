@@ -14,6 +14,7 @@ uses
   FMX.Memo,
   FMX.Memo.Types,
   FMX.Objects,
+  FMX.Platform,
   FMX.StdCtrls,
   FMX.TabControl,
   FMX.Types,
@@ -148,6 +149,14 @@ type
     ComboBoxSampleSource: TComboBox;
     ButtonRefreshHistory: TButton;
     ButtonUseLastSampleTime: TButton;
+    EditDiagHash: TEdit;
+    EditDiagHashOwner: TEdit;
+    EditDiagNameOwner: TEdit;
+    EditDiagName: TEdit;
+    EditDiagMinSampleCount: TEdit;
+    EditDiagWindowDurationSec: TEdit;
+    ButtonCopyHash: TButton;
+    ButtonShowIniData: TButton;
     FTestCurrentTimeMs: Int64;
     FTestDataModified: Boolean;
     FTestTargetValue: Double;
@@ -182,6 +191,10 @@ type
     EditCoefP: TEdit;
 
     procedure BuildUI;
+    procedure BuildStabilityDiagnosticsUI;
+    procedure UpdateStabilityDiagnostics;
+    procedure ButtonCopyHashClick(Sender: TObject);
+    procedure ButtonShowIniDataClick(Sender: TObject);
     procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
     procedure AddCheckRow(const ACaption: string; out ACheckBox: TCheckBox);
     procedure AddComboRow(const ACaption: string; out AComboBox: TComboBox);
@@ -396,6 +409,8 @@ begin
       HitTest := True;
     end;
 
+  BuildStabilityDiagnosticsUI;
+
   ButtonSampleAdd.OnClick := ButtonSampleAddClick;
   ButtonSampleEdit.OnClick := ButtonSampleEditClick;
   ButtonSampleDelete.OnClick := ButtonSampleDeleteClick;
@@ -511,6 +526,195 @@ begin
   AddEditRow('Значение делителя', EditValueDevider);
   AddEditRow('Коэффициент K', EditCoefK);
   AddEditRow('Коэффициент P', EditCoefP);
+end;
+
+
+procedure TFrameMeterValueEdit.BuildStabilityDiagnosticsUI;
+var
+  ParentControl: TControl;
+  Group: TGroupBox;
+  Row: TLayout;
+  CaptionLabel: TLabel;
+  TopPos: Single;
+
+  procedure AddRow(const ACaption, AHint: string; out AEdit: TEdit; const AWithCopyButton: Boolean);
+  begin
+    Row := TLayout.Create(Self);
+    Row.Parent := Group;
+    Row.Position.X := 12;
+    Row.Position.Y := TopPos;
+    Row.Size.Width := 660;
+    Row.Size.Height := 28;
+    Row.Stored := False;
+
+    CaptionLabel := TLabel.Create(Self);
+    CaptionLabel.Parent := Row;
+    CaptionLabel.Position.X := 0;
+    CaptionLabel.Position.Y := 4;
+    CaptionLabel.Size.Width := 150;
+    CaptionLabel.Size.Height := 22;
+    CaptionLabel.Text := ACaption;
+    CaptionLabel.Hint := AHint;
+    CaptionLabel.ShowHint := True;
+    CaptionLabel.HitTest := True;
+    CaptionLabel.Stored := False;
+
+    AEdit := TEdit.Create(Self);
+    AEdit.Parent := Row;
+    AEdit.Position.X := 160;
+    AEdit.Position.Y := 0;
+    if AWithCopyButton then
+      AEdit.Size.Width := 340
+    else
+      AEdit.Size.Width := 470;
+    AEdit.Size.Height := 24;
+    AEdit.ReadOnly := True;
+    AEdit.HitTest := True;
+    AEdit.ShowHint := True;
+    AEdit.Hint := AHint;
+    AEdit.TextSettings.Font.Family := 'Consolas';
+    AEdit.Stored := False;
+
+    if AWithCopyButton then
+    begin
+      ButtonCopyHash := TButton.Create(Self);
+      ButtonCopyHash.Parent := Row;
+      ButtonCopyHash.Position.X := 510;
+      ButtonCopyHash.Position.Y := 0;
+      ButtonCopyHash.Size.Width := 130;
+      ButtonCopyHash.Size.Height := 24;
+      ButtonCopyHash.Text := 'Копировать Hash';
+      ButtonCopyHash.OnClick := ButtonCopyHashClick;
+      ButtonCopyHash.Stored := False;
+    end;
+
+    TopPos := TopPos + 30;
+  end;
+
+begin
+  if FindComponent('SettingsScrollBox') is TControl then
+    ParentControl := TControl(FindComponent('SettingsScrollBox'))
+  else
+    ParentControl := TabItemStabilitySettings;
+
+  Group := TGroupBox.Create(Self);
+  Group.Parent := ParentControl;
+  Group.Align := TAlignLayout.Top;
+  Group.Margins.Bottom := 8;
+  Group.Size.Height := 216;
+  Group.Text := 'Диагностика текущего TMeterValue';
+  Group.Stored := False;
+
+  TopPos := 28;
+  AddRow('Hash TMeterValue',
+    'Уникальный идентификатор текущей метрологической величины. Используется для поиска соответствующей секции MeterValue.N в MeterValues.ini.',
+    EditDiagHash, True);
+  AddRow('Hash владельца',
+    'Идентификатор владельца метрологической величины. Используется для проверки связи TMeterValue с прибором, каналом или расходомером.',
+    EditDiagHashOwner, False);
+  AddRow('NameOwner', 'Имя владельца текущей метрологической величины.', EditDiagNameOwner, False);
+  AddRow('Name', 'Имя текущей метрологической величины.', EditDiagName, False);
+  AddRow('MinSampleCount', 'Минимальное количество отсчётов из текущих StabilitySettings.', EditDiagMinSampleCount, False);
+  AddRow('WindowDurationSec', 'Длительность окна из текущих StabilitySettings.', EditDiagWindowDurationSec, False);
+
+  ButtonShowIniData := TButton.Create(Self);
+  ButtonShowIniData.Parent := Group;
+  ButtonShowIniData.Position.X := 172;
+  ButtonShowIniData.Position.Y := TopPos + 2;
+  ButtonShowIniData.Size.Width := 180;
+  ButtonShowIniData.Size.Height := 28;
+  ButtonShowIniData.Text := 'Показать данные из INI';
+  ButtonShowIniData.OnClick := ButtonShowIniDataClick;
+  ButtonShowIniData.Stored := False;
+end;
+
+procedure TFrameMeterValueEdit.UpdateStabilityDiagnostics;
+var
+  Settings: TMeterValueStabilitySettings;
+begin
+  if FMeterValue = nil then
+  begin
+    if EditDiagHash <> nil then EditDiagHash.Text := '';
+    if EditDiagHashOwner <> nil then EditDiagHashOwner.Text := '';
+    if EditDiagNameOwner <> nil then EditDiagNameOwner.Text := '';
+    if EditDiagName <> nil then EditDiagName.Text := '';
+    if EditDiagMinSampleCount <> nil then EditDiagMinSampleCount.Text := '';
+    if EditDiagWindowDurationSec <> nil then EditDiagWindowDurationSec.Text := '';
+    Exit;
+  end;
+
+  Settings := FMeterValue.StabilitySettings;
+  if EditDiagHash <> nil then EditDiagHash.Text := FMeterValue.Hash;
+  if EditDiagHashOwner <> nil then
+    if Trim(FMeterValue.HashOwner) = '' then
+      EditDiagHashOwner.Text := '—'
+    else
+      EditDiagHashOwner.Text := FMeterValue.HashOwner;
+  if EditDiagNameOwner <> nil then EditDiagNameOwner.Text := FMeterValue.NameOwner;
+  if EditDiagName <> nil then EditDiagName.Text := FMeterValue.Name;
+  if EditDiagMinSampleCount <> nil then EditDiagMinSampleCount.Text := IntToStr(Settings.MinSampleCount);
+  if EditDiagWindowDurationSec <> nil then EditDiagWindowDurationSec.Text := FloatToStr(Settings.WindowDurationSec);
+end;
+
+procedure TFrameMeterValueEdit.ButtonCopyHashClick(Sender: TObject);
+var
+  Clipboard: IFMXClipboardService;
+begin
+  if (FMeterValue = nil) or (Trim(FMeterValue.Hash) = '') then
+  begin
+    ShowMessage('Hash текущей величины не задан.');
+    Exit;
+  end;
+
+  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Clipboard) then
+    Clipboard.SetClipboard(TValue.From<string>(FMeterValue.Hash))
+  else
+    ShowMessage('Буфер обмена недоступен.');
+end;
+
+procedure TFrameMeterValueEdit.ButtonShowIniDataClick(Sender: TObject);
+var
+  Ini: TMemIniFile;
+  FileName: string;
+  Count: Integer;
+  I: Integer;
+  Section: string;
+  Hash: string;
+  Lines: TStringList;
+begin
+  if (FMeterValue = nil) or (Trim(FMeterValue.Hash) = '') then
+  begin
+    ShowMessage('Hash текущей величины не задан.');
+    Exit;
+  end;
+
+  FileName := TMeterValue.GetMeterValuesFileName(0);
+  Ini := TMemIniFile.Create(FileName);
+  Lines := TStringList.Create;
+  try
+    Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
+    for I := 0 to Count - 1 do
+    begin
+      Section := 'MeterValue.' + IntToStr(I);
+      Hash := Ini.ReadString(Section, 'Hash', '');
+      if Hash = FMeterValue.Hash then
+      begin
+        Lines.Add('Section=' + Section);
+        Lines.Add('Hash=' + Hash);
+        Lines.Add('HashOwner=' + Ini.ReadString(Section, 'HashOwner', ''));
+        Lines.Add('NameOwner=' + Ini.ReadString(Section, 'NameOwner', ''));
+        Lines.Add('Name=' + Ini.ReadString(Section, 'Name', ''));
+        Lines.Add('StabilityMinSampleCount=' + Ini.ReadString(Section, 'StabilityMinSampleCount', ''));
+        Lines.Add('StabilityWindowDurationSec=' + Ini.ReadString(Section, 'StabilityWindowDurationSec', ''));
+        ShowMessage(Lines.Text);
+        Exit;
+      end;
+    end;
+    ShowMessage(Format('Секция с Hash %s в MeterValues.ini не найдена.', [FMeterValue.Hash]));
+  finally
+    Lines.Free;
+    Ini.Free;
+  end;
 end;
 
 procedure TFrameMeterValueEdit.AddEditRow(const ACaption: string; out AEdit: TEdit);
@@ -2409,6 +2613,7 @@ begin
 {$ENDIF}
 
   FSettingsModified := False;
+  UpdateStabilityDiagnostics;
   LoadSettingsToControls;
   FModified := FTestDataModified;
   if CheckBoxAutoAnalyze.IsChecked then
@@ -2565,6 +2770,7 @@ begin
 {$ENDIF}
   MeterValueChanged := FMeterValue <> AMeterValue;
   FMeterValue := AMeterValue;
+  UpdateStabilityDiagnostics;
   FLoading := True;
   try
     if FMeterValue = nil then
@@ -2684,6 +2890,7 @@ begin
       else
         UpdateTargetLimits;
     end;
+    UpdateStabilityDiagnostics;
     if ComboBoxSampleSource <> nil then
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
     UpdateSampleSourceControls;

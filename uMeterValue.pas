@@ -177,6 +177,7 @@ type
     class function GetCopyMeterValueBool(var AHash: string; out IsExisted: Integer): TMeterValue; static;
     class function GetExistedMeterValueBool(var AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue; static;
     class function GetMeterValue(const AHash: string): TMeterValue; overload; static;
+    class function FindMeterValueByOwnerAndName(const AHashOwner, ANameOwner, AValueName: string): TMeterValue; static;
     class function GetMeterValue(const AHash, AHashOwner: string; const AName: string): TMeterValue; overload; static;
 
     procedure Random;
@@ -539,6 +540,19 @@ begin
   if AHash.IsEmpty then Exit;
   for MV in FMeterValues do
     if MV.Hash = AHash then
+      Exit(MV);
+end;
+
+{ Finds an existing meter value by owner identity and exact value name. }
+class function TMeterValue.FindMeterValueByOwnerAndName(const AHashOwner,
+  ANameOwner, AValueName: string): TMeterValue;
+var
+  MV: TMeterValue;
+begin
+  Result := nil;
+  for MV in FMeterValues do
+    if SameText(MV.HashOwner, AHashOwner) and SameText(MV.NameOwner, ANameOwner) and
+       SameText(MV.Name, AValueName) then
       Exit(MV);
 end;
 
