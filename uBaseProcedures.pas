@@ -1245,7 +1245,7 @@ begin
     mvsfrVariationTooHigh: Result := 'размах превышает допустимое значение';
     mvsfrDeviationTooHigh: Result := 'стандартное отклонение превышает допустимое значение';
     mvsfrTrendTooHigh: Result := 'скорость тренда превышает допустимое значение';
-    mvsfrTooManyOutliers: Result := 'доля выбросов превышает допустимое значение';
+    mvsfrTooManyOutliers: Result := 'Доля выбросов превышает допустимое значение';
     mvsfrCurrentValueOutOfRange: Result := 'текущее значение вне диапазона';
     mvsfrMeanValueOutOfRange: Result := 'среднее значение вне диапазона';
     mvsfrForecastOutOfRange: Result := 'прогноз вне диапазона';
