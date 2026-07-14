@@ -177,6 +177,12 @@ type
     class function GetCopyMeterValueBool(var AHash: string; out IsExisted: Integer): TMeterValue; static;
     class function GetExistedMeterValueBool(var AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue; static;
     class function GetMeterValue(const AHash: string): TMeterValue; overload; static;
+    class function FindMeterValueByOwnerAndName(const AHashOwner, ANameOwner, AValueName: string): TMeterValue; static;
+    class function MakeValueKind(const AValueType: EValueType; const AShrtName: string): string; static;
+    class function FindMeterValueByOwnerAndKind(const AHashOwner, AValueKind: string): TMeterValue; static;
+    class function LoadStabilitySettingsByPersistentKey(AMeterValue: TMeterValue; out ALookupMode, ALookupKey, AMatchedSection, AMatchedHash, AMatchedHashOwner, AMatchedValueKind: string): Boolean; static;
+    class function FindStabilitySectionByPersistentKey(AMeterValue: TMeterValue; out ALookupMode, ALookupKey, AMatchedSection, AMatchedHash, AMatchedHashOwner, AMatchedValueKind: string): Boolean; static;
+    function GetValueKind: string;
     class function GetMeterValue(const AHash, AHashOwner: string; const AName: string): TMeterValue; overload; static;
 
     procedure Random;
@@ -311,6 +317,7 @@ type
     procedure SetCalcValue;
 
     function GetNewUUID: string;
+    class function GetMeterValuesFileName(IsBackUp: Integer): string; static;
     class procedure SaveToFile(IsBackUp: Integer); static;
     class procedure LoadFromFile; static;
     // Удаляет указанные значения/владельцев из памяти и физически перезаписывает MeterValues.ini.
@@ -352,7 +359,8 @@ implementation
 
 
 uses
-  FmxHelper;
+  FmxHelper,
+  uDebugLog;
 
 function MedianValue(const AValues: TArray<Double>): Double;
 var
@@ -537,6 +545,294 @@ begin
   if AHash.IsEmpty then Exit;
   for MV in FMeterValues do
     if MV.Hash = AHash then
+      Exit(MV);
+end;
+
+
+class function TMeterValue.MakeValueKind(const AValueType: EValueType;
+  const AShrtName: string): string;
+begin
+  Result := Trim(AShrtName);
+  if Result = '' then
+    Result := IntToStr(Ord(AValueType));
+end;
+
+function TMeterValue.GetValueKind: string;
+begin
+  Result := MakeValueKind(ValueType, ShrtName);
+end;
+
+class function TMeterValue.FindMeterValueByOwnerAndKind(const AHashOwner,
+  AValueKind: string): TMeterValue;
+var
+  MV: TMeterValue;
+begin
+  Result := nil;
+  if Trim(AHashOwner) = '' then
+    Exit;
+  if Trim(AValueKind) = '' then
+    Exit;
+
+  for MV in FMeterValues do
+    if SameText(MV.HashOwner, AHashOwner) and SameText(MV.GetValueKind, AValueKind) then
+      Exit(MV);
+end;
+
+
+
+class function TMeterValue.FindStabilitySectionByPersistentKey(AMeterValue: TMeterValue;
+  out ALookupMode, ALookupKey, AMatchedSection, AMatchedHash, AMatchedHashOwner,
+  AMatchedValueKind: string): Boolean;
+var
+  Ini: TMemIniFile;
+  Count: Integer;
+  I: Integer;
+  MatchIndex: Integer;
+  LegacyCount: Integer;
+  LegacyIndex: Integer;
+  Section: string;
+  CurrentKind: string;
+
+  function SectionKind(const ASection: string): string;
+  var
+    KindText: string;
+  begin
+    KindText := Ini.ReadString(ASection, 'ValueKind', '');
+    if Trim(KindText) <> '' then
+    begin
+      if Pos(':', KindText) > 0 then
+        Exit(Copy(KindText, Pos(':', KindText) + 1, MaxInt));
+      Exit(KindText);
+    end;
+    Result := MakeValueKind(EValueType(Ini.ReadInteger(ASection, 'ValueType', Ord(PARAM_TYPE))),
+      Ini.ReadString(ASection, 'ShrtName', ''));
+  end;
+
+  procedure FillMatch(const ASection: string; const AMode, AKey: string);
+  begin
+    ALookupMode := AMode;
+    ALookupKey := AKey;
+    AMatchedSection := ASection;
+    AMatchedHash := Ini.ReadString(ASection, 'Hash', '');
+    AMatchedHashOwner := Ini.ReadString(ASection, 'HashOwner', '');
+    AMatchedValueKind := SectionKind(ASection);
+  end;
+
+begin
+  Result := False;
+  ALookupMode := 'None';
+  ALookupKey := '';
+  AMatchedSection := '';
+  AMatchedHash := '';
+  AMatchedHashOwner := '';
+  AMatchedValueKind := '';
+  if AMeterValue = nil then
+    Exit;
+
+  Ini := TMemIniFile.Create(GetMeterValuesFileName(0));
+  try
+    Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
+    if Trim(AMeterValue.Hash) <> '' then
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        if SameText(Ini.ReadString(Section, 'Hash', ''), AMeterValue.Hash) then
+        begin
+          FillMatch(Section, 'Hash', AMeterValue.Hash);
+          Exit(True);
+        end;
+      end;
+
+    CurrentKind := AMeterValue.GetValueKind;
+    MatchIndex := -1;
+    if (Trim(AMeterValue.HashOwner) <> '') and (Trim(CurrentKind) <> '') then
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        if SameText(Ini.ReadString(Section, 'HashOwner', ''), AMeterValue.HashOwner) and
+           SameText(SectionKind(Section), CurrentKind) then
+          MatchIndex := I;
+      end;
+    if MatchIndex >= 0 then
+    begin
+      Section := 'MeterValue.' + IntToStr(MatchIndex);
+      FillMatch(Section, 'HashOwner+ValueKind', AMeterValue.HashOwner + '|' + CurrentKind);
+      Exit(True);
+    end;
+
+    LegacyCount := 0;
+    LegacyIndex := -1;
+    if (Trim(AMeterValue.HashOwner) <> '') and (Trim(AMeterValue.Name) <> '') then
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        if (Trim(Ini.ReadString(Section, 'ValueKind', '')) = '') and
+           SameText(Ini.ReadString(Section, 'HashOwner', ''), AMeterValue.HashOwner) and
+           SameText(Ini.ReadString(Section, 'Name', ''), AMeterValue.Name) then
+        begin
+          Inc(LegacyCount);
+          LegacyIndex := I;
+        end;
+      end;
+    if LegacyCount = 1 then
+    begin
+      Section := 'MeterValue.' + IntToStr(LegacyIndex);
+      FillMatch(Section, 'HashOwner+NameLegacy', AMeterValue.HashOwner + '|' + AMeterValue.Name);
+      Exit(True);
+    end;
+  finally
+    Ini.Free;
+  end;
+end;
+
+class function TMeterValue.LoadStabilitySettingsByPersistentKey(AMeterValue: TMeterValue;
+  out ALookupMode, ALookupKey, AMatchedSection, AMatchedHash, AMatchedHashOwner,
+  AMatchedValueKind: string): Boolean;
+var
+  Ini: TMemIniFile;
+  Count: Integer;
+  I: Integer;
+  LegacyCount: Integer;
+  LegacyIndex: Integer;
+  MatchIndex: Integer;
+  Section: string;
+  CurrentKind: string;
+
+  function SectionKind(const ASection: string): string;
+  var
+    KindText: string;
+    ValueTypeOrdinal: Integer;
+  begin
+    KindText := Ini.ReadString(ASection, 'ValueKind', '');
+    if Trim(KindText) <> '' then
+    begin
+      if Pos(':', KindText) > 0 then
+        Exit(Copy(KindText, Pos(':', KindText) + 1, MaxInt));
+      Exit(KindText);
+    end;
+
+    ValueTypeOrdinal := Ini.ReadInteger(ASection, 'ValueType', Ord(PARAM_TYPE));
+    Result := MakeValueKind(EValueType(ValueTypeOrdinal), Ini.ReadString(ASection, 'ShrtName', ''));
+  end;
+
+  procedure FillMatch(const ASection: string; const AMode, AKey: string);
+  begin
+    ALookupMode := AMode;
+    ALookupKey := AKey;
+    AMatchedSection := ASection;
+    AMatchedHash := Ini.ReadString(ASection, 'Hash', '');
+    AMatchedHashOwner := Ini.ReadString(ASection, 'HashOwner', '');
+    AMatchedValueKind := SectionKind(ASection);
+  end;
+
+  procedure ReadSettings(const ASection: string);
+  begin
+    AMeterValue.IsToSave := Ini.ReadBool(ASection, 'IsToSave', True);
+    AMeterValue.FStabilitySettings.Enabled := Ini.ReadBool(ASection, 'StabilityEnabled', AMeterValue.FStabilitySettings.Enabled);
+    AMeterValue.FStabilitySettings.MinSampleCount := Ini.ReadInteger(ASection, 'StabilityMinSampleCount', AMeterValue.FStabilitySettings.MinSampleCount);
+    AMeterValue.FStabilitySettings.WindowDurationSec := S2F(Ini.ReadString(ASection, 'StabilityWindowDurationSec', F2S(AMeterValue.FStabilitySettings.WindowDurationSec)));
+    AMeterValue.FStabilitySettings.MaxSampleAgeSec := S2F(Ini.ReadString(ASection, 'StabilityMaxSampleAgeSec', F2S(AMeterValue.FStabilitySettings.MaxSampleAgeSec)));
+    AMeterValue.FStabilitySettings.MaxVariation := S2F(Ini.ReadString(ASection, 'StabilityMaxVariation', F2S(AMeterValue.FStabilitySettings.MaxVariation)));
+    AMeterValue.FStabilitySettings.MaxStdDeviation := S2F(Ini.ReadString(ASection, 'StabilityMaxStdDeviation', F2S(AMeterValue.FStabilitySettings.MaxStdDeviation)));
+    AMeterValue.FStabilitySettings.MaxTrendRate := S2F(Ini.ReadString(ASection, 'StabilityMaxTrendRate', F2S(AMeterValue.FStabilitySettings.MaxTrendRate)));
+    AMeterValue.FStabilitySettings.ForecastHorizonSec := S2F(Ini.ReadString(ASection, 'StabilityForecastHorizonSec', F2S(AMeterValue.FStabilitySettings.ForecastHorizonSec)));
+    AMeterValue.FStabilitySettings.MaxOutlierFraction := S2F(Ini.ReadString(ASection, 'StabilityMaxOutlierFraction', F2S(AMeterValue.FStabilitySettings.MaxOutlierFraction)));
+    AMeterValue.FStabilitySettings.OutlierFactor := S2F(Ini.ReadString(ASection, 'StabilityOutlierFactor', F2S(AMeterValue.FStabilitySettings.OutlierFactor)));
+    AMeterValue.FStabilitySettings.ConfirmationTimeSec := S2F(Ini.ReadString(ASection, 'StabilityConfirmationTimeSec', F2S(AMeterValue.FStabilitySettings.ConfirmationTimeSec)));
+    AMeterValue.FStabilitySettings.ExitThresholdFactor := S2F(Ini.ReadString(ASection, 'StabilityExitThresholdFactor', F2S(AMeterValue.FStabilitySettings.ExitThresholdFactor)));
+    AMeterValue.FStabilitySettings.TargetValue := S2F(Ini.ReadString(ASection, 'TargetValue', F2S(AMeterValue.FStabilitySettings.TargetValue)));
+    AMeterValue.FStabilitySettings.TargetAccuracyPlusPercent := S2F(Ini.ReadString(ASection, 'TargetAccuracyPlusPercent', F2S(AMeterValue.FStabilitySettings.TargetAccuracyPlusPercent)));
+    AMeterValue.FStabilitySettings.TargetAccuracyMinusPercent := S2F(Ini.ReadString(ASection, 'TargetAccuracyMinusPercent', F2S(AMeterValue.FStabilitySettings.TargetAccuracyMinusPercent)));
+    AMeterValue.FStabilitySettings.TargetToleranceAbsolute := S2F(Ini.ReadString(ASection, 'TargetToleranceAbsolute', F2S(AMeterValue.FStabilitySettings.TargetToleranceAbsolute)));
+    AMeterValue.FStabilitySettings.RequireCurrentValueInRange := Ini.ReadBool(ASection, 'RequireCurrentValueInRange', AMeterValue.FStabilitySettings.RequireCurrentValueInRange);
+    AMeterValue.FStabilitySettings.RequireMeanValueInRange := Ini.ReadBool(ASection, 'RequireMeanValueInRange', AMeterValue.FStabilitySettings.RequireMeanValueInRange);
+    AMeterValue.FStabilitySettings.RequireForecastInRange := Ini.ReadBool(ASection, 'RequireForecastInRange', AMeterValue.FStabilitySettings.RequireForecastInRange);
+    AMeterValue.FStabilitySettings.AutoAnalyze := Ini.ReadBool(ASection, 'StabilityAutoAnalyze', AMeterValue.FStabilitySettings.AutoAnalyze);
+  end;
+
+begin
+  Result := False;
+  ALookupMode := 'None';
+  ALookupKey := '';
+  AMatchedSection := '';
+  AMatchedHash := '';
+  AMatchedHashOwner := '';
+  AMatchedValueKind := '';
+  if AMeterValue = nil then
+    Exit;
+
+  Ini := TMemIniFile.Create(GetMeterValuesFileName(0));
+  try
+    Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
+
+    if Trim(AMeterValue.Hash) <> '' then
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        if SameText(Ini.ReadString(Section, 'Hash', ''), AMeterValue.Hash) then
+        begin
+          FillMatch(Section, 'Hash', AMeterValue.Hash);
+          ReadSettings(Section);
+          Exit(True);
+        end;
+      end;
+
+    CurrentKind := AMeterValue.GetValueKind;
+    MatchIndex := -1;
+    if (Trim(AMeterValue.HashOwner) <> '') and (Trim(CurrentKind) <> '') then
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        if SameText(Ini.ReadString(Section, 'HashOwner', ''), AMeterValue.HashOwner) and
+           SameText(SectionKind(Section), CurrentKind) then
+          MatchIndex := I;
+      end;
+
+    if MatchIndex >= 0 then
+    begin
+      Section := 'MeterValue.' + IntToStr(MatchIndex);
+      FillMatch(Section, 'HashOwner+ValueKind', AMeterValue.HashOwner + '|' + CurrentKind);
+      ReadSettings(Section);
+      Exit(True);
+    end;
+
+    LegacyCount := 0;
+    LegacyIndex := -1;
+    if (Trim(AMeterValue.HashOwner) <> '') and (Trim(AMeterValue.Name) <> '') then
+      for I := 0 to Count - 1 do
+      begin
+        Section := 'MeterValue.' + IntToStr(I);
+        if (Trim(Ini.ReadString(Section, 'ValueKind', '')) = '') and
+           SameText(Ini.ReadString(Section, 'HashOwner', ''), AMeterValue.HashOwner) and
+           SameText(Ini.ReadString(Section, 'Name', ''), AMeterValue.Name) then
+        begin
+          Inc(LegacyCount);
+          LegacyIndex := I;
+        end;
+      end;
+
+    if LegacyCount = 1 then
+    begin
+      Section := 'MeterValue.' + IntToStr(LegacyIndex);
+      FillMatch(Section, 'HashOwner+NameLegacy', AMeterValue.HashOwner + '|' + AMeterValue.Name);
+      ReadSettings(Section);
+      Exit(True);
+    end;
+  finally
+    Ini.Free;
+  end;
+end;
+
+{ Finds an existing meter value by owner identity and exact value name. }
+class function TMeterValue.FindMeterValueByOwnerAndName(const AHashOwner,
+  ANameOwner, AValueName: string): TMeterValue;
+var
+  MV: TMeterValue;
+begin
+  Result := nil;
+  for MV in FMeterValues do
+    if SameText(MV.HashOwner, AHashOwner) and SameText(MV.NameOwner, ANameOwner) and
+       SameText(MV.Name, AValueName) then
       Exit(MV);
 end;
 
@@ -825,12 +1121,14 @@ begin
   FStabilitySettings.OutlierFactor := 3.5;
   FStabilitySettings.ConfirmationTimeSec := 3.0;
   FStabilitySettings.ExitThresholdFactor := 1.2;
+  FStabilitySettings.TargetValue := 0.0;
   FStabilitySettings.TargetAccuracyPlusPercent := 0.0;
   FStabilitySettings.TargetAccuracyMinusPercent := 0.0;
   FStabilitySettings.TargetToleranceAbsolute := 0.0;
   FStabilitySettings.RequireCurrentValueInRange := True;
   FStabilitySettings.RequireMeanValueInRange := True;
   FStabilitySettings.RequireForecastInRange := True;
+  FStabilitySettings.AutoAnalyze := True;
 end;
 
 procedure TMeterValue.ResetStabilityInfo;
@@ -1054,9 +1352,9 @@ end;
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
-  Result := (FStabilitySettings.MinSampleCount >= 2) and
+  Result := (FStabilitySettings.MinSampleCount >= 1) and
     (FStabilitySettings.WindowDurationSec > 0) and
-    (FStabilitySettings.MaxSampleAgeSec > 0) and
+    (FStabilitySettings.MaxSampleAgeSec >= 0) and
     (FStabilitySettings.MaxVariation >= 0) and
     (FStabilitySettings.MaxStdDeviation >= 0) and
     (FStabilitySettings.MaxTrendRate >= 0) and
@@ -3094,6 +3392,14 @@ begin
 end;
 
 { Serializes all meter values to persistent INI storage (optionally backup). }
+class function TMeterValue.GetMeterValuesFileName(IsBackUp: Integer): string;
+begin
+  if IsBackUp = 0 then
+    Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini')
+  else
+    Result := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
+end;
+
 class procedure TMeterValue.SaveToFile(IsBackUp: Integer);
 var
   Ini: TMemIniFile;
@@ -3104,16 +3410,34 @@ var
   SubSection: string;
   Dim: TDimension;
   CoefItem: TCoef;
+  Keys: TStringList;
+  Key: string;
+  ExistingIndex: Integer;
 begin
   FMeterValuesSaves.Clear;
-  for MV in FMeterValues do
-    if MV.IsToSave then
-      FMeterValuesSaves.Add(MV);
+  Keys := TStringList.Create;
+  try
+    for MV in FMeterValues do
+      if MV.IsToSave then
+      begin
+        if (Trim(MV.HashOwner) <> '') and (Trim(MV.GetValueKind) <> '') then
+          Key := MV.HashOwner + '|' + MV.GetValueKind
+        else
+          Key := MV.Hash;
+        ExistingIndex := Keys.IndexOf(Key);
+        if ExistingIndex >= 0 then
+          FMeterValuesSaves[ExistingIndex] := MV
+        else
+        begin
+          Keys.Add(Key);
+          FMeterValuesSaves.Add(MV);
+        end;
+      end;
+  finally
+    Keys.Free;
+  end;
 
-  if IsBackUp = 0 then
-    FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini')
-  else
-    FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), Format('MeterValuesBackUp%d.ini', [IsBackUp]));
+  FileName := GetMeterValuesFileName(IsBackUp);
 
   ForceDirectories(ExtractFilePath(FileName));
 
@@ -3139,6 +3463,8 @@ begin
       Ini.WriteString(Section, 'Type', MV.&Type);
       Ini.WriteString(Section, 'RawValueName', MV.RawValueName);
       Ini.WriteString(Section, 'RawValueDim', MV.RawValueDim);
+      Ini.WriteString(Section, 'ValueKind', MV.GetValueKind);
+      Ini.WriteString(Section, 'ValueKindName', MV.ShrtName);
 
       Ini.WriteString(Section, 'HashValueRate', MV.HashValueRate);
       Ini.WriteString(Section, 'HashValueBaseMultiplier', MV.HashValueBaseMultiplier);
@@ -3175,12 +3501,14 @@ begin
       Ini.WriteFloat(Section, 'StabilityOutlierFactor', MV.FStabilitySettings.OutlierFactor);
       Ini.WriteFloat(Section, 'StabilityConfirmationTimeSec', MV.FStabilitySettings.ConfirmationTimeSec);
       Ini.WriteFloat(Section, 'StabilityExitThresholdFactor', MV.FStabilitySettings.ExitThresholdFactor);
+      Ini.WriteFloat(Section, 'TargetValue', MV.FStabilitySettings.TargetValue);
       Ini.WriteFloat(Section, 'TargetAccuracyPlusPercent', MV.FStabilitySettings.TargetAccuracyPlusPercent);
       Ini.WriteFloat(Section, 'TargetAccuracyMinusPercent', MV.FStabilitySettings.TargetAccuracyMinusPercent);
       Ini.WriteFloat(Section, 'TargetToleranceAbsolute', MV.FStabilitySettings.TargetToleranceAbsolute);
       Ini.WriteBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
       Ini.WriteBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       Ini.WriteBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
+      Ini.WriteBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
 
       Ini.WriteInteger(Section, 'DimensionsCount', MV.Dimensions.Count);
       for J := 0 to MV.Dimensions.Count - 1 do
@@ -3363,7 +3691,7 @@ var
   CoefItem: TCoef;
   Hash: string;
 begin
-  FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini');
+  FileName := GetMeterValuesFileName(0);
   if not FileExists(FileName) then
   begin
     SaveToFile(0);
@@ -3431,12 +3759,19 @@ begin
       MV.FStabilitySettings.OutlierFactor := S2F(Ini.ReadString(Section, 'StabilityOutlierFactor', F2S(MV.FStabilitySettings.OutlierFactor)));
       MV.FStabilitySettings.ConfirmationTimeSec := S2F(Ini.ReadString(Section, 'StabilityConfirmationTimeSec', F2S(MV.FStabilitySettings.ConfirmationTimeSec)));
       MV.FStabilitySettings.ExitThresholdFactor := S2F(Ini.ReadString(Section, 'StabilityExitThresholdFactor', F2S(MV.FStabilitySettings.ExitThresholdFactor)));
+      MV.FStabilitySettings.TargetValue := S2F(Ini.ReadString(Section, 'TargetValue', F2S(MV.FStabilitySettings.TargetValue)));
       MV.FStabilitySettings.TargetAccuracyPlusPercent := S2F(Ini.ReadString(Section, 'TargetAccuracyPlusPercent', F2S(MV.FStabilitySettings.TargetAccuracyPlusPercent)));
       MV.FStabilitySettings.TargetAccuracyMinusPercent := S2F(Ini.ReadString(Section, 'TargetAccuracyMinusPercent', F2S(MV.FStabilitySettings.TargetAccuracyMinusPercent)));
       MV.FStabilitySettings.TargetToleranceAbsolute := S2F(Ini.ReadString(Section, 'TargetToleranceAbsolute', F2S(MV.FStabilitySettings.TargetToleranceAbsolute)));
       MV.FStabilitySettings.RequireCurrentValueInRange := Ini.ReadBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
       MV.FStabilitySettings.RequireMeanValueInRange := Ini.ReadBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       MV.FStabilitySettings.RequireForecastInRange := Ini.ReadBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
+      MV.FStabilitySettings.AutoAnalyze := Ini.ReadBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
+{$IFDEF DEBUG}
+      DebugLog(Format('Stability LoadFromFile: Section=%s Hash=%s Name=%s MinSampleCount=%d WindowDurationSec=%.12g TargetValue=%.12g',
+        [Section, MV.Hash, MV.Name, MV.FStabilitySettings.MinSampleCount,
+         MV.FStabilitySettings.WindowDurationSec, MV.FStabilitySettings.TargetValue]));
+{$ENDIF}
 
       MV.Dimensions.Clear;
       for J := 0 to Ini.ReadInteger(Section, 'DimensionsCount', 0) - 1 do
