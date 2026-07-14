@@ -2304,7 +2304,6 @@ begin
   end;
 end;
 
-
 function TMeasurementRun.GetCurrentStopTimeValue: Double;
 begin
   Result := 0;
