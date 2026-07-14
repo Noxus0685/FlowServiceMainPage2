@@ -2345,8 +2345,6 @@ begin
     (ALeft.AutoAnalyze = ARight.AutoAnalyze);
 end;
 
-{$IFDEF DEBUG}
-
 function TFrameMeterValueEdit.ApplySettingsFromControls(
   const AShowError: Boolean): Boolean;
 var
