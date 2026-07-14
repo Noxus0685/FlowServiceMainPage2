@@ -217,7 +217,6 @@ type
     function GetStatusColor(const AStatus: Integer): TAlphaColor;
     function BuildResultTextByStatus(const AStatus: Integer): string;
     procedure UpdateResultsPointColumns;
-    function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
     procedure LogResultCellDebug(const ARow: TResultGridRow; APoint: TDevicePoint; ASpillage: TPointSpillage; const ACellValue: string);
     procedure ShowAllDevicesResults;
     procedure ShowDevicesResults(const ADevices: TList<TDevice>);
@@ -300,6 +299,9 @@ type
     { Public declarations }
     procedure Initialize;
     procedure RefreshResultsTab;
+    function FindResultSpillageForPoint(ADevice: TDevice; APoint: TDevicePoint): TPointSpillage;
+    function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
+    function GetPointResultFlowLS(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     destructor Destroy; override;
   end;
 
@@ -1667,6 +1669,39 @@ begin
     if Spillage.Valid then
       Exit;
   end;
+end;
+
+function TFrameProceed.GetPointResultError(const ADevice: TDevice;
+  const APoint: TDevicePoint): Double;
+var
+  Spillage: TPointSpillage;
+begin
+  Result := NaN;
+  Spillage := FindResultSpillageForPoint(ADevice, APoint);
+  if (Spillage <> nil) and (Spillage.State <> osDeleted) and Spillage.Enabled then
+    Result := Spillage.Error;
+end;
+
+function TFrameProceed.GetPointResultFlowLS(const ADevice: TDevice;
+  const APoint: TDevicePoint): Double;
+var
+  Spillage: TPointSpillage;
+begin
+  Result := NaN;
+  Spillage := FindResultSpillageForPoint(ADevice, APoint);
+
+  if (Spillage <> nil) and (Spillage.State <> osDeleted) and Spillage.Enabled and
+     (not IsNan(Spillage.QavgEtalon)) and (not IsInfinite(Spillage.QavgEtalon)) and
+     (Spillage.QavgEtalon > 0) then
+  begin
+    // QavgEtalon хранится в м3/ч, для графика используем базовые л/с.
+    Result := Spillage.QavgEtalon / 3.6;
+    Exit;
+  end;
+
+  if (APoint <> nil) and (not IsNan(APoint.Q)) and (not IsInfinite(APoint.Q)) and
+     (APoint.Q > 0) then
+    Result := APoint.Q / 3.6;
 end;
 
 procedure TFrameProceed.LogResultCellDebug(const ARow: TResultGridRow;

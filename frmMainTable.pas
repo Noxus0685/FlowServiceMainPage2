@@ -29,6 +29,7 @@ uses
   FMX.Menus,
   FMX.Objects,
   FMX.ScrollBox,
+  FMX.SimpleChart,
   FMX.SpinBox,
   FMX.StdCtrls,
   FMX.TabControl,
@@ -52,6 +53,7 @@ uses
   System.Actions,
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.IniFiles,
   System.Math,
   System.Rtti,
@@ -451,6 +453,8 @@ type
     TabControlDevices: TTabControl;
     TabItemMeasurmentRun: TTabItem;
     TabItemMRResults: TTabItem;
+    TabItemChart: TTabItem;
+    ChartResults: TSimpleChart;
     TabItemChannelProperties: TTabItem;
     TabItemWorkTableProperties: TTabItem;
     StringColumnDeviceCoef1: TStringColumn;
@@ -529,6 +533,8 @@ type
     procedure ButtonCancelClick(Sender: TObject);
     procedure TestButtonClick(Sender: TObject);
     procedure TabControl1Change(Sender: TObject);
+    function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
+    procedure UpdateResultsChart;
     procedure TreeViewDevicesChange(Sender: TObject);
     procedure TreeViewDevicesMouseDown(Sender: TObject;
       Button: TMouseButton; Shift: TShiftState; X, Y: Single);
@@ -1266,6 +1272,7 @@ procedure TFrameMainTable.UpdateForm;
             if FFrameWorkTableProperties <> nil then
               FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
             ApplyActiveWorkTableEditMode;
+            UpdateResultsChart;
             Exit;
           end;
 
@@ -1280,6 +1287,7 @@ procedure TFrameMainTable.UpdateForm;
                 if FFrameWorkTableProperties <> nil then
                   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
                 ApplyActiveWorkTableEditMode;
+                UpdateResultsChart;
             finally
           IsUpdating := False;
           end;
@@ -2080,6 +2088,103 @@ procedure TFrameMainTable.TabControl1Change(Sender: TObject);
 begin
 //  if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
 //    FFrameProceed.RefreshResultsTab;
+  if (TabControlDevices <> nil) and (TabControlDevices.ActiveTab = TabItemChart) then
+    UpdateResultsChart;
+end;
+
+function TFrameMainTable.GetPointResultError(const ADevice: TDevice;
+  const APoint: TDevicePoint): Double;
+begin
+  Result := NaN;
+  if FFrameProceed <> nil then
+    Result := FFrameProceed.GetPointResultError(ADevice, APoint);
+end;
+
+procedure TFrameMainTable.UpdateResultsChart;
+type
+  TChartPoint = record
+    Flow: Double;
+    Error: Double;
+  end;
+var
+  WorkTable: TWorkTable;
+  Ch: TChannel;
+  Device: TDevice;
+  Point: TDevicePoint;
+  Points: TList<TChartPoint>;
+  ChartPoint: TChartPoint;
+  Series: TSimpleChartSeries;
+  SeriesName: string;
+begin
+  if ChartResults = nil then
+    Exit;
+
+  ChartResults.ClearSeries;
+  ChartResults.Title := 'Погрешность по точкам';
+  ChartResults.XTitle := 'Расход, л/с';
+  ChartResults.YTitle := 'Погрешность, %';
+
+  WorkTable := FActiveWorkTable;
+  if (WorkTable = nil) or (WorkTable.DeviceChannels = nil) or (FFrameProceed = nil) then
+  begin
+    ChartResults.Repaint;
+    Exit;
+  end;
+
+  for Ch in WorkTable.DeviceChannels do
+  begin
+    if (Ch = nil) or (Ch.State = osDeleted) or (Ch.FlowMeter = nil) or
+       (Ch.FlowMeter.Device = nil) then
+      Continue;
+
+    Device := Ch.FlowMeter.Device;
+    if (Device = nil) or (Device.State = osDeleted) or (Device.Points = nil) then
+      Continue;
+
+    Points := TList<TChartPoint>.Create;
+    try
+      for Point in Device.Points do
+      begin
+        if (Point = nil) or (Point.State = osDeleted) or (not Point.Enabled) then
+          Continue;
+
+        if FFrameProceed.FindResultSpillageForPoint(Device, Point) = nil then
+          Continue;
+
+        ChartPoint.Flow := FFrameProceed.GetPointResultFlowLS(Device, Point);
+        ChartPoint.Error := GetPointResultError(Device, Point);
+        if IsNan(ChartPoint.Flow) or IsInfinite(ChartPoint.Flow) or
+           IsNan(ChartPoint.Error) or IsInfinite(ChartPoint.Error) then
+          Continue;
+
+        Points.Add(ChartPoint);
+      end;
+
+      if Points.Count = 0 then
+        Continue;
+
+      Points.Sort(TComparer<TChartPoint>.Construct(
+        function(const L, R: TChartPoint): Integer
+        begin
+          Result := CompareValue(L.Flow, R.Flow);
+        end));
+
+      SeriesName := Trim(Device.Name + ' ' + Device.SerialNumber);
+      if SeriesName = '' then
+        SeriesName := Device.Name;
+
+      Series := ChartResults.AddSeries(SeriesName);
+      Series.ShowLines := True;
+      Series.ShowMarkers := True;
+
+      for ChartPoint in Points do
+        Series.AddPoint(ChartPoint.Flow, ChartPoint.Error);
+    finally
+      Points.Free;
+    end;
+  end;
+
+  ChartResults.Repaint;
 end;
 
 procedure TFrameMainTable.SetSessionDim(UnitName: string; QuantityUnitName: string);
@@ -2130,6 +2235,7 @@ procedure TFrameMainTable.GridDataPointsCellClick(const Column: TColumn; const R
 begin
   if FFrameProceed <> nil then
     FFrameProceed.GridDataPointsCellClick(Column, Row);
+  UpdateResultsChart;
 end;
 
 procedure TFrameMainTable.GridDataPointsMouseDown(Sender: TObject; Button: TMouseButton;
