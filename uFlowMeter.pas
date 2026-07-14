@@ -1278,18 +1278,6 @@ var
       AMeterValue.Description := ADescription;
   end;
 
-{$IFDEF DEBUG}
-  procedure LogInitValue(const AStage: string; AMeterValue: TMeterValue);
-  begin
-    if AMeterValue = nil then
-      DebugLog(Format('FlowMeter InitValues %s: FlowMeterPtr=%p ValuePtr=nil', [AStage, Pointer(Self)]))
-    else
-      DebugLog(Format('FlowMeter InitValues %s: FlowMeterPtr=%p ValuePtr=%p Hash=%s MinSampleCount=%d WindowDurationSec=%.12g',
-        [AStage, Pointer(Self), Pointer(AMeterValue), AMeterValue.Hash,
-         AMeterValue.StabilitySettings.MinSampleCount,
-         AMeterValue.StabilitySettings.WindowDurationSec]));
-  end;
-{$ENDIF}
 
   procedure BindSavedMeterValue(var AMeterValue: TMeterValue; var AHash: string;
     const AExpectedName: string; var AIsExisted: Integer);
@@ -1305,12 +1293,6 @@ var
     if (AMeterValue <> nil) and TMeterValue.LoadStabilitySettingsByPersistentKey(AMeterValue,
       LookupMode, LookupKey, MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
     begin
-{$IFDEF DEBUG}
-      DebugLog(Format('FlowMeter bind MeterValue from INI: FlowMeterPtr=%p ValuePtr=%p ExpectedName=%s LookupMode=%s LookupKey=%s MatchedSection=%s MatchedHash=%s MatchedHashOwner=%s MatchedValueKind=%s MinSampleCount=%d WindowDurationSec=%.12g',
-        [Pointer(Self), Pointer(AMeterValue), AExpectedName, LookupMode, LookupKey,
-         MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind,
-         AMeterValue.StabilitySettings.MinSampleCount, AMeterValue.StabilitySettings.WindowDurationSec]));
-{$ENDIF}
       AIsExisted := 1;
       Exit;
     end;
@@ -1330,12 +1312,6 @@ var
 
     if (SavedValue <> nil) and (SavedValue <> AMeterValue) then
     begin
-{$IFDEF DEBUG}
-      DebugLog(Format('FlowMeter bind MeterValue: FlowMeterPtr=%p OldValuePtr=%p SavedValuePtr=%p ExpectedName=%s LookupMode=%s OldHash=%s SavedHash=%s Owner=%s/%s ValueKind=%s SavedMinSampleCount=%d SavedWindowDurationSec=%.12g',
-        [Pointer(Self), Pointer(AMeterValue), Pointer(SavedValue), AExpectedName, LookupMode, AHash,
-         SavedValue.Hash, UUID, Name, SavedValue.GetValueKind, SavedValue.StabilitySettings.MinSampleCount,
-         SavedValue.StabilitySettings.WindowDurationSec]));
-{$ENDIF}
       if LookupMode = 'Hash' then
       begin
         AMeterValue := SavedValue;
@@ -1454,28 +1430,12 @@ begin
   ValueMassFlow.ValueEtalon := nil;
 
   ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, UUID, Name);
-{$IFDEF DEBUG}
-  LogInitValue('ValueVolumeFlow after GetExistedMeterValueBool', ValueVolumeFlow);
-{$ENDIF}
   if IsExisted = 0 then
   begin
-{$IFDEF DEBUG}
-    LogInitValue('ValueVolumeFlow before SetAsVolumeFlow', ValueVolumeFlow);
-{$ENDIF}
     ValueVolumeFlow.SetAsVolumeFlow;
-{$IFDEF DEBUG}
-    LogInitValue('ValueVolumeFlow after SetAsVolumeFlow', ValueVolumeFlow);
-{$ENDIF}
     SetDescription(ValueVolumeFlow, 'Объемный расход');
   end;
   BindSavedMeterValue(FValueVolumeFlow, HashValueVolumeFlow, 'Объемный расход', IsExisted);
-{$IFDEF DEBUG}
-  LogInitValue('ValueVolumeFlow after BindSavedMeterValue', ValueVolumeFlow);
-  if (ValueVolumeFlow <> nil) and (ValueFlow <> nil) then
-    DebugLog(Format('FlowMeter ValueFlow resolve: SavedHashValueFlow=%s HashValueVolumeFlow=%s ValueVolumeFlow.Hash=%s ValueFlow.Hash=%s SameObject=%s',
-      [HashValueVolumeFlow, HashValueVolumeFlow, ValueVolumeFlow.Hash, ValueFlow.Hash,
-       BoolToStr(Pointer(ValueFlow) = Pointer(ValueVolumeFlow), True)]));
-{$ENDIF}
   ValueVolumeFlow.ValueCorrection := nil;
   ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
   ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;
@@ -1571,9 +1531,6 @@ begin
   else if ValueFlow <> nil then
     ValueFlow.Accuracy := -1;
         ValueImp.Accuracy := 0;
-{$IFDEF DEBUG}
-  LogInitValue('ValueVolumeFlow after InitValues', ValueVolumeFlow);
-{$ENDIF}
 end;
 
 procedure TFlowMeter.SetEtalon(AEtalon: TFlowMeter);

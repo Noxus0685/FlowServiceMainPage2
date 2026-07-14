@@ -14,14 +14,12 @@ uses
   FMX.Memo,
   FMX.Memo.Types,
   FMX.Objects,
-  FMX.Platform,
   FMX.StdCtrls,
   FMX.TabControl,
   FMX.Types,
   FMX.Grid,
   System.Classes,
   System.Generics.Collections,
-  System.IniFiles,
   System.Math,
   System.Rtti,
   System.SysUtils,
@@ -149,15 +147,6 @@ type
     ComboBoxSampleSource: TComboBox;
     ButtonRefreshHistory: TButton;
     ButtonUseLastSampleTime: TButton;
-    EditDiagHash: TEdit;
-    EditDiagHashOwner: TEdit;
-    EditDiagNameOwner: TEdit;
-    EditDiagName: TEdit;
-    EditDiagMinSampleCount: TEdit;
-    EditDiagWindowDurationSec: TEdit;
-    ButtonCopyHash: TButton;
-    ButtonShowIniData: TButton;
-    ButtonCopyDiagnostics: TButton;
     FTestCurrentTimeMs: Int64;
     FTestDataModified: Boolean;
     FTestTargetValue: Double;
@@ -172,7 +161,6 @@ type
     EditType: TEdit;
     EditShrtName: TEdit;
     EditDescription: TEdit;
-    EditHash: TEdit;
     CheckBoxIsToSave: TCheckBox;
     EditValueFull: TEdit;
     EditValue: TEdit;
@@ -192,13 +180,6 @@ type
     EditCoefP: TEdit;
 
     procedure BuildUI;
-    procedure BuildStabilityDiagnosticsUI;
-    procedure UpdateStabilityDiagnostics;
-    procedure ButtonCopyHashClick(Sender: TObject);
-    procedure ButtonShowIniDataClick(Sender: TObject);
-    procedure ButtonCopyDiagnosticsClick(Sender: TObject);
-    function BuildStabilitySettingsDump(const AStage: string): string;
-    procedure CopyTextToClipboardSafe(const AText: string);
     procedure AddEditRow(const ACaption: string; out AEdit: TEdit);
     procedure AddCheckRow(const ACaption: string; out ACheckBox: TCheckBox);
     procedure AddComboRow(const ACaption: string; out AComboBox: TComboBox);
@@ -265,10 +246,6 @@ type
     procedure ReadSettingsFromControls(out ASettings: TMeterValueStabilitySettings);
     function StabilitySettingsEqual(const ALeft, ARight: TMeterValueStabilitySettings): Boolean;
     function ApplySettingsFromControls(const AShowError: Boolean): Boolean;
-{$IFDEF DEBUG}
-    procedure DebugLogStabilityPersistence(const AStage: string; const ASettings: TMeterValueStabilitySettings);
-    procedure DebugLogStabilityUI(const AStage: string);
-{$ENDIF}
     function ValidateControls(out AErrorText: string): Boolean;
     procedure HandleSettingsChange(Sender: TObject);
     function TryReadFloat(const AText: string; out AValue: Double): Boolean;
@@ -320,13 +297,7 @@ begin
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
-{$IFDEF DEBUG}
-  DebugLogStabilityUI('before BuildUI');
-{$ENDIF}
   BuildUI;
-{$IFDEF DEBUG}
-  DebugLogStabilityUI('after BuildUI');
-{$ENDIF}
   ClearAnalysisDisplay;
 end;
 
@@ -419,8 +390,6 @@ begin
       ShowHint := True;
       HitTest := True;
     end;
-
-  BuildStabilityDiagnosticsUI;
 
   ButtonSampleAdd.OnClick := ButtonSampleAddClick;
   ButtonSampleEdit.OnClick := ButtonSampleEditClick;
@@ -517,8 +486,6 @@ begin
   AddEditRow('Тип', EditType);
   AddEditRow('Краткое имя', EditShrtName);
   AddEditRow('Описание', EditDescription);
-  AddEditRow('Hash', EditHash);
-  EditHash.ReadOnly := True;
   AddCheckRow('Сохранять', CheckBoxIsToSave);
   AddSectionRow('Значения');
   AddComboRow('Размерность', ComboValueDim);
@@ -539,446 +506,6 @@ begin
   AddEditRow('Коэффициент P', EditCoefP);
 end;
 
-
-procedure TFrameMeterValueEdit.BuildStabilityDiagnosticsUI;
-var
-  ParentControl: TControl;
-  Group: TGroupBox;
-  Row: TLayout;
-  CaptionLabel: TLabel;
-  TopPos: Single;
-
-  procedure AddRow(const ACaption, AHint: string; out AEdit: TEdit; const AWithCopyButton: Boolean);
-  begin
-    Row := TLayout.Create(Self);
-    Row.Parent := Group;
-    Row.Position.X := 12;
-    Row.Position.Y := TopPos;
-    Row.Size.Width := 660;
-    Row.Size.Height := 28;
-    Row.Stored := False;
-
-    CaptionLabel := TLabel.Create(Self);
-    CaptionLabel.Parent := Row;
-    CaptionLabel.Position.X := 0;
-    CaptionLabel.Position.Y := 4;
-    CaptionLabel.Size.Width := 150;
-    CaptionLabel.Size.Height := 22;
-    CaptionLabel.Text := ACaption;
-    CaptionLabel.Hint := AHint;
-    CaptionLabel.ShowHint := True;
-    CaptionLabel.HitTest := True;
-    CaptionLabel.Stored := False;
-
-    AEdit := TEdit.Create(Self);
-    AEdit.Parent := Row;
-    AEdit.Position.X := 160;
-    AEdit.Position.Y := 0;
-    if AWithCopyButton then
-      AEdit.Size.Width := 340
-    else
-      AEdit.Size.Width := 470;
-    AEdit.Size.Height := 24;
-    AEdit.ReadOnly := True;
-    AEdit.HitTest := True;
-    AEdit.ShowHint := True;
-    AEdit.Hint := AHint;
-    AEdit.Stored := False;
-
-    if AWithCopyButton then
-    begin
-      ButtonCopyHash := TButton.Create(Self);
-      ButtonCopyHash.Parent := Row;
-      ButtonCopyHash.Position.X := 510;
-      ButtonCopyHash.Position.Y := 0;
-      ButtonCopyHash.Size.Width := 130;
-      ButtonCopyHash.Size.Height := 24;
-      ButtonCopyHash.Text := 'Копировать Hash';
-      ButtonCopyHash.OnClick := ButtonCopyHashClick;
-      ButtonCopyHash.Stored := False;
-    end;
-
-    TopPos := TopPos + 30;
-  end;
-
-begin
-  if FindComponent('SettingsScrollBox') is TControl then
-    ParentControl := TControl(FindComponent('SettingsScrollBox'))
-  else
-    ParentControl := TabItemStabilitySettings;
-
-  Group := TGroupBox.Create(Self);
-  Group.Parent := ParentControl;
-  Group.Align := TAlignLayout.Top;
-  Group.Margins.Bottom := 8;
-  Group.Size.Height := 252;
-  Group.Text := 'Диагностика текущего TMeterValue';
-  Group.Stored := False;
-
-  TopPos := 28;
-  AddRow('Hash TMeterValue',
-    'Уникальный идентификатор текущей метрологической величины. Используется для поиска соответствующей секции MeterValue.N в MeterValues.ini.',
-    EditDiagHash, True);
-  AddRow('Hash владельца',
-    'Идентификатор владельца метрологической величины. Используется для проверки связи TMeterValue с прибором, каналом или расходомером.',
-    EditDiagHashOwner, False);
-  AddRow('NameOwner', 'Имя владельца текущей метрологической величины.', EditDiagNameOwner, False);
-  AddRow('Name', 'Имя текущей метрологической величины.', EditDiagName, False);
-  AddRow('MinSampleCount', 'Минимальное количество отсчётов из текущих StabilitySettings.', EditDiagMinSampleCount, False);
-  AddRow('WindowDurationSec', 'Длительность окна из текущих StabilitySettings.', EditDiagWindowDurationSec, False);
-
-  ButtonShowIniData := TButton.Create(Self);
-  ButtonShowIniData.Parent := Group;
-  ButtonShowIniData.Position.X := 172;
-  ButtonShowIniData.Position.Y := TopPos + 2;
-  ButtonShowIniData.Size.Width := 180;
-  ButtonShowIniData.Size.Height := 28;
-  ButtonShowIniData.Text := 'Показать данные из INI';
-  ButtonShowIniData.OnClick := ButtonShowIniDataClick;
-  ButtonShowIniData.Stored := False;
-
-  ButtonCopyDiagnostics := TButton.Create(Self);
-  ButtonCopyDiagnostics.Parent := Group;
-  ButtonCopyDiagnostics.Position.X := 364;
-  ButtonCopyDiagnostics.Position.Y := TopPos + 2;
-  ButtonCopyDiagnostics.Size.Width := 180;
-  ButtonCopyDiagnostics.Size.Height := 28;
-  ButtonCopyDiagnostics.Text := 'Копировать диагностику';
-  ButtonCopyDiagnostics.OnClick := ButtonCopyDiagnosticsClick;
-  ButtonCopyDiagnostics.Stored := False;
-end;
-
-procedure TFrameMeterValueEdit.UpdateStabilityDiagnostics;
-var
-  Settings: TMeterValueStabilitySettings;
-begin
-  if FMeterValue = nil then
-  begin
-    if EditDiagHash <> nil then EditDiagHash.Text := '';
-    if EditDiagHashOwner <> nil then EditDiagHashOwner.Text := '';
-    if EditDiagNameOwner <> nil then EditDiagNameOwner.Text := '';
-    if EditDiagName <> nil then EditDiagName.Text := '';
-    if EditDiagMinSampleCount <> nil then EditDiagMinSampleCount.Text := '';
-    if EditDiagWindowDurationSec <> nil then EditDiagWindowDurationSec.Text := '';
-    Exit;
-  end;
-
-  Settings := FMeterValue.StabilitySettings;
-  if EditDiagHash <> nil then EditDiagHash.Text := FMeterValue.Hash;
-  if EditDiagHashOwner <> nil then
-    if Trim(FMeterValue.HashOwner) = '' then
-      EditDiagHashOwner.Text := '—'
-    else
-      EditDiagHashOwner.Text := FMeterValue.HashOwner;
-  if EditDiagNameOwner <> nil then EditDiagNameOwner.Text := FMeterValue.NameOwner;
-  if EditDiagName <> nil then EditDiagName.Text := FMeterValue.Name;
-  if EditDiagMinSampleCount <> nil then EditDiagMinSampleCount.Text := IntToStr(Settings.MinSampleCount);
-  if EditDiagWindowDurationSec <> nil then EditDiagWindowDurationSec.Text := FloatToStr(Settings.WindowDurationSec);
-end;
-
-procedure TFrameMeterValueEdit.ButtonCopyHashClick(Sender: TObject);
-var
-  Clipboard: IFMXClipboardService;
-begin
-  if (FMeterValue = nil) or (Trim(FMeterValue.Hash) = '') then
-  begin
-    ShowMessage('Hash текущей величины не задан.');
-    Exit;
-  end;
-
-  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Clipboard) then
-    Clipboard.SetClipboard(TValue.From<string>(FMeterValue.Hash))
-  else
-    ShowMessage('Буфер обмена недоступен.');
-end;
-
-procedure TFrameMeterValueEdit.ButtonShowIniDataClick(Sender: TObject);
-var
-  Ini: TMemIniFile;
-  FileName: string;
-  Count: Integer;
-  I: Integer;
-  Section: string;
-  Hash: string;
-  Lines: TStringList;
-begin
-  if (FMeterValue = nil) or (Trim(FMeterValue.Hash) = '') then
-  begin
-    ShowMessage('Hash текущей величины не задан.');
-    Exit;
-  end;
-
-  FileName := TMeterValue.GetMeterValuesFileName(0);
-  Ini := TMemIniFile.Create(FileName);
-  Lines := TStringList.Create;
-  try
-    Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
-    for I := 0 to Count - 1 do
-    begin
-      Section := 'MeterValue.' + IntToStr(I);
-      Hash := Ini.ReadString(Section, 'Hash', '');
-      if Hash = FMeterValue.Hash then
-      begin
-        Lines.Add('Section=' + Section);
-        Lines.Add('Hash=' + Hash);
-        Lines.Add('HashOwner=' + Ini.ReadString(Section, 'HashOwner', ''));
-        Lines.Add('NameOwner=' + Ini.ReadString(Section, 'NameOwner', ''));
-        Lines.Add('Name=' + Ini.ReadString(Section, 'Name', ''));
-        Lines.Add('StabilityMinSampleCount=' + Ini.ReadString(Section, 'StabilityMinSampleCount', ''));
-        Lines.Add('StabilityWindowDurationSec=' + Ini.ReadString(Section, 'StabilityWindowDurationSec', ''));
-        ShowMessage(Lines.Text);
-        Exit;
-      end;
-    end;
-    ShowMessage(Format('Секция с Hash %s в MeterValues.ini не найдена.', [FMeterValue.Hash]));
-  finally
-    Lines.Free;
-    Ini.Free;
-  end;
-end;
-
-
-procedure TFrameMeterValueEdit.CopyTextToClipboardSafe(const AText: string);
-var
-  Clipboard: IFMXClipboardService;
-begin
-  try
-    if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Clipboard) then
-      Clipboard.SetClipboard(TValue.From<string>(AText));
-  except
-    // Временная диагностика не должна ломать редактор.
-  end;
-end;
-
-function TFrameMeterValueEdit.BuildStabilitySettingsDump(const AStage: string): string;
-var
-  Lines: TStringList;
-  FS: TFormatSettings;
-  LookupMode: string;
-  LookupKey: string;
-  MatchedSection: string;
-  MatchedHash: string;
-  MatchedHashOwner: string;
-  MatchedValueKind: string;
-  DuplicateMatchCount: Integer;
-
-
-  function CountSectionsForCurrentKey: Integer;
-  var
-    Ini: TMemIniFile;
-    I: Integer;
-    Count: Integer;
-    Section: string;
-    CurrentKind: string;
-    KindText: string;
-  begin
-    Result := 0;
-    if FMeterValue = nil then
-      Exit;
-    CurrentKind := FMeterValue.GetValueKind;
-    if (Trim(FMeterValue.HashOwner) = '') or (Trim(CurrentKind) = '') then
-      Exit;
-
-    Ini := TMemIniFile.Create(TMeterValue.GetMeterValuesFileName(0));
-    try
-      Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
-      for I := 0 to Count - 1 do
-      begin
-        Section := 'MeterValue.' + IntToStr(I);
-        KindText := Ini.ReadString(Section, 'ValueKind', '');
-        if Pos(':', KindText) > 0 then
-          KindText := Copy(KindText, Pos(':', KindText) + 1, MaxInt);
-        if KindText = '' then
-          KindText := TMeterValue.MakeValueKind(EValueType(Ini.ReadInteger(Section, 'ValueType', Ord(PARAM_TYPE))),
-            Ini.ReadString(Section, 'ShrtName', ''));
-        if SameText(Ini.ReadString(Section, 'HashOwner', ''), FMeterValue.HashOwner) and
-           SameText(KindText, CurrentKind) then
-          Inc(Result);
-      end;
-    finally
-      Ini.Free;
-    end;
-  end;
-
-  function PtrHex(APointer: Pointer): string;
-  begin
-    Result := IntToHex(NativeUInt(APointer), SizeOf(Pointer) * 2);
-  end;
-
-  function BoolDump(const AValue: Boolean): string;
-  begin
-    if AValue then
-      Result := 'True'
-    else
-      Result := 'False';
-  end;
-
-  function FloatDump(const AValue: Double): string;
-  begin
-    Result := FloatToStr(AValue, FS);
-  end;
-
-  function OwnerClassName: string;
-  begin
-    if Owner = nil then
-      Result := 'nil'
-    else
-      Result := Owner.ClassName;
-  end;
-
-  function ParentClassName: string;
-  begin
-    if Parent = nil then
-      Result := 'nil'
-    else
-      Result := Parent.ClassName;
-  end;
-
-  procedure AddSettings(const ACaption: string; const ASettings: TMeterValueStabilitySettings);
-  begin
-    Lines.Add('');
-    Lines.Add(ACaption);
-    Lines.Add('Enabled=' + BoolDump(ASettings.Enabled));
-    Lines.Add('AutoAnalyze=' + BoolDump(ASettings.AutoAnalyze));
-    Lines.Add('MinSampleCount=' + IntToStr(ASettings.MinSampleCount));
-    Lines.Add('WindowDurationSec=' + FloatDump(ASettings.WindowDurationSec));
-    Lines.Add('MaxSampleAgeSec=' + FloatDump(ASettings.MaxSampleAgeSec));
-    Lines.Add('ConfirmationTimeSec=' + FloatDump(ASettings.ConfirmationTimeSec));
-    Lines.Add('ExitThresholdFactor=' + FloatDump(ASettings.ExitThresholdFactor));
-    Lines.Add('MaxVariation=' + FloatDump(ASettings.MaxVariation));
-    Lines.Add('MaxStdDeviation=' + FloatDump(ASettings.MaxStdDeviation));
-    Lines.Add('MaxTrendRate=' + FloatDump(ASettings.MaxTrendRate));
-    Lines.Add('MaxOutlierFraction=' + FloatDump(ASettings.MaxOutlierFraction));
-    Lines.Add('OutlierFactor=' + FloatDump(ASettings.OutlierFactor));
-    Lines.Add('ForecastHorizonSec=' + FloatDump(ASettings.ForecastHorizonSec));
-    Lines.Add('TargetValue=' + FloatDump(ASettings.TargetValue));
-    Lines.Add('TargetAccuracyPlusPercent=' + FloatDump(ASettings.TargetAccuracyPlusPercent));
-    Lines.Add('TargetAccuracyMinusPercent=' + FloatDump(ASettings.TargetAccuracyMinusPercent));
-    Lines.Add('TargetToleranceAbsolute=' + FloatDump(ASettings.TargetToleranceAbsolute));
-    Lines.Add('RequireCurrentValueInRange=' + BoolDump(ASettings.RequireCurrentValueInRange));
-    Lines.Add('RequireMeanValueInRange=' + BoolDump(ASettings.RequireMeanValueInRange));
-    Lines.Add('RequireForecastInRange=' + BoolDump(ASettings.RequireForecastInRange));
-  end;
-
-  function EditText(AEdit: TEdit): string;
-  begin
-    if AEdit = nil then
-      Result := '<nil>'
-    else
-      Result := AEdit.Text;
-  end;
-
-  function CheckText(ACheckBox: TCheckBox): string;
-  begin
-    if ACheckBox = nil then
-      Result := '<nil>'
-    else
-      Result := BoolDump(ACheckBox.IsChecked);
-  end;
-
-begin
-  try
-    FS := TFormatSettings.Invariant;
-    Lines := TStringList.Create;
-    try
-      Lines.Add('Stage=' + AStage);
-      Lines.Add('DateTime=' + FormatDateTime('yyyy-mm-dd hh:nn:ss.zzz', Now));
-      Lines.Add('FramePointer=' + PtrHex(Pointer(Self)));
-      Lines.Add('MeterValuePointer=' + PtrHex(Pointer(FMeterValue)));
-      Lines.Add('OwnerClass=' + OwnerClassName);
-      Lines.Add('ParentClass=' + ParentClassName);
-      Lines.Add('Visible=' + BoolDump(Visible));
-
-      Lines.Add('');
-      Lines.Add('[MeterValue]');
-      if FMeterValue = nil then
-        Lines.Add('MeterValue=nil')
-      else
-      begin
-        Lines.Add('Hash=' + FMeterValue.Hash);
-        Lines.Add('HashOwner=' + FMeterValue.HashOwner);
-        Lines.Add('NameOwner=' + FMeterValue.NameOwner);
-        Lines.Add('Name=' + FMeterValue.Name);
-        Lines.Add('IsToSave=' + BoolDump(FMeterValue.IsToSave));
-        Lines.Add('Enabled=' + BoolDump(FMeterValue.StabilitySettings.Enabled));
-        Lines.Add('ValueType=' + IntToStr(Ord(FMeterValue.ValueType)));
-        Lines.Add('ValueKind=' + FMeterValue.GetValueKind);
-        Lines.Add('UnitName=' + DisplayUnitName);
-        Lines.Add('DimensionName=' + DisplayUnitName);
-        DuplicateMatchCount := CountSectionsForCurrentKey;
-        Lines.Add('StorageMode=HashOwner+ValueKind');
-        Lines.Add('StorageKey=' + FMeterValue.HashOwner + '|' + FMeterValue.GetValueKind);
-        Lines.Add('DuplicateMatchCount=' + IntToStr(DuplicateMatchCount));
-        if TMeterValue.FindStabilitySectionByPersistentKey(FMeterValue, LookupMode, LookupKey,
-          MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
-        begin
-          Lines.Add('LookupMode=' + LookupMode);
-          Lines.Add('LookupKey=' + LookupKey);
-          Lines.Add('MatchedSection=' + MatchedSection);
-          Lines.Add('UpdatedSection=' + MatchedSection);
-          Lines.Add('CreatedNewSection=' + BoolDump(False));
-          Lines.Add('MatchedHash=' + MatchedHash);
-          Lines.Add('MatchedHashOwner=' + MatchedHashOwner);
-          Lines.Add('MatchedValueKind=' + MatchedValueKind);
-        end
-        else
-        begin
-          Lines.Add('LookupMode=None');
-          Lines.Add('LookupKey=');
-          Lines.Add('MatchedSection=');
-          Lines.Add('UpdatedSection=');
-          Lines.Add('CreatedNewSection=' + BoolDump(FMeterValue.IsToSave));
-          Lines.Add('MatchedHash=');
-          Lines.Add('MatchedHashOwner=');
-          Lines.Add('MatchedValueKind=');
-        end;
-        AddSettings('[MeterValue.StabilitySettings]', FMeterValue.StabilitySettings);
-      end;
-
-      AddSettings('[Frame.FTestSettings]', FTestSettings);
-
-      Lines.Add('');
-      Lines.Add('[Controls]');
-      Lines.Add('CheckBoxStabilityEnabled.IsChecked=' + CheckText(CheckBoxStabilityEnabled));
-      Lines.Add('CheckBoxAutoAnalyze.IsChecked=' + CheckText(CheckBoxAutoAnalyze));
-      Lines.Add('EditMinSampleCount.Text=' + EditText(EditMinSampleCount));
-      Lines.Add('EditWindowDurationSec.Text=' + EditText(EditWindowDurationSec));
-      Lines.Add('EditMaxSampleAgeSec.Text=' + EditText(EditMaxSampleAgeSec));
-      Lines.Add('EditConfirmationTimeSec.Text=' + EditText(EditConfirmationTimeSec));
-      Lines.Add('EditExitThresholdFactor.Text=' + EditText(EditExitThresholdFactor));
-      Lines.Add('EditMaxVariation.Text=' + EditText(EditMaxVariation));
-      Lines.Add('EditMaxStdDeviation.Text=' + EditText(EditMaxStdDeviation));
-      Lines.Add('EditMaxTrendRate.Text=' + EditText(EditMaxTrendRate));
-      Lines.Add('EditMaxOutlierFractionPercent.Text=' + EditText(EditMaxOutlierFractionPercent));
-      Lines.Add('EditOutlierFactor.Text=' + EditText(EditOutlierFactor));
-      Lines.Add('EditForecastHorizonSec.Text=' + EditText(EditForecastHorizonSec));
-      Lines.Add('EditTestTargetValue.Text=' + EditText(EditTestTargetValue));
-      Lines.Add('EditTargetAccuracyPlusPercent.Text=' + EditText(EditTargetAccuracyPlusPercent));
-      Lines.Add('EditTargetAccuracyMinusPercent.Text=' + EditText(EditTargetAccuracyMinusPercent));
-      Lines.Add('EditTargetToleranceAbsolute.Text=' + EditText(EditTargetToleranceAbsolute));
-      Lines.Add('CheckBoxRequireCurrentValueInRange.IsChecked=' + CheckText(CheckBoxRequireCurrentValueInRange));
-      Lines.Add('CheckBoxRequireMeanValueInRange.IsChecked=' + CheckText(CheckBoxRequireMeanValueInRange));
-      Lines.Add('CheckBoxRequireForecastInRange.IsChecked=' + CheckText(CheckBoxRequireForecastInRange));
-
-      Lines.Add('');
-      Lines.Add('[FrameState]');
-      Lines.Add('FLoading=' + BoolDump(FLoading));
-      Lines.Add('FSettingsModified=' + BoolDump(FSettingsModified));
-      Result := Lines.Text;
-    finally
-      Lines.Free;
-    end;
-  except
-    on E: Exception do
-      Result := 'Stage=' + AStage + sLineBreak + 'DiagnosticsError=' + E.ClassName + ': ' + E.Message;
-  end;
-end;
-
-procedure TFrameMeterValueEdit.ButtonCopyDiagnosticsClick(Sender: TObject);
-begin
-  CopyTextToClipboardSafe(BuildStabilitySettingsDump('MANUAL'));
-  MemoConclusion.Lines.Text := 'Диагностика настроек скопирована в буфер обмена';
-end;
 
 procedure TFrameMeterValueEdit.AddEditRow(const ACaption: string; out AEdit: TEdit);
 var
@@ -2672,17 +2199,8 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.ButtonApplyStabilitySettingsClick(Sender: TObject);
-var
-  BeforeDump: string;
-  AfterDump: string;
 begin
-  BeforeDump := BuildStabilitySettingsDump('BEFORE_APPLY');
   ApplySettingsToWorkMeterValue;
-  AfterDump := BuildStabilitySettingsDump('AFTER_APPLY');
-  CopyTextToClipboardSafe(BeforeDump + sLineBreak +
-    '================ APPLY RESULT ================' + sLineBreak + sLineBreak +
-    AfterDump);
-  MemoConclusion.Lines.Text := 'Диагностика настроек скопирована в буфер обмена';
 end;
 
 procedure TFrameMeterValueEdit.CopySettingsFromWorkMeterValue;
@@ -2695,9 +2213,6 @@ end;
 
 procedure TFrameMeterValueEdit.LoadSettingsToControls;
 begin
-{$IFDEF DEBUG}
-  DebugLogStabilityUI('before LoadSettingsToControls');
-{$ENDIF}
   FLoading := True;
   try
     CheckBoxStabilityEnabled.IsChecked := FTestSettings.Enabled;
@@ -2725,9 +2240,6 @@ begin
   finally
     FLoading := False;
   end;
-{$IFDEF DEBUG}
-  DebugLogStabilityUI('after LoadSettingsToControls');
-{$ENDIF}
 end;
 
 function TFrameMeterValueEdit.TryReadFloat(const AText: string;
@@ -2799,77 +2311,6 @@ end;
 
 {$IFDEF DEBUG}
 
-procedure TFrameMeterValueEdit.DebugLogStabilityUI(const AStage: string);
-var
-  HashText: string;
-  MinText: string;
-  WindowText: string;
-begin
-  HashText := '';
-  if FMeterValue <> nil then
-    HashText := FMeterValue.Hash;
-  if EditMinSampleCount <> nil then
-    MinText := EditMinSampleCount.Text
-  else
-    MinText := '<nil>';
-  if EditWindowDurationSec <> nil then
-    WindowText := EditWindowDurationSec.Text
-  else
-    WindowText := '<nil>';
-
-  DebugLog(Format('Stability UI %s: Hash=%s FTestMinSampleCount=%d FTestWindowDurationSec=%.12g EditMinSampleCount=%s EditWindowDurationSec=%s',
-    [AStage, HashText, FTestSettings.MinSampleCount, FTestSettings.WindowDurationSec,
-     MinText, WindowText]));
-end;
-
-procedure TFrameMeterValueEdit.DebugLogStabilityPersistence(const AStage: string;
-  const ASettings: TMeterValueStabilitySettings);
-var
-  FileName: string;
-  Ini: TMemIniFile;
-  Count: Integer;
-  I: Integer;
-  Section: string;
-  SavedHash: string;
-begin
-  if FMeterValue = nil then
-    Exit;
-
-  FileName := TMeterValue.GetMeterValuesFileName(0);
-  DebugLog(Format('Stability %s: Hash=%s Name=%s IsToSave=%s MinSampleCount=%d WindowDurationSec=%.12g MaxSampleAgeSec=%.12g ConfirmationTimeSec=%.12g ExitThresholdFactor=%.12g Ini=%s',
-    [AStage, FMeterValue.Hash, FMeterValue.Name, BoolToStr(FMeterValue.IsToSave, True),
-     ASettings.MinSampleCount, ASettings.WindowDurationSec, ASettings.MaxSampleAgeSec,
-     ASettings.ConfirmationTimeSec, ASettings.ExitThresholdFactor, FileName]));
-
-  if (AStage <> 'after-save') or (FMeterValue.Hash = '') then
-    Exit;
-
-  Ini := TMemIniFile.Create(FileName);
-  try
-    Count := Ini.ReadInteger('MeterValues', 'ValuesCount', 0);
-    for I := 0 to Count - 1 do
-    begin
-      Section := 'MeterValue.' + IntToStr(I);
-      SavedHash := Ini.ReadString(Section, 'Hash', '');
-      if SavedHash = FMeterValue.Hash then
-      begin
-        DebugLog(Format('Stability after-save ini: Section=%s Hash=%s MinSampleCount=%d WindowDurationSec=%s MaxSampleAgeSec=%s ConfirmationTimeSec=%s ExitThresholdFactor=%s AutoAnalyze=%s',
-          [Section, SavedHash, Ini.ReadInteger(Section, 'StabilityMinSampleCount', -1),
-           Ini.ReadString(Section, 'StabilityWindowDurationSec', ''),
-           Ini.ReadString(Section, 'StabilityMaxSampleAgeSec', ''),
-           Ini.ReadString(Section, 'StabilityConfirmationTimeSec', ''),
-           Ini.ReadString(Section, 'StabilityExitThresholdFactor', ''),
-           BoolToStr(Ini.ReadBool(Section, 'StabilityAutoAnalyze', True), True)]));
-        Exit;
-      end;
-    end;
-    DebugLog(Format('Stability after-save ini: Hash=%s not found in %s', [FMeterValue.Hash, FileName]));
-  finally
-    Ini.Free;
-  end;
-end;
-{$ENDIF}
-
 function TFrameMeterValueEdit.ApplySettingsFromControls(
   const AShowError: Boolean): Boolean;
 var
@@ -2889,9 +2330,6 @@ begin
   end;
 
   ReadSettingsFromControls(Settings);
-{$IFDEF DEBUG}
-  DebugLogStabilityPersistence('before-save', Settings);
-{$ENDIF}
   FMeterValue.StabilitySettings := Settings;
   FTestSettings := Settings;
   FTestTargetValue := Settings.TargetValue;
@@ -2900,19 +2338,12 @@ begin
   if FMeterValue.IsToSave then
   begin
     TMeterValue.SaveToFile(0);
-{$IFDEF DEBUG}
-    DebugLogStabilityPersistence('after-save', Settings);
-{$ENDIF}
   end
   else
   begin
-{$IFDEF DEBUG}
-    DebugLogStabilityPersistence('session-only', Settings);
-{$ENDIF}
   end;
 
   FSettingsModified := False;
-  UpdateStabilityDiagnostics;
   LoadSettingsToControls;
   FModified := FTestDataModified;
   if CheckBoxAutoAnalyze.IsChecked then
@@ -3066,22 +2497,8 @@ procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
 var
   MeterValueChanged: Boolean;
 begin
-{$IFDEF DEBUG}
-  if AMeterValue <> nil then
-    DebugLog(Format('Stability LoadFromMeterValue enter: Ptr=%p Hash=%s Name=%s Enabled=%s AutoAnalyze=%s MinSampleCount=%d WindowDurationSec=%.12g MaxSampleAgeSec=%.12g ConfirmationTimeSec=%.12g ExitThresholdFactor=%.12g TargetValue=%.12g',
-      [Pointer(AMeterValue), AMeterValue.Hash, AMeterValue.Name,
-       BoolToStr(AMeterValue.StabilitySettings.Enabled, True),
-       BoolToStr(AMeterValue.StabilitySettings.AutoAnalyze, True),
-       AMeterValue.StabilitySettings.MinSampleCount,
-       AMeterValue.StabilitySettings.WindowDurationSec,
-       AMeterValue.StabilitySettings.MaxSampleAgeSec,
-       AMeterValue.StabilitySettings.ConfirmationTimeSec,
-       AMeterValue.StabilitySettings.ExitThresholdFactor,
-       AMeterValue.StabilitySettings.TargetValue]));
-{$ENDIF}
   MeterValueChanged := FMeterValue <> AMeterValue;
   FMeterValue := AMeterValue;
-  UpdateStabilityDiagnostics;
   FLoading := True;
   try
     if FMeterValue = nil then
@@ -3090,7 +2507,6 @@ begin
       EditType.Text := '';
       EditShrtName.Text := '';
       EditDescription.Text := '';
-      EditHash.Text := '';
       EditValueFull.Text := '';
       EditGeneratorStartValue.Text := '0';
       EditValue.Text := '';
@@ -3137,8 +2553,6 @@ begin
     EditType.Text := FMeterValue.&Type;
     EditShrtName.Text := FMeterValue.ShrtName;
     EditDescription.Text := FMeterValue.Description;
-    EditHash.Text := FMeterValue.Hash;
-    EditHash.ReadOnly := True;
     CheckBoxIsToSave.IsChecked := FMeterValue.IsToSave;
 
     if FMeterValue.ValueRate <> nil then
@@ -3181,9 +2595,6 @@ begin
       FTestTargetValue := FMeterValue.Value;
       CopySettingsFromWorkMeterValue;
       LoadSettingsToControls;
-{$IFDEF DEBUG}
-      DebugLogStabilityPersistence('load-from-meter-value', FTestSettings);
-{$ENDIF}
       FSampleSource := mssWorkHistory;
       ClearTestAnalysis;
     end
@@ -3194,15 +2605,11 @@ begin
       begin
         CopySettingsFromWorkMeterValue;
         LoadSettingsToControls;
-{$IFDEF DEBUG}
-        DebugLogStabilityPersistence('reload-same-meter-value', FTestSettings);
-{$ENDIF}
       end
       else
         UpdateTargetLimits;
     end;
-    UpdateStabilityDiagnostics;
-    if ComboBoxSampleSource <> nil then
+      if ComboBoxSampleSource <> nil then
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
     UpdateSampleSourceControls;
     RefreshSamplesGrid;
@@ -3213,8 +2620,6 @@ begin
   finally
     FLoading := False;
   end;
-  if MeterValueChanged and (FMeterValue <> nil) then
-    CopyTextToClipboardSafe(BuildStabilitySettingsDump('OPEN'));
 end;
 
 
