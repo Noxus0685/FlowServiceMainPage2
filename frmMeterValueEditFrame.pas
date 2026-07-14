@@ -1326,6 +1326,39 @@ procedure TFrameMeterValueEdit.ApplyScenario(const AScenario: TMeterValueTestSce
       AddSamplePoint(I, AValue);
   end;
 
+  function FailReasonsText(const AInfo: TMeterValueStabilityInfo): string;
+  var
+    Reason: TMeterValueStabilityFailReason;
+  begin
+    Result := '';
+    for Reason := Low(TMeterValueStabilityFailReason) to High(TMeterValueStabilityFailReason) do
+      if Reason in AInfo.FailReasons then
+      begin
+        if Result <> '' then
+          Result := Result + ',';
+        Result := Result + StabilityFailReasonToText(Reason);
+      end;
+    if Result = '' then
+      Result := 'none';
+  end;
+
+  procedure LogAllConditionsAnalysis(const AStage: string);
+  begin
+    if AScenario <> mtsAllConditionsPassed then
+      Exit;
+
+    DebugLog(Format('AllConditions %s: SampleCount=%d UsedSampleCount=%d OutlierCount=%d Variation=%.12g StdDeviation=%.12g TrendRate=%.12g MaxVariation=%.12g MaxStdDeviation=%.12g MaxTrendRate=%.12g LastSampleAgeSec=%.12g IsSignalStable=%s IsStabilityConfirmed=%s FailReasons=%s FTestStableCandidateSinceMs=%d FTestCurrentTimeMs=%d',
+      [AStage, FLastTestAnalysis.SampleCount, FLastTestAnalysis.UsedSampleCount,
+       FLastTestAnalysis.OutlierCount, FLastTestAnalysis.Variation,
+       FLastTestAnalysis.StdDeviation, FLastTestAnalysis.TrendRate,
+       FTestSettings.MaxVariation, FTestSettings.MaxStdDeviation,
+       FTestSettings.MaxTrendRate, FLastTestAnalysis.LastSampleAgeSec,
+       BoolToStr(FLastTestAnalysis.IsSignalStable, True),
+       BoolToStr(FLastTestAnalysis.IsStabilityConfirmed, True),
+       FailReasonsText(FLastTestAnalysis), FTestStableCandidateSinceMs,
+       FTestCurrentTimeMs]));
+  end;
+
 begin
   FLoading := True;
   try
@@ -1409,9 +1442,12 @@ begin
         AddConstantSamples(11, 0);
       mtsAllConditionsPassed:
         begin
+          FTestSettings.MaxVariation := DisplayDeltaToBase('0.01');
+          FTestSettings.MaxStdDeviation := DisplayDeltaToBase('0.01');
+          FTestSettings.MaxTrendRate := DisplayDeltaToBase('0.001');
           FTestSettings.MaxSampleAgeSec := 3;
           FTestSettings.ConfirmationTimeSec := 3;
-          AddConstantSamples(14, 10);
+          AddConstantSamples(11, 10);
           FTestCurrentTimeMs := 10000;
         end;
     end;
@@ -1428,10 +1464,19 @@ begin
   if AScenario = mtsAllConditionsPassed then
   begin
     Analyze;
+    LogAllConditionsAnalysis('after first analyze');
+    AddSamplePoint(11, 10);
+    AddSamplePoint(12, 10);
+    AddSamplePoint(13, 10);
+    SortSamples;
+    RefreshSamplesGrid;
     FTestCurrentTimeMs := 13000;
     EditAnalysisTime.Text := FloatToStr(FTestCurrentTimeMs / 1000.0);
-  end;
-  Analyze;
+    Analyze;
+    LogAllConditionsAnalysis('after second analyze');
+  end
+  else
+    Analyze;
 end;
 
 procedure TFrameMeterValueEdit.ButtonSampleAddClick(Sender: TObject);
@@ -1908,8 +1953,8 @@ end;
 function TFrameMeterValueEdit.TryReadFloat(const AText: string;
   out AValue: Double): Boolean;
 begin
-  Result := TryStrToFloat(StringReplace(Trim(AText), ',', FormatSettings.DecimalSeparator,
-    [rfReplaceAll]), AValue) and (not IsNan(AValue)) and (not IsInfinite(AValue));
+  Result := TryStrToFloat(StringReplace(StringReplace(Trim(AText), '.', FormatSettings.DecimalSeparator,
+    [rfReplaceAll]), ',', FormatSettings.DecimalSeparator, [rfReplaceAll]), AValue) and (not IsNan(AValue)) and (not IsInfinite(AValue));
 end;
 
 function TFrameMeterValueEdit.TryReadInteger(const AText: string;
@@ -2006,7 +2051,7 @@ end;
 
 function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
 begin
-  Result := StrToFloatDef(StringReplace(S, ',', FormatSettings.DecimalSeparator, [rfReplaceAll]), 0);
+  Result := StrToFloatDef(StringReplace(StringReplace(S, '.', FormatSettings.DecimalSeparator, [rfReplaceAll]), ',', FormatSettings.DecimalSeparator, [rfReplaceAll]), 0);
 end;
 
 procedure TFrameMeterValueEdit.HandleControlExit(Sender: TObject);
