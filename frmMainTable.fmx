@@ -1,4 +1,4 @@
-object FrameMainTable: TFrameMainTable
+﻿object FrameMainTable: TFrameMainTable
   Size.Width = 1940.000000000000000000
   Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
@@ -5418,6 +5418,7 @@ object FrameMainTable: TFrameMainTable
           Size.PlatformDefault = False
           TabIndex = 5
           TabOrder = 1
+          OnChange = TabControl1Change
           TabPosition = PlatformDefault
           Sizes = (
             674s
@@ -5461,6 +5462,31 @@ object FrameMainTable: TFrameMainTable
             Text = #1056#1077#1079#1091#1083#1100#1090#1072#1090#1099
             ExplicitSize.cx = 81.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
+          end
+          object TabItemChart: TTabItem
+            CustomIcon = <
+              item
+              end>
+            TextSettings.Trimming = None
+            IsSelected = False
+            Size.Width = 60.000000000000000000
+            Size.Height = 26.000000000000000000
+            Size.PlatformDefault = False
+            StyleLookup = ''
+            TabOrder = 0
+            Text = #1043#1088#1072#1092#1080#1082
+            ExplicitSize.cx = 60.000000000000000000
+            ExplicitSize.cy = 26.000000000000000000
+            object ChartResults: TSimpleChart
+              Align = Client
+              Size.Width = 674.000000000000000000
+              Size.Height = 427.000000000000000000
+              Size.PlatformDefault = False
+              TabOrder = 0
+              Title = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100' '#1087#1086' '#1090#1086#1095#1082#1072#1084
+              XTitle = #1056#1072#1089#1093#1086#1076', '#1083'/'#1089
+              YTitle = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
+            end
           end
           object TabItemChannelProperties: TTabItem
             CustomIcon = <
