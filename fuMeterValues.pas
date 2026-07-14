@@ -83,6 +83,8 @@ type
     CheckBoxIsToSave: TCheckBox;
     EditHash: TEdit;
     TabItem4: TTabItem;
+    TabItemStabilityForecast: TTabItem;
+    LayoutStabilityForecast: TLayout;
     EditTestValueDim: TEdit;
     LabelValueDim: TLabel;
     LabelTestValueDim: TLabel;
@@ -179,20 +181,16 @@ implementation
 
 procedure TFormMeterValues.EnsureMeterValueEditFrame;
 var
-  OldLayout: TComponent;
+  OldMainParameters: TControl;
 begin
   if FFrameMeterValueEdit = nil then
-  begin
     FFrameMeterValueEdit := TFrameMeterValueEdit.Create(Self);
-    FFrameMeterValueEdit.Parent := TabItem1;
-    FFrameMeterValueEdit.Align := TAlignLayout.Client;
-  end;
 
-  OldLayout := FindComponent('Layout8');
-  if OldLayout is TControl then
-    TControl(OldLayout).Visible := False;
+  OldMainParameters := FindComponent('Layout8') as TControl;
+  if OldMainParameters <> nil then
+    OldMainParameters.Visible := False;
 
-  FFrameMeterValueEdit.BringToFront;
+  FFrameMeterValueEdit.SetIntegratedMode(TabItem1, LayoutStabilityForecast);
   FFrameMeterValueEdit.LoadFromMeterValue(MeterValue);
 end;
 
@@ -499,6 +497,7 @@ begin
         UpdateStringGridCoefs;
       end;
     2: UpdateStringGridDimensions;
+    4: EnsureMeterValueEditFrame;
   end;
 end;
 
