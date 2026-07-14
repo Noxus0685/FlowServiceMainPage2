@@ -2395,6 +2395,19 @@ begin
   Result := False;
   AErrorText := '';
 
+  if (EditMinSampleCount = nil) or (EditWindowDurationSec = nil) or
+     (EditMaxSampleAgeSec = nil) or (EditConfirmationTimeSec = nil) or
+     (EditExitThresholdFactor = nil) or (EditMaxVariation = nil) or
+     (EditMaxStdDeviation = nil) or (EditMaxTrendRate = nil) or
+     (EditMaxOutlierFractionPercent = nil) or (EditOutlierFactor = nil) or
+     (EditForecastHorizonSec = nil) or (EditTestTargetValue = nil) or
+     (EditTargetAccuracyPlusPercent = nil) or (EditTargetAccuracyMinusPercent = nil) or
+     (EditTargetToleranceAbsolute = nil) then
+  begin
+    AErrorText := 'Элементы управления настройками стабильности не инициализированы.';
+    Exit;
+  end;
+
   if not TryReadInteger(EditMinSampleCount.Text, IntValue) then
     AErrorText := 'Некорректное минимальное количество отсчётов.'
   else if IntValue < 1 then
