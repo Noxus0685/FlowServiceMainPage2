@@ -2673,7 +2673,16 @@ begin
     else
     begin
       EditGeneratorStartValue.Text := BaseToDisplayText(DisplayToBase(EditGeneratorStartValue.Text));
-      UpdateTargetLimits;
+      if not FSettingsModified then
+      begin
+        CopySettingsFromWorkMeterValue;
+        LoadSettingsToControls;
+{$IFDEF DEBUG}
+        DebugLogStabilityPersistence('reload-same-meter-value', FTestSettings);
+{$ENDIF}
+      end
+      else
+        UpdateTargetLimits;
     end;
     if ComboBoxSampleSource <> nil then
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
