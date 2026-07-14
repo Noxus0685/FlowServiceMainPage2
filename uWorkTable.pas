@@ -4603,7 +4603,7 @@ begin
     Channel.FHashValueFlow := AIni.ReadString(Section, 'HashValueFlow', Channel.FHashValueFlow);
     if (Channel.FlowMeter <> nil) and (Trim(Channel.FHashValueFlow) <> '') then
     begin
-      Channel.FlowMeter.HashValueVolumeFlow := Channel.FHashValueFlow;
+      Channel.FlowMeter.RestoreValueVolumeFlowHash(Channel.FHashValueFlow);
     end;
 
     if Channel.FValueImp <> nil then Channel.FValueImp.DeleteFromVector;

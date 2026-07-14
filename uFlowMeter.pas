@@ -363,6 +363,8 @@ public
   property ValueCurrent: TMeterValue read FValueCurrent write SetValueCurrent;
   property ValueTime: TMeterValue read FValueTime write SetValueTime;
 
+  procedure RestoreValueVolumeFlowHash(const AHash: string);
+
   constructor Create(); overload;
   constructor Create(AIsEtalon: Boolean); overload;
   destructor Destroy;
@@ -966,6 +968,11 @@ end;
 procedure TFlowMeter.SetValueFlow(const AValue: TMeterValue);
 begin
   ValueVolumeFlow := AValue;
+end;
+
+procedure TFlowMeter.RestoreValueVolumeFlowHash(const AHash: string);
+begin
+  HashValueVolumeFlow := AHash;
 end;
 
 procedure TFlowMeter.SetValueMassFlow(const AValue: TMeterValue);
