@@ -78,14 +78,14 @@
               Align = Left
               Margins.Left = 8.000000000000000000
               Position.X = 8.000000000000000000
-              Size.Width = 168.000000000000000000
+              Size.Width = 185.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
               Text = #1057#1080#1075#1085#1072#1083' '#1089#1090#1072#1073#1080#1083#1077#1085
             end
             object LabelSignalStableValue: TLabel
               Align = Client
-              Size.Width = 52.000000000000000000
+              Size.Width = 35.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
               TextSettings.HorzAlign = Center
@@ -128,14 +128,15 @@
               Align = Left
               Margins.Left = 8.000000000000000000
               Position.X = 8.000000000000000000
-              Size.Width = 168.000000000000000000
+              Size.Width = 177.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
+              TextSettings.WordWrap = False
               Text = #1058#1077#1082#1091#1097#1077#1077' '#1079#1085#1072#1095#1077#1085#1080#1077' '#1074' '#1076#1080#1072#1087#1072#1079#1086#1085#1077
             end
             object LabelCurrentInRangeValue: TLabel
               Align = Client
-              Size.Width = 52.000000000000000000
+              Size.Width = 43.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
               TextSettings.HorzAlign = Center
@@ -152,14 +153,15 @@
               Align = Left
               Margins.Left = 8.000000000000000000
               Position.X = 8.000000000000000000
-              Size.Width = 168.000000000000000000
+              Size.Width = 185.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
+              TextSettings.WordWrap = False
               Text = #1057#1088#1077#1076#1085#1077#1077' '#1079#1085#1072#1095#1077#1085#1080#1077' '#1074' '#1076#1080#1072#1087#1072#1079#1086#1085#1077
             end
             object LabelMeanInRangeValue: TLabel
               Align = Client
-              Size.Width = 52.000000000000000000
+              Size.Width = 35.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
               TextSettings.HorzAlign = Center
@@ -202,14 +204,14 @@
               Align = Left
               Margins.Left = 8.000000000000000000
               Position.X = 8.000000000000000000
-              Size.Width = 168.000000000000000000
+              Size.Width = 177.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
               Text = #1055#1088#1080#1075#1086#1076#1085#1086' '#1076#1083#1103' '#1080#1079#1084#1077#1088#1077#1085#1080#1103
             end
             object LabelSuitableValue: TLabel
               Align = Client
-              Size.Width = 52.000000000000000000
+              Size.Width = 43.000000000000000000
               Size.Height = 30.000000000000000000
               Size.PlatformDefault = False
               TextSettings.HorzAlign = Center

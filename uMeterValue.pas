@@ -918,6 +918,23 @@ begin
   Result := GetSamples;
 end;
 
+function TMeterValue.UpdateStabilitySample(const AIndex: Integer;
+  const ASample: TMeterValueSample): Boolean;
+begin
+  Result := False;
+  FSampleLock.Enter;
+  try
+    if (AIndex < 0) or (AIndex >= FSamples.Count) then
+      Exit;
+
+    FSamples[AIndex] := ASample;
+    ResetStabilityInfo;
+    Result := True;
+  finally
+    FSampleLock.Leave;
+  end;
+end;
+
 
 function TMeterValue.AddStabilitySampleManual(const ATimeStampMs: Int64;
   const AValue: Double): Boolean;
