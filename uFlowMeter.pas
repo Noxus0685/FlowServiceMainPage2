@@ -1291,21 +1291,39 @@ var
     const AExpectedName: string; var AIsExisted: Integer);
   var
     SavedValue: TMeterValue;
+    LookupMode: string;
   begin
     SavedValue := TMeterValue.GetMeterValue(AHash);
+    LookupMode := 'Hash';
+    if (SavedValue = nil) and (AMeterValue <> nil) then
+    begin
+      SavedValue := TMeterValue.FindMeterValueByOwnerAndKind(UUID, AMeterValue.GetValueKind);
+      LookupMode := 'HashOwner+ValueKind';
+    end;
     if SavedValue = nil then
+    begin
       SavedValue := TMeterValue.FindMeterValueByOwnerAndName(UUID, Name, AExpectedName);
+      LookupMode := 'HashOwner+Name';
+    end;
 
     if (SavedValue <> nil) and (SavedValue <> AMeterValue) then
     begin
 {$IFDEF DEBUG}
-      DebugLog(Format('FlowMeter bind MeterValue: FlowMeterPtr=%p OldValuePtr=%p SavedValuePtr=%p ExpectedName=%s OldHash=%s SavedHash=%s Owner=%s/%s SavedMinSampleCount=%d SavedWindowDurationSec=%.12g',
-        [Pointer(Self), Pointer(AMeterValue), Pointer(SavedValue), AExpectedName, AHash,
-         SavedValue.Hash, UUID, Name, SavedValue.StabilitySettings.MinSampleCount,
+      DebugLog(Format('FlowMeter bind MeterValue: FlowMeterPtr=%p OldValuePtr=%p SavedValuePtr=%p ExpectedName=%s LookupMode=%s OldHash=%s SavedHash=%s Owner=%s/%s ValueKind=%s SavedMinSampleCount=%d SavedWindowDurationSec=%.12g',
+        [Pointer(Self), Pointer(AMeterValue), Pointer(SavedValue), AExpectedName, LookupMode, AHash,
+         SavedValue.Hash, UUID, Name, SavedValue.GetValueKind, SavedValue.StabilitySettings.MinSampleCount,
          SavedValue.StabilitySettings.WindowDurationSec]));
 {$ENDIF}
-      AMeterValue := SavedValue;
-      AHash := SavedValue.Hash;
+      if LookupMode = 'Hash' then
+      begin
+        AMeterValue := SavedValue;
+        AHash := SavedValue.Hash;
+      end
+      else if AMeterValue <> nil then
+      begin
+        AMeterValue.StabilitySettings := SavedValue.StabilitySettings;
+        AMeterValue.SetToSave(SavedValue.IsToSave);
+      end;
       AIsExisted := 1;
     end;
   end;
@@ -1417,10 +1435,6 @@ begin
 {$IFDEF DEBUG}
   LogInitValue('ValueVolumeFlow after GetExistedMeterValueBool', ValueVolumeFlow);
 {$ENDIF}
-  BindSavedMeterValue(FValueVolumeFlow, HashValueVolumeFlow, 'Объемный расход', IsExisted);
-{$IFDEF DEBUG}
-  LogInitValue('ValueVolumeFlow after BindSavedMeterValue', ValueVolumeFlow);
-{$ENDIF}
   if IsExisted = 0 then
   begin
 {$IFDEF DEBUG}
@@ -1432,6 +1446,10 @@ begin
 {$ENDIF}
     SetDescription(ValueVolumeFlow, 'Объемный расход');
   end;
+  BindSavedMeterValue(FValueVolumeFlow, HashValueVolumeFlow, 'Объемный расход', IsExisted);
+{$IFDEF DEBUG}
+  LogInitValue('ValueVolumeFlow after BindSavedMeterValue', ValueVolumeFlow);
+{$ENDIF}
   ValueVolumeFlow.ValueCorrection := nil;
   ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
   ValueVolumeFlow.ValueBaseDevider := ValueVolumeCoef;

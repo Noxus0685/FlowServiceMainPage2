@@ -178,6 +178,9 @@ type
     class function GetExistedMeterValueBool(var AHash: string; out IsExisted: Integer; const AHashOwner: string; const AName: string): TMeterValue; static;
     class function GetMeterValue(const AHash: string): TMeterValue; overload; static;
     class function FindMeterValueByOwnerAndName(const AHashOwner, ANameOwner, AValueName: string): TMeterValue; static;
+    class function MakeValueKind(const AValueType: EValueType; const AShrtName: string): string; static;
+    class function FindMeterValueByOwnerAndKind(const AHashOwner, AValueKind: string): TMeterValue; static;
+    function GetValueKind: string;
     class function GetMeterValue(const AHash, AHashOwner: string; const AName: string): TMeterValue; overload; static;
 
     procedure Random;
@@ -540,6 +543,34 @@ begin
   if AHash.IsEmpty then Exit;
   for MV in FMeterValues do
     if MV.Hash = AHash then
+      Exit(MV);
+end;
+
+
+class function TMeterValue.MakeValueKind(const AValueType: EValueType;
+  const AShrtName: string): string;
+begin
+  Result := IntToStr(Ord(AValueType)) + ':' + Trim(AShrtName);
+end;
+
+function TMeterValue.GetValueKind: string;
+begin
+  Result := MakeValueKind(ValueType, ShrtName);
+end;
+
+class function TMeterValue.FindMeterValueByOwnerAndKind(const AHashOwner,
+  AValueKind: string): TMeterValue;
+var
+  MV: TMeterValue;
+begin
+  Result := nil;
+  if Trim(AHashOwner) = '' then
+    Exit;
+  if Trim(AValueKind) = '' then
+    Exit;
+
+  for MV in FMeterValues do
+    if SameText(MV.HashOwner, AHashOwner) and SameText(MV.GetValueKind, AValueKind) then
       Exit(MV);
 end;
 
@@ -3162,6 +3193,7 @@ begin
       Ini.WriteString(Section, 'Type', MV.&Type);
       Ini.WriteString(Section, 'RawValueName', MV.RawValueName);
       Ini.WriteString(Section, 'RawValueDim', MV.RawValueDim);
+      Ini.WriteString(Section, 'ValueKind', MV.GetValueKind);
 
       Ini.WriteString(Section, 'HashValueRate', MV.HashValueRate);
       Ini.WriteString(Section, 'HashValueBaseMultiplier', MV.HashValueBaseMultiplier);
