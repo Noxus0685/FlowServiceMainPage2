@@ -831,6 +831,7 @@ begin
   FStabilitySettings.RequireCurrentValueInRange := True;
   FStabilitySettings.RequireMeanValueInRange := True;
   FStabilitySettings.RequireForecastInRange := True;
+  FStabilitySettings.AutoAnalyze := True;
 end;
 
 procedure TMeterValue.ResetStabilityInfo;
@@ -1054,9 +1055,9 @@ end;
 
 function TMeterValue.ValidateStabilitySettings(out AErrorText: string): Boolean;
 begin
-  Result := (FStabilitySettings.MinSampleCount >= 2) and
+  Result := (FStabilitySettings.MinSampleCount >= 1) and
     (FStabilitySettings.WindowDurationSec > 0) and
-    (FStabilitySettings.MaxSampleAgeSec > 0) and
+    (FStabilitySettings.MaxSampleAgeSec >= 0) and
     (FStabilitySettings.MaxVariation >= 0) and
     (FStabilitySettings.MaxStdDeviation >= 0) and
     (FStabilitySettings.MaxTrendRate >= 0) and
@@ -3181,6 +3182,7 @@ begin
       Ini.WriteBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
       Ini.WriteBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       Ini.WriteBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
+      Ini.WriteBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
 
       Ini.WriteInteger(Section, 'DimensionsCount', MV.Dimensions.Count);
       for J := 0 to MV.Dimensions.Count - 1 do
@@ -3437,6 +3439,7 @@ begin
       MV.FStabilitySettings.RequireCurrentValueInRange := Ini.ReadBool(Section, 'RequireCurrentValueInRange', MV.FStabilitySettings.RequireCurrentValueInRange);
       MV.FStabilitySettings.RequireMeanValueInRange := Ini.ReadBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       MV.FStabilitySettings.RequireForecastInRange := Ini.ReadBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
+      MV.FStabilitySettings.AutoAnalyze := Ini.ReadBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
 
       MV.Dimensions.Clear;
       for J := 0 to Ini.ReadInteger(Section, 'DimensionsCount', 0) - 1 do
