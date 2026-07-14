@@ -416,7 +416,8 @@ uses
   uDataManager,
   uRepositories,
   uWorkTable,
-  uMKSDebug;
+  uMKSDebug,
+  uDebugLog;
 
 { TFlowMeter }
 
@@ -1272,8 +1273,45 @@ var
     if AMeterValue <> nil then
       AMeterValue.Description := ADescription;
   end;
+
+{$IFDEF DEBUG}
+  procedure LogInitValue(const AStage: string; AMeterValue: TMeterValue);
+  begin
+    if AMeterValue = nil then
+      DebugLog(Format('FlowMeter InitValues %s: FlowMeterPtr=%p ValuePtr=nil', [AStage, Pointer(Self)]))
+    else
+      DebugLog(Format('FlowMeter InitValues %s: FlowMeterPtr=%p ValuePtr=%p Hash=%s MinSampleCount=%d WindowDurationSec=%.12g',
+        [AStage, Pointer(Self), Pointer(AMeterValue), AMeterValue.Hash,
+         AMeterValue.StabilitySettings.MinSampleCount,
+         AMeterValue.StabilitySettings.WindowDurationSec]));
+  end;
+{$ENDIF}
+
+  procedure BindSavedMeterValue(var AMeterValue: TMeterValue; var AHash: string;
+    const AExpectedName: string; var AIsExisted: Integer);
+  var
+    SavedValue: TMeterValue;
+  begin
+    SavedValue := TMeterValue.GetMeterValue(AHash);
+    if SavedValue = nil then
+      SavedValue := TMeterValue.FindMeterValueByOwnerAndName(UUID, Name, AExpectedName);
+
+    if (SavedValue <> nil) and (SavedValue <> AMeterValue) then
+    begin
+{$IFDEF DEBUG}
+      DebugLog(Format('FlowMeter bind MeterValue: FlowMeterPtr=%p OldValuePtr=%p SavedValuePtr=%p ExpectedName=%s OldHash=%s SavedHash=%s Owner=%s/%s SavedMinSampleCount=%d SavedWindowDurationSec=%.12g',
+        [Pointer(Self), Pointer(AMeterValue), Pointer(SavedValue), AExpectedName, AHash,
+         SavedValue.Hash, UUID, Name, SavedValue.StabilitySettings.MinSampleCount,
+         SavedValue.StabilitySettings.WindowDurationSec]));
+{$ENDIF}
+      AMeterValue := SavedValue;
+      AHash := SavedValue.Hash;
+      AIsExisted := 1;
+    end;
+  end;
 begin
   ValueTime := TMeterValue.GetExistedMeterValueBool(HashValueTime, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueTime, HashValueTime, 'Время', IsExisted);
   if IsExisted = 0 then
   begin
     ValueTime.SetAsTime;
@@ -1281,6 +1319,7 @@ begin
   end;
 
   ValuePressure := TMeterValue.GetExistedMeterValueBool(HashValuePressure, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValuePressure, HashValuePressure, 'Давление', IsExisted);
   if IsExisted = 0 then
   begin
     ValuePressure.SetAsPressure;
@@ -1288,6 +1327,7 @@ begin
   end;
 
   ValueTemperture := TMeterValue.GetExistedMeterValueBool(HashValueTemperture, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueTemperture, HashValueTemperture, 'Температура', IsExisted);
   if IsExisted = 0 then
   begin
     ValueTemperture.SetAsTemp;
@@ -1295,6 +1335,7 @@ begin
   end;
 
   ValueDensity := TMeterValue.GetExistedMeterValueBool(HashValueDensity, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueDensity, HashValueDensity, 'Плотность', IsExisted);
   if IsExisted = 0 then
   begin
     ValueDensity.SetAsDensity;
@@ -1325,6 +1366,7 @@ begin
   end;
 
   ValueImp := TMeterValue.GetExistedMeterValueBool(HashValueImp, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueImp, HashValueImp, 'Импульсы', IsExisted);
   if IsExisted = 0 then
   begin
 
@@ -1333,6 +1375,7 @@ begin
     ValueImp.SetAsImp;
 
   ValueImpTotal := TMeterValue.GetExistedMeterValueBool(HashValueImpTotal, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueImpTotal, HashValueImpTotal, 'Суммарные импульсы', IsExisted);
   if IsExisted = 0 then
   begin
     SetDescription(ValueImpTotal, 'Суммарные импульсы');
@@ -1340,6 +1383,7 @@ begin
     ValueImpTotal.SetAsImp;
 
   ValueVolumeCoef := TMeterValue.GetExistedMeterValueBool(HashValueVolumeCoef, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueVolumeCoef, HashValueVolumeCoef, 'Коэффициент объема', IsExisted);
   if IsExisted = 0 then
   begin
     ValueVolumeCoef.SetAsVolumeCoef;
@@ -1348,6 +1392,7 @@ begin
   ValueVolumeCoef.SetValue(1);
 
   ValueMassCoef := TMeterValue.GetExistedMeterValueBool(HashValueMassCoef, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueMassCoef, HashValueMassCoef, 'Коэффициент массы', IsExisted);
   if IsExisted = 0 then
   begin
     ValueMassCoef.SetAsMassCoef;
@@ -1356,6 +1401,7 @@ begin
   ValueMassCoef.SetValue(1);
 
   ValueMassFlow := TMeterValue.GetExistedMeterValueBool(HashValueMassFlow, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueMassFlow, HashValueMassFlow, 'Массовый расход', IsExisted);
   if IsExisted = 0 then
   begin
     ValueMassFlow.SetAsMassFlow;
@@ -1368,9 +1414,22 @@ begin
   ValueMassFlow.ValueEtalon := nil;
 
   ValueVolumeFlow := TMeterValue.GetExistedMeterValueBool(HashValueVolumeFlow, IsExisted, UUID, Name);
+{$IFDEF DEBUG}
+  LogInitValue('ValueVolumeFlow after GetExistedMeterValueBool', ValueVolumeFlow);
+{$ENDIF}
+  BindSavedMeterValue(FValueVolumeFlow, HashValueVolumeFlow, 'Объемный расход', IsExisted);
+{$IFDEF DEBUG}
+  LogInitValue('ValueVolumeFlow after BindSavedMeterValue', ValueVolumeFlow);
+{$ENDIF}
   if IsExisted = 0 then
   begin
+{$IFDEF DEBUG}
+    LogInitValue('ValueVolumeFlow before SetAsVolumeFlow', ValueVolumeFlow);
+{$ENDIF}
     ValueVolumeFlow.SetAsVolumeFlow;
+{$IFDEF DEBUG}
+    LogInitValue('ValueVolumeFlow after SetAsVolumeFlow', ValueVolumeFlow);
+{$ENDIF}
     SetDescription(ValueVolumeFlow, 'Объемный расход');
   end;
   ValueVolumeFlow.ValueCorrection := nil;
@@ -1380,6 +1439,7 @@ begin
   ValueVolumeFlow.ValueEtalon := nil;
 
   ValueVolume := TMeterValue.GetExistedMeterValueBool(HashValueVolume, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueVolume, HashValueVolume, 'Объем', IsExisted);
   if IsExisted = 0 then
   begin
     ValueVolume.SetAsVolume;
@@ -1392,6 +1452,7 @@ begin
   ValueVolume.ValueEtalon := nil;
 
   ValueMass := TMeterValue.GetExistedMeterValueBool(HashValueMass, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueMass, HashValueMass, 'Масса', IsExisted);
   if IsExisted = 0 then
   begin
     ValueMass.SetAsMass;
@@ -1438,6 +1499,7 @@ begin
   ValueMassError.ValueBaseMultiplier := ValueMass;
 
   ValueError := TMeterValue.GetExistedMeterValueBool(HashValueError, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueError, HashValueError, 'Погрешность', IsExisted);
   if IsExisted = 0 then
   begin
     ValueError.SetAsError;
@@ -1447,6 +1509,7 @@ begin
   UpdateErrorEtalon;
 
   ValueCurrent := TMeterValue.GetExistedMeterValueBool(HashValueCurrent, IsExisted, UUID, Name);
+  BindSavedMeterValue(FValueCurrent, HashValueCurrent, 'Токовый сигнал', IsExisted);
   if IsExisted = 0 then
   begin
     ValueCurrent.SetAsCurrent;
@@ -1464,6 +1527,9 @@ begin
   else if ValueFlow <> nil then
     ValueFlow.Accuracy := -1;
         ValueImp.Accuracy := 0;
+{$IFDEF DEBUG}
+  LogInitValue('ValueVolumeFlow after InitValues', ValueVolumeFlow);
+{$ENDIF}
 end;
 
 procedure TFlowMeter.SetEtalon(AEtalon: TFlowMeter);
