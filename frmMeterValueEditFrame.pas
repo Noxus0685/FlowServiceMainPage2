@@ -754,6 +754,12 @@ function TFrameMeterValueEdit.BuildStabilitySettingsDump(const AStage: string): 
 var
   Lines: TStringList;
   FS: TFormatSettings;
+  LookupMode: string;
+  LookupKey: string;
+  MatchedSection: string;
+  MatchedHash: string;
+  MatchedHashOwner: string;
+  MatchedValueKind: string;
 
   function PtrHex(APointer: Pointer): string;
   begin
@@ -860,31 +866,25 @@ begin
         Lines.Add('ValueKind=' + FMeterValue.GetValueKind);
         Lines.Add('UnitName=' + DisplayUnitName);
         Lines.Add('DimensionName=' + DisplayUnitName);
-        if TMeterValue.GetMeterValue(FMeterValue.Hash) <> nil then
+        if TMeterValue.FindStabilitySectionByPersistentKey(FMeterValue, LookupMode, LookupKey,
+          MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
         begin
-          Lines.Add('LookupMode=Hash');
-          Lines.Add('LookupKey=' + FMeterValue.Hash);
-          Lines.Add('MatchedHash=' + FMeterValue.Hash);
-          Lines.Add('MatchedHashOwner=' + FMeterValue.HashOwner);
-          Lines.Add('MatchedValueKind=' + FMeterValue.GetValueKind);
-        end
-        else if TMeterValue.FindMeterValueByOwnerAndKind(FMeterValue.HashOwner, FMeterValue.GetValueKind) <> nil then
-        begin
-          Lines.Add('LookupMode=HashOwner+ValueKind');
-          Lines.Add('LookupKey=' + FMeterValue.HashOwner + '|' + FMeterValue.GetValueKind);
-          Lines.Add('MatchedHash=' + TMeterValue.FindMeterValueByOwnerAndKind(FMeterValue.HashOwner, FMeterValue.GetValueKind).Hash);
-          Lines.Add('MatchedHashOwner=' + TMeterValue.FindMeterValueByOwnerAndKind(FMeterValue.HashOwner, FMeterValue.GetValueKind).HashOwner);
-          Lines.Add('MatchedValueKind=' + TMeterValue.FindMeterValueByOwnerAndKind(FMeterValue.HashOwner, FMeterValue.GetValueKind).GetValueKind);
+          Lines.Add('LookupMode=' + LookupMode);
+          Lines.Add('LookupKey=' + LookupKey);
+          Lines.Add('MatchedSection=' + MatchedSection);
+          Lines.Add('MatchedHash=' + MatchedHash);
+          Lines.Add('MatchedHashOwner=' + MatchedHashOwner);
+          Lines.Add('MatchedValueKind=' + MatchedValueKind);
         end
         else
         begin
-          Lines.Add('LookupMode=<none>');
-          Lines.Add('LookupKey=' + FMeterValue.HashOwner + '|' + FMeterValue.GetValueKind);
+          Lines.Add('LookupMode=None');
+          Lines.Add('LookupKey=');
+          Lines.Add('MatchedSection=');
           Lines.Add('MatchedHash=');
           Lines.Add('MatchedHashOwner=');
           Lines.Add('MatchedValueKind=');
         end;
-        Lines.Add('MatchedSection=<not-read>');
         AddSettings('[MeterValue.StabilitySettings]', FMeterValue.StabilitySettings);
       end;
 

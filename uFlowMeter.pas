@@ -1292,7 +1292,25 @@ var
   var
     SavedValue: TMeterValue;
     LookupMode: string;
+    LookupKey: string;
+    MatchedSection: string;
+    MatchedHash: string;
+    MatchedHashOwner: string;
+    MatchedValueKind: string;
   begin
+    if (AMeterValue <> nil) and TMeterValue.LoadStabilitySettingsByPersistentKey(AMeterValue,
+      LookupMode, LookupKey, MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind) then
+    begin
+{$IFDEF DEBUG}
+      DebugLog(Format('FlowMeter bind MeterValue from INI: FlowMeterPtr=%p ValuePtr=%p ExpectedName=%s LookupMode=%s LookupKey=%s MatchedSection=%s MatchedHash=%s MatchedHashOwner=%s MatchedValueKind=%s MinSampleCount=%d WindowDurationSec=%.12g',
+        [Pointer(Self), Pointer(AMeterValue), AExpectedName, LookupMode, LookupKey,
+         MatchedSection, MatchedHash, MatchedHashOwner, MatchedValueKind,
+         AMeterValue.StabilitySettings.MinSampleCount, AMeterValue.StabilitySettings.WindowDurationSec]));
+{$ENDIF}
+      AIsExisted := 1;
+      Exit;
+    end;
+
     SavedValue := TMeterValue.GetMeterValue(AHash);
     LookupMode := 'Hash';
     if (SavedValue = nil) and (AMeterValue <> nil) then
