@@ -191,6 +191,8 @@ type
     procedure FillDimensionCombo;
     function SafeFloat(const S: string): Double;
     function SampleSecondsToMs(const ASeconds: Double): Int64;
+    function GetSampleIndexForGridRow(const ARow: Integer): Integer;
+    function GetGridRowForSampleIndex(const AIndex: Integer): Integer;
     function SelectedSampleIndex: Integer;
     function GetDisplayedSamples: TArray<TMeterValueSample>;
     procedure RefreshDisplayedSamples;
@@ -251,6 +253,7 @@ type
     procedure ClearTestAnalysis;
     function FindSampleAnalysis(const ARow: Integer; out AResult: TMeterValueSampleAnalysis): Boolean;
     function BoolText(const AValue: Boolean): string;
+    function InWindowText(const AValue: Boolean): string;
     procedure AnalyzeIfNeeded;
     procedure HandleAutoAnalyzeChange(Sender: TObject);
     procedure DisplayAnalysis(const AInfo: TMeterValueStabilityInfo);
@@ -834,7 +837,7 @@ begin
 
   SelectedTimeStampMs := -1;
   if (GridSamples.Row >= 0) and (GridSamples.Row < Length(FDisplayedSamples)) then
-    SelectedTimeStampMs := FDisplayedSamples[GridSamples.Row].TimeStampMs;
+    SelectedTimeStampMs := FDisplayedSamples[GetSampleIndexForGridRow(GridSamples.Row)].TimeStampMs;
 
   if FMeterValue <> nil then
     BeforeSamples := FMeterValue.GetStabilitySamples
@@ -856,9 +859,9 @@ begin
         Break;
       end;
     end;
-    GridSamples.Row := BestIndex;
-    GridSamples.Selected := BestIndex;
-    LoadSampleToEditor(BestIndex);
+    GridSamples.Row := GetGridRowForSampleIndex(BestIndex);
+    GridSamples.Selected := GridSamples.Row;
+    LoadSampleToEditor(GridSamples.Row);
   end;
 
   if FMeterValue <> nil then
@@ -884,25 +887,38 @@ begin
   Result := Round(ASeconds * 1000);
 end;
 
+function TFrameMeterValueEdit.GetSampleIndexForGridRow(const ARow: Integer): Integer;
+begin
+  Result := -1;
+  if (ARow >= 0) and (ARow < Length(FDisplayedSamples)) then
+    Result := Length(FDisplayedSamples) - 1 - ARow;
+end;
+
+function TFrameMeterValueEdit.GetGridRowForSampleIndex(const AIndex: Integer): Integer;
+begin
+  Result := -1;
+  if (AIndex >= 0) and (AIndex < Length(FDisplayedSamples)) then
+    Result := Length(FDisplayedSamples) - 1 - AIndex;
+end;
+
 function TFrameMeterValueEdit.SelectedSampleIndex: Integer;
 begin
   Result := -1;
-  if (GridSamples <> nil) and (GridSamples.Row >= 0) and
-     (GridSamples.Row < Length(FDisplayedSamples)) then
-    Result := GridSamples.Row;
+  if GridSamples <> nil then
+    Result := GetSampleIndexForGridRow(GridSamples.Row);
 end;
 
 procedure TFrameMeterValueEdit.LoadSampleToEditor(const AIndex: Integer);
+var
+  SampleIndex: Integer;
 begin
-  if (AIndex < 0) or (AIndex >= Length(FDisplayedSamples)) then
+  SampleIndex := GetSampleIndexForGridRow(AIndex);
+  if SampleIndex < 0 then
     Exit;
 
-  if Length(FDisplayedSamples) > 0 then
-    EditSampleTime.Text := FloatToStr((FDisplayedSamples[AIndex].TimeStampMs -
-      FDisplayedSamples[0].TimeStampMs) / 1000)
-  else
-    EditSampleTime.Text := FloatToStr(FDisplayedSamples[AIndex].TimeStampMs / 1000);
-  EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[AIndex].Value);
+  EditSampleTime.Text := FloatToStr((FDisplayedSamples[SampleIndex].TimeStampMs -
+    FDisplayedSamples[0].TimeStampMs) / 1000);
+  EditSampleValue.Text := BaseToDisplayText(FDisplayedSamples[SampleIndex].Value);
 end;
 
 procedure TFrameMeterValueEdit.RefreshSamplesGrid(const AReload: Boolean);
@@ -967,6 +983,9 @@ begin
     if (FMeterValue <> nil) and FMeterValue.AddStabilitySampleManual(Sample.TimeStampMs, Sample.Value) then
     begin
       RefreshSamplesGrid(True);
+      GridSamples.Row := 0;
+      GridSamples.Selected := GridSamples.Row;
+      LoadSampleToEditor(GridSamples.Row);
       AnalyzeIfNeeded;
     end;
     Exit;
@@ -985,8 +1004,8 @@ begin
     if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
        SameValue(FTestSamples[I].Value, Sample.Value) then
     begin
-      GridSamples.Row := I;
-      GridSamples.Selected := I;
+      GridSamples.Row := GetGridRowForSampleIndex(I);
+      GridSamples.Selected := GridSamples.Row;
       Break;
     end;
   LoadSampleToEditor(GridSamples.Row);
@@ -1013,9 +1032,9 @@ begin
     if (FMeterValue <> nil) and FMeterValue.UpdateStabilitySampleValue(Index, Sample.Value) then
     begin
       RefreshSamplesGrid(True);
-      GridSamples.Row := Index;
-      GridSamples.Selected := Index;
-      LoadSampleToEditor(Index);
+      GridSamples.Row := GetGridRowForSampleIndex(Index);
+      GridSamples.Selected := GridSamples.Row;
+      LoadSampleToEditor(GridSamples.Row);
       AnalyzeIfNeeded;
     end;
     Exit;
@@ -1033,8 +1052,8 @@ begin
     if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
        SameValue(FTestSamples[I].Value, Sample.Value) then
     begin
-      GridSamples.Row := I;
-      GridSamples.Selected := I;
+      GridSamples.Row := GetGridRowForSampleIndex(I);
+      GridSamples.Selected := GridSamples.Row;
       Break;
     end;
 
@@ -1336,7 +1355,7 @@ begin
   RefreshSamplesGrid;
   if FTestSamples.Count > 0 then
   begin
-    GridSamples.Row := FTestSamples.Count - 1;
+    GridSamples.Row := 0;
     GridSamples.Selected := GridSamples.Row;
     LoadSampleToEditor(GridSamples.Row);
   end;
@@ -1381,7 +1400,7 @@ begin
   RefreshSamplesGrid;
   if FTestSamples.Count > 0 then
   begin
-    GridSamples.Row := FTestSamples.Count - 1;
+    GridSamples.Row := 0;
     GridSamples.Selected := GridSamples.Row;
     LoadSampleToEditor(GridSamples.Row);
   end
@@ -1675,10 +1694,10 @@ begin
 
   case ACol of
     0: Value := IntToStr(ARow + 1);
-    1: Value := FloatToStr((FDisplayedSamples[ARow].TimeStampMs - FDisplayedSamples[0].TimeStampMs) / 1000);
-    2: Value := IntToStr(FDisplayedSamples[ARow].TimeStampMs);
-    3: Value := BaseToDisplayText(FDisplayedSamples[ARow].Value);
-    4: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.InWindow) else Value := '';
+    1: Value := FloatToStr((FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs - FDisplayedSamples[0].TimeStampMs) / 1000);
+    2: Value := IntToStr(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].TimeStampMs);
+    3: Value := BaseToDisplayText(FDisplayedSamples[GetSampleIndexForGridRow(ARow)].Value);
+    4: if FindSampleAnalysis(ARow, AResult) then Value := InWindowText(AResult.InWindow) else Value := '';
     5: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.IsOutlier) else Value := '';
     6: if FindSampleAnalysis(ARow, AResult) then Value := BoolText(AResult.IsInRange) else Value := '';
   end;
@@ -1693,13 +1712,13 @@ begin
   if FSampleSource <> mssTestSamples then
     Exit;
 
-  if (ARow < 0) or (ARow >= FTestSamples.Count) then
+  if GetSampleIndexForGridRow(ARow) < 0 then
     Exit;
 
   if not (ACol in [1, 3]) then
     Exit;
 
-  Sample := FTestSamples[ARow];
+  Sample := FTestSamples[GetSampleIndexForGridRow(ARow)];
   case ACol of
     1: if Length(FDisplayedSamples) > 0 then
          Sample.TimeStampMs := FDisplayedSamples[0].TimeStampMs + SampleSecondsToMs(SafeFloat(Value.ToString))
@@ -1708,15 +1727,15 @@ begin
     3: Sample.Value := DisplayToBase(Value.ToString);
   end;
 
-  FTestSamples[ARow] := Sample;
+  FTestSamples[GetSampleIndexForGridRow(ARow)] := Sample;
   SortSamples;
   RefreshSamplesGrid;
   for I := 0 to FTestSamples.Count - 1 do
     if (FTestSamples[I].TimeStampMs = Sample.TimeStampMs) and
        SameValue(FTestSamples[I].Value, Sample.Value) then
     begin
-      GridSamples.Row := I;
-      GridSamples.Selected := I;
+      GridSamples.Row := GetGridRowForSampleIndex(I);
+      GridSamples.Selected := GridSamples.Row;
       Break;
     end;
   LoadSampleToEditor(GridSamples.Row);
@@ -1801,26 +1820,36 @@ begin
     Result := 'Нет';
 end;
 
+function TFrameMeterValueEdit.InWindowText(const AValue: Boolean): string;
+begin
+  if AValue then
+    Result := 'Стаб'
+  else
+    Result := 'Нет';
+end;
+
 function TFrameMeterValueEdit.FindSampleAnalysis(const ARow: Integer;
   out AResult: TMeterValueSampleAnalysis): Boolean;
 var
   I: Integer;
+  SampleIndex: Integer;
 begin
   Result := False;
   AResult := Default(TMeterValueSampleAnalysis);
-  if (ARow < 0) or (ARow >= Length(FDisplayedSamples)) then
+  SampleIndex := GetSampleIndexForGridRow(ARow);
+  if SampleIndex < 0 then
     Exit;
 
   for I := 0 to High(FLastTestAnalysis.SampleResults) do
-    if (FLastTestAnalysis.SampleResults[I].SourceIndex = ARow) and
-       (FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[ARow].TimeStampMs) then
+    if (FLastTestAnalysis.SampleResults[I].SourceIndex = SampleIndex) and
+       (FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[SampleIndex].TimeStampMs) then
     begin
       AResult := FLastTestAnalysis.SampleResults[I];
       Exit(True);
     end;
 
   for I := 0 to High(FLastTestAnalysis.SampleResults) do
-    if FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[ARow].TimeStampMs then
+    if FLastTestAnalysis.SampleResults[I].TimeStampMs = FDisplayedSamples[SampleIndex].TimeStampMs then
     begin
       AResult := FLastTestAnalysis.SampleResults[I];
       Exit(True);
