@@ -271,6 +271,7 @@ type
     procedure SaveChanges;
     procedure ApplySettingsToWorkMeterValue;
     procedure SetStabilityOnlyMode;
+    procedure SetIntegratedMode(const AMainParametersParent, AStabilityParent: TControl);
   end;
 
 implementation
@@ -2405,9 +2406,62 @@ begin
   TabControlStability.Align := TAlignLayout.Client;
   TabControlStability.Visible := True;
   TabControlStability.TabPosition := TTabPosition.Top;
+
+  if LayoutConclusion.Parent <> Self then
+    LayoutConclusion.Parent := Self;
+  LayoutConclusion.Align := TAlignLayout.Bottom;
+  LayoutConclusion.Height := 148;
+  LayoutConclusion.Visible := True;
+  LayoutConclusion.Enabled := True;
+  LayoutConclusion.Opacity := 1;
+  LayoutConclusion.BringToFront;
+
   TabControlMain.Visible := False;
   TabItemMainParameters.Visible := False;
   TabItemStabilityForecast.Visible := False;
+  TabItemStabilityData.Visible := True;
+  TabItemStabilitySettings.Visible := True;
+  TabItemStabilityResult.Visible := True;
+end;
+
+procedure TFrameMeterValueEdit.SetIntegratedMode(const AMainParametersParent,
+  AStabilityParent: TControl);
+begin
+  TabControlMain.Visible := False;
+  TabItemMainParameters.Visible := False;
+  TabItemStabilityForecast.Visible := False;
+
+  if AMainParametersParent <> nil then
+  begin
+    if LayoutRoot.Parent <> AMainParametersParent then
+      LayoutRoot.Parent := AMainParametersParent;
+    LayoutRoot.Align := TAlignLayout.Client;
+    LayoutRoot.Visible := True;
+    LayoutRoot.Enabled := True;
+    LayoutRoot.Opacity := 1;
+    LayoutRoot.BringToFront;
+  end;
+
+  if AStabilityParent <> nil then
+  begin
+    if TabControlStability.Parent <> AStabilityParent then
+      TabControlStability.Parent := AStabilityParent;
+    TabControlStability.Align := TAlignLayout.Client;
+    TabControlStability.Visible := True;
+    TabControlStability.Enabled := True;
+    TabControlStability.Opacity := 1;
+    TabControlStability.TabPosition := TTabPosition.Top;
+
+    if LayoutConclusion.Parent <> AStabilityParent then
+      LayoutConclusion.Parent := AStabilityParent;
+    LayoutConclusion.Align := TAlignLayout.Bottom;
+    LayoutConclusion.Height := 148;
+    LayoutConclusion.Visible := True;
+    LayoutConclusion.Enabled := True;
+    LayoutConclusion.Opacity := 1;
+    LayoutConclusion.BringToFront;
+  end;
+
   TabItemStabilityData.Visible := True;
   TabItemStabilitySettings.Visible := True;
   TabItemStabilityResult.Visible := True;
