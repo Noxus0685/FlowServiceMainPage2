@@ -353,7 +353,8 @@ implementation
 
 
 uses
-  FmxHelper;
+  FmxHelper,
+  uDebugLog;
 
 function MedianValue(const AValues: TArray<Double>): Double;
 var
@@ -3373,7 +3374,7 @@ var
   CoefItem: TCoef;
   Hash: string;
 begin
-  FileName := TPath.Combine(TPath.Combine(ExtractFilePath(ParamStr(0)), 'Settings'), 'MeterValues.ini');
+  FileName := GetMeterValuesFileName(0);
   if not FileExists(FileName) then
   begin
     SaveToFile(0);
@@ -3449,6 +3450,11 @@ begin
       MV.FStabilitySettings.RequireMeanValueInRange := Ini.ReadBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       MV.FStabilitySettings.RequireForecastInRange := Ini.ReadBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
       MV.FStabilitySettings.AutoAnalyze := Ini.ReadBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
+{$IFDEF DEBUG}
+      DebugLog(Format('Stability LoadFromFile: Section=%s Hash=%s Name=%s MinSampleCount=%d WindowDurationSec=%.12g TargetValue=%.12g',
+        [Section, MV.Hash, MV.Name, MV.FStabilitySettings.MinSampleCount,
+         MV.FStabilitySettings.WindowDurationSec, MV.FStabilitySettings.TargetValue]));
+{$ENDIF}
 
       MV.Dimensions.Clear;
       for J := 0 to Ini.ReadInteger(Section, 'DimensionsCount', 0) - 1 do

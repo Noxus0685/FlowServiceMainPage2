@@ -2550,6 +2550,19 @@ procedure TFrameMeterValueEdit.LoadFromMeterValue(AMeterValue: TMeterValue);
 var
   MeterValueChanged: Boolean;
 begin
+{$IFDEF DEBUG}
+  if AMeterValue <> nil then
+    DebugLog(Format('Stability LoadFromMeterValue enter: Ptr=%p Hash=%s Name=%s Enabled=%s AutoAnalyze=%s MinSampleCount=%d WindowDurationSec=%.12g MaxSampleAgeSec=%.12g ConfirmationTimeSec=%.12g ExitThresholdFactor=%.12g TargetValue=%.12g',
+      [Pointer(AMeterValue), AMeterValue.Hash, AMeterValue.Name,
+       BoolToStr(AMeterValue.StabilitySettings.Enabled, True),
+       BoolToStr(AMeterValue.StabilitySettings.AutoAnalyze, True),
+       AMeterValue.StabilitySettings.MinSampleCount,
+       AMeterValue.StabilitySettings.WindowDurationSec,
+       AMeterValue.StabilitySettings.MaxSampleAgeSec,
+       AMeterValue.StabilitySettings.ConfirmationTimeSec,
+       AMeterValue.StabilitySettings.ExitThresholdFactor,
+       AMeterValue.StabilitySettings.TargetValue]));
+{$ENDIF}
   MeterValueChanged := FMeterValue <> AMeterValue;
   FMeterValue := AMeterValue;
   FLoading := True;

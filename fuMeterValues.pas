@@ -28,7 +28,8 @@ uses
   System.UITypes,
   System.Variants,
   frmMeterValueEditFrame,
-  uMeterValue;
+  uMeterValue,
+  uDebugLog;
 
 type
   TFormMeterValues = class(TForm)
@@ -191,6 +192,12 @@ begin
     OldMainParameters.Visible := False;
 
   FFrameMeterValueEdit.SetIntegratedMode(TabItem1, LayoutStabilityForecast);
+{$IFDEF DEBUG}
+  if MeterValue <> nil then
+    DebugLog(Format('Stability before LoadFromMeterValue: Ptr=%p Hash=%s Name=%s MinSampleCount=%d WindowDurationSec=%.12g',
+      [Pointer(MeterValue), MeterValue.Hash, MeterValue.Name,
+       MeterValue.StabilitySettings.MinSampleCount, MeterValue.StabilitySettings.WindowDurationSec]));
+{$ENDIF}
   FFrameMeterValueEdit.LoadFromMeterValue(MeterValue);
 end;
 
