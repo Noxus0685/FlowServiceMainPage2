@@ -904,7 +904,7 @@ end;
 
 function TFlowMeter.GetValueFlow: TMeterValue;
 begin
-  Result := TMeterValue.GetMeterValue(HashValueFlow);
+  Result := ValueVolumeFlow;
 end;
 
 procedure TFlowMeter.SetValueImp(const AValue: TMeterValue);
@@ -965,10 +965,7 @@ end;
 
 procedure TFlowMeter.SetValueFlow(const AValue: TMeterValue);
 begin
-  if AValue <> nil then
-    HashValueFlow := AValue.Hash
-  else
-    HashValueFlow := '';
+  ValueVolumeFlow := AValue;
 end;
 
 procedure TFlowMeter.SetValueMassFlow(const AValue: TMeterValue);
@@ -1467,6 +1464,10 @@ begin
   BindSavedMeterValue(FValueVolumeFlow, HashValueVolumeFlow, 'Объемный расход', IsExisted);
 {$IFDEF DEBUG}
   LogInitValue('ValueVolumeFlow after BindSavedMeterValue', ValueVolumeFlow);
+  if (ValueVolumeFlow <> nil) and (ValueFlow <> nil) then
+    DebugLog(Format('FlowMeter ValueFlow resolve: SavedHashValueFlow=%s HashValueVolumeFlow=%s ValueVolumeFlow.Hash=%s ValueFlow.Hash=%s SameObject=%s',
+      [HashValueVolumeFlow, HashValueVolumeFlow, ValueVolumeFlow.Hash, ValueFlow.Hash,
+       BoolToStr(Pointer(ValueFlow) = Pointer(ValueVolumeFlow), True)]));
 {$ENDIF}
   ValueVolumeFlow.ValueCorrection := nil;
   ValueVolumeFlow.ValueBaseMultiplier := ValueImp;
