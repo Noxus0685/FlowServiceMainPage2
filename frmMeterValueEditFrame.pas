@@ -2068,10 +2068,8 @@ begin
       LoadSampleToEditor(SelectedRow);
   end;
 
-  {$IFOPT C+}
   Assert(Length(FDisplayedSamples) = OldSampleCount);
   Assert(GridSamples.RowCount = OldRowCount);
-  {$ENDIF}
 end;
 
 function TFrameMeterValueEdit.FormatInfoFloat(const AValue: Double;
