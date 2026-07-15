@@ -1,0 +1,60 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{37777C93-1092-47E7-AD7A-1BE7777779AC}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="IcsFmxNxMessagingTest.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="IcsFmxMessagingTest.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="IcsCliDemo.dproj">
+            <Dependencies/>
+        </Projects>
+     </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="IcsFmxNxMessagingTest">
+        <MSBuild Projects="IcsFmxNxMessagingTest.dproj"/>
+    </Target>
+    <Target Name="IcsFmxNxMessagingTest:Clean">
+        <MSBuild Projects="IcsFmxNxMessagingTest.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="IcsFmxNxMessagingTest:Make">
+        <MSBuild Projects="IcsFmxNxMessagingTest.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="IcsFmxMessagingTest">
+        <MSBuild Projects="IcsFmxMessagingTest.dproj"/>
+    </Target>
+    <Target Name="IcsFmxMessagingTest:Clean">
+        <MSBuild Projects="IcsFmxMessagingTest.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="IcsFmxMessagingTest:Make">
+        <MSBuild Projects="IcsFmxMessagingTest.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="IcsCliDemo">
+        <MSBuild Projects="IcsCliDemo.dproj"/>
+    </Target>
+    <Target Name="IcsCliDemo:Clean">
+        <MSBuild Projects="IcsCliDemo.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="IcsCliDemo:Make">
+        <MSBuild Projects="IcsCliDemo.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="IcsFmxNxMessagingTest;IcsFmxMessagingTest;IcsCommonNewRun;IcsCommonNewDesign;IcsVclMiniRun;IcsVclMiniDesign;OverbyteIcsSnippets;IcsCliDemo;OverbyteIcsHttpTst"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="IcsFmxNxMessagingTest:Clean;IcsFmxMessagingTest:Clean;IcsCommonNewRun:Clean;IcsCommonNewDesign:Clean;IcsVclMiniRun:Clean;IcsVclMiniDesign:Clean;OverbyteIcsSnippets:Clean;IcsCliDemo:Clean;OverbyteIcsHttpTst:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="IcsFmxNxMessagingTest:Make;IcsFmxMessagingTest:Make;IcsCommonNewRun:Make;IcsCommonNewDesign:Make;IcsVclMiniRun:Make;IcsVclMiniDesign:Make;OverbyteIcsSnippets:Make;IcsCliDemo:Make;OverbyteIcsHttpTst:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

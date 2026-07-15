@@ -1,0 +1,70 @@
+package fmxfp;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO OFF}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE RELEASE}
+{$ENDIF IMPLICITBUILDING}
+{$IMPLICITBUILD ON}
+
+requires
+  rtl,
+  xmlrtl,
+  fmx,
+  vcl,
+  vclactnband,
+  vclx,
+  IndySystem,
+  IndyCore,
+  designide;
+
+contains
+  FmxPump in 'FmxPump.pas',
+  FmxDecCompileTime in 'FmxDecCompileTime.pas',
+  FmxFlowmeter in 'FmxFlowmeter.pas',
+  FmxElectricValve in 'FmxElectricValve.pas',
+  FmxUnoperatedPump in 'FmxUnoperatedPump.pas',
+  FmxThermometer_Manometer in 'FmxThermometer_Manometer.pas',
+  FmxScales in 'FmxScales.pas',
+  FmxLevelDetector in 'FmxLevelDetector.pas',
+  FmxBlcedValve in 'FmxBlcedValve.pas',
+  FmxFCD in 'FmxFCD.pas',
+  FmxPneumaticValve in 'FmxPneumaticValve.pas',
+  FmxLabel in 'FmxLabel.pas',
+  FmxShemeVirtualImage in 'FmxShemeVirtualImage.pas',
+  FmxFlowmetersPanel in 'FmxFlowmetersPanel.pas',
+  FmxFloatEdit in 'FmxFloatEdit.pas',
+  FmxWaterLevel in 'FmxWaterLevel.pas',
+  FmxBitMask in 'FmxBitMask.pas',
+  FmxFrame in 'FmxFrame.pas',
+  FMX.CurrencyEdit in 'FMX.CurrencyEdit.pas',
+  uFloatEdit in 'uFloatEdit.pas',
+  uErrorIndicator in 'uErrorIndicator.pas',
+  FmxSimpleEdit in 'FmxSimpleEdit.pas',
+  uMyCheckListBox in 'uMyCheckListBox.pas',
+  uCardItem in 'uCardItem.pas',
+  FMX.SimpleChart in 'FMX.SimpleChart.pas',
+  FMXCoilCheckList in 'FMXCoilCheckList.pas',
+  uColoredMemo in 'uColoredMemo.pas';
+
+end.

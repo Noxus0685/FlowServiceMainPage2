@@ -52,6 +52,7 @@ uses
   System.Actions,
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.IniFiles,
   System.Math,
   System.Rtti,
@@ -529,6 +530,7 @@ type
     procedure ButtonCancelClick(Sender: TObject);
     procedure TestButtonClick(Sender: TObject);
     procedure TabControl1Change(Sender: TObject);
+    function GetPointResultError(const ADevice: TDevice; const APoint: TDevicePoint): Double;
     procedure TreeViewDevicesChange(Sender: TObject);
     procedure TreeViewDevicesMouseDown(Sender: TObject;
       Button: TMouseButton; Shift: TShiftState; X, Y: Single);
@@ -1280,7 +1282,7 @@ procedure TFrameMainTable.UpdateForm;
                 if FFrameWorkTableProperties <> nil then
                   FFrameWorkTableProperties.LoadFromWorkTable(FActiveWorkTable);
                 ApplyActiveWorkTableEditMode;
-            finally
+                finally
           IsUpdating := False;
           end;
  end;
@@ -2080,6 +2082,14 @@ procedure TFrameMainTable.TabControl1Change(Sender: TObject);
 begin
 //  if (TabControl1.ActiveTab = TabItemResults) and (FFrameProceed <> nil) then
 //    FFrameProceed.RefreshResultsTab;
+end;
+
+function TFrameMainTable.GetPointResultError(const ADevice: TDevice;
+  const APoint: TDevicePoint): Double;
+begin
+  Result := NaN;
+  if FFrameProceed <> nil then
+    Result := FFrameProceed.GetPointResultError(ADevice, APoint);
 end;
 
 procedure TFrameMainTable.SetSessionDim(UnitName: string; QuantityUnitName: string);

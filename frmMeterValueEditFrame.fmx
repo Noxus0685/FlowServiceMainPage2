@@ -248,6 +248,8 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
           893s
           438s
           893s
+          438s
+          893s
           438s)
         object TabItemStabilityData: TTabItem
           CustomIcon = <
@@ -947,7 +949,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
               Size.Height = 250.000000000000000000
               Size.PlatformDefault = False
               Text = #1062#1077#1083#1077#1074#1086#1081' '#1076#1080#1072#1087#1072#1079#1086#1085
-              TabOrder = 5
+              TabOrder = 6
               object LabelTestTargetValue: TLabel
                 Position.X = 12.000000000000000000
                 Position.Y = 32.000000000000000000
@@ -1078,6 +1080,79 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
                 Size.Width = 120.000000000000000000
                 Size.Height = 24.000000000000000000
                 Size.PlatformDefault = False
+              end
+            end
+            object GroupBoxChartAppearance: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 150.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1042#1085#1077#1096#1085#1080#1081' '#1074#1080#1076' '#1075#1088#1072#1092#1080#1082#1072
+              TabOrder = 5
+              object LabelChartSignalColor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 32.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1062#1074#1077#1090' '#1089#1080#1075#1085#1072#1083#1072
+              end
+              object ComboBoxChartSignalColor: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 30.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 0
+              end
+              object LabelChartToleranceColor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 62.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1062#1074#1077#1090' '#1076#1086#1087#1091#1089#1082#1086#1074
+              end
+              object ComboBoxChartToleranceColor: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 60.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 1
+              end
+              object LabelChartSignalWidth: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 92.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1058#1086#1083#1097#1080#1085#1072' '#1089#1080#1075#1085#1072#1083#1072
+              end
+              object ComboBoxChartSignalWidth: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 90.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 2
+              end
+              object LabelChartToleranceWidth: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 122.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Size.PlatformDefault = False
+                Text = #1058#1086#1083#1097#1080#1085#1072' '#1076#1086#1087#1091#1089#1082#1086#1074
+              end
+              object ComboBoxChartToleranceWidth: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 120.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                Size.PlatformDefault = False
+                TabOrder = 3
               end
             end
           end
@@ -1478,6 +1553,42 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
                 Viewport.Height = 252.000000000000000000
               end
             end
+          end
+        end
+        object TabItemStabilityChart: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = False
+          Size.Width = 1.000000000000000000
+          Size.Height = 5.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
+          Text = #1043#1088#1072#1092#1080#1082
+          ExplicitSize.cx = 1.000000000000000000
+          ExplicitSize.cy = 5.000000000000000000
+          object ChartStability: TSimpleChart
+            Align = Client
+            XMax = 100.000000000000000000
+            YMax = 100.000000000000000000
+            LineColor = claBlue
+            LineThickness = 2.000000000000000000
+            ShowMarkers = True
+            MarkerRadius = 3.000000000000000000
+            GridColor = xFFCCCCCC
+            AxisColor = claBlack
+            BackgroundColor = claWhite
+            MarginLeft = 40.000000000000000000
+            MarginRight = 20.000000000000000000
+            MarginTop = 40.000000000000000000
+            MarginBottom = 40.000000000000000000
+            Title = #1048#1089#1090#1086#1088#1080#1103' '#1089#1080#1075#1085#1072#1083#1072
+            XTitle = #1042#1088#1077#1084#1103', '#1089
+            YTitle = #1047#1085#1072#1095#1077#1085#1080#1077
+            XTitleOffset = 5.000000000000000000
+            YTitleOffset = 30.000000000000000000
           end
         end
       end

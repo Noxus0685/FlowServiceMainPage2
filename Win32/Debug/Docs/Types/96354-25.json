@@ -1,0 +1,179 @@
+﻿{
+  "device_type": {
+    "general_info": {
+      "name": "Счетчики-расходомеры электромагнитные ЭР-А",
+      "category": null,
+      "manufacturer": "ООО «АНКОМИ»",
+      "modification": null,
+      "procedure": null,
+      "grsi_number": "96354-25",
+      "valid_from": null,
+      "valid_to": null,
+      "mpi": null,
+      "verification_method": null,
+      "accuracy_class": "A",
+      "base_error": null,
+      "report_form_file": null
+    },
+    "signal": {
+      "measured_value": "объемный расход",
+      "measurement_unit": "м3/ч",
+      "signal_type": null
+    },
+    "pulses": {
+      "output_type": null,
+      "representation": null,
+      "kp_qmax": null
+    }
+  },
+  "diameters": [
+    {
+      "enabled": true,
+      "name": "DN 15",
+      "dn_mm": 15,
+      "qmax_l_s": 6.5,
+      "qnom_l_s": null,
+      "qtr_l_s": 0.065,
+      "q2tr_l_s": 0.043,
+      "qmin_l_s": 0.026,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 20",
+      "dn_mm": 20,
+      "qmax_l_s": 10,
+      "qnom_l_s": null,
+      "qtr_l_s": 0.1,
+      "q2tr_l_s": 0.067,
+      "qmin_l_s": 0.04,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 25",
+      "dn_mm": 25,
+      "qmax_l_s": 18,
+      "qnom_l_s": null,
+      "qtr_l_s": 0.18,
+      "q2tr_l_s": 0.12,
+      "qmin_l_s": 0.072,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 32",
+      "dn_mm": 32,
+      "qmax_l_s": 30,
+      "qnom_l_s": null,
+      "qtr_l_s": 0.3,
+      "q2tr_l_s": 0.2,
+      "qmin_l_s": 0.12,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 40",
+      "dn_mm": 40,
+      "qmax_l_s": 45,
+      "qnom_l_s": null,
+      "qtr_l_s": 0.45,
+      "q2tr_l_s": 0.3,
+      "qmin_l_s": 0.18,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 50",
+      "dn_mm": 50,
+      "qmax_l_s": 75,
+      "qnom_l_s": null,
+      "qtr_l_s": 0.75,
+      "q2tr_l_s": 0.5,
+      "qmin_l_s": 0.3,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 65",
+      "dn_mm": 65,
+      "qmax_l_s": 120,
+      "qnom_l_s": null,
+      "qtr_l_s": 1.2,
+      "q2tr_l_s": 0.8,
+      "qmin_l_s": 0.48,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 80",
+      "dn_mm": 80,
+      "qmax_l_s": 200,
+      "qnom_l_s": null,
+      "qtr_l_s": 2,
+      "q2tr_l_s": 1.33,
+      "qmin_l_s": 0.8,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 100",
+      "dn_mm": 100,
+      "qmax_l_s": 300,
+      "qnom_l_s": null,
+      "qtr_l_s": 3,
+      "q2tr_l_s": 2,
+      "qmin_l_s": 1.2,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "DN 150",
+      "dn_mm": 150,
+      "qmax_l_s": 600,
+      "qnom_l_s": null,
+      "qtr_l_s": 6,
+      "q2tr_l_s": 4,
+      "qmin_l_s": 2.4,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    }
+  ],
+  "verification_points": [],
+  "calculation_parameters": {
+    "dynamic_range": null,
+    "flow_velocity_qmax_m_s": null
+  },
+  "deepseek_result": {
+    "status": "completed",
+    "warnings": [],
+    "missing_fields": [
+      "device_type.general_info.modification",
+      "device_type.general_info.valid_from",
+      "device_type.general_info.valid_to",
+      "device_type.general_info.mpi",
+      "device_type.general_info.verification_method",
+      "device_type.general_info.base_error",
+      "device_type.general_info.report_form_file",
+      "device_type.signal.signal_type",
+      "device_type.pulses.output_type",
+      "device_type.pulses.representation",
+      "device_type.pulses.kp_qmax",
+      "diameters[].kp_imp_l",
+      "diameters[].qf_l_s",
+      "verification_points",
+      "calculation_parameters.dynamic_range",
+      "calculation_parameters.flow_velocity_qmax_m_s"
+    ],
+    "raw_notes": "Выбрана таблица 5 для класса 'Б' (первая строка для каждого DN, так как класс точности не указан в шаблоне, но в тексте есть два класса: Б и В; выбрана строка с классом Б, так как это первый класс в таблице). Столбцы сопоставлены: Qмин -> qmin_l_s, Qпер2 -> q2tr_l_s, Qпер1 -> qtr_l_s, Qмакс -> qmax_l_s. Столбец Qном отсутствует, поэтому qnom_l_s = null. Значения расходов в м3/ч, единица измерения указана в шаблоне как м3/ч. Поле base_error не заполнено, так как в тексте нет конкретного значения погрешности для класса Б, а есть диапазоны погрешностей в зависимости от расхода."
+  }
+}

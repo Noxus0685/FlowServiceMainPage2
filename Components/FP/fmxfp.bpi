@@ -1,0 +1,3 @@
+/* 'fmxfp' Package */
+OUTPUT_FORMAT(elf64-x86-64)
+GROUP ( bplfmxfp.so fmxfp_nonshared.a )
