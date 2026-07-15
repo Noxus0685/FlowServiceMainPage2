@@ -101,7 +101,6 @@ type
     EditGeneratorOutlierAmplitude: TEdit;
     ButtonGenerateNew: TButton;
     ButtonGenerateAppend: TButton;
-    ButtonApplyStabilitySettings: TButton;
     CheckBoxStabilityEnabled: TCheckBox;
     EditMinSampleCount: TEdit;
     EditWindowDurationSec: TEdit;
@@ -166,7 +165,11 @@ type
     FTestStabilityConfirmed: Boolean;
     FSettingsModified: Boolean;
     FChartAppearanceModified: Boolean;
+    FApplyingSettings: Boolean;
+    FRecalculating: Boolean;
+    FStabilityTimerUpdating: Boolean;
     FModified: Boolean;
+    TimerStabilityAutoRefresh: TTimer;
     LayoutRoot: TVertScrollBox;
     EditName: TEdit;
     EditType: TEdit;
@@ -205,7 +208,13 @@ type
     function GetGridRowForSampleIndex(const AIndex: Integer): Integer;
     function SelectedSampleIndex: Integer;
     function GetDisplayedSamples: TArray<TMeterValueSample>;
+    function GetDisplayedStabilitySamples: TArray<TMeterValueSample>;
     procedure RefreshDisplayedSamples;
+    procedure SortDisplayedSamples;
+    function CanRunStabilityAutoRefresh: Boolean;
+    procedure UpdateStabilityAutoRefreshTimer;
+    procedure RefreshStabilityHistoryAndAnalysis;
+    procedure TimerStabilityAutoRefreshTimer(Sender: TObject);
     procedure SetSampleSource(const ASource: TMeterValueSampleSource);
     procedure UpdateSampleSourceControls;
     procedure ComboBoxSampleSourceChange(Sender: TObject);
@@ -255,7 +264,6 @@ type
     procedure ButtonGenerateNewClick(Sender: TObject);
     procedure ButtonGenerateAppendClick(Sender: TObject);
     procedure ButtonApplyScenarioClick(Sender: TObject);
-    procedure ButtonApplyStabilitySettingsClick(Sender: TObject);
     procedure GridSamplesCellDblClick(const Column: TColumn; const Row: Integer);
     procedure GridSamplesGetValue(Sender: TObject; const ACol, ARow: Integer; var Value: TValue);
     procedure GridSamplesSetValue(Sender: TObject; const ACol, ARow: Integer; const Value: TValue);
@@ -266,6 +274,8 @@ type
     procedure ReadSettingsFromControls(out ASettings: TMeterValueStabilitySettings);
     function StabilitySettingsEqual(const ALeft, ARight: TMeterValueStabilitySettings): Boolean;
     function ApplySettingsFromControls(const AShowError: Boolean): Boolean;
+    function ApplyAndSaveStabilitySettings(const ARecalculate: Boolean; const ARefreshChartOnly: Boolean = False; const AShowError: Boolean = False): Boolean;
+    procedure RestoreStabilitySettingsControls;
     function ValidateControls(out AErrorText: string): Boolean;
     procedure HandleSettingsChange(Sender: TObject);
     function TryReadFloat(const AText: string; out AValue: Double): Boolean;
@@ -322,7 +332,14 @@ begin
   FTestTargetValue := 0;
   FSettingsModified := False;
   FChartAppearanceModified := False;
+  FApplyingSettings := False;
+  FRecalculating := False;
+  FStabilityTimerUpdating := False;
   FModified := False;
+  TimerStabilityAutoRefresh := TTimer.Create(Self);
+  TimerStabilityAutoRefresh.Interval := 1000;
+  TimerStabilityAutoRefresh.Enabled := False;
+  TimerStabilityAutoRefresh.OnTimer := TimerStabilityAutoRefreshTimer;
   FillChar(FTestSettings, SizeOf(FTestSettings), 0);
   FTestStabilityInfo := Default(TMeterValueStabilityInfo);
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
@@ -334,8 +351,8 @@ end;
 
 destructor TFrameMeterValueEdit.Destroy;
 begin
-  if FSettingsModified and (not FChartAppearanceModified) then
-    ApplySettingsFromControls(False);
+  if TimerStabilityAutoRefresh <> nil then
+    TimerStabilityAutoRefresh.Enabled := False;
   FTestSamples.Free;
   inherited;
 end;
@@ -439,7 +456,6 @@ begin
   ComboBoxChartToleranceColor.OnChange := ChartAppearanceChange;
   ComboBoxChartSignalWidth.OnChange := ChartAppearanceChange;
   ComboBoxChartToleranceWidth.OnChange := ChartAppearanceChange;
-  ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
   CheckBoxAutoAnalyze.OnChange := HandleAutoAnalyzeChange;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
   GridSamples.OnGetValue := GridSamplesGetValue;
@@ -447,21 +463,21 @@ begin
   GridSamples.OnSelectCell := GridSamplesSelectCell;
   EditAnalysisTime.OnExit := EditAnalysisTimeExit;
   CheckBoxStabilityEnabled.OnChange := HandleSettingsChange;
-  EditMinSampleCount.OnChange := HandleSettingsChange;
-  EditWindowDurationSec.OnChange := HandleSettingsChange;
-  EditMaxSampleAgeSec.OnChange := HandleSettingsChange;
-  EditConfirmationTimeSec.OnChange := HandleSettingsChange;
-  EditExitThresholdFactor.OnChange := HandleSettingsChange;
-  EditMaxVariation.OnChange := HandleSettingsChange;
-  EditMaxStdDeviation.OnChange := HandleSettingsChange;
-  EditMaxTrendRate.OnChange := HandleSettingsChange;
-  EditMaxOutlierFractionPercent.OnChange := HandleSettingsChange;
-  EditOutlierFactor.OnChange := HandleSettingsChange;
-  EditForecastHorizonSec.OnChange := HandleSettingsChange;
-  EditTestTargetValue.OnChange := HandleTargetRangeChange;
-  EditTargetAccuracyPlusPercent.OnChange := HandleTargetRangeChange;
-  EditTargetAccuracyMinusPercent.OnChange := HandleTargetRangeChange;
-  EditTargetToleranceAbsolute.OnChange := HandleTargetRangeChange;
+  EditMinSampleCount.OnExit := HandleSettingsChange;
+  EditWindowDurationSec.OnExit := HandleSettingsChange;
+  EditMaxSampleAgeSec.OnExit := HandleSettingsChange;
+  EditConfirmationTimeSec.OnExit := HandleSettingsChange;
+  EditExitThresholdFactor.OnExit := HandleSettingsChange;
+  EditMaxVariation.OnExit := HandleSettingsChange;
+  EditMaxStdDeviation.OnExit := HandleSettingsChange;
+  EditMaxTrendRate.OnExit := HandleSettingsChange;
+  EditMaxOutlierFractionPercent.OnExit := HandleSettingsChange;
+  EditOutlierFactor.OnExit := HandleSettingsChange;
+  EditForecastHorizonSec.OnExit := HandleSettingsChange;
+  EditTestTargetValue.OnExit := HandleTargetRangeChange;
+  EditTargetAccuracyPlusPercent.OnExit := HandleTargetRangeChange;
+  EditTargetAccuracyMinusPercent.OnExit := HandleTargetRangeChange;
+  EditTargetToleranceAbsolute.OnExit := HandleTargetRangeChange;
   CheckBoxRequireCurrentValueInRange.OnChange := HandleTargetRangeChange;
   CheckBoxRequireMeanValueInRange.OnChange := HandleTargetRangeChange;
   CheckBoxRequireForecastInRange.OnChange := HandleTargetRangeChange;
@@ -784,13 +800,14 @@ end;
 
 procedure TFrameMeterValueEdit.ChartAppearanceChange(Sender: TObject);
 begin
-  if FLoading then
+  if FLoading or FApplyingSettings then
     Exit;
 
   ReadSettingsFromControls(FTestSettings);
   FSettingsModified := True;
   FChartAppearanceModified := True;
   FModified := True;
+  ApplyAndSaveStabilitySettings(False, True, True);
 end;
 
 function TFrameMeterValueEdit.DisplayUnitName: string;
@@ -958,6 +975,11 @@ end;
 
 function TFrameMeterValueEdit.GetDisplayedSamples: TArray<TMeterValueSample>;
 begin
+  Result := GetDisplayedStabilitySamples;
+end;
+
+function TFrameMeterValueEdit.GetDisplayedStabilitySamples: TArray<TMeterValueSample>;
+begin
   case FSampleSource of
     mssWorkHistory:
       if FMeterValue <> nil then
@@ -969,9 +991,102 @@ begin
   end;
 end;
 
+procedure TFrameMeterValueEdit.SortDisplayedSamples;
+begin
+  TArray.Sort<TMeterValueSample>(FDisplayedSamples,
+    TComparer<TMeterValueSample>.Construct(
+      function(const L, R: TMeterValueSample): Integer
+      begin
+        Result := CompareValue(L.TimeStampMs, R.TimeStampMs);
+      end));
+end;
+
 procedure TFrameMeterValueEdit.RefreshDisplayedSamples;
 begin
-  FDisplayedSamples := GetDisplayedSamples;
+  FDisplayedSamples := GetDisplayedStabilitySamples;
+  SortDisplayedSamples;
+end;
+
+function TFrameMeterValueEdit.CanRunStabilityAutoRefresh: Boolean;
+begin
+  Result := (not FLoading) and
+    (not (csDestroying in ComponentState)) and
+    (FMeterValue <> nil) and
+    (CheckBoxAutoAnalyze <> nil) and CheckBoxAutoAnalyze.IsChecked and
+    (CheckBoxStabilityEnabled <> nil) and CheckBoxStabilityEnabled.IsChecked;
+end;
+
+procedure TFrameMeterValueEdit.UpdateStabilityAutoRefreshTimer;
+begin
+  if TimerStabilityAutoRefresh = nil then
+    Exit;
+
+  if csDestroying in ComponentState then
+  begin
+    TimerStabilityAutoRefresh.Enabled := False;
+    Exit;
+  end;
+
+  TimerStabilityAutoRefresh.Enabled := CanRunStabilityAutoRefresh;
+end;
+
+procedure TFrameMeterValueEdit.TimerStabilityAutoRefreshTimer(Sender: TObject);
+begin
+  if FStabilityTimerUpdating then
+    Exit;
+  if csDestroying in ComponentState then
+    Exit;
+  if not CanRunStabilityAutoRefresh then
+  begin
+    UpdateStabilityAutoRefreshTimer;
+    Exit;
+  end;
+
+  FStabilityTimerUpdating := True;
+  try
+    RefreshStabilityHistoryAndAnalysis;
+  finally
+    FStabilityTimerUpdating := False;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.RefreshStabilityHistoryAndAnalysis;
+var
+  WasLastRow: Boolean;
+  SelectedTimeStampMs: Int64;
+  SelectedRow: Integer;
+  I: Integer;
+begin
+  if (GridSamples <> nil) and GridSamples.IsFocused and (FSampleSource = mssTestSamples) then
+    Exit;
+  if not CanRunStabilityAutoRefresh then
+    Exit;
+
+  SelectedRow := GridSamples.Row;
+  WasLastRow := (SelectedRow >= 0) and (SelectedRow = GridSamples.RowCount - 1);
+  SelectedTimeStampMs := -1;
+  if (SelectedRow >= 0) and (SelectedRow < Length(FDisplayedSamples)) and
+     (GetSampleIndexForGridRow(SelectedRow) >= 0) then
+    SelectedTimeStampMs := FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].TimeStampMs;
+
+  RefreshDisplayedSamples;
+  if FSampleSource = mssWorkHistory then
+    FTestCurrentTimeMs := GetTickCount64;
+  RefreshSamplesGrid(False);
+
+  if WasLastRow and (GridSamples.RowCount > 0) then
+    GridSamples.Row := GridSamples.RowCount - 1
+  else if SelectedTimeStampMs >= 0 then
+    for I := 0 to High(FDisplayedSamples) do
+      if FDisplayedSamples[I].TimeStampMs = SelectedTimeStampMs then
+      begin
+        GridSamples.Row := GetGridRowForSampleIndex(I);
+        Break;
+      end;
+  GridSamples.Selected := GridSamples.Row;
+
+  AnalyzeDisplayedSamples(False, False, False);
+  UpdateStabilityChart;
 end;
 
 procedure TFrameMeterValueEdit.SetAnalysisTimeByLastDisplayedSample;
@@ -993,6 +1108,7 @@ begin
     Analyze
   else
     AnalyzeIfNeeded;
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 procedure TFrameMeterValueEdit.UpdateSampleSourceControls;
@@ -2053,15 +2169,15 @@ end;
 
 procedure TFrameMeterValueEdit.HandleTargetRangeChange(Sender: TObject);
 begin
-  if FLoading then
+  if FLoading or FApplyingSettings then
     Exit;
 
   UpdateTargetLimits;
-  if Sender <> EditTestTargetValue then
-    FSettingsModified := True;
+  FSettingsModified := True;
   FTestDataModified := True;
   FModified := True;
-  AnalyzeIfNeeded;
+  ApplyAndSaveStabilitySettings(True, False, True);
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 procedure TFrameMeterValueEdit.ClearTestAnalysis;
@@ -2133,16 +2249,16 @@ end;
 
 procedure TFrameMeterValueEdit.HandleAutoAnalyzeChange(Sender: TObject);
 begin
-  if FLoading then
+  if FLoading or FApplyingSettings then
     Exit;
 
   FSettingsModified := True;
   FModified := True;
   FTestSettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
+  ApplyAndSaveStabilitySettings(False, False, True);
+  UpdateStabilityAutoRefreshTimer;
   if CheckBoxAutoAnalyze.IsChecked then
-    AnalyzeDisplayedSamples(False, True, False)
-  else
-    ClearTestAnalysis;
+    RefreshStabilityHistoryAndAnalysis;
 end;
 
 function TFrameMeterValueEdit.TryGetTestTargetLimits(out ALowerLimit, AUpperLimit: Double): Boolean;
@@ -2569,13 +2685,7 @@ end;
 
 procedure TFrameMeterValueEdit.ApplySettingsToWorkMeterValue;
 begin
-  if ApplySettingsFromControls(True) then
-    UpdateStabilityChart;
-end;
-
-procedure TFrameMeterValueEdit.ButtonApplyStabilitySettingsClick(Sender: TObject);
-begin
-  ApplySettingsToWorkMeterValue;
+  ApplyAndSaveStabilitySettings(True, False, True);
 end;
 
 procedure TFrameMeterValueEdit.CopySettingsFromWorkMeterValue;
@@ -2699,47 +2809,77 @@ begin
     SameValue(ALeft.ChartToleranceLineWidth, ARight.ChartToleranceLineWidth, 1E-9);
 end;
 
-function TFrameMeterValueEdit.ApplySettingsFromControls(
-  const AShowError: Boolean): Boolean;
+procedure TFrameMeterValueEdit.RestoreStabilitySettingsControls;
+begin
+  if FMeterValue <> nil then
+    FTestSettings := FMeterValue.StabilitySettings;
+  LoadSettingsToControls;
+end;
+
+function TFrameMeterValueEdit.ApplyAndSaveStabilitySettings(const ARecalculate: Boolean;
+  const ARefreshChartOnly: Boolean; const AShowError: Boolean): Boolean;
 var
   ErrorText: string;
   Settings: TMeterValueStabilitySettings;
-  SessionOnly: Boolean;
+  SavedSettings: TMeterValueStabilitySettings;
 begin
   Result := False;
+  if FLoading or FApplyingSettings then
+    Exit;
   if FMeterValue = nil then
     Exit(True);
 
   if not ValidateControls(ErrorText) then
   begin
     if AShowError then
-      ShowMessage('Настройки стабильности не применены.' + sLineBreak + ErrorText);
+      ShowMessage('Настройки стабильности не сохранены.' + sLineBreak + ErrorText);
+    RestoreStabilitySettingsControls;
     Exit(False);
   end;
 
   ReadSettingsFromControls(Settings);
+  SavedSettings := FMeterValue.StabilitySettings;
   FMeterValue.StabilitySettings := Settings;
-  FTestSettings := Settings;
-  FTestTargetValue := Settings.TargetValue;
-
-  SessionOnly := not FMeterValue.IsToSave;
-  if FMeterValue.IsToSave then
+  if not FMeterValue.ValidateStabilitySettings(ErrorText) then
   begin
-    TMeterValue.SaveToFile(0);
-  end
-  else
-  begin
+    FMeterValue.StabilitySettings := SavedSettings;
+    if AShowError then
+      ShowMessage('Настройки стабильности не сохранены.' + sLineBreak + ErrorText);
+    RestoreStabilitySettingsControls;
+    Exit(False);
   end;
 
-  FSettingsModified := False;
-  FChartAppearanceModified := False;
-  LoadSettingsToControls;
-  FModified := FTestDataModified;
-  if CheckBoxAutoAnalyze.IsChecked then
-    Analyze;
-  if SessionOnly then
-    MemoConclusion.Lines.Text := 'Настройки применены только для текущего сеанса. Для сохранения после перезапуска включите “Сохранять” в основных параметрах.';
-  Result := True;
+  FApplyingSettings := True;
+  try
+    FTestSettings := Settings;
+    FTestTargetValue := Settings.TargetValue;
+    FSettingsModified := False;
+    FChartAppearanceModified := False;
+    FModified := FTestDataModified;
+    LoadSettingsToControls;
+    if FMeterValue.IsToSave then
+      TMeterValue.SaveToFile(0);
+    if ARefreshChartOnly then
+      UpdateStabilityChart
+    else if ARecalculate then
+    begin
+      FRecalculating := True;
+      try
+        AnalyzeIfNeeded;
+      finally
+        FRecalculating := False;
+      end;
+    end;
+    Result := True;
+  finally
+    FApplyingSettings := False;
+  end;
+end;
+
+function TFrameMeterValueEdit.ApplySettingsFromControls(
+  const AShowError: Boolean): Boolean;
+begin
+  Result := ApplyAndSaveStabilitySettings(True, False, AShowError);
 end;
 
 function TFrameMeterValueEdit.ValidateControls(out AErrorText: string): Boolean;
@@ -2801,17 +2941,14 @@ begin
 end;
 
 procedure TFrameMeterValueEdit.HandleSettingsChange(Sender: TObject);
-var
-  ErrorText: string;
 begin
-  if FLoading then
+  if FLoading or FApplyingSettings then
     Exit;
 
   FSettingsModified := True;
   FModified := True;
-  if ValidateControls(ErrorText) then
-    ReadSettingsFromControls(FTestSettings);
-  AnalyzeIfNeeded;
+  ApplyAndSaveStabilitySettings(True, False, True);
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
@@ -2938,6 +3075,7 @@ begin
       UpdateSampleSourceControls;
       ClearTestAnalysis;
       MemoConclusion.Lines.Text := 'В рабочей истории нет данных';
+      UpdateStabilityAutoRefreshTimer;
       Exit;
     end;
 
@@ -3023,6 +3161,7 @@ begin
 
   if FMeterValue <> nil then
     RecalculateTestPreview;
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 
@@ -3115,10 +3254,7 @@ begin
   FMeterValue.ShowTrailingZeros := CheckBoxShowTrailingZeros.IsChecked;
   FMeterValue.CoefK := SafeFloat(EditCoefK.Text);
   FMeterValue.CoefP := SafeFloat(EditCoefP.Text);
-  if FSettingsModified then
-    ApplySettingsFromControls(False)
-  else
-    TMeterValue.SaveToFile(0);
+  TMeterValue.SaveToFile(0);
 end;
 
 end.
