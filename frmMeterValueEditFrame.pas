@@ -2190,6 +2190,7 @@ var
   Sample: TMeterValueSample;
   SampleResult: TMeterValueSampleAnalysis;
   HasSampleResult: Boolean;
+  HasLimits: Boolean;
   BaseTimeMs: Int64;
   X: Double;
   DisplayValue: Double;
@@ -2240,6 +2241,15 @@ begin
       BaseTimeMs := FDisplayedSamples[0].TimeStampMs;
       MinTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
       MaxTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
+      HasLimits := (Indexes.Count > 1) and TryReadFloat(EditTargetLowerLimit.Text, LowerLimit) and
+        TryReadFloat(EditTargetUpperLimit.Text, UpperLimit);
+      if HasLimits then
+      begin
+        LowerLimit := ValueToCurrentDimension(DisplayToBase(EditTargetLowerLimit.Text));
+        UpperLimit := ValueToCurrentDimension(DisplayToBase(EditTargetUpperLimit.Text));
+        LowerSeries := ChartStability.AddSeries('Нижняя граница');
+        UpperSeries := ChartStability.AddSeries('Верхняя граница');
+      end;
 
       Series := ChartStability.AddSeries('Сигнал');
       WindowSeries := ChartStability.AddSeries('В окне анализа');
@@ -2280,14 +2290,10 @@ begin
         MeanSeries.AddPoint(MaxTimeSec, DisplayValue);
       end;
 
-      if TryReadFloat(EditTargetLowerLimit.Text, LowerLimit) and TryReadFloat(EditTargetUpperLimit.Text, UpperLimit) then
+      if HasLimits then
       begin
-        LowerLimit := ValueToCurrentDimension(DisplayToBase(EditTargetLowerLimit.Text));
-        UpperLimit := ValueToCurrentDimension(DisplayToBase(EditTargetUpperLimit.Text));
-        LowerSeries := ChartStability.AddSeries('Нижняя граница');
         LowerSeries.AddPoint(MinTimeSec, LowerLimit);
         LowerSeries.AddPoint(MaxTimeSec, LowerLimit);
-        UpperSeries := ChartStability.AddSeries('Верхняя граница');
         UpperSeries.AddPoint(MinTimeSec, UpperLimit);
         UpperSeries.AddPoint(MaxTimeSec, UpperLimit);
       end;
