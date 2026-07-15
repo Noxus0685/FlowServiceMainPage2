@@ -192,7 +192,6 @@ type
 
   /// <summary>Configurable criteria used by TMeterValue and target-range checks used by TParameter.</summary>
   TChartColorOption = (
-    ccoAuto,
     ccoBlue,
     ccoLightBlue,
     ccoGreen,
