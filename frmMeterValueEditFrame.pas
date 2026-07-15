@@ -165,6 +165,7 @@ type
     FTestStableCandidateSinceMs: Int64;
     FTestStabilityConfirmed: Boolean;
     FSettingsModified: Boolean;
+    FChartAppearanceModified: Boolean;
     FModified: Boolean;
     LayoutRoot: TVertScrollBox;
     EditName: TEdit;
@@ -320,6 +321,7 @@ begin
   FTestDataModified := False;
   FTestTargetValue := 0;
   FSettingsModified := False;
+  FChartAppearanceModified := False;
   FModified := False;
   FillChar(FTestSettings, SizeOf(FTestSettings), 0);
   FTestStabilityInfo := Default(TMeterValueStabilityInfo);
@@ -332,7 +334,7 @@ end;
 
 destructor TFrameMeterValueEdit.Destroy;
 begin
-  if FSettingsModified then
+  if FSettingsModified and (not FChartAppearanceModified) then
     ApplySettingsFromControls(False);
   FTestSamples.Free;
   inherited;
@@ -787,8 +789,8 @@ begin
 
   ReadSettingsFromControls(FTestSettings);
   FSettingsModified := True;
+  FChartAppearanceModified := True;
   FModified := True;
-  UpdateStabilityChart;
 end;
 
 function TFrameMeterValueEdit.DisplayUnitName: string;
@@ -2387,10 +2389,15 @@ var
   LowerLimit: Double;
   UpperLimit: Double;
   ToleranceColor: TAlphaColor;
+  ChartSettings: TMeterValueStabilitySettings;
 
 begin
   if ChartStability = nil then
     Exit;
+
+  ChartSettings := FTestSettings;
+  if FMeterValue <> nil then
+    ChartSettings := FMeterValue.StabilitySettings;
 
   ChartStability.BeginUpdate;
   try
@@ -2423,18 +2430,18 @@ begin
         UpperLimit := ValueToCurrentDimension(UpperLimit);
         LowerSeries := ChartStability.AddSeries('Нижняя граница');
         UpperSeries := ChartStability.AddSeries('Верхняя граница');
-        ToleranceColor := ChartColorOptionToAlphaColor(FTestSettings.ChartToleranceColor);
+        ToleranceColor := ChartColorOptionToAlphaColor(ChartSettings.ChartToleranceColor);
         LowerSeries.Color := ToleranceColor;
         UpperSeries.Color := ToleranceColor;
-        LowerSeries.Thickness := FTestSettings.ChartToleranceLineWidth;
-        UpperSeries.Thickness := FTestSettings.ChartToleranceLineWidth;
+        LowerSeries.Thickness := ChartSettings.ChartToleranceLineWidth;
+        UpperSeries.Thickness := ChartSettings.ChartToleranceLineWidth;
         LowerSeries.ShowMarkers := False;
         UpperSeries.ShowMarkers := False;
       end;
 
       Series := ChartStability.AddSeries('Сигнал');
-      ApplyChartSeriesStyle(Series, FTestSettings.ChartSignalColor,
-        FTestSettings.ChartSignalLineWidth, True);
+      ApplyChartSeriesStyle(Series, ChartSettings.ChartSignalColor,
+        ChartSettings.ChartSignalLineWidth, True);
 
       for SampleIndex in Indexes do
       begin
@@ -2447,7 +2454,7 @@ begin
       if FTestStabilityInfo.HasForecast then
       begin
         ForecastSeries := ChartStability.AddSeries('Прогноз');
-        ForecastSeries.Thickness := FTestSettings.ChartSignalLineWidth;
+        ForecastSeries.Thickness := ChartSettings.ChartSignalLineWidth;
         ForecastSeries.ShowMarkers := False;
         Sample := FDisplayedSamples[Indexes[Indexes.Count - 1]];
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
@@ -2562,7 +2569,8 @@ end;
 
 procedure TFrameMeterValueEdit.ApplySettingsToWorkMeterValue;
 begin
-  ApplySettingsFromControls(True);
+  if ApplySettingsFromControls(True) then
+    UpdateStabilityChart;
 end;
 
 procedure TFrameMeterValueEdit.ButtonApplyStabilitySettingsClick(Sender: TObject);
@@ -2576,6 +2584,7 @@ begin
   if FMeterValue <> nil then
     FTestSettings := FMeterValue.StabilitySettings;
   FSettingsModified := False;
+  FChartAppearanceModified := False;
 end;
 
 procedure TFrameMeterValueEdit.LoadSettingsToControls;
@@ -2723,6 +2732,7 @@ begin
   end;
 
   FSettingsModified := False;
+  FChartAppearanceModified := False;
   LoadSettingsToControls;
   FModified := FTestDataModified;
   if CheckBoxAutoAnalyze.IsChecked then
