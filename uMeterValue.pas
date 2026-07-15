@@ -1129,6 +1129,13 @@ begin
   FStabilitySettings.RequireMeanValueInRange := True;
   FStabilitySettings.RequireForecastInRange := True;
   FStabilitySettings.AutoAnalyze := True;
+  FStabilitySettings.ChartSignalColor := ccoBlue;
+  FStabilitySettings.ChartToleranceColor := ccoOrange;
+  FStabilitySettings.ChartForecastColor := ccoPurple;
+  FStabilitySettings.ChartOutlierColor := ccoRed;
+  FStabilitySettings.ChartOutOfRangeColor := ccoOrange;
+  FStabilitySettings.ChartSignalLineWidth := 2.0;
+  FStabilitySettings.ChartToleranceLineWidth := 1.0;
 end;
 
 procedure TMeterValue.ResetStabilityInfo;
@@ -3509,6 +3516,13 @@ begin
       Ini.WriteBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       Ini.WriteBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
       Ini.WriteBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
+      Ini.WriteInteger(Section, 'ChartSignalColor', Ord(MV.FStabilitySettings.ChartSignalColor));
+      Ini.WriteInteger(Section, 'ChartToleranceColor', Ord(MV.FStabilitySettings.ChartToleranceColor));
+      Ini.WriteInteger(Section, 'ChartForecastColor', Ord(MV.FStabilitySettings.ChartForecastColor));
+      Ini.WriteInteger(Section, 'ChartOutlierColor', Ord(MV.FStabilitySettings.ChartOutlierColor));
+      Ini.WriteInteger(Section, 'ChartOutOfRangeColor', Ord(MV.FStabilitySettings.ChartOutOfRangeColor));
+      Ini.WriteFloat(Section, 'ChartSignalLineWidth', MV.FStabilitySettings.ChartSignalLineWidth);
+      Ini.WriteFloat(Section, 'ChartToleranceLineWidth', MV.FStabilitySettings.ChartToleranceLineWidth);
 
       Ini.WriteInteger(Section, 'DimensionsCount', MV.Dimensions.Count);
       for J := 0 to MV.Dimensions.Count - 1 do
@@ -3767,6 +3781,13 @@ begin
       MV.FStabilitySettings.RequireMeanValueInRange := Ini.ReadBool(Section, 'RequireMeanValueInRange', MV.FStabilitySettings.RequireMeanValueInRange);
       MV.FStabilitySettings.RequireForecastInRange := Ini.ReadBool(Section, 'RequireForecastInRange', MV.FStabilitySettings.RequireForecastInRange);
       MV.FStabilitySettings.AutoAnalyze := Ini.ReadBool(Section, 'StabilityAutoAnalyze', MV.FStabilitySettings.AutoAnalyze);
+      MV.FStabilitySettings.ChartSignalColor := TChartColorOption(EnsureRange(Ini.ReadInteger(Section, 'ChartSignalColor', Ord(MV.FStabilitySettings.ChartSignalColor)), Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
+      MV.FStabilitySettings.ChartToleranceColor := TChartColorOption(EnsureRange(Ini.ReadInteger(Section, 'ChartToleranceColor', Ord(MV.FStabilitySettings.ChartToleranceColor)), Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
+      MV.FStabilitySettings.ChartForecastColor := TChartColorOption(EnsureRange(Ini.ReadInteger(Section, 'ChartForecastColor', Ord(MV.FStabilitySettings.ChartForecastColor)), Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
+      MV.FStabilitySettings.ChartOutlierColor := TChartColorOption(EnsureRange(Ini.ReadInteger(Section, 'ChartOutlierColor', Ord(MV.FStabilitySettings.ChartOutlierColor)), Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
+      MV.FStabilitySettings.ChartOutOfRangeColor := TChartColorOption(EnsureRange(Ini.ReadInteger(Section, 'ChartOutOfRangeColor', Ord(MV.FStabilitySettings.ChartOutOfRangeColor)), Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
+      MV.FStabilitySettings.ChartSignalLineWidth := EnsureRange(S2F(Ini.ReadString(Section, 'ChartSignalLineWidth', F2S(MV.FStabilitySettings.ChartSignalLineWidth))), 0.5, 10.0);
+      MV.FStabilitySettings.ChartToleranceLineWidth := EnsureRange(S2F(Ini.ReadString(Section, 'ChartToleranceLineWidth', F2S(MV.FStabilitySettings.ChartToleranceLineWidth))), 0.5, 10.0);
 {$IFDEF DEBUG}
       DebugLog(Format('Stability LoadFromFile: Section=%s Hash=%s Name=%s MinSampleCount=%d WindowDurationSec=%.12g TargetValue=%.12g',
         [Section, MV.Hash, MV.Name, MV.FStabilitySettings.MinSampleCount,
