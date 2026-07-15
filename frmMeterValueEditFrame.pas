@@ -7,6 +7,7 @@ uses
   FMX.Controls.Presentation,
   FMX.Consts,
   FMX.Dialogs,
+  FMX.DialogService,
   FMX.Edit,
   FMX.Forms,
   FMX.Layouts,
@@ -20,13 +21,14 @@ uses
   FMX.Grid,
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.Math,
   System.Rtti,
   System.SysUtils,
   System.Types,
   System.UITypes,
   uBaseProcedures,
-  uMeterValue, FMX.Grid.Style, FMX.ScrollBox, uDebugLog;
+  uMeterValue, FMX.Grid.Style, FMX.ScrollBox, FMX.SimpleChart, uDebugLog;
 
 type
   TMeterValueSampleSource = (
@@ -58,6 +60,8 @@ type
     TabItemStabilityData: TTabItem;
     TabItemStabilitySettings: TTabItem;
     TabItemStabilityResult: TTabItem;
+    TabItemStabilityChart: TTabItem;
+    ChartStability: TSimpleChart;
     LayoutConclusion: TLayout;
     LabelConclusionTitle: TLabel;
     RectangleSignalStable: TRectangle;
@@ -138,6 +142,11 @@ type
     EditResultForecastInRange: TEdit;
     ListBoxStabilityReasons: TListBox;
     MemoStabilityConclusion: TMemo;
+    GroupBoxChartAppearance: TGroupBox;
+    ComboBoxChartSignalColor: TComboBox;
+    ComboBoxChartToleranceColor: TComboBox;
+    ComboBoxChartSignalWidth: TComboBox;
+    ComboBoxChartToleranceWidth: TComboBox;
   private
     FMeterValue: TMeterValue;
     FLoading: Boolean;
@@ -198,13 +207,20 @@ type
     procedure SetSampleSource(const ASource: TMeterValueSampleSource);
     procedure UpdateSampleSourceControls;
     procedure ComboBoxSampleSourceChange(Sender: TObject);
+    procedure TabControlStabilityChange(Sender: TObject);
     procedure ButtonRefreshHistoryClick(Sender: TObject);
     procedure ButtonUseLastSampleTimeClick(Sender: TObject);
     procedure SetAnalysisTimeByLastDisplayedSample;
     function DisplayUnitName: string;
     function AppendUnit(const AText, AUnit: string): string;
     procedure UpdateStabilityHints;
+    procedure FillChartColorComboBox(AComboBox: TComboBox);
+    procedure FillChartWidthComboBox(AComboBox: TComboBox);
+    function ChartWidthToComboIndex(const AValue: Single): Integer;
+    function ComboIndexToChartWidth(const AIndex: Integer): Single;
+    procedure ChartAppearanceChange(Sender: TObject);
     function BaseToDisplayText(const AValue: Double): string;
+    function ValueToCurrentDimension(const ABaseValue: Double): Double;
     function BaseDeltaToDisplayText(const AValue: Double): string;
     function FormatBaseInfo(const AValue: Double; const AHasValue: Boolean): string;
     function FormatBaseDeltaInfo(const AValue: Double; const AHasValue: Boolean): string;
@@ -269,6 +285,9 @@ type
     function FormatInfoFloat(const AValue: Double; const AHasValue: Boolean; const ADigits: Integer = 4): string;
     function TrendDirectionText(const ADirection: TMeterValueTrendDirection; const AHasTrend: Boolean): string;
     procedure UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
+    function ChartColorOptionToAlphaColor(const AOption: TChartColorOption; const AAutoColor: TAlphaColor): TAlphaColor;
+    procedure ApplyChartSeriesStyle(const ASeries: TChartSeries; const AColor: TChartColorOption; const AAutoColor: TAlphaColor; const AThickness: Double; const AShowMarkers: Boolean);
+    procedure UpdateStabilityChart;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -400,6 +419,15 @@ begin
   ButtonGenerateNew.OnClick := ButtonGenerateNewClick;
   ButtonGenerateAppend.OnClick := ButtonGenerateAppendClick;
   ButtonApplyScenario.OnClick := ButtonApplyScenarioClick;
+  TabControlStability.OnChange := TabControlStabilityChange;
+  FillChartColorComboBox(ComboBoxChartSignalColor);
+  FillChartColorComboBox(ComboBoxChartToleranceColor);
+  FillChartWidthComboBox(ComboBoxChartSignalWidth);
+  FillChartWidthComboBox(ComboBoxChartToleranceWidth);
+  ComboBoxChartSignalColor.OnChange := ChartAppearanceChange;
+  ComboBoxChartToleranceColor.OnChange := ChartAppearanceChange;
+  ComboBoxChartSignalWidth.OnChange := ChartAppearanceChange;
+  ComboBoxChartToleranceWidth.OnChange := ChartAppearanceChange;
   ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
   CheckBoxAutoAnalyze.OnChange := HandleAutoAnalyzeChange;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
@@ -653,6 +681,78 @@ end;
 
 
 
+procedure TFrameMeterValueEdit.FillChartColorComboBox(AComboBox: TComboBox);
+begin
+  if AComboBox = nil then
+    Exit;
+  AComboBox.Items.Clear;
+  AComboBox.Items.Add('Авто');
+  AComboBox.Items.Add('Синий');
+  AComboBox.Items.Add('Голубой');
+  AComboBox.Items.Add('Зелёный');
+  AComboBox.Items.Add('Красный');
+  AComboBox.Items.Add('Оранжевый');
+  AComboBox.Items.Add('Жёлтый');
+  AComboBox.Items.Add('Фиолетовый');
+  AComboBox.Items.Add('Серый');
+  AComboBox.Items.Add('Чёрный');
+end;
+
+procedure TFrameMeterValueEdit.FillChartWidthComboBox(AComboBox: TComboBox);
+begin
+  if AComboBox = nil then
+    Exit;
+  AComboBox.Items.Clear;
+  AComboBox.Items.Add('0,5');
+  AComboBox.Items.Add('1');
+  AComboBox.Items.Add('1,5');
+  AComboBox.Items.Add('2');
+  AComboBox.Items.Add('3');
+  AComboBox.Items.Add('4');
+end;
+
+function TFrameMeterValueEdit.ComboIndexToChartWidth(const AIndex: Integer): Single;
+const
+  Widths: array[0..5] of Single = (0.5, 1.0, 1.5, 2.0, 3.0, 4.0);
+begin
+  if (AIndex >= Low(Widths)) and (AIndex <= High(Widths)) then
+    Result := Widths[AIndex]
+  else
+    Result := 1.0;
+end;
+
+function TFrameMeterValueEdit.ChartWidthToComboIndex(const AValue: Single): Integer;
+const
+  Widths: array[0..5] of Single = (0.5, 1.0, 1.5, 2.0, 3.0, 4.0);
+var
+  I: Integer;
+  BestDelta: Single;
+  Delta: Single;
+begin
+  Result := 0;
+  BestDelta := Abs(AValue - Widths[0]);
+  for I := 1 to High(Widths) do
+  begin
+    Delta := Abs(AValue - Widths[I]);
+    if Delta < BestDelta then
+    begin
+      BestDelta := Delta;
+      Result := I;
+    end;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.ChartAppearanceChange(Sender: TObject);
+begin
+  if FLoading then
+    Exit;
+
+  ReadSettingsFromControls(FTestSettings);
+  FSettingsModified := True;
+  FModified := True;
+  UpdateStabilityChart;
+end;
+
 function TFrameMeterValueEdit.DisplayUnitName: string;
 begin
   Result := '';
@@ -673,6 +773,16 @@ begin
     Result := FMeterValue.FormatBaseValue(AValue)
   else
     Result := FloatToStr(AValue);
+end;
+
+function TFrameMeterValueEdit.ValueToCurrentDimension(const ABaseValue: Double): Double;
+begin
+  Result := ABaseValue;
+  if IsNan(ABaseValue) or IsInfinite(ABaseValue) then
+    Exit;
+
+  if FMeterValue <> nil then
+    Result := FMeterValue.BaseToDisplayValue(ABaseValue);
 end;
 
 function TFrameMeterValueEdit.BaseDeltaToDisplayText(const AValue: Double): string;
@@ -896,6 +1006,12 @@ begin
     SetSampleSource(mssWorkHistory);
 end;
 
+procedure TFrameMeterValueEdit.TabControlStabilityChange(Sender: TObject);
+begin
+  if TabControlStability.ActiveTab = TabItemStabilityChart then
+    UpdateStabilityChart;
+end;
+
 procedure TFrameMeterValueEdit.ButtonRefreshHistoryClick(Sender: TObject);
 var
   BeforeSamples: TArray<TMeterValueSample>;
@@ -1038,6 +1154,7 @@ begin
   end;
   GridSamples.Repaint;
   UpdateSampleSourceControls;
+  UpdateStabilityChart;
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -1334,13 +1451,19 @@ procedure TFrameMeterValueEdit.ClearSamples;
 begin
   if FSampleSource = mssWorkHistory then
   begin
-    if (FMeterValue <> nil) and (MessageDlg('Очистить историю TMeterValue?',
-      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes) then
-    begin
-      FMeterValue.ClearStabilitySamples;
-      RefreshSamplesGrid(True);
-      ClearAnalysisDisplay;
-    end;
+    if FMeterValue <> nil then
+      TDialogService.MessageDialog('Очистить историю TMeterValue?',
+        TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+        TMsgDlgBtn.mbNo, 0,
+        procedure(const AResult: TModalResult)
+        begin
+          if AResult = mrYes then
+          begin
+            FMeterValue.ClearStabilitySamples;
+            RefreshSamplesGrid(True);
+            ClearAnalysisDisplay;
+          end;
+        end);
     Exit;
   end;
 
@@ -2143,6 +2266,141 @@ begin
 end;
 
 
+function TFrameMeterValueEdit.ChartColorOptionToAlphaColor(
+  const AOption: TChartColorOption; const AAutoColor: TAlphaColor): TAlphaColor;
+begin
+  case AOption of
+    ccoBlue: Result := TAlphaColorRec.Blue;
+    ccoLightBlue: Result := TAlphaColorRec.Cornflowerblue;
+    ccoGreen: Result := TAlphaColorRec.Green;
+    ccoRed: Result := TAlphaColorRec.Red;
+    ccoOrange: Result := TAlphaColorRec.Orange;
+    ccoYellow: Result := TAlphaColorRec.Gold;
+    ccoPurple: Result := TAlphaColorRec.Purple;
+    ccoGray: Result := TAlphaColorRec.Gray;
+    ccoBlack: Result := TAlphaColorRec.Black;
+  else
+    Result := AAutoColor;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.ApplyChartSeriesStyle(const ASeries: TChartSeries;
+  const AColor: TChartColorOption; const AAutoColor: TAlphaColor;
+  const AThickness: Double; const AShowMarkers: Boolean);
+begin
+  if ASeries = nil then
+    Exit;
+
+  if AColor <> ccoAuto then
+    ASeries.Color := ChartColorOptionToAlphaColor(AColor, AAutoColor);
+  ASeries.Thickness := EnsureRange(AThickness, 0.5, 10.0);
+  ASeries.ShowMarkers := AShowMarkers;
+end;
+
+procedure TFrameMeterValueEdit.UpdateStabilityChart;
+var
+  Indexes: TList<Integer>;
+  Series: TChartSeries;
+  ForecastSeries: TChartSeries;
+  LowerSeries: TChartSeries;
+  UpperSeries: TChartSeries;
+  I: Integer;
+  SampleIndex: Integer;
+  Sample: TMeterValueSample;
+  HasLimits: Boolean;
+  BaseTimeMs: Int64;
+  X: Double;
+  DisplayValue: Double;
+  MinActualTimeSec: Double;
+  MaxActualTimeSec: Double;
+  ForecastEndTimeSec: Double;
+  LowerLimit: Double;
+  UpperLimit: Double;
+
+begin
+  if ChartStability = nil then
+    Exit;
+
+  ChartStability.BeginUpdate;
+  try
+    ChartStability.ClearAllSeries;
+    ChartStability.Title := 'История сигнала';
+    ChartStability.XTitle := 'Время, с';
+    ChartStability.YTitle := AppendUnit('Значение', DisplayUnitName);
+
+    if Length(FDisplayedSamples) = 0 then
+      Exit;
+
+    Indexes := TList<Integer>.Create;
+    try
+      for I := 0 to High(FDisplayedSamples) do
+        Indexes.Add(I);
+      Indexes.Sort(TComparer<Integer>.Construct(
+        function(const L, R: Integer): Integer
+        begin
+          Result := CompareValue(FDisplayedSamples[L].TimeStampMs, FDisplayedSamples[R].TimeStampMs);
+        end));
+
+      BaseTimeMs := FDisplayedSamples[0].TimeStampMs;
+      MinActualTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
+      MaxActualTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
+      ForecastEndTimeSec := MaxActualTimeSec;
+      HasLimits := (Indexes.Count > 1) and TryReadFloat(EditTargetLowerLimit.Text, LowerLimit) and
+        TryReadFloat(EditTargetUpperLimit.Text, UpperLimit);
+      if HasLimits then
+      begin
+        LowerLimit := ValueToCurrentDimension(DisplayToBase(EditTargetLowerLimit.Text));
+        UpperLimit := ValueToCurrentDimension(DisplayToBase(EditTargetUpperLimit.Text));
+        LowerSeries := ChartStability.AddSeries('Нижняя граница');
+        ApplyChartSeriesStyle(LowerSeries, FTestSettings.ChartToleranceColor,
+          LowerSeries.Color, FTestSettings.ChartToleranceLineWidth, False);
+        UpperSeries := ChartStability.AddSeries('Верхняя граница');
+        ApplyChartSeriesStyle(UpperSeries, FTestSettings.ChartToleranceColor,
+          UpperSeries.Color, FTestSettings.ChartToleranceLineWidth, False);
+      end;
+
+      Series := ChartStability.AddSeries('Сигнал');
+      ApplyChartSeriesStyle(Series, FTestSettings.ChartSignalColor,
+        Series.Color, FTestSettings.ChartSignalLineWidth, True);
+
+      for SampleIndex in Indexes do
+      begin
+        Sample := FDisplayedSamples[SampleIndex];
+        X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
+        DisplayValue := ValueToCurrentDimension(Sample.Value);
+        Series.AddPoint(X, DisplayValue);
+      end;
+
+      if FLastTestAnalysis.HasForecast then
+      begin
+        ForecastSeries := ChartStability.AddSeries('Прогноз');
+        ApplyChartSeriesStyle(ForecastSeries, FTestSettings.ChartForecastColor,
+          ForecastSeries.Color, FTestSettings.ChartSignalLineWidth, False);
+        Sample := FDisplayedSamples[Indexes[Indexes.Count - 1]];
+        X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
+        ForecastEndTimeSec := X + FTestSettings.ForecastHorizonSec;
+        ForecastSeries.AddPoint(X, ValueToCurrentDimension(Sample.Value));
+        ForecastSeries.AddPoint(ForecastEndTimeSec,
+          ValueToCurrentDimension(FLastTestAnalysis.ForecastValue));
+      end;
+
+      if HasLimits then
+      begin
+        LowerSeries.AddPoint(MinActualTimeSec, LowerLimit);
+        LowerSeries.AddPoint(MaxActualTimeSec, LowerLimit);
+        UpperSeries.AddPoint(MinActualTimeSec, UpperLimit);
+        UpperSeries.AddPoint(MaxActualTimeSec, UpperLimit);
+      end;
+    finally
+      Indexes.Free;
+    end;
+  finally
+    ChartStability.EndUpdate;
+  end;
+
+  ChartStability.InvalidateChart;
+end;
+
 procedure TFrameMeterValueEdit.UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
 var
   Lines: TStringList;
@@ -2272,6 +2530,10 @@ begin
     CheckBoxRequireCurrentValueInRange.IsChecked := FTestSettings.RequireCurrentValueInRange;
     CheckBoxRequireMeanValueInRange.IsChecked := FTestSettings.RequireMeanValueInRange;
     CheckBoxRequireForecastInRange.IsChecked := FTestSettings.RequireForecastInRange;
+    ComboBoxChartSignalColor.ItemIndex := Ord(FTestSettings.ChartSignalColor);
+    ComboBoxChartToleranceColor.ItemIndex := Ord(FTestSettings.ChartToleranceColor);
+    ComboBoxChartSignalWidth.ItemIndex := ChartWidthToComboIndex(FTestSettings.ChartSignalLineWidth);
+    ComboBoxChartToleranceWidth.ItemIndex := ChartWidthToComboIndex(FTestSettings.ChartToleranceLineWidth);
     UpdateTargetLimits;
   finally
     FLoading := False;
@@ -2318,6 +2580,12 @@ begin
   ASettings.RequireCurrentValueInRange := CheckBoxRequireCurrentValueInRange.IsChecked;
   ASettings.RequireMeanValueInRange := CheckBoxRequireMeanValueInRange.IsChecked;
   ASettings.RequireForecastInRange := CheckBoxRequireForecastInRange.IsChecked;
+  if ComboBoxChartSignalColor.ItemIndex >= 0 then
+    ASettings.ChartSignalColor := TChartColorOption(EnsureRange(ComboBoxChartSignalColor.ItemIndex, Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
+  if ComboBoxChartToleranceColor.ItemIndex >= 0 then
+    ASettings.ChartToleranceColor := TChartColorOption(EnsureRange(ComboBoxChartToleranceColor.ItemIndex, Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
+  ASettings.ChartSignalLineWidth := ComboIndexToChartWidth(ComboBoxChartSignalWidth.ItemIndex);
+  ASettings.ChartToleranceLineWidth := ComboIndexToChartWidth(ComboBoxChartToleranceWidth.ItemIndex);
 end;
 
 function TFrameMeterValueEdit.StabilitySettingsEqual(const ALeft,
@@ -2342,7 +2610,14 @@ begin
     (ALeft.RequireCurrentValueInRange = ARight.RequireCurrentValueInRange) and
     (ALeft.RequireMeanValueInRange = ARight.RequireMeanValueInRange) and
     (ALeft.RequireForecastInRange = ARight.RequireForecastInRange) and
-    (ALeft.AutoAnalyze = ARight.AutoAnalyze);
+    (ALeft.AutoAnalyze = ARight.AutoAnalyze) and
+    (ALeft.ChartSignalColor = ARight.ChartSignalColor) and
+    (ALeft.ChartToleranceColor = ARight.ChartToleranceColor) and
+    (ALeft.ChartForecastColor = ARight.ChartForecastColor) and
+    (ALeft.ChartOutlierColor = ARight.ChartOutlierColor) and
+    (ALeft.ChartOutOfRangeColor = ARight.ChartOutOfRangeColor) and
+    SameValue(ALeft.ChartSignalLineWidth, ARight.ChartSignalLineWidth, 1E-9) and
+    SameValue(ALeft.ChartToleranceLineWidth, ARight.ChartToleranceLineWidth, 1E-9);
 end;
 
 function TFrameMeterValueEdit.ApplySettingsFromControls(
