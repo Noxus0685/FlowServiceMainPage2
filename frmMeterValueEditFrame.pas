@@ -275,6 +275,8 @@ type
     function FormatInfoFloat(const AValue: Double; const AHasValue: Boolean; const ADigits: Integer = 4): string;
     function TrendDirectionText(const ADirection: TMeterValueTrendDirection; const AHasTrend: Boolean): string;
     procedure UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
+    function ChartColorOptionToAlphaColor(const AOption: TChartColorOption; const AAutoColor: TAlphaColor): TAlphaColor;
+    procedure ApplyChartSeriesStyle(const ASeries: TChartSeries; const AColor: TChartColorOption; const AAutoColor: TAlphaColor; const AThickness: Double; const AShowMarkers: Boolean);
     procedure UpdateStabilityChart;
   public
     constructor Create(AOwner: TComponent); override;
@@ -2174,6 +2176,37 @@ begin
 end;
 
 
+function TFrameMeterValueEdit.ChartColorOptionToAlphaColor(
+  const AOption: TChartColorOption; const AAutoColor: TAlphaColor): TAlphaColor;
+begin
+  case AOption of
+    ccoBlue: Result := TAlphaColorRec.Blue;
+    ccoLightBlue: Result := TAlphaColorRec.Cornflowerblue;
+    ccoGreen: Result := TAlphaColorRec.Green;
+    ccoRed: Result := TAlphaColorRec.Red;
+    ccoOrange: Result := TAlphaColorRec.Orange;
+    ccoYellow: Result := TAlphaColorRec.Gold;
+    ccoPurple: Result := TAlphaColorRec.Purple;
+    ccoGray: Result := TAlphaColorRec.Gray;
+    ccoBlack: Result := TAlphaColorRec.Black;
+  else
+    Result := AAutoColor;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.ApplyChartSeriesStyle(const ASeries: TChartSeries;
+  const AColor: TChartColorOption; const AAutoColor: TAlphaColor;
+  const AThickness: Double; const AShowMarkers: Boolean);
+begin
+  if ASeries = nil then
+    Exit;
+
+  if AColor <> ccoAuto then
+    ASeries.Color := ChartColorOptionToAlphaColor(AColor, AAutoColor);
+  ASeries.Thickness := EnsureRange(AThickness, 0.5, 10.0);
+  ASeries.ShowMarkers := AShowMarkers;
+end;
+
 procedure TFrameMeterValueEdit.UpdateStabilityChart;
 var
   Indexes: TList<Integer>;
@@ -2229,10 +2262,16 @@ begin
         LowerLimit := ValueToCurrentDimension(DisplayToBase(EditTargetLowerLimit.Text));
         UpperLimit := ValueToCurrentDimension(DisplayToBase(EditTargetUpperLimit.Text));
         LowerSeries := ChartStability.AddSeries('Нижняя граница');
+        ApplyChartSeriesStyle(LowerSeries, FTestSettings.ChartToleranceColor,
+          LowerSeries.Color, FTestSettings.ChartToleranceLineWidth, False);
         UpperSeries := ChartStability.AddSeries('Верхняя граница');
+        ApplyChartSeriesStyle(UpperSeries, FTestSettings.ChartToleranceColor,
+          UpperSeries.Color, FTestSettings.ChartToleranceLineWidth, False);
       end;
 
       Series := ChartStability.AddSeries('Сигнал');
+      ApplyChartSeriesStyle(Series, FTestSettings.ChartSignalColor,
+        Series.Color, FTestSettings.ChartSignalLineWidth, True);
 
       for SampleIndex in Indexes do
       begin
@@ -2245,6 +2284,8 @@ begin
       if FLastTestAnalysis.HasForecast then
       begin
         ForecastSeries := ChartStability.AddSeries('Прогноз');
+        ApplyChartSeriesStyle(ForecastSeries, FTestSettings.ChartForecastColor,
+          ForecastSeries.Color, FTestSettings.ChartSignalLineWidth, False);
         Sample := FDisplayedSamples[Indexes[Indexes.Count - 1]];
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
         ForecastEndTimeSec := X + FTestSettings.ForecastHorizonSec;
@@ -2469,7 +2510,14 @@ begin
     (ALeft.RequireCurrentValueInRange = ARight.RequireCurrentValueInRange) and
     (ALeft.RequireMeanValueInRange = ARight.RequireMeanValueInRange) and
     (ALeft.RequireForecastInRange = ARight.RequireForecastInRange) and
-    (ALeft.AutoAnalyze = ARight.AutoAnalyze);
+    (ALeft.AutoAnalyze = ARight.AutoAnalyze) and
+    (ALeft.ChartSignalColor = ARight.ChartSignalColor) and
+    (ALeft.ChartToleranceColor = ARight.ChartToleranceColor) and
+    (ALeft.ChartForecastColor = ARight.ChartForecastColor) and
+    (ALeft.ChartOutlierColor = ARight.ChartOutlierColor) and
+    (ALeft.ChartOutOfRangeColor = ARight.ChartOutOfRangeColor) and
+    SameValue(ALeft.ChartSignalLineWidth, ARight.ChartSignalLineWidth, 1E-9) and
+    SameValue(ALeft.ChartToleranceLineWidth, ARight.ChartToleranceLineWidth, 1E-9);
 end;
 
 function TFrameMeterValueEdit.ApplySettingsFromControls(
