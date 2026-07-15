@@ -1,0 +1,72 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{376A4443-1092-47E7-AD7A-1BE3444679AC}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="IcsCommonNewRun.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="IcsCommonNewDesign.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="IcsVclMiniRun.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="IcsVclMiniDesign.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="IcsCommonNewRun">
+        <MSBuild Projects="IcsCommonNewRun.dproj"/>
+    </Target>
+    <Target Name="IcsCommonNewRun:Clean">
+        <MSBuild Projects="IcsCommonNewRun.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="IcsCommonNewRun:Make">
+        <MSBuild Projects="IcsCommonNewRun.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="IcsCommonNewDesign">
+        <MSBuild Projects="IcsCommonNewDesign.dproj"/>
+    </Target>
+    <Target Name="IcsCommonNewDesign:Clean">
+        <MSBuild Projects="IcsCommonNewDesign.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="IcsCommonNewDesign:Make">
+        <MSBuild Projects="IcsCommonNewDesign.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="IcsVclMiniRun">
+        <MSBuild Projects="IcsVclMiniRun.dproj"/>
+    </Target>
+    <Target Name="IcsVclMiniRun:Clean">
+        <MSBuild Projects="IcsVclMiniRun.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="IcsVclMiniRun:Make">
+        <MSBuild Projects="IcsVclMiniRun.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="IcsVclMiniDesign">
+        <MSBuild Projects="IcsVclMiniDesign.dproj"/>
+    </Target>
+    <Target Name="IcsVclMiniDesign:Clean">
+        <MSBuild Projects="IcsVclMiniDesign.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="IcsVclMiniDesign:Make">
+        <MSBuild Projects="IcsVclMiniDesign.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="IcsCommonNewRun;IcsCommonNewDesign;IcsVclMiniRun;IcsVclMiniDesign"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="IcsCommonNewRun:Clean;IcsCommonNewDesign:Clean;IcsVclMiniRun:Clean;IcsVclMiniDesign:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="IcsCommonNewRun:Make;IcsCommonNewDesign:Make;IcsVclMiniRun:Make;IcsVclMiniDesign:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

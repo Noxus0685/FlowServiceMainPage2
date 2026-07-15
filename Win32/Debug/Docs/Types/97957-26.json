@@ -1,0 +1,198 @@
+﻿{
+  "device_type": {
+    "general_info": {
+      "name": "Расходомеры-счетчики электромагнитные Счетовод",
+      "category": null,
+      "manufacturer": "Общество с ограниченной ответственностью «Производственная Фирма «Гидродинамика» (ООО «ПФ «Гидродинамика»)",
+      "modification": "ПТ",
+      "procedure": null,
+      "grsi_number": "97957-26",
+      "valid_from": null,
+      "valid_to": null,
+      "mpi": null,
+      "verification_method": null,
+      "accuracy_class": "A",
+      "base_error": 0.2,
+      "report_form_file": null
+    },
+    "signal": {
+      "measured_value": null,
+      "measurement_unit": "м3/ч",
+      "signal_type": null
+    },
+    "pulses": {
+      "output_type": null,
+      "representation": null,
+      "kp_qmax": null
+    }
+  },
+  "diameters": [
+    {
+      "enabled": true,
+      "name": "4",
+      "dn_mm": 4,
+      "qmax_l_s": 0.45,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.01,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "6",
+      "dn_mm": 6,
+      "qmax_l_s": 1.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.02,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "8",
+      "dn_mm": 8,
+      "qmax_l_s": 1.8,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.04,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "10",
+      "dn_mm": 10,
+      "qmax_l_s": 2.8,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.1,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "15",
+      "dn_mm": 15,
+      "qmax_l_s": 6,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.2,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "25",
+      "dn_mm": 25,
+      "qmax_l_s": 18,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.6,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "32",
+      "dn_mm": 32,
+      "qmax_l_s": 30,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 1,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "40",
+      "dn_mm": 40,
+      "qmax_l_s": 45,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 2,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "50",
+      "dn_mm": 50,
+      "qmax_l_s": 70,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 3,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "65",
+      "dn_mm": 65,
+      "qmax_l_s": 120,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 4,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "80",
+      "dn_mm": 80,
+      "qmax_l_s": 180,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 6,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "100",
+      "dn_mm": 100,
+      "qmax_l_s": 282,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 10,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "125",
+      "dn_mm": 125,
+      "qmax_l_s": 400,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 20,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    }
+  ],
+  "verification_points": [],
+  "calculation_parameters": {
+    "dynamic_range": null,
+    "flow_velocity_qmax_m_s": null
+  },
+  "deepseek_result": {
+    "status": "completed",
+    "warnings": [],
+    "missing_fields": [],
+    "raw_notes": "Выбрана таблица 3 (модификация ПТ) по переданной modification 'ПТ'. Столбцы: 'Наименьший расход, Qнаим, м3/ч' -> qmin_l_s, 'Наибольший расход, Qнаиб, м3/ч' -> qmax_l_s. Столбцы для qnom_l_s, qtr_l_s, q2tr_l_s отсутствуют в таблице, поэтому они оставлены null. Для каждого DN выбрана единственная строка. base_error = 0.2% (предел погрешности для диапазона от Qнаим до Qнаиб)."
+  }
+}

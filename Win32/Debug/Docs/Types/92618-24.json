@@ -1,0 +1,230 @@
+﻿{
+  "device_type": {
+    "general_info": {
+      "name": "Расходомеры-счетчики электромагнитные ПУЛЬСАР",
+      "category": null,
+      "manufacturer": "Общество с ограниченной ответственностью научно-производственное предприятие «ТЕПЛОВОДОХРАН» (ООО НПП «ТЕПЛОВОДОХРАН»)",
+      "modification": null,
+      "procedure": null,
+      "grsi_number": "92618-24",
+      "valid_from": null,
+      "valid_to": null,
+      "mpi": null,
+      "verification_method": null,
+      "accuracy_class": "A",
+      "base_error": 1,
+      "report_form_file": null
+    },
+    "signal": {
+      "measured_value": null,
+      "measurement_unit": "м3/ч",
+      "signal_type": null
+    },
+    "pulses": {
+      "output_type": null,
+      "representation": null,
+      "kp_qmax": null
+    }
+  },
+  "diameters": [
+    {
+      "enabled": true,
+      "name": "15",
+      "dn_mm": 15,
+      "qmax_l_s": 6.4,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.064,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "20",
+      "dn_mm": 20,
+      "qmax_l_s": 11.3,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.113,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "25",
+      "dn_mm": 25,
+      "qmax_l_s": 17.6,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.176,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "32",
+      "dn_mm": 32,
+      "qmax_l_s": 29.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.29,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "40",
+      "dn_mm": 40,
+      "qmax_l_s": 45.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.45,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "50",
+      "dn_mm": 50,
+      "qmax_l_s": 71.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 0.71,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "65",
+      "dn_mm": 65,
+      "qmax_l_s": 119.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 1.19,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "80",
+      "dn_mm": 80,
+      "qmax_l_s": 181.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 1.81,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "100",
+      "dn_mm": 100,
+      "qmax_l_s": 282.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 2.82,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "125",
+      "dn_mm": 125,
+      "qmax_l_s": 442.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 4.42,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "150",
+      "dn_mm": 150,
+      "qmax_l_s": 636.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 6.36,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "200",
+      "dn_mm": 200,
+      "qmax_l_s": 1130.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 11.3,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "250",
+      "dn_mm": 250,
+      "qmax_l_s": 1200.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 17.67,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    },
+    {
+      "enabled": true,
+      "name": "300",
+      "dn_mm": 300,
+      "qmax_l_s": 1200.0,
+      "qnom_l_s": null,
+      "qtr_l_s": null,
+      "q2tr_l_s": null,
+      "qmin_l_s": 25.44,
+      "kp_imp_l": null,
+      "qf_l_s": null
+    }
+  ],
+  "verification_points": [],
+  "calculation_parameters": {
+    "dynamic_range": null,
+    "flow_velocity_qmax_m_s": null
+  },
+  "deepseek_result": {
+    "status": "completed",
+    "warnings": [],
+    "missing_fields": [
+      "device_type.general_info.modification",
+      "device_type.general_info.procedure",
+      "device_type.general_info.valid_from",
+      "device_type.general_info.valid_to",
+      "device_type.general_info.mpi",
+      "device_type.general_info.verification_method",
+      "device_type.signal.measured_value",
+      "device_type.signal.signal_type",
+      "device_type.pulses.output_type",
+      "device_type.pulses.representation",
+      "device_type.pulses.kp_qmax",
+      "diameters[].qnom_l_s",
+      "diameters[].qtr_l_s",
+      "diameters[].q2tr_l_s",
+      "diameters[].kp_imp_l",
+      "diameters[].qf_l_s",
+      "verification_points",
+      "calculation_parameters.dynamic_range",
+      "calculation_parameters.flow_velocity_qmax_m_s"
+    ],
+    "raw_notes": "Выбрана таблица 2 для qmax и таблица 3 для qmin (исполнение A, так как accuracy_class = 'A' из шаблона). Столбцы: qmax_l_s из таблицы 2 (столбец 'Максимальный расход, qmax, м3/ч'), qmin_l_s из таблицы 3 (столбец 'qmin, м3/ч') для исполнения A (qmax/100). qnom_l_s, qtr_l_s, q2tr_l_s оставлены null, так как в таблице 3 для исполнения A нет переходных расходов (указано '-'). Для Ду250 и 300 qmin взят из таблицы 4 для исполнения A. base_error = 1% (из таблицы 5 для исполнения A, диапазон qmin ≤ q < qmax)."
+  }
+}

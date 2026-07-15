@@ -1,0 +1,41 @@
+﻿{
+  "device_type": {
+    "general_info": {
+      "name": "Счётчики-расходомеры электромагнитные ЭМИС-МАГ 270",
+      "category": null,
+      "manufacturer": "Акционерное общество «Электронные и механические измерительные системы» (АО «ЭМИС»)",
+      "modification": null,
+      "procedure": null,
+      "grsi_number": "86201-22",
+      "valid_from": null,
+      "valid_to": null,
+      "mpi": null,
+      "verification_method": null,
+      "accuracy_class": "A",
+      "base_error": null,
+      "report_form_file": null
+    },
+    "signal": {
+      "measured_value": null,
+      "measurement_unit": "м3/ч",
+      "signal_type": null
+    },
+    "pulses": {
+      "output_type": null,
+      "representation": null,
+      "kp_qmax": null
+    }
+  },
+  "diameters": [],
+  "verification_points": [],
+  "calculation_parameters": {
+    "dynamic_range": null,
+    "flow_velocity_qmax_m_s": null
+  },
+  "deepseek_result": {
+    "status": "incomplete",
+    "warnings": ["В тексте отсутствуют таблицы с данными по диаметрам и поверочным точкам. Таблицы 3 и 4 содержат общие метрологические и технические характеристики, но не содержат конкретных значений расходов для разных DN. Класс точности не указан в тексте, оставлен из шаблона (A)."],
+    "missing_fields": ["diameters", "verification_points", "calculation_parameters", "device_type.general_info.base_error", "device_type.general_info.modification", "device_type.signal.measured_value", "device_type.signal.signal_type", "device_type.pulses.output_type", "device_type.pulses.representation", "device_type.pulses.kp_qmax"],
+    "raw_notes": "Таблицы с данными по диаметрам и поверочным точкам отсутствуют в предоставленном тексте. Таблица 3 содержит общие метрологические характеристики (диапазон расходов, классы точности, погрешности), но не привязана к конкретным DN. Таблица 4 содержит технические характеристики. Класс точности не указан, оставлен из шаблона (A). base_error не определен, так как нет таблицы с конкретными значениями погрешности для выбранного класса."
+  }
+}

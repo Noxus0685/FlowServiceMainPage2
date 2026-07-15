@@ -1,0 +1,41 @@
+﻿{
+  "device_type": {
+    "general_info": {
+      "name": "Расходомер электромагнитный Yokemeter AFT-500",
+      "category": null,
+      "manufacturer": "Dalian Yoke Instrument & Meter Со., Ltd.",
+      "modification": null,
+      "procedure": null,
+      "grsi_number": "98018-26",
+      "valid_from": null,
+      "valid_to": null,
+      "mpi": null,
+      "verification_method": null,
+      "accuracy_class": "A",
+      "base_error": null,
+      "report_form_file": null
+    },
+    "signal": {
+      "measured_value": null,
+      "measurement_unit": "м3/ч",
+      "signal_type": null
+    },
+    "pulses": {
+      "output_type": null,
+      "representation": null,
+      "kp_qmax": null
+    }
+  },
+  "diameters": [],
+  "verification_points": [],
+  "calculation_parameters": {
+    "dynamic_range": null,
+    "flow_velocity_qmax_m_s": null
+  },
+  "deepseek_result": {
+    "status": null,
+    "warnings": [],
+    "missing_fields": [],
+    "raw_notes": "Выбрана строка с максимальным Q3 для каждого DN."
+  }
+}
