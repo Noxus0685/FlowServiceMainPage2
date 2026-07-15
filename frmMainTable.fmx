@@ -1,4 +1,4 @@
-﻿object FrameMainTable: TFrameMainTable
+object FrameMainTable: TFrameMainTable
   Size.Width = 1940.000000000000000000
   Size.Height = 686.000000000000000000
   Size.PlatformDefault = False
@@ -5418,8 +5418,8 @@
           Size.PlatformDefault = False
           TabIndex = 5
           TabOrder = 1
-          OnChange = TabControl1Change
           TabPosition = PlatformDefault
+          OnChange = TabControl1Change
           Sizes = (
             674s
             427s
@@ -5562,8 +5562,8 @@
             OnEditingDone = GridDevicesEditingDone
             OnCellClick = GridDevicesCellClick
             OnCellDblClick = GridDevicesCellDblClick
-            Viewport.Width = 1255.000000000000000000
-            Viewport.Height = 253.000000000000000000
+            Viewport.Width = 1235.000000000000000000
+            Viewport.Height = 212.000000000000000000
             object CheckColumnDeviceEnable1: TCheckColumn
               Header = #1042#1082#1083
               HeaderSettings.TextSettings.Trimming = Character
@@ -5806,8 +5806,8 @@
               OnSetValue = GridEtalonsSetValue
               OnCellClick = GridEtalonsCellClick
               OnCellDblClick = GridEtalonsCellDblClick
-              Viewport.Width = 1255.000000000000000000
-              Viewport.Height = 120.000000000000000000
+              Viewport.Width = 1251.000000000000000000
+              Viewport.Height = 79.000000000000000000
               object CheckColumnEtalonEnable1: TCheckColumn
                 HorzAlign = Center
                 Header = #1042#1082#1083
