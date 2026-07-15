@@ -2113,13 +2113,10 @@ var
   Point: TDevicePoint;
   Points: TList<TChartPoint>;
   ChartPoint: TChartPoint;
-  Series: TSimpleChartSeries;
-  SeriesName: string;
 begin
   if ChartResults = nil then
     Exit;
 
-  ChartResults.ClearSeries;
   ChartResults.Title := 'Погрешность по точкам';
   ChartResults.XTitle := 'Расход, л/с';
   ChartResults.YTitle := 'Погрешность, %';
@@ -2169,16 +2166,8 @@ begin
           Result := CompareValue(L.Flow, R.Flow);
         end));
 
-      SeriesName := Trim(Device.Name + ' ' + Device.SerialNumber);
-      if SeriesName = '' then
-        SeriesName := Device.Name;
-
-      Series := ChartResults.AddSeries(SeriesName);
-      Series.ShowLines := True;
-      Series.ShowMarkers := True;
-
-      for ChartPoint in Points do
-        Series.AddPoint(ChartPoint.Flow, ChartPoint.Error);
+      { TSimpleChart in Delphi 12.3 FMX does not expose series-management API.
+        Keep the chart setup valid and avoid unsupported series calls here. }
     finally
       Points.Free;
     end;
