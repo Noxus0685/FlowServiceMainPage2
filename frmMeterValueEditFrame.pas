@@ -2179,7 +2179,6 @@ var
   Indexes: TList<Integer>;
   Series: TChartSeries;
   ForecastSeries: TChartSeries;
-  MeanSeries: TChartSeries;
   LowerSeries: TChartSeries;
   UpperSeries: TChartSeries;
   I: Integer;
@@ -2252,14 +2251,6 @@ begin
         ForecastSeries.AddPoint(X, ValueToCurrentDimension(Sample.Value));
         ForecastSeries.AddPoint(ForecastEndTimeSec,
           ValueToCurrentDimension(FLastTestAnalysis.ForecastValue));
-      end;
-
-      if FLastTestAnalysis.HasStatistics then
-      begin
-        MeanSeries := ChartStability.AddSeries('Среднее');
-        DisplayValue := ValueToCurrentDimension(FLastTestAnalysis.MeanValue);
-        MeanSeries.AddPoint(MinActualTimeSec, DisplayValue);
-        MeanSeries.AddPoint(MaxActualTimeSec, DisplayValue);
       end;
 
       if HasLimits then
