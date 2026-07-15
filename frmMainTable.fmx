@@ -5465,42 +5465,6 @@ object FrameMainTable: TFrameMainTable
             ExplicitSize.cx = 81.000000000000000000
             ExplicitSize.cy = 26.000000000000000000
           end
-          object TabItemChart: TTabItem
-            CustomIcon = <
-              item
-              end>
-            TextSettings.Trimming = None
-            IsSelected = False
-            Size.Width = 1.000000000000000000
-            Size.Height = 5.000000000000000000
-            Size.PlatformDefault = False
-            StyleLookup = ''
-            TabOrder = 0
-            Text = #1043#1088#1072#1092#1080#1082
-            ExplicitSize.cx = 60.000000000000000000
-            ExplicitSize.cy = 26.000000000000000000
-            object ChartResults: TSimpleChart
-              Align = Client
-              XMax = 100.000000000000000000
-              YMax = 100.000000000000000000
-              LineColor = claBlue
-              LineThickness = 2.000000000000000000
-              ShowMarkers = True
-              MarkerRadius = 3.000000000000000000
-              GridColor = xFFCCCCCC
-              AxisColor = claBlack
-              BackgroundColor = claWhite
-              MarginLeft = 40.000000000000000000
-              MarginRight = 20.000000000000000000
-              MarginTop = 40.000000000000000000
-              MarginBottom = 40.000000000000000000
-              Title = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100' '#1087#1086' '#1090#1086#1095#1082#1072#1084
-              XTitle = #1056#1072#1089#1093#1086#1076', '#1083'/'#1089
-              YTitle = #1055#1086#1075#1088#1077#1096#1085#1086#1089#1090#1100', %'
-              XTitleOffset = 5.000000000000000000
-              YTitleOffset = 30.000000000000000000
-            end
-          end
           object TabItemChannelProperties: TTabItem
             CustomIcon = <
               item
