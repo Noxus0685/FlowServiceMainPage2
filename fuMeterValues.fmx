@@ -1,4 +1,4 @@
-﻿object FormMeterValues: TFormMeterValues
+object FormMeterValues: TFormMeterValues
   Left = 0
   Top = 0
   Caption = #1053#1072#1089#1090#1088#1086#1081#1082#1080' '#1084#1077#1090#1088#1086#1083#1086#1075#1080#1095#1077#1089#1082#1080#1093' '#1074#1077#1083#1080#1095#1080#1085
@@ -3184,7 +3184,7 @@
     Size.Width = 896.000000000000000000
     Size.Height = 557.000000000000000000
     Size.PlatformDefault = False
-    TabIndex = 4
+    TabIndex = 5
     TabOrder = 3
     TabPosition = PlatformDefault
     OnChange = TabControlMeterValueSettingsChange
@@ -3207,7 +3207,7 @@
         end>
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 77.000000000000000000
+      Size.Width = 142.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
@@ -5502,19 +5502,20 @@
         TabOrder = 4
       end
     end
-
     object TabItemStabilityForecast: TTabItem
       CustomIcon = <
         item
         end>
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 164.000000000000000000
+      Size.Width = 154.000000000000000000
       Size.Height = 26.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
       Text = #1057#1090#1072#1073#1080#1083#1100#1085#1086#1089#1090#1100' '#1080' '#1087#1088#1086#1075#1085#1086#1079
+      ExplicitSize.cx = 164.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
       object LayoutStabilityForecast: TLayout
         Align = Client
         Size.Width = 896.000000000000000000
