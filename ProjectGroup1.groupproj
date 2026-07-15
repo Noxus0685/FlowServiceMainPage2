@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{F026EE49-8017-4915-8851-D53BA32475A8}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="ProjectFornTest.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="ProjectFornTest">
+        <MSBuild Projects="ProjectFornTest.dproj"/>
+    </Target>
+    <Target Name="ProjectFornTest:Clean">
+        <MSBuild Projects="ProjectFornTest.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ProjectFornTest:Make">
+        <MSBuild Projects="ProjectFornTest.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="FMXFP">
+        <MSBuild Projects="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj"/>
+    </Target>
+    <Target Name="FMXFP:Clean">
+        <MSBuild Projects="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FMXFP:Make">
+        <MSBuild Projects="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="ProjectFornTest;FMXFP"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="ProjectFornTest:Clean;FMXFP:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="ProjectFornTest:Make;FMXFP:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
