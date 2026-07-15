@@ -160,6 +160,7 @@ type
     FTestDataModified: Boolean;
     FTestTargetValue: Double;
     FTestSettings: TMeterValueStabilitySettings;
+    FTestStabilityInfo: TMeterValueStabilityInfo;
     FLastTestAnalysis: TMeterValueStabilityInfo;
     FTestStableCandidateSinceMs: Int64;
     FTestStabilityConfirmed: Boolean;
@@ -271,6 +272,8 @@ type
     procedure UpdateTargetLimits;
     procedure HandleTargetRangeChange(Sender: TObject);
     procedure Analyze;
+    procedure RecalculateTestPreview;
+    function TryGetTestTargetLimits(out ALowerLimit, AUpperLimit: Double): Boolean;
     procedure AnalyzeDisplayedSamples(const AUseLastWorkSampleTime: Boolean; const AShowValidationError: Boolean;
       const ARefreshSource: Boolean = False);
     procedure ClearTestAnalysis;
@@ -319,6 +322,7 @@ begin
   FSettingsModified := False;
   FModified := False;
   FillChar(FTestSettings, SizeOf(FTestSettings), 0);
+  FTestStabilityInfo := Default(TMeterValueStabilityInfo);
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
@@ -2060,6 +2064,7 @@ end;
 
 procedure TFrameMeterValueEdit.ClearTestAnalysis;
 begin
+  FTestStabilityInfo := Default(TMeterValueStabilityInfo);
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
   FTestStableCandidateSinceMs := 0;
   FTestStabilityConfirmed := False;
@@ -2138,6 +2143,31 @@ begin
     ClearTestAnalysis;
 end;
 
+function TFrameMeterValueEdit.TryGetTestTargetLimits(out ALowerLimit, AUpperLimit: Double): Boolean;
+begin
+  Result := (not IsNan(FTestSettings.TargetValue)) and (not IsInfinite(FTestSettings.TargetValue)) and
+    (not IsNan(FTestSettings.TargetAccuracyPlusPercent)) and (not IsInfinite(FTestSettings.TargetAccuracyPlusPercent)) and
+    (not IsNan(FTestSettings.TargetAccuracyMinusPercent)) and (not IsInfinite(FTestSettings.TargetAccuracyMinusPercent)) and
+    (not IsNan(FTestSettings.TargetToleranceAbsolute)) and (not IsInfinite(FTestSettings.TargetToleranceAbsolute)) and
+    (FTestSettings.TargetAccuracyPlusPercent >= 0) and
+    (FTestSettings.TargetAccuracyMinusPercent >= 0) and
+    (FTestSettings.TargetToleranceAbsolute >= 0);
+  if not Result then
+    Exit;
+
+  CalculateTargetLimits(FTestSettings.TargetValue, FTestSettings.TargetAccuracyPlusPercent,
+    FTestSettings.TargetAccuracyMinusPercent, FTestSettings.TargetToleranceAbsolute,
+    ALowerLimit, AUpperLimit);
+  Result := (not IsNan(ALowerLimit)) and (not IsInfinite(ALowerLimit)) and
+    (not IsNan(AUpperLimit)) and (not IsInfinite(AUpperLimit)) and
+    (ALowerLimit <= AUpperLimit);
+end;
+
+procedure TFrameMeterValueEdit.RecalculateTestPreview;
+begin
+  AnalyzeDisplayedSamples(False, True, True);
+end;
+
 procedure TFrameMeterValueEdit.Analyze;
 begin
   AnalyzeDisplayedSamples(False, True, False);
@@ -2198,9 +2228,15 @@ begin
   end;
 
   ReadSettingsFromControls(Settings);
+  FTestSettings := Settings;
   UpdateTargetLimits;
-  LowerLimit := DisplayToBase(EditTargetLowerLimit.Text);
-  UpperLimit := DisplayToBase(EditTargetUpperLimit.Text);
+  if not TryGetTestTargetLimits(LowerLimit, UpperLimit) then
+  begin
+    ClearTestAnalysis;
+    if AShowValidationError then
+      ShowMessage('Анализ не выполнен. Некорректный целевой диапазон.');
+    Exit;
+  end;
 
   if (FSampleSource = mssWorkHistory) and AUseLastWorkSampleTime then
     SetAnalysisTimeByLastDisplayedSample;
@@ -2209,10 +2245,11 @@ begin
   for I := 0 to High(FDisplayedSamples) do
     Samples[I] := FDisplayedSamples[I];
 
-  TMeterValue.AnalyzeStabilitySamples(Samples, Settings, FTestCurrentTimeMs,
+  TMeterValue.AnalyzeStabilitySamples(Samples, FTestSettings, FTestCurrentTimeMs,
     FTestTargetValue, LowerLimit, UpperLimit, FTestStableCandidateSinceMs,
-    FTestStabilityConfirmed, FLastTestAnalysis);
-  DisplayAnalysis(FLastTestAnalysis);
+    FTestStabilityConfirmed, FTestStabilityInfo);
+  FLastTestAnalysis := FTestStabilityInfo;
+  DisplayAnalysis(FTestStabilityInfo);
   RefreshSamplesGrid(False);
 
   if (SelectedRow >= 0) and (SelectedRow < GridSamples.RowCount) then
@@ -2227,6 +2264,7 @@ begin
 
   Assert(Length(FDisplayedSamples) = OldSampleCount);
   Assert(GridSamples.RowCount = OldRowCount);
+  UpdateStabilityChart;
 end;
 
 function TFrameMeterValueEdit.FormatInfoFloat(const AValue: Double;
@@ -2378,12 +2416,11 @@ begin
       MinActualTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
       MaxActualTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
       ForecastEndTimeSec := MaxActualTimeSec;
-      HasLimits := (Indexes.Count > 1) and TryReadFloat(EditTargetLowerLimit.Text, LowerLimit) and
-        TryReadFloat(EditTargetUpperLimit.Text, UpperLimit);
+      HasLimits := (Indexes.Count > 1) and TryGetTestTargetLimits(LowerLimit, UpperLimit);
       if HasLimits then
       begin
-        LowerLimit := ValueToCurrentDimension(DisplayToBase(EditTargetLowerLimit.Text));
-        UpperLimit := ValueToCurrentDimension(DisplayToBase(EditTargetUpperLimit.Text));
+        LowerLimit := ValueToCurrentDimension(LowerLimit);
+        UpperLimit := ValueToCurrentDimension(UpperLimit);
         LowerSeries := ChartStability.AddSeries('Нижняя граница');
         UpperSeries := ChartStability.AddSeries('Верхняя граница');
         ToleranceColor := ChartColorOptionToAlphaColor(FTestSettings.ChartToleranceColor);
@@ -2407,7 +2444,7 @@ begin
         Series.AddPoint(X, DisplayValue);
       end;
 
-      if FLastTestAnalysis.HasForecast then
+      if FTestStabilityInfo.HasForecast then
       begin
         ForecastSeries := ChartStability.AddSeries('Прогноз');
         ForecastSeries.Thickness := FTestSettings.ChartSignalLineWidth;
@@ -2417,7 +2454,7 @@ begin
         ForecastEndTimeSec := X + FTestSettings.ForecastHorizonSec;
         ForecastSeries.AddPoint(X, ValueToCurrentDimension(Sample.Value));
         ForecastSeries.AddPoint(ForecastEndTimeSec,
-          ValueToCurrentDimension(FLastTestAnalysis.ForecastValue));
+          ValueToCurrentDimension(FTestStabilityInfo.ForecastValue));
       end;
 
       if HasLimits then
@@ -2968,13 +3005,14 @@ begin
       ComboBoxSampleSource.ItemIndex := Ord(FSampleSource);
     UpdateSampleSourceControls;
     RefreshSamplesGrid;
-    if MeterValueChanged then
-      Analyze
-    else if FLastTestAnalysis.Status <> mvssUnknown then
-      DisplayAnalysis(FLastTestAnalysis);
+    if (not MeterValueChanged) and (FTestStabilityInfo.Status <> mvssUnknown) then
+      DisplayAnalysis(FTestStabilityInfo);
   finally
     FLoading := False;
   end;
+
+  if FMeterValue <> nil then
+    RecalculateTestPreview;
 end;
 
 
