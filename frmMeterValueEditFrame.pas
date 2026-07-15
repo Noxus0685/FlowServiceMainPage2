@@ -2194,8 +2194,9 @@ var
   BaseTimeMs: Int64;
   X: Double;
   DisplayValue: Double;
-  MinTimeSec: Double;
-  MaxTimeSec: Double;
+  MinActualTimeSec: Double;
+  MaxActualTimeSec: Double;
+  ForecastEndTimeSec: Double;
   LowerLimit: Double;
   UpperLimit: Double;
 
@@ -2239,8 +2240,9 @@ begin
         end));
 
       BaseTimeMs := FDisplayedSamples[0].TimeStampMs;
-      MinTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
-      MaxTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
+      MinActualTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
+      MaxActualTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
+      ForecastEndTimeSec := MaxActualTimeSec;
       HasLimits := (Indexes.Count > 1) and TryReadFloat(EditTargetLowerLimit.Text, LowerLimit) and
         TryReadFloat(EditTargetUpperLimit.Text, UpperLimit);
       if HasLimits then
@@ -2277,8 +2279,9 @@ begin
         ForecastSeries := ChartStability.AddSeries('Прогноз');
         Sample := FDisplayedSamples[Indexes[Indexes.Count - 1]];
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
+        ForecastEndTimeSec := X + FTestSettings.ForecastHorizonSec;
         ForecastSeries.AddPoint(X, ValueToCurrentDimension(Sample.Value));
-        ForecastSeries.AddPoint(X + FTestSettings.ForecastHorizonSec,
+        ForecastSeries.AddPoint(ForecastEndTimeSec,
           ValueToCurrentDimension(FLastTestAnalysis.ForecastValue));
       end;
 
@@ -2286,16 +2289,16 @@ begin
       begin
         MeanSeries := ChartStability.AddSeries('Среднее');
         DisplayValue := ValueToCurrentDimension(FLastTestAnalysis.MeanValue);
-        MeanSeries.AddPoint(MinTimeSec, DisplayValue);
-        MeanSeries.AddPoint(MaxTimeSec, DisplayValue);
+        MeanSeries.AddPoint(MinActualTimeSec, DisplayValue);
+        MeanSeries.AddPoint(MaxActualTimeSec, DisplayValue);
       end;
 
       if HasLimits then
       begin
-        LowerSeries.AddPoint(MinTimeSec, LowerLimit);
-        LowerSeries.AddPoint(MaxTimeSec, LowerLimit);
-        UpperSeries.AddPoint(MinTimeSec, UpperLimit);
-        UpperSeries.AddPoint(MaxTimeSec, UpperLimit);
+        LowerSeries.AddPoint(MinActualTimeSec, LowerLimit);
+        LowerSeries.AddPoint(MaxActualTimeSec, LowerLimit);
+        UpperSeries.AddPoint(MinActualTimeSec, UpperLimit);
+        UpperSeries.AddPoint(MaxActualTimeSec, UpperLimit);
       end;
     finally
       Indexes.Free;
