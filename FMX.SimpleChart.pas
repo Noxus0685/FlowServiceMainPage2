@@ -46,9 +46,19 @@ type
 
   TSimpleChart = class(TControl)
   private
+    FAutoScale: Boolean;
+    FAxisColor: TAlphaColor;
+    FBackgroundColor: TAlphaColor;
+    FGridColor: TAlphaColor;
     FSeries: TObjectList<TChartSeries>;
+    FShowGrid: Boolean;
+    FShowLegend: Boolean;
     FTitle: string;
+    FXMax: Double;
+    FXMin: Double;
     FXTitle: string;
+    FYMax: Double;
+    FYMin: Double;
     FYTitle: string;
     FUpdateCount: Integer;
     function NextSeriesColor: TAlphaColor;
@@ -65,23 +75,35 @@ type
     property Series: TObjectList<TChartSeries> read FSeries;
   published
     property Align;
+    property AutoScale: Boolean read FAutoScale write FAutoScale default True;
+    property AxisColor: TAlphaColor read FAxisColor write FAxisColor;
     property Anchors;
+    property BackgroundColor: TAlphaColor read FBackgroundColor write FBackgroundColor;
     property ClipChildren;
     property ClipParent;
     property Cursor;
     property Enabled;
+    property GridColor: TAlphaColor read FGridColor write FGridColor;
     property Height;
     property HitTest;
     property Margins;
     property Opacity;
     property Padding;
     property Position;
+    property ShowGrid: Boolean read FShowGrid write FShowGrid default True;
+    property ShowLegend: Boolean read FShowLegend write FShowLegend default False;
     property Size;
     property TabOrder;
     property Title: string read FTitle write FTitle;
     property Visible;
     property Width;
+    property XAxisTitle: string read FXTitle write FXTitle;
+    property XMax: Double read FXMax write FXMax;
+    property XMin: Double read FXMin write FXMin;
     property XTitle: string read FXTitle write FXTitle;
+    property YAxisTitle: string read FYTitle write FYTitle;
+    property YMax: Double read FYMax write FYMax;
+    property YMin: Double read FYMin write FYMin;
     property YTitle: string read FYTitle write FYTitle;
   end;
 
@@ -137,7 +159,13 @@ end;
 constructor TSimpleChart.Create(AOwner: TComponent);
 begin
   inherited;
+  FAutoScale := True;
+  FAxisColor := TAlphaColorRec.Lightgray;
+  FBackgroundColor := TAlphaColorRec.White;
+  FGridColor := TAlphaColorRec.Lightgray;
   FSeries := TObjectList<TChartSeries>.Create(True);
+  FShowGrid := True;
+  FShowLegend := False;
   CanFocus := False;
 end;
 
@@ -221,7 +249,7 @@ var
 begin
   inherited;
   Bounds := LocalRect;
-  Canvas.Fill.Color := TAlphaColorRec.White;
+  Canvas.Fill.Color := FBackgroundColor;
   Canvas.FillRect(Bounds, 0, 0, [], 1);
 
   ChartRect := Bounds;
@@ -230,7 +258,7 @@ begin
   if (ChartRect.Width <= 0) or (ChartRect.Height <= 0) then
     Exit;
 
-  Canvas.Stroke.Color := TAlphaColorRec.Lightgray;
+  Canvas.Stroke.Color := FAxisColor;
   Canvas.Stroke.Thickness := 1;
   Canvas.DrawRect(ChartRect, 0, 0, [], 1);
 
@@ -262,6 +290,24 @@ begin
 
   if not HasPoint then
     Exit;
+
+  if not FAutoScale then
+  begin
+    MinX := FXMin;
+    MaxX := FXMax;
+    MinY := FYMin;
+    MaxY := FYMax;
+    if SameValue(MinX, MaxX) then
+    begin
+      MinX := MinX - 0.5;
+      MaxX := MaxX + 0.5;
+    end;
+    if SameValue(MinY, MaxY) then
+    begin
+      MinY := MinY - 0.5;
+      MaxY := MaxY + 0.5;
+    end;
+  end;
 
   for S in FSeries do
   begin
