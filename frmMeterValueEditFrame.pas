@@ -210,6 +210,7 @@ type
     function AppendUnit(const AText, AUnit: string): string;
     procedure UpdateStabilityHints;
     function BaseToDisplayText(const AValue: Double): string;
+    function ValueToCurrentDimension(const ABaseValue: Double): Double;
     function BaseDeltaToDisplayText(const AValue: Double): string;
     function FormatBaseInfo(const AValue: Double; const AHasValue: Boolean): string;
     function FormatBaseDeltaInfo(const AValue: Double; const AHasValue: Boolean): string;
@@ -680,6 +681,16 @@ begin
     Result := FMeterValue.FormatBaseValue(AValue)
   else
     Result := FloatToStr(AValue);
+end;
+
+function TFrameMeterValueEdit.ValueToCurrentDimension(const ABaseValue: Double): Double;
+begin
+  Result := ABaseValue;
+  if IsNan(ABaseValue) or IsInfinite(ABaseValue) then
+    Exit;
+
+  if FMeterValue <> nil then
+    Result := FMeterValue.BaseToDisplayValue(ABaseValue);
 end;
 
 function TFrameMeterValueEdit.BaseDeltaToDisplayText(const AValue: Double): string;
@@ -2181,6 +2192,7 @@ var
   HasSampleResult: Boolean;
   BaseTimeMs: Int64;
   X: Double;
+  DisplayValue: Double;
   MinTimeSec: Double;
   MaxTimeSec: Double;
   LowerLimit: Double;
@@ -2238,15 +2250,16 @@ begin
       begin
         Sample := FDisplayedSamples[SampleIndex];
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
-        Series.AddPoint(X, Sample.Value);
+        DisplayValue := ValueToCurrentDimension(Sample.Value);
+        Series.AddPoint(X, DisplayValue);
 
         HasSampleResult := FindAnalysisBySampleIndex(SampleIndex, SampleResult);
         if HasSampleResult and SampleResult.InWindow then
-          WindowSeries.AddPoint(X, Sample.Value);
+          WindowSeries.AddPoint(X, DisplayValue);
         if HasSampleResult and SampleResult.IsOutlier then
-          OutlierSeries.AddPoint(X, Sample.Value);
+          OutlierSeries.AddPoint(X, DisplayValue);
         if HasSampleResult and (not SampleResult.IsInRange) then
-          OutOfRangeSeries.AddPoint(X, Sample.Value);
+          OutOfRangeSeries.AddPoint(X, DisplayValue);
       end;
 
       if FLastTestAnalysis.HasForecast then
@@ -2254,21 +2267,23 @@ begin
         ForecastSeries := ChartStability.AddSeries('Прогноз');
         Sample := FDisplayedSamples[Indexes[Indexes.Count - 1]];
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
-        ForecastSeries.AddPoint(X, Sample.Value);
-        ForecastSeries.AddPoint(X + FTestSettings.ForecastHorizonSec, FLastTestAnalysis.ForecastValue);
+        ForecastSeries.AddPoint(X, ValueToCurrentDimension(Sample.Value));
+        ForecastSeries.AddPoint(X + FTestSettings.ForecastHorizonSec,
+          ValueToCurrentDimension(FLastTestAnalysis.ForecastValue));
       end;
 
       if FLastTestAnalysis.HasStatistics then
       begin
         MeanSeries := ChartStability.AddSeries('Среднее');
-        MeanSeries.AddPoint(MinTimeSec, FLastTestAnalysis.MeanValue);
-        MeanSeries.AddPoint(MaxTimeSec, FLastTestAnalysis.MeanValue);
+        DisplayValue := ValueToCurrentDimension(FLastTestAnalysis.MeanValue);
+        MeanSeries.AddPoint(MinTimeSec, DisplayValue);
+        MeanSeries.AddPoint(MaxTimeSec, DisplayValue);
       end;
 
       if TryReadFloat(EditTargetLowerLimit.Text, LowerLimit) and TryReadFloat(EditTargetUpperLimit.Text, UpperLimit) then
       begin
-        LowerLimit := DisplayToBase(EditTargetLowerLimit.Text);
-        UpperLimit := DisplayToBase(EditTargetUpperLimit.Text);
+        LowerLimit := ValueToCurrentDimension(DisplayToBase(EditTargetLowerLimit.Text));
+        UpperLimit := ValueToCurrentDimension(DisplayToBase(EditTargetUpperLimit.Text));
         LowerSeries := ChartStability.AddSeries('Нижняя граница');
         LowerSeries.AddPoint(MinTimeSec, LowerLimit);
         LowerSeries.AddPoint(MaxTimeSec, LowerLimit);
