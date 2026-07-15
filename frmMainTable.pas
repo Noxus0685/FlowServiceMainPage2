@@ -2113,78 +2113,80 @@ var
   Point: TDevicePoint;
   Points: TList<TChartPoint>;
   ChartPoint: TChartPoint;
-  Series: TSimpleChartSeries;
+  Series: FMX.SimpleChart.TChartSeries;
   SeriesName: string;
 begin
   if ChartResults = nil then
     Exit;
 
-  ChartResults.ClearSeries;
-  ChartResults.Title := 'Погрешность по точкам';
-  ChartResults.XTitle := 'Расход, л/с';
-  ChartResults.YTitle := 'Погрешность, %';
+  ChartResults.BeginUpdate;
+  try
+    ChartResults.ClearAllSeries;
+    ChartResults.Title := 'Погрешность по точкам';
+    ChartResults.XTitle := 'Расход, л/с';
+    ChartResults.YTitle := 'Погрешность, %';
 
-  WorkTable := FActiveWorkTable;
-  if (WorkTable = nil) or (WorkTable.DeviceChannels = nil) or (FFrameProceed = nil) then
-  begin
-    ChartResults.Repaint;
-    Exit;
-  end;
+    WorkTable := FActiveWorkTable;
+    if (WorkTable = nil) or (WorkTable.DeviceChannels = nil) or (FFrameProceed = nil) then
+      Exit;
 
-  for Ch in WorkTable.DeviceChannels do
-  begin
-    if (Ch = nil) or (Ch.State = osDeleted) or (Ch.FlowMeter = nil) or
-       (Ch.FlowMeter.Device = nil) then
-      Continue;
-
-    Device := Ch.FlowMeter.Device;
-    if (Device = nil) or (Device.State = osDeleted) or (Device.Points = nil) then
-      Continue;
-
-    Points := TList<TChartPoint>.Create;
-    try
-      for Point in Device.Points do
-      begin
-        if (Point = nil) or (Point.State = osDeleted) or (not Point.Enabled) then
-          Continue;
-
-        if FFrameProceed.FindResultSpillageForPoint(Device, Point) = nil then
-          Continue;
-
-        ChartPoint.Flow := FFrameProceed.GetPointResultFlowLS(Device, Point);
-        ChartPoint.Error := GetPointResultError(Device, Point);
-        if IsNan(ChartPoint.Flow) or IsInfinite(ChartPoint.Flow) or
-           IsNan(ChartPoint.Error) or IsInfinite(ChartPoint.Error) then
-          Continue;
-
-        Points.Add(ChartPoint);
-      end;
-
-      if Points.Count = 0 then
+    for Ch in WorkTable.DeviceChannels do
+    begin
+      if (Ch = nil) or (Ch.State = osDeleted) or (Ch.FlowMeter = nil) or
+         (Ch.FlowMeter.Device = nil) then
         Continue;
 
-      Points.Sort(TComparer<TChartPoint>.Construct(
-        function(const L, R: TChartPoint): Integer
+      Device := Ch.FlowMeter.Device;
+      if (Device = nil) or (Device.State = osDeleted) or (Device.Points = nil) then
+        Continue;
+
+      Points := TList<TChartPoint>.Create;
+      try
+        for Point in Device.Points do
         begin
-          Result := CompareValue(L.Flow, R.Flow);
-        end));
+          if (Point = nil) or (Point.State = osDeleted) or (not Point.Enabled) then
+            Continue;
 
-      SeriesName := Trim(Device.Name + ' ' + Device.SerialNumber);
-      if SeriesName = '' then
-        SeriesName := Device.Name;
+          if FFrameProceed.FindResultSpillageForPoint(Device, Point) = nil then
+            Continue;
 
-      Series := ChartResults.AddSeries(SeriesName);
-      Series.ShowLines := True;
-      Series.ShowMarkers := True;
+          ChartPoint.Flow := FFrameProceed.GetPointResultFlowLS(Device, Point);
+          ChartPoint.Error := GetPointResultError(Device, Point);
+          if IsNan(ChartPoint.Flow) or IsInfinite(ChartPoint.Flow) or
+             IsNan(ChartPoint.Error) or IsInfinite(ChartPoint.Error) then
+            Continue;
 
-      for ChartPoint in Points do
-        Series.AddPoint(ChartPoint.Flow, ChartPoint.Error);
-    finally
-      Points.Free;
+          Points.Add(ChartPoint);
+        end;
+
+        if Points.Count = 0 then
+          Continue;
+
+        Points.Sort(TComparer<TChartPoint>.Construct(
+          function(const L, R: TChartPoint): Integer
+          begin
+            Result := CompareValue(L.Flow, R.Flow);
+          end));
+
+        SeriesName := Trim(Device.Name + ' ' + Device.SerialNumber);
+        if SeriesName = '' then
+          SeriesName := Device.Name;
+
+        Series := ChartResults.AddSeries(SeriesName);
+        Series.ShowLines := True;
+        Series.ShowMarkers := True;
+
+        for ChartPoint in Points do
+          Series.AddPoint(ChartPoint.Flow, ChartPoint.Error);
+      finally
+        Points.Free;
+      end;
     end;
+  finally
+    ChartResults.EndUpdate;
   end;
 
-  ChartResults.Repaint;
+  ChartResults.InvalidateChart;
 end;
 
 procedure TFrameMainTable.SetSessionDim(UnitName: string; QuantityUnitName: string);
