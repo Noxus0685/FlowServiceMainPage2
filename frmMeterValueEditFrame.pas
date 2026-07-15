@@ -167,7 +167,9 @@ type
     FChartAppearanceModified: Boolean;
     FApplyingSettings: Boolean;
     FRecalculating: Boolean;
+    FStabilityTimerUpdating: Boolean;
     FModified: Boolean;
+    TimerStabilityAutoRefresh: TTimer;
     LayoutRoot: TVertScrollBox;
     EditName: TEdit;
     EditType: TEdit;
@@ -206,7 +208,13 @@ type
     function GetGridRowForSampleIndex(const AIndex: Integer): Integer;
     function SelectedSampleIndex: Integer;
     function GetDisplayedSamples: TArray<TMeterValueSample>;
+    function GetDisplayedStabilitySamples: TArray<TMeterValueSample>;
     procedure RefreshDisplayedSamples;
+    procedure SortDisplayedSamples;
+    function CanRunStabilityAutoRefresh: Boolean;
+    procedure UpdateStabilityAutoRefreshTimer;
+    procedure RefreshStabilityHistoryAndAnalysis;
+    procedure TimerStabilityAutoRefreshTimer(Sender: TObject);
     procedure SetSampleSource(const ASource: TMeterValueSampleSource);
     procedure UpdateSampleSourceControls;
     procedure ComboBoxSampleSourceChange(Sender: TObject);
@@ -326,7 +334,12 @@ begin
   FChartAppearanceModified := False;
   FApplyingSettings := False;
   FRecalculating := False;
+  FStabilityTimerUpdating := False;
   FModified := False;
+  TimerStabilityAutoRefresh := TTimer.Create(Self);
+  TimerStabilityAutoRefresh.Interval := 1000;
+  TimerStabilityAutoRefresh.Enabled := False;
+  TimerStabilityAutoRefresh.OnTimer := TimerStabilityAutoRefreshTimer;
   FillChar(FTestSettings, SizeOf(FTestSettings), 0);
   FTestStabilityInfo := Default(TMeterValueStabilityInfo);
   FLastTestAnalysis := Default(TMeterValueStabilityInfo);
@@ -338,6 +351,8 @@ end;
 
 destructor TFrameMeterValueEdit.Destroy;
 begin
+  if TimerStabilityAutoRefresh <> nil then
+    TimerStabilityAutoRefresh.Enabled := False;
   FTestSamples.Free;
   inherited;
 end;
@@ -960,6 +975,11 @@ end;
 
 function TFrameMeterValueEdit.GetDisplayedSamples: TArray<TMeterValueSample>;
 begin
+  Result := GetDisplayedStabilitySamples;
+end;
+
+function TFrameMeterValueEdit.GetDisplayedStabilitySamples: TArray<TMeterValueSample>;
+begin
   case FSampleSource of
     mssWorkHistory:
       if FMeterValue <> nil then
@@ -971,9 +991,102 @@ begin
   end;
 end;
 
+procedure TFrameMeterValueEdit.SortDisplayedSamples;
+begin
+  TArray.Sort<TMeterValueSample>(FDisplayedSamples,
+    TComparer<TMeterValueSample>.Construct(
+      function(const L, R: TMeterValueSample): Integer
+      begin
+        Result := CompareValue(L.TimeStampMs, R.TimeStampMs);
+      end));
+end;
+
 procedure TFrameMeterValueEdit.RefreshDisplayedSamples;
 begin
-  FDisplayedSamples := GetDisplayedSamples;
+  FDisplayedSamples := GetDisplayedStabilitySamples;
+  SortDisplayedSamples;
+end;
+
+function TFrameMeterValueEdit.CanRunStabilityAutoRefresh: Boolean;
+begin
+  Result := (not FLoading) and
+    (not (csDestroying in ComponentState)) and
+    (FMeterValue <> nil) and
+    (CheckBoxAutoAnalyze <> nil) and CheckBoxAutoAnalyze.IsChecked and
+    (CheckBoxStabilityEnabled <> nil) and CheckBoxStabilityEnabled.IsChecked;
+end;
+
+procedure TFrameMeterValueEdit.UpdateStabilityAutoRefreshTimer;
+begin
+  if TimerStabilityAutoRefresh = nil then
+    Exit;
+
+  if csDestroying in ComponentState then
+  begin
+    TimerStabilityAutoRefresh.Enabled := False;
+    Exit;
+  end;
+
+  TimerStabilityAutoRefresh.Enabled := CanRunStabilityAutoRefresh;
+end;
+
+procedure TFrameMeterValueEdit.TimerStabilityAutoRefreshTimer(Sender: TObject);
+begin
+  if FStabilityTimerUpdating then
+    Exit;
+  if csDestroying in ComponentState then
+    Exit;
+  if not CanRunStabilityAutoRefresh then
+  begin
+    UpdateStabilityAutoRefreshTimer;
+    Exit;
+  end;
+
+  FStabilityTimerUpdating := True;
+  try
+    RefreshStabilityHistoryAndAnalysis;
+  finally
+    FStabilityTimerUpdating := False;
+  end;
+end;
+
+procedure TFrameMeterValueEdit.RefreshStabilityHistoryAndAnalysis;
+var
+  WasLastRow: Boolean;
+  SelectedTimeStampMs: Int64;
+  SelectedRow: Integer;
+  I: Integer;
+begin
+  if (GridSamples <> nil) and GridSamples.IsFocused and (FSampleSource = mssTestSamples) then
+    Exit;
+  if not CanRunStabilityAutoRefresh then
+    Exit;
+
+  SelectedRow := GridSamples.Row;
+  WasLastRow := (SelectedRow >= 0) and (SelectedRow = GridSamples.RowCount - 1);
+  SelectedTimeStampMs := -1;
+  if (SelectedRow >= 0) and (SelectedRow < Length(FDisplayedSamples)) and
+     (GetSampleIndexForGridRow(SelectedRow) >= 0) then
+    SelectedTimeStampMs := FDisplayedSamples[GetSampleIndexForGridRow(SelectedRow)].TimeStampMs;
+
+  RefreshDisplayedSamples;
+  if FSampleSource = mssWorkHistory then
+    FTestCurrentTimeMs := GetTickCount64;
+  RefreshSamplesGrid(False);
+
+  if WasLastRow and (GridSamples.RowCount > 0) then
+    GridSamples.Row := GridSamples.RowCount - 1
+  else if SelectedTimeStampMs >= 0 then
+    for I := 0 to High(FDisplayedSamples) do
+      if FDisplayedSamples[I].TimeStampMs = SelectedTimeStampMs then
+      begin
+        GridSamples.Row := GetGridRowForSampleIndex(I);
+        Break;
+      end;
+  GridSamples.Selected := GridSamples.Row;
+
+  AnalyzeDisplayedSamples(False, False, False);
+  UpdateStabilityChart;
 end;
 
 procedure TFrameMeterValueEdit.SetAnalysisTimeByLastDisplayedSample;
@@ -995,6 +1108,7 @@ begin
     Analyze
   else
     AnalyzeIfNeeded;
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 procedure TFrameMeterValueEdit.UpdateSampleSourceControls;
@@ -2063,6 +2177,7 @@ begin
   FTestDataModified := True;
   FModified := True;
   ApplyAndSaveStabilitySettings(True, False, True);
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 procedure TFrameMeterValueEdit.ClearTestAnalysis;
@@ -2140,7 +2255,10 @@ begin
   FSettingsModified := True;
   FModified := True;
   FTestSettings.AutoAnalyze := CheckBoxAutoAnalyze.IsChecked;
-  ApplyAndSaveStabilitySettings(True, False, True);
+  ApplyAndSaveStabilitySettings(False, False, True);
+  UpdateStabilityAutoRefreshTimer;
+  if CheckBoxAutoAnalyze.IsChecked then
+    RefreshStabilityHistoryAndAnalysis;
 end;
 
 function TFrameMeterValueEdit.TryGetTestTargetLimits(out ALowerLimit, AUpperLimit: Double): Boolean;
@@ -2830,6 +2948,7 @@ begin
   FSettingsModified := True;
   FModified := True;
   ApplyAndSaveStabilitySettings(True, False, True);
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 function TFrameMeterValueEdit.SafeFloat(const S: string): Double;
@@ -2956,6 +3075,7 @@ begin
       UpdateSampleSourceControls;
       ClearTestAnalysis;
       MemoConclusion.Lines.Text := 'В рабочей истории нет данных';
+      UpdateStabilityAutoRefreshTimer;
       Exit;
     end;
 
@@ -3041,6 +3161,7 @@ begin
 
   if FMeterValue <> nil then
     RecalculateTestPreview;
+  UpdateStabilityAutoRefreshTimer;
 end;
 
 
