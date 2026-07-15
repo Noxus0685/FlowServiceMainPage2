@@ -2178,9 +2178,6 @@ procedure TFrameMeterValueEdit.UpdateStabilityChart;
 var
   Indexes: TList<Integer>;
   Series: TChartSeries;
-  WindowSeries: TChartSeries;
-  OutlierSeries: TChartSeries;
-  OutOfRangeSeries: TChartSeries;
   ForecastSeries: TChartSeries;
   MeanSeries: TChartSeries;
   LowerSeries: TChartSeries;
@@ -2188,8 +2185,6 @@ var
   I: Integer;
   SampleIndex: Integer;
   Sample: TMeterValueSample;
-  SampleResult: TMeterValueSampleAnalysis;
-  HasSampleResult: Boolean;
   HasLimits: Boolean;
   BaseTimeMs: Int64;
   X: Double;
@@ -2199,21 +2194,6 @@ var
   ForecastEndTimeSec: Double;
   LowerLimit: Double;
   UpperLimit: Double;
-
-  function FindAnalysisBySampleIndex(const AIndex: Integer; out AResult: TMeterValueSampleAnalysis): Boolean;
-  var
-    AnalysisIndex: Integer;
-  begin
-    Result := False;
-    AResult := Default(TMeterValueSampleAnalysis);
-    for AnalysisIndex := 0 to High(FLastTestAnalysis.SampleResults) do
-      if (FLastTestAnalysis.SampleResults[AnalysisIndex].SourceIndex = AIndex) and
-         (FLastTestAnalysis.SampleResults[AnalysisIndex].TimeStampMs = FDisplayedSamples[AIndex].TimeStampMs) then
-      begin
-        AResult := FLastTestAnalysis.SampleResults[AnalysisIndex];
-        Exit(True);
-      end;
-  end;
 
 begin
   if ChartStability = nil then
@@ -2254,9 +2234,6 @@ begin
       end;
 
       Series := ChartStability.AddSeries('Сигнал');
-      WindowSeries := ChartStability.AddSeries('В окне анализа');
-      OutlierSeries := ChartStability.AddSeries('Выбросы');
-      OutOfRangeSeries := ChartStability.AddSeries('Вне диапазона');
 
       for SampleIndex in Indexes do
       begin
@@ -2264,14 +2241,6 @@ begin
         X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
         DisplayValue := ValueToCurrentDimension(Sample.Value);
         Series.AddPoint(X, DisplayValue);
-
-        HasSampleResult := FindAnalysisBySampleIndex(SampleIndex, SampleResult);
-        if HasSampleResult and SampleResult.InWindow then
-          WindowSeries.AddPoint(X, DisplayValue);
-        if HasSampleResult and SampleResult.IsOutlier then
-          OutlierSeries.AddPoint(X, DisplayValue);
-        if HasSampleResult and (not SampleResult.IsInRange) then
-          OutOfRangeSeries.AddPoint(X, DisplayValue);
       end;
 
       if FLastTestAnalysis.HasForecast then
