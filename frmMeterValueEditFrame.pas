@@ -2176,7 +2176,6 @@ var
   UpperSeries: TChartSeries;
   I: Integer;
   SampleIndex: Integer;
-  AnalysisIndex: Integer;
   Sample: TMeterValueSample;
   SampleResult: TMeterValueSampleAnalysis;
   HasSampleResult: Boolean;
@@ -2188,6 +2187,8 @@ var
   UpperLimit: Double;
 
   function FindAnalysisBySampleIndex(const AIndex: Integer; out AResult: TMeterValueSampleAnalysis): Boolean;
+  var
+    AnalysisIndex: Integer;
   begin
     Result := False;
     AResult := Default(TMeterValueSampleAnalysis);
