@@ -709,6 +709,113 @@
               Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
               TextSettings.Trimming = None
             end
+            object GroupBoxChartAppearance: TGroupBox
+              Align = Top
+              Margins.Bottom = 8.000000000000000000
+              Size.Width = 704.000000000000000000
+              Size.Height = 250.000000000000000000
+              Size.PlatformDefault = False
+              Text = #1042#1085#1077#1096#1085#1080#1081' '#1074#1080#1076' '#1075#1088#1072#1092#1080#1082#1072
+              TabOrder = 1
+              object LabelChartSignalColor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 32.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Text = #1062#1074#1077#1090' '#1089#1080#1075#1085#1072#1083#1072
+              end
+              object ComboBoxChartSignalColor: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 30.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                TabOrder = 0
+              end
+              object LabelChartToleranceColor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 62.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Text = #1062#1074#1077#1090' '#1076#1086#1087#1091#1089#1082#1086#1074
+              end
+              object ComboBoxChartToleranceColor: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 60.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                TabOrder = 1
+              end
+              object LabelChartForecastColor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 92.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Text = #1062#1074#1077#1090' '#1087#1088#1086#1075#1085#1086#1079#1072
+              end
+              object ComboBoxChartForecastColor: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 90.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                TabOrder = 2
+              end
+              object LabelChartOutlierColor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 122.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Text = #1062#1074#1077#1090' '#1074#1099#1073#1088#1086#1089#1086#1074
+              end
+              object ComboBoxChartOutlierColor: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 120.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                TabOrder = 3
+              end
+              object LabelChartOutOfRangeColor: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 152.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Text = #1062#1074#1077#1090' '#1074#1085#1077' '#1076#1080#1072#1087#1072#1079#1086#1085#1072
+              end
+              object ComboBoxChartOutOfRangeColor: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 150.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                TabOrder = 4
+              end
+              object LabelChartSignalWidth: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 182.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Text = #1058#1086#1083#1097#1080#1085#1072' '#1089#1080#1075#1085#1072#1083#1072
+              end
+              object ComboBoxChartSignalWidth: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 180.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                TabOrder = 5
+              end
+              object LabelChartToleranceWidth: TLabel
+                Position.X = 12.000000000000000000
+                Position.Y = 212.000000000000000000
+                Size.Width = 190.000000000000000000
+                Size.Height = 22.000000000000000000
+                Text = #1058#1086#1083#1097#1080#1085#1072' '#1076#1086#1087#1091#1089#1082#1086#1074
+              end
+              object ComboBoxChartToleranceWidth: TComboBox
+                Position.X = 220.000000000000000000
+                Position.Y = 210.000000000000000000
+                Size.Width = 150.000000000000000000
+                Size.Height = 24.000000000000000000
+                TabOrder = 6
+              end
+            end
             object GroupSettingsCommon: TGroupBox
               Align = Top
               Margins.Bottom = 8.000000000000000000
