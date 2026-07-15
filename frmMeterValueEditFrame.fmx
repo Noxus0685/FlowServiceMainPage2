@@ -1,4 +1,4 @@
-object FrameMeterValueEdit: TFrameMeterValueEdit
+﻿object FrameMeterValueEdit: TFrameMeterValueEdit
   Size.Width = 909.000000000000000000
   Size.Height = 620.000000000000000000
   Size.PlatformDefault = False
@@ -701,16 +701,6 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
             TabOrder = 0
             Viewport.Width = 704.000000000000000000
             Viewport.Height = 360.000000000000000000
-            object ButtonApplyStabilitySettings: TButton
-              Align = Top
-              Margins.Bottom = 8.000000000000000000
-              Size.Width = 704.000000000000000000
-              Size.Height = 32.000000000000000000
-              Size.PlatformDefault = False
-              TabOrder = 0
-              Text = #1055#1088#1080#1084#1077#1085#1080#1090#1100
-              TextSettings.Trimming = None
-            end
             object GroupSettingsCommon: TGroupBox
               Align = Top
               Margins.Bottom = 8.000000000000000000
@@ -718,7 +708,7 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
               Size.Height = 220.000000000000000000
               Size.PlatformDefault = False
               Text = #1054#1073#1097#1080#1077' '#1087#1072#1088#1072#1084#1077#1090#1088#1099
-              TabOrder = 1
+              TabOrder = 0
               object CheckBoxStabilityEnabled: TCheckBox
                 Position.X = 12.000000000000000000
                 Position.Y = 30.000000000000000000
