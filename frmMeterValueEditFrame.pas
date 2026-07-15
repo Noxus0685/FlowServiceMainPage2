@@ -145,9 +145,6 @@ type
     GroupBoxChartAppearance: TGroupBox;
     ComboBoxChartSignalColor: TComboBox;
     ComboBoxChartToleranceColor: TComboBox;
-    ComboBoxChartForecastColor: TComboBox;
-    ComboBoxChartOutlierColor: TComboBox;
-    ComboBoxChartOutOfRangeColor: TComboBox;
     ComboBoxChartSignalWidth: TComboBox;
     ComboBoxChartToleranceWidth: TComboBox;
   private
@@ -425,16 +422,10 @@ begin
   TabControlStability.OnChange := TabControlStabilityChange;
   FillChartColorComboBox(ComboBoxChartSignalColor);
   FillChartColorComboBox(ComboBoxChartToleranceColor);
-  FillChartColorComboBox(ComboBoxChartForecastColor);
-  FillChartColorComboBox(ComboBoxChartOutlierColor);
-  FillChartColorComboBox(ComboBoxChartOutOfRangeColor);
   FillChartWidthComboBox(ComboBoxChartSignalWidth);
   FillChartWidthComboBox(ComboBoxChartToleranceWidth);
   ComboBoxChartSignalColor.OnChange := ChartAppearanceChange;
   ComboBoxChartToleranceColor.OnChange := ChartAppearanceChange;
-  ComboBoxChartForecastColor.OnChange := ChartAppearanceChange;
-  ComboBoxChartOutlierColor.OnChange := ChartAppearanceChange;
-  ComboBoxChartOutOfRangeColor.OnChange := ChartAppearanceChange;
   ComboBoxChartSignalWidth.OnChange := ChartAppearanceChange;
   ComboBoxChartToleranceWidth.OnChange := ChartAppearanceChange;
   ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
@@ -2541,9 +2532,6 @@ begin
     CheckBoxRequireForecastInRange.IsChecked := FTestSettings.RequireForecastInRange;
     ComboBoxChartSignalColor.ItemIndex := Ord(FTestSettings.ChartSignalColor);
     ComboBoxChartToleranceColor.ItemIndex := Ord(FTestSettings.ChartToleranceColor);
-    ComboBoxChartForecastColor.ItemIndex := Ord(FTestSettings.ChartForecastColor);
-    ComboBoxChartOutlierColor.ItemIndex := Ord(FTestSettings.ChartOutlierColor);
-    ComboBoxChartOutOfRangeColor.ItemIndex := Ord(FTestSettings.ChartOutOfRangeColor);
     ComboBoxChartSignalWidth.ItemIndex := ChartWidthToComboIndex(FTestSettings.ChartSignalLineWidth);
     ComboBoxChartToleranceWidth.ItemIndex := ChartWidthToComboIndex(FTestSettings.ChartToleranceLineWidth);
     UpdateTargetLimits;
@@ -2596,12 +2584,6 @@ begin
     ASettings.ChartSignalColor := TChartColorOption(EnsureRange(ComboBoxChartSignalColor.ItemIndex, Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
   if ComboBoxChartToleranceColor.ItemIndex >= 0 then
     ASettings.ChartToleranceColor := TChartColorOption(EnsureRange(ComboBoxChartToleranceColor.ItemIndex, Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
-  if ComboBoxChartForecastColor.ItemIndex >= 0 then
-    ASettings.ChartForecastColor := TChartColorOption(EnsureRange(ComboBoxChartForecastColor.ItemIndex, Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
-  if ComboBoxChartOutlierColor.ItemIndex >= 0 then
-    ASettings.ChartOutlierColor := TChartColorOption(EnsureRange(ComboBoxChartOutlierColor.ItemIndex, Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
-  if ComboBoxChartOutOfRangeColor.ItemIndex >= 0 then
-    ASettings.ChartOutOfRangeColor := TChartColorOption(EnsureRange(ComboBoxChartOutOfRangeColor.ItemIndex, Ord(Low(TChartColorOption)), Ord(High(TChartColorOption))));
   ASettings.ChartSignalLineWidth := ComboIndexToChartWidth(ComboBoxChartSignalWidth.ItemIndex);
   ASettings.ChartToleranceLineWidth := ComboIndexToChartWidth(ComboBoxChartToleranceWidth.ItemIndex);
 end;
