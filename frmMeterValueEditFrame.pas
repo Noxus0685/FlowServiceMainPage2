@@ -7,6 +7,7 @@ uses
   FMX.Controls.Presentation,
   FMX.Consts,
   FMX.Dialogs,
+  FMX.DialogService,
   FMX.Edit,
   FMX.Forms,
   FMX.Layouts,
@@ -20,13 +21,14 @@ uses
   FMX.Grid,
   System.Classes,
   System.Generics.Collections,
+  System.Generics.Defaults,
   System.Math,
   System.Rtti,
   System.SysUtils,
   System.Types,
   System.UITypes,
   uBaseProcedures,
-  uMeterValue, FMX.Grid.Style, FMX.ScrollBox, uDebugLog;
+  uMeterValue, FMX.Grid.Style, FMX.ScrollBox, FMX.SimpleChart, uDebugLog;
 
 type
   TMeterValueSampleSource = (
@@ -58,6 +60,8 @@ type
     TabItemStabilityData: TTabItem;
     TabItemStabilitySettings: TTabItem;
     TabItemStabilityResult: TTabItem;
+    TabItemStabilityChart: TTabItem;
+    ChartStability: TSimpleChart;
     LayoutConclusion: TLayout;
     LabelConclusionTitle: TLabel;
     RectangleSignalStable: TRectangle;
@@ -198,6 +202,7 @@ type
     procedure SetSampleSource(const ASource: TMeterValueSampleSource);
     procedure UpdateSampleSourceControls;
     procedure ComboBoxSampleSourceChange(Sender: TObject);
+    procedure TabControlStabilityChange(Sender: TObject);
     procedure ButtonRefreshHistoryClick(Sender: TObject);
     procedure ButtonUseLastSampleTimeClick(Sender: TObject);
     procedure SetAnalysisTimeByLastDisplayedSample;
@@ -205,6 +210,7 @@ type
     function AppendUnit(const AText, AUnit: string): string;
     procedure UpdateStabilityHints;
     function BaseToDisplayText(const AValue: Double): string;
+    function ValueToCurrentDimension(const ABaseValue: Double): Double;
     function BaseDeltaToDisplayText(const AValue: Double): string;
     function FormatBaseInfo(const AValue: Double; const AHasValue: Boolean): string;
     function FormatBaseDeltaInfo(const AValue: Double; const AHasValue: Boolean): string;
@@ -269,6 +275,7 @@ type
     function FormatInfoFloat(const AValue: Double; const AHasValue: Boolean; const ADigits: Integer = 4): string;
     function TrendDirectionText(const ADirection: TMeterValueTrendDirection; const AHasTrend: Boolean): string;
     procedure UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
+    procedure UpdateStabilityChart;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -400,6 +407,7 @@ begin
   ButtonGenerateNew.OnClick := ButtonGenerateNewClick;
   ButtonGenerateAppend.OnClick := ButtonGenerateAppendClick;
   ButtonApplyScenario.OnClick := ButtonApplyScenarioClick;
+  TabControlStability.OnChange := TabControlStabilityChange;
   ButtonApplyStabilitySettings.OnClick := ButtonApplyStabilitySettingsClick;
   CheckBoxAutoAnalyze.OnChange := HandleAutoAnalyzeChange;
   GridSamples.OnCellDblClick := GridSamplesCellDblClick;
@@ -675,6 +683,16 @@ begin
     Result := FloatToStr(AValue);
 end;
 
+function TFrameMeterValueEdit.ValueToCurrentDimension(const ABaseValue: Double): Double;
+begin
+  Result := ABaseValue;
+  if IsNan(ABaseValue) or IsInfinite(ABaseValue) then
+    Exit;
+
+  if FMeterValue <> nil then
+    Result := FMeterValue.BaseToDisplayValue(ABaseValue);
+end;
+
 function TFrameMeterValueEdit.BaseDeltaToDisplayText(const AValue: Double): string;
 begin
   if FMeterValue <> nil then
@@ -896,6 +914,12 @@ begin
     SetSampleSource(mssWorkHistory);
 end;
 
+procedure TFrameMeterValueEdit.TabControlStabilityChange(Sender: TObject);
+begin
+  if TabControlStability.ActiveTab = TabItemStabilityChart then
+    UpdateStabilityChart;
+end;
+
 procedure TFrameMeterValueEdit.ButtonRefreshHistoryClick(Sender: TObject);
 var
   BeforeSamples: TArray<TMeterValueSample>;
@@ -1038,6 +1062,7 @@ begin
   end;
   GridSamples.Repaint;
   UpdateSampleSourceControls;
+  UpdateStabilityChart;
 end;
 
 procedure TFrameMeterValueEdit.SortSamples;
@@ -1334,13 +1359,19 @@ procedure TFrameMeterValueEdit.ClearSamples;
 begin
   if FSampleSource = mssWorkHistory then
   begin
-    if (FMeterValue <> nil) and (MessageDlg('Очистить историю TMeterValue?',
-      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes) then
-    begin
-      FMeterValue.ClearStabilitySamples;
-      RefreshSamplesGrid(True);
-      ClearAnalysisDisplay;
-    end;
+    if FMeterValue <> nil then
+      TDialogService.MessageDialog('Очистить историю TMeterValue?',
+        TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+        TMsgDlgBtn.mbNo, 0,
+        procedure(const AResult: TModalResult)
+        begin
+          if AResult = mrYes then
+          begin
+            FMeterValue.ClearStabilitySamples;
+            RefreshSamplesGrid(True);
+            ClearAnalysisDisplay;
+          end;
+        end);
     Exit;
   end;
 
@@ -2142,6 +2173,133 @@ begin
   UpdateConclusionIndicators(AInfo);
 end;
 
+
+procedure TFrameMeterValueEdit.UpdateStabilityChart;
+var
+  Indexes: TList<Integer>;
+  Series: TChartSeries;
+  WindowSeries: TChartSeries;
+  OutlierSeries: TChartSeries;
+  OutOfRangeSeries: TChartSeries;
+  ForecastSeries: TChartSeries;
+  MeanSeries: TChartSeries;
+  LowerSeries: TChartSeries;
+  UpperSeries: TChartSeries;
+  I: Integer;
+  SampleIndex: Integer;
+  Sample: TMeterValueSample;
+  SampleResult: TMeterValueSampleAnalysis;
+  HasSampleResult: Boolean;
+  BaseTimeMs: Int64;
+  X: Double;
+  DisplayValue: Double;
+  MinTimeSec: Double;
+  MaxTimeSec: Double;
+  LowerLimit: Double;
+  UpperLimit: Double;
+
+  function FindAnalysisBySampleIndex(const AIndex: Integer; out AResult: TMeterValueSampleAnalysis): Boolean;
+  var
+    AnalysisIndex: Integer;
+  begin
+    Result := False;
+    AResult := Default(TMeterValueSampleAnalysis);
+    for AnalysisIndex := 0 to High(FLastTestAnalysis.SampleResults) do
+      if (FLastTestAnalysis.SampleResults[AnalysisIndex].SourceIndex = AIndex) and
+         (FLastTestAnalysis.SampleResults[AnalysisIndex].TimeStampMs = FDisplayedSamples[AIndex].TimeStampMs) then
+      begin
+        AResult := FLastTestAnalysis.SampleResults[AnalysisIndex];
+        Exit(True);
+      end;
+  end;
+
+begin
+  if ChartStability = nil then
+    Exit;
+
+  ChartStability.BeginUpdate;
+  try
+    ChartStability.ClearAllSeries;
+    ChartStability.Title := 'История сигнала';
+    ChartStability.XTitle := 'Время, с';
+    ChartStability.YTitle := AppendUnit('Значение', DisplayUnitName);
+
+    if Length(FDisplayedSamples) = 0 then
+      Exit;
+
+    Indexes := TList<Integer>.Create;
+    try
+      for I := 0 to High(FDisplayedSamples) do
+        Indexes.Add(I);
+      Indexes.Sort(TComparer<Integer>.Construct(
+        function(const L, R: Integer): Integer
+        begin
+          Result := CompareValue(FDisplayedSamples[L].TimeStampMs, FDisplayedSamples[R].TimeStampMs);
+        end));
+
+      BaseTimeMs := FDisplayedSamples[0].TimeStampMs;
+      MinTimeSec := (FDisplayedSamples[Indexes[0]].TimeStampMs - BaseTimeMs) / 1000;
+      MaxTimeSec := (FDisplayedSamples[Indexes[Indexes.Count - 1]].TimeStampMs - BaseTimeMs) / 1000;
+
+      Series := ChartStability.AddSeries('Сигнал');
+      WindowSeries := ChartStability.AddSeries('В окне анализа');
+      OutlierSeries := ChartStability.AddSeries('Выбросы');
+      OutOfRangeSeries := ChartStability.AddSeries('Вне диапазона');
+
+      for SampleIndex in Indexes do
+      begin
+        Sample := FDisplayedSamples[SampleIndex];
+        X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
+        DisplayValue := ValueToCurrentDimension(Sample.Value);
+        Series.AddPoint(X, DisplayValue);
+
+        HasSampleResult := FindAnalysisBySampleIndex(SampleIndex, SampleResult);
+        if HasSampleResult and SampleResult.InWindow then
+          WindowSeries.AddPoint(X, DisplayValue);
+        if HasSampleResult and SampleResult.IsOutlier then
+          OutlierSeries.AddPoint(X, DisplayValue);
+        if HasSampleResult and (not SampleResult.IsInRange) then
+          OutOfRangeSeries.AddPoint(X, DisplayValue);
+      end;
+
+      if FLastTestAnalysis.HasForecast then
+      begin
+        ForecastSeries := ChartStability.AddSeries('Прогноз');
+        Sample := FDisplayedSamples[Indexes[Indexes.Count - 1]];
+        X := (Sample.TimeStampMs - BaseTimeMs) / 1000;
+        ForecastSeries.AddPoint(X, ValueToCurrentDimension(Sample.Value));
+        ForecastSeries.AddPoint(X + FTestSettings.ForecastHorizonSec,
+          ValueToCurrentDimension(FLastTestAnalysis.ForecastValue));
+      end;
+
+      if FLastTestAnalysis.HasStatistics then
+      begin
+        MeanSeries := ChartStability.AddSeries('Среднее');
+        DisplayValue := ValueToCurrentDimension(FLastTestAnalysis.MeanValue);
+        MeanSeries.AddPoint(MinTimeSec, DisplayValue);
+        MeanSeries.AddPoint(MaxTimeSec, DisplayValue);
+      end;
+
+      if TryReadFloat(EditTargetLowerLimit.Text, LowerLimit) and TryReadFloat(EditTargetUpperLimit.Text, UpperLimit) then
+      begin
+        LowerLimit := ValueToCurrentDimension(DisplayToBase(EditTargetLowerLimit.Text));
+        UpperLimit := ValueToCurrentDimension(DisplayToBase(EditTargetUpperLimit.Text));
+        LowerSeries := ChartStability.AddSeries('Нижняя граница');
+        LowerSeries.AddPoint(MinTimeSec, LowerLimit);
+        LowerSeries.AddPoint(MaxTimeSec, LowerLimit);
+        UpperSeries := ChartStability.AddSeries('Верхняя граница');
+        UpperSeries.AddPoint(MinTimeSec, UpperLimit);
+        UpperSeries.AddPoint(MaxTimeSec, UpperLimit);
+      end;
+    finally
+      Indexes.Free;
+    end;
+  finally
+    ChartStability.EndUpdate;
+  end;
+
+  ChartStability.InvalidateChart;
+end;
 
 procedure TFrameMeterValueEdit.UpdateDetailedConclusion(const AInfo: TMeterValueStabilityInfo);
 var

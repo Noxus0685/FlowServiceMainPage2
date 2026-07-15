@@ -1,4 +1,4 @@
-object FrameMeterValueEdit: TFrameMeterValueEdit
+﻿object FrameMeterValueEdit: TFrameMeterValueEdit
   Size.Width = 909.000000000000000000
   Size.Height = 620.000000000000000000
   Size.PlatformDefault = False
@@ -1478,6 +1478,29 @@ object FrameMeterValueEdit: TFrameMeterValueEdit
                 Viewport.Height = 252.000000000000000000
               end
             end
+          end
+        end
+        object TabItemStabilityChart: TTabItem
+          CustomIcon = <
+            item
+            end>
+          TextSettings.Trimming = None
+          IsSelected = False
+          Size.Width = 1.000000000000000000
+          Size.Height = 5.000000000000000000
+          Size.PlatformDefault = False
+          StyleLookup = ''
+          TabOrder = 0
+          Text = #1043#1088#1072#1092#1080#1082
+          object ChartStability: TSimpleChart
+            Align = Client
+            Size.Width = 893.000000000000000000
+            Size.Height = 438.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 0
+            Title = #1048#1089#1090#1086#1088#1080#1103' '#1089#1080#1075#1085#1072#1083#1072
+            XTitle = #1042#1088#1077#1084#1103', '#1089
+            YTitle = #1047#1085#1072#1095#1077#1085#1080#1077
           end
         end
       end
