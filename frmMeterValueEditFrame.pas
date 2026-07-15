@@ -7,6 +7,7 @@ uses
   FMX.Controls.Presentation,
   FMX.Consts,
   FMX.Dialogs,
+  FMX.DialogService,
   FMX.Edit,
   FMX.Forms,
   FMX.Layouts,
@@ -1347,13 +1348,19 @@ procedure TFrameMeterValueEdit.ClearSamples;
 begin
   if FSampleSource = mssWorkHistory then
   begin
-    if (FMeterValue <> nil) and (MessageDlg('Очистить историю TMeterValue?',
-      TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo], 0) = mrYes) then
-    begin
-      FMeterValue.ClearStabilitySamples;
-      RefreshSamplesGrid(True);
-      ClearAnalysisDisplay;
-    end;
+    if FMeterValue <> nil then
+      TDialogService.MessageDialog('Очистить историю TMeterValue?',
+        TMsgDlgType.mtConfirmation, [TMsgDlgBtn.mbYes, TMsgDlgBtn.mbNo],
+        TMsgDlgBtn.mbNo, 0,
+        procedure(const AResult: TModalResult)
+        begin
+          if AResult = mrYes then
+          begin
+            FMeterValue.ClearStabilitySamples;
+            RefreshSamplesGrid(True);
+            ClearAnalysisDisplay;
+          end;
+        end);
     Exit;
   end;
 
