@@ -191,6 +191,19 @@ type
   TMeterValueStabilityFailReasons = set of TMeterValueStabilityFailReason;
 
   /// <summary>Configurable criteria used by TMeterValue and target-range checks used by TParameter.</summary>
+  TChartColorOption = (
+    ccoAuto,
+    ccoBlue,
+    ccoLightBlue,
+    ccoGreen,
+    ccoRed,
+    ccoOrange,
+    ccoYellow,
+    ccoPurple,
+    ccoGray,
+    ccoBlack
+  );
+
   TMeterValueStabilitySettings = record
     /// <summary>Enables mathematical stability analysis; disabled values never auto-confirm readiness.</summary>
     Enabled: Boolean;
@@ -232,6 +245,13 @@ type
     RequireForecastInRange: Boolean;
     /// <summary>Runs preview-analysis automatically after UI changes; persisted per TMeterValue.</summary>
     AutoAnalyze: Boolean;
+    ChartSignalColor: TChartColorOption;
+    ChartToleranceColor: TChartColorOption;
+    ChartForecastColor: TChartColorOption;
+    ChartOutlierColor: TChartColorOption;
+    ChartOutOfRangeColor: TChartColorOption;
+    ChartSignalLineWidth: Double;
+    ChartToleranceLineWidth: Double;
   end;
 
   /// <summary>Direction of the calculated linear trend.</summary>
