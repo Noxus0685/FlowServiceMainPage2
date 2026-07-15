@@ -6,7 +6,7 @@
         <Projects Include="ProjectFornTest.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj">
+        <Projects Include="Components\FP\FMXFP.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -27,13 +27,13 @@
         <MSBuild Projects="ProjectFornTest.dproj" Targets="Make"/>
     </Target>
     <Target Name="FMXFP">
-        <MSBuild Projects="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj"/>
+        <MSBuild Projects="Components\FP\FMXFP.dproj"/>
     </Target>
     <Target Name="FMXFP:Clean">
-        <MSBuild Projects="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj" Targets="Clean"/>
+        <MSBuild Projects="Components\FP\FMXFP.dproj" Targets="Clean"/>
     </Target>
     <Target Name="FMXFP:Make">
-        <MSBuild Projects="C:\Users\Tim\Desktop\Components\FP\FMXFP.dproj" Targets="Make"/>
+        <MSBuild Projects="Components\FP\FMXFP.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
         <CallTarget Targets="ProjectFornTest;FMXFP"/>

@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <BorlandProject>
-  <Transactions/>
-  <Default.Personality>
-    <Projects ActiveProject="C:\D\FlowServiceMainPage2\ProjectFornTest.dproj"/>
-  </Default.Personality>
+	<Transactions/>
+	<Default.Personality>
+		<Projects ActiveProject="C:\D\FlowServiceMainPage2\ProjectFornTest.dproj"/>
+	</Default.Personality>
 </BorlandProject>
