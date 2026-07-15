@@ -192,7 +192,6 @@ type
 
   /// <summary>Configurable criteria used by TMeterValue and target-range checks used by TParameter.</summary>
   TChartColorOption = (
-    ccoAuto,
     ccoBlue,
     ccoLightBlue,
     ccoGreen,
@@ -247,11 +246,8 @@ type
     AutoAnalyze: Boolean;
     ChartSignalColor: TChartColorOption;
     ChartToleranceColor: TChartColorOption;
-    ChartForecastColor: TChartColorOption;
-    ChartOutlierColor: TChartColorOption;
-    ChartOutOfRangeColor: TChartColorOption;
-    ChartSignalLineWidth: Double;
-    ChartToleranceLineWidth: Double;
+    ChartSignalLineWidth: Single;
+    ChartToleranceLineWidth: Single;
   end;
 
   /// <summary>Direction of the calculated linear trend.</summary>
