@@ -2484,11 +2484,12 @@ var
   AllowedMin: Double;
   AllowedMax: Double;
   RangeSource: string;
-  I: Integer;
-  Channel: TChannel;
   Details: TStringBuilder;
 
   function BuildFlowDetails(const AReason: string): string;
+  var
+    J: Integer;
+    DetailChannel: TChannel;
   begin
     Details := TStringBuilder.Create;
     try
@@ -2500,16 +2501,16 @@ var
           Details.AppendFormat('; WorkTable.FlowRate.Min=%.6f; WorkTable.FlowRate.Max=%.6f',
             [FWorkTable.FlowRate.Min, FWorkTable.FlowRate.Max]);
         if FWorkTable.EtalonChannels <> nil then
-          for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+          for J := 0 to FWorkTable.EtalonChannels.Count - 1 do
           begin
-            Channel := FWorkTable.EtalonChannels[I];
-            if Channel = nil then
+            DetailChannel := FWorkTable.EtalonChannels[J];
+            if DetailChannel = nil then
               Continue;
             Details.AppendFormat('; Etalon[%d].Enabled=%s; Group=%d; QminWork=%.6f; QmaxWork=%.6f',
-              [I, BoolToStr(Channel.Enabled, True), Channel.Group, Channel.QMinWork, Channel.QMaxWork]);
-            if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
+              [J, BoolToStr(DetailChannel.Enabled, True), DetailChannel.Group, DetailChannel.QMinWork, DetailChannel.QMaxWork]);
+            if (DetailChannel.FlowMeter <> nil) and (DetailChannel.FlowMeter.Device <> nil) then
               Details.AppendFormat('; Etalon[%d].Name=%s; DeviceQmin=%.6f; DeviceQmax=%.6f',
-                [I, Channel.FlowMeter.Device.Name, Channel.FlowMeter.Device.Qmin, Channel.FlowMeter.Device.Qmax]);
+                [J, DetailChannel.FlowMeter.Device.Name, DetailChannel.FlowMeter.Device.Qmin, DetailChannel.FlowMeter.Device.Qmax]);
           end;
       end;
       Result := Details.ToString;
