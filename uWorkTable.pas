@@ -481,6 +481,7 @@ type
     FNextPressChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
     FSimulationLastUpdateTimeMs: Double;
+    FSimulationLastFlowUnitsLogTarget: Double;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -769,6 +770,7 @@ type
     property NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
     property NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
     property SimulationLastUpdateTimeMs: Double read FSimulationLastUpdateTimeMs write FSimulationLastUpdateTimeMs;
+    property SimulationLastFlowUnitsLogTarget: Double read FSimulationLastFlowUnitsLogTarget write FSimulationLastFlowUnitsLogTarget;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -2035,6 +2037,7 @@ begin
   FLimitImpSet := 0;
   FLimitVolumeSet := 0;
   FSimulationLastUpdateTimeMs := 0;
+  FSimulationLastFlowUnitsLogTarget := 0;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
@@ -6424,7 +6427,7 @@ begin
     if (not AChannels[I].Enabled) then
       Result[I] := 0
     else if Coef > 0 then
-      Result[I] := (AFlowRate * MaxRatio * Coef) / 3.6
+      Result[I] := AFlowRate * MaxRatio * Coef
     else
       Result[I] := AFallbackImpSec;
   end;
@@ -6913,6 +6916,52 @@ begin
   end;
 end;
 
+procedure LogFlowUnitsDiagnostic(const AWorkTable: TWorkTable; const ABaseTargetFlowLS: Double);
+const
+  TARGET_EPSILON = 1E-6;
+var
+  UnitName: string;
+  DisplayedSetValue: Double;
+  EtalonValueFlowLS: Double;
+  DeviceValueFlowLS: Double;
+  DisplayedEtalonFlow: Double;
+  DisplayedDeviceFlow: Double;
+begin
+  if (AWorkTable = nil) or (AWorkTable.ValueFlowRate = nil) or (ProtocolManager = nil) then
+    Exit;
+
+  if SameValue(AWorkTable.SimulationLastFlowUnitsLogTarget, ABaseTargetFlowLS, TARGET_EPSILON) then
+    Exit;
+
+  AWorkTable.SimulationLastFlowUnitsLogTarget := ABaseTargetFlowLS;
+  UnitName := AWorkTable.ValueFlowRate.GetDimName;
+  DisplayedSetValue := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseTargetFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  EtalonValueFlowLS := 0;
+  if (AWorkTable.EtalonChannels.Count > 0) and (AWorkTable.EtalonChannels[0] <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow <> nil) then
+    EtalonValueFlowLS := AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DeviceValueFlowLS := 0;
+  if (AWorkTable.DeviceChannels.Count > 0) and (AWorkTable.DeviceChannels[0] <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow <> nil) then
+    DeviceValueFlowLS := AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DisplayedEtalonFlow := AWorkTable.ValueFlowRate.GetDoubleNum(EtalonValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+  DisplayedDeviceFlow := AWorkTable.ValueFlowRate.GetDoubleNum(DeviceValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'FlowUnitsDiagnostic',
+    'Flow unit conversion diagnostic',
+    Format('DisplayedSetValue=%.6f SelectedUnit=%s BaseTargetFlowLS=%.6f EtalonValueFlowLS=%.6f DisplayedEtalonFlow=%.6f DeviceValueFlowLS=%.6f DisplayedDeviceFlow=%.6f',
+      [DisplayedSetValue, UnitName, ABaseTargetFlowLS, EtalonValueFlowLS,
+       DisplayedEtalonFlow, DeviceValueFlowLS, DisplayedDeviceFlow]));
+end;
+
 procedure UpdateChannelSimulation(const AWorkTable: TWorkTable);
 const
   MAX_DELTA_TIME_SEC = 1.0;
@@ -6938,6 +6987,7 @@ begin
   AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
 
   TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+  LogFlowUnitsDiagnostic(AWorkTable, TargetFlow);
   EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
   try
     for I := 0 to AWorkTable.EtalonChannels.Count - 1 do

@@ -661,6 +661,7 @@ type
     function ShouldReleaseGridDeviceBeforeSave(AChannel: TChannel; ADevice: TDevice): Boolean;
     function GetEtalonGroupColor(const AGroup: Integer): TAlphaColor;
     function GetDeviceGroupColor(const AGroup: Integer): TAlphaColor;
+    function GetDisplayFlowText(AFlowMeter: TFlowMeter; AWorkTable: TWorkTable): string;
 
     procedure UpdateUIFromValues;
     procedure SetValues;
@@ -6490,6 +6491,19 @@ begin
   );
 end;
 
+function TFrameMainTable.GetDisplayFlowText(AFlowMeter: TFlowMeter;
+  AWorkTable: TWorkTable): string;
+begin
+  Result := '-';
+  if (AFlowMeter = nil) or (AFlowMeter.ValueFlow = nil) then
+    Exit;
+
+  if (AWorkTable <> nil) and (AWorkTable.ValueFlowRate <> nil) then
+    Result := AWorkTable.ValueFlowRate.GetStrNum(AFlowMeter.ValueFlow.GetDoubleValue)
+  else
+    Result := AFlowMeter.ValueFlow.GetStrValue;
+end;
+
 function TFrameMainTable.GetAverageFlowText(AFlowMeter: TFlowMeter;
   AWorkTable: TWorkTable): string;
 var
@@ -6507,7 +6521,10 @@ begin
     Exit;
 
   AvgFlow := AFlowMeter.ValueQuantity.GetDoubleValue / MeasureTime;
-  Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
+  if AWorkTable.ValueFlowRate <> nil then
+    Result := AWorkTable.ValueFlowRate.GetStrNum(AvgFlow)
+  else
+    Result := AFlowMeter.ValueFlow.GetStrNum(AvgFlow);
 end;
 
 procedure TFrameMainTable.GridDevicesGetValue(Sender: TObject; const ACol,
@@ -6547,7 +6564,7 @@ begin
     begin
       if (WorkTable.DeviceChannels[ARow].FlowMeter <> nil) and
          (WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.DeviceChannels[ARow].FlowMeter.ValueFlow.GetStrValue
+        Value := GetDisplayFlowText(WorkTable.DeviceChannels[ARow].FlowMeter, WorkTable)
       else
         Value := '-';
     end
@@ -6983,7 +7000,7 @@ begin
      (AWorkTable.FlowRate.ValueSet.Value > 0) then
     Flow := AWorkTable.FlowRate.ValueSet.Value
   else if AWorkTable.EtalonFlowSet > 0 then
-    Flow := AWorkTable.EtalonFlowSet * 3.6;
+    Flow := AWorkTable.EtalonFlowSet;
   if Flow <= 0 then
     Exit;
 
@@ -7074,7 +7091,7 @@ begin
     begin
       if (WorkTable.EtalonChannels[ARow].FlowMeter <> nil) and
          (WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow <> nil) then
-        Value := WorkTable.EtalonChannels[ARow].FlowMeter.ValueFlow.GetStrValue
+        Value := GetDisplayFlowText(WorkTable.EtalonChannels[ARow].FlowMeter, WorkTable)
       else
         Value := '-';
     end
