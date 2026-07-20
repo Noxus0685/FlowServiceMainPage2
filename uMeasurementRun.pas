@@ -118,6 +118,7 @@ uses
   System.StrUtils,
   System.SyncObjs,
   System.SysUtils,
+  System.TypInfo,
   System.Variants,
   uBaseProcedures,
   uClasses,
@@ -239,6 +240,18 @@ type
     FPhysicalStopRequested: Boolean;
     FActualStopEventFired: Boolean;
     FNextStageAfterSave: EMeasurementState;
+    FMeasurementDiagnosticEvents: TList<string>;
+    FMeasurementDiagnosticCS: TCriticalSection;
+    FMeasurementDiagnosticDropped: Integer;
+    FLastDiagnosticIsStableText: string;
+    FLastDiagnosticIsStableSecond: Int64;
+    FLastDiagnosticWorkTableState: EStateWorkTable;
+    FLastSaveMeasurementResultsCalled: Boolean;
+    FLastSaveMeasurementResultsResult: string;
+    FLastSaveErrorText: string;
+    FLastMeasureCompletedEventSent: Boolean;
+    FLastSaveDoneEventSent: Boolean;
+    FLastPointDoneEventSent: Boolean;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -310,6 +323,10 @@ type
     function IsThreadRunning: Boolean;
 
     function IsStable(out StableInfo: RStableInfo): Boolean;
+    procedure AddDiagnosticEvent(const AText: string);
+    procedure AddWorkTableStateDiagnosticEvent;
+    function IsFlowStable(out StableInfo: RStableInfo): Boolean;
+    procedure ContinueAfterPointError(const AStatus: EMeasurementPointStatus; AEvent: EMeasurementEvent; const AError: TErrorInfo);
     function IsTerminated: Boolean;
   public
     constructor Create(AWorkTable: TWorkTable);
@@ -334,6 +351,8 @@ type
     procedure Process;
     procedure ProcessStage;
     procedure SaveMeasurementResults;
+    function BuildDiagnosticSnapshot(const ASwitchAutoText: string): string;
+    function DrainDiagnosticEvents: TArray<string>;
 
     class function MeasurementStateToString(AState: EMeasurementState): string; static;
     class function MeasurementStateFromString(const AValue: string): EMeasurementState; static;
@@ -348,6 +367,12 @@ type
     property CurrentPointIndex: Integer read FCurrentPointIndex;
     property CurrentPoint: TDevicePoint read GetCurrentPoint;
     property CurrentRepeat: Integer read FCurrentRepeat;
+    property StopRequested: Boolean read FStopRequested;
+    property NextStageAfterSave: EMeasurementState read FNextStageAfterSave;
+    property ForceNextPoint: Integer read FForceNextPoint;
+    property Attempt: Integer read FAttempt;
+    property MaxAttemptCount: Integer read FMaxAttemptCount;
+    property IsWorkerThreadRunning: Boolean read IsThreadRunning;
 
     property ManualFlowRate: Double read FManualFlowRate write FManualFlowRate;
     property ManualFluidTemp: Double read FManualFluidTemp write FManualFluidTemp;
@@ -612,6 +637,10 @@ begin
   FPhysicalStopRequested := False;
   FActualStopEventFired := False;
   FNextStageAfterSave := msNone;
+  FMeasurementDiagnosticEvents := TList<string>.Create;
+  FMeasurementDiagnosticCS := TCriticalSection.Create;
+  FLastDiagnosticWorkTableState := swtNONE;
+  FLastSaveMeasurementResultsResult := 'not called';
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -677,6 +706,8 @@ begin
   StopWorkerThread;
   if FCurrentStage <> msNone then
     SetStage(msNone);
+  FreeAndNil(FMeasurementDiagnosticCS);
+  FreeAndNil(FMeasurementDiagnosticEvents);
   FreeAndNil(FCriticalSection);
   FreeAndNil(FPoints);
   inherited Destroy;
@@ -700,21 +731,21 @@ begin
         Result := False;
       end;
     msSelectPoint:
-      Result := ANewStage in [msSelectEtalon, msDone, msNone];
+      Result := ANewStage in [msSelectEtalon, msSetupPoint, msDone, msNone];
     msSelectEtalon:
-      Result := ANewStage in [msSetupPoint, msDone, msNone];
+      Result := ANewStage in [msSetupPoint, msSelectPoint, msDone, msNone];
     msSetupPoint:
-      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msDone, msNone];
+      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msSelectPoint, msDone, msNone];
     msWaitStable:
-      Result := ANewStage in [msWaitMeasureStart, msSetupPoint, msDone, msNone];
+      Result := ANewStage in [msWaitMeasureStart, msSetupPoint, msSelectPoint, msDone, msNone];
     msWaitMeasureStart:
-      Result := ANewStage in [msMeasure, msWaitMeasureStop, msDone, msNone];
+      Result := ANewStage in [msMeasure, msWaitMeasureStop, msSelectPoint, msDone, msNone];
     msMeasure:
-      Result := ANewStage in [msWaitMeasureStop, msDone, msNone];
+      Result := ANewStage in [msWaitMeasureStop, msSelectPoint, msDone, msNone];
     msWaitMeasureStop:
-      Result := ANewStage in [msResultsRead, msDone, msNone];
+      Result := ANewStage in [msResultsRead, msSelectPoint, msDone, msNone];
     msResultsRead:
-      Result := ANewStage in [msSave, msDone, msNone];
+      Result := ANewStage in [msSave, msSelectPoint, msDone, msNone];
     msSave:
       Result := ANewStage in [msSelectPoint, msSetupPoint, msDone, msNone];
     msDone:
@@ -751,6 +782,7 @@ begin
 
   ProtocolManager.AddMessage(pcState, psMeasurement, 'SetStage',
     'Переход этапа измерения, тайм аут: ' +inttostr(TThread.GetTickCount64 - FWaitStartedTick)+'; ', TransitionText);
+  AddDiagnosticEvent('Stage ' + MeasurementStateToString(OldStage) + ' -> ' + MeasurementStateToString(ANewStage));
   if FWorkTable <> nil then
     FWorkTable.MeasurementRunStateChanged(Self, ANewStage);
   Notify(Integer(meStateChanged));
@@ -793,6 +825,7 @@ begin
   if Point.Status = AStatus then
     Exit;
   Point.Status := AStatus;
+  AddDiagnosticEvent('PointStatus -> ' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(AStatus)));
   if FWorkTable <> nil then
  //   FWorkTable.MeasurementRunPointChanged(Self, Point, FCurrentPointIndex);
  // Notify(Integer(mePointChanged), Point);
@@ -836,7 +869,8 @@ begin
     Exit;
 
   for I := Max(AStartIndex, 0) to FPoints.Count - 1 do
-    if (FPoints[I] <> nil) and FPoints[I].Enabled then
+    if (FPoints[I] <> nil) and FPoints[I].Enabled and
+       (FPoints[I].State <> osDeleted) then
       Exit(I);
 end;
 
@@ -870,7 +904,8 @@ begin
     Inc(FCurrentPointIndex);
 
   if (FMode = mrmAutomatic) and ((FCurrentPointIndex < 0) or
-     (FCurrentPointIndex >= FPoints.Count) or (not FPoints[FCurrentPointIndex].Enabled)) then
+     (FCurrentPointIndex >= FPoints.Count) or (not FPoints[FCurrentPointIndex].Enabled) or
+     (FPoints[FCurrentPointIndex].State = osDeleted)) then
     FCurrentPointIndex := FindNextEnabledPointIndex(FCurrentPointIndex);
 
   // Принудительный индекс является одноразовой командой.
@@ -968,12 +1003,10 @@ begin
     // информацией об ошибке, сформированной внутри SetPoint.
     FireEvent(mePointInvalid, Error);
 
-    // Текущая реализация считает ошибку выбора точки критической
-    // для всего измерительного запуска.
-    //
-    // Поэтому после первой некорректной точки дальнейшие точки не
-    // обрабатываются, а машина состояний переходит в msDone.
-    SetStage(msDone);
+    if FMode = mrmAutomatic then
+      EnterSelectPoint
+    else
+      SetStage(msDone);
   end;
 end;
 
@@ -993,9 +1026,7 @@ begin
   end
   else
   begin
-    SetCurrentPointStatus(mptsSetupError);
-    FireEvent(meEtalonAbsent, Error);
-    SetStage(msDone);
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
   end;
 end;
 
@@ -1019,9 +1050,7 @@ begin
 
     if not SetupMeasurement(Point, Error) then
     begin
-      SetCurrentPointStatus(mptsSetupError);
-      FireEvent(mePointNotSet, Error);
-      SetStage(msDone);
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
       Exit;
     end;
 
@@ -1045,9 +1074,7 @@ begin
   begin
     if not SetupPoint(Point, Error) then
     begin
-      SetCurrentPointStatus(mptsSetupError);
-      FireEvent(mePointNotSet, Error);
-      SetStage(msDone);
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
       Exit;
     end;
   end
@@ -1056,9 +1083,7 @@ begin
 
   if not SetupMeasurement(Point, Error) then
   begin
-    SetCurrentPointStatus(mptsSetupError);
-    FireEvent(mePointNotSet, Error);
-    SetStage(msDone);
+    ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
     Exit;
   end;
 
@@ -1118,6 +1143,7 @@ begin
 
   ProtocolManager.AddMessage(pcAction, psMeasurement, 'StartTest',
     'Отдана команда запуска измерения', MeasurementStateToString(FCurrentStage));
+  AddDiagnosticEvent('StartTest called');
   FPhysicalMeasureStarted := True;
   FWorkTable.StartTest;
 end;
@@ -1147,6 +1173,7 @@ begin
         'Отдана команда остановки измерения',
         Format('Stage=%s; Reason=%s', [MeasurementStateToString(FCurrentStage),
           MeasurementStopReasonToString(GetStopReason)]));
+      AddDiagnosticEvent('StopTest called');
       FWorkTable.StopTest;
     end
     else
@@ -1164,6 +1191,7 @@ end;
 
 procedure TMeasurementRun.EnterResultsRead;
 begin
+  // FWorkTable.SaveMeasurementResults; результат сохраняется в SaveMeasurementResults после чтения.
   SetCurrentPointStatus(mptsResultsRead);
   FireEvent(meResultReading);
 end;
@@ -1176,11 +1204,13 @@ begin
   FNextStageAfterSave := msDone;
   SetCurrentPointStatus(mptsSave);
 
+  FLastMeasureCompletedEventSent := True;
   FireEvent(meMeasureCompleted);
 
   Point := GetCurrentPoint;
 
   SaveMeasurementResults;
+  FLastSaveDoneEventSent := True;
   FireEvent(meSaveDone);
 
   if IsStopRequested then
@@ -1204,6 +1234,8 @@ begin
     if Point <> nil then
       SetCurrentPointStatus(mptsSaved);
     FCurrentRepeat := 0;
+    FLastPointDoneEventSent := True;
+    AddDiagnosticEvent('mePointDone');
     FireEvent(mePointDone);
     if FMode = mrmManual then
       FNextStageAfterSave := msDone
@@ -1220,6 +1252,7 @@ procedure TMeasurementRun.EnterDone;
 begin
   if (GetCurrentPoint <> nil) and (GetCurrentPoint.Status = mptsResultsRead) then
     SetCurrentPointStatus(mptsDone);
+  AddDiagnosticEvent('meAllDone');
   FireEvent(meAllDone);
   if FThread <> nil then
     FThread.Terminate;
@@ -1232,6 +1265,7 @@ var
 begin
   ProtocolManager.AddMessage(pcEvent, psMeasurement, 'FireEvent',
     'Событие измерения', MeasurementEventToString(AEvent));
+  AddDiagnosticEvent('Event ' + MeasurementEventToString(AEvent));
 
   if (AError.Code <> 0) or (Trim(AError.Msg) <> '') then
   begin
@@ -1286,6 +1320,8 @@ function TMeasurementRun.IsStable(out StableInfo: RStableInfo): Boolean;
 var
   Point: TDevicePoint;
   ParamInfo: RStableInfo;
+  DiagnosticText: string;
+  DiagnosticSecond: Int64;
 begin
   Result := False;
   StableInfo.Status := sNONE;
@@ -1299,7 +1335,7 @@ begin
   Result := True;
   if (FWorkTable.FlowRate <> nil) and (Point.Q >= 0) then
   begin
-    Result := FWorkTable.FlowRate.IsStable(ParamInfo) and Result;
+    Result := IsFlowStable(ParamInfo) and Result;
     if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
   end;
@@ -1316,6 +1352,328 @@ begin
     Result := FWorkTable.FluidPress.IsStable(ParamInfo) and Result;
     if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
+  end;
+
+  DiagnosticSecond := Trunc((TThread.GetTickCount64 - FWaitStartedTick) / 1000);
+  DiagnosticText := Format('IsStable=%s; Reason=%s', [BoolToStr(Result, True), StableInfo.StatusText]);
+  if (DiagnosticText <> FLastDiagnosticIsStableText) or
+     (DiagnosticSecond <> FLastDiagnosticIsStableSecond) then
+  begin
+    FLastDiagnosticIsStableText := DiagnosticText;
+    FLastDiagnosticIsStableSecond := DiagnosticSecond;
+    AddDiagnosticEvent(DiagnosticText);
+  end;
+end;
+
+
+function TMeasurementRun.IsFlowStable(out StableInfo: RStableInfo): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  OldValue: TMeterValue;
+  StableValue: TMeterValue;
+begin
+  StableInfo := Default(RStableInfo);
+  Result := False;
+
+  if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) then
+    Exit;
+
+  StableValue := nil;
+  if FWorkTable.EtalonChannels <> nil then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and Channel.Enabled and
+         (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+      begin
+        StableValue := Channel.FlowMeter.ValueFlow;
+        Break;
+      end;
+    end;
+
+  if StableValue = nil then
+    Exit(FWorkTable.FlowRate.IsStable(StableInfo));
+
+  OldValue := FWorkTable.FlowRate.Value;
+  try
+    FWorkTable.FlowRate.Value := StableValue;
+    Result := FWorkTable.FlowRate.IsStable(StableInfo);
+  finally
+    FWorkTable.FlowRate.Value := OldValue;
+  end;
+end;
+
+procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
+  AEvent: EMeasurementEvent; const AError: TErrorInfo);
+begin
+  AddDiagnosticEvent('Point error: Status=' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(AStatus)) + '; Event=' + MeasurementEventToString(AEvent) + '; Error=' + AError.Msg);
+  SetCurrentPointStatus(AStatus);
+  FireEvent(AEvent, AError);
+  FCurrentRepeat := 0;
+  SetStopReason(msrError);
+
+  if FMode = mrmAutomatic then
+    SetStage(msSelectPoint)
+  else
+    SetStage(msDone);
+end;
+
+
+procedure TMeasurementRun.AddDiagnosticEvent(const AText: string);
+const
+  MAX_DIAGNOSTIC_EVENTS = 5000;
+begin
+  if (FMeasurementDiagnosticEvents = nil) or (FMeasurementDiagnosticCS = nil) then
+    Exit;
+
+  FMeasurementDiagnosticCS.Acquire;
+  try
+    while FMeasurementDiagnosticEvents.Count >= MAX_DIAGNOSTIC_EVENTS do
+    begin
+      FMeasurementDiagnosticEvents.Delete(0);
+      Inc(FMeasurementDiagnosticDropped);
+    end;
+    FMeasurementDiagnosticEvents.Add(FormatDateTime('hh:nn:ss.zzz', Now) + ' ' + AText);
+  finally
+    FMeasurementDiagnosticCS.Release;
+  end;
+end;
+
+procedure TMeasurementRun.AddWorkTableStateDiagnosticEvent;
+begin
+  if FWorkTable = nil then
+    Exit;
+  if FWorkTable.State <> FLastDiagnosticWorkTableState then
+  begin
+    AddDiagnosticEvent('WorkTable.State ' + GetEnumName(TypeInfo(EStateWorkTable), Ord(FLastDiagnosticWorkTableState)) +
+      ' -> ' + GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State)));
+    FLastDiagnosticWorkTableState := FWorkTable.State;
+  end;
+end;
+
+function TMeasurementRun.DrainDiagnosticEvents: TArray<string>;
+var
+  I: Integer;
+begin
+  SetLength(Result, 0);
+  if (FMeasurementDiagnosticEvents = nil) or (FMeasurementDiagnosticCS = nil) then
+    Exit;
+
+  FMeasurementDiagnosticCS.Acquire;
+  try
+    SetLength(Result, FMeasurementDiagnosticEvents.Count + Ord(FMeasurementDiagnosticDropped > 0));
+    I := 0;
+    if FMeasurementDiagnosticDropped > 0 then
+    begin
+      Result[0] := Format('%s <удалено старых диагностических событий: %d>',
+        [FormatDateTime('hh:nn:ss.zzz', Now), FMeasurementDiagnosticDropped]);
+      I := 1;
+    end;
+    while I < Length(Result) do
+    begin
+      Result[I] := FMeasurementDiagnosticEvents[I - Ord(FMeasurementDiagnosticDropped > 0)];
+      Inc(I);
+    end;
+    FMeasurementDiagnosticEvents.Clear;
+    FMeasurementDiagnosticDropped := 0;
+  finally
+    FMeasurementDiagnosticCS.Release;
+  end;
+end;
+
+function TMeasurementRun.BuildDiagnosticSnapshot(const ASwitchAutoText: string): string;
+const
+  STABLE_TIMEOUT_SEC = 30;
+var
+  Lines: TStringList;
+  Point, NextPoint: TDevicePoint;
+  StableInfo, FlowStableInfo: RStableInfo;
+  IsStableResult, IsFlowStableResult: Boolean;
+  NextIndex: Integer;
+  WaitStableSec, MeasureSec: Double;
+  Reason: string;
+  ActualFlowSource, ActualFlowValue, EtalonName: string;
+  EtalonIndex: Integer;
+  I: Integer;
+  Channel: TChannel;
+  CurrentTime, CurrentVolume: Double;
+  CurrentImp: Int64;
+
+  function SBool(AValue: Boolean): string;
+  begin
+    if AValue then Result := 'True' else Result := 'False';
+  end;
+
+  function SFloat(AValue: Double): string;
+  begin
+    Result := FormatFloat('0.######', AValue);
+  end;
+
+begin
+  Lines := TStringList.Create;
+  try
+    Point := GetCurrentPoint;
+    IsFlowStableResult := IsFlowStable(FlowStableInfo);
+    IsStableResult := IsStable(StableInfo);
+    Reason := StableInfo.StatusText;
+    if Reason = '' then
+      Reason := '<нет данных>';
+
+    EtalonIndex := -1;
+    EtalonName := '<нет данных>';
+    ActualFlowSource := '<нет данных>';
+    ActualFlowValue := '<нет данных>';
+    if (FWorkTable <> nil) and (FWorkTable.EtalonChannels <> nil) then
+      for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+      begin
+        Channel := FWorkTable.EtalonChannels[I];
+        if (Channel <> nil) and Channel.Enabled and (Channel.FlowMeter <> nil) and
+           (Channel.FlowMeter.ValueFlow <> nil) then
+        begin
+          EtalonIndex := I;
+          ActualFlowSource := Format('EtalonChannels[%d].FlowMeter.ValueFlow', [I]);
+          ActualFlowValue := SFloat(Channel.FlowMeter.ValueFlow.GetDoubleValue);
+          if Channel.Name <> '' then
+            EtalonName := Channel.Name
+          else if Channel.FlowMeter.Device <> nil then
+            EtalonName := Channel.FlowMeter.Device.Name;
+          Break;
+        end;
+      end;
+    if (ActualFlowValue = '<нет данных>') and (FWorkTable <> nil) and (FWorkTable.FlowRate <> nil) and
+       (FWorkTable.FlowRate.Value <> nil) then
+    begin
+      ActualFlowSource := 'WorkTable.FlowRate.Value';
+      ActualFlowValue := SFloat(FWorkTable.FlowRate.Value.GetDoubleValue);
+    end;
+
+    WaitStableSec := 0;
+    if FCurrentStage = msWaitStable then
+      WaitStableSec := (TThread.GetTickCount64 - FWaitStartedTick) / 1000;
+    MeasureSec := 0;
+    if FCurrentStage = msMeasure then
+      MeasureSec := (TThread.GetTickCount64 - FWaitStartedTick) / 1000;
+
+    NextIndex := FindNextEnabledPointIndex(FCurrentPointIndex + 1);
+    NextPoint := nil;
+    if (NextIndex >= 0) and (NextIndex < FPoints.Count) then
+      NextPoint := FPoints[NextIndex];
+
+    CurrentTime := GetCurrentStopTimeValue;
+    CurrentVolume := GetCurrentStopVolumeValue;
+    CurrentImp := GetCurrentStopImpulseValue;
+
+    Lines.Add('==================================================');
+    Lines.Add('Время снимка: ' + FormatDateTime('dd.mm.yyyy hh:nn:ss.zzz', Now));
+    Lines.Add('Причина: ручное нажатие «Добавить лог»');
+    Lines.Add('');
+    Lines.Add('[РЕЖИМ]');
+    Lines.Add('SwitchAuto=' + ASwitchAutoText);
+    Lines.Add('MeasurementRun.Mode=' + GetEnumName(TypeInfo(EMeasurementRunMode), Ord(FMode)));
+    if FWorkTable <> nil then
+    begin
+      Lines.Add('WorkTable.MeasurementMode=' + GetEnumName(TypeInfo(EMeasurementRunMode), Ord(FWorkTable.MeasurementMode)));
+      Lines.Add('WorkTable.State=' + GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State)));
+    end
+    else
+    begin
+      Lines.Add('WorkTable.MeasurementMode=<нет данных>');
+      Lines.Add('WorkTable.State=<нет данных>');
+    end;
+    Lines.Add('MeasurementRun.Stage=' + MeasurementStateToString(FCurrentStage));
+    Lines.Add('WorkerThreadRunning=' + SBool(IsThreadRunning));
+    Lines.Add('StopRequested=' + SBool(FStopRequested));
+    Lines.Add('NextStageAfterSave=' + MeasurementStateToString(FNextStageAfterSave));
+    Lines.Add('ForceNextPoint=' + IntToStr(FForceNextPoint));
+    Lines.Add('');
+    Lines.Add('[ТОЧКА]');
+    Lines.Add('CurrentPointIndex=' + IntToStr(FCurrentPointIndex));
+    if FPoints <> nil then Lines.Add('Points.Count=' + IntToStr(FPoints.Count)) else Lines.Add('Points.Count=<нет данных>');
+    if Point <> nil then
+    begin
+      Lines.Add('Name=' + Point.Name);
+      Lines.Add('UUID=' + Point.UUID);
+      Lines.Add('Enabled=' + SBool(Point.Enabled));
+      Lines.Add('State=' + GetEnumName(TypeInfo(TObjectState), Ord(Point.State)));
+      Lines.Add('Status=' + GetEnumName(TypeInfo(EMeasurementPointStatus), Ord(Point.Status)));
+      Lines.Add('FlowRate=' + SFloat(Point.FlowRate));
+      Lines.Add('Q=' + SFloat(Point.Q));
+      Lines.Add('StopCriteria=' + StopCriteriaToLogString(Point.StopCriteria));
+      Lines.Add('LimitTime=' + SFloat(Point.LimitTime));
+      Lines.Add('LimitVolume=' + SFloat(Point.LimitVolume));
+      Lines.Add('LimitImp=' + IntToStr(Point.LimitImp));
+      Lines.Add('Repeats=' + IntToStr(Point.Repeats));
+      Lines.Add('RepeatsCompleted=' + IntToStr(Point.RepeatsCompleted));
+    end
+    else
+      Lines.Add('CurrentPoint=<нет данных>');
+    Lines.Add('CurrentRepeat=' + IntToStr(FCurrentRepeat));
+    Lines.Add('');
+    Lines.Add('[СТАБИЛИЗАЦИЯ]');
+    Lines.Add('Stage=' + MeasurementStateToString(FCurrentStage));
+    Lines.Add('WaitStableSec=' + SFloat(WaitStableSec));
+    if (FWorkTable <> nil) and (FWorkTable.FlowRate <> nil) and (FWorkTable.FlowRate.ValueSet <> nil) then
+      Lines.Add('TargetFlowLS=' + SFloat(FWorkTable.FlowRate.ValueSet.Value))
+    else
+      Lines.Add('TargetFlowLS=<нет данных>');
+    Lines.Add('ActualFlowLS=' + ActualFlowValue);
+    Lines.Add('ActualFlowSource=' + ActualFlowSource);
+    Lines.Add('SelectedEtalonIndex=' + IntToStr(EtalonIndex));
+    Lines.Add('SelectedEtalonName=' + EtalonName);
+    Lines.Add('FlowMin=' + SFloat(FlowStableInfo.LowerLimit));
+    Lines.Add('FlowMax=' + SFloat(FlowStableInfo.UpperLimit));
+    Lines.Add('IsFlowStable=' + SBool(IsFlowStableResult));
+    Lines.Add('IsStable=' + SBool(IsStableResult));
+    Lines.Add('Reason=' + Reason);
+    Lines.Add('Attempt=' + IntToStr(FAttempt));
+    Lines.Add('MaxAttemptCount=' + IntToStr(FMaxAttemptCount));
+    Lines.Add('TimeoutSec=' + IntToStr(STABLE_TIMEOUT_SEC));
+    Lines.Add('');
+    Lines.Add('[ИЗМЕРЕНИЕ]');
+    Lines.Add('MeasureStageSec=' + SFloat(MeasureSec));
+    Lines.Add('CurrentTime=' + SFloat(CurrentTime));
+    Lines.Add('CurrentVolume=' + SFloat(CurrentVolume));
+    Lines.Add('CurrentImpulses=' + IntToStr(CurrentImp));
+    if Point <> nil then
+    begin
+      Lines.Add('TimeReached=' + SBool((scTime in Point.StopCriteria) and (Point.LimitTime > 0) and (CurrentTime >= Point.LimitTime)));
+      Lines.Add('VolumeReached=' + SBool((scVolume in Point.StopCriteria) and (Point.LimitVolume > 0) and (CurrentVolume >= Point.LimitVolume)));
+      Lines.Add('ImpulseReached=' + SBool((scImpulse in Point.StopCriteria) and (Point.LimitImp > 0) and (CurrentImp >= Point.LimitImp)));
+    end;
+    Lines.Add('StopCriteriaReached=' + SBool(IsCommandStopLimitReached(Reason)));
+    Lines.Add('StopReason=' + MeasurementStopReasonToString(FStopReason));
+    Lines.Add('RequestStopCalled=' + SBool(FStopRequested));
+    Lines.Add('RouteStopInWorker=<см. события>');
+    Lines.Add('');
+    Lines.Add('[ПЕРЕХОД]');
+    Lines.Add('CurrentPointIndex=' + IntToStr(FCurrentPointIndex));
+    Lines.Add('NextSearchStartIndex=' + IntToStr(FCurrentPointIndex + 1));
+    Lines.Add('NextEnabledPointIndex=' + IntToStr(NextIndex));
+    if NextPoint <> nil then
+    begin
+      Lines.Add('NextPointName=' + NextPoint.Name);
+      Lines.Add('NextPointEnabled=' + SBool(NextPoint.Enabled));
+      Lines.Add('NextPointState=' + GetEnumName(TypeInfo(TObjectState), Ord(NextPoint.State)));
+    end
+    else
+      Lines.Add('NextPointReason=<следующая включенная точка не найдена>');
+    Lines.Add('CurrentStage=' + MeasurementStateToString(FCurrentStage));
+    Lines.Add('NextStageAfterSave=' + MeasurementStateToString(FNextStageAfterSave));
+    Lines.Add('DoneReason=<см. события>');
+    Lines.Add('');
+    Lines.Add('[СОХРАНЕНИЕ]');
+    Lines.Add('SaveMeasurementResultsCalled=' + SBool(FLastSaveMeasurementResultsCalled));
+    Lines.Add('LastSaveResult=' + FLastSaveMeasurementResultsResult);
+    Lines.Add('MeasureCompletedEventSent=' + SBool(FLastMeasureCompletedEventSent));
+    Lines.Add('SaveDoneEventSent=' + SBool(FLastSaveDoneEventSent));
+    Lines.Add('PointDoneEventSent=' + SBool(FLastPointDoneEventSent));
+    Lines.Add('ResultsAddedToProcessing=<поле отсутствует в текущей реализации>');
+    Lines.Add('ResultsPerDevice=<поле отсутствует в текущей реализации>');
+    if FLastSaveErrorText <> '' then Lines.Add('LastSaveError=' + FLastSaveErrorText) else Lines.Add('LastSaveError=<нет данных>');
+    Result := Lines.Text;
+  finally
+    Lines.Free;
   end;
 end;
 
@@ -1593,6 +1951,13 @@ begin
     FAttempt := 0;
     FMeasureTimeout := 0;
     FNextStageAfterSave := msNone;
+    FLastDiagnosticWorkTableState := swtNONE;
+    FLastSaveMeasurementResultsCalled := False;
+    FLastSaveMeasurementResultsResult := 'not called';
+    FLastSaveErrorText := '';
+    FLastMeasureCompletedEventSent := False;
+    FLastSaveDoneEventSent := False;
+    FLastPointDoneEventSent := False;
 
     case Mode of
       mrmAutomatic:
@@ -1739,6 +2104,8 @@ end;
 
 procedure TMeasurementRun.RouteStopInWorker;
 begin
+  if IsStopRequested then
+    AddDiagnosticEvent('RouteStopInWorker processing: Stage=' + MeasurementStateToString(FCurrentStage));
   if not IsStopRequested then
     Exit;
 
@@ -1812,6 +2179,9 @@ begin
     Format('Stage=%s; Reason=%s', [MeasurementStateToString(StageSnapshot),
       MeasurementStopReasonToString(ReasonSnapshot)]));
 
+  AddDiagnosticEvent('RequestStop called');
+  if StageSnapshot in [msWaitMeasureStart, msMeasure] then
+    SetStage(msWaitMeasureStop);
   FireEvent(meStopRequested);
 end;
 
@@ -1880,6 +2250,7 @@ begin
 end;
 
 procedure TMeasurementRun.RunThreadProc;
+// msWaitMeasureStop is processed by ProcessStage for graceful Stop.
 
 procedure InitializeRunStage;
 var
@@ -1932,7 +2303,7 @@ begin
       begin
         FireEvent(meMeasureError, BuildError(1999, E.Message));
         if FCurrentStage <> msDone then
-          SetStage(msDone);
+          ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1999, E.Message));
       end;
     end;
 
@@ -1983,6 +2354,7 @@ begin
     AError := BuildError(1004, 'Индекс точки вне диапазона');
     Exit;
   end;
+  AddDiagnosticEvent(Format('SetPoint called: Index=%d; PreviousIndex=%d', [Index, FCurrentPointIndex]));
   FCurrentPointIndex := Index;
   Point := GetCurrentPoint;
   Result := ValidatePoint(Point, AError);
@@ -1990,10 +2362,11 @@ begin
   begin
 
     FCurrentRepeat := Point.RepeatsCompleted;
+    AddDiagnosticEvent('SetPoint success: ' + BuildPointSelectionLog(Point));
 
   end else
   begin
-
+    AddDiagnosticEvent('SetPoint failed: ' + AError.Msg);
   end;
 end;
 
@@ -2138,6 +2511,7 @@ end;
 
 procedure TMeasurementRun.ProcessStage;
 begin
+  AddWorkTableStateDiagnosticEvent;
   case FCurrentStage of
     msSelectPoint: ProcessSelectPoint;
     msSelectEtalon: ProcessSelectEtalon;
@@ -2169,7 +2543,7 @@ end;
 
 procedure TMeasurementRun.ProcessWaitStable;
 const
-  DEFAULT_STABLE_TIMEOUT_S = 30000;
+  DEFAULT_STABLE_TIMEOUT_S = 30;
   STABLE_PROTOCOL_INTERVAL_MS = 2000;
 var
   Point: TDevicePoint;
@@ -2254,7 +2628,10 @@ begin
       BuildError(1301, 'Стабилизация не достигнута')
     );
 
-    SetStage(msDone);
+    if FMode = mrmAutomatic then
+      ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'))
+    else
+      SetStage(msDone);
   end;
 end;
 
@@ -2276,6 +2653,7 @@ begin
     swtEXECUTE:
       begin
         FPhysicalMeasureStarted := True;
+        AddDiagnosticEvent('WorkTable.State -> swtEXECUTE');
         SetStage(msMeasure);
         Exit;
       end;
@@ -2289,18 +2667,14 @@ begin
       end;
     swtFAILURE:
       begin
-        SetStopReason(msrError);
-        FireEvent(meMeasureError, BuildError(1402, 'Ошибка запуска измерения'));
-        SetStage(msDone);
+        ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1402, 'Ошибка запуска измерения'));
         Exit;
       end;
   end;
    timeout := (TThread.GetTickCount64 - FWaitStartedTick)/1000;
   if timeout > DEFAULT_START_TIMEOUT_S then
   begin
-    FireEvent(meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
-  { TODO -oAndrey -cОтладка : Надо потом отладить и вернуть обратно }
-    SetStage(msDone);
+    ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
   end;
 end;
 
@@ -2516,6 +2890,7 @@ begin
   begin
     if IsCommandStopLimitReached(StopReason) then
     begin
+      AddDiagnosticEvent('StopCriteria reached: ' + StopReason);
       ProtocolManager.AddMessage(pcInfo, psMeasurement, 'ProcessMeasure',
         'Достигнут программный лимит измерения',
         BuildCommandStopLimitDetails(FWorkTable.CurrentPoint, StopReason));
@@ -2570,18 +2945,14 @@ begin
 
     swtFAILURE:
       begin
-        SetStopReason(msrError);
-        FireEvent(meMeasureError, BuildError(1405, 'Ошибка остановки измерения'));
-        SetStage(msDone);
+        ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1405, 'Ошибка остановки измерения'));
         Exit;
       end;
   end;
 
   if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
-    SetStopReason(msrError);
-    FireEvent(meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
-    SetStage(msDone);
+    ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
   end;
 end;
 
@@ -2618,18 +2989,14 @@ begin
 
     swtFAILURE:
       begin
-        SetStopReason(msrError);
-        FireEvent(meMeasureError, BuildError(1410, 'Ошибка чтения результатов'));
-        SetStage(msDone);
+        ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1410, 'Ошибка чтения результатов'));
         Exit;
       end;
   end;
 
   if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
-    SetStopReason(msrError);
-    FireEvent(meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
-    SetStage(msDone);
+    ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
   end;
 end;
 
@@ -2650,31 +3017,52 @@ var
   Point: TDevicePoint;
   RepeatsTarget: Integer;
 begin
+  FLastSaveMeasurementResultsCalled := True;
+  FLastSaveMeasurementResultsResult := 'started';
+  FLastSaveErrorText := '';
+  AddDiagnosticEvent('SaveMeasurementResults called');
+
   Point := GetCurrentPoint;
   if Point = nil then
-    Exit;
-
-  RepeatsTarget := Max(Point.Repeats, 1);
-
-  if FWorkTable <> nil then
   begin
-    FWorkTable.RecalculateAllMeterValues;
-    if FWorkTable.ValueTime <> nil then
-      FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
-    else
-      FWorkTable.TimeResult := Point.LimitTime;
+    FLastSaveMeasurementResultsResult := 'failed: current point is nil';
+    AddDiagnosticEvent('SaveMeasurementResults failed: current point is nil');
+    Exit;
   end;
 
-  WorkTable.SaveMeasurementResults;
+  try
+    RepeatsTarget := Max(Point.Repeats, 1);
 
-  if DataManager <> nil then
-    DataManager.Save;
+    if FWorkTable <> nil then
+    begin
+      FWorkTable.RecalculateAllMeterValues;
+      if FWorkTable.ValueTime <> nil then
+        FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
+      else
+        FWorkTable.TimeResult := Point.LimitTime;
+    end;
 
-  if WorkTableManager <> nil then
-    WorkTableManager.Save;
+    WorkTable.SaveMeasurementResults;
 
-  Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
-  Point.DateTime := Now;
+    if DataManager <> nil then
+      DataManager.Save;
+
+    if WorkTableManager <> nil then
+      WorkTableManager.Save;
+
+    Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
+    Point.DateTime := Now;
+    FLastSaveMeasurementResultsResult := 'success';
+    AddDiagnosticEvent('SaveMeasurementResults success');
+  except
+    on E: Exception do
+    begin
+      FLastSaveMeasurementResultsResult := 'failed';
+      FLastSaveErrorText := E.Message;
+      AddDiagnosticEvent('SaveMeasurementResults failed: ' + E.Message);
+      raise;
+    end;
+  end;
 end;
 
 { Converts persisted string to spill state enum value. }
