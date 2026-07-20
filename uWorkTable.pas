@@ -260,15 +260,6 @@ type
     FSimulationRampDurationSec: Double;
     FSimulationRampActive: Boolean;
     FSimulationLastProgressLogMs: Double;
-    FSimulationCurrentNoiseFlowLS: Double;
-    FSimulationTargetNoiseFlowLS: Double;
-    FSimulationNoiseMoveStartImpSec: Double;
-    FSimulationNoiseMoveTargetImpSec: Double;
-    FSimulationNoiseMoveActive: Boolean;
-    FSimulationNoiseChangeStartTimeMs: Double;
-    FSimulationNoiseChangeDurationMs: Double;
-    FSimulationNextNoiseChangeTimeMs: Double;
-    FSimulationLastNoiseLogTimeMs: Double;
 
     FFlowMeter: TFlowMeter;
     FValueImp: TMeterValue;
@@ -417,15 +408,6 @@ type
     property SimulationRampDurationSec: Double read FSimulationRampDurationSec write FSimulationRampDurationSec;
     property SimulationRampActive: Boolean read FSimulationRampActive write FSimulationRampActive;
     property SimulationLastProgressLogMs: Double read FSimulationLastProgressLogMs write FSimulationLastProgressLogMs;
-    property SimulationCurrentNoiseFlowLS: Double read FSimulationCurrentNoiseFlowLS write FSimulationCurrentNoiseFlowLS;
-    property SimulationTargetNoiseFlowLS: Double read FSimulationTargetNoiseFlowLS write FSimulationTargetNoiseFlowLS;
-    property SimulationNoiseMoveStartImpSec: Double read FSimulationNoiseMoveStartImpSec write FSimulationNoiseMoveStartImpSec;
-    property SimulationNoiseMoveTargetImpSec: Double read FSimulationNoiseMoveTargetImpSec write FSimulationNoiseMoveTargetImpSec;
-    property SimulationNoiseMoveActive: Boolean read FSimulationNoiseMoveActive write FSimulationNoiseMoveActive;
-    property SimulationNoiseChangeStartTimeMs: Double read FSimulationNoiseChangeStartTimeMs write FSimulationNoiseChangeStartTimeMs;
-    property SimulationNoiseChangeDurationMs: Double read FSimulationNoiseChangeDurationMs write FSimulationNoiseChangeDurationMs;
-    property SimulationNextNoiseChangeTimeMs: Double read FSimulationNextNoiseChangeTimeMs write FSimulationNextNoiseChangeTimeMs;
-    property SimulationLastNoiseLogTimeMs: Double read FSimulationLastNoiseLogTimeMs write FSimulationLastNoiseLogTimeMs;
 
     property ValueImp: TMeterValue read FValueImp write SetValueImp;
     property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
@@ -1470,15 +1452,6 @@ begin
   FSimulationRampDurationSec := 0;
   FSimulationRampActive := False;
   FSimulationLastProgressLogMs := 0;
-  FSimulationCurrentNoiseFlowLS := 0;
-  FSimulationTargetNoiseFlowLS := 0;
-  FSimulationNoiseMoveStartImpSec := 0;
-  FSimulationNoiseMoveTargetImpSec := 0;
-  FSimulationNoiseMoveActive := False;
-  FSimulationNoiseChangeStartTimeMs := 0;
-  FSimulationNoiseChangeDurationMs := 0;
-  FSimulationNextNoiseChangeTimeMs := 0;
-  FSimulationLastNoiseLogTimeMs := 0;
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
@@ -6698,15 +6671,6 @@ begin
   AChannel.SimulationRampDurationSec := 0;
   AChannel.SimulationRampActive := False;
   AChannel.SimulationLastProgressLogMs := 0;
-  AChannel.SimulationCurrentNoiseFlowLS := 0;
-  AChannel.SimulationTargetNoiseFlowLS := 0;
-  AChannel.SimulationNoiseMoveStartImpSec := 0;
-  AChannel.SimulationNoiseMoveTargetImpSec := 0;
-  AChannel.SimulationNoiseMoveActive := False;
-  AChannel.SimulationNoiseChangeStartTimeMs := 0;
-  AChannel.SimulationNoiseChangeDurationMs := 0;
-  AChannel.SimulationNextNoiseChangeTimeMs := 0;
-  AChannel.SimulationLastNoiseLogTimeMs := 0;
 end;
 
 function IsSimulationChannelEnabled(const AChannel: TChannel): Boolean;
@@ -6822,123 +6786,40 @@ begin
   end;
 end;
 
-procedure ApplySimulationNoise(const AChannel: TChannel; const AChannelKind: string;
+procedure ApplySimpleSimulationNoise(const AChannel: TChannel; const AChannelKind: string;
   const AChannelIndex: Integer; const ACurrentTimeMs, ANoisePercent: Double;
   const ADeviceReady: Boolean);
-const
-  MIN_NOISE_AMPLITUDE_FLOW_LS = 0.001;
-  NOISE_UPDATE_PERIOD_MS = 700.0;
-  NOISE_CHANGE_DURATION_MS = 500.0;
 var
-  ChannelCoef: Double;
   TargetImpSec: Double;
-  TargetFlowLS: Double;
-  NoiseAmplitudeFlowLS: Double;
-  NoiseAmplitudeImpSec: Double;
-  ElapsedMs: Double;
-  Progress: Double;
-  NoiseFlowLS: Double;
-  NoiseImpSec: Double;
-  CalculatedFlowLS: Double;
-  MinNoiseImpSec: Double;
-  MaxNoiseImpSec: Double;
-  SelectNewTarget: Boolean;
-  SelectNewTargetReason: string;
-  ElapsedNoiseMoveMs: Double;
-  ApplyNoiseDeltaMs: Double;
+  AllowedDelta: Double;
+  RandomStep: Double;
+  BeforeImpSec: Double;
+  AfterImpSec: Double;
 begin
-  if AChannel = nil then
+  if (AChannel = nil) or AChannel.SimulationRampActive then
     Exit;
 
-  if AChannel.SimulationRampActive then
-  begin
-    AChannel.SimulationNoiseMoveActive := False;
-    AChannel.SimulationNextNoiseChangeTimeMs := 0;
-    Exit;
-  end;
-
-  ChannelCoef := GetChannelFlowCoef(AChannel);
   TargetImpSec := AChannel.SimulationTargetImpSec;
-  if (TargetImpSec <= 0) or (ChannelCoef <= 0) then
+  if TargetImpSec <= 0 then
     Exit;
 
-  TargetFlowLS := TargetImpSec / ChannelCoef;
-  NoiseAmplitudeFlowLS := Max(Abs(TargetFlowLS) * ANoisePercent / 100.0,
-    MIN_NOISE_AMPLITUDE_FLOW_LS);
-  NoiseAmplitudeImpSec := NoiseAmplitudeFlowLS * ChannelCoef;
-  MinNoiseImpSec := Max(0.0, TargetImpSec - NoiseAmplitudeImpSec);
-  MaxNoiseImpSec := TargetImpSec + NoiseAmplitudeImpSec;
-
-  SelectNewTarget := False;
-  SelectNewTargetReason := '';
-  if not AChannel.SimulationNoiseMoveActive then
-  begin
-    if AChannel.SimulationNextNoiseChangeTimeMs = 0 then
-      SelectNewTargetReason := 'Initial'
-    else if ACurrentTimeMs >= AChannel.SimulationNextNoiseChangeTimeMs then
-      SelectNewTargetReason := 'NextTargetTime';
-
-    if SelectNewTargetReason <> '' then
-    begin
-      SelectNewTarget := True;
-      NoiseFlowLS := (Random * 2.0 - 1.0) * NoiseAmplitudeFlowLS;
-      AChannel.SimulationCurrentNoiseFlowLS :=
-        (AChannel.ImpSec - TargetImpSec) / ChannelCoef;
-      AChannel.SimulationTargetNoiseFlowLS := NoiseFlowLS;
-      AChannel.SimulationNoiseMoveStartImpSec := AChannel.ImpSec;
-      AChannel.SimulationNoiseMoveTargetImpSec := EnsureRange(TargetImpSec + NoiseFlowLS * ChannelCoef,
-        MinNoiseImpSec, MaxNoiseImpSec);
-      AChannel.SimulationNoiseChangeStartTimeMs := ACurrentTimeMs;
-      AChannel.SimulationNoiseChangeDurationMs := NOISE_CHANGE_DURATION_MS;
-      AChannel.SimulationNextNoiseChangeTimeMs := ACurrentTimeMs + NOISE_UPDATE_PERIOD_MS;
-      AChannel.SimulationNoiseMoveActive := True;
-    end;
-  end;
-
-  ElapsedMs := Max(0.0, ACurrentTimeMs - AChannel.SimulationNoiseChangeStartTimeMs);
-  if AChannel.SimulationNoiseChangeDurationMs > 0 then
-    Progress := EnsureRange(ElapsedMs / AChannel.SimulationNoiseChangeDurationMs, 0.0, 1.0)
-  else
-    Progress := 1.0;
-
-  AChannel.ImpSec := AChannel.SimulationNoiseMoveStartImpSec +
-    (AChannel.SimulationNoiseMoveTargetImpSec - AChannel.SimulationNoiseMoveStartImpSec) * Progress;
-  AChannel.ImpSec := EnsureRange(AChannel.ImpSec, MinNoiseImpSec, MaxNoiseImpSec);
-  if Progress >= 1.0 then
-  begin
-    AChannel.ImpSec := AChannel.SimulationNoiseMoveTargetImpSec;
-    AChannel.SimulationNoiseMoveActive := False;
-  end;
-  NoiseImpSec := AChannel.ImpSec - TargetImpSec;
-  NoiseFlowLS := NoiseImpSec / ChannelCoef;
-  CalculatedFlowLS := AChannel.ImpSec / ChannelCoef;
-  ElapsedNoiseMoveMs := ElapsedMs;
-
-  if AChannel.SimulationLastNoiseLogTimeMs > 0 then
-    ApplyNoiseDeltaMs := ACurrentTimeMs - AChannel.SimulationLastNoiseLogTimeMs
-  else
-    ApplyNoiseDeltaMs := 0.0;
+  BeforeImpSec := AChannel.ImpSec;
+  AllowedDelta := EnsureRange(Abs(TargetImpSec) * ANoisePercent / 100.0, 0.1, 30.0);
+  RandomStep := (Random * 2.0 - 1.0) * AllowedDelta;
+  AfterImpSec := EnsureRange(BeforeImpSec + RandomStep,
+    Max(0.0, TargetImpSec - AllowedDelta), TargetImpSec + AllowedDelta);
+  AChannel.ImpSec := AfterImpSec;
 
   if (ProtocolManager <> nil) and
-     ((AChannel.SimulationLastNoiseLogTimeMs = 0) or
-      (ApplyNoiseDeltaMs >= 1000.0)) then
+     ((AChannel.SimulationLastProgressLogMs = 0) or
+      (ACurrentTimeMs - AChannel.SimulationLastProgressLogMs >= 1000.0)) then
   begin
-    AChannel.SimulationLastNoiseLogTimeMs := ACurrentTimeMs;
-    ProtocolManager.AddMessage(pcState, psWorkTable, 'ChannelNoiseDiagnostic',
-      'Channel noise diagnostic',
-      Format('ChannelKind=%s ChannelIndex=%d TargetFlowLS=%.6f TargetImpSec=%.6f NoiseSource=FlowPercent NoiseAmplitudeFlowLS=%.6f CurrentNoiseFlowLS=%.6f NoiseImpSec=%.6f NoiseMoveStartImpSec=%.6f NoiseMoveTargetImpSec=%.6f NoiseMoveProgress=%.3f CurrentImpSec=%.6f SimulationTargetImpSec=%.6f DistanceFromTargetImpSec=%.6f CalculatedFlowLS=%.6f DisplayedFlow=%.6f TargetSelectedAtMs=%.0f NextTargetAtMs=%.0f NoiseMoveActive=%s CurrentTimeMs=%.0f NoiseMoveStartTimeMs=%.0f ElapsedNoiseMoveMs=%.0f NoiseMoveDurationMs=%.0f SelectNewTarget=%s SelectNewTargetReason=%s ApplyNoiseDeltaMs=%.0f DeviceReady=%s',
-        [AChannelKind, AChannelIndex, TargetFlowLS, TargetImpSec,
-         NoiseAmplitudeFlowLS, NoiseFlowLS, NoiseImpSec,
-         AChannel.SimulationNoiseMoveStartImpSec,
-         AChannel.SimulationNoiseMoveTargetImpSec, Progress, AChannel.ImpSec,
-         TargetImpSec, AChannel.ImpSec - TargetImpSec, CalculatedFlowLS,
-         CalculatedFlowLS * 3.6, AChannel.SimulationNoiseChangeStartTimeMs,
-         AChannel.SimulationNextNoiseChangeTimeMs,
-         IfThen(AChannel.SimulationNoiseMoveActive, 'True', 'False'), ACurrentTimeMs,
-         AChannel.SimulationNoiseChangeStartTimeMs, ElapsedNoiseMoveMs,
-         AChannel.SimulationNoiseChangeDurationMs, IfThen(SelectNewTarget, 'True', 'False'),
-         SelectNewTargetReason, ApplyNoiseDeltaMs,
-         IfThen(ADeviceReady, 'True', 'False')]));
+    AChannel.SimulationLastProgressLogMs := ACurrentTimeMs;
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'SimulationNoise',
+      'Simple channel simulation noise',
+      Format('ChannelKind=%s ChannelIndex=%d DeviceReady=%s TargetImpSec=%.6f BeforeImpSec=%.6f RandomStep=%.6f AllowedDelta=%.6f AfterImpSec=%.6f',
+        [AChannelKind, AChannelIndex, IfThen(ADeviceReady, 'True', 'False'),
+         TargetImpSec, BeforeImpSec, RandomStep, AllowedDelta, AfterImpSec]));
   end;
 end;
 
@@ -6999,8 +6880,8 @@ begin
       ATargetImpSecValues[I], ACurrentTimeMs,
       Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
         [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
-    ApplySimulationNoise(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
-      ACurrentTimeMs, 0.1, AWorkTable.DeviceReady);
+    ApplySimpleSimulationNoise(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
+      ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
     UpdateChannelCurSec(Channel, 0.03);
   end;
 end;
@@ -7060,8 +6941,8 @@ begin
         Channel := EnabledDeviceChannels[I];
         if not Channel.SimulationRampActive then
           Channel.SimulationTargetImpSec := Channel.ImpSec;
-        ApplySimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
-          ACurrentTimeMs, 0.2, AWorkTable.DeviceReady);
+        ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
+          ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
         UpdateChannelCurSec(Channel, 0.3);
       end;
     end
@@ -7077,8 +6958,8 @@ begin
           TargetImpSec, ACurrentTimeMs,
           Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
             [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
-        ApplySimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
-          ACurrentTimeMs, 0.2, AWorkTable.DeviceReady);
+        ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
+          ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
         UpdateChannelCurSec(Channel, 0.3);
       end;
     end;
