@@ -2280,6 +2280,8 @@ procedure TMeasurementRun.RouteStopInWorker;
 var
   DiagnosticKey: string;
 begin
+  if IsStopRequested then
+    AddDiagnosticEvent('RouteStopInWorker processing: Stage=' + MeasurementStateToString(FCurrentStage));
   if not IsStopRequested then
     Exit;
 
