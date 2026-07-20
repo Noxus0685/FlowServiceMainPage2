@@ -673,6 +673,7 @@ type
 
   procedure ApplyChannelValues(AChannels: TObjectList<TChannel>; const ACurSec: Double;
   const AImpSecValues: TArray<Double>; const AImpResult: Double);
+  procedure SyncRuntimeMeterValues;
 
   function FindPumpByUUID(const APumpUUID: string): TPump;
   function FindPumpByName(const APumpName: string): TPump;
@@ -3994,6 +3995,72 @@ begin
   AssignTableFlowAsEtalonToDevices;
 end;
 
+procedure TWorkTable.SyncRuntimeMeterValues;
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if (FluidTemp <> nil) then
+  begin
+    SetTemperature(FluidTemp.BeforeValue, FluidTemp.AfterValue);
+    if ValueTempertureBefore <> nil then
+      ValueTempertureBefore.SetValue(FluidTemp.BeforeValue);
+    if ValueTempertureAfter <> nil then
+      ValueTempertureAfter.SetValue(FluidTemp.AfterValue);
+  end;
+
+  if (FluidPress <> nil) then
+  begin
+    SetPressure(FluidPress.BeforeValue, FluidPress.AfterValue);
+    if ValuePressureBefore <> nil then
+      ValuePressureBefore.SetValue(FluidPress.BeforeValue);
+    if ValuePressureAfter <> nil then
+      ValuePressureAfter.SetValue(FluidPress.AfterValue);
+  end;
+
+  if ValueTime <> nil then
+    ValueTime.SetValue(Time);
+
+  for I := 0 to EtalonChannels.Count - 1 do
+  begin
+    Channel := EtalonChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if Channel.ValueCurrent <> nil then
+      Channel.ValueCurrent.SetValue(Channel.CurSec);
+    if Channel.ValueImp <> nil then
+      Channel.ValueImp.SetValue(Channel.ImpSec);
+    if Channel.ValueImpTotal <> nil then
+      Channel.ValueImpTotal.SetValue(Channel.ImpResult);
+  end;
+
+  for I := 0 to DeviceChannels.Count - 1 do
+  begin
+    Channel := DeviceChannels[I];
+    if (Channel = nil) or (Channel.FlowMeter = nil) then
+      Continue;
+
+    if Channel.ValueCurrent <> nil then
+      Channel.ValueCurrent.SetValue(Channel.CurSec);
+    if Channel.ValueImp <> nil then
+      Channel.ValueImp.SetValue(Channel.ImpSec);
+    if Channel.ValueImpTotal <> nil then
+      Channel.ValueImpTotal.SetValue(Channel.ImpResult);
+    if Channel.ValueInterface <> nil then
+      Channel.ValueInterface.SetValue(Channel.ValueSec);
+  end;
+
+  RecalculateAllMeterValues;
+
+  if (FluidTemp <> nil) and (FluidTemp.Value <> nil) and (ValueTemperture <> nil) then
+    FluidTemp.Value.Value := ValueTemperture.GetDoubleValue;
+  if (FluidPress <> nil) and (FluidPress.Value <> nil) and (ValuePressure <> nil) then
+    FluidPress.Value.Value := ValuePressure.GetDoubleValue;
+  if (FlowRate <> nil) and (FlowRate.Value <> nil) and (ValueFlowRate <> nil) then
+    FlowRate.Value.Value := ValueFlowRate.GetDoubleValue;
+end;
+
 procedure TWorkTable.SetValues;
 
 begin
@@ -6620,6 +6687,7 @@ begin
    end;
 end;
 
+
 procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
 var
   Pump: tPump;             // Активный насос (исполнитель)
@@ -7246,6 +7314,9 @@ begin
   // Обновление давления
   UpdateRandomPress(WorkTable);
 
+  if not (WorkTable.State in [swtMONITOR, swtEXECUTE]) then
+    WorkTable.SyncRuntimeMeterValues;
+
 
   // ============================================================
   // 3. Машина состояний измерения
@@ -7285,7 +7356,10 @@ begin
     // Мониторинг (наблюдение без измерения)
     // ------------------------------------------------------------
     swtMONITOR:
+    begin
       RunChannelSimulationCycle(WorkTable); // обновление показаний
+      WorkTable.SyncRuntimeMeterValues;
+    end;
 
 
     // ------------------------------------------------------------
@@ -7318,6 +7392,7 @@ begin
     begin
       // Обновление сигналов (имитация работы датчиков)
       RunChannelSimulationCycle(WorkTable);
+      WorkTable.SyncRuntimeMeterValues;
 
 
       // ----------------------------------------------------------

@@ -4800,76 +4800,13 @@ end;
 procedure TFrameMainTable.SetValues;
 var
   WorkTable: TWorkTable;
-  I: Integer;
-  DeviceChannel: TChannel;
-  EtalonChannel: TChannel;
 begin
   NormalizeActiveWorkTable;
   WorkTable := FActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
-
-
-
-  // Основные MeterValues рабочего стола.
-   WorkTable.SetTemperature(WorkTable.FluidTemp.BeforeValue, WorkTable.FluidTemp.AfterValue);
-  WorkTable.ValueTempertureBefore.SetValue(WorkTable.FluidTemp.BeforeValue);
-  WorkTable.ValueTempertureAfter.SetValue(WorkTable.FluidTemp.AfterValue);
-
-  WorkTable.ValuePressureBefore.SetValue(WorkTable.FluidPress.BeforeValue);
-  WorkTable.ValuePressureAfter.SetValue(WorkTable.FluidPress.AfterValue);
-
-
-
-  WorkTable.ValueTime.SetValue(WorkTable.Time);
-
-  // Основные MeterValues эталонных каналов.
-  for I := 0 to WorkTable.EtalonChannels.Count - 1 do
-  begin
-    EtalonChannel := WorkTable.EtalonChannels[I];
-    if (EtalonChannel = nil) or (EtalonChannel.FlowMeter = nil) then
-      Continue;
-
-    EtalonChannel.ValueCurrent.SetValue(EtalonChannel.CurSec);
-    EtalonChannel.ValueImp.SetValue(EtalonChannel.ImpSec);
-    EtalonChannel.ValueImpTotal.SetValue(EtalonChannel.ImpResult);
-  end;
-
-  // Основные MeterValues каналов приборов.
-  for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-  begin
-    DeviceChannel := WorkTable.DeviceChannels[I];
-    if (DeviceChannel = nil) or (DeviceChannel.FlowMeter = nil) then
-      Continue;
-
-         if DeviceChannel.ValueCurrent<>nil then
-    DeviceChannel.ValueCurrent.SetValue(DeviceChannel.CurSec);
-         if DeviceChannel.ValueImp<>nil then
-    DeviceChannel.ValueImp.SetValue(DeviceChannel.ImpSec);
-         if DeviceChannel.ValueImpTotal<>nil then
-    DeviceChannel.ValueImpTotal.SetValue(DeviceChannel.ImpResult);
-         if DeviceChannel.ValueInterface<>nil then
-    DeviceChannel.ValueInterface.SetValue(DeviceChannel.ValueSec);
-  end;
-
-  WorkTable.RecalculateAllMeterValues;
-
-
-   WorkTable.FluidTemp.Value.value:=  WorkTable.ValueTemperture.GetDoubleValue;
-   WorkTable.FluidPress.Value.value:= WorkTable.ValuePressure.GetDoubleValue;
-   // WorkTable.FlowRate.Flow:= WorkTable.ValueFlowRate.GetDoubleValue
-
-
-  //if WorkTable.FlowRate.IsRunning then
-    WorkTable.FlowRate.Value.value:= WorkTable.ValueFlowRate.GetDoubleValue;    //в value записываем в л/с а выводим в label в м3/ч
-  //else
-  //  WorkTable.FlowRate.Value:=0;
-    {if WorkTable.ValueFlowRate <> nil then
-    LabelFlowRate.Text := WorkTable.ValueFlowRate.GetStrValue
-  else
-    LabelFlowRate.Text := '-'; }
-
+  WorkTable.SyncRuntimeMeterValues;
 end;
 
 procedure TFrameMainTable.TimerMainTimer(Sender: TObject);
@@ -5076,7 +5013,7 @@ begin
 
   if WorkTable.ValueTime <> nil then
   begin
-    LabelTime.Text := WorkTable.ValueTime.GetStrValue;
+    LabelTime.Text := FormatFloat('0', WorkTable.ValueTime.GetDoubleValue);
   end
   else
     LabelTime.Text := '-';
