@@ -252,6 +252,10 @@ type
     FLastMeasureCompletedEventSent: Boolean;
     FLastSaveDoneEventSent: Boolean;
     FLastPointDoneEventSent: Boolean;
+    FLastProcessedPointIndex: Integer;
+    FLastProcessedPointName: string;
+    FLastResultsAddedToProcessing: Integer;
+    FLastResultsPerDevice: string;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -641,6 +645,10 @@ begin
   FMeasurementDiagnosticCS := TCriticalSection.Create;
   FLastDiagnosticWorkTableState := swtNONE;
   FLastSaveMeasurementResultsResult := 'not called';
+  FLastProcessedPointIndex := -1;
+  FLastProcessedPointName := '';
+  FLastResultsAddedToProcessing := 0;
+  FLastResultsPerDevice := '';
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -1232,7 +1240,11 @@ begin
   if FCurrentRepeat >= RepeatsTarget then
   begin
     if Point <> nil then
+    begin
+      FLastProcessedPointIndex := FCurrentPointIndex;
+      FLastProcessedPointName := Point.Name;
       SetCurrentPointStatus(mptsSaved);
+    end;
     FCurrentRepeat := 0;
     FLastPointDoneEventSent := True;
     AddDiagnosticEvent('mePointDone');
@@ -1654,7 +1666,10 @@ begin
     if FCurrentStage = msMeasure then
       MeasureSec := (TThread.GetTickCount64 - FWaitStartedTick) / 1000;
 
-    NextIndex := FindNextEnabledPointIndex(FCurrentPointIndex + 1);
+    if FCurrentStage = msDone then
+      NextIndex := -1
+    else
+      NextIndex := FindNextEnabledPointIndex(FCurrentPointIndex + 1);
     NextPoint := nil;
     if (NextIndex >= 0) and (NextIndex < FPoints.Count) then
       NextPoint := FPoints[NextIndex];
@@ -1711,6 +1726,12 @@ begin
     Lines.Add('MeasurementRun.Stage=' + MeasurementStateToString(FCurrentStage));
     Lines.Add('WorkerThreadRunning=' + SBool(IsThreadRunning));
     Lines.Add('StopRequested=' + SBool(FStopRequested));
+    Lines.Add('RunCompleted=' + SBool(FCurrentStage = msDone));
+    Lines.Add('LastProcessedPointIndex=' + IntToStr(FLastProcessedPointIndex));
+    if FLastProcessedPointName <> '' then
+      Lines.Add('LastProcessedPointName=' + FLastProcessedPointName)
+    else
+      Lines.Add('LastProcessedPointName=<нет данных>');
     Lines.Add('NextStageAfterSave=' + MeasurementStateToString(FNextStageAfterSave));
     Lines.Add('ForceNextPoint=' + IntToStr(FForceNextPoint));
     Lines.Add('');
@@ -1786,6 +1807,7 @@ begin
     Lines.Add('CurrentPointIndex=' + IntToStr(FCurrentPointIndex));
     Lines.Add('NextSearchStartIndex=' + IntToStr(FCurrentPointIndex + 1));
     Lines.Add('NextEnabledPointIndex=' + IntToStr(NextIndex));
+    Lines.Add('NextPointExists=' + SBool(NextPoint <> nil));
     if NextPoint <> nil then
     begin
       Lines.Add('NextPointName=' + NextPoint.Name);
@@ -1796,7 +1818,10 @@ begin
       Lines.Add('NextPointReason=<следующая включенная точка не найдена>');
     Lines.Add('CurrentStage=' + MeasurementStateToString(FCurrentStage));
     Lines.Add('NextStageAfterSave=' + MeasurementStateToString(FNextStageAfterSave));
-    Lines.Add('DoneReason=<см. события>');
+    if FCurrentStage = msDone then
+      Lines.Add('DoneReason=EndOfPointList')
+    else
+      Lines.Add('DoneReason=<см. события>');
     Lines.Add('');
     Lines.Add('[СОХРАНЕНИЕ]');
     Lines.Add('SaveMeasurementResultsCalled=' + SBool(FLastSaveMeasurementResultsCalled));
@@ -1804,8 +1829,11 @@ begin
     Lines.Add('MeasureCompletedEventSent=' + SBool(FLastMeasureCompletedEventSent));
     Lines.Add('SaveDoneEventSent=' + SBool(FLastSaveDoneEventSent));
     Lines.Add('PointDoneEventSent=' + SBool(FLastPointDoneEventSent));
-    Lines.Add('ResultsAddedToProcessing=<поле отсутствует в текущей реализации>');
-    Lines.Add('ResultsPerDevice=<поле отсутствует в текущей реализации>');
+    Lines.Add('ResultsAddedToProcessing=' + IntToStr(FLastResultsAddedToProcessing));
+    if FLastResultsPerDevice <> '' then
+      Lines.Add('ResultsPerDevice=' + FLastResultsPerDevice)
+    else
+      Lines.Add('ResultsPerDevice=<нет данных>');
     if FLastSaveErrorText <> '' then Lines.Add('LastSaveError=' + FLastSaveErrorText) else Lines.Add('LastSaveError=<нет данных>');
     Result := Lines.Text;
   finally
@@ -2094,6 +2122,10 @@ begin
     FLastMeasureCompletedEventSent := False;
     FLastSaveDoneEventSent := False;
     FLastPointDoneEventSent := False;
+    FLastProcessedPointIndex := -1;
+    FLastProcessedPointName := '';
+    FLastResultsAddedToProcessing := 0;
+    FLastResultsPerDevice := '';
 
     case Mode of
       mrmAutomatic:
@@ -2448,6 +2480,44 @@ begin
 end;
 
 function TMeasurementRun.ValidatePoint(APoint: TDevicePoint; out AError: TErrorInfo): Boolean;
+var
+  AllowedMin: Double;
+  AllowedMax: Double;
+  RangeSource: string;
+  I: Integer;
+  Channel: TChannel;
+  Details: TStringBuilder;
+
+  function BuildFlowDetails(const AReason: string): string;
+  begin
+    Details := TStringBuilder.Create;
+    try
+      Details.AppendFormat('SetPoint validation failed: Index=%d; Name=%s; FlowRate=%.6f; PointQ=%.6f л/с; AllowedMin=%.6f л/с; AllowedMax=%.6f л/с; RangeSource=%s; Reason=%s',
+        [FCurrentPointIndex, APoint.Name, APoint.FlowRate, APoint.Q, AllowedMin, AllowedMax, RangeSource, AReason]);
+      if FWorkTable <> nil then
+      begin
+        if FWorkTable.FlowRate <> nil then
+          Details.AppendFormat('; WorkTable.FlowRate.Min=%.6f; WorkTable.FlowRate.Max=%.6f',
+            [FWorkTable.FlowRate.Min, FWorkTable.FlowRate.Max]);
+        if FWorkTable.EtalonChannels <> nil then
+          for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+          begin
+            Channel := FWorkTable.EtalonChannels[I];
+            if Channel = nil then
+              Continue;
+            Details.AppendFormat('; Etalon[%d].Enabled=%s; Group=%d; QminWork=%.6f; QmaxWork=%.6f',
+              [I, BoolToStr(Channel.Enabled, True), Channel.Group, Channel.QMinWork, Channel.QMaxWork]);
+            if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.Device <> nil) then
+              Details.AppendFormat('; Etalon[%d].Name=%s; DeviceQmin=%.6f; DeviceQmax=%.6f',
+                [I, Channel.FlowMeter.Device.Name, Channel.FlowMeter.Device.Qmin, Channel.FlowMeter.Device.Qmax]);
+          end;
+      end;
+      Result := Details.ToString;
+    finally
+      Details.Free;
+    end;
+  end;
+
 begin
   AError := TErrorInfo.Empty(Integer(msSelectPoint));
   Result := Assigned(APoint) and Assigned(FWorkTable);
@@ -2457,11 +2527,43 @@ begin
     Exit;
   end;
 
-  if (APoint.Q > 0) and ((FWorkTable.FlowRate = nil) or
-     (APoint.Q < FWorkTable.FlowRate.Min) or (APoint.Q > FWorkTable.FlowRate.Max)) then
+  if APoint.Q > 0 then
   begin
-    AError := BuildError(1001, 'Расход точки вне диапазона');
-    Exit(False);
+    if FWorkTable.FlowRate = nil then
+    begin
+      AllowedMin := 0;
+      AllowedMax := 0;
+      RangeSource := 'WorkTable.FlowRate';
+      AError := BuildError(1001, BuildFlowDetails('WorkTable.FlowRate=nil'));
+      Exit(False);
+    end;
+
+    if FMode = mrmAutomatic then
+    begin
+      AllowedMin := 0;
+      AllowedMax := FWorkTable.CalcEtalonFlowRateMax;
+      RangeSource := 'AllEtalonChannelsAndGroups';
+      if (AllowedMax > 0) and (APoint.Q > AllowedMax) then
+      begin
+        AError := BuildError(1001, BuildFlowDetails('PointQ > maximum flow of all available etalon channels/groups'));
+        AddDiagnosticEvent(AError.Msg);
+        Exit(False);
+      end;
+      AddDiagnosticEvent(Format('SetPoint validation: Index=%d; Name=%s; PointQ=%.6f л/с; AllowedMin=%.6f л/с; AllowedMax=%.6f л/с; RangeSource=%s; Result=True',
+        [FCurrentPointIndex, APoint.Name, APoint.Q, AllowedMin, AllowedMax, RangeSource]));
+    end
+    else if (APoint.Q < FWorkTable.FlowRate.Min) or (APoint.Q > FWorkTable.FlowRate.Max) then
+    begin
+      AllowedMin := FWorkTable.FlowRate.Min;
+      AllowedMax := FWorkTable.FlowRate.Max;
+      RangeSource := 'WorkTable.FlowRate';
+      if APoint.Q < AllowedMin then
+        AError := BuildError(1001, BuildFlowDetails('PointQ < WorkTable.FlowRate.Min'))
+      else
+        AError := BuildError(1001, BuildFlowDetails('PointQ > WorkTable.FlowRate.Max'));
+      AddDiagnosticEvent(AError.Msg);
+      Exit(False);
+    end;
   end;
 
   if (APoint.Temp > 0) and ((FWorkTable.FluidTemp = nil) or
@@ -3152,6 +3254,11 @@ procedure TMeasurementRun.SaveMeasurementResults;
 var
   Point: TDevicePoint;
   RepeatsTarget: Integer;
+  I: Integer;
+  Device: TDevice;
+  TotalBefore: Integer;
+  TotalAfter: Integer;
+  PerDevice: TStringBuilder;
 begin
   FLastSaveMeasurementResultsCalled := True;
   FLastSaveMeasurementResultsResult := 'started';
@@ -3166,38 +3273,75 @@ begin
     Exit;
   end;
 
+  TotalBefore := 0;
+  TotalAfter := 0;
+  PerDevice := TStringBuilder.Create;
   try
-    RepeatsTarget := Max(Point.Repeats, 1);
+    try
+      RepeatsTarget := Max(Point.Repeats, 1);
 
-    if FWorkTable <> nil then
-    begin
-      FWorkTable.RecalculateAllMeterValues;
-      if FWorkTable.ValueTime <> nil then
-        FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
-      else
-        FWorkTable.TimeResult := Point.LimitTime;
+      if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+        for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+          if (FWorkTable.DeviceChannels[I] <> nil) and
+             (FWorkTable.DeviceChannels[I].FlowMeter <> nil) then
+          begin
+            Device := FWorkTable.DeviceChannels[I].FlowMeter.Device;
+            if (Device <> nil) and (Device.Spillages <> nil) then
+              Inc(TotalBefore, Device.Spillages.Count);
+          end;
+
+      if FWorkTable <> nil then
+      begin
+        FWorkTable.RecalculateAllMeterValues;
+        if FWorkTable.ValueTime <> nil then
+          FWorkTable.TimeResult := FWorkTable.ValueTime.GetDoubleValue
+        else
+          FWorkTable.TimeResult := Point.LimitTime;
+      end;
+
+      WorkTable.SaveMeasurementResults;
+
+      if (FWorkTable <> nil) and (FWorkTable.DeviceChannels <> nil) then
+        for I := 0 to FWorkTable.DeviceChannels.Count - 1 do
+          if (FWorkTable.DeviceChannels[I] <> nil) and
+             (FWorkTable.DeviceChannels[I].FlowMeter <> nil) then
+          begin
+            Device := FWorkTable.DeviceChannels[I].FlowMeter.Device;
+            if (Device <> nil) and (Device.Spillages <> nil) then
+            begin
+              Inc(TotalAfter, Device.Spillages.Count);
+              if PerDevice.Length > 0 then
+                PerDevice.Append('; ');
+              PerDevice.AppendFormat('DeviceUUID=%s; DeviceName=%s; Results=%d',
+                [Device.UUID, Device.Name, Device.Spillages.Count]);
+            end;
+          end;
+
+      FLastResultsAddedToProcessing := Max(0, TotalAfter - TotalBefore);
+      FLastResultsPerDevice := PerDevice.ToString;
+
+      if DataManager <> nil then
+        DataManager.Save;
+
+      if WorkTableManager <> nil then
+        WorkTableManager.Save;
+
+      Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
+      Point.DateTime := Now;
+      FLastSaveMeasurementResultsResult := 'success';
+      AddDiagnosticEvent(Format('SaveMeasurementResults success; ResultsAdded=%d; %s',
+        [FLastResultsAddedToProcessing, FLastResultsPerDevice]));
+    except
+      on E: Exception do
+      begin
+        FLastSaveMeasurementResultsResult := 'failed';
+        FLastSaveErrorText := E.Message;
+        AddDiagnosticEvent('SaveMeasurementResults failed: ' + E.Message);
+        raise;
+      end;
     end;
-
-    WorkTable.SaveMeasurementResults;
-
-    if DataManager <> nil then
-      DataManager.Save;
-
-    if WorkTableManager <> nil then
-      WorkTableManager.Save;
-
-    Point.RepeatsCompleted := Min(RepeatsTarget, FCurrentRepeat + 1);
-    Point.DateTime := Now;
-    FLastSaveMeasurementResultsResult := 'success';
-    AddDiagnosticEvent('SaveMeasurementResults success');
-  except
-    on E: Exception do
-    begin
-      FLastSaveMeasurementResultsResult := 'failed';
-      FLastSaveErrorText := E.Message;
-      AddDiagnosticEvent('SaveMeasurementResults failed: ' + E.Message);
-      raise;
-    end;
+  finally
+    PerDevice.Free;
   end;
 end;
 
