@@ -6877,7 +6877,7 @@ begin
         Channel := EnabledDeviceChannels[I];
         TargetImpSec := TargetImpSecValues[I];
         UpdateChannelRamp(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
-          TargetImpSec, ACurrentTimeMs, Format('DeviceReady=%s', [BoolToStr(AWorkTable.DeviceReady, True)]));
+          TargetImpSec, ACurrentTimeMs, Format('DeviceReady=%s', [IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
         ApplySimulationNoise(Channel, 0.005, 30.0);
         UpdateChannelCurSec(Channel, 0.3);
       end;
