@@ -6684,18 +6684,21 @@ begin
   Result := Now * MSecsPerDay;
 end;
 
-function CalculateRampDurationSec(const ACurrentImpSec, ATargetImpSec: Double): Double;
+function CalculateRampDurationByFlowDelta(const AStartFlowLS, ATargetFlowLS: Double): Double;
 const
   MIN_SIMULATION_RAMP_DURATION_SEC = 0.3;
   SIMULATION_RAMP_MAX_DURATION_SEC = 10.0;
+  SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC = 0.666667;
 var
-  ScaleImpSec: Double;
-  RelativeDistance: Double;
+  FlowDeltaLS: Double;
 begin
-  ScaleImpSec := Max(Max(Abs(ACurrentImpSec), Abs(ATargetImpSec)), 1.0);
-  RelativeDistance := Abs(ATargetImpSec - ACurrentImpSec) / ScaleImpSec;
-  Result := EnsureRange(RelativeDistance * SIMULATION_RAMP_MAX_DURATION_SEC,
-    MIN_SIMULATION_RAMP_DURATION_SEC, SIMULATION_RAMP_MAX_DURATION_SEC);
+  FlowDeltaLS := Abs(ATargetFlowLS - AStartFlowLS);
+  if SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC <= 0 then
+    Result := SIMULATION_RAMP_MAX_DURATION_SEC
+  else
+    Result := FlowDeltaLS / SIMULATION_RAMP_FLOW_SPEED_LS_PER_SEC;
+  Result := EnsureRange(Result, MIN_SIMULATION_RAMP_DURATION_SEC,
+    SIMULATION_RAMP_MAX_DURATION_SEC);
 end;
 
 function CalculateChannelFlowLS(const AChannel: TChannel): Double;
@@ -6727,6 +6730,10 @@ var
   ElapsedSec: Double;
   Progress: Double;
   NewImpSec: Double;
+  ChannelCoef: Double;
+  StartFlowLS: Double;
+  TargetFlowLS: Double;
+  FlowDeltaLS: Double;
 begin
   if AChannel = nil then
     Exit;
@@ -6735,16 +6742,29 @@ begin
   begin
     AChannel.SimulationStartImpSec := AChannel.ImpSec;
     AChannel.SimulationTargetImpSec := Max(0.0, ATargetImpSec);
+    ChannelCoef := GetChannelFlowCoef(AChannel);
+    if ChannelCoef > 0 then
+    begin
+      StartFlowLS := AChannel.SimulationStartImpSec / ChannelCoef;
+      TargetFlowLS := AChannel.SimulationTargetImpSec / ChannelCoef;
+    end
+    else
+    begin
+      StartFlowLS := 0.0;
+      TargetFlowLS := 0.0;
+    end;
+    FlowDeltaLS := Abs(TargetFlowLS - StartFlowLS);
     AChannel.SimulationRampStartTimeMs := ACurrentTimeMs;
-    AChannel.SimulationRampDurationSec := CalculateRampDurationSec(AChannel.ImpSec,
-      AChannel.SimulationTargetImpSec);
+    AChannel.SimulationRampDurationSec := CalculateRampDurationByFlowDelta(StartFlowLS,
+      TargetFlowLS);
     AChannel.SimulationRampActive := not SameValue(AChannel.SimulationStartImpSec,
       AChannel.SimulationTargetImpSec, TARGET_EPSILON);
     AChannel.SimulationLastProgressLogMs := 0;
     LogSimulationRamp('SimulationRampStarted', AChannelKind, AChannelIndex,
-      Format('%s StartImpSec=%.6f TargetImpSec=%.6f RampDurationSec=%.3f',
-        [AStartDetails, AChannel.SimulationStartImpSec,
-         AChannel.SimulationTargetImpSec, AChannel.SimulationRampDurationSec]));
+      Format('%s StartFlowLS=%.6f TargetFlowLS=%.6f FlowDeltaLS=%.6f RampFlowSpeedLSPerSec=%.6f StartImpSec=%.6f TargetImpSec=%.6f CoefImpPerLiter=%.6f RampDurationSec=%.3f',
+        [AStartDetails, StartFlowLS, TargetFlowLS, FlowDeltaLS, 0.666667,
+         AChannel.SimulationStartImpSec, AChannel.SimulationTargetImpSec,
+         ChannelCoef, AChannel.SimulationRampDurationSec]));
   end;
 
   if AChannel.SimulationRampActive then
@@ -6966,6 +6986,126 @@ begin
   finally
     EnabledDeviceChannels.Free;
   end;
+end;
+
+procedure ResetDisabledChannelSignals(const AWorkTable: TWorkTable);
+var
+  I: Integer;
+begin
+  for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+    if (AWorkTable.EtalonChannels[I] <> nil) and
+       (not IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I])) then
+      ResetChannelSimulation(AWorkTable.EtalonChannels[I], True);
+end;
+
+procedure AccumulateChannelImpResult(const AChannels: TObjectList<TChannel>; const ADeltaTimeSec: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+begin
+  if AChannels = nil then
+    Exit;
+
+  for I := 0 to AChannels.Count - 1 do
+  begin
+    Channel := AChannels[I];
+    if IsSimulationChannelEnabled(Channel) then
+      Channel.ImpResult := EnsureRange(Channel.ImpResult + Channel.ImpSec * ADeltaTimeSec, 0.0, 1.0E12);
+  end;
+end;
+
+procedure LogFlowUnitsDiagnostic(const AWorkTable: TWorkTable; const ABaseTargetFlowLS: Double);
+const
+  TARGET_EPSILON = 1E-6;
+var
+  UnitName: string;
+  DisplayedSetValue: Double;
+  EtalonValueFlowLS: Double;
+  DeviceValueFlowLS: Double;
+  DisplayedEtalonFlow: Double;
+  DisplayedDeviceFlow: Double;
+begin
+  if (AWorkTable = nil) or (AWorkTable.ValueFlowRate = nil) or (ProtocolManager = nil) then
+    Exit;
+
+  if SameValue(AWorkTable.SimulationLastFlowUnitsLogTarget, ABaseTargetFlowLS, TARGET_EPSILON) then
+    Exit;
+
+  AWorkTable.SimulationLastFlowUnitsLogTarget := ABaseTargetFlowLS;
+  UnitName := AWorkTable.ValueFlowRate.GetDimName;
+  DisplayedSetValue := AWorkTable.ValueFlowRate.GetDoubleNum(ABaseTargetFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  EtalonValueFlowLS := 0;
+  if (AWorkTable.EtalonChannels.Count > 0) and (AWorkTable.EtalonChannels[0] <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter <> nil) and
+     (AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow <> nil) then
+    EtalonValueFlowLS := AWorkTable.EtalonChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DeviceValueFlowLS := 0;
+  if (AWorkTable.DeviceChannels.Count > 0) and (AWorkTable.DeviceChannels[0] <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter <> nil) and
+     (AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow <> nil) then
+    DeviceValueFlowLS := AWorkTable.DeviceChannels[0].FlowMeter.ValueFlow.GetDoubleValue;
+
+  DisplayedEtalonFlow := AWorkTable.ValueFlowRate.GetDoubleNum(EtalonValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+  DisplayedDeviceFlow := AWorkTable.ValueFlowRate.GetDoubleNum(DeviceValueFlowLS,
+    AWorkTable.ValueFlowRate.CurrentDimIndex);
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'FlowUnitsDiagnostic',
+    'Flow unit conversion diagnostic',
+    Format('DisplayedSetValue=%.6f SelectedUnit=%s BaseTargetFlowLS=%.6f EtalonValueFlowLS=%.6f DisplayedEtalonFlow=%.6f DeviceValueFlowLS=%.6f DisplayedDeviceFlow=%.6f',
+      [DisplayedSetValue, UnitName, ABaseTargetFlowLS, EtalonValueFlowLS,
+       DisplayedEtalonFlow, DeviceValueFlowLS, DisplayedDeviceFlow]));
+end;
+
+procedure UpdateChannelSimulation(const AWorkTable: TWorkTable);
+const
+  MAX_DELTA_TIME_SEC = 1.0;
+var
+  I: Integer;
+  CurrentTimeMs: Double;
+  DeltaTimeSec: Double;
+  TargetFlow: Double;
+  OldTargetFlow: Double;
+  EnabledEtalonChannels: TObjectList<TChannel>;
+  EtalonTargetImpSecValues: TArray<Double>;
+begin
+  if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or (not AWorkTable.FlowRate.IsRunning) then
+    Exit;
+
+  CurrentTimeMs := GetCurrentTimeMs;
+  if AWorkTable.SimulationLastUpdateTimeMs > 0 then
+    DeltaTimeSec := EnsureRange((CurrentTimeMs - AWorkTable.SimulationLastUpdateTimeMs) / 1000.0,
+      0.0, MAX_DELTA_TIME_SEC)
+  else
+    DeltaTimeSec := 1.0;
+  AWorkTable.SimulationLastUpdateTimeMs := CurrentTimeMs;
+  AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
+
+  TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+  OldTargetFlow := AWorkTable.SimulationTargetFlowBase;
+  LogFlowUnitsDiagnostic(AWorkTable, TargetFlow);
+  EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
+  try
+    for I := 0 to AWorkTable.EtalonChannels.Count - 1 do
+      if IsSimulationChannelEnabled(AWorkTable.EtalonChannels[I]) then
+        EnabledEtalonChannels.Add(AWorkTable.EtalonChannels[I]);
+
+    EtalonTargetImpSecValues := CalculateEtalonTargetImpSecValues(AWorkTable,
+      EnabledEtalonChannels, TargetFlow);
+    UpdateEtalonChannelSignals(AWorkTable, EnabledEtalonChannels,
+      EtalonTargetImpSecValues, CurrentTimeMs, TargetFlow, OldTargetFlow);
+  finally
+    EnabledEtalonChannels.Free;
+  end;
+
+  UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
+  AWorkTable.SimulationTargetFlowBase := TargetFlow;
+  AccumulateChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
+  AccumulateChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
+  ResetDisabledChannelSignals(AWorkTable);
 end;
 
 procedure ResetDisabledChannelSignals(const AWorkTable: TWorkTable);
