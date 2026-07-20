@@ -482,6 +482,7 @@ type
     FNextFreqChangeAt: TDateTime;
     FSimulationLastUpdateTimeMs: Double;
     FSimulationLastFlowUnitsLogTarget: Double;
+    FSimulationTargetFlowBase: Double;
 
     FHashValueTempertureBefore: string;
     FHashValueTempertureAfter: string;
@@ -771,6 +772,7 @@ type
     property NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
     property SimulationLastUpdateTimeMs: Double read FSimulationLastUpdateTimeMs write FSimulationLastUpdateTimeMs;
     property SimulationLastFlowUnitsLogTarget: Double read FSimulationLastFlowUnitsLogTarget write FSimulationLastFlowUnitsLogTarget;
+    property SimulationTargetFlowBase: Double read FSimulationTargetFlowBase write FSimulationTargetFlowBase;
 
     procedure RebindAllFlowMeters;
     procedure RecalculateAllMeterValues;
@@ -2038,6 +2040,7 @@ begin
   FLimitVolumeSet := 0;
   FSimulationLastUpdateTimeMs := 0;
   FSimulationLastFlowUnitsLogTarget := 0;
+  FSimulationTargetFlowBase := 0;
 
   FCurrentPoint := TDevicePoint.Create(0);
   FCurrentPoint.LimitTime := -1;
@@ -6797,7 +6800,7 @@ end;
 
 procedure UpdateEtalonChannelSignals(const AWorkTable: TWorkTable;
   const AEnabledEtalonChannels: TObjectList<TChannel>; const ATargetImpSecValues: TArray<Double>;
-  const ACurrentTimeMs, ATargetFlow: Double);
+  const ACurrentTimeMs, ATargetFlow, AOldTargetFlow: Double);
 var
   I: Integer;
   Channel: TChannel;
@@ -6806,7 +6809,9 @@ begin
   begin
     Channel := AEnabledEtalonChannels[I];
     UpdateChannelRamp(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
-      ATargetImpSecValues[I], ACurrentTimeMs, Format('TargetFlowLS=%.6f', [ATargetFlow]));
+      ATargetImpSecValues[I], ACurrentTimeMs,
+      Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
+        [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
     ApplySimulationNoise(Channel, 0.001, 5.0);
     UpdateChannelCurSec(Channel, 0.03);
   end;
@@ -6840,7 +6845,7 @@ begin
     end;
 end;
 
-procedure UpdateDeviceChannelSignals(const AWorkTable: TWorkTable; const AActualEtalonFlow: Double;
+procedure UpdateDeviceChannelSignals(const AWorkTable: TWorkTable; const ATargetFlow, AOldTargetFlow: Double;
   const ACurrentTimeMs: Double);
 var
   I: Integer;
@@ -6874,13 +6879,15 @@ begin
     else
     begin
       TargetImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
-        EnabledDeviceChannels, AActualEtalonFlow, 0, False, True);
+        EnabledDeviceChannels, ATargetFlow, 0, False, True);
       for I := 0 to EnabledDeviceChannels.Count - 1 do
       begin
         Channel := EnabledDeviceChannels[I];
         TargetImpSec := TargetImpSecValues[I];
         UpdateChannelRamp(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
-          TargetImpSec, ACurrentTimeMs, Format('DeviceReady=%s', [IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
+          TargetImpSec, ACurrentTimeMs,
+          Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
+            [ATargetFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
         ApplySimulationNoise(Channel, 0.005, 30.0);
         UpdateChannelCurSec(Channel, 0.3);
       end;
@@ -6970,9 +6977,9 @@ var
   CurrentTimeMs: Double;
   DeltaTimeSec: Double;
   TargetFlow: Double;
+  OldTargetFlow: Double;
   EnabledEtalonChannels: TObjectList<TChannel>;
   EtalonTargetImpSecValues: TArray<Double>;
-  ActualEtalonFlow: Double;
 begin
   if (AWorkTable = nil) or (AWorkTable.FlowRate = nil) or (not AWorkTable.FlowRate.IsRunning) then
     Exit;
@@ -6987,6 +6994,7 @@ begin
   AWorkTable.Time := AWorkTable.Time + DeltaTimeSec;
 
   TargetFlow := AWorkTable.FlowRate.ValueSet.Value;
+  OldTargetFlow := AWorkTable.SimulationTargetFlowBase;
   LogFlowUnitsDiagnostic(AWorkTable, TargetFlow);
   EnabledEtalonChannels := TObjectList<TChannel>.Create(False);
   try
@@ -6997,13 +7005,13 @@ begin
     EtalonTargetImpSecValues := CalculateEtalonTargetImpSecValues(AWorkTable,
       EnabledEtalonChannels, TargetFlow);
     UpdateEtalonChannelSignals(AWorkTable, EnabledEtalonChannels,
-      EtalonTargetImpSecValues, CurrentTimeMs, TargetFlow);
+      EtalonTargetImpSecValues, CurrentTimeMs, TargetFlow, OldTargetFlow);
   finally
     EnabledEtalonChannels.Free;
   end;
 
-  ActualEtalonFlow := CalculateActualEtalonFlow(AWorkTable);
-  UpdateDeviceChannelSignals(AWorkTable, ActualEtalonFlow, CurrentTimeMs);
+  UpdateDeviceChannelSignals(AWorkTable, TargetFlow, OldTargetFlow, CurrentTimeMs);
+  AWorkTable.SimulationTargetFlowBase := TargetFlow;
   AccumulateChannelImpResult(AWorkTable.EtalonChannels, DeltaTimeSec);
   AccumulateChannelImpResult(AWorkTable.DeviceChannels, DeltaTimeSec);
   ResetDisabledChannelSignals(AWorkTable);
