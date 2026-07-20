@@ -1370,13 +1370,25 @@ function TMeasurementRun.CheckFlowStable(out StableInfo: RStableInfo): Boolean;
 var
   I: Integer;
   Channel: TChannel;
-  OldValue: TMeterValue;
   StableValue: TMeterValue;
+  Settings: TMeterValueStabilitySettings;
+  SignalInfo: TMeterValueStabilityInfo;
+  Point: TDevicePoint;
+  TargetValue: Double;
+  ActualValue: Double;
+  MinPercent: Double;
+  MaxPercent: Double;
+  AllowedMinus: Double;
+  AllowedPlus: Double;
+  ToleranceSource: string;
+  FlowReached: Boolean;
+  HistoryStable: Boolean;
 begin
   StableInfo := Default(RStableInfo);
   Result := False;
 
-  if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) then
+  Point := GetCurrentPoint;
+  if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) or (Point = nil) then
     Exit;
 
   StableValue := nil;
@@ -1393,15 +1405,92 @@ begin
     end;
 
   if StableValue = nil then
-    Exit(FWorkTable.FlowRate.IsStable(StableInfo));
+    StableValue := FWorkTable.FlowRate.Value;
+  if StableValue = nil then
+    Exit;
 
-  OldValue := FWorkTable.FlowRate.Value;
-  try
-    FWorkTable.FlowRate.Value := StableValue;
-    Result := FWorkTable.FlowRate.IsStable(StableInfo);
-  finally
-    FWorkTable.FlowRate.Value := OldValue;
+  TargetValue := Point.Q;
+  if (TargetValue < 0) and (FWorkTable.FlowRate.ValueSet <> nil) then
+    TargetValue := FWorkTable.FlowRate.ValueSet.Value;
+
+  ActualValue := StableValue.GetDoubleValue;
+  Settings := StableValue.StabilitySettings;
+
+  ToleranceSource := 'Point.FlowAccuracy';
+  if AccuracyToRange(Point.FlowAccuracy, MinPercent, MaxPercent) then
+  begin
+    AllowedMinus := Abs(TargetValue) * Abs(MinPercent) / 100.0;
+    AllowedPlus := Abs(TargetValue) * Abs(MaxPercent) / 100.0;
+    StableInfo.LowerLimit := TargetValue - AllowedMinus;
+    StableInfo.UpperLimit := TargetValue + AllowedPlus;
+  end
+  else
+  begin
+    ToleranceSource := 'TMeterValue.StabilitySettings';
+    AllowedMinus := Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyMinusPercent) / 100.0,
+      Settings.TargetToleranceAbsolute);
+    AllowedPlus := Max(Abs(TargetValue) * Abs(Settings.TargetAccuracyPlusPercent) / 100.0,
+      Settings.TargetToleranceAbsolute);
+    if SameValue(AllowedMinus, 0) and SameValue(AllowedPlus, 0) then
+    begin
+      ToleranceSource := 'IsFlowFit default accuracy';
+      AllowedMinus := Abs(TargetValue) * 10.0 / 100.0;
+      AllowedPlus := AllowedMinus;
+    end;
+    StableInfo.LowerLimit := TargetValue - AllowedMinus;
+    StableInfo.UpperLimit := TargetValue + AllowedPlus;
   end;
+
+  StableInfo.TargetValue := TargetValue;
+  StableInfo.CurrentValue := ActualValue;
+  StableInfo.IsCurrentInRange := (ActualValue >= StableInfo.LowerLimit) and
+    (ActualValue <= StableInfo.UpperLimit);
+  StableInfo.IsMeanInRange := True;
+  StableInfo.IsForecastInRange := True;
+  FlowReached := StableInfo.IsCurrentInRange;
+
+  HistoryStable := True;
+  if Settings.Enabled then
+  begin
+    StableValue.AddSample(ActualValue);
+    HistoryStable := StableValue.AnalyzeStability(SignalInfo);
+    StableInfo.SignalInfo := SignalInfo;
+    StableInfo.IsSignalStable := HistoryStable;
+    StableInfo.MeanValue := SignalInfo.MeanValue;
+    StableInfo.ForecastValue := SignalInfo.ForecastValue;
+    StableInfo.IsMeanInRange := (not Settings.RequireMeanValueInRange) or
+      ((SignalInfo.MeanValue >= StableInfo.LowerLimit) and (SignalInfo.MeanValue <= StableInfo.UpperLimit));
+    StableInfo.IsForecastInRange := (not Settings.RequireForecastInRange) or
+      ((SignalInfo.ForecastValue >= StableInfo.LowerLimit) and (SignalInfo.ForecastValue <= StableInfo.UpperLimit));
+    HistoryStable := HistoryStable and StableInfo.IsMeanInRange and StableInfo.IsForecastInRange;
+  end
+  else
+  begin
+    StableInfo.SignalInfo.Status := mvssDisabled;
+    StableInfo.IsSignalStable := True;
+    StableInfo.MeanValue := ActualValue;
+    StableInfo.ForecastValue := ActualValue;
+  end;
+
+  StableInfo.IsTargetConditionPassed := FlowReached and StableInfo.IsMeanInRange and StableInfo.IsForecastInRange;
+  StableInfo.IsReadyForMeasurement := FlowReached and HistoryStable;
+  Result := StableInfo.IsReadyForMeasurement;
+
+  if Result then
+    StableInfo.Status := sOk
+  else
+    StableInfo.Status := sRun_NN;
+
+  StableInfo.StatusText := Format('FlowReached=%s; HistoryAnalysisEnabled=%s; HistoryAnalysisSkipped=%s; '
+    + 'ToleranceSource=%s; Target=%.6f; Actual=%.6f; FlowMin=%.6f; FlowMax=%.6f; '
+    + 'AllowedDeviationLS=%.6f/%.6f; ActualDeviationLS=%.6f; ActualDeviationPercent=%.6f',
+    [BoolToStr(FlowReached, True), BoolToStr(Settings.Enabled, True), BoolToStr(not Settings.Enabled, True),
+     ToleranceSource, TargetValue, ActualValue, StableInfo.LowerLimit, StableInfo.UpperLimit,
+     AllowedMinus, AllowedPlus, Abs(ActualValue - TargetValue),
+     IfThen(not SameValue(TargetValue, 0), Abs(ActualValue - TargetValue) / Abs(TargetValue) * 100.0, 0.0)]);
+
+  if Settings.Enabled and (not HistoryStable) and (SignalInfo.StatusText <> '') then
+    StableInfo.StatusText := StableInfo.StatusText + '; HistoryReason=' + SignalInfo.StatusText;
 end;
 
 procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
@@ -1499,6 +1588,16 @@ var
   Channel: TChannel;
   CurrentTime, CurrentVolume: Double;
   CurrentImp: Int64;
+  TolMinPercent, TolMaxPercent: Double;
+  FlowToleranceSource: string;
+  FlowToleranceRawValue: string;
+  FlowToleranceUnit: string;
+  AllowedDeviationLS: Double;
+  ActualDeviationLS: Double;
+  ActualDeviationPercent: Double;
+  FlowReached: Boolean;
+  TargetFlowForLog: Double;
+  ActualFlowForLog: Double;
 
   function SBool(AValue: Boolean): string;
   begin
@@ -1564,6 +1663,34 @@ begin
     CurrentVolume := GetCurrentStopVolumeValue;
     CurrentImp := GetCurrentStopImpulseValue;
 
+    TargetFlowForLog := FlowStableInfo.TargetValue;
+    ActualFlowForLog := FlowStableInfo.CurrentValue;
+    FlowToleranceSource := 'Point.FlowAccuracy';
+    FlowToleranceRawValue := '<нет данных>';
+    FlowToleranceUnit := '%';
+    if (Point <> nil) and AccuracyToRange(Point.FlowAccuracy, TolMinPercent, TolMaxPercent) then
+    begin
+      FlowToleranceRawValue := Point.FlowAccuracy;
+      AllowedDeviationLS := Max(Abs(TargetFlowForLog) * Abs(TolMinPercent) / 100.0,
+        Abs(TargetFlowForLog) * Abs(TolMaxPercent) / 100.0);
+    end
+    else
+    begin
+      FlowToleranceSource := 'TMeterValue.StabilitySettings/IsFlowFit default';
+      FlowToleranceRawValue := Format('FlowMin=%f; FlowMax=%f',
+        [FlowStableInfo.LowerLimit, FlowStableInfo.UpperLimit]);
+      FlowToleranceUnit := 'л/с';
+      AllowedDeviationLS := Max(Abs(FlowStableInfo.LowerLimit - TargetFlowForLog),
+        Abs(FlowStableInfo.UpperLimit - TargetFlowForLog));
+    end;
+    ActualDeviationLS := Abs(ActualFlowForLog - TargetFlowForLog);
+    if SameValue(TargetFlowForLog, 0) then
+      ActualDeviationPercent := 0
+    else
+      ActualDeviationPercent := ActualDeviationLS / Abs(TargetFlowForLog) * 100.0;
+    FlowReached := (ActualFlowForLog >= FlowStableInfo.LowerLimit) and
+      (ActualFlowForLog <= FlowStableInfo.UpperLimit);
+
     Lines.Add('==================================================');
     Lines.Add('Время снимка: ' + FormatDateTime('dd.mm.yyyy hh:nn:ss.zzz', Now));
     Lines.Add('Причина: ручное нажатие «Добавить лог»');
@@ -1623,6 +1750,15 @@ begin
     Lines.Add('SelectedEtalonName=' + EtalonName);
     Lines.Add('FlowMin=' + SFloat(FlowStableInfo.LowerLimit));
     Lines.Add('FlowMax=' + SFloat(FlowStableInfo.UpperLimit));
+    Lines.Add('FlowToleranceSource=' + FlowToleranceSource);
+    Lines.Add('FlowToleranceRawValue=' + FlowToleranceRawValue);
+    Lines.Add('FlowToleranceUnit=' + FlowToleranceUnit);
+    Lines.Add('AllowedDeviationLS=' + SFloat(AllowedDeviationLS));
+    Lines.Add('ActualDeviationLS=' + SFloat(ActualDeviationLS));
+    Lines.Add('ActualDeviationPercent=' + SFloat(ActualDeviationPercent));
+    Lines.Add('FlowReached=' + SBool(FlowReached));
+    Lines.Add('HistoryAnalysisEnabled=' + SBool(FlowStableInfo.SignalInfo.Status <> mvssDisabled));
+    Lines.Add('HistoryAnalysisSkipped=' + SBool(FlowStableInfo.SignalInfo.Status = mvssDisabled));
     Lines.Add('IsFlowStable=' + SBool(IsFlowStableResult));
     Lines.Add('IsStable=' + SBool(IsStableResult));
     Lines.Add('Reason=' + Reason);
