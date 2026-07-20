@@ -1071,7 +1071,7 @@ begin
 
   RefreshDisplayedSamples;
   if FSampleSource = mssWorkHistory then
-    FTestCurrentTimeMs := GetTickCount64;
+    FTestCurrentTimeMs := TThread.GetTickCount64;
   RefreshSamplesGrid(False);
 
   if WasLastRow and (GridSamples.RowCount > 0) then
