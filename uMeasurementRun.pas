@@ -310,6 +310,8 @@ type
     function IsThreadRunning: Boolean;
 
     function IsStable(out StableInfo: RStableInfo): Boolean;
+    function IsFlowStable(out StableInfo: RStableInfo): Boolean;
+    procedure ContinueAfterPointError(const AStatus: EMeasurementPointStatus; AEvent: EMeasurementEvent; const AError: TErrorInfo);
     function IsTerminated: Boolean;
   public
     constructor Create(AWorkTable: TWorkTable);
@@ -700,21 +702,21 @@ begin
         Result := False;
       end;
     msSelectPoint:
-      Result := ANewStage in [msSelectEtalon, msDone, msNone];
+      Result := ANewStage in [msSelectEtalon, msSetupPoint, msDone, msNone];
     msSelectEtalon:
-      Result := ANewStage in [msSetupPoint, msDone, msNone];
+      Result := ANewStage in [msSetupPoint, msSelectPoint, msDone, msNone];
     msSetupPoint:
-      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msDone, msNone];
+      Result := ANewStage in [msWaitStable, msWaitMeasureStart, msSelectPoint, msDone, msNone];
     msWaitStable:
-      Result := ANewStage in [msWaitMeasureStart, msSetupPoint, msDone, msNone];
+      Result := ANewStage in [msWaitMeasureStart, msSetupPoint, msSelectPoint, msDone, msNone];
     msWaitMeasureStart:
-      Result := ANewStage in [msMeasure, msWaitMeasureStop, msDone, msNone];
+      Result := ANewStage in [msMeasure, msWaitMeasureStop, msSelectPoint, msDone, msNone];
     msMeasure:
-      Result := ANewStage in [msWaitMeasureStop, msDone, msNone];
+      Result := ANewStage in [msWaitMeasureStop, msSelectPoint, msDone, msNone];
     msWaitMeasureStop:
-      Result := ANewStage in [msResultsRead, msDone, msNone];
+      Result := ANewStage in [msResultsRead, msSelectPoint, msDone, msNone];
     msResultsRead:
-      Result := ANewStage in [msSave, msDone, msNone];
+      Result := ANewStage in [msSave, msSelectPoint, msDone, msNone];
     msSave:
       Result := ANewStage in [msSelectPoint, msSetupPoint, msDone, msNone];
     msDone:
@@ -836,7 +838,8 @@ begin
     Exit;
 
   for I := Max(AStartIndex, 0) to FPoints.Count - 1 do
-    if (FPoints[I] <> nil) and FPoints[I].Enabled then
+    if (FPoints[I] <> nil) and FPoints[I].Enabled and
+       (FPoints[I].State <> osDeleted) then
       Exit(I);
 end;
 
@@ -870,7 +873,8 @@ begin
     Inc(FCurrentPointIndex);
 
   if (FMode = mrmAutomatic) and ((FCurrentPointIndex < 0) or
-     (FCurrentPointIndex >= FPoints.Count) or (not FPoints[FCurrentPointIndex].Enabled)) then
+     (FCurrentPointIndex >= FPoints.Count) or (not FPoints[FCurrentPointIndex].Enabled) or
+     (FPoints[FCurrentPointIndex].State = osDeleted)) then
     FCurrentPointIndex := FindNextEnabledPointIndex(FCurrentPointIndex);
 
   // Принудительный индекс является одноразовой командой.
@@ -968,12 +972,10 @@ begin
     // информацией об ошибке, сформированной внутри SetPoint.
     FireEvent(mePointInvalid, Error);
 
-    // Текущая реализация считает ошибку выбора точки критической
-    // для всего измерительного запуска.
-    //
-    // Поэтому после первой некорректной точки дальнейшие точки не
-    // обрабатываются, а машина состояний переходит в msDone.
-    SetStage(msDone);
+    if FMode = mrmAutomatic then
+      EnterSelectPoint
+    else
+      SetStage(msDone);
   end;
 end;
 
@@ -993,9 +995,7 @@ begin
   end
   else
   begin
-    SetCurrentPointStatus(mptsSetupError);
-    FireEvent(meEtalonAbsent, Error);
-    SetStage(msDone);
+    ContinueAfterPointError(mptsSetupError, meEtalonAbsent, Error);
   end;
 end;
 
@@ -1019,9 +1019,7 @@ begin
 
     if not SetupMeasurement(Point, Error) then
     begin
-      SetCurrentPointStatus(mptsSetupError);
-      FireEvent(mePointNotSet, Error);
-      SetStage(msDone);
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
       Exit;
     end;
 
@@ -1045,9 +1043,7 @@ begin
   begin
     if not SetupPoint(Point, Error) then
     begin
-      SetCurrentPointStatus(mptsSetupError);
-      FireEvent(mePointNotSet, Error);
-      SetStage(msDone);
+      ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
       Exit;
     end;
   end
@@ -1056,9 +1052,7 @@ begin
 
   if not SetupMeasurement(Point, Error) then
   begin
-    SetCurrentPointStatus(mptsSetupError);
-    FireEvent(mePointNotSet, Error);
-    SetStage(msDone);
+    ContinueAfterPointError(mptsSetupError, mePointNotSet, Error);
     Exit;
   end;
 
@@ -1299,7 +1293,7 @@ begin
   Result := True;
   if (FWorkTable.FlowRate <> nil) and (Point.Q >= 0) then
   begin
-    Result := FWorkTable.FlowRate.IsStable(ParamInfo) and Result;
+    Result := IsFlowStable(ParamInfo) and Result;
     if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
   end;
@@ -1317,6 +1311,59 @@ begin
     if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
   end;
+end;
+
+
+function TMeasurementRun.IsFlowStable(out StableInfo: RStableInfo): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  OldValue: TMeterValue;
+  StableValue: TMeterValue;
+begin
+  StableInfo := Default(RStableInfo);
+  Result := False;
+
+  if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) then
+    Exit;
+
+  StableValue := nil;
+  if FWorkTable.EtalonChannels <> nil then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and Channel.Enabled and
+         (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+      begin
+        StableValue := Channel.FlowMeter.ValueFlow;
+        Break;
+      end;
+    end;
+
+  if StableValue = nil then
+    Exit(FWorkTable.FlowRate.IsStable(StableInfo));
+
+  OldValue := FWorkTable.FlowRate.Value;
+  try
+    FWorkTable.FlowRate.Value := StableValue;
+    Result := FWorkTable.FlowRate.IsStable(StableInfo);
+  finally
+    FWorkTable.FlowRate.Value := OldValue;
+  end;
+end;
+
+procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
+  AEvent: EMeasurementEvent; const AError: TErrorInfo);
+begin
+  SetCurrentPointStatus(AStatus);
+  FireEvent(AEvent, AError);
+  FCurrentRepeat := 0;
+  SetStopReason(msrError);
+
+  if FMode = mrmAutomatic then
+    SetStage(msSelectPoint)
+  else
+    SetStage(msDone);
 end;
 
 function TMeasurementRun.IsTerminated: Boolean;
@@ -1932,7 +1979,7 @@ begin
       begin
         FireEvent(meMeasureError, BuildError(1999, E.Message));
         if FCurrentStage <> msDone then
-          SetStage(msDone);
+          ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1999, E.Message));
       end;
     end;
 
@@ -2169,7 +2216,7 @@ end;
 
 procedure TMeasurementRun.ProcessWaitStable;
 const
-  DEFAULT_STABLE_TIMEOUT_S = 30000;
+  DEFAULT_STABLE_TIMEOUT_S = 30;
   STABLE_PROTOCOL_INTERVAL_MS = 2000;
 var
   Point: TDevicePoint;
@@ -2254,7 +2301,10 @@ begin
       BuildError(1301, 'Стабилизация не достигнута')
     );
 
-    SetStage(msDone);
+    if FMode = mrmAutomatic then
+      ContinueAfterPointError(mptsSetupError, meStableTimeout, BuildError(1301, 'Стабилизация не достигнута'))
+    else
+      SetStage(msDone);
   end;
 end;
 
@@ -2289,18 +2339,14 @@ begin
       end;
     swtFAILURE:
       begin
-        SetStopReason(msrError);
-        FireEvent(meMeasureError, BuildError(1402, 'Ошибка запуска измерения'));
-        SetStage(msDone);
+        ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1402, 'Ошибка запуска измерения'));
         Exit;
       end;
   end;
    timeout := (TThread.GetTickCount64 - FWaitStartedTick)/1000;
   if timeout > DEFAULT_START_TIMEOUT_S then
   begin
-    FireEvent(meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
-  { TODO -oAndrey -cОтладка : Надо потом отладить и вернуть обратно }
-    SetStage(msDone);
+    ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1403, 'Таймаут ожидания запуска измерения'));
   end;
 end;
 
@@ -2570,18 +2616,14 @@ begin
 
     swtFAILURE:
       begin
-        SetStopReason(msrError);
-        FireEvent(meMeasureError, BuildError(1405, 'Ошибка остановки измерения'));
-        SetStage(msDone);
+        ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1405, 'Ошибка остановки измерения'));
         Exit;
       end;
   end;
 
   if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
-    SetStopReason(msrError);
-    FireEvent(meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
-    SetStage(msDone);
+    ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1406, 'Таймаут ожидания остановки измерения'));
   end;
 end;
 
@@ -2618,18 +2660,14 @@ begin
 
     swtFAILURE:
       begin
-        SetStopReason(msrError);
-        FireEvent(meMeasureError, BuildError(1410, 'Ошибка чтения результатов'));
-        SetStage(msDone);
+        ContinueAfterPointError(mptsMeasureError, meMeasureError, BuildError(1410, 'Ошибка чтения результатов'));
         Exit;
       end;
   end;
 
   if (TThread.GetTickCount64 - FWaitStartedTick) > DEFAULT_STOP_TIMEOUT_MS then
   begin
-    SetStopReason(msrError);
-    FireEvent(meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
-    SetStage(msDone);
+    ContinueAfterPointError(mptsMeasureError, meMeasureTimeout, BuildError(1411, 'Таймаут чтения результатов'));
   end;
 end;
 
