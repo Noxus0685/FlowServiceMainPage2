@@ -7,7 +7,7 @@
     CanFocus = True
     ClipChildren = True
     Size.Width = 1228.000000000000000000
-    Size.Height = 856.000000000000000000
+    Size.Height = 676.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     RowCount = 1
@@ -15,7 +15,7 @@
     OnGetValue = GridMeasurmentRunGetValue
     OnCellClick = GridMeasurmentRunCellClick
     Viewport.Width = 1228.000000000000000000
-    Viewport.Height = 856.000000000000000000
+    Viewport.Height = 676.000000000000000000
     object CheckColumnMREnable: TCheckColumn
       HeaderSettings.TextSettings.Trimming = Character
       HeaderSettings.TextSettings.WordWrap = False
@@ -126,5 +126,41 @@
       TextSettings.Trimming = None
       OnClick = SpeedButtonCreatePointsClick
     end
+    object ButtonAddMeasurementLog: TButton
+      Align = Left
+      Position.X = 321.000000000000000000
+      Size.Width = 110.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      Text = #1044#1086#1073#1072#1074#1080#1090#1100' '#1083#1086#1075
+      OnClick = ButtonAddMeasurementLogClick
+    end
+    object ButtonCopyMeasurementLog: TButton
+      Align = Left
+      Position.X = 431.000000000000000000
+      Size.Width = 120.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      Text = #1050#1086#1087#1080#1088#1086#1074#1072#1090#1100' '#1083#1086#1075
+      OnClick = ButtonCopyMeasurementLogClick
+    end
+    object ButtonClearMeasurementLog: TButton
+      Align = Left
+      Position.X = 551.000000000000000000
+      Size.Width = 110.000000000000000000
+      Size.Height = 32.000000000000000000
+      Size.PlatformDefault = False
+      Text = #1054#1095#1080#1089#1090#1080#1090#1100' '#1083#1086#1075
+      OnClick = ButtonClearMeasurementLogClick
+    end
+  end
+  object MemoMeasurementLog: TMemo
+    Align = Bottom
+    Position.Y = 708.000000000000000000
+    Size.Width = 1228.000000000000000000
+    Size.Height = 180.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    WordWrap = False
   end
 end
