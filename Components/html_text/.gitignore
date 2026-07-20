@@ -1,8 +1,0 @@
-*.~*
-*.identcache
-*.local
-lib/
-backup/
-**/Win32
-*.rc
-*.dres
