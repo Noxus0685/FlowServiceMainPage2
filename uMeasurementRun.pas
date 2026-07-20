@@ -325,7 +325,7 @@ type
     function IsStable(out StableInfo: RStableInfo): Boolean;
     procedure AddDiagnosticEvent(const AText: string);
     procedure AddWorkTableStateDiagnosticEvent;
-    function IsFlowStable(out StableInfo: RStableInfo): Boolean;
+    function CheckFlowStable(out StableInfo: RStableInfo): Boolean;
     procedure ContinueAfterPointError(const AStatus: EMeasurementPointStatus; AEvent: EMeasurementEvent; const AError: TErrorInfo);
     function IsTerminated: Boolean;
   public
@@ -1335,7 +1335,7 @@ begin
   Result := True;
   if (FWorkTable.FlowRate <> nil) and (Point.Q >= 0) then
   begin
-    Result := IsFlowStable(ParamInfo) and Result;
+    Result := CheckFlowStable(ParamInfo) and Result;
     if ParamInfo.Status <> sOk then
       StableInfo := ParamInfo;
   end;
@@ -1366,7 +1366,7 @@ begin
 end;
 
 
-function TMeasurementRun.IsFlowStable(out StableInfo: RStableInfo): Boolean;
+function TMeasurementRun.CheckFlowStable(out StableInfo: RStableInfo): Boolean;
 var
   I: Integer;
   Channel: TChannel;
@@ -1514,7 +1514,7 @@ begin
   Lines := TStringList.Create;
   try
     Point := GetCurrentPoint;
-    IsFlowStableResult := IsFlowStable(FlowStableInfo);
+    IsFlowStableResult := CheckFlowStable(FlowStableInfo);
     IsStableResult := IsStable(StableInfo);
     Reason := StableInfo.StatusText;
     if Reason = '' then
@@ -1675,59 +1675,6 @@ begin
   finally
     Lines.Free;
   end;
-end;
-
-
-function TMeasurementRun.IsFlowStable(out StableInfo: RStableInfo): Boolean;
-var
-  I: Integer;
-  Channel: TChannel;
-  OldValue: TMeterValue;
-  StableValue: TMeterValue;
-begin
-  StableInfo := Default(RStableInfo);
-  Result := False;
-
-  if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) then
-    Exit;
-
-  StableValue := nil;
-  if FWorkTable.EtalonChannels <> nil then
-    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
-    begin
-      Channel := FWorkTable.EtalonChannels[I];
-      if (Channel <> nil) and Channel.Enabled and
-         (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
-      begin
-        StableValue := Channel.FlowMeter.ValueFlow;
-        Break;
-      end;
-    end;
-
-  if StableValue = nil then
-    Exit(FWorkTable.FlowRate.IsStable(StableInfo));
-
-  OldValue := FWorkTable.FlowRate.Value;
-  try
-    FWorkTable.FlowRate.Value := StableValue;
-    Result := FWorkTable.FlowRate.IsStable(StableInfo);
-  finally
-    FWorkTable.FlowRate.Value := OldValue;
-  end;
-end;
-
-procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
-  AEvent: EMeasurementEvent; const AError: TErrorInfo);
-begin
-  SetCurrentPointStatus(AStatus);
-  FireEvent(AEvent, AError);
-  FCurrentRepeat := 0;
-  SetStopReason(msrError);
-
-  if FMode = mrmAutomatic then
-    SetStage(msSelectPoint)
-  else
-    SetStage(msDone);
 end;
 
 function TMeasurementRun.IsTerminated: Boolean;
