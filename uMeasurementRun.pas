@@ -257,6 +257,10 @@ type
     FLastResultsAddedToProcessing: Integer;
     FLastResultsPerDevice: string;
     FLastRouteStopDiagnosticKey: string;
+    FStableSinceMs: UInt64;
+    FRequiredStabilizationSec: Double;
+    FLastStableProgressSecond: Int64;
+    FStableTimerResetReason: string;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -267,6 +271,7 @@ type
     procedure EnterSelectEtalon;
     procedure EnterSetupPoint;
     procedure EnterWaitStable;
+    function CalcRequiredStabilizationSec(APoint: TDevicePoint): Double;
     procedure EnterWaitMeasureStart;
     procedure EnterMeasure;
     procedure EnterWaitMeasureStop;
@@ -651,6 +656,10 @@ begin
   FLastResultsAddedToProcessing := 0;
   FLastResultsPerDevice := '';
   FLastRouteStopDiagnosticKey := '';
+  FStableSinceMs := 0;
+  FRequiredStabilizationSec := 0;
+  FLastStableProgressSecond := -1;
+  FStableTimerResetReason := '';
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -1104,6 +1113,20 @@ begin
     SetStage(msWaitMeasureStart);
 end;
 
+
+function TMeasurementRun.CalcRequiredStabilizationSec(APoint: TDevicePoint): Double;
+begin
+  Result := 0;
+  if APoint = nil then
+    Exit;
+
+  // Столбец "Стабилизация" хранится в TDevicePoint.Pause.
+  // Session-точка собирается через MergePointParams, где Pause берётся как Max
+  // среди точек включённых поверяемых приборов, поэтому здесь не суммируем.
+  if APoint.Pause > 0 then
+    Result := APoint.Pause;
+end;
+
 procedure TMeasurementRun.EnterWaitStable;
 begin
   SetCurrentPointStatus(mptsWaitStable);
@@ -1111,6 +1134,11 @@ begin
   // Начать новый период публикации состояния стабилизации.
   // Первое промежуточное сообщение появится через 2 секунды.
   FLastStableProtocolTick := TThread.GetTickCount64;
+  FStableSinceMs := 0;
+  FStableTimerResetReason := '';
+  FLastStableProgressSecond := -1;
+  FRequiredStabilizationSec := CalcRequiredStabilizationSec(GetCurrentPoint);
+  AddDiagnosticEvent(Format('RequiredStabilizationSec=%.3f; RequiredStabilizationSource=TDevicePoint.Pause', [FRequiredStabilizationSec]));
 
   if IsStopRequested then
     Exit;
@@ -1788,6 +1816,28 @@ begin
     Lines.Add('IsFlowStable=' + SBool(IsFlowStableResult));
     Lines.Add('IsStable=' + SBool(IsStableResult));
     Lines.Add('Reason=' + Reason);
+    Lines.Add('RequiredStabilizationSec=' + SFloat(FRequiredStabilizationSec));
+    Lines.Add('StableSinceMs=' + UIntToStr(FStableSinceMs));
+    if FStableSinceMs <> 0 then
+    begin
+      Lines.Add('StableDurationSec=' + SFloat((TThread.GetTickCount64 - FStableSinceMs) / 1000));
+      Lines.Add('StableRemainingSec=' + SFloat(Max(0.0, FRequiredStabilizationSec - ((TThread.GetTickCount64 - FStableSinceMs) / 1000))));
+      Lines.Add('StableTimerRunning=True');
+    end
+    else
+    begin
+      Lines.Add('StableDurationSec=0');
+      Lines.Add('StableRemainingSec=' + SFloat(FRequiredStabilizationSec));
+      Lines.Add('StableTimerRunning=False');
+    end;
+    if FStableTimerResetReason <> '' then
+      Lines.Add('StableTimerResetReason=' + FStableTimerResetReason)
+    else
+      Lines.Add('StableTimerResetReason=<нет данных>');
+    if Point <> nil then
+      Lines.Add('DeviceStabilizationValues=TDevicePoint.Pause=' + IntToStr(Point.Pause))
+    else
+      Lines.Add('DeviceStabilizationValues=<нет данных>');
     Lines.Add('Attempt=' + IntToStr(FAttempt));
     Lines.Add('MaxAttemptCount=' + IntToStr(FMaxAttemptCount));
     Lines.Add('TimeoutSec=' + IntToStr(STABLE_TIMEOUT_SEC));
@@ -2132,6 +2182,10 @@ begin
     FLastResultsAddedToProcessing := 0;
     FLastResultsPerDevice := '';
     FLastRouteStopDiagnosticKey := '';
+    FStableSinceMs := 0;
+    FRequiredStabilizationSec := 0;
+    FLastStableProgressSecond := -1;
+    FStableTimerResetReason := '';
 
     case Mode of
       mrmAutomatic:
@@ -2826,16 +2880,46 @@ begin
     Exit;
   end;
 
+  CurrentTick := TThread.GetTickCount64;
+
   if IsStable(StableInfo) then
   begin
-    FireEvent(meStableReached);
-    SetStage(msWaitMeasureStart);
-    Exit;
+    if FStableSinceMs = 0 then
+    begin
+      FStableSinceMs := CurrentTick;
+      FLastStableProgressSecond := -1;
+      AddDiagnosticEvent(Format('IsStable became True; stabilization timer started; Required=%.3f sec', [FRequiredStabilizationSec]));
+    end;
+
+    if Trunc((CurrentTick - FStableSinceMs) / 1000) <> FLastStableProgressSecond then
+    begin
+      FLastStableProgressSecond := Trunc((CurrentTick - FStableSinceMs) / 1000);
+      AddDiagnosticEvent(Format('Stability progress: %.3f/%.3f sec',
+        [(CurrentTick - FStableSinceMs) / 1000, FRequiredStabilizationSec]));
+    end;
+
+    if ((CurrentTick - FStableSinceMs) / 1000) >= FRequiredStabilizationSec then
+    begin
+      AddDiagnosticEvent(Format('Stabilization completed: %.3f sec', [(CurrentTick - FStableSinceMs) / 1000]));
+      FireEvent(meStableReached);
+      SetStage(msWaitMeasureStart);
+      Exit;
+    end;
+  end
+  else
+  begin
+    if FStableSinceMs <> 0 then
+    begin
+      FStableTimerResetReason := StableInfo.StatusText;
+      AddDiagnosticEvent(Format('IsStable became False; stabilization timer reset at %.3f sec; Reason=%s',
+        [(CurrentTick - FStableSinceMs) / 1000, FStableTimerResetReason]));
+    end;
+    FStableSinceMs := 0;
+    FLastStableProgressSecond := -1;
   end;
 
-  // Параметры ещё не стабилизированы.
+  // Параметры ещё не стабилизированы или идёт выдержка стабилизации.
   // Публиковать диагностическую информацию не чаще одного раза в 2 секунды.
-  CurrentTick := TThread.GetTickCount64;
 
   if CurrentTick - FLastStableProtocolTick >=
      STABLE_PROTOCOL_INTERVAL_MS then
@@ -2851,8 +2935,8 @@ begin
     );
   end;
 
-  if ((CurrentTick - FWaitStartedTick) / 1000) >
-     DEFAULT_STABLE_TIMEOUT_S then
+  if (FStableSinceMs = 0) and (((CurrentTick - FWaitStartedTick) / 1000) >
+     DEFAULT_STABLE_TIMEOUT_S) then
   begin
     Inc(FAttempt);
 
