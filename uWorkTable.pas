@@ -6826,21 +6826,35 @@ procedure UpdateEtalonChannelSignals(const AWorkTable: TWorkTable;
 var
   I: Integer;
   Channel: TChannel;
+  ChannelCoef: Double;
+  ChannelFlowLS: Double;
+  CoefRaw: Double;
+  CoefDimension: string;
 begin
   for I := 0 to AEnabledEtalonChannels.Count - 1 do
   begin
     Channel := AEnabledEtalonChannels[I];
+    ChannelCoef := GetChannelFlowCoef(Channel);
+    if ChannelCoef > 0 then
+      ChannelFlowLS := ATargetImpSecValues[I] / ChannelCoef
+    else
+      ChannelFlowLS := 0.0;
+    CoefRaw := 0.0;
+    CoefDimension := '';
+    if (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueCoef <> nil) then
+    begin
+      CoefRaw := Channel.FlowMeter.ValueCoef.GetDoubleValue;
+      CoefDimension := Channel.FlowMeter.ValueCoef.GetDimName;
+    end;
+
     if (ProtocolManager <> nil) and
        (not SameValue(Channel.SimulationTargetImpSec, ATargetImpSecValues[I], 1E-6)) then
       ProtocolManager.AddMessage(pcState, psWorkTable, 'EtalonTargetDiagnostic',
         'Etalon target impulse diagnostic',
         Format('ChannelIndex=%d TargetFlowTotalLS=%.6f ChannelFlowLS=%.6f CoefRaw=%.6f CoefDimension=%s CoefImpPerLiter=%.6f StartImpSec=%.6f TargetImpSec=%.6f ExpectedFlowFromTargetImpSec=%.6f',
           [AWorkTable.EtalonChannels.IndexOf(Channel), ATargetFlow,
-           IfThen(GetChannelFlowCoef(Channel) > 0, ATargetImpSecValues[I] / GetChannelFlowCoef(Channel), 0.0),
-           IfThen((Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueCoef <> nil), Channel.FlowMeter.ValueCoef.GetDoubleValue, 0.0),
-           IfThen((Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueCoef <> nil), Channel.FlowMeter.ValueCoef.GetDimName, ''),
-           GetChannelFlowCoef(Channel), Channel.ImpSec, ATargetImpSecValues[I],
-           IfThen(GetChannelFlowCoef(Channel) > 0, ATargetImpSecValues[I] / GetChannelFlowCoef(Channel), 0.0)]));
+           ChannelFlowLS, CoefRaw, CoefDimension, ChannelCoef, Channel.ImpSec,
+           ATargetImpSecValues[I], ChannelFlowLS]));
     UpdateChannelRamp(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
       ATargetImpSecValues[I], ACurrentTimeMs,
       Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
