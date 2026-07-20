@@ -256,6 +256,7 @@ type
     FLastProcessedPointName: string;
     FLastResultsAddedToProcessing: Integer;
     FLastResultsPerDevice: string;
+    FLastRouteStopDiagnosticKey: string;
 
     procedure HandleCommand(Cmd: EMeasurementCommand; const Param: Variant);
     procedure SetStage(const ANewStage: EMeasurementState);
@@ -649,6 +650,7 @@ begin
   FLastProcessedPointName := '';
   FLastResultsAddedToProcessing := 0;
   FLastResultsPerDevice := '';
+  FLastRouteStopDiagnosticKey := '';
 end;
 
 function TMeasurementRun.BuildPointSelectionLog(APoint: TDevicePoint): string;
@@ -1733,6 +1735,9 @@ begin
     else
       Lines.Add('LastProcessedPointName=<нет данных>');
     Lines.Add('NextStageAfterSave=' + MeasurementStateToString(FNextStageAfterSave));
+    Lines.Add('WorkTableFlowRangeSource=WorkTable.FlowRate.Min/Max');
+    Lines.Add('WorkTableFlowRangeUpdatedBy=<см. события WorkTable.State/SelectEtalons>');
+    Lines.Add('WorkTableFlowRangeUnit=л/с');
     Lines.Add('ForceNextPoint=' + IntToStr(FForceNextPoint));
     Lines.Add('');
     Lines.Add('[ТОЧКА]');
@@ -1829,11 +1834,11 @@ begin
     Lines.Add('MeasureCompletedEventSent=' + SBool(FLastMeasureCompletedEventSent));
     Lines.Add('SaveDoneEventSent=' + SBool(FLastSaveDoneEventSent));
     Lines.Add('PointDoneEventSent=' + SBool(FLastPointDoneEventSent));
-    Lines.Add('ResultsAddedToProcessing=' + IntToStr(FLastResultsAddedToProcessing));
+    Lines.Add('ResultsAddedThisPoint=' + IntToStr(FLastResultsAddedToProcessing));
     if FLastResultsPerDevice <> '' then
-      Lines.Add('ResultsPerDevice=' + FLastResultsPerDevice)
+      Lines.Add('TotalResultsPerDevice=' + FLastResultsPerDevice)
     else
-      Lines.Add('ResultsPerDevice=<нет данных>');
+      Lines.Add('TotalResultsPerDevice=<нет данных>');
     if FLastSaveErrorText <> '' then Lines.Add('LastSaveError=' + FLastSaveErrorText) else Lines.Add('LastSaveError=<нет данных>');
     Result := Lines.Text;
   finally
@@ -2126,6 +2131,7 @@ begin
     FLastProcessedPointName := '';
     FLastResultsAddedToProcessing := 0;
     FLastResultsPerDevice := '';
+    FLastRouteStopDiagnosticKey := '';
 
     case Mode of
       mrmAutomatic:
@@ -2271,11 +2277,25 @@ begin
 end;
 
 procedure TMeasurementRun.RouteStopInWorker;
+var
+  DiagnosticKey: string;
 begin
   if IsStopRequested then
     AddDiagnosticEvent('RouteStopInWorker processing: Stage=' + MeasurementStateToString(FCurrentStage));
   if not IsStopRequested then
     Exit;
+
+  DiagnosticKey := MeasurementStateToString(FCurrentStage) + '|';
+  if FWorkTable <> nil then
+    DiagnosticKey := DiagnosticKey + GetEnumName(TypeInfo(EStateWorkTable), Ord(FWorkTable.State))
+  else
+    DiagnosticKey := DiagnosticKey + '<нет WorkTable>';
+  DiagnosticKey := DiagnosticKey + '|Stop=True';
+  if DiagnosticKey <> FLastRouteStopDiagnosticKey then
+  begin
+    FLastRouteStopDiagnosticKey := DiagnosticKey;
+    AddDiagnosticEvent('RouteStopInWorker accepted: ' + DiagnosticKey);
+  end;
 
   case FCurrentStage of
     msNone, msDone:

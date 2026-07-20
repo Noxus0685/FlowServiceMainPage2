@@ -2911,7 +2911,8 @@ var
 
     // Канал без назначенного расходомера не может участвовать
     // в выборе эталонного набора.
-    if (AChannel = nil) or (AChannel.FlowMeter = nil) then
+    if (AChannel = nil) or (not AChannel.Enabled) or (AChannel.State = osDeleted) or
+       (AChannel.FlowMeter = nil) then
       Exit;
 
     ChannelFlowMin := GetChannelFlowMin(AChannel);
@@ -3502,7 +3503,6 @@ function TWorkTable.CalcEtalonFlowRateMax: Double;
 var
   I: Integer;
   Channel: TChannel;
-  Device: TDevice;
   QmaxBase: Double;
   GroupSum: Double;
   GroupSums: TDictionary<Integer, Double>;
@@ -3517,15 +3517,11 @@ begin
     for I := 0 to FEtalonChannels.Count - 1 do
     begin
       Channel := FEtalonChannels[I];
-      if (Channel = nil) or
+      if (Channel = nil) or (not Channel.Enabled) or (Channel.State = osDeleted) or
          (Channel.FlowMeter = nil) or (Channel.FlowMeter.Device = nil) then
         Continue;
 
-      Device := Channel.FlowMeter.Device;
-      if Device.Qmax <= 0 then
-        Continue;
-
-      QmaxBase := Device.Qmax;
+      QmaxBase := Channel.QMaxWork;
       if QmaxBase <= 0 then
         Continue;
 
