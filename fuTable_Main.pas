@@ -249,7 +249,7 @@ begin
     ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
       WorkTable,
       EnabledDeviceChannels,
-      FlowRate,
+      FlowRate / 3.6,
       NormalizeFloatInput(EditDeviceImpSec.Text),
       False,
       True
@@ -298,7 +298,7 @@ begin
     ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
       WorkTable,
       EnabledEtalonChannels,
-      FlowRate,
+      FlowRate / 3.6,
       NormalizeFloatInput(EditEtalonImpSec.Text)
     );
 
