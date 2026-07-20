@@ -1677,6 +1677,59 @@ begin
   end;
 end;
 
+
+function TMeasurementRun.IsFlowStable(out StableInfo: RStableInfo): Boolean;
+var
+  I: Integer;
+  Channel: TChannel;
+  OldValue: TMeterValue;
+  StableValue: TMeterValue;
+begin
+  StableInfo := Default(RStableInfo);
+  Result := False;
+
+  if (FWorkTable = nil) or (FWorkTable.FlowRate = nil) then
+    Exit;
+
+  StableValue := nil;
+  if FWorkTable.EtalonChannels <> nil then
+    for I := 0 to FWorkTable.EtalonChannels.Count - 1 do
+    begin
+      Channel := FWorkTable.EtalonChannels[I];
+      if (Channel <> nil) and Channel.Enabled and
+         (Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueFlow <> nil) then
+      begin
+        StableValue := Channel.FlowMeter.ValueFlow;
+        Break;
+      end;
+    end;
+
+  if StableValue = nil then
+    Exit(FWorkTable.FlowRate.IsStable(StableInfo));
+
+  OldValue := FWorkTable.FlowRate.Value;
+  try
+    FWorkTable.FlowRate.Value := StableValue;
+    Result := FWorkTable.FlowRate.IsStable(StableInfo);
+  finally
+    FWorkTable.FlowRate.Value := OldValue;
+  end;
+end;
+
+procedure TMeasurementRun.ContinueAfterPointError(const AStatus: EMeasurementPointStatus;
+  AEvent: EMeasurementEvent; const AError: TErrorInfo);
+begin
+  SetCurrentPointStatus(AStatus);
+  FireEvent(AEvent, AError);
+  FCurrentRepeat := 0;
+  SetStopReason(msrError);
+
+  if FMode = mrmAutomatic then
+    SetStage(msSelectPoint)
+  else
+    SetStage(msDone);
+end;
+
 function TMeasurementRun.IsTerminated: Boolean;
 begin
   Result := (FThread = nil) or FThread.CheckTerminated;
