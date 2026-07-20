@@ -6320,18 +6320,33 @@ begin
 end;
 
 function TWorkTableManager.GetChannelFlowCoef(const AChannel: TChannel): Double;
+
+  function IsValidCoef(const AValue: Double): Boolean;
+  begin
+    Result := (AValue > 0.0) and (Abs(AValue) < MaxDouble);
+  end;
+
+var
+  ValueCoef: Double;
 begin
   Result := 0.0;
   if (AChannel = nil) or (AChannel.FlowMeter = nil) then
     Exit;
 
+  // Базовый контракт коэффициента для импульсных каналов: имп/л.
+  // Device.Coef является паспортным коэффициентом прибора и не зависит от
+  // выбранной размерности UI; ValueCoef используем только если паспортного
+  // коэффициента нет.
+  if Assigned(AChannel.FlowMeter.Device) and IsValidCoef(AChannel.FlowMeter.Device.Coef) then
+    Exit(AChannel.FlowMeter.Device.Coef);
+
+  ValueCoef := 0.0;
   if (AChannel.FlowMeter.ValueCoef <> nil) then
-    Result := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+    ValueCoef := AChannel.FlowMeter.ValueCoef.GetDoubleValue;
+  if IsValidCoef(ValueCoef) then
+    Exit(ValueCoef);
 
-  if SameValue(Result, 0.0, 1E-12) and Assigned(AChannel.FlowMeter.Device) then
-    Result := AChannel.FlowMeter.Device.Coef;
-
-  if SameValue(Result, 0.0, 1E-12) then
+  if IsValidCoef(AChannel.FlowMeter.Kp) then
     Result := AChannel.FlowMeter.Kp;
 end;
 
@@ -6432,7 +6447,14 @@ begin
     else if Coef > 0 then
       Result[I] := AFlowRate * MaxRatio * Coef
     else
+    begin
+      if ProtocolManager <> nil then
+        ProtocolManager.AddMessage(pcError, psWorkTable, 'ChannelCoefficientInvalid',
+          'Не удалось рассчитать частоту канала',
+          Format('ChannelIndex=%d TargetFlowLS=%.6f CoefImpPerLiter=%.6f',
+            [I, AFlowRate * MaxRatio, Coef]));
       Result[I] := AFallbackImpSec;
+    end;
   end;
 end;
 
@@ -6808,6 +6830,17 @@ begin
   for I := 0 to AEnabledEtalonChannels.Count - 1 do
   begin
     Channel := AEnabledEtalonChannels[I];
+    if (ProtocolManager <> nil) and
+       (not SameValue(Channel.SimulationTargetImpSec, ATargetImpSecValues[I], 1E-6)) then
+      ProtocolManager.AddMessage(pcState, psWorkTable, 'EtalonTargetDiagnostic',
+        'Etalon target impulse diagnostic',
+        Format('ChannelIndex=%d TargetFlowTotalLS=%.6f ChannelFlowLS=%.6f CoefRaw=%.6f CoefDimension=%s CoefImpPerLiter=%.6f StartImpSec=%.6f TargetImpSec=%.6f ExpectedFlowFromTargetImpSec=%.6f',
+          [AWorkTable.EtalonChannels.IndexOf(Channel), ATargetFlow,
+           IfThen(GetChannelFlowCoef(Channel) > 0, ATargetImpSecValues[I] / GetChannelFlowCoef(Channel), 0.0),
+           IfThen((Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueCoef <> nil), Channel.FlowMeter.ValueCoef.GetDoubleValue, 0.0),
+           IfThen((Channel.FlowMeter <> nil) and (Channel.FlowMeter.ValueCoef <> nil), Channel.FlowMeter.ValueCoef.GetDimName, ''),
+           GetChannelFlowCoef(Channel), Channel.ImpSec, ATargetImpSecValues[I],
+           IfThen(GetChannelFlowCoef(Channel) > 0, ATargetImpSecValues[I] / GetChannelFlowCoef(Channel), 0.0)]));
     UpdateChannelRamp(Channel, 'Etalon', AWorkTable.EtalonChannels.IndexOf(Channel),
       ATargetImpSecValues[I], ACurrentTimeMs,
       Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
