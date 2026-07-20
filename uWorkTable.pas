@@ -6620,6 +6620,33 @@ begin
    end;
 end;
 
+
+procedure SyncEnvironmentMeterValues(const AWorkTable: TWorkTable);
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  if (AWorkTable.FluidTemp <> nil) then
+  begin
+    AWorkTable.SetTemperature(AWorkTable.FluidTemp.BeforeValue, AWorkTable.FluidTemp.AfterValue);
+    if AWorkTable.ValueTempertureBefore <> nil then
+      AWorkTable.ValueTempertureBefore.SetValue(AWorkTable.FluidTemp.BeforeValue);
+    if AWorkTable.ValueTempertureAfter <> nil then
+      AWorkTable.ValueTempertureAfter.SetValue(AWorkTable.FluidTemp.AfterValue);
+  end;
+
+  if (AWorkTable.FluidPress <> nil) then
+  begin
+    AWorkTable.SetPressure(AWorkTable.FluidPress.BeforeValue, AWorkTable.FluidPress.AfterValue);
+    if AWorkTable.ValuePressureBefore <> nil then
+      AWorkTable.ValuePressureBefore.SetValue(AWorkTable.FluidPress.BeforeValue);
+    if AWorkTable.ValuePressureAfter <> nil then
+      AWorkTable.ValuePressureAfter.SetValue(AWorkTable.FluidPress.AfterValue);
+  end;
+
+  AWorkTable.SetValues;
+end;
+
 procedure UpdateRandomFreq(const AWorkTable: TWorkTable);
 var
   Pump: tPump;             // Активный насос (исполнитель)
@@ -7245,6 +7272,9 @@ begin
 
   // Обновление давления
   UpdateRandomPress(WorkTable);
+
+  // Перенос runtime-значений климата в TMeterValue до UI/сохранения.
+  SyncEnvironmentMeterValues(WorkTable);
 
 
   // ============================================================
