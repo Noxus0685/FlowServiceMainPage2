@@ -480,8 +480,6 @@ type
     FNextClimateChangeAt: TDateTime;
     FNextPressChangeAt: TDateTime;
     FNextFreqChangeAt: TDateTime;
-    FSimulationBaseTempBefore: Double;
-    FSimulationBaseTempAfter: Double;
     FSimulationBasePressBefore: Double;
     FSimulationBasePressAfter: Double;
     FEnvironmentSimulationBaseInitialized: Boolean;
@@ -630,7 +628,6 @@ type
   procedure DoStopMonitor;
   procedure DoStartTest;
   procedure DoStopTest;
-  procedure CaptureEnvironmentSimulationBase;
   class function WorkTableEventToText(AEvent: TWorkTableEvent): string; static;
   class function WorkTableEventToString(AEvent: TWorkTableEvent): string; static;
   class function WorkTableEventToProtocolCategory(AEvent: TWorkTableEvent): EProtocolCategory; static;
@@ -638,6 +635,7 @@ type
 
 
   public
+  procedure CaptureEnvironmentSimulationBase;
   procedure InitChannels;
   constructor Create;
   destructor Destroy; override;
@@ -776,8 +774,6 @@ type
     property NextClimateChangeAt: TDateTime  read FNextClimateChangeAt write FNextClimateChangeAt;
     property NextPressChangeAt: TDateTime  read FNextPressChangeAt write FNextPressChangeAt;
     property NextFreqChangeAt: TDateTime  read FNextFreqChangeAt write FNextFreqChangeAt;
-    property SimulationBaseTempBefore: Double read FSimulationBaseTempBefore;
-    property SimulationBaseTempAfter: Double read FSimulationBaseTempAfter;
     property SimulationBasePressBefore: Double read FSimulationBasePressBefore;
     property SimulationBasePressAfter: Double read FSimulationBasePressAfter;
     property EnvironmentSimulationBaseInitialized: Boolean read FEnvironmentSimulationBaseInitialized;
@@ -5269,17 +5265,6 @@ end;
 
 procedure TWorkTable.CaptureEnvironmentSimulationBase;
 begin
-  if FFluidTemp <> nil then
-  begin
-    FSimulationBaseTempBefore := FFluidTemp.BeforeValue;
-    FSimulationBaseTempAfter := FFluidTemp.AfterValue;
-  end
-  else
-  begin
-    FSimulationBaseTempBefore := 0;
-    FSimulationBaseTempAfter := 0;
-  end;
-
   if FFluidPress <> nil then
   begin
     FSimulationBasePressBefore := FFluidPress.BeforeValue;
@@ -6514,7 +6499,7 @@ procedure TWorkTableManager.UpdateSimulation;
  LimitReached: Boolean;   // Флаг: достигнут хотя бы один критерий остановки
 
 
-function RandomAroundBase(const ABaseValue: Double;
+function PressureRandomAroundBase(const ABaseValue: Double;
   const ARelativeDeviation: Double): Double;
 var
   RandomUnit: Double;
@@ -6543,22 +6528,101 @@ begin
 end;
 
 procedure UpdateRandomTemp(const AWorkTable: TWorkTable);
-const
-  RelativeDeviation = 0.05;
+var
+  TempDelta, PressDelta: Double; // Случайные приращения температуры и давления
+  StableState: RStableInfo;     // Информация о стабильности параметра
 begin
-  if (AWorkTable = nil) or (AWorkTable.FluidTemp = nil) then
+  // ============================================================
+  // 1. Проверка входных данных
+  // ============================================================
+
+  // Если рабочая таблица не задана — выходим
+  if AWorkTable = nil then
     Exit;
 
+
+  // ============================================================
+  // 3. Ограничение частоты обновления (не каждый тик таймера)
+  // ============================================================
+
+  // Обновляем температуру не постоянно, а раз в несколько секунд
   if (AWorkTable.NextClimateChangeAt = 0) or
      (Now >= AWorkTable.NextClimateChangeAt) then
   begin
-    EnsureEnvironmentSimulationBase(AWorkTable);
 
-    AWorkTable.FluidTemp.BeforeValue :=
-      RandomAroundBase(AWorkTable.SimulationBaseTempBefore, RelativeDeviation);
-    AWorkTable.FluidTemp.AfterValue :=
-      RandomAroundBase(AWorkTable.SimulationBaseTempAfter, RelativeDeviation);
+    // ----------------------------------------------------------
+    // 3.1 Генерация случайных изменений (шум системы)
+    // ----------------------------------------------------------
 
+    // Температура ±0.15
+    TempDelta := (Random * 0.30) - 0.15;
+
+    // Давление ±0.03 (сейчас не используется)
+    PressDelta := (Random * 0.06) - 0.03;
+
+
+    // ----------------------------------------------------------
+    // 3.2 Регулирование температуры (имитация ПИД-подобного поведения)
+    // ----------------------------------------------------------
+
+    // Если система регулирования запущена
+    if (AWorkTable.FluidTemp.IsRunning) then
+    begin
+
+      // Если температура ещё НЕ стабилизировалась
+      if not AWorkTable.FluidTemp.IsStable(StableState) then
+      begin
+
+        // Если текущая температура меньше заданной → "нагреваем"
+        if AWorkTable.FluidTemp.Value.Value < AWorkTable.FluidTemp.ValueSet.Value then
+        begin
+          AWorkTable.FluidTemp.BeforeValue :=
+            AWorkTable.FluidTemp.BeforeValue + 1;
+
+          AWorkTable.FluidTemp.AfterValue :=
+            AWorkTable.FluidTemp.AfterValue + 1;
+        end
+        else
+        begin
+          // Иначе → "охлаждаем"
+          AWorkTable.FluidTemp.BeforeValue :=
+            AWorkTable.FluidTemp.BeforeValue - 1;
+
+          AWorkTable.FluidTemp.AfterValue :=
+            AWorkTable.FluidTemp.AfterValue - 1;
+        end;
+
+      end;
+
+    end;
+
+
+    // ----------------------------------------------------------
+    // 3.3 Добавление случайного шума (реалистичность)
+    // ----------------------------------------------------------
+
+    // Если задано целевое значение температуры
+    if AWorkTable.FluidTemp.ValueSet.Value <> 0 then
+    begin
+      // Добавляем небольшое случайное отклонение
+      // и ограничиваем диапазон допустимых значений
+
+      AWorkTable.FluidTemp.BeforeValue :=
+        EnsureRange(
+          AWorkTable.FluidTemp.BeforeValue + TempDelta,
+          -50.0, 150.0);
+
+      AWorkTable.FluidTemp.AfterValue :=
+        EnsureRange(
+          AWorkTable.FluidTemp.AfterValue + TempDelta,
+          -50.0, 150.0);
+    end;
+
+    // ----------------------------------------------------------
+    // 3.5 Планирование следующего изменения
+    // ----------------------------------------------------------
+
+    // Следующее обновление через 3–4 секунды
     AWorkTable.NextClimateChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
   end;
 end;
@@ -6575,9 +6639,9 @@ begin
     EnsureEnvironmentSimulationBase(AWorkTable);
 
     AWorkTable.FluidPress.BeforeValue :=
-      RandomAroundBase(AWorkTable.SimulationBasePressBefore, RelativeDeviation);
+      PressureRandomAroundBase(AWorkTable.SimulationBasePressBefore, RelativeDeviation);
     AWorkTable.FluidPress.AfterValue :=
-      RandomAroundBase(AWorkTable.SimulationBasePressAfter, RelativeDeviation);
+      PressureRandomAroundBase(AWorkTable.SimulationBasePressAfter, RelativeDeviation);
 
     AWorkTable.NextPressChangeAt := Now + EncodeTime(0, 0, 3 + Random(2), 0);
   end;
