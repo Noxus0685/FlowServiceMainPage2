@@ -154,6 +154,8 @@ type
     procedure RestoreDeviceFlowRateText(const AWorkTable: TWorkTable);
     procedure LogDeviceFlowRateApply(const ADetails: string);
     procedure UpdateDeviceFlowRateEditFromWorkTable;
+    function GetChannelCurrentFlowLS(const AChannel: TChannel): Double;
+    procedure HandleDeviceReadyTransition(const AWorkTable: TWorkTable; const AOldReady, ANewReady: Boolean);
     procedure OnNotify(Sender: TObject; AEvent: Integer; Data: TObject);
     function QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
     function _AddRef: Integer; stdcall;
@@ -282,22 +284,92 @@ begin
     EditDeviceFlowRate.Text := '';
 end;
 
+
+function TTableMainForm.GetChannelCurrentFlowLS(const AChannel: TChannel): Double;
+begin
+  Result := 0;
+  if (AChannel <> nil) and (AChannel.FlowMeter <> nil) and
+     (AChannel.FlowMeter.ValueFlow <> nil) then
+    Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+end;
+
+procedure TTableMainForm.HandleDeviceReadyTransition(const AWorkTable: TWorkTable;
+  const AOldReady, ANewReady: Boolean);
+var
+  I: Integer;
+  Channel: TChannel;
+  CurrentFlowLS: Double;
+  NextTargetSource: string;
+  NextTargetFlowLS: Double;
+begin
+  if (AWorkTable = nil) or (AOldReady = ANewReady) then
+    Exit;
+
+  if AWorkTable.HasDeviceSimulationFlowRate then
+  begin
+    NextTargetSource := 'SeparateDeviceFlow';
+    NextTargetFlowLS := AWorkTable.DeviceSimulationFlowRate;
+  end
+  else
+  begin
+    NextTargetSource := 'EtalonFlow';
+    if (AWorkTable.FlowRate <> nil) and (AWorkTable.FlowRate.ValueSet <> nil) then
+      NextTargetFlowLS := AWorkTable.FlowRate.ValueSet.Value
+    else
+      NextTargetFlowLS := AWorkTable.EtalonFlowSet;
+  end;
+
+  for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if (Channel = nil) then
+      Continue;
+
+    if ANewReady then
+    begin
+      if (not Channel.Enabled) or (Channel.FlowMeter = nil) or
+         (Channel.FlowMeter.Device = nil) then
+        Continue;
+
+      CurrentFlowLS := GetChannelCurrentFlowLS(Channel);
+      Channel.ReadinessBaseFlow := CurrentFlowLS;
+      Channel.HasReadinessBaseFlow := True;
+      if ProtocolManager <> nil then
+        ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceReadinessBaseCaptured',
+          'Device readiness base captured',
+          Format('ChannelIndex=%d DeviceUUID=%s DeviceName=%s CurrentFlowLps=%.6f ReadinessBaseFlowLps=%.6f',
+            [I, Channel.DeviceUUID, Channel.DeviceName, CurrentFlowLS,
+             Channel.ReadinessBaseFlow]));
+    end
+    else if Channel.HasReadinessBaseFlow then
+    begin
+      if ProtocolManager <> nil then
+        ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceReadinessBaseReleased',
+          'Device readiness base released',
+          Format('ChannelIndex=%d DeviceUUID=%s DeviceName=%s PreviousReadinessBaseFlowLps=%.6f NextTargetSource=%s NextTargetFlowLps=%.6f',
+            [I, Channel.DeviceUUID, Channel.DeviceName, Channel.ReadinessBaseFlow,
+             NextTargetSource, NextTargetFlowLS]));
+      Channel.HasReadinessBaseFlow := False;
+    end;
+  end;
+end;
+
 procedure TTableMainForm.ButtonApplyDeviceValuesClick(Sender: TObject);
 var
   WorkTable: TWorkTable;
   InputText: string;
   DisplayFlowRate: Double;
   DeviceFlowBase: Double;
-  ImpSecValues: TArray<Double>;
-  EnabledDeviceChannels: TObjectList<TChannel>;
-  I: Integer;
+  OldDeviceReady: Boolean;
 begin
   WorkTable := FWorkTableManager.ActiveWorkTable;
   if WorkTable = nil then
     Exit;
 
   InputText := Trim(EditDeviceFlowRate.Text);
+  OldDeviceReady := WorkTable.DeviceReady;
   WorkTable.DeviceReady := CheckBoxDeviceReady.IsChecked;
+  HandleDeviceReadyTransition(WorkTable, OldDeviceReady, WorkTable.DeviceReady);
   WorkTable.EtalonFlowSet := WorkTable.ValueFlowRate.GetDoubleBaseNum(
     NormalizeFloatInput(EditEtalonFlowRate.Text),
     WorkTable.ValueFlowRate.CurrentDimIndex);
@@ -305,7 +377,7 @@ begin
   if InputText = '' then
   begin
     WorkTable.HasDeviceSimulationFlowRate := False;
-    LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=True ParseSuccess=False HasSeparateDeviceFlow=False DeviceFlowBaseLps=%.6f FallbackToEtalon=True',
+    LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=True ParseSuccess=False HasSeparateDeviceFlow=False DeviceFlowBaseLps=%.6f FallbackToEtalon=True ImmediateApply=False CurrentValuesPreserved=True TargetChanged=True',
       [InputText, WorkTable.DeviceSimulationFlowRate]));
     Exit;
   end;
@@ -313,7 +385,7 @@ begin
   if not TryNormalizeFloatInput(InputText, DisplayFlowRate) then
   begin
     RestoreDeviceFlowRateText(WorkTable);
-    LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=False ParseSuccess=False HasSeparateDeviceFlow=%s DeviceFlowBaseLps=%.6f FallbackToEtalon=False PreviousTargetPreserved=True',
+    LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=False ParseSuccess=False HasSeparateDeviceFlow=%s DeviceFlowBaseLps=%.6f FallbackToEtalon=False PreviousTargetPreserved=True ImmediateApply=False CurrentValuesPreserved=True TargetChanged=False',
       [InputText, BoolToStr(WorkTable.HasDeviceSimulationFlowRate, True),
        WorkTable.DeviceSimulationFlowRate]));
     Exit;
@@ -324,37 +396,12 @@ begin
   WorkTable.DeviceSimulationFlowRate := DeviceFlowBase;
   WorkTable.HasDeviceSimulationFlowRate := True;
 
-  EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
-  try
-    for I := 0 to WorkTable.DeviceChannels.Count - 1 do
-      if (WorkTable.DeviceChannels[I] <> nil) and
-         (WorkTable.DeviceChannels[I].Enabled) then
-        EnabledDeviceChannels.Add(WorkTable.DeviceChannels[I]);
-
-    EditDeviceImpSec.Text := FloatToStr(
-      FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, DisplayFlowRate)
-    );
-    ImpSecValues := FWorkTableManager.BuildImpSecValuesForChannels(
-      WorkTable,
-      EnabledDeviceChannels,
-      DeviceFlowBase,
-      NormalizeFloatInput(EditDeviceImpSec.Text),
-      False,
-      False
-    );
-
-    WorkTable.ApplyChannelValues(
-      EnabledDeviceChannels,
-      NormalizeFloatInput(EditDeviceCurSec.Text),
-      ImpSecValues,
-      NormalizeFloatInput(EditDeviceImpResult.Text)
-    );
-  finally
-    EnabledDeviceChannels.Free;
-  end;
+  EditDeviceImpSec.Text := FloatToStr(
+    FWorkTableManager.UpdateDeviceImpSecFromFlowRate(WorkTable, DisplayFlowRate)
+  );
 
   EditDeviceFlowRate.Text := FlowBaseToDisplayText(DeviceFlowBase);
-  LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=False ParseSuccess=True HasSeparateDeviceFlow=True DeviceFlowBaseLps=%.6f FallbackToEtalon=False',
+  LogDeviceFlowRateApply(Format('InputText=%s InputIsEmpty=False ParseSuccess=True HasSeparateDeviceFlow=True DeviceFlowBaseLps=%.6f FallbackToEtalon=False ImmediateApply=False CurrentValuesPreserved=True TargetChanged=True',
     [InputText, DeviceFlowBase]));
 end;
 

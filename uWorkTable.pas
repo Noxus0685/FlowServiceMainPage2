@@ -260,6 +260,8 @@ type
     FSimulationRampDurationSec: Double;
     FSimulationRampActive: Boolean;
     FSimulationLastProgressLogMs: Double;
+    FReadinessBaseFlow: Double;
+    FHasReadinessBaseFlow: Boolean;
 
     FFlowMeter: TFlowMeter;
     FValueImp: TMeterValue;
@@ -408,6 +410,8 @@ type
     property SimulationRampDurationSec: Double read FSimulationRampDurationSec write FSimulationRampDurationSec;
     property SimulationRampActive: Boolean read FSimulationRampActive write FSimulationRampActive;
     property SimulationLastProgressLogMs: Double read FSimulationLastProgressLogMs write FSimulationLastProgressLogMs;
+    property ReadinessBaseFlow: Double read FReadinessBaseFlow write FReadinessBaseFlow;
+    property HasReadinessBaseFlow: Boolean read FHasReadinessBaseFlow write FHasReadinessBaseFlow;
 
     property ValueImp: TMeterValue read FValueImp write SetValueImp;
     property ValueImpTotal: TMeterValue read FValueImpTotal write SetValueImpTotal;
@@ -1464,6 +1468,8 @@ begin
   FSimulationRampDurationSec := 0;
   FSimulationRampActive := False;
   FSimulationLastProgressLogMs := 0;
+  FReadinessBaseFlow := 0;
+  FHasReadinessBaseFlow := False;
   FCurResult := 0;
   FValueSec := 0;
   FValueResult := 0;
@@ -7006,15 +7012,103 @@ begin
     end;
 end;
 
+
+function GetChannelCurrentFlowLS(const AChannel: TChannel): Double;
+begin
+  Result := 0;
+  if (AChannel <> nil) and (AChannel.FlowMeter <> nil) and
+     (AChannel.FlowMeter.ValueFlow <> nil) then
+    Result := AChannel.FlowMeter.ValueFlow.GetDoubleValue;
+end;
+
+function GetChannelDeviceNameForLog(const AChannel: TChannel): string;
+begin
+  Result := '';
+  if AChannel <> nil then
+    Result := AChannel.DeviceName;
+end;
+
+procedure LogDeviceReadinessBaseCaptured(const AWorkTable: TWorkTable; const AChannel: TChannel;
+  const AChannelIndex: Integer; const ACurrentFlowLS: Double);
+begin
+  if ProtocolManager <> nil then
+    ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceReadinessBaseCaptured',
+      'Device readiness base captured',
+      Format('ChannelIndex=%d DeviceUUID=%s DeviceName=%s CurrentFlowLps=%.6f ReadinessBaseFlowLps=%.6f',
+        [AChannelIndex, AChannel.DeviceUUID, GetChannelDeviceNameForLog(AChannel),
+         ACurrentFlowLS, AChannel.ReadinessBaseFlow]));
+end;
+
+procedure LogDeviceReadinessBaseReleased(const AWorkTable: TWorkTable; const AChannel: TChannel;
+  const AChannelIndex: Integer; const ANextTargetFlowLS: Double);
+var
+  NextTargetSource: string;
+begin
+  if ProtocolManager = nil then
+    Exit;
+
+  if (AWorkTable <> nil) and AWorkTable.HasDeviceSimulationFlowRate then
+    NextTargetSource := 'SeparateDeviceFlow'
+  else
+    NextTargetSource := 'EtalonFlow';
+
+  ProtocolManager.AddMessage(pcState, psWorkTable, 'DeviceReadinessBaseReleased',
+    'Device readiness base released',
+    Format('ChannelIndex=%d DeviceUUID=%s DeviceName=%s PreviousReadinessBaseFlowLps=%.6f NextTargetSource=%s NextTargetFlowLps=%.6f',
+      [AChannelIndex, AChannel.DeviceUUID, GetChannelDeviceNameForLog(AChannel),
+       AChannel.ReadinessBaseFlow, NextTargetSource, ANextTargetFlowLS]));
+end;
+
+procedure CaptureDeviceReadinessBase(const AWorkTable: TWorkTable; const AChannel: TChannel;
+  const AChannelIndex: Integer);
+var
+  CurrentFlowLS: Double;
+begin
+  if (AChannel = nil) or (not AChannel.Enabled) or
+     (AChannel.FlowMeter = nil) or (AChannel.FlowMeter.Device = nil) or
+     AChannel.HasReadinessBaseFlow then
+    Exit;
+
+  CurrentFlowLS := GetChannelCurrentFlowLS(AChannel);
+  AChannel.ReadinessBaseFlow := CurrentFlowLS;
+  AChannel.HasReadinessBaseFlow := True;
+  LogDeviceReadinessBaseCaptured(AWorkTable, AChannel, AChannelIndex, CurrentFlowLS);
+end;
+
+procedure ReleaseDeviceReadinessBases(const AWorkTable: TWorkTable; const ATargetEtalonFlow: Double);
+var
+  I: Integer;
+  Channel: TChannel;
+  NextTargetFlowLS: Double;
+begin
+  if AWorkTable = nil then
+    Exit;
+
+  if AWorkTable.HasDeviceSimulationFlowRate then
+    NextTargetFlowLS := AWorkTable.DeviceSimulationFlowRate
+  else
+    NextTargetFlowLS := ATargetEtalonFlow;
+
+  for I := 0 to AWorkTable.DeviceChannels.Count - 1 do
+  begin
+    Channel := AWorkTable.DeviceChannels[I];
+    if (Channel <> nil) and Channel.HasReadinessBaseFlow then
+    begin
+      LogDeviceReadinessBaseReleased(AWorkTable, Channel, I, NextTargetFlowLS);
+      Channel.HasReadinessBaseFlow := False;
+    end;
+  end;
+end;
+
 procedure UpdateDeviceChannelSignals(const AWorkTable: TWorkTable; const ATargetEtalonFlow, AOldTargetFlow: Double;
   const ACurrentTimeMs: Double);
 var
   I: Integer;
   Channel: TChannel;
   EnabledDeviceChannels: TObjectList<TChannel>;
-  TargetImpSecValues: TArray<Double>;
   TargetImpSec: Double;
   TargetDeviceFlow: Double;
+  ChannelCoef: Double;
 begin
   EnabledDeviceChannels := TObjectList<TChannel>.Create(False);
   try
@@ -7024,42 +7118,43 @@ begin
       if IsSimulationChannelEnabled(Channel) then
         EnabledDeviceChannels.Add(Channel)
       else if Channel <> nil then
+      begin
+        Channel.HasReadinessBaseFlow := False;
         ResetChannelSimulation(Channel, True);
+      end;
     end;
 
-    if AWorkTable.DeviceReady then
+    if not AWorkTable.DeviceReady then
+      ReleaseDeviceReadinessBases(AWorkTable, ATargetEtalonFlow);
+
+    for I := 0 to EnabledDeviceChannels.Count - 1 do
     begin
-      for I := 0 to EnabledDeviceChannels.Count - 1 do
-      begin
-        Channel := EnabledDeviceChannels[I];
-        if not Channel.SimulationRampActive then
-          Channel.SimulationTargetImpSec := Channel.ImpSec;
-        ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
-          ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
-        UpdateChannelCurSec(Channel, 0.3);
-      end;
-    end
-    else
-    begin
-      if AWorkTable.HasDeviceSimulationFlowRate then
+      Channel := EnabledDeviceChannels[I];
+
+      if (AWorkTable.DeviceReady) and (not Channel.HasReadinessBaseFlow) then
+        CaptureDeviceReadinessBase(AWorkTable, Channel,
+          AWorkTable.DeviceChannels.IndexOf(Channel));
+
+      if (AWorkTable.DeviceReady) and (Channel.HasReadinessBaseFlow) then
+        TargetDeviceFlow := Channel.ReadinessBaseFlow
+      else if AWorkTable.HasDeviceSimulationFlowRate then
         TargetDeviceFlow := AWorkTable.DeviceSimulationFlowRate
       else
         TargetDeviceFlow := ATargetEtalonFlow;
 
-      TargetImpSecValues := BuildImpSecValuesForChannels(AWorkTable,
-        EnabledDeviceChannels, TargetDeviceFlow, 0, False, False);
-      for I := 0 to EnabledDeviceChannels.Count - 1 do
-      begin
-        Channel := EnabledDeviceChannels[I];
-        TargetImpSec := TargetImpSecValues[I];
-        UpdateChannelRamp(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
-          TargetImpSec, ACurrentTimeMs,
-          Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
-            [TargetDeviceFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
-        ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
-          ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
-        UpdateChannelCurSec(Channel, 0.3);
-      end;
+      ChannelCoef := GetChannelFlowCoef(Channel);
+      if ChannelCoef > 0 then
+        TargetImpSec := TargetDeviceFlow * ChannelCoef
+      else
+        TargetImpSec := 0;
+
+      UpdateChannelRamp(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
+        TargetImpSec, ACurrentTimeMs,
+        Format('Reason=WorkTableTargetChanged TargetSource=WorkTableSetFlow TargetFlowBaseLS=%.6f OldTargetFlowBaseLS=%.6f PointUUID= DeviceReady=%s',
+          [TargetDeviceFlow, AOldTargetFlow, IfThen(AWorkTable.DeviceReady, 'True', 'False')]));
+      ApplySimpleSimulationNoise(Channel, 'Device', AWorkTable.DeviceChannels.IndexOf(Channel),
+        ACurrentTimeMs, 1.0, AWorkTable.DeviceReady);
+      UpdateChannelCurSec(Channel, 0.3);
     end;
   finally
     EnabledDeviceChannels.Free;
